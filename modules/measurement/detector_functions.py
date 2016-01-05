@@ -3,8 +3,6 @@ Module containing a collection of sweep functions used by the Measurement Contro
 These are closely related to the sweep functions from modules/measurement_toolbox created by Gijs.
 In the future these can possibly be merged
 '''
-import qt
-
 import numpy as np
 import cmath #only used to get phase from complex number.
 import logging
@@ -83,7 +81,7 @@ class Soft_Detector(Detector_Function):
         self.detector_control = 'soft'
 
     def acquire_data_point(self, **kw):
-        pass
+        np.random.random()
 
     def prepare(self):
         pass
@@ -934,19 +932,3 @@ class SH_mixer_skewness_det(Soft_Detector):
 
     def finish(self, **kw):
         self.SH.abort()
-
-class Keithley_Voltmeter(Soft_Detector):
-    def __init__(self, Keithley = qt.instruments['Keithley'], **kw):
-        super(Keithley_Voltmeter, self).__init__()
-        self.detector_control = 'soft'
-        self.name = 'Keithley_Voltmeter'
-        self.value_names = ['Voltage']
-        self.value_units = ['V']
-        self.Keithley = Keithley
-
-    def prepare(self, **kw):
-        pass
-
-    def acquire_data_point(self):
-        qt.msleep(0.001)
-        return self.Keithley.readnext()

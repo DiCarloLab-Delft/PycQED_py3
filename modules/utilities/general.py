@@ -1,6 +1,5 @@
-import subprocess
 import os
-import qt
+# import qt
 import h5py
 from modules.analysis import analysis_toolbox as a_tools
 
@@ -20,6 +19,16 @@ def get_git_revision_hash():
         hash = '00000'
 
     return hash
+
+
+def dict_to_ordered_tuples(dic):
+    '''Convert a dictionary to a list of tuples, sorted by key.'''
+    if dic is None:
+        return []
+    keys = dic.keys()
+    keys.sort()
+    ret = [(key, dic[key]) for key in keys]
+    return ret
 
 
 def load_settings_onto_instrument(instrument, folder=None,
@@ -100,65 +109,10 @@ def send_email(subject='PycQED needs your attention!',
 
     # Send the email via our own SMTP server.
     s = smtplib.SMTP_SSL('smtp.gmail.com')
-    s.login('DCLabemail@gmail.com','DiCarloLab')
+    s.login('DCLabemail@gmail.com', 'DiCarloLab')
     s.sendmail(email, family, msg.as_string())
     s.quit()
 
-
-#This is code from Kwant that Anton showed me (Adriaan), it is located
-# at http://git.kwant-project.org/kwant/tree/setup.py.
-# it should in the future replace the current git get revision hash function.
-
-# This is an exact copy of the function from kwant/version.py.  We can't import
-# it here (because Kwant is not yet built when this scipt is run), so we just
-# include a copy.
-def get_version_from_git():
-    PycQEDdir = qt.config['PycQEDdir']
-    try:
-        p = subprocess.Popen(['git', 'rev-parse', '--show-toplevel'],
-                             cwd=PycQEDdir,
-                             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    except OSError:
-        return
-    if p.wait() != 0:
-        return
-    # TODO: use os.path.samefile once we depend on Python >= 3.3.
-    if os.path.normpath(p.communicate()[0].rstrip('\n')) != PycQEDdir:
-        # The top-level directory of the current Git repository is not the same
-        # as the root directory of the Kwant distribution: do not extract the
-        # version from Git.
-        return
-
-
-
-    # git describe --first-parent does not take into account tags from branches
-    # that were merged-in.
-    for opts in [['--first-parent'], []]:
-        try:
-            p = subprocess.Popen(['git', 'describe'] + opts, cwd=PycQEDdir,
-                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        except OSError:
-            return
-        if p.wait() == 0:
-            break
-    else:
-        pass
-        # return p
-    version = p.communicate()[0].rstrip('\n')
-
-    # if version[0] == 'v':
-    #     version = version[1:]
-
-    try:
-        p = subprocess.Popen(['git', 'diff', '--quiet'], cwd=PycQEDdir)
-        print('Try statement')
-        return p
-    except OSError:
-        version += '-confused'  # This should never happen.
-    else:
-        if p.wait() == 1:
-            version += '-dirty'
-    return version
 
 
 def list_available_serial_ports():

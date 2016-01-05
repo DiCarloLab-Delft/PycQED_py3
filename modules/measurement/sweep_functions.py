@@ -2,7 +2,6 @@
 Module containing a collection of sweep functions used by the Measurement Control Instrument.
 These are closely related to the sweep functions from modules/measurement_toolbox created by Gijs.
 '''
-import qt
 import numpy as np
 import logging
 import time

@@ -30,11 +30,11 @@ Contains:
 import os
 import time
 import h5py
-from lib.config import get_config
-config = get_config()
-in_qtlab = config.get('qtlab', False)
+import numpy as np
+# Hardcoded datadir, not cool :)
+config = {'datadir': 'D:\Experiments\Simultaneous_Driving\data'}
 
-import data
+# import data
 
 
 class DateTimeGenerator:
@@ -113,7 +113,7 @@ class DateTimeGenerator:
 
 class Data(h5py.File):
 
-    _data_list = data.Data._data_list
+    # _data_list = data.Data._data_list
     _filename_generator = DateTimeGenerator()
 
     def __init__(self, name='None', filepath=None, *args, **kwargs):
@@ -125,9 +125,8 @@ class Data(h5py.File):
             name (string) : default is 'data' (%timemark is interpreted as
             its timemark)
         """
-
         # FIXME: the name generation here is a bit nasty
-        name = data.Data._data_list.new_item_name(self, name)
+        # name = data.Data._data_list.new_item_name(self, name)
         self._name = name
 
         self._localtime = time.localtime()
@@ -147,3 +146,16 @@ class Data(h5py.File):
             os.makedirs(self.folder)
         super(Data, self).__init__(self.filepath, 'a')
         self.flush()
+
+
+def encode_to_utf8(s):
+    '''
+    Required because h5py does not support python3 strings
+    '''
+    # converts byte type to string because of h5py datasaving
+    if type(s) == str:
+        s = s.encode('utf-8')
+    # If it is an array of value decodes individual entries
+    elif type(s) == np.ndarray or list:
+        s = [s.encode('utf-8') for s in s]
+    return s

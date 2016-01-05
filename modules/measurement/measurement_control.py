@@ -1,4 +1,3 @@
-# import qt
 try:
     import msvcrt  # used on windows to catch keyboard input
 except:
@@ -6,7 +5,6 @@ except:
 
 import types
 from modules.measurement import hdf5
-from instrument import Instrument
 from modules.utilities import general
 import logging
 import time
@@ -14,42 +12,40 @@ import sys
 import os
 import numpy as np
 from scipy.optimize import fmin_powell
-from lib.misc import dict_to_ordered_tuples
+from modules.utilities.general import dict_to_ordered_tuples
 
 
-class MeasurementControl(Instrument):
+class MeasurementControl:
     '''
     New version of Measurement Control that allows for adaptively determining
     data points.
     '''
     def __init__(self, name, **kw):
-        logging.info(__name__ + ': Initializing instrument')
-        Instrument.__init__(self, name, tags=['Measurement Control'])
-        self.add_parameter('sweep_function_names',
-                           flags=Instrument.FLAG_GETSET, type=list)
-        self.add_parameter('detector_function_name',
-                           flags=Instrument.FLAG_GETSET, type=str)
+        # self.add_parameter('sweep_function_names',
+        #                    flags=Instrument.FLAG_GETSET, type=list)
+        # self.add_parameter('detector_function_name',
+        #                    flags=Instrument.FLAG_GETSET, type=str)
 
         # Parameters for logging
-        self.add_parameter('git_hash',
-                           flags=Instrument.FLAG_GET, type=str)
-        self.add_parameter('measurement_begintime',
-                           flags=Instrument.FLAG_GET, type=str)
-        self.add_parameter('measurement_endtime',
-                           flags=Instrument.FLAG_GET, type=str)
+        # self.add_parameter('git_hash',
+        #                    flags=Instrument.FLAG_GET, type=str)
+        # self.add_parameter('measurement_begintime',
+        #                    flags=Instrument.FLAG_GET, type=str)
+        # self.add_parameter('measurement_endtime',
+        #                    flags=Instrument.FLAG_GET, type=str)
 
-        self.add_parameter('sweep_points',
-                           flags=Instrument.FLAG_GETSET, type=list)
+        # self.add_parameter('sweep_points',
+        #                    flags=Instrument.FLAG_GETSET, type=list)
 
-        self.add_parameter('measurement_name',
-                           flags=Instrument.FLAG_GETSET, type=str)
-        self.add_parameter('optimization_method',
-                           flags=Instrument.FLAG_GETSET, type=str)
+        # self.add_parameter('measurement_name',
+        #                    flags=Instrument.FLAG_GETSET, type=str)
+        # self.add_parameter('optimization_method',
+        #                    flags=Instrument.FLAG_GETSET, type=str)
 
         self.get_git_hash()
-        self.Plotmon = qt.instruments['Plotmon']
-        if self.Plotmon is None:
-            logging.warning('Measurement Control could not connect to Plotmon')
+        # self.Plotmon = qt.instruments['Plotmon']
+        # if self.Plotmon is None:
+        #     logging.warning('Measurement Control could not connect to Plotmon')
 
     ##############################################
     # Functions used to control the measurements #
@@ -516,15 +512,16 @@ class MeasurementControl(Instrument):
             column_names.append(val_name+' (' +
                                 self.detector_function.value_units[i] + ')')
 
-        self.dset.attrs['column_names'] = column_names
+        self.dset.attrs['column_names'] = hdf5.encode_to_utf8(column_names)
 
         # Added to tell analysis how to extract the data
-        data_group.attrs['datasaving_format'] = 'Version 2'
-        data_group.attrs['sweep_parameter_names'] = sweep_par_names
-        data_group.attrs['sweep_parameter_units'] = sweep_par_units
+        data_group.attrs['datasaving_format'] = hdf5.encode_to_utf8('Version 2')
+        data_group.attrs['sweep_parameter_names'] = hdf5.encode_to_utf8(sweep_par_names)
+        data_group.attrs['sweep_parameter_units'] = hdf5.encode_to_utf8(sweep_par_units)
 
-        data_group.attrs['value_names'] = self.detector_function.value_names
-        data_group.attrs['value_units'] = self.detector_function.value_units
+        data_group.attrs['value_names'] = hdf5.encode_to_utf8(self.detector_function.value_names)
+        data_group.attrs['value_units'] = hdf5.encode_to_utf8(self.detector_function.value_units)
+
 
     def save_optimization_settings(self):
         '''
@@ -536,18 +533,19 @@ class MeasurementControl(Instrument):
             opt_sets_grp.attrs[param] = str(val)
 
     def save_instrument_settings(self, *args):
-        if len(args) == 0:
-            data_object = self.data_object
-        else:
-            data_object = args[0]
-        set_grp = data_object.create_group('Instrument settings')
-        inslist = dict_to_ordered_tuples(qt.instruments.get_instruments())
-        for (iname, ins) in inslist:
-            instrument_grp = set_grp.create_group(iname)
-            parameter_list = dict_to_ordered_tuples(ins.get_parameters())
-            for (param, popts) in parameter_list:
-                val = ins.get(param, query=False)
-                instrument_grp.attrs[param] = str(val)
+        pass
+        # if len(args) == 0:
+        #     data_object = self.data_object
+        # else:
+        #     data_object = args[0]
+        # set_grp = data_object.create_group('Instrument settings')
+        # inslist = dict_to_ordered_tuples(qt.instruments.get_instruments())
+        # for (iname, ins) in inslist:
+        #     instrument_grp = set_grp.create_group(iname)
+        #     parameter_list = dict_to_ordered_tuples(ins.get_parameters())
+        #     for (param, popts) in parameter_list:
+        #         val = ins.get(param, query=False)
+        #         instrument_grp.attrs[param] = str(val)
 
     def init_instrument_changelog(self):
 
@@ -603,20 +601,20 @@ class MeasurementControl(Instrument):
         # timing hangups for nested measurements (issue #152)
         # self.init_instrument_changelog()
         self.get_git_hash()
-        if not qt.flow.is_measuring():
-            qt.mstart()
-        else:
-            pass
+        # if not qt.flow.is_measuring():
+        #     qt.mstart()
+        # else:
+        #     pass
 
-    def stop_mflow(self):
-        '''
-        stops measurement flow
-        '''
-        if qt.flow.is_measuring():
-            qt.mend()
-        else:
-            print('Warning: Tried to stop measurement ' + \
-                'but it was already stopped')
+    # def stop_mflow(self):
+    #     '''
+    #     stops measurement flow
+    #     '''
+    #     if qt.flow.is_measuring():
+    #         qt.mend()
+    #     else:
+    #         print('Warning: Tried to stop measurement ' + \
+    #             'but it was already stopped')
         # Commented out because not functioning correctly and it causes major
         # timing hangups for nested measurements (issue #152)
         # self.disconnect_instrument_logging()
@@ -672,7 +670,8 @@ class MeasurementControl(Instrument):
 
     def catch_previous_human_abort(self):
         try:
-            qt.msleep()
+            pass
+            # qt.msleep()
         except ValueError:
             print('Human abort from previuos stop. Continuing measurement')
 
@@ -709,10 +708,10 @@ class MeasurementControl(Instrument):
     def get_sweep_functions(self):
         return self.sweep_functions
 
-    def do_set_sweep_function_names(self, swfname):
+    def set_sweep_function_names(self, swfname):
         self.sweep_function_names = swfname
 
-    def do_get_sweep_function_names(self):
+    def get_sweep_function_names(self):
         return self.sweep_function_names
 
     def set_detector_function(self, detector_function):
@@ -723,33 +722,33 @@ class MeasurementControl(Instrument):
     def get_detector_function(self):
         return self.detector_function
 
-    def do_set_detector_function_name(self, dfname):
+    def set_detector_function_name(self, dfname):
         self._dfname = dfname
 
-    def do_get_detector_function_name(self):
+    def get_detector_function_name(self):
         return self._dfname
 
     ################################
     # Parameter get/set functions  #
     ################################
 
-    def _do_get_git_hash(self):
+    def get_git_hash(self):
         self.git_hash = general.get_git_revision_hash()
         return self.git_hash
 
-    def _do_get_measurement_begintime(self):
+    def get_measurement_begintime(self):
         self.begintime = time.time()
         return time.strftime('%Y-%m-%d %H:%M:%S')
 
-    def _do_get_measurement_endtime(self):
+    def get_measurement_endtime(self):
         return time.strftime('%Y-%m-%d %H:%M:%S')
 
-    def _do_set_sweep_points(self, sweep_points):
+    def set_sweep_points(self, sweep_points):
         self.sweep_points = np.array(sweep_points)
         # line below is because some sweep funcs have their own sweep points attached
         self.sweep_functions[0].sweep_points = np.array(sweep_points)
 
-    def _do_get_sweep_points(self):
+    def get_sweep_points(self):
         return self.sweep_functions[0].sweep_points
 
     def set_adaptive_function_parameters(self, adaptive_function_parameters):
@@ -766,17 +765,17 @@ class MeasurementControl(Instrument):
     def get_adaptive_function_parameters(self):
         return self.af_pars
 
-    def _do_set_measurement_name(self, measurement_name):
+    def set_measurement_name(self, measurement_name):
         if measurement_name == 'None':
             self.measurement_name = 'Measurement'
         else:
             self.measurement_name = measurement_name
 
-    def _do_get_measurement_name(self):
+    def get_measurement_name(self):
         return self.measurement_name
 
-    def _do_set_optimization_method(self, optimization_method):
+    def set_optimization_method(self, optimization_method):
         self.optimization_method = optimization_method
 
-    def _do_get_optimization_method(self):
+    def get_optimization_method(self):
         return self.optimization_method
