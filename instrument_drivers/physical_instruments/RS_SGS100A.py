@@ -39,12 +39,14 @@ class RS_SGS100A(VisaInstrument):
                            parse_function=float,
                            vals=vals.Numbers(-120, 25))
         self.add_parameter('status',
-                           get_cmd=self.get_status,  # use a custom get function
+                           get_cmd=':OUTP:STAT?',
                            set_cmd=self.set_status,
+                           parse_function=self.parse_on_off,
                            vals=vals.Strings())
         self.add_parameter('pulsemod_state',
                            get_cmd=':SOUR:PULM:STAT?',
                            set_cmd=self.set_pulsemod_state,
+                           parse_function=self.parse_on_off,
                            vals=vals.Strings())
         self.add_parameter('pulsemod_source',
                            get_cmd='SOUR:PULM:SOUR?',
@@ -53,8 +55,7 @@ class RS_SGS100A(VisaInstrument):
         self.add_function('reset', call_cmd='*RST')
         self.add_function('run_self_tests', call_cmd='*TST?')
 
-    def get_status(self):
-        stat = self.visa_handle.ask(':OUTP:STAT?')
+    def parse_on_off(self, stat):
         if stat == '0\n':
             stat = 'Off'
         elif stat == '1\n':
