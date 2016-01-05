@@ -199,20 +199,19 @@ class MeasurementAnalysis(object):
         return tuple(self.f + [self.figarray] + self.ax + [self.axarray])
 
     def get_values(self, key):
-        if key in self.g.attrs['sweep_parameter_names']:
-            names = self.g.attrs['sweep_parameter_names']
+        if key in self.get_key('sweep_parameter_names'):
+            names = self.get_key('sweep_parameter_names')
             ind = np.where(names == key)[0]
             values = self.g['Data'].value[:, ind]
-        elif key in self.g.attrs['value_names']:
-            names = self.g.attrs['value_names']
+        elif key in self.get_key('value_names'):
+            names = self.get_key('value_names')
             ind = (np.where(names == key)[0] +
-                   len(self.g.attrs['sweep_parameter_names']))[0]
+                   len(self.get_key('sweep_parameter_names')))[0]
             values = self.g['Data'].value[:, ind]
         else:
             values = self.g[key].value
-        # Makes sure all data is npConverts it to
+        # Makes sure all data is np float64
         return np.asarray(values, dtype=np.float64)
-        return values
 
     def get_key(self, key):
         '''
@@ -223,6 +222,9 @@ class MeasurementAnalysis(object):
         # converts byte type to string because of h5py datasaving
         if type(s) == bytes:
             s = s.decode('utf-8')
+        # If it is an array of value decodes individual entries
+        if type(s) == np.ndarray:
+            s = [s.decode('utf-8') for s in s]
         return s
 
     def group_values(self, group_name):
@@ -767,7 +769,7 @@ class TD_Analysis(MeasurementAnalysis):
             self.add_dataset_to_analysisgroup('Corrected data',
                                               self.corr_data)
             self.analysis_group.attrs.create('corrected data based on',
-                                             'calibration points')
+                                             'calibration points'.encode('utf-8'))
         normalized_values = self.corr_data
         normalized_data_points = normalized_values[:-calsteps]
         normalized_cal_vals = normalized_values[-calsteps:]
@@ -2254,7 +2256,7 @@ class AllXY_Analysis(TD_Analysis):
         self.add_dataset_to_analysisgroup('Corrected data',
                                           self.corr_data)
         self.analysis_group.attrs.create('corrected data based on',
-                                         'calibration points')
+                                         'calibration points'.encode('utf-8'))
         data_error = self.corr_data - ideal_data
         self.deviation_total = np.mean(abs(data_error))
         # Plotting
