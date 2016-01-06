@@ -1,28 +1,11 @@
-# hdf5_data.py, handling data in hdf5 container
-#
-# Wolfgang Pfaff <wolfgangpfff@gmail.com>
-# Reinier Heeres <reinier@heeres.eu>
-#
-# This program is free software; you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation; either version 2 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-
 """
-Module providing handling of HDF5 data within qtlab.
+Module for handling HDF5 data within qcodes.
+Based on hdf5 datawrapper from qtlab originally by Reinier Heeres and
+Wolfgang Pfaff.
 
 Contains:
 - a data class (HDF5Data) which is essentially a wrapper of a h5py data
-  object, adapted for usage with qtlab
+  object, adapted for usage with qcodes
 - name generators in the style of qtlab Data objects
 - functions to create standard data sets
 """
@@ -32,9 +15,11 @@ import time
 import h5py
 import numpy as np
 # Hardcoded datadir, not cool :)
-config = {'datadir': 'D:\Experiments\Simultaneous_Driving\data'}
-
-# import data
+try:
+    qc_config
+except NameError:
+    print('creating qc_config for datadir')
+    qc_config = {'datadir': 'D:\Experiments\Simultaneous_Driving\data'}
 
 
 class DateTimeGenerator:
@@ -104,7 +89,7 @@ class DateTimeGenerator:
 
     def new_filename(self, data_obj):
         '''Return a new filename, based on name and timestamp.'''
-        path, tstr = self.create_data_dir(config['datadir'],
+        path, tstr = self.create_data_dir(qc_config['datadir'],
                                           name=data_obj._name,
                                           ts=data_obj._localtime)
         filename = '%s_%s.hdf5' % (tstr, data_obj._name)

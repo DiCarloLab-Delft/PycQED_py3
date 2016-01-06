@@ -4,7 +4,7 @@ except:
     print('Warning: Could not import msvcrt (used for detecting keystrokes)')
 
 import types
-from modules.measurement import hdf5
+from modules.measurement import hdf5_data as h5d
 from modules.utilities import general
 import logging
 import time
@@ -59,7 +59,7 @@ class MeasurementControl:
         self.catch_previous_human_abort()
         self.set_measurement_name(name)
         self.print_measurement_start_msg()
-        with hdf5.Data(name=self.get_measurement_name()) as self.data_object:
+        with h5d.Data(name=self.get_measurement_name()) as self.data_object:
             self.start_mflow()
             # Such that it is also saved if the measurement fails
             # (might want to overwrite again at the end)
@@ -394,7 +394,7 @@ class MeasurementControl:
         else:
             x = self.dset[:, x_ind]
         data = [x, y]
-        if self.Plotmon is not None:
+        if hasattr(self, 'Plotmon'):
             self.Plotmon.plot2D(mon_nr, data)
 
     def preallocate_2D_plot(self):
@@ -512,15 +512,15 @@ class MeasurementControl:
             column_names.append(val_name+' (' +
                                 self.detector_function.value_units[i] + ')')
 
-        self.dset.attrs['column_names'] = hdf5.encode_to_utf8(column_names)
+        self.dset.attrs['column_names'] = h5d.encode_to_utf8(column_names)
 
         # Added to tell analysis how to extract the data
-        data_group.attrs['datasaving_format'] = hdf5.encode_to_utf8('Version 2')
-        data_group.attrs['sweep_parameter_names'] = hdf5.encode_to_utf8(sweep_par_names)
-        data_group.attrs['sweep_parameter_units'] = hdf5.encode_to_utf8(sweep_par_units)
+        data_group.attrs['datasaving_format'] = h5d.encode_to_utf8('Version 2')
+        data_group.attrs['sweep_parameter_names'] = h5d.encode_to_utf8(sweep_par_names)
+        data_group.attrs['sweep_parameter_units'] = h5d.encode_to_utf8(sweep_par_units)
 
-        data_group.attrs['value_names'] = hdf5.encode_to_utf8(self.detector_function.value_names)
-        data_group.attrs['value_units'] = hdf5.encode_to_utf8(self.detector_function.value_units)
+        data_group.attrs['value_names'] = h5d.encode_to_utf8(self.detector_function.value_names)
+        data_group.attrs['value_units'] = h5d.encode_to_utf8(self.detector_function.value_units)
 
 
     def save_optimization_settings(self):
@@ -629,7 +629,12 @@ class MeasurementControl:
                 t_left=round((100.-percdone)/(percdone) *
                              elapsed_time, 1) if
                 percdone != 0 else '')
-        sys.stdout.write(60*'\b'+scrmes)
+        if percdone != 100:
+            end_char = '\r'
+        else:
+            end_char = '\n'
+        print(scrmes, end=end_char)
+
 
     def print_progress_static_2D_hard(self):
         acquired_points = self.dset.shape[0]

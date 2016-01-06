@@ -11,7 +11,8 @@ def get_git_revision_hash():
     import logging
     import subprocess
     try:
-        PycQEDdir = qt.config['PycQEDdir']
+        # Refers to the global qc_config
+        PycQEDdir = qc_config['PycQEDdir']
         hash = subprocess.check_output(['git', 'rev-parse',
                                         '--short=7', 'HEAD'], cwd=PycQEDdir)
     except:

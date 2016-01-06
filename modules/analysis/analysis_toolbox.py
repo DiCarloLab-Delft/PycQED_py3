@@ -19,8 +19,7 @@ from .tools.data_manipulation import *
 from .tools.plotting import *
 
 try:
-    import qt
-    datadir = qt.config['datadir']
+    datadir = qc_config['datadir'] #currently not recognized, does not do anything
     print('Data directory set to:', datadir)
 except:
     mac = get_mac()

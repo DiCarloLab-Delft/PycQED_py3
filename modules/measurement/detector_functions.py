@@ -61,7 +61,10 @@ class None_Detector(Detector_Function):
         self.value_units = ['None']
 
     def acquire_data_point(self, **kw):
-        pass
+        '''
+        Returns something random for testing
+        '''
+        return np.random.random()
 
 class Hard_Detector(Detector_Function):
     def __init__(self, **kw):
@@ -81,7 +84,7 @@ class Soft_Detector(Detector_Function):
         self.detector_control = 'soft'
 
     def acquire_data_point(self, **kw):
-        np.random.random()
+        return np.random.random()
 
     def prepare(self):
         pass
@@ -90,9 +93,6 @@ class Soft_Detector(Detector_Function):
 ####################     Hardware Controlled Detectors     ########################
 ###################################################################################
 ###################################################################################
-
-
-
 
 
 class Dummy_Detector_Hard(Hard_Detector):
@@ -694,9 +694,9 @@ class QuTechCBox_Shots_Logging_Detector_Touch_N_Go(Hard_Detector):
 
 
 class Dummy_Detector_Soft(Soft_Detector):
-    def __init__(self, **kw):
+    def __init__(self, delay=0, **kw):
         self.set_kw()
-
+        self.delay = delay
         self.detector_control = 'soft'
         self.name = 'Dummy_Detector_Soft'
         self.value_names = ['I', 'Q']
@@ -706,6 +706,7 @@ class Dummy_Detector_Soft(Soft_Detector):
     def acquire_data_point(self, **kw):
         x = self.i/15.
         self.i += 1
+        time.sleep(self.delay)
         return np.array([np.sin(x/np.pi), np.cos(x/np.pi)])
 
 
