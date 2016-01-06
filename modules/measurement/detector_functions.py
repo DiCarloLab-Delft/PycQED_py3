@@ -314,7 +314,7 @@ class Signal_Hound_Spectrum_Track(Hard_Detector):
     def get_values(self, **kw):
         data = np.zeros(len(self.sweep_points))
         for i, freq in enumerate(self.sweep_points):
-            qt.msleep()
+
             if self.source:
                 self.source.set_frequency(freq*1e9)
             self.SH.set_frequency(freq)
@@ -408,7 +408,7 @@ class QuTechCBox_input_average_Detector_Touch_N_Go(Hard_Detector):
                     self.CBox.restart_awg_tape(0)
                     self.CBox.restart_awg_tape(1)
                     self.CBox.restart_awg_tape(2)
-                    qt.msleep(.5)
+                    time.sleep(.5)
                     self.CBox.set_acquisition_mode(6)
                     self.CBox.set_run_mode(1)
         else:
@@ -653,7 +653,7 @@ class QuTechCBox_Shots_Logging_Detector_Touch_N_Go(Hard_Detector):
                     print('Timeout exception caught, retaking data points')
                     print(str(e))
                     i += 1
-                    qt.msleep(.1)
+                    time.sleep(.1)
                     self.CBox.set_run_mode(0)
                     self.CBox.set_acquisition_mode(0)
                     self.CBox.restart_awg_tape(0)
@@ -670,7 +670,7 @@ class QuTechCBox_Shots_Logging_Detector_Touch_N_Go(Hard_Detector):
         '''
         self.CBox.set_acquisition_mode(6)
         self.CBox.set_run_mode(1)
-        qt.msleep()
+
         raw_data = self.CBox.get_integration_log_results()
         weight0_data = raw_data[0]
         if self.digitize:
@@ -680,7 +680,7 @@ class QuTechCBox_Shots_Logging_Detector_Touch_N_Go(Hard_Detector):
             data_0 = weight0_data
         self.CBox.set_run_mode(0)
         self.CBox.set_acquisition_mode(0)
-        qt.msleep()
+
         return data_0
 
     def finish(self, **kw):
@@ -761,7 +761,7 @@ class Detect_simulated_hanger_Soft(Soft_Detector):
         A = 50.
         Inoise = np.random.randn()
         Qnoise = np.random.randn()
-        qt.msleep()
+
         IQ = fn.disp_hanger_S21_complex(*(f, f0, Q, Qe, A, theta))
         return IQ.real+Inoise, IQ.imag+Qnoise
 
@@ -833,10 +833,8 @@ class PulsedSpectroscopyDetector(Soft_Detector):
 
 
 class Signal_Hound_fixed_frequency(Soft_Detector):
-
-    def __init__(self, frequency, Navg=1, delay=0.1, **kw):
-        super(Signal_Hound_fixed_frequency, self).__init__()
-        self.SH = qt.instruments['SH']
+    def __init__(self, frequency, signal_hound, Navg=1, delay=0.1, **kw):
+        super().__init__()
         self.frequency = frequency
         self.name = 'SignalHound_fixed_frequency'
         self.value_names = ['Power']
@@ -846,8 +844,7 @@ class Signal_Hound_fixed_frequency(Soft_Detector):
         self.Navg = Navg
 
     def acquire_data_point(self, **kw):
-        # self.SH.get_power_at_freq(Navg=self.Navg)
-        qt.msleep(self.delay)
+        time.sleep(self.delay)
         return self.SH.get_power_at_freq(Navg=self.Navg)
 
     def prepare(self, **kw):
@@ -883,7 +880,7 @@ class RS_FSV_fixed_frequency(Soft_Detector):
         self.FSV.set_reference_level(-20)
 
     def acquire_data_point(self, navg=1, **kw):
-        qt.msleep(.1)
+        time.sleep(.1)
         return np.array([self.FSV.get_marker_power()])
 
     # def finish(self, **kw):
@@ -918,7 +915,7 @@ class SH_mixer_skewness_det(Soft_Detector):
         print('skewness: %.3f' % skewness)
         self.generate_awg_seq(QI_ratio, skewness, self.f_mod)
         qt.pulsar.AWG.start()
-        qt.msleep(self.delay)
+        time.sleep(self.delay)
         return self.SH.get_power_at_freq(Navg=self.Navg)
 
     def generate_awg_seq(self, QI_ratio, skewness, f_mod):

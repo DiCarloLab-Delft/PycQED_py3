@@ -55,7 +55,6 @@ class SignalHound_USB_SA124B(Instrument):
         Instrument.__init__(self, name, tags=['physical'])
         self.dll = ct.CDLL("C:\Windows\System32\sa_api.dll")
         self.hf = constants()
-        #parameter settings
         self.add_parameter('frequency',
                            label='Frequency (GHz)',
                            get_cmd=self._do_get_frequency,
@@ -86,6 +85,7 @@ class SignalHound_USB_SA124B(Instrument):
                            get_cmd=self._do_get_device_type,
                            set_cmd=self._do_set_device_type,
                            vals=vals.Anything())
+
         self.add_parameter('device_mode',
                            get_cmd=self._do_get_device_mode,
                            set_cmd=self._do_set_device_mode,
@@ -153,11 +153,11 @@ class SignalHound_USB_SA124B(Instrument):
 
         self.devOpen = True
         self._devType = self.get('device_type')
-        self.log.info("Opened Device with handle num: %s", self.deviceHandle.value)
+        print("Opened Device with handle num: ", self.deviceHandle.value)
 
 
     def closeDevice(self):
-        self.log.info("Closing Device with handle num: %s", self.deviceHandle.value)
+        self.log.info("Closing Device with handle num: ", self.deviceHandle.value)
 
         try:
             self.dll.saAbort(self.deviceHandle)
@@ -168,9 +168,9 @@ class SignalHound_USB_SA124B(Instrument):
         ret = self.dll.saCloseDevice(self.deviceHandle)
         if ret != self.hf.saNoError:
             raise ValueError("Error closing device!")
-        self.log.info("Closed Device with handle num: %s", self.deviceHandle.value)
+        print("Closed Device with handle num: ", self.deviceHandle.value)
         self.devOpen = False
-        self.running = False
+        self._running = False
 
     def abort(self):
         self.log.info("Stopping acquisition")
@@ -178,7 +178,7 @@ class SignalHound_USB_SA124B(Instrument):
         err = self.dll.saAbort(self.deviceHandle)
         if err == self.saStatus["saNoError"]:
             self.log.info("Call to abort succeeded.")
-            self.running = False
+            self._running = False
         elif err == self.saStatus["saDeviceNotOpenErr"]:
             raise IOError("Device not open!")
         elif err == self.saStatus["saDeviceNotConfiguredErr"]:
@@ -201,37 +201,37 @@ class SignalHound_USB_SA124B(Instrument):
 
 
     def _do_get_frequency(self):
-        return self.frequency
+        return self._frequency
 
     def _do_set_frequency(self,freq):
-        self.frequency = freq
+        self._frequency = freq
 
     def _do_get_span(self):
-        return self.span
+        return self._span
     def _do_set_span(self,span):
-        self.span = span
+        self._span = span
 
     def _do_get_power(self):
-        return self.power
+        return self._power
     def _do_set_power(self,power):
-        self.power = power
+        self._power = power
 
     def _do_get_ref_lvl(self):
-        return self.ref_lvl
+        return self._ref_lvl
 
     def _do_set_ref_lvl(self,ref_lvl):
-        self.ref_lvl = ref_lvl
+        self._ref_lvl = ref_lvl
 
     def _do_get_external_reference(self):
-        return self.external_reference
+        return self._external_reference
 
     def _do_set_external_reference(self,external_reference):
-        self.external_reference = external_reference
+        self._external_reference = external_reference
 
     def _do_get_running(self):
-        return self.running
+        return self._running
     def _do_set_running(self,running):
-        self.running = running
+        self._running = running
 
     def _do_get_device_type(self):
         self.log.info("Querying device for model information")
@@ -264,24 +264,24 @@ class SignalHound_USB_SA124B(Instrument):
         return dev
 
     def _do_set_device_type(self, device_type):
-        self.device_type = device_type
+        self._device_type = device_type
 
     def _do_get_device_mode(self):
-        return self.device_mode
+        return self._device_mode
     def _do_set_device_mode(self,device_mode):
-        self.device_mode = device_mode
+        self._device_mode = device_mode
         return
 
     def _do_get_acquisition_mode(self):
-        return self.acquisition_mode
+        return self._acquisition_mode
     def _do_set_acquisition_mode(self,acquisition_mode):
-        self.acquisition_mode = acquisition_mode
+        self._acquisition_mode = acquisition_mode
         return
 
     def _do_get_scale(self):
-        return self.scale
+        return self._scale
     def _do_set_scale(self,scale):
-        self.scale = scale
+        self._scale = scale
 
     def _do_get_decimation(self):
         return self.decimation
@@ -289,19 +289,22 @@ class SignalHound_USB_SA124B(Instrument):
         self.decimation = decimation
 
     def _do_get_bandwidth(self):
-        return self.bandwidth
-    def _do_set_bandwidth(self,bandwidth):
-        self.bandwidth = bandwidth
+        return self._bandwidth
+
+    def _do_set_bandwidth(self, bandwidth):
+        self._bandwidth = bandwidth
 
     def _do_get_rbw(self):
-        return self.rbw
-    def _do_set_rbw(self,rbw):
-        self.rbw = rbw
+        return self._rbw
+
+    def _do_set_rbw(self, rbw):
+        self._rbw = rbw
 
     def _do_get_vbw(self):
-        return self.vbw
-    def _do_set_vbw(self,vbw):
-        self.vbw = vbw
+        return self._vbw
+
+    def _do_set_vbw(self, vbw):
+        self._vbw = vbw
 
 
 ############################################################################
@@ -309,7 +312,7 @@ class SignalHound_USB_SA124B(Instrument):
 
 
     def initialisation(self,flag=0):
-        mode=self.device_mode
+        mode=self._device_mode
         modeOpts = {
             "sweeping"       : self.hf.sa_SWEEPING,
             "real_time"      : self.hf.sa_REAL_TIME,
@@ -322,7 +325,7 @@ class SignalHound_USB_SA124B(Instrument):
             raise ValueError("Mode must be one of %s. Passed value was %s." % (modeOpts, mode))
         err = self.dll.saInitiate(self.deviceHandle, mode, flag)
         if err == self.saStatus["saNoError"]:
-            self.running = True
+            self._running = True
             self.log.info("Call to initiate succeeded.")
         elif err == self.saStatus["saDeviceNotOpenErr"]:
             raise IOError("Device not open!")
@@ -361,22 +364,17 @@ class SignalHound_USB_SA124B(Instrument):
         else:
             raise IOError("Unknown error!")
 
-        info = np.array([sweep_len.value,start_freq.value,stepsize.value])
+        info = np.array([sweep_len.value, start_freq.value, stepsize.value])
         return info
 
-    def configure(self,rejection=True):
-        decimation = self.decimation
-        # bandwidth=self.bandwidth
-        ref_lvl = self.ref_lvl
-        external_reference = self.external_reference
-        rbw = self.rbw
-        vbw = self.vbw
+
+
 
     # CenterSpan Configuration
 
 
-        frequency = self.frequency * 1e9
-        span = self.span * 1e9
+        frequency = self._frequency * 1e9
+        span = self._span * 1e9
         center = ct.c_double(frequency)
         span   = ct.c_double(span)
         self.log.info("Setting device CenterSpan configuration.")
@@ -401,12 +399,12 @@ class SignalHound_USB_SA124B(Instrument):
             "log-full-scale" : ct.c_uint(self.hf.sa_LOG_FULL_SCALE),
             "lin-full-scale" : ct.c_uint(self.hf.sa_LIN_FULL_SCALE)
         }
-        if self.acquisition_mode in detectorVals:
-            detector = detectorVals[self.acquisition_mode]
+        if self._acquisition_mode in detectorVals:
+            detector = detectorVals[self._acquisition_mode]
         else:
             raise ValueError("Invalid Detector mode! Detector  must be one of %s. Specified detector = %s" % (list(detectorVals.keys()), detector))
-        if self.scale in scaleVals:
-            scale = scaleVals[self.scale]
+        if self._scale in scaleVals:
+            scale = scaleVals[self._scale]
         else:
             raise ValueError("Invalid Scaling mode! Scaling mode must be one of %s. Specified scale = %s" % (list(scaleVals.keys()), scale))
         err = self.dll.saConfigAcquisition(self.deviceHandle, detector, scale)
@@ -436,7 +434,7 @@ class SignalHound_USB_SA124B(Instrument):
         else:
             raise IOError("Unknown error setting configureLevel! Error = %s" % err)
     # External Reference configuration
-        if self.external_reference:
+        if self._external_reference:
             self.log.info("Setting reference frequency from external source.")
             err = self.dll.saEnableExternalReference(self.deviceHandle)
             if err == self.saStatus["saNoError"]:
@@ -448,10 +446,10 @@ class SignalHound_USB_SA124B(Instrument):
             else:
                 raise IOError("Unknown error!")
 
-        if self.device_mode =='sweeping':
+        if self._device_mode =='sweeping':
             # Sweeping Configuration
-            rbw        = self.rbw
-            vbw        = self.vbw
+            rbw        = self._rbw
+            vbw        = self._vbw
             reject_var = ct.c_bool(rejection)
             self.log.info("Setting device Sweeping configuration.")
             err = self.dll.saConfigSweepCoupling(self.deviceHandle, ct.c_double(rbw), ct.c_double(vbw), reject_var)
@@ -467,8 +465,9 @@ class SignalHound_USB_SA124B(Instrument):
                 raise IOError("'rejection' value is not one of the accepted values.")
             else:
                 raise IOError("Unknown error setting configureSweepCoupling! Error = %s" % err)
-        elif self.device_mode == 'IQ':
-            err = self.dll.saConfigIQ(self.deviceHandle, ct.c_int(decimation), ct.c_double(bandwidth))
+        elif self._device_mode == 'IQ':
+            err = self.dll.saConfigIQ(self.deviceHandle, ct.c_int(decimation),
+                                      ct.c_double(self._bandwidth))
             if err == self.saStatus["saNoError"]:
                 raise IOError("configureSweepCoupling Succeeded.")
             elif err == self.saStatus["saDeviceNotOpenErr"]:
@@ -491,9 +490,9 @@ class SignalHound_USB_SA124B(Instrument):
         if not err == self.saStatus['saNoError']:
             # if an error occurs tries preparing the device and then asks again
             print('Error raised in Sweep Info Query, preparing for measurement')
-            qt.msleep(.5)
+            sleep(.1)
             self.prepare_for_measurement()
-            qt.msleep(.5)
+            sleep(.1)
             err = self.dll.saQuerySweepInfo(self.deviceHandle,
                                             ct.pointer(sweep_len),
                                             ct.pointer(start_freq),
@@ -519,9 +518,9 @@ class SignalHound_USB_SA124B(Instrument):
         if not err == self.saStatus['saNoError']:
             # if an error occurs tries preparing the device and then asks again
             print('Error raised in Sweep Info Query, preparing for measurement')
-            qt.msleep(.5)
+            sleep(.1)
             self.prepare_for_measurement()
-            qt.msleep(.5)
+            sleep(.1)
             minarr = (ct.c_float * sweep_len.value)()
             maxarr = (ct.c_float * sweep_len.value)()
             err = self.dll.saGetSweep_32f(self.deviceHandle, minarr, maxarr)
@@ -559,12 +558,11 @@ class SignalHound_USB_SA124B(Instrument):
         '''
         poweratfreq = 0
         for i in range(Navg):
-            qt.msleep(.1)  # is this delay long enough to work with the vbw
             data = self.sweep()
             max_power = np.max(data[1][:])
             poweratfreq += max_power
-        self.power = poweratfreq / Navg
-        return self.power
+        self._power = poweratfreq / Navg
+        return self._power
 
     def get_spectrum(self, Navg=1):
         sweep_params = self.QuerySweep()
@@ -577,8 +575,7 @@ class SignalHound_USB_SA124B(Instrument):
         return np.array([data_spec, sweep_points])
 
     def prepare_for_measurement(self):
-        self.set_device_mode('sweeping')
-        self.configure()
+        self.set('device_mode', 'sweeping')
         self.initialisation()
         return
 
@@ -594,7 +591,7 @@ class constants():
         self.saDeviceTypeNone = 0
         self.saDeviceTypeSA44 = 1
         self.saDeviceTypeSA44B = 2
-        self.saDeviceTypeSA124A= 3
+        self.saDeviceTypeSA124A = 3
         self.saDeviceTypeSA124B = 4
 
         self.sa44_MIN_FREQ = 1.0
