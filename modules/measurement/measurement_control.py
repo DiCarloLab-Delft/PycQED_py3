@@ -522,7 +522,6 @@ class MeasurementControl:
         data_group.attrs['value_names'] = h5d.encode_to_utf8(self.detector_function.value_names)
         data_group.attrs['value_units'] = h5d.encode_to_utf8(self.detector_function.value_units)
 
-
     def save_optimization_settings(self):
         '''
         Saves the parameters used for optimization
@@ -532,65 +531,31 @@ class MeasurementControl:
         for (param, val) in param_list:
             opt_sets_grp.attrs[param] = str(val)
 
-    def save_instrument_settings(self, *args):
-        pass
-        # if len(args) == 0:
-        #     data_object = self.data_object
-        # else:
-        #     data_object = args[0]
-        # set_grp = data_object.create_group('Instrument settings')
-        # inslist = dict_to_ordered_tuples(qt.instruments.get_instruments())
-        # for (iname, ins) in inslist:
-        #     instrument_grp = set_grp.create_group(iname)
-        #     parameter_list = dict_to_ordered_tuples(ins.get_parameters())
-        #     for (param, popts) in parameter_list:
-        #         val = ins.get(param, query=False)
-        #         instrument_grp.attrs[param] = str(val)
-
-    def init_instrument_changelog(self):
-
-        self._init_time = time.clock()
-        self._instrument_changelog = {}  #
-
-        qt.instruments.connect('instrument-changed', self.add_change_to_log)
-
-    def add_change_to_log(self, inslist, instr, changed_pars):
+    def save_instrument_settings(self, data_object=None, *args):
         '''
-        function to connect to instrument-changed signal
+        uses QCodes station snapshot to save the last known value of any
+        parameter. Only saves the value and not the update time (which is
+        known in the snapshot)
         '''
-        logentry = {}
-        logentry[instr] = changed_pars
-        ts = time.clock()-self._init_time
-        self._instrument_changelog[self.get_datetimestamp()+(
-            '%.4f' % (ts-int(ts)))[1:]] = logentry
-        # the last line is to append subseconds to the key
-
-    def get_instrument_changelog(self):
-        return self._instrument_changelog
-
-    def disconnect_instrument_logging(self):
-        try:
-            qt.instruments.disconnect_by_func(self.add_change_to_log)
-        except:
-            print('Trying to stop instrument logging but logging already stopped...')
-            print(repr(sys.exc_info()[1]))
-
-    def save_instrument_logging(self, *args):
-        if len(args) == 0:
-            data = self.data
+        if data_object is None:
+            data_object = self.data_object
+        if not hasattr(self, 'station'):
+            logging.warning('No station object specified, could not save',
+                            ' instrument settings')
         else:
-            data = args[0]
-        length = sum([len(list(x[1].values())[0]) for x in list(self._instrument_changelog.items())])
-        dataset = data.create_dataset("Instrument_changelog",
-                                      (length, 4), dtype="S25")
-        k = 0
-        for date_time, instrument_dict in list(self._instrument_changelog.items()):
-            for instrument, params in list(instrument_dict.items()):
-                for param, param_value in list(params.items()):
-                    dataset[k] = [date_time, instrument, param,
-                                  str(param_value)]
-        #             print date_time, instrument, param, param_value
-                    k += 1
+            set_grp = data_object.create_group('Instrument settings')
+            inslist = dict_to_ordered_tuples(self.station.instruments)
+            for (iname, ins) in inslist:
+                instrument_grp = set_grp.create_group(iname)
+                par_snap = ins.snapshot()['parameters']
+                parameter_list = dict_to_ordered_tuples(par_snap)
+                for (p_name, p) in parameter_list:
+                    try:
+                        val = str(p['value'])
+                    except KeyError:
+                        val = ''
+                    instrument_grp.attrs[p_name] = str(val)
+
 
     def start_mflow(self):
         '''
@@ -605,19 +570,6 @@ class MeasurementControl:
         #     qt.mstart()
         # else:
         #     pass
-
-    # def stop_mflow(self):
-    #     '''
-    #     stops measurement flow
-    #     '''
-    #     if qt.flow.is_measuring():
-    #         qt.mend()
-    #     else:
-    #         print('Warning: Tried to stop measurement ' + \
-    #             'but it was already stopped')
-        # Commented out because not functioning correctly and it causes major
-        # timing hangups for nested measurements (issue #152)
-        # self.disconnect_instrument_logging()
 
     def print_progress_static_soft_sweep(self, i):
         percdone = (i+1)*1./len(self.sweep_points)*100

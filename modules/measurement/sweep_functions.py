@@ -243,30 +243,20 @@ class TD_t_int(Soft_Sweep):
 
 
 ###################################
-class Source_Sweep(Soft_Sweep):
-    '''
-    Parent of source sweeps
-    '''
-    def __init__(self, **kw):
-        super(Source_Sweep, self).__init__()
-        self.S = kw.pop('Source', qt.instruments['S1'])
 
-    def prepare(self, **kw):
-        self.S.on()
-
-
-class Source_frequency_GHz(Source_Sweep):
-    def __init__(self, **kw):
-        super(Source_frequency_GHz, self).__init__(**kw)
+class Source_frequency_GHz(Soft_Sweep):
+    def __init__(self, source, **kw):
+        super().__init__(**kw)
+        self.S = source
         self.name = 'Source frequency'
-        self.parameter_name = '%s-frequency' % self.S.get_name()
+        self.parameter_name = '%s-frequency' % self.S.name
         self.unit = 'GHz'
 
     def set_parameter(self, val):
-        self.S.set_frequency(val*1e9)
+        self.S.set('frequency', val*1e9)
 
 
-class Source_frequency_modulated_GHz(Source_Sweep):
+class Source_frequency_modulated_GHz(Soft_Sweep):
     def __init__(self, modulation_freq, **kw):
         super(Source_frequency_modulated_GHz, self).__init__(**kw)
         self.name = 'Source frequency modulated'
@@ -278,7 +268,7 @@ class Source_frequency_modulated_GHz(Source_Sweep):
         self.S.set_frequency((val - self.modulation_freq)*1e9)
 
 
-class Source_frequency_GHz_Resonator_Scan(Source_Sweep):
+class Source_frequency_GHz_Resonator_Scan(Soft_Sweep):
     def __init__(self, start_freq_res, end_freq_res, **kw):
         super(Source_frequency_GHz_Resonator_Scan, self).__init__(**kw)
         self.name = 'Source frequency'
@@ -309,7 +299,7 @@ class Source_frequency_GHz_Resonator_Scan(Source_Sweep):
         self.S.set_frequency(val*1e9)
 
 
-class Source_power_dBm(Source_Sweep):
+class Source_power_dBm(Soft_Sweep):
     def __init__(self, **kw):
         super(Source_power_dBm, self).__init__(**kw)
         #print self.name
@@ -321,7 +311,7 @@ class Source_power_dBm(Source_Sweep):
         self.S.set_power(val)
 
 
-class Source_phase_deg(Source_Sweep):
+class Source_phase_deg(Soft_Sweep):
     def __init__(self, **kw):
         super(Source_phase_deg, self).__init__(**kw)
         self.name = '%s-Source phase' % self.S.get_name()

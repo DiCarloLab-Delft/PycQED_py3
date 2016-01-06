@@ -27,7 +27,7 @@ def dict_to_ordered_tuples(dic):
     if dic is None:
         return []
     keys = dic.keys()
-    keys.sort()
+    # keys.sort()
     ret = [(key, dic[key]) for key in keys]
     return ret
 

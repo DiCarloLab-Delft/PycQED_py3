@@ -710,6 +710,19 @@ class Dummy_Detector_Soft(Soft_Detector):
         return np.array([np.sin(x/np.pi), np.cos(x/np.pi)])
 
 
+class Source_frequency_detector(Soft_Detector):
+    def __init__(self, source, **kw):
+        self.set_kw()
+        self.S = source
+        self.detector_control = 'soft'
+        self.name = 'Source frequency detector'
+        self.value_names = ['frequency']
+        self.value_units = ['Hz']
+        self.i = 0
+
+    def acquire_data_point(self, **kw):
+        return self.S.get('frequency')
+
 class Function_Detector(Soft_Detector):
     def __init__(self, sweep_function, result_keys, value_names=None,
                  value_units=None, msmt_kw={}, **kw):
