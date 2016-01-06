@@ -833,17 +833,23 @@ class PulsedSpectroscopyDetector(Soft_Detector):
 
 
 class Signal_Hound_fixed_frequency(Soft_Detector):
-    def __init__(self, frequency, signal_hound, Navg=1, delay=0.1, **kw):
+    def __init__(self, signal_hound, frequency=None, Navg=1, delay=0.1,
+                 prepare_for_each_point=False, **kw):
         super().__init__()
         self.frequency = frequency
         self.name = 'SignalHound_fixed_frequency'
         self.value_names = ['Power']
         self.value_units = ['dBm']
         self.delay = delay
-        self.SH.set_frequency(frequency)
+        self.SH = signal_hound
+        if frequency is not None:
+            self.SH.set('frequency', frequency)
         self.Navg = Navg
+        self.prepare_for_each_point = prepare_for_each_point
 
     def acquire_data_point(self, **kw):
+        if self.prepare_for_each_point:
+            self.SH.prepare_for_measurement()
         time.sleep(self.delay)
         return self.SH.get_power_at_freq(Navg=self.Navg)
 
