@@ -230,8 +230,7 @@ class MeasurementControl:
 
         datasetshape = self.dset.shape
         self.iteration = datasetshape[0] + 1
-        vals = self.detector_function.acquire_data_point(
-            iteration=self.iteration)
+        vals = self.detector_function.acquire_data_point()
 
         # Resizing dataset and saving
         new_datasetshape = (self.iteration, datasetshape[1])
@@ -645,7 +644,7 @@ class MeasurementControl:
         '''
         self.sweep_functions = [sweep_function]
         self.set_sweep_function_names(
-            [str(sweep_function.__class__.__name__)])
+            [str(sweep_function.name)])
 
     def get_sweep_function(self):
         return self.sweep_functions[0]
