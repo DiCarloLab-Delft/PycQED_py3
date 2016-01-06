@@ -42,10 +42,11 @@ class MeasurementControl:
         # self.add_parameter('optimization_method',
         #                    flags=Instrument.FLAG_GETSET, type=str)
 
-        self.get_git_hash()
+        # self.get_git_hash()
         # self.Plotmon = qt.instruments['Plotmon']
         # if self.Plotmon is None:
         #     logging.warning('Measurement Control could not connect to Plotmon')
+        self.name = name
 
     ##############################################
     # Functions used to control the measurements #
@@ -672,8 +673,7 @@ class MeasurementControl:
 
     def set_detector_function(self, detector_function):
         self.detector_function = detector_function
-        self.set_detector_function_name(str(
-            detector_function.__class__.__name__))
+        self.set_detector_function_name(detector_function.name)
 
     def get_detector_function(self):
         return self.detector_function

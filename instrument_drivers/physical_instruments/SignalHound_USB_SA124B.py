@@ -1,30 +1,27 @@
 from time import sleep, time
 import select
 import socket
-import qt
 import numpy as np
 import ctypes as ct
-import types
 import ctypes.util as ctu
-import sys
-import os
-from instrument import Instrument
 import logging
-# import matplotlib.pyplot as plt
 
-waittime = 0.01
+# load the qcodes path, until we have this installed as a package
+import sys
+qcpath = 'D:\GitHubRepos\Qcodes'
+if qcpath not in sys.path:
+    sys.path.append(qcpath)
 
-
-def has_newline(ans):
-    if len(ans) > 0 and ans.find('\n') != -1:
-        return True
-    return False
+from qcodes.instrument.base import Instrument
+from qcodes.utils import validators as vals
 
 
 # initialize with
-# qt.instruments.create(name='Signal_Hound',instype='SignalHound_USB_SA124B',dummy_instrument=True)
-# dummy instrument because it does not use VISA
+# qt.instruments.create(name='Signal_Hound',instype='SignalHound_USB_SA124B')
 class SignalHound_USB_SA124B(Instrument):
+    '''
+    This is a direct port of the signal hound QTLab driver by Ramiro
+    '''
     saStatus = {
         "saUnknownErr"                  : -666,
         "saFrequencyRangeErr"           : -99,
@@ -52,50 +49,93 @@ class SignalHound_USB_SA124B(Instrument):
         "saParameterClamped"            : 3
     }
 
-
-    def __init__(self,name):
+    def __init__(self, name):
         self.log = logging.getLogger("Main.DeviceInt")
         logging.info(__name__ + ' : Initializing instrument SignalHound USB 124A')
         Instrument.__init__(self, name, tags=['physical'])
         self.dll = ct.CDLL("C:\Windows\System32\sa_api.dll")
         self.hf = constants()
         #parameter settings
-        self.add_parameter('frequency', flags=Instrument.FLAG_GETSET, units='GHz',
-                           type=float)
-        self.add_parameter('span', flags=Instrument.FLAG_GETSET, units='GHz',
-                           type=float)
-        self.add_parameter('power', flags=Instrument.FLAG_GETSET, units='dBm',
-                           maxval=20, type=float)
-        self.add_parameter('ref_lvl', flags=Instrument.FLAG_GETSET, units='dBm',
-                           maxval=20, type=float)
-        self.add_parameter('external_reference', flags=Instrument.FLAG_GETSET,type=bool)
-        self.add_parameter('device_type',type=bytes, flags=Instrument.FLAG_GETSET)
-        self.add_parameter('device_mode',type=bytes, flags=Instrument.FLAG_GETSET)
-        self.add_parameter('acquisition_mode',type=bytes, flags=Instrument.FLAG_GETSET)
-        self.add_parameter('scale',type=bytes, flags=Instrument.FLAG_GETSET)
-        self.add_parameter('running', flags=Instrument.FLAG_GETSET,type=bool)
-        self.add_parameter('decimation', flags=Instrument.FLAG_GETSET,maxval=8,minval=1,type=int)
+        self.add_parameter('frequency',
+                           label='Frequency (GHz)',
+                           get_cmd=self._do_get_frequency,
+                           set_cmd=self._do_set_frequency,
+                           parse_function=float)
+        self.add_parameter('span',
+                           label='Span (GHz)',
+                           get_cmd=self._do_get_frequency,
+                           set_cmd=self._do_set_frequency,
+                           parse_function=float)
+        self.add_parameter('power',
+                           label='Power (dBm)',
+                           get_cmd=self._do_get_power,
+                           set_cmd=self._do_set_power,
+                           vals=vals.Numbers(max_value=20),
+                           parse_function=float)
+        self.add_parameter('ref_lvl',
+                           label='Reference power (dBm)',
+                           get_cmd=self._do_get_ref_lvl,
+                           set_cmd=self._do_set_ref_lvl,
+                           vals=vals.Numbers(max_value=20),
+                           parse_function=float)
+        self.add_parameter('external_reference',
+                           get_cmd=self._do_get_external_reference,
+                           set_cmd=self._do_set_external_reference,
+                           vals=vals.Bool())
+        self.add_parameter('device_type',
+                           get_cmd=self._do_get_device_type,
+                           set_cmd=self._do_set_device_type,
+                           vals=vals.Anything())
+        self.add_parameter('device_mode',
+                           get_cmd=self._do_get_device_mode,
+                           set_cmd=self._do_set_device_mode,
+                           vals=vals.Anything())
+        self.add_parameter('acquisition_mode',
+                           get_cmd=self._do_get_acquisition_mode,
+                           set_cmd=self._do_set_acquisition_mode,
+                           vals=vals.Anything())
 
-        self.add_parameter('bandwidth', flags=Instrument.FLAG_GETSET, units='Hz',
-                           type=float)
-        self.add_parameter('rbw', flags=Instrument.FLAG_GETSET, units='Hz',
-                           type=float)
-        self.add_parameter('vbw', flags=Instrument.FLAG_GETSET, units='Hz',
-                           type=float)
-        self.set_frequency(5)
-        self.set_span(.25e-3)
-        self.set_power(0)
-        self.set_ref_lvl(0)
-        self.set_external_reference(False)
-        self.set_device_type('Not loaded')
-        self.set_device_mode('sweeping')
-        self.set_acquisition_mode('average')
-        self.set_scale('log-scale')
-        self.set_running(False)
-        self.set_decimation(1)
-        self.set_bandwidth(0)
-        self.set_rbw(1e3)
-        self.set_vbw(1e3)
+        self.add_parameter('scale',
+                           get_cmd=self._do_get_scale,
+                           set_cmd=self._do_set_scale,
+                           vals=vals.Anything())
+        self.add_parameter('running',
+                           get_cmd=self._do_get_running,
+                           set_cmd=self._do_set_running,
+                           vals=vals.Bool())
+        self.add_parameter('decimation',
+                           get_cmd=self._do_get_decimation,
+                           set_cmd=self._do_set_decimation,
+                           vals=vals.Ints(1, 8))
+        self.add_parameter('bandwidth',
+                           label='Bandwidth (Hz)',
+                           get_cmd=self._do_get_bandwidth,
+                           set_cmd=self._do_set_bandwidth,
+                           parse_function=float)
+        self.add_parameter('rbw',  # Not clear what rbw is
+                           label='R Bandwidth (Hz)',
+                           get_cmd=self._do_get_rbw,
+                           set_cmd=self._do_set_rbw,
+                           parse_function=float)
+        self.add_parameter('vbw',
+                           label='Video Bandwidth (Hz)',
+                           get_cmd=self._do_get_bandwidth,
+                           set_cmd=self._do_set_bandwidth,
+                           parse_function=float)
+        self.set('frequency', 5)
+        self.set('span', .25e-3)
+        self.set('power', 0)
+        self.set('ref_lvl', 0)
+        self.set('external_reference', False)
+        self.set('device_type', 'Not loaded')
+        self.set('device_mode', 'sweeping')
+        self.set('acquisition_mode', 'average')
+        self.set('scale', 'log-scale')
+        self.set('running', False)
+        self.set('decimation', 1)
+        self.set('bandwidth', 0)
+        self.set('rbw', 1e3)
+        self.set('vbw', 1e3)
         self.openDevice()
 
     def openDevice(self):
@@ -112,7 +152,7 @@ class SignalHound_USB_SA124B(Instrument):
                 raise ValueError("Could not open device due to unknown reason! Error = %d" % ret)
 
         self.devOpen = True
-        self._devType = self.get_device_type()
+        self._devType = self.get('device_type')
         self.log.info("Opened Device with handle num: %s", self.deviceHandle.value)
 
 
@@ -636,185 +676,3 @@ class constants():
         self.saCompressionWarning = 2
         self.saParameterClamped = 3
         self.saBandwidthClamped = 4
-
-
-
-'''
-######################### OLD FUNCTIONS ###################################################
-    def setup_LO(self,centerFrequency,devNum=0):
-        self.S.write('SetupLO('+str(centerFrequency)+','+str(self.mixerband(centerFrequency))+','+str(devNum)+')')
-        return self.S.read()
-
-    def write(self,string):
-        print string
-        self.S.write(string)
-
-    def read(self):
-        print self.S.read()
-
-
-    def start_streaming(self,devNum=0):
-        self.S.write('StartStreamingData('+str(devNum)+')')
-        return self.S.read()
-
-    def stop_streaming(self,devNum=0):
-        self.S.write('StopStreamingData('+str(devNum)+')')
-        return self.S.read()
-
-
-    def get_data_packet(self,devNum=0):
-        ''
-        It's required to empty the buffer of the Signal Hound before taking
-        a data point, else you will measure some old data. The buffer
-        contains 18 data points and seems no to refresh all the time
-        when data is being streamed.
-        ''
-        for i in range(18):
-            self.S.write('GetStreamingPacket('+str(devNum)+')')
-            self.S.read()
-        self.S.write('GetStreamingPacket('+str(devNum)+')')
-        return float(self.S.read())
-
-
-    def mixerband(self,CenterFrequency):
-        ''
-        This is to choose the correct mixer band. Note that this is poorly
-        documented information fluthi obtained by personal correspondence
-        with Justin Crooks from SignalHound, Dec. 2014
-        ''
-        if (CenterFrequency <= 150000000):
-            return 0
-        elif (CenterFrequency <= 4000000000):
-            return 1
-        elif (CenterFrequency <= 6500000000):
-            return 2
-        elif (CenterFrequency <= 8300000000):
-            return 3
-        elif (CenterFrequency <= 9750000000):
-            return 4
-        else:
-            return 5
-
-    def get_data_point(self,centerFrequency,devNum=0):
-        self.configure(centerFrequency)
-        self.setup_LO(centerFrequency)
-        self.start_streaming()
-        value = self.get_data_packet()
-        self.stop_streaming()
-        return float(value)
-
-    def get_sweep(self,centerFrequency,span,FFT=16,ImageHandling=0,devNum=0):
-        self.configure(centerFrequency,10,1,1,0,0,devNum)
-        self.S.write('GetSweep('+str(centerFrequency)+','+str(span)+','+str(FFT)+','+str(ImageHandling)+','+str(devNum)+')')
-        return [float(i) for i in self.S.read().split('\t')]
-
-    def get_sweep_plot(self,centerFrequency,span,FFT=16,ImageHandling=0,devNum=0):
-        sweepPoints = self.get_sweep(centerFrequency,span,FFT,ImageHandling,devNum)
-        frequencyPoints = arange(centerFrequency - span/2, centerFrequency + span/2, float(span)/len(sweepPoints))
-        plt.plot(frequencyPoints,sweepPoints)
-
-
-    def calibrate_mixer(self, set_offset_1, set_offset_2,
-                        centerFrequency, devNum):
-        ''
-        This is not really working...
-        set_offset_1 needs to be the I channel dc-offset function,
-        like AWG.set_ch1_offset(1)
-        set_offset_2 needs to be the Q channel dc-offset function,
-         like AWG.set_ch2_offset(1)
-        ''
-        ivoltage = 0
-        qvoltage = 0
-        voltageGrid = [-0.06,-0.021,-0.009,-0.003]
-        stepList = [0.02,0.007,0.003,0.001]
-        dBmTable = array([[0 for x in range(7)] for x in range(7)])
-        minimaTable = [[0 for x in range(2)] for x in range(5)]
-        minIndex = (0,0)
-        self.configure(centerFrequency,devNum) # This should be changed to a fastConfig at some point
-        self.setupLO(centerFrequency,devNum) # Just to get the Hound streaming
-        self.startStreaming(devNum)
-        for q in range(4):
-            ivoltage = minimaTable[q][0] + voltageGrid[q] #Get starting point for new grid
-            qvoltage = minimaTable[q][1] + voltageGrid[q]
-            for i in range(7): # Step the i voltage in this loop
-                # Set the I voltage of the AWG
-                self.set_offset_1(ivoltage)
-                for j in range(7): # Step the q voltage in this loop
-                    self.set_offset_2(qvoltage) # Set the q voltage of the AWG
-                    dBmTable[i][j] = self.getDataPacket(devNum)
-                    qvoltage += stepList[q]
-                qvoltage = minimaTable[q][0] + voltageGrid[q]
-                ivoltage += stepList[q]
-            minIndex = unravel_index(dBmTable.argmin(),bla.shape) # (ivoltIndex,qvoltIndex)
-            minimaTable[q+1][0] = minimaTable[q][0] + voltageGrid[q] + minIndex[0]*stepList[q]
-            minimaTable[q+1][1] = minimaTable[q][1] + voltageGrid[q] + minIndex[1]*stepList[q]
-        # Result for i and q voltage is stored in minimaTable[5]
-        # Set the outputs of the AWG to the values we found
-        self.set_offset_1(minimaTable[5][0])
-        self.set_offset_2(minimaTable[5][1])
-        streamingValue = self.getDataPacket(devNum)
-        # Stop the Data streaming
-        self.stopStreaming(devNum)
-        print "%s dBm at %d Hz for I-Voltage %d and Q-Voltage %d." % (streamingValue, centerFrequency, minimaTable[5][0],minimaTable[5][1])
-        self.getSweepPlot(centerFrequency,30000000,256,0,devNum)
-
-
-
-
-
-
-
-#execdir = qt.config['execdir']
-#signalhound_folder = '\\instrument_plugins\\user_instruments\\_SignalHound'
-#self.signalhoundfolderpath = os.path.join(execdir,signalhound_folder)
-
-# class Socket:
-#     # Should be moved to qtlab source as it is currently being used in multiple user instruments
-#     def __init__(self, host, port):
-#         self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-#         self._socket.connect((host, port))
-#         self._socket.settimeout(20)
-
-#     def clear(self):
-#         rlist, wlist, xlist = select.select([self._socket], [], [])
-#         if len(rlist) == 0:
-#             return
-#         ret = self.read()
-#         print 'Unexpected data before ask(): %r' % (ret, )
-
-#     def properwrite(self, data):
-#         self.clear()
-#         qt.msleep(waittime)
-#         if len(data) > 0 and data[-1] != '\r\n':
-#             data += '\n'
-#         self._socket.send(data+'\r\n')
-
-#     def write(self,data):
-#         qt.msleep(waittime)
-#         self._socket.send(data+'\r\n')
-
-#     def read(self,timeouttime=20):
-#         start = time()
-#         try:
-#             ans = ''
-#             while len(ans) == 0 and (time() - start) < timeouttime or not has_newline(ans):
-#                 ans2 = self._socket.recv(8192)
-#                 ans += ans2
-#                 if len(ans2) == 0:
-#                     qt.msleep(waittime)
-#             AWGlastdataread=ans
-#         except socket.timeout, e:
-#             print 'Timed out'
-#             return ''
-
-#         if len(ans) > 0:
-#             ans = ans.rstrip('\r\n')
-#         return ans
-
-#     def ask(self, data):
-#         self.clear()
-#         qt.msleep(waittime)
-#         self.write(data)
-#         return self.read()
-
-'''
