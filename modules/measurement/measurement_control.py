@@ -79,7 +79,6 @@ class MeasurementControl:
 
     def measure(self, *kw):
         self.initialize_plot_monitor()
-
         if (self.sweep_functions[0].sweep_control !=
                 self.detector_function.detector_control):
                 # FIXME only checks first sweepfunction

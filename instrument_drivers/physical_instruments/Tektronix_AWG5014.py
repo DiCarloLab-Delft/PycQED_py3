@@ -1,4 +1,5 @@
-# Tektronix_AWG5014.py class, to perform the communication between the Wrapper and the device
+# Tektronix_AWG5014.py class, to perform the communication between the Wrapper
+# and the device
 # Pieter de Groot <pieterdegroot@gmail.com>, 2008
 # Martijn Schaafsma <mcschaafsma@gmail.com>, 2008
 #
@@ -16,8 +17,6 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
-from instrument import Instrument
-import visa
 import types
 import logging
 import numpy
@@ -27,11 +26,18 @@ from time import sleep, time, localtime
 from io import StringIO
 import qt
 import os
-from modules.utilities.VisaSocket import SocketVisa
-# Socketvisa is needed when connection is TCPIP
+
+# load the qcodes path, until we have this installed as a package
+import sys
+qcpath = 'D:\GitHubRepos\Qcodes'
+if qcpath not in sys.path:
+    sys.path.append(qcpath)
+
+from qcodes.instrument.visa import VisaInstrument
+from qcodes.utils import validators as vals
 
 
-class Tektronix_AWG5014(Instrument):
+class Tektronix_AWG5014(VisaInstrument):
     '''
     This is the python driver for the Tektronix AWG5014
     Arbitrary Waveform Generator
@@ -56,6 +62,7 @@ class Tektronix_AWG5014(Instrument):
         through the folders on the AWG
     8-8-2015 by Adriaan : Merging the now diverged versions of this driver from
         the Diamond and Transmon groups @ TUD
+    7-1-2016 Converted to use with QCodes
     '''
     AWG_FILE_FORMAT_HEAD = {
         'SAMPLING_RATE': 'd',    # d
