@@ -46,9 +46,9 @@ class Tektronix_AWG5014(VisaInstrument):
     think about:    clock, waveform length
 
     TODO:
-    1) Get All
-    2) Remove test_send??
-    3) Add docstrings
+    * Remove test_send??
+    * Sequence element (SQEL) parameter functions exist but no corresponding parameters
+
 
     CHANGES:
     26-11-2008 by Gijs: Copied this plugin from the 520 and added support for
@@ -209,100 +209,75 @@ class Tektronix_AWG5014(VisaInstrument):
                            vals=vals.Numbers(-5, 5),
                            parse_function=float)
 
-        # self.add_parameter(
-        #     'clock', type=float,
-        #     flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET,
-        #     minval=1e6, maxval=1.2e9, units='Hz')
+        self.add_parameter('clock_freq',
+                           label='Clock frequency (Hz)',
+                           get_cmd='SOUR:FREQ?',
+                           set_cmd='SOUR:FREQ '+'{}',
+                           vals=vals.Numbers(1e6, 1.2e9),
+                           parse_function=float)
 
-        # # Numpoints was commented out, do not know why as it is used...
-        # self.add_parameter(
-        #     'numpoints', type=int,
-        #     flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET,
-        #     minval=100, maxval=1e9, units='Int')
+        self.add_parameter('numpoints',
+                           label='Number of datapoints per wave',
+                           get_cmd=self._do_get_numpoints,
+                           set_cmd=self._do_set_numpoints,
+                           vals=vals.Ints(100, int(1e9)))
+        self.add_parameter('setup_filename',
+                           get_cmd='AWGC:SNAM?')
+                           # set_cmd=self.do_set_setup_filename,
+                           # vals=vals.Strings())
+                           # set function has optional args and therefore
+                           # does not work with QCodes
 
-        # self.add_parameter('setup_filename', type=bytes,
-        #                    flags=Instrument.FLAG_GETSET)
+        # Channel parameters #
+        for i in range(4):
+            i += 1  # to convert from pythonic counting to AWG counting
+            amp_cmd = 'SOUR{}:VOLT:LEV:IMM:AMPL'.format(i)
+            offset_cmd = 'SOUR{}:VOLT:LEV:IMM:OFFS'.format(i)
+            # Set channel first to ensure sensible sorting of pars
+            self.add_parameter('ch{}_amp'.format(i),
+                               label='Amplitude channel {} (V)'.format(i),
+                               get_cmd=amp_cmd + '?',
+                               set_cmd=amp_cmd + '{:.6f}',
+                               vals=vals.Numbers(0.02, 1.5),
+                               parse_function=float)
+            self.add_parameter('ch{}_offset'.format(i),
+                               label='Offset channel {} (V)'.format(i),
+                               get_cmd=offset_cmd + '?',
+                               set_cmd=offset_cmd + '{:.6f}',
+                               vals=vals.Numbers(-.1, .1),
+                               parse_function=float)
+            # Marker channels
+            for j in range(2):
+                j += 1  # to convert from pythonic counting to AWG counting
+                m_del_cmd = 'SOUR{}:MARK{}:DEL'.format(i, j)
+                m_high_cmd = 'SOUR{}:MARK{}:VOLT:LEV:IMM:HIGH'.format(i, j)
+                m_low_cmd = 'SOUR{}:MARK{}:VOLT:LEV:IMM:LOW'.format(i, j)
 
-        # self.add_parameter(
-        #     'amplitude', type=float,
-        #     flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET,
-        #     channels=(1, 2, 3, 4),
-        #     minval=0.02,
-        #     maxval=1.5,
-        #     units='Volts',
-        #     channel_prefix='ch%d_')
-        # self.add_parameter(
-        #     'offset', type=float,
-        #     flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET,
-        #     channels=(1, 2, 3, 4),
-        #     minval=-0.1,
-        #     maxval=0.1,
-        #     units='Volts',
-        #     channel_prefix='ch%d_')
-
-        # # Marker parameters
-        # self.add_parameter(
-        #     'marker1_low', type=float,
-        #     flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET,
-        #     channels=(1, 2, 3, 4), minval=-2.7, maxval=2.7, units='Volts',
-        #     channel_prefix='ch%d_')
-        # self.add_parameter(
-        #     'marker1_high', type=float,
-        #     flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET,
-        #     channels=(1, 2, 3, 4), minval=-2.7, maxval=2.7, units='Volts',
-        #     channel_prefix='ch%d_')
-        # self.add_parameter(
-        #     'marker1_delay', type=float,
-        #     flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET,
-        #     channels=(1, 2, 3, 4), minval=0, maxval=1, units='ns',
-        #     channel_prefix='ch%d_')
-        # self.add_parameter(
-        #     'marker2_low', type=float,
-        #     flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET,
-        #     channels=(1, 2, 3, 4), minval=-2.7, maxval=2.7, units='Volts',
-        #     channel_prefix='ch%d_')
-        # self.add_parameter(
-        #     'marker2_high', type=float,
-        #     flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET,
-        #     channels=(1, 2, 3, 4), minval=-2.7, maxval=2.7, units='Volts',
-        #     channel_prefix='ch%d_')
-        # self.add_parameter(
-        #     'marker2_delay', type=float,
-        #     flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET,
-        #     channels=(1, 2, 3, 4), minval=0, maxval=1, units='ns',
-        #     channel_prefix='ch%d_')
-
-        # self.add_parameter('status', type=bytes,
-        #                    flags=Instrument.FLAG_GETSET,
-        #                    channels=(1, 2, 3, 4),
-        #                    channel_prefix='ch%d_')
+                self.add_parameter(
+                    'ch{}_m{}_del'.format(i, j),
+                    label='Channel {} Marker {} delay (ns)'.format(i, j),
+                    get_cmd=m_del_cmd + '?',
+                    set_cmd=m_del_cmd + '{:.3f}e-9',
+                    vals=vals.Numbers(0, 1),
+                    parse_function=float)
+                self.add_parameter(
+                    'ch{}_m{}_high'.format(i, j),
+                    label='Channel {} Marker {} high level (V)'.format(i, j),
+                    get_cmd=m_high_cmd + '?',
+                    set_cmd=m_high_cmd + '{:.3f}',
+                    vals=vals.Numbers(-2.7, 2.7),
+                    parse_function=float)
+                self.add_parameter(
+                    'ch{}_m{}_low'.format(i, j),
+                    label='Channel {} Marker {} low level (V)'.format(i, j),
+                    get_cmd=m_low_cmd + '?',
+                    set_cmd=m_low_cmd + '{:.3f}',
+                    vals=vals.Numbers(-2.7, 2.7),
+                    parse_function=float)
 
         # # Add functions
-        # self.add_function('reset')
-        # self.add_function('get_all')
-        # self.add_function('clear_waveforms')
-        # self.add_function('delete_all_waveforms_from_list')
-        # self.add_function('set_trigger_mode_on')
-        # self.add_function('set_trigger_mode_off')
-        # self.add_function('set_trigger_impedance_1e3')
-        # self.add_function('set_trigger_impedance_50')
-        # self.add_function('import_waveform_file')
-        # self.add_function('import_and_load_waveform_file_to_channel')
-        # self.add_function('set_filename')
-        # self.add_function('get_filenames')
-        # self.add_function('send_waveform')
-        # self.add_function('resend_waveform')
-        # self.add_function('set_sqel_goto_state')
-        # self.add_function('set_sqel_waveform')
-        # self.add_function('set_sqel_loopcnt')
-        # self.add_function('set_sqel_trigger_wait')
-        # self.add_function('set_sqel_goto_target_index')
-        # self.add_function('set_sqel_loopcnt_to_inf')
-        # self.add_function('set_sqel_event_jump_type')
-        # self.add_function('set_sqel_event_jump_target_index')
-        # self.add_function('start')
-        # self.add_function('stop')
-        # self.add_function('set_sq_length')
+
+
         # self.add_function('get_state')
         # self.add_function('set_event_jump_timing')
         # self.add_function('get_event_jump_timing')
@@ -315,13 +290,13 @@ class Tektronix_AWG5014(VisaInstrument):
         # self.add_function('initialize_dc_waveforms')
 
         # # Setup filepaths
-        # self._file_path = "C:\\waveforms\\"
-        # self._rem_file_path = "Z:\\waveforms\\"
+        self._file_path = "C:\\waveforms\\"
+        self._rem_file_path = "Z:\\waveforms\\"
 
-        # self._setup_folder = setup_folder
-        # self.set_current_folder_name(self._file_path)
+        self._setup_folder = setup_folder
+        self.set_current_folder_name(self._file_path)
         # self.get_all()
-        # self.set_trigger_impedance(50)
+        self.set('trigger_impedance', 50)
         # if reset:
         #     self.reset()
         # else:
@@ -329,13 +304,30 @@ class Tektronix_AWG5014(VisaInstrument):
 
         # Commented out command from transmon version don't know if needed
 
-        # self.visa_handle.write('mmem:CDIrectory "\\wfs"')
+        self.visa_handle.write('mmem:CDIrectory "\\wfs"')
         # NOTE! this directory has to exist on the AWG!!
         print('Connected to \n', self.get('IDN').replace(',', '\n'))
 
     # Functions
+    def get_state(self):
+        state = self.visa_handle.ask('AWGC:RSTATE?')
+        if state.startswith('0'):
+            return 'Idle'
+        elif state.startswith('1'):
+            return 'Waiting for trigger'
+        elif state.startswith('2'):
+            return 'Running'
+        else:
+            raise ValueError(__name__ + ' : AWG in undefined state "%s"' %
+                             state)
 
     def start(self):
+        '''
+        Convenience function, identical to run()
+        '''
+        return self.run()
+
+    def run(self):
         self.visa_handle.write('AWGC:RUN')
         return self.get_state()
 
@@ -423,7 +415,6 @@ class Tektronix_AWG5014(VisaInstrument):
         Output:
             None
         '''
-        logging.debug(__name__ + ' : Clear waveforms from channels')
         self.visa_handle.write('SOUR1:FUNC:USER ""')
         self.visa_handle.write('SOUR2:FUNC:USER ""')
         self.visa_handle.write('SOUR3:FUNC:USER ""')
@@ -538,20 +529,20 @@ class Tektronix_AWG5014(VisaInstrument):
 
     def set_sqel_waveform(self, waveform_name, channel, element_no=1):
         self.visa_handle.write('SEQ:ELEM%s:WAV%s "%s"' % (
-                                   element_no, channel, waveform_name))
+                               element_no, channel, waveform_name))
 
     def get_sqel_waveform(self, channel, element_no=1):
         return self.visa_handle.ask('SEQ:ELEM%s:WAV%s?' % (
-                                        element_no, channel))
+                                    element_no, channel))
 
     def set_sqel_trigger_wait(self, element_no, state=1):
         self.visa_handle.write('SEQ:ELEM%s:TWA %s' % (
-                                   element_no, state))
+                               element_no, state))
         return self.get_sqel_trigger_wait(element_no)
 
     def get_sqel_trigger_wait(self, element_no):
         return self.visa_handle.ask('SEQ:ELEM%s:TWA?' % (
-                                        element_no))
+                                    element_no))
 
     def get_sq_length(self):
         return self.visa_handle.ask('SEQ:LENG?')
@@ -561,11 +552,11 @@ class Tektronix_AWG5014(VisaInstrument):
 
     def set_sqel_event_jump_target_index(self, element_no, jtar_index_no):
         self.visa_handle.write('SEQ:ELEM%s:JTAR:INDex %s' % (
-                                   element_no, jtar_index_no))
+                               element_no, jtar_index_no))
 
     def set_sqel_event_jump_type(self, element_no,jtar_state):
         self.visa_handle.write('SEQuence:ELEMent%s:JTAR:TYPE %s' % (
-                                   element_no, jtar_state))
+                               element_no, jtar_state))
 
     def get_sq_mode(self):
         return self.visa_handle.ask('AWGC:SEQ:TYPE?')
@@ -648,40 +639,10 @@ class Tektronix_AWG5014(VisaInstrument):
 
     ##################################################################
 
-    def _do_get_clock(self):
-        '''
-        Returns the clockfrequency, which is the rate at which the datapoints
-        are sent to the designated output
-        Corresponds to SAMPLING_RATE
-
-        Input:
-            None
-        Output:
-            clock (int) : frequency in Hz
-        '''
-        return self._clock
-
-    def _do_set_clock(self, clock):
-        '''
-        Sets the rate at which the datapoints are sent to the designated output
-        channel
-
-        Input:
-            clock (int) : frequency in Hz
-        Output:
-            None
-        '''
-        '''logging.warning(__name__ + ' : Clock set to %s. This is not fully functional yet. To avoid problems, it is better not to change the clock during operation' % clock)'''''
-        self._clock = clock
-        self.visa_handle.write('SOUR:FREQ %f' % clock)
-
     def import_waveform_file(self, waveform_listname, waveform_filename,
                              type='wfm'):
-        self._import_waveform_file(waveform_listname, waveform_filename)
-
-    def _import_waveform_file(self, waveform_listname, waveform_filename,
-                              type='wfm'):
-        self.visa_handle.write('mmem:imp "%s","%s",%s'%(waveform_listname, waveform_filename, type))
+        self.visa_handle.write('mmem:imp "%s","%s",%s' % (waveform_listname,
+                               waveform_filename, type))
 
     def import_and_load_waveform_file_to_channel(self, channel_no,
                                                  waveform_listname,
@@ -693,18 +654,19 @@ class Tektronix_AWG5014(VisaInstrument):
 
     def _import_and_load_waveform_file_to_channel(self, channel_no,
                                                   waveform_listname,
-                                                  waveform_filename, type='wfm'):
+                                                  waveform_filename,
+                                                  type='wfm'):
         self.visa_handle.write('mmem:imp "%s","%s",%s' % (
-                                   waveform_listname, waveform_filename, type))
+                               waveform_listname, waveform_filename, type))
         self.visa_handle.write('sour%s:wav "%s"' % (
-                                   channel_no, waveform_listname))
+                               channel_no, waveform_listname))
         i = 0
         while not (self.visa_handle.ask("sour%s:wav?" % channel_no)
                    == '"%s"' % waveform_listname):
             sleep(0.01)
             i = i+1
             print(i)
-        return 1
+        return
     ######################
     # AWG file functions #
     ######################
@@ -925,8 +887,8 @@ class Tektronix_AWG5014(VisaInstrument):
         Output:
             None
         '''
-        logging.debug(__name__ + ' : Sending waveform %s to instrument' %
-                      filename)
+        # logging.debug(__name__ + ' : Sending waveform %s to instrument' %
+        #               filename)
         # Check for errors
         dim = len(w)
 
@@ -980,8 +942,8 @@ class Tektronix_AWG5014(VisaInstrument):
             None
         '''
         filename = self._values['recent_channel_%s' % channel]['filename']
-        logging.debug(__name__ + ' : Resending %s to channel %s' %
-                      (filename, channel))
+        # logging.debug(__name__ + ' : Resending %s to channel %s' %
+        #               (filename, channel))
 
         if (w == []):
             w = self._values['recent_channel_%s' % channel]['w']
@@ -992,9 +954,9 @@ class Tektronix_AWG5014(VisaInstrument):
         if (clock == []):
             clock = self._values['recent_channel_%s' % channel]['clock']
 
-        if not ((len(w) == self._numpoints) and (len(m1) == self._numpoints)
-                and (len(m2) == self._numpoints)):
-            logging.error(__name__ + ' : one (or more) lengths of waveforms do not match with numpoints')
+        # if not ((len(w) == self._numpoints) and (len(m1) == self._numpoints)
+        #         and (len(m2) == self._numpoints)):
+        #     logging.error(__name__ + ' : one (or more) lengths of waveforms do not match with numpoints')
 
         self.send_waveform(w, m1, m2, filename, clock)
         self.set_filename(filename, channel)
@@ -1015,16 +977,17 @@ class Tektronix_AWG5014(VisaInstrument):
         Output:
             None
         '''
-        logging.debug(__name__  + ' : Try to set %s on channel %s' %(name, channel))
+        # logging.debug(__name__  + ' : Try to set %s on channel %s' %(name, channel))
         exists = False
         if name in self._values['files']:
             exists= True
-            logging.debug(__name__  + ' : File exists in local memory')
-            self._values['recent_channel_%s' %channel] = self._values['files'][name]
-            self._values['recent_channel_%s' %channel]['filename'] = name
+            # logging.debug(__name__  + ' : File exists in local memory')
+            self._values['recent_channel_%s' % channel] = \
+                self._values['files'][name]
+            self._values['recent_channel_%s' % channel]['filename'] = name
         else:
-            logging.debug(__name__  + ' : File does not exist in memory, \
-            reading from instrument')
+            # logging.debug(__name__  + ' : File does not exist in memory, \
+            # reading from instrument')
             lijst = self.visa_handle.ask('MMEM:CAT? "MAIN"')
             bool = False
             bestand=""
@@ -1040,23 +1003,22 @@ class Tektronix_AWG5014(VisaInstrument):
         if exists:
             data = self.visa_handle.ask('MMEM:DATA? "%s"' %name)
 
-            logging.debug(__name__  + ' : File exists on instrument, loading \
-                    into local memory')
-            self._import_waveform_file(name,name)
+            # logging.debug(__name__  + ' : File exists on instrument, loading \
+            #         into local memory')
+            self._import_waveform_file(name, name)
             # string alsvolgt opgebouwd: '#' <lenlen1> <len> 'MAGIC 1000\r\n' '#' <len waveform> 'CLOCK ' <clockvalue>
-            len1=int(data[1])
-            len2=int(data[2:2+len1])
-            i=len1
+            len1 = int(data[1])
+            len2 = int(data[2:2+len1])
+            i = len1
             tekst = ""
-            while (tekst!='#'):
-                tekst=data[i]
-                i=i+1
-            len3=int(data[i])
-            len4=int(data[i+1:i+1+len3])
-
-            w=[]
-            m1=[]
-            m2=[]
+            while (tekst != '#'):
+                tekst = data[i]
+                i = i+1
+            len3 = int(data[i])
+            len4 = int(data[i+1:i+1+len3])
+            w = []
+            m1 = []
+            m2 = []
 
             for q in range(i+1+len3, i+1+len3+len4,5):
                 j=int(q)
@@ -1074,244 +1036,19 @@ class Tektronix_AWG5014(VisaInstrument):
             self._values['files'][name]['clock']=clock
             self._values['files'][name]['numpoints']=len(w)
 
-            self._values['recent_channel_%s' %channel] = self._values['files'][name]
-            self._values['recent_channel_%s' %channel]['filename'] = name
-        else:
-            logging.error(__name__  + ' : Invalid filename specified %s' %name)
+            self._values['recent_channel_%s' % channel] = \
+                self._values['files'][name]
+            self._values['recent_channel_%s' % channel]['filename'] = name
+        # else:
+            # logging.error(__name__  + ' : Invalid filename specified %s' %name)
 
         if (self._numpoints==self._values['files'][name]['numpoints']):
-            logging.warning(__name__  + ' : Set file %s on channel %s' % (name, channel))
+            # logging.warning(__name__  + ' : Set file %s on channel %s' % (name, channel))
             self.visa_handle.write('SOUR%s:WAV "%s"' % (channel, name))
         else:
-            logging.warning(__name__  + ' : Verkeerde lengte %s ipv %s'
-                %(self._values['files'][name]['numpoints'], self._numpoints))
-
-    # End of waveform file functions
-
-    def _do_get_amplitude(self, channel):
-        '''
-        Reads the amplitude of the designated channel from the instrument
-
-        Input:
-            channel (int) : 1 to 4, the number of the designated channel
-
-        Output:
-            amplitude (float) : the amplitude of the signal in Volts
-        '''
-        logging.debug(__name__ + ' : Get amplitude of channel %s from instrument'
-            %channel)
-        val=  (self.visa_handle.ask('SOUR%s:VOLT:LEV:IMM:AMPL?' % channel))
-        return val
-
-    def _do_set_amplitude(self, amp, channel):
-        '''
-        Sets the amplitude of the designated channel of the instrument
-
-        Input:
-            amp (float)   : amplitude in Volts
-            channel (int) : 1 to 4, the number of the designated channel
-
-        Output:
-            None
-        '''
-        logging.debug(__name__ + ' : Set amplitude of channel %s to %.6f'
-            %(channel, amp))
-        self.visa_handle.write('SOUR%s:VOLT:LEV:IMM:AMPL %.6f' % (channel, amp))
-
-    def _do_get_offset(self, channel):
-        '''
-        Reads the offset of the designated channel of the instrument
-
-        Input:
-            channel (int) : 1 to 4, the number of the designated channel
-
-        Output:
-            offset (float) : offset of designated channel in Volts
-        '''
-        logging.debug(__name__ + ' : Get offset of channel %s' %channel)
-        return float(self.visa_handle.ask('SOUR%s:VOLT:LEV:IMM:OFFS?' % channel))
-
-    def _do_set_offset(self, offset, channel):
-        '''
-        Sets the offset of the designated channel of the instrument
-
-        Input:
-            offset (float) : offset in Volts
-            channel (int)  : 1 to 4, the number of the designated channel
-
-        Output:
-            None
-        '''
-        logging.debug(__name__ + ' : Set offset of channel %s to %.6f' %(channel, offset))
-        self.visa_handle.write('SOUR%s:VOLT:LEV:IMM:OFFS %.6f' % (channel, offset))
-
-    def _do_get_marker1_low(self, channel):
-        '''
-        Gets the low level for marker1 on the designated channel.
-
-        Input:
-            channel (int) : 1 to 4, the number of the designated channel
-
-        Output:
-            low (float) : low level in Volts
-        '''
-        logging.debug(__name__ + ' : Get lower bound of marker1 of channel %s' %channel)
-        return float(self.visa_handle.ask('SOUR%s:MARK1:VOLT:LEV:IMM:LOW?' % channel))
-
-    def _do_set_marker1_low(self, low, channel):
-        '''
-        Sets the low level for marker1 on the designated channel.
-
-        Input:
-            low (float)   : low level in Volts
-            channel (int) : 1 to 4, the number of the designated channel
-
-        Output:
-            None
-         '''
-        logging.debug(__name__ + ' : Set lower bound of marker1 of channel %s to %.3f'
-            %(channel, low))
-        self.visa_handle.write('SOUR%s:MARK1:VOLT:LEV:IMM:LOW %.3f' % (channel, low))
-
-    def _do_get_marker1_high(self, channel):
-        '''
-        Gets the high level for marker1 on the designated channel.
-
-        Input:
-            channel (int) : 1 to 4, the number of the designated channel
-
-        Output:
-            high (float) : high level in Volts
-        '''
-        logging.debug(__name__ + ' : Get upper bound of marker1 of channel %s' %channel)
-        return float(self.visa_handle.ask('SOUR%s:MARK1:VOLT:LEV:IMM:HIGH?' % channel))
-
-    def _do_set_marker1_high(self, high, channel):
-        '''
-        Sets the high level for marker1 on the designated channel.
-
-        Input:
-            high (float)   : high level in Volts
-            channel (int) : 1 to 4, the number of the designated channel
-
-        Output:
-            None
-         '''
-        logging.debug(__name__ + ' : Set upper bound of marker1 of channel %s to %.3f'
-            %(channel,high))
-        self.visa_handle.write('SOUR%s:MARK1:VOLT:LEV:IMM:HIGH %.3f' % (channel, high))
-
-    def _do_get_marker1_delay(self, channel):
-        '''
-        Gets the low level for marker1 on the designated channel.
-
-        Input:
-            channel (int) : 1 to 4, the number of the designated channel
-
-        Output:
-           delay(float) : delay in seconds
-        '''
-        logging.debug(__name__ + ' : Get delay of marker1 of channel %s' %channel)
-        return float(self.visa_handle.ask('SOUR%s:MARK1:DEL?' % channel))*1e9
-
-    def _do_set_marker1_delay(self, delay, channel):
-        '''
-        Sets the low level for marker1 on the designated channel.
-
-        Input:
-            delay   : in seconds
-            channel (int) : 1 to 4, the number of the designated channel
-
-        Output:
-            None
-         '''
-        logging.debug(__name__ + ' : Set delay of marker1 of channel %s to %.3f'
-            %(channel, delay))
-        self.visa_handle.write('SOUR%s:MARK1:DEL %.3fe-9' % (channel, delay))
-
-    def _do_get_marker2_low(self, channel):
-        '''
-        Gets the low level for marker2 on the designated channel.
-
-        Input:
-            channel (int) : 1 to 4, the number of the designated channel
-
-        Output:
-            low (float) : low level in Volts
-        '''
-        logging.debug(__name__ + ' : Get lower bound of marker2 of channel %s' %channel)
-        return float(self.visa_handle.ask('SOUR%s:MARK2:VOLT:LEV:IMM:LOW?' % channel))
-
-    def _do_set_marker2_low(self, low, channel):
-        '''
-        Sets the low level for marker2 on the designated channel.
-
-        Input:
-            low (float)   : low level in Volts
-            channel (int) : 1 to 4, the number of the designated channel
-
-        Output:
-            None
-         '''
-        logging.debug(__name__ + ' : Set lower bound of marker2 of channel %s to %.3f'
-            %(channel, low))
-        self.visa_handle.write('SOUR%s:MARK2:VOLT:LEV:IMM:LOW %.3f' % (channel, low))
-
-    def _do_get_marker2_high(self, channel):
-        '''
-        Gets the high level for marker2 on the designated channel.
-
-        Input:
-            channel (int) : 1 to 4, the number of the designated channel
-
-        Output:
-            high (float) : high level in Volts
-        '''
-        logging.debug(__name__ + ' : Get upper bound of marker2 of channel %s' %channel)
-        return float(self.visa_handle.ask('SOUR%s:MARK2:VOLT:LEV:IMM:HIGH?' % channel))
-
-    def _do_set_marker2_high(self, high, channel):
-        '''
-        Sets the high level for marker2 on the designated channel.
-
-        Input:
-            high (float)   : high level in Volts
-            channel (int) : 1 to 4, the number of the designated channel
-
-        Output:
-            None
-         '''
-        logging.debug(__name__ + ' : Set upper bound of marker2 of channel %s to %.3f'
-            %(channel,high))
-        self.visa_handle.write('SOUR%s:MARK2:VOLT:LEV:IMM:HIGH %.3f' % (channel, high))
-
-    def _do_get_marker2_delay(self, channel):
-        '''
-        Gets the low level for marker1 on the designated channel.
-
-        Input:
-            channel (int) : 1 to 4, the number of the designated channel
-
-        Output:
-           delay(float) : delay in seconds
-        '''
-        logging.debug(__name__ + ' : Get delay of marker1 of channel %s' %channel)
-        return float(self.visa_handle.ask('SOUR%s:MARK2:DEL?' % channel))*1e9
-
-    def _do_set_marker2_delay(self, delay, channel):
-        '''
-        Sets the low level for marker1 on the designated channel.
-
-        Input:
-            delay   : in seconds
-            channel (int) : 1 to 4, the number of the designated channel
-
-        Output:
-            None
-         '''
-        logging.debug(__name__ + ' : Set delay of marker1 of channel %s to %.3f'
-            %(channel, delay))
-        self.visa_handle.write('SOUR%s:MARK2:DEL %.3fe-9' % (channel, delay))
+            pass
+            # logging.warning(__name__  + ' : Verkeerde lengte %s ipv %s'
+            #     %(self._values['files'][name]['numpoints'], self._numpoints))
 
     def delete_all_waveforms_from_list(self):
         self.visa_handle.write('WLISt:WAVeform:DELete ALL')
@@ -1359,7 +1096,7 @@ class Tektronix_AWG5014(VisaInstrument):
 
     #  Ask for string with filenames
     def get_filenames(self):
-        logging.debug(__name__ + ' : Read filenames from instrument')
+        # logging.debug(__name__ + ' : Read filenames from instrument')
         return self.visa_handle.ask('MMEM:CAT?')
 
     def set_DC_out(self, DC_channel_number, Voltage):
@@ -1397,9 +1134,6 @@ class Tektronix_AWG5014(VisaInstrument):
         self.get_state()
         print('setting time: ',time()-t1-t0)
 
-    def do_get_setup_filename(self):
-        return self.visa_handle.ask('AWGControl:SNAMe?')
-
     def _set_setup_filename(self, fname):
         folder_name = 'C:/' + self._setup_folder + '/' + fname
         self.set_current_folder_name(folder_name)
@@ -1408,9 +1142,9 @@ class Tektronix_AWG5014(VisaInstrument):
             print('Warning, unsuccesfully set AWG file', folder_name)
         print('Current AWG file set to: ', self.get_current_folder_name())
         self.visa_handle.write('AWGC:SRES "%s.awg"' % fname)
-        qt.msleep(.5)  # dirty hack to see if this helps
 
-    def do_set_setup_filename(self, fname, force_load=False):
+
+    def set_setup_filename(self, fname, force_load=False):
         '''
         sets the .awg file to a .awg file that already exists in the memory of
         the AWG.
@@ -1436,7 +1170,6 @@ class Tektronix_AWG5014(VisaInstrument):
             parkeys.remove('trigger_mode')
             # Removed trigger_mode because duplicate of run mode
             comm = False
-            qt.msleep()
             for key in parkeys:
                 try:
                     # print 'setting: %s' % key
@@ -1446,10 +1179,10 @@ class Tektronix_AWG5014(VisaInstrument):
                     print(key + ' not set!')
                     comm = False
 
-                qt.msleep(0.00005)
                 # Sped up by factor 10, VISA protocol should take care of wait
                 if comm:
                     self.visa_handle.ask('*OPC?')
+        self.get('setup_filename') # ensures the setup filename gets updated
 
     def is_awg_ready(self):
         self.visa_handle.ask('*OPC?')
