@@ -20,7 +20,7 @@
 import numpy as np
 import struct
 from time import sleep, time, localtime
-from io import StringIO
+from io import BytesIO
 import os
 
 # load the qcodes path, until we have this installed as a package
@@ -208,6 +208,10 @@ class Tektronix_AWG5014(VisaInstrument):
                            set_cmd='EVEN:LEV '+'{:.3f}',
                            vals=vals.Numbers(-5, 5),
                            parse_function=float)
+        self.add_parameter('event_jump_timing',
+                           get_cmd='EVEN:JTIM?',
+                           set_cmd='EVEN:JTIM {}',
+                           vals=vals.Strings(options=['SYNC', 'ASYNC']))
 
         self.add_parameter('clock_freq',
                            label='Clock frequency (Hz)',
@@ -387,11 +391,11 @@ class Tektronix_AWG5014(VisaInstrument):
         '''
         logging.info(__name__ + ' : Reading all data from instrument')
 
-        self.get_trigger_mode()
-        self.get_trigger_impedance()
-        self.get_trigger_level()
-        self.get_numpoints()
-        self.get_clock()
+        self.get('trigger_mode')
+        self.get('trigger_impedance')
+        self.get('trigger_level')
+        self.get('numpoints')
+        self.get('clock_freq')
 
         for i in range(1, 5):
             self.get('ch%d_amplitude' % i)
@@ -567,11 +571,7 @@ class Tektronix_AWG5014(VisaInstrument):
     def sq_forced_jump(self, jump_index_no):
         self.visa_handle.write('SEQ:JUMP:IMM %s' % jump_index_no)
 
-    def set_event_jump_timing(self, mode):
-        self.visa_handle.write('EVEN:JTIM %s' % (mode))
 
-    def get_event_jump_timing(self):
-        return self.visa_handle.ask('EVEN:JTIM?')
 
     #################################
     # Transmon version file loading #
@@ -665,7 +665,6 @@ class Tektronix_AWG5014(VisaInstrument):
                    == '"%s"' % waveform_listname):
             sleep(0.01)
             i = i+1
-            print(i)
         return
     ######################
     # AWG file functions #
@@ -686,24 +685,31 @@ class Tektronix_AWG5014(VisaInstrument):
 
         '''
         if len(dtype) == 1:
-            #print 'dtype:1'
             dat = struct.pack('<'+dtype, value)
             lendat = len(dat)
-            #print 'name: ',name, 'dtype: ',dtype, 'len: ',lendat, 'vali: ',value
         else:
-            #print 'dtype:>1'
-            if dtype[-1] == 's':
+            # print('dtype:>1')
+            if dtype[-1] == 's'.encode('utf-8'):
+                # dtype = dtype.encode('utf-8')
                 dat = struct.pack(dtype, value)
                 lendat = len(dat)
-                #print 'name: ',name, 'dtype: ',dtype, 'len: ',lendat, 'vals: ',len(value)
             else:
-                #print tuple(value)
-                dat = struct.pack('<'+dtype, *tuple(value))
+                # print('Debug print for pack record')
+                # print('name:', name, type(name))
+                # print('dtype:', dtype, type(dtype))
+                # print('value:', value, type(value), '\n')
+                if type(value) is str:
+                    value = value.encode('utf-8')
+                if (type(value) is tuple or type(value) is list or
+                        type(value) is np.ndarray):
+                    dat = struct.pack('<'+dtype, *value)
+                else:
+                    dat = struct.pack('<'+dtype, value)
                 lendat = len(dat)
-                #print 'name: ',name, 'dtype: ',dtype, 'len: ',lendat, 'vals: ',len(value)
-        #print lendat
-        return struct.pack('<II', len(name+'\x00'),
-                           lendat) + name + '\x00' + dat
+           #print lendat
+
+        return struct.pack('<II', len(name.encode('utf-8') + b'x00'),
+                           lendat) + bytes(name.encode('utf-8')) + b'x00' + dat
 
     def generate_sequence_cfg(self):
         '''
@@ -714,28 +720,28 @@ class Tektronix_AWG5014(VisaInstrument):
         print('Generating sequence_cfg')
 
         AWG_sequence_cfg = {
-            'SAMPLING_RATE': self.get_clock(),
+            'SAMPLING_RATE': self.get('clock_freq'),
             'CLOCK_SOURCE': (1 if self.query_visa('AWGC:CLOCK:SOUR?') == 'INT'
                              else 2),  # Internal | External
             'REFERENCE_SOURCE':   2,  # Internal | External
             'EXTERNAL_REFERENCE_TYPE':   1,  # Fixed | Variable
             'REFERENCE_CLOCK_FREQUENCY_SELECTION': 1,
             # 10 MHz | 20 MHz | 100 MHz
-            'TRIGGER_SOURCE':   1 if self.get_trigger_source() == 'EXT' else 2,
+            'TRIGGER_SOURCE':   1 if self.get('trigger_source') == 'EXT' else 2,
             # External | Internal
-            'TRIGGER_INPUT_IMPEDANCE': (1 if self.get_trigger_impedance() ==
+            'TRIGGER_INPUT_IMPEDANCE': (1 if self.get('trigger_impedance') ==
                                         50. else 2),  # 50 ohm | 1 kohm
-            'TRIGGER_INPUT_SLOPE': (1 if self.get_trigger_slope() ==
+            'TRIGGER_INPUT_SLOPE': (1 if self.get('trigger_slope') ==
                                     'POS' else 2),  # Positive | Negative
             'TRIGGER_INPUT_POLARITY': (1 if self.query_visa('TRIG:POL?') ==
                                        'POS' else 2),  # Positive | Negative
-            'TRIGGER_INPUT_THRESHOLD':  self.get_trigger_level(),  # V
-            'EVENT_INPUT_IMPEDANCE':   (1 if self.get_event_impedance() ==
+            'TRIGGER_INPUT_THRESHOLD':  self.get('trigger_level'),  # V
+            'EVENT_INPUT_IMPEDANCE':   (1 if self.get('event_impedance') ==
                                         50. else 2),  # 50 ohm | 1 kohm
-            'EVENT_INPUT_POLARITY':  (1 if self.get_event_polarity() == 'POS'
+            'EVENT_INPUT_POLARITY':  (1 if self.get('event_polarity') == 'POS'
                                       else 2),  # Positive | Negative
-            'EVENT_INPUT_THRESHOLD':   self.get_event_level(),  # V
-            'JUMP_TIMING':   (1 if self.get_event_jump_timing() == 'SYNC'
+            'EVENT_INPUT_THRESHOLD':   self.get('event_level'),  # V
+            'JUMP_TIMING':   (1 if self.get('event_jump_timing') == 'SYNC'
                               else 2),  # Sync | Async
             'RUN_MODE':   4,  # Continuous | Triggered | Gated | Sequence
             'RUN_STATE':  0,  # On | Off
@@ -770,9 +776,11 @@ class Tektronix_AWG5014(VisaInstrument):
         timetuple = tuple(np.array(localtime())[[0, 1, 8, 2, 3, 4, 5, 6, 7]])
 
         # general settings
-        head_str = StringIO()
-        head_str.write(self._pack_record('MAGIC', 5000, 'h') +
+        head_str = BytesIO()
+        str_to_write = (self._pack_record('MAGIC', 5000, 'h') +
                        self._pack_record('VERSION', 1, 'h'))
+        head_str.write(str_to_write)
+        # head_str.write(string(str_to_write))
         if sequence_cfg is None:
             sequence_cfg = self.generate_sequence_cfg()
 
@@ -784,7 +792,7 @@ class Tektronix_AWG5014(VisaInstrument):
                 logging.warning('AWG: ' + k +
                                 ' not recognized as valid AWG setting')
         # channel settings
-        ch_record_str = StringIO()
+        ch_record_str = BytesIO()
         for k in list(channel_cfg.keys()):
             ch_k = k[:-1] + 'N'
             if ch_k in self.AWG_FILE_FORMAT_CHANNEL:
@@ -795,7 +803,7 @@ class Tektronix_AWG5014(VisaInstrument):
                                 ' not recognized as valid AWG channel setting')
         # waveforms
         ii = 21
-        wf_record_str = StringIO()
+        wf_record_str = BytesIO()
         wlist = list(packed_waveforms.keys())
         wlist.sort()
         for wf in wlist:
@@ -814,7 +822,7 @@ class Tektronix_AWG5014(VisaInstrument):
             ii += 1
         # sequence
         kk = 1
-        seq_record_str = StringIO()
+        seq_record_str = BytesIO()
         for segment in wfname_l.transpose():
             seq_record_str.write(
                 self._pack_record('SEQUENCE_WAIT_%s' % kk, trig_wait[kk-1],
@@ -840,8 +848,14 @@ class Tektronix_AWG5014(VisaInstrument):
         # print self.visa_handle.ask('MMEMory:CDIRectory?')
         s1 = 'MMEM:DATA "%s",' % filename
         s2 = '#' + str(len(str(len(awg_file)))) + str(len(awg_file))
-        mes = s1+s2+awg_file
-        self.visa_handle.write(mes)
+
+        print('S1', s1, type(s1))
+        print('S2', s2, type(s2))
+        print('awg_file', type(awg_file))
+
+        mes = s1.encode('utf-8')+s2.encode('utf-8')+awg_file
+        # mes = s1+s2+awg_file
+        self.visa_handle.write_raw(mes)
 
     def load_awg_file(self, filename):
         s = 'AWGCONTROL:SRESTORE "%s"' % filename
@@ -899,7 +913,7 @@ class Tektronix_AWG5014(VisaInstrument):
         self._values['files'][filename]['w'] = w
         self._values['files'][filename]['m1'] = m1
         self._values['files'][filename]['m2'] = m2
-        self._values['files'][filename]['clock'] = clock
+        self._values['files'][filename]['clock_freq'] = clock
         self._values['files'][filename]['numpoints'] = len(w)
 
         m = m1 + np.multiply(m2, 2)
@@ -952,7 +966,7 @@ class Tektronix_AWG5014(VisaInstrument):
         if (m2 == []):
             m2 = self._values['recent_channel_%s' % channel]['m2']
         if (clock == []):
-            clock = self._values['recent_channel_%s' % channel]['clock']
+            clock = self._values['recent_channel_%s' % channel]['clock_freq']
 
         # if not ((len(w) == self._numpoints) and (len(m1) == self._numpoints)
         #         and (len(m2) == self._numpoints)):
@@ -1033,7 +1047,7 @@ class Tektronix_AWG5014(VisaInstrument):
             self._values['files'][name]['w']=w
             self._values['files'][name]['m1']=m1
             self._values['files'][name]['m2']=m2
-            self._values['files'][name]['clock']=clock
+            self._values['files'][name]['clock_freq']=clock
             self._values['files'][name]['numpoints']=len(w)
 
             self._values['recent_channel_%s' % channel] = \
@@ -1214,7 +1228,7 @@ class Tektronix_AWG5014(VisaInstrument):
         self._values['files'][filename]['w']=w
         self._values['files'][filename]['m1']=m1
         self._values['files'][filename]['m2']=m2
-        self._values['files'][filename]['clock']=clock
+        self._values['files'][filename]['clock_freq']=clock
         self._values['files'][filename]['numpoints']=len(w)
 
         m = m1 + np.multiply(m2,2)
@@ -1275,7 +1289,7 @@ class Tektronix_AWG5014(VisaInstrument):
         if (m2==[]):
             m2 = self._values['recent_channel_%s' %channel]['m2']
         if (clock==[]):
-            clock = self._values['recent_channel_%s' %channel]['clock']
+            clock = self._values['recent_channel_%s' %channel]['clock_freq']
 
         if not ( (len(w) == self._numpoints) and (len(m1) == self._numpoints) and (len(m2) == self._numpoints)):
             logging.error(__name__ + ' : one (or more) lengths of waveforms do not match with numpoints')
