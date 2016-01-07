@@ -4,14 +4,16 @@ except:
     print('Warning: Could not import msvcrt (used for detecting keystrokes)')
 
 import types
-from modules.measurement import hdf5_data as h5d
-from modules.utilities import general
 import logging
 import time
 import sys
 import os
 import numpy as np
+import pyqtgraph as pg
+import pyqtgraph.multiprocess as pgmp
 from scipy.optimize import fmin_powell
+from modules.measurement import hdf5_data as h5d
+from modules.utilities import general
 from modules.utilities.general import dict_to_ordered_tuples
 
 
@@ -55,13 +57,12 @@ class MeasurementControl:
     def run(self, name=None, mode='1D', **kw):
         '''
         Core of the Measurement control.
-        Starts by preparing
         '''
-        self.catch_previous_human_abort()
         self.set_measurement_name(name)
         self.print_measurement_start_msg()
         with h5d.Data(name=self.get_measurement_name()) as self.data_object:
-            self.start_mflow()
+            self.get_measurement_begintime()
+            self.get_git_hash()
             # Such that it is also saved if the measurement fails
             # (might want to overwrite again at the end)
             self.save_instrument_settings(self.data_object)
@@ -74,13 +75,11 @@ class MeasurementControl:
             elif mode == 'adaptive':
                 self.measure_soft_adaptive()
             else:
-                raise ValueError('mode %s not recognized' %mode)
-
-            # Commented out because not functioning correctly and it causes major
-            # timing hangups for nested measurements (issue #152)
-            # self.save_instrument_logging(self.data_object)
+                raise ValueError('mode %s not recognized' % mode)
 
     def measure(self, *kw):
+        self.initialize_plot_monitor()
+
         if (self.sweep_functions[0].sweep_control !=
                 self.detector_function.detector_control):
                 # FIXME only checks first sweepfunction
@@ -202,10 +201,11 @@ class MeasurementControl:
             self.dset[start_idx:, 0:len(self.sweep_functions)] = \
                 relevant_swp_points
 
-        for i in range(len(self.detector_function.value_names)):
-            self.update_plotmon(
-                mon_nr=i+1, x_ind=0,
-                y_ind=-len(self.detector_function.value_names)+i)
+        self.update_plotmon()
+        # for i in range(len(self.detector_function.value_names)):
+        #     self.update_plotmon(
+        #         mon_nr=i+1, x_ind=0,
+        #         y_ind=-len(self.detector_function.value_names)+i)
         if hasattr(self, 'TwoD_array'):
             self.update_plotmon_2D_hard()
             self.print_progress_static_2D_hard()
@@ -239,22 +239,23 @@ class MeasurementControl:
         savable_data = np.append(x, vals)
         self.dset[self.iteration-1, :] = savable_data
         # update plotmon
-        if len(self.sweep_functions) == 1:
-            for i in range(len(self.detector_function.value_names)):
-                self.update_plotmon(mon_nr=i+1, x_ind=0, y_ind=i+1)
-        elif len(self.sweep_functions) == 2:
-            for i in range(len(self.detector_function.value_names)):
-                self.update_plotmon(mon_nr=i+1, x_ind=0, y_ind=i+1)
-        elif len(self.sweep_functions) <= 4:
-            for i in range(len(self.sweep_functions)):
-                self.update_plotmon(
-                    mon_nr=i+1, x_ind=i,
-                    y_ind=-len(self.detector_function.value_names))
-        else:
-            for i in range(4):
-                self.update_plotmon(
-                    mon_nr=i+1, x_ind=i,
-                    y_ind=-len(self.detector_function.value_names))
+        self.update_plotmon()
+        # if len(self.sweep_functions) == 1:
+        #     for i in range(len(self.detector_function.value_names)):
+        #         self.update_plotmon(mon_nr=i+1, x_ind=0, y_ind=i+1)
+        # elif len(self.sweep_functions) == 2:
+        #     for i in range(len(self.detector_function.value_names)):
+        #         self.update_plotmon(mon_nr=i+1, x_ind=0, y_ind=i+1)
+        # elif len(self.sweep_functions) <= 4:
+        #     for i in range(len(self.sweep_functions)):
+        #         self.update_plotmon(
+        #             mon_nr=i+1, x_ind=i,
+        #             y_ind=-len(self.detector_function.value_names))
+        # else:
+        #     for i in range(4):
+        #         self.update_plotmon(
+        #             mon_nr=i+1, x_ind=i,
+        #             y_ind=-len(self.detector_function.value_names))
         if hasattr(self, 'TwoD_array'):
             self.update_plotmon_2D()
         return vals
@@ -386,16 +387,50 @@ class MeasurementControl:
     ###########
     # Plotmon #
     ###########
+    '''
+    There are (will be) three kinds of plotmons, the regular plotmon,
+    the 2D plotmon (which does a heatmap) and the adaptive plotmon.
+    '''
+    def initialize_plot_monitor(self):
+        pg.mkQApp()
+        proc = pgmp.QtProcess()  # pyqtgraph multiprocessing
+        rpg = proc._import('pyqtgraph')
+        self.win = rpg.GraphicsWindow(title='Plot monitor of %s' % self.name)
+        self.win.resize(1000, 600)
+        self.curves = []
+        xlabels = self.column_names[0:len(self.sweep_function_names)]
+        ylabels = self.column_names[len(self.sweep_function_names):]
+        for xlab in xlabels:
+            for ylab in ylabels:
+                p = self.win.addPlot()
+                p.setLabel('bottom', xlab)
+                p.setLabel('left', ylab)
+                c = p.plot()
+                self.curves.append(c)
+            self.win.nextRow()
+        return self.win, self.curves
 
-    def update_plotmon(self, mon_nr, x_ind=0, y_ind=-1):
-        y = self.dset[:, y_ind]
-        if x_ind is None:
-            x = np.arange(len(y))
-        else:
-            x = self.dset[:, x_ind]
-        data = [x, y]
-        if hasattr(self, 'Plotmon'):
-            self.Plotmon.plot2D(mon_nr, data)
+    def update_plotmon(self):
+        i = 0
+        nr_sweep_funcs = len(self.sweep_function_names)
+        for x_ind in range(nr_sweep_funcs):
+            for y_ind in range(len(self.detector_function.value_names)):
+                x = self.dset[:, x_ind]
+                y = self.dset[:, nr_sweep_funcs+y_ind]
+                self.curves[i].setData(x, y)
+                i += 1
+
+
+
+    # def update_plotmon(self, mon_nr, x_ind=0, y_ind=-1):
+    #     y = self.dset[:, y_ind]
+    #     if x_ind is None:
+    #         x = np.arange(len(y))
+    #     else:
+    #         x = self.dset[:, x_ind]
+    #     data = [x, y]
+    #     if hasattr(self, 'Plotmon'):
+    #         self.Plotmon.plot2D(mon_nr, data)
 
     def preallocate_2D_plot(self):
         '''
@@ -436,7 +471,7 @@ class MeasurementControl:
         if len(self.detector_function.value_names) == 1:
             z_ind = len(self.sweep_functions)
             self.TwoD_array[x_ind, y_ind] = self.dset[i, z_ind]
-            if self.Plotmon is not None:
+            if hasattr(self, 'Plotmon'):
                 self.Plotmon.plot3D(1, data=self.TwoD_array,
                                     axis=(self.x_start, self.x_step,
                                           self.y_start, self.y_step))
@@ -444,7 +479,7 @@ class MeasurementControl:
             for j in range(2):
                 z_ind = len(self.sweep_functions) + j
                 self.TwoD_array[x_ind, y_ind, j] = self.dset[i, z_ind]
-                if self.Plotmon is not None:
+                if hasattr(self, 'Plotmon'):
                     self.Plotmon.plot3D(j+1, data=self.TwoD_array[:, :, j],
                                         axis=(self.x_start, self.x_step,
                                               self.y_start, self.y_step))
@@ -490,6 +525,22 @@ class MeasurementControl:
         '''
         return self.data_object
 
+    def get_column_names(self):
+        self.column_names = []
+        self.sweep_par_names = []
+        self.sweep_par_units = []
+
+        for sweep_function in self.sweep_functions:
+            self.column_names.append(sweep_function.parameter_name+' (' +
+                                     sweep_function.unit+')')
+            self.sweep_par_names.append(sweep_function.parameter_name)
+            self.sweep_par_units.append(sweep_function.unit)
+
+        for i, val_name in enumerate(self.detector_function.value_names):
+            self.column_names.append(val_name+' (' +
+                self.detector_function.value_units[i] + ')')
+        return self.column_names
+
     def create_experimentaldata_dataset(self):
         data_group = self.data_object.create_group('Experimental Data')
         self.dset = data_group.create_dataset(
@@ -497,27 +548,12 @@ class MeasurementControl:
                      len(self.detector_function.value_names)),
             maxshape=(None, len(self.sweep_functions) +
                       len(self.detector_function.value_names)))
-
-        column_names = []
-        sweep_par_names = []
-        sweep_par_units = []
-
-        for sweep_function in self.sweep_functions:
-            column_names.append(sweep_function.parameter_name+' (' +
-                                sweep_function.unit+')')
-            sweep_par_names.append(sweep_function.parameter_name)
-            sweep_par_units.append(sweep_function.unit)
-
-        for i, val_name in enumerate(self.detector_function.value_names):
-            column_names.append(val_name+' (' +
-                                self.detector_function.value_units[i] + ')')
-
-        self.dset.attrs['column_names'] = h5d.encode_to_utf8(column_names)
-
+        self.get_column_names()
+        self.dset.attrs['column_names'] = h5d.encode_to_utf8(self.column_names)
         # Added to tell analysis how to extract the data
         data_group.attrs['datasaving_format'] = h5d.encode_to_utf8('Version 2')
-        data_group.attrs['sweep_parameter_names'] = h5d.encode_to_utf8(sweep_par_names)
-        data_group.attrs['sweep_parameter_units'] = h5d.encode_to_utf8(sweep_par_units)
+        data_group.attrs['sweep_parameter_names'] = h5d.encode_to_utf8(self.sweep_par_names)
+        data_group.attrs['sweep_parameter_units'] = h5d.encode_to_utf8(self.sweep_par_units)
 
         data_group.attrs['value_names'] = h5d.encode_to_utf8(self.detector_function.value_names)
         data_group.attrs['value_units'] = h5d.encode_to_utf8(self.detector_function.value_units)
@@ -556,21 +592,6 @@ class MeasurementControl:
                         val = ''
                     instrument_grp.attrs[p_name] = str(val)
 
-
-    def start_mflow(self):
-        '''
-        Checks if measurement is running
-        '''
-        self.get_measurement_begintime()
-        # Commented out because not functioning correctly and it causes major
-        # timing hangups for nested measurements (issue #152)
-        # self.init_instrument_changelog()
-        self.get_git_hash()
-        # if not qt.flow.is_measuring():
-        #     qt.mstart()
-        # else:
-        #     pass
-
     def print_progress_static_soft_sweep(self, i):
         percdone = (i+1)*1./len(self.sweep_points)*100
         elapsed_time = time.time() - self.begintime
@@ -586,7 +607,6 @@ class MeasurementControl:
         else:
             end_char = '\n'
         print(scrmes, end=end_char)
-
 
     def print_progress_static_2D_hard(self):
         acquired_points = self.dset.shape[0]
@@ -624,13 +644,6 @@ class MeasurementControl:
                 print('Sweep function %d: %s' % (
                     i, self.sweep_function_names[i]))
             print('Detector function: %s' % self.get_detector_function_name())
-
-    def catch_previous_human_abort(self):
-        try:
-            pass
-            # qt.msleep()
-        except ValueError:
-            print('Human abort from previuos stop. Continuing measurement')
 
     def get_datetimestamp(self):
         return time.strftime('%Y%m%d_%H%M%S', time.localtime())

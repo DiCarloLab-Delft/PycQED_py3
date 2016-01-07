@@ -153,7 +153,7 @@ class SignalHound_USB_SA124B(Instrument):
         #  VBW can be arbitrary. For best performance use RBW as the VBW.
         self.add_parameter('vbw',
                            label='Video Bandwidth (Hz)',
-                           get_cmd=self._do_get_vbw ,
+                           get_cmd=self._do_get_vbw,
                            set_cmd=self._do_set_vbw,
                            parse_function=float)
         self.set('frequency', 5)
