@@ -146,7 +146,8 @@ class Pulsar:
                 if self.channels[names[sid]]['active']:
                     output = True
             if output:
-                getattr(self.AWG, 'set_%s_status' % id)('on')
+                self.AWG.set('{}_state'.format(id), 1)
+                # getattr(self.AWG, 'set_%s_status' % id)('on')
 
     def get_awg_channel_cfg(self):
         channel_cfg = {}

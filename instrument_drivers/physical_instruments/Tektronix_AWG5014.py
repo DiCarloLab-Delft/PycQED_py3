@@ -237,7 +237,13 @@ class Tektronix_AWG5014(VisaInstrument):
             i += 1  # to convert from pythonic counting to AWG counting
             amp_cmd = 'SOUR{}:VOLT:LEV:IMM:AMPL'.format(i)
             offset_cmd = 'SOUR{}:VOLT:LEV:IMM:OFFS'.format(i)
+            state_cmd = 'OUTPUT{}:STATE'.format(i)
             # Set channel first to ensure sensible sorting of pars
+            self.add_parameter('ch{}_state'.format(i),
+                               label='Status channel {}'.format(i),
+                               get_cmd=state_cmd+'?',
+                               set_cmd=state_cmd+' {}',
+                               vals=vals.Ints(0, 1))
             self.add_parameter('ch{}_amp'.format(i),
                                label='Amplitude channel {} (V)'.format(i),
                                get_cmd=amp_cmd + '?',
@@ -376,7 +382,7 @@ class Tektronix_AWG5014(VisaInstrument):
 
     def set_all_channels_on(self):
         for i in range(1, 5):
-            exec('self.set_ch%d_status("On")' % i)
+            self.set('ch{}_state', 1)
 
     def get_all(self):
         '''
@@ -1067,46 +1073,6 @@ class Tektronix_AWG5014(VisaInstrument):
     def delete_all_waveforms_from_list(self):
         self.visa_handle.write('WLISt:WAVeform:DELete ALL')
 
-    def do_get_status(self, channel):
-        '''
-        Gets the status of the designated channel.
-        'Tektronix_AWG5014'
-        Input:
-            channel (int) : 1 to 4, the number of the designated channel
-
-        Output:
-            None
-        '''
-        logging.debug(__name__ + ' : Get status of channel %s' %channel)
-        outp = self.visa_handle.ask('OUTP%s?' %channel)
-        if (outp=='0'):
-            return 'Off'
-        elif (outp=='1'):
-            return 'On'
-        else:
-            logging.debug(__name__ + ' : Read invalid status from instrument %s' %outp)
-            return 'an error occurred while reading status from instrument'
-
-    def do_set_status(self, status, channel):
-        '''
-        Sets the status of designated channel.
-
-        Input:
-            status (string) : 'On' or 'Off'
-            channel (int)   : channel number
-
-        Output:
-            None
-        '''
-        logging.debug(__name__ + ' : Set status of channel %s to %s'
-            %(channel, status))
-        if (status.upper()=='ON'):
-            self.visa_handle.write('OUTP%s ON' %channel)
-        elif (status.upper()=='OFF'):
-            self.visa_handle.write('OUTP%s OFF' %channel)
-        else:
-            logging.debug(__name__ + ' : Try to set status to invalid value %s' % status)
-            print('Tried to set status to invalid value %s' %status)
 
     #  Ask for string with filenames
     def get_filenames(self):
