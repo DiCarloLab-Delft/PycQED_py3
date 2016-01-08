@@ -264,8 +264,8 @@ class Pulsar:
                 % (sequence.name, sequence.element_count()), end=' ')
             return
 
-        print("Programming '%s' (%d element(s))...\n" \
-            % (sequence.name, sequence.element_count()), end=' ')
+        print("Programming '%s' (%d element(s))...\n"
+              % (sequence.name, sequence.element_count()), end=' ')
 
         # determine which channels are involved in the sequence
         if channels == 'all':
@@ -360,15 +360,18 @@ class Pulsar:
             np.array(wfname_l),
             nrep_l, wait_l, goto_l, logic_jump_l,
             self.get_awg_channel_cfg())
+        # print(awg_file.decode('utf-8'))
         self.AWG.send_awg_file(filename, awg_file)
         self.AWG.load_awg_file(filename)
-        self.activate_channels(channels)
+        print('DEBUG using version2')
+        # self.activate_channels(channels)
 
-        self.AWG.is_awg_ready()
+        # self.AWG.is_awg_ready()
         # Waits for AWG to be ready
         _t = time.time() - _t0
         print(" finished in %.2f seconds." % _t)
         print()
+        return awg_file
 
     def check_sequence_consistency(self, packed_waveforms,
                                    wfname_l,

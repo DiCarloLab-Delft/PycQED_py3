@@ -628,7 +628,7 @@ class Tektronix_AWG5014(VisaInstrument):
 
     def import_waveform_file(self, waveform_listname, waveform_filename,
                              type='wfm'):
-        self.visa_handle.write('mmem:imp "%s","%s",%s' % (waveform_listname,
+        return self.visa_handle.write('mmem:imp "%s","%s",%s' % (waveform_listname,
                                waveform_filename, type))
 
     def import_and_load_waveform_file_to_channel(self, channel_no,
@@ -659,53 +659,35 @@ class Tektronix_AWG5014(VisaInstrument):
 
     def _pack_record(self, name, value, dtype):
         '''
-        packs awg_file record structure: '<I(lenname)I(lendat)s[data of dtype]'
+        packs awg_file record into a struct in the folowing way:
+            struct.pack(fmtstring, namesize, datasize, name, data)
+        where fmtstring = '<IIs"dtype"'
+
+
         The file record format is as follows:
-
-        Record Name Size
-        (32-bit unsigned integer)
-        Record Data Size
-        (32-bit unsigned integer)
-        Record Name (ASCII)
-        (Include NULL.)
+        Record Name Size:        (32-bit unsigned integer)
+        Record Data Size:        (32-bit unsigned integer)
+        Record Name:             (ASCII) (Include NULL.)
         Record Data
+        For details see "File and Record Format" in the AWG help
 
+           < denotes little-endian encoding, I and other dtypes are format
+           characters denoted in the struct documentation
         '''
-        # name=name.encode('ASCII')
         if len(dtype) == 1:
-            dat = struct.pack('<'+dtype, value)
-            lendat = len(dat)
+            dat_struct = struct.pack('<'+dtype, value)
         else:
-            # print('dtype:>1')
-            if dtype[-1] == 's'.encode('ASCII'):
-                # dtype = dtype.encode('ASCII')
-                dat = struct.pack(dtype, value)
-                lendat = len(dat)
+            if dtype[-1] == 's':
+                dat_struct = value.encode('ASCII')
             else:
-                print('Debug print for pack record')
-                print('name:', name, type(name))
-                print('dtype:', dtype, type(dtype))
-                print('value:', value, type(value), '\n')
-                if type(value) is str:
-                    value = value.encode('ASCII')
-                if (type(value) is tuple or type(value) is list or
-                        type(value) is np.ndarray):
-                    dat = struct.pack('<'+dtype, *value)
-                else:
-                    dat = struct.pack('<'+dtype, value)
-                lendat = len(dat)
-           #print lendat
-        '''
-        Docstring: of struct.pack
-        pack(fmt, v1, v2, ...) -> bytes
+                dat_struct = struct.pack('<'+dtype, *value)
 
-        Return a bytes object containing the values v1, v2, ... packed according
-        to the format string fmt.  See help(struct) for more on format strings.
-        Type:      builtin_function_or_method
-        '''
-        packed_struct = struct.pack('<II', len(name.encode('ASCII') + b'x00'),
-                           lendat) + bytes(name.encode('ASCII')) + b'x00' + dat
-        # print(packed_struct)
+        name_struct = name.encode('ASCII')
+        name_len = len(name_struct)
+        dat_len = len(dat_struct)
+        size_struct = struct.pack('<II', name_len, dat_len)
+        packed_struct = size_struct+name_struct + dat_struct
+
         return packed_struct
 
     def generate_sequence_cfg(self):
@@ -774,20 +756,22 @@ class Tektronix_AWG5014(VisaInstrument):
 
         # general settings
         head_str = BytesIO()
-        str_to_write = (self._pack_record('MAGIC', 5000, 'h') +
-                       self._pack_record('VERSION', 1, 'h'))
-        head_str.write(str_to_write)
-        # head_str.write(string(str_to_write))
-        if sequence_cfg is None:
-            sequence_cfg = self.generate_sequence_cfg()
+        bytes_to_write = (self._pack_record('MAGIC', 5000, 'h') +
+                          self._pack_record('VERSION', 1, 'h'))
+        head_str.write(bytes_to_write)
+        # head_str.write(string(bytes_to_write))
 
-        for k in list(sequence_cfg.keys()):
-            if k in self.AWG_FILE_FORMAT_HEAD:
-                head_str.write(self._pack_record(k, sequence_cfg[k],
-                               self.AWG_FILE_FORMAT_HEAD[k]))
-            else:
-                logging.warning('AWG: ' + k +
-                                ' not recognized as valid AWG setting')
+        # Commented out the sequence config.
+        # if sequence_cfg is None:
+        #     sequence_cfg = self.generate_sequence_cfg()
+
+        # for k in list(sequence_cfg.keys()):
+        #     if k in self.AWG_FILE_FORMAT_HEAD:
+        #         head_str.write(self._pack_record(k, sequence_cfg[k],
+        #                        self.AWG_FILE_FORMAT_HEAD[k]))
+        #     else:
+        #         logging.warning('AWG: ' + k +
+        #                         ' not recognized as valid AWG setting')
         # channel settings
         ch_record_str = BytesIO()
         for k in list(channel_cfg.keys()):
@@ -839,23 +823,31 @@ class Tektronix_AWG5014(VisaInstrument):
                                           + '_%s' % kk, wfname + '\x00',
                                           '%ss' % len(wfname+'\x00')))
             kk += 1
-        return head_str.getvalue() + ch_record_str.getvalue() + wf_record_str.getvalue() + seq_record_str.getvalue()
+
+        print('Printing awg_file contents: \n',
+              'head_str:\t', head_str.getvalue(), '\t',
+              'ch_record_str:\t', ch_record_str.getvalue(), '\t',
+              # 'wf_record_str:\t', wf_record_str.getvalue(), '\t',
+              'seq_record_str:\t', seq_record_str.getvalue())
+        print('*'*10, '\n')
+        return bytes_to_write  # head_str.getvalue()
+        # + ch_record_str.getvalue() + \
+        #     wf_record_str.getvalue() + seq_record_str.getvalue()
 
     def send_awg_file(self, filename, awg_file):
         print('Writing to:', self.visa_handle.ask('MMEMory:CDIRectory?'),
               filename)
-
-        s1 = 'MMEM:DATA "%s",' % filename # Command to write data
-        s2 = '#' + str(len(str(len(awg_file)))) + str(len(awg_file)) # Header indicating the size
-        # and the actual file that
-        mes = s1.encode('ASCII')+s2.encode('ASCII')+awg_file
-        # mes = s1+s2+awg_file
-        self.visa_handle.write(mes)
+        # Header indicating the name and size of the file being send
+        name_str = ('MMEM:DATA "%s",' % filename).encode('ASCII')
+        size_str = ('#' + str(len(str(len(awg_file)))) +
+                    str(len(awg_file))).encode('ASCII')
+        mes = name_str + size_str + awg_file
+        self.visa_handle.write_raw(mes)
 
     def load_awg_file(self, filename):
         s = 'AWGCONTROL:SRESTORE "%s"' % filename
         # print s
-        self.visa_handle.write(s)
+        self.visa_handle.write_raw(s)
 
     def get_error(self):
         # print self.visa_handle.ask('AWGControl:SNAMe?')
