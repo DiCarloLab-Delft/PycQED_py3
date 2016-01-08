@@ -300,12 +300,13 @@ class Tektronix_AWG5014(VisaInstrument):
         # self.add_function('initialize_dc_waveforms')
 
         # # Setup filepaths
-        self._file_path = "C:\\waveforms\\"
-        self._rem_file_path = "Z:\\waveforms\\"
+        self.waveform_folder = "Waveforms"
+        self._rem_file_path = "Z:\\Waveforms\\"
 
         self._setup_folder = setup_folder
-        self.set_current_folder_name(self._file_path)
-        # self.get_all()
+        self.goto_root()
+        self.change_folder(self.waveform_folder)
+        self.get_all()
         self.set('trigger_impedance', 50)
         # if reset:
         #     self.reset()
@@ -316,9 +317,16 @@ class Tektronix_AWG5014(VisaInstrument):
 
         self.visa_handle.write('mmem:CDIrectory "\\wfs"')
         # NOTE! this directory has to exist on the AWG!!
-        print('Connected to \n', self.get('IDN').replace(',', '\n'))
+        print('Connected to: \n', self.get('IDN').replace(',', ', '))
 
     # Functions
+    def get_all(self, update=True):
+        # Ensures updating
+        if update:
+            for par in self.parameters:
+                self.get(par)
+        return self.snapshot()
+
     def get_state(self):
         state = self.visa_handle.ask('AWGC:RSTATE?')
         if state.startswith('0'):
@@ -344,20 +352,25 @@ class Tektronix_AWG5014(VisaInstrument):
     def stop(self):
         self.visa_handle.write('AWGC:STOP')
 
-    def get_folder_contents(self):
+    def get_folder_contents(self, print_contents=True):
+        if print_contents:
+            print('Current folder:', self.get_current_folder_name())
+            print(self.visa_handle.ask('MMEM:CAT?')
+                  .replace(',"$', '\n$').replace('","', '\n')
+                  .replace(',', '\t'))
         return self.visa_handle.ask('mmem:cat?')
 
     def get_current_folder_name(self):
         return self.visa_handle.ask('mmem:cdir?')
 
     def set_current_folder_name(self, file_path):
-        self.visa_handle.write('mmem:cdir "%s"' % file_path)
+        return self.visa_handle.write('mmem:cdir "%s"' % file_path)
 
     def change_folder(self, dir):
-        self.visa_handle.write('mmem:cdir "\%s"' %dir)
+        return self.visa_handle.write('mmem:cdir "\%s"' %dir)
 
     def goto_root(self):
-        self.visa_handle.write('mmem:cdir "c:\\.."')
+        return self.visa_handle.write('mmem:cdir "c:\\.."')
 
     def create_and_goto_dir(self, dir):
         '''
@@ -383,38 +396,6 @@ class Tektronix_AWG5014(VisaInstrument):
     def set_all_channels_on(self):
         for i in range(1, 5):
             self.set('ch{}_state', 1)
-
-    def get_all(self):
-        '''
-        Reads all implemented parameters from the instrument,
-        and updates the wrapper.
-
-        Input:
-            None
-
-        Output:
-            None
-        '''
-        logging.info(__name__ + ' : Reading all data from instrument')
-
-        self.get('trigger_mode')
-        self.get('trigger_impedance')
-        self.get('trigger_level')
-        self.get('numpoints')
-        self.get('clock_freq')
-
-        for i in range(1, 5):
-            self.get('ch%d_amplitude' % i)
-            self.get('ch%d_offset' % i)
-            self.get('ch%d_marker1_low' % i)
-            self.get('ch%d_marker1_high' % i)
-            self.get('ch%d_marker1_delay' % i)
-            self.get('ch%d_marker2_low' % i)
-            self.get('ch%d_marker2_high' % i)
-            self.get('ch%d_marker2_delay' % i)
-            self.get('ch%d_status' % i)
-        self.get('run_mode')
-        self.get('setup_filename')
 
     def clear_waveforms(self):
         '''
@@ -690,22 +671,23 @@ class Tektronix_AWG5014(VisaInstrument):
         Record Data
 
         '''
+        # name=name.encode('ASCII')
         if len(dtype) == 1:
             dat = struct.pack('<'+dtype, value)
             lendat = len(dat)
         else:
             # print('dtype:>1')
-            if dtype[-1] == 's'.encode('utf-8'):
-                # dtype = dtype.encode('utf-8')
+            if dtype[-1] == 's'.encode('ASCII'):
+                # dtype = dtype.encode('ASCII')
                 dat = struct.pack(dtype, value)
                 lendat = len(dat)
             else:
-                # print('Debug print for pack record')
-                # print('name:', name, type(name))
-                # print('dtype:', dtype, type(dtype))
-                # print('value:', value, type(value), '\n')
+                print('Debug print for pack record')
+                print('name:', name, type(name))
+                print('dtype:', dtype, type(dtype))
+                print('value:', value, type(value), '\n')
                 if type(value) is str:
-                    value = value.encode('utf-8')
+                    value = value.encode('ASCII')
                 if (type(value) is tuple or type(value) is list or
                         type(value) is np.ndarray):
                     dat = struct.pack('<'+dtype, *value)
@@ -713,9 +695,18 @@ class Tektronix_AWG5014(VisaInstrument):
                     dat = struct.pack('<'+dtype, value)
                 lendat = len(dat)
            #print lendat
+        '''
+        Docstring: of struct.pack
+        pack(fmt, v1, v2, ...) -> bytes
 
-        return struct.pack('<II', len(name.encode('utf-8') + b'x00'),
-                           lendat) + bytes(name.encode('utf-8')) + b'x00' + dat
+        Return a bytes object containing the values v1, v2, ... packed according
+        to the format string fmt.  See help(struct) for more on format strings.
+        Type:      builtin_function_or_method
+        '''
+        packed_struct = struct.pack('<II', len(name.encode('ASCII') + b'x00'),
+                           lendat) + bytes(name.encode('ASCII')) + b'x00' + dat
+        # print(packed_struct)
+        return packed_struct
 
     def generate_sequence_cfg(self):
         '''
@@ -851,17 +842,15 @@ class Tektronix_AWG5014(VisaInstrument):
         return head_str.getvalue() + ch_record_str.getvalue() + wf_record_str.getvalue() + seq_record_str.getvalue()
 
     def send_awg_file(self, filename, awg_file):
-        # print self.visa_handle.ask('MMEMory:CDIRectory?')
-        s1 = 'MMEM:DATA "%s",' % filename
-        s2 = '#' + str(len(str(len(awg_file)))) + str(len(awg_file))
+        print('Writing to:', self.visa_handle.ask('MMEMory:CDIRectory?'),
+              filename)
 
-        print('S1', s1, type(s1))
-        print('S2', s2, type(s2))
-        print('awg_file', type(awg_file))
-
-        mes = s1.encode('utf-8')+s2.encode('utf-8')+awg_file
+        s1 = 'MMEM:DATA "%s",' % filename # Command to write data
+        s2 = '#' + str(len(str(len(awg_file)))) + str(len(awg_file)) # Header indicating the size
+        # and the actual file that
+        mes = s1.encode('ASCII')+s2.encode('ASCII')+awg_file
         # mes = s1+s2+awg_file
-        self.visa_handle.write_raw(mes)
+        self.visa_handle.write(mes)
 
     def load_awg_file(self, filename):
         s = 'AWGCONTROL:SRESTORE "%s"' % filename
@@ -1183,7 +1172,7 @@ class Tektronix_AWG5014(VisaInstrument):
         Output:
             None
         '''
-        logging.debug(__name__ + ' : Sending waveform %s to instrument' % filename)
+        # logging.debug(__name__ + ' : Sending waveform %s to instrument' % filename)
         # Check for errors
         dim = len(w)
 
@@ -1200,7 +1189,7 @@ class Tektronix_AWG5014(VisaInstrument):
         m = m1 + np.multiply(m2,2)
         ws = ''
         for i in range(0,len(w)):
-            ws = ws + struct.pack('<fB',w[i],int(np.round(m[i],0)))
+            ws = ws + struct.pack('<fB', w[i],int(np.round(m[i],0)))
 
         s1 = 'MMEM:DATA "%s",' % filename
         s3 = 'MAGIC 1000\n'
