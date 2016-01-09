@@ -303,20 +303,17 @@ class Tektronix_AWG5014(VisaInstrument):
         self.waveform_folder = "Waveforms"
         self._rem_file_path = "Z:\\Waveforms\\"
 
+        # NOTE! this directory has to exist on the AWG!!
         self._setup_folder = setup_folder
         self.goto_root()
         self.change_folder(self.waveform_folder)
-        self.get_all()
-        self.set('trigger_impedance', 50)
-        # if reset:
-        #     self.reset()
-        # else:
-        #     self.get_all()
-
-        # Commented out command from transmon version don't know if needed
-
-        self.visa_handle.write('mmem:CDIrectory "\\wfs"')
-        # NOTE! this directory has to exist on the AWG!!
+        try:
+            self.get_all()
+        except:
+            # Makes it possible to create the AWG instrument and have
+            # Working visa comss to fix the problem.
+            print('Warning error raised in get_all()')
+        # self.set('trigger_impedance', 50)
         print('Connected to: \n', self.get('IDN').replace(',', ', '))
 
     # Functions
@@ -681,8 +678,9 @@ class Tektronix_AWG5014(VisaInstrument):
                 dat_struct = value.encode('ASCII')
             else:
                 dat_struct = struct.pack('<'+dtype, *value)
+        # dat_struct += b'\x00'
 
-        name_struct = name.encode('ASCII')
+        name_struct = name.encode('ASCII')+b'\x00'
         name_len = len(name_struct)
         dat_len = len(dat_struct)
         size_struct = struct.pack('<II', name_len, dat_len)
