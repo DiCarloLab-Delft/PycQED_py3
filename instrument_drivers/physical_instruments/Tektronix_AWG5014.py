@@ -758,17 +758,16 @@ class Tektronix_AWG5014(VisaInstrument):
         head_str.write(bytes_to_write)
         # head_str.write(string(bytes_to_write))
 
-        # Commented out the sequence config.
-        # if sequence_cfg is None:
-        #     sequence_cfg = self.generate_sequence_cfg()
+        if sequence_cfg is None:
+            sequence_cfg = self.generate_sequence_cfg()
 
-        # for k in list(sequence_cfg.keys()):
-        #     if k in self.AWG_FILE_FORMAT_HEAD:
-        #         head_str.write(self._pack_record(k, sequence_cfg[k],
-        #                        self.AWG_FILE_FORMAT_HEAD[k]))
-        #     else:
-        #         logging.warning('AWG: ' + k +
-        #                         ' not recognized as valid AWG setting')
+        for k in list(sequence_cfg.keys()):
+            if k in self.AWG_FILE_FORMAT_HEAD:
+                head_str.write(self._pack_record(k, sequence_cfg[k],
+                               self.AWG_FILE_FORMAT_HEAD[k]))
+            else:
+                logging.warning('AWG: ' + k +
+                                ' not recognized as valid AWG setting')
         # channel settings
         ch_record_str = BytesIO()
         for k in list(channel_cfg.keys()):
