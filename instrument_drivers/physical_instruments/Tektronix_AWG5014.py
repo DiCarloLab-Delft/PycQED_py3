@@ -660,7 +660,6 @@ class Tektronix_AWG5014(VisaInstrument):
             struct.pack(fmtstring, namesize, datasize, name, data)
         where fmtstring = '<IIs"dtype"'
 
-
         The file record format is as follows:
         Record Name Size:        (32-bit unsigned integer)
         Record Data Size:        (32-bit unsigned integer)
@@ -669,24 +668,24 @@ class Tektronix_AWG5014(VisaInstrument):
         For details see "File and Record Format" in the AWG help
 
            < denotes little-endian encoding, I and other dtypes are format
-           characters denoted in the struct documentation
+           characters denoted in the documentation of the struct package
         '''
         if len(dtype) == 1:
-            dat_struct = struct.pack('<'+dtype, value)
+            record_data = struct.pack('<'+dtype, value)
         else:
             if dtype[-1] == 's':
-                dat_struct = value.encode('ASCII')
+                record_data = value.encode('ASCII')
             else:
-                dat_struct = struct.pack('<'+dtype, *value)
-        # dat_struct += b'\x00'
+                record_data = struct.pack('<'+dtype, *value)
 
-        name_struct = name.encode('ASCII')+b'\x00'
-        name_len = len(name_struct)
-        dat_len = len(dat_struct)
-        size_struct = struct.pack('<II', name_len, dat_len)
-        packed_struct = size_struct+name_struct + dat_struct
+        # the zero byte at the end the record name is the "(Include NULL.)"
+        record_name = name.encode('ASCII')+b'\x00'
+        record_name_size = len(record_name)
+        record_data_size = len(record_data)
+        size_struct = struct.pack('<II', record_name_size, record_data_size)
+        packed_record = size_struct + record_name + record_data
 
-        return packed_struct
+        return packed_record
 
     def generate_sequence_cfg(self):
         '''
@@ -822,15 +821,9 @@ class Tektronix_AWG5014(VisaInstrument):
                                           '%ss' % len(wfname+'\x00')))
             kk += 1
 
-        print('Printing awg_file contents: \n',
-              'head_str:\t', head_str.getvalue(), '\t',
-              'ch_record_str:\t', ch_record_str.getvalue(), '\t',
-              # 'wf_record_str:\t', wf_record_str.getvalue(), '\t',
-              'seq_record_str:\t', seq_record_str.getvalue())
-        print('*'*10, '\n')
-        return bytes_to_write  # head_str.getvalue()
-        # + ch_record_str.getvalue() + \
-        #     wf_record_str.getvalue() + seq_record_str.getvalue()
+        awg_file = head_str.getvalue() + ch_record_str.getvalue() + \
+            wf_record_str.getvalue() + seq_record_str.getvalue()
+        return awg_file
 
     def send_awg_file(self, filename, awg_file):
         print('Writing to:', self.visa_handle.ask('MMEMory:CDIRectory?'),

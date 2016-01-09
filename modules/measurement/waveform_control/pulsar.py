@@ -147,7 +147,6 @@ class Pulsar:
                     output = True
             if output:
                 self.AWG.set('{}_state'.format(id), 1)
-                # getattr(self.AWG, 'set_%s_status' % id)('on')
 
     def get_awg_channel_cfg(self):
         channel_cfg = {}
@@ -360,13 +359,12 @@ class Pulsar:
             np.array(wfname_l),
             nrep_l, wait_l, goto_l, logic_jump_l,
             self.get_awg_channel_cfg())
-        # print(awg_file.decode('utf-8'))
         self.AWG.send_awg_file(filename, awg_file)
         self.AWG.load_awg_file(filename)
-        print('DEBUG using version2')
-        # self.activate_channels(channels)
 
-        # self.AWG.is_awg_ready()
+        self.activate_channels(channels)
+
+        print('AWG Ready?', self.AWG.is_awg_ready())
         # Waits for AWG to be ready
         _t = time.time() - _t0
         print(" finished in %.2f seconds." % _t)
