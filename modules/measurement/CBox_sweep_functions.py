@@ -1,5 +1,4 @@
 import numpy as np
-import qt
 import logging
 from modules.measurement import sweep_functions as swf
 from modules.measurement.sweep_functions import Soft_Sweep

@@ -459,12 +459,12 @@ class AWG_channel_offset(Soft_Sweep):
     Sweep AWG channel offset for Mixer calibration
     Needs to be generalized for AWG_Comp
     '''
-    def __init__(self, channel, AWG_name='AWG', **kw):
+    def __init__(self, AWG, channel, **kw):
         super(AWG_channel_offset, self).__init__()
         self.name = 'AWG amplitude channel '+str(channel)
         self.parameter_name = 'Voltage'
         self.unit = 'V'
-        self.AWG = qt.instruments[AWG_name]
+        self.AWG = AWG
         self.set_offset = eval("self.AWG.set_ch%d_offset" % channel)
 
     def set_parameter(self, val):

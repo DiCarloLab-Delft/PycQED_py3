@@ -62,7 +62,8 @@ class MeasurementControl:
         self.print_measurement_start_msg()
         with h5d.Data(name=self.get_measurement_name()) as self.data_object:
             self.get_measurement_begintime()
-            self.get_git_hash()
+            #Commented out because requires git shell interaction from python
+            # self.get_git_hash()
             # Such that it is also saved if the measurement fails
             # (might want to overwrite again at the end)
             self.save_instrument_settings(self.data_object)
@@ -594,7 +595,7 @@ class MeasurementControl:
     def print_progress_static_soft_sweep(self, i):
         percdone = (i+1)*1./len(self.sweep_points)*100
         elapsed_time = time.time() - self.begintime
-        scrmes = "{percdone}% completed, elapsed time: "\
+        progress_message = "{percdone}% completed, elapsed time: "\
             "{t_elapsed} s, time left: {t_left} s".format(
                 percdone=int(percdone),
                 t_elapsed=round(elapsed_time, 1),
@@ -605,7 +606,7 @@ class MeasurementControl:
             end_char = '\r'
         else:
             end_char = '\n'
-        print(scrmes, end=end_char)
+        print(progress_message, end=end_char)
 
     def print_progress_static_2D_hard(self):
         acquired_points = self.dset.shape[0]
@@ -632,12 +633,11 @@ class MeasurementControl:
 
     def print_measurement_start_msg(self):
         if len(self.sweep_functions) == 1:
-            print('\n' + '*'*78)
+            print('\n')
             print('Starting measurement: %s' % self.get_measurement_name())
             print('Sweep function: %s' % self.get_sweep_function_names()[0])
             print('Detector function: %s' % self.get_detector_function_name())
         else:
-            print('\n' + '*'*78)
             print('Starting measurement: %s' % self.get_measurement_name())
             for i, sweep_function in enumerate(self.sweep_functions):
                 print('Sweep function %d: %s' % (

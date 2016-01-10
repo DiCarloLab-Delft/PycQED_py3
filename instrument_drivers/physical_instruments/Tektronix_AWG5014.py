@@ -247,13 +247,13 @@ class Tektronix_AWG5014(VisaInstrument):
             self.add_parameter('ch{}_amp'.format(i),
                                label='Amplitude channel {} (V)'.format(i),
                                get_cmd=amp_cmd + '?',
-                               set_cmd=amp_cmd + '{:.6f}',
+                               set_cmd=amp_cmd + ' {:.6f}',
                                vals=vals.Numbers(0.02, 1.5),
                                parse_function=float)
             self.add_parameter('ch{}_offset'.format(i),
                                label='Offset channel {} (V)'.format(i),
                                get_cmd=offset_cmd + '?',
-                               set_cmd=offset_cmd + '{:.6f}',
+                               set_cmd=offset_cmd + ' {:.3f}',
                                vals=vals.Numbers(-.1, .1),
                                parse_function=float)
             # Marker channels
@@ -392,7 +392,7 @@ class Tektronix_AWG5014(VisaInstrument):
 
     def set_all_channels_on(self):
         for i in range(1, 5):
-            self.set('ch{}_state', 1)
+            self.set('ch{}_state'.format(i), 1)
 
     def clear_waveforms(self):
         '''

@@ -1,11 +1,11 @@
 import numpy as np
-import qt
+# import qt
 from matplotlib import pyplot as plt
-from modules.measurement import hdf5
-CBox = qt.instruments['CBox']
+from modules.measurement import hdf5_data
+# CBox = qt.instruments['CBox']
 import time
 import h5py
-AWG = qt.instruments['AWG']
+# AWG = qt.instruments['AWG']
 
 ###################
 # Pulse envelopes #
@@ -226,7 +226,7 @@ def T1_CBox(n_waves=70, time_step=2000, amp180=4000):
 
     # Below is data saving
     AWG.stop()
-    filename = hdf5.Data(name="T1")
+    filename = hdf5_data.Data(name="T1")
 
     if "Experimental Data" in filename:
         grp = filename["Experimental Data"]

@@ -364,7 +364,15 @@ class Pulsar:
 
         self.activate_channels(channels)
 
-        print('AWG Ready?', self.AWG.is_awg_ready())
+
+        # Need to add proper error handling to handle the timeout
+        # awg_ready = False
+        # try:
+        #     self.is_awg_ready()
+        # except VisaIOError:
+
+
+        # print('AWG Ready?', self.AWG.is_awg_ready())
         # Waits for AWG to be ready
         _t = time.time() - _t0
         print(" finished in %.2f seconds." % _t)

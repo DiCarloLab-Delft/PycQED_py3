@@ -69,17 +69,13 @@ class DateTimeGenerator:
                         tsd = time.strftime('%H%M%S', ts)
                     if counter >= 10:
                         raise Exception()
-                except OSError as e:
-                    # if the day folder does not exist the timestamp is unique
-                    if (
-                            '[Error 3] The system cannot find the path'
-                            not in str(e) and
-                            '[Errno 2] No such file or directory:'
-                            not in str(e)):
-                        raise e
-                    else:
+                except OSError as err:
+                    if 'cannot find the path specified' in str(err):
                         timestamp_verified = True
-
+                    elif 'No such file or directory' in str(err):
+                        timestamp_verified = True
+                    else:
+                        raise err
             if name is not None:
                 path = os.path.join(path, tsd+'_'+name)
             else:

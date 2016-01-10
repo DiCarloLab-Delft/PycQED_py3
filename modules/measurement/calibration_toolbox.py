@@ -1,23 +1,18 @@
 import numpy as np
-import time
-import qt
 import logging
-import lmfit
 from modules.measurement import sweep_functions as swf
 from modules.measurement import CBox_sweep_functions as CB_swf
-from modules.measurement import AWG_sweep_functions as awg_swf
 from modules.measurement import detector_functions as det
-from modules.measurement import composite_detector_functions as detc
 from modules.analysis import measurement_analysis as MA
-from modules.analysis import analysis_toolbox as a_toolbox
+from modules.measurement import mc_parameter_wrapper as pw
 import msvcrt as m  # Package unique to windows!
 import imp
 imp.reload(MA)
 imp.reload(CB_swf)
-AWG = qt.instruments['AWG']
-MC = qt.instruments['MC']
-TD_Meas = qt.instruments['TD_Meas']
-Duplexer = qt.instruments['Duplexer']
+# AWG = qt.instruments['AWG']
+# MC = qt.instruments['MC']
+# TD_Meas = qt.instruments['TD_Meas']
+# Duplexer = qt.instruments['Duplexer']
 
 
 def wait_for_keypressed():
@@ -97,11 +92,102 @@ def measure_E_c(qubit, E_c_estimate, span_x=0.05, span_y=0.2,
     qubit_source.off()
 
 
+def mixer_carrier_cancellation_5014(station,
+                                    frequency=None,
+                                    AWG_channel1=1,
+                                    AWG_channel2=2,
+                                    voltage_grid=[.1, 0.05, 0.02],
+                                    xtol=0.001):
+    '''
+    Varies the mixer offsets to minimize leakage at the carrier frequency.
+    this is the version for a tektronix AWG.
+
+    voltage_grid defines the ranges for the preliminary coarse sweeps.
+    If the range is too small, add another number infront of -0.12
+    '''
+    AWG = station['AWG']
+    MC = station.MC  # I add it like this by hand
+    SH = station['Signal hound']
+    ch_1_min = 0  # Initializing variables used later on
+    ch_2_min = 0
+    last_ch_1_min = 1
+    last_ch_2_min = 1
+    ii = 0
+    min_power = 0
+    '''
+    Make coarse sweeps to approximate the minimum
+    '''
+    ch1_offset = AWG['ch{}_offset'.format(AWG_channel1)]
+    ch2_offset = AWG['ch{}_offset'.format(AWG_channel2)]
+
+    ch1_swf = pw.wrap_par_to_swf(ch1_offset)
+    ch2_swf = pw.wrap_par_to_swf(ch2_offset)
+    for voltage_span in voltage_grid:
+        # Channel 1
+        MC.set_sweep_function(ch1_swf)
+        MC.set_detector_function(
+            det.Signal_Hound_fixed_frequency(signal_hound=SH, frequency=frequency))
+        MC.set_sweep_points(np.linspace(ch_1_min + voltage_span,
+                                        ch_1_min - voltage_span, 11))
+        MC.run(name='Mixer_cal_Offset_ch%s' % AWG_channel1,
+               sweep_delay=.1, debug_mode=True)
+        Mixer_Calibration_Analysis = MA.Mixer_Calibration_Analysis(
+            label='Mixer_cal', auto=True)
+        ch_1_min = Mixer_Calibration_Analysis.fit_results[0]
+        ch1_offset.set(ch_1_min)
+
+        # Channel 2
+        MC.set_sweep_function(ch2_swf)
+        MC.set_sweep_points(np.linspace(ch_2_min + voltage_span,
+                                        ch_2_min - voltage_span, 11))
+        MC.run(name='Mixer_cal_Offset_ch%s' % AWG_channel2,
+               sweep_delay=.1, debug_mode=True)
+        Mixer_Calibration_Analysis = MA.Mixer_Calibration_Analysis(
+            label='Mixer_cal', auto=True)
+        ch_2_min = Mixer_Calibration_Analysis.fit_results[0]
+        ch2_offset.set(ch_2_min)
+
+    # Refine and repeat the sweeps to find the minimum
+    while(abs(last_ch_1_min - ch_1_min) > xtol
+          and abs(last_ch_2_min - ch_2_min) > xtol):
+        ii += 1
+        dac_resolution = 0.001
+        # channel 1 finer sweep
+        MC.set_sweep_function(ch1_swf)
+        MC.set_sweep_points(np.linspace(ch_1_min - dac_resolution*6,
+                            ch_1_min + dac_resolution*6, 13))
+        MC.run(name='Mixer_cal_Offset_ch%s' % AWG_channel1,
+               sweep_delay=.1, debug_mode=True)
+        Mixer_Calibration_Analysis = MA.Mixer_Calibration_Analysis(
+            label='Mixer_cal', auto=True)
+        last_ch_1_min = ch_1_min
+        ch_1_min = Mixer_Calibration_Analysis.fit_results[0]
+        ch1_offset.set(ch_1_min)
+        # Channel 2 finer sweep
+        MC.set_sweep_function(ch2_swf)
+        MC.set_sweep_points(np.linspace(ch_2_min - dac_resolution*6,
+                                        ch_2_min + dac_resolution*6, 13))
+        MC.run(name='Mixer_cal_Offset_ch%s' % AWG_channel2,
+               sweep_delay=.1, debug_mode=True)
+        Mixer_Calibration_Analysis = MA.Mixer_Calibration_Analysis(
+            label='Mixer_cal', auto=True)
+        last_ch_2_min = ch_2_min
+        min_power = min(Mixer_Calibration_Analysis.measured_powers)
+        ch_2_min = Mixer_Calibration_Analysis.fit_results[0]
+        ch2_offset.set(ch_2_min)
+
+        if ii > 10:
+            logging.error('Mixer calibration did not converge')
+            break
+    return ch_1_min, ch_2_min
+
+
+
 def mixer_carrier_cancellation(frequency, AWG_nr=0, AWG_channel1=1, AWG_channel2=2,
                                AWG_name='AWG', pulse_amp_control='AWG',
                                analyzer='Signal Hound',
                                voltage_grid=[.1, 0.05, 0.02],
-                               x_tol=0.001):
+                               xtol=0.001):
     '''
     Varies the mixer offsets to minimize leakage at the carrier frequency.
 
@@ -140,7 +226,7 @@ def mixer_carrier_cancellation(frequency, AWG_nr=0, AWG_channel1=1, AWG_channel2
 
         if analyzer == 'Signal Hound':
             MC.set_detector_function(
-                det.Signal_Hound_fixed_frequency(frequency=frequency))
+                det.Signal_Hound_fixed_frequency(SH=SH, frequency=frequency))
         elif analyzer is 'FSV':
             MC.set_detector_function(
                 det.RS_FSV_fixed_frequency(frequency=frequency))
@@ -196,8 +282,8 @@ def mixer_carrier_cancellation(frequency, AWG_nr=0, AWG_channel1=1, AWG_channel2
         Refine and repeat the sweeps to find the minimum
         '''
 
-    while(abs(last_ch_1_min - ch_1_min) > x_tol
-          and abs(last_ch_2_min - ch_2_min) > x_tol):
+    while(abs(last_ch_1_min - ch_1_min) > xtol
+          and abs(last_ch_2_min - ch_2_min) > xtol):
 
         ii += 1
 
@@ -211,7 +297,7 @@ def mixer_carrier_cancellation(frequency, AWG_nr=0, AWG_channel1=1, AWG_channel2
             dac_resolution = 0.001
         if analyzer is 'Signal Hound':
             MC.set_detector_function(
-                det.Signal_Hound_fixed_frequency(frequency=frequency))
+                det.Signal_Hound_fixed_frequency(SH=SH, frequency=frequency))
         elif analyzer is 'FSV':
             MC.set_detector_function(
                 det.RS_FSV_fixed_frequency(frequency=frequency))
@@ -353,7 +439,7 @@ def mixer_skewness_calibration_adaptive(source,
                                                  f_mod=sideband_frequency,
                                                  Navg=5, delay=0.5)
         else:
-            detector = det.Signal_Hound_fixed_frequency(
+            detector = det.Signal_Hound_fixed_frequency(SH,
                 generator_frequency + sign*sideband_frequency,
                 Navg=5, delay=0.3)
 
