@@ -4,6 +4,7 @@ import sys
 import serial
 import io
 import visa
+import unittest
 # from bitstring import BitArray
 
 qcpath = 'D:\GitHubRepos\Qcodes'
@@ -21,7 +22,9 @@ pyximport.install(setup_args={"script_args": ["--compiler=msvc"],
 
 from ._ControlBox import defHeaders  # File containing bytestring commands
 from ._ControlBox import decoder as d  # Cython based decoder
-
+from ._ControlBox import test_suite# import CBox_tests
+from importlib import reload # Useful for reloading during testin
+reload(test_suite)
 
 class QuTech_ControlBox(VisaInstrument):
     '''
@@ -37,14 +40,15 @@ class QuTech_ControlBox(VisaInstrument):
     different protocol (e.g. TCPIP is used).
     '''
 
-    def __init__(self, name, address, reset=False):
+    def __init__(self, name, address, reset=False, run_tests=False):
         super().__init__(name, address)
-        # Establish communications
-        # self.S = self.open_serial_port(address)
 
-        # self.add_parameter('acquisition_mode', type=int,
-        #                    flags=Instrument.FLAG_GETSET |
-        #                    Instrument.FLAG_SOFTGET)
+        # Establish communications
+        self.add_parameter('firmware_version',
+                           get_cmd=self._do_get_firmware_version)
+        self.add_parameter('acquisition_mode', type=int,
+                           set_cmd=self._do_set_acquisition_mode,
+                           get_cmd=self._do_get_acquisition_mode)
         # self.add_parameter('signal_delay', type=int,
         #                    min=0, max=255,
         #                    flags=Instrument.FLAG_GETSET |
@@ -135,8 +139,7 @@ class QuTech_ControlBox(VisaInstrument):
         # self.dac_offsets[:] = np.NAN
 
         # self.set_measurement_timeout(360)
-        self.add_parameter('firmware_version',
-                           get_cmd=self._do_get_firmware_version)
+
         # self.add_function('set_awg_lookuptable')
         # self.add_function('get_streaming_results')
         # self.add_function('get_integration_log_results')
@@ -150,9 +153,14 @@ class QuTech_ControlBox(VisaInstrument):
         # # self.add_function('awg_mode') #somehow won't wrap it in QTLab ...
         # self.add_function('set_lin_trans_coeffs')
         # self.add_function('set_dac_offset')
-        # self.get_firmware_version()  # Updates firmware version in instr view
+
         # convert to string with options
 
+        if run_tests:
+            # pass the CBox to the module so it can be used in the tests
+            test_suite.CBox = self
+            suite = unittest.TestLoader().loadTestsFromTestCase(test_suite.CBox_tests)
+            unittest.TextTestRunner(verbosity=2).run(suite)
 
     def get_all(self):
         for par in self.parameters:
@@ -877,13 +885,14 @@ class QuTech_ControlBox(VisaInstrument):
         message = self.create_message(cmd, data_bytes)
         (stat, mesg) = self.serial_write(message)
         if stat:
-            self.acquisition_mode = acquisition_mode
+            self._acquisition_mode = acquisition_mode
         else:
             raise Exception('Failed to set acquisition_mode')
         return (stat, message)
 
     def _do_get_acquisition_mode(self):
-        return self.acquisition_mode
+        return self._acquisition_mode
+
 
     def _do_set_run_mode(self, run_mode):
         '''

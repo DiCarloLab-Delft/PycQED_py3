@@ -105,3 +105,4 @@ EndOfMessageHeader = b"\x7F"
 MC_TestHeader = b"\x40"
 
 
+acquistion_modes = ['idle', 'integration logging'
