@@ -20,7 +20,7 @@ pyximport.install(setup_args={"script_args": ["--compiler=msvc"],
                   reload_support=True)
 
 from ._ControlBox import defHeaders  # File containing bytestring commands
-# from ._ControlBox import decoder as d  # Cython based decoder
+from ._ControlBox import decoder as d  # Cython based decoder
 
 
 class QuTech_ControlBox(VisaInstrument):

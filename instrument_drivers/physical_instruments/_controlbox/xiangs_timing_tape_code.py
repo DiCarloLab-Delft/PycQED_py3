@@ -1,4 +1,3 @@
-~~~ python
 def set_conditional_tape(self, awg_nr, tape_nr, tape):
     '''
     set the conditional tape content for an awg
