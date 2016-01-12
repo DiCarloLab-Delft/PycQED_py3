@@ -1,23 +1,28 @@
-
-import qt
 import time
 import numpy as np
 import sys
 import serial
 import io
-from instrument import Instrument
-import logging
-from bitstring import BitArray
+# from bitstring import BitArray
+
+qcpath = 'D:\GitHubRepos\Qcodes'
+if qcpath not in sys.path:
+    sys.path.append(qcpath)
+
+from qcodes.instrument.visa import VisaInstrument
+from qcodes.utils import validators as vals
+
+# cython drivers for encoding and decoding
 import pyximport
-# pyximport.install(setup_args={"script_args": ["--compiler=msvc"],
-#                               "include_dirs": np.get_include()},
-#                   reload_support=True)
+pyximport.install(setup_args={"script_args": ["--compiler=msvc"],
+                              "include_dirs": np.get_include()},
+                  reload_support=True)
 
 from ._ControlBox import defHeaders  # File containing bytestring commands
-from ._ControlBox import decoder as d  # Cython based decoder
+# from ._ControlBox import decoder as d  # Cython based decoder
 
 
-class QuTech_ControlBox(Instrument):
+class QuTech_ControlBox(VisaInstrument):
     '''
     This is the qtlab driver for the 250 MS/s control box developed in
     collaboration with EWI.
@@ -32,120 +37,118 @@ class QuTech_ControlBox(Instrument):
     '''
 
     def __init__(self, name, address, reset=False):
-
-        logging.info(__name__ + ' : Initializing instrument')
-        Instrument.__init__(self, name, tags=['physical'])
+        super().__init__(name, address)
         # Establish communications
-        self.S = self.open_serial_port(address)
+        # self.S = self.open_serial_port(address)
 
-        self.add_parameter('acquisition_mode', type=int,
-                           flags=Instrument.FLAG_GETSET |
-                           Instrument.FLAG_SOFTGET)
-        self.add_parameter('signal_delay', type=int,
-                           min=0, max=255,
-                           flags=Instrument.FLAG_GETSET |
-                           Instrument.FLAG_SOFTGET)
-        self.add_parameter('integration_length', type=int,
-                           min=1, max=512,
-                           flags=Instrument.FLAG_GETSET |
-                           Instrument.FLAG_SOFTGET)
-        self.add_parameter('signal_threshold_line0', type=int,
-                           min=-2**27, max=2**27-1,
-                           flag=Instrument.FLAG_GETSET |
-                           Instrument.FLAG_SOFTGET)
-        self.add_parameter('signal_threshold_line1', type=int,
-                           min=-2**27, max=2**27-1,
-                           flag=Instrument.FLAG_GETSET |
-                           Instrument.FLAG_SOFTGET)
-        self.add_parameter('adc_offset', type=int,
-                           min=-128, max=127,
-                           flag=Instrument.FLAG_GETSET |
-                           Instrument.FLAG_SOFTGET)
-        self.add_parameter('log_length', type=int,
-                           min=0, max=8000,
-                           flag=Instrument.FLAG_GETSET |
-                           Instrument.FLAG_SOFTGET)
+        # self.add_parameter('acquisition_mode', type=int,
+        #                    flags=Instrument.FLAG_GETSET |
+        #                    Instrument.FLAG_SOFTGET)
+        # self.add_parameter('signal_delay', type=int,
+        #                    min=0, max=255,
+        #                    flags=Instrument.FLAG_GETSET |
+        #                    Instrument.FLAG_SOFTGET)
+        # self.add_parameter('integration_length', type=int,
+        #                    min=1, max=512,
+        #                    flags=Instrument.FLAG_GETSET |
+        #                    Instrument.FLAG_SOFTGET)
+        # self.add_parameter('signal_threshold_line0', type=int,
+        #                    min=-2**27, max=2**27-1,
+        #                    flag=Instrument.FLAG_GETSET |
+        #                    Instrument.FLAG_SOFTGET)
+        # self.add_parameter('signal_threshold_line1', type=int,
+        #                    min=-2**27, max=2**27-1,
+        #                    flag=Instrument.FLAG_GETSET |
+        #                    Instrument.FLAG_SOFTGET)
+        # self.add_parameter('adc_offset', type=int,
+        #                    min=-128, max=127,
+        #                    flag=Instrument.FLAG_GETSET |
+        #                    Instrument.FLAG_SOFTGET)
+        # self.add_parameter('log_length', type=int,
+        #                    min=0, max=8000,
+        #                    flag=Instrument.FLAG_GETSET |
+        #                    Instrument.FLAG_SOFTGET)
 
-        self.add_parameter('nr_samples', type=int,
-                           flag=Instrument.FLAG_GETSET |
-                           Instrument.FLAG_SOFTGET)
-        self.add_parameter('nr_averages', type=int,
-                           flag=Instrument.FLAG_GETSET |
-                           Instrument.FLAG_SOFTGET)
-        self.add_parameter('run_mode', type=int,
-                           flag=Instrument.FLAG_GETSET |
-                           Instrument.FLAG_SOFTGET)
-        self.add_parameter('measurement_timeout', type=int, units='seconds',
-                           flag=Instrument.FLAG_GETSET)
+        # self.add_parameter('nr_samples', type=int,
+        #                    flag=Instrument.FLAG_GETSET |
+        #                    Instrument.FLAG_SOFTGET)
+        # self.add_parameter('nr_averages', type=int,
+        #                    flag=Instrument.FLAG_GETSET |
+        #                    Instrument.FLAG_SOFTGET)
+        # self.add_parameter('run_mode', type=int,
+        #                    flag=Instrument.FLAG_GETSET |
+        #                    Instrument.FLAG_SOFTGET)
+        # self.add_parameter('measurement_timeout', type=int, units='seconds',
+        #                    flag=Instrument.FLAG_GETSET)
 
-        self.add_parameter('sequencer_counters', type=int,
-                           flag=Instrument.FLAG_GET)
+        # self.add_parameter('sequencer_counters', type=int,
+        #                    flag=Instrument.FLAG_GET)
 
-        self.add_parameter('tng_heartbeat_interval', type=int, units='ns',
-                           flag=Instrument.FLAG_GETSET)
-        self.add_parameter('tng_burst_heartbeat_interval', type=int,
-                           flag=Instrument.FLAG_GETSET)
-        self.add_parameter('tng_burst_heartbeat_n', type=int,
-                           flag=Instrument.FLAG_GETSET)
-        self.add_parameter('tng_readout_delay', type=int, units='ns',
-                           flag=Instrument.FLAG_GETSET)
-        self.add_parameter('tng_second_pre_rotation_delay', type=int,
-                           units='ns', flag=Instrument.FLAG_GETSET)
-        self.add_parameter('tng_calibration_mode', type=int,
-                           flag=Instrument.FLAG_GETSET)
-        self.add_parameter('tng_awg_mask', type=int,
-                           flag=Instrument.FLAG_GETSET)
-        self.add_parameter('tng_readout_pulse_length', type=int, units='ns',
-                           flag=Instrument.FLAG_GETSET)
-        self.add_parameter('tng_readout_wave_interval', type=int, units='ns',
-                           flag=Instrument.FLAG_GETSET)
-        self.add_parameter('tng_output_trigger_delay', type=int, units='ns',
-                           flag=Instrument.FLAG_GETSET)
-        self.add_parameter('tng_trigger_state', type=int,
-                           flag=Instrument.FLAG_GETSET)
-        self.add_parameter('tng_feedback_mode', type=int,
-                           flag=Instrument.FLAG_GETSET)
-        self.add_parameter('tng_feedback_code', type=int,
-                           flag=Instrument.FLAG_GETSET)
-        self.add_parameter('tng_logging_mode', type=int,
-                           flag=Instrument.FLAG_GETSET)
+        # self.add_parameter('tng_heartbeat_interval', type=int, units='ns',
+        #                    flag=Instrument.FLAG_GETSET)
+        # self.add_parameter('tng_burst_heartbeat_interval', type=int,
+        #                    flag=Instrument.FLAG_GETSET)
+        # self.add_parameter('tng_burst_heartbeat_n', type=int,
+        #                    flag=Instrument.FLAG_GETSET)
+        # self.add_parameter('tng_readout_delay', type=int, units='ns',
+        #                    flag=Instrument.FLAG_GETSET)
+        # self.add_parameter('tng_second_pre_rotation_delay', type=int,
+        #                    units='ns', flag=Instrument.FLAG_GETSET)
+        # self.add_parameter('tng_calibration_mode', type=int,
+        #                    flag=Instrument.FLAG_GETSET)
+        # self.add_parameter('tng_awg_mask', type=int,
+        #                    flag=Instrument.FLAG_GETSET)
+        # self.add_parameter('tng_readout_pulse_length', type=int, units='ns',
+        #                    flag=Instrument.FLAG_GETSET)
+        # self.add_parameter('tng_readout_wave_interval', type=int, units='ns',
+        #                    flag=Instrument.FLAG_GETSET)
+        # self.add_parameter('tng_output_trigger_delay', type=int, units='ns',
+        #                    flag=Instrument.FLAG_GETSET)
+        # self.add_parameter('tng_trigger_state', type=int,
+        #                    flag=Instrument.FLAG_GETSET)
+        # self.add_parameter('tng_feedback_mode', type=int,
+        #                    flag=Instrument.FLAG_GETSET)
+        # self.add_parameter('tng_feedback_code', type=int,
+        #                    flag=Instrument.FLAG_GETSET)
+        # self.add_parameter('tng_logging_mode', type=int,
+        #                    flag=Instrument.FLAG_GETSET)
 
-        self.tng_heartbeat_interval = 100000
-        self.tng_burst_heartbeat_interval = 10000
-        self.tng_burst_heartbeat_n = 1
-        self.tng_readout_delay = 300
-        self.tng_calibration_mode = True
-        self.tng_awg_mask = 100
-        self.tng_readout_pulse_length = 1200
-        self.tng_readout_wave_interval = 600
-        self.tng_output_trigger_delay = 1
-        self.tng_trigger_state = 1
-        self.tng_feedback_mode = 1
-        self.tng_feedback_code = 3
-        self.tng_logging_mode = 3
-        self.tng_second_pre_rotation_delay = 0
+        # self.tng_heartbeat_interval = 100000
+        # self.tng_burst_heartbeat_interval = 10000
+        # self.tng_burst_heartbeat_n = 1
+        # self.tng_readout_delay = 300
+        # self.tng_calibration_mode = True
+        # self.tng_awg_mask = 100
+        # self.tng_readout_pulse_length = 1200
+        # self.tng_readout_wave_interval = 600
+        # self.tng_output_trigger_delay = 1
+        # self.tng_trigger_state = 1
+        # self.tng_feedback_mode = 1
+        # self.tng_feedback_code = 3
+        # self.tng_logging_mode = 3
+        # self.tng_second_pre_rotation_delay = 0
 
-        self.integration_weights = [[], []]
-        self.awg_mode = [0, 0, 0]  # default values so it is gettable
-        self.dac_offsets = np.empty([3, 2])
-        self.dac_offsets[:] = np.NAN
+        # self.integration_weights = [[], []]
+        # self.awg_mode = [0, 0, 0]  # default values so it is gettable
+        # self.dac_offsets = np.empty([3, 2])
+        # self.dac_offsets[:] = np.NAN
 
-        self.set_measurement_timeout(360)
-        self.add_parameter('firmware_version', flags=Instrument.FLAG_GET)
-        self.add_function('set_awg_lookuptable')
-        self.add_function('get_streaming_results')
-        self.add_function('get_integration_log_results')
-        self.add_function('get_avg_size')
+        # self.set_measurement_timeout(360)
+        # self.add_parameter('firmware_version', flags=Instrument.FLAG_GET)
+        # self.add_function('set_awg_lookuptable')
+        # self.add_function('get_streaming_results')
+        # self.add_function('get_integration_log_results')
+        # self.add_function('get_avg_size')
 
-        self.add_function('set_averaging_parameters')
-        self.add_function('set_integration_weights')
-        self.add_function('encode_byte')
-        self.add_function('decode_byte')
-        self.add_function('enable_dac')
-        # self.add_function('awg_mode') #somehow won't wrap it in QTLab ...
-        self.add_function('set_lin_trans_coeffs')
-        self.add_function('set_dac_offset')
-        self.get_firmware_version()  # Updates firmware version in instr view
+        # self.add_function('set_averaging_parameters')
+        # self.add_function('set_integration_weights')
+        # self.add_function('encode_byte')
+        # self.add_function('decode_byte')
+        # self.add_function('enable_dac')
+        # # self.add_function('awg_mode') #somehow won't wrap it in QTLab ...
+        # self.add_function('set_lin_trans_coeffs')
+        # self.add_function('set_dac_offset')
+        # self.get_firmware_version()  # Updates firmware version in instr view
         # convert to string with options
 
     def _do_set_measurement_timeout(self, val):
