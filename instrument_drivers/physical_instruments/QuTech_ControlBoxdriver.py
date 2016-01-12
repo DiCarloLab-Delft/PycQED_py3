@@ -3,6 +3,7 @@ import numpy as np
 import sys
 import serial
 import io
+import visa
 # from bitstring import BitArray
 
 qcpath = 'D:\GitHubRepos\Qcodes'
@@ -134,7 +135,8 @@ class QuTech_ControlBox(VisaInstrument):
         # self.dac_offsets[:] = np.NAN
 
         # self.set_measurement_timeout(360)
-        # self.add_parameter('firmware_version', flags=Instrument.FLAG_GET)
+        self.add_parameter('firmware_version',
+                           get_cmd=self._do_get_firmware_version)
         # self.add_function('set_awg_lookuptable')
         # self.add_function('get_streaming_results')
         # self.add_function('get_integration_log_results')
@@ -150,6 +152,12 @@ class QuTech_ControlBox(VisaInstrument):
         # self.add_function('set_dac_offset')
         # self.get_firmware_version()  # Updates firmware version in instr view
         # convert to string with options
+
+
+    def get_all(self):
+        for par in self.parameters:
+                        self[par].get()
+        return self.snapshot()
 
     def _do_set_measurement_timeout(self, val):
         '''
@@ -167,9 +175,9 @@ class QuTech_ControlBox(VisaInstrument):
         if stat:
             version_msg = self.serial_read()
         # Decoding the message
-        v_list = list(map(ord, version_msg[0:3]))
-        version = str(v_list[0]-128)+'.'+str(v_list[1]-128) + \
-            '.'+str(v_list[2]-128)
+        # -128 is because of MSB signifying data byte
+        version = str(version_msg[0]-128)+'.'+str(version_msg[1]-128) + \
+            '.'+str(version_msg[2]-128)
         return version
 
     def _do_get_sequencer_counters(self):
@@ -330,21 +338,16 @@ class QuTech_ControlBox(VisaInstrument):
         Creates a bytearray to send as a message.
         Starts with a command, then adds the data bytes and ends with EOM.
         '''
-        message = bytearray()
-        message.extend(cmd)
+        message = bytes()
+        message += cmd
 
         if data_bytes is None:
             pass
-        elif type(data_bytes) is list:
-            for data_byte in data_bytes:
-                if type(data_byte) is not bytearray:
-                    raise TypeError
-                message.extend(data_byte)
-        elif type(data_bytes) is bytearray:
-            message.extend(data_bytes)
+        elif type(data_bytes) is bytes:
+            message += data_bytes
         else:
             raise TypeError
-        message.extend(EOM)
+        message += EOM
         return message
 
     # Read Functions
@@ -494,9 +497,9 @@ class QuTech_ControlBox(VisaInstrument):
         i = 0
         while not succes:
             i += 1
-            in_wait = self.S.inWaiting()
+            in_wait = self.visa_handle.bytes_in_buffer
             if in_wait > 0:
-                message.extend(self.S.read(in_wait))
+                message.extend(self._read_raw(in_wait))
             elif termination_send:
                 if in_wait == 0:  # This is to prevent slow message check
                     if message[-1] == ord(defHeaders.EndOfMessageHeader):
@@ -1125,17 +1128,6 @@ class QuTech_ControlBox(VisaInstrument):
 
         return ser
 
-    def close_serial_port(self):
-        '''
-        Closes the serial port, should be used before reloading the instrument
-        '''
-        self.S.close()
-        print('closing port')
-        return True
-
-    def get_serial(self):
-        return self.S
-
     def calculate_checksum(self, input_command):
         '''
         Calculates checksum by taking the XOR of all elements
@@ -1148,6 +1140,15 @@ class QuTech_ControlBox(VisaInstrument):
         checksum = chr(checksum)# Convert int to hexstring representation and set MSbit
 
         return checksum
+
+    def _read_raw(self, size):
+        '''
+        Intended to replace visa_handle.read_raw
+        '''
+        with(self.visa_handle.ignore_warning(visa.constants.VI_SUCCESS_MAX_CNT)):
+            mes = self.visa_handle.visalib.read(
+                self.visa_handle.session, size)
+        return mes[0]
 
     def serial_read(self, timeout=5, read_all=False, read_N=0):
         '''
@@ -1163,26 +1164,28 @@ class QuTech_ControlBox(VisaInstrument):
         '''
         t_start = time.time()
         end_of_message_received = False
-        message = ''
+        message = bytes()
         while not end_of_message_received:
             if read_all:
-                m = self.S.readline(self.S.inWaiting())
+                m = self._read_raw(self.visa_handle.bytes_in_buffer)
                 message += m
             elif read_N != 0:
-                if self.S.inWaiting() == 2:
+                if self.visa_handle.bytes_in_buffer == 2:
                     # To catch all the "empty" messages (checksum +EOM)
-                    m = self.S.read(2)
+                    m = self._read_raw(2)
                 else:
-                    m = self.S.read(read_N)
+                    m = self._read_raw(read_N)
                 message += m
-            else:
-                message += self.S.read(1)
+            elif self.visa_handle.bytes_in_buffer != 0:
+                message += self._read_raw(1)
+            if len(message) != 0:
+                if message[-1:] == defHeaders.EndOfMessageHeader:
+                    end_of_message_received = True
 
-            if message[-1] == defHeaders.EndOfMessageHeader:
-                end_of_message_received = True
-            elif (time.time() - t_start) > timeout:
-                raise Exception('Read timed out without EndOfMessage')
-
+            if not end_of_message_received:
+                time.sleep(.01)
+                if (time.time() - t_start) > timeout:
+                    raise Exception('Read timed out without EndOfMessage')
         if message[0] == defHeaders.IllegalCommandHeader:
             raise ValueError('Command not recognized')
         if message[0] == defHeaders.DataOverflowHeader:
@@ -1195,9 +1198,8 @@ class QuTech_ControlBox(VisaInstrument):
         '''
         Core write function used for communicating with the Box.
 
-        Accepts either a string of hex characters or a list of hexcharacter as
-        input.
-        e.g. command = '\x5A\x00\x7F' or command = ['\x5A','\x00','\x7F']
+        Accepts either a bytes as input
+        e.g. command = b'\x5A\x00\x7F'
 
         Writes data to the serial port and verifies the checksum to see if the
         message was received correctly.
@@ -1205,28 +1207,23 @@ class QuTech_ControlBox(VisaInstrument):
         Returns: succes, message
         Succes is true if the checksum matches.
         '''
-        if type(command) == list:
-            command = ''.join(command)
+        if type(command) != bytes:
+            raise TypeError('command must be type bytes')
         checksum = self.calculate_checksum(command)
 
-        in_wait = self.S.inWaiting()
-        if in_wait > 0:
-            self.S.flushInput()
+        in_wait = self.visa_handle.bytes_in_buffer
+        if in_wait > 0:  # Clear any leftover messages in the buffer
+            self.visa_handle.clear()
             print("Extra flush! Flushed %s bytes" % in_wait)
-        self.S.write(command)
-
+        self.visa_handle.write_raw(command)
         # Done writing , verify message executed
         if verify_execution:
             message = self.serial_read()
-            # try:
-            if message[0] == checksum:
-                succes = True
-            else:
-                raise Exception('Checksum Error, Command not executed')
-                # succes = False
-            # except:
-            #     raise Exception('Checksum Error, Command not executed')
-            #     # succes = False
+
+        #     if message[0] == checksum:
+            succes = True
+        #     else:
+        #         raise Exception('Checksum Error, Command not executed')
             return succes, message
         else:
             return True
