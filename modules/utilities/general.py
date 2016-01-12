@@ -31,6 +31,11 @@ def dict_to_ordered_tuples(dic):
     ret = [(key, dic[key]) for key in keys]
     return ret
 
+def to_hex_string(byteval):
+    '''
+    Returns a hex representation of bytes for printing purposes
+    '''
+    return "b'" + ''.join('\\x{:02x}'.format(x) for x in byteval) + "'"
 
 def load_settings_onto_instrument(instrument, folder=None,
                                   label='Settings',
