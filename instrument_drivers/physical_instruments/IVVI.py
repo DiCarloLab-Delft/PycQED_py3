@@ -1,6 +1,6 @@
 import time
 import numpy as np
-import visa #used for the parity constant, also inherited
+import visa  # used for the parity constant
 # load the qcodes path, until we have this installed as a package
 import sys
 qcpath = 'D:\GitHubRepos\Qcodes'
@@ -13,14 +13,20 @@ from qcodes.utils import validators as vals
 
 class IVVI(VisaInstrument):
     '''
-    Status: Alpha version, untested
-    This is the python driver for the IVVI-rack,
+    Status: Alpha version, tested for basic get-set commands
+        TODO:
+            - Add individual parameters per channel
+            - Add individual parameters for channel polarities
+            - Add range protection per channel (adjustable for next version)
+            - Add ramping speed protection (mV/s parameter for each channel)
+            - Add error handling for the specific error messages in the protocol
+            - Remove/fine-tune manual sleep statements
+
+    This is the python driver for the D5 module of the IVVI-rack
+    see: http://qtwork.tudelft.nl/~schouten/ivvi/doc-d5/index-d5.htm
+
     A descriptor for the data protocol can be found at
     http://qtwork.tudelft.nl/~schouten/ivvi/doc-d5/rs232linkformat.txt
-
-    TODO:
-        Add error handling for the device specific error codes
-
     '''
 
     def __init__(self, name, address, reset=False, numdacs=8,
@@ -54,39 +60,11 @@ class IVVI(VisaInstrument):
                            label='Dac voltages (mV)',
                            get_cmd=self._get_dacs)
         # for i in range(numdacs):
-        #     self.add_parameter('ch{}'.format(i),
-        #                        label='Dac {} (mV)'.format(i),
+        #     self.add_parameter('ch{}'.format(i+1),
+        #                        label='Dac {} (mV)'.format(i+1),
         #                        get_cmd=self.get_dac)
-                               # set_cmd=self.set_dac
-                               # parse_function=
-
-        # Add parameters
-        # self.add_parameter('pol_dacrack',
-        #     type=bytes,
-        #     channels=(1, self._numdacs/4),
-        #     flags=Instrument.FLAG_SET)
-        # self.add_parameter('dac',
-        #     type=float,
-        #     flags=Instrument.FLAG_GETSET,
-        #     channels=(1, self._numdacs),
-        #     maxstep=10, stepdelay=50,
-        #     units='mV', format='%.02f',
-        #     tags=['sweep'])
-
-        # self.add_function('reset')
-        # self.add_function('get_all')
-        # self.add_function('set_dacs_zero')
-        # self.add_function('get_numdacs')
-        # self._open_serial_connection()
-
-        # # get_all calls are performed below (in reset or get_all)
-        # for j in range(numdacs / 4):
-        #     self.set('pol_dacrack%d' % (j+1), polarity[j], getall=False)
-
-        # if reset:
-        #     self.reset()
-        # else:
-        #     self.get_all()
+        #                        set_cmd=self.set_dac
+        #                        parse_function=
 
     def __del__(self):
         '''
@@ -105,20 +83,6 @@ class IVVI(VisaInstrument):
         v = mes[2]
         print(v)
         return v
-
-    # def reset(self):
-    #     '''
-    #     Resets all dacs to 0 volts
-
-    #     Input:
-    #         None
-
-    #     Output:
-    #         None
-    #     '''
-    #     # logging.info('Resetting instrument')
-    #     self.set_dacs_zero()
-    #     self.get_all()
 
     def get_all(self):
         for par in self.parameters:
