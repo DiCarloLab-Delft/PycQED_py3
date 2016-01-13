@@ -5,7 +5,7 @@ import serial
 import io
 import visa
 import unittest
-# from bitstring import BitArray
+from bitstring import BitArray
 
 qcpath = 'D:\GitHubRepos\Qcodes'
 if qcpath not in sys.path:
@@ -22,6 +22,7 @@ pyximport.install(setup_args={"script_args": ["--compiler=msvc"],
 
 from ._ControlBox import defHeaders  # File containing bytestring commands
 from ._ControlBox import decoder as d  # Cython based decoder
+from ._ControlBox import codec as c
 from ._ControlBox import test_suite# import CBox_tests
 from importlib import reload # Useful for reloading during testin
 reload(test_suite)
@@ -42,7 +43,6 @@ class QuTech_ControlBox(VisaInstrument):
 
     def __init__(self, name, address, reset=False, run_tests=False):
         super().__init__(name, address)
-
         # Establish communications
         self.add_parameter('firmware_version',
                            get_cmd=self._do_get_firmware_version)
@@ -158,6 +158,7 @@ class QuTech_ControlBox(VisaInstrument):
 
         if run_tests:
             # pass the CBox to the module so it can be used in the tests
+            self.c = c  # make the codec callable from the testsuite
             test_suite.CBox = self
             suite = unittest.TestLoader().loadTestsFromTestCase(test_suite.CBox_tests)
             unittest.TextTestRunner(verbosity=2).run(suite)
@@ -178,15 +179,16 @@ class QuTech_ControlBox(VisaInstrument):
         return self.timeout
 
     def _do_get_firmware_version(self):
-        message = self.create_message(defHeaders.ReadVersion)
+        message = c.create_message(defHeaders.ReadVersion)
         (stat, mesg) = self.serial_write(message)
         if stat:
             version_msg = self.serial_read()
         # Decoding the message
         # -128 is because of MSB signifying data byte
-        version = str(version_msg[0]-128)+'.'+str(version_msg[1]-128) + \
+        v_str = str(version_msg[0]-128)+'.'+str(version_msg[1]-128) + \
             '.'+str(version_msg[2]-128)
-        return version
+        return v_str
+        return v_str
 
     def _do_get_sequencer_counters(self):
         '''
@@ -195,7 +197,7 @@ class QuTech_ControlBox(VisaInstrument):
         Heartbeat counter: how many times touch n go was attempted.
         Trigger counter: how many times an external triger was given.
         '''
-        message = self.create_message(defHeaders.ReadSequencerCounters)
+        message = c.create_message(defHeaders.ReadSequencerCounters)
         (stat, mesg) = self.serial_write(message)
         if stat:
             sequencer_msg = self.serial_read()
@@ -208,71 +210,6 @@ class QuTech_ControlBox(VisaInstrument):
 
         return heartbeat_counter, trigger_counter
 
-    def encode_byte(self, value, data_bits_per_byte=7,
-                    signed_integer_length=None,
-                    expected_number_of_bytes=None):
-        '''
-        Takes a value as input and returns an an encoded bytearray.
-
-        full_byte encoding has 7 bits per byte.
-        nibble_byte encoding has 4 bits per byte.
-
-        From "250 MSPs Control Box Design Specification" version May 2015
-        by Jacob de Sterke
-
-        full_byte encoding:
-        In this mode each protocol byte contains 7 bits or the data to be
-        transferred. This results in a bit efficiency of about 85%. This mode
-        is mostly used when large words (e.g. 28-bit words) need to be
-        transferred. This improves the efficiency since transferring a 28-bit
-        word only needs four protocol bytes instead of seven when using the
-        nibble per byte mode.
-
-        |7|6|5|4|3|2|1|0|
-         | | > > > > > > > data bits
-         |
-         always 1
-
-
-        nibble_byte encoding:
-        In this mode each protocol byte contains only four bits (a nibble) of
-        the data to be transferred. This results in a bit efficiency of 50%;
-        to transfer one data byte two protocol bytes are needed.
-        |7|6|5|4|3|2|1|0|
-        | | | | | > > >  data bits
-        | | > > > unused bits (should be set to zero for consistency)
-        |
-        always 1
-        '''
-        if signed_integer_length is None:
-            if value < 0:
-                raise ValueError('Negative numbers not allowed unless' +
-                                 ' signed_integer_length is specified')
-            else:
-                bit_val = BitArray(bin(value))
-        else:
-            bit_val = BitArray(int=value, length=signed_integer_length)
-
-        byte_array_length = int(np.ceil((len(bit_val)) /
-                                        float(data_bits_per_byte)))
-        data_byte_array = bytearray(byte_array_length)
-        for i in range(byte_array_length):
-            if i == 0:
-                data_byte = bit_val[-data_bits_per_byte*(i+1):]
-            else:
-                data_byte = bit_val[-data_bits_per_byte*(i+1):
-                                    -data_bits_per_byte*(i)]
-            # Make sure lenght of the byte is correct
-            while len(data_byte) < 7:
-                data_byte.prepend('0b0')
-            # Set the bit indicating byte contains data to 1
-            data_byte.prepend('0b1')
-            data_byte_array[i] = data_byte.uint  # required for writing byte
-        data_byte_array.reverse()  # because of order elements where filled
-
-        while len(data_byte_array) < expected_number_of_bytes:
-            data_byte_array.insert(0, 128)
-        return data_byte_array
 
     def decode_message(self, data_bytes, data_bits_per_byte=7,
                        bytes_per_value=2, signed_integer=False):
@@ -378,7 +315,7 @@ class QuTech_ControlBox(VisaInstrument):
         succes = False
         t0 = time.time()
         while not succes:
-            log_message = self.create_message(defHeaders.ReadLoggedResults)
+            log_message = c.create_message(defHeaders.ReadLoggedResults)
             stat, log = self.serial_write(log_message)
             # print 'Got the data request stat %s' %stat
             if stat:
@@ -418,7 +355,7 @@ class QuTech_ControlBox(VisaInstrument):
         t0 = time.time()
         # While loop is to make sure measurement finished before querying.
         while not succes:
-            log_message = self.create_message(
+            log_message = c.create_message(
                 defHeaders.ReadInputAverageResults)
             stat, log = self.serial_write(log_message)
             if stat:
@@ -456,7 +393,7 @@ class QuTech_ControlBox(VisaInstrument):
         succes = False
         t0 = time.time()
         while not succes:
-            log_message = self.create_message(
+            log_message = c.create_message(
                 defHeaders.ReadIntAverageResults)
             stat, log = self.serial_write(log_message)
             if stat:
@@ -481,7 +418,7 @@ class QuTech_ControlBox(VisaInstrument):
         return ch0, ch1
 
     def send_stop_streaming(self):
-        termination_message = self.create_message(
+        termination_message = c.create_message(
             defHeaders.EndOfStreamingHeader)
         stat = self.serial_write(termination_message,
                                  verify_execution=False)
@@ -494,7 +431,7 @@ class QuTech_ControlBox(VisaInstrument):
         message = bytearray()
         # Request the data
 
-        log_message = self.create_message(
+        log_message = c.create_message(
             defHeaders.ReadIntStreamingResults)
         stat, log = self.serial_write(log_message)
 
@@ -590,20 +527,20 @@ class QuTech_ControlBox(VisaInstrument):
         # Makes sure the values are rounded before encoding as bytes
         lut = np.round(lut)
         cmd = defHeaders.AwgLUTHeader
-        data_bytes = []
-        data_bytes.append(self.encode_byte(awg_nr, 4))
-        data_bytes.append(self.encode_byte(table_nr, 4))
-        data_bytes.append(self.encode_byte(dac_ch, 4))
-        # This length is substracted by 1, because the FPGA counts from 0 instead of 1.
-        # With 1 substracted, the hardware will work properly.  -- 14-7-2015.
-        data_bytes.append(self.encode_byte(length-1, 7))
-        # Length -2  is a workaroun for issue #32
-        for sample_data in lut:
-            data_bytes.append(self.encode_byte(sample_data, 7,
-                                               signed_integer_length=14,
-                                               expected_number_of_bytes=2))
+        data_bytes = bytearray()
+        data_bytes.extend(c.encode_byte(awg_nr, 4,
+                          expected_number_of_bytes=1))
+        data_bytes.extend(c.encode_byte(table_nr, 4,
+                          expected_number_of_bytes=1))
+        data_bytes.extend(c.encode_byte(dac_ch, 4,
+                          expected_number_of_bytes=1))
+        # This length is substracted by 1, because the FPGA counts from 0
+        # With 1 substracted, the hardware will work properly.  -- 14-7-2015.               # With 1 substracted, the hardware will work properly.  -- 14-7-2015.
+        data_bytes.extend(c.encode_byte(length-1, 7))
+        data_bytes.extend(c.encode_array(lut,
+                          data_bits_per_byte=7, bytes_per_value=2))
+        message = c.create_message(cmd, data_bytes)
 
-        message = self.create_message(cmd, data_bytes)
         (stat, mesg) = self.serial_write(message)
         if not stat:
             raise Exception('Failed to set AWG lookup table')
@@ -627,17 +564,16 @@ class QuTech_ControlBox(VisaInstrument):
             raise ValueError
         if length != len(tape):
             raise ValueError
-
         cmd = defHeaders.AwgTapeHeader
-        data_bytes = []
-        data_bytes.append(self.encode_byte(awg_nr, 4))
-        data_bytes.append(self.encode_byte(length, 7,
-                          signed_integer_length=14,
+        data_bytes = bytearray()
+        data_bytes.extend(c.encode_byte(awg_nr, 4,
+                          expected_number_of_bytes=1))
+        data_bytes.extend(c.encode_byte(length, 7,
                           expected_number_of_bytes=2))
-        for sample_data in tape:
-            data_bytes.append(self.encode_byte(int(sample_data), 4))
 
-        message = self.create_message(cmd, data_bytes)
+        data_bytes.extend(c.encode_array(tape, 4, 1))
+
+        message = c.create_message(cmd, data_bytes)
         (stat, mesg) = self.serial_write(message)
         return (stat, mesg)
 
@@ -650,9 +586,9 @@ class QuTech_ControlBox(VisaInstrument):
         '''
 
         cmd = defHeaders.AwgRestartTapeHeader
-        data_bytes = []
-        data_bytes.append(self.encode_byte(awg_nr, 4))
-        message = self.create_message(cmd, data_bytes)
+        data_bytes = bytearray()
+        data_bytes.extend(c.encode_byte(awg_nr, 4, 1))
+        message = c.create_message(cmd, data_bytes)
         (stat, mesg) = self.serial_write(message)
         if not stat:
             raise Exception('Failed to restart awg tape')
@@ -671,9 +607,9 @@ class QuTech_ControlBox(VisaInstrument):
             cmd = defHeaders.AwgDisableHeader
         else:
             cmd = defHeaders.AwgEnableHeader
-        data_bytes = [self.encode_byte(awg_nr, 4),
-                      self.encode_byte(dac_ch, 4)]
-        message = self.create_message(cmd, data_bytes)
+        data_bytes = [c.encode_byte(awg_nr, 4, 1),
+                      c.encode_byte(dac_ch, 4, 1)]
+        message = c.create_message(cmd, data_bytes)
         (stat, mesg) = self.serial_write(message)
         if not stat:
             raise Exception('Failed to enable dac')
@@ -697,13 +633,13 @@ class QuTech_ControlBox(VisaInstrument):
             offset_dac = int(2**13-1)
 
         cmd = defHeaders.AwgOffsetHeader
-        data_bytes = []
-        data_bytes.append(self.encode_byte(awg_nr, 4))
-        data_bytes.append(self.encode_byte(dac_ch, 4))
-        data_bytes.append(self.encode_byte(offset_dac, data_bits_per_byte=7,
-                                           signed_integer_length=14,
-                                           expected_number_of_bytes=2))
-        message = self.create_message(cmd, data_bytes)
+        data_bytes = bytearray()
+        data_bytes.extend(c.encode_byte(awg_nr, 4, 1))
+        data_bytes.extend(c.encode_byte(dac_ch, 4, 1))
+        data_bytes.extend(c.encode_byte(offset_dac,
+                                        data_bits_per_byte=7,
+                                        expected_number_of_bytes=2))
+        message = c.create_message(cmd, data_bytes)
         (stat, mesg) = self.serial_write(message)
         if not stat:
             raise Exception('Failed to set dac_offset')
@@ -739,12 +675,12 @@ class QuTech_ControlBox(VisaInstrument):
             raise ValueError
 
         cmd = defHeaders.UpdateAverageSettings
-        data_bytes = []
-        data_bytes.append(self.encode_byte(nr_samples, 7,
-                                           expected_number_of_bytes=2))
-        data_bytes.append(self.encode_byte(avg_size, 7,
-                                           expected_number_of_bytes=1))
-        message = self.create_message(cmd, data_bytes)
+        data_bytes = bytearray()
+        data_bytes.extend(c.encode_byte(nr_samples, 7,
+                          expected_number_of_bytes=2))
+        data_bytes.extend(c.encode_byte(avg_size, 7,
+                          expected_number_of_bytes=1))
+        message = c.create_message(cmd, data_bytes)
         (stat, mesg) = self.serial_write(message)
         if stat:
             self.nr_samples = nr_samples
@@ -820,21 +756,17 @@ class QuTech_ControlBox(VisaInstrument):
         a12_dac = int(a12*2**12)
         a21_dac = int(a21*2**12)
         a22_dac = int(a22*2**12)
-        data_bytes = []
-        data_bytes.append(self.encode_byte(a11_dac, data_bits_per_byte=7,
-                                           signed_integer_length=14,
-                                           expected_number_of_bytes=2))
-        data_bytes.append(self.encode_byte(a12_dac, data_bits_per_byte=7,
-                                           signed_integer_length=14,
-                                           expected_number_of_bytes=2))
-        data_bytes.append(self.encode_byte(a21_dac, data_bits_per_byte=7,
-                                           signed_integer_length=14,
-                                           expected_number_of_bytes=2))
-        data_bytes.append(self.encode_byte(a22_dac, data_bits_per_byte=7,
-                                           signed_integer_length=14,
-                                           expected_number_of_bytes=2))
+        data_bytes = bytearray()
+        data_bytes.extend(c.encode_byte(a11_dac, data_bits_per_byte=7,
+                          expected_number_of_bytes=2))
+        data_bytes.extend(c.encode_byte(a12_dac, data_bits_per_byte=7,
+                          expected_number_of_bytes=2))
+        data_bytes.extend(c.encode_byte(a21_dac, data_bits_per_byte=7,
+                          expected_number_of_bytes=2))
+        data_bytes.extend(c.encode_byte(a22_dac, data_bits_per_byte=7,
+                          expected_number_of_bytes=2))
 
-        message = self.create_message(cmd, data_bytes)
+        message = c.create_message(cmd, data_bytes)
         (stat, mesg) = self.serial_write(message)
         if not stat:
             raise Exception('Failed to set lin_trans_coeffs')
@@ -854,9 +786,9 @@ class QuTech_ControlBox(VisaInstrument):
         if length < 1 or length > 8000:
             raise ValueError
         cmd = defHeaders.UpdateLoggerMaxCounterHeader
-        data_bytes = self.encode_byte(length-1, 7,
+        data_bytes = c.encode_byte(length-1, 7,
                                       expected_number_of_bytes=2)
-        message = self.create_message(cmd, data_bytes)
+        message = c.create_message(cmd, data_bytes)
         (stat, mesg) = self.serial_write(message)
         if stat:
             self.log_length = length
@@ -881,8 +813,8 @@ class QuTech_ControlBox(VisaInstrument):
         '''
         # Here the actual acquisition_mode is set
         cmd = defHeaders.UpdateModeHeader
-        data_bytes = self.encode_byte(acquisition_mode, 7)
-        message = self.create_message(cmd, data_bytes)
+        data_bytes = c.encode_byte(acquisition_mode, 7)
+        message = c.create_message(cmd, data_bytes)
         (stat, mesg) = self.serial_write(message)
         if stat:
             self._acquisition_mode = acquisition_mode
@@ -892,7 +824,6 @@ class QuTech_ControlBox(VisaInstrument):
 
     def _do_get_acquisition_mode(self):
         return self._acquisition_mode
-
 
     def _do_set_run_mode(self, run_mode):
         '''
@@ -906,8 +837,8 @@ class QuTech_ControlBox(VisaInstrument):
 
         # Here the actual mode is set
         cmd = defHeaders.UpdateRunModeHeader
-        data_bytes = self.encode_byte(run_mode, 7)
-        message = self.create_message(cmd, data_bytes)
+        data_bytes = c.encode_byte(run_mode, 7)
+        message = c.create_message(cmd, data_bytes)
         (stat, mesg) = self.serial_write(message)
         if stat:
             self.run_mode = run_mode
@@ -935,10 +866,10 @@ class QuTech_ControlBox(VisaInstrument):
             raise ValueError('awg_mode should be 0, 1 or 2')
         # Convert to No due to implementation in the box
         cmd = defHeaders.AwgModeHeader
-        data_bytes = []
-        data_bytes.append(self.encode_byte(awg_nr, 7))
-        data_bytes.append(self.encode_byte(awg_mode, 7))
-        message = self.create_message(cmd, data_bytes)
+        data_bytes = bytearray()
+        data_bytes.extend(c.encode_byte(awg_nr, 7))
+        data_bytes.extend(c.encode_byte(awg_mode, 7))
+        message = c.create_message(cmd, data_bytes)
 
         (stat, mesg) = self.serial_write(message)
         if stat:
@@ -961,9 +892,9 @@ class QuTech_ControlBox(VisaInstrument):
         '''
 
         cmd = defHeaders.UpdVoffsetHeader
-        data_bytes = self.encode_byte(adc_offset, data_bits_per_byte=4,
-                                      signed_integer_length=8)
-        message = self.create_message(cmd, data_bytes)
+        data_bytes = c.encode_byte(adc_offset, data_bits_per_byte=4,
+                                   signed_integer_length=8)
+        message = c.create_message(cmd, data_bytes)
         (stat, mesg) = self.serial_write(message)
         if stat:
             self.adc_offset = adc_offset
@@ -986,8 +917,8 @@ class QuTech_ControlBox(VisaInstrument):
         if delay < 0 or delay > 255:
             raise ValueError
         cmd = defHeaders.UpdIntegrationDelayHeader
-        data_bytes = self.encode_byte(delay, 4, expected_number_of_bytes=2)
-        message = self.create_message(cmd, data_bytes)
+        data_bytes = c.encode_byte(delay, 4, expected_number_of_bytes=2)
+        message = c.create_message(cmd, data_bytes)
         (stat, mesg) = self.serial_write(message)
         if stat:
             self.signal_delay = delay
@@ -1010,8 +941,8 @@ class QuTech_ControlBox(VisaInstrument):
         if length < 0 or length > 512:
             raise ValueError
         cmd = defHeaders.UpdIntegrationLengthHeader
-        data_bytes = self.encode_byte(length, 7, expected_number_of_bytes=2)
-        message = self.create_message(cmd, data_bytes)
+        data_bytes = c.encode_byte(length, 7, expected_number_of_bytes=2)
+        message = c.create_message(cmd, data_bytes)
         (stat, mesg) = self.serial_write(message)
         if stat:
             self.integration_length = length
@@ -1046,7 +977,7 @@ class QuTech_ControlBox(VisaInstrument):
 
     def _set_signal_threshold(self, line, threshold):
         '''
-        Private version of command, DOES not go through qtlab event logger!
+        Private version of command
         set the thresholds for the ancilla statusses of the integration
         results
 
@@ -1056,7 +987,9 @@ class QuTech_ControlBox(VisaInstrument):
               of this value is between -2^27 and +2^27-1
         @return stat : 0 if the upload succeeded and 1 if the upload failed.
         '''
-        threshold = threshold # the -sign is workaround for threshold problem, see note Active resonator reset/depletion optimization/100 ns pulses, opt....
+        # the -sign is workaround for threshold problem, see note
+        # Active resonator reset/depletion optimization/100 ns pulses, opt....
+        threshold = threshold
         signed_threshold = threshold
         if (threshold < 0):
             signed_threshold = threshold + 2 ** 28
@@ -1064,10 +997,10 @@ class QuTech_ControlBox(VisaInstrument):
             cmd = defHeaders.UpdThresholdZeroHeader
         elif line == 1:
             cmd = defHeaders.UpdThresholdOneHeader
-        data_bytes = self.encode_byte(signed_threshold,
-                                               data_bits_per_byte=7,
-                                               expected_number_of_bytes=4)
-        message = self.create_message(cmd, data_bytes)
+        data_bytes = c.encode_byte(signed_threshold,
+                                   data_bits_per_byte=7,
+                                   expected_number_of_bytes=4)
+        message = c.create_message(cmd, data_bytes)
         (stat, mesg) = self.serial_write(message)
         return (stat, message)
 
@@ -1096,11 +1029,11 @@ class QuTech_ControlBox(VisaInstrument):
             cmd = defHeaders.UpdWeightsOneHeader
         data_bytes = []
         for i, weight in enumerate(weights):
-            data_bytes.append(self.encode_byte(weight,
+            data_bytes.append(c.encode_byte(weight,
                                                data_bits_per_byte=4,
                                                signed_integer_length=8,
                                                expected_number_of_bytes=2))
-        message = self.create_message(cmd, data_bytes)
+        message = c.create_message(cmd, data_bytes)
         (stat, mesg) = self.serial_write(message)
 
         if not stat:
@@ -1146,7 +1079,7 @@ class QuTech_ControlBox(VisaInstrument):
         for byte in bytearray(input_command):
             checksum = checksum ^ byte
         checksum = checksum | 128
-        checksum = chr(checksum)# Convert int to hexstring representation and set MSbit
+        checksum = chr(checksum) # Convert int to hexs and set MSbit
 
         return checksum
 
@@ -1244,11 +1177,10 @@ class QuTech_ControlBox(VisaInstrument):
         @param awg_nr : the awg of the dac, (0,1,2).
         @return stat : 0 if the upload succeeded and 1 if the upload failed.
         '''
-
         cmd = defHeaders.AwgRestartTapeHeader
-        data_bytes = []
-        data_bytes.append(self.encode_byte(awg_nr, 4))
-        message = self.create_message(cmd, data_bytes)
+        data_bytes = bytearray()
+        data_bytes.extend(c.encode_byte(awg_nr, 4, 1))
+        message = c.create_message(cmd, data_bytes)
         (stat, mesg) = self.serial_write(message)
         if not stat:
             raise Exception('Failed to restart awg tape')
@@ -1604,26 +1536,26 @@ class QuTech_ControlBox(VisaInstrument):
         readout_wave_interval = readout_wave_interval-1  # compensating for
         # definition in CBox
         cmd = defHeaders.UpdateSequencerParametersHeader
-        data_bytes = []
-        data_bytes.append(self.encode_byte(heartbeat_interval, 7,
+        data_bytes = bytearray()
+        data_bytes.extend(c.encode_byte(heartbeat_interval, 7,
                           expected_number_of_bytes=2))
-        data_bytes.append(self.encode_byte(burst_heartbeat_interval, 7))
-        data_bytes.append(self.encode_byte(burst_heartbeat_n, 7,
+        data_bytes.extend(c.encode_byte(burst_heartbeat_interval, 7, 1))
+        data_bytes.extend(c.encode_byte(burst_heartbeat_n, 7,
                           expected_number_of_bytes=2))
-        data_bytes.append(self.encode_byte(readout_delay, 7))
+        data_bytes.extend(c.encode_byte(readout_delay, 7, 1))
         # Comment back in for v 2.12 +
-        data_bytes.append(self.encode_byte(second_pre_rot_delay, 7))
-        data_bytes.append(self.encode_byte(calibration_mode, 7))
-        data_bytes.append(self.encode_byte(awg_mask, 7))
-        data_bytes.append(self.encode_byte(readout_pulse_length, 7))
-        data_bytes.append(self.encode_byte(readout_wave_interval, 7))
-        data_bytes.append(self.encode_byte(output_trigger_delay, 7))
-        data_bytes.append(self.encode_byte(trigger_state, 7))
-        data_bytes.append(self.encode_byte(feedback_mode, 7))
-        data_bytes.append(self.encode_byte(feedback_code, 7))
-        data_bytes.append(self.encode_byte(logging_mode, 7))
+        data_bytes.extend(c.encode_byte(second_pre_rot_delay, 7, 1))
+        data_bytes.extend(c.encode_byte(calibration_mode, 7, 1))
+        data_bytes.extend(c.encode_byte(awg_mask, 7, 1))
+        data_bytes.extend(c.encode_byte(readout_pulse_length, 7, 1))
+        data_bytes.extend(c.encode_byte(readout_wave_interval, 7, 1))
+        data_bytes.extend(c.encode_byte(output_trigger_delay, 7, 1))
+        data_bytes.extend(c.encode_byte(trigger_state, 7, 1))
+        data_bytes.extend(c.encode_byte(feedback_mode, 7, 1))
+        data_bytes.extend(c.encode_byte(feedback_code, 7, 1))
+        data_bytes.extend(c.encode_byte(logging_mode, 7, 1))
 
-        message = self.create_message(cmd, data_bytes)
+        message = c.create_message(cmd, data_bytes)
         (stat, mesg) = self.serial_write(message)
 
         return stat

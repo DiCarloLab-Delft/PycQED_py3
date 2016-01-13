@@ -105,4 +105,10 @@ EndOfMessageHeader = b"\x7F"
 MC_TestHeader = b"\x40"
 
 
-acquistion_modes = ['idle', 'integration logging'
+acquistion_modes = ['0: idle',
+                    '1: integration logging mode',
+                    '2: feedback mode,',
+                    '3: input average.',
+                    '4: integration average',
+                    '5: integration streaming',
+                    "6: touch 'n go"]

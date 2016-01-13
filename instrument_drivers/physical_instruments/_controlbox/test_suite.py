@@ -3,6 +3,16 @@ import numpy as np
 
 CBox = None
 
+
+def bytes_to_binary(bytestring):
+    '''
+    used as a convenience function in codec testing
+    '''
+    s = ''
+    for n in bytestring:
+        s+= ''.join(str((n & (1 << i)) and 1) for i in reversed(range(8)))
+    return s
+
 class CBox_tests(unittest.TestCase):
     '''
     This is a test suite for testing the QuTech_ControlBox Instrument.
@@ -14,9 +24,15 @@ class CBox_tests(unittest.TestCase):
         print('CBox', CBox)
         self.CBox = CBox
 
-    def test_get_all(self):
-        CBox.get_all()
-        return True
+    # def test_get_all(self):
+    #     CBox.get_all()
+    #     return True
+
+    def test_firmware_version(self):
+        v = CBox.get('firmware_version')
+        self.assertTrue(int(v[0]) == 2)  # major version
+        self.assertTrue(int(int(v[2:4])) > 13)  # minor version
+
 
     # def test_setting_acquisition_mode(self):
     #     stat = self.CBox.set_acquisition_mode(0)
@@ -47,41 +63,38 @@ class CBox_tests(unittest.TestCase):
     #     self.assertTrue(stat)
     #     self.assertEqual(0, self.CBox.get_acquisition_mode(0))
 
-    # def test_encoding(self):
-    #     encoded_128 = self.CBox.encode_byte(128, 7)
-    #     self.assertTrue(len(encoded_128) == 2)
-    #     self.assertTrue(bin(encoded_128[0]) == '0b10000001')
-    #     self.assertTrue(bin(encoded_128[1]) == '0b10000000')
+    def test_codec(self):
+        # codec is CBox.c
+        encoded_128 = self.CBox.c.encode_byte(128, 7)
+        self.assertTrue(type(encoded_128) == bytes)
+        self.assertTrue(len(encoded_128) == 2)
+        self.assertTrue(bytes_to_binary(encoded_128)
+                        == '1000000110000000')
+        encoded_128 = self.CBox.c.encode_byte(128, 4)
+        self.assertTrue(type(encoded_128) == bytes)
+        self.assertTrue(len(encoded_128) == 2)
+        self.assertTrue(bytes_to_binary(encoded_128) ==
+                        '1000100010000000')
 
-    #     encoded_128 = self.CBox.encode_byte(128, 4)
-    #     self.assertTrue(len(encoded_128) == 2)
-    #     self.assertTrue(bin(encoded_128[0]) == '0b10001000')
-    #     self.assertTrue(bin(encoded_128[1]) == '0b10000000')
+        # Encoding using 4 bits per byte
+        encoded_546815 = self.CBox.c.encode_byte(546815, 4, 6)
+        self.assertEqual(type(encoded_546815), bytes)
+        self.assertEqual(len(encoded_546815), 6)
+        sub_str = bytes([encoded_546815[0], encoded_546815[-1]])
+        self.assertTrue(bin(sub_str == '1000100010001111'))
+        self.assertEqual(CBox.c.decode_byte(encoded_546815, 4), 546815)
 
-    #     encoded_128 = self.CBox.encode_byte(546815, 4)
-    #     self.assertTrue(len(encoded_128) == 5)
-    #     self.assertTrue(bin(encoded_128[0]) == '0b10001000')
-    #     self.assertTrue(bin(encoded_128[-1]) == '0b10001111')
+        # encoding using 7 bits per byte
+        encoded_546815 = self.CBox.c.encode_byte(546815, 7, 4)
+        self.assertEqual(CBox.c.decode_byte(encoded_546815, 7), 546815)
 
-    #     encodedTrue = self.CBox.encode_byte(True, 7)
-    #     self.assertEqual(bin(encodedTrue[0]), '0b10000001')
-    #     encodedFalse = self.CBox.encode_byte(False, 4)
-    #     self.assertEqual(bin(encodedFalse[0]), '0b10000000')
+        # Encoding and decoding array
+        x = np.random.randint(0, 2565, 20)
+        data_bytes = CBox.c.encode_array(x, 7, 2)
+        message = CBox.c.create_message(data_bytes=data_bytes)
+        x_dec = CBox.c.decode_message(message, 7, 2)
+        self.assertEqual(x.all(), x_dec.all())
 
-    #     encoded_negative_4023 = self.CBox.encode_byte(4023,
-    #                                                   data_bits_per_byte=7,
-    #                                                   signed_integer_length=14)
-    #     self.assertTrue(len(encoded_negative_4023) == 2)
-    #     self.assertEqual(bin(encoded_negative_4023[0]), '0b10011111')
-
-    # def test_decoding(self):
-    #     val = 128
-    #     encoded_bytes = self.CBox.encode_byte(val, 7)
-    #     self.assertEqual(self.CBox.decode_byte(encoded_bytes, 7), val)
-
-    #     val = 128
-    #     encoded_bytes = self.CBox.encode_byte(val, 4)
-    #     self.assertEqual(self.CBox.decode_byte(encoded_bytes, 4), val)
 
     # def test_readLog(self):
     #     '''
