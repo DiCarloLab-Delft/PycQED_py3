@@ -218,7 +218,7 @@ class QuTech_ControlBox(VisaInstrument):
         recommend using the cython version otherwise.
         '''
         message_bytes = bytearray(data_bytes[:-2])
-        # checksum = self.calculate_checksum(message_bytes)
+        # checksum = c.calculate_checksum(message_bytes)
         # if checksum != message_bytes[-1]:
         #     raise ValueError('Checksum does not match message')
         if type(data_bits_per_byte) == int:
@@ -1070,18 +1070,6 @@ class QuTech_ControlBox(VisaInstrument):
 
         return ser
 
-    def calculate_checksum(self, input_command):
-        '''
-        Calculates checksum by taking the XOR of all elements
-        in a hex string.
-        '''
-        checksum = 0
-        for byte in bytearray(input_command):
-            checksum = checksum ^ byte
-        checksum = checksum | 128
-        checksum = chr(checksum) # Convert int to hexs and set MSbit
-
-        return checksum
 
     def _read_raw(self, size):
         '''
@@ -1151,7 +1139,7 @@ class QuTech_ControlBox(VisaInstrument):
         '''
         if type(command) != bytes:
             raise TypeError('command must be type bytes')
-        checksum = self.calculate_checksum(command)
+        checksum = c.calculate_checksum(command)
 
         in_wait = self.visa_handle.bytes_in_buffer
         if in_wait > 0:  # Clear any leftover messages in the buffer

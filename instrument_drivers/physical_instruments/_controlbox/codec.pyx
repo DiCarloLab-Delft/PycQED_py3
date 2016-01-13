@@ -8,7 +8,12 @@ Cython module that contains encoder and decoder for the CBox v2
 def create_message(cmd=None, bytes data_bytes=bytes(),
                    bytes EOM=b"\x7F"):
     '''
-    Creates a bytes to send as a message.
+    Input arguments:
+                  cmd         = None
+        bytes     data_bytes  = bytes()
+        bytes     EOM         = b'\x7F'
+
+    Creates bytes to send as a message.
     Starts with a command, then adds the data bytes and ends with EOM.
     '''
     cdef bytes message = bytes()
@@ -72,10 +77,10 @@ cpdef encode_byte(int value, int data_bits_per_byte=7,
 def encode_array(values, int data_bits_per_byte=7,
                  int bytes_per_value = 2):
     '''
-    input arguments
-    int* values: array of values to be encoded
-    int data_bits_per_byte       : specify bits/byte used in encoding
-    int bytes_per_value          : number of bytes expected per value
+    Input arguments
+        int*   values                      : array of values to be encoded
+        int    data_bits_per_byte = 7      : specify bits/byte used in encoding
+        int    bytes_per_value    = 2      : number of bytes expected per value
 
     Takes an array of values and encodes every single one using
     the encode_byte function.
@@ -145,3 +150,19 @@ cpdef decode_byte(data_bytes, int data_bits_per_byte=7):
         value&= ~(1<<nr_bits_m1) # set msb of small int to 0
         value = value - 2**nr_bits_m1 # flip sign of 32bit int
     return value
+
+
+def calculate_checksum(bytes input_command):
+        '''
+        Input arguments
+            bytes input_command
+
+        Calculates checksum by taking the XOR of all bytes in input_command
+        '''
+        checksum = 0
+        for byte in input_command:
+            checksum ^= byte
+        checksum = checksum | 128
+        checksum = bytes([checksum]) # Convert int to hexs and set MSbit
+
+        return checksum
