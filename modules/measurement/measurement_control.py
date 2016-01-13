@@ -404,7 +404,8 @@ class MeasurementControl:
                 p = self.win.addPlot()
                 p.setLabel('bottom', xlab)
                 p.setLabel('left', ylab)
-                c = p.plot()
+                c = p.plot(symbol='o')
+                # symbol options are  o, s(quare), t(riangle), d(iamond), +
                 self.curves.append(c)
             self.win.nextRow()
         return self.win, self.curves
