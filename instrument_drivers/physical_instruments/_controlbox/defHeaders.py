@@ -104,11 +104,18 @@ EndOfMessageHeader = b"\x7F"
 # Test header to test fpga to PC communication
 MC_TestHeader = b"\x40"
 
-
+# Modes index in list corresponds to the integer that will be sent
 acquisition_modes = ['0: idle',
                      '1: integration logging mode',
                      '2: feedback mode,',
-                     '3: input average.',
-                     '4: integration average',
-                     '5: integration streaming',
+                     '3: input averaging mode',
+                     '4: integration averaging mode',
+                     '5: integration streaming mode',
                      "6: touch 'n go"]
+
+run_modes = ['0: idle',
+             '1: Run mode']
+
+awg_modes = ['0: Codeword-trigger mode',
+             '1: No-codeword mode',
+             '2: Tape mode']
