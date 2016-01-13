@@ -1,17 +1,10 @@
 import unittest
 import numpy as np
-
+from . import defHeaders
 CBox = None
 
 
-def bytes_to_binary(bytestring):
-    '''
-    used as a convenience function in codec testing
-    '''
-    s = ''
-    for n in bytestring:
-        s+= ''.join(str((n & (1 << i)) and 1) for i in reversed(range(8)))
-    return s
+
 
 class CBox_tests(unittest.TestCase):
     '''
@@ -30,38 +23,38 @@ class CBox_tests(unittest.TestCase):
 
     def test_firmware_version(self):
         v = CBox.get('firmware_version')
-        self.assertTrue(int(v[0]) == 2)  # major version
-        self.assertTrue(int(int(v[2:4])) > 13)  # minor version
+        self.assertTrue(int(v[1]) == 2)  # major version
+        self.assertTrue(int(int(v[3:5])) > 13)  # minor version
 
 
-    # def test_setting_acquisition_mode(self):
-    #     stat = self.CBox.set_acquisition_mode(0)
-    #     self.assertTrue(stat)
-    #     self.assertEqual(0, self.CBox.get_acquisition_mode())
+    def test_setting_acquisition_mode(self):
+        self.CBox.set('acquisition_mode', 0)
+        self.assertEqual(self.CBox.get('acquisition_mode'),
+                         defHeaders.acquisition_modes[0])
 
-    #     stat = self.CBox.set_acquisition_mode(1)
-    #     self.assertTrue(stat)
-    #     self.assertEqual(1, self.CBox.get_acquisition_mode(1))
+        self.CBox.set('acquisition_mode', 1)
+        self.assertEqual(self.CBox.get('acquisition_mode'),
+                         defHeaders.acquisition_modes[1])
 
-    #     stat = self.CBox.set_acquisition_mode(2)
-    #     self.assertTrue(stat)
-    #     self.assertEqual(2, self.CBox.get_acquisition_mode(2))
+        self.CBox.set('acquisition_mode', 2)
+        self.assertEqual(self.CBox.get('acquisition_mode'),
+                         defHeaders.acquisition_modes[2])
 
-    #     stat = self.CBox.set_acquisition_mode(3)
-    #     self.assertTrue(stat)
-    #     self.assertEqual(3, self.CBox.get_acquisition_mode(3))
+        self.CBox.set('acquisition_mode', 3)
+        self.assertEqual(self.CBox.get('acquisition_mode'),
+                         defHeaders.acquisition_modes[3])
 
-    #     stat = self.CBox.set_acquisition_mode(4)
-    #     self.assertTrue(stat)
-    #     self.assertEqual(4, self.CBox.get_acquisition_mode(4))
+        self.CBox.set('acquisition_mode', 4)
+        self.assertEqual(self.CBox.get('acquisition_mode'),
+                         defHeaders.acquisition_modes[4])
 
-    #     stat = self.CBox.set_acquisition_mode(5)
-    #     self.assertTrue(stat)
-    #     self.assertEqual(5, self.CBox.get_acquisition_mode(5))
+        self.CBox.set('acquisition_mode', 5)
+        self.assertEqual(self.CBox.get('acquisition_mode'),
+                         defHeaders.acquisition_modes[5])
 
-    #     stat = self.CBox.set_acquisition_mode(0)
-    #     self.assertTrue(stat)
-    #     self.assertEqual(0, self.CBox.get_acquisition_mode(0))
+        self.CBox.set('acquisition_mode', 0)
+        self.assertEqual(self.CBox.get('acquisition_mode'),
+                         defHeaders.acquisition_modes[0])
 
     def test_codec(self):
         # codec is CBox.c
@@ -88,6 +81,10 @@ class CBox_tests(unittest.TestCase):
         encoded_546815 = self.CBox.c.encode_byte(546815, 7, 4)
         self.assertEqual(CBox.c.decode_byte(encoded_546815, 7), 546815)
 
+        # encoding using 7 bits per byte
+        encoded_neg235 = self.CBox.c.encode_byte(-235, 7, 4)
+        self.assertEqual(CBox.c.decode_byte(encoded_neg235, 7), -235)
+
         # Encoding and decoding array
         x = np.random.randint(0, 2565, 20)
         data_bytes = CBox.c.encode_array(x, 7, 2)
@@ -95,6 +92,53 @@ class CBox_tests(unittest.TestCase):
         x_dec = CBox.c.decode_message(message, 7, 2)
         self.assertEqual(x.all(), x_dec.all())
 
+    def test_sig_del(self):
+        s_del = self.CBox.get('signal_delay')
+
+        self.CBox.set('signal_delay', 0)
+        self.assertEqual(self.CBox.get('signal_delay'), 0)
+        self.CBox.set('signal_delay', 124)
+        self.assertEqual(self.CBox.get('signal_delay'), 124)
+
+        self.CBox.set('signal_delay', s_del)
+
+    def test_integration_length(self):
+        s_del = self.CBox.get('integration_length')
+
+        self.CBox.set('integration_length', 50)
+        self.assertEqual(self.CBox.get('integration_length'), 50)
+        self.CBox.set('integration_length', 124)
+        self.assertEqual(self.CBox.get('integration_length'), 124)
+
+        self.CBox.set('integration_length', s_del)
+
+    def test_set_signal_threshold(self):
+        for i in range(2):
+            t = self.CBox.get('signal_threshold_line_{}'.format(i))
+            self.CBox.set('signal_threshold_line_{}'.format(i), 124)
+            self.assertEqual(
+                self.CBox.get('signal_threshold_line_{}'.format(i)), 124)
+
+            self.CBox.set('signal_threshold_line_{}'.format(i), t)
+
+    def test_adc_offset(self):
+        offs = self.CBox.get('adc_offset')
+
+        self.CBox.set('adc_offset', 123)
+        self.assertEqual(self.CBox.get('adc_offset'), 123)
+        self.CBox.set('adc_offset', -123)
+        self.assertEqual(self.CBox.get('adc_offset'), -123)
+
+        self.CBox.set('adc_offset', offs)
+    def test_log_length(self):
+        initial_val = self.CBox.get('log_length')
+
+        self.CBox.set('log_length', 2)
+        self.assertEqual(self.CBox.get('log_length'), 2)
+        self.CBox.set('log_length', 7500)
+        self.assertEqual(self.CBox.get('log_length'), 7500)
+
+        self.CBox.set('log_length', initial_val)
 
     # def test_readLog(self):
     #     '''
@@ -232,11 +276,6 @@ class CBox_tests(unittest.TestCase):
     #     stat = self.CBox.set_awg_mode(awg_nr, True)
     #     self.assertTrue(stat)
 
-    # def test_firmware_version(self):
-    #     v = self.CBox.get_firmware_version()
-    #     self.assertEqual(v, '2.10.1')
-    #     # Warning, only tests string length not if actual version is newer.
-
     # def test_unrecognized_command_error(self):
     #     with self.assertRaises(ValueError):
     #         self.CBox.serial_write('\x02\x00\x7F')
@@ -276,7 +315,14 @@ class CBox_tests(unittest.TestCase):
     #     succes = self.CBox.set_integration_weights(line=0, weights=array_good)
     #     self.assertTrue(succes)
 
-
+def bytes_to_binary(bytestring):
+    '''
+    used as a convenience function in codec testing
+    '''
+    s = ''
+    for n in bytestring:
+        s+= ''.join(str((n & (1 << i)) and 1) for i in reversed(range(8)))
+    return s
 
 if __name__ == '__main__':
 

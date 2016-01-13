@@ -129,9 +129,6 @@ cpdef decode_byte(data_bytes, int data_bits_per_byte=7):
 
     Inverse function of encode byte. Protocol is described in docstring
     of encode_byte().
-
-
-    Note: does not support unsigned integers.
     '''
     cdef int MASK =((1<<(data_bits_per_byte)) -1);
     cdef int i=0;

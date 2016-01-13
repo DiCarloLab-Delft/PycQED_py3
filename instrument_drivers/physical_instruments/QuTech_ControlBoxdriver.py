@@ -46,29 +46,41 @@ class QuTech_ControlBox(VisaInstrument):
         # Establish communications
         self.add_parameter('firmware_version',
                            get_cmd=self._do_get_firmware_version)
-        self.add_parameter('acquisition_mode', type=int,
+        self.add_parameter('acquisition_mode',
                            set_cmd=self._do_set_acquisition_mode,
-                           get_cmd=self._do_get_acquisition_mode)
-        # self.add_parameter('signal_delay', type=int,
-        #                    min=0, max=255,
-        #                    flags=Instrument.FLAG_GETSET |
-        #                    Instrument.FLAG_SOFTGET)
-        # self.add_parameter('integration_length', type=int,
-        #                    min=1, max=512,
-        #                    flags=Instrument.FLAG_GETSET |
-        #                    Instrument.FLAG_SOFTGET)
-        # self.add_parameter('signal_threshold_line0', type=int,
-        #                    min=-2**27, max=2**27-1,
-        #                    flag=Instrument.FLAG_GETSET |
-        #                    Instrument.FLAG_SOFTGET)
-        # self.add_parameter('signal_threshold_line1', type=int,
-        #                    min=-2**27, max=2**27-1,
-        #                    flag=Instrument.FLAG_GETSET |
-        #                    Instrument.FLAG_SOFTGET)
-        # self.add_parameter('adc_offset', type=int,
-        #                    min=-128, max=127,
-        #                    flag=Instrument.FLAG_GETSET |
-        #                    Instrument.FLAG_SOFTGET)
+                           get_cmd=self._do_get_acquisition_mode,
+                           vals=vals.Anything())
+        self.add_parameter('signal_delay',
+                           label='signal delay (# samples)',
+                           get_cmd=self._do_get_signal_delay,
+                           set_cmd=self._do_set_signal_delay,
+                           vals=vals.Ints(0, 255))
+        self.add_parameter('integration_length',
+                           label='integration length (# samples)',
+                           get_cmd=self._do_get_integration_length,
+                           set_cmd=self._do_set_integration_length,
+                           vals=vals.Ints(1, 512))
+
+        for i in range(2):
+            self._sig_thres = [0]*2
+            # Warning this way of generating paramters can create closures in
+            # multiprocessing, awaiting new syntax from Alex
+            self.add_parameter('signal_threshold_line_{}'.format(i),
+                               label='Signal threshold line {}'.format(i),
+                               get_cmd=self._gen_signal_threshold_get_func(i),
+                               set_cmd=self._gen_signal_threshold_set_func(i),
+                               vals=vals.Ints(-2**27, 2**27-1))
+        self.add_parameter('adc_offset',
+                           label='Voltage offset adc converter',
+                           get_cmd=self._do_get_adc_offset,
+                           set_cmd=self._do_set_adc_offset,
+                           vals=vals.Ints(-128, 127))
+        self.add_parameter('log_length',
+                           label='Log length (# shots)',
+                           get_cmd=self._do_get_log_length,
+                           set_cmd=self._do_set_log_length,
+                           vals=vals.Ints(1, 8000))
+
         # self.add_parameter('log_length', type=int,
         #                    min=0, max=8000,
         #                    flag=Instrument.FLAG_GETSET |
@@ -118,7 +130,14 @@ class QuTech_ControlBox(VisaInstrument):
         # self.add_parameter('tng_logging_mode', type=int,
         #                    flag=Instrument.FLAG_GETSET)
 
+        # Setting default arguments
+        self.set('acquisition_mode', 'idle')
+        self.set('signal_delay', 0)
+        self.set('integration_length', 100)
+        self.set('adc_offset', 0)
+        self.set('log_length', 100)
         # self.tng_heartbeat_interval = 100000
+
         # self.tng_burst_heartbeat_interval = 10000
         # self.tng_burst_heartbeat_n = 1
         # self.tng_readout_delay = 300
@@ -162,6 +181,7 @@ class QuTech_ControlBox(VisaInstrument):
             test_suite.CBox = self
             suite = unittest.TestLoader().loadTestsFromTestCase(test_suite.CBox_tests)
             unittest.TextTestRunner(verbosity=2).run(suite)
+        print('Initialized CBox', self.get('firmware_version'))
 
     def get_all(self):
         for par in self.parameters:
@@ -185,7 +205,7 @@ class QuTech_ControlBox(VisaInstrument):
             version_msg = self.serial_read()
         # Decoding the message
         # -128 is because of MSB signifying data byte
-        v_str = str(version_msg[0]-128)+'.'+str(version_msg[1]-128) + \
+        v_str = 'v'+str(version_msg[0]-128)+'.'+str(version_msg[1]-128) + \
             '.'+str(version_msg[2]-128)
         return v_str
         return v_str
@@ -783,21 +803,19 @@ class QuTech_ControlBox(VisaInstrument):
         @param length : the number of measurements range (1, 8000)
         @return stat : 0 if the upload succeeded and 1 if the upload failed.
         '''
-        if length < 1 or length > 8000:
-            raise ValueError
         cmd = defHeaders.UpdateLoggerMaxCounterHeader
         data_bytes = c.encode_byte(length-1, 7,
                                       expected_number_of_bytes=2)
         message = c.create_message(cmd, data_bytes)
         (stat, mesg) = self.serial_write(message)
         if stat:
-            self.log_length = length
+            self._log_length = length
         else:
             raise Exception('Failed to set log_length')
         return (stat, message)
 
     def _do_get_log_length(self):
-        return self.log_length
+        return self._log_length
 
     def _do_set_acquisition_mode(self, acquisition_mode):
         '''
@@ -811,15 +829,25 @@ class QuTech_ControlBox(VisaInstrument):
             6 = touch 'n go
         @return stat : True if the upload succeeded and False if the upload failed
         '''
+        acquisition_mode = str(acquisition_mode)
+        mode_int = None
+        for i in range(len(defHeaders.acquisition_modes)):
+            if acquisition_mode.upper() in defHeaders.acquisition_modes[i].upper():
+                mode_int = i
+                break
+        if mode_int is None:
+            raise KeyError('acquisition_mode %s not recognized')
+
         # Here the actual acquisition_mode is set
         cmd = defHeaders.UpdateModeHeader
-        data_bytes = c.encode_byte(acquisition_mode, 7)
+        data_bytes = c.encode_byte(mode_int, 7)
         message = c.create_message(cmd, data_bytes)
         (stat, mesg) = self.serial_write(message)
         if stat:
-            self._acquisition_mode = acquisition_mode
+            self._acquisition_mode = defHeaders.acquisition_modes[mode_int]
         else:
             raise Exception('Failed to set acquisition_mode')
+        self.get('acquisition_mode')  # ensure updating of the value
         return (stat, message)
 
     def _do_get_acquisition_mode(self):
@@ -892,18 +920,17 @@ class QuTech_ControlBox(VisaInstrument):
         '''
 
         cmd = defHeaders.UpdVoffsetHeader
-        data_bytes = c.encode_byte(adc_offset, data_bits_per_byte=4,
-                                   signed_integer_length=8)
+        data_bytes = c.encode_byte(adc_offset, data_bits_per_byte=4)
         message = c.create_message(cmd, data_bytes)
         (stat, mesg) = self.serial_write(message)
         if stat:
-            self.adc_offset = adc_offset
+            self._adc_offset = adc_offset
         else:
             raise Exception('Failed to set adc_offset')
         return (stat, message)
 
     def _do_get_adc_offset(self):
-        return self.adc_offset
+        return self._adc_offset
 
     def _do_set_signal_delay(self, delay):
         '''
@@ -921,13 +948,13 @@ class QuTech_ControlBox(VisaInstrument):
         message = c.create_message(cmd, data_bytes)
         (stat, mesg) = self.serial_write(message)
         if stat:
-            self.signal_delay = delay
+            self._signal_delay = delay
         else:
             raise Exception('Failed to set signal_delay')
         return (stat, message)
 
     def _do_get_signal_delay(self):
-        return self.signal_delay
+        return self._signal_delay
 
     def _do_set_integration_length(self, length):
         '''
@@ -945,35 +972,29 @@ class QuTech_ControlBox(VisaInstrument):
         message = c.create_message(cmd, data_bytes)
         (stat, mesg) = self.serial_write(message)
         if stat:
-            self.integration_length = length
+            self._integration_length = length
         else:
             raise Exception('Failed to set integration length')
         return stat
 
     def _do_get_integration_length(self):
-        return self.integration_length
+        return self._integration_length
 
-    def _do_set_signal_threshold_line0(self, threshold):
-        succes = self._set_signal_threshold(0, threshold)
-        if succes:
-            self.threshold0 = threshold
-        else:
-            raise Exception('Failed to set signed_threshold 0')
-        return succes
+    def _gen_signal_threshold_set_func(self, line):
+        def set_sig_threshold_i(threshold):
+            '''
+            wrapper around self._set_signal_threshold for param
+            '''
+            return self._set_signal_threshold(line, threshold)
+        return set_sig_threshold_i
 
-    def _do_set_signal_threshold_line1(self, threshold):
-        succes = self._set_signal_threshold(1, threshold)
-        if succes:
-            self.threshold1 = threshold
-        else:
-            raise Exception('Failed to set signed_threshold 1')
-        return succes
-
-    def _do_get_signal_threshold_line0(self):
-        return self.threshold0
-
-    def _do_get_signal_threshold_line1(self):
-        return self.threshold1
+    def _gen_signal_threshold_get_func(self, line):
+        def get_sig_threshold_i():
+            '''
+            wrapper around self._get_signal_threshold for param
+            '''
+            return self._get_signal_threshold(line)
+        return get_sig_threshold_i
 
     def _set_signal_threshold(self, line, threshold):
         '''
@@ -989,7 +1010,6 @@ class QuTech_ControlBox(VisaInstrument):
         '''
         # the -sign is workaround for threshold problem, see note
         # Active resonator reset/depletion optimization/100 ns pulses, opt....
-        threshold = threshold
         signed_threshold = threshold
         if (threshold < 0):
             signed_threshold = threshold + 2 ** 28
@@ -1002,7 +1022,12 @@ class QuTech_ControlBox(VisaInstrument):
                                    expected_number_of_bytes=4)
         message = c.create_message(cmd, data_bytes)
         (stat, mesg) = self.serial_write(message)
+        if stat:
+            self._sig_thres[line] = threshold
         return (stat, message)
+
+    def _get_signal_threshold(self, line):
+        return self._sig_thres[line]
 
     def set_integration_weights(self, line, weights):
         '''
