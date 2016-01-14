@@ -144,10 +144,8 @@ class Tektronix_AWG5014(VisaInstrument):
         super().__init__(name, address)
 
         self._address = address
-        # if address[:5] == 'TCPIP':
-        #     self.visa_handle = SocketVisa('192.168.0.3', 4000)
-        # else:
-        #     self.visa_handle = visa.instrument(address, timeout=10)
+
+
         self._values = {}
         self._values['files'] = {}
         self._clock = clock
@@ -162,7 +160,7 @@ class Tektronix_AWG5014(VisaInstrument):
                            get_cmd='AWGC:RMOD?',
                            set_cmd='AWGC:RMOD ' + '{}',
                            vals=vals.Strings(
-                                options=['CONT', 'TRIG', 'SEQ', 'GAT']))
+                            options=['CONT', 'TRIG', 'SEQ', 'GAT']))
         # Trigger parameters #
         # ! Warning this is the same as run mode, do not use! exists
         # Solely for legacy purposes
@@ -186,7 +184,8 @@ class Tektronix_AWG5014(VisaInstrument):
         self.add_parameter('trigger_slope',
                            get_cmd='TRIG:SLOP?',
                            set_cmd='TRIG:SLOP '+'{}',
-                           vals=vals.Strings(options=['POS', 'NEG']))
+                           vals=vals.Strings(options=['POS', 'NEG']))#,
+                           # parse_function=self.parse_int_pos_neg)
         self.add_parameter('trigger_source',
                            get_cmd='TRIG:source?',
                            set_cmd='TRIG:source '+'{}',
@@ -307,13 +306,9 @@ class Tektronix_AWG5014(VisaInstrument):
         self._setup_folder = setup_folder
         self.goto_root()
         self.change_folder(self.waveform_folder)
-        try:
-            self.get_all()
-        except:
-            # Makes it possible to create the AWG instrument and have
-            # Working visa comss to fix the problem.
-            print('Warning error raised in get_all()')
-        # self.set('trigger_impedance', 50)
+
+        self.set('trigger_impedance', 50)
+
         print('Connected to: \n', self.get('IDN').replace(',', ', '))
 
     # Functions
@@ -697,13 +692,14 @@ class Tektronix_AWG5014(VisaInstrument):
 
         AWG_sequence_cfg = {
             'SAMPLING_RATE': self.get('clock_freq'),
-            'CLOCK_SOURCE': (1 if self.query_visa('AWGC:CLOCK:SOUR?') == 'INT'
+            'CLOCK_SOURCE': (1 if self.query_visa('AWGC:CLOCK:SOUR?').startswith('INT')
                              else 2),  # Internal | External
             'REFERENCE_SOURCE':   2,  # Internal | External
             'EXTERNAL_REFERENCE_TYPE':   1,  # Fixed | Variable
             'REFERENCE_CLOCK_FREQUENCY_SELECTION': 1,
             # 10 MHz | 20 MHz | 100 MHz
-            'TRIGGER_SOURCE':   1 if self.get('trigger_source') == 'EXT' else 2,
+            'TRIGGER_SOURCE':   1 if
+                self.get('trigger_source').startswith('EXT') else 2,
             # External | Internal
             'TRIGGER_INPUT_IMPEDANCE': (1 if self.get('trigger_impedance') ==
                                         50. else 2),  # 50 ohm | 1 kohm
@@ -714,10 +710,12 @@ class Tektronix_AWG5014(VisaInstrument):
             'TRIGGER_INPUT_THRESHOLD':  self.get('trigger_level'),  # V
             'EVENT_INPUT_IMPEDANCE':   (1 if self.get('event_impedance') ==
                                         50. else 2),  # 50 ohm | 1 kohm
-            'EVENT_INPUT_POLARITY':  (1 if self.get('event_polarity') == 'POS'
+            'EVENT_INPUT_POLARITY':  (1 if
+                                      self.get('event_polarity').startswith('POS')
                                       else 2),  # Positive | Negative
             'EVENT_INPUT_THRESHOLD':   self.get('event_level'),  # V
-            'JUMP_TIMING':   (1 if self.get('event_jump_timing') == 'SYNC'
+            'JUMP_TIMING':   (1 if
+                              self.get('event_jump_timing').startswith('SYNC')
                               else 2),  # Sync | Async
             'RUN_MODE':   4,  # Continuous | Triggered | Gated | Sequence
             'RUN_STATE':  0,  # On | Off
@@ -761,6 +759,7 @@ class Tektronix_AWG5014(VisaInstrument):
         if sequence_cfg is None:
             sequence_cfg = self.generate_sequence_cfg()
 
+        print(sequence_cfg)
         for k in list(sequence_cfg.keys()):
             if k in self.AWG_FILE_FORMAT_HEAD:
                 head_str.write(self._pack_record(k, sequence_cfg[k],
@@ -1276,3 +1275,10 @@ class Tektronix_AWG5014(VisaInstrument):
 
 
 
+
+    # QCodes specific parse_functions
+    def parse_int_pos_neg(self, val):
+        return ['POS', 'NEG'][val]
+
+    def parse_int_int_ext(self, val):
+        return ['INT', 'EXT'][val]

@@ -52,7 +52,7 @@ class MeasurementControl:
         self.proc = pgmp.QtProcess()  # pyqtgraph multiprocessing
         self.rpg = self.proc._import('pyqtgraph')
         self.win = self.rpg.GraphicsWindow(title='Plot monitor of %s' % self.name)
-        self.win.resize(1000, 600)
+        # self.win.resize(1000, 600)
 
     ##############################################
     # Functions used to control the measurements #
@@ -420,6 +420,13 @@ class MeasurementControl:
                 y = self.dset[:, nr_sweep_funcs+y_ind]
                 self.curves[i].setData(x, y)
                 i += 1
+
+    def new_plotmon_window(self):
+        '''
+        respawns the pyqtgraph plotting window
+        '''
+        self.win = self.rpg.GraphicsWindow(
+            title='Plot monitor of %s' % self.name)
 
 
 
