@@ -97,7 +97,7 @@ def mixer_carrier_cancellation_5014(station,
                                     AWG_channel1=1,
                                     AWG_channel2=2,
                                     voltage_grid=[.1, 0.05, 0.02],
-                                    xtol=0.001):
+                                    xtol=0.001, **kw):
     '''
     Varies the mixer offsets to minimize leakage at the carrier frequency.
     this is the version for a tektronix AWG.
@@ -106,7 +106,8 @@ def mixer_carrier_cancellation_5014(station,
     If the range is too small, add another number infront of -0.12
     '''
     AWG = station['AWG']
-    MC = station.MC  # I add it like this by hand
+    MC = kw.pop('MC', station.MC)
+    print('using:', MC)
     SH = station['Signal hound']
     ch_1_min = 0  # Initializing variables used later on
     ch_2_min = 0
@@ -179,6 +180,7 @@ def mixer_carrier_cancellation_5014(station,
         if ii > 10:
             logging.error('Mixer calibration did not converge')
             break
+    print(ch_1_min, ch_2_min)
     return ch_1_min, ch_2_min
 
 

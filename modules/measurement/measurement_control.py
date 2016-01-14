@@ -51,6 +51,8 @@ class MeasurementControl:
         pg.mkQApp()
         self.proc = pgmp.QtProcess()  # pyqtgraph multiprocessing
         self.rpg = self.proc._import('pyqtgraph')
+        self.win = self.rpg.GraphicsWindow(title='Plot monitor of %s' % self.name)
+        self.win.resize(1000, 600)
 
     ##############################################
     # Functions used to control the measurements #
@@ -394,8 +396,7 @@ class MeasurementControl:
     the 2D plotmon (which does a heatmap) and the adaptive plotmon.
     '''
     def initialize_plot_monitor(self):
-        self.win = self.rpg.GraphicsWindow(title='Plot monitor of %s' % self.name)
-        self.win.resize(1000, 600)
+        self.win.clear()  # clear out previous data
         self.curves = []
         xlabels = self.column_names[0:len(self.sweep_function_names)]
         ylabels = self.column_names[len(self.sweep_function_names):]
