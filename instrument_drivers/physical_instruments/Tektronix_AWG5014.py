@@ -759,7 +759,6 @@ class Tektronix_AWG5014(VisaInstrument):
         if sequence_cfg is None:
             sequence_cfg = self.generate_sequence_cfg()
 
-        print(sequence_cfg)
         for k in list(sequence_cfg.keys()):
             if k in self.AWG_FILE_FORMAT_HEAD:
                 head_str.write(self._pack_record(k, sequence_cfg[k],

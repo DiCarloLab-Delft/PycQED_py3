@@ -209,12 +209,15 @@ class QuTech_ControlBox(VisaInstrument):
         # convert to string with options
 
         if run_tests:
+            self.run_test_suite()
+        print('Initialized CBox', self.get('firmware_version'))
+
+    def run_test_suite(self):
             # pass the CBox to the module so it can be used in the tests
             self.c = c  # make the codec callable from the testsuite
             test_suite.CBox = self
             suite = unittest.TestLoader().loadTestsFromTestCase(test_suite.CBox_tests)
             unittest.TextTestRunner(verbosity=2).run(suite)
-        print('Initialized CBox', self.get('firmware_version'))
 
     def get_all(self):
         for par in self.parameters:
@@ -715,8 +718,12 @@ class QuTech_ControlBox(VisaInstrument):
         '''
         set the parameters for Input and Integrated Average functions.
 
-        @param nr_samples : Number of samples for the input signal.
-                            Range: [1 - 2000]
+        @param nr_samples : Number of samples of the input signal that get
+                            returned.
+                            ! this parameter is overloaded and has two different
+                              ranges.
+                            Range: [1 - 2000] when used in integration average
+                            Range: [1 - 127] when used in input average
                             In input average this corresponds to trace length
                             in integration averaging this corresponds to the
                             number of integration results.
