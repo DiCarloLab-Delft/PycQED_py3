@@ -217,8 +217,8 @@ class CBox_tests(unittest.TestCase):
         self.assertTrue((InputAvgRes1 == np.zeros(NoSamples)).all())
 
         weights1 = np.ones(512) * 1
-        self.CBox.set_integration_weights(line=1, weights=weights1)
-        self.CBox.set_lin_trans_coeffs(0, 0, 0, 1)
+        self.CBox.set('sig1_integration_weights', weights1)
+        self.CBox.set('lin_trans_coeffs', [0, 0, 0, 1])
         self.CBox.set('acquisition_mode', 4)
         [InputAvgRes0, InputAvgRes1] = self.CBox.get_integrated_avg_results()
         self.CBox.set('acquisition_mode', 0)

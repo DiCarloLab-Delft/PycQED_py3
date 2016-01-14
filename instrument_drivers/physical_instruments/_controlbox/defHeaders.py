@@ -107,7 +107,7 @@ MC_TestHeader = b"\x40"
 # Modes index in list corresponds to the integer that will be sent
 acquisition_modes = ['0: idle',
                      '1: integration logging mode',
-                     '2: feedback mode,',
+                     '2: feedback mode,',  # This mode does not do anything
                      '3: input averaging mode',
                      '4: integration averaging mode',
                      '5: integration streaming mode',

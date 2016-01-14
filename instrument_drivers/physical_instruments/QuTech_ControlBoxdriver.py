@@ -27,6 +27,7 @@ from ._ControlBox import test_suite# import CBox_tests
 from importlib import reload # Useful for reloading during testin
 reload(test_suite)
 
+
 class QuTech_ControlBox(VisaInstrument):
     '''
     This is the qtlab driver for the 250 MS/s control box developed in
@@ -200,8 +201,6 @@ class QuTech_ControlBox(VisaInstrument):
 
         # self.add_function('set_averaging_parameters')
         # self.add_function('_set_integration_weights')
-        # self.add_function('encode_byte')
-        # self.add_function('decode_byte')
         # self.add_function('enable_dac')
 
 
@@ -870,7 +869,7 @@ class QuTech_ControlBox(VisaInstrument):
 
         # Here the actual acquisition_mode is set
         cmd = defHeaders.UpdateModeHeader
-        data_bytes = c.encode_byte(mode_int, 7)
+        data_bytes = c.encode_byte(mode_int, 7, expected_number_of_bytes=1)
         message = c.create_message(cmd, data_bytes)
         (stat, mesg) = self.serial_write(message)
         if stat:
@@ -901,7 +900,7 @@ class QuTech_ControlBox(VisaInstrument):
 
         # Here the actual mode is set
         cmd = defHeaders.UpdateRunModeHeader
-        data_bytes = c.encode_byte(mode_int, 7)
+        data_bytes = c.encode_byte(mode_int, 7, expected_number_of_bytes=1)
         message = c.create_message(cmd, data_bytes)
         (stat, mesg) = self.serial_write(message)
         if stat:
@@ -947,8 +946,8 @@ class QuTech_ControlBox(VisaInstrument):
         # Convert to No due to implementation in the box
         cmd = defHeaders.AwgModeHeader
         data_bytes = bytes()
-        data_bytes += (c.encode_byte(awg_nr, 7))
-        data_bytes += (c.encode_byte(mode_int, 7))
+        data_bytes += (c.encode_byte(awg_nr, 7, expected_number_of_bytes=1))
+        data_bytes += (c.encode_byte(mode_int, 7, expected_number_of_bytes=1))
         message = c.create_message(cmd, data_bytes)
 
         (stat, mesg) = self.serial_write(message)
@@ -1184,12 +1183,16 @@ class QuTech_ControlBox(VisaInstrument):
                 time.sleep(.01)
                 if (time.time() - t_start) > timeout:
                     raise Exception('Read timed out without EndOfMessage')
-        if message[0] == defHeaders.IllegalCommandHeader:
+        # If an error code gets send CBox will return [checksum, err_code, EOM]
+        if bytes([message[-2]]) == defHeaders.IllegalCommandHeader:
             raise ValueError('Command not recognized')
-        if message[0] == defHeaders.DataOverflowHeader:
+        if bytes([message[-2]]) == defHeaders.DataOverflowHeader:
             raise ValueError('Data overflow: too many parameters')
-        if message[0] == defHeaders.IllegalDataHeader:
+        if bytes([message[-2]]) == defHeaders.IllegalDataHeader:
             raise ValueError('Illegal data sent')
+        if bytes([message[-1]]) != defHeaders.EndOfMessageHeader:
+            raise ValueError('EndOfMessage character "%s" not recognized'
+                             % bytes([message[-1]]))
         return message
 
     def serial_write(self, command, verify_execution=True):
