@@ -6,6 +6,7 @@ import io
 import visa
 import unittest
 from bitstring import BitArray
+import logging
 
 qcpath = 'D:\GitHubRepos\Qcodes'
 if qcpath not in sys.path:
@@ -172,7 +173,7 @@ class QuTech_ControlBox(VisaInstrument):
         self.set('measurement_timeout', kw.pop('measurement_timeout', 120))
         self.set('lin_trans_coeffs', [1, 0, 0, 1])
 
-
+        self._i_wait = 0  # used in _print_waiting_char()
 
 
         # self.tng_heartbeat_interval = 100000
@@ -389,8 +390,8 @@ class QuTech_ControlBox(VisaInstrument):
             if len(ch0) != 0:
                 succes = True
             else:
-                time.sleep(0.01)
-                print('.', end='')
+                time.sleep(0.0001)
+                self._print_waiting_char()
             if time.time()-t0 > self._timeout:
                 raise Exception('Measurement timed out')
         return ch0, ch1
@@ -406,7 +407,7 @@ class QuTech_ControlBox(VisaInstrument):
         # Information on the encoding
         data_bits_per_byte = 4
         bytes_per_value = 2
-
+        i = 0
         succes = False
         t0 = time.time()
         # While loop is to make sure measurement finished before querying.
@@ -426,8 +427,8 @@ class QuTech_ControlBox(VisaInstrument):
             if len(ch0) != 0:
                 succes = True
             else:
-                time.sleep(0.01)
-                print('.', end='')
+                time.sleep(0.0001)
+                self._print_waiting_char()
             if time.time()-t0 > self._timeout:
                 raise Exception('Measurement timed out')
         return ch0, ch1
@@ -839,9 +840,17 @@ class QuTech_ControlBox(VisaInstrument):
         @param length : the number of measurements range (1, 8000)
         @return stat : 0 if the upload succeeded and 1 if the upload failed.
         '''
+        v = self.get('firmware_version')
+        if v.startswith('v2.15'):
+            n_bytes = 3
+        else:
+            # logging.warning('Version != 2.15 using old protocol for log length')
+            n_bytes = 2
+
         cmd = defHeaders.UpdateLoggerMaxCounterHeader
         data_bytes = c.encode_byte(length-1, 7,
-                                   expected_number_of_bytes=2)
+                                   expected_number_of_bytes=n_bytes)
+        # Changed from version 2.15 onwards
         message = c.create_message(cmd, data_bytes)
         (stat, mesg) = self.serial_write(message)
         if stat:
@@ -873,7 +882,8 @@ class QuTech_ControlBox(VisaInstrument):
                 break
         if mode_int is None:
             raise KeyError('acquisition_mode %s not recognized')
-
+        if mode_int == 3 and self._log_length >8000:
+            logging.warning('Log length can be max 8000 in int. log. mode')
         # Here the actual acquisition_mode is set
         cmd = defHeaders.UpdateModeHeader
         data_bytes = c.encode_byte(mode_int, 7, expected_number_of_bytes=1)
@@ -1144,7 +1154,6 @@ class QuTech_ControlBox(VisaInstrument):
 
         return ser
 
-
     def _read_raw(self, size):
         '''
         Intended to replace visa_handle.read_raw
@@ -1187,7 +1196,7 @@ class QuTech_ControlBox(VisaInstrument):
                     end_of_message_received = True
 
             if not end_of_message_received:
-                time.sleep(.01)
+                time.sleep(.00001)
                 if (time.time() - t_start) > timeout:
                     raise Exception('Read timed out without EndOfMessage')
         # If an error code gets send CBox will return [checksum, err_code, EOM]
@@ -1262,6 +1271,12 @@ class QuTech_ControlBox(VisaInstrument):
             return function(channel)
         return channel_specific_function
 
+    def _print_waiting_char(self):
+        self._i_wait += 1
+        if self._i_wait % 2 == 0:
+            print('\r/', end='')
+        else:
+            print('\r\ ', end='')
     # Touch n go functions
     def _do_set_tng_heartbeat_interval(self, tng_heartbeat_interval):
         '''
