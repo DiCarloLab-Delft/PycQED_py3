@@ -1140,7 +1140,10 @@ class Tektronix_AWG5014(VisaInstrument):
         self.get('setup_filename') # ensures the setup filename gets updated
 
     def is_awg_ready(self):
-        self.visa_handle.ask('*OPC?')
+        try:
+            self.visa_handle.ask('*OPC?')
+        except: # makes the awg read again if there is a timeout
+            self.visa_handle.read() 
         return True
 
     def send_waveform(self, w, m1, m2, filename, clock=1e9):

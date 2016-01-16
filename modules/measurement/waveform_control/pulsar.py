@@ -367,11 +367,7 @@ class Pulsar:
 
         # Need to add proper error handling to handle the timeout
         # awg_ready = False
-        try:
-            self.AWG.is_awg_ready()
-        except Exception as e:
-            logging.warning(e)
-
+        self.AWG.is_awg_ready()
 
         # print('AWG Ready?', self.AWG.is_awg_ready())
         # Waits for AWG to be ready

@@ -27,7 +27,8 @@ def generate_marker_element(i, marker_length, marker_interval):
     return marker_element
 
 
-def generate_marker_element_with_RF_mod(i, marker_length, marker_interval, IF):
+def generate_marker_element_with_RF_mod(i, marker_length, marker_interval, IF,
+                                        mod_amp=.5):
     # make sure tau is a multiple of 1 ns, if it is not the fixed point will
     # not be able to be computed.
 
@@ -37,9 +38,10 @@ def generate_marker_element_with_RF_mod(i, marker_length, marker_interval, IF):
                        amplitude=0, length=100e-9))
     number_of_pulses = int(200*1e-6/marker_interval)
     marker_element.add(pulse.CosPulse(name='cosI', channel='ch3',
-                       amplitude=.5, frequency=IF, length=200e-6))
+                       amplitude=mod_amp, frequency=IF, length=200e-6))
     marker_element.add(pulse.CosPulse(name='sinQ', channel='ch4',
-                       amplitude=.5, frequency=IF, length=200e-6, phase=90))
+                       amplitude=mod_amp, frequency=IF,
+                       length=200e-6, phase=90))
     for i in range(number_of_pulses):
         for channel in ['ch2_marker1', 'ch2_marker2', 'ch1_marker2', 'ch1_marker1']:
             marker_element.add(pulse.SquarePulse(
@@ -52,13 +54,14 @@ def generate_marker_element_with_RF_mod(i, marker_length, marker_interval, IF):
 
 
 def generate_and_upload_marker_sequence(marker_length, marker_interval,
-                                        RF_mod=False, IF=None):
+                                        RF_mod=False, IF=None, mod_amp=None):
     seq = sequence.Sequence('Heterodyne marker sequence with modulation')
     el_list = []
     for i in range(2):
         if RF_mod:
             el = generate_marker_element_with_RF_mod(i, marker_length,
-                                                     marker_interval, IF=IF)
+                                                     marker_interval,
+                                                     IF=IF, mod_amp=mod_amp)
         else:
             el = generate_marker_element(i, marker_length, marker_interval)
         el_list.append(el)

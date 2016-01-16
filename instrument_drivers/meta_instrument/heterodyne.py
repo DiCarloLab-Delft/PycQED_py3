@@ -226,9 +226,6 @@ class HeterodyneInstrument(Instrument):
         Starts acquisition and returns the data
             'COMP' : returns data as a complex point in the I-Q plane in Volts
         '''
-        # if self._t_int != self.ATS_CW.get_t_int():
-        #     self.init()
-
         i = 0
         succes = False
         while succes is False and i < 10:
@@ -302,8 +299,23 @@ class LO_modulated_Heterodyne(HeterodyneInstrument):
                            label='Single sideband demodulation',
                            get_cmd=self.do_get_single_sideband_demod,
                            set_cmd=self.do_set_single_sideband_demod)
-        self.set('IF', 10e6)
         self.set('single_sideband_demod', single_sideband_demod)
+
+        self.add_parameter('mod_amp',
+                           label='Modulation amplitude (V)',
+                           set_cmd=self._do_set_mod_amp,
+                           get_cmd=self._do_get_mod_amp,
+                           vals=vals.Numbers(0, 1))
+        # Negative vals should be done by setting the IF negative
+
+        self._IF = 10e6
+        self._mod_amp = .5
+        self._frequency = None
+        self.set('IF', 10e6)
+        self.set('mod_amp', .5)
+
+        self._awg_seq_paramters_changed = True
+        # internally used to reload awg sequence implicitly
 
     def prepare(self, get_t_base=True, regenerate_seq=True):
         '''
@@ -315,8 +327,9 @@ class LO_modulated_Heterodyne(HeterodyneInstrument):
         t_int.
         '''
         if regenerate_seq:
-            stds.generate_and_upload_marker_sequence(500e-9, 2e-6, RF_mod=True,
-                                                     IF=self.get('IF'))
+            stds.generate_and_upload_marker_sequence(
+                500e-9, 2e-6, RF_mod=True,
+                IF=self.get('IF'), mod_amp=self.get('mod_amp'))
         self.AWG.run()
         if get_t_base is True:
             trace_length = self.CBox.get('nr_samples')
@@ -324,6 +337,8 @@ class LO_modulated_Heterodyne(HeterodyneInstrument):
             self.cosI = np.cos(2*np.pi*self.get('IF')*tbase)
             self.sinI = np.sin(2*np.pi*self.get('IF')*tbase)
         self.LO.on()
+        # Changes are now incorporated in the awg seq
+        self._awg_seq_paramters_changed = False
 
     def do_set_frequency(self, val):
         self._frequency = val
@@ -331,3 +346,20 @@ class LO_modulated_Heterodyne(HeterodyneInstrument):
         # AWG modulation ensures that signal ends up at RF-frequency
         self.LO.set('frequency', val-self.IF.get())
 
+    def probe(self):
+        if self._awg_seq_paramters_changed:
+            self.prepare()
+        return super().probe()
+
+    def _do_set_mod_amp(self, val):
+        if val != self._mod_amp:
+            self._awg_seq_paramters_changed = True
+        self._mod_amp = val
+
+    def _do_get_mod_amp(self):
+        return self._mod_amp
+
+    def do_set_IF(self, val):
+        if val != self._IF:
+            self._awg_seq_paramters_changed = True
+        self._IF = val
