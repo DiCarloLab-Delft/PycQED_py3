@@ -34,7 +34,8 @@ class HeterodyneInstrument(Instrument):
         Instrument.__init__(self, name, tags=['Virtual'])
 
         self.LO = LO
-        self.RF = RF
+        if RF is not None:
+            self.RF = RF
         self.CBox = CBox
         self._max_tint = 2000
 
@@ -70,17 +71,22 @@ class HeterodyneInstrument(Instrument):
         # self.get_status()
 
     def set_sources(self, status):
-        self.RF.set('status', status)
+        if self.RF is not None:
+            self.RF.set('status', status)
         self.LOset('status', status)
 
     def do_set_frequency(self, val):
         self._frequency = val
         # this is the definition agreed upon in issue 131
-        self.RF.set('frequency', val)
-        self.LO.set('frequency', val-self.IF)
+        if self.RF is not None:
+            self.RF.set('frequency', val)
+        self.LO.set('frequency', val-self.IF.get())
 
     def do_get_frequency(self):
-        freq = self.RF.get_frequency()
+        if self.RF is not None:
+            freq = self.RF.get_frequency()
+        else:
+            freq = self._frequency
         LO_freq = self.LO.get_frequency()
         if LO_freq != freq+self._IF:
             logging.warning('IF between RF and LO is not set correctly')
@@ -250,12 +256,15 @@ class HeterodyneInstrument(Instrument):
         # if self._t_int != self.ATS_CW.get_t_int():
         #     self.init()
 
-        # gets data in Volts avg acq
-        for i in range(10): #to work with the CBox timeouts
+        i = 0
+        succes = False
+        while succes is False and i < 10:
             try:
                 data = self.get_averaged_transient()
+                succes = True
             except:
-                pass
+                succes = False
+            i += 1
         s21 = self.demodulate_data(data)  # returns a complex point in the IQ-plane
         return s21
 

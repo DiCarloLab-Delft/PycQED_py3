@@ -22,6 +22,7 @@ import struct
 from time import sleep, time, localtime
 from io import BytesIO
 import os
+import logging
 
 # load the qcodes path, until we have this installed as a package
 import sys
@@ -385,9 +386,14 @@ class Tektronix_AWG5014(VisaInstrument):
             self.visa_handle.write('mmem:cdir "\%s"' % dir)
             return self.get_folder_contents()
 
-    def set_all_channels_on(self):
+    def all_channels_on(self):
         for i in range(1, 5):
             self.set('ch{}_state'.format(i), 1)
+
+    def all_channels_off(self):
+        for i in range(1, 5):
+            self.set('ch{}_state'.format(i), 0)
+
 
     def clear_waveforms(self):
         '''

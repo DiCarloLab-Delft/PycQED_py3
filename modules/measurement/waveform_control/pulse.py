@@ -119,7 +119,7 @@ class SquarePulse(Pulse):
         return np.ones(len(tvals)) * self.amplitude
 
 
-class SinePulse(Pulse):
+class CosPulse(Pulse):
     def __init__(self, channel, name='sine pulse', **kw):
         Pulse.__init__(self, name)
 
@@ -140,7 +140,7 @@ class SinePulse(Pulse):
         return self
 
     def chan_wf(self, chan, tvals):
-        return self.amplitude * np.sin(2*np.pi *
+        return self.amplitude * np.cos(2*np.pi *
                                        (self.frequency * tvals +
                                         self.phase/360.))
 
