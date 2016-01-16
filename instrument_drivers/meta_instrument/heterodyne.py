@@ -7,6 +7,9 @@ from time import time
 from qcodes.instrument.base import Instrument
 from qcodes.utils import validators as vals
 
+# Used for uploading the right AWG sequences
+from modules.measurement.waveform_control import standard_sequences as stds
+
 
 class HeterodyneInstrument(Instrument):
     '''
@@ -29,13 +32,11 @@ class HeterodyneInstrument(Instrument):
     '''
     def __init__(self, name,  RF, LO, CBox,
                  single_sideband_demod=False):
-
         logging.info(__name__ + ' : Initializing instrument')
-        Instrument.__init__(self, name, tags=['Virtual'])
+        Instrument.__init__(self, name)
 
         self.LO = LO
-        if RF is not None:
-            self.RF = RF
+        self.RF = RF
         self.CBox = CBox
         self._max_tint = 2000
 
@@ -48,7 +49,7 @@ class HeterodyneInstrument(Instrument):
                            set_cmd=self.do_set_IF,
                            get_cmd=self.do_get_IF,
                            vals=vals.Numbers(-200e6, 200e6),
-                           label='IF (Hz)')
+                           label='Intermodulation frequency (Hz)')
 
         # self.add_parameter('t_int', type=float,
         #                    flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET,
@@ -71,22 +72,17 @@ class HeterodyneInstrument(Instrument):
         # self.get_status()
 
     def set_sources(self, status):
-        if self.RF is not None:
-            self.RF.set('status', status)
+        self.RF.set('status', status)
         self.LOset('status', status)
 
     def do_set_frequency(self, val):
         self._frequency = val
         # this is the definition agreed upon in issue 131
-        if self.RF is not None:
-            self.RF.set('frequency', val)
+        self.RF.set('frequency', val)
         self.LO.set('frequency', val-self.IF.get())
 
     def do_get_frequency(self):
-        if self.RF is not None:
-            freq = self.RF.get_frequency()
-        else:
-            freq = self._frequency
+        freq = self.RF.get_frequency()
         LO_freq = self.LO.get_frequency()
         if LO_freq != freq+self._IF:
             logging.warning('IF between RF and LO is not set correctly')
@@ -206,29 +202,6 @@ class HeterodyneInstrument(Instrument):
         self.RF.on()
         self.LO.on()
 
-    # def init(self, optimize=False, get_t_base=True, silent=False, max_buf=1024):
-    #     '''
-    #     Sets parameters in the ATS_CW and turns on the sources.
-    #     if optimize == True it will optimze the acquisition time for a fixed
-    #     t_int.
-    #     '''
-    #     self.ATS_CW.init(optimize=optimize, silent=silent, max_buf=max_buf)
-    #     self.RF.set_power(self.do_get_RF_power())
-    #     self.LO.set_power(self.do_get_LO_power())
-
-    #     if self.RF.get_type() != 'Agilent_E8257D':
-    #         self.RF.set_pulsemod_state('Off')
-    #     if self.LO.get_type() != 'Agilent_E8257D':
-    #         self.LO.set_pulsemod_state('Off')
-
-    #     if get_t_base is True:
-    #         tbase = self.ATS_CW.get_t_base()
-    #         self.cosI = np.cos(2*np.pi*self.get_IF()*tbase)
-    #         self.sinI = np.sin(2*np.pi*self.get_IF()*tbase)
-    #     # To ensure the gui updates
-    #     self.get_t_int()
-    #     self.get_number_of_buffers()
-    #     self.get_trace_length()
 
     # def do_set_channel(self, ch):
     #     self.channel = ch
@@ -297,3 +270,64 @@ class HeterodyneInstrument(Instrument):
 
     def do_get_single_sideband_demod(self):
         return self._single_sideband_demod
+
+
+class LO_modulated_Heterodyne(HeterodyneInstrument):
+    '''
+    Heterodyne instrument for pulse modulated LO.
+    Inherits functionality for the HeterodyneInstrument
+
+    AWG is used for modulating signal and triggering the CBox
+    CBox is used for acquisition.
+    '''
+    def __init__(self, name,  LO, CBox, AWG,
+                 single_sideband_demod=False):
+        logging.info(__name__ + ' : Initializing instrument')
+        Instrument.__init__(self, name)
+        self.LO = LO
+        self.CBox = CBox
+        self.AWG = AWG
+        self.add_parameter('frequency',
+                           label='Heterodyne frequency (Hz)',
+                           get_cmd=self.do_get_frequency,
+                           set_cmd=self.do_set_frequency,
+                           vals=vals.Numbers(9e3, 40e9))
+        self.add_parameter('IF',
+                           set_cmd=self.do_set_IF,
+                           get_cmd=self.do_get_IF,
+                           vals=vals.Numbers(-200e6, 200e6),
+                           label='Intermodulation frequency (Hz)')
+
+        self.add_parameter('single_sideband_demod',
+                           label='Single sideband demodulation',
+                           get_cmd=self.do_get_single_sideband_demod,
+                           set_cmd=self.do_set_single_sideband_demod)
+        self.set('IF', 10e6)
+        self.set('single_sideband_demod', single_sideband_demod)
+
+    def prepare(self, get_t_base=True, regenerate_seq=True):
+        '''
+        This function needs to be overwritten for the ATS based version of this
+        driver
+
+        Sets parameters in the ATS_CW and turns on the sources.
+        if optimize == True it will optimze the acquisition time for a fixed
+        t_int.
+        '''
+        if regenerate_seq:
+            stds.generate_and_upload_marker_sequence(500e-9, 2e-6, RF_mod=True,
+                                                     IF=self.get('IF'))
+        self.AWG.run()
+        if get_t_base is True:
+            trace_length = self.CBox.get('nr_samples')
+            tbase = np.arange(0, 5*trace_length, 5)*1e-9
+            self.cosI = np.cos(2*np.pi*self.get('IF')*tbase)
+            self.sinI = np.sin(2*np.pi*self.get('IF')*tbase)
+        self.LO.on()
+
+    def do_set_frequency(self, val):
+        self._frequency = val
+        # this is the definition agreed upon in issue 131
+        # AWG modulation ensures that signal ends up at RF-frequency
+        self.LO.set('frequency', val-self.IF.get())
+
