@@ -400,12 +400,12 @@ class MeasurementControl:
         self.curves = []
         xlabels = self.column_names[0:len(self.sweep_function_names)]
         ylabels = self.column_names[len(self.sweep_function_names):]
-        for xlab in xlabels:
-            for ylab in ylabels:
+        for ylab in ylabels:
+            for xlab in xlabels:
                 p = self.win.addPlot()
                 p.setLabel('bottom', xlab)
                 p.setLabel('left', ylab)
-                c = p.plot(symbol='o')
+                c = p.plot(symbol='o', symbolSize=7)
                 # symbol options are  o, s(quare), t(riangle), d(iamond), +
                 self.curves.append(c)
             self.win.nextRow()

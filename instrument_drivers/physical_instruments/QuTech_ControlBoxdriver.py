@@ -1,7 +1,6 @@
 import time
 import numpy as np
 import sys
-import serial
 import io
 import visa
 import unittest
@@ -22,7 +21,6 @@ pyximport.install(setup_args={"script_args": ["--compiler=msvc"],
                   reload_support=True)
 
 from ._ControlBox import defHeaders  # File containing bytestring commands
-from ._ControlBox import decoder as d  # Cython based decoder
 from ._ControlBox import codec as c
 from ._ControlBox import test_suite# import CBox_tests
 from importlib import reload # Useful for reloading during testin
@@ -1132,27 +1130,6 @@ class QuTech_ControlBox(VisaInstrument):
     #  Low Level functions #
     ########################
     # These functions are located in AuxiliaryFctn in the matlab driver
-
-    def open_serial_port(self, nameCOM):
-        '''
-        Establishes serial connection with instrument.
-        Requires comport as argument e.g. 'Com3'
-        rest of the settings is given the arguments required for the
-        QuTech_ControlBox.
-        '''
-
-        ser = serial.Serial(port=nameCOM, baudrate=7372800, timeout=2,
-                            bytesize=8, parity=serial.PARITY_NONE,
-                            stopbits=1, xonxoff=0, rtscts=0)
-        # ser_io is used for "fast" reading by specifying a custom newline char
-        newline = ('\n')
-        self.ser_io = io.TextIOWrapper(io.BufferedRWPair(ser, ser, 1),
-                                       newline=newline,
-                                       line_buffering=True)
-        # self.ser_io.write("ID\r")
-        # self_id = self.ser_io.readline()
-
-        return ser
 
     def _read_raw(self, size):
         '''

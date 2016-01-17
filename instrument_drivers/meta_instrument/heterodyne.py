@@ -41,7 +41,8 @@ class HeterodyneInstrument(Instrument):
         self._max_tint = 2000
 
         self.add_parameter('frequency',
-                           label='Heterodyne frequency (Hz)',
+                           label='Heterodyne frequency',
+                           units='Hz',
                            get_cmd=self.do_get_frequency,
                            set_cmd=self.do_set_frequency,
                            vals=vals.Numbers(9e3, 40e9))
@@ -49,7 +50,8 @@ class HeterodyneInstrument(Instrument):
                            set_cmd=self.do_set_IF,
                            get_cmd=self.do_get_IF,
                            vals=vals.Numbers(-200e6, 200e6),
-                           label='Intermodulation frequency (Hz)')
+                           label='Intermodulation frequency',
+                           units='Hz')
 
         # self.add_parameter('t_int', type=float,
         #                    flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET,
@@ -285,7 +287,8 @@ class LO_modulated_Heterodyne(HeterodyneInstrument):
         self.CBox = CBox
         self.AWG = AWG
         self.add_parameter('frequency',
-                           label='Heterodyne frequency (Hz)',
+                           label='Heterodyne frequency',
+                           units='Hz',
                            get_cmd=self.do_get_frequency,
                            set_cmd=self.do_set_frequency,
                            vals=vals.Numbers(9e3, 40e9))
@@ -293,7 +296,8 @@ class LO_modulated_Heterodyne(HeterodyneInstrument):
                            set_cmd=self.do_set_IF,
                            get_cmd=self.do_get_IF,
                            vals=vals.Numbers(-200e6, 200e6),
-                           label='Intermodulation frequency (Hz)')
+                           label='Intermodulation frequency',
+                           units='Hz')
 
         self.add_parameter('single_sideband_demod',
                            label='Single sideband demodulation',
@@ -302,16 +306,17 @@ class LO_modulated_Heterodyne(HeterodyneInstrument):
         self.set('single_sideband_demod', single_sideband_demod)
 
         self.add_parameter('mod_amp',
-                           label='Modulation amplitude (V)',
+                           label='Modulation amplitud',
+                           units= '(V)',
                            set_cmd=self._do_set_mod_amp,
                            get_cmd=self._do_get_mod_amp,
                            vals=vals.Numbers(0, 1))
         # Negative vals should be done by setting the IF negative
 
-        self._IF = 10e6
+        self._IF = 0  # ensures that awg_seq_par_changed flag is True
         self._mod_amp = .5
         self._frequency = None
-        self.set('IF', 10e6)
+        self.set('IF', -10e6)
         self.set('mod_amp', .5)
 
         self._awg_seq_paramters_changed = True
