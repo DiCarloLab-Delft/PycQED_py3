@@ -117,13 +117,19 @@ class CBox_tests(unittest.TestCase):
 
     def test_adc_offset(self):
         offs = self.CBox.get('adc_offset')
-
         self.CBox.set('adc_offset', 123)
         self.assertEqual(self.CBox.get('adc_offset'), 123)
         self.CBox.set('adc_offset', -123)
         self.assertEqual(self.CBox.get('adc_offset'), -123)
-
         self.CBox.set('adc_offset', offs)
+
+    # def test_dac_offset(self):
+    #     for i in range(3):
+    #         initial_val = self.CBox.get('AWG_{}_dac_offset'.format(i))
+    #         self.CBox.set('AWG_{}_dac_offset'.format(i), 200)
+    #         self.assertEqual(self.CBox.get('AWG_{}_dac_offset'.format(i)), 200)
+    #         self.CBox.set('AWG_{}_dac_offset'.format(i), initial_val)
+
     def test_log_length(self):
         initial_val = self.CBox.get('log_length')
 
@@ -244,21 +250,21 @@ class CBox_tests(unittest.TestCase):
         random_lut = np.random.randint(-1000, 1000, length)
         self.assertTrue(self.CBox.set_awg_lookuptable(0, 4, 0, random_lut))
 
-    # def test_DacEnable(self):
-    #     for awg in range(3):
-    #         self.assertTrue(self.CBox.enable_dac(awg, 0, True))
-    #         self.assertTrue(self.CBox.enable_dac(awg, 0, False))
+    def test_DacEnable(self):
+        for awg in range(3):
+            self.assertTrue(self.CBox.enable_dac(awg, 0, True))
+            self.assertTrue(self.CBox.enable_dac(awg, 0, False))
 
-    #         self.assertTrue(self.CBox.enable_dac(awg, 1, True))
-    #         self.assertTrue(self.CBox.enable_dac(awg, 1, False))
+            self.assertTrue(self.CBox.enable_dac(awg, 1, True))
+            self.assertTrue(self.CBox.enable_dac(awg, 1, False))
 
-    # def test_DacOffset(self):
-    #     for awg in range(3):
-    #         self.assertTrue(self.CBox.set_dac_offset(awg, 0, True))
-    #         self.assertTrue(self.CBox.set_dac_offset(awg, 0, False))
+    def test_DacOffset(self):
+        for awg in range(3):
+            self.assertTrue(self.CBox.set_dac_offset(awg, 0, True))
+            self.assertTrue(self.CBox.set_dac_offset(awg, 0, False))
 
-    #         self.assertTrue(self.CBox.set_dac_offset(awg, 1, True))
-    #         self.assertTrue(self.CBox.set_dac_offset(awg, 1, False))
+            self.assertTrue(self.CBox.set_dac_offset(awg, 1, True))
+            self.assertTrue(self.CBox.set_dac_offset(awg, 1, False))
 
     def test_input_avg_mode(self):
         self.CBox.set('acquisition_mode', 0)

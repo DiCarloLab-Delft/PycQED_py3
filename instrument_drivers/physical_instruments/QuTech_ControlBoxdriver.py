@@ -1,7 +1,6 @@
 import time
 import numpy as np
 import sys
-import io
 import visa
 import unittest
 from bitstring import BitArray
@@ -22,9 +21,6 @@ pyximport.install(setup_args={"script_args": ["--compiler=msvc"],
 
 from ._ControlBox import defHeaders  # File containing bytestring commands
 from ._ControlBox import codec as c
-from ._ControlBox import test_suite# import CBox_tests
-from importlib import reload # Useful for reloading during testin
-reload(test_suite)
 
 
 class QuTech_ControlBox(VisaInstrument):
@@ -34,13 +30,12 @@ class QuTech_ControlBox(VisaInstrument):
     This is a direct port of the 'old' qtlab driver.
 
     Requirements:
-    defHeaders.py +
-    codec.pyx + working cython
+    defHeaders.py,  codec.pyx and working cython installation
 
     TODO:
-    test streaming mode
-    add parameters for lookuptables
-
+    - test streaming mode
+    - add parameters for lookuptables
+    - Add touch n go parameters (probably not needed for CBox v3?
     '''
 
     def __init__(self, name, address, reset=False, run_tests=False, **kw):
@@ -91,6 +86,7 @@ class QuTech_ControlBox(VisaInstrument):
                            get_cmd=self._do_get_adc_offset,
                            set_cmd=self._do_set_adc_offset,
                            vals=vals.Ints(-128, 127))
+
         self.add_parameter('log_length',
                            label='Log length (# shots)',
                            get_cmd=self._do_get_log_length,
@@ -116,6 +112,14 @@ class QuTech_ControlBox(VisaInstrument):
                                get_cmd=self._gen_awg_mode_get_func(i),
                                set_cmd=self._gen_awg_mode_set_func(i),
                                vals=vals.Anything())
+            # for j in range(2):
+            #     self.add_parameter(
+            #         'AWG{}_dac{}_offset'.format(i,j),
+            #         label='Dac offset AWG {}', units='mV',
+            #         get_cmd=self._gen_ch_get_func(self.get_dac_offset, i),
+            #         set_cmd=self._gen_ch_set_func(self.set_dac_offset, i),
+            #         vals=vals.Ints(-999, 999))
+            # Need to add double wrapping for get/set funcs here
 
         self.add_parameter('measurement_timeout', units='s',
                            set_cmd=self._do_set_measurement_timeout,
@@ -175,7 +179,6 @@ class QuTech_ControlBox(VisaInstrument):
 
 
         # self.tng_heartbeat_interval = 100000
-
         # self.tng_burst_heartbeat_interval = 10000
         # self.tng_burst_heartbeat_n = 1
         # self.tng_readout_delay = 300
@@ -190,28 +193,17 @@ class QuTech_ControlBox(VisaInstrument):
         # self.tng_logging_mode = 3
         # self.tng_second_pre_rotation_delay = 0
 
-        # self.dac_offsets = np.empty([3, 2])
-        # self.dac_offsets[:] = np.NAN
-
-        # self.add_function('set_awg_lookuptable')
-        # self.add_function('get_streaming_results')
-        # self.add_function('get_integration_log_results')
-        # self.add_function('get_avg_size')
-
-        # self.add_function('set_averaging_parameters')
-        # self.add_function('_set_integration_weights')
-        # self.add_function('enable_dac')
-
-
-        # self.add_function('set_dac_offset')
-
-        # convert to string with options
+        self._dac_offsets = np.empty([3, 2])
+        self._dac_offsets[:] = np.NAN
 
         if run_tests:
             self.run_test_suite()
         print('Initialized CBox', self.get('firmware_version'))
 
     def run_test_suite(self):
+            from importlib import reload  # Useful for testing
+            from ._ControlBox import test_suite
+            reload(test_suite)
             # pass the CBox to the module so it can be used in the tests
             self.c = c  # make the codec callable from the testsuite
             test_suite.CBox = self
@@ -661,8 +653,9 @@ class QuTech_ControlBox(VisaInstrument):
             cmd = defHeaders.AwgDisableHeader
         else:
             cmd = defHeaders.AwgEnableHeader
-        data_bytes = [c.encode_byte(awg_nr, 4, 1),
-                      c.encode_byte(dac_ch, 4, 1)]
+        data_bytes = bytes()
+        data_bytes += c.encode_byte(awg_nr, 4, 1)
+        data_bytes += c.encode_byte(dac_ch, 4, 1)
         message = c.create_message(cmd, data_bytes)
         (stat, mesg) = self.serial_write(message)
         if not stat:
@@ -687,25 +680,24 @@ class QuTech_ControlBox(VisaInstrument):
             offset_dac = int(2**13-1)
 
         cmd = defHeaders.AwgOffsetHeader
-        data_bytes = bytearray()
-        data_bytes.extend(c.encode_byte(awg_nr, 4, 1))
-        data_bytes.extend(c.encode_byte(dac_ch, 4, 1))
-        data_bytes.extend(c.encode_byte(offset_dac,
-                                        data_bits_per_byte=7,
-                                        expected_number_of_bytes=2))
+        data_bytes = bytes()
+        data_bytes += (c.encode_byte(awg_nr, 4, 1))
+        data_bytes += (c.encode_byte(dac_ch, 4, 1))
+        data_bytes += (c.encode_byte(offset_dac, data_bits_per_byte=7,
+                       expected_number_of_bytes=2))
         message = c.create_message(cmd, data_bytes)
         (stat, mesg) = self.serial_write(message)
         if not stat:
             raise Exception('Failed to set dac_offset')
         else:
-            self.dac_offsets[awg_nr, dac_ch] = offset
+            self._dac_offsets[awg_nr, dac_ch] = offset
         return stat
 
     def get_dac_offset(self, awg_nr, dac_ch):
         '''
         Returns the dac offset of "awg_nr" for "dac_ch" in mV
         '''
-        return self.dac_offsets[awg_nr, dac_ch]
+        return self._dac_offsets[awg_nr, dac_ch]
 
     def set_ecc_truthtable():
         '''
@@ -1628,3 +1620,13 @@ class QuTech_ControlBox(VisaInstrument):
         (stat, mesg) = self.serial_write(message)
 
         return stat
+
+    def _gen_ch_set_func(self, fun, ch):
+        def set_func(val):
+            return fun(ch, val)
+        return set_func
+
+    def _gen_ch_get_func(self, fun, ch):
+        def get_func():
+            return fun(ch)
+        return get_func

@@ -81,5 +81,12 @@ CBox.set('nr_averages', 2**12)
 # this is the max nr of averages that does not slow down the heterodyning
 CBox.set('nr_samples', 100)  # sets 500ns of integration in heterodyne
 
+# !Not calibrated
+CBox.set_dac_offset(0, 1, 0) #I channel qubit drive AWG
+CBox.set_dac_offset(0, 0, 0) #Q channel
+CBox.set_dac_offset(1, 1, 0) #I channel
+CBox.set_dac_offset(1, 0, 0) #Q channel readout AWG
+
+
 t1 = time.time()
 print('Ran initialization in %.2fs' % (t1-t0))
