@@ -364,16 +364,10 @@ class Pulsar:
 
         self.activate_channels(channels)
 
-
-        # Need to add proper error handling to handle the timeout
-        # awg_ready = False
-        self.AWG.is_awg_ready()
-
-        # print('AWG Ready?', self.AWG.is_awg_ready())
         # Waits for AWG to be ready
+        self.AWG.is_awg_ready()
         _t = time.time() - _t0
         print(" finished in %.2f seconds." % _t)
-        print()
         return awg_file
 
     def check_sequence_consistency(self, packed_waveforms,

@@ -8,7 +8,7 @@ from qcodes.instrument.base import Instrument
 from qcodes.utils import validators as vals
 
 # Used for uploading the right AWG sequences
-from modules.measurement.waveform_control import standard_sequences as stds
+from modules.measurement.waveform_control import standard_sequences as st_seqs
 
 
 class HeterodyneInstrument(Instrument):
@@ -332,7 +332,7 @@ class LO_modulated_Heterodyne(HeterodyneInstrument):
         t_int.
         '''
         if regenerate_seq:
-            stds.generate_and_upload_marker_sequence(
+            st_seqs.generate_and_upload_marker_sequence(
                 500e-9, 2e-6, RF_mod=True,
                 IF=self.get('IF'), mod_amp=self.get('mod_amp'))
         self.AWG.run()
