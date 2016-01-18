@@ -16,10 +16,10 @@ imp.reload(PG)
 class CBox_Sweep(swf.Hard_Sweep):
     def __init__(self, Duplexer=False, **kw):
         self.sweep_control = 'hard'
-        self.CBox = qt.instruments['CBox']
-        self.AWG = qt.instruments['AWG']
-        self.CBox_lut_man = qt.instruments['CBox_lut_man']
-        self.TD_Meas = qt.instruments['TD_Meas']
+        # self.CBox = qt.instruments['CBox']
+        # self.AWG = qt.instruments['AWG']
+        # self.CBox_lut_man = qt.instruments['CBox_lut_man']
+        # self.TD_Meas = qt.instruments['TD_Meas']
         print("loading instruments CBox")
         if not hasattr(self, 'cal_points'):
             self.cal_points = kw.pop('cal_points', 10)
@@ -382,26 +382,21 @@ class DAC_offset(CBox_Sweep):
     Varies DAC offsets in CBox AWG's. Additionally identity pulses are loaded
     in the lookuptable 0, of I and Q channels
     '''
-    def __init__(self, AWG_channel, AWG_nr):
+    def __init__(self,  AWG_nr, dac_ch, CBox):
         super(self.__class__, self).__init__()
         self.sweep_control = 'soft' # Overwrites 'hard sweep part'
         self.name = 'CBox DAC offset'
         self.parameter_name = 'Voltage'
         self.unit = 'mV'
         self.filename = 'FPGA_DAC_offset_sweep_5014'
-        self.AWG_channel = AWG_channel
+        self.dac_channel = dac_ch
         self.AWG_nr = AWG_nr
+        self.CBox = CBox
         # any arbitrary sequence that is not time dependent on the pulse
         # trigger will do
 
-    def prepare(self):
-        self.AWG.stop()
-        self.AWG.set_setup_filename(self.filename,
-                                    force_load=False)
-        self.AWG.start()
-
     def set_parameter(self, val):
-        self.CBox.set_dac_offset(self.AWG_nr, self.AWG_channel, val)
+        self.CBox.set_dac_offset(self.AWG_nr, self.dac_channel, val)
 
 
 class Ramsey(CBox_Sweep):

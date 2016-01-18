@@ -62,7 +62,8 @@ def generate_marker_element_with_RF_mod(i, marker_length, marker_interval, IF,
 
 def generate_and_upload_marker_sequence(marker_length, marker_interval,
                                         RF_mod=False, IF=None, mod_amp=None):
-    seq = sequence.Sequence('Heterodyne marker sequence with modulation')
+    seq_name = 'Heterodyne_marker_seq_RF_mod'
+    seq = sequence.Sequence(seq_name)
     el_list = []
     for i in range(2):
         if RF_mod:
@@ -75,7 +76,7 @@ def generate_and_upload_marker_sequence(marker_length, marker_interval,
         seq.append_element(el, trigger_wait=False) # Ensures a continuously running sequence
     station.instruments['AWG'].stop()
     station.pulsar.program_awg(seq, *el_list, verbose=False)
-    return
+    return seq_name
 
 
 def gen_and_upl_CBox_single_pulse_seq(IF, mod_amp,
@@ -83,16 +84,21 @@ def gen_and_upl_CBox_single_pulse_seq(IF, mod_amp,
                                       verbose=False):
     '''
     '''
-    seq = sequence.Sequence('Single pulse sequence')
+    seq_name = 'Single_pulse_sequence'
+    seq = sequence.Sequence(seq_name)
     el_list = []
 
     def generate_element(i):
         el = element.Element(name='single-pulse-el_%s' % i,
                              pulsar=station.pulsar)
+
+        dummy_el = el.add(pulse.SquarePulse(name='refpulse_0', channel='ch1',
+                           amplitude=0, length=100e-9))
+
         sqp = pulse.SquarePulse(name='CBox-pulse-trigger',
                                 channel='ch1_marker1',
-                                amplitude=1, length=50e-9)
-        el.add(sqp, name='CBox-pulse-trigger')
+                                amplitude=1, length=5e-9)
+        el.add(sqp, name='CBox-pulse-trigger', start=10e-9, refpulse=dummy_el)
         el.add(pulse.cp(sqp, channel='ch1_marker2'),
                refpulse='CBox-pulse-trigger', refpoint='start', start=0)
         # The Readout tone
@@ -119,5 +125,4 @@ def gen_and_upl_CBox_single_pulse_seq(IF, mod_amp,
         seq.append_element(el, trigger_wait=True)
     station.instruments['AWG'].stop()
     station.pulsar.program_awg(seq, *el_list, verbose=verbose)
-    return seq, el_list
-
+    return seq_name

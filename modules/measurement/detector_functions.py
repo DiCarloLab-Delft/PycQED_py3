@@ -459,42 +459,50 @@ class QuTechCBox_integrated_average_Detector(Hard_Detector):
         self.CBox.set_acquisition_mode(0)
 
 
-class QuTechCBox_integrated_average_single_trace_Detector(Soft_Detector):
+class CBox_single_integration_average_det(Soft_Detector):
     '''
     Detector used for acquiring single points of the CBox while externally
     triggered by the AWG.
-    Actually very similar to the regular integrated avg detector.
-    Should investigate if the two can be merged but operated in soft and
-    hard mode...
+    Very similar to the regular integrated avg detector.
     '''
-    def __init__(self, AWG='AWG', **kw):
-        super(self.__class__, self).__init__()
-        self.CBox = qt.instruments['CBox']
-        self.name = 'CBox_Streaming_data'
-        self.value_names = ['Ch0', 'Ch1']
+    def __init__(self, CBox, **kw):
+        super().__init__()
+        self.CBox = CBox
+        self.name = 'CBox_single_inte_avg_det'
+        self.value_names = ['I', 'Q']
         self.value_units = ['a.u.', 'a.u.']
-        if AWG is not None:
-            self.AWG = qt.instruments[AWG]
-            # Used for synchronisation when CBox is not supplying pulses itself.
 
     def acquire_data_point(self, **kw):
-        self.CBox.set_acquisition_mode(4)
+        self.CBox.set('acquisition_mode', 4)
         data = self.CBox.get_integrated_avg_results()
-        self.CBox.set_acquisition_mode(0)
+        self.CBox.set('acquisition_mode', 0)
         return data
 
-
-    def prepare(self, sweep_points):
-        if self.AWG is not None:
-            self.AWG.stop()
-        self.CBox.set_nr_samples(1)
-        self.CBox.set_acquisition_mode(0)
-        self.AWG.start()
+    def prepare(self):
+        self.CBox.set('nr_samples', 1)
+        self.CBox.set('acquisition_mode', 0)
 
     def finish(self):
-        if self.AWG is not None:
-            self.AWG.stop()
-        self.CBox.set_acquisition_mode(0)
+        self.CBox.set('acquisition_mode', 0)
+
+
+class CBox_single_int_avg_with_LutReload(CBox_single_integration_average_det):
+    '''
+    Detector used for acquiring single points of the CBox while externally
+    triggered by the AWG.
+    Very similar to the regular integrated avg detector.
+    '''
+    def __init__(self, CBox, LutMan, **kw):
+        super().__init__(CBox, **kw)
+        self.LutMan = LutMan
+
+    def acquire_data_point(self, **kw):
+        self.LutMan.load_pulse_onto_AWG_lookuptable('X180', 0)
+        self.LutMan.load_pulse_onto_AWG_lookuptable('X180', 1)
+        # self.LutMan.load_pulses_onto_AWG_lookuptable(0)
+        # self.LutMan.load_pulses_onto_AWG_lookuptable(1)
+        return super().acquire_data_point(**kw)
+
 
 
 class QuTechCBox_Streaming_Detector(Hard_Detector):

@@ -108,7 +108,7 @@ class QuTech_ControlBox_LookuptableManager(Instrument):
         self.add_parameter('apply_predistortion_matrix', type=bool,
                            flag=Instrument.FLAG_GETSET)
 
-        self.set_lut_mapping(['I', 'X180', 'Y180', 'X90', 'Y90', 'Block',
+        self.set_lut_mapping(['I', 'X180', 'Y180', 'X90', 'Y90', 'I',  # 'Block',
                              'X180_delayed'])
         # Set to a default because box is not expected to change
         self.set_sampling_rate(0.2)

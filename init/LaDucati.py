@@ -32,22 +32,26 @@ import qcodes.instrument_drivers.IVVI as iv
 from qcodes.instrument_drivers import Tektronix_AWG5014 as tek
 from instrument_drivers.physical_instruments import QuTech_ControlBoxdriver as qcb
 from instrument_drivers.meta_instrument import heterodyne as hd
+import instrument_drivers.meta_instrument.CBox_LookuptableManager as lm
 
 # Initializing instruments
-try:
-    SH = sh.SignalHound_USB_SA124B('Signal hound')
-except:
-    SH.closeDevice()
-    SH = sh.SignalHound_USB_SA124B('Signal hound')
 
+SH = sh.SignalHound_USB_SA124B('Signal hound')
 CBox = qcb.QuTech_ControlBox('CBox', address='Com3', run_tests=False)
-LO = rs.RS_SGS100A(name='LO', address='TCPIP0::192.168.0.77')
-S1 = rs.RS_SGS100A(name='S1', address='TCPIP0::192.168.0.78')
+
+
+S1 = rs.RS_SGS100A('S1', address='GPIB0::11::INSTR') #located on top of rack
+
+LO = rs.RS_SGS100A(name='LO', address='TCPIP0::192.168.0.77')  # left of s2
+S2 = rs.RS_SGS100A(name='S1', address='TCPIP0::192.168.0.78')  # right
+
 AWG = tek.Tektronix_AWG5014(name='AWG', setup_folder=None,
                             address='TCPIP0::192.168.0.9')
 IVVI = iv.IVVI('IVVI', address='ASRL1', numdacs=16)
-HS = hd.LO_modulated_Heterodyne('HS', LO=LO, CBox=CBox, AWG=AWG)
 
+# Meta-instruments
+HS = hd.LO_modulated_Heterodyne('HS', LO=LO, CBox=CBox, AWG=AWG)
+LutMan = lm.QuTech_ControlBox_LookuptableManager('LutMan', CBox)
 MC = mc.MeasurementControl('MC')
 station = qc.Station(LO, S1, AWG, CBox, HS, SH)
 MC.station = station
@@ -75,18 +79,40 @@ for i in range(4):
 # to make the pulsar available to the standard awg seqs
 st_seqs.station = station
 
+IF = -20e6
 HS.set('mod_amp', .1)  # low power regime of VIPmon2
+HS.set('IF', IF)
 LO.set('power', 16)  # splitting gives 13dBm at both mixer LO ports
 CBox.set('nr_averages', 2**12)
 # this is the max nr of averages that does not slow down the heterodyning
-CBox.set('nr_samples', 100)  # sets 500ns of integration in heterodyne
+CBox.set('nr_samples', 300)  # sets 1500ns of integration in heterodyne
+# Could be set to 400
 
-# !Not calibrated
-CBox.set_dac_offset(0, 1, 0) #I channel qubit drive AWG
-CBox.set_dac_offset(0, 0, 0) #Q channel
-CBox.set_dac_offset(1, 1, 0) #I channel
-CBox.set_dac_offset(1, 0, 0) #Q channel readout AWG
+# Calibrated at 6.5GHz (18-1-2016)
+CBox.set_dac_offset(0, 1, 20.00)  # I channel qubit drive AWG
+CBox.set_dac_offset(0, 0, -24.00)  # Q channel
 
+CBox.set_dac_offset(1, 1, 0)  # I channel
+CBox.set_dac_offset(1, 0, 0)  # Q channel readout AWG
+
+t_base = np.arange(512)*5e-9
+
+cosI = np.cos(2*np.pi * t_base*IF)
+sinI = np.sin(2*np.pi * t_base*IF)
+w0 = np.round(cosI*120)
+w1 = np.round(sinI*120)
+
+CBox.set('sig0_integration_weights', w0)
+CBox.set('sig1_integration_weights', w1)
+
+CBox.set('integration_length', 140) # 280=1400 ns
+CBox.set('acquisition_mode', 0)
+CBox.set('lin_trans_coeffs', [1, 0, 0, 1])
+CBox.set('log_length', 200)
 
 t1 = time.time()
+
+IVVI.set('dac2', 318.028534371)
+IVVI.set('dac5', 27.4967574578)
+
 print('Ran initialization in %.2fs' % (t1-t0))

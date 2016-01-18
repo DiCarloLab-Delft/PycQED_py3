@@ -11,6 +11,7 @@ imp.reload(PG)
 
 global lm  # Global used for passing value to the testsuite
 
+
 class QuTech_ControlBox_LookuptableManager(Instrument):
     '''
     meta-instrument that handles loading pulses into the CBox lookuptables
@@ -83,8 +84,8 @@ class QuTech_ControlBox_LookuptableManager(Instrument):
                            set_cmd=self._do_set_apply_predistortion_matrix,
                            get_cmd=self._do_get_apply_predistortion_matrix)
 
-        self.set('lut_mapping', ['I', 'X180', 'Y180', 'X90', 'Y90', 'Block',
-                                 'X180_delayed'])
+        self.set('lut_mapping', ['I', 'X180', 'Y180', 'X90', 'Y90', 'I',
+                                 'I']) #TODO: readd 'Block'
         # Set to a default because box is not expected to change
         self.set('sampling_rate', 0.2)
         self.set('QI_amp_ratio', 1)

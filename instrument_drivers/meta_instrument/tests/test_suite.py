@@ -18,7 +18,7 @@ class LutManTests(unittest.TestCase):
             self.LutMan.get(par)
     def test_uploading_waveforms(self):
         self.LutMan.CBox.set('acquisition_mode', 'idle')
-        # self.LutMan.generate_standard_pulses()
+        self.LutMan.generate_standard_pulses()
         self.LutMan.load_pulse_onto_AWG_lookuptable('X180', 0, 0)
         self.LutMan.load_pulses_onto_AWG_lookuptable(0)
         self.LutMan.load_pulses_onto_AWG_lookuptable(1)

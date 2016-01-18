@@ -184,6 +184,97 @@ def mixer_carrier_cancellation_5014(station,
     return ch_1_min, ch_2_min
 
 
+def mixer_carrier_cancellation_CBox(station,
+                                    frequency=None,
+                                    awg_nr=0,
+                                    voltage_grid=[100, 50, 20],
+                                    xtol=1, **kw):
+    '''
+    Varies the mixer offsets to minimize leakage at the carrier frequency.
+    this is the version for the QuTech ControlBox
+
+    voltage_grid defines the ranges for the preliminary coarse sweeps.
+    If the range is too small, add another number infront of -0.12
+    '''
+    CBox = station['CBox']
+    MC = kw.pop('MC', station.MC)
+    print('using:', MC)
+    SH = station['Signal hound']
+    ch_0_min = 0  # Initializing variables used later on
+    ch_1_min = 0
+    last_ch_0_min = 1
+    last_ch_1_min = 1
+    ii = 0
+    min_power = 0
+    '''
+    Make coarse sweeps to approximate the minimum
+    '''
+
+    ch0_swf = CB_swf.DAC_offset(awg_nr, dac_ch=0, CBox=CBox)
+    ch1_swf = CB_swf.DAC_offset(awg_nr, dac_ch=1, CBox=CBox)
+    for voltage_span in voltage_grid:
+        # Channel 0
+        MC.set_sweep_function(ch0_swf)
+        MC.set_detector_function(
+            det.Signal_Hound_fixed_frequency(signal_hound=SH, frequency=frequency))
+        MC.set_sweep_points(np.linspace(ch_0_min + voltage_span,
+                                        ch_0_min - voltage_span, 11))
+        MC.run(name='Mixer_cal_Offset_awg{}_dac{}'.format(awg_nr, 0),
+               sweep_delay=.1, debug_mode=True)
+        Mixer_Calibration_Analysis = MA.Mixer_Calibration_Analysis(
+            label='Mixer_cal', auto=True)
+        ch_0_min = Mixer_Calibration_Analysis.fit_results[0]
+        CBox.set_dac_offset(awg_nr, 0, ch_0_min)
+
+        # Channel 2
+        MC.set_sweep_function(ch1_swf)
+        MC.set_sweep_points(np.linspace(ch_1_min + voltage_span,
+                                        ch_1_min - voltage_span, 11))
+        MC.run(name='Mixer_cal_Offset_awg{}_dac{}'.format(awg_nr, 1),
+               sweep_delay=.1, debug_mode=True)
+        Mixer_Calibration_Analysis = MA.Mixer_Calibration_Analysis(
+            label='Mixer_cal', auto=True)
+        ch_1_min = Mixer_Calibration_Analysis.fit_results[0]
+        CBox.set_dac_offset(awg_nr, 1, ch_1_min)
+
+    # Refine and repeat the sweeps to find the minimum
+    while(abs(last_ch_0_min - ch_0_min) > xtol
+          and abs(last_ch_1_min - ch_1_min) > xtol):
+        ii += 1
+        dac_resolution = 1000/2**14  # quantization of the dacs
+        # channel 1 finer sweep
+        MC.set_sweep_function(ch0_swf)
+        MC.set_sweep_points(np.linspace(ch_0_min - dac_resolution*6,
+                            ch_0_min + dac_resolution*6, 13))
+        MC.run(name='Mixer_cal_Offset_awg{}_dac{}'.format(awg_nr, 0),
+               sweep_delay=.1, debug_mode=True)
+        Mixer_Calibration_Analysis = MA.Mixer_Calibration_Analysis(
+            label='Mixer_cal', auto=True)
+        last_ch_0_min = ch_0_min
+        ch_0_min = Mixer_Calibration_Analysis.fit_results[0]
+        CBox.set_dac_offset(awg_nr, 0, ch_0_min)
+        # Channel 2 finer sweep
+        MC.set_sweep_function(ch1_swf)
+        MC.set_sweep_points(np.linspace(ch_1_min - dac_resolution*6,
+                                        ch_1_min + dac_resolution*6, 13))
+        MC.run(name='Mixer_cal_Offset_awg{}_dac{}'.format(awg_nr, 1),
+               sweep_delay=.1, debug_mode=True)
+        Mixer_Calibration_Analysis = MA.Mixer_Calibration_Analysis(
+            label='Mixer_cal', auto=True)
+        last_ch_1_min = ch_1_min
+        min_power = min(Mixer_Calibration_Analysis.measured_powers)
+        ch_1_min = Mixer_Calibration_Analysis.fit_results[0]
+        CBox.set_dac_offset(awg_nr, 1, ch_1_min)
+        if ii > 10:
+            logging.error('Mixer calibration did not converge')
+            break
+
+    CBox.set_dac_offset(awg_nr, 0, ch_0_min)
+    CBox.set_dac_offset(awg_nr, 1, ch_1_min)
+    return ch_0_min, ch_1_min
+
+
+
 
 def mixer_carrier_cancellation(frequency, AWG_nr=0, AWG_channel1=1, AWG_channel2=2,
                                AWG_name='AWG', pulse_amp_control='AWG',

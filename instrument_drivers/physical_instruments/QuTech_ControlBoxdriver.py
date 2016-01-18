@@ -582,11 +582,11 @@ class QuTech_ControlBox(VisaInstrument):
                        expected_number_of_bytes=1))
         # This length is substracted by 1, because the FPGA counts from 0
         # With 1 substracted, the hardware will work properly.  -- 14-7-2015.               # With 1 substracted, the hardware will work properly.  -- 14-7-2015.
-        data_bytes += (c.encode_byte(length-1, 7))
+        data_bytes += (c.encode_byte(length-1, 7,
+                       expected_number_of_bytes=1))
         data_bytes += (c.encode_array(lut,
                        data_bits_per_byte=7, bytes_per_value=2))
         message = c.create_message(cmd, data_bytes)
-
         (stat, mesg) = self.serial_write(message)
         if not stat:
             raise Exception('Failed to set AWG lookup table')
