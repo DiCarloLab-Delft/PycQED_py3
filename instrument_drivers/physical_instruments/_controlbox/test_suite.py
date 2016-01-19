@@ -23,8 +23,9 @@ class CBox_tests(unittest.TestCase):
 
     def test_firmware_version(self):
         v = CBox.get('firmware_version')
-        self.assertTrue(int(v[1]) == 2)  # major version
-        self.assertTrue(int(int(v[3:5])) > 13)  # minor version
+        self.assertTrue(int(v[1]) == 3)  # major version
+        self.assertTrue(int(v[3]) == 1)  # minor version
+        self.assertTrue(int(v[5]) == 0)  # minor version
 
 
     def test_setting_mode(self):

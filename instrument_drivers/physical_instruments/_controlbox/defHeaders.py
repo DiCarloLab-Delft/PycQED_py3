@@ -73,10 +73,8 @@ UpdLinTransCoeffHeader = b"\x57"
 UpdateAverageSettings = b"\x58"
 UpdateLoggerMaxCounterHeader = b"\x59"
 UpdateModeHeader = b"\x5A"
-# EndOfStreaming = b"\x5B"
 UpdateRunModeHeader = b"\x5B"
 UpdateSequencerParametersHeader = b"\x5C"
-EndOfStreaming = b"\x5B"   # FIXME: this header is not defined in the FPGA headers - JdS
 
 # Register Read transactions
 ReadCalculatedVoffset = b"\x5F"
@@ -84,6 +82,7 @@ ReadCalculatedVoffset = b"\x5F"
 # Memory  Update transactions
 UpdWeightsZeroHeader = b"\x40"
 UpdWeightsOneHeader = b"\x41"
+LoadInstructionsHeader = "\x42"
 
 # Memory read transactions
 ReadSequencerCounters = b"\x4B"
@@ -92,6 +91,8 @@ ReadIntAverageResults = b"\x4D"
 ReadInputAverageResults = b"\x4E"
 ReadLoggedResults = b"\x4F"
 ReadVersion = b"\x60"
+
+
 # ########################## Communication headers ######################## #
 EndOfDataTrailer = b"\x77"
 EndOfStreamingHeader = b"\x78"

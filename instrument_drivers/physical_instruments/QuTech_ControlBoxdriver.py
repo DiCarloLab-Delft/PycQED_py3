@@ -3,7 +3,7 @@ import numpy as np
 import sys
 import visa
 import unittest
-from bitstring import BitArray
+# from bitstring import BitArray
 import logging
 
 qcpath = 'D:\GitHubRepos\Qcodes'
@@ -19,8 +19,8 @@ pyximport.install(setup_args={"script_args": ["--compiler=msvc"],
                               "include_dirs": np.get_include()},
                   reload_support=True)
 
-from ._ControlBox import defHeaders  # File containing bytestring commands
-from ._ControlBox import codec as c
+from ._controlbox import defHeaders  # File containing bytestring commands
+from ._controlbox import codec as c
 
 
 class QuTech_ControlBox(VisaInstrument):
@@ -202,7 +202,7 @@ class QuTech_ControlBox(VisaInstrument):
 
     def run_test_suite(self):
             from importlib import reload  # Useful for testing
-            from ._ControlBox import test_suite
+            from ._controlbox import test_suite
             reload(test_suite)
             # pass the CBox to the module so it can be used in the tests
             self.c = c  # make the codec callable from the testsuite
@@ -297,32 +297,32 @@ class QuTech_ControlBox(VisaInstrument):
                 values[i, j] = val
         return values
 
-    def decode_byte(self, data_bytes, data_bits_per_byte=7,
-                    signed_integer=False):
-        '''
-        Exists for legacy purposes, only used in integration streaming mode.
-        Otherwise use the cython version of this function.
+    # def decode_byte(self, data_bytes, data_bits_per_byte=7,
+    #                 signed_integer=False):
+    #     '''
+    #     Exists for legacy purposes, only used in integration streaming mode.
+    #     Otherwise use the cython version of this function.
 
-        Inverse function of encode byte. Protocol is described in docstring
-        of encode_byte().
+    #     Inverse function of encode byte. Protocol is described in docstring
+    #     of encode_byte().
 
-        Takes the message data bytes as input, converts them to a a BitArray
-        and removes the MSB indicating it is a data byte and puts them together
-        '''
-        data_bit_val = BitArray()
-        # loop over bytes and only add data bits to final BitArray.
-        for byte in data_bytes:
-            bit_val = BitArray(bin(byte))
-            data_bit = bit_val[-data_bits_per_byte:]
-            data_bit_val.append(data_bit)
+    #     Takes the message data bytes as input, converts them to a a BitArray
+    #     and removes the MSB indicating it is a data byte and puts them together
+    #     '''
+    #     data_bit_val = BitArray()
+    #     # loop over bytes and only add data bits to final BitArray.
+    #     for byte in data_bytes:
+    #         bit_val = BitArray(bin(byte))
+    #         data_bit = bit_val[-data_bits_per_byte:]
+    #         data_bit_val.append(data_bit)
 
-        # Convert BitArray to value as unsigned integer
-        if signed_integer:
-            value = data_bit_val.int
-        else:
-            value = data_bit_val.uint
+    #     # Convert BitArray to value as unsigned integer
+    #     if signed_integer:
+    #         value = data_bit_val.int
+    #     else:
+    #         value = data_bit_val.uint
 
-        return value
+    #     return value
 
     def create_message(self, cmd, data_bytes=None,
                        EOM=defHeaders.EndOfMessageHeader):
