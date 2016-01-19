@@ -16,6 +16,7 @@ qc_config = {'datadir': 'D:\Experiments\Simultaneous_Driving\data',
 # General PycQED modules
 from modules.measurement import measurement_control as mc
 from modules.measurement import sweep_functions as swf
+from modules.measurement import awg_sweep_functions as awg_swf
 from modules.measurement import detector_functions as det
 from modules.analysis import measurement_analysis as ma
 from modules.measurement import calibration_toolbox as cal_tools

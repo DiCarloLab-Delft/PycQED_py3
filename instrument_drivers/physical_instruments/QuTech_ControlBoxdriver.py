@@ -872,7 +872,7 @@ class QuTech_ControlBox(VisaInstrument):
                 break
         if mode_int is None:
             raise KeyError('acquisition_mode %s not recognized')
-        if mode_int == 3 and self._log_length >8000:
+        if mode_int == 3 and self._log_length > 8000:
             logging.warning('Log length can be max 8000 in int. log. mode')
         # Here the actual acquisition_mode is set
         cmd = defHeaders.UpdateModeHeader

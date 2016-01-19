@@ -370,13 +370,13 @@ class QuTechCBox_input_average_Detector(Hard_Detector):
     def prepare(self, sweep_points):
         if self.AWG is not None:
             self.AWG.stop()
-        self.CBox.set_acquisition_mode(0)
-        self.CBox.set_acquisition_mode(3)
+        self.CBox.set('acquisition_mode', 0)
+        self.CBox.set('acquisition_mode', 3)
 
     def finish(self):
         if self.AWG is not None:
             self.AWG.stop()
-        self.CBox.set_acquisition_mode(0)
+        self.CBox.set('acquisition_mode', 0)
 
 
 class QuTechCBox_input_average_Detector_Touch_N_Go(Hard_Detector):
@@ -404,12 +404,12 @@ class QuTechCBox_input_average_Detector_Touch_N_Go(Hard_Detector):
                     print(str(e))
                     i += 1
                     self.CBox.set_run_mode(0)
-                    self.CBox.set_acquisition_mode(0)
+                    self.CBox.set('acquisition_mode', 0)
                     self.CBox.restart_awg_tape(0)
                     self.CBox.restart_awg_tape(1)
                     self.CBox.restart_awg_tape(2)
                     time.sleep(.5)
-                    self.CBox.set_acquisition_mode(6)
+                    self.CBox.set('acquisition_mode', 6)
                     self.CBox.set_run_mode(1)
         else:
             d = self._get_values()
@@ -420,43 +420,35 @@ class QuTechCBox_input_average_Detector_Touch_N_Go(Hard_Detector):
         return data
 
     def prepare(self, sweep_points):
-        self.TD_Meas.prepare()
-        self.CBox.set_acquisition_mode(0)
-        self.CBox.set_acquisition_mode(6)
+        self.CBox.set('acquisition_mode', 0)
+        self.CBox.set('acquisition_mode', 6)
         self.CBox.set_run_mode(1)
 
     def finish(self):
-        self.CBox.set_acquisition_mode(0)
+        self.CBox.set('acquisition_mode', 0)
         self.CBox.set_run_mode(0)
 
 
-class QuTechCBox_integrated_average_Detector(Hard_Detector):
-    def __init__(self, AWG='AWG', **kw):
-        super(QuTechCBox_integrated_average_Detector, self).__init__()
-        self.CBox = qt.instruments['CBox']
-        self.name = 'CBox_Streaming_data'
+class CBox_integrated_average_detector(Hard_Detector):
+    def __init__(self, CBox, AWG, **kw):
+        super().__init__()
+        self.CBox = CBox
+        self.name = 'CBox_integrated_average_detector'
         self.value_names = ['Ch0', 'Ch1']
         self.value_units = ['a.u.', 'a.u.']
-        if AWG is not None:
-            self.AWG = qt.instruments[AWG]
-            # Used for synchronisation when CBox is not supplying pulses itself.
+        self.AWG = AWG
 
     def get_values(self):
-        if self.AWG is not None:
-            self.AWG.start()
         data = self.CBox.get_integrated_avg_results()
         return data
 
     def prepare(self, sweep_points):
-        if self.AWG is not None:
-            self.AWG.stop()
-        self.CBox.set_nr_samples(len(sweep_points))
-        self.CBox.set_acquisition_mode(4)
+        self.CBox.set('nr_samples', len(sweep_points))
+        self.CBox.set('acquisition_mode', 4)
+        self.AWG.start()  # Is needed here to ensure data aligns with seq elt
 
     def finish(self):
-        if self.AWG is not None:
-            self.AWG.stop()
-        self.CBox.set_acquisition_mode(0)
+        self.CBox.set('acquisition_mode', 0)
 
 
 class CBox_single_integration_average_det(Soft_Detector):
@@ -528,10 +520,10 @@ class QuTechCBox_Streaming_Detector(Hard_Detector):
     def prepare(self, sweep_points):
         if self.AWG is not None:
             self.AWG.stop()
-        self.CBox.set_acquisition_mode(5)
+        self.CBox.set('acquisition_mode', 5)
 
     def finish(self):
-        self.CBox.set_acquisition_mode(0)
+        self.CBox.set('acquisition_mode', 0)
         if self.AWG is not None:
             self.AWG.stop()
 
@@ -559,10 +551,10 @@ class QuTechCBox_AlternatingShots_Streaming_Detector(Hard_Detector):
     def prepare(self, sweep_points):
         if self.AWG is not None:
             self.AWG.stop()
-        self.CBox.set_acquisition_mode(5)
+        self.CBox.set('acquisition_mode', 5)
 
     def finish(self):
-        self.CBox.set_acquisition_mode(0)
+        self.CBox.set('acquisition_mode', 0)
         if self.AWG is not None:
             self.AWG.stop()
 
@@ -593,7 +585,7 @@ class QuTechCBox_AlternatingShots_Logging_Detector_Touch_N_Go(Hard_Detector):
                     print(str(e))
                     i += 1
                     self.CBox.set_run_mode(0)
-                    self.CBox.set_acquisition_mode(0)
+                    self.CBox.set('acquisition_mode', 0)
                     self.CBox.restart_awg_tape(0)
                     self.CBox.restart_awg_tape(1)
                     self.CBox.restart_awg_tape(2)
@@ -613,14 +605,14 @@ class QuTechCBox_AlternatingShots_Logging_Detector_Touch_N_Go(Hard_Detector):
     def prepare(self, **kw):
         if self.AWG is not None:
             self.AWG.stop()
-        self.CBox.set_acquisition_mode(6)
+        self.CBox.set('acquisition_mode', 6)
         self.CBox.set_run_mode(1)
 
     def finish(self):
         counters = np.array(self.CBox.get_sequencer_counters())
         triggerfraction = float(counters[1])/float(counters[0])
         print("trigger fraction", triggerfraction)
-        self.CBox.set_acquisition_mode(0)
+        self.CBox.set('acquisition_mode', 0)
         self.CBox.set_run_mode(0)
         if self.AWG is not None:
             self.AWG.stop()
@@ -663,7 +655,7 @@ class QuTechCBox_Shots_Logging_Detector_Touch_N_Go(Hard_Detector):
                     i += 1
                     time.sleep(.1)
                     self.CBox.set_run_mode(0)
-                    self.CBox.set_acquisition_mode(0)
+                    self.CBox.set('acquisition_mode', 0)
                     self.CBox.restart_awg_tape(0)
                     self.CBox.restart_awg_tape(1)
                     self.CBox.restart_awg_tape(2)
@@ -676,7 +668,7 @@ class QuTechCBox_Shots_Logging_Detector_Touch_N_Go(Hard_Detector):
         '''
         private version of the acquisition command used for the workaround
         '''
-        self.CBox.set_acquisition_mode(6)
+        self.CBox.set('acquisition_mode', 6)
         self.CBox.set_run_mode(1)
 
         raw_data = self.CBox.get_integration_log_results()
@@ -687,7 +679,7 @@ class QuTechCBox_Shots_Logging_Detector_Touch_N_Go(Hard_Detector):
         else:
             data_0 = weight0_data
         self.CBox.set_run_mode(0)
-        self.CBox.set_acquisition_mode(0)
+        self.CBox.set('acquisition_mode', 0)
 
         return data_0
 
