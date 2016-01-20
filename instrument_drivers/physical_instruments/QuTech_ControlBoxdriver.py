@@ -716,8 +716,7 @@ class QuTech_ControlBox(VisaInstrument):
                             returned.
                             ! this parameter is overloaded and has two different
                               ranges.
-                            Range: [1 - 2000] when used in integration average
-                            Range: [1 - 127] when used in input average
+                            Range: [1 - 2000]
                             In input average this corresponds to trace length
                             In integration averaging this corresponds to the
                             number of integration results.

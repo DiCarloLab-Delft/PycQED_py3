@@ -362,10 +362,12 @@ class Pulsar:
         self.AWG.send_awg_file(filename, awg_file)
         self.AWG.load_awg_file(filename)
 
-        self.activate_channels(channels)
-
+        time.sleep(.1)
         # Waits for AWG to be ready
         self.AWG.is_awg_ready()
+
+        self.activate_channels(channels)
+
         _t = time.time() - _t0
         print(" finished in %.2f seconds." % _t)
         return awg_file

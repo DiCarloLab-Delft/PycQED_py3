@@ -9,6 +9,7 @@ from . import standard_elements as st_elts
 from importlib import reload
 reload(st_elts)
 station = None
+reload(element)
 # You need to explicitly set this before running any functions from this module
 # I guess there are cleaner solutions :)
 
@@ -103,14 +104,31 @@ def CBox_single_pulse_seq(IF, meas_pulse_delay=0, RO_trigger_delay=0,
 
 def CBox_T1_marker_seq(IF, times, meas_pulse_delay,
                        RO_trigger_delay=0, verbose=False):
+    '''
+    Beware, replaces the last 4 points with calibration points
+    '''
     seq_name = 'CBox_T1'
     seq = sequence.Sequence(seq_name)
     el_list = []
 
-    for i, tau in enumerate(times):
+    for i, tau in enumerate(times[:-4]):
         el = st_elts.single_pulse_elt(i, station, IF, meas_pulse_delay,
                                       RO_trigger_delay, tau=tau)
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
+    cal_0_elt0 = st_elts.no_pulse_elt(i+1, station, IF, RO_trigger_delay)
+    cal_0_elt1 = st_elts.no_pulse_elt(i+2, station, IF, RO_trigger_delay)
+    cal_1_elt0 = st_elts.single_pulse_elt(i+3, station, IF, meas_pulse_delay,
+                                          RO_trigger_delay)
+    cal_1_elt1 = st_elts.single_pulse_elt(i+4, station, IF, meas_pulse_delay,
+                                          RO_trigger_delay)
+    seq.append_element(cal_0_elt0, trigger_wait=True)
+    seq.append_element(cal_0_elt1, trigger_wait=True)
+    seq.append_element(cal_1_elt0, trigger_wait=True)
+    seq.append_element(cal_1_elt1, trigger_wait=True)
+    el_list.append(cal_0_elt0)
+    el_list.append(cal_0_elt1)
+    el_list.append(cal_1_elt0)
+    el_list.append(cal_1_elt1)
     station.instruments['AWG'].stop()
     station.pulsar.program_awg(seq, *el_list, verbose=verbose)

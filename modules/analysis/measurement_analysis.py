@@ -268,7 +268,7 @@ class MeasurementAnalysis(object):
             '\n'+'*'*80 + '\n\n'
 
         fit_grp.attrs.create(name='chisqr', data=fit_res.chisqr)
-        fit_grp.attrs.create(name='var_name', data=var_name)
+        fit_grp.attrs.create(name='var_name', data=var_name.encode('utf-8'))
         if fit_res.covar is not None:
             if 'covar' in list(fit_grp.keys()):
                 del fit_grp['covar']
@@ -743,7 +743,7 @@ class OptimizationAnalysis(MeasurementAnalysis):
 
 
 class TD_Analysis(MeasurementAnalysis):
-    def __init__(self, NoCalPoints=10, center_point=31, **kw):
+    def __init__(self, NoCalPoints=4, center_point=31, **kw):
         self.NoCalPoints = NoCalPoints
         self.normalized_values = []
         self.normalized_cal_vals = []
@@ -760,8 +760,9 @@ class TD_Analysis(MeasurementAnalysis):
         calsteps: number of points that corresponds to calibration points
         '''
         NoPts = len(values)
-        cal_zero_points = list(range(NoPts-calsteps, NoPts-calsteps/2))
-        cal_one_points = list(range(NoPts-calsteps/2, NoPts))
+        cal_zero_points = list(range(NoPts-int(calsteps),
+                               int(NoPts-int(calsteps)/2)))
+        cal_one_points = list(range(int(NoPts-int(calsteps)/2), NoPts))
 
         self.corr_data = a_tools.rotate_and_normalize_data(
             self.measured_values[0:2], cal_zero_points, cal_one_points)[0]
@@ -771,8 +772,8 @@ class TD_Analysis(MeasurementAnalysis):
             self.analysis_group.attrs.create('corrected data based on',
                                              'calibration points'.encode('utf-8'))
         normalized_values = self.corr_data
-        normalized_data_points = normalized_values[:-calsteps]
-        normalized_cal_vals = normalized_values[-calsteps:]
+        normalized_data_points = normalized_values[:-int(calsteps)]
+        normalized_cal_vals = normalized_values[-int(calsteps):]
         return [normalized_values, normalized_data_points, normalized_cal_vals]
 
 
@@ -1536,7 +1537,7 @@ class T1_Analysis(TD_Analysis):
     def __init__(self, label='T1', **kw):
         kw['label'] = label
         kw['h5mode'] = 'r+'  # Read write mode, file must exist
-        super(self.__class__, self).__init__(**kw)
+        super().__init__(**kw)
 
     def fit_T1(self, t_arr, data):
         # Guess for params
@@ -1544,12 +1545,11 @@ class T1_Analysis(TD_Analysis):
                                               min=0, max=2)
         fit_mods.ExpDecayModel.set_param_hint(
             'tau',
-            value=self.sweep_points[0]*50,
-            min=self.sweep_points[0]*5,
-            max=self.sweep_points[0]*1000)
+            value=self.sweep_points[1]*50,  # use index 1
+            min=self.sweep_points[1]*5,
+            max=self.sweep_points[-1]*1000)
         fit_mods.ExpDecayModel.set_param_hint('offset', value=0, vary=False)
-        fit_mods.ExpDecayModel.set_param_hint('n', value=1, vary=False,
-                                              min=0, max=3)
+        fit_mods.ExpDecayModel.set_param_hint('n', value=1, vary=False)
         self.params = fit_mods.ExpDecayModel.make_params()
 
         fit_res = fit_mods.ExpDecayModel.fit(
@@ -2360,7 +2360,7 @@ class Homodyne_Analysis(MeasurementAnalysis):
     def __init__(self, label='HM', **kw):
         kw['label'] = label
         kw['h5mode'] = 'r+'
-        super(self.__class__, self).__init__(**kw)
+        super().__init__(**kw)
 
     def run_default_analysis(self, print_fit_results=False,
                              close_file=False, fitting_model='hanger',
@@ -2418,11 +2418,9 @@ class Homodyne_Analysis(MeasurementAnalysis):
             HangerModel.set_param_hint('theta', value=0, min=-np.pi/2,
                                        max=np.pi/2)
             HangerModel.set_param_hint('slope', value=0, vary=True)
-
             self.params = HangerModel.make_params()
             fit_res = HangerModel.fit(data=self.measured_powers,
-                                      f=self.sweep_points * 1.e9,
-                                      params=self.params)
+                                      f=self.sweep_points * 1.e9)
 
         elif fitting_model == 'lorentzian':
             LorentzianModel = fit_mods.LorentzianModel
