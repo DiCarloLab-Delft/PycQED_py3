@@ -7,7 +7,8 @@ default_gauss_width = 10
 
 
 class CBox_T1(swf.Hard_Sweep):
-    def __init__(self, IF, meas_pulse_delay, RO_trigger_delay, mod_amp, AWG):
+    def __init__(self, IF, meas_pulse_delay, RO_trigger_delay, mod_amp, AWG,
+                 upload=True):
         super().__init__()
         self.IF = IF
         self.meas_pulse_delay = meas_pulse_delay
@@ -17,14 +18,16 @@ class CBox_T1(swf.Hard_Sweep):
         self.name = 'T1'
         self.AWG = AWG
         self.mod_amp = mod_amp
+        self.upload = upload
 
     def prepare(self, **kw):
-        st_seqs.CBox_T1_marker_seq(IF=self.IF, times=self.sweep_points,
-                                   meas_pulse_delay=self.meas_pulse_delay,
-                                   RO_trigger_delay=self.RO_trigger_delay,
-                                   verbose=False)
-        self.AWG.set('ch3_amp', self.mod_amp)
-        self.AWG.set('ch4_amp', self.mod_amp)
+        if self.upload:
+            st_seqs.CBox_T1_marker_seq(IF=self.IF, times=self.sweep_points,
+                                       meas_pulse_delay=self.meas_pulse_delay,
+                                       RO_trigger_delay=self.RO_trigger_delay,
+                                       verbose=False)
+            self.AWG.set('ch3_amp', self.mod_amp)
+            self.AWG.set('ch4_amp', self.mod_amp)
 
 
 # class AWG_Sweep(swf.Hard_Sweep):

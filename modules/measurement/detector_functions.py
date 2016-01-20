@@ -434,16 +434,19 @@ class CBox_integrated_average_detector(Hard_Detector):
         super().__init__()
         self.CBox = CBox
         self.name = 'CBox_integrated_average_detector'
-        self.value_names = ['Ch0', 'Ch1']
+        self.value_names = ['I', 'Q']
         self.value_units = ['a.u.', 'a.u.']
         self.AWG = AWG
 
     def get_values(self):
         data = self.CBox.get_integrated_avg_results()
+
         return data
 
     def prepare(self, sweep_points):
         self.CBox.set('nr_samples', len(sweep_points))
+        self.AWG.stop()  # needed to align the samples
+        self.CBox.set('acquisition_mode', 0)
         self.CBox.set('acquisition_mode', 4)
         self.AWG.start()  # Is needed here to ensure data aligns with seq elt
 
@@ -463,11 +466,15 @@ class CBox_single_integration_average_det(Soft_Detector):
         self.name = 'CBox_single_inte_avg_det'
         self.value_names = ['I', 'Q']
         self.value_units = ['a.u.', 'a.u.']
+        # self.value_names = ['I', 'Q', '|S21|', 'angle|S21|']
+        # self.value_units = ['a.u.', 'a.u.', 'a.u.', 'deg']
 
     def acquire_data_point(self, **kw):
         self.CBox.set('acquisition_mode', 4)
         data = self.CBox.get_integrated_avg_results()
         self.CBox.set('acquisition_mode', 0)
+        # S21 = data[0] + 1j*data[1]
+        # data = [S21.real, S21.imag, abs(S21), np.angle(S21)/(2*np.pi)*360]
         return data
 
     def prepare(self):
@@ -766,42 +773,21 @@ class Detect_simulated_hanger_Soft(Soft_Detector):
         return IQ.real+Inoise, IQ.imag+Qnoise
 
 
-class HomodyneDetector(Soft_Detector):
+class Heterodyne_probe(Soft_Detector):
+    def __init__(self, HS, **kw):
+        super().__init__(**kw)
+        self.HS = HS
+        self.name = 'Heterodyne probe'
+        self.value_names = ['|S21|', 'S21 angle']  # , 'Re{S21}', 'Im{S21}']
+        self.value_units = ['a.u.', 'deg']  # , 'a.u.', 'a.u.']
 
-    def __init__(self, AWG_name='AWG', **kw):
-        super(HomodyneDetector, self).__init__()
-        self.HM = qt.instruments['HM']
-        self.ATS = qt.instruments['ATS']
-        self.AWG = qt.instruments[AWG_name]
-        self.name = 'HomodyneMeasurement'
-        self.value_names = ['S21_magn', 'S21_phase', 'Re{S21}', 'Im{S21}']
-        self.value_units = ['V', 'deg', 'V', 'V']
-
-    def prepare(self, **kw):
-        #  Issues a warning if RF or LO is off
-        self.AWG.start()
-        self.HM.init()
-        if self.HM.get_RF_status() == 'off':
-            logging.warning('RF is off')
-        if self.HM.get_LO_status() == 'off':
-            logging.warning('LO is off')
-        self.ATS.abort()
-        self.ATS.configure_board()
+    def prepare(self):
+        self.HS.prepare()
 
     def acquire_data_point(self, **kw):
-        S21 = 0.+0j
-        for i in range(self.HM.get_Navg()):
-            S21 += self.HM.probe(mtype='COMP')
-        S21 = S21 / float(self.HM.get_Navg())
-        S21_re = np.real(S21)
-        S21_im = np.imag(S21)
-        S21_phase = cmath.phase(S21)/np.pi*180
-        S21_magn = np.abs(S21)
-        #  Yes this would mean we need to integrate plotmon in the HomoDyne
-        return np.array([S21_magn, S21_phase, S21_re, S21_im])
+        S21 = self.HS.probe()
+        return abs(S21), np.angle(S21)/(2*np.pi)*360,# S21.real, S21.imag
 
-    def finish(self, **kw):
-        self.AWG.stop()
 
 
 class PulsedSpectroscopyDetector(Soft_Detector):

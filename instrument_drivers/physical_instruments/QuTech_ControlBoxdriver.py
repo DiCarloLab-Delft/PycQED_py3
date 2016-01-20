@@ -39,6 +39,7 @@ class QuTech_ControlBox(VisaInstrument):
     '''
 
     def __init__(self, name, address, reset=False, run_tests=False, **kw):
+        t0 = time.time()
         super().__init__(name, address)
         # Establish communications
         self.add_parameter('firmware_version',
@@ -198,7 +199,9 @@ class QuTech_ControlBox(VisaInstrument):
 
         if run_tests:
             self.run_test_suite()
-        print('Initialized CBox', self.get('firmware_version'))
+        t1 = time.time()
+        print('Initialized CBox', self.get('firmware_version'),
+              'in %.2fs' % (t1-t0))
 
     def run_test_suite(self):
             from importlib import reload  # Useful for testing
@@ -458,7 +461,7 @@ class QuTech_ControlBox(VisaInstrument):
             if len(ch0) != 0:
                 succes = True
             else:
-                sys.stdout.write('.')
+                self._print_waiting_char()
             if time.time()-t0 > self._timeout:
                 raise Exception('Measurement timed out')
         return ch0, ch1
@@ -716,7 +719,7 @@ class QuTech_ControlBox(VisaInstrument):
                             Range: [1 - 2000] when used in integration average
                             Range: [1 - 127] when used in input average
                             In input average this corresponds to trace length
-                            in integration averaging this corresponds to the
+                            In integration averaging this corresponds to the
                             number of integration results.
         @param avg_size    : For each sample, 2 ^ avg_size values will be taken
                            into the averaging calculation.

@@ -109,7 +109,8 @@ class MeasurementControl:
                     sweep_points=self.get_sweep_points()[0: self.xlen, 0])
                 self.complete = False
                 for j in range(self.ylen):
-                    if not self.complete:  # added specifically for 2D hard sweeps
+                    # added specifically for 2D hard sweeps
+                    if not self.complete:
                         for i, sweep_function in enumerate(self.sweep_functions):
                             x = self.get_sweep_points()[
                                 self.iteration*self.xlen]
@@ -166,7 +167,6 @@ class MeasurementControl:
         '''
         ToDo: integrate soft averaging into MC
         '''
-        self.check_keyboard_interupt()
         # note, checking after the data comes in is pointless in hard msmt
         new_data = np.array(self.detector_function.get_values()).T
 
@@ -183,7 +183,7 @@ class MeasurementControl:
         datasetshape = self.dset.shape
 
         self.iteration = datasetshape[0]/shape_new_data[0] + 1
-        start_idx = shape_new_data[0]*(self.iteration-1)
+        start_idx = int(shape_new_data[0]*(self.iteration-1))
         new_datasetshape = (shape_new_data[0]*self.iteration, datasetshape[1])
         self.dset.resize(new_datasetshape)
         len_new_data = shape_new_data[0]

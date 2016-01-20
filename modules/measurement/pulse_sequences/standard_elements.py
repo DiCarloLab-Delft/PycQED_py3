@@ -17,7 +17,7 @@ def single_pulse_elt(i, station, IF, meas_pulse_delay=0, RO_trigger_delay=0,
 
         sqp = pulse.SquarePulse(name='CBox-pulse-trigger',
                                 channel='ch1_marker1',
-                                amplitude=1, length=5e-9)
+                                amplitude=1, length=15e-9)
         el.add(sqp, name='CBox-pulse-trigger', start=10e-9, refpulse=dummy_el)
         el.add(pulse.cp(sqp, channel='ch1_marker2'),
                refpulse='CBox-pulse-trigger', refpoint='start', start=0)

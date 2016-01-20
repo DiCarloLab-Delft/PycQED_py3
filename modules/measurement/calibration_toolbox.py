@@ -184,10 +184,10 @@ def mixer_carrier_cancellation_5014(station,
     return ch_1_min, ch_2_min
 
 
-def mixer_carrier_cancellation_CBox(station,
+def mixer_carrier_cancellation_CBox(CBox, SH, source, MC,
                                     frequency=None,
                                     awg_nr=0,
-                                    voltage_grid=[100, 50, 20],
+                                    voltage_grid=[50, 20, 10, 5],
                                     xtol=1, **kw):
     '''
     Varies the mixer offsets to minimize leakage at the carrier frequency.
@@ -195,17 +195,22 @@ def mixer_carrier_cancellation_CBox(station,
 
     voltage_grid defines the ranges for the preliminary coarse sweeps.
     If the range is too small, add another number infront of -0.12
+    input arguments:
+        frequency:  in GHz, if None uses the frequency the source is set to
+
     '''
-    CBox = station['CBox']
-    MC = kw.pop('MC', station.MC)
-    print('using:', MC)
-    SH = station['Signal hound']
     ch_0_min = 0  # Initializing variables used later on
     ch_1_min = 0
     last_ch_0_min = 1
     last_ch_1_min = 1
     ii = 0
     min_power = 0
+    source.on()
+    if frequency is None:
+        frequency = source.get('frequency')
+    else:
+        source.set('frequency', frequency)
+
     '''
     Make coarse sweeps to approximate the minimum
     '''
@@ -216,7 +221,7 @@ def mixer_carrier_cancellation_CBox(station,
         # Channel 0
         MC.set_sweep_function(ch0_swf)
         MC.set_detector_function(
-            det.Signal_Hound_fixed_frequency(signal_hound=SH, frequency=frequency))
+            det.Signal_Hound_fixed_frequency(signal_hound=SH, frequency=frequency*1e-9))
         MC.set_sweep_points(np.linspace(ch_0_min + voltage_span,
                                         ch_0_min - voltage_span, 11))
         MC.run(name='Mixer_cal_Offset_awg{}_dac{}'.format(awg_nr, 0),

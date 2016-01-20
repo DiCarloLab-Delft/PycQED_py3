@@ -23,8 +23,7 @@ from modules.measurement import calibration_toolbox as cal_tools
 from modules.measurement import mc_parameter_wrapper as pw
 # Standarad awg sequences
 from modules.measurement.waveform_control import pulsar as ps
-from modules.measurement.waveform_control import standard_sequences as st_seqs
-
+from modules.measurement.pulse_sequences import standard_sequences as st_seqs
 
 # Instrument drivers
 from qcodes.instrument_drivers import RS_SGS100A as rs
@@ -53,8 +52,8 @@ IVVI = iv.IVVI('IVVI', address='ASRL1', numdacs=16)
 # Meta-instruments
 HS = hd.LO_modulated_Heterodyne('HS', LO=LO, CBox=CBox, AWG=AWG)
 LutMan = lm.QuTech_ControlBox_LookuptableManager('LutMan', CBox)
+station = qc.Station(LO, S1, AWG, CBox, HS, SH, IVVI)
 MC = mc.MeasurementControl('MC')
-station = qc.Station(LO, S1, AWG, CBox, HS, SH)
 MC.station = station
 station.MC = MC
 
@@ -80,18 +79,35 @@ for i in range(4):
 # to make the pulsar available to the standard awg seqs
 st_seqs.station = station
 
-IF = -20e6
-HS.set('mod_amp', .1)  # low power regime of VIPmon2
-HS.set('IF', IF)
-LO.set('power', 16)  # splitting gives 13dBm at both mixer LO ports
-CBox.set('nr_averages', 2**12)
-# this is the max nr of averages that does not slow down the heterodyning
-CBox.set('nr_samples', 300)  # sets 1500ns of integration in heterodyne
-# Could be set to 400
+IVVI.set('dac2', 0)
+IVVI.set('dac5', 27.4967574578)
 
+RO_freq = 6.8544e9
+qubit_freq = 6.48e9
+IF = -20e6        # RO modulation frequency
+mod_freq = -40e6  # Qubit pulse modulation frequency
+
+HS.set('mod_amp', .13)  # low power regime of VIPmon2
+HS.set('IF', IF)
+HS.set('frequency', RO_freq)  # Frequence of the RO resonator of qubit 2
+LO.set('power', 16)  # splitting gives 13dBm at both mixer LO ports
+LO.off()
+
+S1.off()
+S2.set('power', 14)
+S2.set('frequency', qubit_freq - mod_freq)
+S2.off()
+
+LutMan.set('f_modulation', mod_freq*1e-9)  # Lutman works in ns and GHz
+LutMan.set('gauss_width', 10)
+LutMan.set('amp180', 30)
+
+CBox.set('nr_averages', 2**14)
+# this is the max nr of averages that does not slow down the heterodyning
+CBox.set('nr_samples', 75)  # Shorter because of min marker spacing
 # Calibrated at 6.5GHz (18-1-2016)
-CBox.set_dac_offset(0, 1, 20.00)  # I channel qubit drive AWG
-CBox.set_dac_offset(0, 0, -24.00)  # Q channel
+CBox.set_dac_offset(0, 1, 18.81)  # I channel qubit drive AWG
+CBox.set_dac_offset(0, 0, -24.938)  # Q channel
 
 CBox.set_dac_offset(1, 1, 0)  # I channel
 CBox.set_dac_offset(1, 0, 0)  # Q channel readout AWG
@@ -106,14 +122,13 @@ w1 = np.round(sinI*120)
 CBox.set('sig0_integration_weights', w0)
 CBox.set('sig1_integration_weights', w1)
 
-CBox.set('integration_length', 140) # 280=1400 ns
+CBox.set('nr_averages', 16384)  # 2**14
+CBox.set('integration_length', 70)
 CBox.set('acquisition_mode', 0)
 CBox.set('lin_trans_coeffs', [1, 0, 0, 1])
 CBox.set('log_length', 200)
 
 t1 = time.time()
 
-IVVI.set('dac2', 318.028534371)
-IVVI.set('dac5', 27.4967574578)
 
 print('Ran initialization in %.2fs' % (t1-t0))

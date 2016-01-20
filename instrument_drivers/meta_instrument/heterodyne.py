@@ -8,8 +8,7 @@ from qcodes.instrument.base import Instrument
 from qcodes.utils import validators as vals
 
 # Used for uploading the right AWG sequences
-from modules.measurement.waveform_control import standard_sequences as st_seqs
-
+from modules.measurement.pulse_sequences import standard_sequences as st_seqs
 
 class HeterodyneInstrument(Instrument):
     '''
@@ -319,7 +318,7 @@ class LO_modulated_Heterodyne(HeterodyneInstrument):
         self._frequency = None
         self.set('IF', -10e6)
         self.set('mod_amp', .5)
-
+        self._disable_auto_seq_loading = False
         self._awg_seq_paramters_changed = True
         # internally used to reload awg sequence implicitly
 
@@ -332,11 +331,12 @@ class LO_modulated_Heterodyne(HeterodyneInstrument):
         if optimize == True it will optimze the acquisition time for a fixed
         t_int.
         '''
-        if (self._awg_seq_filename not in self.AWG.get('setup_filename') or
-                self._awg_seq_paramters_changed):
+        if ((self._awg_seq_filename not in self.AWG.get('setup_filename') or
+                self._awg_seq_paramters_changed) and
+                not self._disable_auto_seq_loading):
             self.seq_name = st_seqs.generate_and_upload_marker_sequence(
-                500e-9, 2e-6, RF_mod=True,
-                IF=self.get('IF'), mod_amp=self.get('mod_amp'))
+                500e-9, 20e-6, RF_mod=True,
+                IF=self.get('IF'), mod_amp=0.5)
         self.AWG.set('ch3_amp', self.get('mod_amp'))
         self.AWG.set('ch4_amp', self.get('mod_amp'))
         self.AWG.run()
@@ -358,7 +358,7 @@ class LO_modulated_Heterodyne(HeterodyneInstrument):
         self.LO.set('frequency', val-self.IF.get())
 
     def do_get_frequency(self):
-        LO_freq = self.LO.get_frequency()
+        LO_freq = self.LO.get('frequency')
         freq = LO_freq + self._IF
         return freq
 
