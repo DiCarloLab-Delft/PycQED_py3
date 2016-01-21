@@ -79,7 +79,7 @@ def fit_qubit_frequency(sweep_points, data, mode='dac',
 
 class MeasurementAnalysis(object):
 
-    def __init__(self, TwoD=False, folder=None, auto=False, **kw):
+    def __init__(self, TwoD=False, folder=None, auto=True, **kw):
         if folder is None:
             self.folder = a_tools.get_folder(**kw)
         else:
@@ -201,12 +201,13 @@ class MeasurementAnalysis(object):
     def get_values(self, key):
         if key in self.get_key('sweep_parameter_names'):
             names = self.get_key('sweep_parameter_names')
-            ind = np.where(names == key)[0]
+
+            ind = names.index(key)
             values = self.g['Data'].value[:, ind]
         elif key in self.get_key('value_names'):
             names = self.get_key('value_names')
-            ind = (np.where(names == key)[0] +
-                   len(self.get_key('sweep_parameter_names')))[0]
+            ind = (names.index(key) +
+                   len(self.get_key('sweep_parameter_names')))
             values = self.g['Data'].value[:, ind]
         else:
             values = self.g[key].value
@@ -318,10 +319,10 @@ class MeasurementAnalysis(object):
             # Preallocate the array of axes in the figure
             # Creates either a 2x2 grid or a vertical list
             if len(self.value_names) == 4:
-                fig, axs = plt.subplots(len(self.value_names)/2, 2,
-                                        figsize=(min(6*len(self.value_names),
-                                                 11),
-                                        1.5*len(self.value_names)))
+                fig, axs = plt.subplots(
+                    nrows=int(len(self.value_names)/2), ncols=2,
+                    figsize=(min(6*len(self.value_names), 11),
+                             1.5*len(self.value_names)))
             else:
                 fig, axs = plt.subplots(max(len(self.value_names), 1), 1,
                                         figsize=(5, 3*len(self.value_names)))
@@ -1180,7 +1181,8 @@ class SSRO_Analysis(MeasurementAnalysis):
 
         cumsum_diff = (abs(self.cumsum_1-self.cumsum_0))
         cumsum_diff_list = cumsum_diff.tolist()
-        self.index_V_opt_raw = cumsum_diff_list.index(np.max(cumsum_diff_list))
+        self.index_V_opt_raw = int(cumsum_diff_list.index(np.max(
+                                   cumsum_diff_list)))
         V_opt_raw = bins[self.index_V_opt_raw]+(bins[1]-bins[0])/2
         # adding half a bin size
         F_raw = cumsum_diff_list[self.index_V_opt_raw]
@@ -3546,7 +3548,7 @@ class butterfly_analysis(MeasurementAnalysis):
     '''
     Extracts the coefficients for the post-measurement butterfly
     '''
-    def __init__(self,  auto=False, label_exc='ind_exc', close_file=True,
+    def __init__(self,  auto=True, label_exc='ind_exc', close_file=True,
                  digitize=True, label_rel='ind_rel', timestamp_exc=None,
                  timestamp_rel=None, threshold_postselection=None,
                  postselection=False, **kw):
@@ -3627,7 +3629,7 @@ class butterfly_analysis(MeasurementAnalysis):
 class Tomo_Analysis(MeasurementAnalysis):
 
     def __init__(self, num_qubits=2, quad='IQ', over_complete_set=False,
-                 plot_oper=True, folder=None, auto=False, **kw):
+                 plot_oper=True, folder=None, auto=True, **kw):
         self.num_qubits = num_qubits
         self.num_states = 2**num_qubits
         self.over_complete_set = over_complete_set

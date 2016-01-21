@@ -38,7 +38,7 @@ class CBox_OffOn(swf.Hard_Sweep):
         self.IF = IF
         self.meas_pulse_delay = meas_pulse_delay
         self.RO_trigger_delay = RO_trigger_delay
-        self.parameter_name = 'Tape elment'
+        self.parameter_name = 'Tape element'
         self.unit = ''
         self.name = 'Off-On'
         self.tape = [0, 1]
