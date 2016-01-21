@@ -1,8 +1,7 @@
-import qt
 import numpy as np
 import time
 from modules.measurement import sweep_functions as swf
-from modules.measurement import AWG_sweep_functions as awg_swf
+from modules.measurement import awg_sweep_functions as awg_swf
 from modules.measurement import CBox_sweep_functions as CB_swf
 from modules.measurement import detector_functions as det
 from modules.analysis import measurement_analysis as MA
@@ -383,60 +382,61 @@ class Average_Readout_Contrast_CBox(det.Soft_Detector):
 
 
 
-class Average_Readout_Contrast_Multiplexed(det.Soft_Detector):
-    '''
-    This runs an on off sequence and gives back the average readout contrast
-    '''
+# class Average_Readout_Contrast_Multiplexed(det.Soft_Detector):
+#     '''
+#     This runs an on off sequence and gives back the average readout contrast
+#     '''
 
-    def __init__(self, idx, Duplexer=False, gauss_width=5,
-                 measurement_name=None, **kw):
-        # super(Average_Readout_Contrast, self).__init__()
-        self.detector_control = 'soft'
-        self.name = 'Average_Readout_Contrast'
-        self.value_names = ['Readout contrast']
-        self.value_units = [' ']
-        self.Duplexer = Duplexer
-        self.gauss_width = gauss_width
-        self.idx = idx
-        self.measurement_name = measurement_name
+#     def __init__(self, idx, Duplexer=False, gauss_width=5,
+#                  measurement_name=None, **kw):
+#         # super(Average_Readout_Contrast, self).__init__()
+#         self.detector_control = 'soft'
+#         self.name = 'Average_Readout_Contrast'
+#         self.value_names = ['Readout contrast']
+#         self.value_units = [' ']
+#         self.Duplexer = Duplexer
+#         self.gauss_width = gauss_width
+#         self.idx = idx
+#         self.measurement_name = measurement_name
 
-    def prepare(self, **kw):
-        imp.reload(MA)
-        self.MC_timedomain = qt.instruments.create('MC_timedomain',
-                                                   'MeasurementControl')
+#     def prepare(self, **kw):
+#         imp.reload(MA)
+#         self.MC_timedomain = qt.instruments.create('MC_timedomain',
+#                                                    'MeasurementControl')
 
-        self.MC_timedomain.set_sweep_function(
-            awg_swf.OnOff(Duplexer=self.Duplexer,
-                          gauss_width=self.gauss_width))
+#         self.MC_timedomain.set_sweep_function(
+#             awg_swf.OnOff(Duplexer=self.Duplexer,
+#                           gauss_width=self.gauss_width))
 
-        self.MC_timedomain.set_detector_function(
-            det.TimeDomainDetector_multiplexed_cal(
-                rotate_to_zero=False))
+#         self.MC_timedomain.set_detector_function(
+#             det.TimeDomainDetector_multiplexed_cal(
+#                 rotate_to_zero=False))
 
-    def acquire_data_point(self, *args, **kw):
-        if self.measurement_name is not None:
-            measurement_name = self.measurement_name
-        else:
-            measurement_name = 'OnOff_{}_{:.9}'.format(
-                self.measurement_name,
-                kw.pop('sweep_point', None))
-        print('measurement name is %s' %measurement_name)
-        self.MC_timedomain.run(name=measurement_name,
-                               debug_mode=True, suppress_print_statements=True)
-        self.OnOff_a = MA.OnOff_Analysis(idx=self.idx, auto=True)
+#     def acquire_data_point(self, *args, **kw):
+#         if self.measurement_name is not None:
+#             measurement_name = self.measurement_name
+#         else:
+#             measurement_name = 'OnOff_{}_{:.9}'.format(
+#                 self.measurement_name,
+#                 kw.pop('sweep_point', None))
+#         print('measurement name is %s' %measurement_name)
+#         self.MC_timedomain.run(name=measurement_name,
+#                                debug_mode=True, suppress_print_statements=True)
+#         self.OnOff_a = MA.OnOff_Analysis(idx=self.idx, auto=True)
 
-        contrast = self.OnOff_a.contrast
-        return np.array([contrast])
+#         contrast = self.OnOff_a.contrast
+#         return np.array([contrast])
 
-    def finish(self, **kw):
-        self.MC_timedomain.remove()
+#     def finish(self, **kw):
+#         self.MC_timedomain.remove()
 
 
 class SSRO_Fidelity_Detector_CBox(det.Soft_Detector):
     '''
     Currently only for CBox.
+    Todo: remove the predefined values for the sequence
     '''
-    def __init__(self, measurement_name=None, **kw):
+    def __init__(self, measurement_name, MC, AWG, CBox, raw=True, **kw):
         self.detector_control = 'soft'
         self.name = 'SSRO_Fidelity'
         # For an explanation of the difference between the different
@@ -444,108 +444,110 @@ class SSRO_Fidelity_Detector_CBox(det.Soft_Detector):
         self.value_names = ['F', 'F corrected']
         self.value_units = [' ', ' ']
         self.measurement_name = measurement_name
-        self.NoSamples = kw.get('NoSamples', 5000)
-        self.gauss_width = kw.get('gauss_width',10)
-        self.qubit_suffix = kw.get('qubit_suffix','')
+        self.NoSamples = kw.get('NoSamples', 8000)  # current max of log mode
+        self.MC = MC
+        self.CBox = CBox
+        self.AWG = AWG
+
+        self.IF = kw.pop('IF', -20e6)
+        self.mod_amp = kw.pop('mod_amp', 0.5)
+        self.RO_trigger_delay = kw.pop('RO_trigger_delay', -100e-9)
+        self.meas_pulse_delay = kw.pop('meas_pulse_delay', 300e-9)
+        self.i = 0
+
+        self.raw = raw  # Performs no fits if True
 
     def prepare(self, **kw):
-        self.MC_SSRO = qt.instruments.create('MC_SSRO', 'MeasurementControl')
-        self.MC_SSRO.set_sweep_function(awg_swf.OnOff(
-                                        gauss_width=self.gauss_width,
-                                        nr_segments=2))
-        #self.MC_SSRO.set_sweep_function(awg_swf.FPGA_OnOff())
-        self.MC_SSRO.set_detector_function(
-            det.QuTechCBox_AlternatingShots_Streaming_Detector(
-                NoSamples=self.NoSamples))
 
+        self.MC.set_sweep_function(awg_swf.CBox_OffOn(
+            IF=self.IF,
+            meas_pulse_delay=self.meas_pulse_delay,
+            RO_trigger_delay=self.RO_trigger_delay,
+            mod_amp=self.mod_amp, AWG=self.AWG, CBox=self.CBox))
 
-    def acquire_data_point(self, *args, **kw):
-        if self.measurement_name is not None:
-            measurement_name = self.measurement_name
-        else:
-            measurement_name = 'SSRO_Fid_{:.9}'.format(
-                kw.pop('sweep_point', None))
-        print('measurement name is %s' % measurement_name)
-        self.MC_SSRO.run(name=measurement_name)
-
-        t0 = time.time()
-        ana = MA.SSRO_Analysis(auto=True, close_file=True,
-                               label=measurement_name)
-        print('analyzing took %.2f' % ((time.time() - t0)))
-        ana.finish()
-        # Arbitrary choice, does not think about the deffinition
-        return ana.F, ana.F_corrected
-
-    def finish(self, **kw):
-        self.MC_SSRO.remove()
-
-
-
-
-class SSRO_Fidelity_Detector_ATS(det.Soft_Detector):
-    '''
-    SSRO fidelity measurement with ATS
-    '''
-    def __init__(self, measurement_name=None, no_fits=False, nr_measurements=1,
-                 **kw):
-        self.detector_control = 'soft'
-        self.name = 'SSRO_Fidelity'
-        if nr_measurements==2:
-            self.name = 'SSRO_Fidelity_2'
-        # For an explanation of the difference between the different
-        # Fidelities look in the analysis script
-        self.no_fits = no_fits
-        if self.no_fits:
-            print("data for nofits")
-            self.value_names = ['F_raw']
-            self.value_units = [' ']
-        else:
-            self.value_names = ['F', 'F corrected']
-            self.value_units = [' ', ' ']
-        self.measurement_name = measurement_name
-        self.gauss_width = kw.get('gauss_width',10)
-        self.qubit_suffix = kw.get('qubit_suffix','')
-        self.nr_measurements = nr_measurements
-        self.TD_Meas = qt.instruments['TD_Meas']
-
-    def prepare(self, **kw):
-        imp.reload(MA)
-        self.MC_SSRO = qt.instruments.create('MC_SSRO', 'MeasurementControl')
-        self.MC_SSRO.set_sweep_function(awg_swf.OnOff(
-                                    gauss_width=self.gauss_width,
-                                    qubit_suffix=self.qubit_suffix,
-                                    nr_segments=2,
-                                    nr_measurements=self.nr_measurements))
-        #self.MC_SSRO.set_sweep_points([np.linspace(1,2,2)])
-        self.TD_Meas.set_shot_mode(True)
-        self.TD_Meas.set_MC('MC_SSRO')
-        self.MC_SSRO.set_detector_function(det.TimeDomainDetector())
+        self.MC.set_detector_function(
+            det.CBox_alternating_shots_det(self.CBox, self.AWG))
 
     def acquire_data_point(self, *args, **kw):
-        if self.measurement_name is not None:
-            measurement_name = self.measurement_name
-        else:
-            measurement_name = 'SSRO_Fid_{:.9}'.format(
-                kw.pop('sweep_point', None))
-        print('measurement name is %s' % measurement_name)
-        self.MC_SSRO.run(name=measurement_name)
+        self.i += 1
+        self.MC.run(name=self.measurement_name+'_'+str(self.i))
 
-        t0 = time.time()
-        ana = MA.SSRO_Analysis(auto=True, close_file=True,
-                               label=measurement_name,
-                               no_fits=self.no_fits)
-        print('analyzing took %.2f' % ((time.time() - t0)))
-
+        ana = MA.SSRO_Analysis(label=self.measurement_name,
+                               no_fits=self.raw)
         # Arbitrary choice, does not think about the deffinition
-        if self.no_fits:
+        if self.raw:
             return ana.F_raw
         else:
             return ana.F, ana.F_corrected
 
-    def finish(self, **kw):
-        self.TD_Meas.set_MC('MC')
-        self.MC_SSRO.remove()
-        self.TD_Meas.set_shot_mode(False)
+
+
+
+
+# class SSRO_Fidelity_Detector_ATS(det.Soft_Detector):
+#     '''
+#     SSRO fidelity measurement with ATS
+#     '''
+#     def __init__(self, measurement_name=None, no_fits=False, nr_measurements=1,
+#                  **kw):
+#         self.detector_control = 'soft'
+#         self.name = 'SSRO_Fidelity'
+#         if nr_measurements==2:
+#             self.name = 'SSRO_Fidelity_2'
+#         # For an explanation of the difference between the different
+#         # Fidelities look in the analysis script
+#         self.no_fits = no_fits
+#         if self.no_fits:
+#             print("data for nofits")
+#             self.value_names = ['F_raw']
+#             self.value_units = [' ']
+#         else:
+#             self.value_names = ['F', 'F corrected']
+#             self.value_units = [' ', ' ']
+#         self.measurement_name = measurement_name
+#         self.gauss_width = kw.get('gauss_width',10)
+#         self.qubit_suffix = kw.get('qubit_suffix','')
+#         self.nr_measurements = nr_measurements
+#         self.TD_Meas = qt.instruments['TD_Meas']
+
+#     def prepare(self, **kw):
+#         imp.reload(MA)
+#         self.MC_SSRO = qt.instruments.create('MC_SSRO', 'MeasurementControl')
+#         self.MC_SSRO.set_sweep_function(awg_swf.OnOff(
+#                                     gauss_width=self.gauss_width,
+#                                     qubit_suffix=self.qubit_suffix,
+#                                     nr_segments=2,
+#                                     nr_measurements=self.nr_measurements))
+#         #self.MC_SSRO.set_sweep_points([np.linspace(1,2,2)])
+#         self.TD_Meas.set_shot_mode(True)
+#         self.TD_Meas.set_MC('MC_SSRO')
+#         self.MC_SSRO.set_detector_function(det.TimeDomainDetector())
+
+#     def acquire_data_point(self, *args, **kw):
+#         if self.measurement_name is not None:
+#             measurement_name = self.measurement_name
+#         else:
+#             measurement_name = 'SSRO_Fid_{:.9}'.format(
+#                 kw.pop('sweep_point', None))
+#         print('measurement name is %s' % measurement_name)
+#         self.MC_SSRO.run(name=measurement_name)
+
+#         t0 = time.time()
+#         ana = MA.SSRO_Analysis(auto=True, close_file=True,
+#                                label=measurement_name,
+#                                no_fits=self.no_fits)
+#         print('analyzing took %.2f' % ((time.time() - t0)))
+
+#         # Arbitrary choice, does not think about the deffinition
+#         if self.no_fits:
+#             return ana.F_raw
+#         else:
+#             return ana.F, ana.F_corrected
+
+#     def finish(self, **kw):
+#         self.TD_Meas.set_MC('MC')
+#         self.MC_SSRO.remove()
+#         self.TD_Meas.set_shot_mode(False)
 
 
 class SSRO_Fidelity_Detector_CBox_optimum_weights(det.Soft_Detector):

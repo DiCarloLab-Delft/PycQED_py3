@@ -190,12 +190,14 @@ class MeasurementAnalysis(object):
             self.f = [self.default_fig() for fig in range(main_figs)]
             self.ax = [self.f[k].add_subplot(111) for k in range(main_figs)]
         val_len = len(self.value_names)
-        if val_len < 4:
-            self.figarray, self.axarray = plt.subplots(val_len, 1,
-                                                       figsize=(8, 4*val_len))
+        if val_len == 4:
+            self.figarray, self.axarray = plt.subplots(
+                val_len, 1, figsize=(min(6*len(self.value_names), 11),
+                                     1.5*len(self.value_names)))
         else:
-            self.figarray, self.axarray = plt.subplots((val_len+1)/2, 2,
-                                                       figsize=(11, 2*val_len))
+            self.figarray, self.axarray = plt.subplots(
+                max(len(self.value_names), 1), 1,
+                figsize=(5, 3*len(self.value_names)))
         return tuple(self.f + [self.figarray] + self.ax + [self.axarray])
 
     def get_values(self, key):
@@ -956,12 +958,12 @@ class SSRO_Analysis(MeasurementAnalysis):
     the optimum threshold and fidelity from cumulative histograms.
     '''
 
-    def __init__(self, label='SSRO_char', **kw):
-        kw['label'] = label
+    def __init__(self, **kw):
         kw['h5mode'] = 'r+'
         super(self.__class__, self).__init__(**kw)
 
-    def run_default_analysis(self, rotate=True, no_fits=False, print_fit_results=False, **kw):
+    def run_default_analysis(self, rotate=True, no_fits=False,
+                             print_fit_results=False, **kw):
 
         self.add_analysis_datagroup_to_file()
         self.no_fits = no_fits
@@ -1007,10 +1009,9 @@ class SSRO_Analysis(MeasurementAnalysis):
                               **kw)
         self.finish(**kw)
 
-
-
     def optimize_IQ_angle(self, shots_I_data_1, shots_Q_data_1, shots_I_data_0,
-                          shots_Q_data_0, min_len, **kw):
+                          shots_Q_data_0, min_len, plot_2D_histograms=True,
+                          **kw):
         #plotting 2D histograms of mmts with pulse
 
         # FIXME OVERLAP AND GENERAL LOOKS
@@ -1018,55 +1019,51 @@ class SSRO_Analysis(MeasurementAnalysis):
         V_max_I1 = np.max(abs(shots_I_data_1))
         V_max_Q0 = np.max(abs(shots_Q_data_0))
         V_max_Q1 = np.max(abs(shots_Q_data_1))
-        V_max=np.max([V_max_I0,V_max_I1,V_max_Q0,V_max_Q1])*1.1
+        V_max = np.max([V_max_I0, V_max_I1, V_max_Q0, V_max_Q1])*1.1
 
         # determining the amount of bins
-        n_bins_range = 60 #the bins we want to have around our data
+        n_bins_range = 60  # the bins we want to have around our data
         V_range_I_0 = np.max(shots_I_data_0)-np.min(shots_I_data_0)             # data voltagerange
         V_range_Q_0 = np.max(shots_Q_data_0)-np.min(shots_Q_data_0)
         V_range_I_1 = np.max(shots_I_data_1)-np.min(shots_I_data_1)             # data voltagerange
         V_range_Q_1 = np.max(shots_Q_data_1)-np.min(shots_Q_data_1)
-        V_range = np.max([V_range_I_0 , V_range_Q_0, V_range_I_1 , V_range_Q_1])
-        print('V_max', V_max)
-        print('V_range', V_range)
-
-        n_bins=n_bins_range*2*V_max/V_range
-        print("n_bins", n_bins)
-
-        H1, xedges1, yedges1 = np.histogram2d(shots_I_data_1, shots_Q_data_1, bins=n_bins,
-                                              range=[[-V_max,V_max],[-V_max,V_max]])
-        #fig, axarray = plt.subplots(nrows=1, ncols=2)
-        #plt.tick_params(axis='both', which='major', labelsize=5)
-        fig, axarray = plt.subplots(nrows=1, ncols=2)
-        axarray[0].tick_params(axis='both', which='major', labelsize=5, direction='out')
-        axarray[1].tick_params(axis='both', which='major', labelsize=5, direction = 'out')
-        # fig.tight_layout()
-
-        plt.subplots_adjust(hspace=20)
-        #plt.tick_params(axis='both', which='major', labelsize=5)
-
-        axarray[0].set_title('2D histogram, pi pulse',fontsize=5)
-        im1 = axarray[0].imshow(H1, interpolation='nearest', origin='low',
-                                extent=[xedges1[0], xedges1[-1],
-                                yedges1[0], yedges1[-1]])
-        axarray[0].set_xlabel('DAC voltage I integrated (V)',fontsize=5)
-        axarray[0].set_ylabel('DAC voltage Q integrated (V)',fontsize=5)
-
-        #plotting 2D histograms of mmts with no pulse
+        V_range = np.max([V_range_I_0, V_range_Q_0, V_range_I_1, V_range_Q_1])
+        n_bins = n_bins_range*2*V_max/V_range
+        H1, xedges1, yedges1 = np.histogram2d(shots_I_data_1, shots_Q_data_1,
+                                              bins=n_bins,
+                                              range=[[-V_max, V_max],
+                                                     [-V_max, V_max]])
         H0, xedges0, yedges0 = np.histogram2d(shots_I_data_0, shots_Q_data_0,
                                               bins=n_bins,
-                                              range=[[-V_max,V_max],[-V_max,V_max]])
+                                              range=[[-V_max, V_max],
+                                                     [-V_max, V_max]])
 
-        # fig = plt.figure(figsize=(20, 20))
-        # ax = fig.add_subplot(131)
-        axarray[1].set_title('2D histogram, no pi pulse', fontsize=5)
-        im0 = axarray[1].imshow(H0, interpolation='nearest', origin='low',
-                                extent=[xedges0[0], xedges0[-1], yedges0[0],
-                                yedges0[-1]])
-        axarray[1].set_xlabel('DAC voltage I integrated (V)', fontsize=5)
-        axarray[1].set_ylabel('DAC voltage Q integrated (V)', fontsize=5)
 
-        self.save_fig(fig, figname='SSRO_Density_Plots', **kw)
+        if plot_2D_histograms:
+            fig, axarray = plt.subplots(nrows=1, ncols=2)
+            axarray[0].tick_params(axis='both', which='major',
+                                   labelsize=5, direction='out')
+            axarray[1].tick_params(axis='both', which='major',
+                                   labelsize=5, direction='out')
+
+            plt.subplots_adjust(hspace=20)
+
+            axarray[0].set_title('2D histogram, pi pulse',fontsize=5)
+            im1 = axarray[0].imshow(H1, interpolation='nearest', origin='low',
+                                    extent=[xedges1[0], xedges1[-1],
+                                    yedges1[0], yedges1[-1]])
+            axarray[0].set_xlabel('DAC voltage I integrated (V)', fontsize=5)
+            axarray[0].set_ylabel('DAC voltage Q integrated (V)', fontsize=5)
+
+            # plotting 2D histograms of mmts with no pulse
+            axarray[1].set_title('2D histogram, no pi pulse', fontsize=5)
+            im0 = axarray[1].imshow(H0, interpolation='nearest', origin='low',
+                                    extent=[xedges0[0], xedges0[-1], yedges0[0],
+                                    yedges0[-1]])
+            axarray[1].set_xlabel('DAC voltage I integrated (V)', fontsize=5)
+            axarray[1].set_ylabel('DAC voltage Q integrated (V)', fontsize=5)
+
+            self.save_fig(fig, figname='SSRO_Density_Plots', **kw)
 
         #this part performs 2D gaussian fits and calculates coordinates of the maxima
         def gaussian(height, center_x, center_y, width_x, width_y):
@@ -1125,40 +1122,44 @@ class SSRO_Analysis(MeasurementAnalysis):
         shots_Q_data_0_rot = np.sin(theta)*shots_I_data_0 + np.cos(theta)*shots_Q_data_0
 
         #plotting the histograms before rotation
-        fig, axes = plt.subplots(figsize=(10,10))
-        axes.hist(shots_Q_data_1, bins=40, label = '1 Q',histtype='step',normed=1)
-        axes.hist(shots_Q_data_0, bins=40, label = '0 Q',histtype='step',normed=1)
-        axes.hist(shots_I_data_1, bins=40, label = '1 I',histtype='step',normed=1)
-        axes.hist(shots_I_data_0, bins=40, label = '0 I',histtype='step',normed=1)
+        fig, axes = plt.subplots()
+        axes.hist(shots_Q_data_1, bins=40, label='1 Q',
+                  histtype='step', normed=1)
+        axes.hist(shots_Q_data_0, bins=40, label='0 Q',
+                  histtype='step', normed=1)
+        axes.hist(shots_I_data_1, bins=40, label='1 I',
+                  histtype='step', normed=1)
+        axes.hist(shots_I_data_0, bins=40, label='0 I',
+                  histtype='step', normed=1)
 
         axes.set_title('Histograms of shots on IQ plane as measured, %s shots'%min_len)
-        plt.xlabel('DAQ voltage integrated (AU)', fontsize=14)
+        plt.xlabel('DAQ voltage integrated (a.u.)', fontsize=14)
         plt.ylabel('Fraction', fontsize=14)
 
-        #plt.hist(SS_Q_data, bins=40,label = '0 Q')
+        #plt.hist(SS_Q_data, bins=40,label='0 Q')
         plt.legend()
         self.save_fig(fig, figname='raw-histograms', **kw)
         plt.show()
 
         #plotting the histograms after rotation
-        fig, axes = plt.subplots(figsize=(10,10))
-        axes.hist(shots_Q_data_1_rot, bins=40, label = '1 Q',histtype='step',normed=1)
-        axes.hist(shots_Q_data_0_rot, bins=40, label = '0 Q',histtype='step',normed=1)
-        axes.hist(shots_I_data_1_rot, bins=40, label = '1 I',histtype='step',normed=1)
-        axes.hist(shots_I_data_0_rot, bins=40, label = '0 I',histtype='step',normed=1)
+        fig, axes = plt.subplots()
+        axes.hist(shots_I_data_1_rot, bins=40, label='|1>',
+                  histtype='step', normed=1, color='r')
+        axes.hist(shots_I_data_0_rot, bins=40, label='|0>',
+                  histtype='step', normed=1, color='b')
 
-        axes.set_title('Histograms of shots on rotaded IQ plane optimized for I, %s shots'%min_len)
-        plt.xlabel('DAQ voltage integrated (AU)', fontsize=14)
+        axes.set_title('Histograms of shots on rotaded IQ plane, %s shots' %
+                       min_len)
+        plt.xlabel('DAQ voltage integrated (a.u.)', fontsize=14)
         plt.ylabel('Fraction', fontsize=14)
 
-        #plt.hist(SS_Q_data, bins=40,label = '0 Q')
         plt.legend()
         self.save_fig(fig, figname='rotated-histograms', **kw)
         plt.show()
         return(theta, shots_I_data_1_rot, shots_I_data_0_rot)
 
     def no_fits_analysis(self, shots_I_data_1_rot, shots_I_data_0_rot, min_len,
-                     **kw):
+                         **kw):
         min_voltage_1 = np.min(shots_I_data_1_rot)
         min_voltage_0 = np.min(shots_I_data_0_rot)
         min_voltage = np.min([min_voltage_1, min_voltage_0])
@@ -1187,14 +1188,14 @@ class SSRO_Analysis(MeasurementAnalysis):
         # adding half a bin size
         F_raw = cumsum_diff_list[self.index_V_opt_raw]
 
-        fig, axes = plt.subplots(figsize=(10, 10))
-        #axes.plot(bins[0:-1], hist_1,label='hist1')
-        axes.plot(bins[0:-1], self.cumsum_1, label='cumsum_1')
-        axes.plot(bins[0:-1], self.cumsum_0, label='cumsum_0, F_raw = '+str(F_raw))
-        axes.axvline(V_opt_raw, ls='--', label="V_opt_raw = "+str(V_opt_raw),
+        fig, ax = plt.subplots()
+        ax.plot(bins[0:-1], self.cumsum_1, label='cumsum_1', color='red')
+        ax.plot(bins[0:-1], self.cumsum_0, label='cumsum_0', color='blue')
+        ax.axvline(V_opt_raw, ls='--', label="V_opt_raw = %.3f" % V_opt_raw,
                    linewidth=2, color='grey')
-        #axes.plot(bins[0:-1], cumsum_diff,label='cumsum_diff')
-        axes.set_title('raw cumulative histograms')
+        ax.text(.7, .6, 'F-raw = %.4f' % F_raw, transform=ax.transAxes,
+                fontsize='large')
+        ax.set_title('raw cumulative histograms')
         plt.xlabel('DAQ voltage integrated (AU)', fontsize=14)
         plt.ylabel('Fraction', fontsize=14)
 
