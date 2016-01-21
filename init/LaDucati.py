@@ -36,7 +36,7 @@ import instrument_drivers.meta_instrument.CBox_LookuptableManager as lm
 
 # Initializing instruments
 
-SH = sh.SignalHound_USB_SA124B('Signal hound')
+# SH = sh.SignalHound_USB_SA124B('Signal hound') #commented because of 8s load time
 CBox = qcb.QuTech_ControlBox('CBox', address='Com3', run_tests=False)
 
 
@@ -52,7 +52,7 @@ IVVI = iv.IVVI('IVVI', address='ASRL1', numdacs=16)
 # Meta-instruments
 HS = hd.LO_modulated_Heterodyne('HS', LO=LO, CBox=CBox, AWG=AWG)
 LutMan = lm.QuTech_ControlBox_LookuptableManager('LutMan', CBox)
-station = qc.Station(LO, S1, AWG, CBox, HS, SH, IVVI)
+station = qc.Station(LO, S1, AWG, CBox, HS, IVVI)
 MC = mc.MeasurementControl('MC')
 MC.station = station
 station.MC = MC

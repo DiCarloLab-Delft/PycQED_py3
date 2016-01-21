@@ -4,8 +4,6 @@ from . import defHeaders
 CBox = None
 
 
-
-
 class CBox_tests(unittest.TestCase):
     '''
     This is a test suite for testing the QuTech_ControlBox Instrument.
@@ -26,7 +24,6 @@ class CBox_tests(unittest.TestCase):
         self.assertTrue(int(v[1]) == 2)  # major version
         self.assertTrue(int(int(v[3:5])) > 13)  # minor version
 
-
     def test_setting_mode(self):
         for i in range(6):
             self.CBox.set('acquisition_mode', i)
@@ -44,11 +41,10 @@ class CBox_tests(unittest.TestCase):
 
         for j in range(3):
             for i in range(3):
-                self.CBox.set('AWG_{}_mode'.format(j), i)
-                self.assertEqual(self.CBox.get('AWG_{}_mode'.format(j)),
+                self.CBox.set('AWG{}_mode'.format(j), i)
+                self.assertEqual(self.CBox.get('AWG{}_mode'.format(j)),
                                  defHeaders.awg_modes[i])
-                self.CBox.set('AWG_{}_mode'.format(j), 0)
-
+                self.CBox.set('AWG{}_mode'.format(j), 0)
 
     def test_codec(self):
         # codec is CBox.c
@@ -123,12 +119,22 @@ class CBox_tests(unittest.TestCase):
         self.assertEqual(self.CBox.get('adc_offset'), -123)
         self.CBox.set('adc_offset', offs)
 
-    # def test_dac_offset(self):
-    #     for i in range(3):
-    #         initial_val = self.CBox.get('AWG_{}_dac_offset'.format(i))
-    #         self.CBox.set('AWG_{}_dac_offset'.format(i), 200)
-    #         self.assertEqual(self.CBox.get('AWG_{}_dac_offset'.format(i)), 200)
-    #         self.CBox.set('AWG_{}_dac_offset'.format(i), initial_val)
+    def test_dac_offset(self):
+        for i in range(3):
+            for j in range(2):
+                initial_val = self.CBox.get('AWG{}_dac{}_offset'.format(i, j))
+                self.CBox.set('AWG{}_dac{}_offset'.format(i, j), 200)
+                self.assertEqual(
+                    self.CBox.get('AWG{}_dac{}_offset'.format(i, j)), 200)
+                self.CBox.set('AWG{}_dac{}_offset'.format(i, j), initial_val)
+
+    def test_tape(self):
+        for i in range(3):
+            tape = [2, 4, 5, 1, 0, 3]
+            initial_val = self.CBox.get('AWG{}_tape'.format(i))
+            self.CBox.set('AWG{}_tape'.format(i), tape)
+            self.assertEqual(self.CBox.get('AWG{}_tape'.format(i)), tape)
+            self.CBox.set('AWG{}_tape'.format(i), initial_val)
 
     def test_log_length(self):
         initial_val = self.CBox.get('log_length')
@@ -215,23 +221,23 @@ class CBox_tests(unittest.TestCase):
         self.CBox.set('nr_samples', NoSamples)
 
         self.CBox.set('acquisition_mode', 4)
-        [InputAvgRes0, InputAvgRes1] = self.CBox.get_integrated_avg_results()
+        [InputAvgRes0, IntAvgRes1] = self.CBox.get_integrated_avg_results()
         self.CBox.set('acquisition_mode', 0)
         # Test signal lengths set correctly
         self.assertEqual(len(InputAvgRes0), NoSamples)
         # Test if setting weights to zero functions correctly
-        self.assertTrue((InputAvgRes1 == np.zeros(NoSamples)).all())
+        self.assertTrue((IntAvgRes1 == np.zeros(NoSamples)).all())
 
         weights1 = np.ones(512) * 1
         self.CBox.set('sig1_integration_weights', weights1)
         self.CBox.set('lin_trans_coeffs', [0, 0, 0, 1])
         self.CBox.set('acquisition_mode', 4)
-        [InputAvgRes0, InputAvgRes1] = self.CBox.get_integrated_avg_results()
+        [InputAvgRes0, IntAvgRes1] = self.CBox.get_integrated_avg_results()
         self.CBox.set('acquisition_mode', 0)
 
         # Test if setting lin trans coeff to zero functions correctly
         self.assertTrue((InputAvgRes0 == np.zeros(NoSamples)).all())
-        self.assertFalse((InputAvgRes1 == np.zeros(NoSamples)).all())
+        self.assertFalse((IntAvgRes1 == np.zeros(NoSamples)).all())
 
     # def test_streaming_mode(self):
 

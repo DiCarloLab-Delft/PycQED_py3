@@ -30,6 +30,44 @@ class CBox_T1(swf.Hard_Sweep):
             self.AWG.set('ch4_amp', self.mod_amp)
 
 
+class CBox_OffOn(swf.Hard_Sweep):
+    def __init__(self, IF, meas_pulse_delay, RO_trigger_delay, mod_amp,
+                 AWG, CBox,
+                 upload=True):
+        super().__init__()
+        self.IF = IF
+        self.meas_pulse_delay = meas_pulse_delay
+        self.RO_trigger_delay = RO_trigger_delay
+        self.parameter_name = 'Tape elment'
+        self.unit = ''
+        self.name = 'Off-On'
+        self.tape = [0, 1]
+        self.sweep_points = np.array(self.tape)  # array for transpose in MC
+        self.AWG = AWG
+        self.CBox = CBox
+        self.mod_amp = mod_amp
+        # would actually like to check if file is already loaded
+        # filename can be get using AWG.get('setup_filename')
+        self.upload = upload
+
+    def prepare(self, **kw):
+        self.AWG.stop()
+        self.CBox.AWG0_mode.set('Tape')
+        self.CBox.AWG1_mode.set('Tape')
+        self.CBox.restart_awg_tape(0)
+        self.CBox.restart_awg_tape(1)
+        self.CBox.set('AWG0_tape', self.tape)
+        self.CBox.set('AWG1_tape', self.tape)
+
+        if self.upload:
+            st_seqs.CBox_single_pulse_seq(
+                IF=self.IF,
+                meas_pulse_delay=self.meas_pulse_delay,
+                RO_trigger_delay=self.RO_trigger_delay, verbose=False)
+            self.AWG.set('ch3_amp', self.mod_amp)
+            self.AWG.set('ch4_amp', self.mod_amp)
+
+
 # class AWG_Sweep(swf.Hard_Sweep):
 #     def __init__(self, Duplexer=False, **kw):
 #         self.sweep_control = 'hard'

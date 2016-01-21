@@ -148,23 +148,23 @@ class QuTech_ControlBox_tests(unittest.TestCase):
         self.assertEqual(self.CBox.get_avg_size(), AvgSize)
 
         self.CBox.set_acquisition_mode(4)
-        [InputAvgRes0, InputAvgRes1] = self.CBox.get_integrated_avg_results()
+        [InputAvgRes0, IntAvgRes1] = self.CBox.get_integrated_avg_results()
         self.CBox.set_acquisition_mode(0)
         # Test signal lengths set correctly
         self.assertEqual(len(InputAvgRes0), NoSamples)
         # Test if setting weights to zero functions correctly
-        self.assertTrue((InputAvgRes1 == np.zeros(NoSamples)).all())
+        self.assertTrue((IntAvgRes1 == np.zeros(NoSamples)).all())
 
         weights1 = np.ones(512) * 1
         self.CBox.set_integration_weights(line=1, weights=weights1)
         self.CBox.set_lin_trans_coeffs(0, 0, 0, 1)
         self.CBox.set_acquisition_mode(4)
-        [InputAvgRes0, InputAvgRes1] = self.CBox.get_integrated_avg_results()
+        [InputAvgRes0, IntAvgRes1] = self.CBox.get_integrated_avg_results()
         self.CBox.set_acquisition_mode(0)
 
         # Test if setting lin trans coeff to zero functions correctly
         self.assertTrue((InputAvgRes0 == np.zeros(NoSamples)).all())
-        self.assertFalse((InputAvgRes1 == np.zeros(NoSamples)).all())
+        self.assertFalse((IntAvgRes1 == np.zeros(NoSamples)).all())
 
     def test_streaming_mode(self):
 

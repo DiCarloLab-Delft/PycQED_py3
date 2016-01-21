@@ -107,19 +107,29 @@ class QuTech_ControlBox(VisaInstrument):
         self._nr_averages = 2
         self._nr_samples = 200
         nr_awgs = 3
-        for i in range(nr_awgs):
+        for awg_nr in range(nr_awgs):
             self._awg_mode = [0]*nr_awgs
-            self.add_parameter('AWG_{}_mode'.format(i),
-                               get_cmd=self._gen_awg_mode_get_func(i),
-                               set_cmd=self._gen_awg_mode_set_func(i),
-                               vals=vals.Anything())
-            # for j in range(2):
-            #     self.add_parameter(
-            #         'AWG{}_dac{}_offset'.format(i,j),
-            #         label='Dac offset AWG {}', units='mV',
-            #         get_cmd=self._gen_ch_get_func(self.get_dac_offset, i),
-            #         set_cmd=self._gen_ch_set_func(self.set_dac_offset, i),
-            #         vals=vals.Ints(-999, 999))
+            self._tape = [[0]]*nr_awgs
+            self.add_parameter(
+                'AWG{}_mode'.format(awg_nr),
+                get_cmd=self._gen_awg_mode_get_func(awg_nr),
+                set_cmd=self._gen_awg_mode_set_func(awg_nr),
+                vals=vals.Anything())
+            self.add_parameter(
+                'AWG{}_tape'.format(awg_nr),
+                get_cmd=self._gen_ch_get_func(self._get_awg_tape, awg_nr),
+                set_cmd=self._gen_ch_set_func(self._set_awg_tape, awg_nr),
+                vals=vals.Anything())
+
+            for dac_ch in range(2):
+                self.add_parameter(
+                    'AWG{}_dac{}_offset'.format(awg_nr, dac_ch),
+                    label='Dac offset AWG {}', units='mV',
+                    get_cmd=self._gen_sub_ch_get_func(self.get_dac_offset,
+                                                      awg_nr, dac_ch),
+                    set_cmd=self._gen_sub_ch_set_func(self.set_dac_offset,
+                                                      awg_nr, dac_ch),
+                    vals=vals.Numbers(-999, 999))
             # Need to add double wrapping for get/set funcs here
 
         self.add_parameter('measurement_timeout', units='s',
@@ -595,17 +605,21 @@ class QuTech_ControlBox(VisaInstrument):
             raise Exception('Failed to set AWG lookup table')
         return (stat, mesg)
 
-    def set_awg_tape(self, awg_nr, length, tape):
+    def _get_awg_tape(self, awg_nr):
+        '''
+        Retruns the tape that was last set as stored in memory
+        '''
+        return self._tape[awg_nr]
+
+    def _set_awg_tape(self, awg_nr, tape):
         '''
         set the tape content for an awg
 
         @param awg : the awg of the dac, (0,1,2).
-        @param length : the length in samples of the tape entries, (1,2^12-1)
         @param tape : the array of pulse numbers, (0, 7)
         @return stat : 0 if the upload succeeded and 1 if the upload failed.
-
         '''
-
+        length = len(tape)
         # Check out of bounds
         if awg_nr < 0 or awg_nr > 2:
             raise ValueError
@@ -614,16 +628,18 @@ class QuTech_ControlBox(VisaInstrument):
         if length != len(tape):
             raise ValueError
         cmd = defHeaders.AwgTapeHeader
-        data_bytes = bytearray()
-        data_bytes.extend(c.encode_byte(awg_nr, 4,
-                          expected_number_of_bytes=1))
-        data_bytes.extend(c.encode_byte(length, 7,
-                          expected_number_of_bytes=2))
+        data_bytes = bytes()
+        data_bytes += (c.encode_byte(awg_nr, 4,
+                       expected_number_of_bytes=1))
+        data_bytes += (c.encode_byte(length, 7,
+                       expected_number_of_bytes=2))
 
-        data_bytes.extend(c.encode_array(tape, 4, 1))
+        data_bytes += (c.encode_array(tape, 4, 1))
 
         message = c.create_message(cmd, data_bytes)
         (stat, mesg) = self.serial_write(message)
+        self._tape[awg_nr] = tape  # updates the software version of the tape
+
         return (stat, mesg)
 
     def restart_awg_tape(self, awg_nr):
@@ -635,8 +651,8 @@ class QuTech_ControlBox(VisaInstrument):
         '''
 
         cmd = defHeaders.AwgRestartTapeHeader
-        data_bytes = bytearray()
-        data_bytes.extend(c.encode_byte(awg_nr, 4, 1))
+        data_bytes = bytes()
+        data_bytes += (c.encode_byte(awg_nr, 4, 1))
         message = c.create_message(cmd, data_bytes)
         (stat, mesg) = self.serial_write(message)
         if not stat:
@@ -1216,21 +1232,6 @@ class QuTech_ControlBox(VisaInstrument):
         else:
             return True
 
-    def restart_awg_tape(self, awg_nr):
-        '''
-        Reset the tape pointer of specified awg to 0.
-
-        @param awg_nr : the awg of the dac, (0,1,2).
-        @return stat : 0 if the upload succeeded and 1 if the upload failed.
-        '''
-        cmd = defHeaders.AwgRestartTapeHeader
-        data_bytes = bytearray()
-        data_bytes.extend(c.encode_byte(awg_nr, 4, 1))
-        message = c.create_message(cmd, data_bytes)
-        (stat, mesg) = self.serial_write(message)
-        if not stat:
-            raise Exception('Failed to restart awg tape')
-        return stat
 
     def _wrap_ch_set_fun(self, function, channel):
         def channel_specific_function(value):
@@ -1631,4 +1632,15 @@ class QuTech_ControlBox(VisaInstrument):
     def _gen_ch_get_func(self, fun, ch):
         def get_func():
             return fun(ch)
+        return get_func
+
+    #  Required because set and get funcs don't currently allow optional args
+    def _gen_sub_ch_set_func(self, fun, ch, sub_ch):
+        def set_func(val):
+            return fun(ch, sub_ch, val)
+        return set_func
+
+    def _gen_sub_ch_get_func(self, fun, ch, sub_ch):
+        def get_func():
+            return fun(ch, sub_ch)
         return get_func
