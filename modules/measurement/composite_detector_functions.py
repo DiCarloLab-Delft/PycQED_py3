@@ -454,7 +454,7 @@ class SSRO_Fidelity_Detector_CBox(det.Soft_Detector):
         self.AWG = AWG
 
         self.IF = kw.pop('IF', -20e6)
-        self.mod_amp = kw.pop('mod_amp', 0.5)
+        self.mod_amp = kw.pop('mod_amp', 0.5)  # FIXME: Not used, need to remove
         self.RO_trigger_delay = kw.pop('RO_trigger_delay', -100e-9)
         self.meas_pulse_delay = kw.pop('meas_pulse_delay', 300e-9)
         self.i = 0
@@ -485,7 +485,47 @@ class SSRO_Fidelity_Detector_CBox(det.Soft_Detector):
             return ana.F, ana.F_corrected
 
 
+class AllXY_devition_detector_CBox(det.Soft_Detector):
+    '''
+    Currently only for CBox.
+    Todo: remove the predefined values for the sequence
+    '''
+    def __init__(self, measurement_name, MC, AWG, CBox, **kw):
+        self.detector_control = 'soft'
+        self.name = 'AllXY_dev_i'
+        # For an explanation of the difference between the different
+        # Fidelities look in the analysis script
+        self.value_names = ['Avg deviation']
+        self.value_units = ['']
+        self.measurement_name = measurement_name
+        self.NoSamples = kw.get('NoSamples', 8000)  # current max of log mode
+        self.MC = MC
+        self.CBox = CBox
+        self.AWG = AWG
 
+        self.IF = kw.pop('IF', -20e6)
+        self.RO_trigger_delay = kw.pop('RO_trigger_delay', -100e-9)
+        self.meas_pulse_delay = kw.pop('meas_pulse_delay', 300e-9)
+        self.interpulse_delay = kw.pop('interpulse_delay', 80e-9)
+
+    def prepare(self, **kw):
+        self.i = 0
+        self.MC.set_sweep_function(awg_swf.CBox_AllXY(
+                                   IF=self.IF,
+                                   interpulse_delay=self.interpulse_delay,
+                                   meas_pulse_delay=self.meas_pulse_delay,
+                                   RO_trigger_delay=self.RO_trigger_delay,
+                                   AWG=self.AWG, CBox=self.CBox))
+        self.MC.set_detector_function(
+            det.CBox_integrated_average_detector(self.CBox, self.AWG))
+
+    def acquire_data_point(self, *args, **kw):
+        self.i += 1
+        self.MC.run(name=self.measurement_name+'_'+str(self.i))
+
+        ana = MA.AllXY_Analysis(label=self.measurement_name)
+        avg_dev = ana.deviation_total/21
+        return avg_dev
 
 
 # class SSRO_Fidelity_Detector_ATS(det.Soft_Detector):
@@ -1102,189 +1142,189 @@ class Photon_number_detector(det.Soft_Detector):
 
 
 
-class AllXY_deviation_detector(det.Soft_Detector):
-    '''
-    Performs an All XY measurement and returns the deviation to the ideal
-    expected shape.
+# class AllXY_deviation_detector(det.Soft_Detector):
+#     '''
+#     Performs an All XY measurement and returns the deviation to the ideal
+#     expected shape.
 
-    '''
-    def __init__(self, measurement_name=None, data_acquisition='ATS',
-                 driving='CBox', CLEAR_double=False, optimize_on_ground=True,
-                 source_name='S2',
-                 sequence="AllXY", prepi=False, **kw):
-        self.detector_control = 'soft'
-        self.name = '%s_deviation' % sequence
+#     '''
+#     def __init__(self, measurement_name=None, data_acquisition='ATS',
+#                  driving='CBox', CLEAR_double=False, optimize_on_ground=True,
+#                  source_name='S2',
+#                  sequence="AllXY", prepi=False, **kw):
+#         self.detector_control = 'soft'
+#         self.name = '%s_deviation' % sequence
 
-        self.data_acquisition = data_acquisition
-        self.measurement_name = measurement_name
-        self.TD_Meas = qt.instruments['TD_Meas']
-        self.driving = driving
-        self.optimize_on_ground = optimize_on_ground
-        self.CLEAR_double = CLEAR_double
-        if self.CLEAR_double:
-            self.value_names = ['%s error sum' % sequence, "error ground",
-                                "error excited"]
-            self.value_units = ['a.u.', 'a.u.', 'a.u.']
-        else:
-            if optimize_on_ground:
-                self.state = "ground"
-            else:
-                self.state = "excited"
-            self.value_names = ['%s error (%s)' % (sequence, self.state)]
-            self.value_units = ['a.u.']
-        print("measurement_name", measurement_name)
-        self.source = qt.instruments[source_name]
-        self.prepi = prepi
-        self.sweep_function = awg_swf.AllXY(sequence=sequence, prepi=self.prepi)
+#         self.data_acquisition = data_acquisition
+#         self.measurement_name = measurement_name
+#         self.TD_Meas = qt.instruments['TD_Meas']
+#         self.driving = driving
+#         self.optimize_on_ground = optimize_on_ground
+#         self.CLEAR_double = CLEAR_double
+#         if self.CLEAR_double:
+#             self.value_names = ['%s error sum' % sequence, "error ground",
+#                                 "error excited"]
+#             self.value_units = ['a.u.', 'a.u.', 'a.u.']
+#         else:
+#             if optimize_on_ground:
+#                 self.state = "ground"
+#             else:
+#                 self.state = "excited"
+#             self.value_names = ['%s error (%s)' % (sequence, self.state)]
+#             self.value_units = ['a.u.']
+#         print("measurement_name", measurement_name)
+#         self.source = qt.instruments[source_name]
+#         self.prepi = prepi
+#         self.sweep_function = awg_swf.AllXY(sequence=sequence, prepi=self.prepi)
 
-    def prepare(self, **kw):
-        self.TD_Meas.prepare()
-        # setting the RF and LO settings from Time domain instruments
-        # Here the transient setting sould be done
+#     def prepare(self, **kw):
+#         self.TD_Meas.prepare()
+#         # setting the RF and LO settings from Time domain instruments
+#         # Here the transient setting sould be done
 
-        self.MC_AllXY = qt.instruments.create('MC_AllXY',
-                                              'MeasurementControl')
-        self.TD_Meas.set_MC(self.MC_AllXY.get_name())
+#         self.MC_AllXY = qt.instruments.create('MC_AllXY',
+#                                               'MeasurementControl')
+#         self.TD_Meas.set_MC(self.MC_AllXY.get_name())
 
-        if self.driving is "CBox":
-            self.MC_AllXY.set_sweep_function(CB_swf.AllXY())
-        elif self.driving is "AWG":
-            self.MC_AllXY.set_sweep_function(self.sweep_function)
-        if self.data_acquisition == 'ATS':
-            self.MC_AllXY.set_detector_function(det.TimeDomainDetector())
-        elif self.data_acquisition == 'CBox':
-            self.MC_AllXY.set_detector_function(
-                det.QuTechCBox_integrated_average_Detector())
+#         if self.driving is "CBox":
+#             self.MC_AllXY.set_sweep_function(CB_swf.AllXY())
+#         elif self.driving is "AWG":
+#             self.MC_AllXY.set_sweep_function(self.sweep_function)
+#         if self.data_acquisition == 'ATS':
+#             self.MC_AllXY.set_detector_function(det.TimeDomainDetector())
+#         elif self.data_acquisition == 'CBox':
+#             self.MC_AllXY.set_detector_function(
+#                 det.QuTechCBox_integrated_average_Detector())
 
-    def acquire_data_point(self, *args, **kw):
-        if self.measurement_name is not None:
-            measurement_name = self.measurement_name
-        else:
-            iteration = kw.get('iteration', None)
-            print("iteration", iteration)
-            if iteration is None:
-                sweep_point = kw.get('sweep_point', None)
-                sweep_point_outer = kw.get('sweep_point_outer', None)
-                print("sweep outer", sweep_point_outer)
-                measurement_name = 'AllXY_dev_inner_%s_outer_%s' % (
-                    sweep_point, sweep_point_outer)
-            else:
-                measurement_name = 'AllXY_iteration_%s' % iteration
-        if self.CLEAR_double is False:
-            if self.optimize_on_ground:
-                self.source.off()
-            else:
-                self.source.on()
-            self.MC_AllXY.run(name=measurement_name)
-            t0 = time.time()
-            flip_ax = self.prepi != self.optimize_on_ground
-            ana = MA.AllXY_Analysis(auto=True, flip_axis=flip_ax,
-                                    cal_points=self.sweep_function.cal_points,
-                                    ideal_data=self.sweep_function.ideal_data)
-            print('analyzing AllXY took %.2f' % ((time.time() - t0)))
-            if self.TD_Meas.get_CBox_touch_n_go_save_transients():
-                MA.TransientAnalysis(auto=True, label='AllXY')
-            deviation = ana.deviation_total
-            return deviation
+#     def acquire_data_point(self, *args, **kw):
+#         if self.measurement_name is not None:
+#             measurement_name = self.measurement_name
+#         else:
+#             iteration = kw.get('iteration', None)
+#             print("iteration", iteration)
+#             if iteration is None:
+#                 sweep_point = kw.get('sweep_point', None)
+#                 sweep_point_outer = kw.get('sweep_point_outer', None)
+#                 print("sweep outer", sweep_point_outer)
+#                 measurement_name = 'AllXY_dev_inner_%s_outer_%s' % (
+#                     sweep_point, sweep_point_outer)
+#             else:
+#                 measurement_name = 'AllXY_iteration_%s' % iteration
+#         if self.CLEAR_double is False:
+#             if self.optimize_on_ground:
+#                 self.source.off()
+#             else:
+#                 self.source.on()
+#             self.MC_AllXY.run(name=measurement_name)
+#             t0 = time.time()
+#             flip_ax = self.prepi != self.optimize_on_ground
+#             ana = MA.AllXY_Analysis(auto=True, flip_axis=flip_ax,
+#                                     cal_points=self.sweep_function.cal_points,
+#                                     ideal_data=self.sweep_function.ideal_data)
+#             print('analyzing AllXY took %.2f' % ((time.time() - t0)))
+#             if self.TD_Meas.get_CBox_touch_n_go_save_transients():
+#                 MA.TransientAnalysis(auto=True, label='AllXY')
+#             deviation = ana.deviation_total
+#             return deviation
 
-        elif self.CLEAR_double:
-            measurement_name = 'AllXY_iteration_'
-            self.source.off()
-            self.MC_AllXY.run(name=measurement_name+"_ground")
-            ana_g = MA.AllXY_Analysis(auto=True,
-                                      cal_points=self.sweep_function.cal_points,
-                                      ideal_data=self.sweep_function.ideal_data)
-            error_g = ana_g.deviation_total
-            if self.TD_Meas.get_CBox_touch_n_go_save_transients():
-                MA.TransientAnalysis(auto=True, label='AllXY')
-            print("error ground", error_g)
-            self.source.on()
-            self.MC_AllXY.run(name=measurement_name+"_excited")
-            ana_e = MA.AllXY_Analysis(auto=True, flip_axis=True,
-                                      cal_points=self.sweep_function.cal_points,
-                                      ideal_data=self.sweep_function.ideal_data)
-            error_e = ana_e.deviation_total
-            if self.TD_Meas.get_CBox_touch_n_go_save_transients():
-                MA.TransientAnalysis(auto=True, label='AllXY')
-            print("error excited", error_e)
-            deviation = error_g + error_e
-            print("total deviation", deviation)
-            return deviation, error_g, error_e
+#         elif self.CLEAR_double:
+#             measurement_name = 'AllXY_iteration_'
+#             self.source.off()
+#             self.MC_AllXY.run(name=measurement_name+"_ground")
+#             ana_g = MA.AllXY_Analysis(auto=True,
+#                                       cal_points=self.sweep_function.cal_points,
+#                                       ideal_data=self.sweep_function.ideal_data)
+#             error_g = ana_g.deviation_total
+#             if self.TD_Meas.get_CBox_touch_n_go_save_transients():
+#                 MA.TransientAnalysis(auto=True, label='AllXY')
+#             print("error ground", error_g)
+#             self.source.on()
+#             self.MC_AllXY.run(name=measurement_name+"_excited")
+#             ana_e = MA.AllXY_Analysis(auto=True, flip_axis=True,
+#                                       cal_points=self.sweep_function.cal_points,
+#                                       ideal_data=self.sweep_function.ideal_data)
+#             error_e = ana_e.deviation_total
+#             if self.TD_Meas.get_CBox_touch_n_go_save_transients():
+#                 MA.TransientAnalysis(auto=True, label='AllXY')
+#             print("error excited", error_e)
+#             deviation = error_g + error_e
+#             print("total deviation", deviation)
+#             return deviation, error_g, error_e
 
-    def finish(self, **kw):
-        self.MC_AllXY.remove()
-
-
-class drag_detuning_detector(det.Soft_Detector):
-    '''
-    Performs a drag_detuning measurement and returns the deviation.
-
-    '''
-    def __init__(self, measurement_name=None, data_acquisition='ATS', **kw):
-        self.detector_control = 'soft'
-        self.name = 'drag_detuning'
-        self.value_names = ['drag detuning']
-        self.value_units = ['a.u.']
-        self.data_acquisition = data_acquisition
-        self.measurement_name = measurement_name
-
-    def prepare(self, **kw):
-        self.MC_drag = qt.instruments.create('MC_drag', 'MeasurementControl')
-        self.MC_drag.set_sweep_function(CB_swf.drag_detuning())
-
-        if self.data_acquisition == 'ATS':
-            self.MC_drag.set_detector_function(det.TimeDomainDetector())
-        elif self.data_acquisition == 'CBox':
-            self.MC_drag.set_detector_function(
-                det.QuTechCBox_integrated_average_Detector())
-
-    def acquire_data_point(self, *args, **kw):
-        data = self.MC_drag.run(name=self.measurement_name)
-        distance = (data[0][1] - data[0][0])#**2 -
-        #        (data[1][1] - data[1][0])**2)
-        print('Drag detuning = ', distance)
-        return distance
-
-    def finish(self, **kw):
-        self.MC_drag.remove()
+#     def finish(self, **kw):
+#         self.MC_AllXY.remove()
 
 
-class drag_detuning_detector_v2(det.Soft_Detector):
-    '''
-    Performs a drag_detuning measurement and returns both the deviation and
-    the measured values.
+# class drag_detuning_detector(det.Soft_Detector):
+#     '''
+#     Performs a drag_detuning measurement and returns the deviation.
 
-    '''
-    def __init__(self, measurement_name=None, data_acquisition='ATS', **kw):
-        self.detector_control = 'soft'
-        self.name = 'drag_detuning'
-        self.value_names = ['drag detuning', 'I_0', 'Q_0', 'I_1', 'Q_1']
-        self.value_units = ['a.u.', 'dac_val', 'dac_val', 'dac_val', 'dac_val']
-        self.data_acquisition = data_acquisition
-        self.measurement_name = measurement_name
+#     '''
+#     def __init__(self, measurement_name=None, data_acquisition='ATS', **kw):
+#         self.detector_control = 'soft'
+#         self.name = 'drag_detuning'
+#         self.value_names = ['drag detuning']
+#         self.value_units = ['a.u.']
+#         self.data_acquisition = data_acquisition
+#         self.measurement_name = measurement_name
 
-    def prepare(self, **kw):
-        self.MC_drag = qt.instruments.create('MC_drag', 'MeasurementControl')
-        self.MC_drag.set_sweep_function(CB_swf.drag_detuning())
+#     def prepare(self, **kw):
+#         self.MC_drag = qt.instruments.create('MC_drag', 'MeasurementControl')
+#         self.MC_drag.set_sweep_function(CB_swf.drag_detuning())
 
-        if self.data_acquisition == 'ATS':
-            self.MC_drag.set_detector_function(det.TimeDomainDetector())
-        elif self.data_acquisition == 'CBox':
-            self.MC_drag.set_detector_function(
-                det.QuTechCBox_integrated_average_Detector())
+#         if self.data_acquisition == 'ATS':
+#             self.MC_drag.set_detector_function(det.TimeDomainDetector())
+#         elif self.data_acquisition == 'CBox':
+#             self.MC_drag.set_detector_function(
+#                 det.QuTechCBox_integrated_average_Detector())
 
-    def acquire_data_point(self, *args, **kw):
-        data = self.MC_drag.run(name=self.measurement_name)
-        distance = (data[0][1] - data[0][0])#**2 -
-        #        (data[1][1] - data[1][0])**2)
-        print('Drag detuning = ', distance)
-        returned_data = [distance,
-                         data[0][0], data[1][0],  # I_0, Q_0
-                         data[0][1], data[1][1]]  # I_1, Q_1
-        return distance
+#     def acquire_data_point(self, *args, **kw):
+#         data = self.MC_drag.run(name=self.measurement_name)
+#         distance = (data[0][1] - data[0][0])#**2 -
+#         #        (data[1][1] - data[1][0])**2)
+#         print('Drag detuning = ', distance)
+#         return distance
 
-    def finish(self, **kw):
-        self.MC_drag.remove()
+#     def finish(self, **kw):
+#         self.MC_drag.remove()
+
+
+# class drag_detuning_detector_v2(det.Soft_Detector):
+#     '''
+#     Performs a drag_detuning measurement and returns both the deviation and
+#     the measured values.
+
+#     '''
+#     def __init__(self, measurement_name=None, data_acquisition='ATS', **kw):
+#         self.detector_control = 'soft'
+#         self.name = 'drag_detuning'
+#         self.value_names = ['drag detuning', 'I_0', 'Q_0', 'I_1', 'Q_1']
+#         self.value_units = ['a.u.', 'dac_val', 'dac_val', 'dac_val', 'dac_val']
+#         self.data_acquisition = data_acquisition
+#         self.measurement_name = measurement_name
+
+#     def prepare(self, **kw):
+#         self.MC_drag = qt.instruments.create('MC_drag', 'MeasurementControl')
+#         self.MC_drag.set_sweep_function(CB_swf.drag_detuning())
+
+#         if self.data_acquisition == 'ATS':
+#             self.MC_drag.set_detector_function(det.TimeDomainDetector())
+#         elif self.data_acquisition == 'CBox':
+#             self.MC_drag.set_detector_function(
+#                 det.QuTechCBox_integrated_average_Detector())
+
+#     def acquire_data_point(self, *args, **kw):
+#         data = self.MC_drag.run(name=self.measurement_name)
+#         distance = (data[0][1] - data[0][0])#**2 -
+#         #        (data[1][1] - data[1][0])**2)
+#         print('Drag detuning = ', distance)
+#         returned_data = [distance,
+#                          data[0][0], data[1][0],  # I_0, Q_0
+#                          data[0][1], data[1][1]]  # I_1, Q_1
+#         return distance
+
+#     def finish(self, **kw):
+#         self.MC_drag.remove()
 
 
 class TwoTone_Spectroscopy(det.Soft_Detector):

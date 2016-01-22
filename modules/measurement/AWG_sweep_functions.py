@@ -22,12 +22,14 @@ class CBox_T1(swf.Hard_Sweep):
 
     def prepare(self, **kw):
         if self.upload:
+            ch3_amp = self.AWG.get('ch3_amp')
+            ch4_amp = self.AWG.get('ch3_amp')
             st_seqs.CBox_T1_marker_seq(IF=self.IF, times=self.sweep_points,
                                        meas_pulse_delay=self.meas_pulse_delay,
                                        RO_trigger_delay=self.RO_trigger_delay,
                                        verbose=False)
-            self.AWG.set('ch3_amp', self.mod_amp)
-            self.AWG.set('ch4_amp', self.mod_amp)
+            self.AWG.set('ch3_amp', ch3_amp)
+            self.AWG.set('ch4_amp', ch4_amp)
 
 
 class CBox_OffOn(swf.Hard_Sweep):
@@ -69,6 +71,66 @@ class CBox_OffOn(swf.Hard_Sweep):
                 RO_trigger_delay=self.RO_trigger_delay, verbose=False)
             self.AWG.set('ch3_amp', ch3_amp)
             self.AWG.set('ch4_amp', ch4_amp)
+
+
+class CBox_AllXY(swf.Hard_Sweep):
+    def __init__(self, IF, interpulse_delay, meas_pulse_delay,
+                 RO_trigger_delay,
+                 AWG, CBox,
+                 upload=True):
+        super().__init__()
+
+        self.parameter_name = 'AllXY element'
+        self.unit = '#'
+        self.name = 'AllXY'
+        # would actually like to check if file is already loaded
+        # filename can be get using AWG.get('setup_filename')
+        self.upload = upload
+
+        # The AllXY tape
+        self.tape = np.array([0, 0, 1, 1,  # 1, 2
+                              2, 2, 1, 2,  # 3, 4
+                              2, 1, 3, 0,  # 5, 6
+                              4, 0, 3, 4,  # 7, 8
+                              4, 3, 3, 2,  # 9, 10
+                              4, 1, 1, 4,  # 11, 12
+                              2, 3, 3, 1,  # 13, 14
+                              1, 3, 4, 2,  # 15, 16
+                              2, 4, 1, 0,  # 17, 18
+                              2, 0, 3, 3,  # 19, 20
+                              4, 4])       # 21
+        self.sweep_points = np.arange(int(len(self.tape)/2))  # 2 pulses per elt
+
+        # Making input pars available to prepare
+        # Required instruments
+        self.AWG = AWG
+        self.CBox = CBox
+        self.IF = IF
+        self.meas_pulse_delay = meas_pulse_delay
+        self.RO_trigger_delay = RO_trigger_delay
+        self.interpulse_delay = interpulse_delay
+
+    def prepare(self, **kw):
+        self.AWG.stop()
+        self.CBox.AWG0_mode.set('Tape')
+        self.CBox.AWG1_mode.set('Tape')
+        self.CBox.restart_awg_tape(0)
+        self.CBox.restart_awg_tape(1)
+        self.CBox.set('AWG0_tape', self.tape)
+        self.CBox.set('AWG1_tape', self.tape)
+
+        if self.upload:
+            ch3_amp = self.AWG.get('ch3_amp')
+            ch4_amp = self.AWG.get('ch3_amp')
+
+            st_seqs.CBox_two_pulse_seq(
+                IF=self.IF,
+                interpulse_delay=self.interpulse_delay,
+                meas_pulse_delay=self.meas_pulse_delay,
+                RO_trigger_delay=self.RO_trigger_delay, verbose=False)
+            self.AWG.set('ch3_amp', ch3_amp)
+            self.AWG.set('ch4_amp', ch4_amp)
+
 
 
 # class AWG_Sweep(swf.Hard_Sweep):

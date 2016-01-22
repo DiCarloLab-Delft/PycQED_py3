@@ -90,7 +90,7 @@ def CBox_single_pulse_seq(IF, meas_pulse_delay=0, RO_trigger_delay=0,
     seq = sequence.Sequence(seq_name)
     el_list = []
 
-    for i in range(2):
+    for i in range(2):  # seq has to have at least 2 elts
         el = st_elts.single_pulse_elt(i, station, IF, meas_pulse_delay,
                                       RO_trigger_delay)
         el_list.append(el)
@@ -99,15 +99,19 @@ def CBox_single_pulse_seq(IF, meas_pulse_delay=0, RO_trigger_delay=0,
     station.pulsar.program_awg(seq, *el_list, verbose=verbose)
     return seq_name
 
-def CBox_two_pulse_seq(IF, meas_pulse_delay=0, RO_trigger_delay=0,
+
+def CBox_two_pulse_seq(IF, interpulse_delay=40e-9,
+                       meas_pulse_delay=0, RO_trigger_delay=0,
                        verbose=False):
-    seq_name = 'Single_pulse_sequence'
+    seq_name = 'CBox_two_pulse_seq'
     seq = sequence.Sequence(seq_name)
     el_list = []
 
-    for i in range(2):
-        el = st_elts.single_pulse_elt(i, station, IF, meas_pulse_delay,
-                                      RO_trigger_delay)
+    for i in range(2):  # seq has to have at least 2 elts
+        el = st_elts.two_pulse_elt(i, station, IF,
+                                   interpulse_delay=interpulse_delay,
+                                   meas_pulse_delay=meas_pulse_delay,
+                                   RO_trigger_delay=RO_trigger_delay)
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
     station.instruments['AWG'].stop()

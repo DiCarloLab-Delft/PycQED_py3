@@ -2294,7 +2294,7 @@ class AllXY_Analysis(TD_Analysis):
             if len(self.measured_values[0]) == 42:
                 locs = np.arange(1, 42, 2)
             else:
-                locs = np.arange(1, 22, 1)
+                locs = np.arange(0, 21, 1)
             labels = ['II', 'XX', 'YY', 'XY', 'YX',
                       'xI', 'yI', 'xy', 'yx', 'xY', 'yX',
                       'Xy', 'Yx', 'xX', 'Xx', 'yY', 'Yy',
