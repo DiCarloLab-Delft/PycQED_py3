@@ -470,22 +470,41 @@ class AWG_channel_offset(Soft_Sweep):
     def set_parameter(self, val):
         self.set_offset(val)
 
-class AWG_channel_amplitude(Soft_Sweep):
-    '''
-    Sweep AWG channel amplitude for Mixer calibration
-    Needs to be generalized for AWG_Comp
-    '''
-    def __init__(self, channel, AWG_name='AWG', **kw):
-        super(AWG_channel_amplitude, self).__init__()
-        self.AWG = qt.instruments[AWG_name]
-        self.channel = channel
+# class AWG_channel_amplitude(Soft_Sweep):
+#     '''
+#     Superceded by using the parameter directly
+#     Sweep AWG channel amplitude for Mixer calibration
+#     Needs to be generalized for AWG_Comp
+#     '''
+#     def __init__(self, channel, AWG_name='AWG', **kw):
+#         super(AWG_channel_amplitude, self).__init__()
+#         self.AWG = qt.instruments[AWG_name]
+#         self.channel = channel
 
-        self.name = 'AWG offset channel '+str(channel)
-        self.parameter_name = 'Voltage'
+#         self.name = 'AWG offset channel '+str(channel)
+#         self.parameter_name = 'Voltage'
+#         self.unit = 'V'
+
+#     def set_parameter(self, val):
+#         eval('self.AWG.set_ch%d_amplitude(val)' % self.channel)
+
+
+class AWG_multi_channel_amplitude(Soft_Sweep):
+    '''
+    Sweep function to sweep multiple AWG channels simultaneously
+    '''
+    def __init__(self, AWG, channels, **kw):
+        super().__init__()
+        self.name = 'AWG channel amplitude chs %s' % channels
+        self.parameter_name = 'AWG chs %s' % channels
         self.unit = 'V'
+        self.AWG = AWG
+        self.channels = channels
 
     def set_parameter(self, val):
-        eval('self.AWG.set_ch%d_amplitude(val)' % self.channel)
+        for ch in self.channels:
+            self.AWG.set('ch{}_amp'.format(ch), val)
+
 
 class AWG_channel_phase(Soft_Sweep):
     '''

@@ -441,8 +441,12 @@ class SSRO_Fidelity_Detector_CBox(det.Soft_Detector):
         self.name = 'SSRO_Fidelity'
         # For an explanation of the difference between the different
         # Fidelities look in the analysis script
-        self.value_names = ['F', 'F corrected']
-        self.value_units = [' ', ' ']
+        if raw:
+            self.value_names = ['F-raw']
+            self.value_units = [' ']
+        else:
+            self.value_names = ['F', 'F corrected']
+            self.value_units = [' ', ' ']
         self.measurement_name = measurement_name
         self.NoSamples = kw.get('NoSamples', 8000)  # current max of log mode
         self.MC = MC

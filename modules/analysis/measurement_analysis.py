@@ -461,7 +461,7 @@ class MeasurementAnalysis(object):
             raise ValueError('datasaving_format "%s " not recognized'
                              % datasaving_format)
 
-    def plot_results_vs_sweepparam(self, x, y, fig, ax, show=False, marker='o',
+    def plot_results_vs_sweepparam(self, x, y, fig, ax, show=False, marker='-o',
                                    log=False, plotlabel=None, **kw):
         save = kw.pop('save', False)
         self.plot_title = kw.pop('plot_title',
@@ -995,12 +995,10 @@ class SSRO_Analysis(MeasurementAnalysis):
                                        shots_I_data_0, shots_Q_data_0, min_len,
                                        **kw)
             self.theta = theta
-            print("rotating")
         else:
             self.theta = 0
             shots_I_data_1_rot = shots_I_data_1
             shots_I_data_0_rot = shots_I_data_0
-            print("not rotating")
         # making gaussfits of s-curves
         self.no_fits_analysis(shots_I_data_1_rot, shots_I_data_0_rot, min_len,
                               **kw)
@@ -1038,7 +1036,6 @@ class SSRO_Analysis(MeasurementAnalysis):
                                               range=[[-V_max, V_max],
                                                      [-V_max, V_max]])
 
-
         if plot_2D_histograms:
             fig, axarray = plt.subplots(nrows=1, ncols=2)
             axarray[0].tick_params(axis='both', which='major',
@@ -1069,11 +1066,13 @@ class SSRO_Analysis(MeasurementAnalysis):
         def gaussian(height, center_x, center_y, width_x, width_y):
             width_x = float(width_x)
             width_y = float(width_y)
-            return lambda x,y: height*np.exp(-(((center_x-x)/width_x)**2+((center_y-y)/width_y)**2)/2)
+            return lambda x, y: height*np.exp(-(((center_x-x)/width_x)**2+(
+                                              (center_y-y)/width_y)**2)/2)
 
         def fitgaussian(data):
             params = moments(data)
-            errorfunction = lambda p: np.ravel(gaussian(*p)(*np.indices(data.shape))-data)
+            errorfunction = lambda p: np.ravel(gaussian(*p)(*np.indices(
+                                               data.shape))-data)
             p, success = optimize.leastsq(errorfunction, params)
             return p
 
@@ -1083,9 +1082,12 @@ class SSRO_Analysis(MeasurementAnalysis):
             x = (X*data).sum()/total
             y = (Y*data).sum()/total
             col = data[:, int(y)]
-            width_x = np.sqrt(abs((np.arange(col.size)-y)**2*col).sum()/col.sum())
+            eps = 1e-8  # To prevent division by zero
+            width_x = np.sqrt(abs((np.arange(col.size)-y)**2*col).sum()/(
+                              col.sum()+eps))
             row = data[int(x), :]
-            width_y = np.sqrt(abs((np.arange(row.size)-x)**2*row).sum()/row.sum())
+            width_y = np.sqrt(abs((np.arange(row.size)-x)**2*row).sum()/(
+                              row.sum()+eps))
             height = data.max()
             return height, x, y, width_x, width_y
 
@@ -1095,8 +1097,7 @@ class SSRO_Analysis(MeasurementAnalysis):
         data1 = H1
         params1 = fitgaussian(data1)
         fit1 = gaussian(*params1)
-
-        #interpolating to find the gauss top x and y coordinates
+        # interpolating to find the gauss top x and y coordinates
         x_lin = np.linspace(0, n_bins, n_bins+1)
         y_lin = np.linspace(0, n_bins, n_bins+1)
         f_x_1 = interp1d(x_lin, xedges1)
@@ -1143,6 +1144,7 @@ class SSRO_Analysis(MeasurementAnalysis):
 
         #plotting the histograms after rotation
         fig, axes = plt.subplots()
+
         axes.hist(shots_I_data_1_rot, bins=40, label='|1>',
                   histtype='step', normed=1, color='r')
         axes.hist(shots_I_data_0_rot, bins=40, label='|0>',

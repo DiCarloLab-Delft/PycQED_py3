@@ -60,12 +60,15 @@ class CBox_OffOn(swf.Hard_Sweep):
         self.CBox.set('AWG1_tape', self.tape)
 
         if self.upload:
+            ch3_amp = self.AWG.get('ch3_amp')
+            ch4_amp = self.AWG.get('ch3_amp')
+
             st_seqs.CBox_single_pulse_seq(
                 IF=self.IF,
                 meas_pulse_delay=self.meas_pulse_delay,
                 RO_trigger_delay=self.RO_trigger_delay, verbose=False)
-            self.AWG.set('ch3_amp', self.mod_amp)
-            self.AWG.set('ch4_amp', self.mod_amp)
+            self.AWG.set('ch3_amp', ch3_amp)
+            self.AWG.set('ch4_amp', ch4_amp)
 
 
 # class AWG_Sweep(swf.Hard_Sweep):
