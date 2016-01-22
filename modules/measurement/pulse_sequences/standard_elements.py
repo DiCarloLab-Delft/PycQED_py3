@@ -96,11 +96,11 @@ def no_pulse_elt(i, station, IF, RO_trigger_delay=0):
 
 
 def two_pulse_elt(i, station, IF, meas_pulse_delay=0, RO_trigger_delay=0,
-                  interpulse_delay=40e-9):
+                  interpulse_delay=40e-9, tau=0):
         '''
         two pulse element for triggering the CBox.
         Plays two markers of (15ns) on ch1m1 and ch1m2 separated by
-        the interpulse_delay followed by a cos that modulates the LO
+        the interpulse_delay and tau, followed by a cos that modulates the LO
         for Readout and a RO marker.
 
         The RO-tone is fixed in phase with respect to the RO-trigger
@@ -128,7 +128,7 @@ def two_pulse_elt(i, station, IF, meas_pulse_delay=0, RO_trigger_delay=0,
         el.add(pulse.cp(sqp, channel='ch1_marker1'),
                name='CBox-pulse-trigger-2',
                refpulse='CBox-pulse-trigger-1', refpoint='start',
-               start=interpulse_delay)
+               start=interpulse_delay+tau)
         el.add(pulse.cp(sqp, channel='ch1_marker2'),
                refpulse='CBox-pulse-trigger-2', refpoint='start', start=0)
 

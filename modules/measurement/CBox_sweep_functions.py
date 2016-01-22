@@ -33,6 +33,8 @@ class CBox_Sweep(swf.Hard_Sweep):
 ######################
 # Time domain sweeps #
 ######################
+
+
 class T1(CBox_Sweep):
     '''
     Performs a T1 measurement using a tektronix and the CBox.
