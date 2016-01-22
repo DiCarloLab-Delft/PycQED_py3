@@ -1,8 +1,8 @@
+import logging
+import numpy as np
 from ..waveform_control import pulsar
-from ..waveform_control import pulse
 from ..waveform_control import element
-from ..waveform_control import sequence
-from ..waveform_control.viewer import show_element, show_wf
+from ..waveform_control import pulse
 from ..waveform_control import pulse_library as pl
 
 
@@ -106,6 +106,11 @@ def two_pulse_elt(i, station, IF, meas_pulse_delay=0, RO_trigger_delay=0,
         The RO-tone is fixed in phase with respect to the RO-trigger
         The RO trigger is delayed by RO-trigger delay.
         '''
+        logging.warning('function not tested')
+        logging.warning('todo-replace with multi-pulse elt')
+        if tau % 5e-9 != 0:
+            logging.warning('tau is not a multiple of 5ns this can cause' +
+                            'phase errors in CBox pulses')
         el = element.Element(name='two-pulse-elt_%s' % i,
                              pulsar=station.pulsar)
 
@@ -153,3 +158,67 @@ def two_pulse_elt(i, station, IF, meas_pulse_delay=0, RO_trigger_delay=0,
                refpulse=ROm_name, refpoint='start', start=0)
         return el
 
+
+def multi_pulse_elt(i, station, IF, meas_pulse_delay=0, RO_trigger_delay=0,
+                    interpulse_delay=40e-9,
+                    n_pulses=3,
+                    taus=None):
+        '''
+
+
+        '''
+        logging.warning('FUnction not tested')
+        if taus is None:
+            taus = np.zeros(n_pulses)
+        else:
+            # prepend a 0 to the list of inter-pulse wait times tau to
+            # make the length of the wait times add up
+            taus = np.concatenate([[0], taus])
+        # prepend a 0 to the list of taus
+        for tau in taus:  #this statement can probably be reduced to 1 line
+            if tau % 5e-9 != 0:
+                logging.warning('tau is not a multiple of 5ns this can cause' +
+                                'phase errors in CBox pulses')
+        el = element.Element(name='%s-pulse-elt_%s' % (n_pulses, i),
+                             pulsar=station.pulsar)
+
+        # exitst to ensure that channel is not high when waiting for trigger
+        ref_elt = el.add(pulse.SquarePulse(name='refpulse_0', channel='ch1',
+                         amplitude=0, length=1e-9))
+        for i in range(3):  # Exist to ensure there are no empty channels
+            el.add(pulse.SquarePulse(name='refpulse_0',
+                                     channel='ch{}'.format(i+1),
+                                     amplitude=0, length=1e-9))
+        marker_ref = ref_elt
+        sqp = pulse.SquarePulse(name='CBox-pulse-trigger',
+                                channel='ch1_marker1',
+                                amplitude=1, length=15e-9)
+        for j in range(n_pulses):
+            # overwrite the reference with the latest added marker
+            marker_ref = el.add(pulse.cp(sqp, channel='ch1_marker1'),
+                                name='CBox-pulse-trigger-%s' % j,
+                                start=interpulse_delay+taus[j],
+                                refpulse=marker_ref)
+            el.add(pulse.cp(sqp, channel='ch1_marker2'),
+                   refpulse=marker_ref,
+                   refpoint='start', start=0)
+
+        # Readout modulation tone
+        cosP = pulse.CosPulse(name='cosI', channel='ch3',
+                              amplitude=0.5, frequency=IF, length=2e-6)
+        ROpulse = el.add(cosP, start=meas_pulse_delay,
+                         refpulse=marker_ref)
+        el.add(pulse.CosPulse(name='sinQ', channel='ch4',
+                              amplitude=0.5, frequency=IF,
+                              length=2e-6, phase=90),
+               start=0, refpulse=ROpulse, refpoint='start')
+
+        # Start Acquisition marker
+        ROm = pulse.SquarePulse(name='RO-marker',
+                                amplitude=1, length=20e-9,
+                                channel='ch4_marker1')
+        ROm_name = el.add(ROm, start=RO_trigger_delay,
+                          refpulse=ROpulse, refpoint='start')
+        el.add(pulse.cp(ROm, channel='ch4_marker2'),
+               refpulse=ROm_name, refpoint='start', start=0)
+        return el

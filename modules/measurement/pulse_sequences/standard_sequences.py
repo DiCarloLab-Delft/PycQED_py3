@@ -152,32 +152,61 @@ def CBox_T1_marker_seq(IF, times, meas_pulse_delay,
 
 
 def CBox_Ramsey_marker_seq(IF, times, meas_pulse_delay,
-                           RO_trigger_delay=0, verbose=False):
+                           RO_trigger_delay=0, interpulse_delay=80e-9,
+                           verbose=False,
+                           cal_points=True):
     '''
-    Beware, replaces the last 4 points with calibration points
+    If cal_points, replaces the last 4 elements with calibration points
     '''
     seq_name = 'CBox_Ramsey'
     seq = sequence.Sequence(seq_name)
     el_list = []
-
-    for i, tau in enumerate(times[:-4]):
-        el = st_elts.single_pulse_elt(i, station, IF, meas_pulse_delay,
-                                      RO_trigger_delay, tau=tau)
+    if cal_points:
+        times = times[:-4]
+    for i, tau in enumerate(times):
+        el = st_elts.two_pulse_elt(i, station, IF, meas_pulse_delay,
+                                   RO_trigger_delay, interpulse_delay,
+                                   tau=tau)
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
-    cal_0_elt0 = st_elts.no_pulse_elt(i+1, station, IF, RO_trigger_delay)
-    cal_0_elt1 = st_elts.no_pulse_elt(i+2, station, IF, RO_trigger_delay)
-    cal_1_elt0 = st_elts.single_pulse_elt(i+3, station, IF, meas_pulse_delay,
-                                          RO_trigger_delay)
-    cal_1_elt1 = st_elts.single_pulse_elt(i+4, station, IF, meas_pulse_delay,
-                                          RO_trigger_delay)
-    seq.append_element(cal_0_elt0, trigger_wait=True)
-    seq.append_element(cal_0_elt1, trigger_wait=True)
-    seq.append_element(cal_1_elt0, trigger_wait=True)
-    seq.append_element(cal_1_elt1, trigger_wait=True)
-    el_list.append(cal_0_elt0)
-    el_list.append(cal_0_elt1)
-    el_list.append(cal_1_elt0)
-    el_list.append(cal_1_elt1)
+    if cal_points:
+        # use tape to make sure no pulse is played for first 2 cal pts
+        for j in range(4):
+            el = st_elts.single_pulse_elt(i+j, station, IF, meas_pulse_delay,
+                                          RO_trigger_delay, interpulse_delay)
+            el_list.append(el)
+            seq.append_element(el, trigger_wait=True)
     station.instruments['AWG'].stop()
     station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+
+
+
+def CBox_Echo_marker_seq(IF, times, meas_pulse_delay,
+                           RO_trigger_delay=0, interpulse_delay=80e-9,
+                           verbose=False,
+                           cal_points=True):
+    '''
+    If cal_points, replaces the last 4 elements with calibration points
+    '''
+    logging.warning('Echo sequence needs to be tested')
+    seq_name = 'CBox_Echo'
+    seq = sequence.Sequence(seq_name)
+    el_list = []
+    if cal_points:
+        times = times[:-4]
+    for i, tau in enumerate(times):
+        el = st_elts.multi_pulse_elt(i, station, IF, meas_pulse_delay,
+                                     RO_trigger_delay, interpulse_delay,
+                                     taus=[tau/2]*2, n_pulses=3)
+        el_list.append(el)
+        seq.append_element(el, trigger_wait=True)
+    if cal_points:
+        # use tape to make sure no pulse is played for first 2 cal pts
+        for j in range(4):
+            el = st_elts.single_pulse_elt(i+j, station, IF, meas_pulse_delay,
+                                          RO_trigger_delay, interpulse_delay)
+            el_list.append(el)
+            seq.append_element(el, trigger_wait=True)
+    station.instruments['AWG'].stop()
+    station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+
