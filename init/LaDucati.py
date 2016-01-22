@@ -39,13 +39,9 @@ import instrument_drivers.meta_instrument.CBox_LookuptableManager as lm
 
 # SH = sh.SignalHound_USB_SA124B('Signal hound') #commented because of 8s load time
 CBox = qcb.QuTech_ControlBox('CBox', address='Com3', run_tests=False)
-
-
 S1 = rs.RS_SGS100A('S1', address='GPIB0::11::INSTR') #located on top of rack
-
 LO = rs.RS_SGS100A(name='LO', address='TCPIP0::192.168.0.77')  # left of s2
 S2 = rs.RS_SGS100A(name='S1', address='TCPIP0::192.168.0.78')  # right
-
 AWG = tek.Tektronix_AWG5014(name='AWG', setup_folder=None,
                             address='TCPIP0::192.168.0.9')
 IVVI = iv.IVVI('IVVI', address='ASRL1', numdacs=16)
@@ -53,10 +49,14 @@ IVVI = iv.IVVI('IVVI', address='ASRL1', numdacs=16)
 # Meta-instruments
 HS = hd.LO_modulated_Heterodyne('HS', LO=LO, CBox=CBox, AWG=AWG)
 LutMan = lm.QuTech_ControlBox_LookuptableManager('LutMan', CBox)
-station = qc.Station(LO, S1, AWG, CBox, HS, IVVI)
+station = qc.Station(LO, S1, S2, IVVI,
+                     HS,
+                     AWG, CBox, LutMan)
 MC = mc.MeasurementControl('MC')
 MC.station = station
 station.MC = MC
+nested_MC = mc.MeasurementControl('nested_MC')
+nested_MC.station = station
 
 # The AWG sequencer
 station.pulsar = ps.Pulsar()
@@ -83,8 +83,8 @@ st_seqs.station = station
 IVVI.set('dac2', 0)
 IVVI.set('dac5', 95.0)
 
-RO_freq = 6.8544e9
-qubit_freq = 6.48e9
+RO_freq = 6.8482e9
+qubit_freq = 6.4718e9 - 40e6  # as measured by my Ramsey
 IF = -20e6        # RO modulation frequency
 mod_freq = -40e6  # Qubit pulse modulation frequency
 
@@ -99,13 +99,15 @@ S2.set('power', 14)
 S2.set('frequency', qubit_freq - mod_freq)
 S2.off()
 
+LutMan.set('lut_mapping',
+           ['I', 'X180', 'Y180', 'X90', 'Y90', 'I', 'I', 'I'])
 LutMan.set('f_modulation', mod_freq*1e-9)  # Lutman works in ns and GHz
 LutMan.set('gauss_width', 10)
-LutMan.set('amp180', 30)
+amp180 = 50
+# Need to add attenuation to ensure a more sensible value is used (e.g. 300)
+LutMan.set('amp180', amp180)
+LutMan.set('amp90', amp180/2)
 
-CBox.set('nr_averages', 2**14)
-# this is the max nr of averages that does not slow down the heterodyning
-CBox.set('nr_samples', 75)  # Shorter because of min marker spacing
 # Calibrated at 6.5GHz (18-1-2016)
 CBox.set_dac_offset(0, 1, 18.81)  # I channel qubit drive AWG
 CBox.set_dac_offset(0, 0, -24.938)  # Q channel
@@ -123,11 +125,18 @@ w1 = np.round(sinI*120)
 CBox.set('sig0_integration_weights', w0)
 CBox.set('sig1_integration_weights', w1)
 
-CBox.set('nr_averages', 16384)  # 2**14
+CBox.set('nr_averages', 2048)
+# this is the max nr of averages that does not slow down the heterodyning
+CBox.set('nr_samples', 75)  # Shorter because of min marker spacing
 CBox.set('integration_length', 70)
 CBox.set('acquisition_mode', 0)
 CBox.set('lin_trans_coeffs', [1, 0, 0, 1])
-CBox.set('log_length', 200)
+CBox.set('log_length', 8000)
+
+CBox.set('AWG0_mode', 'Tape')
+CBox.set('AWG1_mode', 'Tape')
+CBox.set('AWG0_tape', [1, 1])
+CBox.set('AWG1_tape', [1, 1])
 
 t1 = time.time()
 

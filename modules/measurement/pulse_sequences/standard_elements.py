@@ -39,7 +39,8 @@ def single_pulse_elt(i, station, IF, meas_pulse_delay=0, RO_trigger_delay=0,
         cosP = pulse.CosPulse(name='cosI', channel='ch3',
                               amplitude=0.5, frequency=IF, length=2e-6)
         ROpulse = el.add(cosP, start=tau+meas_pulse_delay,
-                         refpulse='CBox-pulse-trigger')#, fixed_point_freq=IF)
+                         refpulse='CBox-pulse-trigger',
+                         fixed_point_freq=10e6)
         el.add(pulse.CosPulse(name='sinQ', channel='ch4',
                               amplitude=0.5, frequency=IF,
                               length=2e-6, phase=90),
@@ -78,7 +79,7 @@ def no_pulse_elt(i, station, IF, RO_trigger_delay=0):
         cosP = pulse.CosPulse(name='cosI', channel='ch3',
                               amplitude=0.5, frequency=IF, length=2e-6)
         ROpulse = el.add(cosP, start=10e-6,
-                         refpulse=ref_elt)  #, fixed_point_freq=IF)
+                         refpulse=ref_elt, fixed_point_freq=IF)
         el.add(pulse.CosPulse(name='sinQ', channel='ch4',
                               amplitude=0.5, frequency=IF,
                               length=2e-6, phase=90),
@@ -142,7 +143,8 @@ def two_pulse_elt(i, station, IF, meas_pulse_delay=0, RO_trigger_delay=0,
         cosP = pulse.CosPulse(name='cosI', channel='ch3',
                               amplitude=0.5, frequency=IF, length=2e-6)
         ROpulse = el.add(cosP, start=meas_pulse_delay,
-                         refpulse='CBox-pulse-trigger-2')
+                         refpulse='CBox-pulse-trigger-2',
+                         fixed_point_freq=10e6)
 
         el.add(pulse.CosPulse(name='sinQ', channel='ch4',
                               amplitude=0.5, frequency=IF,
@@ -208,7 +210,7 @@ def multi_pulse_elt(i, station, IF, meas_pulse_delay=0, RO_trigger_delay=0,
         cosP = pulse.CosPulse(name='cosI', channel='ch3',
                               amplitude=0.5, frequency=IF, length=2e-6)
         ROpulse = el.add(cosP, start=meas_pulse_delay,
-                         refpulse=marker_ref)
+                         refpulse=marker_ref, fixed_point_freq=10e6)
         el.add(pulse.CosPulse(name='sinQ', channel='ch4',
                               amplitude=0.5, frequency=IF,
                               length=2e-6, phase=90),
