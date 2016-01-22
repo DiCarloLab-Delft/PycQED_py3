@@ -1680,7 +1680,7 @@ class Ramsey_Analysis(TD_Analysis):
 
             if print_fit_results:
                 print('Setting frequency to 0 and ' + \
-                    'fitting with decaying exponential.')
+                      'fitting with decaying exponential.')
             damped_osc_mod.set_param_hint('frequency',
                                           value=freq_est,
                                           vary=False)
@@ -1709,15 +1709,15 @@ class Ramsey_Analysis(TD_Analysis):
                                       value=phase_estimate, vary=True)
 
         damped_osc_mod.set_param_hint('tau',
-                                      value=self.sweep_points[0]*10,
-                                      min=self.sweep_points[0]*5,
-                                      max=self.sweep_points[0]*1000)
+                                      value=self.sweep_points[1]*10,
+                                      min=self.sweep_points[1],
+                                      max=self.sweep_points[1]*1000)
 
         damped_osc_mod.set_param_hint('exponential_offset',
+                                      value=0, vary=False)
+        damped_osc_mod.set_param_hint('oscillation_offset',
                                       value=0.5,
                                       min=0.4, max=1.1)
-        damped_osc_mod.set_param_hint('oscillation_offset',
-                                      value=0, vary=False)
 
         damped_osc_mod.set_param_hint('n',
                                       value=1,
@@ -1727,7 +1727,7 @@ class Ramsey_Analysis(TD_Analysis):
                                      t=self.sweep_points[:-self.NoCalPoints],
                                      params=self.params)
         if fit_res.chisqr > .35:
-            print('Fit did not converge, varying phase')
+            logging.warning('Fit did not converge, varying phase')
             fit_res_lst = []
 
             for phase_estimate in np.linspace(0, 7*np.pi/4, 9):
@@ -1747,11 +1747,12 @@ class Ramsey_Analysis(TD_Analysis):
         return fit_res
 
     def plot_results(self, fig, ax, fit_res, ylabel, show_guess=False):
-        textstr = '$f$ = %.3g $\pm$ (%.3g) GHz \n $ T_2^\star $ = %.4g $\pm$ (%.5g) ns ' \
-                  % (fit_res.params['frequency'].value,
-                     fit_res.params['frequency'].stderr,
-                     fit_res.params['tau'].value,
-                     fit_res.params['tau'].stderr)
+        textstr = ('  $f$  \t= %.3g $ \t \pm$ (%.3g) Hz'
+                   % (fit_res.params['frequency'].value,
+                      fit_res.params['frequency'].stderr) +
+                   '\n$T_2^\star$ = %.3g $\t \pm$ (%.3g) s '
+                   % (fit_res.params['tau'].value,
+                      fit_res.params['tau'].stderr))
         ax.text(0.4, 0.95, textstr,
                 transform=ax.transAxes, fontsize=11,
                 verticalalignment='top', bbox=self.box_props)

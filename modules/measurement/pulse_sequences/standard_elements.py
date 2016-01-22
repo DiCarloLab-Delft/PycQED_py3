@@ -106,11 +106,12 @@ def two_pulse_elt(i, station, IF, meas_pulse_delay=0, RO_trigger_delay=0,
         The RO-tone is fixed in phase with respect to the RO-trigger
         The RO trigger is delayed by RO-trigger delay.
         '''
-        logging.warning('function not tested')
-        logging.warning('todo-replace with multi-pulse elt')
-        if tau % 5e-9 != 0:
-            logging.warning('tau is not a multiple of 5ns this can cause' +
-                            'phase errors in CBox pulses')
+        if round(tau*1e10) % 50 != 0.0:  # round to 5 ns
+            # actually anything not a multiple of 1/mod_freq can give errors
+            # but that info is not available here
+            logging.warning(
+                'tau ({} ns) is not a multiple '.format(tau*1e9) +
+                'of 5ns this can cause phase errors in CBox pulses')
         el = element.Element(name='two-pulse-elt_%s' % i,
                              pulsar=station.pulsar)
 

@@ -81,7 +81,7 @@ for i in range(4):
 st_seqs.station = station
 
 IVVI.set('dac2', 0)
-IVVI.set('dac5', 27.4967574578)
+IVVI.set('dac5', 95.0)
 
 RO_freq = 6.8544e9
 qubit_freq = 6.48e9

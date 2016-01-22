@@ -65,7 +65,7 @@ class CBox_Ramsey(swf.Hard_Sweep):
         # gets assigned in MC.set sweep_points
         nr_elts = len(self.sweep_points)
         if self.cal_points:
-            tape = [3, 3] * (nr_elts-4) + [0, 1]
+            tape = [3, 3] * (nr_elts-4) + [0, 0, 1, 1]
         else:
             tape = [3, 3] * nr_elts
 
@@ -76,6 +76,7 @@ class CBox_Ramsey(swf.Hard_Sweep):
         self.CBox.restart_awg_tape(1)
         self.CBox.set('AWG0_tape', tape)
         self.CBox.set('AWG1_tape', tape)
+
 
 class CBox_Echo(swf.Hard_Sweep):
     def __init__(self, IF,
