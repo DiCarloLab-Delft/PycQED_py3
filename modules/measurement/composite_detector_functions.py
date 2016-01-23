@@ -495,8 +495,10 @@ class AllXY_devition_detector_CBox(det.Soft_Detector):
         self.name = 'AllXY_dev_i'
         # For an explanation of the difference between the different
         # Fidelities look in the analysis script
-        self.value_names = ['Avg deviation']
-        self.value_units = ['']
+        self.value_names = ['Total_deviation', 'Avg deviation']
+        # Should only return one instead of two but for now just for
+        # convenience as I understand the scale of total deviation
+        self.value_units = ['', '']
         self.measurement_name = measurement_name
         self.NoSamples = kw.get('NoSamples', 8000)  # current max of log mode
         self.MC = MC

@@ -7,7 +7,7 @@ from ..waveform_control import pulse_library as pl
 
 
 def single_pulse_elt(i, station, IF, meas_pulse_delay=0, RO_trigger_delay=0,
-                     tau=0):
+                     RO_pulse_length=1e-6, tau=0):
         '''
         Single pulse element for triggering the CBox.
         Plays a single marker (15ns) on ch1m1 and ch1m2 followed by
@@ -37,13 +37,13 @@ def single_pulse_elt(i, station, IF, meas_pulse_delay=0, RO_trigger_delay=0,
 
         # Readout modulation tone
         cosP = pulse.CosPulse(name='cosI', channel='ch3',
-                              amplitude=0.5, frequency=IF, length=2e-6)
+                              amplitude=0.5, frequency=IF, length=RO_pulse_length)
         ROpulse = el.add(cosP, start=tau+meas_pulse_delay,
                          refpulse='CBox-pulse-trigger',
                          fixed_point_freq=10e6)
         el.add(pulse.CosPulse(name='sinQ', channel='ch4',
                               amplitude=0.5, frequency=IF,
-                              length=2e-6, phase=90),
+                              length=RO_pulse_length, phase=90),
                start=0, refpulse=ROpulse, refpoint='start')
 
         # Start Acquisition marker
@@ -57,7 +57,7 @@ def single_pulse_elt(i, station, IF, meas_pulse_delay=0, RO_trigger_delay=0,
         return el
 
 
-def no_pulse_elt(i, station, IF, RO_trigger_delay=0):
+def no_pulse_elt(i, station, IF, RO_trigger_delay=0, RO_pulse_length=1e-6):
         '''
         Element that contains a RO modulating tone and a marker to
         trigger acquisiton.
@@ -77,12 +77,12 @@ def no_pulse_elt(i, station, IF, RO_trigger_delay=0):
                                      amplitude=0, length=1e-9))
         # Readout modulation tone
         cosP = pulse.CosPulse(name='cosI', channel='ch3',
-                              amplitude=0.5, frequency=IF, length=2e-6)
+                              amplitude=0.5, frequency=IF, length=RO_pulse_length)
         ROpulse = el.add(cosP, start=10e-6,
                          refpulse=ref_elt, fixed_point_freq=IF)
         el.add(pulse.CosPulse(name='sinQ', channel='ch4',
                               amplitude=0.5, frequency=IF,
-                              length=2e-6, phase=90),
+                              length=RO_pulse_length, phase=90),
                start=0, refpulse=ROpulse, refpoint='start')
 
         # Start Acquisition marker
@@ -97,6 +97,7 @@ def no_pulse_elt(i, station, IF, RO_trigger_delay=0):
 
 
 def two_pulse_elt(i, station, IF, meas_pulse_delay=0, RO_trigger_delay=0,
+                  RO_pulse_length=1e-6,
                   interpulse_delay=40e-9, tau=0):
         '''
         two pulse element for triggering the CBox.
@@ -141,14 +142,14 @@ def two_pulse_elt(i, station, IF, meas_pulse_delay=0, RO_trigger_delay=0,
 
         # Readout modulation tone
         cosP = pulse.CosPulse(name='cosI', channel='ch3',
-                              amplitude=0.5, frequency=IF, length=2e-6)
+                              amplitude=0.5, frequency=IF, length=RO_pulse_length)
         ROpulse = el.add(cosP, start=meas_pulse_delay,
                          refpulse='CBox-pulse-trigger-2',
                          fixed_point_freq=10e6)
 
         el.add(pulse.CosPulse(name='sinQ', channel='ch4',
                               amplitude=0.5, frequency=IF,
-                              length=2e-6, phase=90),
+                              length=RO_pulse_length, phase=90),
                start=0, refpulse=ROpulse, refpoint='start')
 
         # Start Acquisition marker
@@ -162,15 +163,12 @@ def two_pulse_elt(i, station, IF, meas_pulse_delay=0, RO_trigger_delay=0,
         return el
 
 
-def multi_pulse_elt(i, station, IF, meas_pulse_delay=0, RO_trigger_delay=0,
+def multi_pulse_elt(i, station, IF, meas_pulse_delay=0,
+                    RO_pulse_length=1e-6, RO_trigger_delay=0,
                     interpulse_delay=40e-9,
                     n_pulses=3,
                     taus=None):
-        '''
 
-
-        '''
-        logging.warning('FUnction not tested')
         if taus is None:
             taus = np.zeros(n_pulses)
         else:
@@ -201,19 +199,20 @@ def multi_pulse_elt(i, station, IF, meas_pulse_delay=0, RO_trigger_delay=0,
             marker_ref = el.add(pulse.cp(sqp, channel='ch1_marker1'),
                                 name='CBox-pulse-trigger-%s' % j,
                                 start=interpulse_delay+taus[j],
-                                refpulse=marker_ref)
+                                refpulse=marker_ref, refpoint='start')
             el.add(pulse.cp(sqp, channel='ch1_marker2'),
                    refpulse=marker_ref,
+                   name = 'CBox-pulse-trigger-2%s' % j,
                    refpoint='start', start=0)
 
         # Readout modulation tone
         cosP = pulse.CosPulse(name='cosI', channel='ch3',
-                              amplitude=0.5, frequency=IF, length=2e-6)
+                              amplitude=0.5, frequency=IF, length=RO_pulse_length)
         ROpulse = el.add(cosP, start=meas_pulse_delay,
                          refpulse=marker_ref, fixed_point_freq=10e6)
         el.add(pulse.CosPulse(name='sinQ', channel='ch4',
                               amplitude=0.5, frequency=IF,
-                              length=2e-6, phase=90),
+                              length=RO_pulse_length, phase=90),
                start=0, refpulse=ROpulse, refpoint='start')
 
         # Start Acquisition marker

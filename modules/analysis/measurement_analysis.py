@@ -1694,7 +1694,7 @@ class Ramsey_Analysis(TD_Analysis):
                                                self.sweep_points[-1])),
                                           max=(20/self.sweep_points[-1]))
 
-        amplitude_guess = 0.5
+        amplitude_guess = 1
         damped_osc_mod.set_param_hint('amplitude',
                                       value=amplitude_guess,
                                       min=0.4, max=2.0)
@@ -1714,10 +1714,10 @@ class Ramsey_Analysis(TD_Analysis):
                                       max=self.sweep_points[1]*1000)
 
         damped_osc_mod.set_param_hint('exponential_offset',
-                                      value=0, vary=False)
-        damped_osc_mod.set_param_hint('oscillation_offset',
                                       value=0.5,
                                       min=0.4, max=1.1)
+        damped_osc_mod.set_param_hint('oscillation_offset',
+                                      value=0, vary=False)
 
         damped_osc_mod.set_param_hint('n',
                                       value=1,
@@ -1730,7 +1730,7 @@ class Ramsey_Analysis(TD_Analysis):
             logging.warning('Fit did not converge, varying phase')
             fit_res_lst = []
 
-            for phase_estimate in np.linspace(0, 7*np.pi/4, 9):
+            for phase_estimate in np.linspace(0, 2*np.pi, 8):
                 damped_osc_mod.set_param_hint('phase',
                                               value=phase_estimate)
                 self.params = damped_osc_mod.make_params()
