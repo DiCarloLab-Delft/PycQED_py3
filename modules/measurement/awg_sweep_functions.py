@@ -124,10 +124,9 @@ class CBox_Echo(swf.Hard_Sweep):
         self.CBox.set('AWG1_tape', tape)
 
 
-
-
 class CBox_OffOn(swf.Hard_Sweep):
-    def __init__(self, IF, meas_pulse_delay, RO_trigger_delay, mod_amp,
+    def __init__(self, IF, meas_pulse_delay, RO_trigger_delay,
+                 RO_pulse_length,
                  AWG, CBox,
                  upload=True):
         super().__init__()
@@ -141,7 +140,7 @@ class CBox_OffOn(swf.Hard_Sweep):
         self.sweep_points = np.array(self.tape)  # array for transpose in MC
         self.AWG = AWG
         self.CBox = CBox
-        self.mod_amp = mod_amp
+        self.RO_pulse_length = RO_pulse_length
         # would actually like to check if file is already loaded
         # filename can be get using AWG.get('setup_filename')
         self.upload = upload
@@ -158,11 +157,13 @@ class CBox_OffOn(swf.Hard_Sweep):
         if self.upload:
             ch3_amp = self.AWG.get('ch3_amp')
             ch4_amp = self.AWG.get('ch3_amp')
-
+            print('reloaded')
             st_seqs.CBox_single_pulse_seq(
                 IF=self.IF,
                 meas_pulse_delay=self.meas_pulse_delay,
-                RO_trigger_delay=self.RO_trigger_delay, verbose=False)
+                RO_trigger_delay=self.RO_trigger_delay,
+                RO_pulse_length=self.RO_pulse_length,
+                verbose=False)
             self.AWG.set('ch3_amp', ch3_amp)
             self.AWG.set('ch4_amp', ch4_amp)
 

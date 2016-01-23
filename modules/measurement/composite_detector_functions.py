@@ -431,6 +431,7 @@ class Average_Readout_Contrast_CBox(det.Soft_Detector):
 #         self.MC_timedomain.remove()
 
 
+
 class SSRO_Fidelity_Detector_CBox(det.Soft_Detector):
     '''
     Currently only for CBox.
@@ -454,20 +455,21 @@ class SSRO_Fidelity_Detector_CBox(det.Soft_Detector):
         self.AWG = AWG
 
         self.IF = kw.pop('IF', -20e6)
-        self.mod_amp = kw.pop('mod_amp', 0.5)  # FIXME: Not used, need to remove
         self.RO_trigger_delay = kw.pop('RO_trigger_delay', -100e-9)
         self.meas_pulse_delay = kw.pop('meas_pulse_delay', 300e-9)
+        self.RO_pulse_length = kw.pop('RO_pulse_length', 300e-9)
+
         self.i = 0
 
         self.raw = raw  # Performs no fits if True
 
     def prepare(self, **kw):
-
         self.MC.set_sweep_function(awg_swf.CBox_OffOn(
             IF=self.IF,
             meas_pulse_delay=self.meas_pulse_delay,
             RO_trigger_delay=self.RO_trigger_delay,
-            mod_amp=self.mod_amp, AWG=self.AWG, CBox=self.CBox))
+            RO_pulse_length=self.RO_pulse_length,
+            AWG=self.AWG, CBox=self.CBox))
 
         self.MC.set_detector_function(
             det.CBox_alternating_shots_det(self.CBox, self.AWG))

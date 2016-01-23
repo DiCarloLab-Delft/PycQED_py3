@@ -86,6 +86,7 @@ def generate_and_upload_marker_sequence(marker_length, marker_interval,
 
 def CBox_single_pulse_seq(IF, meas_pulse_delay=0, RO_trigger_delay=0,
                           verbose=False):
+    print('reload')
     seq_name = 'Single_pulse_sequence'
     seq = sequence.Sequence(seq_name)
     el_list = []

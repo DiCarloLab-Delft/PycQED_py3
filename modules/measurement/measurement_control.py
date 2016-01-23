@@ -616,7 +616,7 @@ class MeasurementControl:
             end_char = '\n'
         print(progress_message, end=end_char)
 
-    def print_progress_static_2D_hard(self):
+    def print_progress_static_hard(self):
         acquired_points = self.dset.shape[0]
         total_nr_pts = self.sweep_points.shape[0]
         if acquired_points == total_nr_pts:
@@ -742,7 +742,7 @@ class MeasurementControl:
         return self.af_pars
 
     def set_measurement_name(self, measurement_name):
-        if measurement_name == 'None':
+        if measurement_name is None:
             self.measurement_name = 'Measurement'
         else:
             self.measurement_name = measurement_name
