@@ -80,13 +80,13 @@ for i in range(4):
 # to make the pulsar available to the standard awg seqs
 st_seqs.station = station
 
-IVVI.set('dac2', 0)
+IVVI.set('dac2', 300)
 IVVI.set('dac5', 95.0)
 
 RO_freq = 6.8482e9
 qubit_freq = 6.4718e9 - 40e6  # as measured by my Ramsey
 IF = -20e6        # RO modulation frequency
-mod_freq = -40e6  # Qubit pulse modulation frequency
+mod_freq = -50e6  # Qubit pulse modulation frequency
 
 HS.set('mod_amp', .13)  # low power regime of VIPmon2
 HS.set('IF', IF)

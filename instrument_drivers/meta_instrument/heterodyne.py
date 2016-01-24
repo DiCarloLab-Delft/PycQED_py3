@@ -10,6 +10,7 @@ from qcodes.utils import validators as vals
 # Used for uploading the right AWG sequences
 from modules.measurement.pulse_sequences import standard_sequences as st_seqs
 
+
 class HeterodyneInstrument(Instrument):
     '''
     This is a virtual instrument for a homodyne source

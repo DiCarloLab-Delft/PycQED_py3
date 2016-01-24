@@ -84,6 +84,30 @@ def generate_and_upload_marker_sequence(marker_length, marker_interval,
     return seq_name
 
 
+def Pulsed_spec_seq_RF_mod(IF, spec_pulse_length=1e-6,
+                           RO_pulse_length=1e-6,
+                           RO_pulse_delay=100e-9,
+                           RO_trigger_delay=0,
+                           marker_interval=4e-6,
+                           mod_amp=0.5):
+    seq_name = 'Pulsed_spec_with_RF_mod'
+    seq = sequence.Sequence(seq_name)
+    el_list = []
+    for i in range(2):
+        el = st_elts.pulsed_spec_elt_with_RF_mod(
+            i, station, IF,
+            spec_pulse_length=spec_pulse_length,
+            RO_pulse_length=RO_pulse_length,
+            RO_pulse_delay=RO_pulse_delay,
+            RO_trigger_delay=RO_trigger_delay,
+            marker_interval=marker_interval,
+            mod_amp=mod_amp)
+        el_list.append(el)
+        seq.append_element(el, trigger_wait=False) # Ensures a continuously running sequence
+    station.instruments['AWG'].stop()
+    station.pulsar.program_awg(seq, *el_list, verbose=False)
+
+
 def CBox_single_pulse_seq(IF, meas_pulse_delay, RO_trigger_delay,
                           RO_pulse_length, verbose=False):
     print('reload')

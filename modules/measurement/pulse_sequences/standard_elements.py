@@ -202,7 +202,7 @@ def multi_pulse_elt(i, station, IF, meas_pulse_delay=0,
                                 refpulse=marker_ref, refpoint='start')
             el.add(pulse.cp(sqp, channel='ch1_marker2'),
                    refpulse=marker_ref,
-                   name = 'CBox-pulse-trigger-2%s' % j,
+                   name='CBox-pulse-trigger-2%s' % j,
                    refpoint='start', start=0)
 
         # Readout modulation tone
@@ -224,3 +224,61 @@ def multi_pulse_elt(i, station, IF, meas_pulse_delay=0,
         el.add(pulse.cp(ROm, channel='ch4_marker2'),
                refpulse=ROm_name, refpoint='start', start=0)
         return el
+
+
+def pulsed_spec_elt_with_RF_mod(i, station, IF,
+                                spec_pulse_length=1e-6,
+                                RO_pulse_length=1e-6,
+                                RO_pulse_delay=100e-9,
+                                RO_trigger_delay=0,
+                                marker_interval=4e-6,
+                                mod_amp=0.5):
+    el = element.Element(name=('el %s' % i),
+                         pulsar=station.pulsar)
+
+    # Thispulse ensures that the total length of the element is exactly 200us
+    ref_length_pulse = el.add(pulse.SquarePulse(name='refpulse_0',
+                              channel='ch2',
+                              amplitude=0, length=200e-6,
+                              start=0))
+    # This pulse is used as a reference
+    refpulse = el.add(pulse.SquarePulse(name='refpulse_0', channel='ch1',
+                      amplitude=0, length=100e-9,
+                      start=10e-9))
+
+
+    # a marker pulse
+    sqp = pulse.SquarePulse(name='CBox-pulse-trigger',
+                            channel='ch1_marker1',
+                            amplitude=1, length=15e-9)
+    CosP = pulse.CosPulse(name='cosI', channel='ch3',
+                          amplitude=mod_amp, frequency=IF,
+                          length=RO_pulse_length)
+    SinP = pulse.CosPulse(name='sinQ', channel='ch4',
+                          amplitude=mod_amp, frequency=IF,
+                          length=RO_pulse_length, phase=90)
+
+    number_of_pulses = int(200*1e-6/marker_interval)
+
+    for i in range(number_of_pulses):
+        for j in range(2):
+            # spec pulse marker
+            el.add(pulse.cp(sqp, channel='ch2_marker{}'.format(j+1),
+                            length=spec_pulse_length),
+                   name='Spec-marker-{}{}'.format(i, j),
+                   start=i*marker_interval,
+                   refpulse=refpulse, refpoint='start')
+        # RO modulation tone
+        el.add(pulse.cp(CosP), name='RO-Cos-{}'.format(i),
+               start=RO_pulse_delay, refpoint='end',
+               refpulse='Spec-marker-{}{}'.format(i, j))
+        el.add(pulse.cp(SinP), name='RO-Sin-{}'.format(i),
+               start=0, refpoint='start', refpulse='RO-Cos-{}'.format(i))
+        for j in range(2):
+            # RO acquisition marker
+            el.add(pulse.cp(sqp, channel='ch4_marker{}'.format(j+1)),
+                   name='RO-marker-{}{}'.format(i, j),
+                   start=RO_trigger_delay,
+                   refpulse='RO-Cos-{}'.format(i), refpoint='start')
+    return el
+

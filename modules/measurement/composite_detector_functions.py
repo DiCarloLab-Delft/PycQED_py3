@@ -494,7 +494,11 @@ class AllXY_devition_detector_CBox(det.Soft_Detector):
     Currently only for CBox.
     Todo: remove the predefined values for the sequence
     '''
-    def __init__(self, measurement_name, MC, AWG, CBox, **kw):
+    def __init__(self, measurement_name, MC, AWG, CBox, LutMan=None,
+                 reload_pulses=False, **kw):
+        '''
+        If reloading of pulses is desired the LutMan is a required instrument
+        '''
         self.detector_control = 'soft'
         self.name = 'AllXY_dev_i'
         # For an explanation of the difference between the different
@@ -514,6 +518,9 @@ class AllXY_devition_detector_CBox(det.Soft_Detector):
         self.meas_pulse_delay = kw.pop('meas_pulse_delay', 300e-9)
         self.interpulse_delay = kw.pop('interpulse_delay', 80e-9)
 
+        self.LutMan = LutMan
+        self.reload_pulses = reload_pulses
+
     def prepare(self, **kw):
         self.i = 0
         self.MC.set_sweep_function(awg_swf.CBox_AllXY(
@@ -527,6 +534,11 @@ class AllXY_devition_detector_CBox(det.Soft_Detector):
 
     def acquire_data_point(self, *args, **kw):
         self.i += 1
+        if self.reload_pulses:
+            self.LutMan.load_pulses_onto_AWG_lookuptable(0)
+            self.LutMan.load_pulses_onto_AWG_lookuptable(1)
+            self.LutMan.load_pulses_onto_AWG_lookuptable(2)
+
         self.MC.run(name=self.measurement_name+'_'+str(self.i))
 
         ana = MA.AllXY_Analysis(label=self.measurement_name)
