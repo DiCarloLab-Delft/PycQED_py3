@@ -486,25 +486,6 @@ class AWG_multi_channel_amplitude(Soft_Sweep):
             self.AWG.set('ch{}_amp'.format(ch), val)
 
 
-class AWG_channel_phase(Soft_Sweep):
-    '''
-    Sweep AWG channel phase for Mixer calibration
-    Needs to be generalized for AWG_Comp
-    Note this only works in continuous mode
-    '''
-    def __init__(self, channel, **kw):
-        super(AWG_channel_phase, self).__init__()
-        self.AWG = qt.instruments['AWG']
-        self.channel = channel
-
-        self.name = 'AWG phase channel '+str(self.channel)
-        self.parameter_name = 'Phase'
-        self.unit = 'deg'
-
-    def set_parameter(self, phase):
-        self.AWG.send_visa_command('SOUR{}:PHASe {}'.format(self.channel, phase))
-
-
 class AWG_sequence(Soft_Sweep):
     '''
     Sweep AWG sequences

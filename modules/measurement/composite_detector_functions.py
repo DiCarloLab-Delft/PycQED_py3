@@ -437,7 +437,7 @@ class SSRO_Fidelity_Detector_CBox(det.Soft_Detector):
     Currently only for CBox.
     Todo: remove the predefined values for the sequence
     '''
-    def __init__(self, measurement_name, MC, AWG, CBox, raw=True, **kw):
+    def __init__(self, measurement_name, MC, AWG, CBox,  raw=True, measurement_pulse_length=300e-9, **kw):
         self.detector_control = 'soft'
         self.name = 'SSRO_Fidelity'
         # For an explanation of the difference between the different
@@ -457,7 +457,7 @@ class SSRO_Fidelity_Detector_CBox(det.Soft_Detector):
         self.IF = kw.pop('IF', -20e6)
         self.RO_trigger_delay = kw.pop('RO_trigger_delay', -100e-9)
         self.meas_pulse_delay = kw.pop('meas_pulse_delay', 300e-9)
-        self.RO_pulse_length = kw.pop('RO_pulse_length', 300e-9)
+        self.RO_pulse_length = kw.pop('RO_pulse_length', measurement_pulse_length)
 
         self.i = 0
 
