@@ -226,6 +226,72 @@ def multi_pulse_elt(i, station, IF, meas_pulse_delay=0,
         return el
 
 
+def CBox_resetless_multi_pulse_elt(
+        i, station, IF,
+        meas_pulse_delay=0,
+        RO_pulse_length=1e-6, RO_trigger_delay=0,
+        RO_pulse_delay=100e-9,
+        pulse_separation=60e-9,
+        resetless_interval=10e-6,
+        n_pulses=3,
+        mod_amp=.5):
+    el = element.Element(name=('el %s' % i),
+                         pulsar=station.pulsar)
+
+    # Thispulse ensures that the total length of the element is exactly 200us
+    el.add(pulse.SquarePulse(name='refpulse_200us',
+                             channel='ch2',
+                             amplitude=0, length=200e-6,
+                             start=0))
+    # This pulse is used as a reference
+    refpulse = el.add(pulse.SquarePulse(name='refpulse_0', channel='ch1',
+                      amplitude=0, length=100e-9,
+                      start=10e-9))
+    # a marker pulse
+    sqp = pulse.SquarePulse(name='CBox-pulse-trigger',
+                            channel='ch1_marker1',
+                            amplitude=1, length=15e-9)
+    CosP = pulse.CosPulse(name='cosI', channel='ch3',
+                          amplitude=mod_amp, frequency=IF,
+                          length=RO_pulse_length)
+    SinP = pulse.CosPulse(name='sinQ', channel='ch4',
+                          amplitude=mod_amp, frequency=IF,
+                          length=RO_pulse_length, phase=90)
+
+    number_of_resetless_sequences = int(200*1e-6/resetless_interval)
+
+    if number_of_resetless_sequences < 1:
+        logging.warning('Number of resetless seqs <1 ')
+    if ((n_pulses * pulse_separation + RO_pulse_length+RO_pulse_delay) >
+            resetless_interval):
+        logging.warning('Sequence does not fit in the resetless interval')
+
+    for i in range(number_of_resetless_sequences):
+        for j in range(n_pulses):
+            # overwrite the reference with the latest added marker
+            el.add(pulse.cp(sqp, channel='ch1_marker1'),
+                   name='CBox-pulse-trigger-ch1_{}.{}'.format(i, j),
+                   start=j*pulse_separation+i*resetless_interval,
+                   refpulse=refpulse, refpoint='start')
+            el.add(pulse.cp(sqp, channel='ch1_marker2'),
+                   refpulse='CBox-pulse-trigger-ch1_{}.{}'.format(i, j),
+                   name='CBox-pulse-trigger-ch2_{}.{}'.format(i, j),
+                   refpoint='start', start=0)
+        # RO modulation tone
+        el.add(pulse.cp(CosP), name='RO-Cos-{}'.format(i),
+               start=RO_pulse_delay, refpoint='end',
+               refpulse='CBox-pulse-trigger-ch1_{}.{}'.format(i, j))
+        el.add(pulse.cp(SinP), name='RO-Sin-{}'.format(i),
+               start=0, refpoint='start', refpulse='RO-Cos-{}'.format(i))
+        for k in range(2):
+            # RO acquisition marker
+            el.add(pulse.cp(sqp, channel='ch4_marker{}'.format(k+1)),
+                   name='RO-marker-{}{}'.format(i, k),
+                   start=RO_trigger_delay,
+                   refpulse='RO-Cos-{}'.format(i), refpoint='start')
+    return el
+
+
 def pulsed_spec_elt_with_RF_mod(i, station, IF,
                                 spec_pulse_length=1e-6,
                                 RO_pulse_length=1e-6,

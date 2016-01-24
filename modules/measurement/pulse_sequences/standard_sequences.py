@@ -148,7 +148,9 @@ def CBox_two_pulse_seq(IF, interpulse_delay=40e-9,
 
 def CBox_multi_pulse_seq(IF, n_pulses,
                          interpulse_delay=40e-9,
-                         meas_pulse_delay=0, RO_trigger_delay=0,
+                         meas_pulse_delay=0,
+                         RO_pulse_length=1e-6,
+                         RO_trigger_delay=0,
                          verbose=False):
     seq_name = 'CBox_%s_pulse_seq' % n_pulses
     seq = sequence.Sequence(seq_name)
@@ -156,16 +158,40 @@ def CBox_multi_pulse_seq(IF, n_pulses,
 
     for i in range(2):  # seq has to have at least 2 elts
         el = st_elts.multi_pulse_elt(i, station, IF,
-                                   interpulse_delay=interpulse_delay,
-                                   meas_pulse_delay=meas_pulse_delay,
-                                   RO_trigger_delay=RO_trigger_delay,
-                                   n_pulses=n_pulses)
+                                     interpulse_delay=interpulse_delay,
+                                     meas_pulse_delay=meas_pulse_delay,
+                                     RO_pulse_length=RO_pulse_length,
+                                     RO_trigger_delay=RO_trigger_delay,
+                                     n_pulses=n_pulses)
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
     station.instruments['AWG'].stop()
     station.pulsar.program_awg(seq, *el_list, verbose=verbose)
     return seq_name
 
+
+def CBox_resetless_multi_pulse_seq(IF, n_pulses,
+                                   pulse_separation=60e-9,
+                                   meas_pulse_delay=0,
+                                   RO_pulse_length=1e-6,
+                                   RO_trigger_delay=0,
+                                   resetless_interval=10e-6,
+                                   verbose=False):
+    seq_name = 'CBox_resetless_{}_pulse_seq'.format(n_pulses)
+    seq = sequence.Sequence(seq_name)
+    el_list = []
+    for i in range(2):  # seq has to have at least 2 elts
+        el = st_elts.CBox_resetless_multi_pulse_elt(
+            i, station, IF,
+            pulse_separation=pulse_separation,
+            meas_pulse_delay=meas_pulse_delay,
+            RO_trigger_delay=RO_trigger_delay,
+            RO_pulse_length=RO_pulse_length,
+            n_pulses=n_pulses)
+        el_list.append(el)
+        seq.append_element(el, trigger_wait=True)
+    station.instruments['AWG'].stop()
+    station.pulsar.program_awg(seq, *el_list, verbose=verbose)
 
 
 def CBox_T1_marker_seq(IF, times, meas_pulse_delay,
