@@ -378,23 +378,7 @@ class Step_Atten_dB(Soft_Sweep):
         self.step_atten.set_attenuation(val)
 
 
-
-
 ###################################
-
-
-class Bias_Dac_mV(Soft_Sweep):
-    def __init__(self, dac_channel, sleeptime=0, **kw):
-        super(Bias_Dac_mV, self).__init__()
-        self.dac_channel = dac_channel
-        self.name = 'Dac_'+str(dac_channel)+' Voltage'
-        self.parameter_name = 'Dac_'+str(dac_channel)
-        self.unit = 'mV'
-        self.sleeptime = sleeptime
-
-    def set_parameter(self, val):
-        eval("qt.instruments['IVVI'].set_dac%d(val)" % self.dac_channel)
-        qt.msleep(self.sleeptime)
 
 class Flux_Control_mV(Soft_Sweep):
     def __init__(self, flux_channel, **kw):

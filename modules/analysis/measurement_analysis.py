@@ -613,8 +613,15 @@ class MeasurementAnalysis(object):
 class OptimizationAnalysis(MeasurementAnalysis):
     def run_default_analysis(self, close_file=True, show=False, **kw):
         self.get_naming_and_values()
-        optimization_method = self.data_file['Instrument settings']\
-            ['MC'].attrs['optimization_method']
+        try:
+            optimization_method = self.data_file['Instrument settings']\
+                ['MC'].attrs['optimization_method']
+        except:
+            optimization_method = 'Numerical'
+            # This is because the MC is no longer an instrument and thus
+            # does not get saved, I have to re add this (MAR 1/2016)
+            logging.warning('Could not extract optimization method from' +
+                            ' data file')
 
         base_figname = optimization_method + ' optimization of ' + \
             self.value_names[0]
@@ -631,15 +638,16 @@ class OptimizationAnalysis(MeasurementAnalysis):
         ax.set_ylabel(self.ylabels[0])
         ax.set_title(self.timestamp_string + ' ' + figname1)
 
-        textstr = 'Optimization converged to: \n   %s: %.2f %s' % (
+        textstr = 'Optimization converged to: \n   %s: %.3g %s' % (
             self.value_names[0], self.measured_values[0][-1],
             self.value_units[0])
         for i in range(len(self.parameter_names)):
-            textstr += '\n   %s: %.2f %s' % (self.parameter_names[i],
+            textstr += '\n   %s: %.4g %s' % (self.parameter_names[i],
                                              self.sweep_points[i][-1],
                                              self.parameter_units[i])
 
-        ax.text(0.95, 0.05, textstr,
+        # y coord 0.4 ensures there is no overlap for both maximizing and minim
+        ax.text(0.95, 0.4, textstr,
                 transform=ax.transAxes,
                 fontsize=11, verticalalignment='bottom',
                 horizontalalignment='right',
@@ -655,12 +663,12 @@ class OptimizationAnalysis(MeasurementAnalysis):
             fig2_type
 
         if len(self.parameter_names) != 1:
+            axarray[0].set_title(self.timestamp_string + ' ' + figname2)
             for i in range(len(self.parameter_names)):
                 axarray[i].plot(self.sweep_points[i], marker='o')
                 # assumes only one value exists because it is an optimization
                 axarray[i].set_xlabel('iteration (n)')
                 axarray[i].set_ylabel(self.parameter_labels[i])
-                axarray[i].set_title(self.timestamp_string + ' ' + figname2)
         else:
             axarray.plot(self.sweep_points, marker='o')
             # assumes only one value exists because it is an optimization
@@ -679,6 +687,7 @@ class OptimizationAnalysis(MeasurementAnalysis):
 
         cm = plt.cm.get_cmap('RdYlBu')
         if len(self.parameter_names) != 1:
+            axarray[0].set_title(self.timestamp_string + ' ' + figname3)
             for i in range(len(self.parameter_names)):
                 axarray[i].plot(self.sweep_points[i], self.measured_values[0],
                                 linestyle='--', c='k')
@@ -689,7 +698,6 @@ class OptimizationAnalysis(MeasurementAnalysis):
                                         cmap=cm, marker='o', lw=0.1)
                 axarray[i].set_xlabel(self.parameter_labels[i])
                 axarray[i].set_ylabel(self.ylabels[0])
-                axarray[i].set_title(self.timestamp_string + ' ' + figname3)
             fig3.subplots_adjust(right=0.8)
             # WARNING: Command does not work in ipython notebook
             cbar_ax = fig3.add_axes([.85, 0.15, 0.05, 0.7])

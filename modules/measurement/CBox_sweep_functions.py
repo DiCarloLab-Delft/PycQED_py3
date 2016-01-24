@@ -262,26 +262,26 @@ class Lut_man_f_modulation(Soft_Sweep):
             self.CBox_lut_man.load_pulses_onto_AWG_lookuptable(self.awg_nr)
 
 
-class Lut_man_amp180_90(Soft_Sweep):
+class LutMan_amp180_90(Soft_Sweep):
     '''
     Sweeps both the amp180 parameter and the amp90 of the CBox_lut_man
     Automatically sets amp90 to half of amp180.
     The amp180 is the sweep parameter that is set and tracked.
     '''
-    def __init__(self, reload_pulses=True, awg_nr=0):
+    def __init__(self, LutMan, reload_pulses=True, awg_nr=0):
         super(self.__class__, self).__init__()
         self.awg_nr = awg_nr
         self.reload_pulses = reload_pulses
         self.name = 'lookuptable amp180'
         self.parameter_name = 'amp180'
         self.unit = 'mV'
-        self.CBox_lut_man = qt.instruments['CBox_lut_man']
+        self.LutMan = LutMan
 
     def set_parameter(self, val):
-        self.CBox_lut_man.set_amp180(val)
-        self.CBox_lut_man.set_amp90(val/2.0)
+        self.LutMan.set('amp180', val)
+        self.LutMan.set('amp90', val/2.0)
         if self.reload_pulses:
-            self.CBox_lut_man.load_pulses_onto_AWG_lookuptable(self.awg_nr)
+            self.LutMan.load_pulses_onto_AWG_lookuptable(self.awg_nr)
 
 
 class Lut_man_amp180(Soft_Sweep):

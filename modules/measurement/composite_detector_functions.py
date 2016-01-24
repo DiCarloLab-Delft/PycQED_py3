@@ -464,6 +464,8 @@ class SSRO_Fidelity_Detector_CBox(det.Soft_Detector):
         self.raw = raw  # Performs no fits if True
 
     def prepare(self, **kw):
+        self.CBox.set('log_length', self.NoSamples)
+
         self.MC.set_sweep_function(awg_swf.CBox_OffOn(
             IF=self.IF,
             meas_pulse_delay=self.meas_pulse_delay,
@@ -528,8 +530,10 @@ class AllXY_devition_detector_CBox(det.Soft_Detector):
         self.MC.run(name=self.measurement_name+'_'+str(self.i))
 
         ana = MA.AllXY_Analysis(label=self.measurement_name)
-        avg_dev = ana.deviation_total/21
-        return avg_dev
+        tot_dev = ana.deviation_total
+        avg_dev = tot_dev/21
+
+        return tot_dev, avg_dev
 
 
 # class SSRO_Fidelity_Detector_ATS(det.Soft_Detector):

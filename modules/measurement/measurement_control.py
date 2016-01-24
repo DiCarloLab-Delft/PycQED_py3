@@ -64,6 +64,7 @@ class MeasurementControl:
         '''
         self.set_measurement_name(name)
         self.print_measurement_start_msg()
+        self.mode = mode
         with h5d.Data(name=self.get_measurement_name()) as self.data_object:
             self.get_measurement_begintime()
             #Commented out because requires git shell interaction from python
@@ -73,14 +74,14 @@ class MeasurementControl:
             self.save_instrument_settings(self.data_object)
 
             self.create_experimentaldata_dataset()
-            if mode == '1D':
+            if self.mode == '1D':
                 self.measure()
-            elif mode == '2D':
+            elif self.mode == '2D':
                 self.measure_2D()
-            elif mode == 'adaptive':
+            elif self.mode == 'adaptive':
                 self.measure_soft_adaptive()
             else:
-                raise ValueError('mode %s not recognized' % mode)
+                raise ValueError('mode %s not recognized' % self.mode)
 
     def measure(self, *kw):
         self.initialize_plot_monitor()
@@ -140,6 +141,7 @@ class MeasurementControl:
         adaptive_function = self.af_pars.pop('adaptive_function')
         print('Adaptive function passed: %s' % adaptive_function)
 
+        self.initialize_plot_monitor()
         for sweep_function in self.sweep_functions:
             sweep_function.prepare()
         self.detector_function.prepare()
@@ -198,7 +200,7 @@ class MeasurementControl:
         # Only add sweep points if these make sense (i.e. same shape as new_data)
         if sweep_len == len_new_data:  # 1D sweep
             self.dset[:, 0] = self.get_sweep_points().T
-        elif hasattr(self, 'xlen'):  # 2D sweep
+        elif self.mode is '2D':  # 2D sweep
             # always add for a 2D sweep
             relevant_swp_points = self.get_sweep_points()[
                 start_idx:start_idx+len_new_data:]
@@ -244,22 +246,6 @@ class MeasurementControl:
         self.dset[self.iteration-1, :] = savable_data
         # update plotmon
         self.update_plotmon()
-        # if len(self.sweep_functions) == 1:
-        #     for i in range(len(self.detector_function.value_names)):
-        #         self.update_plotmon(mon_nr=i+1, x_ind=0, y_ind=i+1)
-        # elif len(self.sweep_functions) == 2:
-        #     for i in range(len(self.detector_function.value_names)):
-        #         self.update_plotmon(mon_nr=i+1, x_ind=0, y_ind=i+1)
-        # elif len(self.sweep_functions) <= 4:
-        #     for i in range(len(self.sweep_functions)):
-        #         self.update_plotmon(
-        #             mon_nr=i+1, x_ind=i,
-        #             y_ind=-len(self.detector_function.value_names))
-        # else:
-        #     for i in range(4):
-        #         self.update_plotmon(
-        #             mon_nr=i+1, x_ind=i,
-        #             y_ind=-len(self.detector_function.value_names))
         if hasattr(self, 'TwoD_array'):
             self.update_plotmon_2D()
         return vals
@@ -285,8 +271,9 @@ class MeasurementControl:
                 x[i] = float(x[i])/float(self.x_scale[i])
         if self.minimize_optimization:
             vals = self.measurement_function(x)
-            if (vals < self.f_termination) & (self.f_termination is not None):
-                raise StopIteration()
+            if (self.f_termination is not None):
+                if (vals < self.f_termination):
+                    raise StopIteration()
         else:
             vals = self.measurement_function(x)
             # when maximizing interrupt when larger than condition before
@@ -295,13 +282,11 @@ class MeasurementControl:
                 raise StopIteration()
             vals = np.multiply(-1, vals)
 
-        # print 'Completed iteration %d' % self.iteration
-        # measurement function ensures this self.iteration is correct
-        # print 'Measured with parameters: ', x
-        # print 'Measured value: ', vals
-        self.update_plotmon(
-            mon_nr=5, x_ind=None,
-            y_ind=-len(self.detector_function.value_names))
+        # TODO: re add the extra plotmon that shows the progress of the
+        # optimization
+        # self.update_plotmon(
+        #     mon_nr=5, x_ind=None,
+        #     y_ind=-len(self.detector_function.value_names))
         # to check if vals is an array with multiple values
         if hasattr(vals, '__iter__'):
             if len(vals) > 1:
@@ -396,6 +381,8 @@ class MeasurementControl:
     the 2D plotmon (which does a heatmap) and the adaptive plotmon.
     '''
     def initialize_plot_monitor(self):
+
+        self._monitor_refresh_time = .5  # used when there is more than 200 pts
         self.win.clear()  # clear out previous data
         self.curves = []
         xlabels = self.column_names[0:len(self.sweep_function_names)]
@@ -413,13 +400,23 @@ class MeasurementControl:
 
     def update_plotmon(self):
         i = 0
-        nr_sweep_funcs = len(self.sweep_function_names)
-        for x_ind in range(nr_sweep_funcs):
+        try:
+            time_since_last_mon_update = time.time() - self._mon_upd_time
+        except:
+            self._mon_upd_time = time.time()
+            time_since_last_mon_update = 1e9
+        # Update always if just a few points otherwise wait for the refresh
+        # timer
+        if (self.dset.shape[0] < 200 or time_since_last_mon_update >
+                self._monitor_refresh_time):
+            nr_sweep_funcs = len(self.sweep_function_names)
             for y_ind in range(len(self.detector_function.value_names)):
-                x = self.dset[:, x_ind]
-                y = self.dset[:, nr_sweep_funcs+y_ind]
-                self.curves[i].setData(x, y)
-                i += 1
+                for x_ind in range(nr_sweep_funcs):
+                    x = self.dset[:, x_ind]
+                    y = self.dset[:, nr_sweep_funcs+y_ind]
+                    self.curves[i].setData(x, y)
+                    i += 1
+            self._mon_upd_time = time.time()
 
     def new_plotmon_window(self):
         '''

@@ -3,7 +3,7 @@ import logging
 from modules.measurement import sweep_functions as swf
 
 from modules.measurement.pulse_sequences import standard_sequences as st_seqs
-default_gauss_width = 10
+default_gauss_width = 10  # magic number should be removed
 
 
 class CBox_T1(swf.Hard_Sweep):
@@ -157,7 +157,6 @@ class CBox_OffOn(swf.Hard_Sweep):
         if self.upload:
             ch3_amp = self.AWG.get('ch3_amp')
             ch4_amp = self.AWG.get('ch3_amp')
-            print('reloaded')
             st_seqs.CBox_single_pulse_seq(
                 IF=self.IF,
                 meas_pulse_delay=self.meas_pulse_delay,

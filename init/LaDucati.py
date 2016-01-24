@@ -41,7 +41,7 @@ import instrument_drivers.meta_instrument.CBox_LookuptableManager as lm
 CBox = qcb.QuTech_ControlBox('CBox', address='Com3', run_tests=False)
 S1 = rs.RS_SGS100A('S1', address='GPIB0::11::INSTR') #located on top of rack
 LO = rs.RS_SGS100A(name='LO', address='TCPIP0::192.168.0.77')  # left of s2
-S2 = rs.RS_SGS100A(name='S1', address='TCPIP0::192.168.0.78')  # right
+S2 = rs.RS_SGS100A(name='S2', address='TCPIP0::192.168.0.78')  # right
 AWG = tek.Tektronix_AWG5014(name='AWG', setup_folder=None,
                             address='TCPIP0::192.168.0.9')
 IVVI = iv.IVVI('IVVI', address='ASRL1', numdacs=16)
@@ -109,8 +109,8 @@ LutMan.set('amp180', amp180)
 LutMan.set('amp90', amp180/2)
 
 # Calibrated at 6.5GHz (18-1-2016)
-CBox.set_dac_offset(0, 1, 18.81)  # I channel qubit drive AWG
-CBox.set_dac_offset(0, 0, -24.938)  # Q channel
+CBox.set_dac_offset(0, 1, 18.6948)  # I channel qubit drive AWG
+CBox.set_dac_offset(0, 0, -26.244)  # Q channel
 
 CBox.set_dac_offset(1, 1, 0)  # I channel
 CBox.set_dac_offset(1, 0, 0)  # Q channel readout AWG

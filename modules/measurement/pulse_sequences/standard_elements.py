@@ -22,7 +22,7 @@ def single_pulse_elt(i, station, IF, meas_pulse_delay=0, RO_trigger_delay=0,
         # exitst to ensure that channel is not high when waiting for trigger
         ref_elt = el.add(pulse.SquarePulse(name='refpulse_0', channel='ch1',
                          amplitude=0, length=1e-9))
-        for i in range(3): # Exist to ensure there are no empty channels
+        for i in range(3):  # Exist to ensure there are no empty channels
             el.add(pulse.SquarePulse(name='refpulse_0',
                                      channel='ch{}'.format(i+1),
                                      amplitude=0, length=1e-9))

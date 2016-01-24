@@ -84,16 +84,18 @@ def generate_and_upload_marker_sequence(marker_length, marker_interval,
     return seq_name
 
 
-def CBox_single_pulse_seq(IF, meas_pulse_delay=0, RO_trigger_delay=0,
-                          verbose=False):
+def CBox_single_pulse_seq(IF, meas_pulse_delay, RO_trigger_delay,
+                          RO_pulse_length, verbose=False):
     print('reload')
     seq_name = 'Single_pulse_sequence'
     seq = sequence.Sequence(seq_name)
     el_list = []
 
     for i in range(2):  # seq has to have at least 2 elts
-        el = st_elts.single_pulse_elt(i, station, IF, meas_pulse_delay,
-                                      RO_trigger_delay)
+        el = st_elts.single_pulse_elt(i, station, IF,
+                                      meas_pulse_delay,
+                                      RO_trigger_delay,
+                                      RO_pulse_length)
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
     station.instruments['AWG'].stop()
