@@ -355,7 +355,7 @@ class SSRO_Fidelity_Detector_CBox(det.Soft_Detector):
         self.MC.run(name=self.measurement_name+'_'+str(self.i))
 
         ana = ma.SSRO_Analysis(label=self.measurement_name,
-                               no_fits=self.raw)
+                               no_fits=self.raw, close_file=True)
         # Arbitrary choice, does not think about the deffinition
         if self.raw:
             return ana.F_raw
@@ -447,8 +447,6 @@ class CBox_trace_error_fraction_detector(det.Soft_Detector):
                     double_err_counter += 1
         return single_err_counter/trace_length, double_err_counter/trace_length
 
-
-
 # class SSRO_Fidelity_Detector_CBox_optimum_weights(SSRO_Fidelity_Detector_CBox):
 #     '''
 #     Currently only for CBox.
@@ -494,14 +492,15 @@ class CBox_trace_error_fraction_detector(det.Soft_Detector):
 #         else:
 #             return ana.F, ana.F_corrected
 
-
-
 class AllXY_devition_detector_CBox(det.Soft_Detector):
     '''
     Currently only for CBox.
     Todo: remove the predefined values for the sequence
     '''
-    def __init__(self, measurement_name, MC, AWG, CBox, LutMan=None,
+    def __init__(self, measurement_name, MC, AWG, CBox,
+                 IF, RO_trigger_delay, meas_pulse_delay, RO_pulse_length,
+                 pulse_separation,
+                 LutMan=None,
                  reload_pulses=False, **kw):
         '''
         If reloading of pulses is desired the LutMan is a required instrument
@@ -515,15 +514,15 @@ class AllXY_devition_detector_CBox(det.Soft_Detector):
         # convenience as I understand the scale of total deviation
         self.value_units = ['', '']
         self.measurement_name = measurement_name
-        self.NoSamples = kw.get('NoSamples', 8000)  # current max of log mode
         self.MC = MC
         self.CBox = CBox
         self.AWG = AWG
 
-        self.IF = kw.pop('IF', -20e6)
-        self.RO_trigger_delay = kw.pop('RO_trigger_delay', -100e-9)
-        self.meas_pulse_delay = kw.pop('meas_pulse_delay', 300e-9)
-        self.interpulse_delay = kw.pop('interpulse_delay', 80e-9)
+        self.IF = IF
+        self.RO_trigger_delay = RO_trigger_delay
+        self.meas_pulse_delay = meas_pulse_delay
+        self.pulse_separation = pulse_separation
+        self.RO_pulse_length = RO_pulse_length
 
         self.LutMan = LutMan
         self.reload_pulses = reload_pulses
@@ -532,9 +531,10 @@ class AllXY_devition_detector_CBox(det.Soft_Detector):
         self.i = 0
         self.MC.set_sweep_function(awg_swf.CBox_AllXY(
                                    IF=self.IF,
-                                   interpulse_delay=self.interpulse_delay,
+                                   pulse_separation=self.pulse_separation,
                                    meas_pulse_delay=self.meas_pulse_delay,
                                    RO_trigger_delay=self.RO_trigger_delay,
+                                   RO_pulse_length=self.RO_pulse_length,
                                    AWG=self.AWG, CBox=self.CBox))
         self.MC.set_detector_function(
             det.CBox_integrated_average_detector(self.CBox, self.AWG))

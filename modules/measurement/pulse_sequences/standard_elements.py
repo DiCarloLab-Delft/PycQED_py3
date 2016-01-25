@@ -6,7 +6,7 @@ from ..waveform_control import pulse
 from ..waveform_control import pulse_library as pl
 
 
-def single_pulse_elt(i, station, IF, meas_pulse_delay=0, RO_trigger_delay=0,
+def single_pulse_elt(i, station, IF, RO_pulse_delay=0, RO_trigger_delay=0,
                      RO_pulse_length=1e-6, tau=0):
         '''
         Single pulse element for triggering the CBox.
@@ -38,7 +38,7 @@ def single_pulse_elt(i, station, IF, meas_pulse_delay=0, RO_trigger_delay=0,
         # Readout modulation tone
         cosP = pulse.CosPulse(name='cosI', channel='ch3',
                               amplitude=0.5, frequency=IF, length=RO_pulse_length)
-        ROpulse = el.add(cosP, start=tau+meas_pulse_delay,
+        ROpulse = el.add(cosP, start=tau+RO_pulse_delay,
                          refpulse='CBox-pulse-trigger',
                          fixed_point_freq=10e6)
         el.add(pulse.CosPulse(name='sinQ', channel='ch4',
@@ -96,13 +96,13 @@ def no_pulse_elt(i, station, IF, RO_trigger_delay=0, RO_pulse_length=1e-6):
         return el
 
 
-def two_pulse_elt(i, station, IF, meas_pulse_delay=0, RO_trigger_delay=0,
-                  RO_pulse_length=1e-6,
-                  interpulse_delay=40e-9, tau=0):
+def two_pulse_elt(i, station, IF, RO_pulse_delay, RO_trigger_delay,
+                  RO_pulse_length,
+                  pulse_separation, tau=0):
         '''
         two pulse element for triggering the CBox.
         Plays two markers of (15ns) on ch1m1 and ch1m2 separated by
-        the interpulse_delay and tau, followed by a cos that modulates the LO
+        the pulse_separation and tau, followed by a cos that modulates the LO
         for Readout and a RO marker.
 
         The RO-tone is fixed in phase with respect to the RO-trigger
@@ -136,14 +136,14 @@ def two_pulse_elt(i, station, IF, meas_pulse_delay=0, RO_trigger_delay=0,
         el.add(pulse.cp(sqp, channel='ch1_marker1'),
                name='CBox-pulse-trigger-2',
                refpulse='CBox-pulse-trigger-1', refpoint='start',
-               start=interpulse_delay+tau)
+               start=pulse_separation+tau)
         el.add(pulse.cp(sqp, channel='ch1_marker2'),
                refpulse='CBox-pulse-trigger-2', refpoint='start', start=0)
 
         # Readout modulation tone
         cosP = pulse.CosPulse(name='cosI', channel='ch3',
                               amplitude=0.5, frequency=IF, length=RO_pulse_length)
-        ROpulse = el.add(cosP, start=meas_pulse_delay,
+        ROpulse = el.add(cosP, start=RO_pulse_delay,
                          refpulse='CBox-pulse-trigger-2',
                          fixed_point_freq=10e6)
 
@@ -163,9 +163,9 @@ def two_pulse_elt(i, station, IF, meas_pulse_delay=0, RO_trigger_delay=0,
         return el
 
 
-def multi_pulse_elt(i, station, IF, meas_pulse_delay=0,
+def multi_pulse_elt(i, station, IF, RO_pulse_delay=0,
                     RO_pulse_length=1e-6, RO_trigger_delay=0,
-                    interpulse_delay=40e-9,
+                    pulse_separation=40e-9,
                     n_pulses=3,
                     taus=None):
 
@@ -198,7 +198,7 @@ def multi_pulse_elt(i, station, IF, meas_pulse_delay=0,
             # overwrite the reference with the latest added marker
             marker_ref = el.add(pulse.cp(sqp, channel='ch1_marker1'),
                                 name='CBox-pulse-trigger-%s' % j,
-                                start=interpulse_delay+taus[j],
+                                start=pulse_separation+taus[j],
                                 refpulse=marker_ref, refpoint='start')
             el.add(pulse.cp(sqp, channel='ch1_marker2'),
                    refpulse=marker_ref,
@@ -208,7 +208,7 @@ def multi_pulse_elt(i, station, IF, meas_pulse_delay=0,
         # Readout modulation tone
         cosP = pulse.CosPulse(name='cosI', channel='ch3',
                               amplitude=0.5, frequency=IF, length=RO_pulse_length)
-        ROpulse = el.add(cosP, start=meas_pulse_delay,
+        ROpulse = el.add(cosP, start=RO_pulse_delay,
                          refpulse=marker_ref, fixed_point_freq=10e6)
         el.add(pulse.CosPulse(name='sinQ', channel='ch4',
                               amplitude=0.5, frequency=IF,
@@ -228,7 +228,6 @@ def multi_pulse_elt(i, station, IF, meas_pulse_delay=0,
 
 def CBox_resetless_multi_pulse_elt(
         i, station, IF,
-        meas_pulse_delay=0,
         RO_pulse_length=1e-6, RO_trigger_delay=0,
         RO_pulse_delay=100e-9,
         pulse_separation=60e-9,
