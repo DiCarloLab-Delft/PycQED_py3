@@ -226,6 +226,56 @@ class CBox_AllXY(swf.Hard_Sweep):
             self.AWG.set('ch4_amp', ch4_amp)
 
 
+class Resetless_tape(swf.Hard_Sweep):
+    def __init__(self, n_pulses, tape,
+                 pulse_separation, resetless_interval,
+                 IF, RO_pulse_delay, RO_trigger_delay,
+                 RO_pulse_length,
+                 AWG, CBox,
+                 upload=True):
+        super().__init__()
+        self.IF = IF
+        self.RO_pulse_delay = RO_pulse_delay
+        self.RO_trigger_delay = RO_trigger_delay
+        self.parameter_name = 'Tape element'
+        self.unit = ''
+        self.name = 'Resetless_tape'
+        self.tape = tape
+        # array for transpose in MC these values are bs
+        self.sweep_points = np.array(self.tape)
+        self.AWG = AWG
+        self.CBox = CBox
+        self.RO_pulse_length = RO_pulse_length
+        # would actually like to check if file is already loaded
+        # filename can be get using AWG.get('setup_filename')
+        self.upload = upload
+
+        self.n_pulses = n_pulses
+        self.resetless_interval = resetless_interval
+        self.pulse_separation = pulse_separation
+
+    def prepare(self, **kw):
+        self.AWG.stop()
+        self.CBox.AWG0_mode.set('Tape')
+        self.CBox.AWG1_mode.set('Tape')
+        self.CBox.restart_awg_tape(0)
+        self.CBox.restart_awg_tape(1)
+        self.CBox.set('AWG0_tape', self.tape)
+        self.CBox.set('AWG1_tape', self.tape)
+        if self.upload:
+            ch3_amp = self.AWG.get('ch3_amp')
+            ch4_amp = self.AWG.get('ch3_amp')
+            st_seqs.CBox_resetless_multi_pulse_seq(
+                n_pulses=self.n_pulses, pulse_separation=self.pulse_separation,
+                resetless_interval=self.resetless_interval,
+                IF=self.IF,
+                RO_pulse_delay=self.RO_pulse_delay,
+                RO_trigger_delay=self.RO_trigger_delay,
+                RO_pulse_length=self.RO_pulse_length,
+                verbose=False)
+            self.AWG.set('ch3_amp', ch3_amp)
+            self.AWG.set('ch4_amp', ch4_amp)
+
 
 # class AWG_Sweep(swf.Hard_Sweep):
 #     def __init__(self, Duplexer=False, **kw):

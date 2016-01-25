@@ -235,7 +235,7 @@ def CBox_resetless_multi_pulse_elt(
         resetless_interval=10e-6,
         n_pulses=3,
         mod_amp=.5):
-    el = element.Element(name=('el %s' % i),
+    el = element.Element(name=('el_{}'.format(i)),
                          pulsar=station.pulsar)
 
     # Thispulse ensures that the total length of the element is exactly 200us
@@ -258,7 +258,9 @@ def CBox_resetless_multi_pulse_elt(
                           amplitude=mod_amp, frequency=IF,
                           length=RO_pulse_length, phase=90)
 
-    number_of_resetless_sequences = int(200*1e-6/resetless_interval)
+    # I multiply the interval by 1e6 instead of dividing 200 to prevent
+    # rounding errors
+    number_of_resetless_sequences = int(200/(resetless_interval*1e6))
 
     if number_of_resetless_sequences < 1:
         logging.warning('Number of resetless seqs <1 ')
@@ -272,7 +274,7 @@ def CBox_resetless_multi_pulse_elt(
             el.add(pulse.cp(sqp, channel='ch1_marker1'),
                    name='CBox-pulse-trigger-ch1_{}.{}'.format(i, j),
                    start=j*pulse_separation+i*resetless_interval,
-                   refpulse=refpulse, refpoint='start')
+                   refpulse=refpulse, refpoint='end')
             el.add(pulse.cp(sqp, channel='ch1_marker2'),
                    refpulse='CBox-pulse-trigger-ch1_{}.{}'.format(i, j),
                    name='CBox-pulse-trigger-ch2_{}.{}'.format(i, j),

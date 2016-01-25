@@ -99,15 +99,14 @@ S2.set('power', 14)
 S2.set('frequency', qubit_freq - mod_freq)
 S2.off()
 
-LutMan.set('lut_mapping',
-           ['I', 'X180', 'Y180', 'X90', 'Y90', 'I', 'I', 'I'])
+
 LutMan.set('f_modulation', mod_freq*1e-9)  # Lutman works in ns and GHz
 LutMan.set('gauss_width', 10)
-amp180 = 50
+amp180 = 520
 # Need to add attenuation to ensure a more sensible value is used (e.g. 300)
 LutMan.set('amp180', amp180)
 LutMan.set('amp90', amp180/2)
-
+LutMan.set('motzoi_parameter', -0.280901698)
 # Calibrated at 6.5GHz (18-1-2016)
 CBox.set_dac_offset(0, 1, 18.6948)  # I channel qubit drive AWG
 CBox.set_dac_offset(0, 0, -26.244)  # Q channel
@@ -115,15 +114,21 @@ CBox.set_dac_offset(0, 0, -26.244)  # Q channel
 CBox.set_dac_offset(1, 1, 0)  # I channel
 CBox.set_dac_offset(1, 0, 0)  # Q channel readout AWG
 
-t_base = np.arange(512)*5e-9
 
-cosI = np.cos(2*np.pi * t_base*IF)
-sinI = np.sin(2*np.pi * t_base*IF)
-w0 = np.round(cosI*120)
-w1 = np.round(sinI*120)
+def set_CBox_cos_sine_weigths(IF):
+    '''
+    Maybe I should add this to the CBox driver
+    '''
+    t_base = np.arange(512)*5e-9
 
-CBox.set('sig0_integration_weights', w0)
-CBox.set('sig1_integration_weights', w1)
+    cosI = np.cos(2*np.pi * t_base*IF)
+    sinI = np.sin(2*np.pi * t_base*IF)
+    w0 = np.round(cosI*120)
+    w1 = np.round(sinI*120)
+
+    CBox.set('sig0_integration_weights', w0)
+    CBox.set('sig1_integration_weights', w1)
+set_CBox_cos_sine_weigths(IF)
 
 CBox.set('nr_averages', 2048)
 # this is the max nr of averages that does not slow down the heterodyning

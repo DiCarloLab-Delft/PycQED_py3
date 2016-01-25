@@ -172,7 +172,7 @@ def CBox_multi_pulse_seq(IF, n_pulses,
 
 def CBox_resetless_multi_pulse_seq(IF, n_pulses,
                                    pulse_separation=60e-9,
-                                   meas_pulse_delay=0,
+                                   RO_pulse_delay=0,
                                    RO_pulse_length=1e-6,
                                    RO_trigger_delay=0,
                                    resetless_interval=10e-6,
@@ -180,16 +180,25 @@ def CBox_resetless_multi_pulse_seq(IF, n_pulses,
     seq_name = 'CBox_resetless_{}_pulse_seq'.format(n_pulses)
     seq = sequence.Sequence(seq_name)
     el_list = []
-    for i in range(2):  # seq has to have at least 2 elts
+    for i in range(3):  # seq has to have at least 2 elts
         el = st_elts.CBox_resetless_multi_pulse_elt(
             i, station, IF,
             pulse_separation=pulse_separation,
-            meas_pulse_delay=meas_pulse_delay,
+            RO_pulse_delay=RO_pulse_delay,
             RO_trigger_delay=RO_trigger_delay,
             RO_pulse_length=RO_pulse_length,
+            resetless_interval=resetless_interval,
             n_pulses=n_pulses)
         el_list.append(el)
-        seq.append_element(el, trigger_wait=True)
+
+    # trick to make sure the sequence runs continously while still requiring
+    # a trigger
+    seq.append_element(el_list[0], trigger_wait=True)
+    seq.append_element(el_list[1], trigger_wait=False,
+                       goto_target=el_list[1].name)
+    # Extra element is needed because otherwise last elt will always goto 1
+    seq.append_element(el_list[2], trigger_wait=False,
+                       goto_target=el_list[1].name)
     station.instruments['AWG'].stop()
     station.pulsar.program_awg(seq, *el_list, verbose=verbose)
 

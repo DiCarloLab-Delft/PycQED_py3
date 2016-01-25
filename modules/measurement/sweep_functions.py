@@ -598,11 +598,12 @@ class Hard_Sweep(Sweep_function):
     def __init__(self, **kw):
         super(Hard_Sweep, self).__init__()
         self.sweep_control = 'hard'
-        self.parameter_name = 'none'
+        self.parameter_name = 'None'
         self.unit = 'a.u.'
 
     def start_acquistion(self):
         pass
+
 # NOTE: AWG_sweeps are located in AWG_sweep_functions
 
 

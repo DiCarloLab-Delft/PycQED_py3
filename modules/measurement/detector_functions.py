@@ -71,7 +71,7 @@ class Hard_Detector(Detector_Function):
         super(Hard_Detector, self).__init__()
         self.detector_control = 'hard'
 
-    def prepare(self, sweep_points):
+    def prepare(self, sweep_points=None):
         pass
 
     def finish(self):
@@ -491,26 +491,43 @@ class CBox_single_int_avg_with_LutReload(CBox_single_integration_average_det):
     triggered by the AWG.
     Very similar to the regular integrated avg detector.
     '''
-    def __init__(self, CBox, LutMan, **kw):
+    def __init__(self, CBox, LutMan, reload_pulses='all', awg_nrs=[0], **kw):
         super().__init__(CBox, **kw)
         self.LutMan = LutMan
+        self.reload_pulses = reload_pulses
+        self.awg_nrs = awg_nrs
 
     def acquire_data_point(self, **kw):
-        self.LutMan.load_pulse_onto_AWG_lookuptable('X180', 0)
-        self.LutMan.load_pulse_onto_AWG_lookuptable('X180', 1)
-        # self.LutMan.load_pulses_onto_AWG_lookuptable(0)
-        # self.LutMan.load_pulses_onto_AWG_lookuptable(1)
+        #
+        # self.LutMan.load_pulse_onto_AWG_lookuptable('X180', 1)
+        if self.reload_pulses == 'all':
+            for awg_nr in self.awg_nrs:
+                self.LutMan.load_pulses_onto_AWG_lookuptable(awg_nr)
+        else:
+            for pulse_name in self.reload_pulses:
+                for awg_nr in self.awg_nrs:
+                    self.LutMan.load_pulse_onto_AWG_lookuptable(
+                        pulse_name, awg_nr)
         return super().acquire_data_point(**kw)
 
 
 class CBox_integration_logging_det(Hard_Detector):
-    def __init__(self, CBox, AWG, **kw):
+    def __init__(self, CBox, AWG, LutMan=None, reload_pulses=False,
+                 awg_nrs=None, **kw):
+        '''
+        If you want AWG reloading you should give a LutMan and specify
+        on what AWG nr to reload default is no reloading of pulses.
+        '''
         super().__init__()
         self.CBox = CBox
         self.name = 'CBox_integration_logging_detector'
         self.value_names = ['I', 'Q']
         self.value_units = ['a.u.', 'a.u.']
         self.AWG = AWG
+
+        self.LutMan = LutMan
+        self.reload_pulses = reload_pulses
+        self.awg_nrs = awg_nrs
 
     def get_values(self):
         exception_mode = True
@@ -531,12 +548,16 @@ class CBox_integration_logging_det(Hard_Detector):
     def _get_values(self):
         self.AWG.stop()
         self.CBox.set('acquisition_mode', 0)
-        self.CBox.restart_awg_tape(0)
-        self.CBox.restart_awg_tape(1)
-        self.CBox.restart_awg_tape(2)
+        if self.awg_nrs is not None:
+            for awg_nr in self.awg_nrs:
+                self.CBox.restart_awg_tape(awg_nr)
+                if self.reload_pulses:
+                    self.LutMan.load_pulses_onto_AWG_lookuptable(awg_nr)
         self.CBox.set('acquisition_mode', 'integration logging')
         self.AWG.start()
+
         data = self.CBox.get_integration_log_results()
+
         self.CBox.set('acquisition_mode', 0)
         return data
 
@@ -558,6 +579,25 @@ class CBox_alternating_shots_det(CBox_integration_logging_det):
         Q_data_0, Q_data_1 = a_tools.zigzag(raw_data[1])
         data = [I_data_0, Q_data_0, I_data_1, Q_data_1]
         return data
+
+
+class CBox_digitizing_shots_det(CBox_integration_logging_det):
+    """docstring for  CBox_digitizing_shots_det"""
+    def __init__(self, CBox, AWG, threshold,
+                 LutMan=None, reload_pulses=False, awg_nrs=None):
+        super().__init__(CBox, AWG, LutMan, reload_pulses, awg_nrs)
+        self.name = 'CBox_digitizing_shots_detector'
+        self.value_names = ['Declared state']
+        self.value_units = ['']
+        self.threshold = threshold
+
+    def get_values(self):
+        d = super().get_values()[0]
+        # comparing 8000 vals with threshold takes 3.8us
+        # converting to int 10.8us and to float 13.8us, let's see later if we
+        # can cut that.
+        return (d > self.threshold).astype(int)
+
 
 
 # class QuTechCBox_Streaming_Detector(Hard_Detector):

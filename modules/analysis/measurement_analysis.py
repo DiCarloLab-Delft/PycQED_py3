@@ -1053,20 +1053,20 @@ class SSRO_Analysis(MeasurementAnalysis):
 
             plt.subplots_adjust(hspace=20)
 
-            axarray[0].set_title('2D histogram, pi pulse',fontsize=5)
+            axarray[0].set_title('2D histogram, pi pulse')
             im1 = axarray[0].imshow(H1, interpolation='nearest', origin='low',
                                     extent=[xedges1[0], xedges1[-1],
                                     yedges1[0], yedges1[-1]])
-            axarray[0].set_xlabel('DAC voltage I integrated (V)', fontsize=5)
-            axarray[0].set_ylabel('DAC voltage Q integrated (V)', fontsize=5)
+            axarray[0].set_xlabel('Int. I (V)')
+            axarray[0].set_ylabel('Int. Q (V)')
 
             # plotting 2D histograms of mmts with no pulse
-            axarray[1].set_title('2D histogram, no pi pulse', fontsize=5)
+            axarray[1].set_title('2D histogram, no pi pulse')
             im0 = axarray[1].imshow(H0, interpolation='nearest', origin='low',
                                     extent=[xedges0[0], xedges0[-1], yedges0[0],
                                     yedges0[-1]])
-            axarray[1].set_xlabel('DAC voltage I integrated (V)', fontsize=5)
-            axarray[1].set_ylabel('DAC voltage Q integrated (V)', fontsize=5)
+            axarray[1].set_xlabel('Int. I (V)')
+            axarray[1].set_ylabel('Int. Q (V)')
 
             self.save_fig(fig, figname='SSRO_Density_Plots', **kw)
 
@@ -1133,20 +1133,20 @@ class SSRO_Analysis(MeasurementAnalysis):
         #plotting the histograms before rotation
         fig, axes = plt.subplots()
         axes.hist(shots_Q_data_1, bins=40, label='1 Q',
-                  histtype='step', normed=1)
+                  histtype='step', normed=1, color='r')
         axes.hist(shots_Q_data_0, bins=40, label='0 Q',
-                  histtype='step', normed=1)
+                  histtype='step', normed=1, color='b')
         axes.hist(shots_I_data_1, bins=40, label='1 I',
-                  histtype='step', normed=1)
+                  histtype='step', normed=1, color='m')
         axes.hist(shots_I_data_0, bins=40, label='0 I',
-                  histtype='step', normed=1)
+                  histtype='step', normed=1, color='c')
 
         axes.set_title('Histograms of shots on IQ plane as measured, %s shots'%min_len)
         plt.xlabel('DAQ voltage integrated (a.u.)', fontsize=14)
         plt.ylabel('Fraction', fontsize=14)
 
         #plt.hist(SS_Q_data, bins=40,label='0 Q')
-        plt.legend()
+        plt.legend(loc='best')
         self.save_fig(fig, figname='raw-histograms', **kw)
         plt.show()
 
