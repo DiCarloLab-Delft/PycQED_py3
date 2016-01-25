@@ -330,7 +330,7 @@ class SSRO_Fidelity_Detector_CBox(det.Soft_Detector):
 
         self.IF = kw.pop('IF', -20e6)
         self.RO_trigger_delay = kw.pop('RO_trigger_delay', -100e-9)
-        self.meas_pulse_delay = kw.pop('meas_pulse_delay', 300e-9)
+        self.RO_pulse_delay = kw.pop('RO_pulse_delay', 300e-9)
         self.RO_pulse_length = kw.pop('RO_pulse_length', RO_pulse_length)
 
         self.i = 0
@@ -342,7 +342,7 @@ class SSRO_Fidelity_Detector_CBox(det.Soft_Detector):
 
         self.MC.set_sweep_function(awg_swf.CBox_OffOn(
             IF=self.IF,
-            meas_pulse_delay=self.meas_pulse_delay,
+            RO_pulse_delay=self.RO_pulse_delay,
             RO_trigger_delay=self.RO_trigger_delay,
             RO_pulse_length=self.RO_pulse_length,
             AWG=self.AWG, CBox=self.CBox))
@@ -472,7 +472,7 @@ class CBox_trace_error_fraction_detector(det.Soft_Detector):
 
 #         self.MC.set_sweep_function(awg_swf.CBox_OffOn(
 #             IF=self.IF,
-#             meas_pulse_delay=self.meas_pulse_delay,
+#             RO_pulse_delay=self.RO_pulse_delay,
 #             RO_trigger_delay=self.RO_trigger_delay,
 #             RO_pulse_length=self.RO_pulse_length,
 #             AWG=self.AWG, CBox=self.CBox))
@@ -498,7 +498,7 @@ class AllXY_devition_detector_CBox(det.Soft_Detector):
     Todo: remove the predefined values for the sequence
     '''
     def __init__(self, measurement_name, MC, AWG, CBox,
-                 IF, RO_trigger_delay, meas_pulse_delay, RO_pulse_length,
+                 IF, RO_trigger_delay, RO_pulse_delay, RO_pulse_length,
                  pulse_separation,
                  LutMan=None,
                  reload_pulses=False, **kw):
@@ -520,7 +520,7 @@ class AllXY_devition_detector_CBox(det.Soft_Detector):
 
         self.IF = IF
         self.RO_trigger_delay = RO_trigger_delay
-        self.meas_pulse_delay = meas_pulse_delay
+        self.RO_pulse_delay = RO_pulse_delay
         self.pulse_separation = pulse_separation
         self.RO_pulse_length = RO_pulse_length
 
@@ -532,7 +532,7 @@ class AllXY_devition_detector_CBox(det.Soft_Detector):
         self.MC.set_sweep_function(awg_swf.CBox_AllXY(
                                    IF=self.IF,
                                    pulse_separation=self.pulse_separation,
-                                   meas_pulse_delay=self.meas_pulse_delay,
+                                   RO_pulse_delay=self.RO_pulse_delay,
                                    RO_trigger_delay=self.RO_trigger_delay,
                                    RO_pulse_length=self.RO_pulse_length,
                                    AWG=self.AWG, CBox=self.CBox))
@@ -540,6 +540,8 @@ class AllXY_devition_detector_CBox(det.Soft_Detector):
             det.CBox_integrated_average_detector(self.CBox, self.AWG))
 
     def acquire_data_point(self, *args, **kw):
+        if self.i > 0:
+            self.MC.sweep_functions[0].upload = False
         self.i += 1
         if self.reload_pulses:
             self.LutMan.load_pulses_onto_AWG_lookuptable(0)

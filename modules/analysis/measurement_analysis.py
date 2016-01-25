@@ -754,13 +754,101 @@ class OptimizationAnalysis(MeasurementAnalysis):
 
 
 class TD_Analysis(MeasurementAnalysis):
-    def __init__(self, NoCalPoints=4, center_point=31, **kw):
+    def __init__(self, NoCalPoints=4, center_point=31, make_fig=True,
+                 zero_coord=None, one_coord=None, cal_points=None, **kw):
         self.NoCalPoints = NoCalPoints
         self.normalized_values = []
         self.normalized_cal_vals = []
         self.normalized_data_points = []
+        self.cal_points = cal_points
+        self.make_fig = make_fig
+
+        self.zero_coord = zero_coord
+        self.one_coord = one_coord
         self.center_point = center_point
+
         super(TD_Analysis, self).__init__(**kw)
+
+    def rotate_and_normalize_data(self):
+        if self.cal_points is None:
+            if len(self.measured_values[0]) == 42:
+                self.corr_data, self.zero_coord, self.one_coord = \
+                    a_tools.rotate_and_normalize_data(
+                        data=self.measured_values[0:2],
+                        zero_coord=self.zero_coord,
+                        one_coord=self.one_coord,
+                        cal_zero_points=list(range(2)),
+                        cal_one_points=list(range(-8, -4)))
+            elif len(self.measured_values[0]) == 21:
+                self.corr_data, self.zero_coord, self.one_coord = \
+                    a_tools.rotate_and_normalize_data(
+                        data=self.measured_values[0:2],
+                        zero_coord=self.zero_coord,
+                        one_coord=self.one_coord,
+                        cal_zero_points=list(range(1)),
+                        cal_one_points=list(range(-4, -2)))
+            else:
+                self.corr_data, self.zero_coord, self.one_coord = \
+                    a_tools.rotate_and_normalize_data(
+                        data=self.measured_values[0:2],
+                        zero_coord=self.zero_coord,
+                        one_coord=self.one_coord,
+                        cal_zero_points=list(range(1)),
+                        cal_one_points=list(range(-2, 0)))
+        else:
+            self.corr_data, self.zero_coord, self.one_coord = \
+                a_tools.rotate_and_normalize_data(
+                    data=self.measured_values[0:2],
+                    zero_coord=self.zero_coord,
+                    one_coord=self.one_coord,
+                    cal_zero_points=self.cal_points[0],
+                    cal_one_points=self.cal_points[1])
+
+    def run_default_analysis(self,
+                             close_main_fig=True,  **kw):
+        close_file = kw.pop('close_file', True)
+        self.add_analysis_datagroup_to_file()
+        self.get_naming_and_values()
+
+        self.rotate_and_normalize_data()
+        self.add_dataset_to_analysisgroup('Corrected data',
+                                          self.corr_data)
+        self.analysis_group.attrs.create('corrected data based on',
+                                         'calibration points'.encode('utf-8'))
+
+        # Plotting
+        if self.make_fig:
+            fig1, fig2, ax1, axarray = self.setup_figures_and_axes()
+            for i in range(2):
+                if len(self.value_names) >= 4:
+                        ax = axarray[i/2, i % 2]
+                else:
+                    ax = axarray[i]
+                self.plot_results_vs_sweepparam(x=self.sweep_points,
+                                                y=self.measured_values[i],
+                                                fig=fig2, ax=ax,
+                                                xlabel=self.xlabel,
+                                                ylabel=str(self.value_names[i]),
+                                                save=False)
+            ax1.set_ylim(min(self.corr_data)-.1, max(self.corr_data)+.1)
+            ylabel = r'$F$ $|1 \rangle$'
+            self.plot_results_vs_sweepparam(x=self.sweep_points,
+                                            y=self.corr_data,
+                                            fig=fig1, ax=ax1,
+                                            xlabel=self.xlabel,
+                                            ylabel=ylabel,
+                                            save=False)
+            if not close_main_fig:
+                # Hacked in here, good idea to only show the main fig but can
+                # be optimized somehow
+                self.save_fig(fig1, ylabel='Amplitude (normalized)',
+                              close_fig=False, **kw)
+            else:
+                self.save_fig(fig1, ylabel='Amplitude (normalized)', **kw)
+            self.save_fig(fig2, ylabel='Amplitude', **kw)
+        if close_file:
+            self.data_file.close()
+        return
 
     def normalize_data_to_calibration_points(self, values, calsteps,
                                              save_norm_to_data_file=True):
@@ -2215,40 +2303,7 @@ class AllXY_Analysis(TD_Analysis):
 
         super(self.__class__, self).__init__(**kw)
 
-    def rotate_and_normalize_data(self):
-        if self.cal_points is None:
-            if len(self.measured_values[0]) == 42:
-                self.corr_data, self.zero_coord, self.one_coord = \
-                    a_tools.rotate_and_normalize_data(
-                        data=self.measured_values[0:2],
-                        zero_coord=self.zero_coord,
-                        one_coord=self.one_coord,
-                        cal_zero_points=list(range(2)),
-                        cal_one_points=list(range(-8, -4)))
-            elif len(self.measured_values[0]) == 21:
-                self.corr_data, self.zero_coord, self.one_coord = \
-                    a_tools.rotate_and_normalize_data(
-                        data=self.measured_values[0:2],
-                        zero_coord=self.zero_coord,
-                        one_coord=self.one_coord,
-                        cal_zero_points=list(range(1)),
-                        cal_one_points=list(range(-4, -2)))
-            else:
-                self.corr_data, self.zero_coord, self.one_coord = \
-                    a_tools.rotate_and_normalize_data(
-                        data=self.measured_values[0:2],
-                        zero_coord=self.zero_coord,
-                        one_coord=self.one_coord,
-                        cal_zero_points=list(range(1)),
-                        cal_one_points=list(range(-2, 0)))
-        else:
-            self.corr_data, self.zero_coord, self.one_coord = \
-                a_tools.rotate_and_normalize_data(
-                    data=self.measured_values[0:2],
-                    zero_coord=self.zero_coord,
-                    one_coord=self.one_coord,
-                    cal_zero_points=self.cal_points[0],
-                    cal_one_points=self.cal_points[1])
+
 
     def run_default_analysis(self, print_fit_results=False,
                              close_main_fig=True, flip_axis=False, **kw):

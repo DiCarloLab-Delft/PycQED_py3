@@ -7,11 +7,11 @@ default_gauss_width = 10  # magic number should be removed
 
 
 class CBox_T1(swf.Hard_Sweep):
-    def __init__(self, IF, meas_pulse_delay, RO_trigger_delay, mod_amp, AWG,
+    def __init__(self, IF, RO_pulse_delay, RO_trigger_delay, mod_amp, AWG,
                  upload=True):
         super().__init__()
         self.IF = IF
-        self.meas_pulse_delay = meas_pulse_delay
+        self.RO_pulse_delay = RO_pulse_delay
         self.RO_trigger_delay = RO_trigger_delay
         self.name = 'T1'
         self.parameter_name = 'tau'
@@ -25,7 +25,7 @@ class CBox_T1(swf.Hard_Sweep):
             ch3_amp = self.AWG.get('ch3_amp')
             ch4_amp = self.AWG.get('ch3_amp')
             st_seqs.CBox_T1_marker_seq(IF=self.IF, times=self.sweep_points,
-                                       meas_pulse_delay=self.meas_pulse_delay,
+                                       RO_pulse_delay=self.RO_pulse_delay,
                                        RO_trigger_delay=self.RO_trigger_delay,
                                        verbose=False)
             self.AWG.set('ch3_amp', ch3_amp)
@@ -34,12 +34,12 @@ class CBox_T1(swf.Hard_Sweep):
 
 class CBox_Ramsey(swf.Hard_Sweep):
     def __init__(self, IF,
-                 meas_pulse_delay, RO_trigger_delay, pulse_separation,
+                 RO_pulse_delay, RO_trigger_delay, pulse_separation,
                  AWG, CBox, cal_points=True,
                  upload=True):
         super().__init__()
         self.IF = IF
-        self.meas_pulse_delay = meas_pulse_delay
+        self.RO_pulse_delay = RO_pulse_delay
         self.RO_trigger_delay = RO_trigger_delay
         self.pulse_separation = pulse_separation
         self.name = 'T2*'
@@ -56,7 +56,7 @@ class CBox_Ramsey(swf.Hard_Sweep):
             ch4_amp = self.AWG.get('ch3_amp')
             st_seqs.CBox_Ramsey_marker_seq(
                 IF=self.IF, times=self.sweep_points,
-                meas_pulse_delay=self.meas_pulse_delay,
+                RO_pulse_delay=self.RO_pulse_delay,
                 RO_trigger_delay=self.RO_trigger_delay,
                 verbose=False)
             self.AWG.set('ch3_amp', ch3_amp)
@@ -80,12 +80,12 @@ class CBox_Ramsey(swf.Hard_Sweep):
 
 class CBox_Echo(swf.Hard_Sweep):
     def __init__(self, IF,
-                 meas_pulse_delay, RO_trigger_delay, pulse_separation,
+                 RO_pulse_delay, RO_trigger_delay, pulse_separation,
                  AWG, CBox, cal_points=True,
                  upload=True):
         super().__init__()
         self.IF = IF
-        self.meas_pulse_delay = meas_pulse_delay
+        self.RO_pulse_delay = RO_pulse_delay
         self.RO_trigger_delay = RO_trigger_delay
         self.pulse_separation = pulse_separation
         self.name = 'T2-echo'
@@ -104,7 +104,7 @@ class CBox_Echo(swf.Hard_Sweep):
             ch4_amp = self.AWG.get('ch3_amp')
             st_seqs.CBox_Echo_marker_seq(
                 IF=self.IF, times=self.sweep_points,
-                meas_pulse_delay=self.meas_pulse_delay,
+                RO_pulse_delay=self.RO_pulse_delay,
                 RO_trigger_delay=self.RO_trigger_delay,
                 verbose=False)
             self.AWG.set('ch3_amp', ch3_amp)
@@ -127,13 +127,13 @@ class CBox_Echo(swf.Hard_Sweep):
 
 
 class CBox_OffOn(swf.Hard_Sweep):
-    def __init__(self, IF, meas_pulse_delay, RO_trigger_delay,
+    def __init__(self, IF, RO_pulse_delay, RO_trigger_delay,
                  RO_pulse_length,
                  AWG, CBox,
                  upload=True):
         super().__init__()
         self.IF = IF
-        self.meas_pulse_delay = meas_pulse_delay
+        self.RO_pulse_delay = RO_pulse_delay
         self.RO_trigger_delay = RO_trigger_delay
         self.parameter_name = 'Tape element'
         self.unit = ''
@@ -161,7 +161,7 @@ class CBox_OffOn(swf.Hard_Sweep):
             ch4_amp = self.AWG.get('ch3_amp')
             st_seqs.CBox_single_pulse_seq(
                 IF=self.IF,
-                meas_pulse_delay=self.meas_pulse_delay,
+                RO_pulse_delay=self.RO_pulse_delay,
                 RO_trigger_delay=self.RO_trigger_delay,
                 RO_pulse_length=self.RO_pulse_length,
                 verbose=False)
@@ -171,7 +171,7 @@ class CBox_OffOn(swf.Hard_Sweep):
 
 class CBox_AllXY(swf.Hard_Sweep):
     def __init__(self, IF, pulse_separation,
-                 meas_pulse_delay,
+                 RO_pulse_delay,
                  RO_trigger_delay,
                  RO_pulse_length,
                  AWG, CBox,
@@ -204,7 +204,7 @@ class CBox_AllXY(swf.Hard_Sweep):
         self.AWG = AWG
         self.CBox = CBox
         self.IF = IF
-        self.meas_pulse_delay = meas_pulse_delay
+        self.RO_pulse_delay = RO_pulse_delay
         self.RO_trigger_delay = RO_trigger_delay
         self.RO_pulse_length = RO_pulse_length
         self.pulse_separation = pulse_separation
@@ -225,7 +225,7 @@ class CBox_AllXY(swf.Hard_Sweep):
             st_seqs.CBox_two_pulse_seq(
                 IF=self.IF,
                 pulse_separation=self.pulse_separation,
-                meas_pulse_delay=self.meas_pulse_delay,
+                RO_pulse_delay=self.RO_pulse_delay,
                 RO_pulse_length=self.RO_pulse_length,
                 RO_trigger_delay=self.RO_trigger_delay, verbose=False)
             self.AWG.set('ch3_amp', ch3_amp)
