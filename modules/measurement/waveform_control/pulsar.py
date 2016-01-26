@@ -259,8 +259,10 @@ class Pulsar:
         # sequence programming
         _t0 = time.time()
         if sequence.element_count() > 8000:
-            print("Error: trying to program '%s' (%d element(s))...\n Sequence contains more than 8000 elements, Aborting" \
-                % (sequence.name, sequence.element_count()), end=' ')
+            logging.warning("Error: trying to program '{:s}' ({:d}'".format(
+                            sequence.name, sequence.element_count()) +
+                            " element(s))...\n Sequence contains more than " +
+                            "8000 elements, Aborting", end=' ')
             return
 
         print("Programming '%s' (%d element(s))...\n"
