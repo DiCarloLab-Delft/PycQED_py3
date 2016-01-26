@@ -4,6 +4,8 @@ from ..waveform_control import pulsar
 from ..waveform_control import element
 from ..waveform_control import pulse
 from ..waveform_control import pulse_library as pl
+from importlib import reload
+reload(pulse)
 
 
 def single_pulse_elt(i, station, IF, RO_pulse_delay=0, RO_trigger_delay=0,
@@ -176,7 +178,7 @@ def multi_pulse_elt(i, station, IF, RO_pulse_delay=0,
             # make the length of the wait times add up
             taus = np.concatenate([[0], taus])
         # prepend a 0 to the list of taus
-        for tau in taus:  #this statement can probably be reduced to 1 line
+        for tau in taus:  # this statement can probably be reduced to 1 line
             if tau % 5e-9 != 0:
                 logging.warning('tau is not a multiple of 5ns this can cause' +
                                 'phase errors in CBox pulses')
@@ -190,26 +192,27 @@ def multi_pulse_elt(i, station, IF, RO_pulse_delay=0,
             el.add(pulse.SquarePulse(name='refpulse_0',
                                      channel='ch{}'.format(i+1),
                                      amplitude=0, length=1e-9))
-        marker_ref = ref_elt
         sqp = pulse.SquarePulse(name='CBox-pulse-trigger',
                                 channel='ch1_marker1',
                                 amplitude=1, length=15e-9)
+
         for j in range(n_pulses):
-            # overwrite the reference with the latest added marker
-            marker_ref = el.add(pulse.cp(sqp, channel='ch1_marker1'),
-                                name='CBox-pulse-trigger-%s' % j,
-                                start=pulse_separation+taus[j],
-                                refpulse=marker_ref, refpoint='start')
+            el.add(pulse.cp(sqp, channel='ch1_marker1'),
+                   name='CBox-pulse-trigger-ch1_{}.{}'.format(i, j),
+                   start=j*pulse_separation+taus[j],
+                   refpulse=ref_elt, refpoint='end')
             el.add(pulse.cp(sqp, channel='ch1_marker2'),
-                   refpulse=marker_ref,
-                   name='CBox-pulse-trigger-2%s' % j,
+                   refpulse='CBox-pulse-trigger-ch1_{}.{}'.format(i, j),
+                   name='CBox-pulse-trigger-ch2_{}.{}'.format(i, j),
                    refpoint='start', start=0)
 
         # Readout modulation tone
         cosP = pulse.CosPulse(name='cosI', channel='ch3',
-                              amplitude=0.5, frequency=IF, length=RO_pulse_length)
+                              amplitude=0.5, frequency=IF,
+                              length=RO_pulse_length)
         ROpulse = el.add(cosP, start=RO_pulse_delay,
-                         refpulse=marker_ref, fixed_point_freq=10e6)
+                         refpulse='CBox-pulse-trigger-ch1_{}.{}'.format(i, j),
+                         fixed_point_freq=10e6)
         el.add(pulse.CosPulse(name='sinQ', channel='ch4',
                               amplitude=0.5, frequency=IF,
                               length=RO_pulse_length, phase=90),
@@ -220,7 +223,8 @@ def multi_pulse_elt(i, station, IF, RO_pulse_delay=0,
                                 amplitude=1, length=20e-9,
                                 channel='ch4_marker1')
         ROm_name = el.add(ROm, start=RO_trigger_delay,
-                          refpulse=ROpulse, refpoint='start')
+                          refpulse='CBox-pulse-trigger-ch1_{}.{}'.format(i, j),
+                          refpoint='start')
         el.add(pulse.cp(ROm, channel='ch4_marker2'),
                refpulse=ROm_name, refpoint='start', start=0)
         return el
@@ -266,22 +270,35 @@ def CBox_resetless_multi_pulse_elt(
     if ((n_pulses * pulse_separation + RO_pulse_length+RO_pulse_delay) >
             resetless_interval):
         logging.warning('Sequence does not fit in the resetless interval')
+    if number_of_resetless_sequences > 200:
+        logging.warning('More than 200 iterations, probably some typo')
+
+    marker_tr_p = pulse.marker_train(name='CBox-pulse_marker',
+                                     channel='ch1_marker1', amplitude=1,
+                                     marker_length=15e-9,
+                                     marker_separation=pulse_separation,
+                                     nr_markers=n_pulses)
 
     for i in range(number_of_resetless_sequences):
-        for j in range(n_pulses):
-            # overwrite the reference with the latest added marker
-            el.add(pulse.cp(sqp, channel='ch1_marker1'),
-                   name='CBox-pulse-trigger-ch1_{}.{}'.format(i, j),
-                   start=j*pulse_separation+i*resetless_interval,
-                   refpulse=refpulse, refpoint='end')
-            el.add(pulse.cp(sqp, channel='ch1_marker2'),
-                   refpulse='CBox-pulse-trigger-ch1_{}.{}'.format(i, j),
-                   name='CBox-pulse-trigger-ch2_{}.{}'.format(i, j),
-                   refpoint='start', start=0)
+        el.add(pulse.cp(marker_tr_p, channel='ch1_marker1'),
+               name='CBox-pulse-trigger-ch1_{}'.format(i),
+               start=i*resetless_interval,
+               refpulse=refpulse, refpoint='end')
+        el.add(pulse.cp(marker_tr_p, channel='ch1_marker2'),
+               name='CBox-pulse-trigger-ch2_{}'.format(i),
+               refpulse='CBox-pulse-trigger-ch1_{}'.format(i),
+               refpoint='start', start=0)
+
+        # for j in range(n_pulses):
+        #     # overwrite the reference with the latest added marker
+        #     el.add(pulse.cp(sqp, channel='ch1_marker2'),
+        #            refpulse='CBox-pulse-trigger-ch1_{}.{}'.format(i, j),
+        #            name='CBox-pulse-trigger-ch2_{}.{}'.format(i, j),
+        #            refpoint='start', start=0)
         # RO modulation tone
         el.add(pulse.cp(CosP), name='RO-Cos-{}'.format(i),
                start=RO_pulse_delay, refpoint='end',
-               refpulse='CBox-pulse-trigger-ch1_{}.{}'.format(i, j))
+               refpulse='CBox-pulse-trigger-ch1_{}'.format(i))
         el.add(pulse.cp(SinP), name='RO-Sin-{}'.format(i),
                start=0, refpoint='start', refpulse='RO-Cos-{}'.format(i))
         for k in range(2):
