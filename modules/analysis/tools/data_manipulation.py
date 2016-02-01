@@ -231,25 +231,57 @@ def digitize(data, threshold, positive_case=True):
 
     '''
     if positive_case:
-        data_digitized = np.asarray([[1 if d_element < threshold else -1
+        data_digitized = np.asarray([[1 if d_element <= threshold else -1
                                     for d_element in d_row] for d_row in data])
     else:
-        data_digitized = np.asarray([[1 if d_element > threshold else -1
+        data_digitized = np.asarray([[1 if d_element >= threshold else -1
                                     for d_element in d_row] for d_row in data])
     return data_digitized
 
 
 def postselect(data, threshold, positive_case=True):
-    data_postselected =[]
+    data_postselected = []
     if positive_case:
         for data_row in data:
-            if data_row[0]<threshold:
+            if data_row[0] <= threshold:
                 data_postselected.append(data_row)
     else:
         for data_row in data:
-            if data_row[0]>threshold:
+            if data_row[0] >= threshold:
                 data_postselected.append(data_row)
     return np.asarray(data_postselected)
 
+
+def count_error_fractions(trace):
+    '''
+    The counters produce the same results as the CBox counters in
+    CBox.get_qubit_state_log_counters().
+    Requires a boolean array or an array of ints as input.
+    '''
+    no_err_counter = 0
+    single_err_counter = 0
+    double_err_counter = 0
+    zero_counter = 0
+    one_counter = 0
+
+    for i in range(len(trace)):
+        if i < (len(trace)-1):
+            if trace[i] == trace[i+1]:
+                # A single error is associated with a qubit error
+                single_err_counter += 1
+                if i < (len(trace)-2):
+                    if trace[i] == trace[i+2]:
+                        # If there are two errors in a row this is associated with
+                        # a RO error, this counter must be substracted from the
+                        # single counter
+                        double_err_counter += 1
+            else:
+                no_err_counter +=1
+        if trace[i] == 1:
+            zero_counter +=1
+        else:
+            one_counter +=1
+
+    return no_err_counter, single_err_counter, double_err_counter, zero_counter, one_counter
 
 

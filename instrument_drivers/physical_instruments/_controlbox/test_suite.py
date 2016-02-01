@@ -2,6 +2,7 @@ import unittest
 import numpy as np
 from . import defHeaders
 CBox = None
+from modules.analysis.tools import data_manipulation as dm_tools
 
 
 class CBox_tests(unittest.TestCase):
@@ -12,12 +13,7 @@ class CBox_tests(unittest.TestCase):
     '''
     @classmethod
     def setUpClass(self):
-        print('CBox', CBox)
         self.CBox = CBox
-
-    # def test_get_all(self):
-    #     CBox.get_all()
-    #     return True
 
     def test_firmware_version(self):
         v = CBox.get('firmware_version')
@@ -181,9 +177,9 @@ class CBox_tests(unittest.TestCase):
         self.assertEqual(self.CBox.get('measurement_timeout'), -123)
         self.CBox.set('measurement_timeout', initial_val)
 
-    def test_readLog(self):
+    def test_Integration_logging(self):
         '''
-        Test for mode 2 integration logs. Only tests on length of data
+        Test for mode 1 integration logs. Only tests on length of data
         '''
         log_length = 50
         self.CBox.set('acquisition_mode', 0)
@@ -205,6 +201,48 @@ class CBox_tests(unittest.TestCase):
 
         self.assertEqual(len(InputAvgRes0), log_length)
         self.assertEqual(len(InputAvgRes1), log_length)
+
+    def test_state_logging_and_counters(self):
+        '''
+        Test uses mode 1 integration logging. Checks if the results
+        for the integration shots, states and state counters produce
+        the same results for a given threshold.
+        Does not do this using a dedicated sequence.
+        '''
+        log_length = 50
+        self.CBox.set('acquisition_mode', 0)
+        self.CBox.set('log_length', log_length)
+
+        weights0 = np.ones(512)
+        weights1 = np.ones(512)
+        self.CBox.set('sig0_integration_weights', weights0)
+        self.CBox.set('sig1_integration_weights', weights1)
+
+        self.CBox.set('acquisition_mode', 1)
+        [IntLog0, IntLog1] = self.CBox.get_integration_log_results()
+        self.CBox.set('acquisition_mode', 0)
+
+        threshold = int(np.mean(IntLog0))
+        self.CBox.sig0_threshold_line.set(threshold)
+        self.CBox.sig1_threshold_line.set(threshold)
+
+        self.CBox.set('acquisition_mode', 1)
+        log = self.CBox.get_integration_log_results()
+        counters = self.CBox.get_qubit_state_log_counters()
+        self.CBox.set('acquisition_mode', 0)
+
+        digi_shots = dm_tools.digitize(
+            log, threshold=CBox.sig0_threshold_line.get())
+        software_err_fracs_0 = dm_tools.count_error_fractions(digi_shots[0])
+        software_err_fracs_1 = dm_tools.count_error_fractions(digi_shots[1])
+
+        # Test if software analysis of the counters and CBox counters are the
+        # same
+        self.assertTrue((software_err_fracs_0 == counters[0]).all())
+        self.assertTrue((software_err_fracs_1 == counters[1]).all())
+
+
+
 
     def test_integration_average_mode(self):
         self.CBox.set('acquisition_mode', 0)

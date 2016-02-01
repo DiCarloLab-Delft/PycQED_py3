@@ -1,14 +1,9 @@
 import time
 import numpy as np
-import sys
 import visa
 import unittest
 from bitstring import BitArray
 import logging
-
-qcpath = 'D:\GitHubRepos\Qcodes'
-if qcpath not in sys.path:
-    sys.path.append(qcpath)
 
 from qcodes.instrument.visa import VisaInstrument
 from qcodes.utils import validators as vals
@@ -357,48 +352,6 @@ class QuTech_ControlBox(VisaInstrument):
 
     # Read Functions
 
-    def get_integration_log_results(self):
-        '''
-        read the log of the master
-        Corresponds to mode 2: Integration logging
-
-        Uses fixed length for reading out the message for speedup.
-
-        Returns integrated logs for ch0 and ch1
-        '''
-
-        log_length = self.get('log_length')
-        # Information on the encoding
-        bytes_per_value = 4
-        data_bits_per_byte = 7
-
-        succes = False
-        t0 = time.time()
-        while not succes:
-            log_message = c.create_message(defHeaders.ReadLoggedResults)
-            stat, log = self.serial_write(log_message)
-            # print 'Got the data request stat %s' %stat
-            if stat:
-                # read_N +2 is for checksum and EndOfMessage
-                b_log = bytearray(
-                    self.serial_read(read_N=2*log_length*bytes_per_value+2))
-
-            decoded_message = c.decode_message(
-                b_log,
-                data_bits_per_byte=data_bits_per_byte,
-                bytes_per_value=bytes_per_value)
-            ch0 = decoded_message[::2]  # take all even entries
-            ch1 = decoded_message[1::2]  # take all odd entries
-
-            if len(ch0) != 0:
-                succes = True
-            else:
-                time.sleep(0.0001)
-                self._print_waiting_char()
-            if time.time()-t0 > self._timeout:
-                raise Exception('Measurement timed out')
-        return ch0, ch1
-
     def get_input_avg_results(self):
         '''
         reads the Input Average log of the ADC input.
@@ -475,6 +428,134 @@ class QuTech_ControlBox(VisaInstrument):
             if time.time()-t0 > self._timeout:
                 raise Exception('Measurement timed out')
         return ch0, ch1
+
+    def get_integration_log_results(self):
+        '''
+        read the log of the master
+        Corresponds to mode 2: Integration logging
+
+        Uses fixed length for reading out the message for speedup.
+
+        Returns integrated logs for ch0 and ch1
+        '''
+
+        log_length = self.get('log_length')
+        # Information on the encoding
+        bytes_per_value = 4
+        data_bits_per_byte = 7
+
+        succes = False
+        t0 = time.time()
+        while not succes:
+            log_message = c.create_message(defHeaders.ReadLoggedResults)
+            stat, log = self.serial_write(log_message)
+            # print 'Got the data request stat %s' %stat
+            if stat:
+                # read_N +2 is for checksum and EndOfMessage
+                b_log = bytearray(
+                    self.serial_read(read_N=2*log_length*bytes_per_value+2))
+
+            decoded_message = c.decode_message(
+                b_log,
+                data_bits_per_byte=data_bits_per_byte,
+                bytes_per_value=bytes_per_value)
+            ch0 = decoded_message[::2]  # take all even entries
+            ch1 = decoded_message[1::2]  # take all odd entries
+
+            if len(ch0) != 0:
+                succes = True
+            else:
+                time.sleep(0.0001)
+                self._print_waiting_char()
+            if time.time()-t0 > self._timeout:
+                raise Exception('Measurement timed out')
+        return ch0, ch1
+
+    def get_qubit_state_log_results(self):
+        '''
+        Description :   Returns the qubit state log results after the logging
+                        started. State log is started together with system
+                        modes 1 (Integration logging),
+                              4 (Integration averaging mode), and
+                              6 (Conditional pulse trigger mode)
+                        In case mode 6 is set state log is started when
+                        LoggingMode 1 (Integration average logging) or
+                        2 (normal logging) is selected
+        Parameters    :   None
+
+        Return bytes  :
+        Receive Checksum
+        Logger results:   1-bit bit values representing the qubit state.
+                The number of received results is equal to:
+                Number returned full bytes= floor((Logger size)/4)×2
+                Logger size is the value set by the SetLoggerSize command
+                If the value set by the SetLoggerSize command divided by
+                four is not an integer the remainder bits will not be sent.
+                The logger results are available until system mode 0 is
+                selected. They can only be read once.
+        Transmit checksum
+
+        If the GetQubitStateLogResults command is sent before the logging
+        is finished only a transmit checksum of zero and EndOfMessageHeader
+        is returned.
+
+        '''
+        logging.warning('Not implemented, returning random data')
+        return np.ones(5), np.ones(5)
+
+    def get_qubit_state_log_counters(self):
+        '''
+        Description :  Returns the values of the qubit state log counters.
+                       Counting is started started together with the
+                       QubitStateLog. The counters will be reset as soon as
+                       SetSystemMode  with mode 0 is sent.
+        Parameters  :   None
+
+        Return bytes:
+        Receive Checksum
+        NoErrorCounter_chI:       21-bit unsigned value. Range is 0 to 2**21.
+        NoErrorCounter_chQ
+        SingleErrorCounter_chI:   21-bit unsigned value. Range is 0 to 2**21.
+        SingleErrorCounter_chQ
+        DoubleErrorCounter_chI:   21-bit unsigned value. Range is 0 to 2**21.
+        DoubleErrorCounter_chQ
+        ZeroStateCounter_chI:     21-bit unsigned value. Range is 0 to 2**21.
+        ZeroStateCounter_chQ
+        OneStateCounter_chI:      21-bit unsigned value. Range is 0 to 2**21.
+        OneStateCounter_chQ
+        Transmit checksum
+
+        If the GetQubitStateLogCounterResults command is sent before the
+        number of measurements set by the SetLoggerSize is finished only a
+        transmit checksum of zero and EndOfMessageHeader is returned.
+        '''
+        nr_of_counters = 5
+        nr_of_channels = 2
+        data_bits_per_byte = 7
+        bytes_per_value = 3
+        succes = False
+        t0 = time.time()
+
+        while not succes:
+            req_mess = c.create_message(
+                defHeaders.GetQubitStateLogCounterResults)
+            stat, log = self.serial_write(req_mess)
+            if stat:
+                # read_N +2 is for checksum and EndOfMessage
+                encoded_message = self.serial_read(
+                    read_N=nr_of_channels*nr_of_counters*bytes_per_value+2)
+                decoded_message = c.decode_message(
+                    encoded_message, data_bits_per_byte=data_bits_per_byte,
+                    bytes_per_value=bytes_per_value)
+                break
+            else:
+                time.sleep(0.0001)
+                self._print_waiting_char()
+            if time.time()-t0 > self._timeout:
+                raise Exception('Measurement timed out')
+        ch0_counters = decoded_message[::2]
+        ch1_counters = decoded_message[1::2]
+        return ch0_counters, ch1_counters
 
     def send_stop_streaming(self):
         termination_message = c.create_message(
@@ -770,7 +851,6 @@ class QuTech_ControlBox(VisaInstrument):
 
     def _do_get_nr_samples(self):
         return self._nr_samples
-
 
     def _do_get_nr_averages(self):
         return self._nr_averages
@@ -1145,9 +1225,23 @@ class QuTech_ControlBox(VisaInstrument):
         '''
         Intended to replace visa_handle.read_raw
         '''
-        with(self.visa_handle.ignore_warning(visa.constants.VI_SUCCESS_MAX_CNT)):
-            mes = self.visa_handle.visalib.read(
-                self.visa_handle.session, size)
+        # Todo: test where this construction should be located, problem
+        # seems to be missing a send comand rather than read
+        # this is to catch the timeout error that can occur due to the latency
+        # of 1ms in the serial emulator of windows.
+        for i in range(2):
+            try:
+                with(self.visa_handle.ignore_warning(
+                        visa.constants.VI_SUCCESS_MAX_CNT)):
+                    mes = self.visa_handle.visalib.read(
+                        self.visa_handle.session, size)
+                    break
+            except visa.VisaIOError as e:
+                logging.warning(e)
+        else:
+            # If it fails 5 times raise an error,
+            # could not figure out how to raise original error
+            raise Exception
         return mes[0]
 
     def serial_read(self, timeout=5, read_all=False, read_N=0):

@@ -52,7 +52,8 @@ AwgOffsetHeader = b"\x31"
 AwgDisableHeader = b"\x32"
 AwgEnableHeader = b"\x33"
 AwgModeHeader = b"\x34"
-AwgNoCodewordTrigHeader = b"\x34" # FIXME: should be removed once integrated with AWGMode function
+AwgNoCodewordTrigHeader = b"\x34"
+# FIXME: should be removed once integrated with AWGMode function
 AwgRestartTapeHeader = b"\x35"
 
 # Memory  Update transactions
@@ -76,7 +77,8 @@ UpdateModeHeader = b"\x5A"
 # EndOfStreaming = b"\x5B"
 UpdateRunModeHeader = b"\x5B"
 UpdateSequencerParametersHeader = b"\x5C"
-EndOfStreaming = b"\x5B"   # FIXME: this header is not defined in the FPGA headers - JdS
+EndOfStreaming = b"\x5B"
+# FIXME: this header is not defined in the FPGA headers - JdS
 
 # Register Read transactions
 ReadCalculatedVoffset = b"\x5F"
@@ -86,6 +88,8 @@ UpdWeightsZeroHeader = b"\x40"
 UpdWeightsOneHeader = b"\x41"
 
 # Memory read transactions
+GetQubitStateLogResults = b"\x49"
+GetQubitStateLogCounterResults = b"\x4A"
 ReadSequencerCounters = b"\x4B"
 ReadIntStreamingResults = b"\x4C"
 ReadIntAverageResults = b"\x4D"
@@ -98,7 +102,8 @@ EndOfStreamingHeader = b"\x78"
 IllegalDataHeader = b"\x7C"
 DataOverflowHeader = b"\x7D"
 IllegalCommandHeader = b"\x7E"
-#CommunicationErrorHeader = b"\x7E"
+
+# CommunicationErrorHeader = b"\x7E"
 EndOfMessageHeader = b"\x7F"
 
 # Test header to test fpga to PC communication
