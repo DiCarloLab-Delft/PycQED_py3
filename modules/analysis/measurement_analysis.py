@@ -755,7 +755,8 @@ class OptimizationAnalysis(MeasurementAnalysis):
 
 class TD_Analysis(MeasurementAnalysis):
     def __init__(self, NoCalPoints=4, center_point=31, make_fig=True,
-                 zero_coord=None, one_coord=None, cal_points=None, **kw):
+                 zero_coord=None, one_coord=None, cal_points=None,
+                 plot_cal_points=True, **kw):
         self.NoCalPoints = NoCalPoints
         self.normalized_values = []
         self.normalized_cal_vals = []
@@ -766,7 +767,7 @@ class TD_Analysis(MeasurementAnalysis):
         self.zero_coord = zero_coord
         self.one_coord = one_coord
         self.center_point = center_point
-
+        self.plot_cal_points = plot_cal_points
         super(TD_Analysis, self).__init__(**kw)
 
     def rotate_and_normalize_data(self):
@@ -830,14 +831,28 @@ class TD_Analysis(MeasurementAnalysis):
                                                 xlabel=self.xlabel,
                                                 ylabel=str(self.value_names[i]),
                                                 save=False)
-            ax1.set_ylim(min(self.corr_data)-.1, max(self.corr_data)+.1)
-            ylabel = r'$F$ $|1 \rangle$'
-            self.plot_results_vs_sweepparam(x=self.sweep_points,
-                                            y=self.corr_data,
+            ylabel = r'$F$ $\left(|1 \rangle \right)$'
+
+            if self.plot_cal_points:
+                x = self.sweep_points
+                y = self.corr_data
+            else:
+                logging.warning('not tested for all types of calpoints')
+                if type(self.cal_points[0]) is int:
+                    x = self.sweep_points[:-2]
+                    y = self.corr_data[:-2]
+                else:
+                    x = self.sweep_points[:-1*(len(self.cal_points[0])*2)]
+                    y = self.corr_data[:-1*(len(self.cal_points[0])*2)]
+
+            self.plot_results_vs_sweepparam(x=x,
+                                            y=y,
                                             fig=fig1, ax=ax1,
                                             xlabel=self.xlabel,
                                             ylabel=ylabel,
                                             save=False)
+            ax1.set_ylim(min(min(self.corr_data)-.1, -.1),
+                         max(max(self.corr_data)+.1, 1.1))
             if not close_main_fig:
                 # Hacked in here, good idea to only show the main fig but can
                 # be optimized somehow

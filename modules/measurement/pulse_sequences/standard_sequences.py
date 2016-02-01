@@ -236,30 +236,24 @@ def CBox_T1_marker_seq(IF, times, RO_pulse_delay,
     station.pulsar.program_awg(seq, *el_list, verbose=verbose)
 
 
-def CBox_Ramsey_marker_seq(IF, times, RO_pulse_delay,
-                           RO_trigger_delay=0, pulse_separation=80e-9,
-                           verbose=False,
-                           cal_points=True):
+def CBox_Ramsey_marker_seq(IF, times, RO_pulse_delay, RO_pulse_length,
+                           RO_trigger_delay, pulse_separation,
+                           verbose=False):
     '''
     If cal_points, replaces the last 4 elements with calibration points
     '''
     seq_name = 'CBox_Ramsey'
     seq = sequence.Sequence(seq_name)
     el_list = []
-    if cal_points:
-        times = times[:-4]
+
     for i, tau in enumerate(times):
         el = st_elts.two_pulse_elt(i, station, IF, RO_pulse_delay,
-                                   RO_trigger_delay, pulse_separation,
+                                   RO_trigger_delay=RO_trigger_delay,
+                                   RO_pulse_length=RO_pulse_length,
+                                   pulse_separation=pulse_separation,
                                    tau=tau)
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
-    if cal_points:
-        # use tape to make sure no pulse is played for first 2 cal pts
-        for j in range(4):
-            el = st_elts.single_pulse_elt(i+j, station, IF, RO_pulse_delay,
-                                          RO_trigger_delay, pulse_separation)
-            el_list.append(el)
-            seq.append_element(el, trigger_wait=True)
+
     station.instruments['AWG'].stop()
     station.pulsar.program_awg(seq, *el_list, verbose=verbose)

@@ -88,7 +88,11 @@ qubit_freq = 6.4718e9 - 40e6  # as measured by my Ramsey
 IF = -20e6        # RO modulation frequency
 mod_freq = -50e6  # Qubit pulse modulation frequency
 
-HS.set('mod_amp', .13)  # low power regime of VIPmon2
+RO_pulse_length = 300e-9
+RO_trigger_delay = 100e-9
+RO_pulse_delay = 300e-9
+
+HS.set('mod_amp', .125)  # low power regime of VIPmon2
 HS.set('IF', IF)
 HS.set('frequency', RO_freq)  # Frequence of the RO resonator of qubit 2
 LO.set('power', 16)  # splitting gives 13dBm at both mixer LO ports
@@ -102,14 +106,14 @@ S2.off()
 
 LutMan.set('f_modulation', mod_freq*1e-9)  # Lutman works in ns and GHz
 LutMan.set('gauss_width', 10)
-amp180 = 520
+amp180 = 509
 # Need to add attenuation to ensure a more sensible value is used (e.g. 300)
 LutMan.set('amp180', amp180)
 LutMan.set('amp90', amp180/2)
-LutMan.set('motzoi_parameter', -0.280901698)
+LutMan.set('motzoi_parameter', -0.3)
 # Calibrated at 6.5GHz (18-1-2016)
-CBox.set_dac_offset(0, 1, 18.6948)  # I channel qubit drive AWG
-CBox.set_dac_offset(0, 0, -26.244)  # Q channel
+CBox.set_dac_offset(0, 1, 16.30517578125)  # I channel qubit drive AWG
+CBox.set_dac_offset(0, 0, -40.6337890625,)  # Q channel
 
 CBox.set_dac_offset(1, 1, 0)  # I channel
 CBox.set_dac_offset(1, 0, 0)  # Q channel readout AWG
@@ -133,7 +137,7 @@ set_CBox_cos_sine_weigths(IF)
 CBox.set('nr_averages', 2048)
 # this is the max nr of averages that does not slow down the heterodyning
 CBox.set('nr_samples', 75)  # Shorter because of min marker spacing
-CBox.set('integration_length', 70)
+CBox.set('integration_length', 140)
 CBox.set('acquisition_mode', 0)
 CBox.set('lin_trans_coeffs', [1, 0, 0, 1])
 CBox.set('log_length', 8000)

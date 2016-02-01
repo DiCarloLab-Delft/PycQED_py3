@@ -223,7 +223,7 @@ def multi_pulse_elt(i, station, IF, RO_pulse_delay=0,
                                 amplitude=1, length=20e-9,
                                 channel='ch4_marker1')
         ROm_name = el.add(ROm, start=RO_trigger_delay,
-                          refpulse='CBox-pulse-trigger-ch1_{}.{}'.format(i, j),
+                          refpulse=ROpulse,
                           refpoint='start')
         el.add(pulse.cp(ROm, channel='ch4_marker2'),
                refpulse=ROm_name, refpoint='start', start=0)

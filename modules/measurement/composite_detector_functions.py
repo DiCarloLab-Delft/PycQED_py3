@@ -310,8 +310,9 @@ class SSRO_Fidelity_Detector_CBox(det.Soft_Detector):
     Currently only for CBox.
     Todo: remove the predefined values for the sequence
     '''
-    def __init__(self, measurement_name, MC, AWG, CBox,  raw=True,
-                 RO_pulse_length=300e-9, **kw):
+    def __init__(self, measurement_name, MC, AWG, CBox,
+                 RO_pulse_length, RO_pulse_delay, RO_trigger_delay,
+                 raw=True, **kw):
         self.detector_control = 'soft'
         self.name = 'SSRO_Fidelity'
         # For an explanation of the difference between the different
@@ -329,9 +330,9 @@ class SSRO_Fidelity_Detector_CBox(det.Soft_Detector):
         self.AWG = AWG
 
         self.IF = kw.pop('IF', -20e6)
-        self.RO_trigger_delay = kw.pop('RO_trigger_delay', -100e-9)
-        self.RO_pulse_delay = kw.pop('RO_pulse_delay', 300e-9)
-        self.RO_pulse_length = kw.pop('RO_pulse_length', RO_pulse_length)
+        self.RO_trigger_delay = RO_trigger_delay
+        self.RO_pulse_delay = RO_pulse_delay
+        self.RO_pulse_length = RO_pulse_length
 
         self.i = 0
 
@@ -393,7 +394,10 @@ class CBox_trace_error_fraction_detector(det.Soft_Detector):
             self.CBox.lin_trans_coeffs.set(rot_mat)
             ssro_d = SSRO_Fidelity_Detector_CBox(
                 'SSRO_det', self.MC, self.AWG, self.CBox,
-                RO_pulse_length=self.sequence_swf.RO_pulse_length)
+                RO_pulse_length=self.sequence_swf.RO_pulse_length,
+                RO_pulse_delay=self.sequence_swf.RO_pulse_delay,
+                RO_trigger_delay=self.sequence_swf.RO_trigger_delay,
+                )
             ssro_d.prepare()
             ssro_d.acquire_data_point()
             a = ma.SSRO_Analysis(auto=True, close_fig=True,
@@ -439,6 +443,8 @@ class CBox_trace_error_fraction_detector(det.Soft_Detector):
         single_err_counter = 0
         double_err_counter = 0
         triple_err_counter = 0
+        print(trace_length)
+        print(trace[0:20])
         for i in range(len(trace)-3):
             if trace[i] == trace[i+1]:
                 # A single error is associated with a qubit error

@@ -223,7 +223,6 @@ class MeasurementControl:
         Core measurement function used for soft sweeps
         '''
         self.check_keyboard_interupt()
-
         if np.size(x) == 1:
             x = [x]
         if np.size(x) != len(self.sweep_functions):

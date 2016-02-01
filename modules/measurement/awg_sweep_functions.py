@@ -33,7 +33,7 @@ class CBox_T1(swf.Hard_Sweep):
 
 
 class CBox_Ramsey(swf.Hard_Sweep):
-    def __init__(self, IF,
+    def __init__(self, IF, RO_pulse_length,
                  RO_pulse_delay, RO_trigger_delay, pulse_separation,
                  AWG, CBox, cal_points=True,
                  upload=True):
@@ -42,6 +42,7 @@ class CBox_Ramsey(swf.Hard_Sweep):
         self.RO_pulse_delay = RO_pulse_delay
         self.RO_trigger_delay = RO_trigger_delay
         self.pulse_separation = pulse_separation
+        self.RO_pulse_length = RO_pulse_length
         self.name = 'T2*'
         self.parameter_name = 'tau'
         self.unit = 's'
@@ -57,15 +58,17 @@ class CBox_Ramsey(swf.Hard_Sweep):
             st_seqs.CBox_Ramsey_marker_seq(
                 IF=self.IF, times=self.sweep_points,
                 RO_pulse_delay=self.RO_pulse_delay,
+                RO_pulse_length=self.RO_pulse_length,
                 RO_trigger_delay=self.RO_trigger_delay,
+                pulse_separation=self.pulse_separation,
                 verbose=False)
             self.AWG.set('ch3_amp', ch3_amp)
             self.AWG.set('ch4_amp', ch4_amp)
 
         # gets assigned in MC.set sweep_points
         nr_elts = len(self.sweep_points)
-        if self.cal_points:
-            tape = [3, 3] * (nr_elts-4) + [0, 0, 1, 1]
+        if self.cal_points:  # append the calibration points to the tape
+            tape = [3, 3] * (nr_elts-4) + [0, 0, 0, 0, 0, 1, 0, 1]
         else:
             tape = [3, 3] * nr_elts
 
