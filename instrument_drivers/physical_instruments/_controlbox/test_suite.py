@@ -1,6 +1,7 @@
 import unittest
 import numpy as np
-from . import defHeaders
+from . import defHeaders_CBox_v3 as defHeaders
+
 CBox = None
 
 
@@ -23,13 +24,11 @@ class CBox_tests(unittest.TestCase):
 
     def test_firmware_version(self):
         v = CBox.get('firmware_version')
-        self.assertTrue(int(v[1]) == 3)  # major version
-        self.assertTrue(int(v[3]) == 1)  # minor version
-        self.assertTrue(int(v[5]) == 0)  # minor version
+        print(v)
 
 
     def test_setting_mode(self):
-        for i in range(6):
+        for i in range(5):
             self.CBox.set('acquisition_mode', i)
             self.assertEqual(self.CBox.get('acquisition_mode'),
                              defHeaders.acquisition_modes[i])
@@ -42,6 +41,12 @@ class CBox_tests(unittest.TestCase):
             self.assertEqual(self.CBox.get('run_mode'),
                              defHeaders.run_modes[i])
         self.CBox.set('run_mode', 0)
+
+        for i in range(3):
+            self.CBox.set('trigger_source', i)
+            self.assertEqual(self.CBox.get('trigger_source'),
+                             defHeaders.trigger_sources[i])
+        self.CBox.set('trigger_source', 0)
 
         for j in range(3):
             for i in range(3):
@@ -215,7 +220,7 @@ class CBox_tests(unittest.TestCase):
         self.CBox.set('nr_averages', 4)
         self.CBox.set('nr_samples', NoSamples)
 
-        self.CBox.set('acquisition_mode', 4)
+        self.CBox.set('acquisition_mode', 2)
         [InputAvgRes0, InputAvgRes1] = self.CBox.get_integrated_avg_results()
         self.CBox.set('acquisition_mode', 0)
         # Test signal lengths set correctly
@@ -278,6 +283,8 @@ class CBox_tests(unittest.TestCase):
         self.CBox.set('acquisition_mode', 3)
         [InputAvgRes0, InputAvgRes1] = self.CBox.get_input_avg_results()
         self.CBox.set('acquisition_mode', 0)
+
+        return [InputAvgRes0, InputAvgRes1]
 
         # Only checks on lenght of signal as test
         # No check if averaging or signal delay works

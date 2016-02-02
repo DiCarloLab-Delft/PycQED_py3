@@ -292,14 +292,13 @@ class Assembler():
 
             # the following translate function should be tested.
             elements = [rawEle.strip(string.punctuation.translate({'-': None})) for rawEle in instr.split()]
-            print (elements[0].lower())
 
             if (elements[0].lower() == 'lui') :     # lui rt, pos, byte_data
-                print ('parsing lui instruction.')
+                # print ('parsing lui instruction.')
                 instructions.append(int(self.LuiFormat(elements[1], elements[2], elements[3]), 2))
 
             elif (elements[0].lower() == 'add') :   # add rd, rs, rt
-                print ('parsing add instruction.')
+                # print ('parsing add instruction.')
                 if (elements[1][0] != 'r' or elements[2][0] != 'r' or elements[3][0] != 'r'):
                     print ('Error: Add instruction only receive three registers as input.')
                     exit()
@@ -307,7 +306,7 @@ class Assembler():
                 instructions.append(int(self.AddFormat(elements[1], elements[2], elements[3]), 2))
 
             elif (elements[0].lower() == 'sub') :   # sub rd, rs, rt
-                print ('parsing sub instruction.')
+                # print ('parsing sub instruction.')
                 if (elements[1][0] != 'r' or elements[2][0] != 'r' or elements[3][0] != 'r'):
                     print ('Error: Sub instruction only receive three registers as input.')
                     exit()
@@ -315,7 +314,7 @@ class Assembler():
                 instructions.append(int(self.SubFormat(elements[1], elements[2], elements[3]), 2))
 
             elif (elements[0].lower() == 'beq') :   # beq rs, rt, off
-                print ('parsing beq instruction.')
+                # print ('parsing beq instruction.')
 
                 if (elements[1][0] != 'r' or elements[2][0] != 'r'):
                     print ('Error: beq instruction only receive registers as the first two parameter.')
@@ -330,13 +329,12 @@ class Assembler():
                 instructions.append(int(self.BeqFormat(elements[1], elements[2], target_addr), 2))
 
             elif (elements[0].lower() == 'bne') :   # bne rs, rt, off
-                print ('parsing bne instruction.')
+                # print ('parsing bne instruction.')
 
                 if (elements[1][0] != 'r' or elements[2][0] != 'r'):
                     print ('Error: bne instruction only receive registers as the first two parameter.')
                     exit()
 
-                print (tag_addr_dict)
                 if elements[3].strip().lower() in tag_addr_dict:
                     target_addr = tag_addr_dict[elements[3].strip().lower()] - (cur_addr + 1)
                 else:
@@ -346,7 +344,7 @@ class Assembler():
                 instructions.append(int(self.BneFormat(elements[1], elements[2], target_addr), 2))
 
             elif (elements[0].lower() == 'addi') :  # addi rt, rs, imm
-                print ('parsing addi instruction.')
+                # print ('parsing addi instruction.')
 
                 if (elements[1][0] != 'r' or elements[2][0] != 'r'):
                     print ('Error: addi instruction only receive registers as the first two parameter.')
@@ -355,7 +353,7 @@ class Assembler():
                 instructions.append(int(self.AddiFormat(elements[1], elements[2], elements[3]), 2))
 
             elif (elements[0].lower() == 'ori') :   # ori rt, rs, imm
-                print ('parsing ori instruction.')
+                # print ('parsing ori instruction.')
 
                 if (elements[1][0] != 'r' or elements[2][0] != 'r'):
                     print ('Error: Ori instruction only receive registers as the first two parameter.')
@@ -364,7 +362,7 @@ class Assembler():
                 instructions.append(int(self.OriFormat(elements[1], elements[2], elements[3]), 2))
 
             elif (elements[0].lower() == 'waitreg') :   # WaitReg rs
-                print ('parsing WaitReg instruction.')
+                # print ('parsing WaitReg instruction.')
 
                 if (elements[1][0] != 'r'):
                     print ('Error: WaitReg instruction only a register as the parameter.')
@@ -373,11 +371,11 @@ class Assembler():
                 instructions.append(int(self.WaitRegFormat(elements[1]), 2))
 
             elif (elements[0].lower() == 'pulse') :   # Pulse awg0, awg1, awg2
-                print ('parsing Pulse instruction.')
+                # print ('parsing Pulse instruction.')
                 instructions.append(int(self.PulseFormat(elements[1], elements[2], elements[3]), 2))
 
             elif (elements[0].lower() == 'measure') :   # Measure rt
-                print ('parsing Measure instruction.')
+                # print ('parsing Measure instruction.')
 
                 if (elements[1][0] != 'r'):
                     print ('Error: measure instruction only a register as the parameter.')
@@ -386,15 +384,15 @@ class Assembler():
                 instructions.append(int(self.MeasureFormat(elements[1]), 2))
 
             elif (elements[0].lower() == 'wait') :   # Wait imm
-                print ('parsing Wait instruction.')
+                # print ('parsing Wait instruction.')
                 instructions.append(int(self.WaitFormat(elements[1]), 2))
 
             elif (elements[0].lower() == 'trigger') :   # Trigger mask, duration
-                print ('parsing Trigger instruction.')
+                # print ('parsing Trigger instruction.')
                 instructions.append(int(self.TriggerFormat(elements[1], elements[2]), 2))
 
             elif (elements[0].lower() == 'nop') :
-                print ('parsing nop instruction.')
+                # print ('parsing nop instruction.')
                 instructions.append(int(self.NopFormat(), 2))
 
             else :
