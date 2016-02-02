@@ -363,7 +363,6 @@ class QuTech_ControlBox(VisaInstrument):
         # Information on the encoding
         data_bits_per_byte = 4
         bytes_per_value = 2
-        i = 0
         succes = False
         t0 = time.time()
         # While loop is to make sure measurement finished before querying.
@@ -387,6 +386,7 @@ class QuTech_ControlBox(VisaInstrument):
                 self._print_waiting_char()
             if time.time()-t0 > self._timeout:
                 raise Exception('Measurement timed out')
+        self._i_wait = 0  # leaves the wait char counter in the 0 state
         return ch0, ch1
 
     def get_integrated_avg_results(self):
@@ -418,15 +418,15 @@ class QuTech_ControlBox(VisaInstrument):
             decoded_message = c.decode_message(
                 b_log, data_bits_per_byte=data_bits_per_byte,
                 bytes_per_value=bytes_per_value)
-            ch0 = decoded_message[::2]  # take all even entries
-            ch1 = decoded_message[1::2]  # take all odd entries
 
-            if len(ch0) != 0:
-                succes = True
+            if len(decoded_message) != 0:
+                break
+            elif time.time()-t0 > self._timeout:
+                raise Exception('Measurement timed out')
             else:
                 self._print_waiting_char()
-            if time.time()-t0 > self._timeout:
-                raise Exception('Measurement timed out')
+        ch0 = decoded_message[::2]  # take all even entries
+        ch1 = decoded_message[1::2]  # take all odd entries
         return ch0, ch1
 
     def get_integration_log_results(self):
@@ -469,6 +469,7 @@ class QuTech_ControlBox(VisaInstrument):
                 self._print_waiting_char()
             if time.time()-t0 > self._timeout:
                 raise Exception('Measurement timed out')
+        self._i_wait = 0  # leaves the wait char counter in the 0 state
         return ch0, ch1
 
     def get_qubit_state_log_results(self):
@@ -500,8 +501,29 @@ class QuTech_ControlBox(VisaInstrument):
         is returned.
 
         '''
-        logging.warning('Not implemented, returning random data')
-        return np.ones(5), np.ones(5)
+        t0 = time.time()
+        succes = False
+        while not succes:
+            req_mess = c.create_message(
+                defHeaders.GetQubitStateLogResults)
+            stat, log = self.serial_write(req_mess)
+            if stat:
+                # read_N +2 is for checksum and EndOfMessage
+                # encoded_message = self.serial_read(
+                #     read_N=nr_of_channels*nr_of_counters*bytes_per_value+2)
+                encoded_message = self.serial_read(
+                    read_all=True)
+                # decoded_message = c.decode_message(
+                #     encoded_message, data_bits_per_byte=data_bits_per_byte,
+                #     bytes_per_value=bytes_per_value)
+                break
+            else:
+                time.sleep(0.0001)
+                self._print_waiting_char()
+            if time.time()-t0 > self._timeout:
+                raise Exception('Measurement timed out')
+        self._i_wait = 0  # leaves the wait char counter in the 0 state
+        return encoded_message
 
     def get_qubit_state_log_counters(self):
         '''
@@ -547,12 +569,14 @@ class QuTech_ControlBox(VisaInstrument):
                 decoded_message = c.decode_message(
                     encoded_message, data_bits_per_byte=data_bits_per_byte,
                     bytes_per_value=bytes_per_value)
+            if len(decoded_message) != 0:
                 break
+            elif time.time()-t0 > self._timeout:
+                raise Exception('Measurement timed out')
             else:
                 time.sleep(0.0001)
                 self._print_waiting_char()
-            if time.time()-t0 > self._timeout:
-                raise Exception('Measurement timed out')
+        self._i_wait = 0  # leaves the wait char counter in the 0 state
         ch0_counters = decoded_message[::2]
         ch1_counters = decoded_message[1::2]
         return ch0_counters, ch1_counters
@@ -1338,11 +1362,13 @@ class QuTech_ControlBox(VisaInstrument):
         return channel_specific_function
 
     def _print_waiting_char(self):
-        self._i_wait += 1
+        if self._i_wait == 0:
+            print('\n\ ', end='')  # ensures firs iteration comes at a new line
         if self._i_wait % 2 == 0:
-            print('\r/', end='')
-        else:
             print('\r\ ', end='')
+        else:
+            print('\r/ ', end='')
+        self._i_wait += 1
     # Touch n go functions
     def _do_set_tng_heartbeat_interval(self, tng_heartbeat_interval):
         '''
