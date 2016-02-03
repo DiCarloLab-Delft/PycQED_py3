@@ -27,10 +27,10 @@ from modules.measurement.waveform_control import pulsar as ps
 from modules.measurement.pulse_sequences import standard_sequences as st_seqs
 
 # Instrument drivers
-from qcodes.instrument_drivers import RS_SGS100A as rs
-import qcodes.instrument_drivers.SignalHound_USB_SA124B as sh
-import qcodes.instrument_drivers.IVVI as iv
-from qcodes.instrument_drivers import Tektronix_AWG5014 as tek
+from qcodes.instrument_drivers.rohde_schwarz import SGS100A as rs
+import qcodes.instrument_drivers.signal_hound.USB_SA124B as sh
+import qcodes.instrument_drivers.QuTech.IVVI as iv
+from qcodes.instrument_drivers.tektronix import AWG5014 as tek
 from instrument_drivers.physical_instruments import QuTech_ControlBoxdriver as qcb
 from instrument_drivers.meta_instrument import heterodyne as hd
 import instrument_drivers.meta_instrument.CBox_LookuptableManager as lm
@@ -39,9 +39,9 @@ import instrument_drivers.meta_instrument.CBox_LookuptableManager as lm
 
 # SH = sh.SignalHound_USB_SA124B('Signal hound') #commented because of 8s load time
 CBox = qcb.QuTech_ControlBox('CBox', address='Com3', run_tests=False)
-S1 = rs.RS_SGS100A('S1', address='GPIB0::11::INSTR') #located on top of rack
-LO = rs.RS_SGS100A(name='LO', address='TCPIP0::192.168.0.77')  # left of s2
-S2 = rs.RS_SGS100A(name='S2', address='TCPIP0::192.168.0.78')  # right
+S1 = rs.RohdeSchwarz_SGS100A('S1', address='GPIB0::11::INSTR')  # located on top of rack
+LO = rs.RohdeSchwarz_SGS100A(name='LO', address='TCPIP0::192.168.0.77')  # left of s2
+S2 = rs.RohdeSchwarz_SGS100A(name='S2', address='TCPIP0::192.168.0.78')  # right
 AWG = tek.Tektronix_AWG5014(name='AWG', setup_folder=None,
                             address='TCPIP0::192.168.0.9')
 IVVI = iv.IVVI('IVVI', address='ASRL1', numdacs=16)
