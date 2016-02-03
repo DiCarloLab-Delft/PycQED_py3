@@ -483,20 +483,16 @@ class MeasurementControl:
         if len(self.detector_function.value_names) == 1:
             z_ind = len(self.sweep_functions)
             self.TwoD_array[x_ind, y_ind] = self.dset[i, z_ind]
-            # if hasattr(self, 'Plotmon'):
-            #     self.Plotmon.plot3D(1, data=self.TwoD_array,
-            #                         axis=(self.x_start, self.x_step,
-            #                               self.y_start, self.y_step))
+
+            # this is a workaround for updating the data in the live plot
             self.QC_QtPlot.traces[0]['config']['z'] = self.TwoD_array
             self.QC_QtPlot.update_plot()
         else:
             for j in range(2):
                 z_ind = len(self.sweep_functions) + j
                 self.TwoD_array[x_ind, y_ind, j] = self.dset[i, z_ind]
-                # if hasattr(self, 'Plotmon'):
-                #     self.Plotmon.plot3D(j+1, data=self.TwoD_array[:, :, j],
-                #                         axis=(self.x_start, self.x_step,
-                #                               self.y_start, self.y_step))
+            self.QC_QtPlot.traces[0]['config']['z'] = self.TwoD_array[:, :, 0]
+            self.QC_QtPlot.update_plot()
 
     def update_plotmon_2D_hard(self):
         '''
