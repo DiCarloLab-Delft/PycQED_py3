@@ -20,7 +20,7 @@ from ._ControlBox import codec as c
 
 class QuTech_ControlBox(VisaInstrument):
     '''
-    This is the qtlab driver for the 250 MS/s control box developed in
+    This is the qcodes driver for the 250 MS/s control box developed in
     collaboration with EWI.
     This is a direct port of the 'old' qtlab driver.
 
@@ -523,7 +523,8 @@ class QuTech_ControlBox(VisaInstrument):
             if time.time()-t0 > self._timeout:
                 raise Exception('Measurement timed out')
         self._i_wait = 0  # leaves the wait char counter in the 0 state
-        return encoded_message
+        ch0_values, ch1_values = c.decode_boolean_array(encoded_message)
+        return ch0_values, ch1_values
 
     def get_qubit_state_log_counters(self):
         '''

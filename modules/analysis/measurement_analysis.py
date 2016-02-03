@@ -3074,7 +3074,6 @@ class TwoD_Analysis(MeasurementAnalysis):
         close_file = kw.pop('close_file', True)
 
         self.get_naming_and_values_2D()
-        print("kw",kw)
         self.fig_array = []
         self.ax_array = []
 
