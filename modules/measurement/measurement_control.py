@@ -15,6 +15,7 @@ from scipy.optimize import fmin_powell
 from modules.measurement import hdf5_data as h5d
 from modules.utilities import general
 from modules.utilities.general import dict_to_ordered_tuples
+from qcodes.plots.pyqtgraph import QtPlot
 
 
 class MeasurementControl:
@@ -82,6 +83,8 @@ class MeasurementControl:
                 self.measure_soft_adaptive()
             else:
                 raise ValueError('mode %s not recognized' % self.mode)
+            result = self.dset[()]
+        return result
 
     def measure(self, *kw):
         self.initialize_plot_monitor()
@@ -349,14 +352,14 @@ class MeasurementControl:
             print('Reshaping sweep points')
             self.xlen = len(self.get_sweep_points())
             self.ylen = len(self.sweep_points_2D)
-            self.preallocate_2D_plot()
 
             # create inner loop pts
-            sweep_pts_0 = np.tile(self.get_sweep_points(), self.ylen)
+            self.sweep_pts_x = np.tile(self.get_sweep_points(), self.ylen)
             # create outer loop
-            sweep_pts_1 = np.repeat(self.sweep_points_2D, self.xlen)
-            c = np.column_stack((sweep_pts_0, sweep_pts_1))
+            self.sweep_pts_y = np.repeat(self.sweep_points_2D, self.xlen)
+            c = np.column_stack((self.sweep_pts_x, self.sweep_pts_y))
             self.set_sweep_points(c)
+            self.preallocate_2D_plot()
             self.measure(**kw)
             del self.TwoD_array
         return
@@ -417,12 +420,13 @@ class MeasurementControl:
                     i += 1
             self._mon_upd_time = time.time()
 
-    def new_plotmon_window(self):
+    def new_plotmon_window(self, theme=((60, 60, 60), 'w')):
         '''
         respawns the pyqtgraph plotting window
         '''
         self.win = self.rpg.GraphicsWindow(
             title='Plot monitor of %s' % self.name)
+        self.win.setBackground(theme[1])
 
 
 
@@ -443,6 +447,7 @@ class MeasurementControl:
         Made to work with at most 2 2D arrays (as this is how the labview code
         works). It should be easy to extend this function for more vals.
         '''
+
         if len(self.detector_function.value_names) == 1:
             self.TwoD_array = np.empty((self.xlen,
                                        self.ylen))
@@ -452,13 +457,16 @@ class MeasurementControl:
                  self.ylen,
                  len(self.detector_function.value_names)])
 
-        self.x_step = self.get_sweep_points()[1] - self.get_sweep_points()[0]
-        self.y_step = self.sweep_points_2D[1] - self.sweep_points_2D[0]
+        self.x_step = self.sweep_pts_x[1] - self.sweep_pts_x[0]
+        self.y_step = self.sweep_pts_y[1] - self.sweep_pts_y[0]
         # The - self. _step/2.0 is to make center of tile lie on the value
-        self.x_start = self.get_sweep_points()[0] - self.x_step/2.0
-        self.y_start = self.sweep_points_2D[0] - self.y_step/2.0
+        self.x_start = self.sweep_pts_x[0] - self.x_step/2.0
+        self.y_start = self.sweep_pts_y[0] - self.y_step/2.0
 
         self.TwoD_array[:] = np.NAN
+        self.QC_QtPlot = QtPlot(x=self.sweep_pts_x,
+                                y=self.sweep_pts_y, z=self.TwoD_array,
+                                cmap='Viridis')  #  new matplotlib default
 
     def update_plotmon_2D(self):
         '''
@@ -475,18 +483,20 @@ class MeasurementControl:
         if len(self.detector_function.value_names) == 1:
             z_ind = len(self.sweep_functions)
             self.TwoD_array[x_ind, y_ind] = self.dset[i, z_ind]
-            if hasattr(self, 'Plotmon'):
-                self.Plotmon.plot3D(1, data=self.TwoD_array,
-                                    axis=(self.x_start, self.x_step,
-                                          self.y_start, self.y_step))
+            # if hasattr(self, 'Plotmon'):
+            #     self.Plotmon.plot3D(1, data=self.TwoD_array,
+            #                         axis=(self.x_start, self.x_step,
+            #                               self.y_start, self.y_step))
+            self.QC_QtPlot.traces[0]['config']['z'] = self.TwoD_array
+            self.QC_QtPlot.update_plot()
         else:
             for j in range(2):
                 z_ind = len(self.sweep_functions) + j
                 self.TwoD_array[x_ind, y_ind, j] = self.dset[i, z_ind]
-                if hasattr(self, 'Plotmon'):
-                    self.Plotmon.plot3D(j+1, data=self.TwoD_array[:, :, j],
-                                        axis=(self.x_start, self.x_step,
-                                              self.y_start, self.y_step))
+                # if hasattr(self, 'Plotmon'):
+                #     self.Plotmon.plot3D(j+1, data=self.TwoD_array[:, :, j],
+                #                         axis=(self.x_start, self.x_step,
+                #                               self.y_start, self.y_step))
 
     def update_plotmon_2D_hard(self):
         '''
