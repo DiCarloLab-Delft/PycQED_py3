@@ -5,7 +5,7 @@ from modules.analysis import analysis_toolbox as a_tools
 
 import sys
 import glob
-import serial
+
 
 def get_git_revision_hash():
     import logging
@@ -120,9 +120,9 @@ def send_email(subject='PycQED needs your attention!',
     s.quit()
 
 
-
 def list_available_serial_ports():
-    """Lists serial ports
+    '''
+    Lists serial ports
 
     :raises EnvironmentError:
         On unsupported or unknown platforms
@@ -132,7 +132,8 @@ def list_available_serial_ports():
     Frunction from :
     http://stackoverflow.com/questions/12090503/
         listing-available-com-ports-with-python
-    """
+    '''
+    import serial
     if sys.platform.startswith('win'):
         ports = ['COM' + str(i + 1) for i in range(256)]
 

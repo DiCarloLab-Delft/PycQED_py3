@@ -24,28 +24,6 @@ class MeasurementControl:
     data points.
     '''
     def __init__(self, name, **kw):
-        # self.add_parameter('sweep_function_names',
-        #                    flags=Instrument.FLAG_GETSET, type=list)
-        # self.add_parameter('detector_function_name',
-        #                    flags=Instrument.FLAG_GETSET, type=str)
-
-        # Parameters for logging
-        # self.add_parameter('git_hash',
-        #                    flags=Instrument.FLAG_GET, type=str)
-        # self.add_parameter('measurement_begintime',
-        #                    flags=Instrument.FLAG_GET, type=str)
-        # self.add_parameter('measurement_endtime',
-        #                    flags=Instrument.FLAG_GET, type=str)
-
-        # self.add_parameter('sweep_points',
-        #                    flags=Instrument.FLAG_GETSET, type=list)
-
-        # self.add_parameter('measurement_name',
-        #                    flags=Instrument.FLAG_GETSET, type=str)
-        # self.add_parameter('optimization_method',
-        #                    flags=Instrument.FLAG_GETSET, type=str)
-
-        # self.get_git_hash()
         self.name = name
         # starting the process for the pyqtgraph plotting
         # You do not want a new process to be created every time you start a run
@@ -53,7 +31,7 @@ class MeasurementControl:
         self.proc = pgmp.QtProcess()  # pyqtgraph multiprocessing
         self.rpg = self.proc._import('pyqtgraph')
         self.win = self.rpg.GraphicsWindow(title='Plot monitor of %s' % self.name)
-        # self.win.resize(1000, 600)
+        self.win.setBackground(theme[1])
 
     ##############################################
     # Functions used to control the measurements #
@@ -428,18 +406,6 @@ class MeasurementControl:
             title='Plot monitor of %s' % self.name)
         self.win.setBackground(theme[1])
 
-
-
-    # def update_plotmon(self, mon_nr, x_ind=0, y_ind=-1):
-    #     y = self.dset[:, y_ind]
-    #     if x_ind is None:
-    #         x = np.arange(len(y))
-    #     else:
-    #         x = self.dset[:, x_ind]
-    #     data = [x, y]
-    #     if hasattr(self, 'Plotmon'):
-    #         self.Plotmon.plot2D(mon_nr, data)
-
     def preallocate_2D_plot(self):
         '''
         Preallocates a data array to be used for the update_plotmon_2D command.
@@ -447,6 +413,7 @@ class MeasurementControl:
         Made to work with at most 2 2D arrays (as this is how the labview code
         works). It should be easy to extend this function for more vals.
         '''
+        self.time_last_2Dplot_update = time.time()
 
         if len(self.detector_function.value_names) == 1:
             self.TwoD_array = np.empty((self.xlen,
@@ -486,12 +453,14 @@ class MeasurementControl:
 
             # this is a workaround for updating the data in the live plot
             self.QC_QtPlot.traces[0]['config']['z'] = self.TwoD_array
-            self.QC_QtPlot.update_plot()
         else:
             for j in range(2):
                 z_ind = len(self.sweep_functions) + j
                 self.TwoD_array[x_ind, y_ind, j] = self.dset[i, z_ind]
             self.QC_QtPlot.traces[0]['config']['z'] = self.TwoD_array[:, :, 0]
+
+        if time.time() - self.time_last_2Dplot_update > self.QC_QtPlot.interval:
+            self.time_last_2Dplot_update = time.time()
             self.QC_QtPlot.update_plot()
 
     def update_plotmon_2D_hard(self):
