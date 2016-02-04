@@ -1,10 +1,11 @@
 # General imports
 import time
-t0 = time.time()
+t0 = time.time()  # to print how long init takes
+from importlib import reload  # Useful for reloading while testing
 import numpy as np
 import matplotlib.pyplot as plt
+import pandas as pd
 
-from importlib import reload  # Useful for reloading during testin
 # Qcodes
 import qcodes as qc
 qc.set_mp_method('spawn')  # force Windows behavior on mac
@@ -12,6 +13,7 @@ qc.set_mp_method('spawn')  # force Windows behavior on mac
 # Globally defined config
 qc_config = {'datadir': 'D:\Experiments\Simultaneous_Driving\data',
              'PycQEDdir': 'D:\GitHubRepos\PycQED_py3'}
+
 
 # General PycQED modules
 from modules.measurement import measurement_control as mc

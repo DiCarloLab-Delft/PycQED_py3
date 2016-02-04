@@ -181,7 +181,7 @@ class CBox_tests(unittest.TestCase):
         '''
         Test for mode 1 integration logs. Only tests on length of data
         '''
-        log_length = 50
+        log_length = 8000
         self.CBox.set('acquisition_mode', 0)
         self.CBox.set('log_length', log_length)
         self.CBox.set('signal_delay', 20)

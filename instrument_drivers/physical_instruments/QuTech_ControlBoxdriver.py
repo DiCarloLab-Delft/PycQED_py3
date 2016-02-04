@@ -131,43 +131,11 @@ class QuTech_ControlBox(VisaInstrument):
                            set_cmd=self._do_set_measurement_timeout,
                            get_cmd=self._do_get_measurement_timeout)
 
-        # Todo: test and use codec
-        # self.add_parameter('sequencer_counters',
-        #                    get_cmd=self._do_get_sequencer_counters)
-
         self.add_parameter('lin_trans_coeffs',
                            label='Linear transformation coefficients',
                            set_cmd=self._set_lin_trans_coeffs,
                            get_cmd=self._get_lin_trans_coeffs,
                            vals=vals.Anything())
-        # self.add_parameter('tng_heartbeat_interval', type=int, units='ns',
-        #                    flag=Instrument.FLAG_GETSET)
-        # self.add_parameter('tng_burst_heartbeat_interval', type=int,
-        #                    flag=Instrument.FLAG_GETSET)
-        # self.add_parameter('tng_burst_heartbeat_n', type=int,
-        #                    flag=Instrument.FLAG_GETSET)
-        # self.add_parameter('tng_readout_delay', type=int, units='ns',
-        #                    flag=Instrument.FLAG_GETSET)
-        # self.add_parameter('tng_second_pre_rotation_delay', type=int,
-        #                    units='ns', flag=Instrument.FLAG_GETSET)
-        # self.add_parameter('tng_calibration_mode', type=int,
-        #                    flag=Instrument.FLAG_GETSET)
-        # self.add_parameter('tng_awg_mask', type=int,
-        #                    flag=Instrument.FLAG_GETSET)
-        # self.add_parameter('tng_readout_pulse_length', type=int, units='ns',
-        #                    flag=Instrument.FLAG_GETSET)
-        # self.add_parameter('tng_readout_wave_interval', type=int, units='ns',
-        #                    flag=Instrument.FLAG_GETSET)
-        # self.add_parameter('tng_output_trigger_delay', type=int, units='ns',
-        #                    flag=Instrument.FLAG_GETSET)
-        # self.add_parameter('tng_trigger_state', type=int,
-        #                    flag=Instrument.FLAG_GETSET)
-        # self.add_parameter('tng_feedback_mode', type=int,
-        #                    flag=Instrument.FLAG_GETSET)
-        # self.add_parameter('tng_feedback_code', type=int,
-        #                    flag=Instrument.FLAG_GETSET)
-        # self.add_parameter('tng_logging_mode', type=int,
-        #                    flag=Instrument.FLAG_GETSET)
 
         # Setting default arguments
         self.set('acquisition_mode', 'idle')
@@ -182,22 +150,6 @@ class QuTech_ControlBox(VisaInstrument):
         self.set('lin_trans_coeffs', [1, 0, 0, 1])
 
         self._i_wait = 0  # used in _print_waiting_char()
-
-
-        # self.tng_heartbeat_interval = 100000
-        # self.tng_burst_heartbeat_interval = 10000
-        # self.tng_burst_heartbeat_n = 1
-        # self.tng_readout_delay = 300
-        # self.tng_calibration_mode = True
-        # self.tng_awg_mask = 100
-        # self.tng_readout_pulse_length = 1200
-        # self.tng_readout_wave_interval = 600
-        # self.tng_output_trigger_delay = 1
-        # self.tng_trigger_state = 1
-        # self.tng_feedback_mode = 1
-        # self.tng_feedback_code = 3
-        # self.tng_logging_mode = 3
-        # self.tng_second_pre_rotation_delay = 0
 
         self._dac_offsets = np.empty([3, 2])
         self._dac_offsets[:] = np.NAN
@@ -215,7 +167,8 @@ class QuTech_ControlBox(VisaInstrument):
             # pass the CBox to the module so it can be used in the tests
             self.c = c  # make the codec callable from the testsuite
             test_suite.CBox = self
-            suite = unittest.TestLoader().loadTestsFromTestCase(test_suite.CBox_tests)
+            suite = unittest.TestLoader().loadTestsFromTestCase(
+                test_suite.CBox_tests)
             unittest.TextTestRunner(verbosity=2).run(suite)
 
     def get_all(self):
@@ -265,7 +218,6 @@ class QuTech_ControlBox(VisaInstrument):
 
         return heartbeat_counter, trigger_counter
 
-
     def decode_message(self, data_bytes, data_bits_per_byte=7,
                        bytes_per_value=2, signed_integer=False):
         '''
@@ -280,8 +232,8 @@ class QuTech_ControlBox(VisaInstrument):
             data_bits_per_byte = [data_bits_per_byte]
         if type(bytes_per_value) == int:
             bytes_per_value = [bytes_per_value]
-        if type(signed_integer)==bool:
-            signed_integer=[signed_integer]*len(bytes_per_value)
+        if type(signed_integer) == bool:
+            signed_integer = [signed_integer]*len(bytes_per_value)
         assert(len(data_bits_per_byte) == len(bytes_per_value))
 
         bytes_per_iteration = sum(bytes_per_value)
@@ -449,12 +401,10 @@ class QuTech_ControlBox(VisaInstrument):
         while not succes:
             log_message = c.create_message(defHeaders.ReadLoggedResults)
             stat, log = self.serial_write(log_message)
-            # print 'Got the data request stat %s' %stat
             if stat:
                 # read_N +2 is for checksum and EndOfMessage
                 b_log = bytearray(
                     self.serial_read(read_N=2*log_length*bytes_per_value+2))
-
             decoded_message = c.decode_message(
                 b_log,
                 data_bits_per_byte=data_bits_per_byte,
@@ -464,6 +414,7 @@ class QuTech_ControlBox(VisaInstrument):
 
             if len(ch0) != 0:
                 succes = True
+                break
             else:
                 time.sleep(0.0001)
                 self._print_waiting_char()
@@ -1279,8 +1230,9 @@ class QuTech_ControlBox(VisaInstrument):
 
         Setting read_N speeds up the readout significantly.
 
-        returns the message as a string (including the EndOfMessageHeader).
+        returns the message as bytes (including the EndOfMessageHeader).
         '''
+        buffersize = 4090
         t_start = time.time()
         end_of_message_received = False
         message = bytes()
@@ -1291,10 +1243,13 @@ class QuTech_ControlBox(VisaInstrument):
             elif read_N != 0:
                 if self.visa_handle.bytes_in_buffer == 2:
                     # To catch all the "empty" messages (checksum +EOM)
+                    # Removing this makes program more robust.
                     m = self._read_raw(2)
-                else:
+                    message += m
+                elif (self.visa_handle.bytes_in_buffer > read_N/2 or
+                        self.visa_handle.bytes_in_buffer >= buffersize):
                     m = self._read_raw(read_N)
-                message += m
+                    message += m
             elif self.visa_handle.bytes_in_buffer != 0:
                 message += self._read_raw(1)
             if len(message) != 0:
@@ -1302,7 +1257,7 @@ class QuTech_ControlBox(VisaInstrument):
                     end_of_message_received = True
 
             if not end_of_message_received:
-                time.sleep(.00001)
+                time.sleep(.0001)
                 if (time.time() - t_start) > timeout:
                     raise Exception('Read timed out without EndOfMessage')
         # If an error code gets send CBox will return [checksum, err_code, EOM]
