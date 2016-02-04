@@ -332,7 +332,7 @@ class MeasurementControl:
             y_rep = np.repeat(self.sweep_pts_y, self.xlen)
             c = np.column_stack((x_tiled, y_rep))
             self.set_sweep_points(c)
-            self.preallocate_2D_plot()
+            self.initialize_plot_monitor_2D()
             self.measure(**kw)
             # del self.TwoD_array
         return
@@ -406,7 +406,7 @@ class MeasurementControl:
             title='Plot monitor of %s' % self.name)
         self.win.setBackground(self.plot_theme[1])
 
-    def preallocate_2D_plot(self):
+    def initialize_plot_monitor_2D(self):
         '''
         Preallocates a data array to be used for the update_plotmon_2D command.
 
@@ -425,6 +425,10 @@ class MeasurementControl:
 
         self.QC_QtPlot = QtPlot(x=self.sweep_pts_x,
                                 y=self.sweep_pts_y, z=self.TwoD_array,
+                                xlabel=self.column_names[0],
+                                ylabel=self.column_names[1],
+                                zlabel=self.column_names[2],
+                                windowTitle=self.name+' 2D monitor',
                                 cmap='Viridis')
 
     def update_plotmon_2D(self):
