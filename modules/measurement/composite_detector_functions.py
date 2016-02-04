@@ -369,9 +369,12 @@ class CBox_trace_error_fraction_detector(det.Soft_Detector):
                  sequence_swf=None,
                  threshold=None,
                  calibrate_threshold=False,
-                 raw=True, save_raw_trace=False,
+                 raw=True,
+                 save_raw_trace=False,
+                 counters=True,
                  **kw):
         super().__init__(**kw)
+        # TODO remove the no-counters non-raw mode
         self.name = measurement_name
         self.threshold = threshold
         self.value_names = ['nr no err',
@@ -383,6 +386,8 @@ class CBox_trace_error_fraction_detector(det.Soft_Detector):
         self.MC = MC
         self.CBox = CBox
         self.raw = raw
+        self.counters = counters
+        # after testing equivalence this is to be removed
         self.save_raw_trace = save_raw_trace
 
         self.sequence_swf = sequence_swf
@@ -408,13 +413,20 @@ class CBox_trace_error_fraction_detector(det.Soft_Detector):
             rot_mat = [np.cos(a.theta), -np.sin(a.theta),
                        np.sin(a.theta), np.cos(a.theta)]
             self.CBox.lin_trans_coeffs.set(rot_mat)
-            self.threshold = a.V_opt_raw
+            self.threshold = a.V_opt_raw  # allows
+            self.CBox.sig0_threshold_line.set(int(a.V_opt_raw))
             self.sequence_swf.upload = True
             # make sure the sequence gets uploaded
+        else:
+            self.CBox.sig0_threshold_line.set(self.threshold)
         self.MC.set_sweep_function(self.sequence_swf)
 
+        # if self.counters:
+        self.counters_d = det.CBox_state_couners_det(self.CBox, self.AWG)
+
         self.dig_shots_det = det.CBox_digitizing_shots_det(
-            self.CBox, self.AWG, threshold=self.threshold)
+            self.CBox, self.AWG,
+            threshold=self.CBox.sig0_threshold_line.get())
         self.MC.set_detector_function(self.dig_shots_det)
 
     def acquire_data_point(self, **kw):
@@ -423,17 +435,24 @@ class CBox_trace_error_fraction_detector(det.Soft_Detector):
             # prevent reloading
             self.sequence_swf.upload = False
         self.i += 1
-        if self.save_raw_trace:
-            self.MC.run(self.name+'_{}'.format(self.i))
-            a = ma.MeasurementAnalysis(auto=False)
-            a.get_naming_and_values()
-            trace = a.measured_values[0]
-            a.finish()  # close the datafile
+
+        if not self.counters:
+            if self.save_raw_trace:
+                self.MC.run(self.name+'_{}'.format(self.i))
+                a = ma.MeasurementAnalysis(auto=False)
+                a.get_naming_and_values()
+                trace = a.measured_values[0]
+                a.finish()  # close the datafile
+            else:
+                self.sequence_swf.prepare()
+                self.dig_shots_det.prepare()
+                trace = self.dig_shots_det.get_values()[0]
+                counters = self.counters_d.get_values()
+            return self.count_error_fractions(trace, len(trace))
         else:
             self.sequence_swf.prepare()
-            self.dig_shots_det.prepare()
-            trace = self.dig_shots_det.get_values()[0]
-        return self.count_error_fractions(trace, len(trace))
+            counters = self.counters_d.get_values()
+            return counters[0:3]  # no err, single and double for weight A
 
     def count_error_fractions(self, trace, trace_length):
         no_err_counter = 0

@@ -379,56 +379,6 @@ class QuTechCBox_input_average_Detector(Hard_Detector):
         self.CBox.set('acquisition_mode', 0)
 
 
-# class QuTechCBox_input_average_Detector_Touch_N_Go(Hard_Detector):
-#     def __init__(self, **kw):
-#         super(QuTechCBox_input_average_Detector_Touch_N_Go, self).__init__()
-#         self.CBox = qt.instruments['CBox']
-#         self.name = 'CBox_Streaming_data'
-#         self.value_names = ['Ch0', 'Ch1']
-#         self.value_units = ['a.u.', 'a.u.']
-#         self.TD_Meas = qt.instruments['TD_Meas']
-
-#     def get_values(self):
-#         # Exists for the sake of CBox issue #38
-#         exception_mode = True
-#         if exception_mode:
-#             success = False
-#             i = 0
-#             while not success and i < 10:
-#                 try:
-#                     d = self._get_values()
-#                     success = True
-#                 except Exception as e:
-#                     print()
-#                     print('Timeout exception caught, retaking data points')
-#                     print(str(e))
-#                     i += 1
-#                     self.CBox.set_run_mode(0)
-#                     self.CBox.set('acquisition_mode', 0)
-#                     self.CBox.restart_awg_tape(0)
-#                     self.CBox.restart_awg_tape(1)
-#                     self.CBox.restart_awg_tape(2)
-#                     time.sleep(.5)
-#                     self.CBox.set('acquisition_mode', 6)
-#                     self.CBox.set_run_mode(1)
-#         else:
-#             d = self._get_values()
-#         return d
-
-#     def _get_values(self):
-#         data = self.CBox.get_input_avg_results()
-#         return data
-
-#     def prepare(self, sweep_points):
-#         self.CBox.set('acquisition_mode', 0)
-#         self.CBox.set('acquisition_mode', 6)
-#         self.CBox.set_run_mode(1)
-
-#     def finish(self):
-#         self.CBox.set('acquisition_mode', 0)
-#         self.CBox.set_run_mode(0)
-
-
 class CBox_integrated_average_detector(Hard_Detector):
     def __init__(self, CBox, AWG, **kw):
         super().__init__(**kw)
@@ -466,15 +416,11 @@ class CBox_single_integration_average_det(Soft_Detector):
         self.name = 'CBox_single_integration_avg_det'
         self.value_names = ['I', 'Q']
         self.value_units = ['a.u.', 'a.u.']
-        # self.value_names = ['I', 'Q', '|S21|', 'angle|S21|']
-        # self.value_units = ['a.u.', 'a.u.', 'a.u.', 'deg']
 
     def acquire_data_point(self, **kw):
         self.CBox.set('acquisition_mode', 4)
         data = self.CBox.get_integrated_avg_results()
         self.CBox.set('acquisition_mode', 0)
-        # S21 = data[0] + 1j*data[1]
-        # data = [S21.real, S21.imag, abs(S21), np.angle(S21)/(2*np.pi)*360]
         return data
 
     def prepare(self):
@@ -566,6 +512,45 @@ class CBox_integration_logging_det(Hard_Detector):
         self.AWG.stop()
 
 
+class CBox_state_couners_det(Hard_Detector):
+    def __init__(self, CBox, AWG, **kw):
+        super().__init__()
+        self.CBox = CBox
+        self.name = 'CBox_state_couners_detector'
+        # A and B refer to the counts for the different weigth functions
+        self.value_names = ['no error A', 'single error A', 'double error A',
+                            '|0> A', '|1> A',
+                            'no error B', 'single error B', 'double error B',
+                            '|0> B', '|1> B', ]
+        self.value_units = ['#']*10
+        self.AWG = AWG
+
+    def get_values(self):
+        success = False
+        i = 0
+        while not success and i < 10:
+            try:
+                d = self._get_values()
+                success = True
+            except Exception as e:
+                logging.warning('Exception {} caught, retaking data'.format(e))
+                i += 1
+        return d
+
+    def _get_values(self):
+        self.AWG.stop()
+        self.CBox.set('acquisition_mode', 0)
+        self.CBox.set('acquisition_mode', 'integration logging')
+        self.AWG.start()
+        data = self.CBox.get_qubit_state_log_counters()
+        self.CBox.set('acquisition_mode', 0)
+        return np.concatenate(data)  # concatenates counters A and B
+
+    def finish(self):
+        self.CBox.set('acquisition_mode', 0)
+        self.AWG.stop()
+
+
 class CBox_alternating_shots_det(CBox_integration_logging_det):
     def __init__(self, CBox, AWG, **kw):
         super().__init__(CBox, AWG, **kw)
@@ -599,68 +584,6 @@ class CBox_digitizing_shots_det(CBox_integration_logging_det):
         # can cut that.
         return (d > self.threshold).astype(int), dat[0], dat[1]
 
-
-
-# class QuTechCBox_Streaming_Detector(Hard_Detector):
-#     def __init__(self, NoSamples=10000, AWG='AWG', **kw):
-#         super(QuTechCBox_Streaming_Detector, self).__init__()
-#         self.CBox = qt.instruments['CBox']
-#         self.name = 'CBox_Streaming_data'
-#         self.value_names = ['Ch0', 'Ch1', 'index']
-#         self.value_units = ['a.u.', 'a.u.', 'i']
-
-#         self.NoSamples = NoSamples
-#         if AWG is not None:
-#             self.AWG = qt.instruments[AWG]
-#             # Used for synchronisation when CBox is not supplying pulses itself.
-
-#     def get_values(self):
-#         if self.AWG is not None:
-#             self.AWG.start()
-#         data = self.CBox.get_streaming_results(self.NoSamples)
-
-#         return data
-
-#     def prepare(self, sweep_points):
-#         if self.AWG is not None:
-#             self.AWG.stop()
-#         self.CBox.set('acquisition_mode', 5)
-
-#     def finish(self):
-#         self.CBox.set('acquisition_mode', 0)
-#         if self.AWG is not None:
-#             self.AWG.stop()
-
-
-# class QuTechCBox_AlternatingShots_Streaming_Detector(Hard_Detector):
-#     def __init__(self, NoSamples=10000, AWG='AWG', **kw):
-#         super(QuTechCBox_AlternatingShots_Streaming_Detector, self).__init__()
-#         self.CBox = qt.instruments['CBox']
-#         self.name = 'CBox_Streaming_data'
-#         self.value_names = ['I_0', 'Q_0', 'I_1', 'Q_1']
-#         self.value_units = ['a.u.', 'a.u.', 'a.u.', 'a.u.']
-#         self.NoSamples = NoSamples
-#         if AWG is not None:
-#             self.AWG = qt.instruments[AWG]
-
-#     def get_values(self):
-#         if self.AWG is not None:
-#             self.AWG.start()
-#         raw_data = self.CBox.get_streaming_results(self.NoSamples)
-#         I_data_0, I_data_1 = a_tools.zigzag(raw_data[0, :])
-#         Q_data_0, Q_data_1 = a_tools.zigzag(raw_data[1, :])
-#         data = [I_data_0, Q_data_0, I_data_1, Q_data_1]
-#         return data
-
-#     def prepare(self, sweep_points):
-#         if self.AWG is not None:
-#             self.AWG.stop()
-#         self.CBox.set('acquisition_mode', 5)
-
-#     def finish(self):
-#         self.CBox.set('acquisition_mode', 0)
-#         if self.AWG is not None:
-#             self.AWG.stop()
 
 
 # class QuTechCBox_AlternatingShots_Logging_Detector_Touch_N_Go(Hard_Detector):
