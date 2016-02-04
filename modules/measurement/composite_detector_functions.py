@@ -374,9 +374,9 @@ class CBox_trace_error_fraction_detector(det.Soft_Detector):
         super().__init__(**kw)
         self.name = measurement_name
         self.threshold = threshold
-        self.value_names = ['nr pulse errors',
-                            'nr RO errors',
-                            'single error counter']
+        self.value_names = ['nr no err',
+                            'nr single err',
+                            'nr double err']
         self.value_units = ['#', '#', '#']
 
         self.AWG = AWG
@@ -432,20 +432,14 @@ class CBox_trace_error_fraction_detector(det.Soft_Detector):
         else:
             self.sequence_swf.prepare()
             self.dig_shots_det.prepare()
-            trace = self.dig_shots_det.get_values()
+            trace = self.dig_shots_det.get_values()[0]
         return self.count_error_fractions(trace, len(trace))
-        # pulse_err_frac = s_err_frac - d_err_frac
-        # return s_err_frac, d_err_frac, pulse_err_frac
 
     def count_error_fractions(self, trace, trace_length):
-        # TODO: These counters also exist in the CBox counter mode that is not
-        # tested yet see CBox issue #45
+        no_err_counter = 0
         single_err_counter = 0
         double_err_counter = 0
-        triple_err_counter = 0
-        print(trace_length)
-        print(trace[0:20])
-        for i in range(len(trace)-3):
+        for i in range(len(trace)-2):
             if trace[i] == trace[i+1]:
                 # A single error is associated with a qubit error
                 single_err_counter += 1
@@ -454,18 +448,9 @@ class CBox_trace_error_fraction_detector(det.Soft_Detector):
                     # a RO error, this counter must be substracted from the
                     # single counter
                     double_err_counter += 1
-                    if trace[i] == trace[i+3]:
-                        # if three errors happen consecutively it is more
-                        # likely that the pulse is not doing anything than
-                        # that there were two RO errors in a row. This is
-                        # a higher order correction valid in the regime where
-                        # P(RO-err) << P(pulse-err)
-                        triple_err_counter += 1
-
-        # At this point we assign an interpretation to the raw counters
-        nr_RO_errors = double_err_counter - triple_err_counter
-        nr_pulse_errors = single_err_counter - nr_RO_errors
-        return nr_pulse_errors, nr_RO_errors, single_err_counter
+            else:
+                no_err_counter += 1
+        return no_err_counter, single_err_counter, double_err_counter
 
 # class SSRO_Fidelity_Detector_CBox_optimum_weights(SSRO_Fidelity_Detector_CBox):
 #     '''
