@@ -23,15 +23,16 @@ class MeasurementControl:
     New version of Measurement Control that allows for adaptively determining
     data points.
     '''
-    def __init__(self, name, **kw):
+    def __init__(self, name, plot_theme=((60, 60, 60), 'w'), **kw):
         self.name = name
         # starting the process for the pyqtgraph plotting
         # You do not want a new process to be created every time you start a run
+        self.plot_theme = plot_theme
         pg.mkQApp()
         self.proc = pgmp.QtProcess()  # pyqtgraph multiprocessing
         self.rpg = self.proc._import('pyqtgraph')
         self.win = self.rpg.GraphicsWindow(title='Plot monitor of %s' % self.name)
-        self.win.setBackground(theme[1])
+        self.win.setBackground(self.plot_theme[1])
 
     ##############################################
     # Functions used to control the measurements #
@@ -369,11 +370,14 @@ class MeasurementControl:
         ylabels = self.column_names[len(self.sweep_function_names):]
         for ylab in ylabels:
             for xlab in xlabels:
-                p = self.win.addPlot()
-                p.setLabel('bottom', xlab)
-                p.setLabel('left', ylab)
-                c = p.plot(symbol='o', symbolSize=7)
-                # symbol options are  o, s(quare), t(riangle), d(iamond), +
+                p = self.win.addPlot(pen=self.plot_theme[0])
+                b_ax = p.getAxis('bottom')
+                p.setLabel('bottom', xlab, pen=self.plot_theme[0])
+                b_ax.setPen(self.plot_theme[0])
+                l_ax = p.getAxis('left')
+                l_ax.setPen(self.plot_theme[0])
+                p.setLabel('left', ylab, pen=self.plot_theme[0])
+                c = p.plot(symbol='o', symbolSize=7, pen=self.plot_theme[0])
                 self.curves.append(c)
             self.win.nextRow()
         return self.win, self.curves
@@ -398,13 +402,15 @@ class MeasurementControl:
                     i += 1
             self._mon_upd_time = time.time()
 
-    def new_plotmon_window(self, theme=((60, 60, 60), 'w')):
+    def new_plotmon_window(self, plot_theme=None):
         '''
         respawns the pyqtgraph plotting window
         '''
+        if plot_theme is not None:
+            self.plot_theme = plot_theme
         self.win = self.rpg.GraphicsWindow(
             title='Plot monitor of %s' % self.name)
-        self.win.setBackground(theme[1])
+        self.win.setBackground(self.plot_theme[1])
 
     def preallocate_2D_plot(self):
         '''
