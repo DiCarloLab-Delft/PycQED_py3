@@ -204,7 +204,7 @@ class MeasurementControl:
         '''
         Core measurement function used for soft sweeps
         '''
-        self.check_keyboard_interupt()
+
         if np.size(x) == 1:
             x = [x]
         if np.size(x) != len(self.sweep_functions):
@@ -218,6 +218,12 @@ class MeasurementControl:
 
         datasetshape = self.dset.shape
         self.iteration = datasetshape[0] + 1
+
+        # TODO: REMOVE THIS ONLY FOR BENCHMARKING
+        # if self.iteration > 2:
+        #     print('Time of iteration: {:.4g}'.format(time.time()-self.it_time))
+        # self.it_time = time.time()
+
         vals = self.detector_function.acquire_data_point()
 
         # Resizing dataset and saving
@@ -293,20 +299,6 @@ class MeasurementControl:
         except AttributeError:
             pass
 
-    def check_keyboard_interupt(self):
-        try:  # Try except statement is to make it work on non windows pc
-            if msvcrt.kbhit():
-                key = msvcrt.getch()
-                if key == 'q':
-                    filedir = os.path.dirname(self.data_object.filepath)
-                    self.data_object.close()
-                    filedirparts = os.path.split(filedir)
-                    newdirname = filedirparts[1][:6]+'_X'+filedirparts[1][6:]
-                    newfiledir = os.path.join(filedirparts[0], newdirname)
-                    os.rename(filedir, newfiledir)
-                    raise KeyboardInterrupt('Human interupt q')
-        except:
-            pass
 
     ###################
     # 2D-measurements #
@@ -333,14 +325,16 @@ class MeasurementControl:
             self.ylen = len(self.sweep_points_2D)
 
             # create inner loop pts
-            self.sweep_pts_x = np.tile(self.get_sweep_points(), self.ylen)
+            self.sweep_pts_x = self.get_sweep_points()
+            x_tiled = np.tile(self.sweep_pts_x, self.ylen)
             # create outer loop
-            self.sweep_pts_y = np.repeat(self.sweep_points_2D, self.xlen)
-            c = np.column_stack((self.sweep_pts_x, self.sweep_pts_y))
+            self.sweep_pts_y = self.sweep_points_2D
+            y_rep = np.repeat(self.sweep_pts_y, self.xlen)
+            c = np.column_stack((x_tiled, y_rep))
             self.set_sweep_points(c)
             self.preallocate_2D_plot()
             self.measure(**kw)
-            del self.TwoD_array
+            # del self.TwoD_array
         return
 
     def set_sweep_function_2D(self, sweep_function):
@@ -391,7 +385,7 @@ class MeasurementControl:
             time_since_last_mon_update = 1e9
         # Update always if just a few points otherwise wait for the refresh
         # timer
-        if (self.dset.shape[0] < 200 or time_since_last_mon_update >
+        if (self.dset.shape[0] < 20 or time_since_last_mon_update >
                 self._monitor_refresh_time):
             nr_sweep_funcs = len(self.sweep_function_names)
             for y_ind in range(len(self.detector_function.value_names)):
@@ -420,49 +414,38 @@ class MeasurementControl:
         works). It should be easy to extend this function for more vals.
         '''
         self.time_last_2Dplot_update = time.time()
-
+        n = len(self.sweep_pts_y)
+        m = len(self.sweep_pts_x)
         if len(self.detector_function.value_names) == 1:
-            self.TwoD_array = np.empty((self.xlen,
-                                       self.ylen))
+            self.TwoD_array = np.empty(n, m)
         else:
             self.TwoD_array = np.empty(
-                [self.xlen,
-                 self.ylen,
-                 len(self.detector_function.value_names)])
-
-        self.x_step = self.sweep_pts_x[1] - self.sweep_pts_x[0]
-        self.y_step = self.sweep_pts_y[1] - self.sweep_pts_y[0]
-        # The - self. _step/2.0 is to make center of tile lie on the value
-        self.x_start = self.sweep_pts_x[0] - self.x_step/2.0
-        self.y_start = self.sweep_pts_y[0] - self.y_step/2.0
-
+                [n, m, len(self.detector_function.value_names)])
         self.TwoD_array[:] = np.NAN
+
         self.QC_QtPlot = QtPlot(x=self.sweep_pts_x,
                                 y=self.sweep_pts_y, z=self.TwoD_array,
-                                cmap='Viridis')  #  new matplotlib default
+                                cmap='Viridis')
 
     def update_plotmon_2D(self):
         '''
         Adds latest measured value to the TwoD_array and sends it
         to the plotmon.
-        Note that the plotmon only supports evenly spaced lattices.
 
-        Made to work with at most 2 2D arrays (as this is how the labview code
-        works). It should be easy to extend this function for more vals.
         '''
         i = self.iteration-1
         x_ind = i % self.xlen
         y_ind = i / self.xlen
         if len(self.detector_function.value_names) == 1:
             z_ind = len(self.sweep_functions)
-            self.TwoD_array[x_ind, y_ind] = self.dset[i, z_ind]
+            self.TwoD_array[y_ind, x_ind] = self.dset[i, z_ind]
 
             # this is a workaround for updating the data in the live plot
-            self.QC_QtPlot.traces[0]['config']['z'] = self.TwoD_array
+            self.QC_QtPlot.traces[0]['config']['z'] = self.TwoD_array.T
         else:
             for j in range(2):
                 z_ind = len(self.sweep_functions) + j
-                self.TwoD_array[x_ind, y_ind, j] = self.dset[i, z_ind]
+                self.TwoD_array[y_ind, x_ind, j] = self.dset[i, z_ind]
             self.QC_QtPlot.traces[0]['config']['z'] = self.TwoD_array[:, :, 0]
 
         if time.time() - self.time_last_2Dplot_update > self.QC_QtPlot.interval:
