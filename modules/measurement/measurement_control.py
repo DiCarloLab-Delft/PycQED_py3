@@ -1,13 +1,7 @@
-try:
-    import msvcrt  # used on windows to catch keyboard input
-except:
-    print('Warning: Could not import msvcrt (used for detecting keystrokes)')
-
 import types
 import logging
 import time
 import sys
-import os
 import numpy as np
 import pyqtgraph as pg
 import pyqtgraph.multiprocess as pgmp
@@ -23,16 +17,18 @@ class MeasurementControl:
     New version of Measurement Control that allows for adaptively determining
     data points.
     '''
-    def __init__(self, name, plot_theme=((60, 60, 60), 'w'), **kw):
+    def __init__(self, name, plot_theme=((60, 60, 60), 'w'),
+                 plotting_interval=2, **kw):
         self.name = name
         # starting the process for the pyqtgraph plotting
-        # You do not want a new process to be created every time you start a run
-        self.plot_theme = plot_theme
+        # You do not want a new process to be created every time you start a
+        # run. This can be removed when I replace my custom process with the
+        # pyqtgraph one.
         pg.mkQApp()
         self.proc = pgmp.QtProcess()  # pyqtgraph multiprocessing
         self.rpg = self.proc._import('pyqtgraph')
-        self.win = self.rpg.GraphicsWindow(title='Plot monitor of %s' % self.name)
-        self.win.setBackground(self.plot_theme[1])
+        self.new_plotmon_window(plot_theme=plot_theme,
+                                interval=plotting_interval)
 
     ##############################################
     # Functions used to control the measurements #
@@ -320,7 +316,6 @@ class MeasurementControl:
         if np.size(self.get_sweep_points()[0]) == 2:
             self.measure(**kw)
         elif np.size(self.get_sweep_points()[0]) == 1:
-            print('Reshaping sweep points')
             self.xlen = len(self.get_sweep_points())
             self.ylen = len(self.sweep_points_2D)
 
@@ -396,15 +391,20 @@ class MeasurementControl:
                     i += 1
             self._mon_upd_time = time.time()
 
-    def new_plotmon_window(self, plot_theme=None):
+    def new_plotmon_window(self, plot_theme=None, interval=2):
         '''
         respawns the pyqtgraph plotting window
+        Creates self.win       : a direct pyqtgraph window
+                self.QC_QtPlot : the qcodes pyqtgraph window
         '''
         if plot_theme is not None:
             self.plot_theme = plot_theme
         self.win = self.rpg.GraphicsWindow(
             title='Plot monitor of %s' % self.name)
         self.win.setBackground(self.plot_theme[1])
+        self.QC_QtPlot = QtPlot(
+            windowTitle='Plot monitor 2D of %s' % self.name,
+            interval=interval)
 
     def initialize_plot_monitor_2D(self):
         '''
@@ -416,20 +416,22 @@ class MeasurementControl:
         self.time_last_2Dplot_update = time.time()
         n = len(self.sweep_pts_y)
         m = len(self.sweep_pts_x)
-        if len(self.detector_function.value_names) == 1:
-            self.TwoD_array = np.empty(n, m)
-        else:
-            self.TwoD_array = np.empty(
-                [n, m, len(self.detector_function.value_names)])
+        # if len(self.detector_function.value_names) == 1:
+        #     self.TwoD_array = np.empty(n, m)
+        # else:
+        self.TwoD_array = np.empty(
+            [n, m, len(self.detector_function.value_names)])
         self.TwoD_array[:] = np.NAN
-
-        self.QC_QtPlot = QtPlot(x=self.sweep_pts_x,
-                                y=self.sweep_pts_y, z=self.TwoD_array,
-                                xlabel=self.column_names[0],
-                                ylabel=self.column_names[1],
-                                zlabel=self.column_names[2],
-                                windowTitle=self.name+' 2D monitor',
-                                cmap='Viridis')
+        self.QC_QtPlot.clear()
+        for j in range(len(self.detector_function.value_names)):
+            self.QC_QtPlot.add(x=self.sweep_pts_x,
+                               y=self.sweep_pts_y,
+                               z=self.TwoD_array[:, :, j],
+                               xlabel=self.column_names[0],
+                               ylabel=self.column_names[1],
+                               zlabel=self.column_names[2+j],
+                               subplot=j+1,
+                               cmap='viridis')
 
     def update_plotmon_2D(self):
         '''
@@ -440,19 +442,14 @@ class MeasurementControl:
         i = self.iteration-1
         x_ind = i % self.xlen
         y_ind = i / self.xlen
-        if len(self.detector_function.value_names) == 1:
-            z_ind = len(self.sweep_functions)
-            self.TwoD_array[y_ind, x_ind] = self.dset[i, z_ind]
+        for j in range(len(self.detector_function.value_names)):
+            z_ind = len(self.sweep_functions) + j
+            self.TwoD_array[y_ind, x_ind, j] = self.dset[i, z_ind]
+        self.QC_QtPlot.traces[j]['config']['z'] = self.TwoD_array[:, :, j]
 
-            # this is a workaround for updating the data in the live plot
-            self.QC_QtPlot.traces[0]['config']['z'] = self.TwoD_array.T
-        else:
-            for j in range(2):
-                z_ind = len(self.sweep_functions) + j
-                self.TwoD_array[y_ind, x_ind, j] = self.dset[i, z_ind]
-            self.QC_QtPlot.traces[0]['config']['z'] = self.TwoD_array[:, :, 0]
-
-        if time.time() - self.time_last_2Dplot_update > self.QC_QtPlot.interval:
+        if (time.time() - self.time_last_2Dplot_update >
+                self.QC_QtPlot.interval
+                or self.iteration == len(self.sweep_points)):
             self.time_last_2Dplot_update = time.time()
             self.QC_QtPlot.update_plot()
 
@@ -567,8 +564,8 @@ class MeasurementControl:
     def print_progress_static_soft_sweep(self, i):
         percdone = (i+1)*1./len(self.sweep_points)*100
         elapsed_time = time.time() - self.begintime
-        progress_message = "{percdone}% completed, elapsed time: "\
-            "{t_elapsed} s, time left: {t_left} s".format(
+        progress_message = "\r {percdone}% completed \telapsed time: "\
+            "{t_elapsed}s \ttime left: {t_left}s".format(
                 percdone=int(percdone),
                 t_elapsed=round(elapsed_time, 1),
                 t_left=round((100.-percdone)/(percdone) *

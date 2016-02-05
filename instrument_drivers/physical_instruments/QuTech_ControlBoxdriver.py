@@ -1318,8 +1318,6 @@ class QuTech_ControlBox(VisaInstrument):
         return channel_specific_function
 
     def _print_waiting_char(self):
-        if self._i_wait == 0:
-            print('\n\ ', end='')  # ensures firs iteration comes at a new line
         if self._i_wait % 2 == 0:
             print('\r\ ', end='')
         else:
