@@ -416,9 +416,6 @@ class MeasurementControl:
         self.time_last_2Dplot_update = time.time()
         n = len(self.sweep_pts_y)
         m = len(self.sweep_pts_x)
-        # if len(self.detector_function.value_names) == 1:
-        #     self.TwoD_array = np.empty(n, m)
-        # else:
         self.TwoD_array = np.empty(
             [n, m, len(self.detector_function.value_names)])
         self.TwoD_array[:] = np.NAN

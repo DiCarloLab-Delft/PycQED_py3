@@ -137,6 +137,34 @@ def linear_with_background(x, a, b):
     '''
     return np.sqrt((a*x)**2 + b**2)
 
+####################
+# Guess functions  #
+####################
+
+
+def double_gauss_guess(model, data, x=None, **kwargs):
+    '''
+    Finds a guess for the intial parametes of the double gauss model.
+    Guess is based on taking the cumulative sum of the data and
+    finding the points corresponding to 25% and 75%
+    it finds sigma by using the
+    '''
+    if x is None:
+        x = np.arange(len(data))
+    cdf = np.cumsum(data)
+    norm_cdf = cdf/cdf[-1]
+    A_center = x[(np.abs(norm_cdf - 0.25)).argmin()]
+    B_center = x[(np.abs(norm_cdf - 0.75)).argmin()]
+    A_sigma = (x[(np.abs(norm_cdf - 0.25 - .33/2)).argmin()]
+               - x[(np.abs(norm_cdf - 0.25 + .33/2)).argmin()])
+    B_sigma = (x[(np.abs(norm_cdf - 0.75 - .33/2)).argmin()]
+               - x[(np.abs(norm_cdf - 0.75 + .33/2)).argmin()])
+
+    amp = max(data)*(A_sigma + B_sigma)/2.
+    pars = model.make_params(A_center=A_center, B_center=B_center,
+                             A_sigma=A_sigma, B_sigma=B_sigma,
+                             A_amplitude=amp, B_amplitude=amp)
+    return pars
 
 #################################
 #     User defined Models       #
@@ -165,8 +193,12 @@ LinBGModel = lmfit.Model(linear_with_background)
 LorentzModel = lmfit.Model(lmfit.models.lorentzian)
 Lorentz_w_background_Model = lmfit.models.LorentzianModel() + \
     lmfit.models.LinearModel()
-
 PolyBgHangerAmplitudeModel = HangerAmplitudeModel * lmfit.models.PolynomialModel(degree=7)
+
+DoubleGaussModel = (lmfit.models.GaussianModel(prefix='A_') +
+                    lmfit.models.GaussianModel(prefix='B_'))
+DoubleGaussModel.guess = double_gauss_guess  # defines a guess function
+
 
 # Before defining a new model, take a look at the built in models in lmfit.
 

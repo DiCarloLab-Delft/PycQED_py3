@@ -16,67 +16,6 @@ from modules.analysis.tools import data_manipulation as dm_tools
 import imp
 imp.reload(dm_tools)
 
-def fit_qubit_frequency(sweep_points, data, mode='dac',
-                        vary_E_c=True, vary_f_max=True,
-                        vary_dac_flux_coeff=True,
-                        vary_dac_sweet_spot=True,
-                        data_file=None, **kw):
-    '''
-    Function for fitting the qubit dac/flux arc
-    Has default values for all the fit parameters, if specied as a **kw it uses
-    that value. If a qubit name and a hdf5 data file is specified it uses
-    values from the data_file.
-    NB! This function could be cleaned up a bit.
-    '''
-
-    qubit_name = kw.pop('qubit_name', None)
-    if qubit_name is not None and data_file is not None:
-        try:
-            instrument_settings = data_file['Instrument settings']
-            qubit_attrs = instrument_settings[qubit_name].attrs
-            print(qubit_attrs)
-        except:
-            print('Qubit instrument is not in data file')
-            qubit_attrs = {}
-    else:
-        qubit_attrs = {}
-
-    # Extract initial values, first from kw, then data file, then default
-    E_c = kw.pop('E_c', qubit_attrs.get('E_c', 0.3e9))
-    f_max = kw.pop('f_max', qubit_attrs.get('f_max', np.max(data)))
-    dac_flux_coeff = kw.pop('dac_flux_coefficient',
-                            qubit_attrs.get('dac_flux_coefficient', 1.))
-    dac_sweet_spot = kw.pop('dac_sweet_spot',
-                            qubit_attrs.get('dac_sweet_spot', 0))
-    flux_zero = kw.pop('flux_zero', qubit_attrs.get('flux_zero', 10))
-
-    if mode == 'dac':
-        Q_dac_freq_mod = fit_mods.QubitFreqDacModel
-        Q_dac_freq_mod.set_param_hint('E_c', value=E_c, vary=vary_E_c,
-                                      min=0, max=500e6)
-        Q_dac_freq_mod.set_param_hint('f_max', value=f_max,
-                                      vary=vary_f_max)
-        Q_dac_freq_mod.set_param_hint('dac_flux_coefficient',
-                                      value=dac_flux_coeff,
-                                      vary=vary_dac_flux_coeff)
-        Q_dac_freq_mod.set_param_hint('dac_sweet_spot',
-                                      value=dac_sweet_spot,
-                                      vary=vary_dac_sweet_spot)
-
-        fit_res = Q_dac_freq_mod.fit(data=data, dac_voltage=sweep_points)
-    elif mode == 'flux':
-        Qubit_freq_mod = fit_mods.QubitFreqFluxModel
-        Qubit_freq_mod.set_param_hint('E_c', value=E_c, vary=vary_E_c,
-                                      min=0, max=100e6)
-        Qubit_freq_mod.set_param_hint('f_max', value=f_max, vary=vary_f_max)
-        Qubit_freq_mod.set_param_hint('flux_zero', value=flux_zero,
-                                      min=0, vary=True)
-        Qubit_freq_mod.set_param_hint('dac_offset', value=0, vary=True)
-
-        fit_res = Qubit_freq_mod.fit(data=data, flux=sweep_points)
-    return fit_res
-
-
 class MeasurementAnalysis(object):
 
     def __init__(self, TwoD=False, folder=None, auto=True, **kw):
@@ -4041,3 +3980,63 @@ class RandomizedBenchmarking_Analysis():
     #     self.save_fig(fig2, xlabel=self.xlabel, ylabel='Power', **kw)
     #     if close_file:
     #         self.data_file.close()
+
+def fit_qubit_frequency(sweep_points, data, mode='dac',
+                        vary_E_c=True, vary_f_max=True,
+                        vary_dac_flux_coeff=True,
+                        vary_dac_sweet_spot=True,
+                        data_file=None, **kw):
+    '''
+    Function for fitting the qubit dac/flux arc
+    Has default values for all the fit parameters, if specied as a **kw it uses
+    that value. If a qubit name and a hdf5 data file is specified it uses
+    values from the data_file.
+    NB! This function could be cleaned up a bit.
+    '''
+
+    qubit_name = kw.pop('qubit_name', None)
+    if qubit_name is not None and data_file is not None:
+        try:
+            instrument_settings = data_file['Instrument settings']
+            qubit_attrs = instrument_settings[qubit_name].attrs
+            print(qubit_attrs)
+        except:
+            print('Qubit instrument is not in data file')
+            qubit_attrs = {}
+    else:
+        qubit_attrs = {}
+
+    # Extract initial values, first from kw, then data file, then default
+    E_c = kw.pop('E_c', qubit_attrs.get('E_c', 0.3e9))
+    f_max = kw.pop('f_max', qubit_attrs.get('f_max', np.max(data)))
+    dac_flux_coeff = kw.pop('dac_flux_coefficient',
+                            qubit_attrs.get('dac_flux_coefficient', 1.))
+    dac_sweet_spot = kw.pop('dac_sweet_spot',
+                            qubit_attrs.get('dac_sweet_spot', 0))
+    flux_zero = kw.pop('flux_zero', qubit_attrs.get('flux_zero', 10))
+
+    if mode == 'dac':
+        Q_dac_freq_mod = fit_mods.QubitFreqDacModel
+        Q_dac_freq_mod.set_param_hint('E_c', value=E_c, vary=vary_E_c,
+                                      min=0, max=500e6)
+        Q_dac_freq_mod.set_param_hint('f_max', value=f_max,
+                                      vary=vary_f_max)
+        Q_dac_freq_mod.set_param_hint('dac_flux_coefficient',
+                                      value=dac_flux_coeff,
+                                      vary=vary_dac_flux_coeff)
+        Q_dac_freq_mod.set_param_hint('dac_sweet_spot',
+                                      value=dac_sweet_spot,
+                                      vary=vary_dac_sweet_spot)
+
+        fit_res = Q_dac_freq_mod.fit(data=data, dac_voltage=sweep_points)
+    elif mode == 'flux':
+        Qubit_freq_mod = fit_mods.QubitFreqFluxModel
+        Qubit_freq_mod.set_param_hint('E_c', value=E_c, vary=vary_E_c,
+                                      min=0, max=100e6)
+        Qubit_freq_mod.set_param_hint('f_max', value=f_max, vary=vary_f_max)
+        Qubit_freq_mod.set_param_hint('flux_zero', value=flux_zero,
+                                      min=0, vary=True)
+        Qubit_freq_mod.set_param_hint('dac_offset', value=0, vary=True)
+
+        fit_res = Qubit_freq_mod.fit(data=data, flux=sweep_points)
+    return fit_res
