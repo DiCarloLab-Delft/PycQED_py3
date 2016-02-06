@@ -285,3 +285,28 @@ def count_error_fractions(trace):
     return no_err_counter, single_err_counter, double_err_counter, zero_counter, one_counter
 
 
+def bin_2D_shots(I_shots, Q_shots):
+    '''
+    Creates a 2D histogram of I and Q shotsdata.
+
+    Watch out that when you plot the histogram uses the convention
+    H[xbins, ybins] and plotting generally uses H[yrows, xcols] meaning you
+    want to Transpose the data using H.T
+    '''
+    n_bins_range = 60  # the bins we want to have around our data
+    V_range_I = np.max(I_shots)-np.min(I_shots)             # data voltagerange
+    V_range_Q = np.max(Q_shots)-np.min(Q_shots)
+
+    V_max = np.max([V_range_I, V_range_Q])*1.1
+
+    # determining the amount of bins
+    n_bins_range = 60  # the bins we want to have around our data
+    V_range = np.max([V_range_I, V_range_Q, V_range_I, V_range_Q])
+    n_bins = n_bins_range*2*V_max/V_range
+
+    H, xedges, yedges = np.histogram2d(I_shots, Q_shots,
+                                       bins=n_bins,
+                                       range=[[-V_max, V_max],
+                                              [-V_max, V_max]],
+                                        normed=True)
+    return H, xedges, yedges

@@ -983,6 +983,7 @@ class Rabi_Analysis(TD_Analysis):
         print('Drive scaling factor: %.2f' % drive_scaling_factor)
         return drive_scaling_factor
 
+
 class SSRO_Analysis(MeasurementAnalysis):
     '''
     Analysis class for Single Shot Readout.
@@ -1534,10 +1535,6 @@ class SSRO_Analysis(MeasurementAnalysis):
         fid_grp.attrs.create(name='V_opt', data=V_opt)
         fid_grp.attrs.create(name='F', data=F)
         fid_grp.attrs.create(name='F_corrected', data=F_corrected)
-
-
-
-
 
         self.sigma0_0 = sigma0_0
         self.sigma1_1 = sigma1_1

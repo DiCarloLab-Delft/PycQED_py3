@@ -147,7 +147,8 @@ def double_gauss_guess(model, data, x=None, **kwargs):
     Finds a guess for the intial parametes of the double gauss model.
     Guess is based on taking the cumulative sum of the data and
     finding the points corresponding to 25% and 75%
-    it finds sigma by using the
+    it finds sigma by using the property that ~33% of the data is contained
+    in the range mu-sigma to mu+sigma.
     '''
     if x is None:
         x = np.arange(len(data))
