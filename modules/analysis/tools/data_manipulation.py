@@ -35,7 +35,8 @@ def count_rounds_to_error(series):
     return np.NAN
 
 
-def count_rtf_and_term_cond(series, only_count_min_1=False, return_termination_condition=True):
+def count_rtf_and_term_cond(series, only_count_min_1=False,
+                            return_termination_condition=True):
     '''
     returns the index of the first entry that is different
     from the initial value.
@@ -285,7 +286,7 @@ def count_error_fractions(trace):
     return no_err_counter, single_err_counter, double_err_counter, zero_counter, one_counter
 
 
-def bin_2D_shots(I_shots, Q_shots):
+def bin_2D_shots(I_shots, Q_shots, normed=True):
     '''
     Creates a 2D histogram of I and Q shotsdata.
 
@@ -308,5 +309,5 @@ def bin_2D_shots(I_shots, Q_shots):
                                        bins=n_bins,
                                        range=[[-V_max, V_max],
                                               [-V_max, V_max]],
-                                        normed=True)
+                                       normed=normed)
     return H, xedges, yedges

@@ -137,9 +137,55 @@ def linear_with_background(x, a, b):
     '''
     return np.sqrt((a*x)**2 + b**2)
 
+
+def gaussian_2D(x, y, amplitude=1,
+                center_x=0, center_y=0,
+                sigma_x=1, sigma_y=1):
+    '''
+    A 2D gaussian function. if you want to use this for fitting you need to
+    flatten your data first.
+    '''
+    gaus = lmfit.lineshapes.gaussian
+    val = (gaus(x, amplitude, center_x, sigma_x) *
+           gaus(y, amplitude, center_y, sigma_y))
+    return val
+
 ####################
 # Guess functions  #
 ####################
+
+
+def gauss_2D_guess(model, data, x, y):
+    '''
+    takes the mean of every row/column and then uses the regular gauss guess
+    function to get a guess for the model parameters.
+
+    Assumptions on input data
+        * input is a flattened version of a 2D grid.
+        * total surface under the gaussians sums up to 1.
+
+    Potential improvements:
+        Make the input also accept a 2D grid of data to prevent reshaping.
+        Find a way to extract amplitude guess from data itself, note that
+        taking the sum of the data (which should correspond to all data under
+                                    the curve) does not do the trick.
+
+    Note: possibly not compatible if the model uses prefixes.
+    '''
+    data_grid = data.reshape(-1, len(np.unique(x)))
+    x_proj_data = np.mean(data_grid, axis=0)
+    y_proj_data = np.mean(data_grid, axis=1)
+
+    x_guess = lmfit.models.GaussianModel().guess(x_proj_data, np.unique(x))
+    y_guess = lmfit.models.GaussianModel().guess(y_proj_data, np.unique(y))
+
+    params = model.make_params(amplitude=1,
+                               center_x=x_guess['center'].value,
+                               center_y=y_guess['center'].value,
+                               sigma_x=x_guess['sigma'].value,
+                               sigma_y=y_guess['sigma'].value)
+    return params
+
 
 
 def double_gauss_guess(model, data, x=None, **kwargs):
@@ -186,6 +232,11 @@ TwinLorentzModel = lmfit.Model(TwinLorentzFunc)
 LorentzianModel = lmfit.Model(Lorentzian)
 RBModel = lmfit.Model(RandomizedBenchmarkingDecay)
 LinBGModel = lmfit.Model(linear_with_background)
+
+# 2D models
+Gaussian_2D_model = lmfit.Model(gaussian_2D, independent_vars=['x', 'y'])
+Gaussian_2D_model.guess = gauss_2D_guess
+
 
 ###################################
 # Models based on lmfit functions #
