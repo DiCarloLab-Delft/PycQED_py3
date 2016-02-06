@@ -1,4 +1,5 @@
 import numpy as np
+import matplotlib.pyplot as plt
 import lmfit
 #################################
 #   Fitting Functions Library   #
@@ -187,7 +188,6 @@ def gauss_2D_guess(model, data, x, y):
     return params
 
 
-
 def double_gauss_guess(model, data, x=None, **kwargs):
     '''
     Finds a guess for the intial parametes of the double gauss model.
@@ -250,6 +250,33 @@ PolyBgHangerAmplitudeModel = HangerAmplitudeModel * lmfit.models.PolynomialModel
 DoubleGaussModel = (lmfit.models.GaussianModel(prefix='A_') +
                     lmfit.models.GaussianModel(prefix='B_'))
 DoubleGaussModel.guess = double_gauss_guess  # defines a guess function
+
+
+def plot_fitres2D_heatmap(fit_res, x, y, axs=None, cmap='CMRmap'):
+    '''
+    Convenience function for plotting results of flattened 2D fits.
+
+    It could be argued this does not belong in fitting models (it is not a
+    model) but I put it here as it is closely related to all the stuff we do
+    with lmfit. If anyone has a better location in mind, let me know (MAR).
+    '''
+    nr_cols = len(np.unique(x))
+    data_2D = fit_res.data.reshape(-1, nr_cols)
+    fit_2D = fit_res.best_fit.reshape(-1, nr_cols)
+    guess_2D = fit_res.init_fit.reshape(-1, nr_cols)
+
+    if axs is None:
+        f, axs = plt.subplots(1, 3, figsize=(14, 6))
+    axs[0].imshow(data_2D, extent=[x[0], x[-1], y[0], y[-1]],
+                  cmap=cmap, vmin=np.min(data_2D), vmax=np.max(data_2D))
+    axs[1].imshow(fit_2D, extent=[x[0], x[-1], y[0], y[-1]],
+                  cmap=cmap, vmin=np.min(data_2D), vmax=np.max(data_2D))
+    axs[2].imshow(guess_2D, extent=[x[0], x[-1], y[0], y[-1]],
+                  cmap=cmap, vmin=np.min(data_2D), vmax=np.max(data_2D))
+    axs[0].set_title('data')
+    axs[1].set_title('fit-result')
+    axs[2].set_title('initial guess')
+    return axs
 
 
 # Before defining a new model, take a look at the built in models in lmfit.
