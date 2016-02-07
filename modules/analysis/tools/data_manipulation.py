@@ -325,8 +325,8 @@ def flatten_2D_histogram(H, xedges, yedges):
 
     Returns
         H_flat: flattened array of length (yrows*xcols)
-        x_grid_flat: 1D array of bin-x-centers of length (yrows*xcols)
-        y_grid_flat: ""
+        x_tiled_flat: 1D array of bin-x-centers of length (yrows*xcols)
+        y_rep_flat: 1D array of bin-x-centers of length (yrows*xcols)
     '''
     # Transpose because Histogram is H(yrows, xcols)
     H_flat = H.T.flatten()
@@ -336,8 +336,9 @@ def flatten_2D_histogram(H, xedges, yedges):
     y = yedges[:-1]+ystep
     nr_rows = len(y)
     nr_cols = len(x)
+    # tiling and rep is to make the indices match with the locations in the
+    # 2D grid of H
+    x_tiled_flat = np.tile(x, nr_cols)
+    y_rep_flat = np.repeat(y, nr_rows)
 
-    x_grid_flat = np.tile(x, nr_cols)
-    y_grid_flat = np.repeat(y, nr_rows)
-
-    return H_flat, x_grid_flat, y_grid_flat
+    return H_flat, x_tiled_flat, y_rep_flat

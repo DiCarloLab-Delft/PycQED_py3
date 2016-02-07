@@ -14,7 +14,9 @@ from scipy.interpolate import interp1d
 import pylab
 from modules.analysis.tools import data_manipulation as dm_tools
 import imp
+import math
 imp.reload(dm_tools)
+
 
 class MeasurementAnalysis(object):
 
@@ -218,7 +220,7 @@ class MeasurementAnalysis(object):
         for parname, par in fit_res.params.items():
             try:
                 par_group = fit_grp.create_group(parname)
-            except:
+            except:  # if it already exists overwrite existing
                 par_group = fit_grp[parname]
             par_dict = vars(par)
             for val_name, val in par_dict.items():
@@ -1173,7 +1175,7 @@ class SSRO_Analysis(MeasurementAnalysis):
         shots_I_data_0_rot = np.cos(theta)*shots_I_data_0 - np.sin(theta)*shots_Q_data_0
         shots_Q_data_0_rot = np.sin(theta)*shots_I_data_0 + np.cos(theta)*shots_Q_data_0
 
-        #plotting the histograms before rotation
+        # plotting the histograms before rotation
         fig, axes = plt.subplots()
         axes.hist(shots_Q_data_1, bins=40, label='1 Q',
                   histtype='step', normed=1, color='r')
@@ -1546,6 +1548,106 @@ class SSRO_Analysis(MeasurementAnalysis):
         self.F = F
         self.F_corrected = F_corrected
 
+
+class SSRO_discrimination_analysis(MeasurementAnalysis):
+    '''
+    Analysis that takes IQ-shots and extracts discrimination fidelity from
+    it by fitting 2 2D gaussians. It does not assumption on what state the
+    individual shots belong to.
+
+    This method will only work if the gaussians belonging to both distributions
+    are distinguisable.
+
+    The 2D gauss does not include squeezing and assumes symmetric (in x/y)
+    distributions.
+    '''
+    def __init__(self, **kw):
+        kw['h5mode'] = 'r+'
+        super(self.__class__, self).__init__(**kw)
+
+    def run_default_analysis(self, plot_2D_histograms=True,
+                             current_threshold=None, **kw):
+        self.add_analysis_datagroup_to_file()
+        # Extract I and Q data based on name of variable.
+        I_shots = self.get_values(key='I')
+        Q_shots = self.get_values(key='Q')
+        # Reshaping the data
+        H, xedges, yedges = dm_tools.bin_2D_shots(I_shots, Q_shots)
+        H_flat, x_tiled, y_rep = dm_tools.flatten_2D_histogram(
+            H, xedges, yedges)
+        # Performing the fits
+        g2_mod = fit_mods.DoubleGauss2D_model
+        params = g2_mod.guess(model=g2_mod, data=H_flat, x=x_tiled, y=y_rep)
+        # assume symmetry of the gaussian blobs in x and y
+        params['A_sigma_y'].set(expr='A_sigma_x')
+        params['B_sigma_y'].set(expr='B_sigma_x')
+        self.fit_res = g2_mod.fit(data=H_flat, x=x_tiled, y=y_rep,
+                                  params=params)
+
+        # Saving the fit results to the datafile
+        self.save_fitted_parameters(self.fit_res, 'Double gauss fit')
+        if plot_2D_histograms:  # takes ~350ms, speedup quite noticable
+            fig, axs = plt.subplots(nrows=1, ncols=3)
+            fit_mods.plot_fitres2D_heatmap(self.fit_res, x_tiled, y_rep,
+                                           axs=axs)
+            for ax in axs:
+                ax.set_xlabel('I')  # TODO: add units
+            axs[0].set_ylabel('Q')
+            self.save_fig(fig, figname='2D-Histograms', **kw)
+
+        #######################################################
+        #         Extract quantities of interest              #
+        #######################################################
+        self.mu_a = (self.fit_res.params['A_center_x'].value +
+                     1j * self.fit_res.params['A_center_y'].value)
+        self.mu_b = (self.fit_res.params['B_center_x'].value +
+                     1j * self.fit_res.params['B_center_y'].value)
+        # only look at sigma x because we assume sigma_x = sigma_y
+        sig_a = self.fit_res.params['A_sigma_x'].value
+        sig_b = self.fit_res.params['B_sigma_x'].value
+
+        # Picking threshold in the middle assumes same sigma for both
+        # distributions, this can be improved by optimizing the F_discr
+        if abs(self.mu_a) > abs(self.mu_b):
+            diff_vec = self.mu_a - self.mu_b
+            self.opt_I_threshold = (self.mu_b.real + diff_vec.real/2)
+        else:
+            diff_vec = self.mu_b - self.mu_a
+            self.opt_I_threshold = (self.mu_a.real + diff_vec.real/2)
+        self.theta = np.arctan(diff_vec.imag/diff_vec.real)
+        self.mean_sigma = np.mean([sig_a, sig_b])
+        # relative separation of the gaussians in units of sigma
+        self.relative_separation = abs(diff_vec)/self.mean_sigma
+        # relative separation of the gaussians when projected on the I-axis
+        self.relative_separation_I = diff_vec.real/self.mean_sigma
+
+        #######################################################
+        # Calculating discrimanation fidelities based on erfc #
+        #######################################################
+        # CDF of gaussian is P(X<=x) = .5 erfc((mu-x)/(sqrt(2)sig))
+
+        # Along the optimal direction
+        CDF_a = .5 * math.erfc((abs(diff_vec/2)) /
+                               (np.sqrt(2)*sig_a))
+        CDF_b = .5 * math.erfc((-abs(diff_vec/2)) /
+                               (np.sqrt(2)*sig_b))
+        self.F_discr = abs(CDF_a - CDF_b)
+
+        # Projected on the I-axis
+        CDF_a = .5 * math.erfc((self.mu_a.real - self.opt_I_threshold) /
+                               (np.sqrt(2)*sig_a))
+        CDF_b = .5 * math.erfc((self.mu_b.real - self.opt_I_threshold) /
+                               (np.sqrt(2)*sig_b))
+        self.F_discr_I = abs(CDF_a - CDF_b)
+        # Current threshold projected on the I-axis
+        if current_threshold is not None:
+            CDF_a = .5 * math.erfc((self.mu_a.real - current_threshold) /
+                                   (np.sqrt(2)*sig_a))
+            CDF_b = .5 * math.erfc((self.mu_b.real - current_threshold) /
+                                   (np.sqrt(2)*sig_b))
+            self.F_discr_curr_t = abs(CDF_a - CDF_b)
+
+        self.finish(**kw)
 
 class touch_n_go_SSRO_Analysis(MeasurementAnalysis):
     '''
