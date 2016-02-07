@@ -311,3 +311,33 @@ def bin_2D_shots(I_shots, Q_shots, normed=True):
                                               [-V_max, V_max]],
                                        normed=normed)
     return H, xedges, yedges
+
+
+def flatten_2D_histogram(H, xedges, yedges):
+    '''
+    Flattens a 2D histogram in preparation for fitting.
+    Input is the output of the np.histogram2d() command.
+
+    Inputs
+        H: 2D array of counts of shape (yrows, xcols)
+        xedges: 1D array of bin-edges along x
+        yedges: ""
+
+    Returns
+        H_flat: flattened array of length (yrows*xcols)
+        x_grid_flat: 1D array of bin-x-centers of length (yrows*xcols)
+        y_grid_flat: ""
+    '''
+    # Transpose because Histogram is H(yrows, xcols)
+    H_flat = H.T.flatten()
+    xstep = (xedges[1]-xedges[0])/2
+    ystep = (yedges[1]-yedges[0])/2
+    x = xedges[:-1]+xstep
+    y = yedges[:-1]+ystep
+    nr_rows = len(y)
+    nr_cols = len(x)
+
+    x_grid_flat = np.tile(x, nr_cols)
+    y_grid_flat = np.repeat(y, nr_rows)
+
+    return H_flat, x_grid_flat, y_grid_flat
