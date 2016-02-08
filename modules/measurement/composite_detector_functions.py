@@ -471,6 +471,55 @@ class CBox_trace_error_fraction_detector(det.Soft_Detector):
                 no_err_counter += 1
         return no_err_counter, single_err_counter, double_err_counter
 
+
+class CBox_SSRO_discrimination_detector(det.Soft_Detector):
+    def __init__(self, measurement_name, MC, AWG, CBox,
+                 threshold,
+                 sequence_swf,
+                 calibrate_threshold=False,
+                 raw=True,
+                 save_raw_trace=False,
+                 counters=True,
+                 **kw):
+        super().__init__(**kw)
+        # TODO remove the no-counters non-raw mode
+        self.name = measurement_name
+        self.threshold = threshold
+        self.value_names = ['F-discr. cur. th.',
+                            'F-discr. optimal',
+                            'theta',
+                            'optimal I-threshold',
+                            'rel. separation',
+                            'rel. separation I']  # projected along I axis
+        self.value_units = ['%', '%', 'deg', 'a.u', '1/sigma', '1/sigma']
+
+        self.AWG = AWG
+        self.MC = MC
+        self.CBox = CBox
+        self.sequence_swf = sequence_swf
+
+    def prepare(self, **kw):
+        self.i = 0
+        self.MC.set_sweep_function(self.sequence_swf)
+        self.MC.set_detector_function(det.CBox_integration_logging_det(
+            self.CBox, self.AWG))
+
+    def acquire_data_point(self, **kw):
+        if self.i > 0:
+            # overwrites the upload arg if the sequence swf has it to
+            # prevent reloading
+            self.sequence_swf.upload = False
+        self.i += 1
+
+        self.MC.run(self.name+'_{}'.format(self.i))
+        a = ma.SSRO_discrimination_analysis(
+            label=self.name+'_{}'.format(self.i),
+            current_threshold=self.threshold)
+        return (a.F_discr_curr_t*100, a.F_discr*100,
+                a.theta, a.opt_I_threshold,
+                a.relative_separation, a.relative_separation_I)
+
+
 # class SSRO_Fidelity_Detector_CBox_optimum_weights(SSRO_Fidelity_Detector_CBox):
 #     '''
 #     Currently only for CBox.
