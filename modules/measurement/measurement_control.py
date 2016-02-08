@@ -29,6 +29,7 @@ class MeasurementControl:
         self.rpg = self.proc._import('pyqtgraph')
         self.new_plotmon_window(plot_theme=plot_theme,
                                 interval=plotting_interval)
+        self.live_plot_enabled = True
 
     ##############################################
     # Functions used to control the measurements #
@@ -372,24 +373,25 @@ class MeasurementControl:
         return self.win, self.curves
 
     def update_plotmon(self):
-        i = 0
-        try:
-            time_since_last_mon_update = time.time() - self._mon_upd_time
-        except:
-            self._mon_upd_time = time.time()
-            time_since_last_mon_update = 1e9
-        # Update always if just a few points otherwise wait for the refresh
-        # timer
-        if (self.dset.shape[0] < 20 or time_since_last_mon_update >
-                self._monitor_refresh_time):
-            nr_sweep_funcs = len(self.sweep_function_names)
-            for y_ind in range(len(self.detector_function.value_names)):
-                for x_ind in range(nr_sweep_funcs):
-                    x = self.dset[:, x_ind]
-                    y = self.dset[:, nr_sweep_funcs+y_ind]
-                    self.curves[i].setData(x, y)
-                    i += 1
-            self._mon_upd_time = time.time()
+        if self.live_plot_enabled:
+            i = 0
+            try:
+                time_since_last_mon_update = time.time() - self._mon_upd_time
+            except:
+                self._mon_upd_time = time.time()
+                time_since_last_mon_update = 1e9
+            # Update always if just a few points otherwise wait for the refresh
+            # timer
+            if (self.dset.shape[0] < 20 or time_since_last_mon_update >
+                    self._monitor_refresh_time):
+                nr_sweep_funcs = len(self.sweep_function_names)
+                for y_ind in range(len(self.detector_function.value_names)):
+                    for x_ind in range(nr_sweep_funcs):
+                        x = self.dset[:, x_ind]
+                        y = self.dset[:, nr_sweep_funcs+y_ind]
+                        self.curves[i].setData(x, y)
+                        i += 1
+                self._mon_upd_time = time.time()
 
     def new_plotmon_window(self, plot_theme=None, interval=2):
         '''
@@ -436,19 +438,20 @@ class MeasurementControl:
         to the plotmon.
 
         '''
-        i = self.iteration-1
-        x_ind = i % self.xlen
-        y_ind = i / self.xlen
-        for j in range(len(self.detector_function.value_names)):
-            z_ind = len(self.sweep_functions) + j
-            self.TwoD_array[y_ind, x_ind, j] = self.dset[i, z_ind]
-        self.QC_QtPlot.traces[j]['config']['z'] = self.TwoD_array[:, :, j]
+        if self.live_plot_enabled:
+            i = self.iteration-1
+            x_ind = i % self.xlen
+            y_ind = i / self.xlen
+            for j in range(len(self.detector_function.value_names)):
+                z_ind = len(self.sweep_functions) + j
+                self.TwoD_array[y_ind, x_ind, j] = self.dset[i, z_ind]
+            self.QC_QtPlot.traces[j]['config']['z'] = self.TwoD_array[:, :, j]
 
-        if (time.time() - self.time_last_2Dplot_update >
-                self.QC_QtPlot.interval
-                or self.iteration == len(self.sweep_points)):
-            self.time_last_2Dplot_update = time.time()
-            self.QC_QtPlot.update_plot()
+            if (time.time() - self.time_last_2Dplot_update >
+                    self.QC_QtPlot.interval
+                    or self.iteration == len(self.sweep_points)):
+                self.time_last_2Dplot_update = time.time()
+                self.QC_QtPlot.update_plot()
 
     def update_plotmon_2D_hard(self):
         '''
