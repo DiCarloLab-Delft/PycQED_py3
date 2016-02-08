@@ -368,10 +368,9 @@ class CBox_trace_error_fraction_detector(det.Soft_Detector):
     def __init__(self, measurement_name, MC, AWG, CBox,
                  sequence_swf=None,
                  threshold=None,
-                 calibrate_threshold=False,
+                 calibrate_threshold='conventional',
                  raw=True,
                  save_raw_trace=False,
-                 counters=True,
                  **kw):
         super().__init__(**kw)
         # TODO remove the no-counters non-raw mode
@@ -386,9 +385,9 @@ class CBox_trace_error_fraction_detector(det.Soft_Detector):
         self.MC = MC
         self.CBox = CBox
         self.raw = raw
-        self.counters = counters
         # after testing equivalence this is to be removed
         self.save_raw_trace = save_raw_trace
+        self.calibrate_threshold = calibrate_threshold
 
         self.sequence_swf = sequence_swf
 
@@ -397,17 +396,20 @@ class CBox_trace_error_fraction_detector(det.Soft_Detector):
         if self.threshold is None:  # calibrate threshold
             rot_mat = [1, 0, 0, 1]
             self.CBox.lin_trans_coeffs.set(rot_mat)
-            ssro_d = SSRO_Fidelity_Detector_CBox(
-                'SSRO_det', self.MC, self.AWG, self.CBox,
-                RO_pulse_length=self.sequence_swf.RO_pulse_length,
-                RO_pulse_delay=self.sequence_swf.RO_pulse_delay,
-                RO_trigger_delay=self.sequence_swf.RO_trigger_delay,
-                )
-            ssro_d.prepare()
-            ssro_d.acquire_data_point()
-            a = ma.SSRO_Analysis(auto=True, close_fig=True,
-                                 label='SSRO', no_fits=self.raw,
-                                 close_file=True)
+            if self.calibrate_threshold is 'conventional':
+                ssro_d = SSRO_Fidelity_Detector_CBox(
+                    'SSRO_det', self.MC, self.AWG, self.CBox,
+                    RO_pulse_length=self.sequence_swf.RO_pulse_length,
+                    RO_pulse_delay=self.sequence_swf.RO_pulse_delay,
+                    RO_trigger_delay=self.sequence_swf.RO_trigger_delay,
+                    )
+                ssro_d.prepare()
+                ssro_d.acquire_data_point()
+                a = ma.SSRO_Analysis(auto=True, close_fig=True,
+                                     label='SSRO', no_fits=self.raw,
+                                     close_file=True)
+            elif self.calibrate_threshold is 'self-consistent':
+                raise NotImplementedError()
             print('Setting rotation coeffs for {:.3g} deg'.format(
                   a.theta/(2*np.pi)*360))
             rot_mat = [np.cos(a.theta), -np.sin(a.theta),
@@ -435,19 +437,12 @@ class CBox_trace_error_fraction_detector(det.Soft_Detector):
             # prevent reloading
             self.sequence_swf.upload = False
         self.i += 1
-
-        if not self.counters:
-            if self.save_raw_trace:
-                self.MC.run(self.name+'_{}'.format(self.i))
-                a = ma.MeasurementAnalysis(auto=False)
-                a.get_naming_and_values()
-                trace = a.measured_values[0]
-                a.finish()  # close the datafile
-            else:
-                self.sequence_swf.prepare()
-                self.dig_shots_det.prepare()
-                trace = self.dig_shots_det.get_values()[0]
-                counters = self.counters_d.get_values()
+        if self.save_raw_trace:
+            self.MC.run(self.name+'_{}'.format(self.i))
+            a = ma.MeasurementAnalysis(auto=False)
+            a.get_naming_and_values()
+            trace = a.measured_values[0]
+            a.finish()  # close the datafile
             return self.count_error_fractions(trace, len(trace))
         else:
             self.sequence_swf.prepare()
