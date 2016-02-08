@@ -389,65 +389,63 @@ class CBox_trace_error_fraction_detector(det.Soft_Detector):
 
         self.sequence_swf = sequence_swf
 
-    def calibrate_threshold_conventional():
-        raise NotImplementedError()
+    def calibrate_threshold_conventional(self):
+        self.CBox.lin_trans_coeffs.set([1, 0, 0, 1])
+        ssro_d = SSRO_Fidelity_Detector_CBox(
+            'SSRO_det', self.MC, self.AWG, self.CBox,
+            RO_pulse_length=self.sequence_swf.RO_pulse_length,
+            RO_pulse_delay=self.sequence_swf.RO_pulse_delay,
+            RO_trigger_delay=self.sequence_swf.RO_trigger_delay)
+        ssro_d.prepare()
+        ssro_d.acquire_data_point()
+        a = ma.SSRO_Analysis(auto=True, close_fig=True,
+                             label='SSRO', no_fits=True,
+                             close_file=True)
+        # SSRO analysis returns the angle to rotate by
+        theta = a.theta  # analysis returns theta in rad
+        print('Setting rotation coeffs for {:.3g} deg'.format(
+              theta/(2*np.pi)*360))
+        rot_mat = [np.cos(theta), -np.sin(theta),
+                   np.sin(theta), np.cos(theta)]
+        self.CBox.lin_trans_coeffs.set(rot_mat)
+        self.threshold = a.V_opt_raw  # allows
+        self.CBox.sig0_threshold_line.set(int(a.V_opt_raw))
+        self.sequence_swf.upload = True
+        # make sure the sequence gets uploaded
 
-    def calibrate_threshold_self_consistent():
-        raise NotImplementedError()
+    def calibrate_threshold_self_consistent(self):
+        self.CBox.lin_trans_coeffs.set([1, 0, 0, 1])
+        ssro_d = CBox_SSRO_discrimination_detector(
+            'SSRO-disc-det',
+            MC=self.MC, AWG=self.AWG, CBox=self.CBox,
+            sequence_swf=self.sequence_swf)
+        ssro_d.prepare()
+        discr_vals = ssro_d.acquire_data_point()
+        # hardcoded indices correspond to values in CBox SSRO discr det
+        theta = discr_vals[2] * 2 * np.pi/360
+
+        print('Setting rotation coeffs for {:.3g} deg'.format(
+              theta/(2*np.pi)*360))
+        # Discr returns the current angle, rotation is - that angle
+        rot_mat = [np.cos(-1*theta), -np.sin(-1*theta),
+                   np.sin(-1*theta), np.cos(-1*theta)]
+        self.CBox.lin_trans_coeffs.set(rot_mat)
+
+        # Measure it again to determine the threshold after rotating
+        discr_vals = ssro_d.acquire_data_point()
+        # hardcoded indices correspond to values in CBox SSRO discr det
+        theta = discr_vals[2]
+        self.threshold = int(discr_vals[3])
+
+        self.CBox.sig0_threshold_line.set(self.threshold)
 
     def prepare(self, **kw):
         self.i = 0
         if self.threshold is None:  # calibrate threshold
-            rot_mat = [1, 0, 0, 1]
-            self.CBox.lin_trans_coeffs.set(rot_mat)
             if self.calibrate_threshold is 'conventional':
-                ssro_d = SSRO_Fidelity_Detector_CBox(
-                    'SSRO_det', self.MC, self.AWG, self.CBox,
-                    RO_pulse_length=self.sequence_swf.RO_pulse_length,
-                    RO_pulse_delay=self.sequence_swf.RO_pulse_delay,
-                    RO_trigger_delay=self.sequence_swf.RO_trigger_delay,
-                    )
-                ssro_d.prepare()
-                ssro_d.acquire_data_point()
-                a = ma.SSRO_Analysis(auto=True, close_fig=True,
-                                     label='SSRO', no_fits=True,
-                                     close_file=True)
-                # SSRO analysis returns the angle to rotate by
-                theta = a.theta  # analysis returns theta in rad
-                print('Setting rotation coeffs for {:.3g} deg'.format(
-                      theta/(2*np.pi)*360))
-                rot_mat = [np.cos(theta), -np.sin(theta),
-                           np.sin(theta), np.cos(theta)]
-                self.CBox.lin_trans_coeffs.set(rot_mat)
-                self.threshold = a.V_opt_raw  # allows
-                self.CBox.sig0_threshold_line.set(int(a.V_opt_raw))
-                self.sequence_swf.upload = True
-                # make sure the sequence gets uploaded
-
+                self.calibrate_threshold_conventional()
             elif self.calibrate_threshold == 'self-consistent':
-                ssro_d = CBox_SSRO_discrimination_detector(
-                    'SSRO-disc-det',
-                    MC=self.MC, AWG=self.AWG, CBox=self.CBox,
-                    sequence_swf=self.sequence_swf)
-                ssro_d.prepare()
-                discr_vals = ssro_d.acquire_data_point()
-                # hardcoded indices correspond to values in CBox SSRO discr det
-                theta = discr_vals[2] * 2 * np.pi/360
-
-                print('Setting rotation coeffs for {:.3g} deg'.format(
-                      theta/(2*np.pi)*360))
-                # Discr returns the current angle, rotation is - that angle
-                rot_mat = [np.cos(-1*theta), -np.sin(-1*theta),
-                           np.sin(-1*theta), np.cos(-1*theta)]
-                self.CBox.lin_trans_coeffs.set(rot_mat)
-
-                # Measure it again to determine the threshold after rotating
-                discr_vals = ssro_d.acquire_data_point()
-                # hardcoded indices correspond to values in CBox SSRO discr det
-                theta = discr_vals[2]
-                self.threshold = int(discr_vals[3])
-
-                self.CBox.sig0_threshold_line.set(self.threshold)
+                self.calibrate_threshold_self_consistent()
             else:
                 raise Exception(
                     'calibrate_threshold "{}"'.format(self.calibrate_threshold)
