@@ -1614,7 +1614,7 @@ class SSRO_discrimination_analysis(MeasurementAnalysis):
         else:
             diff_vec = self.mu_b - self.mu_a
             self.opt_I_threshold = (self.mu_a.real + diff_vec.real/2)
-        self.theta = np.arctan(diff_vec.imag/diff_vec.real)
+        self.theta = np.arctan(diff_vec.imag/diff_vec.real)/(2*np.pi)*360
         self.mean_sigma = np.mean([sig_a, sig_b])
         # relative separation of the gaussians in units of sigma
         self.relative_separation = abs(diff_vec)/self.mean_sigma
