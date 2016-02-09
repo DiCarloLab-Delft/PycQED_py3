@@ -10,10 +10,6 @@ from modules.measurement import hdf5_data as h5d
 from modules.utilities import general
 from modules.utilities.general import dict_to_ordered_tuples
 from qcodes.plots.pyqtgraph import QtPlot
-from qcodes.plots import pyqtgraph as qcpqt
-
-from importlib import reload
-reload(qcpqt)
 
 
 class MeasurementControl:
@@ -133,8 +129,8 @@ class MeasurementControl:
         if adaptive_function == 'Powell':
             print('Optimizing using scipy.fmin_powell')
             adaptive_function = fmin_powell
-        if type(adaptive_function) == types.FunctionType:
-            print('passing these adaptive pars', self.af_pars)
+        if (isinstance(adaptive_function, types.FunctionType) or
+                isinstance(adaptive_function, np.ufunc)):
             try:
                 adaptive_function(self.optimization_function, **self.af_pars)
             except StopIteration:
@@ -149,6 +145,8 @@ class MeasurementControl:
         self.update_plotmon(force_update=True)
         self.update_plotmon_adaptive(force_update=True)
         self.get_measurement_endtime()
+        print('Optimization completed in {:.4g}s'.format(
+            self.endtime-self.begintime))
         return
 
     def measure_hard(self):
@@ -409,7 +407,7 @@ class MeasurementControl:
             title='Plot monitor of %s' % self.name)
         self.win.setBackground(self.plot_theme[1])
         self.QC_QtPlot = QtPlot(
-            windowTitle='Plot monitor 2D of %s' % self.name,
+            windowTitle='QC-Plot monitor of %s' % self.name,
             interval=interval)
 
     def initialize_plot_monitor_2D(self):
@@ -710,6 +708,7 @@ class MeasurementControl:
         return time.strftime('%Y-%m-%d %H:%M:%S')
 
     def get_measurement_endtime(self):
+        self.endtime = time.time()
         return time.strftime('%Y-%m-%d %H:%M:%S')
 
     def set_sweep_points(self, sweep_points):
