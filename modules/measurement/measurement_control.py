@@ -10,6 +10,10 @@ from modules.measurement import hdf5_data as h5d
 from modules.utilities import general
 from modules.utilities.general import dict_to_ordered_tuples
 from qcodes.plots.pyqtgraph import QtPlot
+from qcodes.plots import pyqtgraph as qcpqt
+
+from importlib import reload
+reload(qcpqt)
 
 
 class MeasurementControl:
@@ -121,6 +125,7 @@ class MeasurementControl:
         print('Adaptive function passed: %s' % adaptive_function)
 
         self.initialize_plot_monitor()
+        self.initialize_plot_monitor_adaptive()
         for sweep_function in self.sweep_functions:
             sweep_function.prepare()
         self.detector_function.prepare()
@@ -129,6 +134,7 @@ class MeasurementControl:
             print('Optimizing using scipy.fmin_powell')
             adaptive_function = fmin_powell
         if type(adaptive_function) == types.FunctionType:
+            print('passing these adaptive pars', self.af_pars)
             try:
                 adaptive_function(self.optimization_function, **self.af_pars)
             except StopIteration:
@@ -140,7 +146,8 @@ class MeasurementControl:
         for sweep_function in self.sweep_functions:
             sweep_function.finish()
         self.detector_function.finish()
-
+        self.update_plotmon(force_update=True)
+        self.update_plotmon_adaptive(force_update=True)
         self.get_measurement_endtime()
         return
 
@@ -187,11 +194,7 @@ class MeasurementControl:
                 relevant_swp_points
 
         self.update_plotmon()
-        # for i in range(len(self.detector_function.value_names)):
-        #     self.update_plotmon(
-        #         mon_nr=i+1, x_ind=0,
-        #         y_ind=-len(self.detector_function.value_names)+i)
-        if hasattr(self, 'TwoD_array'):
+        if self.mode == '2D':
             self.update_plotmon_2D_hard()
             self.print_progress_static_2D_hard()
 
@@ -230,8 +233,10 @@ class MeasurementControl:
         self.dset[self.iteration-1, :] = savable_data
         # update plotmon
         self.update_plotmon()
-        if hasattr(self, 'TwoD_array'):
+        if self.mode == '2D':
             self.update_plotmon_2D()
+        elif self.mode == 'adaptive':
+            self.update_plotmon_adaptive()
         return vals
 
     def optimization_function(self, x):
@@ -262,8 +267,9 @@ class MeasurementControl:
             vals = self.measurement_function(x)
             # when maximizing interrupt when larger than condition before
             # inverting
-            if (vals > self.f_termination) & (self.f_termination is not None):
-                raise StopIteration()
+            if (self.f_termination is not None):
+                if (vals > self.f_termination):
+                    raise StopIteration()
             vals = np.multiply(-1, vals)
 
         # TODO: re add the extra plotmon that shows the progress of the
@@ -352,8 +358,6 @@ class MeasurementControl:
     the 2D plotmon (which does a heatmap) and the adaptive plotmon.
     '''
     def initialize_plot_monitor(self):
-
-        self._monitor_refresh_time = .5  # used when there is more than 200 pts
         self.win.clear()  # clear out previous data
         self.curves = []
         xlabels = self.column_names[0:len(self.sweep_function_names)]
@@ -372,7 +376,7 @@ class MeasurementControl:
             self.win.nextRow()
         return self.win, self.curves
 
-    def update_plotmon(self):
+    def update_plotmon(self, force_update=False):
         if self.live_plot_enabled:
             i = 0
             try:
@@ -383,7 +387,7 @@ class MeasurementControl:
             # Update always if just a few points otherwise wait for the refresh
             # timer
             if (self.dset.shape[0] < 20 or time_since_last_mon_update >
-                    self._monitor_refresh_time):
+                    self.QC_QtPlot.interval or force_update):
                 nr_sweep_funcs = len(self.sweep_function_names)
                 for y_ind in range(len(self.detector_function.value_names)):
                     for x_ind in range(nr_sweep_funcs):
@@ -452,6 +456,34 @@ class MeasurementControl:
                     or self.iteration == len(self.sweep_points)):
                 self.time_last_2Dplot_update = time.time()
                 self.QC_QtPlot.update_plot()
+
+    def initialize_plot_monitor_adaptive(self):
+        '''
+        Uses the Qcodes plotting windows for plotting adaptive plot updates
+        '''
+        self.time_last_ad_plot_update = time.time()
+        self.QC_QtPlot.clear()
+        for j in range(len(self.detector_function.value_names)):
+            self.QC_QtPlot.add(x=[0],
+                               y=[0],
+                               xlabel='iteration',
+                               ylabel=self.detector_function.value_names[j],
+                               subplot=j+1,
+                               symbol='o', symbolSize=5)
+
+    def update_plotmon_adaptive(self, force_update=False):
+        if self.live_plot_enabled:
+            if (time.time() - self.time_last_ad_plot_update >
+                    self.QC_QtPlot.interval or force_update):
+                for j in range(len(self.detector_function.value_names)):
+                    y_ind = len(self.sweep_functions) + j
+                    y = self.dset[:, y_ind]
+                    x = range(len(y))
+                    self.QC_QtPlot.traces[j]['config']['x'] = x
+                    self.QC_QtPlot.traces[j]['config']['y'] = y
+                    self.time_last_ad_plot_update = time.time()
+                    self.QC_QtPlot.update_plot()
+
 
     def update_plotmon_2D_hard(self):
         '''

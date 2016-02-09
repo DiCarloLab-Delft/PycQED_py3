@@ -368,7 +368,7 @@ class CBox_trace_error_fraction_detector(det.Soft_Detector):
     def __init__(self, measurement_name, MC, AWG, CBox,
                  sequence_swf=None,
                  threshold=None,
-                 calibrate_threshold='conventional',
+                 calibrate_threshold='self-consistent',
                  save_raw_trace=False,
                  **kw):
         super().__init__(**kw)
