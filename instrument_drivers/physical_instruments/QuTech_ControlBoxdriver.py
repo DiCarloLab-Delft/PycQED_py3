@@ -1306,7 +1306,6 @@ class QuTech_ControlBox(VisaInstrument):
         else:
             return True
 
-
     def _wrap_ch_set_fun(self, function, channel):
         def channel_specific_function(value):
             return function(channel, value)
@@ -1318,11 +1317,13 @@ class QuTech_ControlBox(VisaInstrument):
         return channel_specific_function
 
     def _print_waiting_char(self):
-        if self._i_wait % 2 == 0:
-            print('\r\ ', end='')
-        else:
-            print('\r/ ', end='')
-        self._i_wait += 1
+        pass  # commented out because it is annoying (MAR)
+        # if self._i_wait % 2 == 0:
+        #     print('\r\ ', end='')
+        # else:
+        #     print('\r/ ', end='')
+        # self._i_wait += 1
+
     # Touch n go functions
     def _do_set_tng_heartbeat_interval(self, tng_heartbeat_interval):
         '''
@@ -1335,7 +1336,8 @@ class QuTech_ControlBox(VisaInstrument):
         if np.mod(tng_heartbeat_interval, 100) != 0.0:
             raise ValueError('%s is not divisble by 100 ns' %
                              tng_heartbeat_interval)
-        if self.tng_burst_heartbeat_interval*self.tng_burst_heartbeat_n > tng_heartbeat_interval:
+        if (self.tng_burst_heartbeat_interval*self.tng_burst_heartbeat_n >
+                tng_heartbeat_interval):
             raise ValueError('%s x %s does not fit in the heartbeatinterval %s'%(
                              self.tng_burst_heartbeat_interval,
                              self.tng_burst_heartbeat_n,

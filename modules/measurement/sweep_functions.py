@@ -54,6 +54,30 @@ class None_Sweep(Soft_Sweep):
         pass
 
 
+class Delayed_None_Sweep(Soft_Sweep):
+    def __init__(self, sweep_control='soft', delay=0, **kw):
+        super().__init__()
+        self.sweep_control = sweep_control
+        self.name = 'None_Sweep'
+        self.parameter_name = 'pts'
+        self.unit = 'arb. unit'
+        self.delay = delay
+        self.time_last_set = 0
+        if delay > 60:
+            logging.warning(
+                'setting a delay of {:.g}s are you sure?'.format(delay))
+
+    def set_parameter(self, val):
+        '''
+        Set the parameter(s) to be sweeped. Differs per sweep function
+        '''
+        while (time.time() - self.time_last_set) < self.delay:
+            pass  # wait
+        self.time_last_set = time.time()
+
+
+
+
 class Dummy_Set_DS_frequency_GHz(Soft_Sweep):
     def __init__(self, **kw):
         super(Dummy_Set_DS_frequency_GHz, self).__init__()

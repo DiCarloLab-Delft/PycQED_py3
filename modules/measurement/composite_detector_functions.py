@@ -368,10 +368,8 @@ class CBox_trace_error_fraction_detector(det.Soft_Detector):
     def __init__(self, measurement_name, MC, AWG, CBox,
                  sequence_swf=None,
                  threshold=None,
-                 calibrate_threshold=False,
-                 raw=True,
+                 calibrate_threshold='self-consistent',
                  save_raw_trace=False,
-                 counters=True,
                  **kw):
         super().__init__(**kw)
         # TODO remove the no-counters non-raw mode
@@ -385,38 +383,70 @@ class CBox_trace_error_fraction_detector(det.Soft_Detector):
         self.AWG = AWG
         self.MC = MC
         self.CBox = CBox
-        self.raw = raw
-        self.counters = counters
         # after testing equivalence this is to be removed
         self.save_raw_trace = save_raw_trace
+        self.calibrate_threshold = calibrate_threshold
 
         self.sequence_swf = sequence_swf
+
+    def calibrate_threshold_conventional(self):
+        self.CBox.lin_trans_coeffs.set([1, 0, 0, 1])
+        ssro_d = SSRO_Fidelity_Detector_CBox(
+            'SSRO_det', self.MC, self.AWG, self.CBox,
+            RO_pulse_length=self.sequence_swf.RO_pulse_length,
+            RO_pulse_delay=self.sequence_swf.RO_pulse_delay,
+            RO_trigger_delay=self.sequence_swf.RO_trigger_delay)
+        ssro_d.prepare()
+        ssro_d.acquire_data_point()
+        a = ma.SSRO_Analysis(auto=True, close_fig=True,
+                             label='SSRO', no_fits=True,
+                             close_file=True)
+        # SSRO analysis returns the angle to rotate by
+        theta = a.theta  # analysis returns theta in rad
+
+        rot_mat = [np.cos(theta), -np.sin(theta),
+                   np.sin(theta), np.cos(theta)]
+        self.CBox.lin_trans_coeffs.set(rot_mat)
+        self.threshold = a.V_opt_raw  # allows
+        self.CBox.sig0_threshold_line.set(int(a.V_opt_raw))
+        self.sequence_swf.upload = True
+        # make sure the sequence gets uploaded
+
+    def calibrate_threshold_self_consistent(self):
+        self.CBox.lin_trans_coeffs.set([1, 0, 0, 1])
+        ssro_d = CBox_SSRO_discrimination_detector(
+            'SSRO-disc-det',
+            MC=self.MC, AWG=self.AWG, CBox=self.CBox,
+            sequence_swf=self.sequence_swf)
+        ssro_d.prepare()
+        discr_vals = ssro_d.acquire_data_point()
+        # hardcoded indices correspond to values in CBox SSRO discr det
+        theta = discr_vals[2] * 2 * np.pi/360
+
+        # Discr returns the current angle, rotation is - that angle
+        rot_mat = [np.cos(-1*theta), -np.sin(-1*theta),
+                   np.sin(-1*theta), np.cos(-1*theta)]
+        self.CBox.lin_trans_coeffs.set(rot_mat)
+
+        # Measure it again to determine the threshold after rotating
+        discr_vals = ssro_d.acquire_data_point()
+        # hardcoded indices correspond to values in CBox SSRO discr det
+        theta = discr_vals[2]
+        self.threshold = int(discr_vals[3])
+
+        self.CBox.sig0_threshold_line.set(self.threshold)
 
     def prepare(self, **kw):
         self.i = 0
         if self.threshold is None:  # calibrate threshold
-            rot_mat = [1, 0, 0, 1]
-            self.CBox.lin_trans_coeffs.set(rot_mat)
-            ssro_d = SSRO_Fidelity_Detector_CBox(
-                'SSRO_det', self.MC, self.AWG, self.CBox,
-                RO_pulse_length=self.sequence_swf.RO_pulse_length,
-                RO_pulse_delay=self.sequence_swf.RO_pulse_delay,
-                RO_trigger_delay=self.sequence_swf.RO_trigger_delay,
-                )
-            ssro_d.prepare()
-            ssro_d.acquire_data_point()
-            a = ma.SSRO_Analysis(auto=True, close_fig=True,
-                                 label='SSRO', no_fits=self.raw,
-                                 close_file=True)
-            print('Setting rotation coeffs for {:.3g} deg'.format(
-                  a.theta/(2*np.pi)*360))
-            rot_mat = [np.cos(a.theta), -np.sin(a.theta),
-                       np.sin(a.theta), np.cos(a.theta)]
-            self.CBox.lin_trans_coeffs.set(rot_mat)
-            self.threshold = a.V_opt_raw  # allows
-            self.CBox.sig0_threshold_line.set(int(a.V_opt_raw))
-            self.sequence_swf.upload = True
-            # make sure the sequence gets uploaded
+            if self.calibrate_threshold is 'conventional':
+                self.calibrate_threshold_conventional()
+            elif self.calibrate_threshold == 'self-consistent':
+                self.calibrate_threshold_self_consistent()
+            else:
+                raise Exception(
+                    'calibrate_threshold "{}"'.format(self.calibrate_threshold)
+                    + 'not recognized')
         else:
             self.CBox.sig0_threshold_line.set(self.threshold)
         self.MC.set_sweep_function(self.sequence_swf)
@@ -435,19 +465,12 @@ class CBox_trace_error_fraction_detector(det.Soft_Detector):
             # prevent reloading
             self.sequence_swf.upload = False
         self.i += 1
-
-        if not self.counters:
-            if self.save_raw_trace:
-                self.MC.run(self.name+'_{}'.format(self.i))
-                a = ma.MeasurementAnalysis(auto=False)
-                a.get_naming_and_values()
-                trace = a.measured_values[0]
-                a.finish()  # close the datafile
-            else:
-                self.sequence_swf.prepare()
-                self.dig_shots_det.prepare()
-                trace = self.dig_shots_det.get_values()[0]
-                counters = self.counters_d.get_values()
+        if self.save_raw_trace:
+            self.MC.run(self.name+'_{}'.format(self.i))
+            a = ma.MeasurementAnalysis(auto=False)
+            a.get_naming_and_values()
+            trace = a.measured_values[0]
+            a.finish()  # close the datafile
             return self.count_error_fractions(trace, len(trace))
         else:
             self.sequence_swf.prepare()
@@ -470,6 +493,59 @@ class CBox_trace_error_fraction_detector(det.Soft_Detector):
             else:
                 no_err_counter += 1
         return no_err_counter, single_err_counter, double_err_counter
+
+
+class CBox_SSRO_discrimination_detector(det.Soft_Detector):
+    def __init__(self, measurement_name, MC, AWG, CBox,
+                 sequence_swf,
+                 threshold=None,
+                 calibrate_threshold=False,
+                 save_raw_trace=False,
+                 counters=True,
+                 **kw):
+        super().__init__(**kw)
+
+        self.name = measurement_name
+        if threshold is None:
+            self.threshold = CBox.sig0_threshold_line.get()
+        else:
+            self.threshold = threshold
+
+        self.value_names = ['F-discr. cur. th.',
+                            'F-discr. optimal',
+                            'theta',
+                            'optimal I-threshold',
+                            'rel. separation',
+                            'rel. separation I']  # projected along I axis
+        self.value_units = ['%', '%', 'deg', 'a.u', '1/sigma', '1/sigma']
+
+        self.AWG = AWG
+        self.MC = MC
+        self.CBox = CBox
+        # Required to set some kind of sequence that does a pulse
+        self.sequence_swf = sequence_swf
+
+    def prepare(self, **kw):
+        self.i = 0
+        self.MC.set_sweep_function(self.sequence_swf)
+        self.MC.set_detector_function(det.CBox_integration_logging_det(
+            self.CBox, self.AWG))
+
+    def acquire_data_point(self, **kw):
+        if self.i > 0:
+            # overwrites the upload arg if the sequence swf has it to
+            # prevent reloading
+            self.sequence_swf.upload = False
+        self.i += 1
+
+        self.MC.run(self.name+'_{}'.format(self.i))
+        a = ma.SSRO_discrimination_analysis(
+            label=self.name+'_{}'.format(self.i),
+            current_threshold=self.threshold)
+        return (a.F_discr_curr_t*100, a.F_discr*100,
+                a.theta, a.opt_I_threshold,
+                a.relative_separation, a.relative_separation_I)
+
 
 # class SSRO_Fidelity_Detector_CBox_optimum_weights(SSRO_Fidelity_Detector_CBox):
 #     '''

@@ -110,7 +110,7 @@ listNbrGatesInCliffords = cell(length(nbrClif),1);
 for indexSeq = 1:length(nbrClif)
     % Chose random sequence of Cliffords
     elements = randi(24,[1,nbrClif(indexSeq)]);
-    
+
     if isempty(elements)
         sequence = 1;
     else
@@ -119,7 +119,7 @@ for indexSeq = 1:length(nbrClif)
         for indexClifford = 1:length(elements)
             T = C{elements(indexClifford)}*T;
         end
-        
+
         % search for the final Clifford
         tempC = T';
         finalC = 0;
@@ -139,11 +139,11 @@ for indexSeq = 1:length(nbrClif)
         if finalC == 0
             fprint('here')
         end
-        
+
         sequence = [elements finalC];
-        
+
     end
-    
+
     % build the sequence in terms of Puali rotations
     for ii = 1: length(sequence)
         finalSeq{indexSeq} = [finalSeq{indexSeq} CP{sequence(ii)}];
@@ -157,14 +157,14 @@ if saveFile == 1
     saveascii('nbrCliffords={',file);
     saveascii(nbrClif,file,0,'a');
     saveascii('}',file,'a');
-    
+
     saveascii('RBlist={',file, 'a');
     for indexSeq = 1:length(finalSeq)-1
         saveascii(['{' saveascii(finalSeq{indexSeq}, 0, ',') '},'], file,'a')
     end
     saveascii(['{' saveascii(finalSeq{end},0, ',') '}'], file,'a')
     saveascii('}',file,'a');
-		
+
 		saveascii('NbrGatesInClif={',file, 'a');
     for indexSeq = 1:length(listNbrGatesInCliffords)-1
         saveascii(['{' saveascii(listNbrGatesInCliffords{indexSeq}, 0, ',') '},'], file,'a')
