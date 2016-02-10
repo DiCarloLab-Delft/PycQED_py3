@@ -20,6 +20,8 @@ class MeasurementControl:
     def __init__(self, name, plot_theme=((60, 60, 60), 'w'),
                  plotting_interval=2, **kw):
         self.name = name
+
+        self.verbose = True  # enables printing of the start message
         # starting the process for the pyqtgraph plotting
         # You do not want a new process to be created every time you start a
         # run. This can be removed when I replace my custom process with the
@@ -631,17 +633,20 @@ class MeasurementControl:
         sys.stdout.write(60*'\b'+scrmes)
 
     def print_measurement_start_msg(self):
-        if len(self.sweep_functions) == 1:
-            print('\n')
-            print('Starting measurement: %s' % self.get_measurement_name())
-            print('Sweep function: %s' % self.get_sweep_function_names()[0])
-            print('Detector function: %s' % self.get_detector_function_name())
-        else:
-            print('Starting measurement: %s' % self.get_measurement_name())
-            for i, sweep_function in enumerate(self.sweep_functions):
-                print('Sweep function %d: %s' % (
-                    i, self.sweep_function_names[i]))
-            print('Detector function: %s' % self.get_detector_function_name())
+        if self.verbose:
+            if len(self.sweep_functions) == 1:
+                print('Starting measurement: %s' % self.get_measurement_name())
+                print('Sweep function: %s' %
+                      self.get_sweep_function_names()[0])
+                print('Detector function: %s'
+                      % self.get_detector_function_name())
+            else:
+                print('Starting measurement: %s' % self.get_measurement_name())
+                for i, sweep_function in enumerate(self.sweep_functions):
+                    print('Sweep function %d: %s' % (
+                        i, self.sweep_function_names[i]))
+                print('Detector function: %s'
+                      % self.get_detector_function_name())
 
     def get_datetimestamp(self):
         return time.strftime('%Y%m%d_%H%M%S', time.localtime())

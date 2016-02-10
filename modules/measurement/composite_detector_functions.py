@@ -403,8 +403,7 @@ class CBox_trace_error_fraction_detector(det.Soft_Detector):
                              close_file=True)
         # SSRO analysis returns the angle to rotate by
         theta = a.theta  # analysis returns theta in rad
-        print('Setting rotation coeffs for {:.3g} deg'.format(
-              theta/(2*np.pi)*360))
+
         rot_mat = [np.cos(theta), -np.sin(theta),
                    np.sin(theta), np.cos(theta)]
         self.CBox.lin_trans_coeffs.set(rot_mat)
@@ -424,8 +423,6 @@ class CBox_trace_error_fraction_detector(det.Soft_Detector):
         # hardcoded indices correspond to values in CBox SSRO discr det
         theta = discr_vals[2] * 2 * np.pi/360
 
-        print('Setting rotation coeffs for {:.3g} deg'.format(
-              theta/(2*np.pi)*360))
         # Discr returns the current angle, rotation is - that angle
         rot_mat = [np.cos(-1*theta), -np.sin(-1*theta),
                    np.sin(-1*theta), np.cos(-1*theta)]
