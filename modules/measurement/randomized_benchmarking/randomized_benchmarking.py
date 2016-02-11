@@ -2,6 +2,9 @@ import numpy as np
 from modules.measurement.randomized_benchmarking.clifford_group import(
     clifford_lookuptable)
 
+from modules.measurement.randomized_benchmarking.clifford_decompositions \
+    import(gate_decomposition)
+
 
 def calculate_net_clifford(cliffords):
     '''
@@ -31,7 +34,7 @@ def calculate_recovery_clifford(cl_in, desired_cl=0):
 
 
 def convert_clifford_sequence_to_tape(clifford_sequence, lutmapping,
-                                      gate_decomposition):
+                                      gate_decomposition=gate_decomposition):
     '''
     Converts a list of qubit operations to the relevant pulse elements
 
