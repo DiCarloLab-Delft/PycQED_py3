@@ -6,7 +6,8 @@ from modules.measurement.randomized_benchmarking.clifford_group import(
 def calculate_net_clifford(cliffords):
     '''
     Calculates the net-clifford corresponding to a list of cliffords using the
-    clifford lookuptable. Order is order in which they are applied in time.
+    clifford lookuptable. The order of the input list "cliffords" is order in
+    which they are applied in time.
 
     Note: the order corresponds to the order in a pulse sequence but is
         the reverse of what it would be in a chained dot product.
@@ -17,13 +18,14 @@ def calculate_net_clifford(cliffords):
         net_cl = clifford_lookuptable[net_cl, cliffords[i]]
     return net_cl
 
+
 def calculate_recovery_clifford(cl_in, desired_cl=0):
     '''
     Extracts the clifford that has to be applied to cl_in to make the net
     operation correspond to desired_cl from the clifford lookuptable.
     '''
-    raise NotImplementedError()
-    return recovery_cl
+    row = clifford_lookuptable[cl_in]
+    return row
 
 
 def decompose_clifford_to_gates():

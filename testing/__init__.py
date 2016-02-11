@@ -8,7 +8,9 @@ from . import clifford_tests as clt
 from importlib import reload
 reload(clt)
 
-test_classes_to_run = [clt.TestLookuptable, clt.TestCalculateNetClifford]
+test_classes_to_run = [clt.TestLookuptable,
+                       clt.TestCalculateNetClifford,
+                       clt.TestRecoveryClifford]
 
 suites_list = []
 for test_class in test_classes_to_run:

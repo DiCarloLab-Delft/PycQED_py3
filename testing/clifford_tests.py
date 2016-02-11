@@ -24,9 +24,6 @@ class TestLookuptable(TestCase):
 
 
 class TestCalculateNetClifford(TestCase):
-    def test_dummy(self):
-        pass
-
     def test_identity_does_nothing(self):
         id_seq = np.zeros(5)
         net_cl = rb.calculate_net_clifford(id_seq)
@@ -41,5 +38,21 @@ class TestCalculateNetClifford(TestCase):
         for cl in [0, 3, 6, 9, 12]:  # 12 is Hadamard
             net_cl = rb.calculate_net_clifford([cl, cl])
             self.assertEqual(net_cl, 0)
+
+
+class TestRecoveryClifford(TestCase):
+    def testInversionRandomSequence(self):
+        random_cliffords = np.random.randint(0, len(Clifford_group), 100)
+        net_cl = rb.calculate_net_clifford(random_cliffords)
+
+        for des_cl in range(len(Clifford_group)):
+            rec_cliff = rb.calculate_recovery_clifford(net_cl, des_cl)
+            comb_seq = random_cliffords.append(rec_cliff)
+
+            comb_net_cl_simple = rb.calculate_net_clifford([net_cl, rec_cliff])
+            comb_net_cl = rb.calculate_net_clifford(comb_seq)
+
+            self.assertEqual(comb_net_cl, des_cl)
+            self.assertEqual(comb_net_cl_simple, des_cl)
 
 
