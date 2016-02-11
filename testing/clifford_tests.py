@@ -47,12 +47,30 @@ class TestRecoveryClifford(TestCase):
 
         for des_cl in range(len(Clifford_group)):
             rec_cliff = rb.calculate_recovery_clifford(net_cl, des_cl)
-            comb_seq = random_cliffords.append(rec_cliff)
+            comb_seq = np.append(random_cliffords, rec_cliff)
 
             comb_net_cl_simple = rb.calculate_net_clifford([net_cl, rec_cliff])
             comb_net_cl = rb.calculate_net_clifford(comb_seq)
 
             self.assertEqual(comb_net_cl, des_cl)
             self.assertEqual(comb_net_cl_simple, des_cl)
+
+
+class TestRB_sequence(TestCase):
+    def test_net_cliff(self):
+        for i in range(len(Clifford_group)):
+            rb_seq = rb.randomized_benchmarking_sequence(500, desired_net_cl=i)
+            net_cliff = rb.calculate_net_clifford(rb_seq)
+            self.assertEqual(net_cliff, i)
+
+    def test_seed_reproduces(self):
+        rb_seq_a = rb.randomized_benchmarking_sequence(500, seed=5)
+        rb_seq_b = rb.randomized_benchmarking_sequence(500, seed=None)
+        rb_seq_c = rb.randomized_benchmarking_sequence(500, seed=5)
+        rb_seq_d = rb.randomized_benchmarking_sequence(500, seed=None)
+        self.assertTrue((rb_seq_a == rb_seq_c).all())
+        self.assertTrue((rb_seq_a != rb_seq_b).any)
+        self.assertTrue((rb_seq_c != rb_seq_b).any)
+        self.assertTrue((rb_seq_b != rb_seq_d).any)
 
 

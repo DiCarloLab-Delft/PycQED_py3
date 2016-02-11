@@ -23,9 +23,11 @@ def calculate_recovery_clifford(cl_in, desired_cl=0):
     '''
     Extracts the clifford that has to be applied to cl_in to make the net
     operation correspond to desired_cl from the clifford lookuptable.
+
+    This operation should perform the inverse of calculate_net_clifford
     '''
-    row = clifford_lookuptable[cl_in]
-    return row
+    row = list(clifford_lookuptable[cl_in])
+    return row.index(desired_cl)
 
 
 def decompose_clifford_to_gates():
@@ -52,11 +54,12 @@ def convert_pulse_sequence_to_tape():
 def randomized_benchmarking_sequence(n_cl, desired_net_cl=0,
                                      seed=None):
     '''
-    Generates a sequence of "n_cl" random cliffords and appends a
+    Generates a sequence of length "n_cl" random cliffords and appends a
     recovery clifford to make the net result correspond to applying the
-    "desired_net_cl". The default behaviour is that the net clifford corresponds
-    to an identity ("0"), if you want e.g. an inverting sequence you should set
-    the desired_net_cl to "1".
+    "desired_net_cl".
+    The default behaviour is that the net clifford corresponds to an
+    identity ("0"). If you want e.g. an inverting sequence you should set
+    the desired_net_cl to "3" (corresponds to Pauli X).
     '''
     if seed is None:
         rb_cliffords = np.random.randint(0, 24, n_cl)
@@ -68,6 +71,6 @@ def randomized_benchmarking_sequence(n_cl, desired_net_cl=0,
     recovery_clifford = calculate_recovery_clifford(
         net_clifford, desired_net_cl)
 
-    rb_cliffords.append(recovery_clifford)
+    rb_cliffords = np.append(rb_cliffords, recovery_clifford)
 
     return rb_cliffords
