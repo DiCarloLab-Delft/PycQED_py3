@@ -1,16 +1,21 @@
 import numpy as np
+from modules.measurement.randomized_benchmarking.clifford_group import(
+    clifford_lookuptable)
 
 
-def calculate_net_clifford(*cliffords):
+def calculate_net_clifford(cliffords):
     '''
-    Calculates the net-clifford cl_C that applying cl_B to cl_A corresponds to
-    using the clifford lookuptable.
+    Calculates the net-clifford corresponding to a list of cliffords using the
+    clifford lookuptable. Order is order in which they are applied in time.
 
-    Note have to think of a syntax to make this work with *cliffords (i.e.
-    accepts a list of cliffords as inputs).
+    Note: the order corresponds to the order in a pulse sequence but is
+        the reverse of what it would be in a chained dot product.
+
     '''
-    raise NotImplementedError()
-    return net_clifford
+    net_cl = 0  # assumes element 0 is the Identity
+    for i in range(len(cliffords)):
+        net_cl = clifford_lookuptable[net_cl, cliffords[i]]
+    return net_cl
 
 def calculate_recovery_clifford(cl_in, desired_cl=0):
     '''
