@@ -259,8 +259,10 @@ class Pulsar:
         # sequence programming
         _t0 = time.time()
         if sequence.element_count() > 8000:
-            print("Error: trying to program '%s' (%d element(s))...\n Sequence contains more than 8000 elements, Aborting" \
-                % (sequence.name, sequence.element_count()), end=' ')
+            logging.warning("Error: trying to program '{:s}' ({:d}'".format(
+                            sequence.name, sequence.element_count()) +
+                            " element(s))...\n Sequence contains more than " +
+                            "8000 elements, Aborting", end=' ')
             return
 
         print("Programming '%s' (%d element(s))...\n"
@@ -362,10 +364,12 @@ class Pulsar:
         self.AWG.send_awg_file(filename, awg_file)
         self.AWG.load_awg_file(filename)
 
-        self.activate_channels(channels)
-
+        time.sleep(.1)
         # Waits for AWG to be ready
         self.AWG.is_awg_ready()
+
+        self.activate_channels(channels)
+
         _t = time.time() - _t0
         print(" finished in %.2f seconds." % _t)
         return awg_file

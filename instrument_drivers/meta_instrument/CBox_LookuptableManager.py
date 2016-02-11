@@ -84,8 +84,8 @@ class QuTech_ControlBox_LookuptableManager(Instrument):
                            set_cmd=self._do_set_apply_predistortion_matrix,
                            get_cmd=self._do_get_apply_predistortion_matrix)
 
-        self.set('lut_mapping', ['I', 'X180', 'Y180', 'X90', 'Y90', 'I',
-                                 'I']) #TODO: readd 'Block'
+        self.set('lut_mapping', ['I', 'X180', 'Y180', 'X90', 'Y90', 'mX90',
+                                 'mY90', 'I'])  # TODO: readd 'Block'
         # Set to a default because box is not expected to change
         self.set('sampling_rate', 0.2)
         self.set('QI_amp_ratio', 1)
@@ -110,7 +110,6 @@ class QuTech_ControlBox_LookuptableManager(Instrument):
             suite = unittest.TestLoader().loadTestsFromTestCase(
                 test_suite.LutManTests)
             unittest.TextTestRunner(verbosity=2).run(suite)
-
 
     def generate_standard_pulses(self):
         '''
@@ -152,9 +151,16 @@ class QuTech_ControlBox_LookuptableManager(Instrument):
                                  sampling_rate=self.get('sampling_rate'),
                                  Q_phase_delay=self.get('IQ_phase_skewness'))
 
+        Wave_mY90 = PG.mod_gauss(-self.get('amp90'), self.get('gauss_width'),
+                                 self.get('f_modulation'), axis='y',
+                                 motzoi=self.get('motzoi_parameter'),
+                                 sampling_rate=self.get('sampling_rate'),
+                                 Q_phase_delay=self.get('IQ_phase_skewness'))
+
         self._wave_dict = {'I': Wave_I,
-                          'X180': Wave_X_180, 'Y180': Wave_Y_180,
-                          'X90': Wave_X_90, 'Y90': Wave_Y_90}
+                           'X180': Wave_X_180, 'Y180': Wave_Y_180,
+                           'X90': Wave_X_90, 'Y90': Wave_Y_90,
+                           'mX90': Wave_mX90, 'mY90': Wave_mY90}
         if self.apply_predistortion_matrix:
             M = self.get_mixer_predistortion_matrix()
             for key, val in self._wave_dict.items():

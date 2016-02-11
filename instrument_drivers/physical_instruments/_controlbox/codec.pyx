@@ -1,5 +1,6 @@
+from bitarray import bitarray
 import numpy as np
-# cimport numpy as np
+cimport numpy as np  # cython internally fixes ambiguity
 '''
 @author: MAR
 Cython module that contains encoder and decoder for the CBox v2
@@ -148,6 +149,24 @@ cpdef decode_byte(data_bytes, int data_bits_per_byte=7):
         value = value - 2**nr_bits_m1 # flip sign of 32bit int
     return value
 
+def decode_boolean_array(data_bytes, int data_bits_per_byte=4):
+    '''
+    Used in the qubit state logging mode
+    '''
+    # Convert the raw bits to an array of booleans
+    bitarr = bitarray()
+    bitarr.frombytes(data_bytes[:-2]) # -2 to remove checksum and eom
+    raw_vals = np.array(bitarr)
+    # Slicing the array to only take the last 4 data bits per byte
+    values = np.empty((len(data_bytes)-2)*4)
+    for i in range((len(data_bytes)-2)):\
+        # loop over all bytes (in steps of 8 bits)
+        for j in range(data_bits_per_byte):
+            # loop over all data bits in a byte
+            values[data_bits_per_byte*i+j] = raw_vals[8*i+j+data_bits_per_byte]
+    ch0_values = values[:len(values)//2]
+    ch1_values = values[len(values)//2:]
+    return ch0_values, ch1_values
 
 def calculate_checksum(bytes input_command):
         '''

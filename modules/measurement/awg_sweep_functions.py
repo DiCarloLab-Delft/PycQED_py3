@@ -3,28 +3,339 @@ import logging
 from modules.measurement import sweep_functions as swf
 
 from modules.measurement.pulse_sequences import standard_sequences as st_seqs
-default_gauss_width = 10
+default_gauss_width = 10  # magic number should be removed
 
 
 class CBox_T1(swf.Hard_Sweep):
-    def __init__(self, IF, meas_pulse_delay, RO_trigger_delay, mod_amp, AWG):
+    def __init__(self, IF, RO_pulse_delay, RO_trigger_delay, mod_amp, AWG,
+                 upload=True):
         super().__init__()
         self.IF = IF
-        self.meas_pulse_delay = meas_pulse_delay
+        self.RO_pulse_delay = RO_pulse_delay
         self.RO_trigger_delay = RO_trigger_delay
+        self.name = 'T1'
         self.parameter_name = 'tau'
         self.unit = 's'
-        self.name = 'T1'
         self.AWG = AWG
         self.mod_amp = mod_amp
+        self.upload = upload
 
     def prepare(self, **kw):
-        st_seqs.CBox_T1_marker_seq(IF=self.IF, times=self.sweep_points,
-                                   meas_pulse_delay=self.meas_pulse_delay,
-                                   RO_trigger_delay=self.RO_trigger_delay,
-                                   verbose=False)
-        self.AWG.set('ch3_amp', self.mod_amp)
-        self.AWG.set('ch4_amp', self.mod_amp)
+        if self.upload:
+            ch3_amp = self.AWG.get('ch3_amp')
+            ch4_amp = self.AWG.get('ch3_amp')
+            st_seqs.CBox_T1_marker_seq(IF=self.IF, times=self.sweep_points,
+                                       RO_pulse_delay=self.RO_pulse_delay,
+                                       RO_trigger_delay=self.RO_trigger_delay,
+                                       verbose=False)
+            self.AWG.set('ch3_amp', ch3_amp)
+            self.AWG.set('ch4_amp', ch4_amp)
+
+
+class CBox_Ramsey(swf.Hard_Sweep):
+    def __init__(self, IF, RO_pulse_length,
+                 RO_pulse_delay, RO_trigger_delay, pulse_separation,
+                 AWG, CBox, cal_points=True,
+                 upload=True):
+        super().__init__()
+        self.IF = IF
+        self.RO_pulse_delay = RO_pulse_delay
+        self.RO_trigger_delay = RO_trigger_delay
+        self.pulse_separation = pulse_separation
+        self.RO_pulse_length = RO_pulse_length
+        self.name = 'T2*'
+        self.parameter_name = 'tau'
+        self.unit = 's'
+        self.AWG = AWG
+        self.CBox = CBox
+        self.upload = upload
+        self.cal_points = cal_points
+
+    def prepare(self, **kw):
+        if self.upload:
+            ch3_amp = self.AWG.get('ch3_amp')
+            ch4_amp = self.AWG.get('ch3_amp')
+            st_seqs.CBox_Ramsey_marker_seq(
+                IF=self.IF, times=self.sweep_points,
+                RO_pulse_delay=self.RO_pulse_delay,
+                RO_pulse_length=self.RO_pulse_length,
+                RO_trigger_delay=self.RO_trigger_delay,
+                pulse_separation=self.pulse_separation,
+                verbose=False)
+            self.AWG.set('ch3_amp', ch3_amp)
+            self.AWG.set('ch4_amp', ch4_amp)
+
+        # gets assigned in MC.set sweep_points
+        nr_elts = len(self.sweep_points)
+        if self.cal_points:  # append the calibration points to the tape
+            tape = [3, 3] * (nr_elts-4) + [0, 0, 0, 0, 0, 1, 0, 1]
+        else:
+            tape = [3, 3] * nr_elts
+
+        self.AWG.stop()
+        self.CBox.AWG0_mode.set('Tape')
+        self.CBox.AWG1_mode.set('Tape')
+        self.CBox.restart_awg_tape(0)
+        self.CBox.restart_awg_tape(1)
+        self.CBox.set('AWG0_tape', tape)
+        self.CBox.set('AWG1_tape', tape)
+
+
+class CBox_Echo(swf.Hard_Sweep):
+    def __init__(self, IF,
+                 RO_pulse_delay, RO_trigger_delay, pulse_separation,
+                 AWG, CBox, cal_points=True,
+                 upload=True):
+        super().__init__()
+        self.IF = IF
+        self.RO_pulse_delay = RO_pulse_delay
+        self.RO_trigger_delay = RO_trigger_delay
+        self.pulse_separation = pulse_separation
+        self.name = 'T2-echo'
+        self.parameter_name = 'tau'
+        self.unit = 's'
+        self.AWG = AWG
+        self.CBox = CBox
+        self.upload = upload
+        self.cal_points = cal_points
+        logging.warning('Underlying sequence is not implemented')
+        logging.warning('Replace it with the multi-pulse sequence')
+
+    def prepare(self, **kw):
+        if self.upload:
+            ch3_amp = self.AWG.get('ch3_amp')
+            ch4_amp = self.AWG.get('ch3_amp')
+            st_seqs.CBox_Echo_marker_seq(
+                IF=self.IF, times=self.sweep_points,
+                RO_pulse_delay=self.RO_pulse_delay,
+                RO_trigger_delay=self.RO_trigger_delay,
+                verbose=False)
+            self.AWG.set('ch3_amp', ch3_amp)
+            self.AWG.set('ch4_amp', ch4_amp)
+
+        # gets assigned in MC.set sweep_points
+        nr_elts = len(self.sweep_points)
+        if self.cal_points:
+            tape = [3, 3] * (nr_elts-4) + [0, 1]
+        else:
+            tape = [3, 3] * nr_elts
+
+        self.AWG.stop()
+        self.CBox.AWG0_mode.set('Tape')
+        self.CBox.AWG1_mode.set('Tape')
+        self.CBox.restart_awg_tape(0)
+        self.CBox.restart_awg_tape(1)
+        self.CBox.set('AWG0_tape', tape)
+        self.CBox.set('AWG1_tape', tape)
+
+
+class CBox_OffOn(swf.Hard_Sweep):
+    def __init__(self, IF, RO_pulse_delay, RO_trigger_delay,
+                 RO_pulse_length,
+                 AWG, CBox,
+                 upload=True):
+        super().__init__()
+        self.IF = IF
+        self.RO_pulse_delay = RO_pulse_delay
+        self.RO_trigger_delay = RO_trigger_delay
+        self.parameter_name = 'Tape element'
+        self.unit = ''
+        self.name = 'Off-On'
+        self.tape = [0, 1]
+        self.sweep_points = np.array(self.tape)  # array for transpose in MC
+        self.AWG = AWG
+        self.CBox = CBox
+        self.RO_pulse_length = RO_pulse_length
+        # would actually like to check if file is already loaded
+        # filename can be get using AWG.get('setup_filename')
+        self.upload = upload
+
+    def prepare(self, **kw):
+        self.AWG.stop()
+        self.CBox.AWG0_mode.set('Tape')
+        self.CBox.AWG1_mode.set('Tape')
+        self.CBox.restart_awg_tape(0)
+        self.CBox.restart_awg_tape(1)
+        self.CBox.set('AWG0_tape', self.tape)
+        self.CBox.set('AWG1_tape', self.tape)
+
+        if self.upload:
+            ch3_amp = self.AWG.get('ch3_amp')
+            ch4_amp = self.AWG.get('ch3_amp')
+            st_seqs.CBox_single_pulse_seq(
+                IF=self.IF,
+                RO_pulse_delay=self.RO_pulse_delay,
+                RO_trigger_delay=self.RO_trigger_delay,
+                RO_pulse_length=self.RO_pulse_length,
+                verbose=False)
+            self.AWG.set('ch3_amp', ch3_amp)
+            self.AWG.set('ch4_amp', ch4_amp)
+
+
+class CBox_AllXY(swf.Hard_Sweep):
+    def __init__(self, IF, pulse_separation,
+                 RO_pulse_delay,
+                 RO_trigger_delay,
+                 RO_pulse_length,
+                 AWG, CBox,
+                 upload=True):
+        super().__init__()
+
+        self.parameter_name = 'AllXY element'
+        self.unit = '#'
+        self.name = 'AllXY'
+        # would actually like to check if file is already loaded
+        # filename can be get using AWG.get('setup_filename')
+        self.upload = upload
+
+        # The AllXY tape
+        self.tape = np.array([0, 0, 1, 1,  # 1, 2
+                              2, 2, 1, 2,  # 3, 4
+                              2, 1, 3, 0,  # 5, 6
+                              4, 0, 3, 4,  # 7, 8
+                              4, 3, 3, 2,  # 9, 10
+                              4, 1, 1, 4,  # 11, 12
+                              2, 3, 3, 1,  # 13, 14
+                              1, 3, 4, 2,  # 15, 16
+                              2, 4, 1, 0,  # 17, 18
+                              2, 0, 3, 3,  # 19, 20
+                              4, 4])       # 21
+        self.sweep_points = np.arange(int(len(self.tape)/2))  # 2 pulses per elt
+
+        # Making input pars available to prepare
+        # Required instruments
+        self.AWG = AWG
+        self.CBox = CBox
+        self.IF = IF
+        self.RO_pulse_delay = RO_pulse_delay
+        self.RO_trigger_delay = RO_trigger_delay
+        self.RO_pulse_length = RO_pulse_length
+        self.pulse_separation = pulse_separation
+
+    def prepare(self, **kw):
+        self.AWG.stop()
+        self.CBox.AWG0_mode.set('Tape')
+        self.CBox.AWG1_mode.set('Tape')
+        self.CBox.restart_awg_tape(0)
+        self.CBox.restart_awg_tape(1)
+        self.CBox.set('AWG0_tape', self.tape)
+        self.CBox.set('AWG1_tape', self.tape)
+
+        if self.upload:
+            ch3_amp = self.AWG.get('ch3_amp')
+            ch4_amp = self.AWG.get('ch3_amp')
+
+            st_seqs.CBox_two_pulse_seq(
+                IF=self.IF,
+                pulse_separation=self.pulse_separation,
+                RO_pulse_delay=self.RO_pulse_delay,
+                RO_pulse_length=self.RO_pulse_length,
+                RO_trigger_delay=self.RO_trigger_delay, verbose=False)
+            self.AWG.set('ch3_amp', ch3_amp)
+            self.AWG.set('ch4_amp', ch4_amp)
+
+
+class CBox_multi_element_tape(swf.Hard_Sweep):
+    def __init__(self, n_pulses, tape,
+                 pulse_separation,
+                 IF, RO_pulse_delay, RO_trigger_delay,
+                 RO_pulse_length,
+                 AWG, CBox,
+                 upload=True):
+        '''
+        Sets an arbitrary tape as a sequence
+        n_pulses is the number of pulses per element in the sequence
+        by default
+        '''
+        super().__init__()
+        self.n_pulses = n_pulses
+        self.parameter_name = 'Element'
+        self.unit = '#'
+        self.name = 'multi-element tape'
+        self.tape = tape
+
+        self.upload = upload
+
+        self.sweep_points = np.arange(int(len(self.tape)/n_pulses))
+        self.AWG = AWG
+        self.CBox = CBox
+        self.IF = IF
+        self.RO_pulse_delay = RO_pulse_delay
+        self.RO_trigger_delay = RO_trigger_delay
+        self.RO_pulse_length = RO_pulse_length
+        self.pulse_separation = pulse_separation
+
+    def prepare(self, **kw):
+        self.AWG.stop()
+        self.CBox.AWG0_mode.set('Tape')
+        self.CBox.AWG1_mode.set('Tape')
+        self.CBox.restart_awg_tape(0)
+        self.CBox.restart_awg_tape(1)
+        self.CBox.set('AWG0_tape', self.tape)
+        self.CBox.set('AWG1_tape', self.tape)
+        if self.upload:
+            ch3_amp = self.AWG.get('ch3_amp')
+            ch4_amp = self.AWG.get('ch3_amp')
+            st_seqs.CBox_multi_pulse_seq(
+                n_pulses=self.n_pulses, pulse_separation=self.pulse_separation,
+                IF=self.IF,
+                RO_pulse_delay=self.RO_pulse_delay,
+                RO_trigger_delay=self.RO_trigger_delay,
+                RO_pulse_length=self.RO_pulse_length,
+                verbose=False)
+            self.AWG.set('ch3_amp', ch3_amp)
+            self.AWG.set('ch4_amp', ch4_amp)
+
+
+class Resetless_tape(swf.Hard_Sweep):
+    def __init__(self, n_pulses, tape,
+                 pulse_separation, resetless_interval,
+                 IF, RO_pulse_delay, RO_trigger_delay,
+                 RO_pulse_length,
+                 AWG, CBox,
+                 upload=True):
+        super().__init__()
+        self.IF = IF
+        self.RO_pulse_delay = RO_pulse_delay
+        self.RO_trigger_delay = RO_trigger_delay
+        self.parameter_name = 'Tape element'
+        self.unit = ''
+        self.name = 'Resetless_tape'
+        self.tape = tape
+        # array for transpose in MC these values are bs
+        self.sweep_points = np.array(self.tape)
+        self.AWG = AWG
+        self.CBox = CBox
+        self.RO_pulse_length = RO_pulse_length
+        # would actually like to check if file is already loaded
+        # filename can be get using AWG.get('setup_filename')
+        self.upload = upload
+
+        self.n_pulses = n_pulses
+        self.resetless_interval = resetless_interval
+        self.pulse_separation = pulse_separation
+
+    def prepare(self, **kw):
+        self.AWG.stop()
+        self.CBox.AWG0_mode.set('Tape')
+        self.CBox.AWG1_mode.set('Tape')
+        self.CBox.restart_awg_tape(0)
+        self.CBox.restart_awg_tape(1)
+        self.CBox.set('AWG0_tape', self.tape)
+        self.CBox.set('AWG1_tape', self.tape)
+        if self.upload:
+            ch3_amp = self.AWG.get('ch3_amp')
+            ch4_amp = self.AWG.get('ch3_amp')
+            st_seqs.CBox_resetless_multi_pulse_seq(
+                n_pulses=self.n_pulses, pulse_separation=self.pulse_separation,
+                resetless_interval=self.resetless_interval,
+                IF=self.IF,
+                RO_pulse_delay=self.RO_pulse_delay,
+                RO_trigger_delay=self.RO_trigger_delay,
+                RO_pulse_length=self.RO_pulse_length,
+                verbose=False)
+            self.AWG.set('ch3_amp', ch3_amp)
+            self.AWG.set('ch4_amp', ch4_amp)
 
 
 # class AWG_Sweep(swf.Hard_Sweep):

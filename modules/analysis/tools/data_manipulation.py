@@ -35,7 +35,8 @@ def count_rounds_to_error(series):
     return np.NAN
 
 
-def count_rtf_and_term_cond(series, only_count_min_1=False, return_termination_condition=True):
+def count_rtf_and_term_cond(series, only_count_min_1=False,
+                            return_termination_condition=True):
     '''
     returns the index of the first entry that is different
     from the initial value.
@@ -231,25 +232,113 @@ def digitize(data, threshold, positive_case=True):
 
     '''
     if positive_case:
-        data_digitized = np.asarray([[1 if d_element < threshold else -1
+        data_digitized = np.asarray([[1 if d_element <= threshold else -1
                                     for d_element in d_row] for d_row in data])
     else:
-        data_digitized = np.asarray([[1 if d_element > threshold else -1
+        data_digitized = np.asarray([[1 if d_element >= threshold else -1
                                     for d_element in d_row] for d_row in data])
     return data_digitized
 
 
 def postselect(data, threshold, positive_case=True):
-    data_postselected =[]
+    data_postselected = []
     if positive_case:
         for data_row in data:
-            if data_row[0]<threshold:
+            if data_row[0] <= threshold:
                 data_postselected.append(data_row)
     else:
         for data_row in data:
-            if data_row[0]>threshold:
+            if data_row[0] >= threshold:
                 data_postselected.append(data_row)
     return np.asarray(data_postselected)
 
 
+def count_error_fractions(trace):
+    '''
+    The counters produce the same results as the CBox counters in
+    CBox.get_qubit_state_log_counters().
+    Requires a boolean array or an array of ints as input.
+    '''
+    no_err_counter = 0
+    single_err_counter = 0
+    double_err_counter = 0
+    zero_counter = 0
+    one_counter = 0
 
+    for i in range(len(trace)):
+        if i < (len(trace)-1):
+            if trace[i] == trace[i+1]:
+                # A single error is associated with a qubit error
+                single_err_counter += 1
+                if i < (len(trace)-2):
+                    if trace[i] == trace[i+2]:
+                        # If there are two errors in a row this is associated with
+                        # a RO error, this counter must be substracted from the
+                        # single counter
+                        double_err_counter += 1
+            else:
+                no_err_counter +=1
+        if trace[i] == 1:
+            zero_counter +=1
+        else:
+            one_counter +=1
+
+    return no_err_counter, single_err_counter, double_err_counter, zero_counter, one_counter
+
+
+def bin_2D_shots(I_shots, Q_shots, normed=True):
+    '''
+    Creates a 2D histogram of I and Q shotsdata.
+
+    Watch out that when you plot the histogram uses the convention
+    H[xbins, ybins] and plotting generally uses H[yrows, xcols] meaning you
+    want to Transpose the data using H.T
+    '''
+    n_bins_range = 60  # the bins we want to have around our data
+    V_range_I = np.max(I_shots)-np.min(I_shots)             # data voltagerange
+    V_range_Q = np.max(Q_shots)-np.min(Q_shots)
+
+    V_max = np.max([V_range_I, V_range_Q])*1.1
+
+    # determining the amount of bins
+    n_bins_range = 60  # the bins we want to have around our data
+    V_range = np.max([V_range_I, V_range_Q, V_range_I, V_range_Q])
+    n_bins = n_bins_range*2*V_max/V_range
+
+    H, xedges, yedges = np.histogram2d(I_shots, Q_shots,
+                                       bins=n_bins,
+                                       range=[[-V_max, V_max],
+                                              [-V_max, V_max]],
+                                       normed=normed)
+    return H, xedges, yedges
+
+
+def flatten_2D_histogram(H, xedges, yedges):
+    '''
+    Flattens a 2D histogram in preparation for fitting.
+    Input is the output of the np.histogram2d() command.
+
+    Inputs
+        H: 2D array of counts of shape (yrows, xcols)
+        xedges: 1D array of bin-edges along x
+        yedges: ""
+
+    Returns
+        H_flat: flattened array of length (yrows*xcols)
+        x_tiled_flat: 1D array of bin-x-centers of length (yrows*xcols)
+        y_rep_flat: 1D array of bin-x-centers of length (yrows*xcols)
+    '''
+    # Transpose because Histogram is H(yrows, xcols)
+    H_flat = H.T.flatten()
+    xstep = (xedges[1]-xedges[0])/2
+    ystep = (yedges[1]-yedges[0])/2
+    x = xedges[:-1]+xstep
+    y = yedges[:-1]+ystep
+    nr_rows = len(y)
+    nr_cols = len(x)
+    # tiling and rep is to make the indices match with the locations in the
+    # 2D grid of H
+    x_tiled_flat = np.tile(x, nr_cols)
+    y_rep_flat = np.repeat(y, nr_rows)
+
+    return H_flat, x_tiled_flat, y_rep_flat

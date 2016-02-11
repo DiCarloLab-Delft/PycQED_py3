@@ -1,13 +1,7 @@
-try:
-    import msvcrt  # used on windows to catch keyboard input
-except:
-    print('Warning: Could not import msvcrt (used for detecting keystrokes)')
-
 import types
 import logging
 import time
 import sys
-import os
 import numpy as np
 import pyqtgraph as pg
 import pyqtgraph.multiprocess as pgmp
@@ -15,6 +9,7 @@ from scipy.optimize import fmin_powell
 from modules.measurement import hdf5_data as h5d
 from modules.utilities import general
 from modules.utilities.general import dict_to_ordered_tuples
+from qcodes.plots.pyqtgraph import QtPlot
 
 
 class MeasurementControl:
@@ -22,37 +17,21 @@ class MeasurementControl:
     New version of Measurement Control that allows for adaptively determining
     data points.
     '''
-    def __init__(self, name, **kw):
-        # self.add_parameter('sweep_function_names',
-        #                    flags=Instrument.FLAG_GETSET, type=list)
-        # self.add_parameter('detector_function_name',
-        #                    flags=Instrument.FLAG_GETSET, type=str)
-
-        # Parameters for logging
-        # self.add_parameter('git_hash',
-        #                    flags=Instrument.FLAG_GET, type=str)
-        # self.add_parameter('measurement_begintime',
-        #                    flags=Instrument.FLAG_GET, type=str)
-        # self.add_parameter('measurement_endtime',
-        #                    flags=Instrument.FLAG_GET, type=str)
-
-        # self.add_parameter('sweep_points',
-        #                    flags=Instrument.FLAG_GETSET, type=list)
-
-        # self.add_parameter('measurement_name',
-        #                    flags=Instrument.FLAG_GETSET, type=str)
-        # self.add_parameter('optimization_method',
-        #                    flags=Instrument.FLAG_GETSET, type=str)
-
-        # self.get_git_hash()
+    def __init__(self, name, plot_theme=((60, 60, 60), 'w'),
+                 plotting_interval=2, **kw):
         self.name = name
+
+        self.verbose = True  # enables printing of the start message
         # starting the process for the pyqtgraph plotting
-        # You do not want a new process to be created every time you start a run
+        # You do not want a new process to be created every time you start a
+        # run. This can be removed when I replace my custom process with the
+        # pyqtgraph one.
         pg.mkQApp()
         self.proc = pgmp.QtProcess()  # pyqtgraph multiprocessing
         self.rpg = self.proc._import('pyqtgraph')
-        self.win = self.rpg.GraphicsWindow(title='Plot monitor of %s' % self.name)
-        # self.win.resize(1000, 600)
+        self.new_plotmon_window(plot_theme=plot_theme,
+                                interval=plotting_interval)
+        self.live_plot_enabled = True
 
     ##############################################
     # Functions used to control the measurements #
@@ -64,6 +43,7 @@ class MeasurementControl:
         '''
         self.set_measurement_name(name)
         self.print_measurement_start_msg()
+        self.mode = mode
         with h5d.Data(name=self.get_measurement_name()) as self.data_object:
             self.get_measurement_begintime()
             #Commented out because requires git shell interaction from python
@@ -73,14 +53,16 @@ class MeasurementControl:
             self.save_instrument_settings(self.data_object)
 
             self.create_experimentaldata_dataset()
-            if mode == '1D':
+            if self.mode == '1D':
                 self.measure()
-            elif mode == '2D':
+            elif self.mode == '2D':
                 self.measure_2D()
-            elif mode == 'adaptive':
+            elif self.mode == 'adaptive':
                 self.measure_soft_adaptive()
             else:
-                raise ValueError('mode %s not recognized' % mode)
+                raise ValueError('mode %s not recognized' % self.mode)
+            result = self.dset[()]
+        return result
 
     def measure(self, *kw):
         self.initialize_plot_monitor()
@@ -109,7 +91,8 @@ class MeasurementControl:
                     sweep_points=self.get_sweep_points()[0: self.xlen, 0])
                 self.complete = False
                 for j in range(self.ylen):
-                    if not self.complete:  # added specifically for 2D hard sweeps
+                    # added specifically for 2D hard sweeps
+                    if not self.complete:
                         for i, sweep_function in enumerate(self.sweep_functions):
                             x = self.get_sweep_points()[
                                 self.iteration*self.xlen]
@@ -139,6 +122,8 @@ class MeasurementControl:
         adaptive_function = self.af_pars.pop('adaptive_function')
         print('Adaptive function passed: %s' % adaptive_function)
 
+        self.initialize_plot_monitor()
+        self.initialize_plot_monitor_adaptive()
         for sweep_function in self.sweep_functions:
             sweep_function.prepare()
         self.detector_function.prepare()
@@ -146,7 +131,8 @@ class MeasurementControl:
         if adaptive_function == 'Powell':
             print('Optimizing using scipy.fmin_powell')
             adaptive_function = fmin_powell
-        if type(adaptive_function) == types.FunctionType:
+        if (isinstance(adaptive_function, types.FunctionType) or
+                isinstance(adaptive_function, np.ufunc)):
             try:
                 adaptive_function(self.optimization_function, **self.af_pars)
             except StopIteration:
@@ -158,15 +144,17 @@ class MeasurementControl:
         for sweep_function in self.sweep_functions:
             sweep_function.finish()
         self.detector_function.finish()
-
+        self.update_plotmon(force_update=True)
+        self.update_plotmon_adaptive(force_update=True)
         self.get_measurement_endtime()
+        print('Optimization completed in {:.4g}s'.format(
+            self.endtime-self.begintime))
         return
 
     def measure_hard(self):
         '''
         ToDo: integrate soft averaging into MC
         '''
-        self.check_keyboard_interupt()
         # note, checking after the data comes in is pointless in hard msmt
         new_data = np.array(self.detector_function.get_values()).T
 
@@ -183,7 +171,7 @@ class MeasurementControl:
         datasetshape = self.dset.shape
 
         self.iteration = datasetshape[0]/shape_new_data[0] + 1
-        start_idx = shape_new_data[0]*(self.iteration-1)
+        start_idx = int(shape_new_data[0]*(self.iteration-1))
         new_datasetshape = (shape_new_data[0]*self.iteration, datasetshape[1])
         self.dset.resize(new_datasetshape)
         len_new_data = shape_new_data[0]
@@ -198,7 +186,7 @@ class MeasurementControl:
         # Only add sweep points if these make sense (i.e. same shape as new_data)
         if sweep_len == len_new_data:  # 1D sweep
             self.dset[:, 0] = self.get_sweep_points().T
-        elif hasattr(self, 'xlen'):  # 2D sweep
+        elif self.mode is '2D':  # 2D sweep
             # always add for a 2D sweep
             relevant_swp_points = self.get_sweep_points()[
                 start_idx:start_idx+len_new_data:]
@@ -206,11 +194,7 @@ class MeasurementControl:
                 relevant_swp_points
 
         self.update_plotmon()
-        # for i in range(len(self.detector_function.value_names)):
-        #     self.update_plotmon(
-        #         mon_nr=i+1, x_ind=0,
-        #         y_ind=-len(self.detector_function.value_names)+i)
-        if hasattr(self, 'TwoD_array'):
+        if self.mode == '2D':
             self.update_plotmon_2D_hard()
             self.print_progress_static_2D_hard()
 
@@ -220,7 +204,6 @@ class MeasurementControl:
         '''
         Core measurement function used for soft sweeps
         '''
-        self.check_keyboard_interupt()
 
         if np.size(x) == 1:
             x = [x]
@@ -235,6 +218,12 @@ class MeasurementControl:
 
         datasetshape = self.dset.shape
         self.iteration = datasetshape[0] + 1
+
+        # TODO: REMOVE THIS ONLY FOR BENCHMARKING
+        # if self.iteration > 2:
+        #     print('Time of iteration: {:.4g}'.format(time.time()-self.it_time))
+        # self.it_time = time.time()
+
         vals = self.detector_function.acquire_data_point()
 
         # Resizing dataset and saving
@@ -244,24 +233,10 @@ class MeasurementControl:
         self.dset[self.iteration-1, :] = savable_data
         # update plotmon
         self.update_plotmon()
-        # if len(self.sweep_functions) == 1:
-        #     for i in range(len(self.detector_function.value_names)):
-        #         self.update_plotmon(mon_nr=i+1, x_ind=0, y_ind=i+1)
-        # elif len(self.sweep_functions) == 2:
-        #     for i in range(len(self.detector_function.value_names)):
-        #         self.update_plotmon(mon_nr=i+1, x_ind=0, y_ind=i+1)
-        # elif len(self.sweep_functions) <= 4:
-        #     for i in range(len(self.sweep_functions)):
-        #         self.update_plotmon(
-        #             mon_nr=i+1, x_ind=i,
-        #             y_ind=-len(self.detector_function.value_names))
-        # else:
-        #     for i in range(4):
-        #         self.update_plotmon(
-        #             mon_nr=i+1, x_ind=i,
-        #             y_ind=-len(self.detector_function.value_names))
-        if hasattr(self, 'TwoD_array'):
+        if self.mode == '2D':
             self.update_plotmon_2D()
+        elif self.mode == 'adaptive':
+            self.update_plotmon_adaptive()
         return vals
 
     def optimization_function(self, x):
@@ -285,23 +260,23 @@ class MeasurementControl:
                 x[i] = float(x[i])/float(self.x_scale[i])
         if self.minimize_optimization:
             vals = self.measurement_function(x)
-            if (vals < self.f_termination) & (self.f_termination is not None):
-                raise StopIteration()
+            if (self.f_termination is not None):
+                if (vals < self.f_termination):
+                    raise StopIteration()
         else:
             vals = self.measurement_function(x)
             # when maximizing interrupt when larger than condition before
             # inverting
-            if (vals > self.f_termination) & (self.f_termination is not None):
-                raise StopIteration()
+            if (self.f_termination is not None):
+                if (vals > self.f_termination):
+                    raise StopIteration()
             vals = np.multiply(-1, vals)
 
-        # print 'Completed iteration %d' % self.iteration
-        # measurement function ensures this self.iteration is correct
-        # print 'Measured with parameters: ', x
-        # print 'Measured value: ', vals
-        self.update_plotmon(
-            mon_nr=5, x_ind=None,
-            y_ind=-len(self.detector_function.value_names))
+        # TODO: re add the extra plotmon that shows the progress of the
+        # optimization
+        # self.update_plotmon(
+        #     mon_nr=5, x_ind=None,
+        #     y_ind=-len(self.detector_function.value_names))
         # to check if vals is an array with multiple values
         if hasattr(vals, '__iter__'):
             if len(vals) > 1:
@@ -327,20 +302,6 @@ class MeasurementControl:
         except AttributeError:
             pass
 
-    def check_keyboard_interupt(self):
-        try:  # Try except statement is to make it work on non windows pc
-            if msvcrt.kbhit():
-                key = msvcrt.getch()
-                if key == 'q':
-                    filedir = os.path.dirname(self.data_object.filepath)
-                    self.data_object.close()
-                    filedirparts = os.path.split(filedir)
-                    newdirname = filedirparts[1][:6]+'_X'+filedirparts[1][6:]
-                    newfiledir = os.path.join(filedirparts[0], newdirname)
-                    os.rename(filedir, newfiledir)
-                    raise KeyboardInterrupt('Human interupt q')
-        except:
-            pass
 
     ###################
     # 2D-measurements #
@@ -362,19 +323,20 @@ class MeasurementControl:
         if np.size(self.get_sweep_points()[0]) == 2:
             self.measure(**kw)
         elif np.size(self.get_sweep_points()[0]) == 1:
-            print('Reshaping sweep points')
             self.xlen = len(self.get_sweep_points())
             self.ylen = len(self.sweep_points_2D)
-            self.preallocate_2D_plot()
 
             # create inner loop pts
-            sweep_pts_0 = np.tile(self.get_sweep_points(), self.ylen)
+            self.sweep_pts_x = self.get_sweep_points()
+            x_tiled = np.tile(self.sweep_pts_x, self.ylen)
             # create outer loop
-            sweep_pts_1 = np.repeat(self.sweep_points_2D, self.xlen)
-            c = np.column_stack((sweep_pts_0, sweep_pts_1))
+            self.sweep_pts_y = self.sweep_points_2D
+            y_rep = np.repeat(self.sweep_pts_y, self.xlen)
+            c = np.column_stack((x_tiled, y_rep))
             self.set_sweep_points(c)
+            self.initialize_plot_monitor_2D()
             self.measure(**kw)
-            del self.TwoD_array
+            # del self.TwoD_array
         return
 
     def set_sweep_function_2D(self, sweep_function):
@@ -402,95 +364,126 @@ class MeasurementControl:
         ylabels = self.column_names[len(self.sweep_function_names):]
         for ylab in ylabels:
             for xlab in xlabels:
-                p = self.win.addPlot()
-                p.setLabel('bottom', xlab)
-                p.setLabel('left', ylab)
-                c = p.plot(symbol='o', symbolSize=7)
-                # symbol options are  o, s(quare), t(riangle), d(iamond), +
+                p = self.win.addPlot(pen=self.plot_theme[0])
+                b_ax = p.getAxis('bottom')
+                p.setLabel('bottom', xlab, pen=self.plot_theme[0])
+                b_ax.setPen(self.plot_theme[0])
+                l_ax = p.getAxis('left')
+                l_ax.setPen(self.plot_theme[0])
+                p.setLabel('left', ylab, pen=self.plot_theme[0])
+                c = p.plot(symbol='o', symbolSize=7, pen=self.plot_theme[0])
                 self.curves.append(c)
             self.win.nextRow()
         return self.win, self.curves
 
-    def update_plotmon(self):
-        i = 0
-        nr_sweep_funcs = len(self.sweep_function_names)
-        for x_ind in range(nr_sweep_funcs):
-            for y_ind in range(len(self.detector_function.value_names)):
-                x = self.dset[:, x_ind]
-                y = self.dset[:, nr_sweep_funcs+y_ind]
-                self.curves[i].setData(x, y)
-                i += 1
+    def update_plotmon(self, force_update=False):
+        if self.live_plot_enabled:
+            i = 0
+            try:
+                time_since_last_mon_update = time.time() - self._mon_upd_time
+            except:
+                self._mon_upd_time = time.time()
+                time_since_last_mon_update = 1e9
+            # Update always if just a few points otherwise wait for the refresh
+            # timer
+            if (self.dset.shape[0] < 20 or time_since_last_mon_update >
+                    self.QC_QtPlot.interval or force_update):
+                nr_sweep_funcs = len(self.sweep_function_names)
+                for y_ind in range(len(self.detector_function.value_names)):
+                    for x_ind in range(nr_sweep_funcs):
+                        x = self.dset[:, x_ind]
+                        y = self.dset[:, nr_sweep_funcs+y_ind]
+                        self.curves[i].setData(x, y)
+                        i += 1
+                self._mon_upd_time = time.time()
 
-    def new_plotmon_window(self):
+    def new_plotmon_window(self, plot_theme=None, interval=2):
         '''
         respawns the pyqtgraph plotting window
+        Creates self.win       : a direct pyqtgraph window
+                self.QC_QtPlot : the qcodes pyqtgraph window
         '''
+        if plot_theme is not None:
+            self.plot_theme = plot_theme
         self.win = self.rpg.GraphicsWindow(
             title='Plot monitor of %s' % self.name)
+        self.win.setBackground(self.plot_theme[1])
+        self.QC_QtPlot = QtPlot(
+            windowTitle='QC-Plot monitor of %s' % self.name,
+            interval=interval)
 
-
-
-    # def update_plotmon(self, mon_nr, x_ind=0, y_ind=-1):
-    #     y = self.dset[:, y_ind]
-    #     if x_ind is None:
-    #         x = np.arange(len(y))
-    #     else:
-    #         x = self.dset[:, x_ind]
-    #     data = [x, y]
-    #     if hasattr(self, 'Plotmon'):
-    #         self.Plotmon.plot2D(mon_nr, data)
-
-    def preallocate_2D_plot(self):
+    def initialize_plot_monitor_2D(self):
         '''
         Preallocates a data array to be used for the update_plotmon_2D command.
 
         Made to work with at most 2 2D arrays (as this is how the labview code
         works). It should be easy to extend this function for more vals.
         '''
-        if len(self.detector_function.value_names) == 1:
-            self.TwoD_array = np.empty((self.xlen,
-                                       self.ylen))
-        else:
-            self.TwoD_array = np.empty(
-                [self.xlen,
-                 self.ylen,
-                 len(self.detector_function.value_names)])
-
-        self.x_step = self.get_sweep_points()[1] - self.get_sweep_points()[0]
-        self.y_step = self.sweep_points_2D[1] - self.sweep_points_2D[0]
-        # The - self. _step/2.0 is to make center of tile lie on the value
-        self.x_start = self.get_sweep_points()[0] - self.x_step/2.0
-        self.y_start = self.sweep_points_2D[0] - self.y_step/2.0
-
+        self.time_last_2Dplot_update = time.time()
+        n = len(self.sweep_pts_y)
+        m = len(self.sweep_pts_x)
+        self.TwoD_array = np.empty(
+            [n, m, len(self.detector_function.value_names)])
         self.TwoD_array[:] = np.NAN
+        self.QC_QtPlot.clear()
+        for j in range(len(self.detector_function.value_names)):
+            self.QC_QtPlot.add(x=self.sweep_pts_x,
+                               y=self.sweep_pts_y,
+                               z=self.TwoD_array[:, :, j],
+                               xlabel=self.column_names[0],
+                               ylabel=self.column_names[1],
+                               zlabel=self.column_names[2+j],
+                               subplot=j+1,
+                               cmap='viridis')
 
     def update_plotmon_2D(self):
         '''
         Adds latest measured value to the TwoD_array and sends it
         to the plotmon.
-        Note that the plotmon only supports evenly spaced lattices.
 
-        Made to work with at most 2 2D arrays (as this is how the labview code
-        works). It should be easy to extend this function for more vals.
         '''
-        i = self.iteration-1
-        x_ind = i % self.xlen
-        y_ind = i / self.xlen
-        if len(self.detector_function.value_names) == 1:
-            z_ind = len(self.sweep_functions)
-            self.TwoD_array[x_ind, y_ind] = self.dset[i, z_ind]
-            if hasattr(self, 'Plotmon'):
-                self.Plotmon.plot3D(1, data=self.TwoD_array,
-                                    axis=(self.x_start, self.x_step,
-                                          self.y_start, self.y_step))
-        else:
-            for j in range(2):
+        if self.live_plot_enabled:
+            i = self.iteration-1
+            x_ind = i % self.xlen
+            y_ind = i / self.xlen
+            for j in range(len(self.detector_function.value_names)):
                 z_ind = len(self.sweep_functions) + j
-                self.TwoD_array[x_ind, y_ind, j] = self.dset[i, z_ind]
-                if hasattr(self, 'Plotmon'):
-                    self.Plotmon.plot3D(j+1, data=self.TwoD_array[:, :, j],
-                                        axis=(self.x_start, self.x_step,
-                                              self.y_start, self.y_step))
+                self.TwoD_array[y_ind, x_ind, j] = self.dset[i, z_ind]
+            self.QC_QtPlot.traces[j]['config']['z'] = self.TwoD_array[:, :, j]
+
+            if (time.time() - self.time_last_2Dplot_update >
+                    self.QC_QtPlot.interval
+                    or self.iteration == len(self.sweep_points)):
+                self.time_last_2Dplot_update = time.time()
+                self.QC_QtPlot.update_plot()
+
+    def initialize_plot_monitor_adaptive(self):
+        '''
+        Uses the Qcodes plotting windows for plotting adaptive plot updates
+        '''
+        self.time_last_ad_plot_update = time.time()
+        self.QC_QtPlot.clear()
+        for j in range(len(self.detector_function.value_names)):
+            self.QC_QtPlot.add(x=[0],
+                               y=[0],
+                               xlabel='iteration',
+                               ylabel=self.detector_function.value_names[j],
+                               subplot=j+1,
+                               symbol='o', symbolSize=5)
+
+    def update_plotmon_adaptive(self, force_update=False):
+        if self.live_plot_enabled:
+            if (time.time() - self.time_last_ad_plot_update >
+                    self.QC_QtPlot.interval or force_update):
+                for j in range(len(self.detector_function.value_names)):
+                    y_ind = len(self.sweep_functions) + j
+                    y = self.dset[:, y_ind]
+                    x = range(len(y))
+                    self.QC_QtPlot.traces[j]['config']['x'] = x
+                    self.QC_QtPlot.traces[j]['config']['y'] = y
+                    self.time_last_ad_plot_update = time.time()
+                    self.QC_QtPlot.update_plot()
+
 
     def update_plotmon_2D_hard(self):
         '''
@@ -603,8 +596,8 @@ class MeasurementControl:
     def print_progress_static_soft_sweep(self, i):
         percdone = (i+1)*1./len(self.sweep_points)*100
         elapsed_time = time.time() - self.begintime
-        progress_message = "{percdone}% completed, elapsed time: "\
-            "{t_elapsed} s, time left: {t_left} s".format(
+        progress_message = "\r {percdone}% completed \telapsed time: "\
+            "{t_elapsed}s \ttime left: {t_left}s".format(
                 percdone=int(percdone),
                 t_elapsed=round(elapsed_time, 1),
                 t_left=round((100.-percdone)/(percdone) *
@@ -616,7 +609,7 @@ class MeasurementControl:
             end_char = '\n'
         print(progress_message, end=end_char)
 
-    def print_progress_static_2D_hard(self):
+    def print_progress_static_hard(self):
         acquired_points = self.dset.shape[0]
         total_nr_pts = self.sweep_points.shape[0]
         if acquired_points == total_nr_pts:
@@ -640,17 +633,20 @@ class MeasurementControl:
         sys.stdout.write(60*'\b'+scrmes)
 
     def print_measurement_start_msg(self):
-        if len(self.sweep_functions) == 1:
-            print('\n')
-            print('Starting measurement: %s' % self.get_measurement_name())
-            print('Sweep function: %s' % self.get_sweep_function_names()[0])
-            print('Detector function: %s' % self.get_detector_function_name())
-        else:
-            print('Starting measurement: %s' % self.get_measurement_name())
-            for i, sweep_function in enumerate(self.sweep_functions):
-                print('Sweep function %d: %s' % (
-                    i, self.sweep_function_names[i]))
-            print('Detector function: %s' % self.get_detector_function_name())
+        if self.verbose:
+            if len(self.sweep_functions) == 1:
+                print('Starting measurement: %s' % self.get_measurement_name())
+                print('Sweep function: %s' %
+                      self.get_sweep_function_names()[0])
+                print('Detector function: %s'
+                      % self.get_detector_function_name())
+            else:
+                print('Starting measurement: %s' % self.get_measurement_name())
+                for i, sweep_function in enumerate(self.sweep_functions):
+                    print('Sweep function %d: %s' % (
+                        i, self.sweep_function_names[i]))
+                print('Detector function: %s'
+                      % self.get_detector_function_name())
 
     def get_datetimestamp(self):
         return time.strftime('%Y%m%d_%H%M%S', time.localtime())
@@ -717,6 +713,7 @@ class MeasurementControl:
         return time.strftime('%Y-%m-%d %H:%M:%S')
 
     def get_measurement_endtime(self):
+        self.endtime = time.time()
         return time.strftime('%Y-%m-%d %H:%M:%S')
 
     def set_sweep_points(self, sweep_points):
@@ -742,7 +739,7 @@ class MeasurementControl:
         return self.af_pars
 
     def set_measurement_name(self, measurement_name):
-        if measurement_name == 'None':
+        if measurement_name is None:
             self.measurement_name = 'Measurement'
         else:
             self.measurement_name = measurement_name

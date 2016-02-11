@@ -1,14 +1,9 @@
 import time
 import numpy as np
-import sys
 import visa
 import unittest
 # from bitstring import BitArray
 import logging
-
-qcpath = 'D:\GitHubRepos\Qcodes'
-if qcpath not in sys.path:
-    sys.path.append(qcpath)
 
 from qcodes.instrument.visa import VisaInstrument
 from qcodes.utils import validators as vals
@@ -25,7 +20,7 @@ from ._controlbox import codec as c
 
 class QuTech_ControlBox(VisaInstrument):
     '''
-    This is the qtlab driver for the 250 MS/s control box developed in
+    This is the qcodes driver for the 250 MS/s control box developed in
     collaboration with EWI.
     This is a direct port of the 'old' qtlab driver.
 
@@ -39,6 +34,7 @@ class QuTech_ControlBox(VisaInstrument):
     '''
 
     def __init__(self, name, address, reset=False, run_tests=False, **kw):
+        t0 = time.time()
         super().__init__(name, address)
         # Establish communications
         self.add_parameter('firmware_version',
@@ -106,62 +102,40 @@ class QuTech_ControlBox(VisaInstrument):
         self._nr_averages = 2
         self._nr_samples = 200
         nr_awgs = 3
-        for i in range(nr_awgs):
+        for awg_nr in range(nr_awgs):
             self._awg_mode = [0]*nr_awgs
-            self.add_parameter('AWG_{}_mode'.format(i),
-                               get_cmd=self._gen_awg_mode_get_func(i),
-                               set_cmd=self._gen_awg_mode_set_func(i),
-                               vals=vals.Anything())
-            # for j in range(2):
-            #     self.add_parameter(
-            #         'AWG{}_dac{}_offset'.format(i,j),
-            #         label='Dac offset AWG {}', units='mV',
-            #         get_cmd=self._gen_ch_get_func(self.get_dac_offset, i),
-            #         set_cmd=self._gen_ch_set_func(self.set_dac_offset, i),
-            #         vals=vals.Ints(-999, 999))
+            self._tape = [[0]]*nr_awgs
+            self.add_parameter(
+                'AWG{}_mode'.format(awg_nr),
+                get_cmd=self._gen_awg_mode_get_func(awg_nr),
+                set_cmd=self._gen_awg_mode_set_func(awg_nr),
+                vals=vals.Anything())
+            self.add_parameter(
+                'AWG{}_tape'.format(awg_nr),
+                get_cmd=self._gen_ch_get_func(self._get_awg_tape, awg_nr),
+                set_cmd=self._gen_ch_set_func(self._set_awg_tape, awg_nr),
+                vals=vals.Anything())
+
+            for dac_ch in range(2):
+                self.add_parameter(
+                    'AWG{}_dac{}_offset'.format(awg_nr, dac_ch),
+                    label='Dac offset AWG {}', units='mV',
+                    get_cmd=self._gen_sub_ch_get_func(self.get_dac_offset,
+                                                      awg_nr, dac_ch),
+                    set_cmd=self._gen_sub_ch_set_func(self.set_dac_offset,
+                                                      awg_nr, dac_ch),
+                    vals=vals.Numbers(-999, 999))
             # Need to add double wrapping for get/set funcs here
 
         self.add_parameter('measurement_timeout', units='s',
                            set_cmd=self._do_set_measurement_timeout,
                            get_cmd=self._do_get_measurement_timeout)
 
-        # Todo: test and use codec
-        # self.add_parameter('sequencer_counters',
-        #                    get_cmd=self._do_get_sequencer_counters)
-
         self.add_parameter('lin_trans_coeffs',
                            label='Linear transformation coefficients',
                            set_cmd=self._set_lin_trans_coeffs,
                            get_cmd=self._get_lin_trans_coeffs,
                            vals=vals.Anything())
-        # self.add_parameter('tng_heartbeat_interval', type=int, units='ns',
-        #                    flag=Instrument.FLAG_GETSET)
-        # self.add_parameter('tng_burst_heartbeat_interval', type=int,
-        #                    flag=Instrument.FLAG_GETSET)
-        # self.add_parameter('tng_burst_heartbeat_n', type=int,
-        #                    flag=Instrument.FLAG_GETSET)
-        # self.add_parameter('tng_readout_delay', type=int, units='ns',
-        #                    flag=Instrument.FLAG_GETSET)
-        # self.add_parameter('tng_second_pre_rotation_delay', type=int,
-        #                    units='ns', flag=Instrument.FLAG_GETSET)
-        # self.add_parameter('tng_calibration_mode', type=int,
-        #                    flag=Instrument.FLAG_GETSET)
-        # self.add_parameter('tng_awg_mask', type=int,
-        #                    flag=Instrument.FLAG_GETSET)
-        # self.add_parameter('tng_readout_pulse_length', type=int, units='ns',
-        #                    flag=Instrument.FLAG_GETSET)
-        # self.add_parameter('tng_readout_wave_interval', type=int, units='ns',
-        #                    flag=Instrument.FLAG_GETSET)
-        # self.add_parameter('tng_output_trigger_delay', type=int, units='ns',
-        #                    flag=Instrument.FLAG_GETSET)
-        # self.add_parameter('tng_trigger_state', type=int,
-        #                    flag=Instrument.FLAG_GETSET)
-        # self.add_parameter('tng_feedback_mode', type=int,
-        #                    flag=Instrument.FLAG_GETSET)
-        # self.add_parameter('tng_feedback_code', type=int,
-        #                    flag=Instrument.FLAG_GETSET)
-        # self.add_parameter('tng_logging_mode', type=int,
-        #                    flag=Instrument.FLAG_GETSET)
 
         # Setting default arguments
         self.set('acquisition_mode', 'idle')
@@ -177,28 +151,14 @@ class QuTech_ControlBox(VisaInstrument):
 
         self._i_wait = 0  # used in _print_waiting_char()
 
-
-        # self.tng_heartbeat_interval = 100000
-        # self.tng_burst_heartbeat_interval = 10000
-        # self.tng_burst_heartbeat_n = 1
-        # self.tng_readout_delay = 300
-        # self.tng_calibration_mode = True
-        # self.tng_awg_mask = 100
-        # self.tng_readout_pulse_length = 1200
-        # self.tng_readout_wave_interval = 600
-        # self.tng_output_trigger_delay = 1
-        # self.tng_trigger_state = 1
-        # self.tng_feedback_mode = 1
-        # self.tng_feedback_code = 3
-        # self.tng_logging_mode = 3
-        # self.tng_second_pre_rotation_delay = 0
-
         self._dac_offsets = np.empty([3, 2])
         self._dac_offsets[:] = np.NAN
 
         if run_tests:
             self.run_test_suite()
-        print('Initialized CBox', self.get('firmware_version'))
+        t1 = time.time()
+        print('Initialized CBox', self.get('firmware_version'),
+              'in %.2fs' % (t1-t0))
 
     def run_test_suite(self):
             from importlib import reload  # Useful for testing
@@ -207,7 +167,8 @@ class QuTech_ControlBox(VisaInstrument):
             # pass the CBox to the module so it can be used in the tests
             self.c = c  # make the codec callable from the testsuite
             test_suite.CBox = self
-            suite = unittest.TestLoader().loadTestsFromTestCase(test_suite.CBox_tests)
+            suite = unittest.TestLoader().loadTestsFromTestCase(
+                test_suite.CBox_tests)
             unittest.TextTestRunner(verbosity=2).run(suite)
 
     def get_all(self):
@@ -257,7 +218,6 @@ class QuTech_ControlBox(VisaInstrument):
 
         return heartbeat_counter, trigger_counter
 
-
     def decode_message(self, data_bytes, data_bits_per_byte=7,
                        bytes_per_value=2, signed_integer=False):
         '''
@@ -272,8 +232,8 @@ class QuTech_ControlBox(VisaInstrument):
             data_bits_per_byte = [data_bits_per_byte]
         if type(bytes_per_value) == int:
             bytes_per_value = [bytes_per_value]
-        if type(signed_integer)==bool:
-            signed_integer=[signed_integer]*len(bytes_per_value)
+        if type(signed_integer) == bool:
+            signed_integer = [signed_integer]*len(bytes_per_value)
         assert(len(data_bits_per_byte) == len(bytes_per_value))
 
         bytes_per_iteration = sum(bytes_per_value)
@@ -344,48 +304,6 @@ class QuTech_ControlBox(VisaInstrument):
 
     # Read Functions
 
-    def get_integration_log_results(self):
-        '''
-        read the log of the master
-        Corresponds to mode 2: Integration logging
-
-        Uses fixed length for reading out the message for speedup.
-
-        Returns integrated logs for ch0 and ch1
-        '''
-
-        log_length = self.get('log_length')
-        # Information on the encoding
-        bytes_per_value = 4
-        data_bits_per_byte = 7
-
-        succes = False
-        t0 = time.time()
-        while not succes:
-            log_message = c.create_message(defHeaders.ReadLoggedResults)
-            stat, log = self.serial_write(log_message)
-            # print 'Got the data request stat %s' %stat
-            if stat:
-                # read_N +2 is for checksum and EndOfMessage
-                b_log = bytearray(
-                    self.serial_read(read_N=2*log_length*bytes_per_value+2))
-
-            decoded_message = c.decode_message(
-                b_log,
-                data_bits_per_byte=data_bits_per_byte,
-                bytes_per_value=bytes_per_value)
-            ch0 = decoded_message[::2]  # take all even entries
-            ch1 = decoded_message[1::2]  # take all odd entries
-
-            if len(ch0) != 0:
-                succes = True
-            else:
-                time.sleep(0.0001)
-                self._print_waiting_char()
-            if time.time()-t0 > self._timeout:
-                raise Exception('Measurement timed out')
-        return ch0, ch1
-
     def get_input_avg_results(self):
         '''
         reads the Input Average log of the ADC input.
@@ -397,7 +315,6 @@ class QuTech_ControlBox(VisaInstrument):
         # Information on the encoding
         data_bits_per_byte = 4
         bytes_per_value = 2
-        i = 0
         succes = False
         t0 = time.time()
         # While loop is to make sure measurement finished before querying.
@@ -421,6 +338,7 @@ class QuTech_ControlBox(VisaInstrument):
                 self._print_waiting_char()
             if time.time()-t0 > self._timeout:
                 raise Exception('Measurement timed out')
+        self._i_wait = 0  # leaves the wait char counter in the 0 state
         return ch0, ch1
 
     def get_integrated_avg_results(self):
@@ -452,16 +370,168 @@ class QuTech_ControlBox(VisaInstrument):
             decoded_message = c.decode_message(
                 b_log, data_bits_per_byte=data_bits_per_byte,
                 bytes_per_value=bytes_per_value)
+
+            if len(decoded_message) != 0:
+                break
+            elif time.time()-t0 > self._timeout:
+                raise Exception('Measurement timed out')
+            else:
+                self._print_waiting_char()
+        ch0 = decoded_message[::2]  # take all even entries
+        ch1 = decoded_message[1::2]  # take all odd entries
+        return ch0, ch1
+
+    def get_integration_log_results(self):
+        '''
+        read the log of the master
+        Corresponds to mode 2: Integration logging
+
+        Uses fixed length for reading out the message for speedup.
+
+        Returns integrated logs for ch0 and ch1
+        '''
+
+        log_length = self.get('log_length')
+        # Information on the encoding
+        bytes_per_value = 4
+        data_bits_per_byte = 7
+
+        succes = False
+        t0 = time.time()
+        while not succes:
+            log_message = c.create_message(defHeaders.ReadLoggedResults)
+            stat, log = self.serial_write(log_message)
+            if stat:
+                # read_N +2 is for checksum and EndOfMessage
+                b_log = bytearray(
+                    self.serial_read(read_N=2*log_length*bytes_per_value+2))
+            decoded_message = c.decode_message(
+                b_log,
+                data_bits_per_byte=data_bits_per_byte,
+                bytes_per_value=bytes_per_value)
             ch0 = decoded_message[::2]  # take all even entries
             ch1 = decoded_message[1::2]  # take all odd entries
 
             if len(ch0) != 0:
                 succes = True
+                break
             else:
-                sys.stdout.write('.')
+                time.sleep(0.0001)
+                self._print_waiting_char()
             if time.time()-t0 > self._timeout:
                 raise Exception('Measurement timed out')
+        self._i_wait = 0  # leaves the wait char counter in the 0 state
         return ch0, ch1
+
+    def get_qubit_state_log_results(self):
+        '''
+        Description :   Returns the qubit state log results after the logging
+                        started. State log is started together with system
+                        modes 1 (Integration logging),
+                              4 (Integration averaging mode), and
+                              6 (Conditional pulse trigger mode)
+                        In case mode 6 is set state log is started when
+                        LoggingMode 1 (Integration average logging) or
+                        2 (normal logging) is selected
+        Parameters    :   None
+
+        Return bytes  :
+        Receive Checksum
+        Logger results:   1-bit bit values representing the qubit state.
+                The number of received results is equal to:
+                Number returned full bytes= floor((Logger size)/4)×2
+                Logger size is the value set by the SetLoggerSize command
+                If the value set by the SetLoggerSize command divided by
+                four is not an integer the remainder bits will not be sent.
+                The logger results are available until system mode 0 is
+                selected. They can only be read once.
+        Transmit checksum
+
+        If the GetQubitStateLogResults command is sent before the logging
+        is finished only a transmit checksum of zero and EndOfMessageHeader
+        is returned.
+
+        '''
+        t0 = time.time()
+        succes = False
+        while not succes:
+            req_mess = c.create_message(
+                defHeaders.GetQubitStateLogResults)
+            stat, log = self.serial_write(req_mess)
+            if stat:
+                # read_N +2 is for checksum and EndOfMessage
+                # encoded_message = self.serial_read(
+                #     read_N=nr_of_channels*nr_of_counters*bytes_per_value+2)
+                encoded_message = self.serial_read(
+                    read_all=True)
+                # decoded_message = c.decode_message(
+                #     encoded_message, data_bits_per_byte=data_bits_per_byte,
+                #     bytes_per_value=bytes_per_value)
+                break
+            else:
+                time.sleep(0.0001)
+                self._print_waiting_char()
+            if time.time()-t0 > self._timeout:
+                raise Exception('Measurement timed out')
+        self._i_wait = 0  # leaves the wait char counter in the 0 state
+        ch0_values, ch1_values = c.decode_boolean_array(encoded_message)
+        return ch0_values, ch1_values
+
+    def get_qubit_state_log_counters(self):
+        '''
+        Description :  Returns the values of the qubit state log counters.
+                       Counting is started started together with the
+                       QubitStateLog. The counters will be reset as soon as
+                       SetSystemMode  with mode 0 is sent.
+        Parameters  :   None
+
+        Return bytes:
+        Receive Checksum
+        NoErrorCounter_chI:       21-bit unsigned value. Range is 0 to 2**21.
+        NoErrorCounter_chQ
+        SingleErrorCounter_chI:   21-bit unsigned value. Range is 0 to 2**21.
+        SingleErrorCounter_chQ
+        DoubleErrorCounter_chI:   21-bit unsigned value. Range is 0 to 2**21.
+        DoubleErrorCounter_chQ
+        ZeroStateCounter_chI:     21-bit unsigned value. Range is 0 to 2**21.
+        ZeroStateCounter_chQ
+        OneStateCounter_chI:      21-bit unsigned value. Range is 0 to 2**21.
+        OneStateCounter_chQ
+        Transmit checksum
+
+        If the GetQubitStateLogCounterResults command is sent before the
+        number of measurements set by the SetLoggerSize is finished only a
+        transmit checksum of zero and EndOfMessageHeader is returned.
+        '''
+        nr_of_counters = 5
+        nr_of_channels = 2
+        data_bits_per_byte = 7
+        bytes_per_value = 3
+        succes = False
+        t0 = time.time()
+
+        while not succes:
+            req_mess = c.create_message(
+                defHeaders.GetQubitStateLogCounterResults)
+            stat, log = self.serial_write(req_mess)
+            if stat:
+                # read_N +2 is for checksum and EndOfMessage
+                encoded_message = self.serial_read(
+                    read_N=nr_of_channels*nr_of_counters*bytes_per_value+2)
+                decoded_message = c.decode_message(
+                    encoded_message, data_bits_per_byte=data_bits_per_byte,
+                    bytes_per_value=bytes_per_value)
+            if len(decoded_message) != 0:
+                break
+            elif time.time()-t0 > self._timeout:
+                raise Exception('Measurement timed out')
+            else:
+                time.sleep(0.0001)
+                self._print_waiting_char()
+        self._i_wait = 0  # leaves the wait char counter in the 0 state
+        ch0_counters = decoded_message[::2]
+        ch1_counters = decoded_message[1::2]
+        return ch0_counters, ch1_counters
 
     def send_stop_streaming(self):
         termination_message = c.create_message(
@@ -592,17 +662,21 @@ class QuTech_ControlBox(VisaInstrument):
             raise Exception('Failed to set AWG lookup table')
         return (stat, mesg)
 
-    def set_awg_tape(self, awg_nr, length, tape):
+    def _get_awg_tape(self, awg_nr):
+        '''
+        Retruns the tape that was last set as stored in memory
+        '''
+        return self._tape[awg_nr]
+
+    def _set_awg_tape(self, awg_nr, tape):
         '''
         set the tape content for an awg
 
         @param awg : the awg of the dac, (0,1,2).
-        @param length : the length in samples of the tape entries, (1,2^12-1)
         @param tape : the array of pulse numbers, (0, 7)
         @return stat : 0 if the upload succeeded and 1 if the upload failed.
-
         '''
-
+        length = len(tape)
         # Check out of bounds
         if awg_nr < 0 or awg_nr > 2:
             raise ValueError
@@ -611,16 +685,18 @@ class QuTech_ControlBox(VisaInstrument):
         if length != len(tape):
             raise ValueError
         cmd = defHeaders.AwgTapeHeader
-        data_bytes = bytearray()
-        data_bytes.extend(c.encode_byte(awg_nr, 4,
-                          expected_number_of_bytes=1))
-        data_bytes.extend(c.encode_byte(length, 7,
-                          expected_number_of_bytes=2))
+        data_bytes = bytes()
+        data_bytes += (c.encode_byte(awg_nr, 4,
+                       expected_number_of_bytes=1))
+        data_bytes += (c.encode_byte(length, 7,
+                       expected_number_of_bytes=2))
 
-        data_bytes.extend(c.encode_array(tape, 4, 1))
+        data_bytes += (c.encode_array(tape, 4, 1))
 
         message = c.create_message(cmd, data_bytes)
         (stat, mesg) = self.serial_write(message)
+        self._tape[awg_nr] = tape  # updates the software version of the tape
+
         return (stat, mesg)
 
     def restart_awg_tape(self, awg_nr):
@@ -632,8 +708,8 @@ class QuTech_ControlBox(VisaInstrument):
         '''
 
         cmd = defHeaders.AwgRestartTapeHeader
-        data_bytes = bytearray()
-        data_bytes.extend(c.encode_byte(awg_nr, 4, 1))
+        data_bytes = bytes()
+        data_bytes += (c.encode_byte(awg_nr, 4, 1))
         message = c.create_message(cmd, data_bytes)
         (stat, mesg) = self.serial_write(message)
         if not stat:
@@ -713,10 +789,9 @@ class QuTech_ControlBox(VisaInstrument):
                             returned.
                             ! this parameter is overloaded and has two different
                               ranges.
-                            Range: [1 - 2000] when used in integration average
-                            Range: [1 - 127] when used in input average
+                            Range: [1 - 2000]
                             In input average this corresponds to trace length
-                            in integration averaging this corresponds to the
+                            In integration averaging this corresponds to the
                             number of integration results.
         @param avg_size    : For each sample, 2 ^ avg_size values will be taken
                            into the averaging calculation.
@@ -752,7 +827,6 @@ class QuTech_ControlBox(VisaInstrument):
 
     def _do_get_nr_samples(self):
         return self._nr_samples
-
 
     def _do_get_nr_averages(self):
         return self._nr_averages
@@ -1127,9 +1201,23 @@ class QuTech_ControlBox(VisaInstrument):
         '''
         Intended to replace visa_handle.read_raw
         '''
-        with(self.visa_handle.ignore_warning(visa.constants.VI_SUCCESS_MAX_CNT)):
-            mes = self.visa_handle.visalib.read(
-                self.visa_handle.session, size)
+        # Todo: test where this construction should be located, problem
+        # seems to be missing a send comand rather than read
+        # this is to catch the timeout error that can occur due to the latency
+        # of 1ms in the serial emulator of windows.
+        for i in range(2):
+            try:
+                with(self.visa_handle.ignore_warning(
+                        visa.constants.VI_SUCCESS_MAX_CNT)):
+                    mes = self.visa_handle.visalib.read(
+                        self.visa_handle.session, size)
+                    break
+            except visa.VisaIOError as e:
+                logging.warning(e)
+        else:
+            # If it fails 5 times raise an error,
+            # could not figure out how to raise original error
+            raise Exception
         return mes[0]
 
     def serial_read(self, timeout=5, read_all=False, read_N=0):
@@ -1142,8 +1230,9 @@ class QuTech_ControlBox(VisaInstrument):
 
         Setting read_N speeds up the readout significantly.
 
-        returns the message as a string (including the EndOfMessageHeader).
+        returns the message as bytes (including the EndOfMessageHeader).
         '''
+        buffersize = 4090
         t_start = time.time()
         end_of_message_received = False
         message = bytes()
@@ -1154,10 +1243,13 @@ class QuTech_ControlBox(VisaInstrument):
             elif read_N != 0:
                 if self.visa_handle.bytes_in_buffer == 2:
                     # To catch all the "empty" messages (checksum +EOM)
+                    # Removing this makes program more robust.
                     m = self._read_raw(2)
-                else:
+                    message += m
+                elif (self.visa_handle.bytes_in_buffer > read_N/2 or
+                        self.visa_handle.bytes_in_buffer >= buffersize):
                     m = self._read_raw(read_N)
-                message += m
+                    message += m
             elif self.visa_handle.bytes_in_buffer != 0:
                 message += self._read_raw(1)
             if len(message) != 0:
@@ -1165,7 +1257,7 @@ class QuTech_ControlBox(VisaInstrument):
                     end_of_message_received = True
 
             if not end_of_message_received:
-                time.sleep(.00001)
+                time.sleep(.0001)
                 if (time.time() - t_start) > timeout:
                     raise Exception('Read timed out without EndOfMessage')
         # If an error code gets send CBox will return [checksum, err_code, EOM]
@@ -1214,22 +1306,6 @@ class QuTech_ControlBox(VisaInstrument):
         else:
             return True
 
-    def restart_awg_tape(self, awg_nr):
-        '''
-        Reset the tape pointer of specified awg to 0.
-
-        @param awg_nr : the awg of the dac, (0,1,2).
-        @return stat : 0 if the upload succeeded and 1 if the upload failed.
-        '''
-        cmd = defHeaders.AwgRestartTapeHeader
-        data_bytes = bytearray()
-        data_bytes.extend(c.encode_byte(awg_nr, 4, 1))
-        message = c.create_message(cmd, data_bytes)
-        (stat, mesg) = self.serial_write(message)
-        if not stat:
-            raise Exception('Failed to restart awg tape')
-        return stat
-
     def _wrap_ch_set_fun(self, function, channel):
         def channel_specific_function(value):
             return function(channel, value)
@@ -1241,11 +1317,13 @@ class QuTech_ControlBox(VisaInstrument):
         return channel_specific_function
 
     def _print_waiting_char(self):
-        self._i_wait += 1
-        if self._i_wait % 2 == 0:
-            print('\r/', end='')
-        else:
-            print('\r\ ', end='')
+        pass  # commented out because it is annoying (MAR)
+        # if self._i_wait % 2 == 0:
+        #     print('\r\ ', end='')
+        # else:
+        #     print('\r/ ', end='')
+        # self._i_wait += 1
+
     # Touch n go functions
     def _do_set_tng_heartbeat_interval(self, tng_heartbeat_interval):
         '''
@@ -1258,7 +1336,8 @@ class QuTech_ControlBox(VisaInstrument):
         if np.mod(tng_heartbeat_interval, 100) != 0.0:
             raise ValueError('%s is not divisble by 100 ns' %
                              tng_heartbeat_interval)
-        if self.tng_burst_heartbeat_interval*self.tng_burst_heartbeat_n > tng_heartbeat_interval:
+        if (self.tng_burst_heartbeat_interval*self.tng_burst_heartbeat_n >
+                tng_heartbeat_interval):
             raise ValueError('%s x %s does not fit in the heartbeatinterval %s'%(
                              self.tng_burst_heartbeat_interval,
                              self.tng_burst_heartbeat_n,
@@ -1629,4 +1708,15 @@ class QuTech_ControlBox(VisaInstrument):
     def _gen_ch_get_func(self, fun, ch):
         def get_func():
             return fun(ch)
+        return get_func
+
+    #  Required because set and get funcs don't currently allow optional args
+    def _gen_sub_ch_set_func(self, fun, ch, sub_ch):
+        def set_func(val):
+            return fun(ch, sub_ch, val)
+        return set_func
+
+    def _gen_sub_ch_get_func(self, fun, ch, sub_ch):
+        def get_func():
+            return fun(ch, sub_ch)
         return get_func

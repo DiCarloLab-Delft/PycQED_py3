@@ -3,8 +3,7 @@ import numpy as np
 from . import defHeaders_CBox_v3 as defHeaders
 
 CBox = None
-
-
+from modules.analysis.tools import data_manipulation as dm_tools
 
 
 class CBox_tests(unittest.TestCase):
@@ -15,17 +14,11 @@ class CBox_tests(unittest.TestCase):
     '''
     @classmethod
     def setUpClass(self):
-        print('CBox', CBox)
         self.CBox = CBox
-
-    # def test_get_all(self):
-    #     CBox.get_all()
-    #     return True
 
     def test_firmware_version(self):
         v = CBox.get('firmware_version')
         print(v)
-
 
     def test_setting_mode(self):
         for i in range(5):
@@ -50,11 +43,10 @@ class CBox_tests(unittest.TestCase):
 
         for j in range(3):
             for i in range(3):
-                self.CBox.set('AWG_{}_mode'.format(j), i)
-                self.assertEqual(self.CBox.get('AWG_{}_mode'.format(j)),
+                self.CBox.set('AWG{}_mode'.format(j), i)
+                self.assertEqual(self.CBox.get('AWG{}_mode'.format(j)),
                                  defHeaders.awg_modes[i])
-                self.CBox.set('AWG_{}_mode'.format(j), 0)
-
+                self.CBox.set('AWG{}_mode'.format(j), 0)
 
     def test_codec(self):
         # codec is CBox.c
@@ -129,12 +121,22 @@ class CBox_tests(unittest.TestCase):
         self.assertEqual(self.CBox.get('adc_offset'), -123)
         self.CBox.set('adc_offset', offs)
 
-    # def test_dac_offset(self):
-    #     for i in range(3):
-    #         initial_val = self.CBox.get('AWG_{}_dac_offset'.format(i))
-    #         self.CBox.set('AWG_{}_dac_offset'.format(i), 200)
-    #         self.assertEqual(self.CBox.get('AWG_{}_dac_offset'.format(i)), 200)
-    #         self.CBox.set('AWG_{}_dac_offset'.format(i), initial_val)
+    def test_dac_offset(self):
+        for i in range(3):
+            for j in range(2):
+                initial_val = self.CBox.get('AWG{}_dac{}_offset'.format(i, j))
+                self.CBox.set('AWG{}_dac{}_offset'.format(i, j), 200)
+                self.assertEqual(
+                    self.CBox.get('AWG{}_dac{}_offset'.format(i, j)), 200)
+                self.CBox.set('AWG{}_dac{}_offset'.format(i, j), initial_val)
+
+    def test_tape(self):
+        for i in range(3):
+            tape = [2, 4, 5, 1, 0, 3]
+            initial_val = self.CBox.get('AWG{}_tape'.format(i))
+            self.CBox.set('AWG{}_tape'.format(i), tape)
+            self.assertEqual(self.CBox.get('AWG{}_tape'.format(i)), tape)
+            self.CBox.set('AWG{}_tape'.format(i), initial_val)
 
     def test_log_length(self):
         initial_val = self.CBox.get('log_length')
@@ -181,11 +183,11 @@ class CBox_tests(unittest.TestCase):
         self.assertEqual(self.CBox.get('measurement_timeout'), -123)
         self.CBox.set('measurement_timeout', initial_val)
 
-    def test_readLog(self):
+    def test_Integration_logging(self):
         '''
-        Test for mode 2 integration logs. Only tests on length of data
+        Test for mode 1 integration logs. Only tests on length of data
         '''
-        log_length = 50
+        log_length = 8000
         self.CBox.set('acquisition_mode', 0)
         self.CBox.set('log_length', log_length)
         self.CBox.set('signal_delay', 20)
@@ -206,6 +208,48 @@ class CBox_tests(unittest.TestCase):
         self.assertEqual(len(InputAvgRes0), log_length)
         self.assertEqual(len(InputAvgRes1), log_length)
 
+    def test_state_logging_and_counters(self):
+        '''
+        Test uses mode 1 integration logging. Checks if the results
+        for the integration shots, states and state counters produce
+        the same results for a given threshold.
+        Does not do this using a dedicated sequence.
+        '''
+        log_length = 50
+        self.CBox.set('acquisition_mode', 0)
+        self.CBox.set('log_length', log_length)
+
+        weights0 = np.ones(512)
+        weights1 = np.ones(512)
+        self.CBox.set('sig0_integration_weights', weights0)
+        self.CBox.set('sig1_integration_weights', weights1)
+
+        self.CBox.set('acquisition_mode', 1)
+        [IntLog0, IntLog1] = self.CBox.get_integration_log_results()
+        self.CBox.set('acquisition_mode', 0)
+
+        threshold = int(np.mean(IntLog0))
+        self.CBox.sig0_threshold_line.set(threshold)
+        self.CBox.sig1_threshold_line.set(threshold)
+
+        self.CBox.set('acquisition_mode', 1)
+        log = self.CBox.get_integration_log_results()
+        counters = self.CBox.get_qubit_state_log_counters()
+        self.CBox.set('acquisition_mode', 0)
+
+        digi_shots = dm_tools.digitize(
+            log, threshold=CBox.sig0_threshold_line.get())
+        software_err_fracs_0 = dm_tools.count_error_fractions(digi_shots[0])
+        software_err_fracs_1 = dm_tools.count_error_fractions(digi_shots[1])
+
+        # Test if software analysis of the counters and CBox counters are the
+        # same
+        self.assertTrue((software_err_fracs_0 == counters[0]).all())
+        self.assertTrue((software_err_fracs_1 == counters[1]).all())
+
+
+
+
     def test_integration_average_mode(self):
         self.CBox.set('acquisition_mode', 0)
         NoSamples = 60
@@ -220,24 +264,29 @@ class CBox_tests(unittest.TestCase):
         self.CBox.set('nr_averages', 4)
         self.CBox.set('nr_samples', NoSamples)
 
+<<<<<<< HEAD
         self.CBox.set('acquisition_mode', 2)
         [InputAvgRes0, InputAvgRes1] = self.CBox.get_integrated_avg_results()
+=======
+        self.CBox.set('acquisition_mode', 4)
+        [InputAvgRes0, IntAvgRes1] = self.CBox.get_integrated_avg_results()
+>>>>>>> origin/master
         self.CBox.set('acquisition_mode', 0)
         # Test signal lengths set correctly
         self.assertEqual(len(InputAvgRes0), NoSamples)
         # Test if setting weights to zero functions correctly
-        self.assertTrue((InputAvgRes1 == np.zeros(NoSamples)).all())
+        self.assertTrue((IntAvgRes1 == np.zeros(NoSamples)).all())
 
         weights1 = np.ones(512) * 1
         self.CBox.set('sig1_integration_weights', weights1)
         self.CBox.set('lin_trans_coeffs', [0, 0, 0, 1])
         self.CBox.set('acquisition_mode', 4)
-        [InputAvgRes0, InputAvgRes1] = self.CBox.get_integrated_avg_results()
+        [InputAvgRes0, IntAvgRes1] = self.CBox.get_integrated_avg_results()
         self.CBox.set('acquisition_mode', 0)
 
         # Test if setting lin trans coeff to zero functions correctly
         self.assertTrue((InputAvgRes0 == np.zeros(NoSamples)).all())
-        self.assertFalse((InputAvgRes1 == np.zeros(NoSamples)).all())
+        self.assertFalse((IntAvgRes1 == np.zeros(NoSamples)).all())
 
     # def test_streaming_mode(self):
 

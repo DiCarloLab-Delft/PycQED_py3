@@ -1,7 +1,3 @@
-'''
-Module containing a collection of sweep functions used by the Measurement Control Instrument.
-These are closely related to the sweep functions from modules/measurement_toolbox created by Gijs.
-'''
 import numpy as np
 import logging
 import time
@@ -56,6 +52,30 @@ class None_Sweep(Soft_Sweep):
         Set the parameter(s) to be sweeped. Differs per sweep function
         '''
         pass
+
+
+class Delayed_None_Sweep(Soft_Sweep):
+    def __init__(self, sweep_control='soft', delay=0, **kw):
+        super().__init__()
+        self.sweep_control = sweep_control
+        self.name = 'None_Sweep'
+        self.parameter_name = 'pts'
+        self.unit = 'arb. unit'
+        self.delay = delay
+        self.time_last_set = 0
+        if delay > 60:
+            logging.warning(
+                'setting a delay of {:.g}s are you sure?'.format(delay))
+
+    def set_parameter(self, val):
+        '''
+        Set the parameter(s) to be sweeped. Differs per sweep function
+        '''
+        while (time.time() - self.time_last_set) < self.delay:
+            pass  # wait
+        self.time_last_set = time.time()
+
+
 
 
 class Dummy_Set_DS_frequency_GHz(Soft_Sweep):
@@ -382,23 +402,7 @@ class Step_Atten_dB(Soft_Sweep):
         self.step_atten.set_attenuation(val)
 
 
-
-
 ###################################
-
-
-class Bias_Dac_mV(Soft_Sweep):
-    def __init__(self, dac_channel, sleeptime=0, **kw):
-        super(Bias_Dac_mV, self).__init__()
-        self.dac_channel = dac_channel
-        self.name = 'Dac_'+str(dac_channel)+' Voltage'
-        self.parameter_name = 'Dac_'+str(dac_channel)
-        self.unit = 'mV'
-        self.sleeptime = sleeptime
-
-    def set_parameter(self, val):
-        eval("qt.instruments['IVVI'].set_dac%d(val)" % self.dac_channel)
-        qt.msleep(self.sleeptime)
 
 class Flux_Control_mV(Soft_Sweep):
     def __init__(self, flux_channel, **kw):
@@ -470,40 +474,40 @@ class AWG_channel_offset(Soft_Sweep):
     def set_parameter(self, val):
         self.set_offset(val)
 
-class AWG_channel_amplitude(Soft_Sweep):
-    '''
-    Sweep AWG channel amplitude for Mixer calibration
-    Needs to be generalized for AWG_Comp
-    '''
-    def __init__(self, channel, AWG_name='AWG', **kw):
-        super(AWG_channel_amplitude, self).__init__()
-        self.AWG = qt.instruments[AWG_name]
-        self.channel = channel
+# class AWG_channel_amplitude(Soft_Sweep):
+#     '''
+#     Superceded by using the parameter directly
+#     Sweep AWG channel amplitude for Mixer calibration
+#     Needs to be generalized for AWG_Comp
+#     '''
+#     def __init__(self, channel, AWG_name='AWG', **kw):
+#         super(AWG_channel_amplitude, self).__init__()
+#         self.AWG = qt.instruments[AWG_name]
+#         self.channel = channel
 
-        self.name = 'AWG offset channel '+str(channel)
-        self.parameter_name = 'Voltage'
+#         self.name = 'AWG offset channel '+str(channel)
+#         self.parameter_name = 'Voltage'
+#         self.unit = 'V'
+
+#     def set_parameter(self, val):
+#         eval('self.AWG.set_ch%d_amplitude(val)' % self.channel)
+
+
+class AWG_multi_channel_amplitude(Soft_Sweep):
+    '''
+    Sweep function to sweep multiple AWG channels simultaneously
+    '''
+    def __init__(self, AWG, channels, **kw):
+        super().__init__()
+        self.name = 'AWG channel amplitude chs %s' % channels
+        self.parameter_name = 'AWG chs %s' % channels
         self.unit = 'V'
+        self.AWG = AWG
+        self.channels = channels
 
     def set_parameter(self, val):
-        eval('self.AWG.set_ch%d_amplitude(val)' % self.channel)
-
-class AWG_channel_phase(Soft_Sweep):
-    '''
-    Sweep AWG channel phase for Mixer calibration
-    Needs to be generalized for AWG_Comp
-    Note this only works in continuous mode
-    '''
-    def __init__(self, channel, **kw):
-        super(AWG_channel_phase, self).__init__()
-        self.AWG = qt.instruments['AWG']
-        self.channel = channel
-
-        self.name = 'AWG phase channel '+str(self.channel)
-        self.parameter_name = 'Phase'
-        self.unit = 'deg'
-
-    def set_parameter(self, phase):
-        self.AWG.send_visa_command('SOUR{}:PHASe {}'.format(self.channel, phase))
+        for ch in self.channels:
+            self.AWG.set('ch{}_amp'.format(ch), val)
 
 
 class AWG_sequence(Soft_Sweep):
@@ -618,11 +622,12 @@ class Hard_Sweep(Sweep_function):
     def __init__(self, **kw):
         super(Hard_Sweep, self).__init__()
         self.sweep_control = 'hard'
-        self.parameter_name = 'none'
+        self.parameter_name = 'None'
         self.unit = 'a.u.'
 
     def start_acquistion(self):
         pass
+
 # NOTE: AWG_sweeps are located in AWG_sweep_functions
 
 

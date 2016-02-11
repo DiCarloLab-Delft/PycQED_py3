@@ -174,3 +174,36 @@ class clock_train(Pulse):
         wf = unit_cell*self.cycles
 
         return wf
+
+
+class marker_train(Pulse):
+    def __init__(self, channel, name='marker train', **kw):
+        Pulse.__init__(self, name)
+
+        self.channel = channel
+        self.channels.append(channel)
+
+        self.amplitude = kw.pop('amplitude', 1)
+        self.nr_markers = kw.pop('nr_markers', 100)
+        self.marker_length = kw.pop('marker_length', 15e-9)
+        self.marker_separation = kw.pop('marker_separation', 100e-9)
+
+    def __call__(self, **kw):
+        self.channel = kw.pop('channel', self.channel)
+        self.amplitude = kw.pop('amplitude', self.amplitude)
+        self.nr_markers = kw.pop('nr_markers', self.nr_markers)
+        self.marker_length = kw.pop('marker_length', self.marker_length)
+        self.length = self.nr_markers*self.marker_separation
+        return self
+
+    def chan_wf(self, chan, tvals):
+        unit_cell = []
+        # if unit cells can work with arrays I should replace this with np.zeros
+        # and np.ones for speed
+        for i in np.arange(int(self.marker_length*1e9)+1):
+            unit_cell.append(self.amplitude)
+        for i in np.arange(int(
+                           (self.marker_separation-self.marker_length)*1e9)+1):
+            unit_cell.append(0)
+        wf = unit_cell*self.nr_markers
+        return wf
