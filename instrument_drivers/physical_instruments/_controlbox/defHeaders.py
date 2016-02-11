@@ -62,7 +62,9 @@ AwgRestartTapeHeader = b"\x35"
 
 # Memory  Update transactions
 AwgLUTHeader = b"\x21"
-AwgTapeHeader = b"\x22"
+AwgTapeHeader = b"\x22"  # this header is obselete in timing tape AWG.
+AwgCondionalTape = b"\x22"
+AwgSegmentedTape = b"\x23"
 
 # #################### Master controller headers ########################### #
 MC_BaseAddress = b"\x40"
@@ -81,11 +83,6 @@ UpdateLoggerMaxCounterHeader = b"\x59"
 UpdateModeHeader = b"\x5A"
 UpdateRunModeHeader = b"\x5B"
 UpdateSequencerParametersHeader = b"\x5C"
-<<<<<<< HEAD
-=======
-EndOfStreaming = b"\x5B"
-# FIXME: this header is not defined in the FPGA headers - JdS
->>>>>>> origin/master
 
 # Register Read transactions
 ReadCalculatedVoffset = b"\x5F"
