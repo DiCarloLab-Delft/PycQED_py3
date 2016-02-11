@@ -283,9 +283,10 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
         if instructions == False :
             print("Error: the assembly file is of errors.")
             return False
-
-        # for instruction in instructions:
-        #     print(format(instruction, 'x').zfill(8))
+        i = 0
+        for instruction in instructions:
+            print(i, ": ",  format(instruction, 'x').zfill(8))
+            i = i + 1
 
         # Check the instruction list length
         if len(instructions) == 0 :
