@@ -30,25 +30,20 @@ def calculate_recovery_clifford(cl_in, desired_cl=0):
     return row.index(desired_cl)
 
 
-def decompose_clifford_to_gates():
-    '''
-    Decomposes an element of the Clifford group into primitive gates.
-    The set of primitive gates is I, x90, y90, x90, -x180, -Y180 as
-    explored in the MSc. thesis of S.Asaad. This decomposition is
-    arbitrary.
-
-    Currently only available for single-qubit cliffords.
-    '''
-    raise NotImplementedError()
-
-
-def convert_pulse_sequence_to_tape():
+def convert_clifford_sequence_to_tape(clifford_sequence, lutmapping,
+                                      gate_decomposition):
     '''
     Converts a list of qubit operations to the relevant pulse elements
 
     This method will be overwritten depending on the hardware implementation.
     '''
-    raise NotImplementedError()
+    decomposed_seq = []
+    for cl in clifford_sequence:
+        decomposed_seq.extend(gate_decomposition[cl])
+    tape = []
+    for g in decomposed_seq:
+        tape.append(lutmapping.index(g))
+    return tape
 
 
 def randomized_benchmarking_sequence(n_cl, desired_net_cl=0,
