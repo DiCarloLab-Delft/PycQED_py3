@@ -11,7 +11,8 @@ reload(clt)
 test_classes_to_run = [clt.TestLookuptable,
                        clt.TestCalculateNetClifford,
                        clt.TestRecoveryClifford,
-                       clt.TestRB_sequence]
+                       clt.TestRB_sequence,
+                       clt.TestGateDecomposition]
 
 suites_list = []
 for test_class in test_classes_to_run:

@@ -4,8 +4,11 @@ from unittest import TestCase
 from modules.measurement.randomized_benchmarking.clifford_group import(
     clifford_lookuptable, Clifford_group)
 
-import modules.measurement.randomized_benchmarking.randomized_benchmarking as rb
+import modules.measurement.randomized_benchmarking.randomized_benchmarking \
+    as rb
 
+from modules.measurement.randomized_benchmarking.clifford_decompositions \
+    import(gate_decomposition)
 
 class TestLookuptable(TestCase):
     def test_unique_mapping(self):
@@ -74,3 +77,12 @@ class TestRB_sequence(TestCase):
         self.assertTrue((rb_seq_b != rb_seq_d).any)
 
 
+class TestGateDecomposition(TestCase):
+    def test_unique_elements(self):
+        for gate in gate_decomposition:
+            self.assertEqual(gate_decomposition.count(gate), 1)
+
+    def test_average_number_of_gates(self):
+        from itertools import chain
+        avg_nr_gates = len(list(chain(*gate_decomposition)))/24
+        self.assertEqual(avg_nr_gates, 1.875)
