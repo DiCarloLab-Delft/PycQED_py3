@@ -10,6 +10,7 @@ import modules.measurement.randomized_benchmarking.randomized_benchmarking \
 from modules.measurement.randomized_benchmarking.clifford_decompositions \
     import(gate_decomposition)
 
+
 class TestLookuptable(TestCase):
     def test_unique_mapping(self):
         for row in clifford_lookuptable:
