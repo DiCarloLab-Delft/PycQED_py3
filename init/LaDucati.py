@@ -83,7 +83,7 @@ for i in range(4):
 st_seqs.station = station
 
 IVVI.set('dac2', 300)
-IVVI.set('dac5', 95.0)
+IVVI.set('dac5', 91.52)
 
 RO_freq = 6.8482e9
 qubit_freq = 6.4718e9 - 40e6  # as measured by my Ramsey
