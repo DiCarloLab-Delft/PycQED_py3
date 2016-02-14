@@ -198,8 +198,8 @@ class marker_train(Pulse):
 
     def chan_wf(self, chan, tvals):
         unit_cell = []
-        # if unit cells can work with arrays I should replace this with np.zeros
-        # and np.ones for speed
+        # if unit cells can work with arrays I should replace this
+        # with np.zeros and np.ones for speed
         for i in np.arange(int(self.marker_length*1e9)+1):
             unit_cell.append(self.amplitude)
         for i in np.arange(int(

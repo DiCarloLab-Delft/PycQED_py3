@@ -257,3 +257,25 @@ def CBox_Ramsey_marker_seq(IF, times, RO_pulse_delay, RO_pulse_length,
 
     station.instruments['AWG'].stop()
     station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+
+
+def CBox_marker_train_seq(marker_separation=60e-9,
+                          verbose=False):
+    seq_name = 'CBox_marker_train_seq'
+    seq = sequence.Sequence(seq_name)
+    el_list = []
+    for i in range(3):  # seq has to have at least 2 elts
+        el = st_elts.CBox_marker_sequence(
+            i, station, marker_separation)
+        el_list.append(el)
+
+    # trick to make sure the sequence runs continously while still requiring
+    # a trigger
+    seq.append_element(el_list[0], trigger_wait=True)
+    seq.append_element(el_list[1], trigger_wait=False,
+                       goto_target=el_list[1].name)
+    # Extra element is needed because otherwise last elt will always goto 1
+    seq.append_element(el_list[2], trigger_wait=False,
+                       goto_target=el_list[1].name)
+    station.instruments['AWG'].stop()
+    station.pulsar.program_awg(seq, *el_list, verbose=verbose)

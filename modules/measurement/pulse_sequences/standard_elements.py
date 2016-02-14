@@ -366,3 +366,36 @@ def pulsed_spec_elt_with_RF_mod(i, station, IF,
                    refpulse='RO-Cos-{}'.format(i), refpoint='start')
     return el
 
+
+def CBox_marker_sequence(i, station, marker_separation):
+    el = element.Element(name=('el_{}'.format(i)),
+                         pulsar=station.pulsar)
+
+    # Thispulse ensures that the total length of the element is exactly 20us
+    refpulse = el.add(pulse.SquarePulse(name='refpulse_20us',
+                                        channel='ch2',
+                                        amplitude=0, length=20e-6,
+                                        start=0))
+    # ensures complete seq is filled with markers
+    nr_markers = int(20e-6//marker_separation)
+
+    marker_tr_p_a = pulse.marker_train(name='CBox-pulse_marker',
+                                       channel='ch1_marker1', amplitude=1,
+                                       marker_length=15e-9,
+                                       marker_separation=marker_separation,
+                                       nr_markers=nr_markers)
+    marker_tr_p_b = pulse.marker_train(name='CBox-pulse_marker',
+                                       channel='ch1_marker2', amplitude=1,
+                                       marker_length=15e-9,
+                                       marker_separation=marker_separation,
+                                       nr_markers=nr_markers)
+    el.add(pulse.cp(marker_tr_p_a),
+           name='CBox-pulse-trigger-ch1_{}'.format(i),
+           start=0,
+           refpulse=refpulse, refpoint='start')
+
+    el.add(pulse.cp(marker_tr_p_b),
+           name='CBox-pulse-trigger-ch2_{}'.format(i),
+           start=0,
+           refpulse=refpulse, refpoint='start')
+    return el

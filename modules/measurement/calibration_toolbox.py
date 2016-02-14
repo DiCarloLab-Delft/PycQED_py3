@@ -234,10 +234,7 @@ def mixer_skewness_cal_CBox_adaptive(CBox, SH, source,
                                      LutMan,
                                      AWG,
                                      MC,
-                                     awg_nr=0,
-                                     mixer=None,
-                                     sideband_frequency=.1,
-                                     ):
+                                     awg_nr=0):
     '''
     Input args
         CBox
@@ -264,7 +261,7 @@ def mixer_skewness_cal_CBox_adaptive(CBox, SH, source,
 
     '''
 
-    AWG.set_setup_filename('FPGA_cont_drive_5014')
+    AWG.setup_filename.set('FPGA_cont_drive_5014')
     optimization_method = 'Powell'
     sweepfunctions = [pw.wrap_par_to_swf(LutMan.QI_amp_ratio),
                       pw.wrap_par_to_swf(LutMan.IQ_phase_skewness)]
