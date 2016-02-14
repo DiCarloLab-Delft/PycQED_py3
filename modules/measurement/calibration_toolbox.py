@@ -230,4 +230,97 @@ def mixer_carrier_cancellation_CBox(CBox, SH, source, MC,
     return ch_0_min, ch_1_min
 
 
+def mixer_skewness_cal_CBox_adaptive(CBox, SH, source,
+                                     LutMan,
+                                     AWG,
+                                     MC,
+                                     awg_nr=0,
+                                     mixer=None,
+                                     sideband_frequency=.1,
+                                     ):
+    '''
+    Input args
+        CBox
+        SH:     Signal Hound
+        source: MW-source connected to the mixer
+        LutMan: Used for changing the pars and loading the pulses
+        AWG:    Used for supplying triggers to the CBox
+        MC:
+        awg_nr: The awg used in the CBox to which the pulses are uploaded.
 
+
+    Calibrates the mixer skewnness
+    The CBox, in this case a fixed sequence is played in the tektronix
+    to ensure the CBox is continously triggered and the paramters are
+    reloaded between each measued point.
+
+    The optimization runs two calibrations, first it tries to minimize the
+    power in the spurious sideband by varying the phase and amplitude skewness.
+    After that it flips the phase 180 degrees and repeates the same experiment
+    for the desired sideband. Both should give the same result.
+
+    For a description on how to translate these coefficients to a rotation
+    matrix see the notes in docs/notes/MixerSkewnessCalibration_LDC_150629.pdf
+
+    '''
+
+    AWG.set_setup_filename('FPGA_cont_drive_5014')
+    optimization_method = 'Powell'
+    sweepfunctions = [pw.wrap_par_to_swf(LutMan.QI_amp_ratio),
+                      pw.wrap_par_to_swf(LutMan.IQ_phase_skewness)]
+    logging.warning('Check that the AWG-seq is correct')
+    logging.warning('Check that the playing the right pulses')
+    logging.warning('Check that pulses reload')
+
+    ampl_min_lst = np.empty(2)
+    phase_min_lst = np.empty(2)
+
+    for i, name in enumerate(
+            ['Numerical mixer calibration spurious sideband',
+             'Numerical mixer calibration desired sideband']):
+
+        sign = -1 if i is 0 else 1  # Flips freq to minimize signal
+        # Note Signal hound has frequency in GHz
+        detector = det.Signal_Hound_fixed_frequency(
+            SH, frequency=(source.frequency.get()*1e9 +
+                           sign*LutMan.f_modulation.get()),
+            Navg=5, delay=.3)
+
+        xtol = 5e-2
+        ftol = 1e-3
+        start_ratio = 0.8
+        phase_center = i * 180  # i=0 is spurious sideband, i=1 is desired
+        r_step = .1
+        sk_step = 10.
+        start_skewness = phase_center-10
+        ad_func_pars = {'adaptive_function': 'Powell',
+                        'x0': [start_ratio, start_skewness],
+                        'direc': [[r_step, 0],
+                                  [0, sk_step],
+                                  [0, 0]],  # direc is a tuple of vectors
+                        'ftol': ftol,
+                        'xtol': xtol, 'minimize': True}
+
+        MC.set_sweep_functions(sweepfunctions)  # sets swf1 and swf2
+        MC.set_detector_function(detector)  # sets test_detector
+        MC.set_adaptive_function_parameters(ad_func_pars)
+        MC.run(name=name, mode='adaptive')
+        a = MA.OptimizationAnalysis(auto=True, label='Numerical')
+        ampl_min_lst[i] = a.optimization_result[0][0]
+        phase_min_lst[i] = a.optimization_result[0][1]
+
+        print()
+        print('Finished calibration')
+        print('*'*80)
+        print('Phase at minimum w-: {} deg, w+: {} deg'.format(
+            phase_min_lst[0], phase_min_lst[1]))
+        print('QI_amp_ratio at minimum w-: {},  w+: {}'.format(
+            ampl_min_lst[0], ampl_min_lst[1]))
+        # print 'Power at minimum: {} dBm'.format(power_min)
+        print('*'*80)
+
+        phi = -1*(np.mod((phase_min_lst[0] - (phase_min_lst[1]-180)), 360))/2.0
+        alpha = (1/ampl_min_lst[0] + 1/ampl_min_lst[1])/2.
+        print('Phi = {} deg'.format(phi))
+        print('alpha = {}'.format(alpha))
+        return phi, alpha
