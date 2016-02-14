@@ -259,7 +259,7 @@ def CBox_Ramsey_marker_seq(IF, times, RO_pulse_delay, RO_pulse_length,
     station.pulsar.program_awg(seq, *el_list, verbose=verbose)
 
 
-def CBox_marker_train_seq(marker_separation=60e-9,
+def CBox_marker_train_seq(marker_separation=100e-9,
                           verbose=False):
     seq_name = 'CBox_marker_train_seq'
     seq = sequence.Sequence(seq_name)

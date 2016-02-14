@@ -5,6 +5,7 @@ from modules.measurement import CBox_sweep_functions as CB_swf
 from modules.measurement import detector_functions as det
 from modules.analysis import measurement_analysis as MA
 from modules.measurement import mc_parameter_wrapper as pw
+from modules.measurement.pulse_sequences import standard_sequences as st_seqs
 import imp
 imp.reload(MA)
 imp.reload(CB_swf)
@@ -261,8 +262,21 @@ def mixer_skewness_cal_CBox_adaptive(CBox, SH, source,
 
     '''
 
-    AWG.setup_filename.set('FPGA_cont_drive_5014')
-    optimization_method = 'Powell'
+    # Loads a train of pulses to the AWG to trigger the CBox continuously
+
+    AWG.stop()
+    CBox.AWG0_mode.set('Tape')
+    CBox.AWG1_mode.set('Tape')
+    # Note if the mod block is not in the lutmapping this will raise an error
+    tape = [LutMan.lut_mapping.get().index('ModBlock')]
+    CBox.set('AWG0_tape', tape)
+    CBox.set('AWG1_tape', tape)
+    marker_sep = LutMan.block_length.get()/1e9
+    # divide instead of multiply by 1e-9 because of rounding errs
+    st_seqs.CBox_marker_train_seq(
+        marker_separation=marker_sep)  # Lutman is in ns
+    AWG.start()
+
     sweepfunctions = [pw.wrap_par_to_swf(LutMan.QI_amp_ratio),
                       pw.wrap_par_to_swf(LutMan.IQ_phase_skewness)]
     logging.warning('Check that the AWG-seq is correct')

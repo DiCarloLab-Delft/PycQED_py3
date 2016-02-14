@@ -45,13 +45,19 @@ class QuTech_ControlBox_LookuptableManager(Instrument):
                            vals=vals.Numbers(),
                            get_cmd=self._do_get_ampCW,
                            set_cmd=self._do_set_ampCW)
+        self.add_parameter('block_length', units='ns',
+                           vals=vals.Numbers(),
+                           get_cmd=self._do_get_block_length,
+                           set_cmd=self._do_set_block_length)
+
         self.add_parameter('motzoi_parameter', vals=vals.Numbers(),
                            get_cmd=self._do_get_motzoi_parameter,
                            set_cmd=self._do_set_motzoi_parameter)
         self.add_parameter('QI_amp_ratio', vals=vals.Numbers(),
                            get_cmd=self._do_get_QI_amp_ratio,
                            set_cmd=self._do_set_QI_amp_ratio)
-        self.add_parameter('IQ_phase_skewness', vals=vals.Numbers(), units='deg',
+        self.add_parameter('IQ_phase_skewness', vals=vals.Numbers(),
+                           units='deg',
                            get_cmd=self._do_get_IQ_phase_skewness,
                            set_cmd=self._do_set_IQ_phase_skewness)
 
@@ -85,7 +91,7 @@ class QuTech_ControlBox_LookuptableManager(Instrument):
                            get_cmd=self._do_get_apply_predistortion_matrix)
 
         self.set('lut_mapping', ['I', 'X180', 'Y180', 'X90', 'Y90', 'mX90',
-                                 'mY90', 'I'])  # TODO: readd 'Block'
+                                 'mY90', 'ModBlock'])
         # Set to a default because box is not expected to change
         self.set('sampling_rate', 0.2)
         self.set('QI_amp_ratio', 1)
@@ -96,6 +102,7 @@ class QuTech_ControlBox_LookuptableManager(Instrument):
         self.set('amp180', 0)
         self.set('amp90', 0)
         self.set('ampCW', 0)
+        self.set('block_length', 50)
         self.set('gauss_width', 10)
         self.set('f_modulation', -0.02)
         self.set('motzoi_parameter', 0)
@@ -157,10 +164,21 @@ class QuTech_ControlBox_LookuptableManager(Instrument):
                                  sampling_rate=self.get('sampling_rate'),
                                  Q_phase_delay=self.get('IQ_phase_skewness'))
 
+        Block = PG.block_pulse(self.get('ampCW'), self.block_length.get(),  #ns
+                               sampling_rate=self.get('sampling_rate'),
+                               delay=0,
+                               phase=0)
+        ModBlock = PG.mod_pulse(Block[0], Block[1],
+                                f_modulation=self.f_modulation.get(),
+                                sampling_rate=self.sampling_rate.get(),
+                                Q_phase_delay=self.IQ_phase_skewness.get())
+
         self._wave_dict = {'I': Wave_I,
                            'X180': Wave_X_180, 'Y180': Wave_Y_180,
                            'X90': Wave_X_90, 'Y90': Wave_Y_90,
-                           'mX90': Wave_mX90, 'mY90': Wave_mY90}
+                           'mX90': Wave_mX90, 'mY90': Wave_mY90,
+                           'Block': Block,
+                           'ModBlock': ModBlock}
         if self.apply_predistortion_matrix:
             M = self.get_mixer_predistortion_matrix()
             for key, val in self._wave_dict.items():
@@ -276,6 +294,12 @@ class QuTech_ControlBox_LookuptableManager(Instrument):
 
     def _do_get_ampCW(self):
         return self._ampCW
+
+    def _do_set_block_length(self, val):
+        self._block_length = val
+
+    def _do_get_block_length(self):
+        return self._block_length
 
     def _do_set_motzoi_parameter(self, val):
         self._motzoi_parameter = val

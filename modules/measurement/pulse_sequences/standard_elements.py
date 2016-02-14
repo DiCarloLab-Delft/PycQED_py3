@@ -371,6 +371,9 @@ def CBox_marker_sequence(i, station, marker_separation):
     el = element.Element(name=('el_{}'.format(i)),
                          pulsar=station.pulsar)
 
+    # Somehow I got errors whenever I picked a marker separation>63 ns
+    # 14-2-2016 MAR -> Update quite sure it is a ns rounding error!
+
     # Thispulse ensures that the total length of the element is exactly 20us
     refpulse = el.add(pulse.SquarePulse(name='refpulse_20us',
                                         channel='ch2',
@@ -378,7 +381,6 @@ def CBox_marker_sequence(i, station, marker_separation):
                                         start=0))
     # ensures complete seq is filled with markers
     nr_markers = int(20e-6//marker_separation)
-
     marker_tr_p_a = pulse.marker_train(name='CBox-pulse_marker',
                                        channel='ch1_marker1', amplitude=1,
                                        marker_length=15e-9,
