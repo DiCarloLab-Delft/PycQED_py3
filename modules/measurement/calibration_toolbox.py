@@ -235,7 +235,8 @@ def mixer_skewness_cal_CBox_adaptive(CBox, SH, source,
                                      LutMan,
                                      AWG,
                                      MC,
-                                     awg_nrs=[0]):
+                                     awg_nrs=[0],
+                                     calibrate_both_sidebands=False):
     '''
     Input args
         CBox
@@ -253,13 +254,17 @@ def mixer_skewness_cal_CBox_adaptive(CBox, SH, source,
     to ensure the CBox is continously triggered and the paramters are
     reloaded between each measued point.
 
-    The optimization runs two calibrations, first it tries to minimize the
-    power in the spurious sideband by varying the phase and amplitude skewness.
-    After that it flips the phase 180 degrees and repeates the same experiment
-    for the desired sideband. Both should give the same result.
+    If calibrate_both_sidebands is True the optimization runs two calibrations,
+    first it tries to minimize the power in the spurious sideband by varying
+    the phase and amplitude skewness. After that it flips the phase 180 degrees
+    and repeates the same experiment for the desired sideband. Both should
+    give the same result.
 
     For a description on how to translate these coefficients to a rotation
     matrix see the notes in docs/notes/MixerSkewnessCalibration_LDC_150629.pdf
+
+    If calibrate_both_sidebands is False it will only minimize the signal in
+    the spurious sideband. and return those values.
 
     '''
 
@@ -283,16 +288,15 @@ def mixer_skewness_cal_CBox_adaptive(CBox, SH, source,
                       CB_swf.Lutman_par_with_reload(LutMan,
                                                     LutMan.IQ_phase_skewness,
                                                     awg_nrs=awg_nrs)]
-    logging.warning('Check that the AWG-seq is correct')
-    logging.warning('Check that the playing the right pulses')
-    logging.warning('Check that pulses reload')
-
     ampl_min_lst = np.empty(2)
     phase_min_lst = np.empty(2)
+    if calibrate_both_sidebands:
+        sidebands = ['Numerical mixer calibration spurious sideband',
+                     'Numerical mixer calibration desired sideband']
+    else:
+        sidebands = ['Numerical mixer calibration spurious sideband']
 
-    for i, name in enumerate(
-            ['Numerical mixer calibration spurious sideband',
-             'Numerical mixer calibration desired sideband']):
+    for i, name in enumerate(sidebands):
 
         sign = -1 if i is 0 else 1  # Flips freq to minimize signal
         # Note Signal hound has frequency in GHz
@@ -300,8 +304,9 @@ def mixer_skewness_cal_CBox_adaptive(CBox, SH, source,
             SH, frequency=(source.frequency.get()/1e9 +
                            sign*LutMan.f_modulation.get()),
             Navg=5, delay=.3)
+        # Timing is not finetuned and can probably be sped up
 
-        xtol = 5e-2
+        xtol = 5e-3
         ftol = 1e-3
         start_ratio = 0.8
         phase_center = i * 180  # i=0 is spurious sideband, i=1 is desired
@@ -324,6 +329,7 @@ def mixer_skewness_cal_CBox_adaptive(CBox, SH, source,
         ampl_min_lst[i] = a.optimization_result[0][0]
         phase_min_lst[i] = a.optimization_result[0][1]
 
+    if calibrate_both_sidebands:
         print('Finished calibration')
         print('*'*80)
         print('Phase at minimum w-: {} deg, w+: {} deg'.format(
@@ -338,3 +344,6 @@ def mixer_skewness_cal_CBox_adaptive(CBox, SH, source,
         print('Phi = {} deg'.format(phi))
         print('alpha = {}'.format(alpha))
         return phi, alpha
+    else:
+        return phase_min_lst[0], ampl_min_lst[0]
+

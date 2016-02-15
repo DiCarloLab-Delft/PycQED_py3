@@ -120,7 +120,6 @@ class MeasurementControl:
         '''
         self.save_optimization_settings()
         adaptive_function = self.af_pars.pop('adaptive_function')
-        print('Adaptive function passed: %s' % adaptive_function)
 
         self.initialize_plot_monitor()
         self.initialize_plot_monitor_adaptive()
@@ -129,7 +128,6 @@ class MeasurementControl:
         self.detector_function.prepare()
 
         if adaptive_function == 'Powell':
-            print('Optimizing using scipy.fmin_powell')
             adaptive_function = fmin_powell
         if (isinstance(adaptive_function, types.FunctionType) or
                 isinstance(adaptive_function, np.ufunc)):

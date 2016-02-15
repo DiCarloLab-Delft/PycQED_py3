@@ -99,9 +99,9 @@ class QuTech_ControlBox_LookuptableManager(Instrument):
         self.set('phi', 0)
         self.set('IQ_phase_skewness', 0)
         self.set('apply_predistortion_matrix', False)
-        self.set('amp180', 0)
-        self.set('amp90', 0)
-        self.set('ampCW', 0)
+        self.set('amp180', 30)
+        self.set('amp90', 15)
+        self.set('ampCW', 10)
         self.set('block_length', 50)
         self.set('gauss_width', 10)
         self.set('f_modulation', -0.02)
@@ -227,6 +227,9 @@ class QuTech_ControlBox_LookuptableManager(Instrument):
 
         Notes on the procedure for acquiring this matrix can be found in
         PycQED/docs/notes/MixerSkewnessCalibration_LDC_150629.pdf
+
+        Note: The same effect as the predistortion matrix can also be achieved
+        by setting the IQ-phase skewness and QI-amp-ratio paramters.
         '''
 
         mixer_pre_distortion_matrix = np.array(
