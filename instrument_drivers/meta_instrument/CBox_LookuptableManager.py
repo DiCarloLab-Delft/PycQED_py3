@@ -197,9 +197,9 @@ class QuTech_ControlBox_LookuptableManager(Instrument):
             ax.vlines(128, self._voltage_min, self._voltage_max, linestyle='--')
         elif time_units == 'ns':
             x = (np.arange(len(self._wave_dict[wave_name][0]))
-                 / self.get_sampling_rate())
+                 / self.sampling_rate.get())
             ax.set_xlabel('time (ns)')
-            ax.vlines(128 / self.get_sampling_rate(),
+            ax.vlines(128 / self.sampling_rate.get(),
                       self._voltage_min, self._voltage_max, linestyle='--')
 
         ax.plot(x, self._wave_dict[wave_name][0],

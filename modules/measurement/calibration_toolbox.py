@@ -235,7 +235,7 @@ def mixer_skewness_cal_CBox_adaptive(CBox, SH, source,
                                      LutMan,
                                      AWG,
                                      MC,
-                                     awg_nr=0):
+                                     awg_nrs=[0]):
     '''
     Input args
         CBox
@@ -244,7 +244,8 @@ def mixer_skewness_cal_CBox_adaptive(CBox, SH, source,
         LutMan: Used for changing the pars and loading the pulses
         AWG:    Used for supplying triggers to the CBox
         MC:
-        awg_nr: The awg used in the CBox to which the pulses are uploaded.
+        awg_nrs: The awgs used in the CBox to which the pulses are uploaded.
+                 (list to allow setting a copy on e.g. awg_nr = 1)
 
 
     Calibrates the mixer skewnness
@@ -263,7 +264,6 @@ def mixer_skewness_cal_CBox_adaptive(CBox, SH, source,
     '''
 
     # Loads a train of pulses to the AWG to trigger the CBox continuously
-
     AWG.stop()
     CBox.AWG0_mode.set('Tape')
     CBox.AWG1_mode.set('Tape')
@@ -277,8 +277,12 @@ def mixer_skewness_cal_CBox_adaptive(CBox, SH, source,
         marker_separation=marker_sep)  # Lutman is in ns
     AWG.start()
 
-    sweepfunctions = [pw.wrap_par_to_swf(LutMan.QI_amp_ratio),
-                      pw.wrap_par_to_swf(LutMan.IQ_phase_skewness)]
+    sweepfunctions = [CB_swf.Lutman_par_with_reload(LutMan,
+                                                    LutMan.QI_amp_ratio,
+                                                    awg_nrs=awg_nrs),
+                      CB_swf.Lutman_par_with_reload(LutMan,
+                                                    LutMan.IQ_phase_skewness,
+                                                    awg_nrs=awg_nrs)]
     logging.warning('Check that the AWG-seq is correct')
     logging.warning('Check that the playing the right pulses')
     logging.warning('Check that pulses reload')
