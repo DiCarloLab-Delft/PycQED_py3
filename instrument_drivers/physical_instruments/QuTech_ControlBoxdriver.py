@@ -707,6 +707,10 @@ class QuTech_ControlBox(VisaInstrument):
         @return stat : True if the upload succeeded and False if the upload failed.
         '''
 
+        v = CBox.get('firmware_version')
+        if (int(v[1]) == 2)  and (int(int(v[3:5])) > 16) :
+            raise NotImplementedError("restart_awg_tape is not enabled in version 2.16.")
+
         cmd = defHeaders.AwgRestartTapeHeader
         data_bytes = bytes()
         data_bytes += (c.encode_byte(awg_nr, 4, 1))
@@ -1723,24 +1727,28 @@ class QuTech_ControlBox(VisaInstrument):
 
     def set_conditional_tape(self, awg_nr, tape_nr, tape):
         '''
-        NOTE: The ControlBox does not support timing tape till now.
+        NOTE: ControlBox only support timing tape from version 2.16.
+              CBox_v3 have not supported timing tape yet(2016-02-15).
 
-        set the conditional tape content for an awg
+        Set the conditional tape content for a specified awg.
+
+        In the tape mode, once received a trigger + 3-bit codeword, the AWG will choose
+        one of the eight tapes to get a sequence of pulses with corresponding timing.
+        - Tape 0 ~ 6 is called Conditional Tape, each tape with a length of 512. Every time
+        the conditional tape is triggered, it starts outputting the pulses from the first entry.
+        - Tape 7 is called Segmented Tape, with a length of 29184. It contains several
+        segments. Every segment contains a sequence of pulses with corresponding timing, and
+        the end of a segment is indicated by the end_of_marker bit of the last entry of the segment.
+        Every time the Segmented Tape is triggered, it outputs a segment. The next trigger
+        for this tape will trigger the next segment.
 
         @param awg : the awg of the dac, (0,1,2).
         @param tape_nr : the number of the tape, integer ranging (0~6)
-        @param tape : the array of entries, with a maximum number of entries 512.
-            Every entry is an integer has the following structure:
-                |WaitingTime (9bits) | PUlse number (3 bits) | EndofSegment marker (1bit)|
-            WaitingTime: The waiting time before the end of last pulse or trigger, in ns.
-            Pulse number: 0~7, indicating which pulse to be output
-            EndofSegment marker: 1 if the entry is the last entry of the tape, otherwise 0.
+        @param tape : the array of entries created by the function create_timing_tape_entry.
+                      Conditional tape can contain at most 512 entries.
         @return stat : 0 if the upload succeeded and 1 if the upload failed.
 
         '''
-
-        print("Timing tape is not supported yet.")
-        return False
 
         length = len(tape)
         tape_addr_width = 9
@@ -1774,24 +1782,27 @@ class QuTech_ControlBox(VisaInstrument):
 
     def set_segmented_tape(self, awg_nr, tape):
         '''
-        NOTE: The ControlBox does not support timing tape till now.
+        NOTE: ControlBox only support timing tape from version 2.16.
+              CBox_v3 have not supported timing tape yet(2016-02-15).
 
-        set the conditional tape content for an awg
+        Set the Segmented Tape content for a specified awg.
+
+        In the tape mode, once received a trigger + 3-bit codeword, the AWG will choose
+        one of the eight tapes to get a sequence of pulses with corresponding timing.
+        - Tape 0 ~ 6 is called Conditional Tape, each tape with a length of 512. Every time
+        the conditional tape is triggered, it starts outputting the pulses from the first entry.
+        - Tape 7 is called Segmented Tape, with a length of 29184. It contains several
+        segments. Every segment contains a sequence of pulses with corresponding timing, and
+        the end of a segment is indicated by the end_of_marker bit of the last entry of the segment.
+        Every time the Segmented Tape is triggered, it outputs a segment. The next trigger
+        for this tape will trigger the next segment.
 
         @param awg : the awg of the dac, (0,1,2).
-        @param tape : the array of entries, with a maximum number of entries 29184.
-            Every entry is an integer has the following structure:
-                |WaitingTime (9bits) | PUlse number (3 bits) | EndofSegment marker (1bit)|
-            WaitingTime: The waiting time before the end of last pulse or trigger, in ns.
-            Pulse number: 0~7, indicating which pulse to be output
-            EndofSegment marker: 1 if the entry is the last entry of a segment, otherwise 0.
+        @param tape : the array of entries created by the function create_timing_tape_entry.
+                      Segmented tape can contain at most 29184 entries.
         @return stat : 0 if the upload succeeded and 1 if the upload failed.
 
         '''
-
-        print("Timing tape is not supported yet.")
-        return False
-
 
         length = len(tape)
         tape_addr_width = 15
@@ -1818,25 +1829,40 @@ class QuTech_ControlBox(VisaInstrument):
         (stat, mesg) = self.serial_write(message)
         return (stat, mesg)
 
-    def create_entry(self, interval, pulse_num, end_of_marker):
+    def create_timing_tape_entry(self, interval, pulse_num, end_of_marker):
         '''
+        Create the timing tape entry included in the conditional tape or segemented tape.
+
         @param interval : The waiting time before the end of last pulse or trigger in ns,
-                          ranging from 0ns to 2560ns with minimum step of 5ns.
+                          ranging from 0ns to 2560ns with a minimum resolution of 5ns.
         @param pulse_num : 0~7, indicating which pulse to be output
-        @param end_of_marker : 1 if the entry is the last entry of a segment, otherwise 0.
+        @param end_of_marker : True if the entry is the last entry of a segment, otherwise False.
+
+        The return is an integer representing an timing tape entry which has the following structure:
+            |WaitingTime (9 bits) | PUlse number (3 bits) | EndofSegment marker (1 bit)|
+        WaitingTime: The waiting time before the end of last pulse or trigger, in FPGA cycle time.
+        Pulse number: 0~7, indicating which pulse to be output.
+        EndofSegment marker: 1 if the entry is the last entry of a segment, otherwise 0.
+
         '''
 
-        if interval < 0 or interval > 2560:
+        FPGA_Cycle_Time = 5 # ns
+        if (interval < 0) or (interval > 2560) or (interval % FPGA_Cycle_Time != 0) :
             raise ValueError
         if pulse_num < 0 or pulse_num > 7:
             raise ValueError
-        if end_of_marker < 0 or end_of_marker > 1:
-            raise ValueError
 
-        entry_bits = BitArray(Bits(uint=interval, length=9))
-        entry_bits.append(BitArray(Bits(uint=pulse_num, length=3)))
-        entry_bits.append(BitArray(Bits(uint=end_of_marker, length=1)))
+        if end_of_marker == True:
+            i_end_of_marker = 1
+        else:
+            i_end_of_marker = 0
+
+        return (interval/FPGA_Cycle_Time)*(2**9) + pulse_num * 2**1 + i_end_of_marker
+
+        # entry_bits = BitArray(Bits(uint=interval/5, length=9))
+        # entry_bits.append(BitArray(Bits(uint=pulse_num, length=3)))
+        # entry_bits.append(BitArray(Bits(uint=i_end_of_marker, length=1)))
         # print "The entry generated is: ",
         # print entry_bits.uint
 
-        return entry_bits.uint
+        # return entry_bits.uint

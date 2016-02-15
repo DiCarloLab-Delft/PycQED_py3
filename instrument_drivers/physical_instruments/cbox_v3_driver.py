@@ -38,15 +38,17 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
         #                    set_cmd=self._do_set_acquisition_mode,
         #                    get_cmd=self._do_get_acquisition_mode,
         #                    vals=vals.Anything())
+        if not('core_state' in self.parameters):
+            self.add_parameter('core_state',
+                               set_cmd=self._do_set_core_state,
+                               get_cmd=self._do_get_core_state,
+                               vals=vals.Anything())
 
-        self.add_parameter('core_state',
-                           set_cmd=self._do_set_core_state,
-                           get_cmd=self._do_get_core_state,
-                           vals=vals.Anything())
-        self.add_parameter('trigger_source',
-                           set_cmd=self._do_set_trigger_source,
-                           get_cmd=self._do_get_trigger_source,
-                           vals=vals.Anything())
+        if not('trigger_source' in self.parameters):
+            self.add_parameter('trigger_source',
+                               set_cmd=self._do_set_trigger_source,
+                               get_cmd=self._do_get_trigger_source,
+                               vals=vals.Anything())
 
         self.set_master_controller_working_state(0, 0, 0)
 
@@ -61,7 +63,9 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
             unittest.TextTestRunner(verbosity=2).run(suite)
 
     def _do_get_firmware_version(self):
-        logging.warning("This function is obselete, now try function get_master_controller_params.")
+        # raise NotImplementedError("This function is obselete, please try function get_master_controller_params.")
+        v = self.get_master_controller_params();
+        print(v)
 
     def get_master_controller_params(self):
         message = self.create_message(defHeaders.ReadVersion)
@@ -144,21 +148,25 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
                                   tmp_trigger_source)
 
     def _do_set_acquisition_mode(self, acquisition_mode):
-        if not('core_state' in self.parameters):
-            logging.warning('Core state needs to be fixed for acq')
-            return
-
-        if self.get('core_state') is not None:
+        if not('core_state' in self.parameters):            # this function can be invoked by CBox_v2 driver, so the parameter needs to be added.
+            self.add_parameter('core_state',
+                               set_cmd=self._do_set_core_state,
+                               get_cmd=self._do_get_core_state,
+                               vals=vals.Anything())
+            tmp_core_state = 0
+        elif self.get('core_state') is not None:
             tmp_core_state = self.get('core_state')
             print('_do_set_acquisition_mode\got_core_state: ', tmp_core_state)
         else:
             tmp_core_state = 0   # idle state
 
-        if not('trigger_source' in self.parameters):
-            logging.warning('MasterController trigger source needs to be fixed for acq')
-            return
-
-        if self.get('trigger_source') is not None:
+        if not('trigger_source' in self.parameters):        # this function can be invoked by CBox_v2 driver, so the parameter needs to be added.
+            self.add_parameter('trigger_source',
+                               set_cmd=self._do_set_trigger_source,
+                               get_cmd=self._do_get_trigger_source,
+                               vals=vals.Anything())
+            tmp_trigger_source = 0
+        elif self.get('trigger_source') is not None:
             tmp_trigger_source = self.get('trigger_source')
             print('_do_set_acquisition_mode\got_trigger_source: ', tmp_trigger_source)
         else:

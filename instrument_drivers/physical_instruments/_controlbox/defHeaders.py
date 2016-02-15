@@ -52,12 +52,6 @@ AwgOffsetHeader = b"\x31"
 AwgDisableHeader = b"\x32"
 AwgEnableHeader = b"\x33"
 AwgModeHeader = b"\x34"
-<<<<<<< HEAD
-
-=======
->>>>>>> origin/master
-AwgNoCodewordTrigHeader = b"\x34"
-# FIXME: should be removed once integrated with AWGMode function
 AwgRestartTapeHeader = b"\x35"
 
 # Memory  Update transactions
