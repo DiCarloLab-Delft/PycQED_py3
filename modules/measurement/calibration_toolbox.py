@@ -293,7 +293,7 @@ def mixer_skewness_cal_CBox_adaptive(CBox, SH, source,
         sign = -1 if i is 0 else 1  # Flips freq to minimize signal
         # Note Signal hound has frequency in GHz
         detector = det.Signal_Hound_fixed_frequency(
-            SH, frequency=(source.frequency.get()*1e9 +
+            SH, frequency=(source.frequency.get()/1e9 +
                            sign*LutMan.f_modulation.get()),
             Navg=5, delay=.3)
 
@@ -320,7 +320,6 @@ def mixer_skewness_cal_CBox_adaptive(CBox, SH, source,
         ampl_min_lst[i] = a.optimization_result[0][0]
         phase_min_lst[i] = a.optimization_result[0][1]
 
-        print()
         print('Finished calibration')
         print('*'*80)
         print('Phase at minimum w-: {} deg, w+: {} deg'.format(

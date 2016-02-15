@@ -381,22 +381,17 @@ def CBox_marker_sequence(i, station, marker_separation):
                                         start=0))
     # ensures complete seq is filled with markers
     nr_markers = int(20e-6//marker_separation)
-    marker_tr_p_a = pulse.marker_train(name='CBox-pulse_marker',
-                                       channel='ch1_marker1', amplitude=1,
-                                       marker_length=15e-9,
-                                       marker_separation=marker_separation,
-                                       nr_markers=nr_markers)
-    marker_tr_p_b = pulse.marker_train(name='CBox-pulse_marker',
-                                       channel='ch1_marker2', amplitude=1,
-                                       marker_length=15e-9,
-                                       marker_separation=marker_separation,
-                                       nr_markers=nr_markers)
-    el.add(pulse.cp(marker_tr_p_a),
+    marker_tr_p = pulse.marker_train(name='CBox-pulse_marker',
+                                     channel='ch1_marker1', amplitude=1,
+                                     marker_length=15e-9,
+                                     marker_separation=marker_separation,
+                                     nr_markers=nr_markers)
+    el.add(pulse.cp(marker_tr_p),
            name='CBox-pulse-trigger-ch1_{}'.format(i),
            start=0,
            refpulse=refpulse, refpoint='start')
 
-    el.add(pulse.cp(marker_tr_p_b),
+    el.add(pulse.cp(marker_tr_p, channel='ch1_marker2'),
            name='CBox-pulse-trigger-ch2_{}'.format(i),
            start=0,
            refpulse=refpulse, refpoint='start')

@@ -179,7 +179,6 @@ class clock_train(Pulse):
 class marker_train(Pulse):
     def __init__(self, channel, name='marker train', **kw):
         Pulse.__init__(self, name)
-
         self.channel = channel
         self.channels.append(channel)
 
@@ -193,17 +192,24 @@ class marker_train(Pulse):
         self.amplitude = kw.pop('amplitude', self.amplitude)
         self.nr_markers = kw.pop('nr_markers', self.nr_markers)
         self.marker_length = kw.pop('marker_length', self.marker_length)
+        self.marker_separation = kw.pop('marker_separation',
+                                        self.marker_separation)
+
+        self.channels = []
+        self.channels.append(self.channel)
         self.length = self.nr_markers*self.marker_separation
         return self
 
     def chan_wf(self, chan, tvals):
-        unit_cell = []
-        # if unit cells can work with arrays I should replace this
-        # with np.zeros and np.ones for speed
-        for i in np.arange(int(self.marker_length*1e9)+1):
-            unit_cell.append(self.amplitude)
-        for i in np.arange(int(
-                           (self.marker_separation-self.marker_length)*1e9)+1):
-            unit_cell.append(0)
+        # Using lists because that is default, I expect arrays also work
+        # but have not tested that. MAR 15-2-2016
+        unit_cell = list(np.ones(round(self.marker_length*1e9)))
+        unit_cell.extend(list(np.zeros(
+            round((self.marker_separation-self.marker_length)*1e9))))
         wf = unit_cell*self.nr_markers
+        # Added this check because I had issues with this before it can occur
+        # when e.g. giving separations that are not in sub ns resolution
+        if(len(wf) != round(self.length*1e9)):
+            raise ValueError('Waveform length is not equal to expected length')
+
         return wf

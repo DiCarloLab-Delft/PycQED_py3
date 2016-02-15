@@ -321,7 +321,6 @@ class Element:
 
     # computing the numerical waveform
     def ideal_waveforms(self):
-        # tvals = np.arange(self.samples())/self.clock
         wfs = {}
         tvals = np.arange(self.samples())/self.clock
 
