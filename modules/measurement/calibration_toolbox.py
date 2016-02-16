@@ -276,7 +276,10 @@ def mixer_skewness_cal_CBox_adaptive(CBox, SH, source,
     tape = [LutMan.lut_mapping.get().index('ModBlock')]
     CBox.set('AWG0_tape', tape)
     CBox.set('AWG1_tape', tape)
-    marker_sep = LutMan.block_length.get()/1e9
+    # Ensure that the block is exactly 4 periods of the modulation freq
+    block_length = abs(round(1/LutMan.f_modulation.get())*4)
+    LutMan.block_length.set(block_length*2)  # in ns
+    marker_sep = block_length/1e9
     # divide instead of multiply by 1e-9 because of rounding errs
     st_seqs.CBox_marker_train_seq(
         marker_separation=marker_sep)  # Lutman is in ns

@@ -1290,9 +1290,10 @@ class QuTech_ControlBox(VisaInstrument):
         checksum = c.calculate_checksum(command)
 
         in_wait = self.visa_handle.bytes_in_buffer
-        if in_wait > 0:  # Clear any leftover messages in the buffer
+        while in_wait > 0:  # Clear any leftover messages in the buffer
             self.visa_handle.clear()
             print("Extra flush! Flushed %s bytes" % in_wait)
+            in_wait = self.visa_handle.bytes_in_buffer
         self.visa_handle.write_raw(command)
         # Done writing , verify message executed
         if verify_execution:

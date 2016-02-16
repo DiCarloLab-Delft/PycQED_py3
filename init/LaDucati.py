@@ -24,6 +24,7 @@ from modules.measurement import composite_detector_functions as cdet
 from modules.analysis import measurement_analysis as ma
 from modules.measurement import calibration_toolbox as cal_tools
 from modules.measurement import mc_parameter_wrapper as pw
+from modules.measurement import CBox_sweep_functions as CB_swf
 # Standarad awg sequences
 from modules.measurement.waveform_control import pulsar as ps
 from modules.measurement.pulse_sequences import standard_sequences as st_seqs
@@ -83,7 +84,7 @@ for i in range(4):
 st_seqs.station = station
 
 IVVI.set('dac2', 300)
-IVVI.set('dac5', 91.52)
+IVVI.dac5.set(91.3)
 
 RO_freq = 6.8482e9
 qubit_freq = 6.4718e9 - 40e6  # as measured by my Ramsey
