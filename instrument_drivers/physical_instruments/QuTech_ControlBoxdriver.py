@@ -701,38 +701,36 @@ class QuTech_ControlBox(VisaInstrument):
 
     def restart_awg_tape(self, awg_nr):
         '''
-        In tape without timing: Reset the tape pointer of specified awg to 0. (for version <= 2.15)
+        In tape without timing: Reset the tape pointer of specified awg to 0.
+        (for version <= 2.15)
 
-        In timing tape: Reset the segmented tape pointer of specified awg to 0. (for version >= 2.16)
+        In timing tape: Reset the segmented tape pointer of specified awg to 0.
+        (for version >= 2.16)
 
 
         @param awg_nr : the awg of the dac, (0,1,2).
-        @return stat : True if the upload succeeded and False if the upload failed.
+        @return stat : True if the upload succeeded and False if the upload
+                        failed.
         '''
 
-        v = CBox.get('firmware_version')
+        v = self.get('firmware_version')
+        # for version >= 2.16, restarting timing tape is done by switching from
+        # another mode into tape mode.
+        if (int(v[1]) == 2) and (int(int(v[3:5])) > 15):
+            cur_mode = self.get('AWG{}_mode'.format(awg_nr))
+            self.set('AWG{}_mode'.format(awg_nr), 0)
+            self.set('AWG{}_mode'.format(awg_nr), cur_mode)
 
-        # for version >= 2.16, restarting timing tape is done by switching from another mode into tape mode.
-        if (int(v[1]) == 2)  and (int(int(v[3:5])) > 15) :
-            (stat, mesg) = self._set_awg_mode(awg_nr, 0)
-            if not stat:
-                raise Exception('Failed to restart awg tape')
-                return stat
-
-            self._set_awg_mode(awg_nr, 2)
+        else:
+            # for version <= 2.15, the previous AwgRestartTape command is sent.
+            cmd = defHeaders.AwgRestartTapeHeader
+            data_bytes = bytes()
+            data_bytes += (c.encode_byte(awg_nr, 4, 1))
+            message = c.create_message(cmd, data_bytes)
+            (stat, mesg) = self.serial_write(message)
             if not stat:
                 raise Exception('Failed to restart awg tape')
             return stat
-
-        # for version <= 2.15, the previous AwgRestartTape command is sent.
-        cmd = defHeaders.AwgRestartTapeHeader
-        data_bytes = bytes()
-        data_bytes += (c.encode_byte(awg_nr, 4, 1))
-        message = c.create_message(cmd, data_bytes)
-        (stat, mesg) = self.serial_write(message)
-        if not stat:
-            raise Exception('Failed to restart awg tape')
-        return stat
 
     def enable_dac(self, awg_nr, dac_ch, enable):
         '''
