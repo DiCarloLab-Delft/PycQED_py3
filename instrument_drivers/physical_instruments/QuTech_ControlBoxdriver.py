@@ -701,16 +701,30 @@ class QuTech_ControlBox(VisaInstrument):
 
     def restart_awg_tape(self, awg_nr):
         '''
-        Reset the tape pointer of specified awg to 0.
+        In tape without timing: Reset the tape pointer of specified awg to 0. (for version <= 2.15)
+
+        In timing tape: Reset the segmented tape pointer of specified awg to 0. (for version >= 2.16)
+
 
         @param awg_nr : the awg of the dac, (0,1,2).
         @return stat : True if the upload succeeded and False if the upload failed.
         '''
 
         v = CBox.get('firmware_version')
-        if (int(v[1]) == 2)  and (int(int(v[3:5])) > 16) :
-            raise NotImplementedError("restart_awg_tape is not enabled in version 2.16.")
 
+        # for version >= 2.16, restarting timing tape is done by switching from another mode into tape mode.
+        if (int(v[1]) == 2)  and (int(int(v[3:5])) > 15) :
+            (stat, mesg) = self._set_awg_mode(awg_nr, 0)
+            if not stat:
+                raise Exception('Failed to restart awg tape')
+                return stat
+
+            self._set_awg_mode(awg_nr, 2)
+            if not stat:
+                raise Exception('Failed to restart awg tape')
+            return stat
+
+        # for version <= 2.15, the previous AwgRestartTape command is sent.
         cmd = defHeaders.AwgRestartTapeHeader
         data_bytes = bytes()
         data_bytes += (c.encode_byte(awg_nr, 4, 1))
