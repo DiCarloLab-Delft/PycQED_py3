@@ -195,6 +195,8 @@ class MeasurementControl:
         if self.mode == '2D':
             self.update_plotmon_2D_hard()
             self.print_progress_static_2D_hard()
+        else:
+            self.print_progress_static_hard()
 
         return new_data
 
@@ -609,26 +611,27 @@ class MeasurementControl:
 
     def print_progress_static_hard(self):
         acquired_points = self.dset.shape[0]
-        total_nr_pts = self.sweep_points.shape[0]
+        total_nr_pts = len(self.get_sweep_points())
         if acquired_points == total_nr_pts:
-            self.complete = True
+            self.complete = True  # Note is self.complete ever used?
         elif acquired_points > total_nr_pts:
             self.complete = True
-            logging.warning(
-                'Warning nr of acq points is larger nr of sweep points')
-            logging.warning('Acq pts: %s, total_nr_pts: %s' % (
-                            acquired_points, total_nr_pts))
 
         percdone = acquired_points*1./total_nr_pts*100
         elapsed_time = time.time() - self.begintime
-        scrmes = "{percdone}% completed, elapsed time: "\
-            "{t_elapsed} s, time left: {t_left} s".format(
+        progress_message = "\r {percdone}% completed \telapsed time: "\
+            "{t_elapsed}s \ttime left: {t_left}s".format(
                 percdone=int(percdone),
                 t_elapsed=round(elapsed_time, 1),
                 t_left=round((100.-percdone)/(percdone) *
                              elapsed_time, 1) if
                 percdone != 0 else '')
-        sys.stdout.write(60*'\b'+scrmes)
+
+        if percdone != 100:
+            end_char = '\r'
+        else:
+            end_char = '\n'
+        print(progress_message, end=end_char)
 
     def print_measurement_start_msg(self):
         if self.verbose:
