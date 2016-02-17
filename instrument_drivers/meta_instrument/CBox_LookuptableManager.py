@@ -23,7 +23,7 @@ class QuTech_ControlBox_LookuptableManager(Instrument):
     todo:
         Add RO-tones to lut (or maybe to a child class?)
         Convert all units to SI (s and Hz instead of ns and GHz)
-    Note: I did not port over the depletion pulses yet (MAR 7-1-2016)
+    Note: I did not port over the depletion pulses (MAR 7-1-2016)
     '''
 
     def __init__(self, name, CBox):
@@ -34,15 +34,15 @@ class QuTech_ControlBox_LookuptableManager(Instrument):
         self.CBox = CBox
 
         self.add_parameter('amp180', units='mV',
-                           vals=vals.Numbers(),
+                           vals=vals.Numbers(-1000, 1000),
                            get_cmd=self._do_get_amp180,
                            set_cmd=self._do_set_amp180)
         self.add_parameter('amp90', units='mV',
-                           vals=vals.Numbers(),
+                           vals=vals.Numbers(-1000, 1000),
                            get_cmd=self._do_get_amp90,
                            set_cmd=self._do_set_amp90)
         self.add_parameter('ampCW', units='mV',
-                           vals=vals.Numbers(),
+                           vals=vals.Numbers(-1000, 1000),
                            get_cmd=self._do_get_ampCW,
                            set_cmd=self._do_set_ampCW)
         self.add_parameter('block_length', units='ns',
@@ -50,7 +50,7 @@ class QuTech_ControlBox_LookuptableManager(Instrument):
                            get_cmd=self._do_get_block_length,
                            set_cmd=self._do_set_block_length)
 
-        self.add_parameter('motzoi_parameter', vals=vals.Numbers(),
+        self.add_parameter('motzoi_parameter', vals=vals.Numbers(-2, 2),
                            get_cmd=self._do_get_motzoi_parameter,
                            set_cmd=self._do_set_motzoi_parameter)
         self.add_parameter('QI_amp_ratio', vals=vals.Numbers(),
