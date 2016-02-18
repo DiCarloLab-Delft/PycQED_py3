@@ -1854,8 +1854,6 @@ class QuTech_ControlBox(VisaInstrument):
         # should be added and the variable _tape should be removed.
 
         length = len(tape)
-        for entry in tape:
-            print('entry: ', entry)
         tape_addr_width = 15
         entry_length = 9 + 3 + 1
 
