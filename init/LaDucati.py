@@ -38,6 +38,8 @@ from instrument_drivers.physical_instruments import QuTech_ControlBoxdriver as q
 from instrument_drivers.meta_instrument import heterodyne as hd
 import instrument_drivers.meta_instrument.CBox_LookuptableManager as lm
 
+from instrument_drivers.meta_instrument import qubit_object as qb
+
 # Initializing instruments
 
 # SH = sh.SignalHound_USB_SA124B('Signal hound') #commented because of 8s load time
@@ -53,8 +55,7 @@ IVVI = iv.IVVI('IVVI', address='ASRL1', numdacs=16)
 HS = hd.LO_modulated_Heterodyne('HS', LO=LO, CBox=CBox, AWG=AWG)
 LutMan = lm.QuTech_ControlBox_LookuptableManager('LutMan', CBox)
 station = qc.Station(LO, S1, S2, IVVI,
-                     HS,
-                     AWG, CBox, LutMan)
+                     AWG, HS, CBox, LutMan)
 MC = mc.MeasurementControl('MC')
 MC.station = station
 station.MC = MC

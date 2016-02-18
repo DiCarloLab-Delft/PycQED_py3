@@ -1,6 +1,10 @@
 from qcodes.instrument.base import Instrument
 from qcodes.utils import validators as vals
 from modules.analysis.analysis_toolbox import calculate_transmon_transitions
+from modules.measurement import detector_functions as det
+from modules.measurement import mc_parameter_wrapper as pw
+from modules.analysis import measurement_analysis as ma
+
 
 class Qubit(Instrument):
     '''
@@ -54,6 +58,7 @@ class Qubit(Instrument):
         super().__init__(name)
         self.add_parameter('T1', units='s',
                            get_cmd=self.measure_T1)
+        self.msmt_suffix = '_' + name  # used to append to measuremnet labels
 
     def measure_T1(self):
         raise NotImplementedError()
@@ -82,7 +87,7 @@ class Qubit(Instrument):
         '''
         raise NotImplementedError()
 
-    def measure_heterodyne_spectroscopy(self, pulsed=False):
+    def measure_heterodyne_spectroscopy(self):
         raise NotImplementedError()
 
 
@@ -235,6 +240,48 @@ class Transmon(Qubit):
 
 
 class CBox_driven_transmon(Transmon):
-    def __init__(self, name):
+    '''
+    Setup configuration:
+        Drive:                 CBox AWGs
+        Acquisition:           CBox
+        Readout pulse configuration: LO modulated using AWG
+    '''
+    def __init__(self, name,
+                 LO, cw_source, td_source,
+                 CBox, heterodyne_source,
+                 MC):
         super().__init__(name)
-        print('Hello')
+        # MW-sources
+        self.LO = LO
+        self.cw_source = cw_source
+        self.td_source = td_source
+
+        self.heterodyne_source = heterodyne_source
+        self.CBox = CBox
+        self.MC = MC
+
+    def prepare_for_continuous_wave(self):
+        # Currently a lot hardcoded here. This has to disappear
+        self.LO.on()
+        self.td_source.off()
+        self.cw_source.on()
+        self.CBox.set('nr_averages', 2**11)
+        self.heterodyne_source.set('mod_amp', .08)
+        self.heterodyne_source.set('IF', -20e6)
+
+    def find_resonator_frequency(self, freqs, MC=None, close_fig=False):
+        self.measure_heterodyne_spectroscopy(freqs, MC, analyze=False)
+        a = ma.Homodyne_Analysis(label=self.msmt_suffix, close_fig=close_fig)
+        return a.fit_res
+
+    def measure_heterodyne_spectroscopy(self, freqs, MC=None,
+                                        analyze=True, close_fig=False):
+        if MC is None:
+            MC = self.MC
+        MC.set_sweep_function(pw.wrap_par_to_swf(
+                              self.heterodyne_source.frequency))
+        MC.set_sweep_points(freqs)
+        MC.set_detector_function(det.Heterodyne_probe(self.heterodyne_source))
+        MC.run(name='Resonator_scan'+self.msmt_suffix)
+        if analyze:
+            ma.MeasurementAnalysis(auto=True, close_fig=close_fig)

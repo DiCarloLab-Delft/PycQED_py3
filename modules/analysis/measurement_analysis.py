@@ -2521,7 +2521,8 @@ class Homodyne_Analysis(MeasurementAnalysis):
 
             # amplitude_guess = np.pi*sigma_guess * abs(
             #     max(self.measured_powers)-min(self.measured_powers))
-            amplitude_guess = max(self.measured_powers)-min(self.measured_powers)
+            amplitude_guess = (max(self.measured_powers) -
+                               min(self.measured_powers))
             # Creating parameters and estimations
             S21min = min(self.measured_values[0])/max(self.measured_values[0])
 
@@ -2573,6 +2574,9 @@ class Homodyne_Analysis(MeasurementAnalysis):
             fit_res = LorentzianModel.fit(data=self.measured_powers,
                                           f=self.sweep_points*1.e9,
                                           params=self.params)
+        else:
+            raise ValueError('fitting model "{}" not recognized'.format(
+                             fitting_model))
 
         self.fit_results = fit_res
         self.save_fitted_parameters(fit_res, var_name='HM')

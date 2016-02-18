@@ -53,14 +53,6 @@ class HeterodyneInstrument(Instrument):
                            label='Intermodulation frequency',
                            units='Hz')
 
-        # self.add_parameter('t_int', type=float,
-        #                    flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET,
-        #                    minval=100e-6, maxval=self._max_tint, units='ms')
-        # self.add_parameter('trace_length', type=float,
-        #                    flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET,
-        #                    units='ms')
-        # self.add_parameter('Navg', type=int,
-        #                    flags=Instrument.FLAG_GETSET)
         self.add_parameter('single_sideband_demod',
                            label='Single sideband demodulation',
                            get_cmd=self.do_get_single_sideband_demod,
