@@ -1,5 +1,9 @@
+import logging
+import numpy as np
+
 from qcodes.instrument.base import Instrument
 from qcodes.utils import validators as vals
+
 from modules.analysis.analysis_toolbox import calculate_transmon_transitions
 from modules.measurement import detector_functions as det
 from modules.measurement import mc_parameter_wrapper as pw
@@ -269,10 +273,31 @@ class CBox_driven_transmon(Transmon):
         self.heterodyne_source.set('mod_amp', .08)
         self.heterodyne_source.set('IF', -20e6)
 
-    def find_resonator_frequency(self, freqs, MC=None, close_fig=False):
+    def find_resonator_frequency(self, use_min=False,
+                                 update=True,
+                                 freqs=None,
+                                 MC=None, close_fig=False):
+        '''
+        Finds the resonator frequency by performing a heterodyne experiment
+        if freqs == None it will determine a default range dependent on the
+        last known frequency of the resonator.
+        '''
+        if freqs is None:
+            f_center = self.f_res.get()
+            f_span = 10e6
+            f_step = 50e3
+            freqs = np.arange(f_center-f_span/2, f_center+f_span/2, f_step)
         self.measure_heterodyne_spectroscopy(freqs, MC, analyze=False)
         a = ma.Homodyne_Analysis(label=self.msmt_suffix, close_fig=close_fig)
-        return a.fit_res
+        if use_min:
+            f_res = a.min_frequency
+        else:
+            f_res = a.fit_results.params['f0'].value
+        if f_res > max(freqs) or f_res < min(freqs):
+            logging.warning('exracted frequency outside of range of scan')
+        elif update:  # don't update if the value is out of the scan range
+            self.f_res.set(f_res)
+        return f_res
 
     def measure_heterodyne_spectroscopy(self, freqs, MC=None,
                                         analyze=True, close_fig=False):
