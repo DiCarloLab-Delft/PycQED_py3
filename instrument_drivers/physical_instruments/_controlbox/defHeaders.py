@@ -52,13 +52,13 @@ AwgOffsetHeader = b"\x31"
 AwgDisableHeader = b"\x32"
 AwgEnableHeader = b"\x33"
 AwgModeHeader = b"\x34"
-AwgNoCodewordTrigHeader = b"\x34"
-# FIXME: should be removed once integrated with AWGMode function
 AwgRestartTapeHeader = b"\x35"
 
 # Memory  Update transactions
 AwgLUTHeader = b"\x21"
-AwgTapeHeader = b"\x22"
+AwgTapeHeader = b"\x22"  # this header is obselete in timing tape AWG.
+AwgCondionalTape = b"\x22"
+AwgSegmentedTape = b"\x23"
 
 # #################### Master controller headers ########################### #
 MC_BaseAddress = b"\x40"
@@ -73,12 +73,10 @@ UpdVoffsetHeader = b"\x56"
 UpdLinTransCoeffHeader = b"\x57"
 UpdateAverageSettings = b"\x58"
 UpdateLoggerMaxCounterHeader = b"\x59"
+
 UpdateModeHeader = b"\x5A"
-# EndOfStreaming = b"\x5B"
 UpdateRunModeHeader = b"\x5B"
 UpdateSequencerParametersHeader = b"\x5C"
-EndOfStreaming = b"\x5B"
-# FIXME: this header is not defined in the FPGA headers - JdS
 
 # Register Read transactions
 ReadCalculatedVoffset = b"\x5F"
@@ -86,6 +84,7 @@ ReadCalculatedVoffset = b"\x5F"
 # Memory  Update transactions
 UpdWeightsZeroHeader = b"\x40"
 UpdWeightsOneHeader = b"\x41"
+
 
 # Memory read transactions
 GetQubitStateLogResults = b"\x49"
@@ -96,6 +95,8 @@ ReadIntAverageResults = b"\x4D"
 ReadInputAverageResults = b"\x4E"
 ReadLoggedResults = b"\x4F"
 ReadVersion = b"\x60"
+
+
 # ########################## Communication headers ######################## #
 EndOfDataTrailer = b"\x77"
 EndOfStreamingHeader = b"\x78"
@@ -110,11 +111,19 @@ EndOfMessageHeader = b"\x7F"
 MC_TestHeader = b"\x40"
 
 # Modes index in list corresponds to the integer that will be sent
+
+
+
 acquisition_modes = ['0: idle',
                      '1: integration logging mode',
+
                      '2: feedback mode,',  # This mode does not do anything
                      '3: input averaging mode',
                      '4: integration averaging mode',
+
+
+
+
                      '5: integration streaming mode',
                      "6: touch 'n go"]
 
@@ -123,4 +132,5 @@ run_modes = ['0: idle',
 
 awg_modes = ['0: Codeword-trigger mode',
              '1: No-codeword mode',
-             '2: Tape mode']
+             '2: Tape mode',
+             '3: Segmented tape mode']
