@@ -681,6 +681,8 @@ class QuTech_ControlBox(VisaInstrument):
         @param tape : the array of pulse numbers, (0, 7)
         @return stat : 0 if the upload succeeded and 1 if the upload failed.
         '''
+        # TODO: an internal variable _segmented_tape or _conditional_tape
+        # should be added and the variable _tape should be removed.
 
         v = self.get('firmware_version')
         # for version >= 2.16, restarting timing tape is done by switching from
@@ -936,10 +938,11 @@ class QuTech_ControlBox(VisaInstrument):
         @return stat : 0 if the upload succeeded and 1 if the upload failed.
         '''
         v = self.get('firmware_version')
-        if v.startswith('v2.15'):
+        if (int(v[1]) == 2) and (int(int(v[3:5])) >= 15):
             n_bytes = 3
         else:
-            # logging.warning('Version != 2.15 using old protocol for log length')
+            # logging.warning('Version != 2.15 using old protocol for\
+            # log length')
             n_bytes = 2
 
         cmd = defHeaders.UpdateLoggerMaxCounterHeader
@@ -967,12 +970,14 @@ class QuTech_ControlBox(VisaInstrument):
             4 = integration_averaging
             5 = integration_streaming
             6 = touch 'n go
-        @return stat : True if the upload succeeded and False if the upload failed
+        @return stat : True if the upload succeeded and False if the upload
+                       failed
         '''
         acquisition_mode = str(acquisition_mode)
         mode_int = None
         for i in range(len(defHeaders.acquisition_modes)):
-            if acquisition_mode.upper() in defHeaders.acquisition_modes[i].upper():
+            if acquisition_mode.upper() in\
+                   defHeaders.acquisition_modes[i].upper():
                 mode_int = i
                 break
         if mode_int is None:
@@ -999,7 +1004,8 @@ class QuTech_ControlBox(VisaInstrument):
         @param mode : mode of the fpga,
             0 = stop,
             1 = run,
-        @return stat :True if the upload succeeded and False if the upload failed.
+        @return stat :True if the upload succeeded and False if the upload
+                      failed.
         '''
         run_mode = str(run_mode)
         mode_int = None
@@ -1023,9 +1029,6 @@ class QuTech_ControlBox(VisaInstrument):
 
     def _do_get_run_mode(self):
         return self._run_mode
-
-
-
 
     def _gen_awg_mode_set_func(self, awg_nr):
         def set_awg_mode_i(threshold):
@@ -1778,6 +1781,9 @@ class QuTech_ControlBox(VisaInstrument):
 
         '''
 
+        # TODO: an internal variable _segmented_tape or _conditional_tape
+        # should be added and the variable _tape should be removed.
+
         length = len(tape)
         tape_addr_width = 9
         entry_length = 9 + 3 + 1
@@ -1792,19 +1798,23 @@ class QuTech_ControlBox(VisaInstrument):
                              1 to 512.")
 
         cmd = defHeaders.AwgCondionalTape
-        data_bytes = bytearray()
+        data_bytes = bytes()
 
-        data_bytes.extend(c.encode_byte(awg_nr, 4,      # add AWG number
-                                        expected_number_of_bytes=1))
-        data_bytes.extend(c.encode_byte(tape_nr, 4,     # add the tape number
-                                        expected_number_of_bytes=1))
-        data_bytes.extend(c.encode_byte(length-1, 7,    # add the tape length
-                          expected_number_of_bytes=np.ceil(
-                            tape_addr_width/7.0)))
-        data_bytes.extend(c.encode_array(               # add the tape entries
+        # add AWG number
+        data_bytes += (c.encode_byte(awg_nr, data_bits_per_byte=4,
+                                     expected_number_of_bytes=1))
+        # add the tape number
+        data_bytes += (c.encode_byte(tape_nr, data_bits_per_byte=4,
+                                     expected_number_of_bytes=1))
+        # add the tape length
+        data_bytes += (c.encode_byte(length-1, data_bits_per_byte=7,
+                                     expected_number_of_bytes=np.ceil(
+                                         tape_addr_width/7.0)))
+        # add the tape entries
+        data_bytes += (c.encode_array(
                           self.convert_arrary_to_signed(tape, entry_length),
                           data_bits_per_byte=7,
-                          expected_number_of_bytes=np.ceil(entry_length/7.0)))
+                          bytes_per_value=np.ceil(entry_length/7.0)))
 
         message = c.create_message(cmd, data_bytes)
         (stat, mesg) = self.serial_write(message)
@@ -1840,7 +1850,12 @@ class QuTech_ControlBox(VisaInstrument):
 
         '''
 
+        # TODO: an internal variable _segmented_tape or _conditional_tape
+        # should be added and the variable _tape should be removed.
+
         length = len(tape)
+        for entry in tape:
+            print('entry: ', entry)
         tape_addr_width = 15
         entry_length = 9 + 3 + 1
 
@@ -1852,17 +1867,16 @@ class QuTech_ControlBox(VisaInstrument):
                               1 to 29184.")
 
         cmd = defHeaders.AwgSegmentedTape
-        data_bytes = bytearray()
-        data_bytes.extend(c.encode_byte(awg_nr, 4,
-                                        expected_number_of_bytes=1))
-        data_bytes.extend(c.encode_byte(length-1, 7,
-                          expected_number_of_bytes=np.ceil(
-                            tape_addr_width / 7.0)))
-        data_bytes.extend(c.encode_array(
+        data_bytes = bytes()
+        data_bytes += (c.encode_byte(awg_nr, data_bits_per_byte=4,
+                                     expected_number_of_bytes=1))
+        data_bytes += (c.encode_byte(length-1, data_bits_per_byte=7,
+                                     expected_number_of_bytes=np.ceil(
+                                         tape_addr_width / 7.0)))
+        data_bytes += (c.encode_array(
                           self.convert_arrary_to_signed(tape, entry_length),
                           data_bits_per_byte=7,
-                          expected_number_of_bytes=np.ceil(
-                            entry_length/7.0)))
+                          bytes_per_value=np.ceil(entry_length/7.0)))
 
         message = self.create_message(cmd, data_bytes)
         (stat, mesg) = self.serial_write(message)
@@ -1905,7 +1919,7 @@ class QuTech_ControlBox(VisaInstrument):
         else:
             i_end_of_marker = 0
 
-        return ((interval/FPGA_Cycle_Time)*(2**9) +
+        return ((interval/FPGA_Cycle_Time)*(2**4) +
                 pulse_num * 2**1 +
                 i_end_of_marker)
 
@@ -1917,15 +1931,19 @@ class QuTech_ControlBox(VisaInstrument):
         @param unsigned_number: the unsigned number.
         @param bit_width: Bit width of the output signed number.
         '''
+        def is_number(s):
+            try:
+                float(s)
+                return True
+            except ValueError:
+                return False
 
-        if (not isinstance(unsigned_number, (int))) or (unsigned_number < 0):
-            raise ValueError("The number %d should be a positive integer." %
-                             unsigned_number)
+        if (not is_number(unsigned_number) or (unsigned_number < 0)):
+            raise ValueError("The number %d should be a positive integer." % unsigned_number)
 
         if unsigned_number < 0 or unsigned_number >= 2**bit_width:
             raise ValueError("Given number %d is too large in terms of the \
-                              given bit_width %d." %
-                             unsigned_number, bit_width)
+                              given bit_width %d." % (unsigned_number, bit_width))
 
         if unsigned_number >= 2**(bit_width-1):
             signed_number = unsigned_number - 2**bit_width

@@ -132,4 +132,5 @@ run_modes = ['0: idle',
 
 awg_modes = ['0: Codeword-trigger mode',
              '1: No-codeword mode',
-             '2: Tape mode']
+             '2: Tape mode',
+             '3: Segmented tape mode']
