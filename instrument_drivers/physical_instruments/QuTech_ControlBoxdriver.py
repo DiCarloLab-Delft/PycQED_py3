@@ -14,8 +14,8 @@ pyximport.install(setup_args={"script_args": ["--compiler=msvc"],
                               "include_dirs": np.get_include()},
                   reload_support=True)
 
-from ._ControlBox import defHeaders  # File containing bytestring commands
-from ._ControlBox import codec as c
+from ._controlbox import defHeaders  # File containing bytestring commands
+from ._controlbox import codec as c
 
 
 class QuTech_ControlBox(VisaInstrument):
@@ -162,7 +162,7 @@ class QuTech_ControlBox(VisaInstrument):
 
     def run_test_suite(self):
             from importlib import reload  # Useful for testing
-            from ._ControlBox import test_suite
+            from ._controlbox import test_suite
             reload(test_suite)
             # pass the CBox to the module so it can be used in the tests
             self.c = c  # make the codec callable from the testsuite
@@ -1290,9 +1290,10 @@ class QuTech_ControlBox(VisaInstrument):
         checksum = c.calculate_checksum(command)
 
         in_wait = self.visa_handle.bytes_in_buffer
-        if in_wait > 0:  # Clear any leftover messages in the buffer
+        while in_wait > 0:  # Clear any leftover messages in the buffer
             self.visa_handle.clear()
             print("Extra flush! Flushed %s bytes" % in_wait)
+            in_wait = self.visa_handle.bytes_in_buffer
         self.visa_handle.write_raw(command)
         # Done writing , verify message executed
         if verify_execution:
