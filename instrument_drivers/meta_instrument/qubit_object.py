@@ -1,6 +1,6 @@
 from qcodes.instrument.base import Instrument
 from qcodes.utils import validators as vals
-
+from modules.analysis.analysis_toolbox import calculate_transmon_transitions
 
 class Qubit(Instrument):
     '''
@@ -93,24 +93,69 @@ class Transmon(Qubit):
     '''
     def __init__(self, name):
         super().__init__(name)
-        self.add_parameter('E_c', units='Hz',
-                           get_cmd=self._get_Ec,
-                           set_cmd=self._set_Ec,
+        self.add_parameter('EC', units='Hz',
+                           get_cmd=self._get_EC,
+                           set_cmd=self._set_EC,
                            vals=vals.Numbers())
 
-        self.add_parameter('E_j', units='Hz',
-                           get_cmd=self._get_Ec,
-                           set_cmd=self._set_Ec,
+        self.add_parameter('EJ', units='Hz',
+                           get_cmd=self._get_EJ,
+                           set_cmd=self._set_EJ,
                            vals=vals.Numbers())
-        self.add_parameter('assymetry')
+        self.add_parameter('assymetry',
+                           get_cmd=self._get_assym,
+                           set_cmd=self._set_assym)
 
-        self.add_parameter('dac_sweet_spot', units='mV')
-        self.add_parameter('dac_channel', units='mV')
-        self.add_parameter('frequency', units='Hz')
+        self.add_parameter('dac_voltage', units='mV',
+                           get_cmd=self._get_dac_voltage,
+                           set_cmd=self._set_dac_voltage)
+        self.add_parameter('dac_sweet_spot', units='mV',
+                           get_cmd=self._get_dac_sw_spot,
+                           set_cmd=self._set_dac_sw_spot)
+        self.add_parameter('dac_channel', vals=vals.Ints(),
+                           get_cmd=self._get_dac_channel,
+                           set_cmd=self._set_dac_channel)
+        self.add_parameter('flux',
+                           get_cmd=self._get_flux,
+                           set_cmd=self._set_flux)
 
+        self.add_parameter('f_qubit', label='qubit frequency', units='Hz',
+                           get_cmd=self._get_freq,
+                           set_cmd=self._set_freq)
+        self.add_parameter('f_res', label='resonator frequency', units='Hz',
+                           get_cmd=self._get_f_res,
+                           set_cmd=self._set_f_res)
 
-    def calculate_frequency(self, dac=None, flux=None):
-        raise NotImplementedError()
+    def calculate_frequency(self, EC=None, EJ=None, assymetry=None,
+                            dac_voltage=None, flux=None,
+                            no_transitions=1):
+        '''
+        Calculates transmon energy levels from the full transmon qubit
+        Hamiltonian.
+
+        Parameters of the qubit object are used unless specified.
+        Flux can be specified both in terms of dac voltage or flux but not
+        both.
+
+        If specified in terms of a dac voltage it will convert the dac voltage
+        to a flux using convert dac to flux (NOT IMPLEMENTED)
+        '''
+        if EC is None:
+            EC = self.EC.get()
+        if EJ is None:
+            EJ = self.EJ.get()
+        if assymetry is None:
+            assymetry = self.assymetry.get()
+
+        if dac_voltage is not None and flux is not None:
+            raise ValueError('Specify either dac voltage or flux but not both')
+        if flux is None:
+            flux = self.flux.get()
+        # Calculating with dac-voltage not implemented yet
+
+        freq = calculate_transmon_transitions(
+            EC, EJ, asym=assymetry, reduced_flux=flux, no_transitions=1)
+        return freq
 
     def calculate_flux(self, frequency):
         raise NotImplementedError()
@@ -131,6 +176,62 @@ class Transmon(Qubit):
 
     def find_resonator_frequency(self, **kw):
         raise NotImplementedError()
+
+    # All the functions below should be absorbed into the new
+    # "holder parameter" get and set function of QCodes that does not exist yet
+    def _set_EJ(self, val):
+        self._EJ = val
+
+    def _get_EJ(self):
+        return self._EJ
+
+    def _set_EC(self, val):
+        self._EC = val
+
+    def _get_EC(self):
+        return self._EC
+
+    def _set_assym(self, val):
+        self._assym = val
+
+    def _get_assym(self):
+        return self._assym
+
+    def _set_dac_voltage(self, val):
+        self._dac_voltage = val
+
+    def _get_dac_voltage(self):
+        return self._dac_voltage
+
+    def _set_dac_sw_spot(self, val):
+        self._dac_sw_spot = val
+
+    def _get_dac_sw_spot(self):
+        return self._dac_sw_spot
+
+    def _set_dac_channel(self, val):
+        self._dac_channel = val
+
+    def _get_dac_channel(self):
+        return self._dac_channel
+
+    def _set_flux(self, val):
+        self._flux = val
+
+    def _get_flux(self):
+        return self._flux
+
+    def _set_freq(self, val):
+        self._freq = val
+
+    def _get_freq(self):
+        return self._freq
+
+    def _set_f_res(self, val):
+        self._f_res = val
+
+    def _get_f_res(self):
+        return self._f_res
 
 
 class CBox_driven_transmon(Transmon):
