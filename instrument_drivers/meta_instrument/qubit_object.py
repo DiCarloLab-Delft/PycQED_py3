@@ -53,7 +53,7 @@ class Qubit(Instrument):
     def __init__(self, name):
         super().__init__(name)
         self.add_parameter('T1', units='s',
-                           get_cmd=self._measure_T1())
+                           get_cmd=self.measure_T1)
 
     def measure_T1(self):
         raise NotImplementedError()
@@ -132,3 +132,8 @@ class Transmon(Qubit):
     def find_resonator_frequency(self, **kw):
         raise NotImplementedError()
 
+
+class CBox_driven_transmon(Transmon):
+    def __init__(self, name):
+        super().__init__(name)
+        print('Hello')
