@@ -310,3 +310,21 @@ class CBox_driven_transmon(Transmon):
         MC.run(name='Resonator_scan'+self.msmt_suffix)
         if analyze:
             ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
+
+    def measure_resonator_power(self, freqs, mod_amps,
+                                MC=None, analyze=True, close_fig=False):
+        '''
+        N.B. This one does not use powers but varies the mod-amp.
+        Need to find a way to keep this function agnostic to that
+        '''
+        if MC is None:
+            MC = self.MC
+        MC.set_sweep_functions(
+            [pw.wrap_par_to_swf(self.heterodyne_source.frequency),
+             pw.wrap_par_to_swf(self.heterodyne_source.mod_amp)])
+        MC.set_sweep_points(freqs)
+        MC.set_sweep_points_2D(mod_amps)
+        MC.set_detector_function(det.Heterodyne_probe(self.heterodyne_source))
+        MC.run(name='Resonator_power_scan'+self.msmt_suffix, mode='2D')
+        if analyze:
+            ma.MeasurementAnalysis(auto=True, TwoD=True, close_fig=close_fig)
