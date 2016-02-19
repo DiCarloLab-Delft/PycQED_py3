@@ -1047,6 +1047,7 @@ class QuTech_ControlBox(VisaInstrument):
             0:Codeword-trigger mode: trigger + codeword specifying lookuptable.
             1:No-codeword mode: trigger will play lookuptable 0.
             2:Tape mode: trigger will play the lut specified in the tape.
+            3: Segmented-tape mode blabla finsiht htis TODO !
 
         @return stat : 0 if the upload succeeded and 1 if the upload failed.
         '''

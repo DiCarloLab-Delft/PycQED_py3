@@ -21,10 +21,13 @@ from modules.measurement import sweep_functions as swf
 from modules.measurement import awg_sweep_functions as awg_swf
 from modules.measurement import detector_functions as det
 from modules.measurement import composite_detector_functions as cdet
-from modules.analysis import measurement_analysis as ma
 from modules.measurement import calibration_toolbox as cal_tools
 from modules.measurement import mc_parameter_wrapper as pw
 from modules.measurement import CBox_sweep_functions as CB_swf
+from modules.analysis import measurement_analysis as ma
+from modules.analysis import analysis_toolbox as a_tools
+
+from modules.utilities import general as gen
 # Standarad awg sequences
 from modules.measurement.waveform_control import pulsar as ps
 from modules.measurement.pulse_sequences import standard_sequences as st_seqs
