@@ -6,6 +6,7 @@ from qcodes.utils import validators as vals
 
 from modules.analysis.analysis_toolbox import calculate_transmon_transitions
 from modules.measurement import detector_functions as det
+from modules.measurement import composite_detector_functions as cdet
 from modules.measurement import mc_parameter_wrapper as pw
 from modules.measurement import awg_sweep_functions as awg_swf
 from modules.analysis import measurement_analysis as ma
@@ -342,6 +343,22 @@ class CBox_driven_transmon(Transmon):
         self.add_parameter('awg_nr', label='CBox awg nr', units='#',
                            get_cmd=self._get_awg_nr,
                            set_cmd=self._set_awg_nr)
+
+        self.add_parameter('amp180',
+                           label='Pi-pulse amplitude', units='mV',
+                           get_cmd=self._get_amp180,
+                           set_cmd=self._set_amp180)
+        # amp90 is hard-linked to amp180
+        self.add_parameter('amp90',
+                           label='Pi/2-pulse amplitude', units='mV',
+                           get_cmd=self._get_amp90)
+        self.add_parameter('gauss_width', units='s',
+                           get_cmd=self._get_gauss_width,
+                           set_cmd=self._set_gauss_width)
+        self.add_parameter('motzoi', label='Motzoi parameter', units='',
+                           get_cmd=self._get_motzoi,
+                           set_cmd=self._set_motzoi)
+
     def prepare_for_continuous_wave(self):
 
         self.heterodyne_instr._disable_auto_seq_loading = False
@@ -364,6 +381,12 @@ class CBox_driven_transmon(Transmon):
         self.td_source.power.set(self.td_source_pow.get())
         self.AWG.set('ch3_amp', self.mod_amp_td.get())
         self.AWG.set('ch4_amp', self.mod_amp_td.get())
+
+        self.LutMan.amp180.set(self.amp180.get())
+        self.LutMan.amp90.set(self.amp90.get())
+        self.LutMan.gauss_width.set(self.gauss_width.get()*1e9)  # s to ns
+        self.LutMan.motzoi_parameter.set(self.motzoi.get())
+        self.LutMan.load_pulses_onto_AWG_lookuptable(self.awg_nr.get())
 
     def find_resonator_frequency(self, use_min=False,
                                  update=True,
@@ -539,6 +562,56 @@ class CBox_driven_transmon(Transmon):
             a = ma.T1_Analysis(auto=True, close_fig=False)
             return a.T1
 
+    def measure_ramsey(self, times, artificial_detuning=0, MC=None,
+                       analyze=True, close_fig=False, verbose=True):
+        self.prepare_for_timedomain()
+        if MC is None:
+            MC = self.MC
+        f = self.td_source.get('frequency')
+        # This is required because I cannot change the phase in the pulses
+        if not all([np.round(t*1e9) % (1/self.f_pulse_mod.get()*1e9)
+                   == 0 for t in times]):
+            raise ValueError('timesteps must be multiples of modulation freq')
+        self.td_source.set('frequency', f+artificial_detuning)
+        Rams_swf = awg_swf.CBox_Ramsey(
+            AWG=self.AWG, CBox=self.CBox, IF=self.IF.get(), pulse_separation=0,
+            RO_pulse_delay=self.RO_pulse_delay.get(),
+            RO_trigger_delay=self.RO_trigger_delay.get(),
+            RO_pulse_length=self.RO_pulse_length.get())
+        MC.set_sweep_function(Rams_swf)
+        MC.set_sweep_points(times)
+        MC.set_detector_function(det.CBox_integrated_average_detector(
+                                 self.CBox, self.AWG))
+        MC.run('Ramsey')
+        self.td_source.set('frequency', f)
+        if analyze:
+            a = ma.Ramsey_Analysis(auto=True, close_fig=False)
+
+            if verbose:
+                fitted_freq = a.fit_res.params['frequency'].value
+                print('Artificial detuning: {:.2e}'.format(
+                      artificial_detuning))
+                print('Fitted detuning: {:.2e}'.format(fitted_freq))
+                print('Actual detuning:{:.2e}'.format(
+                      fitted_freq-artificial_detuning))
+
+    def measure_allxy(self, MC=None,
+                      analyze=True, close_fig=False, verbose=True):
+        self.prepare_for_timedomain()
+        if MC is None:
+            MC = self.MC
+        d = cdet.AllXY_devition_detector_CBox(
+                'AllXY'+self.msmt_suffix, MC=MC,
+                AWG=self.AWG, CBox=self.CBox, IF=self.IF.get(),
+                pulse_separation=self.pulse_separation.get(),
+                RO_pulse_delay=self.RO_pulse_delay.get(),
+                RO_trigger_delay=self.RO_trigger_delay.get(),
+                RO_pulse_length=self.RO_pulse_length.get())
+        d.prepare()
+        d.acquire_data_point()
+        if analyze:
+            ma.AllXY_Analysis(close_main_fig=close_fig)
+
     ###########################
     # Parameter get set commands, should be removed in a later version.
     ############################
@@ -613,3 +686,24 @@ class CBox_driven_transmon(Transmon):
 
     def _set_awg_nr(self, val):
         self._awg_nr = val
+
+    def _get_amp180(self):
+        return self._amp180
+
+    def _set_amp180(self, val):
+        self._amp180 = val
+
+    def _get_amp90(self):
+        return self.amp180.get()/2
+
+    def _get_gauss_width(self):
+        return self._gauss_width
+
+    def _set_gauss_width(self, val):
+        self._gauss_width = val
+
+    def _get_motzoi(self):
+        return self._motzoi
+
+    def _set_motzoi(self, val):
+        self._motzoi = val
