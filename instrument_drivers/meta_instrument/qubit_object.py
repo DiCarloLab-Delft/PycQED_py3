@@ -7,6 +7,7 @@ from qcodes.utils import validators as vals
 from modules.analysis.analysis_toolbox import calculate_transmon_transitions
 from modules.measurement import detector_functions as det
 from modules.measurement import mc_parameter_wrapper as pw
+from modules.measurement import awg_sweep_functions as awg_swf
 from modules.analysis import measurement_analysis as ma
 from modules.measurement.pulse_sequences import standard_sequences as st_seqs
 
@@ -61,8 +62,6 @@ class Qubit(Instrument):
     '''
     def __init__(self, name):
         super().__init__(name)
-        self.add_parameter('T1', units='s',
-                           get_cmd=self.measure_T1)
         self.msmt_suffix = '_' + name  # used to append to measuremnet labels
 
     def measure_T1(self):
@@ -487,6 +486,8 @@ class CBox_driven_transmon(Transmon):
                      MC=None, analyze=True, close_fig=False,
                      verbose=False):
         self.prepare_for_timedomain()
+        if MC is None:
+            MC = self.MC
         st_seqs.CBox_multi_pulse_seq(
             IF=self.IF.get(), n_pulses=n,
             pulse_separation=self.pulse_separation.get(),
@@ -499,14 +500,44 @@ class CBox_driven_transmon(Transmon):
         pulse_amps = cal_points + list(pulse_amps)
         self.CBox.set('AWG0_tape', [1, 1])
         self.CBox.set('AWG1_tape', [1, 1])
-        self.MC.set_sweep_function(pw.wrap_par_to_swf(self.LutMan.amp180))
-        self.MC.set_sweep_points(pulse_amps)
-        self.MC.set_detector_function(det.CBox_single_int_avg_with_LutReload(
+        MC.set_sweep_function(pw.wrap_par_to_swf(self.LutMan.amp180))
+        MC.set_sweep_points(pulse_amps)
+        MC.set_detector_function(det.CBox_single_int_avg_with_LutReload(
                                       self.CBox, self.LutMan,
                                       awg_nrs=[self.awg_nr.get()]))
-        self.MC.run('Rabi-n{}'.format(n)+self.msmt_suffix)
+        MC.run('Rabi-n{}'.format(n)+self.msmt_suffix)
         if analyze:
             ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
+
+    def measure_T1(self, times, MC=None,
+                   analyze=True, close_fig=False):
+        '''
+        if update is True will update self.T1 with the measured value
+        '''
+        self.prepare_for_timedomain()
+        if MC is None:
+            MC = self.MC
+        # append the calibration points, times are for location in plot
+        times = np.concatenate([times,
+                               (times[-1]+times[0],
+                                times[-1]+times[0],
+                                times[-1]+times[1],
+                                times[-1]+times[1])])
+        self.CBox.set('nr_samples', len(times))
+        MC.set_sweep_function(
+            awg_swf.CBox_T1(IF=self.IF.get(),
+                            RO_pulse_delay=self.RO_pulse_delay.get(),
+                            RO_trigger_delay=self.RO_trigger_delay.get(),
+                            mod_amp=self.mod_amp_td.get(),
+                            AWG=self.AWG,
+                            upload=True))
+        MC.set_sweep_points(times)
+        MC.set_detector_function(det.CBox_integrated_average_detector(
+                                 self.CBox, self.AWG))
+        MC.run('T1'+self.msmt_suffix)
+        if analyze:
+            a = ma.T1_Analysis(auto=True, close_fig=False)
+            return a.T1
 
     ###########################
     # Parameter get set commands, should be removed in a later version.
