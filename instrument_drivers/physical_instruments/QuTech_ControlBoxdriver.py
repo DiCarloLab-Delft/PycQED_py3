@@ -211,10 +211,12 @@ class QuTech_ControlBox(VisaInstrument):
             sequencer_msg = self.serial_read()
             # Decoding the message
             s_list = list(map(ord, sequencer_msg[0:6]))
-            heartbeat_counter = (s_list[0]-128)*(2**14)+(s_list[1]-128)*(2**7) + \
-                (s_list[2]-128)
-            trigger_counter = (s_list[3]-128)*(2**14)+(s_list[4]-128)*(2**7) + \
-                (s_list[5]-128)
+            heartbeat_counter = (s_list[0]-128)*(2**14) + \
+                                (s_list[1]-128)*(2**7) + \
+                                (s_list[2]-128)
+            trigger_counter = (s_list[3]-128)*(2**14) + \
+                              (s_list[4]-128)*(2**7) + \
+                              (s_list[5]-128)
 
         return heartbeat_counter, trigger_counter
 
@@ -606,7 +608,9 @@ class QuTech_ControlBox(VisaInstrument):
 
         @param awg : the awg of the dac, (0,1,2).
         @param table_nr : the lut of the awg, (0,1,2,3,4,5,6,7).
-        @param dac : the dac of the awg, 0 = Q and 1 = I channel.
+        @param dac : the dac of the awg.
+            If version <= 2.15:  0 = Q and 1 = I channel.
+            If version >= 2.16:  0 = I and 1 = Q channel.
         @param lut : the array of the with amplitude values,
             if units is 'mV' the range is (-1000mV, 1000mV)
             if units is 'dac' range is (-8192, 8191)
@@ -634,6 +638,12 @@ class QuTech_ControlBox(VisaInstrument):
             raise ValueError
         if dac_ch < 0 or dac_ch > 1:
             raise ValueError
+
+        # for version >= 2.16, the I/Q port order is opposite to the earlier
+        # version
+        v = self.get('firmware_version')
+        if (int(v[1]) == 2) and (int(int(v[3:5])) > 15):
+            dac_ch = 1 - dac_ch
 
         length = len(lut)
 
@@ -754,10 +764,18 @@ class QuTech_ControlBox(VisaInstrument):
         mute or enable a dac of an awg
 
         @param awg_nr : the awg of the dac, (0,1,2).
-        @param dac_ch : the dac of the awg, 0 = Q and 1 = I channel.
+        @param dac : the dac of the awg.
+            If version <= 2.15:  0 = Q and 1 = I channel.
+            If version >= 2.16:  0 = I and 1 = Q channel.
         @param enable: True = enable and False = disable
         @return stat : 0 if the upload succeeded and 1 if the upload failed.
         '''
+        # for version >= 2.16, the I/Q port order is opposite to the earlier
+        # version
+        v = self.get('firmware_version')
+        if (int(v[1]) == 2) and (int(int(v[3:5])) > 15):
+            dac_ch = 1 - dac_ch
+
         if enable == 0:
             cmd = defHeaders.AwgDisableHeader
         else:
@@ -776,10 +794,18 @@ class QuTech_ControlBox(VisaInstrument):
         set the offset of 1 dac of an awg.
 
         @param awg : the awg of the dac, (0,1,2).
-        @param dac : the dac of the awg, 0 = Q and 1 = I channel.
+        @param dac : the dac of the awg.
+            If version <= 2.15:  0 = Q and 1 = I channel.
+            If version >= 2.16:  0 = I and 1 = Q channel.
         @param offset : the offset in mV, range [-1000, 1000].
         @return stat : 0 if the upload succeeded and 1 if the upload failed.
         '''
+        # for version >= 2.16, the I/Q port order is opposite to the earlier
+        # version
+        v = self.get('firmware_version')
+        if (int(v[1]) == 2) and (int(int(v[3:5])) > 15):
+            dac_ch = 1 - dac_ch
+
         if offset > 1000 or offset < -1000:
             raise ValueError('offset out of range [-1, 1] (volts)')
 
