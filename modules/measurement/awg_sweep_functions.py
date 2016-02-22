@@ -171,6 +171,9 @@ class CBox_OffOn(swf.Hard_Sweep):
                 verbose=False)
             self.AWG.set('ch3_amp', ch3_amp)
             self.AWG.set('ch4_amp', ch4_amp)
+            # Prevents reloading, potentially bug prone as reusing the swf
+            # does not rest the upload flag
+            self.upload = False
 
 
 class CBox_AllXY(swf.Hard_Sweep):

@@ -57,9 +57,19 @@ IVVI = iv.IVVI('IVVI', address='ASRL1', numdacs=16)
 # Meta-instruments
 HS = hd.LO_modulated_Heterodyne('HS', LO=LO, CBox=CBox, AWG=AWG)
 LutMan = lm.QuTech_ControlBox_LookuptableManager('LutMan', CBox)
-station = qc.Station(LO, S1, S2, IVVI,
-                     AWG, HS, CBox, LutMan)
+
 MC = mc.MeasurementControl('MC')
+
+VIP_mon_4 = qb.CBox_driven_transmon('VIP_mon_4',
+                                    LO=LO, cw_source=S1, td_source=S2,
+                                    IVVI=IVVI,
+                                    AWG=AWG, LutMan=LutMan,
+                                    CBox=CBox, heterodyne_instr=HS, MC=MC)
+gen.load_settings_onto_instrument(VIP_mon_4, label='VIP_mon_4')
+
+station = qc.Station(LO, S1, S2, IVVI,
+                     AWG, HS, CBox, LutMan,
+                     VIP_mon_4)
 MC.station = station
 station.MC = MC
 nested_MC = mc.MeasurementControl('nested_MC')
@@ -90,37 +100,17 @@ st_seqs.station = station
 IVVI.set('dac2', 300)
 IVVI.dac5.set(91.3)
 
-RO_freq = 6.8482e9
-qubit_freq = 6.4718e9 - 40e6  # as measured by my Ramsey
 IF = -20e6        # RO modulation frequency
-mod_freq = -50e6  # Qubit pulse modulation frequency
 
-RO_pulse_length = 300e-9
-RO_trigger_delay = 100e-9
-RO_pulse_delay = 300e-9
-
-HS.set('mod_amp', .125)  # low power regime of VIPmon2
-HS.set('IF', IF)
-HS.set('frequency', RO_freq)  # Frequence of the RO resonator of qubit 2
-LO.set('power', 16)  # splitting gives 13dBm at both mixer LO ports
 LO.off()
 
 S1.off()
-S2.set('power', 14)
-S2.set('frequency', qubit_freq - mod_freq)
 S2.off()
 
 
-LutMan.set('f_modulation', mod_freq*1e-9)  # Lutman works in ns and GHz
-LutMan.set('gauss_width', 10)
-amp180 = 509
-# Need to add attenuation to ensure a more sensible value is used (e.g. 300)
-LutMan.set('amp180', amp180)
-LutMan.set('amp90', amp180/2)
-LutMan.set('motzoi_parameter', -0.3)
-# Calibrated at 6.5GHz (18-1-2016)
-CBox.set_dac_offset(0, 1, 16.30517578125)  # I channel qubit drive AWG
-CBox.set_dac_offset(0, 0, -40.6337890625,)  # Q channel
+# Calibrated at 6.6GHz (22-2-2016)
+CBox.set_dac_offset(0, 0, -38.8779296875)  # Q channel
+CBox.set_dac_offset(0, 1,  16.1220703125)  # I channel qubit drive AWG
 
 CBox.set_dac_offset(1, 1, 0)  # I channel
 CBox.set_dac_offset(1, 0, 0)  # Q channel readout AWG

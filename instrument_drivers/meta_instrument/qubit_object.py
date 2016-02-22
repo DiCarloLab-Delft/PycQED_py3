@@ -3,6 +3,7 @@ import numpy as np
 
 from qcodes.instrument.base import Instrument
 from qcodes.utils import validators as vals
+from qcodes.instrument.parameter import ManualParameter
 
 from modules.analysis.analysis_toolbox import calculate_transmon_transitions
 from modules.measurement import detector_functions as det
@@ -107,51 +108,38 @@ class Transmon(Qubit):
     def __init__(self, name):
         super().__init__(name)
         self.add_parameter('EC', units='Hz',
-                           get_cmd=self._get_EC,
-                           set_cmd=self._set_EC,
+                           parameter_class=ManualParameter,
                            vals=vals.Numbers())
 
         self.add_parameter('EJ', units='Hz',
-                           get_cmd=self._get_EJ,
-                           set_cmd=self._set_EJ,
+                           parameter_class=ManualParameter,
                            vals=vals.Numbers())
         self.add_parameter('assymetry',
-                           get_cmd=self._get_assym,
-                           set_cmd=self._set_assym)
+                           parameter_class=ManualParameter)
 
         self.add_parameter('dac_voltage', units='mV',
-                           get_cmd=self._get_dac_voltage,
-                           set_cmd=self._set_dac_voltage)
+                           parameter_class=ManualParameter)
         self.add_parameter('dac_sweet_spot', units='mV',
-                           get_cmd=self._get_dac_sw_spot,
-                           set_cmd=self._set_dac_sw_spot)
+                           parameter_class=ManualParameter)
         self.add_parameter('dac_channel', vals=vals.Ints(),
-                           get_cmd=self._get_dac_channel,
-                           set_cmd=self._set_dac_channel)
+                           parameter_class=ManualParameter)
         self.add_parameter('flux',
-                           get_cmd=self._get_flux,
-                           set_cmd=self._set_flux)
+                           parameter_class=ManualParameter)
 
         self.add_parameter('f_qubit', label='qubit frequency', units='Hz',
-                           get_cmd=self._get_freq,
-                           set_cmd=self._set_freq)
+                           parameter_class=ManualParameter)
         self.add_parameter('f_res', label='resonator frequency', units='Hz',
-                           get_cmd=self._get_f_res,
-                           set_cmd=self._set_f_res)
+                           parameter_class=ManualParameter)
 
         # Sequence/pulse parameters
         self.add_parameter('RO_pulse_delay', units='s',
-                           get_cmd=self._get_RO_pulse_delay,
-                           set_cmd=self._set_RO_pulse_delay)
+                           parameter_class=ManualParameter)
         self.add_parameter('RO_pulse_length', units='s',
-                           get_cmd=self._get_RO_pulse_length,
-                           set_cmd=self._set_RO_pulse_length)
+                           parameter_class=ManualParameter)
         self.add_parameter('RO_trigger_delay', units='s',
-                           get_cmd=self._get_RO_trigger_delay,
-                           set_cmd=self._set_RO_trigger_delay)
+                           parameter_class=ManualParameter)
         self.add_parameter('pulse_separation', units='s',
-                           get_cmd=self._get_pulse_separation,
-                           set_cmd=self._set_pulse_separation)
+                           parameter_class=ManualParameter)
 
     def calculate_frequency(self, EC=None, EJ=None, assymetry=None,
                             dac_voltage=None, flux=None,
@@ -236,86 +224,6 @@ class Transmon(Qubit):
     def find_resonator_frequency(self, **kw):
         raise NotImplementedError()
 
-    # All the functions below should be absorbed into the new
-    # "holder parameter" get and set function of QCodes that does not exist yet
-    def _set_EJ(self, val):
-        self._EJ = val
-
-    def _get_EJ(self):
-        return self._EJ
-
-    def _set_EC(self, val):
-        self._EC = val
-
-    def _get_EC(self):
-        return self._EC
-
-    def _set_assym(self, val):
-        self._assym = val
-
-    def _get_assym(self):
-        return self._assym
-
-    def _set_dac_voltage(self, val):
-        self._dac_voltage = val
-
-    def _get_dac_voltage(self):
-        return self._dac_voltage
-
-    def _set_dac_sw_spot(self, val):
-        self._dac_sw_spot = val
-
-    def _get_dac_sw_spot(self):
-        return self._dac_sw_spot
-
-    def _set_dac_channel(self, val):
-        self._dac_channel = val
-
-    def _get_dac_channel(self):
-        return self._dac_channel
-
-    def _set_flux(self, val):
-        self._flux = val
-
-    def _get_flux(self):
-        return self._flux
-
-    def _set_freq(self, val):
-        self._freq = val
-
-    def _get_freq(self):
-        return self._freq
-
-    def _set_f_res(self, val):
-        self._f_res = val
-
-    def _get_f_res(self):
-        return self._f_res
-
-    def _set_RO_pulse_delay(self, val):
-        self._RO_pulse_delay = val
-
-    def _get_RO_pulse_delay(self):
-        return self._RO_pulse_delay
-
-    def _set_RO_pulse_length(self, val):
-        self._RO_pulse_length = val
-
-    def _get_RO_pulse_length(self):
-        return self._RO_pulse_length
-
-    def _set_RO_trigger_delay(self, val):
-        self._RO_trigger_delay = val
-
-    def _get_RO_trigger_delay(self):
-        return self._RO_trigger_delay
-
-    def _set_pulse_separation(self, val):
-        self._pulse_separation = val
-
-    def _get_pulse_separation(self):
-        return self._pulse_separation
-
 
 class CBox_driven_transmon(Transmon):
     '''
@@ -342,55 +250,42 @@ class CBox_driven_transmon(Transmon):
         self.MC = MC
         self.add_parameter('mod_amp_cw', label='RO modulation ampl cw',
                            units='V',
-                           get_cmd=self._get_mod_amp_cw,
-                           set_cmd=self._set_mod_amp_cw)
+                           parameter_class=ManualParameter)
         self.add_parameter('mod_amp_td', label='RO modulation ampl td',
                            units='V',
-                           get_cmd=self._get_mod_amp_td,
-                           set_cmd=self._set_mod_amp_td)
+                           parameter_class=ManualParameter)
 
         self.add_parameter('spec_pow', label='spectroscopy power',
                            units='dBm',
-                           get_cmd=self._get_spec_pow,
-                           set_cmd=self._set_spec_pow)
+                           parameter_class=ManualParameter)
         self.add_parameter('spec_pow_pulsed',
                            label='pulsed spectroscopy power',
                            units='dBm',
-                           get_cmd=self._get_spec_pow_pulsed,
-                           set_cmd=self._set_spec_pow_pulsed)
+                           parameter_class=ManualParameter)
         self.add_parameter('td_source_pow',
                            label='Time-domain power',
                            units='dBm',
-                           get_cmd=self._get_td_source_pow,
-                           set_cmd=self._set_td_source_pow)
-
+                           parameter_class=ManualParameter)
         self.add_parameter('IF',
                            label='inter-modulation frequency', units='Hz',
-                           get_cmd=self._get_IF,
-                           set_cmd=self._set_IF)
+                           parameter_class=ManualParameter)
         # Time-domain parameters
         self.add_parameter('f_pulse_mod',
                            label='pulse-modulation frequency', units='Hz',
-                           get_cmd=self._get_f_pulsemod,
-                           set_cmd=self._set_f_pulsemod)
+                           parameter_class=ManualParameter)
         self.add_parameter('awg_nr', label='CBox awg nr', units='#',
-                           get_cmd=self._get_awg_nr,
-                           set_cmd=self._set_awg_nr)
+                           parameter_class=ManualParameter)
 
         self.add_parameter('amp180',
                            label='Pi-pulse amplitude', units='mV',
-                           get_cmd=self._get_amp180,
-                           set_cmd=self._set_amp180)
-        # amp90 is hard-linked to amp180
+                           parameter_class=ManualParameter)
         self.add_parameter('amp90',
                            label='Pi/2-pulse amplitude', units='mV',
                            get_cmd=self._get_amp90)
         self.add_parameter('gauss_width', units='s',
-                           get_cmd=self._get_gauss_width,
-                           set_cmd=self._set_gauss_width)
+                           parameter_class=ManualParameter)
         self.add_parameter('motzoi', label='Motzoi parameter', units='',
-                           get_cmd=self._get_motzoi,
-                           set_cmd=self._set_motzoi)
+                           parameter_class=ManualParameter)
 
     def prepare_for_continuous_wave(self):
 
@@ -643,109 +538,43 @@ class CBox_driven_transmon(Transmon):
         if MC is None:
             MC = self.MC
         d = cdet.AllXY_devition_detector_CBox(
-                'AllXY'+self.msmt_suffix, MC=MC,
-                AWG=self.AWG, CBox=self.CBox, IF=self.IF.get(),
-                pulse_separation=self.pulse_separation.get(),
-                RO_pulse_delay=self.RO_pulse_delay.get(),
-                RO_trigger_delay=self.RO_trigger_delay.get(),
-                RO_pulse_length=self.RO_pulse_length.get())
+            'AllXY'+self.msmt_suffix, MC=MC,
+            AWG=self.AWG, CBox=self.CBox, IF=self.IF.get(),
+            pulse_separation=self.pulse_separation.get(),
+            RO_pulse_delay=self.RO_pulse_delay.get(),
+            RO_trigger_delay=self.RO_trigger_delay.get(),
+            RO_pulse_length=self.RO_pulse_length.get())
         d.prepare()
         d.acquire_data_point()
         if analyze:
             ma.AllXY_Analysis(close_main_fig=close_fig)
 
-    ###########################
-    # Parameter get set commands, should be removed in a later version.
-    ############################
-    def _get_mod_amp_cw(self):
-        return self._mod_amp_cw
+    def measure_ssro(self, no_fits=False,
+                     return_detector=False,
+                     MC=None,
+                     analyze=True, close_fig=False, verbose=True):
+        self.prepare_for_timedomain()
 
-    def _set_mod_amp_cw(self, val):
-        self._mod_amp_cw = val
+        if MC is None:
+            MC = self.MC
+        d = cdet.SSRO_Fidelity_Detector_CBox(
+            'SSRO'+self.msmt_suffix,
+            analyze=return_detector,
+            raw=no_fits,
+            MC=MC,
+            AWG=self.AWG, CBox=self.CBox, IF=self.IF.get(),
+            pulse_separation=self.pulse_separation.get(),
+            RO_pulse_delay=self.RO_pulse_delay.get(),
+            RO_trigger_delay=self.RO_trigger_delay.get(),
+            RO_pulse_length=self.RO_pulse_length.get())
 
-    def _get_IF(self):
-        return self._IF
-
-    def _set_IF(self, val):
-        self._IF = val
-
-    def _get_mod_amp_cw(self):
-        return self._mod_amp_cw
-
-    def _set_mod_amp_cw(self, val):
-        self._mod_amp_cw = val
-
-    def _get_mod_amp_cw(self):
-        return self._mod_amp_cw
-
-    def _set_mod_amp_cw(self, val):
-        self._mod_amp_cw = val
-
-    def _get_mod_amp_cw(self):
-        return self._mod_amp_cw
-
-    def _set_mod_amp_cw(self, val):
-        self._mod_amp_cw = val
-
-    def _get_mod_amp_cw(self):
-        return self._mod_amp_cw
-
-    def _set_mod_amp_cw(self, val):
-        self._mod_amp_cw = val
-
-    def _get_mod_amp_td(self):
-        return self._mod_amp_td
-
-    def _set_mod_amp_td(self, val):
-        self._mod_amp_td = val
-
-    def _get_spec_pow(self):
-        return self._spec_pow
-
-    def _set_spec_pow(self, val):
-        self._spec_pow = val
-
-    def _get_spec_pow_pulsed(self):
-        return self._spec_pow_pulsed
-
-    def _set_spec_pow_pulsed(self, val):
-        self._spec_pow_pulsed = val
-
-    def _get_td_source_pow(self):
-        return self._td_source_pow
-
-    def _set_td_source_pow(self, val):
-        self._td_source_pow = val
-
-    def _get_f_pulsemod(self):
-        return self._f_pulsemod
-
-    def _set_f_pulsemod(self, val):
-        self._f_pulsemod = val
-
-    def _get_awg_nr(self):
-        return self._awg_nr
-
-    def _set_awg_nr(self, val):
-        self._awg_nr = val
-
-    def _get_amp180(self):
-        return self._amp180
-
-    def _set_amp180(self, val):
-        self._amp180 = val
+        if return_detector:
+            return d
+        d.prepare()
+        d.acquire_data_point()
+        if analyze:
+            ma.SSRO_Analysis(label='SSRO'+self.msmt_suffix,
+                             no_fits=no_fits, close_fig=close_fig)
 
     def _get_amp90(self):
         return self.amp180.get()/2
-
-    def _get_gauss_width(self):
-        return self._gauss_width
-
-    def _set_gauss_width(self, val):
-        self._gauss_width = val
-
-    def _get_motzoi(self):
-        return self._motzoi
-
-    def _set_motzoi(self, val):
-        self._motzoi = val

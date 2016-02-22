@@ -308,11 +308,10 @@ class TimeDomainDetector_integrated(det.Soft_Detector):
 class SSRO_Fidelity_Detector_CBox(det.Soft_Detector):
     '''
     Currently only for CBox.
-    Todo: remove the predefined values for the sequence
     '''
     def __init__(self, measurement_name, MC, AWG, CBox,
                  RO_pulse_length, RO_pulse_delay, RO_trigger_delay,
-                 raw=True, **kw):
+                 raw=True, analyze=True, **kw):
         self.detector_control = 'soft'
         self.name = 'SSRO_Fidelity'
         # For an explanation of the difference between the different
@@ -337,6 +336,9 @@ class SSRO_Fidelity_Detector_CBox(det.Soft_Detector):
         self.i = 0
 
         self.raw = raw  # Performs no fits if True
+        self.analyze = analyze
+
+        self.upload=True
 
     def prepare(self, **kw):
         self.CBox.set('log_length', self.NoSamples)
@@ -354,14 +356,14 @@ class SSRO_Fidelity_Detector_CBox(det.Soft_Detector):
     def acquire_data_point(self, *args, **kw):
         self.i += 1
         self.MC.run(name=self.measurement_name+'_'+str(self.i))
-
-        ana = ma.SSRO_Analysis(label=self.measurement_name,
-                               no_fits=self.raw, close_file=True)
-        # Arbitrary choice, does not think about the deffinition
-        if self.raw:
-            return ana.F_raw
-        else:
-            return ana.F, ana.F_corrected
+        if self.analyze:
+            ana = ma.SSRO_Analysis(label=self.measurement_name,
+                                   no_fits=self.raw, close_file=True)
+            # Arbitrary choice, does not think about the deffinition
+            if self.raw:
+                return ana.F_raw
+            else:
+                return ana.F, ana.F_corrected
 
 
 class CBox_trace_error_fraction_detector(det.Soft_Detector):
