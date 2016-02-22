@@ -222,7 +222,8 @@ class Transmon(Qubit):
                     print('Measured detuning:{:.2e}'.format(measured_detuning))
                     print('Setting freq to: {:.9e}, \n'.format(cur_freq))
 
-                if times[-1] > 3*a.T2_star:
+                if times[-1] > 1.5*a.T2_star:
+                    # If the last step is > T2* then the next will be for sure
                     if verbose:
                         print('Breaking of measurement because of T2*')
                     break

@@ -123,10 +123,11 @@ class Element:
         '''
         checks if "value" is divisible by the clock period.
         This funciton is needed because of floating point errors
+
+        It performs this by multiplying everything by 1e11 (looking at 0.01ns
+        resolution for divisibility)
         '''
-        if value % (1/self.clock) < 1e-20:
-            return True
-        elif (1/self.clock) - value % (1/self.clock) < 1e-20:
+        if np.round(value*1e11) % (1/self.clock*1e11) == 0:
             return True
         else:
             return False
