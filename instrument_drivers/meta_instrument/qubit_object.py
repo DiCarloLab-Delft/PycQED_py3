@@ -15,8 +15,9 @@ from modules.measurement.pulse_sequences import standard_sequences as st_seqs
 
 class Qubit(Instrument):
     '''
-    Base class for the qubit object.
+    Abstract base class for the qubit object.
     Contains a template for all the functions a qubit should have.
+    N.B. This is not intended to be initialized.
 
     Specific types of qubits should inherit from this class, different setups
     can inherit from those to further specify the functionality.
@@ -192,13 +193,44 @@ class Transmon(Qubit):
     def prepare_for_continuous_wave(self):
         raise NotImplementedError()
 
-    def find_frequency(self, method='spectroscopy', **kw):
-        raise NotImplementedError()
-        if method == 'spectroscopy':
-            self.measure_spectroscopy(**kw)
-        else:
-            # Paste the Ramsey loop here
-            self.measure_Ramsey(**kw)
+    def find_frequency(self, method='spectroscopy',
+                       steps=[1, 3, 10, 30, 100, 300, 1000],
+                       verbose=True,
+                       update=False,
+                       close_fig=False):
+
+        if method.lower() == 'spectroscopy':
+            self.measure_spectroscopy()
+        elif method.lower() == 'ramsey':
+
+            stepsize = abs(1/self.f_pulse_mod.get())
+            cur_freq = self.f_qubit.get()
+            # Steps don't double to be more robust against aliasing
+            for n in [1, 3, 10, 30, 100, 300, 1000]:
+                times = np.arange(self.pulse_separation.get(),
+                                  50*n*stepsize, n*stepsize)
+                artificial_detuning = 4/times[-1]
+                self.measure_ramsey(times,
+                                    artificial_detuning=artificial_detuning,
+                                    f_qubit=cur_freq,
+                                    analyze=False)
+                a = ma.Ramsey_Analysis(auto=True, close_fig=close_fig)
+                fitted_freq = a.fit_res.params['frequency'].value
+                measured_detuning = fitted_freq-artificial_detuning
+                cur_freq -= measured_detuning
+                if verbose:
+                    print('Measured detuning:{:.2e}'.format(measured_detuning))
+                    print('Setting freq to: {:.9e}, \n'.format(cur_freq))
+
+                if times[-1] > 3*a.T2_star:
+                    if verbose:
+                        print('Breaking of measurement because of T2*')
+                    break
+        if verbose:
+            print('Converged to: {:.9e}'.format(cur_freq))
+        if update:
+            self.f_qubit.set(cur_freq)
+        return cur_freq
 
     def find_resonator_frequency(self, **kw):
         raise NotImplementedError()
@@ -381,11 +413,13 @@ class CBox_driven_transmon(Transmon):
         self.td_source.power.set(self.td_source_pow.get())
         self.AWG.set('ch3_amp', self.mod_amp_td.get())
         self.AWG.set('ch4_amp', self.mod_amp_td.get())
+        self.CBox.set('AWG{:.0g}_mode'.format(self.awg_nr.get()), 'tape')
 
         self.LutMan.amp180.set(self.amp180.get())
         self.LutMan.amp90.set(self.amp90.get())
         self.LutMan.gauss_width.set(self.gauss_width.get()*1e9)  # s to ns
         self.LutMan.motzoi_parameter.set(self.motzoi.get())
+        self.LutMan.f_modulation.set(self.f_pulse_mod.get()*1e-9)
         self.LutMan.load_pulses_onto_AWG_lookuptable(self.awg_nr.get())
 
     def find_resonator_frequency(self, use_min=False,
@@ -517,6 +551,8 @@ class CBox_driven_transmon(Transmon):
             RO_pulse_delay=self.RO_pulse_delay.get(),
             RO_trigger_delay=self.RO_trigger_delay.get(),
             RO_pulse_length=self.RO_pulse_length.get(), verbose=verbose)
+        self.AWG.set('ch3_amp', self.mod_amp_td.get())
+        self.AWG.set('ch4_amp', self.mod_amp_td.get())
         self.AWG.start()
 
         cal_points = [0, 0]
@@ -526,8 +562,8 @@ class CBox_driven_transmon(Transmon):
         MC.set_sweep_function(pw.wrap_par_to_swf(self.LutMan.amp180))
         MC.set_sweep_points(pulse_amps)
         MC.set_detector_function(det.CBox_single_int_avg_with_LutReload(
-                                      self.CBox, self.LutMan,
-                                      awg_nrs=[self.awg_nr.get()]))
+                                 self.CBox, self.LutMan,
+                                 awg_nrs=[self.awg_nr.get()]))
         MC.run('Rabi-n{}'.format(n)+self.msmt_suffix)
         if analyze:
             ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
@@ -562,17 +598,22 @@ class CBox_driven_transmon(Transmon):
             a = ma.T1_Analysis(auto=True, close_fig=False)
             return a.T1
 
-    def measure_ramsey(self, times, artificial_detuning=0, MC=None,
-                       analyze=True, close_fig=False, verbose=True):
+    def measure_ramsey(self, times, artificial_detuning=0, f_qubit=None,
+                       MC=None, analyze=True, close_fig=False, verbose=True):
         self.prepare_for_timedomain()
         if MC is None:
             MC = self.MC
-        f = self.td_source.get('frequency')
+
         # This is required because I cannot change the phase in the pulses
         if not all([np.round(t*1e9) % (1/self.f_pulse_mod.get()*1e9)
                    == 0 for t in times]):
             raise ValueError('timesteps must be multiples of modulation freq')
-        self.td_source.set('frequency', f+artificial_detuning)
+
+        if f_qubit is None:
+            f_qubit = self.f_qubit.get()
+        # this should have no effect if artificial detuning = 0
+        self.td_source.set('frequency', f_qubit - self.f_pulse_mod.get() +
+                           artificial_detuning)
         Rams_swf = awg_swf.CBox_Ramsey(
             AWG=self.AWG, CBox=self.CBox, IF=self.IF.get(), pulse_separation=0,
             RO_pulse_delay=self.RO_pulse_delay.get(),
@@ -582,8 +623,8 @@ class CBox_driven_transmon(Transmon):
         MC.set_sweep_points(times)
         MC.set_detector_function(det.CBox_integrated_average_detector(
                                  self.CBox, self.AWG))
-        MC.run('Ramsey')
-        self.td_source.set('frequency', f)
+        MC.run('Ramsey'+self.msmt_suffix)
+
         if analyze:
             a = ma.Ramsey_Analysis(auto=True, close_fig=False)
 

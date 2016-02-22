@@ -73,8 +73,9 @@ class CBox_Ramsey(swf.Hard_Sweep):
             tape = [3, 3] * nr_elts
 
         self.AWG.stop()
-        self.CBox.AWG0_mode.set('Tape')
-        self.CBox.AWG1_mode.set('Tape')
+        # TODO Change to segmented tape if we have the new timing tape
+        self.CBox.AWG0_mode.set('tape')
+        self.CBox.AWG1_mode.set('tape')
         self.CBox.restart_awg_tape(0)
         self.CBox.restart_awg_tape(1)
         self.CBox.set('AWG0_tape', tape)
