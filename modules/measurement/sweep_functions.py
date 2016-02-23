@@ -40,12 +40,14 @@ class Soft_Sweep(Sweep_function):
 
 
 class None_Sweep(Soft_Sweep):
-    def __init__(self, sweep_control='soft', **kw):
+    def __init__(self, sweep_control='soft', sweep_points=None,
+                 **kw):
         super(None_Sweep, self).__init__()
         self.sweep_control = sweep_control
         self.name = 'None_Sweep'
         self.parameter_name = 'pts'
         self.unit = 'arb. unit'
+        self.sweep_points = sweep_points
 
     def set_parameter(self, val):
         '''

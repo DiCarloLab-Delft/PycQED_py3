@@ -9,6 +9,8 @@ from modules.analysis.analysis_toolbox import calculate_transmon_transitions
 from modules.measurement import detector_functions as det
 from modules.measurement import composite_detector_functions as cdet
 from modules.measurement import mc_parameter_wrapper as pw
+
+from modules.measurement import sweep_functions as swf
 from modules.measurement import awg_sweep_functions as awg_swf
 from modules.analysis import measurement_analysis as ma
 from modules.measurement.pulse_sequences import standard_sequences as st_seqs
@@ -575,6 +577,50 @@ class CBox_driven_transmon(Transmon):
         if analyze:
             ma.SSRO_Analysis(label='SSRO'+self.msmt_suffix,
                              no_fits=no_fits, close_fig=close_fig)
+
+    def measure_discrimination_fid(self, no_fits=False,
+                                   return_detector=False,
+                                   MC=None,
+                                   analyze=True,
+                                   close_fig=False, make_fig=True,
+                                   verbose=True):
+        '''
+        Measures the single shot discrimination fidelity.
+        Uses whatever sequence is currently loaded and takes 8000 single shots
+        Constructs histograms based on those and uses it to extract the
+        single-shot discrimination fidelity.
+        '''
+        self.prepare_for_timedomain()
+
+        if MC is None:
+            MC = self.MC
+
+        # If I return the detector to use it must do analysis internally
+        # Otherwise I do it here in the qubit object so that I can pass args
+        analysis_in_det = return_detector
+        d = cdet.CBox_SSRO_discrimination_detector(
+                'SSRO-disc'+self.msmt_suffix,
+                analyze=analysis_in_det,
+                MC=MC, AWG=self.AWG, CBox=self.CBox,
+                sequence_swf=swf.None_Sweep(sweep_control='hard',
+                                            sweep_points=np.arange(10)))
+        if return_detector:
+            return d
+        d.prepare()
+        discr_vals = d.acquire_data_point()
+        if analyze:
+            current_threshold = self.CBox.sig0_threshold_line.get()
+            a = ma.SSRO_discrimination_analysis(
+                label='SSRO-disc'+self.msmt_suffix,
+                current_threshold=current_threshold,
+                close_fig=close_fig,
+                plot_2D_histograms=make_fig)
+
+            return (a.F_discr_curr_t*100, a.F_discr*100,
+                    a.theta, a.opt_I_threshold,
+                    a.relative_separation, a.relative_separation_I)
+        return discr_vals
+
 
     def _get_amp90(self):
         return self.amp180.get()/2

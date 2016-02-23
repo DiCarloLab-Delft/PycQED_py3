@@ -504,6 +504,7 @@ class CBox_SSRO_discrimination_detector(det.Soft_Detector):
                  calibrate_threshold=False,
                  save_raw_trace=False,
                  counters=True,
+                 analyze=True,
                  **kw):
         super().__init__(**kw)
 
@@ -527,6 +528,9 @@ class CBox_SSRO_discrimination_detector(det.Soft_Detector):
         # Required to set some kind of sequence that does a pulse
         self.sequence_swf = sequence_swf
 
+        # If analyze is False it cannot be used as a detector anymore
+        self.analyze = analyze
+
     def prepare(self, **kw):
         self.i = 0
         self.MC.set_sweep_function(self.sequence_swf)
@@ -541,12 +545,13 @@ class CBox_SSRO_discrimination_detector(det.Soft_Detector):
         self.i += 1
 
         self.MC.run(self.name+'_{}'.format(self.i))
-        a = ma.SSRO_discrimination_analysis(
-            label=self.name+'_{}'.format(self.i),
-            current_threshold=self.threshold)
-        return (a.F_discr_curr_t*100, a.F_discr*100,
-                a.theta, a.opt_I_threshold,
-                a.relative_separation, a.relative_separation_I)
+        if self.analyze:
+            a = ma.SSRO_discrimination_analysis(
+                label=self.name+'_{}'.format(self.i),
+                current_threshold=self.threshold)
+            return (a.F_discr_curr_t*100, a.F_discr*100,
+                    a.theta, a.opt_I_threshold,
+                    a.relative_separation, a.relative_separation_I)
 
 
 # class SSRO_Fidelity_Detector_CBox_optimum_weights(SSRO_Fidelity_Detector_CBox):
