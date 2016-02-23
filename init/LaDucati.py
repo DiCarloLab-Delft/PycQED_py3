@@ -41,7 +41,8 @@ from instrument_drivers.physical_instruments import QuTech_ControlBoxdriver as q
 from instrument_drivers.meta_instrument import heterodyne as hd
 import instrument_drivers.meta_instrument.CBox_LookuptableManager as lm
 
-from instrument_drivers.meta_instrument import qubit_object as qb
+from instrument_drivers.meta_instrument.qubit_objects import CBox_driven_transmon as qb
+
 
 # Initializing instruments
 
