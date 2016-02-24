@@ -1,5 +1,6 @@
 import logging
 import numpy as np
+from scipy.optimize import brent
 
 from .qubit_object import Transmon
 from qcodes.utils import validators as vals
@@ -10,9 +11,11 @@ from modules.measurement import composite_detector_functions as cdet
 from modules.measurement import mc_parameter_wrapper as pw
 
 from modules.measurement import sweep_functions as swf
+from modules.measurement import CBox_sweep_functions as cb_swf
 from modules.measurement import awg_sweep_functions as awg_swf
 from modules.analysis import measurement_analysis as ma
 from modules.measurement.pulse_sequences import standard_sequences as st_seqs
+import modules.measurement.randomized_benchmarking.randomized_benchmarking as rb
 
 
 class CBox_driven_transmon(Transmon):
@@ -77,6 +80,18 @@ class CBox_driven_transmon(Transmon):
         self.add_parameter('motzoi', label='Motzoi parameter', units='',
                            parameter_class=ManualParameter)
 
+        # Single shot readout specific parameters
+        self.add_parameter('RO_threshold', units='dac-value',
+                           parameter_class=ManualParameter)
+        self.add_parameter('signal_line', parameter_class=ManualParameter,
+                           vals=vals.Enum(0, 1), initial_value=0)
+
+        # Mixer skewness correction
+        self.add_parameter('phi', units='deg',
+                           parameter_class=ManualParameter, initial_value=0)
+        self.add_parameter('alpha', units='',
+                           parameter_class=ManualParameter, initial_value=1)
+
     def prepare_for_continuous_wave(self):
 
         self.heterodyne_instr._disable_auto_seq_loading = False
@@ -106,7 +121,18 @@ class CBox_driven_transmon(Transmon):
         self.LutMan.gauss_width.set(self.gauss_width.get()*1e9)  # s to ns
         self.LutMan.motzoi_parameter.set(self.motzoi.get())
         self.LutMan.f_modulation.set(self.f_pulse_mod.get()*1e-9)
+
+        # Mixer skewness correction
+        self.LutMan.IQ_phase_skewness.set(0)
+        self.LutMan.QI_amp_ratio.set(1)
+        self.LutMan.apply_predistortion_matrix.set(True)
+        self.LutMan.alpha.set(self.alpha.get())
+        self.LutMan.phi.set(self.phi.get())
+
         self.LutMan.load_pulses_onto_AWG_lookuptable(self.awg_nr.get())
+
+        self.CBox.set('sig{}_threshold_line'.format(int(self.signal_line.get())),
+                      int(self.RO_threshold.get()))
 
     def find_resonator_frequency(self, use_min=False,
                                  update=True,
@@ -133,6 +159,192 @@ class CBox_driven_transmon(Transmon):
         elif update:  # don't update if the value is out of the scan range
             self.f_res.set(f_res)
         return f_res
+
+    def get_resetless_rb_detector(self, nr_cliff, starting_seed=1,
+                                  nr_seeds='max', pulse_p_elt='min',
+                                  MC=None,
+                                  upload=True):
+        if MC is None:
+            MC = self.MC
+
+        if pulse_p_elt == 'min':
+            safety_factor = 5 if nr_cliff < 8 else 3
+            pulse_p_elt = int(safety_factor*nr_cliff)
+        if nr_seeds == 'max':
+            nr_seeds = 4000//pulse_p_elt
+
+        if nr_seeds*pulse_p_elt > 4000:
+            raise ValueError(
+                'Too many pulses ({}), {} seeds, {} pulse_p_elt'.format(
+                    nr_seeds*pulse_p_elt, nr_seeds, pulse_p_elt))
+
+        resetless_interval = (
+            np.round(pulse_p_elt*self.pulse_separation.get()*1e6)+2.5)*1e-6
+
+        combined_tape = []
+        for i in range(nr_seeds):
+            if starting_seed is not None:
+                seed = starting_seed*1000*i
+            else:
+                seed = None
+            rb_seq = rb.randomized_benchmarking_sequence(nr_cliff,
+                                                         desired_net_cl=3,
+                                                         seed=seed)
+            tape = rb.convert_clifford_sequence_to_tape(
+                rb_seq, self.LutMan.lut_mapping.get())
+            if len(tape) > pulse_p_elt:
+                raise ValueError(
+                    'Too many pulses ({}), {} pulse_p_elt'.format(
+                        len(tape),  pulse_p_elt))
+            combined_tape += [0]*(pulse_p_elt-len(tape))+tape
+
+        s = awg_swf.Resetless_tape(
+            n_pulses=pulse_p_elt, tape=combined_tape,
+            IF=self.IF.get(),
+            pulse_separation=self.pulse_separation.get(),
+            resetless_interval=resetless_interval,
+            RO_pulse_delay=self.RO_pulse_delay.get(),
+            RO_pulse_length=self.RO_pulse_length.get(),
+            RO_trigger_delay=self.RO_trigger_delay.get(),
+            AWG=self.AWG, CBox=self.CBox, upload=upload)
+
+        d = cdet.CBox_trace_error_fraction_detector(
+            'Resetless rb det',
+            MC=MC, AWG=self.AWG, CBox=self.CBox,
+            sequence_swf=s,
+            threshold=self.RO_threshold.get(),
+            save_raw_trace=False)
+        return d
+
+    def calibrate_pulse_parameters(self, method='resetless_rb', nr_cliff=10,
+                                   parameters=['amp', 'motzoi', 'frequency'],
+                                   amp_guess=None, motzoi_guess=None,
+                                   frequency_guess=None,
+                                   MC=None, nested_MC=None,
+                                   update=False, close_fig=False,
+                                   verbose=True):
+        '''
+        Calibrates single qubit pulse parameters currently only using
+        the resetless rb method (requires reasonable (80%+?) discrimination
+        fidelity)
+
+        If it there is only one parameter to sweep it will use brent's method
+        instead.
+
+        The function returns the values it found for the optimization.
+        '''
+        if method is not 'resetless_rb':
+            raise NotImplementedError()
+
+        self.prepare_for_timedomain()
+        if MC is None:
+            MC = self.MC
+        if nested_MC is None:
+            nested_MC = self.nested_MC
+
+
+        d = self.get_resetless_rb_detector(nr_cliff=nr_cliff, MC=nested_MC)
+
+        name = 'RB_{}cl_numerical'.format(nr_cliff)
+        MC.set_detector_function(d)
+
+        if amp_guess is None:
+            amp_guess = self.amp180.get()
+        if motzoi_guess is None:
+            motzoi_guess = self.motzoi.get()
+        if frequency_guess is None:
+            frequency_guess = self.f_qubit.get()
+        # Because we are sweeping the source and not the qubit frequency
+        start_freq = frequency_guess - self.f_pulse_mod.get()
+
+        a_step = 30
+        m_step = .1
+        f_step = .2e6
+
+        sweep_functions = []
+        x0 = []
+        dir_vec = []
+        if 'amp' in parameters:
+            sweep_functions.append(cb_swf.LutMan_amp180_90(self.LutMan))
+            x0.append(amp_guess)
+            dir_vec.append(a_step)
+        if 'motzoi' in parameters:
+            sweep_functions.append(
+                pw.wrap_par_to_swf(self.LutMan.motzoi_parameter))
+            x0.append(motzoi_guess)
+            dir_vec.append(m_step)
+        if 'frequency' in parameters:
+            sweep_functions.append(
+                pw.wrap_par_to_swf(self.td_source.frequency))
+            x0.append(start_freq)
+            dir_vec.append(f_step)
+        if len(sweep_functions) == 0:
+            raise ValueError(
+                'parameters "{}" not recognized'.format(parameters))
+        direc = np.diag(dir_vec)
+
+        MC.set_sweep_functions(sweep_functions)
+        xtol = 1e-9  # Has to be this low to ensure frequency converges
+        ftol = .00001
+        if len(sweep_functions) != 1:
+            ad_func_pars = {'adaptive_function': 'Powell',
+                            'x0': x0,
+                            'direc': direc,  # direc is a tuple of vectors
+                            'ftol': ftol,
+                            'xtol': xtol, 'minimize': False,
+                            'maxiter': 400}
+        elif len(sweep_functions) == 1:
+            # Powell does not work for 1D, use brent instead
+            brack = (x0[0]-5*direc[0][0], x0[0])
+            # Ensures relative change in parameter is relevant
+            if parameters == ['frequency']:
+                tol = 1e-9
+            else:
+                tol = 1e-3
+            print('Tolerance:', tol, direc[0][0])
+            print(brack)
+            ad_func_pars = {'adaptive_function': brent,
+                            'brack': brack,
+                            'tol': tol,  # Relative tolerance in brent
+                            'minimize': False}
+        MC.set_adaptive_function_parameters(ad_func_pars)
+        MC.run(name=name, mode='adaptive')
+        if len(sweep_functions) != 1:
+            a = ma.OptimizationAnalysis(auto=True, label=name,
+                                        close_fig=close_fig)
+            if verbose:
+                # Note printing can be made prettier
+                print('Optimization converged to:')
+                print('parameters: {}'.format(parameters))
+                print(a.optimization_result[0])
+            if update:
+                for i, par in enumerate(parameters):
+                    if par == 'amp':
+                        self.amp180.set(a.optimization_result[0][i])
+                    elif par == 'motzoi':
+                        self.motzoi.set(a.optimization_result[0][i])
+                    elif par == 'frequency':
+                        self.f_qubit.set(a.optimization_result[0][i] +
+                                         self.f_pulse_mod.get())
+            return a
+        else:
+            a = ma.MeasurementAnalysis(label=name, close_fig=close_fig)
+            print('Optimization for {} converged to: {}'.format(
+                parameters[0], a.sweep_points[-1]))
+            if update:
+                if parameters == ['amp']:
+                    self.amp180.set(a.sweep_points[-1])
+                elif parameters == ['motzoi']:
+                    self.motzoi.set(a.sweep_points[-1])
+                elif parameters == ['frequency']:
+                    self.f_qubit.set(a.sweep_points[-1]+self.f_pulse_mod.get())
+            return a.sweep_points[-1]
+
+
+
+
+
+
 
     def measure_heterodyne_spectroscopy(self, freqs, MC=None,
                                         analyze=True, close_fig=False):
@@ -285,6 +497,7 @@ class CBox_driven_transmon(Transmon):
             return a.T1
 
     def measure_ramsey(self, times, artificial_detuning=0, f_qubit=None,
+                       label='',
                        MC=None, analyze=True, close_fig=False, verbose=True):
         self.prepare_for_timedomain()
         if MC is None:
@@ -309,7 +522,7 @@ class CBox_driven_transmon(Transmon):
         MC.set_sweep_points(times)
         MC.set_detector_function(det.CBox_integrated_average_detector(
                                  self.CBox, self.AWG))
-        MC.run('Ramsey'+self.msmt_suffix)
+        MC.run('Ramsey'+label+self.msmt_suffix)
 
         if analyze:
             a = ma.Ramsey_Analysis(auto=True, close_fig=False)
@@ -408,6 +621,24 @@ class CBox_driven_transmon(Transmon):
                     a.theta, a.opt_I_threshold,
                     a.relative_separation, a.relative_separation_I)
         return discr_vals
+
+    def measure_rb_vs_amp(self, amps, nr_cliff=1,
+                          resetless=True,
+                          MC=None, analyze=True, close_fig=False,
+                          verbose=False):
+        self.prepare_for_timedomain()
+        if MC is None:
+            MC = self.MC
+        if resetless:
+            d = self.get_resetless_rb_detector(nr_cliff=nr_cliff)
+        else:
+            raise NotImplementedError()
+        MC.set_detector_function(d)
+        MC.set_sweep_functions([cb_swf.LutMan_amp180_90(self.LutMan)])
+        MC.set_sweep_points(amps)
+        MC.run('RB-vs-amp_{}cliff'.format(nr_cliff) + self.msmt_suffix)
+        if analyze:
+            ma.MeasurementAnalysis(close_fig=close_fig)
 
 
     def _get_amp90(self):

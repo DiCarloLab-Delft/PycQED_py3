@@ -339,7 +339,7 @@ def mixer_skewness_cal_CBox_adaptive(CBox, SH, source,
             phase_min_lst[0], phase_min_lst[1]))
         print('QI_amp_ratio at minimum w-: {},  w+: {}'.format(
             ampl_min_lst[0], ampl_min_lst[1]))
-        # print 'Power at minimum: {} dBm'.format(power_min)
+
         print('*'*80)
 
         phi = -1*(np.mod((phase_min_lst[0] - (phase_min_lst[1]-180)), 360))/2.0

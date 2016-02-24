@@ -116,6 +116,10 @@ CBox.set_dac_offset(0, 1,  16.1220703125)  # I channel qubit drive AWG
 CBox.set_dac_offset(1, 1, 0)  # I channel
 CBox.set_dac_offset(1, 0, 0)  # Q channel readout AWG
 
+# LO offsets calibrated at 23-2-2016 at f = 7.15350 GHz
+AWG.ch3_offset.set(0.006)
+AWG.ch4_offset.set(0.013)
+
 
 def set_CBox_cos_sine_weigths(IF):
     '''

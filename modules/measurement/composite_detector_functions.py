@@ -436,7 +436,7 @@ class CBox_trace_error_fraction_detector(det.Soft_Detector):
         theta = discr_vals[2]
         self.threshold = int(discr_vals[3])
 
-        self.CBox.sig0_threshold_line.set(self.threshold)
+        self.CBox.sig0_threshold_line.set(int(self.threshold))
 
     def prepare(self, **kw):
         self.i = 0
@@ -450,7 +450,7 @@ class CBox_trace_error_fraction_detector(det.Soft_Detector):
                     'calibrate_threshold "{}"'.format(self.calibrate_threshold)
                     + 'not recognized')
         else:
-            self.CBox.sig0_threshold_line.set(self.threshold)
+            self.CBox.sig0_threshold_line.set(int(self.threshold))
         self.MC.set_sweep_function(self.sequence_swf)
 
         # if self.counters:

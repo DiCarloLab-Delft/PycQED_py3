@@ -203,15 +203,24 @@ class Transmon(Qubit):
                 self.measure_ramsey(times,
                                     artificial_detuning=artificial_detuning,
                                     f_qubit=cur_freq,
+                                    label='_{}pulse_sep'.format(n),
                                     analyze=False)
-                a = ma.Ramsey_Analysis(auto=True, close_fig=close_fig)
+                a = ma.Ramsey_Analysis(auto=True, close_fig=close_fig,
+                                       close_file=False)
                 fitted_freq = a.fit_res.params['frequency'].value
                 measured_detuning = fitted_freq-artificial_detuning
                 cur_freq -= measured_detuning
+
+                qubit_ana_grp = a.analysis_group.create_group(self.msmt_suffix)
+                qubit_ana_grp.attrs['artificial_detuning'] = \
+                    str(artificial_detuning)
+                qubit_ana_grp.attrs['measured_detuning'] = \
+                    str(measured_detuning)
+                qubit_ana_grp.attrs['estimated_qubit_freq'] = str(cur_freq)
+                a.finish()  # make sure I close the file
                 if verbose:
                     print('Measured detuning:{:.2e}'.format(measured_detuning))
                     print('Setting freq to: {:.9e}, \n'.format(cur_freq))
-
                 if times[-1] > 1.5*a.T2_star:
                     # If the last step is > T2* then the next will be for sure
                     if verbose:
