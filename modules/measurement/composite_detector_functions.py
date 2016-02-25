@@ -413,6 +413,7 @@ class CBox_trace_error_fraction_detector(det.Soft_Detector):
         self.CBox.sig0_threshold_line.set(int(a.V_opt_raw))
         self.sequence_swf.upload = True
         # make sure the sequence gets uploaded
+        return int(self.threshold)
 
     def calibrate_threshold_self_consistent(self):
         self.CBox.lin_trans_coeffs.set([1, 0, 0, 1])
@@ -437,6 +438,7 @@ class CBox_trace_error_fraction_detector(det.Soft_Detector):
         self.threshold = int(discr_vals[3])
 
         self.CBox.sig0_threshold_line.set(int(self.threshold))
+        return int(self.threshold)
 
     def prepare(self, **kw):
         self.i = 0

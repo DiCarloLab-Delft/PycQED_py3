@@ -16,6 +16,9 @@ from modules.measurement import awg_sweep_functions as awg_swf
 from modules.analysis import measurement_analysis as ma
 from modules.measurement.pulse_sequences import standard_sequences as st_seqs
 import modules.measurement.randomized_benchmarking.randomized_benchmarking as rb
+from modules.measurement.calibration_toolbox import mixer_carrier_cancellation_CBox
+from modules.measurement.calibration_toolbox import mixer_skewness_cal_CBox_adaptive
+
 
 
 class CBox_driven_transmon(Transmon):
@@ -31,6 +34,11 @@ class CBox_driven_transmon(Transmon):
                  CBox, heterodyne_instr,
                  MC):
         super().__init__(name)
+        '''
+        Adds the parameters to the qubit insrument, it provides initial values
+        for some parameters but not for all. Powers have to be set by hand as
+        a safety measure.
+        '''
         # MW-sources
         self.LO = LO
         self.cw_source = cw_source
@@ -42,10 +50,10 @@ class CBox_driven_transmon(Transmon):
         self.CBox = CBox
         self.MC = MC
         self.add_parameter('mod_amp_cw', label='RO modulation ampl cw',
-                           units='V',
+                           units='V', initial_value=0.5,
                            parameter_class=ManualParameter)
         self.add_parameter('mod_amp_td', label='RO modulation ampl td',
-                           units='V',
+                           units='V', initial_value=0.5,
                            parameter_class=ManualParameter)
 
         self.add_parameter('spec_pow', label='spectroscopy power',
@@ -61,9 +69,11 @@ class CBox_driven_transmon(Transmon):
                            parameter_class=ManualParameter)
         self.add_parameter('IF',
                            label='inter-modulation frequency', units='Hz',
+                           initial_value=-2e7,
                            parameter_class=ManualParameter)
         # Time-domain parameters
         self.add_parameter('f_pulse_mod',
+                           initial_value=-5e-7,
                            label='pulse-modulation frequency', units='Hz',
                            parameter_class=ManualParameter)
         self.add_parameter('awg_nr', label='CBox awg nr', units='#',
@@ -71,17 +81,22 @@ class CBox_driven_transmon(Transmon):
 
         self.add_parameter('amp180',
                            label='Pi-pulse amplitude', units='mV',
+                           initial_value=300,
                            parameter_class=ManualParameter)
+        # Amp 90 is hardcoded to be half amp180
         self.add_parameter('amp90',
                            label='Pi/2-pulse amplitude', units='mV',
                            get_cmd=self._get_amp90)
         self.add_parameter('gauss_width', units='s',
+                           initial_value=40e-9,
                            parameter_class=ManualParameter)
         self.add_parameter('motzoi', label='Motzoi parameter', units='',
+                           initial_value=0,
                            parameter_class=ManualParameter)
 
         # Single shot readout specific parameters
         self.add_parameter('RO_threshold', units='dac-value',
+                           initial_value=0,
                            parameter_class=ManualParameter)
         self.add_parameter('signal_line', parameter_class=ManualParameter,
                            vals=vals.Enum(0, 1), initial_value=0)
@@ -91,6 +106,11 @@ class CBox_driven_transmon(Transmon):
                            parameter_class=ManualParameter, initial_value=0)
         self.add_parameter('alpha', units='',
                            parameter_class=ManualParameter, initial_value=1)
+        # Mixer offsets correction, qubit drive
+        self.add_parameter('mixer_offs_drive_I',
+                           parameter_class=ManualParameter, initial_value=0)
+        self.add_parameter('mixer_offs_drive_Q',
+                           parameter_class=ManualParameter, initial_value=0)
 
     def prepare_for_continuous_wave(self):
 
@@ -111,10 +131,23 @@ class CBox_driven_transmon(Transmon):
         # Set source to fs =f-f_mod such that pulses appear at f = fs+f_mod
         self.td_source.frequency.set(self.f_qubit.get()
                                      - self.f_pulse_mod.get())
+
+        # Use resonator freq unless explicitly specified
+        if self.f_RO.get() is None:
+            f_RO = self.f_res.get()
+        else:
+            f_RO = self.f_RO.get()
+        self.LO.frequency.set(f_RO - self.IF.get())
+
         self.td_source.power.set(self.td_source_pow.get())
         self.AWG.set('ch3_amp', self.mod_amp_td.get())
         self.AWG.set('ch4_amp', self.mod_amp_td.get())
         self.CBox.set('AWG{:.0g}_mode'.format(self.awg_nr.get()), 'tape')
+        # Mixer offsets correction
+        self.CBox.set('AWG{:.0g}_dac0_offset'.format(self.awg_nr.get()),
+                      self.mixer_offs_drive_I.get())
+        self.CBox.set('AWG{:.0g}_dac1_offset'.format(self.awg_nr.get()),
+                      self.mixer_offs_drive_Q.get())
 
         self.LutMan.amp180.set(self.amp180.get())
         self.LutMan.amp90.set(self.amp90.get())
@@ -340,11 +373,35 @@ class CBox_driven_transmon(Transmon):
                     self.f_qubit.set(a.sweep_points[-1]+self.f_pulse_mod.get())
             return a.sweep_points[-1]
 
+    def calibrate_mixer_offsets(self, signal_hound, update=True):
+        '''
+        Calibrates the mixer skewness and updates the I and Q offsets in
+        the qubit object.
+        signal hound needs to be given as it this is not part of the qubit
+        object in order to reduce dependencies.
+        '''
+        # ensures freq is set correctly
+        self.prepare_for_timedomain()
+        offset_I, offset_Q = mixer_carrier_cancellation_CBox(
+            CBox=self.CBox, SH=signal_hound, source=self.td_source,
+            MC=self.MC, awg_nr=self.awg_nr.get())
+        if update:
+            self.mixer_offs_drive_I.set(offset_I)
+            self.mixer_offs_drive_Q.set(offset_Q)
 
-
-
-
-
+    def calibrate_mixer_skewness(self, signal_hound, update=True):
+        '''
+        Calibrates the mixer skewness using mixer_skewness_cal_CBox_adaptive
+        see calibration toolbox for details
+        '''
+        self.prepare_for_timedomain()
+        phi, alpha = mixer_skewness_cal_CBox_adaptive(
+            CBox=self.CBox, SH=signal_hound, source=self.td_source,
+            LutMan=self.LutMan, AWG=self.AWG, MC=self.MC,
+            awg_nrs=[self.awg_nr.get()], calibrate_both_sidebands=True)
+        if update:
+            self.phi.set(phi)
+            self.alpha.set(alpha)
 
     def measure_heterodyne_spectroscopy(self, freqs, MC=None,
                                         analyze=True, close_fig=False):

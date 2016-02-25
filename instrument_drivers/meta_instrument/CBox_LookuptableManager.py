@@ -46,7 +46,7 @@ class QuTech_ControlBox_LookuptableManager(Instrument):
                            get_cmd=self._do_get_ampCW,
                            set_cmd=self._do_set_ampCW)
         self.add_parameter('block_length', units='ns',
-                           vals=vals.Numbers(),
+                           vals=vals.Numbers(1, 500),
                            get_cmd=self._do_get_block_length,
                            set_cmd=self._do_set_block_length)
 

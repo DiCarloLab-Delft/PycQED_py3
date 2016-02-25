@@ -60,7 +60,7 @@ class Qubit(Instrument):
             (e.g. parameter prefixes)
 
 
-    Futre music (too complicated for now):
+    Future music (too complicated for now):
         - Instead of having a parameter resonator, attach a resonator object
           that has it's own frequency parameter, attach a mixer object that has
           it's own calibration routines.
@@ -132,6 +132,9 @@ class Transmon(Qubit):
                            parameter_class=ManualParameter)
         self.add_parameter('f_res', label='resonator frequency', units='Hz',
                            parameter_class=ManualParameter)
+        self.add_parameter('f_RO', label='readout frequency', units='Hz',
+                           parameter_class=ManualParameter)
+
 
         # Sequence/pulse parameters
         self.add_parameter('RO_pulse_delay', units='s',
@@ -183,14 +186,27 @@ class Transmon(Qubit):
     def prepare_for_continuous_wave(self):
         raise NotImplementedError()
 
-    def find_frequency(self, method='spectroscopy',
+    def find_frequency(self, method='spectroscopy', pulsed=False,
                        steps=[1, 3, 10, 30, 100, 300, 1000],
+                       freqs=None,
+                       f_span=100e6,
+                       f_step=1e6,
                        verbose=True,
                        update=False,
                        close_fig=False):
 
         if method.lower() == 'spectroscopy':
-            self.measure_spectroscopy()
+            if freqs is None:
+                # If not specified it should specify wether to use the last
+                # known one or wether to calculate and how (maybe not in this
+                # function?)
+                freqs = np.arange(self.f_qubit.get()-f_span/2,
+                                  self.f_qubit.get()+f_span/2,
+                                  f_step)
+            # args here should be handed down from the top.
+            self.measure_spectroscopy(freqs, pulsed=pulsed, MC=None,
+                                      analyze=True, close_fig=close_fig)
+            # TODO: add updating and fitting
         elif method.lower() == 'ramsey':
 
             stepsize = abs(1/self.f_pulse_mod.get())
@@ -226,11 +242,11 @@ class Transmon(Qubit):
                     if verbose:
                         print('Breaking of measurement because of T2*')
                     break
-        if verbose:
-            print('Converged to: {:.9e}'.format(cur_freq))
-        if update:
-            self.f_qubit.set(cur_freq)
-        return cur_freq
+            if verbose:
+                print('Converged to: {:.9e}'.format(cur_freq))
+            if update:
+                self.f_qubit.set(cur_freq)
+            return cur_freq
 
     def find_resonator_frequency(self, **kw):
         raise NotImplementedError()
