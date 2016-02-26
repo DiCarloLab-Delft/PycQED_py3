@@ -2,7 +2,7 @@ import time
 import numpy as np
 import visa
 import unittest
-from bitstring import BitArray
+# from bitstring import BitArray
 import logging
 
 from qcodes.instrument.visa import VisaInstrument
@@ -211,10 +211,12 @@ class QuTech_ControlBox(VisaInstrument):
             sequencer_msg = self.serial_read()
             # Decoding the message
             s_list = list(map(ord, sequencer_msg[0:6]))
-            heartbeat_counter = (s_list[0]-128)*(2**14)+(s_list[1]-128)*(2**7) + \
-                (s_list[2]-128)
-            trigger_counter = (s_list[3]-128)*(2**14)+(s_list[4]-128)*(2**7) + \
-                (s_list[5]-128)
+            heartbeat_counter = (s_list[0]-128)*(2**14) + \
+                                (s_list[1]-128)*(2**7) + \
+                                (s_list[2]-128)
+            trigger_counter = (s_list[3]-128)*(2**14) + \
+                              (s_list[4]-128)*(2**7) + \
+                              (s_list[5]-128)
 
         return heartbeat_counter, trigger_counter
 
@@ -257,32 +259,32 @@ class QuTech_ControlBox(VisaInstrument):
                 values[i, j] = val
         return values
 
-    def decode_byte(self, data_bytes, data_bits_per_byte=7,
-                    signed_integer=False):
-        '''
-        Exists for legacy purposes, only used in integration streaming mode.
-        Otherwise use the cython version of this function.
+    # def decode_byte(self, data_bytes, data_bits_per_byte=7,
+    #                 signed_integer=False):
+    #     '''
+    #     Exists for legacy purposes, only used in integration streaming mode.
+    #     Otherwise use the cython version of this function.
 
-        Inverse function of encode byte. Protocol is described in docstring
-        of encode_byte().
+    #     Inverse function of encode byte. Protocol is described in docstring
+    #     of encode_byte().
 
-        Takes the message data bytes as input, converts them to a a BitArray
-        and removes the MSB indicating it is a data byte and puts them together
-        '''
-        data_bit_val = BitArray()
-        # loop over bytes and only add data bits to final BitArray.
-        for byte in data_bytes:
-            bit_val = BitArray(bin(byte))
-            data_bit = bit_val[-data_bits_per_byte:]
-            data_bit_val.append(data_bit)
+    #     Takes the message data bytes as input, converts them to a a BitArray
+    #     and removes the MSB indicating it is a data byte and puts them together
+    #     '''
+    #     data_bit_val = BitArray()
+    #     # loop over bytes and only add data bits to final BitArray.
+    #     for byte in data_bytes:
+    #         bit_val = BitArray(bin(byte))
+    #         data_bit = bit_val[-data_bits_per_byte:]
+    #         data_bit_val.append(data_bit)
 
-        # Convert BitArray to value as unsigned integer
-        if signed_integer:
-            value = data_bit_val.int
-        else:
-            value = data_bit_val.uint
+    #     # Convert BitArray to value as unsigned integer
+    #     if signed_integer:
+    #         value = data_bit_val.int
+    #     else:
+    #         value = data_bit_val.uint
 
-        return value
+    #     return value
 
     def create_message(self, cmd, data_bytes=None,
                        EOM=defHeaders.EndOfMessageHeader):
@@ -606,7 +608,9 @@ class QuTech_ControlBox(VisaInstrument):
 
         @param awg : the awg of the dac, (0,1,2).
         @param table_nr : the lut of the awg, (0,1,2,3,4,5,6,7).
-        @param dac : the dac of the awg, 0 = Q and 1 = I channel.
+        @param dac : the dac of the awg.
+            If version <= 2.15:  0 = Q and 1 = I channel.
+            If version >= 2.16:  0 = I and 1 = Q channel.
         @param lut : the array of the with amplitude values,
             if units is 'mV' the range is (-1000mV, 1000mV)
             if units is 'dac' range is (-8192, 8191)
@@ -634,6 +638,12 @@ class QuTech_ControlBox(VisaInstrument):
             raise ValueError
         if dac_ch < 0 or dac_ch > 1:
             raise ValueError
+
+        # for version >= 2.16, the I/Q port order is opposite to the earlier
+        # version
+        v = self.get('firmware_version')
+        if (int(v[1]) == 2) and (int(int(v[3:5])) > 15):
+            dac_ch = 1 - dac_ch
 
         length = len(lut)
 
@@ -670,61 +680,102 @@ class QuTech_ControlBox(VisaInstrument):
 
     def _set_awg_tape(self, awg_nr, tape):
         '''
-        set the tape content for an awg
+        In tape without timing: set the tape content for an awg.
+        (for version <= 2.15)
+
+        In timing tape: Use segmented tape to mimic tape without timing.
+        (for version >= 2.16)
+
 
         @param awg : the awg of the dac, (0,1,2).
         @param tape : the array of pulse numbers, (0, 7)
         @return stat : 0 if the upload succeeded and 1 if the upload failed.
         '''
-        length = len(tape)
-        # Check out of bounds
-        if awg_nr < 0 or awg_nr > 2:
-            raise ValueError
-        if length < 1 or length > 4095:
-            raise ValueError
-        if length != len(tape):
-            raise ValueError
-        cmd = defHeaders.AwgTapeHeader
-        data_bytes = bytes()
-        data_bytes += (c.encode_byte(awg_nr, 4,
-                       expected_number_of_bytes=1))
-        data_bytes += (c.encode_byte(length, 7,
-                       expected_number_of_bytes=2))
+        # TODO: an internal variable _segmented_tape or _conditional_tape
+        # should be added and the variable _tape should be removed.
 
-        data_bytes += (c.encode_array(tape, 4, 1))
+        v = self.get('firmware_version')
+        # for version >= 2.16, restarting timing tape is done by switching from
+        # another mode into tape mode.
+        if (int(v[1]) == 2) and (int(int(v[3:5])) > 15):
+            timing_tape = [self.create_timing_tape_entry(0, entry, True)
+                           for entry in tape]
 
-        message = c.create_message(cmd, data_bytes)
-        (stat, mesg) = self.serial_write(message)
-        self._tape[awg_nr] = tape  # updates the software version of the tape
+            self.set_segmented_tape(awg_nr, timing_tape)
 
-        return (stat, mesg)
+        else:
+            length = len(tape)
+            # Check out of bounds
+            if awg_nr < 0 or awg_nr > 2:
+                raise ValueError
+            if length < 1 or length > 4095:
+                raise ValueError
+
+            cmd = defHeaders.AwgTapeHeader
+            data_bytes = bytes()
+            data_bytes += (c.encode_byte(awg_nr, 4,
+                           expected_number_of_bytes=1))
+            data_bytes += (c.encode_byte(length, 7,
+                           expected_number_of_bytes=2))
+
+            data_bytes += (c.encode_array(tape, 4, 1))
+
+            message = c.create_message(cmd, data_bytes)
+            (stat, mesg) = self.serial_write(message)
+            self._tape[awg_nr] = tape  # updates the software version of the tape
+
+            return (stat, mesg)
 
     def restart_awg_tape(self, awg_nr):
         '''
-        Reset the tape pointer of specified awg to 0.
+        In tape without timing: Reset the tape pointer of specified awg to 0.
+        (for version <= 2.15)
+
+        In timing tape: Reset the segmented tape pointer of specified awg to 0.
+        (for version >= 2.16)
+
 
         @param awg_nr : the awg of the dac, (0,1,2).
-        @return stat : True if the upload succeeded and False if the upload failed.
+        @return stat : True if the upload succeeded and False if the upload
+                        failed.
         '''
 
-        cmd = defHeaders.AwgRestartTapeHeader
-        data_bytes = bytes()
-        data_bytes += (c.encode_byte(awg_nr, 4, 1))
-        message = c.create_message(cmd, data_bytes)
-        (stat, mesg) = self.serial_write(message)
-        if not stat:
-            raise Exception('Failed to restart awg tape')
-        return stat
+        v = self.get('firmware_version')
+        # for version >= 2.16, restarting timing tape is done by switching from
+        # another mode into tape mode.
+        if (int(v[1]) == 2) and (int(int(v[3:5])) > 15):
+            cur_mode = self.get('AWG{}_mode'.format(awg_nr))
+            self.set('AWG{}_mode'.format(awg_nr), 0)
+            self.set('AWG{}_mode'.format(awg_nr), cur_mode)
+
+        else:
+            # for version <= 2.15, the previous AwgRestartTape command is sent.
+            cmd = defHeaders.AwgRestartTapeHeader
+            data_bytes = bytes()
+            data_bytes += (c.encode_byte(awg_nr, 4, 1))
+            message = c.create_message(cmd, data_bytes)
+            (stat, mesg) = self.serial_write(message)
+            if not stat:
+                raise Exception('Failed to restart awg tape')
+            return stat
 
     def enable_dac(self, awg_nr, dac_ch, enable):
         '''
         mute or enable a dac of an awg
 
         @param awg_nr : the awg of the dac, (0,1,2).
-        @param dac_ch : the dac of the awg, 0 = Q and 1 = I channel.
+        @param dac : the dac of the awg.
+            If version <= 2.15:  0 = Q and 1 = I channel.
+            If version >= 2.16:  0 = I and 1 = Q channel.
         @param enable: True = enable and False = disable
         @return stat : 0 if the upload succeeded and 1 if the upload failed.
         '''
+        # for version >= 2.16, the I/Q port order is opposite to the earlier
+        # version
+        v = self.get('firmware_version')
+        if (int(v[1]) == 2) and (int(int(v[3:5])) > 15):
+            dac_ch = 1 - dac_ch
+
         if enable == 0:
             cmd = defHeaders.AwgDisableHeader
         else:
@@ -743,10 +794,18 @@ class QuTech_ControlBox(VisaInstrument):
         set the offset of 1 dac of an awg.
 
         @param awg : the awg of the dac, (0,1,2).
-        @param dac : the dac of the awg, 0 = Q and 1 = I channel.
+        @param dac : the dac of the awg.
+            If version <= 2.15:  0 = Q and 1 = I channel.
+            If version >= 2.16:  0 = I and 1 = Q channel.
         @param offset : the offset in mV, range [-1000, 1000].
         @return stat : 0 if the upload succeeded and 1 if the upload failed.
         '''
+        # for version >= 2.16, the I/Q port order is opposite to the earlier
+        # version
+        v = self.get('firmware_version')
+        if (int(v[1]) == 2) and (int(int(v[3:5])) > 15):
+            dac_ch = 1 - dac_ch
+
         if offset > 1000 or offset < -1000:
             raise ValueError('offset out of range [-1, 1] (volts)')
 
@@ -905,10 +964,11 @@ class QuTech_ControlBox(VisaInstrument):
         @return stat : 0 if the upload succeeded and 1 if the upload failed.
         '''
         v = self.get('firmware_version')
-        if v.startswith('v2.15'):
+        if (int(v[1]) == 2) and (int(int(v[3:5])) >= 15):
             n_bytes = 3
         else:
-            # logging.warning('Version != 2.15 using old protocol for log length')
+            # logging.warning('Version != 2.15 using old protocol for\
+            # log length')
             n_bytes = 2
 
         cmd = defHeaders.UpdateLoggerMaxCounterHeader
@@ -936,12 +996,14 @@ class QuTech_ControlBox(VisaInstrument):
             4 = integration_averaging
             5 = integration_streaming
             6 = touch 'n go
-        @return stat : True if the upload succeeded and False if the upload failed
+        @return stat : True if the upload succeeded and False if the upload
+                       failed
         '''
         acquisition_mode = str(acquisition_mode)
         mode_int = None
         for i in range(len(defHeaders.acquisition_modes)):
-            if acquisition_mode.upper() in defHeaders.acquisition_modes[i].upper():
+            if acquisition_mode.upper() in\
+                   defHeaders.acquisition_modes[i].upper():
                 mode_int = i
                 break
         if mode_int is None:
@@ -968,7 +1030,8 @@ class QuTech_ControlBox(VisaInstrument):
         @param mode : mode of the fpga,
             0 = stop,
             1 = run,
-        @return stat :True if the upload succeeded and False if the upload failed.
+        @return stat :True if the upload succeeded and False if the upload
+                      failed.
         '''
         run_mode = str(run_mode)
         mode_int = None
@@ -992,9 +1055,6 @@ class QuTech_ControlBox(VisaInstrument):
 
     def _do_get_run_mode(self):
         return self._run_mode
-
-
-
 
     def _gen_awg_mode_set_func(self, awg_nr):
         def set_awg_mode_i(threshold):
@@ -1548,7 +1608,6 @@ class QuTech_ControlBox(VisaInstrument):
         self.tng_output_trigger_delay = tng_output_trigger_delay
         self._set_touch_n_go_parameters()
 
-
     def _do_get_tng_output_trigger_delay(self):
         return self.tng_output_trigger_delay
 
@@ -1564,7 +1623,6 @@ class QuTech_ControlBox(VisaInstrument):
             raise ValueError
         self.tng_trigger_state = tng_trigger_state
         self._set_touch_n_go_parameters()
-
 
     def _do_get_tng_trigger_state(self):
         return self.tng_trigger_state
@@ -1588,7 +1646,6 @@ class QuTech_ControlBox(VisaInstrument):
         self.tng_feedback_mode = tng_feedback_mode
         self._set_touch_n_go_parameters()
 
-
     def _do_get_tng_feedback_mode(self):
         return self.tng_feedback_mode
 
@@ -1602,7 +1659,6 @@ class QuTech_ControlBox(VisaInstrument):
             raise ValueError
         self.tng_feedback_code = tng_feedback_code
         self._set_touch_n_go_parameters()
-
 
     def _do_get_tng_feedback_code(self):
         return self.tng_feedback_code
@@ -1620,7 +1676,6 @@ class QuTech_ControlBox(VisaInstrument):
             raise ValueError
         self.tng_logging_mode = tng_logging_mode
         self._set_touch_n_go_parameters()
-
 
     def _do_get_tng_logging_mode(self):
         return self.tng_logging_mode
@@ -1721,3 +1776,218 @@ class QuTech_ControlBox(VisaInstrument):
         def get_func():
             return fun(ch, sub_ch)
         return get_func
+
+    def set_conditional_tape(self, awg_nr, tape_nr, tape):
+        '''
+        NOTE: ControlBox only support timing tape from version 2.16.
+              CBox_v3 have not supported timing tape yet(2016-02-15).
+
+        Set the conditional tape content for a specified awg.
+
+        In the tape mode, once received a trigger + 3-bit codeword, the AWG
+        will choose one of the eight tapes to get a sequence of pulses with
+        corresponding timing.
+
+        - Tape 0 ~ 6 is called Conditional Tape, each tape with a length of
+        512. Every time the conditional tape is triggered, it starts outputting
+        the pulses from the first entry.
+
+        - Tape 7 is called Segmented Tape, with a length of 29184. It contains
+        several segments. Every segment contains a sequence of pulses with
+        corresponding timing, and the end of a segment is indicated by the
+        end_of_marker bit of the last entry of the segment. Every time the
+        Segmented Tape is triggered, it outputs a segment. The next trigger
+        for this tape will trigger the next segment.
+
+        @param awg : the awg of the dac, (0,1,2).
+        @param tape_nr : the number of the tape, integer ranging (0~6)
+        @param tape : the array of entries created by the function
+                      create_timing_tape_entry.
+                      Conditional tape can contain at most 512 entries.
+        @return stat : 0 if the upload succeeded and 1 if the upload failed.
+
+        '''
+
+        # TODO: an internal variable _segmented_tape or _conditional_tape
+        # should be added and the variable _tape should be removed.
+
+        length = len(tape)
+        tape_addr_width = 9
+        entry_length = 9 + 3 + 1
+
+        # Check out of bounds
+        if awg_nr < 0 or awg_nr > 2:
+            raise ValueError
+        if tape_nr < 0 or tape_nr > 6:
+            raise ValueError
+        if length < 1 or length > 512:
+            raise ValueError("The conditional tape only supports a length from\
+                             1 to 512.")
+
+        cmd = defHeaders.AwgCondionalTape
+        data_bytes = bytes()
+
+        # add AWG number
+        data_bytes += (c.encode_byte(awg_nr, data_bits_per_byte=4,
+                                     expected_number_of_bytes=1))
+        # add the tape number
+        data_bytes += (c.encode_byte(tape_nr, data_bits_per_byte=4,
+                                     expected_number_of_bytes=1))
+        # add the tape length
+        data_bytes += (c.encode_byte(length-1, data_bits_per_byte=7,
+                                     expected_number_of_bytes=np.ceil(
+                                         tape_addr_width/7.0)))
+        # add the tape entries
+        data_bytes += (c.encode_array(
+                          self.convert_arrary_to_signed(tape, entry_length),
+                          data_bits_per_byte=7,
+                          bytes_per_value=np.ceil(entry_length/7.0)))
+
+        message = c.create_message(cmd, data_bytes)
+        (stat, mesg) = self.serial_write(message)
+        return (stat, mesg)
+
+    def set_segmented_tape(self, awg_nr, tape):
+        '''
+        NOTE: ControlBox only support timing tape from version 2.16.
+              CBox_v3 have not supported timing tape yet(2016-02-15).
+
+        Set the Segmented Tape content for a specified awg.
+
+        In the tape mode, once received a trigger + 3-bit codeword, the AWG
+        will choose one of the eight tapes to get a sequence of pulses with
+        corresponding timing.
+
+        - Tape 0 ~ 6 is called Conditional Tape, each tape with a length of
+        512. Every time the conditional tape is triggered, it starts outputting
+        the pulses from the first entry.
+
+        - Tape 7 is called Segmented Tape, with a length of 29184. It contains
+        several segments. Every segment contains a sequence of pulses with
+        corresponding timing, and the end of a segment is indicated by the
+        end_of_marker bit of the last entry of the segment. Every time the
+        Segmented Tape is triggered, it outputs a segment. The next trigger
+        for this tape will trigger the next segment.
+
+        @param awg : the awg of the dac, (0,1,2).
+        @param tape : the array of entries created by the function
+                      create_timing_tape_entry().
+                      Segmented tape can contain at most 29184 entries.
+        @return stat : 0 if the upload succeeded and 1 if the upload failed.
+
+        '''
+
+        # TODO: an internal variable _segmented_tape or _conditional_tape
+        # should be added and the variable _tape should be removed.
+
+        length = len(tape)
+        tape_addr_width = 15
+        entry_length = 9 + 3 + 1
+
+        # Check out of bounds
+        if awg_nr < 0 or awg_nr > 2:
+            raise ValueError("Awg number error!")
+        if length < 1 or length > 29184:
+            raise ValueError("The segemented tape only supports a length from\
+                              1 to 29184.")
+
+        cmd = defHeaders.AwgSegmentedTape
+        data_bytes = bytes()
+        data_bytes += (c.encode_byte(awg_nr, data_bits_per_byte=4,
+                                     expected_number_of_bytes=1))
+        data_bytes += (c.encode_byte(length-1, data_bits_per_byte=7,
+                                     expected_number_of_bytes=np.ceil(
+                                         tape_addr_width / 7.0)))
+        data_bytes += (c.encode_array(
+                          self.convert_arrary_to_signed(tape, entry_length),
+                          data_bits_per_byte=7,
+                          bytes_per_value=np.ceil(entry_length/7.0)))
+
+        message = self.create_message(cmd, data_bytes)
+        (stat, mesg) = self.serial_write(message)
+        return (stat, mesg)
+
+    def create_timing_tape_entry(self, interval, pulse_num, end_of_marker):
+        '''
+        Create the timing tape entry included in the conditional tape or
+        segemented tape.
+
+        @param interval      : The waiting time before the end of last pulse or
+                               trigger in ns, ranging from 0ns to 2560ns with a
+                               minimum resolution of 5ns.
+        @param pulse_num     : 0~7, indicating which pulse to be output
+        @param end_of_marker : True: if the entry is the last entry of a
+                               segment,
+                               False: otherwise.
+
+        The return is an integer representing an timing tape entry which has
+        the following structure:
+              |WaitingTime(9bits) | PulseNumber (3bits) | Marker (1bit)|
+        WaitingTime          : The waiting time before the end of last pulse or
+                               trigger, in FPGA cycle time.
+        Pulse number         : 0~7, indicating which pulse to be output.
+        Marker               : EndofSegment maker
+                               1 : if the entry is the last entry of a segment,
+                               0 : otherwise.
+
+        '''
+
+        FPGA_Cycle_Time = 5  # ns
+        if ((interval < 0) or (interval > 2560) or
+                (interval % FPGA_Cycle_Time != 0)):
+            raise ValueError
+        if pulse_num < 0 or pulse_num > 7:
+            raise ValueError
+
+        if end_of_marker:
+            i_end_of_marker = 1
+        else:
+            i_end_of_marker = 0
+
+        return ((interval/FPGA_Cycle_Time)*(2**4) +
+                pulse_num * 2**1 +
+                i_end_of_marker)
+
+    def convert_to_signed(self, unsigned_number, bit_width):
+        '''
+        Inteprete the input unsinged number into a signed number given the
+        bitwidth.
+
+        @param unsigned_number: the unsigned number.
+        @param bit_width: Bit width of the output signed number.
+        '''
+        def is_number(s):
+            try:
+                float(s)
+                return True
+            except ValueError:
+                return False
+
+        if (not is_number(unsigned_number) or (unsigned_number < 0)):
+            raise ValueError("The number %d should be a positive integer." % unsigned_number)
+
+        if unsigned_number < 0 or unsigned_number >= 2**bit_width:
+            raise ValueError("Given number %d is too large in terms of the \
+                              given bit_width %d." % (unsigned_number, bit_width))
+
+        if unsigned_number >= 2**(bit_width-1):
+            signed_number = unsigned_number - 2**bit_width
+        else:
+            signed_number = unsigned_number
+
+        return signed_number
+
+    def convert_arrary_to_signed(self, unsigned_array, bit_width):
+        '''
+        Inteprete the input unsinged number array into a signed number array
+        based on the given bitwidth.
+
+        @param unsigned_array: the unsigned number array.
+        @param bit_width: Bit width of the output signed number.
+        '''
+
+        signed_array = []
+        for sample in unsigned_array:
+            signed_array.append(self.convert_to_signed(sample, bit_width))
+
+        return signed_array
