@@ -142,7 +142,8 @@ class CBox_driven_transmon(Transmon):
         self.td_source.power.set(self.td_source_pow.get())
         self.AWG.set('ch3_amp', self.mod_amp_td.get())
         self.AWG.set('ch4_amp', self.mod_amp_td.get())
-        self.CBox.set('AWG{:.0g}_mode'.format(self.awg_nr.get()), 'tape')
+        self.CBox.set('AWG{:.0g}_mode'.format(self.awg_nr.get()),
+                      'segmented tape')
         # Mixer offsets correction
         self.CBox.set('AWG{:.0g}_dac0_offset'.format(self.awg_nr.get()),
                       self.mixer_offs_drive_I.get())
@@ -164,7 +165,8 @@ class CBox_driven_transmon(Transmon):
 
         self.LutMan.load_pulses_onto_AWG_lookuptable(self.awg_nr.get())
 
-        self.CBox.set('sig{}_threshold_line'.format(int(self.signal_line.get())),
+        self.CBox.set('sig{}_threshold_line'.format(
+                      int(self.signal_line.get())),
                       int(self.RO_threshold.get()))
 
     def find_resonator_frequency(self, use_min=False,
@@ -274,7 +276,6 @@ class CBox_driven_transmon(Transmon):
             MC = self.MC
         if nested_MC is None:
             nested_MC = self.nested_MC
-
 
         d = self.get_resetless_rb_detector(nr_cliff=nr_cliff, MC=nested_MC)
 
@@ -657,11 +658,11 @@ class CBox_driven_transmon(Transmon):
         # Otherwise I do it here in the qubit object so that I can pass args
         analysis_in_det = return_detector
         d = cdet.CBox_SSRO_discrimination_detector(
-                'SSRO-disc'+self.msmt_suffix,
-                analyze=analysis_in_det,
-                MC=MC, AWG=self.AWG, CBox=self.CBox,
-                sequence_swf=swf.None_Sweep(sweep_control='hard',
-                                            sweep_points=np.arange(10)))
+            'SSRO-disc'+self.msmt_suffix,
+            analyze=analysis_in_det,
+            MC=MC, AWG=self.AWG, CBox=self.CBox,
+            sequence_swf=swf.None_Sweep(sweep_control='hard',
+                                        sweep_points=np.arange(10)))
         if return_detector:
             return d
         d.prepare()
@@ -696,7 +697,6 @@ class CBox_driven_transmon(Transmon):
         MC.run('RB-vs-amp_{}cliff'.format(nr_cliff) + self.msmt_suffix)
         if analyze:
             ma.MeasurementAnalysis(close_fig=close_fig)
-
 
     def _get_amp90(self):
         return self.amp180.get()/2

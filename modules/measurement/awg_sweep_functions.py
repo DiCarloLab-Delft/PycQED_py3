@@ -74,8 +74,8 @@ class CBox_Ramsey(swf.Hard_Sweep):
 
         self.AWG.stop()
         # TODO Change to segmented tape if we have the new timing tape
-        self.CBox.AWG0_mode.set('tape')
-        self.CBox.AWG1_mode.set('tape')
+        self.CBox.AWG0_mode.set('segmented tape')
+        self.CBox.AWG1_mode.set('segmented tape')
         self.CBox.restart_awg_tape(0)
         self.CBox.restart_awg_tape(1)
         self.CBox.set('AWG0_tape', tape)
@@ -122,8 +122,8 @@ class CBox_Echo(swf.Hard_Sweep):
             tape = [3, 3] * nr_elts
 
         self.AWG.stop()
-        self.CBox.AWG0_mode.set('Tape')
-        self.CBox.AWG1_mode.set('Tape')
+        self.CBox.AWG0_mode.set('Segmented tape')
+        self.CBox.AWG1_mode.set('Segmented tape')
         self.CBox.restart_awg_tape(0)
         self.CBox.restart_awg_tape(1)
         self.CBox.set('AWG0_tape', tape)
@@ -153,8 +153,8 @@ class CBox_OffOn(swf.Hard_Sweep):
 
     def prepare(self, **kw):
         self.AWG.stop()
-        self.CBox.AWG0_mode.set('Tape')
-        self.CBox.AWG1_mode.set('Tape')
+        self.CBox.AWG0_mode.set('Segmented tape')
+        self.CBox.AWG1_mode.set('Segmented tape')
         self.CBox.restart_awg_tape(0)
         self.CBox.restart_awg_tape(1)
         self.CBox.set('AWG0_tape', self.tape)
@@ -231,8 +231,8 @@ class CBox_AllXY(swf.Hard_Sweep):
 
     def prepare(self, **kw):
         self.AWG.stop()
-        self.CBox.AWG0_mode.set('Tape')
-        self.CBox.AWG1_mode.set('Tape')
+        self.CBox.AWG0_mode.set('Segmented tape')
+        self.CBox.AWG1_mode.set('Segmented tape')
         self.CBox.restart_awg_tape(0)
         self.CBox.restart_awg_tape(1)
         self.CBox.set('AWG0_tape', self.tape)
@@ -284,8 +284,8 @@ class CBox_multi_element_tape(swf.Hard_Sweep):
 
     def prepare(self, **kw):
         self.AWG.stop()
-        self.CBox.AWG0_mode.set('Tape')
-        self.CBox.AWG1_mode.set('Tape')
+        self.CBox.AWG0_mode.set('Segmented tape')
+        self.CBox.AWG1_mode.set('Segmented tape')
         self.CBox.restart_awg_tape(0)
         self.CBox.restart_awg_tape(1)
         self.CBox.set('AWG0_tape', self.tape)
@@ -334,8 +334,8 @@ class Resetless_tape(swf.Hard_Sweep):
 
     def prepare(self, **kw):
         self.AWG.stop()
-        self.CBox.AWG0_mode.set('Tape')
-        self.CBox.AWG1_mode.set('Tape')
+        self.CBox.AWG0_mode.set('Segmented tape')
+        self.CBox.AWG1_mode.set('Segmented tape')
         self.CBox.restart_awg_tape(0)
         self.CBox.restart_awg_tape(1)
         self.CBox.set('AWG0_tape', self.tape)
