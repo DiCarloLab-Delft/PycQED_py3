@@ -383,6 +383,7 @@ class CBox_driven_transmon(Transmon):
         '''
         # ensures freq is set correctly
         self.prepare_for_timedomain()
+        self.AWG.stop()  # Make sure no waveforms are played
         offset_I, offset_Q = mixer_carrier_cancellation_CBox(
             CBox=self.CBox, SH=signal_hound, source=self.td_source,
             MC=self.MC, awg_nr=self.awg_nr.get())
