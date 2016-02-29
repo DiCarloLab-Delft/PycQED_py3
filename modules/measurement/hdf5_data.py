@@ -11,15 +11,22 @@ Contains:
 """
 
 import os
+import logging
 import time
 import h5py
 import numpy as np
+from uuid import getnode as get_mac
 # Hardcoded datadir, not cool :)
 try:
     qc_config
 except NameError:
-    print('creating qc_config for datadir')
-    qc_config = {'datadir': 'D:\Experiments\Simultaneous_Driving\data'}
+    from init.config import setup_dict
+    mac = get_mac()
+    setup_name = setup_dict.mac_dict[str(mac)]
+    logging.warning('Creating qc_config for datadir')
+    # logging.warning('Data directory set to:',
+    #                 setup_dict.data_dir_dict[setup_name])
+    qc_config = {'datadir': setup_dict.data_dir_dict[setup_name]}
 
 
 class DateTimeGenerator:

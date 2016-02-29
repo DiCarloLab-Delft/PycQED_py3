@@ -11,7 +11,7 @@ from matplotlib import pyplot as plt
 from matplotlib import colors
 import pandas as pd
 from uuid import getnode as get_mac
-from init.config import setup_dict  # used for setting datadir when qt not available
+from init.config import setup_dict
 
 # to allow backwards compatibility with old a_tools code
 from .tools.file_handling import *
