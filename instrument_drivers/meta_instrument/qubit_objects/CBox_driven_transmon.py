@@ -19,6 +19,7 @@ import modules.measurement.randomized_benchmarking.randomized_benchmarking as rb
 from modules.measurement.calibration_toolbox import mixer_carrier_cancellation_CBox
 from modules.measurement.calibration_toolbox import mixer_skewness_cal_CBox_adaptive
 
+from modules.measurement import optimization as opt
 
 
 class CBox_driven_transmon(Transmon):
@@ -403,6 +404,62 @@ class CBox_driven_transmon(Transmon):
         if update:
             self.phi.set(phi)
             self.alpha.set(alpha)
+
+    def calibrate_RO_threshold(self, method='conventional',
+                               MC=None, close_fig=True,
+                               verbose=False, make_fig=True):
+        '''
+        Calibrates the RO threshold and applies the correct rotation to the
+        data either using a conventional SSRO experiment or by using the
+        self-consistent method.
+
+        For details see measure_ssro() and measure_discrimination_fid()
+
+        method: 'conventional' or 'self-consistent
+
+        '''
+
+        if method.lower() == 'conventional':
+            self.CBox.lin_trans_coeffs.set([1, 0, 0, 1])
+            self.measure_ssro(MC=MC, analyze=False, close_fig=close_fig,
+                              verbose=verbose)
+            a = ma.SSRO_Analysis(auto=True, close_fig=True,
+                                 label='SSRO', no_fits=True,
+                                 close_file=True)
+            # SSRO analysis returns the angle to rotate by
+            theta = a.theta  # analysis returns theta in rad
+
+            rot_mat = [np.cos(theta), -np.sin(theta),
+                       np.sin(theta), np.cos(theta)]
+            self.CBox.lin_trans_coeffs.set(rot_mat)
+            self.threshold = a.V_opt_raw  # allows
+            self.RO_threshold.set(int(a.V_opt_raw))
+
+        elif method.lower() == 'self-consistent':
+            self.CBox.lin_trans_coeffs.set([1, 0, 0, 1])
+            discr_vals = self.measure_discrimination_fid(
+                MC=MC, close_fig=close_fig, make_fig=make_fig, verbose=verbose)
+
+            # hardcoded indices correspond to values in CBox SSRO discr det
+            theta = discr_vals[2] * 2 * np.pi/360
+
+            # Discr returns the current angle, rotation is - that angle
+            rot_mat = [np.cos(-1*theta), -np.sin(-1*theta),
+                       np.sin(-1*theta), np.cos(-1*theta)]
+            self.CBox.lin_trans_coeffs.set(rot_mat)
+
+            # Measure it again to determine the threshold after rotating
+            discr_vals = self.measure_discrimination_fid(
+                MC=MC, close_fig=close_fig, make_fig=make_fig, verbose=verbose)
+
+            # hardcoded indices correspond to values in CBox SSRO discr det
+            theta = discr_vals[2]
+            self.threshold = int(discr_vals[3])
+
+            self.RO_threshold.set(int(self.threshold))
+        else:
+            raise ValueError('method %s not recognized, can be' % method +
+                             ' either "conventional" or "self-consistent"')
 
     def measure_heterodyne_spectroscopy(self, freqs, MC=None,
                                         analyze=True, close_fig=False):
