@@ -2,23 +2,30 @@ import copy
 import numpy as np
 
 
-def nelder_mead(f, x_start,
-                step=0.1, no_improve_thr=10e-6,
-                no_improv_break=10, max_iter=0,
+def nelder_mead(fun, x0,
+                initial_step=0.1,
+                no_improve_thr=10e-6, no_improv_break=10,
+                maxiter=0,
                 alpha=1., gamma=2., rho=-0.5, sigma=0.5):
     '''
-    @param f (function): function to optimize, must return a scalar score
-        and operate over a numpy array of the same dimensions as x_start
-    @param x_start (numpy array): initial position
-    @param step (float): look-around radius in initial step
-    @no_improv_thr,  no_improv_break (float, int): break after no_improv_break
-        iterations with an improvement lower than no_improv_thr
-    @max_iter (int): always break after this number of iterations.
-        Set it to 0 to loop indefinitely.
-    @alpha, gamma, rho, sigma (floats): parameters of the algorithm
-        (see Wikipedia page for reference)
-    return: tuple (best parameter array, best score)
+    parameters:
+        fun (function): function to optimize, must return a scalar score
+            and operate over a numpy array of the same dimensions as x0
+        x0 (numpy array): initial position
+        initial_step (float/np array): determines the stepsize to construct
+            the initial simplex. If a float is specified it uses the same
+            value for all parameters, if an array is specified it uses
+            the specified step for each parameter.
 
+        no_improv_thr,  no_improv_break (float, int): break after
+            no_improv_break iterations with an improvement lower than
+            no_improv_thr
+        maxiter (int): always break after this number of iterations.
+            Set it to 0 to loop indefinitely.
+        alpha, gamma, rho, sigma (floats): parameters of the algorithm
+            (see Wikipedia page for reference)
+
+    return: tuple (best parameter array, best score)
 
 
     Pure Python/Numpy implementation of the Nelder-Mead algorithm.
@@ -26,17 +33,26 @@ def nelder_mead(f, x_start,
     Adriaan Rol for use in PycQED.
     Reference: https://en.wikipedia.org/wiki/Nelder%E2%80%93Mead_method
     '''
-
     # init
-    dim = len(x_start)
-    prev_best = f(x_start)
+    x0 = np.array(x0)  # ensures algorithm also accepts lists
+    dim = len(x0)
+    prev_best = fun(x0)
     no_improv = 0
-    res = [[x_start, prev_best]]
+    res = [[x0, prev_best]]
+    if type(initial_step) is float:
+        initial_step_matrix = np.eye(dim)*initial_step
+    elif (type(initial_step) is list) or (type(initial_step) is np.ndarray):
+        if len(initial_step) != dim:
+            raise ValueError('initial_step array must be same lenght as x0')
+        initial_step_matrix = np.diag(initial_step)
+    else:
+        raise TypeError('initial_step ({})must be list or np.array'.format(
+                        type(initial_step)))
 
     for i in range(dim):
-        x = copy.copy(x_start)
-        x[i] = x[i] + step
-        score = f(x)
+        x = copy.copy(x0)
+        x = x + initial_step_matrix[i]
+        score = fun(x)
         res.append([x, score])
 
     # simplex iter
@@ -46,9 +62,10 @@ def nelder_mead(f, x_start,
         res.sort(key=lambda x: x[1])
         best = res[0][1]
 
-        # break after max_iter
-        if max_iter and iters >= max_iter:
-            return res[0]
+        # break after maxiter
+        if maxiter and iters >= maxiter:
+            # Conclude failure break the loop
+            break
         iters += 1
 
         if best < prev_best - no_improve_thr:
@@ -58,7 +75,8 @@ def nelder_mead(f, x_start,
             no_improv += 1
 
         if no_improv >= no_improv_break:
-            return res[0]
+            # Conclude success, break the loop
+            break
 
         # centroid
         x0 = [0.] * dim
@@ -68,7 +86,7 @@ def nelder_mead(f, x_start,
 
         # reflection
         xr = x0 + alpha*(x0 - res[-1][0])
-        rscore = f(xr)
+        rscore = fun(xr)
         if res[0][1] <= rscore < res[-2][1]:
             del res[-1]
             res.append([xr, rscore])
@@ -77,7 +95,7 @@ def nelder_mead(f, x_start,
         # expansion
         if rscore < res[0][1]:
             xe = x0 + gamma*(x0 - res[-1][0])
-            escore = f(xe)
+            escore = fun(xe)
             if escore < rscore:
                 del res[-1]
                 res.append([xe, escore])
@@ -89,7 +107,7 @@ def nelder_mead(f, x_start,
 
         # contraction
         xc = x0 + rho*(x0 - res[-1][0])
-        cscore = f(xc)
+        cscore = fun(xc)
         if cscore < res[-1][1]:
             del res[-1]
             res.append([xc, cscore])
@@ -100,6 +118,11 @@ def nelder_mead(f, x_start,
         nres = []
         for tup in res:
             redx = x1 + sigma*(tup[0] - x1)
-            score = f(redx)
+            score = fun(redx)
             nres.append([redx, score])
         res = nres
+
+    # once the loop is broken evaluate the final value one more time as
+    # verification
+    fun(res[0][0])
+    return res[0]

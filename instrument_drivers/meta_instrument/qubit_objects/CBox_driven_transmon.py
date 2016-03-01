@@ -418,6 +418,7 @@ class CBox_driven_transmon(Transmon):
         method: 'conventional' or 'self-consistent
 
         '''
+        self.prepare_for_timedomain()
 
         if method.lower() == 'conventional':
             self.CBox.lin_trans_coeffs.set([1, 0, 0, 1])

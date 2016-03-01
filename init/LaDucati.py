@@ -23,7 +23,7 @@ from modules.measurement import detector_functions as det
 from modules.measurement import composite_detector_functions as cdet
 from modules.measurement import calibration_toolbox as cal_tools
 from modules.measurement import mc_parameter_wrapper as pw
-from modules.measurement import CBox_sweep_functions as CB_swf
+from modules.measurement import CBox_sweep_functions as cb_swf
 from modules.analysis import measurement_analysis as ma
 from modules.analysis import analysis_toolbox as a_tools
 
