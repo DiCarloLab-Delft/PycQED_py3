@@ -6,7 +6,8 @@ def nelder_mead(fun, x0,
                 initial_step=0.1,
                 no_improve_thr=10e-6, no_improv_break=10,
                 maxiter=0,
-                alpha=1., gamma=2., rho=-0.5, sigma=0.5):
+                alpha=1., gamma=2., rho=-0.5, sigma=0.5,
+                verbose=False):
     '''
     parameters:
         fun (function): function to optimize, must return a scalar score
@@ -65,6 +66,8 @@ def nelder_mead(fun, x0,
         # break after maxiter
         if maxiter and iters >= maxiter:
             # Conclude failure break the loop
+            if verbose:
+                print('max iterations exceeded, optimization failed')
             break
         iters += 1
 
@@ -76,6 +79,9 @@ def nelder_mead(fun, x0,
 
         if no_improv >= no_improv_break:
             # Conclude success, break the loop
+            if verbose:
+                print('No improvement registered for {} rounds,'.format(
+                      no_improv_break) + 'concluding succesful convergence')
             break
 
         # centroid

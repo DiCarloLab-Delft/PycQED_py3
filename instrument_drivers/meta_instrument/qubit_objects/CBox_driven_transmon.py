@@ -19,7 +19,7 @@ import modules.measurement.randomized_benchmarking.randomized_benchmarking as rb
 from modules.measurement.calibration_toolbox import mixer_carrier_cancellation_CBox
 from modules.measurement.calibration_toolbox import mixer_skewness_cal_CBox_adaptive
 
-from modules.measurement import optimization as opt
+from modules.measurement.optimization import nelder_mead
 
 
 class CBox_driven_transmon(Transmon):
@@ -207,9 +207,9 @@ class CBox_driven_transmon(Transmon):
             safety_factor = 5 if nr_cliff < 8 else 3
             pulse_p_elt = int(safety_factor*nr_cliff)
         if nr_seeds == 'max':
-            nr_seeds = 4000//pulse_p_elt
+            nr_seeds = 29184//pulse_p_elt
 
-        if nr_seeds*pulse_p_elt > 4000:
+        if nr_seeds*pulse_p_elt > 29184:
             raise ValueError(
                 'Too many pulses ({}), {} seeds, {} pulse_p_elt'.format(
                     nr_seeds*pulse_p_elt, nr_seeds, pulse_p_elt))
@@ -256,6 +256,7 @@ class CBox_driven_transmon(Transmon):
                                    parameters=['amp', 'motzoi', 'frequency'],
                                    amp_guess=None, motzoi_guess=None,
                                    frequency_guess=None,
+                                   a_step=30, m_step=.1, f_step=20e3,
                                    MC=None, nested_MC=None,
                                    update=False, close_fig=False,
                                    verbose=True):
@@ -292,51 +293,46 @@ class CBox_driven_transmon(Transmon):
         # Because we are sweeping the source and not the qubit frequency
         start_freq = frequency_guess - self.f_pulse_mod.get()
 
-        a_step = 30
-        m_step = .1
-        f_step = .2e6
-
         sweep_functions = []
         x0 = []
-        dir_vec = []
+        init_steps = []
         if 'amp' in parameters:
             sweep_functions.append(cb_swf.LutMan_amp180_90(self.LutMan))
             x0.append(amp_guess)
-            dir_vec.append(a_step)
+            init_steps.append(a_step)
         if 'motzoi' in parameters:
             sweep_functions.append(
                 pw.wrap_par_to_swf(self.LutMan.motzoi_parameter))
             x0.append(motzoi_guess)
-            dir_vec.append(m_step)
+            init_steps.append(m_step)
         if 'frequency' in parameters:
             sweep_functions.append(
                 pw.wrap_par_to_swf(self.td_source.frequency))
             x0.append(start_freq)
-            dir_vec.append(f_step)
+            init_steps.append(f_step)
         if len(sweep_functions) == 0:
             raise ValueError(
                 'parameters "{}" not recognized'.format(parameters))
-        direc = np.diag(dir_vec)
 
         MC.set_sweep_functions(sweep_functions)
-        xtol = 1e-9  # Has to be this low to ensure frequency converges
-        ftol = .00001
+
         if len(sweep_functions) != 1:
-            ad_func_pars = {'adaptive_function': 'Powell',
+            # noise ensures no_improv_break sets the termination condition
+            ad_func_pars = {'adaptive_function': nelder_mead,
                             'x0': x0,
-                            'direc': direc,  # direc is a tuple of vectors
-                            'ftol': ftol,
-                            'xtol': xtol, 'minimize': False,
-                            'maxiter': 400}
+                            'initial_step': init_steps,
+                            'no_improv_break': 10,
+                            'minimize': False,
+                            'maxiter': 500}
         elif len(sweep_functions) == 1:
             # Powell does not work for 1D, use brent instead
-            brack = (x0[0]-5*direc[0][0], x0[0])
+            brack = (x0[0]-5*init_steps[0], x0[0])
             # Ensures relative change in parameter is relevant
             if parameters == ['frequency']:
                 tol = 1e-9
             else:
                 tol = 1e-3
-            print('Tolerance:', tol, direc[0][0])
+            print('Tolerance:', tol, init_steps[0])
             print(brack)
             ad_func_pars = {'adaptive_function': brent,
                             'brack': brack,
@@ -666,7 +662,8 @@ class CBox_driven_transmon(Transmon):
         d.prepare()
         d.acquire_data_point()
         if analyze:
-            ma.AllXY_Analysis(close_main_fig=close_fig)
+            a = ma.AllXY_Analysis(close_main_fig=close_fig)
+            return a
 
     def measure_ssro(self, no_fits=False,
                      return_detector=False,

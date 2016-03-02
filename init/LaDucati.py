@@ -105,7 +105,7 @@ IF = -20e6        # RO modulation frequency
 
 LO.off()
 
-S1.off()
+# S1.off()
 S2.off()
 
 
