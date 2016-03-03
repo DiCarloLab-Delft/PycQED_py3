@@ -23,7 +23,8 @@ class Element:
         self.granularity = kw.pop('granularity', 4)
         self.min_samples = kw.pop('min_samples', 960)
         self.pulsar = kw.pop('pulsar', None)
-        self.ignore_offset_correction = kw.pop('ignore_offset_correction', False)
+        self.ignore_offset_correction = kw.pop('ignore_offset_correction',
+                                               False)
 
         self.global_time = kw.pop('global_time', False)
         self.time_offset = kw.pop('time_offset', 0)

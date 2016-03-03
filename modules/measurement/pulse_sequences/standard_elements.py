@@ -8,6 +8,27 @@ from importlib import reload
 reload(pulse)
 
 
+def single_marker_elt(i, station):
+    '''
+    Puts a single marker of 15ns on each channel
+    '''
+    nr_channels = 4
+    nr_markers = 2
+
+    el = element.Element(name='single-marker-elt_%s' % i,
+                         pulsar=station.pulsar)
+    ref_elt = el.add(pulse.SquarePulse(name='refpulse_0', channel='ch1',
+                     amplitude=0, length=1e-9))
+
+    for i in range(nr_channels):
+        for j in range(nr_markers):
+            el.add(pulse.SquarePulse(name='marker',
+                                     channel='ch{}_marker{}'.format(i+1, j+1),
+                                     length=15e-9, amplitude=1),
+                   start=5e-9, refpulse=ref_elt)
+    return el
+
+
 def single_pulse_elt(i, station, IF, RO_pulse_delay=0, RO_trigger_delay=0,
                      RO_pulse_length=1e-6, tau=0):
         '''
