@@ -1890,7 +1890,7 @@ class QuTech_ControlBox(VisaInstrument):
             raise ValueError("Awg number error!")
         if length < 1 or length > 29184:
             raise ValueError("The segemented tape only supports a length from\
-                              1 to 29184.")
+                              1 to 29184. (specified '{}'".format(length))
 
         cmd = defHeaders.AwgSegmentedTape
         data_bytes = bytes()

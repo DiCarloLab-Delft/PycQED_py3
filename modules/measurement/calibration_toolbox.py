@@ -236,7 +236,8 @@ def mixer_skewness_cal_CBox_adaptive(CBox, SH, source,
                                      AWG,
                                      MC,
                                      awg_nrs=[0],
-                                     calibrate_both_sidebands=False):
+                                     calibrate_both_sidebands=False,
+                                     verbose=True):
     '''
     Input args
         CBox
@@ -267,22 +268,31 @@ def mixer_skewness_cal_CBox_adaptive(CBox, SH, source,
     the spurious sideband. and return those values.
 
     '''
-
     # Loads a train of pulses to the AWG to trigger the CBox continuously
     AWG.stop()
-    CBox.AWG0_mode.set('Tape')
-    CBox.AWG1_mode.set('Tape')
-    # Note if the mod block is not in the lutmapping this will raise an error
-    tape = [LutMan.lut_mapping.get().index('ModBlock')]
-    CBox.set('AWG0_tape', tape)
-    CBox.set('AWG1_tape', tape)
-    # Ensure that the block is exactly 4 periods of the modulation freq
-    block_length = abs(round(1/LutMan.f_modulation.get())*4)
-    LutMan.block_length.set(block_length*2)  # in ns
-    marker_sep = block_length/1e9
+
+    #  Ensure that the block is 4 periods of the modulation freq
+    total_time = 200e-6  # Set by the triggerbox
+    time_per_pulse = abs(round(1/LutMan.f_modulation.get())*4)
+    LutMan.block_length.set(time_per_pulse)  # in ns
+    n_pulses = int(total_time//(time_per_pulse*1e-9))
+
+    # Timing tape that constructs the CW-tone
+    timing = [0]*(n_pulses)
+    pulse_ids = [LutMan.lut_mapping.get().index('ModBlock')]*n_pulses
+    end_of_marker = [False]*(n_pulses-1)+[True]
+    tape0 = []
+    for i in range(n_pulses):
+        tape0.append(CBox.create_timing_tape_entry(timing[i], pulse_ids[i],
+                                                   end_of_marker[i]))
+    for awg_nr in awg_nrs:
+        LutMan.load_pulses_onto_AWG_lookuptable(awg_nr)
+        CBox.set_segmented_tape(awg_nr, tape0)
+        CBox.set('AWG{:g}_mode'.format(awg_nr), 'segmented')
+
     # divide instead of multiply by 1e-9 because of rounding errs
-    st_seqs.CBox_marker_train_seq(
-        marker_separation=marker_sep)  # Lutman is in ns
+    st_seqs.single_marker_seq()
+
     AWG.start()
 
     sweepfunctions = [CB_swf.Lutman_par_with_reload(LutMan,
@@ -333,20 +343,18 @@ def mixer_skewness_cal_CBox_adaptive(CBox, SH, source,
         phase_min_lst[i] = a.optimization_result[0][1]
 
     if calibrate_both_sidebands:
-        print('Finished calibration')
-        print('*'*80)
-        print('Phase at minimum w-: {} deg, w+: {} deg'.format(
-            phase_min_lst[0], phase_min_lst[1]))
-        print('QI_amp_ratio at minimum w-: {},  w+: {}'.format(
-            ampl_min_lst[0], ampl_min_lst[1]))
-
-        print('*'*80)
-
         phi = -1*(np.mod((phase_min_lst[0] - (phase_min_lst[1]-180)), 360))/2.0
         alpha = (1/ampl_min_lst[0] + 1/ampl_min_lst[1])/2.
-        print('Phi = {} deg'.format(phi))
-        print('alpha = {}'.format(alpha))
+        if verbose:
+            print('Finished calibration')
+            print('*'*80)
+            print('Phase at minimum w-: {} deg, w+: {} deg'.format(
+                phase_min_lst[0], phase_min_lst[1]))
+            print('QI_amp_ratio at minimum w-: {},  w+: {}'.format(
+                ampl_min_lst[0], ampl_min_lst[1]))
+            print('*'*80)
+            print('Phi = {} deg'.format(phi))
+            print('alpha = {}'.format(alpha))
         return phi, alpha
     else:
         return phase_min_lst[0], ampl_min_lst[0]
-
