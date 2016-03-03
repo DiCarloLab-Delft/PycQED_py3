@@ -19,6 +19,7 @@ import modules.measurement.randomized_benchmarking.randomized_benchmarking as rb
 from modules.measurement.calibration_toolbox import mixer_carrier_cancellation_CBox
 from modules.measurement.calibration_toolbox import mixer_skewness_cal_CBox_adaptive
 
+from modules.measurement.optimization import nelder_mead
 
 
 class CBox_driven_transmon(Transmon):
@@ -206,9 +207,9 @@ class CBox_driven_transmon(Transmon):
             safety_factor = 5 if nr_cliff < 8 else 3
             pulse_p_elt = int(safety_factor*nr_cliff)
         if nr_seeds == 'max':
-            nr_seeds = 4000//pulse_p_elt
+            nr_seeds = 29184//pulse_p_elt
 
-        if nr_seeds*pulse_p_elt > 4000:
+        if nr_seeds*pulse_p_elt > 29184:
             raise ValueError(
                 'Too many pulses ({}), {} seeds, {} pulse_p_elt'.format(
                     nr_seeds*pulse_p_elt, nr_seeds, pulse_p_elt))
@@ -255,6 +256,7 @@ class CBox_driven_transmon(Transmon):
                                    parameters=['amp', 'motzoi', 'frequency'],
                                    amp_guess=None, motzoi_guess=None,
                                    frequency_guess=None,
+                                   a_step=30, m_step=.1, f_step=20e3,
                                    MC=None, nested_MC=None,
                                    update=False, close_fig=False,
                                    verbose=True):
@@ -291,51 +293,46 @@ class CBox_driven_transmon(Transmon):
         # Because we are sweeping the source and not the qubit frequency
         start_freq = frequency_guess - self.f_pulse_mod.get()
 
-        a_step = 30
-        m_step = .1
-        f_step = .2e6
-
         sweep_functions = []
         x0 = []
-        dir_vec = []
+        init_steps = []
         if 'amp' in parameters:
             sweep_functions.append(cb_swf.LutMan_amp180_90(self.LutMan))
             x0.append(amp_guess)
-            dir_vec.append(a_step)
+            init_steps.append(a_step)
         if 'motzoi' in parameters:
             sweep_functions.append(
                 pw.wrap_par_to_swf(self.LutMan.motzoi_parameter))
             x0.append(motzoi_guess)
-            dir_vec.append(m_step)
+            init_steps.append(m_step)
         if 'frequency' in parameters:
             sweep_functions.append(
                 pw.wrap_par_to_swf(self.td_source.frequency))
             x0.append(start_freq)
-            dir_vec.append(f_step)
+            init_steps.append(f_step)
         if len(sweep_functions) == 0:
             raise ValueError(
                 'parameters "{}" not recognized'.format(parameters))
-        direc = np.diag(dir_vec)
 
         MC.set_sweep_functions(sweep_functions)
-        xtol = 1e-9  # Has to be this low to ensure frequency converges
-        ftol = .00001
+
         if len(sweep_functions) != 1:
-            ad_func_pars = {'adaptive_function': 'Powell',
+            # noise ensures no_improv_break sets the termination condition
+            ad_func_pars = {'adaptive_function': nelder_mead,
                             'x0': x0,
-                            'direc': direc,  # direc is a tuple of vectors
-                            'ftol': ftol,
-                            'xtol': xtol, 'minimize': False,
-                            'maxiter': 400}
+                            'initial_step': init_steps,
+                            'no_improv_break': 10,
+                            'minimize': False,
+                            'maxiter': 500}
         elif len(sweep_functions) == 1:
             # Powell does not work for 1D, use brent instead
-            brack = (x0[0]-5*direc[0][0], x0[0])
+            brack = (x0[0]-5*init_steps[0], x0[0])
             # Ensures relative change in parameter is relevant
             if parameters == ['frequency']:
                 tol = 1e-9
             else:
                 tol = 1e-3
-            print('Tolerance:', tol, direc[0][0])
+            print('Tolerance:', tol, init_steps[0])
             print(brack)
             ad_func_pars = {'adaptive_function': brent,
                             'brack': brack,
@@ -404,6 +401,63 @@ class CBox_driven_transmon(Transmon):
         if update:
             self.phi.set(phi)
             self.alpha.set(alpha)
+
+    def calibrate_RO_threshold(self, method='conventional',
+                               MC=None, close_fig=True,
+                               verbose=False, make_fig=True):
+        '''
+        Calibrates the RO threshold and applies the correct rotation to the
+        data either using a conventional SSRO experiment or by using the
+        self-consistent method.
+
+        For details see measure_ssro() and measure_discrimination_fid()
+
+        method: 'conventional' or 'self-consistent
+
+        '''
+        self.prepare_for_timedomain()
+
+        if method.lower() == 'conventional':
+            self.CBox.lin_trans_coeffs.set([1, 0, 0, 1])
+            self.measure_ssro(MC=MC, analyze=False, close_fig=close_fig,
+                              verbose=verbose)
+            a = ma.SSRO_Analysis(auto=True, close_fig=True,
+                                 label='SSRO', no_fits=True,
+                                 close_file=True)
+            # SSRO analysis returns the angle to rotate by
+            theta = a.theta  # analysis returns theta in rad
+
+            rot_mat = [np.cos(theta), -np.sin(theta),
+                       np.sin(theta), np.cos(theta)]
+            self.CBox.lin_trans_coeffs.set(rot_mat)
+            self.threshold = a.V_opt_raw  # allows
+            self.RO_threshold.set(int(a.V_opt_raw))
+
+        elif method.lower() == 'self-consistent':
+            self.CBox.lin_trans_coeffs.set([1, 0, 0, 1])
+            discr_vals = self.measure_discrimination_fid(
+                MC=MC, close_fig=close_fig, make_fig=make_fig, verbose=verbose)
+
+            # hardcoded indices correspond to values in CBox SSRO discr det
+            theta = discr_vals[2] * 2 * np.pi/360
+
+            # Discr returns the current angle, rotation is - that angle
+            rot_mat = [np.cos(-1*theta), -np.sin(-1*theta),
+                       np.sin(-1*theta), np.cos(-1*theta)]
+            self.CBox.lin_trans_coeffs.set(rot_mat)
+
+            # Measure it again to determine the threshold after rotating
+            discr_vals = self.measure_discrimination_fid(
+                MC=MC, close_fig=close_fig, make_fig=make_fig, verbose=verbose)
+
+            # hardcoded indices correspond to values in CBox SSRO discr det
+            theta = discr_vals[2]
+            self.threshold = int(discr_vals[3])
+
+            self.RO_threshold.set(int(self.threshold))
+        else:
+            raise ValueError('method %s not recognized, can be' % method +
+                             ' either "conventional" or "self-consistent"')
 
     def measure_heterodyne_spectroscopy(self, freqs, MC=None,
                                         analyze=True, close_fig=False):
@@ -609,7 +663,8 @@ class CBox_driven_transmon(Transmon):
         d.prepare()
         d.acquire_data_point()
         if analyze:
-            ma.AllXY_Analysis(close_main_fig=close_fig)
+            a = ma.AllXY_Analysis(close_main_fig=close_fig)
+            return a
 
     def measure_ssro(self, no_fits=False,
                      return_detector=False,

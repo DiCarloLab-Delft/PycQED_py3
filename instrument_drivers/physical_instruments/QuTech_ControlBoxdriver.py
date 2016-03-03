@@ -1840,9 +1840,9 @@ class QuTech_ControlBox(VisaInstrument):
                                          tape_addr_width/7.0)))
         # add the tape entries
         data_bytes += (c.encode_array(
-                          self.convert_arrary_to_signed(tape, entry_length),
-                          data_bits_per_byte=7,
-                          bytes_per_value=np.ceil(entry_length/7.0)))
+                       self.convert_arrary_to_signed(tape, entry_length),
+                       data_bits_per_byte=7,
+                       bytes_per_value=np.ceil(entry_length/7.0)))
 
         message = c.create_message(cmd, data_bytes)
         (stat, mesg) = self.serial_write(message)
@@ -1850,8 +1850,8 @@ class QuTech_ControlBox(VisaInstrument):
 
     def set_segmented_tape(self, awg_nr, tape):
         '''
-        NOTE: ControlBox only support timing tape from version 2.16.
-              CBox_v3 have not supported timing tape yet(2016-02-15).
+        NOTE: ControlBox only supports timing tape from version 2.16.
+              CBox_v3 does not supported timing tape yet(2016-02-15).
 
         Set the Segmented Tape content for a specified awg.
 

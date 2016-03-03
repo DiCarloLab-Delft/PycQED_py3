@@ -23,7 +23,7 @@ from modules.measurement import detector_functions as det
 from modules.measurement import composite_detector_functions as cdet
 from modules.measurement import calibration_toolbox as cal_tools
 from modules.measurement import mc_parameter_wrapper as pw
-from modules.measurement import CBox_sweep_functions as CB_swf
+from modules.measurement import CBox_sweep_functions as cb_swf
 from modules.analysis import measurement_analysis as ma
 from modules.analysis import analysis_toolbox as a_tools
 
@@ -98,14 +98,14 @@ for i in range(4):
 # to make the pulsar available to the standard awg seqs
 st_seqs.station = station
 
-IVVI.set('dac2', 300)
+IVVI.set('dac2', 190)
 IVVI.dac5.set(91.3)
 
 IF = -20e6        # RO modulation frequency
 
 LO.off()
 
-S1.off()
+# S1.off()
 S2.off()
 
 
