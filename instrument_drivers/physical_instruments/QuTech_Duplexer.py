@@ -56,7 +56,8 @@ class QuTech_Duplexer(VisaInstrument):
                                    inp+1, outp+1) + '{} \n',
                                    set_parser=self._mode_set_parser,
                                    vals=vals.Numbers(0, 65536))
-                self.add_parameter('in{}_out{}_attenuation'.format(inp+1, outp+1),
+                self.add_parameter('in{}_out{}_attenuation'.format(inp+1,
+                                                                   outp+1),
                                    set_cmd='ch:in{}:out{}:att:'.format(
                                         inp+1, outp+1) + ' {} \n',
                                    vals=vals.Numbers(0, 65536),
