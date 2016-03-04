@@ -8,6 +8,27 @@ from importlib import reload
 reload(pulse)
 
 
+def single_marker_elt(i, station):
+    '''
+    Puts a single marker of 15ns on each channel
+    '''
+    nr_channels = 4
+    nr_markers = 2
+
+    el = element.Element(name='single-marker-elt_%s' % i,
+                         pulsar=station.pulsar)
+    ref_elt = el.add(pulse.SquarePulse(name='refpulse_0', channel='ch1',
+                     amplitude=0, length=1e-9))
+
+    for i in range(nr_channels):
+        for j in range(nr_markers):
+            el.add(pulse.SquarePulse(name='marker',
+                                     channel='ch{}_marker{}'.format(i+1, j+1),
+                                     length=15e-9, amplitude=1),
+                   start=5e-9, refpulse=ref_elt)
+    return el
+
+
 def single_pulse_elt(i, station, IF, RO_pulse_delay=0, RO_trigger_delay=0,
                      RO_pulse_length=1e-6, tau=0):
         '''
@@ -366,3 +387,33 @@ def pulsed_spec_elt_with_RF_mod(i, station, IF,
                    refpulse='RO-Cos-{}'.format(i), refpoint='start')
     return el
 
+
+def CBox_marker_sequence(i, station, marker_separation):
+    el = element.Element(name=('el_{}'.format(i)),
+                         pulsar=station.pulsar)
+
+    # Somehow I got errors whenever I picked a marker separation>63 ns
+    # 14-2-2016 MAR -> Update quite sure it is a ns rounding error!
+
+    # Thispulse ensures that the total length of the element is exactly 20us
+    refpulse = el.add(pulse.SquarePulse(name='refpulse_20us',
+                                        channel='ch2',
+                                        amplitude=0, length=20e-6,
+                                        start=0))
+    # ensures complete seq is filled with markers
+    nr_markers = int(20e-6//marker_separation)
+    marker_tr_p = pulse.marker_train(name='CBox-pulse_marker',
+                                     channel='ch1_marker1', amplitude=1,
+                                     marker_length=15e-9,
+                                     marker_separation=marker_separation,
+                                     nr_markers=nr_markers)
+    el.add(pulse.cp(marker_tr_p),
+           name='CBox-pulse-trigger-ch1_{}'.format(i),
+           start=0,
+           refpulse=refpulse, refpoint='start')
+
+    el.add(pulse.cp(marker_tr_p, channel='ch1_marker2'),
+           name='CBox-pulse-trigger-ch2_{}'.format(i),
+           start=0,
+           refpulse=refpulse, refpoint='start')
+    return el

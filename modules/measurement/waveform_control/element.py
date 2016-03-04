@@ -23,7 +23,8 @@ class Element:
         self.granularity = kw.pop('granularity', 4)
         self.min_samples = kw.pop('min_samples', 960)
         self.pulsar = kw.pop('pulsar', None)
-        self.ignore_offset_correction = kw.pop('ignore_offset_correction', False)
+        self.ignore_offset_correction = kw.pop('ignore_offset_correction',
+                                               False)
 
         self.global_time = kw.pop('global_time', False)
         self.time_offset = kw.pop('time_offset', 0)
@@ -123,10 +124,11 @@ class Element:
         '''
         checks if "value" is divisible by the clock period.
         This funciton is needed because of floating point errors
+
+        It performs this by multiplying everything by 1e11 (looking at 0.01ns
+        resolution for divisibility)
         '''
-        if value % (1/self.clock) < 1e-20:
-            return True
-        elif (1/self.clock) - value % (1/self.clock) < 1e-20:
+        if np.round(value*1e11) % (1/self.clock*1e11) == 0:
             return True
         else:
             return False
@@ -321,7 +323,6 @@ class Element:
 
     # computing the numerical waveform
     def ideal_waveforms(self):
-        # tvals = np.arange(self.samples())/self.clock
         wfs = {}
         tvals = np.arange(self.samples())/self.clock
 

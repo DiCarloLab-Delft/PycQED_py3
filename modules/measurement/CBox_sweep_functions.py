@@ -84,182 +84,24 @@ class T1(CBox_Sweep):
         self.CBox.set_averaging_parameters(self.NoSegments, NoAvg)
 
 
-class Pulse_amp(CBox_Sweep):
-    '''
-    Varies amplitude of a pulse loaded in the first lookuptable of the CBox
-    '''
-    def __init__(self):
-        print('Warning this function is deprecated.')
-        print('This should be done with the CBox_lut_man')
-        print('If you are still using this give me (Adriaan) a call')
-    #     super(self.__class__, self).__init__()
-    #     self.sweep_control = 'soft' # Overwrites 'hard sweep part'
-    #     self.name = 'CBox pulse amplitude'
-    #     self.parameter_name = 'pulse amplitude'
-    #     self.unit = 'mV'
-    #     self.filename = 'FPGA_RABI25_5014'
-    #     # any arbitrary sequence that is not time dependent on the pulse trigger will do
-
-    # def prepare(self):
-    #     self.CBox.set_awg_mode(0, 1)
-    #     self.CBox.set_awg_mode(1, 1)
-    #     self.AWG.stop()
-    #     self.AWG.set_setup_filename(self.filename,
-    #                                 force_load=False)
-
-    # def set_parameter(self, val):
-    #     print 'Setting Rabi amp %s' % val
-    #     Wave_I, Wave_Q = PG.mod_gauss(val, 25, -0.02)
-    #     self.CBox.set_awg_lookuptable(0, 0, 1, np.round(Wave_I))
-    #     self.CBox.set_awg_lookuptable(0, 0, 0, np.round(Wave_Q))
-    #     self.CBox.set_awg_lookuptable(1, 0, 1, np.round(Wave_I))
-    #     self.CBox.set_awg_lookuptable(1, 0, 0, np.round(Wave_Q))
-
-
-class touch_n_go_Pulse_amp(CBox_Sweep):
-    """
-    Varies amplitude of a pulse loaded in the first lookuptable of the CBox
-    """
-    def __init__(self):
-        super(self.__class__, self).__init__()
-        self.sweep_control = 'soft' # Overwrites 'hard sweep part'
-        self.name = 'CBox pulse amplitude'
-        self.parameter_name = 'pulse amplitude'
-        self.unit = 'DAC value'
-        self.filename = 'FPGA_touch_n_go_5014'
-        self.HeartbeatInterval = 3
-        self.ReadoutPulseLength = 20
-        self.ReadoutDelay = 3
-        self.CallibrationMode = 1
-        self.AwgNr = 3
-        self.OutPutTriggerDelay = 0
-        self.TriggerState = 1
-        #self.CBox_lut_man = qt.instruments['CBox_lut_man']
-
-        # any arbitrary sequence that is not time dependent on the pulse trigger will do
-
-    def prepare(self):
-        self.CBox.set_awg_mode(0, 1)
-        self.CBox.set_awg_mode(1, 1)
-        self.AWG.stop()
-        self.AWG.set_setup_filename(self.filename,
-                                    force_load=False)
-        print('self.ReadoutDelay', self.ReadoutDelay)
-        print('self.CallibrationMode',self.CallibrationMode)
-        self.CBox.set_touch_n_go_parameters(self.HeartbeatInterval,
-            self.ReadoutDelay, self.CallibrationMode,
-            self.AwgNr, self.ReadoutPulseLength,
-            self.OutPutTriggerDelay, self.TriggerState)
+class Lutman_par_with_reload(Soft_Sweep):
+    def __init__(self, LutMan, parameter, awg_nrs=[0]):
+        '''
+        Generic sweep function that combines setting a LutMan parameter
+        with reloading lookuptables.
+        '''
+        super().__init__()
+        self.LutMan = LutMan
+        self.parameter = parameter
+        self.name = parameter.name
+        self.parameter_name = parameter.label
+        self.unit = parameter.units
+        self.awg_nrs = awg_nrs
 
     def set_parameter(self, val):
-        counters=self.CBox.get_sequencer_counters()
-        #print "last point counters",counters
-        if counters[0]>0:
-            print("triggerfraction",counters[1]/float(counters[0]))
-        print('Setting Rabi amp %s' % val)
-        self.CBox.set_run_mode(0)
-        self.CBox.set_acquisition_mode(0)
-        Wave_I, Wave_Q = PG.mod_gauss(val, 25, -0.02)
-        self.CBox.set_awg_lookuptable(0, 0, 1, np.round(Wave_I))
-        self.CBox.set_awg_lookuptable(0, 0, 0, np.round(Wave_Q))
-        self.CBox.set_awg_lookuptable(1, 0, 1, np.round(Wave_I))
-        self.CBox.set_awg_lookuptable(1, 0, 0, np.round(Wave_Q))
-        self.CBox.set_acquisition_mode(6)
-        self.CBox.set_run_mode(1)
-
-
-class touch_n_go_Pulse_amp_2(CBox_Sweep):
-    """
-    Varies amplitude of a pulse loaded in the first lookuptable of the CBox.
-    Used for feedback suppression of Rabi amplitude.
-    """
-    def __init__(self, HeartbeatInterval, ReadoutPulseLength, ReadoutDelay,
-                 CallibrationMode, AwgNr, OutPutTriggerDelay, TriggerState,
-                 FeedbackMode, FeedbackCode, LoggingMode):
-        super(self.__class__, self).__init__()
-        self.sweep_control = 'soft' # Overwrites 'hard sweep part'
-        self.name = 'CBox pulse amplitude'
-        self.parameter_name = 'pulse amplitude'
-        self.unit = 'DAC value'
-        self.filename = 'FPGA_feedback_5014'
-        self.HeartbeatInterval = HeartbeatInterval
-        self.ReadoutPulseLength = ReadoutPulseLength
-        self.ReadoutDelay = ReadoutDelay
-        self.CallibrationMode = CallibrationMode
-        self.AwgNr = AwgNr
-        self.OutPutTriggerDelay = OutPutTriggerDelay
-        self.TriggerState = TriggerState
-        self.FeedbackMode = FeedbackMode
-        self.FeedbackCode = FeedbackCode
-        self.LoggingMode = LoggingMode
-        self.CBox_lut_man = qt.instruments['CBox_lut_man']
-        # any arbitrary sequence that is not time dependent on the pulse trigger will do
-
-    def prepare(self):
-        self.CBox.set_awg_mode(0, 0)
-        self.CBox.set_awg_mode(1, 0)
-        self.AWG.stop()
-
-        self.AWG.set_setup_filename(self.filename,
-                                    force_load=False)
-        print("logging mode", self.LoggingMode)
-        self.CBox.set_touch_n_go_parameters(self.HeartbeatInterval,
-            self.ReadoutDelay, self.CallibrationMode,
-            self.AwgNr, self.ReadoutPulseLength,
-            self.OutPutTriggerDelay, self.TriggerState, self.FeedbackMode,
-            self.FeedbackCode, self.LoggingMode)
-
-    def set_parameter(self, val):
-        print('Setting Rabi amp %s' % val)
-        #self.CBox_lut_man.set_amp180(val) # abusing amp90 as the variable pulse amp
-        self.CBox.set_acquisition_mode(0)
-        Wave_I, Wave_Q = PG.mod_gauss(val, 25, -0.02)
-        self.CBox.set_awg_lookuptable(0, 0, 1, np.round(Wave_I))
-        self.CBox.set_awg_lookuptable(0, 0, 0, np.round(Wave_Q))
-        self.CBox.set_awg_lookuptable(1, 0, 1, np.round(Wave_I))
-        self.CBox.set_awg_lookuptable(1, 0, 0, np.round(Wave_Q))
-        #self.CBox_lut_man.load_pulse_onto_AWG_lookuptable('X180',0)
-        #self.CBox_lut_man.load_pulse_onto_AWG_lookuptable('X180',1)
-        self.CBox.set_acquisition_mode(6)
-        print("set parameter is done")
-
-
-class Lut_man_motzoi(Soft_Sweep):
-    '''
-    Sweeps the motzoi parameter of the CBox_lut_man
-    '''
-    def __init__(self, reload_pulses=True, awg_nr=0):
-        super(self.__class__, self).__init__()
-        self.awg_nr = awg_nr
-        self.reload_pulses = reload_pulses
-        self.name = 'lookuptable motzoi'
-        self.parameter_name = 'motzoi'
-        self.unit = ''
-        self.CBox_lut_man = qt.instruments['CBox_lut_man']
-
-    def set_parameter(self, val):
-        self.CBox_lut_man.set_motzoi_parameter(val)
-        if self.reload_pulses:
-            self.CBox_lut_man.load_pulses_onto_AWG_lookuptable(self.awg_nr)
-
-
-class Lut_man_f_modulation(Soft_Sweep):
-    '''
-    Sweeps the f_modulation parameter of the CBox_lut_man
-    '''
-    def __init__(self, reload_pulses=True, awg_nr=0):
-        super(self.__class__, self).__init__()
-        self.awg_nr = awg_nr
-        self.reload_pulses = reload_pulses
-        self.name = 'lookuptable f_modulation'
-        self.parameter_name = 'f_modulation'
-        self.unit = 'GHz'
-        self.CBox_lut_man = qt.instruments['CBox_lut_man']
-
-    def set_parameter(self, val):
-        self.CBox_lut_man.set_f_modulation(val*1e9)
-        if self.reload_pulses:
-            self.CBox_lut_man.load_pulses_onto_AWG_lookuptable(self.awg_nr)
+        self.parameter.set(val)
+        for awg_nr in self.awg_nrs:
+            self.LutMan.load_pulses_onto_AWG_lookuptable(awg_nr)
 
 
 class LutMan_amp180_90(Soft_Sweep):
@@ -282,101 +124,6 @@ class LutMan_amp180_90(Soft_Sweep):
         self.LutMan.set('amp90', val/2.0)
         if self.reload_pulses:
             self.LutMan.load_pulses_onto_AWG_lookuptable(self.awg_nr)
-
-
-class Lut_man_amp180(Soft_Sweep):
-    '''
-    Sweeps the amp180 parameter of the CBox_lut_man
-    '''
-    def __init__(self, reload_pulses=True, awg_nr=0):
-        super(self.__class__, self).__init__()
-        self.awg_nr = awg_nr
-        self.reload_pulses = reload_pulses
-        self.name = 'lookuptable amp180'
-        self.parameter_name = 'amp180'
-        self.unit = 'mV'
-        self.CBox_lut_man = qt.instruments['CBox_lut_man']
-
-    def set_parameter(self, val):
-        self.CBox_lut_man.set_amp180(val)
-        if self.reload_pulses:
-            self.CBox_lut_man.load_pulses_onto_AWG_lookuptable(self.awg_nr)
-
-
-class Lut_man_amp90(Soft_Sweep):
-    '''
-    Sweeps the amp90 parameter of the CBox_lut_man
-    '''
-    def __init__(self, reload_pulses=True, awg_nr=0):
-        super(self.__class__, self).__init__()
-        self.awg_nr = awg_nr
-        self.reload_pulses = reload_pulses
-        self.name = 'lookuptable amp90'
-        self.parameter_name = 'amp90'
-        self.unit = 'mV'  # Device currently does not support mV
-        self.CBox_lut_man = qt.instruments['CBox_lut_man']
-
-    def set_parameter(self, val):
-        self.CBox_lut_man.set_amp90(val)
-        if self.reload_pulses:
-            self.CBox_lut_man.load_pulses_onto_AWG_lookuptable(self.awg_nr)
-
-
-class Lut_man_QI_amp_ratio(Soft_Sweep):
-    '''
-    Sweeps the QI_amp_ratio parameter of the CBox_lut_man
-    '''
-    def __init__(self, reload_pulses=True, awg_nr=0):
-        super(self.__class__, self).__init__()
-        self.awg_nr = awg_nr
-        self.reload_pulses = reload_pulses
-        self.name = 'lookuptable QI_amp_ratio'
-        self.parameter_name = 'QI_amp_ratio'
-        self.unit = ''
-        self.CBox_lut_man = qt.instruments['CBox_lut_man']
-
-    def set_parameter(self, val):
-        self.CBox_lut_man.set_QI_amp_ratio(val)
-        if self.reload_pulses:
-            self.CBox_lut_man.load_pulses_onto_AWG_lookuptable(self.awg_nr)
-
-
-class Lut_man_IQ_phase_skewness(Soft_Sweep):
-    '''
-    Sweeps the IQ_phase_skewness parameter of the CBox_lut_man
-    '''
-    def __init__(self, reload_pulses=True, awg_nr=0):
-        super(self.__class__, self).__init__()
-        self.awg_nr = awg_nr
-        self.reload_pulses = reload_pulses
-        self.name = 'lookuptable IQ_phase_skewness'
-        self.parameter_name = 'IQ_phase_skewness'
-        self.unit = 'deg'
-        self.CBox_lut_man = qt.instruments['CBox_lut_man']
-
-    def set_parameter(self, val):
-        self.CBox_lut_man.set_IQ_phase_skewness(val)
-        if self.reload_pulses:
-            self.CBox_lut_man.load_pulses_onto_AWG_lookuptable(self.awg_nr)
-
-
-class Lut_man_gauss_width(Soft_Sweep):
-    '''
-    Sweeps the gauss_width parameter of the CBox_lut_man
-    '''
-    def __init__(self, reload_pulses=True, awg_nr=0):
-        super(self.__class__, self).__init__()
-        self.awg_nr = awg_nr
-        self.reload_pulses = reload_pulses
-        self.name = 'lookuptable gauss_width'
-        self.parameter_name = 'gauss_width'
-        self.unit = 'ns'
-        self.CBox_lut_man = qt.instruments['CBox_lut_man']
-
-    def set_parameter(self, val):
-        self.CBox_lut_man.set_gauss_width(val)
-        if self.reload_pulses:
-            self.CBox_lut_man.load_pulses_onto_AWG_lookuptable(self.awg_nr)
 
 
 class DAC_offset(CBox_Sweep):

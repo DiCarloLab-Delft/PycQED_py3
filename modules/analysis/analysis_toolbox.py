@@ -11,7 +11,7 @@ from matplotlib import pyplot as plt
 from matplotlib import colors
 import pandas as pd
 from uuid import getnode as get_mac
-from init.config import setup_dict  # used for setting datadir when qt not available
+from init.config import setup_dict
 
 # to allow backwards compatibility with old a_tools code
 from .tools.file_handling import *
@@ -405,21 +405,22 @@ def get_data_from_ma_v2(ma, param_names, numeric_params=None):
 
 
 def get_data_from_ma(ma, param_names, data_version=2, numeric_params=None):
-    exec('data = get_data_from_ma_v%d(ma, param_names, numeric_params=numeric_params)'%(data_version))
+    if data_version == 1:
+        data = get_data_from_ma_v1(ma, param_names,
+                                    numeric_params=numeric_params)
+    elif data_version == 2:
+        data = get_data_from_ma_v2(ma, param_names,
+                                    numeric_params=numeric_params)
     return data
 
 
+def append_data_from_ma(ma, param_names, data, data_version=2,
+                        numeric_params=None):
 
-def append_data_from_ma(ma, param_names, data, data_version=2, numeric_params=None):
-
-    new_data = get_data_from_ma(ma, param_names, data_version=data_version, numeric_params=numeric_params)
-    #print 'boo5', new_data['amp']
-
-    #print 'boo3', data['amp']
+    new_data = get_data_from_ma(ma, param_names, data_version=data_version,
+                                numeric_params=numeric_params)
     for param in param_names:
-        #print 'boo6', new_data[param]
         data[param].append(new_data[param])
-    #print 'boo4', data['amp']
 
 
 def get_data_from_timestamp_list(timestamps,
@@ -428,7 +429,7 @@ def get_data_from_timestamp_list(timestamps,
                                  max_files=None,
                                  filter_no_analysis=False,
                                  numeric_params=None):
-    from modules.analysis import measurement_analysis as MA
+    from modules.analysis import measurement_analysis as ma
 
     if type(timestamps) is str:
         timestamps = [timestamps]
@@ -438,7 +439,7 @@ def get_data_from_timestamp_list(timestamps,
         if type(param_names) is list:
             data = od([(param, []) for param in param_names])
         elif type(param_names) is dict:
-            data = od([(param, []) for param in list(param_names.values())])
+            data = od([(param, []) for param in param_names.values()])
         else:
             ValueError("Key 'param_names' is incorrect type.")
 
@@ -450,53 +451,59 @@ def get_data_from_timestamp_list(timestamps,
     remove_timestamps = []
     for timestamp in get_timestamps:
         try:
-            ma = MA.MeasurementAnalysis(timestamp=timestamp, auto=False, close_file=False)
+            ana = ma.MeasurementAnalysis(timestamp=timestamp, auto=False,
+                                         close_file=False)
         except:
             try:
-                ma.finish()
-                del ma
+                ana.finish()
+                del ana
             except:
                 pass
             warnings.warn('This data file does not exist or has been corrupted.')
             remove_timestamps.append(timestamp)
         else:
-            do_analysis=True
-            if filter_no_analysis:
-                if 'Analysis' in list(ma.data_file.keys()):
-                    do_analysis=True
-                else:
-                    do_analysis=False
-
-            if do_analysis:
-                if TwoD:
-                    ma.get_naming_and_values_2D()
-                else:
-                    ma.get_naming_and_values()
-
-                if 'datasaving_format' in ma.data_file['Experimental Data'].attrs:
-                    datasaving_format = ma.get_key('datasaving_format')
-                else:
-                    print('Using legacy data loading, assuming old formatting')
-                    datasaving_format = 'Version 1'
-
-                if datasaving_format == 'Version 1':
-                    if single_timestamp:
-                        data = get_data_from_ma(ma, list(param_names.values()), data_version=1)
-                    else:
-                        append_data_from_ma(ma, list(param_names.values()), data, data_version=1)
-
-                elif datasaving_format == 'Version 2':
-                    if single_timestamp:
-                        data = get_data_from_ma(ma, list(param_names.values()), data_version=2)
-                    else:
-                        append_data_from_ma(ma, list(param_names.values()), data, data_version=2)
-
-            else:
-                remove_timestamps.append(timestamp)
+            try:
                 do_analysis=True
+                if filter_no_analysis:
+                    if 'Analysis' in ana.data_file.keys():
+                        do_analysis=True
+                    else:
+                        do_analysis=False
 
-            ma.finish()
-            del ma
+                if do_analysis:
+                    if TwoD:
+                        ana.get_naming_and_values_2D()
+                    else:
+                        ana.get_naming_and_values()
+
+                    if 'datasaving_format' in ana.data_file['Experimental Data'].attrs:
+                        datasaving_format = ana.get_key('datasaving_format')
+                    else:
+                        print('Using legacy data loading, assuming old formatting')
+                        datasaving_format = 'Version 1'
+
+                    if datasaving_format == 'Version 1':
+                        if single_timestamp:
+                            data = get_data_from_ma(ana, param_names.values(),
+                                                    data_version=1)
+                        else:
+                            append_data_from_ma(ana, param_names.values(), data,
+                                                data_version=1)
+
+                    elif datasaving_format == 'Version 2':
+                        if single_timestamp:
+                            data = get_data_from_ma(ana, param_names.values(),
+                                                     data_version=2)
+                        else:
+                            append_data_from_ma(ana, param_names.values(), data, data_version=2)
+
+                else:
+                    remove_timestamps.append(timestamp)
+                    do_analysis=True
+                ana.finish()
+            except Exception as inst:
+                print('Error "%s" when processing timestamp %s' % (inst, timestamp))
+                raise
 
     if len(remove_timestamps)>0:
         for timestamp in remove_timestamps:
@@ -507,12 +514,18 @@ def get_data_from_timestamp_list(timestamps,
     if type(param_names) is list:
         out_data = data
     elif type(param_names) is dict:
-        out_data = od([(key,data[val]) for key, val in list(param_names.items())])
+        out_data = od([(key,data[val]) for key, val in param_names.items()])
 
     if numeric_params is not None:
         for nparam in numeric_params:
-            if nparam in list(out_data.keys()):
-                out_data[nparam] = np.array([np.double(val) for val in out_data[nparam]])
+            if nparam in out_data.keys():
+                try:
+                    out_data[nparam] = np.array([np.double(val) for val in out_data[nparam]])
+                except ValueError as instance:
+                    if 'could not broadcast' in instance.message:
+                        out_data[nparam] = [np.double(val) for val in out_data[nparam]]
+                    else:
+                        raise(instance)
 
     # out_data.update({'timestamps':get_timestamps})
     out_data['timestamps'] = get_timestamps

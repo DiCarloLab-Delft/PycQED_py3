@@ -2521,7 +2521,8 @@ class Homodyne_Analysis(MeasurementAnalysis):
 
             # amplitude_guess = np.pi*sigma_guess * abs(
             #     max(self.measured_powers)-min(self.measured_powers))
-            amplitude_guess = max(self.measured_powers)-min(self.measured_powers)
+            amplitude_guess = (max(self.measured_powers) -
+                               min(self.measured_powers))
             # Creating parameters and estimations
             S21min = min(self.measured_values[0])/max(self.measured_values[0])
 
@@ -2534,15 +2535,18 @@ class Homodyne_Analysis(MeasurementAnalysis):
             HangerModel.set_param_hint('A', value=amplitude_guess)
             HangerModel.set_param_hint('Q', value=Q)
             HangerModel.set_param_hint('Qe', value=Qe)
-            HangerModel.set_param_hint('Qi', expr='1./(1./Q-1./Qe*cos(theta))',
-                                       vary=False)
-            HangerModel.set_param_hint('Qc', expr='Qe/cos(theta)', vary=False)
+            # NB! Expressions are broken in lmfit for python 3.5 this has
+            # been fixed in the lmfit repository but is not yet released
+            # the newest upgrade to lmfit should fix this (MAR 18-2-2016)
+            # HangerModel.set_param_hint('Qi', expr='1./(1./Q-1./Qe*cos(theta))',
+            #                            vary=False)
+            # HangerModel.set_param_hint('Qc', expr='Qe/cos(theta)', vary=False)
             HangerModel.set_param_hint('theta', value=0, min=-np.pi/2,
                                        max=np.pi/2)
             HangerModel.set_param_hint('slope', value=0, vary=True)
             self.params = HangerModel.make_params()
             fit_res = HangerModel.fit(data=self.measured_powers,
-                                      f=self.sweep_points * 1.e9)
+                                      f=self.sweep_points, verbose=False)
 
         elif fitting_model == 'lorentzian':
             LorentzianModel = fit_mods.LorentzianModel
@@ -2573,6 +2577,9 @@ class Homodyne_Analysis(MeasurementAnalysis):
             fit_res = LorentzianModel.fit(data=self.measured_powers,
                                           f=self.sweep_points*1.e9,
                                           params=self.params)
+        else:
+            raise ValueError('fitting model "{}" not recognized'.format(
+                             fitting_model))
 
         self.fit_results = fit_res
         self.save_fitted_parameters(fit_res, var_name='HM')
@@ -2595,7 +2602,7 @@ class Homodyne_Analysis(MeasurementAnalysis):
             ax.plot(self.sweep_points, fit_res.init_fit, 'k--')
         ax.plot(self.sweep_points, fit_res.best_fit, 'r-')
         f0 = self.fit_results.values['f0']
-        plt.plot(f0, fit_res.eval(f=f0*1e9), 'o', ms=8)
+        plt.plot(f0, fit_res.eval(f=f0), 'o', ms=8)
         if show:
             plt.show()
         self.save_fig(fig, xlabel=self.xlabel, ylabel='Power', **kw)

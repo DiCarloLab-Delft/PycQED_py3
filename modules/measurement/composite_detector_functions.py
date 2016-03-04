@@ -308,11 +308,10 @@ class TimeDomainDetector_integrated(det.Soft_Detector):
 class SSRO_Fidelity_Detector_CBox(det.Soft_Detector):
     '''
     Currently only for CBox.
-    Todo: remove the predefined values for the sequence
     '''
     def __init__(self, measurement_name, MC, AWG, CBox,
                  RO_pulse_length, RO_pulse_delay, RO_trigger_delay,
-                 raw=True, **kw):
+                 raw=True, analyze=True, **kw):
         self.detector_control = 'soft'
         self.name = 'SSRO_Fidelity'
         # For an explanation of the difference between the different
@@ -337,6 +336,9 @@ class SSRO_Fidelity_Detector_CBox(det.Soft_Detector):
         self.i = 0
 
         self.raw = raw  # Performs no fits if True
+        self.analyze = analyze
+
+        self.upload=True
 
     def prepare(self, **kw):
         self.CBox.set('log_length', self.NoSamples)
@@ -354,14 +356,14 @@ class SSRO_Fidelity_Detector_CBox(det.Soft_Detector):
     def acquire_data_point(self, *args, **kw):
         self.i += 1
         self.MC.run(name=self.measurement_name+'_'+str(self.i))
-
-        ana = ma.SSRO_Analysis(label=self.measurement_name,
-                               no_fits=self.raw, close_file=True)
-        # Arbitrary choice, does not think about the deffinition
-        if self.raw:
-            return ana.F_raw
-        else:
-            return ana.F, ana.F_corrected
+        if self.analyze:
+            ana = ma.SSRO_Analysis(label=self.measurement_name,
+                                   no_fits=self.raw, close_file=True)
+            # Arbitrary choice, does not think about the deffinition
+            if self.raw:
+                return ana.F_raw
+            else:
+                return ana.F, ana.F_corrected
 
 
 class CBox_trace_error_fraction_detector(det.Soft_Detector):
@@ -411,6 +413,7 @@ class CBox_trace_error_fraction_detector(det.Soft_Detector):
         self.CBox.sig0_threshold_line.set(int(a.V_opt_raw))
         self.sequence_swf.upload = True
         # make sure the sequence gets uploaded
+        return int(self.threshold)
 
     def calibrate_threshold_self_consistent(self):
         self.CBox.lin_trans_coeffs.set([1, 0, 0, 1])
@@ -434,7 +437,8 @@ class CBox_trace_error_fraction_detector(det.Soft_Detector):
         theta = discr_vals[2]
         self.threshold = int(discr_vals[3])
 
-        self.CBox.sig0_threshold_line.set(self.threshold)
+        self.CBox.sig0_threshold_line.set(int(self.threshold))
+        return int(self.threshold)
 
     def prepare(self, **kw):
         self.i = 0
@@ -448,7 +452,7 @@ class CBox_trace_error_fraction_detector(det.Soft_Detector):
                     'calibrate_threshold "{}"'.format(self.calibrate_threshold)
                     + 'not recognized')
         else:
-            self.CBox.sig0_threshold_line.set(self.threshold)
+            self.CBox.sig0_threshold_line.set(int(self.threshold))
         self.MC.set_sweep_function(self.sequence_swf)
 
         # if self.counters:
@@ -502,6 +506,7 @@ class CBox_SSRO_discrimination_detector(det.Soft_Detector):
                  calibrate_threshold=False,
                  save_raw_trace=False,
                  counters=True,
+                 analyze=True,
                  **kw):
         super().__init__(**kw)
 
@@ -525,6 +530,9 @@ class CBox_SSRO_discrimination_detector(det.Soft_Detector):
         # Required to set some kind of sequence that does a pulse
         self.sequence_swf = sequence_swf
 
+        # If analyze is False it cannot be used as a detector anymore
+        self.analyze = analyze
+
     def prepare(self, **kw):
         self.i = 0
         self.MC.set_sweep_function(self.sequence_swf)
@@ -539,12 +547,13 @@ class CBox_SSRO_discrimination_detector(det.Soft_Detector):
         self.i += 1
 
         self.MC.run(self.name+'_{}'.format(self.i))
-        a = ma.SSRO_discrimination_analysis(
-            label=self.name+'_{}'.format(self.i),
-            current_threshold=self.threshold)
-        return (a.F_discr_curr_t*100, a.F_discr*100,
-                a.theta, a.opt_I_threshold,
-                a.relative_separation, a.relative_separation_I)
+        if self.analyze:
+            a = ma.SSRO_discrimination_analysis(
+                label=self.name+'_{}'.format(self.i),
+                current_threshold=self.threshold)
+            return (a.F_discr_curr_t*100, a.F_discr*100,
+                    a.theta, a.opt_I_threshold,
+                    a.relative_separation, a.relative_separation_I)
 
 
 # class SSRO_Fidelity_Detector_CBox_optimum_weights(SSRO_Fidelity_Detector_CBox):

@@ -73,8 +73,9 @@ class CBox_Ramsey(swf.Hard_Sweep):
             tape = [3, 3] * nr_elts
 
         self.AWG.stop()
-        self.CBox.AWG0_mode.set('Tape')
-        self.CBox.AWG1_mode.set('Tape')
+        # TODO Change to segmented tape if we have the new timing tape
+        self.CBox.AWG0_mode.set('segmented tape')
+        self.CBox.AWG1_mode.set('segmented tape')
         self.CBox.restart_awg_tape(0)
         self.CBox.restart_awg_tape(1)
         self.CBox.set('AWG0_tape', tape)
@@ -121,8 +122,8 @@ class CBox_Echo(swf.Hard_Sweep):
             tape = [3, 3] * nr_elts
 
         self.AWG.stop()
-        self.CBox.AWG0_mode.set('Tape')
-        self.CBox.AWG1_mode.set('Tape')
+        self.CBox.AWG0_mode.set('Segmented tape')
+        self.CBox.AWG1_mode.set('Segmented tape')
         self.CBox.restart_awg_tape(0)
         self.CBox.restart_awg_tape(1)
         self.CBox.set('AWG0_tape', tape)
@@ -152,8 +153,8 @@ class CBox_OffOn(swf.Hard_Sweep):
 
     def prepare(self, **kw):
         self.AWG.stop()
-        self.CBox.AWG0_mode.set('Tape')
-        self.CBox.AWG1_mode.set('Tape')
+        self.CBox.AWG0_mode.set('Segmented tape')
+        self.CBox.AWG1_mode.set('Segmented tape')
         self.CBox.restart_awg_tape(0)
         self.CBox.restart_awg_tape(1)
         self.CBox.set('AWG0_tape', self.tape)
@@ -170,6 +171,9 @@ class CBox_OffOn(swf.Hard_Sweep):
                 verbose=False)
             self.AWG.set('ch3_amp', ch3_amp)
             self.AWG.set('ch4_amp', ch4_amp)
+            # Prevents reloading, potentially bug prone as reusing the swf
+            # does not rest the upload flag
+            self.upload = False
 
 
 class CBox_AllXY(swf.Hard_Sweep):
@@ -178,9 +182,16 @@ class CBox_AllXY(swf.Hard_Sweep):
                  RO_trigger_delay,
                  RO_pulse_length,
                  AWG, CBox,
+                 double_points=True,
                  upload=True):
-        super().__init__()
+        '''
+        Generates a sequence for the AWG to trigger the CBox and sets the tape
+        in the CBox to measure an AllXY.
 
+        double_points: True will measure the tape twice per element, this
+            should give insight wether the deviation is real.
+        '''
+        super().__init__()
         self.parameter_name = 'AllXY element'
         self.unit = '#'
         self.name = 'AllXY'
@@ -200,6 +211,12 @@ class CBox_AllXY(swf.Hard_Sweep):
                               2, 4, 1, 0,  # 17, 18
                               2, 0, 3, 3,  # 19, 20
                               4, 4])       # 21
+        if double_points:
+            double_tape = []
+            for i in range(len(self.tape)//2):
+                for j in range(2):
+                    double_tape.extend((self.tape[2*i:2*i+2]))
+            self.tape = double_tape
         self.sweep_points = np.arange(int(len(self.tape)/2))  # 2 pulses per elt
 
         # Making input pars available to prepare
@@ -214,8 +231,8 @@ class CBox_AllXY(swf.Hard_Sweep):
 
     def prepare(self, **kw):
         self.AWG.stop()
-        self.CBox.AWG0_mode.set('Tape')
-        self.CBox.AWG1_mode.set('Tape')
+        self.CBox.AWG0_mode.set('Segmented tape')
+        self.CBox.AWG1_mode.set('Segmented tape')
         self.CBox.restart_awg_tape(0)
         self.CBox.restart_awg_tape(1)
         self.CBox.set('AWG0_tape', self.tape)
@@ -267,8 +284,8 @@ class CBox_multi_element_tape(swf.Hard_Sweep):
 
     def prepare(self, **kw):
         self.AWG.stop()
-        self.CBox.AWG0_mode.set('Tape')
-        self.CBox.AWG1_mode.set('Tape')
+        self.CBox.AWG0_mode.set('Segmented tape')
+        self.CBox.AWG1_mode.set('Segmented tape')
         self.CBox.restart_awg_tape(0)
         self.CBox.restart_awg_tape(1)
         self.CBox.set('AWG0_tape', self.tape)
@@ -317,8 +334,8 @@ class Resetless_tape(swf.Hard_Sweep):
 
     def prepare(self, **kw):
         self.AWG.stop()
-        self.CBox.AWG0_mode.set('Tape')
-        self.CBox.AWG1_mode.set('Tape')
+        self.CBox.AWG0_mode.set('Segmented tape')
+        self.CBox.AWG1_mode.set('Segmented tape')
         self.CBox.restart_awg_tape(0)
         self.CBox.restart_awg_tape(1)
         self.CBox.set('AWG0_tape', self.tape)

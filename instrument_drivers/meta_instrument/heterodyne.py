@@ -53,14 +53,6 @@ class HeterodyneInstrument(Instrument):
                            label='Intermodulation frequency',
                            units='Hz')
 
-        # self.add_parameter('t_int', type=float,
-        #                    flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET,
-        #                    minval=100e-6, maxval=self._max_tint, units='ms')
-        # self.add_parameter('trace_length', type=float,
-        #                    flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET,
-        #                    units='ms')
-        # self.add_parameter('Navg', type=int,
-        #                    flags=Instrument.FLAG_GETSET)
         self.add_parameter('single_sideband_demod',
                            label='Single sideband demodulation',
                            get_cmd=self.do_get_single_sideband_demod,
@@ -320,7 +312,8 @@ class LO_modulated_Heterodyne(HeterodyneInstrument):
         self.set('IF', -10e6)
         self.set('mod_amp', .5)
         self._disable_auto_seq_loading = False
-        self._awg_seq_paramters_changed = True
+        self._awg_seq_parameters_changed = True
+        self._mod_amp_changed = True
         # internally used to reload awg sequence implicitly
 
     def prepare(self, get_t_base=True):
@@ -332,14 +325,14 @@ class LO_modulated_Heterodyne(HeterodyneInstrument):
         if optimize == True it will optimze the acquisition time for a fixed
         t_int.
         '''
+        # only uploads a seq to AWG if something changed
         if ((self._awg_seq_filename not in self.AWG.get('setup_filename') or
-                self._awg_seq_paramters_changed) and
+                self._awg_seq_parameters_changed) and
                 not self._disable_auto_seq_loading):
             self.seq_name = st_seqs.generate_and_upload_marker_sequence(
                 500e-9, 20e-6, RF_mod=True,
                 IF=self.get('IF'), mod_amp=0.5)
-        self.AWG.set('ch3_amp', self.get('mod_amp'))
-        self.AWG.set('ch4_amp', self.get('mod_amp'))
+
         self.AWG.run()
         if get_t_base is True:
             trace_length = self.CBox.get('nr_samples')
@@ -348,7 +341,7 @@ class LO_modulated_Heterodyne(HeterodyneInstrument):
             self.sinI = np.sin(2*np.pi*self.get('IF')*tbase)
         self.LO.on()
         # Changes are now incorporated in the awg seq
-        self._awg_seq_paramters_changed = False
+        self._awg_seq_parameters_changed = False
 
         self.CBox.set('nr_samples', 1)  # because using integrated avg
 
@@ -364,7 +357,11 @@ class LO_modulated_Heterodyne(HeterodyneInstrument):
         return freq
 
     def probe(self):
-        if self._awg_seq_paramters_changed:
+        # Split up in here to prevent unneedy
+        if self._mod_amp_changed:
+            self.AWG.set('ch3_amp', self.get('mod_amp'))
+            self.AWG.set('ch4_amp', self.get('mod_amp'))
+        if self._awg_seq_parameters_changed:
             self.prepare()
         self.CBox.set('acquisition_mode', 0)
         self.CBox.set('acquisition_mode', 4)
@@ -374,11 +371,12 @@ class LO_modulated_Heterodyne(HeterodyneInstrument):
 
     def _do_set_mod_amp(self, val):
         self._mod_amp = val
+        self._mod_amp_changed = True
 
     def _do_get_mod_amp(self):
         return self._mod_amp
 
     def do_set_IF(self, val):
         if val != self._IF:
-            self._awg_seq_paramters_changed = True
+            self._awg_seq_parameters_changed = True
         self._IF = val

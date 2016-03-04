@@ -48,6 +48,7 @@ def gauss_pulse(amp, sigma_length, axis='x', nr_sigma=4, sampling_rate=0.2,
     pulse_Q = list(Zeros)+list(pulse_Q)
     return pulse_I, pulse_Q
 
+
 def block_pulse(amp, length, sampling_rate=0.2, delay=0, phase=0):
     '''
     Generates the envelope of a block pulse.
