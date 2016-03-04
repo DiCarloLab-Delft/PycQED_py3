@@ -275,6 +275,7 @@ def mixer_skewness_cal_CBox_adaptive(CBox, SH, source,
     total_time = 200e-6  # Set by the triggerbox
     time_per_pulse = abs(round(1/LutMan.f_modulation.get())*4)
     LutMan.block_length.set(time_per_pulse)  # in ns
+    LutMan.ampCW.set(200)
     n_pulses = int(total_time//(time_per_pulse*1e-9))
 
     # Timing tape that constructs the CW-tone
@@ -283,7 +284,7 @@ def mixer_skewness_cal_CBox_adaptive(CBox, SH, source,
     end_of_marker = [False]*(n_pulses-1)+[True]
     tape0 = []
     for i in range(n_pulses):
-        tape0.append(CBox.create_timing_tape_entry(timing[i], pulse_ids[i],
+        tape0.extend(CBox.create_timing_tape_entry(timing[i], pulse_ids[i],
                                                    end_of_marker[i]))
     for awg_nr in awg_nrs:
         LutMan.load_pulses_onto_AWG_lookuptable(awg_nr)
@@ -294,7 +295,6 @@ def mixer_skewness_cal_CBox_adaptive(CBox, SH, source,
     st_seqs.single_marker_seq()
 
     AWG.start()
-
     sweepfunctions = [CB_swf.Lutman_par_with_reload(LutMan,
                                                     LutMan.QI_amp_ratio,
                                                     awg_nrs=awg_nrs),

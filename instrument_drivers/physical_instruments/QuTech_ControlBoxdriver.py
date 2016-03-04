@@ -698,8 +698,12 @@ class QuTech_ControlBox(VisaInstrument):
         # for version >= 2.16, restarting timing tape is done by switching from
         # another mode into tape mode.
         if (int(v[1]) == 2) and (int(int(v[3:5])) > 15):
-            timing_tape = [self.create_timing_tape_entry(0, entry, True)
-                           for entry in tape]
+            timing_tape = []
+            for entry in tape:
+                t_entry = self.create_timing_tape_entry(0, entry, True)
+                timing_tape.extend(t_entry)
+            # timing_tape = [self.create_timing_tape_entry(0, entry, True)
+            #                for entry in tape]
 
             self.set_segmented_tape(awg_nr, timing_tape)
 
@@ -1900,30 +1904,38 @@ class QuTech_ControlBox(VisaInstrument):
                                      expected_number_of_bytes=np.ceil(
                                          tape_addr_width / 7.0)))
         data_bytes += (c.encode_array(
-                          self.convert_arrary_to_signed(tape, entry_length),
-                          data_bits_per_byte=7,
-                          bytes_per_value=np.ceil(entry_length/7.0)))
+                       self.convert_arrary_to_signed(tape, entry_length),
+                       data_bits_per_byte=7,
+                       bytes_per_value=np.ceil(entry_length/7.0)))
 
         message = self.create_message(cmd, data_bytes)
         (stat, mesg) = self.serial_write(message)
         return (stat, mesg)
 
-    def create_timing_tape_entry(self, interval, pulse_num, end_of_marker):
+    def create_timing_tape_entry(self, wait_time, pulse_num, end_of_marker,
+                                 prepend_elt=None):
         '''
-        Create the timing tape entry included in the conditional tape or
+        Creates timing tape entries used in the conditional tape or
         segemented tape.
 
-        @param interval      : The waiting time before the end of last pulse or
-                               trigger in ns, ranging from 0ns to 2560ns with a
-                               minimum resolution of 5ns.
-        @param pulse_num     : 0~7, indicating which pulse to be output
-        @param end_of_marker : True: if the entry is the last entry of a
+        Hint if you want to combine multiple entries use the extend method
+        of a list
+
+        parameters:
+            wait_time      : The waiting time before the end of last pulse
+                                or trigger in ns, ranging from 0ns to 2560ns
+                                with a minimum resolution of 5ns.
+            pulse_num     : 0~7, indicating which pulse to be output
+            end_of_marker : True: if the entry is the last entry of a
                                segment,
                                False: otherwise.
+            prepend_elt   : 0~7 will prepend this element if the specified
+                               wait time is larger than 2560ns
+                               if None it will not prepend anything
+        return: list of integers representing timing tape entries
+                every int has the following structure:
+                   |WaitingTime(9bits) | PulseNumber (3bits) | Marker (1bit)|
 
-        The return is an integer representing an timing tape entry which has
-        the following structure:
-              |WaitingTime(9bits) | PulseNumber (3bits) | Marker (1bit)|
         WaitingTime          : The waiting time before the end of last pulse or
                                trigger, in FPGA cycle time.
         Pulse number         : 0~7, indicating which pulse to be output.
@@ -1934,20 +1946,40 @@ class QuTech_ControlBox(VisaInstrument):
         '''
 
         FPGA_Cycle_Time = 5  # ns
-        if ((interval < 0) or (interval > 2560) or
-                (interval % FPGA_Cycle_Time != 0)):
-            raise ValueError
-        if pulse_num < 0 or pulse_num > 7:
-            raise ValueError
 
+        # Validating the inputs
+        if (wait_time < 0):
+            raise ValueError(
+                'wait_time must be 0 < "{}" < 2560'.format(wait_time))
+        if (wait_time > 2560) and (prepend_elt is None):
+            raise ValueError(
+                'wait_time must be 0 < "{}" < 2560'.format(wait_time))
+        if (wait_time % FPGA_Cycle_Time != 0):
+            raise ValueError('wait_time "{}" not a multiple of {}'.format(
+                             wait_time, FPGA_Cycle_Time))
+        if pulse_num < 0 or pulse_num > 7:
+            raise ValueError('pulse_num must be 0 < "{}" <7'.format(pulse_num))
+        if prepend_elt is not None:
+            # nested if because cannot compare < for None
+            if (prepend_elt < 0 or prepend_elt > 7):
+                raise ValueError('prepend_elt must be 0 < "{}" <7 or None'.format(
+                                 prepend_elt))
+
+        tape_entries = []
+        if wait_time > 2560 and prepend_elt is not None:
+            while wait_time > 2560:
+                wait_time -= 2500
+                tape_entries.append((2500/FPGA_Cycle_Time)*(2**4) +
+                                    prepend_elt * 2**1)
         if end_of_marker:
             i_end_of_marker = 1
         else:
             i_end_of_marker = 0
 
-        return ((interval/FPGA_Cycle_Time)*(2**4) +
-                pulse_num * 2**1 +
-                i_end_of_marker)
+        return_elt = ((wait_time/FPGA_Cycle_Time)*(2**4) + pulse_num * 2**1 +
+                      i_end_of_marker)
+        tape_entries.append(return_elt)
+        return tape_entries
 
     def convert_to_signed(self, unsigned_number, bit_width):
         '''
