@@ -266,7 +266,8 @@ class QuTech_ControlBox_LookuptableManager(Instrument):
                          wave_dict[pulse_name][1]), self._voltage_min,
                          self._voltage_max)
         # To account for multiple occurences in lut mapping
-        indices = [i for i, x in enumerate(self.get('lut_mapping')) if x == pulse_name]
+        indices = [i for i, x in enumerate(self.get('lut_mapping')) if
+                   x == pulse_name]
         for i in indices:
             self.CBox.set_awg_lookuptable(awg_nr, i, I_ch, I_wave)
             self.CBox.set_awg_lookuptable(awg_nr, i, Q_ch, Q_wave)

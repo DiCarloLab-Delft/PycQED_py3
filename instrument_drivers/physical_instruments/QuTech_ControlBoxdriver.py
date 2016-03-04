@@ -1946,6 +1946,7 @@ class QuTech_ControlBox(VisaInstrument):
         '''
 
         FPGA_Cycle_Time = 5  # ns
+        idle_elt_time = 50  # ns , I is hardcoded to 10 points in LutMan
 
         # Validating the inputs
         if (wait_time < 0):
@@ -1966,11 +1967,12 @@ class QuTech_ControlBox(VisaInstrument):
                                  prepend_elt))
 
         tape_entries = []
-        if wait_time > 2560 and prepend_elt is not None:
-            while wait_time > 2560:
-                wait_time -= 2500
-                tape_entries.append((2500/FPGA_Cycle_Time)*(2**4) +
-                                    prepend_elt * 2**1)
+        # NOTE: 1280 should be 2560, see issue #11
+        if wait_time > 1280 and prepend_elt is not None:
+            while wait_time > 1280:
+                wait_time -= 1200
+                tape_entries.append(((1200-idle_elt_time)/FPGA_Cycle_Time) *
+                                    (2**4) + prepend_elt * 2**1)
         if end_of_marker:
             i_end_of_marker = 1
         else:
