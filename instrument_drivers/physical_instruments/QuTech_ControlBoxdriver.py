@@ -196,7 +196,6 @@ class QuTech_ControlBox(VisaInstrument):
         v_str = 'v'+str(version_msg[0]-128)+'.'+str(version_msg[1]-128) + \
             '.'+str(version_msg[2]-128)
         return v_str
-        return v_str
 
     def _do_get_sequencer_counters(self):
         '''

@@ -59,13 +59,16 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
             # pass the CBox to the module so it can be used in the tests
             self.c = c  # make the codec callable from the testsuite
             test_suite.CBox = self
-            suite = unittest.TestLoader().loadTestsFromTestCase(test_suite.CBox_tests)
+            suite = unittest.TestLoader().loadTestsFromTestCase(
+                    test_suite.CBox_tests)
             unittest.TextTestRunner(verbosity=2).run(suite)
 
     def _do_get_firmware_version(self):
-        # raise NotImplementedError("This function is obselete, please try function get_master_controller_params.")
-        v = self.get_master_controller_params();
-        print(v)
+        # raise NotImplementedError("This function is obselete, please try\
+        # function get_master_controller_params.")
+        v = self.get_master_controller_params()
+        # print(v)
+        return v
 
     def get_master_controller_params(self):
         message = self.create_message(defHeaders.ReadVersion)
@@ -77,32 +80,34 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
         # version number, first 3 bytes
         v_list = []
         for byte in bytes(param_msg):
-            v_list.append(int(byte) - 128)  # -128 is to remove the highest bit 1 for data_bytes
-            #print(byte, ": ", "{0:{fill}8b}".format(byte, fill='0'))
+            v_list.append(int(byte) - 128)  # Remove the MSb 1 for data_bytes
+            # print(byte, ": ", "{0:{fill}8b}".format(byte, fill='0'))
 
-        version = str(v_list[0])+'.'+str(v_list[1]) + \
+        version = 'v' + str(v_list[0])+'.'+str(v_list[1]) + \
             '.'+str(v_list[2])
 
         self._acquisition_mode = v_list[3]
         self._core_state = v_list[4]
         self._trigger_source = v_list[5]
         self.adc_offset = (v_list[6] << 4) + v_list[7]
-        self.signal_delay= (v_list[8] << 4) + v_list[9]
+        self.signal_delay = (v_list[8] << 4) + v_list[9]
         self.integration_length = (v_list[10] << 7) + v_list[11]
         a11 = (v_list[12] << 7) + v_list[13]
         a12 = (v_list[14] << 7) + v_list[15]
         a21 = (v_list[16] << 7) + v_list[17]
         a22 = (v_list[18] << 7) + v_list[19]
-        self.lin_trans_coeffs =  np.array([a11, a12, a21, a22])
-        self.threshold0 = (v_list[20] << 21) + (v_list[21] << 14) + (v_list[22] << 7) + v_list[23];
-        self.threshold1 = (v_list[24] << 21) + (v_list[25] << 14) + (v_list[26] << 7) + v_list[27];
-        self.log_length = (v_list[28] << 7) + v_list[29];
-        self.nr_samples = (v_list[30] << 7) + v_list[31];
+        self.lin_trans_coeffs = np.array([a11, a12, a21, a22])
+        self.threshold0 = (v_list[20] << 21) + (v_list[21] << 14) + \
+                          (v_list[22] << 7) + v_list[23]
+        self.threshold1 = (v_list[24] << 21) + (v_list[25] << 14) + \
+                          (v_list[26] << 7) + v_list[27]
+        self.log_length = (v_list[28] << 7) + v_list[29]
+        self.nr_samples = (v_list[30] << 7) + v_list[31]
         self.avg_size = v_list[32]
         self.nr_averages = 2**self.avg_size
 
         self.snapshot()
-
+        # print("version: ", version)
         return version
 
     def _do_set_log_length(self, length):
@@ -270,9 +275,10 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
         else:
             raise Exception('Failed to set acquisition_mode')
 
-        print('acquisition_mode:', self.get('acquisition_mode'))  # ensure updating of the value
-        print('core_state:', self.get('core_state'))
-        print('trigger_source:', self.get('trigger_source'))
+        # ensure updating of the value
+        # print('acquisition_mode:', self.get('acquisition_mode'))
+        # print('core_state:', self.get('core_state'))
+        # print('trigger_source:', self.get('trigger_source'))
 
         return (stat, message)
 
@@ -288,7 +294,7 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
 
         instructions = asm.convert_to_instructions()
 
-        if instructions == False :
+        if instructions is False:
             print("Error: the assembly file is of errors.")
             return False
         i = 0
@@ -297,7 +303,7 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
             i = i + 1
 
         # Check the instruction list length
-        if len(instructions) == 0 :
+        if len(instructions) == 0:
             raise ValueError("The instruction list is empty.")
 
         cmd = defHeaders.LoadInstructionsHeader
