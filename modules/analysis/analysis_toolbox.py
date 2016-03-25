@@ -1109,9 +1109,9 @@ def color_plot(x, y, z, fig, ax, show=False, normalize=False, log=False,
     if normalize:
         z = normalize_data_v2(z, axis=1, order=2)
 
-    cmap = plt.get_cmap(kw.pop('cmap', 'CMRmap'))
-    # CMRmap chosen as default because it is designed to convert well to
-    # grayscale (see http://matplotlib.org/users/colormaps.html)
+    cmap = plt.get_cmap(kw.pop('cmap', 'viridis'))
+    # CMRmap is our old default
+
 
     clim = kw.pop('clim', [None, None])
 
@@ -1201,7 +1201,7 @@ def color_plot_slices(xvals, yvals, zvals, ax=None,
 
     # various plot options
     # define colormap
-    cmap = kw.pop('cmap', 'CMRmap')
+    cmap = kw.pop('cmap', 'viridis')
     clim = kw.pop('clim', [None, None])
     # normalized plot
     if normalize:

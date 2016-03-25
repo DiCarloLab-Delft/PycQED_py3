@@ -64,7 +64,7 @@ class MeasurementAnalysis(object):
         return h5py.File(os.path.join(self.folder, name+'.hdf5'), mode)
 
     def default_fig(self, **kw):
-        figsize = kw.pop('figsize', (6, 5))
+        figsize = kw.pop('figsize', None)
         return plt.figure(figsize=figsize, **kw)
 
     def default_ax(self, fig=None, *arg, **kw):
@@ -138,7 +138,7 @@ class MeasurementAnalysis(object):
         else:
             self.figarray, self.axarray = plt.subplots(
                 max(len(self.value_names), 1), 1,
-                figsize=(5, 3*len(self.value_names)))
+                figsize=(6, 1.5*len(self.value_names)))
         return tuple(self.f + [self.figarray] + self.ax + [self.axarray])
 
     def get_values(self, key):
@@ -695,6 +695,10 @@ class OptimizationAnalysis(MeasurementAnalysis):
 
 
 class TD_Analysis(MeasurementAnalysis):
+    '''
+    Parent class for Time Domain (TD) analysis. Contains functions for
+    rotating and normalizing data based on calibration coordinates.
+    '''
     def __init__(self, NoCalPoints=4, center_point=31, make_fig=True,
                  zero_coord=None, one_coord=None, cal_points=None,
                  plot_cal_points=True, **kw):
@@ -760,7 +764,7 @@ class TD_Analysis(MeasurementAnalysis):
 
         # Plotting
         if self.make_fig:
-            fig1, fig2, ax1, axarray = self.setup_figures_and_axes()
+            self.fig1, fig2, self.ax1, axarray = self.setup_figures_and_axes()
             for i in range(2):
                 if len(self.value_names) >= 4:
                         ax = axarray[i/2, i % 2]
@@ -788,19 +792,19 @@ class TD_Analysis(MeasurementAnalysis):
 
             self.plot_results_vs_sweepparam(x=x,
                                             y=y,
-                                            fig=fig1, ax=ax1,
+                                            fig=self.fig1, ax=self.ax1,
                                             xlabel=self.xlabel,
                                             ylabel=ylabel,
                                             save=False)
-            ax1.set_ylim(min(min(self.corr_data)-.1, -.1),
-                         max(max(self.corr_data)+.1, 1.1))
+            self.ax1.set_ylim(min(min(self.corr_data)-.1, -.1),
+                              max(max(self.corr_data)+.1, 1.1))
             if not close_main_fig:
                 # Hacked in here, good idea to only show the main fig but can
                 # be optimized somehow
-                self.save_fig(fig1, ylabel='Amplitude (normalized)',
+                self.save_fig(self.fig1, ylabel='Amplitude (normalized)',
                               close_fig=False, **kw)
             else:
-                self.save_fig(fig1, ylabel='Amplitude (normalized)', **kw)
+                self.save_fig(self.fig1, ylabel='Amplitude (normalized)', **kw)
             self.save_fig(fig2, ylabel='Amplitude', **kw)
         if close_file:
             self.data_file.close()
@@ -2436,46 +2440,119 @@ class AllXY_Analysis(TD_Analysis):
         return self.deviation_total
 
 
-class RBfixed_Analysis(TD_Analysis):
-    def __init__(self, label='RBfixed', **kw):
-        kw['label'] = label
-        kw['h5mode'] = 'r+'  # Read write mode, file must exist
-        super(self.__class__, self).__init__(**kw)
+class RandomizedBenchmarking_Analysis(TD_Analysis):
+    def __init__(self, label='RB', **kw):
+        super().__init__(**kw)
 
-    def run_default_analysis(self, print_fit_results=False, **kw):
+    def run_default_analysis(self, **kw):
+        close_main_fig = kw.pop('close_main_fig', True)
         close_file = kw.pop('close_file', True)
-        figsize = kw.pop('figsize', (11, 10))
-        self.add_analysis_datagroup_to_file()
-        self.get_naming_and_values()
+        super().run_default_analysis(close_file=False, make_fig=False,
+                                     **kw)
+        if self.cal_points is None:
+            self.cal_points = [list(range(2)), list(range(-2, 0))]
 
-        # Data normalization
-        data = self.measured_values[0]
-        data_cal = [np.mean(data[-10:-5]), np.mean(data[-5:])]
-        data = (data - data_cal[0]) / (data_cal[1] - data_cal[0])
+        data = self.corr_data[:-1*(len(self.cal_points[0]*2))]
+        n_cl = self.sweep_points[:-1*(len(self.cal_points[0]*2))]
 
-        self.data_mean = np.mean(data[:-10])
-        self.data_std = np.std(data[:-10])
+        self.fit_res = self.fit_data(data, n_cl)
+        self.save_fitted_parameters(fit_res=self.fit_res, var_name='F|1>')
+        if self.make_fig:
+            self.make_figures(close_main_fig=close_main_fig, **kw)
 
-        # Plotting
-        fig1, fig2, ax, axarray = self.setup_figures_and_axes()
-
-        for i in range(len(self.measured_values)):
-            if len(self.value_names) == 4:
-                if i < 2:
-                    ax = axarray[0, i]
-                else:
-                    ax = axarray[1, i-2]
-            else:
-                ax = axarray[i]
-            self.plot_results_vs_sweepparam(x=self.sweep_points,
-                                            y=self.measured_values[i],
-                                            fig=fig2, ax=ax,
-                                            xlabel=self.xlabel,
-                                            ylabel=str(self.value_names[i]),
-                                            save=False)
-        self.save_fig(fig2, xlabel=self.xlabel, ylabel='Power', **kw)
         if close_file:
             self.data_file.close()
+        return
+
+    def make_figures(self, close_main_fig, **kw):
+
+            ylabel = r'$F$ $\left(|1 \rangle \right)$'
+            self.fig, self.ax = self.default_ax()
+            if self.plot_cal_points:
+                x = self.sweep_points
+                y = self.corr_data
+            else:
+                logging.warning('not tested for all types of calpoints')
+                if type(self.cal_points[0]) is int:
+                    x = self.sweep_points[:-2]
+                    y = self.corr_data[:-2]
+                else:
+                    x = self.sweep_points[:-1*(len(self.cal_points[0])*2)]
+                    y = self.corr_data[:-1*(len(self.cal_points[0])*2)]
+
+            self.plot_results_vs_sweepparam(x=x,
+                                            y=y,
+                                            fig=self.fig, ax=self.ax,
+                                            xlabel=self.xlabel,
+                                            ylabel=ylabel,
+                                            save=False)
+
+            x_best_fit = np.linspace(0, self.sweep_points[-1], 1000)
+            best_fit = fit_mods.RandomizedBenchmarkingDecay(
+                x_best_fit, **self.fit_res.best_values)
+            self.ax.plot(x_best_fit, best_fit, label='Fit')
+            self.ax.set_ylim(min(min(self.corr_data)-.1, -.1),
+                             max(max(self.corr_data)+.1, 1.1))
+
+            # Add a textbox
+            textstr = ('\t$F/$Cl \t= {:.3g} $\pm$ ({:.2g})%'.format(
+                    self.fit_res.params['fidelity_per_Clifford'].value*100,
+                    self.fit_res.params['fidelity_per_Clifford'].stderr*100) +
+                '\n  $1-F/$Cl  = {:.3g} $\pm$ ({:.2g})%'.format(
+                    (1-self.fit_res.params['fidelity_per_Clifford'].value)*100,
+                    (self.fit_res.params['fidelity_per_Clifford'].stderr)*100) +
+                '\n\tOffset\t= {:.2g} $\pm$ ({:.2g})'.format(
+                    (self.fit_res.params['offset'].value),
+                    (self.fit_res.params['offset'].stderr)))
+
+            self.ax.text(0.1, 0.95, textstr, transform=self.ax.transAxes,
+                fontsize=11, verticalalignment='top',
+                bbox=self.box_props)
+
+
+            if not close_main_fig:
+                # Hacked in here, good idea to only show the main fig but can
+                # be optimized somehow
+                self.save_fig(self.fig, ylabel='Amplitude (normalized)',
+                              close_fig=False, **kw)
+            else:
+                self.save_fig(self.fig, ylabel='Amplitude (normalized)', **kw)
+
+    def fit_data(self, data, numCliff,
+                 print_fit_results=False,
+                 show_guess=False,
+                 plot_results=False):
+
+        RBModel = lmfit.Model(fit_mods.RandomizedBenchmarkingDecay)
+        # RBModel = fit_mods.RBModel
+        RBModel.set_param_hint('Amplitude', value=-0.5)
+        RBModel.set_param_hint('p', value=.99)
+        RBModel.set_param_hint('offset', value=.5)
+        RBModel.set_param_hint('fidelity_per_Clifford',  # vary=False,
+                               expr='(p + (1-p)/2)')
+        RBModel.set_param_hint('error_per_Clifford',  # vary=False,
+                               expr='1-fidelity_per_Clifford')
+        RBModel.set_param_hint('fidelity_per_gate',  # vary=False,
+                               expr='fidelity_per_Clifford**(1./1.875)')
+        RBModel.set_param_hint('error_per_gate',  # vary=False,
+                               expr='1-fidelity_per_gate')
+
+        params = RBModel.make_params()
+        fit_res = RBModel.fit(data, numCliff=numCliff,
+                              params=params)
+        if print_fit_results:
+            print(fit_res.fit_report())
+        if plot_results:
+            plt.plot(fit_res.data, 'o-', label='data')
+            plt.plot(fit_res.best_fit, label='best fit')
+            if show_guess:
+                plt.plot(fit_res.init_fit, '--', label='init fit')
+
+        return fit_res
+
+#######################################################
+# End of time domain analyses
+#######################################################
 
 
 class Homodyne_Analysis(MeasurementAnalysis):
@@ -4018,74 +4095,7 @@ class Tomo_Analysis(MeasurementAnalysis):
 
 
 
-class RandomizedBenchmarking_Analysis():
-    def __init__(self, label='RB', **kw):
-        # kw['label'] = label
-        # kw['h5mode'] = 'r+'  # Read write mode, file must exist
-        # super(self.__class__, self).__init__(**kw)
-        pass
-    def fit_data(self, data, numCliffords_lst, cal_points=10,
-                 print_fit_results=False, show_guess=False,
-                 plot_results=False):
-        RBModel = fit_mods.RBModel
-        RBModel.set_param_hint('Amplitude', value=-0.5)
-        RBModel.set_param_hint('p', value=.99)
-        RBModel.set_param_hint('offset', value=.5)
-        RBModel.set_param_hint('fidelity_per_Clifford', vary=False,
-                               expr='(p + (1-p)/2)')
-        RBModel.set_param_hint('error_per_Clifford', vary=False,
-                               expr='1-fidelity_per_Clifford')
-        RBModel.set_param_hint('fidelity_per_gate', vary=False,
-                               expr='fidelity_per_Clifford**(1./1.875)')
-        RBModel.set_param_hint('error_per_gate', vary=False,
-                               expr='1-fidelity_per_gate')
 
-        params = RBModel.make_params()
-        fit_res = RBModel.fit(data[:-cal_points], numCliff=numCliffords_lst,
-                              params=params)
-        if print_fit_results:
-            print(fit_res.fit_report())
-        if plot_results:
-            plt.plot(fit_res.data, 'o-', label='data')
-            plt.plot(fit_res.best_fit, label='best fit')
-            if show_guess:
-                plt.plot(fit_res.init_fit, '--', label='init fit')
-
-        return fit_res
-    # def run_default_analysis(self, print_fit_results=False, **kw):
-    #     close_file = kw.pop('close_file', True)
-    #     figsize = kw.pop('figsize', (11, 10))
-    #     self.add_analysis_datagroup_to_file()
-    #     self.get_naming_and_values()
-
-    #     # Data normalization
-    #     data = self.measured_values[0]
-    #     data_cal = [np.mean(data[-10:-5]), np.mean(data[-5:])]
-    #     data = (data - data_cal[0]) / (data_cal[1] - data_cal[0])
-
-    #     self.data_mean = np.mean(data[:-10])
-    #     self.data_std = np.std(data[:-10])
-
-    #     # Plotting
-    #     fig1, fig2, ax, axarray = self.setup_figures_and_axes()
-
-    #     for i in range(len(self.measured_values)):
-    #         if len(self.value_names) == 4:
-    #             if i < 2:
-    #                 ax = axarray[0, i]
-    #             else:
-    #                 ax = axarray[1, i-2]
-    #         else:
-    #             ax = axarray[i]
-    #         self.plot_results_vs_sweepparam(x=self.sweep_points,
-    #                                         y=self.measured_values[i],
-    #                                         fig=fig2, ax=ax,
-    #                                         xlabel=self.xlabel,
-    #                                         ylabel=str(self.value_names[i]),
-    #                                         save=False)
-    #     self.save_fig(fig2, xlabel=self.xlabel, ylabel='Power', **kw)
-    #     if close_file:
-    #         self.data_file.close()
 
 def fit_qubit_frequency(sweep_points, data, mode='dac',
                         vary_E_c=True, vary_f_max=True,
