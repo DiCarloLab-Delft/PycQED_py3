@@ -96,6 +96,10 @@ def HangerFuncAmplitude(f, f0, Q, Qe, A, theta):
     the hanger is small.
     In this case it may misjudge the slope
     Theta is the asymmetry parameter
+
+    Note! units are inconsistent
+    f is in Hz
+    f0 is in GHz
     '''
     return abs(A*(1.-Q/Qe*np.exp(1.j*theta)/(1.+2.j*Q*(f/1.e9-f0)/f0)))
 
