@@ -43,6 +43,7 @@ def mixer_skewness_calibration_adaptive(**kw):
 
 
 def mixer_carrier_cancellation_5014(station,
+                                    source,
                                     frequency=None,
                                     AWG_channel1=1,
                                     AWG_channel2=2,
@@ -51,6 +52,11 @@ def mixer_carrier_cancellation_5014(station,
     '''
     Varies the mixer offsets to minimize leakage at the carrier frequency.
     this is the version for a tektronix AWG.
+
+    station:    QCodes station object that contains the instruments
+    source:     the source for which carrier leakage must be minimized
+    frequency:  frequency in Hz on which to minimize leakage, if None uses the
+                current frequency of the source
 
     voltage_grid defines the ranges for the preliminary coarse sweeps.
     If the range is too small, add another number infront of -0.12
@@ -66,6 +72,13 @@ def mixer_carrier_cancellation_5014(station,
     last_ch_2_min = 1
     ii = 0
     min_power = 0
+
+    source.on()
+    if frequency is None:
+        frequency = source.get('frequency')
+    else:
+        source.set('frequency', frequency)
+
     '''
     Make coarse sweeps to approximate the minimum
     '''
@@ -78,7 +91,8 @@ def mixer_carrier_cancellation_5014(station,
         # Channel 1
         MC.set_sweep_function(ch1_swf)
         MC.set_detector_function(
-            det.Signal_Hound_fixed_frequency(signal_hound=SH, frequency=frequency))
+            det.Signal_Hound_fixed_frequency(signal_hound=SH,
+                                             frequency=frequency*1e-9))
         MC.set_sweep_points(np.linspace(ch_1_min + voltage_span,
                                         ch_1_min - voltage_span, 11))
         MC.run(name='Mixer_cal_Offset_ch%s' % AWG_channel1,

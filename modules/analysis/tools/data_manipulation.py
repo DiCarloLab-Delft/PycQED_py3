@@ -342,3 +342,14 @@ def flatten_2D_histogram(H, xedges, yedges):
     y_rep_flat = np.repeat(y, nr_rows)
 
     return H_flat, x_tiled_flat, y_rep_flat
+
+
+def reject_outliers(data, m=6.):
+    '''
+    Reject outliers function from stack overflow
+    http://stackoverflow.com/questions/11686720/is-there-a-numpy-builtin-to-reject-outliers-from-a-list
+    '''
+    d = np.abs(data - np.median(data))
+    mdev = np.median(d)
+    s = d/mdev if mdev else 0.
+    return data[s < m]
