@@ -61,16 +61,22 @@ LutMan = lm.QuTech_ControlBox_LookuptableManager('LutMan', CBox)
 
 MC = mc.MeasurementControl('MC')
 
+VIP_mon_2 = qb.CBox_driven_transmon('VIP_mon_2',
+                                    LO=LO, cw_source=S1, td_source=S2,
+                                    IVVI=IVVI,
+                                    AWG=AWG, LutMan=LutMan,
+                                    CBox=CBox, heterodyne_instr=HS, MC=MC)
 VIP_mon_4 = qb.CBox_driven_transmon('VIP_mon_4',
                                     LO=LO, cw_source=S1, td_source=S2,
                                     IVVI=IVVI,
                                     AWG=AWG, LutMan=LutMan,
                                     CBox=CBox, heterodyne_instr=HS, MC=MC)
 gen.load_settings_onto_instrument(VIP_mon_4, label='VIP_mon_4')
+gen.load_settings_onto_instrument(VIP_mon_2, label='VIP_mon_2')
 
 station = qc.Station(LO, S1, S2, IVVI,
                      AWG, HS, CBox, LutMan,
-                     VIP_mon_4)
+                     VIP_mon_2, VIP_mon_4)
 MC.station = station
 station.MC = MC
 nested_MC = mc.MeasurementControl('nested_MC')
@@ -98,8 +104,8 @@ for i in range(4):
 # to make the pulsar available to the standard awg seqs
 st_seqs.station = station
 
-IVVI.set('dac2', 190)
-IVVI.dac5.set(91.3)
+IVVI.set('dac2', 0)
+IVVI.dac5.set(0)
 
 IF = -20e6        # RO modulation frequency
 
@@ -117,8 +123,8 @@ CBox.set_dac_offset(1, 1, 0)  # I channel
 CBox.set_dac_offset(1, 0, 0)  # Q channel readout AWG
 
 # LO offsets calibrated at 23-2-2016 at f = 7.15350 GHz
-AWG.ch3_offset.set(0.006)
-AWG.ch4_offset.set(0.013)
+AWG.ch3_offset.set(0.002)
+AWG.ch4_offset.set(0.018)
 
 
 def set_CBox_cos_sine_weigths(IF):
