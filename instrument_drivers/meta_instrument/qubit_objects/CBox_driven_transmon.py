@@ -74,7 +74,7 @@ class CBox_driven_transmon(Transmon):
                            parameter_class=ManualParameter)
         # Time-domain parameters
         self.add_parameter('f_pulse_mod',
-                           initial_value=-5e-7,
+                           initial_value=-50e6,
                            label='pulse-modulation frequency', units='Hz',
                            parameter_class=ManualParameter)
         self.add_parameter('awg_nr', label='CBox awg nr', units='#',
