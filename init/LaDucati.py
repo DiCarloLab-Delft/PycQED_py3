@@ -71,12 +71,18 @@ VIP_mon_4 = qb.CBox_driven_transmon('VIP_mon_4',
                                     IVVI=IVVI,
                                     AWG=AWG, LutMan=LutMan,
                                     CBox=CBox, heterodyne_instr=HS, MC=MC)
-gen.load_settings_onto_instrument(VIP_mon_4, label='VIP_mon_4')
+VIP_mon_6 = qb.CBox_driven_transmon('VIP_mon_6',
+                                    LO=LO, cw_source=S1, td_source=S2,
+                                    IVVI=IVVI,
+                                    AWG=AWG, LutMan=LutMan,
+                                    CBox=CBox, heterodyne_instr=HS, MC=MC)
 gen.load_settings_onto_instrument(VIP_mon_2, label='VIP_mon_2')
+gen.load_settings_onto_instrument(VIP_mon_4, label='VIP_mon_4')
+gen.load_settings_onto_instrument(VIP_mon_6, label='VIP_mon_6')
 
 station = qc.Station(LO, S1, S2, IVVI,
                      AWG, HS, CBox, LutMan,
-                     VIP_mon_2, VIP_mon_4)
+                     VIP_mon_2, VIP_mon_4, VIP_mon_6)
 MC.station = station
 station.MC = MC
 nested_MC = mc.MeasurementControl('nested_MC')
