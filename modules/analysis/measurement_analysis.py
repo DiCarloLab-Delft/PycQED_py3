@@ -2595,20 +2595,23 @@ class Homodyne_Analysis(MeasurementAnalysis):
 
         if fitting_model == 'hanger':
             HangerModel = fit_mods.SlopedHangerAmplitudeModel
-
-            # amplitude_guess = np.pi*sigma_guess * abs(
-            #     max(self.measured_powers)-min(self.measured_powers))
-            amplitude_guess = (max(self.measured_powers) -
-                               min(self.measured_powers))
+            # added reject outliers to be robust agains CBox data acq bug.
+            # this should have no effect on regular data acquisition and is
+            # only used in the guess.
+            amplitude_guess = (max(dm_tools.reject_outliers(
+                                   self.measured_powers)) -
+                               min(dm_tools.reject_outliers(
+                                   self.measured_powers)))
             # Creating parameters and estimations
-            S21min = min(self.measured_values[0])/max(self.measured_values[0])
+            S21min = (min(dm_tools.reject_outliers(self.measured_values[0])) /
+                      max(dm_tools.reject_outliers(self.measured_values[0])))
 
-            Q = f0 / abs(self.min_frequency - self.max_frequency)
+            Q = kw.pop('Q', f0 / abs(self.min_frequency - self.max_frequency))
             Qe = abs(Q / abs(1 - S21min))
 
-            HangerModel.set_param_hint('f0', value=f0,
-                                       min=min(self.sweep_points),
-                                       max=max(self.sweep_points))
+            HangerModel.set_param_hint('f0', value=f0*1e-9,
+                                       min=min(self.sweep_points*1e-9),
+                                       max=max(self.sweep_points*1e-9))
             HangerModel.set_param_hint('A', value=amplitude_guess)
             HangerModel.set_param_hint('Q', value=Q)
             HangerModel.set_param_hint('Qe', value=Qe)
@@ -2679,7 +2682,7 @@ class Homodyne_Analysis(MeasurementAnalysis):
             ax.plot(self.sweep_points, fit_res.init_fit, 'k--')
         ax.plot(self.sweep_points, fit_res.best_fit, 'r-')
         f0 = self.fit_results.values['f0']
-        plt.plot(f0, fit_res.eval(f=f0), 'o', ms=8)
+        plt.plot(f0*1e9, fit_res.eval(f=f0*1e9), 'o', ms=8)
         if show:
             plt.show()
         self.save_fig(fig, xlabel=self.xlabel, ylabel='Power', **kw)
