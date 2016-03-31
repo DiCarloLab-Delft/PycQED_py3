@@ -2441,7 +2441,16 @@ class AllXY_Analysis(TD_Analysis):
 
 
 class RandomizedBenchmarking_Analysis(TD_Analysis):
-    def __init__(self, label='RB', **kw):
+    '''
+    Rotates and normalizes the data before doing a fit with a decaying
+    exponential to extract the Clifford fidelity.
+    By optionally specifying T1 and the pulse separation (time between start
+    of pulses) the T1 limited fidelity will be given and plotted in the
+    same figure.
+    '''
+    def __init__(self, label='RB', T1=None, pulse_separation=None, **kw):
+        self.T1 = T1
+        self.pulse_separation = pulse_separation
         super().__init__(**kw)
 
     def run_default_analysis(self, **kw):
@@ -2463,6 +2472,17 @@ class RandomizedBenchmarking_Analysis(TD_Analysis):
         if close_file:
             self.data_file.close()
         return
+
+    def calc_T1_limited_fidelity(self, T1, pulse_separation):
+        '''
+        Formula from Asaad et al.
+        pulse separation is time between start of pulses
+        '''
+        Np = 1.875  # Number of gates per Clifford
+        F_cl = (1/6*(3 + 2*np.exp(-1*pulse_separation/(2*T1)) +
+                     np.exp(-pulse_separation/T1)))**Np
+
+        return F_cl
 
     def make_figures(self, close_main_fig, **kw):
 
@@ -2487,23 +2507,30 @@ class RandomizedBenchmarking_Analysis(TD_Analysis):
                                             ylabel=ylabel,
                                             save=False)
 
-            x_best_fit = np.linspace(0, self.sweep_points[-1], 1000)
+            x_fine = np.linspace(0, self.sweep_points[-1], 1000)
             best_fit = fit_mods.RandomizedBenchmarkingDecay(
-                x_best_fit, **self.fit_res.best_values)
-            self.ax.plot(x_best_fit, best_fit, label='Fit')
+                x_fine, **self.fit_res.best_values)
+            self.ax.plot(x_fine, best_fit, label='Fit')
             self.ax.set_ylim(min(min(self.corr_data)-.1, -.1),
                              max(max(self.corr_data)+.1, 1.1))
 
             # Add a textbox
-            textstr = ('\t$F/$Cl \t= {:.3g} $\pm$ ({:.2g})%'.format(
+            textstr = ('\t$F_{Cl}$'+' \t= {:.3g} $\pm$ ({:.2g})%'.format(
                     self.fit_res.params['fidelity_per_Clifford'].value*100,
                     self.fit_res.params['fidelity_per_Clifford'].stderr*100) +
-                '\n  $1-F/$Cl  = {:.3g} $\pm$ ({:.2g})%'.format(
+                '\n  $1-F_{Cl}$'+'  = {:.3g} $\pm$ ({:.2g})%'.format(
                     (1-self.fit_res.params['fidelity_per_Clifford'].value)*100,
                     (self.fit_res.params['fidelity_per_Clifford'].stderr)*100) +
                 '\n\tOffset\t= {:.2g} $\pm$ ({:.2g})'.format(
                     (self.fit_res.params['offset'].value),
                     (self.fit_res.params['offset'].stderr)))
+            if self.T1 is not None and self.pulse_separation is not None:
+                F_T1 = self.calc_T1_limited_fidelity(self.T1, self.pulse_separation)
+                T1_limited_curve = fit_mods.RandomizedBenchmarkingDecay(
+                    x_fine, -0.5, F_T1, 0.5)
+                self.ax.plot(x_fine, T1_limited_curve, label='T1-limit')
+                textstr+=('\n\t  $F_{Cl}^{T_1}$  = '+'{:.6g}'.format(F_T1))
+                self.ax.legend()
 
             self.ax.text(0.1, 0.95, textstr, transform=self.ax.transAxes,
                 fontsize=11, verticalalignment='top',
@@ -2549,6 +2576,23 @@ class RandomizedBenchmarking_Analysis(TD_Analysis):
                 plt.plot(fit_res.init_fit, '--', label='init fit')
 
         return fit_res
+
+
+class RandomizedBench_2D_flat_Analysis(RandomizedBenchmarking_Analysis):
+    '''
+    Analysis for the specific RB sequenes used in the CBox that require
+    doing a 2D scan in order to get enough seeds in (due to the limit of the
+    max number of pulses).
+    '''
+    def get_naming_and_values(self):
+        '''
+        Extracts the data as if it is 2D then takes the mean and stores it as
+        if it it is just a simple line scan.
+        '''
+        self.get_naming_and_values_2D()
+        self.measured_values = np.array([np.mean(self.Z[0][:], axis=0),
+                                         np.mean(self.Z[1][:], axis=0)])
+
 
 #######################################################
 # End of time domain analyses
