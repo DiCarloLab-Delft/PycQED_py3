@@ -556,6 +556,87 @@ class CBox_SSRO_discrimination_detector(det.Soft_Detector):
                     a.relative_separation, a.relative_separation_I)
 
 
+class CBox_RB_detector(det.Soft_Detector):
+    def __init__(self, measurement_name, MC, AWG, CBox, LutMan,
+                 nr_cliffords, desired_nr_seeds,
+                 IF,
+                 RO_pulse_length, RO_pulse_delay, RO_trigger_delay,
+                 pulse_separation,
+                 T1=None, **kw):
+        super().__init__(**kw)
+        self.name = measurement_name
+        self.nr_cliffords = nr_cliffords
+        self.desired_nr_seeds = desired_nr_seeds
+        self.AWG = AWG
+        self.MC = MC
+        self.CBox = CBox
+        self.LutMan = LutMan
+        self.IF = IF
+        self.RO_pulse_length = RO_pulse_length
+        self.RO_pulse_delay = RO_pulse_delay
+        self.RO_trigger_delay = RO_trigger_delay
+        self.pulse_separation = pulse_separation
+        self.T1 = T1
+        self.value_names = ['F_cl']
+        self.value_units = ['']
+
+    def calculate_seq_duration_and_max_nr_seeds(self, nr_cliffords,
+                                                pulse_separation):
+        max_nr_cliffords = max(nr_cliffords)
+        # For few cliffords the number of gates is not the average number of
+        # gates so pick the max, rounded to ns
+        max_seq_duration = np.round(max(max_nr_cliffords*pulse_separation *
+                                        (1.875+.5), 10e-6), 9)
+        max_idling_waveforms_per_seed = max_seq_duration/(1200e-9)
+        max_nr_waveforms = 29184  # hard limit from the CBox
+        max_nr_seeds = int(max_nr_waveforms/((max_idling_waveforms_per_seed +
+                           np.mean(nr_cliffords)*1.875)*(len(nr_cliffords)+4)))
+        return max_seq_duration, max_nr_seeds
+
+    def prepare(self, **kw):
+        max_seq_duration, max_nr_seeds = \
+            self.calculate_seq_duration_and_max_nr_seeds(self.nr_cliffords,
+                                                         self.pulse_separation)
+        nr_repetitions = int(np.ceil(self.desired_nr_seeds/max_nr_seeds))
+        self.total_nr_seeds = nr_repetitions*max_nr_seeds
+
+        averages_per_tape = self.desired_nr_seeds//nr_repetitions
+        self.CBox.nr_averages.set(int(2**np.ceil(np.log2(averages_per_tape))))
+
+        rb_swf = awg_swf.CBox_RB_sweep(nr_cliffords=self.nr_cliffords,
+                                       nr_seeds=max_nr_seeds,
+                                       max_seq_duration=max_seq_duration,
+                                       safety_margin=0,
+                                       IF=self.IF,
+                                       RO_pulse_length=self.RO_pulse_length,
+                                       RO_pulse_delay=self.RO_pulse_delay,
+                                       RO_trigger_delay=self.RO_trigger_delay,
+                                       pulse_separation=self.pulse_separation,
+                                       AWG=self.AWG,
+                                       CBox=self.CBox,
+                                       LutMan=self.LutMan)
+
+        self.i = 0
+        self.MC.set_sweep_function(rb_swf)
+        self.MC.set_sweep_function_2D(awg_swf.Two_d_CBox_RB_seq(rb_swf))
+        self.MC.set_sweep_points_2D(np.arange(nr_repetitions))
+        self.MC.set_detector_function(det.CBox_integrated_average_detector(
+                                      self.CBox, self.AWG))
+
+    def acquire_data_point(self, **kw):
+            self.i += 1
+            self.MC.run(self.name+'_{}_{}seeds'.format(
+                        self.i, self.total_nr_seeds), mode='2D')
+            a = ma.RandomizedBench_2D_flat_Analysis(
+                auto=True, close_main_fig=True, T1=self.T1,
+                pulse_separation=self.pulse_separation)
+            F_cl = a.fit_res.params['fidelity_per_Clifford'].value
+            return F_cl
+
+
+
+
+
 # class SSRO_Fidelity_Detector_CBox_optimum_weights(SSRO_Fidelity_Detector_CBox):
 #     '''
 #     Currently only for CBox.

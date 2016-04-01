@@ -389,7 +389,25 @@ class CBox_integrated_average_detector(Hard_Detector):
         self.AWG = AWG
 
     def get_values(self):
-        data = self.CBox.get_integrated_avg_results()
+        succes = False
+        i = 0
+        while not succes:
+            try:
+                data = self.CBox.get_integrated_avg_results()
+                succes = True
+            except:
+                logging.warning('Exception caught retrying')
+                self.CBox.set('acquisition_mode', 0)
+                self.AWG.stop()
+                self.CBox.restart_awg_tape(0)
+                self.CBox.restart_awg_tape(1)
+                self.CBox.restart_awg_tape(2)
+
+                self.CBox.set('acquisition_mode', 4)
+                self.AWG.start()  # Is needed here to ensure data aligns with seq elt
+            i += 1
+            if i > 10:
+                break
 
         return data
 

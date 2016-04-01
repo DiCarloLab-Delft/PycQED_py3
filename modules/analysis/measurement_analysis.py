@@ -2524,18 +2524,19 @@ class RandomizedBenchmarking_Analysis(TD_Analysis):
                 '\n\tOffset\t= {:.2g} $\pm$ ({:.2g})'.format(
                     (self.fit_res.params['offset'].value),
                     (self.fit_res.params['offset'].stderr)))
+
             if self.T1 is not None and self.pulse_separation is not None:
                 F_T1 = self.calc_T1_limited_fidelity(self.T1, self.pulse_separation)
                 T1_limited_curve = fit_mods.RandomizedBenchmarkingDecay(
                     x_fine, -0.5, F_T1, 0.5)
                 self.ax.plot(x_fine, T1_limited_curve, label='T1-limit')
-                textstr+=('\n\t  $F_{Cl}^{T_1}$  = '+'{:.6g}'.format(F_T1))
+                textstr += ('\n\t  $F_{Cl}^{T_1}$  = ' +
+                            '{:.6g}%'.format(F_T1*100))
                 self.ax.legend()
 
             self.ax.text(0.1, 0.95, textstr, transform=self.ax.transAxes,
-                fontsize=11, verticalalignment='top',
-                bbox=self.box_props)
-
+                         fontsize=11, verticalalignment='top',
+                         bbox=self.box_props)
 
             if not close_main_fig:
                 # Hacked in here, good idea to only show the main fig but can

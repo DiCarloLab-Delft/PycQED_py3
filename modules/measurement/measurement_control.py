@@ -497,7 +497,12 @@ class MeasurementControl:
                     i*self.xlen:(i+1)*self.xlen, z_ind]
                 self.QC_QtPlot.traces[j]['config']['z'] = \
                     self.TwoD_array[:, :, j]
-        self.QC_QtPlot.update_plot()
+
+        if (time.time() - self.time_last_2Dplot_update >
+                self.QC_QtPlot.interval
+                or self.iteration == len(self.sweep_points)):
+            self.time_last_2Dplot_update = time.time()
+            self.QC_QtPlot.update_plot()
 
     ##################################
     # Small helper/utility functions #
