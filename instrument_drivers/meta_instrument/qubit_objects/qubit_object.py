@@ -193,7 +193,7 @@ class Transmon(Qubit):
                        f_step=1e6,
                        verbose=True,
                        update=False,
-                       close_fig=False):
+                       close_fig=True):
 
         if method.lower() == 'spectroscopy':
             if freqs is None:

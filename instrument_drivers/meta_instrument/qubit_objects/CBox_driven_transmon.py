@@ -173,7 +173,7 @@ class CBox_driven_transmon(Transmon):
     def find_resonator_frequency(self, use_min=False,
                                  update=True,
                                  freqs=None,
-                                 MC=None, close_fig=False):
+                                 MC=None, close_fig=True):
         '''
         Finds the resonator frequency by performing a heterodyne experiment
         if freqs == None it will determine a default range dependent on the
@@ -258,7 +258,7 @@ class CBox_driven_transmon(Transmon):
                                    frequency_guess=None,
                                    a_step=30, m_step=.1, f_step=20e3,
                                    MC=None, nested_MC=None,
-                                   update=False, close_fig=False,
+                                   update=False, close_fig=True,
                                    verbose=True):
         '''
         Calibrates single qubit pulse parameters currently only using
@@ -460,7 +460,7 @@ class CBox_driven_transmon(Transmon):
                              ' either "conventional" or "self-consistent"')
 
     def measure_heterodyne_spectroscopy(self, freqs, MC=None,
-                                        analyze=True, close_fig=False):
+                                        analyze=True, close_fig=True):
         self.prepare_for_continuous_wave()
         if MC is None:
             MC = self.MC
@@ -473,7 +473,7 @@ class CBox_driven_transmon(Transmon):
             ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
 
     def measure_spectroscopy(self, freqs, pulsed=False, MC=None,
-                             analyze=True, close_fig=False):
+                             analyze=True, close_fig=True):
         self.prepare_for_continuous_wave()
         if MC is None:
             MC = self.MC
@@ -493,7 +493,7 @@ class CBox_driven_transmon(Transmon):
             ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
 
     def measure_pulsed_spectroscopy(self, freqs, MC=None,
-                                    analyze=True, close_fig=False):
+                                    analyze=True, close_fig=True):
         # This is a trick so I can reuse the heterodyne instr
         # to do pulsed-spectroscopy
         self.heterodyne_instr._disable_auto_seq_loading = True
@@ -515,7 +515,7 @@ class CBox_driven_transmon(Transmon):
             ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
 
     def measure_resonator_power(self, freqs, mod_amps,
-                                MC=None, analyze=True, close_fig=False):
+                                MC=None, analyze=True, close_fig=True):
         '''
         N.B. This one does not use powers but varies the mod-amp.
         Need to find a way to keep this function agnostic to that
@@ -534,7 +534,7 @@ class CBox_driven_transmon(Transmon):
             ma.MeasurementAnalysis(auto=True, TwoD=True, close_fig=close_fig)
 
     def measure_resonator_dac(self, freqs, dac_voltages,
-                              MC=None, analyze=True, close_fig=False):
+                              MC=None, analyze=True, close_fig=True):
         self.prepare_for_continuous_wave()
         if MC is None:
             MC = self.MC
@@ -551,7 +551,7 @@ class CBox_driven_transmon(Transmon):
             ma.MeasurementAnalysis(auto=True, TwoD=True, close_fig=close_fig)
 
     def measure_rabi(self, pulse_amps, n=1,
-                     MC=None, analyze=True, close_fig=False,
+                     MC=None, analyze=True, close_fig=True,
                      verbose=False):
         self.prepare_for_timedomain()
         if MC is None:
@@ -580,7 +580,7 @@ class CBox_driven_transmon(Transmon):
             ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
 
     def measure_T1(self, times, MC=None,
-                   analyze=True, close_fig=False):
+                   analyze=True, close_fig=True):
         '''
         if update is True will update self.T1 with the measured value
         '''
@@ -606,12 +606,12 @@ class CBox_driven_transmon(Transmon):
                                  self.CBox, self.AWG))
         MC.run('T1'+self.msmt_suffix)
         if analyze:
-            a = ma.T1_Analysis(auto=True, close_fig=False)
+            a = ma.T1_Analysis(auto=True, close_fig=True)
             return a.T1
 
     def measure_ramsey(self, times, artificial_detuning=0, f_qubit=None,
                        label='',
-                       MC=None, analyze=True, close_fig=False, verbose=True):
+                       MC=None, analyze=True, close_fig=True, verbose=True):
         self.prepare_for_timedomain()
         if MC is None:
             MC = self.MC
@@ -638,7 +638,7 @@ class CBox_driven_transmon(Transmon):
         MC.run('Ramsey'+label+self.msmt_suffix)
 
         if analyze:
-            a = ma.Ramsey_Analysis(auto=True, close_fig=False)
+            a = ma.Ramsey_Analysis(auto=True, close_fig=True)
 
             if verbose:
                 fitted_freq = a.fit_res.params['frequency'].value
@@ -649,7 +649,7 @@ class CBox_driven_transmon(Transmon):
                       fitted_freq-artificial_detuning))
 
     def measure_allxy(self, MC=None,
-                      analyze=True, close_fig=False, verbose=True):
+                      analyze=True, close_fig=True, verbose=True):
         self.prepare_for_timedomain()
         if MC is None:
             MC = self.MC
@@ -669,7 +669,7 @@ class CBox_driven_transmon(Transmon):
     def measure_ssro(self, no_fits=False,
                      return_detector=False,
                      MC=None,
-                     analyze=True, close_fig=False, verbose=True):
+                     analyze=True, close_fig=True, verbose=True):
         self.prepare_for_timedomain()
 
         if MC is None:
@@ -697,7 +697,7 @@ class CBox_driven_transmon(Transmon):
                                    return_detector=False,
                                    MC=None,
                                    analyze=True,
-                                   close_fig=False, make_fig=True,
+                                   close_fig=True, make_fig=True,
                                    verbose=True):
         '''
         Measures the single shot discrimination fidelity.
@@ -738,7 +738,7 @@ class CBox_driven_transmon(Transmon):
 
     def measure_rb_vs_amp(self, amps, nr_cliff=1,
                           resetless=True,
-                          MC=None, analyze=True, close_fig=False,
+                          MC=None, analyze=True, close_fig=True,
                           verbose=False):
         self.prepare_for_timedomain()
         if MC is None:

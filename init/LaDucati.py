@@ -110,7 +110,8 @@ for i in range(4):
 # to make the pulsar available to the standard awg seqs
 st_seqs.station = station
 
-IVVI.set('dac2', 0)
+IVVI.dac1.set(-40)
+IVVI.dac2.set(70)
 IVVI.dac5.set(0)
 
 IF = -20e6        # RO modulation frequency
