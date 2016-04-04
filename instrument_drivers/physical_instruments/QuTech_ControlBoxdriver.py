@@ -808,7 +808,9 @@ class QuTech_ControlBox(VisaInstrument):
         # version
         v = self.get('firmware_version')
         if (int(v[1]) == 2) and (int(int(v[3:5])) > 15):
-            dac_ch = 1 - dac_ch
+            dac_ch_code = 1 - dac_ch
+        else:
+            dac_ch_code = dac_ch
 
         if offset > 1000 or offset < -1000:
             raise ValueError('offset out of range [-1, 1] (volts)')
@@ -821,7 +823,7 @@ class QuTech_ControlBox(VisaInstrument):
         cmd = defHeaders.AwgOffsetHeader
         data_bytes = bytes()
         data_bytes += (c.encode_byte(awg_nr, 4, 1))
-        data_bytes += (c.encode_byte(dac_ch, 4, 1))
+        data_bytes += (c.encode_byte(dac_ch_code, 4, 1))
         data_bytes += (c.encode_byte(offset_dac, data_bits_per_byte=7,
                        expected_number_of_bytes=2))
         message = c.create_message(cmd, data_bytes)
