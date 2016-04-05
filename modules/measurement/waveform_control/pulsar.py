@@ -265,7 +265,7 @@ class Pulsar:
                             "8000 elements, Aborting", end=' ')
             return
 
-        print("Programming '%s' (%d element(s))...\n"
+        print("Programming '%s' (%d element(s)) \t"
               % (sequence.name, sequence.element_count()), end=' ')
 
         # determine which channels are involved in the sequence

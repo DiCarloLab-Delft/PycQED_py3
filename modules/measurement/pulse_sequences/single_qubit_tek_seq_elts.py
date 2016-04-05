@@ -7,7 +7,8 @@ from ..waveform_control.pulse_library import MW_IQmod_pulse, SSB_DRAG_pulse
 from ..waveform_control import sequence
 from importlib import reload
 reload(pulse)
-
+from ..waveform_control import pulse_library
+reload(pulse_library)
 
 station = None
 reload(element)
@@ -30,7 +31,7 @@ def Rabi_seq(amps,
     seq = sequence.Sequence(seq_name)
     el_list = []
 
-    for amp, i in enumerate(amps):  # seq has to have at least 2 elts
+    for i, amp in enumerate(amps):  # seq has to have at least 2 elts
         pulse_pars['amplitude'] = amp
         el = single_SSB_DRAG_pulse_elt(i, station,
                                        pulse_pars,
@@ -85,16 +86,15 @@ def single_SSB_DRAG_pulse_elt(i, station,
         # Readout modulation tone
         # TODO: add option to use same sequence but spit out only marker
         # instead of a RO tone.
-        RO_tone = MW_IQmod_pulse(name='RO_tone',
-                                 I_channel=RO_pars['I_channel'],
-                                 Q_channel=RO_pars['Q_channel'],
-                                 length=RO_pars['length'],
-                                 amplitude=RO_pars['amplitude'],
-                                 mod_frequency=RO_pars['mod_frequency'])
-
-        el.add(RO_tone, start=RO_pars['pulse_delay'],
-               refpulse='Rabi_pulse',
-               fixed_point_freq=RO_pars['mod_frequency'])
+        RO_tone = el.add(MW_IQmod_pulse(name='RO_tone',
+                                        I_channel=RO_pars['I_channel'],
+                                        Q_channel=RO_pars['Q_channel'],
+                                        length=RO_pars['length'],
+                                        amplitude=RO_pars['amplitude'],
+                                        mod_frequency=RO_pars['mod_frequency']),
+                         start=RO_pars['pulse_delay'],
+                         refpulse='Rabi_pulse',
+                         fixed_point_freq=RO_pars['mod_frequency'])
 
         # Start Acquisition marker
         ROm = pulse.SquarePulse(name='RO-marker',
@@ -104,5 +104,4 @@ def single_SSB_DRAG_pulse_elt(i, station,
                           refpulse=RO_tone, refpoint='start')
         el.add(pulse.cp(ROm, channel=RO_pars['marker_ch2']),
                refpulse=ROm_name, refpoint='start', start=0)
-
         return el

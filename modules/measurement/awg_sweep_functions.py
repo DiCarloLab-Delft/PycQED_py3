@@ -3,7 +3,27 @@ import logging
 from modules.measurement import sweep_functions as swf
 from modules.measurement.randomized_benchmarking import randomized_benchmarking as rb
 from modules.measurement.pulse_sequences import standard_sequences as st_seqs
-default_gauss_width = 10  # magic number should be removed
+from modules.measurement.pulse_sequences import single_qubit_tek_seq_elts as sqs
+default_gauss_width = 10  # magic number should be removed,
+# note magic number only used in old mathematica seqs
+
+
+class Rabi(swf.Hard_Sweep):
+    def __init__(self, pulse_pars, RO_pars, upload=True):
+        super().__init__()
+        self.pulse_pars = pulse_pars
+        self.RO_pars = RO_pars
+        self.upload = upload
+
+        self.name = 'Rabi'
+        self.parameter_name = 'amplitude'
+        self.unit = 'V'
+
+    def prepare(self, **kw):
+        if self.upload:
+            sqs.Rabi_seq(amps=self.sweep_points,
+                         pulse_pars=self.pulse_pars,
+                         RO_pars=self.RO_pars)
 
 
 class CBox_T1(swf.Hard_Sweep):
