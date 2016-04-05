@@ -1,5 +1,6 @@
 import logging
 import numpy as np
+from copy import deepcopy
 from ..waveform_control import pulsar
 from ..waveform_control import element
 from ..waveform_control import pulse
@@ -65,21 +66,23 @@ def Ramsey_seq(times, pulse_pars, RO_pars,
     pi2_amp = pulse_pars['amplitude']/2
 
     pulse_pars['amplitude'] = pi2_amp  # Use a pi/2 pulse
+    pulse_pars_2 = deepcopy(pulse_pars)
     for i, tau in enumerate(times):
-        pulse_pars['pulse_separation'] = tau
-        if artificial_detuning is None:
-            pulse_pars['phase'] = 0
-        else:
-            raise NotImplementedError('artificial_detuning not implemented yet')
+        pulse_pars_2['pulse_separation'] = tau
+        if artificial_detuning is not None:
+            pulse_pars_2['phase'] = tau * artificial_detuning * 360
+            raise NotImplementedError('Implemented but phase not tested')
         if cal_points:
             if (i == (len(times)-4) or i == (len(times)-3)):
                 pulse_pars['amplitude'] = 0
+                pulse_pars_2['amplitude'] = 0
             elif(i == (len(times)-2) or i == (len(times)-1)):
-                pulse_pars['amplitude'] = pi_amp
+                pulse_pars['amplitude'] = 0
+                pulse_pars_2['amplitude'] = pi_amp
 
         el = double_SSB_DRAG_pulse_elt(i, station,
                                        pulse_pars,
-                                       pulse_pars,
+                                       pulse_pars_2,
                                        RO_pars)
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)

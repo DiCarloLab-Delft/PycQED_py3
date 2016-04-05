@@ -141,7 +141,8 @@ class Element:
 
             Time correction is rounded to a full clock cycle.
             '''
-            phase_diff = (360 * abs(fixed_point_freq) * t0) % (360)
+            fixed_point_freq = abs(fixed_point_freq)
+            phase_diff = (360 * fixed_point_freq * t0) % (360)
             phase_corr = 360 - phase_diff  # Correction in degrees
             time_corr_0 = phase_corr/(360*fixed_point_freq)
             time_corr = time_corr_0
@@ -159,6 +160,12 @@ class Element:
                     raise Exception('Could not find time corr for fixed point')
                 time_corr += 1/fixed_point_freq
             time_corr = round(time_corr, 9)  # Rounds to ns
+            if time_corr < 0:
+                raise ValueError(
+                    'Time correction "{}" cannot be negative'.format(time_corr))
+                # Cannot be negative because it will give unexpected behaviour
+                # This should not be possible to happen but I ran into this
+                # a few time so I leave the exception here
             return time_corr
 
     def shift_all_pulses(self, dt):
@@ -350,7 +357,6 @@ class Element:
                     chan_tvals[c] = c_tvals
 
                 pulsewfs = self.pulses[p].get_wfs(chan_tvals)
-
             for c in self.pulses[p].channels:
                 idx0 = self.pulse_start_sample(p, c)
                 idx1 = self.pulse_end_sample(p, c) + 1
