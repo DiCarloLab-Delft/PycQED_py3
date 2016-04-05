@@ -141,7 +141,7 @@ class Element:
 
             Time correction is rounded to a full clock cycle.
             '''
-            phase_diff = (360 * fixed_point_freq * t0) % (360)
+            phase_diff = (360 * abs(fixed_point_freq) * t0) % (360)
             phase_corr = 360 - phase_diff  # Correction in degrees
             time_corr_0 = phase_corr/(360*fixed_point_freq)
             time_corr = time_corr_0
@@ -158,6 +158,7 @@ class Element:
                     print('1/fixed_point_freq: %s' % (1/fixed_point_freq))
                     raise Exception('Could not find time corr for fixed point')
                 time_corr += 1/fixed_point_freq
+            time_corr = round(time_corr, 9)  # Rounds to ns
             return time_corr
 
     def shift_all_pulses(self, dt):
@@ -354,7 +355,6 @@ class Element:
                 idx0 = self.pulse_start_sample(p, c)
                 idx1 = self.pulse_end_sample(p, c) + 1
                 wfs[c][idx0:idx1] += pulsewfs[c]
-
         return tvals, wfs
 
     def waveforms(self):

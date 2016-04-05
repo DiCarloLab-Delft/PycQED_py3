@@ -26,6 +26,31 @@ class Rabi(swf.Hard_Sweep):
                          RO_pars=self.RO_pars)
 
 
+class Ramsey(swf.Hard_Sweep):
+    def __init__(self, pulse_pars, RO_pars,
+                 artificial_detuning=None,
+                 cal_points=True,
+                 upload=True):
+        super().__init__()
+        self.pulse_pars = pulse_pars
+        self.RO_pars = RO_pars
+        self.upload = upload
+        self.cal_points = cal_points
+        self.artificial_detuning = artificial_detuning
+
+        self.name = 'Ramsey'
+        self.parameter_name = 't'
+        self.unit = 's'
+
+    def prepare(self, **kw):
+        if self.upload:
+            sqs.Ramsey_seq(times=self.sweep_points,
+                           pulse_pars=self.pulse_pars,
+                           RO_pars=self.RO_pars,
+                           artificial_detuning=self.artificial_detuning,
+                           cal_points=self.cal_points)
+
+
 class CBox_T1(swf.Hard_Sweep):
     def __init__(self, IF, RO_pulse_delay, RO_trigger_delay, mod_amp, AWG,
                  upload=True):
