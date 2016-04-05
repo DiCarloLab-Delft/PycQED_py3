@@ -212,7 +212,7 @@ class Transmon(Qubit):
             stepsize = abs(1/self.f_pulse_mod.get())
             cur_freq = self.f_qubit.get()
             # Steps don't double to be more robust against aliasing
-            for n in [1, 3, 10, 30, 100, 300, 1000]:
+            for n in steps:
                 times = np.arange(self.pulse_separation.get(),
                                   50*n*stepsize, n*stepsize)
                 artificial_detuning = 4/times[-1]
