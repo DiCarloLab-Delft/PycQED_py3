@@ -26,6 +26,29 @@ class Rabi(swf.Hard_Sweep):
                          RO_pars=self.RO_pars)
 
 
+class AllXY(swf.Hard_Sweep):
+    def __init__(self, pulse_pars, RO_pars, double_points=False, upload=True):
+        super().__init__()
+        self.pulse_pars = pulse_pars
+        self.RO_pars = RO_pars
+        self.double_points = double_points
+        self.upload = upload
+
+        self.parameter_name = 'AllXY element'
+        self.unit = '#'
+        self.name = 'AllXY'
+        if not double_points:
+            self.sweep_points = np.arange(21)
+        else:
+            self.sweep_points = np.arange(42)
+
+    def prepare(self, **kw):
+        if self.upload:
+            sqs.AllXY_seq(pulse_pars=self.pulse_pars,
+                          RO_pars=self.RO_pars,
+                          double_points=self.double_points)
+
+
 class Ramsey(swf.Hard_Sweep):
     def __init__(self, pulse_pars, RO_pars,
                  artificial_detuning=None,

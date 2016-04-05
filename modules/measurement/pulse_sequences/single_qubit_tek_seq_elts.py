@@ -91,6 +91,56 @@ def Ramsey_seq(times, pulse_pars, RO_pars,
     return seq_name
 
 
+def AllXY_seq(pulse_pars, RO_pars, double_points=False,
+              verbose=False):
+    '''
+    AllXY sequence for a single qubit using the tektronix.
+    SSB_Drag pulse is used for driving, simple modualtion used for RO
+    Input pars:
+        pulse_pars:          dict containing the pulse parameters
+        RO_pars:             dict containing the RO parameters
+
+    '''
+    seq_name = 'Ramsey_sequence'
+    seq = sequence.Sequence(seq_name)
+    el_list = []
+    # Create a dict with the parameters for all the pulses
+    pi2_amp = pulse_pars['amplitude']/2
+
+    pulses = {'I': deepcopy(pulse_pars),
+              'X': deepcopy(pulse_pars),
+              'x': deepcopy(pulse_pars),
+              'Y': deepcopy(pulse_pars),
+              'y': deepcopy(pulse_pars)}
+
+    pulses['I']['amplitude'] = 0
+    pulses['x']['amplitude'] = pi2_amp
+    pulses['Y']['phase'] = 90
+    pulses['y']['amplitude'] = pi2_amp
+    pulses['y']['phase'] = 90
+
+    pulse_combinations = ['II', 'XX', 'YY', 'XY', 'YX',
+                          'xI', 'yI', 'xy', 'yx', 'xY', 'yX',
+                          'Xy', 'Yx', 'xX', 'Xx', 'yY', 'Yy',
+                          'XI', 'YI', 'xx', 'yy']
+    if double_points:
+        pulse_combinations = [val for val in pulse_combinations
+                              for _ in (0, 1)]
+
+    for i, pulse_comb in enumerate(pulse_combinations):
+        el = double_SSB_DRAG_pulse_elt(i, station,
+                                       pulses[pulse_comb[0]],
+                                       pulses[pulse_comb[1]],
+                                       RO_pars)
+        el_list.append(el)
+        seq.append_element(el, trigger_wait=True)
+    station.instruments['AWG'].stop()
+    station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+    return seq_name
+
+
+
+
 def single_SSB_DRAG_pulse_elt(i, station,
                               pulse_pars,
                               RO_pars):
