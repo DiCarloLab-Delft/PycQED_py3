@@ -113,7 +113,6 @@ def Ramsey_seq(times, pulse_pars, RO_pars,
 
         if artificial_detuning is not None:
             pulse_pars_x2['phase'] = tau * artificial_detuning * 360
-            raise NotImplementedError('Implemented but phase not tested')
 
         if cal_points and (i == (len(times)-4) or i == (len(times)-3)):
                 el = single_SSB_DRAG_pulse_elt(i, station,
@@ -163,6 +162,33 @@ def AllXY_seq(pulse_pars, RO_pars, double_points=False,
         el = double_SSB_DRAG_pulse_elt(i, station,
                                        pulses[pulse_comb[0]],
                                        pulses[pulse_comb[1]],
+                                       RO_pars)
+        el_list.append(el)
+        seq.append_element(el, trigger_wait=True)
+    station.instruments['AWG'].stop()
+    station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+    return seq_name
+
+def OffOn_seq(pulse_pars, RO_pars,
+              verbose=False):
+    '''
+    OffOn sequence for a single qubit using the tektronix.
+    SSB_Drag pulse is used for driving, simple modualtion used for RO
+    Input pars:
+        pulse_pars:          dict containing the pulse parameters
+        RO_pars:             dict containing the RO parameters
+    '''
+    seq_name = 'OffOn_sequence'
+    seq = sequence.Sequence(seq_name)
+    el_list = []
+    # Create a dict with the parameters for all the pulses
+    pulses = get_pulse_dict_from_pars(pulse_pars)
+
+    pulse_combinations = ['I', 'X']
+
+    for i, pulse_comb in enumerate(pulse_combinations):
+        el = single_SSB_DRAG_pulse_elt(i, station,
+                                       pulses[pulse_comb],
                                        RO_pars)
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)

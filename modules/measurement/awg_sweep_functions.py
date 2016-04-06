@@ -66,6 +66,23 @@ class AllXY(swf.Hard_Sweep):
                           RO_pars=self.RO_pars,
                           double_points=self.double_points)
 
+class OffOn(swf.Hard_Sweep):
+    def __init__(self, pulse_pars, RO_pars, upload=True):
+        super().__init__()
+        self.pulse_pars = pulse_pars
+        self.RO_pars = RO_pars
+        self.upload = upload
+
+        self.parameter_name = 'OffOn element'
+        self.unit = '#'
+        self.name = 'OffOn'
+        self.sweep_points = np.arange(2)
+
+    def prepare(self, **kw):
+        if self.upload:
+            sqs.OffOn_seq(pulse_pars=self.pulse_pars,
+                          RO_pars=self.RO_pars)
+
 
 class Ramsey(swf.Hard_Sweep):
     def __init__(self, pulse_pars, RO_pars,

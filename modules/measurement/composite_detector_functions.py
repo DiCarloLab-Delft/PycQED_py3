@@ -328,7 +328,7 @@ class SSRO_Fidelity_Detector_CBox(det.Soft_Detector):
         self.CBox = CBox
         self.AWG = AWG
 
-        self.IF = kw.pop('IF', -20e6)
+        #self.IF = kw.pop('IF', -20e6)
         self.RO_trigger_delay = RO_trigger_delay
         self.RO_pulse_delay = RO_pulse_delay
         self.RO_pulse_length = RO_pulse_length
@@ -349,6 +349,57 @@ class SSRO_Fidelity_Detector_CBox(det.Soft_Detector):
             RO_trigger_delay=self.RO_trigger_delay,
             RO_pulse_length=self.RO_pulse_length,
             AWG=self.AWG, CBox=self.CBox))
+
+        self.MC.set_detector_function(
+            det.CBox_alternating_shots_det(self.CBox, self.AWG))
+
+    def acquire_data_point(self, *args, **kw):
+        self.i += 1
+        self.MC.run(name=self.measurement_name+'_'+str(self.i))
+        if self.analyze:
+            ana = ma.SSRO_Analysis(label=self.measurement_name,
+                                   no_fits=self.raw, close_file=True)
+            # Arbitrary choice, does not think about the deffinition
+            if self.raw:
+                return ana.F_raw
+            else:
+                return ana.F, ana.F_corrected
+
+
+class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
+    '''
+    For Qcodes. Readout with CBox, pulse generation with 5014
+    '''
+    def __init__(self, measurement_name,  MC, AWG, CBox, pulse_pars, RO_pars,
+                 raw=True, analyze=True, **kw):
+        self.detector_control = 'soft'
+        self.name = 'SSRO_Fidelity'
+        # For an explanation of the difference between the different
+        # Fidelities look in the analysis script
+        if raw:
+            self.value_names = ['F-raw']
+            self.value_units = [' ']
+        else:
+            self.value_names = ['F', 'F corrected']
+            self.value_units = [' ', ' ']
+        self.measurement_name = measurement_name
+        self.MC = MC
+        self.CBox = CBox
+        self.AWG = AWG
+        self.pulse_pars = pulse_pars
+        self.RO_pars = RO_pars
+
+        #self.IF = kw.pop('IF', -20e6)
+        self.i = 0
+
+        self.raw = raw  # Performs no fits if True
+        self.analyze = analyze
+
+        self.upload=True
+
+    def prepare(self, **kw):
+        self.MC.set_sweep_function(awg_swf.OffOn(pulse_pars=self.pulse_pars,
+                                                 RO_pars=self.RO_pars))
 
         self.MC.set_detector_function(
             det.CBox_alternating_shots_det(self.CBox, self.AWG))

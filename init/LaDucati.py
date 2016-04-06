@@ -132,7 +132,7 @@ CBox.set_dac_offset(1, 0, 0)  # Q channel readout AWG
 # LO offsets calibrated at 23-2-2016 at f = 7.15350 GHz
 AWG.ch3_offset.set(0.002)
 AWG.ch4_offset.set(0.018)
-
+AWG.clock_freq.set(1e9)
 
 def set_CBox_cos_sine_weigths(IF):
     '''
