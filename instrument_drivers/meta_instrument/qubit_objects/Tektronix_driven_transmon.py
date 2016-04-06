@@ -253,4 +253,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                       verbose=False):
         raise NotImplementedError()
 
+    def measure_Echo(self, times, MC=None,
+                     analyze=True, close_fig=True, verbose=True):
+        raise NotImplementedError()
 
