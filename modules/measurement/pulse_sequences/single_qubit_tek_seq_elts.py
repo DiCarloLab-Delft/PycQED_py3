@@ -1,6 +1,7 @@
 import logging
 import numpy as np
 from copy import deepcopy
+from math import gcd
 from ..waveform_control import pulsar
 from ..waveform_control import element
 from ..waveform_control import pulse
@@ -220,7 +221,9 @@ def single_SSB_DRAG_pulse_elt(i, station,
                                         mod_frequency=RO_pars['mod_frequency']),
                          start=RO_pars['pulse_delay'],
                          refpulse='pulse1',
-                         fixed_point_freq=RO_pars['mod_frequency'])
+                         fixed_point_freq=gcd(int(RO_pars['mod_frequency']),
+                                              int(20e6)))
+        # Hardcoded gcd to ensure fixed point always a multiple of 5ns for CBox
 
         # Start Acquisition marker
         ROm = pulse.SquarePulse(name='RO-marker',
@@ -297,7 +300,9 @@ def double_SSB_DRAG_pulse_elt(i, station,
                                         mod_frequency=RO_pars['mod_frequency']),
                          start=RO_pars['pulse_delay'],
                          refpulse='pulse_2',
-                         fixed_point_freq=RO_pars['mod_frequency'])
+                         fixed_point_freq=gcd(int(RO_pars['mod_frequency']),
+                                              int(20e6)))
+        # Hardcoded gcd to ensure fixed point always a multiple of 5ns for CBox
 
         # Start Acquisition marker
         ROm = pulse.SquarePulse(name='RO-marker',

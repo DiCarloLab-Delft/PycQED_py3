@@ -222,7 +222,8 @@ class Element:
                                             pulse used
         refpoint_new ('start'|'end'|'center'): reference point in added
                                                pulse used
-        fixed_point_freq (float)    : if not None
+        fixed_point_freq (float): if not None shifts all pulses so that
+                                  this pulse is at a multiple of 1/fixed_point_freq
 
         '''
         pulse = deepcopy(pulse)
@@ -335,8 +336,7 @@ class Element:
         tvals = np.arange(self.samples())/self.clock
 
         for c in self._channels:
-            wfs[c] = np.zeros(self.samples()) + self._channels[c]['offset']
-
+            wfs[c] = np.zeros(self.samples()+1) + self._channels[c]['offset']
         # we first compute the ideal function values
         for p in self.pulses:
             psamples = self.pulse_samples(p)
@@ -361,6 +361,10 @@ class Element:
                 idx0 = self.pulse_start_sample(p, c)
                 idx1 = self.pulse_end_sample(p, c) + 1
                 wfs[c][idx0:idx1] += pulsewfs[c]
+                if idx1 == len(wfs[c]):
+                    # If this happens the seq will laod fine but will have
+                    # funny behaviour because it does not end in zero
+                    raise ValueError(self.pulses[p].name, idx1, len(wfs[c]))
         return tvals, wfs
 
     def waveforms(self):
