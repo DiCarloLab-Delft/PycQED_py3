@@ -31,11 +31,11 @@ def Rabi_seq(amps,
     seq_name = 'Rabi_sequence'
     seq = sequence.Sequence(seq_name)
     el_list = []
-
+    pulses = get_pulse_dict_from_pars(pulse_pars)
     for i, amp in enumerate(amps):  # seq has to have at least 2 elts
-        pulse_pars['amplitude'] = amp
+        pulses['X']['amplitude'] = amp
         el = single_SSB_DRAG_pulse_elt(i, station,
-                                       pulse_pars,
+                                       pulses['X'],
                                        RO_pars)
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
@@ -59,22 +59,26 @@ def T1_seq(times,
     seq_name = 'T1_sequence'
     seq = sequence.Sequence(seq_name)
     el_list = []
-    pi_amp = pulse_pars['amplitude']
     RO_pulse_delay = RO_pars['pulse_delay']
-    print(RO_pulse_delay)
+    RO_pars = deepcopy(RO_pars)  # Prevents overwriting of the dict
+    pulses = get_pulse_dict_from_pars(pulse_pars)
 
     for i, tau in enumerate(times):  # seq has to have at least 2 elts
         RO_pars['pulse_delay'] = RO_pulse_delay + tau
         if cal_points:
             if (i == (len(times)-4) or i == (len(times)-3)):
-                pulse_pars['amplitude'] = 0
+                el = single_SSB_DRAG_pulse_elt(i, station,
+                                               pulses['I'],
+                                               RO_pars)
             elif(i == (len(times)-2) or i == (len(times)-1)):
-                pulse_pars['amplitude'] = pi_amp
                 RO_pars['pulse_delay'] = RO_pulse_delay
-                print(RO_pulse_delay)
-        el = single_SSB_DRAG_pulse_elt(i, station,
-                                       pulse_pars,
-                                       RO_pars)
+                el = single_SSB_DRAG_pulse_elt(i, station,
+                                               pulses['X'],
+                                               RO_pars)
+            else:
+                el = single_SSB_DRAG_pulse_elt(i, station,
+                                               pulses['X'],
+                                               RO_pars)
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
     station.instruments['AWG'].stop()
@@ -100,28 +104,29 @@ def Ramsey_seq(times, pulse_pars, RO_pars,
     seq = sequence.Sequence(seq_name)
     el_list = []
     # First extract values from input, later overwrite when generating waveforms
-    pi_amp = pulse_pars['amplitude']
-    pi2_amp = pulse_pars['amplitude']/2
+    pulses = get_pulse_dict_from_pars(pulse_pars)
 
-    pulse_pars['amplitude'] = pi2_amp  # Use a pi/2 pulse
-    pulse_pars_2 = deepcopy(pulse_pars)
+    pulse_pars_x2 = deepcopy(pulses['x'])
     for i, tau in enumerate(times):
-        pulse_pars_2['pulse_separation'] = tau
-        if artificial_detuning is not None:
-            pulse_pars_2['phase'] = tau * artificial_detuning * 360
-            raise NotImplementedError('Implemented but phase not tested')
-        if cal_points:
-            if (i == (len(times)-4) or i == (len(times)-3)):
-                pulse_pars['amplitude'] = 0
-                pulse_pars_2['amplitude'] = 0
-            elif(i == (len(times)-2) or i == (len(times)-1)):
-                pulse_pars['amplitude'] = 0
-                pulse_pars_2['amplitude'] = pi_amp
+        pulse_pars_x2['pulse_separation'] = tau
 
-        el = double_SSB_DRAG_pulse_elt(i, station,
-                                       pulse_pars,
-                                       pulse_pars_2,
-                                       RO_pars)
+        if artificial_detuning is not None:
+            pulse_pars_x2['phase'] = tau * artificial_detuning * 360
+            raise NotImplementedError('Implemented but phase not tested')
+
+        if cal_points and (i == (len(times)-4) or i == (len(times)-3)):
+                el = single_SSB_DRAG_pulse_elt(i, station,
+                                               pulses['I'],
+                                               RO_pars)
+        elif cal_points and (i == (len(times)-2) or i == (len(times)-1)):
+                el = single_SSB_DRAG_pulse_elt(i, station,
+                                               pulses['X'],
+                                               RO_pars)
+        else:
+            el = double_SSB_DRAG_pulse_elt(i, station,
+                                           pulses['x'],
+                                           pulse_pars_x2,
+                                           RO_pars)
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
     station.instruments['AWG'].stop()
@@ -143,19 +148,7 @@ def AllXY_seq(pulse_pars, RO_pars, double_points=False,
     seq = sequence.Sequence(seq_name)
     el_list = []
     # Create a dict with the parameters for all the pulses
-    pi2_amp = pulse_pars['amplitude']/2
-
-    pulses = {'I': deepcopy(pulse_pars),
-              'X': deepcopy(pulse_pars),
-              'x': deepcopy(pulse_pars),
-              'Y': deepcopy(pulse_pars),
-              'y': deepcopy(pulse_pars)}
-
-    pulses['I']['amplitude'] = 0
-    pulses['x']['amplitude'] = pi2_amp
-    pulses['Y']['phase'] = 90
-    pulses['y']['amplitude'] = pi2_amp
-    pulses['y']['phase'] = 90
+    pulses = get_pulse_dict_from_pars(pulse_pars)
 
     pulse_combinations = ['II', 'XX', 'YY', 'XY', 'YX',
                           'xI', 'yI', 'xy', 'yx', 'xY', 'yX',
@@ -316,3 +309,33 @@ def double_SSB_DRAG_pulse_elt(i, station,
                refpulse=ROm_name, refpoint='start', start=0)
         return el
 
+# Helper functions
+
+
+def get_pulse_dict_from_pars(pulse_pars):
+    '''
+    Returns a dictionary containing pulse_pars for all the primitive pulses
+    based on a single set of pulse_pars.
+    Using this function deepcopies the pulse parameters preventing accidently
+    editing to input dictionary.
+
+    input args:
+        pulse_pars: dictionary containing pulse_parameters
+    return:
+        pulses: dictionary of pulse_pars dictionaries
+    '''
+    pi2_amp = pulse_pars['amplitude']/2
+
+    pulses = {'I': deepcopy(pulse_pars),
+              'X': deepcopy(pulse_pars),
+              'x': deepcopy(pulse_pars),
+              'Y': deepcopy(pulse_pars),
+              'y': deepcopy(pulse_pars)}
+
+    pulses['I']['amplitude'] = 0
+    pulses['x']['amplitude'] = pi2_amp
+    pulses['Y']['phase'] = 90
+    pulses['y']['amplitude'] = pi2_amp
+    pulses['y']['phase'] = 90
+
+    return pulses
