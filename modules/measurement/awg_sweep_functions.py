@@ -26,6 +26,24 @@ class Rabi(swf.Hard_Sweep):
                          RO_pars=self.RO_pars)
 
 
+class T1(swf.Hard_Sweep):
+    def __init__(self, pulse_pars, RO_pars, upload=True):
+        super().__init__()
+        self.pulse_pars = pulse_pars
+        self.RO_pars = RO_pars
+        self.upload = upload
+
+        self.name = 'T1'
+        self.parameter_name = 't'
+        self.unit = 's'
+
+    def prepare(self, **kw):
+        if self.upload:
+            sqs.T1_seq(times=self.sweep_points,
+                       pulse_pars=self.pulse_pars,
+                       RO_pars=self.RO_pars)
+
+
 class AllXY(swf.Hard_Sweep):
     def __init__(self, pulse_pars, RO_pars, double_points=False, upload=True):
         super().__init__()

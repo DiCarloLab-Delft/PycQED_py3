@@ -44,6 +44,44 @@ def Rabi_seq(amps,
     return seq_name
 
 
+def T1_seq(times,
+           pulse_pars, RO_pars,
+           cal_points=True,
+           verbose=False):
+    '''
+    Rabi sequence for a single qubit using the tektronix.
+    SSB_Drag pulse is used for driving, simple modualtion used for RO
+    Input pars:
+        times:       array of times to wait after the initial pi-pulse
+        pulse_pars:  dict containing the pulse parameters
+        RO_pars:     dict containing the RO parameters
+    '''
+    seq_name = 'T1_sequence'
+    seq = sequence.Sequence(seq_name)
+    el_list = []
+    pi_amp = pulse_pars['amplitude']
+    RO_pulse_delay = RO_pars['pulse_delay']
+    print(RO_pulse_delay)
+
+    for i, tau in enumerate(times):  # seq has to have at least 2 elts
+        RO_pars['pulse_delay'] = RO_pulse_delay + tau
+        if cal_points:
+            if (i == (len(times)-4) or i == (len(times)-3)):
+                pulse_pars['amplitude'] = 0
+            elif(i == (len(times)-2) or i == (len(times)-1)):
+                pulse_pars['amplitude'] = pi_amp
+                RO_pars['pulse_delay'] = RO_pulse_delay
+                print(RO_pulse_delay)
+        el = single_SSB_DRAG_pulse_elt(i, station,
+                                       pulse_pars,
+                                       RO_pars)
+        el_list.append(el)
+        seq.append_element(el, trigger_wait=True)
+    station.instruments['AWG'].stop()
+    station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+    return seq_name
+
+
 def Ramsey_seq(times, pulse_pars, RO_pars,
                artificial_detuning=None,
                cal_points=True,
@@ -139,8 +177,6 @@ def AllXY_seq(pulse_pars, RO_pars, double_points=False,
     return seq_name
 
 
-
-
 def single_SSB_DRAG_pulse_elt(i, station,
                               pulse_pars,
                               RO_pars):
@@ -220,7 +256,7 @@ def double_SSB_DRAG_pulse_elt(i, station,
             RO_pars:    dictionary containing the parameters for the RO tone
                         and markers
         '''
-        el = element.Element(name='single-pulse-elt_%s' % i,
+        el = element.Element(name='double-pulse-elt_%s' % i,
                              pulsar=station.pulsar)
 
         # exitst to ensure that channel is not high when waiting for trigger
