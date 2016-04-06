@@ -143,6 +143,8 @@ class Transmon(Qubit):
                            parameter_class=ManualParameter)
         self.add_parameter('RO_trigger_delay', units='s',
                            parameter_class=ManualParameter)
+        self.add_parameter('RO_amp', units='V',
+                           parameter_class=ManualParameter)
         self.add_parameter('pulse_separation', units='s',
                            parameter_class=ManualParameter)
 
