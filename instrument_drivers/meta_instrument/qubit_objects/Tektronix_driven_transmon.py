@@ -1,7 +1,7 @@
 import logging
 import numpy as np
 from scipy.optimize import brent
-
+from math import gcd
 from qcodes.utils import validators as vals
 from qcodes.instrument.parameter import ManualParameter
 
@@ -18,7 +18,7 @@ import modules.measurement.randomized_benchmarking.randomized_benchmarking as rb
 
 from modules.measurement.optimization import nelder_mead
 
-# from .qubit_object import Transmon
+from .qubit_object import Transmon
 from .CBox_driven_transmon import CBox_driven_transmon
 # It would be better to inherit from Transmon directly and put all the common
 # stuff in there but for now I am inheriting from what I already have
@@ -38,7 +38,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                  IVVI, AWG, CBox,
                  heterodyne_instr,
                  MC):
-        super().super().__init__(name) # Change this when inheriting directly from Transmon instead of from CBox driven Transmon.
+        super(CBox_driven_transmon, self).__init__(name) # Change this when inheriting directly from Transmon instead of from CBox driven Transmon.
         self.LO = LO
         self.cw_source = cw_source
         self.td_source = td_source
@@ -65,12 +65,16 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         # Rename f_RO_mod
         # Time-domain parameters
         self.add_parameter('pulse_I_channel', initial_value='ch1',
+                           vals=vals.Strings(),
                            parameter_class=ManualParameter)
         self.add_parameter('pulse_Q_channel', initial_value='ch2',
+                           vals=vals.Strings(),
                            parameter_class=ManualParameter)
         self.add_parameter('RO_I_channel', initial_value='ch3',
+                           vals=vals.Strings(),
                            parameter_class=ManualParameter)
         self.add_parameter('RO_Q_channel', initial_value='ch4',
+                           vals=vals.Strings(),
                            parameter_class=ManualParameter)
 
         self.add_parameter('f_pulse_mod',
@@ -120,10 +124,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         self.LO.frequency.set(f_RO - self.f_RO_mod.get())
 
         self.td_source.power.set(self.td_source_pow.get())
-
-
         self.get_pulse_pars()
-        self.get_RO_pars()
 
     def get_pulse_pars(self):
         self.pulse_pars = {
@@ -135,7 +136,8 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
             'motzoi': self.motzoi.get(),
             'mod_frequency': self.f_pulse_mod.get(),
             'pulse_separation': self.pulse_separation.get(),
-            'phase': 0}
+            'phase': 0,
+            'pulse_type': 'SSB_DRAG_pulse'}
 
         self.RO_pars = {
             'I_channel': self.RO_I_channel.get(),
@@ -144,10 +146,12 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
             'length': self.RO_pulse_length.get(),
             'trigger_delay': self.RO_trigger_delay.get(),
             'pulse_delay': self.RO_pulse_delay.get(),
-            'mod_frequency': self.IF.get(),
+            'mod_frequency': self.f_RO_mod.get(),
+            'fixed_point_frequency': gcd(int(self.f_RO_mod.get()), int(20e6)),
             'marker_ch1': self.RO_Q_channel.get()+'_marker1',
             'marker_ch2': self.RO_Q_channel.get()+'_marker2',
-            'phase': 0}
+            'phase': 0,
+            'pulse_type': 'MW_IQmod_pulse'}
         return self.pulse_pars, self.RO_pars
 
     def calibrate_mixer_offsets(self, signal_hound, update=True):
@@ -164,14 +168,12 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
     def measure_rabi(self, amps, n=1,
                      MC=None, analyze=True, close_fig=True,
                      verbose=False):
-        if n != 1:
-            raise NotImplementedError('flipping not implemented for tek')
         self.prepare_for_timedomain()
         if MC is None:
             MC = self.MC
 
         MC.set_sweep_function(awg_swf.Rabi(
-            pulse_pars=self.pulse_pars, RO_pars=self.RO_pars))
+            pulse_pars=self.pulse_pars, RO_pars=self.RO_pars, n=n))
         MC.set_sweep_points(amps)
         MC.set_detector_function(self.int_avg_det)
         MC.run('Rabi-n{}'.format(n)+self.msmt_suffix)
@@ -256,4 +258,3 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
     def measure_Echo(self, times, MC=None,
                      analyze=True, close_fig=True, verbose=True):
         raise NotImplementedError()
-

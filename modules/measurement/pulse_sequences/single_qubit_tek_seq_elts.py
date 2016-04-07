@@ -18,16 +18,14 @@ reload(element)
 # I guess there are cleaner solutions :)
 
 
-def Rabi_seq(amps,
-             pulse_pars, RO_pars,
-             verbose=False):
+def Rabi_seq(amps, pulse_pars, RO_pars, n=1, verbose=False):
     '''
     Rabi sequence for a single qubit using the tektronix.
-    SSB_Drag pulse is used for driving, simple modualtion used for RO
     Input pars:
         amps:        array of pulse amplitudes (V)
         pulse_pars:  dict containing the pulse parameters
         RO_pars:     dict containing the RO parameters
+        n:           number of pulses (1 is conventional Rabi)
     '''
     seq_name = 'Rabi_sequence'
     seq = sequence.Sequence(seq_name)
@@ -35,9 +33,8 @@ def Rabi_seq(amps,
     pulses = get_pulse_dict_from_pars(pulse_pars)
     for i, amp in enumerate(amps):  # seq has to have at least 2 elts
         pulses['X']['amplitude'] = amp
-        el = single_SSB_DRAG_pulse_elt(i, station,
-                                       pulses['X'],
-                                       RO_pars)
+        pulse_list = n*[pulses['X']]+[RO_pars]
+        el = multi_pulse_elt(i, station, pulse_list)
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
     station.instruments['AWG'].stop()
@@ -201,6 +198,8 @@ def single_SSB_DRAG_pulse_elt(i, station,
                               pulse_pars,
                               RO_pars):
         '''
+        ! NOTE: Already deprecated, I recommend to use "multi_pulse_elt" !
+
         Single SSB_DRAG pulse, a RO-tone and a RO-marker.
 
         The RO-tone is fixed in phase with respect to the RO-trigger
@@ -267,6 +266,8 @@ def double_SSB_DRAG_pulse_elt(i, station,
                               pulse_pars_2,
                               RO_pars):
         '''
+        ! NOTE: Already deprecated, I recommend to use "multi_pulse_elt" !
+
         Two SSB_DRAG pulses, a RO-tone and a RO-marker.
 
         The RO-tone is fixed in phase with respect to the RO-trigger
@@ -339,6 +340,79 @@ def double_SSB_DRAG_pulse_elt(i, station,
         el.add(pulse.cp(ROm, channel=RO_pars['marker_ch2']),
                refpulse=ROm_name, refpoint='start', start=0)
         return el
+
+
+def multi_pulse_elt(i, station, pulse_list):
+        '''
+        Two SSB_DRAG pulses, a RO-tone and a RO-marker.
+
+        The RO-tone is fixed in phase with respect to the RO-trigger
+        The RO trigger is delayed by RO-trigger delay.
+
+        Input args
+            station:    qcodes station object, contains AWG etc
+            pulse_list: list of pulse_dicts containing pulse parameters
+
+        Currently works with two types of pulses, 'SSB_DRAG_pulse' and
+        'MW_IQmod_pulse' from pulselib. The idea is to make this function
+        work with arbitrary pulses that have a function in the pulselib.
+        The other idea is to have one 'pulse' in pulselib per 'pulse' that
+        also include markers in the RO this is still added by hand in the if
+        statement.
+
+        If you want to add extra pulses to this function please talk to me
+        (Adriaan) as I would like to keep it clean and prevent a  big if, elif
+        loop. (I have some ideas on how to implement this).
+        '''
+        el = element.Element(
+            name='{}-pulse-elt_{}'.format(len(pulse_list), i),
+            pulsar=station.pulsar)
+        # exitst to ensure that channel is not high when waiting for trigger
+        last_pulse = el.add(pulse.SquarePulse(name='refpulse_0', channel='ch1',
+                                              amplitude=0, length=1e-9))
+        for i in range(3):  # Exist to ensure there are no empty channels
+            el.add(pulse.SquarePulse(name='refpulse_0',
+                                     channel='ch{}'.format(i+1),
+                                     amplitude=0, length=1e-9))
+
+        for i, pulse_pars in enumerate(pulse_list):
+            if pulse_pars['pulse_type'] == 'SSB_DRAG_pulse':
+
+                last_pulse = el.add(SSB_DRAG_pulse(name='pulse_{}'.format(i),
+                                    I_channel=pulse_pars['I_channel'],
+                                    Q_channel=pulse_pars['Q_channel'],
+                                    amplitude=pulse_pars['amplitude'],
+                                    sigma=pulse_pars['sigma'],
+                                    nr_sigma=pulse_pars['nr_sigma'],
+                                    motzoi=pulse_pars['motzoi'],
+                                    mod_frequency=pulse_pars['mod_frequency'],
+                                    phase=pulse_pars['phase']),
+                        start=pulse_pars['pulse_separation'],
+                        refpulse=last_pulse)
+            elif pulse_pars['pulse_type'] == 'MW_IQmod_pulse':
+                # Does more than just call the function as it also adds the
+                # markers. Ideally we combine both in one function in pulselib
+                last_pulse = el.add(
+                    MW_IQmod_pulse(name='RO_tone',
+                                   I_channel=pulse_pars['I_channel'],
+                                   Q_channel=pulse_pars['Q_channel'],
+                                   length=pulse_pars['length'],
+                                   amplitude=pulse_pars['amplitude'],
+                                   mod_frequency=pulse_pars['mod_frequency']),
+                    start=pulse_pars['pulse_delay'],
+                    refpulse=last_pulse,
+                    fixed_point_freq=pulse_pars['fixed_point_frequency'])
+                # Start Acquisition marker
+                ROm = pulse.SquarePulse(name='RO-marker',
+                                        amplitude=1, length=20e-9,
+                                        channel=pulse_pars['marker_ch1'])
+                ROm_name = el.add(ROm, start=pulse_pars['trigger_delay'],
+                                  refpulse=last_pulse, refpoint='start')
+                el.add(pulse.cp(ROm, channel=pulse_pars['marker_ch2']),
+                       refpulse=ROm_name, refpoint='start', start=0)
+
+        return el
+
 
 # Helper functions
 

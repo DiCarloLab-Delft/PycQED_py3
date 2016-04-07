@@ -9,10 +9,11 @@ default_gauss_width = 10  # magic number should be removed,
 
 
 class Rabi(swf.Hard_Sweep):
-    def __init__(self, pulse_pars, RO_pars, upload=True):
+    def __init__(self, pulse_pars, RO_pars, n=1, upload=True):
         super().__init__()
         self.pulse_pars = pulse_pars
         self.RO_pars = RO_pars
+        self.n = n
         self.upload = upload
 
         self.name = 'Rabi'
@@ -23,7 +24,8 @@ class Rabi(swf.Hard_Sweep):
         if self.upload:
             sqs.Rabi_seq(amps=self.sweep_points,
                          pulse_pars=self.pulse_pars,
-                         RO_pars=self.RO_pars)
+                         RO_pars=self.RO_pars,
+                         n=self.n)
 
 
 class T1(swf.Hard_Sweep):

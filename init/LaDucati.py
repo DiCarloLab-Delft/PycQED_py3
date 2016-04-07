@@ -38,6 +38,7 @@ import qcodes.instrument_drivers.signal_hound.USB_SA124B as sh
 import qcodes.instrument_drivers.QuTech.IVVI as iv
 from qcodes.instrument_drivers.tektronix import AWG5014 as tek
 from instrument_drivers.physical_instruments import QuTech_ControlBoxdriver as qcb
+import instrument_drivers.meta_instrument.qubit_objects.Tektronix_driven_transmon as qbt
 from instrument_drivers.meta_instrument import heterodyne as hd
 import instrument_drivers.meta_instrument.CBox_LookuptableManager as lm
 
@@ -76,13 +77,24 @@ VIP_mon_6 = qb.CBox_driven_transmon('VIP_mon_6',
                                     IVVI=IVVI,
                                     AWG=AWG, LutMan=LutMan,
                                     CBox=CBox, heterodyne_instr=HS, MC=MC)
+
+
+VIP_mon_4_tek = qbt.Tektronix_driven_transmon('VIP_mon_4_tek',
+                                              LO=LO,
+                                              cw_source=S1, td_source=S2,
+                                              IVVI=IVVI,
+                                              AWG=AWG,
+                                              CBox=CBox, heterodyne_instr=HS,
+                                              MC=MC)
+
 gen.load_settings_onto_instrument(VIP_mon_2, label='VIP_mon_2')
 gen.load_settings_onto_instrument(VIP_mon_4, label='VIP_mon_4')
+gen.load_settings_onto_instrument(VIP_mon_4_tek)
 gen.load_settings_onto_instrument(VIP_mon_6, label='VIP_mon_6')
 
 station = qc.Station(LO, S1, S2, IVVI,
                      AWG, HS, CBox, LutMan,
-                     VIP_mon_2, VIP_mon_4, VIP_mon_6)
+                     VIP_mon_2, VIP_mon_4, VIP_mon_4_tek, VIP_mon_6)
 MC.station = station
 station.MC = MC
 nested_MC = mc.MeasurementControl('nested_MC')
