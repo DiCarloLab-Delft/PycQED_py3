@@ -241,6 +241,26 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
             a = ma.AllXY_Analysis(close_main_fig=close_fig)
             return a
 
+    def measure_randomized_benchmarking(self, nr_cliffords,
+                                        nr_seeds=20, T1=None,
+                                        MC=None, analyze=True, close_fig=True,
+                                        verbose=False):
+        '''
+        Performs a randomized benchmarking fidelity.
+        Optionally specifying T1 also shows the T1 limited fidelity.
+        '''
+        self.prepare_for_timedomain()
+        if MC is None:
+            MC = self.MC
+        MC.set_sweep_function(awg_swf.Randomized_Benchmarking(
+            pulse_pars=self.pulse_pars, RO_pars=self.RO_pars,
+            nr_cliffords=nr_cliffords, nr_seeds=nr_seeds))
+        MC.set_detector_function(self.int_avg_det)
+        MC.run('RB_{}seeds'.format(nr_seeds)+self.msmt_suffix)
+        ma.RandomizedBenchmarking_Analysis(
+            close_main_fig=close_fig, T1=T1,
+            pulse_separation=self.pulse_separation.get())
+
     def measure_discrimination_fid(self, no_fits=False,
                                    return_detector=False,
                                    MC=None,

@@ -469,7 +469,7 @@ def get_pulse_dict_from_pars(pulse_pars):
     Returns a dictionary containing pulse_pars for all the primitive pulses
     based on a single set of pulse_pars.
     Using this function deepcopies the pulse parameters preventing accidently
-    editing to input dictionary.
+    editing the input dictionary.
 
     input args:
         pulse_pars: dictionary containing pulse_parameters
