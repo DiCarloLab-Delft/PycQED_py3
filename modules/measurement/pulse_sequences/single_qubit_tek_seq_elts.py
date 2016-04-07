@@ -232,6 +232,13 @@ def Randomized_Benchmarking_seq(pulse_pars, RO_pars,
                 el_list.append(el)
                 seq.append_element(el, trigger_wait=True)
 
+                if n_cl*pulse_pars['pulse_separation']*1.875 > 50e-6:
+                    # If the element is too long, add in an extra wait elt
+                    # to skip a trigger
+                    el = multi_pulse_elt(i, station, [pulses['I']])
+                    el_list.append(el)
+                    seq.append_element(el, trigger_wait=True)
+
     station.instruments['AWG'].stop()
     station.pulsar.program_awg(seq, *el_list, verbose=verbose)
     return seq_name
