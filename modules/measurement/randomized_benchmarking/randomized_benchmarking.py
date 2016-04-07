@@ -33,6 +33,14 @@ def calculate_recovery_clifford(cl_in, desired_cl=0):
     return row.index(desired_cl)
 
 
+def decompose_clifford_seq(clifford_sequence,
+                           gate_decomposition=gate_decomposition):
+    decomposed_seq = []
+    for cl in clifford_sequence:
+        decomposed_seq.extend(gate_decomposition[cl])
+    return decomposed_seq
+
+
 def convert_clifford_sequence_to_tape(clifford_sequence, lutmapping,
                                       gate_decomposition=gate_decomposition):
     '''
@@ -40,6 +48,10 @@ def convert_clifford_sequence_to_tape(clifford_sequence, lutmapping,
 
     This method will be overwritten depending on the hardware implementation.
     '''
+    # This is intended to replace the block below but not done because
+    # I cannot test it at this moment (MAR)
+    # decomposed_seq = decompose_clifford_seq(clifford_sequence,
+    #                                         gate_decomposition)
     decomposed_seq = []
     for cl in clifford_sequence:
         decomposed_seq.extend(gate_decomposition[cl])

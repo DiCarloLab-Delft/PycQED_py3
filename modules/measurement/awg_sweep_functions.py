@@ -68,6 +68,7 @@ class AllXY(swf.Hard_Sweep):
                           RO_pars=self.RO_pars,
                           double_points=self.double_points)
 
+
 class OffOn(swf.Hard_Sweep):
     def __init__(self, pulse_pars, RO_pars, upload=True):
         super().__init__()
@@ -84,6 +85,42 @@ class OffOn(swf.Hard_Sweep):
         if self.upload:
             sqs.OffOn_seq(pulse_pars=self.pulse_pars,
                           RO_pars=self.RO_pars)
+
+
+class Randomized_Benchmarking(swf.Hard_Sweep):
+    def __init__(self, pulse_pars, RO_pars,
+                 nr_seeds, nr_cliffords,
+                 cal_points=True,
+                 upload=True):
+        # If nr_cliffords is None it still needs to be specfied when setting
+        # the experiment
+        super().__init__()
+        self.pulse_pars = pulse_pars
+        self.RO_pars = RO_pars
+        self.upload = upload
+        self.nr_seeds = nr_seeds
+        self.cal_points = cal_points
+        self.sweep_points = nr_cliffords
+
+        self.parameter_name = 'Nr of Cliffords'
+        self.unit = '#'
+        self.name = 'Randomized_Benchmarking'
+        self.sweep_points = nr_cliffords
+
+        if self.cal_points:
+            self.sweep_points = np.concatenate([nr_cliffords,
+                                   [nr_cliffords[-1]+.2,
+                                    nr_cliffords[-1]+.3,
+                                    nr_cliffords[-1]+.7,
+                                    nr_cliffords[-1]+.8]])
+
+    def prepare(self, **kw):
+        if self.upload:
+            sqs.Randomized_Benchmarking_seq(
+                self.pulse_pars, self.RO_pars,
+                nr_cliffords=self.sweep_points,
+                nr_seeds=self.nr_seeds,
+                cal_points=self.cal_points)
 
 
 class Ramsey(swf.Hard_Sweep):

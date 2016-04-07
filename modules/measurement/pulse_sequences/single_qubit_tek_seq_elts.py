@@ -7,6 +7,7 @@ from ..waveform_control import element
 from ..waveform_control import pulse
 from ..waveform_control.pulse_library import MW_IQmod_pulse, SSB_DRAG_pulse
 from ..waveform_control import sequence
+from modules.measurement.randomized_benchmarking import randomized_benchmarking as rb
 from importlib import reload
 reload(pulse)
 from ..waveform_control import pulse_library
@@ -198,30 +199,43 @@ def OffOn_seq(pulse_pars, RO_pars,
     station.pulsar.program_awg(seq, *el_list, verbose=verbose)
     return seq_name
 
+
 def Randomized_Benchmarking_seq(pulse_pars, RO_pars,
                                 nr_cliffords,
                                 nr_seeds,
                                 cal_points=True, verbose=False):
 
-    seq_name = 'Rabi_sequence'
+    seq_name = 'RandomizedBenchmarking_sequence'
     seq = sequence.Sequence(seq_name)
     el_list = []
     pulses = get_pulse_dict_from_pars(pulse_pars)
+    i = 0
     for seed in range(nr_seeds):
-            for n_cl in nr_cliffords:
-                cliffords = rb.randomized_benchmarking_sequence(n_cl)
-                # cl_tape = rb.convert_clifford_sequence_to_tape(
-                #     cliffords, 'lutmapping' )
-
-        # pulse_list = n*[pulses['X180']]+[RO_pars]
-        # el = multi_pulse_elt(i, station, pulse_list)
-        # el_list.append(el)
-        # seq.append_element(el, trigger_wait=True)
-
+            for j, n_cl in enumerate(nr_cliffords):
+                i += 1  # only used for ensuring unique elt names
+                if cal_points and (j == (len(nr_cliffords)-4) or
+                                   j == (len(nr_cliffords)-3)):
+                    el = single_SSB_DRAG_pulse_elt(i, station,
+                                                   pulses['I'],
+                                                   RO_pars)
+                elif cal_points and (j == (len(nr_cliffords)-2) or
+                                     j == (len(nr_cliffords)-1)):
+                    el = single_SSB_DRAG_pulse_elt(i, station,
+                                                   pulses['X180'],
+                                                   RO_pars)
+                else:
+                    cl_seq = rb.randomized_benchmarking_sequence(n_cl)
+                    pulse_keys = rb.decompose_clifford_seq(cl_seq)
+                    pulse_list = [pulses[x] for x in pulse_keys]
+                    pulse_list += [RO_pars]
+                    el = multi_pulse_elt(i, station, pulse_list)
+                el_list.append(el)
+                seq.append_element(el, trigger_wait=True)
 
     station.instruments['AWG'].stop()
     station.pulsar.program_awg(seq, *el_list, verbose=verbose)
     return seq_name
+
 
 def single_SSB_DRAG_pulse_elt(i, station,
                               pulse_pars,
@@ -455,18 +469,30 @@ def get_pulse_dict_from_pars(pulse_pars):
     return:
         pulses: dictionary of pulse_pars dictionaries
     '''
+    pi_amp = pulse_pars['amplitude']
     pi2_amp = pulse_pars['amplitude']/2
 
     pulses = {'I': deepcopy(pulse_pars),
               'X180': deepcopy(pulse_pars),
+              'mX180': deepcopy(pulse_pars),
               'X90': deepcopy(pulse_pars),
+              'mX90': deepcopy(pulse_pars),
               'Y180': deepcopy(pulse_pars),
-              'Y90': deepcopy(pulse_pars)}
+              'mY180': deepcopy(pulse_pars),
+              'Y90': deepcopy(pulse_pars),
+              'mY90': deepcopy(pulse_pars)}
 
     pulses['I']['amplitude'] = 0
+    pulses['mX180']['amplitude'] = -pi_amp
     pulses['X90']['amplitude'] = pi2_amp
+    pulses['mX90']['amplitude'] = -pi2_amp
     pulses['Y180']['phase'] = 90
+    pulses['mY180']['phase'] = 90
+    pulses['mY180']['amplitude'] = -pi_amp
+
     pulses['Y90']['amplitude'] = pi2_amp
     pulses['Y90']['phase'] = 90
+    pulses['mY90']['amplitude'] = -pi2_amp
+    pulses['mY90']['phase'] = 90
 
     return pulses
