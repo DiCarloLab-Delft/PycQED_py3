@@ -104,6 +104,10 @@ nested_MC.station = station
 station.pulsar = ps.Pulsar()
 station.pulsar.AWG = station.instruments['AWG']
 for i in range(4):
+    # Note that these are default parameters and should be kept so.
+    # the channel offset is set in the AWG itself. For now the amplitude is
+    # hardcoded. You can set it by hand but this will make the value in the
+    # sequencer different.
     station.pulsar.define_channel(id='ch{}'.format(i+1),
                                   name='ch{}'.format(i+1), type='analog',
                                   # max safe IQ voltage

@@ -2,6 +2,7 @@ import time
 import numpy as np
 import logging
 
+
 class Sequence:
     """
     Class that contains a sequence.
@@ -68,16 +69,16 @@ class Sequence:
         return names.index(name)+start_idx
 
     def set_djump(self, state):
-        if state==True:
-            #if program_sequence gets a djump_table it will set the AWG later to DJUM
+        if state is True:
+            # if program_sequence gets a djump_table it will set the AWG later to DJUM
             self.djump_table = {}
 
-        if state==False:
+        if state is False:
             self.djump_table = None
         return True
 
     def add_djump_address(self, pattern, name):
-        #name should be the name of the element and pattern the bit address
+        # name should be the name of the element and pattern the bit address
         self.djump_table[pattern] = name
         return True
 

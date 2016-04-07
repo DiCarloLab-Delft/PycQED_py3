@@ -15,7 +15,7 @@ from modules.measurement import awg_sweep_functions as awg_swf
 from modules.analysis import measurement_analysis as ma
 from modules.measurement.pulse_sequences import standard_sequences as st_seqs
 import modules.measurement.randomized_benchmarking.randomized_benchmarking as rb
-
+from modules.measurement.calibration_toolbox import mixer_carrier_cancellation_5014
 from modules.measurement.optimization import nelder_mead
 
 from .qubit_object import Transmon
@@ -70,11 +70,24 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         self.add_parameter('pulse_Q_channel', initial_value='ch2',
                            vals=vals.Strings(),
                            parameter_class=ManualParameter)
+        self.add_parameter('pulse_I_offset', initial_value=0.0,
+                           vals=vals.Numbers(min_value=-0.1, max_value=0.1),
+                           parameter_class=ManualParameter)
+        self.add_parameter('pulse_Q_offset', initial_value=0.0,
+                           vals=vals.Numbers(min_value=-0.1, max_value=0.1),
+                           parameter_class=ManualParameter)
+
         self.add_parameter('RO_I_channel', initial_value='ch3',
                            vals=vals.Strings(),
                            parameter_class=ManualParameter)
         self.add_parameter('RO_Q_channel', initial_value='ch4',
                            vals=vals.Strings(),
+                           parameter_class=ManualParameter)
+        self.add_parameter('RO_I_offset', initial_value=0.0,
+                           vals=vals.Numbers(min_value=-0.1, max_value=0.1),
+                           parameter_class=ManualParameter)
+        self.add_parameter('RO_Q_offset', initial_value=0.0,
+                           vals=vals.Numbers(min_value=-0.1, max_value=0.1),
                            parameter_class=ManualParameter)
 
         self.add_parameter('f_pulse_mod',
@@ -122,9 +135,15 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         else:
             f_RO = self.f_RO.get()
         self.LO.frequency.set(f_RO - self.f_RO_mod.get())
-
         self.td_source.power.set(self.td_source_pow.get())
         self.get_pulse_pars()
+
+        self.AWG.set(self.pulse_I_channel.get()+'_offset',
+                     self.pulse_I_offset.get())
+        self.AWG.set(self.pulse_Q_channel.get()+'_offset',
+                     self.pulse_Q_offset.get())
+        self.AWG.set(self.RO_I_channel.get()+'_offset', self.RO_I_offset.get())
+        self.AWG.set(self.RO_Q_channel.get()+'_offset', self.RO_Q_offset.get())
 
     def get_pulse_pars(self):
         self.pulse_pars = {
@@ -154,8 +173,48 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
             'pulse_type': 'MW_IQmod_pulse'}
         return self.pulse_pars, self.RO_pars
 
-    def calibrate_mixer_offsets(self, signal_hound, update=True):
-        raise NotImplementedError('parent class uses CBox')
+    def calibrate_mixer_offsets(self, signal_hound, offs_type='pulse',
+                                update=True):
+        '''
+        input:
+            signal_hound: instance of the SH instrument
+            offs_type:         ['pulse' | 'RO'] whether to calibrate the
+                                            RO or pulse IQ offsets
+            update:        update the values in the qubit object
+
+        Calibrates the mixer skewness and updates the I and Q offsets in
+        the qubit object.
+        signal hound needs to be given as it this is not part of the qubit
+        object in order to reduce dependencies.
+        '''
+        # ensures freq is set correctly
+        # Still need to test this, start by doing this in notebook
+        self.prepare_for_timedomain()
+        self.AWG.stop()  # Make sure no waveforms are played
+        if offs_type == 'pulse':
+            AWG_channel1 = self.pulse_I_channel.get()
+            AWG_channel2 = self.pulse_Q_channel.get()
+            source = self.td_source
+        elif offs_type == 'RO':
+            AWG_channel1 = self.RO_I_channel.get()
+            AWG_channel2 = self.RO_Q_channel.get()
+            source = self.LO
+        else:
+            raise ValueError('offs_type "{}" not recognized'.format(offs_type))
+
+        offset_I, offset_Q = mixer_carrier_cancellation_5014(
+            AWG=self.AWG, SH=signal_hound, source=source, MC=self.MC,
+            AWG_channel1=AWG_channel1, AWG_channel2=AWG_channel2)
+
+        if update:
+            if offs_type == 'pulse':
+                self.pulse_I_offset.set(offset_I)
+                self.pulse_Q_offset.set(offset_Q)
+            if offs_type == 'RO':
+                self.RO_I_offset.set(offset_I)
+                self.RO_Q_offset.set(offset_Q)
+
+
 
     def calibrate_mixer_skewness(self, signal_hound, update=True):
         raise NotImplementedError('parent class uses CBox')

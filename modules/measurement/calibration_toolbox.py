@@ -42,8 +42,7 @@ def mixer_skewness_calibration_adaptive(**kw):
     raise NotImplementedError('see archived calibration toolbox')
 
 
-def mixer_carrier_cancellation_5014(station,
-                                    source,
+def mixer_carrier_cancellation_5014(AWG, SH, source, MC,
                                     frequency=None,
                                     AWG_channel1=1,
                                     AWG_channel2=2,
@@ -63,9 +62,6 @@ def mixer_carrier_cancellation_5014(station,
 
     Note: Updated for QCodes
     '''
-    AWG = station['AWG']
-    MC = kw.pop('MC', station.MC)
-    SH = station['Signal hound']
     ch_1_min = 0  # Initializing variables used later on
     ch_2_min = 0
     last_ch_1_min = 1
@@ -82,8 +78,14 @@ def mixer_carrier_cancellation_5014(station,
     '''
     Make coarse sweeps to approximate the minimum
     '''
-    ch1_offset = AWG['ch{}_offset'.format(AWG_channel1)]
-    ch2_offset = AWG['ch{}_offset'.format(AWG_channel2)]
+    if type(AWG_channel1) is int:
+        ch1_offset = AWG['ch{}_offset'.format(AWG_channel1)]
+    else:
+        ch1_offset = AWG[AWG_channel1+'_offset']
+    if type(AWG_channel2) is int:
+        ch2_offset = AWG['ch{}_offset'.format(AWG_channel2)]
+    else:
+        ch2_offset = AWG[AWG_channel2+'_offset']
 
     ch1_swf = pw.wrap_par_to_swf(ch1_offset)
     ch2_swf = pw.wrap_par_to_swf(ch2_offset)
@@ -95,7 +97,7 @@ def mixer_carrier_cancellation_5014(station,
                                              frequency=frequency*1e-9))
         MC.set_sweep_points(np.linspace(ch_1_min + voltage_span,
                                         ch_1_min - voltage_span, 11))
-        MC.run(name='Mixer_cal_Offset_ch%s' % AWG_channel1,
+        MC.run(name='Mixer_cal_Offset_%s' % AWG_channel1,
                sweep_delay=.1, debug_mode=True)
         Mixer_Calibration_Analysis = MA.Mixer_Calibration_Analysis(
             label='Mixer_cal', auto=True)
@@ -122,7 +124,7 @@ def mixer_carrier_cancellation_5014(station,
         MC.set_sweep_function(ch1_swf)
         MC.set_sweep_points(np.linspace(ch_1_min - dac_resolution*6,
                             ch_1_min + dac_resolution*6, 13))
-        MC.run(name='Mixer_cal_Offset_ch%s' % AWG_channel1,
+        MC.run(name='Mixer_cal_Offset_%s' % AWG_channel1,
                sweep_delay=.1, debug_mode=True)
         Mixer_Calibration_Analysis = MA.Mixer_Calibration_Analysis(
             label='Mixer_cal', auto=True)
@@ -133,7 +135,7 @@ def mixer_carrier_cancellation_5014(station,
         MC.set_sweep_function(ch2_swf)
         MC.set_sweep_points(np.linspace(ch_2_min - dac_resolution*6,
                                         ch_2_min + dac_resolution*6, 13))
-        MC.run(name='Mixer_cal_Offset_ch%s' % AWG_channel2,
+        MC.run(name='Mixer_cal_Offset_%s' % AWG_channel2,
                sweep_delay=.1, debug_mode=True)
         Mixer_Calibration_Analysis = MA.Mixer_Calibration_Analysis(
             label='Mixer_cal', auto=True)

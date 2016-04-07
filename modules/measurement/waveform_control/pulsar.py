@@ -186,6 +186,7 @@ class Pulsar:
         Advantage is that it's much faster, since sequence information is sent
         to the AWG in a single file.
         """
+
         verbose = kw.pop('verbose', False)
         debug = kw.pop('debug', False)
         channels = kw.pop('channels', 'all')
@@ -196,6 +197,14 @@ class Pulsar:
         chan_ids = self.get_used_channel_ids()
         packed_waveforms = {}
 
+        # Store offset settings to restore them after upload the seq
+        # Note that this is the AWG setting offset, as distinct from the
+        # channel parameter offset.
+        offsets = {}
+        for c in self.channels:
+            if self.channels[c]['type'] == 'analog':
+                offsets[c] = self.AWG.get(c+'_offset')
+
         elements_with_non_zero_first_points = []
 
         # order the waveforms according to physical AWG channels and
@@ -204,8 +213,6 @@ class Pulsar:
             if verbose:
                 print("%d / %d: %s (%d samples)... " % \
                     (i+1, elt_cnt, element.name, element.samples()))
-
-            if verbose:
                 print("Generate/upload '%s' (%d samples)... " \
                     % (element.name, element.samples()), end=' ')
             _t0 = time.time()
@@ -330,7 +337,6 @@ class Pulsar:
         if sequence.djump_table != None and self.AWG_type not in ['opt09']:
             raise Exception('pulsar: The AWG configured does not support dynamic jumping')
 
-
         if self.AWG_type in ['opt09']:
             # TODO as self.AWG_sequence_cfg no longer exists but is generated
             # from the sequence_cfg file, make these set the values on the AWG
@@ -347,7 +353,6 @@ class Pulsar:
 
             else:
                 self.AWG_sequence_cfg['EVENT_JUMP_MODE'] = 1  # EVENT JUMP
-             # print 'AWG set to event jump'
 
         if debug:
             self.check_sequence_consistency(packed_waveforms,
@@ -367,6 +372,9 @@ class Pulsar:
         time.sleep(.1)
         # Waits for AWG to be ready
         self.AWG.is_awg_ready()
+
+        for channel, offset in offsets.items():
+            self.AWG.set(channel+'_offset', offset)
 
         self.activate_channels(channels)
 
