@@ -101,6 +101,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         self.add_parameter('amp180',
                            label='Pi-pulse amplitude', units='V',
                            initial_value=.25,
+                           vals=vals.Numbers(min_value=-0.5, max_value=0.5),
                            parameter_class=ManualParameter)
         self.add_parameter('gauss_sigma', units='s',
                            initial_value=10e-9,

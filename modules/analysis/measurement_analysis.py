@@ -870,10 +870,13 @@ class Rabi_Analysis(TD_Analysis):
                                             ylabel=self.ylabels[i],
                                             save=False,
                                             plot_title=plot_title)
-            fine_fit = fit_mods.CosFunc(x_fine, **self.fit_res[i].best_values)
+
+            fine_fit = self.fit_res[i].model.func(
+                x_fine, **self.fit_res[i].best_values)
             self.axs[i].plot(x_fine, fine_fit, label='fit')
             if show_guess:
-                fine_fit = fit_mods.CosFunc(x_fine, **self.fit_res[i].init_values)
+                fine_fit = self.fit_res[i].model.func(
+                    x_fine, **self.fit_res[i].init_values)
                 self.axs[i].plot(x_fine, fine_fit, label='guess')
                 self.axs[i].legend(loc='best')
         self.save_fig(self.fig, fig_tight=False, **kw)
@@ -890,6 +893,26 @@ class Rabi_Analysis(TD_Analysis):
             self.fit_res[i] = fit_mods.CosModel.fit(
                 data=self.measured_values[i],
                 t=self.sweep_points,
+                params=params)
+            self.save_fitted_parameters(fit_res=self.fit_res[i],
+                                        var_name=self.value_names[i])
+
+
+class Rabi_parabola_analysis(Rabi_Analysis):
+
+    def fit_data(self, print_fit_results=False, **kw):
+        self.add_analysis_datagroup_to_file()
+        model = lmfit.models.ParabolicModel()
+        self.fit_res = ['', '']
+        # It would be best to do 1 fit to both datasets but since it is
+        # easier to do just one fit we stick to that.
+        for i in [0, 1]:
+            model.set_param_hint('x0', expr='-b/(2*a)')
+            params = model.guess(data=self.measured_values[i],
+                                 x=self.sweep_points)
+            self.fit_res[i] = model.fit(
+                data=self.measured_values[i],
+                x=self.sweep_points,
                 params=params)
             self.save_fitted_parameters(fit_res=self.fit_res[i],
                                         var_name=self.value_names[i])

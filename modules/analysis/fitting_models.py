@@ -176,6 +176,7 @@ def Cos_guess(model, data, t):
     # Freq guess ! only valid with uniform sampling
     w = np.fft.fft(data)
     f = np.fft.fftfreq(len(data), t[1]-t[0])
+    w[0] = 0  # Removes DC component from fourier transform
     freq_guess = f[w == max(w)]
 
     ph_guess = -2*np.pi*t[data == max(data)]*freq_guess
