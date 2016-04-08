@@ -53,8 +53,14 @@ def QubitFreqFlux(flux, f_max, E_c,
 
 
 def CosFunc(t, amplitude, frequency, phase, offset):
-    # Naming convention, frequency should be Hz
-    # omega is in radial freq
+    '''
+    parameters:
+        t, time in s
+        amplitude a.u.
+        frequency in Hz (f, not omega!)
+        phase in rad
+        offset a.u.
+    '''
     return amplitude*np.cos(2*np.pi*frequency*t + phase)+offset
 
 
@@ -158,6 +164,30 @@ def gaussian_2D(x, y, amplitude=1,
 ####################
 # Guess functions  #
 ####################
+
+
+def Cos_guess(model, data, t):
+    '''
+    Guess for a cosine fit using FFT, only works for evenly spaced points
+    '''
+    amp_guess = abs(max(data)-min(data))/2  # amp is positive by convention
+    offs_guess = np.mean(data)
+
+    # Freq guess ! only valid with uniform sampling
+    w = np.fft.fft(data)
+    f = np.fft.fftfreq(len(data), t[1]-t[0])
+    freq_guess = f[w == max(w)]
+
+    ph_guess = -2*np.pi*t[data == max(data)]*freq_guess
+
+    model.set_param_hint('period', expr='1/frequency')
+    params = model.make_params(amplitude=amp_guess,
+                               frequency=freq_guess,
+                               phase=ph_guess,
+                               offset=offs_guess)
+    params['amplitude'].min = 0  # Ensures positive amp
+
+    return params
 
 
 def gauss_2D_guess(model, data, x, y):
@@ -266,7 +296,12 @@ def double_gauss_guess(model, data, x=None, **kwargs):
 #################################
 #     User defined Models       #
 #################################
+# NOTE: it is actually better to instantiate the model within your analysis
+# file, this prevents the model params having a memory.
+# A valid reason to define it here would be if you want to add a guess function
 CosModel = lmfit.Model(CosFunc)
+CosModel.guess = Cos_guess
+
 ExpDecayModel = lmfit.Model(ExpDecayFunc)
 ExpDampOscModel = lmfit.Model(ExpDampOscFunc)
 GaussExpDampOscModel = lmfit.Model(GaussExpDampOscFunc)

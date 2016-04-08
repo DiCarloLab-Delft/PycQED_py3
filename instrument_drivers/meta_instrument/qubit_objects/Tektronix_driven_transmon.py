@@ -237,7 +237,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         MC.set_detector_function(self.int_avg_det)
         MC.run('Rabi-n{}'.format(n)+self.msmt_suffix)
         if analyze:
-            ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
+            ma.Rabi_Analysis(auto=True, close_fig=close_fig)
 
     def measure_T1(self, times, MC=None,
                    analyze=True, close_fig=True):

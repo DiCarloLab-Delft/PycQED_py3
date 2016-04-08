@@ -837,6 +837,68 @@ class TD_Analysis(MeasurementAnalysis):
 
 
 class Rabi_Analysis(TD_Analysis):
+    def __init__(self, label='Rabi', **kw):
+        kw['label'] = label
+        kw['h5mode'] = 'r+'
+        super().__init__(**kw)
+
+    def run_default_analysis(self, close_file=True, **kw):
+        self.get_naming_and_values()
+        self.fit_data(**kw)
+        self.make_figures(**kw)
+        if close_file:
+            self.data_file.close()
+        return self.fit_res
+
+    def make_figures(self, **kw):
+        show_guess = kw.pop('show_guess', False)
+        self.fig, self.axs = plt.subplots(2, 1, figsize=(5, 6))
+        x_fine = np.linspace(min(self.sweep_points), max(self.sweep_points),
+                             1000)
+        for i in [0, 1]:
+            if i == 0:
+                plot_title = kw.pop('plot_title', textwrap.fill(
+                                    self.timestamp_string + '_' +
+                                    self.measurementstring, 40))
+            else:
+                plot_title = ''
+            self.axs[i].ticklabel_format(useOffset=False)
+            self.plot_results_vs_sweepparam(x=self.sweep_points,
+                                            y=self.measured_values[i],
+                                            fig=self.fig, ax=self.axs[i],
+                                            xlabel=self.xlabel,
+                                            ylabel=self.ylabels[i],
+                                            save=False,
+                                            plot_title=plot_title)
+            fine_fit = fit_mods.CosFunc(x_fine, **self.fit_res[i].best_values)
+            self.axs[i].plot(x_fine, fine_fit, label='fit')
+            if show_guess:
+                fine_fit = fit_mods.CosFunc(x_fine, **self.fit_res[i].init_values)
+                self.axs[i].plot(x_fine, fine_fit, label='guess')
+                self.axs[i].legend(loc='best')
+        self.save_fig(self.fig, fig_tight=False, **kw)
+
+    def fit_data(self, print_fit_results=False, **kw):
+        self.add_analysis_datagroup_to_file()
+        model = fit_mods.CosModel
+        self.fit_res = ['', '']
+        # It would be best to do 1 fit to both datasets but since it is
+        # easier to do just one fit we stick to that.
+        for i in [0, 1]:
+            params = model.guess(model, data=self.measured_values[i],
+                                 t=self.sweep_points)
+            self.fit_res[i] = fit_mods.CosModel.fit(
+                data=self.measured_values[i],
+                t=self.sweep_points,
+                params=params)
+            self.save_fitted_parameters(fit_res=self.fit_res[i],
+                                        var_name=self.value_names[i])
+
+
+class Rabi_Analysis_old(TD_Analysis):
+    '''
+    This is the old Rabi analysis for the mathematica sequences of 60 points
+    '''
     def __init__(self, label='Rabi',  **kw):
         kw['label'] = label
         kw['h5mode'] = 'r+'

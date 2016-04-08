@@ -31,6 +31,7 @@ from modules.utilities import general as gen
 # Standarad awg sequences
 from modules.measurement.waveform_control import pulsar as ps
 from modules.measurement.pulse_sequences import standard_sequences as st_seqs
+from modules.measurement.pulse_sequences import single_qubit_tek_seq_elts as sq
 
 # Instrument drivers
 from qcodes.instrument_drivers.rohde_schwarz import SGS100A as rs
@@ -125,6 +126,7 @@ for i in range(4):
                                   delay=0, active=True)
 # to make the pulsar available to the standard awg seqs
 st_seqs.station = station
+sq.station = station
 
 IVVI.dac1.set(-40)
 IVVI.dac2.set(70)
