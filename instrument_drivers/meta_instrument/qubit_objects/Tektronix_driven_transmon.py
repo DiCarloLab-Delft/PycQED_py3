@@ -148,8 +148,8 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
 
     def get_pulse_pars(self):
         self.pulse_pars = {
-            'I_channel': 'ch1',
-            'Q_channel': 'ch2',
+            'I_channel': self.pulse_I_channel.get(),
+            'Q_channel': self.pulse_Q_channel.get(),
             'amplitude': self.amp180.get(),
             'sigma': self.gauss_sigma.get(),
             'nr_sigma': 4,
