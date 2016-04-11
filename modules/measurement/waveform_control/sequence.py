@@ -100,7 +100,7 @@ class Sequence:
         for elt in self.elements:
             if elt['name'] == insertable_elt['name']:
                 print('append_element')
-                print(element['name'])
+                print(element.name)
                 print('Sequence names must be unique. Not added.')
                 return False
         if pos is None:

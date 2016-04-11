@@ -148,6 +148,23 @@ class Ramsey(swf.Hard_Sweep):
                            cal_points=self.cal_points)
 
 
+class Motzoi_XY(swf.Hard_Sweep):
+    def __init__(self, pulse_pars, RO_pars, upload=True):
+        super().__init__()
+        self.pulse_pars = pulse_pars
+        self.RO_pars = RO_pars
+        self.upload = upload
+        self.name = 'Motzoi_XY'
+        self.parameter_name = 'motzoi'
+        self.unit = ' '
+
+    def prepare(self, **kw):
+        if self.upload:
+            sqs.Motzoi_XY(motzois=self.sweep_points,
+                          pulse_pars=self.pulse_pars,
+                          RO_pars=self.RO_pars)
+
+
 class CBox_T1(swf.Hard_Sweep):
     def __init__(self, IF, RO_pulse_delay, RO_trigger_delay, mod_amp, AWG,
                  upload=True):
