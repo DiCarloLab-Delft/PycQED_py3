@@ -485,7 +485,9 @@ def multi_pulse_elt(i, station, pulse_list):
                                     nr_sigma=pulse_pars['nr_sigma'],
                                     motzoi=pulse_pars['motzoi'],
                                     mod_frequency=pulse_pars['mod_frequency'],
-                                    phase=pulse_pars['phase']),
+                                    phase=pulse_pars['phase'],
+                                    phi_skew= pulse_pars['phi_skew'],
+                                    alpha=pulse_pars['alpha']),
                         start=pulse_pars['pulse_separation'],
                         refpulse=last_pulse)
             elif pulse_pars['pulse_type'] == 'MW_IQmod_pulse':

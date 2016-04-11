@@ -110,6 +110,15 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                            initial_value=0,
                            parameter_class=ManualParameter)
 
+        self.add_parameter('phi_skew', label='IQ phase skewness', units='deg',
+                           vals=vals.Numbers(-180, 180),
+                           initial_value=0,
+                           parameter_class=ManualParameter)
+        self.add_parameter('alpha', label='QI amplitude skewness', units='',
+                           vals=vals.Numbers(.1, 2),
+                           initial_value=1,
+                           parameter_class=ManualParameter)
+
         # Single shot readout specific parameters
         self.add_parameter('RO_threshold', units='dac-value',
                            initial_value=0,
@@ -156,6 +165,8 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
             'motzoi': self.motzoi.get(),
             'mod_frequency': self.f_pulse_mod.get(),
             'pulse_separation': self.pulse_separation.get(),
+            'phi_skew': self.phi_skew.get(),
+            'alpha': self.alpha.get(),
             'phase': 0,
             'pulse_type': 'SSB_DRAG_pulse'}
 
