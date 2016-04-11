@@ -338,3 +338,21 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
     def measure_Echo(self, times, MC=None,
                      analyze=True, close_fig=True, verbose=True):
         raise NotImplementedError()
+
+    def measure_motoi_XY(self, motzois, MC=None, analyze=True, close_fig=True,
+                         verbose=True, update=True):
+
+        self.prepare_for_timedomain()
+        if MC is None:
+            MC = self.MC
+
+        MC.set_sweep_function(awg_swf.Motzoi_XY(
+            pulse_pars=self.pulse_pars, RO_pars=self.RO_pars, motzois=motzois))
+        MC.set_detector_function(self.int_avg_det)
+        MC.run('Motzoi_XY'+self.msmt_suffix)
+
+        if analyze:
+            a = ma.Motzoi_XY_analysis(close_fig=close_fig)
+            if update:
+                self.motzoi.set(a.optimal_motzoi)
+            return a

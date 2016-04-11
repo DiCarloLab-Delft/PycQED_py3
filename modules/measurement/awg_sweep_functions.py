@@ -149,7 +149,11 @@ class Ramsey(swf.Hard_Sweep):
 
 
 class Motzoi_XY(swf.Hard_Sweep):
-    def __init__(self, pulse_pars, RO_pars, upload=True):
+    def __init__(self, motzois, pulse_pars, RO_pars, upload=True):
+        '''
+        Measures 2 points per motzoi value specified in motzois and adds 4
+        calibration points to it.
+        '''
         super().__init__()
         self.pulse_pars = pulse_pars
         self.RO_pars = RO_pars
@@ -157,6 +161,9 @@ class Motzoi_XY(swf.Hard_Sweep):
         self.name = 'Motzoi_XY'
         self.parameter_name = 'motzoi'
         self.unit = ' '
+        sweep_pts = np.repeat(motzois, 2)
+        self.sweep_points = np.append(sweep_pts,
+                                   [motzois[-1]+(motzois[-1]-motzois[-2])]*4)
 
     def prepare(self, **kw):
         if self.upload:

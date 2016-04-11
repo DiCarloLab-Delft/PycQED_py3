@@ -403,7 +403,7 @@ class MeasurementAnalysis(object):
                              % datasaving_format)
 
     def plot_results_vs_sweepparam(self, x, y, fig, ax, show=False, marker='-o',
-                                   log=False, plotlabel=None, **kw):
+                                   log=False, label=None, **kw):
         save = kw.pop('save', False)
         self.plot_title = kw.pop('plot_title',
                                  textwrap.fill(self.timestamp_string + '_' +
@@ -415,7 +415,7 @@ class MeasurementAnalysis(object):
             ax.set_xlabel(xlabel)
         if ylabel is not None:
             ax.set_ylabel(ylabel)
-        ax.plot(x, y, marker, label=plotlabel)
+        ax.plot(x, y, marker, label=label)
         if log:
             ax.set_yscale('log')
         if show:
@@ -715,6 +715,15 @@ class TD_Analysis(MeasurementAnalysis):
         self.plot_cal_points = plot_cal_points
         super(TD_Analysis, self).__init__(**kw)
 
+    # def run_default_analysis(self, close_file=True, **kw):
+    #     self.get_naming_and_values()
+    #     self.fit_data(**kw)
+    #     self.make_figures(**kw)
+    #     if close_file:
+    #         self.data_file.close()
+    #     return self.fit_res
+
+
     def rotate_and_normalize_data(self):
         if self.cal_points is None:
             if len(self.measured_values[0]) == 42:
@@ -835,6 +844,12 @@ class TD_Analysis(MeasurementAnalysis):
         normalized_cal_vals = normalized_values[-int(calsteps):]
         return [normalized_values, normalized_data_points, normalized_cal_vals]
 
+    def fit_data(*kw):
+        '''
+        Exists to be able to include it in the TD_Analysis run default
+        '''
+        pass
+
 
 class Rabi_Analysis(TD_Analysis):
     def __init__(self, label='Rabi', **kw):
@@ -916,6 +931,111 @@ class Rabi_parabola_analysis(Rabi_Analysis):
                 params=params)
             self.save_fitted_parameters(fit_res=self.fit_res[i],
                                         var_name=self.value_names[i])
+
+
+class Motzoi_XY_analysis(TD_Analysis):
+    '''
+    Analysis for the Motzoi XY sequence (Xy-Yx)
+    Extracts the alternating datapoints and then fits two polynomials.
+    The intersect of the fits corresponds to the optimum motzoi parameter.
+    '''
+    def __init__(self, label='Motzoi', **kw):
+        kw['label'] = label
+        kw['h5mode'] = 'r+'
+        super().__init__(**kw)
+
+    def run_default_analysis(self, close_file=True, close_main_fig=True, **kw):
+        self.get_naming_and_values()
+        self.add_analysis_datagroup_to_file()
+        self.cal_points = kw.pop('cal_point', [[-4, -3], [-2, -1]])
+        self.rotate_and_normalize_data()
+        self.add_dataset_to_analysisgroup('Corrected data',
+                                          self.corr_data)
+        self.analysis_group.attrs.create('corrected data based on',
+                                         'calibration points'.encode('utf-8'))
+        # Only the unfolding part here is unique to this analysis
+        self.sweep_points_Xy = self.sweep_points[:-4:2]
+        self.sweep_points_Yx = self.sweep_points[1:-4:2]
+        self.corr_data_Xy = self.corr_data[:-4:2]
+        self.corr_data_Yx = self.corr_data[1:-4:2]
+
+        self.fit_data(**kw)
+        self.make_figures(**kw)
+
+        opt_motzoi = self.calculate_optimal_motzoi()
+
+        if close_file:
+            self.data_file.close()
+        return opt_motzoi
+
+    def make_figures(self, **kw):
+        # Unique in that it has hardcoded names and ponits to plot
+        show_guess = kw.pop('show_guess', False)
+        self.fig, self.ax = plt.subplots(1, 1, figsize=(5, 3))
+        x_fine = np.linspace(min(self.sweep_points), max(self.sweep_points),
+                             1000)
+        plot_title = kw.pop('plot_title', textwrap.fill(
+                            self.timestamp_string + '_' +
+                            self.measurementstring, 40))
+        self.ax.set_title(plot_title)
+
+        self.ax.ticklabel_format(useOffset=False)
+        self.ax.set_xlabel(kw.pop('xlabel', self.xlabel))
+        self.ax.set_ylabel(kw.pop('ylabel', r'$F|1\rangle$'))
+        self.ax.plot(self.sweep_points_Xy, self.corr_data_Xy,
+                     'o', c='b', label='Xy')
+        self.ax.plot(self.sweep_points_Yx, self.corr_data_Yx,
+                     'o', c='r', label='Yx')
+        c = ['b', 'r']
+        if hasattr(self, 'fit_res'):
+            for i in range(len(self.fit_res)):
+                fine_fit = self.fit_res[i].model.func(
+                    x_fine, **self.fit_res[i].best_values)
+                self.ax.plot(x_fine, fine_fit, c=c[i], label='fit')
+                if show_guess:
+                    fine_fit = self.fit_res[i].model.func(
+                        x_fine, **self.fit_res[i].init_values)
+                    self.ax.plot(x_fine, fine_fit, c=c[i], label='guess')
+
+        self.ax.legend(loc='best')
+        self.ax.set_ylim(-.1, 1.1)
+        self.save_fig(self.fig, fig_tight=True, **kw)
+
+    def fit_data(self, **kw):
+        model = lmfit.models.ParabolicModel()
+        self.fit_res = ['', '']
+
+        params = model.guess(data=self.corr_data_Xy,
+                             x=self.sweep_points_Xy)
+        self.fit_res[0] = model.fit(
+            data=self.corr_data_Xy,
+            x=self.sweep_points_Xy,
+            params=params)
+        self.save_fitted_parameters(fit_res=self.fit_res[0],
+                                    var_name='Xy')
+
+        params = model.guess(data=self.corr_data_Yx,
+                             x=self.sweep_points_Yx)
+        self.fit_res[1] = model.fit(
+            data=self.corr_data_Yx,
+            x=self.sweep_points_Yx,
+            params=params)
+        self.save_fitted_parameters(fit_res=self.fit_res[1],
+                                    var_name='Yx')
+
+    def calculate_optimal_motzoi(self):
+        '''
+        The best motzoi parameter is there where both curves intersect.
+        As a parabola can have 2 intersects.
+        Will default to picking the one closest to zero
+        '''
+        b_vals0 = self.fit_res[0].best_values
+        b_vals1 = self.fit_res[1].best_values
+        x1, x2 = a_tools.solve_quadratic_equation(
+            b_vals1['a']-b_vals0['a'], b_vals1['b']-b_vals0['b'],
+            b_vals1['c']-b_vals0['c'])
+        self.optimal_motzoi = min(x1, x2, key=lambda x: abs(x))
+        return self.optimal_motzoi
 
 
 class Rabi_Analysis_old(TD_Analysis):
@@ -2373,7 +2493,7 @@ class OnOff_Analysis(TD_Analysis):
                                             ax=ax,
                                             xlabel=self.xlabel,
                                             ylabel=self.ylabels[i],
-                                            plotlabel='On',
+                                            label='On',
                                             marker='o:',
                                             **kw)
             self.plot_results_vs_sweepparam(x=self.sweep_points[1::2],
@@ -2382,7 +2502,7 @@ class OnOff_Analysis(TD_Analysis):
                                             ax=ax,
                                             xlabel=self.xlabel,
                                             ylabel=self.ylabels[i],
-                                            plotlabel='Off',
+                                            label='Off',
                                             marker='o:',
                                             **kw)
             ax.legend()
@@ -2393,7 +2513,7 @@ class OnOff_Analysis(TD_Analysis):
                                         ax=ax2,
                                         xlabel=self.xlabel,
                                         ylabel=self.ylabels[idx_val],
-                                        plotlabel='Off',
+                                        label='Off',
                                         marker='o:',
                                         **kw)
         self.plot_results_vs_sweepparam(x=self.sweep_points[1::2],
@@ -2402,7 +2522,7 @@ class OnOff_Analysis(TD_Analysis):
                                         ax=ax2,
                                         xlabel=self.xlabel,
                                         ylabel=self.ylabels[idx_val],
-                                        plotlabel='Off',
+                                        label='Off',
                                         marker='o:',
                                         **kw)
         ax2.hlines((zero_mean), 0, len(self.sweep_points),
