@@ -266,17 +266,6 @@ class TD_t_int(Soft_Sweep):
 
 ###################################
 
-class Source_frequency_GHz(Soft_Sweep):
-    def __init__(self, source, **kw):
-        super().__init__(**kw)
-        self.S = source
-        self.name = 'Source frequency'
-        self.parameter_name = '%s-frequency' % self.S.name
-        self.unit = 'GHz'
-
-    def set_parameter(self, val):
-        self.S.set('frequency', val*1e9)
-
 
 class Source_frequency_modulated_GHz(Soft_Sweep):
     def __init__(self, modulation_freq, **kw):
@@ -321,104 +310,6 @@ class Source_frequency_GHz_Resonator_Scan(Soft_Sweep):
         self.S.set_frequency(val*1e9)
 
 
-class Source_power_dBm(Soft_Sweep):
-    def __init__(self, **kw):
-        super(Source_power_dBm, self).__init__(**kw)
-        #print self.name
-        self.name = '%s-Source power' % self.S.get_name()
-        self.parameter_name = 'power'
-        self.unit = 'dBm'
-
-    def set_parameter(self, val):
-        self.S.set_power(val)
-
-
-class Source_phase_deg(Soft_Sweep):
-    def __init__(self, **kw):
-        super(Source_phase_deg, self).__init__(**kw)
-        self.name = '%s-Source phase' % self.S.get_name()
-        self.parameter_name = 'phase'
-        self.unit = 'deg'
-
-    def set_parameter(self, val):
-        self.S.set_phase(val)
-
-###################################
-
-class Qubit_Sweep(Soft_Sweep):
-    '''
-    Parent of qubit sweeps
-    '''
-    def __init__(self, qubit, **kw):
-        super(Qubit_Sweep, self).__init__()
-        self.qubit = qubit
-
-    def prepare(self, **kw):
-        pass
-
-    def finish(self, **kw):
-        pass
-
-class Qubit_source_power_dBm(Qubit_Sweep):
-    def __init__(self, qubit, **kw):
-        super(Qubit_source_power_dBm, self).__init__(qubit, **kw)
-        self.initial_power = self.qubit.get_source_power()
-        self.name = 'Source power'
-        self.parameter_name = 'power'
-        self.unit = 'dBm'
-
-    def set_parameter(self, val):
-        self.qubit.set_source_power(val)
-
-    def finish(self):
-        self.qubit.set_source_power(self.initial_power)
-
-class Qubit_frequency_GHz(Qubit_Sweep):
-    def __init__(self, qubit, **kw):
-        super(Qubit_frequency_GHz, self).__init__(qubit, **kw)
-        self.initial_frequency = self.qubit.get_current_frequency()
-        self.name = 'Qubit frequency'
-        self.parameter_name = 'frequency'
-        self.unit = 'GHz'
-
-    def set_parameter(self, val):
-        self.qubit.set_current_frequency(val)
-
-    def finish(self):
-        self.qubit.set_current_frequency(self.initial_frequency)
-
-
-###################################
-
-
-class Step_Atten_dB(Soft_Sweep):
-    def __init__(self, step_atten, **kw):
-        super(Step_Atten_dB, self).__init__()
-        print("step_atten", step_atten)
-        self.step_atten = step_atten
-        self.name = 'Step Attenuation'
-        self.parameter_name = 'attenuation'
-        self.unit = 'dB'
-
-    def set_parameter(self, val):
-        self.step_atten.set_attenuation(val)
-
-
-###################################
-
-class Flux_Control_mV(Soft_Sweep):
-    def __init__(self, flux_channel, **kw):
-        super(Flux_Control_mV, self).__init__()
-        self.flux_channel = flux_channel
-        self.name = 'Flux_'+str(flux_channel)+' Voltage'
-        self.parameter_name = 'Flux_'+str(flux_channel)
-        self.unit = 'mV'
-        self.Flux_Control = qt.instruments['Flux_Control']
-
-    def set_parameter(self, val):
-        print('Setting flux')
-        self.Flux_Control.set_flux(self.flux_channel, val)
-
 class Bias_Hyst_mV(Soft_Sweep):
     def __init__(self, dac_channel, sleeptime=0, return_point=-1000, **kw):
         super(Bias_Hyst_mV, self).__init__()
@@ -434,65 +325,8 @@ class Bias_Hyst_mV(Soft_Sweep):
         eval("qt.instruments['IVVI'].set_dac%d(self.return_point)" % self.dac_channel)
         eval("qt.instruments['IVVI'].set_dac%d(val)" % self.dac_channel)
 
-###################################
-class IQ_mixer_QI_ratio(Soft_Sweep):
-    def __init__(self, mixer, **kw):
-        super(IQ_mixer_QI_ratio, self).__init__()
-        self.name = 'QI_ratio'
-        self.parameter_name = 'QI_ratio'
-        self.unit = ' '
-        self.mixer = mixer
-
-    def set_parameter(self, val):
-        self.mixer.set_QI_amp_ratio(val)
 
 
-class IQ_mixer_skewness(Soft_Sweep):
-    def __init__(self, mixer, **kw):
-        super(IQ_mixer_skewness, self).__init__()
-        self.name = 'IQ_skewness'
-        self.parameter_name = 'IQ_skewness'
-        self.unit = 'deg'
-        self.mixer = mixer
-
-    def set_parameter(self, val):
-        self.mixer.set_IQ_phase_skewness(val)
-
-###################################
-
-class AWG_channel_offset(Soft_Sweep):
-    '''
-    Sweep AWG channel offset for Mixer calibration
-    Needs to be generalized for AWG_Comp
-    '''
-    def __init__(self, AWG, channel, **kw):
-        super(AWG_channel_offset, self).__init__()
-        self.name = 'AWG amplitude channel '+str(channel)
-        self.parameter_name = 'Voltage'
-        self.unit = 'V'
-        self.AWG = AWG
-        self.set_offset = eval("self.AWG.set_ch%d_offset" % channel)
-
-    def set_parameter(self, val):
-        self.set_offset(val)
-
-# class AWG_channel_amplitude(Soft_Sweep):
-#     '''
-#     Superceded by using the parameter directly
-#     Sweep AWG channel amplitude for Mixer calibration
-#     Needs to be generalized for AWG_Comp
-#     '''
-#     def __init__(self, channel, AWG_name='AWG', **kw):
-#         super(AWG_channel_amplitude, self).__init__()
-#         self.AWG = qt.instruments[AWG_name]
-#         self.channel = channel
-
-#         self.name = 'AWG offset channel '+str(channel)
-#         self.parameter_name = 'Voltage'
-#         self.unit = 'V'
-
-#     def set_parameter(self, val):
-#         eval('self.AWG.set_ch%d_amplitude(val)' % self.channel)
 
 
 class AWG_multi_channel_amplitude(Soft_Sweep):
