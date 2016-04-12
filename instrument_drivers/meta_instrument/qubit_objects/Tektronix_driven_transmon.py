@@ -16,6 +16,7 @@ from modules.analysis import measurement_analysis as ma
 from modules.measurement.pulse_sequences import standard_sequences as st_seqs
 import modules.measurement.randomized_benchmarking.randomized_benchmarking as rb
 from modules.measurement.calibration_toolbox import mixer_carrier_cancellation_5014
+from modules.measurement.calibration_toolbox import mixer_skewness_calibration_5014
 from modules.measurement.optimization import nelder_mead
 
 from .qubit_object import Transmon
@@ -226,10 +227,24 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                 self.RO_I_offset.set(offset_I)
                 self.RO_Q_offset.set(offset_Q)
 
+    def calibrate_mixer_skewness(self, signal_hound, station, update=True):
+        '''
+        Calibrates mixer skewness at the frequency relevant for qubit driving.
 
+        Note: I don't like that you have to pass station here but I don't want
+        to introduce extra variables at this point, it should be available to
+        you in the notebook (MAR).
+        '''
+        self.prepare_for_timedomain()
 
-    def calibrate_mixer_skewness(self, signal_hound, update=True):
-        raise NotImplementedError('parent class uses CBox')
+        phi, alpha = mixer_skewness_calibration_5014(
+            signal_hound, self.td_source, station,
+            f_mod=self.f_pulse_mod.get(),
+            I_ch=self.pulse_I_channel.get(), Q_ch=self.pulse_Q_channel.get(),
+            name='Mixer_skewness'+self.msmt_suffix)
+        if update:
+            self.phi_skew.set(phi)
+            self.alpha.set(alpha)
 
     def calibrate_RO_threshold(self, method='conventional',
                                MC=None, close_fig=True,

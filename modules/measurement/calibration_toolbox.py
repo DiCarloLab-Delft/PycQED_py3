@@ -1,11 +1,13 @@
 import numpy as np
 import logging
+from qcodes.instrument.parameter import ManualParameter
 from modules.measurement import sweep_functions as swf
 from modules.measurement import CBox_sweep_functions as CB_swf
 from modules.measurement import detector_functions as det
 from modules.analysis import measurement_analysis as MA
 from modules.measurement import mc_parameter_wrapper as pw
 from modules.measurement.pulse_sequences import standard_sequences as st_seqs
+from modules.measurement.optimization import nelder_mead
 import imp
 imp.reload(MA)
 imp.reload(CB_swf)
@@ -34,8 +36,73 @@ def mixer_carrier_cancellation(**kw):
                               'See the archived folder for the old function')
 
 
-def mixer_skewness_calibration(**kw):
-    raise NotImplementedError('see archived calibration toolbox')
+def mixer_skewness_calibration_5014(SH, Source, station,
+                                    MC=None,
+                                    QI_amp_ratio=None, IQ_phase=None,
+                                    frequency=None, f_mod=10e6,
+                                    I_ch=1, Q_ch=2,
+                                    name='mixer_skewness_calibration_5014'):
+    '''
+    Loads a cos and sin waveform in the specified I and Q channels of the
+    tektronix 5014 AWG (taken from station.pulsar.AWG).
+    By looking at the frequency corresponding with the spurious sideband the
+    phase_skewness and amplitude skewness that minimize the signal correspond
+    to the mixer skewness.
+
+    Inputs:
+        SH              (instrument)
+        Source          (instrument)     MW-source used for driving
+        station         (qcodes station) Contains the AWG and pulasr sequencer
+        QI_amp_ratio    (parameter)      qcodes parameter
+        IQ_phase        (parameter)
+        frequency       (float Hz)       Spurious SB freq: f_source - f_mod
+        f_mod           (float Hz)       Modulation frequency
+        I_ch/Q_ch       (int or str)     Specifies the AWG channels
+
+    returns:
+        alpha, phi     the coefficients that go in the predistortion matrix
+    For the spurious sideband:
+        alpha = 1/QI_amp_optimal
+        phi = -IQ_phase_optimal
+    For details, see Leo's notes on mixer skewness calibration in the docs
+    '''
+    if frequency is None:
+        # Corresponds to the frequency where to minimize with the SH
+        frequency = Source.frequency.get() - f_mod
+    if QI_amp_ratio is None:
+        QI_amp_ratio = ManualParameter('QI_amp', initial_value=1)
+    if IQ_phase is None:
+        IQ_phase = ManualParameter('IQ_phase', units='deg', initial_value=0)
+    if MC is None:
+        MC = station.MC
+    if type(I_ch) is int:
+        I_ch = 'ch{}'.format(I_ch)
+    if type(Q_ch) is int:
+        Q_ch = 'ch{}'.format(Q_ch)
+
+    d = det.SH_mixer_skewness_det(frequency, QI_amp_ratio, IQ_phase, SH,
+                                  f_mod=f_mod,
+                                  I_ch=I_ch, Q_ch=Q_ch, station=station)
+    S1 = pw.wrap_par_to_swf(QI_amp_ratio)
+    S2 = pw.wrap_par_to_swf(IQ_phase)
+
+    ad_func_pars = {'adaptive_function': nelder_mead,
+                    'x0': [1, 0.0],
+                    'initial_step': [.15, 10],
+                    'no_improv_break': 5,
+                    'minimize': True,
+                    'maxiter': 500}
+    MC.set_sweep_functions([S1, S2])
+    MC.set_detector_function(d)
+    MC.set_adaptive_function_parameters(ad_func_pars)
+    MC.run(name=name, mode='adaptive')
+    a = MA.OptimizationAnalysis()
+    # phi and alpha are the coefficients that go in the predistortion matrix
+    alpha = 1/a.optimization_result[0][0]
+    phi = -1*a.optimization_result[0][1]
+
+    return phi, alpha
+
 
 
 def mixer_skewness_calibration_adaptive(**kw):
@@ -268,8 +335,8 @@ def mixer_skewness_cal_CBox_adaptive(CBox, SH, source,
 
     Calibrates the mixer skewnness
     The CBox, in this case a fixed sequence is played in the tektronix
-    to ensure the CBox is continously triggered and the paramters are
-    reloaded between each measued point.
+    to ensure the CBox is continously triggered and the parameters are
+    reloaded between each measured point.
 
     If calibrate_both_sidebands is True the optimization runs two calibrations,
     first it tries to minimize the power in the spurious sideband by varying
