@@ -8,7 +8,7 @@ class CBox_RB_sweep(swf.Hard_Sweep):
     def __init__(self,
                  IF, RO_pulse_length,
                  RO_pulse_delay, RO_trigger_delay,
-                 pulse_separation,
+                 pulse_delay,
                  AWG, CBox, LutMan,
                  cal_points=True,
                  nr_cliffords=[1, 3, 5, 10, 20],
@@ -29,7 +29,7 @@ class CBox_RB_sweep(swf.Hard_Sweep):
         self.cal_points = [0, 0, 1, 1]
         self.nr_cliffords = np.array(nr_cliffords)
         self.max_seq_duration = max_seq_duration
-        self.pulse_separation_ns = pulse_separation*1e9
+        self.pulse_delay_ns = pulse_delay*1e9
 
         self.IF = IF
         self.RO_pulse_length = RO_pulse_length
@@ -58,10 +58,10 @@ class CBox_RB_sweep(swf.Hard_Sweep):
                     if i == 0:
                         # wait_time is in ns
                         wait_time = (self.max_seq_duration*1e9 -
-                                     (len(cl_tape)-1)*self.pulse_separation_ns -
+                                     (len(cl_tape)-1)*self.pulse_delay_ns -
                                      pulse_length)
                     else:
-                        wait_time = self.pulse_separation_ns - pulse_length
+                        wait_time = self.pulse_delay_ns - pulse_length
                     end_of_marker = (i == (len(cl_tape)-1))
                     entry = self.CBox.create_timing_tape_entry(
                         wait_time, tape_elt, end_of_marker, prepend_elt=0)

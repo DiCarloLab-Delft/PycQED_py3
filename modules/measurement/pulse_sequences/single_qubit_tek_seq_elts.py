@@ -107,7 +107,7 @@ def Ramsey_seq(times, pulse_pars, RO_pars,
 
     pulse_pars_x2 = deepcopy(pulses['X90'])
     for i, tau in enumerate(times):
-        pulse_pars_x2['pulse_separation'] = tau
+        pulse_pars_x2['pulse_delay'] = tau
 
         if artificial_detuning is not None:
             pulse_pars_x2['phase'] = tau * artificial_detuning * 360
@@ -232,12 +232,54 @@ def Randomized_Benchmarking_seq(pulse_pars, RO_pars,
                 el_list.append(el)
                 seq.append_element(el, trigger_wait=True)
 
-                if n_cl*pulse_pars['pulse_separation']*1.875 > 50e-6:
+                if n_cl*pulse_pars['pulse_delay']*1.875 > 50e-6:
                     # If the element is too long, add in an extra wait elt
                     # to skip a trigger
                     el = multi_pulse_elt(i, station, [pulses['I']])
                     el_list.append(el)
                     seq.append_element(el, trigger_wait=True)
+
+    station.instruments['AWG'].stop()
+    station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+    return seq_name
+
+
+def resetless_RB_seq(pulse_pars, RO_pars,
+                     nr_cliffords,
+                     nr_seeds,
+                     post_measurement_delay,
+                     verbose=False):
+    '''
+    Consists of 1 very long element that interleaves RB-sequences with
+    measurement.
+    After every measurement it waits for at least post_measurement_delay.
+    Because I need to make sure all RO pulses start with the same phase I need
+    to do something....
+    '''
+    seq_name = 'Resetless_RB_seq'
+    seq = sequence.Sequence(seq_name)
+    el_list = []
+    pulses = get_pulse_dict_from_pars(pulse_pars)
+    pulse_list = []
+    # Extracting and fixed point freq, taking care of by hand here
+    fixed_point_freq = RO_pars['fixed_point_frequency']
+    RO_pars['fixed_point_frequency'] = None
+
+
+    for seed in range(nr_seeds):
+        cl_seq = rb.randomized_benchmarking_sequence(nr_cliffords)
+
+        pulse_keys = rb.decompose_clifford_seq(cl_seq)
+        pulse_sub_list = [pulses[x] for x in pulse_keys]
+        pulse_sub_list += [RO_pars]
+
+        sub_seq_length = sum([p['pulse_delay'] for p in pulse_sub_list])
+        # Need to append a wait element here to ensure phase lock + wait
+
+    el = multi_pulse_elt(1, station, pulse_list)
+
+    el_list.append(el)
+    seq.append_element(el, trigger_wait=False)  # Keep running perpetually
 
     station.instruments['AWG'].stop()
     station.pulsar.program_awg(seq, *el_list, verbose=verbose)
@@ -295,6 +337,7 @@ def Motzoi_XY(motzois, pulse_pars, RO_pars,
     station.pulsar.program_awg(seq, *el_list, verbose=verbose)
     return seq_name
 
+# sequence element generating functions
 
 def single_SSB_DRAG_pulse_elt(i, station,
                               pulse_pars,
@@ -415,7 +458,7 @@ def double_SSB_DRAG_pulse_elt(i, station,
                                  mod_frequency=pulse_pars_2['mod_frequency'],
                                  phase=pulse_pars_2['phase'])
 
-        el.add(pulse_2, name='pulse_2', start=pulse_pars_2['pulse_separation'],
+        el.add(pulse_2, name='pulse_2', start=pulse_pars_2['pulse_delay'],
                refpulse='pulse_1')
 
         # Readout modulation tone
@@ -462,6 +505,9 @@ def multi_pulse_elt(i, station, pulse_list):
         If you want to add extra pulses to this function please talk to me
         (Adriaan) as I would like to keep it clean and prevent a  big if, elif
         loop. (I have some ideas on how to implement this).
+
+        Note: this function could be the template for the most standard
+        element we use.
         '''
         el = element.Element(
             name='{}-pulse-elt_{}'.format(len(pulse_list), i),
@@ -476,20 +522,20 @@ def multi_pulse_elt(i, station, pulse_list):
 
         for i, pulse_pars in enumerate(pulse_list):
             if pulse_pars['pulse_type'] == 'SSB_DRAG_pulse':
-
-                last_pulse = el.add(SSB_DRAG_pulse(name='pulse_{}'.format(i),
-                                    I_channel=pulse_pars['I_channel'],
-                                    Q_channel=pulse_pars['Q_channel'],
-                                    amplitude=pulse_pars['amplitude'],
-                                    sigma=pulse_pars['sigma'],
-                                    nr_sigma=pulse_pars['nr_sigma'],
-                                    motzoi=pulse_pars['motzoi'],
-                                    mod_frequency=pulse_pars['mod_frequency'],
-                                    phase=pulse_pars['phase'],
-                                    phi_skew= pulse_pars['phi_skew'],
-                                    alpha=pulse_pars['alpha']),
-                        start=pulse_pars['pulse_separation'],
-                        refpulse=last_pulse)
+                last_pulse = el.add(
+                    SSB_DRAG_pulse(name='pulse_{}'.format(i),
+                                   I_channel=pulse_pars['I_channel'],
+                                   Q_channel=pulse_pars['Q_channel'],
+                                   amplitude=pulse_pars['amplitude'],
+                                   sigma=pulse_pars['sigma'],
+                                   nr_sigma=pulse_pars['nr_sigma'],
+                                   motzoi=pulse_pars['motzoi'],
+                                   mod_frequency=pulse_pars['mod_frequency'],
+                                   phase=pulse_pars['phase'],
+                                   phi_skew=pulse_pars['phi_skew'],
+                                   alpha=pulse_pars['alpha']),
+                    start=pulse_pars['pulse_delay'],
+                    refpulse=last_pulse, refpoint='start')
             elif pulse_pars['pulse_type'] == 'MW_IQmod_pulse':
                 # Does more than just call the function as it also adds the
                 # markers. Ideally we combine both in one function in pulselib

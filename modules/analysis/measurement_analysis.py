@@ -2653,9 +2653,9 @@ class RandomizedBenchmarking_Analysis(TD_Analysis):
     of pulses) the T1 limited fidelity will be given and plotted in the
     same figure.
     '''
-    def __init__(self, label='RB', T1=None, pulse_separation=None, **kw):
+    def __init__(self, label='RB', T1=None, pulse_delay=None, **kw):
         self.T1 = T1
-        self.pulse_separation = pulse_separation
+        self.pulse_delay = pulse_delay
         super().__init__(**kw)
 
     def run_default_analysis(self, **kw):
@@ -2678,14 +2678,14 @@ class RandomizedBenchmarking_Analysis(TD_Analysis):
             self.data_file.close()
         return
 
-    def calc_T1_limited_fidelity(self, T1, pulse_separation):
+    def calc_T1_limited_fidelity(self, T1, pulse_delay):
         '''
         Formula from Asaad et al.
         pulse separation is time between start of pulses
         '''
         Np = 1.875  # Number of gates per Clifford
-        F_cl = (1/6*(3 + 2*np.exp(-1*pulse_separation/(2*T1)) +
-                     np.exp(-pulse_separation/T1)))**Np
+        F_cl = (1/6*(3 + 2*np.exp(-1*pulse_delay/(2*T1)) +
+                     np.exp(-pulse_delay/T1)))**Np
 
         return F_cl
 
@@ -2730,8 +2730,8 @@ class RandomizedBenchmarking_Analysis(TD_Analysis):
                     (self.fit_res.params['offset'].value),
                     (self.fit_res.params['offset'].stderr)))
 
-            if self.T1 is not None and self.pulse_separation is not None:
-                F_T1 = self.calc_T1_limited_fidelity(self.T1, self.pulse_separation)
+            if self.T1 is not None and self.pulse_delay is not None:
+                F_T1 = self.calc_T1_limited_fidelity(self.T1, self.pulse_delay)
                 T1_limited_curve = fit_mods.RandomizedBenchmarkingDecay(
                     x_fine, -0.5, F_T1, 0.5)
                 self.ax.plot(x_fine, T1_limited_curve, label='T1-limit')

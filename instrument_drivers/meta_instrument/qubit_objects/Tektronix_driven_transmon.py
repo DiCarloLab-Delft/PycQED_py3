@@ -165,7 +165,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
             'nr_sigma': 4,
             'motzoi': self.motzoi.get(),
             'mod_frequency': self.f_pulse_mod.get(),
-            'pulse_separation': self.pulse_separation.get(),
+            'pulse_delay': self.pulse_delay.get(),
             'phi_skew': self.phi_skew.get(),
             'alpha': self.alpha.get(),
             'phase': 0,
@@ -345,7 +345,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         MC.run('RB_{}seeds'.format(nr_seeds)+self.msmt_suffix)
         ma.RandomizedBenchmarking_Analysis(
             close_main_fig=close_fig, T1=T1,
-            pulse_separation=self.pulse_separation.get())
+            pulse_delay=self.pulse_delay.get())
 
     def measure_discrimination_fid(self, no_fits=False,
                                    return_detector=False,

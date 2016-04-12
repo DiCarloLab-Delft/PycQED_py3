@@ -200,14 +200,14 @@ class CBox_T1(swf.Hard_Sweep):
 
 class CBox_Ramsey(swf.Hard_Sweep):
     def __init__(self, IF, RO_pulse_length,
-                 RO_pulse_delay, RO_trigger_delay, pulse_separation,
+                 RO_pulse_delay, RO_trigger_delay, pulse_delay,
                  AWG, CBox, cal_points=True,
                  upload=True):
         super().__init__()
         self.IF = IF
         self.RO_pulse_delay = RO_pulse_delay
         self.RO_trigger_delay = RO_trigger_delay
-        self.pulse_separation = pulse_separation
+        self.pulse_delay = pulse_delay
         self.RO_pulse_length = RO_pulse_length
         self.name = 'T2*'
         self.parameter_name = 'tau'
@@ -226,7 +226,7 @@ class CBox_Ramsey(swf.Hard_Sweep):
                 RO_pulse_delay=self.RO_pulse_delay,
                 RO_pulse_length=self.RO_pulse_length,
                 RO_trigger_delay=self.RO_trigger_delay,
-                pulse_separation=self.pulse_separation,
+                pulse_delay=self.pulse_delay,
                 verbose=False)
             self.AWG.set('ch3_amp', ch3_amp)
             self.AWG.set('ch4_amp', ch4_amp)
@@ -250,14 +250,14 @@ class CBox_Ramsey(swf.Hard_Sweep):
 
 class CBox_Echo(swf.Hard_Sweep):
     def __init__(self, IF,
-                 RO_pulse_delay, RO_trigger_delay, pulse_separation,
+                 RO_pulse_delay, RO_trigger_delay, pulse_delay,
                  AWG, CBox, cal_points=True,
                  upload=True):
         super().__init__()
         self.IF = IF
         self.RO_pulse_delay = RO_pulse_delay
         self.RO_trigger_delay = RO_trigger_delay
-        self.pulse_separation = pulse_separation
+        self.pulse_delay = pulse_delay
         self.name = 'T2-echo'
         self.parameter_name = 'tau'
         self.unit = 's'
@@ -343,7 +343,7 @@ class CBox_OffOn(swf.Hard_Sweep):
 
 
 class CBox_AllXY(swf.Hard_Sweep):
-    def __init__(self, IF, pulse_separation,
+    def __init__(self, IF, pulse_delay,
                  RO_pulse_delay,
                  RO_trigger_delay,
                  RO_pulse_length,
@@ -393,7 +393,7 @@ class CBox_AllXY(swf.Hard_Sweep):
         self.RO_pulse_delay = RO_pulse_delay
         self.RO_trigger_delay = RO_trigger_delay
         self.RO_pulse_length = RO_pulse_length
-        self.pulse_separation = pulse_separation
+        self.pulse_delay = pulse_delay
 
     def prepare(self, **kw):
         self.AWG.stop()
@@ -410,7 +410,7 @@ class CBox_AllXY(swf.Hard_Sweep):
 
             st_seqs.CBox_two_pulse_seq(
                 IF=self.IF,
-                pulse_separation=self.pulse_separation,
+                pulse_delay=self.pulse_delay,
                 RO_pulse_delay=self.RO_pulse_delay,
                 RO_pulse_length=self.RO_pulse_length,
                 RO_trigger_delay=self.RO_trigger_delay, verbose=False)
@@ -420,7 +420,7 @@ class CBox_AllXY(swf.Hard_Sweep):
 
 class CBox_multi_element_tape(swf.Hard_Sweep):
     def __init__(self, n_pulses, tape,
-                 pulse_separation,
+                 pulse_delay,
                  IF, RO_pulse_delay, RO_trigger_delay,
                  RO_pulse_length,
                  AWG, CBox,
@@ -446,7 +446,7 @@ class CBox_multi_element_tape(swf.Hard_Sweep):
         self.RO_pulse_delay = RO_pulse_delay
         self.RO_trigger_delay = RO_trigger_delay
         self.RO_pulse_length = RO_pulse_length
-        self.pulse_separation = pulse_separation
+        self.pulse_delay = pulse_delay
 
     def prepare(self, **kw):
         self.AWG.stop()
@@ -460,7 +460,7 @@ class CBox_multi_element_tape(swf.Hard_Sweep):
             ch3_amp = self.AWG.get('ch3_amp')
             ch4_amp = self.AWG.get('ch3_amp')
             st_seqs.CBox_multi_pulse_seq(
-                n_pulses=self.n_pulses, pulse_separation=self.pulse_separation,
+                n_pulses=self.n_pulses, pulse_delay=self.pulse_delay,
                 IF=self.IF,
                 RO_pulse_delay=self.RO_pulse_delay,
                 RO_trigger_delay=self.RO_trigger_delay,
@@ -472,7 +472,7 @@ class CBox_multi_element_tape(swf.Hard_Sweep):
 
 class Resetless_tape(swf.Hard_Sweep):
     def __init__(self, n_pulses, tape,
-                 pulse_separation, resetless_interval,
+                 pulse_delay, resetless_interval,
                  IF, RO_pulse_delay, RO_trigger_delay,
                  RO_pulse_length,
                  AWG, CBox,
@@ -496,7 +496,7 @@ class Resetless_tape(swf.Hard_Sweep):
 
         self.n_pulses = n_pulses
         self.resetless_interval = resetless_interval
-        self.pulse_separation = pulse_separation
+        self.pulse_delay = pulse_delay
 
     def prepare(self, **kw):
         self.AWG.stop()
@@ -510,7 +510,7 @@ class Resetless_tape(swf.Hard_Sweep):
             ch3_amp = self.AWG.get('ch3_amp')
             ch4_amp = self.AWG.get('ch3_amp')
             st_seqs.CBox_resetless_multi_pulse_seq(
-                n_pulses=self.n_pulses, pulse_separation=self.pulse_separation,
+                n_pulses=self.n_pulses, pulse_delay=self.pulse_delay,
                 resetless_interval=self.resetless_interval,
                 IF=self.IF,
                 RO_pulse_delay=self.RO_pulse_delay,
@@ -525,7 +525,7 @@ class CBox_RB_sweep(swf.Hard_Sweep):
     def __init__(self,
                  IF, RO_pulse_length,
                  RO_pulse_delay, RO_trigger_delay,
-                 pulse_separation,
+                 pulse_delay,
                  AWG, CBox, LutMan,
                  cal_points=True,
                  nr_cliffords=[1, 3, 5, 10, 20],
@@ -546,7 +546,7 @@ class CBox_RB_sweep(swf.Hard_Sweep):
         self.cal_points = [0, 0, 1, 1]
         self.nr_cliffords = np.array(nr_cliffords)
         self.max_seq_duration = max_seq_duration
-        self.pulse_separation_ns = pulse_separation*1e9
+        self.pulse_delay_ns = pulse_delay*1e9
 
         self.IF = IF
         self.RO_pulse_length = RO_pulse_length
@@ -575,10 +575,10 @@ class CBox_RB_sweep(swf.Hard_Sweep):
                     if i == 0:
                         # wait_time is in ns
                         wait_time = (self.max_seq_duration*1e9 -
-                                     (len(cl_tape)-1)*self.pulse_separation_ns -
+                                     (len(cl_tape)-1)*self.pulse_delay_ns -
                                      pulse_length)
                     else:
-                        wait_time = self.pulse_separation_ns - pulse_length
+                        wait_time = self.pulse_delay_ns - pulse_length
                     end_of_marker = (i == (len(cl_tape)-1))
                     entry = self.CBox.create_timing_tape_entry(
                         wait_time, tape_elt, end_of_marker, prepend_elt=0)
