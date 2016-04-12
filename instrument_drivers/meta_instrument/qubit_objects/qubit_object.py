@@ -145,7 +145,8 @@ class Transmon(Qubit):
                            parameter_class=ManualParameter)
         self.add_parameter('RO_amp', units='V',
                            parameter_class=ManualParameter)
-        self.add_parameter('pulse_separation', units='s',
+        # Time between start of pulses
+        self.add_parameter('pulse_delay', units='s',
                            parameter_class=ManualParameter)
 
     def calculate_frequency(self, EC=None, EJ=None, assymetry=None,
@@ -215,7 +216,7 @@ class Transmon(Qubit):
             cur_freq = self.f_qubit.get()
             # Steps don't double to be more robust against aliasing
             for n in steps:
-                times = np.arange(self.pulse_separation.get(),
+                times = np.arange(self.pulse_delay.get(),
                                   50*n*stepsize, n*stepsize)
                 artificial_detuning = 4/times[-1]
                 self.measure_ramsey(times,

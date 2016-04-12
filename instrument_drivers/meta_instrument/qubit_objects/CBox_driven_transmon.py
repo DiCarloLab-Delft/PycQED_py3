@@ -216,7 +216,7 @@ class CBox_driven_transmon(Transmon):
                     nr_seeds*pulse_p_elt, nr_seeds, pulse_p_elt))
 
         resetless_interval = (
-            np.round(pulse_p_elt*self.pulse_separation.get()*1e6)+2.5)*1e-6
+            np.round(pulse_p_elt*self.pulse_delay.get()*1e6)+2.5)*1e-6
 
         combined_tape = []
         for i in range(nr_seeds):
@@ -239,7 +239,7 @@ class CBox_driven_transmon(Transmon):
         s = awg_swf.Resetless_tape(
             n_pulses=pulse_p_elt, tape=combined_tape,
             IF=self.f_RO_mod.get(),
-            pulse_separation=self.pulse_separation.get(),
+            pulse_delay=self.pulse_delay.get(),
             resetless_interval=resetless_interval,
             RO_pulse_delay=self.RO_pulse_delay.get(),
             RO_pulse_length=self.RO_pulse_length.get(),
@@ -560,7 +560,7 @@ class CBox_driven_transmon(Transmon):
             MC = self.MC
         st_seqs.CBox_multi_pulse_seq(
             IF=self.f_RO_mod.get(), n_pulses=n,
-            pulse_separation=self.pulse_separation.get(),
+            pulse_delay=self.pulse_delay.get(),
             RO_pulse_delay=self.RO_pulse_delay.get(),
             RO_trigger_delay=self.RO_trigger_delay.get(),
             RO_pulse_length=self.RO_pulse_length.get(), verbose=verbose)
@@ -629,7 +629,7 @@ class CBox_driven_transmon(Transmon):
         self.td_source.set('frequency', f_qubit - self.f_pulse_mod.get() +
                            artificial_detuning)
         Rams_swf = awg_swf.CBox_Ramsey(
-            AWG=self.AWG, CBox=self.CBox, IF=self.f_RO_mod.get(), pulse_separation=0,
+            AWG=self.AWG, CBox=self.CBox, IF=self.f_RO_mod.get(), pulse_delay=0,
             RO_pulse_delay=self.RO_pulse_delay.get(),
             RO_trigger_delay=self.RO_trigger_delay.get(),
             RO_pulse_length=self.RO_pulse_length.get())
@@ -658,7 +658,7 @@ class CBox_driven_transmon(Transmon):
         d = cdet.AllXY_devition_detector_CBox(
             'AllXY'+self.msmt_suffix, MC=MC,
             AWG=self.AWG, CBox=self.CBox, IF=self.f_RO_mod.get(),
-            pulse_separation=self.pulse_separation.get(),
+            pulse_delay=self.pulse_delay.get(),
             RO_pulse_delay=self.RO_pulse_delay.get(),
             RO_trigger_delay=self.RO_trigger_delay.get(),
             RO_pulse_length=self.RO_pulse_length.get())
@@ -682,7 +682,7 @@ class CBox_driven_transmon(Transmon):
             raw=no_fits,
             MC=MC,
             AWG=self.AWG, CBox=self.CBox, IF=self.f_RO_mod.get(),
-            pulse_separation=self.pulse_separation.get(),
+            pulse_delay=self.pulse_delay.get(),
             RO_pulse_delay=self.RO_pulse_delay.get(),
             RO_trigger_delay=self.RO_trigger_delay.get(),
             RO_pulse_length=self.RO_pulse_length.get())

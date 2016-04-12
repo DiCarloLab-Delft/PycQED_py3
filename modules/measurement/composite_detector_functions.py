@@ -612,7 +612,7 @@ class CBox_RB_detector(det.Soft_Detector):
                  nr_cliffords, desired_nr_seeds,
                  IF,
                  RO_pulse_length, RO_pulse_delay, RO_trigger_delay,
-                 pulse_separation,
+                 pulse_delay,
                  T1=None, **kw):
         super().__init__(**kw)
         self.name = measurement_name
@@ -626,17 +626,17 @@ class CBox_RB_detector(det.Soft_Detector):
         self.RO_pulse_length = RO_pulse_length
         self.RO_pulse_delay = RO_pulse_delay
         self.RO_trigger_delay = RO_trigger_delay
-        self.pulse_separation = pulse_separation
+        self.pulse_delay = pulse_delay
         self.T1 = T1
         self.value_names = ['F_cl']
         self.value_units = ['']
 
     def calculate_seq_duration_and_max_nr_seeds(self, nr_cliffords,
-                                                pulse_separation):
+                                                pulse_delay):
         max_nr_cliffords = max(nr_cliffords)
         # For few cliffords the number of gates is not the average number of
         # gates so pick the max, rounded to ns
-        max_seq_duration = np.round(max(max_nr_cliffords*pulse_separation *
+        max_seq_duration = np.round(max(max_nr_cliffords*pulse_delay *
                                         (1.875+.5), 10e-6), 9)
         max_idling_waveforms_per_seed = max_seq_duration/(1200e-9)
         max_nr_waveforms = 29184  # hard limit from the CBox
@@ -647,7 +647,7 @@ class CBox_RB_detector(det.Soft_Detector):
     def prepare(self, **kw):
         max_seq_duration, max_nr_seeds = \
             self.calculate_seq_duration_and_max_nr_seeds(self.nr_cliffords,
-                                                         self.pulse_separation)
+                                                         self.pulse_delay)
         nr_repetitions = int(np.ceil(self.desired_nr_seeds/max_nr_seeds))
         self.total_nr_seeds = nr_repetitions*max_nr_seeds
 
@@ -662,7 +662,7 @@ class CBox_RB_detector(det.Soft_Detector):
                                        RO_pulse_length=self.RO_pulse_length,
                                        RO_pulse_delay=self.RO_pulse_delay,
                                        RO_trigger_delay=self.RO_trigger_delay,
-                                       pulse_separation=self.pulse_separation,
+                                       pulse_delay=self.pulse_delay,
                                        AWG=self.AWG,
                                        CBox=self.CBox,
                                        LutMan=self.LutMan)
@@ -680,7 +680,7 @@ class CBox_RB_detector(det.Soft_Detector):
                         self.i, self.total_nr_seeds), mode='2D')
             a = ma.RandomizedBench_2D_flat_Analysis(
                 auto=True, close_main_fig=True, T1=self.T1,
-                pulse_separation=self.pulse_separation)
+                pulse_delay=self.pulse_delay)
             F_cl = a.fit_res.params['fidelity_per_Clifford'].value
             return F_cl
 
@@ -740,7 +740,7 @@ class AllXY_devition_detector_CBox(det.Soft_Detector):
     '''
     def __init__(self, measurement_name, MC, AWG, CBox,
                  IF, RO_trigger_delay, RO_pulse_delay, RO_pulse_length,
-                 pulse_separation,
+                 pulse_delay,
                  LutMan=None,
                  reload_pulses=False, **kw):
         '''
@@ -762,7 +762,7 @@ class AllXY_devition_detector_CBox(det.Soft_Detector):
         self.IF = IF
         self.RO_trigger_delay = RO_trigger_delay
         self.RO_pulse_delay = RO_pulse_delay
-        self.pulse_separation = pulse_separation
+        self.pulse_delay = pulse_delay
         self.RO_pulse_length = RO_pulse_length
 
         self.LutMan = LutMan
@@ -772,7 +772,7 @@ class AllXY_devition_detector_CBox(det.Soft_Detector):
         self.i = 0
         self.MC.set_sweep_function(awg_swf.CBox_AllXY(
                                    IF=self.IF,
-                                   pulse_separation=self.pulse_separation,
+                                   pulse_delay=self.pulse_delay,
                                    RO_pulse_delay=self.RO_pulse_delay,
                                    RO_trigger_delay=self.RO_trigger_delay,
                                    RO_pulse_length=self.RO_pulse_length,
