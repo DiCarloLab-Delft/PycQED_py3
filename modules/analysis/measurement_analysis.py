@@ -2661,10 +2661,11 @@ class RandomizedBenchmarking_Analysis(TD_Analysis):
     def run_default_analysis(self, **kw):
         close_main_fig = kw.pop('close_main_fig', True)
         close_file = kw.pop('close_file', True)
+        if self.cal_points is None:
+            self.cal_points = [list(range(-4, -2)), list(range(-2, 0))]
+
         super().run_default_analysis(close_file=False, make_fig=False,
                                      **kw)
-        if self.cal_points is None:
-            self.cal_points = [list(range(2)), list(range(-2, 0))]
 
         data = self.corr_data[:-1*(len(self.cal_points[0]*2))]
         n_cl = self.sweep_points[:-1*(len(self.cal_points[0]*2))]
@@ -2686,8 +2687,9 @@ class RandomizedBenchmarking_Analysis(TD_Analysis):
         Np = 1.875  # Number of gates per Clifford
         F_cl = (1/6*(3 + 2*np.exp(-1*pulse_separation/(2*T1)) +
                      np.exp(-pulse_separation/T1)))**Np
+        p = 2*F_cl - 1
 
-        return F_cl
+        return F_cl, p
 
     def make_figures(self, close_main_fig, **kw):
 
@@ -2730,14 +2732,16 @@ class RandomizedBenchmarking_Analysis(TD_Analysis):
                     (self.fit_res.params['offset'].value),
                     (self.fit_res.params['offset'].stderr)))
 
+            # Here we add the line corresponding to T1 limited fidelity
             if self.T1 is not None and self.pulse_separation is not None:
-                F_T1 = self.calc_T1_limited_fidelity(self.T1, self.pulse_separation)
+                F_T1, p_T1 = self.calc_T1_limited_fidelity(
+                    self.T1, self.pulse_separation)
                 T1_limited_curve = fit_mods.RandomizedBenchmarkingDecay(
-                    x_fine, -0.5, F_T1, 0.5)
+                    x_fine, -0.5, p_T1, 0.5)
                 self.ax.plot(x_fine, T1_limited_curve, label='T1-limit')
                 textstr += ('\n\t  $F_{Cl}^{T_1}$  = ' +
                             '{:.6g}%'.format(F_T1*100))
-                self.ax.legend()
+                self.ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
 
             self.ax.text(0.1, 0.95, textstr, transform=self.ax.transAxes,
                          fontsize=11, verticalalignment='top',
