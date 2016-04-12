@@ -931,52 +931,65 @@ class SH_mixer_skewness_det(Soft_Detector):
     '''
     Based on the "Signal_Hound_fixed_frequency" detector.
     generates an AWG seq to measure sideband transmission
-    '''
 
-    def __init__(self, frequency, mixer,
-                 Navg=1, delay=0.1, f_mod=0.01, **kw):
+    Inputs:
+        frequency       (Hz)
+        QI_amp_ratio    (parameter)
+        IQ_phase        (parameter)
+        SH              (instrument)
+        f_mod           (Hz)
+
+    '''
+    def __init__(self, frequency, QI_amp_ratio, IQ_phase, SH,
+                 I_ch, Q_ch,
+                 station,
+                 Navg=1, delay=0.1, f_mod=10e6, verbose=False, **kw):
         super(SH_mixer_skewness_det, self).__init__()
-        self.SH = qt.instruments['SH']
+        self.SH = SH
         self.frequency = frequency
-        self.name = 'SignalHound_fixed_frequency'
+        self.name = 'SignalHound_mixer_skewness_det'
         self.value_names = ['Power']
         self.value_units = ['dBm']
         self.delay = delay
-        self.SH.set_frequency(frequency)
+        self.SH.frequency.set(frequency*1e-9) # Accepts input in Hz
         self.Navg = Navg
-        self.mixer = mixer
-        self.pulsar = qt.pulsar
-        self.f_mod = f_mod*1e9  # Convert to GHz for pulse
+        self.QI_amp_ratio = QI_amp_ratio
+        self.IQ_phase = IQ_phase
+        self.pulsar = station.pulsar
+        self.f_mod = f_mod
+        self.I_ch = I_ch
+        self.Q_ch = Q_ch
+        self.verbose = verbose
 
     def acquire_data_point(self, **kw):
-        QI_ratio = self.mixer.get_QI_amp_ratio()
-        skewness = self.mixer.get_IQ_phase_skewness()
-        print('QI ratio: %.3f' % QI_ratio)
-        print('skewness: %.3f' % skewness)
+        QI_ratio = self.QI_amp_ratio.get()
+        skewness = self.IQ_phase.get()
+        if self.verbose:
+            print('QI ratio: %.3f' % QI_ratio)
+            print('skewness: %.3f' % skewness)
         self.generate_awg_seq(QI_ratio, skewness, self.f_mod)
-        qt.pulsar.AWG.start()
+        self.pulsar.AWG.start()
         time.sleep(self.delay)
         return self.SH.get_power_at_freq(Navg=self.Navg)
 
     def generate_awg_seq(self, QI_ratio, skewness, f_mod):
         SSB_modulation_el = element.Element('SSB_modulation_el',
                                             pulsar=self.pulsar)
-        cos_pulse = pulse.SinePulse(channel='I', name='cos_pulse')
-        sin_pulse = pulse.SinePulse(channel='Q', name='sin_pulse')
+        cos_pulse = pulse.CosPulse(channel=self.I_ch, name='cos_pulse')
+        sin_pulse = pulse.CosPulse(channel=self.Q_ch, name='sin_pulse')
 
         SSB_modulation_el.add(pulse.cp(cos_pulse, name='cos_pulse',
-                              frequency=f_mod, amplitude=0.5,
-                              length=1e-6, phase=90))
+                              frequency=f_mod, amplitude=0.3,
+                              length=1e-6, phase=0))
         SSB_modulation_el.add(pulse.cp(sin_pulse, name='sin_pulse',
-                              frequency=f_mod, amplitude=0.5*QI_ratio,
-                              length=1e-6, phase=0+skewness))
+                              frequency=f_mod, amplitude=0.3*QI_ratio,
+                              length=1e-6, phase=90+skewness))
 
         seq = sequence.Sequence('Sideband_modulation_seq')
         seq.append(name='SSB_modulation_el', wfname='SSB_modulation_el',
                    trigger_wait=False)
-        qt.pulsar.AWG.stop()
-        qt.pulsar.program_awg(seq, SSB_modulation_el)
-
+        self.pulsar.AWG.stop()
+        self.pulsar.program_awg(seq, SSB_modulation_el)
 
     def prepare(self, **kw):
         self.SH.prepare_for_measurement()
