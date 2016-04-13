@@ -4,6 +4,7 @@ from copy import deepcopy
 from math import gcd
 from ..waveform_control import pulsar
 from ..waveform_control import element
+from ..waveform_control.element import calculate_time_corr
 from ..waveform_control import pulse
 from ..waveform_control.pulse_library import MW_IQmod_pulse, SSB_DRAG_pulse
 from ..waveform_control import sequence
@@ -265,7 +266,6 @@ def resetless_RB_seq(pulse_pars, RO_pars,
     fixed_point_freq = RO_pars['fixed_point_frequency']
     RO_pars['fixed_point_frequency'] = None
 
-
     for seed in range(nr_seeds):
         cl_seq = rb.randomized_benchmarking_sequence(nr_cliffords)
 
@@ -273,8 +273,21 @@ def resetless_RB_seq(pulse_pars, RO_pars,
         pulse_sub_list = [pulses[x] for x in pulse_keys]
         pulse_sub_list += [RO_pars]
 
-        sub_seq_length = sum([p['pulse_delay'] for p in pulse_sub_list])
-        # Need to append a wait element here to ensure phase lock + wait
+        # Calculate the time correction to ensure RO pulse starts at a
+        # multiple of the fixed_point_freq
+        sub_seq_duration = sum([p['pulse_delay'] for p in pulse_sub_list])
+        # Warning assumes sampling freq of 1e9
+        extra_delay = calculate_time_corr(
+            sub_seq_duration+post_measurement_delay, fixed_point_freq)
+        initial_pulse_delay = post_measurement_delay + extra_delay
+        start_pulse = deepcopy(pulse_sub_list[0])
+        start_pulse['pulse_delay'] = initial_pulse_delay
+    # Now I would like to extend the final element with a wait time that is
+    # equal to the time from the end of the final pulse to a multiple of
+    # the fixpoint frequency...
+    # That sounds like a command in the element...
+    # or I add an extra element
+
 
     el = multi_pulse_elt(1, station, pulse_list)
 
