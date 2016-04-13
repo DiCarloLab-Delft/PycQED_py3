@@ -231,6 +231,11 @@ class Element:
             name = self._auto_pulse_name(pulse.name)
 
         t0 = start - pulse.start_offset
+        if refpoint not in ['start', 'center', 'end']:
+            raise ValueError('refpoint not recognized')
+
+        if refpoint_new not in ['start', 'center', 'end']:
+            raise ValueError('refpoint not recognized')
 
         if refpulse is not None:
             if refpoint is None:
@@ -267,7 +272,6 @@ class Element:
         if fixed_point_freq is not None:
             time_corr = self.calculate_time_corr(t0, fixed_point_freq)
             self.shift_all_pulses(time_corr)
-
         return name
 
     def append(self, *pulses):

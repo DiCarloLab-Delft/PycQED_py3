@@ -1990,7 +1990,7 @@ class T1_Analysis(TD_Analysis):
             offset=best_vals['offset'])
 
         ax.plot(t, y, 'r-')
-        textstr = '$T_1$ = %.3g $\pm$ (%.5g) ns ' % (
+        textstr = '$T_1$ = %.3g $\pm$ (%.5g) s ' % (
             fit_res.params['tau'].value, fit_res.params['tau'].stderr)
 
         ax.text(0.4, 0.95, textstr, transform=ax.transAxes,
@@ -2656,6 +2656,7 @@ class RandomizedBenchmarking_Analysis(TD_Analysis):
     def __init__(self, label='RB', T1=None, pulse_delay=None, **kw):
         self.T1 = T1
         self.pulse_delay = pulse_delay
+        kw['label'] = label
         super().__init__(**kw)
 
     def run_default_analysis(self, **kw):

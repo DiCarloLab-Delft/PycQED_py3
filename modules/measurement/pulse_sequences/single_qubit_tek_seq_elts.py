@@ -142,7 +142,7 @@ def AllXY_seq(pulse_pars, RO_pars, double_points=False,
         RO_pars:             dict containing the RO parameters
 
     '''
-    seq_name = 'Ramsey_sequence'
+    seq_name = 'AllXY_seq'
     seq = sequence.Sequence(seq_name)
     el_list = []
     # Create a dict with the parameters for all the pulses
@@ -161,12 +161,13 @@ def AllXY_seq(pulse_pars, RO_pars, double_points=False,
                               for _ in (0, 1)]
 
     for i, pulse_comb in enumerate(pulse_combinations):
-        el = double_SSB_DRAG_pulse_elt(i, station,
-                                       pulses[pulse_comb[0]],
-                                       pulses[pulse_comb[1]],
-                                       RO_pars)
+        pulse_list = [pulses[pulse_comb[0]],
+                      pulses[pulse_comb[1]],
+                      RO_pars]
+        el = multi_pulse_elt(i, station, pulse_list)
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
+
     station.instruments['AWG'].stop()
     station.pulsar.program_awg(seq, *el_list, verbose=verbose)
     return seq_name
@@ -265,14 +266,12 @@ def resetless_RB_seq(pulse_pars, RO_pars,
     fixed_point_freq = RO_pars['fixed_point_frequency']
     RO_pars['fixed_point_frequency'] = None
 
-
     for seed in range(nr_seeds):
         cl_seq = rb.randomized_benchmarking_sequence(nr_cliffords)
 
         pulse_keys = rb.decompose_clifford_seq(cl_seq)
         pulse_sub_list = [pulses[x] for x in pulse_keys]
         pulse_sub_list += [RO_pars]
-
         sub_seq_length = sum([p['pulse_delay'] for p in pulse_sub_list])
         # Need to append a wait element here to ensure phase lock + wait
 
@@ -339,6 +338,7 @@ def Motzoi_XY(motzois, pulse_pars, RO_pars,
 
 # sequence element generating functions
 
+
 def single_SSB_DRAG_pulse_elt(i, station,
                               pulse_pars,
                               RO_pars):
@@ -378,7 +378,8 @@ def single_SSB_DRAG_pulse_elt(i, station,
                                 mod_frequency=pulse_pars['mod_frequency'],
                                 phase=pulse_pars['phase'])
 
-        el.add(pulse1, name='pulse1', start=20e-9, refpulse=ref_elt)
+        el.add(pulse1, name='pulse1', start=pulse_pars['pulse_delay'],
+               refpulse=ref_elt, refpoint='start')
 
         # Readout modulation tone
         # TODO: add option to use same sequence but spit out only marker
@@ -390,7 +391,7 @@ def single_SSB_DRAG_pulse_elt(i, station,
                                         amplitude=RO_pars['amplitude'],
                                         mod_frequency=RO_pars['mod_frequency']),
                          start=RO_pars['pulse_delay'],
-                         refpulse='pulse1',
+                         refpulse='pulse1', refpoint='start',
                          fixed_point_freq=gcd(int(RO_pars['mod_frequency']),
                                               int(20e6)))
         # Hardcoded gcd to ensure fixed point always a multiple of 5ns for CBox
@@ -446,7 +447,8 @@ def double_SSB_DRAG_pulse_elt(i, station,
                                  mod_frequency=pulse_pars_1['mod_frequency'],
                                  phase=pulse_pars_1['phase'])
 
-        el.add(pulse_1, name='pulse_1', start=20e-9, refpulse=ref_elt)
+        el.add(pulse_1, name='pulse_1', start=pulse_pars_1['pulse_delay'],
+               refpulse=ref_elt, refpoint='start')
 
         pulse_2 = SSB_DRAG_pulse(name='pulse_2',
                                  I_channel=pulse_pars_2['I_channel'],
@@ -457,9 +459,8 @@ def double_SSB_DRAG_pulse_elt(i, station,
                                  motzoi=pulse_pars_2['motzoi'],
                                  mod_frequency=pulse_pars_2['mod_frequency'],
                                  phase=pulse_pars_2['phase'])
-
         el.add(pulse_2, name='pulse_2', start=pulse_pars_2['pulse_delay'],
-               refpulse='pulse_1')
+               refpulse='pulse_1', refpoint='start')
 
         # Readout modulation tone
         # TODO: add option to use same sequence but spit out only marker
@@ -470,7 +471,7 @@ def double_SSB_DRAG_pulse_elt(i, station,
                                         length=RO_pars['length'],
                                         amplitude=RO_pars['amplitude'],
                                         mod_frequency=RO_pars['mod_frequency']),
-                         start=RO_pars['pulse_delay'],
+                         start=RO_pars['pulse_delay'], refpoint='start',
                          refpulse='pulse_2',
                          fixed_point_freq=gcd(int(RO_pars['mod_frequency']),
                                               int(20e6)))
@@ -547,7 +548,7 @@ def multi_pulse_elt(i, station, pulse_list):
                                    amplitude=pulse_pars['amplitude'],
                                    mod_frequency=pulse_pars['mod_frequency']),
                     start=pulse_pars['pulse_delay'],
-                    refpulse=last_pulse,
+                    refpulse=last_pulse, refpoint='start',
                     fixed_point_freq=pulse_pars['fixed_point_frequency'])
                 # Start Acquisition marker
                 ROm = pulse.SquarePulse(name='RO-marker',
