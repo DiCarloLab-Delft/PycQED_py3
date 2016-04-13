@@ -1990,7 +1990,7 @@ class T1_Analysis(TD_Analysis):
             offset=best_vals['offset'])
 
         ax.plot(t, y, 'r-')
-        textstr = '$T_1$ = %.3g $\pm$ (%.5g) ns ' % (
+        textstr = '$T_1$ = %.3g $\pm$ (%.5g) s ' % (
             fit_res.params['tau'].value, fit_res.params['tau'].stderr)
 
         ax.text(0.4, 0.95, textstr, transform=ax.transAxes,
@@ -2656,15 +2656,17 @@ class RandomizedBenchmarking_Analysis(TD_Analysis):
     def __init__(self, label='RB', T1=None, pulse_delay=None, **kw):
         self.T1 = T1
         self.pulse_delay = pulse_delay
+        kw['label'] = label
         super().__init__(**kw)
 
     def run_default_analysis(self, **kw):
         close_main_fig = kw.pop('close_main_fig', True)
         close_file = kw.pop('close_file', True)
+        if self.cal_points is None:
+            self.cal_points = [list(range(-4, -2)), list(range(-2, 0))]
+
         super().run_default_analysis(close_file=False, make_fig=False,
                                      **kw)
-        if self.cal_points is None:
-            self.cal_points = [list(range(2)), list(range(-2, 0))]
 
         data = self.corr_data[:-1*(len(self.cal_points[0]*2))]
         n_cl = self.sweep_points[:-1*(len(self.cal_points[0]*2))]
@@ -2686,8 +2688,9 @@ class RandomizedBenchmarking_Analysis(TD_Analysis):
         Np = 1.875  # Number of gates per Clifford
         F_cl = (1/6*(3 + 2*np.exp(-1*pulse_delay/(2*T1)) +
                      np.exp(-pulse_delay/T1)))**Np
+        p = 2*F_cl - 1
 
-        return F_cl
+        return F_cl, p
 
     def make_figures(self, close_main_fig, **kw):
 
@@ -2730,14 +2733,16 @@ class RandomizedBenchmarking_Analysis(TD_Analysis):
                     (self.fit_res.params['offset'].value),
                     (self.fit_res.params['offset'].stderr)))
 
+            # Here we add the line corresponding to T1 limited fidelity
             if self.T1 is not None and self.pulse_delay is not None:
-                F_T1 = self.calc_T1_limited_fidelity(self.T1, self.pulse_delay)
+                F_T1, p_T1 = self.calc_T1_limited_fidelity(
+                    self.T1, self.pulse_delay)
                 T1_limited_curve = fit_mods.RandomizedBenchmarkingDecay(
-                    x_fine, -0.5, F_T1, 0.5)
+                    x_fine, -0.5, p_T1, 0.5)
                 self.ax.plot(x_fine, T1_limited_curve, label='T1-limit')
                 textstr += ('\n\t  $F_{Cl}^{T_1}$  = ' +
                             '{:.6g}%'.format(F_T1*100))
-                self.ax.legend()
+                self.ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
 
             self.ax.text(0.1, 0.95, textstr, transform=self.ax.transAxes,
                          fontsize=11, verticalalignment='top',

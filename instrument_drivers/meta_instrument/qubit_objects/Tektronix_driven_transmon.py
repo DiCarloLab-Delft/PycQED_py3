@@ -347,13 +347,32 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
             close_main_fig=close_fig, T1=T1,
             pulse_delay=self.pulse_delay.get())
 
-    def measure_discrimination_fid(self, no_fits=False,
+
+    def measure_ssro(self, no_fits=False,
                                    return_detector=False,
                                    MC=None,
                                    analyze=True,
-                                   close_fig=True, make_fig=True,
+                                   close_fig=True,
                                    verbose=True):
-        raise NotImplementedError()
+        self.prepare_for_timedomain()
+        if MC is None:
+            MC = self.MC
+        d = cdet.SSRO_Fidelity_Detector_Tek(
+            'SSRO'+self.msmt_suffix,
+            analyze=return_detector,
+            raw=no_fits,
+            MC=MC,
+            AWG=self.AWG, CBox=self.CBox,
+            pulse_pars=self.pulse_pars, RO_pars=self.RO_pars)
+        if return_detector:
+            return d
+        d.prepare()
+        d.acquire_data_point()
+        if analyze:
+            ma.SSRO_Analysis(label='SSRO'+self.msmt_suffix,
+                             no_fits=no_fits, close_fig=close_fig)
+
+
 
     def measure_rb_vs_amp(self, amps, nr_cliff=1,
                       resetless=True,
