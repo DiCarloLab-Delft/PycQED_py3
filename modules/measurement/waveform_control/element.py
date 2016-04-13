@@ -330,7 +330,7 @@ class Element:
         tvals = np.arange(self.samples())/self.clock
 
         for c in self._channels:
-            wfs[c] = np.zeros(self.samples()+1) + self._channels[c]['offset']
+            wfs[c] = np.zeros(self.samples()) + self._channels[c]['offset']
         # we first compute the ideal function values
         for p in self.pulses:
             psamples = self.pulse_samples(p)

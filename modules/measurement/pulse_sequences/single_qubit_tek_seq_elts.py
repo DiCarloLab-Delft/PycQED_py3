@@ -1,7 +1,10 @@
 import logging
 import numpy as np
 from copy import deepcopy
-from math import gcd
+try:
+    from math import gcd
+except:  # Moved to math in python 3.5, this is to be 3.4 compatible
+    from fractions import gcd
 from ..waveform_control import pulsar
 from ..waveform_control import element
 from ..waveform_control.element import calculate_time_corr
@@ -248,8 +251,8 @@ def Randomized_Benchmarking_seq(pulse_pars, RO_pars,
 
 def resetless_RB_seq(pulse_pars, RO_pars,
                      nr_cliffords,
-                     nr_seeds,
-                     post_measurement_delay,
+                     nr_seeds=10,
+                     post_measurement_delay=3e-6,
                      verbose=False):
     '''
     Consists of 1 very long element that interleaves RB-sequences with
@@ -267,33 +270,41 @@ def resetless_RB_seq(pulse_pars, RO_pars,
     fixed_point_freq = RO_pars['fixed_point_frequency']
     RO_pars['fixed_point_frequency'] = None
 
+    # You can think of every seed as it's own little "block"
+    # the idea is to shift whole blocks to ensure the RO is in-phase
     for seed in range(nr_seeds):
         cl_seq = rb.randomized_benchmarking_sequence(nr_cliffords)
-
         pulse_keys = rb.decompose_clifford_seq(cl_seq)
         pulse_sub_list = [pulses[x] for x in pulse_keys]
         pulse_sub_list += [RO_pars]
-
         # Calculate the time correction to ensure RO pulse starts at a
         # multiple of the fixed_point_freq
         sub_seq_duration = sum([p['pulse_delay'] for p in pulse_sub_list])
-        # Warning assumes sampling freq of 1e9
         extra_delay = calculate_time_corr(
             sub_seq_duration+post_measurement_delay, fixed_point_freq)
         initial_pulse_delay = post_measurement_delay + extra_delay
+        # Replace the initial element to wait for an extended period of time
         start_pulse = deepcopy(pulse_sub_list[0])
         start_pulse['pulse_delay'] = initial_pulse_delay
-    # Now I would like to extend the final element with a wait time that is
-    # equal to the time from the end of the final pulse to a multiple of
-    # the fixpoint frequency...
-    # That sounds like a command in the element...
-    # or I add an extra element
+        pulse_sub_list[0] = start_pulse
 
-
+        pulse_list += pulse_sub_list
     el = multi_pulse_elt(1, station, pulse_list)
-
+    extra_delay = calculate_time_corr(
+        el.length(), fixed_point_freq)
+    el.min_samples = el.samples() + int(extra_delay*el.clock)
     el_list.append(el)
-    seq.append_element(el, trigger_wait=False)  # Keep running perpetually
+    return el
+
+    init_el = deepcopy(el)
+    init_el.name = 'init_elt'
+    el_list.append(init_el)
+
+    # First wait for trigger ensure experiment starts in phase
+    seq.append_element(init_el, trigger_wait=True)  # Keep running perpetually
+    # Setting goto_target to the element itself ensures it will not wait for
+    # triggers afterwards
+    seq.append_element(el, trigger_wait=False, goto_target=el.name)
 
     station.instruments['AWG'].stop()
     station.pulsar.program_awg(seq, *el_list, verbose=verbose)
@@ -419,6 +430,11 @@ def single_SSB_DRAG_pulse_elt(i, station,
                           refpulse=RO_tone, refpoint='start')
         el.add(pulse.cp(ROm, channel=RO_pars['marker_ch2']),
                refpulse=ROm_name, refpoint='start', start=0)
+
+        el.add(pulse.SquarePulse(name='final_empty_pulse',
+                                              channel='ch1',
+                                              amplitude=0, length=1e-9),
+                            refpulse=RO_tone, refpoint='end')
         return el
 
 
@@ -500,6 +516,12 @@ def double_SSB_DRAG_pulse_elt(i, station,
                           refpulse=RO_tone, refpoint='start')
         el.add(pulse.cp(ROm, channel=RO_pars['marker_ch2']),
                refpulse=ROm_name, refpoint='start', start=0)
+
+        el.add(pulse.SquarePulse(name='final_empty_pulse',
+                                 channel='ch1',
+                                 amplitude=0, length=1e-9),
+               refpulse=RO_tone, refpoint='end')
+
         return el
 
 
@@ -573,6 +595,12 @@ def multi_pulse_elt(i, station, pulse_list):
                                   refpulse=last_pulse, refpoint='start')
                 el.add(pulse.cp(ROm, channel=pulse_pars['marker_ch2']),
                        refpulse=ROm_name, refpoint='start', start=0)
+
+        # This pulse ensures that the sequence always ends at zero amp
+        last_pulse = el.add(pulse.SquarePulse(name='final_empty_pulse',
+                                              channel='ch1',
+                                              amplitude=0, length=1e-9),
+                            refpulse=last_pulse, refpoint='end')
 
         return el
 
