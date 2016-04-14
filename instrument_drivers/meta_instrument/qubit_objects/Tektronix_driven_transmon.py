@@ -392,16 +392,23 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
             initialize=initialize, post_measurement_delay=post_measurement_delay))
         MC.set_detector_function(self.int_log_det)
         MC.run('Butterfly{}initialize_{}'.format(self.msmt_suffix, initialize))
+        #first perform SSRO analysis to extract the optimal rotation angle theta
         a=ma.SSRO_discrimination_analysis(
             label='Butterfly',
             current_threshold=None,
             close_fig=False,
             plot_2D_histograms=True)
-        print(a.theta)
-        print(a.opt_I_threshold)
-        # ma.butterfly_analysis(
-        #    close_main_fig=close_fig, initialize=initialize,
-        #    pulse_delay=self.pulse_delay.get())
+        #the, run it a second time to determin the optimum threshold along the rotated I axis
+        b=ma.SSRO_discrimination_analysis(
+            label='Butterfly',
+            current_threshold=None,
+            close_fig=False,
+            plot_2D_histograms=True, theta_in=-a.theta)
+
+        ma.butterfly_analysis(
+            close_main_fig=close_fig, initialize=initialize,
+            theta_in=-a.theta,
+            threshold=b.opt_I_threshold, digitize=True)
 
 
 

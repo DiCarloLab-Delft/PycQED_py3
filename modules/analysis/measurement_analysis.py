@@ -1832,7 +1832,6 @@ class SSRO_discrimination_analysis(MeasurementAnalysis):
         # only look at sigma x because we assume sigma_x = sigma_y
         sig_a = self.fit_res.params['A_sigma_x'].value
         sig_b = self.fit_res.params['B_sigma_x'].value
-
         # Picking threshold in the middle assumes same sigma for both
         # distributions, this can be improved by optimizing the F_discr
         if abs(self.mu_a) > abs(self.mu_b):
@@ -4030,19 +4029,22 @@ class butterfly_analysis(MeasurementAnalysis):
     def __init__(self,  auto=True, label='Butterfly', close_file=True,
                  timestamp=None,
                  threshold=None,
-                 initialize=False, **kw):
-
+                 theta_in=0,
+                 initialize=False,
+                digitize=True,
+                 **kw):
         self.folder = a_tools.get_folder(timestamp=timestamp,
-                                             label='Butterfly', **kw)
+                                             label=label, **kw)
         self.load_hdf5data(folder=self.folder, **kw)
-        self.get_naming_and_values_2D()
-        self.data = self.Z
-        a = ma.SSRO_discrimination_analysis(
-            label=label,
-            current_threshold=None,
-            close_fig=False,
-            plot_2D_histograms=True)
 
+        self.get_naming_and_values()
+        I_shots = self.measured_values[0]
+        Q_shots = self.measured_values[1]
+
+        #rotating according to theta
+        I_shots = np.cos(theta_in*2*np.pi/360)*I_shots - np.sin(theta_in*2*np.pi/360)*Q_shots
+        Q_shots = np.sin(theta_in*2*np.pi/360)*I_shots + np.cos(theta_in*2*np.pi/360)*Q_shots
+        self.data=I_shots
 
         # SSRO_discrimination_analysis(
 
@@ -4085,29 +4087,21 @@ class butterfly_analysis(MeasurementAnalysis):
 
         m0_on = self.data[2::4]
         m1_on = self.data[3::4]
-        self.data_rel = m0_on+m1_on
-        self.data_rel[::2] = m0_on
-        self.data_rel[1::2] = m1_on
+        self.data_rel = np.zeros([np.size(m0_on),2])
+        self.data_rel[:,0] = m0_on
+        self.data_rel[:,1] = m1_on
         m0_off = self.data[0::4]
         m1_off = self.data[1::4]
-        self.data_exc = m0_off+m1_off
-        self.data_exc[::2] = m0_off
-        self.data_exc[1::2] = m1_off
-
-        #fingding the optimal rotation angle
-        SSRO_
-
-
-
+        self.data_exc = np.zeros([np.size(m0_off),2])
+        self.data_exc[:,0] = m0_off
+        self.data_exc[:,1] = m1_off
         if digitize:
-            instrument_settings = self.data_file['Instrument settings']
-            threshold = float(
-                instrument_settings['CBox'].attrs['signal_threshold_line0'])
-
             self.data_exc = dm_tools.digitize(threshold=threshold,
-                                              data=self.data_exc)
+                                              data=self.data_exc,
+                                              positive_case=False)
             self.data_rel = dm_tools.digitize(threshold=threshold,
-                                              data=self.data_rel)
+                                              data=self.data_rel,
+                                              positive_case=False)
         if close_file:
             self.data_file.close()
         if auto is True:
@@ -4116,6 +4110,7 @@ class butterfly_analysis(MeasurementAnalysis):
     def run_default_analysis(self, **kw):
         exc_coeffs = dm_tools.butterfly_data_binning(Z=self.data_exc,
                                                      initial_state=0)
+        #print(exc_coeffs)
         rel_coeffs = dm_tools.butterfly_data_binning(Z=self.data_rel,
                                                      initial_state=1)
         self.butterfly_coeffs = dm_tools.butterfly_matrix_inversion(exc_coeffs,
