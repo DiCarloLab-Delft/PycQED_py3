@@ -579,6 +579,30 @@ class CBox_state_counters_det(Hard_Detector):
         self.AWG.stop()
 
 
+class CBox_single_qubit_state_counters(CBox_state_counters_det):
+    '''
+    Child of the state counters detector
+    Returns only a subset of the counters relating to weight function 1.
+    Rescales the measured counts to percentages.
+    '''
+    def __init__(self, CBox, AWG):
+        self.CBox = CBox
+        self.name = 'CBox_state_counters_detector'
+        # A and B refer to the counts for the different weight functions
+        self.value_names = ['no err. frac.', 'single err. frac.',
+                            'double err. frac.']
+        self.value_units = ['%']*3
+        self.AWG = AWG
+
+    def prepare(self, **kw):
+        self.nr_shots = self.CBox.log_length.get()
+
+    def get_values(self):
+        d = super().get_values()
+        data = d[0:3]/self.nr_shots * 100
+        return data
+
+
 class CBox_digitizing_shots_det(CBox_integration_logging_det):
     """docstring for  CBox_digitizing_shots_det"""
     def __init__(self, CBox, AWG, threshold,
