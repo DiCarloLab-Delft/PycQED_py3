@@ -1,9 +1,196 @@
 import numpy as np
 import logging
 from modules.measurement import sweep_functions as swf
-
+from modules.measurement.randomized_benchmarking import randomized_benchmarking as rb
 from modules.measurement.pulse_sequences import standard_sequences as st_seqs
-default_gauss_width = 10  # magic number should be removed
+from modules.measurement.pulse_sequences import single_qubit_tek_seq_elts as sqs
+default_gauss_width = 10  # magic number should be removed,
+# note magic number only used in old mathematica seqs
+
+
+class Rabi(swf.Hard_Sweep):
+    def __init__(self, pulse_pars, RO_pars, n=1, upload=True):
+        super().__init__()
+        self.pulse_pars = pulse_pars
+        self.RO_pars = RO_pars
+        self.n = n
+        self.upload = upload
+
+        self.name = 'Rabi'
+        self.parameter_name = 'amplitude'
+        self.unit = 'V'
+
+    def prepare(self, **kw):
+        if self.upload:
+            sqs.Rabi_seq(amps=self.sweep_points,
+                         pulse_pars=self.pulse_pars,
+                         RO_pars=self.RO_pars,
+                         n=self.n)
+
+
+class T1(swf.Hard_Sweep):
+    def __init__(self, pulse_pars, RO_pars, upload=True):
+        super().__init__()
+        self.pulse_pars = pulse_pars
+        self.RO_pars = RO_pars
+        self.upload = upload
+
+        self.name = 'T1'
+        self.parameter_name = 't'
+        self.unit = 's'
+
+    def prepare(self, **kw):
+        if self.upload:
+            sqs.T1_seq(times=self.sweep_points,
+                       pulse_pars=self.pulse_pars,
+                       RO_pars=self.RO_pars)
+
+
+class AllXY(swf.Hard_Sweep):
+    def __init__(self, pulse_pars, RO_pars, double_points=False, upload=True):
+        super().__init__()
+        self.pulse_pars = pulse_pars
+        self.RO_pars = RO_pars
+        self.double_points = double_points
+        self.upload = upload
+
+        self.parameter_name = 'AllXY element'
+        self.unit = '#'
+        self.name = 'AllXY'
+        if not double_points:
+            self.sweep_points = np.arange(21)
+        else:
+            self.sweep_points = np.arange(42)
+
+    def prepare(self, **kw):
+        if self.upload:
+            sqs.AllXY_seq(pulse_pars=self.pulse_pars,
+                          RO_pars=self.RO_pars,
+                          double_points=self.double_points)
+
+
+class OffOn(swf.Hard_Sweep):
+    def __init__(self, pulse_pars, RO_pars, upload=True):
+        super().__init__()
+        self.pulse_pars = pulse_pars
+        self.RO_pars = RO_pars
+        self.upload = upload
+
+        self.parameter_name = 'OffOn element'
+        self.unit = '#'
+        self.name = 'OffOn'
+        self.sweep_points = np.arange(2)
+
+    def prepare(self, **kw):
+        if self.upload:
+            sqs.OffOn_seq(pulse_pars=self.pulse_pars,
+                          RO_pars=self.RO_pars)
+
+class Butterfly(swf.Hard_Sweep):
+    def __init__(self, pulse_pars, RO_pars, initialize=False, upload=True,
+                 post_measurement_delay=2000e-9):
+        super().__init__()
+        self.pulse_pars = pulse_pars
+        self.RO_pars = RO_pars
+        self.upload = upload
+        self.parameter_name = 'Buttefly element'
+        self.unit = '#'
+        self.name = 'Butterfly'
+        self.sweep_points = np.arange(2)
+        self.initialize=initialize
+        self.post_measurement_delay = post_measurement_delay
+
+    def prepare(self, **kw):
+        if self.upload:
+            sqs.Butterfly_seq(pulse_pars=self.pulse_pars,
+                              post_measurement_delay=self.post_measurement_delay,
+                          RO_pars=self.RO_pars, initialize=self.initialize)
+
+
+
+class Randomized_Benchmarking(swf.Hard_Sweep):
+    def __init__(self, pulse_pars, RO_pars,
+                 nr_seeds, nr_cliffords,
+                 cal_points=True,
+                 upload=True):
+        # If nr_cliffords is None it still needs to be specfied when setting
+        # the experiment
+        super().__init__()
+        self.pulse_pars = pulse_pars
+        self.RO_pars = RO_pars
+        self.upload = upload
+        self.nr_seeds = nr_seeds
+        self.cal_points = cal_points
+        self.sweep_points = nr_cliffords
+
+        self.parameter_name = 'Nr of Cliffords'
+        self.unit = '#'
+        self.name = 'Randomized_Benchmarking'
+        self.sweep_points = nr_cliffords
+
+        if self.cal_points:
+            self.sweep_points = np.concatenate([nr_cliffords,
+                                   [nr_cliffords[-1]+.2,
+                                    nr_cliffords[-1]+.3,
+                                    nr_cliffords[-1]+.7,
+                                    nr_cliffords[-1]+.8]])
+
+    def prepare(self, **kw):
+        if self.upload:
+            sqs.Randomized_Benchmarking_seq(
+                self.pulse_pars, self.RO_pars,
+                nr_cliffords=self.sweep_points,
+                nr_seeds=self.nr_seeds,
+                cal_points=self.cal_points)
+
+
+class Ramsey(swf.Hard_Sweep):
+    def __init__(self, pulse_pars, RO_pars,
+                 artificial_detuning=None,
+                 cal_points=True,
+                 upload=True):
+        super().__init__()
+        self.pulse_pars = pulse_pars
+        self.RO_pars = RO_pars
+        self.upload = upload
+        self.cal_points = cal_points
+        self.artificial_detuning = artificial_detuning
+
+        self.name = 'Ramsey'
+        self.parameter_name = 't'
+        self.unit = 's'
+
+    def prepare(self, **kw):
+        if self.upload:
+            sqs.Ramsey_seq(times=self.sweep_points,
+                           pulse_pars=self.pulse_pars,
+                           RO_pars=self.RO_pars,
+                           artificial_detuning=self.artificial_detuning,
+                           cal_points=self.cal_points)
+
+
+class Motzoi_XY(swf.Hard_Sweep):
+    def __init__(self, motzois, pulse_pars, RO_pars, upload=True):
+        '''
+        Measures 2 points per motzoi value specified in motzois and adds 4
+        calibration points to it.
+        '''
+        super().__init__()
+        self.pulse_pars = pulse_pars
+        self.RO_pars = RO_pars
+        self.upload = upload
+        self.name = 'Motzoi_XY'
+        self.parameter_name = 'motzoi'
+        self.unit = ' '
+        sweep_pts = np.repeat(motzois, 2)
+        self.sweep_points = np.append(sweep_pts,
+                                   [motzois[-1]+(motzois[-1]-motzois[-2])]*4)
+
+    def prepare(self, **kw):
+        if self.upload:
+            sqs.Motzoi_XY(motzois=self.sweep_points,
+                          pulse_pars=self.pulse_pars,
+                          RO_pars=self.RO_pars)
 
 
 class CBox_T1(swf.Hard_Sweep):
@@ -34,14 +221,14 @@ class CBox_T1(swf.Hard_Sweep):
 
 class CBox_Ramsey(swf.Hard_Sweep):
     def __init__(self, IF, RO_pulse_length,
-                 RO_pulse_delay, RO_trigger_delay, pulse_separation,
+                 RO_pulse_delay, RO_trigger_delay, pulse_delay,
                  AWG, CBox, cal_points=True,
                  upload=True):
         super().__init__()
         self.IF = IF
         self.RO_pulse_delay = RO_pulse_delay
         self.RO_trigger_delay = RO_trigger_delay
-        self.pulse_separation = pulse_separation
+        self.pulse_delay = pulse_delay
         self.RO_pulse_length = RO_pulse_length
         self.name = 'T2*'
         self.parameter_name = 'tau'
@@ -60,7 +247,7 @@ class CBox_Ramsey(swf.Hard_Sweep):
                 RO_pulse_delay=self.RO_pulse_delay,
                 RO_pulse_length=self.RO_pulse_length,
                 RO_trigger_delay=self.RO_trigger_delay,
-                pulse_separation=self.pulse_separation,
+                pulse_delay=self.pulse_delay,
                 verbose=False)
             self.AWG.set('ch3_amp', ch3_amp)
             self.AWG.set('ch4_amp', ch4_amp)
@@ -84,14 +271,14 @@ class CBox_Ramsey(swf.Hard_Sweep):
 
 class CBox_Echo(swf.Hard_Sweep):
     def __init__(self, IF,
-                 RO_pulse_delay, RO_trigger_delay, pulse_separation,
+                 RO_pulse_delay, RO_trigger_delay, pulse_delay,
                  AWG, CBox, cal_points=True,
                  upload=True):
         super().__init__()
         self.IF = IF
         self.RO_pulse_delay = RO_pulse_delay
         self.RO_trigger_delay = RO_trigger_delay
-        self.pulse_separation = pulse_separation
+        self.pulse_delay = pulse_delay
         self.name = 'T2-echo'
         self.parameter_name = 'tau'
         self.unit = 's'
@@ -177,7 +364,7 @@ class CBox_OffOn(swf.Hard_Sweep):
 
 
 class CBox_AllXY(swf.Hard_Sweep):
-    def __init__(self, IF, pulse_separation,
+    def __init__(self, IF, pulse_delay,
                  RO_pulse_delay,
                  RO_trigger_delay,
                  RO_pulse_length,
@@ -227,7 +414,7 @@ class CBox_AllXY(swf.Hard_Sweep):
         self.RO_pulse_delay = RO_pulse_delay
         self.RO_trigger_delay = RO_trigger_delay
         self.RO_pulse_length = RO_pulse_length
-        self.pulse_separation = pulse_separation
+        self.pulse_delay = pulse_delay
 
     def prepare(self, **kw):
         self.AWG.stop()
@@ -244,7 +431,7 @@ class CBox_AllXY(swf.Hard_Sweep):
 
             st_seqs.CBox_two_pulse_seq(
                 IF=self.IF,
-                pulse_separation=self.pulse_separation,
+                pulse_delay=self.pulse_delay,
                 RO_pulse_delay=self.RO_pulse_delay,
                 RO_pulse_length=self.RO_pulse_length,
                 RO_trigger_delay=self.RO_trigger_delay, verbose=False)
@@ -254,7 +441,7 @@ class CBox_AllXY(swf.Hard_Sweep):
 
 class CBox_multi_element_tape(swf.Hard_Sweep):
     def __init__(self, n_pulses, tape,
-                 pulse_separation,
+                 pulse_delay,
                  IF, RO_pulse_delay, RO_trigger_delay,
                  RO_pulse_length,
                  AWG, CBox,
@@ -280,7 +467,7 @@ class CBox_multi_element_tape(swf.Hard_Sweep):
         self.RO_pulse_delay = RO_pulse_delay
         self.RO_trigger_delay = RO_trigger_delay
         self.RO_pulse_length = RO_pulse_length
-        self.pulse_separation = pulse_separation
+        self.pulse_delay = pulse_delay
 
     def prepare(self, **kw):
         self.AWG.stop()
@@ -294,7 +481,7 @@ class CBox_multi_element_tape(swf.Hard_Sweep):
             ch3_amp = self.AWG.get('ch3_amp')
             ch4_amp = self.AWG.get('ch3_amp')
             st_seqs.CBox_multi_pulse_seq(
-                n_pulses=self.n_pulses, pulse_separation=self.pulse_separation,
+                n_pulses=self.n_pulses, pulse_delay=self.pulse_delay,
                 IF=self.IF,
                 RO_pulse_delay=self.RO_pulse_delay,
                 RO_trigger_delay=self.RO_trigger_delay,
@@ -306,7 +493,7 @@ class CBox_multi_element_tape(swf.Hard_Sweep):
 
 class Resetless_tape(swf.Hard_Sweep):
     def __init__(self, n_pulses, tape,
-                 pulse_separation, resetless_interval,
+                 pulse_delay, resetless_interval,
                  IF, RO_pulse_delay, RO_trigger_delay,
                  RO_pulse_length,
                  AWG, CBox,
@@ -330,7 +517,7 @@ class Resetless_tape(swf.Hard_Sweep):
 
         self.n_pulses = n_pulses
         self.resetless_interval = resetless_interval
-        self.pulse_separation = pulse_separation
+        self.pulse_delay = pulse_delay
 
     def prepare(self, **kw):
         self.AWG.stop()
@@ -344,7 +531,7 @@ class Resetless_tape(swf.Hard_Sweep):
             ch3_amp = self.AWG.get('ch3_amp')
             ch4_amp = self.AWG.get('ch3_amp')
             st_seqs.CBox_resetless_multi_pulse_seq(
-                n_pulses=self.n_pulses, pulse_separation=self.pulse_separation,
+                n_pulses=self.n_pulses, pulse_delay=self.pulse_delay,
                 resetless_interval=self.resetless_interval,
                 IF=self.IF,
                 RO_pulse_delay=self.RO_pulse_delay,
@@ -353,6 +540,111 @@ class Resetless_tape(swf.Hard_Sweep):
                 verbose=False)
             self.AWG.set('ch3_amp', ch3_amp)
             self.AWG.set('ch4_amp', ch4_amp)
+
+
+class CBox_RB_sweep(swf.Hard_Sweep):
+    def __init__(self,
+                 IF, RO_pulse_length,
+                 RO_pulse_delay, RO_trigger_delay,
+                 pulse_delay,
+                 AWG, CBox, LutMan,
+                 cal_points=True,
+                 nr_cliffords=[1, 3, 5, 10, 20],
+                 nr_seeds=3, max_seq_duration=15e-6,
+                 safety_margin=500e-9,
+                 upload=True):
+        super().__init__()
+        self.parameter_name = 'Nr of Cliffords'
+        self.unit = '#'
+        self.name = 'Randomized_Benchmarking'
+        self.safety_margin = safety_margin
+        # Making input pars available to prepare
+        # Required instruments
+        self.AWG = AWG
+        self.CBox = CBox
+        self.LutMan = LutMan
+        self.nr_seeds = nr_seeds
+        self.cal_points = [0, 0, 1, 1]
+        self.nr_cliffords = np.array(nr_cliffords)
+        self.max_seq_duration = max_seq_duration
+        self.pulse_delay_ns = pulse_delay*1e9
+
+        self.IF = IF
+        self.RO_pulse_length = RO_pulse_length
+        self.RO_pulse_delay = RO_pulse_delay
+        self.RO_trigger_delay = RO_trigger_delay
+        # Funny last sweep point values are to make the cal points appear
+        # in sensible (visible) places in the plot
+        self.sweep_points = np.concatenate([nr_cliffords,
+                                           [nr_cliffords[-1]+.2,
+                                            nr_cliffords[-1]+.3,
+                                            nr_cliffords[-1]+.7,
+                                            nr_cliffords[-1]+.8]])
+
+    def prepare(self, upload_tek_seq=True, **kw):
+        self.AWG.stop()
+        n_cls = self.nr_cliffords
+        time_tape = []
+        pulse_length = self.LutMan.gauss_width.get()*4
+        for seed in range(self.nr_seeds):
+            for n_cl in n_cls:
+                cliffords = rb.randomized_benchmarking_sequence(n_cl)
+                cl_tape = rb.convert_clifford_sequence_to_tape(
+                    cliffords,
+                    self.LutMan.lut_mapping.get())
+                for i, tape_elt in enumerate(cl_tape):
+                    if i == 0:
+                        # wait_time is in ns
+                        wait_time = (self.max_seq_duration*1e9 -
+                                     (len(cl_tape)-1)*self.pulse_delay_ns -
+                                     pulse_length)
+                    else:
+                        wait_time = self.pulse_delay_ns - pulse_length
+                    end_of_marker = (i == (len(cl_tape)-1))
+                    entry = self.CBox.create_timing_tape_entry(
+                        wait_time, tape_elt, end_of_marker, prepend_elt=0)
+                    time_tape.extend(entry)
+
+            for cal_pt in self.cal_points:
+                wait_time = self.max_seq_duration*1e9 - pulse_length
+                time_tape.extend(self.CBox.create_timing_tape_entry(
+                    wait_time, cal_pt, True, prepend_elt=0))
+        # print('Total tape length', len(time_tape))
+        for awg in range(3):
+            self.CBox.set('AWG{}_mode'.format(awg), 'Segmented')
+            self.CBox.set_segmented_tape(awg, time_tape)
+            self.CBox.restart_awg_tape(awg)
+        if upload_tek_seq:
+            self.upload_tek_seq()
+
+    def upload_tek_seq(self):
+        st_seqs.CBox_single_pulse_seq(
+            IF=self.IF,
+            RO_pulse_delay=self.RO_pulse_delay +
+            self.max_seq_duration+self.safety_margin,
+            RO_trigger_delay=self.RO_trigger_delay,
+            RO_pulse_length=self.RO_pulse_length)
+
+
+class Two_d_CBox_RB_seq(swf.Soft_Sweep):
+    def __init__(self, CBox_RB_sweepfunction):
+        super().__init__()
+        self.parameter_name = 'Idx'
+        self.unit = '#'
+        self.name = 'Randomized_Benchmarking_random_seeds'
+        self.CBox_RB_sweepfunction = CBox_RB_sweepfunction
+
+    def set_parameter(self, val):
+        '''
+        Uses the CBox RB sweepfunction to upload a new tape of random cliffords
+        explicitly does not reupload the AWG sequence.
+        '''
+        self.CBox_RB_sweepfunction.prepare(upload_tek_seq=False)
+
+
+
+
+
 
 
 # class AWG_Sweep(swf.Hard_Sweep):

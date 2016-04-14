@@ -56,7 +56,6 @@ class MW_IQmod_pulse(pulse.Pulse):
         if chan == self.I_channel:
             wf[idx0:idx1] += self.amplitude * np.cos(2 * np.pi * (
                 self.mod_frequency * tvals[idx0:idx1] + self.phase/360.))
-        print('phase =', self.phase)
 
         if chan == self.Q_channel:
             wf[idx0:idx1] += self.amplitude * np.sin(2 * np.pi * (
@@ -84,10 +83,27 @@ class SSB_DRAG_pulse(pulse.Pulse):
         phase (deg)
         phaselock (bool)
 
+        alpha (arb. units): QI amplitude
+        phi_skew (deg) :    phase skewness
+
     I_env is a gaussian
-    transformation:
-    [I_mod] = [cos(wt+phi)   sin(wt+phi)] [I_env]
-    [Q_mod]   [-sin(wt+phi)  cos(wt+phi)] [Q_env]
+    Q_env is the derivative of a gaussian
+    The envelope is transformation:
+    Signal = predistortion * modulation * envelope
+
+    See Leo's notes on mixer predistortion in the docs for details
+
+    [I_mod] = [1        tan(phi-skew)] [cos(wt+phi)   sin(wt+phi)] [I_env]
+    [Q_mod]   [0  sec(phi-skew)/alpha] [-sin(wt+phi)  cos(wt+phi)] [Q_env]
+
+
+    The predistortion * modulation matrix is implemented in a single step using
+    the following matrix
+
+    M*mod = [cos(x)-tan(phi-skew)sin(x)      sin(x)+tan(phi-skew)cos(x) ]
+            [-sin(x)sec(phi-skew)/alpha  cos(x)sec(phi-skew)/alpha]
+
+    where: x = wt+phi
 
     Reduces to a Gaussian pulse if motzoi == 0
     Reduces to an unmodulated pulse if mod_frequency == 0
@@ -106,6 +122,9 @@ class SSB_DRAG_pulse(pulse.Pulse):
         self.mod_frequency = kw.pop('mod_frequency', 1e6)
         self.phase = kw.pop('phase', 0.)
         self.phaselock = kw.pop('phaselock', True)
+
+        self.alpha = kw.pop('alpha', 1)        # QI amp ratio
+        self.phi_skew = kw.pop('phi_skew', 0)  # IQ phase skewness
 
         self.length = self.sigma * self.nr_sigma
 
@@ -138,16 +157,54 @@ class SSB_DRAG_pulse(pulse.Pulse):
 
         # Note prefactor is multiplied by self.sigma to normalize
         if chan == self.I_channel:
-            wf[idx0:idx1] += gauss_env * np.cos(2 * np.pi * (
-                self.mod_frequency * tvals[idx0:idx1] + self.phase/360.)) \
-                + deriv_gauss_env * np.sin(2 * np.pi * (
-                    self.mod_frequency * tvals[idx0:idx1] + self.phase/360.))
+            I_mod, Q_mod = self.apply_modulation(gauss_env, deriv_gauss_env,
+                                                 tvals[idx0:idx1])
+            wf[idx0:idx1] += I_mod
 
         if chan == self.Q_channel:
-            wf[idx0:idx1] += -gauss_env * np.sin(2 * np.pi * (
-                self.mod_frequency * tvals[idx0:idx1] + self.phase/360.))\
-                + deriv_gauss_env * np.cos(2 * np.pi * (
-                    self.mod_frequency * tvals[idx0:idx1] + self.phase/360.))
+            I_mod, Q_mod = self.apply_modulation(gauss_env, deriv_gauss_env,
+                                                 tvals[idx0:idx1])
+            wf[idx0:idx1] += Q_mod
 
         return wf
 
+    def apply_modulation(self, I_env, Q_env, tvals):
+        '''
+        Applies single sideband modulation, requires timevals to make sure the
+        phases are correct.
+
+        Input args:
+            I_env
+            Q_env
+            tvals
+        returns:
+            [I_mod, Q_mod] = M*mod*[I_env, Q_env]
+
+        Signal = predistortion * modulation * envelope
+        See Leo's notes on mixer predistortion in the docs for details
+
+        [I_mod] = [1        tan(phi-skew)] [cos(wt+phi)   sin(wt+phi)] [I_env]
+        [Q_mod]   [0  sec(phi-skew)/alpha] [-sin(wt+phi)  cos(wt+phi)] [Q_env]
+
+        The predistortion * modulation matrix is implemented in a single step
+        using the following matrix
+
+        M*mod = [cos(x)-tan(phi-skew)sin(x)      sin(x)+tan(phi-skew)cos(x) ]
+                [-sin(x)sec(phi-skew)/alpha  cos(x)sec(phi-skew)/alpha]
+        '''
+        tan_phi_skew = np.tan(2*np.pi*self.phi_skew/360)
+        sec_phi_alpha = 1/(np.cos(2*np.pi*self.phi_skew/360) * self.alpha)
+
+        I_mod = (I_env*(np.cos(2*np.pi*(self.mod_frequency*tvals +
+                                        self.phase/360)) - tan_phi_skew *
+                        np.sin(2*np.pi*(self.mod_frequency*tvals +
+                                        self.phase/360))) +
+                 Q_env*(np.sin(2*np.pi*(self.mod_frequency*tvals +
+                                        self.phase/360)) + tan_phi_skew *
+                 np.cos(2*np.pi*(self.mod_frequency*tvals + self.phase/360))))
+
+        Q_mod = (-1*I_env*sec_phi_alpha*np.sin(2*np.pi*(self.mod_frequency *
+                 tvals + self.phase/360.)) +
+                 + Q_env * sec_phi_alpha * np.cos(2 * np.pi * (
+                 self.mod_frequency * tvals + self.phase/360.)))
+        return [I_mod, Q_mod]

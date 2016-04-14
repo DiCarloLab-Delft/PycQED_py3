@@ -120,7 +120,7 @@ class SquarePulse(Pulse):
 
 
 class CosPulse(Pulse):
-    def __init__(self, channel, name='sine pulse', **kw):
+    def __init__(self, channel, name='cos pulse', **kw):
         Pulse.__init__(self, name)
 
         self.channel = channel  # this is just for convenience, internally

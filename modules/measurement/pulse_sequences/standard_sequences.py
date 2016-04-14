@@ -17,6 +17,11 @@ reload(element)
 Standard sequences. Currently (17-1-2016) all sequences have the channels
 hardcoded. It would be better if these use the named channels and have the
 mapping defined on the pulsar.
+
+Update (12-4-2016) this module has grown out to be very CBox specific.
+Almost any sequence here can be made with the "multi_pulse_elt" that exists
+in single_qubit_tek_seq_elts.
+Will not move what is here now for backwards compatibility.
 '''
 
 
@@ -143,7 +148,7 @@ def CBox_single_pulse_seq(IF, RO_pulse_delay, RO_trigger_delay,
     return seq_name
 
 
-def CBox_two_pulse_seq(IF, pulse_separation, RO_pulse_length,
+def CBox_two_pulse_seq(IF, pulse_delay, RO_pulse_length,
                        RO_pulse_delay, RO_trigger_delay,
                        verbose=False):
     seq_name = 'CBox_two_pulse_seq'
@@ -152,7 +157,7 @@ def CBox_two_pulse_seq(IF, pulse_separation, RO_pulse_length,
 
     for i in range(2):  # seq has to have at least 2 elts
         el = st_elts.two_pulse_elt(i, station, IF,
-                                   pulse_separation=pulse_separation,
+                                   pulse_delay=pulse_delay,
                                    RO_pulse_delay=RO_pulse_delay,
                                    RO_trigger_delay=RO_trigger_delay,
                                    RO_pulse_length=RO_pulse_length)
@@ -164,7 +169,7 @@ def CBox_two_pulse_seq(IF, pulse_separation, RO_pulse_length,
 
 
 def CBox_multi_pulse_seq(IF, n_pulses,
-                         pulse_separation,
+                         pulse_delay,
                          RO_pulse_delay,
                          RO_pulse_length,
                          RO_trigger_delay,
@@ -174,7 +179,7 @@ def CBox_multi_pulse_seq(IF, n_pulses,
     el_list = []
     for i in range(2):  # seq has to have at least 2 elts
         el = st_elts.multi_pulse_elt(i, station, IF,
-                                     pulse_separation=pulse_separation,
+                                     pulse_delay=pulse_delay,
                                      RO_pulse_delay=RO_pulse_delay,
                                      RO_pulse_length=RO_pulse_length,
                                      RO_trigger_delay=RO_trigger_delay,
@@ -187,7 +192,7 @@ def CBox_multi_pulse_seq(IF, n_pulses,
 
 
 def CBox_resetless_multi_pulse_seq(IF, n_pulses,
-                                   pulse_separation=60e-9,
+                                   pulse_delay=60e-9,
                                    RO_pulse_delay=0,
                                    RO_pulse_length=1e-6,
                                    RO_trigger_delay=0,
@@ -199,7 +204,7 @@ def CBox_resetless_multi_pulse_seq(IF, n_pulses,
     for i in range(3):  # seq has to have at least 2 elts
         el = st_elts.CBox_resetless_multi_pulse_elt(
             i, station, IF,
-            pulse_separation=pulse_separation,
+            pulse_delay=pulse_delay,
             RO_pulse_delay=RO_pulse_delay,
             RO_trigger_delay=RO_trigger_delay,
             RO_pulse_length=RO_pulse_length,
@@ -252,7 +257,7 @@ def CBox_T1_marker_seq(IF, times, RO_pulse_delay,
 
 
 def CBox_Ramsey_marker_seq(IF, times, RO_pulse_delay, RO_pulse_length,
-                           RO_trigger_delay, pulse_separation,
+                           RO_trigger_delay, pulse_delay,
                            verbose=False):
     '''
     If cal_points, replaces the last 4 elements with calibration points
@@ -265,7 +270,7 @@ def CBox_Ramsey_marker_seq(IF, times, RO_pulse_delay, RO_pulse_length,
         el = st_elts.two_pulse_elt(i, station, IF, RO_pulse_delay,
                                    RO_trigger_delay=RO_trigger_delay,
                                    RO_pulse_length=RO_pulse_length,
-                                   pulse_separation=pulse_separation,
+                                   pulse_delay=pulse_delay,
                                    tau=tau)
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)

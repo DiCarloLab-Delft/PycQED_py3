@@ -143,7 +143,10 @@ class Transmon(Qubit):
                            parameter_class=ManualParameter)
         self.add_parameter('RO_trigger_delay', units='s',
                            parameter_class=ManualParameter)
-        self.add_parameter('pulse_separation', units='s',
+        self.add_parameter('RO_amp', units='V',
+                           parameter_class=ManualParameter)
+        # Time between start of pulses
+        self.add_parameter('pulse_delay', units='s',
                            parameter_class=ManualParameter)
 
     def calculate_frequency(self, EC=None, EJ=None, assymetry=None,
@@ -193,7 +196,7 @@ class Transmon(Qubit):
                        f_step=1e6,
                        verbose=True,
                        update=False,
-                       close_fig=False):
+                       close_fig=True):
 
         if method.lower() == 'spectroscopy':
             if freqs is None:
@@ -212,8 +215,8 @@ class Transmon(Qubit):
             stepsize = abs(1/self.f_pulse_mod.get())
             cur_freq = self.f_qubit.get()
             # Steps don't double to be more robust against aliasing
-            for n in [1, 3, 10, 30, 100, 300, 1000]:
-                times = np.arange(self.pulse_separation.get(),
+            for n in steps:
+                times = np.arange(self.pulse_delay.get(),
                                   50*n*stepsize, n*stepsize)
                 artificial_detuning = 4/times[-1]
                 self.measure_ramsey(times,
@@ -250,4 +253,53 @@ class Transmon(Qubit):
 
     def find_resonator_frequency(self, **kw):
         raise NotImplementedError()
+
+    def find_pulse_amplitude(self, amps,
+                             N_steps=[3, 7, 13, 17], max_n=18,
+                             close_fig=True, verbose=False,
+                             MC=None, update=True):
+        '''
+        Finds the pulse-amplitude using a rabi experiment.
+
+        If amps is an array it starts by fitting a cos to a Rabi experiment
+        to get an initial guess for the amplitude.
+        If amps is a float it uses that as the initial amplitude and starts
+        doing rabi flipping experiments around that optimum directly.
+        '''
+        if MC is None:
+            MC = self.MC
+        if np.size(amps) != 1:
+            self.measure_rabi(amps, n=1, MC=MC, analyze=False)
+            a = ma.Rabi_Analysis(close_fig=close_fig)
+            if (a.fit_res[0].params['period'].stderr <=
+                    a.fit_res[1].params['period'].stderr):
+                ampl = abs(a.fit_res[0].params['period'].value)/2
+            else:
+                ampl = abs(a.fit_res[1].params['period'].value)/2
+        else:
+            ampl = amps
+        if verbose:
+            print('Initial Amplitude:', ampl, '\n')
+
+        for n in N_steps:
+            if n > max_n:
+                break
+            else:
+                ampl_span = 0.3*ampl/n
+                amps = np.linspace(ampl-ampl_span, ampl+ampl_span, 15)
+                self.measure_rabi(amps, n=n, MC=MC, analyze=False)
+                a = ma.Rabi_parabola_analysis(close_fig=close_fig)
+                if (a.fit_res[0].params['x0'].stderr <=
+                        a.fit_res[1].params['x0'].stderr):
+                    ampl = a.fit_res[0].params['x0'].value
+                else:
+                    ampl = a.fit_res[1].params['x0'].value
+                if verbose:
+                    print('Found amplitude', ampl, '\n')
+        if update:
+            self.amp180.set(ampl)
+
+        # After this it should enter a loop where it fine tunes the amplitude
+        # based on fine scanes around the optimum with higher sensitivity.
+
 

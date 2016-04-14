@@ -172,9 +172,9 @@ class Ramsey(CBox_Sweep):
     #     self.CBox_lut_man = qt.instruments['CBox_lut_man']
     #     self.filename = 'FPGA_Codeword_Ramsey_%i_5014' % (stepsize)
 
-    #     base_pulse_separation = 200
-    #     self.sweep_points = np.linspace(stepsize+base_pulse_separation,
-    #                                     NoSegments*stepsize + base_pulse_separation,
+    #     base_pulse_delay = 200
+    #     self.sweep_points = np.linspace(stepsize+base_pulse_delay,
+    #                                     NoSegments*stepsize + base_pulse_delay,
     #                                     NoSegments)
     #     self.NoSegments = NoSegments
 
@@ -216,10 +216,10 @@ class Ramsey_tape(CBox_Sweep):
         self.TD_Meas = qt.instruments['TD_Meas']
         self.filename = 'FPGA_Ramsey_%i_5014' % (stepsize)
 
-        base_pulse_separation = 200
-        self.sweep_points = np.arange(stepsize+base_pulse_separation,
+        base_pulse_delay = 200
+        self.sweep_points = np.arange(stepsize+base_pulse_delay,
                                       NoSegments*(stepsize+5) +
-                                      base_pulse_separation,
+                                      base_pulse_delay,
                                       stepsize + 5, dtype=float)
 
         self.NoSegments = NoSegments

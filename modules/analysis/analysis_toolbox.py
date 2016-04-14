@@ -1283,3 +1283,25 @@ def fit_EC_EJ(f01, f12):
     (EC, EJ), success = optimize.leastsq(penaltyfn, (EC0, EJ0))
     return EC, EJ
 
+
+def solve_quadratic_equation(a, b, c, verbose=False):
+    '''
+    returns solutions to the quadratic equation. Will raise an error if the
+    solution is negative
+    '''
+    d = b**2-4*a*c
+    if d < 0:
+        if verbose:
+            print("This equation has no real solution")
+        return [np.NAN, np.NAN]
+    elif d == 0:
+        x = (-b+np.sqrt(b**2-4*a*c))/2*a
+        if verbose:
+            print("This equation has one solution: ", x)
+        return [x, x]
+    else:
+        x1 = (-b+np.sqrt((b**2)-(4*(a*c))))/(2*a)
+        x2 = (-b-np.sqrt((b**2)-(4*(a*c))))/(2*a)
+        if verbose:
+            print("This equation has two solutions: ", x1, " or", x2)
+        return [x1, x2]

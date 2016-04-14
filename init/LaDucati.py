@@ -31,6 +31,7 @@ from modules.utilities import general as gen
 # Standarad awg sequences
 from modules.measurement.waveform_control import pulsar as ps
 from modules.measurement.pulse_sequences import standard_sequences as st_seqs
+from modules.measurement.pulse_sequences import single_qubit_tek_seq_elts as sq
 
 # Instrument drivers
 from qcodes.instrument_drivers.rohde_schwarz import SGS100A as rs
@@ -38,6 +39,7 @@ import qcodes.instrument_drivers.signal_hound.USB_SA124B as sh
 import qcodes.instrument_drivers.QuTech.IVVI as iv
 from qcodes.instrument_drivers.tektronix import AWG5014 as tek
 from instrument_drivers.physical_instruments import QuTech_ControlBoxdriver as qcb
+import instrument_drivers.meta_instrument.qubit_objects.Tektronix_driven_transmon as qbt
 from instrument_drivers.meta_instrument import heterodyne as hd
 import instrument_drivers.meta_instrument.CBox_LookuptableManager as lm
 
@@ -61,16 +63,39 @@ LutMan = lm.QuTech_ControlBox_LookuptableManager('LutMan', CBox)
 
 MC = mc.MeasurementControl('MC')
 
+VIP_mon_2 = qb.CBox_driven_transmon('VIP_mon_2',
+                                    LO=LO, cw_source=S1, td_source=S2,
+                                    IVVI=IVVI,
+                                    AWG=AWG, LutMan=LutMan,
+                                    CBox=CBox, heterodyne_instr=HS, MC=MC)
 VIP_mon_4 = qb.CBox_driven_transmon('VIP_mon_4',
                                     LO=LO, cw_source=S1, td_source=S2,
                                     IVVI=IVVI,
                                     AWG=AWG, LutMan=LutMan,
                                     CBox=CBox, heterodyne_instr=HS, MC=MC)
+VIP_mon_6 = qb.CBox_driven_transmon('VIP_mon_6',
+                                    LO=LO, cw_source=S1, td_source=S2,
+                                    IVVI=IVVI,
+                                    AWG=AWG, LutMan=LutMan,
+                                    CBox=CBox, heterodyne_instr=HS, MC=MC)
+
+
+VIP_mon_4_tek = qbt.Tektronix_driven_transmon('VIP_mon_4_tek',
+                                              LO=LO,
+                                              cw_source=S1, td_source=S2,
+                                              IVVI=IVVI,
+                                              AWG=AWG,
+                                              CBox=CBox, heterodyne_instr=HS,
+                                              MC=MC)
+
+gen.load_settings_onto_instrument(VIP_mon_2, label='VIP_mon_2')
 gen.load_settings_onto_instrument(VIP_mon_4, label='VIP_mon_4')
+gen.load_settings_onto_instrument(VIP_mon_4_tek)
+gen.load_settings_onto_instrument(VIP_mon_6, label='VIP_mon_6')
 
 station = qc.Station(LO, S1, S2, IVVI,
                      AWG, HS, CBox, LutMan,
-                     VIP_mon_4)
+                     VIP_mon_2, VIP_mon_4, VIP_mon_4_tek, VIP_mon_6)
 MC.station = station
 station.MC = MC
 nested_MC = mc.MeasurementControl('nested_MC')
@@ -80,6 +105,10 @@ nested_MC.station = station
 station.pulsar = ps.Pulsar()
 station.pulsar.AWG = station.instruments['AWG']
 for i in range(4):
+    # Note that these are default parameters and should be kept so.
+    # the channel offset is set in the AWG itself. For now the amplitude is
+    # hardcoded. You can set it by hand but this will make the value in the
+    # sequencer different.
     station.pulsar.define_channel(id='ch{}'.format(i+1),
                                   name='ch{}'.format(i+1), type='analog',
                                   # max safe IQ voltage
@@ -97,9 +126,11 @@ for i in range(4):
                                   delay=0, active=True)
 # to make the pulsar available to the standard awg seqs
 st_seqs.station = station
+sq.station = station
 
-IVVI.set('dac2', 190)
-IVVI.dac5.set(91.3)
+IVVI.dac1.set(-40)
+IVVI.dac2.set(70)
+IVVI.dac5.set(0)
 
 IF = -20e6        # RO modulation frequency
 
@@ -117,9 +148,9 @@ CBox.set_dac_offset(1, 1, 0)  # I channel
 CBox.set_dac_offset(1, 0, 0)  # Q channel readout AWG
 
 # LO offsets calibrated at 23-2-2016 at f = 7.15350 GHz
-AWG.ch3_offset.set(0.006)
-AWG.ch4_offset.set(0.013)
-
+AWG.ch3_offset.set(0.002)
+AWG.ch4_offset.set(0.018)
+AWG.clock_freq.set(1e9)
 
 def set_CBox_cos_sine_weigths(IF):
     '''

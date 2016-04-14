@@ -1,11 +1,13 @@
 import numpy as np
 import logging
+from qcodes.instrument.parameter import ManualParameter
 from modules.measurement import sweep_functions as swf
 from modules.measurement import CBox_sweep_functions as CB_swf
 from modules.measurement import detector_functions as det
 from modules.analysis import measurement_analysis as MA
 from modules.measurement import mc_parameter_wrapper as pw
 from modules.measurement.pulse_sequences import standard_sequences as st_seqs
+from modules.measurement.optimization import nelder_mead
 import imp
 imp.reload(MA)
 imp.reload(CB_swf)
@@ -34,15 +36,80 @@ def mixer_carrier_cancellation(**kw):
                               'See the archived folder for the old function')
 
 
-def mixer_skewness_calibration(**kw):
-    raise NotImplementedError('see archived calibration toolbox')
+def mixer_skewness_calibration_5014(SH, Source, station,
+                                    MC=None,
+                                    QI_amp_ratio=None, IQ_phase=None,
+                                    frequency=None, f_mod=10e6,
+                                    I_ch=1, Q_ch=2,
+                                    name='mixer_skewness_calibration_5014'):
+    '''
+    Loads a cos and sin waveform in the specified I and Q channels of the
+    tektronix 5014 AWG (taken from station.pulsar.AWG).
+    By looking at the frequency corresponding with the spurious sideband the
+    phase_skewness and amplitude skewness that minimize the signal correspond
+    to the mixer skewness.
+
+    Inputs:
+        SH              (instrument)
+        Source          (instrument)     MW-source used for driving
+        station         (qcodes station) Contains the AWG and pulasr sequencer
+        QI_amp_ratio    (parameter)      qcodes parameter
+        IQ_phase        (parameter)
+        frequency       (float Hz)       Spurious SB freq: f_source - f_mod
+        f_mod           (float Hz)       Modulation frequency
+        I_ch/Q_ch       (int or str)     Specifies the AWG channels
+
+    returns:
+        alpha, phi     the coefficients that go in the predistortion matrix
+    For the spurious sideband:
+        alpha = 1/QI_amp_optimal
+        phi = -IQ_phase_optimal
+    For details, see Leo's notes on mixer skewness calibration in the docs
+    '''
+    if frequency is None:
+        # Corresponds to the frequency where to minimize with the SH
+        frequency = Source.frequency.get() - f_mod
+    if QI_amp_ratio is None:
+        QI_amp_ratio = ManualParameter('QI_amp', initial_value=1)
+    if IQ_phase is None:
+        IQ_phase = ManualParameter('IQ_phase', units='deg', initial_value=0)
+    if MC is None:
+        MC = station.MC
+    if type(I_ch) is int:
+        I_ch = 'ch{}'.format(I_ch)
+    if type(Q_ch) is int:
+        Q_ch = 'ch{}'.format(Q_ch)
+
+    d = det.SH_mixer_skewness_det(frequency, QI_amp_ratio, IQ_phase, SH,
+                                  f_mod=f_mod,
+                                  I_ch=I_ch, Q_ch=Q_ch, station=station)
+    S1 = pw.wrap_par_to_swf(QI_amp_ratio)
+    S2 = pw.wrap_par_to_swf(IQ_phase)
+
+    ad_func_pars = {'adaptive_function': nelder_mead,
+                    'x0': [1, 0.0],
+                    'initial_step': [.15, 10],
+                    'no_improv_break': 5,
+                    'minimize': True,
+                    'maxiter': 500}
+    MC.set_sweep_functions([S1, S2])
+    MC.set_detector_function(d)
+    MC.set_adaptive_function_parameters(ad_func_pars)
+    MC.run(name=name, mode='adaptive')
+    a = MA.OptimizationAnalysis()
+    # phi and alpha are the coefficients that go in the predistortion matrix
+    alpha = 1/a.optimization_result[0][0]
+    phi = -1*a.optimization_result[0][1]
+
+    return phi, alpha
+
 
 
 def mixer_skewness_calibration_adaptive(**kw):
     raise NotImplementedError('see archived calibration toolbox')
 
 
-def mixer_carrier_cancellation_5014(station,
+def mixer_carrier_cancellation_5014(AWG, SH, source, MC,
                                     frequency=None,
                                     AWG_channel1=1,
                                     AWG_channel2=2,
@@ -52,25 +119,40 @@ def mixer_carrier_cancellation_5014(station,
     Varies the mixer offsets to minimize leakage at the carrier frequency.
     this is the version for a tektronix AWG.
 
+    station:    QCodes station object that contains the instruments
+    source:     the source for which carrier leakage must be minimized
+    frequency:  frequency in Hz on which to minimize leakage, if None uses the
+                current frequency of the source
+
     voltage_grid defines the ranges for the preliminary coarse sweeps.
     If the range is too small, add another number infront of -0.12
 
     Note: Updated for QCodes
     '''
-    AWG = station['AWG']
-    MC = kw.pop('MC', station.MC)
-    SH = station['Signal hound']
     ch_1_min = 0  # Initializing variables used later on
     ch_2_min = 0
     last_ch_1_min = 1
     last_ch_2_min = 1
     ii = 0
     min_power = 0
+
+    source.on()
+    if frequency is None:
+        frequency = source.get('frequency')
+    else:
+        source.set('frequency', frequency)
+
     '''
     Make coarse sweeps to approximate the minimum
     '''
-    ch1_offset = AWG['ch{}_offset'.format(AWG_channel1)]
-    ch2_offset = AWG['ch{}_offset'.format(AWG_channel2)]
+    if type(AWG_channel1) is int:
+        ch1_offset = AWG['ch{}_offset'.format(AWG_channel1)]
+    else:
+        ch1_offset = AWG[AWG_channel1+'_offset']
+    if type(AWG_channel2) is int:
+        ch2_offset = AWG['ch{}_offset'.format(AWG_channel2)]
+    else:
+        ch2_offset = AWG[AWG_channel2+'_offset']
 
     ch1_swf = pw.wrap_par_to_swf(ch1_offset)
     ch2_swf = pw.wrap_par_to_swf(ch2_offset)
@@ -78,10 +160,11 @@ def mixer_carrier_cancellation_5014(station,
         # Channel 1
         MC.set_sweep_function(ch1_swf)
         MC.set_detector_function(
-            det.Signal_Hound_fixed_frequency(signal_hound=SH, frequency=frequency))
+            det.Signal_Hound_fixed_frequency(signal_hound=SH,
+                                             frequency=frequency*1e-9))
         MC.set_sweep_points(np.linspace(ch_1_min + voltage_span,
                                         ch_1_min - voltage_span, 11))
-        MC.run(name='Mixer_cal_Offset_ch%s' % AWG_channel1,
+        MC.run(name='Mixer_cal_Offset_%s' % AWG_channel1,
                sweep_delay=.1, debug_mode=True)
         Mixer_Calibration_Analysis = MA.Mixer_Calibration_Analysis(
             label='Mixer_cal', auto=True)
@@ -108,7 +191,7 @@ def mixer_carrier_cancellation_5014(station,
         MC.set_sweep_function(ch1_swf)
         MC.set_sweep_points(np.linspace(ch_1_min - dac_resolution*6,
                             ch_1_min + dac_resolution*6, 13))
-        MC.run(name='Mixer_cal_Offset_ch%s' % AWG_channel1,
+        MC.run(name='Mixer_cal_Offset_%s' % AWG_channel1,
                sweep_delay=.1, debug_mode=True)
         Mixer_Calibration_Analysis = MA.Mixer_Calibration_Analysis(
             label='Mixer_cal', auto=True)
@@ -119,7 +202,7 @@ def mixer_carrier_cancellation_5014(station,
         MC.set_sweep_function(ch2_swf)
         MC.set_sweep_points(np.linspace(ch_2_min - dac_resolution*6,
                                         ch_2_min + dac_resolution*6, 13))
-        MC.run(name='Mixer_cal_Offset_ch%s' % AWG_channel2,
+        MC.run(name='Mixer_cal_Offset_%s' % AWG_channel2,
                sweep_delay=.1, debug_mode=True)
         Mixer_Calibration_Analysis = MA.Mixer_Calibration_Analysis(
             label='Mixer_cal', auto=True)
@@ -252,8 +335,8 @@ def mixer_skewness_cal_CBox_adaptive(CBox, SH, source,
 
     Calibrates the mixer skewnness
     The CBox, in this case a fixed sequence is played in the tektronix
-    to ensure the CBox is continously triggered and the paramters are
-    reloaded between each measued point.
+    to ensure the CBox is continously triggered and the parameters are
+    reloaded between each measured point.
 
     If calibrate_both_sidebands is True the optimization runs two calibrations,
     first it tries to minimize the power in the spurious sideband by varying

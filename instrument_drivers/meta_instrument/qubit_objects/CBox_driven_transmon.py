@@ -68,13 +68,13 @@ class CBox_driven_transmon(Transmon):
                            label='Time-domain power',
                            units='dBm',
                            parameter_class=ManualParameter)
-        self.add_parameter('IF',
-                           label='inter-modulation frequency', units='Hz',
+        self.add_parameter('f_RO_mod',
+                           label='Readout-modulation frequency', units='Hz',
                            initial_value=-2e7,
                            parameter_class=ManualParameter)
         # Time-domain parameters
         self.add_parameter('f_pulse_mod',
-                           initial_value=-5e-7,
+                           initial_value=-50e6,
                            label='pulse-modulation frequency', units='Hz',
                            parameter_class=ManualParameter)
         self.add_parameter('awg_nr', label='CBox awg nr', units='#',
@@ -120,7 +120,8 @@ class CBox_driven_transmon(Transmon):
         self.td_source.off()
         self.cw_source.on()
         self.heterodyne_instr.set('mod_amp', self.mod_amp_cw.get())
-        self.heterodyne_instr.set('IF', self.IF.get())
+        # TODO Update IF to f_RO_mod in heterodyne instr
+        self.heterodyne_instr.set('IF', self.f_RO_mod.get())
         self.heterodyne_instr.frequency.set(self.f_res.get())
         self.cw_source.pulsemod_state.set('off')
         self.cw_source.power.set(self.spec_pow.get())
@@ -138,7 +139,7 @@ class CBox_driven_transmon(Transmon):
             f_RO = self.f_res.get()
         else:
             f_RO = self.f_RO.get()
-        self.LO.frequency.set(f_RO - self.IF.get())
+        self.LO.frequency.set(f_RO - self.f_RO_mod.get())
 
         self.td_source.power.set(self.td_source_pow.get())
         self.AWG.set('ch3_amp', self.mod_amp_td.get())
@@ -173,7 +174,7 @@ class CBox_driven_transmon(Transmon):
     def find_resonator_frequency(self, use_min=False,
                                  update=True,
                                  freqs=None,
-                                 MC=None, close_fig=False):
+                                 MC=None, close_fig=True):
         '''
         Finds the resonator frequency by performing a heterodyne experiment
         if freqs == None it will determine a default range dependent on the
@@ -215,7 +216,7 @@ class CBox_driven_transmon(Transmon):
                     nr_seeds*pulse_p_elt, nr_seeds, pulse_p_elt))
 
         resetless_interval = (
-            np.round(pulse_p_elt*self.pulse_separation.get()*1e6)+2.5)*1e-6
+            np.round(pulse_p_elt*self.pulse_delay.get()*1e6)+2.5)*1e-6
 
         combined_tape = []
         for i in range(nr_seeds):
@@ -234,10 +235,11 @@ class CBox_driven_transmon(Transmon):
                         len(tape),  pulse_p_elt))
             combined_tape += [0]*(pulse_p_elt-len(tape))+tape
 
+        # Rename IF in awg_swf_resetless tape
         s = awg_swf.Resetless_tape(
             n_pulses=pulse_p_elt, tape=combined_tape,
-            IF=self.IF.get(),
-            pulse_separation=self.pulse_separation.get(),
+            IF=self.f_RO_mod.get(),
+            pulse_delay=self.pulse_delay.get(),
             resetless_interval=resetless_interval,
             RO_pulse_delay=self.RO_pulse_delay.get(),
             RO_pulse_length=self.RO_pulse_length.get(),
@@ -258,7 +260,7 @@ class CBox_driven_transmon(Transmon):
                                    frequency_guess=None,
                                    a_step=30, m_step=.1, f_step=20e3,
                                    MC=None, nested_MC=None,
-                                   update=False, close_fig=False,
+                                   update=False, close_fig=True,
                                    verbose=True):
         '''
         Calibrates single qubit pulse parameters currently only using
@@ -460,7 +462,7 @@ class CBox_driven_transmon(Transmon):
                              ' either "conventional" or "self-consistent"')
 
     def measure_heterodyne_spectroscopy(self, freqs, MC=None,
-                                        analyze=True, close_fig=False):
+                                        analyze=True, close_fig=True):
         self.prepare_for_continuous_wave()
         if MC is None:
             MC = self.MC
@@ -473,7 +475,7 @@ class CBox_driven_transmon(Transmon):
             ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
 
     def measure_spectroscopy(self, freqs, pulsed=False, MC=None,
-                             analyze=True, close_fig=False):
+                             analyze=True, close_fig=True):
         self.prepare_for_continuous_wave()
         if MC is None:
             MC = self.MC
@@ -493,13 +495,13 @@ class CBox_driven_transmon(Transmon):
             ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
 
     def measure_pulsed_spectroscopy(self, freqs, MC=None,
-                                    analyze=True, close_fig=False):
+                                    analyze=True, close_fig=True):
         # This is a trick so I can reuse the heterodyne instr
         # to do pulsed-spectroscopy
         self.heterodyne_instr._disable_auto_seq_loading = True
         if ('Pulsed_spec' not in self.AWG.setup_filename.get()):
             st_seqs.Pulsed_spec_seq_RF_mod(
-                IF=self.IF.get(),
+                IF=self.f_RO_mod.get(),
                 spec_pulse_length=16e-6, marker_interval=30e-6,
                 RO_pulse_delay=self.RO_pulse_delay.get())
         self.cw_source.pulsemod_state.set('on')
@@ -515,7 +517,7 @@ class CBox_driven_transmon(Transmon):
             ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
 
     def measure_resonator_power(self, freqs, mod_amps,
-                                MC=None, analyze=True, close_fig=False):
+                                MC=None, analyze=True, close_fig=True):
         '''
         N.B. This one does not use powers but varies the mod-amp.
         Need to find a way to keep this function agnostic to that
@@ -534,7 +536,7 @@ class CBox_driven_transmon(Transmon):
             ma.MeasurementAnalysis(auto=True, TwoD=True, close_fig=close_fig)
 
     def measure_resonator_dac(self, freqs, dac_voltages,
-                              MC=None, analyze=True, close_fig=False):
+                              MC=None, analyze=True, close_fig=True):
         self.prepare_for_continuous_wave()
         if MC is None:
             MC = self.MC
@@ -550,15 +552,15 @@ class CBox_driven_transmon(Transmon):
         if analyze:
             ma.MeasurementAnalysis(auto=True, TwoD=True, close_fig=close_fig)
 
-    def measure_rabi(self, pulse_amps, n=1,
-                     MC=None, analyze=True, close_fig=False,
+    def measure_rabi(self, amps, n=1,
+                     MC=None, analyze=True, close_fig=True,
                      verbose=False):
         self.prepare_for_timedomain()
         if MC is None:
             MC = self.MC
         st_seqs.CBox_multi_pulse_seq(
-            IF=self.IF.get(), n_pulses=n,
-            pulse_separation=self.pulse_separation.get(),
+            IF=self.f_RO_mod.get(), n_pulses=n,
+            pulse_delay=self.pulse_delay.get(),
             RO_pulse_delay=self.RO_pulse_delay.get(),
             RO_trigger_delay=self.RO_trigger_delay.get(),
             RO_pulse_length=self.RO_pulse_length.get(), verbose=verbose)
@@ -567,11 +569,11 @@ class CBox_driven_transmon(Transmon):
         self.AWG.start()
 
         cal_points = [0, 0]
-        pulse_amps = cal_points + list(pulse_amps)
+        amps = cal_points + list(amps)
         self.CBox.set('AWG0_tape', [1, 1])
         self.CBox.set('AWG1_tape', [1, 1])
         MC.set_sweep_function(pw.wrap_par_to_swf(self.LutMan.amp180))
-        MC.set_sweep_points(pulse_amps)
+        MC.set_sweep_points(amps)
         MC.set_detector_function(det.CBox_single_int_avg_with_LutReload(
                                  self.CBox, self.LutMan,
                                  awg_nrs=[self.awg_nr.get()]))
@@ -580,7 +582,7 @@ class CBox_driven_transmon(Transmon):
             ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
 
     def measure_T1(self, times, MC=None,
-                   analyze=True, close_fig=False):
+                   analyze=True, close_fig=True):
         '''
         if update is True will update self.T1 with the measured value
         '''
@@ -595,7 +597,7 @@ class CBox_driven_transmon(Transmon):
                                 times[-1]+times[1])])
         self.CBox.set('nr_samples', len(times))
         MC.set_sweep_function(
-            awg_swf.CBox_T1(IF=self.IF.get(),
+            awg_swf.CBox_T1(IF=self.f_RO_mod.get(),
                             RO_pulse_delay=self.RO_pulse_delay.get(),
                             RO_trigger_delay=self.RO_trigger_delay.get(),
                             mod_amp=self.mod_amp_td.get(),
@@ -606,12 +608,12 @@ class CBox_driven_transmon(Transmon):
                                  self.CBox, self.AWG))
         MC.run('T1'+self.msmt_suffix)
         if analyze:
-            a = ma.T1_Analysis(auto=True, close_fig=False)
+            a = ma.T1_Analysis(auto=True, close_fig=True)
             return a.T1
 
     def measure_ramsey(self, times, artificial_detuning=0, f_qubit=None,
                        label='',
-                       MC=None, analyze=True, close_fig=False, verbose=True):
+                       MC=None, analyze=True, close_fig=True, verbose=True):
         self.prepare_for_timedomain()
         if MC is None:
             MC = self.MC
@@ -627,7 +629,7 @@ class CBox_driven_transmon(Transmon):
         self.td_source.set('frequency', f_qubit - self.f_pulse_mod.get() +
                            artificial_detuning)
         Rams_swf = awg_swf.CBox_Ramsey(
-            AWG=self.AWG, CBox=self.CBox, IF=self.IF.get(), pulse_separation=0,
+            AWG=self.AWG, CBox=self.CBox, IF=self.f_RO_mod.get(), pulse_delay=0,
             RO_pulse_delay=self.RO_pulse_delay.get(),
             RO_trigger_delay=self.RO_trigger_delay.get(),
             RO_pulse_length=self.RO_pulse_length.get())
@@ -638,7 +640,7 @@ class CBox_driven_transmon(Transmon):
         MC.run('Ramsey'+label+self.msmt_suffix)
 
         if analyze:
-            a = ma.Ramsey_Analysis(auto=True, close_fig=False)
+            a = ma.Ramsey_Analysis(auto=True, close_fig=True)
 
             if verbose:
                 fitted_freq = a.fit_res.params['frequency'].value
@@ -649,14 +651,14 @@ class CBox_driven_transmon(Transmon):
                       fitted_freq-artificial_detuning))
 
     def measure_allxy(self, MC=None,
-                      analyze=True, close_fig=False, verbose=True):
+                      analyze=True, close_fig=True, verbose=True):
         self.prepare_for_timedomain()
         if MC is None:
             MC = self.MC
         d = cdet.AllXY_devition_detector_CBox(
             'AllXY'+self.msmt_suffix, MC=MC,
-            AWG=self.AWG, CBox=self.CBox, IF=self.IF.get(),
-            pulse_separation=self.pulse_separation.get(),
+            AWG=self.AWG, CBox=self.CBox, IF=self.f_RO_mod.get(),
+            pulse_delay=self.pulse_delay.get(),
             RO_pulse_delay=self.RO_pulse_delay.get(),
             RO_trigger_delay=self.RO_trigger_delay.get(),
             RO_pulse_length=self.RO_pulse_length.get())
@@ -669,7 +671,7 @@ class CBox_driven_transmon(Transmon):
     def measure_ssro(self, no_fits=False,
                      return_detector=False,
                      MC=None,
-                     analyze=True, close_fig=False, verbose=True):
+                     analyze=True, close_fig=True, verbose=True):
         self.prepare_for_timedomain()
 
         if MC is None:
@@ -679,8 +681,8 @@ class CBox_driven_transmon(Transmon):
             analyze=return_detector,
             raw=no_fits,
             MC=MC,
-            AWG=self.AWG, CBox=self.CBox, IF=self.IF.get(),
-            pulse_separation=self.pulse_separation.get(),
+            AWG=self.AWG, CBox=self.CBox, IF=self.f_RO_mod.get(),
+            pulse_delay=self.pulse_delay.get(),
             RO_pulse_delay=self.RO_pulse_delay.get(),
             RO_trigger_delay=self.RO_trigger_delay.get(),
             RO_pulse_length=self.RO_pulse_length.get())
@@ -697,7 +699,7 @@ class CBox_driven_transmon(Transmon):
                                    return_detector=False,
                                    MC=None,
                                    analyze=True,
-                                   close_fig=False, make_fig=True,
+                                   close_fig=True, make_fig=True,
                                    verbose=True):
         '''
         Measures the single shot discrimination fidelity.
@@ -738,7 +740,7 @@ class CBox_driven_transmon(Transmon):
 
     def measure_rb_vs_amp(self, amps, nr_cliff=1,
                           resetless=True,
-                          MC=None, analyze=True, close_fig=False,
+                          MC=None, analyze=True, close_fig=True,
                           verbose=False):
         self.prepare_for_timedomain()
         if MC is None:
