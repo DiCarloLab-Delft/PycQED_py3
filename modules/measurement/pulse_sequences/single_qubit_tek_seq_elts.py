@@ -343,17 +343,9 @@ def resetless_RB_seq(pulse_pars, RO_pars,
         el.length(), fixed_point_freq)
     el.min_samples = el.samples() + int(extra_delay*el.clock)
     el_list.append(el)
-    return el
-
-    init_el = deepcopy(el)
-    init_el.name = 'init_elt'
-    el_list.append(init_el)
-
-    # First wait for trigger ensure experiment starts in phase
-    seq.append_element(init_el, trigger_wait=True)  # Keep running perpetually
-    # Setting goto_target to the element itself ensures it will not wait for
-    # triggers afterwards
-    seq.append_element(el, trigger_wait=False, goto_target=el.name)
+    # trigger_wait ensures seq starts in phase, repetitions set to max to
+    # ensure it doesn't wait for triggers unnecesarily
+    seq.append_element(el, trigger_wait=True, repetitions=int(2**16))
 
     station.instruments['AWG'].stop()
     station.pulsar.program_awg(seq, *el_list, verbose=verbose)
