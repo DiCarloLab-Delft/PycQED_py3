@@ -174,13 +174,18 @@ def AllXY_seq(pulse_pars, RO_pars, double_points=False,
 
 
 def OffOn_seq(pulse_pars, RO_pars,
-              verbose=False):
+              verbose=False, initialize=False,
+              post_measurement_delay=2000):
     '''
     OffOn sequence for a single qubit using the tektronix.
     SSB_Drag pulse is used for driving, simple modualtion used for RO
     Input pars:
         pulse_pars:          dict containing the pulse parameters
         RO_pars:             dict containing the RO parameters
+    - Initialize adds an exta measurement before state preparation to allow
+    initialization by post-selection
+    - Post-measurement delay should be sufficiently long to avoid photon-induced gate
+    errors when post-selecting.
     '''
     seq_name = 'OffOn_sequence'
     seq = sequence.Sequence(seq_name)
@@ -199,6 +204,45 @@ def OffOn_seq(pulse_pars, RO_pars,
     station.instruments['AWG'].stop()
     station.pulsar.program_awg(seq, *el_list, verbose=verbose)
     return seq_name
+
+def Butterfly_seq(pulse_pars, RO_pars, initialize=False,
+                  post_measurement_delay=2000e-9, verbose=False):
+    '''
+    Butterfly sequence to measure single shot readout fidelity to the
+    pre-and post-measurement state. This is the way to veify the QND-ness off
+    the measurement.
+    - Initialize adds an exta measurement before state preparation to allow
+    initialization by post-selection
+    - Post-measurement delay can be varied to correct data for Tone effects.
+    Post-measurement delay should be sufficiently long to avoid photon-induced gate
+    errors when post-selecting.
+    '''
+    seq_name = 'Butterfly_seq'
+    seq = sequence.Sequence(seq_name)
+    el_list = []
+    # Create a dict with the parameters for all the pulses
+    pulses = get_pulse_dict_from_pars(pulse_pars)
+    pulses['RO'] = RO_pars
+    pulse_combinations = ['I', 'X180']
+    pulse_lists = ['', '']
+    pulses['I_wait'] = deepcopy(pulses['I'])
+    pulses['I_wait']['pulse_delay'] = post_measurement_delay
+    if initialize:
+        pulse_lists[0] = ['I', 'RO', 'I_wait', 'I', 'RO', 'I_wait', 'I','RO']
+        pulse_lists[1] = ['I', 'RO', 'I_wait', 'X180', 'RO', 'I_wait','I', 'RO']
+    else:
+        pulse_lists[0] = ['I', 'RO', 'I_wait', 'I','RO']
+        pulse_lists[1] = ['X180', 'RO', 'I_wait','I', 'RO']
+    for i, pulse_keys in enumerate(pulse_lists):
+        pulse_list = [pulses[key] for key in pulse_keys]
+        el = multi_pulse_elt(i, station, pulse_list)
+        el_list.append(el)
+        seq.append_element(el, trigger_wait=True)
+
+    station.instruments['AWG'].stop()
+    station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+    return seq_name
+
 
 
 def Randomized_Benchmarking_seq(pulse_pars, RO_pars,

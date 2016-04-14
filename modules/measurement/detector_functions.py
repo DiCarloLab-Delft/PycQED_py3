@@ -579,21 +579,6 @@ class CBox_state_couners_det(Hard_Detector):
         self.AWG.stop()
 
 
-class CBox_alternating_shots_det(CBox_integration_logging_det):
-    def __init__(self, CBox, AWG, **kw):
-        super().__init__(CBox, AWG, **kw)
-        self.name = 'CBox_alternating_shots_detector'
-        self.value_names = ['I_0', 'Q_0', 'I_1', 'Q_1']
-        self.value_units = ['a.u.', 'a.u.', 'a.u.', 'a.u.']
-
-    def get_values(self):
-        raw_data = super().get_values()
-        I_data_0, I_data_1 = a_tools.zigzag(raw_data[0])
-        Q_data_0, Q_data_1 = a_tools.zigzag(raw_data[1])
-        data = [I_data_0, Q_data_0, I_data_1, Q_data_1]
-        return data
-
-
 class CBox_digitizing_shots_det(CBox_integration_logging_det):
     """docstring for  CBox_digitizing_shots_det"""
     def __init__(self, CBox, AWG, threshold,

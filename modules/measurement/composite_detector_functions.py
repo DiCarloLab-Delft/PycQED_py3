@@ -402,7 +402,7 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
                                                  RO_pars=self.RO_pars))
 
         self.MC.set_detector_function(
-            det.CBox_alternating_shots_det(self.CBox, self.AWG))
+            det.CBox_integration_logging_det(self.CBox, self.AWG))
 
     def acquire_data_point(self, *args, **kw):
         self.i += 1
