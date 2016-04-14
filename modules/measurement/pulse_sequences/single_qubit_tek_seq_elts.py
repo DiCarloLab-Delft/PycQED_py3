@@ -277,16 +277,20 @@ def resetless_RB_seq(pulse_pars, RO_pars,
         pulse_keys = rb.decompose_clifford_seq(cl_seq)
         pulse_sub_list = [pulses[x] for x in pulse_keys]
         pulse_sub_list += [RO_pars]
+
         # Calculate the time correction to ensure RO pulse starts at a
         # multiple of the fixed_point_freq
         sub_seq_duration = sum([p['pulse_delay'] for p in pulse_sub_list])
         extra_delay = calculate_time_corr(
             sub_seq_duration+post_measurement_delay, fixed_point_freq)
         initial_pulse_delay = post_measurement_delay + extra_delay
+
         # Replace the initial element to wait for an extended period of time
         start_pulse = deepcopy(pulse_sub_list[0])
-        start_pulse['pulse_delay'] = initial_pulse_delay
-        pulse_sub_list[0] = start_pulse
+        start_pulse['pulse_delay'] += initial_pulse_delay
+        # print('replacing omitted')
+        print(initial_pulse_delay)
+        # pulse_sub_list[0] = start_pulse
 
         pulse_list += pulse_sub_list
     el = multi_pulse_elt(1, station, pulse_list)
