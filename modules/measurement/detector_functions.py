@@ -540,12 +540,12 @@ class CBox_integration_logging_det(Hard_Detector):
         self.AWG.stop()
 
 
-class CBox_state_couners_det(Hard_Detector):
+class CBox_state_counters_det(Hard_Detector):
     def __init__(self, CBox, AWG, **kw):
         super().__init__()
         self.CBox = CBox
-        self.name = 'CBox_state_couners_detector'
-        # A and B refer to the counts for the different weigth functions
+        self.name = 'CBox_state_counters_detector'
+        # A and B refer to the counts for the different weight functions
         self.value_names = ['no error A', 'single error A', 'double error A',
                             '|0> A', '|1> A',
                             'no error B', 'single error B', 'double error B',

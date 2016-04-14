@@ -203,7 +203,7 @@ class QuTech_ControlBox(VisaInstrument):
         Compares heartbeat counts to trigger counts in touch 'n go mode.
         To determine succes rate.
         Heartbeat counter: how many times touch n go was attempted.
-        Trigger counter: how many times an external triger was given.
+        Trigger counter: how many times an external trigger was given.
         '''
         message = c.create_message(defHeaders.ReadSequencerCounters)
         (stat, mesg) = self.serial_write(message)

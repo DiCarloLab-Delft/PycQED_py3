@@ -257,9 +257,12 @@ def resetless_RB_seq(pulse_pars, RO_pars,
     '''
     Consists of 1 very long element that interleaves RB-sequences with
     measurement.
-    After every measurement it waits for at least post_measurement_delay.
-    Because I need to make sure all RO pulses start with the same phase I need
-    to do something....
+
+    Takes care all RO pulses are in phase by waiting a post_measurement_delay
+    + a correction time before starting each block of pulses.
+
+    Appends empty samples to ensure the total length of the sequence is a
+    multiple of the modulation (fix_point) frequency.
     '''
     seq_name = 'Resetless_RB_seq'
     seq = sequence.Sequence(seq_name)
@@ -288,11 +291,9 @@ def resetless_RB_seq(pulse_pars, RO_pars,
         # Replace the initial element to wait for an extended period of time
         start_pulse = deepcopy(pulse_sub_list[0])
         start_pulse['pulse_delay'] += initial_pulse_delay
-        # print('replacing omitted')
-        print(initial_pulse_delay)
-        # pulse_sub_list[0] = start_pulse
-
+        pulse_sub_list[0] = start_pulse
         pulse_list += pulse_sub_list
+
     el = multi_pulse_elt(1, station, pulse_list)
     extra_delay = calculate_time_corr(
         el.length(), fixed_point_freq)
