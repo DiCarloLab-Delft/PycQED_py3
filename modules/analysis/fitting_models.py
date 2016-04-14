@@ -342,7 +342,7 @@ DoubleGaussModel = (lmfit.models.GaussianModel(prefix='A_') +
 DoubleGaussModel.guess = double_gauss_guess  # defines a guess function
 
 
-def plot_fitres2D_heatmap(fit_res, x, y, axs=None, cmap='CMRmap'):
+def plot_fitres2D_heatmap(fit_res, x, y, axs=None, cmap='viridis'):
     '''
     Convenience function for plotting results of flattened 2D fits.
 
@@ -351,9 +351,9 @@ def plot_fitres2D_heatmap(fit_res, x, y, axs=None, cmap='CMRmap'):
     with lmfit. If anyone has a better location in mind, let me know (MAR).
     '''
     nr_cols = len(np.unique(x))
-    data_2D = fit_res.data.reshape(-1, nr_cols)
-    fit_2D = fit_res.best_fit.reshape(-1, nr_cols)
-    guess_2D = fit_res.init_fit.reshape(-1, nr_cols)
+    data_2D = fit_res.data.reshape(-1, nr_cols, order='C')
+    fit_2D = fit_res.best_fit.reshape(-1, nr_cols, order='C')
+    guess_2D = fit_res.init_fit.reshape(-1, nr_cols, order='C')
 
     if axs is None:
         f, axs = plt.subplots(1, 3, figsize=(14, 6))

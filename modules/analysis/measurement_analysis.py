@@ -1231,10 +1231,10 @@ class SSRO_Analysis(MeasurementAnalysis):
         self.no_fits = no_fits
         # plotting histograms of the raw shots on I and Q axis
         try:
-            shots_I_data_0 = self.get_values(key='I_0')
-            shots_I_data_1 = self.get_values(key='I_1')
-            shots_Q_data_0 = self.get_values(key='Q_0')
-            shots_Q_data_1 = self.get_values(key='Q_1')
+            shots_I_data = self.get_values(key='I')
+            shots_Q_data = self.get_values(key='Q')
+            shots_I_data_0, shots_I_data_1 = a_tools.zigzag(shots_I_data)
+            shots_Q_data_0, shots_Q_data_1 = a_tools.zigzag(shots_Q_data)
 
         except(KeyError):  # used for different naming when using TD_meas shots
             shots_I_data_0 = self.get_values(key='single_shot_I')[:, 0]
@@ -1775,15 +1775,27 @@ class SSRO_discrimination_analysis(MeasurementAnalysis):
         super(self.__class__, self).__init__(**kw)
 
     def run_default_analysis(self, plot_2D_histograms=True,
-                             current_threshold=None, **kw):
+                             current_threshold=None, theta_in=0, **kw):
         self.add_analysis_datagroup_to_file()
         # Extract I and Q data based on name of variable.
-        I_shots = self.get_values(key='I')
-        Q_shots = self.get_values(key='Q')
+        # I_shots = self.get_values(key='I')
+        # Q_shots = self.get_values(key='Q')
+        self.get_naming_and_values()
+        I_shots = self.measured_values[0]
+        Q_shots = self.measured_values[1]
+
+        #rotating according to theta
+        I_shots = np.cos(theta_in*2*np.pi/360)*I_shots - np.sin(theta_in*2*np.pi/360)*Q_shots
+        Q_shots = np.sin(theta_in*2*np.pi/360)*I_shots + np.cos(theta_in*2*np.pi/360)*Q_shots
+
         # Reshaping the data
         H, xedges, yedges = dm_tools.bin_2D_shots(I_shots, Q_shots)
+        self.H = H
+        self.xedges = xedges
+        self.yedges = yedges
         H_flat, x_tiled, y_rep = dm_tools.flatten_2D_histogram(
             H, xedges, yedges)
+
         # Performing the fits
         g2_mod = fit_mods.DoubleGauss2D_model
         params = g2_mod.guess(model=g2_mod, data=H_flat, x=x_tiled, y=y_rep)
@@ -1793,6 +1805,7 @@ class SSRO_discrimination_analysis(MeasurementAnalysis):
         self.fit_res = g2_mod.fit(data=H_flat, x=x_tiled, y=y_rep,
                                   params=params)
 
+
         # Saving the fit results to the datafile
         self.save_fitted_parameters(self.fit_res, 'Double gauss fit')
         if plot_2D_histograms:  # takes ~350ms, speedup quite noticable
@@ -1801,7 +1814,12 @@ class SSRO_discrimination_analysis(MeasurementAnalysis):
                                            axs=axs)
             for ax in axs:
                 ax.set_xlabel('I')  # TODO: add units
+                edge=max(max(abs(xedges)), max(abs(yedges)))
+                ax.set_xlim(-edge, edge)
+                ax.set_ylim(-edge, edge)
+                ax.set_axis_bgcolor(plt.cm.viridis(0))
             axs[0].set_ylabel('Q')
+
             self.save_fig(fig, figname='2D-Histograms', **kw)
 
         #######################################################
@@ -1823,7 +1841,7 @@ class SSRO_discrimination_analysis(MeasurementAnalysis):
         else:
             diff_vec = self.mu_b - self.mu_a
             self.opt_I_threshold = (self.mu_a.real + diff_vec.real/2)
-        self.theta = np.arctan(diff_vec.imag/diff_vec.real)/(2*np.pi)*360
+        self.theta = np.arctan(diff_vec.imag/diff_vec.real)/(2*np.pi)*360-theta_in
         self.mean_sigma = np.mean([sig_a, sig_b])
         # relative separation of the gaussians in units of sigma
         self.relative_separation = abs(diff_vec)/self.mean_sigma
@@ -4009,46 +4027,78 @@ class butterfly_analysis(MeasurementAnalysis):
     '''
     Extracts the coefficients for the post-measurement butterfly
     '''
-    def __init__(self,  auto=True, label_exc='ind_exc', close_file=True,
-                 digitize=True, label_rel='ind_rel', timestamp_exc=None,
-                 timestamp_rel=None, threshold_postselection=None,
-                 postselection=False, **kw):
+    def __init__(self,  auto=True, label='Butterfly', close_file=True,
+                 timestamp=None,
+                 threshold=None,
+                 initialize=False, **kw):
 
-        self.folder_exc = a_tools.get_folder(timestamp=timestamp_exc,
-                                             label='ind_exc', **kw)
-        self.load_hdf5data(folder=self.folder_exc, **kw)
+        self.folder = a_tools.get_folder(timestamp=timestamp,
+                                             label='Butterfly', **kw)
+        self.load_hdf5data(folder=self.folder, **kw)
         self.get_naming_and_values_2D()
-        self.data_exc = self.Z
-        if close_file:
-            self.data_file.close()
-        self.folder_rel = a_tools.get_folder(timestamp=timestamp_rel,
-                                             label='ind_rel', **kw)
+        self.data = self.Z
+        a = ma.SSRO_discrimination_analysis(
+            label=label,
+            current_threshold=None,
+            close_fig=False,
+            plot_2D_histograms=True)
 
-        self.load_hdf5data(folder=self.folder_rel, **kw)
-        self.get_naming_and_values_2D()
-        self.data_rel = self.Z
-        print(np.shape(self.data_rel))
-        if postselection:
-            if threshold_postselection is None:
-                instrument_settings = self.data_file['Instrument settings']
-                threshold_postselection = float(instrument_settings['CBox'].attrs['signal_threshold_line0'])
-            else:
-                pass
-            print("threshold postselection", threshold_postselection)
-            length0=len(self.data_rel[:,0])
 
-            self.data_rel = dm_tools.postselect(data=self.data_rel,
-                                                threshold=threshold_postselection)
-            self.data_rel = self.data_rel[:,1:]
-            length1=len(self.data_rel[:,0])
+        # SSRO_discrimination_analysis(
 
-            print("rel postselecting faction", length1/np.float(length0))
-            length0=len(self.data_exc[:,0])
-            self.data_exc = dm_tools.postselect(data=self.data_exc,
-                                            threshold=threshold_postselection)
-            self.data_exc = self.data_exc[:,1:]
-            length1=len(self.data_exc[:,0])
-            print("exc postselecting fraction", length1/np.float(length0))
+
+        # if close_file:
+        #     self.data_file.close()
+        # if initialize:
+        #     #reshuffeling the data to endup with two arrays for the diffeent input states
+        #     m0_on = self.data[3::6]
+        #     m1_on = self.data[4::6]
+        #     m2_on = self.data[5::6]
+        #     self.data_rel = m0_on+m1_on+m2_on
+        #     self.data_rel[::3] = m0_on
+        #     self.data_rel[1::3] = m1_on
+        #     self.data_rel[2::3] = m2_on
+        #     m0_off = self.data[0::6]
+        #     m1_off = self.data[1::6]
+        #     m2_off = self.data[2::6]
+        #     self.data_exc = m0_off+m1_off+m2_off
+        #     self.data_exc[::3] = m0_off
+        #     self.data_exc[1::3] = m1_off
+        #     self.data_exc[2::3] = m2_off
+        #     SSRO_discrimination_analysis(
+
+
+        #     length0 = len(self.data_rel[:,0])
+
+        #     self.data_rel = dm_tools.postselect(data=self.data_rel,
+        #                                         threshold=threshold)
+        #     self.data_rel = self.data_rel[:,1:]
+        #     length1 = len(self.data_rel[:,0])
+
+        #     print("rel postselecting faction", length1/np.float(length0))
+        #     length0 = len(self.data_exc[:,0])
+        #     self.data_exc = dm_tools.postselect(data=self.data_exc,
+        #                                     threshold=threshold)
+        #     self.data_exc = self.data_exc[:,1:]
+        #     length1 = len(self.data_exc[:,0])
+        #     print("exc postselecting fraction", length1/np.float(length0))
+
+        m0_on = self.data[2::4]
+        m1_on = self.data[3::4]
+        self.data_rel = m0_on+m1_on
+        self.data_rel[::2] = m0_on
+        self.data_rel[1::2] = m1_on
+        m0_off = self.data[0::4]
+        m1_off = self.data[1::4]
+        self.data_exc = m0_off+m1_off
+        self.data_exc[::2] = m0_off
+        self.data_exc[1::2] = m1_off
+
+        #fingding the optimal rotation angle
+        SSRO_
+
+
+
         if digitize:
             instrument_settings = self.data_file['Instrument settings']
             threshold = float(

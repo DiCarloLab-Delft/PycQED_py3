@@ -132,6 +132,8 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         # or potential digitizer acquisition easily
         self.int_avg_det = det.CBox_integrated_average_detector(self.CBox,
                                                                 self.AWG)
+        self.int_log_det = det.CBox_integration_logging_det(self.CBox,
+                                                                self.AWG)
 
     def prepare_for_timedomain(self):
         self.LO.on()
@@ -368,9 +370,41 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
             return d
         d.prepare()
         d.acquire_data_point()
+
         if analyze:
             ma.SSRO_Analysis(label='SSRO'+self.msmt_suffix,
                              no_fits=no_fits, close_fig=close_fig)
+
+
+    def measure_butterfly(self,    return_detector=False,
+                                   MC=None,
+                                   analyze=True,
+                                   close_fig=True,
+                                   verbose=True,
+                                   initialize=False,
+                                   post_measurement_delay=2000e-9
+                                   ):
+        self.prepare_for_timedomain()
+        if MC is None:
+            MC = self.MC
+        MC.set_sweep_function(awg_swf.Butterfly(
+            pulse_pars=self.pulse_pars, RO_pars=self.RO_pars,
+            initialize=initialize, post_measurement_delay=post_measurement_delay))
+        MC.set_detector_function(self.int_log_det)
+        MC.run('Butterfly{}initialize_{}'.format(self.msmt_suffix, initialize))
+        a=ma.SSRO_discrimination_analysis(
+            label='Butterfly',
+            current_threshold=None,
+            close_fig=False,
+            plot_2D_histograms=True)
+        print(a.theta)
+        print(a.opt_I_threshold)
+        # ma.butterfly_analysis(
+        #    close_main_fig=close_fig, initialize=initialize,
+        #    pulse_delay=self.pulse_delay.get())
+
+
+
 
 
 
