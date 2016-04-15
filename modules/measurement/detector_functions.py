@@ -586,6 +586,8 @@ class CBox_single_qubit_state_counters(CBox_state_counters_det):
     Rescales the measured counts to percentages.
     '''
     def __init__(self, CBox, AWG):
+        super(CBox_state_counters_det, self).__init__()
+        self.detector_control = 'soft'
         self.CBox = CBox
         self.name = 'CBox_state_counters_detector'
         # A and B refer to the counts for the different weight functions
@@ -597,7 +599,7 @@ class CBox_single_qubit_state_counters(CBox_state_counters_det):
     def prepare(self, **kw):
         self.nr_shots = self.CBox.log_length.get()
 
-    def get_values(self):
+    def acquire_data_point(self):
         d = super().get_values()
         data = d[0:3]/self.nr_shots * 100
         return data

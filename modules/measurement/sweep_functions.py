@@ -333,17 +333,19 @@ class AWG_multi_channel_amplitude(Soft_Sweep):
     '''
     Sweep function to sweep multiple AWG channels simultaneously
     '''
-    def __init__(self, AWG, channels, **kw):
+    def __init__(self, AWG, channels, delay=0, **kw):
         super().__init__()
         self.name = 'AWG channel amplitude chs %s' % channels
         self.parameter_name = 'AWG chs %s' % channels
         self.unit = 'V'
         self.AWG = AWG
         self.channels = channels
+        self.delay = delay
 
     def set_parameter(self, val):
         for ch in self.channels:
             self.AWG.set('ch{}_amp'.format(ch), val)
+        time.sleep(self.delay)
 
 
 class AWG_sequence(Soft_Sweep):

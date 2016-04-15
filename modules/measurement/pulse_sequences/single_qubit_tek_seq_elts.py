@@ -320,8 +320,11 @@ def resetless_RB_seq(pulse_pars, RO_pars,
     # You can think of every seed as it's own little "block"
     # the idea is to shift whole blocks to ensure the RO is in-phase
     for seed in range(nr_seeds):
-        cl_seq = rb.randomized_benchmarking_sequence(nr_cliffords)
+        cl_seq = rb.randomized_benchmarking_sequence(nr_cliffords,
+                                                     desired_net_cl=3)
+        print(cl_seq)
         pulse_keys = rb.decompose_clifford_seq(cl_seq)
+        print(pulse_keys)
         pulse_sub_list = [pulses[x] for x in pulse_keys]
         pulse_sub_list += [RO_pars]
 
@@ -345,7 +348,7 @@ def resetless_RB_seq(pulse_pars, RO_pars,
     el_list.append(el)
     # trigger_wait ensures seq starts in phase, repetitions set to max to
     # ensure it doesn't wait for triggers unnecesarily
-    seq.append_element(el, trigger_wait=True, repetitions=int(2**16))
+    seq.append_element(el, trigger_wait=True)#, repetitions=int(2**16))
 
     station.instruments['AWG'].stop()
     station.pulsar.program_awg(seq, *el_list, verbose=verbose)
