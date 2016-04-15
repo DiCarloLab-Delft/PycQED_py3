@@ -1784,9 +1784,11 @@ class SSRO_discrimination_analysis(MeasurementAnalysis):
         I_shots = self.measured_values[0]
         Q_shots = self.measured_values[1]
 
-        #rotating according to theta
-        I_shots = np.cos(theta_in*2*np.pi/360)*I_shots - np.sin(theta_in*2*np.pi/360)*Q_shots
-        Q_shots = np.sin(theta_in*2*np.pi/360)*I_shots + np.cos(theta_in*2*np.pi/360)*Q_shots
+        # rotating according to theta
+        I_shots = (np.cos(theta_in*2*np.pi/360)*I_shots -
+                   np.sin(theta_in*2*np.pi/360)*Q_shots)
+        Q_shots = (np.sin(theta_in*2*np.pi/360)*I_shots +
+                   np.cos(theta_in*2*np.pi/360)*Q_shots)
 
         # Reshaping the data
         H, xedges, yedges = dm_tools.bin_2D_shots(I_shots, Q_shots)
@@ -1814,7 +1816,7 @@ class SSRO_discrimination_analysis(MeasurementAnalysis):
                                            axs=axs)
             for ax in axs:
                 ax.set_xlabel('I')  # TODO: add units
-                edge=max(max(abs(xedges)), max(abs(yedges)))
+                edge = max(max(abs(xedges)), max(abs(yedges)))
                 ax.set_xlim(-edge, edge)
                 ax.set_ylim(-edge, edge)
                 ax.set_axis_bgcolor(plt.cm.viridis(0))
@@ -4046,55 +4048,36 @@ class butterfly_analysis(MeasurementAnalysis):
         Q_shots = np.sin(theta_in*2*np.pi/360)*I_shots + np.cos(theta_in*2*np.pi/360)*Q_shots
         self.data=I_shots
 
-        # SSRO_discrimination_analysis(
-
-
-        # if close_file:
-        #     self.data_file.close()
-        # if initialize:
-        #     #reshuffeling the data to endup with two arrays for the diffeent input states
-        #     m0_on = self.data[3::6]
-        #     m1_on = self.data[4::6]
-        #     m2_on = self.data[5::6]
-        #     self.data_rel = m0_on+m1_on+m2_on
-        #     self.data_rel[::3] = m0_on
-        #     self.data_rel[1::3] = m1_on
-        #     self.data_rel[2::3] = m2_on
-        #     m0_off = self.data[0::6]
-        #     m1_off = self.data[1::6]
-        #     m2_off = self.data[2::6]
-        #     self.data_exc = m0_off+m1_off+m2_off
-        #     self.data_exc[::3] = m0_off
-        #     self.data_exc[1::3] = m1_off
-        #     self.data_exc[2::3] = m2_off
-        #     SSRO_discrimination_analysis(
-
-
-        #     length0 = len(self.data_rel[:,0])
-
-        #     self.data_rel = dm_tools.postselect(data=self.data_rel,
-        #                                         threshold=threshold)
-        #     self.data_rel = self.data_rel[:,1:]
-        #     length1 = len(self.data_rel[:,0])
-
-        #     print("rel postselecting faction", length1/np.float(length0))
-        #     length0 = len(self.data_exc[:,0])
-        #     self.data_exc = dm_tools.postselect(data=self.data_exc,
-        #                                     threshold=threshold)
-        #     self.data_exc = self.data_exc[:,1:]
-        #     length1 = len(self.data_exc[:,0])
-        #     print("exc postselecting fraction", length1/np.float(length0))
-
-        m0_on = self.data[2::4]
-        m1_on = self.data[3::4]
-        self.data_rel = np.zeros([np.size(m0_on),2])
-        self.data_rel[:,0] = m0_on
-        self.data_rel[:,1] = m1_on
-        m0_off = self.data[0::4]
-        m1_off = self.data[1::4]
-        self.data_exc = np.zeros([np.size(m0_off),2])
-        self.data_exc[:,0] = m0_off
-        self.data_exc[:,1] = m1_off
+        if close_file:
+            self.data_file.close()
+        if initialize:
+            #reshuffeling the data to endup with two arrays for the diffeent input states
+            # m0_on = self.data[3::6]
+            # m1_on = self.data[4::6]
+            # m2_on = self.data[5::6]
+            # self.data_rel = np.zeros([np.size(m0_on),3])
+            # self.data_rel[:,0] = m0_on
+            # self.data_rel[:,1] = m1_on
+            # self.data_rel[:,2] = m2_on
+            # m0_off = self.data[0::6]
+            # m1_off = self.data[1::6]
+            # m2_off = self.data[2::6]
+            # self.data_exc = np.zeros([np.size(m0_off),3])
+            # self.data_exc[:,0] = m0_off
+            # self.data_exc[:,1] = m1_off
+            # self.data_exc[:,2] = m2_off
+            raise NotImplementedError()
+        else:
+            m0_on = self.data[2::4]
+            m1_on = self.data[3::4]
+            self.data_rel = np.zeros([np.size(m0_on),2])
+            self.data_rel[:,0] = m0_on
+            self.data_rel[:,1] = m1_on
+            m0_off = self.data[0::4]
+            m1_off = self.data[1::4]
+            self.data_exc = np.zeros([np.size(m0_off),2])
+            self.data_exc[:,0] = m0_off
+            self.data_exc[:,1] = m1_off
         if digitize:
             self.data_exc = dm_tools.digitize(threshold=threshold,
                                               data=self.data_exc,
@@ -4107,7 +4090,8 @@ class butterfly_analysis(MeasurementAnalysis):
         if auto is True:
             self.run_default_analysis(**kw)
 
-    def run_default_analysis(self, **kw):
+    def run_default_analysis(self,  **kw):
+        verbose = kw.pop('verbose', False)
         exc_coeffs = dm_tools.butterfly_data_binning(Z=self.data_exc,
                                                      initial_state=0)
         #print(exc_coeffs)
@@ -4123,9 +4107,10 @@ class butterfly_analysis(MeasurementAnalysis):
                        self.butterfly_coeffs.get('eps10_1'))
         mmt_ind_exc = (self.butterfly_coeffs.get('eps11_0') +
                        self.butterfly_coeffs.get('eps01_0'))
-        print('SSRO Fid', F_bf)
-        print('mmt_ind_rel', mmt_ind_rel)
-        print('mmt_ind_exc', mmt_ind_exc)
+        if verbose:
+            print('SSRO Fid', F_bf)
+            print('mmt_ind_rel', mmt_ind_rel)
+            print('mmt_ind_exc', mmt_ind_exc)
         self.butterfly_coeffs['F_bf'] = F_bf
         self.butterfly_coeffs['mmt_ind_exc'] = mmt_ind_exc
         self.butterfly_coeffs['mmt_ind_rel'] = mmt_ind_rel

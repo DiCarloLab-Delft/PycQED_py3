@@ -1,9 +1,13 @@
 import logging
 import numpy as np
 from copy import deepcopy
-from math import gcd
+try:
+    from math import gcd
+except:  # Moved to math in python 3.5, this is to be 3.4 compatible
+    from fractions import gcd
 from ..waveform_control import pulsar
 from ..waveform_control import element
+from ..waveform_control.element import calculate_time_corr
 from ..waveform_control import pulse
 from ..waveform_control.pulse_library import MW_IQmod_pulse, SSB_DRAG_pulse
 from ..waveform_control import sequence
@@ -291,15 +295,18 @@ def Randomized_Benchmarking_seq(pulse_pars, RO_pars,
 
 def resetless_RB_seq(pulse_pars, RO_pars,
                      nr_cliffords,
-                     nr_seeds,
-                     post_measurement_delay,
+                     nr_seeds=10,
+                     post_measurement_delay=3e-6,
                      verbose=False):
     '''
     Consists of 1 very long element that interleaves RB-sequences with
     measurement.
-    After every measurement it waits for at least post_measurement_delay.
-    Because I need to make sure all RO pulses start with the same phase I need
-    to do something....
+
+    Takes care all RO pulses are in phase by waiting a post_measurement_delay
+    + a correction time before starting each block of pulses.
+
+    Appends empty samples to ensure the total length of the sequence is a
+    multiple of the modulation (fix_point) frequency.
     '''
     seq_name = 'Resetless_RB_seq'
     seq = sequence.Sequence(seq_name)
@@ -310,19 +317,38 @@ def resetless_RB_seq(pulse_pars, RO_pars,
     fixed_point_freq = RO_pars['fixed_point_frequency']
     RO_pars['fixed_point_frequency'] = None
 
+    # You can think of every seed as it's own little "block"
+    # the idea is to shift whole blocks to ensure the RO is in-phase
     for seed in range(nr_seeds):
-        cl_seq = rb.randomized_benchmarking_sequence(nr_cliffords)
-
+        cl_seq = rb.randomized_benchmarking_sequence(nr_cliffords,
+                                                     desired_net_cl=3)
+        print(cl_seq)
         pulse_keys = rb.decompose_clifford_seq(cl_seq)
+        print(pulse_keys)
         pulse_sub_list = [pulses[x] for x in pulse_keys]
         pulse_sub_list += [RO_pars]
-        sub_seq_length = sum([p['pulse_delay'] for p in pulse_sub_list])
-        # Need to append a wait element here to ensure phase lock + wait
+
+        # Calculate the time correction to ensure RO pulse starts at a
+        # multiple of the fixed_point_freq
+        sub_seq_duration = sum([p['pulse_delay'] for p in pulse_sub_list])
+        extra_delay = calculate_time_corr(
+            sub_seq_duration+post_measurement_delay, fixed_point_freq)
+        initial_pulse_delay = post_measurement_delay + extra_delay
+
+        # Replace the initial element to wait for an extended period of time
+        start_pulse = deepcopy(pulse_sub_list[0])
+        start_pulse['pulse_delay'] += initial_pulse_delay
+        pulse_sub_list[0] = start_pulse
+        pulse_list += pulse_sub_list
 
     el = multi_pulse_elt(1, station, pulse_list)
-
+    extra_delay = calculate_time_corr(
+        el.length(), fixed_point_freq)
+    el.min_samples = el.samples() + int(extra_delay*el.clock)
     el_list.append(el)
-    seq.append_element(el, trigger_wait=False)  # Keep running perpetually
+    # trigger_wait ensures seq starts in phase, repetitions set to max to
+    # ensure it doesn't wait for triggers unnecesarily
+    seq.append_element(el, trigger_wait=True)#, repetitions=int(2**16))
 
     station.instruments['AWG'].stop()
     station.pulsar.program_awg(seq, *el_list, verbose=verbose)
@@ -448,6 +474,11 @@ def single_SSB_DRAG_pulse_elt(i, station,
                           refpulse=RO_tone, refpoint='start')
         el.add(pulse.cp(ROm, channel=RO_pars['marker_ch2']),
                refpulse=ROm_name, refpoint='start', start=0)
+
+        el.add(pulse.SquarePulse(name='final_empty_pulse',
+                                              channel='ch1',
+                                              amplitude=0, length=1e-9),
+                            refpulse=RO_tone, refpoint='end')
         return el
 
 
@@ -529,6 +560,12 @@ def double_SSB_DRAG_pulse_elt(i, station,
                           refpulse=RO_tone, refpoint='start')
         el.add(pulse.cp(ROm, channel=RO_pars['marker_ch2']),
                refpulse=ROm_name, refpoint='start', start=0)
+
+        el.add(pulse.SquarePulse(name='final_empty_pulse',
+                                 channel='ch1',
+                                 amplitude=0, length=1e-9),
+               refpulse=RO_tone, refpoint='end')
+
         return el
 
 
@@ -602,6 +639,12 @@ def multi_pulse_elt(i, station, pulse_list):
                                   refpulse=last_pulse, refpoint='start')
                 el.add(pulse.cp(ROm, channel=pulse_pars['marker_ch2']),
                        refpulse=ROm_name, refpoint='start', start=0)
+
+        # This pulse ensures that the sequence always ends at zero amp
+        last_pulse = el.add(pulse.SquarePulse(name='final_empty_pulse',
+                                              channel='ch1',
+                                              amplitude=0, length=1e-9),
+                            refpulse=last_pulse, refpoint='end')
 
         return el
 

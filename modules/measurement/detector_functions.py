@@ -540,12 +540,12 @@ class CBox_integration_logging_det(Hard_Detector):
         self.AWG.stop()
 
 
-class CBox_state_couners_det(Hard_Detector):
+class CBox_state_counters_det(Hard_Detector):
     def __init__(self, CBox, AWG, **kw):
         super().__init__()
         self.CBox = CBox
-        self.name = 'CBox_state_couners_detector'
-        # A and B refer to the counts for the different weigth functions
+        self.name = 'CBox_state_counters_detector'
+        # A and B refer to the counts for the different weight functions
         self.value_names = ['no error A', 'single error A', 'double error A',
                             '|0> A', '|1> A',
                             'no error B', 'single error B', 'double error B',
@@ -577,6 +577,32 @@ class CBox_state_couners_det(Hard_Detector):
     def finish(self):
         self.CBox.set('acquisition_mode', 0)
         self.AWG.stop()
+
+
+class CBox_single_qubit_state_counters(CBox_state_counters_det):
+    '''
+    Child of the state counters detector
+    Returns only a subset of the counters relating to weight function 1.
+    Rescales the measured counts to percentages.
+    '''
+    def __init__(self, CBox, AWG):
+        super(CBox_state_counters_det, self).__init__()
+        self.detector_control = 'soft'
+        self.CBox = CBox
+        self.name = 'CBox_state_counters_detector'
+        # A and B refer to the counts for the different weight functions
+        self.value_names = ['no err. frac.', 'single err. frac.',
+                            'double err. frac.']
+        self.value_units = ['%']*3
+        self.AWG = AWG
+
+    def prepare(self, **kw):
+        self.nr_shots = self.CBox.log_length.get()
+
+    def acquire_data_point(self):
+        d = super().get_values()
+        data = d[0:3]/self.nr_shots * 100
+        return data
 
 
 class CBox_digitizing_shots_det(CBox_integration_logging_det):

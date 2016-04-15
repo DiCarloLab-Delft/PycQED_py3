@@ -26,9 +26,12 @@ def show_wf(tvals, wf, name='', ax=None, ret=None, dt=None):
         return None
 
 
-def show_element(element, delay=True):
+def show_element(element, delay=True, channels='all'):
     tvals, wfs = element.waveforms()
-    cnt = len(wfs)
+    if channels == 'all':
+        cnt = len(wfs)
+    else:
+        cnt = len(channels)
     i = 0
 
     fig, axs = plt.subplots(cnt, 1, sharex=True)
@@ -36,29 +39,30 @@ def show_element(element, delay=True):
     t1 = 0
 
     for wf in wfs:
-        i += 1
-        hi = element._channels[wf]['high']
-        lo = element._channels[wf]['low']
-        # some prettifying
-        ax = axs[i-1]
-        ax.set_axis_bgcolor('gray')
-        ax.axhspan(lo, hi, facecolor='w', linewidth=0)
-        # the waveform
-        if delay:
-            t = tvals
-        else:
-            t = element.real_times(tvals, wf)
+        if channels == 'all' or wf in channels:
+            i += 1
+            hi = element._channels[wf]['high']
+            lo = element._channels[wf]['low']
+            # some prettifying
+            ax = axs[i-1]
+            ax.set_axis_bgcolor('gray')
+            ax.axhspan(lo, hi, facecolor='w', linewidth=0)
+            # the waveform
+            if delay:
+                t = tvals
+            else:
+                t = element.real_times(tvals, wf)
 
-        t0 = min(t0, t[0])
-        t1 = max(t1, t[-1])
-        # TODO style options
-        show_wf(t, wfs[wf], name=wf, ax=ax, dt=1./element.clock)
+            t0 = min(t0, t[0])
+            t1 = max(t1, t[-1])
+            # TODO style options
+            show_wf(t, wfs[wf], name=wf, ax=ax, dt=1./element.clock)
 
-        ax.set_ylim(lo*1.1, hi*1.1)
+            ax.set_ylim(lo*1.1, hi*1.1)
 
-        if i == cnt:
-            ax.set_xlabel('Time')
-            ax.set_xlim(t0, t1)
+            if i == cnt:
+                ax.set_xlabel('Time')
+                ax.set_xlim(t0, t1)
 
 
 def show_fourier_of_element_channels(element, channels, units='Hz'):
