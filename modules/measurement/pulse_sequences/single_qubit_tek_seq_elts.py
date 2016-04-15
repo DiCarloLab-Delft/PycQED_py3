@@ -70,18 +70,12 @@ def T1_seq(times,
         RO_pars['pulse_delay'] = RO_pulse_delay + tau
         if cal_points:
             if (i == (len(times)-4) or i == (len(times)-3)):
-                el = single_SSB_DRAG_pulse_elt(i, station,
-                                               pulses['I'],
-                                               RO_pars)
+                el = multi_pulse_elt(i, station, [pulses['I'], RO_pars])
             elif(i == (len(times)-2) or i == (len(times)-1)):
                 RO_pars['pulse_delay'] = RO_pulse_delay
-                el = single_SSB_DRAG_pulse_elt(i, station,
-                                               pulses['X180'],
-                                               RO_pars)
+                el = multi_pulse_elt(i, station, [pulses['X180'], RO_pars])
             else:
-                el = single_SSB_DRAG_pulse_elt(i, station,
-                                               pulses['X180'],
-                                               RO_pars)
+                el = multi_pulse_elt(i, station, [pulses['X180'], RO_pars])
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
     station.instruments['AWG'].stop()
@@ -117,18 +111,12 @@ def Ramsey_seq(times, pulse_pars, RO_pars,
             pulse_pars_x2['phase'] = tau * artificial_detuning * 360
 
         if cal_points and (i == (len(times)-4) or i == (len(times)-3)):
-                el = single_SSB_DRAG_pulse_elt(i, station,
-                                               pulses['I'],
-                                               RO_pars)
+                el = multi_pulse_elt(i, station, [pulses['I'], RO_pars])
         elif cal_points and (i == (len(times)-2) or i == (len(times)-1)):
-                el = single_SSB_DRAG_pulse_elt(i, station,
-                                               pulses['X180'],
-                                               RO_pars)
+                el = multi_pulse_elt(i, station, [pulses['X180'], RO_pars])
         else:
-            el = double_SSB_DRAG_pulse_elt(i, station,
-                                           pulses['X90'],
-                                           pulse_pars_x2,
-                                           RO_pars)
+            el = multi_pulse_elt(i, station,
+                                 [pulses['X90'], pulse_pars_x2, RO_pars])
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
     station.instruments['AWG'].stop()
@@ -262,14 +250,12 @@ def Randomized_Benchmarking_seq(pulse_pars, RO_pars,
                 i += 1  # only used for ensuring unique elt names
                 if cal_points and (j == (len(nr_cliffords)-4) or
                                    j == (len(nr_cliffords)-3)):
-                    el = single_SSB_DRAG_pulse_elt(i, station,
-                                                   pulses['I'],
-                                                   RO_pars)
+                    el = multi_pulse_elt(i, station,
+                                         [pulses['I'], RO_pars])
                 elif cal_points and (j == (len(nr_cliffords)-2) or
                                      j == (len(nr_cliffords)-1)):
-                    el = single_SSB_DRAG_pulse_elt(i, station,
-                                                   pulses['X180'],
-                                                   RO_pars)
+                    el = multi_pulse_elt(i, station,
+                                         [pulses['X180'], RO_pars])
                 else:
                     cl_seq = rb.randomized_benchmarking_sequence(n_cl)
                     pulse_keys = rb.decompose_clifford_seq(cl_seq)
@@ -440,16 +426,12 @@ def Motzoi_XY(motzois, pulse_pars, RO_pars,
 
         if cal_points and (i == (len(motzois)-4) or
                            i == (len(motzois)-3)):
-            el = single_SSB_DRAG_pulse_elt(i, station,
-                                           pulses['I'],
-                                           RO_pars)
+            el = multi_pulse_elt(i, station, [pulses['I'], RO_pars])
         elif cal_points and (i == (len(motzois)-2) or
                              i == (len(motzois)-1)):
             # pick motzoi for calpoint in the middle of the range
             pulses['X180']['motzoi'] = np.mean(motzois)
-            el = single_SSB_DRAG_pulse_elt(i, station,
-                                           pulses['X180'],
-                                           RO_pars)
+            el = multi_pulse_elt(i, station, [pulses['X180'], RO_pars])
         else:
             pulse_list = [pulses[x] for x in pulse_keys]
             pulse_list += [RO_pars]
@@ -481,60 +463,7 @@ def single_SSB_DRAG_pulse_elt(i, station,
             RO_pars:    dictionary containing the parameters for the RO tone
                         and markers
         '''
-        el = element.Element(name='single-pulse-elt_%s' % i,
-                             pulsar=station.pulsar)
-
-        # exitst to ensure that channel is not high when waiting for trigger
-        ref_elt = el.add(pulse.SquarePulse(name='refpulse_0', channel='ch1',
-                         amplitude=0, length=1e-9))
-        for i in range(3):  # Exist to ensure there are no empty channels
-            el.add(pulse.SquarePulse(name='refpulse_0',
-                                     channel='ch{}'.format(i+1),
-                                     amplitude=0, length=1e-9))
-
-        # Pulse trigger
-        pulse1 = SSB_DRAG_pulse(name='pulse1',
-                                I_channel=pulse_pars['I_channel'],
-                                Q_channel=pulse_pars['Q_channel'],
-                                amplitude=pulse_pars['amplitude'],
-                                sigma=pulse_pars['sigma'],
-                                nr_sigma=pulse_pars['nr_sigma'],
-                                motzoi=pulse_pars['motzoi'],
-                                mod_frequency=pulse_pars['mod_frequency'],
-                                phase=pulse_pars['phase'])
-
-        el.add(pulse1, name='pulse1', start=pulse_pars['pulse_delay'],
-               refpulse=ref_elt, refpoint='start')
-
-        # Readout modulation tone
-        # TODO: add option to use same sequence but spit out only marker
-        # instead of a RO tone.
-        RO_tone = el.add(MW_IQmod_pulse(name='RO_tone',
-                                        I_channel=RO_pars['I_channel'],
-                                        Q_channel=RO_pars['Q_channel'],
-                                        length=RO_pars['length'],
-                                        amplitude=RO_pars['amplitude'],
-                                        mod_frequency=RO_pars['mod_frequency']),
-                         start=RO_pars['pulse_delay'],
-                         refpulse='pulse1', refpoint='start',
-                         fixed_point_freq=gcd(int(RO_pars['mod_frequency']),
-                                              int(20e6)))
-        # Hardcoded gcd to ensure fixed point always a multiple of 5ns for CBox
-
-        # Start Acquisition marker
-        ROm = pulse.SquarePulse(name='RO-marker',
-                                amplitude=1, length=20e-9,
-                                channel=RO_pars['marker_ch1'])
-        ROm_name = el.add(ROm, start=RO_pars['acq_marker_delay'],
-                          refpulse=RO_tone, refpoint='start')
-        el.add(pulse.cp(ROm, channel=RO_pars['marker_ch2']),
-               refpulse=ROm_name, refpoint='start', start=0)
-
-        el.add(pulse.SquarePulse(name='final_empty_pulse',
-                                              channel='ch1',
-                                              amplitude=0, length=1e-9),
-                            refpulse=RO_tone, refpoint='end')
-        return el
+        raise NotImplementedError('deprecated, use multi-pulse elt')
 
 
 def double_SSB_DRAG_pulse_elt(i, station,
@@ -555,73 +484,7 @@ def double_SSB_DRAG_pulse_elt(i, station,
             RO_pars:    dictionary containing the parameters for the RO tone
                         and markers
         '''
-        el = element.Element(name='double-pulse-elt_%s' % i,
-                             pulsar=station.pulsar)
-
-        # exitst to ensure that channel is not high when waiting for trigger
-        ref_elt = el.add(pulse.SquarePulse(name='refpulse_0', channel='ch1',
-                         amplitude=0, length=1e-9))
-        for i in range(3):  # Exist to ensure there are no empty channels
-            el.add(pulse.SquarePulse(name='refpulse_0',
-                                     channel='ch{}'.format(i+1),
-                                     amplitude=0, length=1e-9))
-
-        # Pulse trigger
-        pulse_1 = SSB_DRAG_pulse(name='pulse_1',
-                                 I_channel=pulse_pars_1['I_channel'],
-                                 Q_channel=pulse_pars_1['Q_channel'],
-                                 amplitude=pulse_pars_1['amplitude'],
-                                 sigma=pulse_pars_1['sigma'],
-                                 nr_sigma=pulse_pars_1['nr_sigma'],
-                                 motzoi=pulse_pars_1['motzoi'],
-                                 mod_frequency=pulse_pars_1['mod_frequency'],
-                                 phase=pulse_pars_1['phase'])
-
-        el.add(pulse_1, name='pulse_1', start=pulse_pars_1['pulse_delay'],
-               refpulse=ref_elt, refpoint='start')
-
-        pulse_2 = SSB_DRAG_pulse(name='pulse_2',
-                                 I_channel=pulse_pars_2['I_channel'],
-                                 Q_channel=pulse_pars_2['Q_channel'],
-                                 amplitude=pulse_pars_2['amplitude'],
-                                 sigma=pulse_pars_2['sigma'],
-                                 nr_sigma=pulse_pars_2['nr_sigma'],
-                                 motzoi=pulse_pars_2['motzoi'],
-                                 mod_frequency=pulse_pars_2['mod_frequency'],
-                                 phase=pulse_pars_2['phase'])
-        el.add(pulse_2, name='pulse_2', start=pulse_pars_2['pulse_delay'],
-               refpulse='pulse_1', refpoint='start')
-
-        # Readout modulation tone
-        # TODO: add option to use same sequence but spit out only marker
-        # instead of a RO tone.
-        RO_tone = el.add(MW_IQmod_pulse(name='RO_tone',
-                                        I_channel=RO_pars['I_channel'],
-                                        Q_channel=RO_pars['Q_channel'],
-                                        length=RO_pars['length'],
-                                        amplitude=RO_pars['amplitude'],
-                                        mod_frequency=RO_pars['mod_frequency']),
-                         start=RO_pars['pulse_delay'], refpoint='start',
-                         refpulse='pulse_2',
-                         fixed_point_freq=gcd(int(RO_pars['mod_frequency']),
-                                              int(20e6)))
-        # Hardcoded gcd to ensure fixed point always a multiple of 5ns for CBox
-
-        # Start Acquisition marker
-        ROm = pulse.SquarePulse(name='RO-marker',
-                                amplitude=1, length=20e-9,
-                                channel=RO_pars['marker_ch1'])
-        ROm_name = el.add(ROm, start=RO_pars['acq_marker_delay'],
-                          refpulse=RO_tone, refpoint='start')
-        el.add(pulse.cp(ROm, channel=RO_pars['marker_ch2']),
-               refpulse=ROm_name, refpoint='start', start=0)
-
-        el.add(pulse.SquarePulse(name='final_empty_pulse',
-                                 channel='ch1',
-                                 amplitude=0, length=1e-9),
-               refpulse=RO_tone, refpoint='end')
-
-        return el
+        raise NotImplementedError('Deprecated use multi pulse let')
 
 
 def multi_pulse_elt(i, station, pulse_list):
