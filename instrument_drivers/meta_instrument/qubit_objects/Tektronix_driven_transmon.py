@@ -183,11 +183,11 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
             self.AWG.set(self.RO_Q_channel.get()+'_offset',
                          self.RO_Q_offset.get())
         elif self.RO_pulse_type.get() is 'Gated_MW_RO_pulse':
-            self.f_RO_source.on()
+            self.rf_RO_source.on()
             print('double check this command')
-            self.f_RO_source.pulsemod_state.set(True)
-            self.f_RO_source.frequency.set(self.f_RO.get())
-            self.f_RO_source.power.set(self.RO_power.get())
+            self.rf_RO_source.pulsemod_state.set('on')
+            self.rf_RO_source.frequency.set(self.f_RO.get())
+            self.rf_RO_source.power.set(self.RO_pulse_power.get())
 
 
     def get_pulse_pars(self):
