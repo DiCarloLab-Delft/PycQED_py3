@@ -1813,7 +1813,7 @@ class SSRO_discrimination_analysis(MeasurementAnalysis):
         if plot_2D_histograms:  # takes ~350ms, speedup quite noticable
             fig, axs = plt.subplots(nrows=1, ncols=3)
             fit_mods.plot_fitres2D_heatmap(self.fit_res, x_tiled, y_rep,
-                                           axs=axs)
+                                           axs=axs, cmap='viridis')
             for ax in axs:
                 ax.set_xlabel('I')  # TODO: add units
                 edge = max(max(abs(xedges)), max(abs(yedges)))
@@ -4034,6 +4034,7 @@ class butterfly_analysis(MeasurementAnalysis):
                  theta_in=0,
                  initialize=False,
                 digitize=True,
+                case=False,
                  **kw):
         self.folder = a_tools.get_folder(timestamp=timestamp,
                                              label=label, **kw)
@@ -4048,10 +4049,10 @@ class butterfly_analysis(MeasurementAnalysis):
         Q_shots = np.sin(theta_in*2*np.pi/360)*I_shots + np.cos(theta_in*2*np.pi/360)*Q_shots
         self.data=I_shots
 
-        if close_file:
-            self.data_file.close()
+        # if close_file:
+        #     self.data_file.close()
         if initialize:
-            #reshuffeling the data to endup with two arrays for the diffeent input states
+            # #reshuffeling the data to endup with two arrays for the diffeent input states
             # m0_on = self.data[3::6]
             # m1_on = self.data[4::6]
             # m2_on = self.data[5::6]
@@ -4066,6 +4067,13 @@ class butterfly_analysis(MeasurementAnalysis):
             # self.data_exc[:,0] = m0_off
             # self.data_exc[:,1] = m1_off
             # self.data_exc[:,2] = m2_off
+            # self.data_exc = dm_tools.postselect(threshold=threshold,
+            #                                   data=self.data_exc,
+            #                                   positive_case=case)
+            # self.data_rel = dm_tools.postselect(threshold=threshold,
+            #                                   data=self.data_rel,
+            #                                   positive_case=case)
+
             raise NotImplementedError()
         else:
             m0_on = self.data[2::4]
@@ -4081,10 +4089,10 @@ class butterfly_analysis(MeasurementAnalysis):
         if digitize:
             self.data_exc = dm_tools.digitize(threshold=threshold,
                                               data=self.data_exc,
-                                              positive_case=False)
+                                              positive_case=case)
             self.data_rel = dm_tools.digitize(threshold=threshold,
                                               data=self.data_rel,
-                                              positive_case=False)
+                                              positive_case=case)
         if close_file:
             self.data_file.close()
         if auto is True:

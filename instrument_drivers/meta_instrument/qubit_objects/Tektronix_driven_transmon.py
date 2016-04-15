@@ -78,6 +78,8 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                            vals=vals.Numbers(min_value=-0.1, max_value=0.1),
                            parameter_class=ManualParameter)
 
+        # These parameters are only relevant if using MW_IQmod_pulse type
+        # RO
         self.add_parameter('RO_I_channel', initial_value='ch3',
                            vals=vals.Strings(),
                            parameter_class=ManualParameter)
@@ -89,6 +91,15 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                            parameter_class=ManualParameter)
         self.add_parameter('RO_Q_offset', initial_value=0.0,
                            vals=vals.Numbers(min_value=-0.1, max_value=0.1),
+                           parameter_class=ManualParameter)
+
+        self.add_parameter('RO_pulse_type', initial_value='MW_IQmod_pulse',
+                           vals=vals.Enum('MW_IQmod_pulse',
+                                          'Gated_MW_RO_pulse'),
+                           parameter_class=ManualParameter)
+        # Relevant when using a marker channel to gate a MW-RO tone.
+        self.add_parameter('RO_pulse_marker_channel',
+                           vals=vals.Strings(),
                            parameter_class=ManualParameter)
 
         self.add_parameter('f_pulse_mod',
@@ -176,16 +187,16 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         self.RO_pars = {
             'I_channel': self.RO_I_channel.get(),
             'Q_channel': self.RO_Q_channel.get(),
+            'RO_pulse_marker_channel': self.RO_pulse_marker_channel.get(),
             'amplitude': self.RO_amp.get(),
             'length': self.RO_pulse_length.get(),
-            'trigger_delay': self.RO_trigger_delay.get(),
             'pulse_delay': self.RO_pulse_delay.get(),
             'mod_frequency': self.f_RO_mod.get(),
             'fixed_point_frequency': gcd(int(self.f_RO_mod.get()), int(20e6)),
-            'marker_ch1': self.RO_Q_channel.get()+'_marker1',
-            'marker_ch2': self.RO_Q_channel.get()+'_marker2',
+            'acq_marker_delay': self.RO_acq_marker_delay.get(),
+            'acq_marker_channel': self.RO_acq_marker_channel.get(),
             'phase': 0,
-            'pulse_type': 'MW_IQmod_pulse'}
+            'pulse_type': self.RO_pulse_type.get()}
         return self.pulse_pars, self.RO_pars
 
     def calibrate_mixer_offsets(self, signal_hound, offs_type='pulse',

@@ -200,9 +200,7 @@ def OffOn_seq(pulse_pars, RO_pars,
     pulse_combinations = ['I', 'X180']
 
     for i, pulse_comb in enumerate(pulse_combinations):
-        el = single_SSB_DRAG_pulse_elt(i, station,
-                                       pulses[pulse_comb],
-                                       RO_pars)
+        el = multi_pulse_elt(i, station, [pulses[pulse_comb], RO_pars])
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
     station.instruments['AWG'].stop()
@@ -355,6 +353,63 @@ def resetless_RB_seq(pulse_pars, RO_pars,
     return seq_name
 
 
+def resetless_rabi_seq(pulse_pars, RO_pars,
+                       n=1,
+                       post_measurement_delay=3e-6,
+                       verbose=False):
+    '''
+    Interleaves n-rabi pulses with measurements, waits at least
+    post_measurement_delay after (the start of) each RO before starting a new
+    pulse.
+
+    Appends empty samples to ensure the total length of the sequence is a
+    multiple of the modulation (fix_point) frequency.
+    '''
+    seq_name = 'Resetless_rabi_seq'
+    seq = sequence.Sequence(seq_name)
+    el_list = []
+    pulses = get_pulse_dict_from_pars(pulse_pars)
+    pulse_list = []
+    # Extracting and fixed point freq, taking care of by hand here
+    fixed_point_freq = RO_pars['fixed_point_frequency']
+    RO_pars['fixed_point_frequency'] = None
+
+    # You can think of every seed as it's own little "block"
+    # the idea is to shift whole blocks to ensure the RO is in-phase
+    # Makes 10 "block" to ensure we fill up the minimum element size
+    for i in range(2):
+
+        pulse_sub_list = n*[pulses['X180']]+[RO_pars]
+
+        # TODO: This is a block common to all resetless sequences, I should
+        # make it into a function.
+        # Calculate the time correction to ensure RO pulse starts at a
+        # multiple of the fixed_point_freq
+        sub_seq_duration = sum([p['pulse_delay'] for p in pulse_sub_list])
+        extra_delay = calculate_time_corr(
+            sub_seq_duration+post_measurement_delay, fixed_point_freq)
+        initial_pulse_delay = post_measurement_delay + extra_delay
+
+        # Replace the initial element to wait for an extended period of time
+        start_pulse = deepcopy(pulse_sub_list[0])
+        start_pulse['pulse_delay'] += initial_pulse_delay
+        pulse_sub_list[0] = start_pulse
+        pulse_list += pulse_sub_list
+
+    el = multi_pulse_elt(1, station, pulse_list)
+    extra_delay = calculate_time_corr(
+        el.length(), fixed_point_freq)
+    el.min_samples = el.samples() + int(extra_delay*el.clock)
+    el_list.append(el)
+    # trigger_wait ensures seq starts in phase, repetitions set to max to
+    # ensure it doesn't wait for triggers unnecesarily
+    seq.append_element(el, trigger_wait=True)#, repetitions=int(2**16))
+
+    station.instruments['AWG'].stop()
+    station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+    return seq_name
+
+
 def Motzoi_XY(motzois, pulse_pars, RO_pars,
               cal_points=True, verbose=False):
     '''
@@ -470,7 +525,7 @@ def single_SSB_DRAG_pulse_elt(i, station,
         ROm = pulse.SquarePulse(name='RO-marker',
                                 amplitude=1, length=20e-9,
                                 channel=RO_pars['marker_ch1'])
-        ROm_name = el.add(ROm, start=RO_pars['trigger_delay'],
+        ROm_name = el.add(ROm, start=RO_pars['acq_marker_delay'],
                           refpulse=RO_tone, refpoint='start')
         el.add(pulse.cp(ROm, channel=RO_pars['marker_ch2']),
                refpulse=ROm_name, refpoint='start', start=0)
@@ -556,7 +611,7 @@ def double_SSB_DRAG_pulse_elt(i, station,
         ROm = pulse.SquarePulse(name='RO-marker',
                                 amplitude=1, length=20e-9,
                                 channel=RO_pars['marker_ch1'])
-        ROm_name = el.add(ROm, start=RO_pars['trigger_delay'],
+        ROm_name = el.add(ROm, start=RO_pars['acq_marker_delay'],
                           refpulse=RO_tone, refpoint='start')
         el.add(pulse.cp(ROm, channel=RO_pars['marker_ch2']),
                refpulse=ROm_name, refpoint='start', start=0)
@@ -618,27 +673,41 @@ def multi_pulse_elt(i, station, pulse_list):
                                    alpha=pulse_pars['alpha']),
                     start=pulse_pars['pulse_delay'],
                     refpulse=last_pulse, refpoint='start')
-            elif pulse_pars['pulse_type'] == 'MW_IQmod_pulse':
+
+            elif (pulse_pars['pulse_type'] == 'MW_IQmod_pulse' or
+                  pulse_pars['pulse_type'] == 'Gated_MW_RO_pulse'):
                 # Does more than just call the function as it also adds the
                 # markers. Ideally we combine both in one function in pulselib
-                last_pulse = el.add(
-                    MW_IQmod_pulse(name='RO_tone',
-                                   I_channel=pulse_pars['I_channel'],
-                                   Q_channel=pulse_pars['Q_channel'],
-                                   length=pulse_pars['length'],
-                                   amplitude=pulse_pars['amplitude'],
-                                   mod_frequency=pulse_pars['mod_frequency']),
-                    start=pulse_pars['pulse_delay'],
-                    refpulse=last_pulse, refpoint='start',
-                    fixed_point_freq=pulse_pars['fixed_point_frequency'])
+                if pulse_pars['pulse_type'] == 'MW_IQmod_pulse':
+                    last_pulse = el.add(MW_IQmod_pulse(
+                            name='RO_tone',
+                            I_channel=pulse_pars['I_channel'],
+                            Q_channel=pulse_pars['Q_channel'],
+                            length=pulse_pars['length'],
+                            amplitude=pulse_pars['amplitude'],
+                            mod_frequency=pulse_pars['mod_frequency']),
+                        start=pulse_pars['pulse_delay'],
+                        refpulse=last_pulse, refpoint='start',
+                        fixed_point_freq=pulse_pars['fixed_point_frequency'])
+                else:
+                    last_pulse = el.add(pulse.SquarePulse(
+                            name='RO_marker', amplitude=1,
+                            length=pulse_pars['length'],
+                            channel=pulse_pars['RO_pulse_marker_channel']),
+                        start=pulse_pars['pulse_delay'], refpulse=last_pulse,
+                        refpoint='start',
+                        fixed_point_freq=pulse_pars['fixed_point_frequency'])
                 # Start Acquisition marker
-                ROm = pulse.SquarePulse(name='RO-marker',
-                                        amplitude=1, length=20e-9,
-                                        channel=pulse_pars['marker_ch1'])
-                ROm_name = el.add(ROm, start=pulse_pars['trigger_delay'],
-                                  refpulse=last_pulse, refpoint='start')
-                el.add(pulse.cp(ROm, channel=pulse_pars['marker_ch2']),
-                       refpulse=ROm_name, refpoint='start', start=0)
+                Acq_marker = pulse.SquarePulse(
+                    name='Acq-trigger', amplitude=1, length=20e-9,
+                    channel=pulse_pars['acq_marker_channel'])
+                el.add(
+                    Acq_marker, start=pulse_pars['acq_marker_delay'],
+                    refpulse=last_pulse, refpoint='start')
+
+            else:
+                raise KeyError('pulse_type {} not recognized'.format(
+                    pulse_pars['pulse_type']))
 
         # This pulse ensures that the sequence always ends at zero amp
         last_pulse = el.add(pulse.SquarePulse(name='final_empty_pulse',

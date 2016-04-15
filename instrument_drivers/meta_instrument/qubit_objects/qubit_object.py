@@ -141,8 +141,11 @@ class Transmon(Qubit):
                            parameter_class=ManualParameter)
         self.add_parameter('RO_pulse_length', units='s',
                            parameter_class=ManualParameter)
-        self.add_parameter('RO_trigger_delay', units='s',
+        self.add_parameter('RO_acq_marker_delay', units='s',
                            parameter_class=ManualParameter)
+        self.add_parameter('RO_acq_marker_channel',
+                           parameter_class=ManualParameter,
+                           vals=vals.Strings())
         self.add_parameter('RO_amp', units='V',
                            parameter_class=ManualParameter)
         # Time between start of pulses
