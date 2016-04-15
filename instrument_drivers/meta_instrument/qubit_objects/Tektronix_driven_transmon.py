@@ -31,18 +31,24 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
     Setup configuration:
         Drive:                 Tektronix 5014 AWG
         Acquisition:           CBox
-                    (in the future to be compatible with both CBox and ATS)
-        Readout pulse configuration: LO modulated using AWG
+            (in the future to be compatible with both CBox and ATS)
+
+    Readout pulse configuration:
+        Set by parameter RO_pulse_type ['MW_IQmod_pulse', 'Gated_MW_RO_pulse']
+        - LO modulated using AWG: 'MW_IQmod_pulse'
+        - LO + RF-pulsed with marker: 'Gated_MW_RO_pulse'
+        Depending on the RO_pulse_type some parameters are not used
     '''
     def __init__(self, name,
                  LO, cw_source, td_source,
                  IVVI, AWG, CBox,
-                 heterodyne_instr,
-                 MC):
-        super(CBox_driven_transmon, self).__init__(name) # Change this when inheriting directly from Transmon instead of from CBox driven Transmon.
+                 heterodyne_instr, MC, rf_RO_source=None):
+        super(CBox_driven_transmon, self).__init__(name)
+        # Change this when inheriting directly from Transmon instead of from CBox driven Transmon.
         self.LO = LO
         self.cw_source = cw_source
         self.td_source = td_source
+        self.rf_RO_source = rf_RO_source
         self.IVVI = IVVI
         self.heterodyne_instr = heterodyne_instr
         self.AWG = AWG
@@ -101,6 +107,8 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         self.add_parameter('RO_pulse_marker_channel',
                            vals=vals.Strings(),
                            parameter_class=ManualParameter)
+        self.add_parameter('RO_pulse_power', units='dBm',
+                           parameter_class=ManualParameter)
 
         self.add_parameter('f_pulse_mod',
                            initial_value=-100e6,
@@ -150,9 +158,11 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         self.LO.on()
         self.cw_source.off()
         self.td_source.on()
+
         # Set source to fs =f-f_mod such that pulses appear at f = fs+f_mod
         self.td_source.frequency.set(self.f_qubit.get()
                                      - self.f_pulse_mod.get())
+
         # Use resonator freq unless explicitly specified
         if self.f_RO.get() is None:
             f_RO = self.f_res.get()
@@ -166,8 +176,19 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                      self.pulse_I_offset.get())
         self.AWG.set(self.pulse_Q_channel.get()+'_offset',
                      self.pulse_Q_offset.get())
-        self.AWG.set(self.RO_I_channel.get()+'_offset', self.RO_I_offset.get())
-        self.AWG.set(self.RO_Q_channel.get()+'_offset', self.RO_Q_offset.get())
+
+        if self.RO_pulse_type.get() is 'MW_IQmod_pulse':
+            self.AWG.set(self.RO_I_channel.get()+'_offset',
+                         self.RO_I_offset.get())
+            self.AWG.set(self.RO_Q_channel.get()+'_offset',
+                         self.RO_Q_offset.get())
+        elif self.RO_pulse_type.get() is 'Gated_MW_RO_pulse':
+            self.f_RO_source.on()
+            print('double check this command')
+            self.f_RO_source.pulsemod_state.set(True)
+            self.f_RO_source.frequency.set(self.f_RO.get())
+            self.f_RO_source.power.set(self.RO_power.get())
+
 
     def get_pulse_pars(self):
         self.pulse_pars = {
@@ -420,11 +441,6 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
             theta_in=-a.theta,
             threshold=b.opt_I_threshold, digitize=True)
         return c.butterfly_coeffs
-
-
-
-
-
 
     def measure_rb_vs_amp(self, amps, nr_cliff=1,
                       resetless=True,
