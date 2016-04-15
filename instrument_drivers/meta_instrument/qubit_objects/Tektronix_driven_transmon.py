@@ -376,14 +376,13 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                              no_fits=no_fits, close_fig=close_fig)
 
 
-    def measure_butterfly(self,    return_detector=False,
-                                   MC=None,
-                                   analyze=True,
-                                   close_fig=True,
-                                   verbose=True,
-                                   initialize=False,
-                                   post_measurement_delay=2000e-9
-                                   ):
+    def measure_butterfly(self, return_detector=False,
+                          MC=None,
+                          analyze=True,
+                          close_fig=True,
+                          verbose=True,
+                          initialize=False,
+                          post_measurement_delay=2000e-9):
         self.prepare_for_timedomain()
         if MC is None:
             MC = self.MC
@@ -392,23 +391,24 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
             initialize=initialize, post_measurement_delay=post_measurement_delay))
         MC.set_detector_function(self.int_log_det)
         MC.run('Butterfly{}initialize_{}'.format(self.msmt_suffix, initialize))
-        #first perform SSRO analysis to extract the optimal rotation angle theta
-        a=ma.SSRO_discrimination_analysis(
+        # first perform SSRO analysis to extract the optimal rotation angle theta
+        a = ma.SSRO_discrimination_analysis(
             label='Butterfly',
             current_threshold=None,
-            close_fig=False,
+            close_fig=close_fig,
             plot_2D_histograms=True)
         #the, run it a second time to determin the optimum threshold along the rotated I axis
-        b=ma.SSRO_discrimination_analysis(
+        b = ma.SSRO_discrimination_analysis(
             label='Butterfly',
             current_threshold=None,
-            close_fig=False,
+            close_fig=close_fig,
             plot_2D_histograms=True, theta_in=-a.theta)
 
-        ma.butterfly_analysis(
+        c = ma.butterfly_analysis(
             close_main_fig=close_fig, initialize=initialize,
             theta_in=-a.theta,
             threshold=b.opt_I_threshold, digitize=True)
+        return c.butterfly_coeffs
 
 
 
