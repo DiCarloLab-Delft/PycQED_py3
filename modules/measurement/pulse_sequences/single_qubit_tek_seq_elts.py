@@ -9,7 +9,8 @@ from ..waveform_control import pulsar
 from ..waveform_control import element
 from ..waveform_control.element import calculate_time_corr
 from ..waveform_control import pulse
-from ..waveform_control.pulse_library import MW_IQmod_pulse, SSB_DRAG_pulse
+from ..waveform_control.pulse_library import MW_IQmod_pulse, SSB_DRAG_pulse, \
+    Mux_DRAG_pulse
 from ..waveform_control import sequence
 from modules.measurement.randomized_benchmarking import randomized_benchmarking as rb
 from importlib import reload
@@ -195,6 +196,7 @@ def OffOn_seq(pulse_pars, RO_pars,
     station.pulsar.program_awg(seq, *el_list, verbose=verbose)
     return seq_name
 
+
 def Butterfly_seq(pulse_pars, RO_pars, initialize=False,
                   post_measurement_delay=2000e-9, verbose=False):
     '''
@@ -212,19 +214,33 @@ def Butterfly_seq(pulse_pars, RO_pars, initialize=False,
     el_list = []
     # Create a dict with the parameters for all the pulses
     pulses = get_pulse_dict_from_pars(pulse_pars)
+    fixed_point_freq = RO_pars['fixed_point_frequency']
+    RO_pars['fixed_point_frequency'] = None
+
     pulses['RO'] = RO_pars
-    pulse_combinations = ['I', 'X180']
     pulse_lists = ['', '']
     pulses['I_wait'] = deepcopy(pulses['I'])
     pulses['I_wait']['pulse_delay'] = post_measurement_delay
     if initialize:
-        pulse_lists[0] = ['I', 'RO', 'I_wait', 'I', 'RO', 'I_wait', 'I','RO']
-        pulse_lists[1] = ['I', 'RO', 'I_wait', 'X180', 'RO', 'I_wait','I', 'RO']
+        pulse_lists[0] = [['I', 'RO'], ['I', 'RO'], ['I', 'RO']]
+        pulse_lists[1] = [['I', 'RO'], ['X180', 'RO'], ['I', 'RO']]
     else:
-        pulse_lists[0] = ['I', 'RO', 'I_wait', 'I','RO']
-        pulse_lists[1] = ['X180', 'RO', 'I_wait','I', 'RO']
-    for i, pulse_keys in enumerate(pulse_lists):
-        pulse_list = [pulses[key] for key in pulse_keys]
+        pulse_lists[0] = [['I', 'RO'], ['I', 'RO']]
+        pulse_lists[1] = [['X180', 'RO'], ['I', 'RO']]
+    for i, pulse_keys_sub_list in enumerate(pulse_lists):
+        pulse_list = []
+        # sub list exist to make sure the RO-s are in phase
+        for pulse_keys in pulse_keys_sub_list:
+            pulse_sub_list = [pulses[key] for key in pulse_keys]
+            sub_seq_duration = sum([p['pulse_delay'] for p in pulse_sub_list])
+            extra_delay = calculate_time_corr(
+                sub_seq_duration+post_measurement_delay, fixed_point_freq)
+            initial_pulse_delay = post_measurement_delay + extra_delay
+            start_pulse = deepcopy(pulse_sub_list[0])
+            start_pulse['pulse_delay'] += initial_pulse_delay
+            pulse_sub_list[0] = start_pulse
+            pulse_list += pulse_sub_list
+
         el = multi_pulse_elt(i, station, pulse_list)
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
@@ -446,47 +462,6 @@ def Motzoi_XY(motzois, pulse_pars, RO_pars,
 # sequence element generating functions
 
 
-def single_SSB_DRAG_pulse_elt(i, station,
-                              pulse_pars,
-                              RO_pars):
-        '''
-        ! NOTE: Already deprecated, I recommend to use "multi_pulse_elt" !
-
-        Single SSB_DRAG pulse, a RO-tone and a RO-marker.
-
-        The RO-tone is fixed in phase with respect to the RO-trigger
-        The RO trigger is delayed by RO-trigger delay.
-
-        Input args
-            station:    qcodes station object, contains AWG etc
-            pulse_pars: dictionary containing parameters for the qubit pulse
-            RO_pars:    dictionary containing the parameters for the RO tone
-                        and markers
-        '''
-        raise NotImplementedError('deprecated, use multi-pulse elt')
-
-
-def double_SSB_DRAG_pulse_elt(i, station,
-                              pulse_pars_1,
-                              pulse_pars_2,
-                              RO_pars):
-        '''
-        ! NOTE: Already deprecated, I recommend to use "multi_pulse_elt" !
-
-        Two SSB_DRAG pulses, a RO-tone and a RO-marker.
-
-        The RO-tone is fixed in phase with respect to the RO-trigger
-        The RO trigger is delayed by RO-trigger delay.
-
-        Input args
-            station:    qcodes station object, contains AWG etc
-            pulse_pars: dictionary containing parameters for the qubit pulse
-            RO_pars:    dictionary containing the parameters for the RO tone
-                        and markers
-        '''
-        raise NotImplementedError('Deprecated use multi pulse let')
-
-
 def multi_pulse_elt(i, station, pulse_list):
         '''
         Input args
@@ -536,6 +511,12 @@ def multi_pulse_elt(i, station, pulse_list):
                                    alpha=pulse_pars['alpha']),
                     start=pulse_pars['pulse_delay'],
                     refpulse=last_pulse, refpoint='start')
+            elif pulse_pars['pulse_type'] == 'Mux_DRAG_pulse':
+                # pulse_pars.pop('pulse_type')
+                last_pulse = el.add(Mux_DRAG_pulse(name='pulse_{}'.format(i),
+                                                   **pulse_pars),
+                                    start=pulse_pars['pulse_delay'],
+                                    refpulse=last_pulse, refpoint='start')
 
             elif (pulse_pars['pulse_type'] == 'MW_IQmod_pulse' or
                   pulse_pars['pulse_type'] == 'Gated_MW_RO_pulse'):

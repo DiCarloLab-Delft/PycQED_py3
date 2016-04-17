@@ -184,7 +184,6 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                          self.RO_Q_offset.get())
         elif self.RO_pulse_type.get() is 'Gated_MW_RO_pulse':
             self.rf_RO_source.on()
-            print('double check this command')
             self.rf_RO_source.pulsemod_state.set('on')
             self.rf_RO_source.frequency.set(self.f_RO.get())
             self.rf_RO_source.power.set(self.RO_pulse_power.get())
@@ -381,13 +380,12 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
             close_main_fig=close_fig, T1=T1,
             pulse_delay=self.pulse_delay.get())
 
-
     def measure_ssro(self, no_fits=False,
-                                   return_detector=False,
-                                   MC=None,
-                                   analyze=True,
-                                   close_fig=True,
-                                   verbose=True):
+                     return_detector=False,
+                     MC=None,
+                     analyze=True,
+                     close_fig=True,
+                     verbose=True):
         self.prepare_for_timedomain()
         if MC is None:
             MC = self.MC
@@ -404,8 +402,8 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         d.acquire_data_point()
 
         if analyze:
-            ma.SSRO_Analysis(label='SSRO'+self.msmt_suffix,
-                             no_fits=no_fits, close_fig=close_fig)
+            return ma.SSRO_Analysis(label='SSRO'+self.msmt_suffix,
+                                    no_fits=no_fits, close_fig=close_fig)
 
 
     def measure_butterfly(self, return_detector=False,
@@ -414,7 +412,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                           close_fig=True,
                           verbose=True,
                           initialize=False,
-                          post_measurement_delay=2000e-9):
+                          post_measurement_delay=2000e-9, case=True):
         self.prepare_for_timedomain()
         if MC is None:
             MC = self.MC
@@ -439,7 +437,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         c = ma.butterfly_analysis(
             close_main_fig=close_fig, initialize=initialize,
             theta_in=-a.theta,
-            threshold=b.opt_I_threshold, digitize=True)
+            threshold=b.opt_I_threshold, digitize=True, case=case)
         return c.butterfly_coeffs
 
     def measure_rb_vs_amp(self, amps, nr_cliff=1,

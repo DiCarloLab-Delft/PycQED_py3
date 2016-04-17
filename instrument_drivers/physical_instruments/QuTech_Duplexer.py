@@ -73,10 +73,9 @@ class QuTech_Duplexer(VisaInstrument):
                                    set_parser=self._attenuation_set_parser,
                                    get_parser=self._attenuation_get_parser)
 
-        # Get commands are not Implemented!!!
         # self.add_parameter('IDN', get_cmd='IDN?')
         t1 = time.time()
-        print('Initialized Duplexer in {}'.format(t1-t0))
+        print('Initialized Duplexer in {:.2f}'.format(t1-t0))
 
     def set_all_switches_to(self, mode):
         raise NotImplementedError()

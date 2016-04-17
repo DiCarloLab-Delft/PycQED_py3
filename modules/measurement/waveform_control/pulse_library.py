@@ -4,10 +4,10 @@ Library containing pulse shapes.
 '''
 
 
-from modules.measurement.waveform_control import pulse
+from modules.measurement.waveform_control.pulse import Pulse
 
 
-class MW_IQmod_pulse(pulse.Pulse):
+class MW_IQmod_pulse(Pulse):
     '''
     Block pulse on the I channel modulated with IQ modulation.
 
@@ -24,7 +24,7 @@ class MW_IQmod_pulse(pulse.Pulse):
     [Q_mod]   [-sin(wt+phi)  0] [0]
     '''
     def __init__(self, name, I_channel, Q_channel, **kw):
-        pulse.Pulse.__init__(self, name)
+        super().__init__(name)
         self.I_channel = I_channel
         self.Q_channel = Q_channel
         self.channels = [I_channel, Q_channel]
@@ -63,7 +63,7 @@ class MW_IQmod_pulse(pulse.Pulse):
         return wf
 
 
-class SSB_DRAG_pulse(pulse.Pulse):
+class SSB_DRAG_pulse(Pulse):
     '''
     Gauss pulse on the I channel, derivative of Gauss on the Q channel.
     modulated with Single Sideband (SSB)  modulation.
@@ -109,7 +109,7 @@ class SSB_DRAG_pulse(pulse.Pulse):
     Reduces to an unmodulated pulse if mod_frequency == 0
     '''
     def __init__(self, name, I_channel, Q_channel, **kw):
-        pulse.Pulse.__init__(self, name)
+        super().__init__(name)
         self.I_channel = I_channel
         self.Q_channel = Q_channel
         self.channels = [I_channel, Q_channel]
@@ -208,3 +208,99 @@ class SSB_DRAG_pulse(pulse.Pulse):
                  + Q_env * sec_phi_alpha * np.cos(2 * np.pi * (
                  self.mod_frequency * tvals + self.phase/360.)))
         return [I_mod, Q_mod]
+
+
+class Mux_DRAG_pulse(SSB_DRAG_pulse):
+    '''
+    Uses 4 AWG channels to play a multiplexer compatible SSB DRAG pulse
+    uses channels GI and GQ (default 1 and 2) for the SSB-modulated gaussian
+    and uses channels DI and DQ (default 3 and 4) for the modulated derivative
+    components.
+    '''
+    def __init__(self, name, GI_channel='ch1', GQ_channel='ch2',
+                 DI_channel='ch3', DQ_channel='ch4', **kw):
+        # Ideally I'd use grandparent inheritance here but I couldn't get it
+        # to work
+        self.name = name
+        self.start_offset = 0
+        self.stop_offset = 0
+        self._t0 = None
+        self._clock = None
+
+        self.GI_channel = GI_channel
+        self.GQ_channel = GQ_channel
+        self.DI_channel = DI_channel
+        self.DQ_channel = DQ_channel
+        self.channels = [GI_channel, GQ_channel, DI_channel, DQ_channel]
+        self.amplitude = kw.pop('amplitude', 0.1)
+        self.sigma = kw.pop('sigma', 0.25e-6)
+        self.nr_sigma = kw.pop('nr_sigma', 4)
+        self.motzoi = kw.pop('motzoi', 1)
+
+        self.mod_frequency = kw.pop('mod_frequency', 1e6)
+        self.phase = kw.pop('phase', 0.)
+        self.phaselock = kw.pop('phaselock', True)
+
+        # skewness parameters
+        self.alpha = kw.pop('G_alpha', 1)        # QI amp ratio of Gauss
+        self.phi_skew = kw.pop('G_phi_skew', 0)  # IQ phase skewness of Gauss
+        self.alpha = kw.pop('D_alpha', 1)        # QI amp ratio of deriv
+        self.phi_skew = kw.pop('D_phi_skew', 0)  # IQ phase skewness of deriv
+
+        self.length = self.sigma * self.nr_sigma
+
+    def __call__(self, **kw):
+        self.GI_channel = kw.pop('GI_channel', self.GI_channel)
+        self.GQ_channel = kw.pop('GQ_channel', self.GQ_channel)
+        self.DI_channel = kw.pop('DI_channel', self.DI_channel)
+        self.DQ_channel = kw.pop('DQ_channel', self.DQ_channel)
+        self.channels = [self.GI_channel, self.GQ_channel,
+                         self.DI_channel, self.DQ_channel]
+        self.amplitude = kw.pop('amplitude', self.amplitude)
+        self.sigma = kw.pop('sigma', self.sigma)
+        self.nr_sigma = kw.pop('nr_sigma', self.nr_sigma)
+
+        self.mod_frequency = kw.pop('mod_frequency', self.mod_frequency)
+        self.phase = kw.pop('phase', self.phase)
+        self.phaselock = kw.pop('phaselock', self.phaselock)
+
+        # skewness parameters
+        self.alpha = kw.pop('G_alpha', self.G_alpha)        # QI amp ratio
+        self.phi_skew = kw.pop('G_phi_skew', self.G_phi_skew)  # IQ phase skewness
+        self.alpha = kw.pop('D_alpha', self.D_alpha)
+        self.phi_skew = kw.pop('D_phi_skew', self.D_phi_skew)
+
+        self.length = self.sigma * self.nr_sigma
+        return self
+
+    def chan_wf(self, chan, tvals):
+        idx0 = np.where(tvals >= tvals[0])[0][0]
+        idx1 = np.where(tvals <= tvals[0] + self.length)[0][-1] + 1
+        wf = np.zeros(len(tvals))
+        t = tvals - tvals[0]  # Gauss envelope should not be displaced
+        mu = self.length/2.0
+        if not self.phaselock:
+            tvals = tvals.copy() - tvals[idx0]
+
+        gauss_env = self.amplitude*np.exp(-(0.5 * ((t-mu)**2) / self.sigma**2))
+        if chan in [self.GI_channel, self.GQ_channel]:
+            gauss_env -= (gauss_env[0]+gauss_env[-1])/2.
+            I_mod, Q_mod = self.apply_modulation(gauss_env,
+                                                 np.zeros(len(tvals)),
+                                                 tvals[idx0:idx1])
+            if chan == self.GI_channel:
+                wf[idx0:idx1] += I_mod
+            else:
+                wf[idx0:idx1] += Q_mod
+
+        elif chan in [self.DI_channel, self.DQ_channel]:
+            der_env = self.motzoi * -1 * (t-mu)/(self.sigma**1) * gauss_env
+            der_env -= (der_env[0]+der_env[-1])/2.
+            I_mod, Q_mod = self.apply_modulation(np.zeros(len(tvals)), der_env,
+                                                 tvals[idx0:idx1])
+            if chan == self.DI_channel:
+                wf[idx0:idx1] += I_mod
+            else:
+                wf[idx0:idx1] += Q_mod
+        return wf
+
