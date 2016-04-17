@@ -1272,8 +1272,8 @@ class SSRO_Analysis(MeasurementAnalysis):
     def optimize_IQ_angle(self, shots_I_data_1, shots_Q_data_1, shots_I_data_0,
                           shots_Q_data_0, min_len, plot_2D_histograms=True,
                           **kw):
+        cmap = kw.pop('cmap', 'viridis')
         #plotting 2D histograms of mmts with pulse
-
         # FIXME OVERLAP AND GENERAL LOOKS
         V_max_I0 = np.max(abs(shots_I_data_0))
         V_max_I1 = np.max(abs(shots_I_data_1))
@@ -1283,9 +1283,11 @@ class SSRO_Analysis(MeasurementAnalysis):
 
         # determining the amount of bins
         n_bins_range = 60  # the bins we want to have around our data
-        V_range_I_0 = np.max(shots_I_data_0)-np.min(shots_I_data_0)             # data voltagerange
+        V_range_I_0 = np.max(shots_I_data_0)-np.min(shots_I_data_0)
+        # data voltagerange
         V_range_Q_0 = np.max(shots_Q_data_0)-np.min(shots_Q_data_0)
-        V_range_I_1 = np.max(shots_I_data_1)-np.min(shots_I_data_1)             # data voltagerange
+        V_range_I_1 = np.max(shots_I_data_1)-np.min(shots_I_data_1)
+        # data voltagerange
         V_range_Q_1 = np.max(shots_Q_data_1)-np.min(shots_Q_data_1)
         V_range = np.max([V_range_I_0, V_range_Q_0, V_range_I_1, V_range_Q_1])
         n_bins = n_bins_range*2*V_max/V_range
@@ -1310,7 +1312,7 @@ class SSRO_Analysis(MeasurementAnalysis):
             axarray[0].set_title('2D histogram, pi pulse')
             im1 = axarray[0].imshow(H1, interpolation='nearest', origin='low',
                                     extent=[xedges1[0], xedges1[-1],
-                                    yedges1[0], yedges1[-1]])
+                                    yedges1[0], yedges1[-1]], cmap=cmap)
             axarray[0].set_xlabel('Int. I (V)')
             axarray[0].set_ylabel('Int. Q (V)')
 
@@ -1318,7 +1320,7 @@ class SSRO_Analysis(MeasurementAnalysis):
             axarray[1].set_title('2D histogram, no pi pulse')
             im0 = axarray[1].imshow(H0, interpolation='nearest', origin='low',
                                     extent=[xedges0[0], xedges0[-1], yedges0[0],
-                                    yedges0[-1]])
+                                    yedges0[-1]], cmap=cmap)
             axarray[1].set_xlabel('Int. I (V)')
             axarray[1].set_ylabel('Int. Q (V)')
 

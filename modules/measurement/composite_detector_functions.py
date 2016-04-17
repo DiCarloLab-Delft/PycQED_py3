@@ -371,7 +371,7 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
     For Qcodes. Readout with CBox, pulse generation with 5014
     '''
     def __init__(self, measurement_name,  MC, AWG, CBox, pulse_pars, RO_pars,
-                 raw=True, analyze=True, **kw):
+                 raw=True, analyze=True, upload=True, **kw):
         self.detector_control = 'soft'
         self.name = 'SSRO_Fidelity'
         # For an explanation of the difference between the different
@@ -395,7 +395,7 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
         self.raw = raw  # Performs no fits if True
         self.analyze = analyze
 
-        self.upload=True
+        self.upload = upload
 
     def prepare(self, **kw):
         self.MC.set_sweep_function(awg_swf.OffOn(pulse_pars=self.pulse_pars,

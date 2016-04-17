@@ -44,6 +44,7 @@ from instrument_drivers.meta_instrument import heterodyne as hd
 import instrument_drivers.meta_instrument.CBox_LookuptableManager as lm
 
 from instrument_drivers.meta_instrument.qubit_objects import CBox_driven_transmon as qb
+from instrument_drivers.physical_instruments import QuTech_Duplexer as qdux
 
 
 # Initializing instruments
@@ -56,6 +57,7 @@ S2 = rs.RohdeSchwarz_SGS100A(name='S2', address='TCPIP0::192.168.0.78')  # right
 AWG = tek.Tektronix_AWG5014(name='AWG', setup_folder=None,
                             address='TCPIP0::192.168.0.9')
 IVVI = iv.IVVI('IVVI', address='ASRL1', numdacs=16)
+Dux = qdux.QuTech_Duplexer('Dux', address='TCPIP0::192.168.0.101')
 
 # Meta-instruments
 HS = hd.LO_modulated_Heterodyne('HS', LO=LO, CBox=CBox, AWG=AWG)
@@ -93,7 +95,7 @@ gen.load_settings_onto_instrument(VIP_mon_4, label='VIP_mon_4')
 gen.load_settings_onto_instrument(VIP_mon_4_tek)
 gen.load_settings_onto_instrument(VIP_mon_6, label='VIP_mon_6')
 
-station = qc.Station(LO, S1, S2, IVVI,
+station = qc.Station(LO, S1, S2, IVVI, Dux,
                      AWG, HS, CBox, LutMan,
                      VIP_mon_2, VIP_mon_4, VIP_mon_4_tek, VIP_mon_6)
 MC.station = station
