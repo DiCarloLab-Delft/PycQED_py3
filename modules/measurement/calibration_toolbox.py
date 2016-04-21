@@ -1,98 +1,115 @@
 import numpy as np
 import logging
+from qcodes.instrument.parameter import ManualParameter
 from modules.measurement import sweep_functions as swf
 from modules.measurement import CBox_sweep_functions as CB_swf
 from modules.measurement import detector_functions as det
 from modules.analysis import measurement_analysis as MA
 from modules.measurement import mc_parameter_wrapper as pw
-import msvcrt as m  # Package unique to windows!
+from modules.measurement.pulse_sequences import standard_sequences as st_seqs
+from modules.measurement.optimization import nelder_mead
 import imp
 imp.reload(MA)
 imp.reload(CB_swf)
-# AWG = qt.instruments['AWG']
-# MC = qt.instruments['MC']
-# TD_Meas = qt.instruments['TD_Meas']
-# Duplexer = qt.instruments['Duplexer']
+
+'''
+Contains general calibration routines, most notably for calculating mixer
+offsets and skewness. Not all has been transferred to QCodes.
+
+Those things that have not been transferred have a placeholder function and
+raise a NotImplementedError.
+'''
 
 
-def wait_for_keypressed():
-    print('Press any key to continue')
-    m.getch()
+def measure_E_c(**kw):
+    raise NotImplementedError('see archived calibration toolbox')
 
 
-def measure_E_c(qubit, E_c_estimate, span_x=0.05, span_y=0.2,
-                stepsize_x=0.002, nr_sweeps=30,
-                res_span=0.005, res_step=50e-6, MC_name='MC',
-                qubit_source12='S2', find_resonator_frequency=True,
-                second_source_extra_power=6):
+def mixer_carrier_cancellation_duplexer(**kw):
+    raise NotImplementedError('see archived calibration toolbox')
+
+
+def mixer_carrier_cancellation(**kw):
+    raise NotImplementedError('Use either mixer'
+                              + 'mixer_carrier_cancellation_CBox or' +
+                              'mixer_carrier_cancellation_5014' +
+                              'See the archived folder for the old function')
+
+
+def mixer_skewness_calibration_5014(SH, Source, station,
+                                    MC=None,
+                                    QI_amp_ratio=None, IQ_phase=None,
+                                    frequency=None, f_mod=10e6,
+                                    I_ch=1, Q_ch=2,
+                                    name='mixer_skewness_calibration_5014'):
     '''
-    Uses three sources, The HM LO and RF sources are set at the resonator.
-    The qubit drive instrument (needs to be rewired) and the qubit source are
-    used as the other sources.
-    This function does not return anything as analysis needs to be done by hand
-    Corresponding analysis file is MA.Three_Tone_Spectroscopy_Analysis()
+    Loads a cos and sin waveform in the specified I and Q channels of the
+    tektronix 5014 AWG (taken from station.pulsar.AWG).
+    By looking at the frequency corresponding with the spurious sideband the
+    phase_skewness and amplitude skewness that minimize the signal correspond
+    to the mixer skewness.
+
+    Inputs:
+        SH              (instrument)
+        Source          (instrument)     MW-source used for driving
+        station         (qcodes station) Contains the AWG and pulasr sequencer
+        QI_amp_ratio    (parameter)      qcodes parameter
+        IQ_phase        (parameter)
+        frequency       (float Hz)       Spurious SB freq: f_source - f_mod
+        f_mod           (float Hz)       Modulation frequency
+        I_ch/Q_ch       (int or str)     Specifies the AWG channels
+
+    returns:
+        alpha, phi     the coefficients that go in the predistortion matrix
+    For the spurious sideband:
+        alpha = 1/QI_amp_optimal
+        phi = -IQ_phase_optimal
+    For details, see Leo's notes on mixer skewness calibration in the docs
     '''
+    if frequency is None:
+        # Corresponds to the frequency where to minimize with the SH
+        frequency = Source.frequency.get() - f_mod
+    if QI_amp_ratio is None:
+        QI_amp_ratio = ManualParameter('QI_amp', initial_value=1)
+    if IQ_phase is None:
+        IQ_phase = ManualParameter('IQ_phase', units='deg', initial_value=0)
+    if MC is None:
+        MC = station.MC
+    if type(I_ch) is int:
+        I_ch = 'ch{}'.format(I_ch)
+    if type(Q_ch) is int:
+        Q_ch = 'ch{}'.format(Q_ch)
 
-    if qubit.get_freq_calc() == 'flux':
-        dac_channel = qubit.get_dac_channel()
-        Flux_Control = qt.instruments['Flux_Control']
-        flux = Flux_Control.get_flux(dac_channel)
-        f01 = qubit.calculate_frequency_flux(flux)
-        f12 = f01 - E_c_estimate
-    else:
-        f01 = qubit.get_current_frequency()
-        f12 = f01 - E_c_estimate
-    HM = qt.instruments['HM']
-    MC = qt.instruments[MC_name]
-    AWG = qt.instruments['AWG']
+    d = det.SH_mixer_skewness_det(frequency, QI_amp_ratio, IQ_phase, SH,
+                                  f_mod=f_mod,
+                                  I_ch=I_ch, Q_ch=Q_ch, station=station)
+    S1 = pw.wrap_par_to_swf(QI_amp_ratio)
+    S2 = pw.wrap_par_to_swf(IQ_phase)
 
-    second_source_power = qubit.get_source_power()+second_source_extra_power
-    # power of the source sweeping vertically set to quadruple (+3dB)
-    # qubit source power
-    spec_range_x = np.arange(f01-span_x/2,
-                             f01+span_x/2, stepsize_x)
-    spec_range_y = np.linspace(f12 - span_y/2.,
-                               f12 + span_y/2., nr_sweeps)
-    qubit_source = qt.instruments[qubit.get_qubit_source()]
-    qubit_source12 = qt.instruments[qubit_source12]
+    ad_func_pars = {'adaptive_function': nelder_mead,
+                    'x0': [1, 0.0],
+                    'initial_step': [.15, 10],
+                    'no_improv_break': 5,
+                    'minimize': True,
+                    'maxiter': 500}
+    MC.set_sweep_functions([S1, S2])
+    MC.set_detector_function(d)
+    MC.set_adaptive_function_parameters(ad_func_pars)
+    MC.run(name=name, mode='adaptive')
+    a = MA.OptimizationAnalysis()
+    # phi and alpha are the coefficients that go in the predistortion matrix
+    alpha = 1/a.optimization_result[0][0]
+    phi = -1*a.optimization_result[0][1]
 
-    HM.init()
-    HM.set_sources('On')
-
-    if find_resonator_frequency:
-        cur_f_RO = qubit.get_current_RO_frequency()
-        qubit.find_resonator_frequency(
-            MC_name=MC_name,
-            f_start=cur_f_RO-res_span/2,
-            f_stop=cur_f_RO+res_span/2,
-            suppress_print_statements=True,
-            f_step=res_step,
-            use_min=True)
-        print('Readout frequency: ', qubit.get_current_RO_frequency())
-
-    HM.set_frequency(qubit.get_current_RO_frequency()*1e9)
-    qubit_source12.set_power(second_source_power)
-    qubit_source.set_power(qubit.get_source_power())
-
-    qubit_source12.on()
-    qubit_source.on()
-
-    AWG.start()
-    MC.set_sweep_function(swf.Source_frequency_GHz(Source=qubit_source))
-    MC.set_sweep_function_2D(swf.Source_frequency_GHz(Source=qubit_source12))
-    MC.set_sweep_points(spec_range_x)
-    MC.set_sweep_points_2D(spec_range_y)
-    MC.set_detector_function(det.HomodyneDetector())
-
-    MC.run_2D('Three_tone_spec_E_c')
-    AWG.stop()
-
-    HM.set_sources('Off')
-    qubit_source12.off()
-    qubit_source.off()
+    return phi, alpha
 
 
-def mixer_carrier_cancellation_5014(station,
+
+def mixer_skewness_calibration_adaptive(**kw):
+    raise NotImplementedError('see archived calibration toolbox')
+
+
+def mixer_carrier_cancellation_5014(AWG, SH, source, MC,
                                     frequency=None,
                                     AWG_channel1=1,
                                     AWG_channel2=2,
@@ -102,24 +119,40 @@ def mixer_carrier_cancellation_5014(station,
     Varies the mixer offsets to minimize leakage at the carrier frequency.
     this is the version for a tektronix AWG.
 
+    station:    QCodes station object that contains the instruments
+    source:     the source for which carrier leakage must be minimized
+    frequency:  frequency in Hz on which to minimize leakage, if None uses the
+                current frequency of the source
+
     voltage_grid defines the ranges for the preliminary coarse sweeps.
     If the range is too small, add another number infront of -0.12
+
+    Note: Updated for QCodes
     '''
-    AWG = station['AWG']
-    MC = kw.pop('MC', station.MC)
-    print('using:', MC)
-    SH = station['Signal hound']
     ch_1_min = 0  # Initializing variables used later on
     ch_2_min = 0
     last_ch_1_min = 1
     last_ch_2_min = 1
     ii = 0
     min_power = 0
+
+    source.on()
+    if frequency is None:
+        frequency = source.get('frequency')
+    else:
+        source.set('frequency', frequency)
+
     '''
     Make coarse sweeps to approximate the minimum
     '''
-    ch1_offset = AWG['ch{}_offset'.format(AWG_channel1)]
-    ch2_offset = AWG['ch{}_offset'.format(AWG_channel2)]
+    if type(AWG_channel1) is int:
+        ch1_offset = AWG['ch{}_offset'.format(AWG_channel1)]
+    else:
+        ch1_offset = AWG[AWG_channel1+'_offset']
+    if type(AWG_channel2) is int:
+        ch2_offset = AWG['ch{}_offset'.format(AWG_channel2)]
+    else:
+        ch2_offset = AWG[AWG_channel2+'_offset']
 
     ch1_swf = pw.wrap_par_to_swf(ch1_offset)
     ch2_swf = pw.wrap_par_to_swf(ch2_offset)
@@ -127,10 +160,11 @@ def mixer_carrier_cancellation_5014(station,
         # Channel 1
         MC.set_sweep_function(ch1_swf)
         MC.set_detector_function(
-            det.Signal_Hound_fixed_frequency(signal_hound=SH, frequency=frequency))
+            det.Signal_Hound_fixed_frequency(signal_hound=SH,
+                                             frequency=frequency*1e-9))
         MC.set_sweep_points(np.linspace(ch_1_min + voltage_span,
                                         ch_1_min - voltage_span, 11))
-        MC.run(name='Mixer_cal_Offset_ch%s' % AWG_channel1,
+        MC.run(name='Mixer_cal_Offset_%s' % AWG_channel1,
                sweep_delay=.1, debug_mode=True)
         Mixer_Calibration_Analysis = MA.Mixer_Calibration_Analysis(
             label='Mixer_cal', auto=True)
@@ -157,7 +191,7 @@ def mixer_carrier_cancellation_5014(station,
         MC.set_sweep_function(ch1_swf)
         MC.set_sweep_points(np.linspace(ch_1_min - dac_resolution*6,
                             ch_1_min + dac_resolution*6, 13))
-        MC.run(name='Mixer_cal_Offset_ch%s' % AWG_channel1,
+        MC.run(name='Mixer_cal_Offset_%s' % AWG_channel1,
                sweep_delay=.1, debug_mode=True)
         Mixer_Calibration_Analysis = MA.Mixer_Calibration_Analysis(
             label='Mixer_cal', auto=True)
@@ -168,7 +202,7 @@ def mixer_carrier_cancellation_5014(station,
         MC.set_sweep_function(ch2_swf)
         MC.set_sweep_points(np.linspace(ch_2_min - dac_resolution*6,
                                         ch_2_min + dac_resolution*6, 13))
-        MC.run(name='Mixer_cal_Offset_ch%s' % AWG_channel2,
+        MC.run(name='Mixer_cal_Offset_%s' % AWG_channel2,
                sweep_delay=.1, debug_mode=True)
         Mixer_Calibration_Analysis = MA.Mixer_Calibration_Analysis(
             label='Mixer_cal', auto=True)
@@ -187,7 +221,7 @@ def mixer_carrier_cancellation_5014(station,
 def mixer_carrier_cancellation_CBox(CBox, SH, source, MC,
                                     frequency=None,
                                     awg_nr=0,
-                                    voltage_grid=[50, 20, 10, 5],
+                                    voltage_grid=[50, 20, 10, 5, 2],
                                     xtol=1, **kw):
     '''
     Varies the mixer offsets to minimize leakage at the carrier frequency.
@@ -198,6 +232,7 @@ def mixer_carrier_cancellation_CBox(CBox, SH, source, MC,
     input arguments:
         frequency:  in GHz, if None uses the frequency the source is set to
 
+    Note: Updated for QCodes
     '''
     ch_0_min = 0  # Initializing variables used later on
     ch_1_min = 0
@@ -279,475 +314,130 @@ def mixer_carrier_cancellation_CBox(CBox, SH, source, MC,
     return ch_0_min, ch_1_min
 
 
-
-
-def mixer_carrier_cancellation(frequency, AWG_nr=0, AWG_channel1=1, AWG_channel2=2,
-                               AWG_name='AWG', pulse_amp_control='AWG',
-                               analyzer='Signal Hound',
-                               voltage_grid=[.1, 0.05, 0.02],
-                               xtol=0.001):
+def mixer_skewness_cal_CBox_adaptive(CBox, SH, source,
+                                     LutMan,
+                                     AWG,
+                                     MC,
+                                     awg_nrs=[0],
+                                     calibrate_both_sidebands=False,
+                                     verbose=True):
     '''
-    Varies the mixer offsets to minimize leakage at the carrier frequency.
-
-    pulse_amp_control, the name of the instrument at which the offsets are set.
-        options for pulse_amp_control are 'AWG' and 'CBox'
-
-    Set the Duplexer such that the desired mixer is adressed, pay attention
-    to the attenuation settings. Also, set the RF source to the right
-    frequency and turn it on.
-
-    voltage_grid defines the ranges for the preliminary coarse sweeps.
-    If the range is too small, add another number infront of -0.12
-    '''
-    AWG = qt.instruments[AWG_name]
-    AWG_type = AWG.get_type()
-    MC = qt.instruments['MC']
-    CBox = qt.instruments['CBox']
-
-    ch_1_min = 0  # Initializing variables used later on
-    ch_2_min = 0
-    last_ch_1_min = 1
-    last_ch_2_min = 1
-    ii = 0
-    min_power = 0
-    '''
-    Make coarse sweeps to approximate the minimum
-    '''
-    for voltage_span in voltage_grid:
-        # Channel 1
-        if pulse_amp_control == 'CBox':
-            MC.set_sweep_function(CB_swf.DAC_offset(AWG_channel=AWG_channel1,
-                                                    AWG_nr=AWG_nr))
-        else:
-            MC.set_sweep_function(swf.AWG_channel_offset(channel=AWG_channel1,
-                                  AWG_name=AWG_name))
-
-        if analyzer == 'Signal Hound':
-            MC.set_detector_function(
-                det.Signal_Hound_fixed_frequency(SH=SH, frequency=frequency))
-        elif analyzer is 'FSV':
-            MC.set_detector_function(
-                det.RS_FSV_fixed_frequency(frequency=frequency))
-        else:
-            raise NameError('Analyzer type not found')
-
-        MC.set_sweep_points(np.linspace(ch_1_min + voltage_span,
-                                        ch_1_min - voltage_span, 11))
-        print('-'*10)
-        print(MC.get_sweep_points())
-        print('-'*10)
-        MC.run(name='Mixer_cal_Offset_ch%s' % AWG_channel1,
-               sweep_delay=.1, debug_mode=True)
-
-        Mixer_Calibration_Analysis = MA.Mixer_Calibration_Analysis(
-            label='Mixer_cal', auto=True)
-
-        ch_1_min = Mixer_Calibration_Analysis.fit_results[0]
-
-        if pulse_amp_control == 'CBox':
-            CBox.set_dac_offset(AWG_nr, AWG_channel1, ch_1_min)
-        else:
-            exec('AWG.set_ch%s_offset(%s)' % (AWG_channel1, ch_1_min))
-
-        # Channel 2
-        if pulse_amp_control == 'CBox':
-            MC.set_sweep_function(CB_swf.DAC_offset(AWG_channel=AWG_channel2,
-                                                    AWG_nr=AWG_nr))
-        else:
-            MC.set_sweep_function(swf.AWG_channel_offset(channel=AWG_channel2,
-                                  AWG_name=AWG_name))
-
-        MC.set_sweep_points(np.linspace(ch_2_min + voltage_span,
-                                        ch_2_min - voltage_span, 11))
-
-        print('-'*10)
-        print(MC.get_sweep_points())
-        print('-'*10)
-        MC.run(name='Mixer_cal_Offset_ch%s' % AWG_channel2,
-               sweep_delay=.1, debug_mode=True)
-
-        Mixer_Calibration_Analysis = MA.Mixer_Calibration_Analysis(
-            label='Mixer_cal', auto=True)
-
-        ch_2_min = Mixer_Calibration_Analysis.fit_results[0]
-
-        if pulse_amp_control == 'CBox':
-            CBox.set_dac_offset(AWG_nr, AWG_channel2, ch_2_min)
-        else:
-            exec('AWG.set_ch%s_offset(%s)' % (AWG_channel2, ch_2_min))
-
-        '''
-        Refine and repeat the sweeps to find the minimum
-        '''
-
-    while(abs(last_ch_1_min - ch_1_min) > xtol
-          and abs(last_ch_2_min - ch_2_min) > xtol):
-
-        ii += 1
-
-        if pulse_amp_control == 'CBox':
-            MC.set_sweep_function(CB_swf.DAC_offset(AWG_channel=AWG_channel1,
-                                  AWG_nr=AWG_nr))
-            dac_resolution = 1.0
-        else:
-            MC.set_sweep_function(swf.AWG_channel_offset(channel=AWG_channel1,
-                                  AWG_name=AWG_name))
-            dac_resolution = 0.001
-        if analyzer is 'Signal Hound':
-            MC.set_detector_function(
-                det.Signal_Hound_fixed_frequency(SH=SH, frequency=frequency))
-        elif analyzer is 'FSV':
-            MC.set_detector_function(
-                det.RS_FSV_fixed_frequency(frequency=frequency))
-
-        MC.set_sweep_points(np.linspace(ch_1_min - dac_resolution*6,
-                            ch_1_min + dac_resolution*6, 13))
-        MC.run(name='Mixer_cal_Offset_ch%s' % AWG_channel1,
-               sweep_delay=.1, debug_mode=True)
-        Mixer_Calibration_Analysis = MA.Mixer_Calibration_Analysis(
-            label='Mixer_cal', auto=True)
-
-        last_ch_1_min = ch_1_min
-        ch_1_min = Mixer_Calibration_Analysis.fit_results[0]
-
-        if pulse_amp_control == 'CBox':
-            CBox.set_dac_offset(AWG_nr, AWG_channel1, ch_1_min)
-
-        else:
-            exec('AWG.set_ch%s_offset(%s)' % (AWG_channel1, ch_1_min))
-
-        if pulse_amp_control == 'CBox':
-            MC.set_sweep_function(CB_swf.DAC_offset(AWG_channel=AWG_channel2,
-                                  AWG_nr=AWG_nr))
-        else:
-            MC.set_sweep_function(swf.AWG_channel_offset(channel=AWG_channel2,
-                                  AWG_name=AWG_name))
-        MC.set_sweep_points(np.linspace(ch_2_min - dac_resolution*6,
-                                        ch_2_min + dac_resolution*6, 13))
-        MC.run(name='Mixer_cal_Offset_ch%s' % AWG_channel2,
-               sweep_delay=.1, debug_mode=True)
-        Mixer_Calibration_Analysis = MA.Mixer_Calibration_Analysis(
-            label='Mixer_cal', auto=True)
-
-        last_ch_2_min = ch_2_min
-        min_power = min(Mixer_Calibration_Analysis.measured_powers)
-        ch_2_min = Mixer_Calibration_Analysis.fit_results[0]
-
-        if pulse_amp_control == 'CBox':
-            CBox.set_dac_offset(AWG_nr, AWG_channel2, ch_2_min)
-
-        else:
-            exec('AWG.set_ch%s_offset(%s)' % (AWG_channel2, ch_2_min))
-
-        if ii > 10:
-            logging.error('Mixer calibration did not converge')
-            break
-    return ch_1_min, ch_2_min
-
-def mixer_carrier_cancellation_duplexer(qubit, **kw):
-    Duplexer = qt.instruments['Duplexer']
-    AWG = qt.instruments['AWG']
-    AWG.stop()
-    output_channel = qubit.get_duplexer_output_channel()
-    frequency = (qubit.get_current_frequency()
-                 + qubit.get_sideband_modulation_frequency())
-    drive = qt.instruments[qubit.get_qubit_drive()]
-    drive.set_frequency(frequency * 1e9)
-    drive.set_power(qubit.get_drive_power())
-    drive.on()
-
-    Duplexer.set_all_switches_to('Off')
-
-    print('Cancelling carrier leakage mixer 1')
-    Duplexer.set_switch(1, output_channel, 'ON')
-    Duplexer.set_attenuation(1, output_channel, 49000)
-
-    mixer_carrier_cancellation(frequency=frequency,
-                               AWG_channel1=1,
-                               AWG_channel2=2, **kw)
-
-    Duplexer.set_switch(1, output_channel, 'OFF')
-
-    print('Cancelling carrier leakage mixer 2')
-    Duplexer.set_switch(2, output_channel, 'ON')
-    Duplexer.set_attenuation(2, output_channel, 49000)
-
-    mixer_carrier_cancellation(frequency=frequency,
-                               AWG_channel1=3,
-                               AWG_channel2=4, **kw)
-
-    Duplexer.set_switch(2, output_channel, 'OFF')
-    drive.off()
+    Input args
+        CBox
+        SH:     Signal Hound
+        source: MW-source connected to the mixer
+        LutMan: Used for changing the pars and loading the pulses
+        AWG:    Used for supplying triggers to the CBox
+        MC:
+        awg_nrs: The awgs used in the CBox to which the pulses are uploaded.
+                 (list to allow setting a copy on e.g. awg_nr = 1)
 
 
-def mixer_skewness_calibration_adaptive(source,
-                                        generator_frequency,
-                                        mixer=None,
-                                        sideband_frequency=.1,
-                                        MC_name='MC',
-                                        pulse_amp_control='AWG'):
-    '''
     Calibrates the mixer skewnness
-    Using:
-      * The AWG 5014, in this case the detector function generates sequences
-        for the AWG based on parameters set in the mixer object/instrument.
-      * The CBox, in this case a fixed sequence is played in the tektronix
-        to ensure the CBox is continously triggered and the paramters are
-        reloaded between each measued point.
-    Note: mixer cannot be None when driving with the AWG
-    '''
+    The CBox, in this case a fixed sequence is played in the tektronix
+    to ensure the CBox is continously triggered and the parameters are
+    reloaded between each measured point.
 
-    MC = qt.instruments['MC']
-    optimization_method = 'Powell'
-    # Preparation of experiment
-    source.on()
-    source.set_frequency(generator_frequency*1e9)
+    If calibrate_both_sidebands is True the optimization runs two calibrations,
+    first it tries to minimize the power in the spurious sideband by varying
+    the phase and amplitude skewness. After that it flips the phase 180 degrees
+    and repeates the same experiment for the desired sideband. Both should
+    give the same result.
+
+    For a description on how to translate these coefficients to a rotation
+    matrix see the notes in docs/notes/MixerSkewnessCalibration_LDC_150629.pdf
+
+    If calibrate_both_sidebands is False it will only minimize the signal in
+    the spurious sideband. and return those values.
+
+    '''
+    # Loads a train of pulses to the AWG to trigger the CBox continuously
+    AWG.stop()
+
+    #  Ensure that the block is 4 periods of the modulation freq
+    total_time = 200e-6  # Set by the triggerbox
+    time_per_pulse = abs(round(1/LutMan.f_modulation.get())*4)
+    LutMan.block_length.set(time_per_pulse)  # in ns
+    LutMan.ampCW.set(200)
+    n_pulses = int(total_time//(time_per_pulse*1e-9))
+
+    # Timing tape that constructs the CW-tone
+    timing = [0]*(n_pulses)
+    pulse_ids = [LutMan.lut_mapping.get().index('ModBlock')]*n_pulses
+    end_of_marker = [False]*(n_pulses-1)+[True]
+    tape0 = []
+    for i in range(n_pulses):
+        tape0.extend(CBox.create_timing_tape_entry(timing[i], pulse_ids[i],
+                                                   end_of_marker[i]))
+    for awg_nr in awg_nrs:
+        LutMan.load_pulses_onto_AWG_lookuptable(awg_nr)
+        CBox.set_segmented_tape(awg_nr, tape0)
+        CBox.set('AWG{:g}_mode'.format(awg_nr), 'segmented')
+
+    # divide instead of multiply by 1e-9 because of rounding errs
+    st_seqs.single_marker_seq()
+
+    AWG.start()
+    sweepfunctions = [CB_swf.Lutman_par_with_reload(LutMan,
+                                                    LutMan.QI_amp_ratio,
+                                                    awg_nrs=awg_nrs),
+                      CB_swf.Lutman_par_with_reload(LutMan,
+                                                    LutMan.IQ_phase_skewness,
+                                                    awg_nrs=awg_nrs)]
     ampl_min_lst = np.empty(2)
     phase_min_lst = np.empty(2)
-
-    # Initialization of numerical optimization
-    if pulse_amp_control is 'AWG':
-        sweepfunctions = [swf.IQ_mixer_QI_ratio(mixer),
-                          swf.IQ_mixer_skewness(mixer)]
-    elif pulse_amp_control is 'CBox':
-        AWG.set_setup_filename('FPGA_cont_drive_5014')
-        sweepfunctions = [CB_swf.Lut_man_QI_amp_ratio(reload_pulses=True),
-                          CB_swf.Lut_man_IQ_phase_skewness(reload_pulses=True)]
+    if calibrate_both_sidebands:
+        sidebands = ['Numerical mixer calibration spurious sideband',
+                     'Numerical mixer calibration desired sideband']
     else:
-        raise ValueError('pulse_amp_control "%s" not recognized'
-                         % pulse_amp_control)
+        sidebands = ['Numerical mixer calibration spurious sideband']
 
-    for i, name in enumerate(
-            ['Numerical mixer calibration spurious sideband',
-             'Numerical mixer calibration desired sideband']):
-        # phase center determines where you signal ends up,
-        # sign determines where you look for the minimal signal with the
-        # signal hound
-        if i == 0:
-            phase_center = 0
-            sign = -1
-        else:
-            phase_center = 180
-            sign = 1
-        # Set the detector
-        if pulse_amp_control is 'AWG':
-            detector = det.SH_mixer_skewness_det(generator_frequency +
-                                                 sign*sideband_frequency,
-                                                 mixer=mixer,
-                                                 f_mod=sideband_frequency,
-                                                 Navg=5, delay=0.5)
-        else:
-            detector = det.Signal_Hound_fixed_frequency(SH,
-                generator_frequency + sign*sideband_frequency,
-                Navg=5, delay=0.3)
+    for i, name in enumerate(sidebands):
 
-        start_val = np.array([0.8, phase_center-10])  # units:(ratio, degree)
-        initial_stepsize = np.array([.1, 10.])
-        x0 = start_val/initial_stepsize  # Initial guess
-        x_scale = 1/initial_stepsize  # Scaling parameters
+        sign = -1 if i is 0 else 1  # Flips freq to minimize signal
+        # Note Signal hound has frequency in GHz
+        detector = det.Signal_Hound_fixed_frequency(
+            SH, frequency=(source.frequency.get()/1e9 +
+                           sign*LutMan.f_modulation.get()),
+            Navg=5, delay=.3)
+        # Timing is not finetuned and can probably be sped up
 
-        ad_func_pars = {'x0': x0,
-                        'x_scale': x_scale,
-                        'bounds': None,
-                        'minimize': True,
-                        'ftol': 1e-3,
-                        'xtol':  5e-2,
-                        'maxiter': 500,  # Maximum No. iterations,
-                        'maxfun': 500,  # Maximum No. function evaluations,
-                        'factr': 1e7,  # 1e7,
-                        'pgtol': 1e-2,      # Gradient tolerance,
-                        'epsilon': 5e-1,     # Tolerance in measured val,
-                        'epsilon_COBYLA': 1,  # Initial step length,
-                        'accuracy_COBYLA': 1e-2,  # Convergence tolerance,
-                        'constraints': np.array([2, 90])}
+        xtol = 5e-3
+        ftol = 1e-3
+        start_ratio = 0.8
+        phase_center = i * 180  # i=0 is spurious sideband, i=1 is desired
+        r_step = .1
+        sk_step = 10.
+        start_skewness = phase_center-10
+        ad_func_pars = {'adaptive_function': 'Powell',
+                        'x0': [start_ratio, start_skewness],
+                        'direc': [[r_step, 0],
+                                  [0, sk_step],
+                                  [0, 0]],  # direc is a tuple of vectors
+                        'ftol': ftol,
+                        'xtol': xtol, 'minimize': True}
 
-        # Experiment:
         MC.set_sweep_functions(sweepfunctions)  # sets swf1 and swf2
         MC.set_detector_function(detector)  # sets test_detector
-        MC.set_measurement_mode('adaptive')
-        MC.set_measurement_mode_temp(adaptive_function='optimization',
-                                     method=optimization_method)
-
         MC.set_adaptive_function_parameters(ad_func_pars)
-        MC.run(name=name)
+        MC.run(name=name, mode='adaptive')
         a = MA.OptimizationAnalysis(auto=True, label='Numerical')
         ampl_min_lst[i] = a.optimization_result[0][0]
         phase_min_lst[i] = a.optimization_result[0][1]
 
-    print()
-    print('Finished calibration')
-    print('*'*80)
-    print('Phase at minimum w-: {} deg, w+: {} deg'.format(
-        phase_min_lst[0], phase_min_lst[1]))
-    print('QI_amp_ratio at minimum w-: {},  w+: {}'.format(
-        ampl_min_lst[0], ampl_min_lst[1]))
-    # print 'Power at minimum: {} dBm'.format(power_min)
-    print('*'*80)
-
-    phi = -1*(np.mod((phase_min_lst[0] - (phase_min_lst[1]-180)), 360))/2.0
-    alpha = (1/ampl_min_lst[0] + 1/ampl_min_lst[1])/2.
-    print('Phi = {} deg'.format(phi))
-    print('alpha = {}'.format(alpha))
-
-    # Wrap up experiment
-    source.off()
-    return phi, alpha
-
-def mixer_skewness_calibration(generator_frequency, sideband_frequency=.1,
-                               phase_ranges=[40, 8],
-                               QI_amp_ratio_ranges=[.6, .1],
-                               estimated_IQ_phase_skewness=0,
-                               estimated_QI_amp_ratio=1.,
-                               phase_step=None, QI_amp_ratio_step=None,
-                               AWG_channel=1,
-                               mixer=None,
-                               AWG_name='AWG', MC_name='MC', drive_name='IQ',
-                               pulse_amp_control='AWG',
-                               analyzer='Signal Hound'):
-    '''
-    Currently supports calibrating mixer skewness both with the Duplexer
-    and with the CBox.
-
-    The value AWG_channel is not used when calibrating with the CBox.
-    '''
-    def set_default_AWG_settings():
-        AWG.stop()
-        AWG.set_run_mode('SEQ')
-        for channel in range(1, 4):
-            eval('AWG.set_ch{}_QI_amp_ratio({})'.format(channel,
-                 estimated_QI_amp_ratio))
-
-    def measure(name, phase_center, phase_range, QI_amp_ratio_center,
-                QI_amp_ratio_range,
-                phase_step=None, QI_amp_ratio_step=None):
-        phase_range = float(phase_range)
-        QI_amp_ratio_range = float(QI_amp_ratio_range)
-        if phase_step is None:
-            phase_step = phase_range / 20.
-        if QI_amp_ratio_step is None:
-            QI_amp_ratio_step = max(np.round(QI_amp_ratio_range/30, 3), .001)
-        sweep_points_phase = np.arange(phase_center - np.round(phase_range / 2,
-                                                               1),
-                                       phase_center + np.round(phase_range / 2,
-                                                               1),
-                                       phase_step)
-        sweep_points_ampl = np.arange(QI_amp_ratio_center - QI_amp_ratio_range / 2,
-                                      QI_amp_ratio_center + QI_amp_ratio_range / 2,
-                                      QI_amp_ratio_step)
-        MC.set_sweep_points_2D(sweep_points_phase)
-        MC.set_sweep_points(sweep_points_ampl)
-        MC.run_2D(name=name)
-        ma = MA.Mixer_Skewness_Analysis(auto=True)
-
-        phase_min = ma.phase_min
-        QI_min = ma.QI_min
-
-        return phase_min, QI_min
-
-    print('Measuring mixer skewness at frequency', generator_frequency+sideband_frequency)
-    MC = qt.instruments[MC_name]
-    AWG = qt.instruments[AWG_name]
-    drive = qt.instruments[drive_name]
-    drive.set_frequency(generator_frequency * 1e9)
-
-    if pulse_amp_control == 'AWG':
-        MC.set_sweep_function(swf.IQ_mixer_QI_ratio(mixer))
-        MC.set_sweep_function_2D(swf.IQ_mixer_skewness(mixer))
-
-    elif pulse_amp_control != 'CBox':
-        CBox = qt.instruments['CBox']
-        CBox.set_awg_mode(0, 0)
-        CBox.set_awg_mode(1, 0)
-        set_default_AWG_settings()
-        MC.set_sweep_function_2D(swf.AWG_phase_sequence())
-        MC.set_sweep_function(swf.AWG_channel_amplitude(AWG_channel))
+    if calibrate_both_sidebands:
+        phi = -1*(np.mod((phase_min_lst[0] - (phase_min_lst[1]-180)), 360))/2.0
+        alpha = (1/ampl_min_lst[0] + 1/ampl_min_lst[1])/2.
+        if verbose:
+            print('Finished calibration')
+            print('*'*80)
+            print('Phase at minimum w-: {} deg, w+: {} deg'.format(
+                phase_min_lst[0], phase_min_lst[1]))
+            print('QI_amp_ratio at minimum w-: {},  w+: {}'.format(
+                ampl_min_lst[0], ampl_min_lst[1]))
+            print('*'*80)
+            print('Phi = {} deg'.format(phi))
+            print('alpha = {}'.format(alpha))
+        return phi, alpha
     else:
-        AWG.set_setup_filename('FPGA_cont_drive_5014')
-        MC.set_sweep_function(CB_swf.Lut_man_QI_amp_ratio(reload_pulses=True))
-        # only reload on inner loop for speedup
-        MC.set_sweep_function_2D(
-            CB_swf.Lut_man_IQ_phase_skewness(reload_pulses=False))
-
-    if QI_amp_ratio_ranges is None:
-        # Generate QI_amp_ratio range depending on range of phases
-        QI_amp_ratio_ranges = np.sqrt(np.array(phase_ranges)) / 20
-
-    AWG.start()
-    drive.on()
-
-    ampl_min_lst = [0, 0]
-    phase_min_lst = [0, 0]
-
-    for i, name in enumerate(
-            ['Mixer calibration spurious sideband',
-             'Mixer calibration desired sideband']):
-        QI_amp_ratio_center = estimated_QI_amp_ratio
-        if i == 0:
-            phase_center = estimated_IQ_phase_skewness + 180
-            sign = -1
-        else:
-            phase_center = estimated_IQ_phase_skewness
-            sign = 1
-
-        if analyzer == 'Signal Hound' and pulse_amp_control == 'AWG':
-            MC.set_detector_function(
-                det.SH_mixer_skewness_det(generator_frequency +
-                                          sign*sideband_frequency,
-                                          mixer=mixer,
-                                          f_mod=sideband_frequency))
-        elif analyzer == 'Signal Hound':
-            MC.set_detector_function(
-                det.Signal_Hound_fixed_frequency(generator_frequency +
-                                                 sign*sideband_frequency,
-                                                 delay=.1, Navg=3))
-        else:
-            MC.set_detector_function(
-                det.RS_FSV_fixed_frequency(frequency=generator_frequency +
-                                           sign*sideband_frequency))
-
-        for k, phase_range in enumerate(phase_ranges):
-            print('*' * 20)
-            print('at loop {} with phase: min={}, max={}, step={}'.format(
-                k+1, phase_center - phase_range / 2,
-                phase_center + phase_range / 2,
-                float(phase_range) / 5))
-            QI_amp_ratio_range = QI_amp_ratio_ranges[min(
-                k, len(QI_amp_ratio_ranges)-1)]
-
-            phase_min, ampl_min = measure(
-                name,
-                phase_center, phase_range,
-                QI_amp_ratio_center, QI_amp_ratio_range,
-                phase_step=phase_step,
-                QI_amp_ratio_step=QI_amp_ratio_step)
-            phase_center = phase_min
-            QI_amp_ratio_center = ampl_min
-
-            print('Minimum phase: {} degree'.format(phase_min))
-            print('Minimum QI_amp_ratio: {}'.format(ampl_min))
-            # print 'Power at minimum: {} dBm'.format(power_min)
-            print()
-
-        ampl_min_lst[i] = ampl_min
-
-        phase_min_lst[i] = phase_min
-
-    if pulse_amp_control != 'CBox':
-        set_default_AWG_settings()
-    print('Finished calibration')
-    print('*'*80)
-    print('Phase at minimum w-: {} deg, w+: {} deg'.format(
-        phase_min_lst[0], phase_min_lst[1]))
-    print('QI_amp_ratio at minimum w-: {},  w+: {}'.format(
-        ampl_min_lst[0], ampl_min_lst[1]))
-    # print 'Power at minimum: {} dBm'.format(power_min)
-    print('*'*80)
-
-    phi = -1*(np.mod((phase_min_lst[0] - phase_min_lst[1]), 360) - 180)/2.0
-    alpha = (1/ampl_min_lst[0] + 1/ampl_min_lst[1])/2.
-    print('Phi = {} deg'.format(phi))
-    print('alpha = {}'.format(alpha))
-
-    return phi, alpha
-
-
+        return phase_min_lst[0], ampl_min_lst[0]

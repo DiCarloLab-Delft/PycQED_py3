@@ -8,6 +8,27 @@ from importlib import reload
 reload(pulse)
 
 
+def single_marker_elt(i, station):
+    '''
+    Puts a single marker of 15ns on each channel
+    '''
+    nr_channels = 4
+    nr_markers = 2
+
+    el = element.Element(name='single-marker-elt_%s' % i,
+                         pulsar=station.pulsar)
+    ref_elt = el.add(pulse.SquarePulse(name='refpulse_0', channel='ch1',
+                     amplitude=0, length=1e-9))
+
+    for i in range(nr_channels):
+        for j in range(nr_markers):
+            el.add(pulse.SquarePulse(name='marker',
+                                     channel='ch{}_marker{}'.format(i+1, j+1),
+                                     length=15e-9, amplitude=1),
+                   start=5e-9, refpulse=ref_elt)
+    return el
+
+
 def single_pulse_elt(i, station, IF, RO_pulse_delay=0, RO_trigger_delay=0,
                      RO_pulse_length=1e-6, tau=0):
         '''
@@ -100,11 +121,11 @@ def no_pulse_elt(i, station, IF, RO_trigger_delay=0, RO_pulse_length=1e-6):
 
 def two_pulse_elt(i, station, IF, RO_pulse_delay, RO_trigger_delay,
                   RO_pulse_length,
-                  pulse_separation, tau=0):
+                  pulse_delay, tau=0):
         '''
         two pulse element for triggering the CBox.
         Plays two markers of (15ns) on ch1m1 and ch1m2 separated by
-        the pulse_separation and tau, followed by a cos that modulates the LO
+        the pulse_delay and tau, followed by a cos that modulates the LO
         for Readout and a RO marker.
 
         The RO-tone is fixed in phase with respect to the RO-trigger
@@ -138,7 +159,7 @@ def two_pulse_elt(i, station, IF, RO_pulse_delay, RO_trigger_delay,
         el.add(pulse.cp(sqp, channel='ch1_marker1'),
                name='CBox-pulse-trigger-2',
                refpulse='CBox-pulse-trigger-1', refpoint='start',
-               start=pulse_separation+tau)
+               start=pulse_delay+tau)
         el.add(pulse.cp(sqp, channel='ch1_marker2'),
                refpulse='CBox-pulse-trigger-2', refpoint='start', start=0)
 
@@ -167,9 +188,14 @@ def two_pulse_elt(i, station, IF, RO_pulse_delay, RO_trigger_delay,
 
 def multi_pulse_elt(i, station, IF, RO_pulse_delay=0,
                     RO_pulse_length=1e-6, RO_trigger_delay=0,
-                    pulse_separation=40e-9,
+                    pulse_delay=40e-9,
                     n_pulses=3,
                     taus=None):
+        '''
+        Note this is CBox specific. For a more up to date version look at the
+        multi-pulse elt that exists in the single_qubit_tek_seq_elts.
+        (12-4-2016)
+        '''
 
         if taus is None:
             taus = np.zeros(n_pulses)
@@ -199,7 +225,7 @@ def multi_pulse_elt(i, station, IF, RO_pulse_delay=0,
         for j in range(n_pulses):
             el.add(pulse.cp(sqp, channel='ch1_marker1'),
                    name='CBox-pulse-trigger-ch1_{}.{}'.format(i, j),
-                   start=j*pulse_separation+taus[j],
+                   start=j*pulse_delay+taus[j],
                    refpulse=ref_elt, refpoint='end')
             el.add(pulse.cp(sqp, channel='ch1_marker2'),
                    refpulse='CBox-pulse-trigger-ch1_{}.{}'.format(i, j),
@@ -234,7 +260,7 @@ def CBox_resetless_multi_pulse_elt(
         i, station, IF,
         RO_pulse_length=1e-6, RO_trigger_delay=0,
         RO_pulse_delay=100e-9,
-        pulse_separation=60e-9,
+        pulse_delay=60e-9,
         resetless_interval=10e-6,
         n_pulses=3,
         mod_amp=.5):
@@ -267,7 +293,7 @@ def CBox_resetless_multi_pulse_elt(
 
     if number_of_resetless_sequences < 1:
         logging.warning('Number of resetless seqs <1 ')
-    if ((n_pulses * pulse_separation + RO_pulse_length+RO_pulse_delay) >
+    if ((n_pulses * pulse_delay + RO_pulse_length+RO_pulse_delay) >
             resetless_interval):
         logging.warning('Sequence does not fit in the resetless interval')
     if number_of_resetless_sequences > 200:
@@ -276,7 +302,7 @@ def CBox_resetless_multi_pulse_elt(
     marker_tr_p = pulse.marker_train(name='CBox-pulse_marker',
                                      channel='ch1_marker1', amplitude=1,
                                      marker_length=15e-9,
-                                     marker_separation=pulse_separation,
+                                     marker_separation=pulse_delay,
                                      nr_markers=n_pulses)
 
     for i in range(number_of_resetless_sequences):
@@ -366,3 +392,33 @@ def pulsed_spec_elt_with_RF_mod(i, station, IF,
                    refpulse='RO-Cos-{}'.format(i), refpoint='start')
     return el
 
+
+def CBox_marker_sequence(i, station, marker_separation):
+    el = element.Element(name=('el_{}'.format(i)),
+                         pulsar=station.pulsar)
+
+    # Somehow I got errors whenever I picked a marker separation>63 ns
+    # 14-2-2016 MAR -> Update quite sure it is a ns rounding error!
+
+    # Thispulse ensures that the total length of the element is exactly 20us
+    refpulse = el.add(pulse.SquarePulse(name='refpulse_20us',
+                                        channel='ch2',
+                                        amplitude=0, length=20e-6,
+                                        start=0))
+    # ensures complete seq is filled with markers
+    nr_markers = int(20e-6//marker_separation)
+    marker_tr_p = pulse.marker_train(name='CBox-pulse_marker',
+                                     channel='ch1_marker1', amplitude=1,
+                                     marker_length=15e-9,
+                                     marker_separation=marker_separation,
+                                     nr_markers=nr_markers)
+    el.add(pulse.cp(marker_tr_p),
+           name='CBox-pulse-trigger-ch1_{}'.format(i),
+           start=0,
+           refpulse=refpulse, refpoint='start')
+
+    el.add(pulse.cp(marker_tr_p, channel='ch1_marker2'),
+           name='CBox-pulse-trigger-ch2_{}'.format(i),
+           start=0,
+           refpulse=refpulse, refpoint='start')
+    return el

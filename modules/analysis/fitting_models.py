@@ -53,8 +53,14 @@ def QubitFreqFlux(flux, f_max, E_c,
 
 
 def CosFunc(t, amplitude, frequency, phase, offset):
-    # Naming convention, frequency should be Hz
-    # omega is in radial freq
+    '''
+    parameters:
+        t, time in s
+        amplitude a.u.
+        frequency in Hz (f, not omega!)
+        phase in rad
+        offset a.u.
+    '''
     return amplitude*np.cos(2*np.pi*frequency*t + phase)+offset
 
 
@@ -96,6 +102,10 @@ def HangerFuncAmplitude(f, f0, Q, Qe, A, theta):
     the hanger is small.
     In this case it may misjudge the slope
     Theta is the asymmetry parameter
+
+    Note! units are inconsistent
+    f is in Hz
+    f0 is in GHz
     '''
     return abs(A*(1.-Q/Qe*np.exp(1.j*theta)/(1.+2.j*Q*(f/1.e9-f0)/f0)))
 
@@ -154,6 +164,31 @@ def gaussian_2D(x, y, amplitude=1,
 ####################
 # Guess functions  #
 ####################
+
+
+def Cos_guess(model, data, t):
+    '''
+    Guess for a cosine fit using FFT, only works for evenly spaced points
+    '''
+    amp_guess = abs(max(data)-min(data))/2  # amp is positive by convention
+    offs_guess = np.mean(data)
+
+    # Freq guess ! only valid with uniform sampling
+    w = np.fft.fft(data)
+    f = np.fft.fftfreq(len(data), t[1]-t[0])
+    w[0] = 0  # Removes DC component from fourier transform
+    freq_guess = f[w == max(w)]
+
+    ph_guess = -2*np.pi*t[data == max(data)]*freq_guess
+
+    model.set_param_hint('period', expr='1/frequency')
+    params = model.make_params(amplitude=amp_guess,
+                               frequency=freq_guess,
+                               phase=ph_guess,
+                               offset=offs_guess)
+    params['amplitude'].min = 0  # Ensures positive amp
+
+    return params
 
 
 def gauss_2D_guess(model, data, x, y):
@@ -262,7 +297,12 @@ def double_gauss_guess(model, data, x=None, **kwargs):
 #################################
 #     User defined Models       #
 #################################
+# NOTE: it is actually better to instantiate the model within your analysis
+# file, this prevents the model params having a memory.
+# A valid reason to define it here would be if you want to add a guess function
 CosModel = lmfit.Model(CosFunc)
+CosModel.guess = Cos_guess
+
 ExpDecayModel = lmfit.Model(ExpDecayFunc)
 ExpDampOscModel = lmfit.Model(ExpDampOscFunc)
 GaussExpDampOscModel = lmfit.Model(GaussExpDampOscFunc)
@@ -302,7 +342,7 @@ DoubleGaussModel = (lmfit.models.GaussianModel(prefix='A_') +
 DoubleGaussModel.guess = double_gauss_guess  # defines a guess function
 
 
-def plot_fitres2D_heatmap(fit_res, x, y, axs=None, cmap='CMRmap'):
+def plot_fitres2D_heatmap(fit_res, x, y, axs=None, cmap='viridis'):
     '''
     Convenience function for plotting results of flattened 2D fits.
 
@@ -311,9 +351,9 @@ def plot_fitres2D_heatmap(fit_res, x, y, axs=None, cmap='CMRmap'):
     with lmfit. If anyone has a better location in mind, let me know (MAR).
     '''
     nr_cols = len(np.unique(x))
-    data_2D = fit_res.data.reshape(-1, nr_cols)
-    fit_2D = fit_res.best_fit.reshape(-1, nr_cols)
-    guess_2D = fit_res.init_fit.reshape(-1, nr_cols)
+    data_2D = fit_res.data.reshape(-1, nr_cols, order='C')
+    fit_2D = fit_res.best_fit.reshape(-1, nr_cols, order='C')
+    guess_2D = fit_res.init_fit.reshape(-1, nr_cols, order='C')
 
     if axs is None:
         f, axs = plt.subplots(1, 3, figsize=(14, 6))

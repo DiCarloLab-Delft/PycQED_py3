@@ -87,8 +87,6 @@ class MeasurementControl:
                     sweep_points=self.get_sweep_points())
                 self.measure_hard()
             elif len(self.sweep_functions) == 2:
-                self.detector_function.prepare(
-                    sweep_points=self.get_sweep_points()[0: self.xlen, 0])
                 self.complete = False
                 for j in range(self.ylen):
                     # added specifically for 2D hard sweeps
@@ -98,6 +96,8 @@ class MeasurementControl:
                                 self.iteration*self.xlen]
                             if i != 0:
                                 sweep_function.set_parameter(x[i])
+                        self.detector_function.prepare(
+                            sweep_points=self.get_sweep_points()[0: self.xlen, 0])
                         self.measure_hard()
             else:
                 raise Exception('hard measurements have not been generalized to N-D yet')
@@ -120,7 +120,6 @@ class MeasurementControl:
         '''
         self.save_optimization_settings()
         adaptive_function = self.af_pars.pop('adaptive_function')
-        print('Adaptive function passed: %s' % adaptive_function)
 
         self.initialize_plot_monitor()
         self.initialize_plot_monitor_adaptive()
@@ -129,7 +128,6 @@ class MeasurementControl:
         self.detector_function.prepare()
 
         if adaptive_function == 'Powell':
-            print('Optimizing using scipy.fmin_powell')
             adaptive_function = fmin_powell
         if (isinstance(adaptive_function, types.FunctionType) or
                 isinstance(adaptive_function, np.ufunc)):
@@ -196,7 +194,9 @@ class MeasurementControl:
         self.update_plotmon()
         if self.mode == '2D':
             self.update_plotmon_2D_hard()
-            self.print_progress_static_2D_hard()
+            self.print_progress_static_hard()
+        else:
+            self.print_progress_static_hard()
 
         return new_data
 
@@ -439,8 +439,7 @@ class MeasurementControl:
     def update_plotmon_2D(self):
         '''
         Adds latest measured value to the TwoD_array and sends it
-        to the plotmon.
-
+        to the QC_QtPlot.
         '''
         if self.live_plot_enabled:
             i = self.iteration-1
@@ -484,35 +483,26 @@ class MeasurementControl:
                     self.time_last_ad_plot_update = time.time()
                     self.QC_QtPlot.update_plot()
 
-
     def update_plotmon_2D_hard(self):
         '''
         Adds latest datarow to the TwoD_array and send it
-        to the plotmon.
+        to the QC_QtPlot.
         Note that the plotmon only supports evenly spaced lattices.
-
-        Made to work with at most 2 2D arrays (as this is how the labview code
-        works). It should be easy to extend this function for more vals.
         '''
-        i = self.iteration-1
+        i = int(self.iteration-1)
         y_ind = i
-        if len(self.detector_function.value_names) == 1:
-            z_ind = len(self.sweep_functions)
-            self.TwoD_array[:, y_ind] = self.dset[i*self.xlen:(i+1)*self.xlen,
-                                                  z_ind]
-            if self.Plotmon is not None:
-                self.Plotmon.plot3D(1, data=self.TwoD_array,
-                                    axis=(self.x_start, self.x_step,
-                                          self.y_start, self.y_step))
-        else:
-            for j in range(2):
+        for j in range(len(self.detector_function.value_names)):
                 z_ind = len(self.sweep_functions) + j
-                self.TwoD_array[:, y_ind, j] = self.dset[
+                self.TwoD_array[y_ind, :, j] = self.dset[
                     i*self.xlen:(i+1)*self.xlen, z_ind]
-                if self.Plotmon is not None:
-                    self.Plotmon.plot3D(j+1, data=self.TwoD_array[:, :, j],
-                                        axis=(self.x_start, self.x_step,
-                                              self.y_start, self.y_step))
+                self.QC_QtPlot.traces[j]['config']['z'] = \
+                    self.TwoD_array[:, :, j]
+
+        if (time.time() - self.time_last_2Dplot_update >
+                self.QC_QtPlot.interval
+                or self.iteration == len(self.sweep_points)):
+            self.time_last_2Dplot_update = time.time()
+            self.QC_QtPlot.update_plot()
 
     ##################################
     # Small helper/utility functions #
@@ -611,26 +601,27 @@ class MeasurementControl:
 
     def print_progress_static_hard(self):
         acquired_points = self.dset.shape[0]
-        total_nr_pts = self.sweep_points.shape[0]
+        total_nr_pts = len(self.get_sweep_points())
         if acquired_points == total_nr_pts:
-            self.complete = True
+            self.complete = True  # Note is self.complete ever used?
         elif acquired_points > total_nr_pts:
             self.complete = True
-            logging.warning(
-                'Warning nr of acq points is larger nr of sweep points')
-            logging.warning('Acq pts: %s, total_nr_pts: %s' % (
-                            acquired_points, total_nr_pts))
 
         percdone = acquired_points*1./total_nr_pts*100
         elapsed_time = time.time() - self.begintime
-        scrmes = "{percdone}% completed, elapsed time: "\
-            "{t_elapsed} s, time left: {t_left} s".format(
+        progress_message = "\r {percdone}% completed \telapsed time: "\
+            "{t_elapsed}s \ttime left: {t_left}s".format(
                 percdone=int(percdone),
                 t_elapsed=round(elapsed_time, 1),
                 t_left=round((100.-percdone)/(percdone) *
                              elapsed_time, 1) if
                 percdone != 0 else '')
-        sys.stdout.write(60*'\b'+scrmes)
+
+        if percdone != 100:
+            end_char = '\r'
+        else:
+            end_char = '\n'
+        print(progress_message, end=end_char)
 
     def print_measurement_start_msg(self):
         if self.verbose:

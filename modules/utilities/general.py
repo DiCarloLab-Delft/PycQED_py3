@@ -37,6 +37,7 @@ def to_hex_string(byteval):
     '''
     return "b'" + ''.join('\\x{:02x}'.format(x) for x in byteval) + "'"
 
+
 def load_settings_onto_instrument(instrument, folder=None,
                                   label='Settings',
                                   timestamp=None, **kw):
@@ -48,7 +49,7 @@ def load_settings_onto_instrument(instrument, folder=None,
         can be chosen as the settings file.
         '''
         older_than = None
-        instrument_name = instrument.get_name()
+        instrument_name = instrument.name
         success = False
         count = 0
         while success is False and count < 10:
@@ -80,14 +81,14 @@ def load_settings_onto_instrument(instrument, folder=None,
                 if value != 'None':  # None is saved as string in hdf5
                     if type(value) == str:
                         if value == 'False':
-                            exec("instrument.set_%s(False)" % (parameter))
+                            instrument.set(parameter, False)
                         else:
-                            exec("instrument.set_%s('%s')" % (parameter, value))
+                            instrument.set(parameter, float(value))
                     else:
-                        exec('instrument.set_%s(%s)' % (parameter, value))
+                        instrument.set(parameter, value)
             except:
-                print('Could not set parameter: "%s" for instrument "%s"' % (
-                    parameter, instrument_name))
+                print('Could not set parameter: "%s" to "%s" for instrument "%s"' % (
+                    parameter, value, instrument_name))
         f.close()
         return True
 

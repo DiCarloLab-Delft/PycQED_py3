@@ -64,7 +64,7 @@ class MeasurementAnalysis(object):
         return h5py.File(os.path.join(self.folder, name+'.hdf5'), mode)
 
     def default_fig(self, **kw):
-        figsize = kw.pop('figsize', (6, 5))
+        figsize = kw.pop('figsize', None)
         return plt.figure(figsize=figsize, **kw)
 
     def default_ax(self, fig=None, *arg, **kw):
@@ -138,7 +138,7 @@ class MeasurementAnalysis(object):
         else:
             self.figarray, self.axarray = plt.subplots(
                 max(len(self.value_names), 1), 1,
-                figsize=(5, 3*len(self.value_names)))
+                figsize=(6, 1.5*len(self.value_names)))
         return tuple(self.f + [self.figarray] + self.ax + [self.axarray])
 
     def get_values(self, key):
@@ -403,7 +403,7 @@ class MeasurementAnalysis(object):
                              % datasaving_format)
 
     def plot_results_vs_sweepparam(self, x, y, fig, ax, show=False, marker='-o',
-                                   log=False, plotlabel=None, **kw):
+                                   log=False, label=None, **kw):
         save = kw.pop('save', False)
         self.plot_title = kw.pop('plot_title',
                                  textwrap.fill(self.timestamp_string + '_' +
@@ -415,7 +415,7 @@ class MeasurementAnalysis(object):
             ax.set_xlabel(xlabel)
         if ylabel is not None:
             ax.set_ylabel(ylabel)
-        ax.plot(x, y, marker, label=plotlabel)
+        ax.plot(x, y, marker, label=label)
         if log:
             ax.set_yscale('log')
         if show:
@@ -695,6 +695,10 @@ class OptimizationAnalysis(MeasurementAnalysis):
 
 
 class TD_Analysis(MeasurementAnalysis):
+    '''
+    Parent class for Time Domain (TD) analysis. Contains functions for
+    rotating and normalizing data based on calibration coordinates.
+    '''
     def __init__(self, NoCalPoints=4, center_point=31, make_fig=True,
                  zero_coord=None, one_coord=None, cal_points=None,
                  plot_cal_points=True, **kw):
@@ -710,6 +714,15 @@ class TD_Analysis(MeasurementAnalysis):
         self.center_point = center_point
         self.plot_cal_points = plot_cal_points
         super(TD_Analysis, self).__init__(**kw)
+
+    # def run_default_analysis(self, close_file=True, **kw):
+    #     self.get_naming_and_values()
+    #     self.fit_data(**kw)
+    #     self.make_figures(**kw)
+    #     if close_file:
+    #         self.data_file.close()
+    #     return self.fit_res
+
 
     def rotate_and_normalize_data(self):
         if self.cal_points is None:
@@ -760,7 +773,7 @@ class TD_Analysis(MeasurementAnalysis):
 
         # Plotting
         if self.make_fig:
-            fig1, fig2, ax1, axarray = self.setup_figures_and_axes()
+            self.fig1, fig2, self.ax1, axarray = self.setup_figures_and_axes()
             for i in range(2):
                 if len(self.value_names) >= 4:
                         ax = axarray[i/2, i % 2]
@@ -788,19 +801,19 @@ class TD_Analysis(MeasurementAnalysis):
 
             self.plot_results_vs_sweepparam(x=x,
                                             y=y,
-                                            fig=fig1, ax=ax1,
+                                            fig=self.fig1, ax=self.ax1,
                                             xlabel=self.xlabel,
                                             ylabel=ylabel,
                                             save=False)
-            ax1.set_ylim(min(min(self.corr_data)-.1, -.1),
-                         max(max(self.corr_data)+.1, 1.1))
+            self.ax1.set_ylim(min(min(self.corr_data)-.1, -.1),
+                              max(max(self.corr_data)+.1, 1.1))
             if not close_main_fig:
                 # Hacked in here, good idea to only show the main fig but can
                 # be optimized somehow
-                self.save_fig(fig1, ylabel='Amplitude (normalized)',
+                self.save_fig(self.fig1, ylabel='Amplitude (normalized)',
                               close_fig=False, **kw)
             else:
-                self.save_fig(fig1, ylabel='Amplitude (normalized)', **kw)
+                self.save_fig(self.fig1, ylabel='Amplitude (normalized)', **kw)
             self.save_fig(fig2, ylabel='Amplitude', **kw)
         if close_file:
             self.data_file.close()
@@ -831,8 +844,204 @@ class TD_Analysis(MeasurementAnalysis):
         normalized_cal_vals = normalized_values[-int(calsteps):]
         return [normalized_values, normalized_data_points, normalized_cal_vals]
 
+    def fit_data(*kw):
+        '''
+        Exists to be able to include it in the TD_Analysis run default
+        '''
+        pass
+
 
 class Rabi_Analysis(TD_Analysis):
+    def __init__(self, label='Rabi', **kw):
+        kw['label'] = label
+        kw['h5mode'] = 'r+'
+        super().__init__(**kw)
+
+    def run_default_analysis(self, close_file=True, **kw):
+        self.get_naming_and_values()
+        self.fit_data(**kw)
+        self.make_figures(**kw)
+        if close_file:
+            self.data_file.close()
+        return self.fit_res
+
+    def make_figures(self, **kw):
+        show_guess = kw.pop('show_guess', False)
+        self.fig, self.axs = plt.subplots(2, 1, figsize=(5, 6))
+        x_fine = np.linspace(min(self.sweep_points), max(self.sweep_points),
+                             1000)
+        for i in [0, 1]:
+            if i == 0:
+                plot_title = kw.pop('plot_title', textwrap.fill(
+                                    self.timestamp_string + '_' +
+                                    self.measurementstring, 40))
+            else:
+                plot_title = ''
+            self.axs[i].ticklabel_format(useOffset=False)
+            self.plot_results_vs_sweepparam(x=self.sweep_points,
+                                            y=self.measured_values[i],
+                                            fig=self.fig, ax=self.axs[i],
+                                            xlabel=self.xlabel,
+                                            ylabel=self.ylabels[i],
+                                            save=False,
+                                            plot_title=plot_title)
+
+            fine_fit = self.fit_res[i].model.func(
+                x_fine, **self.fit_res[i].best_values)
+            self.axs[i].plot(x_fine, fine_fit, label='fit')
+            if show_guess:
+                fine_fit = self.fit_res[i].model.func(
+                    x_fine, **self.fit_res[i].init_values)
+                self.axs[i].plot(x_fine, fine_fit, label='guess')
+                self.axs[i].legend(loc='best')
+        self.save_fig(self.fig, fig_tight=False, **kw)
+
+    def fit_data(self, print_fit_results=False, **kw):
+        self.add_analysis_datagroup_to_file()
+        model = fit_mods.CosModel
+        self.fit_res = ['', '']
+        # It would be best to do 1 fit to both datasets but since it is
+        # easier to do just one fit we stick to that.
+        for i in [0, 1]:
+            params = model.guess(model, data=self.measured_values[i],
+                                 t=self.sweep_points)
+            self.fit_res[i] = fit_mods.CosModel.fit(
+                data=self.measured_values[i],
+                t=self.sweep_points,
+                params=params)
+            self.save_fitted_parameters(fit_res=self.fit_res[i],
+                                        var_name=self.value_names[i])
+
+
+class Rabi_parabola_analysis(Rabi_Analysis):
+
+    def fit_data(self, print_fit_results=False, **kw):
+        self.add_analysis_datagroup_to_file()
+        model = lmfit.models.ParabolicModel()
+        self.fit_res = ['', '']
+        # It would be best to do 1 fit to both datasets but since it is
+        # easier to do just one fit we stick to that.
+        for i in [0, 1]:
+            model.set_param_hint('x0', expr='-b/(2*a)')
+            params = model.guess(data=self.measured_values[i],
+                                 x=self.sweep_points)
+            self.fit_res[i] = model.fit(
+                data=self.measured_values[i],
+                x=self.sweep_points,
+                params=params)
+            self.save_fitted_parameters(fit_res=self.fit_res[i],
+                                        var_name=self.value_names[i])
+
+
+class Motzoi_XY_analysis(TD_Analysis):
+    '''
+    Analysis for the Motzoi XY sequence (Xy-Yx)
+    Extracts the alternating datapoints and then fits two polynomials.
+    The intersect of the fits corresponds to the optimum motzoi parameter.
+    '''
+    def __init__(self, label='Motzoi', **kw):
+        kw['label'] = label
+        kw['h5mode'] = 'r+'
+        super().__init__(**kw)
+
+    def run_default_analysis(self, close_file=True, close_main_fig=True, **kw):
+        self.get_naming_and_values()
+        self.add_analysis_datagroup_to_file()
+        self.cal_points = kw.pop('cal_point', [[-4, -3], [-2, -1]])
+        self.rotate_and_normalize_data()
+        self.add_dataset_to_analysisgroup('Corrected data',
+                                          self.corr_data)
+        self.analysis_group.attrs.create('corrected data based on',
+                                         'calibration points'.encode('utf-8'))
+        # Only the unfolding part here is unique to this analysis
+        self.sweep_points_Xy = self.sweep_points[:-4:2]
+        self.sweep_points_Yx = self.sweep_points[1:-4:2]
+        self.corr_data_Xy = self.corr_data[:-4:2]
+        self.corr_data_Yx = self.corr_data[1:-4:2]
+
+        self.fit_data(**kw)
+        self.make_figures(**kw)
+
+        opt_motzoi = self.calculate_optimal_motzoi()
+
+        if close_file:
+            self.data_file.close()
+        return opt_motzoi
+
+    def make_figures(self, **kw):
+        # Unique in that it has hardcoded names and ponits to plot
+        show_guess = kw.pop('show_guess', False)
+        self.fig, self.ax = plt.subplots(1, 1, figsize=(5, 3))
+        x_fine = np.linspace(min(self.sweep_points), max(self.sweep_points),
+                             1000)
+        plot_title = kw.pop('plot_title', textwrap.fill(
+                            self.timestamp_string + '_' +
+                            self.measurementstring, 40))
+        self.ax.set_title(plot_title)
+
+        self.ax.ticklabel_format(useOffset=False)
+        self.ax.set_xlabel(kw.pop('xlabel', self.xlabel))
+        self.ax.set_ylabel(kw.pop('ylabel', r'$F|1\rangle$'))
+        self.ax.plot(self.sweep_points_Xy, self.corr_data_Xy,
+                     'o', c='b', label='Xy')
+        self.ax.plot(self.sweep_points_Yx, self.corr_data_Yx,
+                     'o', c='r', label='Yx')
+        c = ['b', 'r']
+        if hasattr(self, 'fit_res'):
+            for i in range(len(self.fit_res)):
+                fine_fit = self.fit_res[i].model.func(
+                    x_fine, **self.fit_res[i].best_values)
+                self.ax.plot(x_fine, fine_fit, c=c[i], label='fit')
+                if show_guess:
+                    fine_fit = self.fit_res[i].model.func(
+                        x_fine, **self.fit_res[i].init_values)
+                    self.ax.plot(x_fine, fine_fit, c=c[i], label='guess')
+
+        self.ax.legend(loc='best')
+        self.ax.set_ylim(-.1, 1.1)
+        self.save_fig(self.fig, fig_tight=True, **kw)
+
+    def fit_data(self, **kw):
+        model = lmfit.models.ParabolicModel()
+        self.fit_res = ['', '']
+
+        params = model.guess(data=self.corr_data_Xy,
+                             x=self.sweep_points_Xy)
+        self.fit_res[0] = model.fit(
+            data=self.corr_data_Xy,
+            x=self.sweep_points_Xy,
+            params=params)
+        self.save_fitted_parameters(fit_res=self.fit_res[0],
+                                    var_name='Xy')
+
+        params = model.guess(data=self.corr_data_Yx,
+                             x=self.sweep_points_Yx)
+        self.fit_res[1] = model.fit(
+            data=self.corr_data_Yx,
+            x=self.sweep_points_Yx,
+            params=params)
+        self.save_fitted_parameters(fit_res=self.fit_res[1],
+                                    var_name='Yx')
+
+    def calculate_optimal_motzoi(self):
+        '''
+        The best motzoi parameter is there where both curves intersect.
+        As a parabola can have 2 intersects.
+        Will default to picking the one closest to zero
+        '''
+        b_vals0 = self.fit_res[0].best_values
+        b_vals1 = self.fit_res[1].best_values
+        x1, x2 = a_tools.solve_quadratic_equation(
+            b_vals1['a']-b_vals0['a'], b_vals1['b']-b_vals0['b'],
+            b_vals1['c']-b_vals0['c'])
+        self.optimal_motzoi = min(x1, x2, key=lambda x: abs(x))
+        return self.optimal_motzoi
+
+
+class Rabi_Analysis_old(TD_Analysis):
+    '''
+    This is the old Rabi analysis for the mathematica sequences of 60 points
+    '''
     def __init__(self, label='Rabi',  **kw):
         kw['label'] = label
         kw['h5mode'] = 'r+'
@@ -1022,10 +1231,10 @@ class SSRO_Analysis(MeasurementAnalysis):
         self.no_fits = no_fits
         # plotting histograms of the raw shots on I and Q axis
         try:
-            shots_I_data_0 = self.get_values(key='I_0')
-            shots_I_data_1 = self.get_values(key='I_1')
-            shots_Q_data_0 = self.get_values(key='Q_0')
-            shots_Q_data_1 = self.get_values(key='Q_1')
+            shots_I_data = self.get_values(key='I')
+            shots_Q_data = self.get_values(key='Q')
+            shots_I_data_0, shots_I_data_1 = a_tools.zigzag(shots_I_data)
+            shots_Q_data_0, shots_Q_data_1 = a_tools.zigzag(shots_Q_data)
 
         except(KeyError):  # used for different naming when using TD_meas shots
             shots_I_data_0 = self.get_values(key='single_shot_I')[:, 0]
@@ -1566,15 +1775,27 @@ class SSRO_discrimination_analysis(MeasurementAnalysis):
         super(self.__class__, self).__init__(**kw)
 
     def run_default_analysis(self, plot_2D_histograms=True,
-                             current_threshold=None, **kw):
+                             current_threshold=None, theta_in=0, **kw):
         self.add_analysis_datagroup_to_file()
         # Extract I and Q data based on name of variable.
-        I_shots = self.get_values(key='I')
-        Q_shots = self.get_values(key='Q')
+        # I_shots = self.get_values(key='I')
+        # Q_shots = self.get_values(key='Q')
+        self.get_naming_and_values()
+        I_shots = self.measured_values[0]
+        Q_shots = self.measured_values[1]
+
+        #rotating according to theta
+        I_shots = np.cos(theta_in*2*np.pi/360)*I_shots - np.sin(theta_in*2*np.pi/360)*Q_shots
+        Q_shots = np.sin(theta_in*2*np.pi/360)*I_shots + np.cos(theta_in*2*np.pi/360)*Q_shots
+
         # Reshaping the data
         H, xedges, yedges = dm_tools.bin_2D_shots(I_shots, Q_shots)
+        self.H = H
+        self.xedges = xedges
+        self.yedges = yedges
         H_flat, x_tiled, y_rep = dm_tools.flatten_2D_histogram(
             H, xedges, yedges)
+
         # Performing the fits
         g2_mod = fit_mods.DoubleGauss2D_model
         params = g2_mod.guess(model=g2_mod, data=H_flat, x=x_tiled, y=y_rep)
@@ -1584,6 +1805,7 @@ class SSRO_discrimination_analysis(MeasurementAnalysis):
         self.fit_res = g2_mod.fit(data=H_flat, x=x_tiled, y=y_rep,
                                   params=params)
 
+
         # Saving the fit results to the datafile
         self.save_fitted_parameters(self.fit_res, 'Double gauss fit')
         if plot_2D_histograms:  # takes ~350ms, speedup quite noticable
@@ -1592,7 +1814,12 @@ class SSRO_discrimination_analysis(MeasurementAnalysis):
                                            axs=axs)
             for ax in axs:
                 ax.set_xlabel('I')  # TODO: add units
+                edge=max(max(abs(xedges)), max(abs(yedges)))
+                ax.set_xlim(-edge, edge)
+                ax.set_ylim(-edge, edge)
+                ax.set_axis_bgcolor(plt.cm.viridis(0))
             axs[0].set_ylabel('Q')
+
             self.save_fig(fig, figname='2D-Histograms', **kw)
 
         #######################################################
@@ -1605,7 +1832,6 @@ class SSRO_discrimination_analysis(MeasurementAnalysis):
         # only look at sigma x because we assume sigma_x = sigma_y
         sig_a = self.fit_res.params['A_sigma_x'].value
         sig_b = self.fit_res.params['B_sigma_x'].value
-
         # Picking threshold in the middle assumes same sigma for both
         # distributions, this can be improved by optimizing the F_discr
         if abs(self.mu_a) > abs(self.mu_b):
@@ -1614,7 +1840,7 @@ class SSRO_discrimination_analysis(MeasurementAnalysis):
         else:
             diff_vec = self.mu_b - self.mu_a
             self.opt_I_threshold = (self.mu_a.real + diff_vec.real/2)
-        self.theta = np.arctan(diff_vec.imag/diff_vec.real)/(2*np.pi)*360
+        self.theta = np.arctan(diff_vec.imag/diff_vec.real)/(2*np.pi)*360-theta_in
         self.mean_sigma = np.mean([sig_a, sig_b])
         # relative separation of the gaussians in units of sigma
         self.relative_separation = abs(diff_vec)/self.mean_sigma
@@ -1781,7 +2007,7 @@ class T1_Analysis(TD_Analysis):
             offset=best_vals['offset'])
 
         ax.plot(t, y, 'r-')
-        textstr = '$T_1$ = %.3g $\pm$ (%.5g) ns ' % (
+        textstr = '$T_1$ = %.3g $\pm$ (%.5g) s ' % (
             fit_res.params['tau'].value, fit_res.params['tau'].stderr)
 
         ax.text(0.4, 0.95, textstr, transform=ax.transAxes,
@@ -2284,7 +2510,7 @@ class OnOff_Analysis(TD_Analysis):
                                             ax=ax,
                                             xlabel=self.xlabel,
                                             ylabel=self.ylabels[i],
-                                            plotlabel='On',
+                                            label='On',
                                             marker='o:',
                                             **kw)
             self.plot_results_vs_sweepparam(x=self.sweep_points[1::2],
@@ -2293,7 +2519,7 @@ class OnOff_Analysis(TD_Analysis):
                                             ax=ax,
                                             xlabel=self.xlabel,
                                             ylabel=self.ylabels[i],
-                                            plotlabel='Off',
+                                            label='Off',
                                             marker='o:',
                                             **kw)
             ax.legend()
@@ -2304,7 +2530,7 @@ class OnOff_Analysis(TD_Analysis):
                                         ax=ax2,
                                         xlabel=self.xlabel,
                                         ylabel=self.ylabels[idx_val],
-                                        plotlabel='Off',
+                                        label='Off',
                                         marker='o:',
                                         **kw)
         self.plot_results_vs_sweepparam(x=self.sweep_points[1::2],
@@ -2313,7 +2539,7 @@ class OnOff_Analysis(TD_Analysis):
                                         ax=ax2,
                                         xlabel=self.xlabel,
                                         ylabel=self.ylabels[idx_val],
-                                        plotlabel='Off',
+                                        label='Off',
                                         marker='o:',
                                         **kw)
         ax2.hlines((zero_mean), 0, len(self.sweep_points),
@@ -2436,46 +2662,169 @@ class AllXY_Analysis(TD_Analysis):
         return self.deviation_total
 
 
-class RBfixed_Analysis(TD_Analysis):
-    def __init__(self, label='RBfixed', **kw):
+class RandomizedBenchmarking_Analysis(TD_Analysis):
+    '''
+    Rotates and normalizes the data before doing a fit with a decaying
+    exponential to extract the Clifford fidelity.
+    By optionally specifying T1 and the pulse separation (time between start
+    of pulses) the T1 limited fidelity will be given and plotted in the
+    same figure.
+    '''
+    def __init__(self, label='RB', T1=None, pulse_delay=None, **kw):
+        self.T1 = T1
+        self.pulse_delay = pulse_delay
         kw['label'] = label
-        kw['h5mode'] = 'r+'  # Read write mode, file must exist
-        super(self.__class__, self).__init__(**kw)
+        super().__init__(**kw)
 
-    def run_default_analysis(self, print_fit_results=False, **kw):
+    def run_default_analysis(self, **kw):
+        close_main_fig = kw.pop('close_main_fig', True)
         close_file = kw.pop('close_file', True)
-        figsize = kw.pop('figsize', (11, 10))
-        self.add_analysis_datagroup_to_file()
-        self.get_naming_and_values()
+        if self.cal_points is None:
+            self.cal_points = [list(range(-4, -2)), list(range(-2, 0))]
 
-        # Data normalization
-        data = self.measured_values[0]
-        data_cal = [np.mean(data[-10:-5]), np.mean(data[-5:])]
-        data = (data - data_cal[0]) / (data_cal[1] - data_cal[0])
+        super().run_default_analysis(close_file=False, make_fig=False,
+                                     **kw)
 
-        self.data_mean = np.mean(data[:-10])
-        self.data_std = np.std(data[:-10])
+        data = self.corr_data[:-1*(len(self.cal_points[0]*2))]
+        n_cl = self.sweep_points[:-1*(len(self.cal_points[0]*2))]
 
-        # Plotting
-        fig1, fig2, ax, axarray = self.setup_figures_and_axes()
+        self.fit_res = self.fit_data(data, n_cl)
+        self.save_fitted_parameters(fit_res=self.fit_res, var_name='F|1>')
+        if self.make_fig:
+            self.make_figures(close_main_fig=close_main_fig, **kw)
 
-        for i in range(len(self.measured_values)):
-            if len(self.value_names) == 4:
-                if i < 2:
-                    ax = axarray[0, i]
-                else:
-                    ax = axarray[1, i-2]
-            else:
-                ax = axarray[i]
-            self.plot_results_vs_sweepparam(x=self.sweep_points,
-                                            y=self.measured_values[i],
-                                            fig=fig2, ax=ax,
-                                            xlabel=self.xlabel,
-                                            ylabel=str(self.value_names[i]),
-                                            save=False)
-        self.save_fig(fig2, xlabel=self.xlabel, ylabel='Power', **kw)
         if close_file:
             self.data_file.close()
+        return
+
+    def calc_T1_limited_fidelity(self, T1, pulse_delay):
+        '''
+        Formula from Asaad et al.
+        pulse separation is time between start of pulses
+        '''
+        Np = 1.875  # Number of gates per Clifford
+        F_cl = (1/6*(3 + 2*np.exp(-1*pulse_delay/(2*T1)) +
+                     np.exp(-pulse_delay/T1)))**Np
+        p = 2*F_cl - 1
+
+        return F_cl, p
+
+    def make_figures(self, close_main_fig, **kw):
+
+            ylabel = r'$F$ $\left(|1 \rangle \right)$'
+            self.fig, self.ax = self.default_ax()
+            if self.plot_cal_points:
+                x = self.sweep_points
+                y = self.corr_data
+            else:
+                logging.warning('not tested for all types of calpoints')
+                if type(self.cal_points[0]) is int:
+                    x = self.sweep_points[:-2]
+                    y = self.corr_data[:-2]
+                else:
+                    x = self.sweep_points[:-1*(len(self.cal_points[0])*2)]
+                    y = self.corr_data[:-1*(len(self.cal_points[0])*2)]
+
+            self.plot_results_vs_sweepparam(x=x,
+                                            y=y,
+                                            fig=self.fig, ax=self.ax,
+                                            xlabel=self.xlabel,
+                                            ylabel=ylabel,
+                                            save=False)
+
+            x_fine = np.linspace(0, self.sweep_points[-1], 1000)
+            best_fit = fit_mods.RandomizedBenchmarkingDecay(
+                x_fine, **self.fit_res.best_values)
+            self.ax.plot(x_fine, best_fit, label='Fit')
+            self.ax.set_ylim(min(min(self.corr_data)-.1, -.1),
+                             max(max(self.corr_data)+.1, 1.1))
+
+            # Add a textbox
+            textstr = ('\t$F_{Cl}$'+' \t= {:.3g} $\pm$ ({:.2g})%'.format(
+                    self.fit_res.params['fidelity_per_Clifford'].value*100,
+                    self.fit_res.params['fidelity_per_Clifford'].stderr*100) +
+                '\n  $1-F_{Cl}$'+'  = {:.3g} $\pm$ ({:.2g})%'.format(
+                    (1-self.fit_res.params['fidelity_per_Clifford'].value)*100,
+                    (self.fit_res.params['fidelity_per_Clifford'].stderr)*100) +
+                '\n\tOffset\t= {:.2g} $\pm$ ({:.2g})'.format(
+                    (self.fit_res.params['offset'].value),
+                    (self.fit_res.params['offset'].stderr)))
+
+            # Here we add the line corresponding to T1 limited fidelity
+            if self.T1 is not None and self.pulse_delay is not None:
+                F_T1, p_T1 = self.calc_T1_limited_fidelity(
+                    self.T1, self.pulse_delay)
+                T1_limited_curve = fit_mods.RandomizedBenchmarkingDecay(
+                    x_fine, -0.5, p_T1, 0.5)
+                self.ax.plot(x_fine, T1_limited_curve, label='T1-limit')
+                textstr += ('\n\t  $F_{Cl}^{T_1}$  = ' +
+                            '{:.6g}%'.format(F_T1*100))
+                self.ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+
+            self.ax.text(0.1, 0.95, textstr, transform=self.ax.transAxes,
+                         fontsize=11, verticalalignment='top',
+                         bbox=self.box_props)
+
+            if not close_main_fig:
+                # Hacked in here, good idea to only show the main fig but can
+                # be optimized somehow
+                self.save_fig(self.fig, ylabel='Amplitude (normalized)',
+                              close_fig=False, **kw)
+            else:
+                self.save_fig(self.fig, ylabel='Amplitude (normalized)', **kw)
+
+    def fit_data(self, data, numCliff,
+                 print_fit_results=False,
+                 show_guess=False,
+                 plot_results=False):
+
+        RBModel = lmfit.Model(fit_mods.RandomizedBenchmarkingDecay)
+        # RBModel = fit_mods.RBModel
+        RBModel.set_param_hint('Amplitude', value=-0.5)
+        RBModel.set_param_hint('p', value=.99)
+        RBModel.set_param_hint('offset', value=.5)
+        RBModel.set_param_hint('fidelity_per_Clifford',  # vary=False,
+                               expr='(p + (1-p)/2)')
+        RBModel.set_param_hint('error_per_Clifford',  # vary=False,
+                               expr='1-fidelity_per_Clifford')
+        RBModel.set_param_hint('fidelity_per_gate',  # vary=False,
+                               expr='fidelity_per_Clifford**(1./1.875)')
+        RBModel.set_param_hint('error_per_gate',  # vary=False,
+                               expr='1-fidelity_per_gate')
+
+        params = RBModel.make_params()
+        fit_res = RBModel.fit(data, numCliff=numCliff,
+                              params=params)
+        if print_fit_results:
+            print(fit_res.fit_report())
+        if plot_results:
+            plt.plot(fit_res.data, 'o-', label='data')
+            plt.plot(fit_res.best_fit, label='best fit')
+            if show_guess:
+                plt.plot(fit_res.init_fit, '--', label='init fit')
+
+        return fit_res
+
+
+class RandomizedBench_2D_flat_Analysis(RandomizedBenchmarking_Analysis):
+    '''
+    Analysis for the specific RB sequenes used in the CBox that require
+    doing a 2D scan in order to get enough seeds in (due to the limit of the
+    max number of pulses).
+    '''
+    def get_naming_and_values(self):
+        '''
+        Extracts the data as if it is 2D then takes the mean and stores it as
+        if it it is just a simple line scan.
+        '''
+        self.get_naming_and_values_2D()
+        self.measured_values = np.array([np.mean(self.Z[0][:], axis=0),
+                                         np.mean(self.Z[1][:], axis=0)])
+
+
+#######################################################
+# End of time domain analyses
+#######################################################
 
 
 class Homodyne_Analysis(MeasurementAnalysis):
@@ -2518,31 +2867,38 @@ class Homodyne_Analysis(MeasurementAnalysis):
 
         if fitting_model == 'hanger':
             HangerModel = fit_mods.SlopedHangerAmplitudeModel
-
-            # amplitude_guess = np.pi*sigma_guess * abs(
-            #     max(self.measured_powers)-min(self.measured_powers))
-            amplitude_guess = max(self.measured_powers)-min(self.measured_powers)
+            # added reject outliers to be robust agains CBox data acq bug.
+            # this should have no effect on regular data acquisition and is
+            # only used in the guess.
+            amplitude_guess = (max(dm_tools.reject_outliers(
+                                   self.measured_powers)) -
+                               min(dm_tools.reject_outliers(
+                                   self.measured_powers)))
             # Creating parameters and estimations
-            S21min = min(self.measured_values[0])/max(self.measured_values[0])
+            S21min = (min(dm_tools.reject_outliers(self.measured_values[0])) /
+                      max(dm_tools.reject_outliers(self.measured_values[0])))
 
-            Q = f0 / abs(self.min_frequency - self.max_frequency)
+            Q = kw.pop('Q', f0 / abs(self.min_frequency - self.max_frequency))
             Qe = abs(Q / abs(1 - S21min))
 
-            HangerModel.set_param_hint('f0', value=f0,
-                                       min=min(self.sweep_points),
-                                       max=max(self.sweep_points))
+            HangerModel.set_param_hint('f0', value=f0*1e-9,
+                                       min=min(self.sweep_points*1e-9),
+                                       max=max(self.sweep_points*1e-9))
             HangerModel.set_param_hint('A', value=amplitude_guess)
             HangerModel.set_param_hint('Q', value=Q)
             HangerModel.set_param_hint('Qe', value=Qe)
-            HangerModel.set_param_hint('Qi', expr='1./(1./Q-1./Qe*cos(theta))',
-                                       vary=False)
-            HangerModel.set_param_hint('Qc', expr='Qe/cos(theta)', vary=False)
+            # NB! Expressions are broken in lmfit for python 3.5 this has
+            # been fixed in the lmfit repository but is not yet released
+            # the newest upgrade to lmfit should fix this (MAR 18-2-2016)
+            # HangerModel.set_param_hint('Qi', expr='1./(1./Q-1./Qe*cos(theta))',
+            #                            vary=False)
+            # HangerModel.set_param_hint('Qc', expr='Qe/cos(theta)', vary=False)
             HangerModel.set_param_hint('theta', value=0, min=-np.pi/2,
                                        max=np.pi/2)
             HangerModel.set_param_hint('slope', value=0, vary=True)
             self.params = HangerModel.make_params()
             fit_res = HangerModel.fit(data=self.measured_powers,
-                                      f=self.sweep_points * 1.e9)
+                                      f=self.sweep_points, verbose=False)
 
         elif fitting_model == 'lorentzian':
             LorentzianModel = fit_mods.LorentzianModel
@@ -2573,6 +2929,9 @@ class Homodyne_Analysis(MeasurementAnalysis):
             fit_res = LorentzianModel.fit(data=self.measured_powers,
                                           f=self.sweep_points*1.e9,
                                           params=self.params)
+        else:
+            raise ValueError('fitting model "{}" not recognized'.format(
+                             fitting_model))
 
         self.fit_results = fit_res
         self.save_fitted_parameters(fit_res, var_name='HM')
@@ -2595,7 +2954,7 @@ class Homodyne_Analysis(MeasurementAnalysis):
             ax.plot(self.sweep_points, fit_res.init_fit, 'k--')
         ax.plot(self.sweep_points, fit_res.best_fit, 'r-')
         f0 = self.fit_results.values['f0']
-        plt.plot(f0, fit_res.eval(f=f0*1e9), 'o', ms=8)
+        plt.plot(f0*1e9, fit_res.eval(f=f0*1e9), 'o', ms=8)
         if show:
             plt.show()
         self.save_fig(fig, xlabel=self.xlabel, ylabel='Power', **kw)
@@ -3667,55 +4026,82 @@ class butterfly_analysis(MeasurementAnalysis):
     '''
     Extracts the coefficients for the post-measurement butterfly
     '''
-    def __init__(self,  auto=True, label_exc='ind_exc', close_file=True,
-                 digitize=True, label_rel='ind_rel', timestamp_exc=None,
-                 timestamp_rel=None, threshold_postselection=None,
-                 postselection=False, **kw):
+    def __init__(self,  auto=True, label='Butterfly', close_file=True,
+                 timestamp=None,
+                 threshold=None,
+                 theta_in=0,
+                 initialize=False,
+                digitize=True,
+                 **kw):
+        self.folder = a_tools.get_folder(timestamp=timestamp,
+                                             label=label, **kw)
+        self.load_hdf5data(folder=self.folder, **kw)
 
-        self.folder_exc = a_tools.get_folder(timestamp=timestamp_exc,
-                                             label='ind_exc', **kw)
-        self.load_hdf5data(folder=self.folder_exc, **kw)
-        self.get_naming_and_values_2D()
-        self.data_exc = self.Z
-        if close_file:
-            self.data_file.close()
-        self.folder_rel = a_tools.get_folder(timestamp=timestamp_rel,
-                                             label='ind_rel', **kw)
+        self.get_naming_and_values()
+        I_shots = self.measured_values[0]
+        Q_shots = self.measured_values[1]
 
-        self.load_hdf5data(folder=self.folder_rel, **kw)
-        self.get_naming_and_values_2D()
-        self.data_rel = self.Z
-        print(np.shape(self.data_rel))
-        if postselection:
-            if threshold_postselection is None:
-                instrument_settings = self.data_file['Instrument settings']
-                threshold_postselection = float(instrument_settings['CBox'].attrs['signal_threshold_line0'])
-            else:
-                pass
-            print("threshold postselection", threshold_postselection)
-            length0=len(self.data_rel[:,0])
+        #rotating according to theta
+        I_shots = np.cos(theta_in*2*np.pi/360)*I_shots - np.sin(theta_in*2*np.pi/360)*Q_shots
+        Q_shots = np.sin(theta_in*2*np.pi/360)*I_shots + np.cos(theta_in*2*np.pi/360)*Q_shots
+        self.data=I_shots
 
-            self.data_rel = dm_tools.postselect(data=self.data_rel,
-                                                threshold=threshold_postselection)
-            self.data_rel = self.data_rel[:,1:]
-            length1=len(self.data_rel[:,0])
+        # SSRO_discrimination_analysis(
 
-            print("rel postselecting faction", length1/np.float(length0))
-            length0=len(self.data_exc[:,0])
-            self.data_exc = dm_tools.postselect(data=self.data_exc,
-                                            threshold=threshold_postselection)
-            self.data_exc = self.data_exc[:,1:]
-            length1=len(self.data_exc[:,0])
-            print("exc postselecting fraction", length1/np.float(length0))
+
+        # if close_file:
+        #     self.data_file.close()
+        # if initialize:
+        #     #reshuffeling the data to endup with two arrays for the diffeent input states
+        #     m0_on = self.data[3::6]
+        #     m1_on = self.data[4::6]
+        #     m2_on = self.data[5::6]
+        #     self.data_rel = m0_on+m1_on+m2_on
+        #     self.data_rel[::3] = m0_on
+        #     self.data_rel[1::3] = m1_on
+        #     self.data_rel[2::3] = m2_on
+        #     m0_off = self.data[0::6]
+        #     m1_off = self.data[1::6]
+        #     m2_off = self.data[2::6]
+        #     self.data_exc = m0_off+m1_off+m2_off
+        #     self.data_exc[::3] = m0_off
+        #     self.data_exc[1::3] = m1_off
+        #     self.data_exc[2::3] = m2_off
+        #     SSRO_discrimination_analysis(
+
+
+        #     length0 = len(self.data_rel[:,0])
+
+        #     self.data_rel = dm_tools.postselect(data=self.data_rel,
+        #                                         threshold=threshold)
+        #     self.data_rel = self.data_rel[:,1:]
+        #     length1 = len(self.data_rel[:,0])
+
+        #     print("rel postselecting faction", length1/np.float(length0))
+        #     length0 = len(self.data_exc[:,0])
+        #     self.data_exc = dm_tools.postselect(data=self.data_exc,
+        #                                     threshold=threshold)
+        #     self.data_exc = self.data_exc[:,1:]
+        #     length1 = len(self.data_exc[:,0])
+        #     print("exc postselecting fraction", length1/np.float(length0))
+
+        m0_on = self.data[2::4]
+        m1_on = self.data[3::4]
+        self.data_rel = np.zeros([np.size(m0_on),2])
+        self.data_rel[:,0] = m0_on
+        self.data_rel[:,1] = m1_on
+        m0_off = self.data[0::4]
+        m1_off = self.data[1::4]
+        self.data_exc = np.zeros([np.size(m0_off),2])
+        self.data_exc[:,0] = m0_off
+        self.data_exc[:,1] = m1_off
         if digitize:
-            instrument_settings = self.data_file['Instrument settings']
-            threshold = float(
-                instrument_settings['CBox'].attrs['signal_threshold_line0'])
-
             self.data_exc = dm_tools.digitize(threshold=threshold,
-                                              data=self.data_exc)
+                                              data=self.data_exc,
+                                              positive_case=False)
             self.data_rel = dm_tools.digitize(threshold=threshold,
-                                              data=self.data_rel)
+                                              data=self.data_rel,
+                                              positive_case=False)
         if close_file:
             self.data_file.close()
         if auto is True:
@@ -3724,6 +4110,7 @@ class butterfly_analysis(MeasurementAnalysis):
     def run_default_analysis(self, **kw):
         exc_coeffs = dm_tools.butterfly_data_binning(Z=self.data_exc,
                                                      initial_state=0)
+        #print(exc_coeffs)
         rel_coeffs = dm_tools.butterfly_data_binning(Z=self.data_rel,
                                                      initial_state=1)
         self.butterfly_coeffs = dm_tools.butterfly_matrix_inversion(exc_coeffs,
@@ -4011,74 +4398,7 @@ class Tomo_Analysis(MeasurementAnalysis):
 
 
 
-class RandomizedBenchmarking_Analysis():
-    def __init__(self, label='RB', **kw):
-        # kw['label'] = label
-        # kw['h5mode'] = 'r+'  # Read write mode, file must exist
-        # super(self.__class__, self).__init__(**kw)
-        pass
-    def fit_data(self, data, numCliffords_lst, cal_points=10,
-                 print_fit_results=False, show_guess=False,
-                 plot_results=False):
-        RBModel = fit_mods.RBModel
-        RBModel.set_param_hint('Amplitude', value=-0.5)
-        RBModel.set_param_hint('p', value=.99)
-        RBModel.set_param_hint('offset', value=.5)
-        RBModel.set_param_hint('fidelity_per_Clifford', vary=False,
-                               expr='(p + (1-p)/2)')
-        RBModel.set_param_hint('error_per_Clifford', vary=False,
-                               expr='1-fidelity_per_Clifford')
-        RBModel.set_param_hint('fidelity_per_gate', vary=False,
-                               expr='fidelity_per_Clifford**(1./1.875)')
-        RBModel.set_param_hint('error_per_gate', vary=False,
-                               expr='1-fidelity_per_gate')
 
-        params = RBModel.make_params()
-        fit_res = RBModel.fit(data[:-cal_points], numCliff=numCliffords_lst,
-                              params=params)
-        if print_fit_results:
-            print(fit_res.fit_report())
-        if plot_results:
-            plt.plot(fit_res.data, 'o-', label='data')
-            plt.plot(fit_res.best_fit, label='best fit')
-            if show_guess:
-                plt.plot(fit_res.init_fit, '--', label='init fit')
-
-        return fit_res
-    # def run_default_analysis(self, print_fit_results=False, **kw):
-    #     close_file = kw.pop('close_file', True)
-    #     figsize = kw.pop('figsize', (11, 10))
-    #     self.add_analysis_datagroup_to_file()
-    #     self.get_naming_and_values()
-
-    #     # Data normalization
-    #     data = self.measured_values[0]
-    #     data_cal = [np.mean(data[-10:-5]), np.mean(data[-5:])]
-    #     data = (data - data_cal[0]) / (data_cal[1] - data_cal[0])
-
-    #     self.data_mean = np.mean(data[:-10])
-    #     self.data_std = np.std(data[:-10])
-
-    #     # Plotting
-    #     fig1, fig2, ax, axarray = self.setup_figures_and_axes()
-
-    #     for i in range(len(self.measured_values)):
-    #         if len(self.value_names) == 4:
-    #             if i < 2:
-    #                 ax = axarray[0, i]
-    #             else:
-    #                 ax = axarray[1, i-2]
-    #         else:
-    #             ax = axarray[i]
-    #         self.plot_results_vs_sweepparam(x=self.sweep_points,
-    #                                         y=self.measured_values[i],
-    #                                         fig=fig2, ax=ax,
-    #                                         xlabel=self.xlabel,
-    #                                         ylabel=str(self.value_names[i]),
-    #                                         save=False)
-    #     self.save_fig(fig2, xlabel=self.xlabel, ylabel='Power', **kw)
-    #     if close_file:
-    #         self.data_file.close()
 
 def fit_qubit_frequency(sweep_points, data, mode='dac',
                         vary_E_c=True, vary_f_max=True,

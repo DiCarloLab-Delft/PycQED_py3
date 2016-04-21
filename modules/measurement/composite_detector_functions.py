@@ -308,11 +308,10 @@ class TimeDomainDetector_integrated(det.Soft_Detector):
 class SSRO_Fidelity_Detector_CBox(det.Soft_Detector):
     '''
     Currently only for CBox.
-    Todo: remove the predefined values for the sequence
     '''
     def __init__(self, measurement_name, MC, AWG, CBox,
                  RO_pulse_length, RO_pulse_delay, RO_trigger_delay,
-                 raw=True, **kw):
+                 raw=True, analyze=True, **kw):
         self.detector_control = 'soft'
         self.name = 'SSRO_Fidelity'
         # For an explanation of the difference between the different
@@ -329,7 +328,7 @@ class SSRO_Fidelity_Detector_CBox(det.Soft_Detector):
         self.CBox = CBox
         self.AWG = AWG
 
-        self.IF = kw.pop('IF', -20e6)
+        #self.IF = kw.pop('IF', -20e6)
         self.RO_trigger_delay = RO_trigger_delay
         self.RO_pulse_delay = RO_pulse_delay
         self.RO_pulse_length = RO_pulse_length
@@ -337,6 +336,9 @@ class SSRO_Fidelity_Detector_CBox(det.Soft_Detector):
         self.i = 0
 
         self.raw = raw  # Performs no fits if True
+        self.analyze = analyze
+
+        self.upload=True
 
     def prepare(self, **kw):
         self.CBox.set('log_length', self.NoSamples)
@@ -354,14 +356,65 @@ class SSRO_Fidelity_Detector_CBox(det.Soft_Detector):
     def acquire_data_point(self, *args, **kw):
         self.i += 1
         self.MC.run(name=self.measurement_name+'_'+str(self.i))
+        if self.analyze:
+            ana = ma.SSRO_Analysis(label=self.measurement_name,
+                                   no_fits=self.raw, close_file=True)
+            # Arbitrary choice, does not think about the deffinition
+            if self.raw:
+                return ana.F_raw
+            else:
+                return ana.F, ana.F_corrected
 
-        ana = ma.SSRO_Analysis(label=self.measurement_name,
-                               no_fits=self.raw, close_file=True)
-        # Arbitrary choice, does not think about the deffinition
-        if self.raw:
-            return ana.F_raw
+
+class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
+    '''
+    For Qcodes. Readout with CBox, pulse generation with 5014
+    '''
+    def __init__(self, measurement_name,  MC, AWG, CBox, pulse_pars, RO_pars,
+                 raw=True, analyze=True, **kw):
+        self.detector_control = 'soft'
+        self.name = 'SSRO_Fidelity'
+        # For an explanation of the difference between the different
+        # Fidelities look in the analysis script
+        if raw:
+            self.value_names = ['F-raw']
+            self.value_units = [' ']
         else:
-            return ana.F, ana.F_corrected
+            self.value_names = ['F', 'F corrected']
+            self.value_units = [' ', ' ']
+        self.measurement_name = measurement_name
+        self.MC = MC
+        self.CBox = CBox
+        self.AWG = AWG
+        self.pulse_pars = pulse_pars
+        self.RO_pars = RO_pars
+
+        #self.IF = kw.pop('IF', -20e6)
+        self.i = 0
+
+        self.raw = raw  # Performs no fits if True
+        self.analyze = analyze
+
+        self.upload=True
+
+    def prepare(self, **kw):
+        self.MC.set_sweep_function(awg_swf.OffOn(pulse_pars=self.pulse_pars,
+                                                 RO_pars=self.RO_pars))
+
+        self.MC.set_detector_function(
+            det.CBox_integration_logging_det(self.CBox, self.AWG))
+
+    def acquire_data_point(self, *args, **kw):
+        self.i += 1
+        self.MC.run(name=self.measurement_name+'_'+str(self.i))
+        if self.analyze:
+            ana = ma.SSRO_Analysis(label=self.measurement_name,
+                                   no_fits=self.raw, close_file=True)
+            # Arbitrary choice, does not think about the deffinition
+            if self.raw:
+                return ana.F_raw
+            else:
+                return ana.F, ana.F_corrected
 
 
 class CBox_trace_error_fraction_detector(det.Soft_Detector):
@@ -411,6 +464,7 @@ class CBox_trace_error_fraction_detector(det.Soft_Detector):
         self.CBox.sig0_threshold_line.set(int(a.V_opt_raw))
         self.sequence_swf.upload = True
         # make sure the sequence gets uploaded
+        return int(self.threshold)
 
     def calibrate_threshold_self_consistent(self):
         self.CBox.lin_trans_coeffs.set([1, 0, 0, 1])
@@ -434,7 +488,8 @@ class CBox_trace_error_fraction_detector(det.Soft_Detector):
         theta = discr_vals[2]
         self.threshold = int(discr_vals[3])
 
-        self.CBox.sig0_threshold_line.set(self.threshold)
+        self.CBox.sig0_threshold_line.set(int(self.threshold))
+        return int(self.threshold)
 
     def prepare(self, **kw):
         self.i = 0
@@ -448,7 +503,7 @@ class CBox_trace_error_fraction_detector(det.Soft_Detector):
                     'calibrate_threshold "{}"'.format(self.calibrate_threshold)
                     + 'not recognized')
         else:
-            self.CBox.sig0_threshold_line.set(self.threshold)
+            self.CBox.sig0_threshold_line.set(int(self.threshold))
         self.MC.set_sweep_function(self.sequence_swf)
 
         # if self.counters:
@@ -502,6 +557,7 @@ class CBox_SSRO_discrimination_detector(det.Soft_Detector):
                  calibrate_threshold=False,
                  save_raw_trace=False,
                  counters=True,
+                 analyze=True,
                  **kw):
         super().__init__(**kw)
 
@@ -525,6 +581,9 @@ class CBox_SSRO_discrimination_detector(det.Soft_Detector):
         # Required to set some kind of sequence that does a pulse
         self.sequence_swf = sequence_swf
 
+        # If analyze is False it cannot be used as a detector anymore
+        self.analyze = analyze
+
     def prepare(self, **kw):
         self.i = 0
         self.MC.set_sweep_function(self.sequence_swf)
@@ -539,12 +598,94 @@ class CBox_SSRO_discrimination_detector(det.Soft_Detector):
         self.i += 1
 
         self.MC.run(self.name+'_{}'.format(self.i))
-        a = ma.SSRO_discrimination_analysis(
-            label=self.name+'_{}'.format(self.i),
-            current_threshold=self.threshold)
-        return (a.F_discr_curr_t*100, a.F_discr*100,
-                a.theta, a.opt_I_threshold,
-                a.relative_separation, a.relative_separation_I)
+        if self.analyze:
+            a = ma.SSRO_discrimination_analysis(
+                label=self.name+'_{}'.format(self.i),
+                current_threshold=self.threshold)
+            return (a.F_discr_curr_t*100, a.F_discr*100,
+                    a.theta, a.opt_I_threshold,
+                    a.relative_separation, a.relative_separation_I)
+
+
+class CBox_RB_detector(det.Soft_Detector):
+    def __init__(self, measurement_name, MC, AWG, CBox, LutMan,
+                 nr_cliffords, desired_nr_seeds,
+                 IF,
+                 RO_pulse_length, RO_pulse_delay, RO_trigger_delay,
+                 pulse_delay,
+                 T1=None, **kw):
+        super().__init__(**kw)
+        self.name = measurement_name
+        self.nr_cliffords = nr_cliffords
+        self.desired_nr_seeds = desired_nr_seeds
+        self.AWG = AWG
+        self.MC = MC
+        self.CBox = CBox
+        self.LutMan = LutMan
+        self.IF = IF
+        self.RO_pulse_length = RO_pulse_length
+        self.RO_pulse_delay = RO_pulse_delay
+        self.RO_trigger_delay = RO_trigger_delay
+        self.pulse_delay = pulse_delay
+        self.T1 = T1
+        self.value_names = ['F_cl']
+        self.value_units = ['']
+
+    def calculate_seq_duration_and_max_nr_seeds(self, nr_cliffords,
+                                                pulse_delay):
+        max_nr_cliffords = max(nr_cliffords)
+        # For few cliffords the number of gates is not the average number of
+        # gates so pick the max, rounded to ns
+        max_seq_duration = np.round(max(max_nr_cliffords*pulse_delay *
+                                        (1.875+.5), 10e-6), 9)
+        max_idling_waveforms_per_seed = max_seq_duration/(1200e-9)
+        max_nr_waveforms = 29184  # hard limit from the CBox
+        max_nr_seeds = int(max_nr_waveforms/((max_idling_waveforms_per_seed +
+                           np.mean(nr_cliffords)*1.875)*(len(nr_cliffords)+4)))
+        return max_seq_duration, max_nr_seeds
+
+    def prepare(self, **kw):
+        max_seq_duration, max_nr_seeds = \
+            self.calculate_seq_duration_and_max_nr_seeds(self.nr_cliffords,
+                                                         self.pulse_delay)
+        nr_repetitions = int(np.ceil(self.desired_nr_seeds/max_nr_seeds))
+        self.total_nr_seeds = nr_repetitions*max_nr_seeds
+
+        averages_per_tape = self.desired_nr_seeds//nr_repetitions
+        self.CBox.nr_averages.set(int(2**np.ceil(np.log2(averages_per_tape))))
+
+        rb_swf = awg_swf.CBox_RB_sweep(nr_cliffords=self.nr_cliffords,
+                                       nr_seeds=max_nr_seeds,
+                                       max_seq_duration=max_seq_duration,
+                                       safety_margin=0,
+                                       IF=self.IF,
+                                       RO_pulse_length=self.RO_pulse_length,
+                                       RO_pulse_delay=self.RO_pulse_delay,
+                                       RO_trigger_delay=self.RO_trigger_delay,
+                                       pulse_delay=self.pulse_delay,
+                                       AWG=self.AWG,
+                                       CBox=self.CBox,
+                                       LutMan=self.LutMan)
+
+        self.i = 0
+        self.MC.set_sweep_function(rb_swf)
+        self.MC.set_sweep_function_2D(awg_swf.Two_d_CBox_RB_seq(rb_swf))
+        self.MC.set_sweep_points_2D(np.arange(nr_repetitions))
+        self.MC.set_detector_function(det.CBox_integrated_average_detector(
+                                      self.CBox, self.AWG))
+
+    def acquire_data_point(self, **kw):
+            self.i += 1
+            self.MC.run(self.name+'_{}_{}seeds'.format(
+                        self.i, self.total_nr_seeds), mode='2D')
+            a = ma.RandomizedBench_2D_flat_Analysis(
+                auto=True, close_main_fig=True, T1=self.T1,
+                pulse_delay=self.pulse_delay)
+            F_cl = a.fit_res.params['fidelity_per_Clifford'].value
+            return F_cl
+
+
+
 
 
 # class SSRO_Fidelity_Detector_CBox_optimum_weights(SSRO_Fidelity_Detector_CBox):
@@ -599,7 +740,7 @@ class AllXY_devition_detector_CBox(det.Soft_Detector):
     '''
     def __init__(self, measurement_name, MC, AWG, CBox,
                  IF, RO_trigger_delay, RO_pulse_delay, RO_pulse_length,
-                 pulse_separation,
+                 pulse_delay,
                  LutMan=None,
                  reload_pulses=False, **kw):
         '''
@@ -621,7 +762,7 @@ class AllXY_devition_detector_CBox(det.Soft_Detector):
         self.IF = IF
         self.RO_trigger_delay = RO_trigger_delay
         self.RO_pulse_delay = RO_pulse_delay
-        self.pulse_separation = pulse_separation
+        self.pulse_delay = pulse_delay
         self.RO_pulse_length = RO_pulse_length
 
         self.LutMan = LutMan
@@ -631,7 +772,7 @@ class AllXY_devition_detector_CBox(det.Soft_Detector):
         self.i = 0
         self.MC.set_sweep_function(awg_swf.CBox_AllXY(
                                    IF=self.IF,
-                                   pulse_separation=self.pulse_separation,
+                                   pulse_delay=self.pulse_delay,
                                    RO_pulse_delay=self.RO_pulse_delay,
                                    RO_trigger_delay=self.RO_trigger_delay,
                                    RO_pulse_length=self.RO_pulse_length,

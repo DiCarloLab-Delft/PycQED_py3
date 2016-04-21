@@ -23,7 +23,8 @@ class Element:
         self.granularity = kw.pop('granularity', 4)
         self.min_samples = kw.pop('min_samples', 960)
         self.pulsar = kw.pop('pulsar', None)
-        self.ignore_offset_correction = kw.pop('ignore_offset_correction', False)
+        self.ignore_offset_correction = kw.pop('ignore_offset_correction',
+                                               False)
 
         self.global_time = kw.pop('global_time', False)
         self.time_offset = kw.pop('time_offset', 0)
@@ -123,10 +124,11 @@ class Element:
         '''
         checks if "value" is divisible by the clock period.
         This funciton is needed because of floating point errors
+
+        It performs this by multiplying everything by 1e11 (looking at 0.01ns
+        resolution for divisibility)
         '''
-        if value % (1/self.clock) < 1e-20:
-            return True
-        elif (1/self.clock) - value % (1/self.clock) < 1e-20:
+        if np.round(value*1e11) % (1/self.clock*1e11) == 0:
             return True
         else:
             return False
@@ -140,6 +142,7 @@ class Element:
             Time correction is rounded to a full clock cycle.
             '''
             phase_diff = (360 * fixed_point_freq * t0) % (360)
+            fixed_point_freq = abs(fixed_point_freq)
             phase_corr = 360 - phase_diff  # Correction in degrees
             time_corr_0 = phase_corr/(360*fixed_point_freq)
             time_corr = time_corr_0
@@ -156,6 +159,13 @@ class Element:
                     print('1/fixed_point_freq: %s' % (1/fixed_point_freq))
                     raise Exception('Could not find time corr for fixed point')
                 time_corr += 1/fixed_point_freq
+            time_corr = round(time_corr, 9)  # Rounds to ns
+            if time_corr < 0:
+                raise ValueError(
+                    'Time correction "{}" cannot be negative'.format(time_corr))
+                # Cannot be negative because it will give unexpected behaviour
+                # This should not be possible to happen but I ran into this
+                # a few time so I leave the exception here
             return time_corr
 
     def shift_all_pulses(self, dt):
@@ -212,7 +222,8 @@ class Element:
                                             pulse used
         refpoint_new ('start'|'end'|'center'): reference point in added
                                                pulse used
-        fixed_point_freq (float)    : if not None
+        fixed_point_freq (float): if not None shifts all pulses so that
+                                  this pulse is at a multiple of 1/fixed_point_freq
 
         '''
         pulse = deepcopy(pulse)
@@ -220,6 +231,11 @@ class Element:
             name = self._auto_pulse_name(pulse.name)
 
         t0 = start - pulse.start_offset
+        if refpoint not in ['start', 'center', 'end']:
+            raise ValueError('refpoint not recognized')
+
+        if refpoint_new not in ['start', 'center', 'end']:
+            raise ValueError('refpoint not recognized')
 
         if refpulse is not None:
             if refpoint is None:
@@ -256,7 +272,6 @@ class Element:
         if fixed_point_freq is not None:
             time_corr = self.calculate_time_corr(t0, fixed_point_freq)
             self.shift_all_pulses(time_corr)
-
         return name
 
     def append(self, *pulses):
@@ -321,13 +336,11 @@ class Element:
 
     # computing the numerical waveform
     def ideal_waveforms(self):
-        # tvals = np.arange(self.samples())/self.clock
         wfs = {}
         tvals = np.arange(self.samples())/self.clock
 
         for c in self._channels:
-            wfs[c] = np.zeros(self.samples()) + self._channels[c]['offset']
-
+            wfs[c] = np.zeros(self.samples()+1) + self._channels[c]['offset']
         # we first compute the ideal function values
         for p in self.pulses:
             psamples = self.pulse_samples(p)
@@ -348,12 +361,14 @@ class Element:
                     chan_tvals[c] = c_tvals
 
                 pulsewfs = self.pulses[p].get_wfs(chan_tvals)
-
             for c in self.pulses[p].channels:
                 idx0 = self.pulse_start_sample(p, c)
                 idx1 = self.pulse_end_sample(p, c) + 1
                 wfs[c][idx0:idx1] += pulsewfs[c]
-
+                if idx1 == len(wfs[c]):
+                    # If this happens the seq will laod fine but will have
+                    # funny behaviour because it does not end in zero
+                    raise ValueError(self.pulses[p].name, idx1, len(wfs[c]))
         return tvals, wfs
 
     def waveforms(self):

@@ -294,21 +294,11 @@ def bin_2D_shots(I_shots, Q_shots, normed=True):
     H[xbins, ybins] and plotting generally uses H[yrows, xcols] meaning you
     want to Transpose the data using H.T
     '''
-    n_bins_range = 60  # the bins we want to have around our data
-    V_range_I = np.max(I_shots)-np.min(I_shots)             # data voltagerange
-    V_range_Q = np.max(Q_shots)-np.min(Q_shots)
-
-    V_max = np.max([V_range_I, V_range_Q])*1.1
-
-    # determining the amount of bins
-    n_bins_range = 60  # the bins we want to have around our data
-    V_range = np.max([V_range_I, V_range_Q, V_range_I, V_range_Q])
-    n_bins = n_bins_range*2*V_max/V_range
-
+    n_bins = 60  # the bins we want to have around our data
     H, xedges, yedges = np.histogram2d(I_shots, Q_shots,
                                        bins=n_bins,
-                                       range=[[-V_max, V_max],
-                                              [-V_max, V_max]],
+                                       range=[[min(I_shots), max(I_shots)],
+                                              [min(Q_shots), max(Q_shots)]],
                                        normed=normed)
     return H, xedges, yedges
 
@@ -342,3 +332,14 @@ def flatten_2D_histogram(H, xedges, yedges):
     y_rep_flat = np.repeat(y, nr_rows)
 
     return H_flat, x_tiled_flat, y_rep_flat
+
+
+def reject_outliers(data, m=6.):
+    '''
+    Reject outliers function from stack overflow
+    http://stackoverflow.com/questions/11686720/is-there-a-numpy-builtin-to-reject-outliers-from-a-list
+    '''
+    d = np.abs(data - np.median(data))
+    mdev = np.median(d)
+    s = d/mdev if mdev else 0.
+    return data[s < m]
