@@ -350,11 +350,11 @@ def plot_fitres2D_heatmap(fit_res, x, y, axs=None, cmap='viridis'):
     model) but I put it here as it is closely related to all the stuff we do
     with lmfit. If anyone has a better location in mind, let me know (MAR).
     '''
+    #fixing the data rotation with [::-1]
     nr_cols = len(np.unique(x))
-    data_2D = fit_res.data.reshape(-1, nr_cols, order='C')
-    fit_2D = fit_res.best_fit.reshape(-1, nr_cols, order='C')
-    guess_2D = fit_res.init_fit.reshape(-1, nr_cols, order='C')
-
+    data_2D = fit_res.data.reshape(-1, nr_cols, order='C')[::-1]
+    fit_2D = fit_res.best_fit.reshape(-1, nr_cols, order='C')[::-1]
+    guess_2D = fit_res.init_fit.reshape(-1, nr_cols, order='C')[::-1]
     if axs is None:
         f, axs = plt.subplots(1, 3, figsize=(14, 6))
     axs[0].imshow(data_2D, extent=[x[0], x[-1], y[0], y[-1]],

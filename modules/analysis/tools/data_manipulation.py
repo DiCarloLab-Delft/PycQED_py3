@@ -278,21 +278,6 @@ def count_error_fractions(trace):
     return no_err_counter, single_err_counter, double_err_counter, zero_counter, one_counter
 
 
-def bin_2D_shots(I_shots, Q_shots, normed=True):
-    '''
-    Creates a 2D histogram of I and Q shotsdata.
-
-    Watch out that when you plot the histogram uses the convention
-    H[xbins, ybins] and plotting generally uses H[yrows, xcols] meaning you
-    want to Transpose the data using H.T
-    '''
-    n_bins = 120  # the bins we want to have around our data
-    H, xedges, yedges = np.histogram2d(I_shots, Q_shots,
-                                       bins=n_bins,
-                                       range=[[min(I_shots), max(I_shots)],
-                                              [min(Q_shots), max(Q_shots)]],
-                                       normed=normed)
-    return H, xedges, yedges
 
 
 def flatten_2D_histogram(H, xedges, yedges):

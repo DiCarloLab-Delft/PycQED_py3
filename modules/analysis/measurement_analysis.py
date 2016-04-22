@@ -1242,7 +1242,7 @@ class SSRO_Analysis(MeasurementAnalysis):
             shots_Q_data_0 = self.get_values(key='single_shot_Q')[:, 0]
             shots_Q_data_1 = self.get_values(key='single_shot_Q')[:, 1]
 
-        # cutting off half data points
+        # cutting off half data points (odd number of data points)
         min_len = np.min([np.size(shots_I_data_0), np.size(shots_I_data_1),
                           np.size(shots_Q_data_0), np.size(shots_Q_data_1)])
         shots_I_data_0 = shots_I_data_0[0:min_len]
@@ -1269,36 +1269,29 @@ class SSRO_Analysis(MeasurementAnalysis):
                               **kw)
         self.finish(**kw)
 
-    def optimize_IQ_angle(self, shots_I_data_1, shots_Q_data_1, shots_I_data_0,
-                          shots_Q_data_0, min_len, plot_2D_histograms=True,
+    def optimize_IQ_angle(self, shots_I_1, shots_Q_1, shots_I_0,
+                          shots_Q_0, min_len, plot_2D_histograms=True,
                           **kw):
         cmap = kw.pop('cmap', 'viridis')
         #plotting 2D histograms of mmts with pulse
-        # FIXME OVERLAP AND GENERAL LOOKS
-        V_max_I0 = np.max(abs(shots_I_data_0))
-        V_max_I1 = np.max(abs(shots_I_data_1))
-        V_max_Q0 = np.max(abs(shots_Q_data_0))
-        V_max_Q1 = np.max(abs(shots_Q_data_1))
-        V_max = np.max([V_max_I0, V_max_I1, V_max_Q0, V_max_Q1])*1.1
 
-        # determining the amount of bins
-        n_bins_range = 60  # the bins we want to have around our data
-        V_range_I_0 = np.max(shots_I_data_0)-np.min(shots_I_data_0)
-        # data voltagerange
-        V_range_Q_0 = np.max(shots_Q_data_0)-np.min(shots_Q_data_0)
-        V_range_I_1 = np.max(shots_I_data_1)-np.min(shots_I_data_1)
-        # data voltagerange
-        V_range_Q_1 = np.max(shots_Q_data_1)-np.min(shots_Q_data_1)
-        V_range = np.max([V_range_I_0, V_range_Q_0, V_range_I_1, V_range_Q_1])
-        n_bins = n_bins_range*2*V_max/V_range
-        H1, xedges1, yedges1 = np.histogram2d(shots_I_data_1, shots_Q_data_1,
-                                              bins=n_bins,
-                                              range=[[-V_max, V_max],
-                                                     [-V_max, V_max]])
-        H0, xedges0, yedges0 = np.histogram2d(shots_I_data_0, shots_Q_data_0,
-                                              bins=n_bins,
-                                              range=[[-V_max, V_max],
-                                                     [-V_max, V_max]])
+
+        n_bins = 120  # the bins we want to have around our data
+        I_min = min(min(shots_I_0), min(shots_I_1))
+        I_max = max(max(shots_I_0), max(shots_I_1))
+        Q_min = min(min(shots_Q_0), min(shots_Q_1))
+        Q_max = max(max(shots_Q_0), max(shots_Q_1))
+        edge = max(abs(I_min), abs(I_max), abs(Q_min), abs(Q_max))
+        H0, xedges0, yedges0 = np.histogram2d(shots_I_0, shots_Q_0,
+                                       bins=n_bins,
+                                       range=[[I_min, I_max],
+                                              [Q_min, Q_max]],
+                                       normed=True)
+        H1, xedges1, yedges1 = np.histogram2d(shots_I_1, shots_Q_1,
+                                       bins=n_bins,
+                                       range=[[I_min, I_max,],
+                                              [Q_min, Q_max,]],
+                                       normed=True)
 
         if plot_2D_histograms:
             fig, axarray = plt.subplots(nrows=1, ncols=2)
@@ -1310,19 +1303,24 @@ class SSRO_Analysis(MeasurementAnalysis):
             plt.subplots_adjust(hspace=20)
 
             axarray[0].set_title('2D histogram, pi pulse')
-            im1 = axarray[0].imshow(H1, interpolation='nearest', origin='low',
+            im1 = axarray[0].imshow(np.transpose(H1), interpolation='nearest', origin='low',
                                     extent=[xedges1[0], xedges1[-1],
-                                    yedges1[0], yedges1[-1]], cmap=cmap)
+                                            yedges1[0], yedges1[-1]], cmap=cmap)
             axarray[0].set_xlabel('Int. I (V)')
             axarray[0].set_ylabel('Int. Q (V)')
+            axarray[0].set_xlim(-edge, edge)
+            axarray[0].set_ylim(-edge, edge)
 
             # plotting 2D histograms of mmts with no pulse
             axarray[1].set_title('2D histogram, no pi pulse')
-            im0 = axarray[1].imshow(H0, interpolation='nearest', origin='low',
+            im0 = axarray[1].imshow(np.transpose(H0), interpolation='nearest', origin='low',
                                     extent=[xedges0[0], xedges0[-1], yedges0[0],
                                     yedges0[-1]], cmap=cmap)
             axarray[1].set_xlabel('Int. I (V)')
             axarray[1].set_ylabel('Int. Q (V)')
+            axarray[1].set_xlim(-edge, edge)
+            axarray[1].set_ylim(-edge, edge)
+
 
             self.save_fig(fig, figname='SSRO_Density_Plots', **kw)
 
@@ -1380,21 +1378,21 @@ class SSRO_Analysis(MeasurementAnalysis):
         x_diff = x_1_max-x_0_max
         theta = -np.arctan(y_diff/x_diff)
 
-        shots_I_data_1_rot = np.cos(theta)*shots_I_data_1 - np.sin(theta)*shots_Q_data_1
-        shots_Q_data_1_rot = np.sin(theta)*shots_I_data_1 + np.cos(theta)*shots_Q_data_1
+        shots_I_1_rot = np.cos(theta)*shots_I_1 - np.sin(theta)*shots_Q_1
+        shots_Q_1_rot = np.sin(theta)*shots_I_1 + np.cos(theta)*shots_Q_1
 
-        shots_I_data_0_rot = np.cos(theta)*shots_I_data_0 - np.sin(theta)*shots_Q_data_0
-        shots_Q_data_0_rot = np.sin(theta)*shots_I_data_0 + np.cos(theta)*shots_Q_data_0
+        shots_I_0_rot = np.cos(theta)*shots_I_0 - np.sin(theta)*shots_Q_0
+        shots_Q_0_rot = np.sin(theta)*shots_I_0 + np.cos(theta)*shots_Q_0
 
         # plotting the histograms before rotation
         fig, axes = plt.subplots()
-        axes.hist(shots_Q_data_1, bins=40, label='1 Q',
+        axes.hist(shots_Q_1, bins=40, label='1 Q',
                   histtype='step', normed=1, color='r')
-        axes.hist(shots_Q_data_0, bins=40, label='0 Q',
+        axes.hist(shots_Q_0, bins=40, label='0 Q',
                   histtype='step', normed=1, color='b')
-        axes.hist(shots_I_data_1, bins=40, label='1 I',
+        axes.hist(shots_I_1, bins=40, label='1 I',
                   histtype='step', normed=1, color='m')
-        axes.hist(shots_I_data_0, bins=40, label='0 I',
+        axes.hist(shots_I_0, bins=40, label='0 I',
                   histtype='step', normed=1, color='c')
 
         axes.set_title('Histograms of shots on IQ plane as measured, %s shots'%min_len)
@@ -1409,9 +1407,9 @@ class SSRO_Analysis(MeasurementAnalysis):
         #plotting the histograms after rotation
         fig, axes = plt.subplots()
 
-        axes.hist(shots_I_data_1_rot, bins=40, label='|1>',
+        axes.hist(shots_I_1_rot, bins=40, label='|1>',
                   histtype='step', normed=1, color='r')
-        axes.hist(shots_I_data_0_rot, bins=40, label='|0>',
+        axes.hist(shots_I_0_rot, bins=40, label='|0>',
                   histtype='step', normed=1, color='b')
 
         axes.set_title('Histograms of shots on rotaded IQ plane, %s shots' %
@@ -1422,25 +1420,25 @@ class SSRO_Analysis(MeasurementAnalysis):
         plt.legend()
         self.save_fig(fig, figname='rotated-histograms', **kw)
         plt.show()
-        return(theta, shots_I_data_1_rot, shots_I_data_0_rot)
+        return(theta, shots_I_1_rot, shots_I_0_rot)
 
-    def no_fits_analysis(self, shots_I_data_1_rot, shots_I_data_0_rot, min_len,
+    def no_fits_analysis(self, shots_I_1_rot, shots_I_0_rot, min_len,
                          **kw):
-        min_voltage_1 = np.min(shots_I_data_1_rot)
-        min_voltage_0 = np.min(shots_I_data_0_rot)
+        min_voltage_1 = np.min(shots_I_1_rot)
+        min_voltage_0 = np.min(shots_I_0_rot)
         min_voltage = np.min([min_voltage_1, min_voltage_0])
 
-        max_voltage_1 = np.max(shots_I_data_1_rot)
-        max_voltage_0 = np.max(shots_I_data_0_rot)
+        max_voltage_1 = np.max(shots_I_1_rot)
+        max_voltage_0 = np.max(shots_I_0_rot)
         max_voltage = np.max([max_voltage_1, max_voltage_0])
 
-        hist_1, bins = np.histogram(shots_I_data_1_rot, bins=1000,
+        hist_1, bins = np.histogram(shots_I_1_rot, bins=1000,
                                     range=(min_voltage, max_voltage),
                                     density=1)
         cumsum_1 = np.cumsum(hist_1)
         self.cumsum_1 = cumsum_1/cumsum_1[-1]  # renormalizing
 
-        hist_0, bins = np.histogram(shots_I_data_0_rot, bins=1000,
+        hist_0, bins = np.histogram(shots_I_0_rot, bins=1000,
                                     range=(min_voltage, max_voltage),
                                     density=1)
         cumsum_0 = np.cumsum(hist_0)
@@ -1482,15 +1480,15 @@ class SSRO_Analysis(MeasurementAnalysis):
         self.V_opt_raw = V_opt_raw
 
 
-    def s_curve_fits(self, shots_I_data_1_rot, shots_I_data_0_rot, min_len,
+    def s_curve_fits(self, shots_I_1_rot, shots_I_0_rot, min_len,
                      **kw):
         # Sorting data for analytical fitting
-        S_sorted_I_data_1 = np.sort(shots_I_data_1_rot)
-        S_sorted_I_data_0 = np.sort(shots_I_data_0_rot)
-        p_norm_I_data_1 = 1. * np.arange(len(S_sorted_I_data_1)) / \
-            (len(S_sorted_I_data_1) - 1)
-        p_norm_I_data_0 = 1. * np.arange(len(S_sorted_I_data_0)) / \
-            (len(S_sorted_I_data_0) - 1)
+        S_sorted_I_1 = np.sort(shots_I_1_rot)
+        S_sorted_I_0 = np.sort(shots_I_0_rot)
+        p_norm_I_1 = 1. * np.arange(len(S_sorted_I_1)) / \
+            (len(S_sorted_I_1) - 1)
+        p_norm_I_0 = 1. * np.arange(len(S_sorted_I_0)) / \
+            (len(S_sorted_I_0) - 1)
 
 
         # fitting the curves with integral normal distribution
@@ -1539,21 +1537,21 @@ class SSRO_Analysis(MeasurementAnalysis):
             return y
 
         NormCdf2Model = lmfit.Model(NormCdf2)
-        NormCdfModel.set_param_hint('mu', value=(np.average(shots_I_data_0_rot)
-                                    + np.average(shots_I_data_0_rot))/2)
-        NormCdfModel.set_param_hint('sigma', value=(np.std(shots_I_data_0_rot)
-                                    + np.std(shots_I_data_0_rot))/2, min=0)
+        NormCdfModel.set_param_hint('mu', value=(np.average(shots_I_0_rot)
+                                    + np.average(shots_I_0_rot))/2)
+        NormCdfModel.set_param_hint('sigma', value=(np.std(shots_I_0_rot)
+                                    + np.std(shots_I_0_rot))/2, min=0)
 
         params = NormCdfModel.make_params()
 
         fit_res_0 = NormCdfModel.fit(
-                            data=p_norm_I_data_0,
-                            x=S_sorted_I_data_0,
+                            data=p_norm_I_0,
+                            x=S_sorted_I_0,
                             params=params)
 
         fit_res_1 = NormCdfModel.fit(
-                            data=p_norm_I_data_1,
-                            x=S_sorted_I_data_1,
+                            data=p_norm_I_1,
+                            x=S_sorted_I_1,
                             params=params)
         #extracting the fitted parameters for the gaussian fits
         mu0 = fit_res_0.params['mu'].value
@@ -1565,15 +1563,15 @@ class SSRO_Analysis(MeasurementAnalysis):
         #setting hint parameters for double gaussfit of 'on' measurements
         NormCdf2Model.set_param_hint('mu0', value=mu0, vary=False)
         NormCdf2Model.set_param_hint('sigma0', value=sigma0, min=0, vary=False)
-        NormCdf2Model.set_param_hint('mu1', value=np.average(shots_I_data_1_rot))
-        NormCdf2Model.set_param_hint('sigma1', value=np.std(shots_I_data_1_rot), min=0)
+        NormCdf2Model.set_param_hint('mu1', value=np.average(shots_I_1_rot))
+        NormCdf2Model.set_param_hint('sigma1', value=np.std(shots_I_1_rot), min=0)
         NormCdf2Model.set_param_hint('frac1', value=0.9, min=0, max=1)
 
         # performing the double gaussfits of on 1 data
         params = NormCdf2Model.make_params()
         fit_res_double_1 = NormCdf2Model.fit(
-                            data=p_norm_I_data_1,
-                            x=S_sorted_I_data_1,
+                            data=p_norm_I_1,
+                            x=S_sorted_I_1,
                             params=params)
 
         # extracting the fitted parameters for the double gaussian fit 'on'
@@ -1592,8 +1590,8 @@ class SSRO_Analysis(MeasurementAnalysis):
 
         params = NormCdf2Model.make_params()
         fit_res_double_0 = NormCdf2Model.fit(
-                            data=p_norm_I_data_0,
-                            x=S_sorted_I_data_0,
+                            data=p_norm_I_0,
+                            x=S_sorted_I_0,
                             params=params)
 
         # extracting the fitted parameters for the double gaussian fit 'off'
@@ -1651,47 +1649,48 @@ class SSRO_Analysis(MeasurementAnalysis):
         # print 'mu1', mu1,mu1_0,mu1_1
 
         #plotting s-curves
-        fig, ax = plt.subplots(figsize=(20,10))
+        fig, ax = plt.subplots(figsize=(8, 4))
         ax.set_title('S-curves (not binned) and fits, determining fidelity and threshold optimum, %s shots'%min_len)
-        ax.set_xlabel('DAQ voltage integrated (V)', fontsize=14)
-        ax.set_ylabel('Fraction of counts', fontsize=14)
+        ax.set_xlabel('DAQ voltage integrated (V)')#, fontsize=14)
+        ax.set_ylabel('Fraction of counts')#, fontsize=14)
         ax.set_ylim((-.01, 1.01))
-        ax.plot(S_sorted_I_data_0, p_norm_I_data_0, label='0 I', linewidth=2,
+        ax.plot(S_sorted_I_0, p_norm_I_0, label='0 I', linewidth=2,
                 color='blue')
-        ax.plot(S_sorted_I_data_1, p_norm_I_data_1, label='1 I', linewidth=2,
+        ax.plot(S_sorted_I_1, p_norm_I_1, label='1 I', linewidth=2,
                 color='red')
 
-        # ax.plot(S_sorted_I_data_0, fit_res_0.best_fit,
+        # ax.plot(S_sorted_I_0, fit_res_0.best_fit,
         #         label='0 I single gaussian fit', ls='--', linewidth=3,
         #         color='lightblue')
-        # ax.plot(S_sorted_I_data_1, fit_res_1.best_fit, label='1 I',
+        # ax.plot(S_sorted_I_1, fit_res_1.best_fit, label='1 I',
         #         linewidth=2, color='red')
 
-        ax.plot(S_sorted_I_data_0, fit_res_double_0.best_fit,
+        ax.plot(S_sorted_I_0, fit_res_double_0.best_fit,
                 label='0 I double gaussfit', ls='--', linewidth=3,
                 color='lightblue')
-        ax.plot(S_sorted_I_data_1, fit_res_double_1.best_fit,
+        ax.plot(S_sorted_I_1, fit_res_double_1.best_fit,
                 label='1 I double gaussfit', ls='--', linewidth=3,
                 color='darkred')
         labelstring = 'V_opt= %.3f V \nF= %.4f'%(V_opt,F)
-        labelstring_corrected = 'V_opt_corrected= %.3f V \nF_corrected= %.4f\ndiscarding fraction 0 in 1= %.2f and fraction 1 in 0= %.2f' %(V_opt_corrected,F_corrected,frac1_0,1-frac1_1)
+        labelstring_corrected = 'V_opt_corrected= %.3f V \nF_corrected= %.4f\ndiscarding fraction 0 in 1= %.2f \nand fraction 1 in 0= %.2f' %(V_opt_corrected,F_corrected,frac1_0,1-frac1_1)
 
         ax.axvline(V_opt, ls='--', label=labelstring,
                    linewidth=2, color='grey')
         ax.axvline(V_opt_corrected, ls='--', label=labelstring_corrected,
                    linewidth=2, color='black')
 
-        ax.legend(loc=0)
+        leg = ax.legend(loc='best')
+        leg.get_frame().set_alpha(0.5)
         self.save_fig(fig, figname='S-curves', **kw)
         plt.show()
 
         #plotting the histograms
-        fig, axes = plt.subplots(figsize=(20,10))
+        fig, axes = plt.subplots(figsize=(8, 4))
 
-        n, bins1, patches = pylab.hist(shots_I_data_1_rot, bins=int(min_len/50),
+        n, bins1, patches = pylab.hist(shots_I_1_rot, bins=int(min_len/50),
                                       label = '1 I',histtype='step',
                                       color='red',normed=1)
-        n, bins0, patches = pylab.hist(shots_I_data_0_rot, bins=int(min_len/50),
+        n, bins0, patches = pylab.hist(shots_I_0_rot, bins=int(min_len/50),
                                       label = '0 I',histtype='step',
                                       color='blue',normed=1)
 
@@ -1716,14 +1715,15 @@ class SSRO_Analysis(MeasurementAnalysis):
         pylab.plot(bins1, y1_1, 'r--', linewidth=3.5)
 
         axes.set_title('Histograms of shots on rotaded IQ plane optimized for I, %s shots'%min_len)
-        plt.xlabel('DAQ voltage integrated (V)', fontsize=14)
-        plt.ylabel('Fraction of counts', fontsize=14)
+        plt.xlabel('DAQ voltage integrated (V)')#, fontsize=14)
+        plt.ylabel('Fraction of counts')#, fontsize=14)
 
         plt.axvline(V_opt, ls='--', label=labelstring,
                    linewidth=2, color='grey')
         plt.axvline(V_opt_corrected, ls='--', label=labelstring_corrected,
                    linewidth=2, color='black')
-        plt.legend(loc=0)
+        leg2 = ax.legend(loc='best')
+        leg2.get_frame().set_alpha(0.5)
         #plt.hist(SS_Q_data, bins=40,label = '0 Q')
         self.save_fig(fig, figname='Histograms', **kw)
         plt.show()
@@ -1793,7 +1793,16 @@ class SSRO_discrimination_analysis(MeasurementAnalysis):
                    np.cos(theta_in*2*np.pi/360)*Q_shots)
 
         # Reshaping the data
-        H, xedges, yedges = dm_tools.bin_2D_shots(I_shots, Q_shots)
+        n_bins = 120  # the bins we want to have around our data
+        # min min and max max constructions exist so that it also works
+        # if one dimension only conatins zeros
+        H, xedges, yedges = np.histogram2d(I_shots, Q_shots,
+                                       bins=n_bins,
+                                       range=[[min(min(I_shots), -1),
+                                               max(max(I_shots), 1)],
+                                              [min(min(Q_shots), -1),
+                                               max(max(Q_shots), 1)]],
+                                       normed=True)
         self.H = H
         self.xedges = xedges
         self.yedges = yedges
@@ -1817,12 +1826,13 @@ class SSRO_discrimination_analysis(MeasurementAnalysis):
             fit_mods.plot_fitres2D_heatmap(self.fit_res, x_tiled, y_rep,
                                            axs=axs, cmap='viridis')
             for ax in axs:
-                ax.ticklabel_format(style = 'sci',fontsize=4, scilimits=(0,0))
+                ax.ticklabel_format(style='sci', fontsize=4,
+                                    scilimits=(0, 0))
                 ax.set_xlabel('I')  # TODO: add units
                 edge = max(max(abs(xedges)), max(abs(yedges)))
                 ax.set_xlim(-edge, edge)
                 ax.set_ylim(-edge, edge)
-                ax.set_axis_bgcolor(plt.cm.viridis(0))
+                # ax.set_axis_bgcolor(plt.cm.viridis(0))
             axs[0].set_ylabel('Q')
             #axs[0].ticklabel_format(style = 'sci',  fontsize=4)
 
