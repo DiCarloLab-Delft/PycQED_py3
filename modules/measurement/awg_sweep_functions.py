@@ -70,21 +70,21 @@ class AllXY(swf.Hard_Sweep):
 
 
 class OffOn(swf.Hard_Sweep):
-    def __init__(self, pulse_pars, RO_pars, upload=True):
+    def __init__(self, pulse_pars, RO_pars, upload=True,pulse_comb='OffOn', nr_samples=2):
         super().__init__()
         self.pulse_pars = pulse_pars
         self.RO_pars = RO_pars
         self.upload = upload
 
-        self.parameter_name = 'OffOn element'
+        self.parameter_name = 'sample'
         self.unit = '#'
-        self.name = 'OffOn'
-        self.sweep_points = np.arange(2)
+        self.name = pulse_comb
+        self.sweep_points = np.arange(nr_samples)
 
     def prepare(self, **kw):
         if self.upload:
             sqs.OffOn_seq(pulse_pars=self.pulse_pars,
-                          RO_pars=self.RO_pars)
+                          RO_pars=self.RO_pars, pulse_comb=self.name)
 
 class Butterfly(swf.Hard_Sweep):
     def __init__(self, pulse_pars, RO_pars, initialize=False, upload=True,

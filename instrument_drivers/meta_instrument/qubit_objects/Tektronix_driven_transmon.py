@@ -153,6 +153,8 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                                                                 self.AWG)
         self.int_log_det = det.CBox_integration_logging_det(self.CBox,
                                                                 self.AWG)
+        self.input_average_detector = det.CBox_input_average_detector(self.CBox,
+                                                                      self.AWG)
 
     def prepare_for_timedomain(self):
         self.LO.on()
@@ -284,7 +286,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                                verbose=False, make_fig=True):
         raise NotImplementedError()
 
-    def measure_rabi(self, amps, n=1,
+    def measure_rabi(self, amps=np.linspace(-.5, .5, 31), n=1,
                      MC=None, analyze=True, close_fig=True,
                      verbose=False):
         self.prepare_for_timedomain()
@@ -385,7 +387,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                      MC=None,
                      analyze=True,
                      close_fig=True,
-                     verbose=True):
+                     verbose=True, set_integration_weights=False):
         self.prepare_for_timedomain()
         if MC is None:
             MC = self.MC
@@ -395,15 +397,19 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
             raw=no_fits,
             MC=MC,
             AWG=self.AWG, CBox=self.CBox,
-            pulse_pars=self.pulse_pars, RO_pars=self.RO_pars)
+            pulse_pars=self.pulse_pars, RO_pars=self.RO_pars,
+             set_integration_weights=set_integration_weights)
         if return_detector:
             return d
         d.prepare()
         d.acquire_data_point()
 
+
         if analyze:
             return ma.SSRO_Analysis(label='SSRO'+self.msmt_suffix,
                                     no_fits=no_fits, close_fig=close_fig)
+
+
 
 
     def measure_butterfly(self, return_detector=False,
@@ -439,6 +445,53 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
             theta_in=-a.theta,
             threshold=b.opt_I_threshold, digitize=True, case=case)
         return c.butterfly_coeffs
+
+    def measure_transients(self, return_detector=False,
+                          MC=None,
+                          analyze=True,
+                          close_fig=True,
+                          verbose=True,
+                          set_integration_weights=False,
+                          nr_samples = 512):
+        if set_integration_weights:
+            print("always using 512 samples to set the weightfunction")
+            self.CBox.nr_samples.set(512)
+        else:
+            self.CBox.nr_samples.set(nr_samples)
+
+        self.prepare_for_timedomain()
+        if MC is None:
+            MC = self.MC
+
+        self.MC.set_sweep_function(awg_swf.OffOn(pulse_pars=self.pulse_pars,
+                                                 RO_pars=self.RO_pars,
+                                                 pulse_comb='OffOff',
+                                                 nr_samples=nr_samples))
+        self.MC.set_detector_function(self.input_average_detector)
+        self.MC.run('Measure_transients_{}_0'.format(self.msmt_suffix))
+        a0=ma.MeasurementAnalysis(auto=True)
+        self.MC.set_sweep_function(awg_swf.OffOn(pulse_pars=self.pulse_pars,
+                                                 RO_pars=self.RO_pars,
+                                                 pulse_comb='OnOn',
+                                                 nr_samples=nr_samples))
+        self.MC.set_detector_function(self.input_average_detector)
+        self.MC.run('Measure_transients_{}_1'.format(self.msmt_suffix))
+        a1=ma.MeasurementAnalysis(auto=True)
+
+        if set_integration_weights:
+            transient0=a0.data[1,:]
+            transient1=a1.data[1,:]
+            optimized_weights = transient1-transient0
+            optimized_weights = optimized_weights+np.mean(optimized_weights)
+            self.CBox.sig0_integration_weights.set(optimized_weights)
+            self.CBox.sig1_integration_weights.set(np.zeros(512)) #disabling the Q quadrature
+
+
+
+        # first perform SSRO analysis to extract the optimal rotation angle theta
+        #return c.butterfly_coeffs
+
+
 
     def measure_rb_vs_amp(self, amps, nr_cliff=1,
                       resetless=True,

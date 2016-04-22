@@ -1817,12 +1817,14 @@ class SSRO_discrimination_analysis(MeasurementAnalysis):
             fit_mods.plot_fitres2D_heatmap(self.fit_res, x_tiled, y_rep,
                                            axs=axs, cmap='viridis')
             for ax in axs:
+                ax.ticklabel_format(style = 'sci',fontsize=4, scilimits=(0,0))
                 ax.set_xlabel('I')  # TODO: add units
                 edge = max(max(abs(xedges)), max(abs(yedges)))
                 ax.set_xlim(-edge, edge)
                 ax.set_ylim(-edge, edge)
                 ax.set_axis_bgcolor(plt.cm.viridis(0))
             axs[0].set_ylabel('Q')
+            #axs[0].ticklabel_format(style = 'sci',  fontsize=4)
 
             self.save_fig(fig, figname='2D-Histograms', **kw)
 
@@ -4054,29 +4056,39 @@ class butterfly_analysis(MeasurementAnalysis):
         # if close_file:
         #     self.data_file.close()
         if initialize:
-            # #reshuffeling the data to endup with two arrays for the diffeent input states
-            # m0_on = self.data[3::6]
-            # m1_on = self.data[4::6]
-            # m2_on = self.data[5::6]
-            # self.data_rel = np.zeros([np.size(m0_on),3])
-            # self.data_rel[:,0] = m0_on
-            # self.data_rel[:,1] = m1_on
-            # self.data_rel[:,2] = m2_on
-            # m0_off = self.data[0::6]
-            # m1_off = self.data[1::6]
-            # m2_off = self.data[2::6]
-            # self.data_exc = np.zeros([np.size(m0_off),3])
-            # self.data_exc[:,0] = m0_off
-            # self.data_exc[:,1] = m1_off
-            # self.data_exc[:,2] = m2_off
-            # self.data_exc = dm_tools.postselect(threshold=threshold,
-            #                                   data=self.data_exc,
-            #                                   positive_case=case)
-            # self.data_rel = dm_tools.postselect(threshold=threshold,
-            #                                   data=self.data_rel,
-            #                                   positive_case=case)
+            #reshuffeling the data to endup with two arrays for the diffeent input states
+            shots=np.size(self.data)
+            shots_per_mmt = np.floor_divide(shots,6)
+            shots_used = shots_per_mmt*6
+            m0_on = self.data[3:shots_used:6]
+            m1_on = self.data[4:shots_used:6]
+            m2_on = self.data[5:shots_used:6]
+            self.data_rel = np.zeros([np.size(m0_on),3])
+            self.data_rel[:,0] = m0_on
+            self.data_rel[:,1] = m1_on
+            self.data_rel[:,2] = m2_on
+            m0_off = self.data[0:shots_used:6]
+            m1_off = self.data[1:shots_used:6]
+            m2_off = self.data[2:shots_used:6]
+            self.data_exc = np.zeros([np.size(m0_off),3])
+            self.data_exc[:,0] = m0_off
+            self.data_exc[:,1] = m1_off
+            self.data_exc[:,2] = m2_off
+            self.data_exc = dm_tools.postselect(threshold=threshold,
+                                              data=self.data_exc,
+                                              positive_case=case)
+            self.data_rel = dm_tools.postselect(threshold=threshold,
+                                              data=self.data_rel,
+                                              positive_case=case)
+            self.data_exc_post = self.data_exc[:,1:]
+            self.data_rel_post = self.data_rel[:,1:]
+            self.data_exc = self.data_exc_post
+            self.data_rel = self.data_rel_post
+            fraction = (np.size(self.data_exc) + np.size(self.data_exc))*3/shots_used/2
 
-            raise NotImplementedError()
+            print ("postselection fraction", fraction)
+
+            #raise NotImplementedError()
         else:
             m0_on = self.data[2::4]
             m1_on = self.data[3::4]
@@ -4104,7 +4116,6 @@ class butterfly_analysis(MeasurementAnalysis):
         verbose = kw.pop('verbose', False)
         exc_coeffs = dm_tools.butterfly_data_binning(Z=self.data_exc,
                                                      initial_state=0)
-        #print(exc_coeffs)
         rel_coeffs = dm_tools.butterfly_data_binning(Z=self.data_rel,
                                                      initial_state=1)
         self.butterfly_coeffs = dm_tools.butterfly_matrix_inversion(exc_coeffs,

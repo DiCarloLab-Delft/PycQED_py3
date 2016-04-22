@@ -351,15 +351,14 @@ class Signal_Hound_Spectrum_Track(Hard_Detector):
 
 
 # Detectors for QuTech Control box modes
-class QuTechCBox_input_average_Detector(Hard_Detector):
-    def __init__(self, AWG='AWG', **kw):
-        super(QuTechCBox_input_average_Detector, self).__init__()
-        self.CBox = qt.instruments['CBox']
+class CBox_input_average_detector(Hard_Detector):
+    def __init__(self, CBox, AWG, **kw):
+        super(CBox_input_average_detector, self).__init__()
+        self.CBox = CBox
         self.name = 'CBox_Streaming_data'
         self.value_names = ['Ch0', 'Ch1']
         self.value_units = ['a.u.', 'a.u.']
-        if AWG is not None:
-            self.AWG = qt.instruments[AWG]
+        self.AWG = AWG
 
     def get_values(self):
         if self.AWG is not None:
@@ -551,7 +550,6 @@ class CBox_state_counters_det(Hard_Detector):
                             'no error B', 'single error B', 'double error B',
                             '|0> B', '|1> B', ]
         self.value_units = ['#']*10
-        self.AWG = AWG
 
     def get_values(self):
         success = False
@@ -566,17 +564,16 @@ class CBox_state_counters_det(Hard_Detector):
         return d
 
     def _get_values(self):
-        self.AWG.stop()
+
         self.CBox.set('acquisition_mode', 0)
         self.CBox.set('acquisition_mode', 'integration logging')
-        self.AWG.start()
+
         data = self.CBox.get_qubit_state_log_counters()
         self.CBox.set('acquisition_mode', 0)
         return np.concatenate(data)  # concatenates counters A and B
 
     def finish(self):
         self.CBox.set('acquisition_mode', 0)
-        self.AWG.stop()
 
 
 class CBox_single_qubit_state_counters(CBox_state_counters_det):

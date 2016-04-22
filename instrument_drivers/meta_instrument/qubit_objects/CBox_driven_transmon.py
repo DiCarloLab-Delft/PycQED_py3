@@ -243,7 +243,7 @@ class CBox_driven_transmon(Transmon):
             resetless_interval=resetless_interval,
             RO_pulse_delay=self.RO_pulse_delay.get(),
             RO_pulse_length=self.RO_pulse_length.get(),
-            RO_trigger_delay=self.RO_trigger_delay.get(),
+            RO_trigger_delay=self.RO_acq_marker_delay.get(),
             AWG=self.AWG, CBox=self.CBox, upload=upload)
 
         d = cdet.CBox_trace_error_fraction_detector(
@@ -562,7 +562,7 @@ class CBox_driven_transmon(Transmon):
             IF=self.f_RO_mod.get(), n_pulses=n,
             pulse_delay=self.pulse_delay.get(),
             RO_pulse_delay=self.RO_pulse_delay.get(),
-            RO_trigger_delay=self.RO_trigger_delay.get(),
+            RO_trigger_delay=self.RO_acq_marker_delay.get(),
             RO_pulse_length=self.RO_pulse_length.get(), verbose=verbose)
         self.AWG.set('ch3_amp', self.mod_amp_td.get())
         self.AWG.set('ch4_amp', self.mod_amp_td.get())
@@ -599,7 +599,7 @@ class CBox_driven_transmon(Transmon):
         MC.set_sweep_function(
             awg_swf.CBox_T1(IF=self.f_RO_mod.get(),
                             RO_pulse_delay=self.RO_pulse_delay.get(),
-                            RO_trigger_delay=self.RO_trigger_delay.get(),
+                            RO_trigger_delay=self.RO_acq_marker_delay.get(),
                             mod_amp=self.mod_amp_td.get(),
                             AWG=self.AWG,
                             upload=True))
@@ -631,7 +631,7 @@ class CBox_driven_transmon(Transmon):
         Rams_swf = awg_swf.CBox_Ramsey(
             AWG=self.AWG, CBox=self.CBox, IF=self.f_RO_mod.get(), pulse_delay=0,
             RO_pulse_delay=self.RO_pulse_delay.get(),
-            RO_trigger_delay=self.RO_trigger_delay.get(),
+            RO_trigger_delay=self.RO_acq_marker_delay.get(),
             RO_pulse_length=self.RO_pulse_length.get())
         MC.set_sweep_function(Rams_swf)
         MC.set_sweep_points(times)
@@ -660,7 +660,7 @@ class CBox_driven_transmon(Transmon):
             AWG=self.AWG, CBox=self.CBox, IF=self.f_RO_mod.get(),
             pulse_delay=self.pulse_delay.get(),
             RO_pulse_delay=self.RO_pulse_delay.get(),
-            RO_trigger_delay=self.RO_trigger_delay.get(),
+            RO_trigger_delay=self.RO_acq_marker_delay.get(),
             RO_pulse_length=self.RO_pulse_length.get())
         d.prepare()
         d.acquire_data_point()
@@ -684,7 +684,7 @@ class CBox_driven_transmon(Transmon):
             AWG=self.AWG, CBox=self.CBox, IF=self.f_RO_mod.get(),
             pulse_delay=self.pulse_delay.get(),
             RO_pulse_delay=self.RO_pulse_delay.get(),
-            RO_trigger_delay=self.RO_trigger_delay.get(),
+            RO_trigger_delay=self.RO_acq_marker_delay.get(),
             RO_pulse_length=self.RO_pulse_length.get())
 
         if return_detector:

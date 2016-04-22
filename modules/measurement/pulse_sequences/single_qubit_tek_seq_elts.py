@@ -168,7 +168,7 @@ def AllXY_seq(pulse_pars, RO_pars, double_points=False,
 
 def OffOn_seq(pulse_pars, RO_pars,
               verbose=False, initialize=False,
-              post_measurement_delay=2000):
+              post_measurement_delay=2000, pulse_comb='OffOn'):
     '''
     OffOn sequence for a single qubit using the tektronix.
     SSB_Drag pulse is used for driving, simple modualtion used for RO
@@ -186,7 +186,12 @@ def OffOn_seq(pulse_pars, RO_pars,
     # Create a dict with the parameters for all the pulses
     pulses = get_pulse_dict_from_pars(pulse_pars)
 
-    pulse_combinations = ['I', 'X180']
+    if pulse_comb=='OffOn':
+        pulse_combinations = ['I', 'X180']
+    elif pulse_comb=='OnOn':
+        pulse_combinations = ['X180', 'X180']
+    elif pulse_comb=='OffOff':
+        pulse_combinations = ['I', 'I']
 
     for i, pulse_comb in enumerate(pulse_combinations):
         el = multi_pulse_elt(i, station, [pulses[pulse_comb], RO_pars])
@@ -322,9 +327,7 @@ def resetless_RB_seq(pulse_pars, RO_pars,
     for seed in range(nr_seeds):
         cl_seq = rb.randomized_benchmarking_sequence(nr_cliffords,
                                                      desired_net_cl=3)
-        print(cl_seq)
         pulse_keys = rb.decompose_clifford_seq(cl_seq)
-        print(pulse_keys)
         pulse_sub_list = [pulses[x] for x in pulse_keys]
         pulse_sub_list += [RO_pars]
 
@@ -346,9 +349,7 @@ def resetless_RB_seq(pulse_pars, RO_pars,
         el.length(), fixed_point_freq)
     el.min_samples = el.samples() + int(extra_delay*el.clock)
     el_list.append(el)
-    # trigger_wait ensures seq starts in phase, repetitions set to max to
-    # ensure it doesn't wait for triggers unnecesarily
-    seq.append_element(el, trigger_wait=True)#, repetitions=int(2**16))
+    seq.append_element(el, trigger_wait=True, repetitions=2**16)
 
     station.instruments['AWG'].stop()
     station.pulsar.program_awg(seq, *el_list, verbose=verbose)
@@ -403,10 +404,8 @@ def resetless_rabi_seq(pulse_pars, RO_pars,
         el.length(), fixed_point_freq)
     el.min_samples = el.samples() + int(extra_delay*el.clock)
     el_list.append(el)
-    # trigger_wait ensures seq starts in phase, repetitions set to max to
-    # ensure it doesn't wait for triggers unnecesarily
-    seq.append_element(el, trigger_wait=True)#, repetitions=int(2**16))
 
+    seq.append_element(el, trigger_wait=True, repetitions=2**16)
     station.instruments['AWG'].stop()
     station.pulsar.program_awg(seq, *el_list, verbose=verbose)
     return seq_name

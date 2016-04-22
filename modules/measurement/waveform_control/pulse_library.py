@@ -58,7 +58,7 @@ class MW_IQmod_pulse(Pulse):
                 self.mod_frequency * tvals[idx0:idx1] + self.phase/360.))
 
         if chan == self.Q_channel:
-            wf[idx0:idx1] += self.amplitude * np.sin(2 * np.pi * (
+            wf[idx0:idx1] += self.amplitude * -np.sin(2 * np.pi * (
                 self.mod_frequency * tvals[idx0:idx1] + self.phase/360.))
         return wf
 
