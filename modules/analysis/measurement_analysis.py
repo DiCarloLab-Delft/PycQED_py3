@@ -15,6 +15,7 @@ import pylab
 from modules.analysis.tools import data_manipulation as dm_tools
 import imp
 import math
+from math import erfc
 imp.reload(dm_tools)
 
 
@@ -1891,6 +1892,7 @@ class SSRO_discrimination_analysis(MeasurementAnalysis):
 
         self.finish(**kw)
 
+
 class touch_n_go_SSRO_Analysis(MeasurementAnalysis):
     '''
     Script to analyze the single shots used for touch and go selection
@@ -1927,6 +1929,104 @@ class touch_n_go_SSRO_Analysis(MeasurementAnalysis):
         plt.show()
 
         self.finish(**kw)
+
+
+class SSRO_single_quadrature_discriminiation_analysis(MeasurementAnalysis):
+    '''
+    Analysis that fits two gaussians to a histogram of a dataset.
+    Uses this to extract F_discr and the optimal threshold
+    '''
+    def __init__(self, quadrature='I', **kw):
+        # Note: quadrature is a bit of misnomer here
+        # it represents the channel/weight of the data we want to bin
+        kw['h5mode'] = 'r+'
+        self.quadrature = quadrature
+        super().__init__(**kw)
+
+    def run_default_analysis(self, close_file=True, **kw):
+        self.get_naming_and_values()
+        hist, bins, centers = self.histogram_shots(self.shots)
+        self.fit_data(hist, centers)
+        self.make_figures(hist=hist, centers=centers, **kw)
+
+        self.F_discr, self.opt_threshold = self.calculate_discrimination_fidelity(
+            fit_res=self.fit_res)
+        if close_file:
+            self.data_file.close()
+        return
+
+    def get_naming_and_values(self):
+        super().get_naming_and_values()
+        if type(self.quadrature) is str:
+            self.shots = self.get_values(self.quadrature)
+            # Potentially bug sensitive!!
+            self.units = self.value_units[0]
+        elif type(self.quadrature) is int:
+            self.shots = self.measured_values[self.quadrature]
+            self.units = self.value_units[self.quadrature]
+
+    def histogram_shots(self, shots):
+        hist, bins = np.histogram(shots, bins=90, normed=True)
+        # 0.7 bin widht is a sensible default for plotting
+        centers = (bins[:-1] + bins[1:]) / 2
+        return hist, bins, centers
+
+    def fit_data(self, hist, centers):
+        self.add_analysis_datagroup_to_file()
+        self.model = fit_mods.DoubleGaussModel
+        params = self.model.guess(self.model, hist, centers)
+        self.fit_res = self.model.fit(data=hist, x=centers, params=params)
+        self.save_fitted_parameters(
+            fit_res=self.fit_res, var_name='{}shots'.format(self.quadrature))
+        return self.fit_res
+
+    def make_figures(self, hist, centers, show_guess=False, **kw):
+        self.fig, self.ax = plt.subplots(figsize=(5, 3))
+        width = .7 * (centers[1]-centers[0])
+        plot_title = kw.pop('plot_title', textwrap.fill(
+                            self.timestamp_string + '_' +
+                            self.measurementstring, 40))
+
+        x_fine = np.linspace(min(centers),
+                             max(centers), 1000)
+        # Plotting the data
+        self.ax.bar(centers, hist, align='center', width=width, label='data')
+        self.ax.plot(x_fine, self.fit_res.eval(x=x_fine), label='fit', c='r')
+        if show_guess:
+            self.ax.plot(x_fine, self.fit_res.eval(
+                x=x_fine, **self.fit_res.init_values), label='guess', c='g')
+            self.ax.legend(loc='best')
+
+        # Prettifying the plot
+        self.ax.ticklabel_format(useOffset=False)
+        self.ax.set_title(plot_title)
+        self.ax.set_xlabel('{} ({})'.format(self.quadrature, self.units))
+        self.ax.set_ylabel('normalized counts')
+        self.save_fig(self.fig, fig_tight=True, **kw)
+
+    def calculate_discrimination_fidelity(self, fit_res):
+        '''
+        Calculate fidelity based on the overlap of the two fits.
+        Does this by numerically evaluating the function.
+        Analytic is possible but not done here.
+        '''
+        mu_a = fit_res.best_values['A_center']
+        mu_b = fit_res.best_values['B_center']
+        s_a = fit_res.best_values['A_sigma']
+        s_b = fit_res.best_values['B_sigma']
+
+        x_fine = np.linspace(min(mu_a-4*s_a, mu_b-4*s_b),
+                             max(mu_b+4*s_a, mu_b+4*s_b), 1000)
+        CDF_a = np.zeros(len(x_fine))
+        CDF_b = np.zeros(len(x_fine))
+        for i, x in enumerate(x_fine):
+            CDF_a[i] = .5 * erfc((mu_a-x)/(np.sqrt(2)*s_a))
+            CDF_b[i] = .5 * erfc((mu_b-x)/(np.sqrt(2)*s_b))
+        F_discr = np.max(abs(CDF_a-CDF_b))
+        opt_threshold = x_fine[np.argmax(abs(CDF_a-CDF_b))]
+        return F_discr, opt_threshold
+
+
 
 
 class T1_Analysis(TD_Analysis):
