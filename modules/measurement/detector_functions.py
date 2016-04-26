@@ -987,10 +987,10 @@ class SH_mixer_skewness_det(Soft_Detector):
         sin_pulse = pulse.CosPulse(channel=self.Q_ch, name='sin_pulse')
 
         SSB_modulation_el.add(pulse.cp(cos_pulse, name='cos_pulse',
-                              frequency=f_mod, amplitude=0.3,
+                              frequency=f_mod, amplitude=0.15,
                               length=1e-6, phase=0))
         SSB_modulation_el.add(pulse.cp(sin_pulse, name='sin_pulse',
-                              frequency=f_mod, amplitude=0.3*QI_ratio,
+                              frequency=f_mod, amplitude=0.15*QI_ratio,
                               length=1e-6, phase=90+skewness))
 
         seq = sequence.Sequence('Sideband_modulation_seq')

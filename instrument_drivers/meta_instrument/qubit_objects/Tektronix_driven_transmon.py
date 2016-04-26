@@ -191,36 +191,6 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
             self.rf_RO_source.power.set(self.RO_pulse_power.get())
 
 
-    def get_pulse_pars(self):
-        self.pulse_pars = {
-            'I_channel': self.pulse_I_channel.get(),
-            'Q_channel': self.pulse_Q_channel.get(),
-            'amplitude': self.amp180.get(),
-            'sigma': self.gauss_sigma.get(),
-            'nr_sigma': 4,
-            'motzoi': self.motzoi.get(),
-            'mod_frequency': self.f_pulse_mod.get(),
-            'pulse_delay': self.pulse_delay.get(),
-            'phi_skew': self.phi_skew.get(),
-            'alpha': self.alpha.get(),
-            'phase': 0,
-            'pulse_type': 'SSB_DRAG_pulse'}
-
-        self.RO_pars = {
-            'I_channel': self.RO_I_channel.get(),
-            'Q_channel': self.RO_Q_channel.get(),
-            'RO_pulse_marker_channel': self.RO_pulse_marker_channel.get(),
-            'amplitude': self.RO_amp.get(),
-            'length': self.RO_pulse_length.get(),
-            'pulse_delay': self.RO_pulse_delay.get(),
-            'mod_frequency': self.f_RO_mod.get(),
-            'fixed_point_frequency': gcd(int(self.f_RO_mod.get()), int(20e6)),
-            'acq_marker_delay': self.RO_acq_marker_delay.get(),
-            'acq_marker_channel': self.RO_acq_marker_channel.get(),
-            'phase': 0,
-            'pulse_type': self.RO_pulse_type.get()}
-        return self.pulse_pars, self.RO_pars
-
     def calibrate_mixer_offsets(self, signal_hound, offs_type='pulse',
                                 update=True):
         '''
@@ -326,7 +296,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
 
         if f_qubit is None:
             f_qubit = self.f_qubit.get()
-
+        self.td_source.set('frequency', f_qubit - self.f_pulse_mod.get())
         Rams_swf = awg_swf.Ramsey(
             pulse_pars=self.pulse_pars, RO_pars=self.RO_pars,
             artificial_detuning=artificial_detuning)
@@ -520,3 +490,34 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
             if update:
                 self.motzoi.set(a.optimal_motzoi)
             return a
+
+
+    def get_pulse_pars(self):
+        self.pulse_pars = {
+            'I_channel': self.pulse_I_channel.get(),
+            'Q_channel': self.pulse_Q_channel.get(),
+            'amplitude': self.amp180.get(),
+            'sigma': self.gauss_sigma.get(),
+            'nr_sigma': 4,
+            'motzoi': self.motzoi.get(),
+            'mod_frequency': self.f_pulse_mod.get(),
+            'pulse_delay': self.pulse_delay.get(),
+            'phi_skew': self.phi_skew.get(),
+            'alpha': self.alpha.get(),
+            'phase': 0,
+            'pulse_type': 'SSB_DRAG_pulse'}
+
+        self.RO_pars = {
+            'I_channel': self.RO_I_channel.get(),
+            'Q_channel': self.RO_Q_channel.get(),
+            'RO_pulse_marker_channel': self.RO_pulse_marker_channel.get(),
+            'amplitude': self.RO_amp.get(),
+            'length': self.RO_pulse_length.get(),
+            'pulse_delay': self.RO_pulse_delay.get(),
+            'mod_frequency': self.f_RO_mod.get(),
+            'fixed_point_frequency': gcd(int(self.f_RO_mod.get()), int(20e6)),
+            'acq_marker_delay': self.RO_acq_marker_delay.get(),
+            'acq_marker_channel': self.RO_acq_marker_channel.get(),
+            'phase': 0,
+            'pulse_type': self.RO_pulse_type.get()}
+        return self.pulse_pars, self.RO_pars
