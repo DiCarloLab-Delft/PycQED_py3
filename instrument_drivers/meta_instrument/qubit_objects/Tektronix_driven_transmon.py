@@ -190,7 +190,6 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
             self.rf_RO_source.frequency.set(self.f_RO.get())
             self.rf_RO_source.power.set(self.RO_pulse_power.get())
 
-
     def calibrate_mixer_offsets(self, signal_hound, offs_type='pulse',
                                 update=True):
         '''
@@ -283,12 +282,11 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         MC.set_detector_function(self.int_avg_det)
         MC.run('T1'+self.msmt_suffix)
         if analyze:
-            a = ma.T1_Analysis(auto=True, close_fig=True)
+            a = ma.T1_Analysis(auto=True, close_fig=close_fig)
             return a.T1
 
     def measure_ramsey(self, times, artificial_detuning=None,
-                       f_qubit=None,
-                       label='',
+                       f_qubit=None, label='',
                        MC=None, analyze=True, close_fig=True, verbose=True):
         self.prepare_for_timedomain()
         if MC is None:
@@ -306,7 +304,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         MC.run('Ramsey'+label+self.msmt_suffix)
 
         if analyze:
-            a = ma.Ramsey_Analysis(auto=True, close_fig=True)
+            a = ma.Ramsey_Analysis(auto=True, close_fig=close_fig)
             if verbose:
                 fitted_freq = a.fit_res.params['frequency'].value
                 print('Artificial detuning: {:.2e}'.format(
@@ -329,7 +327,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         MC.run('Echo'+label+self.msmt_suffix)
 
         if analyze:
-            a = ma.TD_Analysis(auto=True, close_fig=True)
+            a = ma.Echo_analysis(auto=True, close_fig=close_fig)
             return a
 
     def measure_allxy(self, double_points=True,
