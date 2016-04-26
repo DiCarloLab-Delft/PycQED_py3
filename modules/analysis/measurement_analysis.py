@@ -913,12 +913,63 @@ class Rabi_Analysis(TD_Analysis):
             self.save_fitted_parameters(fit_res=self.fit_res[i],
                                         var_name=self.value_names[i])
 
+
 class Echo_analysis(TD_Analysis):
 
     def run_default_analysis(self, close_file=True, **kw):
         self.get_naming_and_values()
+        self.rotate_and_normalize_data()
         self.fit_data(**kw)
+        self.make_figures(**kw)
+        if close_file:
+            self.data_file.close()
+        return self.fit_res
         pass
+
+    def fit_data(self, print_fit_results=False, **kw):
+
+        self.add_analysis_datagroup_to_file()
+        model = fit_mods.ExpDecayModel
+
+        params = model.guess(model, data=self.corr_data[:-self.NoCalPoints],
+                             t=self.sweep_points[:-self.NoCalPoints])
+        self.fit_res = model.fit(data=self.corr_data[:-self.NoCalPoints],
+                                 t=self.sweep_points[:-self.NoCalPoints],
+                                 params=params)
+        self.save_fitted_parameters(fit_res=self.fit_res,
+                                    var_name='corr_data')
+
+    def make_figures(self, **kw):
+        show_guess = kw.pop('show_guess', False)
+        self.fig, self.ax = plt.subplots(figsize=(5, 3))
+        x_fine = np.linspace(min(self.sweep_points), max(self.sweep_points),
+                             1000)
+        plot_title = kw.pop('plot_title', textwrap.fill(
+                            self.timestamp_string + '_' +
+                            self.measurementstring, 40))
+        self.plot_results_vs_sweepparam(x=self.sweep_points,
+                                        y=self.corr_data,
+                                        fig=self.fig, ax=self.ax,
+                                        xlabel=self.xlabel,
+                                        ylabel=r'F$|1\rangle$',
+                                        save=False,
+                                        plot_title=plot_title)
+
+        self.ax.plot(x_fine, self.fit_res.eval(t=x_fine), label='fit')
+        textstr = '$T_2$={:.3g}$\pm$({:.3g})s '.format(
+            self.fit_res.params['tau'].value,
+            self.fit_res.params['tau'].stderr)
+        if show_guess:
+            self.ax.plot(x_fine, self.fit_res.eval(
+                t=x_fine, **self.fit_res.init_values), label='guess')
+            self.ax.legend(loc='best')
+
+        self.ax.ticklabel_format(style='sci', scilimits=(0, 0))
+        self.ax.text(0.4, 0.95, textstr, transform=self.ax.transAxes,
+                     fontsize=11, verticalalignment='top',
+                     bbox=self.box_props)
+        self.save_fig(self.fig, fig_tight=True, **kw)
+
 
 class Rabi_parabola_analysis(Rabi_Analysis):
 

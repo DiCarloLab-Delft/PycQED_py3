@@ -166,6 +166,21 @@ def gaussian_2D(x, y, amplitude=1,
 ####################
 
 
+def exp_dec_guess(model, data, t):
+    '''
+    Assumes exponential decay in estimating the parameters
+    '''
+    offs_guess = data[np.argmax(t)]
+    amp_guess = data[np.argmin(t)] - offs_guess
+    # guess tau by looking for value closest to 1/e
+    tau_guess = t[np.argmin(abs((amp_guess*(1/np.e) + offs_guess)-data))]
+    params = model.make_params(amplitude=amp_guess,
+                               tau=tau_guess,
+                               n=1,
+                               offset=offs_guess)
+    return params
+
+
 def Cos_guess(model, data, t):
     '''
     Guess for a cosine fit using FFT, only works for evenly spaced points
@@ -304,6 +319,7 @@ CosModel = lmfit.Model(CosFunc)
 CosModel.guess = Cos_guess
 
 ExpDecayModel = lmfit.Model(ExpDecayFunc)
+ExpDecayModel.guess = exp_dec_guess
 ExpDampOscModel = lmfit.Model(ExpDampOscFunc)
 GaussExpDampOscModel = lmfit.Model(GaussExpDampOscFunc)
 ExpDampDblOscModel = lmfit.Model(ExpDampDblOscFunc)
