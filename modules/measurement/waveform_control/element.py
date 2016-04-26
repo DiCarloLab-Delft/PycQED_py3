@@ -355,10 +355,7 @@ class Element:
                 idx0 = self.pulse_start_sample(p, c)
                 idx1 = self.pulse_end_sample(p, c) + 1
                 wfs[c][idx0:idx1] += pulsewfs[c]
-                if idx1 == len(wfs[c]):
-                    # If this happens the seq will laod fine but will have
-                    # funny behaviour because it does not end in zero
-                    raise ValueError(self.pulses[p].name, idx1, len(wfs[c]))
+
         return tvals, wfs
 
     def waveforms(self):

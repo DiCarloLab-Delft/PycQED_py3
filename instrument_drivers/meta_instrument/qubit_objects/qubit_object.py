@@ -252,6 +252,7 @@ class Transmon(Qubit):
                 print('Converged to: {:.9e}'.format(cur_freq))
             if update:
                 self.f_qubit.set(cur_freq)
+                print("update",update)
             return cur_freq
 
     def find_resonator_frequency(self, **kw):
@@ -260,7 +261,7 @@ class Transmon(Qubit):
     def find_pulse_amplitude(self, amps,
                              N_steps=[3, 7, 13, 17], max_n=18,
                              close_fig=True, verbose=False,
-                             MC=None, update=True):
+                             MC=None, update=True, take_fit_I=False):
         '''
         Finds the pulse-amplitude using a rabi experiment.
 
@@ -274,11 +275,15 @@ class Transmon(Qubit):
         if np.size(amps) != 1:
             self.measure_rabi(amps, n=1, MC=MC, analyze=False)
             a = ma.Rabi_Analysis(close_fig=close_fig)
-            if (a.fit_res[0].params['period'].stderr <=
-                    a.fit_res[1].params['period'].stderr):
-                ampl = abs(a.fit_res[0].params['period'].value)/2
+            if take_fit_I:
+                    ampl = abs(a.fit_res[0].params['period'].value)/2
+                    print("taking I")
             else:
-                ampl = abs(a.fit_res[1].params['period'].value)/2
+                if (a.fit_res[0].params['period'].stderr <=
+                        a.fit_res[1].params['period'].stderr):
+                    ampl = abs(a.fit_res[0].params['period'].value)/2
+                else:
+                    ampl = abs(a.fit_res[1].params['period'].value)/2
         else:
             ampl = amps
         if verbose:
@@ -292,15 +297,22 @@ class Transmon(Qubit):
                 amps = np.linspace(ampl-ampl_span, ampl+ampl_span, 15)
                 self.measure_rabi(amps, n=n, MC=MC, analyze=False)
                 a = ma.Rabi_parabola_analysis(close_fig=close_fig)
-                if (a.fit_res[0].params['x0'].stderr <=
-                        a.fit_res[1].params['x0'].stderr):
+                if take_fit_I:
                     ampl = a.fit_res[0].params['x0'].value
+                    print("taking I")
                 else:
-                    ampl = a.fit_res[1].params['x0'].value
+                    print("checking both fits")
+                    if (a.fit_res[0].params['x0'].stderr <=
+                            a.fit_res[1].params['x0'].stderr):
+                        ampl = a.fit_res[0].params['x0'].value
+                    else:
+                        ampl = a.fit_res[1].params['x0'].value
                 if verbose:
                     print('Found amplitude', ampl, '\n')
         if update:
             self.amp180.set(ampl)
+            print("should be updated")
+            print(ampl)
 
         # After this it should enter a loop where it fine tunes the amplitude
         # based on fine scanes around the optimum with higher sensitivity.
