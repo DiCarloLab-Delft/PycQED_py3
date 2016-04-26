@@ -345,6 +345,23 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                 print('Actual detuning:{:.2e}'.format(
                       fitted_freq-artificial_detuning))
 
+    def measure_echo(self, times, label='', MC=None,
+                     analyze=True, close_fig=True, verbose=True):
+        self.prepare_for_timedomain()
+        if MC is None:
+            MC = self.MC
+
+        Echo_swf = awg_swf.Echo(
+            pulse_pars=self.pulse_pars, RO_pars=self.RO_pars)
+        MC.set_sweep_function(Echo_swf)
+        MC.set_sweep_points(times)
+        MC.set_detector_function(self.int_avg_det)
+        MC.run('Echo'+label+self.msmt_suffix)
+
+        if analyze:
+            a = ma.Ramsey_Analysis(auto=True, close_fig=True)
+            return a
+
     def measure_allxy(self, double_points=True,
                       MC=None,
                       analyze=True, close_fig=True, verbose=True):

@@ -125,6 +125,43 @@ def Ramsey_seq(times, pulse_pars, RO_pars,
     return seq_name
 
 
+def Echo_seq(times, pulse_pars, RO_pars,
+             cal_points=True,
+             verbose=False):
+    '''
+    Echo sequence for a single qubit using the tektronix.
+    Input pars:
+        times:          array of times between (start of) pulses (s)
+        pulse_pars:     dict containing the pulse parameters
+        RO_pars:        dict containing the RO parameters
+        cal_points:     whether to use calibration points or not
+    '''
+    seq_name = 'Echo_sequence'
+    seq = sequence.Sequence(seq_name)
+    el_list = []
+
+    pulses = get_pulse_dict_from_pars(pulse_pars)
+    center_X180 = deepcopy(pulses['X180'])
+    final_X90 = deepcopy(pulses['X90'])
+    for i, tau in enumerate(times):
+        center_X180['pulse_delay'] = tau/2
+        final_X90['pulse_delay'] = tau/2
+
+        if cal_points and (i == (len(times)-4) or i == (len(times)-3)):
+                el = multi_pulse_elt(i, station, [pulses['I'], RO_pars])
+        elif cal_points and (i == (len(times)-2) or i == (len(times)-1)):
+                el = multi_pulse_elt(i, station, [pulses['X180'], RO_pars])
+        else:
+            el = multi_pulse_elt(i, station,
+                                 [pulses['X90'], center_X180,
+                                  final_X90, RO_pars])
+        el_list.append(el)
+        seq.append_element(el, trigger_wait=True)
+    station.instruments['AWG'].stop()
+    station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+    return seq_name
+
+
 def AllXY_seq(pulse_pars, RO_pars, double_points=False,
               verbose=False):
     '''

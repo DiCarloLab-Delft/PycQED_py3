@@ -2027,8 +2027,6 @@ class SSRO_single_quadrature_discriminiation_analysis(MeasurementAnalysis):
         return F_discr, opt_threshold
 
 
-
-
 class T1_Analysis(TD_Analysis):
     def __init__(self, label='T1', **kw):
         kw['label'] = label
