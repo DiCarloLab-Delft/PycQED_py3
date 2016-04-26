@@ -329,7 +329,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         MC.run('Echo'+label+self.msmt_suffix)
 
         if analyze:
-            a = ma.Ramsey_Analysis(auto=True, close_fig=True)
+            a = ma.TD_Analysis(auto=True, close_fig=True)
             return a
 
     def measure_allxy(self, double_points=True,
@@ -385,19 +385,14 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
             MC=MC,
             AWG=self.AWG, CBox=self.CBox,
             pulse_pars=self.pulse_pars, RO_pars=self.RO_pars,
-             set_integration_weights=set_integration_weights)
+            set_integration_weights=set_integration_weights)
         if return_detector:
             return d
         d.prepare()
         d.acquire_data_point()
-
-
         if analyze:
             return ma.SSRO_Analysis(label='SSRO'+self.msmt_suffix,
                                     no_fits=no_fits, close_fig=close_fig)
-
-
-
 
     def measure_butterfly(self, return_detector=False,
                           MC=None,
@@ -486,9 +481,6 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                       verbose=False):
         raise NotImplementedError()
 
-    def measure_Echo(self, times, MC=None,
-                     analyze=True, close_fig=True, verbose=True):
-        raise NotImplementedError()
 
     def measure_motoi_XY(self, motzois, MC=None, analyze=True, close_fig=True,
                          verbose=True, update=True):
@@ -507,7 +499,6 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
             if update:
                 self.motzoi.set(a.optimal_motzoi)
             return a
-
 
     def get_pulse_pars(self):
         self.pulse_pars = {

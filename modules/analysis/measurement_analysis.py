@@ -913,6 +913,12 @@ class Rabi_Analysis(TD_Analysis):
             self.save_fitted_parameters(fit_res=self.fit_res[i],
                                         var_name=self.value_names[i])
 
+class Echo_analysis(TD_Analysis):
+
+    def run_default_analysis(self, close_file=True, **kw):
+        self.get_naming_and_values()
+        self.fit_data(**kw)
+        pass
 
 class Rabi_parabola_analysis(Rabi_Analysis):
 
@@ -4509,8 +4515,6 @@ class Tomo_Analysis(MeasurementAnalysis):
 ##########################################
 ### Analysis for data measurement sets ###
 ##########################################
-
-
 
 
 
