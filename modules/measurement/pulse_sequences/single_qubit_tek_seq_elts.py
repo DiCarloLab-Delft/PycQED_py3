@@ -339,7 +339,7 @@ def resetless_RB_seq(pulse_pars, RO_pars,
                      nr_cliffords,
                      nr_seeds=10,
                      post_measurement_delay=3e-6,
-                     verbose=False):
+                     verbose=False, repetitions=2**16):
     '''
     Consists of 1 very long element that interleaves RB-sequences with
     measurement.
@@ -386,7 +386,7 @@ def resetless_RB_seq(pulse_pars, RO_pars,
         el.length(), fixed_point_freq)
     el.min_samples = el.samples() + int(extra_delay*el.clock)
     el_list.append(el)
-    seq.append_element(el, trigger_wait=True, repetitions=2**16)
+    seq.append_element(el, trigger_wait=True, repetitions=repetitions)
 
     station.instruments['AWG'].stop()
     station.pulsar.program_awg(seq, *el_list, verbose=verbose)
