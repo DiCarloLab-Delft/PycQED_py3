@@ -118,6 +118,24 @@ class Assembler():
         except ValueError as detail:
             print('Lui instruction format error:', detail.args)
 
+    # mov rt, imm32
+    def MovFormat(self, Register, imm32):
+        try:
+            val32 = int(imm32)
+            putByte0 = val32 & ((1 << 8) - 1)
+            putByte1 = (val32 >> 8) & ((1 << 8) - 1)
+            putByte2 = (val32 >> 16) & ((1 << 8) - 1)
+            putByte3 = (val32 >> 24) & ((1 << 8) - 1)
+            Luis = []
+            Luis.append(self.LuiFormat(Register, 0, putByte0))
+            Luis.append(self.LuiFormat(Register, 1, putByte1))
+            Luis.append(self.LuiFormat(Register, 2, putByte2))
+            Luis.append(self.LuiFormat(Register, 3, putByte3))
+            return Luis
+
+        except ValueError as detail:
+            print('Lui instruction format error:', detail.args)
+
     # add rd, rs, rt
     def AddFormat(self, dst_reg, src_reg1, src_reg2):
         try:
@@ -253,6 +271,20 @@ class Assembler():
 
     # trigger mask, duration
     def TriggerFormat(self, mask, imm11):
+        if len(mask) != 7:
+            raise ValueError("The mask should be 7 bits. \
+                              With the MSb indicating marker 1, \
+                              and the LSb indicating marker 7.")
+        for b in mask:
+            if (b != '0' and b != '1'):
+                raise ValueError("The mask should only contain 1 or 0.")
+
+        # In the core of 3.1.0, the MSb works for the trigger 7.
+        # Reverse the string so that the MSb works for trigger 1.
+        mask = mask[::-1]
+
+        mask = "00000" + mask   # The mask should be 12-bit wide.
+
         if int(imm11) < 0 or int(imm11) > 2047:
             raise ValueError("the value of the duration time is out of range \
                               (accepted: integer in 0~2047).")
@@ -272,7 +304,8 @@ class Assembler():
         try:
             Asm_File = open(self.asmfilename, 'r')
         except:
-            print('Error: Fail to open file ' + self.asmfilename + ".")
+            print('\tError: Fail to open file ' + self.asmfilename + ".")
+            exit(0)
 
         tag_addr_dict = {}
         cur_addr = 0
@@ -285,7 +318,7 @@ class Assembler():
             if (len(line) == 0):  # skip empty line and comment
                 continue
 
-            cur_addr = cur_addr + 1
+            cur_addr = len(instructions) + 1
 
             head, sep, tail = line.partition(':')
             if (sep == ":"):
@@ -304,6 +337,12 @@ class Assembler():
                 instructions.append(int(self.LuiFormat(elements[1],
                                                        elements[2],
                                                        elements[3]), 2))
+
+            if (elements[0].lower() == 'mov'):      # mov rt, imm32
+                # print('parsing mov instruction.')
+                instr4 = self.MovFormat(elements[1], elements[2])
+                for i in instr4:
+                    instructions.append(int(i, 2))
 
             elif (elements[0].lower() == 'add'):   # add rd, rs, rt
                 # print('parsing add instruction.')
@@ -360,6 +399,7 @@ class Assembler():
                 if elements[3].strip().lower() in tag_addr_dict:
                     target_addr = tag_addr_dict[elements[3].strip().lower()] -\
                                   (cur_addr + 1)
+                    print("beq, target_addr: ", target_addr)
                 else:
                     print("Error: bne. Cannot find the target: ",
                           elements[3].strip().lower())

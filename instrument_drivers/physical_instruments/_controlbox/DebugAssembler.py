@@ -44,6 +44,7 @@ class Assembler():
 
     def __init__(self, asm_filename):
         self.asmfilename = asm_filename
+        print("initialized asm filename: ", self.asmfilename)
 
     InstOpCode = {'add':     '000000',
                   'sub':     '000000',
@@ -272,7 +273,8 @@ class Assembler():
         try:
             Asm_File = open(self.asmfilename, 'r')
         except:
-            print('Error: Fail to open file ' + self.asmfilename + ".")
+            print('\tError: Fail to open file ' + self.asmfilename + ".")
+            exit(0)
 
         tag_addr_dict = {}
         cur_addr = 0

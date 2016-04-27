@@ -139,13 +139,13 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
     def _do_set_core_state(self, core_state):
         if self.get('acquisition_mode') is not None:
             tmp_acquisition_mode = self.get('acquisition_mode')
-            print('_do_set_core_state\got_acquisition_mode: ', tmp_acquisition_mode)
+            # print('_do_set_core_state\got_acquisition_mode: ', tmp_acquisition_mode)
         else:
             tmp_acquisition_mode = 0   # idle state
 
         if self.get('trigger_source') is not None:
             tmp_trigger_source = self.get('trigger_source')
-            print('_do_set_core_state\got_trigger_source: ', tmp_trigger_source)
+            # print('_do_set_core_state\got_trigger_source: ', tmp_trigger_source)
         else:
             tmp_trigger_source = 0      # internal trigger
 
@@ -161,7 +161,7 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
             tmp_core_state = 0
         elif self.get('core_state') is not None:
             tmp_core_state = self.get('core_state')
-            print('_do_set_acquisition_mode\got_core_state: ', tmp_core_state)
+            # print('_do_set_acquisition_mode\got_core_state: ', tmp_core_state)
         else:
             tmp_core_state = 0   # idle state
 
@@ -173,7 +173,7 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
             tmp_trigger_source = 0
         elif self.get('trigger_source') is not None:
             tmp_trigger_source = self.get('trigger_source')
-            print('_do_set_acquisition_mode\got_trigger_source: ', tmp_trigger_source)
+            # print('_do_set_acquisition_mode\got_trigger_source: ', tmp_trigger_source)
         else:
             tmp_trigger_source = 0      # internal trigger
 
@@ -183,13 +183,13 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
     def _do_set_trigger_source(self, trigger_source):
         if self.get('core_state') is not None:
             tmp_core_state = self.get('core_state')
-            print('_do_set_trigger_source\got_core_state: ', tmp_core_state)
+            # print('_do_set_trigger_source\got_core_state: ', tmp_core_state)
         else:
             tmp_core_state = 0   # idle state
 
         if self.get('acquisition_mode') is not None:
             tmp_acquisition_mode = self.get('acquisition_mode')
-            print('_do_set_trigger_source\got_acquisition_mode: ', tmp_acquisition_mode)
+            # print('_do_set_trigger_source\got_acquisition_mode: ', tmp_acquisition_mode)
         else:
             tmp_acquisition_mode = 0   # idle state
 
@@ -300,7 +300,7 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
         i = 0
         for instruction in instructions:
             print(i, ": ",  format(instruction, 'x').zfill(8))
-            i = i + 1
+            i = i + 4
 
         # Check the instruction list length
         if len(instructions) == 0:
