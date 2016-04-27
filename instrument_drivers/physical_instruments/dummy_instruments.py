@@ -8,16 +8,16 @@ from qcodes.instrument.parameter import ManualParameter
 
 class DummyParHolder(Instrument):
     '''
-    Holds dummy parameters which are get and set able aswell as provides
+    Holds dummy parameters which are get and set able as well as provides
     some basic functions that depends on these parameters for testing
     purposes.
 
-    Located in physical instruments because it mimicks a instrument that
+    Located in physical instruments because it mimics a instrument that
     talks directly to the hardware.
     '''
 
-    def __init__(self, name):
-        super().__init__(name)
+    def __init__(self, name, **kw):
+        super().__init__(name, **kw)
 
         # Instrument parameters
         for parname in ['x', 'y', 'z']:

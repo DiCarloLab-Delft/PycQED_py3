@@ -11,6 +11,12 @@ from modules.utilities import general
 from modules.utilities.general import dict_to_ordered_tuples
 from qcodes.plots.pyqtgraph import QtPlot
 
+# Used for auto qcodes parameter wrapping
+from modules.measurement import sweep_functions as swf
+from modules.measurement import detector_functions as det
+from modules.measurement.mc_parameter_wrapper import wrap_par_to_swf
+from modules.measurement.mc_parameter_wrapper import wrap_par_to_det
+
 
 class MeasurementControl:
     '''
@@ -340,6 +346,11 @@ class MeasurementControl:
         return
 
     def set_sweep_function_2D(self, sweep_function):
+        # If it is not a sweep function, assume it is a qc.parameter
+        # and try to auto convert it it
+        if not isinstance(sweep_function, swf.Sweep_function):
+            sweep_function = wrap_par_to_swf(sweep_function)
+
         if len(self.sweep_functions) != 1:
             raise KeyError('Specify sweepfunction 1D before specifying sweep_function 2D')
         else:
@@ -650,6 +661,14 @@ class MeasurementControl:
         '''
         Used if only 1 sweep function is set.
         '''
+        # If it is not a sweep function, assume it is a qc.parameter
+        # and try to auto convert it it
+        if not isinstance(sweep_function, swf.Sweep_function):
+            sweep_function = wrap_par_to_swf(sweep_function)
+            print('wrapped it !')
+            print(sweep_function)
+            print(sweep_function.name)
+        print('or not?')
         self.sweep_functions = [sweep_function]
         self.set_sweep_function_names(
             [str(sweep_function.name)])
@@ -661,12 +680,15 @@ class MeasurementControl:
         '''
         Used to set an arbitrary number of sweep functions.
         '''
-        self.sweep_functions = sweep_functions
-
         sweep_function_names = []
-        for swf in sweep_functions:
+        for i, swf in enumerate(sweep_functions):
+            # If it is not a sweep function, assume it is a qc.parameter
+            # and try to auto convert it it
+            if not isinstance(swf, swf.Sweep_function):
+                swf = wrap_par_to_swf(swf)
+                sweep_functions[i] = swf
             sweep_function_names.append(str(swf.__class__.__name__))
-            # input str(swf.__class__.__name__)
+        self.sweep_functions = sweep_functions
         self.set_sweep_function_names(sweep_function_names)
 
     def get_sweep_functions(self):
@@ -679,6 +701,11 @@ class MeasurementControl:
         return self.sweep_function_names
 
     def set_detector_function(self, detector_function):
+        # If it is not a detector function, assume it is a qc.parameter
+        # and try to auto convert it it
+        if not isinstance(detector_function, det.Detector_Function):
+            detector_function = wrap_par_to_det(detector_function)
+
         self.detector_function = detector_function
         self.set_detector_function_name(detector_function.name)
 
