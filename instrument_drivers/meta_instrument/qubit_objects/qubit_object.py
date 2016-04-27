@@ -65,8 +65,8 @@ class Qubit(Instrument):
           that has it's own frequency parameter, attach a mixer object that has
           it's own calibration routines.
     '''
-    def __init__(self, name):
-        super().__init__(name)
+    def __init__(self, name, **kw):
+        super().__init__(name, **kw)
         self.msmt_suffix = '_' + name  # used to append to measuremnet labels
 
     def measure_T1(self):
@@ -107,8 +107,8 @@ class Transmon(Qubit):
     circuit-QED Transmon as used in DiCarlo Lab.
     Adds transmon specific parameters as well
     '''
-    def __init__(self, name):
-        super().__init__(name)
+    def __init__(self, name, **kw):
+        super().__init__(name, **kw)
         self.add_parameter('EC', units='Hz',
                            parameter_class=ManualParameter,
                            vals=vals.Numbers())

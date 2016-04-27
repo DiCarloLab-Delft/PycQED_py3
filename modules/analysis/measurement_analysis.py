@@ -929,7 +929,9 @@ class Echo_analysis(TD_Analysis):
     def fit_data(self, print_fit_results=False, **kw):
 
         self.add_analysis_datagroup_to_file()
-        model = fit_mods.ExpDecayModel
+        # Instantiating here ensures models have no memory of constraints
+        model = lmfit.Model(fit_mods.ExpDecayFunc)
+        model.guess = fit_mods.exp_dec_guess
 
         params = model.guess(model, data=self.corr_data[:-self.NoCalPoints],
                              t=self.sweep_points[:-self.NoCalPoints])

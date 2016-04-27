@@ -9,7 +9,7 @@ import pandas as pd
 # Qcodes
 import qcodes as qc
 qc.set_mp_method('spawn')  # force Windows behavior on mac
-
+qc.show_subprocess_widget()
 # Globally defined config
 qc_config = {'datadir': 'D:\Experiments\Simultaneous_Driving\data',
              'PycQEDdir': 'D:\GitHubRepos\PycQED_py3'}
@@ -50,18 +50,21 @@ from instrument_drivers.physical_instruments import QuTech_Duplexer as qdux
 # Initializing instruments
 
 # SH = sh.SignalHound_USB_SA124B('Signal hound') #commented because of 8s load time
-CBox = qcb.QuTech_ControlBox('CBox', address='Com3', run_tests=False)
+CBox = qcb.QuTech_ControlBox('CBox', address='Com3', run_tests=False,
+                             server_name=None)
 S1 = rs.RohdeSchwarz_SGS100A('S1', address='GPIB0::11::INSTR')  # located on top of rack
 LO = rs.RohdeSchwarz_SGS100A(name='LO', address='TCPIP0::192.168.0.77')  # left of s2
 S2 = rs.RohdeSchwarz_SGS100A(name='S2', address='TCPIP0::192.168.0.78')  # right
 AWG = tek.Tektronix_AWG5014(name='AWG', setup_folder=None,
-                            address='TCPIP0::192.168.0.9')
+                            address='TCPIP0::192.168.0.9', server_name=None)
 IVVI = iv.IVVI('IVVI', address='ASRL1', numdacs=16)
 Dux = qdux.QuTech_Duplexer('Dux', address='TCPIP0::192.168.0.101')
 
 # Meta-instruments
-HS = hd.LO_modulated_Heterodyne('HS', LO=LO, CBox=CBox, AWG=AWG)
-LutMan = lm.QuTech_ControlBox_LookuptableManager('LutMan', CBox)
+HS = hd.LO_modulated_Heterodyne('HS', LO=LO, CBox=CBox, AWG=AWG,
+                                server_name=None)
+LutMan = lm.QuTech_ControlBox_LookuptableManager('LutMan', CBox,
+                                                 server_name=None)
 
 MC = mc.MeasurementControl('MC')
 
@@ -69,17 +72,20 @@ VIP_mon_2 = qb.CBox_driven_transmon('VIP_mon_2',
                                     LO=LO, cw_source=S1, td_source=S2,
                                     IVVI=IVVI,
                                     AWG=AWG, LutMan=LutMan,
-                                    CBox=CBox, heterodyne_instr=HS, MC=MC)
+                                    CBox=CBox, heterodyne_instr=HS, MC=MC,
+                                    server_name=None)
 VIP_mon_4 = qb.CBox_driven_transmon('VIP_mon_4',
                                     LO=LO, cw_source=S1, td_source=S2,
                                     IVVI=IVVI,
                                     AWG=AWG, LutMan=LutMan,
-                                    CBox=CBox, heterodyne_instr=HS, MC=MC)
+                                    CBox=CBox, heterodyne_instr=HS, MC=MC,
+                                    server_name=None)
 VIP_mon_6 = qb.CBox_driven_transmon('VIP_mon_6',
                                     LO=LO, cw_source=S1, td_source=S2,
                                     IVVI=IVVI,
                                     AWG=AWG, LutMan=LutMan,
-                                    CBox=CBox, heterodyne_instr=HS, MC=MC)
+                                    CBox=CBox, heterodyne_instr=HS, MC=MC,
+                                    server_name=None)
 
 
 VIP_mon_4_tek = qbt.Tektronix_driven_transmon('VIP_mon_4_tek',
@@ -88,7 +94,8 @@ VIP_mon_4_tek = qbt.Tektronix_driven_transmon('VIP_mon_4_tek',
                                               IVVI=IVVI,
                                               AWG=AWG,
                                               CBox=CBox, heterodyne_instr=HS,
-                                              MC=MC)
+                                              MC=MC,
+                                              server_name=None)
 
 gen.load_settings_onto_instrument(VIP_mon_2, label='VIP_mon_2')
 gen.load_settings_onto_instrument(VIP_mon_4, label='VIP_mon_4')

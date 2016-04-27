@@ -39,11 +39,14 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         - LO + RF-pulsed with marker: 'Gated_MW_RO_pulse'
         Depending on the RO_pulse_type some parameters are not used
     '''
+    shared_kwargs = ['LO', 'cw_source', 'td_source', 'IVVI', 'AWG', 'CBox',
+                     'heterodyne_instr', 'rf_RO_source', 'MC']
+
     def __init__(self, name,
                  LO, cw_source, td_source,
                  IVVI, AWG, CBox,
-                 heterodyne_instr, MC, rf_RO_source=None):
-        super(CBox_driven_transmon, self).__init__(name)
+                 heterodyne_instr, MC, rf_RO_source=None, **kw):
+        super(CBox_driven_transmon, self).__init__(name, **kw)
         # Change this when inheriting directly from Transmon instead of from CBox driven Transmon.
         self.LO = LO
         self.cw_source = cw_source

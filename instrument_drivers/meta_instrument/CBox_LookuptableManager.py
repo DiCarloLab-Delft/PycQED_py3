@@ -26,10 +26,10 @@ class QuTech_ControlBox_LookuptableManager(Instrument):
     Note: I did not port over the depletion pulses (MAR 7-1-2016)
     '''
 
-    def __init__(self, name, CBox):
+    def __init__(self, name, CBox, **kw):
 
         logging.info(__name__ + ' : Initializing instrument')
-        super().__init__(name)
+        super().__init__(name, **kw)
 
         self.CBox = CBox
 

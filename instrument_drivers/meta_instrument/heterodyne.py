@@ -31,9 +31,9 @@ class HeterodyneInstrument(Instrument):
            identical results
     '''
     def __init__(self, name,  RF, LO, CBox,
-                 single_sideband_demod=False):
+                 single_sideband_demod=False, **kw):
         logging.info(__name__ + ' : Initializing instrument')
-        Instrument.__init__(self, name)
+        Instrument.__init__(self, name, **kw)
 
         self.LO = LO
         self.RF = RF
@@ -272,9 +272,9 @@ class LO_modulated_Heterodyne(HeterodyneInstrument):
     CBox is used for acquisition.
     '''
     def __init__(self, name,  LO, CBox, AWG,
-                 single_sideband_demod=False):
+                 single_sideband_demod=False, **kw):
         logging.info(__name__ + ' : Initializing instrument')
-        Instrument.__init__(self, name)
+        Instrument.__init__(self, name, **kw)
         self.LO = LO
         self.CBox = CBox
         self.AWG = AWG

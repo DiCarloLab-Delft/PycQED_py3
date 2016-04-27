@@ -988,7 +988,7 @@ def normalize_2D_data_on_elements(data_2D, elements):
     return data_2D
 
 def rotate_and_normalize_data(data, cal_zero_points, cal_one_points,
-                              zero_coord=None, one_coord=None):
+                              zero_coord=None, one_coord=None, **kw):
     '''
     Rotates and normalizes data with respect to some reference coordinates.
     there are two ways to specify the reference coordinates.

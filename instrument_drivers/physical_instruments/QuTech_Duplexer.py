@@ -13,15 +13,17 @@ class QuTech_Duplexer(VisaInstrument):
     This is the python driver for the QuTech duplexer made by TNO.
     '''
 
-    def __init__(self, name, address='TCPIP0::192.168.0.100', reset=False,
-                 nr_input_channels=4, nr_output_channels=2):
+    def __init__(self, name, address='TCPIP0::192.168.0.100',
+                 nr_input_channels=4, nr_output_channels=2, **kw):
         '''
         Initializes the QuTech_Duplexer, and communicates with the wrapper.
 
         Input:
-            name (string)    : name of the instrument
-            address (string) : TCPIP address
-            reset (bool)     : resets to default values, default=false
+            name (string)      : name of the instrument
+            address (string)   : TCPIP address
+            nr_input_channels  :  for multiplexer compatibility
+            nr_output_channels :  ""
+            **kw               : required for qcodes server compatibility
 
         Output:
             None

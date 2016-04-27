@@ -33,8 +33,8 @@ class CBox_driven_transmon(Transmon):
                  LO, cw_source, td_source,
                  IVVI, AWG, LutMan,
                  CBox, heterodyne_instr,
-                 MC):
-        super().__init__(name)
+                 MC, **kw):
+        super().__init__(name, **kw)
         '''
         Adds the parameters to the qubit insrument, it provides initial values
         for some parameters but not for all. Powers have to be set by hand as
