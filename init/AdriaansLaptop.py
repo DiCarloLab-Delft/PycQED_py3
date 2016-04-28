@@ -28,7 +28,9 @@ MC = mc.MeasurementControl('MC')
 MC.station = station
 station.MC = MC
 
-t1 = time.time()
+from instrument_drivers.physical_instruments import dummy_instruments as dm
+Dummy_inst = dm.DummyParHolder('Dummy_inst')
+station.add_instrument(Dummy_inst)
 
 station.pulsar = ps.Pulsar()
 # station.pulsar.AWG = station.instruments['AWG']
@@ -55,4 +57,5 @@ for i in range(4):
 
 
 
+t1 = time.time()
 print('Ran initialization in %.2fs' % (t1-t0))
