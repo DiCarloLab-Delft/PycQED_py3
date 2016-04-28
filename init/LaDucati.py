@@ -49,7 +49,7 @@ from instrument_drivers.physical_instruments import QuTech_Duplexer as qdux
 
 # Initializing instruments
 
-# SH = sh.SignalHound_USB_SA124B('Signal hound') #commented because of 8s load time
+# SH = sh.SignalHound_USB_SA124B('Signal hound', server_name=None) #commented because of 8s load time
 CBox = qcb.QuTech_ControlBox('CBox', address='Com3', run_tests=False,
                              server_name=None)
 S1 = rs.RohdeSchwarz_SGS100A('S1', address='GPIB0::11::INSTR')  # located on top of rack
@@ -63,7 +63,7 @@ Dux = qdux.QuTech_Duplexer('Dux', address='TCPIP0::192.168.0.101')
 # Meta-instruments
 HS = hd.LO_modulated_Heterodyne('HS', LO=LO, CBox=CBox, AWG=AWG,
                                 server_name=None)
-LutMan = lm.QuTech_ControlBox_LookuptableManager('LutMan', CBox,
+LutMan = lm.QuTech_ControlBox_LookuptableManager('LutMan', CBox=CBox,
                                                  server_name=None)
 
 MC = mc.MeasurementControl('MC')

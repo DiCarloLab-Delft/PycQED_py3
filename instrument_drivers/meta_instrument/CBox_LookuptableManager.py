@@ -25,6 +25,7 @@ class QuTech_ControlBox_LookuptableManager(Instrument):
         Convert all units to SI (s and Hz instead of ns and GHz)
     Note: I did not port over the depletion pulses (MAR 7-1-2016)
     '''
+    shared_kwargs = ['CBox']
 
     def __init__(self, name, CBox, **kw):
 

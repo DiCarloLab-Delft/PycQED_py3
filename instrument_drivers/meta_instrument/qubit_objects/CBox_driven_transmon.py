@@ -29,6 +29,10 @@ class CBox_driven_transmon(Transmon):
         Acquisition:           CBox
         Readout pulse configuration: LO modulated using AWG
     '''
+    shared_kwargs = ['LO', 'cw_source', 'td_source', 'IVVI', 'AWG', 'LutMan',
+                     'CBox',
+                     'heterodyne_instr',  'MC']
+
     def __init__(self, name,
                  LO, cw_source, td_source,
                  IVVI, AWG, LutMan,

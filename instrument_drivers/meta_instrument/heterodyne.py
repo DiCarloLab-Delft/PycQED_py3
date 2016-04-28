@@ -30,6 +30,8 @@ class HeterodyneInstrument(Instrument):
         - Add option to use CBox integration averaging mode and verify
            identical results
     '''
+    shared_kwargs = ['RF', 'LO', 'CBox']
+
     def __init__(self, name,  RF, LO, CBox,
                  single_sideband_demod=False, **kw):
         logging.info(__name__ + ' : Initializing instrument')
@@ -271,6 +273,8 @@ class LO_modulated_Heterodyne(HeterodyneInstrument):
     AWG is used for modulating signal and triggering the CBox
     CBox is used for acquisition.
     '''
+    shared_kwargs = ['RF', 'LO', 'CBox', 'AWG']
+
     def __init__(self, name,  LO, CBox, AWG,
                  single_sideband_demod=False, **kw):
         logging.info(__name__ + ' : Initializing instrument')
