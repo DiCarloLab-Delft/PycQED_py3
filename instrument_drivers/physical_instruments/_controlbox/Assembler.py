@@ -121,11 +121,11 @@ class Assembler():
     # mov rt, imm32
     def MovFormat(self, Register, imm32):
         try:
-            val32 = int(imm32)
-            putByte0 = val32 & ((1 << 8) - 1)
-            putByte1 = (val32 >> 8) & ((1 << 8) - 1)
-            putByte2 = (val32 >> 16) & ((1 << 8) - 1)
-            putByte3 = (val32 >> 24) & ((1 << 8) - 1)
+            bit32 = get_bin(imm32, 32)
+            putByte0 = int(bit32[24:32], 2)
+            putByte1 = int(bit32[16:24], 2)
+            putByte2 = int(bit32[8:16], 2)
+            putByte3 = int(bit32[0:8], 2)
             Luis = []
             Luis.append(self.LuiFormat(Register, 0, putByte0))
             Luis.append(self.LuiFormat(Register, 1, putByte1))
@@ -330,7 +330,7 @@ class Assembler():
 
             # the following translate function should be tested.
             elements = [rawEle.strip(string.punctuation.translate(
-                        {'-': None})) for rawEle in instr.split()]
+                        {ord('-'): None})) for rawEle in instr.split()]
 
             if (elements[0].lower() == 'lui'):     # lui rt, pos, byte_data
                 # print('parsing lui instruction.')
@@ -338,7 +338,7 @@ class Assembler():
                                                        elements[2],
                                                        elements[3]), 2))
 
-            if (elements[0].lower() == 'mov'):      # mov rt, imm32
+            elif (elements[0].lower() == 'mov'):      # mov rt, imm32
                 # print('parsing mov instruction.')
                 instr4 = self.MovFormat(elements[1], elements[2])
                 for i in instr4:
@@ -399,7 +399,7 @@ class Assembler():
                 if elements[3].strip().lower() in tag_addr_dict:
                     target_addr = tag_addr_dict[elements[3].strip().lower()] -\
                                   (cur_addr + 1)
-                    print("beq, target_addr: ", target_addr)
+                    # print("bne, target_addr: ", target_addr)
                 else:
                     print("Error: bne. Cannot find the target: ",
                           elements[3].strip().lower())
