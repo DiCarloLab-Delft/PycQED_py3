@@ -212,10 +212,11 @@ def OffOn_seq(pulse_pars, RO_pars,
     Input pars:
         pulse_pars:          dict containing the pulse parameters
         RO_pars:             dict containing the RO parameters
-    - Initialize adds an exta measurement before state preparation to allow
-    initialization by post-selection
-    - Post-measurement delay should be sufficiently long to avoid photon-induced gate
-    errors when post-selecting.
+        Initialize:          adds an exta measurement before state preparation
+                             to allow initialization by post-selection
+        Post-measurement delay:  should be sufficiently long to avoid
+                             photon-induced gate errors when post-selecting.
+        pulse_comb:          OffOn/OnOn/OffOff cobmination of pulses to play
     '''
     seq_name = 'OffOn_sequence'
     seq = sequence.Sequence(seq_name)
@@ -578,12 +579,13 @@ def multi_pulse_elt(i, station, pulse_list):
                         refpoint='start',
                         fixed_point_freq=pulse_pars['fixed_point_frequency'])
                 # Start Acquisition marker
-                Acq_marker = pulse.SquarePulse(
-                    name='Acq-trigger', amplitude=1, length=20e-9,
-                    channel=pulse_pars['acq_marker_channel'])
-                el.add(
-                    Acq_marker, start=pulse_pars['acq_marker_delay'],
-                    refpulse=last_pulse, refpoint='start')
+                if type(pulse_pars['acq_marker_channel']) is str:
+                    Acq_marker = pulse.SquarePulse(
+                        name='Acq-trigger', amplitude=1, length=20e-9,
+                        channel=pulse_pars['acq_marker_channel'])
+                    el.add(
+                        Acq_marker, start=pulse_pars['acq_marker_delay'],
+                        refpulse=last_pulse, refpoint='start')
 
             else:
                 raise KeyError('pulse_type {} not recognized'.format(

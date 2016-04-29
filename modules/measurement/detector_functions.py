@@ -15,6 +15,7 @@ from modules.measurement.waveform_control import pulsar
 from modules.measurement.waveform_control import element
 from modules.measurement.waveform_control import sequence
 
+
 class Detector_Function(object):
     '''
     Detector_Function class for MeasurementControl(Instrument)
@@ -80,7 +81,7 @@ class Hard_Detector(Detector_Function):
 
 class Soft_Detector(Detector_Function):
     def __init__(self, **kw):
-        super(Soft_Detector, self).__init__()
+        super().__init__(**kw)
         self.detector_control = 'soft'
 
     def acquire_data_point(self, **kw):
