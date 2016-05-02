@@ -70,7 +70,6 @@ LutMan = lm.QuTech_ControlBox_LookuptableManager('LutMan', CBox=CBox,
                                                  server_name=None)
 
 MC = mc.MeasurementControl('MC')
-
 VIP_mon_2 = qb.CBox_driven_transmon('VIP_mon_2',
                                     LO=LO, cw_source=S1, td_source=S2,
                                     IVVI=IVVI,

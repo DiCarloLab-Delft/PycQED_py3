@@ -430,12 +430,12 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         return c.butterfly_coeffs
 
     def measure_transients(self, return_detector=False,
-                          MC=None,
-                          analyze=True,
-                          close_fig=True,
-                          verbose=True,
-                          set_integration_weights=False,
-                          nr_samples = 512):
+                           MC=None,
+                           analyze=True,
+                           close_fig=True,
+                           verbose=True,
+                           set_integration_weights=False,
+                           nr_samples = 512):
         if set_integration_weights:
             print("always using 512 samples to set the weightfunction")
             self.CBox.nr_samples.set(512)

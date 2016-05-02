@@ -224,11 +224,11 @@ def OffOn_seq(pulse_pars, RO_pars,
     # Create a dict with the parameters for all the pulses
     pulses = get_pulse_dict_from_pars(pulse_pars)
 
-    if pulse_comb=='OffOn':
+    if pulse_comb == 'OffOn':
         pulse_combinations = ['I', 'X180']
-    elif pulse_comb=='OnOn':
+    elif pulse_comb == 'OnOn':
         pulse_combinations = ['X180', 'X180']
-    elif pulse_comb=='OffOff':
+    elif pulse_comb == 'OffOff':
         pulse_combinations = ['I', 'I']
 
     for i, pulse_comb in enumerate(pulse_combinations):
@@ -249,8 +249,8 @@ def Butterfly_seq(pulse_pars, RO_pars, initialize=False,
     - Initialize adds an exta measurement before state preparation to allow
     initialization by post-selection
     - Post-measurement delay can be varied to correct data for Tone effects.
-    Post-measurement delay should be sufficiently long to avoid photon-induced gate
-    errors when post-selecting.
+    Post-measurement delay should be sufficiently long to avoid photon-induced
+    gate errors when post-selecting.
     '''
     seq_name = 'Butterfly_seq'
     seq = sequence.Sequence(seq_name)
@@ -586,6 +586,10 @@ def multi_pulse_elt(i, station, pulse_list):
                     el.add(
                         Acq_marker, start=pulse_pars['acq_marker_delay'],
                         refpulse=last_pulse, refpoint='start')
+                else:
+                    # Want to implement compatibiilty with a list of marker
+                    # channels here to allow copies of the pulse
+                    raise TypeError()
 
             else:
                 raise KeyError('pulse_type {} not recognized'.format(
