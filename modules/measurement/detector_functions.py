@@ -540,8 +540,8 @@ class CBox_integration_logging_det(Hard_Detector):
         self.AWG.stop()
 
 
-class CBox_state_counters_det(Hard_Detector):
-    def __init__(self, CBox, AWG, **kw):
+class CBox_state_counters_det(Soft_Detector):
+    def __init__(self, CBox, **kw):
         super().__init__()
         self.CBox = CBox
         self.name = 'CBox_state_counters_detector'
@@ -552,17 +552,17 @@ class CBox_state_counters_det(Hard_Detector):
                             '|0> B', '|1> B', ]
         self.value_units = ['#']*10
 
-    def get_values(self):
+    def acquire_data_point(self):
         success = False
         i = 0
         while not success and i < 10:
             try:
-                d = self._get_values()
+                data = self._get_values()
                 success = True
             except Exception as e:
                 logging.warning('Exception {} caught, retaking data'.format(e))
                 i += 1
-        return d
+        return data
 
     def _get_values(self):
 
@@ -583,7 +583,7 @@ class CBox_single_qubit_state_counters(CBox_state_counters_det):
     Returns only a subset of the counters relating to weight function 1.
     Rescales the measured counts to percentages.
     '''
-    def __init__(self, CBox, AWG):
+    def __init__(self, CBox):
         super(CBox_state_counters_det, self).__init__()
         self.detector_control = 'soft'
         self.CBox = CBox
@@ -597,7 +597,7 @@ class CBox_single_qubit_state_counters(CBox_state_counters_det):
         self.nr_shots = self.CBox.log_length.get()
 
     def acquire_data_point(self):
-        d = super().get_values()
+        d = super().acquire_data_point()
         data = d[0:3]/self.nr_shots * 100
         return data
 
@@ -618,11 +618,11 @@ class CBox_single_qubit_fidelity_counter(CBox_state_counters_det):
         self.name = 'CBox_single_qubit_fidelity_counter'
         # A and B refer to the counts for the different weight functions
         self.value_names = ['F|1>']
-        self.value_units = ['']
+        self.value_units = [' ']
 
     def acquire_data_point(self):
-        d = super().get_values()
-        data = d[5]/(d[4]+d[5]) * 100
+        d = super().acquire_data_point()
+        data = d[4]/(d[3]+d[4])
         return data
 
 
