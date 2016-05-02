@@ -38,6 +38,7 @@ from qcodes.instrument_drivers.rohde_schwarz import SGS100A as rs
 import qcodes.instrument_drivers.signal_hound.USB_SA124B as sh
 import qcodes.instrument_drivers.QuTech.IVVI as iv
 from qcodes.instrument_drivers.tektronix import AWG5014 as tek
+from qcodes.instrument_drivers.tektronix import AWG520 as tk520
 from instrument_drivers.physical_instruments import QuTech_ControlBoxdriver as qcb
 import instrument_drivers.meta_instrument.qubit_objects.Tektronix_driven_transmon as qbt
 from instrument_drivers.meta_instrument import heterodyne as hd
@@ -49,10 +50,12 @@ from instrument_drivers.physical_instruments import QuTech_Duplexer as qdux
 
 # Initializing instruments
 
+AWG520 = tk520.Tektronix_AWG520('AWG520', address='GPIB0::17::INSTR',
+                                server_name='')
 # SH = sh.SignalHound_USB_SA124B('Signal hound', server_name=None) #commented because of 8s load time
 CBox = qcb.QuTech_ControlBox('CBox', address='Com3', run_tests=False,
                              server_name=None)
-S1 = rs.RohdeSchwarz_SGS100A('S1', address='GPIB0::11::INSTR')  # located on top of rack
+S1 = rs.RohdeSchwarz_SGS100A(name='S1', address='TCPIP0::192.168.0.11')  # located on top of rack
 LO = rs.RohdeSchwarz_SGS100A(name='LO', address='TCPIP0::192.168.0.77')  # left of s2
 S2 = rs.RohdeSchwarz_SGS100A(name='S2', address='TCPIP0::192.168.0.78')  # right
 AWG = tek.Tektronix_AWG5014(name='AWG', setup_folder=None,
@@ -67,7 +70,6 @@ LutMan = lm.QuTech_ControlBox_LookuptableManager('LutMan', CBox=CBox,
                                                  server_name=None)
 
 MC = mc.MeasurementControl('MC')
-
 VIP_mon_2 = qb.CBox_driven_transmon('VIP_mon_2',
                                     LO=LO, cw_source=S1, td_source=S2,
                                     IVVI=IVVI,
@@ -103,7 +105,7 @@ gen.load_settings_onto_instrument(VIP_mon_4_tek)
 gen.load_settings_onto_instrument(VIP_mon_6, label='VIP_mon_6')
 
 station = qc.Station(LO, S1, S2, IVVI, Dux,
-                     AWG, HS, CBox, LutMan,
+                     AWG, AWG520, HS, CBox, LutMan,
                      VIP_mon_2, VIP_mon_4, VIP_mon_4_tek, VIP_mon_6)
 MC.station = station
 station.MC = MC
