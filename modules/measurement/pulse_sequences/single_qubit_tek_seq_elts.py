@@ -217,14 +217,11 @@ def OffOn_seq(pulse_pars, RO_pars,
     Input pars:
         pulse_pars:          dict containing the pulse parameters
         RO_pars:             dict containing the RO parameters
-<<<<<<< HEAD
-=======
         Initialize:          adds an exta measurement before state preparation
                              to allow initialization by post-selection
         Post-measurement delay:  should be sufficiently long to avoid
                              photon-induced gate errors when post-selecting.
         pulse_comb:          OffOn/OnOn/OffOff cobmination of pulses to play
->>>>>>> ba4d24012525343d9676020d52f9ca5272baf801
     '''
     seq_name = 'OffOn_sequence'
     seq = sequence.Sequence(seq_name)
