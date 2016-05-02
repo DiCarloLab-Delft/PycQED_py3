@@ -1,6 +1,5 @@
 
 import numpy as np
-
 from qcodes.instrument.base import Instrument
 from qcodes.utils import validators as vals
 from qcodes.instrument.parameter import ManualParameter
