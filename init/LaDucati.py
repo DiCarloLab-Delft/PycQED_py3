@@ -60,7 +60,7 @@ LO = rs.RohdeSchwarz_SGS100A(name='LO', address='TCPIP0::192.168.0.77')  # left 
 S2 = rs.RohdeSchwarz_SGS100A(name='S2', address='TCPIP0::192.168.0.78')  # right
 AWG = tek.Tektronix_AWG5014(name='AWG', setup_folder=None,
                             address='TCPIP0::192.168.0.9', server_name=None)
-IVVI = iv.IVVI('IVVI', address='ASRL1', numdacs=16)
+IVVI = iv.IVVI('IVVI', address='ASRL1', numdacs=16, server_name=None)
 Dux = qdux.QuTech_Duplexer('Dux', address='TCPIP0::192.168.0.101')
 
 # Meta-instruments
@@ -162,6 +162,8 @@ CBox.set_dac_offset(1, 0, 0)  # Q channel readout AWG
 AWG.ch3_offset.set(0.002)
 AWG.ch4_offset.set(0.018)
 AWG.clock_freq.set(1e9)
+
+AWG.trigger_level.set(0.2)
 
 def set_CBox_cos_sine_weigths(IF):
     '''

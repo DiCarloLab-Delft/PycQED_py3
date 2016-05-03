@@ -577,28 +577,27 @@ class CBox_state_counters_det(Soft_Detector):
         self.CBox.set('acquisition_mode', 0)
 
 
-class CBox_single_qubit_state_counters(CBox_state_counters_det):
+class CBox_single_qubit_event_s_fraction(CBox_state_counters_det):
     '''
     Child of the state counters detector
-    Returns only a subset of the counters relating to weight function 1.
+    Returns fraction of event type s by using state counters 1 and 2
     Rescales the measured counts to percentages.
     '''
     def __init__(self, CBox):
         super(CBox_state_counters_det, self).__init__()
-        self.detector_control = 'soft'
         self.CBox = CBox
-        self.name = 'CBox_state_counters_detector'
-        # A and B refer to the counts for the different weight functions
-        self.value_names = ['no err. frac.', 'single err. frac.',
-                            'double err. frac.']
-        self.value_units = ['%']*3
+        self.name = 'CBox_single_qubit_event_s_fraction'
+        self.value_names = ['frac. event s', 'frac. err.', 'frac. 2 or more']
+        self.value_units = ['%', '%', '%']
 
     def prepare(self, **kw):
         self.nr_shots = self.CBox.log_length.get()
 
     def acquire_data_point(self):
         d = super().acquire_data_point()
-        data = d[0:3]/self.nr_shots * 100
+        data = [(d[1]-d[2])/self.nr_shots*100,
+                d[1]/self.nr_shots*100,
+                d[2]/self.nr_shots*100]
         return data
 
 
