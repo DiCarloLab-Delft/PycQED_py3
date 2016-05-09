@@ -19,8 +19,7 @@ from modules.measurement import sweep_functions as swf
 from modules.measurement import detector_functions as det
 from modules.measurement import composite_detector_functions as cdet
 from modules.analysis import measurement_analysis as ma
-from modules.measurement import mc_parameter_wrapper as pw
-from modules.measurement.waveform_control import pulsar as ps
+from modules.analysis import analysis_toolbox as a_tools
 
 # Initializing instruments
 # station = qc.Station()
