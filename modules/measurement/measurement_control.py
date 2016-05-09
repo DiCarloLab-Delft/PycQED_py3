@@ -107,10 +107,10 @@ class MeasurementControl:
                         self.measure_hard()
             else:
                 raise Exception('hard measurements have not been generalized to N-D yet')
+        self.update_plotmon(force_update=True)
         for sweep_function in self.sweep_functions:
             sweep_function.finish()
         self.detector_function.finish()
-
         self.get_measurement_endtime()
         return
 

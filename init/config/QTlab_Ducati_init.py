@@ -71,7 +71,7 @@ ATS = qt.instruments.create('ATS', 'Alazar_ATS9870')
 AWG.start()
 ATS_CW = qt.instruments.create('ATS_CW', 'ATS_CW')
 AWG.stop()
-AWG.set_trigger_slope("Negative")
+AWG.set_trigger_slope("Positive")
 
 ATS_TD = qt. instruments.create('ATS_TD', 'ATS_TD')
 

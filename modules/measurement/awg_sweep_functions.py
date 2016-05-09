@@ -70,7 +70,8 @@ class AllXY(swf.Hard_Sweep):
 
 
 class OffOn(swf.Hard_Sweep):
-    def __init__(self, pulse_pars, RO_pars, upload=True,pulse_comb='OffOn', nr_samples=2):
+    def __init__(self, pulse_pars, RO_pars, upload=True,
+                 pulse_comb='OffOn', nr_samples=2):
         super().__init__()
         self.pulse_pars = pulse_pars
         self.RO_pars = RO_pars

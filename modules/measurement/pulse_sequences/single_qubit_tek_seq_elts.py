@@ -217,6 +217,11 @@ def OffOn_seq(pulse_pars, RO_pars,
     Input pars:
         pulse_pars:          dict containing the pulse parameters
         RO_pars:             dict containing the RO parameters
+        Initialize:          adds an exta measurement before state preparation
+                             to allow initialization by post-selection
+        Post-measurement delay:  should be sufficiently long to avoid
+                             photon-induced gate errors when post-selecting.
+        pulse_comb:          OffOn/OnOn/OffOff cobmination of pulses to play
     '''
     seq_name = 'OffOn_sequence'
     seq = sequence.Sequence(seq_name)
@@ -249,8 +254,8 @@ def Butterfly_seq(pulse_pars, RO_pars, initialize=False,
     - Initialize adds an exta measurement before state preparation to allow
     initialization by post-selection
     - Post-measurement delay can be varied to correct data for Tone effects.
-    Post-measurement delay should be sufficiently long to avoid photon-induced gate
-    errors when post-selecting.
+    Post-measurement delay should be sufficiently long to avoid photon-induced
+    gate errors when post-selecting.
     '''
     seq_name = 'Butterfly_seq'
     seq = sequence.Sequence(seq_name)
@@ -296,6 +301,7 @@ def Butterfly_seq(pulse_pars, RO_pars, initialize=False,
 def Randomized_Benchmarking_seq(pulse_pars, RO_pars,
                                 nr_cliffords,
                                 nr_seeds,
+                                net_clifford=0,
                                 post_msmt_delay=3e-6,
                                 cal_points=True,
                                 resetless=False,
@@ -306,6 +312,8 @@ def Randomized_Benchmarking_seq(pulse_pars, RO_pars,
         RO_pars:       dict containing RO pars
         nr_cliffords:  list nr_cliffords for which to generate RB seqs
         nr_seeds:      int  nr_seeds for which to generate RB seqs
+        net_clifford:  int index of net clifford the sequence should perform
+                       0 corresponds to Identity and 3 corresponds to X180
         post_msmt_delay:
         cal_points:    bool whether to replace the last two elements with
                        calibration points, set to False if you want
@@ -322,6 +330,7 @@ def Randomized_Benchmarking_seq(pulse_pars, RO_pars,
     Optimization use (resetless or not):
         nr_cliffords = [n] is a list with a single entry
         cal_points = False
+        net_clifford = 3 (optional) make sure it does a net pi-pulse
         post_msmt_delay is set (optional)
         resetless (optional)
     '''
@@ -343,7 +352,8 @@ def Randomized_Benchmarking_seq(pulse_pars, RO_pars,
                     el = multi_pulse_elt(i, station,
                                          [pulses['X180'], RO_pars])
                 else:
-                    cl_seq = rb.randomized_benchmarking_sequence(n_cl)
+                    cl_seq = rb.randomized_benchmarking_sequence(
+                        n_cl, desired_net_cl=net_clifford)
                     pulse_keys = rb.decompose_clifford_seq(cl_seq)
                     pulse_list = [pulses[x] for x in pulse_keys]
                     pulse_list += [RO_pars]
@@ -361,121 +371,6 @@ def Randomized_Benchmarking_seq(pulse_pars, RO_pars,
                     el_list.append(el)
                     seq.append_element(el, trigger_wait=True)
 
-    station.instruments['AWG'].stop()
-    station.pulsar.program_awg(seq, *el_list, verbose=verbose)
-    return seq_name
-
-
-def resetless_RB_seq(pulse_pars, RO_pars,
-                     nr_cliffords,
-                     nr_seeds=10,
-                     post_msmt_delay=3e-6,
-                     verbose=False, repetitions=2**16):
-    '''
-    Consists of 1 very long element that interleaves RB-sequences with
-    measurement.
-
-    Takes care all RO pulses are in phase by waiting a post_msmt_delay
-    + a correction time before starting each block of pulses.
-
-    Appends empty samples to ensure the total length of the sequence is a
-    multiple of the modulation (fix_point) frequency.
-    '''
-
-    logging.warning('Deprecated, use Randomized_Benchmarking_seq')
-    seq_name = 'Resetless_RB_seq'
-    seq = sequence.Sequence(seq_name)
-    el_list = []
-    pulses = get_pulse_dict_from_pars(pulse_pars)
-    pulse_list = []
-    # Extracting and fixed point freq, taking care of by hand here
-    fixed_point_freq = RO_pars['fixed_point_frequency']
-    RO_pars['fixed_point_frequency'] = None
-
-    # You can think of every seed as it's own little "block"
-    # the idea is to shift whole blocks to ensure the RO is in-phase
-    for seed in range(nr_seeds):
-        cl_seq = rb.randomized_benchmarking_sequence(nr_cliffords,
-                                                     desired_net_cl=3)
-        pulse_keys = rb.decompose_clifford_seq(cl_seq)
-        pulse_sub_list = [pulses[x] for x in pulse_keys]
-        pulse_sub_list += [RO_pars]
-
-        # Calculate the time correction to ensure RO pulse starts at a
-        # multiple of the fixed_point_freq
-        sub_seq_duration = sum([p['pulse_delay'] for p in pulse_sub_list])
-        extra_delay = calculate_time_corr(
-            sub_seq_duration+post_msmt_delay, fixed_point_freq)
-        initial_pulse_delay = post_msmt_delay + extra_delay
-
-        # Replace the initial element to wait for an extended period of time
-        start_pulse = deepcopy(pulse_sub_list[0])
-        start_pulse['pulse_delay'] += initial_pulse_delay
-        pulse_sub_list[0] = start_pulse
-        pulse_list += pulse_sub_list
-
-    el = multi_pulse_elt(1, station, pulse_list)
-    extra_delay = calculate_time_corr(
-        el.length(), fixed_point_freq)
-    el.min_samples = el.samples() + int(extra_delay*el.clock)
-    el_list.append(el)
-    seq.append_element(el, trigger_wait=True, repetitions=repetitions)
-
-    station.instruments['AWG'].stop()
-    station.pulsar.program_awg(seq, *el_list, verbose=verbose)
-    return seq_name
-
-
-def resetless_rabi_seq(pulse_pars, RO_pars,
-                       n=1,
-                       post_msmt_delay=3e-6,
-                       verbose=False):
-    '''
-    Interleaves n-rabi pulses with measurements, waits at least
-    post_msmt_delay after (the start of) each RO before starting a new
-    pulse.
-
-    Appends empty samples to ensure the total length of the sequence is a
-    multiple of the modulation (fix_point) frequency.
-    '''
-    logging.warning('Deprecated use normal Rabi seq')
-    seq_name = 'Resetless_rabi_seq'
-    seq = sequence.Sequence(seq_name)
-    el_list = []
-    pulses = get_pulse_dict_from_pars(pulse_pars)
-    pulse_list = []
-    # Extracting and fixed point freq, taking care of by hand here
-    fixed_point_freq = RO_pars['fixed_point_frequency']
-    RO_pars['fixed_point_frequency'] = None
-
-    # You can think of every seed as it's own little "block"
-    # the idea is to shift whole blocks to ensure the RO is in-phase
-    # Makes 10 "block" to ensure we fill up the minimum element size
-    for i in range(2):
-
-        pulse_sub_list = n*[pulses['X180']]+[RO_pars]
-
-        # TODO: This is a block common to all resetless sequences, I should
-        # make it into a function.
-        # Calculate the time correction to ensure RO pulse starts at a
-        # multiple of the fixed_point_freq
-        sub_seq_duration = sum([p['pulse_delay'] for p in pulse_sub_list])
-        extra_delay = calculate_time_corr(
-            sub_seq_duration+post_msmt_delay, fixed_point_freq)
-        initial_pulse_delay = post_msmt_delay + extra_delay
-
-        # Replace the initial element to wait for an extended period of time
-        pulse_sub_list[0] = deepcopy(pulse_sub_list[0])
-        pulse_sub_list[0]['pulse_delay'] += initial_pulse_delay
-        pulse_list += pulse_sub_list
-
-    el = multi_pulse_elt(1, station, pulse_list)
-    extra_delay = calculate_time_corr(
-        el.length(), fixed_point_freq)
-    el.min_samples = el.samples() + int(extra_delay*el.clock)
-    el_list.append(el)
-
-    seq.append_element(el, trigger_wait=True, repetitions=2**16)
     station.instruments['AWG'].stop()
     station.pulsar.program_awg(seq, *el_list, verbose=verbose)
     return seq_name
@@ -611,12 +506,17 @@ def multi_pulse_elt(i, station, pulse_list):
                         refpoint='start',
                         fixed_point_freq=pulse_pars['fixed_point_frequency'])
                 # Start Acquisition marker
-                Acq_marker = pulse.SquarePulse(
-                    name='Acq-trigger', amplitude=1, length=20e-9,
-                    channel=pulse_pars['acq_marker_channel'])
-                el.add(
-                    Acq_marker, start=pulse_pars['acq_marker_delay'],
-                    refpulse=last_pulse, refpoint='start')
+                if type(pulse_pars['acq_marker_channel']) is str:
+                    Acq_marker = pulse.SquarePulse(
+                        name='Acq-trigger', amplitude=1, length=20e-9,
+                        channel=pulse_pars['acq_marker_channel'])
+                    el.add(
+                        Acq_marker, start=pulse_pars['acq_marker_delay'],
+                        refpulse=last_pulse, refpoint='start')
+                else:
+                    # Want to implement compatibiilty with a list of marker
+                    # channels here to allow copies of the pulse
+                    raise TypeError()
 
             else:
                 raise KeyError('pulse_type {} not recognized'.format(
