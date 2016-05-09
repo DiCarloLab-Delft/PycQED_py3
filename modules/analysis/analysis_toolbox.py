@@ -1071,7 +1071,7 @@ def current_timemark():
 
 
 def color_plot(x, y, z, fig, ax, show=False, normalize=False, log=False,
-               do_transpose=False, **kw):
+               do_transpose=False, add_colorbar=True, **kw):
     '''
     x, and y are lists, z is a matrix with shape (len(x), len(y))
     In the future this function can be overloaded to handle different
@@ -1127,7 +1127,8 @@ def color_plot(x, y, z, fig, ax, show=False, normalize=False, log=False,
                                  z.transpose(),
                                  cmap=cmap, vmin=clim[0], vmax=clim[1])
     else:
-        colormap = ax.pcolormesh(x_grid, y_grid, z, cmap=cmap, norm=norm)
+        colormap = ax.pcolormesh(x_grid, y_grid, z, cmap=cmap, norm=norm,
+                                 vmin=clim[0], vmax=clim[1])
 
     plot_title = kw.pop('plot_title', None)
 
@@ -1161,13 +1162,13 @@ def color_plot(x, y, z, fig, ax, show=False, normalize=False, log=False,
 
     ax.get_yaxis().set_tick_params(direction='out')
     ax.get_xaxis().set_tick_params(direction='out')
-
-    ax_divider = make_axes_locatable(ax)
-    cax = ax_divider.append_axes('right',size='10%', pad='5%')
-    cbar = plt.colorbar(colormap, cax=cax)
-    if zlabel is not None:
-        cbar.set_label(zlabel)
-    return fig, ax
+    if add_colorbar:
+        ax_divider = make_axes_locatable(ax)
+        cax = ax_divider.append_axes('right', size='10%', pad='5%')
+        cbar = plt.colorbar(colormap, cax=cax)
+        if zlabel is not None:
+            cbar.set_label(zlabel)
+    return fig, ax, colormap
 
 
 def color_plot_slices(xvals, yvals, zvals, ax=None,

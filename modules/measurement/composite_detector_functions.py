@@ -371,14 +371,15 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
     For Qcodes. Readout with CBox, pulse generation with 5014
     '''
     def __init__(self, measurement_name,  MC, AWG, CBox, pulse_pars, RO_pars,
-                 raw=True, analyze=True, upload=True, set_integration_weights=False,**kw):
+                 raw=True, analyze=True, upload=True,
+                 set_integration_weights=False, wait=0.0, **kw):
         self.detector_control = 'soft'
         self.name = 'SSRO_Fidelity'
         # For an explanation of the difference between the different
         # Fidelities look in the analysis script
         if raw:
-            self.value_names = ['F-raw']
-            self.value_units = [' ']
+            self.value_names = ['F-raw', 'theta']
+            self.value_units = [' ', 'rad']
         else:
             self.value_names = ['F', 'F corrected']
             self.value_units = [' ', ' ']
@@ -396,32 +397,37 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
         self.analyze = analyze
 
         self.upload = upload
+        self.wait=wait
 
     def prepare(self, **kw):
         if not self.set_integration_weights:
-            self.MC.set_sweep_function(awg_swf.OffOn(pulse_pars=self.pulse_pars,
-                                                     RO_pars=self.RO_pars))
+            self.MC.set_sweep_function(awg_swf.OffOn(
+                                       pulse_pars=self.pulse_pars,
+                                       RO_pars=self.RO_pars))
             self.MC.set_detector_function(
                 det.CBox_integration_logging_det(self.CBox, self.AWG))
 
     def acquire_data_point(self, *args, **kw):
+        self.time_start=time.time()
         if self.set_integration_weights:
-            nr_samples=512
+            nr_samples = 512
             self.CBox.nr_samples.set(nr_samples)
-            self.MC.set_sweep_function(awg_swf.OffOn(pulse_pars=self.pulse_pars,
-                                                 RO_pars=self.RO_pars,
-                                                 pulse_comb='OffOff',
-                                                 nr_samples=nr_samples))
-            self.MC.set_detector_function(det.CBox_input_average_detector(self.CBox,
-                                                                      self.AWG))
+            self.MC.set_sweep_function(awg_swf.OffOn(
+                                       pulse_pars=self.pulse_pars,
+                                       RO_pars=self.RO_pars,
+                                       pulse_comb='OffOff',
+                                       nr_samples=nr_samples))
+            self.MC.set_detector_function(det.CBox_input_average_detector(
+                                          self.CBox, self.AWG))
             self.MC.run('Measure_transients_0')
             a0 = ma.MeasurementAnalysis(auto=True)
-            self.MC.set_sweep_function(awg_swf.OffOn(pulse_pars=self.pulse_pars,
-                                                     RO_pars=self.RO_pars,
-                                                     pulse_comb='OnOn',
-                                                     nr_samples=nr_samples))
-            self.MC.set_detector_function(det.CBox_input_average_detector(self.CBox,
-                                                                      self.AWG))
+            self.MC.set_sweep_function(awg_swf.OffOn(
+                                       pulse_pars=self.pulse_pars,
+                                       RO_pars=self.RO_pars,
+                                       pulse_comb='OnOn',
+                                       nr_samples=nr_samples))
+            self.MC.set_detector_function(det.CBox_input_average_detector(
+                                          self.CBox, self.AWG))
             self.MC.run('Measure_transients_1')
             a1 = ma.MeasurementAnalysis(auto=True)
             transient0 = a0.data[1, :]
@@ -429,10 +435,12 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
             optimized_weights = transient1-transient0
             optimized_weights = optimized_weights+np.mean(optimized_weights)
             self.CBox.sig0_integration_weights.set(optimized_weights)
-            self.CBox.sig1_integration_weights.set(np.multiply(optimized_weights,0)) #disabling the Q quadrature
+            self.CBox.sig1_integration_weights.set(
+                np.multiply(optimized_weights, 0))  # disabling the Q quadrature
 
-            self.MC.set_sweep_function(awg_swf.OffOn(pulse_pars=self.pulse_pars,
-                                                     RO_pars=self.RO_pars))
+            self.MC.set_sweep_function(awg_swf.OffOn(
+                                       pulse_pars=self.pulse_pars,
+                                       RO_pars=self.RO_pars))
 
             self.MC.set_detector_function(
                 det.CBox_integration_logging_det(self.CBox, self.AWG))
@@ -442,8 +450,13 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
             ana = ma.SSRO_Analysis(label=self.measurement_name,
                                    no_fits=self.raw, close_file=True)
             # Arbitrary choice, does not think about the deffinition
+            time_end=time.time()
+            nett_wait = self.wait-time_end+self.time_start
+            print(self.time_start)
+            if nett_wait>0:
+                time.sleep(nett_wait)
             if self.raw:
-                return ana.F_raw
+                return ana.F_raw, ana.theta
             else:
                 return ana.F, ana.F_corrected
 

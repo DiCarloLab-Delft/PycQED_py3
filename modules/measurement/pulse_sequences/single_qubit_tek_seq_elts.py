@@ -513,6 +513,13 @@ def multi_pulse_elt(i, station, pulse_list):
                     el.add(
                         Acq_marker, start=pulse_pars['acq_marker_delay'],
                         refpulse=last_pulse, refpoint='start')
+                    #hacking in a second marker
+                    Acq_marker2 = pulse.SquarePulse(
+                        name='Acq-trigger', amplitude=1, length=20e-9,
+                        channel='ch4_marker2')
+                    el.add(
+                        Acq_marker2, start=pulse_pars['acq_marker_delay'],
+                        refpulse=last_pulse, refpoint='start')
                 else:
                     # Want to implement compatibiilty with a list of marker
                     # channels here to allow copies of the pulse

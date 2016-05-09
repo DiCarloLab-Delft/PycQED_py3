@@ -1436,7 +1436,7 @@ class SSRO_Analysis(MeasurementAnalysis):
         # All information is to be rotated to the I channel
         y_diff = y_1_max-y_0_max
         x_diff = x_1_max-x_0_max
-        theta = -np.arctan(y_diff/x_diff)
+        theta = -np.arctan2(y_diff,x_diff)
 
         shots_I_1_rot = np.cos(theta)*shots_I_1 - np.sin(theta)*shots_Q_1
         shots_Q_1_rot = np.sin(theta)*shots_I_1 + np.cos(theta)*shots_Q_1
@@ -1916,7 +1916,7 @@ class SSRO_discrimination_analysis(MeasurementAnalysis):
         else:
             diff_vec = self.mu_b - self.mu_a
             self.opt_I_threshold = (self.mu_a.real + diff_vec.real/2)
-        self.theta = np.arctan(diff_vec.imag/diff_vec.real)/(2*np.pi)*360-theta_in
+        self.theta = np.arctan2(diff_vec.imag,diff_vec.real)/(2*np.pi)*360-theta_in
         self.mean_sigma = np.mean([sig_a, sig_b])
         # relative separation of the gaussians in units of sigma
         self.relative_separation = abs(diff_vec)/self.mean_sigma

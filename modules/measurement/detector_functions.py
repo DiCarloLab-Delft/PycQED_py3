@@ -587,7 +587,7 @@ class CBox_single_qubit_event_s_fraction(CBox_state_counters_det):
         super(CBox_state_counters_det, self).__init__()
         self.CBox = CBox
         self.name = 'CBox_single_qubit_event_s_fraction'
-        self.value_names = ['frac. event s', 'frac. err.', 'frac. 2 or more']
+        self.value_names = ['frac. err.', 'frac. 2 or more', 'frac. event s']
         self.value_units = ['%', '%', '%']
 
     def prepare(self, **kw):
@@ -595,9 +595,10 @@ class CBox_single_qubit_event_s_fraction(CBox_state_counters_det):
 
     def acquire_data_point(self):
         d = super().acquire_data_point()
-        data = [(d[1]-d[2])/self.nr_shots*100,
+        data = [
                 d[1]/self.nr_shots*100,
-                d[2]/self.nr_shots*100]
+                d[2]/self.nr_shots*100,
+                (d[1]-d[2])/self.nr_shots*100]
         return data
 
 
@@ -616,8 +617,8 @@ class CBox_single_qubit_fidelity_counter(CBox_state_counters_det):
         self.CBox = CBox
         self.name = 'CBox_single_qubit_fidelity_counter'
         # A and B refer to the counts for the different weight functions
-        self.value_names = ['F|1>']
-        self.value_units = [' ']
+        self.value_names = ['F_1']
+        self.value_units = ['']
 
     def acquire_data_point(self):
         d = super().acquire_data_point()

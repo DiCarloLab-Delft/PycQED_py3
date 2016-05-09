@@ -351,7 +351,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
             return a
 
     def measure_randomized_benchmarking(self, nr_cliffords,
-                                        nr_seeds=20, T1=None,
+                                        nr_seeds=50, T1=None,
                                         MC=None, analyze=True, close_fig=True,
                                         verbose=False):
         '''
