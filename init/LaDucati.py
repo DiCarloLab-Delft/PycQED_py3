@@ -53,11 +53,12 @@ from instrument_drivers.physical_instruments import QuTech_Duplexer as qdux
 AWG520 = tk520.Tektronix_AWG520('AWG520', address='GPIB0::17::INSTR',
                                 server_name='')
 # SH = sh.SignalHound_USB_SA124B('Signal hound', server_name=None) #commented because of 8s load time
+
+S2 = rs.RohdeSchwarz_SGS100A(name='S1', address='TCPIP0::192.168.0.11')  # right
+LO = rs.RohdeSchwarz_SGS100A(name='LO', address='TCPIP0::192.168.0.77')  # left
+S1 = rs.RohdeSchwarz_SGS100A(name='S2', address='TCPIP0::192.168.0.78')  # the is the smb on top
 CBox = qcb.QuTech_ControlBox('CBox', address='Com3', run_tests=False,
                              server_name=None)
-S1 = rs.RohdeSchwarz_SGS100A(name='S1', address='TCPIP0::192.168.0.11')  # located on top of rack
-LO = rs.RohdeSchwarz_SGS100A(name='LO', address='TCPIP0::192.168.0.77')  # left of s2
-S2 = rs.RohdeSchwarz_SGS100A(name='S2', address='TCPIP0::192.168.0.78')  # right
 AWG = tek.Tektronix_AWG5014(name='AWG', setup_folder=None,
                             address='TCPIP0::192.168.0.9', server_name=None)
 IVVI = iv.IVVI('IVVI', address='ASRL1', numdacs=16, server_name=None)

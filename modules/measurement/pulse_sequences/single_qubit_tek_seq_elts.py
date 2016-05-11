@@ -521,6 +521,8 @@ def multi_pulse_elt(i, station, pulse_list):
                         Acq_marker2, start=pulse_pars['acq_marker_delay'],
                         refpulse=last_pulse, refpoint='start')
                 else:
+                    # TODO: remove hacked in second marker and support list
+                    # functionality
                     # Want to implement compatibiilty with a list of marker
                     # channels here to allow copies of the pulse
                     raise TypeError()
