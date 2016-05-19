@@ -699,7 +699,7 @@ class MeasurementControl:
     def set_detector_function(self, detector_function):
         # If it is not a detector function, assume it is a qc.parameter
         # and try to auto convert it it
-        if not isinstance(detector_function, det.Detector_Function):
+        if not hasattr(detector_function, 'detector_control'):
             detector_function = wrap_par_to_det(detector_function)
 
         self.detector_function = detector_function

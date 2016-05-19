@@ -632,8 +632,8 @@ class CBox_digitizing_shots_det(CBox_integration_logging_det):
                  LutMan=None, reload_pulses=False, awg_nrs=None):
         super().__init__(CBox, AWG, LutMan, reload_pulses, awg_nrs)
         self.name = 'CBox_digitizing_shots_detector'
-        self.value_names = ['Declared state', 'I', 'Q']
-        self.value_units = ['', 'a.u.', 'a.u.']
+        self.value_names = ['Declared state']#, 'I', 'Q']
+        self.value_units = ['']#, 'a.u.', 'a.u.']
         self.threshold = threshold
 
     def get_values(self):
@@ -642,7 +642,7 @@ class CBox_digitizing_shots_det(CBox_integration_logging_det):
         # comparing 8000 vals with threshold takes 3.8us
         # converting to int 10.8us and to float 13.8us, let's see later if we
         # can cut that.
-        return (d > self.threshold).astype(int), dat[0], dat[1]
+        return (d > self.threshold).astype(int)#, dat[0], dat[1]
 
 
 

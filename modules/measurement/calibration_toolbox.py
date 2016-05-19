@@ -89,7 +89,7 @@ def mixer_skewness_calibration_5014(SH, source, station,
     ad_func_pars = {'adaptive_function': nelder_mead,
                     'x0': [1.0, 0.0],
                     'initial_step': [.15, 10],
-                    'no_improv_break': 5,
+                    'no_improv_break': 10,
                     'minimize': True,
                     'maxiter': 500}
     MC.set_sweep_functions([S1, S2])

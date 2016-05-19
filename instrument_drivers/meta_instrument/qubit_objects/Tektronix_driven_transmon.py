@@ -61,6 +61,11 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         self.add_parameter('mod_amp_cw', label='RO modulation ampl cw',
                            units='V', initial_value=0.5,
                            parameter_class=ManualParameter)
+
+        self.add_parameter('RO_power_cw', label='RO power cw',
+                           units='dBm',
+                           parameter_class=ManualParameter)
+
         self.add_parameter('spec_pow', label='spectroscopy power',
                            units='dBm',
                            parameter_class=ManualParameter)
@@ -386,7 +391,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
             MC=MC,
             AWG=self.AWG, CBox=self.CBox,
             pulse_pars=self.pulse_pars, RO_pars=self.RO_pars,
-            set_integration_weights=set_integration_weights)
+            set_integration_weights=set_integration_weights, close_fig=close_fig)
         if return_detector:
             return d
         d.prepare()
@@ -401,13 +406,13 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                           close_fig=True,
                           verbose=True,
                           initialize=False,
-                          post_measurement_delay=2000e-9, case=True):
+                          post_msmt_delay=2e-6, case=True):
         self.prepare_for_timedomain()
         if MC is None:
             MC = self.MC
         MC.set_sweep_function(awg_swf.Butterfly(
             pulse_pars=self.pulse_pars, RO_pars=self.RO_pars,
-            initialize=initialize, post_measurement_delay=post_measurement_delay))
+            initialize=initialize, post_msmt_delay=post_msmt_delay))
         MC.set_detector_function(self.int_log_det)
         MC.run('Butterfly{}initialize_{}'.format(self.msmt_suffix, initialize))
         # first perform SSRO analysis to extract the optimal rotation angle theta
@@ -452,18 +457,18 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                                                  nr_samples=nr_samples))
         self.MC.set_detector_function(self.input_average_detector)
         self.MC.run('Measure_transients_{}_0'.format(self.msmt_suffix))
-        a0=ma.MeasurementAnalysis(auto=True)
+        a0 = ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
         self.MC.set_sweep_function(awg_swf.OffOn(pulse_pars=self.pulse_pars,
                                                  RO_pars=self.RO_pars,
                                                  pulse_comb='OnOn',
                                                  nr_samples=nr_samples))
         self.MC.set_detector_function(self.input_average_detector)
         self.MC.run('Measure_transients_{}_1'.format(self.msmt_suffix))
-        a1=ma.MeasurementAnalysis(auto=True)
+        a1 = ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
 
         if set_integration_weights:
-            transient0=a0.data[1,:]
-            transient1=a1.data[1,:]
+            transient0 = a0.data[1, :]
+            transient1 = a1.data[1, :]
             optimized_weights = transient1-transient0
             optimized_weights = optimized_weights+np.mean(optimized_weights)
             self.CBox.sig0_integration_weights.set(optimized_weights)

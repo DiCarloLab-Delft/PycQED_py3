@@ -57,6 +57,10 @@ class CBox_driven_transmon(Transmon):
         self.add_parameter('mod_amp_cw', label='RO modulation ampl cw',
                            units='V', initial_value=0.5,
                            parameter_class=ManualParameter)
+        self.add_parameter('RO_power_cw', label='RO power cw',
+                           units='dBm',
+                           parameter_class=ManualParameter)
+
         self.add_parameter('mod_amp_td', label='RO modulation ampl td',
                            units='V', initial_value=0.5,
                            parameter_class=ManualParameter)
@@ -123,8 +127,11 @@ class CBox_driven_transmon(Transmon):
         self.LO.on()
         self.td_source.off()
         self.cw_source.on()
-        self.heterodyne_instr.set('mod_amp', self.mod_amp_cw.get())
-        # TODO Update IF to f_RO_mod in heterodyne instr
+        if hasattr(self.heterodyne_instr, 'mod_amp'):
+            self.heterodyne_instr.set('mod_amp', self.mod_amp_cw.get())
+        else:
+            self.heterodyne_instr.RF_power(self.RO_power_cw())
+        # TODO: Update IF to f_RO_mod in heterodyne instr
         self.heterodyne_instr.set('IF', self.f_RO_mod.get())
         self.heterodyne_instr.frequency.set(self.f_res.get())
         self.cw_source.pulsemod_state.set('off')
@@ -512,7 +519,10 @@ class CBox_driven_transmon(Transmon):
         self.cw_source.power.set(self.spec_pow_pulsed.get())
 
         self.AWG.start()
-        self.heterodyne_instr.mod_amp.set(self.mod_amp_td.get())
+        if hasattr(self.heterodyne_instr, 'mod_amp'):
+            self.heterodyne_instr.set('mod_amp', self.mod_amp_cw.get())
+        else:
+            self.heterodyne_instr.RF.power(self.RO_power_cw())
         MC.set_sweep_function(pw.wrap_par_to_swf(self.cw_source.frequency))
         MC.set_sweep_points(freqs)
         MC.set_detector_function(det.Heterodyne_probe(self.heterodyne_instr))

@@ -372,7 +372,8 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
     '''
     def __init__(self, measurement_name,  MC, AWG, CBox, pulse_pars, RO_pars,
                  raw=True, analyze=True, upload=True,
-                 set_integration_weights=False, wait=0.0, **kw):
+                 set_integration_weights=False, wait=0.0, close_fig=True,
+                 **kw):
         self.detector_control = 'soft'
         self.name = 'SSRO_Fidelity'
         # For an explanation of the difference between the different
@@ -389,15 +390,15 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
         self.AWG = AWG
         self.pulse_pars = pulse_pars
         self.RO_pars = RO_pars
-        self.set_integration_weights=set_integration_weights
-        #self.IF = kw.pop('IF', -20e6)
+        self.set_integration_weights = set_integration_weights
         self.i = 0
 
         self.raw = raw  # Performs no fits if True
         self.analyze = analyze
 
         self.upload = upload
-        self.wait=wait
+        self.wait = wait
+        self.close_fig = close_fig
 
     def prepare(self, **kw):
         if not self.set_integration_weights:
@@ -408,7 +409,7 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
                 det.CBox_integration_logging_det(self.CBox, self.AWG))
 
     def acquire_data_point(self, *args, **kw):
-        self.time_start=time.time()
+        self.time_start = time.time()
         if self.set_integration_weights:
             nr_samples = 512
             self.CBox.nr_samples.set(nr_samples)
@@ -420,7 +421,7 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
             self.MC.set_detector_function(det.CBox_input_average_detector(
                                           self.CBox, self.AWG))
             self.MC.run('Measure_transients_0')
-            a0 = ma.MeasurementAnalysis(auto=True)
+            a0 = ma.MeasurementAnalysis(auto=True, close_fig=self.close_fig)
             self.MC.set_sweep_function(awg_swf.OffOn(
                                        pulse_pars=self.pulse_pars,
                                        RO_pars=self.RO_pars,
@@ -429,7 +430,7 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
             self.MC.set_detector_function(det.CBox_input_average_detector(
                                           self.CBox, self.AWG))
             self.MC.run('Measure_transients_1')
-            a1 = ma.MeasurementAnalysis(auto=True)
+            a1 = ma.MeasurementAnalysis(auto=True, close_fig=self.close_fig)
             transient0 = a0.data[1, :]
             transient1 = a1.data[1, :]
             optimized_weights = transient1-transient0
@@ -448,7 +449,8 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
         self.MC.run(name=self.measurement_name+'_'+str(self.i))
         if self.analyze:
             ana = ma.SSRO_Analysis(label=self.measurement_name,
-                                   no_fits=self.raw, close_file=True)
+                                   no_fits=self.raw, close_file=True,
+                                   close_fig=self.close_fig)
             # Arbitrary choice, does not think about the deffinition
             time_end=time.time()
             nett_wait = self.wait-time_end+self.time_start
