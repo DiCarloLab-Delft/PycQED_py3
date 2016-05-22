@@ -252,7 +252,7 @@ class MeasurementControl:
         in self.af_pars:
         - Rescales the function using the "x_scale" parameter, default is 1
         - Inverts the measured values if "minimize"==False
-        - Compares measurement value with 'f_termination' and raises an
+        - Compares measurement value with "f_termination" and raises an
         exception, that gets caught outside of the optimization loop, if
         the measured value is smaller than this f_termination.
 
@@ -739,6 +739,27 @@ class MeasurementControl:
         return self.sweep_functions[0].sweep_points
 
     def set_adaptive_function_parameters(self, adaptive_function_parameters):
+        """
+        adaptive_function_parameters: Dictionary containing options for
+            running adaptive mode.
+
+        The following arguments are reserved keywords. All other entries in
+        the dictionary get passed to the adaptive function in the measurement
+        loop.
+
+        Reserved keywords:
+            "adaptive_function":    function
+            "x_scale": 1            float rescales values for adaptive function
+            "minimize": False       Bool, inverts value to allow minimizing
+                                    or maximizing
+            "f_termination" None    terminates the loop if the measured value
+                                    is smaller than this value
+        Common keywords (used in python nelder_mead implementation):
+            "x0":                   list of initial values
+            "initial_step"
+            "no_improv_break"
+            "maxiter"
+        """
         self.af_pars = adaptive_function_parameters
 
         # scaling should not be used if a "direc" argument is available

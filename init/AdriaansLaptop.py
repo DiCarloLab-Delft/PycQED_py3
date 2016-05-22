@@ -22,14 +22,15 @@ from modules.analysis import measurement_analysis as ma
 from modules.analysis import analysis_toolbox as a_tools
 
 # Initializing instruments
-# station = qc.Station()
-# MC = mc.MeasurementControl('MC')
-# MC.station = station
-# station.MC = MC
+station = qc.Station()
+MC = mc.MeasurementControl('MC')
+MC.station = station
+station.MC = MC
 
-# # from instrument_drivers.physical_instruments import dummy_instruments as dm
-# # Dummy_inst = dm.DummyParHolder('Dummy_inst')
-# # station.add_instrument(Dummy_inst)
+from qcodes.tests.instrument_mocks import MockParabola
+
+ParabInstr = MockParabola('ParabInstr')
+station.add_instrument(ParabInstr)
 
 # station.pulsar = ps.Pulsar()
 # # station.pulsar.AWG = station.instruments['AWG']
