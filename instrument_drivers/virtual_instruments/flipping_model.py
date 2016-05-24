@@ -1,10 +1,8 @@
-import time
-
-from qcodes.instrument.mock import MockInstrument, MockModel
+import numpy as np
 from qcodes.instrument.base import Instrument
 from qcodes.utils.validators import Numbers, Enum, Ints
 from qcodes.instrument.parameter import ManualParameter
-import numpy as np
+from modules.analysis.tools.data_manipulation import count_error_fractions
 
 
 class FlippingModel(Instrument):
@@ -47,9 +45,12 @@ class FlippingModel(Instrument):
         self.add_parameter('measure_shots', units=' ',
                            label='Measured shots',
                            get_cmd=self._measure_nshots)
-        self.add_parameter('N_shots', units= '',
+        self.add_parameter('N_shots', units='',
                            parameter_class=ManualParameter,
                            vals=Ints(), initial_value=32)
+        self.add_parameter('err_frac', label='Error fraction',
+                           units='',
+                           get_cmd=self._measure_err_frac)
 
         # The state is fully classical in this model
         self.add_parameter('state', units='',
@@ -101,3 +102,8 @@ class FlippingModel(Instrument):
             else:
                 measured_shots[i] = state
         return measured_shots
+
+    def _measure_err_frac(self):
+        vals = self.measure_shots()
+        fracs = np.array(count_error_fractions(vals))/self.N_shots()
+        return fracs[1]

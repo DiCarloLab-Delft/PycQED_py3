@@ -596,20 +596,21 @@ class MeasurementControl:
                     instrument_grp.attrs[p_name] = str(val)
 
     def print_progress_static_soft_sweep(self, i):
-        percdone = (i+1)*1./len(self.sweep_points)*100
-        elapsed_time = time.time() - self.begintime
-        progress_message = "\r {percdone}% completed \telapsed time: "\
-            "{t_elapsed}s \ttime left: {t_left}s".format(
-                percdone=int(percdone),
-                t_elapsed=round(elapsed_time, 1),
-                t_left=round((100.-percdone)/(percdone) *
-                             elapsed_time, 1) if
-                percdone != 0 else '')
-        if percdone != 100:
-            end_char = '\r'
-        else:
-            end_char = '\n'
-        print(progress_message, end=end_char)
+        if self.verbose:
+            percdone = (i+1)*1./len(self.sweep_points)*100
+            elapsed_time = time.time() - self.begintime
+            progress_message = "\r {percdone}% completed \telapsed time: "\
+                "{t_elapsed}s \ttime left: {t_left}s".format(
+                    percdone=int(percdone),
+                    t_elapsed=round(elapsed_time, 1),
+                    t_left=round((100.-percdone)/(percdone) *
+                                 elapsed_time, 1) if
+                    percdone != 0 else '')
+            if percdone != 100:
+                end_char = '\r'
+            else:
+                end_char = '\n'
+            print(progress_message, end=end_char)
 
     def print_progress_static_hard(self):
         acquired_points = self.dset.shape[0]
