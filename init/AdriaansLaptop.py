@@ -27,10 +27,10 @@ MC = mc.MeasurementControl('MC')
 MC.station = station
 station.MC = MC
 
-from qcodes.tests.instrument_mocks import MockParabola
+# from qcodes.tests.instrument_mocks import MockParabola
 
-ParabInstr = MockParabola('ParabInstr')
-station.add_instrument(ParabInstr)
+# ParabInstr = MockParabola('ParabInstr')
+# station.add_instrument(ParabInstr)
 
 # station.pulsar = ps.Pulsar()
 # # station.pulsar.AWG = station.instruments['AWG']

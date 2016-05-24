@@ -71,7 +71,8 @@ class MeasurementControl:
         return result
 
     def measure(self, *kw):
-        self.initialize_plot_monitor()
+        if self.live_plot_enabled:
+            self.initialize_plot_monitor()
         if (self.sweep_functions[0].sweep_control !=
                 self.detector_function.detector_control):
                 # FIXME only checks first sweepfunction
@@ -696,11 +697,15 @@ class MeasurementControl:
     def get_sweep_function_names(self):
         return self.sweep_function_names
 
-    def set_detector_function(self, detector_function):
-        # If it is not a detector function, assume it is a qc.parameter
-        # and try to auto convert it it
+    def set_detector_function(self, detector_function,
+                              wrapped_det_control='soft'):
+        """
+        Sets the detector function. If a parameter is passed instead it
+        will attempt to wrap it to a detector function.
+        """
         if not isinstance(detector_function, det.Detector_Function):
-            detector_function = wrap_par_to_det(detector_function)
+            detector_function = wrap_par_to_det(detector_function,
+                                                wrapped_det_control)
 
         self.detector_function = detector_function
         self.set_detector_function_name(detector_function.name)

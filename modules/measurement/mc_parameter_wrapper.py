@@ -22,21 +22,22 @@ def wrap_par_to_swf(parameter):
     return sweep_function
 
 
-def wrap_par_to_det(parameter):
+def wrap_par_to_det(parameter, control='soft'):
     '''
     Todo:
      - only soft detector_functions
      - only single parameter
     '''
     detector_function = det.Detector_Function()
-    detector_function.detector_control = 'soft'
+    detector_function.detector_control = control
     detector_function.name = parameter.name
     detector_function.value_names = [parameter.label]
-    detector_function.value_units = parameter.units
+    detector_function.value_units = [parameter.units]
 
     detector_function.prepare = pass_function
     detector_function.finish = pass_function
     detector_function.acquire_data_point = parameter.get
+    detector_function.get_values = parameter.get
     return detector_function
 
 def pass_function(**kw):
