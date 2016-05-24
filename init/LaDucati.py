@@ -73,7 +73,18 @@ LutMan = lm.QuTech_ControlBox_LookuptableManager('LutMan', CBox=CBox,
                                                  server_name='metaLM')
 
 MC = mc.MeasurementControl('MC')
-
+VIP_mon_2 = qb.CBox_driven_transmon('VIP_mon_2',
+                                    LO=LO, cw_source=S1, td_source=S2,
+                                    IVVI=IVVI,
+                                    AWG=AWG, LutMan=LutMan,
+                                    CBox=CBox, heterodyne_instr=HS, MC=MC,
+                                    server_name=None)
+VIP_mon_4 = qb.CBox_driven_transmon('VIP_mon_4',
+                                    LO=LO, cw_source=S1, td_source=S2,
+                                    IVVI=IVVI,
+                                    AWG=AWG, LutMan=LutMan,
+                                    CBox=CBox, heterodyne_instr=HS, MC=MC,
+                                    server_name=None)
 VIP_mon_6 = qb.CBox_driven_transmon('VIP_mon_6',
                                     LO=LO, cw_source=S1, td_source=S2,
                                     IVVI=IVVI,
@@ -84,30 +95,31 @@ VIP_mon_6 = qb.CBox_driven_transmon('VIP_mon_6',
 VIP_mon_2_tek = qbt.Tektronix_driven_transmon('VIP_mon_2_tek',
                                               LO=LO,
                                               cw_source=S1, td_source=S2,
-                                              IVVI=IVVI,
-                                              AWG=AWG,
-                                              CBox=CBox, heterodyne_instr=HS,
-                                              MC=MC, rf_RO_source=S1,
-                                              server_name=None)
-
-
-VIP_mon_4_tek = qbt.Tektronix_driven_transmon('VIP_mon_4_tek',
-                                              LO=LO,
-                                              cw_source=S1, td_source=S2,
-                                              IVVI=IVVI,
+                                              IVVI=IVVI,rf_RO_source=S1,
                                               AWG=AWG,
                                               CBox=CBox, heterodyne_instr=HS,
                                               MC=MC,
                                               server_name=None)
 
 
+VIP_mon_4_tek = qbt.Tektronix_driven_transmon('VIP_mon_4_tek',
+                                              LO=LO,
+                                              cw_source=S1, td_source=S2,
+                                              IVVI=IVVI,rf_RO_source=S1,
+                                              AWG=AWG,
+                                              CBox=CBox, heterodyne_instr=HS,
+                                              MC=MC,
+                                              server_name=None)
+
+gen.load_settings_onto_instrument(VIP_mon_2, label='VIP_mon_2')
+gen.load_settings_onto_instrument(VIP_mon_4, label='VIP_mon_4')
 gen.load_settings_onto_instrument(VIP_mon_2_tek)
 gen.load_settings_onto_instrument(VIP_mon_4_tek)
 gen.load_settings_onto_instrument(VIP_mon_6, label='VIP_mon_6')
 
 station = qc.Station(LO, S1, S2, IVVI, Dux,
                      AWG, AWG520, HS, CBox, LutMan,
-                     VIP_mon_2_tek,
+                     VIP_mon_2, VIP_mon_4, VIP_mon_2_tek,
                      VIP_mon_4_tek, VIP_mon_6)
 MC.station = station
 station.MC = MC
@@ -145,7 +157,7 @@ IVVI.dac1.set(-40)
 IVVI.dac2.set(0)  # was 70 for sweetspot VIP_mon_4
 
 
-IF = -20e6        # RO modulation frequency
+
 
 LO.off()
 
@@ -183,7 +195,7 @@ def set_CBox_cos_sine_weigths(IF):
 
     CBox.set('sig0_integration_weights', w0)
     CBox.set('sig1_integration_weights', w1)
-set_CBox_cos_sine_weigths(IF)
+set_CBox_cos_sine_weigths(VIP_mon_2_tek.f_RO_mod())
 
 CBox.set('nr_averages', 2048)
 # this is the max nr of averages that does not slow down the heterodyning
