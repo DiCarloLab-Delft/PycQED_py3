@@ -33,6 +33,10 @@ class FlippingModel(Instrument):
         self.add_parameter('T1', units='s',
                            parameter_class=ManualParameter,
                            vals=Numbers(), initial_value=1)
+        self.add_parameter('T1_sigma', units='s',
+                           parameter_class=ManualParameter,
+                           vals=Numbers(), initial_value=0)
+
         self.add_parameter('P_RB', units='',
                            label='Randomized Benchmarking',
                            get_cmd=self._get_P_RB,
@@ -83,7 +87,12 @@ class FlippingModel(Instrument):
         Measures n-shots keeping all the probabilities fixed
         """
         n = self.N_shots()
-        p_relax = (1-np.exp(-self.tau_d()/self.T1()))
+        if self.T1_sigma() != 0:
+            T1 = np.random.normal(self.T1(), self.T1_sigma(), 1)
+            print(T1)
+        else:
+            T1 = self.T1()
+        p_relax = (1-np.exp(-self.tau_d()/T1))
         state = self.state()
         P_RB = self.P_RB()
         F_discr = self.F_discr()

@@ -15,7 +15,6 @@ class Rabi(swf.Hard_Sweep):
         self.RO_pars = RO_pars
         self.n = n
         self.upload = upload
-
         self.name = 'Rabi'
         self.parameter_name = 'amplitude'
         self.unit = 'V'
@@ -26,6 +25,28 @@ class Rabi(swf.Hard_Sweep):
                          pulse_pars=self.pulse_pars,
                          RO_pars=self.RO_pars,
                          n=self.n)
+
+
+class Rabi_2nd_exc(swf.Hard_Sweep):
+    def __init__(self, pulse_pars, pulse_pars_2nd,
+                 RO_pars, n=1, upload=True):
+        super().__init__()
+        self.pulse_pars = pulse_pars
+        self.pulse_pars_2nd = pulse_pars_2nd
+        self.RO_pars = RO_pars
+        self.n = n
+        self.upload = upload
+        self.name = 'Rabi 2nd excited state'
+        self.parameter_name = 'amplitude'
+        self.unit = 'V'
+
+    def prepare(self, **kw):
+        if self.upload:
+            sqs.Rabi_2nd_exc_seq(amps=self.sweep_points,
+                                 pulse_pars=self.pulse_pars,
+                                 pulse_pars_2nd=self.pulse_pars_2nd,
+                                 RO_pars=self.RO_pars,
+                                 n=self.n)
 
 
 class T1(swf.Hard_Sweep):
