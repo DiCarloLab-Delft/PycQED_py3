@@ -72,9 +72,10 @@ class DateTimeGenerator:
                         timestamp_verified = True
                     else:
                         # if timestamp not unique, add one second
+                        # This is quite a hack
                         ts = time.localtime((time.mktime(ts)+1))
                         tsd = time.strftime('%H%M%S', ts)
-                    if counter >= 10:
+                    if counter >= 3600:
                         raise Exception()
                 except OSError as err:
                     if 'cannot find the path specified' in str(err):

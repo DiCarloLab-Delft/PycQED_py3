@@ -681,7 +681,7 @@ class MeasurementControl:
         for i, sweep_func in enumerate(sweep_functions):
             # If it is not a sweep function, assume it is a qc.parameter
             # and try to auto convert it it
-            if not isinstance(sweep_func, swf.Sweep_function):
+            if not hasattr(sweep_func, 'sweep_control'):
                 sweep_func = wrap_par_to_swf(sweep_func)
                 sweep_functions[i] = sweep_func
             sweep_function_names.append(str(swf.__class__.__name__))
@@ -703,10 +703,9 @@ class MeasurementControl:
         Sets the detector function. If a parameter is passed instead it
         will attempt to wrap it to a detector function.
         """
-        if not isinstance(detector_function, det.Detector_Function):
+        if not hasattr(detector_function, 'detector_control'):
             detector_function = wrap_par_to_det(detector_function,
                                                 wrapped_det_control)
-
         self.detector_function = detector_function
         self.set_detector_function_name(detector_function.name)
 

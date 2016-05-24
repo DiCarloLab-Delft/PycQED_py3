@@ -6,7 +6,7 @@ import numpy as np
 from time import time
 from qcodes.instrument.base import Instrument
 from qcodes.utils import validators as vals
-
+from qcodes.instrument.parameter import ManualParameter
 # Used for uploading the right AWG sequences
 from modules.measurement.pulse_sequences import standard_sequences as st_seqs
 
@@ -30,15 +30,16 @@ class HeterodyneInstrument(Instrument):
         - Add option to use CBox integration averaging mode and verify
            identical results
     '''
-    shared_kwargs = ['RF', 'LO', 'CBox']
+    shared_kwargs = ['RF', 'LO', 'CBox', 'AWG']
 
-    def __init__(self, name,  RF, LO, CBox,
+    def __init__(self, name,  RF, LO, CBox, AWG,
                  single_sideband_demod=False, **kw):
         logging.info(__name__ + ' : Initializing instrument')
         Instrument.__init__(self, name, **kw)
 
         self.LO = LO
         self.RF = RF
+        self.AWG = AWG
         self.CBox = CBox
         self._max_tint = 2000
 
@@ -48,17 +49,17 @@ class HeterodyneInstrument(Instrument):
                            get_cmd=self.do_get_frequency,
                            set_cmd=self.do_set_frequency,
                            vals=vals.Numbers(9e3, 40e9))
-        self.add_parameter('IF',
-                           set_cmd=self.do_set_IF,
-                           get_cmd=self.do_get_IF,
+        self.add_parameter('IF', parameter_class=ManualParameter,
                            vals=vals.Numbers(-200e6, 200e6),
                            label='Intermodulation frequency',
                            units='Hz')
+        self.add_parameter('RF_power', units='dBm',
+                           set_cmd=self.do_set_RF_power,
+                           get_cmd=self.do_get_RF_power)
 
         self.add_parameter('single_sideband_demod',
                            label='Single sideband demodulation',
-                           get_cmd=self.do_get_single_sideband_demod,
-                           set_cmd=self.do_set_single_sideband_demod)
+                           parameter_class=ManualParameter)
         self.set('IF', 10e6)
         # self.LO_power = 13  # dBm
         # self.RF_power = -60  # dBm
@@ -66,6 +67,8 @@ class HeterodyneInstrument(Instrument):
         self.set('single_sideband_demod', single_sideband_demod)
         # self.init()
         # self.get_status()
+        self._awg_seq_filename = 'Heterodyne_marker_seq_RF_mod'
+        self._disable_auto_seq_loading = False
 
     def set_sources(self, status):
         self.RF.set('status', status)
@@ -78,17 +81,11 @@ class HeterodyneInstrument(Instrument):
         self.LO.set('frequency', val-self.IF.get())
 
     def do_get_frequency(self):
-        freq = self.RF.get_frequency()
-        LO_freq = self.LO.get_frequency()
-        if LO_freq != freq-self._IF:
+        freq = self.RF.frequency()
+        LO_freq = self.LO.frequency()
+        if LO_freq != freq-self.IF():
             logging.warning('IF between RF and LO is not set correctly')
         return freq
-
-    def do_set_IF(self, val):
-        self._IF = val
-
-    def do_get_IF(self):
-        return self._IF
 
     def do_set_Navg(self, val):
         self.Navg = val
@@ -119,13 +116,13 @@ class HeterodyneInstrument(Instrument):
     def do_get_RF_source(self):
         return self.RF
 
-    # def do_set_RF_power(self, val):
-    #     self.RF.set_power(val)
-    #     self.RF_power = val
+    def do_set_RF_power(self, val):
+        self.RF.power(val)
+        self._RF_power = val
         # internally stored to allow setting RF from stored setting
 
-    # def do_get_RF_power(self):
-    #     return self.RF_power
+    def do_get_RF_power(self):
+        return self._RF_power
 
     def do_set_status(self, val):
         self.state = val
@@ -154,85 +151,68 @@ class HeterodyneInstrument(Instrument):
         self.set('status', 'Off')
         return
 
-    # def do_set_t_int(self, t_int):
-    #     '''
-    #     sets the integration time per probe shot
-    #     '''
-    #     self.ATS_CW.set_t_int(t_int)
-    #     self.get_trace_length()
-    #     self.get_number_of_buffers()
-
-    # def do_get_t_int(self):
-    #     return self.ATS_CW.get_t_int()
-
-    # def do_set_trace_length(self, trace_length):
-    #     self.ATS_CW.set_trace_length(trace_length)
-    #     self.get_t_int()
-
-    # def do_get_trace_length(self):
-    #     return self.ATS_CW.get_trace_length()
-
-    # def do_set_number_of_buffers(self, n_buff):
-    #     self.ATS_CW.set_number_of_buffers(n_buff)
-    #     self.get_t_int()
-
-    # def do_get_number_of_buffers(self):
-    #     return self.ATS_CW.get_number_of_buffers()
-
     def prepare(self, get_t_base=True):
         '''
         This function needs to be overwritten for the ATS based version of this
         driver
-
-        Sets parameters in the ATS_CW and turns on the sources.
-        if optimize == True it will optimze the acquisition time for a fixed
-        t_int.
         '''
         # self.RF.set_power(self.do_get_RF_power())
         # self.LO.set_power(self.do_get_LO_power())
+        # if get_t_base is True:
+        #     trace_length = self.CBox.get('nr_samples')
+        #     tbase = np.arange(0, 5*trace_length, 5)*1e-9
+        #     self.cosI = np.cos(2*np.pi*self.get('IF')*tbase)
+        #     self.sinI = np.sin(2*np.pi*self.get('IF')*tbase)
+        # self.RF.on()
+        # self.LO.on()
+        if ((self._awg_seq_filename not in self.AWG.get('setup_filename')) and
+                not self._disable_auto_seq_loading):
+            self.seq_name = st_seqs.generate_and_upload_marker_sequence(
+                500e-9, 20e-6, RF_mod=True,
+                IF=self.get('IF'), mod_amp=0.5)
+
+        self.AWG.run()
         if get_t_base is True:
             trace_length = self.CBox.get('nr_samples')
             tbase = np.arange(0, 5*trace_length, 5)*1e-9
             self.cosI = np.cos(2*np.pi*self.get('IF')*tbase)
             self.sinI = np.sin(2*np.pi*self.get('IF')*tbase)
-        self.RF.on()
         self.LO.on()
+        # Changes are now incorporated in the awg seq
+        self._awg_seq_parameters_changed = False
 
+        self.CBox.set('nr_samples', 1)  # because using integrated avg
 
-    # def do_set_channel(self, ch):
-    #     self.channel = ch
-
-    # def do_get_channel(self, ch):
-    #     return self.channel
-
-    def get_averaged_transient(self):
-        self.CBox.set('acquisition_mode', 0)
-        self.CBox.set('acquisition_mode', 'input averaging mode')
-        dat = self.CBox.get_input_avg_results()
-        # requires rescaling to dac voltages
-        return dat
-
-    # def get_averaged_transient_ATS(self):
-    #     # version that can be used for the ATS
-    #     self.ATS_CW.start()
-    #     data = self.ATS.get_rescaled_avg_data()
+    # def get_averaged_transient(self):
+    #     self.CBox.set('acquisition_mode', 0)
+    #     self.CBox.set('acquisition_mode', 'input averaging mode')
+    #     dat = self.CBox.get_input_avg_results()
+    #     # requires rescaling to dac voltages
+    #     return dat
 
     def probe(self, **kw):
         '''
         Starts acquisition and returns the data
             'COMP' : returns data as a complex point in the I-Q plane in Volts
         '''
-        i = 0
-        succes = False
-        while succes is False and i < 10:
-            try:
-                data = self.get_averaged_transient()
-                succes = True
-            except:
-                succes = False
-            i += 1
-        s21 = self.demodulate_data(data)  # returns a complex point in the IQ-plane
-        return s21
+        # i = 0
+        # succes = False
+        # while succes is False and i < 10:
+        #     try:
+        #         data = self.get_averaged_transient()
+        #         succes = True
+        #     except:
+        #         succes = False
+        #     i += 1
+        # s21 = self.demodulate_data(data)  # returns a complex point in the IQ-plane
+
+        self.CBox.set('acquisition_mode', 0)
+        self.CBox.set('acquisition_mode', 4)
+        d = self.CBox.get_integrated_avg_results()
+        dat = d[0][0]+1j*d[1][0]
+        return dat
+
+        # return s21
 
     def get_demod_array(self):
         return self.cosI, self.sinI
@@ -257,12 +237,6 @@ class HeterodyneInstrument(Instrument):
             I = np.average(dat[0])
             Q = np.average(dat[1])
         return I+1.j*Q
-
-    def do_set_single_sideband_demod(self, val):
-        self._single_sideband_demod = val
-
-    def do_get_single_sideband_demod(self):
-        return self._single_sideband_demod
 
 
 class LO_modulated_Heterodyne(HeterodyneInstrument):

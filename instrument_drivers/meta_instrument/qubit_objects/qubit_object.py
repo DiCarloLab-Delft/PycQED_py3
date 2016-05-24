@@ -195,10 +195,8 @@ class Transmon(Qubit):
     def find_frequency(self, method='spectroscopy', pulsed=False,
                        steps=[1, 3, 10, 30, 100, 300, 1000],
                        freqs=None,
-                       f_span=100e6,
-                       f_step=1e6,
-                       verbose=True,
-                       update=False,
+                       f_span=100e6, f_step=1e6,
+                       verbose=True, update=False,
                        close_fig=True):
 
         if method.lower() == 'spectroscopy':
@@ -316,5 +314,3 @@ class Transmon(Qubit):
 
         # After this it should enter a loop where it fine tunes the amplitude
         # based on fine scanes around the optimum with higher sensitivity.
-
-

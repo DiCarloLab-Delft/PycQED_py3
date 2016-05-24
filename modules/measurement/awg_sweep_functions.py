@@ -90,7 +90,7 @@ class OffOn(swf.Hard_Sweep):
 
 class Butterfly(swf.Hard_Sweep):
     def __init__(self, pulse_pars, RO_pars, initialize=False, upload=True,
-                 post_measurement_delay=2000e-9):
+                 post_msmt_delay=2000e-9):
         super().__init__()
         self.pulse_pars = pulse_pars
         self.RO_pars = RO_pars
@@ -100,12 +100,12 @@ class Butterfly(swf.Hard_Sweep):
         self.name = 'Butterfly'
         self.sweep_points = np.arange(2)
         self.initialize=initialize
-        self.post_measurement_delay = post_measurement_delay
+        self.post_msmt_delay = post_msmt_delay
 
     def prepare(self, **kw):
         if self.upload:
             sqs.Butterfly_seq(pulse_pars=self.pulse_pars,
-                              post_measurement_delay=self.post_measurement_delay,
+                              post_msmt_delay=self.post_msmt_delay,
                           RO_pars=self.RO_pars, initialize=self.initialize)
 
 
