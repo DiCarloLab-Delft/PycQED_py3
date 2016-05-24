@@ -39,6 +39,8 @@ import qcodes.instrument_drivers.signal_hound.USB_SA124B as sh
 import qcodes.instrument_drivers.QuTech.IVVI as iv
 from qcodes.instrument_drivers.tektronix import AWG5014 as tek
 from qcodes.instrument_drivers.tektronix import AWG520 as tk520
+from qcodes.instrument_drivers.agilent.E8527D import Agilent_E8527D
+
 from instrument_drivers.physical_instruments import QuTech_ControlBoxdriver as qcb
 import instrument_drivers.meta_instrument.qubit_objects.Tektronix_driven_transmon as qbt
 from instrument_drivers.meta_instrument import heterodyne as hd
@@ -57,6 +59,7 @@ AWG520 = tk520.Tektronix_AWG520('AWG520', address='GPIB0::17::INSTR',
 LO = rs.RohdeSchwarz_SGS100A(name='LO', address='TCPIP0::192.168.0.77')  # left
 S1 = rs.RohdeSchwarz_SGS100A(name='S1', address='TCPIP0::192.168.0.78')  # right
 S2 = rs.RohdeSchwarz_SGS100A(name='S2', address='TCPIP0::192.168.0.11')  # top
+Pump = Agilent_E8527D(name='Pump', address='TCPIP0::192.168.0.13')
 CBox = qcb.QuTech_ControlBox('CBox', address='Com3', run_tests=False)
 AWG = tek.Tektronix_AWG5014(name='AWG', setup_folder=None,
                             address='TCPIP0::192.168.0.9', server_name=None)
@@ -70,18 +73,7 @@ LutMan = lm.QuTech_ControlBox_LookuptableManager('LutMan', CBox=CBox,
                                                  server_name='metaLM')
 
 MC = mc.MeasurementControl('MC')
-VIP_mon_2 = qb.CBox_driven_transmon('VIP_mon_2',
-                                    LO=LO, cw_source=S1, td_source=S2,
-                                    IVVI=IVVI,
-                                    AWG=AWG, LutMan=LutMan,
-                                    CBox=CBox, heterodyne_instr=HS, MC=MC,
-                                    server_name=None)
-VIP_mon_4 = qb.CBox_driven_transmon('VIP_mon_4',
-                                    LO=LO, cw_source=S1, td_source=S2,
-                                    IVVI=IVVI,
-                                    AWG=AWG, LutMan=LutMan,
-                                    CBox=CBox, heterodyne_instr=HS, MC=MC,
-                                    server_name=None)
+
 VIP_mon_6 = qb.CBox_driven_transmon('VIP_mon_6',
                                     LO=LO, cw_source=S1, td_source=S2,
                                     IVVI=IVVI,
@@ -95,7 +87,7 @@ VIP_mon_2_tek = qbt.Tektronix_driven_transmon('VIP_mon_2_tek',
                                               IVVI=IVVI,
                                               AWG=AWG,
                                               CBox=CBox, heterodyne_instr=HS,
-                                              MC=MC,
+                                              MC=MC, rf_RO_source=S1,
                                               server_name=None)
 
 
@@ -108,15 +100,14 @@ VIP_mon_4_tek = qbt.Tektronix_driven_transmon('VIP_mon_4_tek',
                                               MC=MC,
                                               server_name=None)
 
-gen.load_settings_onto_instrument(VIP_mon_2, label='VIP_mon_2')
-gen.load_settings_onto_instrument(VIP_mon_4, label='VIP_mon_4')
+
 gen.load_settings_onto_instrument(VIP_mon_2_tek)
 gen.load_settings_onto_instrument(VIP_mon_4_tek)
 gen.load_settings_onto_instrument(VIP_mon_6, label='VIP_mon_6')
 
 station = qc.Station(LO, S1, S2, IVVI, Dux,
                      AWG, AWG520, HS, CBox, LutMan,
-                     VIP_mon_2, VIP_mon_4, VIP_mon_2_tek,
+                     VIP_mon_2_tek,
                      VIP_mon_4_tek, VIP_mon_6)
 MC.station = station
 station.MC = MC
@@ -152,7 +143,7 @@ sq.station = station
 
 IVVI.dac1.set(-40)
 IVVI.dac2.set(0)  # was 70 for sweetspot VIP_mon_4
-IVVI.dac5.set(0)
+
 
 IF = -20e6        # RO modulation frequency
 

@@ -126,6 +126,13 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                            label='Readout-modulation frequency', units='Hz',
                            initial_value=-2e7,
                            parameter_class=ManualParameter)
+        # Used in calculating the fixed point frequency, if set to 0 it
+        # has no effect
+        self.add_parameter('f_JPA_pump_mod',
+                           label='JPA pump modulation frequency', units='Hz',
+                           initial_value=0,
+                           parameter_class=ManualParameter,
+                           vals=vals.Numbers(0, 1e9))
         self.add_parameter('amp180',
                            label='Pi-pulse amplitude', units='V',
                            initial_value=.25,
@@ -529,7 +536,8 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
             'length': self.RO_pulse_length.get(),
             'pulse_delay': self.RO_pulse_delay.get(),
             'mod_frequency': self.f_RO_mod.get(),
-            'fixed_point_frequency': gcd(int(self.f_RO_mod.get()), int(20e6)),
+            'fixed_point_frequency': gcd(int(self.f_RO_mod()),
+                                         int(self.f_JPA_pump_mod())),
             'acq_marker_delay': self.RO_acq_marker_delay.get(),
             'acq_marker_channel': self.RO_acq_marker_channel.get(),
             'phase': 0,

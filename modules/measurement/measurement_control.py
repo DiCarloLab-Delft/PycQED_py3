@@ -680,7 +680,7 @@ class MeasurementControl:
         for i, sweep_func in enumerate(sweep_functions):
             # If it is not a sweep function, assume it is a qc.parameter
             # and try to auto convert it it
-            if not isinstance(sweep_func, swf.Sweep_function):
+            if not hasattr(sweep_func, 'sweep_control'):
                 sweep_func = wrap_par_to_swf(sweep_func)
                 sweep_functions[i] = sweep_func
             sweep_function_names.append(str(swf.__class__.__name__))

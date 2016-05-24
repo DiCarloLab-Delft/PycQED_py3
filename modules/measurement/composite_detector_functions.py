@@ -552,7 +552,7 @@ class CBox_trace_error_fraction_detector(det.Soft_Detector):
         self.MC.set_sweep_function(self.sequence_swf)
 
         # if self.counters:
-        self.counters_d = det.CBox_state_counters_det(self.CBox, self.AWG)
+        # self.counters_d = det.CBox_state_counters_det(self.CBox, self.AWG)
 
         self.dig_shots_det = det.CBox_digitizing_shots_det(
             self.CBox, self.AWG,
@@ -571,7 +571,7 @@ class CBox_trace_error_fraction_detector(det.Soft_Detector):
             a.get_naming_and_values()
             trace = a.measured_values[0]
             a.finish()  # close the datafile
-            return self.count_error_fractions(trace, len(trace))/len(trace)*100
+            return self.count_error_fractions(trace, len(trace))
         else:
             self.sequence_swf.prepare()
             counters = self.counters_d.get_values()
@@ -593,7 +593,9 @@ class CBox_trace_error_fraction_detector(det.Soft_Detector):
                     double_err_counter += 1
             else:
                 no_err_counter += 1
-        return no_err_counter, single_err_counter, double_err_counter
+        return (no_err_counter/len(trace)*100,
+                single_err_counter/len(trace)*100,
+                double_err_counter/len(trace)*100)
 
 
 class CBox_SSRO_discrimination_detector(det.Soft_Detector):
