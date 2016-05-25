@@ -12,7 +12,8 @@ mac_dict = {'203178706891063': 'CDickel_Desktop',
             '46390847630': 'tud276606_FPGA_PC',
             '198690273946987': 'Bart_Laptop',
             '167746772205643': 'NuovaFerrari',
-            '167746772714689' : 'Xiang_PC'
+            '167746772714689' : 'Xiang_PC',
+            '180725258210527': 'Niels_macbook'
             }
 
 data_dir_dict = {'tud276606_FPGA_PC': 'D:\Experiments/CBox_Testing/Data',
@@ -20,7 +21,7 @@ data_dir_dict = {'tud276606_FPGA_PC': 'D:\Experiments/CBox_Testing/Data',
                  # 'Adriaans_Macbook': ('/Users/Adriaan/Dropbox/PhD-Delft/' +
                  #    'DataFolders/ExperimentalDataTUD277620/CBox_Testing/Data'),
                  'Adriaans_Macbook': ('/Users/Adriaan/Documents/Testing/Data'),
-
+                 'Niels_macbook': '/Users/nbultink/Dropbox/Simultaneous_driving/temp_data',
                  'La_Ferrari':  'D:\Experiments/1511_RabiSims2/Data',
                  'La_Maserati': 'D:\Experiments/JJO-type_IV/Data',
 
