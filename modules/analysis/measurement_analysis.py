@@ -2087,7 +2087,7 @@ class SSRO_single_quadrature_discriminiation_analysis(MeasurementAnalysis):
 
 
 class T1_Analysis(TD_Analysis):
-    def __init__(self, label='T1', **kw):
+    def __init__(self, label='T1', make_fig=True, **kw):
         kw['label'] = label
         kw['h5mode'] = 'r+'  # Read write mode, file must exist
         super().__init__(**kw)
@@ -2099,7 +2099,7 @@ class T1_Analysis(TD_Analysis):
         fit_mods.ExpDecayModel.set_param_hint(
             'tau',
             value=self.sweep_points[1]*50,  # use index 1
-            min=self.sweep_points[1]*5,
+            min=self.sweep_points[1],
             max=self.sweep_points[-1]*1000)
         fit_mods.ExpDecayModel.set_param_hint('offset', value=0, vary=False)
         fit_mods.ExpDecayModel.set_param_hint('n', value=1, vary=False)
@@ -2111,7 +2111,8 @@ class T1_Analysis(TD_Analysis):
             params=self.params)
         return fit_res
 
-    def run_default_analysis(self, print_fit_results=False, **kw):
+    def run_default_analysis(self, print_fit_results=False,
+                             make_fig=True, **kw):
         show_guess = kw.pop('show_guess', False)
         close_file = kw.pop('close_file', True)
         self.add_analysis_datagroup_to_file()
@@ -2119,18 +2120,19 @@ class T1_Analysis(TD_Analysis):
         fig, figarray, ax, axarray = self.setup_figures_and_axes()
         self.normalized_values = []
 
-        for i, name in enumerate(self.value_names):
-            if len(self.value_names) < 4:
-                ax2 = axarray[i]
-            else:
-                ax2 = axarray[i/2, i % 2]
+        if make_fig:
+            for i, name in enumerate(self.value_names):
+                if len(self.value_names) < 4:
+                    ax2 = axarray[i]
+                else:
+                    ax2 = axarray[i/2, i % 2]
 
-            self.plot_results_vs_sweepparam(x=self.sweep_points,
-                                            y=self.measured_values[i],
-                                            fig=figarray, ax=ax2,
-                                            xlabel=self.xlabel,
-                                            ylabel=self.ylabels[i],
-                                            save=False)
+                self.plot_results_vs_sweepparam(x=self.sweep_points,
+                                                y=self.measured_values[i],
+                                                fig=figarray, ax=ax2,
+                                                xlabel=self.xlabel,
+                                                ylabel=self.ylabels[i],
+                                                save=False)
 
         if 'I_cal' in self.value_names[i]:  # Fit the data
             norm = self.normalize_data_to_calibration_points(
@@ -2158,37 +2160,37 @@ class T1_Analysis(TD_Analysis):
 
         if print_fit_results:
             print(fit_res.fit_report())
+        if make_fig:
+            self.plot_results_vs_sweepparam(x=self.sweep_points,
+                                            y=self.normalized_values,
+                                            fig=fig, ax=ax,
+                                            xlabel=self.xlabel,
+                                            ylabel=r'$F$ $|1 \rangle$',
+                                            **kw)
+            if show_guess:
+                ax.plot(self.sweep_points[:-self.NoCalPoints],
+                        fit_res.init_fit, 'k--')
 
-        self.plot_results_vs_sweepparam(x=self.sweep_points,
-                                        y=self.normalized_values,
-                                        fig=fig, ax=ax,
-                                        xlabel=self.xlabel,
-                                        ylabel=r'$F$ $|1 \rangle$',
-                                        **kw)
-        if show_guess:
-            ax.plot(self.sweep_points[:-self.NoCalPoints],
-                    fit_res.init_fit, 'k--')
+            best_vals = fit_res.best_values
+            t = np.linspace(self.sweep_points[0],
+                            self.sweep_points[-self.NoCalPoints], 1000)
 
-        best_vals = fit_res.best_values
-        t = np.linspace(self.sweep_points[0],
-                        self.sweep_points[-self.NoCalPoints], 1000)
+            y = fit_mods.ExpDecayFunc(
+                t, tau=best_vals['tau'],
+                n=best_vals['n'],
+                amplitude=best_vals['amplitude'],
+                offset=best_vals['offset'])
 
-        y = fit_mods.ExpDecayFunc(
-            t, tau=best_vals['tau'],
-            n=best_vals['n'],
-            amplitude=best_vals['amplitude'],
-            offset=best_vals['offset'])
+            ax.plot(t, y, 'r-')
+            textstr = '$T_1$ = %.3g $\pm$ (%.5g) s ' % (
+                fit_res.params['tau'].value, fit_res.params['tau'].stderr)
 
-        ax.plot(t, y, 'r-')
-        textstr = '$T_1$ = %.3g $\pm$ (%.5g) s ' % (
-            fit_res.params['tau'].value, fit_res.params['tau'].stderr)
-
-        ax.text(0.4, 0.95, textstr, transform=ax.transAxes,
-                fontsize=11, verticalalignment='top',
-                bbox=self.box_props)
-        self.save_fig(fig, figname=self.measurementstring+'_' +
-                      self.value_names[i], **kw)
-        self.save_fig(self.figarray, figname=self.measurementstring, **kw)
+            ax.text(0.4, 0.95, textstr, transform=ax.transAxes,
+                    fontsize=11, verticalalignment='top',
+                    bbox=self.box_props)
+            self.save_fig(fig, figname=self.measurementstring+'_' +
+                          self.value_names[i], **kw)
+            self.save_fig(self.figarray, figname=self.measurementstring, **kw)
         if close_file:
             self.data_file.close()
         return fit_res

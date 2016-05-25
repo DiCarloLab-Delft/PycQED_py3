@@ -57,8 +57,8 @@ AWG520 = tk520.Tektronix_AWG520('AWG520', address='GPIB0::17::INSTR',
 # SH = sh.SignalHound_USB_SA124B('Signal hound', server_name=None) #commented because of 8s load time
 
 LO = rs.RohdeSchwarz_SGS100A(name='LO', address='TCPIP0::192.168.0.77')  # left
-S1 = rs.RohdeSchwarz_SGS100A(name='S1', address='TCPIP0::192.168.0.78')  # right
-S2 = rs.RohdeSchwarz_SGS100A(name='S2', address='TCPIP0::192.168.0.11')  # top
+RF = rs.RohdeSchwarz_SGS100A(name='RF', address='TCPIP0::192.168.0.78')  # right
+Qubit_LO = rs.RohdeSchwarz_SGS100A(name='Qubit_LO', address='TCPIP0::192.168.0.11')  # top
 Pump = Agilent_E8527D(name='Pump', address='TCPIP0::192.168.0.13')
 CBox = qcb.QuTech_ControlBox('CBox', address='Com3', run_tests=False)
 AWG = tek.Tektronix_AWG5014(name='AWG', setup_folder=None,
@@ -67,60 +67,38 @@ IVVI = iv.IVVI('IVVI', address='ASRL1', numdacs=16, server_name=None)
 Dux = qdux.QuTech_Duplexer('Dux', address='TCPIP0::192.168.0.101')
 
 # Meta-instruments
-HS = hd.HeterodyneInstrument('HS', LO=LO, RF=S1, CBox=CBox, AWG=AWG,
+HS = hd.HeterodyneInstrument('HS', LO=LO, RF=RF, CBox=CBox, AWG=AWG,
                              server_name=None)
 LutMan = lm.QuTech_ControlBox_LookuptableManager('LutMan', CBox=CBox,
                                                  server_name='metaLM')
 
 MC = mc.MeasurementControl('MC')
-VIP_mon_2 = qb.CBox_driven_transmon('VIP_mon_2',
-                                    LO=LO, cw_source=S1, td_source=S2,
-                                    IVVI=IVVI,
-                                    AWG=AWG, LutMan=LutMan,
-                                    CBox=CBox, heterodyne_instr=HS, MC=MC,
-                                    server_name=None)
-VIP_mon_4 = qb.CBox_driven_transmon('VIP_mon_4',
-                                    LO=LO, cw_source=S1, td_source=S2,
-                                    IVVI=IVVI,
-                                    AWG=AWG, LutMan=LutMan,
-                                    CBox=CBox, heterodyne_instr=HS, MC=MC,
-                                    server_name=None)
-VIP_mon_6 = qb.CBox_driven_transmon('VIP_mon_6',
-                                    LO=LO, cw_source=S1, td_source=S2,
-                                    IVVI=IVVI,
-                                    AWG=AWG, LutMan=LutMan,
-                                    CBox=CBox, heterodyne_instr=HS, MC=MC,
-                                    server_name=None)
-
 VIP_mon_2_tek = qbt.Tektronix_driven_transmon('VIP_mon_2_tek',
                                               LO=LO,
-                                              cw_source=S1, td_source=S2,
-                                              IVVI=IVVI,rf_RO_source=S1,
+                                              cw_source=Qubit_LO,
+                                              td_source=Qubit_LO,
+                                              IVVI=IVVI, rf_RO_source=RF,
                                               AWG=AWG,
                                               CBox=CBox, heterodyne_instr=HS,
                                               MC=MC,
                                               server_name=None)
-
 
 VIP_mon_4_tek = qbt.Tektronix_driven_transmon('VIP_mon_4_tek',
                                               LO=LO,
-                                              cw_source=S1, td_source=S2,
-                                              IVVI=IVVI,rf_RO_source=S1,
+                                              cw_source=Qubit_LO,
+                                              td_source=Qubit_LO,
+                                              IVVI=IVVI, rf_RO_source=RF,
                                               AWG=AWG,
                                               CBox=CBox, heterodyne_instr=HS,
                                               MC=MC,
                                               server_name=None)
 
-gen.load_settings_onto_instrument(VIP_mon_2, label='VIP_mon_2')
-gen.load_settings_onto_instrument(VIP_mon_4, label='VIP_mon_4')
 gen.load_settings_onto_instrument(VIP_mon_2_tek)
 gen.load_settings_onto_instrument(VIP_mon_4_tek)
-gen.load_settings_onto_instrument(VIP_mon_6, label='VIP_mon_6')
 
-station = qc.Station(LO, S1, S2, IVVI, Dux,
+station = qc.Station(LO, RF, Qubit_LO, IVVI, Dux,
                      AWG, AWG520, HS, CBox, LutMan,
-                     VIP_mon_2, VIP_mon_4, VIP_mon_2_tek,
-                     VIP_mon_4_tek, VIP_mon_6)
+                     VIP_mon_2_tek, VIP_mon_4_tek)
 MC.station = station
 station.MC = MC
 nested_MC = mc.MeasurementControl('nested_MC')
@@ -155,15 +133,6 @@ sq.station = station
 
 IVVI.dac1.set(-40)
 IVVI.dac2.set(0)  # was 70 for sweetspot VIP_mon_4
-
-
-
-
-LO.off()
-
-# S1.off()
-S2.off()
-
 
 # Calibrated at 6.6GHz (22-2-2016)
 CBox.set_dac_offset(0, 0, -38.8779296875)  # Q channel
