@@ -23,8 +23,11 @@ def nelder_mead(fun, x0,
             no_improv_thr
         maxiter (int): always break after this number of iterations.
             Set it to 0 to loop indefinitely.
-        alpha, gamma, rho, sigma (floats): parameters of the algorithm
-            (see Wikipedia page for reference)
+        alpha (float): reflection coefficient
+        gamma (float): expansion coefficient
+        rho (float): contraction coefficient
+        sigma (float): shrink coefficient
+            For details on these parameters see Wikipedia page
 
     return: tuple (best parameter array, best score)
 

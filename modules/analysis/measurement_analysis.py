@@ -552,6 +552,36 @@ class MeasurementAnalysis(object):
             return best_fit_results
 
 
+class OptimizationAnalysis_v2(MeasurementAnalysis):
+    def run_default_analysis(self, close_file=True, **kw):
+        self.get_naming_and_values()
+        self.make_figures(**kw)
+        if close_file:
+            self.data_file.close()
+        return
+
+    def make_figures(self, **kw):
+
+        base_figname = 'optimization of ' + self.value_names[0]
+        if np.shape(self.sweep_points)[0] == 2:
+            f, ax = plt.subplots()
+            a_tools.color_plot_interpolated(
+                x=self.sweep_points[0], y=self.sweep_points[1],
+                z=self.measured_values[0], ax=ax,
+                zlabel=self.value_names[0])
+            ax.set_xlabel(self.parameter_labels[0])
+            ax.set_ylabel(self.parameter_labels[1])
+            ax.plot(self.sweep_points[0], self.sweep_points[1], '-o', c='grey')
+            ax.plot(self.sweep_points[0][-1], self.sweep_points[1][-1],
+                    'o', markersize=5, c='w')
+            plot_title = kw.pop('plot_title', textwrap.fill(
+                                self.timestamp_string + '_' +
+                                self.measurementstring, 40))
+            ax.set_title(plot_title)
+            # ax.text(
+
+            self.save_fig(f, figname=base_figname, **kw)
+
 class OptimizationAnalysis(MeasurementAnalysis):
     def run_default_analysis(self, close_file=True, show=False, **kw):
         self.get_naming_and_values()
@@ -2915,13 +2945,13 @@ class RandomizedBenchmarking_Analysis(TD_Analysis):
                              max(max(self.corr_data)+.1, 1.1))
 
             # Add a textbox
-            textstr = ('\t$F_{Cl}$'+' \t= {:.3g} $\pm$ ({:.2g})%'.format(
+            textstr = ('\t$F_{Cl}$'+' \t= {:.4g} $\pm$ ({:.4g})%'.format(
                     self.fit_res.params['fidelity_per_Clifford'].value*100,
                     self.fit_res.params['fidelity_per_Clifford'].stderr*100) +
-                '\n  $1-F_{Cl}$'+'  = {:.3g} $\pm$ ({:.2g})%'.format(
+                '\n  $1-F_{Cl}$'+'  = {:.4g} $\pm$ ({:.4g})%'.format(
                     (1-self.fit_res.params['fidelity_per_Clifford'].value)*100,
                     (self.fit_res.params['fidelity_per_Clifford'].stderr)*100) +
-                '\n\tOffset\t= {:.2g} $\pm$ ({:.2g})'.format(
+                '\n\tOffset\t= {:.4g} $\pm$ ({:.4g})'.format(
                     (self.fit_res.params['offset'].value),
                     (self.fit_res.params['offset'].stderr)))
 
