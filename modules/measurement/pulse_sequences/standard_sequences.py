@@ -5,7 +5,7 @@ from ..waveform_control import sequence
 from ..waveform_control.viewer import show_element, show_wf
 from ..waveform_control import pulse_library as pl
 
-from . import standard_elements as st_elts
+from . import standard_elements_cbox as st_elts
 from importlib import reload
 reload(st_elts)
 station = None
