@@ -1,4 +1,10 @@
+"""
+This scripts initializes the instruments and imports the modules
+"""
+
+
 # General imports
+
 import time
 t0 = time.time()  # to print how long init takes
 from importlib import reload  # Useful for reloading while testing
@@ -24,8 +30,11 @@ from modules.measurement import composite_detector_functions as cdet
 from modules.measurement import calibration_toolbox as cal_tools
 from modules.measurement import mc_parameter_wrapper as pw
 from modules.measurement import CBox_sweep_functions as cb_swf
+from modules.measurement.optimization import nelder_mead
 from modules.analysis import measurement_analysis as ma
 from modules.analysis import analysis_toolbox as a_tools
+
+
 
 from modules.utilities import general as gen
 # Standarad awg sequences
@@ -131,25 +140,8 @@ for i in range(4):
 st_seqs.station = station
 sq.station = station
 
-IVVI.dac1.set(-40)
-IVVI.dac2.set(0)  # was 70 for sweetspot VIP_mon_4
 
-# Calibrated at 6.6GHz (22-2-2016)
-CBox.set_dac_offset(0, 0, -38.8779296875)  # Q channel
-CBox.set_dac_offset(0, 1,  16.1220703125)  # I channel qubit drive AWG
-
-CBox.set_dac_offset(1, 1, 0)  # I channel
-CBox.set_dac_offset(1, 0, 0)  # Q channel readout AWG
-
-# LO offsets calibrated at 23-2-2016 at f = 7.15350 GHz
-AWG.ch1_offset.set(0.011)
-AWG.ch2_offset.set(0.029)
-AWG.ch3_offset.set(0.003)
-AWG.ch4_offset.set(0.031)
-AWG.clock_freq.set(1e9)
-
-AWG.trigger_level.set(0.2)
-
+t1 = time.time()
 
 def set_CBox_cos_sine_weigths(IF):
     '''
@@ -164,22 +156,26 @@ def set_CBox_cos_sine_weigths(IF):
 
     CBox.set('sig0_integration_weights', w0)
     CBox.set('sig1_integration_weights', w1)
-set_CBox_cos_sine_weigths(VIP_mon_2_tek.f_RO_mod())
 
-CBox.set('nr_averages', 2048)
-# this is the max nr of averages that does not slow down the heterodyning
-CBox.set('nr_samples', 75)  # Shorter because of min marker spacing
-CBox.set('integration_length', 140)
-CBox.set('acquisition_mode', 0)
-CBox.set('lin_trans_coeffs', [1, 0, 0, 1])
-CBox.set('log_length', 8000)
 
-CBox.set('AWG0_mode', 'Tape')
-CBox.set('AWG1_mode', 'Tape')
-CBox.set('AWG0_tape', [1, 1])
-CBox.set('AWG1_tape', [1, 1])
+def set_trigger_slow():
+    AWG520.ch1_m1_high.set(2)
+    AWG520.ch1_m2_high.set(0)
 
-t1 = time.time()
+
+def set_trigger_fast():
+    AWG520.ch1_m1_high.set(0)
+    AWG520.ch1_m2_high.set(2)
+
+
+def calibrate_RO_threshold_no_rotation():
+    d = det.CBox_integration_logging_det(CBox, AWG)
+    MC.set_sweep_function(swf.None_Sweep(sweep_control='hard'))
+    MC.set_sweep_points(np.arange(8000))
+    MC.set_detector_function(d)
+    MC.run('threshold_determination')
+    a = ma.SSRO_single_quadrature_discriminiation_analysis()
+    CBox.sig0_threshold_line.set(int(a.opt_threshold))
 
 
 print('Ran initialization in %.2fs' % (t1-t0))
