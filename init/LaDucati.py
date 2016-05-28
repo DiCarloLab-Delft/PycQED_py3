@@ -7,6 +7,7 @@ This scripts initializes the instruments and imports the modules
 
 import time
 t0 = time.time()  # to print how long init takes
+
 from importlib import reload  # Useful for reloading while testing
 import numpy as np
 import matplotlib.pyplot as plt
@@ -143,39 +144,6 @@ sq.station = station
 
 t1 = time.time()
 
-def set_CBox_cos_sine_weigths(IF):
-    '''
-    Maybe I should add this to the CBox driver
-    '''
-    t_base = np.arange(512)*5e-9
-
-    cosI = np.cos(2*np.pi * t_base*IF)
-    sinI = np.sin(2*np.pi * t_base*IF)
-    w0 = np.round(cosI*120)
-    w1 = np.round(sinI*120)
-
-    CBox.set('sig0_integration_weights', w0)
-    CBox.set('sig1_integration_weights', w1)
-
-
-def set_trigger_slow():
-    AWG520.ch1_m1_high.set(2)
-    AWG520.ch1_m2_high.set(0)
-
-
-def set_trigger_fast():
-    AWG520.ch1_m1_high.set(0)
-    AWG520.ch1_m2_high.set(2)
-
-
-def calibrate_RO_threshold_no_rotation():
-    d = det.CBox_integration_logging_det(CBox, AWG)
-    MC.set_sweep_function(swf.None_Sweep(sweep_control='hard'))
-    MC.set_sweep_points(np.arange(8000))
-    MC.set_detector_function(d)
-    MC.run('threshold_determination')
-    a = ma.SSRO_single_quadrature_discriminiation_analysis()
-    CBox.sig0_threshold_line.set(int(a.opt_threshold))
 
 
 print('Ran initialization in %.2fs' % (t1-t0))

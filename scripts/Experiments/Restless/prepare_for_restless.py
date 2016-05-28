@@ -1,9 +1,15 @@
-
+import time
+import numpy as np
+from copy import deepcopy
+t0 = time.time()
 station = station
 VIP_mon_4_tek = VIP_mon_4_tek
 VIP_mon_2_tek =VIP_mon_2_tek
 AWG = AWG
+AWG520 = AWG520
 CBox = CBox
+MC = MC
+IVVI = IVVI
 
 import instrument_drivers.meta_instrument.qubit_objects.qubit_object as qubi
 reload(qubi)
@@ -13,6 +19,10 @@ import instrument_drivers.meta_instrument.qubit_objects.Tektronix_driven_transmo
 reload(qbt)
 
 print('Defining functions')
+
+
+T1 = 22.7e-6
+
 
 def set_CBox_cos_sine_weigths(IF):
     '''
@@ -48,6 +58,7 @@ def calibrate_RO_threshold_no_rotation():
     a = ma.SSRO_single_quadrature_discriminiation_analysis()
     CBox.sig0_threshold_line.set(int(a.opt_threshold))
 
+
 def measure_allXY(pulse_pars, RO_pars):
     set_trigger_slow()
     MC.set_sweep_function(awg_swf.AllXY(
@@ -60,7 +71,7 @@ def measure_allXY(pulse_pars, RO_pars):
 
 def measure_RB(pulse_pars, RO_pars, upload=True):
     set_trigger_slow()
-    nr_seeds=50
+    nr_seeds = 50
     nr_cliffords = [2, 4, 8, 16, 30, 60, 100, 200, 300, 400, 600, 800]
     MC.set_sweep_function(awg_swf.Randomized_Benchmarking(
         pulse_pars=pulse_pars, RO_pars=RO_pars,
@@ -129,24 +140,9 @@ AWG520.ch1_amp(2.0)
 AWG520.ch1_offset(1.0)
 set_trigger_slow()
 
-#duplex pulsing parameters
-pulse_pars, RO_pars = VIP_mon_2_tek.get_pulse_pars()
-from copy import deepcopy
-pulse_pars_duplex = deepcopy(pulse_pars)
-pulse_pars_duplex['pulse_type'] = 'Mux_DRAG_pulse'
-pulse_pars_duplex['GI_channel'] = 'ch1'
-pulse_pars_duplex['GQ_channel'] = 'ch2'
-pulse_pars_duplex['DI_channel'] = 'ch3'
-pulse_pars_duplex['DQ_channel'] = 'ch4'
-pulse_pars_duplex['motzoi'] = -1.0
-pulse_pars_duplex['amplitude'] = 0.50
-#mixer calibration parameters (offsets are set in the ducati init)
-pulse_pars_duplex['G_alpha'] = 0.8244
-pulse_pars_duplex['G_phi'] = -10.645
-pulse_pars_duplex['D_alpha'] = 0.8565
-pulse_pars_duplex['D_phi'] = -9.101
 
 #duplexer attenuations
+print('setting duplexer settings')
 DUX_1_default = 0.3
 DUX_2_default = 0.3
 Dux.in1_out1_switch('ON')
@@ -165,13 +161,8 @@ Pump.power(-3)
 
 VIP_mon_2_tek.f_JPA_pump_mod(10e6)
 
-print('Ran prepare for restless')
-print('LO frequency:', LO.frequency())
-print('RF frequency:', RF.frequency())
-print('Pump frequency:', Pump.frequency())
 
-
-
+print('setting IVVI parameters')
 IVVI.dac1.set(-40)
 IVVI.dac2.set(0)  # was 70 for sweetspot VIP_mon_4
 
@@ -206,6 +197,8 @@ CBox.set('AWG0_tape', [1, 1])
 CBox.set('AWG1_tape', [1, 1])
 CBox.integration_length.set(200)
 set_CBox_cos_sine_weigths(VIP_mon_2_tek.f_RO_mod())
+CBox.lin_trans_coeffs.set([1, 0, 0, 1])
+
 
 print('setting pulse_pars_duplex')
 pulse_pars, RO_pars = VIP_mon_2_tek.get_pulse_pars()
@@ -215,7 +208,7 @@ pulse_pars_duplex['GI_channel'] = 'ch1'
 pulse_pars_duplex['GQ_channel'] = 'ch2'
 pulse_pars_duplex['DI_channel'] = 'ch3'
 pulse_pars_duplex['DQ_channel'] = 'ch4'
-pulse_pars_duplex['motzoi'] = -.5
+pulse_pars_duplex['motzoi'] = -0.25
 pulse_pars_duplex['amplitude'] = 0.50
 
 #mixer calibration parameters (offsets are set in the ducati init)
@@ -224,4 +217,5 @@ pulse_pars_duplex['G_phi'] = -10.645   # -10deg
 pulse_pars_duplex['D_alpha'] = 0.8565
 pulse_pars_duplex['D_phi'] = -9.101    # - 9deg
 
-
+t1 =time.time()
+print('Ran prepare for restless in {:.2g}s'.format(t1-t0))

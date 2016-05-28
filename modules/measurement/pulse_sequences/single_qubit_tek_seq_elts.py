@@ -305,6 +305,7 @@ def Randomized_Benchmarking_seq(pulse_pars, RO_pars,
                                 post_msmt_delay=3e-6,
                                 cal_points=True,
                                 resetless=False,
+                                double_curves=False,
                                 verbose=False):
     '''
     Input pars:
@@ -320,6 +321,7 @@ def Randomized_Benchmarking_seq(pulse_pars, RO_pars,
                        to measure a single element (for e.g. optimization)
         resetless:     bool if False will append extra Id element if seq
                        is longer than 50us to ensure proper initialization
+        double_curves: Alternates between net clifford 0 and 3
 
     Creates a randomized benchmarking sequence where 1 seed is loaded
     per element.
@@ -339,10 +341,14 @@ def Randomized_Benchmarking_seq(pulse_pars, RO_pars,
     seq = sequence.Sequence(seq_name)
     el_list = []
     pulses = get_pulse_dict_from_pars(pulse_pars)
+    net_cliffords = [0, 3]  # Exists purely for the double curves mode
     i = 0
     for seed in range(nr_seeds):
             for j, n_cl in enumerate(nr_cliffords):
+                if double_curves:
+                    net_clifford = net_cliffords[i%2]
                 i += 1  # only used for ensuring unique elt names
+
                 if cal_points and (j == (len(nr_cliffords)-4) or
                                    j == (len(nr_cliffords)-3)):
                     el = multi_pulse_elt(i, station,
@@ -364,9 +370,9 @@ def Randomized_Benchmarking_seq(pulse_pars, RO_pars,
                 el_list.append(el)
                 seq.append_element(el, trigger_wait=True)
 
+                # If the element is too long, add in an extra wait elt
+                # to skip a trigger
                 if resetless and n_cl*pulse_pars['pulse_delay']*1.875 > 50e-6:
-                    # If the element is too long, add in an extra wait elt
-                    # to skip a trigger
                     el = multi_pulse_elt(i, station, [pulses['I']])
                     el_list.append(el)
                     seq.append_element(el, trigger_wait=True)
