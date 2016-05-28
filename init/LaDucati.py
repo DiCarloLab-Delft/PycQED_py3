@@ -41,6 +41,7 @@ from modules.utilities import general as gen
 # Standarad awg sequences
 from modules.measurement.waveform_control import pulsar as ps
 from modules.measurement.pulse_sequences import standard_sequences as st_seqs
+from modules.measurement.pulse_sequences import calibration_elements as cal_elts
 from modules.measurement.pulse_sequences import single_qubit_tek_seq_elts as sq
 
 # Instrument drivers
@@ -106,7 +107,7 @@ VIP_mon_4_tek = qbt.Tektronix_driven_transmon('VIP_mon_4_tek',
 gen.load_settings_onto_instrument(VIP_mon_2_tek)
 gen.load_settings_onto_instrument(VIP_mon_4_tek)
 
-station = qc.Station(LO, RF, Qubit_LO, IVVI, Dux,
+station = qc.Station(LO, RF, Qubit_LO, IVVI, Dux, Pump,
                      AWG, AWG520, HS, CBox, LutMan,
                      VIP_mon_2_tek, VIP_mon_4_tek)
 MC.station = station
@@ -140,7 +141,7 @@ for i in range(4):
 # to make the pulsar available to the standard awg seqs
 st_seqs.station = station
 sq.station = station
-
+cal_elts.station = station
 
 t1 = time.time()
 

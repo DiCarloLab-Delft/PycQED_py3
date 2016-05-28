@@ -3907,7 +3907,9 @@ class Three_Tone_Spectroscopy_Analysis(MeasurementAnalysis):
         # kw['h5mode'] = 'r+'  # Read write mode, file must exist
         super(self.__class__, self).__init__(**kw)
 
-    def run_default_analysis(self, f01=None, f12=None, **kw):
+    def run_default_analysis(self, f01=None, f12=None,
+                             amp_lims=[None, None], line_color='k',
+                             phase_lims=[-180, 180],**kw):
         self.get_naming_and_values_2D()
         fig1, ax1 = self.default_ax(figsize=(8, 5)) # figsize wider for colorbar
         measured_powers = self.measured_values[0]
@@ -3921,6 +3923,7 @@ class Three_Tone_Spectroscopy_Analysis(MeasurementAnalysis):
                            xlabel=self.xlabel,
                            ylabel=self.ylabel,
                            zlabel=self.zlabels[0],
+                           clim=amp_lims,
                            fig=fig1, ax=ax1, **kw)
 
         fig2, ax2 = self.default_ax(figsize=(8, 5)) # figsize wider for colorbar
@@ -3931,52 +3934,48 @@ class Three_Tone_Spectroscopy_Analysis(MeasurementAnalysis):
                            xlabel = self.xlabel,
                            ylabel = self.ylabel,
                            zlabel = self.zlabels[1],
-                           clim = [-180,180],
+                           clim = phase_lims,
                            plot_title= fig2_title,
                            fig = fig2, ax = ax2)
 
-        if f01 != None:
+        if f01 is not None:
             ax1.vlines(f01, min(self.sweep_points_2D),
                        max(self.sweep_points_2D),
-                       linestyles='dashed', lw=2, colors='k')
+                       linestyles='dashed', lw=2, colors=line_color, alpha=.5)
             ax2.vlines(f01, min(self.sweep_points_2D),
                        max(self.sweep_points_2D),
-                       linestyles='dashed', lw=2, colors='k')
-            # color set to 'k' (black) because it contrasts with the colorpot,
-            # There are probably better choices
-        if f12 !=None:
+                       linestyles='dashed', lw=2, colors=line_color, alpha=.5)
+        if f12 is not None:
             ax1.plot((min(self.sweep_points),
                       max(self.sweep_points)),
-                     (f01+ f12-min(self.sweep_points),
-                      f01+ f12-max(self.sweep_points)),
-                     linestyle='dashed', lw=2, color='k')
+                     (f01 + f12-min(self.sweep_points),
+                      f01 + f12-max(self.sweep_points)),
+                     linestyle='dashed', lw=2, color=line_color, alpha=.5)
             ax2.plot((min(self.sweep_points),
                       max(self.sweep_points)),
-                     (f01+ f12-min(self.sweep_points),
-                      f01+ f12-max(self.sweep_points)),
-                     linestyle='dashed', lw=2, color='k')
-        if (f01!=None) and (f12 !=None):
+                     (f01 + f12-min(self.sweep_points),
+                      f01 + f12-max(self.sweep_points)),
+                     linestyle='dashed', lw=2, color=line_color, alpha=.5)
+        if (f01 is not None) and (f12 is not None):
             anharm = f01-f12
             EC, EJ = a_tools.fit_EC_EJ(f01, f12)
-            EC *= 1000
+            # EC *= 1000
 
-            textstr = 'f01 = %.4f GHz' %f01 +'\n' + \
-                'f12 = %.4f GHz' %f12 +'\n' + \
-                'anharm ~= %.4f GHz' %anharm + '\n' + \
-                'EC = %.1f MHz' %EC + '\n' + \
-                'EJ = %.3f GHz' %EJ
+            textstr = 'f01 = {:.4g} GHz'.format(f01*1e-9) +'\n' + \
+                'f12 = {:.4g} GHz'.format(f12*1e-9) +'\n' + \
+                'anharm ~= {:.4g} MHz'.format(anharm*1e-6) + '\n' + \
+                'EC = {:.4g} MHz'.format(EC*1e-6) + '\n' + \
+                'EJ = {:.4g} GHz'.format(EJ*1e-9)
             ax1.text(0.95, 0.95, textstr, transform=ax1.transAxes,
-                    fontsize=11,
-                    verticalalignment='top',
-                    horizontalalignment ='right',
-                    # Strangely enough plots on the left, but still works
-                    bbox=self.box_props)
+                     fontsize=11,
+                     verticalalignment='top',
+                     horizontalalignment='right',
+                     bbox=self.box_props)
             ax2.text(0.95, 0.95, textstr, transform=ax2.transAxes,
-                    fontsize=11,
-                    verticalalignment='top',
-                    horizontalalignment ='right',
-                    # Strangely enough plots on the left, but still works
-                    bbox=self.box_props)
+                     fontsize=11,
+                     verticalalignment='top',
+                     horizontalalignment='right',
+                     bbox=self.box_props)
         self.save_fig(fig1, figname=ax1.get_title(), **kw)
         self.save_fig(fig2, figname=ax2.get_title(), **kw)
         self.finish()

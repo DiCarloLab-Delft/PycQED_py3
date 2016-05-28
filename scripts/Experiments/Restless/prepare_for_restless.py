@@ -158,6 +158,7 @@ Dux.in2_out1_phase(30000)
 #JPA pump settings
 Pump.on()
 Pump.power(-3)
+Pump.frequency()
 
 VIP_mon_2_tek.f_JPA_pump_mod(10e6)
 

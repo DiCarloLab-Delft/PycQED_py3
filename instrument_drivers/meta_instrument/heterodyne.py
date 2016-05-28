@@ -183,29 +183,11 @@ class HeterodyneInstrument(Instrument):
 
         self.CBox.set('nr_samples', 1)  # because using integrated avg
 
-    # def get_averaged_transient(self):
-    #     self.CBox.set('acquisition_mode', 0)
-    #     self.CBox.set('acquisition_mode', 'input averaging mode')
-    #     dat = self.CBox.get_input_avg_results()
-    #     # requires rescaling to dac voltages
-    #     return dat
-
     def probe(self, **kw):
         '''
         Starts acquisition and returns the data
             'COMP' : returns data as a complex point in the I-Q plane in Volts
         '''
-        # i = 0
-        # succes = False
-        # while succes is False and i < 10:
-        #     try:
-        #         data = self.get_averaged_transient()
-        #         succes = True
-        #     except:
-        #         succes = False
-        #     i += 1
-        # s21 = self.demodulate_data(data)  # returns a complex point in the IQ-plane
-
         self.CBox.set('acquisition_mode', 0)
         self.CBox.set('acquisition_mode', 4)
         d = self.CBox.get_integrated_avg_results()

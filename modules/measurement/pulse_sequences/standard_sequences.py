@@ -14,14 +14,15 @@ reload(element)
 # I guess there are cleaner solutions :)
 
 '''
+Update (12-4-2016) this module has grown out to be very CBox specific.
+Almost any sequence here can be made with the "multi_pulse_elt" that exists
+in single_qubit_tek_seq_elts.
+
+Will not move what is here now for backwards compatibility.
 Standard sequences. Currently (17-1-2016) all sequences have the channels
 hardcoded. It would be better if these use the named channels and have the
 mapping defined on the pulsar.
 
-Update (12-4-2016) this module has grown out to be very CBox specific.
-Almost any sequence here can be made with the "multi_pulse_elt" that exists
-in single_qubit_tek_seq_elts.
-Will not move what is here now for backwards compatibility.
 '''
 
 
