@@ -49,7 +49,7 @@ def Rabi_seq(amps, pulse_pars, RO_pars, n=1, post_msmt_delay=3e-6,
         el = multi_pulse_elt(i, station, pulse_list)
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
-    station.instruments['AWG'].stop()
+    station.components['AWG'].stop()
     station.pulsar.program_awg(seq, *el_list, verbose=verbose)
     return seq_name
 
@@ -85,7 +85,7 @@ def T1_seq(times,
                 el = multi_pulse_elt(i, station, [pulses['X180'], RO_pars])
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
-    station.instruments['AWG'].stop()
+    station.components['AWG'].stop()
     station.pulsar.program_awg(seq, *el_list, verbose=verbose)
     return seq_name
 
@@ -126,7 +126,7 @@ def Ramsey_seq(times, pulse_pars, RO_pars,
                                  [pulses['X90'], pulse_pars_x2, RO_pars])
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
-    station.instruments['AWG'].stop()
+    station.components['AWG'].stop()
     station.pulsar.program_awg(seq, *el_list, verbose=verbose)
     return seq_name
 
@@ -163,7 +163,7 @@ def Echo_seq(times, pulse_pars, RO_pars,
                                   final_X90, RO_pars])
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
-    station.instruments['AWG'].stop()
+    station.components['AWG'].stop()
     station.pulsar.program_awg(seq, *el_list, verbose=verbose)
     return seq_name
 
@@ -204,7 +204,7 @@ def AllXY_seq(pulse_pars, RO_pars, double_points=False,
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
 
-    station.instruments['AWG'].stop()
+    station.components['AWG'].stop()
     station.pulsar.program_awg(seq, *el_list, verbose=verbose)
     return seq_name
 
@@ -240,7 +240,7 @@ def OffOn_seq(pulse_pars, RO_pars,
         el = multi_pulse_elt(i, station, [pulses[pulse_comb], RO_pars])
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
-    station.instruments['AWG'].stop()
+    station.components['AWG'].stop()
     station.pulsar.program_awg(seq, *el_list, verbose=verbose)
     return seq_name
 
@@ -293,7 +293,7 @@ def Butterfly_seq(pulse_pars, RO_pars, initialize=False,
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
 
-    station.instruments['AWG'].stop()
+    station.components['AWG'].stop()
     station.pulsar.program_awg(seq, *el_list, verbose=verbose)
     return seq_name
 
@@ -377,7 +377,7 @@ def Randomized_Benchmarking_seq(pulse_pars, RO_pars,
                     el_list.append(el)
                     seq.append_element(el, trigger_wait=True)
 
-    station.instruments['AWG'].stop()
+    station.components['AWG'].stop()
     station.pulsar.program_awg(seq, *el_list, verbose=verbose)
     return seq_name
 
@@ -425,7 +425,7 @@ def Motzoi_XY(motzois, pulse_pars, RO_pars,
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
 
-    station.instruments['AWG'].stop()
+    station.components['AWG'].stop()
     station.pulsar.program_awg(seq, *el_list, verbose=verbose)
     return seq_name
 
@@ -433,6 +433,7 @@ def Motzoi_XY(motzois, pulse_pars, RO_pars,
 
 
 def Rabi_2nd_exc_seq(amps, pulse_pars, pulse_pars_2nd, RO_pars, n=1,
+                     cal_points=True,
                      post_msmt_delay=3e-6, verbose=False):
     '''
     Rabi sequence for the second excited state
@@ -451,7 +452,8 @@ def Rabi_2nd_exc_seq(amps, pulse_pars, pulse_pars_2nd, RO_pars, n=1,
     pulses_2nd = get_pulse_dict_from_pars(pulse_pars_2nd)
     for i, amp in enumerate(amps):  # seq has to have at least 2 elts
         pulses_2nd['X180']['amplitude'] = amp
-        pulse_list = [pulses['X180']]+n*[pulses_2nd['X180']]+[RO_pars]
+        pulse_list = ([pulses['X180']]+n*[pulses_2nd['X180']]+
+                      [pulses['X180'], RO_pars])
 
         # copy first element and set extra wait
         pulse_list[0] = deepcopy(pulse_list[0])
@@ -459,7 +461,7 @@ def Rabi_2nd_exc_seq(amps, pulse_pars, pulse_pars_2nd, RO_pars, n=1,
         el = multi_pulse_elt(i, station, pulse_list)
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
-    station.instruments['AWG'].stop()
+    station.components['AWG'].stop()
     station.pulsar.program_awg(seq, *el_list, verbose=verbose)
     return seq_name
 

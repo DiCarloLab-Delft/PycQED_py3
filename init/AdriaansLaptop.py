@@ -33,7 +33,7 @@ station.MC = MC
 # station.add_instrument(ParabInstr)
 
 # station.pulsar = ps.Pulsar()
-# # station.pulsar.AWG = station.instruments['AWG']
+# # station.pulsar.AWG = station.components['AWG']
 # for i in range(4):
 #     # Note that these are default parameters and should be kept so.
 #     # the channel offset is set in the AWG itself. For now the amplitude is

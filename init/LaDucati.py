@@ -67,21 +67,27 @@ AWG520 = tk520.Tektronix_AWG520('AWG520', address='GPIB0::17::INSTR',
                                 server_name='')
 # SH = sh.SignalHound_USB_SA124B('Signal hound', server_name=None) #commented because of 8s load time
 
-LO = rs.RohdeSchwarz_SGS100A(name='LO', address='TCPIP0::192.168.0.77')  # left
-RF = rs.RohdeSchwarz_SGS100A(name='RF', address='TCPIP0::192.168.0.78')  # right
-Qubit_LO = rs.RohdeSchwarz_SGS100A(name='Qubit_LO', address='TCPIP0::192.168.0.11')  # top
-Pump = Agilent_E8527D(name='Pump', address='TCPIP0::192.168.0.13')
+LO = rs.RohdeSchwarz_SGS100A(name='LO', address='TCPIP0::192.168.0.77',
+    server_name=None)  # left
+RF = rs.RohdeSchwarz_SGS100A(name='RF', address='TCPIP0::192.168.0.78',
+    server_name=None)  # right
+Qubit_LO = rs.RohdeSchwarz_SGS100A(name='Qubit_LO', address='TCPIP0::192.168.0.11',
+    server_name=None)  # top
+Pump = Agilent_E8527D(name='Pump', address='TCPIP0::192.168.0.13',
+                        server_name=None)
 CBox = qcb.QuTech_ControlBox('CBox', address='Com3', run_tests=False)
 AWG = tek.Tektronix_AWG5014(name='AWG', setup_folder=None,
                             address='TCPIP0::192.168.0.9', server_name=None)
 IVVI = iv.IVVI('IVVI', address='ASRL1', numdacs=16, server_name=None)
-Dux = qdux.QuTech_Duplexer('Dux', address='TCPIP0::192.168.0.101')
+Dux = qdux.QuTech_Duplexer('Dux', address='TCPIP0::192.168.0.101',
+                            server_name=None)
 
 # Meta-instruments
 HS = hd.HeterodyneInstrument('HS', LO=LO, RF=RF, CBox=CBox, AWG=AWG,
                              server_name=None)
 LutMan = lm.QuTech_ControlBox_LookuptableManager('LutMan', CBox=CBox,
-                                                 server_name='metaLM')
+                                                 server_name=None)
+                                                 # server_name='metaLM')
 
 MC = mc.MeasurementControl('MC')
 VIP_mon_2_tek = qbt.Tektronix_driven_transmon('VIP_mon_2_tek',
@@ -117,7 +123,7 @@ nested_MC.station = station
 
 # The AWG sequencer
 station.pulsar = ps.Pulsar()
-station.pulsar.AWG = station.instruments['AWG']
+station.pulsar.AWG = station.components['AWG']
 for i in range(4):
     # Note that these are default parameters and should be kept so.
     # the channel offset is set in the AWG itself. For now the amplitude is

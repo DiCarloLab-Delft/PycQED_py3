@@ -87,7 +87,7 @@ class QuTech_ControlBox_LookuptableManager(Instrument):
         self.add_parameter('phi', vals=vals.Numbers(), units='deg',
                            get_cmd=self._do_get_phi,
                            set_cmd=self._do_set_phi)
-        self.add_parameter('apply_predistortion_matrix', type=bool,
+        self.add_parameter('apply_predistortion_matrix', vals=vals.Bool(),
                            set_cmd=self._do_set_apply_predistortion_matrix,
                            get_cmd=self._do_get_apply_predistortion_matrix)
 

@@ -583,7 +583,7 @@ class MeasurementControl:
                             ' instrument settings')
         else:
             set_grp = data_object.create_group('Instrument settings')
-            inslist = dict_to_ordered_tuples(self.station.instruments)
+            inslist = dict_to_ordered_tuples(self.station.components)
             for (iname, ins) in inslist:
                 instrument_grp = set_grp.create_group(iname)
                 par_snap = ins.snapshot()['parameters']

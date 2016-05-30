@@ -20,7 +20,7 @@ ATS_trig_delay = -200e-9
 
 reload(pulsar)
 station.pulsar = pulsar.Pulsar()
-station.pulsar.AWG = station.instruments['AWG']
+station.pulsar.AWG = station.components['AWG']
 station.pulsar.define_channel(id='ch1', name='I', type='analog',
                               high=1, low=-1,
                               offset=0.0, delay=0, active=True)
@@ -75,7 +75,7 @@ def generate_and_upload_T1_sequence():
         seq.append_element(el, trigger_wait=True)
 
     # show_element(el)
-    station.instruments['AWG'].stop()
+    station.components['AWG'].stop()
     station.pulsar.program_awg(seq, *el_list)
 
 if __name__ == '__main__':

@@ -56,6 +56,6 @@ def cos_seq(amplitude, frequency, channels, phases,
     el_list.append(el)
     seq.append_element(el, trigger_wait=False)
     # seq.append_element(el, trigger_wait=False)
-    station.instruments['AWG'].stop()
+    station.components['AWG'].stop()
     station.pulsar.program_awg(seq, *el_list, verbose=verbose)
     return seq_name
