@@ -432,38 +432,6 @@ def Motzoi_XY(motzois, pulse_pars, RO_pars,
 # Sequences involving the second excited state
 
 
-def Rabi_2nd_exc_seq(amps, pulse_pars, pulse_pars_2nd, RO_pars, n=1,
-                     cal_points=True,
-                     post_msmt_delay=3e-6, verbose=False):
-    '''
-    Rabi sequence for the second excited state
-    Input pars:
-        amps:            array of pulse amplitudes (V)
-        pulse_pars:      dict containing the pulse parameters
-        pulse_pars_2nd:  dict containing pulse_parameters for 2nd exc. state
-        RO_pars:         dict containing the RO parameters
-        n:               number of pulses (1 is conventional Rabi)
-        post_msmt_delay: extra wait time for resetless compatibility
-    '''
-    seq_name = 'Rabi_2nd_exc_sequence'
-    seq = sequence.Sequence(seq_name)
-    el_list = []
-    pulses = get_pulse_dict_from_pars(pulse_pars)
-    pulses_2nd = get_pulse_dict_from_pars(pulse_pars_2nd)
-    for i, amp in enumerate(amps):  # seq has to have at least 2 elts
-        pulses_2nd['X180']['amplitude'] = amp
-        pulse_list = ([pulses['X180']]+n*[pulses_2nd['X180']]+
-                      [pulses['X180'], RO_pars])
-
-        # copy first element and set extra wait
-        pulse_list[0] = deepcopy(pulse_list[0])
-        pulse_list[0]['pulse_delay'] += post_msmt_delay
-        el = multi_pulse_elt(i, station, pulse_list)
-        el_list.append(el)
-        seq.append_element(el, trigger_wait=True)
-    station.components['AWG'].stop()
-    station.pulsar.program_awg(seq, *el_list, verbose=verbose)
-    return seq_name
 
 
 

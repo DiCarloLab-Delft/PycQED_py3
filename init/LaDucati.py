@@ -76,8 +76,9 @@ Qubit_LO = rs.RohdeSchwarz_SGS100A(name='Qubit_LO', address='TCPIP0::192.168.0.1
 Pump = Agilent_E8527D(name='Pump', address='TCPIP0::192.168.0.13',
                         server_name=None)
 CBox = qcb.QuTech_ControlBox('CBox', address='Com3', run_tests=False)
-AWG = tek.Tektronix_AWG5014(name='AWG', setup_folder=None,
+AWG = tek.Tektronix_AWG5014(name='AWG', setup_folder=None, timeout=2,
                             address='TCPIP0::192.168.0.9', server_name=None)
+AWG.timeout(180)
 IVVI = iv.IVVI('IVVI', address='ASRL1', numdacs=16, server_name=None)
 Dux = qdux.QuTech_Duplexer('Dux', address='TCPIP0::192.168.0.101',
                             server_name=None)

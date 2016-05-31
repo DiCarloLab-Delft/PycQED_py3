@@ -4,6 +4,7 @@ from modules.measurement import sweep_functions as swf
 from modules.measurement.randomized_benchmarking import randomized_benchmarking as rb
 from modules.measurement.pulse_sequences import standard_sequences as st_seqs
 from modules.measurement.pulse_sequences import single_qubit_tek_seq_elts as sqs
+from modules.measurement.pulse_sequences import single_qubit_2nd_exc_seqs as sqs2
 default_gauss_width = 10  # magic number should be removed,
 # note magic number only used in old mathematica seqs
 
@@ -29,7 +30,7 @@ class Rabi(swf.Hard_Sweep):
 
 class Rabi_2nd_exc(swf.Hard_Sweep):
     def __init__(self, pulse_pars, pulse_pars_2nd,
-                 RO_pars, n=1, upload=True):
+                 RO_pars, amps=None, n=1, cal_points=True, upload=True):
         super().__init__()
         self.pulse_pars = pulse_pars
         self.pulse_pars_2nd = pulse_pars_2nd
@@ -39,14 +40,53 @@ class Rabi_2nd_exc(swf.Hard_Sweep):
         self.name = 'Rabi 2nd excited state'
         self.parameter_name = 'amplitude'
         self.unit = 'V'
+        if cal_points and amps is not None:
+            self.sweep_points = np.concatenate([amps,
+                                               [amps[-1]*1.05,
+                                               amps[-1]*1.06,
+                                               amps[-1]*1.07,
+                                               amps[-1]*1.08,
+                                               amps[-1]*1.09,
+                                               amps[-1]*1.1]])
 
     def prepare(self, **kw):
         if self.upload:
-            sqs.Rabi_2nd_exc_seq(amps=self.sweep_points,
+            sqs2.Rabi_2nd_exc_seq(amps=self.sweep_points,
                                  pulse_pars=self.pulse_pars,
                                  pulse_pars_2nd=self.pulse_pars_2nd,
                                  RO_pars=self.RO_pars,
                                  n=self.n)
+
+
+class Ramsey_2nd_exc(swf.Hard_Sweep):
+    def __init__(self, pulse_pars, pulse_pars_2nd,
+                 RO_pars, times=None, n=1, cal_points=True, upload=True):
+        super().__init__()
+        self.pulse_pars = pulse_pars
+        self.pulse_pars_2nd = pulse_pars_2nd
+        self.RO_pars = RO_pars
+        self.n = n
+        self.upload = upload
+        self.name = 'Rabi 2nd excited state'
+        self.parameter_name = 'amplitude'
+        self.unit = 'V'
+        if cal_points and times is not None:
+            self.sweep_points = np.concatenate([times,
+                                               [times[-1]*1.05,
+                                               times[-1]*1.06,
+                                               times[-1]*1.07,
+                                               times[-1]*1.08,
+                                               times[-1]*1.09,
+                                               times[-1]*1.1]])
+
+    def prepare(self, **kw):
+        if self.upload:
+            sqs2.Ramsey_2nd_exc_seq(times=self.sweep_points,
+                                 pulse_pars=self.pulse_pars,
+                                 pulse_pars_2nd=self.pulse_pars_2nd,
+                                 RO_pars=self.RO_pars,
+                                 n=self.n)
+
 
 
 class T1(swf.Hard_Sweep):

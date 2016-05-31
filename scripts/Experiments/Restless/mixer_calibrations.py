@@ -1,3 +1,9 @@
+AWG=AWG
+SH = SH
+Qubit_LO = Qubit_LO
+MC= MC
+Dux = Dux
+
 #qubit drive mixer calibrations
 reload(cal_tools)
 old_att_1 = Dux.in1_out1_attenuation.get()
@@ -6,11 +12,13 @@ Dux.in1_out1_attenuation.set(0.0)
 Dux.in2_out1_attenuation.set(0.0)
 Dux.in1_out1_switch.set('ON')
 Dux.in2_out1_switch.set('OFF')
-ch1_min, ch2_min = cal_tools.mixer_carrier_cancellation_5014(AWG, SH, source=Qubit_LO, MC=MC, AWG_channel1=1, AWG_channel2=2 )
+ch1_min, ch2_min = cal_tools.mixer_carrier_cancellation_5014(
+    AWG, SH, source=Qubit_LO, MC=MC, AWG_channel1=1, AWG_channel2=2)
 #G_phi, G_alpha = cal_tools.mixer_skewness_calibration_5014(SH, source=S2, station=station, I_ch=1, Q_ch=2)
 Dux.in1_out1_switch.set('OFF')
 Dux.in2_out1_switch.set('ON')
-ch3_min, ch4_min = cal_tools.mixer_carrier_cancellation_5014(AWG, SH, source=Qubit_LO, MC=MC, AWG_channel1=3, AWG_channel2=4 )
+ch3_min, ch4_min = cal_tools.mixer_carrier_cancellation_5014(
+    AWG, SH, source=Qubit_LO, MC=MC, AWG_channel1=3, AWG_channel2=4)
 #D_phi, D_alpha = cal_tools.mixer_skewness_calibration_5014(SH, source=S2,station=station, I_ch=3, Q_ch=4)
 Dux.in1_out1_switch.set('ON')
 Dux.in2_out1_switch.set('ON')

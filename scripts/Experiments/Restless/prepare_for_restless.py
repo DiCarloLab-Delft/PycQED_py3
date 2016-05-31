@@ -169,11 +169,10 @@ IVVI.dac1.set(-40)
 IVVI.dac2.set(0)  # was 70 for sweetspot VIP_mon_4
 
 print('setting AWG parameters')
-# LO offsets calibrated at 23-2-2016 at f = 7.15350 GHz
 AWG.ch1_offset.set(0.010)
-AWG.ch2_offset.set(0.030)
+AWG.ch2_offset.set(0.029)
 AWG.ch3_offset.set(0.002)
-AWG.ch4_offset.set(0.032)
+AWG.ch4_offset.set(0.030)
 AWG.clock_freq.set(1e9)
 AWG.trigger_level.set(0.2)
 
