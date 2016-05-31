@@ -405,8 +405,9 @@ class CBox_integrated_average_detector(Hard_Detector):
             try:
                 data = self.CBox.get_integrated_avg_results()
                 succes = True
-            except:
+            except Exception as e:
                 logging.warning('Exception caught retrying')
+                logging.warning(e)
                 self.CBox.set('acquisition_mode', 0)
                 self.AWG.stop()
                 self.CBox.restart_awg_tape(0)
@@ -461,7 +462,8 @@ class CBox_single_integration_average_det(Soft_Detector):
             try:
                 data = self.CBox.get_integrated_avg_results()
                 success = True
-            except:
+            except Exception as e:
+                logging.warning(e)
                 logging.warning('Exception caught retrying')
             self.CBox.set('acquisition_mode', 0)
             i += 1

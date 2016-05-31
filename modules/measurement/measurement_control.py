@@ -282,7 +282,7 @@ class MeasurementControl:
         # to check if vals is an array with multiple values
         if hasattr(vals, '__iter__'):
             if len(vals) > 1:
-                vals = vals[0]
+                vals = vals[self.par_idx]
         return vals
 
     def finish(self):
@@ -755,6 +755,8 @@ class MeasurementControl:
                                     or maximizing
             "f_termination" None    terminates the loop if the measured value
                                     is smaller than this value
+            "par_idx": 0            If a parameter returns multiple values,
+                                    specifies which one to use.
         Common keywords (used in python nelder_mead implementation):
             "x0":                   list of initial values
             "initial_step"
@@ -766,6 +768,7 @@ class MeasurementControl:
         # scaling should not be used if a "direc" argument is available
         # in the adaptive function itself, if not specified equals 1
         self.x_scale = self.af_pars.pop('x_scale', 1)
+        self.par_idx = self.af_pars.pop('par_idx', 0)
         # Determines if the optimization will minimize or maximize
         self.minimize_optimization = self.af_pars.pop('minimize', True)
         self.f_termination = self.af_pars.pop('f_termination', None)

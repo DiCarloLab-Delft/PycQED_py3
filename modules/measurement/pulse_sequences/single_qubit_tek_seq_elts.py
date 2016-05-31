@@ -306,6 +306,7 @@ def Randomized_Benchmarking_seq(pulse_pars, RO_pars,
                                 cal_points=True,
                                 resetless=False,
                                 double_curves=False,
+                                seq_name=None,
                                 verbose=False):
     '''
     Input pars:
@@ -336,8 +337,8 @@ def Randomized_Benchmarking_seq(pulse_pars, RO_pars,
         post_msmt_delay is set (optional)
         resetless (optional)
     '''
-
-    seq_name = 'RandomizedBenchmarking_sequence'
+    if seq_name is None:
+        seq_name = 'RandomizedBenchmarking_sequence'
     seq = sequence.Sequence(seq_name)
     el_list = []
     pulses = get_pulse_dict_from_pars(pulse_pars)

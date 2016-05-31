@@ -47,7 +47,8 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                  IVVI, AWG, CBox,
                  heterodyne_instr, MC, rf_RO_source=None, **kw):
         super(CBox_driven_transmon, self).__init__(name, **kw)
-        # Change this when inheriting directly from Transmon instead of from CBox driven Transmon.
+        # Change this when inheriting directly from Transmon instead of
+        # from CBox driven Transmon.
         self.LO = LO
         self.cw_source = cw_source
         self.td_source = td_source
@@ -167,9 +168,9 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         self.int_avg_det = det.CBox_integrated_average_detector(self.CBox,
                                                                 self.AWG)
         self.int_log_det = det.CBox_integration_logging_det(self.CBox,
-                                                                self.AWG)
-        self.input_average_detector = det.CBox_input_average_detector(self.CBox,
-                                                                      self.AWG)
+                                                            self.AWG)
+        self.input_average_detector = det.CBox_input_average_detector(
+            self.CBox, self.AWG)
 
     def prepare_for_timedomain(self):
         self.LO.on()
@@ -375,10 +376,11 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
             MC = self.MC
         MC.set_sweep_function(awg_swf.Randomized_Benchmarking(
             pulse_pars=self.pulse_pars, RO_pars=self.RO_pars,
+            double_curves=True,
             nr_cliffords=nr_cliffords, nr_seeds=nr_seeds))
         MC.set_detector_function(self.int_avg_det)
         MC.run('RB_{}seeds'.format(nr_seeds)+self.msmt_suffix)
-        ma.RandomizedBenchmarking_Analysis(
+        ma.RB_double_curve_Analysis(
             close_main_fig=close_fig, T1=T1,
             pulse_delay=self.pulse_delay.get())
 

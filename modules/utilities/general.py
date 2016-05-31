@@ -38,7 +38,7 @@ def to_hex_string(byteval):
     return "b'" + ''.join('\\x{:02x}'.format(x) for x in byteval) + "'"
 
 
-def load_settings_onto_instrument(instrument, folder=None,
+def load_settings_onto_instrument(instrument, load_from_instr=None, folder=None,
                                   label='Settings',
                                   timestamp=None, **kw):
         '''
@@ -61,7 +61,10 @@ def load_settings_onto_instrument(instrument, folder=None,
                 filepath = a_tools.measurement_filename(folder)
                 f = h5py.File(filepath, 'r')
                 sets_group = f['Instrument settings']
-                ins_group = sets_group[instrument_name]
+                if load_from_instr is None:
+                    ins_group = sets_group[instrument_name]
+                else:
+                    ins_group = sets_group[load_from_instr]
                 print('Loaded Settings Successfully')
                 success = True
             except:
@@ -69,7 +72,7 @@ def load_settings_onto_instrument(instrument, folder=None,
                              +'_'+ os.path.split(folder)[1][:6]
                 folder = None
                 success = False
-            count+=1
+            count += 1
 
         if not success:
             print('Could not open settings for instrument "%s"' % (

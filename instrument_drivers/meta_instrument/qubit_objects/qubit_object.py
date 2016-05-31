@@ -53,7 +53,6 @@ class Qubit(Instrument):
 
     Open for discussion:
         - is a split at the level below qubit really required?
-        - Hz vs GHz (@cdickel)
         - is the name "find_" a good name or should it be merged with measure
             or calibrate?
         - Should the pulse-parameters be grouped here in some convenient way?

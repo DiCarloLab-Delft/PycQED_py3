@@ -7,6 +7,7 @@ This scripts initializes the instruments and imports the modules
 
 import time
 t0 = time.time()  # to print how long init takes
+from instrument_drivers.meta_instrument.qubit_objects import duplexer_tek_transmon as dt
 
 from importlib import reload  # Useful for reloading while testing
 import numpy as np
@@ -111,11 +112,19 @@ VIP_mon_4_tek = qbt.Tektronix_driven_transmon('VIP_mon_4_tek',
                                               MC=MC,
                                               server_name=None)
 
+VIP_mon_2_dux = dt.Duplexer_tek_transmon('VIP_mon_2_dux', LO=LO,
+                                         cw_source=Qubit_LO,
+                                         td_source=Qubit_LO,
+                                         IVVI=IVVI, AWG=AWG, CBox=CBox,
+                                         heterodyne_instr=HS, MC=MC, Mux=Dux,
+                                         rf_RO_source=RF, server_name=None)
+
 gen.load_settings_onto_instrument(VIP_mon_2_tek)
 gen.load_settings_onto_instrument(VIP_mon_4_tek)
 
 station = qc.Station(LO, RF, Qubit_LO, IVVI, Dux, Pump,
                      AWG, AWG520, HS, CBox, LutMan,
+                     VIP_mon_2_dux,
                      VIP_mon_2_tek, VIP_mon_4_tek)
 MC.station = station
 station.MC = MC

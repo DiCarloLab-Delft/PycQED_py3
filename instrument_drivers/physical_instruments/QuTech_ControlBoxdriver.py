@@ -181,10 +181,10 @@ class QuTech_ControlBox(VisaInstrument):
         Sets the measurement timeout in seconds.
         This is distinct from the timeout of the read operation (5s default)
         '''
-        self._timeout = val
+        self._msmt_timeout = val
 
     def _do_get_measurement_timeout(self):
-        return self._timeout
+        return self._msmt_timeout
 
     def _do_get_firmware_version(self):
         message = c.create_message(defHeaders.ReadVersion)
@@ -338,7 +338,7 @@ class QuTech_ControlBox(VisaInstrument):
             else:
                 time.sleep(0.0001)
                 self._print_waiting_char()
-            if time.time()-t0 > self._timeout:
+            if time.time()-t0 > self._msmt_timeout:
                 raise Exception('Measurement timed out')
         self._i_wait = 0  # leaves the wait char counter in the 0 state
         return ch0, ch1
@@ -375,7 +375,7 @@ class QuTech_ControlBox(VisaInstrument):
 
             if len(decoded_message) != 0:
                 break
-            elif time.time()-t0 > self._timeout:
+            elif time.time()-t0 > self._msmt_timeout:
                 raise Exception('Measurement timed out')
             else:
                 self._print_waiting_char()
@@ -420,7 +420,7 @@ class QuTech_ControlBox(VisaInstrument):
             else:
                 time.sleep(0.0001)
                 self._print_waiting_char()
-            if time.time()-t0 > self._timeout:
+            if time.time()-t0 > self._msmt_timeout:
                 raise Exception('Measurement timed out')
         self._i_wait = 0  # leaves the wait char counter in the 0 state
         return ch0, ch1
@@ -473,7 +473,7 @@ class QuTech_ControlBox(VisaInstrument):
             else:
                 time.sleep(0.0001)
                 self._print_waiting_char()
-            if time.time()-t0 > self._timeout:
+            if time.time()-t0 > self._msmt_timeout:
                 raise Exception('Measurement timed out')
         self._i_wait = 0  # leaves the wait char counter in the 0 state
         ch0_values, ch1_values = c.decode_boolean_array(encoded_message)
@@ -525,7 +525,7 @@ class QuTech_ControlBox(VisaInstrument):
                     bytes_per_value=bytes_per_value)
             if len(decoded_message) != 0:
                 break
-            elif time.time()-t0 > self._timeout:
+            elif time.time()-t0 > self._msmt_timeout:
                 raise Exception('Measurement timed out')
             else:
                 time.sleep(0.0001)

@@ -186,6 +186,8 @@ class Pulsar:
         Advantage is that it's much faster, since sequence information is sent
         to the AWG in a single file.
         """
+        old_timeout = self.AWG.timeout()
+        self.AWG.timeout(max(180, old_timeout))
 
         verbose = kw.pop('verbose', False)
         debug = kw.pop('debug', False)
@@ -361,6 +363,7 @@ class Pulsar:
                                             logic_jump_l)
 
         filename = sequence.name+'_FILE.AWG'
+
         awg_file = self.AWG.generate_awg_file(
             packed_waveforms,
             np.array(wfname_l),
@@ -368,6 +371,7 @@ class Pulsar:
             self.get_awg_channel_cfg())
         self.AWG.send_awg_file(filename, awg_file)
         self.AWG.load_awg_file(filename)
+        self.AWG.timeout(old_timeout)
 
         time.sleep(.1)
         # Waits for AWG to be ready

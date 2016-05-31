@@ -11,17 +11,9 @@ CBox = CBox
 MC = MC
 IVVI = IVVI
 
-import instrument_drivers.meta_instrument.qubit_objects.qubit_object as qubi
-reload(qubi)
-import instrument_drivers.meta_instrument.qubit_objects.CBox_driven_transmon as qb
-reload(qb)
-import instrument_drivers.meta_instrument.qubit_objects.Tektronix_driven_transmon as qbt
-reload(qbt)
+from scipy.optimize import minimize_scalar
 
 print('Defining functions')
-
-
-T1 = 22.7e-6
 
 
 def set_CBox_cos_sine_weigths(IF):
@@ -69,19 +61,43 @@ def measure_allXY(pulse_pars, RO_pars):
     ma.AllXY_Analysis()
 
 
-def measure_RB(pulse_pars, RO_pars, upload=True):
+def measure_RB(pulse_pars, RO_pars, upload=True, T1=T1, close_fig=True, pulse_delay=20e-9):
     set_trigger_slow()
     nr_seeds = 50
-    nr_cliffords = [2, 4, 8, 16, 30, 60, 100, 200, 300, 400, 600, 800]
+    nr_cliffords = [2, 4, 8, 16, 30, 60, 100, 200, 300, 400, 600, 800, 1200]
     MC.set_sweep_function(awg_swf.Randomized_Benchmarking(
-        pulse_pars=pulse_pars, RO_pars=RO_pars,
+        pulse_pars=pulse_pars, RO_pars=RO_pars, double_curves=True,
         nr_cliffords=nr_cliffords, nr_seeds=nr_seeds, upload=upload))
 
     MC.set_detector_function(det.CBox_integrated_average_detector(CBox, AWG))
     MC.run('RB_{}seeds'.format(nr_seeds))
-    ma.RandomizedBenchmarking_Analysis(
-        close_main_fig=False, T1=T1,
-        pulse_delay=pulse_pars['pulse_delay'])
+    ma.RB_double_curve_Analysis(
+        close_main_fig=close_fig, T1=T1,
+        pulse_delay=pulse_delay)
+
+def calibrate_JPA_dac(pulse_pars, RO_pars, upload=True):
+    set_trigger_slow()
+    set_CBox_cos_sine_weigths(RO_pars['mod_frequency'])
+    ad_func_pars = {'adaptive_function': minimize_scalar,
+                    'bracket': [-310, -300, -290],
+                    'minimize': False,
+                    'par_idx': 4}
+    MC.set_adaptive_function_parameters(ad_func_pars)
+    MC.set_sweep_function(IVVI.dac5)
+    if upload:
+        sqs.OffOn_seq(pulse_pars=pulse_pars, RO_pars=RO_pars)
+    d = cdet.CBox_SSRO_discrimination_detector(
+        'SSRO-disc',
+        analyze=True,
+        MC=nested_MC,
+        AWG=AWG,
+        CBox=CBox,
+        sequence_swf=swf.None_Sweep(sweep_control='hard',
+                                    sweep_points=np.arange(1))) #is arbitrare
+    MC.set_detector_function(d)
+    MC.run(name='JPA_dac_tuning', mode='adaptive')
+    ma.MeasurementAnalysis(label='JPA_dac_tuning')
+
 
 
 print('setting params of qubit objects')
@@ -131,6 +147,41 @@ VIP_mon_2_tek.gauss_sigma.set(4e-9)
 VIP_mon_2_tek.pulse_delay.set(20e-9)
 VIP_mon_2_tek.f_pulse_mod(-50e6)
 
+print('setting duplxer qubit params')
+gen.load_settings_onto_instrument(VIP_mon_2_dux)
+VIP_mon_2_dux.RO_pulse_power.set(-35)
+VIP_mon_2_dux.f_RO(6.8488e9)
+
+VIP_mon_2_dux.RO_acq_marker_channel.set('ch4_marker1')
+VIP_mon_2_dux.RO_pulse_marker_channel.set('ch2_marker1')
+
+VIP_mon_2_dux.RO_pulse_type.set('Gated_MW_RO_pulse')
+VIP_mon_2_dux.RO_acq_marker_delay.set(150e-9)
+VIP_mon_2_dux.RO_pulse_length.set(700e-9)
+VIP_mon_2_dux.RO_pulse_delay.set(50e-9)
+VIP_mon_2_dux.RO_amp.set(0.12)
+
+VIP_mon_2_dux.gauss_sigma.set(4e-9)
+VIP_mon_2_dux.pulse_delay.set(20e-9)
+VIP_mon_2_dux.f_pulse_mod(-50e6)
+
+
+VIP_mon_2_dux.pulse_GI_offset(0.01)
+VIP_mon_2_dux.pulse_GQ_offset(.029)
+VIP_mon_2_dux.pulse_DI_offset(0.02)
+VIP_mon_2_dux.pulse_DQ_offset(0.030)
+
+VIP_mon_2_dux.D_alpha(0.8565)
+VIP_mon_2_dux.D_phi_skew(-9.101)
+VIP_mon_2_dux.G_alpha(0.8244)
+VIP_mon_2_dux.G_phi_skew(-10.645)
+
+VIP_mon_2_dux.Mux_G_att(0.3)
+VIP_mon_2_dux.Mux_D_att(0.7)
+
+VIP_mon_2_dux.Mux_G_phase(10693)
+VIP_mon_2_dux.Mux_D_phase(30000)
+
 
 AWG.timeout(180)
 
@@ -144,11 +195,7 @@ set_trigger_slow()
 #duplexer attenuations
 print('setting duplexer settings')
 DUX_1_default = 0.3
-DUX_2_default = 0.3
-Dux.in1_out1_switch('ON')
-Dux.in2_out1_switch('ON')
-Dux.in1_out1_attenuation(DUX_1_default)
-Dux.in2_out1_attenuation(DUX_2_default)
+DUX_2_default = 0.7
 
 Dux.in1_out1_phase(10693)
 Dux.in2_out1_phase(30000)
@@ -167,6 +214,7 @@ VIP_mon_2_tek.f_JPA_pump_mod(10e6)
 print('setting IVVI parameters')
 IVVI.dac1.set(-40)
 IVVI.dac2.set(0)  # was 70 for sweetspot VIP_mon_4
+# IVVI.dac5(-299.962)  # JPA pump dac
 
 print('setting AWG parameters')
 AWG.ch1_offset.set(0.010)
@@ -202,21 +250,7 @@ CBox.lin_trans_coeffs.set([1, 0, 0, 1])
 
 
 print('setting pulse_pars_duplex')
-pulse_pars, RO_pars = VIP_mon_2_tek.get_pulse_pars()
-pulse_pars_duplex = deepcopy(pulse_pars)
-pulse_pars_duplex['pulse_type'] = 'Mux_DRAG_pulse'
-pulse_pars_duplex['GI_channel'] = 'ch1'
-pulse_pars_duplex['GQ_channel'] = 'ch2'
-pulse_pars_duplex['DI_channel'] = 'ch3'
-pulse_pars_duplex['DQ_channel'] = 'ch4'
-pulse_pars_duplex['motzoi'] = -0.25
-pulse_pars_duplex['amplitude'] = 0.50
 
-#mixer calibration parameters (offsets are set in the ducati init)
-pulse_pars_duplex['G_alpha'] = 0.8244
-pulse_pars_duplex['G_phi'] = -10.645   # -10deg
-pulse_pars_duplex['D_alpha'] = 0.8565
-pulse_pars_duplex['D_phi'] = -9.101    # - 9deg
-
-t1 =time.time()
+pulse_pars_duplex, RO_pars = VIP_mon_2_dux.get_pulse_pars()
+t1 = time.time()
 print('Ran prepare for restless in {:.2g}s'.format(t1-t0))

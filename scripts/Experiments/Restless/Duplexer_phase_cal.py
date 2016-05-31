@@ -16,7 +16,7 @@ f = Qubit_LO.frequency()+mod_freq
 MC.set_sweep_function(Dux.in1_out1_phase)
 MC.set_detector_function(det.Signal_Hound_fixed_frequency(SH,
                          frequency=f))
-# MC.set_sweep_points(np.arange(0, 50000, 100))
+# MC.set_sweep_points(np.arange(8000, 20000, 100))
 # MC.run('Duplexer_phase_sweep')
 # ma.MeasurementAnalysis()
 
