@@ -4,6 +4,7 @@ from modules.measurement import sweep_functions as swf
 from modules.measurement.randomized_benchmarking import randomized_benchmarking as rb
 from modules.measurement.pulse_sequences import standard_sequences as st_seqs
 from modules.measurement.pulse_sequences import single_qubit_tek_seq_elts as sqs
+from modules.measurement.pulse_sequences import single_qubit_2nd_exc_seqs as sqs2
 default_gauss_width = 10  # magic number should be removed,
 # note magic number only used in old mathematica seqs
 
@@ -29,7 +30,7 @@ class Rabi(swf.Hard_Sweep):
 
 class Rabi_2nd_exc(swf.Hard_Sweep):
     def __init__(self, pulse_pars, pulse_pars_2nd,
-                 RO_pars, n=1, upload=True):
+                 RO_pars, amps=None, n=1, cal_points=True, upload=True):
         super().__init__()
         self.pulse_pars = pulse_pars
         self.pulse_pars_2nd = pulse_pars_2nd
@@ -39,14 +40,53 @@ class Rabi_2nd_exc(swf.Hard_Sweep):
         self.name = 'Rabi 2nd excited state'
         self.parameter_name = 'amplitude'
         self.unit = 'V'
+        if cal_points and amps is not None:
+            self.sweep_points = np.concatenate([amps,
+                                               [amps[-1]*1.05,
+                                               amps[-1]*1.06,
+                                               amps[-1]*1.07,
+                                               amps[-1]*1.08,
+                                               amps[-1]*1.09,
+                                               amps[-1]*1.1]])
 
     def prepare(self, **kw):
         if self.upload:
-            sqs.Rabi_2nd_exc_seq(amps=self.sweep_points,
+            sqs2.Rabi_2nd_exc_seq(amps=self.sweep_points,
                                  pulse_pars=self.pulse_pars,
                                  pulse_pars_2nd=self.pulse_pars_2nd,
                                  RO_pars=self.RO_pars,
                                  n=self.n)
+
+
+class Ramsey_2nd_exc(swf.Hard_Sweep):
+    def __init__(self, pulse_pars, pulse_pars_2nd,
+                 RO_pars, times=None, n=1, cal_points=True, upload=True):
+        super().__init__()
+        self.pulse_pars = pulse_pars
+        self.pulse_pars_2nd = pulse_pars_2nd
+        self.RO_pars = RO_pars
+        self.n = n
+        self.upload = upload
+        self.name = 'Rabi 2nd excited state'
+        self.parameter_name = 'amplitude'
+        self.unit = 'V'
+        if cal_points and times is not None:
+            self.sweep_points = np.concatenate([times,
+                                               [times[-1]*1.05,
+                                               times[-1]*1.06,
+                                               times[-1]*1.07,
+                                               times[-1]*1.08,
+                                               times[-1]*1.09,
+                                               times[-1]*1.1]])
+
+    def prepare(self, **kw):
+        if self.upload:
+            sqs2.Ramsey_2nd_exc_seq(times=self.sweep_points,
+                                 pulse_pars=self.pulse_pars,
+                                 pulse_pars_2nd=self.pulse_pars_2nd,
+                                 RO_pars=self.RO_pars,
+                                 n=self.n)
+
 
 
 class T1(swf.Hard_Sweep):
@@ -120,20 +160,21 @@ class Butterfly(swf.Hard_Sweep):
         self.unit = '#'
         self.name = 'Butterfly'
         self.sweep_points = np.arange(2)
-        self.initialize=initialize
+        self.initialize = initialize
         self.post_msmt_delay = post_msmt_delay
 
     def prepare(self, **kw):
         if self.upload:
             sqs.Butterfly_seq(pulse_pars=self.pulse_pars,
                               post_msmt_delay=self.post_msmt_delay,
-                          RO_pars=self.RO_pars, initialize=self.initialize)
+                              RO_pars=self.RO_pars, initialize=self.initialize)
 
 
 class Randomized_Benchmarking(swf.Hard_Sweep):
     def __init__(self, pulse_pars, RO_pars,
                  nr_seeds, nr_cliffords,
                  cal_points=True,
+                 double_curves=False,
                  upload=True):
         # If nr_cliffords is None it still needs to be specfied when setting
         # the experiment
@@ -144,11 +185,14 @@ class Randomized_Benchmarking(swf.Hard_Sweep):
         self.nr_seeds = nr_seeds
         self.cal_points = cal_points
         self.sweep_points = nr_cliffords
+        self.double_curves = double_curves
 
         self.parameter_name = 'Nr of Cliffords'
         self.unit = '#'
         self.name = 'Randomized_Benchmarking'
         self.sweep_points = nr_cliffords
+        if double_curves:
+            nr_cliffords = np.repeat(nr_cliffords, 2)
 
         if self.cal_points:
             self.sweep_points = np.concatenate([nr_cliffords,
@@ -163,7 +207,8 @@ class Randomized_Benchmarking(swf.Hard_Sweep):
                 self.pulse_pars, self.RO_pars,
                 nr_cliffords=self.sweep_points,
                 nr_seeds=self.nr_seeds,
-                cal_points=self.cal_points)
+                cal_points=self.cal_points,
+                double_curves=self.double_curves)
 
 
 class Ramsey(swf.Hard_Sweep):

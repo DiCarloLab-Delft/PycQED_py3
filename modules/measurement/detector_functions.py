@@ -437,19 +437,42 @@ class CBox_single_integration_average_det(Soft_Detector):
     Detector used for acquiring single points of the CBox while externally
     triggered by the AWG.
     Soft version of the regular integrated avg detector.
+
+    Has two acq_modes, 'IQ' and 'AmpPhase'
     '''
-    def __init__(self, CBox, **kw):
+    def __init__(self, CBox, acq_mode='IQ', **kw):
         super().__init__()
         self.CBox = CBox
         self.name = 'CBox_single_integration_avg_det'
         self.value_names = ['I', 'Q']
         self.value_units = ['a.u.', 'a.u.']
+        if acq_mode == 'IQ':
+            self.acquire_data_point = self.acquire_data_point_IQ
+        elif acq_mode == 'AmpPhase':
+            self.acquire_data_point = self.acquire_data_point_amp_ph
+        else:
+            raise ValueError('acq_mode must be "IQ" or "AmpPhase"')
 
-    def acquire_data_point(self, **kw):
-        self.CBox.set('acquisition_mode', 4)
-        data = self.CBox.get_integrated_avg_results()
-        self.CBox.set('acquisition_mode', 0)
+    def acquire_data_point_IQ(self, **kw):
+        success = False
+        i = 0
+        while not success:
+            self.CBox.set('acquisition_mode', 4)
+            try:
+                data = self.CBox.get_integrated_avg_results()
+                success = True
+            except:
+                logging.warning('Exception caught retrying')
+            self.CBox.set('acquisition_mode', 0)
+            i += 1
+            if i > 10:
+                break
         return data
+
+    def acquire_data_point_amp_ph(self, **kw):
+        data = self.acquire_data_point_IQ()
+        S21 = data[0] + 1j * data[1]
+        return abs(S21), np.angle(S21)/(2*np.pi)*360
 
     def prepare(self):
         self.CBox.set('nr_samples', 1)

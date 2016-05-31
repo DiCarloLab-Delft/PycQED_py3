@@ -9,10 +9,10 @@ from ..waveform_control import pulsar
 from ..waveform_control import element
 from ..waveform_control.element import calculate_time_corr
 from ..waveform_control import pulse
-from ..waveform_control.pulse_library import MW_IQmod_pulse, SSB_DRAG_pulse, \
-    Mux_DRAG_pulse
 from ..waveform_control import sequence
 from modules.measurement.randomized_benchmarking import randomized_benchmarking as rb
+from modules.measurement.pulse_sequences.standard_elements import multi_pulse_elt
+
 from importlib import reload
 reload(pulse)
 from ..waveform_control import pulse_library
@@ -49,7 +49,7 @@ def Rabi_seq(amps, pulse_pars, RO_pars, n=1, post_msmt_delay=3e-6,
         el = multi_pulse_elt(i, station, pulse_list)
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
-    station.instruments['AWG'].stop()
+    station.components['AWG'].stop()
     station.pulsar.program_awg(seq, *el_list, verbose=verbose)
     return seq_name
 
@@ -85,7 +85,7 @@ def T1_seq(times,
                 el = multi_pulse_elt(i, station, [pulses['X180'], RO_pars])
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
-    station.instruments['AWG'].stop()
+    station.components['AWG'].stop()
     station.pulsar.program_awg(seq, *el_list, verbose=verbose)
     return seq_name
 
@@ -126,7 +126,7 @@ def Ramsey_seq(times, pulse_pars, RO_pars,
                                  [pulses['X90'], pulse_pars_x2, RO_pars])
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
-    station.instruments['AWG'].stop()
+    station.components['AWG'].stop()
     station.pulsar.program_awg(seq, *el_list, verbose=verbose)
     return seq_name
 
@@ -163,7 +163,7 @@ def Echo_seq(times, pulse_pars, RO_pars,
                                   final_X90, RO_pars])
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
-    station.instruments['AWG'].stop()
+    station.components['AWG'].stop()
     station.pulsar.program_awg(seq, *el_list, verbose=verbose)
     return seq_name
 
@@ -204,7 +204,7 @@ def AllXY_seq(pulse_pars, RO_pars, double_points=False,
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
 
-    station.instruments['AWG'].stop()
+    station.components['AWG'].stop()
     station.pulsar.program_awg(seq, *el_list, verbose=verbose)
     return seq_name
 
@@ -240,7 +240,7 @@ def OffOn_seq(pulse_pars, RO_pars,
         el = multi_pulse_elt(i, station, [pulses[pulse_comb], RO_pars])
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
-    station.instruments['AWG'].stop()
+    station.components['AWG'].stop()
     station.pulsar.program_awg(seq, *el_list, verbose=verbose)
     return seq_name
 
@@ -293,7 +293,7 @@ def Butterfly_seq(pulse_pars, RO_pars, initialize=False,
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
 
-    station.instruments['AWG'].stop()
+    station.components['AWG'].stop()
     station.pulsar.program_awg(seq, *el_list, verbose=verbose)
     return seq_name
 
@@ -305,6 +305,7 @@ def Randomized_Benchmarking_seq(pulse_pars, RO_pars,
                                 post_msmt_delay=3e-6,
                                 cal_points=True,
                                 resetless=False,
+                                double_curves=False,
                                 verbose=False):
     '''
     Input pars:
@@ -320,6 +321,7 @@ def Randomized_Benchmarking_seq(pulse_pars, RO_pars,
                        to measure a single element (for e.g. optimization)
         resetless:     bool if False will append extra Id element if seq
                        is longer than 50us to ensure proper initialization
+        double_curves: Alternates between net clifford 0 and 3
 
     Creates a randomized benchmarking sequence where 1 seed is loaded
     per element.
@@ -339,10 +341,14 @@ def Randomized_Benchmarking_seq(pulse_pars, RO_pars,
     seq = sequence.Sequence(seq_name)
     el_list = []
     pulses = get_pulse_dict_from_pars(pulse_pars)
+    net_cliffords = [0, 3]  # Exists purely for the double curves mode
     i = 0
     for seed in range(nr_seeds):
             for j, n_cl in enumerate(nr_cliffords):
+                if double_curves:
+                    net_clifford = net_cliffords[i%2]
                 i += 1  # only used for ensuring unique elt names
+
                 if cal_points and (j == (len(nr_cliffords)-4) or
                                    j == (len(nr_cliffords)-3)):
                     el = multi_pulse_elt(i, station,
@@ -364,14 +370,14 @@ def Randomized_Benchmarking_seq(pulse_pars, RO_pars,
                 el_list.append(el)
                 seq.append_element(el, trigger_wait=True)
 
-                if n_cl*pulse_pars['pulse_delay']*1.875 > 50e-6:
-                    # If the element is too long, add in an extra wait elt
-                    # to skip a trigger
+                # If the element is too long, add in an extra wait elt
+                # to skip a trigger
+                if resetless and n_cl*pulse_pars['pulse_delay']*1.875 > 50e-6:
                     el = multi_pulse_elt(i, station, [pulses['I']])
                     el_list.append(el)
                     seq.append_element(el, trigger_wait=True)
 
-    station.instruments['AWG'].stop()
+    station.components['AWG'].stop()
     station.pulsar.program_awg(seq, *el_list, verbose=verbose)
     return seq_name
 
@@ -419,159 +425,15 @@ def Motzoi_XY(motzois, pulse_pars, RO_pars,
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
 
-    station.instruments['AWG'].stop()
+    station.components['AWG'].stop()
     station.pulsar.program_awg(seq, *el_list, verbose=verbose)
     return seq_name
 
 # Sequences involving the second excited state
 
 
-def Rabi_2nd_exc_seq(amps, pulse_pars, pulse_pars_2nd, RO_pars, n=1,
-                     post_msmt_delay=3e-6, verbose=False):
-    '''
-    Rabi sequence for the second excited state
-    Input pars:
-        amps:            array of pulse amplitudes (V)
-        pulse_pars:      dict containing the pulse parameters
-        pulse_pars_2nd:  dict containing pulse_parameters for 2nd exc. state
-        RO_pars:         dict containing the RO parameters
-        n:               number of pulses (1 is conventional Rabi)
-        post_msmt_delay: extra wait time for resetless compatibility
-    '''
-    seq_name = 'Rabi_2nd_exc_sequence'
-    seq = sequence.Sequence(seq_name)
-    el_list = []
-    pulses = get_pulse_dict_from_pars(pulse_pars)
-    pulses_2nd = get_pulse_dict_from_pars(pulse_pars_2nd)
-    for i, amp in enumerate(amps):  # seq has to have at least 2 elts
-        pulses_2nd['X180']['amplitude'] = amp
-        pulse_list = [pulses['X180']]+n*[pulses_2nd['X180']]+[RO_pars]
-
-        # copy first element and set extra wait
-        pulse_list[0] = deepcopy(pulse_list[0])
-        pulse_list[0]['pulse_delay'] += post_msmt_delay
-        el = multi_pulse_elt(i, station, pulse_list)
-        el_list.append(el)
-        seq.append_element(el, trigger_wait=True)
-    station.instruments['AWG'].stop()
-    station.pulsar.program_awg(seq, *el_list, verbose=verbose)
-    return seq_name
 
 
-# sequence element generating functions
-
-def multi_pulse_elt(i, station, pulse_list):
-        '''
-        Input args
-            station:    qcodes station object, contains AWG etc
-            pulse_list: list of pulse_dicts containing pulse parameters
-        Returns:
-            element:    for use with the pulsar sequencer
-
-        Currently works with two types of pulses, 'SSB_DRAG_pulse' and
-        'MW_IQmod_pulse' from pulselib. The idea is to make this function
-        work with arbitrary pulses that have a function in the pulselib.
-        The other idea is to have one 'pulse' in pulselib per 'pulse' that
-        also include markers in the RO this is still added by hand in the if
-        statement.
-
-        If you want to add extra pulses to this function please talk to me
-        (Adriaan) as I would like to keep it clean and prevent a  big if, elif
-        loop. (I have some ideas on how to implement this).
-
-        Note: this function could be the template for the most standard
-        element we use.
-        '''
-        el = element.Element(
-            name='{}-pulse-elt_{}'.format(len(pulse_list), i),
-            pulsar=station.pulsar)
-        # exitst to ensure that channel is not high when waiting for trigger
-        last_pulse = el.add(pulse.SquarePulse(name='refpulse_0', channel='ch1',
-                                              amplitude=0, length=1e-9))
-        for i in range(3):  # Exist to ensure there are no empty channels
-            el.add(pulse.SquarePulse(name='refpulse_0',
-                                     channel='ch{}'.format(i+1),
-                                     amplitude=0, length=1e-9))
-
-        for i, pulse_pars in enumerate(pulse_list):
-            if pulse_pars['pulse_type'] == 'SSB_DRAG_pulse':
-                last_pulse = el.add(
-                    SSB_DRAG_pulse(name='pulse_{}'.format(i),
-                                   I_channel=pulse_pars['I_channel'],
-                                   Q_channel=pulse_pars['Q_channel'],
-                                   amplitude=pulse_pars['amplitude'],
-                                   sigma=pulse_pars['sigma'],
-                                   nr_sigma=pulse_pars['nr_sigma'],
-                                   motzoi=pulse_pars['motzoi'],
-                                   mod_frequency=pulse_pars['mod_frequency'],
-                                   phase=pulse_pars['phase'],
-                                   phi_skew=pulse_pars['phi_skew'],
-                                   alpha=pulse_pars['alpha']),
-                    start=pulse_pars['pulse_delay'],
-                    refpulse=last_pulse, refpoint='start')
-            elif pulse_pars['pulse_type'] == 'Mux_DRAG_pulse':
-                # pulse_pars.pop('pulse_type')
-                last_pulse = el.add(Mux_DRAG_pulse(name='pulse_{}'.format(i),
-                                                   **pulse_pars),
-                                    start=pulse_pars['pulse_delay'],
-                                    refpulse=last_pulse, refpoint='start')
-
-            elif (pulse_pars['pulse_type'] == 'MW_IQmod_pulse' or
-                  pulse_pars['pulse_type'] == 'Gated_MW_RO_pulse'):
-                # Does more than just call the function as it also adds the
-                # markers. Ideally we combine both in one function in pulselib
-                if pulse_pars['pulse_type'] == 'MW_IQmod_pulse':
-                    last_pulse = el.add(MW_IQmod_pulse(
-                            name='RO_tone',
-                            I_channel=pulse_pars['I_channel'],
-                            Q_channel=pulse_pars['Q_channel'],
-                            length=pulse_pars['length'],
-                            amplitude=pulse_pars['amplitude'],
-                            mod_frequency=pulse_pars['mod_frequency']),
-                        start=pulse_pars['pulse_delay'],
-                        refpulse=last_pulse, refpoint='start',
-                        fixed_point_freq=pulse_pars['fixed_point_frequency'])
-                else:
-                    last_pulse = el.add(pulse.SquarePulse(
-                            name='RO_marker', amplitude=1,
-                            length=pulse_pars['length'],
-                            channel=pulse_pars['RO_pulse_marker_channel']),
-                        start=pulse_pars['pulse_delay'], refpulse=last_pulse,
-                        refpoint='start',
-                        fixed_point_freq=pulse_pars['fixed_point_frequency'])
-                # Start Acquisition marker
-                if type(pulse_pars['acq_marker_channel']) is str:
-                    Acq_marker = pulse.SquarePulse(
-                        name='Acq-trigger', amplitude=1, length=20e-9,
-                        channel=pulse_pars['acq_marker_channel'])
-                    el.add(
-                        Acq_marker, start=pulse_pars['acq_marker_delay'],
-                        refpulse=last_pulse, refpoint='start')
-                    #hacking in a second marker
-                    Acq_marker2 = pulse.SquarePulse(
-                        name='Acq-trigger', amplitude=1, length=20e-9,
-                        channel='ch4_marker2')
-                    el.add(
-                        Acq_marker2, start=pulse_pars['acq_marker_delay'],
-                        refpulse=last_pulse, refpoint='start')
-                else:
-                    # TODO: remove hacked in second marker and support list
-                    # functionality
-                    # Want to implement compatibiilty with a list of marker
-                    # channels here to allow copies of the pulse
-                    raise TypeError()
-
-            else:
-                raise KeyError('pulse_type {} not recognized'.format(
-                    pulse_pars['pulse_type']))
-
-        # This pulse ensures that the sequence always ends at zero amp
-        last_pulse = el.add(pulse.SquarePulse(name='final_empty_pulse',
-                                              channel='ch1',
-                                              amplitude=0, length=1e-9),
-                            refpulse=last_pulse, refpoint='end')
-
-        return el
 
 
 # Helper functions

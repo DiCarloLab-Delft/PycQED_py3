@@ -1253,8 +1253,9 @@ def linecut_plot(x, y, z, fig, ax,
 
 
 def color_plot_interpolated(x, y, z, ax=None,
-                            num_points=100,
-                            zlabel=None, cmap='viridis'):
+                            num_points=300,
+                            zlabel=None, cmap='viridis',
+                            interpolation_method='linear'):
     """
     Plots a heatmap using z values at coordinates (x, y) using cubic
     interpolation.
@@ -1270,10 +1271,11 @@ def color_plot_interpolated(x, y, z, ax=None,
     xi = np.linspace(min(x), max(x), num_points)
     yi = np.linspace(min(y), max(y), num_points)
     # grid the data.
-    zi = griddata((x, y), z, (xi[None, :], yi[:, None]), method='cubic')
-
+    zi = griddata((x, y), z, (xi[None, :], yi[:, None]),
+                  method=interpolation_method)
     CS = plt.contour(xi, yi, zi, 30, linewidths=0.2, colors='k')
     CS = plt.contourf(xi, yi, zi, 30, cmap=cmap)
+
     ax_divider = make_axes_locatable(ax)
     cax = ax_divider.append_axes('right', size='5%', pad='5%')
     cbar = plt.colorbar(CS, cax=cax)
@@ -1283,6 +1285,7 @@ def color_plot_interpolated(x, y, z, ax=None,
     if zlabel is not None:
         cbar.set_label(zlabel)
     return ax
+
 
 ######################################################################
 #    Calculations tools

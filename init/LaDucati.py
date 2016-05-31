@@ -1,6 +1,13 @@
+"""
+This scripts initializes the instruments and imports the modules
+"""
+
+
 # General imports
+
 import time
 t0 = time.time()  # to print how long init takes
+
 from importlib import reload  # Useful for reloading while testing
 import numpy as np
 import matplotlib.pyplot as plt
@@ -24,13 +31,17 @@ from modules.measurement import composite_detector_functions as cdet
 from modules.measurement import calibration_toolbox as cal_tools
 from modules.measurement import mc_parameter_wrapper as pw
 from modules.measurement import CBox_sweep_functions as cb_swf
+from modules.measurement.optimization import nelder_mead
 from modules.analysis import measurement_analysis as ma
 from modules.analysis import analysis_toolbox as a_tools
+
+
 
 from modules.utilities import general as gen
 # Standarad awg sequences
 from modules.measurement.waveform_control import pulsar as ps
 from modules.measurement.pulse_sequences import standard_sequences as st_seqs
+from modules.measurement.pulse_sequences import calibration_elements as cal_elts
 from modules.measurement.pulse_sequences import single_qubit_tek_seq_elts as sq
 
 # Instrument drivers
@@ -56,59 +67,56 @@ AWG520 = tk520.Tektronix_AWG520('AWG520', address='GPIB0::17::INSTR',
                                 server_name='')
 # SH = sh.SignalHound_USB_SA124B('Signal hound', server_name=None) #commented because of 8s load time
 
-LO = rs.RohdeSchwarz_SGS100A(name='LO', address='TCPIP0::192.168.0.77')  # left
-S1 = rs.RohdeSchwarz_SGS100A(name='S1', address='TCPIP0::192.168.0.78')  # right
-S2 = rs.RohdeSchwarz_SGS100A(name='S2', address='TCPIP0::192.168.0.11')  # top
-Pump = Agilent_E8527D(name='Pump', address='TCPIP0::192.168.0.13')
+LO = rs.RohdeSchwarz_SGS100A(name='LO', address='TCPIP0::192.168.0.77',
+    server_name=None)  # left
+RF = rs.RohdeSchwarz_SGS100A(name='RF', address='TCPIP0::192.168.0.78',
+    server_name=None)  # right
+Qubit_LO = rs.RohdeSchwarz_SGS100A(name='Qubit_LO', address='TCPIP0::192.168.0.11',
+    server_name=None)  # top
+Pump = Agilent_E8527D(name='Pump', address='TCPIP0::192.168.0.13',
+                        server_name=None)
 CBox = qcb.QuTech_ControlBox('CBox', address='Com3', run_tests=False)
-AWG = tek.Tektronix_AWG5014(name='AWG', setup_folder=None,
+AWG = tek.Tektronix_AWG5014(name='AWG', setup_folder=None, timeout=2,
                             address='TCPIP0::192.168.0.9', server_name=None)
+AWG.timeout(180)
 IVVI = iv.IVVI('IVVI', address='ASRL1', numdacs=16, server_name=None)
-Dux = qdux.QuTech_Duplexer('Dux', address='TCPIP0::192.168.0.101')
+Dux = qdux.QuTech_Duplexer('Dux', address='TCPIP0::192.168.0.101',
+                            server_name=None)
 
 # Meta-instruments
-HS = hd.HeterodyneInstrument('HS', LO=LO, RF=S1, CBox=CBox, AWG=AWG,
+HS = hd.HeterodyneInstrument('HS', LO=LO, RF=RF, CBox=CBox, AWG=AWG,
                              server_name=None)
 LutMan = lm.QuTech_ControlBox_LookuptableManager('LutMan', CBox=CBox,
-                                                 server_name='metaLM')
+                                                 server_name=None)
+                                                 # server_name='metaLM')
 
 MC = mc.MeasurementControl('MC')
-
-VIP_mon_6 = qb.CBox_driven_transmon('VIP_mon_6',
-                                    LO=LO, cw_source=S1, td_source=S2,
-                                    IVVI=IVVI,
-                                    AWG=AWG, LutMan=LutMan,
-                                    CBox=CBox, heterodyne_instr=HS, MC=MC,
-                                    server_name=None)
-
 VIP_mon_2_tek = qbt.Tektronix_driven_transmon('VIP_mon_2_tek',
                                               LO=LO,
-                                              cw_source=S1, td_source=S2,
-                                              IVVI=IVVI,
-                                              AWG=AWG,
-                                              CBox=CBox, heterodyne_instr=HS,
-                                              MC=MC, rf_RO_source=S1,
-                                              server_name=None)
-
-
-VIP_mon_4_tek = qbt.Tektronix_driven_transmon('VIP_mon_4_tek',
-                                              LO=LO,
-                                              cw_source=S1, td_source=S2,
-                                              IVVI=IVVI,
+                                              cw_source=Qubit_LO,
+                                              td_source=Qubit_LO,
+                                              IVVI=IVVI, rf_RO_source=RF,
                                               AWG=AWG,
                                               CBox=CBox, heterodyne_instr=HS,
                                               MC=MC,
                                               server_name=None)
 
+VIP_mon_4_tek = qbt.Tektronix_driven_transmon('VIP_mon_4_tek',
+                                              LO=LO,
+                                              cw_source=Qubit_LO,
+                                              td_source=Qubit_LO,
+                                              IVVI=IVVI, rf_RO_source=RF,
+                                              AWG=AWG,
+                                              CBox=CBox, heterodyne_instr=HS,
+                                              MC=MC,
+                                              server_name=None)
 
 gen.load_settings_onto_instrument(VIP_mon_2_tek)
 gen.load_settings_onto_instrument(VIP_mon_4_tek)
-gen.load_settings_onto_instrument(VIP_mon_6, label='VIP_mon_6')
 
-station = qc.Station(LO, S1, S2, IVVI, Dux,
+station = qc.Station(LO, RF, Qubit_LO, IVVI, Dux, Pump,
                      AWG, AWG520, HS, CBox, LutMan,
-                     VIP_mon_2_tek,
-                     VIP_mon_4_tek, VIP_mon_6)
+                     VIP_mon_2_tek, VIP_mon_4_tek)
 MC.station = station
 station.MC = MC
 nested_MC = mc.MeasurementControl('nested_MC')
@@ -116,7 +124,7 @@ nested_MC.station = station
 
 # The AWG sequencer
 station.pulsar = ps.Pulsar()
-station.pulsar.AWG = station.instruments['AWG']
+station.pulsar.AWG = station.components['AWG']
 for i in range(4):
     # Note that these are default parameters and should be kept so.
     # the channel offset is set in the AWG itself. For now the amplitude is
@@ -140,65 +148,10 @@ for i in range(4):
 # to make the pulsar available to the standard awg seqs
 st_seqs.station = station
 sq.station = station
-
-IVVI.dac1.set(-40)
-IVVI.dac2.set(0)  # was 70 for sweetspot VIP_mon_4
-
-
-IF = -20e6        # RO modulation frequency
-
-LO.off()
-
-# S1.off()
-S2.off()
-
-
-# Calibrated at 6.6GHz (22-2-2016)
-CBox.set_dac_offset(0, 0, -38.8779296875)  # Q channel
-CBox.set_dac_offset(0, 1,  16.1220703125)  # I channel qubit drive AWG
-
-CBox.set_dac_offset(1, 1, 0)  # I channel
-CBox.set_dac_offset(1, 0, 0)  # Q channel readout AWG
-
-# LO offsets calibrated at 23-2-2016 at f = 7.15350 GHz
-AWG.ch1_offset.set(0.011)
-AWG.ch2_offset.set(0.029)
-AWG.ch3_offset.set(0.003)
-AWG.ch4_offset.set(0.031)
-AWG.clock_freq.set(1e9)
-
-AWG.trigger_level.set(0.2)
-
-
-def set_CBox_cos_sine_weigths(IF):
-    '''
-    Maybe I should add this to the CBox driver
-    '''
-    t_base = np.arange(512)*5e-9
-
-    cosI = np.cos(2*np.pi * t_base*IF)
-    sinI = np.sin(2*np.pi * t_base*IF)
-    w0 = np.round(cosI*120)
-    w1 = np.round(sinI*120)
-
-    CBox.set('sig0_integration_weights', w0)
-    CBox.set('sig1_integration_weights', w1)
-set_CBox_cos_sine_weigths(IF)
-
-CBox.set('nr_averages', 2048)
-# this is the max nr of averages that does not slow down the heterodyning
-CBox.set('nr_samples', 75)  # Shorter because of min marker spacing
-CBox.set('integration_length', 140)
-CBox.set('acquisition_mode', 0)
-CBox.set('lin_trans_coeffs', [1, 0, 0, 1])
-CBox.set('log_length', 8000)
-
-CBox.set('AWG0_mode', 'Tape')
-CBox.set('AWG1_mode', 'Tape')
-CBox.set('AWG0_tape', [1, 1])
-CBox.set('AWG1_tape', [1, 1])
+cal_elts.station = station
 
 t1 = time.time()
+
 
 
 print('Ran initialization in %.2fs' % (t1-t0))

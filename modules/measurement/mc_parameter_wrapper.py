@@ -42,3 +42,20 @@ def wrap_par_to_det(parameter, control='soft'):
 
 def pass_function(**kw):
     pass
+
+
+def wrap_func_to_det(func, name, value_names, units, control='soft',  **kw):
+    detector_function = det.Detector_Function()
+    detector_function.detector_control = control
+    detector_function.name = name
+    detector_function.value_names = value_names
+    detector_function.value_units = units
+
+    detector_function.prepare = pass_function
+    detector_function.finish = pass_function
+    def wrapped_func():
+        return func(**kw)
+
+    detector_function.acquire_data_point = wrapped_func
+    detector_function.get_values = wrapped_func
+    return detector_function

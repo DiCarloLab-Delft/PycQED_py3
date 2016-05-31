@@ -58,24 +58,23 @@ class QuTech_Duplexer(VisaInstrument):
                                    get_parser=self._get_parser)
 
                 self.add_parameter('in{}_out{}_phase'.format(inp+1, outp+1),
-                                   set_cmd='ch:in{}:out{}:ph:'.format(
+                                   set_cmd='ch:in{}:out{}:ph:raw '.format(
                                    inp+1, outp+1) + '{} \n',
                                    get_cmd='ch:in{}:out{}:ph:raw?'.format(
                                         inp+1, outp+1),
-                                   set_parser=self._mode_set_parser,
-                                   get_parser =self._get_parser,
+                                   set_parser=int,
+                                   get_parser=self._phase_get_parser,
                                    vals=vals.Numbers(0, 65536))
                 self.add_parameter('in{}_out{}_attenuation'.format(inp+1,
                                                                    outp+1),
                                    set_cmd='ch:in{}:out{}:att:'.format(
                                         inp+1, outp+1) + '{} \n',
-                                   get_cmd='ch:in{}:out{}:att:raw?'.format(inp+1,
-                                                                      outp+1),
+                                   get_cmd='ch:in{}:out{}:att:raw?'.format(
+                                        inp+1, outp+1),
                                    vals=vals.Numbers(0, 65536),
                                    set_parser=self._attenuation_set_parser,
                                    get_parser=self._attenuation_get_parser)
 
-        # self.add_parameter('IDN', get_cmd='IDN?')
         t1 = time.time()
         print('Initialized Duplexer in {:.2f}'.format(t1-t0))
 
@@ -133,6 +132,10 @@ class QuTech_Duplexer(VisaInstrument):
 
     def _get_parser(self, val):
         return val.rsplit('=')[1]
+
+    def _phase_get_parser(self, val):
+        return int(val.rsplit('=')[1])
+
 
 
     def get_scaling_increment(self, scaling_factor):

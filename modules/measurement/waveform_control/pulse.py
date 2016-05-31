@@ -98,12 +98,17 @@ class Pulse:
 
 # Some simple pulse definitions.
 class SquarePulse(Pulse):
-    def __init__(self, channel, name='square pulse', **kw):
+    def __init__(self, channel=None, channels=None, name='square pulse', **kw):
         Pulse.__init__(self, name)
+        if channel is None and channels is None:
+            raise ValueError('Must specify either channel or channels')
+        elif channels is None:
+            self.channel = channel  # this is just for convenience, internally
+            # this is the part the sequencer element wants to communicate with
+            self.channels.append(channel)
+        else:
+            self.channels = channels
 
-        self.channel = channel  # this is just for convenience, internally
-        # this is the part the sequencer element wants to communicate with
-        self.channels.append(channel)
         self.amplitude = kw.pop('amplitude', 0)
         self.length = kw.pop('length', 0)
 
@@ -111,7 +116,7 @@ class SquarePulse(Pulse):
         self.amplitude = kw.pop('amplitude', self.amplitude)
         self.length = kw.pop('length', self.length)
         self.channel = kw.pop('channel', self.channel)
-        self.channels = []
+        self.channels = kw.pop('channels', self.channels)
         self.channels.append(self.channel)
         return self
 
