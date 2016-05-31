@@ -88,8 +88,7 @@ class FlippingModel(Instrument):
         """
         n = self.N_shots()
         if self.T1_sigma() != 0:
-            T1 = np.random.normal(self.T1(), self.T1_sigma(), 1)
-            print(T1)
+            T1 = np.random.normal(self.T1(), self.T1_sigma(), 1)[0]
         else:
             T1 = self.T1()
         p_relax = (1-np.exp(-self.tau_d()/T1))

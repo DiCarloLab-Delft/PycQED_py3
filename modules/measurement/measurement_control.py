@@ -279,11 +279,6 @@ class MeasurementControl:
                     raise StopIteration()
             vals = np.multiply(-1, vals)
 
-        # TODO: re add the extra plotmon that shows the progress of the
-        # optimization
-        # self.update_plotmon(
-        #     mon_nr=5, x_ind=None,
-        #     y_ind=-len(self.detector_function.value_names))
         # to check if vals is an array with multiple values
         if hasattr(vals, '__iter__'):
             if len(vals) > 1:
@@ -341,7 +336,8 @@ class MeasurementControl:
             y_rep = np.repeat(self.sweep_pts_y, self.xlen)
             c = np.column_stack((x_tiled, y_rep))
             self.set_sweep_points(c)
-            self.initialize_plot_monitor_2D()
+            if self.live_plot_enabled:
+                self.initialize_plot_monitor_2D()
             self.measure(**kw)
             # del self.TwoD_array
         return
