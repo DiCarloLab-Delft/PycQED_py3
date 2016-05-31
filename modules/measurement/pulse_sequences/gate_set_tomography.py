@@ -21,6 +21,7 @@ reload(pulse_library)
 station = None
 reload(element)
 
+
 def GST_seq(pulse_pars, RO_pars, double_points=False,
               verbose=False):
     '''
@@ -76,6 +77,7 @@ def GST_seq(pulse_pars, RO_pars, double_points=False,
     # station.pulsar.program_awg(seq, *el_list, verbose=verbose)
     return seq_name
 
+
 def create_experiment_list_pyGSTi(filename):
     """
     Extracting list of experiments from .txt file
@@ -101,7 +103,7 @@ def create_experiment_list_pyGSTi(filename):
         clean_seq = sequences[i].strip()
         gateseq = []
         if "{}" in clean_seq:   # special case (no fiducials &no germs)
-            gateseq.insert(0,"RO")
+            gateseq.insert(0, "RO")
             experimentlist.append(gateseq)
         if "(" in clean_seq:
             fiducial = []
@@ -113,87 +115,89 @@ def create_experiment_list_pyGSTi(filename):
 
                 regsplit1 = re.findall("G[xyi]", result[0])
                 for i in range(len(regsplit1)):
-                    if regsplit1[i]=="Gi":
+                    if regsplit1[i] == "Gi":
                         fiducial.append("I")
-                    elif regsplit1[i]=="Gx":
+                    elif regsplit1[i] == "Gx":
                         fiducial.append("X90")
-                    elif regsplit1[i]=="Gy":
+                    elif regsplit1[i] == "Gy":
                         fiducial.append("Y90")
 
-                regsplit2 = re.findall("G[xyi]",result[1])
+                regsplit2 = re.findall("G[xyi]", result[1])
                 for i in range(len(regsplit2)):
-                    if regsplit2[i]=="Gi":
+                    if regsplit2[i] == "Gi":
                         germs.append("I")
-                    elif regsplit2[i]=="Gx":
+                    elif regsplit2[i] == "Gx":
                         germs.append("X90")
-                    elif regsplit2[i]=="Gy":
+                    elif regsplit2[i] == "Gy":
                         germs.append("Y90")
 
-                regsplit3=re.findall("G[xyi]", result[2])
+                regsplit3 = re.findall("G[xyi]", result[2])
                 for i in range(len(regsplit3)):
-                    if regsplit3[i]=="Gi":
+                    if regsplit3[i] == "Gi":
                         measfiducial.append("I")
-                    elif regsplit3[i]=="Gx":
+                    elif regsplit3[i] == "Gx":
                         measfiducial.append("X90")
-                    elif regsplit3[i]=="Gy":
+                    elif regsplit3[i] == "Gy":
                         measfiducial.append("Y90")
             else:
                 power = 1
-                result = re.split("[()]",clean_seq)
+                result = re.split("[()]", clean_seq)
 
-                regsplit1 = re.findall("G[xyi]",result[0])
+                regsplit1 = re.findall("G[xyi]", result[0])
                 for i in range(len(regsplit1)):
-                    if regsplit1[i]=="Gi":
+                    if regsplit1[i] == "Gi":
                         fiducial.append("I")
-                    elif regsplit1[i]=="Gx":
+                    elif regsplit1[i] == "Gx":
                         fiducial.append("X90")
-                    elif regsplit1[i]=="Gy":
+                    elif regsplit1[i] == "Gy":
                         fiducial.append("Y90")
 
-                regsplit2 = re.findall("G[xyi]",result[1])
+                regsplit2 = re.findall("G[xyi]", result[1])
                 for i in range(len(regsplit2)):
-                    if regsplit2[i]=="Gi":
+                    if regsplit2[i] == "Gi":
                         germs.append("I")
-                    elif regsplit2[i]=="Gx":
+                    elif regsplit2[i] == "Gx":
                         germs.append("X90")
-                    elif regsplit2[i]=="Gy":
+                    elif regsplit2[i] == "Gy":
                         germs.append("Y90")
 
-                regsplit3 = re.findall("G[xyi]",result[2])
+                regsplit3 = re.findall("G[xyi]", result[2])
                 for i in range(len(regsplit3)):
-                    if regsplit3[i]=="Gi":
+                    if regsplit3[i] == "Gi":
                         measfiducial.append("I")
-                    elif regsplit3[i]=="Gx":
+                    elif regsplit3[i] == "Gx":
                         measfiducial.append("X90")
-                    elif regsplit3[i]=="Gy":
+                    elif regsplit3[i] == "Gy":
                         measfiducial.append("Y90")
-            if len(fiducial)!=0:
+            if len(fiducial) != 0:
                 gateseq.append(fiducial)
-            if len(germs)!=0:
+            if len(germs) != 0:
                 gateseq.append(germs*power)
-            if len(measfiducial)!=0:
+            if len(measfiducial) != 0:
                 gateseq.append(measfiducial)
             gateseq.append(["RO"])
-            gateseq=list(flatten_list(gateseq))
+            gateseq = list(flatten_list(gateseq))
             experimentlist.append(gateseq)
         elif ("Gi" in clean_seq) or ("Gx" in clean_seq) or ("Gy" in clean_seq):
-            regsplit =re.findall("G[xyi]",clean_seq)
+            regsplit = re.findall("G[xyi]", clean_seq)
             loopseq = []
             for i in range(len(regsplit)):
-                if regsplit[i]=="Gi":
+                if regsplit[i] == "Gi":
                     loopseq.append("I")
-                elif regsplit[i]=="Gx":
+                elif regsplit[i] == "Gx":
                     loopseq.append("X90")
-                elif regsplit[i]=="Gy":
+                elif regsplit[i] == "Gy":
                     loopseq.append("Y90")
             gateseq.append(loopseq)
             gateseq.append(["RO"])
-            gateseq=list(flatten_list(gateseq))
+            gateseq = list(flatten_list(gateseq))
             experimentlist.append(gateseq)
-    if len(experimentlist)<(len(sequences)-2):
+    if len(experimentlist) < (len(sequences)-2):
         print("Lenght list of experiments too short, probably something wrong")
     experiments.close()
     return experimentlist
+
+
 def flatten_list(lis):
     """
     Help function for using:create_experiment_list_pyGSTi
