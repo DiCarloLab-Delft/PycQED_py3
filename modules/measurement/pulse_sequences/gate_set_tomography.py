@@ -1,81 +1,49 @@
 import logging
 import numpy as np
 from copy import deepcopy
-try:
-    from math import gcd
-except:  # Moved to math in python 3.5, this is to be 3.4 compatible
-    from fractions import gcd
-from ..waveform_control import pulsar
 from ..waveform_control import element
-from ..waveform_control.element import calculate_time_corr
 from ..waveform_control import pulse
 from ..waveform_control import sequence
 from modules.measurement.randomized_benchmarking import randomized_benchmarking as rb
 from modules.measurement.pulse_sequences.standard_elements import multi_pulse_elt
-
+from modules.measurement.pulse_sequences.single_qubit_tek_seq_elts import get_pulse_dict_from_pars
 from importlib import reload
 reload(pulse)
 from ..waveform_control import pulse_library
 reload(pulse_library)
-
 station = None
 reload(element)
 
 
-def GST_seq(pulse_pars, RO_pars, double_points=False,
-              verbose=False):
+def GST_from_textfile(pulse_pars, RO_pars, filename,
+                      upload=True,
+                      verbose=False):
     '''
     Input pars:
-        pulse_pars:          dict containing the pulse parameters
-        RO_pars:             dict containing the RO parameters
-
+        pulse_pars:     dict containing the pulse parameters
+        RO_pars:        dict containing the RO parameters
+        filename:       name of a pygsti generated text file
+        upload:         upload to AWG or not, if returns seq, el_list
     '''
-    seq_name = 'AllXY_seq'
+    seq_name = 'GST_seq'
     seq = sequence.Sequence(seq_name)
     el_list = []
     # Create a dict with the parameters for all the pulses
-    pulses = get_pulse_dict_from_pars(pulse_pars)
+    pulse_dict = get_pulse_dict_from_pars(pulse_pars)
+    pulse_dict['RO'] = RO_pars
+    pulse_combinations = create_experiment_list_pyGSTi(filename)
+    for i, pulse_comb in enumerate(pulse_combinations):
+        pulse_list = []
+        for pulse_key in pulse_comb:
+            pulse_list += [pulse_dict[pulse_key]]
+        el = multi_pulse_elt(i, station, pulse_list)
+        el_list.append(el)
+        seq.append_element(el, trigger_wait=True)
 
-
-
-
-
-    pulse_combinations = [['I', 'I', 'RO'],
-                          ['Y90']*3+['X90', 'X90', 'I', 'Y90']*16 + ['X90']*2+['RO'],
-                          ['X180', 'X180', 'RO'],
-                          ['Y180', 'Y180', 'RO'],
-                          ['X180', 'Y180', 'RO'],
-                          ['Y180', 'X180', 'RO'],
-                          ['X90', 'I', 'RO'],
-                          ['Y90', 'I', 'RO'],
-                          ['X90', 'Y90', 'RO'],
-                          ['Y90', 'X90', 'RO'],
-                          ['X90', 'Y180', 'RO'],
-                          ['Y90', 'X180', 'RO'],
-
-                          ['X180', 'Y90', 'RO'],
-                          ['Y180', 'X90', 'RO'],
-                          ['X90', 'X180', 'RO'],
-
-                          ['X180', 'X90', 'RO'],
-                          ['Y90', 'Y180', 'RO'],
-                          ['Y180', 'Y90', 'RO'],
-
-                          ['X180', 'I', 'RO'],
-                          ['Y180', 'I', 'RO'],
-                          ['X90', 'X90', 'RO'],
-
-                          ['Y90', 'Y90', 'RO']]
-    print(pulse_combinations)
-    # for i, pulse_comb in enumerate(pulse_combinations):
-    #     pulse_list = [pulses[pulse_comb[0]], pulses[pulse_comb[1]], pulses[pulse_comb[2]]]
-    #     el = multi_pulse_elt(i, station, pulse_list)
-    #     el_list.append(el)
-    #     seq.append_element(el, trigger_wait=True)
-
-    # station.instruments['AWG'].stop()
-    # station.pulsar.program_awg(seq, *el_list, verbose=verbose)
-    return seq_name
+    if upload:
+        station.components['AWG'].stop()
+        station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+    return seq, el_list
 
 
 def create_experiment_list_pyGSTi(filename):

@@ -3,7 +3,7 @@ import time
 t0 = time.time()
 import numpy as np
 import matplotlib.pyplot as plt
-
+from modules.measurement.waveform_control import pulsar as ps
 from importlib import reload  # Useful for reloading during testin
 # Qcodes
 import qcodes as qc
@@ -23,37 +23,37 @@ from modules.analysis import analysis_toolbox as a_tools
 
 # Initializing instruments
 station = qc.Station()
-MC = mc.MeasurementControl('MC')
-MC.station = station
-station.MC = MC
+# MC = mc.MeasurementControl('MC')
+# MC.station = station
+# station.MC = MC
 
 # from qcodes.tests.instrument_mocks import MockParabola
 
 # ParabInstr = MockParabola('ParabInstr')
 # station.add_instrument(ParabInstr)
 
-# station.pulsar = ps.Pulsar()
-# # station.pulsar.AWG = station.components['AWG']
-# for i in range(4):
-#     # Note that these are default parameters and should be kept so.
-#     # the channel offset is set in the AWG itself. For now the amplitude is
-#     # hardcoded. You can set it by hand but this will make the value in the
-#     # sequencer different.
-#     station.pulsar.define_channel(id='ch{}'.format(i+1),
-#                                   name='ch{}'.format(i+1), type='analog',
-#                                   # max safe IQ voltage
-#                                   high=.5, low=-.5,
-#                                   offset=0.0, delay=0, active=True)
-#     station.pulsar.define_channel(id='ch{}_marker1'.format(i+1),
-#                                   name='ch{}_marker1'.format(i+1),
-#                                   type='marker',
-#                                   high=2.0, low=0, offset=0.,
-#                                   delay=0, active=True)
-#     station.pulsar.define_channel(id='ch{}_marker2'.format(i+1),
-#                                   name='ch{}_marker2'.format(i+1),
-#                                   type='marker',
-#                                   high=2.0, low=0, offset=0.,
-#                                   delay=0, active=True)
+station.pulsar = ps.Pulsar()
+# station.pulsar.AWG = station.components['AWG']
+for i in range(4):
+    # Note that these are default parameters and should be kept so.
+    # the channel offset is set in the AWG itself. For now the amplitude is
+    # hardcoded. You can set it by hand but this will make the value in the
+    # sequencer different.
+    station.pulsar.define_channel(id='ch{}'.format(i+1),
+                                  name='ch{}'.format(i+1), type='analog',
+                                  # max safe IQ voltage
+                                  high=.5, low=-.5,
+                                  offset=0.0, delay=0, active=True)
+    station.pulsar.define_channel(id='ch{}_marker1'.format(i+1),
+                                  name='ch{}_marker1'.format(i+1),
+                                  type='marker',
+                                  high=2.0, low=0, offset=0.,
+                                  delay=0, active=True)
+    station.pulsar.define_channel(id='ch{}_marker2'.format(i+1),
+                                  name='ch{}_marker2'.format(i+1),
+                                  type='marker',
+                                  high=2.0, low=0, offset=0.,
+                                  delay=0, active=True)
 
 
 
