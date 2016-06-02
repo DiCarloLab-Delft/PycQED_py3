@@ -336,8 +336,7 @@ class MeasurementControl:
             y_rep = np.repeat(self.sweep_pts_y, self.xlen)
             c = np.column_stack((x_tiled, y_rep))
             self.set_sweep_points(c)
-            if self.live_plot_enabled:
-                self.initialize_plot_monitor_2D()
+            self.initialize_plot_monitor_2D()
             self.measure(**kw)
             # del self.TwoD_array
         return
