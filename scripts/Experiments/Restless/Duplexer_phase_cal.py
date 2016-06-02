@@ -21,7 +21,7 @@ MC.set_detector_function(det.Signal_Hound_fixed_frequency(SH,
 # ma.MeasurementAnalysis()
 
 ad_func_pars = {'adaptive_function': minimize_scalar,
-                'bracket': [5000, 12000, 50000]}
+                'bracket': [5000, 12000, 15000]}
 MC.set_adaptive_function_parameters(ad_func_pars)
 MC.run(name='adaptive_duplexer_phase_cal', mode='adaptive')
 

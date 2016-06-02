@@ -61,7 +61,7 @@ def measure_allXY(pulse_pars, RO_pars):
     ma.AllXY_Analysis()
 
 
-def measure_RB(pulse_pars, RO_pars, upload=True, T1=T1, close_fig=True, pulse_delay=20e-9):
+def measure_RB(pulse_pars, RO_pars, upload=True, T1=25e-6, close_fig=True, pulse_delay=20e-9, label_suffix=''):
     set_trigger_slow()
     nr_seeds = 50
     nr_cliffords = [2, 4, 8, 16, 30, 60, 100, 200, 300, 400, 600, 800, 1200]
@@ -70,7 +70,8 @@ def measure_RB(pulse_pars, RO_pars, upload=True, T1=T1, close_fig=True, pulse_de
         nr_cliffords=nr_cliffords, nr_seeds=nr_seeds, upload=upload))
 
     MC.set_detector_function(det.CBox_integrated_average_detector(CBox, AWG))
-    MC.run('RB_{}seeds'.format(nr_seeds))
+    label ='RB_{}seeds'.format(nr_seeds)+label_suffix
+    MC.run(label)
     ma.RB_double_curve_Analysis(
         close_main_fig=close_fig, T1=T1,
         pulse_delay=pulse_delay)

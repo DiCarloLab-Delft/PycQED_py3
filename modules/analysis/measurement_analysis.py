@@ -3031,9 +3031,9 @@ class RB_double_curve_Analysis(RandomizedBenchmarking_Analysis):
             close_file=False, make_fig=False, **kw)
 
         data = self.corr_data[:-1*(len(self.cal_points[0]*2))]
-        data_0 = data[::2]
-        data_1 = data[1::2]
-        data_2 = 1 - data_1 - data_0
+        data_0 = 1 - data[::2]
+        data_1 = 1 - data[1::2]
+        data_2 = 1 -(1- data_1) -(1- data_0)
         n_cl = self.sweep_points[:-1*(len(self.cal_points[0]*2))][::2]
 
         self.fit_results = ['', '']
