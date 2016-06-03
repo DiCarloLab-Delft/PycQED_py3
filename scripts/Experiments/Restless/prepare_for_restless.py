@@ -1,6 +1,15 @@
 import time
 import numpy as np
 from copy import deepcopy
+from modules.measurement.pulse_sequences import single_qubit_tek_seq_elts as sqs
+from modules.measurement.pulse_sequences import calibration_elements as cal_elts
+reload(cal_elts)
+from scipy.optimize import minimize_scalar
+
+
+
+
+
 t0 = time.time()
 station = station
 VIP_mon_4_tek = VIP_mon_4_tek
@@ -80,7 +89,7 @@ def calibrate_JPA_dac(pulse_pars, RO_pars, upload=True):
     set_trigger_slow()
     set_CBox_cos_sine_weigths(RO_pars['mod_frequency'])
     ad_func_pars = {'adaptive_function': minimize_scalar,
-                    'bracket': [-310, -300, -290],
+                    'bracket': [-330, -300, -270],
                     'minimize': False,
                     'par_idx': 4}
     MC.set_adaptive_function_parameters(ad_func_pars)
@@ -98,6 +107,33 @@ def calibrate_JPA_dac(pulse_pars, RO_pars, upload=True):
     MC.set_detector_function(d)
     MC.run(name='JPA_dac_tuning', mode='adaptive')
     ma.MeasurementAnalysis(label='JPA_dac_tuning')
+
+def calibrate_duplexer_phase(pulse_pars):
+    cal_elts.station = station
+
+    mod_freq = -50e6
+
+    cal_elts.cos_seq(.1, mod_freq, ['ch1', 'ch2', 'ch3', 'ch4'],
+                                 phases = [0, 90, 180, 270],
+                                 marker_channels=['ch4_marker1', 'ch4_marker2'])
+
+
+    AWG.start()
+    f = Qubit_LO.frequency()+mod_freq
+    MC.set_sweep_function(Dux.in1_out1_phase)
+    MC.set_detector_function(det.Signal_Hound_fixed_frequency(SH,
+                             frequency=f))
+    MC.set_sweep_points(np.arange(8000, 20000, 100))
+    MC.run('Duplexer_phase_sweep')
+    ma.MeasurementAnalysis()
+
+    # ad_func_pars = {'adaptive_function': minimize_scalar,
+    #                 'bracket': [5000, 12000, 15000]}
+    # MC.set_adaptive_function_parameters(ad_func_pars)
+    # MC.run(name='adaptive_duplexer_phase_cal', mode='adaptive')
+
+    # ma.MeasurementAnalysis()
+
 
 
 
