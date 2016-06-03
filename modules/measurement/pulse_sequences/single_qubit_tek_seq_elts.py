@@ -307,7 +307,7 @@ def Randomized_Benchmarking_seq(pulse_pars, RO_pars,
                                 resetless=False,
                                 double_curves=False,
                                 seq_name=None,
-                                verbose=False):
+                                verbose=False, upload=True):
     '''
     Input pars:
         pulse_pars:    dict containing pulse pars
@@ -323,9 +323,11 @@ def Randomized_Benchmarking_seq(pulse_pars, RO_pars,
         resetless:     bool if False will append extra Id element if seq
                        is longer than 50us to ensure proper initialization
         double_curves: Alternates between net clifford 0 and 3
+        upload:        Upload to the AWG
 
-    Creates a randomized benchmarking sequence where 1 seed is loaded
-    per element.
+    returns:
+        seq, elements_list
+
 
     Conventional use:
         nr_cliffords = [n1, n2, n3 ....]
@@ -377,10 +379,12 @@ def Randomized_Benchmarking_seq(pulse_pars, RO_pars,
                     el = multi_pulse_elt(i, station, [pulses['I']])
                     el_list.append(el)
                     seq.append_element(el, trigger_wait=True)
-
-    station.components['AWG'].stop()
-    station.pulsar.program_awg(seq, *el_list, verbose=verbose)
-    return seq_name
+    if upload:
+        station.components['AWG'].stop()
+        station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+        return seq, el_list
+    else:
+        return seq, el_list
 
 
 def Motzoi_XY(motzois, pulse_pars, RO_pars,
