@@ -3031,49 +3031,69 @@ class RB_double_curve_Analysis(RandomizedBenchmarking_Analysis):
             close_file=False, make_fig=False, **kw)
 
         data = self.corr_data[:-1*(len(self.cal_points[0]*2))]
+        # 1- minus all populations because we measure fidelity to 1
         data_0 = 1 - data[::2]
         data_1 = 1 - data[1::2]
-        data_2 = 1 -(1- data_1) -(1- data_0)
-        n_cl = self.sweep_points[:-1*(len(self.cal_points[0]*2))][::2]
+        # 2-state population is just whatever is missing in 0 and 1 state
+        # assumes that 2 looks like 1 state
+        data_2 = 1 - (data_1) - (data_0)
+        n_cl = self.sweep_points[:-1*(len(self.cal_points[0]*2)):2]
 
-        self.fit_results = ['', '']
-        self.fit_results[0] = self.fit_data(data_0, n_cl)
-        self.fit_results[1] = self.fit_data(data_1, n_cl)
+        self.fit_results = self.fit_data(data_0, data_1, n_cl)
 
-        self.save_fitted_parameters(fit_res=self.fit_results[0],
-                                    var_name='Net_Id')
-        self.save_fitted_parameters(fit_res=self.fit_results[1],
-                                    var_name='Net_Pi')
+        self.save_fitted_parameters(fit_res=self.fit_results,
+                                    var_name='Double_curve_RB')
 
         if self.make_fig:
             self.make_figures(n_cl, data_0, data_1, data_2,
                               close_main_fig=close_main_fig, **kw)
-
         if close_file:
             self.data_file.close()
         return
 
-    def add_textbox(self, ax, F_T1=None):
-        fr0 = self.fit_results[0].params
-        fr1 = self.fit_results[1].params
+    def fit_data(self, data0, data1, numCliff,
+                 print_fit_results=False,
+                 show_guess=False,
+                 plot_results=False):
+        data = np.concatenate([data0, data1])
+        numCliff = 2*list(numCliff)
+        invert = np.concatenate([np.ones(len(data0)),
+                                np.zeros(len(data1))])
+
+        RBModel = lmfit.Model(fit_mods.double_RandomizedBenchmarkingDecay,
+                              independent_vars=['numCliff', 'invert'])
+        RBModel.set_param_hint('p', value=.99)
+        RBModel.set_param_hint('offset', value=.5)
+        RBModel.set_param_hint('fidelity_per_Clifford',  # vary=False,
+                               expr='(p + (1-p)/2)')
+        RBModel.set_param_hint('error_per_Clifford',  # vary=False,
+                               expr='1-fidelity_per_Clifford')
+        RBModel.set_param_hint('fidelity_per_gate',  # vary=False,
+                               expr='fidelity_per_Clifford**(1./1.875)')
+        RBModel.set_param_hint('error_per_gate',  # vary=False,
+                               expr='1-fidelity_per_gate')
+
+        params = RBModel.make_params()
+        fit_res = RBModel.fit(data, numCliff=numCliff, invert=invert,
+                              params=params)
+        if print_fit_results:
+            print(fit_res.fit_report())
+        return fit_res
+
+    def add_textbox(self, f, ax, F_T1=None):
+        fr0 = self.fit_results.params
         textstr = (
-            '$F_{\mathrm{Cl}}^{I}$'+'= {:.5g} $\pm$ ({:.2g})%'.format(
+            '$F_{\mathrm{Cl}}$'+'= {:.5g} \n\t$\pm$ ({:.2g})%'.format(
                 fr0['fidelity_per_Clifford'].value*100,
                 fr0['fidelity_per_Clifford'].stderr*100) +
-            '\n$F_{\mathrm{Cl}}^{\pi}$'+'= {:.5g} $\pm$ ({:.2g})%'.format(
-                fr1['fidelity_per_Clifford'].value*100,
-                fr1['fidelity_per_Clifford'].stderr*100) +
-
-            '\nOffset${ }^I$ '+'= {:.4g} $\pm$ ({:.2g})%'.format(
-                fr0['offset'].value*100, fr0['offset'].stderr*100) +
-            '\nOffset${ }^\pi$ '+'= {:.4g} $\pm$ ({:.2g})%'.format(
-                (fr1['offset'].value*100),
-                (fr1['offset'].stderr*100)))
+            '\nOffset '+'= {:.4g} \n\t$\pm$ ({:.2g})%'.format(
+                fr0['offset'].value*100, fr0['offset'].stderr*100))
         if F_T1 is not None:
             textstr += ('\n\t  $F_{Cl}^{T_1}$  = ' +
                         '{:.5g}%'.format(F_T1*100))
-        ax.text(0.65, 0.05, textstr, transform=ax.transAxes,
-                fontsize=11, verticalalignment='bottom')
+        ax.text(0.95, 0.1, textstr, transform=f.transFigure,
+                fontsize=11, verticalalignment='bottom',
+                horizontalalignment='right')
 
     def make_figures(self, n_cl, data_0, data_1, data_2,
                      close_main_fig, **kw):
@@ -3081,8 +3101,8 @@ class RB_double_curve_Analysis(RandomizedBenchmarking_Analysis):
             ax.plot(n_cl, data_0, 'o', color='b', label=r'$|0\rangle$')
             ax.plot(n_cl, data_1, '^', color='r', label=r'$|1\rangle$')
             ax.plot(n_cl, data_2, 'p', color='g', label=r'$|2\rangle$')
-            ax.hlines(0, n_cl[0], n_cl[-1], linestyle='--')
-            ax.hlines(1, n_cl[0], n_cl[-1], linestyle='--')
+            ax.hlines(0, n_cl[0], n_cl[-1]*1.05, linestyle='--')
+            ax.hlines(1, n_cl[0], n_cl[-1]*1.05, linestyle='--')
             ax.plot([n_cl[-1]]*4, self.corr_data[-4:], 'o', color='None')
             ax.set_xlabel('Number of Cliffords')
             ax.set_ylabel('State populations')
@@ -3090,18 +3110,18 @@ class RB_double_curve_Analysis(RandomizedBenchmarking_Analysis):
                                 self.timestamp_string + '_' +
                                 self.measurementstring, 40))
             ax.set_title(plot_title)
-            ax.set_xlim(n_cl[0], n_cl[-1]*1.57)
+            ax.set_xlim(n_cl[0], n_cl[-1]*1.02)
             ax.set_ylim(-.1, 1.1)
-            x_fine = np.linspace(0, self.sweep_points[-1], 1000)
-            fit_0 = fit_mods.RandomizedBenchmarkingDecay(
-                x_fine, ** self.fit_results[0].best_values)
-            fit_1 = fit_mods.RandomizedBenchmarkingDecay(
-                x_fine, ** self.fit_results[1].best_values)
+            x_fine = np.linspace(0, self.sweep_points[-1]*1.05, 1000)
+            fit_0 = fit_mods.double_RandomizedBenchmarkingDecay(
+                x_fine, invert=1, ** self.fit_results.best_values)
+            fit_1 = fit_mods.double_RandomizedBenchmarkingDecay(
+                x_fine, invert=0, ** self.fit_results.best_values)
             fit_2 = 1-fit_1-fit_0
 
-            ax.plot(x_fine, fit_0, color='b')
-            ax.plot(x_fine, fit_1, color='r')
-            ax.plot(x_fine, fit_2, color='g')
+            ax.plot(x_fine, fit_0, color='darkgray', label='fit')
+            ax.plot(x_fine, fit_1, color='darkgray')
+            ax.plot(x_fine, fit_2, color='darkgray')
 
             F_T1 = None
             if self.T1 is not None and self.pulse_delay is not None:
@@ -3110,16 +3130,20 @@ class RB_double_curve_Analysis(RandomizedBenchmarking_Analysis):
                 T1_limited_curve = fit_mods.RandomizedBenchmarkingDecay(
                     x_fine, -0.5, p_T1, 0.5)
                 ax.plot(x_fine, T1_limited_curve,
-                        linestyle='--', color='grey', label='T1-limit')
+                        linestyle='--', color='lightgray', label='T1-limit')
                 T1_limited_curve = fit_mods.RandomizedBenchmarkingDecay(
                     x_fine, 0.5, p_T1, 0.5)
                 ax.plot(x_fine, T1_limited_curve,
-                        linestyle='--', color='grey')
-            self.add_textbox(ax, F_T1)
-
-            ax.legend(frameon=False, numpoints=1, loc='upper right')
+                        linestyle='--', color='lightgray')
+            self.add_textbox(f, ax, F_T1)
+            ax.legend(frameon=False, numpoints=1,
+                      # bbox_transform=ax.transAxes,#
+                      bbox_transform=f.transFigure,
+                      loc='upper right',
+                      bbox_to_anchor=(.95, .95))
+            plt.subplots_adjust(left=.1, bottom=None, right=.7, top=None)
             self.save_fig(f, figname='Two_curve_RB', close_fig=close_main_fig,
-                          **kw)
+                          fig_tight=False, **kw)
 
 
 

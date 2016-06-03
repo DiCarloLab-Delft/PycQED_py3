@@ -7,7 +7,27 @@ import lmfit
 
 
 def RandomizedBenchmarkingDecay(numCliff, Amplitude, p, offset):
-    val = Amplitude * (p**numCliff) + offset
+    val = Amplitude * (p**numCliff)+ offset
+    return val
+
+
+def double_RandomizedBenchmarkingDecay(numCliff, p, offset,
+                                       invert=1):
+    """
+    A variety of the RB-curve that allows fitting both the inverting and
+    non-inverting exponential.
+    The amplitude of the decay curve is constrained to start at 0 or 1.
+    The offset is the common point both curves converge to.
+
+    pick invert to be 1 or 0
+    """
+    # Inverting clifford curve
+    val_inv = (1-offset) * (p**numCliff) + offset
+    # flipping clifford curve
+    val_flip = -offset * (p**numCliff) + offset
+    # Using invert as a boolean but not using if statement to allow for
+    # arrays to be input in the function
+    val = (1-invert) * val_flip + invert*val_inv
     return val
 
 
