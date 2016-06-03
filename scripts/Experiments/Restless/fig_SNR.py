@@ -22,10 +22,14 @@ center = 0.315338304148
 attenuations = np.linspace(center-.05, center+.05, 21)
 # attenuations = np.arange(.27 + 0.000338, .32001, .001)
 
+
+############################################################
 # Short sequences for testing and building analysis
-nr_cliffords = [2, 4, 8, 16, 30, 60, 100, 200, 300, 400, 600, 800]
+nr_cliffords = [2, 8,  20, 60, 100,  300, 600, 1200]
 nr_seeds = 5
 nr_iterations = 3
+# Comment out between the brackets for the night run
+############################################################
 
 DUX_1_default = 0.3
 DUX_2_default = 0.700729836874
@@ -38,7 +42,7 @@ pulse_pars, RO_pars = VIP_mon_2_dux.get_pulse_pars()
 
 
 detector_restless = det.CBox_single_qubit_event_s_fraction(CBox)
-detector_traditional = det.CBox_state_counters_det(CBox)
+detector_traditional = det.CBox_single_qubit_frac1_counter(CBox)
 
 t0 = time.time()
 VIP_mon_2_dux.measure_ssro(close_fig=True, set_integration_weights=True)
@@ -68,7 +72,8 @@ for i in range(nr_iterations):
                 pulse_pars, RO_pars, [ncl], nr_seeds=nr_seeds,
                 net_clifford=0, post_msmt_delay=3e-6,
                 cal_points=False, resetless=True)
-            MC.set_detector_function(detector_restless)
+            MC.set_detector_function(detector_traditional)
+            AWG.start()
             MC.run('RB_conventional_{}cl_{}sds'.format(ncl, nr_seeds))
             ma.MeasurementAnalysis()
     except Exception:

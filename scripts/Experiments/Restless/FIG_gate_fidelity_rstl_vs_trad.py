@@ -29,7 +29,7 @@ detector_restless=det.CBox_single_qubit_event_s_fraction(CBox)
 
 
 #detector_traditional=det.CBox_single_integration_average_det(CBox)
-detector_traditional=det.CBox_single_qubit_fidelity_counter(CBox)
+detector_traditional=det.CBox_single_qubit_frac1_counter(CBox)
 
 
 

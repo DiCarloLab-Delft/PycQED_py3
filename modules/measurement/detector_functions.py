@@ -627,7 +627,7 @@ class CBox_single_qubit_event_s_fraction(CBox_state_counters_det):
         return data
 
 
-class CBox_single_qubit_fidelity_counter(CBox_state_counters_det):
+class CBox_single_qubit_frac1_counter(CBox_state_counters_det):
     '''
     Based on the shot counters, returns the fraction of shots that corresponds
     to a specific state.
@@ -640,9 +640,9 @@ class CBox_single_qubit_fidelity_counter(CBox_state_counters_det):
         super(CBox_state_counters_det, self).__init__()
         self.detector_control = 'soft'
         self.CBox = CBox
-        self.name = 'CBox_single_qubit_fidelity_counter'
+        self.name = 'CBox_single_qubit_frac1_counter'
         # A and B refer to the counts for the different weight functions
-        self.value_names = ['F_1']
+        self.value_names = ['Frac_1']
         self.value_units = ['']
 
     def acquire_data_point(self):

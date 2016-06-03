@@ -111,7 +111,9 @@ def calibrate_JPA_dac(pulse_pars, RO_pars, upload=True):
 def calibrate_duplexer_phase(pulse_pars):
     cal_elts.station = station
 
-    mod_freq = -50e6
+    mod_freq = pulse_pars['mod_frequency']
+
+
 
     cal_elts.cos_seq(.1, mod_freq, ['ch1', 'ch2', 'ch3', 'ch4'],
                                  phases = [0, 90, 180, 270],
@@ -123,16 +125,17 @@ def calibrate_duplexer_phase(pulse_pars):
     MC.set_sweep_function(Dux.in1_out1_phase)
     MC.set_detector_function(det.Signal_Hound_fixed_frequency(SH,
                              frequency=f))
-    MC.set_sweep_points(np.arange(8000, 20000, 100))
-    MC.run('Duplexer_phase_sweep')
-    ma.MeasurementAnalysis()
 
-    # ad_func_pars = {'adaptive_function': minimize_scalar,
-    #                 'bracket': [5000, 12000, 15000]}
-    # MC.set_adaptive_function_parameters(ad_func_pars)
-    # MC.run(name='adaptive_duplexer_phase_cal', mode='adaptive')
-
+    # MC.set_sweep_points(np.arange(8000, 20000, 100))
+    # MC.run('Duplexer_phase_sweep')
     # ma.MeasurementAnalysis()
+
+    ad_func_pars = {'adaptive_function': minimize_scalar,
+                    'bracket': [5000, 12000, 15000]}
+    MC.set_adaptive_function_parameters(ad_func_pars)
+    MC.run(name='adaptive_duplexer_phase_cal', mode='adaptive')
+
+    ma.MeasurementAnalysis()
 
 
 
@@ -251,7 +254,6 @@ VIP_mon_2_tek.f_JPA_pump_mod(10e6)
 print('setting IVVI parameters')
 IVVI.dac1.set(-40)
 IVVI.dac2.set(0)  # was 70 for sweetspot VIP_mon_4
-# IVVI.dac5(-299.962)  # JPA pump dac
 
 print('setting AWG parameters')
 AWG.ch1_offset.set(0.010)

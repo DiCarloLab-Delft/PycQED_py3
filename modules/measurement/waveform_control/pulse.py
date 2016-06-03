@@ -218,3 +218,51 @@ class marker_train(Pulse):
             raise ValueError('Waveform length is not equal to expected length')
 
         return wf
+
+
+def apply_modulation(I_env, Q_env, tvals, mod_frequency,
+                     phase=0, phi_skew=0, alpha=1):
+    '''
+    Applies single sideband modulation, requires timevals to make sure the
+    phases are correct.
+
+    Input args:
+        I_env (array)
+        Q_env (array)
+        tvals (array):              in seconds
+        mod_frequency(float):       in Hz
+        phase (float):              in degree
+        phi_skew (float):           in degree
+        alpha (float):              ratio
+    returns:
+        [I_mod, Q_mod] = M*mod*[I_env, Q_env]
+
+    Signal = predistortion * modulation * envelope
+    See Leo's notes on mixer predistortion in the docs for details
+
+    [I_mod] = [1        tan(phi-skew)] [cos(wt+phi)   sin(wt+phi)] [I_env]
+    [Q_mod]   [0  sec(phi-skew)/alpha] [-sin(wt+phi)  cos(wt+phi)] [Q_env]
+
+    The predistortion * modulation matrix is implemented in a single step
+    using the following matrix
+
+    M*mod = [cos(x)-tan(phi-skew)sin(x)      sin(x)+tan(phi-skew)cos(x) ]
+            [-sin(x)sec(phi-skew)/alpha  cos(x)sec(phi-skew)/alpha]
+    '''
+
+    tan_phi_skew = np.tan(2*np.pi*phi_skew/360)
+    sec_phi_alpha = 1/(np.cos(2*np.pi*phi_skew/360) * alpha)
+
+    I_mod = (I_env*(np.cos(2*np.pi*(mod_frequency*tvals +
+                                    phase/360)) - tan_phi_skew *
+                    np.sin(2*np.pi*(mod_frequency*tvals +
+                                    phase/360))) +
+             Q_env*(np.sin(2*np.pi*(mod_frequency*tvals +
+                                    phase/360)) + tan_phi_skew *
+             np.cos(2*np.pi*(mod_frequency*tvals + phase/360))))
+
+    Q_mod = (-1*I_env*sec_phi_alpha*np.sin(2*np.pi*(mod_frequency *
+             tvals + phase/360.)) +
+             + Q_env * sec_phi_alpha * np.cos(2 * np.pi * (
+             mod_frequency * tvals + phase/360.)))
+    return [I_mod, Q_mod]
