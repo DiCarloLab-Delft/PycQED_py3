@@ -178,3 +178,86 @@ def flatten_list(lis):
                 yield x
         else:
             yield item
+
+def insert_counts_into_dataset(filename_gateseq, filename_dataoutput, counts):
+    """
+    Function for inserting counts retreived from experiment
+    into pyGSTi. Counts are added to .text file which was used
+    to create the gate sequences for the experiment.
+    Formatted as pyGSTi .txt style
+    Function only works in python >3
+
+    Parameters:
+    ----------------------------------------------------
+    filename_gatseq: string referring to a .txt file
+    must be a .txt file
+
+    filename_dataoutput: string
+    This is the name of the output file
+
+    counts: #ofgateseq by 2 np.array, with first column plus counts, second minus counts    # or list??
+    Counts
+
+    """
+    experiment_text_file_gateseq = open(filename_gateseq)
+    sequences = experiment_text_file_gateseq.read().split("\n") #this thus also includes the first line(title), and last whitelin
+    experiment_text_file_gateseq.close()
+    f = open(filename_dataoutput, "w")
+    print("## Columns = plus count, minus count",file=f)
+    for i in range(len(sequences)-2):
+            if i == 0:
+                print("{}"+"  %s" % counts[0, 0]+"  %s" % counts[0, 1], file=f) # gatesquence + 2 spaces +
+                # count_plus+2 spaces+count_min
+            else:
+                cleanseq = sequences[i+1].strip()
+                print(cleanseq+'  %s' % counts[i, 0]+'  %s' % counts[i, 1], file=f)# gatesquence + 2 spaces +
+                # count_plus+2 spaces+count_min
+    f.close()
+
+def write_textfile_data_for_GST_input(filename_input, filename_output,
+                                      filename_gateseq,  maxLength_gateseq,
+                                      number_of_gateseq):
+    """Writes data from h5py file to text file for input into pyGSTi
+    ---------------------------------------------------------------------------------------
+    Parameters:
+    filename_input:string
+    .hdf5 file containing experimantal data. 'Data' folder must contain data formattted in 3 columns,
+    first being the shot-index, second column only zeros, third column the counts (0 or 1).
+
+    filename_output: string
+    text file for output of data into pyGSTi
+
+    filename_gateseq:string
+    text file containg the gatesequences used in the GST experiment
+
+    maxLength_gateseq: integer
+    max length of the germ sequence (germs are raised to such a power
+    so that they don't exceed the maximum length.
+    That maximum length is this parameter )
+
+    number_of_gateseq: integer
+    Number of gatesequences used in experiment
+
+    """
+    import h5py
+    import numpy as np
+    datafileGST = h5py.File(filename_input,'r')
+    expdata = datafileGST['Experimental Data/Data']
+    pluscountbins = np.zeros((1,number_of_gateseq))
+    for gateseqindex in range(number_of_gateseq):
+        pluscountbins[0, gateseqindex] = np.sum(expdata[gateseqindex::(number_of_gateseq), 2])
+    plus_counts = np.transpose(pluscountbins)
+    number_of_datapoints = np.shape(expdata)[0]
+    if (number_of_datapoints % number_of_gateseq) == 0:
+        datapoints_per_seq = number_of_datapoints/number_of_gateseq
+        total_counts = datapoints_per_seq*np.ones((number_of_gateseq))
+        minus_counts = total_counts-plus_counts
+        counts = (np.concatenate((plus_counts, minus_counts), axis=1)).astype(int)
+        insert_counts_into_dataset(filename_gateseq, filename_output, counts)
+    else:
+        raise ValueError("""Number is not integer times the number of gatesequences
+                         (datapoints are unevenly distributed among gatesequences""")
+
+
+
+
