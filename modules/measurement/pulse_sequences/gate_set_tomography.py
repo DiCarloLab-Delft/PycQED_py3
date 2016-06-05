@@ -219,7 +219,7 @@ def write_textfile_data_for_GST_input(filename_input, filename_output,
                                       filename_gateseq,  maxLength_gateseq,
                                       number_of_gateseq):
     """Writes data from h5py file to text file for input into pyGSTi
-    ---------------------------------------------------------------------------------------
+    --------------------------------------------------------------------------
     Parameters:
     filename_input:string
     .hdf5 file containing experimantal data. 'Data' folder must contain data
@@ -311,3 +311,165 @@ def perform_extended_GST_on_data(filename_data_input, filename_target_gateset,
                                         filename_germs, maxLengths,
                                         gaugeOptRatio=1e-3)
     return results
+
+##try to generalize it
+def create_experiment_list_pyGSTi_general(filename):
+    """
+    Extracting list of experiments from .txt file
+
+    Parameters:
+
+    filename: string
+        Name of the .txt file. File must be formatted in the way as done by
+        pyGSTi.
+        One gatesequence per line, formatted as e.g.:Gx(Gy)^2Gx.
+
+    Returns:
+
+    Nested list containing all gate sequences for experiment. Every gate
+    sequence is also a nested list, []
+
+    """
+    import re
+    experiments = open(filename)
+    sequences = experiments.read().split("\n")
+    experimentlist = []
+    for i in range(len(sequences)):
+        clean_seq = sequences[i].strip()
+        gateseq = []
+        if "{}" in clean_seq:   # special case (no fiducials &no germs)
+            gateseq.insert(0,"RO")
+            experimentlist.append(gateseq)
+        if "(" in clean_seq:
+            fiducial = []
+            germs = []
+            measfiducial = []
+            if "^" in clean_seq:
+                indexpower=1+clean_seq.index('^')
+                power = int(clean_seq[indexpower])   #need to find in it another way, namely as the number following the ^
+                result = re.split("[(]|\)\^\d", clean_seq)
+
+                regsplit1 = re.findall('G[xy]180|G[xy]90|Gi', result[0])
+                for i in range(len(regsplit1)):
+                    if regsplit1[i]=="Gi":
+                        fiducial.append("I")
+                    elif regsplit1[i]=="Gx90":
+                        fiducial.append("X90")
+                    elif regsplit1[i]=="Gy90":
+                        fiducial.append("Y90")
+                    elif regsplit1[i]=='Gx180':
+                        fiducial.append('X180')
+                    elif regsplit1[i]==('Gy180'):
+                        fiducial.append('Y180')
+
+                regsplit2 = re.findall('G[xy]180|G[xy]90|Gi',result[1])
+                for i in range(len(regsplit2)):
+                    if regsplit2[i]=="Gi":
+                        germs.append("I")
+                    elif regsplit2[i]=="Gx90":
+                        germs.append("X90")
+                    elif regsplit2[i]=="Gy90":
+                        germs.append("Y90")
+                    elif regsplit2[i]=='Gx180':
+                        germs.append('X180')
+                    elif regsplit2[i]==('Gy180'):
+                        germs.append('Y180')
+
+                regsplit3=re.findall('G[xy]180|G[xy]90|Gi', result[2])
+                for i in range(len(regsplit3)):
+                    if regsplit3[i]=="Gi":
+                        measfiducial.append("I")
+                    elif regsplit3[i]=="Gx90":
+                        measfiducial.append("X90")
+                    elif regsplit3[i]=="Gy90":
+                        measfiducial.append("Y90")
+                    elif regsplit3[i]=='Gx180':
+                        measfiducial.append('X180')
+                    elif regsplit3[i]==('Gy180'):
+                        measfiducial.append('Y180')
+            else:
+                power = 1
+                result = re.split("[()]",clean_seq)
+
+                regsplit1 = re.findall('G[xy]180|G[xy]90|Gi',result[0])
+                for i in range(len(regsplit1)):
+                    if regsplit1[i]=="Gi":
+                        fiducial.append("I")
+                    elif regsplit1[i]=="Gx90":
+                        fiducial.append("X90")
+                    elif regsplit1[i]=="Gy90":
+                        fiducial.append("Y90")
+                    elif regsplit1[i]=='Gx180':
+                        fiducial.append('X180')
+                    elif regsplit1[i]==('Gy180'):
+                        fiducial.append('Y180')
+
+
+                regsplit2 = re.findall('G[xy]180|G[xy]90|Gi',result[1])
+                for i in range(len(regsplit2)):
+                    if regsplit2[i]=="Gi":
+                        germs.append("I")
+                    elif regsplit2[i]=="Gx90":
+                        germs.append("X90")
+                    elif regsplit2[i]=="Gy90":
+                        germs.append("Y90")
+                    elif regsplit2[i]=='Gx180':
+                        germs.append('X180')
+                    elif regsplit2[i]==('Gy180'):
+                        germs.append('Y180')
+
+                regsplit3 = re.findall('G[xy]180|G[xy]90|Gi',result[2])
+                for i in range(len(regsplit3)):
+                    if regsplit3[i]=="Gi":
+                        measfiducial.append("I")
+                    elif regsplit3[i]=="Gx90":
+                        measfiducial.append("X90")
+                    elif regsplit3[i]=="Gy90":
+                        measfiducial.append("Y90")
+                    elif regsplit3[i]=='Gx180':
+                        measfiducial.append('X180')
+                    elif regsplit3[i]==('Gy180'):
+                        measfiducial.append('Y180')
+            if len(fiducial)!=0:
+                gateseq.append(fiducial)
+            if len(germs)!=0:
+                gateseq.append(germs*power)
+            if len(measfiducial)!=0:
+                gateseq.append(measfiducial)
+            gateseq.append(["RO"])
+            gateseq=list(flatten_list(gateseq))
+            experimentlist.append(gateseq)
+        elif ("Gi" in clean_seq) or ("Gx" in clean_seq) or ("Gy" in clean_seq):
+            regsplit =re.findall('G[xy]180|G[xy]90|Gi',clean_seq)
+            loopseq = []
+            for i in range(len(regsplit)):
+                if regsplit[i]=="Gi":
+                    loopseq.append("I")
+                elif regsplit[i]=="Gx90":
+                    loopseq.append("X90")
+                elif regsplit[i]=="Gy90":
+                    loopseq.append("Y90")
+                elif regsplit[i]=='Gx180':
+                    loopseq.append('X180')
+                elif regsplit[i]==('Gy180'):
+                    loopseq.append('Y180')
+            gateseq.append(loopseq)
+            gateseq.append(["RO"])
+            gateseq=list(flatten_list(gateseq))
+            experimentlist.append(gateseq)
+    if len(experimentlist)<(len(sequences)-2):
+        print("Lenght list of experiments too short, probably something wrong")
+    experiments.close()
+    return experimentlist
+def flatten_list(lis):
+    """
+    Help function for using:create_experiment_list_pyGSTi
+
+    """
+    from collections import Iterable
+    for item in lis:
+        if isinstance(item, Iterable) and not isinstance(item, str):
+            for x in flatten_list(item):
+                yield x
+        else:
+            yield item
