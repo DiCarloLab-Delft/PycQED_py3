@@ -68,6 +68,7 @@ class MeasurementControl:
             else:
                 raise ValueError('mode %s not recognized' % self.mode)
             result = self.dset[()]
+            self.save_MC_metadata(self.data_object) # timing labels etc
         return result
 
     def measure(self, *kw):
@@ -86,15 +87,18 @@ class MeasurementControl:
 
         if self.sweep_functions[0].sweep_control == 'soft':
             self.detector_function.prepare()
+            self.get_measurement_preparetime()
             self.measure_soft_static()
         if self.sweep_functions[0].sweep_control == 'hard':
             self.iteration = 0
             if len(self.sweep_functions) == 1:
                 self.detector_function.prepare(
                     sweep_points=self.get_sweep_points())
+                self.get_measurement_preparetime()
                 self.measure_hard()
             elif len(self.sweep_functions) == 2:
                 self.complete = False
+                self.get_measurement_preparetime()
                 for j in range(self.ylen):
                     # added specifically for 2D hard sweeps
                     if not self.complete:
@@ -113,6 +117,7 @@ class MeasurementControl:
             sweep_function.finish()
         self.detector_function.finish()
         self.get_measurement_endtime()
+
         return
 
     def measure_soft_static(self):
@@ -133,6 +138,7 @@ class MeasurementControl:
         for sweep_function in self.sweep_functions:
             sweep_function.prepare()
         self.detector_function.prepare()
+        self.get_measurement_preparetime()
 
         if adaptive_function == 'Powell':
             adaptive_function = fmin_powell
@@ -590,6 +596,25 @@ class MeasurementControl:
                         val = ''
                     instrument_grp.attrs[p_name] = str(val)
 
+    def save_MC_metadata(self, data_object=None, *args):
+        '''
+        Saves metadata on the MC (such as timings)
+        '''
+        set_grp = data_object.create_group('MC settings')
+
+        bt = set_grp.create_dataset('begintime', (9, 1))
+        bt[:, 0] = np.array(time.localtime(self.begintime))
+        pt = set_grp.create_dataset('preparetime', (9, 1))
+        pt[:, 0] = np.array(time.localtime(self.preparetime))
+        et = set_grp.create_dataset('endtime', (9, 1))
+        et[:, 0] = np.array(time.localtime(self.endtime))
+
+        set_grp.attrs['mode'] = self.mode
+        set_grp.attrs['measurement_name'] = self.measurement_name
+        set_grp.attrs['live_plot_enabled'] = self.live_plot_enabled
+
+
+
     def print_progress_static_soft_sweep(self, i):
         if self.verbose:
             percdone = (i+1)*1./len(self.sweep_points)*100
@@ -729,6 +754,11 @@ class MeasurementControl:
     def get_measurement_endtime(self):
         self.endtime = time.time()
         return time.strftime('%Y-%m-%d %H:%M:%S')
+
+    def get_measurement_preparetime(self):
+        self.preparetime = time.time()
+        return time.strftime('%Y-%m-%d %H:%M:%S')
+
 
     def set_sweep_points(self, sweep_points):
         self.sweep_points = np.array(sweep_points)

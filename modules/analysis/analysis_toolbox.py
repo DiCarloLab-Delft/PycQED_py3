@@ -1072,7 +1072,8 @@ def current_timemark():
 ######################################################################
 
 
-def color_plot(x, y, z, fig, ax, show=False, normalize=False, log=False,
+def color_plot(x, y, z, fig, ax, cax=None,
+               show=False, normalize=False, log=False,
                do_transpose=False, add_colorbar=True, **kw):
     '''
     x, and y are lists, z is a matrix with shape (len(x), len(y))
@@ -1164,8 +1165,9 @@ def color_plot(x, y, z, fig, ax, show=False, normalize=False, log=False,
     ax.get_yaxis().set_tick_params(direction='out')
     ax.get_xaxis().set_tick_params(direction='out')
     if add_colorbar:
-        ax_divider = make_axes_locatable(ax)
-        cax = ax_divider.append_axes('right', size='10%', pad='5%')
+        if cax is None:
+            ax_divider = make_axes_locatable(ax)
+            cax = ax_divider.append_axes('right', size='10%', pad='5%')
         cbar = plt.colorbar(colormap, cax=cax)
         if zlabel is not None:
             cbar.set_label(zlabel)
