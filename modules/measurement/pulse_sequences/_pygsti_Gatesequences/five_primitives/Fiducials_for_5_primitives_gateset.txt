@@ -1,0 +1,7 @@
+# Fiducials for 5 primitive (positive clifford) gateset
+{}
+Gx90
+Gy90
+Gx180
+Gx180Gx90
+Gy180Gy90
