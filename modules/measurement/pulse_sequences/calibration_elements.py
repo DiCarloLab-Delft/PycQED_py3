@@ -9,7 +9,7 @@ station = None
 
 def cos_seq(amplitude, frequency, channels, phases,
             marker_channels=None, marker_lenght=20e-9,
-            verbose=False):
+            verbose=False, alphas=[1], phi_skews=[0], ):
     '''
     Cosine  sequence, plays a continuous cos on the specified channel
 
@@ -23,12 +23,12 @@ def cos_seq(amplitude, frequency, channels, phases,
         marker_channels (list[(str)]: optionally specify markers to play
 
     '''
-    seq_name = 'Cos_seq'
+    seq_name = 'ModSquare'
     seq = sequence.Sequence(seq_name)
     el_list = []
 
-    cos_pars = {'pulse_type': 'CosPulse',
-                'frequency': frequency,
+    base_pars = {'pulse_type': 'ModSquare',
+                'mod_frequency': frequency,
                 'length': 2e-6,
                 'amplitude': amplitude,
                 'pulse_delay': 0}
@@ -38,10 +38,13 @@ def cos_seq(amplitude, frequency, channels, phases,
                    'pulse_delay': 10e-9}
 
     pulse_list = []
-    for channel, phase in zip(channels, phases):
-        pulse = deepcopy(cos_pars)
-        pulse['channel'] = channel
+    for i, phase in enumerate(phases):
+        pulse = deepcopy(base_pars)
+        pulse['I_channel'] = channels[i*2]
+        pulse['Q_channel'] = channels[i*2+1]
         pulse['phase'] = phase
+        pulse['alpha'] = alphas[i]
+        pulse['phi_skew'] = phi_skews[i]
         pulse_list.append(pulse)
         # copy first element and set extra wait
     if marker_channels !=None:

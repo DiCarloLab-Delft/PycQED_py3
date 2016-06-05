@@ -87,6 +87,12 @@ def multi_pulse_elt(i, station, pulse_list):
                                     start=pulse_pars['pulse_delay'],
                                     refpulse=last_pulse, refpoint='start')
 
+            elif pulse_pars['pulse_type'] == 'ModSquare':
+                last_pulse = el.add(MW_IQmod_pulse(name='pulse_{}'.format(i),
+                                                   **pulse_pars),
+                                    start=pulse_pars['pulse_delay'],
+                                    refpulse=last_pulse, refpoint='start')
+
             elif (pulse_pars['pulse_type'] == 'MW_IQmod_pulse' or
                   pulse_pars['pulse_type'] == 'Gated_MW_RO_pulse'):
                 # Does more than just call the function as it also adds the

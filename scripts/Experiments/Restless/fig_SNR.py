@@ -25,9 +25,9 @@ attenuations = np.linspace(center-.05, center+.05, 21)
 
 ############################################################
 # Short sequences for testing and building analysis
-nr_cliffords = [2, 8,  20, 60, 100,  300, 600, 1200]
-nr_seeds = 5
-nr_iterations = 3
+# nr_cliffords = [2, 8,  20, 60, 100,  300, 600, 1200]
+# nr_seeds = 5
+# nr_iterations = 3
 # Comment out between the brackets for the night run
 ############################################################
 

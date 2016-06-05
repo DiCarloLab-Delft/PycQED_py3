@@ -54,7 +54,8 @@ class MW_IQmod_pulse(Pulse):
         if not self.phaselock:
             tvals = tvals.copy() - tvals[idx0]
         I_mod, Q_mod = apply_modulation(
-            np.ones(len(tvals)), np.zeros(len(tvals)), tvals[idx0:idx1],
+            self.amplitude*np.ones(len(tvals)), 
+            np.zeros(len(tvals)), tvals[idx0:idx1],
             mod_frequency=self.mod_frequency, phase=self.phase,
             phi_skew=self.phi_skew, alpha=self.alpha)
         if chan == self.I_channel:

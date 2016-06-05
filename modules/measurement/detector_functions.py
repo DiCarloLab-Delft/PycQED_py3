@@ -1008,7 +1008,7 @@ class SH_mixer_skewness_det(Soft_Detector):
         self.value_names = ['Power']
         self.value_units = ['dBm']
         self.delay = delay
-        self.SH.frequency.set(frequency*1e-9) # Accepts input in Hz
+        self.SH.frequency.set(frequency) # Accepts input in Hz
         self.Navg = Navg
         self.QI_amp_ratio = QI_amp_ratio
         self.IQ_phase = IQ_phase

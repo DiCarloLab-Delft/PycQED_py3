@@ -3,11 +3,7 @@ import numpy as np
 from copy import deepcopy
 from modules.measurement.pulse_sequences import single_qubit_tek_seq_elts as sqs
 from modules.measurement.pulse_sequences import calibration_elements as cal_elts
-reload(cal_elts)
 from scipy.optimize import minimize_scalar
-
-
-
 
 
 t0 = time.time()
@@ -109,22 +105,29 @@ def calibrate_JPA_dac(pulse_pars, RO_pars, upload=True):
     ma.MeasurementAnalysis(label='JPA_dac_tuning')
 
 def calibrate_duplexer_phase(pulse_pars):
-    cal_elts.station = station
-
     mod_freq = pulse_pars['mod_frequency']
+    G_phi_skew =pulse_pars['G_phi_skew']
+    D_phi_skew = pulse_pars['D_phi_skew']
+    G_alpha =pulse_pars['G_alpha']
+    D_alpha = pulse_pars['D_alpha']
 
 
 
+    # cal_elts.cos_seq(.1, mod_freq, ['ch1', 'ch2', 'ch3', 'ch4'],
+    #                              phases = [0, 90, 180, 270],
+    #                              marker_channels=['ch4_marker1', 'ch4_marker2'])
     cal_elts.cos_seq(.1, mod_freq, ['ch1', 'ch2', 'ch3', 'ch4'],
-                                 phases = [0, 90, 180, 270],
-                                 marker_channels=['ch4_marker1', 'ch4_marker2'])
-
+                             phases = [0, 180],
+                             marker_channels=['ch4_marker1', 'ch4_marker2'],
+                             alphas=[G_alpha,D_alpha],
+                             phi_skews=[G_phi_skew, D_phi_skew])
 
     AWG.start()
     f = Qubit_LO.frequency()+mod_freq
     MC.set_sweep_function(Dux.in1_out1_phase)
     MC.set_detector_function(det.Signal_Hound_fixed_frequency(SH,
                              frequency=f))
+
 
     # MC.set_sweep_points(np.arange(8000, 20000, 100))
     # MC.run('Duplexer_phase_sweep')
@@ -134,10 +137,49 @@ def calibrate_duplexer_phase(pulse_pars):
                     'bracket': [5000, 12000, 15000]}
     MC.set_adaptive_function_parameters(ad_func_pars)
     MC.run(name='adaptive_duplexer_phase_cal', mode='adaptive')
-
     ma.MeasurementAnalysis()
 
+def calibrate_duplexer_phase_2D(pulse_pars):
+    mod_freq = pulse_pars['mod_frequency']
+    G_phi_skew =pulse_pars['G_phi_skew']
+    D_phi_skew = pulse_pars['D_phi_skew']
+    G_alpha =pulse_pars['G_alpha']
+    D_alpha = pulse_pars['D_alpha']
 
+    VIP_mon_2_dux.Mux_G_phase(30000)
+    VIP_mon_2_dux.Mux_G_att(0.3)
+    Dux.in1_out1_attenuation(VIP_mon_2_dux.Mux_G_att())
+    Dux.in1_out1_phase(VIP_mon_2_dux.Mux_G_phase())
+
+    cal_elts.cos_seq(.1, mod_freq, ['ch1', 'ch2', 'ch3', 'ch4'],
+                             phases = [0, 180],
+                             marker_channels=['ch4_marker1', 'ch4_marker2'],
+                             alphas=[G_alpha,D_alpha],
+                             phi_skews=[G_phi_skew, D_phi_skew])
+
+    AWG.start()
+    f = Qubit_LO.frequency()+mod_freq
+    MC.set_sweep_functions([Dux.in2_out1_phase, Dux.in2_out1_attenuation])
+    MC.set_detector_function(det.Signal_Hound_fixed_frequency(SH,
+                             frequency=f))
+
+    ad_func_pars = {'adaptive_function': nelder_mead,
+                    'x0': [10000,VIP_mon_2_dux.Mux_G_att()],
+                    'initial_step': [1000,0.05],
+                    'no_improv_break': 35,
+                    'sigma':.5,
+                    'minimize': True,
+                    'maxiter': 500}
+    MC.set_adaptive_function_parameters(ad_func_pars)
+    MC.run(name='adaptive_duplexer_phase_cal_2D', mode='adaptive')
+    ma.OptimizationAnalysis(close_fig=True)
+    a=ma.MeasurementAnalysis(auto=False)
+    phase= int(a.data_file['Analysis']['optimization_result'].attrs['in2_out1_phase'])
+    attenuation = a.data_file['Analysis']['optimization_result'].attrs['in2_out1_attenuation']
+    print('phase', )
+    VIP_mon_2_dux.Mux_D_att(attenuation)
+    VIP_mon_2_dux.Mux_D_phase(phase)
+    print('phase set',VIP_mon_2_dux.Mux_D_phase())
 
 
 print('setting params of qubit objects')
@@ -206,21 +248,17 @@ VIP_mon_2_dux.pulse_delay.set(20e-9)
 VIP_mon_2_dux.f_pulse_mod(-50e6)
 
 
-VIP_mon_2_dux.pulse_GI_offset(0.01)
-VIP_mon_2_dux.pulse_GQ_offset(.029)
-VIP_mon_2_dux.pulse_DI_offset(0.02)
-VIP_mon_2_dux.pulse_DQ_offset(0.030)
+VIP_mon_2_dux.pulse_GI_offset(0.011)
+VIP_mon_2_dux.pulse_GQ_offset(0.029)
+VIP_mon_2_dux.pulse_DI_offset(0.005)
+VIP_mon_2_dux.pulse_DQ_offset(0.031)
 
-VIP_mon_2_dux.D_alpha(0.8565)
-VIP_mon_2_dux.D_phi_skew(-9.101)
-VIP_mon_2_dux.G_alpha(0.8244)
+VIP_mon_2_dux.D_alpha(0.82)
+VIP_mon_2_dux.D_phi_skew(-14.21)
+VIP_mon_2_dux.G_alpha(0.84)
 VIP_mon_2_dux.G_phi_skew(-10.645)
 
-VIP_mon_2_dux.Mux_G_att(0.3)
-VIP_mon_2_dux.Mux_D_att(0.7)
 
-VIP_mon_2_dux.Mux_G_phase(10693)
-VIP_mon_2_dux.Mux_D_phase(30000)
 
 
 AWG.timeout(180)
@@ -230,17 +268,6 @@ AWG.timeout(180)
 AWG520.ch1_amp(2.0)
 AWG520.ch1_offset(1.0)
 set_trigger_slow()
-
-
-#duplexer attenuations
-print('setting duplexer settings')
-DUX_1_default = 0.3
-DUX_2_default = 0.7
-
-Dux.in1_out1_phase(10693)
-Dux.in2_out1_phase(30000)
-
-
 
 #JPA pump settings
 Pump.on()
