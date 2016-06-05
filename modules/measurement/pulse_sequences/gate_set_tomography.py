@@ -200,18 +200,19 @@ def insert_counts_into_dataset(filename_gateseq, filename_dataoutput, counts):
 
     """
     experiment_text_file_gateseq = open(filename_gateseq)
-    sequences = experiment_text_file_gateseq.read().split("\n") #this thus also includes the first line(title), and last whitelin
+    sequences = experiment_text_file_gateseq.read().split("\n") #this thus
+    #also includes the first line(title), and last whiteline
     experiment_text_file_gateseq.close()
     f = open(filename_dataoutput, "w")
     print("## Columns = plus count, minus count",file=f)
     for i in range(len(sequences)-2):
             if i == 0:
-                print("{}"+"  %s" % counts[0, 0]+"  %s" % counts[0, 1], file=f) # gatesquence + 2 spaces +
-                # count_plus+2 spaces+count_min
+                print("{}"+"  %s" % counts[0, 0]+"  %s" % counts[0, 1], file=f)
+                # gatesquence + 2 spaces + # count_plus+2 spaces+count_min
             else:
                 cleanseq = sequences[i+1].strip()
-                print(cleanseq+'  %s' % counts[i, 0]+'  %s' % counts[i, 1], file=f)# gatesquence + 2 spaces +
-                # count_plus+2 spaces+count_min
+                print(cleanseq+'  %s' % counts[i, 0]+'  %s' % counts[i, 1], file=f)#
+                #gatesquence + 2 spaces + count_plus+2 spaces+count_min
     f.close()
 
 def write_textfile_data_for_GST_input(filename_input, filename_output,
@@ -221,8 +222,9 @@ def write_textfile_data_for_GST_input(filename_input, filename_output,
     ---------------------------------------------------------------------------------------
     Parameters:
     filename_input:string
-    .hdf5 file containing experimantal data. 'Data' folder must contain data formattted in 3 columns,
-    first being the shot-index, second column only zeros, third column the counts (0 or 1).
+    .hdf5 file containing experimantal data. 'Data' folder must contain data
+    formattted in 3 columns,first being the shot-index, second column only
+    zeros, third column the counts (0 or 1).
 
     filename_output: string
     text file for output of data into pyGSTi
@@ -260,4 +262,52 @@ def write_textfile_data_for_GST_input(filename_input, filename_output,
 
 
 
+def perform_extended_GST_on_data(filename_data_input, filename_target_gateset,
+                                filename_fiducials, filename_germs,
+                                maxlength_germseq):
+    """Performs extended/long GST on data
+    --------------------------------------------------------------------------
+    Parameters:
 
+    filename_data_input: string
+    Filename of the .txt containing the listofexperiments with the counts as formatted
+    accordign to the standard pyGSTi way,thus at every line a gatesequence, followed
+    by the plus and minus count (|1> and |0>)
+
+    filename_target_gateset: string
+    Filename of the .txt file which contains the target gateset
+
+    filename_fiducials: string
+    Filename of the .txt file containing the fiducials
+
+    filename_germs: string
+    Filename of .txt file containing the germs
+
+    maxlength_germpowerseq: integer
+    Integer specifying the maximum length of the of the germ-power sequence
+    used in the gates sequence. The germs are repeated an integer number of
+    times, such that the total length of this repetition is smaller than a
+    specified maxlength. The list of experiments is composed of all the
+    gatesequences for a specified maxlength which is increasing. The maximum
+    of this maxlength is the parameter ' maxlength_germpowerseq'. #This is
+    still quite unclear/needs better clarification
+
+
+    --------------------------------------------------------------------------
+    Returns:
+
+    pyGSTi .Results object, on which you can apply several functions to create
+    reports and get the estimates such as:
+    results.gatesets['final estimate'] --> gives final estimate of the gateset
+    results.create_full_report_pdf,   --> creates full report
+    results.create_brief_report_pdf   ---> creates brief report
+    """
+    import pygsti
+    maxLengths = [0]
+    for i in range(len(maxlength_germseq)):
+        maxLengths.append((2)**i)
+    results = pygsti.do_long_sequence_gst(filename_data_input, maxlength_germseq,
+                                        filename_fiducials, filename_fiducials,
+                                        filename_germs, maxLengths,
+                                        gaugeOptRatio=1e-3)
+    return results
