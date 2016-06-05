@@ -28,7 +28,7 @@ detector_restless=det.CBox_single_qubit_event_s_fraction(CBox)
 #detector_traditional=det.CBox_single_integration_average_det(CBox)
 detector_traditional=det.CBox_single_qubit_frac1_counter(CBox)
 
-methods=['traditional','restless']
+methods=['traditional', 'restless']
 init1=[0.01]
 init2=[0.01]
 #init3=10693 #fixed now, this is the duplexer phase
@@ -52,7 +52,8 @@ for i in range(100):
             T1 = a.T1
             #starting with calibration of frequency and duplexer phase
             #Dux.in1_out1_phase(init3)
-            VIP_mon_2_dux.find_frequency(method='ramsey',steps=[30,100,300], update=True)
+            VIP_mon_2_dux.find_frequency(method='ramsey',
+                                         steps=[30,100,300], update=True)
 
             #tuning motzoi and amplitude numerically
             # sweep_pars = [Qubit_LO.frequency, Dux.in1_out1_attenuation, Dux.in2_out1_attenuation, ]
