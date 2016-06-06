@@ -54,6 +54,36 @@ def Rabi_seq(amps, pulse_pars, RO_pars, n=1, post_msmt_delay=3e-6,
     return seq_name
 
 
+def Rabi_amp90_seq(scales, pulse_pars, RO_pars, n=1, post_msmt_delay=3e-6,
+             verbose=False):
+    '''
+    Rabi sequence to determine amp90 scaling factor for a single qubit using the tektronix.
+    Input pars:
+        scales:            array of amp90 scaling parameters
+        pulse_pars:      dict containing the pulse parameters
+        RO_pars:         dict containing the RO parameters
+        n:               number of pulses (1 is 2 pi half pulses)
+        post_msmt_delay: extra wait time for resetless compatibility
+    '''
+    seq_name = 'Rabi_amp90_sequence'
+    seq = sequence.Sequence(seq_name)
+    el_list = []
+    pulses = get_pulse_dict_from_pars(pulse_pars)
+    for i, scale in enumerate(scales):  # seq has to have at least 2 elts
+        pulses['X90']['amplitude'] = pulses['X180']['amplitude'] *scale
+        pulse_list = 2*n*[pulses['X90']]+[RO_pars]
+
+        # copy first element and set extra wait
+        pulse_list[0] = deepcopy(pulse_list[0])
+        pulse_list[0]['pulse_delay'] += post_msmt_delay
+        el = multi_pulse_elt(i, station, pulse_list)
+        el_list.append(el)
+        seq.append_element(el, trigger_wait=True)
+    station.components['AWG'].stop()
+    station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+    return seq_name
+
+
 def T1_seq(times,
            pulse_pars, RO_pars,
            cal_points=True,
@@ -457,7 +487,7 @@ def get_pulse_dict_from_pars(pulse_pars):
         pulses: dictionary of pulse_pars dictionaries
     '''
     pi_amp = pulse_pars['amplitude']
-    pi2_amp = pulse_pars['amplitude']/2
+    pi2_amp = pulse_pars['amplitude']*pulse_pars['amp90_scale']
 
     pulses = {'I': deepcopy(pulse_pars),
               'X180': deepcopy(pulse_pars),

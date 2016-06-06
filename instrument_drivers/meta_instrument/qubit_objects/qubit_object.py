@@ -296,9 +296,7 @@ class Transmon(Qubit):
                 a = ma.Rabi_parabola_analysis(close_fig=close_fig)
                 if take_fit_I:
                     ampl = a.fit_res[0].params['x0'].value
-                    print("taking I")
                 else:
-                    print("checking both fits")
                     if (a.fit_res[0].params['x0'].stderr <=
                             a.fit_res[1].params['x0'].stderr):
                         ampl = a.fit_res[0].params['x0'].value
@@ -308,8 +306,62 @@ class Transmon(Qubit):
                     print('Found amplitude', ampl, '\n')
         if update:
             self.amp180.set(ampl)
-            print("should be updated")
             print(ampl)
 
         # After this it should enter a loop where it fine tunes the amplitude
         # based on fine scanes around the optimum with higher sensitivity.
+
+def find_amp90_scaling(self, scales=np.linspace(-1.5,1.5),
+                             N_steps=[1, 4, 8, 18], max_n=18,
+                             close_fig=True, verbose=False,
+                             MC=None, update=True, take_fit_I=False):
+        '''
+        Finds the scaling factor of pi/2 pulses w.r.t pi pulses using a rabi type
+        with each pi pulse replaced by 2 pi/2 pulses.
+
+        If scales is an array it starts by fitting a cos to a Rabi experiment
+        to get an initial guess for the amplitude.
+
+        This experiment is only useful after carefullt calibrating the pi pulse
+        using flipping sequences.
+        '''
+        if MC is None:
+            MC = self.MC
+        if np.size(scales) != 1:
+            self.measure_rabi_amp90(scales=scales, n=1, MC=MC, analyze=False)
+            a = ma.Rabi_Analysis(close_fig=close_fig)
+            if take_fit_I:
+                    scale = abs(a.fit_res[0].params['period'].value)/2
+            else:
+                if (a.fit_res[0].params['period'].stderr <=
+                        a.fit_res[1].params['period'].stderr):
+                    scale = abs(a.fit_res[0].params['period'].value)/2
+                else:
+                    scale = abs(a.fit_res[1].params['period'].value)/2
+        else:
+            scale = scales
+        if verbose:
+            print('Initial scaling factor:', scale, '\n')
+
+        for n in N_steps:
+            if n > max_n:
+                break
+            else:
+                scale_span = 0.3*scale/n
+                scales = np.linspace(scale-scale_span, scale+scale_span, 15)
+                self.measure_rabi(scales, MC=MC, analyze=False)
+                a = ma.Rabi_parabola_analy(cl_fig=closig)
+                if take_fit_I:
+                    scale = a.fit_res[0].params['x0'].value
+                else:
+                    if (a.fit_res[0].params['x0'].stderr <=
+                            a.fit_res[1].params['x0'].stderr):
+                        scale = a.fit_res[0].params['x0'].value
+                    else:
+                        scale =fit_res[1].params['x0'].value
+                if verbose:
+                    print('Founcaleitude', scale, '\n')
+        if update:
+            self.scale_amp90.set(scale)
+            print("should be updated")
+            print(scale)

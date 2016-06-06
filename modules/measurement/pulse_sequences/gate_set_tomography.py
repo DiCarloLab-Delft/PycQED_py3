@@ -31,7 +31,7 @@ def GST_from_textfile(pulse_pars, RO_pars, filename,
     # Create a dict with the parameters for all the pulses
     pulse_dict = get_pulse_dict_from_pars(pulse_pars)
     pulse_dict['RO'] = RO_pars
-    pulse_combinations = create_experiment_list_pyGSTi(filename)
+    pulse_combinations = create_experiment_list_pyGSTi_general(filename)
     for i, pulse_comb in enumerate(pulse_combinations):
         pulse_list = []
         for pulse_key in pulse_comb:
@@ -312,7 +312,8 @@ def perform_extended_GST_on_data(filename_data_input, filename_target_gateset,
                                         gaugeOptRatio=1e-3)
     return results
 
-##try to generalize it
+
+# try to generalize it
 def create_experiment_list_pyGSTi_general(filename):
     """
     Extracting list of experiments from .txt file

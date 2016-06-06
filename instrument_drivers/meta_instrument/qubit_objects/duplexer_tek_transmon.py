@@ -150,6 +150,7 @@ class Duplexer_tek_transmon(Tektronix_driven_transmon):
             'DI_channel': self.pulse_DI_channel(),
             'DQ_channel': self.pulse_DQ_channel(),
             'amplitude': self.amp180.get(),
+            'amp90_scale': self.amp90_scale(),
             'sigma': self.gauss_sigma.get(),
             'nr_sigma': 4,
             'motzoi': self.motzoi.get(),

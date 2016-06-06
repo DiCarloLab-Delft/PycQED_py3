@@ -21,6 +21,11 @@ from scipy.optimize import minimize_scalar
 print('Defining functions')
 
 
+#parameters for channel one are hardcoded and set to the qubit object. parameters
+#for channel 2 are calibrated in Duplexer phase cal 2D
+Dux_phase_1_default=30000
+Dux_att_1_default = 0.2
+
 def set_CBox_cos_sine_weigths(IF):
     '''
     Maybe I should add this to the CBox driver
@@ -139,15 +144,17 @@ def calibrate_duplexer_phase(pulse_pars):
     MC.run(name='adaptive_duplexer_phase_cal', mode='adaptive')
     ma.MeasurementAnalysis()
 
-def calibrate_duplexer_phase_2D(pulse_pars):
+def calibrate_duplexer_phase_2D(pulse_pars,
+                                Dux_phase_1_default=Dux_phase_1_default,
+                                Dux_att_1_default=Dux_att_1_default):
     mod_freq = pulse_pars['mod_frequency']
     G_phi_skew =pulse_pars['G_phi_skew']
     D_phi_skew = pulse_pars['D_phi_skew']
     G_alpha =pulse_pars['G_alpha']
     D_alpha = pulse_pars['D_alpha']
 
-    VIP_mon_2_dux.Mux_G_phase(30000)
-    VIP_mon_2_dux.Mux_G_att(0.3)
+    VIP_mon_2_dux.Mux_G_phase(Dux_phase_1_default)
+    VIP_mon_2_dux.Mux_G_att(Dux_att_1_default)
     Dux.in1_out1_attenuation(VIP_mon_2_dux.Mux_G_att())
     Dux.in1_out1_phase(VIP_mon_2_dux.Mux_G_phase())
 

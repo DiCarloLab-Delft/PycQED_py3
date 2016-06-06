@@ -2,6 +2,7 @@ import qcodes as qc
 from modules.measurement import sweep_functions as swf
 from modules.measurement import detector_functions as det
 import modules.measurement.pulse_sequences.gate_set_tomography as gsts
+reload(gsts)
 gsts.station = station
 
 
@@ -11,20 +12,18 @@ CBox = station.components['CBox']
 
 # calibrate_RO_threshold_no_rotation()
 
-# l = 32
-# nr_elts = 1185 # for 32
 l = 2048
-nr_elts = 3889
-nr_logs = 10000
+nr_elts = 4577
+nr_logs = 1000
 
 reps_per_log = int(8000/nr_elts)
 log_length = (nr_elts*reps_per_log)
 nr_shots_per_point = reps_per_log*nr_logs
 
 set_trigger_slow()
-seq_path = '\modules\measurement\pulse_sequences\_pygsti_Gatesequences\five_primitives'
-fn = (PyCQEDpath+ seq_path+'Gatesequences_maxlength={}.txt'.format(l))
-seq, elts = gsts.GST_from_textfile(pulse_pars=pulse_pars_duplex,
+seq_path = '\\modules\\measurement\\pulse_sequences\\_pygsti_Gatesequences\\five_primitives\\'
+fn = (PyCQEDpath+ seq_path+'Gateseq_maxL={}_#seq={}.txt'.format(l, nr_elts))
+seq, elts = gsts.GST_from_textfile(pulse_pars=pulse_pars,
                                    RO_pars=RO_pars, filename=fn)
 print('starting?')
 MC.live_plot_enabled = False
