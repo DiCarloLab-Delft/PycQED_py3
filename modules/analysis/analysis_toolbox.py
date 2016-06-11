@@ -1171,6 +1171,7 @@ def color_plot(x, y, z, fig, ax, cax=None,
         cbar = plt.colorbar(colormap, cax=cax)
         if zlabel is not None:
             cbar.set_label(zlabel)
+        return fig, ax, colormap, cbar
     return fig, ax, colormap
 
 
