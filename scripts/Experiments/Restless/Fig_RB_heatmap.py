@@ -27,11 +27,11 @@ attenuations_2 = np.linspace(0, 0.5, 31)
 
 ############################################################
 # Short sequences for testing and building analysis
-# nr_cliffords = [300]
-# nr_seeds = 50
-# nr_iterations = 1
-# attenuations = np.linspace(0.1, 0.5, 81)
-# attenuations_2 = np.linspace(0, 0.5, 11)
+nr_cliffords = [300]
+nr_seeds = 50
+nr_iterations = 1
+attenuations = np.linspace(0.1, 0.5, 41)
+attenuations_2 = np.linspace(0, 0.5, 11)
 
 
 # Comment out between the brackets for the night run
@@ -39,9 +39,8 @@ attenuations_2 = np.linspace(0, 0.5, 31)
 
 Dux.in1_out1_switch('ON')
 Dux.in2_out1_switch('ON')
-Dux.in1_out1_attenuation(0.3)
-Dux.in2_out1_attenuation(0.3)
-Dux.in2_out1_phase(12698)
+VIP_mon_2_dux.prepare_for_timedomain()
+
 pulse_pars, RO_pars = VIP_mon_2_dux.get_pulse_pars()
 
 detector_restless = det.CBox_single_qubit_event_s_fraction(CBox)
@@ -72,17 +71,17 @@ for i in range(nr_iterations):
             MC.run('RB_restless_heatmap_{}cl_{}sds'.format(ncl, nr_seeds),
                    mode='2D')
             ma.TwoD_Analysis()
-        for i, ncl in enumerate(nr_cliffords):
-            # Conventional
-            set_trigger_slow()
-            sq.Randomized_Benchmarking_seq(
-                pulse_pars, RO_pars, [ncl], nr_seeds=nr_seeds,
-                net_clifford=0, post_msmt_delay=3e-6,
-                cal_points=False, resetless=True)
-            MC.set_detector_function(detector_traditional)
-            AWG.start()
-            MC.run('RB_conventional_heatmap_{}cl_{}sds'.format(ncl, nr_seeds),
-                   mode='2D')
-            ma.TwoD_Analysis()
+        # for i, ncl in enumerate(nr_cliffords):
+        #     # Conventional
+        #     set_trigger_slow()
+        #     sq.Randomized_Benchmarking_seq(
+        #         pulse_pars, RO_pars, [ncl], nr_seeds=nr_seeds,
+        #         net_clifford=0, post_msmt_delay=3e-6,
+        #         cal_points=False, resetless=True)
+        #     MC.set_detector_function(detector_traditional)
+        #     AWG.start()
+        #     MC.run('RB_conventional_heatmap_{}cl_{}sds'.format(ncl, nr_seeds),
+        #            mode='2D')
+        #     ma.TwoD_Analysis()
     # except Exception:
     #     print('excepting error')

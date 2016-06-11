@@ -31,7 +31,7 @@ def GST_from_textfile(pulse_pars, RO_pars, filename,
     # Create a dict with the parameters for all the pulses
     pulse_dict = get_pulse_dict_from_pars(pulse_pars)
     pulse_dict['RO'] = RO_pars
-    pulse_combinations = create_experiment_list_pyGSTi(filename)
+    pulse_combinations = create_experiment_list_pyGSTi_general(filename)
     for i, pulse_comb in enumerate(pulse_combinations):
         pulse_list = []
         for pulse_key in pulse_comb:
@@ -312,7 +312,7 @@ def perform_extended_GST_on_data(filename_data_input, filename_target_gateset,
                                         gaugeOptRatio=1e-3)
     return results
 
-##try to generalize it
+
 def create_experiment_list_pyGSTi_general(filename):
     """
     Extracting list of experiments from .txt file
@@ -323,6 +323,9 @@ def create_experiment_list_pyGSTi_general(filename):
         Name of the .txt file. File must be formatted in the way as done by
         pyGSTi.
         One gatesequence per line, formatted as e.g.:Gx(Gy)^2Gx.
+        This function only works for the  5 primitives gateset.
+        Gi, Gx90, Gy90, Gx180, Gy180. And still needs to be generalized to
+        be able to handle any dataset.
 
     Returns:
 
@@ -338,15 +341,16 @@ def create_experiment_list_pyGSTi_general(filename):
         clean_seq = sequences[i].strip()
         gateseq = []
         if "{}" in clean_seq:   # special case (no fiducials &no germs)
-            gateseq.insert(0,"RO")
+            gateseq.insert(0, "RO")
             experimentlist.append(gateseq)
         if "(" in clean_seq:
             fiducial = []
             germs = []
             measfiducial = []
             if "^" in clean_seq:
-                indexpower=1+clean_seq.index('^')
-                power = int(clean_seq[indexpower])   #need to find in it another way, namely as the number following the ^
+                powerstring_with_exponent=re.findall('\^\d+',clean_seq)
+                powerstring=re.findall('\d+',powerstring_with_exponent[0])
+                power=int(powerstring[0])
                 result = re.split("[(]|\)\^\d", clean_seq)
 
                 regsplit1 = re.findall('G[xy]180|G[xy]90|Gi', result[0])
@@ -473,3 +477,5 @@ def flatten_list(lis):
                 yield x
         else:
             yield item
+
+

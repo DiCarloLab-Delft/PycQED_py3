@@ -139,6 +139,11 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                            initial_value=.25,
                            vals=vals.Numbers(min_value=-0.5, max_value=0.5),
                            parameter_class=ManualParameter)
+        self.add_parameter('amp90_scale',
+                           label='pulse amplitude scaling factor', units='',
+                           initial_value=.5,
+                           vals=vals.Numbers(min_value=0, max_value=1.0),
+                           parameter_class=ManualParameter)
         self.add_parameter('gauss_sigma', units='s',
                            initial_value=10e-9,
                            parameter_class=ManualParameter)
@@ -283,6 +288,22 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         MC.set_sweep_points(amps)
         MC.set_detector_function(self.int_avg_det)
         MC.run('Rabi-n{}'.format(n)+self.msmt_suffix)
+        if analyze:
+            ma.Rabi_Analysis(auto=True, close_fig=close_fig)
+
+    def measure_rabi_amp90(self,
+                    amp90_scales=np.linspace(-1.5, 1.5, 31), n=1,
+                     MC=None, analyze=True, close_fig=True,
+                     verbose=False):
+        self.prepare_for_timedomain()
+        if MC is None:
+            MC = self.MC
+
+        MC.set_sweep_function(awg_swf.Rabi_amp90(
+            pulse_pars=self.pulse_pars, RO_pars=self.RO_pars, n=n))
+        MC.set_sweep_points(amp90_scales)
+        MC.set_detector_function(self.int_avg_det)
+        MC.run('Rabi_amp90_scales-n{}'.format(n)+self.msmt_suffix)
         if analyze:
             ma.Rabi_Analysis(auto=True, close_fig=close_fig)
 
@@ -520,6 +541,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
             'I_channel': self.pulse_I_channel.get(),
             'Q_channel': self.pulse_Q_channel.get(),
             'amplitude': self.amp180.get(),
+            'amp90_scale': self.amp90_scale(),
             'sigma': self.gauss_sigma.get(),
             'nr_sigma': 4,
             'motzoi': self.motzoi.get(),

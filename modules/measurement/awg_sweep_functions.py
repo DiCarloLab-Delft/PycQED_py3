@@ -27,6 +27,24 @@ class Rabi(swf.Hard_Sweep):
                          RO_pars=self.RO_pars,
                          n=self.n)
 
+class Rabi_amp90(swf.Hard_Sweep):
+    def __init__(self, pulse_pars, RO_pars, n=1, upload=True):
+        super().__init__()
+        self.pulse_pars = pulse_pars
+        self.RO_pars = RO_pars
+        self.n = n
+        self.upload = upload
+        self.name = 'Rabi_amp90'
+        self.parameter_name = 'amp90/amp180'
+        self.unit = ''
+
+    def prepare(self, **kw):
+        if self.upload:
+            sqs.Rabi_amp90_seq(scales=self.sweep_points,
+                         pulse_pars=self.pulse_pars,
+                         RO_pars=self.RO_pars,
+                         n=self.n)
+
 
 class Rabi_2nd_exc(swf.Hard_Sweep):
     def __init__(self, pulse_pars, pulse_pars_2nd,
