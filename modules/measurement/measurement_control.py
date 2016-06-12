@@ -74,22 +74,30 @@ class MeasurementControl:
     def measure(self, *kw):
         if self.live_plot_enabled:
             self.initialize_plot_monitor()
-        if (self.sweep_functions[0].sweep_control !=
-                self.detector_function.detector_control):
-                # FIXME only checks first sweepfunction
-            raise Exception('Sweep and Detector functions not of the same type.'
-                            + 'Aborting measurement')
-            print(self.sweep_function.sweep_control)
-            print(self.detector_function.detector_control)
 
         for sweep_function in self.sweep_functions:
             sweep_function.prepare()
 
-        if self.sweep_functions[0].sweep_control == 'soft':
+        if (self.sweep_functions[0].sweep_control == 'soft' and
+                self.detector_function.detector_control == 'soft'):
             self.detector_function.prepare()
             self.get_measurement_preparetime()
             self.measure_soft_static()
-        if self.sweep_functions[0].sweep_control == 'hard':
+        elif (self.sweep_functions[0].sweep_control == 'soft' and
+                    self.detector_function.detector_control == 'hard'):
+            """
+            This is a special combination for when the detector returns
+            data in chunks, the detector function needs to take care of
+            going over all the sweep points by using all that are specified
+            """
+            self.detector_function.prepare(
+                sweep_points=self.get_sweep_points())
+            self.get_measurement_preparetime()
+            # self.complete gets updated in self.print_progress_static_hard
+            self.complete = False
+            while not self.complete:
+                self.measure_hard()
+        elif self.sweep_functions[0].sweep_control == 'hard':
             self.iteration = 0
             if len(self.sweep_functions) == 1:
                 self.detector_function.prepare(
@@ -112,6 +120,12 @@ class MeasurementControl:
                         self.measure_hard()
             else:
                 raise Exception('hard measurements have not been generalized to N-D yet')
+        else:
+            raise Exception('Sweep and Detector functions not of the same type.'
+                            + 'Aborting measurement')
+            print(self.sweep_function.sweep_control)
+            print(self.detector_function.detector_control)
+
         self.update_plotmon(force_update=True)
         for sweep_function in self.sweep_functions:
             sweep_function.finish()
@@ -197,12 +211,20 @@ class MeasurementControl:
         # Only add sweep points if these make sense (i.e. same shape as new_data)
         if sweep_len == len_new_data:  # 1D sweep
             self.dset[:, 0] = self.get_sweep_points().T
-        elif self.mode is '2D':  # 2D sweep
-            # always add for a 2D sweep
-            relevant_swp_points = self.get_sweep_points()[
-                start_idx:start_idx+len_new_data:]
-            self.dset[start_idx:, 0:len(self.sweep_functions)] = \
-                relevant_swp_points
+        else:
+            try:
+                if len(self.sweep_functions) != 1:
+                    relevant_swp_points = self.get_sweep_points()[
+                        start_idx:start_idx+len_new_data:]
+                    self.dset[start_idx:, 0:len(self.sweep_functions)] = \
+                        relevant_swp_points
+                else:
+                    self.dset[start_idx:, 0] = self.get_sweep_points()[
+                        start_idx:start_idx+len_new_data:].T
+            except Exception:
+                # There are some cases where the sweep points are not
+                # specified that you don't want to crash (e.g. on -off seq)
+                pass
 
         self.update_plotmon()
         if self.mode == '2D':

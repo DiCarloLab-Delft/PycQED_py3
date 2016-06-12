@@ -23,9 +23,9 @@ from modules.analysis import analysis_toolbox as a_tools
 
 # Initializing instruments
 station = qc.Station()
-# MC = mc.MeasurementControl('MC')
-# MC.station = station
-# station.MC = MC
+MC = mc.MeasurementControl('MC')
+MC.station = station
+station.MC = MC
 
 # from qcodes.tests.instrument_mocks import MockParabola
 

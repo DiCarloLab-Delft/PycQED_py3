@@ -109,10 +109,48 @@ class Dummy_Detector_Hard(Hard_Detector):
         self.data = np.zeros(len(sweep_points))
 
     def get_values(self):
-        x = np.arange(0, 10, 60)
-        self.data = np.sin(x / np.pi)
+        x = np.arange(0, 10, .1)
+        self.data = [np.sin(x / np.pi), np.cos(x/np.pi)]
 
         return self.data
+
+
+class Sweep_pts_detector(Detector_Function):
+    """
+    Returns the sweep points, used for testing purposes
+    """
+    def __init__(self, params, chunk_size=80):
+        self.detector_control = 'hard'
+        self.name = 'sweep_points_detector'
+        self.value_names = []
+        self.value_units = []
+        self.chunk_size = chunk_size
+        self.i = 0
+        for par in params:
+            self.value_names += [par.name]
+            self.value_units += [par.units]
+
+    def prepare(self, sweep_points):
+        self.i = 0
+        self.sweep_points = sweep_points
+
+    def get_values(self):
+        return self.get()
+
+    def acquire_data_point(self):
+        return self.get()
+
+    def get(self):
+        print('passing chunk {}'.format(self.i))
+        start_idx = self.i*self.chunk_size
+        end_idx = start_idx + self.chunk_size
+        self.i+=1
+        time.sleep(.2)
+        if len(np.shape(self.sweep_points))==2:
+            return self.sweep_points[start_idx:end_idx, :].T
+        else:
+            return self.sweep_points[start_idx:end_idx]
+
 
 
 class TimeDomainDetector(Hard_Detector):
