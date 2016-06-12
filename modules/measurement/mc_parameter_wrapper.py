@@ -2,9 +2,10 @@
 Module containing functions that wrap a QCodes parameter into a sweep or
 detector function
 '''
+import qcodes as qc
 from modules.measurement import sweep_functions as swf
 from modules.measurement import detector_functions as det
-
+import time
 
 def wrap_par_to_swf(parameter):
     '''
@@ -59,3 +60,12 @@ def wrap_func_to_det(func, name, value_names, units, control='soft',  **kw):
     detector_function.acquire_data_point = wrapped_func
     detector_function.get_values = wrapped_func
     return detector_function
+
+def wrap_par_remainder(par, remainder=1):
+    new_par = qc.Parameter(name=par.name, label=par.label, units=par.units)
+    def wrap_set(val):
+        val = val % remainder
+        par.set(val)
+        par.get()
+    new_par.set = wrap_set
+    return new_par

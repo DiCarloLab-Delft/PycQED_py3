@@ -35,7 +35,7 @@ class Rabi_amp90(swf.Hard_Sweep):
         self.n = n
         self.upload = upload
         self.name = 'Rabi_amp90'
-        self.parameter_name = 'amp90/amp180'
+        self.parameter_name = 'ratio_amp90_amp180'
         self.unit = ''
 
     def prepare(self, **kw):

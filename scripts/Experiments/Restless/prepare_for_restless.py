@@ -24,7 +24,7 @@ print('Defining functions')
 #parameters for channel one are hardcoded and set to the qubit object. parameters
 #for channel 2 are calibrated in Duplexer phase cal 2D
 Dux_phase_1_default=30000
-Dux_att_1_default = 0.2
+Dux_att_1_default = 0.4
 
 def set_CBox_cos_sine_weigths(IF):
     '''
@@ -64,17 +64,17 @@ def calibrate_RO_threshold_no_rotation():
 def measure_allXY(pulse_pars, RO_pars):
     set_trigger_slow()
     MC.set_sweep_function(awg_swf.AllXY(
-        pulse_pars=pulse_pars_duplex, RO_pars=RO_pars,
+        pulse_pars=pulse_pars, RO_pars=RO_pars,
         upload=True, double_points=True))
     MC.set_detector_function(det.CBox_integrated_average_detector(CBox, AWG))
     MC.run('AllXY')
     ma.AllXY_Analysis()
 
 
-def measure_RB(pulse_pars, RO_pars, upload=True, T1=25e-6, close_fig=True, pulse_delay=20e-9, label_suffix=''):
+def measure_RB(pulse_pars, RO_pars, upload=True, T1=25e-6, close_fig=True, pulse_delay=VIP_mon_2_dux.pulse_delay(), label_suffix=''):
     set_trigger_slow()
-    nr_seeds = 50
-    nr_cliffords = [2, 4, 8, 16, 30, 60, 100, 200, 300, 400, 600, 800, 1200]
+    nr_seeds = 30
+    nr_cliffords = [2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048]
     MC.set_sweep_function(awg_swf.Randomized_Benchmarking(
         pulse_pars=pulse_pars, RO_pars=RO_pars, double_curves=True,
         nr_cliffords=nr_cliffords, nr_seeds=nr_seeds, upload=upload))
@@ -232,9 +232,8 @@ RF.pulsemod_state('On') # this is for pulsed readout RF
 #qubit pulses vipmon 2
 VIP_mon_2_tek.pulse_I_channel.set('ch1')
 VIP_mon_2_tek.pulse_Q_channel.set('ch2')
-VIP_mon_2_tek.gauss_sigma.set(4e-9)
-VIP_mon_2_tek.pulse_delay.set(20e-9)
-VIP_mon_2_tek.f_pulse_mod(-50e6)
+
+
 
 print('setting duplxer qubit params')
 gen.load_settings_onto_instrument(VIP_mon_2_dux)
@@ -249,24 +248,20 @@ VIP_mon_2_dux.RO_acq_marker_delay.set(150e-9)
 VIP_mon_2_dux.RO_pulse_length.set(700e-9)
 VIP_mon_2_dux.RO_pulse_delay.set(50e-9)
 VIP_mon_2_dux.RO_amp.set(0.12)
-
-VIP_mon_2_dux.gauss_sigma.set(4e-9)
+VIP_mon_2_dux.gauss_sigma.set(5e-9)
 VIP_mon_2_dux.pulse_delay.set(20e-9)
-VIP_mon_2_dux.f_pulse_mod(-50e6)
+VIP_mon_2_dux.f_pulse_mod(-100e6)
 
 
-VIP_mon_2_dux.pulse_GI_offset(0.011)
-VIP_mon_2_dux.pulse_GQ_offset(0.029)
-VIP_mon_2_dux.pulse_DI_offset(0.005)
-VIP_mon_2_dux.pulse_DQ_offset(0.031)
+VIP_mon_2_dux.pulse_GI_offset(0.006)
+VIP_mon_2_dux.pulse_GQ_offset(0.033)
+VIP_mon_2_dux.pulse_DI_offset(-0.005)
+VIP_mon_2_dux.pulse_DQ_offset(0.035)
 
-VIP_mon_2_dux.D_alpha(0.82)
-VIP_mon_2_dux.D_phi_skew(-14.21)
-VIP_mon_2_dux.G_alpha(0.84)
-VIP_mon_2_dux.G_phi_skew(-10.645)
-
-
-
+VIP_mon_2_dux.D_alpha(0.8189)
+VIP_mon_2_dux.D_phi_skew(-14.169)
+VIP_mon_2_dux.G_alpha(0.8711)
+VIP_mon_2_dux.G_phi_skew(-9.186)
 
 AWG.timeout(180)
 
@@ -284,27 +279,22 @@ Pump.on()
 
 VIP_mon_2_tek.f_JPA_pump_mod(10e6)
 
-
 print('setting IVVI parameters')
 IVVI.dac1.set(-40)
 IVVI.dac2.set(0)  # was 70 for sweetspot VIP_mon_4
 
 print('setting AWG parameters')
-AWG.ch1_offset.set(0.010)
-AWG.ch2_offset.set(0.029)
-AWG.ch3_offset.set(0.002)
-AWG.ch4_offset.set(0.030)
+AWG.ch1_offset.set(VIP_mon_2_dux.pulse_GI_offset())
+AWG.ch2_offset.set(VIP_mon_2_dux.pulse_GQ_offset())
+AWG.ch3_offset.set(VIP_mon_2_dux.pulse_DI_offset())
+AWG.ch4_offset.set(VIP_mon_2_dux.pulse_DQ_offset())
 AWG.clock_freq.set(1e9)
 AWG.trigger_level.set(0.2)
 
 print('setting CBox parameters')
 # Calibrated at 6.6GHz (22-2-2016)
-CBox.set_dac_offset(0, 0, -38.8779296875)  # Q channel
-CBox.set_dac_offset(0, 1,  16.1220703125)  # I channel qubit drive AWG
 
-CBox.set_dac_offset(1, 1, 0)  # I channel
-CBox.set_dac_offset(1, 0, 0)  # Q channel readout AWG
-set_CBox_cos_sine_weigths(VIP_mon_2_tek.f_RO_mod())
+
 CBox.set('nr_averages', 2048)
 # this is the max nr of averages that does not slow down the heterodyning
 CBox.set('nr_samples', 75)  # Shorter because of min marker spacing
@@ -322,8 +312,8 @@ set_CBox_cos_sine_weigths(VIP_mon_2_tek.f_RO_mod())
 CBox.lin_trans_coeffs.set([1, 0, 0, 1])
 
 
-print('setting pulse_pars_duplex')
+print('setting pulse_pars')
 
-pulse_pars_duplex, RO_pars = VIP_mon_2_dux.get_pulse_pars()
+pulse_pars, RO_pars = VIP_mon_2_dux.get_pulse_pars()
 t1 = time.time()
 print('Ran prepare for restless in {:.2g}s'.format(t1-t0))

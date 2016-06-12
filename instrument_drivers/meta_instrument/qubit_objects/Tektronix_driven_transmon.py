@@ -292,18 +292,18 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
             ma.Rabi_Analysis(auto=True, close_fig=close_fig)
 
     def measure_rabi_amp90(self,
-                    amp90_scales=np.linspace(-1.5, 1.5, 31), n=1,
-                     MC=None, analyze=True, close_fig=True,
-                     verbose=False):
+                           scales=np.linspace(-0.7, 0.7, 31), n=1,
+                           MC=None, analyze=True, close_fig=True,
+                           verbose=False):
         self.prepare_for_timedomain()
         if MC is None:
             MC = self.MC
 
         MC.set_sweep_function(awg_swf.Rabi_amp90(
             pulse_pars=self.pulse_pars, RO_pars=self.RO_pars, n=n))
-        MC.set_sweep_points(amp90_scales)
+        MC.set_sweep_points(scales)
         MC.set_detector_function(self.int_avg_det)
-        MC.run('Rabi_amp90_scales-n{}'.format(n)+self.msmt_suffix)
+        MC.run('Rabi_amp90_scales_n{}'.format(n)+self.msmt_suffix)
         if analyze:
             ma.Rabi_Analysis(auto=True, close_fig=close_fig)
 
