@@ -18,21 +18,22 @@ AWG = station.AWG
 
 exec(open(PyCQEDpath+'\scripts\Experiments\Restless\prepare_for_restless.py').read())
 
-nr_cliffords = [40, 100, 300]
+nr_cliffords = [80, 300]
 nr_seeds = 200
-nr_iterations = 3
-attenuations = np.linspace(0.1, 0.5, 81)
-attenuations_2 = np.linspace(0, 0.5, 31)
-
+nr_iterations = 6
+center_att = 0.4
+attenuations = np.linspace(center_att-.2, center_att+.2, 81)
+attenuations_2 = np.linspace(center_att-.2, center_att+.2, 21)
+conventional = True
 
 ############################################################
 # Short sequences for testing and building analysis
-nr_cliffords = [300]
-nr_seeds = 50
-nr_iterations = 1
-attenuations = np.linspace(0.1, 0.5, 41)
-attenuations_2 = np.linspace(0, 0.5, 11)
-
+# nr_cliffords = [300]
+# nr_seeds = 20
+# nr_iterations = 1
+# attenuations = np.linspace(center_att-.2, center_att+.2, 41)
+# attenuations_2 = np.linspace(center_att-.2, center_att+.2, 21)
+# conventional=False
 
 # Comment out between the brackets for the night run
 ############################################################
@@ -48,11 +49,11 @@ detector_traditional = det.CBox_single_qubit_frac1_counter(CBox)
 
 t0 = time.time()
 set_trigger_slow()
-# VIP_mon_2_dux.measure_ssro(close_fig=True, set_integration_weights=True)
+VIP_mon_2_dux.measure_ssro(close_fig=True, set_integration_weights=True)
 
 
 for i in range(nr_iterations):
-    # try:
+    try:
         # Restless heatmap
         set_trigger_fast()
         calibrate_RO_threshold_no_rotation()
@@ -71,17 +72,18 @@ for i in range(nr_iterations):
             MC.run('RB_restless_heatmap_{}cl_{}sds'.format(ncl, nr_seeds),
                    mode='2D')
             ma.TwoD_Analysis()
-        # for i, ncl in enumerate(nr_cliffords):
-        #     # Conventional
-        #     set_trigger_slow()
-        #     sq.Randomized_Benchmarking_seq(
-        #         pulse_pars, RO_pars, [ncl], nr_seeds=nr_seeds,
-        #         net_clifford=0, post_msmt_delay=3e-6,
-        #         cal_points=False, resetless=True)
-        #     MC.set_detector_function(detector_traditional)
-        #     AWG.start()
-        #     MC.run('RB_conventional_heatmap_{}cl_{}sds'.format(ncl, nr_seeds),
-        #            mode='2D')
-        #     ma.TwoD_Analysis()
-    # except Exception:
-    #     print('excepting error')
+        for i, ncl in enumerate(nr_cliffords):
+            # Conventional
+            if conventional:
+                set_trigger_slow()
+                sq.Randomized_Benchmarking_seq(
+                    pulse_pars, RO_pars, [ncl], nr_seeds=nr_seeds,
+                    net_clifford=0, post_msmt_delay=3e-6,
+                    cal_points=False, resetless=True)
+                MC.set_detector_function(detector_traditional)
+                AWG.start()
+                MC.run('RB_conventional_heatmap_{}cl_{}sds'.format(ncl, nr_seeds),
+                       mode='2D')
+                ma.TwoD_Analysis()
+    except Exception:
+        print('excepting error')

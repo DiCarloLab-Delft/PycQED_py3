@@ -19,7 +19,7 @@ exec(open(PyCQEDpath+'\scripts\Experiments\Restless\prepare_for_restless.py').re
 # DUX_2_phase = Dux.in2_out1_phase()
 
 center = VIP_mon_2_dux.Mux_G_att()
-nr_cliffords = [2, 4, 6, 8, 12, 16, 20, 24, 30, 40,
+nr_cliffords = [2, 4, 5, 6, 8, 10, 12, 13, 16, 20, 24, 30, 40,
                 60, 80, 100, 140, 180, 200, 240, 280, 300, 380, 450,
                 500, 550, 600, 700, 800, 1000, 1200, 1500]
 nr_seeds = 200
@@ -50,7 +50,7 @@ detector_traditional = det.CBox_single_qubit_frac1_counter(CBox)
 
 t0 = time.time()
 VIP_mon_2_dux.measure_ssro(close_fig=True, set_integration_weights=True)
-
+par = pw.wrap_par_remainder(Dux.in1_out1_attenuation, remainder=1)
 log_length = (8000)
 # Dux.in1_out1_attenuation(center)
 # Dux.in2_out1_attenuation(DUX_2_default)
@@ -68,7 +68,7 @@ for i in range(nr_iterations):
                 net_clifford=3, post_msmt_delay=3e-6,
                 cal_points=False, resetless=True)
             AWG.start()
-            MC.set_sweep_function(Dux.in1_out1_attenuation)
+            MC.set_sweep_function(par)
             MC.set_sweep_points(attenuations)
             MC.set_detector_function(detector_restless)
             MC.run('RB_restless_{}cl_{}sds'.format(ncl, nr_seeds))
