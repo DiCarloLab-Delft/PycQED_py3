@@ -3123,6 +3123,7 @@ class RB_double_curve_Analysis(RandomizedBenchmarking_Analysis):
             ax.plot(x_fine, fit_1, color='darkgray')
             ax.plot(x_fine, fit_2, color='darkgray')
 
+
             F_T1 = None
             if self.T1 is not None and self.pulse_delay is not None:
                 F_T1, p_T1 = self.calc_T1_limited_fidelity(
@@ -3141,6 +3142,7 @@ class RB_double_curve_Analysis(RandomizedBenchmarking_Analysis):
                       bbox_transform=f.transFigure,
                       loc='upper right',
                       bbox_to_anchor=(.95, .95))
+            # ax.set_xscale("log", nonposx='clip')
             plt.subplots_adjust(left=.1, bottom=None, right=.7, top=None)
             self.save_fig(f, figname='Two_curve_RB', close_fig=close_main_fig,
                           fig_tight=False, **kw)

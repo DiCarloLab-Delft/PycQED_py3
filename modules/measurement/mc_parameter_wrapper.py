@@ -69,3 +69,11 @@ def wrap_par_remainder(par, remainder=1):
         par.get()
     new_par.set = wrap_set
     return new_par
+
+def wrap_par_set_get(par):
+    new_par = qc.Parameter(name=par.name, label=par.label, units=par.units)
+    def wrap_set(val):
+        par.set(val)
+        par.get()
+    new_par.set = wrap_set
+    return new_par

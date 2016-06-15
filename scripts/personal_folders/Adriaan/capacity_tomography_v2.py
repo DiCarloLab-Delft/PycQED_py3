@@ -13,20 +13,24 @@ from modules.measurement.pulse_sequences.single_qubit_tek_seq_elts import get_pu
 # Function definitions
 
 
-def capacity_tomo_seq(bases, states, idle_time, pulse_pars, RO_pars,
+def capacity_tomo_seq(prep_bases, states, RO_bases, idle_time,
+                      pulse_pars, RO_pars,
                       upload=True,
                       verbose=False):
     """
     input pars
-        bases list of ints:
-            0 - Z-basis
-            1 - X-basis
-            2 - Y-basis
-        states (list of ints):
-            0 - |0>
-            1 - |1>
-        idle_time (s)
-
+    prep_bases list of ints:
+        0 - Z-basis
+        1 - X-basis
+        2 - Y-basis
+    states (list of ints):
+        0 - |0>
+        1 - |1>
+    RO_bases list of ints:
+        0 - Z-basis
+        1 - X-basis
+        2 - Y-basis
+    idle_time (s)
 
     """
     assert(len(bases) == len(states))
@@ -38,12 +42,21 @@ def capacity_tomo_seq(bases, states, idle_time, pulse_pars, RO_pars,
     pulse_dict['I']['pulse_delay'] = idle_time
     pulse_dict['RO'] = RO_pars
 
-    pulse_combinations = [['I', 'RO'],
-                          ['X180', 'I', 'RO'],
-                          ['Y90', 'I', 'mY90', 'RO'],
-                          ['mY90', 'I', 'mY90', 'RO'],
-                          ['X90', 'I', 'mX90', 'RO'],
-                          ['mX90', 'I', 'mX90', 'RO']]
+    prep_pulses = [['I'],
+                   ['X180', 'I'],
+                   ['Y90', 'I'],
+                   ['mY90', 'I'],
+                   ['X90', 'I'],
+                   ['mX90', 'I']]
+    RO_pulses = [['RO'],
+                 ['mX90', 'RO'],
+                 ['mY90', 'RO']]
+
+    pulse_combinations = []
+    for RO_pulse_comb in RO_pulses:
+        for prep_pulse_comb in prep_pulses:
+            pulse_combinations += [prep_pulse_comb + RO_pulse_comb]
+
     # Creates elements containing the primitive pulse sequences
     for i, pulse_comb in enumerate(pulse_combinations):
         pulse_list = []
@@ -54,7 +67,7 @@ def capacity_tomo_seq(bases, states, idle_time, pulse_pars, RO_pars,
 
     seq_idx = []
     # Selects the corresponding pulse combination
-    for basis, state in zip(bases, states):
+    for basis, state in zip(prep_bases, states, RO_bases):
         if state not in [0, 1]:
             raise ValueError('state {} not recognized'.format(state))
         if basis == 0:  # computational(Z)-basis

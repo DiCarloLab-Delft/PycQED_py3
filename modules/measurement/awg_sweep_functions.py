@@ -27,6 +27,7 @@ class Rabi(swf.Hard_Sweep):
                          RO_pars=self.RO_pars,
                          n=self.n)
 
+
 class Rabi_amp90(swf.Hard_Sweep):
     def __init__(self, pulse_pars, RO_pars, n=1, upload=True):
         super().__init__()
@@ -41,9 +42,9 @@ class Rabi_amp90(swf.Hard_Sweep):
     def prepare(self, **kw):
         if self.upload:
             sqs.Rabi_amp90_seq(scales=self.sweep_points,
-                         pulse_pars=self.pulse_pars,
-                         RO_pars=self.RO_pars,
-                         n=self.n)
+                               pulse_pars=self.pulse_pars,
+                               RO_pars=self.RO_pars,
+                               n=self.n)
 
 
 class Rabi_2nd_exc(swf.Hard_Sweep):
@@ -61,19 +62,19 @@ class Rabi_2nd_exc(swf.Hard_Sweep):
         if cal_points and amps is not None:
             self.sweep_points = np.concatenate([amps,
                                                [amps[-1]*1.05,
-                                               amps[-1]*1.06,
-                                               amps[-1]*1.07,
-                                               amps[-1]*1.08,
-                                               amps[-1]*1.09,
-                                               amps[-1]*1.1]])
+                                                amps[-1]*1.06,
+                                                amps[-1]*1.07,
+                                                amps[-1]*1.08,
+                                                amps[-1]*1.09,
+                                                amps[-1]*1.1]])
 
     def prepare(self, **kw):
         if self.upload:
             sqs2.Rabi_2nd_exc_seq(amps=self.sweep_points,
-                                 pulse_pars=self.pulse_pars,
-                                 pulse_pars_2nd=self.pulse_pars_2nd,
-                                 RO_pars=self.RO_pars,
-                                 n=self.n)
+                                  pulse_pars=self.pulse_pars,
+                                  pulse_pars_2nd=self.pulse_pars_2nd,
+                                  RO_pars=self.RO_pars,
+                                  n=self.n)
 
 
 class Ramsey_2nd_exc(swf.Hard_Sweep):
@@ -91,19 +92,19 @@ class Ramsey_2nd_exc(swf.Hard_Sweep):
         if cal_points and times is not None:
             self.sweep_points = np.concatenate([times,
                                                [times[-1]*1.05,
-                                               times[-1]*1.06,
-                                               times[-1]*1.07,
-                                               times[-1]*1.08,
-                                               times[-1]*1.09,
-                                               times[-1]*1.1]])
+                                                times[-1]*1.06,
+                                                times[-1]*1.07,
+                                                times[-1]*1.08,
+                                                times[-1]*1.09,
+                                                times[-1]*1.1]])
 
     def prepare(self, **kw):
         if self.upload:
             sqs2.Ramsey_2nd_exc_seq(times=self.sweep_points,
-                                 pulse_pars=self.pulse_pars,
-                                 pulse_pars_2nd=self.pulse_pars_2nd,
-                                 RO_pars=self.RO_pars,
-                                 n=self.n)
+                                    pulse_pars=self.pulse_pars,
+                                    pulse_pars_2nd=self.pulse_pars_2nd,
+                                    RO_pars=self.RO_pars,
+                                    n=self.n)
 
 
 
@@ -192,7 +193,7 @@ class Randomized_Benchmarking(swf.Hard_Sweep):
     def __init__(self, pulse_pars, RO_pars,
                  nr_seeds, nr_cliffords,
                  cal_points=True,
-                 double_curves=False,
+                 double_curves=False, seq_name=None,
                  upload=True):
         # If nr_cliffords is None it still needs to be specfied when setting
         # the experiment
@@ -204,6 +205,7 @@ class Randomized_Benchmarking(swf.Hard_Sweep):
         self.cal_points = cal_points
         self.sweep_points = nr_cliffords
         self.double_curves = double_curves
+        self.seq_name = seq_name
 
         self.parameter_name = 'Nr of Cliffords'
         self.unit = '#'
@@ -226,7 +228,8 @@ class Randomized_Benchmarking(swf.Hard_Sweep):
                 nr_cliffords=self.sweep_points,
                 nr_seeds=self.nr_seeds,
                 cal_points=self.cal_points,
-                double_curves=self.double_curves)
+                double_curves=self.double_curves,
+                seq_name=self.seq_name)
 
 
 class Ramsey(swf.Hard_Sweep):

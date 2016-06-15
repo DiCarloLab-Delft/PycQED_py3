@@ -4,10 +4,11 @@ from copy import deepcopy
 from modules.measurement.pulse_sequences import single_qubit_tek_seq_elts as sqs
 from modules.measurement.pulse_sequences import calibration_elements as cal_elts
 from scipy.optimize import minimize_scalar
-
+import modules.measurement.pulse_sequences.gate_set_tomography as gsts
+station = station
+gsts.station = station
 
 t0 = time.time()
-station = station
 VIP_mon_4_tek = VIP_mon_4_tek
 VIP_mon_2_tek =VIP_mon_2_tek
 AWG = AWG
@@ -71,7 +72,8 @@ def measure_allXY(pulse_pars, RO_pars):
     ma.AllXY_Analysis()
 
 
-def measure_RB(pulse_pars, RO_pars, upload=True, T1=25e-6, close_fig=True, pulse_delay=VIP_mon_2_dux.pulse_delay(), label_suffix=''):
+def measure_RB(pulse_pars, RO_pars, upload=True, T1=25e-6, close_fig=True,
+               pulse_delay=VIP_mon_2_dux.pulse_delay(), label_suffix=''):
     set_trigger_slow()
     nr_seeds = 30
     nr_cliffords = [2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048]
@@ -85,6 +87,34 @@ def measure_RB(pulse_pars, RO_pars, upload=True, T1=25e-6, close_fig=True, pulse
     ma.RB_double_curve_Analysis(
         close_main_fig=close_fig, T1=T1,
         pulse_delay=pulse_delay)
+
+
+def measure_GST_l128(upload=True, nr_logs=400):
+    l = 128
+    nr_elts = 4615
+
+    reps_per_log = int(8000/nr_elts)
+    log_length = (nr_elts*reps_per_log)
+    nr_shots_per_point = reps_per_log*nr_logs
+    seq_path = '\\modules\\measurement\\pulse_sequences\\_pygsti_Gatesequences\\five_primitives\\'
+    fn = (PyCQEDpath+ seq_path+'Exp_list_5_prim_germs10June_Gateseq_maxL={}_#seq={}.txt'.format(l, nr_elts))
+
+    if upload:
+        seq, elts = gsts.GST_from_textfile(pulse_pars=pulse_pars,
+                                           RO_pars=RO_pars, filename=fn)
+    calibrate_RO_threshold_no_rotation()
+    MC.live_plot_enabled = False
+    CBox.log_length(log_length)
+    MC.set_sweep_function(swf.None_Sweep(sweep_control='hard') )
+    MC.set_sweep_points(np.arange(log_length))
+    MC.set_sweep_function_2D(swf.None_Sweep(sweep_control='soft'))
+    MC.set_sweep_points_2D(np.arange(nr_logs))
+    MC.set_detector_function(det.CBox_digitizing_shots_det(
+        CBox, AWG, threshold=CBox.sig0_threshold_line()))
+    AWG.start()
+    MC.run('GST_l{}_2D'.format(l), mode='2D')
+    MC.live_plot_enabled = True
+
 
 def calibrate_JPA_dac(pulse_pars, RO_pars, upload=True):
     set_trigger_slow()

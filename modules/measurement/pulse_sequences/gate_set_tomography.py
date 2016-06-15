@@ -16,7 +16,7 @@ reload(element)
 
 
 def GST_from_textfile(pulse_pars, RO_pars, filename,
-                      upload=True,
+                      upload=True, seq_name=None,
                       verbose=False):
     '''
     Input pars:
@@ -25,7 +25,8 @@ def GST_from_textfile(pulse_pars, RO_pars, filename,
         filename:       name of a pygsti generated text file
         upload:         upload to AWG or not, if returns seq, el_list
     '''
-    seq_name = 'GST_seq'
+    if seq_name is None:
+        seq_name = 'GST_seq'
     seq = sequence.Sequence(seq_name)
     el_list = []
     # Create a dict with the parameters for all the pulses
