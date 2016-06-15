@@ -411,9 +411,8 @@ class Pulsar:
 
     def load_awg_file(self, filename, **kw):
             """
-            Function to load a previously existing AWG sequence
+            Function to load an AWG sequence from its internal hard drive
             No possibility for jump statements
-            Warning: Function added by Niels Bultink
             """
             old_timeout = self.AWG.timeout()
             self.AWG.timeout(max(180, old_timeout))

@@ -67,26 +67,8 @@ def capacity_tomo_seq(prep_bases, states, RO_bases, idle_time,
 
     seq_idx = []
     # Selects the corresponding pulse combination
-    for basis, state in zip(prep_bases, states, RO_bases):
-        if state not in [0, 1]:
-            raise ValueError('state {} not recognized'.format(state))
-        if basis == 0:  # computational(Z)-basis
-            if state == 0:
-                seq_idx += [0]
-            elif state == 1:
-                seq_idx += [1]
-        elif basis == 1:  # X basis
-            if state == 0:
-                seq_idx += [2]
-            if state == 1:
-                seq_idx += [3]
-        elif basis == 2:  # Y basis
-            if state == 0:
-                seq_idx += [4]
-            if state == 1:
-                seq_idx += [5]
-        else:
-            raise ValueError('basis {} not recognized'.formate(basis))
+    for RO_base, prep_base, state in zip(RO_bases, prep_bases, states):
+        seq_idx = 3*2*RO_base + 2*prep_base + state
     # Creates a sequence by selecting the right primitive element
     for i, idx in enumerate(seq_idx):
         seq.append(name='elt_{}'.format(i),
@@ -120,11 +102,12 @@ class Capacity_tomo_detector(det.CBox_digitizing_shots_det):
         start_idx = self.i*self.chunk_size
         end_idx = start_idx + self.chunk_size
         self.i += 1
-        bases = self.sweep_points[start_idx:end_idx, 0]
-        states = self.sweep_points[start_idx:end_idx, 1]
+        RO_bases = self.sweep_points[start_idx:end_idx, 0]
+        prep_bases = self.sweep_points[start_idx:end_idx, 1]
+        states = self.sweep_points[start_idx:end_idx, 2]
 
         # load sequence
-        capacity_tomo_seq(bases, states,
+        capacity_tomo_seq(RO_bases, prep_bases, states,
                           self.idle_time, self.pulse_pars, self.RO_pars,)
         return super().get_values()
 
@@ -138,35 +121,32 @@ number_of_shots = chunk_size*130
 
 
 # Parameters are only used for labels and units in the datafile
-basis = ManualParameter('basis', units='')
+RO_basis = ManualParameter('RO_basis', units='')
+prep_basis = ManualParameter('prep_basis', units='')
 state = ManualParameter('state', units='')
+sweep_pars = [RO_basis, prep_basis, state]
 
 # MC is the MeasurementControl that controls the data acquisition loop
 
 CBox.log_length(chunk_size)
-
-# base_combinations = ['ZX', 'XY']
 base_combinations = ['ZXY']
-idle_times = [0, 5e-6, 10e-6, 15e-6, 20e-6, 25e-6]
-for base in base_combinations:
-    if base == 'ZX':
-        b = [0, 2]
-    elif base == 'XY':
-        b = [1, 3]
-    else:
-        b = [0, 3]
-    for idle_time in idle_times:
-        bases = np.random.randint(b[0], b[1], number_of_shots)
-        states = np.random.randint(0, 2, number_of_shots)
-        sweep_points = np.array([bases, states]).T
-        calibrate_RO_threshold_no_rotation()
-        log_length = CBox.log_length()
-        d = Capacity_tomo_detector(
-            CBox=CBox, AWG=AWG, threshold=CBox.sig0_threshold_line(),
-            chunk_size=log_length,
-            idle_time=idle_time, pulse_pars=pulse_pars, RO_pars=RO_pars)
+idle_times = [2e-6, 5e-6]
 
-        MC.set_sweep_functions([basis, state])
-        MC.set_sweep_points(sweep_points)
-        MC.set_detector_function(d)
-        MC.run('Capacity_tomo_idle_time_{:.4g}s_base_{}'.format(idle_time, base))
+for idle_time in idle_times:
+    RO_bases = np.random.randint(0, 3, number_of_shots)
+    prep_bases = np.random.randint(0, 3, number_of_shots)
+    states = np.random.randint(0, 2, number_of_shots)
+    sweep_points = np.array([RO_bases, prep_bases, states]).T
+    calibrate_RO_threshold_no_rotation()
+    log_length = CBox.log_length()
+    d = Capacity_tomo_detector(
+        CBox=CBox, AWG=AWG, threshold=CBox.sig0_threshold_line(),
+        chunk_size=log_length,
+        idle_time=idle_time, pulse_pars=pulse_pars, RO_pars=RO_pars)
+
+    MC.set_sweep_functions(sweep_pars)
+    MC.set_sweep_points(sweep_points)
+    MC.set_detector_function(d)
+    MC.run('Capacity_tomo_v2_idle_time_{:.4g}s_base_{}'.format(idle_time, base))
+
+

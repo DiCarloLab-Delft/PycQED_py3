@@ -23,14 +23,15 @@ pts_per_iteration = 300
 # center = DUX_1_default
 # Attenuations should correspond to
 #             .999, .998, .995, .994, .99, .985 .98
-attenuations = [.4, .417, .431, .435, .446, .457, .467]  # some test things
+attenuations = [.4, 4.1, .417, 4.22, .431, .435, .446, .457, .467]
+#                  4.1 and      4.22 are extra safety points
 
 ############################################################
 # Short sequences for testing and building analysis
 # nr_cliffords = [2, 8,  20, 60, 100]
 # nr_iterations = 2
 # pts_per_iteration = 100
-# attenuations = [.4, .417]
+# attenuations = [.4, .417, 4.7]
 # Comment out between the brackets for the night run
 ############################################################
 
@@ -44,13 +45,17 @@ detector_restless = det.CBox_single_qubit_event_s_fraction(CBox)
 detector_traditional = det.CBox_single_qubit_frac1_counter(CBox)
 
 t0 = time.time()
-VIP_mon_2_dux.measure_ssro(close_fig=True, set_integration_weights=True)
+
 par = pw.wrap_par_remainder(Dux.in1_out1_attenuation, remainder=1)
 log_length = (8000)
 
 for i in range(nr_iterations):
-    try:
+    # try:
         # Restless heatmap
+        Dux.in1_out1_attenuation(.4)
+        set_CBox_cos_sine_weigths(VIP_mon_2_dux.f_RO_mod())
+        pulse_pars, RO_pars = calibrate_pulse_pars_conventional()
+        VIP_mon_2_dux.measure_ssro(close_fig=True, set_integration_weights=True)
         set_trigger_fast()
         for i, ncl in enumerate(nr_cliffords):
             sq.Randomized_Benchmarking_seq(
@@ -67,5 +72,5 @@ for i in range(nr_iterations):
                 MC.run('RB_restless_noise_{}att_{}cl_{}sds'.format(att, ncl, nr_seeds))
                 ma.MeasurementAnalysis()
 
-    except Exception:
-        print('excepting error')
+    # except Exception:
+    #     print('excepting error')

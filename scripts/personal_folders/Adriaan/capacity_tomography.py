@@ -132,9 +132,9 @@ state = ManualParameter('state', units='')
 
 CBox.log_length(chunk_size)
 
-# base_combinations = ['ZX', 'XY']
 base_combinations = ['ZXY']
-idle_times = [0, 5e-6, 10e-6, 15e-6, 20e-6, 25e-6]
+idle_times = [2e-6, 5e-6]
+
 for base in base_combinations:
     if base == 'ZX':
         b = [0, 2]
@@ -157,3 +157,5 @@ for base in base_combinations:
         MC.set_sweep_points(sweep_points)
         MC.set_detector_function(d)
         MC.run('Capacity_tomo_idle_time_{:.4g}s_base_{}'.format(idle_time, base))
+
+exec(open(PyCQEDpath+'\scripts\personal_folders\Adriaan\capacity_tomography_v2.py').read())

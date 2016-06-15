@@ -17,13 +17,14 @@ CBox = CBox
 MC = MC
 IVVI = IVVI
 
+qubit = VIP_mon_2_dux
 from scipy.optimize import minimize_scalar
 
 print('Defining functions')
 
 
-#parameters for channel one are hardcoded and set to the qubit object. parameters
-#for channel 2 are calibrated in Duplexer phase cal 2D
+# parameters for channel one are hardcoded and set to the qubit object. parameters
+# for channel 2 are calibrated in Duplexer phase cal 2D
 Dux_phase_1_default=30000
 Dux_att_1_default = 0.4
 
@@ -88,20 +89,35 @@ def measure_RB(pulse_pars, RO_pars, upload=True, T1=25e-6, close_fig=True,
         close_main_fig=close_fig, T1=T1,
         pulse_delay=pulse_delay)
 
+def calibrate_pulse_pars_conventional():
+    CBox.nr_averages(2048)
+    set_trigger_slow()
+    set_CBox_cos_sine_weigths(qubit.f_RO_mod())
+    qubit.find_frequency(method='ramsey', steps=[5, 30, 100, 300], update=True)
+    qubit.measure_motoi_XY(motzois=np.linspace(-0.25, -0.15, 21))
+    qubit.find_pulse_amplitude(amps=np.linspace(-.3, .3, 31),
+                               N_steps=[3, 7, 19], max_n=100, take_fit_I=False)
+    qubit.find_amp90_scaling(N_steps=[5, 9], max_n=100,
+                             take_fit_I=False)
 
-def measure_GST_l128(upload=True, nr_logs=400):
-    l = 128
-    nr_elts = 4615
+    CBox.nr_averages(4096)
+    return qubit.get_pulse_pars()
 
+
+def measure_GST(upload=True, l=256, nr_elts=5359, nr_logs=40):
     reps_per_log = int(8000/nr_elts)
     log_length = (nr_elts*reps_per_log)
     nr_shots_per_point = reps_per_log*nr_logs
     seq_path = '\\modules\\measurement\\pulse_sequences\\_pygsti_Gatesequences\\five_primitives\\'
-    fn = (PyCQEDpath+ seq_path+'Exp_list_5_prim_germs10June_Gateseq_maxL={}_#seq={}.txt'.format(l, nr_elts))
+    fn = (PyCQEDpath+ seq_path+'GST_5prim_L_{}_N_{}.txt'.format(l, nr_elts))
 
     if upload:
+        t0 = time.time()
+        # station.pulsar.load_awg_file('GST_seq_FILE.AWG')
         seq, elts = gsts.GST_from_textfile(pulse_pars=pulse_pars,
                                            RO_pars=RO_pars, filename=fn)
+        t1= time.time()
+        print('Loading and generating GST took {:.2f}s'.format(t1-t0))
     calibrate_RO_threshold_no_rotation()
     MC.live_plot_enabled = False
     CBox.log_length(log_length)
@@ -112,8 +128,9 @@ def measure_GST_l128(upload=True, nr_logs=400):
     MC.set_detector_function(det.CBox_digitizing_shots_det(
         CBox, AWG, threshold=CBox.sig0_threshold_line()))
     AWG.start()
-    MC.run('GST_l{}_2D'.format(l), mode='2D')
+    data = MC.run('GST_l{}_2D'.format(l), mode='2D')
     MC.live_plot_enabled = True
+
 
 
 def calibrate_JPA_dac(pulse_pars, RO_pars, upload=True):

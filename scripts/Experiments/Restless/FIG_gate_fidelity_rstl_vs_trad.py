@@ -40,7 +40,7 @@ methods=['traditional', 'restless']
 # ensures a file with the name 'RB_verification_seq' is created
 # measure_RB(pulse_pars, RO_pars, upload=True, T1=25e-6, close_fig=True)
 # ensures a file with the name 'GST_seq_FILE' is created
-#measure_GST_l128(upload=True)
+measure_GST(upload=True,  l=512, nr_elts=6103, nr_logs=100)
 
 init1=[-0.033, 0.033]
 init2=[-0.2,  0.33]
@@ -50,7 +50,7 @@ init3=[-0.5e6, 0.5e6]
 #init2 = [0.2]
 #init3 = [0.5e6]
 
-for i in range(10000):
+for i in range(2):
     for j in range(len(init1)):
         for k in range(len(init2)):
             for l in range(len(init3)):
@@ -134,12 +134,12 @@ for i in range(10000):
                     a = ma.T1_Analysis(label='T1', auto=True)
                     T1 = a.T1
                     set_trigger_slow()
-                    set_CBox_cos_sine_weigths(VIP_mon_2_dux.f_RO_mod())
                     CBox.nr_averages(4096)
                     station.pulsar.load_awg_file('RB_verification_seq_FILE.AWG')
                     measure_RB(pulse_pars, RO_pars, upload=False, T1=T1, close_fig=True)
                     measure_allXY(pulse_pars, RO_pars)
                     # added GST to loop (still needs a retest)
                     station.pulsar.load_awg_file('GST_seq_FILE.AWG')
-                    measure_GST_l128(upload=False)
+                    measure_GST(upload=False,  l=512, nr_elts=6103, nr_logs=100)
+                    # 75s loading, 120s msmt
 
