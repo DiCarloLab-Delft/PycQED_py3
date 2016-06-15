@@ -304,14 +304,13 @@ def perform_extended_GST_on_data(filename_data_input, filename_target_gateset,
     """
     import pygsti
     maxLengths = [0]
-    for i in range(len(maxlength_germseq)):
+    for i in range(int(np.log(maxlength_germseq)/np.log(2))+1):
         maxLengths.append((2)**i)
-    results = pygsti.do_long_sequence_gst(filename_data_input, maxlength_germseq,
+    results = pygsti.do_long_sequence_gst(filename_data_input, filename_target_gateset,
                                         filename_fiducials, filename_fiducials,
                                         filename_germs, maxLengths,
                                         gaugeOptRatio=1e-3)
     return results
-
 def create_experiment_list_pyGSTi_general(filename):
     """
     Extracting list of experiments from .txt file
@@ -477,4 +476,76 @@ def flatten_list(lis):
         else:
             yield item
 
+"""Needs more testing. But this seems to be working fine, and fast, way faster. Reshaping
+is roughly factor 100 faster than looping trough one long long long vector."""
+def write_textfile_data_for_GST_input_adapt_develop(filename_input,filename_output,
+                                      filename_gateseq,number_of_gateseq,
+                                                    zero_one_inverted=False):
+    """Writes data from h5py file to text file for input into pyGSTi
+    ---------------------------------------------------------------------------------------
+    Parameters:
+    filename_input:string
+    .hdf5 file containing experimantal data. 'Data' folder must contain data formattted in 3 columns,
+    first being the shot-index, second column only zeros, third column the counts (0 or 1).
 
+    filename_output: string
+    text file for output of data into pyGSTi
+
+    filename_gateseq:string
+    text file containg the gatesequences used in the GST experiment
+
+    maxLength_gateseq: integer
+    max length of the germ sequence (germs are raised to such a power
+    so that they don't exceed the maximum length.
+    That maximum length is this parameter )
+
+    number_of_gateseq: integer
+    Number of gatesequences used in experiment
+
+    zero_one_inverted: Boolean (optional), or string:'automatic'
+    Due to way which experimental data is converted to counts: by determining a threshold,however
+    it is not know which side of the threshold is 1 and which side is 0, therefore it could be that
+    0 and 1 are inverted. This needs to be checked, for example by looking at what identity gate does.
+    If inverted, specifiy zero_one_inverted=True, otherwise leave at default (False)
+
+    """
+    import h5py
+    import numpy as np
+    datafileGST=h5py.File(filename_input,'r')
+    expdata=datafileGST['Experimental Data/Data']
+    pluscountbins=np.zeros((1,number_of_gateseq))
+    number_of_datapoints=np.shape(expdata)[0]
+    datapoints_per_seq=number_of_datapoints/number_of_gateseq
+    shapedarr=reshape_array_h5pyfile(expdata[:,2],number_of_gateseq,datapoints_per_seq)
+    for gateseqindex in range(number_of_gateseq):
+        pluscountbins[0,gateseqindex]=np.count_nonzero(shapedarr[gateseqindex,:])
+    plus_counts=np.transpose(pluscountbins)
+    plus_counts=np.reshape(plus_counts,(number_of_gateseq,1))
+    if zero_one_inverted=='automatic':
+      if plus_counts[0]>=(datapoints_per_seq/2):
+        zero_one_inverted = True
+      elif plus_counts[0]<(datapoints_per_seq/2):
+        zero_one_inverted = False
+    print(np.shape(plus_counts))
+
+    if (number_of_datapoints%number_of_gateseq)==0:
+        total_counts=datapoints_per_seq*np.ones((number_of_gateseq,1))
+        minus_counts=total_counts-plus_counts
+        minus_counts=np.reshape(minus_counts,(number_of_gateseq,1))
+        print(np.shape(minus_counts))
+        counts=(np.concatenate((plus_counts,minus_counts),axis=1)).astype(int)
+        if zero_one_inverted==False:
+            insert_counts_into_dataset(filename_gateseq,filename_output,counts)
+        elif zero_one_inverted==True :
+            counts=np.fliplr(counts)
+            insert_counts_into_dataset(filename_gateseq,filename_output,counts)
+    else:
+        raise ValueError("""Number is not integer times the number of gatesequences
+                         (datapoints are unevenly distributed among gatesequences""")
+    return  counts
+
+def reshape_array_h5pyfile(array,number_of_gatesequences,datapoints_per_seq):
+    """reshaping function"""
+    new_array=np.reshape(array,(number_of_gatesequences,datapoints_per_seq),order='F') #order is important, for data as column,
+    #use order F, this will give an number_of_gatesequences x datapoints_per_seq matrix
+    return new_array
