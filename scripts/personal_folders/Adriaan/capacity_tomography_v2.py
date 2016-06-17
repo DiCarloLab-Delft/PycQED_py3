@@ -13,7 +13,7 @@ from modules.measurement.pulse_sequences.single_qubit_tek_seq_elts import get_pu
 # Function definitions
 
 
-def capacity_tomo_seq(prep_bases, states, RO_bases, idle_time,
+def capacity_tomo_seq(RO_bases, prep_bases, states, idle_time,
                       pulse_pars, RO_pars,
                       upload=True,
                       verbose=False):
@@ -33,7 +33,8 @@ def capacity_tomo_seq(prep_bases, states, RO_bases, idle_time,
     idle_time (s)
 
     """
-    assert(len(bases) == len(states))
+    assert(len(RO_bases) == len(states))
+    assert(len(prep_bases) == len(states))
     seq_name = 'Capacity_tomo_seq'
     seq = sequence.Sequence(seq_name)
     el_list = []
@@ -68,7 +69,7 @@ def capacity_tomo_seq(prep_bases, states, RO_bases, idle_time,
     seq_idx = []
     # Selects the corresponding pulse combination
     for RO_base, prep_base, state in zip(RO_bases, prep_bases, states):
-        seq_idx = 3*2*RO_base + 2*prep_base + state
+        seq_idx += [3*2*RO_base + 2*prep_base + state]
     # Creates a sequence by selecting the right primitive element
     for i, idx in enumerate(seq_idx):
         seq.append(name='elt_{}'.format(i),
@@ -107,8 +108,10 @@ class Capacity_tomo_detector(det.CBox_digitizing_shots_det):
         states = self.sweep_points[start_idx:end_idx, 2]
 
         # load sequence
-        capacity_tomo_seq(RO_bases, prep_bases, states,
-                          self.idle_time, self.pulse_pars, self.RO_pars,)
+        capacity_tomo_seq(RO_bases=RO_bases, prep_bases=prep_bases,
+                          states=states,
+                          idle_time=self.idle_time,
+                          pulse_pars=self.pulse_pars, RO_pars=self.RO_pars,)
         return super().get_values()
 
 ###################################
@@ -130,7 +133,7 @@ sweep_pars = [RO_basis, prep_basis, state]
 
 CBox.log_length(chunk_size)
 base_combinations = ['ZXY']
-idle_times = [2e-6, 5e-6]
+idle_times = [2e-6, 3e-6]
 
 for idle_time in idle_times:
     RO_bases = np.random.randint(0, 3, number_of_shots)

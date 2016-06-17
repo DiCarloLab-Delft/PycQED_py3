@@ -92,7 +92,11 @@ def measure_RB(pulse_pars, RO_pars, upload=True, T1=25e-6, close_fig=True,
 def calibrate_pulse_pars_conventional():
     CBox.nr_averages(2048)
     set_trigger_slow()
+    calibrate_duplexer_phase_2D(pulse_pars)
     set_CBox_cos_sine_weigths(qubit.f_RO_mod())
+    qubit.find_pulse_amplitude(amps=np.linspace(-.3, .3, 31),
+                             max_n=1, update=True,
+                             take_fit_I=False)
     qubit.find_frequency(method='ramsey', steps=[5, 30, 100, 300], update=True)
     qubit.measure_motoi_XY(motzois=np.linspace(-0.25, -0.15, 21))
     qubit.find_pulse_amplitude(amps=np.linspace(-.3, .3, 31),

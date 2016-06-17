@@ -1272,7 +1272,7 @@ class QuTech_ControlBox(VisaInstrument):
         # seems to be missing a send comand rather than read
         # this is to catch the timeout error that can occur due to the latency
         # of 1ms in the serial emulator of windows.
-        for i in range(2):
+        for i in range(10):
             try:
                 with(self.visa_handle.ignore_warning(
                         visa.constants.VI_SUCCESS_MAX_CNT)):

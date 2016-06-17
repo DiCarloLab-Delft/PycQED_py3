@@ -133,7 +133,7 @@ state = ManualParameter('state', units='')
 CBox.log_length(chunk_size)
 
 base_combinations = ['ZXY']
-idle_times = [2e-6, 5e-6]
+idle_times = [2e-6, 3e-6]
 
 for base in base_combinations:
     if base == 'ZX':
