@@ -95,9 +95,11 @@ def calibrate_pulse_pars_conventional():
     calibrate_duplexer_phase_2D(pulse_pars)
     set_CBox_cos_sine_weigths(qubit.f_RO_mod())
     qubit.find_pulse_amplitude(amps=np.linspace(-.3, .3, 31),
-                             max_n=1, update=True,
+                             max_n=2, update=True,
                              take_fit_I=False)
     qubit.find_frequency(method='ramsey', steps=[5, 30, 100, 300], update=True)
+    qubit.find_pulse_amplitude(amps=np.linspace(-.3, .3, 31),
+                               N_steps=[3,5], max_n=100, take_fit_I=False)
     qubit.measure_motoi_XY(motzois=np.linspace(-0.25, -0.15, 21))
     qubit.find_pulse_amplitude(amps=np.linspace(-.3, .3, 31),
                                N_steps=[3, 7, 19], max_n=100, take_fit_I=False)

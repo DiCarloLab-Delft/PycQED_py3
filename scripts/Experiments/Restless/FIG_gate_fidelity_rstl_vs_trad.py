@@ -27,7 +27,7 @@ f_init_steps = [+0.5e6, +0.05e6]
 
 #tuning methods
 methods=['traditional', 'restless']
-two_par=True
+two_par=True #otherwise three parameter optimization
 GST=True
 #methods = ['restless']
 
@@ -51,8 +51,10 @@ for nr_clifford in nr_cliffords:
 
 #ensures a file with the name 'RB_verification_seq' is created
 measure_RB(pulse_pars, RO_pars, upload=True, T1=25e-6, close_fig=True)
-#ensures a file with the name 'GST_seq_FILE' is created
+
+
 if GST:
+ #ensures a file with the name 'GST_seq_FILE' is created
  measure_GST(upload=True,  l=512, nr_elts=6103, nr_logs=100)
 
 for i in range(10000):
@@ -92,7 +94,7 @@ for i in range(10000):
 
                     #x0 = [DUX_1_init, DUX_2_init] # setting x0 for the first round of optimization
                     if two_par:
-                        [DUX_1_init, DUX_2_init]
+                        x0 = [DUX_1_init, DUX_2_init]
                     else:
                         x0 = [DUX_1_init, DUX_2_init, f_init]
                     #for nr_clifford, DUX_1_init_step, DUX_2_init_step in zip(nr_cliffords, DUX_1_init_steps, DUX_2_init_steps):
