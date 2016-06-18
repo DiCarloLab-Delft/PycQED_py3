@@ -244,12 +244,26 @@ class Assembler():
             print('Pulse instruction format error: ', detail.args)
 
     # measure rt
-    def MeasureFormat(self, dst_reg):
+    # def MeasureFormat(self, dst_reg):
+    #     try:
+    #         opCode = self.InstOpCode['measure']
+    #         FDC = '011'
+    #         zero4 = '0000'
+    #         rt = self.get_reg_num(dst_reg)
+    #         zero9 = '000000000'
+    #         funct = self.InstfunctCode['measure']
+    #         return opCode + FDC + zero4 + rt + zero9 + funct
+    #
+    #     except ValueError as detail:
+    #         print('Measure instruction format error: ', detail.args)
+
+    # measure
+    def MeasureFormat(self):
         try:
             opCode = self.InstOpCode['measure']
             FDC = '011'
             zero4 = '0000'
-            rt = self.get_reg_num(dst_reg)
+            rt = '0000'
             zero9 = '000000000'
             funct = self.InstfunctCode['measure']
             return opCode + FDC + zero4 + rt + zero9 + funct
@@ -302,7 +316,7 @@ class Assembler():
 
     def convert_to_instructions(self):
         try:
-            Asm_File = open(self.asmfilename, 'r')
+            Asm_File = open(self.asmfilename, 'r', encoding="utf-8")
         except:
             print('\tError: Fail to open file ' + self.asmfilename + ".")
             exit(0)
@@ -449,15 +463,15 @@ class Assembler():
                                                          elements[2],
                                                          elements[3]), 2))
 
-            elif (elements[0].lower() == 'measure'):   # Measure rt
+            elif (elements[0].lower() == 'measure'):   # Measure
                 # print('parsing Measure instruction.')
 
-                if (elements[1][0] != 'r'):
-                    print('Error: measure instruction only a register as the \
-                           parameter.')
-                    exit()
+                # if (elements[1][0] != 'r'):
+                #     print('Error: measure instruction only a register as the\
+                #            parameter.')
+                #     exit()
 
-                instructions.append(int(self.MeasureFormat(elements[1]), 2))
+                instructions.append(int(self.MeasureFormat(), 2))
 
             elif (elements[0].lower() == 'wait'):   # Wait imm
                 # print('parsing Wait instruction.')

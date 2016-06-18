@@ -22,13 +22,14 @@ pyximport.install(setup_args={"script_args": ["--compiler=msvc"],
 from ._controlbox import codec as c
 from ._controlbox import Assembler
 from . import QuTech_ControlBoxdriver as qcb
-from ._controlbox import defHeaders_CBox_v3 as defHeaders # File containing bytestring commands
+from ._controlbox import defHeaders_CBox_v3 as defHeaders
 
 '''
 @author: Xiang Fu
 The driver for ControlBox version 3. This is inherited from the driver of
 ControlBox version 2.
 '''
+
 
 class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
     def __init__(self, *args, **kwargs):
@@ -50,7 +51,7 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
                                get_cmd=self._do_get_trigger_source,
                                vals=vals.Anything())
 
-        self.set_master_controller_working_state(0, 0, 0)
+        # self.set_master_controller_working_state(0, 0, 0)
 
     def run_test_suite(self):
             from importlib import reload  # Useful for testing
@@ -106,7 +107,7 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
         self.avg_size = v_list[32]
         self.nr_averages = 2**self.avg_size
 
-        self.snapshot()
+        # self.snapshot()
         # print("version: ", version)
         return version
 
@@ -118,10 +119,11 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
         @return stat : 0 if the upload succeeded and 1 if the upload failed.
         '''
         v = self.get_master_controller_params()
-        if v.startswith('v2.15'):
+        if (int(v[1]) == 2) and (int(int(v[3:5])) >= 15):
+            n_bytes = 3
+        elif (int(v[1]) == 3) and (int(int(v[3])) > 1):
             n_bytes = 3
         else:
-            # logging.warning('Version != 2.15 using old protocol for log length')
             n_bytes = 2
 
         cmd = defHeaders.UpdateLoggerMaxCounterHeader
@@ -139,21 +141,22 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
     def _do_set_core_state(self, core_state):
         if self.get('acquisition_mode') is not None:
             tmp_acquisition_mode = self.get('acquisition_mode')
-            # print('_do_set_core_state\got_acquisition_mode: ', tmp_acquisition_mode)
         else:
             tmp_acquisition_mode = 0   # idle state
 
         if self.get('trigger_source') is not None:
             tmp_trigger_source = self.get('trigger_source')
-            # print('_do_set_core_state\got_trigger_source: ', tmp_trigger_source)
         else:
             tmp_trigger_source = 0      # internal trigger
 
-        self.set_master_controller_working_state(core_state, tmp_acquisition_mode,
-                                  tmp_trigger_source)
+        self.set_master_controller_working_state(core_state,
+                                                 tmp_acquisition_mode,
+                                                 tmp_trigger_source)
 
     def _do_set_acquisition_mode(self, acquisition_mode):
-        if not('core_state' in self.parameters):            # this function can be invoked by CBox_v2 driver, so the parameter needs to be added.
+        # this function can be invoked by CBox_v2 driver, so the parameter
+        # needs to be added.
+        if not('core_state' in self.parameters):
             self.add_parameter('core_state',
                                set_cmd=self._do_set_core_state,
                                get_cmd=self._do_get_core_state,
@@ -161,11 +164,12 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
             tmp_core_state = 0
         elif self.get('core_state') is not None:
             tmp_core_state = self.get('core_state')
-            # print('_do_set_acquisition_mode\got_core_state: ', tmp_core_state)
         else:
             tmp_core_state = 0   # idle state
 
-        if not('trigger_source' in self.parameters):        # this function can be invoked by CBox_v2 driver, so the parameter needs to be added.
+        # this function can be invoked by CBox_v2 driver, so the parameter
+        # needs to be added.
+        if not('trigger_source' in self.parameters):
             self.add_parameter('trigger_source',
                                set_cmd=self._do_set_trigger_source,
                                get_cmd=self._do_get_trigger_source,
@@ -173,12 +177,12 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
             tmp_trigger_source = 0
         elif self.get('trigger_source') is not None:
             tmp_trigger_source = self.get('trigger_source')
-            # print('_do_set_acquisition_mode\got_trigger_source: ', tmp_trigger_source)
         else:
             tmp_trigger_source = 0      # internal trigger
 
-        self.set_master_controller_working_state(tmp_core_state, acquisition_mode,
-                                  tmp_trigger_source)
+        self.set_master_controller_working_state(tmp_core_state,
+                                                 acquisition_mode,
+                                                 tmp_trigger_source)
 
     def _do_set_trigger_source(self, trigger_source):
         if self.get('core_state') is not None:
@@ -189,12 +193,12 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
 
         if self.get('acquisition_mode') is not None:
             tmp_acquisition_mode = self.get('acquisition_mode')
-            # print('_do_set_trigger_source\got_acquisition_mode: ', tmp_acquisition_mode)
         else:
             tmp_acquisition_mode = 0   # idle state
 
-        self.set_master_controller_working_state(tmp_core_state, tmp_acquisition_mode,
-                                  trigger_source)
+        self.set_master_controller_working_state(tmp_core_state,
+                                                 tmp_acquisition_mode,
+                                                 trigger_source)
 
     def _do_get_core_state(self):
         return self._core_state
@@ -211,9 +215,11 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
         Touch 'n Go is only valid for ControlBox version 2, so this function is
         obselete.
         '''
-        print("Warning: Touch 'n Go is only valid for ControlBox version 2. omit")
+        print("Warning: Touch 'n Go is only valid for ControlBox version 2. \
+              omit")
 
-    def set_master_controller_working_state(self, core_state, acquisition_mode, trigger_source):
+    def set_master_controller_working_state(self, core_state, acquisition_mode,
+                                            trigger_source):
         '''
         @param core_states: activate the core or disable it,
                         0 = idle,
@@ -228,7 +234,8 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
                         0 = internal trigger (default),
                         1 = external trigger,
                         2 = mixed trigger
-        @return stat : True if the upload succeeded and False if the upload failed
+        @return stat : True if the upload succeeded and False if the upload
+                       failed
         '''
         core_state = str(core_state)
         acquisition_mode = str(acquisition_mode)
@@ -236,7 +243,8 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
 
         acquisition_mode_int = None
         for i in range(len(defHeaders.acquisition_modes)):
-            if acquisition_mode.upper() in defHeaders.acquisition_modes[i].upper():
+            if acquisition_mode.upper() in \
+               defHeaders.acquisition_modes[i].upper():
                 acquisition_mode_int = i
                 break
         if acquisition_mode_int is None:
@@ -262,16 +270,21 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
 
         # Here the actual acquisition_mode is set
         cmd = defHeaders.UpdateMCWorkingState
-        data_bytes = c.encode_byte(core_state_int, 7, expected_number_of_bytes=1)
-        data_bytes += c.encode_byte(acquisition_mode_int, 7, expected_number_of_bytes=1)
-        data_bytes += c.encode_byte(trigger_source_int, 7, expected_number_of_bytes=1)
+        data_bytes = c.encode_byte(core_state_int, 7,
+                                   expected_number_of_bytes=1)
+        data_bytes += c.encode_byte(acquisition_mode_int, 7,
+                                    expected_number_of_bytes=1)
+        data_bytes += c.encode_byte(trigger_source_int, 7,
+                                    expected_number_of_bytes=1)
         message = c.create_message(cmd, data_bytes)
 
         (stat, mesg) = self.serial_write(message)
         if stat:
-            self._acquisition_mode = defHeaders.acquisition_modes[acquisition_mode_int]
+            self._acquisition_mode = defHeaders.acquisition_modes[
+                                     acquisition_mode_int]
             self._core_state = defHeaders.core_states[core_state_int]
-            self._trigger_source = defHeaders.trigger_sources[trigger_source_int]
+            self._trigger_source = defHeaders.trigger_sources[
+                                   trigger_source_int]
         else:
             raise Exception('Failed to set acquisition_mode')
 
@@ -282,7 +295,7 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
 
         return (stat, message)
 
-    def load_instructions(self, asm_file):
+    def load_instructions(self, asm_file, PrintHex=False):
         '''
         set the weights of the integregration
 
@@ -297,10 +310,12 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
         if instructions is False:
             print("Error: the assembly file is of errors.")
             return False
-        # i = 0
-        # for instruction in instructions:
-        #     print(i, ": ",  format(instruction, 'x').zfill(8))
-        #     i = i + 4
+
+        if PrintHex:
+            i = 0
+            for instruction in instructions:
+                print(i, ": ",  format(instruction, 'x').zfill(8))
+                i = i + 4
 
         # Check the instruction list length
         if len(instructions) == 0:
@@ -311,9 +326,10 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
 
         instr_length = 32
         data_bytes.extend(c.encode_array(
-                        self.convert_arrary_to_signed(instructions, instr_length),
-                        data_bits_per_byte = 4,
-                        bytes_per_value = 8))
+                        self.convert_arrary_to_signed(instructions,
+                                                      instr_length),
+                        data_bits_per_byte=4,
+                        bytes_per_value=8))
 
         message = c.create_message(cmd, bytes(data_bytes))
         (stat, mesg) = self.serial_write(message)

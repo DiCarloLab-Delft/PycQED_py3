@@ -138,6 +138,7 @@ class QuTech_ControlBox(VisaInstrument):
                            vals=vals.Anything())
 
         # Setting default arguments
+        self.set('measurement_timeout', kw.pop('measurement_timeout', 120))
         self.set('acquisition_mode', 'idle')
         self.set('run_mode', 0)
         self.set('signal_delay', 0)
@@ -146,7 +147,6 @@ class QuTech_ControlBox(VisaInstrument):
         self.set('log_length', 100)
         self.set('nr_averages', 512)
         self.set('nr_samples', 100)
-        self.set('measurement_timeout', kw.pop('measurement_timeout', 120))
         self.set('lin_trans_coeffs', [1, 0, 0, 1])
 
         self._i_wait = 0  # used in _print_waiting_char()
@@ -181,6 +181,7 @@ class QuTech_ControlBox(VisaInstrument):
         Sets the measurement timeout in seconds.
         This is distinct from the timeout of the read operation (5s default)
         '''
+        print('function _do_set_measurement_timeout invoked with parameter timeout = ', val)
         self._timeout = val
 
     def _do_get_measurement_timeout(self):
@@ -981,6 +982,7 @@ class QuTech_ControlBox(VisaInstrument):
                                    expected_number_of_bytes=n_bytes)
         # Changed from version 2.15 onwards
         message = c.create_message(cmd, data_bytes)
+        print("set log length command: ",  format(message, 'x').zfill(8))
         (stat, mesg) = self.serial_write(message)
         if stat:
             self._log_length = length
@@ -1318,6 +1320,7 @@ class QuTech_ControlBox(VisaInstrument):
                     message += m
             elif self.visa_handle.bytes_in_buffer != 0:
                 message += self._read_raw(1)
+
             if len(message) != 0:
                 if message[-1:] == defHeaders.EndOfMessageHeader:
                     end_of_message_received = True
@@ -2000,11 +2003,13 @@ class QuTech_ControlBox(VisaInstrument):
                 return False
 
         if (not is_number(unsigned_number) or (unsigned_number < 0)):
-            raise ValueError("The number %d should be a positive integer." % unsigned_number)
+            raise ValueError("The number %d should be a positive integer." %
+                             unsigned_number)
 
         if unsigned_number < 0 or unsigned_number >= 2**bit_width:
             raise ValueError("Given number %d is too large in terms of the \
-                              given bit_width %d." % (unsigned_number, bit_width))
+                              given bit_width %d." %
+                             (unsigned_number, bit_width))
 
         if unsigned_number >= 2**(bit_width-1):
             signed_number = unsigned_number - 2**bit_width
