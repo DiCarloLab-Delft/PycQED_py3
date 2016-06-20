@@ -133,7 +133,8 @@ sweep_pars = [RO_basis, prep_basis, state]
 
 CBox.log_length(chunk_size)
 base_combinations = ['ZXY']
-idle_times = [2e-6, 3e-6]
+idle_times = [3e-6, 2e-6]
+base = 'ZXY'
 
 for idle_time in idle_times:
     RO_bases = np.random.randint(0, 3, number_of_shots)

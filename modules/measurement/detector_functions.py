@@ -455,7 +455,7 @@ class CBox_integrated_average_detector(Hard_Detector):
                 self.CBox.set('acquisition_mode', 4)
                 self.AWG.start()  # Is needed here to ensure data aligns with seq elt
             i += 1
-            if i > 10:
+            if i > 20:
                 break
 
         return data

@@ -5,8 +5,29 @@ Dux = Dux
 import numpy as np
 
 
+#tuning methods
+methods=['traditional', 'restless']
+#methods=['restless']
+
+two_par=False #otherwise three parameter optimization
+GST=False
+recalibrate=True
+
+# Ansatz parameters for numerical optimization
+init1=[-0.033, 0.033] #duplexer 1
+#init1=[0.033]
+init2=[-0.2,  0.33] # duplexer 2
+#init2=[0.33] # duplexer 2
+init3=[-0.5e6, 0.5e6] # frequency
+#init3=[-0.5e6] # frequency
+repetitions=1000
+
 #calibrating phases and Dux default attenuations
-pulse_pars, RO_pars = calibrate_pulse_pars_conventional()
+if recalibrate:
+    pulse_pars, RO_pars = calibrate_pulse_pars_conventional()
+else:
+    pulse_pars, RO_pars = VIP_mon_2_dux.get_pulse_pars()
+
 DUX_1_default = VIP_mon_2_dux.Mux_G_att()
 DUX_2_default = VIP_mon_2_dux.Mux_D_att()
 f_default = VIP_mon_2_dux.f_qubit()-VIP_mon_2_dux.f_pulse_mod()
@@ -15,20 +36,12 @@ f_default = VIP_mon_2_dux.f_qubit()-VIP_mon_2_dux.f_pulse_mod()
 nr_cliffords = [80, 300]
 nr_seeds= 200#200
 
-# Ansatz parameters for numerical optimization
-init1=[-0.033, 0.033] #duplexer 1
-init2=[-0.2,  0.33] # duplexer 2
-init3=[-0.5e6, 0.5e6] # frequency
-
 #ansatz steps, 80 cliffords/300 cliffords
 DUX_1_init_steps = [+0.02, +0.01]
 DUX_2_init_steps = [+0.1, +0.05]
 f_init_steps = [+0.5e6, +0.05e6]
 
-#tuning methods
-methods=['traditional', 'restless']
-two_par=True #otherwise three parameter optimization
-GST=True
+
 #methods = ['restless']
 
 #defingin the detectors
@@ -37,27 +50,26 @@ detector_traditional=det.CBox_single_qubit_frac1_counter(CBox)
 
 
 # Generating the required optimization sequences with the tuned updated pulse pars
-for nr_clifford in nr_cliffords:
-    sq.Randomized_Benchmarking_seq(
-        pulse_pars, RO_pars, [nr_clifford],
-        seq_name='RB_rstl_opt_seq_{}'.format(nr_clifford),
-        nr_seeds=nr_seeds,
-        net_clifford=3, post_msmt_delay=3e-6, cal_points=False, resetless=True)
+if recalibrate: #only relaoding sequences if calibration is redone
+    for nr_clifford in nr_cliffords:
+        sq.Randomized_Benchmarking_seq(
+            pulse_pars, RO_pars, [nr_clifford],
+            seq_name='RB_rstl_opt_seq_{}'.format(nr_clifford),
+            nr_seeds=nr_seeds,
+            net_clifford=3, post_msmt_delay=3e-6, cal_points=False, resetless=True)
 
-    sq.Randomized_Benchmarking_seq(
-        pulse_pars, RO_pars, [nr_clifford], nr_seeds=nr_seeds,
-        seq_name='RB_conv_opt_seq_{}'.format(nr_clifford),
-        net_clifford=0, post_msmt_delay=3e-6, cal_points=False, resetless=True)
+        sq.Randomized_Benchmarking_seq(
+            pulse_pars, RO_pars, [nr_clifford], nr_seeds=nr_seeds,
+            seq_name='RB_conv_opt_seq_{}'.format(nr_clifford),
+            net_clifford=0, post_msmt_delay=3e-6, cal_points=False, resetless=True)
 
-#ensures a file with the name 'RB_verification_seq' is created
-measure_RB(pulse_pars, RO_pars, upload=True, T1=25e-6, close_fig=True)
+    #ensures a file with the name 'RB_verification_seq' is created
+    measure_RB(pulse_pars, RO_pars, upload=True, T1=25e-6, close_fig=True)
+    if GST:
+        #ensures a file with the name 'GST_seq_FILE' is created
+        measure_GST(upload=True,  l=512, nr_elts=6103, nr_logs=100)
 
-
-if GST:
- #ensures a file with the name 'GST_seq_FILE' is created
- measure_GST(upload=True,  l=512, nr_elts=6103, nr_logs=100)
-
-for i in range(10000):
+for i in range(repetitions):
     for j in range(len(init1)):
         for k in range(len(init2)):
             for l in range(len(init3)):

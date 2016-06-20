@@ -140,7 +140,7 @@ def measure_GST(upload=True, l=256, nr_elts=5359, nr_logs=40):
 
 
 def calibrate_JPA_dac(pulse_pars, RO_pars, upload=True):
-    set_trigger_slow()
+    set_trigger_fast()
     set_CBox_cos_sine_weigths(RO_pars['mod_frequency'])
     ad_func_pars = {'adaptive_function': minimize_scalar,
                     'bracket': [-330, -300, -270],
@@ -161,6 +161,7 @@ def calibrate_JPA_dac(pulse_pars, RO_pars, upload=True):
     MC.set_detector_function(d)
     MC.run(name='JPA_dac_tuning', mode='adaptive')
     ma.MeasurementAnalysis(label='JPA_dac_tuning')
+    set_trigger_slow()
 
 def calibrate_duplexer_phase(pulse_pars):
     mod_freq = pulse_pars['mod_frequency']
