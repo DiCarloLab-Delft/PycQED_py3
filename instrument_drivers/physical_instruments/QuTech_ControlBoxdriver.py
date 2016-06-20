@@ -138,6 +138,8 @@ class QuTech_ControlBox(VisaInstrument):
                            vals=vals.Anything())
 
         # Setting default arguments
+        print('kw.pop(\'measurement_timeout\', 120): ',
+              kw.pop('measurement_timeout', 120))
         self.set('measurement_timeout', kw.pop('measurement_timeout', 120))
         self.set('acquisition_mode', 'idle')
         self.set('run_mode', 0)
@@ -154,8 +156,8 @@ class QuTech_ControlBox(VisaInstrument):
         self._dac_offsets = np.empty([3, 2])
         self._dac_offsets[:] = np.NAN
 
-        if run_tests:
-            self.run_test_suite()
+        # if run_tests:
+        #     self.run_test_suite()
         t1 = time.time()
         print('Initialized CBox', self.get('firmware_version'),
               'in %.2fs' % (t1-t0))
@@ -2029,6 +2031,7 @@ class QuTech_ControlBox(VisaInstrument):
 
         signed_array = []
         for sample in unsigned_array:
+            # print("sample: ", sample)
             signed_array.append(self.convert_to_signed(sample, bit_width))
 
         return signed_array

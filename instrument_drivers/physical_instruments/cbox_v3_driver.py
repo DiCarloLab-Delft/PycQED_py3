@@ -51,17 +51,15 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
                                get_cmd=self._do_get_trigger_source,
                                vals=vals.Anything())
 
-        # self.set_master_controller_working_state(0, 0, 0)
-
     def run_test_suite(self):
             from importlib import reload  # Useful for testing
-            from ._controlbox import test_suite
+            from ._controlbox import test_suite_v3 as test_suite
             reload(test_suite)
             # pass the CBox to the module so it can be used in the tests
             self.c = c  # make the codec callable from the testsuite
             test_suite.CBox = self
             suite = unittest.TestLoader().loadTestsFromTestCase(
-                    test_suite.CBox_tests)
+                test_suite.CBox_tests_v3)
             unittest.TextTestRunner(verbosity=2).run(suite)
 
     def _do_get_firmware_version(self):
