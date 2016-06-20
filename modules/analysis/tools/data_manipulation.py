@@ -210,15 +210,7 @@ def butterfly_matrix_inversion(exc_coeffs, rel_coeffs):
     P_vec = [coeffs['P10_1'], coeffs['P11_1']]
     eps_vec = np.dot(inv_matr, P_vec)
     [eps11_1, eps10_1] = eps_vec
-    print(coeffs)
-    print("eps00_0", eps00_0)
-    print("eps01_0", eps01_0)
-    print("eps10_0", eps10_0)
-    print("eps11_0", eps11_0)
-    print("eps00_1", eps00_1)
-    print("eps01_1", eps01_1)
-    print("eps10_1", eps10_1)
-    print("eps11_1", eps11_1)
+
     return {'eps00_0': eps00_0, 'eps01_0': eps01_0, 'eps10_0': eps10_0,
             'eps11_0': eps11_0, 'eps00_1': eps00_1, 'eps01_1': eps01_1,
             'eps10_1': eps10_1, 'eps11_1': eps11_1}
@@ -286,21 +278,6 @@ def count_error_fractions(trace):
     return no_err_counter, single_err_counter, double_err_counter, zero_counter, one_counter
 
 
-def bin_2D_shots(I_shots, Q_shots, normed=True):
-    '''
-    Creates a 2D histogram of I and Q shotsdata.
-
-    Watch out that when you plot the histogram uses the convention
-    H[xbins, ybins] and plotting generally uses H[yrows, xcols] meaning you
-    want to Transpose the data using H.T
-    '''
-    n_bins = 60  # the bins we want to have around our data
-    H, xedges, yedges = np.histogram2d(I_shots, Q_shots,
-                                       bins=n_bins,
-                                       range=[[min(I_shots), max(I_shots)],
-                                              [min(Q_shots), max(Q_shots)]],
-                                       normed=normed)
-    return H, xedges, yedges
 
 
 def flatten_2D_histogram(H, xedges, yedges):

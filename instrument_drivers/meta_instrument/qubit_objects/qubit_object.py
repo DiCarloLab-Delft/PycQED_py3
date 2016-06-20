@@ -53,7 +53,6 @@ class Qubit(Instrument):
 
     Open for discussion:
         - is a split at the level below qubit really required?
-        - Hz vs GHz (@cdickel)
         - is the name "find_" a good name or should it be merged with measure
             or calibrate?
         - Should the pulse-parameters be grouped here in some convenient way?
@@ -65,8 +64,8 @@ class Qubit(Instrument):
           that has it's own frequency parameter, attach a mixer object that has
           it's own calibration routines.
     '''
-    def __init__(self, name):
-        super().__init__(name)
+    def __init__(self, name, **kw):
+        super().__init__(name, **kw)
         self.msmt_suffix = '_' + name  # used to append to measuremnet labels
 
     def measure_T1(self):
@@ -107,8 +106,8 @@ class Transmon(Qubit):
     circuit-QED Transmon as used in DiCarlo Lab.
     Adds transmon specific parameters as well
     '''
-    def __init__(self, name):
-        super().__init__(name)
+    def __init__(self, name, **kw):
+        super().__init__(name, **kw)
         self.add_parameter('EC', units='Hz',
                            parameter_class=ManualParameter,
                            vals=vals.Numbers())
@@ -141,8 +140,11 @@ class Transmon(Qubit):
                            parameter_class=ManualParameter)
         self.add_parameter('RO_pulse_length', units='s',
                            parameter_class=ManualParameter)
-        self.add_parameter('RO_trigger_delay', units='s',
+        self.add_parameter('RO_acq_marker_delay', units='s',
                            parameter_class=ManualParameter)
+        self.add_parameter('RO_acq_marker_channel',
+                           parameter_class=ManualParameter,
+                           vals=vals.Strings())
         self.add_parameter('RO_amp', units='V',
                            parameter_class=ManualParameter)
         # Time between start of pulses
@@ -192,10 +194,8 @@ class Transmon(Qubit):
     def find_frequency(self, method='spectroscopy', pulsed=False,
                        steps=[1, 3, 10, 30, 100, 300, 1000],
                        freqs=None,
-                       f_span=100e6,
-                       f_step=1e6,
-                       verbose=True,
-                       update=False,
+                       f_span=100e6, f_step=1e6,
+                       verbose=True, update=True,
                        close_fig=True):
 
         if method.lower() == 'spectroscopy':
@@ -249,6 +249,7 @@ class Transmon(Qubit):
                 print('Converged to: {:.9e}'.format(cur_freq))
             if update:
                 self.f_qubit.set(cur_freq)
+                print("update",update)
             return cur_freq
 
     def find_resonator_frequency(self, **kw):
@@ -257,7 +258,7 @@ class Transmon(Qubit):
     def find_pulse_amplitude(self, amps,
                              N_steps=[3, 7, 13, 17], max_n=18,
                              close_fig=True, verbose=False,
-                             MC=None, update=True):
+                             MC=None, update=True, take_fit_I=False):
         '''
         Finds the pulse-amplitude using a rabi experiment.
 
@@ -271,11 +272,15 @@ class Transmon(Qubit):
         if np.size(amps) != 1:
             self.measure_rabi(amps, n=1, MC=MC, analyze=False)
             a = ma.Rabi_Analysis(close_fig=close_fig)
-            if (a.fit_res[0].params['period'].stderr <=
-                    a.fit_res[1].params['period'].stderr):
-                ampl = abs(a.fit_res[0].params['period'].value)/2
+            if take_fit_I:
+                    ampl = abs(a.fit_res[0].params['period'].value)/2
+                    print("taking I")
             else:
-                ampl = abs(a.fit_res[1].params['period'].value)/2
+                if (a.fit_res[0].params['period'].stderr <=
+                        a.fit_res[1].params['period'].stderr):
+                    ampl = abs(a.fit_res[0].params['period'].value)/2
+                else:
+                    ampl = abs(a.fit_res[1].params['period'].value)/2
         else:
             ampl = amps
         if verbose:
@@ -289,17 +294,74 @@ class Transmon(Qubit):
                 amps = np.linspace(ampl-ampl_span, ampl+ampl_span, 15)
                 self.measure_rabi(amps, n=n, MC=MC, analyze=False)
                 a = ma.Rabi_parabola_analysis(close_fig=close_fig)
-                if (a.fit_res[0].params['x0'].stderr <=
-                        a.fit_res[1].params['x0'].stderr):
+                if take_fit_I:
                     ampl = a.fit_res[0].params['x0'].value
                 else:
-                    ampl = a.fit_res[1].params['x0'].value
+                    if (a.fit_res[0].params['x0'].stderr <=
+                            a.fit_res[1].params['x0'].stderr):
+                        ampl = a.fit_res[0].params['x0'].value
+                    else:
+                        ampl = a.fit_res[1].params['x0'].value
                 if verbose:
                     print('Found amplitude', ampl, '\n')
         if update:
             self.amp180.set(ampl)
+            print(ampl)
 
         # After this it should enter a loop where it fine tunes the amplitude
         # based on fine scanes around the optimum with higher sensitivity.
 
+    def find_amp90_scaling(self, scales=0.5,
+                           N_steps=[5, 9], max_n=100,
+                           close_fig=True, verbose=False,
+                           MC=None, update=True, take_fit_I=False):
+        '''
+        Finds the scaling factor of pi/2 pulses w.r.t pi pulses using a rabi
+        type with each pi pulse replaced by 2 pi/2 pulses.
 
+        If scales is an array it starts by fitting a cos to a Rabi experiment
+        to get an initial guess for the amplitude.
+
+        This experiment is only useful after carefully calibrating the pi pulse
+        using flipping sequences.
+        '''
+        if MC is None:
+            MC = self.MC
+        if np.size(scales) != 1:
+            self.measure_rabi_amp90(scales=scales, n=1, MC=MC, analyze=False)
+            a = ma.Rabi_Analysis(close_fig=close_fig)
+            if take_fit_I:
+                    scale = abs(a.fit_res[0].params['period'].value)/2
+            else:
+                if (a.fit_res[0].params['period'].stderr <=
+                        a.fit_res[1].params['period'].stderr):
+                    scale = abs(a.fit_res[0].params['period'].value)/2
+                else:
+                    scale = abs(a.fit_res[1].params['period'].value)/2
+        else:
+            scale = scales
+        if verbose:
+            print('Initial scaling factor:', scale, '\n')
+
+        for n in N_steps:
+            if n > max_n:
+                break
+            else:
+                scale_span = 0.3*scale/n
+                scales = np.linspace(scale-scale_span, scale+scale_span, 15)
+                self.measure_rabi_amp90(scales, n=n, MC=MC, analyze=False)
+                a = ma.Rabi_parabola_analysis(close_fig=close_fig)
+                if take_fit_I:
+                    scale = a.fit_res[0].params['x0'].value
+                else:
+                    if (a.fit_res[0].params['x0'].stderr <=
+                            a.fit_res[1].params['x0'].stderr):
+                        scale = a.fit_res[0].params['x0'].value
+                    else:
+                        scale = a.fit_res[1].params['x0'].value
+                if verbose:
+                    print('Founcaleitude', scale, '\n')
+        if update:
+            self.amp90_scale(scale)
+            print("should be updated")
+            print(scale)

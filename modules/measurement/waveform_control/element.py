@@ -120,18 +120,7 @@ class Element:
         return ((tvals + self._channels[channel]['delay'])*self.clock
                 + 0.5).astype(int) / self.clock
 
-    def is_divisible_by_clock(self, value):
-        '''
-        checks if "value" is divisible by the clock period.
-        This funciton is needed because of floating point errors
 
-        It performs this by multiplying everything by 1e11 (looking at 0.01ns
-        resolution for divisibility)
-        '''
-        if np.round(value*1e11) % (1/self.clock*1e11) == 0:
-            return True
-        else:
-            return False
 
     def calculate_time_corr(self, t0, fixed_point_freq):
             '''
@@ -141,32 +130,33 @@ class Element:
 
             Time correction is rounded to a full clock cycle.
             '''
-            phase_diff = (360 * fixed_point_freq * t0) % (360)
-            fixed_point_freq = abs(fixed_point_freq)
-            phase_corr = 360 - phase_diff  # Correction in degrees
-            time_corr_0 = phase_corr/(360*fixed_point_freq)
-            time_corr = time_corr_0
+            return calculate_time_corr(t0, fixed_point_freq, self.clock)
+            # phase_diff = (360 * fixed_point_freq * t0) % (360)
+            # fixed_point_freq = abs(fixed_point_freq)
+            # phase_corr = 360 - phase_diff  # Correction in degrees
+            # time_corr_0 = phase_corr/(360*fixed_point_freq)
+            # time_corr = time_corr_0
 
-            i = 0
-            while not self.is_divisible_by_clock(time_corr):
-                i += 1
-                if i > 100:
-                    print('time_corr_0: %s' % time_corr_0)
-                    print('1/fixed_point_freq: %s' % (1/fixed_point_freq))
-                    raise Exception('Could not find time corr for fixed point')
-                elif time_corr > 10e-6:
-                    print('time_corr_0: %s' % time_corr_0)
-                    print('1/fixed_point_freq: %s' % (1/fixed_point_freq))
-                    raise Exception('Could not find time corr for fixed point')
-                time_corr += 1/fixed_point_freq
-            time_corr = round(time_corr, 9)  # Rounds to ns
-            if time_corr < 0:
-                raise ValueError(
-                    'Time correction "{}" cannot be negative'.format(time_corr))
-                # Cannot be negative because it will give unexpected behaviour
-                # This should not be possible to happen but I ran into this
-                # a few time so I leave the exception here
-            return time_corr
+            # i = 0
+            # while not self.is_divisible_by_clock(time_corr):
+            #     i += 1
+            #     if i > 100:
+            #         print('time_corr_0: %s' % time_corr_0)
+            #         print('1/fixed_point_freq: %s' % (1/fixed_point_freq))
+            #         raise Exception('Could not find time corr for fixed point')
+            #     elif time_corr > 10e-6:
+            #         print('time_corr_0: %s' % time_corr_0)
+            #         print('1/fixed_point_freq: %s' % (1/fixed_point_freq))
+            #         raise Exception('Could not find time corr for fixed point')
+            #     time_corr += 1/fixed_point_freq
+            # time_corr = round(time_corr, 9)  # Rounds to ns
+            # if time_corr < 0:
+            #     raise ValueError(
+            #         'Time correction "{}" cannot be negative'.format(time_corr))
+            #     # Cannot be negative because it will give unexpected behaviour
+            #     # This should not be possible to happen but I ran into this
+            #     # a few time so I leave the exception here
+            # return time_corr
 
     def shift_all_pulses(self, dt):
         '''
@@ -340,7 +330,7 @@ class Element:
         tvals = np.arange(self.samples())/self.clock
 
         for c in self._channels:
-            wfs[c] = np.zeros(self.samples()+1) + self._channels[c]['offset']
+            wfs[c] = np.zeros(self.samples()) + self._channels[c]['offset']
         # we first compute the ideal function values
         for p in self.pulses:
             psamples = self.pulse_samples(p)
@@ -365,10 +355,7 @@ class Element:
                 idx0 = self.pulse_start_sample(p, c)
                 idx1 = self.pulse_end_sample(p, c) + 1
                 wfs[c][idx0:idx1] += pulsewfs[c]
-                if idx1 == len(wfs[c]):
-                    # If this happens the seq will laod fine but will have
-                    # funny behaviour because it does not end in zero
-                    raise ValueError(self.pulses[p].name, idx1, len(wfs[c]))
+
         return tvals, wfs
 
     def waveforms(self):
@@ -435,3 +422,57 @@ class Element:
                 pulses[p][c]['end sample'] = self.pulse_end_sample(p, c)
 
         pprint.pprint(overview)
+
+# Helper functions, previously part of the element object but moved outside
+# to be able to use them in other modules (eg higher level parts of the
+# sequencer)
+
+
+def calculate_time_corr(t0, fixed_point_freq, clock=1e9):
+        '''
+        calculates a time shift to make sure a the "fixed point"  reference
+        is fixed in phase. It calculates the required time shift based on
+        the fixed_point_freq.
+
+        Time correction is rounded to a full clock cycle.
+        '''
+        phase_diff = (360 * fixed_point_freq * t0) % (360)
+        fixed_point_freq = abs(fixed_point_freq)
+        phase_corr = 360 - phase_diff  # Correction in degrees
+        time_corr_0 = phase_corr/(360*fixed_point_freq)
+        time_corr = time_corr_0
+
+        i = 0
+        while not is_divisible_by_clock(time_corr, clock):
+            i += 1
+            if i > 100:
+                print('time_corr_0: %s' % time_corr_0)
+                print('1/fixed_point_freq: %s' % (1/fixed_point_freq))
+                raise Exception('Could not find time corr for fixed point')
+            elif time_corr > 10e-6:
+                print('time_corr_0: %s' % time_corr_0)
+                print('1/fixed_point_freq: %s' % (1/fixed_point_freq))
+                raise Exception('Could not find time corr for fixed point')
+            time_corr += 1/fixed_point_freq
+        time_corr = round(time_corr, 9)  # Rounds to ns
+        if time_corr < 0:
+            raise ValueError(
+                'Time correction "{}" cannot be negative'.format(time_corr))
+            # Cannot be negative because it will give unexpected behaviour
+            # This should not be possible to happen but I ran into this
+            # a few time so I leave the exception here
+        return time_corr
+
+
+def is_divisible_by_clock(value, clock=1e9):
+    '''
+    checks if "value" is divisible by the clock period.
+    This funciton is needed because of floating point errors
+
+    It performs this by multiplying everything by 1e11 (looking at 0.01ns
+    resolution for divisibility)
+    '''
+    if np.round(value*1e11) % (1/clock*1e11) == 0:
+        return True
+    else:
+        return False

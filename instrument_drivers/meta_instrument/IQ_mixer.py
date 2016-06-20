@@ -8,9 +8,9 @@ class IQ_mixer(Instrument):
     '''
     Passive object designed to hold paramters for the mixer.
     '''
-    def __init__(self, name):
+    def __init__(self, name, **kw):
         logging.info(__name__ + ': Initializing instrument')
-        super().__init__(name)
+        super().__init__(name, **kw)
 
         # Qubit parameters
         self.add_parameter('QI_amp_ratio',

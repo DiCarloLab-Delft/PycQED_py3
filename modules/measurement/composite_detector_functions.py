@@ -371,14 +371,16 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
     For Qcodes. Readout with CBox, pulse generation with 5014
     '''
     def __init__(self, measurement_name,  MC, AWG, CBox, pulse_pars, RO_pars,
-                 raw=True, analyze=True, **kw):
+                 raw=True, analyze=True, upload=True,
+                 set_integration_weights=False, wait=0.0, close_fig=True,
+                 **kw):
         self.detector_control = 'soft'
         self.name = 'SSRO_Fidelity'
         # For an explanation of the difference between the different
         # Fidelities look in the analysis script
         if raw:
-            self.value_names = ['F-raw']
-            self.value_units = [' ']
+            self.value_names = ['F-raw', 'theta']
+            self.value_units = [' ', 'rad']
         else:
             self.value_names = ['F', 'F corrected']
             self.value_units = [' ', ' ']
@@ -388,31 +390,75 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
         self.AWG = AWG
         self.pulse_pars = pulse_pars
         self.RO_pars = RO_pars
-
-        #self.IF = kw.pop('IF', -20e6)
+        self.set_integration_weights = set_integration_weights
         self.i = 0
 
         self.raw = raw  # Performs no fits if True
         self.analyze = analyze
 
-        self.upload=True
+        self.upload = upload
+        self.wait = wait
+        self.close_fig = close_fig
 
     def prepare(self, **kw):
-        self.MC.set_sweep_function(awg_swf.OffOn(pulse_pars=self.pulse_pars,
-                                                 RO_pars=self.RO_pars))
-
-        self.MC.set_detector_function(
-            det.CBox_integration_logging_det(self.CBox, self.AWG))
+        if not self.set_integration_weights:
+            self.MC.set_sweep_function(awg_swf.OffOn(
+                                       pulse_pars=self.pulse_pars,
+                                       RO_pars=self.RO_pars))
+            self.MC.set_detector_function(
+                det.CBox_integration_logging_det(self.CBox, self.AWG))
 
     def acquire_data_point(self, *args, **kw):
+        self.time_start = time.time()
+        if self.set_integration_weights:
+            nr_samples = 512
+            self.CBox.nr_samples.set(nr_samples)
+            self.MC.set_sweep_function(awg_swf.OffOn(
+                                       pulse_pars=self.pulse_pars,
+                                       RO_pars=self.RO_pars,
+                                       pulse_comb='OffOff',
+                                       nr_samples=nr_samples))
+            self.MC.set_detector_function(det.CBox_input_average_detector(
+                                          self.CBox, self.AWG))
+            self.MC.run('Measure_transients_0')
+            a0 = ma.MeasurementAnalysis(auto=True, close_fig=self.close_fig)
+            self.MC.set_sweep_function(awg_swf.OffOn(
+                                       pulse_pars=self.pulse_pars,
+                                       RO_pars=self.RO_pars,
+                                       pulse_comb='OnOn',
+                                       nr_samples=nr_samples))
+            self.MC.set_detector_function(det.CBox_input_average_detector(
+                                          self.CBox, self.AWG))
+            self.MC.run('Measure_transients_1')
+            a1 = ma.MeasurementAnalysis(auto=True, close_fig=self.close_fig)
+            transient0 = a0.data[1, :]
+            transient1 = a1.data[1, :]
+            optimized_weights = transient1-transient0
+            optimized_weights = optimized_weights+np.mean(optimized_weights)
+            self.CBox.sig0_integration_weights.set(optimized_weights)
+            self.CBox.sig1_integration_weights.set(
+                np.multiply(optimized_weights, 0))  # disabling the Q quadrature
+
+            self.MC.set_sweep_function(awg_swf.OffOn(
+                                       pulse_pars=self.pulse_pars,
+                                       RO_pars=self.RO_pars))
+
+            self.MC.set_detector_function(
+                det.CBox_integration_logging_det(self.CBox, self.AWG))
         self.i += 1
         self.MC.run(name=self.measurement_name+'_'+str(self.i))
         if self.analyze:
             ana = ma.SSRO_Analysis(label=self.measurement_name,
-                                   no_fits=self.raw, close_file=True)
+                                   no_fits=self.raw, close_file=True,
+                                   close_fig=self.close_fig)
             # Arbitrary choice, does not think about the deffinition
+            time_end=time.time()
+            nett_wait = self.wait-time_end+self.time_start
+            print(self.time_start)
+            if nett_wait>0:
+                time.sleep(nett_wait)
             if self.raw:
-                return ana.F_raw
+                return ana.F_raw, ana.theta
             else:
                 return ana.F, ana.F_corrected
 
@@ -425,13 +471,12 @@ class CBox_trace_error_fraction_detector(det.Soft_Detector):
                  save_raw_trace=False,
                  **kw):
         super().__init__(**kw)
-        # TODO remove the no-counters non-raw mode
         self.name = measurement_name
         self.threshold = threshold
-        self.value_names = ['nr no err',
-                            'nr single err',
-                            'nr double err']
-        self.value_units = ['#', '#', '#']
+        self.value_names = ['no err',
+                            'single err',
+                            'double err']
+        self.value_units = ['%', '%', '%']
 
         self.AWG = AWG
         self.MC = MC
@@ -507,7 +552,7 @@ class CBox_trace_error_fraction_detector(det.Soft_Detector):
         self.MC.set_sweep_function(self.sequence_swf)
 
         # if self.counters:
-        self.counters_d = det.CBox_state_couners_det(self.CBox, self.AWG)
+        # self.counters_d = det.CBox_state_counters_det(self.CBox, self.AWG)
 
         self.dig_shots_det = det.CBox_digitizing_shots_det(
             self.CBox, self.AWG,
@@ -530,7 +575,8 @@ class CBox_trace_error_fraction_detector(det.Soft_Detector):
         else:
             self.sequence_swf.prepare()
             counters = self.counters_d.get_values()
-            return counters[0:3]  # no err, single and double for weight A
+            # no err, single and double for weight A
+            return counters[0:3]/self.CBox.get('log_length')*100
 
     def count_error_fractions(self, trace, trace_length):
         no_err_counter = 0
@@ -547,7 +593,9 @@ class CBox_trace_error_fraction_detector(det.Soft_Detector):
                     double_err_counter += 1
             else:
                 no_err_counter += 1
-        return no_err_counter, single_err_counter, double_err_counter
+        return (no_err_counter/len(trace)*100,
+                single_err_counter/len(trace)*100,
+                double_err_counter/len(trace)*100)
 
 
 class CBox_SSRO_discrimination_detector(det.Soft_Detector):
@@ -688,50 +736,7 @@ class CBox_RB_detector(det.Soft_Detector):
 
 
 
-# class SSRO_Fidelity_Detector_CBox_optimum_weights(SSRO_Fidelity_Detector_CBox):
-#     '''
-#     Currently only for CBox.
-#     Todo: remove the predefined values for the sequence
-#     '''
-#     def __init__(self, measurement_name, MC, AWG, CBox,  raw=True,
-#                  RO_pulse_length=300e-9, **kw):
-#         self.detector_control = 'soft'
-#         super().__init__(measurement_name, MC, AWG, CBox,  raw=True,
-#                          RO_pulse_length=300e-9,)
-#         self.name = 'SSRO_opt_weigths_Fidelity'
-#         # For an explanation of the difference between the different
-#         # Fidelities look in the analysis script
-#         if raw:
-#             self.value_names = ['F-raw']
-#             self.value_units = [' ']
-#         else:
-#             self.value_names = ['F', 'F corrected']
-#             self.value_units = [' ', ' ']
 
-#     def prepare(self, **kw):
-#         self.CBox.set('log_length', self.NoSamples)
-
-#         self.MC.set_sweep_function(awg_swf.CBox_OffOn(
-#             IF=self.IF,
-#             RO_pulse_delay=self.RO_pulse_delay,
-#             RO_trigger_delay=self.RO_trigger_delay,
-#             RO_pulse_length=self.RO_pulse_length,
-#             AWG=self.AWG, CBox=self.CBox))
-
-#         self.MC.set_detector_function(
-#             det.CBox_alternating_shots_det(self.CBox, self.AWG))
-
-#     def acquire_data_point(self, *args, **kw):
-#         self.i += 1
-#         self.MC.run(name=self.measurement_name+'_'+str(self.i))
-
-#         ana = ma.SSRO_Analysis(label=self.measurement_name,
-#                                no_fits=self.raw)
-#         # Arbitrary choice, does not think about the deffinition
-#         if self.raw:
-#             return ana.F_raw
-#         else:
-#             return ana.F, ana.F_corrected
 
 class AllXY_devition_detector_CBox(det.Soft_Detector):
     '''
@@ -2144,149 +2149,149 @@ class Tracked_Qubit_Spectroscopy(det.Soft_Detector):
         self.nested_MC.remove()
 
 
-class T1_Detector(Qubit_Characterization_Detector):
-    def __init__(self, qubit,
-                 spec_start=None,
-                 spec_stop=None,
-                 pulse_amp_guess=0.7,
-                 AWG_name='AWG',
-                 **kw):
-        from modules.measurement import calibration_toolbox as cal_tools
-        imp.reload(cal_tools)
-        self.detector_control = 'soft'
-        self.name = 'T1_Detector'
-        self.value_names = ['f_resonator', 'f_resonator_stderr',
-                            'f_qubit', 'f_qubit_stderr', 'T1', 'T1_stderr']
-        self.value_units = ['GHz', 'GHz', 'GHz', 'GHz', 'us', 'us']
+# class T1_Detector(Qubit_Characterization_Detector):
+#     def __init__(self, qubit,
+#                  spec_start=None,
+#                  spec_stop=None,
+#                  pulse_amp_guess=0.7,
+#                  AWG_name='AWG',
+#                  **kw):
+#         from modules.measurement import calibration_toolbox as cal_tools
+#         imp.reload(cal_tools)
+#         self.detector_control = 'soft'
+#         self.name = 'T1_Detector'
+#         self.value_names = ['f_resonator', 'f_resonator_stderr',
+#                             'f_qubit', 'f_qubit_stderr', 'T1', 'T1_stderr']
+#         self.value_units = ['GHz', 'GHz', 'GHz', 'GHz', 'us', 'us']
 
-        self.AWG = qt.instruments[AWG_name]
-        self.pulse_amp_guess = pulse_amp_guess
-        self.cal_tools = cal_tools
-        self.qubit = qubit
-        self.nested_MC_name = 'MC_T1_detector'
-        self.nested_MC = qt.instruments[self.nested_MC_name]
-        self.cal_tools = cal_tools
-        self.spec_start = spec_start
-        self.spec_stop = spec_stop
-        self.qubit_drive_ins = qt.instruments[self.qubit.get_qubit_drive()]
-        self.HM = qt.instruments['HM']
-        self.TD_Meas = qt.instruments['TD_Meas']
-        # Setting the constants
-        self.calreadoutevery = 1
-        self.loopcnt = 0
-        self.T1_stepsize = 500
+#         self.AWG = qt.instruments[AWG_name]
+#         self.pulse_amp_guess = pulse_amp_guess
+#         self.cal_tools = cal_tools
+#         self.qubit = qubit
+#         self.nested_MC_name = 'MC_T1_detector'
+#         self.nested_MC = qt.instruments[self.nested_MC_name]
+#         self.cal_tools = cal_tools
+#         self.spec_start = spec_start
+#         self.spec_stop = spec_stop
+#         self.qubit_drive_ins = qt.instruments[self.qubit.get_qubit_drive()]
+#         self.HM = qt.instruments['HM']
+#         self.TD_Meas = qt.instruments['TD_Meas']
+#         # Setting the constants
+#         self.calreadoutevery = 1
+#         self.loopcnt = 0
+#         self.T1_stepsize = 500
 
-    def prepare(self, **kw):
+#     def prepare(self, **kw):
 
-        self.nested_MC = qt.instruments.create(
-            self.nested_MC_name,
-            'MeasurementControl')
+#         self.nested_MC = qt.instruments.create(
+#             self.nested_MC_name,
+#             'MeasurementControl')
 
-    def acquire_data_point(self, *args, **kw):
-        self.loopcnt += 1
+#     def acquire_data_point(self, *args, **kw):
+#         self.loopcnt += 1
 
-        self.switch_to_freq_sweep()
+#         self.switch_to_freq_sweep()
 
-        cur_f_RO = self.qubit.get_current_RO_frequency()
-        resonator_scan = self.cal_tools.find_resonator_frequency(
-            MC_name=self.nested_MC_name,
-            start_freq=cur_f_RO-0.002,
-            end_freq=cur_f_RO+0.002,
-            suppress_print_statements=True)
-        f_resonator = resonator_scan['f_resonator']
-        f_resonator_stderr = resonator_scan['f_resonator_stderr']
-        print('Readout frequency: ', f_resonator)
+#         cur_f_RO = self.qubit.get_current_RO_frequency()
+#         resonator_scan = self.cal_tools.find_resonator_frequency(
+#             MC_name=self.nested_MC_name,
+#             start_freq=cur_f_RO-0.002,
+#             end_freq=cur_f_RO+0.002,
+#             suppress_print_statements=True)
+#         f_resonator = resonator_scan['f_resonator']
+#         f_resonator_stderr = resonator_scan['f_resonator_stderr']
+#         print('Readout frequency: ', f_resonator)
 
-        self.qubit.set_current_RO_frequency(f_resonator)
-        self.HM.set_frequency(self.qubit.get_current_RO_frequency()*1e9)
+#         self.qubit.set_current_RO_frequency(f_resonator)
+#         self.HM.set_frequency(self.qubit.get_current_RO_frequency()*1e9)
 
-        qubit_scan = self.cal_tools.find_qubit_frequency_spec(
-            MC_name=self.nested_MC_name,
-            qubit=self.qubit,
-            start_freq=None,
-            end_freq=None,
-            suppress_print_statements=True)
-        f_qubit = qubit_scan['f_qubit']
-        f_qubit_stderr = qubit_scan['f_qubit_stderr']
+#         qubit_scan = self.cal_tools.find_qubit_frequency_spec(
+#             MC_name=self.nested_MC_name,
+#             qubit=self.qubit,
+#             start_freq=None,
+#             end_freq=None,
+#             suppress_print_statements=True)
+#         f_qubit = qubit_scan['f_qubit']
+#         f_qubit_stderr = qubit_scan['f_qubit_stderr']
 
-        print('Estimated qubit frequency: ', f_qubit)
-        self.qubit.set_current_frequency(f_qubit)
+#         print('Estimated qubit frequency: ', f_qubit)
+#         self.qubit.set_current_frequency(f_qubit)
 
-        #############################
-        # Start of Time Domain part #
-        #############################
+#         #############################
+#         # Start of Time Domain part #
+#         #############################
 
-        self.TD_Meas.set_f_readout(self.qubit.get_current_RO_frequency()*1e9)
-        self.qubit_drive_ins.set_frequency(
-            (self.qubit.get_current_frequency() +
-             self.qubit.get_sideband_modulation_frequency()) * 1e9)
-        self.switch_to_time_domain_measurement()
+#         self.TD_Meas.set_f_readout(self.qubit.get_current_RO_frequency()*1e9)
+#         self.qubit_drive_ins.set_frequency(
+#             (self.qubit.get_current_frequency() +
+#              self.qubit.get_sideband_modulation_frequency()) * 1e9)
+#         self.switch_to_time_domain_measurement()
 
-        self.qubit.set_pulse_amplitude_I(self.pulse_amp_guess)
-        self.qubit.set_pulse_amplitude_Q(self.pulse_amp_guess)
-        amp_ch1, amp_ch2 = self.cal_tools.calibrate_pulse_amplitude(
-            MC_name=self.nested_MC_name,
-            qubit=self.qubit,
-            max_nr_iterations=3, desired_accuracy=.1, Navg=4,
-            suppress_print_statements=False)
+#         self.qubit.set_pulse_amplitude_I(self.pulse_amp_guess)
+#         self.qubit.set_pulse_amplitude_Q(self.pulse_amp_guess)
+#         amp_ch1, amp_ch2 = self.cal_tools.calibrate_pulse_amplitude(
+#             MC_name=self.nested_MC_name,
+#             qubit=self.qubit,
+#             max_nr_iterations=3, desired_accuracy=.1, Navg=4,
+#             suppress_print_statements=False)
 
-        self.qubit.set_pulse_amplitude_I(amp_ch1)
-        self.qubit.set_pulse_amplitude_Q(amp_ch2)
+#         self.qubit.set_pulse_amplitude_I(amp_ch1)
+#         self.qubit.set_pulse_amplitude_Q(amp_ch2)
 
-        self.nested_MC.set_detector_function(det.TimeDomainDetector_cal())
+#         self.nested_MC.set_detector_function(det.TimeDomainDetector_cal())
 
-        if self.qubit.pulse_amp_control == 'AWG':
-            self.nested_MC.set_sweep_function(awg_swf.T1(
-                stepsize=self.T1_stepsize,
-                gauss_width=self.qubit.get_gauss_width()))
-        elif self.qubit.pulse_amp_control == 'Duplexer':
-            self.nested_MC.set_sweep_function(awg_swf.T1(
-                stepsize=self.T1_stepsize,
-                gauss_width=self.qubit.get_gauss_width(),
-                Duplexer=True))
+#         if self.qubit.pulse_amp_control == 'AWG':
+#             self.nested_MC.set_sweep_function(awg_swf.T1(
+#                 stepsize=self.T1_stepsize,
+#                 gauss_width=self.qubit.get_gauss_width()))
+#         elif self.qubit.pulse_amp_control == 'Duplexer':
+#             self.nested_MC.set_sweep_function(awg_swf.T1(
+#                 stepsize=self.T1_stepsize,
+#                 gauss_width=self.qubit.get_gauss_width(),
+#                 Duplexer=True))
 
-        self.nested_MC.run()
-        T1_a = ma.T1_Analysis(auto=True, close_file=False)
-        T1, T1_stderr = T1_a.get_measured_T1()
-        T1_a.finish()
-        self.qubit_drive_ins.off()
+#         self.nested_MC.run()
+#         T1_a = ma.T1_Analysis(auto=True, close_file=False)
+#         T1, T1_stderr = T1_a.get_measured_T1()
+#         T1_a.finish()
+#         self.qubit_drive_ins.off()
 
-        return_vals = [f_resonator, f_resonator_stderr,
-                       f_qubit, f_qubit_stderr, T1, T1_stderr]
-        return return_vals
+#         return_vals = [f_resonator, f_resonator_stderr,
+#                        f_qubit, f_qubit_stderr, T1, T1_stderr]
+#         return return_vals
 
-    def finish(self, **kw):
-        self.HM.set_sources('Off')
-        self.nested_MC.remove()
+#     def finish(self, **kw):
+#         self.HM.set_sources('Off')
+#         self.nested_MC.remove()
 
-class HM_SH(det.Soft_Detector):
-    '''
-    Combining a Homodyne measurment and the Signal Hound power at a fixed
-    frequency
-    '''
+# class HM_SH(det.Soft_Detector):
+#     '''
+#     Combining a Homodyne measurment and the Signal Hound power at a fixed
+#     frequency
+#     '''
 
-    def __init__(self, frequency, **kw):
-        # super(TimeDomainDetector_integrated, self).__init__()
+#     def __init__(self, frequency, **kw):
+#         # super(TimeDomainDetector_integrated, self).__init__()
 
-        self.detector_control = 'soft'
-        self.name = 'HM_SH'
-        self.value_names = ['S21_magn', 'S21_phase', 'Power']
-        self.value_units = ['V', 'deg', 'dBm']
-        self.HomodyneDetector = det.HomodyneDetector()
-        self.Signal_Hound_fixed_frequency = det.Signal_Hound_fixed_frequency(
-                                                    frequency=frequency)
+#         self.detector_control = 'soft'
+#         self.name = 'HM_SH'
+#         self.value_names = ['S21_magn', 'S21_phase', 'Power']
+#         self.value_units = ['V', 'deg', 'dBm']
+#         self.HomodyneDetector = det.HomodyneDetector()
+#         self.Signal_Hound_fixed_frequency = det.Signal_Hound_fixed_frequency(
+#                                                     frequency=frequency)
 
-    def acquire_data_point(self, *args, **kw):
-        HM_data = self.HomodyneDetector.acquire_data_point()
-        SH_data = self.Signal_Hound_fixed_frequency.acquire_data_point()
+#     def acquire_data_point(self, *args, **kw):
+#         HM_data = self.HomodyneDetector.acquire_data_point()
+#         SH_data = self.Signal_Hound_fixed_frequency.acquire_data_point()
 
-        return [HM_data[0], HM_data[1], SH_data]
+#         return [HM_data[0], HM_data[1], SH_data]
 
-    def prepare(self, **kw):
-        self.HomodyneDetector.prepare()
-        self.Signal_Hound_fixed_frequency.prepare()
-        print('prepare worked')
+#     def prepare(self, **kw):
+#         self.HomodyneDetector.prepare()
+#         self.Signal_Hound_fixed_frequency.prepare()
+#         print('prepare worked')
 
-    def finish(self, **kw):
-        self.HomodyneDetector.finish()
-        self.Signal_Hound_fixed_frequency.finish()
+#     def finish(self, **kw):
+#         self.HomodyneDetector.finish()
+#         self.Signal_Hound_fixed_frequency.finish()

@@ -36,7 +36,7 @@ def mixer_carrier_cancellation(**kw):
                               'See the archived folder for the old function')
 
 
-def mixer_skewness_calibration_5014(SH, Source, station,
+def mixer_skewness_calibration_5014(SH, source, station,
                                     MC=None,
                                     QI_amp_ratio=None, IQ_phase=None,
                                     frequency=None, f_mod=10e6,
@@ -68,7 +68,7 @@ def mixer_skewness_calibration_5014(SH, Source, station,
     '''
     if frequency is None:
         # Corresponds to the frequency where to minimize with the SH
-        frequency = Source.frequency.get() - f_mod
+        frequency = source.frequency.get() - f_mod
     if QI_amp_ratio is None:
         QI_amp_ratio = ManualParameter('QI_amp', initial_value=1)
     if IQ_phase is None:
@@ -87,9 +87,9 @@ def mixer_skewness_calibration_5014(SH, Source, station,
     S2 = pw.wrap_par_to_swf(IQ_phase)
 
     ad_func_pars = {'adaptive_function': nelder_mead,
-                    'x0': [1, 0.0],
+                    'x0': [1.0, 0.0],
                     'initial_step': [.15, 10],
-                    'no_improv_break': 5,
+                    'no_improv_break': 10,
                     'minimize': True,
                     'maxiter': 500}
     MC.set_sweep_functions([S1, S2])
@@ -123,6 +123,9 @@ def mixer_carrier_cancellation_5014(AWG, SH, source, MC,
     source:     the source for which carrier leakage must be minimized
     frequency:  frequency in Hz on which to minimize leakage, if None uses the
                 current frequency of the source
+
+    returns:
+         ch_1_min, ch_2_min
 
     voltage_grid defines the ranges for the preliminary coarse sweeps.
     If the range is too small, add another number infront of -0.12
@@ -161,7 +164,7 @@ def mixer_carrier_cancellation_5014(AWG, SH, source, MC,
         MC.set_sweep_function(ch1_swf)
         MC.set_detector_function(
             det.Signal_Hound_fixed_frequency(signal_hound=SH,
-                                             frequency=frequency*1e-9))
+                                             frequency=frequency))
         MC.set_sweep_points(np.linspace(ch_1_min + voltage_span,
                                         ch_1_min - voltage_span, 11))
         MC.run(name='Mixer_cal_Offset_%s' % AWG_channel1,
@@ -256,7 +259,7 @@ def mixer_carrier_cancellation_CBox(CBox, SH, source, MC,
         # Channel 0
         MC.set_sweep_function(ch0_swf)
         MC.set_detector_function(
-            det.Signal_Hound_fixed_frequency(signal_hound=SH, frequency=frequency*1e-9))
+            det.Signal_Hound_fixed_frequency(signal_hound=SH, frequency=frequency))
         MC.set_sweep_points(np.linspace(ch_0_min + voltage_span,
                                         ch_0_min - voltage_span, 11))
         MC.run(name='Mixer_cal_Offset_awg{}_dac{}'.format(awg_nr, 0),

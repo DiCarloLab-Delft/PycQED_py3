@@ -29,12 +29,16 @@ class CBox_driven_transmon(Transmon):
         Acquisition:           CBox
         Readout pulse configuration: LO modulated using AWG
     '''
+    shared_kwargs = ['LO', 'cw_source', 'td_source', 'IVVI', 'AWG', 'LutMan',
+                     'CBox',
+                     'heterodyne_instr',  'MC']
+
     def __init__(self, name,
                  LO, cw_source, td_source,
                  IVVI, AWG, LutMan,
                  CBox, heterodyne_instr,
-                 MC):
-        super().__init__(name)
+                 MC, **kw):
+        super().__init__(name, **kw)
         '''
         Adds the parameters to the qubit insrument, it provides initial values
         for some parameters but not for all. Powers have to be set by hand as
@@ -53,6 +57,10 @@ class CBox_driven_transmon(Transmon):
         self.add_parameter('mod_amp_cw', label='RO modulation ampl cw',
                            units='V', initial_value=0.5,
                            parameter_class=ManualParameter)
+        self.add_parameter('RO_power_cw', label='RO power cw',
+                           units='dBm',
+                           parameter_class=ManualParameter)
+
         self.add_parameter('mod_amp_td', label='RO modulation ampl td',
                            units='V', initial_value=0.5,
                            parameter_class=ManualParameter)
@@ -119,8 +127,11 @@ class CBox_driven_transmon(Transmon):
         self.LO.on()
         self.td_source.off()
         self.cw_source.on()
-        self.heterodyne_instr.set('mod_amp', self.mod_amp_cw.get())
-        # TODO Update IF to f_RO_mod in heterodyne instr
+        if hasattr(self.heterodyne_instr, 'mod_amp'):
+            self.heterodyne_instr.set('mod_amp', self.mod_amp_cw.get())
+        else:
+            self.heterodyne_instr.RF_power(self.RO_power_cw())
+        # TODO: Update IF to f_RO_mod in heterodyne instr
         self.heterodyne_instr.set('IF', self.f_RO_mod.get())
         self.heterodyne_instr.frequency.set(self.f_res.get())
         self.cw_source.pulsemod_state.set('off')
@@ -243,7 +254,7 @@ class CBox_driven_transmon(Transmon):
             resetless_interval=resetless_interval,
             RO_pulse_delay=self.RO_pulse_delay.get(),
             RO_pulse_length=self.RO_pulse_length.get(),
-            RO_trigger_delay=self.RO_trigger_delay.get(),
+            RO_trigger_delay=self.RO_acq_marker_delay.get(),
             AWG=self.AWG, CBox=self.CBox, upload=upload)
 
         d = cdet.CBox_trace_error_fraction_detector(
@@ -508,7 +519,10 @@ class CBox_driven_transmon(Transmon):
         self.cw_source.power.set(self.spec_pow_pulsed.get())
 
         self.AWG.start()
-        self.heterodyne_instr.mod_amp.set(self.mod_amp_td.get())
+        if hasattr(self.heterodyne_instr, 'mod_amp'):
+            self.heterodyne_instr.set('mod_amp', self.mod_amp_cw.get())
+        else:
+            self.heterodyne_instr.RF.power(self.RO_power_cw())
         MC.set_sweep_function(pw.wrap_par_to_swf(self.cw_source.frequency))
         MC.set_sweep_points(freqs)
         MC.set_detector_function(det.Heterodyne_probe(self.heterodyne_instr))
@@ -562,7 +576,7 @@ class CBox_driven_transmon(Transmon):
             IF=self.f_RO_mod.get(), n_pulses=n,
             pulse_delay=self.pulse_delay.get(),
             RO_pulse_delay=self.RO_pulse_delay.get(),
-            RO_trigger_delay=self.RO_trigger_delay.get(),
+            RO_trigger_delay=self.RO_acq_marker_delay.get(),
             RO_pulse_length=self.RO_pulse_length.get(), verbose=verbose)
         self.AWG.set('ch3_amp', self.mod_amp_td.get())
         self.AWG.set('ch4_amp', self.mod_amp_td.get())
@@ -599,7 +613,7 @@ class CBox_driven_transmon(Transmon):
         MC.set_sweep_function(
             awg_swf.CBox_T1(IF=self.f_RO_mod.get(),
                             RO_pulse_delay=self.RO_pulse_delay.get(),
-                            RO_trigger_delay=self.RO_trigger_delay.get(),
+                            RO_trigger_delay=self.RO_acq_marker_delay.get(),
                             mod_amp=self.mod_amp_td.get(),
                             AWG=self.AWG,
                             upload=True))
@@ -631,7 +645,7 @@ class CBox_driven_transmon(Transmon):
         Rams_swf = awg_swf.CBox_Ramsey(
             AWG=self.AWG, CBox=self.CBox, IF=self.f_RO_mod.get(), pulse_delay=0,
             RO_pulse_delay=self.RO_pulse_delay.get(),
-            RO_trigger_delay=self.RO_trigger_delay.get(),
+            RO_trigger_delay=self.RO_acq_marker_delay.get(),
             RO_pulse_length=self.RO_pulse_length.get())
         MC.set_sweep_function(Rams_swf)
         MC.set_sweep_points(times)
@@ -660,7 +674,7 @@ class CBox_driven_transmon(Transmon):
             AWG=self.AWG, CBox=self.CBox, IF=self.f_RO_mod.get(),
             pulse_delay=self.pulse_delay.get(),
             RO_pulse_delay=self.RO_pulse_delay.get(),
-            RO_trigger_delay=self.RO_trigger_delay.get(),
+            RO_trigger_delay=self.RO_acq_marker_delay.get(),
             RO_pulse_length=self.RO_pulse_length.get())
         d.prepare()
         d.acquire_data_point()
@@ -684,7 +698,7 @@ class CBox_driven_transmon(Transmon):
             AWG=self.AWG, CBox=self.CBox, IF=self.f_RO_mod.get(),
             pulse_delay=self.pulse_delay.get(),
             RO_pulse_delay=self.RO_pulse_delay.get(),
-            RO_trigger_delay=self.RO_trigger_delay.get(),
+            RO_trigger_delay=self.RO_acq_marker_delay.get(),
             RO_pulse_length=self.RO_pulse_length.get())
 
         if return_detector:

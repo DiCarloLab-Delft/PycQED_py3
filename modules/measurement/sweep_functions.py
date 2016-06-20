@@ -78,8 +78,6 @@ class Delayed_None_Sweep(Soft_Sweep):
         self.time_last_set = time.time()
 
 
-
-
 class Dummy_Set_DS_frequency_GHz(Soft_Sweep):
     def __init__(self, **kw):
         super(Dummy_Set_DS_frequency_GHz, self).__init__()
@@ -107,176 +105,7 @@ class Dummy_Source_Frequency_GHz(Soft_Sweep):
         pass
 
 
-class Heterodyne_frequency_GHz(Soft_Sweep):
-    def __init__(self, **kw):
-        super(Heterodyne_frequency_GHz, self).__init__()
-        self.HS = qt.instruments['HS']
-        self.name = 'HS frequency'
-        self.parameter_name = 'frequency'
-        self.unit = 'GHz'
-
-    def set_parameter(self, val):
-        self.HS.set_frequency(val)
-
-
-class Heterodyne_power_dBm(Soft_Sweep):
-    def __init__(self, **kw):
-        super(Heterodyne_power_dBm, self).__init__()
-        self.HS = qt.instruments['HS']
-        self.name = 'RF power'
-        self.parameter_name = 'power'
-        self.unit = 'dBm'
-
-    def set_parameter(self, val):
-        self.HS.set_RF_power(val)
-
-
-class HM_frequency_GHz(Soft_Sweep):
-    def __init__(self, **kw):
-        super(HM_frequency_GHz, self).__init__()
-        self.HM = qt.instruments['HM']
-        self.name = 'HM frequency'
-        self.parameter_name = 'frequency'
-        self.unit = 'GHz'
-
-    def set_parameter(self, val):
-        self.HM.set_frequency(val*1e9)
-
-
-class HM_power_dBm(Soft_Sweep):
-    def __init__(self, **kw):
-        super(HM_power_dBm, self).__init__()
-        self.HM = qt.instruments['HM']
-        self.name = 'RF power'
-        self.parameter_name = 'power'
-        self.unit = 'dBm'
-
-    def set_parameter(self, val):
-        self.HM.set_RF_power(val)
-
-class HM_IF_GHz(Soft_Sweep):
-    def __init__(self, **kw):
-        super(HM_IF_GHz, self).__init__()
-        self.HM = qt.instruments['HM']
-        self.name = 'Intermediate Frequency'
-        self.parameter_name = 'IF'
-        self.unit = 'GHz'
-
-    def set_parameter(self, val):
-        self.HM.set_IF(val*1e9)
-
-
-class Pulsed_Spec_RO_frequency_GHz(Soft_Sweep):
-    def __init__(self, **kw):
-        super(Pulsed_Spec_RO_frequency_GHz, self).__init__()
-        self.Pulsed_Spec = qt.instruments['Pulsed_Spec']
-        self.name = 'Readout frequency'
-        self.parameter_name = 'frequency'
-        self.unit = 'GHz'
-
-    def set_parameter(self, val):
-        self.Pulsed_Spec.set_f_readout(val*1e9)
-
-
-class Pulsed_Spec_RF_power_dBm(Soft_Sweep):
-    def __init__(self, **kw):
-        super(Pulsed_Spec_RF_power_dBm, self).__init__()
-        self.Pulsed_Spec = qt.instruments['Pulsed_Spec']
-        self.name = 'RF power'
-        self.parameter_name = 'power'
-        self.unit = 'dBm'
-
-    def set_parameter(self, val):
-        self.Pulsed_Spec.set_RF_power(val)
-
-
-class Pulsed_Spec_t_int(Soft_Sweep):
-    def __init__(self, **kw):
-        super(Pulsed_Spec_t_int, self).__init__()
-        self.Pulsed_Spec = qt.instruments['Pulsed_Spec']
-        self.name = 'Integration time'
-        self.parameter_name = 'Time'
-        self.unit = 'ATS timesteps'
-
-    def set_parameter(self, val):
-        self.Pulsed_Spec.set_t_int(val)
-
-class Pulsed_Spec_t_int_start(Soft_Sweep):
-    def __init__(self, **kw):
-        super(Pulsed_Spec_t_int_start, self).__init__()
-        self.Pulsed_Spec = qt.instruments['Pulsed_Spec']
-        self.name = 'Starting time'
-        self.parameter_name = 'Time'
-        self.unit = 'ATS timesteps'
-
-    def set_parameter(self, val):
-        self.Pulsed_Spec.set_int_start(val)
-
-class TD_RO_frequency_GHz(Soft_Sweep):
-    def __init__(self, **kw):
-        super(TD_RO_frequency_GHz, self).__init__()
-        self.TD_Meas = qt.instruments['TD_Meas']
-        self.name = 'Readout frequency'
-        self.parameter_name = 'frequency'
-        self.unit = 'GHz'
-
-    def set_parameter(self, val):
-        self.TD_Meas.set_f_readout(val*1e9)
-
-
-class TD_RO_frequency_multiplex_GHz(Soft_Sweep):
-    def __init__(self, f_readout_lst, idx, **kw):
-        super(TD_RO_frequency_multiplex_GHz, self).__init__()
-        self.TD_Meas = qt.instruments['TD_Meas']
-        self.name = 'Multiplex readout frequency'
-        self.parameter_name = 'frequency'
-        self.unit = 'GHz'
-
-        self.f_readout_lst = f_readout_lst
-        self.idx = idx - 1
-
-    def set_parameter(self, val):
-        f_readout_lst = self.f_readout_lst
-        f_readout_lst[self.idx] = val * 1e9
-        self.TD_Meas.set_f_readout_list(f_readout_lst)
-
-
-class TD_RO_power_dBm(Soft_Sweep):
-    def __init__(self, **kw):
-        super(TD_RO_power_dBm, self).__init__()
-        self.TD_Meas = qt.instruments['TD_Meas']
-        self.name = 'RF power'
-        self.parameter_name = 'power'
-        self.unit = 'dBm'
-
-    def set_parameter(self, val):
-        self.TD_Meas.set_RF_power(val)
-
-class TD_t_int(Soft_Sweep):
-    def __init__(self, **kw):
-        super(TD_t_int, self).__init__()
-        self.TD_Meas = qt.instruments['TD_Meas']
-        self.name = 't_integration'
-        self.parameter_name = 't_integration'
-        self.unit = 'ns'
-
-    def set_parameter(self, val):
-        self.TD_Meas.set_t_int(val)
-
-
 ###################################
-
-
-class Source_frequency_modulated_GHz(Soft_Sweep):
-    def __init__(self, modulation_freq, **kw):
-        super(Source_frequency_modulated_GHz, self).__init__(**kw)
-        self.name = 'Source frequency modulated'
-        self.parameter_name = 'Drive-frequency'
-        self.unit = 'GHz'
-        self.modulation_freq = modulation_freq
-
-    def set_parameter(self, val):
-        self.S.set_frequency((val - self.modulation_freq)*1e9)
 
 
 class Source_frequency_GHz_Resonator_Scan(Soft_Sweep):
@@ -333,17 +162,19 @@ class AWG_multi_channel_amplitude(Soft_Sweep):
     '''
     Sweep function to sweep multiple AWG channels simultaneously
     '''
-    def __init__(self, AWG, channels, **kw):
+    def __init__(self, AWG, channels, delay=0, **kw):
         super().__init__()
         self.name = 'AWG channel amplitude chs %s' % channels
         self.parameter_name = 'AWG chs %s' % channels
         self.unit = 'V'
         self.AWG = AWG
         self.channels = channels
+        self.delay = delay
 
     def set_parameter(self, val):
         for ch in self.channels:
             self.AWG.set('ch{}_amp'.format(ch), val)
+        time.sleep(self.delay)
 
 
 class AWG_sequence(Soft_Sweep):

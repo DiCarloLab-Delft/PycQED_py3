@@ -12,6 +12,8 @@ from matplotlib import colors
 import pandas as pd
 from uuid import getnode as get_mac
 from init.config import setup_dict
+from scipy.interpolate import griddata
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 # to allow backwards compatibility with old a_tools code
 from .tools.file_handling import *
@@ -988,7 +990,7 @@ def normalize_2D_data_on_elements(data_2D, elements):
     return data_2D
 
 def rotate_and_normalize_data(data, cal_zero_points, cal_one_points,
-                              zero_coord=None, one_coord=None):
+                              zero_coord=None, one_coord=None, **kw):
     '''
     Rotates and normalizes data with respect to some reference coordinates.
     there are two ways to specify the reference coordinates.
@@ -1070,14 +1072,14 @@ def current_timemark():
 ######################################################################
 
 
-def color_plot(x, y, z, fig, ax, show=False, normalize=False, log=False,
-               do_transpose=False, **kw):
+def color_plot(x, y, z, fig, ax, cax=None,
+               show=False, normalize=False, log=False,
+               do_transpose=False, add_colorbar=True, **kw):
     '''
     x, and y are lists, z is a matrix with shape (len(x), len(y))
     In the future this function can be overloaded to handle different
     types of input.
     '''
-    from mpl_toolkits.axes_grid1 import make_axes_locatable
 
     # calculate coordinates for corners of color blocks
     # x coordinates
@@ -1091,10 +1093,10 @@ def color_plot(x, y, z, fig, ax, show=False, normalize=False, log=False,
     y_vertices[0] = y[0] - (y[1]-y[0])/2.
     y_vertices[-1] = y[-1] + (y[-1]-y[-2])/2.
 
-    ## This version (below) does not plot the last row, but it possibly fixes
-    ## an issue where it wouldn't plot at all on one computer
-    ## Above lines work as of 26/11/2015 on La Ferrari in both
-    ## MA.MeasurementAnalysis and MA.TwoD_Analysis
+    # This version (below) does not plot the last row, but it possibly fixes
+    # an issue where it wouldn't plot at all on one computer
+    # Above lines work as of 26/11/2015 on La Ferrari in both
+    # MA.MeasurementAnalysis and MA.TwoD_Analysis
     # x_vertices = np.array(x)-(x[1]-x[0])/2.0  # Shift to ensure centre of cmap
     # y_vertices = np.array(y)-(y[1]-y[0])/2.0  # at right position
 
@@ -1127,7 +1129,8 @@ def color_plot(x, y, z, fig, ax, show=False, normalize=False, log=False,
                                  z.transpose(),
                                  cmap=cmap, vmin=clim[0], vmax=clim[1])
     else:
-        colormap = ax.pcolormesh(x_grid, y_grid, z, cmap=cmap, norm=norm)
+        colormap = ax.pcolormesh(x_grid, y_grid, z, cmap=cmap, norm=norm,
+                                 vmin=clim[0], vmax=clim[1])
 
     plot_title = kw.pop('plot_title', None)
 
@@ -1161,13 +1164,15 @@ def color_plot(x, y, z, fig, ax, show=False, normalize=False, log=False,
 
     ax.get_yaxis().set_tick_params(direction='out')
     ax.get_xaxis().set_tick_params(direction='out')
-
-    ax_divider = make_axes_locatable(ax)
-    cax = ax_divider.append_axes('right',size='10%', pad='5%')
-    cbar = plt.colorbar(colormap, cax=cax)
-    if zlabel is not None:
-        cbar.set_label(zlabel)
-    return fig, ax
+    if add_colorbar:
+        if cax is None:
+            ax_divider = make_axes_locatable(ax)
+            cax = ax_divider.append_axes('right', size='10%', pad='5%')
+        cbar = plt.colorbar(colormap, cax=cax)
+        if zlabel is not None:
+            cbar.set_label(zlabel)
+        return fig, ax, colormap, cbar
+    return fig, ax, colormap
 
 
 def color_plot_slices(xvals, yvals, zvals, ax=None,
@@ -1248,6 +1253,46 @@ def linecut_plot(x, y, z, fig, ax,
     ax.set_ylabel(xlabel)
     ax.set_ylabel(zlabel)
     return ax
+
+
+def color_plot_interpolated(x, y, z, ax=None,
+                            num_points=300,
+                            zlabel=None, cmap='viridis',
+                            interpolation_method='linear'):
+    """
+    Plots a heatmap using z values at coordinates (x, y) using cubic
+    interpolation.
+    x: 1D array
+    y: 1D array
+    z: 1D array
+
+
+    """
+    if ax is None:
+        f, ax = plt.subplots()
+    # define grid.
+    xi = np.linspace(min(x), max(x), num_points)
+    yi = np.linspace(min(y), max(y), num_points)
+    # grid the data.
+    zi = griddata((x, y), z, (xi[None, :], yi[:, None]),
+                  method=interpolation_method)
+    CS = plt.contour(xi, yi, zi, 30, linewidths=0.2, colors='k')
+    CS = plt.contourf(xi, yi, zi, 30, cmap=cmap)
+
+    ax_divider = make_axes_locatable(ax)
+    cax = ax_divider.append_axes('right', size='5%', pad='5%')
+    cbar = plt.colorbar(CS, cax=cax)
+
+    ax.get_yaxis().set_tick_params(direction='out')
+    ax.get_xaxis().set_tick_params(direction='out')
+    if zlabel is not None:
+        cbar.set_label(zlabel)
+    return ax
+
+
+######################################################################
+#    Calculations tools
+######################################################################
 
 
 def calculate_transmon_transitions(EC, EJ, asym=0, reduced_flux=0,

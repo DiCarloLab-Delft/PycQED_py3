@@ -5,7 +5,7 @@ from ..waveform_control import sequence
 from ..waveform_control.viewer import show_element, show_wf
 from ..waveform_control import pulse_library as pl
 
-from . import standard_elements as st_elts
+from . import standard_elements_cbox as st_elts
 from importlib import reload
 reload(st_elts)
 station = None
@@ -14,14 +14,15 @@ reload(element)
 # I guess there are cleaner solutions :)
 
 '''
+Update (12-4-2016) this module has grown out to be very CBox specific.
+Almost any sequence here can be made with the "multi_pulse_elt" that exists
+in single_qubit_tek_seq_elts.
+
+Will not move what is here now for backwards compatibility.
 Standard sequences. Currently (17-1-2016) all sequences have the channels
 hardcoded. It would be better if these use the named channels and have the
 mapping defined on the pulsar.
 
-Update (12-4-2016) this module has grown out to be very CBox specific.
-Almost any sequence here can be made with the "multi_pulse_elt" that exists
-in single_qubit_tek_seq_elts.
-Will not move what is here now for backwards compatibility.
 '''
 
 
@@ -87,7 +88,7 @@ def generate_and_upload_marker_sequence(marker_length, marker_interval,
             el = generate_marker_element(i, marker_length, marker_interval)
         el_list.append(el)
         seq.append_element(el, trigger_wait=False) # Ensures a continuously running sequence
-    station.instruments['AWG'].stop()
+    station.components['AWG'].stop()
     station.pulsar.program_awg(seq, *el_list, verbose=False)
     return seq_name
 
@@ -112,7 +113,7 @@ def Pulsed_spec_seq_RF_mod(IF, spec_pulse_length=1e-6,
             mod_amp=mod_amp)
         el_list.append(el)
         seq.append_element(el, trigger_wait=False) # Ensures a continuously running sequence
-    station.instruments['AWG'].stop()
+    station.components['AWG'].stop()
     station.pulsar.program_awg(seq, *el_list, verbose=False)
 
 
@@ -125,7 +126,7 @@ def single_marker_seq(verbose=False):
         el = st_elts.single_marker_elt(i, station)
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
-    station.instruments['AWG'].stop()
+    station.components['AWG'].stop()
     station.pulsar.program_awg(seq, *el_list, verbose=verbose)
     return seq_name
 
@@ -143,7 +144,7 @@ def CBox_single_pulse_seq(IF, RO_pulse_delay, RO_trigger_delay,
                                       RO_pulse_length)
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
-    station.instruments['AWG'].stop()
+    station.components['AWG'].stop()
     station.pulsar.program_awg(seq, *el_list, verbose=verbose)
     return seq_name
 
@@ -163,7 +164,7 @@ def CBox_two_pulse_seq(IF, pulse_delay, RO_pulse_length,
                                    RO_pulse_length=RO_pulse_length)
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
-    station.instruments['AWG'].stop()
+    station.components['AWG'].stop()
     station.pulsar.program_awg(seq, *el_list, verbose=verbose)
     return seq_name
 
@@ -186,7 +187,7 @@ def CBox_multi_pulse_seq(IF, n_pulses,
                                      n_pulses=n_pulses)
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
-    station.instruments['AWG'].stop()
+    station.components['AWG'].stop()
     station.pulsar.program_awg(seq, *el_list, verbose=verbose)
     return seq_name
 
@@ -220,7 +221,7 @@ def CBox_resetless_multi_pulse_seq(IF, n_pulses,
     # Extra element is needed because otherwise last elt will always goto 1
     seq.append_element(el_list[2], trigger_wait=False,
                        goto_target=el_list[1].name)
-    station.instruments['AWG'].stop()
+    station.components['AWG'].stop()
     station.pulsar.program_awg(seq, *el_list, verbose=verbose)
 
 
@@ -252,7 +253,7 @@ def CBox_T1_marker_seq(IF, times, RO_pulse_delay,
     el_list.append(cal_0_elt1)
     el_list.append(cal_1_elt0)
     el_list.append(cal_1_elt1)
-    station.instruments['AWG'].stop()
+    station.components['AWG'].stop()
     station.pulsar.program_awg(seq, *el_list, verbose=verbose)
 
 
@@ -275,7 +276,7 @@ def CBox_Ramsey_marker_seq(IF, times, RO_pulse_delay, RO_pulse_length,
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
 
-    station.instruments['AWG'].stop()
+    station.components['AWG'].stop()
     station.pulsar.program_awg(seq, *el_list, verbose=verbose)
 
 
@@ -297,5 +298,5 @@ def CBox_marker_train_seq(marker_separation=100e-9,
     # Extra element is needed because otherwise last elt will always goto 1
     seq.append_element(el_list[2], trigger_wait=False,
                        goto_target=el_list[1].name)
-    station.instruments['AWG'].stop()
+    station.components['AWG'].stop()
     station.pulsar.program_awg(seq, *el_list, verbose=verbose)

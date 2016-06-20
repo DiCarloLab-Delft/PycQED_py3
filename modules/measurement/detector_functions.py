@@ -15,6 +15,7 @@ from modules.measurement.waveform_control import pulsar
 from modules.measurement.waveform_control import element
 from modules.measurement.waveform_control import sequence
 
+
 class Detector_Function(object):
     '''
     Detector_Function class for MeasurementControl(Instrument)
@@ -80,7 +81,7 @@ class Hard_Detector(Detector_Function):
 
 class Soft_Detector(Detector_Function):
     def __init__(self, **kw):
-        super(Soft_Detector, self).__init__()
+        super().__init__(**kw)
         self.detector_control = 'soft'
 
     def acquire_data_point(self, **kw):
@@ -108,10 +109,48 @@ class Dummy_Detector_Hard(Hard_Detector):
         self.data = np.zeros(len(sweep_points))
 
     def get_values(self):
-        x = np.arange(0, 10, 60)
-        self.data = np.sin(x / np.pi)
+        x = np.arange(0, 10, .1)
+        self.data = [np.sin(x / np.pi), np.cos(x/np.pi)]
 
         return self.data
+
+
+class Sweep_pts_detector(Detector_Function):
+    """
+    Returns the sweep points, used for testing purposes
+    """
+    def __init__(self, params, chunk_size=80):
+        self.detector_control = 'hard'
+        self.name = 'sweep_points_detector'
+        self.value_names = []
+        self.value_units = []
+        self.chunk_size = chunk_size
+        self.i = 0
+        for par in params:
+            self.value_names += [par.name]
+            self.value_units += [par.units]
+
+    def prepare(self, sweep_points):
+        self.i = 0
+        self.sweep_points = sweep_points
+
+    def get_values(self):
+        return self.get()
+
+    def acquire_data_point(self):
+        return self.get()
+
+    def get(self):
+        print('passing chunk {}'.format(self.i))
+        start_idx = self.i*self.chunk_size
+        end_idx = start_idx + self.chunk_size
+        self.i+=1
+        time.sleep(.2)
+        if len(np.shape(self.sweep_points))==2:
+            return self.sweep_points[start_idx:end_idx, :].T
+        else:
+            return self.sweep_points[start_idx:end_idx]
+
 
 
 class TimeDomainDetector(Hard_Detector):
@@ -351,15 +390,14 @@ class Signal_Hound_Spectrum_Track(Hard_Detector):
 
 
 # Detectors for QuTech Control box modes
-class QuTechCBox_input_average_Detector(Hard_Detector):
-    def __init__(self, AWG='AWG', **kw):
-        super(QuTechCBox_input_average_Detector, self).__init__()
-        self.CBox = qt.instruments['CBox']
+class CBox_input_average_detector(Hard_Detector):
+    def __init__(self, CBox, AWG, **kw):
+        super(CBox_input_average_detector, self).__init__()
+        self.CBox = CBox
         self.name = 'CBox_Streaming_data'
         self.value_names = ['Ch0', 'Ch1']
         self.value_units = ['a.u.', 'a.u.']
-        if AWG is not None:
-            self.AWG = qt.instruments[AWG]
+        self.AWG = AWG
 
     def get_values(self):
         if self.AWG is not None:
@@ -405,8 +443,9 @@ class CBox_integrated_average_detector(Hard_Detector):
             try:
                 data = self.CBox.get_integrated_avg_results()
                 succes = True
-            except:
+            except Exception as e:
                 logging.warning('Exception caught retrying')
+                logging.warning(e)
                 self.CBox.set('acquisition_mode', 0)
                 self.AWG.stop()
                 self.CBox.restart_awg_tape(0)
@@ -416,7 +455,7 @@ class CBox_integrated_average_detector(Hard_Detector):
                 self.CBox.set('acquisition_mode', 4)
                 self.AWG.start()  # Is needed here to ensure data aligns with seq elt
             i += 1
-            if i > 10:
+            if i > 20:
                 break
 
         return data
@@ -437,19 +476,43 @@ class CBox_single_integration_average_det(Soft_Detector):
     Detector used for acquiring single points of the CBox while externally
     triggered by the AWG.
     Soft version of the regular integrated avg detector.
+
+    Has two acq_modes, 'IQ' and 'AmpPhase'
     '''
-    def __init__(self, CBox, **kw):
+    def __init__(self, CBox, acq_mode='IQ', **kw):
         super().__init__()
         self.CBox = CBox
         self.name = 'CBox_single_integration_avg_det'
         self.value_names = ['I', 'Q']
         self.value_units = ['a.u.', 'a.u.']
+        if acq_mode == 'IQ':
+            self.acquire_data_point = self.acquire_data_point_IQ
+        elif acq_mode == 'AmpPhase':
+            self.acquire_data_point = self.acquire_data_point_amp_ph
+        else:
+            raise ValueError('acq_mode must be "IQ" or "AmpPhase"')
 
-    def acquire_data_point(self, **kw):
-        self.CBox.set('acquisition_mode', 4)
-        data = self.CBox.get_integrated_avg_results()
-        self.CBox.set('acquisition_mode', 0)
+    def acquire_data_point_IQ(self, **kw):
+        success = False
+        i = 0
+        while not success:
+            self.CBox.set('acquisition_mode', 4)
+            try:
+                data = self.CBox.get_integrated_avg_results()
+                success = True
+            except Exception as e:
+                logging.warning(e)
+                logging.warning('Exception caught retrying')
+            self.CBox.set('acquisition_mode', 0)
+            i += 1
+            if i > 10:
+                break
         return data
+
+    def acquire_data_point_amp_ph(self, **kw):
+        data = self.acquire_data_point_IQ()
+        S21 = data[0] + 1j * data[1]
+        return abs(S21), np.angle(S21)/(2*np.pi)*360
 
     def prepare(self):
         self.CBox.set('nr_samples', 1)
@@ -540,43 +603,90 @@ class CBox_integration_logging_det(Hard_Detector):
         self.AWG.stop()
 
 
-class CBox_state_couners_det(Hard_Detector):
-    def __init__(self, CBox, AWG, **kw):
+class CBox_state_counters_det(Soft_Detector):
+    def __init__(self, CBox, **kw):
         super().__init__()
         self.CBox = CBox
-        self.name = 'CBox_state_couners_detector'
-        # A and B refer to the counts for the different weigth functions
+        self.name = 'CBox_state_counters_detector'
+        # A and B refer to the counts for the different weight functions
         self.value_names = ['no error A', 'single error A', 'double error A',
                             '|0> A', '|1> A',
                             'no error B', 'single error B', 'double error B',
                             '|0> B', '|1> B', ]
         self.value_units = ['#']*10
-        self.AWG = AWG
 
-    def get_values(self):
+    def acquire_data_point(self):
         success = False
         i = 0
         while not success and i < 10:
             try:
-                d = self._get_values()
+                data = self._get_values()
                 success = True
             except Exception as e:
                 logging.warning('Exception {} caught, retaking data'.format(e))
                 i += 1
-        return d
+        return data
 
     def _get_values(self):
-        self.AWG.stop()
+
         self.CBox.set('acquisition_mode', 0)
         self.CBox.set('acquisition_mode', 'integration logging')
-        self.AWG.start()
+
         data = self.CBox.get_qubit_state_log_counters()
         self.CBox.set('acquisition_mode', 0)
         return np.concatenate(data)  # concatenates counters A and B
 
     def finish(self):
         self.CBox.set('acquisition_mode', 0)
-        self.AWG.stop()
+
+
+class CBox_single_qubit_event_s_fraction(CBox_state_counters_det):
+    '''
+    Child of the state counters detector
+    Returns fraction of event type s by using state counters 1 and 2
+    Rescales the measured counts to percentages.
+    '''
+    def __init__(self, CBox):
+        super(CBox_state_counters_det, self).__init__()
+        self.CBox = CBox
+        self.name = 'CBox_single_qubit_event_s_fraction'
+        self.value_names = ['frac. err.', 'frac. 2 or more', 'frac. event s']
+        self.value_units = ['%', '%', '%']
+
+    def prepare(self, **kw):
+        self.nr_shots = self.CBox.log_length.get()
+
+    def acquire_data_point(self):
+        d = super().acquire_data_point()
+        data = [
+                d[1]/self.nr_shots*100,
+                d[2]/self.nr_shots*100,
+                (d[1]-d[2])/self.nr_shots*100]
+        return data
+
+
+class CBox_single_qubit_frac1_counter(CBox_state_counters_det):
+    '''
+    Based on the shot counters, returns the fraction of shots that corresponds
+    to a specific state.
+    Note that this is not corrected for RO-fidelity.
+
+    Also note that depending on the side of the RO the F|1> and F|0> could be
+    inverted
+    '''
+    def __init__(self, CBox):
+        super(CBox_state_counters_det, self).__init__()
+        self.detector_control = 'soft'
+        self.CBox = CBox
+        self.name = 'CBox_single_qubit_frac1_counter'
+        # A and B refer to the counts for the different weight functions
+        self.value_names = ['Frac_1']
+        self.value_units = ['']
+
+    def acquire_data_point(self):
+        d = super().acquire_data_point()
+        data = d[4]/(d[3]+d[4])
+        return data
 
 
 class CBox_digitizing_shots_det(CBox_integration_logging_det):
@@ -585,8 +695,8 @@ class CBox_digitizing_shots_det(CBox_integration_logging_det):
                  LutMan=None, reload_pulses=False, awg_nrs=None):
         super().__init__(CBox, AWG, LutMan, reload_pulses, awg_nrs)
         self.name = 'CBox_digitizing_shots_detector'
-        self.value_names = ['Declared state', 'I', 'Q']
-        self.value_units = ['', 'a.u.', 'a.u.']
+        self.value_names = ['Declared state']
+        self.value_units = ['']
         self.threshold = threshold
 
     def get_values(self):
@@ -595,7 +705,7 @@ class CBox_digitizing_shots_det(CBox_integration_logging_det):
         # comparing 8000 vals with threshold takes 3.8us
         # converting to int 10.8us and to float 13.8us, let's see later if we
         # can cut that.
-        return (d > self.threshold).astype(int), dat[0], dat[1]
+        return (d > self.threshold).astype(int)
 
 
 
@@ -936,7 +1046,7 @@ class SH_mixer_skewness_det(Soft_Detector):
         self.value_names = ['Power']
         self.value_units = ['dBm']
         self.delay = delay
-        self.SH.frequency.set(frequency*1e-9) # Accepts input in Hz
+        self.SH.frequency.set(frequency) # Accepts input in Hz
         self.Navg = Navg
         self.QI_amp_ratio = QI_amp_ratio
         self.IQ_phase = IQ_phase
@@ -964,10 +1074,10 @@ class SH_mixer_skewness_det(Soft_Detector):
         sin_pulse = pulse.CosPulse(channel=self.Q_ch, name='sin_pulse')
 
         SSB_modulation_el.add(pulse.cp(cos_pulse, name='cos_pulse',
-                              frequency=f_mod, amplitude=0.3,
+                              frequency=f_mod, amplitude=0.15,
                               length=1e-6, phase=0))
         SSB_modulation_el.add(pulse.cp(sin_pulse, name='sin_pulse',
-                              frequency=f_mod, amplitude=0.3*QI_ratio,
+                              frequency=f_mod, amplitude=0.15*QI_ratio,
                               length=1e-6, phase=90+skewness))
 
         seq = sequence.Sequence('Sideband_modulation_seq')

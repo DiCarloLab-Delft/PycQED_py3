@@ -186,6 +186,8 @@ class Pulsar:
         Advantage is that it's much faster, since sequence information is sent
         to the AWG in a single file.
         """
+        old_timeout = self.AWG.timeout()
+        self.AWG.timeout(max(180, old_timeout))
 
         verbose = kw.pop('verbose', False)
         debug = kw.pop('debug', False)
@@ -361,6 +363,7 @@ class Pulsar:
                                             logic_jump_l)
 
         filename = sequence.name+'_FILE.AWG'
+
         awg_file = self.AWG.generate_awg_file(
             packed_waveforms,
             np.array(wfname_l),
@@ -368,6 +371,7 @@ class Pulsar:
             self.get_awg_channel_cfg())
         self.AWG.send_awg_file(filename, awg_file)
         self.AWG.load_awg_file(filename)
+        self.AWG.timeout(old_timeout)
 
         time.sleep(.1)
         # Waits for AWG to be ready
@@ -405,3 +409,37 @@ class Pulsar:
                                     ' , channel ' + str(ch) +
                                     ' does not exist in waveform dictionary')
 
+    def load_awg_file(self, filename, **kw):
+            """
+            Function to load an AWG sequence from its internal hard drive
+            No possibility for jump statements
+            """
+            old_timeout = self.AWG.timeout()
+            self.AWG.timeout(max(180, old_timeout))
+            channels = kw.pop('channels', 'all')
+            chan_ids = self.get_used_channel_ids()
+            _t0 = time.time()
+
+            # Store offset settings to restore them after upload the seq
+            # Note that this is the AWG setting offset, as distinct from the
+            # channel parameter offset.
+            offsets = {}
+            for c in self.channels:
+                if self.channels[c]['type'] == 'analog':
+                    offsets[c] = self.AWG.get(c+'_offset')
+
+            filename = filename
+            self.AWG.load_awg_file(filename)
+            self.AWG.timeout(old_timeout)
+
+            time.sleep(.1)
+            # Waits for AWG to be ready
+            self.AWG.is_awg_ready()
+
+            for channel, offset in offsets.items():
+                self.AWG.set(channel+'_offset', offset)
+
+            self.activate_channels(channels)
+
+            _t = time.time() - _t0
+            print(" finished in %.2f seconds." % _t)

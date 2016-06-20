@@ -7,7 +7,27 @@ import lmfit
 
 
 def RandomizedBenchmarkingDecay(numCliff, Amplitude, p, offset):
-    val = Amplitude * (p**numCliff) + offset
+    val = Amplitude * (p**numCliff)+ offset
+    return val
+
+
+def double_RandomizedBenchmarkingDecay(numCliff, p, offset,
+                                       invert=1):
+    """
+    A variety of the RB-curve that allows fitting both the inverting and
+    non-inverting exponential.
+    The amplitude of the decay curve is constrained to start at 0 or 1.
+    The offset is the common point both curves converge to.
+
+    pick invert to be 1 or 0
+    """
+    # Inverting clifford curve
+    val_inv = (1-offset) * (p**numCliff) + offset
+    # flipping clifford curve
+    val_flip = -offset * (p**numCliff) + offset
+    # Using invert as a boolean but not using if statement to allow for
+    # arrays to be input in the function
+    val = (1-invert) * val_flip + invert*val_inv
     return val
 
 
@@ -166,6 +186,21 @@ def gaussian_2D(x, y, amplitude=1,
 ####################
 
 
+def exp_dec_guess(model, data, t):
+    '''
+    Assumes exponential decay in estimating the parameters
+    '''
+    offs_guess = data[np.argmax(t)]
+    amp_guess = data[np.argmin(t)] - offs_guess
+    # guess tau by looking for value closest to 1/e
+    tau_guess = t[np.argmin(abs((amp_guess*(1/np.e) + offs_guess)-data))]
+    params = model.make_params(amplitude=amp_guess,
+                               tau=tau_guess,
+                               n=1,
+                               offset=offs_guess)
+    return params
+
+
 def Cos_guess(model, data, t):
     '''
     Guess for a cosine fit using FFT, only works for evenly spaced points
@@ -304,6 +339,7 @@ CosModel = lmfit.Model(CosFunc)
 CosModel.guess = Cos_guess
 
 ExpDecayModel = lmfit.Model(ExpDecayFunc)
+ExpDecayModel.guess = exp_dec_guess
 ExpDampOscModel = lmfit.Model(ExpDampOscFunc)
 GaussExpDampOscModel = lmfit.Model(GaussExpDampOscFunc)
 ExpDampDblOscModel = lmfit.Model(ExpDampDblOscFunc)
@@ -350,11 +386,11 @@ def plot_fitres2D_heatmap(fit_res, x, y, axs=None, cmap='viridis'):
     model) but I put it here as it is closely related to all the stuff we do
     with lmfit. If anyone has a better location in mind, let me know (MAR).
     '''
+    #fixing the data rotation with [::-1]
     nr_cols = len(np.unique(x))
-    data_2D = fit_res.data.reshape(-1, nr_cols, order='C')
-    fit_2D = fit_res.best_fit.reshape(-1, nr_cols, order='C')
-    guess_2D = fit_res.init_fit.reshape(-1, nr_cols, order='C')
-
+    data_2D = fit_res.data.reshape(-1, nr_cols, order='C')[::-1]
+    fit_2D = fit_res.best_fit.reshape(-1, nr_cols, order='C')[::-1]
+    guess_2D = fit_res.init_fit.reshape(-1, nr_cols, order='C')[::-1]
     if axs is None:
         f, axs = plt.subplots(1, 3, figsize=(14, 6))
     axs[0].imshow(data_2D, extent=[x[0], x[-1], y[0], y[-1]],
