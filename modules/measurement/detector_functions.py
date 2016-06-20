@@ -471,6 +471,52 @@ class CBox_integrated_average_detector(Hard_Detector):
         self.CBox.set('acquisition_mode', 0)
 
 
+class CBox_v3_integrated_average_detector(Hard_Detector):
+    def __init__(self, CBox, seg_per_point=1, **kw):
+        '''
+        Integration average detector.
+        Defaults to averaging data in a number of segments equal to the
+        nr of sweep points specificed.
+
+        seg_per_point allows you to use more than 1 segment per sweeppoint.
+        this is for example useful when doing a MotzoiXY measurement in which
+        there are 2 datapoints per sweep point.
+        '''
+        super().__init__(**kw)
+        self.CBox = CBox
+        self.name = 'CBox_integrated_average_detector'
+        self.value_names = ['I', 'Q']
+        self.value_units = ['a.u.', 'a.u.']
+        self.seg_per_point = seg_per_point
+
+    def get_values(self):
+        succes = False
+        data = None
+        i = 0
+        while not succes:
+            try:
+                data = self.CBox.get_integrated_avg_results()
+                succes = True
+            except Exception as e:
+                logging.warning('Exception caught retrying')
+                logging.warning(e)
+                self.CBox.set('acquisition_mode', 0)
+                self.CBox.set('acquisition_mode', 'integration averaging mode')
+            i += 1
+            if i > 20:
+                break
+
+        return data
+
+    def prepare(self, sweep_points):
+        self.CBox.set('nr_samples', self.seg_per_point*len(sweep_points))
+        self.CBox.set('acquisition_mode', 0)
+        self.CBox.set('acquisition_mode', 'integration averaging mode')
+
+    def finish(self):
+        self.CBox.set('acquisition_mode', 0)
+
+
 class CBox_single_integration_average_det(Soft_Detector):
     '''
     Detector used for acquiring single points of the CBox while externally

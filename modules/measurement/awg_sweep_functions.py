@@ -319,7 +319,7 @@ class CBox_T1(swf.Hard_Sweep):
     def prepare(self, **kw):
         if self.upload:
             ch3_amp = self.AWG.get('ch3_amp')
-            ch4_amp = self.AWG.get('ch3_amp')
+            ch4_amp = self.AWG.get('ch4_amp')
             st_seqs.CBox_T1_marker_seq(IF=self.IF, times=self.sweep_points,
                                        RO_pulse_delay=self.RO_pulse_delay,
                                        RO_trigger_delay=self.RO_trigger_delay,
@@ -327,6 +327,21 @@ class CBox_T1(swf.Hard_Sweep):
             self.AWG.set('ch3_amp', ch3_amp)
             self.AWG.set('ch4_amp', ch4_amp)
 
+class CBox_v3_T1(swf.Hard_Sweep):
+    def __init__(self, IF, RO_pulse_delay, RO_trigger_delay, mod_amp,
+                 upload=True):
+        super().__init__()
+        self.IF = IF
+        self.RO_pulse_delay = RO_pulse_delay
+        self.RO_trigger_delay = RO_trigger_delay
+        self.name = 'T1'
+        self.parameter_name = 'tau'
+        self.unit = 's'
+        self.mod_amp = mod_amp
+        self.upload = upload
+
+    def prepare(self, **kw):
+        print('bla')
 
 class CBox_Ramsey(swf.Hard_Sweep):
     def __init__(self, IF, RO_pulse_length,

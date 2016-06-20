@@ -171,6 +171,7 @@ class CBox_driven_transmon(Transmon):
 
         # Mixer skewness correction
         self.LutMan.IQ_phase_skewness.set(0)
+        print('self.LutMan type: ', type(self.LutMan))
         self.LutMan.QI_amp_ratio.set(1)
         self.LutMan.apply_predistortion_matrix.set(True)
         self.LutMan.alpha.set(self.alpha.get())
@@ -610,16 +611,24 @@ class CBox_driven_transmon(Transmon):
                                 times[-1]+times[1],
                                 times[-1]+times[1])])
         self.CBox.set('nr_samples', len(times))
+        self.CBox.set_master_controller_working_state(0, 0, 0)
+        self.CBox.load_instructions('CBox_v3_test_program\T1.asm')
+        self.CBox.set_master_controller_working_state(1, 0, 0)
+        self.CBox.acquisition_mode(2) # integration average.
+        self.CBox.integration_length(200)
+        self.CBox.nr_averages(2048)
+        self.CBox.signal_delay(0)
+        self.CBox.set('run_mode', 0)
+        self.CBox.set('run_mode', 1)
         MC.set_sweep_function(
-            awg_swf.CBox_T1(IF=self.f_RO_mod.get(),
+            awg_swf.CBox_v3_T1(IF=self.f_RO_mod.get(),
                             RO_pulse_delay=self.RO_pulse_delay.get(),
                             RO_trigger_delay=self.RO_acq_marker_delay.get(),
                             mod_amp=self.mod_amp_td.get(),
-                            AWG=self.AWG,
                             upload=True))
         MC.set_sweep_points(times)
-        MC.set_detector_function(det.CBox_integrated_average_detector(
-                                 self.CBox, self.AWG))
+        MC.set_detector_function(det.CBox_v3_integrated_average_detector(
+                                 self.CBox))
         MC.run('T1'+self.msmt_suffix)
         if analyze:
             a = ma.T1_Analysis(auto=True, close_fig=True)

@@ -88,22 +88,22 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
         self._acquisition_mode = v_list[3]
         self._core_state = v_list[4]
         self._trigger_source = v_list[5]
-        self.adc_offset = (v_list[6] << 4) + v_list[7]
-        self.signal_delay = (v_list[8] << 4) + v_list[9]
-        self.integration_length = (v_list[10] << 7) + v_list[11]
+        self._adc_offset = (v_list[6] << 4) + v_list[7]
+        self._signal_delay = (v_list[8] << 4) + v_list[9]
+        self._integration_length = (v_list[10] << 7) + v_list[11]
         a11 = (v_list[12] << 7) + v_list[13]
         a12 = (v_list[14] << 7) + v_list[15]
         a21 = (v_list[16] << 7) + v_list[17]
         a22 = (v_list[18] << 7) + v_list[19]
-        self.lin_trans_coeffs = np.array([a11, a12, a21, a22])
-        self.threshold0 = (v_list[20] << 21) + (v_list[21] << 14) + \
+        self._lin_trans_coeffs = np.array([a11, a12, a21, a22])
+        self._sig_thres[0] = (v_list[20] << 21) + (v_list[21] << 14) + \
                           (v_list[22] << 7) + v_list[23]
-        self.threshold1 = (v_list[24] << 21) + (v_list[25] << 14) + \
+        self._sig_thres[1] = (v_list[24] << 21) + (v_list[25] << 14) + \
                           (v_list[26] << 7) + v_list[27]
-        self.log_length = (v_list[28] << 7) + v_list[29]
-        self.nr_samples = (v_list[30] << 7) + v_list[31]
-        self.avg_size = v_list[32]
-        self.nr_averages = 2**self.avg_size
+        self._log_length = (v_list[28] << 7) + v_list[29]
+        self._nr_samples = (v_list[30] << 7) + v_list[31]
+        self._avg_size = v_list[32]
+        self._nr_averages = 2**self._avg_size
 
         # self.snapshot()
         # print("version: ", version)

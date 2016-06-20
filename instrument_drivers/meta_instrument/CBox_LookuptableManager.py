@@ -180,7 +180,8 @@ class QuTech_ControlBox_LookuptableManager(Instrument):
                            'mX90': Wave_mX90, 'mY90': Wave_mY90,
                            'Block': Block,
                            'ModBlock': ModBlock}
-        if self.apply_predistortion_matrix:
+
+        if self.apply_predistortion_matrix():
             M = self.get_mixer_predistortion_matrix()
             for key, val in self._wave_dict.items():
                 self._wave_dict[key] = np.dot(M, val)

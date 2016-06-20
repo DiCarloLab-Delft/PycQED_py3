@@ -140,7 +140,7 @@ class QuTech_ControlBox(VisaInstrument):
         # Setting default arguments
         # print('kw.pop(\'measurement_timeout\', 120): ',
               # kw.pop('measurement_timeout', 120))
-        # self.set('measurement_timeout', kw.pop('measurement_timeout', 120))
+        self.set('measurement_timeout', kw.pop('measurement_timeout', 120))
         self.set('acquisition_mode', 'idle')
         self.set('run_mode', 0)
         self.set('signal_delay', 0)
