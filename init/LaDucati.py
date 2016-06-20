@@ -38,7 +38,12 @@ from qcodes.instrument_drivers.rohde_schwarz import SGS100A as rs
 import qcodes.instrument_drivers.signal_hound.USB_SA124B as sh
 import qcodes.instrument_drivers.QuTech.IVVI as iv
 from qcodes.instrument_drivers.tektronix import AWG5014 as tek
-from instrument_drivers.physical_instruments import QuTech_ControlBoxdriver as qcb
+
+# from instrument_drivers.physical_instruments import QuTech_ControlBoxdriver as qcb
+# from instrument_drivers.physical_instruments import cbox_v3_driver as qcb3
+from instrument_drivers.physical_instruments import QuTech_ControlBox_v3 as qcb
+from instrument_drivers.physical_instruments._controlbox import defHeaders_CBox_v3 as header
+
 import instrument_drivers.meta_instrument.qubit_objects.Tektronix_driven_transmon as qbt
 from instrument_drivers.meta_instrument import heterodyne as hd
 import instrument_drivers.meta_instrument.CBox_LookuptableManager as lm
@@ -49,51 +54,57 @@ from instrument_drivers.meta_instrument.qubit_objects import CBox_driven_transmo
 # Initializing instruments
 
 # SH = sh.SignalHound_USB_SA124B('Signal hound') #commented because of 8s load time
-CBox = qcb.QuTech_ControlBox('CBox', address='Com3', run_tests=False)
-S1 = rs.RohdeSchwarz_SGS100A('S1', address='GPIB0::11::INSTR')  # located on top of rack
+# CBox = qcb.QuTech_ControlBox_v3('CBox', address='Com5', run_tests=False)
+CBox = qcb.QuTech_ControlBox_v3('CBox', address='Com5', run_tests=False, server_name=None)
+print('after CBox')
+Qubit_LO = rs.RohdeSchwarz_SGS100A('Qubit_LO', address='TCPIP0::192.168.0.11')  # located on top of rack
 LO = rs.RohdeSchwarz_SGS100A(name='LO', address='TCPIP0::192.168.0.77')  # left of s2
-S2 = rs.RohdeSchwarz_SGS100A(name='S2', address='TCPIP0::192.168.0.78')  # right
+RF = rs.RohdeSchwarz_SGS100A(name='RF', address='TCPIP0::192.168.0.78')  # right
 AWG = tek.Tektronix_AWG5014(name='AWG', setup_folder=None,
                             address='TCPIP0::192.168.0.9')
 IVVI = iv.IVVI('IVVI', address='ASRL1', numdacs=16)
-
+print('after IVVI')
 # Meta-instruments
-HS = hd.LO_modulated_Heterodyne('HS', LO=LO, CBox=CBox, AWG=AWG)
-LutMan = lm.QuTech_ControlBox_LookuptableManager('LutMan', CBox)
-
+HS = hd.HeterodyneInstrument('HS', LO=LO, RF=RF, CBox=CBox, AWG=AWG,
+                             server_name=None)
+print('after HS')
+LutMan = lm.QuTech_ControlBox_LookuptableManager('LutMan', CBox=CBox,
+                                                 server_name=None)
+print('after Lutman')
 MC = mc.MeasurementControl('MC')
+print('after MC')
 
 VIP_mon_2 = qb.CBox_driven_transmon('VIP_mon_2',
-                                    LO=LO, cw_source=S1, td_source=S2,
-                                    IVVI=IVVI,
+                                    LO=LO, cw_source=Qubit_LO, td_source=Qubit_LO,
+                                    IVVI=IVVI, rf_RO_source=RF,
                                     AWG=AWG, LutMan=LutMan,
                                     CBox=CBox, heterodyne_instr=HS, MC=MC)
 VIP_mon_4 = qb.CBox_driven_transmon('VIP_mon_4',
-                                    LO=LO, cw_source=S1, td_source=S2,
-                                    IVVI=IVVI,
+                                    LO=LO, cw_source=Qubit_LO, td_source=Qubit_LO,
+                                    IVVI=IVVI, rf_RO_source=RF,
                                     AWG=AWG, LutMan=LutMan,
                                     CBox=CBox, heterodyne_instr=HS, MC=MC)
 VIP_mon_6 = qb.CBox_driven_transmon('VIP_mon_6',
-                                    LO=LO, cw_source=S1, td_source=S2,
-                                    IVVI=IVVI,
+                                    LO=LO, cw_source=Qubit_LO, td_source=Qubit_LO,
+                                    IVVI=IVVI,rf_RO_source=RF,
                                     AWG=AWG, LutMan=LutMan,
                                     CBox=CBox, heterodyne_instr=HS, MC=MC)
 
 
 VIP_mon_4_tek = qbt.Tektronix_driven_transmon('VIP_mon_4_tek',
                                               LO=LO,
-                                              cw_source=S1, td_source=S2,
-                                              IVVI=IVVI,
+                                              cw_source=Qubit_LO, td_source=Qubit_LO,
+                                              IVVI=IVVI, rf_RO_source=RF,
                                               AWG=AWG,
                                               CBox=CBox, heterodyne_instr=HS,
                                               MC=MC)
-
+print('after qubit objects')
 gen.load_settings_onto_instrument(VIP_mon_2, label='VIP_mon_2')
 gen.load_settings_onto_instrument(VIP_mon_4, label='VIP_mon_4')
 gen.load_settings_onto_instrument(VIP_mon_4_tek)
 gen.load_settings_onto_instrument(VIP_mon_6, label='VIP_mon_6')
 
-station = qc.Station(LO, S1, S2, IVVI,
+station = qc.Station(LO, Qubit_LO, Qubit_LO, IVVI,
                      AWG, HS, CBox, LutMan,
                      VIP_mon_2, VIP_mon_4, VIP_mon_4_tek, VIP_mon_6)
 MC.station = station
@@ -128,16 +139,16 @@ for i in range(4):
 st_seqs.station = station
 sq.station = station
 
-IVVI.dac1.set(-40)
-IVVI.dac2.set(70)
-IVVI.dac5.set(0)
+#IVVI.dac1.set(-40)
+#IVVI.dac2.set(70)
+#IVVI.dac5.set(0)
 
 IF = -20e6        # RO modulation frequency
 
 LO.off()
 
-# S1.off()
-S2.off()
+# Qubit_LO.off()
+Qubit_LO.off()
 
 
 # Calibrated at 6.6GHz (22-2-2016)
@@ -165,8 +176,9 @@ def set_CBox_cos_sine_weigths(IF):
 
     CBox.set('sig0_integration_weights', w0)
     CBox.set('sig1_integration_weights', w1)
-set_CBox_cos_sine_weigths(IF)
 
+
+set_CBox_cos_sine_weigths(IF)
 CBox.set('nr_averages', 2048)
 # this is the max nr of averages that does not slow down the heterodyning
 CBox.set('nr_samples', 75)  # Shorter because of min marker spacing
