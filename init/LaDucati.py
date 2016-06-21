@@ -121,6 +121,8 @@ VIP_mon_2_dux = dt.Duplexer_tek_transmon('VIP_mon_2_dux', LO=LO,
 
 gen.load_settings_onto_instrument(VIP_mon_2_tek)
 gen.load_settings_onto_instrument(VIP_mon_4_tek)
+gen.load_settings_onto_instrument(VIP_mon_2_dux)
+
 
 station = qc.Station(LO, RF, Qubit_LO, IVVI, Dux, Pump,
                      AWG, AWG520, HS, CBox, LutMan,

@@ -326,15 +326,15 @@ AWG520.ch1_offset(1.0)
 set_trigger_slow()
 
 #JPA pump settings
-Pump.on()
+Pump.off()
 Pump.power(-3)
 Pump.frequency(VIP_mon_2_tek.f_RO()+10e6)
-Pump.on()
+Pump.off()
 
 VIP_mon_2_tek.f_JPA_pump_mod(10e6)
 
 print('setting IVVI parameters')
-IVVI.dac1.set(-40)
+IVVI.dac1.set(325)
 IVVI.dac2.set(0)  # was 70 for sweetspot VIP_mon_4
 
 print('setting AWG parameters')
