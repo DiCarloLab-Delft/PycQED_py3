@@ -510,8 +510,9 @@ class CBox_v3_integrated_average_detector(Hard_Detector):
 
     def prepare(self, sweep_points):
         self.CBox.set('nr_samples', self.seg_per_point*len(sweep_points))
-        self.CBox.set('acquisition_mode', 0)
-        self.CBox.set('acquisition_mode', 'integration averaging mode')
+        self.CBox.run_mode(0)
+        self.CBox.acquisition_mode('integration averaging mode') # integration average.
+        self.CBox.run_mode(1)
 
     def finish(self):
         self.CBox.set('acquisition_mode', 0)
@@ -568,6 +569,90 @@ class CBox_single_integration_average_det(Soft_Detector):
         self.CBox.set('acquisition_mode', 0)
 
 
+class CBox_v3_single_integration_average_det(Soft_Detector):
+    '''
+    Detector used for acquiring single points of the CBox while externally
+    triggered by the AWG.
+    Soft version of the regular integrated avg detector.
+
+    Has two acq_modes, 'IQ' and 'AmpPhase'
+    '''
+    def __init__(self, CBox, acq_mode='IQ', **kw):
+        super().__init__()
+        self.CBox = CBox
+        self.name = 'CBox_v3_single_integration_avg_det'
+        self.value_names = ['I', 'Q']
+        self.value_units = ['a.u.', 'a.u.']
+        if acq_mode == 'AmpPhase':
+            self.acquire_data_point = self.acquire_data_point_amp_ph
+
+    def acquire_data_point(self, **kw):
+        success = False
+        i = 0
+        # import traceback  as tb
+        # import sys
+        # tb.print_tb(sys.last_traceback)
+        while not success:
+            print("acquiring")
+
+            self.CBox.set('acquisition_mode', 'integration averaging mode')
+            try:
+                data = self.CBox.get_integrated_avg_results()
+                print("detector function, data", data)
+                success = True
+            except Exception as e:
+                logging.warning(e)
+                logging.warning('Exception caught retrying')
+            self.CBox.set('acquisition_mode', 0)
+            i += 1
+            if i > 20:
+                break
+        return data
+
+    def acquire_data_point_amp_ph(self, **kw):
+        data = self.acquire_data_point_IQ()
+        S21 = data[0] + 1j * data[1]
+        return abs(S21), np.angle(S21)/(2*np.pi)*360
+
+    def prepare(self):
+        self.CBox.run_mode(0)
+        self.CBox.set('nr_samples', 1)
+        self.CBox.set('acquisition_mode', 0)
+        self.CBox.run_mode(1)
+
+
+    def finish(self):
+        self.CBox.set('acquisition_mode', 0)
+
+class CBox_v3_single_int_avg_with_LutReload(CBox_v3_single_integration_average_det):
+    '''
+    Detector used for acquiring single points of the CBox while externally
+    triggered by the AWG.
+    Very similar to the regular integrated avg detector.
+    '''
+    def __init__(self, CBox, LutMan, reload_pulses='all', awg_nrs=[2], **kw):
+        super().__init__(CBox, **kw)
+        self.LutMan = LutMan
+        self.reload_pulses = reload_pulses
+        self.awg_nrs = awg_nrs
+        self.name = 'CBox_v3_single_int_avg_with_LutReload'
+
+    def acquire_data_point(self, **kw):
+        #
+        # self.LutMan.load_pulse_onto_AWG_lookuptable('X180', 1)
+        if self.reload_pulses == 'all':
+            for awg_nr in self.awg_nrs:
+                self.LutMan.load_pulses_onto_AWG_lookuptable(awg_nr)
+        else:
+            for pulse_name in self.reload_pulses:
+                for awg_nr in self.awg_nrs:
+                    self.LutMan.load_pulse_onto_AWG_lookuptable(
+                        pulse_name, awg_nr)
+
+        return super().acquire_data_point(**kw)
+
+
+
 class CBox_single_int_avg_with_LutReload(CBox_single_integration_average_det):
     '''
     Detector used for acquiring single points of the CBox while externally
@@ -586,12 +671,15 @@ class CBox_single_int_avg_with_LutReload(CBox_single_integration_average_det):
         if self.reload_pulses == 'all':
             for awg_nr in self.awg_nrs:
                 self.LutMan.load_pulses_onto_AWG_lookuptable(awg_nr)
+
         else:
             for pulse_name in self.reload_pulses:
                 for awg_nr in self.awg_nrs:
                     self.LutMan.load_pulse_onto_AWG_lookuptable(
                         pulse_name, awg_nr)
         return super().acquire_data_point(**kw)
+
+
 
 
 class CBox_integration_logging_det(Hard_Detector):
