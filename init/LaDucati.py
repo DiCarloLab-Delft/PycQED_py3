@@ -119,9 +119,9 @@ VIP_mon_2_dux = dt.Duplexer_tek_transmon('VIP_mon_2_dux', LO=LO,
                                          heterodyne_instr=HS, MC=MC, Mux=Dux,
                                          rf_RO_source=RF, server_name=None)
 
-gen.load_settings_onto_instrument(VIP_mon_2_tek)
-gen.load_settings_onto_instrument(VIP_mon_4_tek)
-gen.load_settings_onto_instrument(VIP_mon_2_dux)
+gen.load_settings_onto_instrument(VIP_mon_2_tek)#, timestamp='20160621_101926')
+gen.load_settings_onto_instrument(VIP_mon_4_tek)#, timestamp='20160621_101926')
+gen.load_settings_onto_instrument(VIP_mon_2_dux)#, timestamp='20160621_101926')
 
 
 station = qc.Station(LO, RF, Qubit_LO, IVVI, Dux, Pump,

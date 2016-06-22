@@ -16,9 +16,9 @@ recalibrate=True
 # Ansatz parameters for numerical optimization
 init1=[-0.033, 0.033] #duplexer 1
 #init1=[0.033]
-init2=[-0.2,  0.33] # duplexer 2
+init2=[-0.15,  0.2] # duplexer 2
 #init2=[0.33] # duplexer 2
-init3=[-0.5e6, 0.5e6] # frequency
+init3=[-0.25e6, 0.25e6] # frequency
 #init3=[-0.5e6] # frequency
 repetitions=1000
 
@@ -37,9 +37,9 @@ nr_cliffords = [80, 300]
 nr_seeds= 200#200
 
 #ansatz steps, 80 cliffords/300 cliffords
-DUX_1_init_steps = [+0.02, +0.01]
-DUX_2_init_steps = [+0.1, +0.05]
-f_init_steps = [+0.5e6, +0.05e6]
+DUX_1_init_steps = [+0.02, +0.005]
+DUX_2_init_steps = [+0.15, +0.05]
+f_init_steps = [+0.1e6, +0.05e6]
 
 
 #methods = ['restless']

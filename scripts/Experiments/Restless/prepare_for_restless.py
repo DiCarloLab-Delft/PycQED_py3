@@ -95,12 +95,12 @@ def calibrate_pulse_pars_conventional():
     calibrate_duplexer_phase_2D(pulse_pars)
     set_CBox_cos_sine_weigths(qubit.f_RO_mod())
     qubit.find_pulse_amplitude(amps=np.linspace(-.3, .3, 31),
-                             max_n=2, update=True,
+                             max_n=100, update=True,
                              take_fit_I=False)
     qubit.find_frequency(method='ramsey', steps=[5, 30, 100, 300], update=True)
     qubit.find_pulse_amplitude(amps=np.linspace(-.3, .3, 31),
                                N_steps=[3,5], max_n=100, take_fit_I=False)
-    qubit.measure_motoi_XY(motzois=np.linspace(-0.25, -0.15, 21))
+    qubit.measure_motzoi_XY(motzois=np.linspace(-0.25, -0.15, 21))
     qubit.find_pulse_amplitude(amps=np.linspace(-.3, .3, 31),
                                N_steps=[3, 7, 19], max_n=100, take_fit_I=False)
     qubit.find_amp90_scaling(N_steps=[5, 9], max_n=100,
@@ -143,7 +143,7 @@ def calibrate_JPA_dac(pulse_pars, RO_pars, upload=True):
     set_trigger_fast()
     set_CBox_cos_sine_weigths(RO_pars['mod_frequency'])
     ad_func_pars = {'adaptive_function': minimize_scalar,
-                    'bracket': [-330, -300, -270],
+                    'bracket': [-250, -200, -150],
                     'minimize': False,
                     'par_idx': 4}
     MC.set_adaptive_function_parameters(ad_func_pars)
@@ -308,9 +308,9 @@ VIP_mon_2_dux.f_pulse_mod(-100e6)
 
 
 VIP_mon_2_dux.pulse_GI_offset(0.006)
-VIP_mon_2_dux.pulse_GQ_offset(0.033)
-VIP_mon_2_dux.pulse_DI_offset(-0.005)
-VIP_mon_2_dux.pulse_DQ_offset(0.035)
+VIP_mon_2_dux.pulse_GQ_offset(0.034)
+VIP_mon_2_dux.pulse_DI_offset(-0.006)
+VIP_mon_2_dux.pulse_DQ_offset(0.034)
 
 VIP_mon_2_dux.D_alpha(0.8189)
 VIP_mon_2_dux.D_phi_skew(-14.169)
@@ -326,15 +326,15 @@ AWG520.ch1_offset(1.0)
 set_trigger_slow()
 
 #JPA pump settings
-Pump.off()
+Pump.on()
 Pump.power(-3)
 Pump.frequency(VIP_mon_2_tek.f_RO()+10e6)
-Pump.off()
+Pump.on()
 
 VIP_mon_2_tek.f_JPA_pump_mod(10e6)
 
 print('setting IVVI parameters')
-IVVI.dac1.set(325)
+IVVI.dac1.set(288)
 IVVI.dac2.set(0)  # was 70 for sweetspot VIP_mon_4
 
 print('setting AWG parameters')
