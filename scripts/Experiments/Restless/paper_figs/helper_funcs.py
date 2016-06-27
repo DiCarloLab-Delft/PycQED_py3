@@ -15,12 +15,12 @@ def extract_data(start_timestamp, end_timestamp, label):
     data_dict = {}
     t0 = time.time()
     timestamps = a_tools.get_timestamps_in_range(start_timestamp, end_timestamp,
-                                                  label=label)
+                                                 label=label)
     if len(timestamps) == 0:
         raise ValueError('No timestamps in range')
     # for tst in conv_stamps:
     for tst in timestamps:
-        a = ma.MeasurementAnalysis(timestamp = tst, auto=False)
+        a = ma.MeasurementAnalysis(timestamp=tst, auto=False)
         cl_idx1 = a.measurementstring.find('cl')
 
         if 'conv' in label:
@@ -80,24 +80,28 @@ def extract_linecuts(start_timestamp, end_timestamp, label):
         raise ValueError('No timestamps in range')
     # for tst in conv_stamps:
     for tst in timestamps:
-        a = ma.MeasurementAnalysis(timestamp=tst, auto=False)
-        cl_idx0 = a.measurementstring.find('att_')  # for restless
-        cl_idx1 = a.measurementstring.find('cl')
-        n_cl = int(a.measurementstring[cl_idx0+4:cl_idx1])
+        try:
+            a = ma.MeasurementAnalysis(timestamp=tst, auto=False)
+            cl_idx0 = a.measurementstring.find('att_')  # for restless
+            cl_idx1 = a.measurementstring.find('cl')
+            n_cl = int(a.measurementstring[cl_idx0+4:cl_idx1])
 
-        att_idx0 = a.measurementstring.find('noise_')  # for restless
-        att_idx1 = a.measurementstring.find('att')
-        att = (a.measurementstring[att_idx0+6:att_idx1])
+            att_idx0 = a.measurementstring.find('noise_')  # for restless
+            att_idx1 = a.measurementstring.find('att')
+            att = (a.measurementstring[att_idx0+6:att_idx1])
 
-        a.get_naming_and_values()
-        a.sweep_points
-        vals = a.measured_values[0]
-        # if np.mean(vals) < 55 and np.std(vals) < 3:
-        if n_cl not in data_dict.keys():
-            data_dict[n_cl] = {}
-        if att not in data_dict[n_cl].keys():
-            data_dict[n_cl][att] = []
-        data_dict[n_cl][att] += [vals]
+            a.get_naming_and_values()
+            a.sweep_points
+            vals = a.measured_values[0]
+            if np.mean(vals) < 52 and np.std(vals) < 2.5:
+                if n_cl not in data_dict.keys():
+                    data_dict[n_cl] = {}
+                if att not in data_dict[n_cl].keys():
+                    data_dict[n_cl][att] = []
+                data_dict[n_cl][att] += [vals]
+        except Exception as e:
+            print(tst)
+            raise(e)
     n_cls = np.sort(list(data_dict.keys()))
     atts = np.sort(list(data_dict[n_cls[0]].keys()))
 
@@ -106,8 +110,10 @@ def extract_linecuts(start_timestamp, end_timestamp, label):
     for i, n_cl in enumerate(n_cls):
         for j, att in enumerate(atts):
             mean_eps[i, j] = np.mean(data_dict[n_cl][att])
-            std_eps[i, j] = np.std(data_dict[n_cl][att])
-    return n_cls, atts, mean_eps, std_eps
+            # mean_eps[i, j, :] = np.mean(data_dict[n_cl][att], axis=1)
+            std_eps[i, j] = np.mean(np.std(data_dict[n_cl][att], axis=1))
+            # std_eps[i, j, :] = np.std(data_dict[n_cl][att], axis=1)
+    return n_cls, atts, mean_eps, std_eps, data_dict
 
 
 
