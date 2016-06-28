@@ -4,11 +4,37 @@ from modules.analysis import fitting_models as fit_mods
 import time
 import lmfit
 import numpy as np
-
+import uncertainties
+from copy import deepcopy
 
 def running_mean(x, N):
     cumsum = np.cumsum(np.insert(x, 0, 0))
     return (cumsum[N:] - cumsum[:-N]) / N
+
+
+def calc_T1_limited_fidelity(T1, pulse_delay):
+        '''
+        Formula from Asaad et al.
+        pulse separation is time between start of pulses
+        '''
+        Np = 1.875  # Number of gates per Clifford
+        F_cl = (1/6*(3 + 2*np.e**(-1*pulse_delay/(2*T1)) +
+                     np.e**(-pulse_delay/T1)))**Np
+        p = 2*F_cl - 1
+
+        return F_cl, p
+
+
+def t_stampt_to_hours(timestamp, start_timestamp):
+    return (float(timestamp[-2:])/3600+float(timestamp[-4:-2])/60
+            + float(timestamp[-6:-4])
+            + 24*float(timestamp[-9:-7]))-24*float(start_timestamp[-9:-7])
+
+
+def t_stampt_to_seconds(timestamp, start_timestamp):
+    return 3600*(float(timestamp[-2:])/3600+float(timestamp[-4:-2])/60
+                  + float(timestamp[-6:-4])
+            + 24*float(timestamp[-9:-7]))-24*float(start_timestamp[-9:-7])
 
 
 def extract_data(start_timestamp, end_timestamp, label):
@@ -116,4 +142,78 @@ def extract_linecuts(start_timestamp, end_timestamp, label):
     return n_cls, atts, mean_eps, std_eps, data_dict
 
 
+def extract_verification_data(start_timestamp, end_timestamp):
+
+    # T1 calibration
+    timestamps_T1 = a_tools.get_timestamps_in_range(
+        start_timestamp, end_timestamp, label='T1')
+    # RB assessment
+    timestamps_RB = a_tools.get_timestamps_in_range(
+        start_timestamp, end_timestamp, label='RB_30')
+    cycles = len(timestamps_T1)
+
+    T1_dict = {'time': np.zeros(cycles),
+               'mean': np.zeros(cycles),
+               'stderr': np.zeros(cycles),
+               'F': np.zeros(cycles),
+               'F_std': np.zeros(cycles)}
+
+    RB_rstl_dict = {'time': np.zeros([cycles/2]),
+                    'F': np.zeros([cycles/2]),
+                    'F_std': np.zeros([cycles/2]),
+                    'offset': np.zeros([cycles/2]),
+                    'offset_std': np.zeros([cycles/2])}
+    RB_trad_dict = deepcopy(RB_rstl_dict)
+
+    RB_trad = np.zeros([cycles/2, 10])
+    RB_rstl = np.zeros([cycles/2, 10])
+    Dux_trad = np.zeros([cycles/2, 10])
+    Dux_rstl = np.zeros([cycles/2, 10])
+    m = ma.MeasurementAnalysis(auto=False, timestamp=timestamps_T1[0])
+    starting_time = t_stampt_to_hours(m.timestamp, start_timestamp=start_timestamp)
+    print(starting_time)
+    print(cycles)
+    print(len(timestamps_RB), len(timestamps_T1))
+    assert(len(timestamps_RB) == len(timestamps_T1))
+
+    # extracting T1 data
+    for j in range(cycles):
+        m = ma.MeasurementAnalysis(auto=False, timestamp=timestamps_T1[j])
+        T1_dict['time'][j] = t_stampt_to_hours(m.timestamp, start_timestamp=start_timestamp) - starting_time
+        T1_dict['mean'][j] = m.data_file['Analysis']['Fitted Params F|1>']['tau'].attrs['value']
+        T1_dict['stderr'][j] = m.data_file['Analysis']['Fitted Params F|1>']['tau'].attrs['stderr']
+        T1_val = uncertainties.ufloat(T1_dict['mean'][j], T1_dict['stderr'][j])
+        F_T1, p_T1 = calc_T1_limited_fidelity(T1_val, 20e-9)
+        T1_dict['F'][j] = F_T1.nominal_value
+        T1_dict['F_std'][j] = F_T1.std_dev
+        m.finish()
+
+    # extracting the RB traditional values
+    for j in range(int(cycles/2)):
+        m = ma.MeasurementAnalysis(auto=False, timestamp=timestamps_RB[2*j])
+        RB_trad_dict['time'][j] = t_stampt_to_hours(
+            m.timestamp, start_timestamp=start_timestamp) - starting_time
+        RB_trad_dict['F'][j] = m.data_file['Analysis']['Fitted Params Double_curve_RB']['fidelity_per_Clifford'].attrs['value']
+        RB_trad_dict['F_std'][j] = m.data_file['Analysis']['Fitted Params Double_curve_RB']['fidelity_per_Clifford'].attrs['stderr']
+        RB_trad_dict['offset'][j] = m.data_file['Analysis']['Fitted Params Double_curve_RB']['offset'].attrs['value']
+        RB_trad_dict['offset_std'][j] = m.data_file['Analysis']['Fitted Params Double_curve_RB']['offset'].attrs['stderr']
+        Dux_trad[j, 0] = m.data_file['Instrument settings']['Dux'].attrs['in1_out1_attenuation']
+        Dux_trad[j, 1] = m.data_file['Instrument settings']['Dux'].attrs['in2_out1_attenuation']
+        Dux_trad[j, 2] = m.data_file['Instrument settings']['Dux'].attrs['in1_out1_phase']
+
+    #     print(Dux_trad[j, 0])
+        # extracting the RB resetless values
+        m = ma.MeasurementAnalysis(auto=False, timestamp=timestamps_RB[2*j+1])
+        RB_rstl_dict['time'][j] = t_stampt_to_hours(
+            m.timestamp, start_timestamp=start_timestamp) - starting_time
+        RB_rstl_dict['F'][j] = m.data_file['Analysis']['Fitted Params Double_curve_RB']['fidelity_per_Clifford'].attrs['value']
+        RB_rstl_dict['F_std'][j] = m.data_file['Analysis']['Fitted Params Double_curve_RB']['fidelity_per_Clifford'].attrs['stderr']
+        RB_rstl_dict['offset'][j] = m.data_file['Analysis']['Fitted Params Double_curve_RB']['offset'].attrs['value']
+        RB_rstl_dict['offset_std'][j] = m.data_file['Analysis']['Fitted Params Double_curve_RB']['offset'].attrs['stderr']
+        Dux_rstl[j, 0] =m.data_file['Instrument settings']['Dux'].attrs['in1_out1_attenuation']
+        Dux_rstl[j, 1] =m.data_file['Instrument settings']['Dux'].attrs['in2_out1_attenuation']
+        Dux_rstl[j, 2] =m.data_file['Instrument settings']['Dux'].attrs['in1_out1_phase']
+
+
+    return T1_dict, RB_rstl_dict, RB_trad_dict#, GST_dict
 
