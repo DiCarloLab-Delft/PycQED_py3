@@ -7,7 +7,7 @@ qubit.find_pulse_amplitude(amps=np.linspace(-.3, .3, 31),
                              max_n=1, update=True,
                              take_fit_I=False)
 qubit.find_frequency(method='ramsey', steps=[5,30,100, 300], update=True)
-qubit.measure_motoi_XY(motzois=np.linspace(-0.25, -0.15, 21))
+qubit.measure_motzoi_XY(motzois=np.linspace(-0.25, -0.15, 21))
 qubit.find_pulse_amplitude(amps=np.linspace(-.3, .3, 31),
                                N_steps=[3, 7, 19], max_n=100, take_fit_I=False)
 qubit.find_amp90_scaling(N_steps=[5,9],max_n=100,

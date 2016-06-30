@@ -518,7 +518,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         raise NotImplementedError()
 
 
-    def measure_motoi_XY(self, motzois, MC=None, analyze=True, close_fig=True,
+    def measure_motzoi_XY(self, motzois, MC=None, analyze=True, close_fig=True,
                          verbose=True, update=True):
 
         self.prepare_for_timedomain()
