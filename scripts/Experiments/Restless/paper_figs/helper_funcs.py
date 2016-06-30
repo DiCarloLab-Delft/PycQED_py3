@@ -1,7 +1,9 @@
 from modules.analysis import measurement_analysis as ma
 from modules.analysis import analysis_toolbox as a_tools
 from modules.analysis import fitting_models as fit_mods
+import matplotlib.pyplot as plt
 import time
+
 import lmfit
 import numpy as np
 import uncertainties
@@ -165,16 +167,12 @@ def extract_verification_data(start_timestamp, end_timestamp):
                     'offset_std': np.zeros([cycles/2])}
     RB_trad_dict = deepcopy(RB_rstl_dict)
 
-    RB_trad = np.zeros([cycles/2, 10])
-    RB_rstl = np.zeros([cycles/2, 10])
-    Dux_trad = np.zeros([cycles/2, 10])
-    Dux_rstl = np.zeros([cycles/2, 10])
+    Dux_trad_dict = {'in1_out1_attenuation': np.zeros(cycles/2),
+                     'in2_out1_attenuation': np.zeros(cycles/2),
+                     'in1_out1_phase': np.zeros(cycles/2)}
+    Dux_rstl_dict = deepcopy(Dux_trad_dict)
     m = ma.MeasurementAnalysis(auto=False, timestamp=timestamps_T1[0])
     starting_time = t_stampt_to_hours(m.timestamp, start_timestamp=start_timestamp)
-    print(starting_time)
-    print(cycles)
-    print(len(timestamps_RB), len(timestamps_T1))
-    assert(len(timestamps_RB) == len(timestamps_T1))
 
     # extracting T1 data
     for j in range(cycles):
@@ -184,8 +182,8 @@ def extract_verification_data(start_timestamp, end_timestamp):
         T1_dict['stderr'][j] = m.data_file['Analysis']['Fitted Params F|1>']['tau'].attrs['stderr']
         T1_val = uncertainties.ufloat(T1_dict['mean'][j], T1_dict['stderr'][j])
         F_T1, p_T1 = calc_T1_limited_fidelity(T1_val, 20e-9)
-        T1_dict['F'][j] = F_T1.nominal_value
-        T1_dict['F_std'][j] = F_T1.std_dev
+        T1_dict['F'][j] = 100*F_T1.nominal_value
+        T1_dict['F_std'][j] = 100*F_T1.std_dev
         m.finish()
 
     # extracting the RB traditional values
@@ -193,27 +191,82 @@ def extract_verification_data(start_timestamp, end_timestamp):
         m = ma.MeasurementAnalysis(auto=False, timestamp=timestamps_RB[2*j])
         RB_trad_dict['time'][j] = t_stampt_to_hours(
             m.timestamp, start_timestamp=start_timestamp) - starting_time
-        RB_trad_dict['F'][j] = m.data_file['Analysis']['Fitted Params Double_curve_RB']['fidelity_per_Clifford'].attrs['value']
-        RB_trad_dict['F_std'][j] = m.data_file['Analysis']['Fitted Params Double_curve_RB']['fidelity_per_Clifford'].attrs['stderr']
+        RB_trad_dict['F'][j] = 100*m.data_file['Analysis']['Fitted Params Double_curve_RB']['fidelity_per_Clifford'].attrs['value']
+        RB_trad_dict['F_std'][j] = 100*m.data_file['Analysis']['Fitted Params Double_curve_RB']['fidelity_per_Clifford'].attrs['stderr']
         RB_trad_dict['offset'][j] = m.data_file['Analysis']['Fitted Params Double_curve_RB']['offset'].attrs['value']
         RB_trad_dict['offset_std'][j] = m.data_file['Analysis']['Fitted Params Double_curve_RB']['offset'].attrs['stderr']
-        Dux_trad[j, 0] = m.data_file['Instrument settings']['Dux'].attrs['in1_out1_attenuation']
-        Dux_trad[j, 1] = m.data_file['Instrument settings']['Dux'].attrs['in2_out1_attenuation']
-        Dux_trad[j, 2] = m.data_file['Instrument settings']['Dux'].attrs['in1_out1_phase']
+        Dux_trad_dict['in1_out1_attenuation'][j] = \
+            m.data_file['Instrument settings']['Dux'].attrs['in1_out1_attenuation']
+        Dux_trad_dict['in2_out1_attenuation'][j] = \
+            m.data_file['Instrument settings']['Dux'].attrs['in2_out1_attenuation']
+        Dux_trad_dict['in1_out1_phase'][j] = \
+            m.data_file['Instrument settings']['Dux'].attrs['in1_out1_phase']
 
     #     print(Dux_trad[j, 0])
         # extracting the RB resetless values
         m = ma.MeasurementAnalysis(auto=False, timestamp=timestamps_RB[2*j+1])
         RB_rstl_dict['time'][j] = t_stampt_to_hours(
             m.timestamp, start_timestamp=start_timestamp) - starting_time
-        RB_rstl_dict['F'][j] = m.data_file['Analysis']['Fitted Params Double_curve_RB']['fidelity_per_Clifford'].attrs['value']
-        RB_rstl_dict['F_std'][j] = m.data_file['Analysis']['Fitted Params Double_curve_RB']['fidelity_per_Clifford'].attrs['stderr']
+        RB_rstl_dict['F'][j] = 100*m.data_file['Analysis']['Fitted Params Double_curve_RB']['fidelity_per_Clifford'].attrs['value']
+        RB_rstl_dict['F_std'][j] = 100*m.data_file['Analysis']['Fitted Params Double_curve_RB']['fidelity_per_Clifford'].attrs['stderr']
         RB_rstl_dict['offset'][j] = m.data_file['Analysis']['Fitted Params Double_curve_RB']['offset'].attrs['value']
         RB_rstl_dict['offset_std'][j] = m.data_file['Analysis']['Fitted Params Double_curve_RB']['offset'].attrs['stderr']
-        Dux_rstl[j, 0] =m.data_file['Instrument settings']['Dux'].attrs['in1_out1_attenuation']
-        Dux_rstl[j, 1] =m.data_file['Instrument settings']['Dux'].attrs['in2_out1_attenuation']
-        Dux_rstl[j, 2] =m.data_file['Instrument settings']['Dux'].attrs['in1_out1_phase']
+        Dux_rstl_dict['in1_out1_attenuation'][j] = \
+            m.data_file['Instrument settings']['Dux'].attrs['in1_out1_attenuation']
+        Dux_rstl_dict['in2_out1_attenuation'][j] = \
+            m.data_file['Instrument settings']['Dux'].attrs['in2_out1_attenuation']
+        Dux_rstl_dict['in1_out1_phase'][j] = \
+            m.data_file['Instrument settings']['Dux'].attrs['in1_out1_phase']
+
+    return T1_dict, RB_rstl_dict, RB_trad_dict, Dux_rstl_dict, Dux_trad_dict
 
 
-    return T1_dict, RB_rstl_dict, RB_trad_dict#, GST_dict
+def latexify(fig_width=None, fig_height=None, columns=1):
+    """Set up matplotlib's RC params for LaTeX plotting.
+    Call this before plotting a figure.
 
+    Parameters
+    ----------
+    fig_width : float, optional, inches
+    fig_height : float,  optional, inches
+    columns : {1, 2}
+
+    code adapted from http://www.scipy.org/Cookbook/Matplotlib/LaTeX_Examples
+
+    Width and max height in inches for IEEE journals taken from
+    computer.org/cms/Computer.org/Journal%20templates/transactions_art_guide.pdf
+    """
+    assert(columns in [1, 2])
+
+    if fig_width is None:
+        fig_width = 3.39 if columns == 1 else 6.9  # width in inches
+
+    if fig_height is None:
+        golden_mean = (np.sqrt(5)-1.0)/2.0    # Aesthetic ratio
+        fig_height = fig_width*golden_mean  # height in inches
+
+    MAX_HEIGHT_INCHES = 8.0
+    if fig_height > MAX_HEIGHT_INCHES:
+        print("WARNING: fig_height too large:" + fig_height +
+              "so will reduce to" + MAX_HEIGHT_INCHES + "inches.")
+        fig_height = MAX_HEIGHT_INCHES
+
+    params = {#'backend': 'ps',
+#               'text.latex.preamble': [r'\usepackage{gensymb}'],
+              'lines.markersize': 5,
+              'axes.labelsize': 8, # fontsize for x and y labels (was 10)
+              'axes.titlesize': 8,
+              'text.fontsize': 8, # was 10
+              'legend.fontsize': 8, # was 10
+              'xtick.labelsize': 8,
+              'ytick.labelsize': 8,
+              'axes.labelpad': 0,
+#               'text.usetex': True,
+              'figure.figsize': [fig_width, fig_height],
+              'font.family': 'serif',
+              'legend.numpoints': 1,
+              'legend.frameon': False,
+              'legend.markerscale': .75
+    }
+
+    plt.rcParams.update(params)

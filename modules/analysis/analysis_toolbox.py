@@ -1276,8 +1276,8 @@ def color_plot_interpolated(x, y, z, ax=None,
     # grid the data.
     zi = griddata((x, y), z, (xi[None, :], yi[:, None]),
                   method=interpolation_method)
-    CS = plt.contour(xi, yi, zi, 30, linewidths=0.2, colors='k')
-    CS = plt.contourf(xi, yi, zi, 30, cmap=cmap)
+    CS = ax.contour(xi, yi, zi, 30, linewidths=0.2, colors='k')
+    CS = ax.contourf(xi, yi, zi, 30, cmap=cmap)
 
     ax_divider = make_axes_locatable(ax)
     cax = ax_divider.append_axes('right', size='5%', pad='5%')
