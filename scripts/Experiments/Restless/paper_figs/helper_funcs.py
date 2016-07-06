@@ -27,6 +27,14 @@ def calc_T1_limited_fidelity(T1, pulse_delay):
         return F_cl, p
 
 
+def get_duration_in_min(a):
+    bt = tuple(a.data_file['MC settings']['begintime'].value)
+    et = tuple(a.data_file['MC settings']['endtime'].value)
+    dt = (time.mktime(et)-time.mktime(bt))
+    print('duration in seconds {}'.format(dt))
+    return dt//60, dt % 60
+
+
 def t_stampt_to_hours(timestamp, start_timestamp):
     return (float(timestamp[-2:])/3600+float(timestamp[-4:-2])/60
             + float(timestamp[-6:-4])
@@ -255,18 +263,21 @@ def latexify(fig_width=None, fig_height=None, columns=1):
 #               'text.latex.preamble': [r'\usepackage{gensymb}'],
               'lines.markersize': 5,
               'axes.labelsize': 8, # fontsize for x and y labels (was 10)
+              'axes.labelpad': 0,
               'axes.titlesize': 8,
               'text.fontsize': 8, # was 10
               'legend.fontsize': 8, # was 10
               'xtick.labelsize': 8,
               'ytick.labelsize': 8,
-              'axes.labelpad': 0,
+              'axes.labelpad': 0.2,
 #               'text.usetex': True,
               'figure.figsize': [fig_width, fig_height],
               'font.family': 'serif',
+              'legend.fontsize':8,
               'legend.numpoints': 1,
               'legend.frameon': False,
-              'legend.markerscale': .75
+              'legend.markerscale': .75,
+              'legend.handlelength': 1
     }
 
     plt.rcParams.update(params)
