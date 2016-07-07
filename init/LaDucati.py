@@ -53,7 +53,7 @@ from qcodes.instrument_drivers.tektronix import AWG5014 as tek
 from qcodes.instrument_drivers.tektronix import AWG520 as tk520
 from qcodes.instrument_drivers.agilent.E8527D import Agilent_E8527D
 
-from instrument_drivers.physical_instruments import QuTech_ControlBox_v3 as qcb
+from instrument_drivers.physical_instruments import QuTech_ControlBoxdriver as qcb
 import instrument_drivers.meta_instrument.qubit_objects.Tektronix_driven_transmon as qbt
 from instrument_drivers.meta_instrument import heterodyne as hd
 import instrument_drivers.meta_instrument.CBox_LookuptableManager as lm
@@ -76,13 +76,13 @@ Qubit_LO = rs.RohdeSchwarz_SGS100A(name='Qubit_LO', address='TCPIP0::192.168.0.1
     server_name=None)  # top
 Pump = Agilent_E8527D(name='Pump', address='TCPIP0::192.168.0.13',
                         server_name=None)
-CBox = qcb.QuTech_ControlBox_v3('CBox', address='Com5', run_tests=False, server_name=None)
+CBox = qcb.QuTech_ControlBox('CBox', address='Com3', run_tests=False)
 AWG = tek.Tektronix_AWG5014(name='AWG', setup_folder=None, timeout=2,
                             address='TCPIP0::192.168.0.9', server_name=None)
 AWG.timeout(180)
 IVVI = iv.IVVI('IVVI', address='ASRL1', numdacs=16, server_name=None)
-# Dux = qdux.QuTech_Duplexer('Dux', address='TCPIP0::192.168.0.101',
-#                             server_name=None)
+Dux = qdux.QuTech_Duplexer('Dux', address='TCPIP0::192.168.0.101',
+                            server_name=None)
 
 # Meta-instruments
 HS = hd.HeterodyneInstrument('HS', LO=LO, RF=RF, CBox=CBox, AWG=AWG,
@@ -112,34 +112,21 @@ VIP_mon_4_tek = qbt.Tektronix_driven_transmon('VIP_mon_4_tek',
                                               MC=MC,
                                               server_name=None)
 
-VIP_mon_2 = qbt.CBox_driven_transmon('VIP_mon_2',
-                                              LO=LO,
-                                              cw_source=Qubit_LO,
-                                              td_source=Qubit_LO,
-                                              IVVI=IVVI,
-                                              AWG=AWG,
-                                              CBox=CBox, heterodyne_instr=HS,
-                                              MC=MC,
-                                              LutMan=LutMan,
-                                              server_name=None)
+VIP_mon_2_dux = dt.Duplexer_tek_transmon('VIP_mon_2_dux', LO=LO,
+                                         cw_source=Qubit_LO,
+                                         td_source=Qubit_LO,
+                                         IVVI=IVVI, AWG=AWG, CBox=CBox,
+                                         heterodyne_instr=HS, MC=MC, Mux=Dux,
+                                         rf_RO_source=RF, server_name=None)
 
-# VIP_mon_2_dux = dt.Duplexer_tek_transmon('VIP_mon_2_dux', LO=LO,
-#                                          cw_source=Qubit_LO,
-#                                          td_source=Qubit_LO,
-#                                          IVVI=IVVI, AWG=AWG, CBox=CBox,
-#                                          heterodyne_instr=HS, MC=MC, Mux=Dux,
-#                                          rf_RO_source=RF, server_name=None)
+gen.load_settings_onto_instrument(VIP_mon_2_tek)#, timestamp='20160621_101926')
+gen.load_settings_onto_instrument(VIP_mon_4_tek)#, timestamp='20160621_101926')
+gen.load_settings_onto_instrument(VIP_mon_2_dux)#, timestamp='20160621_101926')
 
-gen.load_settings_onto_instrument(VIP_mon_2_tek)
-gen.load_settings_onto_instrument(VIP_mon_4_tek)
-gen.load_settings_onto_instrument(VIP_mon_2)
 
-# station = qc.Station(LO, RF, Qubit_LO, IVVI, Dux, Pump,
-#                      AWG, AWG520, HS, CBox, LutMan,
-#                      VIP_mon_2_dux,
-#                      VIP_mon_2_tek, VIP_mon_4_tek)
-station = qc.Station(LO, RF, Qubit_LO, IVVI, Pump,
-                     AWG, AWG520, HS, CBox, LutMan, VIP_mon_2,
+station = qc.Station(LO, RF, Qubit_LO, IVVI, Dux, Pump,
+                     AWG, AWG520, HS, CBox, LutMan,
+                     VIP_mon_2_dux,
                      VIP_mon_2_tek, VIP_mon_4_tek)
 MC.station = station
 station.MC = MC

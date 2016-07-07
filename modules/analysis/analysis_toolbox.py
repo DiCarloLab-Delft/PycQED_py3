@@ -1114,9 +1114,7 @@ def color_plot(x, y, z, fig, ax, cax=None,
     cmap = plt.get_cmap(kw.pop('cmap', 'viridis'))
     # CMRmap is our old default
 
-
     clim = kw.pop('clim', [None, None])
-
     if log:
         norm = colors.LogNorm()
     else:
@@ -1127,9 +1125,11 @@ def color_plot(x, y, z, fig, ax, cax=None,
         colormap = ax.pcolormesh(y_grid.transpose(),
                                  x_grid.transpose(),
                                  z.transpose(),
+                                 linewidth=0, rasterized=True,
                                  cmap=cmap, vmin=clim[0], vmax=clim[1])
     else:
         colormap = ax.pcolormesh(x_grid, y_grid, z, cmap=cmap, norm=norm,
+                                 linewidth=0, rasterized=True,
                                  vmin=clim[0], vmax=clim[1])
 
     plot_title = kw.pop('plot_title', None)
@@ -1168,7 +1168,7 @@ def color_plot(x, y, z, fig, ax, cax=None,
         if cax is None:
             ax_divider = make_axes_locatable(ax)
             cax = ax_divider.append_axes('right', size='10%', pad='5%')
-        cbar = plt.colorbar(colormap, cax=cax)
+        cbar = plt.colorbar(colormap, cax=cax, orientation='vertical')
         if zlabel is not None:
             cbar.set_label(zlabel)
         return fig, ax, colormap, cbar
@@ -1258,13 +1258,21 @@ def linecut_plot(x, y, z, fig, ax,
 def color_plot_interpolated(x, y, z, ax=None,
                             num_points=300,
                             zlabel=None, cmap='viridis',
-                            interpolation_method='linear'):
+                            interpolation_method='linear',
+                            vmin=None, vmax=None,
+                            N_levels=30,
+                            cax=None, cbar_orientation='vertical',
+                            plot_cbar=True):
     """
     Plots a heatmap using z values at coordinates (x, y) using cubic
     interpolation.
     x: 1D array
     y: 1D array
     z: 1D array
+
+    returns
+        ax: (matplotlib axis object)
+        CS: (mappable used for creating colorbar)
 
 
     """
@@ -1276,18 +1284,18 @@ def color_plot_interpolated(x, y, z, ax=None,
     # grid the data.
     zi = griddata((x, y), z, (xi[None, :], yi[:, None]),
                   method=interpolation_method)
-    CS = plt.contour(xi, yi, zi, 30, linewidths=0.2, colors='k')
-    CS = plt.contourf(xi, yi, zi, 30, cmap=cmap)
-
-    ax_divider = make_axes_locatable(ax)
-    cax = ax_divider.append_axes('right', size='5%', pad='5%')
-    cbar = plt.colorbar(CS, cax=cax)
-
-    ax.get_yaxis().set_tick_params(direction='out')
-    ax.get_xaxis().set_tick_params(direction='out')
-    if zlabel is not None:
-        cbar.set_label(zlabel)
-    return ax
+    CS = ax.contour(xi, yi, zi, N_levels, linewidths=0.2, colors='k',
+                    vmin=vmin, vmax=vmax)
+    CS = ax.contourf(xi, yi, zi, N_levels, cmap=cmap, vmin=vmin, vmax=vmax)
+    if plot_cbar:
+        if cax is None:
+            ax_divider = make_axes_locatable(ax)
+            cax = ax_divider.append_axes('right', size='5%', pad='5%')
+        cbar = plt.colorbar(CS, cax=cax, orientation=cbar_orientation)
+        if zlabel is not None:
+            cbar.set_label(zlabel)
+        return ax, CS, cbar
+    return ax, CS
 
 
 ######################################################################

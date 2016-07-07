@@ -345,6 +345,25 @@ class CBox_v3_T1(swf.Hard_Sweep):
             self.CBox.load_instructions('CBox_v3_test_program\T1.asm')
             self.CBox.set_master_controller_working_state(1, 0, 0)
 
+class CBox_v3_T1(swf.Hard_Sweep):
+    def __init__(self, CBox, upload=True):
+        super().__init__()
+        self.name = 'T1'
+        self.parameter_name = 'tau'
+        self.unit = 's'
+        self.upload = upload
+        self.CBox = CBox
+
+    def prepare(self, **kw):
+        if self.upload:
+            self.CBox.AWG0_mode('Codeword-trigger mode')
+            self.CBox.AWG1_mode('Codeword-trigger mode')
+            self.CBox.AWG2_mode('Codeword-trigger mode')
+            self.CBox.set_master_controller_working_state(0, 0, 0)
+            self.CBox.load_instructions('CBox_v3_test_program\T1.asm')
+            self.CBox.set_master_controller_working_state(1, 0, 0)
+
+
 class CBox_Ramsey(swf.Hard_Sweep):
     def __init__(self, IF, RO_pulse_length,
                  RO_pulse_delay, RO_trigger_delay, pulse_delay,
