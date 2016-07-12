@@ -31,7 +31,6 @@ def get_duration_in_min(a):
     bt = tuple(a.data_file['MC settings']['begintime'].value)
     et = tuple(a.data_file['MC settings']['endtime'].value)
     dt = (time.mktime(et)-time.mktime(bt))
-    print('duration in seconds {}'.format(dt))
     return dt//60, dt % 60
 
 
@@ -45,6 +44,18 @@ def t_stampt_to_seconds(timestamp, start_timestamp):
     return 3600*(float(timestamp[-2:])/3600+float(timestamp[-4:-2])/60
                   + float(timestamp[-6:-4])
             + 24*float(timestamp[-9:-7]))-24*float(start_timestamp[-9:-7])
+
+
+def extract_durations(start_timestamp, end_timestamp, label):
+    timestamps = a_tools.get_timestamps_in_range(start_timestamp, end_timestamp,
+                                                 label=label)
+    durs=[]
+    for tst in timestamps:
+        a = ma.MeasurementAnalysis(timestamp=tst, auto=False)
+        dur = get_duration_in_min(a)
+        durs.append(dur[0]*60 + dur[1])
+        a.finish()
+    return durs
 
 
 def extract_data(start_timestamp, end_timestamp, label):
@@ -281,3 +292,16 @@ def latexify(fig_width=None, fig_height=None, columns=1):
     }
 
     plt.rcParams.update(params)
+
+
+def PSD(array, time_step):
+    """
+    PSD function by Niels
+    """
+    f_axis = np.fft.fftfreq(len(array), time_step)
+    idx = np.argsort(f_axis)
+    f_axis = f_axis[idx]
+    period = time_step*len(array)
+    psd = time_step*time_step/period*(np.abs(np.fft.fft(array)))**2
+    psd = psd[idx]
+    return f_axis[len(psd)/2:], psd[len(psd)/2:]
