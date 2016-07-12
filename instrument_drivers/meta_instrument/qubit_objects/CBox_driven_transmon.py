@@ -171,6 +171,7 @@ class CBox_driven_transmon(Transmon):
 
         # Mixer skewness correction
         self.LutMan.IQ_phase_skewness.set(0)
+        print('self.LutMan type: ', type(self.LutMan))
         self.LutMan.QI_amp_ratio.set(1)
         self.LutMan.apply_predistortion_matrix.set(True)
         self.LutMan.alpha.set(self.alpha.get())
@@ -572,23 +573,17 @@ class CBox_driven_transmon(Transmon):
         self.prepare_for_timedomain()
         if MC is None:
             MC = self.MC
-        st_seqs.CBox_multi_pulse_seq(
-            IF=self.f_RO_mod.get(), n_pulses=n,
-            pulse_delay=self.pulse_delay.get(),
-            RO_pulse_delay=self.RO_pulse_delay.get(),
-            RO_trigger_delay=self.RO_acq_marker_delay.get(),
-            RO_pulse_length=self.RO_pulse_length.get(), verbose=verbose)
-        self.AWG.set('ch3_amp', self.mod_amp_td.get())
-        self.AWG.set('ch4_amp', self.mod_amp_td.get())
-        self.AWG.start()
-
         cal_points = [0, 0]
         amps = cal_points + list(amps)
-        self.CBox.set('AWG0_tape', [1, 1])
-        self.CBox.set('AWG1_tape', [1, 1])
+        self.CBox.AWG0_mode('Codeword-trigger mode')
+        self.CBox.AWG1_mode('Codeword-trigger mode')
+        self.CBox.AWG2_mode('Codeword-trigger mode')
+        self.CBox.set_master_controller_working_state(0, 0, 0)
+        self.CBox.load_instructions('CBox_v3_test_program\Rabi.asm')
+        self.CBox.set_master_controller_working_state(1, 0, 0)
         MC.set_sweep_function(pw.wrap_par_to_swf(self.LutMan.amp180))
         MC.set_sweep_points(amps)
-        MC.set_detector_function(det.CBox_single_int_avg_with_LutReload(
+        MC.set_detector_function(det.CBox_v3_single_int_avg_with_LutReload(
                                  self.CBox, self.LutMan,
                                  awg_nrs=[self.awg_nr.get()]))
         MC.run('Rabi-n{}'.format(n)+self.msmt_suffix)
@@ -606,20 +601,14 @@ class CBox_driven_transmon(Transmon):
         # append the calibration points, times are for location in plot
         times = np.concatenate([times,
                                (times[-1]+times[0],
-                                times[-1]+times[0],
                                 times[-1]+times[1],
-                                times[-1]+times[1])])
-        self.CBox.set('nr_samples', len(times))
+                                times[-1]+times[2],
+                                times[-1]+times[3])])
         MC.set_sweep_function(
-            awg_swf.CBox_T1(IF=self.f_RO_mod.get(),
-                            RO_pulse_delay=self.RO_pulse_delay.get(),
-                            RO_trigger_delay=self.RO_acq_marker_delay.get(),
-                            mod_amp=self.mod_amp_td.get(),
-                            AWG=self.AWG,
-                            upload=True))
+            awg_swf.CBox_v3_T1(CBox=self.CBox, upload=True))
         MC.set_sweep_points(times)
-        MC.set_detector_function(det.CBox_integrated_average_detector(
-                                 self.CBox, self.AWG))
+        MC.set_detector_function(det.CBox_v3_integrated_average_detector(
+                                 self.CBox))
         MC.run('T1'+self.msmt_suffix)
         if analyze:
             a = ma.T1_Analysis(auto=True, close_fig=True)
