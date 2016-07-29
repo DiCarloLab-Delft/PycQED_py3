@@ -32,7 +32,7 @@ You are now ready to start your experiment.
 
 ## Overview of the main modules
 Below follows an overview of the main structure of the code. It makes sense to take a look around here if your are new to get a feeling where to find things. 
-Also take a look at [this presentation](docs\160714 QCoDeS meetup Delft_edited_for_pycqed.pdf), where the relation to qcodes and the core concepts in the package are explained.
+Also take a look at [this presentation](docs/160714_qcodes_meetup.pdf), where the relation to qcodes and the core concepts in the package are explained.
 Mind however that the code is continuously under development so if you think something should be in a different location feel free to tap me (Adriaan) on the shoulder or create an issue to discuss it.
 
 ### Folder Structure
