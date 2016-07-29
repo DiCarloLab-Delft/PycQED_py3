@@ -4,6 +4,7 @@ from modules.measurement import sweep_functions as swf
 from modules.measurement.randomized_benchmarking import randomized_benchmarking as rb
 from modules.measurement.pulse_sequences import standard_sequences as st_seqs
 from modules.measurement.pulse_sequences import single_qubit_tek_seq_elts as sqs
+from modules.measurement.pulse_sequences import single_qubit_2nd_exc_seqs as sqs2
 default_gauss_width = 10  # magic number should be removed,
 # note magic number only used in old mathematica seqs
 
@@ -15,7 +16,6 @@ class Rabi(swf.Hard_Sweep):
         self.RO_pars = RO_pars
         self.n = n
         self.upload = upload
-
         self.name = 'Rabi'
         self.parameter_name = 'amplitude'
         self.unit = 'V'
@@ -26,6 +26,85 @@ class Rabi(swf.Hard_Sweep):
                          pulse_pars=self.pulse_pars,
                          RO_pars=self.RO_pars,
                          n=self.n)
+
+
+class Rabi_amp90(swf.Hard_Sweep):
+    def __init__(self, pulse_pars, RO_pars, n=1, upload=True):
+        super().__init__()
+        self.pulse_pars = pulse_pars
+        self.RO_pars = RO_pars
+        self.n = n
+        self.upload = upload
+        self.name = 'Rabi_amp90'
+        self.parameter_name = 'ratio_amp90_amp180'
+        self.unit = ''
+
+    def prepare(self, **kw):
+        if self.upload:
+            sqs.Rabi_amp90_seq(scales=self.sweep_points,
+                               pulse_pars=self.pulse_pars,
+                               RO_pars=self.RO_pars,
+                               n=self.n)
+
+
+class Rabi_2nd_exc(swf.Hard_Sweep):
+    def __init__(self, pulse_pars, pulse_pars_2nd,
+                 RO_pars, amps=None, n=1, cal_points=True, upload=True):
+        super().__init__()
+        self.pulse_pars = pulse_pars
+        self.pulse_pars_2nd = pulse_pars_2nd
+        self.RO_pars = RO_pars
+        self.n = n
+        self.upload = upload
+        self.name = 'Rabi 2nd excited state'
+        self.parameter_name = 'amplitude'
+        self.unit = 'V'
+        if cal_points and amps is not None:
+            self.sweep_points = np.concatenate([amps,
+                                               [amps[-1]*1.05,
+                                                amps[-1]*1.06,
+                                                amps[-1]*1.07,
+                                                amps[-1]*1.08,
+                                                amps[-1]*1.09,
+                                                amps[-1]*1.1]])
+
+    def prepare(self, **kw):
+        if self.upload:
+            sqs2.Rabi_2nd_exc_seq(amps=self.sweep_points,
+                                  pulse_pars=self.pulse_pars,
+                                  pulse_pars_2nd=self.pulse_pars_2nd,
+                                  RO_pars=self.RO_pars,
+                                  n=self.n)
+
+
+class Ramsey_2nd_exc(swf.Hard_Sweep):
+    def __init__(self, pulse_pars, pulse_pars_2nd,
+                 RO_pars, times=None, n=1, cal_points=True, upload=True):
+        super().__init__()
+        self.pulse_pars = pulse_pars
+        self.pulse_pars_2nd = pulse_pars_2nd
+        self.RO_pars = RO_pars
+        self.n = n
+        self.upload = upload
+        self.name = 'Rabi 2nd excited state'
+        self.parameter_name = 'amplitude'
+        self.unit = 'V'
+        if cal_points and times is not None:
+            self.sweep_points = np.concatenate([times,
+                                               [times[-1]*1.05,
+                                                times[-1]*1.06,
+                                                times[-1]*1.07,
+                                                times[-1]*1.08,
+                                                times[-1]*1.09,
+                                                times[-1]*1.1]])
+    def prepare(self, **kw):
+        if self.upload:
+            sqs2.Ramsey_2nd_exc_seq(times=self.sweep_points,
+                                    pulse_pars=self.pulse_pars,
+                                    pulse_pars_2nd=self.pulse_pars_2nd,
+                                    RO_pars=self.RO_pars,
+                                    n=self.n)
+
 
 
 class T1(swf.Hard_Sweep):
@@ -90,7 +169,7 @@ class OffOn(swf.Hard_Sweep):
 
 class Butterfly(swf.Hard_Sweep):
     def __init__(self, pulse_pars, RO_pars, initialize=False, upload=True,
-                 post_measurement_delay=2000e-9):
+                 post_msmt_delay=2000e-9):
         super().__init__()
         self.pulse_pars = pulse_pars
         self.RO_pars = RO_pars
@@ -99,20 +178,21 @@ class Butterfly(swf.Hard_Sweep):
         self.unit = '#'
         self.name = 'Butterfly'
         self.sweep_points = np.arange(2)
-        self.initialize=initialize
-        self.post_measurement_delay = post_measurement_delay
+        self.initialize = initialize
+        self.post_msmt_delay = post_msmt_delay
 
     def prepare(self, **kw):
         if self.upload:
             sqs.Butterfly_seq(pulse_pars=self.pulse_pars,
-                              post_measurement_delay=self.post_measurement_delay,
-                          RO_pars=self.RO_pars, initialize=self.initialize)
+                              post_msmt_delay=self.post_msmt_delay,
+                              RO_pars=self.RO_pars, initialize=self.initialize)
 
 
 class Randomized_Benchmarking(swf.Hard_Sweep):
     def __init__(self, pulse_pars, RO_pars,
                  nr_seeds, nr_cliffords,
                  cal_points=True,
+                 double_curves=False, seq_name=None,
                  upload=True):
         # If nr_cliffords is None it still needs to be specfied when setting
         # the experiment
@@ -123,11 +203,15 @@ class Randomized_Benchmarking(swf.Hard_Sweep):
         self.nr_seeds = nr_seeds
         self.cal_points = cal_points
         self.sweep_points = nr_cliffords
+        self.double_curves = double_curves
+        self.seq_name = seq_name
 
         self.parameter_name = 'Nr of Cliffords'
         self.unit = '#'
         self.name = 'Randomized_Benchmarking'
         self.sweep_points = nr_cliffords
+        if double_curves:
+            nr_cliffords = np.repeat(nr_cliffords, 2)
 
         if self.cal_points:
             self.sweep_points = np.concatenate([nr_cliffords,
@@ -142,7 +226,9 @@ class Randomized_Benchmarking(swf.Hard_Sweep):
                 self.pulse_pars, self.RO_pars,
                 nr_cliffords=self.sweep_points,
                 nr_seeds=self.nr_seeds,
-                cal_points=self.cal_points)
+                cal_points=self.cal_points,
+                double_curves=self.double_curves,
+                seq_name=self.seq_name)
 
 
 class Ramsey(swf.Hard_Sweep):
@@ -232,13 +318,50 @@ class CBox_T1(swf.Hard_Sweep):
     def prepare(self, **kw):
         if self.upload:
             ch3_amp = self.AWG.get('ch3_amp')
-            ch4_amp = self.AWG.get('ch3_amp')
+            ch4_amp = self.AWG.get('ch4_amp')
             st_seqs.CBox_T1_marker_seq(IF=self.IF, times=self.sweep_points,
                                        RO_pulse_delay=self.RO_pulse_delay,
                                        RO_trigger_delay=self.RO_trigger_delay,
                                        verbose=False)
             self.AWG.set('ch3_amp', ch3_amp)
             self.AWG.set('ch4_amp', ch4_amp)
+
+class CBox_v3_T1(swf.Hard_Sweep):
+    def __init__(self, CBox, upload=True):
+        super().__init__()
+        self.name = 'T1'
+        self.parameter_name = 'tau'
+        self.unit = 's'
+        self.upload = upload
+        self.CBox = CBox
+
+
+    def prepare(self, **kw):
+        if self.upload:
+            self.CBox.AWG0_mode('Codeword-trigger mode')
+            self.CBox.AWG1_mode('Codeword-trigger mode')
+            self.CBox.AWG2_mode('Codeword-trigger mode')
+            self.CBox.set_master_controller_working_state(0, 0, 0)
+            self.CBox.load_instructions('CBox_v3_test_program\T1.asm')
+            self.CBox.set_master_controller_working_state(1, 0, 0)
+
+class CBox_v3_T1(swf.Hard_Sweep):
+    def __init__(self, CBox, upload=True):
+        super().__init__()
+        self.name = 'T1'
+        self.parameter_name = 'tau'
+        self.unit = 's'
+        self.upload = upload
+        self.CBox = CBox
+
+    def prepare(self, **kw):
+        if self.upload:
+            self.CBox.AWG0_mode('Codeword-trigger mode')
+            self.CBox.AWG1_mode('Codeword-trigger mode')
+            self.CBox.AWG2_mode('Codeword-trigger mode')
+            self.CBox.set_master_controller_working_state(0, 0, 0)
+            self.CBox.load_instructions('CBox_v3_test_program\T1.asm')
+            self.CBox.set_master_controller_working_state(1, 0, 0)
 
 
 class CBox_Ramsey(swf.Hard_Sweep):

@@ -53,7 +53,6 @@ class Qubit(Instrument):
 
     Open for discussion:
         - is a split at the level below qubit really required?
-        - Hz vs GHz (@cdickel)
         - is the name "find_" a good name or should it be merged with measure
             or calibrate?
         - Should the pulse-parameters be grouped here in some convenient way?
@@ -195,10 +194,8 @@ class Transmon(Qubit):
     def find_frequency(self, method='spectroscopy', pulsed=False,
                        steps=[1, 3, 10, 30, 100, 300, 1000],
                        freqs=None,
-                       f_span=100e6,
-                       f_step=1e6,
-                       verbose=True,
-                       update=False,
+                       f_span=100e6, f_step=1e6,
+                       verbose=True, update=True,
                        close_fig=True):
 
         if method.lower() == 'spectroscopy':
@@ -299,9 +296,7 @@ class Transmon(Qubit):
                 a = ma.Rabi_parabola_analysis(close_fig=close_fig)
                 if take_fit_I:
                     ampl = a.fit_res[0].params['x0'].value
-                    print("taking I")
                 else:
-                    print("checking both fits")
                     if (a.fit_res[0].params['x0'].stderr <=
                             a.fit_res[1].params['x0'].stderr):
                         ampl = a.fit_res[0].params['x0'].value
@@ -311,10 +306,62 @@ class Transmon(Qubit):
                     print('Found amplitude', ampl, '\n')
         if update:
             self.amp180.set(ampl)
-            print("should be updated")
             print(ampl)
 
         # After this it should enter a loop where it fine tunes the amplitude
         # based on fine scanes around the optimum with higher sensitivity.
 
+    def find_amp90_scaling(self, scales=0.5,
+                           N_steps=[5, 9], max_n=100,
+                           close_fig=True, verbose=False,
+                           MC=None, update=True, take_fit_I=False):
+        '''
+        Finds the scaling factor of pi/2 pulses w.r.t pi pulses using a rabi
+        type with each pi pulse replaced by 2 pi/2 pulses.
 
+        If scales is an array it starts by fitting a cos to a Rabi experiment
+        to get an initial guess for the amplitude.
+
+        This experiment is only useful after carefully calibrating the pi pulse
+        using flipping sequences.
+        '''
+        if MC is None:
+            MC = self.MC
+        if np.size(scales) != 1:
+            self.measure_rabi_amp90(scales=scales, n=1, MC=MC, analyze=False)
+            a = ma.Rabi_Analysis(close_fig=close_fig)
+            if take_fit_I:
+                    scale = abs(a.fit_res[0].params['period'].value)/2
+            else:
+                if (a.fit_res[0].params['period'].stderr <=
+                        a.fit_res[1].params['period'].stderr):
+                    scale = abs(a.fit_res[0].params['period'].value)/2
+                else:
+                    scale = abs(a.fit_res[1].params['period'].value)/2
+        else:
+            scale = scales
+        if verbose:
+            print('Initial scaling factor:', scale, '\n')
+
+        for n in N_steps:
+            if n > max_n:
+                break
+            else:
+                scale_span = 0.3*scale/n
+                scales = np.linspace(scale-scale_span, scale+scale_span, 15)
+                self.measure_rabi_amp90(scales, n=n, MC=MC, analyze=False)
+                a = ma.Rabi_parabola_analysis(close_fig=close_fig)
+                if take_fit_I:
+                    scale = a.fit_res[0].params['x0'].value
+                else:
+                    if (a.fit_res[0].params['x0'].stderr <=
+                            a.fit_res[1].params['x0'].stderr):
+                        scale = a.fit_res[0].params['x0'].value
+                    else:
+                        scale = a.fit_res[1].params['x0'].value
+                if verbose:
+                    print('Founcaleitude', scale, '\n')
+        if update:
+            self.amp90_scale(scale)
+            print("should be updated")
+            print(scale)

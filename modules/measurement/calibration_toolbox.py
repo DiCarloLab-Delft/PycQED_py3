@@ -89,7 +89,7 @@ def mixer_skewness_calibration_5014(SH, source, station,
     ad_func_pars = {'adaptive_function': nelder_mead,
                     'x0': [1.0, 0.0],
                     'initial_step': [.15, 10],
-                    'no_improv_break': 5,
+                    'no_improv_break': 10,
                     'minimize': True,
                     'maxiter': 500}
     MC.set_sweep_functions([S1, S2])
@@ -164,7 +164,7 @@ def mixer_carrier_cancellation_5014(AWG, SH, source, MC,
         MC.set_sweep_function(ch1_swf)
         MC.set_detector_function(
             det.Signal_Hound_fixed_frequency(signal_hound=SH,
-                                             frequency=frequency*1e-9))
+                                             frequency=frequency))
         MC.set_sweep_points(np.linspace(ch_1_min + voltage_span,
                                         ch_1_min - voltage_span, 11))
         MC.run(name='Mixer_cal_Offset_%s' % AWG_channel1,
@@ -259,7 +259,7 @@ def mixer_carrier_cancellation_CBox(CBox, SH, source, MC,
         # Channel 0
         MC.set_sweep_function(ch0_swf)
         MC.set_detector_function(
-            det.Signal_Hound_fixed_frequency(signal_hound=SH, frequency=frequency*1e-9))
+            det.Signal_Hound_fixed_frequency(signal_hound=SH, frequency=frequency))
         MC.set_sweep_points(np.linspace(ch_0_min + voltage_span,
                                         ch_0_min - voltage_span, 11))
         MC.run(name='Mixer_cal_Offset_awg{}_dac{}'.format(awg_nr, 0),

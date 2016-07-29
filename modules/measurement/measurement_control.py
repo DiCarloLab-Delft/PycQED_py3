@@ -68,32 +68,45 @@ class MeasurementControl:
             else:
                 raise ValueError('mode %s not recognized' % self.mode)
             result = self.dset[()]
+            self.save_MC_metadata(self.data_object) # timing labels etc
         return result
 
     def measure(self, *kw):
-        self.initialize_plot_monitor()
-        if (self.sweep_functions[0].sweep_control !=
-                self.detector_function.detector_control):
-                # FIXME only checks first sweepfunction
-            raise Exception('Sweep and Detector functions not of the same type.'
-                            + 'Aborting measurement')
-            print(self.sweep_function.sweep_control)
-            print(self.detector_function.detector_control)
+        if self.live_plot_enabled:
+            self.initialize_plot_monitor()
 
         for sweep_function in self.sweep_functions:
             sweep_function.prepare()
 
-        if self.sweep_functions[0].sweep_control == 'soft':
+        if (self.sweep_functions[0].sweep_control == 'soft' and
+                self.detector_function.detector_control == 'soft'):
             self.detector_function.prepare()
+            self.get_measurement_preparetime()
             self.measure_soft_static()
-        if self.sweep_functions[0].sweep_control == 'hard':
+        elif (self.sweep_functions[0].sweep_control == 'soft' and
+                    self.detector_function.detector_control == 'hard'):
+            """
+            This is a special combination for when the detector returns
+            data in chunks, the detector function needs to take care of
+            going over all the sweep points by using all that are specified
+            """
+            self.detector_function.prepare(
+                sweep_points=self.get_sweep_points())
+            self.get_measurement_preparetime()
+            # self.complete gets updated in self.print_progress_static_hard
+            self.complete = False
+            while not self.complete:
+                self.measure_hard()
+        elif self.sweep_functions[0].sweep_control == 'hard':
             self.iteration = 0
             if len(self.sweep_functions) == 1:
                 self.detector_function.prepare(
                     sweep_points=self.get_sweep_points())
+                self.get_measurement_preparetime()
                 self.measure_hard()
             elif len(self.sweep_functions) == 2:
                 self.complete = False
+                self.get_measurement_preparetime()
                 for j in range(self.ylen):
                     # added specifically for 2D hard sweeps
                     if not self.complete:
@@ -107,11 +120,18 @@ class MeasurementControl:
                         self.measure_hard()
             else:
                 raise Exception('hard measurements have not been generalized to N-D yet')
+        else:
+            raise Exception('Sweep and Detector functions not of the same type.'
+                            + 'Aborting measurement')
+            print(self.sweep_function.sweep_control)
+            print(self.detector_function.detector_control)
+
         self.update_plotmon(force_update=True)
         for sweep_function in self.sweep_functions:
             sweep_function.finish()
         self.detector_function.finish()
         self.get_measurement_endtime()
+
         return
 
     def measure_soft_static(self):
@@ -132,6 +152,7 @@ class MeasurementControl:
         for sweep_function in self.sweep_functions:
             sweep_function.prepare()
         self.detector_function.prepare()
+        self.get_measurement_preparetime()
 
         if adaptive_function == 'Powell':
             adaptive_function = fmin_powell
@@ -190,12 +211,20 @@ class MeasurementControl:
         # Only add sweep points if these make sense (i.e. same shape as new_data)
         if sweep_len == len_new_data:  # 1D sweep
             self.dset[:, 0] = self.get_sweep_points().T
-        elif self.mode is '2D':  # 2D sweep
-            # always add for a 2D sweep
-            relevant_swp_points = self.get_sweep_points()[
-                start_idx:start_idx+len_new_data:]
-            self.dset[start_idx:, 0:len(self.sweep_functions)] = \
-                relevant_swp_points
+        else:
+            try:
+                if len(self.sweep_functions) != 1:
+                    relevant_swp_points = self.get_sweep_points()[
+                        start_idx:start_idx+len_new_data:]
+                    self.dset[start_idx:, 0:len(self.sweep_functions)] = \
+                        relevant_swp_points
+                else:
+                    self.dset[start_idx:, 0] = self.get_sweep_points()[
+                        start_idx:start_idx+len_new_data:].T
+            except Exception:
+                # There are some cases where the sweep points are not
+                # specified that you don't want to crash (e.g. on -off seq)
+                pass
 
         self.update_plotmon()
         if self.mode == '2D':
@@ -230,8 +259,9 @@ class MeasurementControl:
         #     print('Time of iteration: {:.4g}'.format(time.time()-self.it_time))
         # self.it_time = time.time()
 
+        print("measurement_function, called detector_function name: ", self.detector_function.name)
         vals = self.detector_function.acquire_data_point()
-
+        print("measurement_function, detector_function return: ", vals)
         # Resizing dataset and saving
         new_datasetshape = (self.iteration, datasetshape[1])
         self.dset.resize(new_datasetshape)
@@ -252,7 +282,7 @@ class MeasurementControl:
         in self.af_pars:
         - Rescales the function using the "x_scale" parameter, default is 1
         - Inverts the measured values if "minimize"==False
-        - Compares measurement value with 'f_termination' and raises an
+        - Compares measurement value with "f_termination" and raises an
         exception, that gets caught outside of the optimization loop, if
         the measured value is smaller than this f_termination.
 
@@ -278,15 +308,10 @@ class MeasurementControl:
                     raise StopIteration()
             vals = np.multiply(-1, vals)
 
-        # TODO: re add the extra plotmon that shows the progress of the
-        # optimization
-        # self.update_plotmon(
-        #     mon_nr=5, x_ind=None,
-        #     y_ind=-len(self.detector_function.value_names))
         # to check if vals is an array with multiple values
         if hasattr(vals, '__iter__'):
             if len(vals) > 1:
-                vals = vals[0]
+                vals = vals[self.par_idx]
         return vals
 
     def finish(self):
@@ -582,7 +607,7 @@ class MeasurementControl:
                             ' instrument settings')
         else:
             set_grp = data_object.create_group('Instrument settings')
-            inslist = dict_to_ordered_tuples(self.station.instruments)
+            inslist = dict_to_ordered_tuples(self.station.components)
             for (iname, ins) in inslist:
                 instrument_grp = set_grp.create_group(iname)
                 par_snap = ins.snapshot()['parameters']
@@ -594,21 +619,41 @@ class MeasurementControl:
                         val = ''
                     instrument_grp.attrs[p_name] = str(val)
 
+    def save_MC_metadata(self, data_object=None, *args):
+        '''
+        Saves metadata on the MC (such as timings)
+        '''
+        set_grp = data_object.create_group('MC settings')
+
+        bt = set_grp.create_dataset('begintime', (9, 1))
+        bt[:, 0] = np.array(time.localtime(self.begintime))
+        pt = set_grp.create_dataset('preparetime', (9, 1))
+        pt[:, 0] = np.array(time.localtime(self.preparetime))
+        et = set_grp.create_dataset('endtime', (9, 1))
+        et[:, 0] = np.array(time.localtime(self.endtime))
+
+        set_grp.attrs['mode'] = self.mode
+        set_grp.attrs['measurement_name'] = self.measurement_name
+        set_grp.attrs['live_plot_enabled'] = self.live_plot_enabled
+
+
+
     def print_progress_static_soft_sweep(self, i):
-        percdone = (i+1)*1./len(self.sweep_points)*100
-        elapsed_time = time.time() - self.begintime
-        progress_message = "\r {percdone}% completed \telapsed time: "\
-            "{t_elapsed}s \ttime left: {t_left}s".format(
-                percdone=int(percdone),
-                t_elapsed=round(elapsed_time, 1),
-                t_left=round((100.-percdone)/(percdone) *
-                             elapsed_time, 1) if
-                percdone != 0 else '')
-        if percdone != 100:
-            end_char = '\r'
-        else:
-            end_char = '\n'
-        print(progress_message, end=end_char)
+        if self.verbose:
+            percdone = (i+1)*1./len(self.sweep_points)*100
+            elapsed_time = time.time() - self.begintime
+            progress_message = "\r {percdone}% completed \telapsed time: "\
+                "{t_elapsed}s \ttime left: {t_left}s".format(
+                    percdone=int(percdone),
+                    t_elapsed=round(elapsed_time, 1),
+                    t_left=round((100.-percdone)/(percdone) *
+                                 elapsed_time, 1) if
+                    percdone != 0 else '')
+            if percdone != 100:
+                end_char = '\r'
+            else:
+                end_char = '\n'
+            print(progress_message, end=end_char)
 
     def print_progress_static_hard(self):
         acquired_points = self.dset.shape[0]
@@ -680,7 +725,7 @@ class MeasurementControl:
         for i, sweep_func in enumerate(sweep_functions):
             # If it is not a sweep function, assume it is a qc.parameter
             # and try to auto convert it it
-            if not isinstance(sweep_func, swf.Sweep_function):
+            if not hasattr(sweep_func, 'sweep_control'):
                 sweep_func = wrap_par_to_swf(sweep_func)
                 sweep_functions[i] = sweep_func
             sweep_function_names.append(str(swf.__class__.__name__))
@@ -696,12 +741,15 @@ class MeasurementControl:
     def get_sweep_function_names(self):
         return self.sweep_function_names
 
-    def set_detector_function(self, detector_function):
-        # If it is not a detector function, assume it is a qc.parameter
-        # and try to auto convert it it
-        if not isinstance(detector_function, det.Detector_Function):
-            detector_function = wrap_par_to_det(detector_function)
-
+    def set_detector_function(self, detector_function,
+                              wrapped_det_control='soft'):
+        """
+        Sets the detector function. If a parameter is passed instead it
+        will attempt to wrap it to a detector function.
+        """
+        if not hasattr(detector_function, 'detector_control'):
+            detector_function = wrap_par_to_det(detector_function,
+                                                wrapped_det_control)
         self.detector_function = detector_function
         self.set_detector_function_name(detector_function.name)
 
@@ -730,6 +778,11 @@ class MeasurementControl:
         self.endtime = time.time()
         return time.strftime('%Y-%m-%d %H:%M:%S')
 
+    def get_measurement_preparetime(self):
+        self.preparetime = time.time()
+        return time.strftime('%Y-%m-%d %H:%M:%S')
+
+
     def set_sweep_points(self, sweep_points):
         self.sweep_points = np.array(sweep_points)
         # line below is because some sweep funcs have their own sweep points attached
@@ -739,11 +792,35 @@ class MeasurementControl:
         return self.sweep_functions[0].sweep_points
 
     def set_adaptive_function_parameters(self, adaptive_function_parameters):
+        """
+        adaptive_function_parameters: Dictionary containing options for
+            running adaptive mode.
+
+        The following arguments are reserved keywords. All other entries in
+        the dictionary get passed to the adaptive function in the measurement
+        loop.
+
+        Reserved keywords:
+            "adaptive_function":    function
+            "x_scale": 1            float rescales values for adaptive function
+            "minimize": False       Bool, inverts value to allow minimizing
+                                    or maximizing
+            "f_termination" None    terminates the loop if the measured value
+                                    is smaller than this value
+            "par_idx": 0            If a parameter returns multiple values,
+                                    specifies which one to use.
+        Common keywords (used in python nelder_mead implementation):
+            "x0":                   list of initial values
+            "initial_step"
+            "no_improv_break"
+            "maxiter"
+        """
         self.af_pars = adaptive_function_parameters
 
         # scaling should not be used if a "direc" argument is available
         # in the adaptive function itself, if not specified equals 1
         self.x_scale = self.af_pars.pop('x_scale', 1)
+        self.par_idx = self.af_pars.pop('par_idx', 0)
         # Determines if the optimization will minimize or maximize
         self.minimize_optimization = self.af_pars.pop('minimize', True)
         self.f_termination = self.af_pars.pop('f_termination', None)

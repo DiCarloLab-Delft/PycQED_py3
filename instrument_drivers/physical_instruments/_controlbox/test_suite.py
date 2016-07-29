@@ -351,7 +351,7 @@ def bytes_to_binary(bytestring):
     '''
     s = ''
     for n in bytestring:
-        s+= ''.join(str((n & (1 << i)) and 1) for i in reversed(range(8)))
+        s += ''.join(str((n & (1 << i)) and 1) for i in reversed(range(8)))
     return s
 
 if __name__ == '__main__':

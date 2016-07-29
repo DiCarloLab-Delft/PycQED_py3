@@ -2,7 +2,7 @@ from .defHeaders import *
 
 
 # #################### Master controller headers ########################### #
-UpdateModeHeader = None                      # This command is replaced with UpdateMCWorkingState
+UpdateModeHeader = None  # This command is replaced with UpdateMCWorkingState
 UpdateMCWorkingState = b"\x5A"
 UpdateSequencerParametersHeader = None       # sequencer is removed in CBox_v3
 
@@ -25,5 +25,5 @@ acquisition_modes = ['0: idle',
                      '4: integration streaming mode']
 
 trigger_sources = ['0: internal MC trigger',
-                  '1: external MC trigger',
-                  '2: mixed MC trigger']
+                   '1: external MC trigger',
+                   '2: mixed MC trigger']

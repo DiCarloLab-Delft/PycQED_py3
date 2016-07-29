@@ -12,6 +12,8 @@ from matplotlib import colors
 import pandas as pd
 from uuid import getnode as get_mac
 from init.config import setup_dict
+from scipy.interpolate import griddata
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 # to allow backwards compatibility with old a_tools code
 from .tools.file_handling import *
@@ -617,8 +619,8 @@ def compare_instrument_settings(analysis_object_a, analysis_object_b):
                 % ins_key)
 
 
-def get_timestamps_in_range(timestamp_start, timestamp_end=None, label=None,
-                            exact_label_match=True):
+def get_timestamps_in_range(timestamp_start, timestamp_end=None,
+                            label=None, exact_label_match=True):
     datetime_start = datetime_from_timestamp(timestamp_start)
     if timestamp_end is None:
         datetime_end = datetime.datetime.today()
@@ -1070,14 +1072,14 @@ def current_timemark():
 ######################################################################
 
 
-def color_plot(x, y, z, fig, ax, show=False, normalize=False, log=False,
+def color_plot(x, y, z, fig, ax, cax=None,
+               show=False, normalize=False, log=False,
                do_transpose=False, add_colorbar=True, **kw):
     '''
     x, and y are lists, z is a matrix with shape (len(x), len(y))
     In the future this function can be overloaded to handle different
     types of input.
     '''
-    from mpl_toolkits.axes_grid1 import make_axes_locatable
 
     # calculate coordinates for corners of color blocks
     # x coordinates
@@ -1091,10 +1093,10 @@ def color_plot(x, y, z, fig, ax, show=False, normalize=False, log=False,
     y_vertices[0] = y[0] - (y[1]-y[0])/2.
     y_vertices[-1] = y[-1] + (y[-1]-y[-2])/2.
 
-    ## This version (below) does not plot the last row, but it possibly fixes
-    ## an issue where it wouldn't plot at all on one computer
-    ## Above lines work as of 26/11/2015 on La Ferrari in both
-    ## MA.MeasurementAnalysis and MA.TwoD_Analysis
+    # This version (below) does not plot the last row, but it possibly fixes
+    # an issue where it wouldn't plot at all on one computer
+    # Above lines work as of 26/11/2015 on La Ferrari in both
+    # MA.MeasurementAnalysis and MA.TwoD_Analysis
     # x_vertices = np.array(x)-(x[1]-x[0])/2.0  # Shift to ensure centre of cmap
     # y_vertices = np.array(y)-(y[1]-y[0])/2.0  # at right position
 
@@ -1112,9 +1114,7 @@ def color_plot(x, y, z, fig, ax, show=False, normalize=False, log=False,
     cmap = plt.get_cmap(kw.pop('cmap', 'viridis'))
     # CMRmap is our old default
 
-
     clim = kw.pop('clim', [None, None])
-
     if log:
         norm = colors.LogNorm()
     else:
@@ -1125,9 +1125,11 @@ def color_plot(x, y, z, fig, ax, show=False, normalize=False, log=False,
         colormap = ax.pcolormesh(y_grid.transpose(),
                                  x_grid.transpose(),
                                  z.transpose(),
+                                 linewidth=0, rasterized=True,
                                  cmap=cmap, vmin=clim[0], vmax=clim[1])
     else:
         colormap = ax.pcolormesh(x_grid, y_grid, z, cmap=cmap, norm=norm,
+                                 linewidth=0, rasterized=True,
                                  vmin=clim[0], vmax=clim[1])
 
     plot_title = kw.pop('plot_title', None)
@@ -1163,11 +1165,13 @@ def color_plot(x, y, z, fig, ax, show=False, normalize=False, log=False,
     ax.get_yaxis().set_tick_params(direction='out')
     ax.get_xaxis().set_tick_params(direction='out')
     if add_colorbar:
-        ax_divider = make_axes_locatable(ax)
-        cax = ax_divider.append_axes('right', size='10%', pad='5%')
-        cbar = plt.colorbar(colormap, cax=cax)
+        if cax is None:
+            ax_divider = make_axes_locatable(ax)
+            cax = ax_divider.append_axes('right', size='10%', pad='5%')
+        cbar = plt.colorbar(colormap, cax=cax, orientation='vertical')
         if zlabel is not None:
             cbar.set_label(zlabel)
+        return fig, ax, colormap, cbar
     return fig, ax, colormap
 
 
@@ -1249,6 +1253,54 @@ def linecut_plot(x, y, z, fig, ax,
     ax.set_ylabel(xlabel)
     ax.set_ylabel(zlabel)
     return ax
+
+
+def color_plot_interpolated(x, y, z, ax=None,
+                            num_points=300,
+                            zlabel=None, cmap='viridis',
+                            interpolation_method='linear',
+                            vmin=None, vmax=None,
+                            N_levels=30,
+                            cax=None, cbar_orientation='vertical',
+                            plot_cbar=True):
+    """
+    Plots a heatmap using z values at coordinates (x, y) using cubic
+    interpolation.
+    x: 1D array
+    y: 1D array
+    z: 1D array
+
+    returns
+        ax: (matplotlib axis object)
+        CS: (mappable used for creating colorbar)
+
+
+    """
+    if ax is None:
+        f, ax = plt.subplots()
+    # define grid.
+    xi = np.linspace(min(x), max(x), num_points)
+    yi = np.linspace(min(y), max(y), num_points)
+    # grid the data.
+    zi = griddata((x, y), z, (xi[None, :], yi[:, None]),
+                  method=interpolation_method)
+    CS = ax.contour(xi, yi, zi, N_levels, linewidths=0.2, colors='k',
+                    vmin=vmin, vmax=vmax)
+    CS = ax.contourf(xi, yi, zi, N_levels, cmap=cmap, vmin=vmin, vmax=vmax)
+    if plot_cbar:
+        if cax is None:
+            ax_divider = make_axes_locatable(ax)
+            cax = ax_divider.append_axes('right', size='5%', pad='5%')
+        cbar = plt.colorbar(CS, cax=cax, orientation=cbar_orientation)
+        if zlabel is not None:
+            cbar.set_label(zlabel)
+        return ax, CS, cbar
+    return ax, CS
+
+
+######################################################################
+#    Calculations tools
+######################################################################
 
 
 def calculate_transmon_transitions(EC, EJ, asym=0, reduced_flux=0,

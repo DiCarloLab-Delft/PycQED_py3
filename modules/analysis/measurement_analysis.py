@@ -552,6 +552,35 @@ class MeasurementAnalysis(object):
             return best_fit_results
 
 
+class OptimizationAnalysis_v2(MeasurementAnalysis):
+    def run_default_analysis(self, close_file=True, **kw):
+        self.get_naming_and_values()
+        self.make_figures(**kw)
+        if close_file:
+            self.data_file.close()
+        return
+
+    def make_figures(self, **kw):
+
+        base_figname = 'optimization of ' + self.value_names[0]
+        if np.shape(self.sweep_points)[0] == 2:
+            f, ax = plt.subplots()
+            a_tools.color_plot_interpolated(
+                x=self.sweep_points[0], y=self.sweep_points[1],
+                z=self.measured_values[0], ax=ax,
+                zlabel=self.value_names[0])
+            ax.set_xlabel(self.parameter_labels[0])
+            ax.set_ylabel(self.parameter_labels[1])
+            ax.plot(self.sweep_points[0], self.sweep_points[1], '-o', c='grey')
+            ax.plot(self.sweep_points[0][-1], self.sweep_points[1][-1],
+                    'o', markersize=5, c='w')
+            plot_title = kw.pop('plot_title', textwrap.fill(
+                                self.timestamp_string + '_' +
+                                self.measurementstring, 40))
+            ax.set_title(plot_title)
+
+            self.save_fig(f, figname=base_figname, **kw)
+
 class OptimizationAnalysis(MeasurementAnalysis):
     def run_default_analysis(self, close_file=True, show=False, **kw):
         self.get_naming_and_values()
@@ -2087,7 +2116,7 @@ class SSRO_single_quadrature_discriminiation_analysis(MeasurementAnalysis):
 
 
 class T1_Analysis(TD_Analysis):
-    def __init__(self, label='T1', **kw):
+    def __init__(self, label='T1', make_fig=True, **kw):
         kw['label'] = label
         kw['h5mode'] = 'r+'  # Read write mode, file must exist
         super().__init__(**kw)
@@ -2099,7 +2128,7 @@ class T1_Analysis(TD_Analysis):
         fit_mods.ExpDecayModel.set_param_hint(
             'tau',
             value=self.sweep_points[1]*50,  # use index 1
-            min=self.sweep_points[1]*5,
+            min=self.sweep_points[1],
             max=self.sweep_points[-1]*1000)
         fit_mods.ExpDecayModel.set_param_hint('offset', value=0, vary=False)
         fit_mods.ExpDecayModel.set_param_hint('n', value=1, vary=False)
@@ -2111,7 +2140,8 @@ class T1_Analysis(TD_Analysis):
             params=self.params)
         return fit_res
 
-    def run_default_analysis(self, print_fit_results=False, **kw):
+    def run_default_analysis(self, print_fit_results=False,
+                             make_fig=True, **kw):
         show_guess = kw.pop('show_guess', False)
         close_file = kw.pop('close_file', True)
         self.add_analysis_datagroup_to_file()
@@ -2119,18 +2149,19 @@ class T1_Analysis(TD_Analysis):
         fig, figarray, ax, axarray = self.setup_figures_and_axes()
         self.normalized_values = []
 
-        for i, name in enumerate(self.value_names):
-            if len(self.value_names) < 4:
-                ax2 = axarray[i]
-            else:
-                ax2 = axarray[i/2, i % 2]
+        if make_fig:
+            for i, name in enumerate(self.value_names):
+                if len(self.value_names) < 4:
+                    ax2 = axarray[i]
+                else:
+                    ax2 = axarray[i/2, i % 2]
 
-            self.plot_results_vs_sweepparam(x=self.sweep_points,
-                                            y=self.measured_values[i],
-                                            fig=figarray, ax=ax2,
-                                            xlabel=self.xlabel,
-                                            ylabel=self.ylabels[i],
-                                            save=False)
+                self.plot_results_vs_sweepparam(x=self.sweep_points,
+                                                y=self.measured_values[i],
+                                                fig=figarray, ax=ax2,
+                                                xlabel=self.xlabel,
+                                                ylabel=self.ylabels[i],
+                                                save=False)
 
         if 'I_cal' in self.value_names[i]:  # Fit the data
             norm = self.normalize_data_to_calibration_points(
@@ -2158,37 +2189,37 @@ class T1_Analysis(TD_Analysis):
 
         if print_fit_results:
             print(fit_res.fit_report())
+        if make_fig:
+            self.plot_results_vs_sweepparam(x=self.sweep_points,
+                                            y=self.normalized_values,
+                                            fig=fig, ax=ax,
+                                            xlabel=self.xlabel,
+                                            ylabel=r'$F$ $|1 \rangle$',
+                                            **kw)
+            if show_guess:
+                ax.plot(self.sweep_points[:-self.NoCalPoints],
+                        fit_res.init_fit, 'k--')
 
-        self.plot_results_vs_sweepparam(x=self.sweep_points,
-                                        y=self.normalized_values,
-                                        fig=fig, ax=ax,
-                                        xlabel=self.xlabel,
-                                        ylabel=r'$F$ $|1 \rangle$',
-                                        **kw)
-        if show_guess:
-            ax.plot(self.sweep_points[:-self.NoCalPoints],
-                    fit_res.init_fit, 'k--')
+            best_vals = fit_res.best_values
+            t = np.linspace(self.sweep_points[0],
+                            self.sweep_points[-self.NoCalPoints], 1000)
 
-        best_vals = fit_res.best_values
-        t = np.linspace(self.sweep_points[0],
-                        self.sweep_points[-self.NoCalPoints], 1000)
+            y = fit_mods.ExpDecayFunc(
+                t, tau=best_vals['tau'],
+                n=best_vals['n'],
+                amplitude=best_vals['amplitude'],
+                offset=best_vals['offset'])
 
-        y = fit_mods.ExpDecayFunc(
-            t, tau=best_vals['tau'],
-            n=best_vals['n'],
-            amplitude=best_vals['amplitude'],
-            offset=best_vals['offset'])
+            ax.plot(t, y, 'r-')
+            textstr = '$T_1$ = %.3g $\pm$ (%.5g) s ' % (
+                fit_res.params['tau'].value, fit_res.params['tau'].stderr)
 
-        ax.plot(t, y, 'r-')
-        textstr = '$T_1$ = %.3g $\pm$ (%.5g) s ' % (
-            fit_res.params['tau'].value, fit_res.params['tau'].stderr)
-
-        ax.text(0.4, 0.95, textstr, transform=ax.transAxes,
-                fontsize=11, verticalalignment='top',
-                bbox=self.box_props)
-        self.save_fig(fig, figname=self.measurementstring+'_' +
-                      self.value_names[i], **kw)
-        self.save_fig(self.figarray, figname=self.measurementstring, **kw)
+            ax.text(0.4, 0.95, textstr, transform=ax.transAxes,
+                    fontsize=11, verticalalignment='top',
+                    bbox=self.box_props)
+            self.save_fig(fig, figname=self.measurementstring+'_' +
+                          self.value_names[i], **kw)
+            self.save_fig(self.figarray, figname=self.measurementstring, **kw)
         if close_file:
             self.data_file.close()
         return fit_res
@@ -2862,6 +2893,7 @@ class RandomizedBenchmarking_Analysis(TD_Analysis):
         n_cl = self.sweep_points[:-1*(len(self.cal_points[0]*2))]
 
         self.fit_res = self.fit_data(data, n_cl)
+        self.fit_results = [self.fit_res]
         self.save_fitted_parameters(fit_res=self.fit_res, var_name='F|1>')
         if self.make_fig:
             self.make_figures(close_main_fig=close_main_fig, **kw)
@@ -2881,6 +2913,25 @@ class RandomizedBenchmarking_Analysis(TD_Analysis):
         p = 2*F_cl - 1
 
         return F_cl, p
+
+    def add_textbox(self, ax, F_T1=None):
+
+        textstr = ('\t$F_{Cl}$'+' \t= {:.4g} $\pm$ ({:.4g})%'.format(
+                self.fit_res.params['fidelity_per_Clifford'].value*100,
+                self.fit_res.params['fidelity_per_Clifford'].stderr*100) +
+            '\n  $1-F_{Cl}$'+'  = {:.4g} $\pm$ ({:.4g})%'.format(
+                (1-self.fit_res.params['fidelity_per_Clifford'].value)*100,
+                (self.fit_res.params['fidelity_per_Clifford'].stderr)*100) +
+            '\n\tOffset\t= {:.4g} $\pm$ ({:.4g})'.format(
+                (self.fit_res.params['offset'].value),
+                (self.fit_res.params['offset'].stderr)))
+        if F_T1 is not None:
+            textstr += ('\n\t  $F_{Cl}^{T_1}$  = ' +
+                        '{:.6g}%'.format(F_T1*100))
+
+        self.ax.text(0.1, 0.95, textstr, transform=self.ax.transAxes,
+                     fontsize=11, verticalalignment='top',
+                     bbox=self.box_props)
 
     def make_figures(self, close_main_fig, **kw):
 
@@ -2906,37 +2957,27 @@ class RandomizedBenchmarking_Analysis(TD_Analysis):
                                             save=False)
 
             x_fine = np.linspace(0, self.sweep_points[-1], 1000)
-            best_fit = fit_mods.RandomizedBenchmarkingDecay(
-                x_fine, **self.fit_res.best_values)
-            self.ax.plot(x_fine, best_fit, label='Fit')
+            for fit_res in self.fit_results:
+                best_fit = fit_mods.RandomizedBenchmarkingDecay(
+                    x_fine, **fit_res.best_values)
+                self.ax.plot(x_fine, best_fit, label='Fit')
             self.ax.set_ylim(min(min(self.corr_data)-.1, -.1),
                              max(max(self.corr_data)+.1, 1.1))
 
-            # Add a textbox
-            textstr = ('\t$F_{Cl}$'+' \t= {:.3g} $\pm$ ({:.2g})%'.format(
-                    self.fit_res.params['fidelity_per_Clifford'].value*100,
-                    self.fit_res.params['fidelity_per_Clifford'].stderr*100) +
-                '\n  $1-F_{Cl}$'+'  = {:.3g} $\pm$ ({:.2g})%'.format(
-                    (1-self.fit_res.params['fidelity_per_Clifford'].value)*100,
-                    (self.fit_res.params['fidelity_per_Clifford'].stderr)*100) +
-                '\n\tOffset\t= {:.2g} $\pm$ ({:.2g})'.format(
-                    (self.fit_res.params['offset'].value),
-                    (self.fit_res.params['offset'].stderr)))
-
             # Here we add the line corresponding to T1 limited fidelity
+            F_T1 = None
             if self.T1 is not None and self.pulse_delay is not None:
                 F_T1, p_T1 = self.calc_T1_limited_fidelity(
                     self.T1, self.pulse_delay)
                 T1_limited_curve = fit_mods.RandomizedBenchmarkingDecay(
                     x_fine, -0.5, p_T1, 0.5)
                 self.ax.plot(x_fine, T1_limited_curve, label='T1-limit')
-                textstr += ('\n\t  $F_{Cl}^{T_1}$  = ' +
-                            '{:.6g}%'.format(F_T1*100))
+
                 self.ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
 
-            self.ax.text(0.1, 0.95, textstr, transform=self.ax.transAxes,
-                         fontsize=11, verticalalignment='top',
-                         bbox=self.box_props)
+            # Add a textbox
+            self.add_textbox(self.ax, F_T1)
+
 
             if not close_main_fig:
                 # Hacked in here, good idea to only show the main fig but can
@@ -2977,6 +3018,135 @@ class RandomizedBenchmarking_Analysis(TD_Analysis):
                 plt.plot(fit_res.init_fit, '--', label='init fit')
 
         return fit_res
+
+
+class RB_double_curve_Analysis(RandomizedBenchmarking_Analysis):
+    def run_default_analysis(self, **kw):
+        close_main_fig = kw.pop('close_main_fig', True)
+        close_file = kw.pop('close_file', True)
+        if self.cal_points is None:
+            self.cal_points = [list(range(-4, -2)), list(range(-2, 0))]
+
+        super(RandomizedBenchmarking_Analysis, self).run_default_analysis(
+            close_file=False, make_fig=False, **kw)
+
+        data = self.corr_data[:-1*(len(self.cal_points[0]*2))]
+        # 1- minus all populations because we measure fidelity to 1
+        data_0 = 1 - data[::2]
+        data_1 = 1 - data[1::2]
+        # 2-state population is just whatever is missing in 0 and 1 state
+        # assumes that 2 looks like 1 state
+        data_2 = 1 - (data_1) - (data_0)
+        n_cl = self.sweep_points[:-1*(len(self.cal_points[0]*2)):2]
+
+        self.fit_results = self.fit_data(data_0, data_1, n_cl)
+
+        self.save_fitted_parameters(fit_res=self.fit_results,
+                                    var_name='Double_curve_RB')
+
+        if self.make_fig:
+            self.make_figures(n_cl, data_0, data_1, data_2,
+                              close_main_fig=close_main_fig, **kw)
+        if close_file:
+            self.data_file.close()
+        return
+
+    def fit_data(self, data0, data1, numCliff,
+                 print_fit_results=False,
+                 show_guess=False,
+                 plot_results=False):
+        data = np.concatenate([data0, data1])
+        numCliff = 2*list(numCliff)
+        invert = np.concatenate([np.ones(len(data0)),
+                                np.zeros(len(data1))])
+
+        RBModel = lmfit.Model(fit_mods.double_RandomizedBenchmarkingDecay,
+                              independent_vars=['numCliff', 'invert'])
+        RBModel.set_param_hint('p', value=.99)
+        RBModel.set_param_hint('offset', value=.5)
+        RBModel.set_param_hint('fidelity_per_Clifford',  # vary=False,
+                               expr='(p + (1-p)/2)')
+        RBModel.set_param_hint('error_per_Clifford',  # vary=False,
+                               expr='1-fidelity_per_Clifford')
+        RBModel.set_param_hint('fidelity_per_gate',  # vary=False,
+                               expr='fidelity_per_Clifford**(1./1.875)')
+        RBModel.set_param_hint('error_per_gate',  # vary=False,
+                               expr='1-fidelity_per_gate')
+
+        params = RBModel.make_params()
+        fit_res = RBModel.fit(data, numCliff=numCliff, invert=invert,
+                              params=params)
+        if print_fit_results:
+            print(fit_res.fit_report())
+        return fit_res
+
+    def add_textbox(self, f, ax, F_T1=None):
+        fr0 = self.fit_results.params
+        textstr = (
+            '$F_{\mathrm{Cl}}$'+'= {:.5g} \n\t$\pm$ ({:.2g})%'.format(
+                fr0['fidelity_per_Clifford'].value*100,
+                fr0['fidelity_per_Clifford'].stderr*100) +
+            '\nOffset '+'= {:.4g} \n\t$\pm$ ({:.2g})%'.format(
+                fr0['offset'].value*100, fr0['offset'].stderr*100))
+        if F_T1 is not None:
+            textstr += ('\n\t  $F_{Cl}^{T_1}$  = ' +
+                        '{:.5g}%'.format(F_T1*100))
+        ax.text(0.95, 0.1, textstr, transform=f.transFigure,
+                fontsize=11, verticalalignment='bottom',
+                horizontalalignment='right')
+
+    def make_figures(self, n_cl, data_0, data_1, data_2,
+                     close_main_fig, **kw):
+            f, ax = plt.subplots()
+            ax.plot(n_cl, data_0, 'o', color='b', label=r'$|0\rangle$')
+            ax.plot(n_cl, data_1, '^', color='r', label=r'$|1\rangle$')
+            ax.plot(n_cl, data_2, 'p', color='g', label=r'$|2\rangle$')
+            ax.hlines(0, n_cl[0], n_cl[-1]*1.05, linestyle='--')
+            ax.hlines(1, n_cl[0], n_cl[-1]*1.05, linestyle='--')
+            ax.plot([n_cl[-1]]*4, self.corr_data[-4:], 'o', color='None')
+            ax.set_xlabel('Number of Cliffords')
+            ax.set_ylabel('State populations')
+            plot_title = kw.pop('plot_title', textwrap.fill(
+                                self.timestamp_string + '_' +
+                                self.measurementstring, 40))
+            ax.set_title(plot_title)
+            ax.set_xlim(n_cl[0], n_cl[-1]*1.02)
+            ax.set_ylim(-.1, 1.1)
+            x_fine = np.linspace(0, self.sweep_points[-1]*1.05, 1000)
+            fit_0 = fit_mods.double_RandomizedBenchmarkingDecay(
+                x_fine, invert=1, ** self.fit_results.best_values)
+            fit_1 = fit_mods.double_RandomizedBenchmarkingDecay(
+                x_fine, invert=0, ** self.fit_results.best_values)
+            fit_2 = 1-fit_1-fit_0
+
+            ax.plot(x_fine, fit_0, color='darkgray', label='fit')
+            ax.plot(x_fine, fit_1, color='darkgray')
+            ax.plot(x_fine, fit_2, color='darkgray')
+
+
+            F_T1 = None
+            if self.T1 is not None and self.pulse_delay is not None:
+                F_T1, p_T1 = self.calc_T1_limited_fidelity(
+                    self.T1, self.pulse_delay)
+                T1_limited_curve = fit_mods.RandomizedBenchmarkingDecay(
+                    x_fine, -0.5, p_T1, 0.5)
+                ax.plot(x_fine, T1_limited_curve,
+                        linestyle='--', color='lightgray', label='T1-limit')
+                T1_limited_curve = fit_mods.RandomizedBenchmarkingDecay(
+                    x_fine, 0.5, p_T1, 0.5)
+                ax.plot(x_fine, T1_limited_curve,
+                        linestyle='--', color='lightgray')
+            self.add_textbox(f, ax, F_T1)
+            ax.legend(frameon=False, numpoints=1,
+                      # bbox_transform=ax.transAxes,#
+                      bbox_transform=f.transFigure,
+                      loc='upper right',
+                      bbox_to_anchor=(.95, .95))
+            # ax.set_xscale("log", nonposx='clip')
+            plt.subplots_adjust(left=.1, bottom=None, right=.7, top=None)
+            self.save_fig(f, figname='Two_curve_RB', close_fig=close_main_fig,
+                          fig_tight=False, **kw)
+
 
 
 class RandomizedBench_2D_flat_Analysis(RandomizedBenchmarking_Analysis):
@@ -3763,7 +3933,9 @@ class Three_Tone_Spectroscopy_Analysis(MeasurementAnalysis):
         # kw['h5mode'] = 'r+'  # Read write mode, file must exist
         super(self.__class__, self).__init__(**kw)
 
-    def run_default_analysis(self, f01=None, f12=None, **kw):
+    def run_default_analysis(self, f01=None, f12=None,
+                             amp_lims=[None, None], line_color='k',
+                             phase_lims=[-180, 180],**kw):
         self.get_naming_and_values_2D()
         fig1, ax1 = self.default_ax(figsize=(8, 5)) # figsize wider for colorbar
         measured_powers = self.measured_values[0]
@@ -3777,6 +3949,7 @@ class Three_Tone_Spectroscopy_Analysis(MeasurementAnalysis):
                            xlabel=self.xlabel,
                            ylabel=self.ylabel,
                            zlabel=self.zlabels[0],
+                           clim=amp_lims,
                            fig=fig1, ax=ax1, **kw)
 
         fig2, ax2 = self.default_ax(figsize=(8, 5)) # figsize wider for colorbar
@@ -3787,52 +3960,48 @@ class Three_Tone_Spectroscopy_Analysis(MeasurementAnalysis):
                            xlabel = self.xlabel,
                            ylabel = self.ylabel,
                            zlabel = self.zlabels[1],
-                           clim = [-180,180],
+                           clim = phase_lims,
                            plot_title= fig2_title,
                            fig = fig2, ax = ax2)
 
-        if f01 != None:
+        if f01 is not None:
             ax1.vlines(f01, min(self.sweep_points_2D),
                        max(self.sweep_points_2D),
-                       linestyles='dashed', lw=2, colors='k')
+                       linestyles='dashed', lw=2, colors=line_color, alpha=.5)
             ax2.vlines(f01, min(self.sweep_points_2D),
                        max(self.sweep_points_2D),
-                       linestyles='dashed', lw=2, colors='k')
-            # color set to 'k' (black) because it contrasts with the colorpot,
-            # There are probably better choices
-        if f12 !=None:
+                       linestyles='dashed', lw=2, colors=line_color, alpha=.5)
+        if f12 is not None:
             ax1.plot((min(self.sweep_points),
                       max(self.sweep_points)),
-                     (f01+ f12-min(self.sweep_points),
-                      f01+ f12-max(self.sweep_points)),
-                     linestyle='dashed', lw=2, color='k')
+                     (f01 + f12-min(self.sweep_points),
+                      f01 + f12-max(self.sweep_points)),
+                     linestyle='dashed', lw=2, color=line_color, alpha=.5)
             ax2.plot((min(self.sweep_points),
                       max(self.sweep_points)),
-                     (f01+ f12-min(self.sweep_points),
-                      f01+ f12-max(self.sweep_points)),
-                     linestyle='dashed', lw=2, color='k')
-        if (f01!=None) and (f12 !=None):
+                     (f01 + f12-min(self.sweep_points),
+                      f01 + f12-max(self.sweep_points)),
+                     linestyle='dashed', lw=2, color=line_color, alpha=.5)
+        if (f01 is not None) and (f12 is not None):
             anharm = f01-f12
             EC, EJ = a_tools.fit_EC_EJ(f01, f12)
-            EC *= 1000
+            # EC *= 1000
 
-            textstr = 'f01 = %.4f GHz' %f01 +'\n' + \
-                'f12 = %.4f GHz' %f12 +'\n' + \
-                'anharm ~= %.4f GHz' %anharm + '\n' + \
-                'EC = %.1f MHz' %EC + '\n' + \
-                'EJ = %.3f GHz' %EJ
+            textstr = 'f01 = {:.4g} GHz'.format(f01*1e-9) +'\n' + \
+                'f12 = {:.4g} GHz'.format(f12*1e-9) +'\n' + \
+                'anharm ~= {:.4g} MHz'.format(anharm*1e-6) + '\n' + \
+                'EC = {:.4g} MHz'.format(EC*1e-6) + '\n' + \
+                'EJ = {:.4g} GHz'.format(EJ*1e-9)
             ax1.text(0.95, 0.95, textstr, transform=ax1.transAxes,
-                    fontsize=11,
-                    verticalalignment='top',
-                    horizontalalignment ='right',
-                    # Strangely enough plots on the left, but still works
-                    bbox=self.box_props)
+                     fontsize=11,
+                     verticalalignment='top',
+                     horizontalalignment='right',
+                     bbox=self.box_props)
             ax2.text(0.95, 0.95, textstr, transform=ax2.transAxes,
-                    fontsize=11,
-                    verticalalignment='top',
-                    horizontalalignment ='right',
-                    # Strangely enough plots on the left, but still works
-                    bbox=self.box_props)
+                     fontsize=11,
+                     verticalalignment='top',
+                     horizontalalignment='right',
+                     bbox=self.box_props)
         self.save_fig(fig1, figname=ax1.get_title(), **kw)
         self.save_fig(fig2, figname=ax2.get_title(), **kw)
         self.finish()
