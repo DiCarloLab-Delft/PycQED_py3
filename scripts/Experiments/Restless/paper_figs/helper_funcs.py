@@ -182,6 +182,7 @@ def extract_verification_data(start_timestamp, end_timestamp):
     RB_rstl_dict = {'time': np.zeros([cycles/2]),
                     'F': np.zeros([cycles/2]),
                     'F_std': np.zeros([cycles/2]),
+                    'F_sem': np.zeros([cycles/2]),
                     'offset': np.zeros([cycles/2]),
                     'offset_std': np.zeros([cycles/2])}
     RB_trad_dict = deepcopy(RB_rstl_dict)
@@ -203,6 +204,7 @@ def extract_verification_data(start_timestamp, end_timestamp):
         F_T1, p_T1 = calc_T1_limited_fidelity(T1_val, 20e-9)
         T1_dict['F'][j] = 100*F_T1.nominal_value
         T1_dict['F_std'][j] = 100*F_T1.std_dev
+
         m.finish()
 
     # extracting the RB traditional values
@@ -280,18 +282,30 @@ def latexify(fig_width=None, fig_height=None, columns=1):
               'legend.fontsize': 8, # was 10
               'xtick.labelsize': 8,
               'ytick.labelsize': 8,
+
               'axes.labelpad': 0.2,
 #               'text.usetex': True,
               'figure.figsize': [fig_width, fig_height],
-              'font.family': 'serif',
-              'legend.fontsize':8,
+              'font.family': 'sans-serif',
+              'font.sans-serif': 'arial',
+              'legend.fontsize': 8,
               'legend.numpoints': 1,
               'legend.frameon': False,
               'legend.markerscale': .75,
-              'legend.handlelength': 1
+              'legend.handlelength': 2,
+              'legend.columnspacing': 1,
+              'legend.handletextpad': .2
     }
 
     plt.rcParams.update(params)
+
+
+def cm2inch(*tupl):
+    inch = 2.54
+    if isinstance(tupl[0], tuple):
+        return tuple(i/inch for i in tupl[0])
+    else:
+        return tuple(i/inch for i in tupl)
 
 
 def PSD(array, time_step):

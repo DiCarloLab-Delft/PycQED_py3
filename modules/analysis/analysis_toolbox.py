@@ -619,8 +619,8 @@ def compare_instrument_settings(analysis_object_a, analysis_object_b):
                 % ins_key)
 
 
-def get_timestamps_in_range(timestamp_start, timestamp_end=None, label=None,
-                            exact_label_match=True):
+def get_timestamps_in_range(timestamp_start, timestamp_end=None,
+                            label=None, exact_label_match=True):
     datetime_start = datetime_from_timestamp(timestamp_start)
     if timestamp_end is None:
         datetime_end = datetime.datetime.today()
