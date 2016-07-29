@@ -1,4 +1,4 @@
-# Install using Anaconda python 
+# Installing PycQED 
 1. Install python 
 2. Install dependencies 
 3. Clone PycQED_py3 git repository
