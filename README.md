@@ -1,7 +1,7 @@
 # PycQED
 
 Python based measurement environment build on top of the qcodes package.
-This repository is not intended as a stand-alone package.
+This repository is not intended as a stand-alone package. 
 
 ## License
 This software is released under the [MIT License](LICENSE.md)
@@ -12,19 +12,28 @@ To use PycQED, clone this repository and the directory to your path (no pip-inst
 
 ## Usage 
 
-To start PycQED, create a shortcut to qtlab.bat (located in /PycQED/qtlab). Starting PycQED executes the following steps.
-
-+ start up qtlab
-+ [identify setup](init\config\userconfig.py) by imac address
++ start up qcodes
 + load corresponding [config file](init\config\)
 + set folder locations
 + create instruments
 + load values set in the init
 
+```python
+import sys
+import qcodes as qc
+if PyCQEDpath not in sys.path:
+    sys.path.append(PyCQEDpath)
+
+# import as * puts all the imports and objects of the init in the global namespace
+from init.your_initscript import *
+```
+
 You are now ready to start your experiment.
 
 ## Overview of the main modules
-Below follows an overview of the main structure of the code. It makes sense to take a look around here if your are new to get a feeling where to find things. Mind however that the code is continuously under development so if you think something should be in a different location feel free to tap me (Adriaan) on the shoulder or create an issue to discuss it.
+Below follows an overview of the main structure of the code. It makes sense to take a look around here if your are new to get a feeling where to find things. 
+Also take a look at [this presentation](docs\160714 QCoDeS meetup Delft_edited_for_pycqed.pdf), where the relation to qcodes and the core concepts in the package are explained.
+Mind however that the code is continuously under development so if you think something should be in a different location feel free to tap me (Adriaan) on the shoulder or create an issue to discuss it.
 
 ### Folder Structure
 + [docs](docs/)
@@ -49,9 +58,7 @@ but can also provide a layer of abstraction in the form of meta-instruments, whi
 
 We use these qcodes instruments for several reasons; the class provides logging of variables, provides a standardized format for getting and setting parameters, protects the underlying instruments against setting 'bad' values. Additionally qcodes itself comes with drivers for most instruments we use in the lab.
 
-We split the instrument folder up in several subfolders. The physical instruments are drivers that control physical instruments. Meta-instruments are higher level instruments that control other lower level instruments. The figure below shows an instrument hierarchy (figure by Chris). The main point here is that commands only flow down and information flows up.
-
-![Instrument Hierarchy](/docs/figs/InstrumentHierarchy.jpg?raw=true)
+We split the instrument folder up in several subfolders. The physical instruments are drivers that control physical instruments. Meta-instruments are higher level instruments that control other lower level instruments. The main point here is that commands only flow down and information flows up.
 
 #### Measurement Control
 The **Measurement Control** is a special object that is used to run experiments. It takes care of preparing an experiment, giving instructions to the instruments involved and saving the data.
@@ -65,8 +72,11 @@ MC.set_detector_function(det.HomodyneDetector())
 MC.run()
 ```
 
+A sweep_function determines what parameter is varied, a qcodes parameter that contains a .set method can also be inserted here. 
+A deterector_function determines what parameter is measrued, a qcodes parameter that has a .get method can also be inserted here. 
+
 #### The qubit object
-Currently the qubit object is an instrument but it defies the general categorization of the other instruments.
+The qubit object is a (meta) instrument but it defies the general categorization of the other instruments.
 
 It is the object that one is actively manipulating during an experiment and as such contains functions such as qubit.measure_Rabi() and qubit.find_frequency_spec(). It is also used to store the known parameters of the physical qubit object.
 
