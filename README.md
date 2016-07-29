@@ -119,7 +119,7 @@ It is split into personal folders for messing around with your personal files an
 
 ## Other useful stuff
 A little document I wrote containing some handy git commands.
-[Git tips & tricks ](docs/Git_tips_and_tricks.md).
+[Git tips & tricks ](docs/git_tips_and_tricks.md).
 
 Lecture series on scientific python
 [Scientific Computing with Python](https://github.com/jrjohansson/scientific-python-lectures)
