@@ -1,36 +1,20 @@
 # Using Cythonbased files
 @author: Adriaan
 
-I have sped up some parts of the code by writing them in Cython a language
-that is a mixture of C and python.
-
-In order to compile these a setup.py file must be executed with the following command.
-
+In order to compile cython files a setup.py file must be executed with the following command.
 '''
 python setup.py build_ext --inplace
 '''
 
-On windows computers a c-compiler is needed to be able to compile cython .pyx
-files.
+Most likely you will get a vcvarshall not found error when compiling on windows the first time. This is because cython needs MS visual studio. See also: https://github.com/cython/cython/wiki/CythonExtensionsOnWindows
 
-Look at "https://github.com/cython/cython/wiki/CythonExtensionsOnWindows" for instructions on installing a c compiler.
+The following gives a clear explanation on how to fix versions redirection
+of the visual studio for compiling c++
+https://www.ibm.com/developerworks/community/blogs/jfp/entry/Installing_Cython_On_Anaconda_On_Windows?lang=en. 
+It tells you 
+1. Install MS visual studio with c++ compiler 
+2. Edit distutils file hidden deep in the python folder 
 
-Scroll down to the section called
-'''
-Using Windows SDK C/C++ compiler (works for all Python versions)
-'''
-And look for the following section:
-
-
->to install or build a package, you do have to start a SDK Command Prompt or CMD Shell and set some environment variables.
-
->By default the shell starts in at the installation path of the Windows SDK (C:\Program Files\Microsoft SDKs\Windows\v7.0. There, we have to to two things:
->
->    Tell distutils / setuptools to use the Microsoft SDK compiler
->    Tell the compiler to compile a 32 or 64 bit release and whether it should be a debug or a release build
-
->Thus, we have to enter two commands
-
->set DISTUTILS_USE_SDK=1
->setenv /x64 /release
-'''
+MS visual studio 2015 is free for academic research and can be downloaded [here](
+https://www.visualstudio.com/en-us/products/vs-2015-product-editions.aspx)
+make sure you check c++ drivers when installing. If you forget you can start a c++ project 
