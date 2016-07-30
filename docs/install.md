@@ -19,7 +19,7 @@ Besides the standard scientific python packages we require the following package
 * h5py
 * pyvisa
 * pyqtgraph (live-plotting)
-* cython (only for specific drivers)
+* cython (only for specific drivers) [cython on windows](compiling_with_cython.md)
 * flake8 (to ensure proper linting when editing code)
 
 These can be installed by typing (on the command line) 
@@ -37,4 +37,6 @@ import sys
 if PyCQEDpath not in sys.path:
     sys.path.append(PyCQEDpath)
 ```
+
+
 
