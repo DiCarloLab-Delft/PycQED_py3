@@ -984,7 +984,7 @@ class QuTech_ControlBox(VisaInstrument):
                                    expected_number_of_bytes=n_bytes)
         # Changed from version 2.15 onwards
         message = c.create_message(cmd, data_bytes)
-        print("set log length command: ",  format(message, 'x').zfill(8))
+        # print("set log length command: ",  format(message, 'x').zfill(8))
         (stat, mesg) = self.serial_write(message)
         if stat:
             self._log_length = length
