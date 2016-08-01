@@ -214,7 +214,13 @@ def Cos_guess(model, data, t):
     w[0] = 0  # Removes DC component from fourier transform
     freq_guess = f[w == max(w)]
 
-    ph_guess = -2*np.pi*t[data == max(data)]*freq_guess
+    # print(data.shape)
+    # print(max(data).shape)
+    # print(freq_guess.shape)
+    ph_guess = -2*np.pi*t[data == max(data)]*freq_guess[0]
+    # the condition data == max(data) can have several solutions
+    #               (for example when discretization is visible)
+    # to prevent errors we pick the first solution
 
     model.set_param_hint('period', expr='1/frequency')
     params = model.make_params(amplitude=amp_guess,
