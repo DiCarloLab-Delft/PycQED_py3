@@ -134,7 +134,9 @@ class CBox_driven_transmon(Transmon):
         # TODO: Update IF to f_RO_mod in heterodyne instr
         self.heterodyne_instr.set('IF', self.f_RO_mod.get())
         self.heterodyne_instr.frequency.set(self.f_res.get())
-        self.cw_source.pulsemod_state.set('off')
+
+        if hasattr(self.cw_source, 'pulsemod_state'):
+            self.cw_source.pulsemod_state('off')
         self.cw_source.power.set(self.spec_pow.get())
 
     def prepare_for_timedomain(self):

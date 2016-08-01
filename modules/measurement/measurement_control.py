@@ -259,9 +259,7 @@ class MeasurementControl:
         #     print('Time of iteration: {:.4g}'.format(time.time()-self.it_time))
         # self.it_time = time.time()
 
-        print("measurement_function, called detector_function name: ", self.detector_function.name)
         vals = self.detector_function.acquire_data_point()
-        print("measurement_function, detector_function return: ", vals)
         # Resizing dataset and saving
         new_datasetshape = (self.iteration, datasetshape[1])
         self.dset.resize(new_datasetshape)
