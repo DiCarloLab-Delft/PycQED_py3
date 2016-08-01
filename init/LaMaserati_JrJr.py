@@ -20,8 +20,10 @@ import qcodes as qc
 # qc.set_mp_method('spawn')  # force Windows behavior on mac
 qc.show_subprocess_widget()
 # Globally defined config
-qc_config = {'datadir': r'D:\\Experiments\\0716_5Qubit\\data',
-             'PycQEDdir': 'D:\Repositories\PycQED_py3'}
+# qc_config = {'datadir': r'D:\\Experimentsp7_Qcodes_5qubit',
+#              'PycQEDdir': 'D:\GitHubRepos\PycQED_py3'}
+qc_config = {'datadir': r'D:\Experiments\\1607_Qcodes_5qubit\data',
+             'PycQEDdir': 'D:\GitHubRepos\PycQED_py3'}
 
 
 # General PycQED modules
@@ -65,25 +67,35 @@ from instrument_drivers.physical_instruments import QuTech_Duplexer as qdux
 
 # Initializing instruments
 
+
+station = qc.Station()
 print('LO')
 LO = Agilent_E8527D(name='LO', address='TCPIP0::192.168.0.19',
     server_name=None)  # left
+station.add_component(LO)
 RF = rs.RohdeSchwarz_SGS100A(name='RF', address='TCPIP0::192.168.0.20',
     server_name=None)  # right
+station.add_component(RF)
 # print('Qubit_LO')
-Qubit_LO = Agilent_E8527D(name='Qubit_LO', address='TCPIP0::192.168.0.13',
-    server_name=None)  # top
-# print('Spec_source')
-# Spec_source = Agilent_E8527D(name='Spec_source', address='TCPIP0::192.168.0.12',
-#                         server_name=None)
+Qubit_LO = Agilent_E8527D(name='Qubit_LO', address='TCPIP0::192.168.0.12',
+                          server_name=None)  # top
+station.add_component(Qubit_LO)
 
+Spec_source = rs.RohdeSchwarz_SGS100A(name='Spec_source', address='TCPIP0::192.168.0.73',
+                                   server_name=None)
+
+station.add_component(Spec_source)
 CBox = qcb.QuTech_ControlBox('CBox', address='Com5', run_tests=False, server_name=None)
+station.add_component(CBox)
 AWG = tek.Tektronix_AWG5014(name='AWG', setup_folder=None, timeout=2,
                             address='GPIB0::6::INSTR', server_name=None)
+station.add_component(AWG)
 AWG.timeout(180)
 AWG520 = tk520.Tektronix_AWG520('AWG520', address='GPIB0::17::INSTR',
                                 server_name='')
-# IVVI = iv.IVVI('IVVI', address='COM4', numdacs=16, server_name=None)
+station.add_component(AWG520)
+IVVI = iv.IVVI('IVVI', address='COM4', numdacs=16, server_name=None)
+station.add_component(IVVI)
 # Dux = qdux.QuTech_Duplexer('Dux', address='TCPIP0::192.168.0.101',
 #                             server_name=None)
 # SH = sh.SignalHound_USB_SA124B('Signal hound', server_name=None) #commented because of 8s load time
@@ -91,6 +103,7 @@ AWG520 = tk520.Tektronix_AWG520('AWG520', address='GPIB0::17::INSTR',
 # Meta-instruments
 HS = hd.HeterodyneInstrument('HS', LO=LO, RF=RF, CBox=CBox, AWG=AWG,
                              server_name=None)
+station.add_component(HS)
 # LutMan = lm.QuTech_ControlBox_LookuptableManager('LutMan', CBox=CBox,
 #                                                  server_name=None)
                                                  # server_name='metaLM')
@@ -98,23 +111,23 @@ MC = mc.MeasurementControl('MC')
 
 
 
-
-Q1 = qbt.Tektronix_driven_transmon('Q1',
-                                              LO=LO,
-                                              cw_source=Qubit_LO,
+AncB = qbt.Tektronix_driven_transmon('AncB', LO=LO, cw_source=Spec_source,
                                               td_source=Qubit_LO,
-                                              IVVI=None, rf_RO_source=RF,
+                                              IVVI=IVVI, rf_RO_source=RF,
                                               AWG=AWG,
                                               CBox=CBox, heterodyne_instr=HS,
                                               MC=MC,
                                               server_name=None)
+station.add_component(AncB)
+AncT = qbt.Tektronix_driven_transmon('AncT', LO=LO, cw_source=Spec_source,
+                                              td_source=Qubit_LO,
+                                              IVVI=IVVI, rf_RO_source=RF,
+                                              AWG=AWG,
+                                              CBox=CBox, heterodyne_instr=HS,
+                                              MC=MC,
+                                              server_name=None)
+station.add_component(AncT)
 
-
-
-
-
-
-station = qc.Station(LO, RF, AWG, AWG520, HS, Q1)
 MC.station = station
 station.MC = MC
 nested_MC = mc.MeasurementControl('nested_MC')
