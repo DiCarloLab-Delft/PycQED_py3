@@ -14,8 +14,7 @@ Christian Dickel,
 Bart Dikken,
 Xiang Fu, 
 Gijs de Lange, 
-Nathan Langford,  
-Stefano Polleto, 
+Nathan Langford,   
 Adriaan Rol,
 
 ## Contributing 
