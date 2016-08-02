@@ -7,8 +7,16 @@ This repository is not intended as a stand-alone package.
 This software is released under the [MIT License](LICENSE.md)
 
 ## Contributors 
-
-Adriaan Rol, Christian Dickel, Serwan Asaad, Gijs de Lange, Nathan Langford, Niels Bultink, Xiang Fu, Bart Dikken
+Contributors (in alphabetical order):
+Serwan Asaad, 
+Niels Bultink,  
+Christian Dickel,
+Bart Dikken,
+Xiang Fu, 
+Gijs de Lange, 
+Nathan Langford,  
+Stefano Polleto, 
+Adriaan Rol,
 
 ## Contributing 
 Thanks for your interest in the project! We welcome pull requests from developers of all skill levels. 
