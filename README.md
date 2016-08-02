@@ -15,6 +15,7 @@ Bart Dikken,
 Xiang Fu, 
 Gijs de Lange, 
 Nathan Langford,   
+Florian Luthi, 
 Adriaan Rol,
 
 ## Contributing 
