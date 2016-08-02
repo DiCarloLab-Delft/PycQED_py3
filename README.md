@@ -1,14 +1,24 @@
 # PycQED
 
-Python based measurement environment build on top of the qcodes package.
+A python based measurement environment for circuit-QED experiments build on top of the qcodes package by the [DiCarlo group](http://dicarlolab.tudelft.nl/) at [QuTech](http://qutech.nl/), Delft University of Technology. 
 This repository is not intended as a stand-alone package. 
 
 ## License
 This software is released under the [MIT License](LICENSE.md)
 
+## Contributors 
+
+Adriaan Rol, Christian Dickel, Serwan Asaad, Gijs de Lange, Nathan Langford, Niels Bultink, Xiang Fu, Bart Dikken
+
+## Contributing 
+Thanks for your interest in the project! We welcome pull requests from developers of all skill levels. 
+
+If you find a bug or want to propose a new feature open an issue. If you have written some code that should be merged open a pull request describing your changes and why it should be merged. 
+If you have a question or want to discuss something, feel free to send an email to Adriaan Rol (m.a.rol@tudelft.nl).
+
 ## Installation
 
-To use PycQED, clone this repository and the directory to your path (no pip-install yet) and make sure you have a working python3 environment with the required dependencies. For more details see the [installation instructions](docs/install.md).
+To use PycQED, clone this repository and add the directory to your path (no pip-install yet) and make sure you have a working python3 environment with the required dependencies. For more details see the [installation instructions](docs/install.md).
 
 ## Usage 
 
@@ -110,15 +120,14 @@ When instantiating such an object you can pass it a timestamp and/or a label to 
 This toolbox contains tools for analysis such as file-handling tools, plotting tools and some data analysis tools such as a peak finder.
 
 #####Fitting models
-This module contains the lmfit model definitions and fitting functions used for curve fitting
-
+This module contains the lmfit model definitions and fitting functions used for curve fitting.
 
 ### The scripts folder
-The actual scripts that run an experiment. Dig around a bit here to get a feel of what a measurement looks like.
+The scripts that run an experiment. Dig around a bit here to get a feel of what a measurement looks like.
 It is split into personal folders for messing around with your personal files and project folders where people working on the same project have their experimental scripts.
 
 ## Other useful stuff
-A little document I wrote containing some handy git commands.
+A little document containing some handy git commands.
 [Git tips & tricks ](docs/git_tips_and_tricks.md).
 
 Lecture series on scientific python
