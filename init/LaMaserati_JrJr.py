@@ -69,22 +69,16 @@ from instrument_drivers.physical_instruments import QuTech_Duplexer as qdux
 
 
 station = qc.Station()
-print('LO')
-LO = Agilent_E8527D(name='LO', address='TCPIP0::192.168.0.19',
-    server_name=None)  # left
+LO = rs.RohdeSchwarz_SGS100A(name='LO', address='TCPIP0::192.168.0.73', server_name=None)  #
 station.add_component(LO)
-RF = rs.RohdeSchwarz_SGS100A(name='RF', address='TCPIP0::192.168.0.20',
-    server_name=None)  # right
+RF = rs.RohdeSchwarz_SGS100A(name='RF', address='TCPIP0::192.168.0.74', server_name=None)  #
 station.add_component(RF)
-# print('Qubit_LO')
-Qubit_LO = Agilent_E8527D(name='Qubit_LO', address='TCPIP0::192.168.0.12',
-                          server_name=None)  # top
-station.add_component(Qubit_LO)
-
-Spec_source = rs.RohdeSchwarz_SGS100A(name='Spec_source', address='TCPIP0::192.168.0.73',
-                                   server_name=None)
-
+Spec_source = rs.RohdeSchwarz_SGS100A(name='Spec_source', address='TCPIP0::192.168.0.87', server_name=None)  #
 station.add_component(Spec_source)
+Qubit_LO = rs.RohdeSchwarz_SGS100A(name='Qubit_LO', address='TCPIP0::192.168.0.86', server_name=None)  #
+station.add_component(Qubit_LO)
+TWPA_Pump = rs.RohdeSchwarz_SGS100A(name='TWPA_Pump', address='TCPIP0::192.168.0.90', server_name=None)  #
+station.add_component(TWPA_Pump)
 CBox = qcb.QuTech_ControlBox('CBox', address='Com5', run_tests=False, server_name=None)
 station.add_component(CBox)
 AWG = tek.Tektronix_AWG5014(name='AWG', setup_folder=None, timeout=2,
@@ -127,6 +121,30 @@ AncT = qbt.Tektronix_driven_transmon('AncT', LO=LO, cw_source=Spec_source,
                                               MC=MC,
                                               server_name=None)
 station.add_component(AncT)
+DataB = qbt.Tektronix_driven_transmon('DataB', LO=LO, cw_source=Spec_source,
+                                              td_source=Qubit_LO,
+                                              IVVI=IVVI, rf_RO_source=RF,
+                                              AWG=AWG,
+                                              CBox=CBox, heterodyne_instr=HS,
+                                              MC=MC,
+                                              server_name=None)
+station.add_component(DataB)
+DataM = qbt.Tektronix_driven_transmon('DataM', LO=LO, cw_source=Spec_source,
+                                              td_source=Qubit_LO,
+                                              IVVI=IVVI, rf_RO_source=RF,
+                                              AWG=AWG,
+                                              CBox=CBox, heterodyne_instr=HS,
+                                              MC=MC,
+                                              server_name=None)
+station.add_component(DataM)
+DataT = qbt.Tektronix_driven_transmon('DataT', LO=LO, cw_source=Spec_source,
+                                              td_source=Qubit_LO,
+                                              IVVI=IVVI, rf_RO_source=RF,
+                                              AWG=AWG,
+                                              CBox=CBox, heterodyne_instr=HS,
+                                              MC=MC,
+                                              server_name=None)
+station.add_component(DataT)
 
 MC.station = station
 station.MC = MC
