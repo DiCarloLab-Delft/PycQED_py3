@@ -54,6 +54,7 @@ class QuTech_ControlBox(VisaInstrument):
                            vals=vals.Ints(0, 255))
         self.add_parameter('integration_length',
                            label='integration length (# samples)',
+                           units='# samples',
                            get_cmd=self._do_get_integration_length,
                            set_cmd=self._do_set_integration_length,
                            vals=vals.Ints(1, 512))
