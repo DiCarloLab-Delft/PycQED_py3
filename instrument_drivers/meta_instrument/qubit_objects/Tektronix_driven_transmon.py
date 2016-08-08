@@ -19,6 +19,8 @@ from modules.measurement.calibration_toolbox import mixer_carrier_cancellation_5
 from modules.measurement.calibration_toolbox import mixer_skewness_calibration_5014
 from modules.measurement.optimization import nelder_mead
 
+from modules.measurement.pulse_sequences.single_qubit_tek_seq_elts import Pulsed_spec_seq
+
 from .qubit_object import Transmon
 from .CBox_driven_transmon import CBox_driven_transmon
 # It would be better to inherit from Transmon directly and put all the common
@@ -78,6 +80,28 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                            label='Time-domain power',
                            units='dBm',
                            parameter_class=ManualParameter)
+
+        self.add_parameter('spec_pulse_type', label='Pulsed spec pulse type',
+                           parameter_class=ManualParameter,
+                           initial_value='SquarePulse',
+                           vals=vals.Enum('SquarePulse'))  # , SSB_DRAG_pulse))
+        # we should also implement SSB_DRAG_pulse for pulsed spec
+        self.add_parameter('spec_pulse_length',
+                           label='Pulsed spec pulse duration',
+                           units='s',
+                           vals=vals.Numbers(1e-9, 20e-6),
+                           parameter_class=ManualParameter)
+        self.add_parameter('spec_pulse_marker_channel',
+                           units='s',
+                           vals=vals.Strings(),
+                           parameter_class=ManualParameter)
+        self.add_parameter('spec_pulse_depletion_time',
+                           units='s',
+                           vals=vals.Numbers(1e-9, 50e-6),
+                           parameter_class=ManualParameter)
+
+
+
         # Rename f_RO_mod
         # Time-domain parameters
         self.add_parameter('pulse_I_channel', initial_value='ch1',
@@ -177,6 +201,12 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         self.input_average_detector = det.CBox_input_average_detector(
             self.CBox, self.AWG)
 
+    def prepare_for_pulsed_spec(self):
+        # TODO: fix prepare for pulsed spec
+        # TODO: make measure pulsed spec
+        self.prepare_for_timedomain()
+        self.td_source.off()
+
     def prepare_for_timedomain(self):
         self.LO.on()
         self.cw_source.off()
@@ -275,6 +305,46 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                                MC=None, close_fig=True,
                                verbose=False, make_fig=True):
         raise NotImplementedError()
+
+
+    def measure_pulsed_spectroscopy(self, freqs, MC=None, analyze=True,
+                                    return_detector=False,
+                                    close_fig=True, upload=True):
+        """
+        Measure pulsed spec with the qubit.
+
+            Accepts a manual sequence parameters, which has to be a call to a pulse generation
+            allowing for alternative sequences to be played instead of the standard one
+
+        """
+
+        self.prepare_for_pulsed_spec()
+        self.heterodyne_instr._disable_auto_seq_loading = True
+
+        self.cw_source.pulsemod_state.set('On')
+        self.cw_source.power.set(self.spec_pow_pulsed.get())
+        self.cw_source.on()
+
+        if MC is None:
+            MC = self.MC
+
+        spec_pars, RO_pars = self.get_spec_pars()
+        # Upload the AWG sequence
+        Pulsed_spec_seq(spec_pars, RO_pars)
+
+        self.AWG.start()
+        if return_detector:
+            return det.Heterodyne_probe(self.heterodyne_instr)
+
+        else:
+            MC.set_sweep_function(self.cw_source.frequency)
+            MC.set_sweep_points(freqs)
+            MC.set_detector_function(det.Heterodyne_probe(self.heterodyne_instr))
+            MC.run(name='pulsed-spec'+self.msmt_suffix)
+            if analyze:
+                ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
+        self.cw_source.off()
+
 
     def measure_rabi(self, amps=np.linspace(-.5, .5, 31), n=1,
                      MC=None, analyze=True, close_fig=True,
@@ -567,3 +637,15 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
             'phase': 0,
             'pulse_type': self.RO_pulse_type.get()}
         return self.pulse_pars, self.RO_pars
+
+    def get_spec_pars(self):
+        pulse_pars, RO_pars = self.get_pulse_pars()
+        spec_pars = {'pulse_type': 'SquarePulse',
+                     'length': self.spec_pulse_length.get(),
+                     'amplitude': 1,
+                     'channel': self.spec_pulse_marker_channel.get()}
+
+        RO_pars['pulse_delay'] += spec_pars['length']
+        spec_pars['pulse_delay'] = (RO_pars['length'] +
+                                    self.spec_pulse_depletion_time.get())
+        return spec_pars, RO_pars

@@ -6,6 +6,7 @@ from qcodes.utils import validators as vals
 from qcodes.instrument.parameter import ManualParameter
 
 from modules.analysis.analysis_toolbox import calculate_transmon_transitions
+from modules.analysis import analysis_toolbox as a_tools
 from modules.measurement import detector_functions as det
 from modules.measurement import composite_detector_functions as cdet
 from modules.measurement import mc_parameter_wrapper as pw
@@ -89,12 +90,6 @@ class Qubit(Instrument):
         raise NotImplementedError()
 
     def measure_spectroscopy(self):
-        '''
-        Discuss: here I mean a single tone (resonator spectroscpy), for a qubit
-        spectroscopy one should use heterodyne_spectroscopy.
-
-        Is this confusing? Should it be the other way round?
-        '''
         raise NotImplementedError()
 
     def measure_heterodyne_spectroscopy(self):
@@ -133,7 +128,6 @@ class Transmon(Qubit):
                            parameter_class=ManualParameter)
         self.add_parameter('f_RO', label='readout frequency', units='Hz',
                            parameter_class=ManualParameter)
-
 
         # Sequence/pulse parameters
         self.add_parameter('RO_pulse_delay', units='s',
@@ -209,6 +203,8 @@ class Transmon(Qubit):
             # args here should be handed down from the top.
             self.measure_spectroscopy(freqs, pulsed=pulsed, MC=None,
                                       analyze=True, close_fig=close_fig)
+            analysis_spec = ma.Qubit_Spectroscopy_Analysis(label='spectroscopy',close_fig=True)
+            self.f_qubit(analysis_spec.fitted_freq)
             # TODO: add updating and fitting
         elif method.lower() == 'ramsey':
 

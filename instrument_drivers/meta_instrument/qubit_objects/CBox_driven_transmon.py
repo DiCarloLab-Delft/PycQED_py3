@@ -126,7 +126,6 @@ class CBox_driven_transmon(Transmon):
         self.heterodyne_instr._disable_auto_seq_loading = False
         self.LO.on()
         self.td_source.off()
-        self.cw_source.on()
         if hasattr(self.heterodyne_instr, 'mod_amp'):
             self.heterodyne_instr.set('mod_amp', self.mod_amp_cw.get())
         else:
@@ -489,14 +488,19 @@ class CBox_driven_transmon(Transmon):
             ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
 
     def measure_spectroscopy(self, freqs, pulsed=False, MC=None,
-                             analyze=True, close_fig=True):
+                             analyze=True, close_fig=True, mode='ROGated_SpecGate',
+                             force_load=False):
+        self.cw_source.on()
         self.prepare_for_continuous_wave()
         if MC is None:
             MC = self.MC
         if pulsed:
             # Redirect to the pulsed spec function
-            return self.measure_pulsed_spectroscopy(freqs,
-                                                    MC, analyze, close_fig)
+            return self.measure_pulsed_spectroscopy(freqs=freqs,
+                                                    MC=MC,
+                                                    analyze=analyze,
+                                                    close_fig=close_fig,
+                                                    mode=mode, force_load=force_load)
 
         MC.set_sweep_function(pw.wrap_par_to_swf(
                               self.cw_source.frequency))
@@ -507,17 +511,27 @@ class CBox_driven_transmon(Transmon):
 
         if analyze:
             ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
+        self.cw_source.off()
 
-    def measure_pulsed_spectroscopy(self, freqs, MC=None,
-                                    analyze=True, close_fig=True):
+    def measure_pulsed_spectroscopy(self, freqs, mode='ROGated_SpecGate', MC=None,
+                                    analyze=True, close_fig=True, force_load=False):
         # This is a trick so I can reuse the heterodyne instr
         # to do pulsed-spectroscopy
         self.heterodyne_instr._disable_auto_seq_loading = True
-        if ('Pulsed_spec' not in self.AWG.setup_filename.get()):
-            st_seqs.Pulsed_spec_seq_RF_mod(
-                IF=self.f_RO_mod.get(),
-                spec_pulse_length=16e-6, marker_interval=30e-6,
-                RO_pulse_delay=self.RO_pulse_delay.get())
+
+        if mode=='ROMod_SpecGated':
+            if ('Pulsed_spec_with_RF_mod' not in self.AWG.setup_filename.get()) or force_load:
+                st_seqs.Pulsed_spec_seq_RF_mod(
+                    IF=self.f_RO_mod.get(),
+                    spec_pulse_length=spec_pulse_length, marker_interval=30e-6,
+                    RO_pulse_delay=self.RO_pulse_delay.get())
+        elif mode=='ROGated_SpecGate':
+            if ('Pulsed_spec_with_RF_gated' not in self.AWG.setup_filename.get()) or force_load:
+                st_seqs.Pulsed_spec_seq_RF_gated(self.RO_pars,
+                                                 self.pulse_pars)
+        else:
+            NotImplementedError('Pulsed Spec mode not supported. Only ROMod_SpecGated and ROGated_SpecGate are avaible right now.\n')
+
         self.cw_source.pulsemod_state.set('on')
         self.cw_source.power.set(self.spec_pow_pulsed.get())
 
@@ -526,7 +540,8 @@ class CBox_driven_transmon(Transmon):
             self.heterodyne_instr.set('mod_amp', self.mod_amp_cw.get())
         else:
             self.heterodyne_instr.RF.power(self.RO_power_cw())
-        MC.set_sweep_function(pw.wrap_par_to_swf(self.cw_source.frequency))
+        MC.set_sweep_function(pw.wrap_par_to_swf(
+                              self.cw_source.frequency))
         MC.set_sweep_points(freqs)
         MC.set_detector_function(det.Heterodyne_probe(self.heterodyne_instr))
         MC.run(name='pulsed-spec'+self.msmt_suffix)
