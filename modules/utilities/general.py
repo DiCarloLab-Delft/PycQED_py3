@@ -48,6 +48,7 @@ def load_settings_onto_instrument(instrument, load_from_instr=None, folder=None,
         'Settings' in the name. By giving a label or timestamp another file
         can be chosen as the settings file.
         '''
+
         older_than = None
         instrument_name = instrument.name
         success = False
@@ -80,18 +81,39 @@ def load_settings_onto_instrument(instrument, load_from_instr=None, folder=None,
             return False
 
         for parameter, value in ins_group.attrs.items():
+            """
             try:
                 if value != 'None':  # None is saved as string in hdf5
                     if type(value) == str:
                         if value == 'False':
                             instrument.set(parameter, False)
                         else:
-                            instrument.set(parameter, float(value))
+                            if has_chr(value):
+                                print(value)
+                                instrument.set(parameter, value)
+                            else:
+                                instrument.set(parameter, float(value))
                     else:
                         instrument.set(parameter, value)
             except:
                 print('Could not set parameter: "%s" to "%s" for instrument "%s"' % (
                     parameter, value, instrument_name))
+            """
+            if value != 'None':  # None is saved as string in hdf5
+                if type(value) == str:
+                    if value == 'False':
+                        instrument.set(parameter, False)
+                    else:
+                        try:
+                            instrument.set(parameter, float(value))
+                        except ValueError:
+                            try:
+                                instrument.set(parameter, value)
+                            except:
+                                print('Could not set parameter: "%s" to "%s" for instrument "%s"' % (
+                                    parameter, value, instrument_name))
+                else:
+                    instrument.set(parameter, value)
         f.close()
         return True
 
