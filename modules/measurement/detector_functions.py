@@ -1049,20 +1049,38 @@ class Detect_simulated_hanger_Soft(Soft_Detector):
         IQ = fn.disp_hanger_S21_complex(*(f, f0, Q, Qe, A, theta))
         return IQ.real+Inoise, IQ.imag+Qnoise
 
-
 class Heterodyne_probe(Soft_Detector):
-    def __init__(self, HS, **kw):
+    def __init__(self, HS, threshold=1.75, **kw):
         super().__init__(**kw)
         self.HS = HS
         self.name = 'Heterodyne probe'
         self.value_names = ['|S21|', 'S21 angle']  # , 'Re{S21}', 'Im{S21}']
-        self.value_units = ['a.u.', 'deg']  # , 'a.u.', 'a.u.']
+        self.value_units = ['mV', 'deg']  # , 'a.u.', 'a.u.']
+        self.first = True
+        self.last_frequency = 0.
+        self.threshold = threshold
+        self.last = 1.
 
     def prepare(self):
         self.HS.prepare()
 
     def acquire_data_point(self, **kw):
-        S21 = self.HS.probe()
+        passed = False
+        while(not passed):
+            S21 = self.HS.probe()
+            cond_a = (abs(S21)/self.last > self.threshold) or (self.last/abs(S21) > self.threshold)
+            cond_b = self.HS.frequency() > self.last_frequency
+            if cond_a and cond_b:
+                passed = False
+            else:
+                passed = True
+            if self.first:
+                passed = True
+            if not passed:
+                print('retrying HS probe')
+        self.last_frequency = self.HS.frequency()
+        self.first = False
+        self.last = abs(S21)
         return abs(S21), np.angle(S21)/(2*np.pi)*360,# S21.real, S21.imag
 
 
