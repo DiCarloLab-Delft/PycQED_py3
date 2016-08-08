@@ -24,6 +24,76 @@ reload(element)
 # I guess there are cleaner solutions :)
 
 
+def Pulsed_spec_seq(spec_pars, RO_pars):
+    '''
+    Pulsed spectroscopy sequence using the tektronix.
+    Input pars:
+        spec_pars:      dict containing spectroscopy pars
+        RO_pars:        dict containing RO pars
+    '''
+    period = spec_pars['pulse_delay'] + RO_pars['pulse_delay']
+    msg = ('Period of spec seq ({})'.format(period) +
+           'must be multiple of RO modulation period ({})'.format(
+           1/RO_pars['fixed_point_frequency']))
+
+    if (period % (1/RO_pars['fixed_point_frequency']))!=0.0:
+        raise ValueError(msg)
+
+    # Nr of pulse reps is set to ensure max nr of pulses and end 10us before
+    # next trigger comes in. Assumes 200us trigger period, also works for
+    # faster trigger rates.
+    nr_of_pulse_reps = int((200e-6-10e-6)//period)
+
+    seq_name = 'Pulsed_spec'
+    seq = sequence.Sequence(seq_name)
+    el_list = []
+
+    pulse_dict = {'spec_pulse': spec_pars, 'RO': RO_pars}
+    pulse_list = [pulse_dict['spec_pulse'], pulse_dict['RO']]*nr_of_pulse_reps
+    for i in range(2):
+        el = multi_pulse_elt(
+            i, station, pulse_list)
+        el_list.append(el)
+        seq.append_element(el, trigger_wait=True)
+    station.components['AWG'].stop()
+    station.pulsar.program_awg(seq, *el_list, verbose=False)
+
+
+def photon_number_splitting_seq(spec_pars, RO_pars):
+    '''
+    Pulsed spectroscopy sequence using the tektronix.
+    Input pars:
+        spec_pars:      dict containing spectroscopy pars
+        RO_pars:        dict containing RO pars
+    '''
+    period = spec_pars['pulse_delay'] + RO_pars['pulse_delay']
+    msg = ('Period of spec seq ({})'.format(period) +
+           'must be multiple of RO modulation period ({})'.format(
+           1/RO_pars['fixed_point_frequency']))
+
+    if (period % (1/RO_pars['fixed_point_frequency']))!=0.0:
+        raise ValueError(msg)
+
+    # Nr of pulse reps is set to ensure max nr of pulses and end 10us before
+    # next trigger comes in. Assumes 200us trigger period, also works for
+    # faster trigger rates.
+    nr_of_pulse_reps = int((200e-6-10e-6)//period)
+
+    seq_name = 'Pulsed_spec'
+    seq = sequence.Sequence(seq_name)
+    el_list = []
+
+    pulse_dict = {'spec_pulse': spec_pars, 'RO': RO_pars}
+    pulse_list = [pulse_dict['spec_pulse'], pulse_dict['RO']]*nr_of_pulse_reps
+    for i in range(2):
+        el = multi_pulse_elt(
+            i, station, pulse_list)
+        el_list.append(el)
+        seq.append_element(el, trigger_wait=True)
+    station.components['AWG'].stop()
+    station.pulsar.program_awg(seq, *el_list, verbose=False)
+
+
 def Rabi_seq(amps, pulse_pars, RO_pars, n=1, post_msmt_delay=3e-6,
              verbose=False):
     '''
