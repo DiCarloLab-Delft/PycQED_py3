@@ -184,3 +184,10 @@ t1 = time.time()
 
 
 print('Ran initialization in %.2fs' % (t1-t0))
+
+def all_sources_off():
+    LO.off()
+    RF.off()
+    Spec_source.off()
+    Qubit_LO.off()
+    TWPA_Pump.off()
