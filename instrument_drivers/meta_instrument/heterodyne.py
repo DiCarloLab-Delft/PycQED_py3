@@ -143,7 +143,7 @@ class HeterodyneInstrument(Instrument):
         self.set('status', 'Off')
         return
 
-    def prepare(self, get_t_base=True):
+    def prepare(self, get_t_base=True, RO_length=500e-9):
         '''
         This function needs to be overwritten for the ATS based version of this
         driver
@@ -152,15 +152,15 @@ class HeterodyneInstrument(Instrument):
         if ((self._awg_seq_filename not in self.AWG.get('setup_filename')) and
                 not self._disable_auto_seq_loading):
             self.seq_name = st_seqs.generate_and_upload_marker_sequence(
-                500e-9, 20e-6, RF_mod=True,
+                RO_length, 20e-6, RF_mod=True,
                 IF=self.get('IF'), mod_amp=0.5)
 
         self.AWG.run()
         if get_t_base is True:
             trace_length = 512
             tbase = np.arange(0, 5*trace_length, 5)*1e-9
-            self.cosI = np.cos(2*np.pi*self.get('IF')*tbase)
-            self.sinI = np.sin(2*np.pi*self.get('IF')*tbase)
+            self.cosI = np.floor(127.*np.cos(2*np.pi*self.get('IF')*tbase))
+            self.sinI = np.floor(127.*np.sin(2*np.pi*self.get('IF')*tbase))
             self.CBox.sig0_integration_weights(self.cosI)
             self.CBox.sig1_integration_weights(self.sinI)
 
@@ -177,9 +177,18 @@ class HeterodyneInstrument(Instrument):
         '''
         self.CBox.set('acquisition_mode', 0)
         self.CBox.set('acquisition_mode', 4)
-        d = self.CBox.get_integrated_avg_results()
+        # d = self.CBox.get_integrated_avg_results()
+        # quick fix for spec units. Need to properrly implement it later
+        # after this, output is in mV
+        scale_factor_dacmV = 1000.*0.75/128.
+        # scale_factor_integration = 1./float(self.IF()*self.CBox.nr_samples()*5e-9)
+        scale_factor_integration = 1./(64.*self.CBox.integration_length())
+        factor = scale_factor_dacmV*scale_factor_integration
+        d = np.double(self.CBox.get_integrated_avg_results())*np.double(factor)
+        # print(d)
         dat = d[0][0]+1j*d[1][0]
         return dat
+
 
         # return s21
 
