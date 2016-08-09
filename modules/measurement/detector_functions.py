@@ -1066,6 +1066,7 @@ class Heterodyne_probe(Soft_Detector):
 
     def acquire_data_point(self, **kw):
         passed = False
+        c = 0
         while(not passed):
             S21 = self.HS.probe()
             cond_a = (abs(S21)/self.last > self.threshold) or (self.last/abs(S21) > self.threshold)
@@ -1074,10 +1075,11 @@ class Heterodyne_probe(Soft_Detector):
                 passed = False
             else:
                 passed = True
-            if self.first:
+            if self.first or c>3:
                 passed = True
             if not passed:
                 print('retrying HS probe')
+            c += 1
         self.last_frequency = self.HS.frequency()
         self.first = False
         self.last = abs(S21)

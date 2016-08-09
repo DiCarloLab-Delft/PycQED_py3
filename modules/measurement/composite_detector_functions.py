@@ -348,7 +348,8 @@ class SSRO_Fidelity_Detector_CBox(det.Soft_Detector):
             RO_pulse_delay=self.RO_pulse_delay,
             RO_trigger_delay=self.RO_trigger_delay,
             RO_pulse_length=self.RO_pulse_length,
-            AWG=self.AWG, CBox=self.CBox))
+            AWG=self.AWG, CBox=self.CBox,
+            upload=self.upload))
 
         self.MC.set_detector_function(
             det.CBox_alternating_shots_det(self.CBox, self.AWG))
@@ -404,7 +405,8 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
         if not self.set_integration_weights:
             self.MC.set_sweep_function(awg_swf.OffOn(
                                        pulse_pars=self.pulse_pars,
-                                       RO_pars=self.RO_pars))
+                                       RO_pars=self.RO_pars,
+                                       upload=self.upload))
             self.MC.set_detector_function(
                 det.CBox_integration_logging_det(self.CBox, self.AWG))
 
