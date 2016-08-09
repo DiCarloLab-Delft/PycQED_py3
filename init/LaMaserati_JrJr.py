@@ -191,3 +191,11 @@ def all_sources_off():
     Spec_source.off()
     Qubit_LO.off()
     TWPA_Pump.off()
+
+
+def print_instr_params(instr):
+    snapshot = instr.snapshot()
+    for par in snapshot['parameters']:
+        print('{}: {} {}'.format(snapshot['parameters'][par]['name'],
+                                 snapshot['parameters'][par]['value'],
+                                 snapshot['parameters'][par]['units']))
