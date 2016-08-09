@@ -59,7 +59,7 @@ def Pulsed_spec_seq(spec_pars, RO_pars):
     station.pulsar.program_awg(seq, *el_list, verbose=False)
 
 
-def photon_number_splitting_seq(spec_pars, RO_pars):
+def photon_number_splitting_seq(spec_pars, RO_pars, disp_pars):
     '''
     Pulsed spectroscopy sequence using the tektronix.
     Input pars:
@@ -83,8 +83,8 @@ def photon_number_splitting_seq(spec_pars, RO_pars):
     seq = sequence.Sequence(seq_name)
     el_list = []
 
-    pulse_dict = {'spec_pulse': spec_pars, 'RO': RO_pars}
-    pulse_list = [pulse_dict['spec_pulse'], pulse_dict['RO']]*nr_of_pulse_reps
+    pulse_dict = {'disp': disp_pars, 'spec_pulse': spec_pars, 'RO': RO_pars}
+    pulse_list = [pulse_dict['disp'], pulse_dict['spec_pulse'], pulse_dict['RO']]*nr_of_pulse_reps
     for i in range(2):
         el = multi_pulse_elt(
             i, station, pulse_list)

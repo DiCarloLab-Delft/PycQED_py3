@@ -6,6 +6,9 @@ from ..waveform_control import pulse
 from ..waveform_control import pulse_library as pl
 from importlib import reload
 reload(pulse)
+'''
+WARNING!! Module deprecated don't use for new things !!!!
+'''
 
 
 def single_marker_elt(i, station):
