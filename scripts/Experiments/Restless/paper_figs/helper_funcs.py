@@ -5,9 +5,11 @@ import matplotlib.pyplot as plt
 import time
 
 import lmfit
+import scipy
 import numpy as np
 import uncertainties
 from copy import deepcopy
+
 
 def running_mean(x, N):
     cumsum = np.cumsum(np.insert(x, 0, 0))
@@ -49,7 +51,7 @@ def t_stampt_to_seconds(timestamp, start_timestamp):
 def extract_durations(start_timestamp, end_timestamp, label):
     timestamps = a_tools.get_timestamps_in_range(start_timestamp, end_timestamp,
                                                  label=label)
-    durs=[]
+    durs = []
     for tst in timestamps:
         a = ma.MeasurementAnalysis(timestamp=tst, auto=False)
         dur = get_duration_in_min(a)
@@ -118,9 +120,18 @@ def extract_fidelities_from_eps(eps, n_cl):
     return F
 
 
+def reject_outliers(data, nr_dev=2.):
+    '''
+    reject outliers from dataset based on median deviation
+    '''
+    dev_from_med = np.abs(data - np.median(data))
+    s = np.mean(dev_from_med)
+    filtered_idx = np.abs(dev_from_med) < (nr_dev*s)
+    return filtered_idx
+
+
 def extract_linecuts(start_timestamp, end_timestamp, label):
     data_dict = {}
-    t0 = time.time()
     timestamps = a_tools.get_timestamps_in_range(start_timestamp, end_timestamp,
                                                  label=label)
     if len(timestamps) == 0:
@@ -140,27 +151,33 @@ def extract_linecuts(start_timestamp, end_timestamp, label):
             a.get_naming_and_values()
             a.sweep_points
             vals = a.measured_values[0]
-            if np.mean(vals) < 52 and np.std(vals) < 2.5:
-                if n_cl not in data_dict.keys():
-                    data_dict[n_cl] = {}
-                if att not in data_dict[n_cl].keys():
-                    data_dict[n_cl][att] = []
-                data_dict[n_cl][att] += [vals]
+            if n_cl not in data_dict.keys():
+                data_dict[n_cl] = {}
+            if att not in data_dict[n_cl].keys():
+                data_dict[n_cl][att] = []
+            data_dict[n_cl][att] += [vals]
         except Exception as e:
             print(tst)
             raise(e)
+    return data_dict
+
+
+def extract_mn_sig_from_data_dict(data_dict):
     n_cls = np.sort(list(data_dict.keys()))
     atts = np.sort(list(data_dict[n_cls[0]].keys()))
 
     mean_eps = np.zeros((len(n_cls), len(atts)))
     std_eps = np.zeros((len(n_cls), len(atts)))
+    sem_eps = np.zeros((len(n_cls), len(atts)))
+    sem_std = np.zeros((len(n_cls), len(atts)))
     for i, n_cl in enumerate(n_cls):
         for j, att in enumerate(atts):
-            mean_eps[i, j] = np.mean(data_dict[n_cl][att])
-            # mean_eps[i, j, :] = np.mean(data_dict[n_cl][att], axis=1)
+            mean_eps[i, j] = np.mean(np.mean(data_dict[n_cl][att], axis=1))
             std_eps[i, j] = np.mean(np.std(data_dict[n_cl][att], axis=1))
-            # std_eps[i, j, :] = np.std(data_dict[n_cl][att], axis=1)
-    return n_cls, atts, mean_eps, std_eps, data_dict
+            # Standard error of mean on the 10 means and 10 std's measured
+            sem_eps[i, j] = scipy.stats.sem(np.mean(data_dict[n_cl][att], axis=1))
+            sem_std[i, j] = scipy.stats.sem(np.std(data_dict[n_cl][att], axis=1))
+    return n_cls, atts, mean_eps, std_eps, sem_eps, sem_std, data_dict
 
 
 def extract_verification_data(start_timestamp, end_timestamp):
