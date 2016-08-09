@@ -1,5 +1,9 @@
+# NOTE: this is a python2 module for as long as sandia PyGSTi only supports
+# python 2
+from __future__ import print_function
 import numpy as np
-
+import pygsti
+from uncertainties import ufloat
 
 def perform_extended_GST_on_data(filename_data_input, filename_target_gateset,
                                  filename_fiducials, filename_germs,
@@ -9,39 +13,33 @@ def perform_extended_GST_on_data(filename_data_input, filename_target_gateset,
     Parameters:
 
     filename_data_input: string
-    Filename of the .txt containing the listofexperiments with the counts as formatted
-    accordign to the standard pyGSTi way,thus at every line a gatesequence, followed
-    by the plus and minus count (|1> and |0>)
-
+        Filename of the .txt containing the listofexperiments with the counts
+        as formatted according to the standard pyGSTi way,thus at every line
+        a gatesequence, followed by the plus and minus count (|1> and |0>)
     filename_target_gateset: string
-    Filename of the .txt file which contains the target gateset
-
+        Filename of the .txt file which contains the target gateset
     filename_fiducials: string
-    Filename of the .txt file containing the fiducials
-
+        Filename of the .txt file containing the fiducials
     filename_germs: string
-    Filename of .txt file containing the germs
+        Filename of .txt file containing the germs
 
     maxlength_germpowerseq: integer
-    Integer specifying the maximum length of the of the germ-power sequence
-    used in the gates sequence. The germs are repeated an integer number of
-    times, such that the total length of this repetition is smaller than a
-    specified maxlength. The list of experiments is composed of all the
-    gatesequences for a specified maxlength which is increasing. The maximum
-    of this maxlength is the parameter ' maxlength_germpowerseq'. #This is
-    still quite unclear/needs better clarification
-
-
+        Integer specifying the maximum length of the of the germ-power sequence
+        used in the gates sequence. The germs are repeated an integer number
+        of times, such that the total length of this repetition is smaller
+        than a specified maxlength. The list of experiments is composed of all
+        the gatesequences for a specified maxlength which is increasing. The
+        maximum of this maxlength is the parameter ' maxlength_germpowerseq'.
+        #This is still quite unclear/needs better clarification
     --------------------------------------------------------------------------
     Returns:
-
     pyGSTi .Results object, on which you can apply several functions to create
-    reports and get the estimates such as:
-    results.gatesets['final estimate'] --> gives final estimate of the gateset
-    results.create_full_report_pdf,   --> creates full report
-    results.create_brief_report_pdf   ---> creates brief report
+        reports and get the estimates such as:
+        results.gatesets['final estimate'] --> gives final estimate of the gateset
+        results.create_full_report_pdf,   --> creates full report
+        results.create_brief_report_pdf   ---> creates brief report
     """
-    import pygsti
+
     maxLengths = [0]
     for i in range(int(np.log(maxlength_germseq)/np.log(2))+1):
         maxLengths.append((2)**i)
@@ -96,23 +94,30 @@ def extract_RB_fidelity_from_GST_result(
     clifford gate decomposition.
 
     Returns
-    -------------
-    Randomized benchmarking fidelity per gate AND Randomzied benchmarking
-    fidelity per clifford
+    (RB-gate-fidelity, RB-Clifford-fidelity)
+
     """
-    GST_gateset = result.gatesets['target']
-    gatesinfidelities = extract_processinfidelities_from_GST_result(result)
-    if gateset_5_primitives_as_9_gateset == False:
-        pass
-    elif gateset_5_primitives_as_9_gateset == True:
-        gatesinfidelities_ext9 = list(gatesinfidelities)
-        gatesinfidelities_ext9 = gatesinfidelities_ext9+list(gatesinfidelities[1::])
-        gatesinfidelities = gatesinfidelities_ext9
+    gatelabels, gatesinfidelities = \
+        extract_processinfidelities_from_GST_result(result)
+
+    infidelities = []
+    for i, inf in enumerate(gatesinfidelities):
+        infidelities.append(ufloat(inf[0], inf[1]))
+
+    # gatesinfidelities = gatesinfidelities[:, 0]
+    gatesinfidelities = infidelities
+    if gateset_5_primitives_as_9_gateset:
+        gatesinfidelities = np.concatenate((gatesinfidelities,
+                                            gatesinfidelities[1::]))
     weights = make_weights_of_gates_Clifford_decomp(clifford_gate_decomposition)
-    average_process_infidelity_for_RB_calc = np.average(
-        gatesinfidelities, weights=weights)
-    RB_fidelity_per_gate = (
-        dimension*(1-average_process_infidelity_for_RB_calc)+1)/(dimension+1)
+    weights = np.reshape(weights, (9, ))
+    # return gatesinfidelities, weights
+
+    average_process_infidelity_for_RB_calc = np.sum(a*b for a, b in zip(
+        gatesinfidelities, weights))
+    # RB_fidelity_per_gate = (
+    #     dimension*(1-average_process_infidelity_for_RB_calc)+1)/(dimension+1)
+    RB_fidelity_per_gate = 1 - average_process_infidelity_for_RB_calc
     RB_fidelity_per_clifford = RB_fidelity_per_gate**1.875
     return RB_fidelity_per_gate, RB_fidelity_per_clifford
 
@@ -127,16 +132,20 @@ def extract_processinfidelities_from_GST_result(result):
 
     Returns
     --------
-    numpy array containing process infidelities
+        gate labels (list)
+        infidelities and std_dev (2D-array)
     """
 
     GST_gateset = result.gatesets['target']
     infidelitytable = result.tables['bestGatesetVsTargetTable']
     gatelabels = GST_gateset.gates.keys()
-    gatesinfidelities = np.ones((len(gatelabels),1))
+    gatesinfidelities = np.ones((len(gatelabels), 2))
+
     for i in range(len(gatelabels)):
-        gatesinfidelities[i] = infidelitytable[gatelabels[i]]['Process Infidelity']['value']
-    return gatesinfidelities
+        gatesinfidelities[i] = \
+            infidelitytable[gatelabels[i]]['Process|Infidelity']
+        # ['Process|Infidelity'][0] is the value, [1] is the err
+    return gatelabels, gatesinfidelities
 
 
 def make_weights_of_gates_Clifford_decomp(
