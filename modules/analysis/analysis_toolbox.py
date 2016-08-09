@@ -350,7 +350,14 @@ def get_data_from_ma_v2(ma, param_names, numeric_params=None):
                     free_vars += 1
             data[param].update({key+'_err':temp[key].attrs['stderr'] for key in list(temp.keys()) if key != 'covar'})
             data[param].update({'chi_squared':temp.attrs['chisqr']})
-            if ma.data_file['Instrument settings']['MC'].attrs['detector_function_name'] == 'TimeDomainDetector':
+
+            # tmp_var is a temporary fix!
+            # should be removed at some point
+            try:
+                tmp_var = ma.data_file['Instrument settings']['MC'].attrs['detector_function_name']
+            except:
+                tmp_var = None
+            if tmp_var == 'TimeDomainDetector':
                 temp2 = ma.data_file['Instrument settings']['TD_Meas']
                 exec(('cal_zero = %s'%(temp2.attrs['cal_zero_points'])), locals())
                 exec(('cal_one = %s'%(temp2.attrs['cal_one_points'])), locals())
