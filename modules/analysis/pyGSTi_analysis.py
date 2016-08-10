@@ -55,46 +55,47 @@ def extract_RB_fidelity_from_GST_result(
         result, clifford_gate_decomposition,
         gateset_5_primitives_as_9_gateset=True,
         dimension=2, weigthed_average=True):
-    """Function which extracts the RB fidelity per gate and RB fidelity per
-    clifford out of GST result. The weighted average is taken of the
-    processinfidelities (where the weights are determined by the relative
-    frequencies of gates within the clifford decomposition), after which the
-    average processinfidelity is related to the RB fidelity according to
-    equation 3 from the paper by Nielsen: 'A simple formula for the average
-    gate fidelity of a quantum dynamical operation'.Then the RB fidelity per
-    clifford and the RB fidelity per gate are returned.
+    """
+    Extracts the RB fidelity per gate and RB fidelity per clifford out of
+    GST result.
+    The weighted average is taken of the processinfidelities (where the
+    weights are determined by the relative frequencies of gates within
+    the clifford decomposition),
+    The average processinfidelity is related to the RB fidelity according to
+    equation 3 from  Nielsen: 'A simple formula for the average
+    gate fidelity of a quantum dynamical operation'
+    (doi:10.1016/S0375-9601(02)01272-0).
 
-
-    Parameters
+    Input Parameters
     ----------------
     result: pygsti.report.results.Results object
-    Result from standard GST analysis.
+        Result from standard GST analysis.
 
     clifford_gate_decomposition: nested list
-    List containing the decomposition of the clifford in elementary gates.
-    For comparing with RB results, use the same decomposition as was used in RB.
-    Which is at the moment: Gate decomposition decomposition of the clifford
-    group as per Eptstein et al. Phys. Rev. A 89, 062321 (2014).
-    (called: gate_decomposition, in:
-    pycQED-3.modules.measurement.randomized_benchmarking.clifford_decompositions)
+        List containing the decomposition of the clifford in elementary gates.
+        For comparing with RB results, use the same decomposition as was used in RB.
+        Which is at the moment: Gate decomposition decomposition of the clifford
+        group as per Eptstein et al. Phys. Rev. A 89, 062321 (2014).
+        (called: gate_decomposition, in:
+        pycQED-3.modules.measurement.randomized_benchmarking.clifford_decompositions)
 
     gateset_5_primitives_as_9_gateset: optional, default = True,
-    In pycQED-3 RB, the clifford gates are decomposed in 9 elementary gates,
-    I, and rotation about X, Y of Pi or Pi/2. The targetset of GST can be less
-    than those 9 gates, where then is assumed that X90=mX90, Y90=mY90, etc.
-    In that case, leave gateset_5_primitives_as_9_gateset at True.
-    Otherwise if GST's target set was the 9 elementary gates, put it at False.
+        In pycQED-3 RB, the clifford gates are decomposed in 9 elementary gates,
+        I, and rotation about X, Y of Pi or Pi/2. The targetset of GST can be less
+        than those 9 gates, where then is assumed that X90=mX90, Y90=mY90, etc.
+        In that case, leave gateset_5_primitives_as_9_gateset at True.
+        Otherwise if GST's target set was the 9 elementary gates, put it at False.
 
     dimension: optional, default=2
-    Dimension of the Hilbert-space. In case of single qubit offcourse =2.
+        Dimension of the Hilbert-space. In case of single qubit = 2.
 
     weighted_average: optional, default =True
-    Specify whether when averaging over the process infidelities, want to take
-    into account the frequencies with which the elementary gates occur in the
-    clifford gate decomposition.
+        Specify whether when averaging over the process infidelities, want to take
+        into account the frequencies with which the elementary gates occur in the
+        clifford gate decomposition.
 
     Returns
-    (RB-gate-fidelity, RB-Clifford-fidelity)
+        (RB-gate-fidelity, RB-Clifford-fidelity)
 
     """
     gatelabels, gatesinfidelities = \
@@ -113,10 +114,18 @@ def extract_RB_fidelity_from_GST_result(
     weights = np.reshape(weights, (9, ))
     # return gatesinfidelities, weights
 
+    # WARNING: averaging process infidelities like this is not allowed
     average_process_infidelity_for_RB_calc = np.sum(a*b for a, b in zip(
         gatesinfidelities, weights))
-    # RB_fidelity_per_gate = (
-    #     dimension*(1-average_process_infidelity_for_RB_calc)+1)/(dimension+1)
+    # averaging should happen after conversion to the depolarizing parameter
+
+    # This converts the process infidelity to the depolarizing parameter p
+    # which is the RB-fidelity.
+    RB_fidelity_per_gate = (
+        dimension*(1-average_process_infidelity_for_RB_calc)+1)/(dimension+1)
+    # Double check this conversion function
+
+
     RB_fidelity_per_gate = 1 - average_process_infidelity_for_RB_calc
     RB_fidelity_per_clifford = RB_fidelity_per_gate**1.875
     return RB_fidelity_per_gate, RB_fidelity_per_clifford
