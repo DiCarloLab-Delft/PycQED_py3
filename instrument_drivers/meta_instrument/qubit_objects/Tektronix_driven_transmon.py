@@ -100,8 +100,6 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                            vals=vals.Numbers(1e-9, 50e-6),
                            parameter_class=ManualParameter)
 
-
-
         # Rename f_RO_mod
         # Time-domain parameters
         self.add_parameter('pulse_I_channel', initial_value='ch1',
@@ -422,20 +420,22 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                       fitted_freq-artificial_detuning))
 
     def measure_echo(self, times, label='', MC=None,
+                     artificial_detuning=None,
                      analyze=True, close_fig=True, verbose=True):
         self.prepare_for_timedomain()
         if MC is None:
             MC = self.MC
 
         Echo_swf = awg_swf.Echo(
-            pulse_pars=self.pulse_pars, RO_pars=self.RO_pars)
+            pulse_pars=self.pulse_pars, RO_pars=self.RO_pars,
+            artificial_detuning=artificial_detuning)
         MC.set_sweep_function(Echo_swf)
         MC.set_sweep_points(times)
         MC.set_detector_function(self.int_avg_det)
         MC.run('Echo'+label+self.msmt_suffix)
 
         if analyze:
-            a = ma.Echo_analysis(auto=True, close_fig=close_fig)
+            a = ma.Ramsey_analysis(auto=True, close_fig=close_fig)
             return a
 
     def measure_allxy(self, double_points=True,
