@@ -32,16 +32,24 @@ def Pulsed_spec_seq(spec_pars, RO_pars):
         RO_pars:        dict containing RO pars
     '''
     period = spec_pars['pulse_delay'] + RO_pars['pulse_delay']
+    remainder = period % (1/RO_pars['fixed_point_frequency'])
+
     msg = ('Period of spec seq ({})'.format(period) +
            'must be multiple of RO modulation period ({})'.format(
-           1/RO_pars['fixed_point_frequency']))
+           1/RO_pars['fixed_point_frequency']) +
+           "\nAdding {}s to spec_pars['pulse_delay']".format(
+                1/RO_pars['fixed_point_frequency'] - remainder) +
+           '\nConsider updating parameter')
 
-    if (period % (1/RO_pars['fixed_point_frequency']))!=0.0:
-        raise ValueError(msg)
+    if (remainder != 0.0):
+        logging.warning(msg)
+        print(msg)
+        spec_pars['pulse_delay'] += 1/RO_pars['fixed_point_frequency'] - remainder
 
     # Nr of pulse reps is set to ensure max nr of pulses and end 10us before
     # next trigger comes in. Assumes 200us trigger period, also works for
     # faster trigger rates.
+    period = spec_pars['pulse_delay'] + RO_pars['pulse_delay']
     nr_of_pulse_reps = int((200e-6-10e-6)//period)
 
     seq_name = 'Pulsed_spec'
@@ -50,7 +58,7 @@ def Pulsed_spec_seq(spec_pars, RO_pars):
 
     pulse_dict = {'spec_pulse': spec_pars, 'RO': RO_pars}
     pulse_list = [pulse_dict['spec_pulse'], pulse_dict['RO']]*nr_of_pulse_reps
-    for i in range(2):
+    for i in range(1):
         el = multi_pulse_elt(
             i, station, pulse_list)
         el_list.append(el)
@@ -215,7 +223,7 @@ def Ramsey_seq(times, pulse_pars, RO_pars,
         pulse_pars_x2['pulse_delay'] = tau
 
         if artificial_detuning is not None:
-            pulse_pars_x2['phase'] = tau * artificial_detuning * 360
+            pulse_pars_x2['phase'] = (tau-times[0]) * artificial_detuning * 360
 
         if cal_points and (i == (len(times)-4) or i == (len(times)-3)):
                 el = multi_pulse_elt(i, station, [pulses['I'], RO_pars])
@@ -232,12 +240,14 @@ def Ramsey_seq(times, pulse_pars, RO_pars,
 
 
 def Echo_seq(times, pulse_pars, RO_pars,
+             artificial_detuning=None,
              cal_points=True,
              verbose=False):
     '''
     Echo sequence for a single qubit using the tektronix.
     Input pars:
         times:          array of times between (start of) pulses (s)
+        artificial_detuning: artificial_detuning (Hz) implemented using phase
         pulse_pars:     dict containing the pulse parameters
         RO_pars:        dict containing the RO parameters
         cal_points:     whether to use calibration points or not
@@ -252,7 +262,8 @@ def Echo_seq(times, pulse_pars, RO_pars,
     for i, tau in enumerate(times):
         center_X180['pulse_delay'] = tau/2
         final_X90['pulse_delay'] = tau/2
-
+        if artificial_detuning is not None:
+            final_X90['phase'] = (tau-times[0]) * artificial_detuning * 360
         if cal_points and (i == (len(times)-4) or i == (len(times)-3)):
                 el = multi_pulse_elt(i, station, [pulses['I'], RO_pars])
         elif cal_points and (i == (len(times)-2) or i == (len(times)-1)):

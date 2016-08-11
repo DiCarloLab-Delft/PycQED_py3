@@ -19,7 +19,7 @@ from modules.measurement.calibration_toolbox import mixer_carrier_cancellation_5
 from modules.measurement.calibration_toolbox import mixer_skewness_calibration_5014
 from modules.measurement.optimization import nelder_mead
 
-from modules.measurement.pulse_sequences.single_qubit_tek_seq_elts import Pulsed_spec_seq
+import modules.measurement.pulse_sequences.single_qubit_tek_seq_elts as sq
 
 from .qubit_object import Transmon
 from .CBox_driven_transmon import CBox_driven_transmon
@@ -313,8 +313,9 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         """
         Measure pulsed spec with the qubit.
 
-            Accepts a manual sequence parameters, which has to be a call to a pulse generation
-            allowing for alternative sequences to be played instead of the standard one
+            Accepts a manual sequence parameters, which has to be a call to a
+            pulse generation allowing for alternative sequences to be played
+            instead of the standard one
 
         """
 
@@ -330,7 +331,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
 
         spec_pars, RO_pars = self.get_spec_pars()
         # Upload the AWG sequence
-        Pulsed_spec_seq(spec_pars, RO_pars)
+        sq.Pulsed_spec_seq(spec_pars, RO_pars)
 
         self.AWG.start()
         if return_detector:
