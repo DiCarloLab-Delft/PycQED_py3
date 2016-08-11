@@ -1,0 +1,7 @@
+# My fiducial gate strings
+{}
+Gx90
+Gy90
+Gx90Gx90
+Gx90Gx90Gx90
+Gy90Gy90Gy90

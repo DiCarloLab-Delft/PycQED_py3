@@ -15,6 +15,8 @@ reload(pulse_library)
 station = None
 reload(element)
 
+# TODO: MAR move to gate_set_tomography folder
+
 
 def GST_from_textfile(pulse_pars, RO_pars, filename,
                       upload=True, seq_name=None,
