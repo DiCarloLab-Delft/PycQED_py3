@@ -162,7 +162,7 @@ for i in range(4):
     station.pulsar.define_channel(id='ch{}'.format(i+1),
                                   name='ch{}'.format(i+1), type='analog',
                                   # max safe IQ voltage
-                                  high=.5, low=-.5,
+                                  high=.7, low=-.7,
                                   offset=0.0, delay=0, active=True)
     station.pulsar.define_channel(id='ch{}_marker1'.format(i+1),
                                   name='ch{}_marker1'.format(i+1),
@@ -199,3 +199,11 @@ def print_instr_params(instr):
         print('{}: {} {}'.format(snapshot['parameters'][par]['name'],
                                  snapshot['parameters'][par]['value'],
                                  snapshot['parameters'][par]['units']))
+
+def set_integration_weights():
+    trace_length = 512
+    tbase = np.arange(0, 5*trace_length, 5)*1e-9
+    cosI = np.floor(127.*np.cos(2*np.pi*AncB.get('f_RO_mod')*tbase))
+    sinI = np.floor(127.*np.sin(2*np.pi*AncB.get('f_RO_mod')*tbase))
+    CBox.sig0_integration_weights(cosI)
+    CBox.sig1_integration_weights(sinI)
