@@ -2,7 +2,11 @@
 # python 2
 from __future__ import print_function
 import numpy as np
-import pygsti
+import logging
+try:
+    import pygsti
+except ImportError:
+    logging.warning('Could not import pygsti')
 from uncertainties import ufloat
 
 def perform_extended_GST_on_data(filename_data_input, filename_target_gateset,
@@ -176,16 +180,18 @@ def make_weights_of_gates_Clifford_decomp(
     ---------------------------
     list of weights of frequencies of elementary gates in clifford gates
     """
-
+    weights = {}
     total_count = 0
-    individual_gate_counts = np.zeros((len(gates),1))
     for i, gate in enumerate(gates):
+        individual_gate_counts = 0
         for j in range(len(clifford_gate_decomposition)):
             for k in range(len(clifford_gate_decomposition[j])):
                 if clifford_gate_decomposition[j][k] == gate:
                     total_count += 1
-                    individual_gate_counts[i] += 1
-    weights = individual_gate_counts/total_count
+                    individual_gate_counts += 1
+        weights[gate] = individual_gate_counts
+    weights.update((x, y/total_count)
+                   for x, y in weights.items())
     return weights
 
 

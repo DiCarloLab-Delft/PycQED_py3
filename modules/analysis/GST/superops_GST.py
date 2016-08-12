@@ -1,11 +1,13 @@
 import numpy as np
+from copy import deepcopy
 import unittest
 
 # For keeping self contained only
 import sys
 import os
-PycQEDdir = (os.path.abspath('../../../..'))
+PycQEDdir = (os.path.abspath('../../..'))
 sys.path.append(PycQEDdir)
+print(PycQEDdir)
 
 from modules.measurement.randomized_benchmarking.clifford_decompositions \
     import(gate_decomposition)
@@ -54,16 +56,28 @@ Gy180 = np.matrix([[1.0, 0, 0, 0],
 
 # Test inner product between states
 
+def invert_unitary_component_PTM(PTM):
+    """
+    inverts only the unitary part of a superoperator in the Pauli basis
+    uses property that the first column corresponds to the non-unitary
+    (T1, T2) errors.
+    """
+    assert(np.shape(PTM) == (4, 4))
+    unitary_part = PTM[1:, 1:]
+    newPTM = deepcopy(PTM)
+    newPTM[1:, 1:] = unitary_part.T
+
+    return np.matrix(newPTM)
 
 Ideal_gates = {'I': Gi,
                'X90': Gx90,
                'X180': Gx180,
                'Y90': Gy90,
                'Y180': Gy180,
-               'mX90': Gx90**-1,
-               'mX180': Gx180**-1,
-               'mY90': Gy90**-1,
-               'mY180': Gy180**-1,
+               'mX90': invert_unitary_component_PTM(Gx90),
+               'mX180': invert_unitary_component_PTM(Gx180),
+               'mY90': invert_unitary_component_PTM(Gy90),
+               'mY180': invert_unitary_component_PTM(Gy180),
                }
 
 
