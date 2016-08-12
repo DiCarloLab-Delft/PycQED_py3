@@ -7,6 +7,7 @@ import numpy as np
 from copy import deepcopy
 import pprint
 from . import pulsar
+import logging
 
 
 class Element:
@@ -371,6 +372,12 @@ class Element:
 
             # truncate all values that are out of bounds
             if self._channels[wf]['type'] == 'analog':
+                if max(wfs[wf]) > hi:
+                    logging.warning('Clipping waveform {} > {}'.format(
+                                    max(wfs[wf]), hi))
+                if min(wfs[wf]) < lo:
+                    logging.warning('Clipping waveform {} < {}'.format(
+                                    min(wfs[wf]), lo))
                 wfs[wf][wfs[wf] > hi] = hi
                 wfs[wf][wfs[wf] < lo] = lo
             elif self._channels[wf]['type'] == 'marker':
