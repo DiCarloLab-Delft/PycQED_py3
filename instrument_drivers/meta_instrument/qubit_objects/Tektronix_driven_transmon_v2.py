@@ -28,7 +28,7 @@ from .CBox_driven_transmon import CBox_driven_transmon
 # MAR april 2016
 
 
-class Tektronix_driven_transmon(CBox_driven_transmon):
+class Tektronix_driven_transmon_v2(Transmon):
     '''
     Setup configuration:
         Drive:                 Tektronix 5014 AWG
@@ -48,7 +48,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                  LO, cw_source, td_source,
                  IVVI, AWG, CBox,
                  heterodyne_instr, MC, rf_RO_source=None, **kw):
-        super(CBox_driven_transmon, self).__init__(name, **kw)
+        super(Transmon, self).__init__(name, **kw)
         # Change this when inheriting directly from Transmon instead of
         # from CBox driven Transmon.
         self.LO = LO
@@ -161,7 +161,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         self.add_parameter('amp180',
                            label='Pi-pulse amplitude', units='V',
                            initial_value=.25,
-                           vals=vals.Numbers(min_value=-2., max_value=2.),
+                           vals=vals.Numbers(min_value=-0.5, max_value=0.5),
                            parameter_class=ManualParameter)
         self.add_parameter('amp90_scale',
                            label='pulse amplitude scaling factor', units='',
@@ -200,6 +200,34 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                                                             self.AWG)
         self.input_average_detector = det.CBox_input_average_detector(
             self.CBox, self.AWG)
+
+    def prepare_for_continuous_wave(self):
+        """
+        Prepare call for configuration of a CW measurement.
+        """
+
+        # Heterodyne tone configuration
+        self.heterodyne_instr._disable_auto_seq_loading = False
+        self.heterodyne_instr.RF.on()
+        self.heterodyne_instr.LO.on()
+        if hasattr(self.heterodyne_instr, 'mod_amp'):
+            self.heterodyne_instr.set('mod_amp', self.mod_amp_cw.get())
+        else:
+            self.heterodyne_instr.RF_power(self.RO_power_cw())
+        self.heterodyne_instr.set('IF', self.f_RO_mod.get())
+        self.heterodyne_instr.frequency.set(self.f_RO.get())
+        self.heterodyne_instr.RF.power(self.RO_power_cw())
+        self.heterodyne_instr.RF_power(self.RO_power_cw())
+
+        # Turning of TD source
+        self.td_source.off()
+
+        # Updating Spec source
+        self.cw_source.power(self.spec_pow())
+        self.cw_source.frequency(self.f_qubit())
+        if hasattr(self.cw_source, 'pulsemod_state'):
+            self.cw_source.pulsemod_state('off')
+
 
     def prepare_for_pulsed_spec(self):
         # TODO: fix prepare for pulsed spec

@@ -31,7 +31,7 @@ ControlBox version 2.
 '''
 
 
-class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
+class QuTech_ControlBox_v3(qcb.QuTech_ControlBox_base):
     def __init__(self, *args, **kwargs):
         super(QuTech_ControlBox_v3, self).__init__(*args, **kwargs)
 

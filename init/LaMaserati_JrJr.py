@@ -105,14 +105,14 @@ MC = mc.MeasurementControl('MC')
 
 
 
-AncB = qbt.Tektronix_driven_transmon('AncB', LO=LO, cw_source=Spec_source,
-                                              td_source=Qubit_LO,
-                                              IVVI=IVVI, rf_RO_source=RF,
-                                              AWG=AWG,
-                                              CBox=CBox, heterodyne_instr=HS,
-                                              MC=MC,
-                                              server_name=None)
-station.add_component(AncB)
+# AncB = qbt.Tektronix_driven_transmon('AncB', LO=LO, cw_source=Spec_source,
+#                                               td_source=Qubit_LO,
+#                                               IVVI=IVVI, rf_RO_source=RF,
+#                                               AWG=AWG,
+#                                               CBox=CBox, heterodyne_instr=HS,
+#                                               MC=MC,
+#                                               server_name=None)
+# station.add_component(AncB)
 AncT = qbt.Tektronix_driven_transmon('AncT', LO=LO, cw_source=Spec_source,
                                               td_source=Qubit_LO,
                                               IVVI=IVVI, rf_RO_source=RF,

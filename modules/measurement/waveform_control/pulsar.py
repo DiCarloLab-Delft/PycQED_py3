@@ -203,9 +203,17 @@ class Pulsar:
         # Note that this is the AWG setting offset, as distinct from the
         # channel parameter offset.
         offsets = {}
-        for c in self.channels:
-            if self.channels[c]['type'] == 'analog':
-                offsets[c] = self.AWG.get(c+'_offset')
+        for ch_name, chan_dict in self.channels.items():
+            if chan_dict['type'] == 'analog':
+                exec('offsets[ch_name] = self.AWG.{}_offset.get_latest()'.format(ch_name))
+                if offsets[ch_name] is None:
+                    offsets[ch_name] = self.AWG.get(ch_name+'_offset')
+                ch_amp = None  # to prevent linting error showing up
+                exec('ch_amp = self.AWG.{}_amp.get_latest()'.format(ch_name))
+                if ch_amp is None:
+                    ch_amp = self.AWG.get('{}_amp'.format(ch_name))
+                chan_dict['low'] = -ch_amp/2
+                chan_dict['high'] = ch_amp/2
 
         elements_with_non_zero_first_points = []
 

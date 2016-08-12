@@ -1087,6 +1087,55 @@ class Heterodyne_probe(Soft_Detector):
 
 
 
+class Heterodyne_probe_soft_avg(Soft_Detector):
+    def __init__(self, HS, threshold=1.75, Navg=10, **kw):
+        super().__init__(**kw)
+        self.HS = HS
+        self.name = 'Heterodyne probe'
+        self.value_names = ['|S21|', 'S21 angle']  # , 'Re{S21}', 'Im{S21}']
+        self.value_units = ['mV', 'deg']  # , 'a.u.', 'a.u.']
+        self.first = True
+        self.last_frequency = 0.
+        self.threshold = threshold
+        self.last = 1.
+        self.Navg = Navg
+
+    def prepare(self):
+        self.HS.prepare()
+    def acquire_data_point(self, **kw):
+        accum_real = 0.
+        accum_imag = 0.
+        for i in range(self.Navg):
+            measure = self.acquire_single_data_point(**kw)
+            accum_real += measure[0]
+            accum_imag += measure[1]
+        S21 = (accum_real+1j*accum_imag)/float(self.Navg)
+
+        return abs(S21), np.angle(S21)/(2*np.pi)*360
+
+    def acquire_single_data_point(self, **kw):
+        passed = False
+        c = 0
+        while(not passed):
+            S21 = self.HS.probe()
+            cond_a = (abs(S21)/self.last > self.threshold) or (self.last/abs(S21) > self.threshold)
+            cond_b = self.HS.frequency() > self.last_frequency
+            if cond_a and cond_b:
+                passed = False
+            else:
+                passed = True
+            if self.first or c>3:
+                passed = True
+            if not passed:
+                print('retrying HS probe')
+            c += 1
+        self.last_frequency = self.HS.frequency()
+        self.first = False
+        self.last = abs(S21)
+        return S21.real, S21.imag
+
+
+
 class PulsedSpectroscopyDetector(Soft_Detector):
 
     def __init__(self, AWG_filename='Spec_5014', **kw):

@@ -22,7 +22,7 @@ from modules.measurement.calibration_toolbox import mixer_skewness_cal_CBox_adap
 from modules.measurement.optimization import nelder_mead
 
 
-class CBox_driven_transmon(Transmon):
+class CBox_v3_driven_transmon(Transmon):
     '''
     Setup configuration:
         Drive:                 CBox AWGs
