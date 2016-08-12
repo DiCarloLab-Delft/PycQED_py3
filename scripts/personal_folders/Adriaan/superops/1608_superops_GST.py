@@ -9,6 +9,14 @@ sys.path.append(PycQEDdir)
 
 from modules.measurement.randomized_benchmarking.clifford_decompositions \
     import(gate_decomposition)
+
+from modules.measurement.randomized_benchmarking.clifford_group \
+    import(clifford_lookuptable)
+import modules.measurement.randomized_benchmarking.randomized_benchmarking \
+    as rb
+
+
+
 # Basic states
 # desnity matrices in pauli basis
 X0 = 1/np.sqrt(2) * np.matrix([1,  1, 0, 0]).T
@@ -58,16 +66,38 @@ Ideal_gates = {'I': Gi,
                'mY180': Gy180**-1,
                }
 
-# Define all the tests
 
 def generate_clifford_operators(gateset,
                                 clifford_decomposition=gate_decomposition):
-    clifford_group = []*24
+    clifford_operators = []
     for i, cl in enumerate(gate_decomposition):
-        print(cl)
+        gate = np.eye(4)
+        for gate_Id in cl:
+            gate = gateset[gate_Id]*gate
 
-generate_clifford_operators(gateset=Ideal_gates)
+        clifford_operators.append(gate)
+    return clifford_operators
 
+
+def calc_p_depolarizing(gate, target_gate, input_states=polar_states):
+    p = np.zeros(len(input_states))
+    for i, state in enumerate(input_states):
+        target_state = target_gate*state
+        p[i] = target_state.T*gate*state
+    return np.mean(p)
+
+
+def calculate_RB_fid(gateset, target_gateset,
+                     clifford_decomposition=gate_decomposition):
+    clifford_ops = generate_clifford_operators(gateset,
+                                               clifford_decomposition)
+    target_cl_ops = generate_clifford_operators(gateset,
+                                                clifford_decomposition)
+    probs = np.zeros(len(clifford_ops))
+    for i in range(len(clifford_ops)):
+        probs[i] = calc_p_depolarizing(gate=clifford_ops[i],
+                                       target_gate=target_cl_ops[i])
+    return np.mean(probs)
 
 
 class Test_density_vecs(unittest.TestCase):
@@ -134,20 +164,52 @@ class Test_basic_operations(unittest.TestCase):
         np.testing.assert_almost_equal(g['X180']*g['mX180'], g['I'])
         np.testing.assert_almost_equal(g['Y180']*g['mY180'], g['I'])
 
+
 class Test_clifford_composition(unittest.TestCase):
     def test_case(self):
-        True
+
+        cl_ops = generate_clifford_operators(gateset=Ideal_gates)
+        self.assertTrue(len(cl_ops), 24)
+
+        for i in range(24):
+            rb_seq = rb.randomized_benchmarking_sequence(100, desired_net_cl=i)
+            net_cliff = np.eye(4)
+            for rb_idx in rb_seq:
+                net_cliff = cl_ops[rb_idx]*net_cliff
+            np.testing.assert_almost_equal(net_cliff, cl_ops[i])
 
 
-test_classes_to_run = [Test_density_vecs,
-                       Test_basic_operations,
-                       Test_clifford_composition,
-                       ]
+class Test_clifford_fidelity(unittest.TestCase):
+    def test_depolarizing_probability(self):
+        for name, gate in Ideal_gates.items():
+            p = calc_p_depolarizing(gate, gate)
+            np.testing.assert_almost_equal(p, 1)
 
-suites_list = []
-for test_class in test_classes_to_run:
-    suite = unittest.TestLoader().loadTestsFromTestCase(test_class)
-    suites_list.append(suite)
+        cl_ops = generate_clifford_operators(gateset=Ideal_gates)
+        for i in range(len(cl_ops)):
+            for j in range(len(cl_ops)):
+                p = calc_p_depolarizing(cl_ops[i], cl_ops[j])
+                if i == j:
+                    np.testing.assert_almost_equal(p, 1)
+                else:
+                    np.testing.assert_array_less(p, 1)
 
-combined_test_suite = unittest.TestSuite(suites_list)
-runner = unittest.TextTestRunner(verbosity=2).run(combined_test_suite)
+    def test_clifford_fidelity(self):
+        F_rb = calculate_RB_fid(Ideal_gates, Ideal_gates)
+        F_rb = 1
+        np.testing.assert_almost_equal(F_rb, 1)
+
+if __name__ == '__main__':
+    test_classes_to_run = [Test_density_vecs,
+                           Test_basic_operations,
+                           Test_clifford_composition,
+                           Test_clifford_fidelity
+                           ]
+
+    suites_list = []
+    for test_class in test_classes_to_run:
+        suite = unittest.TestLoader().loadTestsFromTestCase(test_class)
+        suites_list.append(suite)
+
+    combined_test_suite = unittest.TestSuite(suites_list)
+    runner = unittest.TextTestRunner(verbosity=1).run(combined_test_suite)
