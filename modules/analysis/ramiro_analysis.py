@@ -140,12 +140,12 @@ class Standard_MA(object):
         for ii, idx in enumerate(slice_idxs):
             if len(slice_idxs) == 1:
                 axs.plot(plot_xvals, plot_yvals[idx], '-bo',
-                         label='%s = %f %s'%(slice_label, plot_slicevals[idx], slice_units))
+                         label='%s = %.3f %s'%(slice_label, plot_slicevals[idx], slice_units))
             else:
                 if ii==0 or ii==len(slice_idxs)-1:
                     axs.plot(plot_xvals, plot_yvals[idx], '-o',
                              color=get_color_order(ii, len(slice_idxs)-1),
-                             label='%s = %f %s'%(slice_label, plot_slicevals[idx], slice_units))
+                             label='%s = %.3f %s'%(slice_label, plot_slicevals[idx], slice_units))
                 else:
                     axs.plot(plot_xvals, plot_yvals[idx], '-o',
                              color=get_color_order(ii, len(slice_idxs)-1))
@@ -195,11 +195,13 @@ class Standard_MA(object):
         axs.set_title(plot_title)
 
         ax_divider = make_axes_locatable(axs)
-        cax = ax_divider.append_axes('right',size='10%', pad='5%')
+        cax = ax_divider.append_axes('right',size='5%', pad='2.5%')
         cbar = plt.colorbar(out['cmap'],cax=cax)
         cbar.set_ticks(np.arange(fig_clim[0],1.01*fig_clim[1],(fig_clim[1]-fig_clim[0])/5.))
         cbar.set_ticklabels([str(fig_clim[0]),'','','','',str(fig_clim[1])])
         cbar.set_label(plot_zlabel)
+
+        self.cbar = cbar
 
         axs.figure.tight_layout()
 
