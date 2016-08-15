@@ -63,10 +63,11 @@ def invert_unitary_component_PTM(PTM):
     (T1, T2) errors.
     """
     assert(np.shape(PTM) == (4, 4))
+    # return PTM
+    # for comparing under assumption that X180 affects FRB same as mX180
     unitary_part = PTM[1:, 1:]
     newPTM = deepcopy(PTM)
     newPTM[1:, 1:] = unitary_part.T
-
     return np.matrix(newPTM)
 
 Ideal_gates = {'I': Gi,
