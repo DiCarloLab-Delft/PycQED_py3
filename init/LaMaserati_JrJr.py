@@ -6,6 +6,7 @@ This scripts initializes the instruments and imports the modules
 # General imports
 
 import time
+import logging
 t0 = time.time()  # to print how long init takes
 from instrument_drivers.meta_instrument.qubit_objects import duplexer_tek_transmon as dt
 
@@ -25,6 +26,9 @@ qc.show_subprocess_widget()
 qc_config = {'datadir': r'D:\Experiments\\1607_Qcodes_5qubit\data',
              'PycQEDdir': 'D:\GitHubRepos\PycQED_py3'}
 
+# makes sure logging messages show up in the notebook
+root = logging.getLogger()
+root.addHandler(logging.StreamHandler())
 
 # General PycQED modules
 from modules.measurement import measurement_control as mc
