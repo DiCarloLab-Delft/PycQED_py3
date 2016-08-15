@@ -1050,7 +1050,7 @@ class Detect_simulated_hanger_Soft(Soft_Detector):
         return IQ.real+Inoise, IQ.imag+Qnoise
 
 class Heterodyne_probe(Soft_Detector):
-    def __init__(self, HS, threshold=1.75, **kw):
+    def __init__(self, HS, threshold=1.75, trigger_separation=20e-6, **kw):
         super().__init__(**kw)
         self.HS = HS
         self.name = 'Heterodyne probe'
@@ -1060,9 +1060,10 @@ class Heterodyne_probe(Soft_Detector):
         self.last_frequency = 0.
         self.threshold = threshold
         self.last = 1.
+        self.trigger_separation = trigger_separation
 
     def prepare(self):
-        self.HS.prepare()
+        self.HS.prepare(trigger_separation=self.trigger_separation)
 
     def acquire_data_point(self, **kw):
         passed = False

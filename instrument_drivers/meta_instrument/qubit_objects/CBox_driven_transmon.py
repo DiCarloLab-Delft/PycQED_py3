@@ -482,7 +482,7 @@ class CBox_driven_transmon(Transmon):
         MC.set_sweep_function(pw.wrap_par_to_swf(
                               self.heterodyne_instr.frequency))
         MC.set_sweep_points(freqs)
-        MC.set_detector_function(det.Heterodyne_probe(self.heterodyne_instr))
+        MC.set_detector_function(det.Heterodyne_probe(self.heterodyne_instr, trigger_separation=2.8e-6))
         MC.run(name='Resonator_scan'+self.msmt_suffix)
         if analyze:
             ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
@@ -506,7 +506,7 @@ class CBox_driven_transmon(Transmon):
                               self.cw_source.frequency))
         MC.set_sweep_points(freqs)
         MC.set_detector_function(
-            det.Heterodyne_probe(self.heterodyne_instr))
+            det.Heterodyne_probe(self.heterodyne_instr, trigger_separation=2.8e-6))
         MC.run(name='spectroscopy'+self.msmt_suffix)
 
         if analyze:

@@ -143,7 +143,7 @@ class HeterodyneInstrument(Instrument):
         self.set('status', 'Off')
         return
 
-    def prepare(self, get_t_base=True, RO_length=500e-9):
+    def prepare(self, get_t_base=True, RO_length=500e-9, trigger_separation=20e-6):
         '''
         This function needs to be overwritten for the ATS based version of this
         driver
@@ -152,7 +152,7 @@ class HeterodyneInstrument(Instrument):
         if ((self._awg_seq_filename not in self.AWG.get('setup_filename')) and
                 not self._disable_auto_seq_loading):
             self.seq_name = st_seqs.generate_and_upload_marker_sequence(
-                RO_length, 20e-6, RF_mod=True,
+                RO_length, trigger_separation, RF_mod=True,
                 IF=self.get('IF'), mod_amp=0.5)
 
         self.AWG.run()
