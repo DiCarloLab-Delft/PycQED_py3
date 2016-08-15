@@ -207,6 +207,46 @@ class Standard_MA(object):
 
 
 
+    def plot_colorx(self, pdict, axs=None):
+        plot_xvals = pdict['xvals']
+        plot_yvals = pdict['yvals']
+        plot_zvals = pdict['zvals']
+        plot_xlabel = pdict['xlabel']
+        plot_ylabel = pdict['ylabel']
+        plot_zlabel = pdict['zlabel']
+        plot_title = pdict['title']
+        plot_cmap = pdict.get('cmap','YlGn')
+
+        plot_xvals_step = plot_xvals[1]-plot_xvals[0]
+        plot_yvals_step = plot_yvals[1,0]-plot_yvals[0,0]
+
+        fig_clim = pdict['zrange']
+        out = flex_color_plot_vs_x(ax=axs,cmap=plot_cmap,normalize=False,
+                             xvals=plot_xvals,
+                             yvals=plot_yvals,
+                             zvals=plot_zvals.transpose())
+
+        xmin, xmax = plot_xvals.min()-plot_xvals_step/2., plot_xvals.max()+plot_xvals_step/2.
+        axs.set_xlabel(plot_xlabel)
+        axs.set_xlim(xmin, xmax)
+
+        ymin, ymax = plot_yvals.min()-plot_yvals_step/2.,plot_yvals.max()+plot_yvals_step/2.
+        axs.set_ylabel(plot_ylabel)
+        axs.set_ylim(ymin, ymax)
+
+        axs.set_title(plot_title)
+
+        # ax_divider = make_axes_locatable(axs)
+        # cax = ax_divider.append_axes('right',size='5%', pad='2.5%')
+        # cbar = plt.colorbar(out['cmap'], cax=cax)
+        # cbar.set_ticks(np.arange(fig_clim[0],1.01*fig_clim[1],(fig_clim[1]-fig_clim[0])/5.))
+        # cbar.set_ticklabels([str(fig_clim[0]),'','','','',str(fig_clim[1])])
+        # cbar.set_label(plot_zlabel)
+
+        # self.cbar = cbar
+
+        axs.figure.tight_layout()
+
 class quick_analysis(Standard_MA):
     def __init__(self, t_start, t_stop,
                  options_dict,
