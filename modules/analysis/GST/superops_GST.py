@@ -94,11 +94,12 @@ def generate_clifford_operators(gateset,
     return clifford_operators
 
 
-def calc_p_depolarizing(gate, target_gate, input_states=polar_states):
-    p = np.zeros(len(input_states))
+def calc_p_depolarizing(gate, target_gate, input_states=polar_states):55
+    p = []
     for i, state in enumerate(input_states):
         target_state = target_gate*state
-        p[i] = target_state.T*gate*state
+
+        p.append(target_state.T*gate*state)
     return np.mean(p)
 
 
@@ -108,10 +109,10 @@ def calculate_RB_fid(gateset, target_gateset,
                                                clifford_decomposition)
     target_cl_ops = generate_clifford_operators(gateset,
                                                 clifford_decomposition)
-    probs = np.zeros(len(clifford_ops))
+    probs = []
     for i in range(len(clifford_ops)):
-        probs[i] = calc_p_depolarizing(gate=clifford_ops[i],
-                                       target_gate=target_cl_ops[i])
+        probs.append(calc_p_depolarizing(gate=clifford_ops[i],
+                                         target_gate=target_cl_ops[i]))
     return np.mean(probs)
 
 

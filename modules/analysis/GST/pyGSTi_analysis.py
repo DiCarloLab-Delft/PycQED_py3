@@ -7,7 +7,7 @@ try:
     import pygsti
 except ImportError:
     logging.warning('Could not import pygsti')
-from uncertainties import ufloat
+from uncertainties import ufloat, umath
 
 def perform_extended_GST_on_data(filename_data_input, filename_target_gateset,
                                  filename_fiducials, filename_germs,
@@ -214,12 +214,15 @@ def extract_gates_T1_from_result_GST(result, gate_operation_time):
     ---------------------------------
     T1 in seconds"""
     decomptable = result.tables['bestGatesetDecompTable']
-    Diagonal_decay_rates = []
-    gatelabels = result.gatesets['target'].gates.keys()
-    for i in range(len(gatelabels)):
-        Diagonal_decay_rates.append(decomptable[gatelabels[i]]['Diag. decay']['value'])
-    T1_gates = [-gate_operation_time/np.log((1-i)) for i in Diagonal_decay_rates]
-    return T1_gates
+
+    gatelabels = decomptable.keys()
+    T1_dict = {}
+    for i, gatelabel in enumerate(gatelabels):
+        diag_dec = ufloat(decomptable[gatelabel]['Diag. decay'])
+        T1 = -gate_operation_time/umath.log(1-diag_dec)
+        T1_dict[gatelabel] = T1
+    # T1_gates = [-gate_operation_time/np.log((1-i)) for i in Diagonal_decay_rates]
+    return T1_dict
 
 
 def extract_gates_T2_from_result_GST(result, gate_operation_time):
