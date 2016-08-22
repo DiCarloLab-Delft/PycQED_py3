@@ -19,7 +19,7 @@ import pandas as pd
 import qcodes as qc
 # currently on a Windows machine
 # qc.set_mp_method('spawn')  # force Windows behavior on mac
-qc.show_subprocess_widget()
+# qc.show_subprocess_widget()
 # Globally defined config
 # qc_config = {'datadir': r'D:\\Experimentsp7_Qcodes_5qubit',
 #              'PycQEDdir': 'D:\GitHubRepos\PycQED_py3'}
@@ -109,14 +109,14 @@ MC = mc.MeasurementControl('MC')
 
 
 
-# AncB = qbt.Tektronix_driven_transmon('AncB', LO=LO, cw_source=Spec_source,
-#                                               td_source=Qubit_LO,
-#                                               IVVI=IVVI, rf_RO_source=RF,
-#                                               AWG=AWG,
-#                                               CBox=CBox, heterodyne_instr=HS,
-#                                               MC=MC,
-#                                               server_name=None)
-# station.add_component(AncB)
+AncB = qbt.Tektronix_driven_transmon('AncB', LO=LO, cw_source=Spec_source,
+                                              td_source=Qubit_LO,
+                                              IVVI=IVVI, rf_RO_source=RF,
+                                              AWG=AWG,
+                                              CBox=CBox, heterodyne_instr=HS,
+                                              MC=MC,
+                                              server_name=None)
+station.add_component(AncB)
 AncT = qbt.Tektronix_driven_transmon('AncT', LO=LO, cw_source=Spec_source,
                                               td_source=Qubit_LO,
                                               IVVI=IVVI, rf_RO_source=RF,
@@ -211,3 +211,5 @@ def set_integration_weights():
     sinI = np.floor(127.*np.sin(2*np.pi*AncB.get('f_RO_mod')*tbase))
     CBox.sig0_integration_weights(cosI)
     CBox.sig1_integration_weights(sinI)
+from scripts.Experiments.FiveQubits import common_functions as cfct
+cfct.set_AWG_limits(station,1.7)
