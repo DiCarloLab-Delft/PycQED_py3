@@ -67,3 +67,22 @@ def pulsed_spec_elt_with_RF_gated(i, station, RO_pars,
                    start=RO_trigger_delay,
                    refpulse='RO-marker-{}'.format(i), refpoint='start')
     return el
+
+
+
+
+
+def fit_last_spec():
+    def get_last_timestamp():
+        splitted_str = (a_tools.get_folder()).split('\\')
+        return splitted_str[-2]+'_'+splitted_str[-1][:6]
+
+    pdict = {'y':'amp',
+             'x':'sweep_points'}
+    opt_dict = {'scan_label':''}
+    nparams = ['y', 'x']
+    spec = RA.quick_analysis(t_start=get_last_timestamp(),t_stop=get_last_timestamp(), options_dict=opt_dict,
+                      params_dict_TD=pdict,numeric_params=nparams)
+
+    peaks_dict = a_tools.peak_finder(x=spec.TD_dict['x'][0],y=a_tools.smooth(spec.TD_dict['y'][0], window_len=11))
+    peaks_dict['peak']
