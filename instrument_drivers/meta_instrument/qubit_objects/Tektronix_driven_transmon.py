@@ -199,13 +199,53 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         self.input_average_detector = det.CBox_input_average_detector(
             self.CBox, self.AWG)
 
+    def prepare_for_continuous_wave(self):
+        # Heterodyne tone configuration
+        if not self.f_RO():
+            RO_freq = self.f_res()
+        else:
+            RO_freq = self.f_RO()
+        self.heterodyne_instr._disable_auto_seq_loading = False
+
+        self.heterodyne_instr.RF.on()
+        self.heterodyne_instr.LO.on()
+        if hasattr(self.heterodyne_instr, 'mod_amp'):
+            self.heterodyne_instr.set('mod_amp', self.mod_amp_cw.get())
+        else:
+            self.heterodyne_instr.RF_power(self.RO_power_cw())
+        self.heterodyne_instr.set('IF', self.f_RO_mod.get())
+        self.heterodyne_instr.frequency.set(RO_freq)
+        self.heterodyne_instr.RF.power(self.RO_power_cw())
+        self.heterodyne_instr.RF_power(self.RO_power_cw())
+
+        # Turning of TD source
+        self.td_source.off()
+
+        # Updating Spec source
+        self.cw_source.power(self.spec_pow())
+        self.cw_source.frequency(self.f_qubit())
+        self.cw_source.off()
+        if hasattr(self.cw_source, 'pulsemod_state'):
+            self.cw_source.pulsemod_state('off')
+        if hasattr(self.rf_RO_source, 'pulsemod_state'):
+            self.rf_RO_source.pulsemod_state('Off')
+
     def prepare_for_pulsed_spec(self):
         # TODO: fix prepare for pulsed spec
         # TODO: make measure pulsed spec
         self.prepare_for_timedomain()
         self.td_source.off()
+        self.cw_source.frequency(self.f_qubit())
+        self.cw_source.power(self.spec_pow_pulsed())
+        if hasattr(self.cw_source, 'pulsemod_state'):
+            self.cw_source.pulsemod_state('On')
+        else:
+            RuntimeError('Spec source for pulsed spectroscopy does not support pulsing!')
+        self.cw_source.on()
 
     def prepare_for_timedomain(self):
+        self.rf_RO_source.pulsemod_state('On')
+        self.td_source.pulsemod_state('Off')
         self.LO.on()
         self.cw_source.off()
         self.td_source.on()
@@ -238,6 +278,9 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
             self.rf_RO_source.pulsemod_state.set('on')
             self.rf_RO_source.frequency(self.f_RO.get())
             self.rf_RO_source.power(self.RO_pulse_power.get())
+        self.rf_RO_source.frequency(self.f_RO())
+        self.rf_RO_source.power(self.RO_pulse_power())
+        self.rf_RO_source.on()
 
     def calibrate_mixer_offsets(self, signal_hound, offs_type='pulse',
                                 update=True):
@@ -304,10 +347,50 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                                verbose=False, make_fig=True):
         raise NotImplementedError()
 
+    def measure_heterodyne_spectroscopy(self, freqs, MC=None,
+                                        analyze=True, close_fig=True):
+        self.prepare_for_continuous_wave()
+        if MC is None:
+            MC = self.MC
+        MC.set_sweep_function(pw.wrap_par_to_swf(
+                              self.heterodyne_instr.frequency))
+        MC.set_sweep_points(freqs)
+        MC.set_detector_function(det.Heterodyne_probe(self.heterodyne_instr, trigger_separation=2.8e-6))
+        MC.run(name='Resonator_scan'+self.msmt_suffix)
+        if analyze:
+            ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
+
+    def measure_spectroscopy(self, freqs, pulsed=False, MC=None,
+                             analyze=True, close_fig=True, mode='ROGated_SpecGate',
+                             force_load=True, use_max=False, update=True):
+        self.prepare_for_continuous_wave()
+        self.cw_source.on()
+        if MC is None:
+            MC = self.MC
+        if pulsed:
+            # Redirect to the pulsed spec function
+            return self.measure_pulsed_spectroscopy(freqs=freqs,
+                                                    MC=MC,
+                                                    analyze=analyze,
+                                                    close_fig=close_fig,
+                                                    update=update,
+                                                    upload=force_load)
+
+        MC.set_sweep_function(pw.wrap_par_to_swf(
+                              self.cw_source.frequency))
+        MC.set_sweep_points(freqs)
+        MC.set_detector_function(
+            det.Heterodyne_probe(self.heterodyne_instr, trigger_separation=2.8e-6))
+        MC.run(name='spectroscopy'+self.msmt_suffix)
+
+        if analyze:
+            ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
+        self.cw_source.off()
 
     def measure_pulsed_spectroscopy(self, freqs, MC=None, analyze=True,
                                     return_detector=False,
-                                    close_fig=True, upload=True):
+                                    close_fig=True, upload=True, update=True,
+                                    use_max=False):
         """
         Measure pulsed spec with the qubit.
 
@@ -340,8 +423,13 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
             MC.set_sweep_points(freqs)
             MC.set_detector_function(det.Heterodyne_probe(self.heterodyne_instr))
             MC.run(name='pulsed-spec'+self.msmt_suffix)
-            if analyze:
-                ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
+            if analyze or update:
+                ma_obj = ma.Qubit_Spectroscopy_Analysis(auto=True, label='pulsed', close_fig=close_fig)
+                if update:
+                    if use_max:
+                        self.f_qubit(ma_obj.peaks['peak'])
+                    else:
+                        self.f_qubit(ma_obj.fitted_freq)
         self.cw_source.off()
 
 
@@ -481,24 +569,26 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                      MC=None,
                      analyze=True,
                      close_fig=True,
-                     verbose=True, set_integration_weights=False):
+                     verbose=True, set_integration_weights=False, use_Q=0,
+                     multiplier=1, soft_rotate=True):
         self.prepare_for_timedomain()
         if MC is None:
             MC = self.MC
         d = cdet.SSRO_Fidelity_Detector_Tek(
             'SSRO'+self.msmt_suffix,
-            analyze=return_detector,
+            analyze=analyze,
             raw=no_fits,
             MC=MC,
             AWG=self.AWG, CBox=self.CBox,
             pulse_pars=self.pulse_pars, RO_pars=self.RO_pars,
-            set_integration_weights=set_integration_weights, close_fig=close_fig)
+            set_integration_weights=set_integration_weights,
+            close_fig=close_fig,use_Q=use_Q, multiplier=multiplier, soft_rotate=soft_rotate)
         if return_detector:
             return d
         d.prepare()
         d.acquire_data_point()
         if analyze:
-            return ma.SSRO_Analysis(label='SSRO'+self.msmt_suffix,
+            return ma.SSRO_Analysis(rotate=soft_rotate,label='SSRO'+self.msmt_suffix,
                                     no_fits=no_fits, close_fig=close_fig)
 
     def measure_butterfly(self, return_detector=False,

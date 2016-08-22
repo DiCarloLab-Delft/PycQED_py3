@@ -188,7 +188,7 @@ class Transmon(Qubit):
     def find_frequency(self, method='spectroscopy', pulsed=False,
                        steps=[1, 3, 10, 30, 100, 300, 1000],
                        freqs=None,
-                       f_span=100e6, f_step=1e6,
+                       f_span=100e6, use_max=False, f_step=1e6,
                        verbose=True, update=True,
                        close_fig=True):
 
@@ -202,9 +202,16 @@ class Transmon(Qubit):
                                   f_step)
             # args here should be handed down from the top.
             self.measure_spectroscopy(freqs, pulsed=pulsed, MC=None,
-                                      analyze=True, close_fig=close_fig)
-            analysis_spec = ma.Qubit_Spectroscopy_Analysis(label='spectroscopy',close_fig=True)
-            self.f_qubit(analysis_spec.fitted_freq)
+                                      analyze=True, close_fig=close_fig, use_max=use_max, update=update)
+            if pulsed:
+                label = 'pulsed-spec'
+            else:
+                label = 'spectroscopy'
+            analysis_spec = ma.Qubit_Spectroscopy_Analysis(label=label,close_fig=True)
+            if use_max:
+                self.f_qubit(analysis_spec.peaks['peak'])
+            else:
+                self.f_qubit(analysis_spec.fitted_freq)
             # TODO: add updating and fitting
         elif method.lower() == 'ramsey':
 
