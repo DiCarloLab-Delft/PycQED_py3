@@ -490,8 +490,8 @@ class CBox_driven_transmon(Transmon):
     def measure_spectroscopy(self, freqs, pulsed=False, MC=None,
                              analyze=True, close_fig=True, mode='ROGated_SpecGate',
                              force_load=False):
-        self.cw_source.on()
         self.prepare_for_continuous_wave()
+        self.cw_source.on()
         if MC is None:
             MC = self.MC
         if pulsed:
