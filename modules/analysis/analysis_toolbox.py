@@ -14,6 +14,7 @@ from uuid import getnode as get_mac
 from init.config import setup_dict
 from scipy.interpolate import griddata
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+import h5py
 
 # to allow backwards compatibility with old a_tools code
 from .tools.file_handling import *
@@ -586,6 +587,51 @@ def get_instrument_setting(analysis_object, instrument_name, parameter):
     return attr
 
 
+def compare_instrument_settings_timestamp(timestamp_a, timestamp_b):
+    '''
+    Takes two analysis objects as input and prints the differences between the instrument settings.
+    Currently it only compares settings existing in object_a, this function can be improved to not care about the order of arguments.
+    '''
+
+    h5mode = 'r+'
+    h5filepath = measurement_filename(get_folder(timestamp_a))
+    analysis_object_a = h5py.File(h5filepath, h5mode)
+    h5filepath = measurement_filename(get_folder(timestamp_b))
+    analysis_object_b = h5py.File(h5filepath, h5mode)
+    sets_a = analysis_object_a['Instrument settings']
+    sets_b = analysis_object_b['Instrument settings']
+
+    for ins_key in list(sets_a.keys()):
+        print()
+        try:
+            sets_b[ins_key]
+
+            ins_a = sets_a[ins_key]
+            ins_b = sets_b[ins_key]
+            print('Instrument "%s" ' % ins_key)
+            diffs_found = False
+            for par_key in list(ins_a.attrs.keys()):
+                try:
+                    ins_b.attrs[par_key]
+                except KeyError:
+                    print('Instrument "%s" does have parameter "%s"' % (
+                        ins_key, par_key))
+
+                if ins_a.attrs[par_key] == ins_b.attrs[par_key]:
+                    pass
+                else:
+                    print('    "%s" has a different value '\
+                        ' "%s" for %s, "%s" for %s' % (
+                            par_key, ins_a.attrs[par_key], timestamp_a,
+                            ins_b.attrs[par_key],timestamp_b))
+                    diffs_found = True
+
+            if not diffs_found:
+                print('    No differences found')
+        except KeyError:
+            print('Instrument "%s" not present in second settings file' \
+                % ins_key)
+
 def compare_instrument_settings(analysis_object_a, analysis_object_b):
     '''
     Takes two analysis objects as input and prints the differences between the instrument settings.
@@ -790,6 +836,7 @@ def smooth(x, window_len=11, window='hanning'):
 
     # Cut edges of y since a mirror image is used
     edge = (window_len - 1) / 2
+    edge = int(edge)
     return y[edge:-edge]
 
 
