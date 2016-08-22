@@ -58,9 +58,9 @@ class QuTech_ControlBox(VisaInstrument):
                            get_cmd=self._do_get_integration_length,
                            set_cmd=self._do_set_integration_length,
                            vals=vals.Ints(1, 512))
-        self.add_parameter('demod_int',
-                           set_cmd=self._do_set_demod_int,
-                           get_cmd=self._do_get_demod_int,
+        self.add_parameter('srcw1_int',
+                           set_cmd=self._do_set_srcw1_int,
+                           get_cmd=self._do_get_srcw1_int,
                            vals=vals.Ints(0, 255))
 
         nr_inputs = 2
@@ -106,7 +106,7 @@ class QuTech_ControlBox(VisaInstrument):
                            vals=vals.Ints(1, 2**17))
         self._nr_averages = 2
         self._nr_samples = 200
-        self._demod_int = 0
+        self._srcw1_int = 0
         nr_awgs = 3
         for awg_nr in range(nr_awgs):
             self._awg_mode = [0]*nr_awgs
@@ -205,15 +205,15 @@ class QuTech_ControlBox(VisaInstrument):
 
 
 
-    def _do_set_demod_int(self, val):
+    def _do_set_srcw1_int(self, val):
         '''
         Sets the measurement timeout in seconds.
         This is distinct from the timeout of the read operation (5s default)
         '''
-        self._demod_int = val
+        self._srcw1_int = val
 
-    def _do_get_demod_int(self):
-        return self._demod_int
+    def _do_get_srcw1_int(self):
+        return self._srcw1_int
 
     def _do_get_firmware_version(self):
         message = c.create_message(defHeaders.ReadVersion)
@@ -1033,13 +1033,13 @@ class QuTech_ControlBox(VisaInstrument):
             5 = integration_streaming
             6 = touch 'n go
 
-        demod_int denotes the adc input mode. When set at 1, ADC input 1 is used with
+        srcw1_int denotes the adc input mode. When set at 1, ADC input 1 is used with
         both weights(0 and 1). Otherwise, weights are applied to each ADC input:
         ADC 1 is mutiplied by weight0 and ADC 2 is multiplied by weight1.
         @return stat : True if the upload succeeded and False if the upload
                        failed
         '''
-        demod_int = self._demod_int
+        srcw1_int = self._srcw1_int
         acquisition_mode = str(acquisition_mode)
         mode_int = None
         for i in range(len(defHeaders.acquisition_modes)):
@@ -1054,7 +1054,7 @@ class QuTech_ControlBox(VisaInstrument):
         # Here the actual acquisition_mode is set
         cmd = defHeaders.UpdateModeHeader
         data_bytes = c.encode_byte(mode_int, 7, expected_number_of_bytes=1)
-        data_bytes += c.encode_byte(demod_int, 7, expected_number_of_bytes=1)
+        data_bytes += c.encode_byte(srcw1_int, 7, expected_number_of_bytes=1)
         message = c.create_message(cmd, data_bytes)
         (stat, mesg) = self.serial_write(message)
         if stat:
