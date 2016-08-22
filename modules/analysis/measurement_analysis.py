@@ -1784,6 +1784,7 @@ class SSRO_Analysis(MeasurementAnalysis):
 
     def __init__(self, **kw):
         kw['h5mode'] = 'r+'
+        self.rotate = kw.pop('rotate',True)
         super(self.__class__, self).__init__(**kw)
 
     def run_default_analysis(self, rotate=True, no_fits=False,
@@ -1813,7 +1814,7 @@ class SSRO_Analysis(MeasurementAnalysis):
         shots_Q_data_1 = shots_Q_data_1[0:min_len]
 
         # rotating IQ-plane to transfer all information to the I-axis
-        if rotate:
+        if self.rotate:
             theta, shots_I_data_1_rot, shots_I_data_0_rot = \
                 self.optimize_IQ_angle(shots_I_data_1, shots_Q_data_1,
                                        shots_I_data_0, shots_Q_data_0, min_len,
@@ -1823,7 +1824,63 @@ class SSRO_Analysis(MeasurementAnalysis):
             self.theta = 0
             shots_I_data_1_rot = shots_I_data_1
             shots_I_data_0_rot = shots_I_data_0
+
+            cmap = kw.pop('cmap', 'viridis')
+            #plotting 2D histograms of mmts with pulse
+
+
+            n_bins = 120  # the bins we want to have around our data
+            I_min = min(min(shots_I_data_0), min(shots_I_data_1))
+            I_max = max(max(shots_I_data_0), max(shots_I_data_1))
+            Q_min = min(min(shots_Q_data_0), min(shots_Q_data_1))
+            Q_max = max(max(shots_Q_data_0), max(shots_Q_data_1))
+            edge = max(abs(I_min), abs(I_max), abs(Q_min), abs(Q_max))
+            H0, xedges0, yedges0 = np.histogram2d(shots_I_data_0, shots_Q_data_0,
+                                           bins=n_bins,
+                                           range=[[I_min, I_max],
+                                                  [Q_min, Q_max]],
+                                           normed=True)
+            H1, xedges1, yedges1 = np.histogram2d(shots_I_data_1, shots_Q_data_1,
+                                           bins=n_bins,
+                                           range=[[I_min, I_max,],
+                                                  [Q_min, Q_max,]],
+                                           normed=True)
+            fig, axarray = plt.subplots(nrows=1, ncols=2)
+            axarray[0].tick_params(axis='both', which='major',
+                                   labelsize=5, direction='out')
+            axarray[1].tick_params(axis='both', which='major',
+                                   labelsize=5, direction='out')
+
+            plt.subplots_adjust(hspace=20)
+
+            axarray[0].set_title('2D histogram, pi pulse')
+            im1 = axarray[0].imshow(np.transpose(H1), interpolation='nearest', origin='low',
+                                    extent=[xedges1[0], xedges1[-1],
+                                            yedges1[0], yedges1[-1]], cmap=cmap)
+            axarray[0].set_xlabel('Int. I (V)')
+            axarray[0].set_ylabel('Int. Q (V)')
+            axarray[0].set_xlim(-edge, edge)
+            axarray[0].set_ylim(-edge, edge)
+
+            # plotting 2D histograms of mmts with no pulse
+            axarray[1].set_title('2D histogram, no pi pulse')
+            im0 = axarray[1].imshow(np.transpose(H0), interpolation='nearest', origin='low',
+                                    extent=[xedges0[0], xedges0[-1], yedges0[0],
+                                    yedges0[-1]], cmap=cmap)
+            axarray[1].set_xlabel('Int. I (V)')
+            axarray[1].set_ylabel('Int. Q (V)')
+            axarray[1].set_xlim(-edge, edge)
+            axarray[1].set_ylim(-edge, edge)
+
+
+            self.save_fig(fig, figname='SSRO_Density_Plots', **kw)
+
+            self.avg_0_I = np.mean(shots_I_data_0)
+            self.avg_1_I = np.mean(shots_I_data_1)
+            self.avg_0_Q = np.mean(shots_Q_data_0)
+            self.avg_1_Q = np.mean(shots_Q_data_1)
         # making gaussfits of s-curves
+
         self.no_fits_analysis(shots_I_data_1_rot, shots_I_data_0_rot, min_len,
                               **kw)
         if self.no_fits is False:
@@ -3928,7 +3985,7 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
                     data_real=self.measured_values[0],
                     data_imag=self.measured_values[1])
 
-            self.peaks = a_tools.peak_finder(self.sweep_points, self.data_dist)
+            self.peaks = a_tools.peak_finder(self.sweep_points, a_tools.smooth(self.data_dist))
 
             if self.peaks['peak'] is not None:
                 f0 = self.peaks['peak']
