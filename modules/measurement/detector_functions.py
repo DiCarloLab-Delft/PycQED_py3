@@ -396,13 +396,16 @@ class CBox_input_average_detector(Hard_Detector):
         self.CBox = CBox
         self.name = 'CBox_Streaming_data'
         self.value_names = ['Ch0', 'Ch1']
-        self.value_units = ['a.u.', 'a.u.']
+        self.value_units = ['mV', 'mV']
         self.AWG = AWG
+        scale_factor_dacmV = 1000.*0.75/128.
+        scale_factor_integration = 1./(64.*self.CBox.integration_length())
+        self.factor = scale_factor_dacmV*scale_factor_integration
 
     def get_values(self):
         if self.AWG is not None:
             self.AWG.start()
-        data = self.CBox.get_input_avg_results()
+        data = np.double(self.CBox.get_integrated_avg_results())*np.double(self.factor)
         return data
 
     def prepare(self, sweep_points):
@@ -715,6 +718,70 @@ class CBox_integration_logging_det(Hard_Detector):
         else:
             d = self._get_values()
         return d
+
+    def _get_values(self):
+        self.AWG.stop()
+        self.CBox.set('acquisition_mode', 0)
+        if self.awg_nrs is not None:
+            for awg_nr in self.awg_nrs:
+                self.CBox.restart_awg_tape(awg_nr)
+                if self.reload_pulses:
+                    self.LutMan.load_pulses_onto_AWG_lookuptable(awg_nr)
+        self.CBox.set('acquisition_mode', 'integration logging')
+        self.AWG.start()
+
+        data = self.CBox.get_integration_log_results()
+
+        self.CBox.set('acquisition_mode', 0)
+        return data
+
+    def finish(self):
+        self.CBox.set('acquisition_mode', 0)
+        self.AWG.stop()
+
+
+class CBox_integration_logging_det_shots(Hard_Detector):
+    def __init__(self, CBox, AWG, LutMan=None, reload_pulses=False,
+                 awg_nrs=None, shots=8000, **kw):
+        '''
+        If you want AWG reloading you should give a LutMan and specify
+        on what AWG nr to reload default is no reloading of pulses.
+        '''
+        super().__init__()
+        self.CBox = CBox
+        self.name = 'CBox_integration_logging_detector'
+        self.value_names = ['I', 'Q']
+        self.value_units = ['a.u.', 'a.u.']
+        self.AWG = AWG
+
+        self.LutMan = LutMan
+        self.reload_pulses = reload_pulses
+        self.awg_nrs = awg_nrs
+        self.repetitions = int(np.ceil(shots/8000))
+
+    def get_values(self):
+        d_0 = []
+        d_1 = []
+        for i in range(self.repetitions):
+            exception_mode = True
+            if exception_mode:
+                success = False
+                i = 0
+                while not success and i < 10:
+                    try:
+                        d = self._get_values()
+                        success = True
+                    except Exception as e:
+                        logging.warning('Exception {} caught, retaking data'.format(e))
+                        i += 1
+            else:
+                d = self._get_values()
+            h_point = len(d)/2
+            d_0.append(d[:h_point])
+            d_1.append(d[h_point:])
+        d_all = np.concatenate((np.array(d_0).flatten(),np.array(d_1).flatten()))
+
+        return d_all
 
     def _get_values(self):
         self.AWG.stop()
@@ -1050,7 +1117,7 @@ class Detect_simulated_hanger_Soft(Soft_Detector):
         return IQ.real+Inoise, IQ.imag+Qnoise
 
 class Heterodyne_probe(Soft_Detector):
-    def __init__(self, HS, threshold=1.75, trigger_separation=20e-6, **kw):
+    def __init__(self, HS, threshold=1.75, trigger_separation=20e-6, demod_int=0, **kw):
         super().__init__(**kw)
         self.HS = HS
         self.name = 'Heterodyne probe'
@@ -1061,6 +1128,7 @@ class Heterodyne_probe(Soft_Detector):
         self.threshold = threshold
         self.last = 1.
         self.trigger_separation = trigger_separation
+        self.demod_int = demod_int
 
     def prepare(self):
         self.HS.prepare(trigger_separation=self.trigger_separation)
@@ -1069,9 +1137,9 @@ class Heterodyne_probe(Soft_Detector):
         passed = False
         c = 0
         while(not passed):
-            S21 = self.HS.probe()
-            cond_a = (abs(S21)/self.last > self.threshold) or (self.last/abs(S21) > self.threshold)
-            cond_b = self.HS.frequency() > self.last_frequency
+            S21 = self.HS.probe(demod_int = self.demod_int)
+            cond_a = ((abs(S21)/self.last) > self.threshold) or ((self.last/abs(S21)) > self.threshold)
+            cond_b = self.HS.frequency() >= self.last_frequency
             if cond_a and cond_b:
                 passed = False
             else:
