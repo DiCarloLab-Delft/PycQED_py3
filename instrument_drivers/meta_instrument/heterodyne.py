@@ -172,7 +172,7 @@ class HeterodyneInstrument(Instrument):
 
         # self.CBox.set('acquisition_mode', 'idle') # aded with xiang
 
-    def probe(self, **kw):
+    def probe(self, demod_int=0, **kw):
         '''
         Starts acquisition and returns the data
             'COMP' : returns data as a complex point in the I-Q plane in Volts
@@ -180,6 +180,7 @@ class HeterodyneInstrument(Instrument):
         # self.CBox.set('acquisition_mode', 'idle')
         self.CBox.set('acquisition_mode', 0)
         # self.CBox.set('acquisition_mode', 'integration averaging')
+        self.CBox.demod_int(demod_int)
         self.CBox.set('acquisition_mode', 4)
         # d = self.CBox.get_integrated_avg_results()
         # quick fix for spec units. Need to properrly implement it later
