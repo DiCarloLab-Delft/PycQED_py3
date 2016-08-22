@@ -24,7 +24,7 @@ reload(element)
 # I guess there are cleaner solutions :)
 
 
-def Pulsed_spec_seq(spec_pars, RO_pars):
+def Pulsed_spec_seq(spec_pars, RO_pars, return_seq=False):
     '''
     Pulsed spectroscopy sequence using the tektronix.
     Input pars:
@@ -65,9 +65,10 @@ def Pulsed_spec_seq(spec_pars, RO_pars):
         seq.append_element(el, trigger_wait=True)
     station.components['AWG'].stop()
     station.pulsar.program_awg(seq, *el_list, verbose=False)
+    return seq
 
 
-def photon_number_splitting_seq(spec_pars, RO_pars, disp_pars):
+def photon_number_splitting_seq(spec_pars, RO_pars, disp_pars, return_seq=False):
     '''
     Pulsed spectroscopy sequence using the tektronix.
     Input pars:
@@ -100,10 +101,11 @@ def photon_number_splitting_seq(spec_pars, RO_pars, disp_pars):
         seq.append_element(el, trigger_wait=True)
     station.components['AWG'].stop()
     station.pulsar.program_awg(seq, *el_list, verbose=False)
+    return seq
 
 
 def Rabi_seq(amps, pulse_pars, RO_pars, n=1, post_msmt_delay=3e-6,
-             verbose=False):
+             verbose=False, return_seq=False):
     '''
     Rabi sequence for a single qubit using the tektronix.
     Input pars:
@@ -129,11 +131,14 @@ def Rabi_seq(amps, pulse_pars, RO_pars, n=1, post_msmt_delay=3e-6,
         seq.append_element(el, trigger_wait=True)
     station.components['AWG'].stop()
     station.pulsar.program_awg(seq, *el_list, verbose=verbose)
-    return seq_name
+    if return_seq:
+        return seq,el_list
+    else:
+        return seq
 
 
 def Rabi_amp90_seq(scales, pulse_pars, RO_pars, n=1, post_msmt_delay=3e-6,
-             verbose=False):
+             verbose=False, return_seq=False):
     '''
     Rabi sequence to determine amp90 scaling factor for a single qubit using the tektronix.
     Input pars:
@@ -159,13 +164,16 @@ def Rabi_amp90_seq(scales, pulse_pars, RO_pars, n=1, post_msmt_delay=3e-6,
         seq.append_element(el, trigger_wait=True)
     station.components['AWG'].stop()
     station.pulsar.program_awg(seq, *el_list, verbose=verbose)
-    return seq_name
+    if return_seq:
+        return seq
+    else:
+        return seq_name
 
 
 def T1_seq(times,
            pulse_pars, RO_pars,
            cal_points=True,
-           verbose=False):
+           verbose=False, return_seq=False):
     '''
     Rabi sequence for a single qubit using the tektronix.
     SSB_Drag pulse is used for driving, simple modualtion used for RO
@@ -195,7 +203,10 @@ def T1_seq(times,
         seq.append_element(el, trigger_wait=True)
     station.components['AWG'].stop()
     station.pulsar.program_awg(seq, *el_list, verbose=verbose)
-    return seq_name
+    if return_seq:
+        return seq
+    else:
+        return seq_name
 
 
 def Ramsey_seq(times, pulse_pars, RO_pars,
@@ -550,10 +561,37 @@ def Motzoi_XY(motzois, pulse_pars, RO_pars,
 
 
 
+# Testing sequences
+
+
+def Rising_seq(amps, pulse_pars, RO_pars, n=1, post_msmt_delay=3e-6,
+             verbose=False, return_seq=False):
+    '''
+    Rabi sequence for a single qubit using the tektronix.
+    Input pars:
+        amps:            array of pulse amplitudes (V)
+        pulse_pars:      dict containing the pulse parameters
+        RO_pars:         dict containing the RO parameters
+        n:               number of pulses (1 is conventional Rabi)
+        post_msmt_delay: extra wait time for resetless compatibility
+    '''
+    seq_name = 'Rising_sequence'
+    seq = sequence.Sequence(seq_name)
+    el_list = []
+    pulse_pars = {'pulse_type':'RisingPulse'}
+    pulse_list = [pulse_pars]
+    el = multi_pulse_elt(0, station, pulse_list)
+    el_list.append(el)
+    seq.append_element(el, trigger_wait=True)
+    station.components['AWG'].stop()
+    station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+    if return_seq:
+        return seq,el_list
+    else:
+        return seq
 
 
 # Helper functions
-
 
 def get_pulse_dict_from_pars(pulse_pars):
     '''
