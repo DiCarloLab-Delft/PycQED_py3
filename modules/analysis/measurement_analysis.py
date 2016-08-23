@@ -2305,12 +2305,25 @@ class SSRO_Analysis(MeasurementAnalysis):
         #plotting the histograms
         fig, axes = plt.subplots(figsize=(8, 4))
 
-        n, bins1, patches = pylab.hist(shots_I_1_rot, bins=int(min_len/50),
+        n1, bins1, patches = pylab.hist(shots_I_1_rot, bins=int(min_len/50),
                                       label = '1 I',histtype='step',
                                       color='red',normed=1)
-        n, bins0, patches = pylab.hist(shots_I_0_rot, bins=int(min_len/50),
+        n0, bins0, patches = pylab.hist(shots_I_0_rot, bins=int(min_len/50),
                                       label = '0 I',histtype='step',
                                       color='blue',normed=1)
+        pylab.clf()
+        # n0, bins0 = np.histogram(shots_I_0_rot, bins=int(min_len/50), normed=1)
+        # n1, bins1 = np.histogram(shots_I_1_rot, bins=int(min_len/50), normed=1)
+
+        pylab.plot(bins1[:-1]+0.5*(bins1[1]-bins1[0]),n1,'ro')
+        pylab.plot(bins0[:-1]+0.5*(bins0[1]-bins0[0]),n0,'bo')
+
+        # n, bins1, patches = np.hist(shots_I_1_rot, bins=int(min_len/50),
+        #                               label = '1 I',histtype='step',
+        #                               color='red',normed=1)
+        # n, bins0, patches = pylab.hist(shots_I_0_rot, bins=int(min_len/50),
+        #                               label = '0 I',histtype='step',
+        #                               color='blue',normed=1)
 
         # add lines showing the fitted distribution
         #building up the histogram fits for off measurements
@@ -2324,13 +2337,14 @@ class SSRO_Analysis(MeasurementAnalysis):
         y0_1 = (1-frac1_1)*pylab.normpdf(bins1, mu0_0, sigma0_0)
 
 
-        pylab.plot(bins0, y0, 'b--', linewidth=1.5)
-        pylab.plot(bins0, y1_0, 'b--', linewidth=3.5)
-        pylab.plot(bins0, y0_0, 'b--', linewidth=3.5)
+        pylab.semilogy(bins0, y0, 'b',linewidth=1.5)
+        pylab.semilogy(bins0, y1_0, 'b--', linewidth=3.5)
+        pylab.semilogy(bins0, y0_0, 'b--', linewidth=3.5)
 
-        pylab.plot(bins1, y1, 'r--', linewidth=1.5)
-        pylab.plot(bins1, y0_1, 'r--', linewidth=3.5)
-        pylab.plot(bins1, y1_1, 'r--', linewidth=3.5)
+        pylab.semilogy(bins1, y1, 'r',linewidth=1.5)
+        pylab.semilogy(bins1, y0_1, 'r--', linewidth=3.5)
+        pylab.semilogy(bins1, y1_1, 'r--', linewidth=3.5)
+        (pylab.gca()).set_ylim(3*10e-7,10e-3)
 
         axes.set_title('Histograms of shots on rotaded IQ plane optimized for I, %s shots'%min_len)
         plt.xlabel('DAQ voltage integrated (V)')#, fontsize=14)
