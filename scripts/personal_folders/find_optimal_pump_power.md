@@ -19,8 +19,8 @@ rm = visa.ResourceManager()
 rm.list_resources()
 
 import visa
-inst = rm.open_resource('GPIB0::12::INSTR')
+inst = rm.open_resource('COM6')
 SYSTem:COMMunicate:NETWork:IPADdress:MODE STAT\n
 SYSTem:COMMunicate:NETWork:IPADdress:GATeway '192.168.0.1'\n
 SYSTem:COMMunicate:NETWork:IPADdress:SUBNet:MASK '255.255.255.0'\n
-SYSTem:COMMunicate:NETWork:IPADdress '192.168.0.86'\n
+SYSTem:COMMunicate:NETWork:IPADdress '192.168.0.85'\n
