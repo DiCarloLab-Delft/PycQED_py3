@@ -208,6 +208,7 @@ class CBox_driven_transmon(Transmon):
             logging.warning('exracted frequency outside of range of scan')
         elif update:  # don't update if the value is out of the scan range
             self.f_res.set(f_res)
+        self.f_RO(self.f_res())
         return f_res
 
     def get_resetless_rb_detector(self, nr_cliff, starting_seed=1,
