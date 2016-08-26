@@ -54,9 +54,14 @@ class QuTech_ControlBox(VisaInstrument):
                            vals=vals.Ints(0, 255))
         self.add_parameter('integration_length',
                            label='integration length (# samples)',
+                           units='# samples',
                            get_cmd=self._do_get_integration_length,
                            set_cmd=self._do_set_integration_length,
                            vals=vals.Ints(1, 512))
+        self.add_parameter('srcw1_int',
+                           set_cmd=self._do_set_srcw1_int,
+                           get_cmd=self._do_get_srcw1_int,
+                           vals=vals.Ints(0, 255))
 
         nr_inputs = 2
         for i in range(nr_inputs):
@@ -101,6 +106,7 @@ class QuTech_ControlBox(VisaInstrument):
                            vals=vals.Ints(1, 2**17))
         self._nr_averages = 2
         self._nr_samples = 200
+        self._srcw1_int = 0
         nr_awgs = 3
         for awg_nr in range(nr_awgs):
             self._awg_mode = [0]*nr_awgs
@@ -140,13 +146,19 @@ class QuTech_ControlBox(VisaInstrument):
         # Setting default arguments
         # print('kw.pop(\'measurement_timeout\', 120): ',
               # kw.pop('measurement_timeout', 120))
+        print('Start: nr_samples: ', self._nr_samples)
         self.set('measurement_timeout', kw.pop('measurement_timeout', 120))
         self.set('acquisition_mode', 'idle')
         self.set('run_mode', 0)
+        print('after run mode, nr_samples: ', self._nr_samples)
         self.set('signal_delay', 0)
+        print('after signal_delay, nr_samples: ', self._nr_samples)
         self.set('integration_length', 100)
+        print('after integration_length, nr_samples: ', self._nr_samples)
         self.set('adc_offset', 0)
+        print('after adc_offset, nr_samples: ', self._nr_samples)
         self.set('log_length', 100)
+        print('after log_length, nr_samples: ', self._nr_samples)
         self.set('nr_averages', 512)
         self.set('nr_samples', 100)
         self.set('lin_trans_coeffs', [1, 0, 0, 1])
@@ -178,6 +190,14 @@ class QuTech_ControlBox(VisaInstrument):
                         self[par].get()
         return self.snapshot()
 
+    def upload_standard_weights(self, IF):
+            trace_length = 512
+            tbase = np.arange(0, 5*trace_length, 5)*1e-9
+            cosI = np.floor(127.*np.cos(2*np.pi*IF*tbase))
+            sinI = np.floor(127.*np.sin(2*np.pi*IF*tbase))
+            self.sig0_integration_weights(cosI)
+            self.sig1_integration_weights(sinI)
+
     def _do_set_measurement_timeout(self, val):
         '''
         Sets the measurement timeout in seconds.
@@ -188,6 +208,14 @@ class QuTech_ControlBox(VisaInstrument):
 
     def _do_get_measurement_timeout(self):
         return self._timeout
+
+
+    # TODO: This set does not actually update to the CBox. Requires change.
+    def _do_set_srcw1_int(self, val):
+        self._srcw1_int = val
+
+    def _do_get_srcw1_int(self):
+        return self._srcw1_int
 
     def _do_get_firmware_version(self):
         message = c.create_message(defHeaders.ReadVersion)
@@ -317,8 +345,8 @@ class QuTech_ControlBox(VisaInstrument):
         '''
         nr_samples = self.get('nr_samples')
         # Information on the encoding
-        data_bits_per_byte = 4
-        bytes_per_value = 2
+        data_bits_per_byte = 7#4
+        bytes_per_value = 4#2
         succes = False
         t0 = time.time()
         # While loop is to make sure measurement finished before querying.
@@ -343,7 +371,8 @@ class QuTech_ControlBox(VisaInstrument):
             if time.time()-t0 > self._timeout:
                 raise Exception('Measurement timed out')
         self._i_wait = 0  # leaves the wait char counter in the 0 state
-        return ch0, ch1
+        avg = self.nr_averages()
+        return np.double(ch0)/np.double(avg), np.double(ch1)/np.double(avg)
 
     def get_integrated_avg_results(self):
         '''
@@ -984,7 +1013,7 @@ class QuTech_ControlBox(VisaInstrument):
                                    expected_number_of_bytes=n_bytes)
         # Changed from version 2.15 onwards
         message = c.create_message(cmd, data_bytes)
-        print("set log length command: ",  format(message, 'x').zfill(8))
+        # print("set log length command: ",  format(message, 'x').zfill(8))
         (stat, mesg) = self.serial_write(message)
         if stat:
             self._log_length = length
@@ -1005,9 +1034,14 @@ class QuTech_ControlBox(VisaInstrument):
             4 = integration_averaging
             5 = integration_streaming
             6 = touch 'n go
+
+        srcw1_int denotes the adc input mode. When set at 1, ADC input 1 is used with
+        both weights(0 and 1). Otherwise, weights are applied to each ADC input:
+        ADC 1 is mutiplied by weight0 and ADC 2 is multiplied by weight1.
         @return stat : True if the upload succeeded and False if the upload
                        failed
         '''
+        srcw1_int = self._srcw1_int
         acquisition_mode = str(acquisition_mode)
         mode_int = None
         for i in range(len(defHeaders.acquisition_modes)):
@@ -1022,6 +1056,7 @@ class QuTech_ControlBox(VisaInstrument):
         # Here the actual acquisition_mode is set
         cmd = defHeaders.UpdateModeHeader
         data_bytes = c.encode_byte(mode_int, 7, expected_number_of_bytes=1)
+        data_bytes += c.encode_byte(srcw1_int, 7, expected_number_of_bytes=1)
         message = c.create_message(cmd, data_bytes)
         (stat, mesg) = self.serial_write(message)
         if stat:
