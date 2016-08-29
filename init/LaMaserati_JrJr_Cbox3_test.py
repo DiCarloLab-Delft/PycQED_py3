@@ -19,7 +19,7 @@ import pandas as pd
 import qcodes as qc
 # currently on a Windows machine
 # qc.set_mp_method('spawn')  # force Windows behavior on mac
-qc.show_subprocess_widget()
+# qc.show_subprocess_widget()
 # Globally defined config
 # qc_config = {'datadir': r'D:\\Experimentsp7_Qcodes_5qubit',
 #              'PycQEDdir': 'D:\GitHubRepos\PycQED_py3'}
@@ -74,19 +74,175 @@ from instrument_drivers.physical_instruments import QuTech_Duplexer as qdux
 
 station = qc.Station()
 
+
 from instrument_drivers.physical_instruments import QuTech_ControlBox_v3 as qcb_v3
 
 
-CBox_v3 = qcb_v3.QuTech_ControlBox_v3('CBox_v3', address='Com6', run_tests=False, server_name=None)
-station.add_component(CBox_v3)
+CBox = qcb_v3.QuTech_ControlBox_v3('CBox', address='Com6', run_tests=False, server_name=None)
+station.add_component(CBox)
 
-CBox_v3.set('measurement_timeout', 120)
-CBox_v3.set('acquisition_mode', 'idle')
-CBox_v3.set('run_mode', 0)
-CBox_v3.set('signal_delay', 0)
-CBox_v3.set('integration_length', 100)
-CBox_v3.set('adc_offset', 0)
-CBox_v3.set('log_length', 100)
-CBox_v3.set('nr_samples', 100)
-CBox_v3.set('nr_averages', 512)
-CBox_v3.set('lin_trans_coeffs', [1, 0, 0, 1])
+CBox.set('measurement_timeout', 120)
+CBox.set('acquisition_mode', 'idle')
+CBox.set('run_mode', 0)
+CBox.set('signal_delay', 0)
+CBox.set('integration_length', 100)
+CBox.set('adc_offset', 0)
+CBox.set('log_length', 100)
+CBox.set('nr_averages', 512)
+CBox.set('nr_samples', 100)
+CBox.set('lin_trans_coeffs', [1, 0, 0, 1])
+CBox.trigger_source('external')
+
+
+
+
+
+
+LO = rs.RohdeSchwarz_SGS100A(name='LO', address='TCPIP0::192.168.0.73', server_name=None)  #
+station.add_component(LO)
+RF = rs.RohdeSchwarz_SGS100A(name='RF', address='TCPIP0::192.168.0.74', server_name=None)  #
+station.add_component(RF)
+Spec_source = rs.RohdeSchwarz_SGS100A(name='Spec_source', address='TCPIP0::192.168.0.87', server_name=None)  #
+station.add_component(Spec_source)
+Qubit_LO = rs.RohdeSchwarz_SGS100A(name='Qubit_LO', address='TCPIP0::192.168.0.86', server_name=None)  #
+station.add_component(Qubit_LO)
+TWPA_Pump = rs.RohdeSchwarz_SGS100A(name='TWPA_Pump', address='TCPIP0::192.168.0.90', server_name=None)  #
+station.add_component(TWPA_Pump)
+AWG = tek.Tektronix_AWG5014(name='AWG', setup_folder=None, timeout=2,
+                            address='GPIB0::6::INSTR', server_name=None)
+station.add_component(AWG)
+AWG.timeout(180)
+AWG520 = tk520.Tektronix_AWG520('AWG520', address='GPIB0::17::INSTR',
+                                server_name='')
+station.add_component(AWG520)
+IVVI = iv.IVVI('IVVI', address='COM4', numdacs=16, server_name=None)
+station.add_component(IVVI)
+# Dux = qdux.QuTech_Duplexer('Dux', address='TCPIP0::192.168.0.101',
+#                             server_name=None)
+# SH = sh.SignalHound_USB_SA124B('Signal hound', server_name=None) #commented because of 8s load time
+
+# Meta-instruments
+HS = hd.HeterodyneInstrument('HS', LO=LO, RF=RF, CBox=CBox, AWG=AWG,
+                             server_name=None)
+station.add_component(HS)
+# LutMan = lm.QuTech_ControlBox_LookuptableManager('LutMan', CBox=CBox,
+#                                                  server_name=None)
+                                                 # server_name='metaLM')
+MC = mc.MeasurementControl('MC')
+
+
+
+AncB = qbt.Tektronix_driven_transmon('AncB', LO=LO, cw_source=Spec_source,
+                                              td_source=Qubit_LO,
+                                              IVVI=IVVI, rf_RO_source=RF,
+                                              AWG=AWG,
+                                              CBox=CBox, heterodyne_instr=HS,
+                                              MC=MC,
+                                              server_name=None)
+station.add_component(AncB)
+AncT = qbt.Tektronix_driven_transmon('AncT', LO=LO, cw_source=Spec_source,
+                                              td_source=Qubit_LO,
+                                              IVVI=IVVI, rf_RO_source=RF,
+                                              AWG=AWG,
+                                              CBox=CBox, heterodyne_instr=HS,
+                                              MC=MC,
+                                              server_name=None)
+station.add_component(AncT)
+DataB = qbt.Tektronix_driven_transmon('DataB', LO=LO, cw_source=Spec_source,
+                                              td_source=Qubit_LO,
+                                              IVVI=IVVI, rf_RO_source=RF,
+                                              AWG=AWG,
+                                              CBox=CBox, heterodyne_instr=HS,
+                                              MC=MC,
+                                              server_name=None)
+station.add_component(DataB)
+DataM = qbt.Tektronix_driven_transmon('DataM', LO=LO, cw_source=Spec_source,
+                                              td_source=Qubit_LO,
+                                              IVVI=IVVI, rf_RO_source=RF,
+                                              AWG=AWG,
+                                              CBox=CBox, heterodyne_instr=HS,
+                                              MC=MC,
+                                              server_name=None)
+station.add_component(DataM)
+DataT = qbt.Tektronix_driven_transmon('DataT', LO=LO, cw_source=Spec_source,
+                                              td_source=Qubit_LO,
+                                              IVVI=IVVI, rf_RO_source=RF,
+                                              AWG=AWG,
+                                              CBox=CBox, heterodyne_instr=HS,
+                                              MC=MC,
+                                              server_name=None)
+station.add_component(DataT)
+
+MC.station = station
+station.MC = MC
+nested_MC = mc.MeasurementControl('nested_MC')
+nested_MC.station = station
+
+# The AWG sequencer
+station.pulsar = ps.Pulsar()
+station.pulsar.AWG = station.components['AWG']
+for i in range(4):
+    # Note that these are default parameters and should be kept so.
+    # the channel offset is set in the AWG itself. For now the amplitude is
+    # hardcoded. You can set it by hand but this will make the value in the
+    # sequencer different.
+    station.pulsar.define_channel(id='ch{}'.format(i+1),
+                                  name='ch{}'.format(i+1), type='analog',
+                                  # max safe IQ voltage
+                                  high=.7, low=-.7,
+                                  offset=0.0, delay=0, active=True)
+    station.pulsar.define_channel(id='ch{}_marker1'.format(i+1),
+                                  name='ch{}_marker1'.format(i+1),
+                                  type='marker',
+                                  high=2.0, low=0, offset=0.,
+                                  delay=0, active=True)
+    station.pulsar.define_channel(id='ch{}_marker2'.format(i+1),
+                                  name='ch{}_marker2'.format(i+1),
+                                  type='marker',
+                                  high=2.0, low=0, offset=0.,
+                                  delay=0, active=True)
+# to make the pulsar available to the standard awg seqs
+st_seqs.station = station
+sq.station = station
+cal_elts.station = station
+
+t1 = time.time()
+
+
+
+print('Ran initialization in %.2fs' % (t1-t0))
+
+gen.load_settings_onto_instrument(AncB)
+gen.load_settings_onto_instrument(AncT)
+gen.load_settings_onto_instrument(DataB)
+gen.load_settings_onto_instrument(DataM)
+gen.load_settings_onto_instrument(DataT)
+gen.load_settings_onto_instrument(HS)
+
+def all_sources_off():
+    LO.off()
+    RF.off()
+    Spec_source.off()
+    Qubit_LO.off()
+    TWPA_Pump.off()
+
+
+def print_instr_params(instr):
+    snapshot = instr.snapshot()
+    for par in snapshot['parameters']:
+        print('{}: {} {}'.format(snapshot['parameters'][par]['name'],
+                                 snapshot['parameters'][par]['value'],
+                                 snapshot['parameters'][par]['units']))
+
+def set_integration_weights():
+    trace_length = 512
+    tbase = np.arange(0, 5*trace_length, 5)*1e-9
+    cosI = np.floor(127.*np.cos(2*np.pi*AncB.get('f_RO_mod')*tbase))
+    sinI = np.floor(127.*np.sin(2*np.pi*AncB.get('f_RO_mod')*tbase))
+    CBox.sig0_integration_weights(cosI)
+    CBox.sig1_integration_weights(sinI)
+from scripts.Experiments.FiveQubits import common_functions as cfct
+cfct.set_AWG_limits(station,1.7)
+
+
+
