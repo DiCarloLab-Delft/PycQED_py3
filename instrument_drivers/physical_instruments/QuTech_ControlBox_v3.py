@@ -248,7 +248,7 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
                                                  tmp_acquisition_mode,
                                                  tmp_trigger_source,
                                                  demodulation_mode)
-                                                 
+
     def _do_get_core_state(self):
         return self._core_state
 
@@ -270,10 +270,10 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
             "This is CBox_v3 driver." +
             "Touch 'n Go is only valid for ControlBox version 2.")
 
-    def set_master_controller_working_state(self, 
-                                            core_state='idle', 
+    def set_master_controller_working_state(self,
+                                            core_state='idle',
                                             acquisition_mode='idle',
-                                            trigger_source='internal', 
+                                            trigger_source='internal',
                                             demodulation_mode=
                                             'double side band demodulation'):
         '''
@@ -350,7 +350,7 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
         data_bytes += c.encode_byte(core_state_int, 7,
                                    expected_number_of_bytes=1)
         message = c.create_message(cmd, data_bytes)
-        print("set master controller command: ",  message)
+        # print("set master controller command: ",  message)
 
         (stat, mesg) = self.serial_write(message)
         if stat:

@@ -58,9 +58,9 @@ class QuTech_ControlBox(VisaInstrument):
                            get_cmd=self._do_get_integration_length,
                            set_cmd=self._do_set_integration_length,
                            vals=vals.Ints(1, 512))
-        self.add_parameter('srcw1_int',
-                           set_cmd=self._do_set_srcw1_int,
-                           get_cmd=self._do_get_srcw1_int,
+        self.add_parameter('demodulation_mode',
+                           set_cmd=self._do_set_demodulation_mode,
+                           get_cmd=self._do_get_demodulation_mode,
                            vals=vals.Ints(0, 255))
 
         nr_inputs = 2
@@ -104,9 +104,9 @@ class QuTech_ControlBox(VisaInstrument):
                            get_cmd=self._do_get_nr_averages,
                            set_cmd=self._do_set_nr_averages,
                            vals=vals.Ints(1, 2**17))
-        self._nr_averages = 2
         self._nr_samples = 200
-        self._srcw1_int = 0
+        self._nr_averages = 2
+        self._demodulation_mode = 0
         nr_awgs = 3
         for awg_nr in range(nr_awgs):
             self._awg_mode = [0]*nr_awgs
@@ -145,22 +145,16 @@ class QuTech_ControlBox(VisaInstrument):
 
         # Setting default arguments
         # print('kw.pop(\'measurement_timeout\', 120): ',
-              # kw.pop('measurement_timeout', 120))
-        print('Start: nr_samples: ', self._nr_samples)
+        #        kw.pop('measurement_timeout', 120))
         self.set('measurement_timeout', kw.pop('measurement_timeout', 120))
         self.set('acquisition_mode', 'idle')
         self.set('run_mode', 0)
-        print('after run mode, nr_samples: ', self._nr_samples)
         self.set('signal_delay', 0)
-        print('after signal_delay, nr_samples: ', self._nr_samples)
         self.set('integration_length', 100)
-        print('after integration_length, nr_samples: ', self._nr_samples)
         self.set('adc_offset', 0)
-        print('after adc_offset, nr_samples: ', self._nr_samples)
         self.set('log_length', 100)
-        print('after log_length, nr_samples: ', self._nr_samples)
-        self.set('nr_averages', 512)
         self.set('nr_samples', 100)
+        self.set('nr_averages', 512)
         self.set('lin_trans_coeffs', [1, 0, 0, 1])
 
         self._i_wait = 0  # used in _print_waiting_char()
@@ -211,11 +205,11 @@ class QuTech_ControlBox(VisaInstrument):
 
 
     # TODO: This set does not actually update to the CBox. Requires change.
-    def _do_set_srcw1_int(self, val):
-        self._srcw1_int = val
+    def _do_set_demodulation_mode(self, val):
+        self._demodulation_mode = val
 
-    def _do_get_srcw1_int(self):
-        return self._srcw1_int
+    def _do_get_demodulation_mode(self):
+        return self._demodulation_mode
 
     def _do_get_firmware_version(self):
         message = c.create_message(defHeaders.ReadVersion)
@@ -1041,7 +1035,7 @@ class QuTech_ControlBox(VisaInstrument):
         @return stat : True if the upload succeeded and False if the upload
                        failed
         '''
-        srcw1_int = self._srcw1_int
+        srcw1_int = self._demodulation_mode
         acquisition_mode = str(acquisition_mode)
         mode_int = None
         for i in range(len(defHeaders.acquisition_modes)):
