@@ -426,7 +426,7 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
             SWF.prepare()
             self.CBox.acquisition_mode(0)
             self.AWG.start()
-            self.CBox.acquisition_mode(3)
+            self.CBox.acquisition_mode('input averaging')
             inp_avg_res = self.CBox.get_input_avg_results()
 
             transient0_I = inp_avg_res[0]
@@ -439,17 +439,30 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
                                 nr_samples=nr_samples)
             SWF.prepare()
             self.CBox.acquisition_mode(0)
-            self.CBox.acquisition_mode(3)
+            self.CBox.acquisition_mode('input averaging')
             self.AWG.start()
             inp_avg_res = self.CBox.get_input_avg_results()
             self.CBox.acquisition_mode(0)
             transient1_I = inp_avg_res[0]
             transient1_Q = inp_avg_res[1]
 
+            # # need to decide about the code below
+            # optimized_weights_I = self.multiplier*(transient1_I-transient0_I)
+            # optimized_weights_I = optimized_weights_I+np.mean(optimized_weights_I)
+            # optimized_weights_Q = self.multiplier*(transient1_Q-transient0_Q)
+            # optimized_weights_Q = optimized_weights_Q+np.mean(optimized_weights_Q)
+
             optimized_weights_I = self.multiplier*(transient1_I-transient0_I)
-            optimized_weights_I = optimized_weights_I+np.mean(optimized_weights_I)
+            optimized_weights_I = optimized_weights_I-np.mean(optimized_weights_I)
+            weight_scale_factor = 128./np.max(np.abs(optimized_weights_I))
+            optimized_weights_I = np.floor(weight_scale_factor*optimized_weights_I).astype(int)
+
             optimized_weights_Q = self.multiplier*(transient1_Q-transient0_Q)
-            optimized_weights_Q = optimized_weights_Q+np.mean(optimized_weights_Q)
+            optimized_weights_Q = optimized_weights_Q-np.mean(optimized_weights_Q)
+            weight_scale_factor = 128./np.max(np.abs(optimized_weights_Q))
+            optimized_weights_Q = np.floor(weight_scale_factor*optimized_weights_Q).astype(int)
+
+
             self.CBox.sig0_integration_weights.set(optimized_weights_I)
             self.CBox.sig1_integration_weights.set(
                 np.multiply(optimized_weights_Q, self.use_Q))  # disabling the Q quadrature

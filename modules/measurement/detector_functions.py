@@ -449,13 +449,13 @@ class CBox_integrated_average_detector(Hard_Detector):
             except Exception as e:
                 logging.warning('Exception caught retrying')
                 logging.warning(e)
-                self.CBox.set('acquisition_mode', 0)
+                self.CBox.set('acquisition_mode', 'idle')
                 self.AWG.stop()
                 self.CBox.restart_awg_tape(0)
                 self.CBox.restart_awg_tape(1)
                 self.CBox.restart_awg_tape(2)
 
-                self.CBox.set('acquisition_mode', 4)
+                self.CBox.set('acquisition_mode', 'integration averaging')
                 self.AWG.start()  # Is needed here to ensure data aligns with seq elt
             i += 1
             if i > 20:
@@ -466,12 +466,12 @@ class CBox_integrated_average_detector(Hard_Detector):
     def prepare(self, sweep_points):
         self.CBox.set('nr_samples', self.seg_per_point*len(sweep_points))
         self.AWG.stop()  # needed to align the samples
-        self.CBox.set('acquisition_mode', 0)
-        self.CBox.set('acquisition_mode', 4)
+        self.CBox.set('acquisition_mode', 'idle')
+        self.CBox.set('acquisition_mode', 'integration averaging')
         self.AWG.start()  # Is needed here to ensure data aligns with seq elt
 
     def finish(self):
-        self.CBox.set('acquisition_mode', 0)
+        self.CBox.set('acquisition_mode', 'idle')
 
 
 class CBox_v3_integrated_average_detector(Hard_Detector):
