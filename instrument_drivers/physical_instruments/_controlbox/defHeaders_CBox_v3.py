@@ -27,6 +27,3 @@ acquisition_modes = ['0: idle',
 trigger_sources = ['0: internal MC trigger',
                    '1: external MC trigger',
                    '2: mixed MC trigger']
-
-demodulation_modes = ['0: double side band demodulation',
-					  '1: single side band demodulation']
