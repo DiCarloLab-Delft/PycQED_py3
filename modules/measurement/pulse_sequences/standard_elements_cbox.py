@@ -9,8 +9,6 @@ reload(pulse)
 '''
 WARNING!! Module deprecated don't use for new things !!!!
 '''
-
-
 def single_marker_elt(i, station):
     '''
     Puts a single marker of 15ns on each channel
@@ -30,7 +28,6 @@ def single_marker_elt(i, station):
                                      length=15e-9, amplitude=1),
                    start=5e-9, refpulse=ref_elt)
     return el
-
 
 def single_pulse_elt(i, station, IF, RO_pulse_delay=0, RO_trigger_delay=0,
                      RO_pulse_length=1e-6, tau=0):

@@ -2,15 +2,17 @@ import numpy as np
 # import qt
 from matplotlib import pyplot as plt
 from modules.measurement import hdf5_data
-# CBox = qt.instruments['CBox']
 import time
 import h5py
-# AWG = qt.instruments['AWG']
+
 
 ###################
 # Pulse envelopes #
 ###################
 
+#This is a general container of pulse functions that will be used for
+#qubit pulses and RO pulses that are generated from all look-up-table based AWG's (so not
+#tektronix  5014 and 520). This module replaces the CBox pulse generator.
 
 def gauss_pulse(amp, sigma_length, axis='x', nr_sigma=4, sampling_rate=0.2,
                 motzoi=0, delay=0):
