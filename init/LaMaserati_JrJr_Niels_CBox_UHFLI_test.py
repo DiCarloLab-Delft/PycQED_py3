@@ -73,35 +73,35 @@ from instrument_drivers.physical_instruments import QuTech_Duplexer as qdux
 
 
 station = qc.Station()
-LO = rs.RohdeSchwarz_SGS100A(name='LO', address='TCPIP0::192.168.0.73', server_name=None)  #
-station.add_component(LO)
-RF = rs.RohdeSchwarz_SGS100A(name='RF', address='TCPIP0::192.168.0.74', server_name=None)  #
-station.add_component(RF)
-Spec_source = rs.RohdeSchwarz_SGS100A(name='Spec_source', address='TCPIP0::192.168.0.87', server_name=None)  #
-station.add_component(Spec_source)
-Qubit_LO = rs.RohdeSchwarz_SGS100A(name='Qubit_LO', address='TCPIP0::192.168.0.86', server_name=None)  #
-station.add_component(Qubit_LO)
-TWPA_Pump = rs.RohdeSchwarz_SGS100A(name='TWPA_Pump', address='TCPIP0::192.168.0.90', server_name=None)  #
-station.add_component(TWPA_Pump)
+#LO = rs.RohdeSchwarz_SGS100A(name='LO', address='TCPIP0::192.168.0.73', server_name=None)  #
+#station.add_component(LO)
+#RF = rs.RohdeSchwarz_SGS100A(name='RF', address='TCPIP0::192.168.0.74', server_name=None)  #
+#station.add_component(RF)
+#Spec_source = rs.RohdeSchwarz_SGS100A(name='Spec_source', address='TCPIP0::192.168.0.87', server_name=None)  #
+#station.add_component(Spec_source)
+#Qubit_LO = rs.RohdeSchwarz_SGS100A(name='Qubit_LO', address='TCPIP0::192.168.0.86', server_name=None)  #
+#station.add_component(Qubit_LO)
+#TWPA_Pump = rs.RohdeSchwarz_SGS100A(name='TWPA_Pump', address='TCPIP0::192.168.0.90', server_name=None)  #
+#station.add_component(TWPA_Pump)
 CBox = qcb.QuTech_ControlBox('CBox', address='Com5', run_tests=False, server_name=None)
 station.add_component(CBox)
 AWG = tek.Tektronix_AWG5014(name='AWG', setup_folder=None, timeout=2,
                             address='GPIB0::6::INSTR', server_name=None)
 station.add_component(AWG)
 AWG.timeout(180)
-AWG520 = tk520.Tektronix_AWG520('AWG520', address='GPIB0::17::INSTR',
-                                server_name='')
-station.add_component(AWG520)
-IVVI = iv.IVVI('IVVI', address='COM4', numdacs=16, server_name=None)
-station.add_component(IVVI)
+#AWG520 = tk520.Tektronix_AWG520('AWG520', address='GPIB0::17::INSTR',
+#                                server_name='')
+#station.add_component(AWG520)
+#IVVI = iv.IVVI('IVVI', address='COM4', numdacs=16, server_name=None)
+#station.add_component(IVVI)
 # Dux = qdux.QuTech_Duplexer('Dux', address='TCPIP0::192.168.0.101',
 #                             server_name=None)
 # SH = sh.SignalHound_USB_SA124B('Signal hound', server_name=None) #commented because of 8s load time
 
 # Meta-instruments
-HS = hd.HeterodyneInstrument('HS', LO=LO, RF=RF, CBox=CBox, AWG=AWG,
-                             server_name=None)
-station.add_component(HS)
+#HS = hd.HeterodyneInstrument('HS', LO=LO, RF=RF, CBox=CBox, AWG=AWG,
+#                             server_name=None)
+#station.add_component(HS)
 # LutMan = lm.QuTech_ControlBox_LookuptableManager('LutMan', CBox=CBox,
 #                                                  server_name=None)
                                                  # server_name='metaLM')
@@ -109,46 +109,46 @@ MC = mc.MeasurementControl('MC')
 
 
 
-AncB = qbt.Tektronix_driven_transmon('AncB', LO=LO, cw_source=Spec_source,
-                                              td_source=Qubit_LO,
-                                              IVVI=IVVI, rf_RO_source=RF,
-                                              AWG=AWG,
-                                              CBox=CBox, heterodyne_instr=HS,
-                                              MC=MC,
-                                              server_name=None)
-station.add_component(AncB)
-AncT = qbt.Tektronix_driven_transmon('AncT', LO=LO, cw_source=Spec_source,
-                                              td_source=Qubit_LO,
-                                              IVVI=IVVI, rf_RO_source=RF,
-                                              AWG=AWG,
-                                              CBox=CBox, heterodyne_instr=HS,
-                                              MC=MC,
-                                              server_name=None)
-station.add_component(AncT)
-DataB = qbt.Tektronix_driven_transmon('DataB', LO=LO, cw_source=Spec_source,
-                                              td_source=Qubit_LO,
-                                              IVVI=IVVI, rf_RO_source=RF,
-                                              AWG=AWG,
-                                              CBox=CBox, heterodyne_instr=HS,
-                                              MC=MC,
-                                              server_name=None)
-station.add_component(DataB)
-DataM = qbt.Tektronix_driven_transmon('DataM', LO=LO, cw_source=Spec_source,
-                                              td_source=Qubit_LO,
-                                              IVVI=IVVI, rf_RO_source=RF,
-                                              AWG=AWG,
-                                              CBox=CBox, heterodyne_instr=HS,
-                                              MC=MC,
-                                              server_name=None)
-station.add_component(DataM)
-DataT = qbt.Tektronix_driven_transmon('DataT', LO=LO, cw_source=Spec_source,
-                                              td_source=Qubit_LO,
-                                              IVVI=IVVI, rf_RO_source=RF,
-                                              AWG=AWG,
-                                              CBox=CBox, heterodyne_instr=HS,
-                                              MC=MC,
-                                              server_name=None)
-station.add_component(DataT)
+# AncB = qbt.Tektronix_driven_transmon('AncB', LO=LO, cw_source=Spec_source,
+#                                               td_source=Qubit_LO,
+#                                               IVVI=IVVI, rf_RO_source=RF,
+#                                               AWG=AWG,
+#                                               CBox=CBox, heterodyne_instr=HS,
+#                                               MC=MC,
+#                                               server_name=None)
+# station.add_component(AncB)
+# AncT = qbt.Tektronix_driven_transmon('AncT', LO=LO, cw_source=Spec_source,
+#                                               td_source=Qubit_LO,
+#                                               IVVI=IVVI, rf_RO_source=RF,
+#                                               AWG=AWG,
+#                                               CBox=CBox, heterodyne_instr=HS,
+#                                               MC=MC,
+#                                               server_name=None)
+# station.add_component(AncT)
+# DataB = qbt.Tektronix_driven_transmon('DataB', LO=LO, cw_source=Spec_source,
+#                                               td_source=Qubit_LO,
+#                                               IVVI=IVVI, rf_RO_source=RF,
+#                                               AWG=AWG,
+#                                               CBox=CBox, heterodyne_instr=HS,
+#                                               MC=MC,
+#                                               server_name=None)
+# station.add_component(DataB)
+# DataM = qbt.Tektronix_driven_transmon('DataM', LO=LO, cw_source=Spec_source,
+#                                               td_source=Qubit_LO,
+#                                               IVVI=IVVI, rf_RO_source=RF,
+#                                               AWG=AWG,
+#                                               CBox=CBox, heterodyne_instr=HS,
+#                                               MC=MC,
+#                                               server_name=None)
+# station.add_component(DataM)
+# DataT = qbt.Tektronix_driven_transmon('DataT', LO=LO, cw_source=Spec_source,
+#                                               td_source=Qubit_LO,
+#                                               IVVI=IVVI, rf_RO_source=RF,
+#                                               AWG=AWG,
+#                                               CBox=CBox, heterodyne_instr=HS,
+#                                               MC=MC,
+#                                               server_name=None)
+# station.add_component(DataT)
 
 MC.station = station
 station.MC = MC
@@ -189,12 +189,12 @@ t1 = time.time()
 
 print('Ran initialization in %.2fs' % (t1-t0))
 
-def all_sources_off():
-    LO.off()
-    RF.off()
-    Spec_source.off()
-    Qubit_LO.off()
-    TWPA_Pump.off()
+# def all_sources_off():
+#     LO.off()
+#     RF.off()
+#     Spec_source.off()
+#     Qubit_LO.off()
+#     TWPA_Pump.off()
 
 
 def print_instr_params(instr):

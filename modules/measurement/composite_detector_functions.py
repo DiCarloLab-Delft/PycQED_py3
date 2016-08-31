@@ -348,7 +348,8 @@ class SSRO_Fidelity_Detector_CBox(det.Soft_Detector):
             RO_pulse_delay=self.RO_pulse_delay,
             RO_trigger_delay=self.RO_trigger_delay,
             RO_pulse_length=self.RO_pulse_length,
-            AWG=self.AWG, CBox=self.CBox))
+            AWG=self.AWG, CBox=self.CBox,
+            upload=self.upload))
 
         self.MC.set_detector_function(
             det.CBox_alternating_shots_det(self.CBox, self.AWG))
@@ -372,8 +373,8 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
     '''
     def __init__(self, measurement_name,  MC, AWG, CBox, pulse_pars, RO_pars,
                  raw=True, analyze=True, upload=True,
-                 set_integration_weights=False, wait=0.0, close_fig=True,
-                 **kw):
+                 set_integration_weights=False, wait=0.0, close_fig=True, use_Q=0,
+                 multiplier=1, soft_rotate=True, **kw):
         self.detector_control = 'soft'
         self.name = 'SSRO_Fidelity'
         # For an explanation of the difference between the different
@@ -399,15 +400,109 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
         self.upload = upload
         self.wait = wait
         self.close_fig = close_fig
+        self.use_Q = use_Q
+        self.multiplier = multiplier
+        self.soft_rotate = soft_rotate
 
     def prepare(self, **kw):
         if not self.set_integration_weights:
             self.MC.set_sweep_function(awg_swf.OffOn(
                                        pulse_pars=self.pulse_pars,
-                                       RO_pars=self.RO_pars))
+                                       RO_pars=self.RO_pars,
+                                       upload=self.upload))
             self.MC.set_detector_function(
                 det.CBox_integration_logging_det(self.CBox, self.AWG))
 
+    def acquire_data_point(self, *args, **kw):
+        self.time_start = time.time()
+        if self.set_integration_weights:
+            nr_samples = 512
+            self.CBox.nr_samples.set(nr_samples)
+            SWF = awg_swf.OffOn(
+                                pulse_pars=self.pulse_pars,
+                                RO_pars=self.RO_pars,
+                                pulse_comb='OffOff',
+                                nr_samples=nr_samples)
+            SWF.prepare()
+            self.CBox.acquisition_mode(0)
+            self.AWG.start()
+            self.CBox.acquisition_mode('input averaging')
+            inp_avg_res = self.CBox.get_input_avg_results()
+
+            transient0_I = inp_avg_res[0]
+            transient0_Q = inp_avg_res[1]
+
+            SWF = awg_swf.OffOn(
+                                pulse_pars=self.pulse_pars,
+                                RO_pars=self.RO_pars,
+                                pulse_comb='OnOn',
+                                nr_samples=nr_samples)
+            SWF.prepare()
+            self.CBox.acquisition_mode(0)
+            self.CBox.acquisition_mode('input averaging')
+            self.AWG.start()
+            inp_avg_res = self.CBox.get_input_avg_results()
+            self.CBox.acquisition_mode(0)
+            transient1_I = inp_avg_res[0]
+            transient1_Q = inp_avg_res[1]
+
+            # # need to decide about the code below
+            # optimized_weights_I = self.multiplier*(transient1_I-transient0_I)
+            # optimized_weights_I = optimized_weights_I+np.mean(optimized_weights_I)
+            # optimized_weights_Q = self.multiplier*(transient1_Q-transient0_Q)
+            # optimized_weights_Q = optimized_weights_Q+np.mean(optimized_weights_Q)
+
+            optimized_weights_I = self.multiplier*(transient1_I-transient0_I)
+            optimized_weights_I = optimized_weights_I-np.mean(optimized_weights_I)
+            weight_scale_factor = 128./np.max(np.abs(optimized_weights_I))
+            optimized_weights_I = np.floor(weight_scale_factor*optimized_weights_I).astype(int)
+
+            optimized_weights_Q = self.multiplier*(transient1_Q-transient0_Q)
+            optimized_weights_Q = optimized_weights_Q-np.mean(optimized_weights_Q)
+            weight_scale_factor = 128./np.max(np.abs(optimized_weights_Q))
+            optimized_weights_Q = np.floor(weight_scale_factor*optimized_weights_Q).astype(int)
+
+
+            self.CBox.sig0_integration_weights.set(optimized_weights_I)
+            self.CBox.sig1_integration_weights.set(
+                np.multiply(optimized_weights_Q, self.use_Q))  # disabling the Q quadrature
+
+            self.MC.set_sweep_function(awg_swf.OffOn(
+                                       pulse_pars=self.pulse_pars,
+                                       RO_pars=self.RO_pars))
+
+            self.MC.set_detector_function(
+                det.CBox_integration_logging_det(self.CBox, self.AWG))
+        self.i += 1
+        self.MC.run(name=self.measurement_name+'_'+str(self.i))
+
+        if self.analyze:
+            ana = ma.SSRO_Analysis(rotate=self.soft_rotate,
+                                   label=self.measurement_name,
+                                   no_fits=self.raw, close_file=False,
+                                   close_fig=True, auto=True)
+            if self.set_integration_weights:
+                # data_group = self.MC.data_object.create_group('Transients Data')
+                dset = ana.g.create_dataset('Transients', (4, 512),
+                                            maxshape=(4, 512))
+                dset[0, :] = transient0_I
+                dset[1, :] = transient0_Q
+                dset[2, :] = transient1_I
+                dset[3, :] = transient1_Q
+                # print('Done!')
+            ana.data_file.close()
+
+            # Arbitrary choice, does not think about the deffinition
+            time_end=time.time()
+            nett_wait = self.wait-time_end+self.time_start
+            print(self.time_start)
+            if nett_wait>0:
+                time.sleep(nett_wait)
+            if self.raw:
+                return ana.F_raw, ana.theta
+            else:
+                return ana.F, ana.F_corrected
+'''
     def acquire_data_point(self, *args, **kw):
         self.time_start = time.time()
         if self.set_integration_weights:
@@ -437,7 +532,7 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
             optimized_weights = optimized_weights+np.mean(optimized_weights)
             self.CBox.sig0_integration_weights.set(optimized_weights)
             self.CBox.sig1_integration_weights.set(
-                np.multiply(optimized_weights, 0))  # disabling the Q quadrature
+                np.multiply(optimized_weights, self.use_Q))  # disabling the Q quadrature
 
             self.MC.set_sweep_function(awg_swf.OffOn(
                                        pulse_pars=self.pulse_pars,
@@ -461,7 +556,7 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
                 return ana.F_raw, ana.theta
             else:
                 return ana.F, ana.F_corrected
-
+'''
 
 class CBox_trace_error_fraction_detector(det.Soft_Detector):
     def __init__(self, measurement_name, MC, AWG, CBox,

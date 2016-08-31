@@ -51,6 +51,12 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
                                get_cmd=self._do_get_trigger_source,
                                vals=vals.Anything())
 
+        if not('demodulation_mode' in self.parameters):
+            self.add_parameter('demodulation_mode',
+                   set_cmd=self._do_set_demodulation_mode,
+                   get_cmd=self._do_get_demodulation_mode,
+                   vals=vals.Anything())
+
     def run_test_suite(self):
             from importlib import reload  # Useful for testing
             from ._controlbox import test_suite_v3 as test_suite
@@ -147,9 +153,14 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
         else:
             tmp_trigger_source = 0      # internal trigger
 
+        if self.get('demodulation_mode') is not None:
+            tmp_demodulation_mode = self.get('demodulation_mode')
+        else:
+            tmp_demodulation_mode = 0   # double side band demodulation
         self.set_master_controller_working_state(core_state,
                                                  tmp_acquisition_mode,
-                                                 tmp_trigger_source)
+                                                 tmp_trigger_source,
+                                                 tmp_demodulation_mode)
 
     def _do_set_acquisition_mode(self, acquisition_mode):
         # this function can be invoked by CBox_v2 driver, so the parameter
@@ -178,9 +189,21 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
         else:
             tmp_trigger_source = 0      # internal trigger
 
+        if not('demodulation_mode' in self.parameters):
+            self.add_parameter('demodulation_mode',
+                               set_cmd=self._do_set_demodulation_mode,
+                               get_cmd=self._do_get_demodulation_mode,
+                               vals=vals.Anything())
+            tmp_demodulation_mode = 0
+        elif self.get('demodulation_mode') is not None:
+            tmp_demodulation_mode = self.get('demodulation_mode')
+        else:
+            tmp_demodulation_mode = 0      # internal trigger
+
         self.set_master_controller_working_state(tmp_core_state,
                                                  acquisition_mode,
-                                                 tmp_trigger_source)
+                                                 tmp_trigger_source,
+                                                 tmp_demodulation_mode)
 
     def _do_set_trigger_source(self, trigger_source):
         if self.get('core_state') is not None:
@@ -194,9 +217,37 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
         else:
             tmp_acquisition_mode = 0   # idle state
 
+        if self.get('demodulation_mode') is not None:
+            tmp_demodulation_mode = self.get('demodulation_mode')
+        else:
+            tmp_demodulation_mode = 0   # double side band demodulation
+
         self.set_master_controller_working_state(tmp_core_state,
                                                  tmp_acquisition_mode,
-                                                 trigger_source)
+                                                 trigger_source,
+                                                 tmp_demodulation_mode)
+
+    def _do_set_demodulation_mode(self, demodulation_mode):
+        if self.get('core_state') is not None:
+            tmp_core_state = self.get('core_state')
+            # print('_do_set_trigger_source\got_core_state: ', tmp_core_state)
+        else:
+            tmp_core_state = 0   # idle state
+
+        if self.get('acquisition_mode') is not None:
+            tmp_acquisition_mode = self.get('acquisition_mode')
+        else:
+            tmp_acquisition_mode = 0   # idle state
+
+        if self.get('trigger_source') is not None:
+            tmp_trigger_source = self.get('trigger_source')
+        else:
+            tmp_trigger_source = 0      # internal trigger
+
+        self.set_master_controller_working_state(tmp_core_state,
+                                                 tmp_acquisition_mode,
+                                                 tmp_trigger_source,
+                                                 demodulation_mode)
 
     def _do_get_core_state(self):
         return self._core_state
@@ -207,37 +258,49 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
     def _do_get_acquisition_mode(self):
         return self._acquisition_mode
 
+    def _do_get_demodulation_mode(self):
+        return self._demodulation_mode
     def _set_touch_n_go_parameters(self):
 
         '''
         Touch 'n Go is only valid for ControlBox version 2, so this function is
         obselete.
         '''
-        print("Warning: Touch 'n Go is only valid for ControlBox version 2. \
-              omit")
+        raise NotImplementedError(
+            "This is CBox_v3 driver." +
+            "Touch 'n Go is only valid for ControlBox version 2.")
 
-    def set_master_controller_working_state(self, core_state, acquisition_mode,
-                                            trigger_source):
+    def set_master_controller_working_state(self,
+                                            core_state='idle',
+                                            acquisition_mode='idle',
+                                            trigger_source='internal',
+                                            demodulation_mode=
+                                            'double side band demodulation'):
         '''
         @param core_states: activate the core or disable it,
                         0 = idle,
-                        1 = active
+                        1 = active.
         @param acquisition_modes: the data collection mode in MasterController,
-                         0 = idle (default),
-                         1 = integration logging mode,
-                         2 = integration averaging mode,
-                         3 = input averaging mode,
-                         4 = integration streaming mode
+                        0 = idle (default),
+                        1 = integration logging mode,
+                        2 = integration averaging mode,
+                        3 = input averaging mode,
+                        4 = integration streaming mode.
         @param trigger_sources: trigger source of the MasterController,
                         0 = internal trigger (default),
                         1 = external trigger,
-                        2 = mixed trigger
+                        2 = mixed trigger.
+        @param demodulation_mode: the method to demodulate the signal,
+                        0 = double side band demodulation,
+                        1 = single side band demodulation.
+
         @return stat : True if the upload succeeded and False if the upload
                        failed
         '''
         core_state = str(core_state)
         acquisition_mode = str(acquisition_mode)
         trigger_source = str(trigger_source)
+        demodulation_mode = str(demodulation_mode)
 
         acquisition_mode_int = None
         for i in range(len(defHeaders.acquisition_modes)):
@@ -266,30 +329,40 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
         if trigger_source_int is None:
             raise KeyError('trigger_state %s not recognized')
 
+        demodulation_mode_int = None
+        for i in range(len(defHeaders.demodulation_modes)):
+            if demodulation_mode.upper() in defHeaders.demodulation_modes[i].upper():
+                demodulation_mode_int = i
+                break
+        if demodulation_mode_int is None:
+            raise KeyError('demodulation_mode %s not recognized')
+
         # Here the actual acquisition_mode is set
         cmd = defHeaders.UpdateMCWorkingState
-        data_bytes = c.encode_byte(core_state_int, 7,
-                                   expected_number_of_bytes=1)
+        data_bytes = bytes()
         data_bytes += c.encode_byte(acquisition_mode_int, 7,
+                                    expected_number_of_bytes=1)
+        data_bytes += c.encode_byte(demodulation_mode_int, 7,
+
                                     expected_number_of_bytes=1)
         data_bytes += c.encode_byte(trigger_source_int, 7,
                                     expected_number_of_bytes=1)
+        data_bytes += c.encode_byte(core_state_int, 7,
+                                   expected_number_of_bytes=1)
         message = c.create_message(cmd, data_bytes)
+        # print("set master controller command: ",  message)
 
         (stat, mesg) = self.serial_write(message)
         if stat:
             self._acquisition_mode = defHeaders.acquisition_modes[
-                                     acquisition_mode_int]
+                                    acquisition_mode_int]
             self._core_state = defHeaders.core_states[core_state_int]
             self._trigger_source = defHeaders.trigger_sources[
-                                   trigger_source_int]
+                                    trigger_source_int]
+            self._demodulation_mode = defHeaders.demodulation_modes[
+                                    demodulation_mode_int]
         else:
             raise Exception('Failed to set acquisition_mode')
-
-        # ensure updating of the value
-        # print('acquisition_mode:', self.get('acquisition_mode'))
-        # print('core_state:', self.get('core_state'))
-        # print('trigger_source:', self.get('trigger_source'))
 
         return (stat, message)
 

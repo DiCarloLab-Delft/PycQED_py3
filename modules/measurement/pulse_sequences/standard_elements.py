@@ -24,6 +24,7 @@ reload(element)
 def multi_pulse_elt(i, station, pulse_list):
         '''
         Input args
+            i:          index of the element, ensures unique element name
             station:    qcodes station object, contains AWG etc
             pulse_list: list of pulse_dicts containing pulse parameters
         Returns:
@@ -123,13 +124,6 @@ def multi_pulse_elt(i, station, pulse_list):
                         channel=pulse_pars['acq_marker_channel'])
                     el.add(
                         Acq_marker, start=pulse_pars['acq_marker_delay'],
-                        refpulse=last_pulse, refpoint='start')
-                    #hacking in a second marker
-                    Acq_marker2 = pulse.SquarePulse(
-                        name='Acq-trigger', amplitude=1, length=20e-9,
-                        channel='ch4_marker2')
-                    el.add(
-                        Acq_marker2, start=pulse_pars['acq_marker_delay'],
                         refpulse=last_pulse, refpoint='start')
                 else:
                     # TODO: remove hacked in second marker and support list

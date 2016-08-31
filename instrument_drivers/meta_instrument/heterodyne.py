@@ -102,14 +102,6 @@ class HeterodyneInstrument(Instrument):
     def do_get_LO_source(self):
         return self.LO
 
-    # def do_set_LO_power(self, val):
-    #     self.LO.set_power(val)
-    #     self.LO_power = val
-    #     # internally stored to allow setting RF from stored setting
-
-    # def do_get_LO_power(self):
-    #     return self.LO_power
-
     def do_set_RF_source(self, val):
         self.RF = val
 
@@ -151,48 +143,57 @@ class HeterodyneInstrument(Instrument):
         self.set('status', 'Off')
         return
 
-    def prepare(self, get_t_base=True):
+    def prepare(self, get_t_base=True, RO_length=500e-9, trigger_separation=20e-6):
         '''
         This function needs to be overwritten for the ATS based version of this
         driver
         '''
-        # self.RF.set_power(self.do_get_RF_power())
-        # self.LO.set_power(self.do_get_LO_power())
-        # if get_t_base is True:
-        #     trace_length = self.CBox.get('nr_samples')
-        #     tbase = np.arange(0, 5*trace_length, 5)*1e-9
-        #     self.cosI = np.cos(2*np.pi*self.get('IF')*tbase)
-        #     self.sinI = np.sin(2*np.pi*self.get('IF')*tbase)
-        # self.RF.on()
-        # self.LO.on()
+
         if ((self._awg_seq_filename not in self.AWG.get('setup_filename')) and
                 not self._disable_auto_seq_loading):
             self.seq_name = st_seqs.generate_and_upload_marker_sequence(
-                500e-9, 20e-6, RF_mod=True,
+                RO_length, trigger_separation, RF_mod=True,
                 IF=self.get('IF'), mod_amp=0.5)
 
         self.AWG.run()
         if get_t_base is True:
-            trace_length = self.CBox.get('nr_samples')
+            trace_length = 512
             tbase = np.arange(0, 5*trace_length, 5)*1e-9
-            self.cosI = np.cos(2*np.pi*self.get('IF')*tbase)
-            self.sinI = np.sin(2*np.pi*self.get('IF')*tbase)
+            self.cosI = np.floor(127.*np.cos(2*np.pi*self.get('IF')*tbase))
+            self.sinI = np.floor(127.*np.sin(2*np.pi*self.get('IF')*tbase))
+            self.CBox.sig0_integration_weights(self.cosI)
+            self.CBox.sig1_integration_weights(self.sinI)
+
         self.LO.on()
         # Changes are now incorporated in the awg seq
         self._awg_seq_parameters_changed = False
 
         self.CBox.set('nr_samples', 1)  # because using integrated avg
 
-    def probe(self, **kw):
+        # self.CBox.set('acquisition_mode', 'idle') # aded with xiang
+
+    def probe(self, demodulation_mode=0, **kw):
         '''
         Starts acquisition and returns the data
             'COMP' : returns data as a complex point in the I-Q plane in Volts
         '''
-        self.CBox.set('acquisition_mode', 0)
-        self.CBox.set('acquisition_mode', 4)
-        d = self.CBox.get_integrated_avg_results()
+        self.CBox.set('acquisition_mode', 'idle')
+        self.CBox.set('acquisition_mode', 'integration averaging')
+        self.CBox.demodulation_mode(demodulation_mode)
+        # d = self.CBox.get_integrated_avg_results()
+        # quick fix for spec units. Need to properrly implement it later
+        # after this, output is in mV
+        scale_factor_dacmV = 1000.*0.75/128.
+        # scale_factor_integration = 1./float(self.IF()*self.CBox.nr_samples()*5e-9)
+        scale_factor_integration = 1./(64.*self.CBox.integration_length())
+        factor = scale_factor_dacmV*scale_factor_integration
+        d = np.double(self.CBox.get_integrated_avg_results())*np.double(factor)
+        # print(d)
         dat = d[0][0]+1j*d[1][0]
+
+        # self.CBox.set('acquisition_mode', 'idle') # aded with xiang
         return dat
+
 
         # return s21
 

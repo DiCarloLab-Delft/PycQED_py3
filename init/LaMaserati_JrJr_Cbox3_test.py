@@ -73,6 +73,31 @@ from instrument_drivers.physical_instruments import QuTech_Duplexer as qdux
 
 
 station = qc.Station()
+
+
+from instrument_drivers.physical_instruments import QuTech_ControlBox_v3 as qcb_v3
+
+
+CBox = qcb_v3.QuTech_ControlBox_v3('CBox', address='Com6', run_tests=False, server_name=None)
+station.add_component(CBox)
+
+CBox.set('measurement_timeout', 120)
+CBox.set('acquisition_mode', 'idle')
+CBox.set('run_mode', 0)
+CBox.set('signal_delay', 0)
+CBox.set('integration_length', 100)
+CBox.set('adc_offset', 0)
+CBox.set('log_length', 100)
+CBox.set('nr_averages', 512)
+CBox.set('nr_samples', 100)
+CBox.set('lin_trans_coeffs', [1, 0, 0, 1])
+CBox.trigger_source('external')
+
+
+
+
+
+
 LO = rs.RohdeSchwarz_SGS100A(name='LO', address='TCPIP0::192.168.0.73', server_name=None)  #
 station.add_component(LO)
 RF = rs.RohdeSchwarz_SGS100A(name='RF', address='TCPIP0::192.168.0.74', server_name=None)  #
@@ -83,8 +108,6 @@ Qubit_LO = rs.RohdeSchwarz_SGS100A(name='Qubit_LO', address='TCPIP0::192.168.0.8
 station.add_component(Qubit_LO)
 TWPA_Pump = rs.RohdeSchwarz_SGS100A(name='TWPA_Pump', address='TCPIP0::192.168.0.90', server_name=None)  #
 station.add_component(TWPA_Pump)
-CBox = qcb.QuTech_ControlBox('CBox', address='Com5', run_tests=False, server_name=None)
-station.add_component(CBox)
 AWG = tek.Tektronix_AWG5014(name='AWG', setup_folder=None, timeout=2,
                             address='GPIB0::6::INSTR', server_name=None)
 station.add_component(AWG)
@@ -189,6 +212,13 @@ t1 = time.time()
 
 print('Ran initialization in %.2fs' % (t1-t0))
 
+gen.load_settings_onto_instrument(AncB)
+gen.load_settings_onto_instrument(AncT)
+gen.load_settings_onto_instrument(DataB)
+gen.load_settings_onto_instrument(DataM)
+gen.load_settings_onto_instrument(DataT)
+gen.load_settings_onto_instrument(HS)
+
 def all_sources_off():
     LO.off()
     RF.off()
@@ -213,3 +243,6 @@ def set_integration_weights():
     CBox.sig1_integration_weights(sinI)
 from scripts.Experiments.FiveQubits import common_functions as cfct
 cfct.set_AWG_limits(station,1.7)
+
+
+

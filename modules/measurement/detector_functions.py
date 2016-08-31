@@ -396,13 +396,16 @@ class CBox_input_average_detector(Hard_Detector):
         self.CBox = CBox
         self.name = 'CBox_Streaming_data'
         self.value_names = ['Ch0', 'Ch1']
-        self.value_units = ['a.u.', 'a.u.']
+        self.value_units = ['mV', 'mV']
         self.AWG = AWG
+        scale_factor_dacmV = 1000.*0.75/128.
+        scale_factor_integration = 1./(64.*self.CBox.integration_length())
+        self.factor = scale_factor_dacmV*scale_factor_integration
 
     def get_values(self):
         if self.AWG is not None:
             self.AWG.start()
-        data = self.CBox.get_input_avg_results()
+        data = np.double(self.CBox.get_integrated_avg_results())*np.double(self.factor)
         return data
 
     def prepare(self, sweep_points):
@@ -446,13 +449,13 @@ class CBox_integrated_average_detector(Hard_Detector):
             except Exception as e:
                 logging.warning('Exception caught retrying')
                 logging.warning(e)
-                self.CBox.set('acquisition_mode', 0)
+                self.CBox.set('acquisition_mode', 'idle')
                 self.AWG.stop()
                 self.CBox.restart_awg_tape(0)
                 self.CBox.restart_awg_tape(1)
                 self.CBox.restart_awg_tape(2)
 
-                self.CBox.set('acquisition_mode', 4)
+                self.CBox.set('acquisition_mode', 'integration averaging')
                 self.AWG.start()  # Is needed here to ensure data aligns with seq elt
             i += 1
             if i > 20:
@@ -463,12 +466,12 @@ class CBox_integrated_average_detector(Hard_Detector):
     def prepare(self, sweep_points):
         self.CBox.set('nr_samples', self.seg_per_point*len(sweep_points))
         self.AWG.stop()  # needed to align the samples
-        self.CBox.set('acquisition_mode', 0)
-        self.CBox.set('acquisition_mode', 4)
+        self.CBox.set('acquisition_mode', 'idle')
+        self.CBox.set('acquisition_mode', 'integration averaging')
         self.AWG.start()  # Is needed here to ensure data aligns with seq elt
 
     def finish(self):
-        self.CBox.set('acquisition_mode', 0)
+        self.CBox.set('acquisition_mode', 'idle')
 
 
 class CBox_v3_integrated_average_detector(Hard_Detector):
@@ -715,6 +718,70 @@ class CBox_integration_logging_det(Hard_Detector):
         else:
             d = self._get_values()
         return d
+
+    def _get_values(self):
+        self.AWG.stop()
+        self.CBox.set('acquisition_mode', 0)
+        if self.awg_nrs is not None:
+            for awg_nr in self.awg_nrs:
+                self.CBox.restart_awg_tape(awg_nr)
+                if self.reload_pulses:
+                    self.LutMan.load_pulses_onto_AWG_lookuptable(awg_nr)
+        self.CBox.set('acquisition_mode', 'integration logging')
+        self.AWG.start()
+
+        data = self.CBox.get_integration_log_results()
+
+        self.CBox.set('acquisition_mode', 0)
+        return data
+
+    def finish(self):
+        self.CBox.set('acquisition_mode', 0)
+        self.AWG.stop()
+
+
+class CBox_integration_logging_det_shots(Hard_Detector):
+    def __init__(self, CBox, AWG, LutMan=None, reload_pulses=False,
+                 awg_nrs=None, shots=8000, **kw):
+        '''
+        If you want AWG reloading you should give a LutMan and specify
+        on what AWG nr to reload default is no reloading of pulses.
+        '''
+        super().__init__()
+        self.CBox = CBox
+        self.name = 'CBox_integration_logging_detector'
+        self.value_names = ['I', 'Q']
+        self.value_units = ['a.u.', 'a.u.']
+        self.AWG = AWG
+
+        self.LutMan = LutMan
+        self.reload_pulses = reload_pulses
+        self.awg_nrs = awg_nrs
+        self.repetitions = int(np.ceil(shots/8000))
+
+    def get_values(self):
+        d_0 = []
+        d_1 = []
+        for i in range(self.repetitions):
+            exception_mode = True
+            if exception_mode:
+                success = False
+                i = 0
+                while not success and i < 10:
+                    try:
+                        d = self._get_values()
+                        success = True
+                    except Exception as e:
+                        logging.warning('Exception {} caught, retaking data'.format(e))
+                        i += 1
+            else:
+                d = self._get_values()
+            h_point = len(d)/2
+            d_0.append(d[:h_point])
+            d_1.append(d[h_point:])
+        d_all = np.concatenate((np.array(d_0).flatten(),np.array(d_1).flatten()))
+
+        return d_all
 
     def _get_values(self):
         self.AWG.stop()
@@ -1049,21 +1116,92 @@ class Detect_simulated_hanger_Soft(Soft_Detector):
         IQ = fn.disp_hanger_S21_complex(*(f, f0, Q, Qe, A, theta))
         return IQ.real+Inoise, IQ.imag+Qnoise
 
-
 class Heterodyne_probe(Soft_Detector):
-    def __init__(self, HS, **kw):
+    def __init__(self, HS, threshold=1.75, trigger_separation=20e-6, demod_int=0, **kw):
         super().__init__(**kw)
         self.HS = HS
         self.name = 'Heterodyne probe'
         self.value_names = ['|S21|', 'S21 angle']  # , 'Re{S21}', 'Im{S21}']
-        self.value_units = ['a.u.', 'deg']  # , 'a.u.', 'a.u.']
+        self.value_units = ['mV', 'deg']  # , 'a.u.', 'a.u.']
+        self.first = True
+        self.last_frequency = 0.
+        self.threshold = threshold
+        self.last = 1.
+        self.trigger_separation = trigger_separation
+        self.demod_int = demod_int
+
+    def prepare(self):
+        self.HS.prepare(trigger_separation=self.trigger_separation)
+
+    def acquire_data_point(self, **kw):
+        passed = False
+        c = 0
+        while(not passed):
+            S21 = self.HS.probe(demod_int = self.demod_int)
+            cond_a = ((abs(S21)/self.last) > self.threshold) or ((self.last/abs(S21)) > self.threshold)
+            cond_b = self.HS.frequency() >= self.last_frequency
+            if cond_a and cond_b:
+                passed = False
+            else:
+                passed = True
+            if self.first or c>3:
+                passed = True
+            if not passed:
+                print('retrying HS probe')
+            c += 1
+        self.last_frequency = self.HS.frequency()
+        self.first = False
+        self.last = abs(S21)
+        return abs(S21), np.angle(S21)/(2*np.pi)*360,# S21.real, S21.imag
+
+
+
+class Heterodyne_probe_soft_avg(Soft_Detector):
+    def __init__(self, HS, threshold=1.75, Navg=10, **kw):
+        super().__init__(**kw)
+        self.HS = HS
+        self.name = 'Heterodyne probe'
+        self.value_names = ['|S21|', 'S21 angle']  # , 'Re{S21}', 'Im{S21}']
+        self.value_units = ['mV', 'deg']  # , 'a.u.', 'a.u.']
+        self.first = True
+        self.last_frequency = 0.
+        self.threshold = threshold
+        self.last = 1.
+        self.Navg = Navg
 
     def prepare(self):
         self.HS.prepare()
-
     def acquire_data_point(self, **kw):
-        S21 = self.HS.probe()
-        return abs(S21), np.angle(S21)/(2*np.pi)*360,# S21.real, S21.imag
+        accum_real = 0.
+        accum_imag = 0.
+        for i in range(self.Navg):
+            measure = self.acquire_single_data_point(**kw)
+            accum_real += measure[0]
+            accum_imag += measure[1]
+        S21 = (accum_real+1j*accum_imag)/float(self.Navg)
+
+        return abs(S21), np.angle(S21)/(2*np.pi)*360
+
+    def acquire_single_data_point(self, **kw):
+        passed = False
+        c = 0
+        while(not passed):
+            S21 = self.HS.probe()
+            cond_a = (abs(S21)/self.last > self.threshold) or (self.last/abs(S21) > self.threshold)
+            cond_b = self.HS.frequency() > self.last_frequency
+            if cond_a and cond_b:
+                passed = False
+            else:
+                passed = True
+            if self.first or c>3:
+                passed = True
+            if not passed:
+                print('retrying HS probe')
+            c += 1
+        self.last_frequency = self.HS.frequency()
+        self.first = False
+        self.last = abs(S21)
+        return S21.real, S21.imag
 
 
 
