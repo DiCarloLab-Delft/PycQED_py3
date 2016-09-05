@@ -54,20 +54,20 @@ class QuTech_ControlBox_LookuptableManager(Instrument):
                            initial_value=500e-9)
         self.add_parameter('Q_motzoi_parameter', vals=vals.Numbers(-2, 2),
                            parameter_class=ManualParameter,
-                           initial_value=0)
+                           initial_value=0.0)
         self.add_parameter('Q_gauss_width', vals=vals.Numbers(), units='s',
                            parameter_class=ManualParameter,
                            initial_value=10e-9)
         self.add_parameter('mixer_QI_amp_ratio', vals=vals.Numbers(),
                            parameter_class=ManualParameter,
-                           initial_value=1)
+                           initial_value=1.0)
         self.add_parameter('mixer_IQ_phase_skewness', vals=vals.Numbers(),
                            units='deg',
                            parameter_class=ManualParameter,
                            initial_value=0.0)
         self.add_parameter('Q_modulation', vals=vals.Numbers(), units='Hz',
                            parameter_class=ManualParameter,
-                           initial_value=20e6)
+                           initial_value=20.0e6)
         self.add_parameter('sampling_rate', vals=vals.Numbers(), units='Hz',
                            parameter_class=ManualParameter,
                            initial_value=0.2e9)
@@ -90,33 +90,33 @@ class QuTech_ControlBox_LookuptableManager(Instrument):
                            initial_value=False)
         self.add_parameter('M_modulation', vals=vals.Numbers(), units='Hz',
                            parameter_class=ManualParameter,
-                           initial_value=20e6)
+                           initial_value=20.0e6)
         self.add_parameter('M_length', units='s',
                            vals=vals.Numbers(1e-9, 640e-9),
                            parameter_class=ManualParameter,
-                           initial_value=500e-9)
+                           initial_value=300e-9)
         self.add_parameter('M_amp', units='V',
                            vals=vals.Numbers(0, 1),
                            parameter_class=ManualParameter,
                            initial_value=0.1)
         self.add_parameter('M_phi', units='deg',
                            parameter_class=ManualParameter,
-                           initial_value=0)
+                           initial_value=0.0)
         self.add_parameter('M_up_length', units='s',
                    vals=vals.Numbers(1e-9, 640e-9),
                    parameter_class=ManualParameter,
-                   initial_value=500e-9)
+                   initial_value=100.0e-9)
         self.add_parameter('M_up_amp', units='V',
                            vals=vals.Numbers(0, 1),
                            parameter_class=ManualParameter,
                            initial_value=0.1)
         self.add_parameter('M_up_phi', units='deg',
                            parameter_class=ManualParameter,
-                           initial_value=0)
+                           initial_value=0.0)
         self.add_parameter('M_down_length', units='s',
                            vals=vals.Numbers(1e-9, 640e-9),
                            parameter_class=ManualParameter,
-                           initial_value=300e-9)
+                           initial_value=200.0e-9)
         self.add_parameter('M_down_amp0', units='V',
                            vals=vals.Numbers(0, 1),
                            parameter_class=ManualParameter,
@@ -127,11 +127,16 @@ class QuTech_ControlBox_LookuptableManager(Instrument):
                            initial_value=0.1)
         self.add_parameter('M_down_phi0', units='deg',
                            parameter_class=ManualParameter,
-                           initial_value=180)
+                           initial_value=180.0)
         self.add_parameter('M_down_phi1', units='deg',
                            parameter_class=ManualParameter,
-                           initial_value=180)
-
+                           initial_value=180.0)
+        self.add_parameter('M0_modulation', vals=vals.Numbers(), units='Hz',
+                           parameter_class=ManualParameter,
+                           initial_value=20.0e6)
+        self.add_parameter('M1_modulation', vals=vals.Numbers(), units='Hz',
+                           parameter_class=ManualParameter,
+                           initial_value=20.0e6)
 
         # Set to a default because box is not expected to change
         self._voltage_min = -1.0
@@ -205,7 +210,7 @@ class QuTech_ControlBox_LookuptableManager(Instrument):
         M = PG.block_pulse(self.get('M_amp'), self.M_length.get(),  #ns
                                sampling_rate=self.get('sampling_rate'),
                                delay=0,
-                               phase=self.M_phi)
+                               phase=self.get('M_phi'))
         Mod_M = PG.mod_pulse(M[0], M[1],
                                 f_modulation=self.M_modulation.get(),
                                 sampling_rate=self.sampling_rate.get(),
@@ -215,35 +220,36 @@ class QuTech_ControlBox_LookuptableManager(Instrument):
         M_up = PG.block_pulse(self.get('M_up_amp'), self.M_up_length.get(),  #ns
                                sampling_rate=self.get('sampling_rate'),
                                delay=0,
-                               phase=self.M_up_phi)
-        M_up_mid = (np.concatenate((self.M_up_mid[0], M[0])),
-                    np.concatenate((self.M_up_mid[1], M[1])))
+                               phase=self.get('M_up_phi'))
+
+        M_up_mid = (np.concatenate((M_up[0], M[0])),
+                    np.concatenate((M_up[1], M[1])))
 
         Mod_M_up_mid = PG.mod_pulse(M_up_mid[0],M_up_mid[1],
-                                f_modulation=self.M_modulation.get(),
-                                sampling_rate=self.sampling_rate.get(),
-                                Q_phase_delay=self.mixer_IQ_phase_skewness.get())
+                                f_modulation=self.get('M_modulation'),
+                                sampling_rate=self.get('sampling_rate'),
+                                Q_phase_delay=self.get('mixer_IQ_phase_skewness'))
 
         # with ramp-up and double frequency depletion
-        M_down0 = PG.block_pulse(self.get('M_down_amp0'), self.M_down_length.get(),  #ns
+        M_down0 = PG.block_pulse(self.get('M_down_amp0'), self.get('M_down_length'),  #ns
                        sampling_rate=self.get('sampling_rate'),
                        delay=0,
-                       phase=self.M_down_phi0)
+                       phase=self.get('M_down_phi0'))
 
-        M_down1 = PG.block_pulse(self.get('M_down_amp1'), self.M_down_length.get(),  #ns
+        M_down1 = PG.block_pulse(self.get('M_down_amp1'), self.get('M_down_length'),  #ns
                        sampling_rate=self.get('sampling_rate'),
                        delay=0,
-                       phase=self.M_down_phi1)
+                       phase=self.get('M_down_phi1'))
         Mod_M_down0 = PG.mod_pulse(M_down0[0],
                          M_down1[1],
-                         f_modulation=self.M0_modulation,
-                         sampling_rate=self.sampling_rate,
-                         Q_phase_delay=self.mixer_IQ_phase_skewness)
+                         f_modulation=self.get('M0_modulation'),
+                         sampling_rate=self.get('sampling_rate'),
+                         Q_phase_delay=self.get('mixer_IQ_phase_skewness'))
         Mod_M_down1 = PG.mod_pulse(M_down1[0],
                      M_down1[1],
-                     f_modulation=self.M1_modulation,
-                     sampling_rate=self.sampling_rate,
-                     Q_phase_delay=self.mixer_IQ_phase_skewness)
+                     f_modulation=self.get('M1_modulation'),
+                     sampling_rate=self.get('sampling_rate'),
+                     Q_phase_delay=self.get('mixer_IQ_phase_skewness'))
 
         # summing the depletion components
         Mod_M_down = (np.add(Mod_M_down0[0],
@@ -349,7 +355,7 @@ class QuTech_ControlBox_LookuptableManager(Instrument):
         Q_ch = 0
         I_wave = np.clip(wave_dict[pulse_name][0],
                          self._voltage_min, self._voltage_max)
-        Q_wave = np.clip(np.multiply(self._mixer_QI_amp_ratio,
+        Q_wave = np.clip(np.multiply(self.get('mixer_QI_amp_ratio'),
                          wave_dict[pulse_name][1]), self._voltage_min,
                          self._voltage_max)
         # To account for multiple occurences in lut mapping
