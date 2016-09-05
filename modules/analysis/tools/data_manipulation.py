@@ -155,6 +155,11 @@ def binary_derivative_2D(data_array, axis=0):
 
 
 def butterfly_data_binning(Z, initial_state=0):
+    """
+    notation of coefficients
+    Pjk_i = P(1st msmt outcome, 2nd msmt outcome, _ input state)
+    epsj_i = eps(1st post msmst state, _input state)
+    """
     if initial_state == 0:  # measurement induced excitation
         eps0_0 = np.mean([1 if s == 1 else 0 for s in Z[:, 0]])
         # first is declared second is input state
@@ -187,6 +192,7 @@ def butterfly_data_binning(Z, initial_state=0):
 
 def butterfly_matrix_inversion(exc_coeffs, rel_coeffs):
 
+    # combines all coeffs in a single dictionary
     rel_coeffs.update(exc_coeffs)
     coeffs = rel_coeffs
     matr = [[coeffs['eps0_0'], coeffs['eps0_1']],

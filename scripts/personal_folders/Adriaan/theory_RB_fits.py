@@ -6,24 +6,56 @@ import numpy as np
 # pg: error rate per gate (20ns)
 # pr: error rate per rest step (4250ns)
 # sg: standard deviation in pg
-# sr: standard deviation in pr
+# sr: standard deviation in pra
+
+
+# Function that I'm fitting to
+def pfunc(n_vec, pg, pr):
+
+    # Boundary conditions in case you want to fit this via scipy.
+    if pg < 0:
+        pg == 0
+    if pg > 1:
+        pg == 1
+
+    # P=0.5-(1-2pg)^n(0.5-pr)
+    return [100*(0.5-(1-2*pg)**n*(0.5-pr)) for n in n_vec]
+
+
+# Function that I'm fitting to
+def sfunc(n_vec, pg, pr, sg, sr):
+
+    # Get variances
+    sr2 = sr**2
+    sg2 = sg**2
+
+    # init return data list
+    sm_vec = []
+    for n in n_vec:
+
+        # Calculate error probability
+        # P=0.5-(1-2pg)^n(0.5-pr)
+        P = (0.5-(1-2*pg)**n*(0.5-pr))
+
+        # Calculate standard deviation of probability of error in
+        # one round of error correction.
+        # Calculated assuming independent errors via:
+        # s_{P}^2=(dP/dpg)^2s_{pg}^2+(dP/dpr)^2s_{pr}^2
+        sp2 = (2*n*(1-2*pg)**(n-1)*(0.5-pr))**2*sg2 + (1-2*pg)**(2*n)*sr2
+
+        # Combine variance from distribution of P and variance
+        # from the binomial distribution that we take in a fairly
+        # crude manner.
+        N = 8000  # number of shots that go into each error fraction
+        sm_vec.append(np.sqrt(P*(1-P)/N + sp2)*100)
+
+    # Return to user
+    return sm_vec
 
 
 def make_difference_plot(x_vec, j1, j2):
 
     # Generates the difference plot
-
-    # Function that I'm fitting to
-    def pfunc(n_vec, pg, pr):
-
-        # Boundary conditions in case you want to fit this via scipy.
-        if pg < 0:
-            pg == 0
-        if pg > 1:
-            pg == 1
-
-        # P=0.5-(1-2pg)^n(0.5-pr)
-        return [100*(0.5-(1-2*pg)**n*(0.5-pr)) for n in n_vec]
 
     # Generate individual curves using preset data defined below
     y_vec1 = pfunc(x_vec, pg_vec[j1], pr_fixed)
@@ -37,34 +69,7 @@ def make_std_plot(x_vec, j1, j2):
 
     # Generates the std plot
 
-    # Function that I'm fitting to
-    def sfunc(n_vec, pg, pr, sg, sr):
 
-        # Get variances
-        sr2 = sr**2
-        sg2 = sg**2
-
-        # init return data list
-        sm_vec = []
-        for n in n_vec:
-
-            # Calculate error probability
-            # P=0.5-(1-2pg)^n(0.5-pr)
-            P = (0.5-(1-2*pg)**n*(0.5-pr))
-
-            # Calculate standard deviation of probability of error in
-            # one round of error correction.
-            # Calculated assuming independent errors via:
-            # s_{P}^2=(dP/dpg)^2s_{pg}^2+(dP/dpr)^2s_{pr}^2
-            sp2 = (2*n*(1-2*pg)**(n-1)*(0.5-pr))**2*sg2 + (1-2*pg)**(2*n)*sr2
-
-            # Combine variance from distribution of P and variance
-            # from the binomial distribution that we take in a fairly
-            # crude manner.
-            sm_vec.append(np.sqrt(P*(1-P)/N + sp2)*100)
-
-        # Return to user
-        return sm_vec
 
     # Generate individual curves using preset data defined below
     y_vec1 = sfunc(x_vec, pg_vec[j1], pr_fixed, sg_fixed, sr_fixed)

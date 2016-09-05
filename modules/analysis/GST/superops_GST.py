@@ -1,6 +1,7 @@
 import numpy as np
 from copy import deepcopy
 import unittest
+import scipy
 
 # For keeping self contained only
 import sys
@@ -94,13 +95,14 @@ def generate_clifford_operators(gateset,
     return clifford_operators
 
 
-def calc_p_depolarizing(gate, target_gate, input_states=polar_states):55
+def calc_p_depolarizing(gate, target_gate, input_states=polar_states):
     p = []
     for i, state in enumerate(input_states):
         target_state = target_gate*state
 
         p.append(target_state.T*gate*state)
-    return np.mean(p)
+    # geometric mean
+    return np.prod(np.array(p))**(1/len(p))
 
 
 def calculate_RB_fid(gateset, target_gateset,
@@ -113,7 +115,8 @@ def calculate_RB_fid(gateset, target_gateset,
     for i in range(len(clifford_ops)):
         probs.append(calc_p_depolarizing(gate=clifford_ops[i],
                                          target_gate=target_cl_ops[i]))
-    return np.mean(probs)
+    # geometric mean
+    return np.prod(np.array(probs))**(1/len(probs))
 
 
 class Test_density_vecs(unittest.TestCase):
