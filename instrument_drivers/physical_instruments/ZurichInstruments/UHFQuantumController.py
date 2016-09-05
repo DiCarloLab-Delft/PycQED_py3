@@ -42,8 +42,8 @@ class UHFQC(Instrument):
                     ['quex/deskew/0/col/1','d',-1,1],
                     ['quex/deskew/1/col/0','d',-1,1],
                     ['quex/deskew/1/col/1','d',-1,1],
-                    ['quex/wint/length','i',0,1]
-                    ['quex/wint/delay','i',0,1]
+                    ['quex/wint/length','i',0,3567587328]
+                    ['quex/wint/delay','i',0,1020]
                     ['quex/wint/weights/0/real','v']
                     ['quex/wint/weights/0/imag','v']
                     ['quex/wint/weights/1/real','v']
@@ -52,8 +52,8 @@ class UHFQC(Instrument):
                     ['quex/wint/weights/2/imag','v']
                     ['quex/wint/weights/3/real','v']
                     ['quex/wint/weights/3/imag','v']
-                    ['quex/iavg/length','i',-1,1]
-                    ['quex/iavg/delay','i',-1,1]
+                    ['quex/iavg/length','i',0,4096]
+                    ['quex/iavg/delay','i',0,1]
                     ['quex/iavg/avgcnt','i',-1,1]
                     ['quex/iavg/acqcnt','d',-1,1]
                     ['quex/iavg/readout','d',-1,1]
