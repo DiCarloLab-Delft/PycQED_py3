@@ -1,30 +1,14 @@
-"""
-This scripts initializes the instruments and imports the modules
-"""
-
-
-# General imports
-
-import time
-import logging
-t0 = time.time()  # to print how long init takes
-from instrument_drivers.meta_instrument.qubit_objects import duplexer_tek_transmon as dt
-
-from importlib import reload  # Useful for reloading while testing
 import numpy as np
+import time
 import matplotlib.pyplot as plt
-import pandas as pd
-
-# Qcodes
+from importlib import reload # Useful for reloading during testin
+# load the qcodes path, until we have this installed as a package
+import logging
 import qcodes as qc
-# currently on a Windows machine
-# qc.set_mp_method('spawn')  # force Windows behavior on mac
-# qc.show_subprocess_widget()
+
 # Globally defined config
-# qc_config = {'datadir': r'D:\\Experimentsp7_Qcodes_5qubit',
-#              'PycQEDdir': 'D:\GitHubRepos\PycQED_py3'}
-qc_config = {'datadir': r'D:\Experiments\\1607_Qcodes_5qubit\data',
-             'PycQEDdir': 'D:\GitHubRepos\PycQED_py3'}
+qc_config = {'datadir':'D:\data',
+             'PycQEDdir': 'D:\GitHub\PycQED_py3'}
 
 # makes sure logging messages show up in the notebook
 root = logging.getLogger()
@@ -85,7 +69,7 @@ station = qc.Station()
 #station.add_component(TWPA_Pump)
 # CBox = qcb.QuTech_ControlBox('CBox', address='Com5', run_tests=False, server_name=None)
 # station.add_component(CBox)
-UHFQC_1 = ZI_UHFQC.UHFQC('UHFQC_1', device='dev2178', server_name=8004)
+UHFQC_1 = ZI_UHFQC.UHFQC('UHFQC_1', device='dev2178',  server_name=8004)
 station.add_component(UHFQC_1)
 # AWG = tek.Tektronix_AWG5014(name='AWG', setup_folder=None, timeout=2,
 #                             address='GPIB0::6::INSTR', server_name=None)
