@@ -1,4 +1,4 @@
-﻿import string
+import string
 from sys import exit
 
 
@@ -314,9 +314,11 @@ class Assembler():
     def NopFormat(self):
         return "00000000000000000000000000000000"
 
-    def ParseLabel(self):
+    def convert_to_instructions(self):
+        print("The old version assembler.")
         try:
             Asm_File = open(self.asmfilename, 'r', encoding="utf-8")
+            print("open file", self.asmfilename, "successfully.")
         except:
             print('\tError: Fail to open file ' + self.asmfilename + ".")
             exit(0)
@@ -335,60 +337,10 @@ class Assembler():
             cur_addr = len(instructions) + 1
 
             head, sep, tail = line.partition(':')
-            print("head, sep, tail: ", head, sep, tail)
             if (sep == ":"):
+                # print("***************** head: ", head)
                 tag_addr_dict[head.strip().lower()] = cur_addr
                 instr = tail
-                if (len(tail) == 0):
-                    continue
-            else:
-                instr = head
-
-            # the following translate function should be tested.
-            elements = [rawEle.strip(string.punctuation.translate(
-                        {ord('-'): None})) for rawEle in instr.split()]
-
-            if (elements[0].lower() == 'mov'):
-                ni = 4
-            else:
-                ni = 1
-            for i in range(ni):
-                instructions.append(len(instructions))
-
-        Asm_File.close()
-
-        return tag_addr_dict
-
-    def convert_to_instructions(self):
-        print("new version assembler.")
-        tag_addr_dict = self.ParseLabel()
-        print("ParseLabel executed successfully.")
-        print("tag_addr_dict: ", tag_addr_dict)
-
-        try:
-            Asm_File = open(self.asmfilename, 'r', encoding="utf-8")
-            print("open file", self.asmfilename, "successfully.")
-        except:
-            print('\tError: Fail to open file ' + self.asmfilename + ".")
-            exit(0)
-
-        cur_addr = 0
-        instructions = []
-
-        for line in Asm_File:
-            line = line.split('#', 1)[0]  # remove anything after '#' symbole
-            line = line.strip(' \t\n\r')  # remove whitespace
-
-            if (len(line) == 0):  # skip empty line and comment
-                continue
-
-            cur_addr = len(instructions) + 1
-
-            head, sep, tail = line.partition(':')
-            if (sep == ":"):
-                instr = tail
-                if (len(tail) == 0):
-                    continue
             else:
                 instr = head
 
@@ -542,6 +494,7 @@ class Assembler():
                 Asm_File.close()
                 return False
 
+        print("tag_addr_dict: ", tag_addr_dict)
         Asm_File.close()
 
         return instructions

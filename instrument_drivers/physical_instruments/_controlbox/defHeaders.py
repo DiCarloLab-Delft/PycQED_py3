@@ -134,3 +134,6 @@ awg_modes = ['0: Codeword-trigger mode',
              '1: No-codeword mode',
              '2: Tape mode',
              '3: Segmented tape mode']
+
+demodulation_modes = ['0: double side band demodulation',
+                      '1: single side band demodulation']

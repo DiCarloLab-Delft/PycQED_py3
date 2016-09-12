@@ -35,27 +35,32 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
     def __init__(self, *args, **kwargs):
         super(QuTech_ControlBox_v3, self).__init__(*args, **kwargs)
 
-        # self.add_parameter('acquisition_mode',
-        #                    set_cmd=self._do_set_acquisition_mode,
-        #                    get_cmd=self._do_get_acquisition_mode,
-        #                    vals=vals.Anything())
-        if not('core_state' in self.parameters):
-            self.add_parameter('core_state',
-                               set_cmd=self._do_set_core_state,
-                               get_cmd=self._do_get_core_state,
-                               vals=vals.Anything())
+    def add_params(self):
+        super(QuTech_ControlBox_v3, self).add_params()
+        self.add_parameter('core_state',
+                           set_cmd=self._do_set_core_state,
+                           get_cmd=self._do_get_core_state,
+                           vals=vals.Anything())
+        self.add_parameter('trigger_source',
+                           set_cmd=self._do_set_trigger_source,
+                           get_cmd=self._do_get_trigger_source,
+                           vals=vals.Anything())
 
-        if not('trigger_source' in self.parameters):
-            self.add_parameter('trigger_source',
-                               set_cmd=self._do_set_trigger_source,
-                               get_cmd=self._do_get_trigger_source,
-                               vals=vals.Anything())
-
-        if not('demodulation_mode' in self.parameters):
-            self.add_parameter('demodulation_mode',
-                   set_cmd=self._do_set_demodulation_mode,
-                   get_cmd=self._do_get_demodulation_mode,
-                   vals=vals.Anything())
+    def init_params(self):
+        self.add_params()
+        self.get_master_controller_params()
+        self.set('acquisition_mode', 'idle')
+        self.set('demodulation_mode', 'double')
+        self.set('trigger_source', 'internal')
+        self.set('core_state', 'idle')
+        self.set('run_mode', 'idle')
+        self.set('signal_delay', 0)
+        self.set('integration_length', 100)
+        self.set('adc_offset', 0)
+        self.set('log_length', 100)
+        self.set('nr_samples', 100)
+        self.set('nr_averages', 512)
+        self.set('lin_trans_coeffs', [1, 0, 0, 1])
 
     def run_test_suite(self):
             from importlib import reload  # Useful for testing
@@ -69,10 +74,7 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
             unittest.TextTestRunner(verbosity=2).run(suite)
 
     def _do_get_firmware_version(self):
-        # raise NotImplementedError("This function is obselete, please try\
-        # function get_master_controller_params.")
         v = self.get_master_controller_params()
-        # print(v)
         return v
 
     def get_master_controller_params(self):
@@ -91,9 +93,13 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
         version = 'v' + str(v_list[0])+'.'+str(v_list[1]) + \
             '.'+str(v_list[2])
 
-        self._acquisition_mode = v_list[3]
-        self._core_state = v_list[4]
-        self._trigger_source = v_list[5]
+        acquisition_mode_int = v_list[3]
+        core_state_int = v_list[4]
+        trigger_source_int = v_list[5]
+        self._acquisition_mode = defHeaders.acquisition_modes[acquisition_mode_int]
+        self._core_state = defHeaders.core_states[core_state_int]
+        self._trigger_source = defHeaders.trigger_sources[trigger_source_int]
+        
         self._adc_offset = (v_list[6] << 4) + v_list[7]
         self._signal_delay = (v_list[8] << 4) + v_list[9]
         self._integration_length = (v_list[10] << 7) + v_list[11]
@@ -111,53 +117,28 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
         self._avg_size = v_list[32]
         self._nr_averages = 2**self._avg_size
 
-        # self.snapshot()
-        # print("version: ", version)
         return version
 
-    def _do_set_log_length(self, length):
-        '''
-        set the number of measurements of the log in test mode.
-
-        @param length : the number of measurements range (1, 8000)
-        @return stat : 0 if the upload succeeded and 1 if the upload failed.
-        '''
-        v = self.get_master_controller_params()
-        if (int(v[1]) == 2) and (int(int(v[3:5])) >= 15):
-            n_bytes = 3
-        elif (int(v[1]) == 3) and (int(int(v[3])) > 1):
-            n_bytes = 3
-        else:
-            n_bytes = 2
-
-        cmd = defHeaders.UpdateLoggerMaxCounterHeader
-        data_bytes = c.encode_byte(length-1, 7,
-                                   expected_number_of_bytes=n_bytes)
-        # Changed from version 2.15 onwards
-        message = c.create_message(cmd, data_bytes)
-        (stat, mesg) = self.serial_write(message)
-        if stat:
-            self._log_length = length
-        else:
-            raise Exception('Failed to set log_length')
-        return (stat, message)
-
     def _do_set_core_state(self, core_state):
+        if not isinstance(core_state, str):
+            raise KeyError('core_state %s not recognized.'
+                           'It should be a string: \'idle\' or \'active.\'')
+
         if self.get('acquisition_mode') is not None:
             tmp_acquisition_mode = self.get('acquisition_mode')
         else:
-            tmp_acquisition_mode = 0   # idle state
+            tmp_acquisition_mode = 'idle'
 
         if self.get('trigger_source') is not None:
             tmp_trigger_source = self.get('trigger_source')
         else:
-            tmp_trigger_source = 0      # internal trigger
+            tmp_trigger_source = 'internal'  # internal MC trigger
 
         if self.get('demodulation_mode') is not None:
             tmp_demodulation_mode = self.get('demodulation_mode')
         else:
-            tmp_demodulation_mode = 0   # double side band demodulation
-        self.set_master_controller_working_state(core_state,
+            tmp_demodulation_mode = 'double' # double side band demodulation
+        self._set_master_controller_working_state(core_state,
                                                  tmp_acquisition_mode,
                                                  tmp_trigger_source,
                                                  tmp_demodulation_mode)
@@ -165,101 +146,100 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
     def _do_set_acquisition_mode(self, acquisition_mode):
         # this function can be invoked by CBox_v2 driver, so the parameter
         # needs to be added.
-        if not('core_state' in self.parameters):
-            self.add_parameter('core_state',
-                               set_cmd=self._do_set_core_state,
-                               get_cmd=self._do_get_core_state,
-                               vals=vals.Anything())
-            tmp_core_state = 0
-        elif self.get('core_state') is not None:
+        if not isinstance(acquisition_mode, str):
+            raise KeyError('acquisition_mode %s not recognized.'
+                           'It should be one of the following mode names: '
+                           '\'idle\', '
+                           '\'integration logging\', '
+                           '\'integration averaging\', '
+                           '\'input averaging\', or '
+                           '\'integration streaming\'.')
+
+        if self.get('core_state') is not None:
             tmp_core_state = self.get('core_state')
         else:
-            tmp_core_state = 0   # idle state
+            tmp_core_state = 'idle'   # idle state
 
-        # this function can be invoked by CBox_v2 driver, so the parameter
-        # needs to be added.
-        if not('trigger_source' in self.parameters):
-            self.add_parameter('trigger_source',
-                               set_cmd=self._do_set_trigger_source,
-                               get_cmd=self._do_get_trigger_source,
-                               vals=vals.Anything())
-            tmp_trigger_source = 0
-        elif self.get('trigger_source') is not None:
+        if self.get('trigger_source') is not None:
             tmp_trigger_source = self.get('trigger_source')
         else:
-            tmp_trigger_source = 0      # internal trigger
+            tmp_trigger_source = 'internal'  # internal trigger
 
-        if not('demodulation_mode' in self.parameters):
-            self.add_parameter('demodulation_mode',
-                               set_cmd=self._do_set_demodulation_mode,
-                               get_cmd=self._do_get_demodulation_mode,
-                               vals=vals.Anything())
-            tmp_demodulation_mode = 0
-        elif self.get('demodulation_mode') is not None:
+        if self.get('demodulation_mode') is not None:
             tmp_demodulation_mode = self.get('demodulation_mode')
         else:
-            tmp_demodulation_mode = 0      # internal trigger
+            tmp_demodulation_mode = 'double'
 
-        self.set_master_controller_working_state(tmp_core_state,
+        self._set_master_controller_working_state(tmp_core_state,
                                                  acquisition_mode,
                                                  tmp_trigger_source,
                                                  tmp_demodulation_mode)
 
     def _do_set_trigger_source(self, trigger_source):
+        if not isinstance(trigger_source, str):
+            raise KeyError('trigger_source %s not recognized.' 
+                           'It should be a string: \'internal\','
+                           ' \'external\' or \'mixed\'.')
+
+            
         if self.get('core_state') is not None:
             tmp_core_state = self.get('core_state')
-            # print('_do_set_trigger_source\got_core_state: ', tmp_core_state)
         else:
-            tmp_core_state = 0   # idle state
+            tmp_core_state = 'idle'
 
         if self.get('acquisition_mode') is not None:
             tmp_acquisition_mode = self.get('acquisition_mode')
         else:
-            tmp_acquisition_mode = 0   # idle state
+            tmp_acquisition_mode = 'idle'
 
         if self.get('demodulation_mode') is not None:
             tmp_demodulation_mode = self.get('demodulation_mode')
         else:
-            tmp_demodulation_mode = 0   # double side band demodulation
+            tmp_demodulation_mode = 'double'   # double side band demodulation
 
-        self.set_master_controller_working_state(tmp_core_state,
+        self._set_master_controller_working_state(tmp_core_state,
                                                  tmp_acquisition_mode,
                                                  trigger_source,
                                                  tmp_demodulation_mode)
 
     def _do_set_demodulation_mode(self, demodulation_mode):
+        if not isinstance(demodulation_mode, str):
+            raise KeyError('demodulation_mode %s not recognized.'
+                           'It should be a string:\'double\', or \'single\'')
+
         if self.get('core_state') is not None:
             tmp_core_state = self.get('core_state')
             # print('_do_set_trigger_source\got_core_state: ', tmp_core_state)
         else:
-            tmp_core_state = 0   # idle state
+            tmp_core_state = 'idle'
 
         if self.get('acquisition_mode') is not None:
             tmp_acquisition_mode = self.get('acquisition_mode')
         else:
-            tmp_acquisition_mode = 0   # idle state
+            tmp_acquisition_mode = 'idle'
 
         if self.get('trigger_source') is not None:
             tmp_trigger_source = self.get('trigger_source')
         else:
-            tmp_trigger_source = 0      # internal trigger
+            tmp_trigger_source = 'internal'  # internal MC trigger
 
-        self.set_master_controller_working_state(tmp_core_state,
+        self._set_master_controller_working_state(tmp_core_state,
                                                  tmp_acquisition_mode,
                                                  tmp_trigger_source,
                                                  demodulation_mode)
 
     def _do_get_core_state(self):
-        return self._core_state
+        return self._core_state[3:]
 
     def _do_get_trigger_source(self):
-        return self._trigger_source
+        return self._trigger_source[3:]
 
     def _do_get_acquisition_mode(self):
-        return self._acquisition_mode
+        return self._acquisition_mode[3:]
 
     def _do_get_demodulation_mode(self):
-        return self._demodulation_mode
+        return self._demodulation_mode[3:]
+
     def _set_touch_n_go_parameters(self):
 
         '''
@@ -270,37 +250,54 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
             "This is CBox_v3 driver." +
             "Touch 'n Go is only valid for ControlBox version 2.")
 
-    def set_master_controller_working_state(self,
+    def _set_master_controller_working_state(self,
                                             core_state='idle',
                                             acquisition_mode='idle',
                                             trigger_source='internal',
                                             demodulation_mode=
                                             'double side band demodulation'):
         '''
-        @param core_states: activate the core or disable it,
-                        0 = idle,
-                        1 = active.
-        @param acquisition_modes: the data collection mode in MasterController,
-                        0 = idle (default),
-                        1 = integration logging mode,
-                        2 = integration averaging mode,
-                        3 = input averaging mode,
-                        4 = integration streaming mode.
-        @param trigger_sources: trigger source of the MasterController,
-                        0 = internal trigger (default),
-                        1 = external trigger,
-                        2 = mixed trigger.
-        @param demodulation_mode: the method to demodulate the signal,
-                        0 = double side band demodulation,
-                        1 = single side band demodulation.
+        @param core_states: activate the core or disable it:
+                        > idle,
+                        > active.
+        @param acquisition_modes: the data collection mode in MasterController:
+                        > idle (default),
+                        > integration logging mode,
+                        > integration averaging mode,
+                        > input averaging mode,
+                        > integration streaming mode.
+        @param trigger_sources: trigger source of the MasterController:
+                        > internal trigger (default),
+                        > external trigger,
+                        > mixed trigger.
+        @param demodulation_mode: the method to demodulate the signal:
+                        > double side band demodulation (default),
+                        > single side band demodulation.
 
         @return stat : True if the upload succeeded and False if the upload
                        failed
         '''
-        core_state = str(core_state)
-        acquisition_mode = str(acquisition_mode)
-        trigger_source = str(trigger_source)
-        demodulation_mode = str(demodulation_mode)
+        if not isinstance(core_state, str):
+            raise KeyError('core_state %s not recognized.'
+                           'It should be a string: \'idle\' or \'active.\'')
+
+        if not isinstance(acquisition_mode, str):
+            raise KeyError('acquisition_mode %s not recognized.'
+                           'It should be one of the following mode names: '
+                           '\'idle\', '
+                           '\'integration logging\', '
+                           '\'integration averaging\', '
+                           '\'input averaging\', or '
+                           '\'integration streaming\'.')
+
+        if not isinstance(trigger_source, str):
+            raise KeyError('trigger_source %s not recognized.' 
+                           'It should be a string: \'internal\','
+                           ' \'external\' or \'mixed\'.')
+
+        if not isinstance(demodulation_mode, str):
+            raise KeyError('demodulation_mode %s not recognized.'
+                           'It should be a string:\'double\', or \'single\'')
 
         acquisition_mode_int = None
         for i in range(len(defHeaders.acquisition_modes)):
