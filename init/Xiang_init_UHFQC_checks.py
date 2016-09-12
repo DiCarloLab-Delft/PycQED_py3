@@ -54,63 +54,12 @@ from instrument_drivers.physical_instruments import QuTech_Duplexer as qdux
 from instrument_drivers.physical_instruments.ZurichInstruments import UHFQuantumController as ZI_UHFQC
 
 # Initializing instruments
-
+t0 = time.time()
 
 station = qc.Station()
-#LO = rs.RohdeSchwarz_SGS100A(name='LO', address='TCPIP0::192.168.0.73', server_name=None)  #
-#station.add_component(LO)
-#RF = rs.RohdeSchwarz_SGS100A(name='RF', address='TCPIP0::192.168.0.74', server_name=None)  #
-#station.add_component(RF)
-#Spec_source = rs.RohdeSchwarz_SGS100A(name='Spec_source', address='TCPIP0::192.168.0.87', server_name=None)  #
-#station.add_component(Spec_source)
-#Qubit_LO = rs.RohdeSchwarz_SGS100A(name='Qubit_LO', address='TCPIP0::192.168.0.86', server_name=None)  #
-#station.add_component(Qubit_LO)
-#TWPA_Pump = rs.RohdeSchwarz_SGS100A(name='TWPA_Pump', address='TCPIP0::192.168.0.90', server_name=None)  #
-#station.add_component(TWPA_Pump)
-# CBox = qcb.QuTech_ControlBox('CBox', address='Com5', run_tests=False, server_name=None)
-# station.add_component(CBox)
-UHFQC_1 = ZI_UHFQC.UHFQC('UHFQC_1', device='dev2178',  server_name=8004)
+UHFQC_1 = ZI_UHFQC.UHFQC('UHFQC_1', device='dev2178',server_name=None)
 station.add_component(UHFQC_1)
-# AWG = tek.Tektronix_AWG5014(name='AWG', setup_folder=None, timeout=2,
-#                             address='GPIB0::6::INSTR', server_name=None)
-# station.add_component(AWG)
-# AWG.timeout(180)
 
-# MC = mc.MeasurementControl('MC')
-
-
-# MC.station = station
-# station.MC = MC
-# nested_MC = mc.MeasurementControl('nested_MC')
-# nested_MC.station = station
-
-# # The AWG sequencer
-# station.pulsar = ps.Pulsar()
-# station.pulsar.AWG = station.components['AWG']
-# for i in range(4):
-#     # Note that these are default parameters and should be kept so.
-#     # the channel offset is set in the AWG itself. For now the amplitude is
-#     # hardcoded. You can set it by hand but this will make the value in the
-#     # sequencer different.
-#     station.pulsar.define_channel(id='ch{}'.format(i+1),
-#                                   name='ch{}'.format(i+1), type='analog',
-#                                   # max safe IQ voltage
-#                                   high=.7, low=-.7,
-#                                   offset=0.0, delay=0, active=True)
-#     station.pulsar.define_channel(id='ch{}_marker1'.format(i+1),
-#                                   name='ch{}_marker1'.format(i+1),
-#                                   type='marker',
-#                                   high=2.0, low=0, offset=0.,
-#                                   delay=0, active=True)
-#     station.pulsar.define_channel(id='ch{}_marker2'.format(i+1),
-#                                   name='ch{}_marker2'.format(i+1),
-#                                   type='marker',
-#                                   high=2.0, low=0, offset=0.,
-#                                   delay=0, active=True)
-# # to make the pulsar available to the standard awg seqs
-# st_seqs.station = station
-# sq.station = station
-# cal_elts.station = station
 
 t1 = time.time()
 print('Ran initialization in %.2fs' % (t1-t0))
