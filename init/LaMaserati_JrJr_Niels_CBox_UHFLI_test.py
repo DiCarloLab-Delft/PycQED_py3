@@ -85,7 +85,7 @@ station = qc.Station()
 #station.add_component(TWPA_Pump)
 # CBox = qcb.QuTech_ControlBox('CBox', address='Com5', run_tests=False, server_name=None)
 # station.add_component(CBox)
-UHFQC_1 = ZI_UHFQC.UHFQC('UHFQC_1', device='dev2178', server_name=None)
+UHFQC_1 = ZI_UHFQC.UHFQC('UHFQC_1', device='dev2178', server_name=8004)
 station.add_component(UHFQC_1)
 # AWG = tek.Tektronix_AWG5014(name='AWG', setup_folder=None, timeout=2,
 #                             address='GPIB0::6::INSTR', server_name=None)

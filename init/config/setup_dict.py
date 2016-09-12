@@ -22,7 +22,7 @@ data_dir_dict = {'tud276606_FPGA_PC': 'D:\Experiments/CBox_Testing/Data',
                  # 'Adriaans_Macbook': ('/Users/Adriaan/Dropbox/PhD-Delft/' +
                  #    'DataFolders/ExperimentalDataTUD277620/CBox_Testing/Data'),
                  'Adriaans_Macbook': ('/Users/Adriaan/Documents/Testing/Data'),
-                 'Niels_macbook': '/Users/nbultink/Dropbox/Simultaneous_driving/temp_data',
+                 'Niels_macbook': '/Users/nbultink/temp_data',
                  'La_Ferrari':  'D:\Experiments/1511_RabiSims2/Data',
                  'La_Maserati': 'D:\Experiments/JJO-type_IV/Data',
                  # 'La_Maserati_JrJr': 'D:\\Experimentsp7_Qcodes_5qubit\data',

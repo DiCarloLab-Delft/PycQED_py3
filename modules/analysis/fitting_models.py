@@ -161,12 +161,23 @@ def SlopedHangerFuncComplex(f, f0, Q, Qe, A, theta, phi_v, phi_0, slope):
     return (1.+slope*(f/1.e9-f0)/f0)*np.exp(1.j*(phi_v*f+phi_0-phi_v*f[0])) * \
         HangerFuncComplex(f, f0, Q, Qe, A, theta)
 
+def linear_with_offset(x, a, b):
+    '''
+    A linear signal with a fixed offset.
+    '''
+    return a*x + b
 
 def linear_with_background(x, a, b):
     '''
     A linear signal with a fixed background.
     '''
     return np.sqrt((a*x)**2 + b**2)
+
+def linear_with_background_and_offset(x, a, b,c):
+    '''
+    A linear signal with a fixed background.
+    '''
+    return np.sqrt((a*x)**2 + b**2)+c
 
 
 def gaussian_2D(x, y, amplitude=1,
@@ -356,7 +367,9 @@ QubitFreqFluxModel = lmfit.Model(QubitFreqFlux)
 TwinLorentzModel = lmfit.Model(TwinLorentzFunc)
 LorentzianModel = lmfit.Model(Lorentzian)
 RBModel = lmfit.Model(RandomizedBenchmarkingDecay)
+LinOModel = lmfit.Model(linear_with_offset)
 LinBGModel = lmfit.Model(linear_with_background)
+LinBGOModel = lmfit.Model(linear_with_background_and_offset)
 
 # 2D models
 Gaus2D_model = lmfit.Model(gaussian_2D, independent_vars=['x', 'y'])
