@@ -81,7 +81,7 @@ def extract_RB_fidelity_from_GST_result(
         Which is at the moment: Gate decomposition decomposition of the clifford
         group as per Eptstein et al. Phys. Rev. A 89, 062321 (2014).
         (called: gate_decomposition, in:
-        pycQED-3.modules.measurement.randomized_benchmarking.clifford_decompositions)
+        pycQED-3.measurement.randomized_benchmarking.clifford_decompositions)
 
     gateset_5_primitives_as_9_gateset: optional, default = True,
         In pycQED-3 RB, the clifford gates are decomposed in 9 elementary gates,

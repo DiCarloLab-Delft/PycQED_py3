@@ -1,6 +1,6 @@
 from copy import deepcopy
-from modules.measurement.pulse_sequences.single_qubit_tek_seq_elts import get_pulse_dict_from_pars
-from modules.measurement.pulse_sequences.standard_elements import multi_pulse_elt
+from measurement.pulse_sequences.single_qubit_tek_seq_elts import get_pulse_dict_from_pars
+from measurement.pulse_sequences.standard_elements import multi_pulse_elt
 from ..waveform_control import sequence
 import numpy as np
 

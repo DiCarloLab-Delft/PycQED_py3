@@ -1,6 +1,6 @@
 import numpy as np
 import time
-from modules.measurement import detector_functions as det
+from measurement import detector_functions as det
 
 station = station
 PyCQEDpath = PyCQEDpath

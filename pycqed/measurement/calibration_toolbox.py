@@ -1,13 +1,13 @@
 import numpy as np
 import logging
 from qcodes.instrument.parameter import ManualParameter
-from modules.measurement import sweep_functions as swf
-from modules.measurement import CBox_sweep_functions as CB_swf
-from modules.measurement import detector_functions as det
-from modules.analysis import measurement_analysis as MA
-from modules.measurement import mc_parameter_wrapper as pw
-from modules.measurement.pulse_sequences import standard_sequences as st_seqs
-from modules.measurement.optimization import nelder_mead
+from measurement import sweep_functions as swf
+from measurement import CBox_sweep_functions as CB_swf
+from measurement import detector_functions as det
+from analysis import measurement_analysis as MA
+from measurement import mc_parameter_wrapper as pw
+from measurement.pulse_sequences import standard_sequences as st_seqs
+from measurement.optimization import nelder_mead
 import imp
 imp.reload(MA)
 imp.reload(CB_swf)

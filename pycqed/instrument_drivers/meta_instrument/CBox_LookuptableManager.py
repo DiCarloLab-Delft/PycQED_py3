@@ -4,7 +4,7 @@ from qcodes.instrument.base import Instrument
 from qcodes.instrument.parameter import ManualParameter
 from qcodes.utils import validators as vals
 import logging
-from modules.measurement import Pulse_Generator as PG
+from measurement import Pulse_Generator as PG
 import unittest
 import matplotlib.pyplot as plt
 import imp

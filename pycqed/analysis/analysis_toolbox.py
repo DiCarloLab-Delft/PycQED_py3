@@ -236,7 +236,7 @@ def get_start_stop_time(timestamp):
     '''
     Retrieves start and stop time from HDF5 file timestamp.
     '''
-    from modules.analysis import measurement_analysis as MA
+    from analysis import measurement_analysis as MA
     ma = MA.MeasurementAnalysis(timestamp=timestamp)
     timestring_start = a_tools.get_instrument_setting(ma,'MC','measurement_begintime')
     timestring_stop = a_tools.get_instrument_setting(ma,'MC','measurement_endtime')
@@ -247,7 +247,7 @@ def get_start_stop_time(timestamp):
     return timestamp_start, timestamp_stop
 
 def get_data_from_timestamp_legacy(timestamps, param_names, TwoD=False, max_files=None):
-    from modules.analysis import measurement_analysis as MA
+    from analysis import measurement_analysis as MA
     if max_files is not None:
         get_timestamps = timestamps[:max_files]
     else:
@@ -439,7 +439,7 @@ def get_data_from_timestamp_list(timestamps,
                                  max_files=None,
                                  filter_no_analysis=False,
                                  numeric_params=None):
-    from modules.analysis import measurement_analysis as ma
+    from analysis import measurement_analysis as ma
 
     if type(timestamps) is str:
         timestamps = [timestamps]
@@ -719,7 +719,7 @@ def get_mean_df(label, starting_timestamp, ending_timestamp,
     if return raw_dataframes
     '''
     # Import within function statement to prevent circular import
-    from modules.analysis import measurement_analysis as MA
+    from analysis import measurement_analysis as MA
     timestamps = get_timestamps_in_range(timestamp_start=starting_timestamp,
                                          timestamp_end=ending_timestamp,
                                          label=label)

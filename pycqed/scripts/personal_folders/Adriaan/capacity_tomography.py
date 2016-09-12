@@ -4,10 +4,10 @@ station = station
 
 import numpy as np
 from qcodes.instrument.parameter import ManualParameter
-from modules.measurement import detector_functions as det
-from modules.measurement.waveform_control import sequence
-from modules.measurement.pulse_sequences.standard_elements import multi_pulse_elt
-from modules.measurement.pulse_sequences.single_qubit_tek_seq_elts import get_pulse_dict_from_pars
+from measurement import detector_functions as det
+from measurement.waveform_control import sequence
+from measurement.pulse_sequences.standard_elements import multi_pulse_elt
+from measurement.pulse_sequences.single_qubit_tek_seq_elts import get_pulse_dict_from_pars
 
 
 # Function definitions

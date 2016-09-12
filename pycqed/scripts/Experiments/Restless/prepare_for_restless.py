@@ -1,10 +1,10 @@
 import time
 import numpy as np
 from copy import deepcopy
-from modules.measurement.pulse_sequences import single_qubit_tek_seq_elts as sqs
-from modules.measurement.pulse_sequences import calibration_elements as cal_elts
+from measurement.pulse_sequences import single_qubit_tek_seq_elts as sqs
+from measurement.pulse_sequences import calibration_elements as cal_elts
 from scipy.optimize import minimize_scalar
-import modules.measurement.pulse_sequences.gate_set_tomography as gsts
+import measurement.pulse_sequences.gate_set_tomography as gsts
 station = station
 gsts.station = station
 

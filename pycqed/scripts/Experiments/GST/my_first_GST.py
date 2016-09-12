@@ -1,7 +1,7 @@
 import qcodes as qc
-from modules.measurement import sweep_functions as swf
-from modules.measurement import detector_functions as det
-import modules.measurement.pulse_sequences.gate_set_tomography as gsts
+from measurement import sweep_functions as swf
+from measurement import detector_functions as det
+import measurement.pulse_sequences.gate_set_tomography as gsts
 gsts.station = station
 
 

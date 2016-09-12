@@ -4,7 +4,7 @@ Library containing pulse shapes.
 '''
 
 
-from modules.measurement.waveform_control.pulse import Pulse, apply_modulation
+from measurement.waveform_control.pulse import Pulse, apply_modulation
 
 
 class MW_IQmod_pulse(Pulse):
@@ -54,7 +54,7 @@ class MW_IQmod_pulse(Pulse):
         if not self.phaselock:
             tvals = tvals.copy() - tvals[idx0]
         I_mod, Q_mod = apply_modulation(
-            self.amplitude*np.ones(len(tvals)), 
+            self.amplitude*np.ones(len(tvals)),
             np.zeros(len(tvals)), tvals[idx0:idx1],
             mod_frequency=self.mod_frequency, phase=self.phase,
             phi_skew=self.phi_skew, alpha=self.alpha)

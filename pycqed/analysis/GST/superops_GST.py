@@ -10,12 +10,12 @@ PycQEDdir = (os.path.abspath('../../..'))
 sys.path.append(PycQEDdir)
 print(PycQEDdir)
 
-from modules.measurement.randomized_benchmarking.clifford_decompositions \
+from measurement.randomized_benchmarking.clifford_decompositions \
     import(gate_decomposition)
 
-from modules.measurement.randomized_benchmarking.clifford_group \
+from measurement.randomized_benchmarking.clifford_group \
     import(clifford_lookuptable)
-import modules.measurement.randomized_benchmarking.randomized_benchmarking \
+import measurement.randomized_benchmarking.randomized_benchmarking \
     as rb
 
 

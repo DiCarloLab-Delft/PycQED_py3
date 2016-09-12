@@ -1,5 +1,5 @@
-from modules.measurement import sweep_functions as swf
-from modules.measurement.pulse_sequences import standard_sequences as st_seqs
+from measurement import sweep_functions as swf
+from measurement.pulse_sequences import standard_sequences as st_seqs
 
 
 class CBox_Echo(swf.Hard_Sweep):

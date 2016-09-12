@@ -3,8 +3,8 @@ Module containing functions that wrap a QCodes parameter into a sweep or
 detector function
 '''
 import qcodes as qc
-from modules.measurement import sweep_functions as swf
-from modules.measurement import detector_functions as det
+from measurement import sweep_functions as swf
+from measurement import detector_functions as det
 import time
 
 def wrap_par_to_swf(parameter):

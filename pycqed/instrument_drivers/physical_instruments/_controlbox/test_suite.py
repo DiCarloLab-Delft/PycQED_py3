@@ -2,7 +2,7 @@ import unittest
 import numpy as np
 from . import defHeaders
 CBox = None
-from modules.analysis.tools import data_manipulation as dm_tools
+from analysis.tools import data_manipulation as dm_tools
 
 
 class CBox_tests(unittest.TestCase):

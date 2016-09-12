@@ -1,7 +1,7 @@
 import numpy as np
-from modules.measurement import sweep_functions as swf
-from modules.measurement.pulse_sequences import standard_sequences as st_seqs
-from modules.measurement.randomized_benchmarking import randomized_benchmarking as rb
+from measurement import sweep_functions as swf
+from measurement.pulse_sequences import standard_sequences as st_seqs
+from measurement.randomized_benchmarking import randomized_benchmarking as rb
 
 
 class CBox_RB_sweep(swf.Hard_Sweep):

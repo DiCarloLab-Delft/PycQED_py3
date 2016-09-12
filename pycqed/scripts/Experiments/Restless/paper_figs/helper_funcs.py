@@ -1,6 +1,6 @@
-from modules.analysis import measurement_analysis as ma
-from modules.analysis import analysis_toolbox as a_tools
-from modules.analysis import fitting_models as fit_mods
+from analysis import measurement_analysis as ma
+from analysis import analysis_toolbox as a_tools
+from analysis import fitting_models as fit_mods
 import matplotlib.pyplot as plt
 import time
 

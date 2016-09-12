@@ -2,10 +2,10 @@ import sys
 import numpy as np
 sys.path.append('d:\GitHubRepos\PycQED_v3')
 from matplotlib import pyplot as plt
-from modules.analysis import analysis_toolbox as a_tools
-from modules.analysis import fitting_models as fit_mods
+from analysis import analysis_toolbox as a_tools
+from analysis import fitting_models as fit_mods
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-from modules.analysis.plotting_tools import *
+from analysis.plotting_tools import *
 
 
 

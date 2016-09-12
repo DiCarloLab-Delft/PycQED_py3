@@ -6,16 +6,16 @@ import numpy as np
 import pyqtgraph as pg
 import pyqtgraph.multiprocess as pgmp
 from scipy.optimize import fmin_powell
-from modules.measurement import hdf5_data as h5d
-from modules.utilities import general
-from modules.utilities.general import dict_to_ordered_tuples
+from measurement import hdf5_data as h5d
+from utilities import general
+from utilities.general import dict_to_ordered_tuples
 from qcodes.plots.pyqtgraph import QtPlot
 
 # Used for auto qcodes parameter wrapping
-from modules.measurement import sweep_functions as swf
-from modules.measurement import detector_functions as det
-from modules.measurement.mc_parameter_wrapper import wrap_par_to_swf
-from modules.measurement.mc_parameter_wrapper import wrap_par_to_det
+from measurement import sweep_functions as swf
+from measurement import detector_functions as det
+from measurement.mc_parameter_wrapper import wrap_par_to_swf
+from measurement.mc_parameter_wrapper import wrap_par_to_det
 
 
 class MeasurementControl:

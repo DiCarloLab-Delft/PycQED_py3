@@ -1,11 +1,11 @@
 import numpy as np
 from time import time
-from modules.measurement.waveform_control import pulsar
-from modules.measurement.waveform_control import pulse
-from modules.measurement.waveform_control import element
-from modules.measurement.waveform_control import sequence
-from modules.measurement.waveform_control.viewer import show_element, show_wf
-from modules.measurement.waveform_control import pulse_library as pl
+from measurement.waveform_control import pulsar
+from measurement.waveform_control import pulse
+from measurement.waveform_control import element
+from measurement.waveform_control import sequence
+from measurement.waveform_control.viewer import show_element, show_wf
+from measurement.waveform_control import pulse_library as pl
 
 reload(element)
 reload(pl)

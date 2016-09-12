@@ -1,8 +1,8 @@
 import numpy as np
 import logging
-from modules.measurement import sweep_functions as swf
-from modules.measurement.sweep_functions import Soft_Sweep
-from modules.measurement import Pulse_Generator as PG
+from measurement import sweep_functions as swf
+from measurement.sweep_functions import Soft_Sweep
+from measurement import Pulse_Generator as PG
 
 # Commented out as there is no module named Experiments.CLEAR.prepare_for_CLEAR.prepare_for_CLEAR
 # from Experiments.CLEAR.prepare_for_CLEAR import prepare_for_CLEAR

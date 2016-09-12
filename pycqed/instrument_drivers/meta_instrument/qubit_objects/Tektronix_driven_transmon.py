@@ -5,21 +5,21 @@ from math import gcd
 from qcodes.utils import validators as vals
 from qcodes.instrument.parameter import ManualParameter
 
-from modules.measurement import detector_functions as det
-from modules.measurement import composite_detector_functions as cdet
-from modules.measurement import mc_parameter_wrapper as pw
+from measurement import detector_functions as det
+from measurement import composite_detector_functions as cdet
+from measurement import mc_parameter_wrapper as pw
 
-from modules.measurement import sweep_functions as swf
-from modules.measurement import CBox_sweep_functions as cb_swf
-from modules.measurement import awg_sweep_functions as awg_swf
-from modules.analysis import measurement_analysis as ma
-from modules.measurement.pulse_sequences import standard_sequences as st_seqs
-import modules.measurement.randomized_benchmarking.randomized_benchmarking as rb
-from modules.measurement.calibration_toolbox import mixer_carrier_cancellation_5014
-from modules.measurement.calibration_toolbox import mixer_skewness_calibration_5014
-from modules.measurement.optimization import nelder_mead
+from measurement import sweep_functions as swf
+from measurement import CBox_sweep_functions as cb_swf
+from measurement import awg_sweep_functions as awg_swf
+from analysis import measurement_analysis as ma
+from measurement.pulse_sequences import standard_sequences as st_seqs
+import measurement.randomized_benchmarking.randomized_benchmarking as rb
+from measurement.calibration_toolbox import mixer_carrier_cancellation_5014
+from measurement.calibration_toolbox import mixer_skewness_calibration_5014
+from measurement.optimization import nelder_mead
 
-import modules.measurement.pulse_sequences.single_qubit_tek_seq_elts as sq
+import measurement.pulse_sequences.single_qubit_tek_seq_elts as sq
 
 from .qubit_object import Transmon
 from .CBox_driven_transmon import CBox_driven_transmon

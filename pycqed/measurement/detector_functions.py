@@ -7,13 +7,13 @@ import numpy as np
 import cmath #only used to get phase from complex number.
 import logging
 import time
-from modules.analysis import analysis_toolbox as a_tools
-from modules.analysis.fit_toolbox import functions as fn
-from modules.measurement.waveform_control import pulse
-from modules.measurement.waveform_control import pulse_library as pl
-from modules.measurement.waveform_control import pulsar
-from modules.measurement.waveform_control import element
-from modules.measurement.waveform_control import sequence
+from analysis import analysis_toolbox as a_tools
+from analysis.fit_toolbox import functions as fn
+from measurement.waveform_control import pulse
+from measurement.waveform_control import pulse_library as pl
+from measurement.waveform_control import pulsar
+from measurement.waveform_control import element
+from measurement.waveform_control import sequence
 
 
 class Detector_Function(object):

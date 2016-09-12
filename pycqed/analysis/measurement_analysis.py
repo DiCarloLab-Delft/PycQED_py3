@@ -4,15 +4,15 @@ import numpy as np
 from scipy import stats
 import h5py
 from matplotlib import pyplot as plt
-from modules.analysis import analysis_toolbox as a_tools
-from modules.analysis import fitting_models as fit_mods
+from analysis import analysis_toolbox as a_tools
+from analysis import fitting_models as fit_mods
 import scipy.optimize as optimize
 import lmfit
 from collections import Counter  # used in counting string fractions
 import textwrap
 from scipy.interpolate import interp1d
 import pylab
-from modules.analysis.tools import data_manipulation as dm_tools
+from analysis.tools import data_manipulation as dm_tools
 import imp
 import math
 from math import erfc

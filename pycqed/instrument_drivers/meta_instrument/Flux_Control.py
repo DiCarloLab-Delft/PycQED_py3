@@ -5,11 +5,11 @@ from qcodes.instrument.base import Instrument
 from qcodes.utils import validators as vals
 from qcodes.instrument.parameter import ManualParameter
 
-# from modules.analysis.analysis_toolbox import calculate_transmon_transitions
-# from modules.analysis import analysis_toolbox as a_tools
-# from modules.measurement import detector_functions as det
-# from modules.measurement import composite_detector_functions as cdet
-# from modules.measurement import mc_parameter_wrapper as pw
+# from analysis.analysis_toolbox import calculate_transmon_transitions
+# from analysis import analysis_toolbox as a_tools
+# from measurement import detector_functions as det
+# from measurement import composite_detector_functions as cdet
+# from measurement import mc_parameter_wrapper as pw
 
 
 class Flux_Control(Instrument):

@@ -24,26 +24,26 @@ qc_config = {'datadir': 'D:\Experiments\Simultaneous_Driving\data',
 
 
 # General PycQED modules
-from modules.measurement import measurement_control as mc
-from modules.measurement import sweep_functions as swf
-from modules.measurement import awg_sweep_functions as awg_swf
-from modules.measurement import detector_functions as det
-from modules.measurement import composite_detector_functions as cdet
-from modules.measurement import calibration_toolbox as cal_tools
-from modules.measurement import mc_parameter_wrapper as pw
-from modules.measurement import CBox_sweep_functions as cb_swf
-from modules.measurement.optimization import nelder_mead
-from modules.analysis import measurement_analysis as ma
-from modules.analysis import analysis_toolbox as a_tools
+from measurement import measurement_control as mc
+from measurement import sweep_functions as swf
+from measurement import awg_sweep_functions as awg_swf
+from measurement import detector_functions as det
+from measurement import composite_detector_functions as cdet
+from measurement import calibration_toolbox as cal_tools
+from measurement import mc_parameter_wrapper as pw
+from measurement import CBox_sweep_functions as cb_swf
+from measurement.optimization import nelder_mead
+from analysis import measurement_analysis as ma
+from analysis import analysis_toolbox as a_tools
 
 
 
-from modules.utilities import general as gen
+from utilities import general as gen
 # Standarad awg sequences
-from modules.measurement.waveform_control import pulsar as ps
-from modules.measurement.pulse_sequences import standard_sequences as st_seqs
-from modules.measurement.pulse_sequences import calibration_elements as cal_elts
-from modules.measurement.pulse_sequences import single_qubit_tek_seq_elts as sq
+from measurement.waveform_control import pulsar as ps
+from measurement.pulse_sequences import standard_sequences as st_seqs
+from measurement.pulse_sequences import calibration_elements as cal_elts
+from measurement.pulse_sequences import single_qubit_tek_seq_elts as sq
 
 # Instrument drivers
 from qcodes.instrument_drivers.rohde_schwarz import SGS100A as rs

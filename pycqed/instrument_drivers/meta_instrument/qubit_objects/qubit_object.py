@@ -5,16 +5,16 @@ from qcodes.instrument.base import Instrument
 from qcodes.utils import validators as vals
 from qcodes.instrument.parameter import ManualParameter
 
-from modules.analysis.analysis_toolbox import calculate_transmon_transitions
-from modules.analysis import analysis_toolbox as a_tools
-from modules.measurement import detector_functions as det
-from modules.measurement import composite_detector_functions as cdet
-from modules.measurement import mc_parameter_wrapper as pw
+from analysis.analysis_toolbox import calculate_transmon_transitions
+from analysis import analysis_toolbox as a_tools
+from measurement import detector_functions as det
+from measurement import composite_detector_functions as cdet
+from measurement import mc_parameter_wrapper as pw
 
-from modules.measurement import sweep_functions as swf
-from modules.measurement import awg_sweep_functions as awg_swf
-from modules.analysis import measurement_analysis as ma
-from modules.measurement.pulse_sequences import standard_sequences as st_seqs
+from measurement import sweep_functions as swf
+from measurement import awg_sweep_functions as awg_swf
+from analysis import measurement_analysis as ma
+from measurement.pulse_sequences import standard_sequences as st_seqs
 
 
 class Qubit(Instrument):

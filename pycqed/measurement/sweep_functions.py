@@ -1,8 +1,8 @@
 import numpy as np
 import logging
 import time
-from modules.measurement import detector_functions as det
-from modules.analysis import measurement_analysis as MA
+from measurement import detector_functions as det
+from analysis import measurement_analysis as MA
 
 
 class Sweep_function(object):
@@ -125,7 +125,7 @@ class Source_frequency_GHz_Resonator_Scan(Soft_Sweep):
         # Measure resonator
         if 'Nested_MC' not in qt.instruments.get_instrument_names():
             qt.instruments.create('Nested_MC', 'MeasurementControl')
-        from modules.measurement import calibration_toolbox as cal_tools
+        from measurement import calibration_toolbox as cal_tools
         resonator_res = cal_tools.find_resonator_frequency(
             start_freq=self.start_freq_res,
             end_freq=self.end_freq_res,
