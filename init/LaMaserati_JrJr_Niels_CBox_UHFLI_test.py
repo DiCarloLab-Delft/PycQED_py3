@@ -67,7 +67,7 @@ import instrument_drivers.meta_instrument.CBox_LookuptableManager as lm
 
 from instrument_drivers.meta_instrument.qubit_objects import CBox_driven_transmon as qb
 from instrument_drivers.physical_instruments import QuTech_Duplexer as qdux
-
+from instrument_drivers.physical_instruments.ZurichInstruments import UHFQuantumController as ZI_UHFQC
 
 # Initializing instruments
 
@@ -83,110 +83,52 @@ station = qc.Station()
 #station.add_component(Qubit_LO)
 #TWPA_Pump = rs.RohdeSchwarz_SGS100A(name='TWPA_Pump', address='TCPIP0::192.168.0.90', server_name=None)  #
 #station.add_component(TWPA_Pump)
-CBox = qcb.QuTech_ControlBox('CBox', address='Com5', run_tests=False, server_name=None)
-station.add_component(CBox)
-AWG = tek.Tektronix_AWG5014(name='AWG', setup_folder=None, timeout=2,
-                            address='GPIB0::6::INSTR', server_name=None)
-station.add_component(AWG)
-AWG.timeout(180)
-#AWG520 = tk520.Tektronix_AWG520('AWG520', address='GPIB0::17::INSTR',
-#                                server_name='')
-#station.add_component(AWG520)
-#IVVI = iv.IVVI('IVVI', address='COM4', numdacs=16, server_name=None)
-#station.add_component(IVVI)
-# Dux = qdux.QuTech_Duplexer('Dux', address='TCPIP0::192.168.0.101',
-#                             server_name=None)
-# SH = sh.SignalHound_USB_SA124B('Signal hound', server_name=None) #commented because of 8s load time
+# CBox = qcb.QuTech_ControlBox('CBox', address='Com5', run_tests=False, server_name=None)
+# station.add_component(CBox)
+UHFQC_1 = ZI_UHFQC.UHFQC('UHFQC_1', device='dev2178', server_name=8004)
+station.add_component(UHFQC_1)
+# AWG = tek.Tektronix_AWG5014(name='AWG', setup_folder=None, timeout=2,
+#                             address='GPIB0::6::INSTR', server_name=None)
+# station.add_component(AWG)
+# AWG.timeout(180)
 
-# Meta-instruments
-#HS = hd.HeterodyneInstrument('HS', LO=LO, RF=RF, CBox=CBox, AWG=AWG,
-#                             server_name=None)
-#station.add_component(HS)
-# LutMan = lm.QuTech_ControlBox_LookuptableManager('LutMan', CBox=CBox,
-#                                                  server_name=None)
-                                                 # server_name='metaLM')
-MC = mc.MeasurementControl('MC')
+# MC = mc.MeasurementControl('MC')
 
 
+# MC.station = station
+# station.MC = MC
+# nested_MC = mc.MeasurementControl('nested_MC')
+# nested_MC.station = station
 
-# AncB = qbt.Tektronix_driven_transmon('AncB', LO=LO, cw_source=Spec_source,
-#                                               td_source=Qubit_LO,
-#                                               IVVI=IVVI, rf_RO_source=RF,
-#                                               AWG=AWG,
-#                                               CBox=CBox, heterodyne_instr=HS,
-#                                               MC=MC,
-#                                               server_name=None)
-# station.add_component(AncB)
-# AncT = qbt.Tektronix_driven_transmon('AncT', LO=LO, cw_source=Spec_source,
-#                                               td_source=Qubit_LO,
-#                                               IVVI=IVVI, rf_RO_source=RF,
-#                                               AWG=AWG,
-#                                               CBox=CBox, heterodyne_instr=HS,
-#                                               MC=MC,
-#                                               server_name=None)
-# station.add_component(AncT)
-# DataB = qbt.Tektronix_driven_transmon('DataB', LO=LO, cw_source=Spec_source,
-#                                               td_source=Qubit_LO,
-#                                               IVVI=IVVI, rf_RO_source=RF,
-#                                               AWG=AWG,
-#                                               CBox=CBox, heterodyne_instr=HS,
-#                                               MC=MC,
-#                                               server_name=None)
-# station.add_component(DataB)
-# DataM = qbt.Tektronix_driven_transmon('DataM', LO=LO, cw_source=Spec_source,
-#                                               td_source=Qubit_LO,
-#                                               IVVI=IVVI, rf_RO_source=RF,
-#                                               AWG=AWG,
-#                                               CBox=CBox, heterodyne_instr=HS,
-#                                               MC=MC,
-#                                               server_name=None)
-# station.add_component(DataM)
-# DataT = qbt.Tektronix_driven_transmon('DataT', LO=LO, cw_source=Spec_source,
-#                                               td_source=Qubit_LO,
-#                                               IVVI=IVVI, rf_RO_source=RF,
-#                                               AWG=AWG,
-#                                               CBox=CBox, heterodyne_instr=HS,
-#                                               MC=MC,
-#                                               server_name=None)
-# station.add_component(DataT)
-
-MC.station = station
-station.MC = MC
-nested_MC = mc.MeasurementControl('nested_MC')
-nested_MC.station = station
-
-# The AWG sequencer
-station.pulsar = ps.Pulsar()
-station.pulsar.AWG = station.components['AWG']
-for i in range(4):
-    # Note that these are default parameters and should be kept so.
-    # the channel offset is set in the AWG itself. For now the amplitude is
-    # hardcoded. You can set it by hand but this will make the value in the
-    # sequencer different.
-    station.pulsar.define_channel(id='ch{}'.format(i+1),
-                                  name='ch{}'.format(i+1), type='analog',
-                                  # max safe IQ voltage
-                                  high=.7, low=-.7,
-                                  offset=0.0, delay=0, active=True)
-    station.pulsar.define_channel(id='ch{}_marker1'.format(i+1),
-                                  name='ch{}_marker1'.format(i+1),
-                                  type='marker',
-                                  high=2.0, low=0, offset=0.,
-                                  delay=0, active=True)
-    station.pulsar.define_channel(id='ch{}_marker2'.format(i+1),
-                                  name='ch{}_marker2'.format(i+1),
-                                  type='marker',
-                                  high=2.0, low=0, offset=0.,
-                                  delay=0, active=True)
-# to make the pulsar available to the standard awg seqs
-st_seqs.station = station
-sq.station = station
-cal_elts.station = station
+# # The AWG sequencer
+# station.pulsar = ps.Pulsar()
+# station.pulsar.AWG = station.components['AWG']
+# for i in range(4):
+#     # Note that these are default parameters and should be kept so.
+#     # the channel offset is set in the AWG itself. For now the amplitude is
+#     # hardcoded. You can set it by hand but this will make the value in the
+#     # sequencer different.
+#     station.pulsar.define_channel(id='ch{}'.format(i+1),
+#                                   name='ch{}'.format(i+1), type='analog',
+#                                   # max safe IQ voltage
+#                                   high=.7, low=-.7,
+#                                   offset=0.0, delay=0, active=True)
+#     station.pulsar.define_channel(id='ch{}_marker1'.format(i+1),
+#                                   name='ch{}_marker1'.format(i+1),
+#                                   type='marker',
+#                                   high=2.0, low=0, offset=0.,
+#                                   delay=0, active=True)
+#     station.pulsar.define_channel(id='ch{}_marker2'.format(i+1),
+#                                   name='ch{}_marker2'.format(i+1),
+#                                   type='marker',
+#                                   high=2.0, low=0, offset=0.,
+#                                   delay=0, active=True)
+# # to make the pulsar available to the standard awg seqs
+# st_seqs.station = station
+# sq.station = station
+# cal_elts.station = station
 
 t1 = time.time()
-
-
-
 print('Ran initialization in %.2fs' % (t1-t0))
 
 # def all_sources_off():
@@ -212,4 +154,4 @@ def set_integration_weights():
     CBox.sig0_integration_weights(cosI)
     CBox.sig1_integration_weights(sinI)
 from scripts.Experiments.FiveQubits import common_functions as cfct
-cfct.set_AWG_limits(station,1.7)
+#cfct.set_AWG_limits(station,1.7)

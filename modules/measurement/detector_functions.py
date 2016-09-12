@@ -1146,8 +1146,8 @@ class Heterodyne_probe(Soft_Detector):
                 passed = True
             if self.first or c>3:
                 passed = True
-            if not passed:
-                print('retrying HS probe')
+            # if not passed:
+            #     print('retrying HS probe')
             c += 1
         self.last_frequency = self.HS.frequency()
         self.first = False

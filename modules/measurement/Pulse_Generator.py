@@ -14,10 +14,10 @@ import h5py
 #qubit pulses and RO pulses that are generated from all look-up-table based AWG's (so not
 #tektronix  5014 and 520). This module replaces the CBox pulse generator.
 
-def gauss_pulse(amp, sigma_length, axis='x', nr_sigma=4, sampling_rate=0.2,
+def gauss_pulse(amp, sigma_length, axis='x', nr_sigma=4, sampling_rate=2e8,
                 motzoi=0, delay=0):
     '''
-    All inputs are in ns and GHz.
+    All inputs are in s and Hz.
     '''
     # why the Gaussian pulse has different values at [0] and [-1]?
     nr_sigma_samples = int(sigma_length * sampling_rate)
@@ -51,13 +51,13 @@ def gauss_pulse(amp, sigma_length, axis='x', nr_sigma=4, sampling_rate=0.2,
     return pulse_I, pulse_Q
 
 
-def block_pulse(amp, length, sampling_rate=0.2, delay=0, phase=0):
+def block_pulse(amp, length, sampling_rate=2e8, delay=0, phase=0):
     '''
     Generates the envelope of a block pulse.
-        length in ns
-        amp in mV
-        sampling_rate in GHz
-        empty delay in ns
+        length in s
+        amp in V
+        sampling_rate in Hz
+        empty delay in s
         phase in degrees
     '''
     nr_samples = (length+delay)*sampling_rate
@@ -78,9 +78,9 @@ def block_pulse(amp, length, sampling_rate=0.2, delay=0, phase=0):
 
 
 def mod_pulse(pulse_I, pulse_Q, f_modulation,
-              Q_phase_delay=0, sampling_rate=0.2):
+              Q_phase_delay=0, sampling_rate=2e8):
     '''
-    inputs are in ns and GHz.
+    inputs are in s and Hz.
     Q_phase_delay is in degree
 
     transformation:
@@ -107,9 +107,9 @@ def mod_pulse(pulse_I, pulse_Q, f_modulation,
 
 
 def simple_mod_pulse(pulse_I, pulse_Q, f_modulation,
-                     Q_phase_delay=0, sampling_rate=0.2):
+                     Q_phase_delay=0, sampling_rate=2e8):
     '''
-    inputs are in ns and GHz.
+    inputs are in s and Hz.
     Q_phase_delay is in degree
 
     transformation:
@@ -133,10 +133,10 @@ def simple_mod_pulse(pulse_I, pulse_Q, f_modulation,
 
 
 def mod_gauss(amp, sigma_length, f_modulation, axis='x',
-              motzoi=0, sampling_rate=0.2,
+              motzoi=0, sampling_rate=2e8,
               Q_phase_delay=0, delay=0):
     '''
-    Simple gauss pulse maker for CBOX. All inputs are in ns and GHz.
+    Simple gauss pulse maker for CBOX. All inputs are in s and Hz.
     '''
     pulse_I, pulse_Q = gauss_pulse(amp, sigma_length, nr_sigma=4,
                                    sampling_rate=sampling_rate, axis=axis,

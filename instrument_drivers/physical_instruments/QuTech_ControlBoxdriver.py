@@ -627,7 +627,7 @@ class QuTech_ControlBox(VisaInstrument):
         return data
 
     def set_awg_lookuptable(self, awg_nr, table_nr, dac_ch, lut,
-                            length=None, units='mV'):
+                            length=None, units='V'):
         '''
         set the 14 bit values of a lut (V2.0)
 
@@ -647,8 +647,8 @@ class QuTech_ControlBox(VisaInstrument):
 
         '''
 
-        if units == 'mV':
-            lut = lut * 8192/1000.  # dac_peak/V_peak
+        if units == 'V':
+            lut = lut * 8192.  # dac_peak/V_peak
             # do conversion
             pass
         elif units == 'dac':

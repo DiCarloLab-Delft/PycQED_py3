@@ -165,7 +165,7 @@ def Rabi_amp90_seq(scales, pulse_pars, RO_pars, n=1, post_msmt_delay=3e-6,
     station.components['AWG'].stop()
     station.pulsar.program_awg(seq, *el_list, verbose=verbose)
     if return_seq:
-        return seq
+        return seq,el_list
     else:
         return seq_name
 
@@ -204,7 +204,7 @@ def T1_seq(times,
     station.components['AWG'].stop()
     station.pulsar.program_awg(seq, *el_list, verbose=verbose)
     if return_seq:
-        return seq
+        return seq, el_list
     else:
         return seq_name
 
@@ -212,7 +212,8 @@ def T1_seq(times,
 def Ramsey_seq(times, pulse_pars, RO_pars,
                artificial_detuning=None,
                cal_points=True,
-               verbose=False):
+               verbose=False,
+               return_seq=False):
     '''
     Ramsey sequence for a single qubit using the tektronix.
     SSB_Drag pulse is used for driving, simple modualtion used for RO
@@ -247,13 +248,17 @@ def Ramsey_seq(times, pulse_pars, RO_pars,
         seq.append_element(el, trigger_wait=True)
     station.components['AWG'].stop()
     station.pulsar.program_awg(seq, *el_list, verbose=verbose)
-    return seq_name
+    if return_seq:
+        return seq, el_list
+    else:
+        return seq_name
 
 
 def Echo_seq(times, pulse_pars, RO_pars,
              artificial_detuning=None,
              cal_points=True,
-             verbose=False):
+             verbose=False,
+             return_seq=False):
     '''
     Echo sequence for a single qubit using the tektronix.
     Input pars:
@@ -287,11 +292,14 @@ def Echo_seq(times, pulse_pars, RO_pars,
         seq.append_element(el, trigger_wait=True)
     station.components['AWG'].stop()
     station.pulsar.program_awg(seq, *el_list, verbose=verbose)
-    return seq_name
+    if return_seq:
+        return seq, el_list
+    else:
+        return seq_name
 
 
 def AllXY_seq(pulse_pars, RO_pars, double_points=False,
-              verbose=False):
+              verbose=False, return_seq=False):
     '''
     AllXY sequence for a single qubit using the tektronix.
     SSB_Drag pulse is used for driving, simple modualtion used for RO
@@ -328,11 +336,14 @@ def AllXY_seq(pulse_pars, RO_pars, double_points=False,
 
     station.components['AWG'].stop()
     station.pulsar.program_awg(seq, *el_list, verbose=verbose)
-    return seq_name
+    if return_seq:
+        return seq, el_list
+    else:
+        return seq_name
 
 
 def OffOn_seq(pulse_pars, RO_pars,
-              verbose=False, pulse_comb='OffOn'):
+              verbose=False, pulse_comb='OffOn', return_seq=False):
     '''
     OffOn sequence for a single qubit using the tektronix.
     SSB_Drag pulse is used for driving, simple modualtion used for RO
@@ -364,7 +375,10 @@ def OffOn_seq(pulse_pars, RO_pars,
         seq.append_element(el, trigger_wait=True)
     station.components['AWG'].stop()
     station.pulsar.program_awg(seq, *el_list, verbose=verbose)
-    return seq_name
+    if return_seq:
+        return seq, el_list
+    else:
+        return seq_name
 
 
 def Butterfly_seq(pulse_pars, RO_pars, initialize=False,
@@ -510,7 +524,7 @@ def Randomized_Benchmarking_seq(pulse_pars, RO_pars,
 
 
 def Motzoi_XY(motzois, pulse_pars, RO_pars,
-              cal_points=True, verbose=False):
+              cal_points=True, verbose=False, return_seq=False):
     '''
     Sequence used for calibrating the motzoi parameter.
     Consists of Xy and Yx
@@ -554,7 +568,10 @@ def Motzoi_XY(motzois, pulse_pars, RO_pars,
 
     station.components['AWG'].stop()
     station.pulsar.program_awg(seq, *el_list, verbose=verbose)
-    return seq_name
+    if return_seq:
+        return seq, el_list
+    else:
+        return seq_name
 
 # Sequences involving the second excited state
 

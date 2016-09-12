@@ -150,6 +150,15 @@ DataT = qbt.Tektronix_driven_transmon('DataT', LO=LO, cw_source=Spec_source,
                                               server_name=None)
 station.add_component(DataT)
 
+# load settings onto qubits
+gen.load_settings_onto_instrument(AncB)
+gen.load_settings_onto_instrument(AncT)
+gen.load_settings_onto_instrument(DataB)
+gen.load_settings_onto_instrument(DataM)
+gen.load_settings_onto_instrument(DataT)
+gen.load_settings_onto_instrument(HS)
+
+
 MC.station = station
 station.MC = MC
 nested_MC = mc.MeasurementControl('nested_MC')
