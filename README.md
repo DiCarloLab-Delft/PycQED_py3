@@ -1,35 +1,35 @@
 # PycQED
 
-A python based measurement environment for circuit-QED experiments by the [DiCarlo group](http://dicarlolab.tudelft.nl/) at [QuTech](http://qutech.nl/), Delft University of Technology. 
-This module is build on top of qcodes and is not intended as a stand-alone package. 
+A python based measurement environment for circuit-QED experiments by the [DiCarlo group](http://dicarlolab.tudelft.nl/) at [QuTech](http://qutech.nl/), Delft University of Technology.
+This module is build on top of qcodes and is not intended as a stand-alone package.
 
 ## License
 This software is released under the [MIT License](LICENSE.md)
 
-## Contributors 
+## Contributors
 Contributors (in alphabetical order):
-Serwan Asaad, 
-Niels Bultink,  
+Serwan Asaad,
+Niels Bultink,
 Christian Dickel,
 Bart Dikken,
-Xiang Fu, 
+Xiang Fu,
 Sjoerd de Jong,
-Gijs de Lange, 
-Nathan Langford,   
-Florian Luthi, 
+Gijs de Lange,
+Nathan Langford,
+Florian Luthi,
 Adriaan Rol,
 
-## Contributing 
-Thanks for your interest in the project! We welcome pull requests from developers of all skill levels. 
+## Contributing
+Thanks for your interest in the project! We welcome pull requests from developers of all skill levels.
 
-If you find a bug or want to propose a new feature open an issue. If you have written some code that should be merged open a pull request describing your changes and why it should be merged. 
+If you find a bug or want to propose a new feature open an issue. If you have written some code that should be merged open a pull request describing your changes and why it should be merged.
 If you have a question or want to discuss something, feel free to send an email to Adriaan Rol (m.a.rol@tudelft.nl).
 
 ## Installation
 
 To use PycQED, clone this repository and add the directory to your path (no pip-install yet) and make sure you have a working python3 environment with the required dependencies. For more details see the [installation instructions](docs/install.md).
 
-## Usage 
+## Usage
 
 + start up qcodes
 + load corresponding [config file](init\config\)
@@ -50,7 +50,7 @@ from init.your_initscript import *
 You are now ready to start your experiment.
 
 ## Overview of the main modules
-Below follows an overview of the main structure of the code. It makes sense to take a look around here if your are new to get a feeling where to find things. 
+Below follows an overview of the main structure of the code. It makes sense to take a look around here if your are new to get a feeling where to find things.
 Also take a look at [this presentation](docs/160714_qcodes_meetup.pdf), where the relation to qcodes and the core concepts in the package are explained.
 Mind however that the code is continuously under development so if you think something should be in a different location feel free to tap me (Adriaan) on the shoulder or create an issue to discuss it.
 
@@ -91,8 +91,8 @@ MC.set_detector_function(det.HomodyneDetector())
 MC.run()
 ```
 
-A sweep_function determines what parameter is varied, a qcodes parameter that contains a .set method can also be inserted here. 
-A deterector_function determines what parameter is measrued, a qcodes parameter that has a .get method can also be inserted here. 
+A sweep_function determines what parameter is varied, a qcodes parameter that contains a .set method can also be inserted here.
+A deterector_function determines what parameter is measrued, a qcodes parameter that has a .get method can also be inserted here.
 
 #### The qubit object
 The qubit object is a (meta) instrument but it defies the general categorization of the other instruments.
