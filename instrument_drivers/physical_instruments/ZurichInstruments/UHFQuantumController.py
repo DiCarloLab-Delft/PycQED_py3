@@ -27,8 +27,6 @@ class UHFQC(Instrument):
     todo:
     - write all fcuncions for data acquisition
     - write all functions for AWG control
-
-    misc: when device crashes, check the log file in "D:\TUD207933"\My Documents\Zurich Instruments\LabOne\WebServer\Log
     '''
     def __init__(self, name, server_name, address=8004, **kw):
         '''
@@ -65,6 +63,8 @@ class UHFQC(Instrument):
         self._s_file_name ='zi_parameter_files/s_node_pars_{}.txt'.format(self._device)
         self._d_file_name = 'zi_parameter_files/d_node_pars_{}.txt'.format(self._device)
 
+        print(self._s_file_name)
+        print(self._d_file_name)
         try:
             f=open(self._s_file_name).read()
             s_node_pars = json.loads(f)
@@ -116,8 +116,14 @@ class UHFQC(Instrument):
                     set_cmd=self._gen_set_func(seti, parameter[0]),
                     get_cmd=self._gen_get_func(geti, parameter[0]),
                     vals=vals.Ints(parameter[2], parameter[3]))
+            elif parameter[1]=='v':
+                self.add_parameter(
+                    parname,
+                    set_cmd=self._gen_set_func(seti, parameter[0]),
+                    get_cmd=self._gen_get_func(geti, parameter[0]),
+                    vals=vals.Anything())
             else:
-                print("parameter {} type {} from from s_node_pars not recognized".format(parname,parameter[1]))
+                print("settable parameter {} type {} not recognized".format(parname,parameter[1]))
 
         for parameter in d_node_pars:
             parname=parameter[0][9:].replace("/","_")
@@ -125,17 +131,8 @@ class UHFQC(Instrument):
                 self.add_parameter(
                     parname,
                     get_cmd=self._gen_get_func(getd, parameter[0]))
-            elif parameter[1]=='vector_g':
-                self.add_parameter(
-                    parname,
-                    get_cmd=self._gen_get_func(getv, parameter[0]))
-            elif parameter[1]=='vector_s':
-                self.add_parameter(
-                    parname,
-                    set_cmd=self._gen_set_func(setv, parameter[0]),
-                    vals=vals.Anything())
-            else:   
-                print("parameter {} type {} from d_node_pars not recognized".format(parname,parameter[1]))
+            else:
+                print("gettable parameter {} type {} not recognized".format(parname,parameter[1]))
 
 
         # self.add_parameter('awg_sequence',
@@ -201,7 +198,7 @@ class UHFQC(Instrument):
 
         s_node_pars=[]
         d_node_pars=[]
-        patterns = ["awgs", "sigins", "sigouts", "quex"]
+        patterns = ["awgs/0/user"]#, "sigins", "sigouts", "quex"]
         for pattern in patterns:
             print("extracting parameters of type", pattern)
             all_nodes = set(zis.find('*{}*'.format(pattern)))
@@ -253,20 +250,9 @@ class UHFQC(Instrument):
             d_nodes = list(d_nodes)
             #default_values=zis.getd(d_nodes, True)
             default_values=np.zeros(len(d_nodes))
-            node_types = ['']*len(d_nodes)
+            node_types = ['float']*len(d_nodes)
             for i, d_node in enumerate(d_nodes):
-                try: 
-                    answer=zis.getv(d_node)
-                    if isinstance(answer, dict):
-                        value=answer['value'][0]
-                        node_types[i]='float'
-                    elif  isinstance(answer, list):
-                        value=answer[0]['vector']
-                        node_types[i]='vector_g'
-                    else:
-                        print("unknown type")
-                except:
-                    node_types[i]='vector_s'
+                #default_values[i]=zis.getd(d_node, True)
                 line=[d_node, node_types[i]]#, default_values[i]]
                 print(line)
                 d_node_pars.append(line)
