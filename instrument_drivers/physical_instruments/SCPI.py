@@ -20,7 +20,9 @@ from qcodes import IPInstrument
 #	def __init__(self, name, address=None, timeout=5, terminator='', **kwargs):
 class SCPI(IPInstrument):
 	def __init__(self, name, transport, **kwargs):
-		super().__init__(name, address=transport.address, port=transport.port, **kwargs)	# FIXME: temporary glue logic
+		super().__init__(name, address=transport.address, port=transport.port, 
+					write_confirmation=False, 		# does not work with QWG
+					**kwargs)	# FIXME: temporary glue logic
 
 	###
 	# Generic SCPI commands from IEEE 488.2 (IEC 625-2) standard

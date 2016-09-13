@@ -8,8 +8,9 @@
 
 '''
 
+from SCPI import SCPI
+
 import numpy as np
-from qcodes.instrument_drivers.QuTech.AWG5014 import AWG5014
 from qcodes import validators as vals
 
 
@@ -19,11 +20,11 @@ class Transport:
 	# FIXME: define empty virtual functions
 
 class IPTransport(Transport):
-    def __init__(self, address=None, port=None, timeout=5,
-                 terminator='\n', persistent=True, write_confirmation=True,
-                 **kwargs):
-    	self.address = address
-    	self.port = port
+	def __init__(self, address=None, port=None, timeout=5,
+				 terminator='\n', persistent=True, write_confirmation=True,
+				 **kwargs):
+		self.address = address
+		self.port = port
 	# FIXME: define functions based on IPInstrument
 
 
@@ -111,11 +112,11 @@ class SocketTransport(Transport):
 
 
 class QWG(SCPI):
-
 	def __init__(self, name, transport=None, **kwargs):
 		super().__init__(name, transport, **kwargs)
 
-		# override AWG properties
+		# AWG properties
+		self.device_descriptor = type('', (), {})()
 		self.device_descriptor.model = 'QWG'
 		self.device_descriptor.numChannels = 4
 		self.device_descriptor.numDacBits = 12
@@ -123,7 +124,7 @@ class QWG(SCPI):
 		self.device_descriptor.numMarkers = 8
 		self.device_descriptor.numTriggers = 8
 
-		# override valid values
+		# valid values
 		self.device_descriptor.mvals_trigger_impedance = vals.Enum(50),
 		self.device_descriptor.mvals_trigger_level = vals.Numbers(0, 2.5)
 		self.device_descriptor.mvals_channel_amplitude = vals.Numbers(0,1)	# FIXME: not in [V]
@@ -172,97 +173,97 @@ class QWG(SCPI):
 		## NB: code below mostly copied from QCoDeS
 		##########################################################################
 
-        self.add_parameter('run_mode',
-                           get_cmd='AWGC:RMOD?',
-                           set_cmd='AWGC:RMOD ' + '{}',
-                           vals=vals.Enum('CONT', 'TRIG', 'SEQ', 'GAT'))
+		self.add_parameter('run_mode',
+						   get_cmd='AWGC:RMOD?',
+						   set_cmd='AWGC:RMOD ' + '{}',
+						   vals=vals.Enum('CONT', 'TRIG', 'SEQ', 'GAT'))		# FIXME: QWG adds 'TBD' and does not support 'TBD'
 
-        # Trigger parameters #
-        self.add_parameter('trigger_impedance',
-                           label='Trigger impedance (Ohm)',
-                           units='Ohm',
-                           get_cmd='TRIG:IMP?',
-                           set_cmd='TRIG:IMP ' + '{}',
-                           vals=vals.Enum(50, 1000),
-                           get_parser=float)
-        self.add_parameter('trigger_level',
-                           units='V',
-                           label='Trigger level (V)',
-                           get_cmd='TRIG:LEV?',
-                           set_cmd='TRIG:LEV ' + '{:.3f}',
-                           vals=vals.Numbers(-5, 5),
-                           get_parser=float)
-        self.add_parameter('trigger_slope',
-                           get_cmd='TRIG:SLOP?',
-                           set_cmd='TRIG:SLOP ' + '{}',
-                           vals=vals.Enum('POS', 'NEG'))  # ,
-                           # get_parser=self.parse_int_pos_neg)
-        self.add_parameter('trigger_source',
-                           get_cmd='TRIG:source?',
-                           set_cmd='TRIG:source ' + '{}',
-                           vals=vals.Enum('INT', 'EXT'))
+		# Trigger parameters #
+		self.add_parameter('trigger_impedance',
+						   label='Trigger impedance (Ohm)',
+						   units='Ohm',
+						   get_cmd='TRIG:IMP?',
+						   set_cmd='TRIG:IMP ' + '{}',
+						   vals=vals.Enum(50, 1000),
+						   get_parser=float)
+		self.add_parameter('trigger_level',
+						   units='V',
+						   label='Trigger level (V)',
+						   get_cmd='TRIG:LEV?',
+						   set_cmd='TRIG:LEV ' + '{:.3f}',
+						   vals=vals.Numbers(-5, 5),
+						   get_parser=float)
+		self.add_parameter('trigger_slope',
+						   get_cmd='TRIG:SLOP?',
+						   set_cmd='TRIG:SLOP ' + '{}',
+						   vals=vals.Enum('POS', 'NEG'))  # ,
+						   # get_parser=self.parse_int_pos_neg)
+		self.add_parameter('trigger_source',
+						   get_cmd='TRIG:source?',
+						   set_cmd='TRIG:source ' + '{}',
+						   vals=vals.Enum('INT', 'EXT'))
 
-        # Channel parameters #
-        for i in range(1, self.numChannels+1):
-            amp_cmd = 'SOUR{}:VOLT:LEV:IMM:AMPL'.format(i)
-            offset_cmd = 'SOUR{}:VOLT:LEV:IMM:OFFS'.format(i)
-            state_cmd = 'OUTPUT{}:STATE'.format(i)
-            waveform_cmd = 'SOUR{}:WAV'.format(i)
-            # Set channel first to ensure sensible sorting of pars
-            self.add_parameter('ch{}_state'.format(i),
-                               label='Status channel {}'.format(i),
-                               get_cmd=state_cmd + '?',
-                               set_cmd=state_cmd + ' {}',
-                               vals=vals.Ints(0, 1))
-            self.add_parameter('ch{}_amp'.format(i),
-                               label='Amplitude channel {} (Vpp)'.format(i),
-                               units='Vpp',
-                               get_cmd=amp_cmd + '?',
-                               set_cmd=amp_cmd + ' {:.6f}',
-                               vals=vals.Numbers(0.02, 4.5),
-                               get_parser=float)
-            self.add_parameter('ch{}_offset'.format(i),
-                               label='Offset channel {} (V)'.format(i),
-                               units='V',
-                               get_cmd=offset_cmd + '?',
-                               set_cmd=offset_cmd + ' {:.3f}',
-                               vals=vals.Numbers(-.1, .1),
-                               get_parser=float)
-            # FIXME: handle waveform differently?
-            self.add_parameter('ch{}_waveform'.format(i),
-                               label='Waveform channel {}'.format(i),
-                               get_cmd=waveform_cmd + '?',
-                               set_cmd=waveform_cmd + ' "{}"',
-                               vals=vals.Strings(),
-                               get_parser=parsestr)
+		# Channel parameters #
+		for i in range(1, self.device_descriptor.numChannels+1):
+			amp_cmd = 'SOUR{}:VOLT:LEV:IMM:AMPL'.format(i)
+			offset_cmd = 'SOUR{}:VOLT:LEV:IMM:OFFS'.format(i)
+			state_cmd = 'OUTPUT{}:STATE'.format(i)
+			waveform_cmd = 'SOUR{}:WAV'.format(i)
+			# Set channel first to ensure sensible sorting of pars
+			self.add_parameter('ch{}_state'.format(i),
+							   label='Status channel {}'.format(i),
+							   get_cmd=state_cmd + '?',
+							   set_cmd=state_cmd + ' {}',
+							   vals=vals.Ints(0, 1))
+			self.add_parameter('ch{}_amp'.format(i),
+							   label='Amplitude channel {} (Vpp)'.format(i),
+							   units='Vpp',
+							   get_cmd=amp_cmd + '?',
+							   set_cmd=amp_cmd + ' {:.6f}',
+							   vals=vals.Numbers(0.02, 4.5),
+							   get_parser=float)
+			self.add_parameter('ch{}_offset'.format(i),
+							   label='Offset channel {} (V)'.format(i),
+							   units='V',
+							   get_cmd=offset_cmd + '?',
+							   set_cmd=offset_cmd + ' {:.3f}',
+							   vals=vals.Numbers(-.1, .1),
+							   get_parser=float)
+			# FIXME: handle waveform differently?
+#			self.add_parameter('ch{}_waveform'.format(i),
+#							   label='Waveform channel {}'.format(i),
+#							   get_cmd=waveform_cmd + '?',
+#							   set_cmd=waveform_cmd + ' "{}"',
+#							   vals=vals.Strings(),
+#FIXME							   get_parser=parsestr)
 
-            # Marker channel parameters #
-            for j in range(1, self.numMarkers+1):
-                m_del_cmd = 'SOUR{}:MARK{}:DEL'.format(i, j)
-                m_high_cmd = 'SOUR{}:MARK{}:VOLT:LEV:IMM:HIGH'.format(i, j)
-                m_low_cmd = 'SOUR{}:MARK{}:VOLT:LEV:IMM:LOW'.format(i, j)
+			# Marker channel parameters #
+			for j in range(1, self.device_descriptor.numMarkers+1):
+				m_del_cmd = 'SOUR{}:MARK{}:DEL'.format(i, j)
+				m_high_cmd = 'SOUR{}:MARK{}:VOLT:LEV:IMM:HIGH'.format(i, j)
+				m_low_cmd = 'SOUR{}:MARK{}:VOLT:LEV:IMM:LOW'.format(i, j)
 
-                self.add_parameter(
-                    'ch{}_m{}_del'.format(i, j),
-                    label='Channel {} Marker {} delay (ns)'.format(i, j),
-                    get_cmd=m_del_cmd + '?',
-                    set_cmd=m_del_cmd + ' {:.3f}e-9',
-                    vals=vals.Numbers(0, 1),
-                    get_parser=float)
-                self.add_parameter(
-                    'ch{}_m{}_high'.format(i, j),
-                    label='Channel {} Marker {} high level (V)'.format(i, j),
-                    get_cmd=m_high_cmd + '?',
-                    set_cmd=m_high_cmd + ' {:.3f}',
-                    vals=vals.Numbers(-2.7, 2.7),
-                    get_parser=float)
-                self.add_parameter(
-                    'ch{}_m{}_low'.format(i, j),
-                    label='Channel {} Marker {} low level (V)'.format(i, j),
-                    get_cmd=m_low_cmd + '?',
-                    set_cmd=m_low_cmd + ' {:.3f}',
-                    vals=vals.Numbers(-2.7, 2.7),
-                    get_parser=float)
+				self.add_parameter(
+					'ch{}_m{}_del'.format(i, j),
+					label='Channel {} Marker {} delay (ns)'.format(i, j),
+					get_cmd=m_del_cmd + '?',
+					set_cmd=m_del_cmd + ' {:.3f}e-9',
+					vals=vals.Numbers(0, 1),
+					get_parser=float)
+				self.add_parameter(
+					'ch{}_m{}_high'.format(i, j),
+					label='Channel {} Marker {} high level (V)'.format(i, j),
+					get_cmd=m_high_cmd + '?',
+					set_cmd=m_high_cmd + ' {:.3f}',
+					vals=vals.Numbers(-2.7, 2.7),
+					get_parser=float)
+				self.add_parameter(
+					'ch{}_m{}_low'.format(i, j),
+					label='Channel {} Marker {} low level (V)'.format(i, j),
+					get_cmd=m_low_cmd + '?',
+					set_cmd=m_low_cmd + ' {:.3f}',
+					vals=vals.Numbers(-2.7, 2.7),
+					get_parser=float)
 
 
 
@@ -497,125 +498,125 @@ class QWG(SCPI):
 		self.write('awgcontrol:stop:immediate')
 
 
-    ## functions: menu Setup|Horizontal 
-    def setClockRefInternal(self):
-        self.write(':roscillator:source internal')
-    
-    def setClockRefExternal(self):
-        self.write(':roscillator:source external');
-    
-    ## functions: menu Setup|Horizontal 
-    def setClockSourceInternal(self):
-        self.write('awgcontrol:clock:source internal')
-    
-    def setClockSourceExternal(self):
-        self.write('awgcontrol:clock:source external')
-       
-    def setClockFrequency(self, frequency):
-        ''' frequency:      AWG520:     TBD
-                            AWG5014:    10 MHz..10GHz (FIXME: TBC)
-        '''
-        self.write('source1:frequency %f' % frequency)
-    
-    def setTriggerInterval(self, interval):
-        ''' interval:           AWG520: 1.0 us to 10.0 s.
-        '''
-        self.write('trigger:timer %f' % interval)
-    
+	## functions: menu Setup|Horizontal 
+	def setClockRefInternal(self):
+		self.write(':roscillator:source internal')
+	
+	def setClockRefExternal(self):
+		self.write(':roscillator:source external');
+	
+	## functions: menu Setup|Horizontal 
+	def setClockSourceInternal(self):
+		self.write('awgcontrol:clock:source internal')
+	
+	def setClockSourceExternal(self):
+		self.write('awgcontrol:clock:source external')
+	   
+	def setClockFrequency(self, frequency):
+		''' frequency:      AWG520:     TBD
+							AWG5014:    10 MHz..10GHz (FIXME: TBC)
+		'''
+		self.write('source1:frequency %f' % frequency)
+	
+	def setTriggerInterval(self, interval):
+		''' interval:           AWG520: 1.0 us to 10.0 s.
+		'''
+		self.write('trigger:timer %f' % interval)
+	
 
 
-    ##########################################################################
-    ## Generic AWG functions also implemented as Parameter
-    ## to be deprecated in the future
-    ##########################################################################
+	##########################################################################
+	## Generic AWG functions also implemented as Parameter
+	## to be deprecated in the future
+	##########################################################################
 
 
-    # NB: functions are organised by their appearance in the AWG520 user interface
-    ## functions: menu Setup|Vertical 
-    def setOffset(self, ch, offset):
-        ''' ch:             AWG520: 1,2 (and 7,8 see documentation)
-            offset:         AWG520: -1.000V to +1.000V in 1 mV steps
-        '''
-        self.write('source%d:voltage:level:immediate:offset %f' % (ch, offset))
-            
-    def getOffset(self, ch):
-        ''' ch:             AWG520: 1,2 (and 7,8 see documentation)
-        '''
-        return self.askDouble('source%d:voltage:level:immediate:offset?' % ch)
-            
-    ## functions: menu Setup|Vertical 
-    def setAmplitude(self, ch, amplitude):
-        ''' ch:             AWG520: 1,2 (and 7,8 see documentation)
-            amplitude:      AWG520: 0.020Vpp to 2.000Vpp in 1 mV steps
-        '''
-        self.write('source%d:voltage:level:immediate:amplitude %f' % (ch, amplitude))
-    
-    def getAmplitude(self, ch):
-        ''' ch:             AWG520: 1,2 (and 7,8 see documentation)
-        '''
-        return self.askDouble('source%d:voltage:level:immediate:amplitude?' % ch)
-    
-    def setMarkerVoltageLow(self, ch, marker, voltage):
-        ''' ch:             AWG520: 1,2
-            marker:         AWG520: 1,2
-            amplitude:      AWG520: -2V to 2V in 0.05V steps
-        '''
-        self.write('source%d:marker%d:voltage:high %f' % (ch, marker, voltage))
-    
-    def setMarkerVoltageHigh(self, ch, marker, voltage):
-        ''' ch:             AWG520: 1,2
-            marker:         AWG520: 1,2
-            amplitude:      AWG520: -2V to 2V in 0.05V steps
-        '''
-        self.write('source%d:marker%d:voltage:high %f' % (ch, marker, voltage))
-    
-    
-    ## functions: Button interface
-    def setOutputStateOn(self, ch):
-        ''' ch:             AWG520: 1,2 (and 7 see documentation)
-            NB: only works if waveform is defined or def Generator is on
-        '''
-        self.write('output%d:state on' % ch)
-    
-    def setOutputStateOff(self, ch):
-        ''' ch:             AWG520: 1,2 (and 7 see documentation)
-        '''
-        self.write('output%d:state off' % ch);
+	# NB: functions are organised by their appearance in the AWG520 user interface
+	## functions: menu Setup|Vertical 
+	def setOffset(self, ch, offset):
+		''' ch:             AWG520: 1,2 (and 7,8 see documentation)
+			offset:         AWG520: -1.000V to +1.000V in 1 mV steps
+		'''
+		self.write('source%d:voltage:level:immediate:offset %f' % (ch, offset))
+			
+	def getOffset(self, ch):
+		''' ch:             AWG520: 1,2 (and 7,8 see documentation)
+		'''
+		return self.askDouble('source%d:voltage:level:immediate:offset?' % ch)
+			
+	## functions: menu Setup|Vertical 
+	def setAmplitude(self, ch, amplitude):
+		''' ch:             AWG520: 1,2 (and 7,8 see documentation)
+			amplitude:      AWG520: 0.020Vpp to 2.000Vpp in 1 mV steps
+		'''
+		self.write('source%d:voltage:level:immediate:amplitude %f' % (ch, amplitude))
+	
+	def getAmplitude(self, ch):
+		''' ch:             AWG520: 1,2 (and 7,8 see documentation)
+		'''
+		return self.askDouble('source%d:voltage:level:immediate:amplitude?' % ch)
+	
+	def setMarkerVoltageLow(self, ch, marker, voltage):
+		''' ch:             AWG520: 1,2
+			marker:         AWG520: 1,2
+			amplitude:      AWG520: -2V to 2V in 0.05V steps
+		'''
+		self.write('source%d:marker%d:voltage:high %f' % (ch, marker, voltage))
+	
+	def setMarkerVoltageHigh(self, ch, marker, voltage):
+		''' ch:             AWG520: 1,2
+			marker:         AWG520: 1,2
+			amplitude:      AWG520: -2V to 2V in 0.05V steps
+		'''
+		self.write('source%d:marker%d:voltage:high %f' % (ch, marker, voltage))
+	
+	
+	## functions: Button interface
+	def setOutputStateOn(self, ch):
+		''' ch:             AWG520: 1,2 (and 7 see documentation)
+			NB: only works if waveform is defined or def Generator is on
+		'''
+		self.write('output%d:state on' % ch)
+	
+	def setOutputStateOff(self, ch):
+		''' ch:             AWG520: 1,2 (and 7 see documentation)
+		'''
+		self.write('output%d:state off' % ch);
 
-    ## functions: menu Setup|Trigger
-    def setTriggerSourceInternal(self):
-        self.write('trigger:source internal')
+	## functions: menu Setup|Trigger
+	def setTriggerSourceInternal(self):
+		self.write('trigger:source internal')
 
-    def setTriggerSourceExternal(self):
-        self.write('trigger:source external')
+	def setTriggerSourceExternal(self):
+		self.write('trigger:source external')
 
-    def setTriggerSlopePositive(self):
-        self.write('trigger:slope positive')
-    
-    def setTriggerSlopeNegative(self):
-        self.write('trigger:slope negative')
-    
-    def setTriggerLevel(self, level):
-        ''' level:              AWG520: -5.0 V to +5.0 V, in 0.1 V steps
-        '''
-        self.write('trigger:level %f' % level)
+	def setTriggerSlopePositive(self):
+		self.write('trigger:slope positive')
+	
+	def setTriggerSlopeNegative(self):
+		self.write('trigger:slope negative')
+	
+	def setTriggerLevel(self, level):
+		''' level:              AWG520: -5.0 V to +5.0 V, in 0.1 V steps
+		'''
+		self.write('trigger:level %f' % level)
 
-    def setTriggerImpedance50ohm(self):
-        self.write('trigger:impedance 50')
-    
+	def setTriggerImpedance50ohm(self):
+		self.write('trigger:impedance 50')
+	
 
-    ## functions: menu Setup|Run Mode
-    def setRunModeEnhanced(self):
-        ''' NB: note that for AWG5014, 'enhanced' is identical to 'sequence'
-        '''
-        self.write('awgcontrol:rmode enhanced') 
-    
-    def setRunModeSequence(self):
-        self.write('awgcontrol:rmode seq')
-    
-    def setRunModeContinuous(self):
-        self.write('awgcontrol:rmode cont')
-    
+	## functions: menu Setup|Run Mode
+	def setRunModeEnhanced(self):
+		''' NB: note that for AWG5014, 'enhanced' is identical to 'sequence'
+		'''
+		self.write('awgcontrol:rmode enhanced') 
+	
+	def setRunModeSequence(self):
+		self.write('awgcontrol:rmode seq')
+	
+	def setRunModeContinuous(self):
+		self.write('awgcontrol:rmode cont')
+	
 
 # FIXME: old
 #	def ReadPatFile(self)
