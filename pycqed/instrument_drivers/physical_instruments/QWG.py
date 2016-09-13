@@ -173,19 +173,22 @@ class QWG(SCPI):
 		## NB: code below mostly copied from QCoDeS
 		##########################################################################
 
+	   # Compatibility: 5015, QWG: FIXME: QWG adds 'TBD' and does not support 'TBD'
 		self.add_parameter('run_mode',
 						   get_cmd='AWGC:RMOD?',
 						   set_cmd='AWGC:RMOD ' + '{}',
-						   vals=vals.Enum('CONT', 'TRIG', 'SEQ', 'GAT'))		# FIXME: QWG adds 'TBD' and does not support 'TBD'
+						   vals=vals.Enum('CONT', 'TRIG', 'SEQ', 'GAT'))		
 
 		# Trigger parameters #
-		self.add_parameter('trigger_impedance',
+		self.add_parameter('trigger_impedance',		
 						   label='Trigger impedance (Ohm)',
 						   units='Ohm',
 						   get_cmd='TRIG:IMP?',
 						   set_cmd='TRIG:IMP ' + '{}',
 						   vals=vals.Enum(50, 1000),
 						   get_parser=float)
+
+		# Compatibility: 5014, QWG FIXME: different range
 		self.add_parameter('trigger_level',
 						   units='V',
 						   label='Trigger level (V)',
@@ -193,11 +196,13 @@ class QWG(SCPI):
 						   set_cmd='TRIG:LEV ' + '{:.3f}',
 						   vals=vals.Numbers(-5, 5),
 						   get_parser=float)
+		
 		self.add_parameter('trigger_slope',
 						   get_cmd='TRIG:SLOP?',
 						   set_cmd='TRIG:SLOP ' + '{}',
 						   vals=vals.Enum('POS', 'NEG'))  # ,
 						   # get_parser=self.parse_int_pos_neg)
+		
 		self.add_parameter('trigger_source',
 						   get_cmd='TRIG:source?',
 						   set_cmd='TRIG:source ' + '{}',
@@ -210,11 +215,15 @@ class QWG(SCPI):
 			state_cmd = 'OUTPUT{}:STATE'.format(i)
 			waveform_cmd = 'SOUR{}:WAV'.format(i)
 			# Set channel first to ensure sensible sorting of pars
+
+			# Compatibility: 5014, QWG 
 			self.add_parameter('ch{}_state'.format(i),
 							   label='Status channel {}'.format(i),
 							   get_cmd=state_cmd + '?',
 							   set_cmd=state_cmd + ' {}',
 							   vals=vals.Ints(0, 1))
+
+			# Compatibility: 5014, QWG (FIXME: different range, not in V)
 			self.add_parameter('ch{}_amp'.format(i),
 							   label='Amplitude channel {} (Vpp)'.format(i),
 							   units='Vpp',
@@ -222,6 +231,8 @@ class QWG(SCPI):
 							   set_cmd=amp_cmd + ' {:.6f}',
 							   vals=vals.Numbers(0.02, 4.5),
 							   get_parser=float)
+
+			# Compatibility: 5014, QWG (FIXME: different range, not in V)
 			self.add_parameter('ch{}_offset'.format(i),
 							   label='Offset channel {} (V)'.format(i),
 							   units='V',
@@ -229,6 +240,7 @@ class QWG(SCPI):
 							   set_cmd=offset_cmd + ' {:.3f}',
 							   vals=vals.Numbers(-.1, .1),
 							   get_parser=float)
+
 			# FIXME: handle waveform differently?
 #			self.add_parameter('ch{}_waveform'.format(i),
 #							   label='Waveform channel {}'.format(i),
@@ -250,6 +262,7 @@ class QWG(SCPI):
 					set_cmd=m_del_cmd + ' {:.3f}e-9',
 					vals=vals.Numbers(0, 1),
 					get_parser=float)
+
 				self.add_parameter(
 					'ch{}_m{}_high'.format(i, j),
 					label='Channel {} Marker {} high level (V)'.format(i, j),
@@ -257,6 +270,7 @@ class QWG(SCPI):
 					set_cmd=m_high_cmd + ' {:.3f}',
 					vals=vals.Numbers(-2.7, 2.7),
 					get_parser=float)
+
 				self.add_parameter(
 					'ch{}_m{}_low'.format(i, j),
 					label='Channel {} Marker {} low level (V)'.format(i, j),
@@ -318,6 +332,7 @@ class QWG(SCPI):
 	def setWaveform(self, ch, name):
 		'''	ch:				1..4
 			name:			waveform name excluding double quotes, e.g. '*Sine100'
+			Compatibility:	5014, QWG
 		'''
 		self.write('source%d:waveform "%s"' % (ch, name))
 	
@@ -326,6 +341,7 @@ class QWG(SCPI):
 		'''	NB: applies to waveforms only, in non-sequence mode
 			ch:				1,2
 			phase:			-180 to 180 [deg], steps not defined
+			Compatibility:	5014
 		'''
 		self.write('source%d:phase %f' % (ch, phase))
 	
@@ -346,6 +362,7 @@ class QWG(SCPI):
 	
 	def setSeqElemWaveform(self, element, ch, name):
 		''' element:		1..length
+			Compatibility:	5014, QWG
 		'''
 		self.write('sequence:element%d:waveform%d "%s"' % (element, ch, name))
 	
@@ -361,7 +378,7 @@ class QWG(SCPI):
 		return self.ask('wlist:name? %d' % idx)
 	
 	def getWlist(self):
-		''' NB: takes a few seconds: our fault or Tek's?
+		''' NB: takes a few seconds on 5014: our fault or Tek's?
 		'''
 		size = self.getWlistSize()
 		wlist = []									# empty list
@@ -371,9 +388,12 @@ class QWG(SCPI):
 	
 	def deleteWaveform(self, name):
 		'''	name:		waveform name excluding double quotes, e.g. 'test'
+			Compatibility:	5014, QWG
 		'''
 		self.write('wlist:waveform:delete "%s"' % name)
 		
+		'''	Compatibility:	5014, QWG
+		'''
 	def deleteWaveformAll(self):
 		self.write('wlist:waveform:delete all')
 	
@@ -400,6 +420,8 @@ class QWG(SCPI):
 				name:		string				waveform name excluding double quotes, e.g. '*Sine100'
 			Output:	
 				tuple containing lists: (waveform, marker1, marker2)
+
+			Compatibility:	5014, QWG
 
 			Funny old Matlab timing results:
 				tic;[waveform,marker1,marker2] = awg.getWaveformData('*Sine100');toc
@@ -434,6 +456,7 @@ class QWG(SCPI):
 				marker1 	int[numpoints]		vector of 0 and 1 defining the first marker
 				marker2 	int[numpoints]		vector of 0 and 1 defining the second marker
 		
+			Compatibility:	5014, QWG
 			Based on:
 				Tektronix_AWG5014.py::send_waveform, which sends data to an AWG _file_, not a memory waveform
 				'awg_transferRealDataWithMarkers', Author = Stefano Poletto, Compatibility = Tektronix AWG5014, AWG7102
