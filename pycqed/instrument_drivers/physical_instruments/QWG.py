@@ -279,7 +279,8 @@ class QWG(SCPI):
 					vals=vals.Numbers(-2.7, 2.7),
 					get_parser=float)
 
-
+			# functions
+#			self.add_function('createWaveformReal')
 
 	
 	##########################################################################
@@ -287,8 +288,10 @@ class QWG(SCPI):
 	##########################################################################
 
 	def syncSidebandGenerators(self):
-		''' 
-		'''
+		"""
+		Synchronize both sideband frequency generators, i.e. restart them
+		with their defined phases.
+		"""
 		self.write('QUTEch:OUTPut:SYNCsideband')
 
 	##########################################################################
@@ -307,7 +310,7 @@ class QWG(SCPI):
 			chPair (int): the channel pair to use, 1 or 3
 
 			frequency (float): the sideband frequency in [Hz], range
-			-MAXF..MAXF in 0.23 Hz steps. MAXF is currently 300 MHz
+				-MAXF..MAXF in 0.23 Hz steps. MAXF is currently 300 MHz
 		"""
 		self.write('qutech:output%d:frequency %f' % (chPair,frequency))
 
@@ -330,10 +333,17 @@ class QWG(SCPI):
 	## AWG5014 functions: SOURCE
 	#####################################################################################
 	def setWaveform(self, ch, name):
-		'''	ch:				1..4
-			name:			waveform name excluding double quotes, e.g. '*Sine100'
-			Compatibility:	5014, QWG
-		'''
+		"""
+		Set the waveform for a channel
+
+		Args:
+			ch (int): the AWG channel number (1..4)
+
+			name (string): name of a waveform available in the AWG, excluding double 
+				quotes, e.g. '*Sine100'
+
+		Compatibility:	5014, QWG
+		"""
 		self.write('source%d:waveform "%s"' % (ch, name))
 	
 	
@@ -361,9 +371,18 @@ class QWG(SCPI):
 		self.write('sequence:element%d:loop:infinite on' % element)
 	
 	def setSeqElemWaveform(self, element, ch, name):
-		''' element:		1..length
-			Compatibility:	5014, QWG
-		'''
+		"""
+		Set the waveform for a sequence element
+
+		Args:
+			element (int): index of sequence element (valid range: 1..length)
+
+			ch (int): AWG channel where waveform is put
+
+			waveform (string): name of waveform in AWG memory
+
+		Compatibility:	5014, QWG
+		"""
 		self.write('sequence:element%d:waveform%d "%s"' % (element, ch, name))
 	
 	#####################################################################################
@@ -447,21 +466,25 @@ class QWG(SCPI):
 	
 	
 	def sendWaveformDataReal(self, name, waveform, marker1, marker2):
-		'''	send waveform and markers directly to AWG memory, i.e. not to a file on the AWG disk.
-			NB: uses real data normalized to the range from -1 to 1 (independent of number of DAC bits of AWG)
+		"""
+		send waveform and markers directly to AWG memory, i.e. not to a file on the AWG disk.
+		NB: uses real data normalized to the range from -1 to 1 (independent of number of DAC bits of AWG)
 
-			Input:
-				name 		string				waveform name excluding double quotes, e.g. 'test'. Must already exits in AWG
-				waveform 	float[numpoints]	vector defining the waveform, normalized between -1.0 and 1.0
-				marker1 	int[numpoints]		vector of 0 and 1 defining the first marker
-				marker2 	int[numpoints]		vector of 0 and 1 defining the second marker
+			Args:
+				name (string): waveform name excluding double quotes, e.g. 'test'. Must already exits in AWG
+
+				waveform (float[numpoints]): vector defining the waveform, normalized between -1.0 and 1.0
+
+				marker1 (int[numpoints]): vector of 0 and 1 defining the first marker
+
+				marker2 (int[numpoints]): vector of 0 and 1 defining the second marker
 		
 			Compatibility:	5014, QWG
+
 			Based on:
 				Tektronix_AWG5014.py::send_waveform, which sends data to an AWG _file_, not a memory waveform
 				'awg_transferRealDataWithMarkers', Author = Stefano Poletto, Compatibility = Tektronix AWG5014, AWG7102
-
-		'''
+		"""
 
 		# parameter handling
 		if len(marker1)==0 and len(marker2)==0:									# no marker data
@@ -487,8 +510,20 @@ class QWG(SCPI):
 
 	
 	def createWaveformReal(self, name, waveform, marker1, marker2):
-		''' convenience function to create a waveform in the AWG and then send data to it
-		'''
+		"""
+		Convenience function to create a waveform in the AWG and then send data to it
+
+		Args:
+			name(string): name of waveform for internal use by the AWG
+
+				waveform (float[numpoints]): vector defining the waveform, normalized between -1.0 and 1.0
+
+				marker1 (int[numpoints]): vector of 0 and 1 defining the first marker
+
+				marker2 (int[numpoints]): vector of 0 and 1 defining the second marker
+
+			Compatibility:	5014, QWG
+		"""
 		waveLen = len(waveform);
 #		if self.paranoid:
 			# check waveform is there, problems might arise if it already existed
