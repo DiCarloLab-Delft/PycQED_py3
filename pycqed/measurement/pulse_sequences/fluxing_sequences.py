@@ -1,4 +1,5 @@
 import logging
+import os
 import numpy as np
 from copy import deepcopy
 try:
@@ -19,77 +20,67 @@ reload(pulse_library)
 
 station = None
 reload(element)
+kernel_dir_path = 'kernels/'
 # You need to explicitly set this before running any functions from this module
 # I guess there are cleaner solutions :)
 
 
-def single_pulse_seq(pulse_pars={}, , verbose=False, return_seq=False):
+def single_pulse_seq(pulse_pars=None,
+                     verbose=False,
+                     distortion_dict=None,
+                     return_seq=False):
     '''
 
     '''
     if pulse_pars is None:
-        square_pulse = {'pulse_type': 'SquarePulse',
-                        'pulse_delay': delay,
-                        'channel': 'ch3',
-                        'amplitude': amp,
-                        'length': length}
-
+        pulse_pars = {'pulse_type': 'SquarePulse',
+                      'pulse_delay': .1e-6,
+                      'channel': 'ch3',
+                      'amplitude': 0.5,
+                      'length': .1e-6,
+                      'dead_time_length': 3e-6}
+    dead_time_pulse = {'pulse_type': 'SquarePulse',
+                       'pulse_delay': (pulse_pars['length'] +
+                                       pulse_pars['pulse_delay']),
+                       'channel': 'ch3',
+                       'amplitude': 0,
+                       'length': pulse_pars['dead_time_length']}
     seq_name = 'Square_seq'
     seq = sequence.Sequence(seq_name)
     el_list = []
-    for i, iter in enumerate([0,1]):  # seq has to have at least 2 elts
+    for i, iter in enumerate([0, 1]):  # seq has to have at least 2 elts
 
-        pulse_list = [square_pulse]
+        pulse_list = [pulse_pars, dead_time_pulse]
 
         el = multi_pulse_elt(i, station, pulse_list)
         el_list.append(el)
-        seq.append_element(el, trigger_wait=True)
-    station.components['AWG'].stop()
-    station.pulsar.program_awg(seq, *el_list, verbose=verbose)
-    if return_seq:
-        return seq,el_list
-    else:
-        return seq
 
-def OffOn_seq(pulse_pars, RO_pars,
-              verbose=False, pulse_comb='OffOn', return_seq=False):
-    '''
-    OffOn sequence for a single qubit using the tektronix.
-    SSB_Drag pulse is used for driving, simple modualtion used for RO
-    Input pars:
-        pulse_pars:          dict containing the pulse parameters
-        RO_pars:             dict containing the RO parameters
-        Initialize:          adds an exta measurement before state preparation
-                             to allow initialization by post-selection
-        Post-measurement delay:  should be sufficiently long to avoid
-                             photon-induced gate errors when post-selecting.
-        pulse_comb:          OffOn/OnOn/OffOff cobmination of pulses to play
-    '''
-    seq_name = 'OffOn_sequence'
-    seq = sequence.Sequence(seq_name)
-    el_list = []
-    # Create a dict with the parameters for all the pulses
-    pulses = get_pulse_dict_from_pars(pulse_pars)
-
-    if pulse_comb == 'OffOn':
-        pulse_combinations = ['I', 'X180']
-    elif pulse_comb == 'OnOn':
-        pulse_combinations = ['X180', 'X180']
-    elif pulse_comb == 'OffOff':
-        pulse_combinations = ['I', 'I']
-
-    for i, pulse_comb in enumerate(pulse_combinations):
-        el = multi_pulse_elt(i, station, [pulses[pulse_comb], RO_pars])
-        el_list.append(el)
+    for i, el in enumerate(el_list):
+        if distortion_dict is not None:
+            el = distort(el, distortion_dict)
+            el_list[i] = el
         seq.append_element(el, trigger_wait=True)
     station.components['AWG'].stop()
     station.pulsar.program_awg(seq, *el_list, verbose=verbose)
     if return_seq:
         return seq, el_list
     else:
-        return seq_name
+        return seq
 
-# Helper functions
+
+def distort(element, distortion_dict):
+    t_vals, outputs_dict = element.waveforms()
+    for ch in distortion_dict['ch_list']:
+        element._channels[ch]['distorted'] = True
+        length = len(outputs_dict[ch])
+        # kernels commute, since they are convolutions!
+        for kernel in distortion_dict[ch]:
+            print('Trying to open {}'.format(kernel_dir_path+kernel))
+            # print(os.path.isfile('kernels/'+kernel))
+            kernelvec = np.loadtxt(kernel_dir_path+kernel)
+            outputs_dict[ch] = np.convolve(outputs_dict[ch], kernelvec)[:length]
+        element.distorted_wfs[ch] = outputs_dict[ch]
+    return element
 
 def get_pulse_dict_from_pars(pulse_pars):
     '''

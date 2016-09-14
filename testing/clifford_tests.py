@@ -1,13 +1,13 @@
 import numpy as np
 from unittest import TestCase
 
-from measurement.randomized_benchmarking.clifford_group import(
+from pycqed.measurement.randomized_benchmarking.clifford_group import(
     clifford_lookuptable, Clifford_group)
 
-import measurement.randomized_benchmarking.randomized_benchmarking \
+import pycqed.measurement.randomized_benchmarking.randomized_benchmarking \
     as rb
 
-from measurement.randomized_benchmarking.clifford_decompositions \
+from pycqed.measurement.randomized_benchmarking.clifford_decompositions \
     import(gate_decomposition)
 
 
