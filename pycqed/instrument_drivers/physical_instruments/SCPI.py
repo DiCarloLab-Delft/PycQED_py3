@@ -99,9 +99,12 @@ class SCPI(IPInstrument):
 				binBlock	bytearray
 				header 		string
 		''' 
-		totHdr = header + SCPIdriver.buildHeaderString(len(binBlock))
+		totHdr = header + SCPI.buildHeaderString(len(binBlock))
 		binMsg = totHdr.encode() + binBlock
-		self.writeBinary(binMsg)
+#		self.writeBinary(binMsg)
+#		self.write_raw(binMsg.decode("utf-8"))		# FIXME: Instrument does not have writeBinary, see whether this works
+#		self.write(binMsg.decode())		# FIXME: Instrument does not have writeBinary, see whether this works
+		self._socket.send(binMsg)		# FIXME: hack
 		self.write('')										# add a Line Terminator
 	
 	def binBlockRead(self):

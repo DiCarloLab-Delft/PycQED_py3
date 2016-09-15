@@ -11,6 +11,7 @@
 from SCPI import SCPI
 
 import numpy as np
+import struct
 from qcodes import validators as vals
 
 
@@ -113,7 +114,7 @@ class SocketTransport(Transport):
 
 class QWG(SCPI):
 	def __init__(self, name, transport=None, **kwargs):
-		super().__init__(name, transport, **kwargs)
+		super().__init__(name, transport, **kwargs)	
 
 		# AWG properties
 		self.device_descriptor = type('', (), {})()

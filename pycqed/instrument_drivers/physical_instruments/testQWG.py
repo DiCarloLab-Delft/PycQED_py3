@@ -34,11 +34,11 @@ marker2 = []
 
 
 
-if 0:
-	qwg1 = QWG('QWG-1', IPTransport('192.168.42.10', 5025))
+if 1:
+	qwg1 = QWG('QWG-1', IPTransport('192.168.42.10', 5025), server_name=None)
 else:
 	# local variant, in combination with 'nc -l 5025' run locally from a terminal
-	qwg1 = QWG('QWG-1', IPTransport('127.0.0.1', 5025))
+	qwg1 = QWG('QWG-1', IPTransport('127.0.0.1', 5025), server_name=None)
 
 qwg1.reset()
 
@@ -83,9 +83,9 @@ else:	# codeword based
 	qwg1.setWaveform(3, 'zero')
 	qwg1.setWaveform(4, 'zero')
 
-	# segment 1: (NB: multi-segment handling is a temporary hack)
 	seg=0
 
+	# segment 1: 
 	seg = seg+1
 	qwg1.setSeqElemWaveform(seg, 1, 'hi')
 	qwg1.setSeqElemWaveform(seg, 2, 'hi')
