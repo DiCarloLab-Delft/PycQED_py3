@@ -293,7 +293,6 @@ class UHFQC(Instrument):
 
 
     def setd(self, path, value):
-        print(path)
         # Handle absolute path
         if path[0] == '/':
             self._daq.setDouble(path, value)
@@ -301,7 +300,6 @@ class UHFQC(Instrument):
             self._daq.setDouble('/' + self._device + '/' + path, value)
 
     def seti(self, path, value):
-        print(path)
         # Handle absolute path
         if path[0] == '/':
             self._daq.setInt(path, value)
