@@ -8,7 +8,6 @@ import cmath #only used to get phase from complex number.
 import logging
 import time
 from analysis import analysis_toolbox as a_tools
-from analysis.fit_toolbox import functions as fn
 from measurement.waveform_control import pulse
 from measurement.waveform_control import pulse_library as pl
 from measurement.waveform_control import pulsar
@@ -1493,3 +1492,63 @@ class CBox_v3_single_int_avg_with_LutReload(CBox_v3_single_integration_average_d
                         pulse_name, awg_nr)
 
         return super().acquire_data_point(**kw)
+
+
+# --------------------------------------------
+# Zurich Instruments UHFQC detector functions
+# --------------------------------------------
+
+class UHFQC_input_average_detector(Hard_Detector):
+    '''
+    Detector used for acquiring averaged input traces withe the UHFQC
+
+    '''
+
+    '''
+    Detector used for acquiring single points of the CBox while externally
+    triggered by the AWG.
+    Soft version of the regular integrated avg detector.
+
+    Has two acq_modes, 'IQ' and 'AmpPhase'
+    '''
+    def __init__(self, UHFQC, AWG, channels=[0,1],**kw):
+        super(UHFQC_input_average_detector, self).__init__()
+        self.UHFQC = UHFQC
+        self.name = 'UHFQC_Streaming_data'
+        self.channels=channels
+        self.value_names = ['']*len(self.channels)
+        self.value_units = ['']*len(self.channels)
+        for i,channel in enumerate(self.channels):
+            self.value_names[i] = 'ch{}'.format(channel)
+            self.value_units[i] = 'V'
+        self.AWG = AWG
+
+
+    def get_values(self):
+        print("hoi")
+        self.UHFQC.awgs_0_single(1)
+        self.UHFQC.awgs_0_enable(1)
+        if self.AWG is not None:
+            self.AWG.start()
+        while self.UHFQC.awgs_0_enable() == 1:
+            time.sleep(0.1)
+        data=['']*len(self.channels)
+        for i,channel in enumerate(self.channels):
+            print(i)
+            dataset=eval("self.UHFQC.quex_iavg_data_{}()".format(channel))
+            data[i]=dataset[0]['vector']
+        return data
+
+    def prepare(self, sweep_points):
+        if self.AWG is not None:
+            self.AWG.stop()
+
+    def finish(self):
+        if self.AWG is not None:
+            self.AWG.stop()
+
+
+
+
+
+
