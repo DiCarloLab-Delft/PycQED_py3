@@ -38,10 +38,19 @@ def single_pulse_seq(pulse_pars=None,
                       'channel': 'ch3',
                       'amplitude': 0.5,
                       'length': .1e-6,
-                      'dead_time_length': 3e-6}
+                      'dead_time_length': 10e-6}
+    minus_pulse_pars = {'pulse_type': 'SquarePulse',
+                  'pulse_delay': 3e-6 + pulse_pars['length'] + pulse_pars['pulse_delay'],
+                  'channel': 'ch3',
+                  'amplitude': -pulse_pars['amplitude'],
+                  'length': pulse_pars['length'],
+                  'dead_time_length': 10e-6}
+
     dead_time_pulse = {'pulse_type': 'SquarePulse',
                        'pulse_delay': (pulse_pars['length'] +
-                                       pulse_pars['pulse_delay']),
+                                       pulse_pars['pulse_delay'] +
+                                       minus_pulse_pars['length'] +
+                                       minus_pulse_pars['pulse_delay']),
                        'channel': 'ch3',
                        'amplitude': 0,
                        'length': pulse_pars['dead_time_length']}
@@ -50,14 +59,14 @@ def single_pulse_seq(pulse_pars=None,
     el_list = []
     for i, iter in enumerate([0, 1]):  # seq has to have at least 2 elts
 
-        pulse_list = [pulse_pars, dead_time_pulse]
+        pulse_list = [pulse_pars, minus_pulse_pars,dead_time_pulse]
 
         el = multi_pulse_elt(i, station, pulse_list)
         el_list.append(el)
 
     for i, el in enumerate(el_list):
         if distortion_dict is not None:
-            el = distort(el, distortion_dict)
+            el = distort_and_compensate(el, distortion_dict)
             el_list[i] = el
         seq.append_element(el, trigger_wait=True)
     station.components['AWG'].stop()
@@ -68,18 +77,117 @@ def single_pulse_seq(pulse_pars=None,
         return seq
 
 
-def distort(element, distortion_dict):
+def chevron_seq_length(lengths, mw_pulse_pars, RO_pars, flux_pulse_pars=None,
+                     verbose=False,
+                     distortion_dict=None,
+                     upload=True,
+                     return_seq=False):
+    '''
+
+    '''
+    preloaded_kernels_vec = preload_kernels_func(distortion_dict)
+    if flux_pulse_pars is None:
+        flux_pulse_pars = {'pulse_type': 'SquarePulse',
+                      'pulse_delay': .1e-6,
+                      'channel': 'ch3',
+                      'amplitude': 0.5,
+                      'length': .1e-6}
+    minus_flux_pulse_pars = {'pulse_type': 'SquarePulse',
+                  'pulse_delay': 3e-6 + RO_pars['length'] + RO_pars['pulse_delay'],
+                  'channel': 'ch3',
+                  'amplitude': -flux_pulse_pars['amplitude'],
+                  'length': flux_pulse_pars['length']}
+    seq_name = 'Square_seq'
+    seq = sequence.Sequence(seq_name)
+    el_list = []
+    pulses = get_pulse_dict_from_pars(mw_pulse_pars)
+    for i, lngt in enumerate(lengths):  # seq has to have at least 2 elts
+        flux_pulse_pars['length'] = lngt
+        minus_flux_pulse_pars['length'] = lngt
+        pulse_list = [pulses['X180'], flux_pulse_pars, RO_pars, minus_flux_pulse_pars]
+
+        el = multi_pulse_elt(i, station, pulse_list)
+        el_list.append(el)
+
+    for i, el in enumerate(el_list):
+        if distortion_dict is not None:
+            el = distort_and_compensate(el, distortion_dict, preloaded_kernels_vec)
+            el_list[i] = el
+        seq.append_element(el, trigger_wait=True)
+    if upload:
+        station.components['AWG'].stop()
+        station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+    if return_seq:
+        return seq, el_list
+    else:
+        return seq
+
+def chevron_seq_amp(amps, mw_pulse_pars, RO_pars, flux_pulse_pars=None,
+                     verbose=False,
+                     distortion_dict=None,
+                     upload=True,
+                     return_seq=False):
+    '''
+
+    '''
+    preloaded_kernels_vec = preload_kernels_func(distortion_dict)
+    if flux_pulse_pars is None:
+        flux_pulse_pars = {'pulse_type': 'SquarePulse',
+                      'pulse_delay': .1e-6,
+                      'channel': 'ch3',
+                      'amplitude': 0.5,
+                      'length': .1e-6}
+    minus_flux_pulse_pars = {'pulse_type': 'SquarePulse',
+                  'pulse_delay': 3e-6 + RO_pars['length'] + RO_pars['pulse_delay'],
+                  'channel': 'ch3',
+                  'amplitude': -flux_pulse_pars['amplitude'],
+                  'length': flux_pulse_pars['length']}
+    seq_name = 'Square_seq'
+    seq = sequence.Sequence(seq_name)
+    el_list = []
+    pulses = get_pulse_dict_from_pars(mw_pulse_pars)
+    for i, am in enumerate(amps):  # seq has to have at least 2 elts
+        flux_pulse_pars['amplitude'] = am
+        minus_flux_pulse_pars['amplitude'] = am
+        pulse_list = [pulses['X180'], flux_pulse_pars, RO_pars, minus_flux_pulse_pars]
+
+        el = multi_pulse_elt(i, station, pulse_list)
+        el_list.append(el)
+
+    for i, el in enumerate(el_list):
+        if distortion_dict is not None:
+            el = distort_and_compensate(el, distortion_dict, preloaded_kernels_vec)
+            el_list[i] = el
+        seq.append_element(el, trigger_wait=True)
+    if upload:
+        station.components['AWG'].stop()
+        station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+    if return_seq:
+        return seq, el_list
+    else:
+        return seq
+
+def preload_kernels_func(distortion_dict):
+    output_dict = {ch: [] for ch in distortion_dict['ch_list']}
+    for ch in distortion_dict['ch_list']:
+        for kernel in distortion_dict[ch]:
+            print('Loading {}'.format(kernel_dir_path+kernel))
+            # print(os.path.isfile('kernels/'+kernel))
+            output_dict[ch].append(np.loadtxt(kernel_dir_path+kernel))
+    return output_dict
+
+
+
+def distort_and_compensate(element, distortion_dict, preloaded_kernels):
     t_vals, outputs_dict = element.waveforms()
+    print(len(t_vals),t_vals[-1])
     for ch in distortion_dict['ch_list']:
         element._channels[ch]['distorted'] = True
         length = len(outputs_dict[ch])
-        # kernels commute, since they are convolutions!
-        for kernel in distortion_dict[ch]:
-            print('Trying to open {}'.format(kernel_dir_path+kernel))
-            # print(os.path.isfile('kernels/'+kernel))
-            kernelvec = np.loadtxt(kernel_dir_path+kernel)
+        for kernelvec in preloaded_kernels[ch]:
             outputs_dict[ch] = np.convolve(outputs_dict[ch], kernelvec)[:length]
-        element.distorted_wfs[ch] = outputs_dict[ch]
+
+        element.distorted_wfs[ch] = outputs_dict[ch][:len(t_vals)]
     return element
 
 def get_pulse_dict_from_pars(pulse_pars):

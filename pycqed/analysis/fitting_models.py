@@ -192,6 +192,10 @@ def gaussian_2D(x, y, amplitude=1,
            gaus(y, amplitude, center_y, sigma_y))
     return val
 
+
+def TripleExpDecayFunc(t, tau1, tau2, tau3, amp1, amp2, amp3, offset, n):
+    return offset+amp1*np.exp(-(t/tau1)**n)+amp2*np.exp(-(t/tau2)**n)+amp3*np.exp(-(t/tau3)**n)
+
 ####################
 # Guess functions  #
 ####################
@@ -353,6 +357,7 @@ CosModel = lmfit.Model(CosFunc)
 CosModel.guess = Cos_guess
 
 ExpDecayModel = lmfit.Model(ExpDecayFunc)
+TripleExpDecayModel = lmfit.Model(TripleExpDecayFunc)
 ExpDecayModel.guess = exp_dec_guess
 ExpDampOscModel = lmfit.Model(ExpDampOscFunc)
 GaussExpDampOscModel = lmfit.Model(GaussExpDampOscFunc)
