@@ -11,18 +11,18 @@ Bugs:
 from qcodes import IPInstrument
 
 
-# FIXME: we would like to be able to choose the base class separately, so the user can
-# choose (e.g. use VISA for IEE488 bus units, and IpInstrument for
-# networked units). This would also make the inits cleaner
+"""
+FIXME: we would like to be able to choose the base class separately, so the
+user can choose (e.g. use VISA for IEE488 bus units, and IpInstrument for
+networked units). This would also make the inits cleaner
+"""
 
-# class SCPI(VisaInstrument):
-#   def __init__(self, name, address=None, timeout=5, terminator='', **kwargs):
 class SCPI(IPInstrument):
 
-    def __init__(self, name, transport, **kwargs):
-        super().__init__(name, address=transport.address, port=transport.port,
-                         write_confirmation=False,      # does not work with QWG
-                         **kwargs)  # FIXME: temporary glue logic
+    def __init__(self, name, address, port, **kwargs):
+        super().__init__(name, address, port,
+                         write_confirmation=False,  # required for QWG
+                         **kwargs)
 
     ###
     # Generic SCPI commands from IEEE 488.2 (IEC 625-2) standard
@@ -102,13 +102,11 @@ class SCPI(IPInstrument):
         totHdr = header + SCPI.buildHeaderString(len(binBlock))
         binMsg = totHdr.encode() + binBlock
 #       self.writeBinary(binMsg)
-#       self.write_raw(binMsg.decode("utf-8"))      # FIXME: Instrument does not have writeBinary, see whether this works
-# self.write(binMsg.decode())             # FIXME: Instrument does not
-# have writeBinary, see whether this works
         self._socket.send(binMsg)       # FIXME: hack
-        self.write('')                                      # add a Line Terminator
+        self.write('')                  # add a Line Terminator
 
     def binBlockRead(self):
+        # FIXME: untested
         ''' read IEEE488.2 binblock
         '''
         # get and decode header

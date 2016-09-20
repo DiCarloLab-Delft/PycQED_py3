@@ -17,8 +17,8 @@ from qcodes import validators as vals
 
 class QWG(SCPI):
 
-    def __init__(self, name, transport=None, **kwargs):
-        super().__init__(name, transport, **kwargs)
+    def __init__(self, name, address, port, **kwargs):
+        super().__init__(name, address, port, **kwargs)
 
         # AWG properties
         self.device_descriptor = type('', (), {})()
