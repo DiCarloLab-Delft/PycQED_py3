@@ -1545,33 +1545,6 @@ class UHFQC_input_average_detector(Hard_Detector):
         if self.AWG is not None:
             self.AWG.stop()
 
-
-
-
-# Utility function for acquiring data using the result logger
-# def rl_acquisition():
-#     global device
-    
-#     p = '/' + device + '/quex/rl/data/'
-    
-#     zis.subs(p + '*')
-    
-#     zis.seti('awgs/0/single', 1)
-#     zis.seti('awgs/0/enable', 1)
-#     while zis.geti('awgs/0/enable') == 1:
-#         time.sleep(0.1)
-    
-#     data = zis.poll(1.0)
-
-#     rv = {}
-#     for i in range(0, 4):
-#         if (p + '{}'.format(i)) in data:
-#             rv[i] = data[p + '{}'.format(i)][0]['vector']
-#         else:
-#             rv[i] = None
-        
-#     return rv
-
 class UHFQC_integrated_average_detector(Hard_Detector):
     '''
     Detector used for integrated average results with the UHFQC
