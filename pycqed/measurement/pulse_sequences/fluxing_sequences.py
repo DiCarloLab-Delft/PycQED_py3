@@ -92,11 +92,14 @@ def chevron_seq_length(lengths, mw_pulse_pars, RO_pars, flux_pulse_pars=None,
                       'channel': 'ch3',
                       'amplitude': 0.5,
                       'length': .1e-6}
+    # flux_pulse_pars['amplitude'] = 0.
     minus_flux_pulse_pars = {'pulse_type': 'SquarePulse',
-                  'pulse_delay': 3e-6 + RO_pars['length'] + RO_pars['pulse_delay'],
+                  'pulse_delay': 0., # will be overwritten
                   'channel': 'ch3',
                   'amplitude': -flux_pulse_pars['amplitude'],
                   'length': flux_pulse_pars['length']}
+    original_delay = deepcopy(RO_pars)['pulse_delay']
+
     seq_name = 'Square_seq'
     seq = sequence.Sequence(seq_name)
     el_list = []
@@ -104,7 +107,19 @@ def chevron_seq_length(lengths, mw_pulse_pars, RO_pars, flux_pulse_pars=None,
     for i, lngt in enumerate(lengths):  # seq has to have at least 2 elts
         flux_pulse_pars['length'] = lngt
         minus_flux_pulse_pars['length'] = lngt
+        # correcting timings
+        pulse_buffer = 100e-9
+        flux_pulse_pars['pulse_delay'] = pulse_buffer + (mw_pulse_pars['sigma'] *
+                                                         mw_pulse_pars['nr_sigma'])
+        msmt_buffer = 400e-9
+        RO_pars['pulse_delay'] = msmt_buffer + lngt
+
+        dead_time = 3e-6
+        minus_flux_pulse_pars['pulse_delay'] = dead_time + RO_pars['length']
         pulse_list = [pulses['X180'], flux_pulse_pars, RO_pars, minus_flux_pulse_pars]
+        # copy first element and set extra wait
+        pulse_list[0] = deepcopy(pulse_list[0])
+        pulse_list[0]['pulse_delay'] += 3e-6
 
         el = multi_pulse_elt(i, station, pulse_list)
         el_list.append(el)
@@ -114,6 +129,28 @@ def chevron_seq_length(lengths, mw_pulse_pars, RO_pars, flux_pulse_pars=None,
             el = distort_and_compensate(el, distortion_dict, preloaded_kernels_vec)
             el_list[i] = el
         seq.append_element(el, trigger_wait=True)
+    cal_points = 4
+    RO_pars['pulse_delay'] = original_delay
+    for i in range(int(cal_points/2)):
+        pulse_list = [pulses['I'], RO_pars]
+        # copy first element and set extra wait
+        pulse_list[0] = deepcopy(pulse_list[0])
+        pulse_list[0]['pulse_delay'] += 3e-6
+
+        el = multi_pulse_elt(len(lengths)+i, station, pulse_list)
+        el_list.append(el)
+        seq.append_element(el, trigger_wait=True)
+    for i in range(int(cal_points/2)):
+        pulse_list = [pulses['X180'], RO_pars]
+        # copy first element and set extra wait
+        pulse_list[0] = deepcopy(pulse_list[0])
+        pulse_list[0]['pulse_delay'] += 3e-6
+
+        el = multi_pulse_elt(len(lengths)+int(cal_points/2)+i, station, pulse_list)
+        el_list.append(el)
+        seq.append_element(el, trigger_wait=True)
+
+
     if upload:
         station.components['AWG'].stop()
         station.pulsar.program_awg(seq, *el_list, verbose=verbose)
@@ -180,7 +217,7 @@ def preload_kernels_func(distortion_dict):
 
 def distort_and_compensate(element, distortion_dict, preloaded_kernels):
     t_vals, outputs_dict = element.waveforms()
-    print(len(t_vals),t_vals[-1])
+    # print(len(t_vals),t_vals[-1])
     for ch in distortion_dict['ch_list']:
         element._channels[ch]['distorted'] = True
         length = len(outputs_dict[ch])

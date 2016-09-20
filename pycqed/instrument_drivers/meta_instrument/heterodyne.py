@@ -152,7 +152,7 @@ class HeterodyneInstrument(Instrument):
         if ((self._awg_seq_filename not in self.AWG.get('setup_filename')) and
                 not self._disable_auto_seq_loading):
             self.seq_name = st_seqs.generate_and_upload_marker_sequence(
-                RO_length, trigger_separation, RF_mod=True,
+                RO_length, trigger_separation, RF_mod=False,
                 IF=self.get('IF'), mod_amp=0.5)
 
         self.AWG.run()

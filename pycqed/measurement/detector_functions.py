@@ -443,6 +443,12 @@ class CBox_integrated_average_detector(Hard_Detector):
         i = 0
         while not succes:
             try:
+                # print('Blah')
+                self.AWG.stop()
+                self.CBox.set('acquisition_mode', 'idle')
+                self.CBox.set('acquisition_mode', 'integration averaging')
+                self.AWG.start()
+                # does not restart AWG tape in CBox as we don't use it anymore
                 data = self.CBox.get_integrated_avg_results()
                 succes = True
             except Exception as e:
@@ -450,9 +456,10 @@ class CBox_integrated_average_detector(Hard_Detector):
                 logging.warning(e)
                 self.CBox.set('acquisition_mode', 'idle')
                 self.AWG.stop()
-                self.CBox.restart_awg_tape(0)
-                self.CBox.restart_awg_tape(1)
-                self.CBox.restart_awg_tape(2)
+                # commented because deprecated
+                # self.CBox.restart_awg_tape(0)
+                # self.CBox.restart_awg_tape(1)
+                # self.CBox.restart_awg_tape(2)
 
                 self.CBox.set('acquisition_mode', 'integration averaging')
                 self.AWG.start()  # Is needed here to ensure data aligns with seq elt
