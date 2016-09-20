@@ -1525,7 +1525,6 @@ class UHFQC_input_average_detector(Hard_Detector):
 
 
     def get_values(self):
-        print("hoi")
         self.UHFQC.awgs_0_single(1)
         self.UHFQC.awgs_0_enable(1)
         if self.AWG is not None:
@@ -1534,7 +1533,6 @@ class UHFQC_input_average_detector(Hard_Detector):
             time.sleep(0.1)
         data=['']*len(self.channels)
         for i,channel in enumerate(self.channels):
-            print(i)
             dataset=eval("self.UHFQC.quex_iavg_data_{}()".format(channel))
             data[i]=dataset[0]['vector']
         return data
@@ -1550,5 +1548,66 @@ class UHFQC_input_average_detector(Hard_Detector):
 
 
 
+# Utility function for acquiring data using the result logger
+# def rl_acquisition():
+#     global device
+    
+#     p = '/' + device + '/quex/rl/data/'
+    
+#     zis.subs(p + '*')
+    
+#     zis.seti('awgs/0/single', 1)
+#     zis.seti('awgs/0/enable', 1)
+#     while zis.geti('awgs/0/enable') == 1:
+#         time.sleep(0.1)
+    
+#     data = zis.poll(1.0)
 
+#     rv = {}
+#     for i in range(0, 4):
+#         if (p + '{}'.format(i)) in data:
+#             rv[i] = data[p + '{}'.format(i)][0]['vector']
+#         else:
+#             rv[i] = None
+        
+#     return rv
 
+class UHFQC_integrated_average_detector(Hard_Detector):
+    '''
+    Detector used for integrated average results with the UHFQC
+
+    '''
+    def __init__(self, UHFQC, AWG, channels=[0,1,2,3],seg_per_point=1,**kw):
+        super(UHFQC_integrated_average_detector, self).__init__()
+        self.UHFQC = UHFQC
+        self.name = 'UHFQC_Streaming_data'
+        self.channels=channels
+        self.value_names = ['']*len(self.channels)
+        self.value_units = ['']*len(self.channels)
+        for i,channel in enumerate(self.channels):
+            self.value_names[i] = 'Ch{}'.format(channel)
+            self.value_units[i] = 'V'
+        self.AWG = AWG
+        self.seg_per_point = seg_per_point
+
+    def get_values(self):
+        self.UHFQC.awgs_0_single(1)
+        self.UHFQC.awgs_0_enable(1)
+        if self.AWG is not None:
+            self.AWG.start()
+        while self.UHFQC.awgs_0_enable() == 1:
+            time.sleep(0.1)
+        data=['']*len(self.channels)
+        for i,channel in enumerate(self.channels):
+            dataset=eval("self.UHFQC.quex_rl_data_{}()".format(channel))
+            data[i]=dataset[0]['vector']
+        return data
+
+    def prepare(self, sweep_points):
+        if self.AWG is not None:
+            self.AWG.stop()
+        self.UHFQC.quex_rl_source(2) #this sets the result to integration and rotation outcome
+
+    def finish(self):
+        if self.AWG is not None:
+            self.AWG.stop()

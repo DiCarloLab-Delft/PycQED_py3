@@ -54,16 +54,19 @@ class UHFQC(Instrument):
         print(self._s_file_name)
         print(self._d_file_name)
 
+        init=True
         try:
             f=open(self._s_file_name).read()
             s_node_pars = json.loads(f)
         except:
             print("parameter file for gettable parameters {} not found".format(self._s_file_name))
+            init=False
         try:
             f=open(self._d_file_name).read()
             d_node_pars = json.loads(f)
         except:
             print("parameter file for settable parameters {} not found".format(self._d_file_name))
+            init=False
 
         for parameter in s_node_pars:
             parname=parameter[0][9:].replace("/","_")
@@ -128,8 +131,8 @@ class UHFQC(Instrument):
         self.add_parameter('AWG_file',
                            set_cmd=self._do_set_AWG_file,
                            vals=vals.Anything())
-
-        self.load_default_settings()
+        if init:
+            self.load_default_settings()
         t1 = time.time()
         print('Initialized UHFQC', self._device,
               'in %.2fs' % (t1-t0))
@@ -145,49 +148,52 @@ class UHFQC(Instrument):
         LOG2_RL_AVG_CNT = 0
 
         # Load an AWG program (from Zurich Instruments/LabOne/WebServer/awg/src)
-        self.AWG_file('quexpress.seqc')
+        self.AWG_file('traditional.seqc')
 
         # The AWG program uses userregs/0 to define the number o iterations in the loop
-        self.seti('awgs/0/userregs/0', pow(2, LOG2_AVG_CNT)*pow(2, LOG2_RL_AVG_CNT))
+        self.awgs_0_userregs_0(pow(2, LOG2_AVG_CNT)*pow(2, LOG2_RL_AVG_CNT))
 
         # Turn on both outputs
-        self.seti('sigouts/0/on', 1)
-        self.seti('sigouts/1/on', 1)
+        self.sigouts_0_on(1)
+        self.sigouts_1_on(1)
 
         # Configure the input averager length and averaging count
-        self.seti('quex/iavg/length', 2048)
-        self.seti('quex/iavg/avgcnt', LOG2_AVG_CNT)
+        self.quex_iavg_length(4096)
+        self.quex_iavg_avgcnt(LOG2_AVG_CNT)
 
         # QuExpress thresholds on DIO (mode == 2), AWG control of DIO (mode == 1)
-        self.seti('dios/0/mode', 2)
+        self.dios_0_mode(2)
         # Drive DIO bits 31 to 16
-        self.seti('dios/0/drive', 0xc)
+        self.dios_0_drive(0xc)
 
-        # Configure the analog trigger input 1 of the AWG to assert on a rising edge on Ref/Trigger 1 (front-panel of the instrument)
-        self.seti('awgs/0/triggers/0/rising', 1)
-        self.setd('awgs/0/triggers/0/level', 0.000000000)
-        self.seti('awgs/0/triggers/0/channel', 2)
+        # Configure the analog trigger input 1 of the AWG to assert on a rising edge on Ref_Trigger 1 (front-panel of the instrument)
+        self.awgs_0_triggers_0_rising(1)
+        self.awgs_0_triggers_0_level(0.000000000)
+        self.awgs_0_triggers_0_channel(2)
 
         # Straight connection, signal input 1 to channel 1, signal input 2 to channel 2
-        self.setd('quex/deskew/0/col/0', 1.0)
-        self.setd('quex/deskew/0/col/1', 0.0)
-        self.setd('quex/deskew/1/col/0', 0.0)
-        self.setd('quex/deskew/1/col/1', 1.0)
+        self.quex_deskew_0_col_0(1.0)
+        self.quex_deskew_0_col_1(0.0)
+        self.quex_deskew_1_col_0(0.0)
+        self.quex_deskew_1_col_1(1.0)
 
         # Configure the weighted integration units with constant values, each channel gets
         # one, two, three and four non-zero weights, respectively
-        self.setv('quex/wint/weights/0/real', np.array([1.0]*1 + [0.0]*127))
-        self.setv('quex/wint/weights/0/imag', np.array([1.0]*1 + [0.0]*127))
-        self.setv('quex/wint/weights/1/real', np.array([1.0]*2 + [0.0]*126))
-        self.setv('quex/wint/weights/1/imag', np.array([1.0]*2 + [0.0]*126))
-        self.setv('quex/wint/weights/2/real', np.array([1.0]*3 + [0.0]*125))
-        self.setv('quex/wint/weights/2/imag', np.array([1.0]*3 + [0.0]*125))
-        self.setv('quex/wint/weights/3/real', np.array([1.0]*12 + [0.0]*116))
-        self.setv('quex/wint/weights/3/imag', np.array([1.0]*12 + [0.0]*116))
+        self.quex_wint_weights_0_real(np.array([1.0]*1 + [0.0]*127))
+        self.quex_wint_weights_0_imag(np.array([1.0]*1 + [0.0]*127))
+        self.quex_wint_weights_1_real(np.array([1.0]*2 + [0.0]*126))
+        self.quex_wint_weights_1_imag(np.array([1.0]*2 + [0.0]*126))
+        self.quex_wint_weights_2_real(np.array([1.0]*3 + [0.0]*125))
+        self.quex_wint_weights_2_imag(np.array([1.0]*3 + [0.0]*125))
+        self.quex_wint_weights_3_real(np.array([1.0]*12 + [0.0]*116))
+        self.quex_wint_weights_3_imag(np.array([1.0]*12 + [0.0]*116))
 
         # Length is set in units of 1 samples
-        self.seti('quex/wint/length', 4)
-        self.seti('quex/wint/delay', 0)
+        self.quex_wint_length(4)
+        self.quex_wint_delay(0)
+
+        # Setting the clock to external 
+        self.system_extclk(1)
             
         # No rotation on the output of the weighted integration units, i.e. take real part of result
         for i in range(0, 4):
@@ -290,7 +296,7 @@ class UHFQC(Instrument):
 
         s_node_pars=[]
         d_node_pars=[]
-        patterns = ["awgs", "sigins", "sigouts", "quex"]
+        patterns = ["awgs", "sigins", "sigouts", "quex", "dios","system/extclk"]
         for pattern in patterns:
             print("extracting parameters of type", pattern)
             all_nodes = set(self.find('*{}*'.format(pattern)))
