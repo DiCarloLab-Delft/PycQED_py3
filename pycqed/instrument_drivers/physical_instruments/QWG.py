@@ -3,7 +3,7 @@
     Author:             Wouter Vlothuizen, TNO/QuTech
     Purpose:            Instrument driver for Qutech QWG
     Usage:
-    Notes:              does not depend on other software or drivers (e.g. Visa, etc). FIXME: not true anymore
+    Notes:
     Bugs:
 
 '''
@@ -13,110 +13,6 @@ from SCPI import SCPI
 import numpy as np
 import struct
 from qcodes import validators as vals
-
-
-class Transport:
-
-    def __init__(self, address=None, timeout=5, terminator=''):
-        self.address = address
-    # FIXME: define empty virtual functions
-
-
-class IPTransport(Transport):
-
-    def __init__(self, address=None, port=None, timeout=5,
-                 terminator='\n', persistent=True, write_confirmation=True,
-                 **kwargs):
-        self.address = address
-        self.port = port
-    # FIXME: define functions based on IPInstrument
-
-
-class SocketTransport(Transport):
-
-    def __init__(self, logging=True, simMode=False, paranoid=False):
-        # properties
-        self.logging = logging      # enable logging
-        self.simMode = simMode      # simulation: don't access hardware
-        # be paranoid about cross checking, at the cost of performance
-        self.paranoid = paranoid
-        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
-    def open(self, host, port=5025):
-        ''' open connection, e.g. open('192.168.0.16', 4000)
-        '''
-        if not self.simMode:
-            # first set timeout (before connect)
-            self.socket.settimeout(1)
-            # beef up buffer, to prevent socket.send() not sending all our data
-            # in one go
-            self.socket.setsockopt(
-                socket.SOL_SOCKET, socket.SO_SNDBUF, 512*1024)
-            self.socket.connect((host, port))
-
-    def close(self):
-        ''' close connection
-        '''
-        if not self.simMode:
-            self.socket.close()
-
-    def write(self, str):
-        ''' send a command string
-                NB: send can be used by the end user directly, but this is not encouraged because it defeats our abstraction layer
-        '''
-        if not self.simMode:
-            outStr = str+'\n'
-            # FIXME: check return value, maybe encode() can be improved on by
-            # not using unicode strings?
-            self.socket.send(outStr.encode('ascii'))
-
-        # FIXME: logging
-
-    def writeBinary(self, data):
-        ''' send binary data
-                Input:
-                        data    bytearray
-        '''
-        if not self.simMode:
-            expLen = len(data)
-            actLen = self.socket.send(data)
-            if(actLen != expLen):
-                # FIXME: handle this case by calling send again. Or enlarge
-                # socket.SO_SNDBUF even further
-                raise UserWarning(
-                    'not all data sent: expected %d, actual %d' % (expLen, actLen))
-
-        # FIXME: logging
-
-    def readBinary(self, byteCnt):
-        ''' read binary data
-        '''
-        if not self.simMode:
-            data = self.socket.recv(byteCnt)
-        else:
-            data = zeros(byteCnt, 1)
-
-        # FIXME: logging
-        return data
-
-    def ask(self, str):
-        ''' send a command, and receive a response
-        '''
-        self.send(str)
-
-        if not self.simMode:
-            #           resp = self.socket.recv(4096)   # FIXME: do a readline
-            # is this allowed when timeout is active (i.e. non blocking
-            # socket)?
-            resp = self.socket.makefile().readline()
-        else:
-            resp = ''
-
-        return resp.rstrip()                                # remove trailing white space, CR, LF
-
-    def askDouble(self, str):
-        resp = self.ask(str)
-        return str2double(resp)
 
 
 class QWG(SCPI):
@@ -194,13 +90,6 @@ class QWG(SCPI):
                            vals=vals.Enum('CONT', 'TRIG', 'SEQ', 'GAT'))
 
         # Trigger parameters #
-        self.add_parameter('trigger_impedance',
-                           label='Trigger impedance (Ohm)',
-                           units='Ohm',
-                           get_cmd='TRIG:IMP?',
-                           set_cmd='TRIG:IMP ' + '{}',
-                           vals=vals.Enum(50, 1000),
-                           get_parser=float)
 
         # Compatibility: 5014, QWG FIXME: different range
         self.add_parameter('trigger_level',
@@ -210,17 +99,6 @@ class QWG(SCPI):
                            set_cmd='TRIG:LEV ' + '{:.3f}',
                            vals=vals.Numbers(-5, 5),
                            get_parser=float)
-
-        self.add_parameter('trigger_slope',
-                           get_cmd='TRIG:SLOP?',
-                           set_cmd='TRIG:SLOP ' + '{}',
-                           vals=vals.Enum('POS', 'NEG'))  # ,
-        # get_parser=self.parse_int_pos_neg)
-
-        self.add_parameter('trigger_source',
-                           get_cmd='TRIG:source?',
-                           set_cmd='TRIG:source ' + '{}',
-                           vals=vals.Enum('INT', 'EXT'))
 
         # Channel parameters #
         for i in range(1, self.device_descriptor.numChannels+1):
@@ -263,40 +141,7 @@ class QWG(SCPI):
 #                              vals=vals.Strings(),
 # FIXME                            get_parser=parsestr)
 
-            # Marker channel parameters #
-            for j in range(1, self.device_descriptor.numMarkers+1):
-                m_del_cmd = 'SOUR{}:MARK{}:DEL'.format(i, j)
-                m_high_cmd = 'SOUR{}:MARK{}:VOLT:LEV:IMM:HIGH'.format(i, j)
-                m_low_cmd = 'SOUR{}:MARK{}:VOLT:LEV:IMM:LOW'.format(i, j)
 
-                self.add_parameter(
-                    'ch{}_m{}_del'.format(i, j),
-                    label='Channel {} Marker {} delay (ns)'.format(i, j),
-                    get_cmd=m_del_cmd + '?',
-                    set_cmd=m_del_cmd + ' {:.3f}e-9',
-                    vals=vals.Numbers(0, 1),
-                    get_parser=float)
-
-                self.add_parameter(
-                    'ch{}_m{}_high'.format(i, j),
-                    label='Channel {} Marker {} high level (V)'.format(
-                        i, j),
-                    get_cmd=m_high_cmd + '?',
-                    set_cmd=m_high_cmd + ' {:.3f}',
-                    vals=vals.Numbers(-2.7, 2.7),
-                    get_parser=float)
-
-                self.add_parameter(
-                    'ch{}_m{}_low'.format(i, j),
-                    label='Channel {} Marker {} low level (V)'.format(
-                        i, j),
-                    get_cmd=m_low_cmd + '?',
-                    set_cmd=m_low_cmd + ' {:.3f}',
-                    vals=vals.Numbers(-2.7, 2.7),
-                    get_parser=float)
-
-            # functions
-#           self.add_function('createWaveformReal')
 
     ##########################################################################
     # QWG functions not very suitable to be implemented as Parameter
@@ -566,30 +411,6 @@ class QWG(SCPI):
     def stop(self):
         self.write('awgcontrol:stop:immediate')
 
-    # functions: menu Setup|Horizontal
-    def setClockRefInternal(self):
-        self.write(':roscillator:source internal')
-
-    def setClockRefExternal(self):
-        self.write(':roscillator:source external')
-
-    # functions: menu Setup|Horizontal
-    def setClockSourceInternal(self):
-        self.write('awgcontrol:clock:source internal')
-
-    def setClockSourceExternal(self):
-        self.write('awgcontrol:clock:source external')
-
-    def setClockFrequency(self, frequency):
-        ''' frequency:      AWG520:     TBD
-                                                AWG5014:    10 MHz..10GHz (FIXME: TBC)
-        '''
-        self.write('source1:frequency %f' % frequency)
-
-    def setTriggerInterval(self, interval):
-        ''' interval:           AWG520: 1.0 us to 10.0 s.
-        '''
-        self.write('trigger:timer %f' % interval)
 
     ##########################################################################
     # Generic AWG functions also implemented as Parameter
@@ -622,20 +443,6 @@ class QWG(SCPI):
         '''
         return self.askDouble('source%d:voltage:level:immediate:amplitude?' % ch)
 
-    def setMarkerVoltageLow(self, ch, marker, voltage):
-        ''' ch:             AWG520: 1,2
-                marker:         AWG520: 1,2
-                amplitude:      AWG520: -2V to 2V in 0.05V steps
-        '''
-        self.write('source%d:marker%d:voltage:high %f' % (ch, marker, voltage))
-
-    def setMarkerVoltageHigh(self, ch, marker, voltage):
-        ''' ch:             AWG520: 1,2
-                marker:         AWG520: 1,2
-                amplitude:      AWG520: -2V to 2V in 0.05V steps
-        '''
-        self.write('source%d:marker%d:voltage:high %f' % (ch, marker, voltage))
-
     # functions: Button interface
     def setOutputStateOn(self, ch):
         ''' ch:             AWG520: 1,2 (and 7 see documentation)
@@ -648,51 +455,14 @@ class QWG(SCPI):
         '''
         self.write('output%d:state off' % ch)
 
-    # functions: menu Setup|Trigger
-    def setTriggerSourceInternal(self):
-        self.write('trigger:source internal')
-
-    def setTriggerSourceExternal(self):
-        self.write('trigger:source external')
-
-    def setTriggerSlopePositive(self):
-        self.write('trigger:slope positive')
-
-    def setTriggerSlopeNegative(self):
-        self.write('trigger:slope negative')
-
     def setTriggerLevel(self, level):
         ''' level:              AWG520: -5.0 V to +5.0 V, in 0.1 V steps
         '''
         self.write('trigger:level %f' % level)
 
-    def setTriggerImpedance50ohm(self):
-        self.write('trigger:impedance 50')
-
     # functions: menu Setup|Run Mode
-    def setRunModeEnhanced(self):
-        ''' NB: note that for AWG5014, 'enhanced' is identical to 'sequence'
-        '''
-        self.write('awgcontrol:rmode enhanced')
-
     def setRunModeSequence(self):
         self.write('awgcontrol:rmode seq')
 
     def setRunModeContinuous(self):
         self.write('awgcontrol:rmode cont')
-
-
-# FIXME: old
-#   def ReadPatFile(self)
-#       fid = fopen('monoplexer-testsetup-datasheets\AWG\Nulti_520Ch10001.pat');
-#       fileType = fscanf(fid, 'MAGIC %d\n');    # AWG500/600 series: 2000
-#       digitCnt = fscanf(fid, '#%1d');
-#       formatString = sprintf('%%%dd', digitCnt);
-#       byteCnt = fscanf(fid, formatString);    # FIXME: use getByteCntFromHeader()
-#       data = fread(fid, byteCnt/2, 'uint16');
-#       % FIXME: more follows: CLOCK
-#       clockFreq = fscanf(fid, 'CLOCK %d\n')
-#       fclose(fid);
-#
-#       plot(bitand(data,1023)-512, 'r')        # AWG520 has 10 bit DACs
-#       % bit 13 = marker 1, bit 14 is marker 2

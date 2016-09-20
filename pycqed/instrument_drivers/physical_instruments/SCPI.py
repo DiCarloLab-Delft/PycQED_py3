@@ -1,15 +1,13 @@
 '''
-    File:               SCPI.py
-    Author:             Wouter Vlothuizen, TNO/QuTech
-    Purpose:            base class for SCPI ('Standard Commands for Programmable Instruments') commands
-    Usage:              don't use directly, use a derived class (e.g. AWG520)
-    Notes:              does not depend on other software or drivers (e.g. Visa, etc). FIXME: not true anymore
-    Bugs:
-
+File:       SCPI.py
+Author:     Wouter Vlothuizen, TNO/QuTech
+Purpose:    base class for SCPI ('Standard Commands for Programmable
+            Instruments') commands
+Usage:      don't use directly, use a derived class (e.g. QWG)
+Notes:
+Bugs:
 '''
 
-
-#from qcodes import VisaInstrument
 from qcodes import IPInstrument
 
 
