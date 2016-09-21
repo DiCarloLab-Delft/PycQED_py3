@@ -66,6 +66,11 @@ class QWG_tests(unittest.TestCase):
 
             if par.name not in ['IDN']+failing_pars:
                 # print('parname:', par.name)
+                try:
+                    old_value = par.get()
+                except timeout:
+                    raise(TimeoutError(' could not read {}'.format(par.name)))
+                if hasattr(par, '_vals'):
                     vals = par._vals
                     if vals.is_numeric:
                         min_val = vals._min_value
@@ -85,6 +90,7 @@ class QWG_tests(unittest.TestCase):
                 else:
                     print(par.name, 'does not have validator')
             else:
+                print('Not in pars to be tested: "{}"'.format(par.name))
 
     def tearDown(self):
         self.qwg._socket.settimeout(5)
