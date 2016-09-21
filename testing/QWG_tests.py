@@ -4,6 +4,8 @@ from instrument_drivers.physical_instruments.QuTech_AWG_Module \
     import QuTech_AWG_Module
 from measurement.waveform_control_CC.waveform import Waveform
 
+from socket import timeout
+
 
 class QWG_tests(unittest.TestCase):
     '''
@@ -23,13 +25,52 @@ class QWG_tests(unittest.TestCase):
                 port=5025, server_name=None)
 
         self.qwg.reset()
+        qwg1._socket.settimeout(.3)  # set low timeout for tests
+        try:
+            qwg1._socket.recv(1000)
+        except timeout:
+            pass
 
     def test_IDN(self):
         IDN = self.qwg.IDN()
+        # IDN = self.qwg.IDN()
+        # should not be called twice, indicates a comms issue
         self.assertIsInstance(IDN, dict)
+        print(IDN)
+        print('printed')
         self.assertEqual(IDN['vendor'], 'QuTech')
         self.assertEqual(IDN['model'], 'QWG')
 
+    def test_Error(self):
+        err_msg = self.qwg.getError()
+        self.assertEqual(err_msg, '0')
+
+    def test_sideband_freqs(self):
+        sb_freq1 = self.qwg.ch_pair1_sideband_frequency()
+        sb_freq3 = self.qwg.ch_pair3_sideband_frequency()
+
+        # setting out of range
+        with self.assertRaises(ValueError):
+            self.qwg.ch_pair1_sideband_frequency(.31e9)
+
+        with self.assertRaises(ValueError):
+            self.qwg.ch_pair3_sideband_frequency(-.31e9)
+
+        # seting allowed value
+        val = 23e6
+        self.qwg.ch_pair1_sideband_frequency(val)
+        self.assertEqual(val, self.qwg.ch_pair1_sideband_frequency())
+
+        self.qwg.ch_pair3_sideband_frequency(val)
+        self.assertEqual(val, self.qwg.ch_pair3_sideband_frequency())
+        self.qwg.ch_pair1_sideband_frequency(sb_freq1)
+        self.qwg.ch_pair3_sideband_frequency(sb_freq3)
+
+
+
+    def tearDown(self):
+        self.qwg._socket.settimeout(5)
+        # set timeout back to default
 
 
 
