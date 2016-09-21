@@ -1,7 +1,7 @@
 #!/usr/bin/python
-import pycqed
-from .QuTech_AWG_Module import QuTech_AWG_Module
-from Waveform import Waveform
+from instrument_drivers.physical_instruments.QuTech_AWG_Module \
+    import QuTech_AWG_Module
+from measurement.waveform_control_CC.waveform import Waveform
 
 
 # create waveforms
