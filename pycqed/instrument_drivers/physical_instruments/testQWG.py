@@ -2,7 +2,7 @@
 
 import qcodes
 
-from QWG import QWG
+from QuTech_AWG_Module import QuTech_AWG_Module
 from Waveform import Waveform
 
 
@@ -33,11 +33,11 @@ marker2 = []
 
 
 if 1:
-    qwg1 = QWG('QWG-1', '192.168.42.10', 5025, server_name=None)
+    qwg1 = QuTech_AWG_Module('QWG-1', '192.168.42.10', 5025, server_name=None)
 else:
     # local variant, in combination with 'nc -l 5025' run locally from a
     # terminal
-    qwg1 = QWG('QWG-1', '127.0.0.1', 5025, server_name=None)
+    qwg1 = QuTech_AWG_Module('QWG-1', '127.0.0.1', 5025, server_name=None)
 
 qwg1.reset()
 

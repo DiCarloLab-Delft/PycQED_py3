@@ -1,21 +1,21 @@
 '''
-    File:               QWG.py
-    Author:             Wouter Vlothuizen, TNO/QuTech
-    Purpose:            Instrument driver for Qutech QWG
-    Usage:
-    Notes:
-    Bugs:
-
+File:               QuTech_AWG_Module.py
+Author:             Wouter Vlothuizen, TNO/QuTech,
+                    edited by Adriaan Rol
+Purpose:            Instrument driver for Qutech QWG
+Usage:
+Notes:
+Bugs:
 '''
 
-from SCPI import SCPI
+from .SCPI import SCPI
 
 import numpy as np
 import struct
 from qcodes import validators as vals
 
 
-class QWG(SCPI):
+class QuTech_AWG_Module(SCPI):
 
     def __init__(self, name, address, port, **kwargs):
         super().__init__(name, address, port, **kwargs)
