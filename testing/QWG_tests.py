@@ -3,7 +3,7 @@ import unittest
 from instrument_drivers.physical_instruments.QuTech_AWG_Module \
     import QuTech_AWG_Module
 from measurement.waveform_control_CC.waveform import Waveform
-
+import time
 from socket import timeout
 
 
@@ -33,11 +33,10 @@ class QWG_tests(unittest.TestCase):
 
     def test_IDN(self):
         IDN = self.qwg.IDN()
-        # IDN = self.qwg.IDN()
+
+        IDN = self.qwg.IDN()
         # should not be called twice, indicates a comms issue
         self.assertIsInstance(IDN, dict)
-        print(IDN)
-        print('printed')
         self.assertEqual(IDN['vendor'], 'QuTech')
         self.assertEqual(IDN['model'], 'QWG')
 
@@ -45,28 +44,47 @@ class QWG_tests(unittest.TestCase):
         err_msg = self.qwg.getError()
         self.assertEqual(err_msg, '0')
 
-    def test_sideband_freqs(self):
-        sb_freq1 = self.qwg.ch_pair1_sideband_frequency()
-        sb_freq3 = self.qwg.ch_pair3_sideband_frequency()
+    def test_parameters(self):
+        # Clearing comms should not be an issue
+        try:
+            qwg1._socket.recv(1000)
+        except timeout:
+            pass
+        for parname, par in self.qwg.parameters.items():
 
-        # setting out of range
-        with self.assertRaises(ValueError):
-            self.qwg.ch_pair1_sideband_frequency(.31e9)
+            failing_pars = []
+            for i in range(4):
+                failing_pars.append('ch_pair{}_sideband_frequency'.format(i+1))
+                failing_pars.append('ch_pair{}_sideband_phase'.format(i+1))
+            for i in range(self.qwg.device_descriptor.numTriggers):
+                failing_pars.append('ch{}_offset'.format(i+1))
+                failing_pars.append('ch{}_trigger_level'.format(i+1))
+            failing_pars.append('trigger_level')
 
-        with self.assertRaises(ValueError):
-            self.qwg.ch_pair3_sideband_frequency(-.31e9)
+            for i in range(self.qwg.device_descriptor.numChannels):
+                failing_pars.append('ch{}_amp'.format(i+1))
 
-        # seting allowed value
-        val = 23e6
-        self.qwg.ch_pair1_sideband_frequency(val)
-        self.assertEqual(val, self.qwg.ch_pair1_sideband_frequency())
-
-        self.qwg.ch_pair3_sideband_frequency(val)
-        self.assertEqual(val, self.qwg.ch_pair3_sideband_frequency())
-        self.qwg.ch_pair1_sideband_frequency(sb_freq1)
-        self.qwg.ch_pair3_sideband_frequency(sb_freq3)
-
-
+            if par.name not in ['IDN']+failing_pars:
+                # print('parname:', par.name)
+                    vals = par._vals
+                    if vals.is_numeric:
+                        min_val = vals._min_value
+                        max_val = vals._max_value
+                        if max_val != float("inf"):
+                            with self.assertRaises(ValueError,
+                                    msg='{} max_val+1 {}'.format(par.name, (
+                                        max_val+1))):
+                                par.set(max_val+1)
+                        if min_val != -float("inf"):
+                            with self.assertRaises(ValueError,
+                                    msg='{} min_val-1: {}'.format(
+                                        par.name, (min_val-1))):
+                                 par.set(min_val-1)
+                    else:
+                        print(par.name, ' is not numeric, not testing')
+                else:
+                    print(par.name, 'does not have validator')
+            else:
 
     def tearDown(self):
         self.qwg._socket.settimeout(5)
@@ -125,7 +143,7 @@ if __name__ == '__main__':
 
         if 1:  # dc
             qwg1.setWaveform(1, 'gauss')  # 'hi')
-            qwg1.setWaveform(2, 'zero')  # 'zero')
+            qwg1.setWaveform(2, 'derivGauss')  # 'zero')
             qwg1.setWaveform(3, 'gauss')  # 'hi')
             qwg1.setWaveform(4, 'zero')  # 'zero')
         else:
@@ -217,8 +235,6 @@ if __name__ == '__main__':
 
     qwg1.run()
 
-
-    print(qwg1.getIdentity())
-
-    print(qwg1.getError())
+    print('Identity: ', qwg1.getIdentity())
+    print('Error messages: ', qwg1.getError())
 
