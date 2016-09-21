@@ -1,8 +1,6 @@
 #!/usr/bin/python
-
-import qcodes
-
-from QuTech_AWG_Module import QuTech_AWG_Module
+import pycqed
+from .QuTech_AWG_Module import QuTech_AWG_Module
 from Waveform import Waveform
 
 
