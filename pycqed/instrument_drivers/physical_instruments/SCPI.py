@@ -17,13 +17,21 @@ user can choose (e.g. use VISA for IEE488 bus units, and IpInstrument for
 networked units). This would also make the inits cleaner
 """
 
+
 class SCPI(IPInstrument):
 
     def __init__(self, name, address, port, **kwargs):
         super().__init__(name, address, port,
                          write_confirmation=False,  # required for QWG
                          **kwargs)
+        # FIXME convert operation etc to parameters
+        # IDN is implemented in the instrument base class
 
+        # example of how the commands could look
+        self.add_function('reset', call_cmd='*RST')
+        self.add_parameter('event_status_enable',
+                           set_cmd='*ESE {}',
+                           get_cmd='*ESE?')
     ###
     # Generic SCPI commands from IEEE 488.2 (IEC 625-2) standard
     ###
