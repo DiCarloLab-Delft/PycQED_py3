@@ -38,6 +38,7 @@ class QuTech_AWG_Module(SCPI):
         self.device_descriptor.mvals_channel_offset = vals.Numbers(-0.05, 0.05)
 
         self.add_parameters()
+        self.connect_message()
 
     def add_parameters(self):
         #######################################################################
