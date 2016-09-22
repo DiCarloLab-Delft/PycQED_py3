@@ -28,6 +28,7 @@ class QuTech_AWG_Module(SCPI):
         self.device_descriptor.numMarkersPerChannel = 2
         self.device_descriptor.numMarkers = 8
         self.device_descriptor.numTriggers = 8
+        self.device_descriptor.numCodewords = 8
 
         # valid values
         self.device_descriptor.mvals_trigger_impedance = vals.Enum(50),
@@ -45,27 +46,38 @@ class QuTech_AWG_Module(SCPI):
         # QWG specific
         #######################################################################
 
-        # FIXME: 1 & 3 only
-        for i in range(1, self.device_descriptor.numChannels+1):
-            sfreq_cmd = 'qutech:output{}:frequency'.format(i)
-            sph_cmd = 'qutech:output{}:phase'.format(i)
+        for i in range(self.device_descriptor.numChannels//2):
+            ch_pair = i*2+1
+            sfreq_cmd = 'qutech:output{}:frequency'.format(ch_pair)
+            sph_cmd = 'qutech:output{}:phase'.format(ch_pair)
+            mat_cmd = 'qutech:output{}:matrix'.format(ch_pair)
             # NB: sideband frequency has a resolution of ~0.23 Hz:
-            self.add_parameter('ch_pair{}_sideband_frequency'.format(i),
+            self.add_parameter('ch_pair{}_sideband_frequency'.format(ch_pair),
                                units='Hz',
-                               label='Sideband frequency channel pair {} (Hz)'.format(
-                                   i),
+                               label=('Sideband frequency channel ' +
+                                      'pair {} (Hz)'.format(i)),
                                get_cmd=sfreq_cmd + '?',
                                set_cmd=sfreq_cmd + ' {}',
                                vals=vals.Numbers(-300e6, 300e6),
                                get_parser=float)
-            self.add_parameter('ch_pair{}_sideband_phase'.format(i),
+            self.add_parameter('ch_pair{}_sideband_phase'.format(ch_pair),
                                units='deg',
-                               label='Sideband phase channel pair {} (deg)'.format(
-                                   i),
+                               label=('Sideband phase channel' +
+                                      ' pair {} (deg)'.format(i)),
                                get_cmd=sph_cmd + '?',
                                set_cmd=sph_cmd + ' {}',
                                vals=vals.Numbers(-180, 360),
                                get_parser=float)
+
+            self.add_parameter('ch_pair{}_transform_matrix'.format(ch_pair),
+                               label=('Transformation matrix channel' +
+                                      'pair {}'.format(i)),
+                               get_cmd=mat_cmd + '?',
+                               set_cmd=self._gen_ch_set_func(
+                                    self._setMatrix, ch_pair),
+                               vals=vals.Anything(),
+                               # vals=vals.Arrays(-180, 360),
+                               get_parser=np.array)
 
         for i in range(1, self.device_descriptor.numTriggers+1):
             triglev_cmd = 'qutech:trigger{}:level'.format(i)
@@ -78,21 +90,12 @@ class QuTech_AWG_Module(SCPI):
                                vals=self.device_descriptor.mvals_trigger_level,
                                get_parser=float)
 
-        #######################################################################
-        # Tek 5014 compatible
-        # NB: code below mostly copied from QCoDeS
-        #######################################################################
-
-           # Compatibility: 5015, QWG: FIXME: QWG adds 'TBD' and does not
-           # support 'TBD'
         self.add_parameter('run_mode',
                            get_cmd='AWGC:RMOD?',
                            set_cmd='AWGC:RMOD ' + '{}',
-                           vals=vals.Enum('CONT', 'TRIG', 'SEQ', 'GAT'))
+                           vals=vals.Enum('CONT', 'SEQ', 'COD'))
 
         # Trigger parameters #
-
-        # Compatibility: 5014, QWG FIXME: different range
         self.add_parameter('trigger_level',
                            units='V',
                            label='Trigger level (V)',
@@ -102,23 +105,22 @@ class QuTech_AWG_Module(SCPI):
                            get_parser=float)
 
         # Channel parameters #
-        for i in range(1, self.device_descriptor.numChannels+1):
-            amp_cmd = 'SOUR{}:VOLT:LEV:IMM:AMPL'.format(i)
-            offset_cmd = 'SOUR{}:VOLT:LEV:IMM:OFFS'.format(i)
-            state_cmd = 'OUTPUT{}:STATE'.format(i)
-            waveform_cmd = 'SOUR{}:WAV'.format(i)
+        for ch in range(1, self.device_descriptor.numChannels+1):
+            amp_cmd = 'SOUR{}:VOLT:LEV:IMM:AMPL'.format(ch)
+            offset_cmd = 'SOUR{}:VOLT:LEV:IMM:OFFS'.format(ch)
+            state_cmd = 'OUTPUT{}:STATE'.format(ch)
+            waveform_cmd = 'SOUR{}:WAV'.format(ch)
             # Set channel first to ensure sensible sorting of pars
-
             # Compatibility: 5014, QWG
-            self.add_parameter('ch{}_state'.format(i),
-                               label='Status channel {}'.format(i),
+            self.add_parameter('ch{}_state'.format(ch),
+                               label='Status channel {}'.format(ch),
                                get_cmd=state_cmd + '?',
                                set_cmd=state_cmd + ' {}',
                                vals=vals.Ints(0, 1))
 
             # Compatibility: 5014, QWG (FIXME: different range, not in V)
-            self.add_parameter('ch{}_amp'.format(i),
-                               label='Amplitude channel {} (Vpp)'.format(i),
+            self.add_parameter('ch{}_amp'.format(ch),
+                               label='Amplitude channel {} (Vpp)'.format(ch),
                                units='Vpp',
                                get_cmd=amp_cmd + '?',
                                set_cmd=amp_cmd + ' {:.6f}',
@@ -126,14 +128,34 @@ class QuTech_AWG_Module(SCPI):
                                get_parser=float)
 
             # Compatibility: 5014, QWG (FIXME: different range, not in V)
-            self.add_parameter('ch{}_offset'.format(i),
-                               label='Offset channel {} (V)'.format(i),
+            self.add_parameter('ch{}_offset'.format(ch),
+                               label='Offset channel {} (V)'.format(ch),
                                units='V',
                                get_cmd=offset_cmd + '?',
                                set_cmd=offset_cmd + ' {:.3f}',
                                vals=vals.Numbers(-.1, .1),
                                get_parser=float)
 
+            self.add_parameter('ch{}_default_waveform'.format(ch),
+                               get_cmd=waveform_cmd+'?',
+                               set_cmd=waveform_cmd+' {}',
+                               vals=vals.Strings())
+
+        for i in range(self.device_descriptor.numCodewords):
+            cw = i+1
+            for j in range(self.device_descriptor.numChannels):
+                ch = j+1
+                cw_cmd = 'sequence:element{:d}:waveform{:d}'.format(cw, ch)
+                self.add_parameter('codeword_{}_ch{}_waveform'.format(cw, ch),
+                                   get_cmd=cw_cmd+'?',
+                                   set_cmd=cw_cmd+' {:s}',
+                                   vals=vals.Strings())
+
+        doc_sSG = "Synchronize both sideband frequency" \
+            + " generators, i.e. restart them with their defined phases."
+        self.add_function('syncSidebandGenerators',
+                          call_cmd='QUTEch:OUTPut:SYNCsideband',
+                          docstring=doc_sSG)
             # FIXME: handle waveform differently?
 #           self.add_parameter('ch{}_waveform'.format(i),
 #                              label='Waveform channel {}'.format(i),
@@ -148,73 +170,76 @@ class QuTech_AWG_Module(SCPI):
     # QWG functions not very suitable to be implemented as Parameter
     ##########################################################################
 
-    def syncSidebandGenerators(self):
-        """
-        Synchronize both sideband frequency generators, i.e. restart them
-        with their defined phases.
-        """
-        self.write('QUTEch:OUTPut:SYNCsideband')
+    # def syncSidebandGenerators(self):
+    #     """
+    #     Synchronize both sideband frequency generators, i.e. restart them
+    #     with their defined phases.
+    #     """
+    #     self.write('QUTEch:OUTPut:SYNCsideband')
 
     ##########################################################################
     # QWG functions that are/could be implemented as Parameter
     # will be deprecated in the future
     ##########################################################################
 
-    def setRunModeCodeword(self):
-        self.write('awgcontrol:rmode codeword')
+    # def setRunModeCodeword(self):
+    #     self.write('awgcontrol:rmode codeword')
 
-    def setSidebandFrequency(self, chPair, frequency):
-        """
-        Set the sideband frequency for a channel pair.
+    # def setSidebandFrequency(self, chPair, frequency):
+    #     """
+    #     Set the sideband frequency for a channel pair.
 
-        Args:
-                chPair (int): the channel pair to use, 1 or 3
+    #     Args:
+    #             chPair (int): the channel pair to use, 1 or 3
 
-                frequency (float): the sideband frequency in [Hz], range
-                        -MAXF..MAXF in 0.23 Hz steps. MAXF is currently 300 MHz
-        """
-        self.write('qutech:output%d:frequency %f' % (chPair, frequency))
+    #             frequency (float): the sideband frequency in [Hz], range
+    #                     -MAXF..MAXF in 0.23 Hz steps. MAXF is currently 300 MHz
+    #     """
+    #     self.write('qutech:output%d:frequency %f' % (chPair, frequency))
 
-    def setSidebandPhase(self, chPair, phaseDeg):
-        ''' phaseDeg:           -180..180, or 0..360 in 65536 steps
+    # def setSidebandPhase(self, chPair, phaseDeg):
+    #     ''' phaseDeg:           -180..180, or 0..360 in 65536 steps
+    #     '''
+    #     self.write('qutech:output%d:phase %f' % (chPair, phaseDeg))
+
+    def _setMatrix(self, chPair, mat):
         '''
-        self.write('qutech:output%d:phase %f' % (chPair, phaseDeg))
-
-    def setMatrix(self, chPair, mat):
-        ''' matrix:             2x2 matrix for mixer calibration
+        matrix:             2x2 matrix for mixer calibration
         '''
-        self.write('qutech:output%d:matrix %f,%f,%f,%f' %
-                   (chPair, mat[0, 0], mat[1, 0], mat[0, 1], mat[1, 1]))        # FIXME
+        # function used internally for the parameters because of formatting
+        print(chPair, mat)
+        self.write('qutech:output{:d}:matrix {:f},{:f},{:f},{:f}'.format(chPair, mat[0, 0], mat[1, 0], mat[0, 1], mat[1, 1]))
 
     def setChannelTriggerLevel(self, trigChannel, level):
-        ''' level:              0.0 V to 2.5 V, in very small steps
+        '''
+        level:              0.0 V to 2.5 V, in very small steps
         '''
         self.write('qutech:trigger%d:level %f' % (trigChannel, level))
 
     ##########################################################################
     # AWG5014 functions: SOURCE
     ##########################################################################
-    def setWaveform(self, ch, name):
-        """
-        Set the waveform for a channel
+    # def setWaveform(self, ch, name):
+    #     """
+    #     Set the waveform for a channel
 
-        Args:
-                ch (int): the AWG channel number (1..4)
+    #     Args:
+    #             ch (int): the AWG channel number (1..4)
 
-                name (string): name of a waveform available in the AWG, excluding double
-                        quotes, e.g. '*Sine100'
+    #             name (string): name of a waveform available in the AWG, excluding double
+    #                     quotes, e.g. '*Sine100'
 
-        Compatibility:  5014, QWG
-        """
-        self.write('source%d:waveform "%s"' % (ch, name))
+    #     Compatibility:  5014, QWG
+    #     """
+    #     self.write('source%d:waveform "%s"' % (ch, name))
 
-    def setPhaseDeg(self, ch, phase):
-        ''' NB: applies to waveforms only, in non-sequence mode
-                ch:             1,2
-                phase:          -180 to 180 [deg], steps not defined
-                Compatibility:  5014
-        '''
-        self.write('source%d:phase %f' % (ch, phase))
+    # def setPhaseDeg(self, ch, phase):
+    #     ''' NB: applies to waveforms only, in non-sequence mode
+    #             ch:             1,2
+    #             phase:          -180 to 180 [deg], steps not defined
+    #             Compatibility:  5014
+    #     '''
+    #     self.write('source%d:phase %f' % (ch, phase))
 
     ##########################################################################
     # AWG5014 functions: SEQUENCE
@@ -229,20 +254,20 @@ class QuTech_AWG_Module(SCPI):
         '''
         self.write('sequence:element%d:loop:infinite on' % element)
 
-    def setSeqElemWaveform(self, element, ch, name):
-        """
-        Set the waveform for a sequence element
+    # def setSeqElemWaveform(self, element, ch, name):
+    #     """
+    #     Set the waveform for a sequence element
 
-        Args:
-                element (int): index of sequence element (valid range: 1..length)
+    #     Args:
+    #             element (int): index of sequence element (valid range: 1..length)
 
-                ch (int): AWG channel where waveform is put
+    #             ch (int): AWG channel where waveform is put
 
-                waveform (string): name of waveform in AWG memory
+    #             waveform (string): name of waveform in AWG memory
 
-        Compatibility:  5014, QWG
-        """
-        self.write('sequence:element%d:waveform%d "%s"' % (element, ch, name))
+    #     Compatibility:  5014, QWG
+    #     """
+    #     self.write('sequence:element%d:waveform%d "%s"' % (element, ch, name))
 
     ##########################################################################
     # AWG5014 functions: WLIST (Waveform list)
@@ -353,8 +378,8 @@ class QuTech_AWG_Module(SCPI):
             if (not((len(waveform) == len(marker1)) and ((len(marker1) == len(marker2))))):
                 raise UserWarning('length mismatch between markers/waveform')
             # prepare markers
-            m = marker1 + numpy.multiply(marker2, 2)
-            m = int(numpy.round(m[i], 0))
+            m = marker1 + np.multiply(marker2, 2)
+            m = int(np.round(m[i], 0))
 
         # FIXME: check waveform amplitude and marker values (if paranoid)
 
@@ -467,3 +492,10 @@ class QuTech_AWG_Module(SCPI):
 
     def setRunModeContinuous(self):
         self.write('awgcontrol:rmode cont')
+
+
+    # Used for setting the channel pairs
+    def _gen_ch_set_func(self, fun, ch):
+        def set_func(val):
+            return fun(ch, val)
+        return set_func
