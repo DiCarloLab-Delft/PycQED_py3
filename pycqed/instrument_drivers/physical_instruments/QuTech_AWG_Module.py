@@ -75,8 +75,8 @@ class QuTech_AWG_Module(SCPI):
                                get_cmd=mat_cmd + '?',
                                set_cmd=self._gen_ch_set_func(
                                     self._setMatrix, ch_pair),
-                               vals=vals.Anything(),
-                               # vals=vals.Arrays(-180, 360),
+                               # NB range is not a hardware limit
+                               vals=vals.Arrays(-2, 2, shape=(2, 2)),
                                get_parser=np.array)
 
         for i in range(1, self.device_descriptor.numTriggers+1):
@@ -138,7 +138,7 @@ class QuTech_AWG_Module(SCPI):
 
             self.add_parameter('ch{}_default_waveform'.format(ch),
                                get_cmd=waveform_cmd+'?',
-                               set_cmd=waveform_cmd+' {}',
+                               set_cmd=waveform_cmd+' "{}"',
                                vals=vals.Strings())
 
         for i in range(self.device_descriptor.numCodewords):
@@ -156,51 +156,6 @@ class QuTech_AWG_Module(SCPI):
         self.add_function('syncSidebandGenerators',
                           call_cmd='QUTEch:OUTPut:SYNCsideband',
                           docstring=doc_sSG)
-            # FIXME: handle waveform differently?
-#           self.add_parameter('ch{}_waveform'.format(i),
-#                              label='Waveform channel {}'.format(i),
-#                              get_cmd=waveform_cmd + '?',
-#                              set_cmd=waveform_cmd + ' "{}"',
-#                              vals=vals.Strings(),
-# FIXME                            get_parser=parsestr)
-
-
-
-    ##########################################################################
-    # QWG functions not very suitable to be implemented as Parameter
-    ##########################################################################
-
-    # def syncSidebandGenerators(self):
-    #     """
-    #     Synchronize both sideband frequency generators, i.e. restart them
-    #     with their defined phases.
-    #     """
-    #     self.write('QUTEch:OUTPut:SYNCsideband')
-
-    ##########################################################################
-    # QWG functions that are/could be implemented as Parameter
-    # will be deprecated in the future
-    ##########################################################################
-
-    # def setRunModeCodeword(self):
-    #     self.write('awgcontrol:rmode codeword')
-
-    # def setSidebandFrequency(self, chPair, frequency):
-    #     """
-    #     Set the sideband frequency for a channel pair.
-
-    #     Args:
-    #             chPair (int): the channel pair to use, 1 or 3
-
-    #             frequency (float): the sideband frequency in [Hz], range
-    #                     -MAXF..MAXF in 0.23 Hz steps. MAXF is currently 300 MHz
-    #     """
-    #     self.write('qutech:output%d:frequency %f' % (chPair, frequency))
-
-    # def setSidebandPhase(self, chPair, phaseDeg):
-    #     ''' phaseDeg:           -180..180, or 0..360 in 65536 steps
-    #     '''
-    #     self.write('qutech:output%d:phase %f' % (chPair, phaseDeg))
 
     def _setMatrix(self, chPair, mat):
         '''
@@ -208,38 +163,8 @@ class QuTech_AWG_Module(SCPI):
         '''
         # function used internally for the parameters because of formatting
         print(chPair, mat)
-        self.write('qutech:output{:d}:matrix {:f},{:f},{:f},{:f}'.format(chPair, mat[0, 0], mat[1, 0], mat[0, 1], mat[1, 1]))
-
-    def setChannelTriggerLevel(self, trigChannel, level):
-        '''
-        level:              0.0 V to 2.5 V, in very small steps
-        '''
-        self.write('qutech:trigger%d:level %f' % (trigChannel, level))
-
-    ##########################################################################
-    # AWG5014 functions: SOURCE
-    ##########################################################################
-    # def setWaveform(self, ch, name):
-    #     """
-    #     Set the waveform for a channel
-
-    #     Args:
-    #             ch (int): the AWG channel number (1..4)
-
-    #             name (string): name of a waveform available in the AWG, excluding double
-    #                     quotes, e.g. '*Sine100'
-
-    #     Compatibility:  5014, QWG
-    #     """
-    #     self.write('source%d:waveform "%s"' % (ch, name))
-
-    # def setPhaseDeg(self, ch, phase):
-    #     ''' NB: applies to waveforms only, in non-sequence mode
-    #             ch:             1,2
-    #             phase:          -180 to 180 [deg], steps not defined
-    #             Compatibility:  5014
-    #     '''
-    #     self.write('source%d:phase %f' % (ch, phase))
+        self.write('qutech:output{:d}:matrix {:f},{:f},{:f},{:f}'.format(
+                   chPair, mat[0, 0], mat[1, 0], mat[0, 1], mat[1, 1]))
 
     ##########################################################################
     # AWG5014 functions: SEQUENCE

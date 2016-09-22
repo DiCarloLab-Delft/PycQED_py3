@@ -4,7 +4,9 @@ from instrument_drivers.physical_instruments.QuTech_AWG_Module \
     import QuTech_AWG_Module
 from measurement.waveform_control_CC.waveform import Waveform
 import time
+import numpy as np
 from socket import timeout
+from qcodes.utils.validators import Arrays
 
 
 class QWG_tests(unittest.TestCase):
@@ -26,10 +28,6 @@ class QWG_tests(unittest.TestCase):
 
         self.qwg.reset()
         qwg1._socket.settimeout(.3)  # set low timeout for tests
-        try:
-            qwg1._socket.recv(1000)
-        except timeout:
-            pass
 
     def test_IDN(self):
         IDN = self.qwg.IDN()
@@ -42,37 +40,16 @@ class QWG_tests(unittest.TestCase):
         self.assertEqual(err_msg, '0,"No error"\n')
 
     def test_parameters(self):
-        # Clearing comms should not be an issue
-        try:
-            qwg1._socket.recv(1000)
-        except timeout:
-            pass
         for parname, par in self.qwg.parameters.items():
 
-            failing_pars = []
-            for i in [1, 3]:
-                failing_pars.append('ch_pair{}_sideband_frequency'.format(i))
-                failing_pars.append('ch_pair{}_sideband_phase'.format(i))
-            for i in range(self.qwg.device_descriptor.numTriggers):
-                failing_pars.append('ch{}_offset'.format(i+1))
-                failing_pars.append('ch{}_trigger_level'.format(i+1))
-            failing_pars.append('run_mode')
-            failing_pars.append('trigger_level')
-
-            for i in range(self.qwg.device_descriptor.numChannels):
-                failing_pars.append('ch{}_amp'.format(i+1))
-
-            if par.name not in ['IDN']+failing_pars:
+            if par.name not in ['IDN']:
                 # print('parname:', par.name)
-                try:
-                    old_value = par.get()
-                    old_value2 = par.get()
-                    self.assertEqual(old_value2, old_value)
-                except timeout:
-                    raise(TimeoutError(' could not read {}'.format(par.name)))
+                old_value = par.get()
+                old_value2 = par.get()
+                self.assertEqual(old_value2, old_value, msg=par.name)
                 if hasattr(par, '_vals'):
                     vals = par._vals
-                    if vals.is_numeric:
+                    if vals.is_numeric and not isinstance(vals, Arrays):
                         min_val = vals._min_value
                         max_val = vals._max_value
                         if max_val != float("inf"):
@@ -87,6 +64,15 @@ class QWG_tests(unittest.TestCase):
                                     msg='{} min_val-1: {}'.format(
                                     par.name, (min_val-1))):
                                 par.set(min_val-1)
+                        if min_val == -float("inf"):
+                            min_val = -100
+                        if max_val == float("inf"):
+                            max_val = 100
+
+                        test_val = (np.random.randn()+min_val)*(max_val-min_val)
+                        par.set(test_val)
+                        self.assertEqual(test_val, par.get())
+
                     else:
                         print(par.name, ' is not numeric, not testing')
                 else:
@@ -137,9 +123,6 @@ qwg1 = QWG
 qwg1.reset()
 
 if __name__ == '__main__':
-    suite = unittest.TestLoader().loadTestsFromTestCase(
-        QWG_tests)
-    unittest.TextTestRunner(verbosity=2).run(suite)
 
     if 1:  # continuous
         qwg1.createWaveformReal('cos', wvCos, marker1, marker2)
@@ -151,15 +134,15 @@ if __name__ == '__main__':
         qwg1.createWaveformReal('derivGauss', wvDerivGauss, marker1, marker2)
 
         if 1:  # dc
-            qwg1.setWaveform(1, 'gauss')  # 'hi')
-            qwg1.setWaveform(2, 'derivGauss')  # 'zero')
-            qwg1.setWaveform(3, 'gauss')  # 'hi')
-            qwg1.setWaveform(4, 'zero')  # 'zero')
+            qwg1.set('ch{}_default_waveform'.format(1), 'gauss')  # 'hi')
+            qwg1.set('ch{}_default_waveform'.format(2), 'derivGauss')  # 'zero')
+            qwg1.set('ch{}_default_waveform'.format(3), 'gauss')  # 'hi')
+            qwg1.set('ch{}_default_waveform'.format(4), 'zero')  # 'zero')
         else:
-            qwg1.setWaveform(1, 'derivGauss')
-            qwg1.setWaveform(2, 'zero')
-            qwg1.setWaveform(3, 'zero')
-            qwg1.setWaveform(4, 'gauss')
+            qwg1.set('ch{}_default_waveform'.format(1), 'derivGauss')
+            qwg1.set('ch{}_default_waveform'.format(2), 'zero')
+            qwg1.set('ch{}_default_waveform'.format(3), 'zero')
+            qwg1.set('ch{}_default_waveform'.format(4), 'gauss')
         qwg1.setRunModeContinuous()
 
     else:  # codeword based
@@ -174,10 +157,10 @@ if __name__ == '__main__':
         qwg1.createWaveformReal('gaussNeg', -wvGauss, marker1, marker2)
 
         # segment 0: idle
-        qwg1.setWaveform(1, 'zero')
-        qwg1.setWaveform(2, 'zero')
-        qwg1.setWaveform(3, 'zero')
-        qwg1.setWaveform(4, 'zero')
+        qwg1.set('ch{}_default_waveform'.format(1), 'zero')
+        qwg1.set('ch{}_default_waveform'.format(2), 'zero')
+        qwg1.set('ch{}_default_waveform'.format(3), 'zero')
+        qwg1.set('ch{}_default_waveform'.format(4), 'zero')
 
         seg = 0
 
@@ -248,3 +231,7 @@ if __name__ == '__main__':
     print('Identity: ', qwg1.getIdentity())
     print('Error messages: ', qwg1.getError())
 
+
+    suite = unittest.TestLoader().loadTestsFromTestCase(
+        QWG_tests)
+    unittest.TextTestRunner(verbosity=2).run(suite)

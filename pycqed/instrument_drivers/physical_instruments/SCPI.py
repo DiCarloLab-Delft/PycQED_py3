@@ -9,7 +9,7 @@ Bugs:
 '''
 
 from qcodes import IPInstrument
-
+from qcodes import validators as vals
 
 """
 FIXME: we would like to be able to choose the base class separately, so the
@@ -31,7 +31,8 @@ class SCPI(IPInstrument):
         self.add_function('reset', call_cmd='*RST')
         self.add_parameter('event_status_enable',
                            set_cmd='*ESE {}',
-                           get_cmd='*ESE?')
+                           get_cmd='*ESE?',
+                           vals=vals.Bool())
 
     def _recv(self):
         """
