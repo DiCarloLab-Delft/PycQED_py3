@@ -32,6 +32,14 @@ class SCPI(IPInstrument):
         self.add_parameter('event_status_enable',
                            set_cmd='*ESE {}',
                            get_cmd='*ESE?')
+
+    def _recv(self):
+        """
+        Overwrites base IP recv command to ensuring read till EOM
+        """
+
+        resp = self._socket.makefile().readline()
+        return resp
     ###
     # Generic SCPI commands from IEEE 488.2 (IEC 625-2) standard
     ###

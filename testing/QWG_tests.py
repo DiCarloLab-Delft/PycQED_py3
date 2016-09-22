@@ -18,7 +18,7 @@ class QWG_tests(unittest.TestCase):
         Try using existing instrument if it exists, otherwise create it.
         '''
         try:
-            self.qwg = qwg1
+            self.qwg = QWG
         except:
             self.qwg = QuTech_AWG_Module(
                 'QWG', address='192.168.42.10',
@@ -33,16 +33,13 @@ class QWG_tests(unittest.TestCase):
 
     def test_IDN(self):
         IDN = self.qwg.IDN()
-
-        IDN = self.qwg.IDN()
-        # should not be called twice, indicates a comms issue
         self.assertIsInstance(IDN, dict)
         self.assertEqual(IDN['vendor'], 'QuTech')
         self.assertEqual(IDN['model'], 'QWG')
 
     def test_Error(self):
         err_msg = self.qwg.getError()
-        self.assertEqual(err_msg, '0')
+        self.assertEqual(err_msg, '0,"No error"\n')
 
     def test_parameters(self):
         # Clearing comms should not be an issue
@@ -53,12 +50,13 @@ class QWG_tests(unittest.TestCase):
         for parname, par in self.qwg.parameters.items():
 
             failing_pars = []
-            for i in range(4):
-                failing_pars.append('ch_pair{}_sideband_frequency'.format(i+1))
-                failing_pars.append('ch_pair{}_sideband_phase'.format(i+1))
+            for i in [1, 3]:
+                failing_pars.append('ch_pair{}_sideband_frequency'.format(i))
+                failing_pars.append('ch_pair{}_sideband_phase'.format(i))
             for i in range(self.qwg.device_descriptor.numTriggers):
                 failing_pars.append('ch{}_offset'.format(i+1))
                 failing_pars.append('ch{}_trigger_level'.format(i+1))
+            failing_pars.append('run_mode')
             failing_pars.append('trigger_level')
 
             for i in range(self.qwg.device_descriptor.numChannels):
@@ -68,6 +66,8 @@ class QWG_tests(unittest.TestCase):
                 # print('parname:', par.name)
                 try:
                     old_value = par.get()
+                    old_value2 = par.get()
+                    self.assertEqual(old_value2, old_value)
                 except timeout:
                     raise(TimeoutError(' could not read {}'.format(par.name)))
                 if hasattr(par, '_vals'):
@@ -76,21 +76,24 @@ class QWG_tests(unittest.TestCase):
                         min_val = vals._min_value
                         max_val = vals._max_value
                         if max_val != float("inf"):
-                            with self.assertRaises(ValueError,
+                            with self.assertRaises(
+                                    ValueError,
                                     msg='{} max_val+1 {}'.format(par.name, (
-                                        max_val+1))):
+                                    max_val+1))):
                                 par.set(max_val+1)
                         if min_val != -float("inf"):
-                            with self.assertRaises(ValueError,
+                            with self.assertRaises(
+                                    ValueError,
                                     msg='{} min_val-1: {}'.format(
-                                        par.name, (min_val-1))):
-                                 par.set(min_val-1)
+                                    par.name, (min_val-1))):
+                                par.set(min_val-1)
                     else:
                         print(par.name, ' is not numeric, not testing')
                 else:
                     print(par.name, 'does not have validator')
             else:
                 print('Not in pars to be tested: "{}"'.format(par.name))
+
 
     def tearDown(self):
         self.qwg._socket.settimeout(5)
@@ -130,7 +133,7 @@ marker2 = []
 #     # local variant, in combination with 'nc -l 5025' run locally from a
 #     # terminal
 #     qwg1 = QuTech_AWG_Module('QWG-1', '127.0.0.1', 5025, server_name=None)
-qwg1 = qwg1
+qwg1 = QWG
 qwg1.reset()
 
 if __name__ == '__main__':
@@ -180,6 +183,7 @@ if __name__ == '__main__':
 
         # segment 1:
         seg = seg+1
+        # Seg corresponds to codeword
         qwg1.setSeqElemWaveform(seg, 1, 'hi')
         qwg1.setSeqElemWaveform(seg, 2, 'hi')
         qwg1.setSeqElemWaveform(seg, 3, 'gauss')
