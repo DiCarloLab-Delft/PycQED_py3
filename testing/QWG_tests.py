@@ -113,6 +113,12 @@ class QWG_tests(unittest.TestCase):
         self.assertEqual(v, par.get(), msg=par.name)
         par.set(old_val)
 
+    def enum_get_set(self, par):
+        old_val = par.get()
+        for v in par._vals._values:
+            par.set(v)
+            self.assertEqual(v, par.get(), msg=par.name)
+        par.set(old_val)
 
     def test_parameters(self):
         for parname, par in sorted(self.qwg.parameters.items()):
@@ -145,6 +151,10 @@ class QWG_tests(unittest.TestCase):
                         self.array_get_set(par)
                     elif isinstance(validator, vals.Bool):
                         self.bool_get_set(par)
+                    elif isinstance(validator, vals.Strings):
+                        self.string_get_set(par)
+                    elif isinstance(validator, vals.Enum):
+                        self.enum_get_set(par)
 
                     else:
                         print('{} validator "{}" not recognized'.format(
