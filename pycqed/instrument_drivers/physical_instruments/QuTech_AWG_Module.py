@@ -91,8 +91,8 @@ class QuTech_AWG_Module(SCPI):
                                get_parser=float)
 
         self.add_parameter('run_mode',
-                           get_cmd='AWGC:RMOD?',
-                           set_cmd='AWGC:RMOD ' + '{}',
+                           get_cmd='AWGC:RMO?',
+                           set_cmd='AWGC:RMO ' + '{}',
                            vals=vals.Enum('CONT', 'SEQ', 'COD'))
 
         # Channel parameters #
@@ -138,7 +138,7 @@ class QuTech_AWG_Module(SCPI):
                 cw_cmd = 'sequence:element{:d}:waveform{:d}'.format(cw, ch)
                 self.add_parameter('codeword_{}_ch{}_waveform'.format(cw, ch),
                                    get_cmd=cw_cmd+'?',
-                                   set_cmd=cw_cmd+' {:s}',
+                                   set_cmd=cw_cmd+' "{:s}"',
                                    vals=vals.Strings())
 
         doc_sSG = "Synchronize both sideband frequency" \
