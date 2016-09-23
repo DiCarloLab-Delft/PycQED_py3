@@ -8,7 +8,7 @@ import numpy as np
 from qcodes.instrument.base import Instrument
 from qcodes.utils import validators as vals
 from fnmatch import fnmatch
-
+import zhinst.zishell as zis
 
 
 class UHFQC(Instrument):
@@ -20,17 +20,18 @@ class UHFQC(Instrument):
     Installation instructions for Zurich Instrument Libraries.
     1. install ziPython 3.5 ucs4 16.04 for 64bit Windows from http://www.zhinst.com/downloads
     2. pip install dependencies: httplib2, plotly, pyqtgraph
-    3. upload the latest firmware to the UHFQC by opening reboot.bat in 'Transmon\Inventory\ZurichInstruments\firmware_Nielsb\firmware_x'. WIth x the highest available number.
-    6. find out where sequences are stored by saving a sequence from the GUI and then check :"showLog" to see where it is stored. This is the location where AWG sequences can be loaded from.
-    misc: when device crashes, check the log file in 
+    3. manually paste zishell.py one directory above the zhinst directory (C:/Anaconda3/side) (can be found in transmon/inventory/firmware_Nielsb)
+    4. upload the latest firmware to the UHFQC by opening reboot.bat in 'Transmon\Inventory\ZurichInstruments\firmware_Nielsb\firmware_x'. WIth x the highest available number.
+    5. find out where sequences are stored by saving a sequence from the GUI and then check :"showLog" to see where it is stored. This is the location where AWG sequences can be loaded from.
+    misc: when device crashes, check the log file in
     EOM
     """
 
     def __init__(self, name, server_name, device='auto', interface='USB', address='127.0.0.1', port=8004, **kw):
         '''
-        Input arguments: 
-            name:           (str) name of the instrument 
-            server_name:    (str) qcodes instrument server 
+        Input arguments:
+            name:           (str) name of the instrument
+            server_name:    (str) qcodes instrument server
             address:        (int) the address of the data server e.g. 8006
         '''
 
@@ -73,38 +74,38 @@ class UHFQC(Instrument):
             if parameter[1]=='float':
                 self.add_parameter(
                     parname,
-                    set_cmd=self._gen_set_func(self.setd, parameter[0]),
-                    get_cmd=self._gen_get_func(self.getd, parameter[0]),
+                    set_cmd=self._gen_set_func(zis.setd, parameter[0]),
+                    get_cmd=self._gen_get_func(zis.getd, parameter[0]),
                     vals=vals.Numbers(parameter[2], parameter[3]))
             elif parameter[1]=='float_small':
                 self.add_parameter(
                     parname,
-                    set_cmd=self._gen_set_func(self.setd, parameter[0]),
-                    get_cmd=self._gen_get_func(self.getd, parameter[0]),
+                    set_cmd=self._gen_set_func(zis.setd, parameter[0]),
+                    get_cmd=self._gen_get_func(zis.getd, parameter[0]),
                     vals=vals.Numbers(parameter[2], parameter[3]))
             elif parameter[1]=='int_8bit':
                 self.add_parameter(
                     parname,
-                    set_cmd=self._gen_set_func(self.seti, parameter[0]),
-                    get_cmd=self._gen_get_func(self.geti, parameter[0]),
+                    set_cmd=self._gen_set_func(zis.seti, parameter[0]),
+                    get_cmd=self._gen_get_func(zis.geti, parameter[0]),
                     vals=vals.Ints(parameter[2], parameter[3]))
             elif parameter[1]=='int':
                 self.add_parameter(
                     parname,
-                    set_cmd=self._gen_set_func(self.seti, parameter[0]),
-                    get_cmd=self._gen_get_func(self.geti, parameter[0]),
+                    set_cmd=self._gen_set_func(zis.seti, parameter[0]),
+                    get_cmd=self._gen_get_func(zis.geti, parameter[0]),
                     vals=vals.Ints(parameter[2], parameter[3]))
             elif parameter[1]=='int_64':
                 self.add_parameter(
                     parname,
-                    set_cmd=self._gen_set_func(self.seti, parameter[0]),
-                    get_cmd=self._gen_get_func(self.geti, parameter[0]),
+                    set_cmd=self._gen_set_func(zis.seti, parameter[0]),
+                    get_cmd=self._gen_get_func(zis.geti, parameter[0]),
                     vals=vals.Ints(parameter[2], parameter[3]))
             elif parameter[1]=='bool':
                 self.add_parameter(
                     parname,
-                    set_cmd=self._gen_set_func(self.seti, parameter[0]),
-                    get_cmd=self._gen_get_func(self.geti, parameter[0]),
+                    set_cmd=self._gen_set_func(zis.seti, parameter[0]),
+                    get_cmd=self._gen_get_func(zis.geti, parameter[0]),
                     vals=vals.Ints(parameter[2], parameter[3]))
             else:
                 print("parameter {} type {} from from s_node_pars not recognized".format(parname,parameter[1]))
@@ -114,26 +115,29 @@ class UHFQC(Instrument):
             if parameter[1]=='float':
                 self.add_parameter(
                     parname,
-                    get_cmd=self._gen_get_func(self.getd, parameter[0]))
+                    get_cmd=self._gen_get_func(zis.getd, parameter[0]))
             elif parameter[1]=='vector_g':
                 self.add_parameter(
                     parname,
-                    get_cmd=self._gen_get_func(self.getv, parameter[0]))
+                    get_cmd=self._gen_get_func(zis.getv, parameter[0]))
             elif parameter[1]=='vector_s':
                 self.add_parameter(
                     parname,
-                    set_cmd=self._gen_set_func(self.setv, parameter[0]),
+                    set_cmd=self._gen_set_func(zis.setv, parameter[0]),
                     vals=vals.Anything())
-            else:   
+            else:
                 print("parameter {} type {} from d_node_pars not recognized".format(parname,parameter[1]))
 
 
         self.add_parameter('AWG_file',
                            set_cmd=self._do_set_AWG_file,
                            vals=vals.Anything())
+        zis.connect_server('localhost', port)
+        zis.connect_device(self._device, 'USB')
         if init:
             self.load_default_settings()
         t1 = time.time()
+
         print('Initialized UHFQC', self._device,
               'in %.2fs' % (t1-t0))
 
@@ -142,7 +146,7 @@ class UHFQC(Instrument):
         # Run this block to do some standard configuration
 
         # The averaging-count is used to specify how many times the AWG program should run
-        LOG2_AVG_CNT = 6
+        LOG2_AVG_CNT = 10
 
         # This averaging count specifies how many measurements the result logger should average
         LOG2_RL_AVG_CNT = 0
@@ -189,40 +193,40 @@ class UHFQC(Instrument):
         self.quex_wint_weights_3_imag(np.array([1.0]*12 + [0.0]*116))
 
         # Length is set in units of 1 samples
-        self.quex_wint_length(4)
+        self.quex_wint_length(4096)
         self.quex_wint_delay(0)
 
-        # Setting the clock to external 
+        # Setting the clock to external
         self.system_extclk(1)
-            
+
         # No rotation on the output of the weighted integration units, i.e. take real part of result
         for i in range(0, 4):
-            self.setd('quex/rot/{0}/real'.format(i), 1.0)
-            self.setd('quex/rot/{0}/imag'.format(i), 0.0)
+            eval('self.quex_rot_{0}_real(1.0)'.format(i))
+            eval('self.quex_rot_{0}_imag(0.0)'.format(i))
 
         # No cross-coupling in the matrix multiplication (identity matrix)
         for i in range(0, 4):
             for j in range(0, 4):
                 if i == j:
-                    self.setd('quex/trans/{0}/col/{1}/real'.format(i,j), 1.0)
+                    eval('self.quex_trans_{0}_col_{1}_real(1)'.format(i,j))
                 else:
-                    self.setd('quex/trans/{0}/col/{1}/real'.format(i,j), 0.0)
-                    
+                    eval('self.quex_trans_{0}_col_{1}_real(0)'.format(i,j))
+
         # Configure the result logger to not do any averaging
-        self.seti('quex/rl/length', pow(2, LOG2_AVG_CNT))
-        self.seti('quex/rl/avgcnt', LOG2_RL_AVG_CNT)
-        self.seti('quex/rl/source', 2)
+        self.quex_rl_length(pow(2, LOG2_AVG_CNT)-1)
+        self.quex_rl_avgcnt(LOG2_RL_AVG_CNT)
+        self.quex_rl_source(2)
 
         # Ready for readout
-        self.seti('quex/iavg/readout', 1)
-        self.seti('quex/rl/readout', 1)
+        self.quex_iavg_readout(1)
+        self.quex_rl_readout(1)
 
         # The custom firmware will feed through the signals on Signal Input 1 to Signal Output 1 and Signal Input 2 to Signal Output 2
         # when the AWG is OFF. For most practical applications this is not really useful. We, therefore, disable the generation of
         # these signals on the output here.
         for i in range(0, 2):
             for j in range(0, 4):
-                self.seti('sigouts/{0}/enables/{1}'.format(i, j), 0)
+                eval('self.sigouts_{0}_enables_{1}(0)'.format(i, j))
 
     def _gen_set_func(self, dev_set_type, cmd_str):
         def set_func(val):
@@ -245,9 +249,9 @@ class UHFQC(Instrument):
         h.execute()
         h.set('awgModule/compiler/sourcefile', filename)
         h.set('awgModule/compiler/start', 1)
-        h.set('awgModule/elf/file', '')        
+        h.set('awgModule/elf/file', '')
 
-        # code to upload AWG sequence as a string 
+        # code to upload AWG sequence as a string
         # def awg(self, filename):
         #         for device in self._devices:
         #             h = self.daq.awgModule()
@@ -256,7 +260,7 @@ class UHFQC(Instrument):
         #             h.execute()
         #             h.set('awgModule/compiler/sourcefile', filename)
         #             h.set('awgModule/compiler/start', 1)
-        #             h.set('awgModule/elf/file', '’)        
+        #             h.set('awgModule/elf/file', '’)
 
         # Now, if you would change it to:
 
@@ -268,9 +272,9 @@ class UHFQC(Instrument):
         #             h.execute()
         #             h.set('awgModule/compiler/sourcestring', sourcestring)
         #             h.set('awgModule/compiler/start', 1)
-        #             h.set('awgModule/elf/file', '’)    
+        #             h.set('awgModule/elf/file', '’)
 
-    def close(self): 
+    def close(self):
         self._daq.disconnectDevice(self._device)
 
     def find(self, *args):
@@ -315,9 +319,9 @@ class UHFQC(Instrument):
             float_values = [np.pi]*len(s_nodes)
             for i, s_node in enumerate(s_nodes):
                 if np.pi > max_values[i]:
-                    float_values[i] = max_values[i]/np.pi;            
+                    float_values[i] = max_values[i]/np.pi;
                 self.setd(s_node, float_values[i])
-            actual_float_values = self.getd(s_nodes, True)        
+            actual_float_values = self.getd(s_nodes, True)
             node_types = ['']*len(s_nodes)
             for i, s_node in enumerate(s_nodes):
                 #self.setd(node,default_values[i])
@@ -345,14 +349,14 @@ class UHFQC(Instrument):
                 line=[s_node, node_types[i], min_values[i], max_values[i], '\n']
                 print(line)
                 s_node_pars.append(line)
-          
+
             #extracting info from the data nodes
             d_nodes = list(d_nodes)
             #default_values=self.getd(d_nodes, True)
             default_values=np.zeros(len(d_nodes))
             node_types = ['']*len(d_nodes)
             for i, d_node in enumerate(d_nodes):
-                try: 
+                try:
                     answer=self.getv(d_node)
                     if isinstance(answer, dict):
                         value=answer['value'][0]
@@ -376,113 +380,123 @@ class UHFQC(Instrument):
         f.close()
 
 
-    def setd(self, path, value):
-        # Handle absolute path
-        if path[0] == '/':
-            self._daq.setDouble(path, value)
-        else:
-            self._daq.setDouble('/' + self._device + '/' + path, value)
+    def upload_demodulation_weights(self, IF):
+            trace_length = 4096
+            tbase = np.arange(0, trace_length/1.8e9, 1/1.8e9)
+            print(tbase)
+            cosI = np.cos(2*np.pi*IF*tbase)
+            sinI = np.sin(2*np.pi*IF*tbase)
+            self.quex_wint_weights_0_real(np.array(cosI))
+            self.quex_wint_weights_1_real(np.array(sinI))
 
-    def seti(self, path, value):
-        # Handle absolute path
-        if path[0] == '/':
-            self._daq.setInt(path, value)
-        else:
-            self._daq.setInt('/' + self._device + '/' + path, value)
 
-    def setv(self, path, value):
-        # Handle absolute path
-        if path[0] == '/':
-            self._daq.vectorWrite(path, value)
-        else:
-            self._daq.vectorWrite('/' + self._device + '/' + path, value)
+    # def setd(self, path, value):
+    #     # Handle absolute path
+    #     if path[0] == '/':
+    #         self._daq.setDouble(path, value)
+    #     else:
+    #         self._daq.setDouble('/' + self._device + '/' + path, value)
 
-    def geti(self, paths, deep=True):
-        if type(paths) is not list:
-            paths = [ paths ]
-            single = 1
-        else:
-            single = 0
-        
-        values = []
-        for p in paths:
-            if p[0] == '/':
-                if deep:
-                    self._daq.getAsEvent(p)
-                    tmp = self._daq.poll(0.1, 500, 4, True)
-                    if p in tmp:
-                        values.append(tmp[p]['value'][0])
-                else:
-                    values.append(self._daq.getInt(p))
-            else:
-                tmp_p = '/' + self._device + '/' + p
-                if deep:
-                    self._daq.getAsEvent(tmp_p)
-                    tmp = self._daq.poll(0.1, 500, 4, True)
-                    if tmp_p in tmp:
-                        values.append(tmp[tmp_p]['value'][0])
-                else:
-                    values.append(self._daq.getInt(tmp_p))
-        if single:
-            return values[0]
-        else:
-            return values
+    # def seti(self, path, value):
+    #     # Handle absolute path
+    #     if path[0] == '/':
+    #         self._daq.setInt(path, value)
+    #     else:
+    #         self._daq.setInt('/' + self._device + '/' + path, value)
 
-    def getd(self, paths, deep=True):
-        if type(paths) is not list:
-            paths = [ paths ]
-            single = 1
-        else:
-            single = 0
-        
-        values = []
-        for p in paths:
-            if p[0] == '/':
-                if deep:
-                    self._daq.getAsEvent(p)
-                    tmp = self._daq.poll(0.1, 500, 4, True)
-                    if p in tmp:
-                        values.append(tmp[p]['value'][0])
-                else:
-                    values.append(self._daq.getDouble(p))
-            else:
-                tmp_p = '/' + self._device + '/' + p
-                if deep:
-                    self._daq.getAsEvent(tmp_p)
-                    tmp = self._daq.poll(0.1, 500, 4, True)
-                    if tmp_p in tmp:
-                        values.append(tmp[tmp_p]['value'][0])
-                else:
-                    values.append(self._daq.getDouble(tmp_p))
-        if single:
-            return values[0]
-        else:
-            return values
+    # def setv(self, path, value):
+    #     # Handle absolute path
+    #     if path[0] == '/':
+    #         self._daq.vectorWrite(path, value)
+    #     else:
+    #         self._daq.vectorWrite('/' + self._device + '/' + path, value)
 
-    def getv(self, paths):
-        if type(paths) is not list:
-            paths = [ paths ]
-            single = 1
-        else:
-            single = 0
-        
-        values = []
-        for p in paths:
-            if p[0] == '/':
-                self._daq.getAsEvent(p)
-                tmp = self._daq.poll(0.5, 500, 4, True)
-                if p in tmp:
-                    values.append(tmp[p])
-            else:
-                tmp_p = '/' + self._device + '/' + p
-                self._daq.getAsEvent(tmp_p)
-                tmp = self._daq.poll(0.5, 500, 4, True)
-                if tmp_p in tmp:
-                    values.append(tmp[tmp_p])
-        if single:
-            return values[0]
-        else:
-            return values
+    # def geti(self, paths, deep=True):
+    #     if type(paths) is not list:
+    #         paths = [ paths ]
+    #         single = 1
+    #     else:
+    #         single = 0
+
+    #     values = []
+    #     for p in paths:
+    #         if p[0] == '/':
+    #             if deep:
+    #                 self._daq.getAsEvent(p)
+    #                 tmp = self._daq.poll(0.1, 500, 4, True)
+    #                 if p in tmp:
+    #                     values.append(tmp[p]['value'][0])
+    #             else:
+    #                 values.append(self._daq.getInt(p))
+    #         else:
+    #             tmp_p = '/' + self._device + '/' + p
+    #             if deep:
+    #                 self._daq.getAsEvent(tmp_p)
+    #                 tmp = self._daq.poll(0.1, 500, 4, True)
+    #                 if tmp_p in tmp:
+    #                     values.append(tmp[tmp_p]['value'][0])
+    #             else:
+    #                 values.append(self._daq.getInt(tmp_p))
+    #     if single:
+    #         return values[0]
+    #     else:
+    #         return values
+
+    # def getd(self, paths, deep=True):
+    #     if type(paths) is not list:
+    #         paths = [ paths ]
+    #         single = 1
+    #     else:
+    #         single = 0
+
+    #     values = []
+    #     for p in paths:
+    #         if p[0] == '/':
+    #             if deep:
+    #                 self._daq.getAsEvent(p)
+    #                 tmp = self._daq.poll(0.1, 500, 4, True)
+    #                 if p in tmp:
+    #                     values.append(tmp[p]['value'][0])
+    #             else:
+    #                 values.append(self._daq.getDouble(p))
+    #         else:
+    #             tmp_p = '/' + self._device + '/' + p
+    #             if deep:
+    #                 self._daq.getAsEvent(tmp_p)
+    #                 tmp = self._daq.poll(0.1, 500, 4, True)
+    #                 if tmp_p in tmp:
+    #                     values.append(tmp[tmp_p]['value'][0])
+    #             else:
+    #                 values.append(self._daq.getDouble(tmp_p))
+    #     if single:
+    #         return values[0]
+    #     else:
+    #         return values
+
+    # def getv(self, paths):
+    #     if type(paths) is not list:
+    #         paths = [ paths ]
+    #         single = 1
+    #     else:
+    #         single = 0
+
+    #     values = []
+    #     for p in paths:
+    #         if p[0] == '/':
+    #             self._daq.getAsEvent(p)
+    #             tmp = self._daq.poll(0.5, 500, 4, True)
+    #             if p in tmp:
+    #                 values.append(tmp[p])
+    #         else:
+    #             tmp_p = '/' + self._device + '/' + p
+    #             self._daq.getAsEvent(tmp_p)
+    #             tmp = self._daq.poll(0.5, 500, 4, True)
+    #             if tmp_p in tmp:
+    #                 values.append(tmp[tmp_p])
+    #     if single:
+    #         return values[0]
+    #     else:
+    #         return values
 
 
 
