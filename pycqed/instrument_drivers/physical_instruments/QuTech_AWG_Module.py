@@ -95,7 +95,6 @@ class QuTech_AWG_Module(SCPI):
                            set_cmd='AWGC:RMOD ' + '{}',
                            vals=vals.Enum('CONT', 'SEQ', 'COD'))
 
-
         # Channel parameters #
         for ch in range(1, self.device_descriptor.numChannels+1):
             amp_cmd = 'SOUR{}:VOLT:LEV:IMM:AMPL'.format(ch)
@@ -108,10 +107,9 @@ class QuTech_AWG_Module(SCPI):
                                label='Status channel {}'.format(ch),
                                get_cmd=state_cmd + '?',
                                set_cmd=state_cmd + ' {}',
-                               get_parser=int,
-                               vals=vals.Ints(0, 1))
+                               val_mapping={True: '1', False: '0'},
+                               vals=vals.Bool())
 
-            # Compatibility: 5014, QWG (FIXME: different range, not in V)
             self.add_parameter('ch{}_amp'.format(ch),
                                label='Amplitude channel {} (Vpp)'.format(ch),
                                units='Vpp',
@@ -120,7 +118,6 @@ class QuTech_AWG_Module(SCPI):
                                vals=vals.Numbers(0.02, 4.5),
                                get_parser=float)
 
-            # Compatibility: 5014, QWG (FIXME: different range, not in V)
             self.add_parameter('ch{}_offset'.format(ch),
                                label='Offset channel {} (V)'.format(ch),
                                units='V',
@@ -172,26 +169,11 @@ class QuTech_AWG_Module(SCPI):
         '''
         self.write('sequence:element%d:loop:infinite on' % element)
 
-    # def setSeqElemWaveform(self, element, ch, name):
-    #     """
-    #     Set the waveform for a sequence element
-
-    #     Args:
-    #             element (int): index of sequence element (valid range: 1..length)
-
-    #             ch (int): AWG channel where waveform is put
-
-    #             waveform (string): name of waveform in AWG memory
-
-    #     Compatibility:  5014, QWG
-    #     """
-    #     self.write('sequence:element%d:waveform%d "%s"' % (element, ch, name))
-
     ##########################################################################
     # AWG5014 functions: WLIST (Waveform list)
     ##########################################################################
     def getWlistSize(self):
-        return self.askDouble('wlist:size?')
+        return self.ask('wlist:size?')
 
     def getWlistName(self, idx):
         ''' idx:            0..size-1
@@ -199,7 +181,8 @@ class QuTech_AWG_Module(SCPI):
         return self.ask('wlist:name? %d' % idx)
 
     def getWlist(self):
-        ''' NB: takes a few seconds on 5014: our fault or Tek's?
+        '''
+        NB: takes a few seconds on 5014: our fault or Tek's?
         '''
         size = self.getWlistSize()
         wlist = []                                  # empty list
@@ -228,7 +211,7 @@ class QuTech_AWG_Module(SCPI):
     def getWaveformLength(self, name):
         ''' name:       waveform name excluding double quotes, e.g. '*Sine100'
         '''
-        return self.askDouble('wlist:waveform:length? "%s"' % name)
+        return self.ask('wlist:waveform:length? "%s"' % name)
 
     def newWaveformReal(self, name, len):
         ''' name:       waveform name excluding double quotes, e.g. 'test'
@@ -262,9 +245,9 @@ class QuTech_AWG_Module(SCPI):
         marker1 = []
         marker2 = []
         for k in range(waveformLen):
-            (waveform[i], markers) = struct.unpack(binBlock, '<fB')
-            marker1[i] = markers & 0x01
-            marker2[i] = markers >> 1 & 0x01
+            (waveform[k], markers) = struct.unpack(binBlock, '<fB')
+            marker1[k] = markers & 0x01
+            marker2[k] = markers >> 1 & 0x01
 
         return (waveform, marker1, marker2)
 
@@ -332,12 +315,6 @@ class QuTech_AWG_Module(SCPI):
         self.sendWaveformDataReal(name, waveform, marker1, marker2)
 
     ##########################################################################
-    # AWG5014 functions: MMEM (Mass Memory)
-    ##########################################################################
-
-#   None at the moment
-
-    ##########################################################################
     # Generic (i.e. at least AWG520 and AWG5014) Tektronix AWG functions
     ##########################################################################
 
@@ -354,62 +331,6 @@ class QuTech_AWG_Module(SCPI):
 
     def stop(self):
         self.write('awgcontrol:stop:immediate')
-
-
-    ##########################################################################
-    # Generic AWG functions also implemented as Parameter
-    # to be deprecated in the future
-    ##########################################################################
-
-    # NB: functions are organised by their appearance in the AWG520 user interface
-    # functions: menu Setup|Vertical
-    def setOffset(self, ch, offset):
-        ''' ch:             AWG520: 1,2 (and 7,8 see documentation)
-                offset:         AWG520: -1.000V to +1.000V in 1 mV steps
-        '''
-        self.write('source%d:voltage:level:immediate:offset %f' % (ch, offset))
-
-    def getOffset(self, ch):
-        ''' ch:             AWG520: 1,2 (and 7,8 see documentation)
-        '''
-        return self.askDouble('source%d:voltage:level:immediate:offset?' % ch)
-
-    # functions: menu Setup|Vertical
-    def setAmplitude(self, ch, amplitude):
-        ''' ch:             AWG520: 1,2 (and 7,8 see documentation)
-                amplitude:      AWG520: 0.020Vpp to 2.000Vpp in 1 mV steps
-        '''
-        self.write('source%d:voltage:level:immediate:amplitude %f' %
-                   (ch, amplitude))
-
-    def getAmplitude(self, ch):
-        ''' ch:             AWG520: 1,2 (and 7,8 see documentation)
-        '''
-        return self.askDouble('source%d:voltage:level:immediate:amplitude?' % ch)
-
-    # functions: Button interface
-    def setOutputStateOn(self, ch):
-        ''' ch:             AWG520: 1,2 (and 7 see documentation)
-                NB: only works if waveform is defined or def Generator is on
-        '''
-        self.write('output%d:state on' % ch)
-
-    def setOutputStateOff(self, ch):
-        ''' ch:             AWG520: 1,2 (and 7 see documentation)
-        '''
-        self.write('output%d:state off' % ch)
-
-    def setTriggerLevel(self, level):
-        ''' level:              AWG520: -5.0 V to +5.0 V, in 0.1 V steps
-        '''
-        self.write('trigger:level %f' % level)
-
-    # functions: menu Setup|Run Mode
-    def setRunModeSequence(self):
-        self.write('awgcontrol:rmode seq')
-
-    def setRunModeContinuous(self):
-        self.write('awgcontrol:rmode cont')
 
 
     # Used for setting the channel pairs

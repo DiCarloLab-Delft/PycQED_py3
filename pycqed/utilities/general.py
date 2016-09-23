@@ -22,6 +22,23 @@ def get_git_revision_hash():
     return hash
 
 
+def str_to_bool(s):
+    valid = {'true': True, 't': True, '1': True,
+             'false': False, 'f': False, '0': False, }
+    if s.lower() not in valid:
+        raise KeyError('{} not a valid boolean string'.format(s))
+    b = valid[s.lower()]
+    return b
+
+
+def bool_to_int_str(b):
+    if b:
+        return '1'
+    else:
+        return '0'
+
+
+
 def dict_to_ordered_tuples(dic):
     '''Convert a dictionary to a list of tuples, sorted by key.'''
     if dic is None:

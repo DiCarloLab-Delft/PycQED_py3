@@ -37,7 +37,7 @@ class QWG_tests(unittest.TestCase):
 
     def test_Error(self):
         err_msg = self.qwg.getError()
-        self.assertEqual(err_msg, '0,"No error"\n')
+        self.assertEqual(err_msg, '0,"No error"')
 
     def bool_get_set(self, par):
         old_val = par.get()
@@ -228,7 +228,7 @@ if __name__ == '__main__':
             qwg1.set('ch{}_default_waveform'.format(2), 'zero')
             qwg1.set('ch{}_default_waveform'.format(3), 'zero')
             qwg1.set('ch{}_default_waveform'.format(4), 'gauss')
-        qwg1.setRunModeContinuous()
+        qwg1.run_mode('CONT')#setRunModeContinuous()
 
     else:  # codeword based
         qwg1.createWaveformReal('zero', wvZero, marker1, marker2)
@@ -306,10 +306,10 @@ if __name__ == '__main__':
     qwg1.ch_pair3_sideband_frequency.set(100e6)
     qwg1.syncSidebandGenerators()
 
-    qwg1.ch1_state.set(1)
-    qwg1.ch2_state.set(1)
-    qwg1.ch3_state.set(1)
-    qwg1.ch4_state.set(1)
+    qwg1.ch1_state.set(True)
+    qwg1.ch2_state.set(True)
+    qwg1.ch3_state.set(True)
+    qwg1.ch4_state.set(True)
 
     qwg1.run()
 

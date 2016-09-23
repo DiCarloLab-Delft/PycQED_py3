@@ -35,7 +35,7 @@ class SCPI(IPInstrument):
         Overwrites base IP recv command to ensuring read till EOM
         """
 
-        resp = self._socket.makefile().readline()
+        resp = self._socket.makefile().readline().rstrip()
         return resp
     ###
     # Generic SCPI commands from IEEE 488.2 (IEC 625-2) standard
