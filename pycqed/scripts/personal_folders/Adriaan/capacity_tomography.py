@@ -121,8 +121,7 @@ class Capacity_tomo_detector(det.CBox_digitizing_shots_det):
 
 
 chunk_size = 8000
-number_of_shots = chunk_size*130
-
+number_of_shots = chunk_size*130 # 3
 
 # Parameters are only used for labels and units in the datafile
 basis = ManualParameter('basis', units='')
@@ -130,10 +129,15 @@ state = ManualParameter('state', units='')
 
 # MC is the MeasurementControl that controls the data acquisition loop
 
+qubit=AncT
+pulse_pars, RO_pars = qubit.get_pulse_pars()
+
+
+
 CBox.log_length(chunk_size)
 
-base_combinations = ['ZXY']
-idle_times = [3e-6]  # [2e-6, 3e-6]
+base_combinations = ['ZX']
+idle_times = [0.3e-6, .6e-6, 1e-6]  # [2e-6, 3e-6]
 
 for base in base_combinations:
     if base == 'ZX':
@@ -158,4 +162,4 @@ for base in base_combinations:
         MC.set_detector_function(d)
         MC.run('Capacity_tomo_idle_time_{:.4g}s_base_{}'.format(idle_time, base))
 
-exec(open(PyCQEDpath+'\scripts\personal_folders\Adriaan\capacity_tomography_v2.py').read())
+# exec(open(PyCQEDpath+'\scripts\personal_folders\Adriaan\capacity_tomography_v2.py').read())

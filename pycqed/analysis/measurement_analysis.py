@@ -3684,7 +3684,7 @@ class RB_double_curve_Analysis(RandomizedBenchmarking_Analysis):
                       bbox_transform=f.transFigure,
                       loc='upper right',
                       bbox_to_anchor=(.95, .95))
-            # ax.set_xscale("log", nonposx='clip')
+            ax.set_xscale("log", nonposx='clip')
             plt.subplots_adjust(left=.1, bottom=None, right=.7, top=None)
             self.save_fig(f, figname='Two_curve_RB', close_fig=close_main_fig,
                           fig_tight=False, **kw)

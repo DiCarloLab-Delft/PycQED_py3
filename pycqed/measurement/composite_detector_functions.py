@@ -371,7 +371,7 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
     '''
     For Qcodes. Readout with CBox, pulse generation with 5014
     '''
-    def __init__(self, measurement_name,  MC, AWG, CBox, pulse_pars, RO_pars,
+    def __init__(self, measurement_name,  MC, AWG, acquisition_instr, pulse_pars, RO_pars,
                  raw=True, analyze=True, upload=True,
                  set_integration_weights=False, wait=0.0, close_fig=True, use_Q=0,
                  multiplier=1, soft_rotate=True, **kw):
@@ -387,22 +387,22 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
             self.value_units = [' ', ' ']
         self.measurement_name = measurement_name
         self.MC = MC
-        self.CBox = CBox
+        self.acquisition_instr = acquisition_instr
         self.AWG = AWG
         self.pulse_pars = pulse_pars
         self.RO_pars = RO_pars
         self.set_integration_weights = set_integration_weights
         self.i = 0
-
         self.raw = raw  # Performs no fits if True
         self.analyze = analyze
-
         self.upload = upload
         self.wait = wait
         self.close_fig = close_fig
         self.use_Q = use_Q
         self.multiplier = multiplier
         self.soft_rotate = soft_rotate
+        if 'CBox' in str(self.acquisition_instr):
+            self.CBox = self.acquisition_instr
 
     def prepare(self, **kw):
         if not self.set_integration_weights:
@@ -410,8 +410,16 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
                                        pulse_pars=self.pulse_pars,
                                        RO_pars=self.RO_pars,
                                        upload=self.upload))
-            self.MC.set_detector_function(
-                det.CBox_integration_logging_det(self.CBox, self.AWG))
+            if 'CBox' in str(self.acquisition_instr):
+                self.MC.set_detector_function(
+                    det.CBox_integration_logging_det(self.acquisition_instr,
+                                                     self.AWG))
+                self.CBox = self.acquisition_instr
+                print('hoi')
+            elif  'UHFQC' in str(self.acquisition_instr):
+                self.MC.set_detector_function(
+                    det.UHFQC_integrated_average_detector(self.acquisition_instr,
+                                                          self.AWG, channels=[0,1]))
 
     def acquire_data_point(self, *args, **kw):
         self.time_start = time.time()

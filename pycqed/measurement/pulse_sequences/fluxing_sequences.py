@@ -47,13 +47,10 @@ def single_pulse_seq(pulse_pars=None,
                   'dead_time_length': 10e-6}
 
     dead_time_pulse = {'pulse_type': 'SquarePulse',
-                       'pulse_delay': (pulse_pars['length'] +
-                                       pulse_pars['pulse_delay'] +
-                                       minus_pulse_pars['length'] +
-                                       minus_pulse_pars['pulse_delay']),
+                       'pulse_delay': (minus_pulse_pars['length']),
                        'channel': 'ch3',
                        'amplitude': 0,
-                       'length': pulse_pars['dead_time_length']}
+                       'length': 5e-6}
     seq_name = 'Square_seq'
     seq = sequence.Sequence(seq_name)
     el_list = []
@@ -64,9 +61,10 @@ def single_pulse_seq(pulse_pars=None,
         el = multi_pulse_elt(i, station, pulse_list)
         el_list.append(el)
 
+    preloaded_kernels_vec = preload_kernels_func(distortion_dict)
     for i, el in enumerate(el_list):
         if distortion_dict is not None:
-            el = distort_and_compensate(el, distortion_dict)
+            el = distort_and_compensate(el, distortion_dict, preloaded_kernels_vec)
             el_list[i] = el
         seq.append_element(el, trigger_wait=True)
     station.components['AWG'].stop()

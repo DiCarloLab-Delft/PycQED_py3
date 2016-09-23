@@ -29,6 +29,7 @@ from .CBox_driven_transmon import CBox_driven_transmon
 
 
 class Tektronix_driven_transmon(CBox_driven_transmon):
+
     '''
     Setup configuration:
         Drive:                 Tektronix 5014 AWG
@@ -42,11 +43,11 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         Depending on the RO_pulse_type some parameters are not used
     '''
     shared_kwargs = ['LO', 'cw_source', 'td_source', 'IVVI', 'AWG', 'CBox',
-                     'heterodyne_instr', 'rf_RO_source', 'MC']
+                     'heterodyne_instr', 'rf_RO_source', 'MC', 'UHFQC']
 
     def __init__(self, name,
                  LO, cw_source, td_source,
-                 IVVI, AWG, CBox,
+                 IVVI, AWG, acquisition_instr,
                  heterodyne_instr, MC, rf_RO_source=None, **kw):
         super(CBox_driven_transmon, self).__init__(name, **kw)
         # Change this when inheriting directly from Transmon instead of
@@ -58,7 +59,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         self.IVVI = IVVI
         self.heterodyne_instr = heterodyne_instr
         self.AWG = AWG
-        self.CBox = CBox
+        self.acquisition_instr = acquisition_instr
         self.MC = MC
 
         self.add_parameter('mod_amp_cw', label='RO modulation ampl cw',
@@ -192,12 +193,27 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
 
         # Specifying the int_avg det here should allow replacing it with ATS
         # or potential digitizer acquisition easily
-        self.int_avg_det = det.CBox_integrated_average_detector(self.CBox,
+
+        if 'CBox' in str(self.acquisition_instr):
+            print("CBox acquisition")
+            self.int_avg_det = det.CBox_integrated_average_detector(self.acquisition_instr,
+                                                                    self.AWG)
+            self.int_log_det = det.CBox_integration_logging_det(self.acquisition_instr,
                                                                 self.AWG)
-        self.int_log_det = det.CBox_integration_logging_det(self.CBox,
-                                                            self.AWG)
-        self.input_average_detector = det.CBox_input_average_detector(
-            self.CBox, self.AWG)
+            self.input_average_detector = det.CBox_input_average_detector(
+                self.acquisition_instr,
+                self.AWG)
+        elif 'UHFQC' in str(self.acquisition_instr):
+            print("UHFQC acquisition")
+            self.input_average_detector = det.UHFQC_input_average_detector(
+                UHFQC=self.acquisition_instr,
+                AWG=self.AWG)
+            self.int_avg_det = det.UHFQC_integrated_average_detector(
+                UHFQC=self.acquisition_instr, AWG=AWG,
+                channels=[0, 1])
+            self.int_log_det = det.UHFQC_integrated_average_detector(
+                UHFQC=self.acquisition_instr, AWG=AWG,
+                channels=[0, 1])
 
     def prepare_for_continuous_wave(self):
         # Heterodyne tone configuration
@@ -240,7 +256,8 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         if hasattr(self.cw_source, 'pulsemod_state'):
             self.cw_source.pulsemod_state('On')
         else:
-            RuntimeError('Spec source for pulsed spectroscopy does not support pulsing!')
+            RuntimeError(
+                'Spec source for pulsed spectroscopy does not support pulsing!')
         self.cw_source.on()
 
     def prepare_for_timedomain(self):
@@ -355,7 +372,8 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         MC.set_sweep_function(pw.wrap_par_to_swf(
                               self.heterodyne_instr.frequency))
         MC.set_sweep_points(freqs)
-        MC.set_detector_function(det.Heterodyne_probe(self.heterodyne_instr, trigger_separation=2.8e-6))
+        MC.set_detector_function(
+            det.Heterodyne_probe(self.heterodyne_instr, trigger_separation=2.8e-6))
         MC.run(name='Resonator_scan'+self.msmt_suffix)
         if analyze:
             ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
@@ -421,17 +439,18 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         else:
             MC.set_sweep_function(self.cw_source.frequency)
             MC.set_sweep_points(freqs)
-            MC.set_detector_function(det.Heterodyne_probe(self.heterodyne_instr))
+            MC.set_detector_function(
+                det.Heterodyne_probe(self.heterodyne_instr))
             MC.run(name='pulsed-spec'+self.msmt_suffix)
             if analyze or update:
-                ma_obj = ma.Qubit_Spectroscopy_Analysis(auto=True, label='pulsed', close_fig=close_fig)
+                ma_obj = ma.Qubit_Spectroscopy_Analysis(
+                    auto=True, label='pulsed', close_fig=close_fig)
                 if update:
                     if use_max:
                         self.f_qubit(ma_obj.peaks['peak'])
                     else:
                         self.f_qubit(ma_obj.fitted_freq)
         self.cw_source.off()
-
 
     def measure_rabi(self, amps=np.linspace(-.5, .5, 31), n=1,
                      MC=None, analyze=True, close_fig=True,
@@ -579,16 +598,16 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
             analyze=analyze,
             raw=no_fits,
             MC=MC,
-            AWG=self.AWG, CBox=self.CBox,
+            AWG=self.AWG, acquisition_instr=self.acquisition_instr,
             pulse_pars=self.pulse_pars, RO_pars=self.RO_pars,
             set_integration_weights=set_integration_weights,
-            close_fig=close_fig,use_Q=use_Q, multiplier=multiplier, soft_rotate=soft_rotate)
+            close_fig=close_fig, use_Q=use_Q, multiplier=multiplier, soft_rotate=soft_rotate)
         if return_detector:
             return d
         d.prepare()
         d.acquire_data_point()
         if analyze:
-            return ma.SSRO_Analysis(rotate=soft_rotate,label='SSRO'+self.msmt_suffix,
+            return ma.SSRO_Analysis(rotate=soft_rotate, label='SSRO'+self.msmt_suffix,
                                     no_fits=no_fits, close_fig=close_fig)
 
     def measure_butterfly(self, return_detector=False,
@@ -606,13 +625,15 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
             initialize=initialize, post_msmt_delay=post_msmt_delay))
         MC.set_detector_function(self.int_log_det)
         MC.run('Butterfly{}initialize_{}'.format(self.msmt_suffix, initialize))
-        # first perform SSRO analysis to extract the optimal rotation angle theta
+        # first perform SSRO analysis to extract the optimal rotation angle
+        # theta
         a = ma.SSRO_discrimination_analysis(
             label='Butterfly',
             current_threshold=None,
             close_fig=close_fig,
             plot_2D_histograms=True)
-        #the, run it a second time to determin the optimum threshold along the rotated I axis
+        # the, run it a second time to determin the optimum threshold along the
+        # rotated I axis
         b = ma.SSRO_discrimination_analysis(
             label='Butterfly',
             current_threshold=None,
@@ -631,12 +652,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                            close_fig=True,
                            verbose=True,
                            set_integration_weights=False,
-                           nr_samples = 512):
-        if set_integration_weights:
-            print("always using 512 samples to set the weightfunction")
-            self.CBox.nr_samples.set(512)
-        else:
-            self.CBox.nr_samples.set(nr_samples)
+                           nr_samples=512):
 
         self.prepare_for_timedomain()
         if MC is None:
@@ -653,6 +669,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                                                  RO_pars=self.RO_pars,
                                                  pulse_comb='OnOn',
                                                  nr_samples=nr_samples))
+        self.input_average_detector.nr_samples = nr_samples
         self.MC.set_detector_function(self.input_average_detector)
         self.MC.run('Measure_transients_{}_1'.format(self.msmt_suffix))
         a1 = ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
@@ -662,25 +679,22 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
             transient1 = a1.data[1, :]
             optimized_weights = transient1-transient0
             optimized_weights = optimized_weights+np.mean(optimized_weights)
-            self.CBox.sig0_integration_weights.set(optimized_weights)
-            self.CBox.sig1_integration_weights.set(np.zeros(512)) #disabling the Q quadrature
-
-
+            self.acquisition_instr.sig0_integration_weights.set(
+                optimized_weights)
+            self.acquisition_instr.sig1_integration_weights.set(
+                np.zeros(nr_samples))  # disabling the Q quadrature
 
         # first perform SSRO analysis to extract the optimal rotation angle theta
-        #return c.butterfly_coeffs
-
-
+        # return c.butterfly_coeffs
 
     def measure_rb_vs_amp(self, amps, nr_cliff=1,
-                      resetless=True,
-                      MC=None, analyze=True, close_fig=True,
-                      verbose=False):
+                          resetless=True,
+                          MC=None, analyze=True, close_fig=True,
+                          verbose=False):
         raise NotImplementedError()
 
-
     def measure_motzoi_XY(self, motzois, MC=None, analyze=True, close_fig=True,
-                         verbose=True, update=True):
+                          verbose=True, update=True):
 
         self.prepare_for_timedomain()
         if MC is None:

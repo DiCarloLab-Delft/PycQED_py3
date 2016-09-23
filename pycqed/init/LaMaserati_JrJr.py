@@ -113,7 +113,7 @@ AncB = qbt.Tektronix_driven_transmon('AncB', LO=LO, cw_source=Spec_source,
                                               td_source=Qubit_LO,
                                               IVVI=IVVI, rf_RO_source=RF,
                                               AWG=AWG,
-                                              CBox=CBox, heterodyne_instr=HS,
+                                              acquisition_instr=CBox, heterodyne_instr=HS,
                                               MC=MC,
                                               server_name=None)
 station.add_component(AncB)
@@ -121,7 +121,7 @@ AncT = qbt.Tektronix_driven_transmon('AncT', LO=LO, cw_source=Spec_source,
                                               td_source=Qubit_LO,
                                               IVVI=IVVI, rf_RO_source=RF,
                                               AWG=AWG,
-                                              CBox=CBox, heterodyne_instr=HS,
+                                              acquisition_instr=CBox, heterodyne_instr=HS,
                                               MC=MC,
                                               server_name=None)
 station.add_component(AncT)
@@ -129,7 +129,7 @@ DataB = qbt.Tektronix_driven_transmon('DataB', LO=LO, cw_source=Spec_source,
                                               td_source=Qubit_LO,
                                               IVVI=IVVI, rf_RO_source=RF,
                                               AWG=AWG,
-                                              CBox=CBox, heterodyne_instr=HS,
+                                              acquisition_instr=CBox, heterodyne_instr=HS,
                                               MC=MC,
                                               server_name=None)
 station.add_component(DataB)
@@ -137,7 +137,7 @@ DataM = qbt.Tektronix_driven_transmon('DataM', LO=LO, cw_source=Spec_source,
                                               td_source=Qubit_LO,
                                               IVVI=IVVI, rf_RO_source=RF,
                                               AWG=AWG,
-                                              CBox=CBox, heterodyne_instr=HS,
+                                              acquisition_instr=CBox, heterodyne_instr=HS,
                                               MC=MC,
                                               server_name=None)
 station.add_component(DataM)
@@ -145,7 +145,7 @@ DataT = qbt.Tektronix_driven_transmon('DataT', LO=LO, cw_source=Spec_source,
                                               td_source=Qubit_LO,
                                               IVVI=IVVI, rf_RO_source=RF,
                                               AWG=AWG,
-                                              CBox=CBox, heterodyne_instr=HS,
+                                              acquisition_instr=CBox, heterodyne_instr=HS,
                                               MC=MC,
                                               server_name=None)
 station.add_component(DataT)
@@ -167,6 +167,7 @@ nested_MC.station = station
 # The AWG sequencer
 station.pulsar = ps.Pulsar()
 station.pulsar.AWG = station.components['AWG']
+marker1highs=[2,2,2.7,2]
 for i in range(4):
     # Note that these are default parameters and should be kept so.
     # the channel offset is set in the AWG itself. For now the amplitude is
@@ -180,7 +181,7 @@ for i in range(4):
     station.pulsar.define_channel(id='ch{}_marker1'.format(i+1),
                                   name='ch{}_marker1'.format(i+1),
                                   type='marker',
-                                  high=2.0, low=0, offset=0.,
+                                  high=marker1highs[i], low=0, offset=0.,
                                   delay=0, active=True)
     station.pulsar.define_channel(id='ch{}_marker2'.format(i+1),
                                   name='ch{}_marker2'.format(i+1),
@@ -208,7 +209,7 @@ def all_sources_off():
 
 def print_instr_params(instr):
     snapshot = instr.snapshot()
-    for par in snapshot['parameters']:
+    for par in sorted(snapshot['parameters']):
         print('{}: {} {}'.format(snapshot['parameters'][par]['name'],
                                  snapshot['parameters'][par]['value'],
                                  snapshot['parameters'][par]['units']))

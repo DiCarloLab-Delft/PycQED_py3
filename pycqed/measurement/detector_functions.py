@@ -390,7 +390,7 @@ class Signal_Hound_Spectrum_Track(Hard_Detector):
 
 # Detectors for QuTech Control box modes
 class CBox_input_average_detector(Hard_Detector):
-    def __init__(self, CBox, AWG, **kw):
+    def __init__(self, CBox, AWG, nr_samples=512,**kw):
         super(CBox_input_average_detector, self).__init__()
         self.CBox = CBox
         self.name = 'CBox_Streaming_data'
@@ -400,6 +400,7 @@ class CBox_input_average_detector(Hard_Detector):
         scale_factor_dacmV = 1000.*0.75/128.
         scale_factor_integration = 1./(64.*self.CBox.integration_length())
         self.factor = scale_factor_dacmV*scale_factor_integration
+        self.nr_samples = nr_samples
 
     def get_values(self):
         if self.AWG is not None:
@@ -410,8 +411,10 @@ class CBox_input_average_detector(Hard_Detector):
     def prepare(self, sweep_points):
         if self.AWG is not None:
             self.AWG.stop()
+        self.CBox.nr_samples(self.nr_samples)
         self.CBox.set('acquisition_mode', 0)
         self.CBox.set('acquisition_mode', 3)
+
 
     def finish(self):
         if self.AWG is not None:
@@ -433,7 +436,7 @@ class CBox_integrated_average_detector(Hard_Detector):
         super().__init__(**kw)
         self.CBox = CBox
         self.name = 'CBox_integrated_average_detector'
-        self.value_names = ['I', 'Q']
+        self.value_names = ['I','Q']
         self.value_units = ['a.u.', 'a.u.']
         self.AWG = AWG
         self.seg_per_point = seg_per_point
@@ -494,7 +497,7 @@ class CBox_v3_integrated_average_detector(Hard_Detector):
         super().__init__(**kw)
         self.CBox = CBox
         self.name = 'CBox_integrated_average_detector'
-        self.value_names = ['I', 'Q']
+        self.value_names = ['I','Q']
         self.value_units = ['a.u.', 'a.u.']
         self.seg_per_point = seg_per_point
 
@@ -539,7 +542,7 @@ class CBox_single_integration_average_det(Soft_Detector):
         super().__init__()
         self.CBox = CBox
         self.name = 'CBox_single_integration_avg_det'
-        self.value_names = ['I', 'Q']
+        self.value_names = ['I','Q']
         self.value_units = ['a.u.', 'a.u.']
         if acq_mode == 'IQ':
             self.acquire_data_point = self.acquire_data_point_IQ
@@ -590,7 +593,7 @@ class CBox_v3_single_integration_average_det(Soft_Detector):
         super().__init__()
         self.CBox = CBox
         self.name = 'CBox_v3_single_integration_avg_det'
-        self.value_names = ['I', 'Q']
+        self.value_names = ['I','Q']
         self.value_units = ['a.u.', 'a.u.']
         if acq_mode == 'AmpPhase':
             self.acquire_data_point = self.acquire_data_point_amp_ph
@@ -701,7 +704,7 @@ class CBox_integration_logging_det(Hard_Detector):
         super().__init__()
         self.CBox = CBox
         self.name = 'CBox_integration_logging_detector'
-        self.value_names = ['I', 'Q']
+        self.value_names = ['I','Q']
         self.value_units = ['a.u.', 'a.u.']
         self.AWG = AWG
 
@@ -756,7 +759,7 @@ class CBox_integration_logging_det_shots(Hard_Detector):
         super().__init__()
         self.CBox = CBox
         self.name = 'CBox_integration_logging_detector'
-        self.value_names = ['I', 'Q']
+        self.value_names = ['I','Q']
         self.value_units = ['a.u.', 'a.u.']
         self.AWG = AWG
 
@@ -1518,7 +1521,7 @@ class UHFQC_input_average_detector(Hard_Detector):
 
     Has two acq_modes, 'IQ' and 'AmpPhase'
     '''
-    def __init__(self, UHFQC, AWG, channels=[0,1],**kw):
+    def __init__(self, UHFQC, AWG, channels=[0,1], nr_samples=4096,**kw):
         super(UHFQC_input_average_detector, self).__init__()
         self.UHFQC = UHFQC
         self.name = 'UHFQC_Streaming_data'
@@ -1529,6 +1532,7 @@ class UHFQC_input_average_detector(Hard_Detector):
             self.value_names[i] = 'ch{}'.format(channel)
             self.value_units[i] = 'V'
         self.AWG = AWG
+        self.nr_samples = nr_samples
 
 
     def get_values(self):
@@ -1538,15 +1542,20 @@ class UHFQC_input_average_detector(Hard_Detector):
             self.AWG.start()
         while self.UHFQC.awgs_0_enable() == 1:
             time.sleep(0.1)
+        time.sleep(1)
         data=['']*len(self.channels)
         for i,channel in enumerate(self.channels):
-            dataset=eval("self.UHFQC.quex_iavg_data_{}()".format(channel))
+            print(i)
+            print(len(self.channels))
+            dataset = eval("self.UHFQC.quex_iavg_data_{}()".format(channel))
+            print(dataset)
             data[i]=dataset[0]['vector']
         return data
 
     def prepare(self, sweep_points):
         if self.AWG is not None:
             self.AWG.stop()
+        self.UHFQC.quex_iavg_length(self.nr_samples)
 
     def finish(self):
         if self.AWG is not None:
@@ -1557,16 +1566,19 @@ class UHFQC_integrated_average_detector(Hard_Detector):
     Detector used for integrated average results with the UHFQC
 
     '''
-    def __init__(self, UHFQC, AWG, channels=[0,1,2,3],seg_per_point=1,**kw):
+    def __init__(self, UHFQC, AWG, channels=[0, 1, 2, 3], seg_per_point=1,**kw):
         super(UHFQC_integrated_average_detector, self).__init__()
         self.UHFQC = UHFQC
         self.name = 'UHFQC_Streaming_data'
-        self.channels=channels
+        self.channels = channels
         self.value_names = ['']*len(self.channels)
         self.value_units = ['']*len(self.channels)
-        for i,channel in enumerate(self.channels):
-            self.value_names[i] = 'Ch{}'.format(channel)
+        for i, channel in enumerate(self.channels):
+            self.value_names[i] = 'w{}'.format(channel)
             self.value_units[i] = 'V'
+        if channels == [0,1]:
+                self.value_names = ['I', 'Q']
+                self.value_units = ['V', 'V']
         self.AWG = AWG
         self.seg_per_point = seg_per_point
 
@@ -1577,10 +1589,10 @@ class UHFQC_integrated_average_detector(Hard_Detector):
             self.AWG.start()
         while self.UHFQC.awgs_0_enable() == 1:
             time.sleep(0.1)
-        data=['']*len(self.channels)
-        for i,channel in enumerate(self.channels):
-            dataset=eval("self.UHFQC.quex_rl_data_{}()".format(channel))
-            data[i]=dataset[0]['vector']
+        data = ['']*len(self.channels)
+        for i, channel in enumerate(self.channels):
+            dataset = eval("self.UHFQC.quex_rl_data_{}()".format(channel))
+            data[i] = dataset[0]['vector']
         return data
 
     def prepare(self, sweep_points):
