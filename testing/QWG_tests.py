@@ -6,7 +6,7 @@ from measurement.waveform_control_CC.waveform import Waveform
 import time
 import numpy as np
 from socket import timeout
-from qcodes.utils.validators import Arrays
+from qcodes.utils  import validators as vals
 
 
 class QWG_tests(unittest.TestCase):
@@ -39,49 +39,105 @@ class QWG_tests(unittest.TestCase):
         err_msg = self.qwg.getError()
         self.assertEqual(err_msg, '0,"No error"\n')
 
-    def test_parameters(self):
-        for parname, par in self.qwg.parameters.items():
+    def bool_get_set(self, par):
+        old_val = par.get()
+        par.set(True)
+        self.assertTrue(par.get(), msg=par.name)
+        par.set(False)
+        self.assertFalse(par.get(), msg=par.name)
+        par.set(old_val)
 
-            if par.name not in ['IDN']:
+    def array_get_set(self, par):
+        old_val = par.get()
+        shape = par._vals._shape
+        mn = par._vals._min_value
+        if mn == -float("inf"):
+            mn = -100
+        mx = par._vals._max_value
+        if mx == float("inf"):
+            mx = 100
+        v = (np.zeros(shape)+mn)+(mx-mn)/2
+        par.set(v)
+        self.assertEqual(v, par.get(), msg=par.name)
+        with self.assertRaises(ValueError, msg=par.name):
+            par.set(v+(mx-mn))
+        with self.assertRaises(ValueError, msg=par.name):
+            par.set(v-(mx-mn))
+        par.set(old_val)
+
+    def floating_get_set(self, par):
+        old_val = par.get()
+        mn = par._vals._min_value
+        if mn == -float("inf"):
+            mn = -100.5
+        mx = par._vals._max_value
+        if mx == float("inf"):
+            mx = 100.5
+        v = (mn)+(mx-mn)/2
+        par.set(v)
+        self.assertEqual(v, par.get(), msg=par.name)
+        with self.assertRaises(ValueError, msg=par.name):
+            par.set(v+(mx-mn))
+        with self.assertRaises(ValueError, msg=par.name):
+            par.set(v-(mx-mn))
+        par.set(old_val)
+
+    def integer_get_set(self, par):
+        old_val = par.get()
+        mn = par._vals._min_value
+        if mn == -float("inf"):
+            mn = -100
+        mx = par._vals._max_value
+        if mx == float("inf"):
+            mx = 100
+        v = (mn)+(mx-mn)//2
+        par.set(v)
+        self.assertEqual(v, par.get(), msg=par.name)
+        with self.assertRaises(ValueError, msg=par.name):
+            par.set(v+(mx-mn)*10)
+        with self.assertRaises(ValueError, msg=par.name):
+            par.set(v-(mx-mn)*10)
+        par.set(old_val)
+
+    def test_parameters(self):
+        for parname, par in sorted(self.qwg.parameters.items()):
+            failing_pars = []
+            for i in range(16):
+                failing_pars.append('ch{}_amp'.format(i))
+                failing_pars.append('ch{}_offset'.format(i))
+                failing_pars.append('ch{}_trigger_level'.format(i))
+
+                # Sideband phase always returns 0 when get
+                failing_pars.append('ch_pair{}_sideband_phase'.format(i))
+                # transformation matrix get returns garbage
+                failing_pars.append('ch_pair{}_transform_matrix'.format(i))
+
+            # Error messages:  -113,"Undefined header;AWGC:RMOD?"
+            failing_pars.append('run_mode')
+            # what is the difference between ch{}_trigger_level and trigger_level
+            failing_pars.append('trigger_level')
+
+            if par.name not in ['IDN'] and par.name not in failing_pars:
                 # print('parname:', par.name)
                 old_value = par.get()
                 old_value2 = par.get()
                 self.assertEqual(old_value2, old_value, msg=par.name)
                 if hasattr(par, '_vals'):
-                    vals = par._vals
-                    if vals.is_numeric and not isinstance(vals, Arrays):
-                        min_val = vals._min_value
-                        max_val = vals._max_value
-                        if max_val != float("inf"):
-                            with self.assertRaises(
-                                    ValueError,
-                                    msg='{} max_val+1 {}'.format(par.name, (
-                                    max_val+1))):
-                                par.set(max_val+1)
-                        if min_val != -float("inf"):
-                            with self.assertRaises(
-                                    ValueError,
-                                    msg='{} min_val-1: {}'.format(
-                                    par.name, (min_val-1))):
-                                par.set(min_val-1)
-                        if min_val == -float("inf"):
-                            min_val = -100
-                        if max_val == float("inf"):
-                            max_val = 100
-
-                        test_val = (min_val)+(max_val-min_val)/2
-                        par.set(test_val)
-                        self.assertEqual(test_val, par.get(),
-                                         '{} test_val'.format(par.name))
-                        test_val_2 = (min_val)+(max_val-min_val)/3
-                        par.set(test_val_2)
-                        self.assertEqual(test_val_2, par.get(),
-                                         '{} test_val_2'.format(par.name))
+                    validator = par._vals
+                    if isinstance(validator, vals.Ints):
+                        self.integer_get_set(par)
+                    elif isinstance(validator, vals.Numbers):
+                        self.floating_get_set(par)
+                    elif isinstance(validator, vals.Arrays):
+                        self.array_get_set(par)
+                    elif isinstance(validator, vals.Bool):
+                        self.bool_get_set(par)
 
                     else:
-                        print(par.name, ' is not numeric, not testing')
+                        print('{} validator "{}" not recognized'.format(
+                            par.name, par._vals))
                 else:
-                    print(par.name, 'does not have validator')
+                    print(par.name, 'does not have validator, not testing')
             else:
                 print('Not in pars to be tested: "{}"'.format(par.name))
 
@@ -128,7 +184,7 @@ if __name__ == '__main__':
 
     suite = unittest.TestLoader().loadTestsFromTestCase(
         QWG_tests)
-    # unittest.TextTestRunner(verbosity=2).run(suite)
+    unittest.TextTestRunner(verbosity=2).run(suite)
 
     if 1:  # continuous
         qwg1.createWaveformReal('cos', wvCos, marker1, marker2)

@@ -116,6 +116,7 @@ class QuTech_AWG_Module(SCPI):
                                label='Status channel {}'.format(ch),
                                get_cmd=state_cmd + '?',
                                set_cmd=state_cmd + ' {}',
+                               get_parser=int,
                                vals=vals.Ints(0, 1))
 
             # Compatibility: 5014, QWG (FIXME: different range, not in V)

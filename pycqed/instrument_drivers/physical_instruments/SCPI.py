@@ -29,10 +29,6 @@ class SCPI(IPInstrument):
 
         # example of how the commands could look
         self.add_function('reset', call_cmd='*RST')
-        self.add_parameter('event_status_enable',
-                           set_cmd='*ESE {}',
-                           get_cmd='*ESE?',
-                           vals=vals.Bool())
 
     def _recv(self):
         """
