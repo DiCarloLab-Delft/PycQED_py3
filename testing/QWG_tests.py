@@ -69,9 +69,14 @@ class QWG_tests(unittest.TestCase):
                         if max_val == float("inf"):
                             max_val = 100
 
-                        test_val = (np.random.randn()+min_val)*(max_val-min_val)
+                        test_val = (min_val)+(max_val-min_val)/2
                         par.set(test_val)
-                        self.assertEqual(test_val, par.get())
+                        self.assertEqual(test_val, par.get(),
+                                         '{} test_val'.format(par.name))
+                        test_val_2 = (min_val)+(max_val-min_val)/3
+                        par.set(test_val_2)
+                        self.assertEqual(test_val_2, par.get(),
+                                         '{} test_val_2'.format(par.name))
 
                     else:
                         print(par.name, ' is not numeric, not testing')
@@ -80,12 +85,9 @@ class QWG_tests(unittest.TestCase):
             else:
                 print('Not in pars to be tested: "{}"'.format(par.name))
 
-
     def tearDown(self):
         self.qwg._socket.settimeout(5)
         # set timeout back to default
-
-
 
 # create waveforms
 sampleCnt = 96
@@ -123,6 +125,10 @@ qwg1 = QWG
 qwg1.reset()
 
 if __name__ == '__main__':
+
+    suite = unittest.TestLoader().loadTestsFromTestCase(
+        QWG_tests)
+    # unittest.TextTestRunner(verbosity=2).run(suite)
 
     if 1:  # continuous
         qwg1.createWaveformReal('cos', wvCos, marker1, marker2)
@@ -230,8 +236,3 @@ if __name__ == '__main__':
 
     print('Identity: ', qwg1.getIdentity())
     print('Error messages: ', qwg1.getError())
-
-
-    suite = unittest.TestLoader().loadTestsFromTestCase(
-        QWG_tests)
-    unittest.TextTestRunner(verbosity=2).run(suite)
