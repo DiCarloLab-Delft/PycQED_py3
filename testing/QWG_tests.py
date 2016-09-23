@@ -99,6 +99,21 @@ class QWG_tests(unittest.TestCase):
             par.set(v-(mx-mn)*10)
         par.set(old_val)
 
+    def string_get_set(self, par):
+        old_val = par.get()
+        min_len = par._vals._min_length
+        max_len = par._vals._max_length
+
+        v = 'test_string'
+        if len(v) > max_len:
+            v = v[:max_len]
+        if len(v) < min_len:
+            par.set(v)  # expect failure and fix it
+        par.set(v)
+        self.assertEqual(v, par.get(), msg=par.name)
+        par.set(old_val)
+
+
     def test_parameters(self):
         for parname, par in sorted(self.qwg.parameters.items()):
             failing_pars = []
@@ -114,8 +129,6 @@ class QWG_tests(unittest.TestCase):
 
             # Error messages:  -113,"Undefined header;AWGC:RMOD?"
             failing_pars.append('run_mode')
-            # what is the difference between ch{}_trigger_level and trigger_level
-            failing_pars.append('trigger_level')
 
             if par.name not in ['IDN'] and par.name not in failing_pars:
                 # print('parname:', par.name)

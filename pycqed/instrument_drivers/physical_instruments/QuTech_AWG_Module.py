@@ -95,14 +95,6 @@ class QuTech_AWG_Module(SCPI):
                            set_cmd='AWGC:RMOD ' + '{}',
                            vals=vals.Enum('CONT', 'SEQ', 'COD'))
 
-        # Trigger parameters #
-        self.add_parameter('trigger_level',
-                           units='V',
-                           label='Trigger level (V)',
-                           get_cmd='TRIG:LEV?',
-                           set_cmd='TRIG:LEV ' + '{:.3f}',
-                           vals=vals.Numbers(-5, 5),
-                           get_parser=float)
 
         # Channel parameters #
         for ch in range(1, self.device_descriptor.numChannels+1):
