@@ -154,9 +154,9 @@ if __name__ == '__main__':
     # fileName='D:\\Experiments\\1607_Qcodes_5qubit\\data\\20160922\\193525_Capacity_tomo_idle_time_1e-06s_base_ZX\\193525_Capacity_tomo_idle_time_1e-06s_base_ZX.hdf5'
     # fileName='D:\\Experiments\\1607_Qcodes_5qubit\\data\\20160922\\194147_Capacity_tomo_idle_time_3e-07s_base_ZX\\194147_Capacity_tomo_idle_time_3e-07s_base_ZX.hdf5'
     # fileName='D:\\Experiments\\1607_Qcodes_5qubit\\data\\20160922\\212731_Capacity_tomo_idle_time_6e-07s_base_ZX\\212731_Capacity_tomo_idle_time_6e-07s_base_ZX.hdf5'
-    fileName='D:\\Experiments\\1607_Qcodes_5qubit\\data\\20160922\\231341_Capacity_tomo_idle_time_1e-06s_base_ZX\\231341_Capacity_tomo_idle_time_1e-06s_base_ZX.hdf5'
+    # fileName='D:\\Experiments\\1607_Qcodes_5qubit\\data\\20160922\\231341_Capacity_tomo_idle_time_1e-06s_base_ZX\\231341_Capacity_tomo_idle_time_1e-06s_base_ZX.hdf5'
 
-
+    fileName='D:\\Experiments\\1607_Qcodes_5qubit\\data\\20160923\\174300_Capacity_tomo_idle_time_3e-07s_base_ZX\\174300_Capacity_tomo_idle_time_3e-07s_base_ZX.hdf5'
 
     # load data as per command line argument
 
