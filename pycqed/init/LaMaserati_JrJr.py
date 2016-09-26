@@ -67,6 +67,7 @@ import instrument_drivers.meta_instrument.CBox_LookuptableManager as lm
 
 from instrument_drivers.meta_instrument.qubit_objects import CBox_driven_transmon as qb
 from instrument_drivers.physical_instruments import QuTech_Duplexer as qdux
+from instrument_drivers.physical_instruments.ZurichInstruments import UHFQuantumController as ZI_UHFQC
 
 
 # Initializing instruments
@@ -94,6 +95,10 @@ AWG520 = tk520.Tektronix_AWG520('AWG520', address='GPIB0::17::INSTR',
 station.add_component(AWG520)
 IVVI = iv.IVVI('IVVI', address='COM4', numdacs=16, server_name=None)
 station.add_component(IVVI)
+
+#Initializing UHFQC
+UHFQC_1 = ZI_UHFQC.UHFQC('UHFQC_1', device='dev2178', server_name=None)
+station.add_component(UHFQC_1)
 # Dux = qdux.QuTech_Duplexer('Dux', address='TCPIP0::192.168.0.101',
 #                             server_name=None)
 # SH = sh.SignalHound_USB_SA124B('Signal hound', server_name=None) #commented because of 8s load time
@@ -113,7 +118,7 @@ AncB = qbt.Tektronix_driven_transmon('AncB', LO=LO, cw_source=Spec_source,
                                               td_source=Qubit_LO,
                                               IVVI=IVVI, rf_RO_source=RF,
                                               AWG=AWG,
-                                              acquisition_instr=CBox, heterodyne_instr=HS,
+                                              heterodyne_instr=HS,
                                               MC=MC,
                                               server_name=None)
 station.add_component(AncB)
@@ -121,7 +126,7 @@ AncT = qbt.Tektronix_driven_transmon('AncT', LO=LO, cw_source=Spec_source,
                                               td_source=Qubit_LO,
                                               IVVI=IVVI, rf_RO_source=RF,
                                               AWG=AWG,
-                                              acquisition_instr=CBox, heterodyne_instr=HS,
+                                              heterodyne_instr=HS,
                                               MC=MC,
                                               server_name=None)
 station.add_component(AncT)
@@ -129,7 +134,7 @@ DataB = qbt.Tektronix_driven_transmon('DataB', LO=LO, cw_source=Spec_source,
                                               td_source=Qubit_LO,
                                               IVVI=IVVI, rf_RO_source=RF,
                                               AWG=AWG,
-                                              acquisition_instr=CBox, heterodyne_instr=HS,
+                                              heterodyne_instr=HS,
                                               MC=MC,
                                               server_name=None)
 station.add_component(DataB)
@@ -137,7 +142,7 @@ DataM = qbt.Tektronix_driven_transmon('DataM', LO=LO, cw_source=Spec_source,
                                               td_source=Qubit_LO,
                                               IVVI=IVVI, rf_RO_source=RF,
                                               AWG=AWG,
-                                              acquisition_instr=CBox, heterodyne_instr=HS,
+                                              heterodyne_instr=HS,
                                               MC=MC,
                                               server_name=None)
 station.add_component(DataM)
@@ -145,7 +150,7 @@ DataT = qbt.Tektronix_driven_transmon('DataT', LO=LO, cw_source=Spec_source,
                                               td_source=Qubit_LO,
                                               IVVI=IVVI, rf_RO_source=RF,
                                               AWG=AWG,
-                                              acquisition_instr=CBox, heterodyne_instr=HS,
+                                              heterodyne_instr=HS,
                                               MC=MC,
                                               server_name=None)
 station.add_component(DataT)
@@ -195,6 +200,8 @@ cal_elts.station = station
 
 t1 = time.time()
 
+#manually setting the clock, to be done automatically
+AWG.clock_freq(1e9)
 
 
 print('Ran initialization in %.2fs' % (t1-t0))

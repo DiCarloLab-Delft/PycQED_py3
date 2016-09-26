@@ -47,7 +47,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
 
     def __init__(self, name,
                  LO, cw_source, td_source,
-                 IVVI, AWG, acquisition_instr,
+                 IVVI, AWG,
                  heterodyne_instr, MC, rf_RO_source=None, **kw):
         super(CBox_driven_transmon, self).__init__(name, **kw)
         # Change this when inheriting directly from Transmon instead of
@@ -59,7 +59,6 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         self.IVVI = IVVI
         self.heterodyne_instr = heterodyne_instr
         self.AWG = AWG
-        self.acquisition_instr = acquisition_instr
         self.MC = MC
 
         self.add_parameter('mod_amp_cw', label='RO modulation ampl cw',
@@ -190,30 +189,10 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         # CBox specific parameter
         self.add_parameter('signal_line', parameter_class=ManualParameter,
                            vals=vals.Enum(0, 1), initial_value=0)
-
-        # Specifying the int_avg det here should allow replacing it with ATS
-        # or potential digitizer acquisition easily
-
-        if 'CBox' in str(self.acquisition_instr):
-            print("CBox acquisition")
-            self.int_avg_det = det.CBox_integrated_average_detector(self.acquisition_instr,
-                                                                    self.AWG)
-            self.int_log_det = det.CBox_integration_logging_det(self.acquisition_instr,
-                                                                self.AWG)
-            self.input_average_detector = det.CBox_input_average_detector(
-                self.acquisition_instr,
-                self.AWG)
-        elif 'UHFQC' in str(self.acquisition_instr):
-            print("UHFQC acquisition")
-            self.input_average_detector = det.UHFQC_input_average_detector(
-                UHFQC=self.acquisition_instr,
-                AWG=self.AWG)
-            self.int_avg_det = det.UHFQC_integrated_average_detector(
-                UHFQC=self.acquisition_instr, AWG=AWG,
-                channels=[0, 1])
-            self.int_log_det = det.UHFQC_integrated_average_detector(
-                UHFQC=self.acquisition_instr, AWG=AWG,
-                channels=[0, 1])
+        self.add_parameter('acquisition_instr',
+                           set_cmd=self._do_set_acquisition_instr,
+                           get_cmd=self._do_get_acquisition_instr,
+                           vals=vals.Anything())
 
     def prepare_for_continuous_wave(self):
         # Heterodyne tone configuration
@@ -279,6 +258,14 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         self.LO.frequency.set(f_RO - self.f_RO_mod.get())
         self.td_source.power.set(self.td_source_pow.get())
         self.get_pulse_pars()
+
+        # makes sure dac range is used optimally, 20% overhead for mixer skew
+        self.AWG.set('{}_amp'.format(self.pulse_I_channel()),
+                     self.amp180()*3.0)
+        # use 60% of based on linear range in mathematica
+        self.AWG.set('{}_amp'.format(self.pulse_Q_channel()),
+                     self.amp180()*3.0)
+        # use 60% of based on linear range in mathematica
 
         self.AWG.set(self.pulse_I_channel.get()+'_offset',
                      self.pulse_I_offset.get())
@@ -455,7 +442,14 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
     def measure_rabi(self, amps=np.linspace(-.5, .5, 31), n=1,
                      MC=None, analyze=True, close_fig=True,
                      verbose=False):
+        # prepare for timedomain takes care of rescaling
         self.prepare_for_timedomain()
+        # Extra rescaling only happens if the amp180 was far too low for the Rabi
+        if max(abs(amps)) > 2.9 * self.AWG.get('{}_amp'.format(self.pulse_I_channel())):
+            self.AWG.set('{}_amp'.format(self.pulse_I_channel()),
+                         np.max(abs(amps))*3.0)
+            self.AWG.set('{}_amp'.format(self.pulse_Q_channel()),
+                         np.max(abs(amps))*3.0)
         if MC is None:
             MC = self.MC
 
@@ -598,7 +592,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
             analyze=analyze,
             raw=no_fits,
             MC=MC,
-            AWG=self.AWG, acquisition_instr=self.acquisition_instr,
+            AWG=self.AWG, acquisition_instr=self._acquisition_instr,
             pulse_pars=self.pulse_pars, RO_pars=self.RO_pars,
             set_integration_weights=set_integration_weights,
             close_fig=close_fig, use_Q=use_Q, multiplier=multiplier, soft_rotate=soft_rotate)
@@ -679,9 +673,9 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
             transient1 = a1.data[1, :]
             optimized_weights = transient1-transient0
             optimized_weights = optimized_weights+np.mean(optimized_weights)
-            self.acquisition_instr.sig0_integration_weights.set(
+            self._acquisition_instr.sig0_integration_weights.set(
                 optimized_weights)
-            self.acquisition_instr.sig1_integration_weights.set(
+            self._acquisition_instr.sig1_integration_weights.set(
                 np.zeros(nr_samples))  # disabling the Q quadrature
 
         # first perform SSRO analysis to extract the optimal rotation angle theta
@@ -710,6 +704,37 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
             if update:
                 self.motzoi.set(a.optimal_motzoi)
             return a
+
+    def _do_get_acquisition_instr(self):
+        # Specifying the int_avg det here should allow replacing it with ATS
+        # or potential digitizer acquisition easily
+        return self._acquisition_instr
+
+
+    def _do_set_acquisition_instr(self,acquisition_instr):
+        # Specifying the int_avg det here should allow replacing it with ATS
+        # or potential digitizer acquisition easily
+        self._acquisition_instr = acquisition_instr
+        if 'CBox' in str(self._acquisition_instr):
+            print("CBox acquisition")
+            self.int_avg_det = det.CBox_integrated_average_detector(self._acquisition_instr,
+                                                                    self.AWG)
+            self.int_log_det = det.CBox_integration_logging_det(self._acquisition_instr,
+                                                                self.AWG)
+            self.input_average_detector = det.CBox_input_average_detector(
+                self._acquisition_instr,
+                self.AWG)
+        elif 'UHFQC' in str(self._acquisition_instr):
+            print("UHFQC acquisition")
+            self.input_average_detector = det.UHFQC_input_average_detector(
+                UHFQC=self._acquisition_instr,
+                AWG=self.AWG)
+            self.int_avg_det = det.UHFQC_integrated_average_detector(
+                UHFQC=self._acquisition_instr, AWG=self.AWG,
+                channels=[0, 1])
+            self.int_log_det = det.UHFQC_integrated_average_detector(
+                UHFQC=self._acquisition_instr, AWG=self.AWG,
+                channels=[0, 1])
 
     def get_pulse_pars(self):
         self.pulse_pars = {
@@ -754,3 +779,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         spec_pars['pulse_delay'] = (RO_pars['length'] +
                                     self.spec_pulse_depletion_time.get())
         return spec_pars, RO_pars
+
+
+
+

@@ -53,7 +53,8 @@ class HeterodyneInstrument(Instrument):
                            vals=vals.Numbers(-200e6, 200e6),
                            label='Intermodulation frequency',
                            units='Hz')
-        self.add_parameter('RF_power', units='dBm',
+        self.add_parameter('RF_power', label='RF power',
+                           units='dBm',
                            set_cmd=self.do_set_RF_power,
                            get_cmd=self.do_get_RF_power)
 

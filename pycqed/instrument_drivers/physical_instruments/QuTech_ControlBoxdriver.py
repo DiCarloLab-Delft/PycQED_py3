@@ -152,7 +152,7 @@ class QuTech_ControlBox(VisaInstrument):
         self.set('signal_delay', 0)
         self.set('integration_length', 100)
         self.set('adc_offset', 0)
-        self.set('log_length', 100)
+        self.set('log_length', 8000)
         self.set('nr_samples', 100)
         self.set('nr_averages', 512)
         self.set('lin_trans_coeffs', [1, 0, 0, 1])
