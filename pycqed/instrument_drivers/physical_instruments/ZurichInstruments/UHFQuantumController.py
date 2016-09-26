@@ -380,15 +380,20 @@ class UHFQC(Instrument):
         f.close()
 
 
-    def upload_demodulation_weights(self, IF):
+    def prepare_SSB_weight_and_rotation(self, IF):
             trace_length = 4096
             tbase = np.arange(0, trace_length/1.8e9, 1/1.8e9)
             print(tbase)
             cosI = np.cos(2*np.pi*IF*tbase)
             sinI = np.sin(2*np.pi*IF*tbase)
             self.quex_wint_weights_0_real(np.array(cosI))
+            self.quex_wint_weights_0_imag(np.array(sinI))
             self.quex_wint_weights_1_real(np.array(sinI))
-
+            self.quex_wint_weights_1_imag(np.array(cosI))
+            self.quex_rot_0_real(1.0)
+            self.quex_rot_0_imag(1.0)
+            self.quex_rot_1_real(1.0)
+            self.quex_rot_1_imag(-1.0)
 
     # def setd(self, path, value):
     #     # Handle absolute path

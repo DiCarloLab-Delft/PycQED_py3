@@ -462,12 +462,12 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
 
             optimized_weights_I = self.multiplier*(transient1_I-transient0_I)
             optimized_weights_I = optimized_weights_I-np.mean(optimized_weights_I)
-            weight_scale_factor = 128./np.max(np.abs(optimized_weights_I))
+            weight_scale_factor = 127./np.max(np.abs(optimized_weights_I))
             optimized_weights_I = np.floor(weight_scale_factor*optimized_weights_I).astype(int)
 
             optimized_weights_Q = self.multiplier*(transient1_Q-transient0_Q)
             optimized_weights_Q = optimized_weights_Q-np.mean(optimized_weights_Q)
-            weight_scale_factor = 128./np.max(np.abs(optimized_weights_Q))
+            weight_scale_factor = 127./np.max(np.abs(optimized_weights_Q))
             optimized_weights_Q = np.floor(weight_scale_factor*optimized_weights_Q).astype(int)
 
 

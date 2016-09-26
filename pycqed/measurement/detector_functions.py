@@ -1569,7 +1569,7 @@ class UHFQC_integrated_average_detector(Hard_Detector):
     def __init__(self, UHFQC, AWG, channels=[0, 1, 2, 3], seg_per_point=1,**kw):
         super(UHFQC_integrated_average_detector, self).__init__()
         self.UHFQC = UHFQC
-        self.name = 'UHFQC_Streaming_data'
+        self.name = 'UHFQC_integrated_average'
         self.channels = channels
         self.value_names = ['']*len(self.channels)
         self.value_units = ['']*len(self.channels)
