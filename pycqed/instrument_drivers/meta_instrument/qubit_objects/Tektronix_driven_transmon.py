@@ -259,13 +259,13 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         self.td_source.power.set(self.td_source_pow.get())
         self.get_pulse_pars()
 
-        # makes sure dac range is used optimally, 20% overhead for mixer skew
-        self.AWG.set('{}_amp'.format(self.pulse_I_channel()),
-                     self.amp180()*3.0)
-        # use 60% of based on linear range in mathematica
-        self.AWG.set('{}_amp'.format(self.pulse_Q_channel()),
-                     self.amp180()*3.0)
-        # use 60% of based on linear range in mathematica
+        # # makes sure dac range is used optimally, 20% overhead for mixer skew
+        # self.AWG.set('{}_amp'.format(self.pulse_I_channel()),
+        #              self.amp180()*3.0)
+        # # use 60% of based on linear range in mathematica
+        # self.AWG.set('{}_amp'.format(self.pulse_Q_channel()),
+        #              self.amp180()*3.0)
+        # # use 60% of based on linear range in mathematica
 
         self.AWG.set(self.pulse_I_channel.get()+'_offset',
                      self.pulse_I_offset.get())
@@ -444,12 +444,12 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                      verbose=False):
         # prepare for timedomain takes care of rescaling
         self.prepare_for_timedomain()
-        # Extra rescaling only happens if the amp180 was far too low for the Rabi
-        if max(abs(amps)) > 2.9 * self.AWG.get('{}_amp'.format(self.pulse_I_channel())):
-            self.AWG.set('{}_amp'.format(self.pulse_I_channel()),
-                         np.max(abs(amps))*3.0)
-            self.AWG.set('{}_amp'.format(self.pulse_Q_channel()),
-                         np.max(abs(amps))*3.0)
+        # # Extra rescaling only happens if the amp180 was far too low for the Rabi
+        # if max(abs(amps)) > 2.9 * self.AWG.get('{}_amp'.format(self.pulse_I_channel())):
+        #     self.AWG.set('{}_amp'.format(self.pulse_I_channel()),
+        #                  np.max(abs(amps))*3.0)
+        #     self.AWG.set('{}_amp'.format(self.pulse_Q_channel()),
+        #                  np.max(abs(amps))*3.0)
         if MC is None:
             MC = self.MC
 
