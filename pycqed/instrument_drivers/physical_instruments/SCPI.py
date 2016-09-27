@@ -37,6 +37,13 @@ class SCPI(IPInstrument):
 
         resp = self._socket.makefile().readline().rstrip()
         return resp
+
+    def ask_float(self, str):
+        return float(self.ask(str))
+
+    def ask_int(self, str):
+        return int(self.ask(str))
+
     ###
     # Generic SCPI commands from IEEE 488.2 (IEC 625-2) standard
     ###
@@ -69,14 +76,14 @@ class SCPI(IPInstrument):
         self.write('*SRE %d' % value)
 
     def getServiceRequestEnable(self):
-        return self.ask('*SRE?')
+        return self.ask_int('*SRE?')
 
     def getStatusByte(self):
-        return self.ask('*STB?')
+        return self.ask_int('*STB?')
 
     def getTestResult(self):
         # NB: result bits are device dependent
-        return self.ask('*TST?')
+        return self.ask_int('*TST?')
 
     def trigger(self):
         self.write('*TRG')
@@ -97,7 +104,7 @@ class SCPI(IPInstrument):
         return self.ask('system:err?')
 
     def getSystemErrorCount(self):
-        return self.ask('system:error:count?')
+        return self.ask_int('system:error:count?')
 
     def getSystemVersion(self):
         return self.ask('system:version?')

@@ -82,7 +82,7 @@ class QuTech_AWG_Module(SCPI):
         for i in range(1, self.device_descriptor.numTriggers+1):
             triglev_cmd = 'qutech:trigger{}:level'.format(i)
             # individual trigger level per trigger input:
-            self.add_parameter('ch{}_trigger_level'.format(i),
+            self.add_parameter('tr{}_trigger_level'.format(i),
                                units='V',
                                label='Trigger level channel {} (V)'.format(i),
                                get_cmd=triglev_cmd + '?',
@@ -93,7 +93,8 @@ class QuTech_AWG_Module(SCPI):
         self.add_parameter('run_mode',
                            get_cmd='AWGC:RMO?',
                            set_cmd='AWGC:RMO ' + '{}',
-                           vals=vals.Enum('CONT', 'SEQ', 'COD'))
+                           vals=vals.Enum('NONE', 'CONt', 'SEQ', 'CODeword'))
+        # NB: setting mode "CON" (valid SCPI abbreviation) reads back as "CONt"
 
         # Channel parameters #
         for ch in range(1, self.device_descriptor.numChannels+1):
@@ -111,11 +112,11 @@ class QuTech_AWG_Module(SCPI):
                                vals=vals.Bool())
 
             self.add_parameter('ch{}_amp'.format(ch),
-                               label='Amplitude channel {} (Vpp)'.format(ch),
+                               label='Amplitude channel {} (Vpp into 50 Ohm)'.format(ch),
                                units='Vpp',
                                get_cmd=amp_cmd + '?',
                                set_cmd=amp_cmd + ' {:.6f}',
-                               vals=vals.Numbers(0.02, 4.5),
+                               vals=vals.Numbers(0.0, 0.45),
                                get_parser=float)
 
             self.add_parameter('ch{}_offset'.format(ch),
@@ -123,7 +124,7 @@ class QuTech_AWG_Module(SCPI):
                                units='V',
                                get_cmd=offset_cmd + '?',
                                set_cmd=offset_cmd + ' {:.3f}',
-                               vals=vals.Numbers(-.1, .1),
+                               vals=vals.Numbers(-.05, .05),
                                get_parser=float)
 
             self.add_parameter('ch{}_default_waveform'.format(ch),
@@ -149,7 +150,10 @@ class QuTech_AWG_Module(SCPI):
 
     def _setMatrix(self, chPair, mat):
         '''
-        matrix:             2x2 matrix for mixer calibration
+        Args:
+            chPair(int): ckannel pair for operation, 1 or 3
+
+            matrix(np.matrix): 2x2 matrix for mixer calibration
         '''
         # function used internally for the parameters because of formatting
         print(chPair, mat)
@@ -160,12 +164,16 @@ class QuTech_AWG_Module(SCPI):
     # AWG5014 functions: SEQUENCE
     ##########################################################################
     def setSeqLength(self, length):
-        ''' length:     0..max. Allocates new, or trims existing sequence
+        '''
+        Args:
+            length (int): 0..max. Allocates new, or trims existing sequence
         '''
         self.write('sequence:length %d' % length)
 
     def setSeqElemLoopInfiniteOn(self, element):
-        ''' element:        1..length
+        '''
+        Args:
+            element(int): 1..length
         '''
         self.write('sequence:element%d:loop:infinite on' % element)
 
@@ -176,7 +184,9 @@ class QuTech_AWG_Module(SCPI):
         return self.ask('wlist:size?')
 
     def getWlistName(self, idx):
-        ''' idx:            0..size-1
+        '''
+        Args:
+            idx(int): 0..size-1
         '''
         return self.ask('wlist:name? %d' % idx)
 
@@ -191,56 +201,64 @@ class QuTech_AWG_Module(SCPI):
         return wlist
 
     def deleteWaveform(self, name):
-        ''' name:       waveform name excluding double quotes, e.g. 'test'
-                Compatibility:  5014, QWG
+        '''
+        Args:
+            name (string):  waveform name excluding double quotes, e.g.
+            'test'
+
+        Compatibility:  5014, QWG
         '''
         self.write('wlist:waveform:delete "%s"' % name)
 
+    def deleteWaveformAll(self):
         ''' Compatibility:  5014, QWG
         '''
-
-    def deleteWaveformAll(self):
         self.write('wlist:waveform:delete all')
 
     def getWaveformType(self, name):
-        ''' name:       waveform name excluding double quotes, e.g. '*Sine100'
-                Returns:    'INT' or 'REAL'
+        '''
+        Args:
+            name (string):  waveform name excluding double quotes, e.g.
+            '*Sine100'
+
+        Returns:
+            'INT' or 'REAL'
         '''
         return self.ask('wlist:waveform:type? "%s"' % name)
 
     def getWaveformLength(self, name):
-        ''' name:       waveform name excluding double quotes, e.g. '*Sine100'
+        '''
+        Args:
+            name (string):  waveform name excluding double quotes, e.g.
+            '*Sine100'
         '''
         return self.ask('wlist:waveform:length? "%s"' % name)
 
     def newWaveformReal(self, name, len):
-        ''' name:       waveform name excluding double quotes, e.g. 'test'
-                NB: seems to do nothing if waveform already exists
+        '''
+        Args:
+            name (string):  waveform name excluding double quotes, e.g.
+            '*Sine100'
+
+        NB: seems to do nothing (on Tek5014) if waveform already exists
         '''
         self.write('wlist:waveform:new "%s",%d,real' % (name, len))
 
     def getWaveformData(self, name):
         '''
-                Input:
-                        name:       string              waveform name excluding double quotes, e.g. '*Sine100'
-                Output:
-                        tuple containing lists: (waveform, marker1, marker2)
+        Args:
+            name (string):  waveform name excluding double quotes, e.g.
+            '*Sine100'
 
-                Compatibility:  5014, QWG
+        Returns:
+            tuple containing lists: (waveform, marker1, marker2)
 
-                Funny old Matlab timing results:
-                        tic;[waveform,marker1,marker2] = awg.getWaveformData('*Sine100');toc
-                        Elapsed time is 0.265559 seconds.
-                        tic;[waveform,marker1,marker2] = awg.getWaveformData('*Sine1000');toc
-                        Elapsed time is 0.101930 seconds.
-                        tic;[waveform,marker1,marker2] = awg.getWaveformData('*Sine3600');toc
-                        Elapsed time is 0.056023 seconds.
+        Compatibility:  5014, QWG
         '''
-        self.write('wlist:waveform:data? "%s"' %
-                   name)                            # response starts with header, e.g. '#3500'
+        self.write('wlist:waveform:data? "%s"' % name)
         binBlock = self.binBlockRead()
         # extract waveform and markers
-        waveformLen = len(binBlock)/5                                           # 5 bytes per record
+        waveformLen = len(binBlock)/5   # 5 bytes per record
         waveform = []
         marker1 = []
         marker2 = []
@@ -253,30 +271,39 @@ class QuTech_AWG_Module(SCPI):
 
     def sendWaveformDataReal(self, name, waveform, marker1, marker2):
         """
-        send waveform and markers directly to AWG memory, i.e. not to a file on the AWG disk.
-        NB: uses real data normalized to the range from -1 to 1 (independent of number of DAC bits of AWG)
+        send waveform and markers directly to AWG memory, i.e. not to a file
+        on the AWG disk.
+        NB: uses real data normalized to the range from -1 to 1 (independent
+        of number of DAC bits of AWG)
 
-                Args:
-                        name (string): waveform name excluding double quotes, e.g. 'test'. Must already exits in AWG
+        Args:
+            name (string): waveform name excluding double quotes, e.g. 'test'.
+            Must already exits in AWG
 
-                        waveform (float[numpoints]): vector defining the waveform, normalized between -1.0 and 1.0
+            waveform (float[numpoints]): vector defining the waveform,
+            normalized between -1.0 and 1.0
 
-                        marker1 (int[numpoints]): vector of 0 and 1 defining the first marker
+            marker1 (int[numpoints]): vector of 0 and 1 defining the first
+            marker
 
-                        marker2 (int[numpoints]): vector of 0 and 1 defining the second marker
+            marker2 (int[numpoints]): vector of 0 and 1 defining the second
+            marker
 
-                Compatibility:  5014, QWG
+        Compatibility:  5014, QWG
 
-                Based on:
-                        Tektronix_AWG5014.py::send_waveform, which sends data to an AWG _file_, not a memory waveform
-                        'awg_transferRealDataWithMarkers', Author = Stefano Poletto, Compatibility = Tektronix AWG5014, AWG7102
+        Based on:
+            Tektronix_AWG5014.py::send_waveform, which sends data to an AWG
+            _file_, not a memory waveform
+            'awg_transferRealDataWithMarkers', Author = Stefano Poletto,
+            Compatibility = Tektronix AWG5014, AWG7102
         """
 
         # parameter handling
-        if len(marker1) == 0 and len(marker2) == 0:                                 # no marker data
+        if len(marker1) == 0 and len(marker2) == 0:  # no marker data
             m = np.zeros(len(waveform))
         else:
-            if (not((len(waveform) == len(marker1)) and ((len(marker1) == len(marker2))))):
+            if (not((len(waveform) == len(marker1))
+                    and ((len(marker1) == len(marker2))))):
                 raise UserWarning('length mismatch between markers/waveform')
             # prepare markers
             m = marker1 + np.multiply(marker2, 2)
@@ -295,22 +322,25 @@ class QuTech_AWG_Module(SCPI):
 
     def createWaveformReal(self, name, waveform, marker1, marker2):
         """
-        Convenience function to create a waveform in the AWG and then send data to it
+        Convenience function to create a waveform in the AWG and then send
+        data to it
 
         Args:
-                name(string): name of waveform for internal use by the AWG
+            name(string): name of waveform for internal use by the AWG
 
-                        waveform (float[numpoints]): vector defining the waveform, normalized between -1.0 and 1.0
+            waveform (float[numpoints]): vector defining the waveform,
+            normalized between -1.0 and 1.0
 
-                        marker1 (int[numpoints]): vector of 0 and 1 defining the first marker
+            marker1 (int[numpoints]): vector of 0 and 1 defining the first
+            marker
 
-                        marker2 (int[numpoints]): vector of 0 and 1 defining the second marker
+            marker2 (int[numpoints]): vector of 0 and 1 defining the second
+            marker
 
-                Compatibility:  5014, QWG
+        Compatibility:  5014, QWG
         """
         waveLen = len(waveform)
-#       if self.paranoid:
-        # check waveform is there, problems might arise if it already existed
+        # FIXME: check waveform is there, problems might arise if it already existed
         self.newWaveformReal(name, waveLen)
         self.sendWaveformDataReal(name, waveform, marker1, marker2)
 
@@ -331,7 +361,6 @@ class QuTech_AWG_Module(SCPI):
 
     def stop(self):
         self.write('awgcontrol:stop:immediate')
-
 
     # Used for setting the channel pairs
     def _gen_ch_set_func(self, fun, ch):

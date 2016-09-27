@@ -123,18 +123,18 @@ class QWG_tests(unittest.TestCase):
     def test_parameters(self):
         for parname, par in sorted(self.qwg.parameters.items()):
             failing_pars = []
-            for i in range(16):
-                failing_pars.append('ch{}_amp'.format(i))
-                failing_pars.append('ch{}_offset'.format(i))
-                failing_pars.append('ch{}_trigger_level'.format(i))
+            #for i in range(16):
+                #failing_pars.append('ch{}_amp'.format(i))
+                #failing_pars.append('ch{}_offset'.format(i))
+                #failing_pars.append('tr{}_trigger_level'.format(i))
 
                 # Sideband phase always returns 0 when get
-                failing_pars.append('ch_pair{}_sideband_phase'.format(i))
+                #failing_pars.append('ch_pair{}_sideband_phase'.format(i))
                 # transformation matrix get returns garbage
-                failing_pars.append('ch_pair{}_transform_matrix'.format(i))
+                #failing_pars.append('ch_pair{}_transform_matrix'.format(i))
 
             # Error messages:  -113,"Undefined header;AWGC:RMOD?"
-            failing_pars.append('run_mode')
+            #failing_pars.append('run_mode')
 
             if par.name not in ['IDN'] and par.name not in failing_pars:
                 # print('parname:', par.name)
@@ -218,17 +218,12 @@ if __name__ == '__main__':
         qwg1.createWaveformReal('gauss', wvGauss, marker1, marker2)
         qwg1.createWaveformReal('derivGauss', wvDerivGauss, marker1, marker2)
 
-        if 1:  # dc
-            qwg1.set('ch{}_default_waveform'.format(1), 'gauss')  # 'hi')
-            qwg1.set('ch{}_default_waveform'.format(2), 'derivGauss')  # 'zero')
-            qwg1.set('ch{}_default_waveform'.format(3), 'gauss')  # 'hi')
-            qwg1.set('ch{}_default_waveform'.format(4), 'zero')  # 'zero')
-        else:
-            qwg1.set('ch{}_default_waveform'.format(1), 'derivGauss')
-            qwg1.set('ch{}_default_waveform'.format(2), 'zero')
-            qwg1.set('ch{}_default_waveform'.format(3), 'zero')
-            qwg1.set('ch{}_default_waveform'.format(4), 'gauss')
-        qwg1.run_mode('CONT')#setRunModeContinuous()
+        qwg1.set('ch1_default_waveform', 'gauss')
+        qwg1.set('ch2_default_waveform', 'derivGauss')
+        qwg1.set('ch3_default_waveform', 'gauss')
+        qwg1.set('ch4_default_waveform', 'zero')
+
+        qwg1.run_mode('CONt')
 
     else:  # codeword based
         qwg1.createWaveformReal('zero', wvZero, marker1, marker2)
@@ -242,10 +237,10 @@ if __name__ == '__main__':
         qwg1.createWaveformReal('gaussNeg', -wvGauss, marker1, marker2)
 
         # segment 0: idle
-        qwg1.set('ch{}_default_waveform'.format(1), 'zero')
-        qwg1.set('ch{}_default_waveform'.format(2), 'zero')
-        qwg1.set('ch{}_default_waveform'.format(3), 'zero')
-        qwg1.set('ch{}_default_waveform'.format(4), 'zero')
+        qwg1.set('ch1_default_waveform', 'zero')
+        qwg1.set('ch2_default_waveform', 'zero')
+        qwg1.set('ch3_default_waveform', 'zero')
+        qwg1.set('ch4_default_waveform', 'zero')
 
         seg = 0
 
@@ -314,4 +309,6 @@ if __name__ == '__main__':
     qwg1.run()
 
     print('Identity: ', qwg1.getIdentity())
-    print('Error messages: ', qwg1.getError())
+    print('Error messages: ')
+    for i in range(qwg1.getSystemErrorCount()):
+        print(qwg1.getError())
