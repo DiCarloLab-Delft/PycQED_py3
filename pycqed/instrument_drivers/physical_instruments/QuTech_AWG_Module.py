@@ -181,7 +181,7 @@ class QuTech_AWG_Module(SCPI):
     # AWG5014 functions: WLIST (Waveform list)
     ##########################################################################
     def getWlistSize(self):
-        return self.ask('wlist:size?')
+        return self.ask_int('wlist:size?')
 
     def getWlistName(self, idx):
         '''
@@ -232,7 +232,7 @@ class QuTech_AWG_Module(SCPI):
             name (string):  waveform name excluding double quotes, e.g.
             '*Sine100'
         '''
-        return self.ask('wlist:waveform:length? "%s"' % name)
+        return self.ask_int('wlist:waveform:length? "%s"' % name)
 
     def newWaveformReal(self, name, len):
         '''
@@ -340,7 +340,8 @@ class QuTech_AWG_Module(SCPI):
         Compatibility:  5014, QWG
         """
         waveLen = len(waveform)
-        # FIXME: check waveform is there, problems might arise if it already existed
+        # FIXME: check waveform is there, problems might arise if it already
+        # existed
         self.newWaveformReal(name, waveLen)
         self.sendWaveformDataReal(name, waveform, marker1, marker2)
 
@@ -352,8 +353,9 @@ class QuTech_AWG_Module(SCPI):
     def loadWaveformOrSequence(self, awgFileName):
         ''' awgFileName:        name referring to AWG file system
         '''
-        self.write('source:def:user "%s"' %
-                   awgFileName)     # NB: we only support default Mass Storage Unit Specifier "Main", which is the internal harddisk
+        self.write('source:def:user "%s"' % awgFileName)
+        # NB: we only  support default Mass Storage Unit Specifier "Main",
+        # which is the internal harddisk
 
     # Tek_AWG functions: Button interface
     def run(self):

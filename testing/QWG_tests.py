@@ -308,6 +308,11 @@ if __name__ == '__main__':
 
     qwg1.run()
 
+    wlistSize = qwg1.getWlistSize()
+    print('WLIST size: ', wlistSize)
+    for i in range(wlistSize):
+        print('wlist: ', qwg1.getWlistName(i+1))
+
     print('Identity: ', qwg1.getIdentity())
     print('Error messages: ')
     for i in range(qwg1.getSystemErrorCount()):
