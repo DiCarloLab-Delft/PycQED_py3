@@ -656,6 +656,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                                                  RO_pars=self.RO_pars,
                                                  pulse_comb='OffOff',
                                                  nr_samples=nr_samples))
+        self.input_average_detector.nr_samples = nr_samples
         self.MC.set_detector_function(self.input_average_detector)
         self.MC.run('Measure_transients_{}_0'.format(self.msmt_suffix))
         a0 = ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
@@ -732,7 +733,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
             self.int_avg_det = det.UHFQC_integrated_average_detector(
                 UHFQC=self._acquisition_instr, AWG=self.AWG,
                 channels=[0, 1])
-            self.int_log_det = det.UHFQC_integrated_average_detector(
+            self.int_log_det = det.UHFQC_integration_logging_det(
                 UHFQC=self._acquisition_instr, AWG=self.AWG,
                 channels=[0, 1])
 

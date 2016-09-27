@@ -415,10 +415,9 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
                     det.CBox_integration_logging_det(self.acquisition_instr,
                                                      self.AWG))
                 self.CBox = self.acquisition_instr
-                print('hoi')
             elif  'UHFQC' in str(self.acquisition_instr):
                 self.MC.set_detector_function(
-                    det.UHFQC_integrated_average_detector(self.acquisition_instr,
+                    det.UHFQC_integration_logging_det(self.acquisition_instr,
                                                           self.AWG, channels=[0,1]))
 
     def acquire_data_point(self, *args, **kw):

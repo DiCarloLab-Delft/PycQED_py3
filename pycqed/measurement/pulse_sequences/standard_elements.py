@@ -124,12 +124,15 @@ def multi_pulse_elt(i, station, pulse_list):
                         fixed_point_freq=pulse_pars['fixed_point_frequency'])
                 # Start Acquisition marker
                 if type(pulse_pars['acq_marker_channel']) is str:
-                    Acq_marker = pulse.SquarePulse(
-                        name='Acq-trigger', amplitude=1, length=20e-9,
-                        channel=pulse_pars['acq_marker_channel'])
-                    el.add(
-                        Acq_marker, start=pulse_pars['acq_marker_delay'],
-                        refpulse=last_pulse, refpoint='start')
+                    channels = pulse_pars['acq_marker_channel']
+                    channels=list(channels.split(','))
+                    for channel in channels:
+                        Acq_marker = pulse.SquarePulse(
+                            name='Acq-trigger', amplitude=1, length=20e-9,
+                            channel=channel)
+                        el.add(
+                            Acq_marker, start=pulse_pars['acq_marker_delay'],
+                            refpulse=last_pulse, refpoint='start')
                 else:
                     # TODO: remove hacked in second marker and support list
                     # functionality

@@ -405,21 +405,22 @@ class CBox_input_average_detector(Hard_Detector):
     def get_values(self):
         if self.AWG is not None:
             self.AWG.start()
-        data = np.double(self.CBox.get_integrated_avg_results())*np.double(self.factor)
+        data = np.double(self.CBox.get_input_avg_results())*np.double(self.factor)
         return data
 
     def prepare(self, sweep_points):
+        self.CBox.acquisition_mode(0)
         if self.AWG is not None:
             self.AWG.stop()
         self.CBox.nr_samples(self.nr_samples)
-        self.CBox.set('acquisition_mode', 0)
-        self.CBox.set('acquisition_mode', 3)
+        self.CBox.acquisition_mode('input averaging')
+        print("cbox input detector prepared")
 
 
     def finish(self):
         if self.AWG is not None:
             self.AWG.stop()
-        self.CBox.set('acquisition_mode', 0)
+        self.CBox.acquisition_mode(0)
 
 
 class CBox_integrated_average_detector(Hard_Detector):
@@ -1545,10 +1546,7 @@ class UHFQC_input_average_detector(Hard_Detector):
         time.sleep(1)
         data=['']*len(self.channels)
         for i,channel in enumerate(self.channels):
-            print(i)
-            print(len(self.channels))
             dataset = eval("self.UHFQC.quex_iavg_data_{}()".format(channel))
-            print(dataset)
             data[i]=dataset[0]['vector']
         return data
 
@@ -1589,6 +1587,56 @@ class UHFQC_integrated_average_detector(Hard_Detector):
             self.AWG.start()
         while self.UHFQC.awgs_0_enable() == 1:
             time.sleep(0.1)
+        time.sleep(1)
+        data = ['']*len(self.channels)
+        for i, channel in enumerate(self.channels):
+            dataset = eval("self.UHFQC.quex_rl_data_{}()".format(channel))
+            data[i] = dataset[0]['vector']
+        print("refreshed")
+        return data
+
+    def prepare(self, sweep_points):
+        if self.AWG is not None:
+            self.AWG.stop()
+        self.UHFQC.quex_rl_source(2) #this sets the result to integration and rotation outcome
+        self.UHFQC.quex_rl_length(len(sweep_points))
+        # Configure the result logger to not do any averaging
+        # The AWG program uses userregs/0 to define the number o iterations in the loop
+        self.UHFQC.awgs_0_userregs_0(2**self.UHFQC.quex_rl_avgcnt()*len(sweep_points))
+        print("prepared for averaged int")
+
+    def finish(self):
+        if self.AWG is not None:
+            self.AWG.stop()
+
+class UHFQC_integration_logging_det(Hard_Detector):
+    '''
+    Detector used for integrated average results with the UHFQC
+
+    '''
+    def __init__(self, UHFQC, AWG, channels=[0, 1, 2, 3], seg_per_point=1,**kw):
+        super(UHFQC_integration_logging_det, self).__init__()
+        self.UHFQC = UHFQC
+        self.name = 'UHFQC_integration_logging_det'
+        self.channels = channels
+        self.value_names = ['']*len(self.channels)
+        self.value_units = ['']*len(self.channels)
+        for i, channel in enumerate(self.channels):
+            self.value_names[i] = 'w{}'.format(channel)
+            self.value_units[i] = 'V'
+        if channels == [0,1]:
+                self.value_names = ['I', 'Q']
+                self.value_units = ['V', 'V']
+        self.AWG = AWG
+        self.seg_per_point = seg_per_point
+
+    def get_values(self):
+        self.UHFQC.awgs_0_single(1)
+        self.UHFQC.awgs_0_enable(1)
+        if self.AWG is not None:
+            self.AWG.start()
+        while self.UHFQC.awgs_0_enable() == 1:
+            time.sleep(0.1)
         data = ['']*len(self.channels)
         for i, channel in enumerate(self.channels):
             dataset = eval("self.UHFQC.quex_rl_data_{}()".format(channel))
@@ -1598,8 +1646,21 @@ class UHFQC_integrated_average_detector(Hard_Detector):
     def prepare(self, sweep_points):
         if self.AWG is not None:
             self.AWG.stop()
+        # The averaging-count is used to specify how many times the AWG program should run
+        LOG2_AVG_CNT = 10 #hardcoded to 1024 shots right now
+
+        # This averaging count specifies how many measurements the result logger should average
+        LOG2_RL_AVG_CNT = 0 # for single shot readout
+
+        # The AWG program uses userregs/0 to define the number o iterations in the loop
+        self.UHFQC.awgs_0_userregs_0(pow(2, LOG2_AVG_CNT)*pow(2, LOG2_RL_AVG_CNT))
+        self.UHFQC.quex_rl_length(pow(2, LOG2_AVG_CNT)-1)
+        self.UHFQC.quex_rl_avgcnt(LOG2_RL_AVG_CNT)
+
         self.UHFQC.quex_rl_source(2) #this sets the result to integration and rotation outcome
 
     def finish(self):
         if self.AWG is not None:
             self.AWG.stop()
+
+

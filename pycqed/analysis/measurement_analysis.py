@@ -2344,7 +2344,7 @@ class SSRO_Analysis(MeasurementAnalysis):
         pylab.semilogy(bins1, y1, 'r',linewidth=1.5)
         pylab.semilogy(bins1, y0_1, 'r--', linewidth=3.5)
         pylab.semilogy(bins1, y1_1, 'r--', linewidth=3.5)
-        (pylab.gca()).set_ylim(3*10e-7,10e-3)
+        (pylab.gca()).set_ylim(1*10e-7,10e-0)
 
         axes.set_title('Histograms of shots on rotaded IQ plane optimized for I, %s shots'%min_len)
         plt.xlabel('DAQ voltage integrated (V)')#, fontsize=14)
