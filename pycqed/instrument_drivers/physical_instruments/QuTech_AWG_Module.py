@@ -72,12 +72,13 @@ class QuTech_AWG_Module(SCPI):
             self.add_parameter('ch_pair{}_transform_matrix'.format(ch_pair),
                                label=('Transformation matrix channel' +
                                       'pair {}'.format(i)),
-                               get_cmd=mat_cmd + '?',
+                               # get_cmd=mat_cmd + '?',
+                               get_cmd=self._gen_ch_get_func(
+                                    self._getMatrix, ch_pair),
                                set_cmd=self._gen_ch_set_func(
                                     self._setMatrix, ch_pair),
                                # NB range is not a hardware limit
-                               vals=vals.Arrays(-2, 2, shape=(2, 2)),
-                               get_parser=np.array)
+                               vals=vals.Arrays(-2, 2, shape=(2, 2)))
 
         for i in range(1, self.device_descriptor.numTriggers+1):
             triglev_cmd = 'qutech:trigger{}:level'.format(i)
@@ -177,9 +178,18 @@ class QuTech_AWG_Module(SCPI):
             matrix(np.matrix): 2x2 matrix for mixer calibration
         '''
         # function used internally for the parameters because of formatting
-        print(chPair, mat)
         self.write('qutech:output{:d}:matrix {:f},{:f},{:f},{:f}'.format(
                    chPair, mat[0, 0], mat[1, 0], mat[0, 1], mat[1, 1]))
+
+    def _getMatrix(self, chPair):
+        # function used internally for the parameters because of formatting
+        mstring = self.ask('qutech:output{}:matrix?'.format(chPair))
+        M = np.zeros(4)
+        for i, x in enumerate(mstring.split(',')):
+            M[i] = x
+        M = M.reshape(2, 2)
+        return(M)
+
 
     ##########################################################################
     # AWG5014 functions: SEQUENCE
@@ -376,3 +386,8 @@ class QuTech_AWG_Module(SCPI):
         def set_func(val):
             return fun(ch, val)
         return set_func
+    def _gen_ch_get_func(self, fun, ch):
+        def get_func():
+            return fun(ch)
+        return get_func
+
