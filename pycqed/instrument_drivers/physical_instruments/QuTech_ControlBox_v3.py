@@ -40,11 +40,12 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
         self.add_parameter('core_state',
                            set_cmd=self._do_set_core_state,
                            get_cmd=self._do_get_core_state,
-                           vals=vals.Anything())
+                           vals=vals.Enum('idle', 'active'))
         self.add_parameter('trigger_source',
                            set_cmd=self._do_set_trigger_source,
                            get_cmd=self._do_get_trigger_source,
-                           vals=vals.Anything())
+                           vals=vals.Enum('internal', 'external',
+                                          'mixed'))
 
     def init_params(self):
         self.add_params()
