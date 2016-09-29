@@ -424,7 +424,8 @@ class CBox_input_average_detector(Hard_Detector):
 
 
 class CBox_integrated_average_detector(Hard_Detector):
-    def __init__(self, CBox, AWG, seg_per_point=1, **kw):
+    def __init__(self, CBox, AWG, seg_per_point=1, normalize=False, rotate=False,
+                 **kw):
         '''
         Integration average detector.
         Defaults to averaging data in a number of segments equal to the
@@ -433,14 +434,22 @@ class CBox_integrated_average_detector(Hard_Detector):
         seg_per_point allows you to use more than 1 segment per sweeppoint.
         this is for example useful when doing a MotzoiXY measurement in which
         there are 2 datapoints per sweep point.
+        Normalize/Rotate adds a third measurement with the rotated/normalized data.
         '''
         super().__init__(**kw)
         self.CBox = CBox
         self.name = 'CBox_integrated_average_detector'
-        self.value_names = ['I','Q']
-        self.value_units = ['a.u.', 'a.u.']
+        if rotate or normalize:
+            self.value_names = ['F|1>', 'F|1>']
+            self.value_units = ['', '']
+        else:
+            self.value_names = ['I', 'Q']
+            self.value_units = ['a.u.', 'a.u.']
         self.AWG = AWG
         self.seg_per_point = seg_per_point
+        self.rotate = rotate
+        self.normalize = normalize
+        self.cal_points = kw.get('cal_points', None)
 
     def get_values(self):
         succes = False
@@ -470,8 +479,27 @@ class CBox_integrated_average_detector(Hard_Detector):
             i += 1
             if i > 20:
                 break
-
-        return data
+        if self.rotate or self.normalize:
+            return self.rotate_and_normalize(data)
+        else:
+            return data
+    def rotate_and_normalize(self, data):
+        """
+        Rotates and normalizes
+        """
+        if self.cal_points is None:
+            self.corr_data, self.zero_coord, self.one_coord = \
+                a_tools.rotate_and_normalize_data(
+                    data=data,
+                    cal_zero_points=list(range(-4, -2)),
+                    cal_one_points=list(range(-2, 0)))
+        else:
+            self.corr_data, self.zero_coord, self.one_coord = \
+                a_tools.rotate_and_normalize_data(
+                    data=self.measured_values[0:2],
+                    cal_zero_points=self.cal_points[0],
+                    cal_one_points=self.cal_points[1])
+        return self.corr_data, self.corr_data
 
     def prepare(self, sweep_points):
         self.CBox.set('nr_samples', self.seg_per_point*len(sweep_points))

@@ -112,7 +112,7 @@ class MeasurementControl:
                     if not self.complete:
                         for i, sweep_function in enumerate(self.sweep_functions):
                             x = self.get_sweep_points()[
-                                self.iteration*self.xlen]
+                                int(self.iteration*self.xlen)]
                             if i != 0:
                                 sweep_function.set_parameter(x[i])
                         self.detector_function.prepare(

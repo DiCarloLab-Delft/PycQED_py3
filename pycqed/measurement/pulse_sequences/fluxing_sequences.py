@@ -41,27 +41,32 @@ def single_pulse_seq(pulse_pars=None,
                       'dead_time_length': 10e-6}
     minus_pulse_pars = {'pulse_type': 'SquarePulse',
                   'pulse_delay': 3e-6 + pulse_pars['length'] + pulse_pars['pulse_delay'],
-                  'channel': 'ch3',
+                  'channel': pulse_pars['channel'],
                   'amplitude': -pulse_pars['amplitude'],
                   'length': pulse_pars['length'],
                   'dead_time_length': 10e-6}
 
     dead_time_pulse = {'pulse_type': 'SquarePulse',
                        'pulse_delay': (minus_pulse_pars['length']),
-                       'channel': 'ch3',
+                       'channel': pulse_pars['channel'],
                        'amplitude': 0,
-                       'length': 5e-6}
+                       'length': pulse_pars['dead_time_length']}
+                       # 'length': 5e-6}
     seq_name = 'Square_seq'
     seq = sequence.Sequence(seq_name)
     el_list = []
     for i, iter in enumerate([0, 1]):  # seq has to have at least 2 elts
 
         pulse_list = [pulse_pars, minus_pulse_pars,dead_time_pulse]
+        # pulse_list = [pulse_pars, dead_time_pulse]
 
         el = multi_pulse_elt(i, station, pulse_list)
         el_list.append(el)
 
-    preloaded_kernels_vec = preload_kernels_func(distortion_dict)
+    if distortion_dict is not None:
+        preloaded_kernels_vec = preload_kernels_func(distortion_dict)
+    else:
+        preloaded_kernels = []
     for i, el in enumerate(el_list):
         if distortion_dict is not None:
             el = distort_and_compensate(el, distortion_dict, preloaded_kernels_vec)
