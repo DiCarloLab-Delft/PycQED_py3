@@ -9,6 +9,8 @@ from qcodes.instrument.base import Instrument
 from qcodes.utils import validators as vals
 from fnmatch import fnmatch
 import zhinst.zishell as zis
+#from instrument_drivers.physical_instruments.ZurichInstruments import UHFQuantumController as ZI_UHFQC
+
 
 
 class UHFQC(Instrument):
@@ -48,12 +50,10 @@ class UHFQC(Instrument):
         s_node_pars=[]
         d_node_pars=[]
 
-
-        self._s_file_name ='zi_parameter_files/s_node_pars_{}.txt'.format(self._device)
-        self._d_file_name = 'zi_parameter_files/d_node_pars_{}.txt'.format(self._device)
-
-        print(self._s_file_name)
-        print(self._d_file_name)
+        path = os.path.abspath(__file__)
+        dir_path = os.path.dirname(path)
+        self._s_file_name = dir_path+'\\zi_parameter_files\\s_node_pars.txt'
+        self._d_file_name = dir_path+'\\zi_parameter_files\\d_node_pars.txt'
 
         init=True
         try:
@@ -124,6 +124,12 @@ class UHFQC(Instrument):
                 self.add_parameter(
                     parname,
                     set_cmd=self._gen_set_func(zis.setv, parameter[0]),
+                    vals=vals.Anything())
+            elif parameter[1]=='vector_gs':
+                self.add_parameter(
+                    parname,
+                    set_cmd=self._gen_set_func(zis.setv, parameter[0]),
+                    get_cmd=self._gen_get_func(zis.getv, parameter[0]),
                     vals=vals.Anything())
             else:
                 print("parameter {} type {} from d_node_pars not recognized".format(parname,parameter[1]))
@@ -224,9 +230,10 @@ class UHFQC(Instrument):
         # The custom firmware will feed through the signals on Signal Input 1 to Signal Output 1 and Signal Input 2 to Signal Output 2
         # when the AWG is OFF. For most practical applications this is not really useful. We, therefore, disable the generation of
         # these signals on the output here.
-        for i in range(0, 2):
-            for j in range(0, 4):
-                eval('self.sigouts_{0}_enables_{1}(0)'.format(i, j))
+        self.sigouts_0_enables_3(0)
+        self.sigouts_1_enables_7(0)
+
+
 
     def _gen_set_func(self, dev_set_type, cmd_str):
         def set_func(val):
@@ -243,13 +250,7 @@ class UHFQC(Instrument):
         zi_utils.autoDetect(self._daq)
 
     def _do_set_AWG_file(self, filename):
-        h = self._daq.awgModule()
-        h.set('awgModule/device', self._device)
-        h.set('awgModule/index', 0)
-        h.execute()
-        h.set('awgModule/compiler/sourcefile', filename)
-        h.set('awgModule/compiler/start', 1)
-        h.set('awgModule/elf/file', '')
+        zis.awg(filename)
 
         # code to upload AWG sequence as a string
         # def awg(self, filename):
@@ -300,7 +301,11 @@ class UHFQC(Instrument):
 
         s_node_pars=[]
         d_node_pars=[]
-        patterns = ["awgs", "sigins", "sigouts", "quex", "dios","system/extclk"]
+        patterns = ["awgs", "sigins", "sigouts", "quex", "dios","system/extclk"] #["quex/iavg", "quex/wint"]
+        s_file = open(self._s_file_name, 'w')
+        d_file = open(self._d_file_name, 'w')
+        #json.dump([, s_file, default=int)  
+        #json.dump([, d_file, default=int) 
         for pattern in patterns:
             print("extracting parameters of type", pattern)
             all_nodes = set(self.find('*{}*'.format(pattern)))
@@ -309,19 +314,19 @@ class UHFQC(Instrument):
             print(len(all_nodes))
             # extracting info from the setting nodes
             s_nodes = list(s_nodes)
-            default_values=self.getd(s_nodes, True)
+            default_values=zis.getd(s_nodes, True)
             for s_node in s_nodes:
-                self.setd(s_node,  1e12)
-            max_values = self.getd(s_nodes, True)
+                zis.setd(s_node,  1e12)
+            max_values = zis.getd(s_nodes, True)
             for s_node in s_nodes:
-                self.setd(s_node, -1e12)
-            min_values = self.getd(s_nodes, True)
+                zis.setd(s_node, -1e12)
+            min_values = zis.getd(s_nodes, True)
             float_values = [np.pi]*len(s_nodes)
             for i, s_node in enumerate(s_nodes):
                 if np.pi > max_values[i]:
                     float_values[i] = max_values[i]/np.pi;
-                self.setd(s_node, float_values[i])
-            actual_float_values = self.getd(s_nodes, True)
+                zis.setd(s_node, float_values[i])
+            actual_float_values = zis.getd(s_nodes, True)
             node_types = ['']*len(s_nodes)
             for i, s_node in enumerate(s_nodes):
                 #self.setd(node,default_values[i])
@@ -346,24 +351,31 @@ class UHFQC(Instrument):
                         node_types[i] = 'int_8bit'
                     elif max_values[i]>4294967295:
                         node_types[i] = 'float'
-                line=[s_node, node_types[i], min_values[i], max_values[i], '\n']
+                line=[s_node, node_types[i], min_values[i], max_values[i]]
                 print(line)
                 s_node_pars.append(line)
+                #json.dump(line, s_file, indent=2, default=int)
+            
 
             #extracting info from the data nodes
             d_nodes = list(d_nodes)
             #default_values=self.getd(d_nodes, True)
             default_values=np.zeros(len(d_nodes))
             node_types = ['']*len(d_nodes)
+            
             for i, d_node in enumerate(d_nodes):
                 try:
-                    answer=self.getv(d_node)
+                    answer=zis.getv(d_node)
                     if isinstance(answer, dict):
                         value=answer['value'][0]
                         node_types[i]='float'
                     elif  isinstance(answer, list):
-                        value=answer[0]['vector']
-                        node_types[i]='vector_g'
+                        try:
+                            zis.setv(d_node,np.array([0,0,0]))
+                            node_types[i]='vector_gs'
+                        except:
+                            value=answer[0]['vector']
+                            node_types[i]='vector_g'
                     else:
                         print("unknown type")
                 except:
@@ -371,14 +383,12 @@ class UHFQC(Instrument):
                 line=[d_node, node_types[i]]#, default_values[i]]
                 print(line)
                 d_node_pars.append(line)
-        f = open(self._s_file_name, 'w')
-        json.dump(s_node_pars, f,default=int)
-        f.close()
+                #json.dump(line, d_file, indent=2, default=int)    
 
-        f = open(self._d_file_name, 'w')
-        json.dump(d_node_pars, f, default=int)
-        f.close()
-
+        json.dump(s_node_pars, s_file, default=int, indent=2)  
+        json.dump(d_node_pars, d_file, default=int, indent=2)  
+        s_file.close()
+        d_file.close()
 
     def prepare_SSB_weight_and_rotation(self, IF):
         trace_length = 4096
