@@ -72,12 +72,13 @@ class QuTech_AWG_Module(SCPI):
             self.add_parameter('ch_pair{}_transform_matrix'.format(ch_pair),
                                label=('Transformation matrix channel' +
                                       'pair {}'.format(i)),
-                               get_cmd=mat_cmd + '?',
+                               # get_cmd=mat_cmd + '?',
+                               get_cmd=self._gen_ch_get_func(
+                                    self._getMatrix, ch_pair),
                                set_cmd=self._gen_ch_set_func(
                                     self._setMatrix, ch_pair),
                                # NB range is not a hardware limit
-                               vals=vals.Arrays(-2, 2, shape=(2, 2)),
-                               get_parser=np.array)
+                               vals=vals.Arrays(-2, 2, shape=(2, 2)))
 
         for i in range(1, self.device_descriptor.numTriggers+1):
             triglev_cmd = 'qutech:trigger{}:level'.format(i)
@@ -142,11 +143,32 @@ class QuTech_AWG_Module(SCPI):
                                    set_cmd=cw_cmd+' "{:s}"',
                                    vals=vals.Strings())
 
+
+        # Waveform parameters
+        self.add_parameter('WlistSize',
+                           label='Waveform list size',
+                           units='#',
+                           get_cmd='wlist:size?',
+                           get_parser=int)
+        self.add_parameter('Wlist',
+                           label='Waveform list',
+                           get_cmd=self._getWlist)
+
+        # This command is added manually
+        # self.add_function('deleteWaveform'
+        self.add_function('deleteWaveformAll',
+                          call_cmd='wlist:waveform:delete all')
+
         doc_sSG = "Synchronize both sideband frequency" \
             + " generators, i.e. restart them with their defined phases."
         self.add_function('syncSidebandGenerators',
                           call_cmd='QUTEch:OUTPut:SYNCsideband',
                           docstring=doc_sSG)
+        # command is run but using start and stop because
+        self.add_function('start',
+                          call_cmd='awgcontrol:run:immediate')
+        self.add_function('stop',
+                          call_cmd='awgcontrol:stop:immediate')
 
     def _setMatrix(self, chPair, mat):
         '''
@@ -156,9 +178,18 @@ class QuTech_AWG_Module(SCPI):
             matrix(np.matrix): 2x2 matrix for mixer calibration
         '''
         # function used internally for the parameters because of formatting
-        print(chPair, mat)
         self.write('qutech:output{:d}:matrix {:f},{:f},{:f},{:f}'.format(
                    chPair, mat[0, 0], mat[1, 0], mat[0, 1], mat[1, 1]))
+
+    def _getMatrix(self, chPair):
+        # function used internally for the parameters because of formatting
+        mstring = self.ask('qutech:output{}:matrix?'.format(chPair))
+        M = np.zeros(4)
+        for i, x in enumerate(mstring.split(',')):
+            M[i] = x
+        M = M.reshape(2, 2)
+        return(M)
+
 
     ##########################################################################
     # AWG5014 functions: SEQUENCE
@@ -180,24 +211,24 @@ class QuTech_AWG_Module(SCPI):
     ##########################################################################
     # AWG5014 functions: WLIST (Waveform list)
     ##########################################################################
-    def getWlistSize(self):
-        return self.ask_int('wlist:size?')
+    # def getWlistSize(self):
+    #     return self.ask_int('wlist:size?')
 
-    def getWlistName(self, idx):
+    def _getWlistName(self, idx):
         '''
         Args:
             idx(int): 0..size-1
         '''
         return self.ask('wlist:name? %d' % idx)
 
-    def getWlist(self):
+    def _getWlist(self):
         '''
         NB: takes a few seconds on 5014: our fault or Tek's?
         '''
-        size = self.getWlistSize()
+        size = self.WlistSize()
         wlist = []                                  # empty list
         for k in range(size):                       # build list of names
-            wlist.append(self.getWlistName(k))
+            wlist.append(self._getWlistName(k+1))
         return wlist
 
     def deleteWaveform(self, name):
@@ -205,15 +236,8 @@ class QuTech_AWG_Module(SCPI):
         Args:
             name (string):  waveform name excluding double quotes, e.g.
             'test'
-
-        Compatibility:  5014, QWG
         '''
         self.write('wlist:waveform:delete "%s"' % name)
-
-    def deleteWaveformAll(self):
-        ''' Compatibility:  5014, QWG
-        '''
-        self.write('wlist:waveform:delete all')
 
     def getWaveformType(self, name):
         '''
@@ -358,15 +382,13 @@ class QuTech_AWG_Module(SCPI):
         # NB: we only  support default Mass Storage Unit Specifier "Main",
         # which is the internal harddisk
 
-    # Tek_AWG functions: Button interface
-    def run(self):
-        self.write('awgcontrol:run:immediate')
-
-    def stop(self):
-        self.write('awgcontrol:stop:immediate')
-
     # Used for setting the channel pairs
     def _gen_ch_set_func(self, fun, ch):
         def set_func(val):
             return fun(ch, val)
         return set_func
+    def _gen_ch_get_func(self, fun, ch):
+        def get_func():
+            return fun(ch)
+        return get_func
+

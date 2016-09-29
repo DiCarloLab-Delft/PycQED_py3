@@ -58,7 +58,7 @@ class QWG_tests(unittest.TestCase):
             mx = 100
         v = (np.zeros(shape)+mn)+(mx-mn)/2
         par.set(v)
-        self.assertEqual(v, par.get(), msg=par.name)
+        np.testing.assert_array_equal(v, par.get(), err_msg=par.name)
         with self.assertRaises(ValueError, msg=par.name):
             par.set(v+(mx-mn))
         with self.assertRaises(ValueError, msg=par.name):
@@ -122,26 +122,14 @@ class QWG_tests(unittest.TestCase):
 
     def test_parameters(self):
         for parname, par in sorted(self.qwg.parameters.items()):
+            # no more failing pars! still here so I can re add if needed
             failing_pars = []
-            #for i in range(16):
-                #failing_pars.append('ch{}_amp'.format(i))
-                #failing_pars.append('ch{}_offset'.format(i))
-                #failing_pars.append('tr{}_trigger_level'.format(i))
-
-                # Sideband phase always returns 0 when get
-                #failing_pars.append('ch_pair{}_sideband_phase'.format(i))
-                # transformation matrix get returns garbage
-                #failing_pars.append('ch_pair{}_transform_matrix'.format(i))
-
-            # Error messages:  -113,"Undefined header;AWGC:RMOD?"
-            #failing_pars.append('run_mode')
-
             if par.name not in ['IDN'] and par.name not in failing_pars:
-                # print('parname:', par.name)
                 old_value = par.get()
                 old_value2 = par.get()
-                self.assertEqual(old_value2, old_value, msg=par.name)
-                if hasattr(par, '_vals'):
+                np.testing.assert_equal(old_value2, old_value,
+                                        err_msg=par.name)
+                if hasattr(par, '_vals') and par.has_set:
                     validator = par._vals
                     if isinstance(validator, vals.Ints):
                         self.integer_get_set(par)
@@ -195,12 +183,12 @@ marker2 = []
 
 
 # if 1:
-qwg1 = QuTech_AWG_Module('QWG-1', '192.168.42.10', 5025, server_name=None)
+# qwg1 = QuTech_AWG_Module('QWG-1', '192.168.42.10', 5025, server_name=None)
 # else:
 #     # local variant, in combination with 'nc -l 5025' run locally from a
 #     # terminal
 #     qwg1 = QuTech_AWG_Module('QWG-1', '127.0.0.1', 5025, server_name=None)
-#qwg1 = QWG
+qwg1 = QWG
 qwg1.reset()
 
 if __name__ == '__main__':
@@ -306,12 +294,12 @@ if __name__ == '__main__':
     qwg1.ch3_state.set(True)
     qwg1.ch4_state.set(True)
 
-    qwg1.run()
+    qwg1.start()
 
-    wlistSize = qwg1.getWlistSize()
+    wlistSize = qwg1.WlistSize()
     print('WLIST size: ', wlistSize)
-    for i in range(wlistSize):
-        print('wlist: ', qwg1.getWlistName(i+1))
+    print('WLIST: ', qwg1.Wlist())
+
 
     wvSin_rd = qwg1.getWaveformData('sin')
 
