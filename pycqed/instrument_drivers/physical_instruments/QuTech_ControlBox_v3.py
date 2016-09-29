@@ -64,11 +64,15 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
 
     def run_test_suite(self):
             from importlib import reload  # Useful for testing
+
+            from ._controlbox import test_suite as test_suite_v2
             from ._controlbox import test_suite_v3 as test_suite
             reload(test_suite)
+            reload(test_suite_v2)
+            test_suite_v2.CBox = self
             # pass the CBox to the module so it can be used in the tests
-            self.c = c  # make the codec callable from the testsuite
-            test_suite.CBox = self
+            self.c = c
+            # make the codec callable from the testsuite
             suite = unittest.TestLoader().loadTestsFromTestCase(
                 test_suite.CBox_tests_v3)
             unittest.TextTestRunner(verbosity=2).run(suite)
@@ -99,7 +103,7 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
         self._acquisition_mode = defHeaders.acquisition_modes[acquisition_mode_int]
         self._core_state = defHeaders.core_states[core_state_int]
         self._trigger_source = defHeaders.trigger_sources[trigger_source_int]
-        
+
         self._adc_offset = (v_list[6] << 4) + v_list[7]
         self._signal_delay = (v_list[8] << 4) + v_list[9]
         self._integration_length = (v_list[10] << 7) + v_list[11]
@@ -177,11 +181,11 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
 
     def _do_set_trigger_source(self, trigger_source):
         if not isinstance(trigger_source, str):
-            raise KeyError('trigger_source %s not recognized.' 
+            raise KeyError('trigger_source %s not recognized.'
                            'It should be a string: \'internal\','
                            ' \'external\' or \'mixed\'.')
 
-            
+
         if self.get('core_state') is not None:
             tmp_core_state = self.get('core_state')
         else:
@@ -291,7 +295,7 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
                            '\'integration streaming\'.')
 
         if not isinstance(trigger_source, str):
-            raise KeyError('trigger_source %s not recognized.' 
+            raise KeyError('trigger_source %s not recognized.'
                            'It should be a string: \'internal\','
                            ' \'external\' or \'mixed\'.')
 

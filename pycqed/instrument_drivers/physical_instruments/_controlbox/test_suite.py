@@ -14,6 +14,7 @@ class CBox_tests(unittest.TestCase):
     @classmethod
     def setUpClass(self):
         self.CBox = CBox
+        print('CBox: ', self.CBox)
 
     def test_firmware_version(self):
         v = CBox.get('firmware_version')
