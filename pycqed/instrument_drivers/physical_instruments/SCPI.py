@@ -34,9 +34,13 @@ class SCPI(IPInstrument):
         """
         Overwrites base IP recv command to ensuring read till EOM
         """
+        return self._socket.makefile().readline().rstrip()
+    ###
+    # Helpers
+    ###
 
-        resp = self._socket.makefile().readline().rstrip()
-        return resp
+    def readBinary(self, size):
+        return self._socket.recv(size)
 
     def ask_float(self, str):
         return float(self.ask(str))
@@ -131,13 +135,12 @@ class SCPI(IPInstrument):
         '''
         # get and decode header
         headerA = self.readBinary(2)                        # consume '#N'
-        # FIXME: Matlab code
-        digitCnt = str2double(char(headerA(2)))
-        headerB = obj.readBinary(digitCnt)
-        byteCnt = str2double(char(headerB))
+        digitCnt = int(str(headerA[1]))
+        headerB = self.readBinary(digitCnt)
+        byteCnt = int(headerB.decode())
 
         # get binblock
-        binBlock = obj.readBinary(byteCnt)
+        binBlock = self.readBinary(byteCnt)
         self.readBinary(2)                                  # consume <CR><LF>
         return binBlock
 

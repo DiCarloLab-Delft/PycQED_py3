@@ -313,6 +313,8 @@ if __name__ == '__main__':
     for i in range(wlistSize):
         print('wlist: ', qwg1.getWlistName(i+1))
 
+    wvSin_rd = qwg1.getWaveformData('sin')
+
     print('Identity: ', qwg1.getIdentity())
     print('Error messages: ')
     for i in range(qwg1.getSystemErrorCount()):
