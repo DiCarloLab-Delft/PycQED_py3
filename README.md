@@ -27,7 +27,9 @@ If you have a question or want to discuss something, feel free to send an email 
 
 ## Installation
 
-To use PycQED, clone this repository and add the directory to your path (no pip-install yet) and make sure you have a working python3 environment with the required dependencies. For more details see the [installation instructions](docs/install.md).
+To use PycQED, clone this repository and add the directory to your path (no pip-install yet) and make sure you have a working python3 environment with the required dependencies.
+Go to the directory where you cloned the repository (in the shell) and run `python setup.py develop`.
+For more details see the [installation instructions](docs/install.md).
 
 ## Usage
 
