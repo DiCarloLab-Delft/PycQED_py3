@@ -19,7 +19,7 @@ def T1(qubit_name, times, clock_cycle=5e-9):
         qasm_file.writelines('\ninit {}  \n'.format(qubit_name))
         qasm_file.writelines('X {}     # exciting pi pulse\n'.format(
                              qubit_name))
-        qasm_file.writelines('I {} {} \n'.format(qubit_name, cl))
+        qasm_file.writelines('I {} {:d} \n'.format(qubit_name, int(cl)))
         qasm_file.writelines('RO {}  \n'.format(qubit_name))
     qasm_file.close()
     return qasm_file

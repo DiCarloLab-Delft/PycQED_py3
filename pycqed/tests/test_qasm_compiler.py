@@ -36,4 +36,5 @@ class Test_single_qubit_seqs(TestCase):
 
     @classmethod
     def tearDownClass(self):
-        self.qubit.close()
+        pass
+        # self.qubit.close()
