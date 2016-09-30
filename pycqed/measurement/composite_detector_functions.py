@@ -1,10 +1,10 @@
 import numpy as np
 import time
-from measurement import sweep_functions as swf
-from measurement import awg_sweep_functions as awg_swf
-from measurement import CBox_sweep_functions as CB_swf
-from measurement import detector_functions as det
-from analysis import measurement_analysis as ma
+from pycqed.measurement import sweep_functions as swf
+from pycqed.measurement import awg_sweep_functions as awg_swf
+from pycqed.measurement import CBox_sweep_functions as CB_swf
+from pycqed.measurement import detector_functions as det
+from pycqed.analysis import measurement_analysis as ma
 import imp
 imp.reload(awg_swf)
 
@@ -30,7 +30,7 @@ class Qubit_Characterization_Detector(det.Soft_Detector):
                  **kw):
         # import placed here to prevent circular import statement
         #   as some cal_tools use composite detectors.
-        from measurement import calibration_toolbox as cal_tools
+        from pycqed.measurement import calibration_toolbox as cal_tools
         imp.reload(cal_tools)
         self.cal_tools = cal_tools
         self.detector_control = 'soft'
@@ -1815,7 +1815,7 @@ class Qubit_Spectroscopy(det.Soft_Detector):
 
         # # import placed here to prevent circular import statement
         # #   as some cal_tools use composite detectors.
-        from measurement import calibration_toolbox as cal_tools
+        from pycqed.measurement import calibration_toolbox as cal_tools
         imp.reload(cal_tools)
         self.cal_tools = cal_tools
         self.qubit = qubit
@@ -2000,7 +2000,7 @@ class Tracked_Qubit_Spectroscopy(det.Soft_Detector):
 
         # import placed here to prevent circular import statement
         #   as some cal_tools use composite detectors.
-        from measurement import calibration_toolbox \
+        from pycqed.measurement import calibration_toolbox \
             as cal_tools
         self.cal_tools = cal_tools
         self.qubit = qubit
@@ -2251,7 +2251,7 @@ class Tracked_Qubit_Spectroscopy(det.Soft_Detector):
 #                  pulse_amp_guess=0.7,
 #                  AWG_name='AWG',
 #                  **kw):
-#         from measurement import calibration_toolbox as cal_tools
+#         from pycqed.measurement import calibration_toolbox as cal_tools
 #         imp.reload(cal_tools)
 #         self.detector_control = 'soft'
 #         self.name = 'T1_Detector'

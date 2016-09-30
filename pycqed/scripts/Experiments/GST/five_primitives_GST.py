@@ -1,6 +1,6 @@
 import qcodes as qc
-from measurement import sweep_functions as swf
-from measurement import detector_functions as det
+from pycqed.measurement import sweep_functions as swf
+from pycqed.measurement import detector_functions as det
 import measurement.pulse_sequences.gate_set_tomography as gsts
 reload(gsts)
 gsts.station = station
