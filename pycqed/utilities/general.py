@@ -2,9 +2,13 @@ import os
 # import qt
 import h5py
 from pycqed.analysis import analysis_toolbox as a_tools
+import errno
 
 import sys
 import glob
+from os.path import join, dirname, exists
+from os import makedirs
+
 
 
 def get_git_revision_hash():
@@ -37,6 +41,16 @@ def bool_to_int_str(b):
     else:
         return '0'
 
+
+def mopen(filename, mode='w'):
+    if not exists(dirname(filename)):
+        try:
+            makedirs(dirname(filename))
+        except OSError as exc:  # Guard against race condition
+            if exc.errno != errno.EEXIST:
+                raise
+    file = open(filename, mode='w')
+    return file
 
 
 def dict_to_ordered_tuples(dic):

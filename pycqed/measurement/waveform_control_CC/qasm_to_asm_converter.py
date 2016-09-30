@@ -1,3 +1,4 @@
+from pycqed.utilities.general import mopen
 from os.path import join, dirname, basename, splitext
 base_asm_path = join(dirname(__file__), 'micro_instruction_files')
 
@@ -22,7 +23,7 @@ ending = 'beq r14, r14, Exp_Start       # Infinite loop'
 def qasm_to_asm(qasm_filepath):
     filename = splitext(basename(qasm_filepath))[0]
     asm_filepath = join(base_asm_path, filename+'.asm')
-    asm_file = open(asm_filepath, mode='w')
+    asm_file = mopen(asm_filepath, mode='w')
     asm_file.writelines(preamble)
 
     with open(qasm_filepath) as qasm_file:
