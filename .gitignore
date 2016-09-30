@@ -107,3 +107,9 @@ $RECYCLE.BIN/
 
 # Windows shortcuts
 *.lnk
+
+
+# Pycqed specific files
+# ======================
+*.qasm   # code generated qasm files
+*.asm    # micro instruction assembly files
