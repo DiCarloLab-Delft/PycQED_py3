@@ -4,7 +4,7 @@ instantiating any instruments.
 '''
 
 import unittest
-from . import clifford_tests as clt
+from . import test_cliffords as clt
 from importlib import reload
 reload(clt)
 

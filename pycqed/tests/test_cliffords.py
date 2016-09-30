@@ -4,7 +4,7 @@ from unittest import TestCase
 from pycqed.measurement.randomized_benchmarking.clifford_group import(
     clifford_lookuptable, Clifford_group)
 
-import measurement.randomized_benchmarking.randomized_benchmarking \
+import pycqed.measurement.randomized_benchmarking.randomized_benchmarking \
     as rb
 
 from pycqed.measurement.randomized_benchmarking.clifford_decompositions \
