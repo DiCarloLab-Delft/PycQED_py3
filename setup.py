@@ -27,7 +27,7 @@ def readme():
 
 
 def license():
-    with open('license.md') as f:
+    with open('LICENSE.md') as f:
         return f.read()
 
 setup(name='PycQED',
@@ -59,7 +59,7 @@ setup(name='PycQED',
           'IPython>=4.0',
           'ipywidgets>=4.1',
           'lmfit>=0.9.5',
-          'qcodes>=0.1.0',
+          # 'qcodes>=0.1.0', # commented out for travis testing
           'scipy>=0.17',
           'h5py>=2.6',
       ],

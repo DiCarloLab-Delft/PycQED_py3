@@ -22,12 +22,15 @@ from .tools.data_manipulation import *
 from .tools.plotting import *
 
 try:
-    datadir = qc_config['datadir'] #currently not recognized, does not do anything
+    datadir = qc_config['datadir']  # currently not recognized, does not do anything
     print('Data directory set to:', datadir)
 except:
     mac = get_mac()
-    setup_name = setup_dict.mac_dict[str(mac)]
-    datadir = setup_dict.data_dir_dict[setup_name]
+    try:
+        setup_name = setup_dict.mac_dict[str(mac)]
+        datadir = setup_dict.data_dir_dict[setup_name]
+    except:
+        datadir = None
     print('Data directory set to:', datadir)
 
 ######################################################################
