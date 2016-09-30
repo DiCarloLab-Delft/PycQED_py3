@@ -2,7 +2,7 @@
 import sys
 
 
-def test_core(verbosity=1, failfast=False):
+def test_core(verbosity=1, failfast=False, test_pattern='test*.py'):
     """
     Run the pycqed core tests.
 
@@ -11,11 +11,13 @@ def test_core(verbosity=1, failfast=False):
             Default 1.
         failfast (bool, optional): If true, stops running on first failure
             Default False.
+        test_pattern (str): the pattern used to detect test files.
 
     Coverage testing is only available from the command line
     """
 
-    _test_core(verbosity=verbosity, failfast=failfast)
+    _test_core(verbosity=verbosity, failfast=failfast,
+               test_pattern=test_pattern)
 
 
 def _test_core(test_pattern='test*.py', **kwargs):

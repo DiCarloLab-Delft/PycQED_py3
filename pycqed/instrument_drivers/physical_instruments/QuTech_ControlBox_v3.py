@@ -367,7 +367,7 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
 
         return (stat, message)
 
-    def load_instructions(self, asm_file, PrintHex=False):
+    def load_instructions(self, asm_filename, PrintHex=False):
         '''
         set the weights of the integregration
 
@@ -375,7 +375,7 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
         @return stat : 0 if the upload succeeded and 1 if the upload failed.
         '''
 
-        asm = Assembler.Assembler(asm_file)
+        asm = Assembler.Assembler(asm_filename)
 
         instructions = asm.convert_to_instructions()
 

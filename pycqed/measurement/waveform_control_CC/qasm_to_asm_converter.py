@@ -1,3 +1,7 @@
+from os.path import join, dirname, basename, splitext
+base_asm_path = join(dirname(__file__), 'micro_instruction_files')
+
+
 commands = ['qubit', 'init', 'X', 'I', 'RO']
 
 op_dict = {'init': 'WaitReg r0 \n',
@@ -15,7 +19,9 @@ preamble = ('mov r0, 20000   # r0 stores the cycle time , 100 us \n' +
 ending = 'beq r14, r14, Exp_Start       # Infinite loop'
 
 
-def qasm_to_asm(qasm_filepath, asm_filepath):
+def qasm_to_asm(qasm_filepath):
+    filename = splitext(basename(qasm_filepath))[0]
+    asm_filepath = join(base_asm_path, filename+'.asm')
     asm_file = open(asm_filepath, mode='w')
     asm_file.writelines(preamble)
 
@@ -42,3 +48,4 @@ def qasm_to_asm(qasm_filepath, asm_filepath):
                 print(line)
     asm_file.writelines(ending)
     asm_file.close()
+    return asm_file
