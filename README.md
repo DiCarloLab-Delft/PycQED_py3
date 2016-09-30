@@ -28,8 +28,16 @@ If you have a question or want to discuss something, feel free to send an email 
 ## Installation
 
 To use PycQED, clone this repository and add the directory to your path (no pip-install yet) and make sure you have a working python3 environment with the required dependencies.
-Go to the directory where you cloned the repository (in the shell) and run `python setup.py develop`.
+Go to the directory where you cloned the repository (in the shell) and run
+* `python setup.py develop`.
 For more details see the [installation instructions](docs/install.md).
+
+Test your installation using
+* `python pycqed/test.py`
+
+Or run a specific test using e.g.
+* `python pycqed/test.py -t test_cliffords.py`
+
 
 ## Usage
 
@@ -42,10 +50,7 @@ For more details see the [installation instructions](docs/install.md).
 ```python
 import sys
 import qcodes as qc
-if PyCQEDpath not in sys.path:
-    sys.path.append(PyCQEDpath)
-
-# import as * puts all the imports and objects of the init in the global namespace
+import pycqed as pq
 from init.your_initscript import *
 ```
 
@@ -59,13 +64,12 @@ Mind however that the code is continuously under development so if you think som
 ### Folder Structure
 + [docs](docs/)
 + [init](init/)
-+ [modules](modules/)
-  + [analysis](modules/analysis/)
-  + [measurement](modules/measurement/)
-  + [utilities](modules/utilities/)
++ [analysis](analysis/)
++ [measurement](measurement/)
++ [utilities](utilities/)
++ [instrument_drivers](instrument_drivers/)
 + [scripts](scripts/)
     + [testing](scripts/testing/)
-    + [playground](scripts/playground/)
     + [personal_folders](scripts/personal_folders/)
 
 
