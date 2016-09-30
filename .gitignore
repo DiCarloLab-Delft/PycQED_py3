@@ -111,5 +111,8 @@ $RECYCLE.BIN/
 
 # Pycqed specific files
 # ======================
-*.qasm   # code generated qasm files
-*.asm    # micro instruction assembly files
+
+# code generated qasm files
+*.qasm
+# micro instruction assembly files
+*.asm
