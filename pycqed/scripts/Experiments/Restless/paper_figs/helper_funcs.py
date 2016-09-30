@@ -1,6 +1,6 @@
-from analysis import measurement_analysis as ma
-from analysis import analysis_toolbox as a_tools
-from analysis import fitting_models as fit_mods
+from pycqed.analysis import measurement_analysis as ma
+from pycqed.analysis import analysis_toolbox as a_tools
+from pycqed.analysis import fitting_models as fit_mods
 import matplotlib.pyplot as plt
 import time
 

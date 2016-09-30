@@ -3,7 +3,7 @@ import os
 import sys
 import numpy as np
 from matplotlib import pyplot as plt
-from utilities import general as gen
+from pycqed.utilities import general as gen
 # plt.ion()
 sys.path.append(os.path.join(qt.config['PycQEDdir'],
                 'instrument_drivers/meta_instruments/PyLabVIEW'))
@@ -16,7 +16,7 @@ import fitting_models as fit_mods
 import sweep_functions as swf
 import AWG_sweep_functions as awg_swf
 import detector_functions as det
-from measurement import CBox_sweep_functions as CB_swf
+from pycqed.measurement import CBox_sweep_functions as CB_swf
 import composite_detector_functions as cdet
 import calibration_toolbox as cal_tools
 

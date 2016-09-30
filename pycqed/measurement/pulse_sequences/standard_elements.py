@@ -11,7 +11,7 @@ from ..waveform_control import pulse
 from ..waveform_control.pulse_library import MW_IQmod_pulse, SSB_DRAG_pulse, \
     Mux_DRAG_pulse
 from ..waveform_control.pulse import CosPulse, SquarePulse
-from measurement.randomized_benchmarking import randomized_benchmarking as rb
+from pycqed.measurement.randomized_benchmarking import randomized_benchmarking as rb
 
 from importlib import reload
 reload(pulse)

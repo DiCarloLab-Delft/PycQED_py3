@@ -1,7 +1,7 @@
 import os
 # import qt
 import h5py
-from analysis import analysis_toolbox as a_tools
+from pycqed.analysis import analysis_toolbox as a_tools
 
 import sys
 import glob

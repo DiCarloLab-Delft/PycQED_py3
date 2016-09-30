@@ -1,9 +1,9 @@
 import qt
 import numpy as np
 import time
-from measurement.waveform_control import pulsar
-from measurement.waveform_control import pulse
-from measurement.waveform_control import element
+from pycqed.measurement.waveform_control import pulsar
+from pycqed.measurement.waveform_control import pulse
+from pycqed.measurement.waveform_control import element
 import pprint
 import imp
 

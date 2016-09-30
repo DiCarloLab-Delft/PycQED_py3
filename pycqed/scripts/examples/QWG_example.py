@@ -3,7 +3,7 @@
 import unittest
 from instrument_drivers.physical_instruments.QuTech_AWG_Module \
     import QuTech_AWG_Module
-from measurement.waveform_control_CC.waveform import Waveform
+from pycqed.measurement.waveform_control_CC.waveform import Waveform
 import time
 import numpy as np
 from socket import timeout

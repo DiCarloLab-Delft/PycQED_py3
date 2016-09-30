@@ -1,7 +1,7 @@
 import numpy as np
 import time
-from measurement import detector_functions as det
-from analysis import measurement_analysis as ma
+from pycqed.measurement import detector_functions as det
+from pycqed.analysis import measurement_analysis as ma
 
 station = station
 PyCQEDpath = PyCQEDpath

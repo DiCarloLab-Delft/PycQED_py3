@@ -40,14 +40,14 @@ class QuTech_ControlBox(VisaInstrument):
         self.init_params()
 
         self.set('measurement_timeout', kw.pop('measurement_timeout', 120))
-        
+
         t1 = time.time()
         print('Initialized CBox', self.get('firmware_version'),
               'in %.2fs' % (t1-t0))
 
     def add_params(self):
         self._i_wait = 0  # used in _print_waiting_char()
-        
+
         # once the demodulation_mode can be get from the FPGA, this
         # line setting _demodulation_mode should be removed.
         self._demodulation_mode = 'double'
@@ -118,7 +118,7 @@ class QuTech_ControlBox(VisaInstrument):
                            get_cmd=self._do_get_nr_averages,
                            set_cmd=self._do_set_nr_averages,
                            vals=vals.Ints(1, 2**17))
-        
+
         nr_awgs = 3
         self._dac_offsets = np.empty([3, 2])
         self._dac_offsets[:] = np.NAN
@@ -206,6 +206,12 @@ class QuTech_ControlBox(VisaInstrument):
     def _do_get_measurement_timeout(self):
         return self._timeout
 
+    def get_idn(self):
+        IDN_dict = {'firmware': self.firmware_version(),
+                    'model': 'CBox',
+                    'serial': None,
+                    'vendor': 'QuTech'}
+        return IDN_dict
 
     def _do_get_firmware_version(self):
         message = c.create_message(defHeaders.ReadVersion)
