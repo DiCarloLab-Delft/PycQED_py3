@@ -304,8 +304,8 @@ class UHFQC(Instrument):
         patterns = ["awgs", "sigins", "sigouts", "quex", "dios","system/extclk"] #["quex/iavg", "quex/wint"]
         s_file = open(self._s_file_name, 'w')
         d_file = open(self._d_file_name, 'w')
-        #json.dump([, s_file, default=int)  
-        #json.dump([, d_file, default=int) 
+        #json.dump([, s_file, default=int)
+        #json.dump([, d_file, default=int)
         for pattern in patterns:
             print("extracting parameters of type", pattern)
             all_nodes = set(self.find('*{}*'.format(pattern)))
@@ -355,14 +355,14 @@ class UHFQC(Instrument):
                 print(line)
                 s_node_pars.append(line)
                 #json.dump(line, s_file, indent=2, default=int)
-            
+
 
             #extracting info from the data nodes
             d_nodes = list(d_nodes)
             #default_values=self.getd(d_nodes, True)
             default_values=np.zeros(len(d_nodes))
             node_types = ['']*len(d_nodes)
-            
+
             for i, d_node in enumerate(d_nodes):
                 try:
                     answer=zis.getv(d_node)
@@ -383,10 +383,10 @@ class UHFQC(Instrument):
                 line=[d_node, node_types[i]]#, default_values[i]]
                 print(line)
                 d_node_pars.append(line)
-                #json.dump(line, d_file, indent=2, default=int)    
+                #json.dump(line, d_file, indent=2, default=int)
 
-        json.dump(s_node_pars, s_file, default=int, indent=2)  
-        json.dump(d_node_pars, d_file, default=int, indent=2)  
+        json.dump(s_node_pars, s_file, default=int, indent=2)
+        json.dump(d_node_pars, d_file, default=int, indent=2)
         s_file.close()
         d_file.close()
 
@@ -417,6 +417,38 @@ class UHFQC(Instrument):
         self.quex_rot_0_imag(0.0)
         self.quex_rot_1_real(1.0)
         self.quex_rot_1_imag(0.0)
+
+
+    # def render_weights(self, wave_name, show=True, time_units='lut_index',
+    #             reload_pulses=True):
+    #     if reload_pulses:
+    #         self.generate_standard_pulses()
+    #     fig, ax = plt.subplots(1, 1)
+    #     if time_units == 'lut_index':
+    #         x = np.arange(len(self._wave_dict[wave_name][0]))
+    #         ax.set_xlabel('Lookuptable index (i)')
+    #         ax.vlines(128, self._voltage_min, self._voltage_max, linestyle='--')
+    #     elif time_units == 's':
+    #         x = (np.arange(len(self._wave_dict[wave_name][0]))
+    #              / self.sampling_rate.get())
+    #         ax.set_xlabel('time (s)')
+    #         ax.vlines(128 / self.sampling_rate.get(),
+    #                   self._voltage_min, self._voltage_max, linestyle='--')
+
+    #     ax.plot(x, self._wave_dict[wave_name][0],
+    #             marker='o', label=wave_name+' chI')
+    #     ax.plot(x, self._wave_dict[wave_name][1],
+    #             marker='o', label=wave_name+' chQ')
+    #     ax.set_ylabel('Amplitude (V)')
+    #     ax.set_axis_bgcolor('gray')
+    #     ax.axhspan(self._voltage_min, self._voltage_max, facecolor='w',
+    #                linewidth=0)
+    #     ax.legend()
+    #     ax.set_ylim(self._voltage_min*1.1, self._voltage_max*1.1)
+    #     ax.set_xlim(0, x[-1])
+    #     if show:
+    #         plt.show()
+    #     return fig, ax
 
     # def setd(self, path, value):
     #     # Handle absolute path

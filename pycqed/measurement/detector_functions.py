@@ -390,7 +390,7 @@ class Signal_Hound_Spectrum_Track(Hard_Detector):
 
 # Detectors for QuTech Control box modes
 class CBox_input_average_detector(Hard_Detector):
-    def __init__(self, CBox, AWG, nr_samples=512,**kw):
+    def __init__(self, CBox, AWG, nr_averages=1024, nr_samples=512,**kw):
         super(CBox_input_average_detector, self).__init__()
         self.CBox = CBox
         self.name = 'CBox_Streaming_data'
@@ -401,6 +401,7 @@ class CBox_input_average_detector(Hard_Detector):
         scale_factor_integration = 1./(64.*self.CBox.integration_length())
         self.factor = scale_factor_dacmV*scale_factor_integration
         self.nr_samples = nr_samples
+        self.nr_averages = nr_averages
 
     def get_values(self):
         if self.AWG is not None:
@@ -412,7 +413,8 @@ class CBox_input_average_detector(Hard_Detector):
         self.CBox.acquisition_mode(0)
         if self.AWG is not None:
             self.AWG.stop()
-        self.CBox.nr_samples(self.nr_samples)
+        self.CBox.nr_averages(int(self.nr_averages))
+        self.CBox.nr_samples(int(self.nr_samples))
         self.CBox.acquisition_mode('input averaging')
         print("cbox input detector prepared")
 
@@ -425,7 +427,7 @@ class CBox_input_average_detector(Hard_Detector):
 
 class CBox_integrated_average_detector(Hard_Detector):
     def __init__(self, CBox, AWG, seg_per_point=1, normalize=False, rotate=False,
-                 **kw):
+                nr_averages=1024, integration_length=1e-6, **kw):
         '''
         Integration average detector.
         Defaults to averaging data in a number of segments equal to the
@@ -450,6 +452,8 @@ class CBox_integrated_average_detector(Hard_Detector):
         self.rotate = rotate
         self.normalize = normalize
         self.cal_points = kw.get('cal_points', None)
+        self.nr_averages = nr_averages
+        self.integration_length = integration_length
 
     def get_values(self):
         succes = False
@@ -507,7 +511,8 @@ class CBox_integrated_average_detector(Hard_Detector):
         self.CBox.set('acquisition_mode', 'idle')
         self.CBox.set('acquisition_mode', 'integration averaging')
         self.AWG.start()  # Is needed here to ensure data aligns with seq elt
-
+        self.CBox.nr_averages(int(self.nr_averages))
+        self.CBox.integration_length(int(self.integration_length/(5e-9)))
     def finish(self):
         self.CBox.set('acquisition_mode', 'idle')
 
@@ -724,7 +729,7 @@ class CBox_single_int_avg_with_LutReload(CBox_single_integration_average_det):
 
 
 class CBox_integration_logging_det(Hard_Detector):
-    def __init__(self, CBox, AWG, LutMan=None, reload_pulses=False,
+    def __init__(self, CBox, AWG, integration_length=1e-6, LutMan=None, reload_pulses=False,
                  awg_nrs=None, **kw):
         '''
         If you want AWG reloading you should give a LutMan and specify
@@ -740,6 +745,7 @@ class CBox_integration_logging_det(Hard_Detector):
         self.LutMan = LutMan
         self.reload_pulses = reload_pulses
         self.awg_nrs = awg_nrs
+        self.integration_length = integration_length
 
     def get_values(self):
         exception_mode = True
@@ -772,6 +778,11 @@ class CBox_integration_logging_det(Hard_Detector):
 
         self.CBox.set('acquisition_mode', 0)
         return data
+
+    def prepare(self, sweep_points):
+        self.CBox.integration_length(int(self.integration_length/(5e-9)))
+
+
 
     def finish(self):
         self.CBox.set('acquisition_mode', 0)
@@ -1550,7 +1561,7 @@ class UHFQC_input_average_detector(Hard_Detector):
 
     Has two acq_modes, 'IQ' and 'AmpPhase'
     '''
-    def __init__(self, UHFQC, AWG, channels=[0,1], nr_samples=4096,**kw):
+    def __init__(self, UHFQC, AWG, channels=[0,1], nr_averages=1024, nr_samples=4096,**kw):
         super(UHFQC_input_average_detector, self).__init__()
         self.UHFQC = UHFQC
         self.name = 'UHFQC_Streaming_data'
@@ -1562,6 +1573,7 @@ class UHFQC_input_average_detector(Hard_Detector):
             self.value_units[i] = 'V'
         self.AWG = AWG
         self.nr_samples = nr_samples
+        self.nr_averages = nr_averages
 
 
     def get_values(self):
@@ -1582,6 +1594,7 @@ class UHFQC_input_average_detector(Hard_Detector):
         if self.AWG is not None:
             self.AWG.stop()
         self.UHFQC.quex_iavg_length(self.nr_samples)
+        self.UHFQC.quex_iavg_avgcnt(int(np.log2(self.nr_averages)))
 
     def finish(self):
         if self.AWG is not None:
@@ -1592,7 +1605,7 @@ class UHFQC_integrated_average_detector(Hard_Detector):
     Detector used for integrated average results with the UHFQC
 
     '''
-    def __init__(self, UHFQC, AWG, channels=[0, 1, 2, 3], seg_per_point=1,**kw):
+    def __init__(self, UHFQC, AWG, integration_length=1e-6, nr_averages=1024, channels=[0, 1, 2, 3], seg_per_point=1,**kw):
         super(UHFQC_integrated_average_detector, self).__init__()
         self.UHFQC = UHFQC
         self.name = 'UHFQC_integrated_average'
@@ -1606,7 +1619,8 @@ class UHFQC_integrated_average_detector(Hard_Detector):
                 self.value_names = ['I', 'Q']
                 self.value_units = ['V', 'V']
         self.AWG = AWG
-        self.seg_per_point = seg_per_point
+        self.nr_averages = nr_averages
+        self.integration_length = integration_length
 
     def get_values(self):
         self.UHFQC.awgs_0_single(1)
@@ -1628,10 +1642,11 @@ class UHFQC_integrated_average_detector(Hard_Detector):
             self.AWG.stop()
         self.UHFQC.quex_rl_source(2) #this sets the result to integration and rotation outcome
         self.UHFQC.quex_rl_length(len(sweep_points))
+        self.UHFQC.quex_rl_avgcnt(int(np.log2(self.nr_averages)))
+        self.UHFQC.quex_wint_length(int(self.integration_length*(1.8e9)))
         # Configure the result logger to not do any averaging
         # The AWG program uses userregs/0 to define the number o iterations in the loop
-        self.UHFQC.awgs_0_userregs_0(2**self.UHFQC.quex_rl_avgcnt()*len(sweep_points))
-        print("prepared for averaged int")
+        self.UHFQC.awgs_0_userregs_0(int(self.nr_averages*len(sweep_points)))
 
     def finish(self):
         if self.AWG is not None:
@@ -1642,7 +1657,8 @@ class UHFQC_integration_logging_det(Hard_Detector):
     Detector used for integrated average results with the UHFQC
 
     '''
-    def __init__(self, UHFQC, AWG, channels=[0, 1, 2, 3], seg_per_point=1,**kw):
+    def __init__(self, UHFQC, AWG, integration_length=1e-6,
+                 channels=[0, 1, 2, 3], **kw):
         super(UHFQC_integration_logging_det, self).__init__()
         self.UHFQC = UHFQC
         self.name = 'UHFQC_integration_logging_det'
@@ -1656,7 +1672,7 @@ class UHFQC_integration_logging_det(Hard_Detector):
                 self.value_names = ['I', 'Q']
                 self.value_units = ['V', 'V']
         self.AWG = AWG
-        self.seg_per_point = seg_per_point
+        self.integration_length = integration_length
 
     def get_values(self):
         self.UHFQC.awgs_0_single(1)
@@ -1665,6 +1681,7 @@ class UHFQC_integration_logging_det(Hard_Detector):
             self.AWG.start()
         while self.UHFQC.awgs_0_enable() == 1:
             time.sleep(0.1)
+        time.sleep(1)
         data = ['']*len(self.channels)
         for i, channel in enumerate(self.channels):
             dataset = eval("self.UHFQC.quex_rl_data_{}()".format(channel))
@@ -1675,7 +1692,7 @@ class UHFQC_integration_logging_det(Hard_Detector):
         if self.AWG is not None:
             self.AWG.stop()
         # The averaging-count is used to specify how many times the AWG program should run
-        LOG2_AVG_CNT = 10 #hardcoded to 1024 shots right now
+        LOG2_AVG_CNT = 12 #hardcoded to 4096 shots right now
 
         # This averaging count specifies how many measurements the result logger should average
         LOG2_RL_AVG_CNT = 0 # for single shot readout
@@ -1684,7 +1701,7 @@ class UHFQC_integration_logging_det(Hard_Detector):
         self.UHFQC.awgs_0_userregs_0(pow(2, LOG2_AVG_CNT)*pow(2, LOG2_RL_AVG_CNT))
         self.UHFQC.quex_rl_length(pow(2, LOG2_AVG_CNT)-1)
         self.UHFQC.quex_rl_avgcnt(LOG2_RL_AVG_CNT)
-
+        self.UHFQC.quex_wint_length(int(self.integration_length*(1.8e9)))
         self.UHFQC.quex_rl_source(2) #this sets the result to integration and rotation outcome
 
     def finish(self):

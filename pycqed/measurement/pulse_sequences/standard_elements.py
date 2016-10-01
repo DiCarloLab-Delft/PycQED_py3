@@ -47,14 +47,14 @@ def multi_pulse_elt(i, station, pulse_list):
         el = element.Element(
             name='{}-pulse-elt_{}'.format(len(pulse_list), i),
             pulsar=station.pulsar)
-        # exitst to ensure that channel is not high when waiting for trigger
-        last_pulse = el.add(pulse.SquarePulse(name='refpulse_0', channel='ch1',
-                                              amplitude=0, length=1e-9))
-        for i in range(3):  # Exist to ensure there are no empty channels
+        for i in range(4):  # Exist to ensure there are no empty channels
             el.add(pulse.SquarePulse(name='refpulse_0',
                                      channel='ch{}'.format(i+1),
                                      amplitude=0, length=1e-9))
-
+        # exists to ensure that channel is not high when waiting for trigger
+        last_pulse = el.add(pulse.SquarePulse(name='refpulse_0', channel='ch1',
+                                              amplitude=0, length=1e-9,),
+                            start=100e-9)
         for i, pulse_pars in enumerate(pulse_list):
             if pulse_pars['pulse_type'] == 'SSB_DRAG_pulse':
                 last_pulse = el.add(
@@ -99,11 +99,12 @@ def multi_pulse_elt(i, station, pulse_list):
                                     start=pulse_pars['pulse_delay'],
                                     refpulse=last_pulse, refpoint='start')
 
-            elif (pulse_pars['pulse_type'] == 'MW_IQmod_pulse' or
+            elif (pulse_pars['pulse_type'] == 'MW_IQmod_pulse_tek' or
+                  pulse_pars['pulse_type'] ==  'MW_IQmod_pulse_nontek' or
                   pulse_pars['pulse_type'] == 'Gated_MW_RO_pulse'):
                 # Does more than just call the function as it also adds the
                 # markers. Ideally we combine both in one function in pulselib
-                if pulse_pars['pulse_type'] == 'MW_IQmod_pulse':
+                if pulse_pars['pulse_type'] == 'MW_IQmod_pulse_tek':
                     last_pulse = el.add(MW_IQmod_pulse(
                             name='RO_tone',
                             I_channel=pulse_pars['I_channel'],
@@ -114,7 +115,7 @@ def multi_pulse_elt(i, station, pulse_list):
                         start=pulse_pars['pulse_delay'],
                         refpulse=last_pulse, refpoint='start',
                         fixed_point_freq=pulse_pars['fixed_point_frequency'])
-                else:
+                elif pulse_pars['pulse_type'] == 'Gated_MW_RO_pulse':
                     last_pulse=el.add(pulse.SquarePulse(
                             name='RO_marker', amplitude=1,
                             length=pulse_pars['length'],
@@ -122,6 +123,9 @@ def multi_pulse_elt(i, station, pulse_list):
                         start=pulse_pars['pulse_delay'], refpulse=last_pulse,
                         refpoint='start',
                         fixed_point_freq=pulse_pars['fixed_point_frequency'])
+                elif pulse_pars['pulse_type'] == 'MW_IQmod_pulse_nontek':
+                    #"nothing to add in this case
+                    pass
                 # Start Acquisition marker
                 if type(pulse_pars['acq_marker_channel']) is str:
                     channels = pulse_pars['acq_marker_channel']
