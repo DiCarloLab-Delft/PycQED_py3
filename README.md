@@ -1,4 +1,4 @@
-# PycQED
+# PycQED [![Build Status](https://travis-ci.org/DiCarloLab-Delft/PycQED_py3.svg?branch=master)](https://travis-ci.org/DiCarloLab-Delft/PycQED_py3)
 
 A python based measurement environment for circuit-QED experiments by the [DiCarlo group](http://dicarlolab.tudelft.nl/) at [QuTech](http://qutech.nl/), Delft University of Technology.
 This module is build on top of qcodes and is not intended as a stand-alone package.
