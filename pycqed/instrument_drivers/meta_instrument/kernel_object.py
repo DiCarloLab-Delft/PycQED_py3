@@ -119,3 +119,7 @@ class Distortion(Instrument):
         else:
             return self.convolve_kernel(kernel_list,
                                         length=self.corrections_length())
+
+    def save_corrections_kernel(self,filename,kernel_list_before=None):
+      save_kernel(self.get_corrections_kernel(kernel_list_before), save_file=filename)
+      return filename
