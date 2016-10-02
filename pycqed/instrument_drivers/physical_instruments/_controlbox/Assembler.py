@@ -1,5 +1,6 @@
 ﻿import string
 from sys import exit
+import logging
 
 
 def is_number(s):
@@ -335,7 +336,7 @@ class Assembler():
             cur_addr = len(instructions) + 1
 
             head, sep, tail = line.partition(':')
-            print("head, sep, tail: ", head, sep, tail)
+            logging.info("head, sep, tail: ", head, sep, tail)
             if (sep == ":"):
                 tag_addr_dict[head.strip().lower()] = cur_addr
                 instr = tail
@@ -360,14 +361,14 @@ class Assembler():
         return tag_addr_dict
 
     def convert_to_instructions(self):
-        print("new version assembler.")
+        logging.info("new version assembler.")
         tag_addr_dict = self.ParseLabel()
-        print("ParseLabel executed successfully.")
-        print("tag_addr_dict: ", tag_addr_dict)
+        logging.info("ParseLabel executed successfully.")
+        logging.info("tag_addr_dict: ", tag_addr_dict)
 
         try:
             Asm_File = open(self.asmfilename, 'r', encoding="utf-8")
-            print("open file", self.asmfilename, "successfully.")
+            logging.info("open file", self.asmfilename, "successfully.")
         except:
             print('\tError: Fail to open file ' + self.asmfilename + ".")
             exit(0)
