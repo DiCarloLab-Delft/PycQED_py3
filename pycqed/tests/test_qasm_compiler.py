@@ -37,18 +37,67 @@ class Test_single_qubit_seqs(TestCase):
                                      'instruction': 'Trigger 0010000, 2 \n'}}
                                 }
 
-    def test_T1_sequence(self):
+    def test_T1(self):
         times = np.linspace(20e-9, 50e-6, 61)
         qasm_file = sq_qasm.T1(self.qubit_name, times)
         asm_file = qasm_to_asm(qasm_file.name)
         asm = Assembler.Assembler(asm_file.name)
         instructions = asm.convert_to_instructions()
 
-    def test_OffOn_sequence(self):
+    def test_OffOn(self):
         qasm_file = sq_qasm.off_on(self.qubit_name)
         asm_file = qasm_to_asm(qasm_file.name)
         asm = Assembler.Assembler(asm_file.name)
         instructions = asm.convert_to_instructions()
+
+    def test_AllXY(self):
+        qasm_file = sq_qasm.AllXY(self.qubit_name, times)
+        asm_file = qasm_to_asm(qasm_file.name)
+        asm = Assembler.Assembler(asm_file.name)
+        instructions = asm.convert_to_instructions()
+
+    def test_Rabi(self):
+        qasm_file = sq_qasm.Rabi(self.qubit_name, amps)
+        asm_file = qasm_to_asm(qasm_file.name)
+        asm = Assembler.Assembler(asm_file.name)
+        instructions = asm.convert_to_instructions()
+
+    def test_Ramsey(self):
+        qasm_file = sq_qasm.Ramsey(self.qubit_name, times)
+        asm_file = qasm_to_asm(qasm_file.name)
+        asm = Assembler.Assembler(asm_file.name)
+        instructions = asm.convert_to_instructions()
+
+    def test_echo(self):
+        qasm_file = sq_qasm.echo(self.qubit_name, times)
+        asm_file = qasm_to_asm(qasm_file.name)
+        asm = Assembler.Assembler(asm_file.name)
+        instructions = asm.convert_to_instructions()
+
+    def test_off_on(self):
+        qasm_file = sq_qasm.off_on(self.qubit_name)
+        asm_file = qasm_to_asm(qasm_file.name)
+        asm = Assembler.Assembler(asm_file.name)
+        instructions = asm.convert_to_instructions()
+
+    def test_butterfly(self):
+        qasm_file = sq_qasm.butterfly(self.qubit_name)
+        asm_file = qasm_to_asm(qasm_file.name)
+        asm = Assembler.Assembler(asm_file.name)
+        instructions = asm.convert_to_instructions()
+
+    def test_randomized_benchmarking(self):
+        qasm_file = sq_qasm.randomized_benchmarking(self.qubit_name)
+        asm_file = qasm_to_asm(qasm_file.name)
+        asm = Assembler.Assembler(asm_file.name)
+        instructions = asm.convert_to_instructions()
+
+    def test_MotzoiXY(self):
+        qasm_file = sq_qasm.MotzoiXY(self.qubit_name)
+        asm_file=qasm_to_asm(qasm_file.name)
+        asm = Assembler.Assembler(asm_file.name)
+        instructions = asm.convert_to_instructions()
+
 
 
     @classmethod
