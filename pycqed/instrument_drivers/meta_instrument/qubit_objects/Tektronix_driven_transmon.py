@@ -114,6 +114,13 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         self.add_parameter('pulse_Q_offset', initial_value=0.0,
                            vals=vals.Numbers(min_value=-0.1, max_value=0.1),
                            parameter_class=ManualParameter)
+        # readout parameters for time domain
+        self.add_parameter('RO_acq_averages', initial_value=1024,
+                           vals=vals.Numbers(min_value=0, max_value=1e6),
+                           parameter_class=ManualParameter)
+        self.add_parameter('RO_acq_integration_length', initial_value=1e-6,
+                           vals=vals.Numbers(min_value=10e-9, max_value=2e-6),
+                           parameter_class=ManualParameter)
 
         # These parameters are only relevant if using MW_IQmod_pulse type
         # RO
@@ -130,9 +137,8 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                            vals=vals.Numbers(min_value=-0.1, max_value=0.1),
                            parameter_class=ManualParameter)
 
-        self.add_parameter('RO_pulse_type', initial_value='MW_IQmod_pulse',
-                           vals=vals.Enum('MW_IQmod_pulse',
-                                          'Gated_MW_RO_pulse'),
+        self.add_parameter('RO_pulse_type', initial_value='MW_IQmod_pulse_tek',
+                           vals=vals.Enum('MW_IQmod_pulse_tek', 'MW_IQmod_pulse_nontek', 'Gated_MW_RO_pulse'),
                            parameter_class=ManualParameter)
         # Relevant when using a marker channel to gate a MW-RO tone.
         self.add_parameter('RO_pulse_marker_channel',
@@ -260,23 +266,26 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         self.get_pulse_pars()
 
         # # makes sure dac range is used optimally, 20% overhead for mixer skew
-        # self.AWG.set('{}_amp'.format(self.pulse_I_channel()),
-        #              self.amp180()*3.0)
         # # use 60% of based on linear range in mathematica
-        # self.AWG.set('{}_amp'.format(self.pulse_Q_channel()),
-        #              self.amp180()*3.0)
-        # # use 60% of based on linear range in mathematica
+        self.AWG.set('{}_amp'.format(self.pulse_I_channel()),
+                     self.amp180()*3.0)
+        self.AWG.set('{}_amp'.format(self.pulse_Q_channel()),
+                     self.amp180()*3.0)
 
         self.AWG.set(self.pulse_I_channel.get()+'_offset',
                      self.pulse_I_offset.get())
         self.AWG.set(self.pulse_Q_channel.get()+'_offset',
                      self.pulse_Q_offset.get())
 
-        if self.RO_pulse_type.get() is 'MW_IQmod_pulse':
+        if self.RO_pulse_type.get() is 'MW_IQmod_pulse_tek':
             self.AWG.set(self.RO_I_channel.get()+'_offset',
                          self.RO_I_offset.get())
             self.AWG.set(self.RO_Q_channel.get()+'_offset',
                          self.RO_Q_offset.get())
+        elif self.RO_pulse_type.get() is 'MW_IQmod_pulse_nontek':
+            print('no specific settings for now, all done from the sequencer')
+            # the following is UHFQC specific
+            #self._acquisition_instr.AWG_file('traditional_IQ_mod_readout.seqc')
         elif self.RO_pulse_type.get() is 'Gated_MW_RO_pulse':
             self.rf_RO_source.on()
             self.rf_RO_source.pulsemod_state.set('on')
@@ -445,11 +454,11 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         # prepare for timedomain takes care of rescaling
         self.prepare_for_timedomain()
         # # Extra rescaling only happens if the amp180 was far too low for the Rabi
-        # if max(abs(amps)) > 2.9 * self.AWG.get('{}_amp'.format(self.pulse_I_channel())):
-        #     self.AWG.set('{}_amp'.format(self.pulse_I_channel()),
-        #                  np.max(abs(amps))*3.0)
-        #     self.AWG.set('{}_amp'.format(self.pulse_Q_channel()),
-        #                  np.max(abs(amps))*3.0)
+        if max(abs(amps)) > 2.9 * self.AWG.get('{}_amp'.format(self.pulse_I_channel())):
+            self.AWG.set('{}_amp'.format(self.pulse_I_channel()),
+                         np.max(abs(amps))*3.0)
+            self.AWG.set('{}_amp'.format(self.pulse_Q_channel()),
+                         np.max(abs(amps))*3.0)
         if MC is None:
             MC = self.MC
 
@@ -582,8 +591,8 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                      MC=None,
                      analyze=True,
                      close_fig=True,
-                     verbose=True, set_integration_weights=False, use_Q=0,
-                     multiplier=1, soft_rotate=True):
+                     verbose=True, optimized_weights=False, SSB=False,
+                     multiplier=1):
         self.prepare_for_timedomain()
         if MC is None:
             MC = self.MC
@@ -593,16 +602,16 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
             raw=no_fits,
             MC=MC,
             AWG=self.AWG, acquisition_instr=self._acquisition_instr,
-            pulse_pars=self.pulse_pars, RO_pars=self.RO_pars,
-            set_integration_weights=set_integration_weights,
-            close_fig=close_fig, use_Q=use_Q, multiplier=multiplier, soft_rotate=soft_rotate)
+            pulse_pars=self.pulse_pars, RO_pars=self.RO_pars, IF= self.f_RO_mod(),
+            optimized_weights=optimized_weights,integration_length=self.RO_acq_integration_length(),
+            close_fig=close_fig, SSB=SSB, multiplier=multiplier, nr_averages=self.RO_acq_averages())
         if return_detector:
             return d
         d.prepare()
         d.acquire_data_point()
-        if analyze:
-            return ma.SSRO_Analysis(rotate=soft_rotate, label='SSRO'+self.msmt_suffix,
-                                    no_fits=no_fits, close_fig=close_fig)
+        # if analyze:
+        #     return ma.SSRO_Analysis(rotate=soft_rotate, label='SSRO'+self.msmt_suffix,
+        #                             no_fits=no_fits, close_fig=close_fig)
 
     def measure_butterfly(self, return_detector=False,
                           MC=None,
@@ -645,7 +654,6 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                            analyze=True,
                            close_fig=True,
                            verbose=True,
-                           set_integration_weights=False,
                            nr_samples=512):
 
         self.prepare_for_timedomain()
@@ -669,18 +677,6 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         self.MC.run('Measure_transients_{}_1'.format(self.msmt_suffix))
         a1 = ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
 
-        if set_integration_weights:
-            transient0 = a0.data[1, :]
-            transient1 = a1.data[1, :]
-            optimized_weights = transient1-transient0
-            optimized_weights = optimized_weights+np.mean(optimized_weights)
-            self._acquisition_instr.sig0_integration_weights.set(
-                optimized_weights)
-            self._acquisition_instr.sig1_integration_weights.set(
-                np.zeros(nr_samples))  # disabling the Q quadrature
-
-        # first perform SSRO analysis to extract the optimal rotation angle theta
-        # return c.butterfly_coeffs
 
     def measure_rb_vs_amp(self, amps, nr_cliff=1,
                           resetless=True,
@@ -719,23 +715,27 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         if 'CBox' in str(self._acquisition_instr):
             print("CBox acquisition")
             self.int_avg_det = det.CBox_integrated_average_detector(self._acquisition_instr,
-                                                                    self.AWG)
+                                                                    self.AWG,
+                                                                    nr_averages=self.RO_acq_averages(),
+                                                                    integration_length=self.RO_acq_integration_length())
             self.int_log_det = det.CBox_integration_logging_det(self._acquisition_instr,
-                                                                self.AWG)
+                                                                self.AWG, integration_length=self.RO_acq_integration_length())
             self.input_average_detector = det.CBox_input_average_detector(
                 self._acquisition_instr,
-                self.AWG)
+                self.AWG, nr_averages=self.RO_acq_averages())
         elif 'UHFQC' in str(self._acquisition_instr):
             print("UHFQC acquisition")
             self.input_average_detector = det.UHFQC_input_average_detector(
                 UHFQC=self._acquisition_instr,
-                AWG=self.AWG)
+                AWG=self.AWG, nr_averages=self.RO_acq_averages())
             self.int_avg_det = det.UHFQC_integrated_average_detector(
                 UHFQC=self._acquisition_instr, AWG=self.AWG,
-                channels=[0, 1])
+                channels=[0, 1], nr_averages=self.RO_acq_averages(),
+                integration_length=self.RO_acq_integration_length())
             self.int_log_det = det.UHFQC_integration_logging_det(
                 UHFQC=self._acquisition_instr, AWG=self.AWG,
-                channels=[0, 1])
+                channels=[0, 1],
+                integration_length=self.RO_acq_integration_length())
 
     def get_pulse_pars(self):
         self.pulse_pars = {

@@ -6,6 +6,7 @@ from measurement import CBox_sweep_functions as CB_swf
 from measurement import detector_functions as det
 from analysis import measurement_analysis as ma
 import imp
+import matplotlib.pyplot as plt
 imp.reload(awg_swf)
 
 
@@ -338,7 +339,7 @@ class SSRO_Fidelity_Detector_CBox(det.Soft_Detector):
         self.raw = raw  # Performs no fits if True
         self.analyze = analyze
 
-        self.upload=True
+        self.upload = True
 
     def prepare(self, **kw):
         self.CBox.set('log_length', self.NoSamples)
@@ -372,9 +373,9 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
     For Qcodes. Readout with CBox, pulse generation with 5014
     '''
     def __init__(self, measurement_name,  MC, AWG, acquisition_instr, pulse_pars, RO_pars,
-                 raw=True, analyze=True, upload=True,
-                 set_integration_weights=False, wait=0.0, close_fig=True, use_Q=0,
-                 multiplier=1, soft_rotate=True, **kw):
+                 raw=True, analyze=True, upload=True, IF=None,
+                 optimized_weights=False, wait=0.0, close_fig=True, SSB=False,
+                 multiplier=1, nr_averages=1024, integration_length=1e-6, **kw):
         self.detector_control = 'soft'
         self.name = 'SSRO_Fidelity'
         # For an explanation of the difference between the different
@@ -391,21 +392,27 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
         self.AWG = AWG
         self.pulse_pars = pulse_pars
         self.RO_pars = RO_pars
-        self.set_integration_weights = set_integration_weights
+        self.optimized_weights = optimized_weights
         self.i = 0
         self.raw = raw  # Performs no fits if True
         self.analyze = analyze
         self.upload = upload
         self.wait = wait
         self.close_fig = close_fig
-        self.use_Q = use_Q
+        self.SSB = SSB
         self.multiplier = multiplier
-        self.soft_rotate = soft_rotate
+        self.IF=IF
         if 'CBox' in str(self.acquisition_instr):
             self.CBox = self.acquisition_instr
+        elif 'UHFQC' in str(self.acquisition_instr):
+            self.UHFQC = self.acquisition_instr
+        self.nr_averages = nr_averages
+        self.integration_length = integration_length
+
 
     def prepare(self, **kw):
-        if not self.set_integration_weights:
+        if not self.optimized_weights:
+            self.soft_rotate=True
             self.MC.set_sweep_function(awg_swf.OffOn(
                                        pulse_pars=self.pulse_pars,
                                        RO_pars=self.RO_pars,
@@ -413,73 +420,186 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
             if 'CBox' in str(self.acquisition_instr):
                 self.MC.set_detector_function(
                     det.CBox_integration_logging_det(self.acquisition_instr,
-                                                     self.AWG))
+                                                     self.AWG, integration_length=self.integration_length))
                 self.CBox = self.acquisition_instr
-            elif  'UHFQC' in str(self.acquisition_instr):
+                if self.SSB:
+                    raise ValueError('SSB is only possible in CBox with optimized weights')
+                else:
+                    self.CBox.lin_trans_coeffs([1,0,0,1])
+                    self.CBox.demodulation_mode(0)
+                    if self.IF==None:
+                        raise ValueError('IF has to be provided when not using optimized weights')
+                    else:
+                        self.CBox.upload_standard_weights(IF=self.IF)
+
+
+            elif 'UHFQC' in str(self.acquisition_instr):
                 self.MC.set_detector_function(
                     det.UHFQC_integration_logging_det(self.acquisition_instr,
-                                                          self.AWG, channels=[0,1]))
+                                                          self.AWG, channels=[0,1],
+                                                          integration_length=self.integration_length))
+                if self.SSB:
+                    self.UHFQC.prepare_SSB_weight_and_rotation(IF=self.IF)
+                else:
+                    if self.IF==None:
+                        raise ValueError('IF has to be provided when not using optimized weights')
+                    else:
+                        self.UHFQC.prepare_DSB_weight_and_rotation(IF=self.IF)
 
     def acquire_data_point(self, *args, **kw):
         self.time_start = time.time()
-        if self.set_integration_weights:
-            nr_samples = 512
-            self.CBox.nr_samples.set(nr_samples)
-            SWF = awg_swf.OffOn(
-                                pulse_pars=self.pulse_pars,
-                                RO_pars=self.RO_pars,
-                                pulse_comb='OffOff',
-                                nr_samples=nr_samples)
-            SWF.prepare()
-            self.CBox.acquisition_mode(0)
-            self.AWG.start()
-            self.CBox.acquisition_mode('input averaging')
-            inp_avg_res = self.CBox.get_input_avg_results()
+        if self.optimized_weights:
+            self.soft_rotate = False
+            if 'CBox' in str(self.acquisition_instr):
+                self.CBox.nr_averages(int(self.nr_averages))
+                if self.SSB:
+                    self.CBox.lin_trans_coeffs([1,1,-1,1])
+                    self.CBox.demodulation_mode(1)
+                else:
+                    self.CBox.lin_trans_coeffs([1,0,0,1])
+                    self.CBox.demodulation_mode(0)
+                nr_samples = 512
+                self.CBox.nr_samples.set(nr_samples)
+                SWF = awg_swf.OffOn(
+                                    pulse_pars=self.pulse_pars,
+                                    RO_pars=self.RO_pars,
+                                    pulse_comb='OffOff',
+                                    nr_samples=nr_samples)
+                SWF.prepare()
+                self.CBox.acquisition_mode(0)
+                self.AWG.start()
+                self.CBox.acquisition_mode('input averaging')
+                inp_avg_res = self.CBox.get_input_avg_results()
 
-            transient0_I = inp_avg_res[0]
-            transient0_Q = inp_avg_res[1]
+                transient0_I = inp_avg_res[0]
+                transient0_Q = inp_avg_res[1]
 
-            SWF = awg_swf.OffOn(
-                                pulse_pars=self.pulse_pars,
-                                RO_pars=self.RO_pars,
-                                pulse_comb='OnOn',
-                                nr_samples=nr_samples)
-            SWF.prepare()
-            self.CBox.acquisition_mode(0)
-            self.CBox.acquisition_mode('input averaging')
-            self.AWG.start()
-            inp_avg_res = self.CBox.get_input_avg_results()
-            self.CBox.acquisition_mode(0)
-            transient1_I = inp_avg_res[0]
-            transient1_Q = inp_avg_res[1]
+                SWF = awg_swf.OffOn(
+                                    pulse_pars=self.pulse_pars,
+                                    RO_pars=self.RO_pars,
+                                    pulse_comb='OnOn',
+                                    nr_samples=nr_samples)
+                SWF.prepare()
+                self.CBox.acquisition_mode(0)
+                self.CBox.acquisition_mode('input averaging')
+                self.AWG.start()
+                inp_avg_res = self.CBox.get_input_avg_results()
+                self.CBox.acquisition_mode(0)
+                transient1_I = inp_avg_res[0]
+                transient1_Q = inp_avg_res[1]
 
-            # # need to decide about the code below
-            # optimized_weights_I = self.multiplier*(transient1_I-transient0_I)
-            # optimized_weights_I = optimized_weights_I+np.mean(optimized_weights_I)
-            # optimized_weights_Q = self.multiplier*(transient1_Q-transient0_Q)
-            # optimized_weights_Q = optimized_weights_Q+np.mean(optimized_weights_Q)
+                # # need to decide about the code below
+                # optimized_weights_I = self.multiplier*(transient1_I-transient0_I)
+                # optimized_weights_I = optimized_weights_I+np.mean(optimized_weights_I)
+                # optimized_weights_Q = self.multiplier*(transient1_Q-transient0_Q)
+                # optimized_weights_Q = optimized_weights_Q+np.mean(optimized_weights_Q)
 
-            optimized_weights_I = self.multiplier*(transient1_I-transient0_I)
-            optimized_weights_I = optimized_weights_I-np.mean(optimized_weights_I)
-            weight_scale_factor = 127./np.max(np.abs(optimized_weights_I))
-            optimized_weights_I = np.floor(weight_scale_factor*optimized_weights_I).astype(int)
+                optimized_weights_I = self.multiplier*(transient1_I-transient0_I)
+                optimized_weights_I = optimized_weights_I-np.mean(optimized_weights_I)
+                weight_scale_factor = 127./np.max(np.abs(optimized_weights_I))
+                optimized_weights_I = np.floor(weight_scale_factor*optimized_weights_I).astype(int)
 
-            optimized_weights_Q = self.multiplier*(transient1_Q-transient0_Q)
-            optimized_weights_Q = optimized_weights_Q-np.mean(optimized_weights_Q)
-            weight_scale_factor = 127./np.max(np.abs(optimized_weights_Q))
-            optimized_weights_Q = np.floor(weight_scale_factor*optimized_weights_Q).astype(int)
+                optimized_weights_Q = self.multiplier*(transient1_Q-transient0_Q)
+                optimized_weights_Q = optimized_weights_Q-np.mean(optimized_weights_Q)
+                weight_scale_factor = 127./np.max(np.abs(optimized_weights_Q))
+                optimized_weights_Q = np.floor(weight_scale_factor*optimized_weights_Q).astype(int)
 
 
-            self.CBox.sig0_integration_weights.set(optimized_weights_I)
-            self.CBox.sig1_integration_weights.set(
-                np.multiply(optimized_weights_Q, self.use_Q))  # disabling the Q quadrature
+                self.CBox.sig0_integration_weights.set(optimized_weights_I)
+                if self.SSB:
+                    self.CBox.sig1_integration_weights.set(optimized_weights_Q)  # disabling the Q quadrature
+                else:
+                    self.CBox.sig1_integration_weights.set(np.multiply(optimized_weights_Q,0))  # disabling the Q quadrature
+                self.MC.set_sweep_function(awg_swf.OffOn(
+                                           pulse_pars=self.pulse_pars,
+                                           RO_pars=self.RO_pars))
 
-            self.MC.set_sweep_function(awg_swf.OffOn(
-                                       pulse_pars=self.pulse_pars,
-                                       RO_pars=self.RO_pars))
+                self.MC.set_detector_function(
+                    det.CBox_integration_logging_det(self.CBox, self.AWG, integration_length=self.integration_length))
 
-            self.MC.set_detector_function(
-                det.CBox_integration_logging_det(self.CBox, self.AWG))
+            elif 'UHFQC' in str(self.acquisition_instr):
+                nr_samples = 4096
+                self.AWG.stop()
+                self.UHFQC.quex_iavg_length(nr_samples)
+                self.UHFQC.quex_iavg_avgcnt(int(np.log2(self.nr_averages)))
+                SWF = awg_swf.OffOn(
+                                    pulse_pars=self.pulse_pars,
+                                    RO_pars=self.RO_pars,
+                                    pulse_comb='OffOff',
+                                    nr_samples=nr_samples)
+                SWF.prepare()
+                self.UHFQC.awgs_0_single(1)
+                self.UHFQC.awgs_0_enable(1)
+                self.AWG.start()
+                while self.UHFQC.awgs_0_enable() == 1:
+                    time.sleep(0.1)
+                time.sleep(1)
+
+                dataset = self.UHFQC.quex_iavg_data_0()
+                transient0_I=dataset[0]['vector']
+                dataset = self.UHFQC.quex_iavg_data_1()
+                transient0_Q=dataset[0]['vector']
+
+                self.AWG.stop()
+                self.UHFQC.quex_iavg_length(nr_samples)
+                SWF = awg_swf.OffOn(
+                                    pulse_pars=self.pulse_pars,
+                                    RO_pars=self.RO_pars,
+                                    pulse_comb='OnOn',
+                                    nr_samples=nr_samples)
+                SWF.prepare()
+                self.UHFQC.awgs_0_single(1)
+                self.UHFQC.awgs_0_enable(1)
+                self.AWG.start()
+                while self.UHFQC.awgs_0_enable() == 1:
+                    time.sleep(0.1)
+                time.sleep(1)
+
+                dataset = self.UHFQC.quex_iavg_data_0()
+                transient1_I=dataset[0]['vector']
+                dataset = self.UHFQC.quex_iavg_data_1()
+                transient1_Q=dataset[0]['vector']
+
+                # # need to decide about the code below
+                # optimized_weights_I = self.multiplier*(transient1_I-transient0_I)
+                # optimized_weights_I = optimized_weights_I+np.mean(optimized_weights_I)
+                # optimized_weights_Q = self.multiplier*(transient1_Q-transient0_Q)
+                # optimized_weights_Q = optimized_weights_Q+np.mean(optimized_weights_Q)
+
+                optimized_weights_I = self.multiplier*(transient1_I-transient0_I)
+                optimized_weights_I = optimized_weights_I-np.mean(optimized_weights_I)
+                weight_scale_factor = 1./np.max(np.abs(optimized_weights_I))
+                optimized_weights_I = weight_scale_factor*optimized_weights_I
+
+                optimized_weights_Q = self.multiplier*(transient1_Q-transient0_Q)
+                optimized_weights_Q = optimized_weights_Q-np.mean(optimized_weights_Q)
+                weight_scale_factor = 1./np.max(np.abs(optimized_weights_Q))
+                optimized_weights_Q = weight_scale_factor*optimized_weights_Q
+
+                self.UHFQC.quex_wint_weights_0_real(np.array(optimized_weights_I))
+
+                if self.SSB:
+                    self.UHFQC.quex_wint_weights_0_imag(np.array(optimized_weights_Q))
+                    self.UHFQC.quex_wint_weights_1_real(np.array(optimized_weights_I))
+                    self.UHFQC.quex_wint_weights_1_imag(np.array(optimized_weights_Q))
+                    self.UHFQC.quex_rot_0_real(1.0)
+                    self.UHFQC.quex_rot_0_imag(-1.0)
+                    self.UHFQC.quex_rot_1_real(1.0)
+                    self.UHFQC.quex_rot_1_imag(1.0)
+                else:
+                    self.UHFQC.quex_wint_weights_0_imag(np.array(np.multiply(optimized_weights_Q,0)))  # disabling the Q quadrature
+                    self.UHFQC.quex_wint_weights_1_real(np.array(np.multiply(optimized_weights_Q,0)))  # disabling the Q quadrature
+                    self.UHFQC.quex_wint_weights_1_imag(np.array(np.multiply(optimized_weights_Q,0)))  # disabling the Q quadrature
+                    self.UHFQC.quex_rot_0_real(1.0)
+                    self.UHFQC.quex_rot_0_imag(0.0) #disabling the second weightfunciton for DSB
+                    self.UHFQC.quex_rot_1_real(0.0)
+                    self.UHFQC.quex_rot_1_imag(0.0)
+                self.MC.set_sweep_function(awg_swf.OffOn(
+                                           pulse_pars=self.pulse_pars,
+                                           RO_pars=self.RO_pars))
+                print("hoi", self.integration_length)
+                self.MC.set_detector_function(
+                    det.UHFQC_integration_logging_det(self.UHFQC, self.AWG, channels=[0,1], integration_length=self.integration_length))
         self.i += 1
         self.MC.run(name=self.measurement_name+'_'+str(self.i))
 
@@ -488,14 +608,14 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
                                    label=self.measurement_name,
                                    no_fits=self.raw, close_file=False,
                                    close_fig=True, auto=True)
-            if self.set_integration_weights:
+            if self.optimized_weights:
                 # data_group = self.MC.data_object.create_group('Transients Data')
-                dset = ana.g.create_dataset('Transients', (4, 512),
-                                            maxshape=(4, 512))
-                dset[0, :] = transient0_I
-                dset[1, :] = transient0_Q
-                dset[2, :] = transient1_I
-                dset[3, :] = transient1_Q
+                dset = ana.g.create_dataset('Transients', (nr_samples, 4),
+                                            maxshape=(nr_samples, 4))
+                dset[:, 0] = transient0_I
+                dset[:, 1] = transient0_Q
+                dset[:, 2] = transient1_I
+                dset[:, 3] = transient1_Q
                 # print('Done!')
             ana.data_file.close()
 
@@ -508,7 +628,7 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
             if self.raw:
                 return ana.F_raw, ana.theta
             else:
-                return ana.F, ana.F_corrected
+                return ana.F_raw, ana.F_corrected
 '''
     def acquire_data_point(self, *args, **kw):
         self.time_start = time.time()
@@ -834,6 +954,92 @@ class CBox_RB_detector(det.Soft_Detector):
             F_cl = a.fit_res.params['fidelity_per_Clifford'].value
             return F_cl
 
+
+
+class Chevron_optimization_v1(det.Soft_Detector):
+    '''
+
+    '''
+    def __init__(self, flux_channel, dist_dict, AWG, MC_nested, qubit, kernel_obj, **kw):
+        super().__init__()
+        self.name = 'chevron_optimization_v1'
+        self.value_names = ['Cost function']
+        self.value_units = ['a.u.']
+        self.kernel_obj = kernel_obj
+        self.AWG = AWG
+        self.MC_nested = MC_nested
+        self.qubit = qubit
+        self.dist_dict = dist_dict
+        self.flux_channel = flux_channel
+        self.dist_dict['ch%d'%self.flux_channel].append('')
+
+        def get_awg_amp():
+            exec('ret = self.AWG.ch{}_amp()'.formatself.flux_channel)
+            return ret
+
+        def set_awg_amp(val):
+            exec('self.AWG.ch{}_amp({})'.format(self.flux_channel, val))
+            return val
+
+        self.awg_amp_par = qc.Parameter(name='AWG_amp', units='Vpp', label='AWG Amplitude')
+        self.awg_amp_par.get = get_awg_amp
+        self.awg_amp_par.set = set_awg_amp
+        self.awg_value = 2.0
+
+
+    def acquire_data_point(self, **kw):
+        # # Before writing it
+        # # Summarize what to do:
+        
+        # # Update kernel from kernel object
+        kernel_before = self.dist_dict['ch%d'%self.flux_channel][0]
+        kernel_file = 'optimizing_kernel_%s.txt'%a_tools.current_timestamp()
+        self.kernel_obj.save_corrections_kernel(kernel_before,kernel_file)
+        self.dist_dict['ch%d'%self.flux_channel][-1] = kernel_file
+
+        mw_pulse_pars, RO_pars = self.qubit.get_pulse_pars()
+        flux_pulse_pars = {'pulse_type': 'SquarePulse',
+                           'pulse_delay': .1e-6,
+                           'channel': 'ch%d'%self.flux_channel,
+                           'amplitude': .5,
+                           'length': 10e-6,
+                           'dead_time_length': 10e-6}
+
+        # preparation of sweep points and cal points
+        lengths_precal = np.arange(0, 81e-9, 1e-9)
+        cal_points = 4
+        lengths_cal = lengths_precal[-1] + np.arange(1,1+cal_points)*(lengths_precal[1]-lengths_precal[0])
+        lengths = np.concatenate((lengths_precal,lengths_cal))
+        # start preparations
+        qubit.prepare_for_timedomain()
+        chevron_swf = swf.chevron_length(lengths_precal, mw_pulse_pars, RO_pars, flux_pulse_pars, dist_dict=self.dist_dict, upload=False)
+
+        # # Upload sequence
+        self.awg_amp_par(2.)
+        chevron_swf.pre_upload()
+
+        # # Update amplitude from AWG object
+        self.awg_amp_par(self.awg_value)
+
+        # # Measure a 1D chevron slice at constant amp with MC_nested
+        MC_nested.set_sweep_function(chevron_swf)
+        MC_nested.set_sweep_points(lengths)
+        MC_nested.set_detector_function(qubit.int_avg_det)
+        MC_nested.run('Chevron_slice_%d_Vpp')
+
+        # # fit it
+        # ma_obj = MA.chevron_optimization_v1(auto=True,label='Chevron_slice')
+        
+        # # Return the cost function sum(min)+sum(1-max)
+        # return ma_obj.cost_value
+
+
+
+    def prepare(self):
+        pass
+
+    def finish(self):
+        pass
 
 
 

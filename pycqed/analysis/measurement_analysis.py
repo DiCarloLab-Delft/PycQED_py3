@@ -2324,10 +2324,10 @@ class SSRO_Analysis(MeasurementAnalysis):
 
         n1, bins1, patches = pylab.hist(shots_I_1_rot, bins=int(min_len/50),
                                       label = '1 I',histtype='step',
-                                      color='red',normed=1)
+                                      color='red', normed=1)
         n0, bins0, patches = pylab.hist(shots_I_0_rot, bins=int(min_len/50),
                                       label = '0 I',histtype='step',
-                                      color='blue',normed=1)
+                                      color='blue', normed=1)
         pylab.clf()
         # n0, bins0 = np.histogram(shots_I_0_rot, bins=int(min_len/50), normed=1)
         # n1, bins1 = np.histogram(shots_I_1_rot, bins=int(min_len/50), normed=1)
@@ -2361,7 +2361,8 @@ class SSRO_Analysis(MeasurementAnalysis):
         pylab.semilogy(bins1, y1, 'r',linewidth=1.5)
         pylab.semilogy(bins1, y0_1, 'r--', linewidth=3.5)
         pylab.semilogy(bins1, y1_1, 'r--', linewidth=3.5)
-        (pylab.gca()).set_ylim(1*10e-7,10e-0)
+        #(pylab.gca()).set_ylim(1e-6,1e-3)
+        (pylab.gca()).set_ylim(1e-3,1e-0)
 
         axes.set_title('Histograms of shots on rotaded IQ plane optimized for I, %s shots'%min_len)
         plt.xlabel('DAQ voltage integrated (V)')#, fontsize=14)

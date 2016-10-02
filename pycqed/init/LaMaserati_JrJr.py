@@ -97,8 +97,12 @@ IVVI = iv.IVVI('IVVI', address='COM4', numdacs=16, server_name=None)
 station.add_component(IVVI)
 
 #Initializing UHFQC
-# UHFQC_1 = ZI_UHFQC.UHFQC('UHFQC_1', device='dev2178', server_name=None)
-# station.add_component(UHFQC_1)
+UHFQC_1 = ZI_UHFQC.UHFQC('UHFQC_1', device='dev2178', server_name=None)
+station.add_component(UHFQC_1)
+
+#preparing the UHFQC for IQ modulated readout
+UHFQC_1.AWG_file('traditional_IQ_mod_readout.seqc')
+
 # Dux = qdux.QuTech_Duplexer('Dux', address='TCPIP0::192.168.0.101',
 #                             server_name=None)
 # SH = sh.SignalHound_USB_SA124B('Signal hound', server_name=None) #commented because of 8s load time
@@ -230,3 +234,20 @@ def set_integration_weights():
     CBox.sig1_integration_weights(sinI)
 from scripts.Experiments.FiveQubits import common_functions as cfct
 cfct.set_AWG_limits(station,1.7)
+
+qubit=AncT
+def switch_to_pulsed_RO_UHFQC():
+    UHFQC_1.AWG_file('traditional.seqc')
+    qubit.RO_pulse_type('Gated_MW_RO_pulse')
+    qubit.RO_acq_marker_delay(175e-9)
+    qubit.acquisition_instr(UHFQC_1)
+def switch_to_pulsed_RO_CBox():
+    UHFQC_1.AWG_file('traditional.seqc')
+    qubit.RO_pulse_type('Gated_MW_RO_pulse')
+    qubit.RO_acq_marker_delay(175e-9)
+    qubit.acquisition_instr(CBox)
+def switch_to_IQ_mod_RO_UHFQC():
+    UHFQC_1.AWG_file('traditional_IQ_mod_readout.seqc')
+    qubit.RO_pulse_type('MW_IQmod_pulse_nontek')
+    qubit.RO_acq_marker_delay(-100e-9)
+    qubit.acquisition_instr(UHFQC_1)
