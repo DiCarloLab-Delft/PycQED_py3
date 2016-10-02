@@ -114,6 +114,8 @@ class Distortion(Instrument):
                        self.get_decay_kernel()]
         if kernel_list_before is not None:
             kernel_list_before.extend(kernel_list)
-            return self.convolve_kernel(kernel_list_before, length=self.corrections_length())
+            return self.convolve_kernel(kernel_list_before,
+                                        length=self.corrections_length())
         else:
-            return self.convolve_kernel(kernel_list, length=self.corrections_length())
+            return self.convolve_kernel(kernel_list,
+                                        length=self.corrections_length())
