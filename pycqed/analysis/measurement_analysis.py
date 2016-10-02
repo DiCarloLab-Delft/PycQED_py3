@@ -879,15 +879,15 @@ class TD_Analysis(MeasurementAnalysis):
         '''
         pass
 
-class ChevronOptAnalysis(TD_Analysis):
+class chevron_optimization_v1(TD_Analysis):
     def __init__(self, NoCalPoints=4, center_point=31, make_fig=True,
                  zero_coord=None, one_coord=None, cal_points=None,
                  plot_cal_points=True, **kw):
-        super(ChevronOptAnalysis, self).__init__(**kw)
+        super(chevron_optimization_v1, self).__init__(**kw)
 
     def run_default_analysis(self,
                              close_main_fig=True,  **kw):
-        super(ChevronOptAnalysis, self).run_default_analysis(**kw)
+        super(chevron_optimization_v1, self).run_default_analysis(**kw)
         output_fft = np.real_if_close(np.fft.rfft(self.measured_values[0]))
         ax_fft = np.fft.rfftfreq(len(self.measured_values[0]),
                                  d=self.sweep_points[1]-self.sweep_points[0])

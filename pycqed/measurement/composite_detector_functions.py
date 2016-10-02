@@ -963,8 +963,8 @@ class Chevron_optimization_v1(det.Soft_Detector):
     def __init__(self, flux_channel, dist_dict, AWG, MC_nested, qubit, kernel_obj, **kw):
         super().__init__()
         self.name = 'chevron_optimization_v1'
-        self.value_names = ['Cost function']
-        self.value_units = ['a.u.']
+        self.value_names = ['Cost function', 'SWAP Time']
+        self.value_units = ['a.u.', 'ns']
         self.kernel_obj = kernel_obj
         self.AWG = AWG
         self.MC_nested = MC_nested
@@ -1028,10 +1028,10 @@ class Chevron_optimization_v1(det.Soft_Detector):
         MC_nested.run('Chevron_slice_%d_Vpp')
 
         # # fit it
-        # ma_obj = MA.chevron_optimization_v1(auto=True,label='Chevron_slice')
+        ma_obj = MA.chevron_optimization_v1(auto=True,label='Chevron_slice')
         
         # # Return the cost function sum(min)+sum(1-max)
-        # return ma_obj.cost_value
+        return ma_obj.cost_value, 0.5*ma_obj.period
 
 
 
