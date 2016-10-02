@@ -3,9 +3,9 @@ from os.path import join, dirname, basename, splitext
 base_asm_path = join(dirname(__file__), 'micro_instruction_files')
 
 
-commands = ['qubit', 'init', 'X', 'I', 'RO']
+commands = ['qubit', 'init_all', 'X', 'I', 'RO']
 
-op_dict = {'init': 'WaitReg r0 \n',
+op_dict = {'init_all': 'WaitReg r0 \n',
            'X': 'Trigger 1000000, 2 \n',  # Using marker 1 for the qubit pulse
            'I': 'mov r1, {} \n WaitReg r1 \n',
            'RO': 'Trigger 0100000, 4 \n'}  # using marker 2 for the RO trigger
@@ -62,11 +62,14 @@ def qasm_to_asm(qasm_filepath, operation_dictionary=op_dict):
                         elts[0], commands))
             elif elts[0] == 'qubit':  # a line that defines a qubit
                 qubits.append(elts[1])
+            elif len(elts) == 1:
+                asm_file.writelines(operation_dictionary[elts[0]])
             elif len(elts) == 2:
                 asm_file.writelines(operation_dictionary[elts[0]])
             elif len(elts) == 3:
                 asm_file.writelines(operation_dictionary[elts[0]].format(elts[2]))
             else:
+
                 print(elts)
                 print(line)
     asm_file.writelines(ending)

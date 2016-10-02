@@ -19,7 +19,7 @@ def T1(qubit_name, times, clock_cycle=5e-9):
     qasm_file = mopen(filename, mode='w')
     qasm_file.writelines('qubit {} \n'.format(qubit_name))
     for cl in clocks:
-        qasm_file.writelines('\ninit {}  \n'.format(qubit_name))
+        qasm_file.writelines('init_all\n')
         qasm_file.writelines('X {}     # exciting pi pulse\n'.format(
                              qubit_name))
         qasm_file.writelines('I {} {:d} \n'.format(qubit_name, int(cl)))
@@ -54,10 +54,10 @@ def off_on(qubit_name):
     qasm_file.writelines('qubit {} \n'.format(qubit_name))
 
     # Off
-    qasm_file.writelines('\ninit {}  \n'.format(qubit_name))
+    qasm_file.writelines('init_all\n')
     qasm_file.writelines('RO {}  \n'.format(qubit_name))
     # On
-    qasm_file.writelines('\ninit {}  \n'.format(qubit_name))
+    qasm_file.writelines('init_all\n')
     qasm_file.writelines('X {}     # On \n'.format(qubit_name))
     qasm_file.writelines('RO {}  \n'.format(qubit_name))
 
