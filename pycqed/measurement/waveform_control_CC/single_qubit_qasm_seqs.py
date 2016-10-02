@@ -32,24 +32,37 @@ def T1(qubit_name, times, clock_cycle=5e-9):
 
 
 
-def AllXY(qubit, times):
+def AllXY(qubit_name, times):
     raise(NotImplementedError)
 
 
-def Rabi(qubit, amps):
+def Rabi(qubit_name, amps):
     raise(NotImplementedError)
 
 
-def Ramsey(qubit, times):
+def Ramsey(qubit_name, times):
     raise(NotImplementedError)
 
 
-def echo(qubit, times):
+def echo(qubit_name, times):
     raise(NotImplementedError)
 
 
-def off_on(qubit):
-    raise(NotImplementedError)
+def off_on(qubit_name):
+    filename = join(base_qasm_path, 'off_on.qasm')
+    qasm_file = mopen(filename, mode='w')
+    qasm_file.writelines('qubit {} \n'.format(qubit_name))
+
+    # Off
+    qasm_file.writelines('\ninit {}  \n'.format(qubit_name))
+    qasm_file.writelines('RO {}  \n'.format(qubit_name))
+    # On
+    qasm_file.writelines('\ninit {}  \n'.format(qubit_name))
+    qasm_file.writelines('X {}     # On \n'.format(qubit_name))
+    qasm_file.writelines('RO {}  \n'.format(qubit_name))
+
+    qasm_file.close()
+    return qasm_file
 
 
 def butterfly(qubit):

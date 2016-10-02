@@ -76,9 +76,9 @@ if __name__ == '__main__':
         cov = coverage.Coverage(source=['pycqed'])
         cov.start()
 
-    success = _test_core(verbosity=(1 + args.verbose - args.quiet),
-                         failfast=args.failfast,
-                         test_pattern=args.test_pattern)
+    success = test_core(verbosity=(1 + args.verbose - args.quiet),
+                        failfast=args.failfast,
+                        test_pattern=args.test_pattern)
 
     if not args.skip_coverage:
         cov.stop()
