@@ -16,7 +16,7 @@ def test_core(verbosity=1, failfast=False, test_pattern='test*.py'):
     Coverage testing is only available from the command line
     """
 
-    _test_core(verbosity=verbosity, failfast=failfast,
+    return _test_core(verbosity=verbosity, failfast=failfast,
                test_pattern=test_pattern)
 
 
