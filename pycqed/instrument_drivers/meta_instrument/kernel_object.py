@@ -6,7 +6,7 @@ from qcodes.utils import validators as vals
 from qcodes.instrument.parameter import ManualParameter
 
 from measurement.kernel_functions import kernel_generic, htilde_bounce, \
-    htilde_skineffect
+    htilde_skineffect, save_kernel
 
 def bounce_kernel(amp=0.02,time=4,length=601):
     """
@@ -90,7 +90,7 @@ class Distortion(Instrument):
                            vals=vals.Numbers())
 
     def get_bounce_kernel(self):
-        return bounce_kernel(amp=self.bounce_amp(), time=self.bounce_time(),
+        return bounce_kernel(amp=self.bounce_amp(), time=self.bounce_tau(),
                              length=self.bounce_length())
 
     def get_skin_kernel(self):
@@ -121,5 +121,5 @@ class Distortion(Instrument):
                                         length=self.corrections_length())
 
     def save_corrections_kernel(self,filename,kernel_list_before=None):
-      save_kernel(self.get_corrections_kernel(kernel_list_before), save_file=filename)
-      return filename
+        save_kernel(self.get_corrections_kernel(kernel_list_before), save_file=filename)
+        return filename

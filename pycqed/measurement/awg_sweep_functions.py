@@ -77,7 +77,7 @@ class Rabi_2nd_exc(swf.Hard_Sweep):
                                   RO_pars=self.RO_pars,
                                   n=self.n)
 
-class chevron_length(awg_swf.swf.Hard_Sweep):
+class chevron_length(swf.Hard_Sweep):
     def __init__(self, length_vec, mw_pulse_pars,RO_pars,
                  flux_pulse_pars,dist_dict, upload=True, return_seq=False):
         super().__init__()

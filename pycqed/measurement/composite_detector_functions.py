@@ -5,6 +5,8 @@ from measurement import awg_sweep_functions as awg_swf
 from measurement import CBox_sweep_functions as CB_swf
 from measurement import detector_functions as det
 from analysis import measurement_analysis as ma
+from analysis import analysis_toolbox as a_tools
+from analysis import measurement_analysis as MA
 import imp
 import matplotlib.pyplot as plt
 imp.reload(awg_swf)
@@ -990,7 +992,7 @@ class Chevron_optimization_v1(det.Soft_Detector):
     def acquire_data_point(self, **kw):
         # # Before writing it
         # # Summarize what to do:
-        
+
         # # Update kernel from kernel object
         kernel_before = self.dist_dict['ch%d'%self.flux_channel][0]
         kernel_file = 'optimizing_kernel_%s.txt'%a_tools.current_timestamp()
@@ -1011,7 +1013,7 @@ class Chevron_optimization_v1(det.Soft_Detector):
         lengths_cal = lengths_precal[-1] + np.arange(1,1+cal_points)*(lengths_precal[1]-lengths_precal[0])
         lengths = np.concatenate((lengths_precal,lengths_cal))
         # start preparations
-        qubit.prepare_for_timedomain()
+        self.qubit.prepare_for_timedomain()
         chevron_swf = swf.chevron_length(lengths_precal, mw_pulse_pars, RO_pars, flux_pulse_pars, dist_dict=self.dist_dict, upload=False)
 
         # # Upload sequence
@@ -1022,14 +1024,14 @@ class Chevron_optimization_v1(det.Soft_Detector):
         self.awg_amp_par(self.awg_value)
 
         # # Measure a 1D chevron slice at constant amp with MC_nested
-        MC_nested.set_sweep_function(chevron_swf)
-        MC_nested.set_sweep_points(lengths)
-        MC_nested.set_detector_function(qubit.int_avg_det)
-        MC_nested.run('Chevron_slice_%d_Vpp')
+        self.MC_nested.set_sweep_function(chevron_swf)
+        self.MC_nested.set_sweep_points(lengths)
+        self.MC_nested.set_detector_function(self.qubit.int_avg_det)
+        self.MC_nested.run('Chevron_slice_%d_Vpp')
 
         # # fit it
         ma_obj = MA.chevron_optimization_v1(auto=True,label='Chevron_slice')
-        
+
         # # Return the cost function sum(min)+sum(1-max)
         return ma_obj.cost_value, 0.5*ma_obj.period
 
