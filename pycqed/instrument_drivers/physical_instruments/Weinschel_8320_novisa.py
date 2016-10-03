@@ -24,7 +24,7 @@ class Weinschel_8320(Instrument):
         self.connect_message()
 
     def _do_set_attenuation(self, val):
-        cmd_str = '\nATTN ALL {0:0=2d}\r\n'.format(val)
+        cmd_str = '\nATTN ALL {0:0=2d}\r\n'.format(int(val))
         cmd_encoded = cmd_str.encode('ascii')
         tn = telnetlib.Telnet(self.address)
         tn.write(cmd_encoded)
