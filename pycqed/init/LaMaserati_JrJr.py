@@ -31,26 +31,26 @@ root = logging.getLogger()
 root.addHandler(logging.StreamHandler())
 
 # General PycQED modules
-from measurement import measurement_control as mc
-from measurement import sweep_functions as swf
-from measurement import awg_sweep_functions as awg_swf
-from measurement import detector_functions as det
-from measurement import composite_detector_functions as cdet
-from measurement import calibration_toolbox as cal_tools
-from measurement import mc_parameter_wrapper as pw
-from measurement import CBox_sweep_functions as cb_swf
-from measurement.optimization import nelder_mead
-from analysis import measurement_analysis as ma
-from analysis import analysis_toolbox as a_tools
+from pycqed.measurement import measurement_control as mc
+from pycqed.measurement import sweep_functions as swf
+from pycqed.measurement import awg_sweep_functions as awg_swf
+from pycqed.measurement import detector_functions as det
+from pycqed.measurement import composite_detector_functions as cdet
+from pycqed.measurement import calibration_toolbox as cal_tools
+from pycqed.measurement import mc_parameter_wrapper as pw
+from pycqed.measurement import CBox_sweep_functions as cb_swf
+from pycqed.measurement.optimization import nelder_mead
+from pycqed.analysis import measurement_analysis as ma
+from pycqed.analysis import analysis_toolbox as a_tools
 
 
 
-from utilities import general as gen
+from pycqed.utilities import general as gen
 # Standarad awg sequences
-from measurement.waveform_control import pulsar as ps
-from measurement.pulse_sequences import standard_sequences as st_seqs
-from measurement.pulse_sequences import calibration_elements as cal_elts
-from measurement.pulse_sequences import single_qubit_tek_seq_elts as sq
+from pycqed.measurement.waveform_control import pulsar as ps
+from pycqed.measurement.pulse_sequences import standard_sequences as st_seqs
+from pycqed.measurement.pulse_sequences import calibration_elements as cal_elts
+from pycqed.measurement.pulse_sequences import single_qubit_tek_seq_elts as sq
 
 # Instrument drivers
 from qcodes.instrument_drivers.rohde_schwarz import SGS100A as rs
@@ -60,14 +60,14 @@ from qcodes.instrument_drivers.tektronix import AWG5014 as tek
 from qcodes.instrument_drivers.tektronix import AWG520 as tk520
 from qcodes.instrument_drivers.agilent.E8527D import Agilent_E8527D
 
-from instrument_drivers.physical_instruments import QuTech_ControlBoxdriver as qcb
-import instrument_drivers.meta_instrument.qubit_objects.Tektronix_driven_transmon as qbt
-from instrument_drivers.meta_instrument import heterodyne as hd
-import instrument_drivers.meta_instrument.CBox_LookuptableManager as lm
+from pycqed.instrument_drivers.physical_instruments import QuTech_ControlBoxdriver as qcb
+import pycqed.instrument_drivers.meta_instrument.qubit_objects.Tektronix_driven_transmon as qbt
+from pycqed.instrument_drivers.meta_instrument import heterodyne as hd
+import pycqed.instrument_drivers.meta_instrument.CBox_LookuptableManager as lm
 
-from instrument_drivers.meta_instrument.qubit_objects import CBox_driven_transmon as qb
-from instrument_drivers.physical_instruments import QuTech_Duplexer as qdux
-from instrument_drivers.physical_instruments.ZurichInstruments import UHFQuantumController as ZI_UHFQC
+from pycqed.instrument_drivers.meta_instrument.qubit_objects import CBox_driven_transmon as qb
+from pycqed.instrument_drivers.physical_instruments import QuTech_Duplexer as qdux
+from pycqed.instrument_drivers.physical_instruments.ZurichInstruments import UHFQuantumController as ZI_UHFQC
 
 
 # Initializing instruments

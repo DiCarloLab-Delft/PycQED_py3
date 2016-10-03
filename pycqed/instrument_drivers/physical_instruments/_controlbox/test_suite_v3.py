@@ -4,9 +4,10 @@ from . import defHeaders_CBox_v3 as defHeaders
 from . import test_suite
 CBox = None
 
+
 class CBox_tests_v3(test_suite.CBox_tests):
     def __init__(self, *args, **kwargs):
-        super(test_suite.CBox_tests, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.loadSaveDataFile = False
 
     def LoadSavedData(self):

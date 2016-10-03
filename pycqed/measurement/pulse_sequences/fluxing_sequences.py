@@ -11,7 +11,7 @@ from ..waveform_control import element
 from ..waveform_control.element import calculate_time_corr
 from ..waveform_control import pulse
 from ..waveform_control import sequence
-from measurement.pulse_sequences.standard_elements import multi_pulse_elt
+from pycqed.measurement.pulse_sequences.standard_elements import multi_pulse_elt
 
 from importlib import reload
 reload(pulse)

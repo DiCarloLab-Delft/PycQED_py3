@@ -20,7 +20,7 @@ from uuid import getnode as get_mac
 try:
     qc_config
 except NameError:
-    from init.config import setup_dict
+    from pycqed.init.config import setup_dict
     mac = get_mac()
     setup_name = setup_dict.mac_dict[str(mac)]
     logging.warning('Creating qc_config for datadir')

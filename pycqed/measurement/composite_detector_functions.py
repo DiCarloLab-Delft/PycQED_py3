@@ -1,12 +1,11 @@
 import numpy as np
 import time
-from measurement import sweep_functions as swf
-from measurement import awg_sweep_functions as awg_swf
-from measurement import CBox_sweep_functions as CB_swf
-from measurement import detector_functions as det
-from analysis import measurement_analysis as ma
-from analysis import analysis_toolbox as a_tools
-from analysis import measurement_analysis as MA
+from pycqed.measurement import sweep_functions as swf
+from pycqed.measurement import awg_sweep_functions as awg_swf
+from pycqed.measurement import CBox_sweep_functions as CB_swf
+from pycqed.measurement import detector_functions as det
+from pycqed.analysis import measurement_analysis as ma
+from pycqed.analysis import analysis_toolbox as a_tools
 import imp
 import matplotlib.pyplot as plt
 imp.reload(awg_swf)
@@ -33,7 +32,7 @@ class Qubit_Characterization_Detector(det.Soft_Detector):
                  **kw):
         # import placed here to prevent circular import statement
         #   as some cal_tools use composite detectors.
-        from measurement import calibration_toolbox as cal_tools
+        from pycqed.measurement import calibration_toolbox as cal_tools
         imp.reload(cal_tools)
         self.cal_tools = cal_tools
         self.detector_control = 'soft'
@@ -1030,7 +1029,7 @@ class Chevron_optimization_v1(det.Soft_Detector):
         self.MC_nested.run('Chevron_slice_%d_Vpp')
 
         # # fit it
-        ma_obj = MA.chevron_optimization_v1(auto=True,label='Chevron_slice')
+        ma_obj = ma.chevron_optimization_v1(auto=True,label='Chevron_slice')
 
         # # Return the cost function sum(min)+sum(1-max)
         return ma_obj.cost_value, 0.5*ma_obj.period
@@ -2030,7 +2029,7 @@ class Qubit_Spectroscopy(det.Soft_Detector):
 
         # # import placed here to prevent circular import statement
         # #   as some cal_tools use composite detectors.
-        from measurement import calibration_toolbox as cal_tools
+        from pycqed.measurement import calibration_toolbox as cal_tools
         imp.reload(cal_tools)
         self.cal_tools = cal_tools
         self.qubit = qubit
@@ -2215,7 +2214,7 @@ class Tracked_Qubit_Spectroscopy(det.Soft_Detector):
 
         # import placed here to prevent circular import statement
         #   as some cal_tools use composite detectors.
-        from measurement import calibration_toolbox \
+        from pycqed.measurement import calibration_toolbox \
             as cal_tools
         self.cal_tools = cal_tools
         self.qubit = qubit
@@ -2466,7 +2465,7 @@ class Tracked_Qubit_Spectroscopy(det.Soft_Detector):
 #                  pulse_amp_guess=0.7,
 #                  AWG_name='AWG',
 #                  **kw):
-#         from measurement import calibration_toolbox as cal_tools
+#         from pycqed.measurement import calibration_toolbox as cal_tools
 #         imp.reload(cal_tools)
 #         self.detector_control = 'soft'
 #         self.name = 'T1_Detector'

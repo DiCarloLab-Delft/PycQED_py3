@@ -16,10 +16,10 @@ qc_config = {'datadir': 'D:\Experiments\Simultaneous_Driving\data',
 
 
 # General PycQED modules
-from analysis import measurement_analysis as ma
-from analysis import analysis_toolbox as a_tools
+from pycqed.analysis import measurement_analysis as ma
+from pycqed.analysis import analysis_toolbox as a_tools
 import matplotlib.gridspec as gridspec
-from utilities import general as gen
+from pycqed.utilities import general as gen
 import seaborn.apionly as sns
 sns.set_palette('muted')
 cls = (sns.color_palette())

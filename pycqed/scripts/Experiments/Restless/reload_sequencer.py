@@ -1,17 +1,17 @@
-from measurement.waveform_control import pulse
+from pycqed.measurement.waveform_control import pulse
 reload(pulse)
 
-from measurement.waveform_control import pulse_library as pulselib
+from pycqed.measurement.waveform_control import pulse_library as pulselib
 reload(pulselib)
 reload(ps)
-from measurement.waveform_control import element
+from pycqed.measurement.waveform_control import element
 reload(element)
-from measurement.pulse_sequences import single_qubit_tek_seq_elts as sq
+from pycqed.measurement.pulse_sequences import single_qubit_tek_seq_elts as sq
 reload(sq)
-from measurement.pulse_sequences import single_qubit_2nd_exc_seqs as sq2
+from pycqed.measurement.pulse_sequences import single_qubit_2nd_exc_seqs as sq2
 reload(sq2)
 
-from measurement.pulse_sequences import standard_elements as ste
+from pycqed.measurement.pulse_sequences import standard_elements as ste
 reload(ste)
 
 reload(awg_swf)
