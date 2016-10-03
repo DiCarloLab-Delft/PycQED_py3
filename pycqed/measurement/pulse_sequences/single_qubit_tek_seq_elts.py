@@ -547,10 +547,8 @@ def Motzoi_XY(motzois, pulse_pars, RO_pars,
     pulses = get_pulse_dict_from_pars(pulse_pars)
     for i, motzoi in enumerate(motzois):
         pulse_keys = pulse_combinations[i % 2]
-
         for p_name in ['X180', 'Y180', 'X90', 'Y90']:
             pulses[p_name]['motzoi'] = motzoi
-
         if cal_points and (i == (len(motzois)-4) or
                            i == (len(motzois)-3)):
             el = multi_pulse_elt(i, station, [pulses['I'], RO_pars])

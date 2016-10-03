@@ -197,8 +197,37 @@ def off_on(qubit_name):
     return qasm_file
 
 
-def butterfly(qubit):
-    raise(NotImplementedError)
+def butterfly(qubit_name, initialize=False):
+    """
+    Initialize adds an exta measurement before state preparation to allow
+    initialization by post-selection
+
+    The duration of the RO + depletion is specified in the definition of RO
+    """
+    filename = join(base_qasm_path, 'butterfly.qasm')
+    qasm_file = mopen(filename, mode='w')
+    qasm_file.writelines('qubit {} \n'.format(qubit_name))
+    if initialize:
+        qasm_file.writelines('init_all\n')
+        qasm_file.writelines('RO {}  \n'.format(qubit_name))
+        qasm_file.writelines('RO {}  \n'.format(qubit_name))
+        qasm_file.writelines('RO {}  \n'.format(qubit_name))
+
+        qasm_file.writelines('init_all\n')
+        qasm_file.writelines('RO {}  \n'.format(qubit_name))
+        qasm_file.writelines('X180 {}  \n'.format(qubit_name))
+        qasm_file.writelines('RO {}  \n'.format(qubit_name))
+        qasm_file.writelines('RO {}  \n'.format(qubit_name))
+    else:
+        qasm_file.writelines('init_all\n')
+        qasm_file.writelines('RO {}  \n'.format(qubit_name))
+        qasm_file.writelines('RO {}  \n'.format(qubit_name))
+
+        qasm_file.writelines('init_all\n')
+        qasm_file.writelines('X180 {}  \n'.format(qubit_name))
+        qasm_file.writelines('RO {}  \n'.format(qubit_name))
+        qasm_file.writelines('RO {}  \n'.format(qubit_name))
+    return qasm_file
 
 
 def randomized_benchmarking(qubit_name, nr_cliffords, nr_seeds,
@@ -251,5 +280,51 @@ def randomized_benchmarking(qubit_name, nr_cliffords, nr_seeds,
     return qasm_file
 
 
-def MotzoiXY(qubit):
-    raise(NotImplementedError)
+def MotzoiXY(qubit_name, motzois, cal_points=True):
+    '''
+    Sequence used for calibrating the motzoi parameter.
+    Consists of Xy and Yx
+
+    Beware that the elements alternate, if you want to measure both Xy and Yx
+    at each motzoi you need repeating motzoi parameters. This was chosen
+    to be more easily compatible with standard detector functions and sweep pts
+
+    Input pars:
+        motzois:             array of motzoi parameters
+        pulse_pars:          dict containing the pulse parameters
+        RO_pars:             dict containing the RO parameters
+        cal_points:          if True, replaces the last 2*4 segments with
+                             calibration points
+    '''
+    filename = join(base_qasm_path, 'Motzoi_XY.qasm')
+    qasm_file = mopen(filename, mode='w')
+    qasm_file.writelines('qubit {} \n'.format(qubit_name))
+    for i, motzoi in enumerate(motzois):
+        qasm_file.writelines('init_all\n')
+        if cal_points and (i == (len(motzois)-4) or
+                           i == (len(motzois)-3)):
+            qasm_file.writelines('RO {}  \n'.format(qubit_name))
+        elif cal_points and (i == (len(motzois)-2) or
+                             i == (len(motzois)-1)):
+            qasm_file.writelines('X180 {} \n'.format(qubit_name))
+            qasm_file.writelines('RO {}  \n'.format(qubit_name))
+        if i % 2:
+            qasm_file.writelines(
+                'X180_M {} {} \n'.format(qubit_name, motzoi))
+            qasm_file.writelines(
+                'Y90_M {} {} \n'.format(qubit_name, motzoi))
+            qasm_file.writelines('RO {}  \n'.format(qubit_name))
+        else:
+            qasm_file.writelines(
+                'Y180_M {} {} \n'.format(qubit_name, motzoi))
+            qasm_file.writelines(
+                'X90_M {} {} \n'.format(qubit_name, motzoi))
+            qasm_file.writelines('RO {}  \n'.format(qubit_name))
+    qasm_file.close()
+    return qasm_file
+
+
+
+
+
+
