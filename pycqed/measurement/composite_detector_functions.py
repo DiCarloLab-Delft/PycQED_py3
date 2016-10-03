@@ -6,6 +6,7 @@ from pycqed.measurement import CBox_sweep_functions as CB_swf
 from pycqed.measurement import detector_functions as det
 from pycqed.analysis import measurement_analysis as ma
 from pycqed.analysis import analysis_toolbox as a_tools
+from qcodes.instrument.parameter import ManualParameter
 import imp
 import matplotlib.pyplot as plt
 imp.reload(awg_swf)
@@ -982,7 +983,7 @@ class Chevron_optimization_v1(det.Soft_Detector):
             exec('self.AWG.ch{}_amp({})'.format(self.flux_channel, val))
             return val
 
-        self.awg_amp_par = qc.Parameter(name='AWG_amp', units='Vpp', label='AWG Amplitude')
+        self.awg_amp_par = ManualParameter(name='AWG_amp', units='Vpp', label='AWG Amplitude')
         self.awg_amp_par.get = get_awg_amp
         self.awg_amp_par.set = set_awg_amp
         self.awg_value = 2.0
