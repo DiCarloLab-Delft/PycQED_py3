@@ -225,13 +225,7 @@ def print_instr_params(instr):
                                  snapshot['parameters'][par]['value'],
                                  snapshot['parameters'][par]['units']))
 
-def set_integration_weights():
-    trace_length = 512
-    tbase = np.arange(0, 5*trace_length, 5)*1e-9
-    cosI = np.floor(127.*np.cos(2*np.pi*AncB.get('f_RO_mod')*tbase))
-    sinI = np.floor(127.*np.sin(2*np.pi*AncB.get('f_RO_mod')*tbase))
-    CBox.sig0_integration_weights(cosI)
-    CBox.sig1_integration_weights(sinI)
+
 from scripts.Experiments.FiveQubits import common_functions as cfct
 cfct.set_AWG_limits(station,1.7)
 

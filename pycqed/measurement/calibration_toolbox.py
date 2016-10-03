@@ -220,6 +220,110 @@ def mixer_carrier_cancellation_5014(AWG, SH, source, MC,
     print(ch_1_min, ch_2_min)
     return ch_1_min, ch_2_min
 
+def mixer_carrier_cancellation_UHFQC(UHFQC, SH, source, MC,
+                                    frequency=None,
+                                    AWG_channel1=0,
+                                    AWG_channel2=1,
+                                    voltage_grid=[.1, 0.05, 0.02],
+                                    xtol=0.001, **kw):
+    '''
+    Varies the mixer offsets to minimize leakage at the carrier frequency.
+    this is the version for a UHFQC.
+
+    station:    QCodes station object that contains the instruments
+    source:     the source for which carrier leakage must be minimized
+    frequency:  frequency in Hz on which to minimize leakage, if None uses the
+                current frequency of the source
+
+    returns:
+         ch_1_min, ch_2_min
+
+    voltage_grid defines the ranges for the preliminary coarse sweeps.
+    If the range is too small, add another number infront of -0.12
+
+    Note: Updated for QCodes
+    '''
+    ch_1_min = 0  # Initializing variables used later on
+    ch_2_min = 0
+    last_ch_1_min = 1
+    last_ch_2_min = 1
+    ii = 0
+    min_power = 0
+
+    source.on()
+    if frequency is None:
+        frequency = source.get('frequency')
+    else:
+        source.set('frequency', frequency)
+
+    '''
+    Make coarse sweeps to approximate the minimum
+    '''
+    ch1_offset = UHFQC.sigouts_0_offset
+    ch2_offset = UHFQC.sigouts_1_offset
+
+    ch1_swf = UHFQC.sigouts_0_offset
+    ch2_swf = UHFQC.sigouts_1_offset
+    for voltage_span in voltage_grid:
+        # Channel 1
+        MC.set_sweep_function(ch1_swf)
+        MC.set_detector_function(
+            det.Signal_Hound_fixed_frequency(signal_hound=SH,
+                                             frequency=frequency))
+        MC.set_sweep_points(np.linspace(ch_1_min + voltage_span,
+                                        ch_1_min - voltage_span, 11))
+        MC.run(name='Mixer_cal_Offset_%s' % AWG_channel1,
+               sweep_delay=.1, debug_mode=True)
+        Mixer_Calibration_Analysis = MA.Mixer_Calibration_Analysis(
+            label='Mixer_cal', auto=True)
+        ch_1_min = Mixer_Calibration_Analysis.fit_results[0]
+        ch1_offset(ch_1_min)
+
+        # Channel 2
+        MC.set_sweep_function(ch2_swf)
+        MC.set_sweep_points(np.linspace(ch_2_min + voltage_span,
+                                        ch_2_min - voltage_span, 11))
+        MC.run(name='Mixer_cal_Offset_ch%s' % AWG_channel2,
+               sweep_delay=.1, debug_mode=True)
+        Mixer_Calibration_Analysis = MA.Mixer_Calibration_Analysis(
+            label='Mixer_cal', auto=True)
+        ch_2_min = Mixer_Calibration_Analysis.fit_results[0]
+        ch2_offset(ch_2_min)
+
+    # Refine and repeat the sweeps to find the minimum
+    while(abs(last_ch_1_min - ch_1_min) > xtol
+          and abs(last_ch_2_min - ch_2_min) > xtol):
+        ii += 1
+        dac_resolution = 0.001
+        # channel 1 finer sweep
+        MC.set_sweep_function(ch1_swf)
+        MC.set_sweep_points(np.linspace(ch_1_min - dac_resolution*6,
+                            ch_1_min + dac_resolution*6, 13))
+        MC.run(name='Mixer_cal_Offset_%s' % AWG_channel1,
+               sweep_delay=.1, debug_mode=True)
+        Mixer_Calibration_Analysis = MA.Mixer_Calibration_Analysis(
+            label='Mixer_cal', auto=True)
+        last_ch_1_min = ch_1_min
+        ch_1_min = Mixer_Calibration_Analysis.fit_results[0]
+        ch1_offset.set(ch_1_min)
+        # Channel 2 finer sweep
+        MC.set_sweep_function(ch2_swf)
+        MC.set_sweep_points(np.linspace(ch_2_min - dac_resolution*6,
+                                        ch_2_min + dac_resolution*6, 13))
+        MC.run(name='Mixer_cal_Offset_%s' % AWG_channel2,
+               sweep_delay=.1, debug_mode=True)
+        Mixer_Calibration_Analysis = MA.Mixer_Calibration_Analysis(
+            label='Mixer_cal', auto=True)
+        last_ch_2_min = ch_2_min
+        min_power = min(Mixer_Calibration_Analysis.measured_powers)
+        ch_2_min = Mixer_Calibration_Analysis.fit_results[0]
+        ch2_offset.set(ch_2_min)
+
+        if ii > 10:
+            logging.error('Mixer calibration did not converge')
+            break
+    print(ch_1_min, ch_2_min)
+    return ch_1_min, ch_2_min
 
 def mixer_carrier_cancellation_CBox(CBox, SH, source, MC,
                                     frequency=None,
