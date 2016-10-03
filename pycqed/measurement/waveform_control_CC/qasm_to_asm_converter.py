@@ -3,30 +3,22 @@ from os.path import join, dirname, basename, splitext
 base_asm_path = join(dirname(__file__), 'micro_instruction_files')
 
 
-commands = ['qubit', 'init_all', 'X', 'I', 'RO']
-
-op_dict = {'init_all': 'WaitReg r0 \n',
-           'X': 'Trigger 1000000, 2 \n',  # Using marker 1 for the qubit pulse
-           'I': 'mov r1, {} \n WaitReg r1 \n',
-           'RO': 'Trigger 0100000, 4 \n'}  # using marker 2 for the RO trigger
-           #  we could also use multiple instructions
-
 preamble = ('mov r0, 20000   # r0 stores the cycle time , 100 us \n' +
             'mov r1, 0       # sets the inter pulse wait to 0\n' +
             'mov r14, 0      # r14 stores number of repetitions\n' +
             '# Experiment: repeat the rounds for infinite times\n' +
-            'Exp_Start:')
+            'Exp_Start: \n')
 
 ending = 'beq r14, r14, Exp_Start       # Infinite loop'
 
 
-def qasm_to_asm(qasm_filepath, operation_dictionary=op_dict):
+def qasm_to_asm(qasm_filepath, operation_dict):
     """
     Args:
         qasm_filepath: (str) location of the qasm file to convert
-        operation_dictionary: (dict) dictionary containing info required for
+        operation_dict: (dict) dictionary containing info required for
             conversion.
-            operation_dictionary (od) should have the following (nested) structure
+            operation_dict (od) should have the following (nested) structure
             od = {operation: {qubit: {duration_cl: int,
                                       instruction: string}}
 
@@ -51,27 +43,45 @@ def qasm_to_asm(qasm_filepath, operation_dictionary=op_dict):
     with open(qasm_filepath) as qasm_file:
         qubits = []  # the qubits that were defined
         for line in qasm_file:
+            # Make lines interpretable
             line = line.split('#', 1)[0]  # remove comments
             line = line.strip(' \t\n\r')  # remove whitespace
             if (len(line) == 0):  # skip empty line and comment
                 continue
             elts = line.split()
+
+            # Interpret qasm elements
+            commands = list(operation_dict.keys()) + ['qubit']
             if elts[0] not in commands:
                 raise ValueError(
                     'Command "{}" not recognized, must be in {}'.format(
                         elts[0], commands))
-            elif elts[0] == 'qubit':  # a line that defines a qubit
+            # special command: a line that defines a qubit
+            elif elts[0] == 'qubit':
                 qubits.append(elts[1])
             elif len(elts) == 1:
-                asm_file.writelines(operation_dictionary[elts[0]])
+                instruction = operation_dict[elts[0]]['instruction']
+                asm_file.writelines(instruction)
+            # Single qubit operation
             elif len(elts) == 2:
-                asm_file.writelines(operation_dictionary[elts[0]])
+                instruction = operation_dict[elts[0]][elts[1]]['instruction']
+                asm_file.writelines(instruction)
+            # two qubit operation or operation with arg
             elif len(elts) == 3:
-                asm_file.writelines(operation_dictionary[elts[0]].format(elts[2]))
+                # single qubit op with argument
+                if 'instruction' in operation_dict[elts[0]][elts[1]].keys():
+                    base_ins = operation_dict[elts[0]][elts[1]]['instruction']
+                    # string formatting is a constraint now but maybe we can
+                    # come up with something smarter
+                    instruction = base_ins.format(elts[2:])
+                else:
+                    instruction = operation_dict[elts[0]][elts[1]][elts[2]]['instruction']
+                asm_file.writelines(instruction)
             else:
+                raise ValueError('qasm lines has too many args {},{}'.format(
+                                 elts, line))
 
-                print(elts)
-                print(line)
+
     asm_file.writelines(ending)
     asm_file.close()
     return asm_file

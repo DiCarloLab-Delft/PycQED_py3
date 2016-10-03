@@ -552,8 +552,8 @@ class Assembler():
                 instructions.append(int(self.NopFormat(), 2))
 
             else:
-                print('Error: unsupported instruction %s found. Abort!' %
-                      elements[0])
+                raise ValueError('Error: unsupported instruction "{}" found on line "{}". '.format(
+                      elements[0], line))
                 Asm_File.close()
                 return False
 
