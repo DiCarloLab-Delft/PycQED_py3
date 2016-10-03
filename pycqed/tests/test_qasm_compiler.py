@@ -1,6 +1,7 @@
 import numpy as np
 from unittest import TestCase
 from os.path import join, dirname
+from copy import deepcopy
 
 # from qcodes import Instrument
 
@@ -73,11 +74,28 @@ class Test_single_qubit_seqs(TestCase):
         asm = Assembler.Assembler(asm_file.name)
         instructions = asm.convert_to_instructions()
 
-    # def test_qasm_seq_Rabi(self):
-    #     qasm_file = sq_qasm.Rabi(self.qubit_name, amps)
-    #     asm_file = qasm_to_asm(qasm_file.name, self.operation_dict)
-    #     asm = Assembler.Assembler(asm_file.name)
-    #     instructions = asm.convert_to_instructions()
+    def test_qasm_seq_Rabi(self):
+        ext_op_dict = deepcopy(self.operation_dict)
+
+        def Rx_codeword(amp, min_amp=-.5, max_amp=0.5):
+            """
+            maps an amp to a codeword, defining a function like this
+            is NOT the responsibility of the qasm compiler
+            """
+            amp = float(amp)
+            codeword = int((amp-min_amp)/(max_amp - min_amp) * 128-1)
+            return 'Trigger {:07b}, 2 , \n'.format(codeword)
+
+        ext_op_dict['Rx'] = {
+            self.qubit_name: {'instruction': Rx_codeword,
+                              'duration': 2}}
+
+        amps = np.linspace(-.4, .5, 51)  # in V
+
+        qasm_file = sq_qasm.Rabi(self.qubit_name, amps)
+        asm_file = qasm_to_asm(qasm_file.name, ext_op_dict)
+        asm = Assembler.Assembler(asm_file.name)
+        instructions = asm.convert_to_instructions()
 
     # def test_qasm_seq_Ramsey(self):
     #     qasm_file = sq_qasm.Ramsey(self.qubit_name, times)
@@ -179,6 +197,48 @@ class Test_qasm_to_asm(TestCase):
         qasm_file.close()
         with self.assertRaises(ValueError):
             qasm_to_asm(qasm_file.name, self.operation_dict)
+
+    def test_qasm_function_with_string_format_arg(self):
+        ext_op_dict = deepcopy(self.operation_dict)
+
+        filename = join(self.base_qasm_path, 'argument.qasm')
+        qasm_file = mopen(filename, mode='w')
+        qasm_file.writelines('qubit {} \n'.format(self.qubit_name))
+         # test wait argument
+        qasm_file.writelines('I {} 12\n'.format(
+                             self.qubit_name))
+        qasm_file.writelines('I {} 4\n'.format(
+                             self.qubit_name))
+        qasm_file.close()
+        qasm_to_asm(qasm_file.name, ext_op_dict)
+
+    def test_qasm_function_with_function_arg(self):
+        ext_op_dict = deepcopy(self.operation_dict)
+
+        def Rx_codeword(amp, min_amp=-.5, max_amp=0.5):
+            """
+            maps an amp to a codeword, defining a function like this
+            is NOT the responsibility of the qasm compiler
+            """
+            amp = float(amp)
+            codeword = int((amp-min_amp)/(max_amp - min_amp) * 128-1)
+            return 'Trigger {:07b}, 2 , \n'.format(codeword)
+
+        ext_op_dict['Rx'] = {
+            self.qubit_name: {'instruction': Rx_codeword,
+                              'duration': 2}}
+        filename = join(self.base_qasm_path, 'argument.qasm')
+        qasm_file = mopen(filename, mode='w')
+        qasm_file.writelines('qubit {} \n'.format(self.qubit_name))
+         # test wait argument
+        qasm_file.writelines('I {} 12\n'.format(
+                             self.qubit_name))
+        qasm_file.writelines('I {} 4\n'.format(
+                             self.qubit_name))
+        qasm_file.close()
+        qasm_to_asm(qasm_file.name, ext_op_dict)
+
+
 
     def test_too_many_args_command(self):
         filename = join(self.base_qasm_path, 'too_many_args.qasm')

@@ -12,18 +12,27 @@ from pycqed.measurement.randomized_benchmarking import randomized_benchmarking a
 base_qasm_path = join(dirname(__file__), 'qasm_files')
 
 
-def T1(qubit_name, times, clock_cycle=5e-9):
+def T1(qubit_name, times, clock_cycle=5e-9,
+       cal_points=True):
     #
     clocks = np.round(times/clock_cycle)
     filename = join(base_qasm_path, 'T1.qasm')
     qasm_file = mopen(filename, mode='w')
     qasm_file.writelines('qubit {} \n'.format(qubit_name))
-    for cl in clocks:
+    for i, cl in enumerate(clocks):
         qasm_file.writelines('init_all\n')
-        qasm_file.writelines('X180 {}     # exciting pi pulse\n'.format(
-                             qubit_name))
-        qasm_file.writelines('I {} {:d} \n'.format(qubit_name, int(cl)))
-        qasm_file.writelines('RO {}  \n'.format(qubit_name))
+        if cal_points and (i == (len(clocks)-4) or
+                           i == (len(clocks)-3)):
+            qasm_file.writelines('RO {}  \n'.format(qubit_name))
+        elif cal_points and (i == (len(clocks)-2) or
+                             i == (len(clocks)-1)):
+            qasm_file.writelines('X180 {} \n'.format(qubit_name))
+            qasm_file.writelines('RO {}  \n'.format(qubit_name))
+        else:
+            qasm_file.writelines('X180 {}     # exciting pi pulse\n'.format(
+                                 qubit_name))
+            qasm_file.writelines('I {} {:d} \n'.format(qubit_name, int(cl)))
+            qasm_file.writelines('RO {}  \n'.format(qubit_name))
     qasm_file.close()
     return qasm_file
 
@@ -56,8 +65,17 @@ def AllXY(qubit_name, double_points=False):
     return qasm_file
 
 
-def Rabi(qubit_name, amps):
-    raise(NotImplementedError)
+def Rabi(qubit_name, amps, n=1):
+    filename = join(base_qasm_path, 'Rabi_{}.qasm'.format(n))
+    qasm_file = mopen(filename, mode='w')
+    qasm_file.writelines('qubit {} \n'.format(qubit_name))
+    for amp in amps:
+        qasm_file.writelines('init_all\n')
+        for i in range(n):
+            qasm_file.writelines('Rx {} {} \n'.format(qubit_name, amp))
+        qasm_file.writelines('RO {}  \n'.format(qubit_name))
+    qasm_file.close()
+    return qasm_file
 
 
 def Ramsey(qubit_name, times):

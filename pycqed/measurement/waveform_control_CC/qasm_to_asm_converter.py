@@ -20,13 +20,12 @@ def qasm_to_asm(qasm_filepath, operation_dict):
             conversion.
             operation_dict (od) should have the following (nested) structure
             od = {operation: {qubit: {duration_cl: int,
-                                      instruction: string}}
+                                      instruction: string or function}}
 
             todo: how to format multi-qubit operations in
                 a) qubit key -> qubits key, combined string with dash
                 b) qubit key1 -> leads to operation or to nested dict with
                                 qubit_key2 that contains the 2-qubit operation
-            todo: dealing with operation args e.g. wait time or angle/phase
             todo: error messages
                 1) undefined operation error
                 2) operation not defined for qubit ""
@@ -73,11 +72,14 @@ def qasm_to_asm(qasm_filepath, operation_dict):
                     base_ins = operation_dict[elts[0]][elts[1]]['instruction']
                     # string formatting is a constraint now but maybe we can
                     # come up with something smarter
-                    instruction = base_ins.format(elts[2:])
+                    if isinstance(base_ins, str):
+                        instruction = base_ins.format(elts[2])
+                    else:
+                        instruction = base_ins(elts[2])
                 else:
                     instruction = operation_dict[elts[0]][elts[1]][elts[2]]['instruction']
                 asm_file.writelines(instruction)
-            else:
+            else: # no support yet for multi qubit ops with arguments
                 raise ValueError('qasm lines has too many args {},{}'.format(
                                  elts, line))
 

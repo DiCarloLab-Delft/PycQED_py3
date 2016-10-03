@@ -300,12 +300,13 @@ class Assembler():
     # trigger mask, duration
     def TriggerFormat(self, mask, imm11):
         if len(mask) != 7:
-            raise ValueError("The mask should be 7 bits. \
+            raise ValueError('The mask "{}" should be 7 bits. \
                               With the MSb indicating marker 1, \
-                              and the LSb indicating marker 7.")
+                              and the LSb indicating marker 7.'.format(mask))
         for b in mask:
             if (b != '0' and b != '1'):
-                raise ValueError("The mask should only contain 1 or 0.")
+                raise ValueError(
+                    'The mask "{}" should only contain 1 or 0.'.format(mask))
 
         # In the core of 3.1.0, the MSb works for the trigger 7.
         # Reverse the string so that the MSb works for trigger 1.
