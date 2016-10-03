@@ -4,7 +4,7 @@ Library containing pulse shapes.
 '''
 
 
-from measurement.waveform_control.pulse import Pulse, apply_modulation
+from pycqed.measurement.waveform_control.pulse import Pulse, apply_modulation
 
 
 class MW_IQmod_pulse(Pulse):

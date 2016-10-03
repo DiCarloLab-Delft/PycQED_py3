@@ -2,7 +2,7 @@ import numpy as np
 from qcodes.instrument.base import Instrument
 from qcodes.utils.validators import Numbers, Enum, Ints
 from qcodes.instrument.parameter import ManualParameter
-from analysis.tools.data_manipulation import count_error_fractions
+from pycqed.analysis.tools.data_manipulation import count_error_fractions
 
 
 class FlippingModel(Instrument):

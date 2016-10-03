@@ -8,7 +8,7 @@ from qcodes.instrument.base import Instrument
 from qcodes.utils import validators as vals
 from qcodes.instrument.parameter import ManualParameter
 # Used for uploading the right AWG sequences
-from measurement.pulse_sequences import standard_sequences as st_seqs
+from pycqed.measurement.pulse_sequences import standard_sequences as st_seqs
 
 
 class HeterodyneInstrument(Instrument):

@@ -5,19 +5,21 @@ from math import gcd
 from qcodes.utils import validators as vals
 from qcodes.instrument.parameter import ManualParameter
 
-from measurement import detector_functions as det
-from measurement import composite_detector_functions as cdet
-from measurement import mc_parameter_wrapper as pw
+from pycqed.measurement import detector_functions as det
+from pycqed.measurement import composite_detector_functions as cdet
+from pycqed.measurement import mc_parameter_wrapper as pw
 
-from measurement import sweep_functions as swf
-from measurement import CBox_sweep_functions as cb_swf
-from measurement import awg_sweep_functions as awg_swf
-from analysis import measurement_analysis as ma
-from measurement.pulse_sequences import standard_sequences as st_seqs
+from pycqed.measurement import sweep_functions as swf
+from pycqed.measurement import CBox_sweep_functions as cb_swf
+from pycqed.measurement import awg_sweep_functions as awg_swf
+from pycqed.analysis import measurement_analysis as ma
+from pycqed.measurement.pulse_sequences import standard_sequences as st_seqs
 import measurement.randomized_benchmarking.randomized_benchmarking as rb
-from measurement.calibration_toolbox import mixer_carrier_cancellation_5014
-from measurement.calibration_toolbox import mixer_skewness_calibration_5014
-from measurement.optimization import nelder_mead
+
+from pycqed.measurement.calibration_toolbox import mixer_carrier_cancellation_5014
+from pycqed.measurement.calibration_toolbox import mixer_carrier_cancellation_UHFQC
+from pycqed.measurement.calibration_toolbox import mixer_skewness_calibration_5014
+from pycqed.measurement.optimization import nelder_mead
 
 import measurement.pulse_sequences.single_qubit_tek_seq_elts as sq
 
@@ -283,13 +285,11 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
             self.AWG.set(self.RO_Q_channel.get()+'_offset',
                          self.RO_Q_offset.get())
         elif self.RO_pulse_type.get() is 'MW_IQmod_pulse_nontek':
-            print('no specific settings for now, all done from the sequencer')
-            # the following is UHFQC specific
-            #self._acquisition_instr.AWG_file('traditional_IQ_mod_readout.seqc')
+            print('this part is UHFQC specific')
+            eval('self._acquisition_instr.sigouts_{}_offset({})'.format(self.RO_I_channel(),self.RO_I_offset()))
+            eval('self._acquisition_instr.sigouts_{}_offset({})'.format(self.RO_Q_channel(),self.RO_Q_offset()))
         elif self.RO_pulse_type.get() is 'Gated_MW_RO_pulse':
-            self.rf_RO_source.on()
-            self.rf_RO_source.pulsemod_state.set('on')
-            self.rf_RO_source.frequency(self.f_RO.get())
+            self.rf_RO_source.pulsemod_stateself.ac.set('on')
             self.rf_RO_source.power(self.RO_pulse_power.get())
         self.rf_RO_source.frequency(self.f_RO())
         self.rf_RO_source.power(self.RO_pulse_power())
@@ -335,6 +335,35 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
             if offs_type == 'RO':
                 self.RO_I_offset.set(offset_I)
                 self.RO_Q_offset.set(offset_Q)
+
+    def calibrate_mixer_offsets_IQ_mod_RO_UHFQC(self, signal_hound,
+                                update=True):
+        '''
+        input:
+            signal_hound: instance of the SH instrument
+            offs_type:         ['pulse' | 'RO'] whether to calibrate the
+                                            RO or pulse IQ offsets
+            update:        update the values in the qubit object
+
+        Calibrates the mixer skewness and updates the I and Q offsets in
+        the qubit object.
+        signal hound needs to be given as it this is not part of the qubit
+        object in order to reduce dependencies.
+        '''
+        # ensures freq is set correctly
+        # Still need to test this, start by doing this in notebook
+        self.prepare_for_timedomain()
+        self.AWG.stop()  # Make sure no waveforms are played
+        AWG_channel1 = self.RO_I_channel.get()
+        AWG_channel2 = self.RO_Q_channel.get()
+        source = self.LO
+        offset_I, offset_Q = mixer_carrier_cancellation_UHFQC(
+            UHFQC=self._acquisition_instr, SH=signal_hound, source=source, MC=self.MC,
+            AWG_channel1=AWG_channel1, AWG_channel2=AWG_channel2)
+
+        if update:
+            self.RO_I_offset.set(offset_I)
+            self.RO_Q_offset.set(offset_Q)
 
     def calibrate_mixer_skewness(self, signal_hound, station, update=True):
         '''

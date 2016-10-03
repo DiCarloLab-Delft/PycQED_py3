@@ -1,0 +1,12 @@
+[run]
+omit =
+    __init__.py
+    */__init__.py
+    test.py
+    tests/*
+    instrument_drivers/*
+    instrument_drivers/*/*
+    scripts/*
+    utils/reload_code.py
+    version.py
+

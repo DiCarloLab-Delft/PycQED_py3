@@ -1,10 +1,14 @@
 import os
 # import qt
 import h5py
-from analysis import analysis_toolbox as a_tools
+from pycqed.analysis import analysis_toolbox as a_tools
+import errno
 
 import sys
 import glob
+from os.path import join, dirname, exists
+from os import makedirs
+
 
 
 def get_git_revision_hash():
@@ -20,6 +24,33 @@ def get_git_revision_hash():
         hash = '00000'
 
     return hash
+
+
+def str_to_bool(s):
+    valid = {'true': True, 't': True, '1': True,
+             'false': False, 'f': False, '0': False, }
+    if s.lower() not in valid:
+        raise KeyError('{} not a valid boolean string'.format(s))
+    b = valid[s.lower()]
+    return b
+
+
+def bool_to_int_str(b):
+    if b:
+        return '1'
+    else:
+        return '0'
+
+
+def mopen(filename, mode='w'):
+    if not exists(dirname(filename)):
+        try:
+            makedirs(dirname(filename))
+        except OSError as exc:  # Guard against race condition
+            if exc.errno != errno.EEXIST:
+                raise
+    file = open(filename, mode='w')
+    return file
 
 
 def dict_to_ordered_tuples(dic):

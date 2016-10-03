@@ -1,10 +1,10 @@
 import numpy as np
 import logging
-from measurement import sweep_functions as swf
-from measurement.randomized_benchmarking import randomized_benchmarking as rb
-from measurement.pulse_sequences import standard_sequences as st_seqs
-from measurement.pulse_sequences import single_qubit_tek_seq_elts as sqs
-from measurement.pulse_sequences import single_qubit_2nd_exc_seqs as sqs2
+from pycqed.measurement import sweep_functions as swf
+from pycqed.measurement.randomized_benchmarking import randomized_benchmarking as rb
+from pycqed.measurement.pulse_sequences import standard_sequences as st_seqs
+from pycqed.measurement.pulse_sequences import single_qubit_tek_seq_elts as sqs
+from pycqed.measurement.pulse_sequences import single_qubit_2nd_exc_seqs as sqs2
 default_gauss_width = 10  # magic number should be removed,
 # note magic number only used in old mathematica seqs
 
@@ -77,7 +77,7 @@ class Rabi_2nd_exc(swf.Hard_Sweep):
                                   RO_pars=self.RO_pars,
                                   n=self.n)
 
-class chevron_length(awg_swf.swf.Hard_Sweep):
+class chevron_length(swf.Hard_Sweep):
     def __init__(self, length_vec, mw_pulse_pars,RO_pars,
                  flux_pulse_pars,dist_dict, upload=True, return_seq=False):
         super().__init__()
