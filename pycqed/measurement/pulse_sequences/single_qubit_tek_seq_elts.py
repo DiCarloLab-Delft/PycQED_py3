@@ -483,38 +483,38 @@ def Randomized_Benchmarking_seq(pulse_pars, RO_pars,
     net_cliffords = [0, 3]  # Exists purely for the double curves mode
     i = 0
     for seed in range(nr_seeds):
-            for j, n_cl in enumerate(nr_cliffords):
-                if double_curves:
-                    net_clifford = net_cliffords[i%2]
-                i += 1  # only used for ensuring unique elt names
+        for j, n_cl in enumerate(nr_cliffords):
+            if double_curves:
+                net_clifford = net_cliffords[i%2]
+            i += 1  # only used for ensuring unique elt names
 
-                if cal_points and (j == (len(nr_cliffords)-4) or
-                                   j == (len(nr_cliffords)-3)):
-                    el = multi_pulse_elt(i, station,
-                                         [pulses['I'], RO_pars])
-                elif cal_points and (j == (len(nr_cliffords)-2) or
-                                     j == (len(nr_cliffords)-1)):
-                    el = multi_pulse_elt(i, station,
-                                         [pulses['X180'], RO_pars])
-                else:
-                    cl_seq = rb.randomized_benchmarking_sequence(
-                        n_cl, desired_net_cl=net_clifford)
-                    pulse_keys = rb.decompose_clifford_seq(cl_seq)
-                    pulse_list = [pulses[x] for x in pulse_keys]
-                    pulse_list += [RO_pars]
-                    # copy first element and set extra wait
-                    pulse_list[0] = deepcopy(pulse_list[0])
-                    pulse_list[0]['pulse_delay'] += post_msmt_delay
-                    el = multi_pulse_elt(i, station, pulse_list)
+            if cal_points and (j == (len(nr_cliffords)-4) or
+                               j == (len(nr_cliffords)-3)):
+                el = multi_pulse_elt(i, station,
+                                     [pulses['I'], RO_pars])
+            elif cal_points and (j == (len(nr_cliffords)-2) or
+                                 j == (len(nr_cliffords)-1)):
+                el = multi_pulse_elt(i, station,
+                                     [pulses['X180'], RO_pars])
+            else:
+                cl_seq = rb.randomized_benchmarking_sequence(
+                    n_cl, desired_net_cl=net_clifford)
+                pulse_keys = rb.decompose_clifford_seq(cl_seq)
+                pulse_list = [pulses[x] for x in pulse_keys]
+                pulse_list += [RO_pars]
+                # copy first element and set extra wait
+                pulse_list[0] = deepcopy(pulse_list[0])
+                pulse_list[0]['pulse_delay'] += post_msmt_delay
+                el = multi_pulse_elt(i, station, pulse_list)
+            el_list.append(el)
+            seq.append_element(el, trigger_wait=True)
+
+            # If the element is too long, add in an extra wait elt
+            # to skip a trigger
+            if resetless and n_cl*pulse_pars['pulse_delay']*1.875 > 50e-6:
+                el = multi_pulse_elt(i, station, [pulses['I']])
                 el_list.append(el)
                 seq.append_element(el, trigger_wait=True)
-
-                # If the element is too long, add in an extra wait elt
-                # to skip a trigger
-                if resetless and n_cl*pulse_pars['pulse_delay']*1.875 > 50e-6:
-                    el = multi_pulse_elt(i, station, [pulses['I']])
-                    el_list.append(el)
-                    seq.append_element(el, trigger_wait=True)
     if upload:
         station.components['AWG'].stop()
         station.pulsar.program_awg(seq, *el_list, verbose=verbose)

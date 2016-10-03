@@ -30,14 +30,28 @@ class Test_single_qubit_seqs(TestCase):
         # a sample operation dictionary for testing
         self.operation_dict = {
             'init_all': {'instruction': 'WaitReg r0 \n'},
-            'X': {self.qubit_name: {'duration': 2,
-                                    'instruction': 'Trigger 1000000, 2 \n'}},
-            'Y': {self.qubit_name: {'duration': 2,
-                                    'instruction': 'Trigger 0100000, 2 \n'}},
-            'I': {self.qubit_name: {'duration': None,
-                                    'instruction': 'wait {} \n'}},
-            'RO': {self.qubit_name: {'duration': 8,
-                                     'instruction': 'Trigger 0010000, 2 \n'}}
+            'X180': {self.qubit_name: {
+                'duration': 2, 'instruction': 'Trigger 1000000, 2 \n'}},
+            'X90': {self.qubit_name: {
+                'duration': 2, 'instruction': 'Trigger 0100000, 2 \n'}},
+            'Y180': {self.qubit_name: {
+                'duration': 2, 'instruction': 'Trigger 0100000, 2 \n'}},
+            'Y90': {self.qubit_name: {
+                'duration': 2, 'instruction': 'Trigger 0100000, 2 \n'}},
+
+            'mX180': {self.qubit_name: {
+                'duration': 2, 'instruction': 'Trigger 1000000, 2 \n'}},
+            'mX90': {self.qubit_name: {
+                'duration': 2, 'instruction': 'Trigger 0100000, 2 \n'}},
+            'mY180': {self.qubit_name: {
+                'duration': 2, 'instruction': 'Trigger 0100000, 2 \n'}},
+            'mY90': {self.qubit_name: {
+                'duration': 2, 'instruction': 'Trigger 0100000, 2 \n'}},
+
+            'I': {self.qubit_name: {
+                'duration': None, 'instruction': 'wait {} \n'}},
+            'RO': {self.qubit_name: {
+                'duration': 8, 'instruction': 'Trigger 0010000, 2 \n'}}
                                 }
 
     def test_qasm_seq_T1(self):
@@ -53,11 +67,11 @@ class Test_single_qubit_seqs(TestCase):
         asm = Assembler.Assembler(asm_file.name)
         instructions = asm.convert_to_instructions()
 
-    # def test_qasm_seq_AllXY(self):
-    #     qasm_file = sq_qasm.AllXY(self.qubit_name, times)
-    #     asm_file = qasm_to_asm(qasm_file.name, self.operation_dict)
-    #     asm = Assembler.Assembler(asm_file.name)
-    #     instructions = asm.convert_to_instructions()
+    def test_qasm_seq_AllXY(self):
+        qasm_file = sq_qasm.AllXY(self.qubit_name)
+        asm_file = qasm_to_asm(qasm_file.name, self.operation_dict)
+        asm = Assembler.Assembler(asm_file.name)
+        instructions = asm.convert_to_instructions()
 
     # def test_qasm_seq_Rabi(self):
     #     qasm_file = sq_qasm.Rabi(self.qubit_name, amps)
@@ -89,11 +103,22 @@ class Test_single_qubit_seqs(TestCase):
     #     asm = Assembler.Assembler(asm_file.name)
     #     instructions = asm.convert_to_instructions()
 
-    # def test_qasm_seq_randomized_benchmarking(self):
-    #     qasm_file = sq_qasm.randomized_benchmarking(self.qubit_name)
-    #     asm_file = qasm_to_asm(qasm_file.name, self.operation_dict)
-    #     asm = Assembler.Assembler(asm_file.name)
-    #     instructions = asm.convert_to_instructions()
+    def test_qasm_seq_randomized_benchmarking(self):
+        nr_cliffords = (2**(np.arange(10)+1))
+        nr_seeds = 10
+        qasm_file = sq_qasm.randomized_benchmarking(self.qubit_name,
+                                                    nr_cliffords, nr_seeds,
+                                                    double_curves=True)
+        asm_file = qasm_to_asm(qasm_file.name, self.operation_dict)
+        asm = Assembler.Assembler(asm_file.name)
+        instructions = asm.convert_to_instructions()
+
+        qasm_file = sq_qasm.randomized_benchmarking(self.qubit_name,
+                                                    nr_cliffords, nr_seeds,
+                                                    double_curves=False)
+        asm_file = qasm_to_asm(qasm_file.name, self.operation_dict)
+        asm = Assembler.Assembler(asm_file.name)
+        instructions = asm.convert_to_instructions()
 
     # def test_qasm_seq_MotzoiXY(self):
     #     qasm_file = sq_qasm.MotzoiXY(self.qubit_name)
@@ -125,18 +150,18 @@ class Test_qasm_to_asm(TestCase):
         # a sample operation dictionary for testing
         self.operation_dict = {
             'init_all': {'instruction': 'WaitReg r0 \n'},
-            'X': {self.qubit_name: {'duration': 2,
-                                    'instruction': 'Trigger 1000000, 2 \n'}},
-            'Y': {self.qubit_name: {'duration': 2,
-                                    'instruction': 'Trigger 0100000, 2 \n'}},
-            'I': {self.qubit_name: {'duration': None,
-                                    'instruction': 'wait {} \n'}},
-            'RO': {self.qubit_name: {'duration': 8,
-                                     'instruction': 'Trigger 0010000, 2 \n'}}
+            'X180': {self.qubit_name: {
+                     'duration': 2, 'instruction': 'Trigger 1000000, 2 \n'}},
+            'Y180': {self.qubit_name: {
+                'duration': 2, 'instruction': 'Trigger 0100000, 2 \n'}},
+            'I': {self.qubit_name: {
+                'duration': None, 'instruction': 'wait {} \n'}},
+            'RO': {self.qubit_name: {
+                'duration': 8, 'instruction': 'Trigger 0010000, 2 \n'}}
                                 }
 
     def test_empty_qasm_file(self):
-        filename = join(self.base_qasm_path, 'T1.qasm')
+        filename = join(self.base_qasm_path, 'empty.qasm')
         qasm_file = mopen(filename, mode='w')
         qasm_file.writelines('qubit {} \n'.format(self.qubit_name))
         qasm_file.close()
@@ -144,8 +169,9 @@ class Test_qasm_to_asm(TestCase):
         asm = Assembler.Assembler(asm_file.name)
         instructions = asm.convert_to_instructions()
 
+
     def test_invalid_command(self):
-        filename = join(self.base_qasm_path, 'T1.qasm')
+        filename = join(self.base_qasm_path, 'invalid_command.qasm')
         qasm_file = mopen(filename, mode='w')
         qasm_file.writelines('qubit {} \n'.format(self.qubit_name))
         qasm_file.writelines('Xbla {}     # invalid cmd\n'.format(
@@ -153,6 +179,24 @@ class Test_qasm_to_asm(TestCase):
         qasm_file.close()
         with self.assertRaises(ValueError):
             qasm_to_asm(qasm_file.name, self.operation_dict)
+
+    def test_too_many_args_command(self):
+        filename = join(self.base_qasm_path, 'too_many_args.qasm')
+        qasm_file = mopen(filename, mode='w')
+        qasm_file.writelines('qubit {} \n'.format(self.qubit_name))
+        # leaving out the \n prevents the line from breaking
+        qasm_file.writelines('X180 {}'.format(
+                             self.qubit_name))
+        qasm_file.writelines('X180 {}'.format(
+                             self.qubit_name))
+        qasm_file.writelines('Y180 {}'.format(
+                             self.qubit_name))
+
+        qasm_file.close()
+        with self.assertRaises(ValueError):
+            qasm_to_asm(qasm_file.name, self.operation_dict)
+
+
 
 
 

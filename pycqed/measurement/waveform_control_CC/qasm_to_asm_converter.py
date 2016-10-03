@@ -81,7 +81,6 @@ def qasm_to_asm(qasm_filepath, operation_dict):
                 raise ValueError('qasm lines has too many args {},{}'.format(
                                  elts, line))
 
-
     asm_file.writelines(ending)
     asm_file.close()
     return asm_file
