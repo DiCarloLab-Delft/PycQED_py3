@@ -78,12 +78,106 @@ def Rabi(qubit_name, amps, n=1):
     return qasm_file
 
 
-def Ramsey(qubit_name, times):
-    raise(NotImplementedError)
+def Ramsey(qubit_name, times, clock_cycle=5e-9,
+           artificial_detuning=4,
+           cal_points=True):
+    '''
+    Ramsey sequence for a single qubit.
+    Input pars:
+        times:               array of times between (start of) pulses (s)
+        pulse_pars:          dict containing the pulse parameters
+        RO_pars:             dict containing the RO parameters
+        artificial_detuning: int,  float or None;
+            if int: number of wiggles
+            if float: artificial_detuning in (Hz)
+            if None: adds no artificial detuning
+                implemented using phase of the second pi/2 pulse
+        cal_points:          whether to use calibration points or not
+    '''
+    # if int interpret artificial detuning as desired nr of wiggles
+    if isinstance(artificial_detuning, int):
+        phases = (360*np.arange(len(times))/(len(times)-4*cal_points) *
+                  artificial_detuning % 360)
+    # if float interpret it as artificial detuning in Hz
+    elif isinstance(artificial_detuning, float):
+        phases = (artificial_detuning*times % 1)*360
+    elif artificial_detuning is None:
+        phases = np.zeros(len(times))
+
+    clocks = np.round(times/clock_cycle)
+    filename = join(base_qasm_path, 'T1.qasm')
+    qasm_file = mopen(filename, mode='w')
+    qasm_file.writelines('qubit {} \n'.format(qubit_name))
+    for i, cl in enumerate(clocks):
+        qasm_file.writelines('init_all\n')
+        if cal_points and (i == (len(clocks)-4) or
+                           i == (len(clocks)-3)):
+            qasm_file.writelines('RO {}  \n'.format(qubit_name))
+        elif cal_points and (i == (len(clocks)-2) or
+                             i == (len(clocks)-1)):
+            qasm_file.writelines('X180 {} \n'.format(qubit_name))
+            qasm_file.writelines('RO {}  \n'.format(qubit_name))
+
+        else:
+            qasm_file.writelines('X90 {}     \n'.format(
+                                 qubit_name))
+            qasm_file.writelines('I {} {:d} \n'.format(qubit_name, int(cl)))
+            qasm_file.writelines('R90_phi {} {}\n'.format(
+                qubit_name, phases[i]))
+            qasm_file.writelines('RO {}  \n'.format(qubit_name))
+    qasm_file.close()
+    return qasm_file
 
 
-def echo(qubit_name, times):
-    raise(NotImplementedError)
+def echo(qubit_name, times, clock_cycle=5e-9,
+         artificial_detuning=4,
+         cal_points=True):
+    '''
+    Echo sequence for a single qubit.
+    Input pars:
+        times:               array of times between (start of) pulses (s)
+        pulse_pars:          dict containing the pulse parameters
+        RO_pars:             dict containing the RO parameters
+        artificial_detuning: int,  float or None;
+            if int: number of wiggles
+            if float: artificial_detuning in (Hz)
+            if None: adds no artificial detuning
+                implemented using phase of the second pi/2 pulse
+        cal_points:          whether to use calibration points or not
+    '''
+    # if int interpret artificial detuning as desired nr of wiggles
+    if isinstance(artificial_detuning, int):
+        phases = (360*np.arange(len(times))/(len(times)-4*cal_points) *
+                  artificial_detuning % 360)
+    # if float interpret it as artificial detuning in Hz
+    elif isinstance(artificial_detuning, float):
+        phases = (artificial_detuning*times % 1)*360
+    elif artificial_detuning is None:
+        phases = np.zeros(len(times))
+
+    clocks = np.round(times/clock_cycle)
+    filename = join(base_qasm_path, 'T1.qasm')
+    qasm_file = mopen(filename, mode='w')
+    qasm_file.writelines('qubit {} \n'.format(qubit_name))
+    for i, cl in enumerate(clocks):
+        qasm_file.writelines('init_all\n')
+        if cal_points and (i == (len(clocks)-4) or
+                           i == (len(clocks)-3)):
+            qasm_file.writelines('RO {}  \n'.format(qubit_name))
+        elif cal_points and (i == (len(clocks)-2) or
+                             i == (len(clocks)-1)):
+            qasm_file.writelines('X180 {} \n'.format(qubit_name))
+            qasm_file.writelines('RO {}  \n'.format(qubit_name))
+        else:
+            qasm_file.writelines('X90 {}     \n'.format(qubit_name))
+            qasm_file.writelines('I {} {:d} \n'.format(qubit_name, int(cl//2)))
+            qasm_file.writelines('X180 {}     \n'.format(qubit_name))
+            qasm_file.writelines('I {} {:d} \n'.format(qubit_name, int(cl//2)))
+            qasm_file.writelines('R90_phi {} {}\n'.format(
+                qubit_name, phases[i]))
+            qasm_file.writelines('RO {}  \n'.format(qubit_name))
+    qasm_file.close()
+    return qasm_file
 
 
 def off_on(qubit_name):

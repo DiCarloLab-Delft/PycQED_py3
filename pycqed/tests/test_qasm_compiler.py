@@ -27,7 +27,7 @@ class Test_single_qubit_seqs(TestCase):
         #     self.qubit = Instrument.find_instrument('q0_test').close()
         #     self.qubit = Transmon('q0_test', server_name=None)
         self.qubit_name = 'q0'  # self.qubit.name
-
+        self.times = np.linspace(20e-9, 50e-6, 61)
         # a sample operation dictionary for testing
         self.operation_dict = {
             'init_all': {'instruction': 'WaitReg r0 \n'},
@@ -55,9 +55,34 @@ class Test_single_qubit_seqs(TestCase):
                 'duration': 8, 'instruction': 'Trigger 0010000, 2 \n'}}
                                 }
 
+        def Rx_codeword(amp, min_amp=-.5, max_amp=0.5):
+            """
+            maps an amp to a codeword, defining a function like this
+            is NOT the responsibility of the qasm compiler
+            """
+            amp = float(amp)
+            codeword = int((amp-min_amp)/(max_amp - min_amp) * 128-1)
+            return 'Trigger {:07b}, 2 , \n'.format(codeword)
+        self.operation_dict['Rx'] = {
+            self.qubit_name: {'instruction': Rx_codeword,
+                              'duration': 2}}
+
+        def Rphi_codeword(phase):
+            """
+            maps an phase to a codeword, defining a function like this
+            is NOT the responsibility of the qasm compiler
+            """
+            phase = float(phase)  # input is in degrees
+            codeword = int(phase/10+10)  # resolution will be up to 10 deg
+            return 'Trigger {:07b}, 2 , \n'.format(codeword)
+
+        self.operation_dict['R90_phi'] = {
+            self.qubit_name: {'instruction': Rphi_codeword,
+                              'duration': 2}}
+
     def test_qasm_seq_T1(self):
-        times = np.linspace(20e-9, 50e-6, 61)
-        qasm_file = sq_qasm.T1(self.qubit_name, times)
+
+        qasm_file = sq_qasm.T1(self.qubit_name, self.times)
         asm_file = qasm_to_asm(qasm_file.name, self.operation_dict)
         asm = Assembler.Assembler(asm_file.name)
         instructions = asm.convert_to_instructions()
@@ -75,39 +100,69 @@ class Test_single_qubit_seqs(TestCase):
         instructions = asm.convert_to_instructions()
 
     def test_qasm_seq_Rabi(self):
-        ext_op_dict = deepcopy(self.operation_dict)
-
-        def Rx_codeword(amp, min_amp=-.5, max_amp=0.5):
-            """
-            maps an amp to a codeword, defining a function like this
-            is NOT the responsibility of the qasm compiler
-            """
-            amp = float(amp)
-            codeword = int((amp-min_amp)/(max_amp - min_amp) * 128-1)
-            return 'Trigger {:07b}, 2 , \n'.format(codeword)
-
-        ext_op_dict['Rx'] = {
-            self.qubit_name: {'instruction': Rx_codeword,
-                              'duration': 2}}
-
         amps = np.linspace(-.4, .5, 51)  # in V
-
         qasm_file = sq_qasm.Rabi(self.qubit_name, amps)
-        asm_file = qasm_to_asm(qasm_file.name, ext_op_dict)
+        asm_file = qasm_to_asm(qasm_file.name, self.operation_dict)
         asm = Assembler.Assembler(asm_file.name)
         instructions = asm.convert_to_instructions()
 
-    # def test_qasm_seq_Ramsey(self):
-    #     qasm_file = sq_qasm.Ramsey(self.qubit_name, times)
-    #     asm_file = qasm_to_asm(qasm_file.name, self.operation_dict)
-    #     asm = Assembler.Assembler(asm_file.name)
-    #     instructions = asm.convert_to_instructions()
+    def test_qasm_seq_Ramsey(self):
+        qasm_file = sq_qasm.Ramsey(self.qubit_name, self.times)
+        asm_file = qasm_to_asm(qasm_file.name, self.operation_dict)
+        asm = Assembler.Assembler(asm_file.name)
+        instructions = asm.convert_to_instructions()
 
-    # def test_qasm_seq_echo(self):
-    #     qasm_file = sq_qasm.echo(self.qubit_name, times)
-    #     asm_file = qasm_to_asm(qasm_file.name, self.operation_dict)
-    #     asm = Assembler.Assembler(asm_file.name)
-    #     instructions = asm.convert_to_instructions()
+        qasm_file = sq_qasm.Ramsey(self.qubit_name, self.times)
+        asm_file = qasm_to_asm(qasm_file.name, self.operation_dict)
+        asm = Assembler.Assembler(asm_file.name)
+        instructions = asm.convert_to_instructions()
+
+        qasm_file = sq_qasm.Ramsey(self.qubit_name, self.times,
+                                   artificial_detuning=4/self.times[-4])
+        asm_file = qasm_to_asm(qasm_file.name, self.operation_dict)
+        asm = Assembler.Assembler(asm_file.name)
+        instructions = asm.convert_to_instructions()
+
+        qasm_file = sq_qasm.Ramsey(self.qubit_name, self.times,
+                                   artificial_detuning=None)
+        asm_file = qasm_to_asm(qasm_file.name, self.operation_dict)
+        asm = Assembler.Assembler(asm_file.name)
+        instructions = asm.convert_to_instructions()
+
+        qasm_file = sq_qasm.Ramsey(self.qubit_name, self.times,
+                                   cal_points=False)
+        asm_file = qasm_to_asm(qasm_file.name, self.operation_dict)
+        asm = Assembler.Assembler(asm_file.name)
+        instructions = asm.convert_to_instructions()
+
+    def test_qasm_seq_echo(self):
+        qasm_file = sq_qasm.echo(self.qubit_name, self.times)
+        asm_file = qasm_to_asm(qasm_file.name, self.operation_dict)
+        asm = Assembler.Assembler(asm_file.name)
+        instructions = asm.convert_to_instructions()
+
+        qasm_file = sq_qasm.echo(self.qubit_name, self.times)
+        asm_file = qasm_to_asm(qasm_file.name, self.operation_dict)
+        asm = Assembler.Assembler(asm_file.name)
+        instructions = asm.convert_to_instructions()
+
+        qasm_file = sq_qasm.echo(self.qubit_name, self.times,
+                                 artificial_detuning=4/self.times[-4])
+        asm_file = qasm_to_asm(qasm_file.name, self.operation_dict)
+        asm = Assembler.Assembler(asm_file.name)
+        instructions = asm.convert_to_instructions()
+
+        qasm_file = sq_qasm.echo(self.qubit_name, self.times,
+                                 artificial_detuning=None)
+        asm_file = qasm_to_asm(qasm_file.name, self.operation_dict)
+        asm = Assembler.Assembler(asm_file.name)
+        instructions = asm.convert_to_instructions()
+
+        qasm_file = sq_qasm.echo(self.qubit_name, self.times,
+                                 cal_points=False)
+        asm_file = qasm_to_asm(qasm_file.name, self.operation_dict)
+        asm = Assembler.Assembler(asm_file.name)
+        instructions = asm.convert_to_instructions()
 
     # def test_qasm_seq_off_on(self):
     #     qasm_file = sq_qasm.off_on(self.qubit_name)
@@ -150,9 +205,6 @@ class Test_single_qubit_seqs(TestCase):
     def tearDownClass(self):
         pass
         # self.qubit.close()
-
-
-
 
 class Test_qasm_to_asm(TestCase):
     @classmethod
