@@ -77,6 +77,38 @@ class Rabi_2nd_exc(swf.Hard_Sweep):
                                   RO_pars=self.RO_pars,
                                   n=self.n)
 
+class chevron_length(awg_swf.swf.Hard_Sweep):
+    def __init__(self, length_vec, mw_pulse_pars,RO_pars,
+                 flux_pulse_pars,dist_dict, upload=True, return_seq=False):
+        super().__init__()
+        self.length_vec = length_vec
+        self.mw_pulse_pars = mw_pulse_pars
+        self.RO_pars = RO_pars
+        self.flux_pulse_pars = flux_pulse_pars
+        self.dist_dict = dist_dict
+        self.upload = upload
+        self.name = 'Chevron'
+        self.parameter_name = 'Time'
+        self.unit = 's'
+        self.return_seq = return_seq
+
+    def prepare(self, **kw):
+        if self.upload:
+            fsqs.chevron_seq_length(self.length_vec,
+                                    self.mw_pulse_pars,
+                                    self.RO_pars,
+                                    self.flux_pulse_pars,
+                                    distortion_dict=self.dist_dict)
+        AWG.start()
+
+    def pre_upload(self, **kw):
+        self.seq = fsqs.chevron_seq_length(self.length_vec,
+                                    self.mw_pulse_pars,
+                                    self.RO_pars,
+                                    self.flux_pulse_pars,
+                                    distortion_dict=self.dist_dict, return_seq=True)
+
+
 
 class Ramsey_2nd_exc(swf.Hard_Sweep):
     def __init__(self, pulse_pars, pulse_pars_2nd,

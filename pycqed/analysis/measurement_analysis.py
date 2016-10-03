@@ -16,6 +16,7 @@ from analysis.tools import data_manipulation as dm_tools
 import imp
 import math
 from math import erfc
+from scipy.signal import argrelextrema
 imp.reload(dm_tools)
 
 
@@ -551,7 +552,6 @@ class MeasurementAnalysis(object):
             best_fit_results = self.data_file['Analysis'][best_key]
             return best_fit_results
 
-
 class OptimizationAnalysis_v2(MeasurementAnalysis):
     def run_default_analysis(self, close_file=True, **kw):
         self.get_naming_and_values()
@@ -723,7 +723,6 @@ class OptimizationAnalysis(MeasurementAnalysis):
         if close_file:
             self.data_file.close()
 
-
 class TD_Analysis(MeasurementAnalysis):
     '''
     Parent class for Time Domain (TD) analysis. Contains functions for
@@ -880,6 +879,24 @@ class TD_Analysis(MeasurementAnalysis):
         '''
         pass
 
+class chevron_optimization_v1(TD_Analysis):
+    def __init__(self, NoCalPoints=4, center_point=31, make_fig=True,
+                 zero_coord=None, one_coord=None, cal_points=None,
+                 plot_cal_points=True, **kw):
+        super(chevron_optimization_v1, self).__init__(**kw)
+
+    def run_default_analysis(self,
+                             close_main_fig=True,  **kw):
+        super(chevron_optimization_v1, self).run_default_analysis(**kw)
+        output_fft = np.real_if_close(np.fft.rfft(self.measured_values[0]))
+        ax_fft = np.fft.rfftfreq(len(self.measured_values[0]),
+                                 d=self.sweep_points[1]-self.sweep_points[0])
+        order_mask = np.argsort(ax_fft)
+        y = output_fft[order_mask]
+        array_peaks = argrelextrema(y, np.greater)
+        sort_mask = np.argsort(y[array_peaks])[::-1]
+        self.period = 1./self.sweep_points[array_peaks[sort_mask[0]]][0]
+        self.cost_value = -np.abs(y[[array_peaks[sort_mask[0]]]])[0]
 
 class Rabi_Analysis(TD_Analysis):
     def __init__(self, label='Rabi', **kw):
