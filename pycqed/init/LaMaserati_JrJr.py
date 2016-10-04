@@ -231,23 +231,24 @@ cfct.set_AWG_limits(station,1.7)
 
 q0=AncT
 q1=DataT
-def switch_to_pulsed_RO_UHFQC():
+def switch_to_pulsed_RO_UHFQC(qubit):
     UHFQC_1.AWG_file('traditional.seqc')
-    q0.RO_pulse_type('Gated_MW_RO_pulse')
+    qubit.RO_pulse_type('Gated_MW_RO_pulse')
     q0.RO_acq_marker_delay(175e-9)
     q0.acquisition_instr(UHFQC_1)
-def switch_to_pulsed_RO_CBox():
+def switch_to_pulsed_RO_CBox(qubit):
     UHFQC_1.AWG_file('traditional.seqc')
-    q0.RO_pulse_type('Gated_MW_RO_pulse')
-    q0.RO_acq_marker_delay(175e-9)
-    q0.acquisition_instr(CBox)
-def switch_to_IQ_mod_RO_UHFQC():
+    qubit.RO_pulse_type('Gated_MW_RO_pulse')
+    qubit.RO_acq_marker_delay(175e-9)
+    qubit.acquisition_instr(CBox)
+def switch_to_IQ_mod_RO_UHFQC(qubit):
     UHFQC_1.AWG_file('traditional_IQ_mod_readout.seqc')
-    q0.RO_pulse_type('MW_IQmod_pulse_nontek')
-    q0.RO_acq_marker_delay(-100e-9)
-    q0.acquisition_instr(UHFQC_1)
-
+    qubit.RO_pulse_type('MW_IQmod_pulse_nontek')
+    qubit.RO_acq_marker_delay(-100e-9)
+    qubit.acquisition_instr(UHFQC_1)
+    qubit.RO_I_channel('0')
+    qubit.RO_Q_channel('1')
 #preparing UHFQC readout with IQ mod pulses
-q0.RO_I_channel('0')
-q0.RO_Q_channel('1')
-switch_to_IQ_mod_RO_UHFQC()
+
+switch_to_IQ_mod_RO_UHFQC(q0)
+switch_to_IQ_mod_RO_UHFQC(q1)
