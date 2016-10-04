@@ -731,6 +731,65 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                 self.motzoi.set(a.optimal_motzoi)
             return a
 
+    def measure_chevron(self, amps, length, MC=None, nr_averages=512):
+
+        if MC is None:
+            MC = self.MC
+
+        if len(amps)==1:
+            slice_scan = True
+        else:
+            slice_scan = False
+
+        self.int_avg_det = det.CBox_integrated_average_detector(self._acquisition_instr,
+                                                                            self.AWG,
+                                                                            normalize=True,
+                                                                            rotate=True,
+                                                                            nr_averages=nr_averages)
+        flux_pulse_pars = {'pulse_type': 'SquarePulse',
+                      'pulse_delay': .1e-6,
+                      'channel': 'ch3',
+                      'amplitude': .5,
+                      'length': 10e-6,
+                      'dead_time_length': 10e-6}
+
+        # preparation of sweep points and cal points
+        cal_points = 4
+        lengths_cal = length[-1] + np.arange(1,1+cal_points)*(length[1]-length[0])
+        lengths_vec = np.concatenate((length,lengths_cal))
+
+        # start preparations
+        self.prepare_for_timedomain()
+        mw_pulse_pars, RO_pars = self.get_pulse_pars()
+        chevron_swf = awg_swf.chevron_length(length,
+                                             mw_pulse_pars,
+                                             RO_pars,
+                                             flux_pulse_pars,
+                                             dist_dict=self.dist_dict,
+                                             AWG=self.AWG,
+                                             upload=False)
+        # upload sequence
+        exec('self.AWG.ch%d_amp(2.)'%self.fluxing_channel)
+        chevron_swf.pre_upload()
+        # MC configuration
+        MC.set_sweep_function(chevron_swf)
+        MC.set_sweep_points(lengths_vec)
+
+        if not slice_scan:
+            MC.set_sweep_function_2D(swf.AWG_amp(self.fluxing_channel, self.AWG))
+            MC.set_sweep_points_2D(amps)
+
+        MC.set_detector_function(self.int_avg_det)
+        if slice_scan:
+            swf_temp = swf.AWG_amp(self.fluxing_channel, self.AWG)
+            swf_temp.set_parameter(amps[0])
+            MC.run('Chevron_slice_%s'%self.name)
+            ma.TD_Analysis(auto=True)
+        else:
+            MC.run('Chevron_2D_%s'%self.name, mode='2D')
+            ma.TwoD_Analysis(auto=True)
+
+
     def _do_get_acquisition_instr(self):
         # Specifying the int_avg det here should allow replacing it with ATS
         # or potential digitizer acquisition easily

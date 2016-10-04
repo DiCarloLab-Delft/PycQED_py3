@@ -156,6 +156,23 @@ class Bias_Hyst_mV(Soft_Sweep):
 
 
 
+class AWG_amp(Soft_Sweep):
+    def __init__(self, channel, AWG):
+        super().__init__()
+        self.name = 'AWG Channel Amplitude'
+        self.channel = channel
+        self.parameter_name = 'AWG_ch{}_amp'.format(channel)
+        self.AWG = AWG
+        self.unit = 'V'
+
+    def prepare(self):
+        pass
+
+    def set_parameter(self, val, **kw):
+        self.AWG.stop()
+        exec('self.AWG.ch{}_amp({})'.format(self.channel, val))
+        self.AWG.start()
+
 
 
 class AWG_multi_channel_amplitude(Soft_Sweep):

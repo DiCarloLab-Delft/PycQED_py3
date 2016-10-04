@@ -962,7 +962,8 @@ class Chevron_optimization_v1(det.Soft_Detector):
     '''
 
     '''
-    def __init__(self, flux_channel, dist_dict, AWG, MC_nested, qubit, kernel_obj, **kw):
+    def __init__(self, flux_channel, dist_dict, AWG, MC_nested, qubit,
+                 kernel_obj, cost_function_opt=0, **kw):
         super().__init__()
         kernel_dir_path = 'kernels/'
         self.name = 'chevron_optimization_v1'
@@ -974,19 +975,13 @@ class Chevron_optimization_v1(det.Soft_Detector):
         self.qubit = qubit
         self.dist_dict = dist_dict
         self.flux_channel = flux_channel
+        self.cost_function_opt = cost_function_opt
         self.dist_dict['ch%d'%self.flux_channel].append('')
-
-        def get_awg_amp():
-            exec('ret = self.AWG.ch{}_amp()'.formatself.flux_channel)
-            return ret
-
-        def set_awg_amp(val):
-            exec('self.AWG.ch{}_amp({})'.format(self.flux_channel, val))
-            return val
+        self.nr_averages = kw.get('nr_averages', 1024)
 
         self.awg_amp_par = ManualParameter(name='AWG_amp', units='Vpp', label='AWG Amplitude')
-        self.awg_amp_par.get = get_awg_amp
-        self.awg_amp_par.set = set_awg_amp
+        self.awg_amp_par.get = lambda: self.AWG.get('ch{}_amp'.format(self.flux_channel))
+        self.awg_amp_par.set = lambda val: self.AWG.set('ch{}_amp'.format(self.flux_channel),val)
         self.awg_value = 2.0
 
         kernel_before_list = self.dist_dict['ch%d'%self.flux_channel]
@@ -995,7 +990,7 @@ class Chevron_optimization_v1(det.Soft_Detector):
             if k is not '':
                 kernel_before_loaded.append(np.loadtxt(kernel_dir_path+k))
         self.kernel_before = kernel_obj.convolve_kernel(kernel_before_loaded,
-                                                             30000)
+                                                        30000)
 
     def acquire_data_point(self, **kw):
         # # Before writing it
@@ -1007,39 +1002,16 @@ class Chevron_optimization_v1(det.Soft_Detector):
         self.kernel_obj.save_corrections_kernel(kernel_file, self.kernel_before,)
         self.dist_dict['ch%d'%self.flux_channel][-1] = kernel_file+'.txt'
 
-        mw_pulse_pars, RO_pars = self.qubit.get_pulse_pars()
-        flux_pulse_pars = {'pulse_type': 'SquarePulse',
-                           'pulse_delay': .1e-6,
-                           'channel': 'ch%d'%self.flux_channel,
-                           'amplitude': .5,
-                           'length': 10e-6,
-                           'dead_time_length': 10e-6}
 
-        # preparation of sweep points and cal points
-        lengths_precal = np.arange(0, 81e-9, 1e-9)
-        cal_points = 4
-        lengths_cal = lengths_precal[-1] + np.arange(1,1+cal_points)*(lengths_precal[1]-lengths_precal[0])
-        lengths = np.concatenate((lengths_precal,lengths_cal))
-        # start preparations
-        self.qubit.prepare_for_timedomain()
-        chevron_swf = awg_swf.chevron_length(lengths_precal, mw_pulse_pars, RO_pars, flux_pulse_pars,
-                                             dist_dict=self.dist_dict, AWG=self.AWG, upload=False)
-
-        # # Upload sequence
-        self.awg_amp_par(2.)
-        chevron_swf.pre_upload()
-
-        # # Update amplitude from AWG object
-        self.awg_amp_par(self.awg_value)
-
-        # # Measure a 1D chevron slice at constant amp with MC_nested
-        self.MC_nested.set_sweep_function(chevron_swf)
-        self.MC_nested.set_sweep_points(lengths)
-        self.MC_nested.set_detector_function(self.qubit.int_avg_det)
-        self.MC_nested.run('Chevron_slice')
+        self.qubit.dist_dict = self.dist_dict
+        self.qubit.measure_chevron(amps=[self.awg_amp_par()],
+                                   length=np.arange(0, 81e-9, 1e-9),
+                                   MC=self.MC_nested,
+                                   nr_averages=self.nr_averages)
 
         # # fit it
-        ma_obj = ma.chevron_optimization_v1(auto=True,label='Chevron_slice')
+        ma_obj = ma.chevron_optimization_v1(auto=True, label='Chevron_slice',
+                                            cost_function=self.cost_function_opt)
 
         # # Return the cost function sum(min)+sum(1-max)
         return ma_obj.cost_value, 0.5*ma_obj.period

@@ -97,11 +97,9 @@ IVVI = iv.IVVI('IVVI', address='COM4', numdacs=16, server_name=None)
 station.add_component(IVVI)
 
 #Initializing UHFQC
-UHFQC_1 = ZI_UHFQC.UHFQC('UHFQC_1', device='dev2178', server_name=None)
-station.add_component(UHFQC_1)
+# UHFQC_1 = ZI_UHFQC.UHFQC('UHFQC_1', device='dev2178', server_name=None)
+# station.add_component(UHFQC_1)
 
-#preparing the UHFQC for IQ modulated readout
-UHFQC_1.AWG_file('traditional_IQ_mod_readout.seqc')
 ATT = Weinschel_8320_novisa.Weinschel_8320(name='ATT',address='192.168.0.54', server_name=None)
 # Dux = qdux.QuTech_Duplexer('Dux', address='TCPIP0::192.168.0.101',
 #                             server_name=None)
@@ -237,7 +235,7 @@ def switch_to_pulsed_RO_UHFQC(qubit):
     q0.RO_acq_marker_delay(175e-9)
     q0.acquisition_instr(UHFQC_1)
 def switch_to_pulsed_RO_CBox(qubit):
-    UHFQC_1.AWG_file('traditional.seqc')
+    # UHFQC_1.AWG_file('traditional.seqc')
     qubit.RO_pulse_type('Gated_MW_RO_pulse')
     qubit.RO_acq_marker_delay(175e-9)
     qubit.acquisition_instr(CBox)
@@ -250,5 +248,5 @@ def switch_to_IQ_mod_RO_UHFQC(qubit):
     qubit.RO_Q_channel('1')
 #preparing UHFQC readout with IQ mod pulses
 
-switch_to_IQ_mod_RO_UHFQC(q0)
-switch_to_IQ_mod_RO_UHFQC(q1)
+switch_to_pulsed_RO_CBox(q0)
+switch_to_pulsed_RO_CBox(q1)

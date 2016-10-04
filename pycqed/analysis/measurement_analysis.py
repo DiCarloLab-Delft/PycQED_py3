@@ -880,24 +880,59 @@ class TD_Analysis(MeasurementAnalysis):
         pass
 
 class chevron_optimization_v1(TD_Analysis):
-    def __init__(self, NoCalPoints=4, center_point=31, make_fig=True,
+    def __init__(self, cost_function=0, NoCalPoints=4, center_point=31, make_fig=True,
                  zero_coord=None, one_coord=None, cal_points=None,
                  plot_cal_points=True, **kw):
+        self.cost_function = cost_function
         super(chevron_optimization_v1, self).__init__(**kw)
 
     def run_default_analysis(self,
                              close_main_fig=True,  **kw):
         super(chevron_optimization_v1, self).run_default_analysis(**kw)
-        output_fft = np.real_if_close(np.fft.rfft(self.measured_values[0]))
-        ax_fft = np.fft.rfftfreq(len(self.measured_values[0]),
-                                 d=self.sweep_points[1]-self.sweep_points[0])
+        sweep_points_wocal = self.sweep_points[:-4]
+        measured_values_wocal = self.measured_values[0][:-4]
+
+        output_fft = np.real_if_close(np.fft.rfft(measured_values_wocal))
+        ax_fft = np.fft.rfftfreq(len(measured_values_wocal),
+                                 d=sweep_points_wocal[1]-sweep_points_wocal[0])
         order_mask = np.argsort(ax_fft)
         y = output_fft[order_mask]
-        array_peaks = argrelextrema(y, np.greater)
-        sort_mask = np.argsort(y[array_peaks])[::-1]
-        # self.period = 1./self.sweep_points[array_peaks[sort_mask[0]]][0]
-        self.period = 0.
-        self.cost_value = -np.abs(y[[array_peaks[sort_mask[0]]]])[0]
+        y = y/np.sum(np.abs(y))
+
+        u = np.where(np.arange(len(y)) == 0, 0, y)
+        array_peaks = a_tools.peak_finder(np.arange(len(np.abs(y))),
+                                          np.abs(u),
+                                          window_len=0)
+        if array_peaks['peak_idx'] is None:
+            self.period = 0.
+            self.cost_value = 100.
+        else:
+            self.period = 1./ax_fft[order_mask][array_peaks['peak_idx']]
+            if self.period == np.inf:
+                self.period = 0.
+            if self.cost_function == 0:
+                self.cost_value = -np.abs(y[array_peaks['peak_idx']])
+            else:
+                self.cost_value = self.get_cost_value(sweep_points_wocal,
+                                                      measured_values_wocal)
+
+    def get_cost_value(self, x, y):
+        num_periods = np.floor(x[-1]/self.period)
+        if num_periods == np.inf:
+            num_periods = 0
+        # sum of mins
+        sum_min = 0.
+        for i in range(int(num_periods)):
+            sum_min += np.interp((i+0.5)*self.period, x, y)
+            # print(sum_min)
+
+        # sum of maxs
+        sum_max = 0.
+        for i in range(int(num_periods)):
+            sum_max += 1.-np.interp(i*self.period, x, y)
+            # print(sum_max)
+
+        return sum_max+sum_min
 
 class Rabi_Analysis(TD_Analysis):
     def __init__(self, label='Rabi', **kw):
