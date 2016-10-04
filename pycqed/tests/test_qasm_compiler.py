@@ -14,8 +14,7 @@ from pycqed.measurement.waveform_control_CC import \
 from pycqed.instrument_drivers.physical_instruments._controlbox \
     import Assembler
 
-from pycqed.measurement.waveform_control_CC.qasm_to_asm_converter import \
-    qasm_to_asm
+from pycqed.measurement.waveform_control_CC import qasm_to_asm as qta
 
 
 class Test_single_qubit_seqs(TestCase):
@@ -86,89 +85,89 @@ class Test_single_qubit_seqs(TestCase):
     def test_qasm_seq_T1(self):
 
         qasm_file = sq_qasm.T1(self.qubit_name, self.times)
-        asm_file = qasm_to_asm(qasm_file.name, self.operation_dict)
+        asm_file = qta.qasm_to_asm(qasm_file.name, self.operation_dict)
         asm = Assembler.Assembler(asm_file.name)
         instructions = asm.convert_to_instructions()
 
     def test_qasm_seq_OffOn(self):
         qasm_file = sq_qasm.off_on(self.qubit_name)
-        asm_file = qasm_to_asm(qasm_file.name, self.operation_dict)
+        asm_file = qta.qasm_to_asm(qasm_file.name, self.operation_dict)
         asm = Assembler.Assembler(asm_file.name)
         instructions = asm.convert_to_instructions()
 
     def test_qasm_seq_AllXY(self):
         qasm_file = sq_qasm.AllXY(self.qubit_name)
-        asm_file = qasm_to_asm(qasm_file.name, self.operation_dict)
+        asm_file = qta.qasm_to_asm(qasm_file.name, self.operation_dict)
         asm = Assembler.Assembler(asm_file.name)
         instructions = asm.convert_to_instructions()
 
     def test_qasm_seq_Rabi(self):
         amps = np.linspace(-.4, .5, 51)  # in V
         qasm_file = sq_qasm.Rabi(self.qubit_name, amps)
-        asm_file = qasm_to_asm(qasm_file.name, self.operation_dict)
+        asm_file = qta.qasm_to_asm(qasm_file.name, self.operation_dict)
         asm = Assembler.Assembler(asm_file.name)
         instructions = asm.convert_to_instructions()
 
     def test_qasm_seq_Ramsey(self):
         qasm_file = sq_qasm.Ramsey(self.qubit_name, self.times)
-        asm_file = qasm_to_asm(qasm_file.name, self.operation_dict)
+        asm_file = qta.qasm_to_asm(qasm_file.name, self.operation_dict)
         asm = Assembler.Assembler(asm_file.name)
         instructions = asm.convert_to_instructions()
 
         qasm_file = sq_qasm.Ramsey(self.qubit_name, self.times,
                                    artificial_detuning=4/self.times[-4])
-        asm_file = qasm_to_asm(qasm_file.name, self.operation_dict)
+        asm_file = qta.qasm_to_asm(qasm_file.name, self.operation_dict)
         asm = Assembler.Assembler(asm_file.name)
         instructions = asm.convert_to_instructions()
 
         qasm_file = sq_qasm.Ramsey(self.qubit_name, self.times,
                                    artificial_detuning=None)
-        asm_file = qasm_to_asm(qasm_file.name, self.operation_dict)
+        asm_file = qta.qasm_to_asm(qasm_file.name, self.operation_dict)
         asm = Assembler.Assembler(asm_file.name)
         instructions = asm.convert_to_instructions()
 
         qasm_file = sq_qasm.Ramsey(self.qubit_name, self.times,
                                    cal_points=False)
-        asm_file = qasm_to_asm(qasm_file.name, self.operation_dict)
+        asm_file = qta.qasm_to_asm(qasm_file.name, self.operation_dict)
         asm = Assembler.Assembler(asm_file.name)
         instructions = asm.convert_to_instructions()
 
     def test_qasm_seq_echo(self):
         qasm_file = sq_qasm.echo(self.qubit_name, self.times)
-        asm_file = qasm_to_asm(qasm_file.name, self.operation_dict)
+        asm_file = qta.qasm_to_asm(qasm_file.name, self.operation_dict)
         asm = Assembler.Assembler(asm_file.name)
         instructions = asm.convert_to_instructions()
 
         qasm_file = sq_qasm.echo(self.qubit_name, self.times)
-        asm_file = qasm_to_asm(qasm_file.name, self.operation_dict)
+        asm_file = qta.qasm_to_asm(qasm_file.name, self.operation_dict)
         asm = Assembler.Assembler(asm_file.name)
         instructions = asm.convert_to_instructions()
 
         qasm_file = sq_qasm.echo(self.qubit_name, self.times,
                                  artificial_detuning=4/self.times[-4])
-        asm_file = qasm_to_asm(qasm_file.name, self.operation_dict)
+        asm_file = qta.qasm_to_asm(qasm_file.name, self.operation_dict)
         asm = Assembler.Assembler(asm_file.name)
         instructions = asm.convert_to_instructions()
 
         qasm_file = sq_qasm.echo(self.qubit_name, self.times,
                                  artificial_detuning=None)
-        asm_file = qasm_to_asm(qasm_file.name, self.operation_dict)
+        asm_file = qta.qasm_to_asm(qasm_file.name, self.operation_dict)
         asm = Assembler.Assembler(asm_file.name)
         instructions = asm.convert_to_instructions()
 
         qasm_file = sq_qasm.echo(self.qubit_name, self.times,
                                  cal_points=False)
-        asm_file = qasm_to_asm(qasm_file.name, self.operation_dict)
+        asm_file = qta.qasm_to_asm(qasm_file.name, self.operation_dict)
         asm = Assembler.Assembler(asm_file.name)
         instructions = asm.convert_to_instructions()
 
     def test_qasm_seq_butterfly(self):
         qasm_file = sq_qasm.butterfly(self.qubit_name, initialize=False)
-        asm_file = qasm_to_asm(qasm_file.name, self.operation_dict)
+        asm_file = qta.qasm_to_asm(qasm_file.name, self.operation_dict)
         asm = Assembler.Assembler(asm_file.name)
         instructions = asm.convert_to_instructions()
         qasm_file = sq_qasm.butterfly(self.qubit_name, initialize=True)
-        asm_file = qasm_to_asm(qasm_file.name, self.operation_dict)
+        asm_file = qta.qasm_to_asm(qasm_file.name, self.operation_dict)
         asm = Assembler.Assembler(asm_file.name)
         instructions = asm.convert_to_instructions()
 
@@ -178,14 +177,14 @@ class Test_single_qubit_seqs(TestCase):
         qasm_file = sq_qasm.randomized_benchmarking(self.qubit_name,
                                                     nr_cliffords, nr_seeds,
                                                     double_curves=True)
-        asm_file = qasm_to_asm(qasm_file.name, self.operation_dict)
+        asm_file = qta.qasm_to_asm(qasm_file.name, self.operation_dict)
         asm = Assembler.Assembler(asm_file.name)
         instructions = asm.convert_to_instructions()
 
         qasm_file = sq_qasm.randomized_benchmarking(self.qubit_name,
                                                     nr_cliffords, nr_seeds,
                                                     double_curves=False)
-        asm_file = qasm_to_asm(qasm_file.name, self.operation_dict)
+        asm_file = qta.qasm_to_asm(qasm_file.name, self.operation_dict)
         asm = Assembler.Assembler(asm_file.name)
         instructions = asm.convert_to_instructions()
 
@@ -193,14 +192,14 @@ class Test_single_qubit_seqs(TestCase):
         qasm_file = sq_qasm.MotzoiXY(
             self.qubit_name, motzois=np.linspace(-.5, .5, 21),
             cal_points=False)
-        asm_file = qasm_to_asm(qasm_file.name, self.operation_dict)
+        asm_file = qta.qasm_to_asm(qasm_file.name, self.operation_dict)
         asm = Assembler.Assembler(asm_file.name)
         instructions = asm.convert_to_instructions()
 
         qasm_file = sq_qasm.MotzoiXY(
             self.qubit_name, motzois=np.linspace(-.5, .5, 21),
             cal_points=True)
-        asm_file = qasm_to_asm(qasm_file.name, self.operation_dict)
+        asm_file = qta.qasm_to_asm(qasm_file.name, self.operation_dict)
         asm = Assembler.Assembler(asm_file.name)
         instructions = asm.convert_to_instructions()
 
@@ -230,7 +229,7 @@ class Test_qasm_to_asm(TestCase):
         qasm_file = mopen(filename, mode='w')
         qasm_file.writelines('qubit {} \n'.format(self.qubit_name))
         qasm_file.close()
-        asm_file = qasm_to_asm(qasm_file.name, self.operation_dict)
+        asm_file = qta.qasm_to_asm(qasm_file.name, self.operation_dict)
         asm = Assembler.Assembler(asm_file.name)
         instructions = asm.convert_to_instructions()
 
@@ -242,7 +241,7 @@ class Test_qasm_to_asm(TestCase):
                              self.qubit_name))
         qasm_file.close()
         with self.assertRaises(ValueError):
-            qasm_to_asm(qasm_file.name, self.operation_dict)
+            qta.qasm_to_asm(qasm_file.name, self.operation_dict)
 
     def test_qasm_function_with_string_format_arg(self):
         ext_op_dict = deepcopy(self.operation_dict)
@@ -256,7 +255,7 @@ class Test_qasm_to_asm(TestCase):
         qasm_file.writelines('I {} 4\n'.format(
                              self.qubit_name))
         qasm_file.close()
-        qasm_to_asm(qasm_file.name, ext_op_dict)
+        qta.qasm_to_asm(qasm_file.name, ext_op_dict)
 
     def test_qasm_function_with_function_arg(self):
         ext_op_dict = deepcopy(self.operation_dict)
@@ -282,7 +281,7 @@ class Test_qasm_to_asm(TestCase):
         qasm_file.writelines('I {} 4\n'.format(
                              self.qubit_name))
         qasm_file.close()
-        qasm_to_asm(qasm_file.name, ext_op_dict)
+        qta.qasm_to_asm(qasm_file.name, ext_op_dict)
 
     def test_too_many_args_command(self):
         filename = join(self.base_qasm_path, 'too_many_args.qasm')
@@ -298,4 +297,107 @@ class Test_qasm_to_asm(TestCase):
 
         qasm_file.close()
         with self.assertRaises(ValueError):
-            qasm_to_asm(qasm_file.name, self.operation_dict)
+            qta.qasm_to_asm(qasm_file.name, self.operation_dict)
+
+
+class Test_qasm_waveform_management(TestCase):
+    """
+    Waveform management,
+        uploading the required waveforms and keeping track of the waveforms
+        is tested here for the example of a Rabi.
+    """
+
+    @classmethod
+    def setUpClass(self):
+        self.base_qasm_path = join(dirname(__file__), 'qasm_files')
+        self.qubit_name = 'q0'  # self.qubit.name
+
+        # a sample operation dictionary for testing
+        self.operation_dict = {
+            'init_all': {'instruction': 'WaitReg r0 \n'},
+            'X180': {self.qubit_name: {
+                     'duration': 2, 'instruction': 'Trigger 1000000, 2 \n'}},
+            'Y180': {self.qubit_name: {
+                'duration': 2, 'instruction': 'Trigger 0100000, 2 \n'}},
+            'I': {self.qubit_name: {
+                'duration': None, 'instruction': 'wait {} \n'}},
+            'RO': {self.qubit_name: {
+                'duration': 8, 'instruction': 'Trigger 0010000, 2 \n'}}
+        }
+
+        self.amps = np.linspace(-.5, .5, 11)  # in V
+        self.Rabi_qasm_file = sq_qasm.Rabi(self.qubit_name, self.amps)
+        self.AllXY_qasm_file = sq_qasm.AllXY(self.qubit_name)
+
+    def test_qasm_extract_required_ops(self):
+        qubits, operations = qta.extract_required_operations(
+            self.AllXY_qasm_file.name)
+        self.assertEqual(qubits, [self.qubit_name])
+        self.assertCountEqual(operations, ['init_all', 'RO q0',
+                                      'X180 q0', 'Y180 q0',
+                                      'X90 q0', 'Y90 q0'])
+
+        qubits, operations = qta.extract_required_operations(
+            self.Rabi_qasm_file.name)
+        self.assertEqual(qubits, [self.qubit_name])
+        rabi_ops = ['init_all', 'RO q0']
+        for amp in self.amps:
+            rabi_ops.append('Rx q0 {}'.format(amp))
+        self.assertCountEqual(operations, rabi_ops)
+
+
+
+    def test_uploading_required_wfs(self):
+        pass
+
+
+    def test_complete_sequence_loading_simple(self):
+        '''
+        Tests all the loading with an AllXY sequence that
+        contains all the basic steps but does not require mapping
+        the allowed operations.
+        '''
+        pass
+        # qasm_file = self.Rabi_qasm_file
+        # required_ops = extract_required_operations(qasm_file.name)
+
+
+        # # config needs to contain enough info to generate mapping
+        # operation_mapping = get_operation_mapping(required_ops, config_a)
+
+        # for operation in operation_mapping:
+        #     waveform = generate_waveform(operation, args)
+        #     upload_waveform(waveform, location)
+
+    def test_complete_sequence_loading_dynamic(self):
+        '''
+        Tests all the loading with a Rabi sequence that requires
+        dynamic defining of the configuration file
+        '''
+        # Still mostly psuedo code
+        pass
+        # self.qasm_file
+        # required_ops = extract_required_operations(self.qasm_file.name)
+
+        # # config needs to contain enough info to generate mapping
+        # operation_mapping = get_operation_mapping(required_ops, config_a)
+
+        # for operation in operation_mapping:
+        #     waveform = generate_waveform(operation, args)
+        #     upload_waveform(waveform, location)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

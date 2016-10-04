@@ -86,3 +86,33 @@ def qasm_to_asm(qasm_filepath, operation_dict):
     asm_file.writelines(ending)
     asm_file.close()
     return asm_file
+
+
+def extract_required_operations(qasm_filepath):
+        """
+        Args:
+            qasm_filepath: (str) location of the qasm file to read
+        returns:
+            list containing of all the used operations with args
+        """
+        filename = splitext(basename(qasm_filepath))[0]
+        asm_filepath = join(base_asm_path, filename+'.asm')
+        asm_file = mopen(asm_filepath, mode='w')
+        asm_file.writelines(preamble)
+
+        qubits = []  # the qubits that were defined
+        operations = []
+        with open(qasm_filepath) as qasm_file:
+            for line in qasm_file:
+                # Make lines interpretable
+                line = line.split('#', 1)[0]  # remove comments
+                line = line.strip(' \t\n\r')  # remove whitespace
+                if (len(line) == 0):  # skip empty line and comment
+                    continue
+                elts = line.split()
+                # special command: a line that defines a qubit
+                if elts[0] == 'qubit':
+                    qubits.append(elts[1])
+                elif line not in operations:
+                    operations.append(line)
+        return qubits, operations
