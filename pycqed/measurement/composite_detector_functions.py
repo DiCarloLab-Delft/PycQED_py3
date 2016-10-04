@@ -6,6 +6,7 @@ from pycqed.measurement import CBox_sweep_functions as CB_swf
 from pycqed.measurement import detector_functions as det
 from pycqed.analysis import measurement_analysis as ma
 from pycqed.analysis import analysis_toolbox as a_tools
+from qcodes.instrument.parameter import ManualParameter
 import imp
 import matplotlib.pyplot as plt
 imp.reload(awg_swf)
@@ -963,6 +964,7 @@ class Chevron_optimization_v1(det.Soft_Detector):
     '''
     def __init__(self, flux_channel, dist_dict, AWG, MC_nested, qubit, kernel_obj, **kw):
         super().__init__()
+        kernel_dir_path = 'kernels/'
         self.name = 'chevron_optimization_v1'
         self.value_names = ['Cost function', 'SWAP Time']
         self.value_units = ['a.u.', 'ns']
@@ -982,21 +984,28 @@ class Chevron_optimization_v1(det.Soft_Detector):
             exec('self.AWG.ch{}_amp({})'.format(self.flux_channel, val))
             return val
 
-        self.awg_amp_par = qc.Parameter(name='AWG_amp', units='Vpp', label='AWG Amplitude')
+        self.awg_amp_par = ManualParameter(name='AWG_amp', units='Vpp', label='AWG Amplitude')
         self.awg_amp_par.get = get_awg_amp
         self.awg_amp_par.set = set_awg_amp
         self.awg_value = 2.0
 
+        kernel_before_list = self.dist_dict['ch%d'%self.flux_channel]
+        kernel_before_loaded = []
+        for k in kernel_before_list:
+            if k is not '':
+                kernel_before_loaded.append(np.loadtxt(kernel_dir_path+k))
+        self.kernel_before = kernel_obj.convolve_kernel(kernel_before_loaded,
+                                                             30000)
 
     def acquire_data_point(self, **kw):
         # # Before writing it
         # # Summarize what to do:
 
         # # Update kernel from kernel object
-        kernel_before = self.dist_dict['ch%d'%self.flux_channel][0]
-        kernel_file = 'optimizing_kernel_%s.txt'%a_tools.current_timestamp()
-        self.kernel_obj.save_corrections_kernel(kernel_before,kernel_file)
-        self.dist_dict['ch%d'%self.flux_channel][-1] = kernel_file
+
+        kernel_file = 'optimizing_kernel_%s'%a_tools.current_timestamp()
+        self.kernel_obj.save_corrections_kernel(kernel_file, self.kernel_before,)
+        self.dist_dict['ch%d'%self.flux_channel][-1] = kernel_file+'.txt'
 
         mw_pulse_pars, RO_pars = self.qubit.get_pulse_pars()
         flux_pulse_pars = {'pulse_type': 'SquarePulse',
@@ -1013,7 +1022,8 @@ class Chevron_optimization_v1(det.Soft_Detector):
         lengths = np.concatenate((lengths_precal,lengths_cal))
         # start preparations
         self.qubit.prepare_for_timedomain()
-        chevron_swf = swf.chevron_length(lengths_precal, mw_pulse_pars, RO_pars, flux_pulse_pars, dist_dict=self.dist_dict, upload=False)
+        chevron_swf = awg_swf.chevron_length(lengths_precal, mw_pulse_pars, RO_pars, flux_pulse_pars,
+                                             dist_dict=self.dist_dict, AWG=self.AWG, upload=False)
 
         # # Upload sequence
         self.awg_amp_par(2.)
@@ -1026,7 +1036,7 @@ class Chevron_optimization_v1(det.Soft_Detector):
         self.MC_nested.set_sweep_function(chevron_swf)
         self.MC_nested.set_sweep_points(lengths)
         self.MC_nested.set_detector_function(self.qubit.int_avg_det)
-        self.MC_nested.run('Chevron_slice_%d_Vpp')
+        self.MC_nested.run('Chevron_slice')
 
         # # fit it
         ma_obj = ma.chevron_optimization_v1(auto=True,label='Chevron_slice')

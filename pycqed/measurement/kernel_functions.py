@@ -78,7 +78,8 @@ def kernel_biastee(t_kernel, tau):
 
 # response functions for distortions arising from inline bounces in the flux-bias line which produce echoes as the qubit
 # model parameters: pairs describing amplitude and arrival time (at the qubit) of an echo
-step_bounce = lambda t, pairs: heaviside(t) + np.sum(np.array(map(lambda pair: pair[0]*heaviside(t-pair[1]), pairs)),0)
+# step_bounce = lambda t, pairs: heaviside(t) + np.sum(np.array(map(lambda pair: pair[0]*heaviside(t-pair[1]), pairs)),0)
+step_bounce = lambda t, pairs: heaviside(t) + np.sum(np.array([pair[0]*heaviside(t - pair[1]) for pair in pairs]),0)
 htilde_bounce = lambda t, pairs: htilde(step_bounce, t, pairs)
 
 # response functions for distortions arising from on-chip currents
