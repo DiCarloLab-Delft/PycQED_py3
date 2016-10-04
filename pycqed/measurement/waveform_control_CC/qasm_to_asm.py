@@ -1,5 +1,6 @@
 from pycqed.utilities.general import mopen
 from os.path import join, dirname, basename, splitext
+from copy import deepcopy
 base_asm_path = join(dirname(__file__), 'micro_instruction_files')
 
 
@@ -127,4 +128,51 @@ def upload_qasm_waveform(qasm_command, operation_dict):
 
 
 def create_operation_dict(required_ops, pulse_pars):
-    pass
+    """
+    Creates the operation dictionary from a set of pulse_pars taken
+    from the qubit object
+    """
+    operation_dict = {}
+    default_control_pulses = ['X180', 'X90', 'Y180', 'Y90',
+                              'mX180', 'mX90', 'mY180', 'mY90']
+    for op_line in required_ops:
+        elts = op_line.split()
+        if not elts[0] in operation_dict.keys():
+            operation_dict[elts[0]] = {}
+        if elts[0] in default_control_pulses:
+            d_entry = deepcopy(pulse_pars[
+                'control_pulse {}'.format(elts[1])])
+            if '90' in elts[0]:
+                d_entry['amplitude'] = (d_entry['amp90_scale'] *
+                                        d_entry['amplitude'])
+            if 'X' in elts[0]:
+                d_entry['phase'] = 0
+            elif 'Y' in elts[0]:
+                d_entry['phase'] = 90
+            if 'm' in elts[0]:
+                d_entry['phase'] += 180
+            operation_dict[elts[0]][elts[1]] = d_entry
+
+        elif elts[0] == 'init_all':
+            operation_dict['init_all'] = {'instruction': 'WaitReg r0 \n'}
+        elif elts[0] == 'RO':  # Currently only writes single qubit dict
+            if op_line in pulse_pars.keys():
+                operation_dict[elts[0]][elts[1]] = pulse_pars[op_line]
+            else:
+                raise KeyError(
+                    'RO on qubits {} not defined in pulse_pars {}'.format(
+                        elts[1:], pulse_pars.keys()))
+        else:
+            raise NotImplementedError(
+                'Operation {} is not implemented'.format(op_line))
+    return operation_dict
+
+
+
+def prepare_operations(operation_dict):
+    print('preparing all operations')
+    print('\t setting global settings')
+    print('\t uploading waveforms')
+
+
+

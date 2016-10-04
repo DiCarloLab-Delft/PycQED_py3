@@ -312,6 +312,32 @@ class Test_qasm_waveform_management(TestCase):
         self.base_qasm_path = join(dirname(__file__), 'qasm_files')
         self.qubit_name = 'q0'  # self.qubit.name
 
+        self.pulse_pars = {
+            'control_pulse q0': {
+                'I_channel': 'ch1',
+                'Q_channel': 'ch2',
+                'amplitude': 0.5,
+                'amp90_scale': 0.48,
+                'sigma': 5e-9,
+                'nr_sigma': 4,
+                'motzoi': -0.2,
+                'mod_frequency': -100e6,
+                'phi_skew': 3.2,
+                'alpha': 1.05,
+                'qubit': 'q0',
+                'pulse_type': 'someQWG_pulse'},  # <- this needs to change,
+            'RO q0': {
+                'I_channel': 'ch3',
+                'Q_channel': 'ch4',
+                'amplitude': 0.4,
+                'length': 200e-9,
+                'pulse_delay': 15e-9,
+                'mod_frequency': 400e6,
+                'acq_marker_delay': -20e-9,
+                'acq_marker_channel': 'ch',
+                'prepare_function': 'nothingness'}  # <-- this needs to change
+                }
+
         # a sample operation dictionary for testing
         self.operation_dict = {
             'init_all': {'instruction': 'WaitReg r0 \n'},
@@ -325,6 +351,9 @@ class Test_qasm_waveform_management(TestCase):
                 'duration': 8, 'instruction': 'Trigger 0010000, 2 \n'}}
         }
 
+        self.basic_ops = ['init_all', 'RO q0', 'X180 q0', 'Y180 q0',
+                          'X90 q0', 'Y90 q0']
+
         self.amps = np.linspace(-.5, .5, 11)  # in V
         self.Rabi_qasm_file = sq_qasm.Rabi(self.qubit_name, self.amps)
         self.AllXY_qasm_file = sq_qasm.AllXY(self.qubit_name)
@@ -333,9 +362,7 @@ class Test_qasm_waveform_management(TestCase):
         qubits, operations = qta.extract_required_operations(
             self.AllXY_qasm_file.name)
         self.assertEqual(qubits, [self.qubit_name])
-        self.assertCountEqual(operations, ['init_all', 'RO q0',
-                                      'X180 q0', 'Y180 q0',
-                                      'X90 q0', 'Y90 q0'])
+        self.assertCountEqual(operations, self.basic_ops)
 
         qubits, operations = qta.extract_required_operations(
             self.Rabi_qasm_file.name)
@@ -351,6 +378,24 @@ class Test_qasm_waveform_management(TestCase):
         pass
 
 
+    def test_create_qasm_operation_dict(self):
+        ops = self.basic_ops + ['mY180 q0']
+
+        operation_dict = qta.create_operation_dict(ops, self.pulse_pars)
+        self.assertCountEqual(operation_dict.keys(), ['init_all',
+                              'RO', 'X180', 'Y180', 'X90', 'Y90', 'mY180'])
+        self.assertEqual(operation_dict['X180']['q0']['amplitude'], 0.5)
+        self.assertEqual(operation_dict['X90']['q0']['amplitude'], 0.5*0.48)
+        self.assertEqual(operation_dict['Y180']['q0']['amplitude'], 0.5)
+        self.assertEqual(operation_dict['Y90']['q0']['amplitude'], 0.5*0.48)
+
+        self.assertEqual(operation_dict['X180']['q0']['phase'], 0)
+        self.assertEqual(operation_dict['X90']['q0']['phase'], 0)
+        self.assertEqual(operation_dict['mY180']['q0']['phase'], 270)
+        self.assertEqual(operation_dict['Y90']['q0']['phase'], 90)
+
+
+
     def test_complete_sequence_loading_simple(self):
         '''
         Tests all the loading with an AllXY sequence that
@@ -362,15 +407,20 @@ class Test_qasm_waveform_management(TestCase):
         required_ops = qta.extract_required_operations(qasm_file.name)
 
         # # config needs to contain enough info to generate mapping
-        # operation_mapping = create_operation_mapping(required_ops)
+        # operation_mapping = qta.create_operation_mapping(required_ops)
 
-        # for operation in operation_mapping:
-        #     waveform = generate_waveform(operation, args)
-        #     upload_waveform(waveform, location)
+        # operation_dict = qta.create_operation_dict(
+        #     required_ops, self.pulse_pars)
 
+        # # uploads all operations in op dict
+        # qta.prepare_operations(operation_dict)
 
-    def test_generate_operation_dict(self):
-        qta.create_operation_dict
+        # qta.qasm_to_asm(qasm_file.name, operation_dict)
+
+    # def test_generate_operation_dict(self):
+    #     qta.create_operation_dict(required_ops=self.basic_ops,
+    #                               self.pulse_pars)
+
 
     def test_complete_sequence_loading_dynamic(self):
         '''
