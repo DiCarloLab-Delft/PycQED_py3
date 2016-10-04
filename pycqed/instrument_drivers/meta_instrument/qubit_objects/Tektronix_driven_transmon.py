@@ -454,6 +454,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
 
         spec_pars, RO_pars = self.get_spec_pars()
         # Upload the AWG sequence
+        sq.station = self.station
         sq.Pulsed_spec_seq(spec_pars, RO_pars)
 
         self.AWG.start()
