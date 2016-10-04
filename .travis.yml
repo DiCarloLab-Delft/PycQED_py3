@@ -13,8 +13,9 @@ install:
     - pip install --upgrade pip
     - pip install ipython
     - pip install -r develop_requirements.txt
+    # awaiting open source qcodes
+    # - pip install -e  git+ssh://git@github.com:qdev-dk/Qcodes.git
     - python setup.py develop
-    - pip install -e  git+ssh://git@github.com:qdev-dk/Qcodes.git
 # command to run tests
 script:
     - python  pycqed/test.py -v --skip-coverage
