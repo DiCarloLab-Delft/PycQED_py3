@@ -895,7 +895,8 @@ class chevron_optimization_v1(TD_Analysis):
         y = output_fft[order_mask]
         array_peaks = argrelextrema(y, np.greater)
         sort_mask = np.argsort(y[array_peaks])[::-1]
-        self.period = 1./self.sweep_points[array_peaks[sort_mask[0]]][0]
+        # self.period = 1./self.sweep_points[array_peaks[sort_mask[0]]][0]
+        self.period = 0.
         self.cost_value = -np.abs(y[[array_peaks[sort_mask[0]]]])[0]
 
 class Rabi_Analysis(TD_Analysis):
@@ -2276,12 +2277,11 @@ class SSRO_Analysis(MeasurementAnalysis):
         # print "refresh"
         V_opt = optimize.brent(NormCdfdiffDouble)
         F = -NormCdfdiffDouble(x=V_opt)
-        # print 'V_opt', V_opt
-        # print 'F', F
-        # print 'frac1_1', frac1_1
-        # print 'frac1_0', frac1_0
-        # print 'mu0', mu0,mu0_0,mu0_1
-        # print 'mu1', mu1,mu1_0,mu1_1
+
+        #calculating the signal-to-noise ratio
+        signal= abs(mu0_0-mu1_1)
+        noise = (sigma0_0 +sigma1_1)/2
+        SNR = signal/noise
 
         #plotting s-curves
         fig, ax = plt.subplots(figsize=(8, 4))
@@ -2353,7 +2353,7 @@ class SSRO_Analysis(MeasurementAnalysis):
         y0_1 = (1-frac1_1)*pylab.normpdf(bins1, mu0_0, sigma0_0)
 
 
-        pylab.semilogy(bins0, y0, 'b',linewidth=1.5)
+        pylab.semilogy(bins0, y0, 'b',linewidth=1.5,label='SNR is {0:.2f}'.format(SNR))
         pylab.semilogy(bins0, y1_0, 'b--', linewidth=3.5)
         pylab.semilogy(bins0, y0_0, 'b--', linewidth=3.5)
 
@@ -2367,6 +2367,7 @@ class SSRO_Analysis(MeasurementAnalysis):
         axes.set_title('Histograms of shots on rotaded IQ plane optimized for I, %s shots'%min_len)
         plt.xlabel('DAQ voltage integrated (V)')#, fontsize=14)
         plt.ylabel('Fraction of counts')#, fontsize=14)
+        plt.legend()
 
         plt.axvline(V_opt, ls='--', label=labelstring,
                    linewidth=2, color='grey')
@@ -2389,6 +2390,8 @@ class SSRO_Analysis(MeasurementAnalysis):
         else:
             fid_grp = self.analysis_group['SSRO_Fidelity']
 
+
+
         fid_grp.attrs.create(name='sigma0_0', data=sigma0_0)
         fid_grp.attrs.create(name='sigma1_1', data=sigma1_1)
         fid_grp.attrs.create(name='mu0_0', data=mu0_0)
@@ -2398,6 +2401,7 @@ class SSRO_Analysis(MeasurementAnalysis):
         fid_grp.attrs.create(name='V_opt', data=V_opt)
         fid_grp.attrs.create(name='F', data=F)
         fid_grp.attrs.create(name='F_corrected', data=F_corrected)
+        fid_grp.attrs.create(name='SNR', data=SNR)
 
         self.sigma0_0 = sigma0_0
         self.sigma1_1 = sigma1_1
@@ -2408,6 +2412,8 @@ class SSRO_Analysis(MeasurementAnalysis):
         self.V_opt = V_opt
         self.F = F
         self.F_corrected = F_corrected
+        self.SNR = SNR
+
 
 class SSRO_discrimination_analysis(MeasurementAnalysis):
     '''
