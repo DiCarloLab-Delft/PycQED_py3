@@ -116,3 +116,15 @@ def extract_required_operations(qasm_filepath):
                 elif line not in operations:
                     operations.append(line)
         return qubits, operations
+
+
+def upload_qasm_waveform(qasm_command, operation_dict):
+    """
+    uploads a single instruction
+    """
+    elts = qasm_command.split()
+    upload_function = operation_dict
+
+
+def create_operation_dict(required_ops, pulse_pars):
+    pass

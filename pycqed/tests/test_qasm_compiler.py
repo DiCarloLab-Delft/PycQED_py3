@@ -358,16 +358,19 @@ class Test_qasm_waveform_management(TestCase):
         the allowed operations.
         '''
         pass
-        # qasm_file = self.Rabi_qasm_file
-        # required_ops = extract_required_operations(qasm_file.name)
-
+        qasm_file = self.AllXY_qasm_file
+        required_ops = qta.extract_required_operations(qasm_file.name)
 
         # # config needs to contain enough info to generate mapping
-        # operation_mapping = get_operation_mapping(required_ops, config_a)
+        # operation_mapping = create_operation_mapping(required_ops)
 
         # for operation in operation_mapping:
         #     waveform = generate_waveform(operation, args)
         #     upload_waveform(waveform, location)
+
+
+    def test_generate_operation_dict(self):
+        qta.create_operation_dict
 
     def test_complete_sequence_loading_dynamic(self):
         '''
