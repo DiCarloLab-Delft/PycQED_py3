@@ -1,7 +1,7 @@
 
 import time
 t0 = time.time()  # to print how long init takes
-from instrument_drivers.meta_instrument.qubit_objects import duplexer_tek_transmon as dt
+from pycqed.instrument_drivers.meta_instrument.qubit_objects import duplexer_tek_transmon as dt
 
 from importlib import reload  # Useful for reloading while testing
 import numpy as np
