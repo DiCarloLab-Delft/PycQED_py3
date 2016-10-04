@@ -216,7 +216,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
             self.heterodyne_instr.set('mod_amp', self.mod_amp_cw.get())
         else:
             self.heterodyne_instr.RF_power(self.RO_power_cw())
-        self.heterodyne_instr.set('IF', self.f_RO_mod.get())
+        self.heterodyne_instr.set('f_RO_mod', self.f_RO_mod.get())
         self.heterodyne_instr.frequency.set(RO_freq)
         self.heterodyne_instr.RF.power(self.RO_power_cw())
         self.heterodyne_instr.RF_power(self.RO_power_cw())
@@ -285,15 +285,14 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
             self.AWG.set(self.RO_Q_channel.get()+'_offset',
                          self.RO_Q_offset.get())
         elif self.RO_pulse_type.get() is 'MW_IQmod_pulse_nontek':
-            print('this part is UHFQC specific')
             eval('self._acquisition_instr.sigouts_{}_offset({})'.format(self.RO_I_channel(),self.RO_I_offset()))
             eval('self._acquisition_instr.sigouts_{}_offset({})'.format(self.RO_Q_channel(),self.RO_Q_offset()))
         elif self.RO_pulse_type.get() is 'Gated_MW_RO_pulse':
-            self.rf_RO_source.pulsemod_stateself.ac.set('on')
+            self.rf_RO_source.pulsemod_state.set('on')
+            self.rf_RO_source.frequency(self.f_RO.get())
             self.rf_RO_source.power(self.RO_pulse_power.get())
-        self.rf_RO_source.frequency(self.f_RO())
-        self.rf_RO_source.power(self.RO_pulse_power())
-        self.rf_RO_source.on()
+            self.rf_RO_source.frequency(self.f_RO())
+            self.rf_RO_source.on()
 
     def calibrate_mixer_offsets(self, signal_hound, offs_type='pulse',
                                 update=True):
