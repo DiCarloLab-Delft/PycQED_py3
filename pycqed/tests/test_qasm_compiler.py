@@ -22,11 +22,6 @@ class Test_single_qubit_seqs(TestCase):
 
     @classmethod
     def setUpClass(self):
-        # try:
-        #     self.qubit = Transmon('q0_test', server_name=None)
-        # except:
-        #     self.qubit = Instrument.find_instrument('q0_test').close()
-        #     self.qubit = Transmon('q0_test', server_name=None)
         self.qubit_name = 'q0'  # self.qubit.name
         self.times = np.linspace(20e-9, 50e-6, 61)
         # a sample operation dictionary for testing
@@ -115,11 +110,6 @@ class Test_single_qubit_seqs(TestCase):
         instructions = asm.convert_to_instructions()
 
     def test_qasm_seq_Ramsey(self):
-        qasm_file = sq_qasm.Ramsey(self.qubit_name, self.times)
-        asm_file = qasm_to_asm(qasm_file.name, self.operation_dict)
-        asm = Assembler.Assembler(asm_file.name)
-        instructions = asm.convert_to_instructions()
-
         qasm_file = sq_qasm.Ramsey(self.qubit_name, self.times)
         asm_file = qasm_to_asm(qasm_file.name, self.operation_dict)
         asm = Assembler.Assembler(asm_file.name)
