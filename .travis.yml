@@ -5,9 +5,9 @@ notifications:
 python:
   - "3.5"
   # whitelist
-branches:
-  only:
-    - master
+# branches:
+#   only:
+#     - master
 # command to install dependencies
 install:
     - pip install --upgrade pip
@@ -16,7 +16,7 @@ install:
     - python setup.py develop
 # command to run tests
 script:
-    - python  pycqed/test.py --skip-coverage
+    - python  pycqed/test.py -v --skip-coverage
 
 after_success:
     # install codacy coverage plugin only on traivs

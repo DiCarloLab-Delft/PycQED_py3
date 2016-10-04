@@ -16,7 +16,7 @@ def test_core(verbosity=1, failfast=False, test_pattern='test*.py'):
     Coverage testing is only available from the command line
     """
 
-    _test_core(verbosity=verbosity, failfast=failfast,
+    return _test_core(verbosity=verbosity, failfast=failfast,
                test_pattern=test_pattern)
 
 
@@ -76,9 +76,9 @@ if __name__ == '__main__':
         cov = coverage.Coverage(source=['pycqed'])
         cov.start()
 
-    success = _test_core(verbosity=(1 + args.verbose - args.quiet),
-                         failfast=args.failfast,
-                         test_pattern=args.test_pattern)
+    success = test_core(verbosity=(1 + args.verbose - args.quiet),
+                        failfast=args.failfast,
+                        test_pattern=args.test_pattern)
 
     if not args.skip_coverage:
         cov.stop()

@@ -15,7 +15,7 @@ from pycqed.measurement import CBox_sweep_functions as cb_swf
 from pycqed.measurement import awg_sweep_functions as awg_swf
 from pycqed.analysis import measurement_analysis as ma
 from pycqed.measurement.pulse_sequences import standard_sequences as st_seqs
-import measurement.randomized_benchmarking.randomized_benchmarking as rb
+import pycqed.measurement.randomized_benchmarking.randomized_benchmarking as rb
 from pycqed.measurement.calibration_toolbox import mixer_carrier_cancellation_CBox
 from pycqed.measurement.calibration_toolbox import mixer_skewness_cal_CBox_adaptive
 
