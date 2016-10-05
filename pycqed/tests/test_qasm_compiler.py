@@ -431,9 +431,9 @@ class Test_qasm_waveform_management(TestCase):
         ops = qta.extract_required_operations(qasm_file.name)
 
         # # config needs to contain enough info to generate mapping
-        # operation_mapping = qta.create_operation_mapping(required_ops)
 
         operation_dict = qta.create_operation_dict(ops, self.pulse_pars)
+        # operation_mapping = qta.create_operation_mapping(required_ops)
 
         # # uploads all operations in op dict
         with Capturing() as output:

@@ -2,7 +2,7 @@ from measurement.waveform_control_CC import waveform as wf
 
 try:
     from qcodes import Instrument
-except ImportError():
+except ImportError:
     print('could not import qcodes Instrument')
 
 
