@@ -367,7 +367,7 @@ class SSRO_Fidelity_Detector_CBox(det.Soft_Detector):
             if self.raw:
                 return ana.F_raw
             else:
-                return ana.F, ana.F_corrected
+                return ana.F_raw, ana.F_corrected
 
 
 class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
@@ -375,9 +375,9 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
     For Qcodes. Readout with CBox, pulse generation with 5014
     '''
     def __init__(self, measurement_name,  MC, AWG, acquisition_instr, pulse_pars, RO_pars,
-                 raw=True, analyze=True, upload=True, IF=None,
+                 raw=True, analyze=True, upload=True, IF=None, weight_function_I=0, weight_function_Q=1,
                  optimized_weights=False, wait=0.0, close_fig=True, SSB=False,
-                 multiplier=1, nr_averages=1024, integration_length=1e-6, **kw):
+                 nr_averages=1024, integration_length=1e-6, **kw):
         self.detector_control = 'soft'
         self.name = 'SSRO_Fidelity'
         # For an explanation of the difference between the different
@@ -386,8 +386,8 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
             self.value_names = ['F-raw', 'theta']
             self.value_units = [' ', 'rad']
         else:
-            self.value_names = ['F', 'F corrected']
-            self.value_units = [' ', ' ']
+            self.value_names = ['F-raw', 'F corrected', 'SNR']
+            self.value_units = [' ', ' ', ' ']
         self.measurement_name = measurement_name
         self.MC = MC
         self.acquisition_instr = acquisition_instr
@@ -402,7 +402,6 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
         self.wait = wait
         self.close_fig = close_fig
         self.SSB = SSB
-        self.multiplier = multiplier
         self.IF=IF
         if 'CBox' in str(self.acquisition_instr):
             self.CBox = self.acquisition_instr
@@ -410,6 +409,8 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
             self.UHFQC = self.acquisition_instr
         self.nr_averages = nr_averages
         self.integration_length = integration_length
+        self.weight_function_I = weight_function_I
+        self.weight_function_Q = weight_function_Q
 
 
     def prepare(self, **kw):
@@ -490,18 +491,12 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
                 transient1_I = inp_avg_res[0]
                 transient1_Q = inp_avg_res[1]
 
-                # # need to decide about the code below
-                # optimized_weights_I = self.multiplier*(transient1_I-transient0_I)
-                # optimized_weights_I = optimized_weights_I+np.mean(optimized_weights_I)
-                # optimized_weights_Q = self.multiplier*(transient1_Q-transient0_Q)
-                # optimized_weights_Q = optimized_weights_Q+np.mean(optimized_weights_Q)
-
-                optimized_weights_I = self.multiplier*(transient1_I-transient0_I)
+                optimized_weights_I = (transient1_I-transient0_I)
                 optimized_weights_I = optimized_weights_I-np.mean(optimized_weights_I)
                 weight_scale_factor = 127./np.max(np.abs(optimized_weights_I))
                 optimized_weights_I = np.floor(weight_scale_factor*optimized_weights_I).astype(int)
 
-                optimized_weights_Q = self.multiplier*(transient1_Q-transient0_Q)
+                optimized_weights_Q = (transient1_Q-transient0_Q)
                 optimized_weights_Q = optimized_weights_Q-np.mean(optimized_weights_Q)
                 weight_scale_factor = 127./np.max(np.abs(optimized_weights_Q))
                 optimized_weights_Q = np.floor(weight_scale_factor*optimized_weights_Q).astype(int)
@@ -562,46 +557,41 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
                 dataset = self.UHFQC.quex_iavg_data_1()
                 transient1_Q=dataset[0]['vector']
 
-                # # need to decide about the code below
-                # optimized_weights_I = self.multiplier*(transient1_I-transient0_I)
-                # optimized_weights_I = optimized_weights_I+np.mean(optimized_weights_I)
-                # optimized_weights_Q = self.multiplier*(transient1_Q-transient0_Q)
-                # optimized_weights_Q = optimized_weights_Q+np.mean(optimized_weights_Q)
-
-                optimized_weights_I = self.multiplier*(transient1_I-transient0_I)
+                optimized_weights_I = (transient1_I-transient0_I)
                 optimized_weights_I = optimized_weights_I-np.mean(optimized_weights_I)
                 weight_scale_factor = 1./np.max(np.abs(optimized_weights_I))
                 optimized_weights_I = weight_scale_factor*optimized_weights_I
 
-                optimized_weights_Q = self.multiplier*(transient1_Q-transient0_Q)
+                optimized_weights_Q = (transient1_Q-transient0_Q)
                 optimized_weights_Q = optimized_weights_Q-np.mean(optimized_weights_Q)
                 weight_scale_factor = 1./np.max(np.abs(optimized_weights_Q))
                 optimized_weights_Q = weight_scale_factor*optimized_weights_Q
 
-                self.UHFQC.quex_wint_weights_0_real(np.array(optimized_weights_I))
+                eval('self.UHFQC.quex_wint_weights_{}_real(np.array(optimized_weights_I))'.format(self.weight_function_I))
 
                 if self.SSB:
-                    self.UHFQC.quex_wint_weights_0_imag(np.array(optimized_weights_Q))
-                    self.UHFQC.quex_wint_weights_1_real(np.array(optimized_weights_I))
-                    self.UHFQC.quex_wint_weights_1_imag(np.array(optimized_weights_Q))
-                    self.UHFQC.quex_rot_0_real(1.0)
-                    self.UHFQC.quex_rot_0_imag(-1.0)
-                    self.UHFQC.quex_rot_1_real(1.0)
-                    self.UHFQC.quex_rot_1_imag(1.0)
+                    eval('self.UHFQC.quex_wint_weights_{}_imag(np.array(optimized_weights_Q))'.format(self.weight_function_I))
+                    eval('self.UHFQC.quex_wint_weights_{}_real(np.array(optimized_weights_I))'.format(self.weight_function_Q))
+                    eval('self.UHFQC.quex_wint_weights_{}_imag(np.array(optimized_weights_Q))'.format(self.weight_function_Q))
+                    eval('self.UHFQC.quex_rot_{}_real(1.0)'.format(self.weight_function_I))
+                    eval('self.UHFQC.quex_rot_{}_imag(-1.0)'.format(self.weight_function_I))
+                    eval('self.UHFQC.quex_rot_{}_real(1.0)'.format(self.weight_function_Q))
+                    eval('self.UHFQC.quex_rot_{}_imag(1.0)'.format(self.weight_function_Q))
                 else:
-                    self.UHFQC.quex_wint_weights_0_imag(np.array(np.multiply(optimized_weights_Q,0)))  # disabling the Q quadrature
-                    self.UHFQC.quex_wint_weights_1_real(np.array(np.multiply(optimized_weights_Q,0)))  # disabling the Q quadrature
-                    self.UHFQC.quex_wint_weights_1_imag(np.array(np.multiply(optimized_weights_Q,0)))  # disabling the Q quadrature
-                    self.UHFQC.quex_rot_0_real(1.0)
-                    self.UHFQC.quex_rot_0_imag(0.0) #disabling the second weightfunciton for DSB
-                    self.UHFQC.quex_rot_1_real(0.0)
-                    self.UHFQC.quex_rot_1_imag(0.0)
+                    eval('self.UHFQC.quex_wint_weights_{}_imag(0*np.array(optimized_weights_Q))'.format(self.weight_function_I)) #disabling the other weight fucntions
+                    eval('self.UHFQC.quex_wint_weights_{}_real(0*np.array(optimized_weights_I))'.format(self.weight_function_Q))
+                    eval('self.UHFQC.quex_wint_weights_{}_imag(0*np.array(optimized_weights_Q))'.format(self.weight_function_Q))
+                    eval('self.UHFQC.quex_rot_{}_real(1.0)'.format(self.weight_function_I))
+                    eval('self.UHFQC.quex_rot_{}_imag(0.0)'.format(self.weight_function_I))
+                    eval('self.UHFQC.quex_rot_{}_real(0.0)'.format(self.weight_function_Q))
+                    eval('self.UHFQC.quex_rot_{}_imag(0.0)'.format(self.weight_function_Q))
                 self.MC.set_sweep_function(awg_swf.OffOn(
                                            pulse_pars=self.pulse_pars,
                                            RO_pars=self.RO_pars))
-                print("hoi", self.integration_length)
                 self.MC.set_detector_function(
-                    det.UHFQC_integration_logging_det(self.UHFQC, self.AWG, channels=[0,1], integration_length=self.integration_length))
+                    det.UHFQC_integration_logging_det(self.UHFQC, self.AWG,
+                                                      channels=[self.weight_function_I,self.weight_function_Q],
+                                                      integration_length=self.integration_length))
         self.i += 1
         self.MC.run(name=self.measurement_name+'_'+str(self.i))
 
@@ -630,7 +620,7 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
             if self.raw:
                 return ana.F_raw, ana.theta
             else:
-                return ana.F_raw, ana.F_corrected
+                return ana.F_raw, ana.F_corrected, ana.SNR
 '''
     def acquire_data_point(self, *args, **kw):
         self.time_start = time.time()
@@ -967,8 +957,8 @@ class Chevron_optimization_v1(det.Soft_Detector):
         super().__init__()
         kernel_dir_path = 'kernels/'
         self.name = 'chevron_optimization_v1'
-        self.value_names = ['Cost function', 'SWAP Time']
-        self.value_units = ['a.u.', 'ns']
+        self.value_names = ['SWAP Time', 'Cost function']
+        self.value_units = ['ns','a.u.']
         self.kernel_obj = kernel_obj
         self.AWG = AWG
         self.MC_nested = MC_nested
@@ -1014,7 +1004,7 @@ class Chevron_optimization_v1(det.Soft_Detector):
                                             cost_function=self.cost_function_opt)
 
         # # Return the cost function sum(min)+sum(1-max)
-        return ma_obj.cost_value, 0.5*ma_obj.period
+        return 0.5*ma_obj.period, ma_obj.cost_value
 
 
 

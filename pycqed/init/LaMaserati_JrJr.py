@@ -97,8 +97,8 @@ IVVI = iv.IVVI('IVVI', address='COM4', numdacs=16, server_name=None)
 station.add_component(IVVI)
 
 #Initializing UHFQC
-# UHFQC_1 = ZI_UHFQC.UHFQC('UHFQC_1', device='dev2178', server_name=None)
-# station.add_component(UHFQC_1)
+UHFQC_1 = ZI_UHFQC.UHFQC('UHFQC_1', device='dev2178', server_name=None)
+station.add_component(UHFQC_1)
 
 ATT = Weinschel_8320_novisa.Weinschel_8320(name='ATT',address='192.168.0.54', server_name=None)
 # Dux = qdux.QuTech_Duplexer('Dux', address='TCPIP0::192.168.0.101',
@@ -229,23 +229,37 @@ cfct.set_AWG_limits(station,1.7)
 
 q0=AncT
 q1=DataT
-def switch_to_pulsed_RO_UHFQC(qubit):
-    UHFQC_1.AWG_file('traditional.seqc')
-    qubit.RO_pulse_type('Gated_MW_RO_pulse')
-    q0.RO_acq_marker_delay(175e-9)
-    q0.acquisition_instr(UHFQC_1)
+
 def switch_to_pulsed_RO_CBox(qubit):
-    # UHFQC_1.AWG_file('traditional.seqc')
+    UHFQC_1.AWG_file('traditional.seqc')
     qubit.RO_pulse_type('Gated_MW_RO_pulse')
     qubit.RO_acq_marker_delay(175e-9)
     qubit.acquisition_instr(CBox)
+    qubit.RO_acq_marker_channel('ch3_marker1')
+    qubit.RO_acq_weight_function_I(0)
+    qubit.RO_acq_weight_function_Q(1)
+
+def switch_to_pulsed_RO_UHFQC(qubit):
+    UHFQC_1.AWG_file('traditional.seqc')
+    qubit.RO_pulse_type('Gated_MW_RO_pulse')
+    qubit.RO_acq_marker_delay(175e-9)
+    qubit.acquisition_instr(UHFQC_1)
+    qubit.RO_acq_marker_channel('ch3_marker2')
+    qubit.RO_acq_weight_function_I(0)
+    qubit.RO_acq_weight_function_Q(1)
+
+
 def switch_to_IQ_mod_RO_UHFQC(qubit):
     UHFQC_1.AWG_file('traditional_IQ_mod_readout.seqc')
     qubit.RO_pulse_type('MW_IQmod_pulse_nontek')
     qubit.RO_acq_marker_delay(-100e-9)
     qubit.acquisition_instr(UHFQC_1)
+    qubit.RO_acq_marker_channel('ch3_marker2')
     qubit.RO_I_channel('0')
     qubit.RO_Q_channel('1')
+    qubit.RO_acq_weight_function_I(0)
+    qubit.RO_acq_weight_function_Q(1)
+
 #preparing UHFQC readout with IQ mod pulses
 
 switch_to_pulsed_RO_CBox(q0)

@@ -54,6 +54,7 @@ def single_pulse_seq(pulse_pars=None,
                        # 'length': 5e-6}
     seq_name = 'Square_seq'
     seq = sequence.Sequence(seq_name)
+    station.pulsar.update_channel_settings()
     el_list = []
     for i, iter in enumerate([0, 1]):  # seq has to have at least 2 elts
 
@@ -105,6 +106,7 @@ def chevron_seq_length(lengths, mw_pulse_pars, RO_pars, flux_pulse_pars=None,
 
     seq_name = 'Square_seq'
     seq = sequence.Sequence(seq_name)
+    station.pulsar.update_channel_settings()
     el_list = []
     pulses = get_pulse_dict_from_pars(mw_pulse_pars)
     for i, lngt in enumerate(lengths):  # seq has to have at least 2 elts
@@ -184,6 +186,7 @@ def chevron_seq_amp(amps, mw_pulse_pars, RO_pars, flux_pulse_pars=None,
                   'length': flux_pulse_pars['length']}
     seq_name = 'Square_seq'
     seq = sequence.Sequence(seq_name)
+    station.pulsar.update_channel_settings()
     el_list = []
     pulses = get_pulse_dict_from_pars(mw_pulse_pars)
     for i, am in enumerate(amps):  # seq has to have at least 2 elts

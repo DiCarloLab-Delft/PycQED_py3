@@ -488,6 +488,8 @@ class CBox_integrated_average_detector(Hard_Detector):
             return self.rotate_and_normalize(data)
         else:
             return data
+
+
     def rotate_and_normalize(self, data):
         """
         Rotates and normalizes
@@ -1605,7 +1607,8 @@ class UHFQC_integrated_average_detector(Hard_Detector):
     Detector used for integrated average results with the UHFQC
 
     '''
-    def __init__(self, UHFQC, AWG, integration_length=1e-6, nr_averages=1024, channels=[0, 1, 2, 3], seg_per_point=1,**kw):
+    def __init__(self, UHFQC, AWG, integration_length=1e-6, nr_averages=1024, rotate=False,
+                 channels=[0, 1, 2, 3], seg_per_point=1,**kw):
         super(UHFQC_integrated_average_detector, self).__init__()
         self.UHFQC = UHFQC
         self.name = 'UHFQC_integrated_average'
@@ -1615,12 +1618,17 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         for i, channel in enumerate(self.channels):
             self.value_names[i] = 'w{}'.format(channel)
             self.value_units[i] = 'V'
-        if channels == [0,1]:
+        self.rotate = rotate
+        if channels == [0,1] or channels == [2,3]:
                 self.value_names = ['I', 'Q']
                 self.value_units = ['V', 'V']
+        else:
+            if self.rotate:
+                raise ValueError('rortate only possible for two weight_function acquisition')
         self.AWG = AWG
         self.nr_averages = nr_averages
         self.integration_length = integration_length
+        self.rotate = rotate
 
     def get_values(self):
         self.UHFQC.awgs_0_single(1)
@@ -1635,7 +1643,29 @@ class UHFQC_integrated_average_detector(Hard_Detector):
             dataset = eval("self.UHFQC.quex_rl_data_{}()".format(channel))
             data[i] = dataset[0]['vector']
         print("refreshed")
-        return data
+
+        if self.rotate:
+            return self.rotate_and_normalize(data)
+        else:
+            return data
+
+    def rotate_and_normalize(self, data):
+        """
+        Rotates and normalizes
+        """
+        if self.cal_points is None:
+            self.corr_data, self.zero_coord, self.one_coord = \
+                a_tools.rotate_and_normalize_data(
+                    data=data,
+                    cal_zero_points=list(range(-4, -2)),
+                    cal_one_points=list(range(-2, 0)))
+        else:
+            self.corr_data, self.zero_coord, self.one_coord = \
+                a_tools.rotate_and_normalize_data(
+                    data=self.measured_values[0:2],
+                    cal_zero_points=self.cal_points[0],
+                    cal_one_points=self.cal_points[1])
+        return self.corr_data, self.corr_data
 
     def prepare(self, sweep_points):
         if self.AWG is not None:
@@ -1668,7 +1698,7 @@ class UHFQC_integration_logging_det(Hard_Detector):
         for i, channel in enumerate(self.channels):
             self.value_names[i] = 'w{}'.format(channel)
             self.value_units[i] = 'V'
-        if channels == [0,1]:
+        if channels == [0,1] or channels == [2,3]:
                 self.value_names = ['I', 'Q']
                 self.value_units = ['V', 'V']
         self.AWG = AWG

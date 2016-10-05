@@ -31,6 +31,7 @@ def GST_from_textfile(pulse_pars, RO_pars, filename,
     if seq_name is None:
         seq_name = 'GST_seq'
     seq = sequence.Sequence(seq_name)
+    station.pulsar.update_channel_settings()
     el_list = []
     # Create a dict with the parameters for all the pulses
     pulse_dict = get_pulse_dict_from_pars(pulse_pars)

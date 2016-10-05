@@ -123,7 +123,12 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         self.add_parameter('RO_acq_integration_length', initial_value=1e-6,
                            vals=vals.Numbers(min_value=10e-9, max_value=2e-6),
                            parameter_class=ManualParameter)
-
+        self.add_parameter('RO_acq_weight_function_I', initial_value=0,
+                           vals=vals.Enum(0, 1, 2, 3, 4, 5),
+                           parameter_class=ManualParameter)
+        self.add_parameter('RO_acq_weight_function_Q', initial_value=1,
+                           vals=vals.Enum(0, 1, 2, 3, 4, 5),
+                           parameter_class=ManualParameter)
         # These parameters are only relevant if using MW_IQmod_pulse type
         # RO
         self.add_parameter('RO_I_channel', initial_value='ch3',
@@ -253,6 +258,8 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         self.LO.on()
         self.cw_source.off()
         self.td_source.on()
+        # Ensures the self.pulse_pars and self.RO_pars get created and updated
+        self.get_pulse_pars()
 
         # Set source to fs =f-f_mod such that pulses appear at f = fs+f_mod
         self.td_source.frequency.set(self.f_qubit.get()
@@ -265,7 +272,6 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
             f_RO = self.f_RO.get()
         self.LO.frequency.set(f_RO - self.f_RO_mod.get())
         self.td_source.power.set(self.td_source_pow.get())
-        self.get_pulse_pars()
 
         # # makes sure dac range is used optimally, 20% overhead for mixer skew
         # # use 60% of based on linear range in mathematica
@@ -454,7 +460,6 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
 
         spec_pars, RO_pars = self.get_spec_pars()
         # Upload the AWG sequence
-        sq.station = self.station
         sq.Pulsed_spec_seq(spec_pars, RO_pars)
 
         self.AWG.start()
@@ -483,7 +488,10 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         # prepare for timedomain takes care of rescaling
         self.prepare_for_timedomain()
         # # Extra rescaling only happens if the amp180 was far too low for the Rabi
-        if max(abs(amps)) > 2.9 * self.AWG.get('{}_amp'.format(self.pulse_I_channel())):
+        if max(abs(amps)) > 2 * self.AWG.get('{}_amp'.format(self.pulse_I_channel())):
+            logging.warning('Auto rescaling AWG amplitude as amp180 {}'.format(
+                            self.amp180()) +
+                            ' was set very low in comparison to Rabi range')
             self.AWG.set('{}_amp'.format(self.pulse_I_channel()),
                          np.max(abs(amps))*3.0)
             self.AWG.set('{}_amp'.format(self.pulse_Q_channel()),
@@ -631,8 +639,9 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
             raw=no_fits,
             MC=MC,
             AWG=self.AWG, acquisition_instr=self._acquisition_instr,
-            pulse_pars=self.pulse_pars, RO_pars=self.RO_pars, IF= self.f_RO_mod(),
-            optimized_weights=optimized_weights,integration_length=self.RO_acq_integration_length(),
+            pulse_pars=self.pulse_pars, RO_pars=self.RO_pars, IF=self.f_RO_mod(), weight_function_I=self.RO_acq_weight_function_I(),
+            weight_function_Q=self.RO_acq_weight_function_Q(),
+            optimized_weights=optimized_weights, integration_length=self.RO_acq_integration_length(),
             close_fig=close_fig, SSB=SSB, multiplier=multiplier, nr_averages=self.RO_acq_averages())
         if return_detector:
             return d
@@ -818,11 +827,11 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                 AWG=self.AWG, nr_averages=self.RO_acq_averages())
             self.int_avg_det = det.UHFQC_integrated_average_detector(
                 UHFQC=self._acquisition_instr, AWG=self.AWG,
-                channels=[0, 1], nr_averages=self.RO_acq_averages(),
+                channels=[self.RO_acq_weight_function_I(), self.RO_acq_weight_function_Q()], nr_averages=self.RO_acq_averages(),
                 integration_length=self.RO_acq_integration_length())
             self.int_log_det = det.UHFQC_integration_logging_det(
                 UHFQC=self._acquisition_instr, AWG=self.AWG,
-                channels=[0, 1],
+                channels=[self.RO_acq_weight_function_I(), self.RO_acq_weight_function_Q()],
                 integration_length=self.RO_acq_integration_length())
 
     def get_pulse_pars(self):
