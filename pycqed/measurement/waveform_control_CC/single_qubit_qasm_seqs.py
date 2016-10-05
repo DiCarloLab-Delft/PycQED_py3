@@ -105,7 +105,7 @@ def Ramsey(qubit_name, times, clock_cycle=5e-9,
         phases = np.zeros(len(times))
 
     clocks = np.round(times/clock_cycle)
-    filename = join(base_qasm_path, 'T1.qasm')
+    filename = join(base_qasm_path, 'Ramsey.qasm')
     qasm_file = mopen(filename, mode='w')
     qasm_file.writelines('qubit {} \n'.format(qubit_name))
     for i, cl in enumerate(clocks):
@@ -156,7 +156,7 @@ def echo(qubit_name, times, clock_cycle=5e-9,
         phases = np.zeros(len(times))
 
     clocks = np.round(times/clock_cycle)
-    filename = join(base_qasm_path, 'T1.qasm')
+    filename = join(base_qasm_path, 'echo.qasm')
     qasm_file = mopen(filename, mode='w')
     qasm_file.writelines('qubit {} \n'.format(qubit_name))
     for i, cl in enumerate(clocks):

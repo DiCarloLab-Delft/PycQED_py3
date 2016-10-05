@@ -359,20 +359,16 @@ class Test_qasm_waveform_management(TestCase):
         self.AllXY_qasm_file = sq_qasm.AllXY(self.qubit_name)
 
     def test_qasm_extract_required_ops(self):
-        qubits, operations = qta.extract_required_operations(
+        operations = qta.extract_required_operations(
             self.AllXY_qasm_file.name)
-        self.assertEqual(qubits, [self.qubit_name])
         self.assertCountEqual(operations, self.basic_ops)
 
-        qubits, operations = qta.extract_required_operations(
+        operations = qta.extract_required_operations(
             self.Rabi_qasm_file.name)
-        self.assertEqual(qubits, [self.qubit_name])
         rabi_ops = ['init_all', 'RO q0']
         for amp in self.amps:
             rabi_ops.append('Rx q0 {}'.format(amp))
         self.assertCountEqual(operations, rabi_ops)
-
-
 
     def test_uploading_required_wfs(self):
         pass
@@ -383,16 +379,16 @@ class Test_qasm_waveform_management(TestCase):
 
         operation_dict = qta.create_operation_dict(ops, self.pulse_pars)
         self.assertCountEqual(operation_dict.keys(), ['init_all',
-                              'RO', 'X180', 'Y180', 'X90', 'Y90', 'mY180'])
-        self.assertEqual(operation_dict['X180']['q0']['amplitude'], 0.5)
-        self.assertEqual(operation_dict['X90']['q0']['amplitude'], 0.5*0.48)
-        self.assertEqual(operation_dict['Y180']['q0']['amplitude'], 0.5)
-        self.assertEqual(operation_dict['Y90']['q0']['amplitude'], 0.5*0.48)
+                              'RO q0', 'X180 q0', 'Y180 q0', 'X90 q0', 'Y90 q0', 'mY180 q0'])
+        self.assertEqual(operation_dict['X180 q0']['amplitude'], 0.5)
+        self.assertEqual(operation_dict['X90 q0']['amplitude'], 0.5*0.48)
+        self.assertEqual(operation_dict['Y180 q0']['amplitude'], 0.5)
+        self.assertEqual(operation_dict['Y90 q0']['amplitude'], 0.5*0.48)
 
-        self.assertEqual(operation_dict['X180']['q0']['phase'], 0)
-        self.assertEqual(operation_dict['X90']['q0']['phase'], 0)
-        self.assertEqual(operation_dict['mY180']['q0']['phase'], 270)
-        self.assertEqual(operation_dict['Y90']['q0']['phase'], 90)
+        self.assertEqual(operation_dict['X180 q0']['phase'], 0)
+        self.assertEqual(operation_dict['X90 q0']['phase'], 0)
+        self.assertEqual(operation_dict['mY180 q0']['phase'], 270)
+        self.assertEqual(operation_dict['Y90 q0']['phase'], 90)
 
 
 
@@ -404,13 +400,11 @@ class Test_qasm_waveform_management(TestCase):
         '''
         pass
         qasm_file = self.AllXY_qasm_file
-        required_ops = qta.extract_required_operations(qasm_file.name)
-
+        ops = qta.extract_required_operations(qasm_file.name)
         # # config needs to contain enough info to generate mapping
         # operation_mapping = qta.create_operation_mapping(required_ops)
 
-        # operation_dict = qta.create_operation_dict(
-        #     required_ops, self.pulse_pars)
+        operation_dict = qta.create_operation_dict(ops, self.pulse_pars)
 
         # # uploads all operations in op dict
         # qta.prepare_operations(operation_dict)
