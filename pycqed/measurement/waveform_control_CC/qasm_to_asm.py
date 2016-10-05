@@ -194,9 +194,9 @@ def prepare_operations(operation_dict):
             prepare_function = getattr(opf, operation['prepare_function'])
             pf_kwargs = operation['prepare_function_kwargs']
             if isinstance(pf_kwargs, dict):
-                prepare_function(**pf_kwargs)
+                prepare_function(operation_name, **pf_kwargs)
             elif pf_kwargs is None:
-                prepare_function()
+                prepare_function(operation_name)
             else:
                 raise TypeError('prepare_function_kwargs not dict "{}"'.format(
                     pf_kwargs))

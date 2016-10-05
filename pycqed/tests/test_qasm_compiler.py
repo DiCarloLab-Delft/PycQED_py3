@@ -429,6 +429,7 @@ class Test_qasm_waveform_management(TestCase):
         '''
         qasm_file = self.AllXY_qasm_file
         ops = qta.extract_required_operations(qasm_file.name)
+
         # # config needs to contain enough info to generate mapping
         # operation_mapping = qta.create_operation_mapping(required_ops)
 
@@ -438,7 +439,7 @@ class Test_qasm_waveform_management(TestCase):
         with Capturing() as output:
             qta.prepare_operations(operation_dict)
 
-        # qta.qasm_to_asm(qasm_file.name, operation_dict)
+        qta.qasm_to_asm(qasm_file.name, operation_dict)
 
     def test_complete_sequence_loading_dynamic(self):
         '''
