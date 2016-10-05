@@ -26,29 +26,28 @@ class Test_single_qubit_seqs(TestCase):
         # a sample operation dictionary for testing
         self.operation_dict = {
             'init_all': {'instruction': 'WaitReg r0 \n'},
-            'X180': {self.qubit_name: {
-                'duration': 2, 'instruction': 'Trigger 1000000, 2 \n'}},
-            'X90': {self.qubit_name: {
-                'duration': 2, 'instruction': 'Trigger 0100000, 2 \n'}},
-            'Y180': {self.qubit_name: {
-                'duration': 2, 'instruction': 'Trigger 0100000, 2 \n'}},
-            'Y90': {self.qubit_name: {
-                'duration': 2, 'instruction': 'Trigger 0100000, 2 \n'}},
+            'X180 {}'.format(self.qubit_name): {
+                'duration': 2, 'instruction': 'Trigger 1000000, 2 \n'},
+            'X90 {}'.format(self.qubit_name): {
+                'duration': 2, 'instruction': 'Trigger 0100000, 2 \n'},
+            'Y180 {}'.format(self.qubit_name): {
+                'duration': 2, 'instruction': 'Trigger 0100000, 2 \n'},
+            'Y90 {}'.format(self.qubit_name): {
+                'duration': 2, 'instruction': 'Trigger 0100000, 2 \n'},
 
-            'mX180': {self.qubit_name: {
-                'duration': 2, 'instruction': 'Trigger 1000000, 2 \n'}},
-            'mX90': {self.qubit_name: {
-                'duration': 2, 'instruction': 'Trigger 0100000, 2 \n'}},
-            'mY180': {self.qubit_name: {
-                'duration': 2, 'instruction': 'Trigger 0100000, 2 \n'}},
-            'mY90': {self.qubit_name: {
-                'duration': 2, 'instruction': 'Trigger 0100000, 2 \n'}},
+            'mX180 {}'.format(self.qubit_name): {
+                'duration': 2, 'instruction': 'Trigger 1000000, 2 \n'},
+            'mX90 {}'.format(self.qubit_name): {
+                'duration': 2, 'instruction': 'Trigger 0100000, 2 \n'},
+            'mY180 {}'.format(self.qubit_name): {
+                'duration': 2, 'instruction': 'Trigger 0100000, 2 \n'},
+            'mY90 {}'.format(self.qubit_name): {
+                'duration': 2, 'instruction': 'Trigger 0100000, 2 \n'},
 
-            'I': {self.qubit_name: {
-                'duration': None, 'instruction': 'wait {} \n'}},
-            'RO': {self.qubit_name: {
+            'I {}'.format(self.qubit_name): {
+                'duration': None, 'instruction': 'wait {} \n'},
+            'RO {}'.format(self.qubit_name): {
                 'duration': 8, 'instruction': 'Trigger 0010000, 2 \n'}}
-        }
 
         def Rx_codeword(amp, min_amp=-.5, max_amp=0.5):
             """
@@ -58,16 +57,14 @@ class Test_single_qubit_seqs(TestCase):
             amp = float(amp)
             codeword = int((amp-min_amp)/(max_amp - min_amp) * 127)
             return 'Trigger {:07b}, 2 , \n'.format(codeword)
-        self.operation_dict['Rx'] = {
-            self.qubit_name: {'instruction': Rx_codeword,
-                              'duration': 2}}
+        self.operation_dict['Rx {}'.format(self.qubit_name)] = {
+            'instruction': Rx_codeword, 'duration': 2}
 
         for op in ['X180', 'X90', 'Y180', 'Y90']:
             # This is not the way to do this in  a real sequence but enough
             # to test if the test motzoi sequence compiles
-            self.operation_dict[op+'_M'] = {
-                self.qubit_name: {'instruction': Rx_codeword,
-                                  'duration': 2}}
+            self.operation_dict[op+'_Motz {}'.format(self.qubit_name)] = {
+                'instruction': Rx_codeword, 'duration': 2}
 
         def Rphi_codeword(phase):
             """
@@ -78,9 +75,8 @@ class Test_single_qubit_seqs(TestCase):
             codeword = int(phase/10+10)  # resolution will be up to 10 deg
             return 'Trigger {:07b}, 2 , \n'.format(codeword)
 
-        self.operation_dict['R90_phi'] = {
-            self.qubit_name: {'instruction': Rphi_codeword,
-                              'duration': 2}}
+        self.operation_dict['R90_phi {}'.format(self.qubit_name)] = {
+            'instruction': Rphi_codeword, 'duration': 2}
 
     def test_qasm_seq_T1(self):
 
@@ -214,15 +210,14 @@ class Test_qasm_to_asm(TestCase):
         # a sample operation dictionary for testing
         self.operation_dict = {
             'init_all': {'instruction': 'WaitReg r0 \n'},
-            'X180': {self.qubit_name: {
-                     'duration': 2, 'instruction': 'Trigger 1000000, 2 \n'}},
-            'Y180': {self.qubit_name: {
-                'duration': 2, 'instruction': 'Trigger 0100000, 2 \n'}},
-            'I': {self.qubit_name: {
-                'duration': None, 'instruction': 'wait {} \n'}},
-            'RO': {self.qubit_name: {
+            'X180 {}'.format(self.qubit_name): {
+                     'duration': 2, 'instruction': 'Trigger 1000000, 2 \n'},
+            'Y180 {}'.format(self.qubit_name): {
+                'duration': 2, 'instruction': 'Trigger 0100000, 2 \n'},
+            'I {}'.format(self.qubit_name): {
+                'duration': None, 'instruction': 'wait {} \n'},
+            'RO {}'.format(self.qubit_name): {
                 'duration': 8, 'instruction': 'Trigger 0010000, 2 \n'}}
-        }
 
     def test_empty_qasm_file(self):
         filename = join(self.base_qasm_path, 'empty.qasm')
@@ -283,6 +278,8 @@ class Test_qasm_to_asm(TestCase):
         qasm_file.close()
         qta.qasm_to_asm(qasm_file.name, ext_op_dict)
 
+        # I need to test here if the file written contains the right commands
+
     def test_too_many_args_command(self):
         filename = join(self.base_qasm_path, 'too_many_args.qasm')
         qasm_file = mopen(filename, mode='w')
@@ -341,15 +338,14 @@ class Test_qasm_waveform_management(TestCase):
         # a sample operation dictionary for testing
         self.operation_dict = {
             'init_all': {'instruction': 'WaitReg r0 \n'},
-            'X180': {self.qubit_name: {
-                     'duration': 2, 'instruction': 'Trigger 1000000, 2 \n'}},
-            'Y180': {self.qubit_name: {
-                'duration': 2, 'instruction': 'Trigger 0100000, 2 \n'}},
-            'I': {self.qubit_name: {
-                'duration': None, 'instruction': 'wait {} \n'}},
-            'RO': {self.qubit_name: {
+            'X180 {}'.format(self.qubit_name): {
+                     'duration': 2, 'instruction': 'Trigger 1000000, 2 \n'},
+            'Y180 {}'.format(self.qubit_name): {
+                'duration': 2, 'instruction': 'Trigger 0100000, 2 \n'},
+            'I {}'.format(self.qubit_name): {
+                'duration': None, 'instruction': 'wait {} \n'},
+            'RO {}'.format(self.qubit_name): {
                 'duration': 8, 'instruction': 'Trigger 0010000, 2 \n'}}
-        }
 
         self.basic_ops = ['init_all', 'RO q0', 'X180 q0', 'Y180 q0',
                           'X90 q0', 'Y90 q0']

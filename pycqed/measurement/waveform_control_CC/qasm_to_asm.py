@@ -51,28 +51,23 @@ def qasm_to_asm(qasm_filepath, operation_dict):
             if (len(line) == 0):  # skip empty line and comment
                 continue
             elts = line.split()
+            # for single qubit gates that have an argument
+            if len(elts) > 1:
+                base_op = elts[0]+' '+elts[1]
 
             # Interpret qasm elements
             commands = list(operation_dict.keys()) + ['qubit']
-            if elts[0] not in commands:
-                raise ValueError(
-                    'Command "{}" not recognized, must be in {}'.format(
-                        elts[0], commands))
-            # special command: a line that defines a qubit
-            elif elts[0] == 'qubit':
+            if elts[0] == 'qubit':
                 qubits.append(elts[1])
-            elif len(elts) == 1:
-                instruction = operation_dict[elts[0]]['instruction']
-                asm_file.writelines(instruction)
-            # Single qubit operation
-            elif len(elts) == 2:
-                instruction = operation_dict[elts[0]][elts[1]]['instruction']
+
+            elif (line in commands):
+                instruction = operation_dict[line]['instruction']
                 asm_file.writelines(instruction)
             # two qubit operation or operation with arg
-            elif len(elts) == 3:
+            elif base_op in commands:
                 # single qubit op with argument
-                if 'instruction' in operation_dict[elts[0]][elts[1]].keys():
-                    base_ins = operation_dict[elts[0]][elts[1]]['instruction']
+                if 'instruction' in operation_dict[base_op].keys():
+                    base_ins = operation_dict[base_op]['instruction']
                     # string formatting is a constraint now but maybe we can
                     # come up with something smarter
                     if isinstance(base_ins, str):
@@ -80,11 +75,15 @@ def qasm_to_asm(qasm_filepath, operation_dict):
                     else:
                         instruction = base_ins(elts[2])
                 else:
-                    instruction = operation_dict[elts[0]][elts[1]][elts[2]]['instruction']
+                    instruction = operation_dict[line]['instruction']
                 asm_file.writelines(instruction)
-            else: # no support yet for multi qubit ops with arguments
-                raise ValueError('qasm lines has too many args {},{}'.format(
-                                 elts, line))
+                # else: # no support yet for multi qubit ops with arguments
+                #     raise ValueError('qasm lines has too many args {},{}'.format(
+                #                      elts, line))
+            else:
+                raise ValueError(
+                    'Command "{}" not recognized, must be in {}'.format(
+                        elts[0], commands))
 
     asm_file.writelines(ending)
     asm_file.close()

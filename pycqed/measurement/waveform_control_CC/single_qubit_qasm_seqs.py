@@ -310,15 +310,15 @@ def MotzoiXY(qubit_name, motzois, cal_points=True):
             qasm_file.writelines('RO {}  \n'.format(qubit_name))
         if i % 2:
             qasm_file.writelines(
-                'X180_M {} {} \n'.format(qubit_name, motzoi))
+                'X180_Motz {} {} \n'.format(qubit_name, motzoi))
             qasm_file.writelines(
-                'Y90_M {} {} \n'.format(qubit_name, motzoi))
+                'Y90_Motz {} {} \n'.format(qubit_name, motzoi))
             qasm_file.writelines('RO {}  \n'.format(qubit_name))
         else:
             qasm_file.writelines(
-                'Y180_M {} {} \n'.format(qubit_name, motzoi))
+                'Y180_Motz {} {} \n'.format(qubit_name, motzoi))
             qasm_file.writelines(
-                'X90_M {} {} \n'.format(qubit_name, motzoi))
+                'X90_Motz {} {} \n'.format(qubit_name, motzoi))
             qasm_file.writelines('RO {}  \n'.format(qubit_name))
     qasm_file.close()
     return qasm_file
