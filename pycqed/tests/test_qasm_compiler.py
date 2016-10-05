@@ -311,6 +311,7 @@ class Test_qasm_waveform_management(TestCase):
 
         self.pulse_pars = {
             'control_pulse q0': {
+                'duration': 2,
                 'I_channel': 'ch1',
                 'Q_channel': 'ch2',
                 'amplitude': 0.5,
@@ -322,8 +323,9 @@ class Test_qasm_waveform_management(TestCase):
                 'phi_skew': 3.2,
                 'alpha': 1.05,
                 'qubit': 'q0',
-                'pulse_type': 'someQWG_pulse'},  # <- this needs to change,
+                'prepare_function': 'someQWG_pulse'},  # <- this needs to change,
             'RO q0': {
+                'duration': 60,
                 'I_channel': 'ch3',
                 'Q_channel': 'ch4',
                 'amplitude': 0.4,
@@ -369,22 +371,36 @@ class Test_qasm_waveform_management(TestCase):
     def test_uploading_required_wfs(self):
         pass
 
-
     def test_create_qasm_operation_dict(self):
         ops = self.basic_ops + ['mY180 q0']
 
         operation_dict = qta.create_operation_dict(ops, self.pulse_pars)
+        self.assertTrue(valid_operation_dictionary(operation_dict))
         self.assertCountEqual(operation_dict.keys(), ['init_all',
                               'RO q0', 'X180 q0', 'Y180 q0', 'X90 q0', 'Y90 q0', 'mY180 q0'])
-        self.assertEqual(operation_dict['X180 q0']['amplitude'], 0.5)
-        self.assertEqual(operation_dict['X90 q0']['amplitude'], 0.5*0.48)
-        self.assertEqual(operation_dict['Y180 q0']['amplitude'], 0.5)
-        self.assertEqual(operation_dict['Y90 q0']['amplitude'], 0.5*0.48)
+        self.assertEqual(
+            operation_dict['X180 q0']['prepare_function_kwargs']['amplitude'],
+            0.5)
+        self.assertEqual(
+            operation_dict['X90 q0']['prepare_function_kwargs']['amplitude'],
+            0.5*0.48)
+        self.assertEqual(
+            operation_dict['Y180 q0']['prepare_function_kwargs']['amplitude'],
+            0.5)
+        self.assertEqual(
+            operation_dict['Y90 q0']['prepare_function_kwargs']['amplitude'],
+            0.5*0.48)
 
-        self.assertEqual(operation_dict['X180 q0']['phase'], 0)
-        self.assertEqual(operation_dict['X90 q0']['phase'], 0)
-        self.assertEqual(operation_dict['mY180 q0']['phase'], 270)
-        self.assertEqual(operation_dict['Y90 q0']['phase'], 90)
+        self.assertEqual(
+            operation_dict['X180 q0']['prepare_function_kwargs']['phase'], 0)
+        self.assertEqual(
+            operation_dict['X90 q0']['prepare_function_kwargs']['phase'], 0)
+        self.assertEqual(
+            operation_dict['mY180 q0']['prepare_function_kwargs']['phase'],
+            270)
+        self.assertEqual(
+            operation_dict['Y90 q0']['prepare_function_kwargs']['phase'], 90)
+
 
 
 
@@ -400,7 +416,7 @@ class Test_qasm_waveform_management(TestCase):
         # # config needs to contain enough info to generate mapping
         # operation_mapping = qta.create_operation_mapping(required_ops)
 
-        operation_dict = qta.create_operation_dict(ops, self.pulse_pars)
+        # operation_dict = qta.create_operation_dict(ops, self.pulse_pars)
 
         # # uploads all operations in op dict
         # qta.prepare_operations(operation_dict)
@@ -420,6 +436,7 @@ class Test_qasm_waveform_management(TestCase):
         # Still mostly psuedo code
         pass
         # self.qasm_file
+
         # required_ops = extract_required_operations(self.qasm_file.name)
 
         # # config needs to contain enough info to generate mapping
@@ -430,15 +447,22 @@ class Test_qasm_waveform_management(TestCase):
         #     upload_waveform(waveform, location)
 
 
-
-
-
-
-
-
-
-
-
+def valid_operation_dictionary(operation_dict):
+    '''
+    checks if the operation dictionary is valid
+    '''
+    if not isinstance(operation_dict, dict):
+        return False
+    for key, item in operation_dict.items():
+        if not isinstance(key, str):
+            return False
+        if sorted(item.keys()) != ['duration', 'instruction',
+                                     'prepare_function',
+                                     'prepare_function_kwargs']:
+            print(sorted([item.keys()]), '!=',
+                  "['duration', 'instruction', 'prepare_function', 'prepare_function_kwargs']")
+            return False
+    return True
 
 
 

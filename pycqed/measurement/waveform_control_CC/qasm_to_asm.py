@@ -19,20 +19,20 @@ def qasm_to_asm(qasm_filepath, operation_dict):
     """
     Args:
         qasm_filepath: (str) location of the qasm file to convert
+
         operation_dict: (dict) dictionary containing info required for
             conversion.
-            operation_dict (od) should have the following (nested) structure
-            od = {operation: {qubit: {duration_cl: int,
-                                      instruction: string or function}}
+            *keys*  correspond to qasm commands
+            *items* contain dicts with the reuired information.
+            every item should contain the following entries:
+                instruction: (str) or (fun) that defines the translation
+                    from qasm to microcode/assembly
+                duration: (int) length of operation expressed in clock cycles
+                prepare_function: (str) str that refers to function used to
+                    prepare the operation
+                prepare_function_kwargs: (dict) containing arguments that get
+                    passed to the prepare function
 
-            todo: how to format multi-qubit operations in
-                a) qubit key -> qubits key, combined string with dash
-                b) qubit key1 -> leads to operation or to nested dict with
-                                qubit_key2 that contains the 2-qubit operation
-            todo: error messages
-                1) undefined operation error
-                2) operation not defined for qubit ""
-                3) syntax errors
     returns:
         asm_file suitable for CBox Assembler, intended to be compatible
         with the central controller in the future.
@@ -74,12 +74,10 @@ def qasm_to_asm(qasm_filepath, operation_dict):
                         instruction = base_ins.format(elts[2])
                     else:
                         instruction = base_ins(elts[2])
-                else:
-                    instruction = operation_dict[line]['instruction']
+                else:  # no support yet for multi qubit ops with arguments
+                    raise NotImplementedError(
+                        'Multi qubit ops with args: "{}"'.format(line))
                 asm_file.writelines(instruction)
-                # else: # no support yet for multi qubit ops with arguments
-                #     raise ValueError('qasm lines has too many args {},{}'.format(
-                #                      elts, line))
             else:
                 raise ValueError(
                     'Command "{}" not recognized, must be in {}'.format(
@@ -120,26 +118,31 @@ def extract_required_operations(qasm_filepath):
         return operations
 
 
-def upload_qasm_waveform(qasm_command, operation_dict):
-    """
-    uploads a single instruction
-    """
-    elts = qasm_command.split()
-    upload_function = operation_dict
-
-
 def create_operation_dict(required_ops, pulse_pars):
     """
     Creates the operation dictionary from a set of pulse_pars taken
     from the qubit object
+    operation_dict: (dict) dictionary containing info required for
+        compilation.
+        *keys*  correspond to qasm commands
+        *items* contain dicts with the reuired information.
+        every item should contain the following entries:
+            instruction: (str) or (fun) that defines the translation
+                from qasm to microcode/assembly
+            duration: (int) length of operation expressed in clock cycles
+            prepare_function: (str) str that refers to function used to
+                prepare the operation
+            prepare_function_kwargs: (dict) containing arguments that get
+                passed to the prepare function
+
     """
     operation_dict = {}
     default_control_pulses = ['X180', 'X90', 'Y180', 'Y90',
                               'mX180', 'mX90', 'mY180', 'mY90']
     for op_line in required_ops:
+        operation_dict[op_line] = {}
+
         elts = op_line.split()
-        # if not op_line in operation_dict.keys():
-        #     operation_dict[elts[0]] = {}
         if elts[0] in default_control_pulses:
             d_entry = deepcopy(pulse_pars[
                 'control_pulse {}'.format(elts[1])])
@@ -152,12 +155,29 @@ def create_operation_dict(required_ops, pulse_pars):
                 d_entry['phase'] = 90
             if 'm' in elts[0]:
                 d_entry['phase'] += 180
-            operation_dict[op_line] = d_entry
+
+            duration = d_entry.pop('duration')
+            operation_dict[op_line]['duration'] = duration
+            prepare_function = d_entry.pop('prepare_function')
+            operation_dict[op_line]['prepare_function'] = prepare_function
+            operation_dict[op_line]['prepare_function_kwargs'] = d_entry
+            # no insruction yet
+            operation_dict[op_line]['instruction'] = ' \n'
 
         elif elts[0] == 'init_all':
-            operation_dict['init_all'] = {'instruction': 'WaitReg r0 \n'}
+            operation_dict['init_all'] = {'instruction': 'WaitReg r0 \n',
+                                          'prepare_function': None,
+                                          'prepare_function_kwargs': None,
+                                          'duration': None}
         elif elts[0] == 'RO':  # Currently only writes single qubit dict
-            operation_dict[op_line] = pulse_pars[op_line]
+            d_entry = deepcopy(pulse_pars[op_line])
+            duration = d_entry.pop('duration')
+            operation_dict[op_line]['duration'] = duration
+            prepare_function = d_entry.pop('prepare_function')
+            operation_dict[op_line]['prepare_function'] = prepare_function
+            operation_dict[op_line]['prepare_function_kwargs'] = d_entry
+            # no insruction yet
+            operation_dict[op_line]['instruction'] = ' \n'
         else:
             raise NotImplementedError(
                 'Operation {} is not implemented'.format(op_line))
