@@ -37,24 +37,6 @@ class QuTech_ControlBox(VisaInstrument):
         t0 = time.time()
         super().__init__(name, address)
         # Establish communications
-'''
-ELIMINATED DURING MASTER MERGING 031016
-        self.init_params()
-
-        self.set('measurement_timeout', kw.pop('measurement_timeout', 120))
-
-        t1 = time.time()
-        print('Initialized CBox', self.get('firmware_version'),
-              'in %.2fs' % (t1-t0))
-
-    def add_params(self):
-        self._i_wait = 0  # used in _print_waiting_char()
-
-        # once the demodulation_mode can be get from the FPGA, this
-        # line setting _demodulation_mode should be removed.
-        self._demodulation_mode = 'double'
-
-'''
         self.add_parameter('firmware_version',
                            get_cmd=self._do_get_firmware_version)
         self.add_parameter('acquisition_mode',
@@ -122,12 +104,9 @@ ELIMINATED DURING MASTER MERGING 031016
                            get_cmd=self._do_get_nr_averages,
                            set_cmd=self._do_set_nr_averages,
                            vals=vals.Ints(1, 2**17))
-'''
-ELIMINATED DURING MASTER MERGING 031016
         self._nr_samples = 200
         self._nr_averages = 2
         self._demodulation_mode = 0
-'''
         nr_awgs = 3
         for awg_nr in range(nr_awgs):
             self._awg_mode = [0]*nr_awgs
@@ -224,12 +203,6 @@ ELIMINATED DURING MASTER MERGING 031016
     def _do_get_measurement_timeout(self):
         return self._timeout
 
-    def get_idn(self):
-        IDN_dict = {'firmware': self.firmware_version(),
-                    'model': 'CBox',
-                    'serial': None,
-                    'vendor': 'QuTech'}
-        return IDN_dict
 
     # TODO: This set does not actually update to the CBox. Requires change.
     def _do_set_demodulation_mode(self, val):

@@ -124,8 +124,14 @@ def multi_pulse_elt(i, station, pulse_list):
                         refpoint='start',
                         fixed_point_freq=pulse_pars['fixed_point_frequency'])
                 elif pulse_pars['pulse_type'] == 'MW_IQmod_pulse_nontek':
-                    #"nothing to add in this case
-                    pass
+                    #"adding a 0 amp pulse because the sequencer needs an element for timing
+                    last_pulse=el.add(pulse.SquarePulse(
+                            name='RO_marker', amplitude=0,
+                            length=pulse_pars['length'],
+                            channel=pulse_pars['RO_pulse_marker_channel']),
+                        start=pulse_pars['pulse_delay'], refpulse=last_pulse,
+                        refpoint='start',
+                        fixed_point_freq=pulse_pars['fixed_point_frequency'])
                 # Start Acquisition marker
                 if type(pulse_pars['acq_marker_channel']) is str:
                     channels = pulse_pars['acq_marker_channel']

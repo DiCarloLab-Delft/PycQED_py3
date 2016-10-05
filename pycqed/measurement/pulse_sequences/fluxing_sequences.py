@@ -114,7 +114,7 @@ def chevron_seq_length(lengths, mw_pulse_pars, RO_pars, flux_pulse_pars=None,
         pulse_buffer = 100e-9
         flux_pulse_pars['pulse_delay'] = pulse_buffer + (mw_pulse_pars['sigma'] *
                                                          mw_pulse_pars['nr_sigma'])
-        msmt_buffer = 400e-9
+        msmt_buffer = 50e-9
         RO_pars['pulse_delay'] = msmt_buffer + lngt
 
         dead_time = 3e-6

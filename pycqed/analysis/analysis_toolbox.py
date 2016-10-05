@@ -843,7 +843,7 @@ def smooth(x, window_len=11, window='hanning'):
     return y[edge:-edge]
 
 
-def peak_finder(x, y, percentile=70, num_sigma_threshold=5):
+def peak_finder(x, y, percentile=70, num_sigma_threshold=5, window_len=11):
 
     def cut_edges(array, window_len=11):
         array = array[(window_len/2):-(window_len/2)]
@@ -856,7 +856,7 @@ def peak_finder(x, y, percentile=70, num_sigma_threshold=5):
     '''
 
     # Smooth the data
-    y_smoothed = smooth(y)
+    y_smoothed = smooth(y, window_len=window_len)
 
     # Finding peaks
     # Defining the threshold

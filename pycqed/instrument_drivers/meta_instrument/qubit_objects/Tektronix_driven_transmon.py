@@ -14,14 +14,14 @@ from pycqed.measurement import CBox_sweep_functions as cb_swf
 from pycqed.measurement import awg_sweep_functions as awg_swf
 from pycqed.analysis import measurement_analysis as ma
 from pycqed.measurement.pulse_sequences import standard_sequences as st_seqs
-import measurement.randomized_benchmarking.randomized_benchmarking as rb
 
+import pycqed.measurement.randomized_benchmarking.randomized_benchmarking as rb
 from pycqed.measurement.calibration_toolbox import mixer_carrier_cancellation_5014
 from pycqed.measurement.calibration_toolbox import mixer_carrier_cancellation_UHFQC
 from pycqed.measurement.calibration_toolbox import mixer_skewness_calibration_5014
 from pycqed.measurement.optimization import nelder_mead
 
-import measurement.pulse_sequences.single_qubit_tek_seq_elts as sq
+import pycqed.measurement.pulse_sequences.single_qubit_tek_seq_elts as sq
 
 from .qubit_object import Transmon
 from .CBox_driven_transmon import CBox_driven_transmon
@@ -216,7 +216,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
             self.heterodyne_instr.set('mod_amp', self.mod_amp_cw.get())
         else:
             self.heterodyne_instr.RF_power(self.RO_power_cw())
-        self.heterodyne_instr.set('IF', self.f_RO_mod.get())
+        self.heterodyne_instr.set('f_RO_mod', self.f_RO_mod.get())
         self.heterodyne_instr.frequency.set(RO_freq)
         self.heterodyne_instr.RF.power(self.RO_power_cw())
         self.heterodyne_instr.RF_power(self.RO_power_cw())
@@ -285,15 +285,14 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
             self.AWG.set(self.RO_Q_channel.get()+'_offset',
                          self.RO_Q_offset.get())
         elif self.RO_pulse_type.get() is 'MW_IQmod_pulse_nontek':
-            print('this part is UHFQC specific')
             eval('self._acquisition_instr.sigouts_{}_offset({})'.format(self.RO_I_channel(),self.RO_I_offset()))
             eval('self._acquisition_instr.sigouts_{}_offset({})'.format(self.RO_Q_channel(),self.RO_Q_offset()))
         elif self.RO_pulse_type.get() is 'Gated_MW_RO_pulse':
-            self.rf_RO_source.pulsemod_stateself.ac.set('on')
+            self.rf_RO_source.pulsemod_state.set('on')
+            self.rf_RO_source.frequency(self.f_RO.get())
             self.rf_RO_source.power(self.RO_pulse_power.get())
-        self.rf_RO_source.frequency(self.f_RO())
-        self.rf_RO_source.power(self.RO_pulse_power())
-        self.rf_RO_source.on()
+            self.rf_RO_source.frequency(self.f_RO())
+            self.rf_RO_source.on()
 
     def calibrate_mixer_offsets(self, signal_hound, offs_type='pulse',
                                 update=True):
@@ -455,6 +454,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
 
         spec_pars, RO_pars = self.get_spec_pars()
         # Upload the AWG sequence
+        sq.station = self.station
         sq.Pulsed_spec_seq(spec_pars, RO_pars)
 
         self.AWG.start()
@@ -730,6 +730,65 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
             if update:
                 self.motzoi.set(a.optimal_motzoi)
             return a
+
+    def measure_chevron(self, amps, length, MC=None, nr_averages=512):
+
+        if MC is None:
+            MC = self.MC
+
+        if len(amps)==1:
+            slice_scan = True
+        else:
+            slice_scan = False
+
+        self.int_avg_det = det.CBox_integrated_average_detector(self._acquisition_instr,
+                                                                            self.AWG,
+                                                                            normalize=True,
+                                                                            rotate=True,
+                                                                            nr_averages=nr_averages)
+        flux_pulse_pars = {'pulse_type': 'SquarePulse',
+                      'pulse_delay': .1e-6,
+                      'channel': 'ch3',
+                      'amplitude': .5,
+                      'length': 10e-6,
+                      'dead_time_length': 10e-6}
+
+        # preparation of sweep points and cal points
+        cal_points = 4
+        lengths_cal = length[-1] + np.arange(1,1+cal_points)*(length[1]-length[0])
+        lengths_vec = np.concatenate((length,lengths_cal))
+
+        # start preparations
+        self.prepare_for_timedomain()
+        mw_pulse_pars, RO_pars = self.get_pulse_pars()
+        chevron_swf = awg_swf.chevron_length(length,
+                                             mw_pulse_pars,
+                                             RO_pars,
+                                             flux_pulse_pars,
+                                             dist_dict=self.dist_dict,
+                                             AWG=self.AWG,
+                                             upload=False)
+        # upload sequence
+        exec('self.AWG.ch%d_amp(2.)'%self.fluxing_channel)
+        chevron_swf.pre_upload()
+        # MC configuration
+        MC.set_sweep_function(chevron_swf)
+        MC.set_sweep_points(lengths_vec)
+
+        if not slice_scan:
+            MC.set_sweep_function_2D(swf.AWG_amp(self.fluxing_channel, self.AWG))
+            MC.set_sweep_points_2D(amps)
+
+        MC.set_detector_function(self.int_avg_det)
+        if slice_scan:
+            swf_temp = swf.AWG_amp(self.fluxing_channel, self.AWG)
+            swf_temp.set_parameter(amps[0])
+            MC.run('Chevron_slice_%s'%self.name)
+            ma.TD_Analysis(auto=True)
+        else:
+            MC.run('Chevron_2D_%s'%self.name, mode='2D')
+            ma.TwoD_Analysis(auto=True)
+
 
     def _do_get_acquisition_instr(self):
         # Specifying the int_avg det here should allow replacing it with ATS

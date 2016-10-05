@@ -15,7 +15,7 @@ from pycqed.measurement import CBox_sweep_functions as cb_swf
 from pycqed.measurement import awg_sweep_functions as awg_swf
 from pycqed.analysis import measurement_analysis as ma
 from pycqed.measurement.pulse_sequences import standard_sequences as st_seqs
-import measurement.randomized_benchmarking.randomized_benchmarking as rb
+import pycqed.measurement.randomized_benchmarking.randomized_benchmarking as rb
 from pycqed.measurement.calibration_toolbox import mixer_carrier_cancellation_CBox
 from pycqed.measurement.calibration_toolbox import mixer_skewness_cal_CBox_adaptive
 
@@ -131,7 +131,7 @@ class CBox_driven_transmon(Transmon):
         else:
             self.heterodyne_instr.RF_power(self.RO_power_cw())
         # TODO: Update IF to f_RO_mod in heterodyne instr
-        self.heterodyne_instr.set('IF', self.f_RO_mod.get())
+        self.heterodyne_instr.set('f_RO_mod', self.f_RO_mod.get())
         self.heterodyne_instr.frequency.set(self.f_res.get())
 
         if hasattr(self.cw_source, 'pulsemod_state'):

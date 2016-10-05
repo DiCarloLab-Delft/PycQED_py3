@@ -6,7 +6,7 @@ from qcodes.utils import validators as vals
 from qcodes.instrument.parameter import ManualParameter
 
 from measurement.kernel_functions import kernel_generic, htilde_bounce, \
-    htilde_skineffect, save_kernel
+    htilde_skineffect, save_kernel, step_bounce, step_skineffect
 
 def bounce_kernel(amp=0.02,time=4,length=601):
     """
@@ -17,8 +17,14 @@ def bounce_kernel(amp=0.02,time=4,length=601):
     """
     t_kernel = np.arange(length)
     bounce_pairs = [[amp, time]]
-    kernel_bounce = kernel_generic(htilde_bounce, t_kernel, bounce_pairs)
+    # kernel_bounce = kernel_generic(htilde_bounce, t_kernel, bounce_pairs)
+    # kernel_bounce /= np.sum(kernel_bounce)
+    bounce_kernel_step = step_bounce(t_kernel, bounce_pairs)
+    kernel_bounce = np.zeros(bounce_kernel_step.shape)
+    kernel_bounce[0] = bounce_kernel_step[0]
+    kernel_bounce[1:] = bounce_kernel_step[1:]-bounce_kernel_step[:-1]
     kernel_bounce /= np.sum(kernel_bounce)
+
     return kernel_bounce
 # save_kernel(kernel_bounce, save_file='kernel_bounce_%.3f_%d'%tuple(bounce_pairs[0]))
 
@@ -44,11 +50,13 @@ def skin_kernel(alpha=0., length=601):
     kernel_step_function
         heaviside(t+1)*(1-errf(alpha/21./np.sqrt(t+1)))
     """
-    alpha = 1.8
-
-    length = 601
     t_kernel = np.arange(length)
-    kernel_skineffect = kernel_generic(htilde_skineffect,t_kernel,alpha)
+    # kernel_skineffect = kernel_generic(htilde_skineffect,t_kernel,alpha)
+    # kernel_skineffect /= np.sum(kernel_skineffect)
+    skineffect_kernel_step = step_skineffect(t_kernel, alpha)
+    kernel_skineffect = np.zeros(skineffect_kernel_step.shape)
+    kernel_skineffect[0] = skineffect_kernel_step[0]
+    kernel_skineffect[1:] = skineffect_kernel_step[1:]-skineffect_kernel_step[:-1]
     kernel_skineffect /= np.sum(kernel_skineffect)
     return kernel_skineffect
 # save_kernel(kernel_skineffect, save_file='kernel_skineffect_%.1f'%(alpha))
@@ -95,7 +103,7 @@ class Distortion(Instrument):
 
     def get_skin_kernel(self):
         return skin_kernel(alpha=self.skineffect_alpha(),
-                           length=self.skineffect_alpha())
+                           length=self.skineffect_length())
 
     def get_decay_kernel(self):
         return decay_kernel(amp=self.decay_amp(), tau=self.decay_tau(),
@@ -121,5 +129,8 @@ class Distortion(Instrument):
                                         length=self.corrections_length())
 
     def save_corrections_kernel(self,filename,kernel_list_before=None):
-        save_kernel(self.get_corrections_kernel(kernel_list_before), save_file=filename)
+        if type(kernel_list_before) is not list:
+            kernel_list_before = [kernel_list_before]
+        save_kernel(self.get_corrections_kernel(kernel_list_before),
+                    save_file=filename)
         return filename

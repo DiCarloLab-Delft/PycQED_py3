@@ -880,23 +880,59 @@ class TD_Analysis(MeasurementAnalysis):
         pass
 
 class chevron_optimization_v1(TD_Analysis):
-    def __init__(self, NoCalPoints=4, center_point=31, make_fig=True,
+    def __init__(self, cost_function=0, NoCalPoints=4, center_point=31, make_fig=True,
                  zero_coord=None, one_coord=None, cal_points=None,
                  plot_cal_points=True, **kw):
+        self.cost_function = cost_function
         super(chevron_optimization_v1, self).__init__(**kw)
 
     def run_default_analysis(self,
                              close_main_fig=True,  **kw):
         super(chevron_optimization_v1, self).run_default_analysis(**kw)
-        output_fft = np.real_if_close(np.fft.rfft(self.measured_values[0]))
-        ax_fft = np.fft.rfftfreq(len(self.measured_values[0]),
-                                 d=self.sweep_points[1]-self.sweep_points[0])
+        sweep_points_wocal = self.sweep_points[:-4]
+        measured_values_wocal = self.measured_values[0][:-4]
+
+        output_fft = np.real_if_close(np.fft.rfft(measured_values_wocal))
+        ax_fft = np.fft.rfftfreq(len(measured_values_wocal),
+                                 d=sweep_points_wocal[1]-sweep_points_wocal[0])
         order_mask = np.argsort(ax_fft)
         y = output_fft[order_mask]
-        array_peaks = argrelextrema(y, np.greater)
-        sort_mask = np.argsort(y[array_peaks])[::-1]
-        self.period = 1./self.sweep_points[array_peaks[sort_mask[0]]][0]
-        self.cost_value = -np.abs(y[[array_peaks[sort_mask[0]]]])[0]
+        y = y/np.sum(np.abs(y))
+
+        u = np.where(np.arange(len(y)) == 0, 0, y)
+        array_peaks = a_tools.peak_finder(np.arange(len(np.abs(y))),
+                                          np.abs(u),
+                                          window_len=0)
+        if array_peaks['peak_idx'] is None:
+            self.period = 0.
+            self.cost_value = 100.
+        else:
+            self.period = 1./ax_fft[order_mask][array_peaks['peak_idx']]
+            if self.period == np.inf:
+                self.period = 0.
+            if self.cost_function == 0:
+                self.cost_value = -np.abs(y[array_peaks['peak_idx']])
+            else:
+                self.cost_value = self.get_cost_value(sweep_points_wocal,
+                                                      measured_values_wocal)
+
+    def get_cost_value(self, x, y):
+        num_periods = np.floor(x[-1]/self.period)
+        if num_periods == np.inf:
+            num_periods = 0
+        # sum of mins
+        sum_min = 0.
+        for i in range(int(num_periods)):
+            sum_min += np.interp((i+0.5)*self.period, x, y)
+            # print(sum_min)
+
+        # sum of maxs
+        sum_max = 0.
+        for i in range(int(num_periods)):
+            sum_max += 1.-np.interp(i*self.period, x, y)
+            # print(sum_max)
+
+        return sum_max+sum_min
 
 class Rabi_Analysis(TD_Analysis):
     def __init__(self, label='Rabi', **kw):
@@ -2276,12 +2312,11 @@ class SSRO_Analysis(MeasurementAnalysis):
         # print "refresh"
         V_opt = optimize.brent(NormCdfdiffDouble)
         F = -NormCdfdiffDouble(x=V_opt)
-        # print 'V_opt', V_opt
-        # print 'F', F
-        # print 'frac1_1', frac1_1
-        # print 'frac1_0', frac1_0
-        # print 'mu0', mu0,mu0_0,mu0_1
-        # print 'mu1', mu1,mu1_0,mu1_1
+
+        #calculating the signal-to-noise ratio
+        signal= abs(mu0_0-mu1_1)
+        noise = (sigma0_0 +sigma1_1)/2
+        SNR = signal/noise
 
         #plotting s-curves
         fig, ax = plt.subplots(figsize=(8, 4))
@@ -2321,13 +2356,12 @@ class SSRO_Analysis(MeasurementAnalysis):
 
         #plotting the histograms
         fig, axes = plt.subplots(figsize=(8, 4))
-
         n1, bins1, patches = pylab.hist(shots_I_1_rot, bins=int(min_len/50),
                                       label = '1 I',histtype='step',
-                                      color='red', normed=1)
+                                      color='red', normed=True)
         n0, bins0, patches = pylab.hist(shots_I_0_rot, bins=int(min_len/50),
                                       label = '0 I',histtype='step',
-                                      color='blue', normed=1)
+                                      color='blue', normed=True)
         pylab.clf()
         # n0, bins0 = np.histogram(shots_I_0_rot, bins=int(min_len/50), normed=1)
         # n1, bins1 = np.histogram(shots_I_1_rot, bins=int(min_len/50), normed=1)
@@ -2354,7 +2388,7 @@ class SSRO_Analysis(MeasurementAnalysis):
         y0_1 = (1-frac1_1)*pylab.normpdf(bins1, mu0_0, sigma0_0)
 
 
-        pylab.semilogy(bins0, y0, 'b',linewidth=1.5)
+        pylab.semilogy(bins0, y0, 'b',linewidth=1.5,label='SNR is {0:.2f}'.format(SNR))
         pylab.semilogy(bins0, y1_0, 'b--', linewidth=3.5)
         pylab.semilogy(bins0, y0_0, 'b--', linewidth=3.5)
 
@@ -2362,11 +2396,13 @@ class SSRO_Analysis(MeasurementAnalysis):
         pylab.semilogy(bins1, y0_1, 'r--', linewidth=3.5)
         pylab.semilogy(bins1, y1_1, 'r--', linewidth=3.5)
         #(pylab.gca()).set_ylim(1e-6,1e-3)
-        (pylab.gca()).set_ylim(1e-3,1e-0)
+        pdf_max=(max(max(y0),max(y1)))
+        (pylab.gca()).set_ylim(pdf_max/1000,2*pdf_max)
 
         axes.set_title('Histograms of shots on rotaded IQ plane optimized for I, %s shots'%min_len)
         plt.xlabel('DAQ voltage integrated (V)')#, fontsize=14)
         plt.ylabel('Fraction of counts')#, fontsize=14)
+        plt.legend()
 
         plt.axvline(V_opt, ls='--', label=labelstring,
                    linewidth=2, color='grey')
@@ -2389,6 +2425,8 @@ class SSRO_Analysis(MeasurementAnalysis):
         else:
             fid_grp = self.analysis_group['SSRO_Fidelity']
 
+
+
         fid_grp.attrs.create(name='sigma0_0', data=sigma0_0)
         fid_grp.attrs.create(name='sigma1_1', data=sigma1_1)
         fid_grp.attrs.create(name='mu0_0', data=mu0_0)
@@ -2398,6 +2436,7 @@ class SSRO_Analysis(MeasurementAnalysis):
         fid_grp.attrs.create(name='V_opt', data=V_opt)
         fid_grp.attrs.create(name='F', data=F)
         fid_grp.attrs.create(name='F_corrected', data=F_corrected)
+        fid_grp.attrs.create(name='SNR', data=SNR)
 
         self.sigma0_0 = sigma0_0
         self.sigma1_1 = sigma1_1
@@ -2408,6 +2447,8 @@ class SSRO_Analysis(MeasurementAnalysis):
         self.V_opt = V_opt
         self.F = F
         self.F_corrected = F_corrected
+        self.SNR = SNR
+
 
 class SSRO_discrimination_analysis(MeasurementAnalysis):
     '''

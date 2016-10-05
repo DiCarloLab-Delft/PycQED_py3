@@ -1,5 +1,6 @@
 ﻿import string
 from sys import exit
+import logging
 
 
 def is_number(s):
@@ -116,7 +117,8 @@ class Assembler():
             return opCode + FDC + rt + rt + position + '000' + imm8
 
         except ValueError as detail:
-            print('Lui instruction format error:', detail.args)
+            raise ValueError('Lui instruction format error:{}'.format(
+                             detail.args))
 
     # mov rt, imm32
     def MovFormat(self, Register, imm32):
@@ -134,7 +136,8 @@ class Assembler():
             return Luis
 
         except ValueError as detail:
-            print('Lui instruction format error:', detail.args)
+            raise ValueError('Lui instruction format error:{}'.format(
+                             detail.args))
 
     # add rd, rs, rt
     def AddFormat(self, dst_reg, src_reg1, src_reg2):
@@ -149,7 +152,8 @@ class Assembler():
             return opCode + FDC + rs + rt + rd + shamt + funct
 
         except ValueError as detail:
-            print('Add instruction format error: ', detail.args)
+            raise ValueError('Add instruction format error: {}'.format(
+                             detail.args))
 
     # sub rd, rs, rt
     def SubFormat(self, dst_reg, src_reg1, src_reg2):
@@ -164,7 +168,8 @@ class Assembler():
             return opCode + FDC + rs + rt + rd + shamt + funct
 
         except ValueError as detail:
-            print('Sub instruction format error: ', detail.args)
+            raise ValueError('Sub instruction format error: {}'.format(
+                             detail.args))
 
     # beq rs, rt, off
     def BeqFormat(self, src_reg1, src_reg2, offset15):
@@ -177,7 +182,8 @@ class Assembler():
             return opCode + FDC + rs + rt + imm15
 
         except ValueError as detail:
-            print('Beq instruction format error: ', detail.args)
+            raise ValueError('Beq instruction format error: {}'.format(
+                             detail.args))
 
     # bne rs, rt, off
     def BneFormat(self, src_reg1, src_reg2, offset15):
@@ -190,7 +196,8 @@ class Assembler():
             return opCode + FDC + rs + rt + immValue
 
         except ValueError as detail:
-            print('Bne instruction format error: ', detail.args)
+            raise ValueError('Bne instruction format error: {}'.format(
+                             detail.args))
 
     # addi rt, rs, imm
     def AddiFormat(self, dst_reg, src_reg1, imm15):
@@ -203,7 +210,8 @@ class Assembler():
             return opCode + FDC + rs + rt + immValue
 
         except ValueError as detail:
-            print('Addi instruction format error: ', detail.args)
+            raise ValueError('Addi instruction format error: {}'.format(
+                             detail.args))
 
     # ori rt, rs, imm
     def OriFormat(self, dst_reg, src_reg1, imm15):
@@ -216,7 +224,8 @@ class Assembler():
             return opCode + FDC + rs + rt + immValue
 
         except ValueError as detail:
-            print('Ori instruction format error: ', detail.args)
+            raise ValueError('Ori instruction format error: {}'.format(
+                             detail.args))
 
     # waitreg rs
     def WaitRegFormat(self, src_reg):
@@ -229,7 +238,8 @@ class Assembler():
             return opCode + FDC + rs + zero13 + funct
 
         except ValueError as detail:
-            print('WaitReg instruction format error: ', detail.args)
+            raise ValueError('WaitReg instruction format error: {}'.format(
+                                 detail.args))
 
     # pulse AWG0, AWG1, AWG2
     def PulseFormat(self, awg0, awg1, awg2):
@@ -241,7 +251,8 @@ class Assembler():
             return opCode + FDC + awg0 + awg1 + awg2 + shamt + funct
 
         except ValueError as detail:
-            print('Pulse instruction format error: ', detail.args)
+            raise ValueError('Pulse instruction format error: {}'.format(
+                                 detail.args))
 
     # measure rt
     # def MeasureFormat(self, dst_reg):
@@ -253,9 +264,10 @@ class Assembler():
     #         zero9 = '000000000'
     #         funct = self.InstfunctCode['measure']
     #         return opCode + FDC + zero4 + rt + zero9 + funct
-    #
+
     #     except ValueError as detail:
-    #         print('Measure instruction format error: ', detail.args)
+    #         raise ValueError('Measure instruction format error: {}'.format(
+    #                          detail.args))
 
     # measure
     def MeasureFormat(self):
@@ -269,7 +281,8 @@ class Assembler():
             return opCode + FDC + zero4 + rt + zero9 + funct
 
         except ValueError as detail:
-            print('Measure instruction format error: ', detail.args)
+            raise ValueError('Measure instruction format error: {}'.format(
+                                 detail.args))
 
     # wait imm
     def WaitFormat(self, imm15):
@@ -281,17 +294,19 @@ class Assembler():
             return opCode + FDC + zero8 + immValue
 
         except ValueError as detail:
-            print('Ori instruction format error: ', detail.args)
+            raise ValueError('Ori instruction format error: {}'.format(
+                             detail.args))
 
     # trigger mask, duration
     def TriggerFormat(self, mask, imm11):
         if len(mask) != 7:
-            raise ValueError("The mask should be 7 bits. \
+            raise ValueError('The mask "{}" should be 7 bits. \
                               With the MSb indicating marker 1, \
-                              and the LSb indicating marker 7.")
+                              and the LSb indicating marker 7.'.format(mask))
         for b in mask:
             if (b != '0' and b != '1'):
-                raise ValueError("The mask should only contain 1 or 0.")
+                raise ValueError(
+                    'The mask "{}" should only contain 1 or 0.'.format(mask))
 
         # In the core of 3.1.0, the MSb works for the trigger 7.
         # Reverse the string so that the MSb works for trigger 1.
@@ -309,7 +324,8 @@ class Assembler():
             return opCode + FDC + mask + immValue[1:]
 
         except ValueError as detail:
-            print('Ori instruction format error: ', detail.args)
+            raise ValueError('Ori instruction format error: {}'.format(
+                             detail.args))
 
     def NopFormat(self):
         return "00000000000000000000000000000000"
@@ -335,7 +351,7 @@ class Assembler():
             cur_addr = len(instructions) + 1
 
             head, sep, tail = line.partition(':')
-            print("head, sep, tail: ", head, sep, tail)
+            logging.info("head, sep, tail: ", head, sep, tail)
             if (sep == ":"):
                 tag_addr_dict[head.strip().lower()] = cur_addr
                 instr = tail
@@ -360,14 +376,14 @@ class Assembler():
         return tag_addr_dict
 
     def convert_to_instructions(self):
-        print("new version assembler.")
+        logging.info("new version assembler.")
         tag_addr_dict = self.ParseLabel()
-        print("ParseLabel executed successfully.")
-        print("tag_addr_dict: ", tag_addr_dict)
+        logging.info("ParseLabel executed successfully.")
+        logging.info("tag_addr_dict: ", tag_addr_dict)
 
         try:
             Asm_File = open(self.asmfilename, 'r', encoding="utf-8")
-            print("open file", self.asmfilename, "successfully.")
+            logging.info("open file", self.asmfilename, "successfully.")
         except:
             print('\tError: Fail to open file ' + self.asmfilename + ".")
             exit(0)
@@ -537,8 +553,8 @@ class Assembler():
                 instructions.append(int(self.NopFormat(), 2))
 
             else:
-                print('Error: unsupported instruction %s found. Abort!' %
-                      elements[0])
+                raise ValueError('Error: unsupported instruction "{}" found on line "{}". '.format(
+                      elements[0], line))
                 Asm_File.close()
                 return False
 
