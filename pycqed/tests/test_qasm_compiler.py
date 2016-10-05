@@ -1,4 +1,7 @@
+
+import sys
 import numpy as np
+from io import StringIO
 from unittest import TestCase
 from os.path import join, dirname
 from copy import deepcopy
@@ -211,7 +214,7 @@ class Test_qasm_to_asm(TestCase):
         self.operation_dict = {
             'init_all': {'instruction': 'WaitReg r0 \n'},
             'X180 {}'.format(self.qubit_name): {
-                     'duration': 2, 'instruction': 'Trigger 1000000, 2 \n'},
+                'duration': 2, 'instruction': 'Trigger 1000000, 2 \n'},
             'Y180 {}'.format(self.qubit_name): {
                 'duration': 2, 'instruction': 'Trigger 0100000, 2 \n'},
             'I {}'.format(self.qubit_name): {
@@ -298,6 +301,7 @@ class Test_qasm_to_asm(TestCase):
 
 
 class Test_qasm_waveform_management(TestCase):
+
     """
     Waveform management,
         uploading the required waveforms and keeping track of the waveforms
@@ -323,7 +327,7 @@ class Test_qasm_waveform_management(TestCase):
                 'phi_skew': 3.2,
                 'alpha': 1.05,
                 'qubit': 'q0',
-                'prepare_function': 'someQWG_pulse'},  # <- this needs to change,
+                'prepare_function': 'mock_control_pulse_prepare'},
             'RO q0': {
                 'duration': 60,
                 'I_channel': 'ch3',
@@ -334,20 +338,31 @@ class Test_qasm_waveform_management(TestCase):
                 'mod_frequency': 400e6,
                 'acq_marker_delay': -20e-9,
                 'acq_marker_channel': 'ch',
-                'prepare_function': 'nothingness'}  # <-- this needs to change
-                }
+                'prepare_function': 'mock_control_pulse_prepare'}
+        }
 
         # a sample operation dictionary for testing
         self.operation_dict = {
-            'init_all': {'instruction': 'WaitReg r0 \n'},
+            'init_all': {'instruction': 'WaitReg r0 \n',
+                         'duration': None,
+                         'prepare_function': None,
+                         'prepare_function_kwargs': None},
             'X180 {}'.format(self.qubit_name): {
-                     'duration': 2, 'instruction': 'Trigger 1000000, 2 \n'},
+                'duration': 2, 'instruction': 'Trigger 1000000, 2 \n',
+                             'prepare_function': 'mock_control_pulse_prepare',
+                             'prepare_function_kwargs': {'test': 0}},
             'Y180 {}'.format(self.qubit_name): {
-                'duration': 2, 'instruction': 'Trigger 0100000, 2 \n'},
+                'duration': 2, 'instruction': 'Trigger 0100000, 2 \n',
+                'prepare_function': 'mock_control_pulse_prepare',
+                'prepare_function_kwargs': {'test': 0}},
             'I {}'.format(self.qubit_name): {
-                'duration': None, 'instruction': 'wait {} \n'},
+                'duration': None, 'instruction': 'wait {} \n',
+                'prepare_function': 'mock_control_pulse_prepare',
+                'prepare_function_kwargs': None},
             'RO {}'.format(self.qubit_name): {
-                'duration': 8, 'instruction': 'Trigger 0010000, 2 \n'}}
+                'duration': 8, 'instruction': 'Trigger 0010000, 2 \n',
+                'prepare_function': 'mock_control_pulse_prepare',
+                'prepare_function_kwargs': {'test': 0}}}
 
         self.basic_ops = ['init_all', 'RO q0', 'X180 q0', 'Y180 q0',
                           'X90 q0', 'Y90 q0']
@@ -368,16 +383,15 @@ class Test_qasm_waveform_management(TestCase):
             rabi_ops.append('Rx q0 {}'.format(amp))
         self.assertCountEqual(operations, rabi_ops)
 
-    def test_uploading_required_wfs(self):
-        pass
-
     def test_create_qasm_operation_dict(self):
         ops = self.basic_ops + ['mY180 q0']
 
         operation_dict = qta.create_operation_dict(ops, self.pulse_pars)
         self.assertTrue(valid_operation_dictionary(operation_dict))
         self.assertCountEqual(operation_dict.keys(), ['init_all',
-                              'RO q0', 'X180 q0', 'Y180 q0', 'X90 q0', 'Y90 q0', 'mY180 q0'])
+                                                      'RO q0', 'X180 q0',
+                                                      'Y180 q0', 'X90 q0',
+                                                      'Y90 q0', 'mY180 q0'])
         self.assertEqual(
             operation_dict['X180 q0']['prepare_function_kwargs']['amplitude'],
             0.5)
@@ -401,8 +415,11 @@ class Test_qasm_waveform_management(TestCase):
         self.assertEqual(
             operation_dict['Y90 q0']['prepare_function_kwargs']['phase'], 90)
 
-
-
+    def test_prepare_operations(self):
+        assert(valid_operation_dictionary(self.operation_dict))
+        with Capturing() as output:
+            qta.prepare_operations(self.operation_dict)
+        self.assertTrue("mock called with {'test': 0}" in output)
 
     def test_complete_sequence_loading_simple(self):
         '''
@@ -410,23 +427,18 @@ class Test_qasm_waveform_management(TestCase):
         contains all the basic steps but does not require mapping
         the allowed operations.
         '''
-        pass
         qasm_file = self.AllXY_qasm_file
         ops = qta.extract_required_operations(qasm_file.name)
         # # config needs to contain enough info to generate mapping
         # operation_mapping = qta.create_operation_mapping(required_ops)
 
-        # operation_dict = qta.create_operation_dict(ops, self.pulse_pars)
+        operation_dict = qta.create_operation_dict(ops, self.pulse_pars)
 
         # # uploads all operations in op dict
-        # qta.prepare_operations(operation_dict)
+        with Capturing() as output:
+            qta.prepare_operations(operation_dict)
 
         # qta.qasm_to_asm(qasm_file.name, operation_dict)
-
-    # def test_generate_operation_dict(self):
-    #     qta.create_operation_dict(required_ops=self.basic_ops,
-    #                               self.pulse_pars)
-
 
     def test_complete_sequence_loading_dynamic(self):
         '''
@@ -457,14 +469,19 @@ def valid_operation_dictionary(operation_dict):
         if not isinstance(key, str):
             return False
         if sorted(item.keys()) != ['duration', 'instruction',
-                                     'prepare_function',
-                                     'prepare_function_kwargs']:
+                                   'prepare_function',
+                                   'prepare_function_kwargs']:
             print(sorted([item.keys()]), '!=',
                   "['duration', 'instruction', 'prepare_function', 'prepare_function_kwargs']")
             return False
     return True
 
 
-
-
-
+class Capturing(list):
+    def __enter__(self):
+        self._stdout = sys.stdout
+        sys.stdout = self._stringio = StringIO()
+        return self
+    def __exit__(self, *args):
+        self.extend(self._stringio.getvalue().splitlines())
+        sys.stdout = self._stdout

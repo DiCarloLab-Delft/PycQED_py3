@@ -126,14 +126,15 @@ def create_operation_dict(required_ops, pulse_pars):
         compilation.
         *keys*  correspond to qasm commands
         *items* contain dicts with the reuired information.
+
         every item should contain the following entries:
-            instruction: (str) or (fun) that defines the translation
-                from qasm to microcode/assembly
-            duration: (int) length of operation expressed in clock cycles
-            prepare_function: (str) str that refers to function used to
-                prepare the operation
-            prepare_function_kwargs: (dict) containing arguments that get
-                passed to the prepare function
+        "instruction": (str) or (fun) that defines the translation
+            from qasm to microcode/assembly
+        "duration": (int) length of operation expressed in clock cycles
+        "prepare_function": (str) str that refers to function used to
+            prepare the operation
+        "prepare_function_kwargs": (dict) containing arguments that get
+            passed to the prepare function
 
     """
     operation_dict = {}
@@ -183,11 +184,23 @@ def create_operation_dict(required_ops, pulse_pars):
                 'Operation {} is not implemented'.format(op_line))
     return operation_dict
 
+
 def prepare_operations(operation_dict):
-    print('preparing all operations')
-    for op_name, op_d in operation_dict.items():
-        prepare_func = getattr(opf, op_d['prepare_function'])
-        prepare_func(**op_d['prepare_function_kwargs'])
+    for operation_name, operation in operation_dict.items():
+        if operation['prepare_function'] is not None:
+            if not hasattr(opf, operation['prepare_function']):
+                raise KeyError('unknown prepare function {}'.format(
+                    operation['prepare_function']))
+            prepare_function = getattr(opf, operation['prepare_function'])
+            pf_kwargs = operation['prepare_function_kwargs']
+            if isinstance(pf_kwargs, dict):
+                prepare_function(**pf_kwargs)
+            elif pf_kwargs is None:
+                prepare_function()
+            else:
+                raise TypeError('prepare_function_kwargs not dict "{}"'.format(
+                    pf_kwargs))
+            print(pf_kwargs)
 
 
 
