@@ -957,8 +957,8 @@ class Chevron_optimization_v1(det.Soft_Detector):
         super().__init__()
         kernel_dir_path = 'kernels/'
         self.name = 'chevron_optimization_v1'
-        self.value_names = ['SWAP Time', 'Cost function']
-        self.value_units = ['ns','a.u.']
+        self.value_names = ['Cost function','SWAP Time']
+        self.value_units = ['a.u.','ns']
         self.kernel_obj = kernel_obj
         self.AWG = AWG
         self.MC_nested = MC_nested
@@ -1004,7 +1004,7 @@ class Chevron_optimization_v1(det.Soft_Detector):
                                             cost_function=self.cost_function_opt)
 
         # # Return the cost function sum(min)+sum(1-max)
-        return 0.5*ma_obj.period, ma_obj.cost_value
+        return ma_obj.cost_value,0.5*ma_obj.period
 
 
 

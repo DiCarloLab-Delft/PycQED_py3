@@ -2388,7 +2388,7 @@ class SSRO_Analysis(MeasurementAnalysis):
         y0_1 = (1-frac1_1)*pylab.normpdf(bins1, mu0_0, sigma0_0)
 
 
-        pylab.semilogy(bins0, y0, 'b',linewidth=1.5,label='SNR is {0:.2f}'.format(SNR))
+        pylab.semilogy(bins0, y0, 'b',linewidth=1.5)
         pylab.semilogy(bins0, y1_0, 'b--', linewidth=3.5)
         pylab.semilogy(bins0, y0_0, 'b--', linewidth=3.5)
 
@@ -2402,12 +2402,13 @@ class SSRO_Analysis(MeasurementAnalysis):
         axes.set_title('Histograms of shots on rotaded IQ plane optimized for I, %s shots'%min_len)
         plt.xlabel('DAQ voltage integrated (V)')#, fontsize=14)
         plt.ylabel('Fraction of counts')#, fontsize=14)
-        plt.legend()
 
-        plt.axvline(V_opt, ls='--', label=labelstring,
-                   linewidth=2, color='grey')
-        plt.axvline(V_opt_corrected, ls='--', label=labelstring_corrected,
+
+        plt.axvline(V_opt, ls='--',
+                   linewidth=2, color='grey' ,label='SNR={0:.2f}\n Fa={1:.4f}\n Fd={2:.4f}'.format(SNR, 1-(1-self.F_raw)/2, 1-(1-F_corrected)/2))
+        plt.axvline(V_opt_corrected, ls='--',
                    linewidth=2, color='black')
+        plt.legend()
         leg2 = ax.legend(loc='best')
         leg2.get_frame().set_alpha(0.5)
         #plt.hist(SS_Q_data, bins=40,label = '0 Q')
