@@ -27,7 +27,7 @@ class Element:
         self.ignore_offset_correction = kw.pop('ignore_offset_correction',
                                                False)
 
-        self.global_time = kw.pop('global_time', False)
+        self.global_time = kw.pop('global_time', True)
         self.time_offset = kw.pop('time_offset', 0)
 
         self.ignore_delays = kw.pop('ignore_delays', False)
