@@ -70,14 +70,14 @@ def to_hex_string(byteval):
 
 
 def load_settings_onto_instrument(instrument, load_from_instr=None, folder=None,
-                                  label='Settings',
+                                  label=None,
                                   timestamp=None, **kw):
         '''
         Loads settings from an hdf5 file onto the instrument handed to the
         function.
-        By default uses the last hdf5 file in the datadirectory with
-        'Settings' in the name. By giving a label or timestamp another file
-        can be chosen as the settings file.
+        By default uses the last hdf5 file in the datadirectory.
+        By giving a label or timestamp another file can be chosen as the
+        settings file.
         '''
 
         older_than = None

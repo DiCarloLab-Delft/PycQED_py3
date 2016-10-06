@@ -120,7 +120,7 @@ class Capacity_tomo_detector(det.CBox_digitizing_shots_det):
 
 
 chunk_size = 8000
-number_of_shots = chunk_size*130
+number_of_shots = chunk_size*3
 
 
 # Parameters are only used for labels and units in the datafile
@@ -133,13 +133,14 @@ sweep_pars = [RO_basis, prep_basis, state]
 
 CBox.log_length(chunk_size)
 base_combinations = ['ZXY']
-idle_times = [3e-6, 2e-6]
+idle_times = [.3e-6, 2e-6]
 base = 'ZXY'
 
 for idle_time in idle_times:
     RO_bases = np.random.randint(0, 3, number_of_shots)
     prep_bases = np.random.randint(0, 3, number_of_shots)
     states = np.random.randint(0, 2, number_of_shots)
+
     sweep_points = np.array([RO_bases, prep_bases, states]).T
     calibrate_RO_threshold_no_rotation()
     log_length = CBox.log_length()

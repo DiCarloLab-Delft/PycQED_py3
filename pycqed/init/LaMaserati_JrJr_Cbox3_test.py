@@ -93,11 +93,6 @@ CBox.set('nr_samples', 100)
 CBox.set('lin_trans_coeffs', [1, 0, 0, 1])
 CBox.trigger_source('external')
 
-
-
-
-
-
 LO = rs.RohdeSchwarz_SGS100A(name='LO', address='TCPIP0::192.168.0.73', server_name=None)  #
 station.add_component(LO)
 RF = rs.RohdeSchwarz_SGS100A(name='RF', address='TCPIP0::192.168.0.74', server_name=None)  #

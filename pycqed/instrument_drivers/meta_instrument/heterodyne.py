@@ -49,18 +49,23 @@ class HeterodyneInstrument(Instrument):
                            get_cmd=self.do_get_frequency,
                            set_cmd=self.do_set_frequency,
                            vals=vals.Numbers(9e3, 40e9))
-        self.add_parameter('IF', parameter_class=ManualParameter,
-                           vals=vals.Numbers(-200e6, 200e6),
+        self.add_parameter('f_RO_mod', parameter_class=ManualParameter,
+                           vals=vals.Numbers(-600e6, 600e6),
                            label='Intermodulation frequency',
                            units='Hz')
-        self.add_parameter('RF_power', units='dBm',
+        self.add_parameter('IF', parameter_class=ManualParameter,
+                           vals=vals.Numbers(-600e6, 600e6),
+                           label='Intermodulation frequency',
+                           units='Hz')
+        self.add_parameter('RF_power', label='RF power',
+                           units='dBm',
                            set_cmd=self.do_set_RF_power,
                            get_cmd=self.do_get_RF_power)
 
         self.add_parameter('single_sideband_demod',
                            label='Single sideband demodulation',
                            parameter_class=ManualParameter)
-        self.set('IF', 10e6)
+        self.set('f_RO_mod', 10e6)
         # self.LO_power = 13  # dBm
         # self.RF_power = -60  # dBm
         # self.set_Navg(1)
@@ -78,13 +83,13 @@ class HeterodyneInstrument(Instrument):
         self._frequency = val
         # this is the definition agreed upon in issue 131
         self.RF.set('frequency', val)
-        self.LO.set('frequency', val-self.IF.get())
+        self.LO.set('frequency', val-self.f_RO_mod.get())
 
     def do_get_frequency(self):
         freq = self.RF.frequency()
         LO_freq = self.LO.frequency()
-        if LO_freq != freq-self.IF():
-            logging.warning('IF between RF and LO is not set correctly')
+        if LO_freq != freq-self.f_RO_mod():
+            logging.warning('f_RO_mod between RF and LO is not set correctly')
         return freq
 
     def do_set_Navg(self, val):
@@ -152,15 +157,15 @@ class HeterodyneInstrument(Instrument):
         if ((self._awg_seq_filename not in self.AWG.get('setup_filename')) and
                 not self._disable_auto_seq_loading):
             self.seq_name = st_seqs.generate_and_upload_marker_sequence(
-                RO_length, trigger_separation, RF_mod=True,
-                IF=self.get('IF'), mod_amp=0.5)
+                RO_length, trigger_separation, RF_mod=False,
+                IF=self.get('f_RO_mod'), mod_amp=0.5)
 
         self.AWG.run()
         if get_t_base is True:
             trace_length = 512
             tbase = np.arange(0, 5*trace_length, 5)*1e-9
-            self.cosI = np.floor(127.*np.cos(2*np.pi*self.get('IF')*tbase))
-            self.sinI = np.floor(127.*np.sin(2*np.pi*self.get('IF')*tbase))
+            self.cosI = np.floor(127.*np.cos(2*np.pi*self.get('f_RO_mod')*tbase))
+            self.sinI = np.floor(127.*np.sin(2*np.pi*self.get('f_RO_mod')*tbase))
             self.CBox.sig0_integration_weights(self.cosI)
             self.CBox.sig1_integration_weights(self.sinI)
 
@@ -184,7 +189,7 @@ class HeterodyneInstrument(Instrument):
         # quick fix for spec units. Need to properrly implement it later
         # after this, output is in mV
         scale_factor_dacmV = 1000.*0.75/128.
-        # scale_factor_integration = 1./float(self.IF()*self.CBox.nr_samples()*5e-9)
+        # scale_factor_integration = 1./float(self.f_RO_mod()*self.CBox.nr_samples()*5e-9)
         scale_factor_integration = 1./(64.*self.CBox.integration_length())
         factor = scale_factor_dacmV*scale_factor_integration
         d = np.double(self.CBox.get_integrated_avg_results())*np.double(factor)
@@ -203,10 +208,10 @@ class HeterodyneInstrument(Instrument):
     def demodulate_data(self, dat):
         '''
         Returns a complex point in the IQ plane by integrating and demodulating
-        the data. Demodulation is done based on the 'IF' and
+        the data. Demodulation is done based on the 'f_RO_mod' and
         'single_sideband_demod' parameters of the Homodyne instrument.
         '''
-        if self._IF != 0:
+        if self._f_RO_mod != 0:
             # self.cosI is based on the time_base and created in self.init()
             if self._single_sideband_demod is True:
                 # this definition for demodulation is consistent with
@@ -246,9 +251,9 @@ class LO_modulated_Heterodyne(HeterodyneInstrument):
                            get_cmd=self.do_get_frequency,
                            set_cmd=self.do_set_frequency,
                            vals=vals.Numbers(9e3, 40e9))
-        self.add_parameter('IF',
-                           set_cmd=self.do_set_IF,
-                           get_cmd=self.do_get_IF,
+        self.add_parameter('f_RO_mod',
+                           set_cmd=self.do_set_f_RO_mod,
+                           get_cmd=self.do_get_f_RO_mod,
                            vals=vals.Numbers(-200e6, 200e6),
                            label='Intermodulation frequency',
                            units='Hz')
@@ -265,12 +270,12 @@ class LO_modulated_Heterodyne(HeterodyneInstrument):
                            set_cmd=self._do_set_mod_amp,
                            get_cmd=self._do_get_mod_amp,
                            vals=vals.Numbers(0, 1))
-        # Negative vals should be done by setting the IF negative
+        # Negative vals should be done by setting the f_RO_mod negative
 
-        self._IF = 0  # ensures that awg_seq_par_changed flag is True
+        self._f_RO_mod = 0  # ensures that awg_seq_par_changed flag is True
         self._mod_amp = .5
         self._frequency = None
-        self.set('IF', -10e6)
+        self.set('f_RO_mod', -10e6)
         self.set('mod_amp', .5)
         self._disable_auto_seq_loading = False
         self._awg_seq_parameters_changed = True
@@ -292,14 +297,14 @@ class LO_modulated_Heterodyne(HeterodyneInstrument):
                 not self._disable_auto_seq_loading):
             self.seq_name = st_seqs.generate_and_upload_marker_sequence(
                 500e-9, 20e-6, RF_mod=True,
-                IF=self.get('IF'), mod_amp=0.5)
+                IF=self.get('f_RO_mod'), mod_amp=0.5)
 
         self.AWG.run()
         if get_t_base is True:
             trace_length = self.CBox.get('nr_samples')
             tbase = np.arange(0, 5*trace_length, 5)*1e-9
-            self.cosI = np.cos(2*np.pi*self.get('IF')*tbase)
-            self.sinI = np.sin(2*np.pi*self.get('IF')*tbase)
+            self.cosI = np.cos(2*np.pi*self.get('f_RO_mod')*tbase)
+            self.sinI = np.sin(2*np.pi*self.get('f_RO_mod')*tbase)
         self.LO.on()
         # Changes are now incorporated in the awg seq
         self._awg_seq_parameters_changed = False
@@ -310,11 +315,11 @@ class LO_modulated_Heterodyne(HeterodyneInstrument):
         self._frequency = val
         # this is the definition agreed upon in issue 131
         # AWG modulation ensures that signal ends up at RF-frequency
-        self.LO.set('frequency', val-self.IF.get())
+        self.LO.set('frequency', val-self.f_RO_mod.get())
 
     def do_get_frequency(self):
         LO_freq = self.LO.get('frequency')
-        freq = LO_freq + self._IF
+        freq = LO_freq + self._f_RO_mod
         return freq
 
     def probe(self):
@@ -337,7 +342,7 @@ class LO_modulated_Heterodyne(HeterodyneInstrument):
     def _do_get_mod_amp(self):
         return self._mod_amp
 
-    def do_set_IF(self, val):
-        if val != self._IF:
+    def do_set_f_RO_mod(self, val):
+        if val != self._f_RO_mod:
             self._awg_seq_parameters_changed = True
-        self._IF = val
+        self._f_RO_mod = val

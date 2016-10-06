@@ -281,3 +281,41 @@ class Mux_DRAG_pulse(SSB_DRAG_pulse):
                 wf[idx0:idx1] += Q_mod
         return wf
 
+
+# Some simple pulse definitions.
+class SquareFluxPulse(Pulse):
+    def __init__(self, channel=None, channels=None, name='square flux pulse', **kw):
+        Pulse.__init__(self, name)
+        if channel is None and channels is None:
+            raise ValueError('Must specify either channel or channels')
+        elif channels is None:
+            self.channel = channel  # this is just for convenience, internally
+            # this is the part the sequencer element wants to communicate with
+            self.channels.append(channel)
+        else:
+            self.channels = channels
+
+        self.amplitude = kw.pop('amplitude', 0)
+        self.length = kw.pop('length', 0)
+        self.kernel_path = kw.get('kernel_path', None)
+        if self.kernel_path is not None:
+            kernelvec = np.loadtxt(self.kernel_path)
+            self.kernel = np.zeros((len(kernelvec),len(kernelvec)))
+            for i in range(len(kernelvec)):
+                for j in range(len(kernelvec)):
+                    self.kernel[i, j] = kernelvec[i-j]
+            del(kernelvec)
+        else:
+            ValueError('Must specify kernel path')
+
+    def __call__(self, **kw):
+        self.amplitude = kw.pop('amplitude', self.amplitude)
+        self.length = kw.pop('length', self.length)
+        self.channel = kw.pop('channel', self.channel)
+        self.channels = kw.pop('channels', self.channels)
+        self.channels.append(self.channel)
+        return self
+
+    def chan_wf(self, chan, tvals):
+        return np.ones(len(tvals)) * self.amplitude
+

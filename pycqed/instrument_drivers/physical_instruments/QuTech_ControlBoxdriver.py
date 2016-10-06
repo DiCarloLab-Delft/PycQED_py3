@@ -37,36 +37,16 @@ class QuTech_ControlBox(VisaInstrument):
         t0 = time.time()
         super().__init__(name, address)
         # Establish communications
-        self.init_params()
-
-        self.set('measurement_timeout', kw.pop('measurement_timeout', 120))
-
-        t1 = time.time()
-        print('Initialized CBox', self.get('firmware_version'),
-              'in %.2fs' % (t1-t0))
-
-    def add_params(self):
-        self._i_wait = 0  # used in _print_waiting_char()
-
-        # once the demodulation_mode can be get from the FPGA, this
-        # line setting _demodulation_mode should be removed.
-        self._demodulation_mode = 'double'
-
         self.add_parameter('firmware_version',
                            get_cmd=self._do_get_firmware_version)
         self.add_parameter('acquisition_mode',
                            set_cmd=self._do_set_acquisition_mode,
                            get_cmd=self._do_get_acquisition_mode,
                            vals=vals.Anything())
-        self.add_parameter('demodulation_mode',
-                           set_cmd=self._do_set_demodulation_mode,
-                           get_cmd=self._do_get_demodulation_mode,
-                           vals=vals.Anything())
         self.add_parameter('run_mode',
                            set_cmd=self._do_set_run_mode,
                            get_cmd=self._do_get_run_mode,
                            vals=vals.Anything())
-
         self.add_parameter('signal_delay',
                            label='signal delay (# samples)',
                            get_cmd=self._do_get_signal_delay,
@@ -77,7 +57,11 @@ class QuTech_ControlBox(VisaInstrument):
                            units='# samples',
                            get_cmd=self._do_get_integration_length,
                            set_cmd=self._do_set_integration_length,
-                           vals=vals.Ints(2, 512))
+                           vals=vals.Ints(1, 512))
+        self.add_parameter('demodulation_mode',
+                           set_cmd=self._do_set_demodulation_mode,
+                           get_cmd=self._do_get_demodulation_mode,
+                           vals=vals.Ints(0, 255))
 
         nr_inputs = 2
         for i in range(nr_inputs):
@@ -103,29 +87,30 @@ class QuTech_ControlBox(VisaInstrument):
                            get_cmd=self._do_get_adc_offset,
                            set_cmd=self._do_set_adc_offset,
                            vals=vals.Ints(-128, 127))
+
         self.add_parameter('log_length',
                            label='Log length (# shots)',
                            get_cmd=self._do_get_log_length,
                            set_cmd=self._do_set_log_length,
-                           vals=vals.Ints(1, 8192))
+                           vals=vals.Ints(1, 8000))
+
         self.add_parameter('nr_samples',
                            label='Number of samples (#)',
                            get_cmd=self._do_get_nr_samples,
                            set_cmd=self._do_set_nr_samples,
-                           vals=vals.Ints(1, 2047))
+                           vals=vals.Ints(1, 2000))
         self.add_parameter('nr_averages',
                            label='Averages per sample (#)',
                            get_cmd=self._do_get_nr_averages,
                            set_cmd=self._do_set_nr_averages,
                            vals=vals.Ints(1, 2**17))
-
+        self._nr_samples = 200
+        self._nr_averages = 2
+        self._demodulation_mode = 0
         nr_awgs = 3
-        self._dac_offsets = np.empty([3, 2])
-        self._dac_offsets[:] = np.NAN
-        self._awg_mode = [defHeaders.awg_modes[0]]*nr_awgs
-        self._tape = [[0]]*nr_awgs
-
         for awg_nr in range(nr_awgs):
+            self._awg_mode = [0]*nr_awgs
+            self._tape = [[0]]*nr_awgs
             self.add_parameter(
                 'AWG{}_mode'.format(awg_nr),
                 get_cmd=self._gen_awg_mode_get_func(awg_nr),
@@ -136,6 +121,7 @@ class QuTech_ControlBox(VisaInstrument):
                 get_cmd=self._gen_ch_get_func(self._get_awg_tape, awg_nr),
                 set_cmd=self._gen_ch_set_func(self._set_awg_tape, awg_nr),
                 vals=vals.Anything())
+
             for dac_ch in range(2):
                 self.add_parameter(
                     'AWG{}_dac{}_offset'.format(awg_nr, dac_ch),
@@ -157,19 +143,30 @@ class QuTech_ControlBox(VisaInstrument):
                            get_cmd=self._get_lin_trans_coeffs,
                            vals=vals.Anything())
 
-    def init_params(self):
-        self.add_params()
-
-        self.set('demodulation_mode', 'double')
+        # Setting default arguments
+        # print('kw.pop(\'measurement_timeout\', 120): ',
+        #        kw.pop('measurement_timeout', 120))
+        self.set('measurement_timeout', kw.pop('measurement_timeout', 120))
         self.set('acquisition_mode', 'idle')
-        self.set('run_mode', 'idle')
+        self.set('run_mode', 0)
         self.set('signal_delay', 0)
         self.set('integration_length', 100)
         self.set('adc_offset', 0)
-        self.set('log_length', 100)
+        self.set('log_length', 8000)
         self.set('nr_samples', 100)
         self.set('nr_averages', 512)
         self.set('lin_trans_coeffs', [1, 0, 0, 1])
+
+        self._i_wait = 0  # used in _print_waiting_char()
+
+        self._dac_offsets = np.empty([3, 2])
+        self._dac_offsets[:] = np.NAN
+
+        # if run_tests:
+        #     self.run_test_suite()
+        t1 = time.time()
+        print('Initialized CBox', self.get('firmware_version'),
+              'in %.2fs' % (t1-t0))
 
     def run_test_suite(self):
             from importlib import reload  # Useful for testing
@@ -206,12 +203,13 @@ class QuTech_ControlBox(VisaInstrument):
     def _do_get_measurement_timeout(self):
         return self._timeout
 
-    def get_idn(self):
-        IDN_dict = {'firmware': self.firmware_version(),
-                    'model': 'CBox',
-                    'serial': None,
-                    'vendor': 'QuTech'}
-        return IDN_dict
+
+    # TODO: This set does not actually update to the CBox. Requires change.
+    def _do_set_demodulation_mode(self, val):
+        self._demodulation_mode = val
+
+    def _do_get_demodulation_mode(self):
+        return self._demodulation_mode
 
     def _do_get_firmware_version(self):
         message = c.create_message(defHeaders.ReadVersion)
@@ -284,6 +282,33 @@ class QuTech_ControlBox(VisaInstrument):
                                        signed_integer=signed_integer[j])
                 values[i, j] = val
         return values
+
+    # def decode_byte(self, data_bytes, data_bits_per_byte=7,
+    #                 signed_integer=False):
+    #     '''
+    #     Exists for legacy purposes, only used in integration streaming mode.
+    #     Otherwise use the cython version of this function.
+
+    #     Inverse function of encode byte. Protocol is described in docstring
+    #     of encode_byte().
+
+    #     Takes the message data bytes as input, converts them to a a BitArray
+    #     and removes the MSB indicating it is a data byte and puts them together
+    #     '''
+    #     data_bit_val = BitArray()
+    #     # loop over bytes and only add data bits to final BitArray.
+    #     for byte in data_bytes:
+    #         bit_val = BitArray(bin(byte))
+    #         data_bit = bit_val[-data_bits_per_byte:]
+    #         data_bit_val.append(data_bit)
+
+    #     # Convert BitArray to value as unsigned integer
+    #     if signed_integer:
+    #         value = data_bit_val.int
+    #     else:
+    #         value = data_bit_val.uint
+
+    #     return value
 
     def create_message(self, cmd, data_bytes=None,
                        EOM=defHeaders.EndOfMessageHeader):
@@ -602,7 +627,7 @@ class QuTech_ControlBox(VisaInstrument):
         return data
 
     def set_awg_lookuptable(self, awg_nr, table_nr, dac_ch, lut,
-                            length=None, units='mV'):
+                            length=None, units='V'):
         '''
         set the 14 bit values of a lut (V2.0)
 
@@ -622,8 +647,8 @@ class QuTech_ControlBox(VisaInstrument):
 
         '''
 
-        if units == 'mV':
-            lut = lut * 8192/1000.  # dac_peak/V_peak
+        if units == 'V':
+            lut = lut * 8192.  # dac_peak/V_peak
             # do conversion
             pass
         elif units == 'dac':
@@ -854,7 +879,7 @@ class QuTech_ControlBox(VisaInstrument):
                             returned.
                             ! this parameter is overloaded and has two different
                               ranges.
-                            Range: [1 - 2047]
+                            Range: [1 - 2000]
                             In input average this corresponds to trace length
                             In integration averaging this corresponds to the
                             number of integration results.
@@ -862,7 +887,7 @@ class QuTech_ControlBox(VisaInstrument):
                            into the averaging calculation.
                         Range: [0 - 17].
         '''
-        if nr_samples < 1 or nr_samples > 2047:  # 2**11: # max is 2000
+        if nr_samples < 1 or nr_samples > 2000:  # 2**11: # max is 2000
             raise ValueError
         if avg_size < 0 or avg_size > 17:  # 32: # max is 17
             raise ValueError
@@ -972,15 +997,17 @@ class QuTech_ControlBox(VisaInstrument):
         v = self.get('firmware_version')
         if (int(v[1]) == 2) and (int(int(v[3:5])) >= 15):
             n_bytes = 3
-        elif (int(v[1]) == 3) and (int(int(v[3])) > 1):
-            n_bytes = 3
         else:
+            # logging.warning('Version != 2.15 using old protocol for\
+            # log length')
             n_bytes = 2
 
         cmd = defHeaders.UpdateLoggerMaxCounterHeader
         data_bytes = c.encode_byte(length-1, 7,
                                    expected_number_of_bytes=n_bytes)
+        # Changed from version 2.15 onwards
         message = c.create_message(cmd, data_bytes)
+        # print("set log length command: ",  format(message, 'x').zfill(8))
         (stat, mesg) = self.serial_write(message)
         if stat:
             self._log_length = length
@@ -991,79 +1018,25 @@ class QuTech_ControlBox(VisaInstrument):
     def _do_get_log_length(self):
         return self._log_length
 
-    def _do_set_demodulation_mode(self, demodulation_mode):
-        if not isinstance(demodulation_mode, str):
-            raise KeyError('demodulation_mode %s not recognized.'
-                           'It should be a string:\'double\', or \'single\'')
-
-        if self.get('acquisition_mode') is not None:
-            tmp_acquisition_mode = self.get('acquisition_mode')
-        else:
-            tmp_acquisition_mode = 'idle'
-
-        self._set_master_controller_working_mode(tmp_acquisition_mode,
-                                                 demodulation_mode)
-
-    def _do_get_demodulation_mode(self):
-        return self._demodulation_mode[3:]
-
     def _do_set_acquisition_mode(self, acquisition_mode):
-        if not isinstance(acquisition_mode, str):
-            raise KeyError('acquisition_mode %s not recognized.'
-                           'It should be a string: '
-                           '\'idle\', '
-                           '\'integration logging\', '
-                           '\'feedback\', '
-                           '\'integration averaging\', '
-                           '\'input averaging\', '
-                           '\'integration streaming\', or '
-                           '\'touch \'n go\'.')
-
-        if self.get('demodulation_mode') is not None:
-            tmp_demodulation_mode = self.get('demodulation_mode')
-        else:
-            tmp_demodulation_mode = 'double'
-
-        self._set_master_controller_working_state(acquisition_mode,
-                                                 tmp_demodulation_mode)
-
-    def _set_master_controller_working_mode(self, acquisition_mode,
-                                            demodulation_mode):
         '''
         @param acquisition_mode : acquisition_mode of the fpga,
-            > idle,
-            > integration logging mode,
-            > feedback mode,
-            > input_average.
-            > integration_averaging
-            > integration_streaming
-            > touch 'n go
+            0 = idle,
+            1 = integration logging mode,
+            2 = feedback mode,
+            3 = input_average.
+            4 = integration_averaging
+            5 = integration_streaming
+            6 = touch 'n go
 
-        @param demodulation_mode: the method to demodulate the signal:
-                        > double side band demodulation (default),
-                        > single side band demodulation.
-
-        demodulation_mode_int denotes the adc input mode. When set at 1, ADC input 1 is used with
+        srcw1_int denotes the adc input mode. When set at 1, ADC input 1 is used with
         both weights(0 and 1). Otherwise, weights are applied to each ADC input:
         ADC 1 is mutiplied by weight0 and ADC 2 is multiplied by weight1.
         @return stat : True if the upload succeeded and False if the upload
                        failed
         '''
-        if not isinstance(acquisition_mode, str):
-            raise KeyError('acquisition_mode %s not recognized.'
-                           'It should be a string: '
-                           '\'idle\', '
-                           '\'integration logging\', '
-                           '\'feedback\', '
-                           '\'integration averaging\', '
-                           '\'input averaging\', '
-                           '\'integration streaming\', or '
-                           '\'touch \'n go\'.')
-
-        if not isinstance(demodulation_mode, str):
-            raise KeyError('demodulation_mode %s not recognized.'
-                           'It should be a string:\'double\', or \'single\'')
-
+        srcw1_int = self._demodulation_mode
+        acquisition_mode = str(acquisition_mode)
         mode_int = None
         for i in range(len(defHeaders.acquisition_modes)):
             if acquisition_mode.upper() in\
@@ -1074,20 +1047,10 @@ class QuTech_ControlBox(VisaInstrument):
             raise KeyError('acquisition_mode %s not recognized')
         if mode_int == 3 and self._log_length > 8000:
             logging.warning('Log length can be max 8000 in int. log. mode')
-
-        demodulation_mode_int = None
-        for i in range(len(defHeaders.demodulation_modes)):
-            if demodulation_mode.upper() in defHeaders.demodulation_modes[i].upper():
-                demodulation_mode_int = i
-                break
-        if demodulation_mode_int is None:
-            raise KeyError('demodulation_mode %s not recognized')
-
-
         # Here the actual acquisition_mode is set
         cmd = defHeaders.UpdateModeHeader
         data_bytes = c.encode_byte(mode_int, 7, expected_number_of_bytes=1)
-        data_bytes += c.encode_byte(demodulation_mode_int, 7, expected_number_of_bytes=1)
+        data_bytes += c.encode_byte(srcw1_int, 7, expected_number_of_bytes=1)
         message = c.create_message(cmd, data_bytes)
         (stat, mesg) = self.serial_write(message)
         if stat:
@@ -1103,7 +1066,7 @@ class QuTech_ControlBox(VisaInstrument):
     def _do_set_run_mode(self, run_mode):
         '''
         @param mode : mode of the fpga,
-            0 = idle,
+            0 = stop,
             1 = run,
         @return stat :True if the upload succeeded and False if the upload
                       failed.
@@ -1152,11 +1115,6 @@ class QuTech_ControlBox(VisaInstrument):
 
         @return stat : 0 if the upload succeeded and 1 if the upload failed.
         '''
-        if not isinstance(awg_mode, str):
-            raise KeyError('awg_mode %s not recognized'
-                           'It should be a string: \'Codeword-trigger\','
-                           ' \'No-codeword\', \'Tape\', or \'Segmented tape\'.')
-
         awg_mode = str(awg_mode)
         mode_int = None
         for i in range(len(defHeaders.awg_modes)):
@@ -1178,7 +1136,7 @@ class QuTech_ControlBox(VisaInstrument):
         return (stat, message)
 
     def _get_awg_mode(self, awg_nr):
-        return self._awg_mode[awg_nr][3:]
+        return self._awg_mode[awg_nr]
 
     def _do_set_adc_offset(self, adc_offset):
         '''
@@ -1233,9 +1191,12 @@ class QuTech_ControlBox(VisaInstrument):
         '''
         set length of the signal for integration.
 
-        @param length : number of samples of the integration delay, (2, 512)
+        @param length : number of samples of the integration delay, (1,512)
+
+        Warning! this is the excpetion that is one nibble (4bit/bte) and one
+        5 bit/byte). Range is limited until VHDL code is updated.
         '''
-        if length < 2 or length > 512:
+        if length < 0 or length > 512:
             raise ValueError
         cmd = defHeaders.UpdIntegrationLengthHeader
         data_bytes = c.encode_byte(length, 7, expected_number_of_bytes=2)

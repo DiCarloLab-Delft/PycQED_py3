@@ -60,14 +60,15 @@ from qcodes.instrument_drivers.tektronix import AWG5014 as tek
 from qcodes.instrument_drivers.tektronix import AWG520 as tk520
 from qcodes.instrument_drivers.agilent.E8527D import Agilent_E8527D
 
-from instrument_drivers.physical_instruments import QuTech_ControlBoxdriver as qcb
-import instrument_drivers.meta_instrument.qubit_objects.Tektronix_driven_transmon as qbt
-from instrument_drivers.meta_instrument import heterodyne as hd
-import instrument_drivers.meta_instrument.CBox_LookuptableManager as lm
+from pycqed.instrument_drivers.physical_instruments import QuTech_ControlBoxdriver as qcb
+import pycqed.instrument_drivers.meta_instrument.qubit_objects.Tektronix_driven_transmon as qbt
+from pycqed.instrument_drivers.meta_instrument import heterodyne as hd
+import pycqed.instrument_drivers.meta_instrument.CBox_LookuptableManager as lm
 
-from instrument_drivers.meta_instrument.qubit_objects import CBox_driven_transmon as qb
-from instrument_drivers.physical_instruments import QuTech_Duplexer as qdux
-
+from pycqed.instrument_drivers.meta_instrument.qubit_objects import CBox_driven_transmon as qb
+from pycqed.instrument_drivers.physical_instruments import QuTech_Duplexer as qdux
+from pycqed.instrument_drivers.physical_instruments.ZurichInstruments import UHFQuantumController as ZI_UHFQC
+from pycqed.instrument_drivers.physical_instruments import Weinschel_8320_novisa
 
 # Initializing instruments
 
@@ -94,6 +95,12 @@ AWG520 = tk520.Tektronix_AWG520('AWG520', address='GPIB0::17::INSTR',
 station.add_component(AWG520)
 IVVI = iv.IVVI('IVVI', address='COM4', numdacs=16, server_name=None)
 station.add_component(IVVI)
+
+#Initializing UHFQC
+UHFQC_1 = ZI_UHFQC.UHFQC('UHFQC_1', device='dev2178', server_name=None)
+station.add_component(UHFQC_1)
+
+ATT = Weinschel_8320_novisa.Weinschel_8320(name='ATT',address='192.168.0.54', server_name=None)
 # Dux = qdux.QuTech_Duplexer('Dux', address='TCPIP0::192.168.0.101',
 #                             server_name=None)
 # SH = sh.SignalHound_USB_SA124B('Signal hound', server_name=None) #commented because of 8s load time
@@ -113,7 +120,7 @@ AncB = qbt.Tektronix_driven_transmon('AncB', LO=LO, cw_source=Spec_source,
                                               td_source=Qubit_LO,
                                               IVVI=IVVI, rf_RO_source=RF,
                                               AWG=AWG,
-                                              CBox=CBox, heterodyne_instr=HS,
+                                              heterodyne_instr=HS,
                                               MC=MC,
                                               server_name=None)
 station.add_component(AncB)
@@ -121,7 +128,7 @@ AncT = qbt.Tektronix_driven_transmon('AncT', LO=LO, cw_source=Spec_source,
                                               td_source=Qubit_LO,
                                               IVVI=IVVI, rf_RO_source=RF,
                                               AWG=AWG,
-                                              CBox=CBox, heterodyne_instr=HS,
+                                              heterodyne_instr=HS,
                                               MC=MC,
                                               server_name=None)
 station.add_component(AncT)
@@ -129,7 +136,7 @@ DataB = qbt.Tektronix_driven_transmon('DataB', LO=LO, cw_source=Spec_source,
                                               td_source=Qubit_LO,
                                               IVVI=IVVI, rf_RO_source=RF,
                                               AWG=AWG,
-                                              CBox=CBox, heterodyne_instr=HS,
+                                              heterodyne_instr=HS,
                                               MC=MC,
                                               server_name=None)
 station.add_component(DataB)
@@ -137,7 +144,7 @@ DataM = qbt.Tektronix_driven_transmon('DataM', LO=LO, cw_source=Spec_source,
                                               td_source=Qubit_LO,
                                               IVVI=IVVI, rf_RO_source=RF,
                                               AWG=AWG,
-                                              CBox=CBox, heterodyne_instr=HS,
+                                              heterodyne_instr=HS,
                                               MC=MC,
                                               server_name=None)
 station.add_component(DataM)
@@ -145,7 +152,7 @@ DataT = qbt.Tektronix_driven_transmon('DataT', LO=LO, cw_source=Spec_source,
                                               td_source=Qubit_LO,
                                               IVVI=IVVI, rf_RO_source=RF,
                                               AWG=AWG,
-                                              CBox=CBox, heterodyne_instr=HS,
+                                              heterodyne_instr=HS,
                                               MC=MC,
                                               server_name=None)
 station.add_component(DataT)
@@ -167,6 +174,7 @@ nested_MC.station = station
 # The AWG sequencer
 station.pulsar = ps.Pulsar()
 station.pulsar.AWG = station.components['AWG']
+marker1highs=[2,2,2.7,2]
 for i in range(4):
     # Note that these are default parameters and should be kept so.
     # the channel offset is set in the AWG itself. For now the amplitude is
@@ -180,7 +188,7 @@ for i in range(4):
     station.pulsar.define_channel(id='ch{}_marker1'.format(i+1),
                                   name='ch{}_marker1'.format(i+1),
                                   type='marker',
-                                  high=2.0, low=0, offset=0.,
+                                  high=marker1highs[i], low=0, offset=0.,
                                   delay=0, active=True)
     station.pulsar.define_channel(id='ch{}_marker2'.format(i+1),
                                   name='ch{}_marker2'.format(i+1),
@@ -194,6 +202,8 @@ cal_elts.station = station
 
 t1 = time.time()
 
+#manually setting the clock, to be done automatically
+AWG.clock_freq(1e9)
 
 
 print('Ran initialization in %.2fs' % (t1-t0))
@@ -208,17 +218,49 @@ def all_sources_off():
 
 def print_instr_params(instr):
     snapshot = instr.snapshot()
-    for par in snapshot['parameters']:
+    for par in sorted(snapshot['parameters']):
         print('{}: {} {}'.format(snapshot['parameters'][par]['name'],
                                  snapshot['parameters'][par]['value'],
                                  snapshot['parameters'][par]['units']))
 
-def set_integration_weights():
-    trace_length = 512
-    tbase = np.arange(0, 5*trace_length, 5)*1e-9
-    cosI = np.floor(127.*np.cos(2*np.pi*AncB.get('f_RO_mod')*tbase))
-    sinI = np.floor(127.*np.sin(2*np.pi*AncB.get('f_RO_mod')*tbase))
-    CBox.sig0_integration_weights(cosI)
-    CBox.sig1_integration_weights(sinI)
+
 from scripts.Experiments.FiveQubits import common_functions as cfct
 cfct.set_AWG_limits(station,1.7)
+
+q0=AncT
+q1=DataT
+
+def switch_to_pulsed_RO_CBox(qubit):
+    UHFQC_1.AWG_file('traditional.seqc')
+    qubit.RO_pulse_type('Gated_MW_RO_pulse')
+    qubit.RO_acq_marker_delay(175e-9)
+    qubit.acquisition_instr(CBox)
+    qubit.RO_acq_marker_channel('ch3_marker1')
+    qubit.RO_acq_weight_function_I(0)
+    qubit.RO_acq_weight_function_Q(1)
+
+def switch_to_pulsed_RO_UHFQC(qubit):
+    UHFQC_1.AWG_file('traditional.seqc')
+    qubit.RO_pulse_type('Gated_MW_RO_pulse')
+    qubit.RO_acq_marker_delay(175e-9)
+    qubit.acquisition_instr(UHFQC_1)
+    qubit.RO_acq_marker_channel('ch3_marker2')
+    qubit.RO_acq_weight_function_I(0)
+    qubit.RO_acq_weight_function_Q(1)
+
+
+def switch_to_IQ_mod_RO_UHFQC(qubit):
+    UHFQC_1.AWG_file('traditional_IQ_mod_readout.seqc')
+    qubit.RO_pulse_type('MW_IQmod_pulse_nontek')
+    qubit.RO_acq_marker_delay(-100e-9)
+    qubit.acquisition_instr(UHFQC_1)
+    qubit.RO_acq_marker_channel('ch3_marker2')
+    qubit.RO_I_channel('0')
+    qubit.RO_Q_channel('1')
+    qubit.RO_acq_weight_function_I(0)
+    qubit.RO_acq_weight_function_Q(1)
+
+#preparing UHFQC readout with IQ mod pulses
+
+switch_to_pulsed_RO_CBox(q0)
+switch_to_pulsed_RO_CBox(q1)

@@ -27,7 +27,7 @@ class Element:
         self.ignore_offset_correction = kw.pop('ignore_offset_correction',
                                                False)
 
-        self.global_time = kw.pop('global_time', False)
+        self.global_time = kw.pop('global_time', True)
         self.time_offset = kw.pop('time_offset', 0)
 
         self.ignore_delays = kw.pop('ignore_delays', False)
@@ -46,6 +46,7 @@ class Element:
                                     high=chan['high'], low=chan['low'],
                                     offset=chan['offset'],
                                     delay=delay)
+        self.distorted_wfs = {}
 
     # tools for time calculations
 
@@ -180,6 +181,7 @@ class Element:
             'offset': offset,
             'high': high,
             'low': low,
+            'distorted': False
             }
 
     def channel_delay(self, cname):
@@ -370,6 +372,8 @@ class Element:
             hi = self._channels[wf]['high']
             lo = self._channels[wf]['low']
 
+            if self._channels[wf]['distorted'] is True:
+                wfs[wf] = self.distorted_wfs[wf]
             # truncate all values that are out of bounds
             if self._channels[wf]['type'] == 'analog':
                 if max(wfs[wf]) > hi:

@@ -16,6 +16,7 @@ mac_dict = {'203178706891063': 'CDickel_Desktop',
             '167746772714689' : 'Xiang_PC',
             '109952948723616': 'Ramiro_Desktop',
             '180725258210527': 'Niels_macbook',
+            '109952948723616': 'Ramiro_Desktop',
             '31054844829911': 'Sjoerd_laptop'
             }
 
@@ -39,5 +40,6 @@ data_dir_dict = {'tud276606_FPGA_PC': 'D:\Experiments/CBox_Testing/Data',
                  'Ramiro_Desktop': r'\\131.180.82.81\\data',
 
                  r'Nathans_Laptop': 'D:/nlangford\My Documents\Projects\Rabi Model\Experiment_1504\Data',
+                 'Ramiro_Desktop': r'\\131.180.82.81\\data',
                  'Bart_Laptop' : 'C:\Experiments/NumericalOptimization/Data'
                 }
