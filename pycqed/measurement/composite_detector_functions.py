@@ -411,6 +411,7 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
         self.integration_length = integration_length
         self.weight_function_I = weight_function_I
         self.weight_function_Q = weight_function_Q
+        print('weights', weight_function_I, weight_function_Q)
 
 
     def prepare(self, **kw):
@@ -437,17 +438,18 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
 
 
             elif 'UHFQC' in str(self.acquisition_instr):
+                print('cdet', self.weight_function_I)
                 self.MC.set_detector_function(
                     det.UHFQC_integration_logging_det(self.acquisition_instr,
-                                                          self.AWG, channels=[0,1],
+                                                          self.AWG, channels=[self.weight_function_I,self.weight_function_Q],
                                                           integration_length=self.integration_length))
                 if self.SSB:
-                    self.UHFQC.prepare_SSB_weight_and_rotation(IF=self.IF)
+                    self.UHFQC.prepare_SSB_weight_and_rotation(IF=self.IF, weight_function_I=self.weight_function_I, weight_function_Q=self.weight_function_Q)
                 else:
                     if self.IF==None:
                         raise ValueError('IF has to be provided when not using optimized weights')
                     else:
-                        self.UHFQC.prepare_DSB_weight_and_rotation(IF=self.IF)
+                        self.UHFQC.prepare_DSB_weight_and_rotation(IF=self.IF, weight_function_I=self.weight_function_I, weight_function_Q=self.weight_function_Q)
 
     def acquire_data_point(self, *args, **kw):
         self.time_start = time.time()
@@ -568,7 +570,6 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
                 optimized_weights_Q = weight_scale_factor*optimized_weights_Q
 
                 eval('self.UHFQC.quex_wint_weights_{}_real(np.array(optimized_weights_I))'.format(self.weight_function_I))
-
                 if self.SSB:
                     eval('self.UHFQC.quex_wint_weights_{}_imag(np.array(optimized_weights_Q))'.format(self.weight_function_I))
                     eval('self.UHFQC.quex_wint_weights_{}_real(np.array(optimized_weights_I))'.format(self.weight_function_Q))
@@ -608,7 +609,6 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
                 dset[:, 1] = transient0_Q
                 dset[:, 2] = transient1_I
                 dset[:, 3] = transient1_Q
-                # print('Done!')
             ana.data_file.close()
 
             # Arbitrary choice, does not think about the deffinition

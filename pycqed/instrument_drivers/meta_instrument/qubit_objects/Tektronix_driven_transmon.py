@@ -2,6 +2,7 @@ import logging
 import numpy as np
 from scipy.optimize import brent
 from math import gcd
+from qcodes import Instrument
 from qcodes.utils import validators as vals
 from qcodes.instrument.parameter import ManualParameter
 
@@ -154,6 +155,11 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         self.add_parameter('RO_pulse_power', units='dBm',
                            parameter_class=ManualParameter)
 
+        self.add_parameter('RO_fixed_point_correction',
+                           vals=vals.Bool(),
+                           parameter_class=ManualParameter,
+                           initial_value=False)
+
         self.add_parameter('f_pulse_mod',
                            initial_value=-100e6,
                            label='pulse-modulation frequency', units='Hz',
@@ -205,9 +211,11 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         self.add_parameter('acquisition_instr',
                            set_cmd=self._do_set_acquisition_instr,
                            get_cmd=self._do_get_acquisition_instr,
-                           vals=vals.Anything())
+                           vals=vals.Strings())
 
     def prepare_for_continuous_wave(self):
+        # makes sure the settings of the acquisition instrument are reloaded
+        self.acquisition_instr(self.acquisition_instr())
         # Heterodyne tone configuration
         if not self.f_RO():
             RO_freq = self.f_res()
@@ -253,6 +261,8 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         self.cw_source.on()
 
     def prepare_for_timedomain(self):
+        # makes sure the settings of the acquisition instrument are reloaded
+        self.acquisition_instr(self.acquisition_instr())
         self.rf_RO_source.pulsemod_state('On')
         self.td_source.pulsemod_state('Off')
         self.LO.on()
@@ -802,14 +812,15 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
     def _do_get_acquisition_instr(self):
         # Specifying the int_avg det here should allow replacing it with ATS
         # or potential digitizer acquisition easily
-        return self._acquisition_instr
+        return self._acquisition_instr.name
 
 
-    def _do_set_acquisition_instr(self,acquisition_instr):
+    def _do_set_acquisition_instr(self, acquisition_instr):
         # Specifying the int_avg det here should allow replacing it with ATS
         # or potential digitizer acquisition easily
-        self._acquisition_instr = acquisition_instr
-        if 'CBox' in str(self._acquisition_instr):
+
+        self._acquisition_instr = self.find_instrument(acquisition_instr)
+        if 'CBox' in acquisition_instr:
             print("CBox acquisition")
             self.int_avg_det = det.CBox_integrated_average_detector(self._acquisition_instr,
                                                                     self.AWG,
@@ -820,7 +831,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
             self.input_average_detector = det.CBox_input_average_detector(
                 self._acquisition_instr,
                 self.AWG, nr_averages=self.RO_acq_averages())
-        elif 'UHFQC' in str(self._acquisition_instr):
+        elif 'UHFQC' in acquisition_instr:
             print("UHFQC acquisition")
             self.input_average_detector = det.UHFQC_input_average_detector(
                 UHFQC=self._acquisition_instr,
@@ -850,6 +861,15 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
             'phase': 0,
             'pulse_type': 'SSB_DRAG_pulse'}
 
+        if self.RO_fixed_point_correction():
+            if self.f_JPA_pump_mod() == 0:
+                f_fix_point = self.f_RO_mod()
+            else:
+                f_fix_point = gcd(int(self.f_RO_mod()),
+                                  int(self.f_JPA_pump_mod()))
+        else:
+            f_fix_point = None
+
         self.RO_pars = {
             'I_channel': self.RO_I_channel.get(),
             'Q_channel': self.RO_Q_channel.get(),
@@ -858,8 +878,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
             'length': self.RO_pulse_length.get(),
             'pulse_delay': self.RO_pulse_delay.get(),
             'mod_frequency': self.f_RO_mod.get(),
-            'fixed_point_frequency': gcd(int(self.f_RO_mod()),
-                                         int(self.f_JPA_pump_mod())),
+            'fixed_point_frequency': f_fix_point,
             'acq_marker_delay': self.RO_acq_marker_delay.get(),
             'acq_marker_channel': self.RO_acq_marker_channel.get(),
             'phase': 0,

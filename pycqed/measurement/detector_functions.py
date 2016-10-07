@@ -1639,6 +1639,7 @@ class UHFQC_integrated_average_detector(Hard_Detector):
             time.sleep(0.1)
         time.sleep(1)
         data = ['']*len(self.channels)
+        print(self.channels)
         for i, channel in enumerate(self.channels):
             dataset = eval("self.UHFQC.quex_rl_data_{}()".format(channel))
             data[i] = dataset[0]['vector']
@@ -1713,6 +1714,7 @@ class UHFQC_integration_logging_det(Hard_Detector):
             time.sleep(0.1)
         time.sleep(1)
         data = ['']*len(self.channels)
+        print(self.channels)
         for i, channel in enumerate(self.channels):
             dataset = eval("self.UHFQC.quex_rl_data_{}()".format(channel))
             data[i] = dataset[0]['vector']
