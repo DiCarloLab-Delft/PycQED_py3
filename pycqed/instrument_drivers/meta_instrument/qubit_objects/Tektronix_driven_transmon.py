@@ -760,11 +760,11 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         else:
             slice_scan = False
 
-        self.int_avg_det = det.CBox_integrated_average_detector(self._acquisition_instr,
-                                                                            self.AWG,
-                                                                            normalize=True,
-                                                                            rotate=True,
-                                                                            nr_averages=nr_averages)
+        # self.int_avg_det = det.CBox_integrated_average_detector(self._acquisition_instr,
+        #                                                                     self.AWG,
+        #                                                                     normalize=True,
+        #                                                                     rotate=True,
+        #                                                                     nr_averages=nr_averages)
         flux_pulse_pars = {'pulse_type': 'SquarePulse',
                       'pulse_delay': .1e-6,
                       'channel': 'ch3',

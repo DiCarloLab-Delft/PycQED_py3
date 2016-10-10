@@ -101,7 +101,6 @@ class chevron_length(swf.Hard_Sweep):
                                     self.RO_pars,
                                     self.flux_pulse_pars,
                                     distortion_dict=self.dist_dict)
-        self.AWG.start()
 
     def pre_upload(self, **kw):
         self.seq = fsqs.chevron_seq_length(self.length_vec,
