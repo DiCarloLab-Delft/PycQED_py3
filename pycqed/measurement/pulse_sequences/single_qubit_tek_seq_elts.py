@@ -427,8 +427,11 @@ def Butterfly_seq(pulse_pars, RO_pars, initialize=False,
         for pulse_keys in pulse_keys_sub_list:
             pulse_sub_list = [pulses[key] for key in pulse_keys]
             sub_seq_duration = sum([p['pulse_delay'] for p in pulse_sub_list])
-            extra_delay = calculate_time_corr(
-                sub_seq_duration+post_msmt_delay, fixed_point_freq)
+            if fixed_point_freq==None:
+                extra_delay = 0
+            else:
+                extra_delay = calculate_time_corr(
+                    sub_seq_duration+post_msmt_delay, fixed_point_freq)
             initial_pulse_delay = post_msmt_delay + extra_delay
             start_pulse = deepcopy(pulse_sub_list[0])
             start_pulse['pulse_delay'] += initial_pulse_delay

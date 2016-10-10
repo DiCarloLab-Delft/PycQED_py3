@@ -417,8 +417,6 @@ class CBox_input_average_detector(Hard_Detector):
         self.CBox.nr_averages(int(self.nr_averages))
         self.CBox.nr_samples(int(self.nr_samples))
         self.CBox.acquisition_mode('input averaging')
-        print("cbox input detector prepared")
-
 
     def finish(self):
         if self.AWG is not None:
@@ -461,7 +459,6 @@ class CBox_integrated_average_detector(Hard_Detector):
         i = 0
         while not succes:
             try:
-                # print('Blah')
                 self.AWG.stop()
                 self.CBox.set('acquisition_mode', 'idle')
                 self.CBox.set('acquisition_mode', 'integration averaging')
@@ -642,12 +639,9 @@ class CBox_v3_single_integration_average_det(Soft_Detector):
         # import sys
         # tb.print_tb(sys.last_traceback)
         while not success:
-            print("acquiring")
-
             self.CBox.set('acquisition_mode', 'integration averaging mode')
             try:
                 data = self.CBox.get_integrated_avg_results()
-                print("detector function, data", data)
                 success = True
             except Exception as e:
                 logging.warning(e)
@@ -1639,11 +1633,9 @@ class UHFQC_integrated_average_detector(Hard_Detector):
             time.sleep(0.1)
         time.sleep(1)
         data = ['']*len(self.channels)
-        print(self.channels)
         for i, channel in enumerate(self.channels):
             dataset = eval("self.UHFQC.quex_rl_data_{}()".format(channel))
             data[i] = dataset[0]['vector']
-        print("refreshed")
 
         if self.rotate:
             return self.rotate_and_normalize(data)
@@ -1714,7 +1706,6 @@ class UHFQC_integration_logging_det(Hard_Detector):
             time.sleep(0.1)
         time.sleep(1)
         data = ['']*len(self.channels)
-        print(self.channels)
         for i, channel in enumerate(self.channels):
             dataset = eval("self.UHFQC.quex_rl_data_{}()".format(channel))
             data[i] = dataset[0]['vector']

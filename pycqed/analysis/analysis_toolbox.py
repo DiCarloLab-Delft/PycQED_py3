@@ -997,13 +997,13 @@ def calculate_distance_ground_state(data_real, data_imag, percentile=70,
     return data_dist
 
 # def rotate_data_to_zero(data_I, data_Q, NoCalPoints):
-def zigzag(seq):
+def zigzag(seq, sample_0,sample_1, nr_samples):
     '''
     Splits a sequence in two sequences, one containing the odd entries, the
     other containing the even entries.
     e.g. in-> [0,1,2,3,4,5] -> out0 = [0,2,4] , out1[1,3,5]
     '''
-    return seq[::2], seq[1::2]
+    return seq[sample_0::nr_samples], seq[sample_1::nr_samples]
 
 def calculate_rotation_matrix(delta_I, delta_Q):
     '''

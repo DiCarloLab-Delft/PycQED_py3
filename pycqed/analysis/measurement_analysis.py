@@ -1840,17 +1840,35 @@ class SSRO_Analysis(MeasurementAnalysis):
         self.rotate = kw.pop('rotate',True)
         super(self.__class__, self).__init__(**kw)
 
-    def run_default_analysis(self, rotate=True, no_fits=False,
+    def run_default_analysis(self, rotate=True,
+                             nr_samples=2,
+                             sample_0=0,
+                             sample_1=1,
+                             channels=['I','Q'],
+                             no_fits=False,
                              print_fit_results=False, **kw):
 
         self.add_analysis_datagroup_to_file()
         self.no_fits = no_fits
         # plotting histograms of the raw shots on I and Q axis
+
+
         try:
-            shots_I_data = self.get_values(key='I')
-            shots_Q_data = self.get_values(key='Q')
-            shots_I_data_0, shots_I_data_1 = a_tools.zigzag(shots_I_data)
-            shots_Q_data_0, shots_Q_data_1 = a_tools.zigzag(shots_Q_data)
+            print('refreshed')
+            print(channels[0])
+            print(channels[1])
+            print(sample_0)
+            print(sample_1)
+            print(nr_samples)
+            shots_I_data = self.get_values(key=channels[0])
+            shots_Q_data = self.get_values(key=channels[1])
+            print('refreshed2')
+            shots_I_data_0, shots_I_data_1 = a_tools.zigzag(shots_I_data,
+                                                sample_0, sample_1, nr_samples)
+            print('refreshed3')
+            shots_Q_data_0, shots_Q_data_1 = a_tools.zigzag(shots_Q_data,
+                                                sample_0, sample_1, nr_samples)
+
 
         except(KeyError):  # used for different naming when using TD_meas shots
             shots_I_data_0 = self.get_values(key='single_shot_I')[:, 0]
@@ -5402,3 +5420,5 @@ def fit_qubit_frequency(sweep_points, data, mode='dac',
 
         fit_res = Qubit_freq_mod.fit(data=data, flux=sweep_points)
     return fit_res
+
+

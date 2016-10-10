@@ -190,7 +190,6 @@ class OffOn(swf.Hard_Sweep):
         self.pulse_pars = pulse_pars
         self.RO_pars = RO_pars
         self.upload = upload
-
         self.parameter_name = 'sample'
         self.unit = '#'
         self.name = pulse_comb
