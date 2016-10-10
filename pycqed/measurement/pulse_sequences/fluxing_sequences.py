@@ -124,7 +124,7 @@ def chevron_seq_length(lengths, mw_pulse_pars, RO_pars, flux_pulse_pars=None,
         pulse_list = [pulses['X180'], flux_pulse_pars, RO_pars, minus_flux_pulse_pars]
         # copy first element and set extra wait
         pulse_list[0] = deepcopy(pulse_list[0])
-        pulse_list[0]['pulse_delay'] += 0.01e-6
+        pulse_list[0]['pulse_delay'] += 0.01e-6 + ((-int(lngt*1e9)) % 50)*1e-9
 
         el = multi_pulse_elt(i, station, pulse_list)
         el_list.append(el)
@@ -140,7 +140,7 @@ def chevron_seq_length(lengths, mw_pulse_pars, RO_pars, flux_pulse_pars=None,
         pulse_list = [pulses['I'], RO_pars]
         # copy first element and set extra wait
         pulse_list[0] = deepcopy(pulse_list[0])
-        pulse_list[0]['pulse_delay'] += 3e-6
+        pulse_list[0]['pulse_delay'] += 0.01e-6
 
         el = multi_pulse_elt(len(lengths)+i, station, pulse_list)
         el_list.append(el)
@@ -149,7 +149,7 @@ def chevron_seq_length(lengths, mw_pulse_pars, RO_pars, flux_pulse_pars=None,
         pulse_list = [pulses['X180'], RO_pars]
         # copy first element and set extra wait
         pulse_list[0] = deepcopy(pulse_list[0])
-        pulse_list[0]['pulse_delay'] += 3e-6
+        pulse_list[0]['pulse_delay'] += 0.01e-6
 
         el = multi_pulse_elt(len(lengths)+int(cal_points/2)+i, station, pulse_list)
         el_list.append(el)

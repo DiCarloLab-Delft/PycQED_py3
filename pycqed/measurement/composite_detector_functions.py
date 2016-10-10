@@ -994,10 +994,10 @@ class Chevron_optimization_v1(det.Soft_Detector):
 
 
         self.qubit.dist_dict = self.dist_dict
+        self.qubit.RO_acq_averages(self.nr_averages)
         self.qubit.measure_chevron(amps=[self.awg_amp_par()],
                                    length=np.arange(0, 81e-9, 1e-9),
-                                   MC=self.MC_nested,
-                                   nr_averages=self.nr_averages)
+                                   MC=self.MC_nested)
 
         # # fit it
         ma_obj = ma.chevron_optimization_v1(auto=True, label='Chevron_slice',

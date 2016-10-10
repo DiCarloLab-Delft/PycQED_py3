@@ -61,6 +61,16 @@ def skin_kernel(alpha=0., length=601):
     return kernel_skineffect
 # save_kernel(kernel_skineffect, save_file='kernel_skineffect_%.1f'%(alpha))
 
+def poly_kernel(a=0,b=11000,c=0, length=30000):
+    """
+    Generates a polynomial kernel(like the one used for bias-tee), with the specified parameters
+
+    """
+    t_kernel = np.arange(length)
+    poly_kernel_f = a*t_kernel**2+b*t_kernel+c
+    return poly_kernel_f
+# save_kernel(kernel_skineffect, save_file='kernel_skineffect_%.1f'%(alpha))
+
 class Distortion(Instrument):
     '''
     Implements a distortion kernel for a flux channel.
@@ -93,6 +103,18 @@ class Distortion(Instrument):
         self.add_parameter('bounce_length', units='ns',
                            parameter_class=ManualParameter,
                            vals=vals.Numbers())
+        self.add_parameter('poly_a', units='',
+                           parameter_class=ManualParameter,
+                           vals=vals.Numbers())
+        self.add_parameter('poly_b', units='',
+                           parameter_class=ManualParameter,
+                           vals=vals.Numbers())
+        self.add_parameter('poly_c', units='',
+                           parameter_class=ManualParameter,
+                           vals=vals.Numbers())
+        self.add_parameter('poly_length', units='ns',
+                           parameter_class=ManualParameter,
+                           vals=vals.Numbers())
         self.add_parameter('corrections_length', units='ns',
                            parameter_class=ManualParameter,
                            vals=vals.Numbers())
@@ -109,6 +131,12 @@ class Distortion(Instrument):
         return decay_kernel(amp=self.decay_amp(), tau=self.decay_tau(),
                             length=self.decay_length())
 
+    def get_poly_kernel(self):
+        return poly_kernel(a=self.poly_a(),
+                           b=self.poly_b(),
+                           c=self.poly_c(),
+                           length=self.poly_length())
+
     def convolve_kernel(self, kernel_list, length=None):
         if length is None:
             length = max([len(k) for k in kernel_list])
@@ -119,7 +147,7 @@ class Distortion(Instrument):
 
     def get_corrections_kernel(self, kernel_list_before=None):
         kernel_list = [self.get_bounce_kernel(), self.get_skin_kernel(),
-                       self.get_decay_kernel()]
+                       self.get_decay_kernel(), self.get_poly_kernel()]
         if kernel_list_before is not None:
             kernel_list_before.extend(kernel_list)
             return self.convolve_kernel(kernel_list_before,

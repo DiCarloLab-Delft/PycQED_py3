@@ -498,7 +498,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         # prepare for timedomain takes care of rescaling
         self.prepare_for_timedomain()
         # # Extra rescaling only happens if the amp180 was far too low for the Rabi
-        if max(abs(amps)) > 2 * self.AWG.get('{}_amp'.format(self.pulse_I_channel())):
+        if max(abs(amps))*2 > self.AWG.get('{}_amp'.format(self.pulse_I_channel())):
             logging.warning('Auto rescaling AWG amplitude as amp180 {}'.format(
                             self.amp180()) +
                             ' was set very low in comparison to Rabi range')
@@ -821,18 +821,19 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
 
         self._acquisition_instr = self.find_instrument(acquisition_instr)
         if 'CBox' in acquisition_instr:
-            print("CBox acquisition")
+            logging.info("setting CBox acquisition")
             self.int_avg_det = det.CBox_integrated_average_detector(self._acquisition_instr,
                                                                     self.AWG,
                                                                     nr_averages=self.RO_acq_averages(),
-                                                                    integration_length=self.RO_acq_integration_length())
+                                                                    integration_length=self.RO_acq_integration_length(),
+                                                                    normalize=True)
             self.int_log_det = det.CBox_integration_logging_det(self._acquisition_instr,
                                                                 self.AWG, integration_length=self.RO_acq_integration_length())
             self.input_average_detector = det.CBox_input_average_detector(
                 self._acquisition_instr,
                 self.AWG, nr_averages=self.RO_acq_averages())
         elif 'UHFQC' in acquisition_instr:
-            print("UHFQC acquisition")
+            logging.info("setting UHFQC acquisition")
             self.input_average_detector = det.UHFQC_input_average_detector(
                 UHFQC=self._acquisition_instr,
                 AWG=self.AWG, nr_averages=self.RO_acq_averages())
