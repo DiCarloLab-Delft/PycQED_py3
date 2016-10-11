@@ -264,3 +264,34 @@ class quick_analysis(Standard_MA):
             self.run_analysis()
     def process_data(self):
         pass
+
+class quick_analysis_list(Standard_MA):
+    def __init__(self, t_list,
+                 options_dict,
+                 extract_only=False,
+                 auto=True,
+                 params_dict_TD=None,
+                 numeric_params=None):
+        self.t_list = t_list
+        t_start = t_list[0]
+        t_stop = t_list[-1]
+        super(quick_analysis_list, self).__init__(t_start, t_stop=t_stop,
+                                             options_dict=options_dict,
+                                             extract_only=extract_only)
+        self.params_dict_TD = params_dict_TD
+
+        self.numeric_params = numeric_params
+        if auto is True:
+            self.run_analysis()
+    def extract_data(self):
+        self.TD_timestamps = self.t_list
+
+        if len(self.TD_timestamps) < 1:
+            raise ValueError("No timestamps in range! Check the labels and other filters.")
+
+        self.TD_dict = a_tools.get_data_from_timestamp_list(self.TD_timestamps, self.params_dict_TD, numeric_params=self.numeric_params)
+
+        # Use timestamps to calculate datetimes and add to dictionary
+        self.TD_dict['datetime'] = [a_tools.datetime_from_timestamp(timestamp) for timestamp in self.TD_dict['timestamps']]
+    def process_data(self):
+        pass
