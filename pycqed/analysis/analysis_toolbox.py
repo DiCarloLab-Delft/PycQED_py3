@@ -1089,7 +1089,27 @@ def rotate_and_normalize_data(data, cal_zero_points, cal_one_points,
 
     return [normalized_data, zero_coord, one_coord]
 
+def normalize_data_v3(data, cal_zero_points=np.arange(-4, -2, 1),
+                      cal_one_points=np.arange(-2, 0, 1), **kw):
+    '''
+    Normalizes data according to calibration points
+    Inputs:
+        data (numpy array) : 1D dataset that has to be normalized
+        cal_zero_points (range) : range specifying what indices in 'data'
+                                  correspond to zero
+        cal_one_points (range) : range specifying what indices in 'data'
+                                 correspond to one
+    '''
+    # Extract zero and one coordinates
+    I_zero = np.mean(data[cal_zero_points])
+    I_one = np.mean(data[cal_one_points])
+    # Translate the date
+    trans_data = data - I_zero
+    # Normalize the data
+    one_zero_dist = I_one-I_zero
+    normalized_data = trans_data/one_zero_dist
 
+    return normalized_data
 
 def datetime_from_timestamp(timestamp):
     if len(timestamp) == 14:

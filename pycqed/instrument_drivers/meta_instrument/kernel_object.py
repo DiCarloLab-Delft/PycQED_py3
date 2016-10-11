@@ -67,8 +67,11 @@ def poly_kernel(a=0,b=11000,c=0, length=30000):
 
     """
     t_kernel = np.arange(length)
-    poly_kernel_f = a*t_kernel**2+b*t_kernel+c
-    return poly_kernel_f
+    poly_kernel_step = a*t_kernel**2+b*t_kernel+c
+    kernel_poly = np.zeros(poly_kernel_step.shape)
+    kernel_poly[0] = poly_kernel_step[0]
+    kernel_poly[1:] = poly_kernel_step[1:]-poly_kernel_step[:-1]
+    return kernel_poly
 # save_kernel(kernel_skineffect, save_file='kernel_skineffect_%.1f'%(alpha))
 
 class Distortion(Instrument):

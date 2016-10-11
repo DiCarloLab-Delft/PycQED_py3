@@ -1577,6 +1577,7 @@ class UHFQC_input_average_detector(Hard_Detector):
         self.UHFQC.awgs_0_enable(1)
         temp = self.UHFQC.awgs_0_enable()  #probing the values to be sure communication is finished before starting AWG
         temp = self.UHFQC.awgs_0_single()
+        del temp
         if self.AWG is not None:
             self.AWG.start()
         while self.UHFQC.awgs_0_enable() == 1:
@@ -1707,6 +1708,7 @@ class UHFQC_integration_logging_det(Hard_Detector):
         self.UHFQC.awgs_0_enable(1)
         temp = self.UHFQC.awgs_0_enable()  #probing the values to be sure communication is finished before starting AWG
         temp = self.UHFQC.awgs_0_single()
+        del temp
         if self.AWG is not None:
             self.AWG.start()
         while self.UHFQC.awgs_0_enable() == 1:

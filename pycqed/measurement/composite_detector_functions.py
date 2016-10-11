@@ -558,7 +558,8 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
                 transient1_I=dataset[0]['vector']
                 dataset = self.UHFQC.quex_iavg_data_1()
                 transient1_Q=dataset[0]['vector']
-
+                print("transients_I", transient1_I)
+                print("transients_Q", transient1_Q)
                 optimized_weights_I = (transient1_I-transient0_I)
                 optimized_weights_I = optimized_weights_I-np.mean(optimized_weights_I)
                 weight_scale_factor = 1./np.max(np.abs(optimized_weights_I))
@@ -950,7 +951,7 @@ class CBox_RB_detector(det.Soft_Detector):
 
 class Chevron_optimization_v1(det.Soft_Detector):
     '''
-
+    Chevron optimization.
     '''
     def __init__(self, flux_channel, dist_dict, AWG, MC_nested, qubit,
                  kernel_obj, cost_function_opt=0, **kw):
@@ -1000,11 +1001,11 @@ class Chevron_optimization_v1(det.Soft_Detector):
                                    MC=self.MC_nested)
 
         # # fit it
-        ma_obj = ma.chevron_optimization_v1(auto=True, label='Chevron_slice',
-                                            cost_function=self.cost_function_opt)
+        ma_obj = ma.chevron_optimization_v2(auto=True, label='Chevron_slice')
+        cost_val = ma_obj.cost_value[self.cost_function_opt]
 
         # # Return the cost function sum(min)+sum(1-max)
-        return ma_obj.cost_value,0.5*ma_obj.period
+        return cost_val, 0.5*ma_obj.period
 
 
 

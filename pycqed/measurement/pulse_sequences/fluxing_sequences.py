@@ -214,9 +214,10 @@ def preload_kernels_func(distortion_dict):
     output_dict = {ch: [] for ch in distortion_dict['ch_list']}
     for ch in distortion_dict['ch_list']:
         for kernel in distortion_dict[ch]:
-            print('Loading {}'.format(kernel_dir_path+kernel))
-            # print(os.path.isfile('kernels/'+kernel))
-            output_dict[ch].append(np.loadtxt(kernel_dir_path+kernel))
+            if kernel is not '':
+                print('Loading {}'.format(kernel_dir_path+kernel))
+                # print(os.path.isfile('kernels/'+kernel))
+                output_dict[ch].append(np.loadtxt(kernel_dir_path+kernel))
     return output_dict
 
 

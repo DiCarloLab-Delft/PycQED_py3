@@ -16,7 +16,7 @@ from pycqed.analysis.tools import data_manipulation as dm_tools
 import imp
 import math
 from math import erfc
-from scipy.signal import argrelextrema
+from scipy.signal import argrelextrema,argrelmax,argrelmin
 imp.reload(dm_tools)
 
 
@@ -933,6 +933,119 @@ class chevron_optimization_v1(TD_Analysis):
             # print(sum_max)
 
         return sum_max+sum_min
+
+class chevron_optimization_v2(TD_Analysis):
+    def __init__(self, NoCalPoints=4, center_point=31, make_fig=True,
+                 zero_coord=None, one_coord=None, cal_points=None,
+                 plot_cal_points=True, **kw):
+        super(chevron_optimization_v2, self).__init__(**kw)
+
+    def run_default_analysis(self,
+                             close_main_fig=True,  **kw):
+        super(chevron_optimization_v2, self).run_default_analysis(**kw)
+        measured_values = a_tools.normalize_data_v3(self.measured_values[0])
+        self.cost_value_1, self.period = self.sum_cost(self.sweep_points*1e9,
+                                                       measured_values)
+        self.cost_value_2 = self.swap_cost(self.sweep_points*1e9,
+                                           measured_values)
+        self.cost_value = [self.cost_value_1, self.cost_value_2]
+
+        fig, ax = plt.subplots(1, figsize=(8, 6))
+
+        min_idx, max_idx = self.return_max_min(self.sweep_points*1e9,
+                                               measured_values, 1)
+        ax.plot(self.sweep_points*1e9, measured_values, 'b-')
+        ax.plot(self.sweep_points[min_idx]*1e9, measured_values[min_idx], 'r*')
+        ax.plot(self.sweep_points[max_idx]*1e9, measured_values[max_idx], 'g*')
+        ax.plot(self.period*0.5, self.cost_value_2, 'b*', label='SWAP cost')
+        ax.set_ylim(-0.05, 1.05)
+        ax.text(35, 0.05, r'%.3f'%(self.cost_value_1), color='red')
+        ax.xaxis.label.set_fontsize(13)
+        ax.yaxis.label.set_fontsize(13)
+        ax.set_xlabel('Time (ns)')
+        ax.set_ylabel(r'$F |1\rangle$')
+
+        ax.set_title('%s: Chevorn slice: Cost functions'%self.timestamp_string)
+
+        self.save_fig(fig, fig_tight=False, **kw)
+
+    def analysis_on_fig(self, ax):
+        measured_values = a_tools.normalize_data_v3(self.measured_values[0])
+        self.cost_value_1, self.period = self.sum_cost(self.sweep_points*1e9,
+                                                       measured_values)
+        self.cost_value_2 = self.swap_cost(self.sweep_points*1e9,
+                                           measured_values)
+        self.cost_value = [self.cost_value_1, self.cost_value_2]
+
+        min_idx, max_idx = self.return_max_min(self.sweep_points*1e9,
+                                               measured_values, 1)
+        ax.plot(self.sweep_points*1e9, measured_values, 'b-')
+        ax.plot(self.sweep_points[min_idx]*1e9, measured_values[min_idx], 'r*')
+        ax.plot(self.sweep_points[max_idx]*1e9, measured_values[max_idx], 'g*')
+        ax.plot(self.period*0.5, self.cost_value_2, 'b*', label='SWAP cost')
+        ax.set_ylim(-0.05, 1.05)
+        ax.text(35, 0.05, r'%.3f'%(self.cost_value_1), color='red')
+        ax.xaxis.label.set_fontsize(13)
+        ax.yaxis.label.set_fontsize(13)
+        ax.set_xlabel('Time (ns)')
+        ax.set_ylabel(r'$F |1\rangle$')
+
+        ax.set_title('%s: Chevorn slice: Cost functions'%self.timestamp_string)
+
+
+    def return_max_min(self, data_x, data_y, window):
+        x_points = data_x[:-4]
+        y_points = a_tools.smooth(data_y[:-4],window_len=window)
+        return argrelmin(y_points), argrelmax(y_points)
+
+    def get_period(self, min_array, max_array):
+        all_toghether = np.concatenate((min_array, max_array))
+        sorted_vec = np.sort(all_toghether)
+        diff = sorted_vec[1:] - sorted_vec[:-1]
+        avg = np.mean(diff)
+        std = np.std(diff)
+        diff_filtered = np.where(np.abs(diff-avg)<std, diff, np.nan)
+        diff_filtered = diff_filtered[~np.isnan(diff_filtered)]
+    #     diff_filtered = diff
+        return 2.*np.mean(diff_filtered), np.std(diff_filtered)
+
+    def spec_power(self, data_x, data_y):
+        x_points = data_x[:-4]
+        y_points = data_y[:-4]
+        min_idx, max_idx = self.return_max_min(data_x, data_y, 1)
+        period, st = self.get_period(data_x[min_idx], data_x[max_idx])
+        f = 1./period
+
+        output_fft = np.real_if_close(np.fft.rfft(y_points))
+        ax_fft = np.fft.rfftfreq(len(y_points),
+                                 d=x_points[1]-x_points[0])
+        order_mask = np.argsort(ax_fft)
+        y = output_fft[order_mask]
+        y = y/np.sum(np.abs(y))
+        return -np.interp(f,ax_fft,np.abs(y))
+
+    def sum_cost(self, data_x, data_y):
+        x_points = data_x[:-4]
+        y_points = data_y[:-4]
+        min_idx, max_idx = self.return_max_min(data_x, data_y, 4)
+        period, st = self.get_period(data_x[min_idx], data_x[max_idx])
+        num_periods = np.floor(x_points[-1]/period)
+
+        sum_min = 0.
+        for i in range(int(num_periods)):
+            sum_min += np.interp((i+0.5)*period, x_points, y_points)
+        sum_max = 0.
+        for i in range(int(num_periods)):
+            sum_max += 1.-np.interp(i*period, x_points, y_points)
+
+        return sum_max+sum_min, period
+
+    def swap_cost(self, data_x, data_y):
+        x_points = data_x[:-4]
+        y_points = data_y[:-4]
+        min_idx, max_idx = self.return_max_min(data_x, data_y, 4)
+        period, st = self.get_period(data_x[min_idx], data_x[max_idx])
+        return np.interp(period*0.5, x_points, y_points)
 
 class Rabi_Analysis(TD_Analysis):
     def __init__(self, label='Rabi', **kw):
