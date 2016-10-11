@@ -683,6 +683,8 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
             current_threshold=None,
             close_fig=close_fig,
             plot_2D_histograms=True)
+
+
         # the, run it a second time to determin the optimum threshold along the
         # rotated I axis
         b = ma.SSRO_discrimination_analysis(

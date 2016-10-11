@@ -42,7 +42,8 @@ from pycqed.measurement import CBox_sweep_functions as cb_swf
 from pycqed.measurement.optimization import nelder_mead
 from pycqed.analysis import measurement_analysis as ma
 from pycqed.analysis import analysis_toolbox as a_tools
-
+from pycqed.measurement import awg_sweep_functions_multi_qubit as awg_swf_m
+from pycqed.measurement.pulse_sequences import multi_qubit_tek_seq_elts as sq_m
 
 
 from pycqed.utilities import general as gen

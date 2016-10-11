@@ -1108,6 +1108,30 @@ class Rabi_Analysis(TD_Analysis):
             self.save_fitted_parameters(fit_res=self.fit_res[i],
                                         var_name=self.value_names[i])
 
+class TD_UHFQC(TD_Analysis):
+    def __init__(self, NoCalPoints=4, center_point=31, make_fig=True,
+                 zero_coord=None, one_coord=None, cal_points=None,
+                 plot_cal_points=True, **kw):
+        super(TD_UHFQC, self).__init__(**kw)
+
+    def run_default_analysis(self,
+                             close_main_fig=True,  **kw):
+        super(TD_UHFQC, self).run_default_analysis(**kw)
+        measured_values = a_tools.normalize_data_v3(self.measured_values[0])
+
+        fig, ax = plt.subplots(1, figsize=(8, 6))
+
+        ax.plot(self.sweep_points*1e9, measured_values, '-o')
+        ax.set_ylim(-0.05, 1.05)
+        ax.xaxis.label.set_fontsize(13)
+        ax.yaxis.label.set_fontsize(13)
+        ax.set_xlabel('Time (ns)')
+        ax.set_ylabel(r'$F |1\rangle$')
+
+        ax.set_title('%s: TD Scan'%self.timestamp_string)
+
+        self.save_fig(fig, fig_tight=False, **kw)
+
 
 class Echo_analysis(TD_Analysis):
 
