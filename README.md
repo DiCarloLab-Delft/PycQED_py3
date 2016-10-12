@@ -56,6 +56,8 @@ from init.your_initscript import *
 
 You are now ready to start your experiment.
 
+If you use this software in any of your publications we would appreciate it if you cite this repository using the [![DOI](https://zenodo.org/badge/49057179.svg)](https://zenodo.org/badge/latestdoi/49057179). 
+
 ## Overview of the main modules
 Below follows an overview of the main structure of the code. It makes sense to take a look around here if your are new to get a feeling where to find things.
 Also take a look at [this presentation](docs/160714_qcodes_meetup.pdf), where the relation to qcodes and the core concepts in the package are explained.
