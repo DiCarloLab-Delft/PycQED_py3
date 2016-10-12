@@ -8,7 +8,8 @@ from qcodes.instrument.parameter import ManualParameter
 from measurement.kernel_functions import kernel_generic, htilde_bounce, \
     htilde_skineffect, save_kernel, step_bounce, step_skineffect
 
-def bounce_kernel(amp=0.02,time=4,length=601):
+
+def bounce_kernel(amp=0.02, time=4, length=601):
     """
     Generates a bounce kernel, with the specified parameters.
 
@@ -28,6 +29,7 @@ def bounce_kernel(amp=0.02,time=4,length=601):
     return kernel_bounce
 # save_kernel(kernel_bounce, save_file='kernel_bounce_%.3f_%d'%tuple(bounce_pairs[0]))
 
+
 def decay_kernel(amp=1., tau=11000, length=20000):
     """
     Generates a decay kernel, with the specified parameters
@@ -43,6 +45,7 @@ def decay_kernel(amp=1., tau=11000, length=20000):
     return decay_kernel
 # save_kernel(decay_kernel, save_file='kernel_fridge_slow1_160212')
 
+
 def skin_kernel(alpha=0., length=601):
     """
     Generates a skin effect kernel, with the specified parameters
@@ -56,12 +59,14 @@ def skin_kernel(alpha=0., length=601):
     skineffect_kernel_step = step_skineffect(t_kernel, alpha)
     kernel_skineffect = np.zeros(skineffect_kernel_step.shape)
     kernel_skineffect[0] = skineffect_kernel_step[0]
-    kernel_skineffect[1:] = skineffect_kernel_step[1:]-skineffect_kernel_step[:-1]
+    kernel_skineffect[1:] = skineffect_kernel_step[
+        1:]-skineffect_kernel_step[:-1]
     kernel_skineffect /= np.sum(kernel_skineffect)
     return kernel_skineffect
 # save_kernel(kernel_skineffect, save_file='kernel_skineffect_%.1f'%(alpha))
 
-def poly_kernel(a=0,b=11000,c=0, length=30000):
+
+def poly_kernel(a=0, b=11000, c=0, length=30000):
     """
     Generates a polynomial kernel(like the one used for bias-tee), with the specified parameters
 
@@ -74,12 +79,15 @@ def poly_kernel(a=0,b=11000,c=0, length=30000):
     return kernel_poly
 # save_kernel(kernel_skineffect, save_file='kernel_skineffect_%.1f'%(alpha))
 
+
 class Distortion(Instrument):
+
     '''
     Implements a distortion kernel for a flux channel.
     It contains the parameters and functions needed to produce a kernel file
     according to the models shown in the functions.
     '''
+
     def __init__(self, name, **kw):
         super().__init__(name, **kw)
         self.add_parameter('skineffect_alpha', units='',
@@ -159,7 +167,7 @@ class Distortion(Instrument):
             return self.convolve_kernel(kernel_list,
                                         length=self.corrections_length())
 
-    def save_corrections_kernel(self,filename,kernel_list_before=None):
+    def save_corrections_kernel(self, filename, kernel_list_before=None):
         if type(kernel_list_before) is not list:
             kernel_list_before = [kernel_list_before]
         save_kernel(self.get_corrections_kernel(kernel_list_before),
