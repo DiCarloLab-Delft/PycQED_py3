@@ -36,7 +36,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
     '''
     Setup configuration:
         Drive:                 Tektronix 5014 AWG
-        Acquisition:           CBox
+        Acquisition:           CBox or UHFQC
             (in the future to be compatible with both CBox and ATS)
 
     Readout pulse configuration:
@@ -216,11 +216,13 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
     def prepare_for_continuous_wave(self):
         # makes sure the settings of the acquisition instrument are reloaded
         self.acquisition_instr(self.acquisition_instr())
+        self.heterodyne_instr.acquisition_instr(self.acquisition_instr()) 
         # Heterodyne tone configuration
         if not self.f_RO():
             RO_freq = self.f_res()
         else:
             RO_freq = self.f_RO()
+        
         self.heterodyne_instr._disable_auto_seq_loading = False
 
         self.heterodyne_instr.RF.on()
@@ -233,6 +235,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         self.heterodyne_instr.frequency.set(RO_freq)
         self.heterodyne_instr.RF.power(self.RO_power_cw())
         self.heterodyne_instr.RF_power(self.RO_power_cw())
+        self.heterodyne_instr.nr_averages(self.RO_acq_averages())
 
         # Turning of TD source
         self.td_source.off()
@@ -245,6 +248,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
             self.cw_source.pulsemod_state('off')
         if hasattr(self.rf_RO_source, 'pulsemod_state'):
             self.rf_RO_source.pulsemod_state('Off')
+
 
     def prepare_for_pulsed_spec(self):
         # TODO: fix prepare for pulsed spec
