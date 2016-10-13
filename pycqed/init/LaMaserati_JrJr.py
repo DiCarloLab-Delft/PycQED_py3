@@ -229,8 +229,8 @@ def print_instr_params(instr):
 from scripts.Experiments.FiveQubits import common_functions as cfct
 cfct.set_AWG_limits(station,1.7)
 
-q0=AncT
-q1=DataT
+q0 = AncT
+q1 = DataT
 
 def switch_to_pulsed_RO_CBox(qubit):
     UHFQC_1.AWG_file('traditional.seqc')

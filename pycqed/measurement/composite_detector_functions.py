@@ -587,6 +587,13 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
                     eval('self.UHFQC.quex_rot_{}_imag(0.0)'.format(self.weight_function_I))
                     eval('self.UHFQC.quex_rot_{}_real(0.0)'.format(self.weight_function_Q))
                     eval('self.UHFQC.quex_rot_{}_imag(0.0)'.format(self.weight_function_Q))
+
+                eval('self.UHFQC.quex_wint_weights_{}_real()'.format(self.weight_function_I)) #disabling the other weight fucntions
+                eval('self.UHFQC.quex_wint_weights_{}_imag()'.format(self.weight_function_I)) #disabling the other weight fucntions
+                eval('self.UHFQC.quex_wint_weights_{}_real()'.format(self.weight_function_Q)) #disabling the other weight fucntions
+                eval('self.UHFQC.quex_wint_weights_{}_imag()'.format(self.weight_function_Q)) #disabling the other weight fucntions
+
+
                 self.MC.set_sweep_function(awg_swf.OffOn(
                                            pulse_pars=self.pulse_pars,
                                            RO_pars=self.RO_pars))

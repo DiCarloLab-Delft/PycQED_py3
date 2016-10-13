@@ -44,7 +44,7 @@ def show_element_dclab(element, delay=True, channels='all', axs=None):
     axs.set_xlim(t_vals.min(),t_vals.max())
 
     axs.legend(loc='best')
-    return fig, axs
+    return  axs
 
 
 def show_wf(tvals, wf, name='', ax=None, ret=None, dt=None):

@@ -236,6 +236,7 @@ def BusT1(times, mw_pulse_pars, RO_pars, flux_pulse_pars=None,
                                                          mw_pulse_pars['nr_sigma'])
 
         flux_pulse_pars_2 = deepcopy(flux_pulse_pars)
+        # flux_pulse_pars_2['amplitude'] = 0.
         flux_pulse_pars_2['pulse_delay'] = tt + flux_pulse_pars['length']
 
         msmt_buffer = 50e-9
@@ -251,7 +252,7 @@ def BusT1(times, mw_pulse_pars, RO_pars, flux_pulse_pars=None,
                       RO_pars, minus_flux_pulse_pars, minus_flux_pulse_pars_2]
 
         #This ensures fixed point
-        pulse_list[0]['pulse_delay'] += 0.01e-6 + ((-int(tt*1e9)) % 50)*1e-9
+        pulse_list[0]['pulse_delay'] += 0.01e-6#+ ((-int(tt*1e9)) % 50)*1e-9
 
         el = multi_pulse_elt(i, station, pulse_list)
         el_list.append(el)

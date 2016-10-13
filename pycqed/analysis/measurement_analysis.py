@@ -5129,6 +5129,7 @@ class butterfly_analysis(MeasurementAnalysis):
     def __init__(self,  auto=True, label='Butterfly', close_file=True,
                  timestamp=None,
                  threshold=None,
+                 threshold_init=None,
                  theta_in=0,
                  initialize=False,
                 digitize=True,
@@ -5149,7 +5150,11 @@ class butterfly_analysis(MeasurementAnalysis):
 
         # if close_file:
         #     self.data_file.close()
+
         if initialize:
+            if threshold_init==None:
+                threshold_init=threshold
+
             #reshuffeling the data to endup with two arrays for the diffeent input states
             shots=np.size(self.data)
             shots_per_mmt = np.floor_divide(shots,6)
@@ -5168,10 +5173,10 @@ class butterfly_analysis(MeasurementAnalysis):
             self.data_exc[:,0] = m0_off
             self.data_exc[:,1] = m1_off
             self.data_exc[:,2] = m2_off
-            self.data_exc = dm_tools.postselect(threshold=threshold,
+            self.data_exc = dm_tools.postselect(threshold=threshold_init,
                                               data=self.data_exc,
                                               positive_case=case)
-            self.data_rel = dm_tools.postselect(threshold=threshold,
+            self.data_rel = dm_tools.postselect(threshold=threshold_init,
                                               data=self.data_rel,
                                               positive_case=case)
             self.data_exc_post = self.data_exc[:,1:]
