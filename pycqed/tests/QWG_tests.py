@@ -1,6 +1,6 @@
 #!/usr/bin/python
 import unittest
-from instrument_drivers.physical_instruments.QuTech_AWG_Module \
+from pycqed.instrument_drivers.physical_instruments.QuTech_AWG_Module \
     import QuTech_AWG_Module
 from pycqed.measurement.waveform_control_CC.waveform import Waveform
 import time

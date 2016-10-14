@@ -1,7 +1,7 @@
 
 #!/usr/bin/python
 import unittest
-from instrument_drivers.physical_instruments.QuTech_AWG_Module \
+from pycqed.instrument_drivers.physical_instruments.QuTech_AWG_Module \
     import QuTech_AWG_Module
 from pycqed.measurement.waveform_control_CC.waveform import Waveform
 import time
@@ -35,14 +35,12 @@ wvDerivGauss2 = Waveform.derivGauss(fs, sampleCnt, mu2, sigma2, dirAmpl2)
 marker1 = []
 marker2 = []
 
-
-# if 1:
-# qwg1 = QuTech_AWG_Module('QWG-1', '192.168.42.10', 5025, server_name=None)
-# else:
-#     # local variant, in combination with 'nc -l 5025' run locally from a
-#     # terminal
-#     qwg1 = QuTech_AWG_Module('QWG-1', '127.0.0.1', 5025, server_name=None)
-qwg1 = QWG
+try:
+    qwg1 = QWG
+except:
+    qwg1 = QuTech_AWG_Module(
+        'QWG', address='192.168.42.10',
+        port=5025, server_name=None)
 qwg1.reset()
 
 if __name__ == '__main__':
@@ -150,6 +148,7 @@ if __name__ == '__main__':
     print('WLIST size: ', wlistSize)
     print('WLIST: ', qwg1.Wlist())
 
+    wvCosReadBack = qwg1.getWaveformData('cos')
 
     print('Identity: ', qwg1.getIdentity())
     print('Error messages: ')
