@@ -15,7 +15,7 @@ from pycqed.measurement import sweep_functions as swf
 from pycqed.measurement import awg_sweep_functions as awg_swf
 from pycqed.analysis import measurement_analysis as ma
 from pycqed.measurement.pulse_sequences import standard_sequences as st_seqs
-
+from analysis import fitting_models as fit_mods
 
 class Qubit(Instrument):
     '''
@@ -117,12 +117,20 @@ class Transmon(Qubit):
                            parameter_class=ManualParameter)
         self.add_parameter('dac_sweet_spot', units='mV',
                            parameter_class=ManualParameter)
+        self.add_parameter('E_c', units='Hz',
+                           parameter_class=ManualParameter)
+        self.add_parameter('dac_flux_coefficient', units='',
+                           parameter_class=ManualParameter)
+        self.add_parameter('asymmetry', units='',
+                           parameter_class=ManualParameter)
         self.add_parameter('dac_channel', vals=vals.Ints(),
                            parameter_class=ManualParameter)
         self.add_parameter('flux',
                            parameter_class=ManualParameter)
 
         self.add_parameter('f_qubit', label='qubit frequency', units='Hz',
+                           parameter_class=ManualParameter)
+        self.add_parameter('f_max', label='qubit frequency', units='Hz',
                            parameter_class=ManualParameter)
         self.add_parameter('f_res', label='resonator frequency', units='Hz',
                            parameter_class=ManualParameter)
@@ -144,6 +152,12 @@ class Transmon(Qubit):
         # Time between start of pulses
         self.add_parameter('pulse_delay', units='s',
                            parameter_class=ManualParameter)
+
+        self.add_parameter('f_qubit_calc', vals=vals.Enum(None, 'dac', 'flux'),
+                           # in the future add 'tracked_dac', 'tracked_flux',
+                           parameter_class=ManualParameter)
+
+
 
     def calculate_frequency(self, EC=None, EJ=None, assymetry=None,
                             dac_voltage=None, flux=None,
@@ -195,11 +209,23 @@ class Transmon(Qubit):
         if method.lower() == 'spectroscopy':
             if freqs is None:
                 # If not specified it should specify wether to use the last
-                # known one or wether to calculate and how (maybe not in this
-                # function?)
-                freqs = np.arange(self.f_qubit.get()-f_span/2,
-                                  self.f_qubit.get()+f_span/2,
-                                  f_step)
+                # known one or wether to calculate and how
+                if self.f_qubit_calc() is None:
+                    freqs = np.arange(self.f_qubit.get()-f_span/2,
+                                      self.f_qubit.get()+f_span/2,
+                                      f_step)
+                elif self.f_qubit_calc() is 'dac':
+                    f_pred = fit_mods.QubitFreqDac(dac_voltage=self.IVVI.get('dac%d'%self.dac_channel()),
+                                                   f_max=self.f_max()*1e-9,
+                                                   E_c=self.E_c()*1e-9,
+                                                   dac_sweet_spot=self.dac_sweet_spot(),
+                                                   dac_flux_coefficient=self.dac_flux_coefficient(),
+                                                   asymmetry=self.asymmetry())*1e9
+                    freqs = np.arange(f_pred-f_span/2,
+                                      f_pred+f_span/2,
+                                      f_step)
+                elif self.f_qubit_calc() is 'flux':
+                    raise ValueError('Not Implemented yet.')
             # args here should be handed down from the top.
             self.measure_spectroscopy(freqs, pulsed=pulsed, MC=None,
                                       analyze=True, close_fig=close_fig, use_max=use_max, update=update)
