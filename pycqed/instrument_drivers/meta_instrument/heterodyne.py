@@ -177,6 +177,7 @@ class HeterodyneInstrument(Instrument):
             'COMP' : returns data as a complex point in the I-Q plane in Volts
         '''
         if 'CBox' in self.acquisition_instr():
+            t0 = time.time()
             self._acquisition_instr.set('acquisition_mode', 'idle')
             self._acquisition_instr.set('acquisition_mode', 'integration averaging')
             self._acquisition_instr.demodulation_mode(demodulation_mode)
@@ -190,13 +191,17 @@ class HeterodyneInstrument(Instrument):
             d = np.double(self._acquisition_instr.get_integrated_avg_results())*np.double(factor)
             # print(np.size(d))
             dat = d[0][0]+1j*d[1][0]
+            t1 = time.time()
+            print("time for CBox polling", t1-t0)
         elif 'UHFQC' in self.acquisition_instr():
+            t0 = time.time()
             self._acquisition_instr.awgs_0_single(1)
             self._acquisition_instr.awgs_0_enable(1)
             temp = self._acquisition_instr.awgs_0_enable()  #probing the values to be sure communication is finished before starting AWG
             temp = self._acquisition_instr.awgs_0_single()
             del temp
             # self.AWG.start()
+
             while self._acquisition_instr.awgs_0_enable() == 1:
                 time.sleep(0.01)
             time.sleep(0.2)
@@ -207,6 +212,8 @@ class HeterodyneInstrument(Instrument):
                 data[i] = dataset[0]['vector']
             print(np.size(data))
             dat=data[0]+1j*data[1]
+            t1 = time.time()
+            print("time for UHFQC polling", t1-t0)
         return dat
 
 
