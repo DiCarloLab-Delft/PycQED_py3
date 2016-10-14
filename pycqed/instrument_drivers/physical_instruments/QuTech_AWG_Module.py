@@ -282,10 +282,11 @@ class QuTech_AWG_Module(SCPI):
         self.write('wlist:waveform:data? "%s"' % name)
         binBlock = self.binBlockRead()
         # extract waveform and markers
-        waveformLen = len(binBlock)/5   # 5 bytes per record
-        waveform = []
-        marker1 = []
-        marker2 = []
+        waveformLen = int(len(binBlock)/5)   # 5 bytes per record
+        waveform = np.array(range(waveformLen))
+        marker1 = np.array(range(waveformLen))
+        marker2 = np.array(range(waveformLen))
+        markers = b''
         for k in range(waveformLen):
             (waveform[k], markers) = struct.unpack(binBlock, '<fB')
             marker1[k] = markers & 0x01
@@ -386,8 +387,8 @@ class QuTech_AWG_Module(SCPI):
         def set_func(val):
             return fun(ch, val)
         return set_func
+
     def _gen_ch_get_func(self, fun, ch):
         def get_func():
             return fun(ch)
         return get_func
-
