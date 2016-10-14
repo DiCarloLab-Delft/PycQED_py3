@@ -268,31 +268,26 @@ class QuTech_AWG_Module(SCPI):
         '''
         self.write('wlist:waveform:new "%s",%d,real' % (name, len))
 
-    def getWaveformData(self, name):
+    def getWaveformDataFloat(self, name):
         '''
         Args:
             name (string):  waveform name excluding double quotes, e.g.
             '*Sine100'
 
         Returns:
-            tuple containing lists: (waveform, marker1, marker2)
+            waveform  (np.array of float): waveform data
 
-        Compatibility:  5014, QWG
+        Compatibility: QWG
         '''
         self.write('wlist:waveform:data? "%s"' % name)
         binBlock = self.binBlockRead()
-        # extract waveform and markers
-        waveformLen = int(len(binBlock)/5)   # 5 bytes per record
-        waveform = np.array(range(waveformLen))
-        marker1 = np.array(range(waveformLen))
-        marker2 = np.array(range(waveformLen))
-        markers = b''
+        # extract waveform
+        waveformLen = int(len(binBlock)/4)   # 4 bytes per record
+        waveform = np.array(range(waveformLen), dtype=float)
         for k in range(waveformLen):
-            (waveform[k], markers) = struct.unpack(binBlock, '<fB')
-            marker1[k] = markers & 0x01
-            marker2[k] = markers >> 1 & 0x01
-
-        return (waveform, marker1, marker2)
+            val = struct.unpack_from('<f', binBlock, k*4)  # FIXME: use array?
+            waveform[k] = val[0]
+        return waveform
 
     def sendWaveformDataReal(self, name, waveform, marker1, marker2):
         """

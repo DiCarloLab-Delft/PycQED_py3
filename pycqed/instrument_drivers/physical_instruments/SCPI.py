@@ -33,6 +33,7 @@ class SCPI(IPInstrument):
     def _recv(self):
         """
         Overwrites base IP recv command to ensuring read till EOM
+        FIXME: should be in parent class
         """
         return self._socket.makefile().readline().rstrip()
     ###
@@ -40,7 +41,10 @@ class SCPI(IPInstrument):
     ###
 
     def readBinary(self, size):
-        return self._socket.recv(size)
+        return self._socket.recv(size)  # FIXME: should be in parent class
+
+    def writeBinary(self, binMsg):
+        self._socket.send(binMsg)       # FIXME: should be in parent class
 
     def ask_float(self, str):
         return float(self.ask(str))
@@ -118,15 +122,17 @@ class SCPI(IPInstrument):
     ###
 
     def binBlockWrite(self, binBlock, header):
-        ''' write IEEE488.2 binblock
-                Input:
-                        binBlock    bytearray
-                        header      string
+        '''
+        write IEEE488.2 binblock
+
+        Args:
+            binBlock (bytearray): binary data to send
+
+            header (string): command string to use
         '''
         totHdr = header + SCPI.buildHeaderString(len(binBlock))
         binMsg = totHdr.encode() + binBlock
-#       self.writeBinary(binMsg)
-        self._socket.send(binMsg)       # FIXME: hack
+        self.writeBinary(binMsg)
         self.write('')                  # add a Line Terminator
 
     def binBlockRead(self):
@@ -138,8 +144,6 @@ class SCPI(IPInstrument):
         digitCnt = int(str(headerA[1]))
         headerB = self.readBinary(digitCnt)
         byteCnt = int(headerB.decode())
-
-        # get binblock
         binBlock = self.readBinary(byteCnt)
         self.readBinary(2)                                  # consume <CR><LF>
         return binBlock
@@ -152,14 +156,3 @@ class SCPI(IPInstrument):
         digitCntStr = str(len(byteCntStr))
         binHeaderStr = '#' + digitCntStr + byteCntStr
         return binHeaderStr
-
-    @staticmethod
-    def getByteCntFromHeader(headerStr):
-        ''' decode IEEE488.2 binblock header
-        '''
-        # FIXME: old Matlab code
-        digitCnt = sscanf(headerStr, '#%1d')
-        formatString = sprintf('%%%dd', digitCnt)           # e.g. '%3d'
-        # byteCnt = sscanf(headerStr(3:end), formatString)        # NB: skip
-        # first '#N'
-        return byteCnt

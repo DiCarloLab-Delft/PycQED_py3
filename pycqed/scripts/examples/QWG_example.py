@@ -8,6 +8,7 @@ import time
 import numpy as np
 from socket import timeout
 from qcodes.utils import validators as vals
+import matplotlib.pyplot as plt
 
 
 # create waveforms
@@ -132,7 +133,6 @@ if __name__ == '__main__':
 
         qwg1.setRunModeCodeword()
 
-
     qwg1.ch_pair1_sideband_frequency.set(100e6)
     qwg1.ch_pair3_sideband_frequency.set(100e6)
     qwg1.syncSidebandGenerators()
@@ -148,7 +148,10 @@ if __name__ == '__main__':
     print('WLIST size: ', wlistSize)
     print('WLIST: ', qwg1.Wlist())
 
-    wvCosReadBack = qwg1.getWaveformData('cos')
+    wvCosReadBack = qwg1.getWaveformDataFloat('cos')
+    plt.plot(wvCosReadBack)
+    plt.ylabel('cos')
+    plt.show()
 
     print('Identity: ', qwg1.getIdentity())
     print('Error messages: ')
