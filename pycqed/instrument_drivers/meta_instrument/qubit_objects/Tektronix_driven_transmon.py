@@ -216,13 +216,13 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
     def prepare_for_continuous_wave(self):
         # makes sure the settings of the acquisition instrument are reloaded
         self.acquisition_instr(self.acquisition_instr())
-        self.heterodyne_instr.acquisition_instr(self.acquisition_instr()) 
+        self.heterodyne_instr.acquisition_instr(self.acquisition_instr())
         # Heterodyne tone configuration
         if not self.f_RO():
             RO_freq = self.f_res()
         else:
             RO_freq = self.f_RO()
-        
+
         self.heterodyne_instr._disable_auto_seq_loading = False
 
         self.heterodyne_instr.RF.on()
@@ -417,7 +417,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                               self.heterodyne_instr.frequency))
         MC.set_sweep_points(freqs)
         MC.set_detector_function(
-            det.Heterodyne_probe(self.heterodyne_instr, trigger_separation=2.8e-6))
+            det.Heterodyne_probe(self.heterodyne_instr, trigger_separation=4e-6))
         MC.run(name='Resonator_scan'+self.msmt_suffix)
         if analyze:
             ma.MeasurementAnalysis(auto=True, close_fig=close_fig)

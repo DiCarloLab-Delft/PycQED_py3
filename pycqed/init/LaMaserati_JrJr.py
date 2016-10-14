@@ -108,7 +108,7 @@ station.add_component(ATT)
 # SH = sh.SignalHound_USB_SA124B('Signal hound', server_name=None) #commented because of 8s load time
 
 # Meta-instruments
-HS = hd.HeterodyneInstrument('HS', LO=LO, RF=RF, CBox=CBox, AWG=AWG,
+HS = hd.HeterodyneInstrument('HS', LO=LO, RF=RF, AWG=AWG, acquisition_instr=CBox.name,
                              server_name=None)
 station.add_component(HS)
 # LutMan = lm.QuTech_ControlBox_LookuptableManager('LutMan', CBox=CBox,
