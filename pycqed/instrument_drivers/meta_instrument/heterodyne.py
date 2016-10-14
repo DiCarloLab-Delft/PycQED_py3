@@ -177,7 +177,6 @@ class HeterodyneInstrument(Instrument):
             'COMP' : returns data as a complex point in the I-Q plane in Volts
         '''
         if 'CBox' in self.acquisition_instr():
-            t0 = time.time()
             self._acquisition_instr.set('acquisition_mode', 'idle')
             self._acquisition_instr.set('acquisition_mode', 'integration averaging')
             self._acquisition_instr.demodulation_mode(demodulation_mode)
@@ -191,8 +190,6 @@ class HeterodyneInstrument(Instrument):
             d = np.double(self._acquisition_instr.get_integrated_avg_results())*np.double(factor)
             # print(np.size(d))
             dat = d[0][0]+1j*d[1][0]
-            t1 = time.time()
-            print("time for CBox polling", t1-t0)
         elif 'UHFQC' in self.acquisition_instr():
             t0 = time.time()
             self._acquisition_instr.awgs_0_single(1)
