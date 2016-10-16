@@ -34,6 +34,17 @@ qamp = lambda vec: np.abs(vec[:, 1])**2
 
 
 def chevron(e0, emin, emax, n, g, t, dt, sf):
+    """
+    Inputs:
+            e0,     set energy scale at the center(detuning).
+            emin,   sets min energy to simulate, in e0 units.
+            emax,   sets max energy to simulate, in e0 units.
+            n,      sets number of points in energy array.
+            g,      Coupling parameter.
+            t,      Final time of the evolution.
+            dt,     Stepsize of the time evolution.
+            sf,     Step function of the distortion kernel.
+    """
     energy_func = lambda energy, t: e0*(1.-(energy*sf(t))**2)
     energy_vec = np.arange(1+emin, 1+emax, (emax-emin)/(n-1))
     chevron_vec = []
@@ -41,3 +52,17 @@ def chevron(e0, emin, emax, n, g, t, dt, sf):
         chevron_vec.append(
             qamp(rabisim(lambda t: energy_func(ee, t), g, t, dt)))
     return np.array(chevron_vec)
+
+
+def chevron_slice(e0, energy, g, t, dt, sf):
+    """
+    Inputs:
+            e0,     set energy scale at the center(detuning).
+            energy, energy of the slice to simulate, in e0 units.
+            g,      Coupling parameter.
+            t,      Final time of the evolution.
+            dt,     Stepsize of the time evolution.
+            sf,     Step function of the distortion kernel.
+    """
+    energy_func = lambda energy, t: e0*(1.-(energy*sf(t))**2)
+    return qamp(rabisim(lambda t: energy_func(energy, t), g, t, dt))
