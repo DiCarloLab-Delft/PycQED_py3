@@ -853,6 +853,23 @@ class Two_d_CBox_RB_seq(swf.Soft_Sweep):
         self.CBox_RB_sweepfunction.prepare(upload_tek_seq=False)
 
 
+class Load_Sequence_Tek(swf.Hard_Sweep):
+    def __init__(self, AWG, sequence_name, seq_elements, upload=True):
+        super().__init__()
+        self.sweep_points = seq_elements
+        self.len = len(seq_elements)
+        self.name = sequence_name
+        self.parameter_name = 'amplitude'
+        self.unit = 'V'
+        self.upload = upload
+        self.sequence_name = sequence_name
+        self.AWG = AWG
+
+    def prepare(self, **kw):
+        if self.upload:
+            self.AWG.set_setup_filename(self.sequence_name)
+
+
 
 
 # class PiHalfX360(AWG_Sweep):
