@@ -773,8 +773,8 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         #                                                                     nr_averages=nr_averages)
         flux_pulse_pars = {'pulse_type': 'SquarePulse',
                       'pulse_delay': .1e-6,
-                      'channel': 'ch3',
-                      'amplitude': .5,
+                      'channel': 'ch%d'%self.fluxing_channel,
+                      'amplitude': 0.5,
                       'length': 10e-6,
                       'dead_time_length': 10e-6}
 
