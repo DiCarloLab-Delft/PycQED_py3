@@ -73,8 +73,6 @@ class UHFQC(Instrument):
         for parameter in s_node_pars:
             parname=parameter[0].replace("/","_")
             parfunc="/"+device+"/"+parameter[0]
-            print(parfunc)
-            print(parname)
             if parameter[1]=='float':
                 self.add_parameter(
                     parname,
@@ -116,8 +114,6 @@ class UHFQC(Instrument):
         for parameter in d_node_pars:
             parname=parameter[0].replace("/","_")
             parfunc="/"+device+"/"+parameter[0]
-            print(parfunc)
-            print(parname)
             if parameter[1]=='float':
                 self.add_parameter(
                     parname,
@@ -391,8 +387,8 @@ class UHFQC(Instrument):
                 d_node_pars.append(line)
                 #json.dump(line, d_file, indent=2, default=int)
 
-        json.dump(s_node_pars, s_file, default=int, indent=2)
-        json.dump(d_node_pars, d_file, default=int, indent=2)
+        json.dump(s_node_pars[9:], s_file, default=int, indent=2)
+        json.dump(d_node_pars[9:], d_file, default=int, indent=2)
         s_file.close()
         d_file.close()
 
