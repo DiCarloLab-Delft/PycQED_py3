@@ -49,6 +49,7 @@ class UHFQC(Instrument):
         self._device = zi_utils.autoDetect(self._daq)
         s_node_pars=[]
         d_node_pars=[]
+        print(self._device)
 
         path = os.path.abspath(__file__)
         dir_path = os.path.dirname(path)
@@ -70,66 +71,71 @@ class UHFQC(Instrument):
             init=False
 
         for parameter in s_node_pars:
-            parname=parameter[0][9:].replace("/","_")
+            parname=parameter[0].replace("/","_")
+            parfunc="/"+device+"/"+parameter[0]
+            print(parfunc)
+            print(parname)
             if parameter[1]=='float':
                 self.add_parameter(
                     parname,
-                    set_cmd=self._gen_set_func(zis.setd, parameter[0]),
-                    get_cmd=self._gen_get_func(zis.getd, parameter[0]),
+                    set_cmd=self._gen_set_func(zis.setd, parfunc),
+                    get_cmd=self._gen_get_func(zis.getd, parfunc),
                     vals=vals.Numbers(parameter[2], parameter[3]))
             elif parameter[1]=='float_small':
                 self.add_parameter(
                     parname,
-                    set_cmd=self._gen_set_func(zis.setd, parameter[0]),
-                    get_cmd=self._gen_get_func(zis.getd, parameter[0]),
+                    set_cmd=self._gen_set_func(zis.setd, parfunc),
+                    get_cmd=self._gen_get_func(zis.getd, parfunc),
                     vals=vals.Numbers(parameter[2], parameter[3]))
             elif parameter[1]=='int_8bit':
                 self.add_parameter(
                     parname,
-                    set_cmd=self._gen_set_func(zis.seti, parameter[0]),
-                    get_cmd=self._gen_get_func(zis.geti, parameter[0]),
+                    set_cmd=self._gen_set_func(zis.seti, parfunc),
+                    get_cmd=self._gen_get_func(zis.geti, parfunc),
                     vals=vals.Ints(parameter[2], parameter[3]))
             elif parameter[1]=='int':
                 self.add_parameter(
                     parname,
-                    set_cmd=self._gen_set_func(zis.seti, parameter[0]),
-                    get_cmd=self._gen_get_func(zis.geti, parameter[0]),
+                    set_cmd=self._gen_set_func(zis.seti, parfunc),
+                    get_cmd=self._gen_get_func(zis.geti, parfunc),
                     vals=vals.Ints(parameter[2], parameter[3]))
             elif parameter[1]=='int_64':
                 self.add_parameter(
                     parname,
-                    set_cmd=self._gen_set_func(zis.seti, parameter[0]),
-                    get_cmd=self._gen_get_func(zis.geti, parameter[0]),
+                    set_cmd=self._gen_set_func(zis.seti, parfunc),
+                    get_cmd=self._gen_get_func(zis.geti, parfunc),
                     vals=vals.Ints(parameter[2], parameter[3]))
             elif parameter[1]=='bool':
                 self.add_parameter(
                     parname,
-                    set_cmd=self._gen_set_func(zis.seti, parameter[0]),
-                    get_cmd=self._gen_get_func(zis.geti, parameter[0]),
+                    set_cmd=self._gen_set_func(zis.seti, parfunc),
+                    get_cmd=self._gen_get_func(zis.geti, parfunc),
                     vals=vals.Ints(parameter[2], parameter[3]))
             else:
                 print("parameter {} type {} from from s_node_pars not recognized".format(parname,parameter[1]))
-
         for parameter in d_node_pars:
-            parname=parameter[0][9:].replace("/","_")
+            parname=parameter[0].replace("/","_")
+            parfunc="/"+device+"/"+parameter[0]
+            print(parfunc)
+            print(parname)
             if parameter[1]=='float':
                 self.add_parameter(
                     parname,
-                    get_cmd=self._gen_get_func(zis.getd, parameter[0]))
+                    get_cmd=self._gen_get_func(zis.getd, parfunc))
             elif parameter[1]=='vector_g':
                 self.add_parameter(
                     parname,
-                    get_cmd=self._gen_get_func(zis.getv, parameter[0]))
+                    get_cmd=self._gen_get_func(zis.getv, parfunc))
             elif parameter[1]=='vector_s':
                 self.add_parameter(
                     parname,
-                    set_cmd=self._gen_set_func(zis.setv, parameter[0]),
+                    set_cmd=self._gen_set_func(zis.setv, parfunc),
                     vals=vals.Anything())
             elif parameter[1]=='vector_gs':
                 self.add_parameter(
                     parname,
-                    set_cmd=self._gen_set_func(zis.setv, parameter[0]),
-                    get_cmd=self._gen_get_func(zis.getv, parameter[0]),
+                    set_cmd=self._gen_set_func(zis.setv, parfunc),
+                    get_cmd=self._gen_get_func(zis.getv, parfunc),
                     vals=vals.Anything())
             else:
                 print("parameter {} type {} from d_node_pars not recognized".format(parname,parameter[1]))
@@ -252,7 +258,7 @@ class UHFQC(Instrument):
     def _do_set_AWG_file(self, filename):
         zis.awg(filename)
 
-        # code to upload AWG sequence as a string
+        #code to upload AWG sequence as a string
         # def awg(self, filename):
         #         for device in self._devices:
         #             h = self.daq.awgModule()
@@ -261,19 +267,19 @@ class UHFQC(Instrument):
         #             h.execute()
         #             h.set('awgModule/compiler/sourcefile', filename)
         #             h.set('awgModule/compiler/start', 1)
-        #             h.set('awgModule/elf/file', '’)
+        #             h.set('awgModule/elf/file', '')
 
         # Now, if you would change it to:
 
-        #  def awg(self, sourcestring):
-        #         for device in self._devices:
-        #             h = self.daq.awgModule()
-        #             h.set('awgModule/device', device)
-        #             h.set('awgModule/index', 0)
-        #             h.execute()
-        #             h.set('awgModule/compiler/sourcestring', sourcestring)
-        #             h.set('awgModule/compiler/start', 1)
-        #             h.set('awgModule/elf/file', '’)
+         # def awg(self, sourcestring):
+         #        for device in self._devices:
+         #            h = self.daq.awgModule()
+         #            h.set('awgModule/device', device)
+         #            h.set('awgModule/index', 0)
+         #            h.execute()
+         #            h.set('awgModule/compiler/sourcestring', sourcestring)
+         #            h.set('awgModule/compiler/start', 1)
+         #            h.set('awgModule/elf/file', '')
 
     def close(self):
         self._daq.disconnectDevice(self._device)
@@ -390,33 +396,33 @@ class UHFQC(Instrument):
         s_file.close()
         d_file.close()
 
-    def prepare_SSB_weight_and_rotation(self, IF,  weight_function_I=0, weight_function_Q=1):
+    def prepare_SSB_weight_and_rotation(self, IF):
         trace_length = 4096
         tbase = np.arange(0, trace_length/1.8e9, 1/1.8e9)
-        cosI = np.array(np.cos(2*np.pi*IF*tbase))
-        sinI = np.array(np.sin(2*np.pi*IF*tbase))
-        eval('self.quex_wint_weights_{}_real(np.array(cosI))'.format(weight_function_I))
-        eval('self.quex_wint_weights_{}_imag(np.array(sinI))'.format(weight_function_I))
-        eval('self.quex_wint_weights_{}_real(np.array(sinI))'.format(weight_function_Q))
-        eval('self.quex_wint_weights_{}_real(np.array(cosI))'.format(weight_function_Q))
-        eval('self.quex_rot_{}_real(1.0)'.format(weight_function_I))
-        eval('self.quex_rot_{}_imag(1.0)'.format(weight_function_I))
-        eval('self.quex_rot_{}_real(1.0)'.format(weight_function_Q))
-        eval('self.quex_rot_{}_imag(-1.0)'.format(weight_function_Q))
+        cosI = np.cos(2*np.pi*IF*tbase)
+        sinI = np.sin(2*np.pi*IF*tbase)
+        self.quex_wint_weights_0_real(np.array(cosI))
+        self.quex_wint_weights_0_imag(np.array(sinI))
+        self.quex_wint_weights_1_real(np.array(sinI))
+        self.quex_wint_weights_1_imag(np.array(cosI))
+        self.quex_rot_0_real(1.0)
+        self.quex_rot_0_imag(1.0)
+        self.quex_rot_1_real(1.0)
+        self.quex_rot_1_imag(-1.0)
 
-    def prepare_DSB_weight_and_rotation(self, IF, weight_function_I=0, weight_function_Q=1):
+    def prepare_DSB_weight_and_rotation(self, IF):
         trace_length = 4096
         tbase = np.arange(0, trace_length/1.8e9, 1/1.8e9)
-        cosI = np.array(np.cos(2*np.pi*IF*tbase))
-        sinI = np.array(np.sin(2*np.pi*IF*tbase))
-        eval('self.quex_wint_weights_{}_real(np.array(cosI))'.format(weight_function_I))
-        eval('self.quex_wint_weights_{}_real(np.array(sinI))'.format(weight_function_I))
-        eval('self.quex_wint_weights_{}_real(np.array(sinI))'.format(weight_function_Q))
-        eval('self.quex_wint_weights_{}_real(np.array(cosI))'.format(weight_function_Q))
-        eval('self.quex_rot_{}_real(1.0)'.format(weight_function_I))
-        eval('self.quex_rot_{}_imag(0.0)'.format(weight_function_I))
-        eval('self.quex_rot_{}_real(1.0)'.format(weight_function_Q))
-        eval('self.quex_rot_{}_imag(0.0)'.format(weight_function_Q))
+        cosI = np.cos(2*np.pi*IF*tbase)
+        sinI = np.sin(2*np.pi*IF*tbase)
+        self.quex_wint_weights_0_real(np.array(cosI))
+        self.quex_wint_weights_0_imag(np.array(sinI)*0)
+        self.quex_wint_weights_1_real(np.array(sinI))
+        self.quex_wint_weights_1_imag(np.array(cosI)*0)
+        self.quex_rot_0_real(1.0)
+        self.quex_rot_0_imag(0.0)
+        self.quex_rot_1_real(1.0)
+        self.quex_rot_1_imag(0.0)
 
 
     # def render_weights(self, wave_name, show=True, time_units='lut_index',
