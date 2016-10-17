@@ -392,33 +392,33 @@ class UHFQC(Instrument):
         s_file.close()
         d_file.close()
 
-    def prepare_SSB_weight_and_rotation(self, IF):
+    def prepare_SSB_weight_and_rotation(self, IF,  weight_function_I=0, weight_function_Q=1):
         trace_length = 4096
         tbase = np.arange(0, trace_length/1.8e9, 1/1.8e9)
-        cosI = np.cos(2*np.pi*IF*tbase)
-        sinI = np.sin(2*np.pi*IF*tbase)
-        self.quex_wint_weights_0_real(np.array(cosI))
-        self.quex_wint_weights_0_imag(np.array(sinI))
-        self.quex_wint_weights_1_real(np.array(sinI))
-        self.quex_wint_weights_1_imag(np.array(cosI))
-        self.quex_rot_0_real(1.0)
-        self.quex_rot_0_imag(1.0)
-        self.quex_rot_1_real(1.0)
-        self.quex_rot_1_imag(-1.0)
+        cosI = np.array(np.cos(2*np.pi*IF*tbase))
+        sinI = np.array(np.sin(2*np.pi*IF*tbase))
+        eval('self.quex_wint_weights_{}_real(np.array(cosI))'.format(weight_function_I))
+        eval('self.quex_wint_weights_{}_imag(np.array(sinI))'.format(weight_function_I))
+        eval('self.quex_wint_weights_{}_real(np.array(sinI))'.format(weight_function_Q))
+        eval('self.quex_wint_weights_{}_real(np.array(cosI))'.format(weight_function_Q))
+        eval('self.quex_rot_{}_real(1.0)'.format(weight_function_I))
+        eval('self.quex_rot_{}_imag(1.0)'.format(weight_function_I))
+        eval('self.quex_rot_{}_real(1.0)'.format(weight_function_Q))
+        eval('self.quex_rot_{}_imag(-1.0)'.format(weight_function_Q))
 
-    def prepare_DSB_weight_and_rotation(self, IF):
+    def prepare_DSB_weight_and_rotation(self, IF, weight_function_I=0, weight_function_Q=1):
         trace_length = 4096
         tbase = np.arange(0, trace_length/1.8e9, 1/1.8e9)
-        cosI = np.cos(2*np.pi*IF*tbase)
-        sinI = np.sin(2*np.pi*IF*tbase)
-        self.quex_wint_weights_0_real(np.array(cosI))
-        self.quex_wint_weights_0_imag(np.array(sinI)*0)
-        self.quex_wint_weights_1_real(np.array(sinI))
-        self.quex_wint_weights_1_imag(np.array(cosI)*0)
-        self.quex_rot_0_real(1.0)
-        self.quex_rot_0_imag(0.0)
-        self.quex_rot_1_real(1.0)
-        self.quex_rot_1_imag(0.0)
+        cosI = np.array(np.cos(2*np.pi*IF*tbase))
+        sinI = np.array(np.sin(2*np.pi*IF*tbase))
+        eval('self.quex_wint_weights_{}_real(np.array(cosI))'.format(weight_function_I))
+        eval('self.quex_wint_weights_{}_real(np.array(sinI))'.format(weight_function_I))
+        eval('self.quex_wint_weights_{}_real(np.array(sinI))'.format(weight_function_Q))
+        eval('self.quex_wint_weights_{}_real(np.array(cosI))'.format(weight_function_Q))
+        eval('self.quex_rot_{}_real(1.0)'.format(weight_function_I))
+        eval('self.quex_rot_{}_imag(0.0)'.format(weight_function_I))
+        eval('self.quex_rot_{}_real(1.0)'.format(weight_function_Q))
+        eval('self.quex_rot_{}_imag(0.0)'.format(weight_function_Q))
 
 
     # def render_weights(self, wave_name, show=True, time_units='lut_index',
