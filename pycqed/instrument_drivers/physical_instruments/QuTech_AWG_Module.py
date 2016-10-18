@@ -289,7 +289,7 @@ class QuTech_AWG_Module(SCPI):
             waveform[k] = val[0]
         return waveform
 
-    def sendWaveformDataReal(self, name, waveform, marker1, marker2):
+    def sendWaveformDataReal(self, name, waveform):
         """
         send waveform and markers directly to AWG memory, i.e. not to a file
         on the AWG disk.
@@ -303,13 +303,7 @@ class QuTech_AWG_Module(SCPI):
             waveform (float[numpoints]): vector defining the waveform,
             normalized between -1.0 and 1.0
 
-            marker1 (int[numpoints]): vector of 0 and 1 defining the first
-            marker
-
-            marker2 (int[numpoints]): vector of 0 and 1 defining the second
-            marker
-
-        Compatibility:  5014, QWG
+        Compatibility:  QWG
 
         Based on:
             Tektronix_AWG5014.py::send_waveform, which sends data to an AWG
@@ -318,29 +312,17 @@ class QuTech_AWG_Module(SCPI):
             Compatibility = Tektronix AWG5014, AWG7102
         """
 
-        # parameter handling
-        if len(marker1) == 0 and len(marker2) == 0:  # no marker data
-            m = np.zeros(len(waveform))
-        else:
-            if (not((len(waveform) == len(marker1))
-                    and ((len(marker1) == len(marker2))))):
-                raise UserWarning('length mismatch between markers/waveform')
-            # prepare markers
-            m = marker1 + np.multiply(marker2, 2)
-            m = int(np.round(m[i], 0))
-
-        # FIXME: check waveform amplitude and marker values (if paranoid)
-
         # generate the binblock
         binBlock = b''
         for i in range(len(waveform)):
-            binBlock = binBlock + struct.pack('<fB', waveform[i], int(m[i]))
+            binBlock = binBlock + struct.pack('<f', waveform[i])
+            # FIXME: use array?
 
         # write binblock
         hdr = 'wlist:waveform:data "{}",'.format(name)
         self.binBlockWrite(binBlock, hdr)
 
-    def createWaveformReal(self, name, waveform, marker1, marker2):
+    def createWaveformReal(self, name, waveform):
         """
         Convenience function to create a waveform in the AWG and then send
         data to it
@@ -351,19 +333,14 @@ class QuTech_AWG_Module(SCPI):
             waveform (float[numpoints]): vector defining the waveform,
             normalized between -1.0 and 1.0
 
-            marker1 (int[numpoints]): vector of 0 and 1 defining the first
-            marker
 
-            marker2 (int[numpoints]): vector of 0 and 1 defining the second
-            marker
-
-        Compatibility:  5014, QWG
+        Compatibility:  QWG
         """
         waveLen = len(waveform)
         # FIXME: check waveform is there, problems might arise if it already
         # existed
         self.newWaveformReal(name, waveLen)
-        self.sendWaveformDataReal(name, waveform, marker1, marker2)
+        self.sendWaveformDataReal(name, waveform)
 
     ##########################################################################
     # Generic (i.e. at least AWG520 and AWG5014) Tektronix AWG functions

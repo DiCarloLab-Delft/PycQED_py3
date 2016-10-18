@@ -33,8 +33,6 @@ wvGauss = Waveform.gauss(fs, sampleCnt, mu, sigma)
 wvDerivGauss = Waveform.derivGauss(fs, sampleCnt, mu, sigma, dirAmpl)
 wvGauss2 = Waveform.gauss(fs, sampleCnt, mu2, sigma2)
 wvDerivGauss2 = Waveform.derivGauss(fs, sampleCnt, mu2, sigma2, dirAmpl2)
-marker1 = []
-marker2 = []
 
 try:
     qwg1 = QWG
@@ -47,13 +45,13 @@ qwg1.reset()
 if __name__ == '__main__':
 
     if 1:  # continuous
-        qwg1.createWaveformReal('cos', wvCos, marker1, marker2)
-        qwg1.createWaveformReal('sin', wvSin, marker1, marker2)
-        qwg1.createWaveformReal('zero', wvZero, marker1, marker2)
-        qwg1.createWaveformReal('hi', wvHi, marker1, marker2)
-        qwg1.createWaveformReal('lo', wvLo, marker1, marker2)
-        qwg1.createWaveformReal('gauss', wvGauss, marker1, marker2)
-        qwg1.createWaveformReal('derivGauss', wvDerivGauss, marker1, marker2)
+        qwg1.createWaveformReal('cos', wvCos)
+        qwg1.createWaveformReal('sin', wvSin)
+        qwg1.createWaveformReal('zero', wvZero)
+        qwg1.createWaveformReal('hi', wvHi)
+        qwg1.createWaveformReal('lo', wvLo)
+        qwg1.createWaveformReal('gauss', wvGauss)
+        qwg1.createWaveformReal('derivGauss', wvDerivGauss)
 
         qwg1.set('ch1_default_waveform', 'gauss')
         qwg1.set('ch2_default_waveform', 'derivGauss')
@@ -63,15 +61,15 @@ if __name__ == '__main__':
         qwg1.run_mode('CONt')
 
     else:  # codeword based
-        qwg1.createWaveformReal('zero', wvZero, marker1, marker2)
-        qwg1.createWaveformReal('hi', wvHi, marker1, marker2)
-        qwg1.createWaveformReal('lo', wvLo, marker1, marker2)
-        qwg1.createWaveformReal('gauss', wvGauss, marker1, marker2)
-        qwg1.createWaveformReal('derivGauss', wvDerivGauss, marker1, marker2)
-        qwg1.createWaveformReal('gauss2', wvGauss2, marker1, marker2)
-        qwg1.createWaveformReal('derivGauss2', wvDerivGauss2, marker1, marker2)
+        qwg1.createWaveformReal('zero', wvZero)
+        qwg1.createWaveformReal('hi', wvHi)
+        qwg1.createWaveformReal('lo', wvLo)
+        qwg1.createWaveformReal('gauss', wvGauss)
+        qwg1.createWaveformReal('derivGauss', wvDerivGauss)
+        qwg1.createWaveformReal('gauss2', wvGauss2)
+        qwg1.createWaveformReal('derivGauss2', wvDerivGauss2)
 
-        qwg1.createWaveformReal('gaussNeg', -wvGauss, marker1, marker2)
+        qwg1.createWaveformReal('gaussNeg', -wvGauss)
 
         # segment 0: idle
         qwg1.set('ch1_default_waveform', 'zero')
