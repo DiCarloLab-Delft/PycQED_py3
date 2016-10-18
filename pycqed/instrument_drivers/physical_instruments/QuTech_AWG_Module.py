@@ -50,7 +50,6 @@ class QuTech_AWG_Module(SCPI):
             ch_pair = i*2+1
             sfreq_cmd = 'qutech:output{}:frequency'.format(ch_pair)
             sph_cmd = 'qutech:output{}:phase'.format(ch_pair)
-            mat_cmd = 'qutech:output{}:matrix'.format(ch_pair)
             # NB: sideband frequency has a resolution of ~0.23 Hz:
             self.add_parameter('ch_pair{}_sideband_frequency'.format(ch_pair),
                                units='Hz',
@@ -72,7 +71,6 @@ class QuTech_AWG_Module(SCPI):
             self.add_parameter('ch_pair{}_transform_matrix'.format(ch_pair),
                                label=('Transformation matrix channel' +
                                       'pair {}'.format(i)),
-                               # get_cmd=mat_cmd + '?',
                                get_cmd=self._gen_ch_get_func(
                                     self._getMatrix, ch_pair),
                                set_cmd=self._gen_ch_set_func(
@@ -143,7 +141,6 @@ class QuTech_AWG_Module(SCPI):
                                    set_cmd=cw_cmd+' "{:s}"',
                                    vals=vals.Strings())
 
-
         # Waveform parameters
         self.add_parameter('WlistSize',
                            label='Waveform list size',
@@ -189,7 +186,6 @@ class QuTech_AWG_Module(SCPI):
             M[i] = x
         M = M.reshape(2, 2)
         return(M)
-
 
     ##########################################################################
     # AWG5014 functions: SEQUENCE
