@@ -8,7 +8,6 @@ import numpy as np
 from qcodes.instrument.base import Instrument
 from qcodes.utils import validators as vals
 from fnmatch import fnmatch
-import zhinst.zishell as zis
 #from instrument_drivers.physical_instruments.ZurichInstruments import UHFQuantumController as ZI_UHFQC
 
 
@@ -53,8 +52,8 @@ class UHFQC(Instrument):
 
         path = os.path.abspath(__file__)
         dir_path = os.path.dirname(path)
-        self._s_file_name = dir_path+'\\zi_parameter_files\\s_node_pars.txt'
-        self._d_file_name = dir_path+'\\zi_parameter_files\\d_node_pars.txt'
+        self._s_file_name = os.path.join(dir_path, 'zi_parameter_files', 's_node_pars.txt')
+        self._d_file_name = os.path.join(dir_path, 'zi_parameter_files', 'd_node_pars.txt')
 
         init=True
         try:
@@ -76,62 +75,63 @@ class UHFQC(Instrument):
             if parameter[1]=='float':
                 self.add_parameter(
                     parname,
-                    set_cmd=self._gen_set_func(zis.setd, parfunc),
-                    get_cmd=self._gen_get_func(zis.getd, parfunc),
+                    set_cmd=self._gen_set_func(self.setd, parfunc),
+                    get_cmd=self._gen_get_func(self.getd, parfunc),
                     vals=vals.Numbers(parameter[2], parameter[3]))
             elif parameter[1]=='float_small':
                 self.add_parameter(
                     parname,
-                    set_cmd=self._gen_set_func(zis.setd, parfunc),
-                    get_cmd=self._gen_get_func(zis.getd, parfunc),
+                    set_cmd=self._gen_set_func(self.setd, parfunc),
+                    get_cmd=self._gen_get_func(self.getd, parfunc),
                     vals=vals.Numbers(parameter[2], parameter[3]))
             elif parameter[1]=='int_8bit':
                 self.add_parameter(
                     parname,
-                    set_cmd=self._gen_set_func(zis.seti, parfunc),
-                    get_cmd=self._gen_get_func(zis.geti, parfunc),
-                    vals=vals.Ints(parameter[2], parameter[3]))
+                    set_cmd=self._gen_set_func(self.seti, parfunc),
+                    get_cmd=self._gen_get_func(self.geti, parfunc),
+                    vals=vals.Ints(int(parameter[2]), int(parameter[3])))
             elif parameter[1]=='int':
                 self.add_parameter(
                     parname,
-                    set_cmd=self._gen_set_func(zis.seti, parfunc),
-                    get_cmd=self._gen_get_func(zis.geti, parfunc),
-                    vals=vals.Ints(parameter[2], parameter[3]))
+                    set_cmd=self._gen_set_func(self.seti, parfunc),
+                    get_cmd=self._gen_get_func(self.geti, parfunc),
+                    vals=vals.Ints(int(parameter[2]), int(parameter[3])))
             elif parameter[1]=='int_64':
                 self.add_parameter(
                     parname,
-                    set_cmd=self._gen_set_func(zis.seti, parfunc),
-                    get_cmd=self._gen_get_func(zis.geti, parfunc),
-                    vals=vals.Ints(parameter[2], parameter[3]))
+                    set_cmd=self._gen_set_func(self.seti, parfunc),
+                    get_cmd=self._gen_get_func(self.geti, parfunc),
+                    vals=vals.Ints(int(parameter[2]), int(parameter[3])))
             elif parameter[1]=='bool':
                 self.add_parameter(
                     parname,
-                    set_cmd=self._gen_set_func(zis.seti, parfunc),
-                    get_cmd=self._gen_get_func(zis.geti, parfunc),
-                    vals=vals.Ints(parameter[2], parameter[3]))
+                    set_cmd=self._gen_set_func(self.seti, parfunc),
+                    get_cmd=self._gen_get_func(self.geti, parfunc),
+                    vals=vals.Ints(int(parameter[2]), int(parameter[3])))
             else:
                 print("parameter {} type {} from from s_node_pars not recognized".format(parname,parameter[1]))
+
         for parameter in d_node_pars:
             parname=parameter[0].replace("/","_")
             parfunc="/"+device+"/"+parameter[0]
             if parameter[1]=='float':
                 self.add_parameter(
                     parname,
-                    get_cmd=self._gen_get_func(zis.getd, parfunc))
+                    get_cmd=self._gen_get_func(self.getd, parfunc))
             elif parameter[1]=='vector_g':
                 self.add_parameter(
                     parname,
-                    get_cmd=self._gen_get_func(zis.getv, parfunc))
+                    get_cmd=self._gen_get_func(self.getv, parfunc))
             elif parameter[1]=='vector_s':
                 self.add_parameter(
                     parname,
-                    set_cmd=self._gen_set_func(zis.setv, parfunc),
+                    set_cmd=self._gen_set_func(self.setv, parfunc),
                     vals=vals.Anything())
             elif parameter[1]=='vector_gs':
                 self.add_parameter(
                     parname,
-                    set_cmd=self._gen_set_func(zis.setv, parfunc),
-                    get_cmd=self._gen_get_func(zis.getv, parfunc),
+                    set_cmd=self._gen_set_func(self.setv, parfunc),
+                    get_cmd=self._gen_get_func(self.getv, parfunc),
                     vals=vals.Anything())
             else:
                 print("parameter {} type {} from d_node_pars not recognized".format(parname,parameter[1]))
@@ -140,8 +140,6 @@ class UHFQC(Instrument):
         self.add_parameter('AWG_file',
                            set_cmd=self._do_set_AWG_file,
                            vals=vals.Anything())
-        zis.connect_server('localhost', port)
-        zis.connect_device(self._device, 'USB')
         if init:
             self.load_default_settings()
         t1 = time.time()
@@ -251,31 +249,32 @@ class UHFQC(Instrument):
     def reconnect(self):
         zi_utils.autoDetect(self._daq)
 
+    def awg(self, filename):
+        print(filename)
+        with open(filename, 'r') as awg_file:
+            sourcestring = awg_file.read()
+            print(sourcestring)
+            h = self._daq.awgModule()
+            h.set('awgModule/device', self._device)
+            h.set('awgModule/index', 0)
+            h.execute()
+            h.set('awgModule/compiler/sourcestring', sourcestring)
+            h.set('awgModule/compiler/start', 1)
+            h.set('awgModule/elf/file', '')
+
     def _do_set_AWG_file(self, filename):
-        zis.awg(filename)
+        self.awg('UHFLI_AWG_sequences/'+filename)
 
-        #code to upload AWG sequence as a string
-        # def awg(self, filename):
-        #         for device in self._devices:
-        #             h = self.daq.awgModule()
-        #             h.set('awgModule/device', device)
-        #             h.set('awgModule/index', 0)
-        #             h.execute()
-        #             h.set('awgModule/compiler/sourcefile', filename)
-        #             h.set('awgModule/compiler/start', 1)
-        #             h.set('awgModule/elf/file', '')
 
-        # Now, if you would change it to:
+    def awg_string(self, sourcestring):
+        h = self._daq.awgModule()
+        h.set('awgModule/device', self._device)
+        h.set('awgModule/index', 0)
+        h.execute()
+        h.set('awgModule/compiler/sourcestring', sourcestring)
+        h.set('awgModule/compiler/start', 1)
+        h.set('awgModule/elf/file', '')
 
-         # def awg(self, sourcestring):
-         #        for device in self._devices:
-         #            h = self.daq.awgModule()
-         #            h.set('awgModule/device', device)
-         #            h.set('awgModule/index', 0)
-         #            h.execute()
-         #            h.set('awgModule/compiler/sourcestring', sourcestring)
-         #            h.set('awgModule/compiler/start', 1)
-         #            h.set('awgModule/elf/file', '')
 
     def close(self):
         self._daq.disconnectDevice(self._device)
@@ -304,8 +303,6 @@ class UHFQC(Instrument):
         s_node_pars=[]
         d_node_pars=[]
         patterns = ["awgs", "sigins", "sigouts", "quex", "dios","system/extclk"] #["quex/iavg", "quex/wint"]
-        s_file = open(self._s_file_name, 'w')
-        d_file = open(self._d_file_name, 'w')
         #json.dump([, s_file, default=int)
         #json.dump([, d_file, default=int)
         for pattern in patterns:
@@ -316,44 +313,48 @@ class UHFQC(Instrument):
             print(len(all_nodes))
             # extracting info from the setting nodes
             s_nodes = list(s_nodes)
-            default_values=zis.getd(s_nodes, True)
+            default_values=self.getd(s_nodes)
             for s_node in s_nodes:
-                zis.setd(s_node,  1e12)
-            max_values = zis.getd(s_nodes, True)
+                self.setd(s_node,  1e12)
+            max_values = self.getd(s_nodes)
             for s_node in s_nodes:
-                zis.setd(s_node, -1e12)
-            min_values = zis.getd(s_nodes, True)
-            float_values = [np.pi]*len(s_nodes)
-            for i, s_node in enumerate(s_nodes):
-                if np.pi > max_values[i]:
-                    float_values[i] = max_values[i]/np.pi;
-                zis.setd(s_node, float_values[i])
-            actual_float_values = zis.getd(s_nodes, True)
-            node_types = ['']*len(s_nodes)
-            for i, s_node in enumerate(s_nodes):
-                #self.setd(node,default_values[i])
-                fraction, integer = np.modf(actual_float_values[i])
-                if fraction != 0:
-                    node_types[i] = 'float'
-                    if min_values[i]==max_values[i]:
-                        node_types[i]='float_small'
-                        min_values[i]=0
-                    elif abs(min_values[i])<0.01:
-                        min_values[i]=0
+                self.setd(s_node, -1e12)
+            min_values = self.getd(s_nodes)
+            float_values = dict.fromkeys(s_nodes)
+            for s_node in s_nodes:
+                if np.pi > max_values[s_node]:
+                    float_values[s_node] = max_values[s_node]/np.pi;
                 else:
-                    node_types[i] = 'int'
-                    min_values[i]=0
-                    if  max_values[i]==3567587328:
-                        node_types[i] = 'int_64'
-                        max_values[i]=4294967295
-                    elif  max_values[i]==1:
-                        node_types[i] = 'bool'
-                    elif max_values[i]==0:
-                        max_values[i]=255
-                        node_types[i] = 'int_8bit'
-                    elif max_values[i]>4294967295:
-                        node_types[i] = 'float'
-                line=[s_node, node_types[i], min_values[i], max_values[i]]
+                    float_values[s_node] = np.pi
+                self.setd(s_node, float_values[s_node])
+            actual_float_values = self.getd(s_nodes)
+
+            node_types = dict.fromkeys(s_nodes)
+            for s_node in sorted(s_nodes):
+                #self.setd(node,default_values[s_node])
+                fraction, integer = np.modf(actual_float_values[s_node])
+                if fraction != 0:
+                    node_types[s_node] = 'float'
+                    if min_values[s_node]==max_values[s_node]:
+                        node_types[s_node]='float_small'
+                        min_values[s_node]=0
+                    elif abs(min_values[s_node])<0.01:
+                        min_values[s_node]=0
+                else:
+                    node_types[s_node] = 'int'
+                    min_values[s_node]=0
+                    if  max_values[s_node]==3567587328:
+                        node_types[s_node] = 'int_64'
+                        max_values[s_node]=4294967295
+                    elif  max_values[s_node]==1:
+                        node_types[s_node] = 'bool'
+                    elif max_values[s_node]==0:
+                        max_values[s_node]=255
+                        node_types[s_node] = 'int_8bit'
+                    elif max_values[s_node]>4294967295:
+                        node_types[s_node] = 'float'
+
+                line=[s_node.replace('/' + self._device + '/', ''), node_types[s_node], min_values[s_node], max_values[s_node]]
                 print(line)
                 s_node_pars.append(line)
                 #json.dump(line, s_file, indent=2, default=int)
@@ -361,19 +362,19 @@ class UHFQC(Instrument):
 
             #extracting info from the data nodes
             d_nodes = list(d_nodes)
-            #default_values=self.getd(d_nodes, True)
+            #default_values=self.getd(d_nodes)
             default_values=np.zeros(len(d_nodes))
             node_types = ['']*len(d_nodes)
 
             for i, d_node in enumerate(d_nodes):
                 try:
-                    answer=zis.getv(d_node)
+                    answer=self.getv(d_node)
                     if isinstance(answer, dict):
                         value=answer['value'][0]
                         node_types[i]='float'
                     elif  isinstance(answer, list):
                         try:
-                            zis.setv(d_node,np.array([0,0,0]))
+                            self.setv(d_node,np.array([0,0,0]))
                             node_types[i]='vector_gs'
                         except:
                             value=answer[0]['vector']
@@ -382,15 +383,16 @@ class UHFQC(Instrument):
                         print("unknown type")
                 except:
                     node_types[i]='vector_s'
-                line=[d_node, node_types[i]]#, default_values[i]]
+                line=[d_node.replace('/' + self._device + '/', ''), node_types[i]]#, default_values[i]]
                 print(line)
                 d_node_pars.append(line)
                 #json.dump(line, d_file, indent=2, default=int)
 
-        json.dump(s_node_pars[9:], s_file, default=int, indent=2)
-        json.dump(d_node_pars[9:], d_file, default=int, indent=2)
-        s_file.close()
-        d_file.close()
+        with open(self._s_file_name, 'w') as s_file:
+            json.dump(s_node_pars, s_file, default=int, indent=2)
+
+        with open(self._d_file_name, 'w') as d_file:
+            json.dump(d_node_pars, d_file, default=int, indent=2)
 
     def prepare_SSB_weight_and_rotation(self, IF,  weight_function_I=0, weight_function_Q=1):
         trace_length = 4096
@@ -452,113 +454,94 @@ class UHFQC(Instrument):
     #         plt.show()
     #     return fig, ax
 
-    # def setd(self, path, value):
-    #     # Handle absolute path
-    #     if path[0] == '/':
-    #         self._daq.setDouble(path, value)
-    #     else:
-    #         self._daq.setDouble('/' + self._device + '/' + path, value)
+    def _make_full_path(self, paths):
+        full_paths = []
+        for p in paths:
+            if p[0] == '/':
+                full_paths.append(p)
+            else:
+                full_paths.append('/' + self._device + '/' + p)
+        return full_paths
 
-    # def seti(self, path, value):
-    #     # Handle absolute path
-    #     if path[0] == '/':
-    #         self._daq.setInt(path, value)
-    #     else:
-    #         self._daq.setInt('/' + self._device + '/' + path, value)
+    def seti(self, path, value):
+        # Handle absolute path
+        if path[0] == '/':
+            self._daq.setInt(path, int(value))
+        else:
+            self._daq.setInt('/' + self._device + '/' + path, int(value))
 
-    # def setv(self, path, value):
-    #     # Handle absolute path
-    #     if path[0] == '/':
-    #         self._daq.vectorWrite(path, value)
-    #     else:
-    #         self._daq.vectorWrite('/' + self._device + '/' + path, value)
+    def setd(self, path, value):
+        # Handle absolute path
+        if path[0] == '/':
+            self._daq.setDouble(path, float(value))
+        else:
+            self._daq.setDouble('/' + self._device + '/' + path, float(value))
 
-    # def geti(self, paths, deep=True):
-    #     if type(paths) is not list:
-    #         paths = [ paths ]
-    #         single = 1
-    #     else:
-    #         single = 0
+    def get(self, paths, convert=None):
+        if type(paths) is not list:
+            paths = [ paths ]
+            single = 1
+        else:
+            single = 0
 
-    #     values = []
-    #     for p in paths:
-    #         if p[0] == '/':
-    #             if deep:
-    #                 self._daq.getAsEvent(p)
-    #                 tmp = self._daq.poll(0.1, 500, 4, True)
-    #                 if p in tmp:
-    #                     values.append(tmp[p]['value'][0])
-    #             else:
-    #                 values.append(self._daq.getInt(p))
-    #         else:
-    #             tmp_p = '/' + self._device + '/' + p
-    #             if deep:
-    #                 self._daq.getAsEvent(tmp_p)
-    #                 tmp = self._daq.poll(0.1, 500, 4, True)
-    #                 if tmp_p in tmp:
-    #                     values.append(tmp[tmp_p]['value'][0])
-    #             else:
-    #                 values.append(self._daq.getInt(tmp_p))
-    #     if single:
-    #         return values[0]
-    #     else:
-    #         return values
+        paths = self._make_full_path(paths)
+        values = {}
 
-    # def getd(self, paths, deep=True):
-    #     if type(paths) is not list:
-    #         paths = [ paths ]
-    #         single = 1
-    #     else:
-    #         single = 0
+        for p in paths:
+            self._daq.getAsEvent(p)
 
-    #     values = []
-    #     for p in paths:
-    #         if p[0] == '/':
-    #             if deep:
-    #                 self._daq.getAsEvent(p)
-    #                 tmp = self._daq.poll(0.1, 500, 4, True)
-    #                 if p in tmp:
-    #                     values.append(tmp[p]['value'][0])
-    #             else:
-    #                 values.append(self._daq.getDouble(p))
-    #         else:
-    #             tmp_p = '/' + self._device + '/' + p
-    #             if deep:
-    #                 self._daq.getAsEvent(tmp_p)
-    #                 tmp = self._daq.poll(0.1, 500, 4, True)
-    #                 if tmp_p in tmp:
-    #                     values.append(tmp[tmp_p]['value'][0])
-    #             else:
-    #                 values.append(self._daq.getDouble(tmp_p))
-    #     if single:
-    #         return values[0]
-    #     else:
-    #         return values
+        while len(values) < len(paths):
+            tmp = self._daq.poll(0.001, 500, 4, True)
+            for p in tmp:
+                if convert:
+                    values[p] = convert(tmp[p]['value'][0])
+                else:
+                    values[p] = tmp[p]['value'][0]
 
-    # def getv(self, paths):
-    #     if type(paths) is not list:
-    #         paths = [ paths ]
-    #         single = 1
-    #     else:
-    #         single = 0
+        if single:
+            return values[paths[0]]
+        else:
+            return values
 
-    #     values = []
-    #     for p in paths:
-    #         if p[0] == '/':
-    #             self._daq.getAsEvent(p)
-    #             tmp = self._daq.poll(0.5, 500, 4, True)
-    #             if p in tmp:
-    #                 values.append(tmp[p])
-    #         else:
-    #             tmp_p = '/' + self._device + '/' + p
-    #             self._daq.getAsEvent(tmp_p)
-    #             tmp = self._daq.poll(0.5, 500, 4, True)
-    #             if tmp_p in tmp:
-    #                 values.append(tmp[tmp_p])
-    #     if single:
-    #         return values[0]
-    #     else:
-    #         return values
+    def geti(self, paths):
+        return self.get(paths, int)
+
+    def getd(self, paths):
+        return self.get(paths, float)
+
+    def getv(self, paths):
+        if type(paths) is not list:
+            paths = [ paths ]
+            single = 1
+        else:
+            single = 0
+
+        paths = self._make_full_path(paths)
+        values = {}
+
+        for p in paths:
+            self._daq.getAsEvent(p)
+
+        tries = 0
+        while len(values) < len(paths) and tries < 10:
+            try:
+                tmp = self._daq.poll(0.001, 500, 4, True)
+                for p in tmp:
+                    values[p] = tmp[p]
+            except ZIException:
+                pass
+
+        if single:
+            return values[paths[0]]
+        else:
+            return values
+
+    def setv(self, path, value):
+        # Handle absolute path
+        if path[0] == '/':
+            self._daq.vectorWrite(path, value)
+        else:
+            self._daq.vectorWrite('/' + self._device + '/' + path, value)
 
 
 
