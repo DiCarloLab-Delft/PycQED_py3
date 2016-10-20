@@ -186,20 +186,8 @@ class UHFQC(Instrument):
         self.quex_deskew_1_col_0(0.0)
         self.quex_deskew_1_col_1(1.0)
 
-        # Configure the weighted integration units with constant values, each channel gets
-        # one, two, three and four non-zero weights, respectively
-        self.quex_wint_weights_0_real(np.array([1.0]*1 + [0.0]*127))
-        self.quex_wint_weights_0_imag(np.array([1.0]*1 + [0.0]*127))
-        self.quex_wint_weights_1_real(np.array([1.0]*2 + [0.0]*126))
-        self.quex_wint_weights_1_imag(np.array([1.0]*2 + [0.0]*126))
-        self.quex_wint_weights_2_real(np.array([1.0]*3 + [0.0]*125))
-        self.quex_wint_weights_2_imag(np.array([1.0]*3 + [0.0]*125))
-        self.quex_wint_weights_3_real(np.array([1.0]*12 + [0.0]*116))
-        self.quex_wint_weights_3_imag(np.array([1.0]*12 + [0.0]*116))
-
-        # Length is set in units of 1 samples
-        self.quex_wint_length(4096)
-        self.quex_wint_delay(0)
+        #setting the AWG to loop only once when triggered
+        self.awgs_0_single(1)
 
         # Setting the clock to external
         self.system_extclk(1)
@@ -522,6 +510,10 @@ class UHFQC(Instrument):
             raise KeyError("exceeding AWG range for I channel, all values should be withing +/-1")
         elif np.max(Qwave)>1.0 or np.min(Qwave)<-1.0:
             raise KeyError("exceeding AWG range for Q channel, all values should be withing +/-1")
+        elif len(Iwave)>1493:
+            raise KeyError("exceeding max AWG wave lenght of 1493 samples for I channel, trying to upload {} samples".format(len(Iwave)))
+        elif len(Qwave)>1493:
+            raise KeyError("exceeding max AWG wave lenght of 1493 samples for Q channel, trying to upload {} samples".format(len(Qwave)))
 
         if acquisition_mode=="iavg":
             trigger_string = '\tsetTrigger(IAVG_TRIG + WINT_EN);'
@@ -550,7 +542,6 @@ var loop_cnt = getUserReg(0);\n"""
 
         loop_start="""
 repeat(loop_cnt) {
-\t//wait for a rising edge on Ref/trigger 1
 \twaitDigTrigger(1, 0);
 \twaitDigTrigger(1, 1);
 \tplayWave(Iwave,Qwave);\n"""
@@ -584,7 +575,6 @@ setTrigger(WINT_EN);
 var loop_cnt = getUserReg(0);
 
 repeat(loop_cnt) {
-\t//wait for a rising edge on Ref/trigger 1
 \twaitDigTrigger(1, 0);
 \twaitDigTrigger(1, 1);\n"""
         end_string="""
