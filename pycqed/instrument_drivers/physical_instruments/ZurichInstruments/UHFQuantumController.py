@@ -161,6 +161,7 @@ class UHFQC(Instrument):
 
         # The AWG program uses userregs/0 to define the number o iterations in the loop
         self.awgs_0_userregs_0(pow(2, LOG2_AVG_CNT)*pow(2, LOG2_RL_AVG_CNT))
+        self.awgs_0_single(1)
 
         # Turn on both outputs
         self.sigouts_0_on(1)
@@ -186,8 +187,8 @@ class UHFQC(Instrument):
         self.quex_deskew_1_col_0(0.0)
         self.quex_deskew_1_col_1(1.0)
 
-        #setting the AWG to loop only once when triggered
-        self.awgs_0_single(1)
+
+        self.quex_wint_delay(0)
 
         # Setting the clock to external
         self.system_extclk(1)
@@ -408,9 +409,6 @@ class UHFQC(Instrument):
         eval('self.quex_rot_{}_imag(0.0)'.format(weight_function_I))
         eval('self.quex_rot_{}_real(1.0)'.format(weight_function_Q))
         eval('self.quex_rot_{}_imag(0.0)'.format(weight_function_Q))
-
-
-
 
     def _make_full_path(self, paths):
         full_paths = []
