@@ -48,7 +48,6 @@ class UHFQC(Instrument):
         self._device = zi_utils.autoDetect(self._daq)
         s_node_pars=[]
         d_node_pars=[]
-        print(self._device)
 
         path = os.path.abspath(__file__)
         dir_path = os.path.dirname(path)
@@ -158,7 +157,7 @@ class UHFQC(Instrument):
         LOG2_RL_AVG_CNT = 0
 
         # Load an AWG program (from Zurich Instruments/LabOne/WebServer/awg/src)
-        self.AWG_file('traditional.seqc')
+        #self.acquisition_sequence(mode='rl')
 
         # The AWG program uses userregs/0 to define the number o iterations in the loop
         self.awgs_0_userregs_0(pow(2, LOG2_AVG_CNT)*pow(2, LOG2_RL_AVG_CNT))
@@ -423,36 +422,7 @@ class UHFQC(Instrument):
         eval('self.quex_rot_{}_imag(0.0)'.format(weight_function_Q))
 
 
-    # def render_weights(self, wave_name, show=True, time_units='lut_index',
-    #             reload_pulses=True):
-    #     if reload_pulses:
-    #         self.generate_standard_pulses()
-    #     fig, ax = plt.subplots(1, 1)
-    #     if time_units == 'lut_index':
-    #         x = np.arange(len(self._wave_dict[wave_name][0]))
-    #         ax.set_xlabel('Lookuptable index (i)')
-    #         ax.vlines(128, self._voltage_min, self._voltage_max, linestyle='--')
-    #     elif time_units == 's':
-    #         x = (np.arange(len(self._wave_dict[wave_name][0]))
-    #              / self.sampling_rate.get())
-    #         ax.set_xlabel('time (s)')
-    #         ax.vlines(128 / self.sampling_rate.get(),
-    #                   self._voltage_min, self._voltage_max, linestyle='--')
 
-    #     ax.plot(x, self._wave_dict[wave_name][0],
-    #             marker='o', label=wave_name+' chI')
-    #     ax.plot(x, self._wave_dict[wave_name][1],
-    #             marker='o', label=wave_name+' chQ')
-    #     ax.set_ylabel('Amplitude (V)')
-    #     ax.set_axis_bgcolor('gray')
-    #     ax.axhspan(self._voltage_min, self._voltage_max, facecolor='w',
-    #                linewidth=0)
-    #     ax.legend()
-    #     ax.set_ylim(self._voltage_min*1.1, self._voltage_max*1.1)
-    #     ax.set_xlim(0, x[-1])
-    #     if show:
-    #         plt.show()
-    #     return fig, ax
 
     def _make_full_path(self, paths):
         full_paths = []
@@ -545,3 +515,81 @@ class UHFQC(Instrument):
 
 
 
+    ## sequencer functions
+
+    def awg_sequence_acquisition_and_pulse(self, Iwave, Qwave, acquisition_delay, acquisition_mode):
+        if np.max(Iwave)>1.0 or np.min(Iwave)<-1.0:
+            raise KeyError("exceeding AWG range for I channel, all values should be withing +/-1")
+        elif np.max(Qwave)>1.0 or np.min(Qwave)<-1.0:
+            raise KeyError("exceeding AWG range for Q channel, all values should be withing +/-1")
+
+        if acquisition_mode=="iavg":
+            trigger_string = '\tsetTrigger(IAVG_TRIG + WINT_EN);'
+        elif acquisition_mode=='rl':
+            trigger_string = '\tsetTrigger(WINT_TRIG + WINT_EN);'
+        else:
+            raise KeyError("no valid acquisition mode")
+        
+        Iwave_strip=",".join(str(bit) for bit in Iwave)
+        Qwave_strip=",".join(str(bit) for bit in Qwave)
+        wave_I_string = "wave Iwave = vect("+Iwave_strip+");\n" 
+        wave_Q_string = "wave Qwave = vect("+Qwave_strip+");\n"
+        
+        delay_samples = int(acquisition_delay*1.8e9/8)
+        delay_string='\twait({});\n'.format(delay_samples)
+        
+
+        preamble="""
+const TRIGGER1  = 0x000001;
+const WINT_TRIG = 0x000010;
+const IAVG_TRIG = 0x000020;
+const WINT_EN   = 0x0f0000;
+
+setTrigger(WINT_EN);
+var loop_cnt = getUserReg(0);\n"""
+
+        loop_start="""
+repeat(loop_cnt) {
+\t//wait for a rising edge on Ref/trigger 1
+\twaitDigTrigger(1, 0);
+\twaitDigTrigger(1, 1);
+\tplayWave(Iwave,Qwave);\n"""
+
+        end_string="""
+\tsetTrigger(WINT_EN);
+\twaitWave();
+}
+setTrigger(0);"""
+
+        string = preamble+wave_I_string+wave_Q_string+loop_start+delay_string+trigger_string+end_string
+        self.awg_string(string)
+
+    def awg_sequence_acquisition(self, acquisition_mode):
+        print(acquisition_mode)
+        if acquisition_mode=="iavg":
+            trigger_string = '\tsetTrigger(IAVG_TRIG + WINT_EN);'
+        elif acquisition_mode=='rl':
+            trigger_string = '\tsetTrigger(WINT_TRIG + WINT_EN);'
+        else:
+            raise KeyError("no valid acquisition mode")
+
+
+        preamble="""
+const TRIGGER1  = 0x000001;
+const WINT_TRIG = 0x000010;
+const IAVG_TRIG = 0x000020;
+const WINT_EN   = 0x0f0000;
+
+setTrigger(WINT_EN);
+var loop_cnt = getUserReg(0);
+
+repeat(loop_cnt) {
+\t//wait for a rising edge on Ref/trigger 1
+\twaitDigTrigger(1, 0);
+\twaitDigTrigger(1, 1);\n"""
+        end_string="""
+\tsetTrigger(WINT_EN);
+}
+setTrigger(0);"""
+        string = preamble+trigger_string+end_string
+        self.awg_string(string)
