@@ -10,6 +10,24 @@ default_gauss_width = 10  # magic number should be removed,
 # note magic number only used in old mathematica seqs
 
 
+class File(swf.Hard_Sweep):
+    def __init__(self, filename, AWG, title=None, NoElements=None, upload=True):
+        self.upload = upload
+        self.AWG = AWG
+        if title:
+            self.name = title
+        else:
+            self.name = filename
+        self.filename = filename + '_FILE'
+        self.upload = upload
+        self.parameter_name = 'amplitude'
+        self.unit = 'V'
+
+    def prepare(self, **kw):
+        if self.upload:
+            self.AWG.set_setup_filename(self.filename)
+
+
 class Rabi(swf.Hard_Sweep):
     def __init__(self, pulse_pars, RO_pars, n=1, upload=True, return_seq=False):
         super().__init__()
