@@ -26,6 +26,7 @@ kernel_dir_path = 'kernels/'
 
 
 def single_pulse_seq(pulse_pars=None,
+                     comp_pulse=True,
                      verbose=False,
                      distortion_dict=None,
                      return_seq=False):
@@ -58,7 +59,10 @@ def single_pulse_seq(pulse_pars=None,
     el_list = []
     for i, iter in enumerate([0, 1]):  # seq has to have at least 2 elts
 
-        pulse_list = [pulse_pars, minus_pulse_pars,dead_time_pulse]
+        if comp_pulse:
+            pulse_list = [pulse_pars, minus_pulse_pars,dead_time_pulse]
+        else:
+            pulse_list = [pulse_pars, dead_time_pulse]
         # pulse_list = [pulse_pars, dead_time_pulse]
 
         el = multi_pulse_elt(i, station, pulse_list)
