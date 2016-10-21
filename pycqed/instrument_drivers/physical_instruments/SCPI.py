@@ -10,6 +10,7 @@ Bugs:
 
 from qcodes import IPInstrument
 from qcodes import validators as vals
+import socket
 
 """
 FIXME: we would like to be able to choose the base class separately, so the
@@ -24,6 +25,10 @@ class SCPI(IPInstrument):
         super().__init__(name, address, port,
                          write_confirmation=False,  # required for QWG
                          **kwargs)
+
+        # send things immediately
+        self._socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+
         # FIXME convert operation etc to parameters
         # IDN is implemented in the instrument base class
 
