@@ -29,6 +29,10 @@ class SCPI(IPInstrument):
         # send things immediately
         self._socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
 
+        # beef up buffer, to prevent socket.send() not sending all our data
+        # in one go
+        self._socket.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, 512*1024)
+
         # FIXME convert operation etc to parameters
         # IDN is implemented in the instrument base class
 
@@ -145,8 +149,12 @@ class SCPI(IPInstrument):
         ''' read IEEE488.2 binblock
         '''
         # get and decode header
-        headerA = self.readBinary(2)                        # consume '#N'
-        digitCnt = int(str(headerA[1]))
+        headerA = self.readBinary(2)                        # read '#N'
+        headerAstr = headerA.decode()
+        if(headerAstr[0] != '#'):
+            s = 'SCPI header error: received {}'.format(headerA)
+            raise RuntimeError(s)
+        digitCnt = int(headerAstr[1])
         headerB = self.readBinary(digitCnt)
         byteCnt = int(headerB.decode())
         binBlock = self.readBinary(byteCnt)

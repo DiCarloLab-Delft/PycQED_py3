@@ -12,6 +12,7 @@ from .SCPI import SCPI
 
 import numpy as np
 import struct
+import array
 from qcodes import validators as vals
 
 
@@ -278,11 +279,14 @@ class QuTech_AWG_Module(SCPI):
         self.write('wlist:waveform:data? "%s"' % name)
         binBlock = self.binBlockRead()
         # extract waveform
-        waveformLen = int(len(binBlock)/4)   # 4 bytes per record
-        waveform = np.array(range(waveformLen), dtype=float)
-        for k in range(waveformLen):
-            val = struct.unpack_from('<f', binBlock, k*4)  # FIXME: use array?
-            waveform[k] = val[0]
+        if 1:   # high performance
+            waveform = np.frombuffer(binBlock, dtype=np.float32)
+        else:   # more generic
+            waveformLen = int(len(binBlock)/4)   # 4 bytes per record
+            waveform = np.array(range(waveformLen), dtype=float)
+            for k in range(waveformLen):
+                val = struct.unpack_from('<f', binBlock, k*4)
+                waveform[k] = val[0]
         return waveform
 
     def sendWaveformDataReal(self, name, waveform):
@@ -296,7 +300,7 @@ class QuTech_AWG_Module(SCPI):
             name (string): waveform name excluding double quotes, e.g. 'test'.
             Must already exits in AWG
 
-            waveform (float[numpoints]): vector defining the waveform,
+            waveform (np.array of float)): vector defining the waveform,
             normalized between -1.0 and 1.0
 
         Compatibility:  QWG
@@ -309,10 +313,13 @@ class QuTech_AWG_Module(SCPI):
         """
 
         # generate the binblock
-        binBlock = b''
-        for i in range(len(waveform)):
-            binBlock = binBlock + struct.pack('<f', waveform[i])
-            # FIXME: use array?
+        if 1:   # high performance
+            arr = np.asarray(waveform, dtype=np.float32)
+            binBlock = arr.tobytes()
+        else:   # more generic
+            binBlock = b''
+            for i in range(len(waveform)):
+                binBlock = binBlock + struct.pack('<f', waveform[i])
 
         # write binblock
         hdr = 'wlist:waveform:data "{}",'.format(name)

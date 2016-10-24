@@ -142,15 +142,47 @@ if __name__ == '__main__':
 
     qwg1.start()
 
-    wlistSize = qwg1.WlistSize()
-    print('WLIST size: ', wlistSize)
-    print('WLIST: ', qwg1.Wlist())
-
+    # read back
+    qwg1.getOperationComplete()
     wvCosReadBack = qwg1.getWaveformDataFloat('cos')
     plt.plot(wvCosReadBack)
     plt.ylabel('cos')
     plt.show()
 
+    # waveform upload performance
+    sizes = [100, 250, 1000, 1500, 2000, 2500]
+    durations = []
+    megaBytesPerSecond = []
+    nrIter = 10
+    for size in sizes:
+        wvTest = Waveform.sin(fs, size, f)
+        markStart = time.perf_counter()
+        for i in range(nrIter):
+            qwg1.createWaveformReal('testSize{}Nr{}'.format(size, i), wvTest)
+        markEnd = time.perf_counter()
+        duration = (markEnd-markStart)/nrIter
+        durations.append(duration*1e6)
+        megaBytesPerSecond.append(size*4/duration/1e6)
+    print(sizes)
+    print(durations)
+    print(megaBytesPerSecond)
+    plt.figure(1)
+    plt.subplot(211)
+    plt.plot(sizes, durations, 'bs')
+    plt.xlabel('upload size [samples]')
+    plt.ylabel('duration per upload [us]')
+    plt.subplot(212)
+    plt.plot(sizes, megaBytesPerSecond, 'g^')
+    plt.xlabel('upload size [samples]')
+    plt.ylabel('performance [MB/s]')
+    plt.show()
+
+    # list waveforms
+    wlistSize = qwg1.WlistSize()
+    print('WLIST size: ', wlistSize)
+    print('WLIST: ', qwg1.Wlist())
+
+    # show some info
     print('Identity: ', qwg1.getIdentity())
     print('Error messages: ')
     for i in range(qwg1.getSystemErrorCount()):
