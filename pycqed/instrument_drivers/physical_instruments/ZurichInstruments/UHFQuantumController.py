@@ -497,15 +497,15 @@ class UHFQC(Instrument):
             raise KeyError("exceeding max AWG wave lenght of 1493 samples for I channel, trying to upload {} samples".format(len(Iwave)))
         elif len(Qwave)>1493:
             raise KeyError("exceeding max AWG wave lenght of 1493 samples for Q channel, trying to upload {} samples".format(len(Qwave)))
-        
+
         Iwave_strip=",".join(str(bit) for bit in Iwave)
         Qwave_strip=",".join(str(bit) for bit in Qwave)
-        wave_I_string = "wave Iwave = vect("+Iwave_strip+");\n" 
+        wave_I_string = "wave Iwave = vect("+Iwave_strip+");\n"
         wave_Q_string = "wave Qwave = vect("+Qwave_strip+");\n"
-        
+
         delay_samples = int(acquisition_delay*1.8e9/8)
         delay_string='\twait({});\n'.format(delay_samples)
-        
+
 
         preamble="""
 const TRIGGER1  = 0x000001;
@@ -530,7 +530,7 @@ repeat(loop_cnt) {
 
 
         end_string="""
-\tsetTrigger(WINT_TRIG +RO_TRIG);
+\tsetTrigger(WINT_EN +RO_TRIG);
 \tsetTrigger(WINT_EN);
 \twaitWave();
 }
@@ -558,8 +558,9 @@ if(getUserReg(1)){
 repeat(loop_cnt) {
 \twaitDigTrigger(1, 0);
 \twaitDigTrigger(1, 1);\n
-\tsetTrigger(WINT_TRIG +RO_TRIG);
+\tsetTrigger(WINT_EN +RO_TRIG);
 \tsetTrigger(WINT_EN);
+\twait(300);
 }
 setTrigger(0);"""
         self.awg_string(string)
@@ -567,7 +568,7 @@ setTrigger(0);"""
 
 
     def awg_sequence_acquisition_and_pulse_SSB(self, f_RO_mod, RO_amp, RO_pulse_length, acquisition_delay):
-        f_sampling=1.8e9         
+        f_sampling=1.8e9
         samples=RO_pulse_length*f_sampling
         array=np.arange(int(samples))
         sinwave=RO_amp*np.sin(2*np.pi*array*f_RO_mod/f_sampling)

@@ -307,15 +307,14 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         elif self.RO_pulse_type() is 'MW_IQmod_pulse_UHFQC':
             eval('self._acquisition_instr.sigouts_{}_offset({})'.format(self.RO_I_channel(),self.RO_I_offset()))
             eval('self._acquisition_instr.sigouts_{}_offset({})'.format(self.RO_Q_channel(),self.RO_Q_offset()))
-            if 'UHFQC' in acquisition_instr:
-                self._acquisition_instr.awg_sequence_acquisition_and_pulse_SSB(f_RO_mod=self.f_RO_mod(), RO_amp=self.RO_pulse_amp(), RO_pulse_length=self.RO_pulse_length(), acquisition_delay=270e-9)
+            self._acquisition_instr.awg_sequence_acquisition_and_pulse_SSB(f_RO_mod=self.f_RO_mod(), RO_amp=self.RO_pulse_amp(), RO_pulse_length=self.RO_pulse_length(), acquisition_delay=270e-9)
         elif self.RO_pulse_type.get() is 'Gated_MW_RO_pulse':
             self.rf_RO_source.pulsemod_state.set('on')
             self.rf_RO_source.frequency(self.f_RO.get())
             self.rf_RO_source.power(self.RO_pulse_power.get())
             self.rf_RO_source.frequency(self.f_RO())
             self.rf_RO_source.on()
-            if 'UHFQC' in acquisition_instr:
+            if 'UHFQC' in self.acquisition_instr():
                 self._acquisition_instr.awg_sequence_acquisition()
 
 
