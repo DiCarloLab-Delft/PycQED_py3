@@ -1592,6 +1592,7 @@ class UHFQC_input_average_detector(Hard_Detector):
             self.AWG.stop()
         self.UHFQC.quex_iavg_length(self.nr_samples)
         self.UHFQC.quex_iavg_avgcnt(int(np.log2(self.nr_averages)))
+        UHFQC_1.awgs_0_userregs_1(1)#0 for rl, 1 for iavg
 
     def finish(self):
         if self.AWG is not None:
@@ -1672,6 +1673,7 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         # Configure the result logger to not do any averaging
         # The AWG program uses userregs/0 to define the number o iterations in the loop
         self.UHFQC.awgs_0_userregs_0(int(self.nr_averages*len(sweep_points)))
+        UHFQC_1.awgs_0_userregs_1(0)#0 for rl, 1 for iavg
 
     def finish(self):
         if self.AWG is not None:
@@ -1729,6 +1731,7 @@ class UHFQC_integration_logging_det(Hard_Detector):
         self.UHFQC.quex_rl_avgcnt(LOG2_RL_AVG_CNT)
         self.UHFQC.quex_wint_length(int(self.integration_length*(1.8e9)))
         self.UHFQC.quex_rl_source(2) #this sets the result to integration and rotation outcome
+        UHFQC_1.awgs_0_userregs_1(0)#0 for rl, 1 for iavg
 
     def finish(self):
         if self.AWG is not None:

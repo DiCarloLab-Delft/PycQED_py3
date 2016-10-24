@@ -35,7 +35,7 @@ class UHFQC(Instrument):
             server_name:    (str) qcodes instrument server
             address:        (int) the address of the data server e.g. 8006
         '''
-
+        #self.socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1) #suggestion W vlothuizen
         t0 = time.time()
         super().__init__(name, server_name)
 
@@ -157,19 +157,11 @@ class UHFQC(Instrument):
         LOG2_RL_AVG_CNT = 0
 
         # Load an AWG program (from Zurich Instruments/LabOne/WebServer/awg/src)
-        #self.acquisition_sequence(mode='rl')
-
-        # The AWG program uses userregs/0 to define the number o iterations in the loop
-        self.awgs_0_userregs_0(pow(2, LOG2_AVG_CNT)*pow(2, LOG2_RL_AVG_CNT))
-        self.awgs_0_single(1)
+        self.awg_sequence_acquisition()
 
         # Turn on both outputs
         self.sigouts_0_on(1)
         self.sigouts_1_on(1)
-
-        # Configure the input averager length and averaging count
-        self.quex_iavg_length(4096)
-        self.quex_iavg_avgcnt(LOG2_AVG_CNT)
 
         # QuExpress thresholds on DIO (mode == 2), AWG control of DIO (mode == 1)
         self.dios_0_mode(2)
@@ -181,12 +173,12 @@ class UHFQC(Instrument):
         self.awgs_0_triggers_0_level(0.000000000)
         self.awgs_0_triggers_0_channel(2)
 
+
         # Straight connection, signal input 1 to channel 1, signal input 2 to channel 2
         self.quex_deskew_0_col_0(1.0)
         self.quex_deskew_0_col_1(0.0)
         self.quex_deskew_1_col_0(0.0)
         self.quex_deskew_1_col_1(1.0)
-
 
         self.quex_wint_delay(0)
 
@@ -241,14 +233,7 @@ class UHFQC(Instrument):
         print(filename)
         with open(filename, 'r') as awg_file:
             sourcestring = awg_file.read()
-            print(sourcestring)
-            h = self._daq.awgModule()
-            h.set('awgModule/device', self._device)
-            h.set('awgModule/index', 0)
-            h.execute()
-            h.set('awgModule/compiler/sourcestring', sourcestring)
-            h.set('awgModule/compiler/start', 1)
-            h.set('awgModule/elf/file', '')
+            self.awg_string(sourcestring)
 
     def _do_set_AWG_file(self, filename):
         self.awg('UHFLI_AWG_sequences/'+filename)
@@ -503,7 +488,7 @@ class UHFQC(Instrument):
 
     ## sequencer functions
 
-    def awg_sequence_acquisition_and_pulse(self, Iwave, Qwave, acquisition_delay, acquisition_mode):
+    def awg_sequence_acquisition_and_pulse(self, Iwave, Qwave, acquisition_delay):
         if np.max(Iwave)>1.0 or np.min(Iwave)<-1.0:
             raise KeyError("exceeding AWG range for I channel, all values should be withing +/-1")
         elif np.max(Qwave)>1.0 or np.min(Qwave)<-1.0:
@@ -512,13 +497,6 @@ class UHFQC(Instrument):
             raise KeyError("exceeding max AWG wave lenght of 1493 samples for I channel, trying to upload {} samples".format(len(Iwave)))
         elif len(Qwave)>1493:
             raise KeyError("exceeding max AWG wave lenght of 1493 samples for Q channel, trying to upload {} samples".format(len(Qwave)))
-
-        if acquisition_mode=="iavg":
-            trigger_string = '\tsetTrigger(IAVG_TRIG + WINT_EN);'
-        elif acquisition_mode=='rl':
-            trigger_string = '\tsetTrigger(WINT_TRIG + WINT_EN);'
-        else:
-            raise KeyError("no valid acquisition mode")
         
         Iwave_strip=",".join(str(bit) for bit in Iwave)
         Qwave_strip=",".join(str(bit) for bit in Qwave)
@@ -536,7 +514,13 @@ const IAVG_TRIG = 0x000020;
 const WINT_EN   = 0x0f0000;
 
 setTrigger(WINT_EN);
-var loop_cnt = getUserReg(0);\n"""
+var loop_cnt = getUserReg(0);
+var RO_TRIG;
+if(getUserReg(1)){
+  RO_TRIG=IAVG_TRIG;
+}else{
+  RO_TRIG=WINT_TRIG;
+}\n"""
 
         loop_start="""
 repeat(loop_cnt) {
@@ -544,26 +528,19 @@ repeat(loop_cnt) {
 \twaitDigTrigger(1, 1);
 \tplayWave(Iwave,Qwave);\n"""
 
+
         end_string="""
+\tsetTrigger(WINT_TRIG +RO_TRIG);
 \tsetTrigger(WINT_EN);
 \twaitWave();
 }
 setTrigger(0);"""
 
-        string = preamble+wave_I_string+wave_Q_string+loop_start+delay_string+trigger_string+end_string
+        string = preamble+wave_I_string+wave_Q_string+loop_start+delay_string+end_string
         self.awg_string(string)
 
-    def awg_sequence_acquisition(self, acquisition_mode):
-        print(acquisition_mode)
-        if acquisition_mode=="iavg":
-            trigger_string = '\tsetTrigger(IAVG_TRIG + WINT_EN);'
-        elif acquisition_mode=='rl':
-            trigger_string = '\tsetTrigger(WINT_TRIG + WINT_EN);'
-        else:
-            raise KeyError("no valid acquisition mode")
-
-
-        preamble="""
+    def awg_sequence_acquisition(self):
+        string="""
 const TRIGGER1  = 0x000001;
 const WINT_TRIG = 0x000010;
 const IAVG_TRIG = 0x000020;
@@ -571,13 +548,32 @@ const WINT_EN   = 0x0f0000;
 
 setTrigger(WINT_EN);
 var loop_cnt = getUserReg(0);
+var RO_TRIG;
+if(getUserReg(1)){
+  RO_TRIG=IAVG_TRIG;
+}else{
+  RO_TRIG=WINT_TRIG;
+}
 
 repeat(loop_cnt) {
 \twaitDigTrigger(1, 0);
-\twaitDigTrigger(1, 1);\n"""
-        end_string="""
+\twaitDigTrigger(1, 1);\n
+\tsetTrigger(WINT_TRIG +RO_TRIG);
 \tsetTrigger(WINT_EN);
 }
 setTrigger(0);"""
-        string = preamble+trigger_string+end_string
         self.awg_string(string)
+
+
+
+    def awg_sequence_acquisition_and_pulse_SSB(self, f_RO_mod, RO_amp, RO_pulse_length, acquisition_delay):
+        f_sampling=1.8e9         
+        samples=RO_pulse_length*f_sampling
+        array=np.arange(int(samples))
+        sinwave=RO_amp*np.sin(2*np.pi*array*f_RO_mod/f_sampling)
+        coswave=RO_amp*np.cos(2*np.pi*array*f_RO_mod/f_sampling)
+        Iwave = coswave+sinwave;
+        Qwave = coswave-sinwave;
+        # Iwave, Qwave = PG.mod_pulse(np.ones(samples), np.zeros(samples), f=f_RO_mod, phase=0, sampling_rate=f_sampling)
+        self.awg_sequence_acquisition_and_pulse(Iwave, Qwave, acquisition_delay)
+

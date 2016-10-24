@@ -163,6 +163,7 @@ class HeterodyneInstrument(Instrument):
                 # Configure the result logger to not do any averaging
                 # The AWG program uses userregs/0 to define the number o iterations in the loop
                 self._acquisition_instr.awgs_0_userregs_0(int(self.nr_averages()))
+                UHFQC_1.awgs_0_userregs_1(1)#0 for rl, 1 for iavg
 
         self.LO.on()
         # Changes are now incorporated in the awg seq
@@ -192,10 +193,8 @@ class HeterodyneInstrument(Instrument):
             dat = d[0][0]+1j*d[1][0]
         elif 'UHFQC' in self.acquisition_instr():
             t0 = time.time()
-            self._acquisition_instr.awgs_0_single(1)
             self._acquisition_instr.awgs_0_enable(1)
             temp = self._acquisition_instr.awgs_0_enable()  #probing the values to be sure communication is finished before starting AWG
-            temp = self._acquisition_instr.awgs_0_single()
             del temp
             # self.AWG.start()
 

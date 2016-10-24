@@ -438,7 +438,6 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
 
 
             elif 'UHFQC' in str(self.acquisition_instr):
-                print('cdet', self.weight_function_I)
                 self.MC.set_detector_function(
                     det.UHFQC_integration_logging_det(self.acquisition_instr,
                                                           self.AWG, channels=[self.weight_function_I,self.weight_function_Q],
@@ -519,6 +518,7 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
             elif 'UHFQC' in str(self.acquisition_instr):
                 nr_samples = 4096
                 self.AWG.stop()
+                self.UHFQC.awgs_0_userregs_1(1)#0 for rl, 1 for iavg
                 self.UHFQC.quex_iavg_length(nr_samples)
                 self.UHFQC.quex_iavg_avgcnt(int(np.log2(self.nr_averages)))
                 SWF = awg_swf.OffOn(
@@ -533,6 +533,7 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
                 while self.UHFQC.awgs_0_enable() == 1:
                     time.sleep(0.1)
                 time.sleep(1)
+
 
                 dataset = self.UHFQC.quex_iavg_data_0()
                 transient0_I=dataset[0]['vector']

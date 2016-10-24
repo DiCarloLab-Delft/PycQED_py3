@@ -146,7 +146,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                            parameter_class=ManualParameter)
 
         self.add_parameter('RO_pulse_type', initial_value='MW_IQmod_pulse_tek',
-                           vals=vals.Enum('MW_IQmod_pulse_tek', 'MW_IQmod_pulse_nontek', 'Gated_MW_RO_pulse'),
+                           vals=vals.Enum('MW_IQmod_pulse_tek', 'MW_IQmod_pulse_UHFQC', 'Gated_MW_RO_pulse'),
                            parameter_class=ManualParameter)
         # Relevant when using a marker channel to gate a MW-RO tone.
         self.add_parameter('RO_pulse_marker_channel',
@@ -264,7 +264,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                 'Spec source for pulsed spectroscopy does not support pulsing!')
         self.cw_source.on()
 
-    def prepare_for_timedomain(self):
+    def prepare_for_timedomain(self, input_averaging=False):
         # makes sure the settings of the acquisition instrument are reloaded
         self.acquisition_instr(self.acquisition_instr())
         self.rf_RO_source.pulsemod_state('On')
@@ -299,20 +299,25 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         self.AWG.set(self.pulse_Q_channel.get()+'_offset',
                      self.pulse_Q_offset.get())
 
-        if self.RO_pulse_type.get() is 'MW_IQmod_pulse_tek':
+        if self.RO_pulse_type() is 'MW_IQmod_pulse_tek':
             self.AWG.set(self.RO_I_channel.get()+'_offset',
                          self.RO_I_offset.get())
             self.AWG.set(self.RO_Q_channel.get()+'_offset',
                          self.RO_Q_offset.get())
-        elif self.RO_pulse_type.get() is 'MW_IQmod_pulse_nontek':
+        elif self.RO_pulse_type() is 'MW_IQmod_pulse_UHFQC':
             eval('self._acquisition_instr.sigouts_{}_offset({})'.format(self.RO_I_channel(),self.RO_I_offset()))
             eval('self._acquisition_instr.sigouts_{}_offset({})'.format(self.RO_Q_channel(),self.RO_Q_offset()))
+            if 'UHFQC' in acquisition_instr:
+                self._acquisition_instr.awg_sequence_acquisition_and_pulse_SSB(f_RO_mod=self.f_RO_mod(), RO_amp=self.RO_pulse_amp(), RO_pulse_length=self.RO_pulse_length(), acquisition_delay=270e-9)
         elif self.RO_pulse_type.get() is 'Gated_MW_RO_pulse':
             self.rf_RO_source.pulsemod_state.set('on')
             self.rf_RO_source.frequency(self.f_RO.get())
             self.rf_RO_source.power(self.RO_pulse_power.get())
             self.rf_RO_source.frequency(self.f_RO())
             self.rf_RO_source.on()
+            if 'UHFQC' in acquisition_instr:
+                self._acquisition_instr.awg_sequence_acquisition()
+
 
     def calibrate_mixer_offsets(self, signal_hound, offs_type='pulse',
                                 update=True):
