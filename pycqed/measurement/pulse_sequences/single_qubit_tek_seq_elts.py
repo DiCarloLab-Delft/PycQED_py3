@@ -32,16 +32,19 @@ def Pulsed_spec_seq(spec_pars, RO_pars, return_seq=False):
         RO_pars:        dict containing RO pars
     '''
     period = spec_pars['pulse_delay'] + RO_pars['pulse_delay']
-    remainder = period % (1/RO_pars['fixed_point_frequency'])
-
-    msg = ('Period of spec seq ({})'.format(period) +
-           'must be multiple of RO modulation period ({})'.format(
-           1/RO_pars['fixed_point_frequency']) +
-           "\nAdding {}s to spec_pars['pulse_delay']".format(
-                1/RO_pars['fixed_point_frequency'] - remainder) +
-           '\nConsider updating parameter')
+    fixed_point_freq = RO_pars['fixed_point_frequency']
+    if fixed_point_freq==None:
+        remainder = 0.0
+    else:
+        remainder = period % (1/RO_pars['fixed_point_frequency'])
 
     if (remainder != 0.0):
+        msg = ('Period of spec seq ({})'.format(period) +
+               'must be multiple of RO modulation period ({})'.format(
+               1/RO_pars['fixed_point_frequency']) +
+               "\nAdding {}s to spec_pars['pulse_delay']".format(
+                    1/RO_pars['fixed_point_frequency'] - remainder) +
+               '\nConsider updating parameter')
         logging.warning(msg)
         print(msg)
         spec_pars['pulse_delay'] += 1/RO_pars['fixed_point_frequency'] - remainder
@@ -77,6 +80,8 @@ def photon_number_splitting_seq(spec_pars, RO_pars, disp_pars, return_seq=False)
         RO_pars:        dict containing RO pars
     '''
     period = spec_pars['pulse_delay'] + RO_pars['pulse_delay']
+
+
     msg = ('Period of spec seq ({})'.format(period) +
            'must be multiple of RO modulation period ({})'.format(
            1/RO_pars['fixed_point_frequency']))
