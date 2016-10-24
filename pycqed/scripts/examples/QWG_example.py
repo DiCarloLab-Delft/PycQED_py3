@@ -150,10 +150,10 @@ if __name__ == '__main__':
     plt.show()
 
     # waveform upload performance
-    sizes = [100, 250, 1000, 1500, 2000, 2500]
+    sizes = [100, 500, 1000, 1500, 2000, 2500]
+    nrIter = 10
     durations = []
     megaBytesPerSecond = []
-    nrIter = 10
     for size in sizes:
         wvTest = Waveform.sin(fs, size, f)
         markStart = time.perf_counter()
@@ -171,10 +171,12 @@ if __name__ == '__main__':
     plt.plot(sizes, durations, 'bs')
     plt.xlabel('upload size [samples]')
     plt.ylabel('duration per upload [us]')
+    plt.axis([0, 2600, 0, 100])
     plt.subplot(212)
     plt.plot(sizes, megaBytesPerSecond, 'g^')
     plt.xlabel('upload size [samples]')
     plt.ylabel('performance [MB/s]')
+    plt.axis([0, 2600, 0, 400])
     plt.show()
 
     # list waveforms
