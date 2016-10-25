@@ -534,6 +534,7 @@ repeat(loop_cnt) {
 \tsetTrigger(WINT_EN);
 \twaitWave();
 }
+wait(300);
 setTrigger(0);"""
 
         string = preamble+wave_I_string+wave_Q_string+loop_start+delay_string+end_string

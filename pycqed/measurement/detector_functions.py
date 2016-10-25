@@ -1705,12 +1705,18 @@ class UHFQC_integration_logging_det(Hard_Detector):
         self.UHFQC.awgs_0_enable(1)
         time.sleep(0.1)
         temp = self.UHFQC.awgs_0_enable()  #probing the values to be sure communication is finished before starting AWG
+        print("enable", temp)
+        temp = self.UHFQC.awgs_0_single()
         del temp
+
         if self.AWG is not None:
             self.AWG.start()
         while self.UHFQC.awgs_0_enable() == 1:
             time.sleep(0.1)
-        time.sleep(1)
+        time.sleep(2)
+        temp = self.UHFQC.awgs_0_enable()  #probing the values to be sure communication is finished before starting AWG
+        print("enable", temp)
+
         data = ['']*len(self.channels)
         for i, channel in enumerate(self.channels):
             dataset = eval("self.UHFQC.quex_rl_data_{}()".format(channel))
@@ -1721,18 +1727,19 @@ class UHFQC_integration_logging_det(Hard_Detector):
         if self.AWG is not None:
             self.AWG.stop()
         # The averaging-count is used to specify how many times the AWG program should run
-        LOG2_AVG_CNT = 12 #hardcoded to 4096 shots right now
+        nr_shots = 255 #hardcoded to 4095 shots right now
 
         # This averaging count specifies how many measurements the result logger should average
         LOG2_RL_AVG_CNT = 0 # for single shot readout
 
         # The AWG program uses userregs/0 to define the number o iterations in the loop
-        self.UHFQC.awgs_0_userregs_0(pow(2, LOG2_AVG_CNT)*pow(2, LOG2_RL_AVG_CNT))
-        self.UHFQC.quex_rl_length(pow(2, LOG2_AVG_CNT)-1)
+        self.UHFQC.awgs_0_userregs_1(0)#0 for rl, 1 for iavg
+        self.UHFQC.awgs_0_userregs_0(nr_shots*pow(2, LOG2_RL_AVG_CNT))
+        self.UHFQC.quex_rl_length(nr_shots)
         self.UHFQC.quex_rl_avgcnt(LOG2_RL_AVG_CNT)
         self.UHFQC.quex_wint_length(int(self.integration_length*(1.8e9)))
         self.UHFQC.quex_rl_source(2) #this sets the result to integration and rotation outcome
-        self.UHFQC.awgs_0_userregs_1(0)#0 for rl, 1 for iavg
+
 
     def finish(self):
         if self.AWG is not None:

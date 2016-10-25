@@ -100,7 +100,7 @@ def multi_pulse_elt(i, station, pulse_list):
                                     refpulse=last_pulse, refpoint='start')
 
             elif (pulse_pars['pulse_type'] == 'MW_IQmod_pulse_tek' or
-                  pulse_pars['pulse_type'] ==  'MW_IQmod_pulse_nontek' or
+                  pulse_pars['pulse_type'] ==  'MW_IQmod_pulse_UHFQC' or
                   pulse_pars['pulse_type'] == 'Gated_MW_RO_pulse'):
                 # Does more than just call the function as it also adds the
                 # markers. Ideally we combine both in one function in pulselib
@@ -123,7 +123,7 @@ def multi_pulse_elt(i, station, pulse_list):
                         start=pulse_pars['pulse_delay'], refpulse=last_pulse,
                         refpoint='start',
                         fixed_point_freq=pulse_pars['fixed_point_frequency'])
-                elif pulse_pars['pulse_type'] == 'MW_IQmod_pulse_nontek':
+                elif pulse_pars['pulse_type'] == 'MW_IQmod_pulse_UHFQC':
                     #"adding a 0 amp pulse because the sequencer needs an element for timing
                     last_pulse=el.add(pulse.SquarePulse(
                             name='RO_marker', amplitude=0,

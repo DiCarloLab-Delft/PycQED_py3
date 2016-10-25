@@ -377,7 +377,7 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
     def __init__(self, measurement_name,  MC, AWG, acquisition_instr, pulse_pars, RO_pars,
                  raw=True, analyze=True, upload=True, IF=None, weight_function_I=0, weight_function_Q=1,
                  optimized_weights=False, wait=0.0, close_fig=True, SSB=False,
-                 nr_averages=1024, integration_length=1e-6, **kw):
+                 nr_averages=1024, integration_length=1e-6, nr_shots=None, **kw):
         self.detector_control = 'soft'
         self.name = 'SSRO_Fidelity'
         # For an explanation of the difference between the different
