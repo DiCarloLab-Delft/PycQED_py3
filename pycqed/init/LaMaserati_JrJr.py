@@ -2,6 +2,8 @@
 This scripts initializes the instruments and imports the modules
 """
 
+UHFQC=False
+
 
 # General imports
 
@@ -68,7 +70,8 @@ import pycqed.instrument_drivers.meta_instrument.CBox_LookuptableManager as lm
 
 from pycqed.instrument_drivers.meta_instrument.qubit_objects import CBox_driven_transmon as qb
 from pycqed.instrument_drivers.physical_instruments import QuTech_Duplexer as qdux
-from pycqed.instrument_drivers.physical_instruments.ZurichInstruments import UHFQuantumController as ZI_UHFQC
+if UHFQC:
+    from pycqed.instrument_drivers.physical_instruments.ZurichInstruments import UHFQuantumController as ZI_UHFQC
 from pycqed.instrument_drivers.physical_instruments import Weinschel_8320_novisa
 
 # Initializing instruments
@@ -97,9 +100,12 @@ station.add_component(AWG520)
 IVVI = iv.IVVI('IVVI', address='COM4', numdacs=16, server_name=None)
 station.add_component(IVVI)
 
-#Initializing UHFQC
-UHFQC_1 = ZI_UHFQC.UHFQC('UHFQC_1', device='dev2178', server_name=None)
-station.add_component(UHFQC_1)
+if UHFQC:
+    #Initializing UHFQC
+    UHFQC_1 = ZI_UHFQC.UHFQC('UHFQC_1', device='dev2178', server_name=None)
+    station.add_component(UHFQC_1)
+else:
+    UHFQC_1=None
 
 # ATT = Weinschel_8320_novisa.Weinschel_8320(name='ATT',address='192.168.0.54', server_name=None)
 # station.add_component(ATT)
@@ -230,37 +236,50 @@ from scripts.Experiments.FiveQubits import common_functions as cfct
 cfct.set_AWG_limits(station,1.7)
 
 
-def switch_to_pulsed_RO_CBox(qubit):
-    UHFQC_1.awg_sequence_acquisition()
-    qubit.RO_pulse_type('Gated_MW_RO_pulse')
-    qubit.RO_acq_marker_delay(175e-9)
-    qubit.acquisition_instr('CBox')
-    qubit.RO_acq_marker_channel('ch3_marker1')
-    qubit.RO_acq_weight_function_I(0)
-    qubit.RO_acq_weight_function_Q(1)
+if UHFQC:
+    def switch_to_pulsed_RO_CBox(qubit):
+        UHFQC_1.awg_sequence_acquisition()
+        qubit.RO_pulse_type('Gated_MW_RO_pulse')
+        qubit.RO_acq_marker_delay(175e-9)
+        qubit.acquisition_instr('CBox')
+        qubit.RO_acq_marker_channel('ch3_marker1')
+        qubit.RO_acq_weight_function_I(0)
+        qubit.RO_acq_weight_function_Q(1)
 
-def switch_to_pulsed_RO_UHFQC(qubit):
-    UHFQC_1.awg_sequence_acquisition()
-    qubit.RO_pulse_type('Gated_MW_RO_pulse')
-    qubit.RO_acq_marker_delay(175e-9)
-    qubit.acquisition_instr('UHFQC_1')
-    qubit.RO_acq_marker_channel('ch3_marker2')
-    qubit.RO_acq_weight_function_I(0)
-    qubit.RO_acq_weight_function_Q(1)
+    def switch_to_pulsed_RO_UHFQC(qubit):
+        UHFQC_1.awg_sequence_acquisition()
+        qubit.RO_pulse_type('Gated_MW_RO_pulse')
+        qubit.RO_acq_marker_delay(175e-9)
+        qubit.acquisition_instr('UHFQC_1')
+        qubit.RO_acq_marker_channel('ch3_marker2')
+        qubit.RO_acq_weight_function_I(0)
+        qubit.RO_acq_weight_function_Q(1)
 
 
-def switch_to_IQ_mod_RO_UHFQC(qubit):
-    UHFQC_1.awg_sequence_acquisition_and_pulse_SSB(f_RO_mod=qubit.f_RO_mod(),
-                RO_amp=qubit.RO_amp(), RO_pulse_length=qubit.RO_pulse_length(),
-                acquisition_delay=270e-9)
-    qubit.RO_pulse_type('MW_IQmod_pulse_UHFQC')
-    qubit.RO_acq_marker_delay(-100e-9)
-    qubit.acquisition_instr('UHFQC_1')
-    qubit.RO_acq_marker_channel('ch3_marker2')
-    qubit.RO_I_channel('0')
-    qubit.RO_Q_channel('1')
-    qubit.RO_acq_weight_function_I(0)
-    qubit.RO_acq_weight_function_Q(1)
+    def switch_to_IQ_mod_RO_UHFQC(qubit):
+        UHFQC_1.awg_sequence_acquisition_and_pulse_SSB(f_RO_mod=qubit.f_RO_mod(),
+                    RO_amp=qubit.RO_amp(), RO_pulse_length=qubit.RO_pulse_length(),
+                    acquisition_delay=270e-9)
+        qubit.RO_pulse_type('MW_IQmod_pulse_UHFQC')
+        qubit.RO_acq_marker_delay(-100e-9)
+        qubit.acquisition_instr('UHFQC_1')
+        qubit.RO_acq_marker_channel('ch3_marker2')
+        qubit.RO_I_channel('0')
+        qubit.RO_Q_channel('1')
+        qubit.RO_acq_weight_function_I(0)
+        qubit.RO_acq_weight_function_Q(1)
+else:
+    def switch_to_pulsed_RO_CBox(qubit):
+        qubit.RO_pulse_type('Gated_MW_RO_pulse')
+        qubit.RO_acq_marker_delay(175e-9)
+        qubit.acquisition_instr('CBox')
+        qubit.RO_acq_marker_channel('ch3_marker1')
+        qubit.RO_acq_weight_function_I(0)
+        qubit.RO_acq_weight_function_Q(1)
+
+
+q0 = AncT
+q1 = DataT
 
 #preparing UHFQC readout with IQ mod pulses
 
