@@ -225,7 +225,19 @@ class Transmon(Qubit):
                                       f_pred+f_span/2,
                                       f_step)
                 elif self.f_qubit_calc() is 'flux':
-                    raise ValueError('Not Implemented yet.')
+                    fluxes = self.FluxCtrl.flux_vector()
+                    mappings = np.array(self.FluxCtrl.dac_mapping())
+                    my_flux = np.sum(np.where(mappings == self.dac_channel(),
+                                              mappings,
+                                              0))
+                    omega = lambda flux, f_max, EC, asym: (f_max + EC) * (asym**2 + (1-asym**2)*np.cos(np.pi*flux)**2)**0.25 - EC
+                    f_pred = lambda flux: omega(flux=fluxes[my_flux],
+                                                f_max=self.f_max()*1e-9,
+                                                EC=self.E_c()*1e-9,
+                                                asym=self.asymmetry())*1e9
+                    freqs = np.arange(f_pred-f_span/2,
+                                      f_pred+f_span/2,
+                                      f_step)
             # args here should be handed down from the top.
             self.measure_spectroscopy(freqs, pulsed=pulsed, MC=None,
                                       analyze=True, close_fig=close_fig, use_max=use_max, update=update)
