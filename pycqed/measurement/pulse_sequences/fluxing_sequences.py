@@ -23,7 +23,7 @@ reload(element)
 kernel_dir_path = 'kernels/'
 # You need to explicitly set this before running any functions from this module
 # I guess there are cleaner solutions :)
-
+cached_kernels = {}
 
 def single_pulse_seq(pulse_pars=None,
                      comp_pulse=True,
@@ -86,10 +86,11 @@ def single_pulse_seq(pulse_pars=None,
 
 
 def chevron_seq_length(lengths, mw_pulse_pars, RO_pars, flux_pulse_pars=None,
-                     verbose=False,
-                     distortion_dict=None,
-                     upload=True,
-                     return_seq=False):
+                       excite=True,
+                       verbose=False,
+                       distortion_dict=None,
+                       upload=True,
+                       return_seq=False):
     '''
 
     '''
@@ -125,7 +126,11 @@ def chevron_seq_length(lengths, mw_pulse_pars, RO_pars, flux_pulse_pars=None,
 
         dead_time = 3e-6
         minus_flux_pulse_pars['pulse_delay'] = dead_time + RO_pars['length']
-        pulse_list = [pulses['X180'], flux_pulse_pars, RO_pars, minus_flux_pulse_pars]
+        if excite:
+            init_pulse = pulses['X180']
+        else:
+            init_pulse = pulses['I']
+        pulse_list = [init_pulse, flux_pulse_pars, RO_pars, minus_flux_pulse_pars]
         # copy first element and set extra wait
         pulse_list[0] = deepcopy(pulse_list[0])
         pulse_list[0]['pulse_delay'] += 0.01e-6 + ((-int(lngt*1e9)) % 50)*1e-9
@@ -257,9 +262,15 @@ def preload_kernels_func(distortion_dict):
     for ch in distortion_dict['ch_list']:
         for kernel in distortion_dict[ch]:
             if kernel is not '':
-                print('Loading {}'.format(kernel_dir_path+kernel))
-                # print(os.path.isfile('kernels/'+kernel))
-                output_dict[ch].append(np.loadtxt(kernel_dir_path+kernel))
+                if kernel in cached_kernels.keys():
+                    print('Cached {}'.format(kernel_dir_path+kernel))
+                    output_dict[ch].append(cached_kernels[kernel])
+                else:
+                    print('Loading {}'.format(kernel_dir_path+kernel))
+                    # print(os.path.isfile('kernels/'+kernel))
+                    kernel_vec = np.loadtxt(kernel_dir_path+kernel)
+                    output_dict[ch].append(kernel_vec)
+                    cached_kernels.update({kernel: kernel_vec})
     return output_dict
 
 
