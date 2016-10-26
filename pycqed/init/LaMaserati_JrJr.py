@@ -73,7 +73,7 @@ from pycqed.instrument_drivers.physical_instruments import QuTech_Duplexer as qd
 if UHFQC:
     from pycqed.instrument_drivers.physical_instruments.ZurichInstruments import UHFQuantumController as ZI_UHFQC
 from pycqed.instrument_drivers.physical_instruments import Weinschel_8320_novisa
-
+from pycqed.instrument_drivers.meta_instrument import Flux_Control as FluxCtrl
 # Initializing instruments
 
 
@@ -107,6 +107,35 @@ if UHFQC:
 else:
     UHFQC_1=None
 
+
+Flux_Control = FluxCtrl.Flux_Control(name='FluxControl',IVVI=station.IVVI)
+station.Flux_Control = Flux_Control
+
+transfer_matrix_dec = np.array([[  4.70306717e-04,  -8.41312977e-05,   3.64442804e-05,  -1.00489353e-05,
+   -2.36455362e-05],
+ [ -6.70464355e-05,   6.39386703e-04,  -4.37263640e-05,  -2.01374983e-05,
+    1.77516922e-05],
+ [  7.69376917e-06,  -4.09893480e-05,   5.35184092e-04,  -2.36755094e-05,
+   -5.34108608e-05],
+ [  3.08518924e-05,   1.11315677e-05,   7.36191927e-05,   4.09078121e-04,
+   -2.63031372e-05],
+ [ -4.51217544e-05,  -1.35430841e-05,  -9.52349548e-05,  -4.18415379e-05,
+    4.09962523e-04]])
+invA = np.array([[  2.17320666e+03,2.79414032e+02,-1.16652799e+02,7.08814870e+01,1.02595827e+02],
+                 [2.16689677e+02,1.59642752e+03,9.70544635e+01,8.55894771e+01,-3.84925724e+01],
+                 [1.52695260e+00,1.25113953e+02,1.90389457e+03,1.42143094e+02,2.51834186e+02],
+                 [-1.55226336e+02,-8.03197377e+01,-3.10695549e+02,2.43001891e+03,1.09956406e+02],
+                 [2.30860259e+02,1.04357646e+02,4.00934628e+02,2.91661201e+02,2.51899161e+03]])
+Flux_Control.transfer_matrix(transfer_matrix_dec)
+Flux_Control.inv_transfer_matrix(invA)
+
+Flux_Control.dac_mapping([1, 2, 3, 4, 5])
+
+Flux_Control.flux_offsets(np.array([3.21499683e-02,-2.91992550e-02,2.88520021e-02,-2.26225717e-06,-9.35805778e-03]))
+
+
+
+
 # ATT = Weinschel_8320_novisa.Weinschel_8320(name='ATT',address='192.168.0.54', server_name=None)
 # station.add_component(ATT)
 # Dux = qdux.QuTech_Duplexer('Dux', address='TCPIP0::192.168.0.101',
@@ -129,6 +158,7 @@ AncB = qbt.Tektronix_driven_transmon('AncB', LO=LO, cw_source=Spec_source,
                                               IVVI=IVVI, rf_RO_source=RF,
                                               AWG=AWG,
                                               heterodyne_instr=HS,
+                                              FluxCtrl=Flux_Control,
                                               MC=MC,
                                               server_name=None)
 station.add_component(AncB)
@@ -137,6 +167,7 @@ AncT = qbt.Tektronix_driven_transmon('AncT', LO=LO, cw_source=Spec_source,
                                               IVVI=IVVI, rf_RO_source=RF,
                                               AWG=AWG,
                                               heterodyne_instr=HS,
+                                              FluxCtrl=Flux_Control,
                                               MC=MC,
                                               server_name=None)
 station.add_component(AncT)
@@ -145,6 +176,7 @@ DataB = qbt.Tektronix_driven_transmon('DataB', LO=LO, cw_source=Spec_source,
                                               IVVI=IVVI, rf_RO_source=RF,
                                               AWG=AWG,
                                               heterodyne_instr=HS,
+                                              FluxCtrl=Flux_Control,
                                               MC=MC,
                                               server_name=None)
 station.add_component(DataB)
@@ -153,6 +185,7 @@ DataM = qbt.Tektronix_driven_transmon('DataM', LO=LO, cw_source=Spec_source,
                                               IVVI=IVVI, rf_RO_source=RF,
                                               AWG=AWG,
                                               heterodyne_instr=HS,
+                                              FluxCtrl=Flux_Control,
                                               MC=MC,
                                               server_name=None)
 station.add_component(DataM)
@@ -161,6 +194,7 @@ DataT = qbt.Tektronix_driven_transmon('DataT', LO=LO, cw_source=Spec_source,
                                               IVVI=IVVI, rf_RO_source=RF,
                                               AWG=AWG,
                                               heterodyne_instr=HS,
+                                              FluxCtrl=Flux_Control,
                                               MC=MC,
                                               server_name=None)
 station.add_component(DataT)
@@ -172,6 +206,41 @@ gen.load_settings_onto_instrument(DataB)
 gen.load_settings_onto_instrument(DataM)
 gen.load_settings_onto_instrument(DataT)
 gen.load_settings_onto_instrument(HS)
+
+DataT.E_c(0.28e9)
+DataT.asymmetry(0)
+DataT.dac_flux_coefficient(0.0016813942523375956)
+DataT.dac_sweet_spot(-53.472554718672427)
+DataT.f_max(5.688884012383026e9)
+DataT.f_qubit_calc('flux')
+
+AncB.E_c(0.28e9)
+AncB.asymmetry(0)
+AncB.dac_flux_coefficient(0.002028986705064149)
+AncB.dac_sweet_spot(36.460579336820274)
+AncB.f_max(6.381268822811037e9)
+AncB.f_qubit_calc('flux')
+
+AncT.E_c(0.28e9)
+AncT.asymmetry(0)
+AncT.dac_flux_coefficient(0.0015092699034525462)
+AncT.dac_sweet_spot(-64.682660992718183)
+AncT.f_max(5.9419418666592483e9)
+AncT.f_qubit_calc('flux')
+
+DataM.E_c(0.28e9)
+DataM.asymmetry(0)
+DataM.dac_flux_coefficient(0.0012685027014113798)
+DataM.dac_sweet_spot(2.4196012752483966)
+DataM.f_max(6.1113712558694182)
+DataM.f_qubit_calc('flux')
+
+DataB.E_c(0.28e9)
+DataB.asymmetry(0)
+DataB.dac_flux_coefficient(0.00094498809508039799)
+DataB.dac_sweet_spot(31.549597601272581)
+DataB.f_max(6.7138650690678894)
+DataB.f_qubit_calc('flux')
 
 
 MC.station = station
