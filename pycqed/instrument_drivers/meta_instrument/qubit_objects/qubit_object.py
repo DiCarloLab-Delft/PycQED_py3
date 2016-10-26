@@ -231,10 +231,11 @@ class Transmon(Qubit):
                                               mappings,
                                               0))
                     omega = lambda flux, f_max, EC, asym: (f_max + EC) * (asym**2 + (1-asym**2)*np.cos(np.pi*flux)**2)**0.25 - EC
-                    f_pred = lambda flux: omega(flux=fluxes[my_flux],
-                                                f_max=self.f_max()*1e-9,
-                                                EC=self.E_c()*1e-9,
-                                                asym=self.asymmetry())*1e9
+                    f_pred_calc = lambda flux: omega(flux=fluxes[my_flux],
+                                                     f_max=self.f_max()*1e-9,
+                                                     EC=self.E_c()*1e-9,
+                                                     asym=self.asymmetry())*1e9
+                    f_pred = f_pred_calc(my_flux)
                     freqs = np.arange(f_pred-f_span/2,
                                       f_pred+f_span/2,
                                       f_step)
