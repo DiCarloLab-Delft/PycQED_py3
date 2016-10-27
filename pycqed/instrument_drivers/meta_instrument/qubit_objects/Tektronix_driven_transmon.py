@@ -46,11 +46,11 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         Depending on the RO_pulse_type some parameters are not used
     '''
     shared_kwargs = ['LO', 'cw_source', 'td_source', 'IVVI', 'AWG', 'CBox',
-                     'heterodyne_instr', 'rf_RO_source', 'MC', 'UHFQC']
+                     'heterodyne_instr', 'rf_RO_source', 'MC', 'UHFQC', 'FluxCtrl']
 
     def __init__(self, name,
                  LO, cw_source, td_source,
-                 IVVI, AWG,
+                 IVVI, AWG, FluxCtrl,
                  heterodyne_instr, MC, rf_RO_source=None, **kw):
         super(CBox_driven_transmon, self).__init__(name, **kw)
         # Change this when inheriting directly from Transmon instead of
@@ -63,6 +63,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         self.heterodyne_instr = heterodyne_instr
         self.AWG = AWG
         self.MC = MC
+        self.FluxCtrl = FluxCtrl
 
         self.add_parameter('mod_amp_cw', label='RO modulation ampl cw',
                            units='V', initial_value=0.5,
@@ -778,7 +779,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         flux_pulse_pars = {'pulse_type': 'SquarePulse',
                       'pulse_delay': .1e-6,
                       'channel': 'ch%d'%self.fluxing_channel,
-                      'amplitude': 0.5,
+                      'amplitude': self.fluxing_amp,
                       'length': 10e-6,
                       'dead_time_length': 10e-6}
 
@@ -816,7 +817,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
             ma.TD_Analysis(auto=True)
         else:
             MC.run('Chevron_2D_%s'%self.name, mode='2D')
-            ma.TwoD_Analysis(auto=True)
+            ma.Chevron_2D(auto=True)
 
 
     def _do_get_acquisition_instr(self):
