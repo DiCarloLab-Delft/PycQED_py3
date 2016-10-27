@@ -203,7 +203,7 @@ class Transmon(Qubit):
                        steps=[1, 3, 10, 30, 100, 300, 1000],
                        freqs=None,
                        f_span=100e6, use_max=False, f_step=1e6,
-                       verbose=True, update=True, num_elements=50,
+                       verbose=True, update=True,
                        close_fig=True):
 
         if method.lower() == 'spectroscopy':
@@ -256,17 +256,16 @@ class Transmon(Qubit):
             # TODO: add updating and fitting
         elif method.lower() == 'ramsey':
 
-            stepsize = 1e-9
+            stepsize = abs(1/self.f_pulse_mod.get())
             cur_freq = self.f_qubit.get()
-            freq_start = self.f_qubit.get()
             # Steps don't double to be more robust against aliasing
             for n in steps:
-                times = np.arange(0.,
-                                  (num_elements+0.5)*n*stepsize, n*stepsize)
+                times = np.arange(self.pulse_delay.get(),
+                                  50*n*stepsize, n*stepsize)
                 artificial_detuning = 4/times[-1]
-                self.f_qubit(cur_freq)
                 self.measure_ramsey(times,
                                     artificial_detuning=artificial_detuning,
+                                    f_qubit=cur_freq,
                                     label='_{}pulse_sep'.format(n),
                                     analyze=False)
                 a = ma.Ramsey_Analysis(auto=True, close_fig=close_fig,
@@ -292,11 +291,9 @@ class Transmon(Qubit):
                     break
             if verbose:
                 print('Converged to: {:.9e}'.format(cur_freq))
-            if not update:
-                self.f_qubit.set(freq_start)
-            else:
-                print("update", update)
-
+            if update:
+                self.f_qubit.set(cur_freq)
+                print("update",update)
             return cur_freq
 
     def find_resonator_frequency(self, **kw):
