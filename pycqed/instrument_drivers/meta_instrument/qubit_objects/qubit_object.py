@@ -229,16 +229,18 @@ class Transmon(Qubit):
                     mappings = np.array(self.FluxCtrl.dac_mapping())
                     my_flux = np.sum(np.where(mappings == self.dac_channel(),
                                               mappings,
-                                              0))
+                                              0))-1
+                    print(mappings, my_flux, self.dac_channel())
                     omega = lambda flux, f_max, EC, asym: (f_max + EC) * (asym**2 + (1-asym**2)*np.cos(np.pi*flux)**2)**0.25 - EC
-                    f_pred_calc = lambda flux: omega(flux=fluxes[my_flux],
+                    f_pred_calc = lambda flux: omega(flux=flux,
                                                      f_max=self.f_max()*1e-9,
                                                      EC=self.E_c()*1e-9,
                                                      asym=self.asymmetry())*1e9
-                    f_pred = f_pred_calc(my_flux)
+                    f_pred = f_pred_calc(fluxes[my_flux])
                     freqs = np.arange(f_pred-f_span/2,
                                       f_pred+f_span/2,
                                       f_step)
+                    print(freqs.min(),freqs.max())
             # args here should be handed down from the top.
             self.measure_spectroscopy(freqs, pulsed=pulsed, MC=None,
                                       analyze=True, close_fig=close_fig, use_max=use_max, update=update)
