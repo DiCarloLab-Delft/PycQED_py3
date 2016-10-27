@@ -6,6 +6,7 @@ import h5py
 from matplotlib import pyplot as plt
 from pycqed.analysis import analysis_toolbox as a_tools
 from pycqed.analysis import fitting_models as fit_mods
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 import scipy.optimize as optimize
 import lmfit
 from collections import Counter  # used in counting string fractions
@@ -17,6 +18,10 @@ import imp
 import math
 from math import erfc
 from scipy.signal import argrelextrema,argrelmax,argrelmin
+from nathan_plotting_tools import *
+
+from pycqed.analysis import ramiro_analysis as RA
+
 imp.reload(dm_tools)
 
 
@@ -2966,8 +2971,9 @@ class T1_Analysis(TD_Analysis):
             ax.text(0.4, 0.95, textstr, transform=ax.transAxes,
                     fontsize=11, verticalalignment='top',
                     bbox=self.box_props)
-            self.save_fig(fig, figname=self.measurementstring+'_' +
-                          self.value_names[i], **kw)
+            self.save_fig(fig, figname=self.measurementstring+'_Fit', **kw)
+            # self.save_fig(fig, figname=self.measurementstring+'_' +
+            #               self.value_names[i], **kw)
             self.save_fig(self.figarray, figname=self.measurementstring, **kw)
         if close_file:
             self.data_file.close()
@@ -5587,7 +5593,7 @@ def fit_qubit_frequency(sweep_points, data, mode='dac',
 #         self.rotate = kw.pop('rotate',True)
 #         super(self.__class__, self).__init__(**kw)
 
-#     def run_default_analysis(self, 
+#     def run_default_analysis(self,
 #                              rotate=True,
 #                              nr_qubits=1,
 #                              no_fits=False,
@@ -6193,3 +6199,125 @@ def fit_qubit_frequency(sweep_points, data, mode='dac',
 #         self.F_corrected = F_corrected
 #         self.SNR = SNR
 
+### Ramiro's routines
+
+
+class Chevron_2D(object):
+    def __init__(self, auto=True, label='', timestamp=None):
+            if timestamp is None:
+                self.folder = a_tools.latest_data('Chevron')
+                splitted = self.folder.split('\\')
+                self.scan_start = splitted[-2]+'_'+splitted[-1][:6]
+                self.scan_stop = self.scan_start
+            else:
+                self.scan_start = timestamp
+                self.scan_stop = timestamp
+                self.folder = a_tools.get_folder(timestamp=self.scan_start)
+            self.pdict = {'I':'amp',
+                     'sweep_points':'sweep_points'}
+            self.opt_dict = {'scan_label':'Chevron_2D'}
+            self.nparams = ['I', 'sweep_points']
+            self.label = label
+            if auto==True:
+                self.analysis()
+    def analysis(self):
+            chevron_scan = RA.quick_analysis(t_start=self.scan_start,
+                                           t_stop=self.scan_stop,
+                                           options_dict=self.opt_dict,
+                                           params_dict_TD=self.pdict,
+                                           numeric_params=self.nparams)
+            x, y, z = self.reshape_data(chevron_scan.TD_dict['sweep_points'][0],
+                                 chevron_scan.TD_dict['I'][0])
+            plot_times = y
+            plot_step = plot_times[1]-plot_times[0]
+
+            plot_x = x
+            x_step = plot_x[1]-plot_x[0]
+
+            result = z
+
+            fig = plt.figure(figsize=(8,6))
+            ax = fig.add_subplot(111)
+            cmin, cmax = 0, 1
+            fig_clim = [cmin, cmax]
+            out = flex_colormesh_plot_vs_xy(ax=ax,clim=fig_clim,cmap='viridis',
+                                 xvals=plot_times,
+                                 yvals=plot_x,
+                                 zvals=result)
+            ax.set_xlabel(r'AWG Amp (Vpp)')
+            ax.set_ylabel(r'Time (ns)')
+            # ax.set_xlim(xmin, xmax)
+            ax.set_ylim(plot_x.min()-x_step/2.,plot_x.max()+x_step/2.)
+            ax.set_xlim(plot_times.min()-plot_step/2.,plot_times.max()+plot_step/2.)
+            #     ax.set_xlim(plot_times.min()-plot_step/2.,plot_times.max()+plot_step/2.)
+            # ax.set_xlim(0,50)
+            #     print('Bounce %d ns amp=%.3f; Pole %d ns amp=%.3f'%(list_values[iter_idx,0],
+            #                                                                list_values[iter_idx,1],
+            #                                                                list_values[iter_idx,2],
+            #                                                                list_values[iter_idx,3]))
+            ax_divider = make_axes_locatable(ax)
+            cax = ax_divider.append_axes('right',size='10%', pad='5%')
+            cbar = plt.colorbar(out['cmap'],cax=cax)
+            cbar.set_ticks(np.arange(fig_clim[0],1.01*fig_clim[1],(fig_clim[1]-fig_clim[0])/5.))
+            cbar.set_ticklabels([str(fig_clim[0]),'','','','',str(fig_clim[1])])
+            cbar.set_label('Qubit excitation probability')
+
+            fig.tight_layout()
+            self.save_fig(fig)
+
+
+    def reshape_axis_2d(self,axis_array):
+        x = axis_array[0, :]
+        y = axis_array[1, :]
+    #     print(y)
+        dimx = np.sum(np.where(x==x[0],1,0))
+        dimy = len(x) // dimx
+    #     print(dimx,dimy)
+        if dimy*dimx<len(x):
+            logging.warning.warn('Data was cut-off. Probably due to an interrupted scan')
+            dimy_c = dimy + 1
+        else:
+            dimy_c = dimy
+    #     print(dimx,dimy,dimy_c,dimx*dimy)
+        return x[:dimy_c],(y[::dimy_c])
+    def reshape_data(self,sweep_points,data):
+        x, y = self.reshape_axis_2d(sweep_points)
+    #     print(x,y)
+        dimx = len(x)
+        dimy = len(y)
+        dim  = dimx*dimy
+        if dim>len(data):
+            dimy = dimy - 1
+        return x,y[:dimy],(data[:dimx*dimy].reshape((dimy,dimx))).transpose()
+
+    def save_fig(self, fig, figname=None, xlabel='x', ylabel='y',
+                 fig_tight=True, **kw):
+        plot_formats = kw.pop('plot_formats', ['png'])
+        fail_counter = False
+        close_fig = kw.pop('close_fig', True)
+        if type(plot_formats) == str:
+            plot_formats = [plot_formats]
+        for plot_format in plot_formats:
+            if figname is None:
+                figname = (self.scan_start+'_Chevron_2D_'+'.'+plot_format)
+            else:
+                figname = (figname+'.' + plot_format)
+            self.savename = os.path.abspath(os.path.join(
+                self.folder, figname))
+            if fig_tight:
+                try:
+                    fig.tight_layout()
+                except ValueError:
+                    print('WARNING: Could not set tight layout')
+            try:
+                fig.savefig(
+                    self.savename, dpi=300,
+                    # value of 300 is arbitrary but higher than default
+                    format=plot_format)
+            except:
+                fail_counter = True
+        if fail_counter:
+            logging.warning('Figure "%s" has not been saved.' % self.savename)
+        if close_fig:
+            plt.close(fig)
+        return
