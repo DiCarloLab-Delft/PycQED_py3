@@ -104,10 +104,16 @@ def chevron_seq_length(lengths, mw_pulse_pars, RO_pars, flux_pulse_pars=None,
     # flux_pulse_pars['amplitude'] = 0.
     minus_flux_pulse_pars = {'pulse_type': 'SquarePulse',
                   'pulse_delay': 0., # will be overwritten
-                  'channel': 'ch3',
+                  'channel': flux_pulse_pars['channel'],
                   'amplitude': -flux_pulse_pars['amplitude'],
                   'length': flux_pulse_pars['length']}
     original_delay = deepcopy(RO_pars)['pulse_delay']
+
+    dead_time_pulse = {'pulse_type': 'SquarePulse',
+                   'pulse_delay': (minus_flux_pulse_pars['length']),
+                   'channel': flux_pulse_pars['channel'],
+                   'amplitude': 0,
+                   'length': 0.}
 
     seq_name = 'Chevron_seq'
     seq = sequence.Sequence(seq_name)
@@ -123,6 +129,7 @@ def chevron_seq_length(lengths, mw_pulse_pars, RO_pars, flux_pulse_pars=None,
                                                          mw_pulse_pars['nr_sigma'])
         msmt_buffer = 50e-9
         RO_pars['pulse_delay'] = msmt_buffer + lngt
+        dead_time_pulse['pulse_delay'] = RO_pars['pulse_delay']
 
         dead_time = 3e-6
         minus_flux_pulse_pars['pulse_delay'] = dead_time + RO_pars['length']
@@ -130,7 +137,7 @@ def chevron_seq_length(lengths, mw_pulse_pars, RO_pars, flux_pulse_pars=None,
             init_pulse = pulses['X180']
         else:
             init_pulse = pulses['I']
-        pulse_list = [init_pulse, flux_pulse_pars, RO_pars, minus_flux_pulse_pars]
+        pulse_list = [init_pulse, flux_pulse_pars, RO_pars, minus_flux_pulse_pars, dead_time_pulse]
         # copy first element and set extra wait
         pulse_list[0] = deepcopy(pulse_list[0])
         pulse_list[0]['pulse_delay'] += 0.01e-6 + ((-int(lngt*1e9)) % 50)*1e-9
