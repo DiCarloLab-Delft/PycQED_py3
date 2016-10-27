@@ -151,17 +151,19 @@ if __name__ == '__main__':
 
     # waveform upload performance
     sizes = [100, 500, 1000, 1500, 2000, 2500]
-    nrIter = 10
+    nrIter = 50
     durations = []
     megaBytesPerSecond = []
     for size in sizes:
         wvTest = Waveform.sin(fs, size, f)
+        qwg1.getOperationComplete()
         markStart = time.perf_counter()
         for i in range(nrIter):
             qwg1.createWaveformReal('testSize{}Nr{}'.format(size, i), wvTest)
+        qwg1.getOperationComplete()
         markEnd = time.perf_counter()
         duration = (markEnd-markStart)/nrIter
-        durations.append(duration*1e6)
+        durations.append(duration*1e3)
         megaBytesPerSecond.append(size*4/duration/1e6)
     print(sizes)
     print(durations)
@@ -170,13 +172,13 @@ if __name__ == '__main__':
     plt.subplot(211)
     plt.plot(sizes, durations, 'bs')
     plt.xlabel('upload size [samples]')
-    plt.ylabel('duration per upload [us]')
-    plt.axis([0, 2600, 0, 100])
+    plt.ylabel('duration per upload [ms]')
+    plt.axis([0, 2600, 0, 5])
     plt.subplot(212)
     plt.plot(sizes, megaBytesPerSecond, 'g^')
     plt.xlabel('upload size [samples]')
     plt.ylabel('performance [MB/s]')
-    plt.axis([0, 2600, 0, 400])
+    plt.axis([0, 2600, 0, 20])
     plt.show()
 
     # list waveforms
