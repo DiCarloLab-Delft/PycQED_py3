@@ -17,7 +17,7 @@ def rabisim(efun, g, t, dt):
     Outputs:
             f_vec,  Evolution for times (1, 1+dt, ..., t)
     """
-    s0 = np.array([1, 0])
+    s0 = np.array([0, 1])
     ts = np.arange(1., t+0.5*dt, dt)
     f = lambda st, ti: np.dot(evol(efun(ti), g, dt), st)
     f_vec = np.zeros((len(ts), 2), dtype=np.complex128)
