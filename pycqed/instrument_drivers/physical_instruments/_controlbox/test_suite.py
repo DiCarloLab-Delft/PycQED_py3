@@ -2,7 +2,7 @@ import unittest
 import numpy as np
 from . import defHeaders
 CBox = None
-from analysis.tools import data_manipulation as dm_tools
+from pycqed.analysis.tools import data_manipulation as dm_tools
 
 
 class CBox_tests(unittest.TestCase):
@@ -14,6 +14,7 @@ class CBox_tests(unittest.TestCase):
     @classmethod
     def setUpClass(self):
         self.CBox = CBox
+        print('CBox: ', self.CBox)
 
     def test_firmware_version(self):
         v = CBox.get('firmware_version')

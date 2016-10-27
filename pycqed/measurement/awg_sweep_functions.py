@@ -1,10 +1,11 @@
 import numpy as np
 import logging
-from measurement import sweep_functions as swf
-from measurement.randomized_benchmarking import randomized_benchmarking as rb
-from measurement.pulse_sequences import standard_sequences as st_seqs
-from measurement.pulse_sequences import single_qubit_tek_seq_elts as sqs
-from measurement.pulse_sequences import single_qubit_2nd_exc_seqs as sqs2
+from pycqed.measurement import sweep_functions as swf
+from pycqed.measurement.randomized_benchmarking import randomized_benchmarking as rb
+from pycqed.measurement.pulse_sequences import standard_sequences as st_seqs
+from pycqed.measurement.pulse_sequences import single_qubit_tek_seq_elts as sqs
+from pycqed.measurement.pulse_sequences import single_qubit_2nd_exc_seqs as sqs2
+from measurement.pulse_sequences import fluxing_sequences as fsqs
 default_gauss_width = 10  # magic number should be removed,
 # note magic number only used in old mathematica seqs
 
@@ -76,6 +77,39 @@ class Rabi_2nd_exc(swf.Hard_Sweep):
                                   pulse_pars_2nd=self.pulse_pars_2nd,
                                   RO_pars=self.RO_pars,
                                   n=self.n)
+
+class chevron_length(swf.Hard_Sweep):
+    def __init__(self, length_vec, mw_pulse_pars,RO_pars,
+                 flux_pulse_pars,dist_dict, AWG, upload=True, return_seq=False):
+        super().__init__()
+        self.length_vec = length_vec
+        self.mw_pulse_pars = mw_pulse_pars
+        self.RO_pars = RO_pars
+        self.flux_pulse_pars = flux_pulse_pars
+        self.dist_dict = dist_dict
+        self.upload = upload
+        self.name = 'Chevron'
+        self.parameter_name = 'Time'
+        self.unit = 's'
+        self.return_seq = return_seq
+        self.AWG = AWG
+
+    def prepare(self, **kw):
+        if self.upload:
+            fsqs.chevron_seq_length(self.length_vec,
+                                    self.mw_pulse_pars,
+                                    self.RO_pars,
+                                    self.flux_pulse_pars,
+                                    distortion_dict=self.dist_dict)
+        self.AWG.start()
+
+    def pre_upload(self, **kw):
+        self.seq = fsqs.chevron_seq_length(self.length_vec,
+                                    self.mw_pulse_pars,
+                                    self.RO_pars,
+                                    self.flux_pulse_pars,
+                                    distortion_dict=self.dist_dict, return_seq=True)
+
 
 
 class Ramsey_2nd_exc(swf.Hard_Sweep):

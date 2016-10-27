@@ -1,8 +1,8 @@
 import numpy as np
-from measurement.randomized_benchmarking.clifford_group import(
+from pycqed.measurement.randomized_benchmarking.clifford_group import(
     clifford_lookuptable)
 
-from measurement.randomized_benchmarking.clifford_decompositions \
+from pycqed.measurement.randomized_benchmarking.clifford_decompositions \
     import(gate_decomposition)
 
 

@@ -10,8 +10,8 @@ from ..waveform_control import element
 from ..waveform_control.element import calculate_time_corr
 from ..waveform_control import pulse
 from ..waveform_control import sequence
-from measurement.randomized_benchmarking import randomized_benchmarking as rb
-from measurement.pulse_sequences.standard_elements import multi_pulse_elt
+from pycqed.measurement.randomized_benchmarking import randomized_benchmarking as rb
+from pycqed.measurement.pulse_sequences.standard_elements import multi_pulse_elt
 
 from importlib import reload
 reload(pulse)
@@ -54,6 +54,7 @@ def Pulsed_spec_seq(spec_pars, RO_pars, return_seq=False):
 
     seq_name = 'Pulsed_spec'
     seq = sequence.Sequence(seq_name)
+    station.pulsar.update_channel_settings()
     el_list = []
 
     pulse_dict = {'spec_pulse': spec_pars, 'RO': RO_pars}
@@ -90,6 +91,7 @@ def photon_number_splitting_seq(spec_pars, RO_pars, disp_pars, return_seq=False)
 
     seq_name = 'Pulsed_spec'
     seq = sequence.Sequence(seq_name)
+    station.pulsar.update_channel_settings()
     el_list = []
 
     pulse_dict = {'disp': disp_pars, 'spec_pulse': spec_pars, 'RO': RO_pars}
@@ -117,6 +119,7 @@ def Rabi_seq(amps, pulse_pars, RO_pars, n=1, post_msmt_delay=3e-6,
     '''
     seq_name = 'Rabi_sequence'
     seq = sequence.Sequence(seq_name)
+    station.pulsar.update_channel_settings()
     el_list = []
     pulses = get_pulse_dict_from_pars(pulse_pars)
     for i, amp in enumerate(amps):  # seq has to have at least 2 elts
@@ -150,6 +153,7 @@ def Rabi_amp90_seq(scales, pulse_pars, RO_pars, n=1, post_msmt_delay=3e-6,
     '''
     seq_name = 'Rabi_amp90_sequence'
     seq = sequence.Sequence(seq_name)
+    station.pulsar.update_channel_settings()
     el_list = []
     pulses = get_pulse_dict_from_pars(pulse_pars)
     for i, scale in enumerate(scales):  # seq has to have at least 2 elts
@@ -184,6 +188,7 @@ def T1_seq(times,
     '''
     seq_name = 'T1_sequence'
     seq = sequence.Sequence(seq_name)
+    station.pulsar.update_channel_settings()
     el_list = []
     RO_pulse_delay = RO_pars['pulse_delay']
     RO_pars = deepcopy(RO_pars)  # Prevents overwriting of the dict
@@ -226,6 +231,7 @@ def Ramsey_seq(times, pulse_pars, RO_pars,
     '''
     seq_name = 'Ramsey_sequence'
     seq = sequence.Sequence(seq_name)
+    station.pulsar.update_channel_settings()
     el_list = []
     # First extract values from input, later overwrite when generating waveforms
     pulses = get_pulse_dict_from_pars(pulse_pars)
@@ -270,6 +276,7 @@ def Echo_seq(times, pulse_pars, RO_pars,
     '''
     seq_name = 'Echo_sequence'
     seq = sequence.Sequence(seq_name)
+    station.pulsar.update_channel_settings()
     el_list = []
 
     pulses = get_pulse_dict_from_pars(pulse_pars)
@@ -310,6 +317,7 @@ def AllXY_seq(pulse_pars, RO_pars, double_points=False,
     '''
     seq_name = 'AllXY_seq'
     seq = sequence.Sequence(seq_name)
+    station.pulsar.update_channel_settings()
     el_list = []
     # Create a dict with the parameters for all the pulses
     pulses = get_pulse_dict_from_pars(pulse_pars)
@@ -358,6 +366,7 @@ def OffOn_seq(pulse_pars, RO_pars,
     '''
     seq_name = 'OffOn_sequence'
     seq = sequence.Sequence(seq_name)
+    station.pulsar.update_channel_settings()
     el_list = []
     # Create a dict with the parameters for all the pulses
     pulses = get_pulse_dict_from_pars(pulse_pars)
@@ -395,6 +404,7 @@ def Butterfly_seq(pulse_pars, RO_pars, initialize=False,
     '''
     seq_name = 'Butterfly_seq'
     seq = sequence.Sequence(seq_name)
+    station.pulsar.update_channel_settings()
     el_list = []
     # Create a dict with the parameters for all the pulses
     pulses = get_pulse_dict_from_pars(pulse_pars)
@@ -478,43 +488,44 @@ def Randomized_Benchmarking_seq(pulse_pars, RO_pars,
     if seq_name is None:
         seq_name = 'RandomizedBenchmarking_sequence'
     seq = sequence.Sequence(seq_name)
+    station.pulsar.update_channel_settings()
     el_list = []
     pulses = get_pulse_dict_from_pars(pulse_pars)
     net_cliffords = [0, 3]  # Exists purely for the double curves mode
     i = 0
     for seed in range(nr_seeds):
-            for j, n_cl in enumerate(nr_cliffords):
-                if double_curves:
-                    net_clifford = net_cliffords[i%2]
-                i += 1  # only used for ensuring unique elt names
+        for j, n_cl in enumerate(nr_cliffords):
+            if double_curves:
+                net_clifford = net_cliffords[i%2]
+            i += 1  # only used for ensuring unique elt names
 
-                if cal_points and (j == (len(nr_cliffords)-4) or
-                                   j == (len(nr_cliffords)-3)):
-                    el = multi_pulse_elt(i, station,
-                                         [pulses['I'], RO_pars])
-                elif cal_points and (j == (len(nr_cliffords)-2) or
-                                     j == (len(nr_cliffords)-1)):
-                    el = multi_pulse_elt(i, station,
-                                         [pulses['X180'], RO_pars])
-                else:
-                    cl_seq = rb.randomized_benchmarking_sequence(
-                        n_cl, desired_net_cl=net_clifford)
-                    pulse_keys = rb.decompose_clifford_seq(cl_seq)
-                    pulse_list = [pulses[x] for x in pulse_keys]
-                    pulse_list += [RO_pars]
-                    # copy first element and set extra wait
-                    pulse_list[0] = deepcopy(pulse_list[0])
-                    pulse_list[0]['pulse_delay'] += post_msmt_delay
-                    el = multi_pulse_elt(i, station, pulse_list)
+            if cal_points and (j == (len(nr_cliffords)-4) or
+                               j == (len(nr_cliffords)-3)):
+                el = multi_pulse_elt(i, station,
+                                     [pulses['I'], RO_pars])
+            elif cal_points and (j == (len(nr_cliffords)-2) or
+                                 j == (len(nr_cliffords)-1)):
+                el = multi_pulse_elt(i, station,
+                                     [pulses['X180'], RO_pars])
+            else:
+                cl_seq = rb.randomized_benchmarking_sequence(
+                    n_cl, desired_net_cl=net_clifford)
+                pulse_keys = rb.decompose_clifford_seq(cl_seq)
+                pulse_list = [pulses[x] for x in pulse_keys]
+                pulse_list += [RO_pars]
+                # copy first element and set extra wait
+                pulse_list[0] = deepcopy(pulse_list[0])
+                pulse_list[0]['pulse_delay'] += post_msmt_delay
+                el = multi_pulse_elt(i, station, pulse_list)
+            el_list.append(el)
+            seq.append_element(el, trigger_wait=True)
+
+            # If the element is too long, add in an extra wait elt
+            # to skip a trigger
+            if resetless and n_cl*pulse_pars['pulse_delay']*1.875 > 50e-6:
+                el = multi_pulse_elt(i, station, [pulses['I']])
                 el_list.append(el)
                 seq.append_element(el, trigger_wait=True)
-
-                # If the element is too long, add in an extra wait elt
-                # to skip a trigger
-                if resetless and n_cl*pulse_pars['pulse_delay']*1.875 > 50e-6:
-                    el = multi_pulse_elt(i, station, [pulses['I']])
-                    el_list.append(el)
-                    seq.append_element(el, trigger_wait=True)
     if upload:
         station.components['AWG'].stop()
         station.pulsar.program_awg(seq, *el_list, verbose=verbose)
@@ -542,15 +553,14 @@ def Motzoi_XY(motzois, pulse_pars, RO_pars,
     '''
     seq_name = 'MotzoiXY'
     seq = sequence.Sequence(seq_name)
+    station.pulsar.update_channel_settings()
     el_list = []
     pulse_combinations = [['X180', 'Y90'], ['Y180', 'X90']]
     pulses = get_pulse_dict_from_pars(pulse_pars)
     for i, motzoi in enumerate(motzois):
         pulse_keys = pulse_combinations[i % 2]
-
         for p_name in ['X180', 'Y180', 'X90', 'Y90']:
             pulses[p_name]['motzoi'] = motzoi
-
         if cal_points and (i == (len(motzois)-4) or
                            i == (len(motzois)-3)):
             el = multi_pulse_elt(i, station, [pulses['I'], RO_pars])
@@ -594,6 +604,7 @@ def Rising_seq(amps, pulse_pars, RO_pars, n=1, post_msmt_delay=3e-6,
     '''
     seq_name = 'Rising_sequence'
     seq = sequence.Sequence(seq_name)
+    station.pulsar.update_channel_settings()
     el_list = []
     pulse_pars = {'pulse_type':'RisingPulse'}
     pulse_list = [pulse_pars]

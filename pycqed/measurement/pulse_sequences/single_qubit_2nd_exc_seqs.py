@@ -1,6 +1,6 @@
 from copy import deepcopy
-from measurement.pulse_sequences.single_qubit_tek_seq_elts import get_pulse_dict_from_pars
-from measurement.pulse_sequences.standard_elements import multi_pulse_elt
+from pycqed.measurement.pulse_sequences.single_qubit_tek_seq_elts import get_pulse_dict_from_pars
+from pycqed.measurement.pulse_sequences.standard_elements import multi_pulse_elt
 from ..waveform_control import sequence
 import numpy as np
 
@@ -22,6 +22,7 @@ def Rabi_2nd_exc_seq(amps, pulse_pars, pulse_pars_2nd, RO_pars, n=1,
     '''
     seq_name = 'Rabi_2nd_exc_sequence'
     seq = sequence.Sequence(seq_name)
+    station.pulsar.update_channel_settings()
     el_list = []
     pulses = get_pulse_dict_from_pars(pulse_pars)
     pulses_2nd = get_pulse_dict_from_pars(pulse_pars_2nd)
@@ -68,6 +69,7 @@ def Ramsey_2nd_exc_seq(times, pulse_pars, pulse_pars_2nd, RO_pars, n=1,
     '''
     seq_name = 'Ramsey_2nd_exc_sequence'
     seq = sequence.Sequence(seq_name)
+    station.pulsar.update_channel_settings()
     el_list = []
     pulses = get_pulse_dict_from_pars(pulse_pars)
     pulses_2nd = get_pulse_dict_from_pars(pulse_pars_2nd)
@@ -104,6 +106,7 @@ def SSRO_2nd_exc_state(pulse_pars, pulse_pars_2nd, RO_pars, verbose=False):
 
     seq_name = 'SSRO_2nd_exc'
     seq = sequence.Sequence(seq_name)
+    station.pulsar.update_channel_settings()
     el_list = []
     pulses = get_pulse_dict_from_pars(pulse_pars)
     pulses_2nd = get_pulse_dict_from_pars(pulse_pars_2nd)

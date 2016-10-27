@@ -1,8 +1,8 @@
 import numpy as np
 import logging
 import time
-from measurement import detector_functions as det
-from analysis import measurement_analysis as MA
+from pycqed.measurement import detector_functions as det
+from pycqed.analysis import measurement_analysis as MA
 
 
 class Sweep_function(object):
@@ -125,7 +125,7 @@ class Source_frequency_GHz_Resonator_Scan(Soft_Sweep):
         # Measure resonator
         if 'Nested_MC' not in qt.instruments.get_instrument_names():
             qt.instruments.create('Nested_MC', 'MeasurementControl')
-        from measurement import calibration_toolbox as cal_tools
+        from pycqed.measurement import calibration_toolbox as cal_tools
         resonator_res = cal_tools.find_resonator_frequency(
             start_freq=self.start_freq_res,
             end_freq=self.end_freq_res,
@@ -155,6 +155,23 @@ class Bias_Hyst_mV(Soft_Sweep):
         eval("qt.instruments['IVVI'].set_dac%d(val)" % self.dac_channel)
 
 
+
+class AWG_amp(Soft_Sweep):
+    def __init__(self, channel, AWG):
+        super().__init__()
+        self.name = 'AWG Channel Amplitude'
+        self.channel = channel
+        self.parameter_name = 'AWG_ch{}_amp'.format(channel)
+        self.AWG = AWG
+        self.unit = 'V'
+
+    def prepare(self):
+        pass
+
+    def set_parameter(self, val, **kw):
+        self.AWG.stop()
+        exec('self.AWG.ch{}_amp({})'.format(self.channel, val))
+        self.AWG.start()
 
 
 

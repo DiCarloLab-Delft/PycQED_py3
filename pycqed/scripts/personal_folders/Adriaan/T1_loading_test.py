@@ -1,11 +1,11 @@
 import numpy as np
 from time import time
-from measurement.waveform_control import pulsar
-from measurement.waveform_control import pulse
-from measurement.waveform_control import element
-from measurement.waveform_control import sequence
-from measurement.waveform_control.viewer import show_element, show_wf
-from measurement.waveform_control import pulse_library as pl
+from pycqed.measurement.waveform_control import pulsar
+from pycqed.measurement.waveform_control import pulse
+from pycqed.measurement.waveform_control import element
+from pycqed.measurement.waveform_control import sequence
+from pycqed.measurement.waveform_control.viewer import show_element, show_wf
+from pycqed.measurement.waveform_control import pulse_library as pl
 
 reload(element)
 reload(pl)

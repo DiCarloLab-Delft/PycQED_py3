@@ -6,20 +6,20 @@ from .qubit_object import Transmon
 from qcodes.utils import validators as vals
 from qcodes.instrument.parameter import ManualParameter
 
-from measurement import detector_functions as det
-from measurement import composite_detector_functions as cdet
-from measurement import mc_parameter_wrapper as pw
+from pycqed.measurement import detector_functions as det
+from pycqed.measurement import composite_detector_functions as cdet
+from pycqed.measurement import mc_parameter_wrapper as pw
 
-from measurement import sweep_functions as swf
-from measurement import CBox_sweep_functions as cb_swf
-from measurement import awg_sweep_functions as awg_swf
-from analysis import measurement_analysis as ma
-from measurement.pulse_sequences import standard_sequences as st_seqs
+from pycqed.measurement import sweep_functions as swf
+from pycqed.measurement import CBox_sweep_functions as cb_swf
+from pycqed.measurement import awg_sweep_functions as awg_swf
+from pycqed.analysis import measurement_analysis as ma
+from pycqed.measurement.pulse_sequences import standard_sequences as st_seqs
 import measurement.randomized_benchmarking.randomized_benchmarking as rb
-from measurement.calibration_toolbox import mixer_carrier_cancellation_CBox
-from measurement.calibration_toolbox import mixer_skewness_cal_CBox_adaptive
+from pycqed.measurement.calibration_toolbox import mixer_carrier_cancellation_CBox
+from pycqed.measurement.calibration_toolbox import mixer_skewness_cal_CBox_adaptive
 
-from measurement.optimization import nelder_mead
+from pycqed.measurement.optimization import nelder_mead
 
 
 class CBox_v3_driven_transmon(Transmon):

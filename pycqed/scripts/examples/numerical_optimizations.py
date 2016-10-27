@@ -1,11 +1,11 @@
 import numpy as np
 import scipy
-from measurement import sweep_functions as swf
+from pycqed.measurement import sweep_functions as swf
 from sweep_functions import (Sweep_function, Soft_Sweep)
-from measurement import AWG_sweep_functions as awg_swf
-from measurement import detector_functions as det
+from pycqed.measurement import AWG_sweep_functions as awg_swf
+from pycqed.measurement import detector_functions as det
 import matplotlib.pyplot as plt
-from analysis import measurement_analysis as MA
+from pycqed.analysis import measurement_analysis as MA
 '''
 Warning: This code will not run as it is written in python2 for qtlab.
 However it is here to serve as an example of using the different options

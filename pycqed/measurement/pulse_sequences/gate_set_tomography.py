@@ -5,9 +5,9 @@ import numpy as np
 from ..waveform_control import element
 from ..waveform_control import pulse
 from ..waveform_control import sequence
-# from measurement.randomized_benchmarking import randomized_benchmarking as rb
-from measurement.pulse_sequences.standard_elements import multi_pulse_elt
-from measurement.pulse_sequences.single_qubit_tek_seq_elts import get_pulse_dict_from_pars
+# from pycqed.measurement.randomized_benchmarking import randomized_benchmarking as rb
+from pycqed.measurement.pulse_sequences.standard_elements import multi_pulse_elt
+from pycqed.measurement.pulse_sequences.single_qubit_tek_seq_elts import get_pulse_dict_from_pars
 from importlib import reload
 reload(pulse)
 from ..waveform_control import pulse_library
@@ -31,6 +31,7 @@ def GST_from_textfile(pulse_pars, RO_pars, filename,
     if seq_name is None:
         seq_name = 'GST_seq'
     seq = sequence.Sequence(seq_name)
+    station.pulsar.update_channel_settings()
     el_list = []
     # Create a dict with the parameters for all the pulses
     pulse_dict = get_pulse_dict_from_pars(pulse_pars)
@@ -493,8 +494,8 @@ def write_experiment_runs_to_text_files(starttime,endtime,maxlength,filename_gat
     the number of gatesequences in each experiment
 
     """
-    from analysis import measurement_analysis as ma
-    from analysis import analysis_toolbox as a_tools
+    from pycqed.analysis import measurement_analysis as ma
+    from pycqed.analysis import analysis_toolbox as a_tools
     import measurement.pulse_sequences.gate_set_tomography as _gst
     from importlib import reload
     import h5py
@@ -539,8 +540,8 @@ def write_experiment_runs_to_text_files_conv_vs_restless(starttime,endtime,maxle
     the number of gatesequences in each experiment
 
     """
-    from analysis import measurement_analysis as ma
-    from analysis import analysis_toolbox as a_tools
+    from pycqed.analysis import measurement_analysis as ma
+    from pycqed.analysis import analysis_toolbox as a_tools
     import measurement.pulse_sequences.gate_set_tomography as _gst
     from importlib import reload
     import h5py

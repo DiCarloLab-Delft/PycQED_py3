@@ -6,20 +6,20 @@ from .qubit_object import Transmon
 from qcodes.utils import validators as vals
 from qcodes.instrument.parameter import ManualParameter
 
-from measurement import detector_functions as det
-from measurement import composite_detector_functions as cdet
-from measurement import mc_parameter_wrapper as pw
+from pycqed.measurement import detector_functions as det
+from pycqed.measurement import composite_detector_functions as cdet
+from pycqed.measurement import mc_parameter_wrapper as pw
 
-from measurement import sweep_functions as swf
-from measurement import CBox_sweep_functions as cb_swf
-from measurement import awg_sweep_functions as awg_swf
-from analysis import measurement_analysis as ma
-from measurement.pulse_sequences import standard_sequences as st_seqs
-import measurement.randomized_benchmarking.randomized_benchmarking as rb
-from measurement.calibration_toolbox import mixer_carrier_cancellation_CBox
-from measurement.calibration_toolbox import mixer_skewness_cal_CBox_adaptive
+from pycqed.measurement import sweep_functions as swf
+from pycqed.measurement import CBox_sweep_functions as cb_swf
+from pycqed.measurement import awg_sweep_functions as awg_swf
+from pycqed.analysis import measurement_analysis as ma
+from pycqed.measurement.pulse_sequences import standard_sequences as st_seqs
+import pycqed.measurement.randomized_benchmarking.randomized_benchmarking as rb
+from pycqed.measurement.calibration_toolbox import mixer_carrier_cancellation_CBox
+from pycqed.measurement.calibration_toolbox import mixer_skewness_cal_CBox_adaptive
 
-from measurement.optimization import nelder_mead
+from pycqed.measurement.optimization import nelder_mead
 
 
 class CBox_driven_transmon(Transmon):
@@ -131,7 +131,7 @@ class CBox_driven_transmon(Transmon):
         else:
             self.heterodyne_instr.RF_power(self.RO_power_cw())
         # TODO: Update IF to f_RO_mod in heterodyne instr
-        self.heterodyne_instr.set('IF', self.f_RO_mod.get())
+        self.heterodyne_instr.set('f_RO_mod', self.f_RO_mod.get())
         self.heterodyne_instr.frequency.set(self.f_res.get())
 
         if hasattr(self.cw_source, 'pulsemod_state'):

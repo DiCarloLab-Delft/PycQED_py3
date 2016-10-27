@@ -1,6 +1,6 @@
 
 from copy import deepcopy
-from measurement.pulse_sequences.standard_elements import multi_pulse_elt
+from pycqed.measurement.pulse_sequences.standard_elements import multi_pulse_elt
 from ..waveform_control import sequence
 import numpy as np
 

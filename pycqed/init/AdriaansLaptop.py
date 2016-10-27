@@ -3,7 +3,7 @@ import time
 t0 = time.time()
 import numpy as np
 import matplotlib.pyplot as plt
-from measurement.waveform_control import pulsar as ps
+from pycqed.measurement.waveform_control import pulsar as ps
 from importlib import reload  # Useful for reloading during testin
 # Qcodes
 import qcodes as qc
@@ -14,12 +14,12 @@ qc_config = {'datadir': '/Users/Adriaan/Documents/Testing',
              'PycQEDdir': '/Users/Adriaan/GitHubRepos/DiCarloLabRepositories/PycQED_py3'}
 
 # General PycQED modules
-from measurement import measurement_control as mc
-from measurement import sweep_functions as swf
-from measurement import detector_functions as det
-from measurement import composite_detector_functions as cdet
-from analysis import measurement_analysis as ma
-from analysis import analysis_toolbox as a_tools
+from pycqed.measurement import measurement_control as mc
+from pycqed.measurement import sweep_functions as swf
+from pycqed.measurement import detector_functions as det
+from pycqed.measurement import composite_detector_functions as cdet
+from pycqed.analysis import measurement_analysis as ma
+from pycqed.analysis import analysis_toolbox as a_tools
 
 # Initializing instruments
 station = qc.Station()

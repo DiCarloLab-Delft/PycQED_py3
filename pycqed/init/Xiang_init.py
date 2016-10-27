@@ -10,7 +10,7 @@ import qcodes as qc
 qc_config = {'datadir':'D:\data',
              'PycQEDdir': 'D:\GitHub\PycQED_py3'}
 
-from measurement import mc_parameter_wrapper as pw
+from pycqed.measurement import mc_parameter_wrapper as pw
 reload(pw)
 
 from instrument_drivers.physical_instruments import QuTech_ControlBoxdriver as qcb

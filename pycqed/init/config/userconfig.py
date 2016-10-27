@@ -19,7 +19,7 @@ sys.path.append(PycQEDdir)
 sys.path.append(os.path.join(PycQEDdir, 'modules'))
 
 # Put here because PycQED dir needs to be appended to path first
-from init.config import setup_dict
+from pycqed.init.config import setup_dict
 
 # execfile(PycQEDdir+'/init/config/setup_dict.py')
 # loads dictionary containing mac addresses and datadirs

@@ -202,18 +202,8 @@ class Pulsar:
         # Store offset settings to restore them after upload the seq
         # Note that this is the AWG setting offset, as distinct from the
         # channel parameter offset.
-        offsets = {}
-        for ch_name, chan_dict in self.channels.items():
-            if chan_dict['type'] == 'analog':
-                exec('offsets[ch_name] = self.AWG.{}_offset.get_latest()'.format(ch_name))
-                if offsets[ch_name] is None:
-                    offsets[ch_name] = self.AWG.get(ch_name+'_offset')
-                ch_amp = None  # to prevent linting error showing up
-                exec('ch_amp = self.AWG.{}_amp.get_latest()'.format(ch_name))
-                if ch_amp is None:
-                    ch_amp = self.AWG.get('{}_amp'.format(ch_name))
-                chan_dict['low'] = -ch_amp/2
-                chan_dict['high'] = ch_amp/2
+
+        channels, offsets = self.update_channel_settings()
 
         elements_with_non_zero_first_points = []
 
@@ -451,3 +441,19 @@ class Pulsar:
 
             _t = time.time() - _t0
             print(" finished in %.2f seconds." % _t)
+
+    def update_channel_settings(self):
+        offsets = {}
+        for ch_name, chan_dict in self.channels.items():
+            if chan_dict['type'] == 'analog':
+                exec('offsets[ch_name] = self.AWG.{}_offset.get_latest()'.format(ch_name))
+                if offsets[ch_name] is None:
+                    offsets[ch_name] = self.AWG.get(ch_name+'_offset')
+                ch_amp = None  # to prevent linting error showing up
+                exec('ch_amp = self.AWG.{}_amp.get_latest()'.format(ch_name))
+                if ch_amp is None:
+                    ch_amp = self.AWG.get('{}_amp'.format(ch_name))
+                chan_dict['low'] = -ch_amp/2
+                chan_dict['high'] = ch_amp/2
+
+        return self.channels, offsets

@@ -4,10 +4,10 @@ station = station
 
 import numpy as np
 from qcodes.instrument.parameter import ManualParameter
-from measurement import detector_functions as det
-from measurement.waveform_control import sequence
-from measurement.pulse_sequences.standard_elements import multi_pulse_elt
-from measurement.pulse_sequences.single_qubit_tek_seq_elts import get_pulse_dict_from_pars
+from pycqed.measurement import detector_functions as det
+from pycqed.measurement.waveform_control import sequence
+from pycqed.measurement.pulse_sequences.standard_elements import multi_pulse_elt
+from pycqed.measurement.pulse_sequences.single_qubit_tek_seq_elts import get_pulse_dict_from_pars
 
 
 # Function definitions
@@ -120,7 +120,7 @@ class Capacity_tomo_detector(det.CBox_digitizing_shots_det):
 
 
 chunk_size = 8000
-number_of_shots = chunk_size*130
+number_of_shots = chunk_size*3
 
 
 # Parameters are only used for labels and units in the datafile
@@ -133,13 +133,14 @@ sweep_pars = [RO_basis, prep_basis, state]
 
 CBox.log_length(chunk_size)
 base_combinations = ['ZXY']
-idle_times = [3e-6, 2e-6]
+idle_times = [.3e-6, 2e-6]
 base = 'ZXY'
 
 for idle_time in idle_times:
     RO_bases = np.random.randint(0, 3, number_of_shots)
     prep_bases = np.random.randint(0, 3, number_of_shots)
     states = np.random.randint(0, 2, number_of_shots)
+
     sweep_points = np.array([RO_bases, prep_bases, states]).T
     calibrate_RO_threshold_no_rotation()
     log_length = CBox.log_length()

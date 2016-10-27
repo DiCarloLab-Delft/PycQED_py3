@@ -1,0 +1,26 @@
+language: python
+notifications:
+  email: false
+
+python:
+  - "3.5"
+  # whitelist
+# branches:
+#   only:
+#     - master
+# command to install dependencies
+install:
+    - pip install --upgrade pip
+    - pip install ipython
+    - pip install -r develop_requirements.txt
+    - python setup.py develop
+# command to run tests
+script:
+    - python  pycqed/test.py -v --skip-coverage
+
+after_success:
+    # install codacy coverage plugin only on traivs
+    - pip install codacy-coverage
+    - cd qcodes
+    - coverage xml
+    - python-codacy-coverage -r coverage.xml
