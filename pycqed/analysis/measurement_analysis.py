@@ -18,8 +18,11 @@ import imp
 import math
 from math import erfc
 from scipy.signal import argrelextrema,argrelmax,argrelmin
-from nathan_plotting_tools import *
 
+try:
+    from nathan_plotting_tools import *
+except:
+    pass
 from pycqed.analysis import ramiro_analysis as RA
 
 imp.reload(dm_tools)
@@ -6246,6 +6249,7 @@ class Chevron_2D(object):
                                  zvals=result)
             ax.set_xlabel(r'AWG Amp (Vpp)')
             ax.set_ylabel(r'Time (ns)')
+            ax.set_title('%s: Chevron scan'%self.scan_start)
             # ax.set_xlim(xmin, xmax)
             ax.set_ylim(plot_x.min()-x_step/2.,plot_x.max()+x_step/2.)
             ax.set_xlim(plot_times.min()-plot_step/2.,plot_times.max()+plot_step/2.)
