@@ -3936,7 +3936,12 @@ class Homodyne_Analysis(MeasurementAnalysis):
 
     def run_default_analysis(self, print_fit_results=False,
                              close_file=False, fitting_model='hanger',
-                             show_guess=False, show=False, **kw):
+                             show_guess=False, show=False,
+                             fit_window=None, **kw):
+        '''
+        fit_window allows to select the windows of data to fit.
+        Example: fit_window=[100,-100]
+        '''
         super(self.__class__, self).run_default_analysis(
             close_file=False, **kw)
         self.add_analysis_datagroup_to_file()
@@ -3951,7 +3956,7 @@ class Homodyne_Analysis(MeasurementAnalysis):
         self.max_frequency = self.sweep_points[max_index]
 
         self.peaks = a_tools.peak_finder((self.sweep_points),
-                                         self.measured_values[0])
+                                         self.measured_powers)
 
         if self.peaks['dip'] is not None:    # look for dips first
             f0 = self.peaks['dip']
@@ -3966,15 +3971,24 @@ class Homodyne_Analysis(MeasurementAnalysis):
             # If this error is raised, it should continue the analysis but
             # not use it to update the qubit object
 
-        if fitting_model == 'hanger':
-            HangerModel = fit_mods.SlopedHangerAmplitudeModel
+        if 'hanger' in fitting_model:
+            if fitting_model == 'hanger':
+                HangerModel = fit_mods.SlopedHangerAmplitudeModel
+            elif fitting_model == 'simple_hanger': # this in not working at the moment (need to be fixed)
+                HangerModel = fit_mods.HangerAmplitudeModel
             # added reject outliers to be robust agains CBox data acq bug.
             # this should have no effect on regular data acquisition and is
             # only used in the guess.
-            amplitude_guess = (max(dm_tools.reject_outliers(
-                                   self.measured_powers)) -
-                               min(dm_tools.reject_outliers(
-                                   self.measured_powers)))
+
+            # Stefano: amplitude guess is the max value of the signal (out of resonance)
+            #          not the diffference max-min.
+            #          I comment this line out, and revrite it.
+            # amplitude_guess = (max(dm_tools.reject_outliers(
+            #                        self.measured_powers)) -
+            #                    min(dm_tools.reject_outliers(
+            #                        self.measured_powers)))
+            amplitude_guess = max(dm_tools.reject_outliers(self.measured_values[0]))
+
             # Creating parameters and estimations
             S21min = (min(dm_tools.reject_outliers(self.measured_values[0])) /
                       max(dm_tools.reject_outliers(self.measured_values[0])))
@@ -3982,24 +3996,45 @@ class Homodyne_Analysis(MeasurementAnalysis):
             Q = kw.pop('Q', f0 / abs(self.min_frequency - self.max_frequency))
             Qe = abs(Q / abs(1 - S21min))
 
+            # Note: input to the fit function is in GHz for convenience
             HangerModel.set_param_hint('f0', value=f0*1e-9,
-                                       min=min(self.sweep_points*1e-9),
-                                       max=max(self.sweep_points*1e-9))
+                                       min=min(self.sweep_points)*1e-9,
+                                       max=max(self.sweep_points)*1e-9)
             HangerModel.set_param_hint('A', value=amplitude_guess)
-            HangerModel.set_param_hint('Q', value=Q)
-            HangerModel.set_param_hint('Qe', value=Qe)
+            HangerModel.set_param_hint('Q', value=Q, min=1, max=50e6)
+            HangerModel.set_param_hint('Qe', value=Qe, min=1, max=50e6)
             # NB! Expressions are broken in lmfit for python 3.5 this has
             # been fixed in the lmfit repository but is not yet released
             # the newest upgrade to lmfit should fix this (MAR 18-2-2016)
-            # HangerModel.set_param_hint('Qi', expr='1./(1./Q-1./Qe*cos(theta))',
-            #                            vary=False)
-            # HangerModel.set_param_hint('Qc', expr='Qe/cos(theta)', vary=False)
+            HangerModel.set_param_hint('Qi', expr='1./(1./Q-1./Qe*cos(theta))',
+                                       vary=False)
+            HangerModel.set_param_hint('Qc', expr='Qe/cos(theta)', vary=False)
             HangerModel.set_param_hint('theta', value=0, min=-np.pi/2,
                                        max=np.pi/2)
             HangerModel.set_param_hint('slope', value=0, vary=True)
             self.params = HangerModel.make_params()
-            fit_res = HangerModel.fit(data=self.measured_powers,
-                                      f=self.sweep_points, verbose=False)
+
+
+            if fit_window == None:
+                data_x = self.sweep_points
+                data_y = self.measured_values[0]
+            else:
+                data_x = self.sweep_points[fit_window[0]:fit_window[1]]
+                data_y_temp = self.measured_values[0]
+                data_y = data_y_temp[fit_window[0]:fit_window[1]]
+
+            # make sure that frequencies are in Hz
+            if np.floor(data_x[0]/1e8)==0: # frequency is defined in GHz
+                data_x = data_x*1e9
+
+
+            # Stefano: fit needs to be done on linear data, not the power.
+            #          Commenting this line and write the proper fit
+            # fit_res = HangerModel.fit(data=self.measured_powers,
+            #                           f=self.sweep_points, verbose=False)
+            fit_res = HangerModel.fit(data=data_y,
+                                      f=data_x, verbose=False)
+
 
         elif fitting_model == 'lorentzian':
             LorentzianModel = fit_mods.LorentzianModel
@@ -4042,15 +4077,39 @@ class Homodyne_Analysis(MeasurementAnalysis):
 
         fig, ax = self.default_ax()
         textstr = '$f_{\mathrm{center}}$ = %.4f $\pm$ (%.3g) GHz' % (
-            fit_res.params['f0'].value, fit_res.params['f0'].stderr)
+            fit_res.params['f0'].value, fit_res.params['f0'].stderr) + '\n' \
+            '$Qc$ = %.1f $\pm$ (%.1f)' % (fit_res.params['Qc'].value, fit_res.params['Qc'].stderr) + '\n' \
+            '$Qi$ = %.1f $\pm$ (%.1f)' % (fit_res.params['Qi'].value, fit_res.params['Qi'].stderr)
+
+        # textstr = '$f_{\mathrm{center}}$ = %.4f $\pm$ (%.3g) GHz' % (
+        #     fit_res.params['f0'].value, fit_res.params['f0'].stderr)
+
         ax.text(0.05, 0.95, textstr, transform=ax.transAxes, fontsize=11,
                 verticalalignment='top', bbox=self.box_props)
-        self.plot_results_vs_sweepparam(x=self.sweep_points,
-                                        y=self.measured_powers,
-                                        fig=fig, ax=ax,
-                                        xlabel=self.xlabel,
-                                        ylabel=str('Power (arb. units)'),
-                                        save=False)
+
+
+        if 'hanger' in fitting_model:
+            self.plot_results_vs_sweepparam(x=self.sweep_points,
+                                            y=self.measured_values[0],
+                                            fig=fig, ax=ax,
+                                            xlabel=self.xlabel,
+                                            ylabel=str('S21_mag (arb. units)'),
+                                            save=False)
+
+        elif fitting_model == 'lorentzian':
+            self.plot_results_vs_sweepparam(x=self.sweep_points,
+                                            y=self.measured_powers,
+                                            fig=fig, ax=ax,
+                                            xlabel=self.xlabel,
+                                            ylabel=str('Power (arb. units)'),
+                                            save=False)
+
+
+        if fit_window == None:
+            data_x = self.sweep_points
+        else:
+            data_x = self.sweep_points[fit_window[0]:fit_window[1]]
+
         if show_guess:
             ax.plot(self.sweep_points, fit_res.init_fit, 'k--')
         ax.plot(self.sweep_points, fit_res.best_fit, 'r-')
@@ -4058,7 +4117,7 @@ class Homodyne_Analysis(MeasurementAnalysis):
         plt.plot(f0*1e9, fit_res.eval(f=f0*1e9), 'o', ms=8)
         if show:
             plt.show()
-        self.save_fig(fig, xlabel=self.xlabel, ylabel='Power', **kw)
+        self.save_fig(fig, xlabel=self.xlabel, ylabel='Mag', **kw)
         if close_file:
             self.data_file.close()
         return fit_res

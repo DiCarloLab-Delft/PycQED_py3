@@ -22,7 +22,7 @@ import qcodes as qc
 # Globally defined config
 # qc_config = {'datadir': r'D:\\Experimentsp7_Qcodes_5qubit',
 #              'PycQEDdir': 'D:\GitHubRepos\PycQED_py3'}
-qc_config = {'datadir': r'D:\Experiments\\1610_QcodesTests\Data',
+qc_config = {'datadir': r'D:\\Experiments\\1610_QcodesTests\\Data',
              'PycQEDdir': 'D:\GitHubRepos\PycQED_py3'}
 
 # makes sure logging messages show up in the notebook
@@ -57,7 +57,9 @@ from qcodes.instrument_drivers.rohde_schwarz import SGS100A as rs
 import qcodes.instrument_drivers.signal_hound.USB_SA124B as sh
 import qcodes.instrument_drivers.QuTech.IVVI as iv
 from qcodes.instrument_drivers.agilent.E8527D import Agilent_E8527D
-from qcodes.instrument_drivers.rohde_schwarz import ZNB20 as VNA
+from qcodes.instrument_drivers.rohde_schwarz import ZNB20 as ZNB20
+from qcodes.instrument_drivers.weinschel import Weinschel_8320 as Weinschel_8320
+from pycqed.instrument_drivers.physical_instruments import Weinschel_8320_novisa
 
 # from qcodes.instrument_drivers.tektronix import AWG5014 as tek
 # from qcodes.instrument_drivers.tektronix import AWG520 as tk520
@@ -86,10 +88,18 @@ station = qc.Station()
 
 
 # VNA
-VNA_inst = VNA.ZNB20(name='VNA', address='TCPIP0::192.168.0.55', server_name=None)  #
-station.add_component(VNA_inst)
+VNA = ZNB20.ZNB20(name='VNA', address='TCPIP0::192.168.0.55', server_name=None)  #
+station.add_component(VNA)
+
+# variable attenuator
+ATT = Weinschel_8320_novisa.Weinschel_8320(name='ATT',address='192.168.0.54', server_name=None)
+station.add_component(ATT)
 
 
+MC = mc.MeasurementControl('MC')
+
+MC.station = station
+station.MC = MC
 
 
 

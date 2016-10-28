@@ -330,8 +330,9 @@ class VNA_ATT_Detector(Hard_Detector):
     def finish(self, **kw):
         pass
 
-class Signal_Hound_Spectrum_Track(Hard_Detector):
 
+
+class Signal_Hound_Spectrum_Track(Hard_Detector):
     def __init__(self, start_freq, end_freq, freq_step, source=None, Navg=1, **kw):
         super(Signal_Hound_Spectrum_Track, self).__init__()
         self.SH = qt.instruments['SH']
@@ -387,6 +388,44 @@ class Signal_Hound_Spectrum_Track(Hard_Detector):
 
     def finish(self, **kw):
         self.SH.abort()
+
+
+
+class ZNB_VNA_detector(Hard_Detector):
+    def __init__(self,  VNA, **kw):
+        '''
+        Detector function for the Rohde & Schwarz ZNB VNA
+        '''
+        super(ZNB_VNA_detector, self).__init__()
+        self.VNA = VNA
+        self.name = 'ZNB_VNA_detector'
+        self.value_names = ['ampl', 'phase',
+                            'real', 'imag',]
+        self.value_units = ['', 'radians',
+                            '', '']
+
+
+    def get_values(self):
+        '''
+        Start a measurement, wait untill the end and retrive data.
+        Return real and imaginary transmission coefficients +
+        amplitude (linear) and phase (deg or radians)
+        '''
+        self.VNA.start_single_sweep_all() # start a measurement
+        self.VNA.wait_to_continue() # wait untill the end of measurement before moving on
+        self.VNA.autoscale_trace() # for visualization on the VNA screen (no effect on data)
+
+        # get data and process them
+        real_data, imag_data = self.VNA.get_real_imaginary_data()
+
+        complex_data = np.add(real_data, 1j*imag_data)
+        ampl_linear = np.abs(complex_data)
+        # ampl_dB = 20*np.log10(ampl_linear)
+        phase_radians = np.arctan2(imag_data, real_data)
+
+
+        return ampl_linear, phase_radians, real_data, imag_data
+
 
 
 # Detectors for QuTech Control box modes
