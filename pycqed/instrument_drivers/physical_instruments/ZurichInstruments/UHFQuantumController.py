@@ -19,11 +19,10 @@ class UHFQC(Instrument):
 
     Requirements:
     Installation instructions for Zurich Instrument Libraries.
-    1. install ziPython 3.5 ucs4 16.04 for 64bit Windows from http://www.zhinst.com/downloads
+    1. install ziPython 3.5 ucs4 16.04 for 64bit Windows from http://www.zhinst.com/downloads, https://people.zhinst.com/~niels/
     2. pip install dependencies: httplib2, plotly, pyqtgraph
-    3. manually paste zishell.py one directory above the zhinst directory (C:/Anaconda3/side) (can be found in transmon/inventory/firmware_Nielsb)
-    4. upload the latest firmware to the UHFQC by opening reboot.bat in 'Transmon\Inventory\ZurichInstruments\firmware_Nielsb\firmware_x'. WIth x the highest available number.
-    5. find out where sequences are stored by saving a sequence from the GUI and then check :"showLog" to see where it is stored. This is the location where AWG sequences can be loaded from.
+    3. upload the latest firmware to the UHFQC by opening reboot.bat in 'Transmon\Inventory\ZurichInstruments\firmware_Nielsb\firmware_x'. WIth x the highest available number.
+    4. find out where sequences are stored by saving a sequence from the GUI and then check :"showLog" to see where it is stored. This is the location where AWG sequences can be loaded from.
     misc: when device crashes, check the log file in
     EOM
     """
@@ -268,6 +267,41 @@ class UHFQC(Instrument):
 
         return nodes
 
+    def single_acquisition(self, samples, acquisition_time=0.010, timeout=0):
+        # Define the channels to use
+        channels = set([0, 1])
+
+        paths = dict()
+        data = dict()
+        for c in channels:
+            paths[c] = '/' + self._device + '/quex/rl/data/{}'.format(c)
+            data[c] = []
+            self._daq.subscribe(paths[c])
+
+        self._daq.setInt('/' + self._device + '/awgs/0/single', 1)
+        self._daq.setInt('/' + self._device + '/awgs/0/enable', 1)
+
+        timeout = 0
+        gotem = [False]*len(channels)
+        while not all(gotem) and timeout < 100:
+            dataset = self._daq.poll(acquisition_time, timeout, 4, True)
+            for n, c in enumerate(channels):
+                p = paths[c]
+                if p in dataset:
+                    for v in dataset[p]:
+                        data[c] = np.concatenate((data[c], v['vector']))
+                    if len(data[c]) >= samples:
+                        gotem[n] = True
+                        
+            timeout += 1
+
+        if not all(gotem):
+            print("Error: Didn't get all results!")
+            for n, c in enumerate(channels):
+                print("    : Channel {}: Got {} of {} samples", c, len(data[c]), samples)
+            return (None, None)
+
+        return data[0] + 1j*data[1]
 
     def create_parameter_files(self):
         #this functions retrieves all possible settable and gettable parameters from the device.
