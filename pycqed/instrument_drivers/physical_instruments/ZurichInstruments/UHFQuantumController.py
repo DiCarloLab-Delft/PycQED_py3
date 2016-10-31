@@ -267,9 +267,8 @@ class UHFQC(Instrument):
 
         return nodes
 
-    def single_acquisition(self, samples, acquisition_time=0.010, timeout=0):
+    def single_acquisition(self, samples, acquisition_time=0.010, timeout=0, channels=set([0, 1])):
         # Define the channels to use
-        channels = set([0, 1])
 
         paths = dict()
         data = dict()
@@ -278,8 +277,8 @@ class UHFQC(Instrument):
             data[c] = []
             self._daq.subscribe(paths[c])
 
-        self._daq.setInt('/' + self._device + '/awgs/0/single', 1)
-        self._daq.setInt('/' + self._device + '/awgs/0/enable', 1)
+        #self._daq.setInt('/' + self._device + '/awgs/0/single', 1)
+        #self._daq.setInt('/' + self._device + '/awgs/0/enable', 1)
 
         timeout = 0
         gotem = [False]*len(channels)
@@ -292,7 +291,7 @@ class UHFQC(Instrument):
                         data[c] = np.concatenate((data[c], v['vector']))
                     if len(data[c]) >= samples:
                         gotem[n] = True
-                        
+
             timeout += 1
 
         if not all(gotem):
@@ -300,8 +299,8 @@ class UHFQC(Instrument):
             for n, c in enumerate(channels):
                 print("    : Channel {}: Got {} of {} samples", c, len(data[c]), samples)
             return (None, None)
-
-        return data[0] + 1j*data[1]
+        # print("data type {}".format(type(data)))
+        return data
 
     def create_parameter_files(self):
         #this functions retrieves all possible settable and gettable parameters from the device.

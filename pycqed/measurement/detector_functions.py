@@ -1650,11 +1650,12 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         self.channels = channels
         self.value_names = ['']*len(self.channels)
         self.value_units = ['']*len(self.channels)
+        self.cal_points = kw.get('cal_points', None)
         for i, channel in enumerate(self.channels):
             self.value_names[i] = 'w{}'.format(channel)
             self.value_units[i] = 'V'
         self.rotate = rotate
-        if channels == [0,1] or channels == [2,3]:
+        if self.channels == [0,1] or self.channels == [2,3]:
                 self.value_names = ['I', 'Q']
                 self.value_units = ['V', 'V']
         else:
@@ -1668,17 +1669,16 @@ class UHFQC_integrated_average_detector(Hard_Detector):
     def get_values(self):
         self.UHFQC.awgs_0_enable(1)
         temp = self.UHFQC.awgs_0_enable()  #probing the values to be sure communication is finished before starting AWG
+        #print("enable is set to {}".format(temp))
         del temp
         if self.AWG is not None:
             self.AWG.start()
-        while self.UHFQC.awgs_0_enable() == 1:
-            time.sleep(0.1)
-        time.sleep(1)
-        data = ['']*len(self.channels)
-        for i, channel in enumerate(self.channels):
-            dataset = eval("self.UHFQC.quex_rl_data_{}()".format(channel))
-            data[i] = dataset[0]['vector']
 
+        data = self.UHFQC.single_acquisition(self.nr_sweep_points,
+                                             self.poll_time, timeout=0,
+                                             channels=set(self.channels))
+        #if isinstance(data,dict):
+        data=np.array([data[key] for key in data.keys()])
         if self.rotate:
             return self.rotate_and_normalize(data)
         else:
@@ -1705,14 +1705,24 @@ class UHFQC_integrated_average_detector(Hard_Detector):
     def prepare(self, sweep_points):
         if self.AWG is not None:
             self.AWG.stop()
+        self.nr_sweep_points=len(sweep_points)
         self.UHFQC.quex_rl_source(2) #this sets the result to integration and rotation outcome
-        self.UHFQC.quex_rl_length(len(sweep_points))
+        self.UHFQC.quex_rl_length(self.nr_sweep_points)
         self.UHFQC.quex_rl_avgcnt(int(np.log2(self.nr_averages)))
         self.UHFQC.quex_wint_length(int(self.integration_length*(1.8e9)))
         # Configure the result logger to not do any averaging
         # The AWG program uses userregs/0 to define the number o iterations in the loop
-        self.UHFQC.awgs_0_userregs_0(int(self.nr_averages*len(sweep_points)))
+        self.UHFQC.awgs_0_userregs_0(int(self.nr_averages*self.nr_sweep_points))
         self.UHFQC.awgs_0_userregs_1(0)#0 for rl, 1 for iavg
+        if self.nr_sweep_points < 128:
+            self.poll_time = 0.01
+        elif self.nr_sweep_points < 256:
+            self.poll_time = 0.05
+        elif self.nr_sweep_points < 512:
+            self.poll_time = 0.1
+        else:
+            self.poll_time = 0.2
+
 
     def finish(self):
         if self.AWG is not None:
@@ -1724,7 +1734,7 @@ class UHFQC_integration_logging_det(Hard_Detector):
 
     '''
     def __init__(self, UHFQC, AWG, integration_length=1e-6,
-                 channels=[0, 1, 2, 3], **kw):
+                 channels=[0, 1, 2, 3], nr_shots=4095,**kw):
         super(UHFQC_integration_logging_det, self).__init__()
         self.UHFQC = UHFQC
         self.name = 'UHFQC_integration_logging_det'
@@ -1739,45 +1749,41 @@ class UHFQC_integration_logging_det(Hard_Detector):
                 self.value_units = ['V', 'V']
         self.AWG = AWG
         self.integration_length = integration_length
+        self.nr_shots = nr_shots
 
     def get_values(self):
         self.UHFQC.awgs_0_enable(1)
-        time.sleep(0.1)
         temp = self.UHFQC.awgs_0_enable()  #probing the values to be sure communication is finished before starting AWG
-        print("enable", temp)
-        temp = self.UHFQC.awgs_0_single()
         del temp
-
         if self.AWG is not None:
             self.AWG.start()
-        while self.UHFQC.awgs_0_enable() == 1:
-            time.sleep(0.1)
-        time.sleep(2)
-        temp = self.UHFQC.awgs_0_enable()  #probing the values to be sure communication is finished before starting AWG
-        print("enable", temp)
 
-        data = ['']*len(self.channels)
-        for i, channel in enumerate(self.channels):
-            dataset = eval("self.UHFQC.quex_rl_data_{}()".format(channel))
-            data[i] = dataset[0]['vector']
+        data = self.UHFQC.single_acquisition(self.nr_shots,
+                                             self.poll_time, timeout=0,
+                                             channels=set(self.channels))
+        data = np.array([data[key] for key in data.keys()])
         return data
 
     def prepare(self, sweep_points):
         if self.AWG is not None:
             self.AWG.stop()
         # The averaging-count is used to specify how many times the AWG program should run
-        nr_shots = 255 #hardcoded to 4095 shots right now
-
-        # This averaging count specifies how many measurements the result logger should average
-        LOG2_RL_AVG_CNT = 0 # for single shot readout
 
         # The AWG program uses userregs/0 to define the number o iterations in the loop
         self.UHFQC.awgs_0_userregs_1(0)#0 for rl, 1 for iavg
-        self.UHFQC.awgs_0_userregs_0(nr_shots*pow(2, LOG2_RL_AVG_CNT))
-        self.UHFQC.quex_rl_length(nr_shots)
-        self.UHFQC.quex_rl_avgcnt(LOG2_RL_AVG_CNT)
+        self.UHFQC.awgs_0_userregs_0(self.nr_shots)
+        self.UHFQC.quex_rl_length(self.nr_shots)
+        self.UHFQC.quex_rl_avgcnt(1) # 1 for single shot readout
         self.UHFQC.quex_wint_length(int(self.integration_length*(1.8e9)))
         self.UHFQC.quex_rl_source(2) #this sets the result to integration and rotation outcome
+        if self.nr_shots < 128:
+            self.poll_time = 0.01
+        elif self.nr_shots < 256:
+            self.poll_time = 0.05
+        elif self.nr_shots < 512:
+            self.poll_time = 0.1
+        else:
+            self.poll_time = 0.2
 
 
     def finish(self):

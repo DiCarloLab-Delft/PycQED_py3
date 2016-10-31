@@ -377,7 +377,7 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
     def __init__(self, measurement_name,  MC, AWG, acquisition_instr, pulse_pars, RO_pars,
                  raw=True, analyze=True, upload=True, IF=None, weight_function_I=0, weight_function_Q=1,
                  optimized_weights=False, wait=0.0, close_fig=True, SSB=False,
-                 nr_averages=1024, integration_length=1e-6, nr_shots=None, **kw):
+                 nr_averages=1024, integration_length=1e-6, nr_shots=4095, **kw):
         self.detector_control = 'soft'
         self.name = 'SSRO_Fidelity'
         # For an explanation of the difference between the different
@@ -411,6 +411,7 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
         self.integration_length = integration_length
         self.weight_function_I = weight_function_I
         self.weight_function_Q = weight_function_Q
+        self.nr_shots=nr_shots
         print('weights', weight_function_I, weight_function_Q)
 
 
@@ -438,10 +439,11 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
 
 
             elif 'UHFQC' in str(self.acquisition_instr):
+                print('loading {} shots into UHFQC'.format(self.nr_shots))
                 self.MC.set_detector_function(
                     det.UHFQC_integration_logging_det(self.acquisition_instr,
                                                           self.AWG, channels=[self.weight_function_I,self.weight_function_Q],
-                                                          integration_length=self.integration_length))
+                                                          integration_length=self.integration_length, nr_shots=self.nr_shots))
                 if self.SSB:
                     self.UHFQC.prepare_SSB_weight_and_rotation(IF=self.IF, weight_function_I=self.weight_function_I, weight_function_Q=self.weight_function_Q)
                 else:

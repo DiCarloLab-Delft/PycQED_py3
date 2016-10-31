@@ -2,7 +2,7 @@
 This scripts initializes the instruments and imports the modules
 """
 
-UHFQC=False
+UHFQC=True
 
 
 # General imports

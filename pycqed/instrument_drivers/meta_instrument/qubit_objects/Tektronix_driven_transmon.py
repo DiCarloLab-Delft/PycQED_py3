@@ -648,7 +648,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                      analyze=True,
                      close_fig=True,
                      verbose=True, optimized_weights=False, SSB=False,
-                     multiplier=1):
+                     multiplier=1, nr_shots=4095):
         self.prepare_for_timedomain()
         if MC is None:
             MC = self.MC
@@ -659,7 +659,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
             MC=MC,
             AWG=self.AWG, acquisition_instr=self._acquisition_instr,
             pulse_pars=self.pulse_pars, RO_pars=self.RO_pars, IF=self.f_RO_mod(), weight_function_I=self.RO_acq_weight_function_I(),
-            weight_function_Q=self.RO_acq_weight_function_Q(),
+            weight_function_Q=self.RO_acq_weight_function_Q(), nr_shots=nr_shots,
             optimized_weights=optimized_weights, integration_length=self.RO_acq_integration_length(),
             close_fig=close_fig, SSB=SSB, multiplier=multiplier, nr_averages=self.RO_acq_averages())
         if return_detector:
@@ -809,7 +809,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
             MC.set_sweep_function_2D(swf.AWG_amp(self.fluxing_channel, self.AWG))
             MC.set_sweep_points_2D(amps)
 
-        MC.set_detector_function(self.int_avg_det)
+        MC.set_detector_function(self.int_avg_det_rot)
         if slice_scan:
             swf_temp = swf.AWG_amp(self.fluxing_channel, self.AWG)
             swf_temp.set_parameter(amps[0])
@@ -838,11 +838,20 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                                                                     nr_averages=self.RO_acq_averages(),
                                                                     integration_length=self.RO_acq_integration_length(),
                                                                     normalize=True)
+            self.int_avg_det_rot = det.CBox_integrated_average_detector(self._acquisition_instr,
+                                                                    self.AWG,
+                                                                    nr_averages=self.RO_acq_averages(),
+                                                                    integration_length=self.RO_acq_integration_length(),
+                                                                    normalize=True)
             self.int_log_det = det.CBox_integration_logging_det(self._acquisition_instr,
                                                                 self.AWG, integration_length=self.RO_acq_integration_length())
+
             self.input_average_detector = det.CBox_input_average_detector(
                 self._acquisition_instr,
                 self.AWG, nr_averages=self.RO_acq_averages())
+
+
+
         elif 'UHFQC' in acquisition_instr:
             logging.info("setting UHFQC acquisition")
             self.input_average_detector = det.UHFQC_input_average_detector(
@@ -852,6 +861,10 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                 UHFQC=self._acquisition_instr, AWG=self.AWG,
                 channels=[self.RO_acq_weight_function_I(), self.RO_acq_weight_function_Q()], nr_averages=self.RO_acq_averages(),
                 integration_length=self.RO_acq_integration_length())
+            self.int_avg_det_rot = det.UHFQC_integrated_average_detector(
+                UHFQC=self._acquisition_instr, AWG=self.AWG,
+                channels=[self.RO_acq_weight_function_I(), self.RO_acq_weight_function_Q()], nr_averages=self.RO_acq_averages(),
+                integration_length=self.RO_acq_integration_length(), rotate=True)
             self.int_log_det = det.UHFQC_integration_logging_det(
                 UHFQC=self._acquisition_instr, AWG=self.AWG,
                 channels=[self.RO_acq_weight_function_I(), self.RO_acq_weight_function_Q()],
