@@ -104,7 +104,7 @@ station.add_component(IVVI)
 
 
 Flux_Control = FluxCtrl.Flux_Control(name='FluxControl',IVVI=station.IVVI)
-station.Flux_Control = Flux_Control
+station.add_component(Flux_Control)
 
 transfer_matrix_dec = np.array([[  4.70306717e-04,  -8.41312977e-05,   3.64442804e-05,  -1.00489353e-05,
    -2.36455362e-05],

@@ -281,7 +281,7 @@ def kernel_sampled(file_name, step_width_ns, points_per_ns, step_params=None, ma
         return my_kernel
 
 
-def get_all_sampled(file_name, step_width_ns, points_per_ns, step_params=None, norm_type='max'):
+def get_all_sampled(file_name, step_width_ns, points_per_ns, max_points=600, step_params=None, norm_type='max'):
 
     f = open('kernels\\'+file_name, 'r')
     step_direct = np.double(f.readlines())
@@ -308,7 +308,7 @@ def get_all_sampled(file_name, step_width_ns, points_per_ns, step_params=None, n
         file_name, step_width_ns, points_per_ns, step_params=step_params, norm_type=norm_type)
 
     my_kernel_simple, my_kernel_step = kernel_sampled(
-        my_file_name, step_width_ns, points_per_ns, step_params=step_params, return_step=True, norm_type=norm_type)
+        file_name, step_width_ns, points_per_ns, step_params=step_params, max_points=max_points, return_step=True, norm_type=norm_type)
     t_my_kernel = np.arange(len(my_kernel_step))*step_width_ns
 
     output_dict = {}

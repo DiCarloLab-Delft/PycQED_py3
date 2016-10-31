@@ -48,6 +48,25 @@ class Rabi(swf.Hard_Sweep):
                          n=self.n, return_seq=self.return_seq)
 
 
+class Flipping(swf.Hard_Sweep):
+    def __init__(self, pulse_pars, RO_pars, n=1, upload=True, return_seq=False):
+        super().__init__()
+        self.pulse_pars = pulse_pars
+        self.RO_pars = RO_pars
+        self.n = n
+        self.upload = upload
+        self.name = 'Rabi'
+        self.parameter_name = 'amplitude'
+        self.unit = 'V'
+        self.return_seq = return_seq
+
+    def prepare(self, **kw):
+        if self.upload:
+            sqs.Flipping_seq(pulse_pars=self.pulse_pars,
+                         RO_pars=self.RO_pars,
+                         n=self.n, return_seq=self.return_seq)
+
+
 class Rabi_amp90(swf.Hard_Sweep):
     def __init__(self, pulse_pars, RO_pars, n=1, upload=True):
         super().__init__()
