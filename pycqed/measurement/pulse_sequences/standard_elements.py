@@ -97,12 +97,12 @@ def multi_pulse_elt(i, station, pulse_list):
             # markers. Ideally we combine both in one function in pulselib
             if pulse_pars['pulse_type'] == 'MW_IQmod_pulse_tek':
                 last_pulse = el.add(MW_IQmod_pulse(
-                    name='RO_tone',
-                    I_channel=pulse_pars['I_channel'],
-                    Q_channel=pulse_pars['Q_channel'],
-                    length=pulse_pars['length'],
-                    amplitude=pulse_pars['amplitude'],
-                    mod_frequency=pulse_pars['mod_frequency']),
+                        name='RO_tone',
+                        I_channel=pulse_pars['I_channel'],
+                        Q_channel=pulse_pars['Q_channel'],
+                        length=pulse_pars['length'],
+                        amplitude=pulse_pars['amplitude'],
+                        mod_frequency=pulse_pars['mod_frequency']),
                     start=pulse_pars['pulse_delay'],
                     refpulse=last_pulse, refpoint='start',
                     fixed_point_freq=pulse_pars['fixed_point_frequency'])
@@ -139,7 +139,8 @@ def multi_pulse_elt(i, station, pulse_list):
                 # functionality
                 # Want to implement compatibiilty with a list of marker
                 # channels here to allow copies of the pulse
-                raise TypeError()
+                raise TypeError('acq_marker_channel "{}"is not a str '.format(
+                    pulse_pars['acq_marker_channel']))
 
         else:
             raise KeyError('pulse_type {} not recognized'.format(

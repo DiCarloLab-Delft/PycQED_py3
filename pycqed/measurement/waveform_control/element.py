@@ -225,8 +225,6 @@ class Element:
         pulse._t0 = t0
         self.pulses[name] = pulse
         self._last_added_pulse = name
-
-        print('Fixpoint freq', fixed_point_freq)
         if fixed_point_freq is not None:
             time_corr = calculate_time_correction(t0, fixed_point_freq)
             self.shift_all_pulses(time_corr)
