@@ -13,6 +13,7 @@ install:
     - pip install --upgrade pip
     - pip install ipython
     - pip install -r develop_requirements.txt
+    - pip install qcodes # Added explictly here
     - python setup.py develop
 # command to run tests
 script:
