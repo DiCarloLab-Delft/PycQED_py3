@@ -612,3 +612,15 @@ setTrigger(0);"""
         # Iwave, Qwave = PG.mod_pulse(np.ones(samples), np.zeros(samples), f=f_RO_mod, phase=0, sampling_rate=f_sampling)
         self.awg_sequence_acquisition_and_pulse(Iwave, Qwave, acquisition_delay)
 
+
+        for i in range(np.shape(matrix)[0]): #looping over the rows
+            for j in range(np.shape(matrix)[1]): #looping over the colums
+                #value =matrix[i,j]
+                #print(value)
+
+        matrix = np.zeros([nr_rows,nr_cols])
+        for i in range(np.shape(matrix)[0]): #looping over the rows
+            for j in range(np.shape(matrix)[1]): #looping over the colums
+                #print(value)
+                #matrix[i,j]=value
+        return matrix
