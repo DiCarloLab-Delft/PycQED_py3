@@ -1432,18 +1432,26 @@ class UHFQC_integrated_average_detector(Hard_Detector):
     def get_values(self):
         self.UHFQC.awgs_0_enable(1)
         # probing the values to be sure communication is finished before
-        # starting AWG
+        
         temp = self.UHFQC.awgs_0_enable()
         #print("enable is set to {}".format(temp))
         del temp
+        # starting AWG
         if self.AWG is not None:
             self.AWG.start()
 
-        data = self.UHFQC.single_acquisition(self.nr_sweep_points,
-                                             self.poll_time, timeout=0,
-                                             channels=set(self.channels))
-        # if isinstance(data,dict):
-        data = np.array([data[key] for key in data.keys()])
+        while self.UHFQC.awgs_0_enable() == 1:
+            time.sleep(0.1)
+        time.sleep(1)
+        data = ['']*len(self.channels)
+        for i, channel in enumerate(self.channels):
+            dataset = eval("self.UHFQC.quex_rl_data_{}()".format(channel))
+            data[i] = dataset[0]['vector']
+
+        # data = self.UHFQC.single_acquisition(self.nr_sweep_points,
+        #                                      self.poll_time, timeout=0,
+        #                                      channels=set(self.channels))
+        # data = np.array([data[key] for key in data.keys()])
         if self.rotate:
             return self.rotate_and_normalize(data)
         else:
@@ -1482,14 +1490,14 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         self.UHFQC.awgs_0_userregs_0(
             int(self.nr_averages*self.nr_sweep_points))
         self.UHFQC.awgs_0_userregs_1(0)  # 0 for rl, 1 for iavg
-        if self.nr_sweep_points < 128:
-            self.poll_time = 0.01
-        elif self.nr_sweep_points < 256:
-            self.poll_time = 0.05
-        elif self.nr_sweep_points < 512:
-            self.poll_time = 0.1
-        else:
-            self.poll_time = 0.2
+        # if self.nr_sweep_points < 128:
+        #     self.poll_time = 0.01
+        # elif self.nr_sweep_points < 256:
+        #     self.poll_time = 0.05
+        # elif self.nr_sweep_points < 512:
+        #     self.poll_time = 0.1
+        # else:
+        #     self.poll_time = 0.2
 
     def finish(self):
         if self.AWG is not None:
@@ -1529,10 +1537,17 @@ class UHFQC_integration_logging_det(Hard_Detector):
         if self.AWG is not None:
             self.AWG.start()
 
-        data = self.UHFQC.single_acquisition(self.nr_shots,
-                                             self.poll_time, timeout=0,
-                                             channels=set(self.channels))
-        data = np.array([data[key] for key in data.keys()])
+        # data = self.UHFQC.single_acquisition(self.nr_shots,
+        #                                      self.poll_time, timeout=0,
+        #                                      channels=set(self.channels))
+        # data = np.array([data[key] for key in data.keys()])
+        while self.UHFQC.awgs_0_enable() == 1:
+            time.sleep(0.1)
+        time.sleep(1)
+        data = ['']*len(self.channels)
+        for i, channel in enumerate(self.channels):
+            dataset = eval("self.UHFQC.quex_rl_data_{}()".format(channel))
+            data[i] = dataset[0]['vector']
         return data
 
     def prepare(self, sweep_points):
@@ -1550,14 +1565,14 @@ class UHFQC_integration_logging_det(Hard_Detector):
         self.UHFQC.quex_wint_length(int(self.integration_length*(1.8e9)))
         # this sets the result to integration and rotation outcome
         self.UHFQC.quex_rl_source(2)
-        if self.nr_shots < 128:
-            self.poll_time = 0.01
-        elif self.nr_shots < 256:
-            self.poll_time = 0.05
-        elif self.nr_shots < 512:
-            self.poll_time = 0.1
-        else:
-            self.poll_time = 0.2
+        # if self.nr_shots < 128:
+        #     self.poll_time = 0.01
+        # elif self.nr_shots < 256:
+        #     self.poll_time = 0.05
+        # elif self.nr_shots < 512:
+        #     self.poll_time = 0.1
+        # else:
+        #     self.poll_time = 0.2
 
     def finish(self):
         if self.AWG is not None:
