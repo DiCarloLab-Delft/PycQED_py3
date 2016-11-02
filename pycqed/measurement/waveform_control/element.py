@@ -363,6 +363,9 @@ class Element:
 
     def waveforms(self):
         """
+        return:
+            tvals, wfs
+
         Returns the waveforms for all used channels.
         Trunctates/clips (channel-imposed) all values
         that are out of bounds
