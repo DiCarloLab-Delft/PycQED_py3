@@ -613,14 +613,18 @@ setTrigger(0);"""
         self.awg_sequence_acquisition_and_pulse(Iwave, Qwave, acquisition_delay)
 
 
+    def upload_transformation_matrix(self, matrix):
         for i in range(np.shape(matrix)[0]): #looping over the rows
             for j in range(np.shape(matrix)[1]): #looping over the colums
                 #value =matrix[i,j]
                 #print(value)
+                eval('self.quex_trans_{}_col_{}_real(matrix[{}][{}])'.format(j,i,i,j))
 
+    def download_transformation_matrix(self, nr_rows=4, nr_cols=4):
         matrix = np.zeros([nr_rows,nr_cols])
         for i in range(np.shape(matrix)[0]): #looping over the rows
             for j in range(np.shape(matrix)[1]): #looping over the colums
+                matrix[i][j]=(eval('self.quex_trans_{}_col_{}_real()'.format(j,i)))
                 #print(value)
                 #matrix[i,j]=value
         return matrix
