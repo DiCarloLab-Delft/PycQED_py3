@@ -411,7 +411,7 @@ class ZNB_VNA_detector(Hard_Detector):
         Return real and imaginary transmission coefficients +
         amplitude (linear) and phase (deg or radians)
         '''
-        self.VNA.start_single_sweep_all() # start a measurement
+        self.VNA.start_sweep_all() # start a measurement
         self.VNA.wait_to_continue() # wait untill the end of measurement before moving on
         self.VNA.autoscale_trace() # for visualization on the VNA screen (no effect on data)
 
