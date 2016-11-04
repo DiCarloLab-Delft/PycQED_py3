@@ -56,6 +56,38 @@ class None_Sweep(Soft_Sweep):
         pass
 
 
+class QX_Sweep(Soft_Sweep):
+    """
+       QX Input Test
+    """
+    def __init__(self, qxc, sweep_control='soft', sweep_points=None,**kw):
+        super(QX_Sweep, self).__init__()
+        self.sweep_control = sweep_control
+        self.name = 'QX_Sweep'
+        self.parameter_name = 'Error Rate'
+        self.unit = 'P'
+        self.sweep_points = sweep_points
+        self.__qxc = qxc
+        self.__qxc.create_qubits(2)
+        self.__cnt = 0
+	
+    # def set_qx_interface(self, qxc):
+    	# self.__qxc = qxc
+
+    def set_parameter(self, val):
+        #
+        #Set the parameter(s) to be sweeped. Differs per sweep function
+        #
+        print("[+] qx_sweep : parameter :",val)
+        circuit_name = ("circuit%i" % self.__cnt)
+        print("[+] creating circuit ", circuit_name)
+        # self.__qxc.create_circuit(circuit_name,"prepz q0; prepz q1; h q0; h q1; h q1; cnot q0,q1; h q0; h q0; measure q0; measure q1")
+        self.__qxc.create_circuit(circuit_name,"prepz q0; h q0; x q0; z q0; y q0; y q0; z q0; x q0; h q0; measure q0;")
+	# self.__qxc.create_circuit(circuit_name,"y q0,1.57079632679; rx q0,3.14159265359; rx q0,3.14159265359; ry q0,3.14159265359; rx q0,3.14159265359; ry q0,3.14159265359; ry q0,3.14159265359; ry q0,3.14159265359; rx q0,3.14159265359; rx q0,3.14159265359; ry q0,1.57079632679; rx q0,3.14159265359")
+        self.__cnt = self.__cnt+1
+        # pass
+
+
 class Delayed_None_Sweep(Soft_Sweep):
     def __init__(self, sweep_control='soft', delay=0, **kw):
         super().__init__()
