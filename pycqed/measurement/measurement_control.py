@@ -24,7 +24,7 @@ class MeasurementControl:
     data points.
     '''
     def __init__(self, name, plot_theme=((60, 60, 60), 'w'),
-                 plotting_interval=2, **kw):
+                 plotting_interval=2,  live_plot_enabled=False, **kw):
         self.name = name
 
         self.verbose = True  # enables printing of the start message
@@ -32,12 +32,15 @@ class MeasurementControl:
         # You do not want a new process to be created every time you start a
         # run. This can be removed when I replace my custom process with the
         # pyqtgraph one.
-        pg.mkQApp()
-        self.proc = pgmp.QtProcess()  # pyqtgraph multiprocessing
-        self.rpg = self.proc._import('pyqtgraph')
-        self.new_plotmon_window(plot_theme=plot_theme,
-                                interval=plotting_interval)
-        self.live_plot_enabled = True
+        if live_plot_enabled:
+            pg.mkQApp()
+            self.proc = pgmp.QtProcess()  # pyqtgraph multiprocessing
+            self.rpg = self.proc._import('pyqtgraph')
+            self.new_plotmon_window(plot_theme=plot_theme,
+                                    interval=plotting_interval)
+            self.live_plot_enabled = True
+        else:
+            self.live_plot_enabled = False
 
     ##############################################
     # Functions used to control the measurements #

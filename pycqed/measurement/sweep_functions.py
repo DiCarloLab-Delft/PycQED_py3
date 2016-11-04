@@ -1,8 +1,5 @@
-import numpy as np
 import logging
 import time
-from pycqed.measurement import detector_functions as det
-from pycqed.analysis import measurement_analysis as MA
 
 
 class Sweep_function(object):

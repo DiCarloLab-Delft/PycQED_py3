@@ -1,11 +1,8 @@
-# TODO make this file run :)
-
 import numpy as np
 import unittest
 
 from pycqed.measurement.waveform_control.pulsar import Pulsar
 from pycqed.measurement.waveform_control import element
-from pycqed.measurement.waveform_control.pulse import SquarePulse
 from pycqed.measurement.pulse_sequences import single_qubit_tek_seq_elts as sqs
 
 
