@@ -41,12 +41,11 @@ class Test_SingleQubitTek(unittest.TestCase):
             'nr_sigma': 4,
             'motzoi': .8,
             'mod_frequency': 100e-6,
-            'pulse_delay': 5e-9,
+            'pulse_delay': 0,
             'phi_skew': 0,
             'alpha': 1,
             'phase': 0,
             'pulse_type': 'SSB_DRAG_pulse'}
-
 
         self.RO_pars = {
             'I_channel': 'ch3',
@@ -65,18 +64,78 @@ class Test_SingleQubitTek(unittest.TestCase):
         station = Bunch(pulsar=self.pulsar)
         sqs.station = station
 
+    def test_ramsey_no_detuning(self):
+        times = np.linspace(0, 5e-6, 41)
+        f_fix_pt = self.RO_pars['fixed_point_frequency']
 
-
-    def test_ramsey(self):
-        times = np.linspace(0, 100e-6, 21)
+        # Sequence with no artificial detuning
         seq, el_list = sqs.Ramsey_seq(times, self.pulse_pars, self.RO_pars,
-                       artificial_detuning=None,
-                       cal_points=True,
-                       verbose=False,
-                       upload=False,
-                       return_seq=True)
+                                      artificial_detuning=None,
+                                      cal_points=True,
+                                      verbose=False,
+                                      upload=False,
+                                      return_seq=True)
+        self.assertEqual(len(times), len(seq.elements))
+        self.assertEqual(len(times), len(el_list))
+        for i, el in enumerate(el_list):
+            t_RO = el.effective_pulse_start_time('RO_tone-0', 'ch1')
+            t_ROm = el.effective_pulse_start_time('Acq-trigger-0', 'ch1')
+            self.assertAlmostEqual(t_RO, t_ROm, places=10)
+            # test if fix point put pulses at the right spot.
+            self.assertTrue(element.is_divisible_by_clock(t_RO, f_fix_pt))
+            # Check pulse delay
+            if i < (len(times)-4):
+                t0 = el.effective_pulse_start_time('pulse_0-0', 'ch1')
+                t1 = el.effective_pulse_start_time('pulse_1-0', 'ch1')
+                self.assertAlmostEqual(t1-t0, times[i], places=10)
+                p0 = el.pulses['pulse_0-0']
+                self.assertEqual(p0.phase, 0)
+                p1 = el.pulses['pulse_1-0']
+                self.assertEqual(p1.phase, 0)
+            else:
+                # Calibration points do not have two pulses
+                with self.assertRaises(KeyError):
+                    t1 = el.effective_pulse_start_time('pulse_1-0', 'ch1')
+
+    def test_ramsey_freq_detuning(self):
+        times = np.linspace(0, 5e-6, 41)
+        f_fix_pt = self.RO_pars['fixed_point_frequency']
+        f_detuning = 300e3 # 300 kHz detuning
+        # Sequence with artificial detuning specified in Hz
+        seq, el_list = sqs.Ramsey_seq(times, self.pulse_pars, self.RO_pars,
+                                      artificial_detuning=f_detuning,
+                                      cal_points=True,
+                                      verbose=False,
+                                      upload=False,
+                                      return_seq=True)
+        self.assertEqual(len(times), len(seq.elements))
+        self.assertEqual(len(times), len(el_list))
+        for i, el in enumerate(el_list):
+            t_RO = el.effective_pulse_start_time('RO_tone-0', 'ch1')
+            t_ROm = el.effective_pulse_start_time('Acq-trigger-0', 'ch1')
+            self.assertAlmostEqual(t_RO, t_ROm, places=10)
+            # test if fix point put pulses at the right spot.
+            self.assertTrue(element.is_divisible_by_clock(t_RO, f_fix_pt))
+            # Check pulse delay
+            if i < (len(times)-4):
+                t0 = el.effective_pulse_start_time('pulse_0-0', 'ch1')
+                t1 = el.effective_pulse_start_time('pulse_1-0', 'ch1')
+                self.assertAlmostEqual(t1-t0, times[i], places=10)
+                p0 = el.pulses['pulse_0-0']
+                self.assertEqual(p0.phase, 0)
+                p1 = el.pulses['pulse_1-0']
+
+                exp_phase = (360*f_detuning*(t1-t0)) #% 360
+                # if exp_phase == 360:
+                #     exp_phase = 0
+                self.assertAlmostEqual(p1.phase, exp_phase, places=10)
+            else:
+                # Calibration points do not have two pulses
+                with self.assertRaises(KeyError):
+                    t1 = el.effective_pulse_start_time('pulse_1-0', 'ch1')
 
 
 class Bunch:
+
     def __init__(self, **kwds):
         self.__dict__.update(kwds)
