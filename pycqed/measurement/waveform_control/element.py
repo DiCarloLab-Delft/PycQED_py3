@@ -413,8 +413,8 @@ def calculate_time_correction(t0, fixed_point_freq, clock=1e9):
 
         Time correction is rounded to a full clock cycle.
         '''
-        phase_diff = (360 * fixed_point_freq * t0) % (360)
         fixed_point_freq = abs(fixed_point_freq)
+        phase_diff = (360 * fixed_point_freq * t0) % (360)
         phase_corr = 360 - phase_diff  # Correction in degrees
         time_corr_0 = phase_corr/(360*fixed_point_freq)
         time_corr = time_corr_0

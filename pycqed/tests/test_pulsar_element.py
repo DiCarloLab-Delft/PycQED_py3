@@ -74,7 +74,7 @@ class Test_Element(unittest.TestCase):
         test_elt.add(SquarePulse(name='dummy_square',
                                  channel='ch1',
                                  amplitude=.3, length=20e-9),
-                     fixed_point_freq=200e6,
+                     fixed_point_freq=-200e6,
                      refpulse='dummy_square', start=98e-9, refpoint='start')
         min_samples = 960
         ch1_wf = test_elt.waveforms()[1]['ch1']
