@@ -603,10 +603,10 @@ setTrigger(0);"""
 
     def awg_sequence_acquisition_and_pulse_SSB(self, f_RO_mod, RO_amp, RO_pulse_length, acquisition_delay):
         f_sampling=1.8e9
-        samples=RO_pulse_length*f_sampling
-        array=np.arange(int(samples))
-        sinwave=RO_amp*np.sin(2*np.pi*array*f_RO_mod/f_sampling)
-        coswave=RO_amp*np.cos(2*np.pi*array*f_RO_mod/f_sampling)
+        samples = RO_pulse_length*f_sampling
+        array = np.arange(int(samples))
+        sinwave = RO_amp*np.sin(2*np.pi*array*f_RO_mod/f_sampling)
+        coswave = RO_amp*np.cos(2*np.pi*array*f_RO_mod/f_sampling)
         Iwave = coswave+sinwave;
         Qwave = coswave-sinwave;
         # Iwave, Qwave = PG.mod_pulse(np.ones(samples), np.zeros(samples), f=f_RO_mod, phase=0, sampling_rate=f_sampling)

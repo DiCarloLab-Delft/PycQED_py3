@@ -1392,6 +1392,7 @@ class UHFQC_input_average_detector(Hard_Detector):
         self.UHFQC.quex_iavg_length(self.nr_samples)
         self.UHFQC.quex_iavg_avgcnt(int(np.log2(self.nr_averages)))
         self.UHFQC.awgs_0_userregs_1(1)  # 0 for rl, 1 for iavg
+        self.UHFQC.awgs_0_userregs_0(int(self.nr_averages))  # 0 for rl, 1 for iavg
 
     def finish(self):
         if self.AWG is not None:
@@ -1430,28 +1431,29 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         self.rotate = rotate
 
     def get_values(self):
+        self.UHFQC.awgs_0_single(1)
         self.UHFQC.awgs_0_enable(1)
         # probing the values to be sure communication is finished before
-        
         temp = self.UHFQC.awgs_0_enable()
+        temp = self.UHFQC.awgs_0_single()
         #print("enable is set to {}".format(temp))
         del temp
         # starting AWG
         if self.AWG is not None:
             self.AWG.start()
 
-        while self.UHFQC.awgs_0_enable() == 1:
-            time.sleep(0.1)
-        time.sleep(1)
-        data = ['']*len(self.channels)
-        for i, channel in enumerate(self.channels):
-            dataset = eval("self.UHFQC.quex_rl_data_{}()".format(channel))
-            data[i] = dataset[0]['vector']
+        # while self.UHFQC.awgs_0_enable() == 1:
+        #     time.sleep(0.1)
+        # time.sleep(1)
+        # data = ['']*len(self.channels)
+        # for i, channel in enumerate(self.channels):
+        #     dataset = eval("self.UHFQC.quex_rl_data_{}()".format(channel))
+        #     data[i] = dataset[0]['vector']
 
-        # data = self.UHFQC.single_acquisition(self.nr_sweep_points,
-        #                                      self.poll_time, timeout=0,
-        #                                      channels=set(self.channels))
-        # data = np.array([data[key] for key in data.keys()])
+        data = self.UHFQC.single_acquisition(self.nr_sweep_points,
+                                             self.poll_time, timeout=0,
+                                             channels=set(self.channels))
+        data = np.array([data[key] for key in data.keys()])
         if self.rotate:
             return self.rotate_and_normalize(data)
         else:
@@ -1490,14 +1492,14 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         self.UHFQC.awgs_0_userregs_0(
             int(self.nr_averages*self.nr_sweep_points))
         self.UHFQC.awgs_0_userregs_1(0)  # 0 for rl, 1 for iavg
-        # if self.nr_sweep_points < 128:
-        #     self.poll_time = 0.01
-        # elif self.nr_sweep_points < 256:
-        #     self.poll_time = 0.05
-        # elif self.nr_sweep_points < 512:
-        #     self.poll_time = 0.1
-        # else:
-        #     self.poll_time = 0.2
+        if self.nr_sweep_points < 128:
+            self.poll_time = 0.01
+        elif self.nr_sweep_points < 256:
+            self.poll_time = 0.05
+        elif self.nr_sweep_points < 512:
+            self.poll_time = 0.1
+        else:
+            self.poll_time = 0.2
 
     def finish(self):
         if self.AWG is not None:
@@ -1529,25 +1531,27 @@ class UHFQC_integration_logging_det(Hard_Detector):
         self.nr_shots = nr_shots
 
     def get_values(self):
+        self.UHFQC.awgs_0_single(1)
         self.UHFQC.awgs_0_enable(1)
         # probing the values to be sure communication is finished before
-        # starting AWG
         temp = self.UHFQC.awgs_0_enable()
+        temp = self.UHFQC.awgs_0_single()
         del temp
+        # starting AWG
         if self.AWG is not None:
             self.AWG.start()
 
-        # data = self.UHFQC.single_acquisition(self.nr_shots,
-        #                                      self.poll_time, timeout=0,
-        #                                      channels=set(self.channels))
-        # data = np.array([data[key] for key in data.keys()])
-        while self.UHFQC.awgs_0_enable() == 1:
-            time.sleep(0.1)
-        time.sleep(1)
-        data = ['']*len(self.channels)
-        for i, channel in enumerate(self.channels):
-            dataset = eval("self.UHFQC.quex_rl_data_{}()".format(channel))
-            data[i] = dataset[0]['vector']
+        data = self.UHFQC.single_acquisition(self.nr_shots,
+                                             self.poll_time, timeout=0,
+                                             channels=set(self.channels))
+        data = np.array([data[key] for key in data.keys()])
+        # while self.UHFQC.awgs_0_enable() == 1:
+        #     time.sleep(0.1)
+        # time.sleep(1)
+        # data = ['']*len(self.channels)
+        # for i, channel in enumerate(self.channels):
+        #     dataset = eval("self.UHFQC.quex_rl_data_{}()".format(channel))
+        #     data[i] = dataset[0]['vector']
         return data
 
     def prepare(self, sweep_points):
@@ -1559,20 +1563,20 @@ class UHFQC_integration_logging_det(Hard_Detector):
         # The AWG program uses userregs/0 to define the number o iterations in
         # the loop
         self.UHFQC.awgs_0_userregs_1(0)  # 0 for rl, 1 for iavg
-        self.UHFQC.awgs_0_userregs_0(self.nr_shots)
+        self.UHFQC.awgs_0_userregs_0(self.nr_shots+1)
         self.UHFQC.quex_rl_length(self.nr_shots)
-        self.UHFQC.quex_rl_avgcnt(1)  # 1 for single shot readout
+        self.UHFQC.quex_rl_avgcnt(0)  # 1 for single shot readout
         self.UHFQC.quex_wint_length(int(self.integration_length*(1.8e9)))
         # this sets the result to integration and rotation outcome
         self.UHFQC.quex_rl_source(2)
-        # if self.nr_shots < 128:
-        #     self.poll_time = 0.01
-        # elif self.nr_shots < 256:
-        #     self.poll_time = 0.05
-        # elif self.nr_shots < 512:
-        #     self.poll_time = 0.1
-        # else:
-        #     self.poll_time = 0.2
+        if self.nr_shots < 128:
+            self.poll_time = 0.01
+        elif self.nr_shots < 256:
+            self.poll_time = 0.05
+        elif self.nr_shots < 512:
+            self.poll_time = 0.1
+        else:
+            self.poll_time = 0.2
 
     def finish(self):
         if self.AWG is not None:

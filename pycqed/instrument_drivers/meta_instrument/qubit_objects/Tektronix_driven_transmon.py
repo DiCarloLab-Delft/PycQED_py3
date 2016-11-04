@@ -350,7 +350,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
 
         offset_I, offset_Q = mixer_carrier_cancellation_5014(
             AWG=self.AWG, SH=signal_hound, source=source, MC=self.MC,
-            AWG_channel1=AWG_channel1, AWG_channel2=AWG_channel2)
+            AWG_channel1=AWG_channel1, AWG_channel2=AWG_channel2, xtol=0.0003)
 
         if update:
             if offs_type == 'pulse':
