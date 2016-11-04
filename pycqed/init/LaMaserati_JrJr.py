@@ -2,7 +2,7 @@
 This scripts initializes the instruments and imports the modules
 """
 
-UHFQC=True
+UHFQC=False
 
 
 # General imports
@@ -136,8 +136,8 @@ Flux_Control.flux_offsets(np.array([3.21499683e-02,-2.91992550e-02,2.88520021e-0
 
 
 
-# ATT = Weinschel_8320_novisa.Weinschel_8320(name='ATT',address='192.168.0.54', server_name=None)
-# station.add_component(ATT)
+ATT = Weinschel_8320_novisa.Weinschel_8320(name='ATT',address='192.168.0.54', server_name=None)
+station.add_component(ATT)
 # Dux = qdux.QuTech_Duplexer('Dux', address='TCPIP0::192.168.0.101',
 #                             server_name=None)
 # SH = sh.SignalHound_USB_SA124B('Signal hound', server_name=None) #commented because of 8s load time
