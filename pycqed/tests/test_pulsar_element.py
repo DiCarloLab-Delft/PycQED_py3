@@ -86,25 +86,6 @@ class Test_Element(unittest.TestCase):
         np.testing.assert_array_almost_equal(ch1_wf, expected_wf)
 
 
-
-    # def test_fixed_point(self):
-    #     test_elt = element.Element('test_elt', pulsar=self.pulsar)
-    #     test_elt.add(SquarePulse(name='dummy_square',
-    #                              channel='ch1',
-    #                              amplitude=.3, length=20e-9))
-    #     test_elt.add(SquarePulse(name='dummy_square_RO',
-    #                              channel='ch1',
-    #                              amplitude=.3, length=20e-9))
-    #     min_samples = 960
-    #     ch1_wf = test_elt.waveforms()[1]['ch1']
-    #     self.assertEqual(len(ch1_wf), min_samples)
-
-    #     expected_wf = np.zeros(960)
-    #     expected_wf[:20] = .3
-    #     np.testing.assert_array_almost_equal(ch1_wf, expected_wf)
-
-
-
     # def test_distorted_attribute(self):
 
     #     test_elt = element.Element('test_elt', pulsar=self.pulsar)
