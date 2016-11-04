@@ -37,9 +37,6 @@ class Detector_Function(object):
     def prepare(self, **kw):
         pass
 
-    def initialize_data_arrays(self, sweep_points):
-        pass
-
     def finish(self, **kw):
         pass
 
@@ -108,11 +105,12 @@ class Dummy_Detector_Hard(Hard_Detector):
         self.value_names = ['distance', 'Power']
         self.value_units = ['m', 'nW']
 
-    def initialize_data_arrays(self, sweep_points):
+    def prepare(self, sweep_points):
+        self.sweep_points = sweep_points
         self.data = np.zeros(len(sweep_points))
 
     def get_values(self):
-        x = np.arange(0, 10, .1)
+        x = self.sweep_points
         self.data = [np.sin(x / np.pi), np.cos(x/np.pi)]
 
         return self.data

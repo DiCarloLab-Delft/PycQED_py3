@@ -24,7 +24,7 @@ class MeasurementControl:
     data points.
     '''
     def __init__(self, name, plot_theme=((60, 60, 60), 'w'),
-                 plotting_interval=2,  live_plot_enabled=False, **kw):
+                 plotting_interval=2,  live_plot_enabled=True, **kw):
         self.name = name
 
         self.verbose = True  # enables printing of the start message
@@ -108,16 +108,19 @@ class MeasurementControl:
                 self.get_measurement_preparetime()
                 self.measure_hard()
             elif len(self.sweep_functions) == 2:
+                self.xlen = len(self.sweep_points)
+                self.ylen = len(self.sweep_points_2D)
+
                 self.complete = False
                 self.get_measurement_preparetime()
                 for j in range(self.ylen):
                     # added specifically for 2D hard sweeps
                     if not self.complete:
                         for i, sweep_function in enumerate(self.sweep_functions):
-                            x = self.get_sweep_points()[
-                                int(self.iteration*self.xlen)]
+                            idx = int(self.iteration*self.xlen)
                             if i != 0:
-                                sweep_function.set_parameter(x[i])
+                                val = sweep_function.sweep_points[idx]
+                                sweep_function.set_parameter(val)
                         self.detector_function.prepare(
                             sweep_points=self.get_sweep_points()[0: self.xlen, 0])
                         self.measure_hard()
@@ -385,6 +388,7 @@ class MeasurementControl:
                 str(sweep_function.__class__.__name__))
 
     def set_sweep_points_2D(self, sweep_points_2D):
+        self.sweep_functions[1].sweep_points = sweep_points_2D
         self.sweep_points_2D = sweep_points_2D
 
     ###########
@@ -456,22 +460,23 @@ class MeasurementControl:
         Made to work with at most 2 2D arrays (as this is how the labview code
         works). It should be easy to extend this function for more vals.
         '''
-        self.time_last_2Dplot_update = time.time()
-        n = len(self.sweep_pts_y)
-        m = len(self.sweep_pts_x)
-        self.TwoD_array = np.empty(
-            [n, m, len(self.detector_function.value_names)])
-        self.TwoD_array[:] = np.NAN
-        self.QC_QtPlot.clear()
-        for j in range(len(self.detector_function.value_names)):
-            self.QC_QtPlot.add(x=self.sweep_pts_x,
-                               y=self.sweep_pts_y,
-                               z=self.TwoD_array[:, :, j],
-                               xlabel=self.column_names[0],
-                               ylabel=self.column_names[1],
-                               zlabel=self.column_names[2+j],
-                               subplot=j+1,
-                               cmap='viridis')
+        if self.live_plot_enabled:
+            self.time_last_2Dplot_update = time.time()
+            n = len(self.sweep_pts_y)
+            m = len(self.sweep_pts_x)
+            self.TwoD_array = np.empty(
+                [n, m, len(self.detector_function.value_names)])
+            self.TwoD_array[:] = np.NAN
+            self.QC_QtPlot.clear()
+            for j in range(len(self.detector_function.value_names)):
+                self.QC_QtPlot.add(x=self.sweep_pts_x,
+                                   y=self.sweep_pts_y,
+                                   z=self.TwoD_array[:, :, j],
+                                   xlabel=self.column_names[0],
+                                   ylabel=self.column_names[1],
+                                   zlabel=self.column_names[2+j],
+                                   subplot=j+1,
+                                   cmap='viridis')
 
     def update_plotmon_2D(self):
         '''
