@@ -1,0 +1,29 @@
+const TRIGGER1  = 0x000001;
+const WINT_TRIG = 0x000010;
+const IAVG_TRIG = 0x000020;
+const WINT_EN   = 0x0f0000;
+
+const FS = 1.8e9;
+const LENGTH = 0.2e-6;
+const N = floor(LENGTH*FS);
+
+wave w = zeros(N);
+
+setTrigger(WINT_EN);
+var loop_cnt = getUserReg(0);
+var wait_time = 0;
+
+repeat(loop_cnt) {
+  //wait for a rising edge on Ref/trigger 1
+  //waitDigTrigger(1, 0);
+  //waitDigTrigger(1, 1);
+  playWave(w,w);
+  //wait(30);
+  //setTrigger(WINT_EN+IAVG_TRIG);
+  //wait(wait_time);
+  setTrigger(WINT_TRIG +WINT_EN+IAVG_TRIG);
+  //start the readout units
+  setTrigger(WINT_EN);
+  waitWave();
+}
+setTrigger(0);

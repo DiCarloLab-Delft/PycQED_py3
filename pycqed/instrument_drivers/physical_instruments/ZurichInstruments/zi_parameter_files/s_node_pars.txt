@@ -1,960 +1,960 @@
 [
   [
-    "/dev2178/awgs/0/triggers/1/falling",
+    "awgs/0/triggers/1/falling",
     "bool",
     0,
     1
   ],
   [
-    "/dev2178/awgs/0/outputs/1/amplitude",
+    "awgs/0/outputs/1/amplitude",
     "float",
     -1.0,
     1.0
   ],
   [
-    "/dev2178/awgs/0/triggers/1/hysteresis/mode",
+    "awgs/0/triggers/1/hysteresis/mode",
     "bool",
     0,
     1
   ],
   [
-    "/dev2178/awgs/0/userregs/6",
+    "awgs/0/userregs/6",
     "int_64",
     0,
     4294967295
   ],
   [
-    "/dev2178/awgs/0/time",
+    "awgs/0/time",
     "int",
     0,
     13
   ],
   [
-    "/dev2178/awgs/0/userregs/13",
+    "awgs/0/userregs/13",
     "int_64",
     0,
     4294967295
   ],
   [
-    "/dev2178/awgs/0/userregs/8",
+    "awgs/0/userregs/8",
     "int_64",
     0,
     4294967295
   ],
   [
-    "/dev2178/awgs/0/userregs/14",
+    "awgs/0/userregs/14",
     "int_64",
     0,
     4294967295
   ],
   [
-    "/dev2178/awgs/0/outputs/0/mode",
+    "awgs/0/outputs/0/mode",
     "int",
     0,
     2
   ],
   [
-    "/dev2178/awgs/0/triggers/0/rising",
+    "awgs/0/triggers/0/rising",
     "bool",
     0,
     1
   ],
   [
-    "/dev2178/awgs/0/auxtriggers/0/channel",
+    "awgs/0/auxtriggers/0/channel",
     "int",
     0,
     7
   ],
   [
-    "/dev2178/awgs/0/userregs/5",
+    "awgs/0/userregs/5",
     "int_64",
     0,
     4294967295
   ],
   [
-    "/dev2178/awgs/0/userregs/7",
+    "awgs/0/userregs/7",
     "int_64",
     0,
     4294967295
   ],
   [
-    "/dev2178/awgs/0/triggers/0/level",
+    "awgs/0/triggers/0/level",
     "float",
     -999999995904.0,
     999999995904.0
   ],
   [
-    "/dev2178/awgs/0/triggers/0/channel",
+    "awgs/0/triggers/0/channel",
     "int_64",
     0,
     4294967295
   ],
   [
-    "/dev2178/awgs/0/userregs/1",
+    "awgs/0/userregs/1",
     "int_64",
     0,
     4294967295
   ],
   [
-    "/dev2178/awgs/0/userregs/10",
+    "awgs/0/userregs/10",
     "int_64",
     0,
     4294967295
   ],
   [
-    "/dev2178/awgs/0/outputs/0/amplitude",
+    "awgs/0/outputs/0/amplitude",
     "float",
     -1.0,
     1.0
   ],
   [
-    "/dev2178/awgs/0/triggers/0/hysteresis/relative",
+    "awgs/0/triggers/0/hysteresis/relative",
     "float",
     0,
     3.1415927410125732
   ],
   [
-    "/dev2178/awgs/0/triggers/1/rising",
+    "awgs/0/triggers/1/rising",
     "bool",
     0,
     1
   ],
   [
-    "/dev2178/awgs/0/triggers/1/gate/inputselect",
+    "awgs/0/triggers/1/gate/inputselect",
     "int_8bit",
     0,
     255
   ],
   [
-    "/dev2178/awgs/0/triggers/1/gate/enable",
+    "awgs/0/triggers/1/gate/enable",
     "bool",
     0,
     1
   ],
   [
-    "/dev2178/awgs/0/userregs/12",
+    "awgs/0/userregs/12",
     "int_64",
     0,
     4294967295
   ],
   [
-    "/dev2178/awgs/0/userregs/3",
+    "awgs/0/userregs/3",
     "int_64",
     0,
     4294967295
   ],
   [
-    "/dev2178/awgs/0/auxtriggers/1/channel",
+    "awgs/0/auxtriggers/1/channel",
     "int",
     0,
     7
   ],
   [
-    "/dev2178/awgs/0/userregs/15",
+    "awgs/0/userregs/15",
     "int_64",
     0,
     4294967295
   ],
   [
-    "/dev2178/awgs/0/enable",
+    "awgs/0/enable",
     "bool",
     0,
     1
   ],
   [
-    "/dev2178/awgs/0/userregs/0",
+    "awgs/0/userregs/0",
     "int_64",
     0,
     4294967295
   ],
   [
-    "/dev2178/awgs/0/single",
+    "awgs/0/single",
     "bool",
     0,
     1
   ],
   [
-    "/dev2178/awgs/0/triggers/0/gate/inputselect",
+    "awgs/0/triggers/0/gate/inputselect",
     "int_8bit",
     0,
     255
   ],
   [
-    "/dev2178/awgs/0/triggers/0/hysteresis/mode",
+    "awgs/0/triggers/0/hysteresis/mode",
     "bool",
     0,
     1
   ],
   [
-    "/dev2178/awgs/0/triggers/0/gate/enable",
+    "awgs/0/triggers/0/gate/enable",
     "bool",
     0,
     1
   ],
   [
-    "/dev2178/awgs/0/userregs/11",
+    "awgs/0/userregs/11",
     "int_64",
     0,
     4294967295
   ],
   [
-    "/dev2178/awgs/0/outputs/1/mode",
+    "awgs/0/outputs/1/mode",
     "int",
     0,
     2
   ],
   [
-    "/dev2178/awgs/0/triggers/0/hysteresis/absolute",
+    "awgs/0/triggers/0/hysteresis/absolute",
     "float",
     0,
     3.1415927410125732
   ],
   [
-    "/dev2178/awgs/0/userregs/2",
+    "awgs/0/userregs/2",
     "int_64",
     0,
     4294967295
   ],
   [
-    "/dev2178/awgs/0/triggers/1/hysteresis/absolute",
+    "awgs/0/triggers/1/hysteresis/absolute",
     "float",
     0,
     999999995904.0
   ],
   [
-    "/dev2178/awgs/0/triggers/1/force",
+    "awgs/0/triggers/1/force",
     "int_8bit",
     0,
     255
   ],
   [
-    "/dev2178/awgs/0/triggers/0/force",
+    "awgs/0/triggers/0/force",
     "int_8bit",
     0,
     255
   ],
   [
-    "/dev2178/awgs/0/triggers/1/level",
+    "awgs/0/triggers/1/level",
     "float",
     -999999995904.0,
     999999995904.0
   ],
   [
-    "/dev2178/awgs/0/triggers/1/channel",
+    "awgs/0/triggers/1/channel",
     "int_64",
     0,
     4294967295
   ],
   [
-    "/dev2178/awgs/0/userregs/4",
+    "awgs/0/userregs/4",
     "int_64",
     0,
     4294967295
   ],
   [
-    "/dev2178/awgs/0/userregs/9",
+    "awgs/0/userregs/9",
     "int_64",
     0,
     4294967295
   ],
   [
-    "/dev2178/awgs/0/triggers/0/falling",
+    "awgs/0/triggers/0/falling",
     "bool",
     0,
     1
   ],
   [
-    "/dev2178/awgs/0/triggers/1/hysteresis/relative",
+    "awgs/0/triggers/1/hysteresis/relative",
     "float",
     0,
     999999995904.0
   ],
   [
-    "/dev2178/sigins/0/scaling",
+    "sigins/0/scaling",
     "float",
     0,
     999999995904.0
   ],
   [
-    "/dev2178/sigins/0/ac",
+    "sigins/0/ac",
     "bool",
     0,
     1
   ],
   [
-    "/dev2178/sigins/0/diff",
+    "sigins/0/diff",
     "int_8bit",
     0,
     255
   ],
   [
-    "/dev2178/sigins/0/imp50",
+    "sigins/0/imp50",
     "bool",
     0,
     1
   ],
   [
-    "/dev2178/sigins/1/bw",
+    "sigins/1/bw",
     "bool",
     0,
     1
   ],
   [
-    "/dev2178/sigins/1/range",
+    "sigins/1/range",
     "float",
     0,
     1.5
   ],
   [
-    "/dev2178/sigins/1/diff",
+    "sigins/1/diff",
     "int",
     0,
     3
   ],
   [
-    "/dev2178/sigins/0/bw",
+    "sigins/0/bw",
     "bool",
     0,
     1
   ],
   [
-    "/dev2178/sigins/1/on",
+    "sigins/1/on",
     "bool",
     0,
     1
   ],
   [
-    "/dev2178/sigins/1/scaling",
+    "sigins/1/scaling",
     "float",
     0,
     999999995904.0
   ],
   [
-    "/dev2178/sigins/1/ac",
+    "sigins/1/ac",
     "bool",
     0,
     1
   ],
   [
-    "/dev2178/sigins/1/imp50",
+    "sigins/1/imp50",
     "bool",
     0,
     1
   ],
   [
-    "/dev2178/sigins/0/on",
+    "sigins/0/on",
     "bool",
     0,
     1
   ],
   [
-    "/dev2178/sigins/0/range",
+    "sigins/0/range",
     "float",
     0,
     1.5
   ],
   [
-    "/dev2178/sigouts/0/range",
+    "sigouts/0/range",
     "float_small",
     0,
     0.75
   ],
   [
-    "/dev2178/sigouts/0/enables/3",
+    "sigouts/0/enables/3",
     "bool",
     0,
     1
   ],
   [
-    "/dev2178/sigouts/1/amplitudes/7",
+    "sigouts/1/amplitudes/7",
     "float",
     -0.75,
     0.75
   ],
   [
-    "/dev2178/sigouts/0/autorange",
+    "sigouts/0/autorange",
     "bool",
     0,
     1
   ],
   [
-    "/dev2178/sigouts/1/enables/7",
+    "sigouts/1/enables/7",
     "bool",
     0,
     1
   ],
   [
-    "/dev2178/sigouts/0/offset",
+    "sigouts/0/offset",
     "float",
     -0.75,
     0.7499771118164062
   ],
   [
-    "/dev2178/sigouts/1/autorange",
+    "sigouts/1/autorange",
     "bool",
     0,
     1
   ],
   [
-    "/dev2178/sigouts/1/offset",
+    "sigouts/1/offset",
     "float",
     -0.75,
     0.7499771118164062
   ],
   [
-    "/dev2178/sigouts/1/on",
+    "sigouts/1/on",
     "bool",
     0,
     1
   ],
   [
-    "/dev2178/sigouts/0/amplitudes/3",
+    "sigouts/0/amplitudes/3",
     "float",
     -0.75,
     0.75
   ],
   [
-    "/dev2178/sigouts/0/on",
+    "sigouts/0/on",
     "bool",
     0,
     1
   ],
   [
-    "/dev2178/sigouts/1/imp50",
+    "sigouts/1/imp50",
     "bool",
     0,
     1
   ],
   [
-    "/dev2178/sigouts/1/range",
+    "sigouts/1/range",
     "float_small",
     0,
     0.75
   ],
   [
-    "/dev2178/sigouts/0/imp50",
+    "sigouts/0/imp50",
     "bool",
     0,
     1
   ],
   [
-    "/dev2178/quex/deskew/1/col/1",
+    "quex/deskew/1/col/1",
     "float",
     -2.0,
     2.0
   ],
   [
-    "/dev2178/quex/rot/2/imag",
+    "quex/rot/2/imag",
     "float",
     -2.0,
     2.0
   ],
   [
-    "/dev2178/quex/rl/source",
+    "quex/rl/source",
     "int_64",
     0,
     4294967295
   ],
   [
-    "/dev2178/quex/trans/2/col/0/real",
+    "quex/trans/2/col/0/real",
     "float",
     -2.0,
     2.0
   ],
   [
-    "/dev2178/quex/trans/4/col/0/imag",
+    "quex/trans/4/col/0/imag",
     "float",
     -2.0,
     2.0
   ],
   [
-    "/dev2178/quex/trans/2/col/3/real",
+    "quex/trans/2/col/3/real",
     "float",
     -2.0,
     2.0
   ],
   [
-    "/dev2178/quex/rot/0/real",
+    "quex/rot/0/real",
     "float",
     -2.0,
     2.0
   ],
   [
-    "/dev2178/quex/trans/1/col/0/imag",
+    "quex/trans/1/col/0/imag",
     "float",
     -2.0,
     2.0
   ],
   [
-    "/dev2178/quex/trans/4/col/2/imag",
+    "quex/trans/4/col/2/imag",
     "float",
     -2.0,
     2.0
   ],
   [
-    "/dev2178/quex/trans/2/col/4/imag",
+    "quex/trans/2/col/4/imag",
     "float",
     -2.0,
     2.0
   ],
   [
-    "/dev2178/quex/trans/2/col/2/imag",
+    "quex/trans/2/col/2/imag",
     "float",
     -2.0,
     2.0
   ],
   [
-    "/dev2178/quex/trans/3/col/2/real",
+    "quex/trans/3/col/2/real",
     "float",
     -2.0,
     2.0
   ],
   [
-    "/dev2178/quex/rot/0/imag",
+    "quex/rot/0/imag",
     "float",
     -2.0,
     2.0
   ],
   [
-    "/dev2178/quex/trans/1/col/3/real",
+    "quex/trans/1/col/3/real",
     "float",
     -2.0,
     2.0
   ],
   [
-    "/dev2178/quex/wint/delay",
+    "quex/wint/delay",
     "int",
     0,
     1020
   ],
   [
-    "/dev2178/quex/trans/0/col/0/real",
+    "quex/trans/0/col/0/real",
     "float",
     -2.0,
     2.0
   ],
   [
-    "/dev2178/quex/trans/0/col/4/imag",
+    "quex/trans/0/col/4/imag",
     "float",
     -2.0,
     2.0
   ],
   [
-    "/dev2178/quex/iavg/delay",
+    "quex/iavg/delay",
     "int",
     0,
     1020
   ],
   [
-    "/dev2178/quex/rot/1/imag",
+    "quex/rot/1/imag",
     "float",
     -2.0,
     2.0
   ],
   [
-    "/dev2178/quex/trans/0/col/2/real",
+    "quex/trans/0/col/2/real",
     "float",
     -2.0,
     2.0
   ],
   [
-    "/dev2178/quex/iavg/avgcnt",
+    "quex/iavg/avgcnt",
     "int",
     0,
     15
   ],
   [
-    "/dev2178/quex/trans/1/col/0/real",
+    "quex/trans/1/col/0/real",
     "float",
     -2.0,
     2.0
   ],
   [
-    "/dev2178/quex/trans/2/col/2/real",
+    "quex/trans/2/col/2/real",
     "float",
     -2.0,
     2.0
   ],
   [
-    "/dev2178/quex/iavg/length",
+    "quex/iavg/length",
     "int",
     0,
     4096
   ],
   [
-    "/dev2178/quex/rl/avgcnt",
+    "quex/rl/avgcnt",
     "int",
     0,
     17
   ],
   [
-    "/dev2178/quex/rl/acqcnt",
+    "quex/rl/acqcnt",
     "int_8bit",
     0,
     255
   ],
   [
-    "/dev2178/quex/thres/1/level",
+    "quex/thres/1/level",
     "float",
     -32.0,
     32.0
   ],
   [
-    "/dev2178/quex/rot/3/imag",
+    "quex/rot/3/imag",
     "float",
     -2.0,
     2.0
   ],
   [
-    "/dev2178/quex/rot/4/imag",
+    "quex/rot/4/imag",
     "float",
     -2.0,
     2.0
   ],
   [
-    "/dev2178/quex/trans/2/col/0/imag",
+    "quex/trans/2/col/0/imag",
     "float",
     -2.0,
     2.0
   ],
   [
-    "/dev2178/quex/iavg/readout",
+    "quex/iavg/readout",
     "int_8bit",
     0,
     255
   ],
   [
-    "/dev2178/quex/rl/length",
+    "quex/rl/length",
     "int",
     0,
     4095
   ],
   [
-    "/dev2178/quex/trans/3/col/1/imag",
+    "quex/trans/3/col/1/imag",
     "float",
     -2.0,
     2.0
   ],
   [
-    "/dev2178/quex/rot/4/real",
+    "quex/rot/4/real",
     "float",
     -2.0,
     2.0
   ],
   [
-    "/dev2178/quex/trans/1/col/2/real",
+    "quex/trans/1/col/2/real",
     "float",
     -2.0,
     2.0
   ],
   [
-    "/dev2178/quex/trans/4/col/2/real",
+    "quex/trans/4/col/2/real",
     "float",
     -2.0,
     2.0
   ],
   [
-    "/dev2178/quex/wint/length",
+    "quex/wint/length",
     "int",
     0,
     16384
   ],
   [
-    "/dev2178/quex/deskew/0/col/0",
+    "quex/deskew/0/col/0",
     "float",
     -2.0,
     2.0
   ],
   [
-    "/dev2178/quex/deskew/0/col/1",
+    "quex/deskew/0/col/1",
     "float",
     -2.0,
     2.0
   ],
   [
-    "/dev2178/quex/trans/3/col/4/real",
+    "quex/trans/3/col/4/real",
     "float",
     -2.0,
     2.0
   ],
   [
-    "/dev2178/quex/trans/3/col/0/imag",
+    "quex/trans/3/col/0/imag",
     "float",
     -2.0,
     2.0
   ],
   [
-    "/dev2178/quex/deskew/1/col/0",
+    "quex/deskew/1/col/0",
     "float",
     -2.0,
     2.0
   ],
   [
-    "/dev2178/quex/trans/2/col/3/imag",
+    "quex/trans/2/col/3/imag",
     "float",
     -2.0,
     2.0
   ],
   [
-    "/dev2178/quex/trans/3/col/2/imag",
+    "quex/trans/3/col/2/imag",
     "float",
     -2.0,
     2.0
   ],
   [
-    "/dev2178/quex/rot/3/real",
+    "quex/rot/3/real",
     "float",
     -2.0,
     2.0
   ],
   [
-    "/dev2178/quex/trans/0/col/3/imag",
+    "quex/trans/0/col/3/imag",
     "float",
     -2.0,
     2.0
   ],
   [
-    "/dev2178/quex/trans/1/col/1/real",
+    "quex/trans/1/col/1/real",
     "float",
     -2.0,
     2.0
   ],
   [
-    "/dev2178/quex/iavg/acqcnt",
+    "quex/iavg/acqcnt",
     "int_8bit",
     0,
     255
   ],
   [
-    "/dev2178/quex/trans/2/col/1/real",
+    "quex/trans/2/col/1/real",
     "float",
     -2.0,
     2.0
   ],
   [
-    "/dev2178/quex/trans/4/col/1/imag",
+    "quex/trans/4/col/1/imag",
     "float",
     -2.0,
     2.0
   ],
   [
-    "/dev2178/quex/trans/4/col/3/imag",
+    "quex/trans/4/col/3/imag",
     "float",
     -2.0,
     2.0
   ],
   [
-    "/dev2178/quex/trans/2/col/1/imag",
+    "quex/trans/2/col/1/imag",
     "float",
     -2.0,
     2.0
   ],
   [
-    "/dev2178/quex/rl/readout",
+    "quex/rl/readout",
     "int_8bit",
     0,
     255
   ],
   [
-    "/dev2178/quex/trans/1/col/4/imag",
+    "quex/trans/1/col/4/imag",
     "float",
     -2.0,
     2.0
   ],
   [
-    "/dev2178/quex/thres/4/level",
+    "quex/thres/4/level",
     "float",
     -32.0,
     32.0
   ],
   [
-    "/dev2178/quex/trans/3/col/1/real",
+    "quex/trans/3/col/1/real",
     "float",
     -2.0,
     2.0
   ],
   [
-    "/dev2178/quex/trans/4/col/4/imag",
+    "quex/trans/4/col/4/imag",
     "float",
     -2.0,
     2.0
   ],
   [
-    "/dev2178/quex/trans/4/col/1/real",
+    "quex/trans/4/col/1/real",
     "float",
     -2.0,
     2.0
   ],
   [
-    "/dev2178/quex/trans/0/col/4/real",
+    "quex/trans/0/col/4/real",
     "float",
     -2.0,
     2.0
   ],
   [
-    "/dev2178/quex/trans/3/col/3/real",
+    "quex/trans/3/col/3/real",
     "float",
     -2.0,
     2.0
   ],
   [
-    "/dev2178/quex/trans/3/col/3/imag",
+    "quex/trans/3/col/3/imag",
     "float",
     -2.0,
     2.0
   ],
   [
-    "/dev2178/quex/thres/0/level",
+    "quex/thres/0/level",
     "float",
     -32.0,
     32.0
   ],
   [
-    "/dev2178/quex/trans/0/col/1/real",
+    "quex/trans/0/col/1/real",
     "float",
     -2.0,
     2.0
   ],
   [
-    "/dev2178/quex/trans/2/col/4/real",
+    "quex/trans/2/col/4/real",
     "float",
     -2.0,
     2.0
   ],
   [
-    "/dev2178/quex/trans/4/col/0/real",
+    "quex/trans/4/col/0/real",
     "float",
     -2.0,
     2.0
   ],
   [
-    "/dev2178/quex/trans/1/col/2/imag",
+    "quex/trans/1/col/2/imag",
     "float",
     -2.0,
     2.0
   ],
   [
-    "/dev2178/quex/trans/0/col/2/imag",
+    "quex/trans/0/col/2/imag",
     "float",
     -2.0,
     2.0
   ],
   [
-    "/dev2178/quex/trans/1/col/1/imag",
+    "quex/trans/1/col/1/imag",
     "float",
     -2.0,
     2.0
   ],
   [
-    "/dev2178/quex/trans/3/col/4/imag",
+    "quex/trans/3/col/4/imag",
     "float",
     -2.0,
     2.0
   ],
   [
-    "/dev2178/quex/trans/4/col/4/real",
+    "quex/trans/4/col/4/real",
     "float",
     -2.0,
     2.0
   ],
   [
-    "/dev2178/quex/trans/0/col/1/imag",
+    "quex/trans/0/col/1/imag",
     "float",
     -2.0,
     2.0
   ],
   [
-    "/dev2178/quex/trans/1/col/3/imag",
+    "quex/trans/1/col/3/imag",
     "float",
     -2.0,
     2.0
   ],
   [
-    "/dev2178/quex/rot/1/real",
+    "quex/rot/1/real",
     "float",
     -2.0,
     2.0
   ],
   [
-    "/dev2178/quex/trans/3/col/0/real",
+    "quex/trans/3/col/0/real",
     "float",
     -2.0,
     2.0
   ],
   [
-    "/dev2178/quex/trans/1/col/4/real",
+    "quex/trans/1/col/4/real",
     "float",
     -2.0,
     2.0
   ],
   [
-    "/dev2178/quex/thres/2/level",
+    "quex/thres/2/level",
     "float",
     -32.0,
     32.0
   ],
   [
-    "/dev2178/quex/trans/0/col/3/real",
+    "quex/trans/0/col/3/real",
     "float",
     -2.0,
     2.0
   ],
   [
-    "/dev2178/quex/trans/4/col/3/real",
+    "quex/trans/4/col/3/real",
     "float",
     -2.0,
     2.0
   ],
   [
-    "/dev2178/quex/rot/2/real",
+    "quex/rot/2/real",
     "float",
     -2.0,
     2.0
   ],
   [
-    "/dev2178/quex/thres/3/level",
+    "quex/thres/3/level",
     "float",
     -32.0,
     32.0
   ],
   [
-    "/dev2178/quex/trans/0/col/0/imag",
+    "quex/trans/0/col/0/imag",
     "float",
     -2.0,
     2.0
   ],
   [
-    "/dev2178/dios/0/extclk",
+    "dios/0/extclk",
     "bool",
     0,
     1
   ],
   [
-    "/dev2178/dios/0/drive",
+    "dios/0/drive",
     "int_8bit",
     0,
     255
   ],
   [
-    "/dev2178/dios/0/mode",
+    "dios/0/mode",
     "int_8bit",
     0,
     255
   ],
   [
-    "/dev2178/dios/0/decimation",
+    "dios/0/decimation",
     "int_64",
     0,
     4294967295
   ],
   [
-    "/dev2178/dios/0/output",
+    "dios/0/output",
     "int_64",
     0,
     4294967295
   ],
   [
-    "/dev2178/system/extclk",
+    "system/extclk",
     "bool",
     0,
     1

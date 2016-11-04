@@ -1,182 +1,182 @@
 [
   [
-    "/dev2178/awgs/0/sequencer/status",
+   "awgs/0/sequencer/status",
     "float"
   ],
   [
-    "/dev2178/awgs/0/sequencer/next",
+    "awgs/0/sequencer/next",
     "float"
   ],
   [
-    "/dev2178/awgs/0/sweep/awgtrigs/2",
+    "awgs/0/sweep/awgtrigs/2",
     "float"
   ],
   [
-    "/dev2178/awgs/0/elf/name",
+    "awgs/0/elf/name",
     "vector_g"
   ],
   [
-    "/dev2178/awgs/0/elf/checksum",
+    "awgs/0/elf/checksum",
     "float"
   ],
   [
-    "/dev2178/awgs/0/elf/data",
+    "awgs/0/elf/data",
     "vector_gs"
   ],
   [
-    "/dev2178/awgs/0/sequencer/program",
+    "awgs/0/sequencer/program",
     "vector_g"
   ],
   [
-    "/dev2178/awgs/0/sequencer/pc",
+    "awgs/0/sequencer/pc",
     "float"
   ],
   [
-    "/dev2178/awgs/0/waveform/memoryusage",
+    "awgs/0/waveform/memoryusage",
     "float"
   ],
   [
-    "/dev2178/awgs/0/sequencer/memoryusage",
+    "awgs/0/sequencer/memoryusage",
     "float"
   ],
   [
-    "/dev2178/awgs/0/waveform/descriptors",
+    "awgs/0/waveform/descriptors",
     "vector_g"
   ],
   [
-    "/dev2178/awgs/0/sequencer/continue",
+    "awgs/0/sequencer/continue",
     "float"
   ],
   [
-    "/dev2178/awgs/0/sweep/awgtrigs/3",
+    "awgs/0/sweep/awgtrigs/3",
     "float"
   ],
   [
-    "/dev2178/awgs/0/sweep/awgtrigs/1",
+    "awgs/0/sweep/awgtrigs/1",
     "float"
   ],
   [
-    "/dev2178/awgs/0/sweep/awgtrigs/0",
+    "awgs/0/sweep/awgtrigs/0",
     "float"
   ],
   [
-    "/dev2178/awgs/0/sequencer/assembly",
+    "awgs/0/sequencer/assembly",
     "vector_g"
   ],
   [
-    "/dev2178/awgs/0/waveform/data",
+    "awgs/0/waveform/data",
     "vector_g"
   ],
   [
-    "/dev2178/awgs/0/elf/memoryusage",
+    "awgs/0/elf/memoryusage",
     "float"
   ],
   [
-    "/dev2178/awgs/0/waveform/index",
+    "awgs/0/waveform/index",
     "float"
   ],
   [
-    "/dev2178/sigins/1/autorange",
+    "sigins/1/autorange",
     "float"
   ],
   [
-    "/dev2178/sigins/0/max",
+    "sigins/0/max",
     "float"
   ],
   [
-    "/dev2178/sigins/0/min",
+    "sigins/0/min",
     "float"
   ],
   [
-    "/dev2178/sigins/1/min",
+    "sigins/1/min",
     "float"
   ],
   [
-    "/dev2178/sigins/1/max",
+    "sigins/1/max",
     "float"
   ],
   [
-    "/dev2178/sigins/0/autorange",
+    "sigins/0/autorange",
     "float"
   ],
   [
-    "/dev2178/sigouts/1/over",
+    "sigouts/1/over",
     "float"
   ],
   [
-    "/dev2178/sigouts/0/over",
+    "sigouts/0/over",
     "float"
   ],
   [
-    "/dev2178/quex/rl/data/4",
+    "quex/rl/data/4",
     "vector_g"
   ],
   [
-    "/dev2178/quex/wint/weights/4/imag",
+    "quex/wint/weights/4/imag",
     "vector_gs"
   ],
   [
-    "/dev2178/quex/iavg/data/0",
+    "quex/iavg/data/0",
     "vector_g"
   ],
   [
-    "/dev2178/quex/wint/weights/0/imag",
+    "quex/wint/weights/0/imag",
     "vector_gs"
   ],
   [
-    "/dev2178/quex/wint/weights/0/real",
+    "quex/wint/weights/0/real",
     "vector_gs"
   ],
   [
-    "/dev2178/quex/rl/data/3",
+    "quex/rl/data/3",
     "vector_g"
   ],
   [
-    "/dev2178/quex/wint/weights/1/real",
+    "quex/wint/weights/1/real",
     "vector_gs"
   ],
   [
-    "/dev2178/quex/wint/weights/2/real",
+    "quex/wint/weights/2/real",
     "vector_gs"
   ],
   [
-    "/dev2178/quex/wint/weights/3/real",
+    "quex/wint/weights/3/real",
     "vector_gs"
   ],
   [
-    "/dev2178/quex/rl/data/1",
+    "quex/rl/data/1",
     "vector_g"
   ],
   [
-    "/dev2178/quex/wint/weights/3/imag",
+    "quex/wint/weights/3/imag",
     "vector_gs"
   ],
   [
-    "/dev2178/quex/rl/data/2",
+    "quex/rl/data/2",
     "vector_g"
   ],
   [
-    "/dev2178/quex/wint/weights/2/imag",
+    "quex/wint/weights/2/imag",
     "vector_gs"
   ],
   [
-    "/dev2178/quex/wint/weights/4/real",
+    "quex/wint/weights/4/real",
     "vector_gs"
   ],
   [
-    "/dev2178/quex/wint/weights/1/imag",
+    "quex/wint/weights/1/imag",
     "vector_gs"
   ],
   [
-    "/dev2178/quex/rl/data/0",
+    "quex/rl/data/0",
     "vector_g"
   ],
   [
-    "/dev2178/quex/iavg/data/1",
+    "quex/iavg/data/1",
     "vector_g"
   ],
   [
-    "/dev2178/dios/0/input",
+    "dios/0/input",
     "vector_s"
   ]
 ]

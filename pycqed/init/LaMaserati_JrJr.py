@@ -2,6 +2,8 @@
 This scripts initializes the instruments and imports the modules
 """
 
+UHFQC=True
+
 
 # General imports
 
@@ -42,7 +44,8 @@ from pycqed.measurement import CBox_sweep_functions as cb_swf
 from pycqed.measurement.optimization import nelder_mead
 from pycqed.analysis import measurement_analysis as ma
 from pycqed.analysis import analysis_toolbox as a_tools
-
+from pycqed.measurement import awg_sweep_functions_multi_qubit as awg_swf_m
+from pycqed.measurement.pulse_sequences import multi_qubit_tek_seq_elts as sq_m
 
 
 from pycqed.utilities import general as gen
@@ -67,9 +70,10 @@ import pycqed.instrument_drivers.meta_instrument.CBox_LookuptableManager as lm
 
 from pycqed.instrument_drivers.meta_instrument.qubit_objects import CBox_driven_transmon as qb
 from pycqed.instrument_drivers.physical_instruments import QuTech_Duplexer as qdux
-from pycqed.instrument_drivers.physical_instruments.ZurichInstruments import UHFQuantumController as ZI_UHFQC
+if UHFQC:
+    from pycqed.instrument_drivers.physical_instruments.ZurichInstruments import UHFQuantumController as ZI_UHFQC
 from pycqed.instrument_drivers.physical_instruments import Weinschel_8320_novisa
-
+from pycqed.instrument_drivers.meta_instrument import Flux_Control as FluxCtrl
 # Initializing instruments
 
 
@@ -96,17 +100,50 @@ station.add_component(AWG520)
 IVVI = iv.IVVI('IVVI', address='COM4', numdacs=16, server_name=None)
 station.add_component(IVVI)
 
-#Initializing UHFQC
-UHFQC_1 = ZI_UHFQC.UHFQC('UHFQC_1', device='dev2178', server_name=None)
-station.add_component(UHFQC_1)
+if UHFQC:
+    #Initializing UHFQC
+    UHFQC_1 = ZI_UHFQC.UHFQC('UHFQC_1', device='dev2178', server_name=None)
+    station.add_component(UHFQC_1)
+else:
+    UHFQC_1=None
 
-ATT = Weinschel_8320_novisa.Weinschel_8320(name='ATT',address='192.168.0.54', server_name=None)
+
+Flux_Control = FluxCtrl.Flux_Control(name='FluxControl',IVVI=station.IVVI)
+station.add_component(Flux_Control)
+
+transfer_matrix_dec = np.array([[  4.70306717e-04,  -8.41312977e-05,   3.64442804e-05,  -1.00489353e-05,
+   -2.36455362e-05],
+ [ -6.70464355e-05,   6.39386703e-04,  -4.37263640e-05,  -2.01374983e-05,
+    1.77516922e-05],
+ [  7.69376917e-06,  -4.09893480e-05,   5.35184092e-04,  -2.36755094e-05,
+   -5.34108608e-05],
+ [  3.08518924e-05,   1.11315677e-05,   7.36191927e-05,   4.09078121e-04,
+   -2.63031372e-05],
+ [ -4.51217544e-05,  -1.35430841e-05,  -9.52349548e-05,  -4.18415379e-05,
+    4.09962523e-04]])
+invA = np.array([[  2.17320666e+03,2.79414032e+02,-1.16652799e+02,7.08814870e+01,1.02595827e+02],
+                 [2.16689677e+02,1.59642752e+03,9.70544635e+01,8.55894771e+01,-3.84925724e+01],
+                 [1.52695260e+00,1.25113953e+02,1.90389457e+03,1.42143094e+02,2.51834186e+02],
+                 [-1.55226336e+02,-8.03197377e+01,-3.10695549e+02,2.43001891e+03,1.09956406e+02],
+                 [2.30860259e+02,1.04357646e+02,4.00934628e+02,2.91661201e+02,2.51899161e+03]])
+Flux_Control.transfer_matrix(transfer_matrix_dec)
+Flux_Control.inv_transfer_matrix(invA)
+
+Flux_Control.dac_mapping([1, 2, 3, 4, 5])
+
+Flux_Control.flux_offsets(np.array([3.21499683e-02,-2.91992550e-02,2.88520021e-02,-2.26225717e-06,-9.35805778e-03]))
+
+
+
+
+# ATT = Weinschel_8320_novisa.Weinschel_8320(name='ATT',address='192.168.0.54', server_name=None)
+# station.add_component(ATT)
 # Dux = qdux.QuTech_Duplexer('Dux', address='TCPIP0::192.168.0.101',
 #                             server_name=None)
 # SH = sh.SignalHound_USB_SA124B('Signal hound', server_name=None) #commented because of 8s load time
 
 # Meta-instruments
-HS = hd.HeterodyneInstrument('HS', LO=LO, RF=RF, CBox=CBox, AWG=AWG,
+HS = hd.HeterodyneInstrument('HS', LO=LO, RF=RF, AWG=AWG, acquisition_instr=CBox.name,
                              server_name=None)
 station.add_component(HS)
 # LutMan = lm.QuTech_ControlBox_LookuptableManager('LutMan', CBox=CBox,
@@ -121,6 +158,7 @@ AncB = qbt.Tektronix_driven_transmon('AncB', LO=LO, cw_source=Spec_source,
                                               IVVI=IVVI, rf_RO_source=RF,
                                               AWG=AWG,
                                               heterodyne_instr=HS,
+                                              FluxCtrl=Flux_Control,
                                               MC=MC,
                                               server_name=None)
 station.add_component(AncB)
@@ -129,6 +167,7 @@ AncT = qbt.Tektronix_driven_transmon('AncT', LO=LO, cw_source=Spec_source,
                                               IVVI=IVVI, rf_RO_source=RF,
                                               AWG=AWG,
                                               heterodyne_instr=HS,
+                                              FluxCtrl=Flux_Control,
                                               MC=MC,
                                               server_name=None)
 station.add_component(AncT)
@@ -137,6 +176,7 @@ DataB = qbt.Tektronix_driven_transmon('DataB', LO=LO, cw_source=Spec_source,
                                               IVVI=IVVI, rf_RO_source=RF,
                                               AWG=AWG,
                                               heterodyne_instr=HS,
+                                              FluxCtrl=Flux_Control,
                                               MC=MC,
                                               server_name=None)
 station.add_component(DataB)
@@ -145,6 +185,7 @@ DataM = qbt.Tektronix_driven_transmon('DataM', LO=LO, cw_source=Spec_source,
                                               IVVI=IVVI, rf_RO_source=RF,
                                               AWG=AWG,
                                               heterodyne_instr=HS,
+                                              FluxCtrl=Flux_Control,
                                               MC=MC,
                                               server_name=None)
 station.add_component(DataM)
@@ -153,6 +194,7 @@ DataT = qbt.Tektronix_driven_transmon('DataT', LO=LO, cw_source=Spec_source,
                                               IVVI=IVVI, rf_RO_source=RF,
                                               AWG=AWG,
                                               heterodyne_instr=HS,
+                                              FluxCtrl=Flux_Control,
                                               MC=MC,
                                               server_name=None)
 station.add_component(DataT)
@@ -164,6 +206,41 @@ gen.load_settings_onto_instrument(DataB)
 gen.load_settings_onto_instrument(DataM)
 gen.load_settings_onto_instrument(DataT)
 gen.load_settings_onto_instrument(HS)
+
+DataT.E_c(0.28e9)
+DataT.asymmetry(0)
+DataT.dac_flux_coefficient(0.0016813942523375956)
+DataT.dac_sweet_spot(-53.472554718672427)
+DataT.f_max(5.688884012383026e9)
+DataT.f_qubit_calc('flux')
+
+AncB.E_c(0.28e9)
+AncB.asymmetry(0)
+AncB.dac_flux_coefficient(0.002028986705064149)
+AncB.dac_sweet_spot(36.460579336820274)
+AncB.f_max(6.381268822811037e9)
+AncB.f_qubit_calc('flux')
+
+AncT.E_c(0.28e9)
+AncT.asymmetry(0)
+AncT.dac_flux_coefficient(0.0015092699034525462)
+AncT.dac_sweet_spot(-64.682660992718183)
+AncT.f_max(5.9419418666592483e9)
+AncT.f_qubit_calc('flux')
+
+DataM.E_c(0.28e9)
+DataM.asymmetry(0)
+DataM.dac_flux_coefficient(0.0012685027014113798)
+DataM.dac_sweet_spot(2.4196012752483966)
+DataM.f_max(6.1113712558694182)
+DataM.f_qubit_calc('flux')
+
+DataB.E_c(0.28e9)
+DataB.asymmetry(0)
+DataB.dac_flux_coefficient(0.00094498809508039799)
+DataB.dac_sweet_spot(31.549597601272581)
+DataB.f_max(6.7138650690678894)
+DataB.f_qubit_calc('flux')
 
 
 MC.station = station
@@ -227,40 +304,53 @@ def print_instr_params(instr):
 from scripts.Experiments.FiveQubits import common_functions as cfct
 cfct.set_AWG_limits(station,1.7)
 
-q0=AncT
-q1=DataT
 
-def switch_to_pulsed_RO_CBox(qubit):
-    UHFQC_1.AWG_file('traditional.seqc')
-    qubit.RO_pulse_type('Gated_MW_RO_pulse')
-    qubit.RO_acq_marker_delay(175e-9)
-    qubit.acquisition_instr(CBox)
-    qubit.RO_acq_marker_channel('ch3_marker1')
-    qubit.RO_acq_weight_function_I(0)
-    qubit.RO_acq_weight_function_Q(1)
+if UHFQC:
+    def switch_to_pulsed_RO_CBox(qubit):
+        UHFQC_1.awg_sequence_acquisition()
+        qubit.RO_pulse_type('Gated_MW_RO_pulse')
+        qubit.RO_acq_marker_delay(175e-9)
+        qubit.acquisition_instr('CBox')
+        qubit.RO_acq_marker_channel('ch3_marker1')
+        qubit.RO_acq_weight_function_I(0)
+        qubit.RO_acq_weight_function_Q(1)
 
-def switch_to_pulsed_RO_UHFQC(qubit):
-    UHFQC_1.AWG_file('traditional.seqc')
-    qubit.RO_pulse_type('Gated_MW_RO_pulse')
-    qubit.RO_acq_marker_delay(175e-9)
-    qubit.acquisition_instr(UHFQC_1)
-    qubit.RO_acq_marker_channel('ch3_marker2')
-    qubit.RO_acq_weight_function_I(0)
-    qubit.RO_acq_weight_function_Q(1)
+    def switch_to_pulsed_RO_UHFQC(qubit):
+        UHFQC_1.awg_sequence_acquisition()
+        qubit.RO_pulse_type('Gated_MW_RO_pulse')
+        qubit.RO_acq_marker_delay(175e-9)
+        qubit.acquisition_instr('UHFQC_1')
+        qubit.RO_acq_marker_channel('ch3_marker2')
+        qubit.RO_acq_weight_function_I(0)
+        qubit.RO_acq_weight_function_Q(1)
 
 
-def switch_to_IQ_mod_RO_UHFQC(qubit):
-    UHFQC_1.AWG_file('traditional_IQ_mod_readout.seqc')
-    qubit.RO_pulse_type('MW_IQmod_pulse_nontek')
-    qubit.RO_acq_marker_delay(-100e-9)
-    qubit.acquisition_instr(UHFQC_1)
-    qubit.RO_acq_marker_channel('ch3_marker2')
-    qubit.RO_I_channel('0')
-    qubit.RO_Q_channel('1')
-    qubit.RO_acq_weight_function_I(0)
-    qubit.RO_acq_weight_function_Q(1)
+    def switch_to_IQ_mod_RO_UHFQC(qubit):
+        UHFQC_1.awg_sequence_acquisition_and_pulse_SSB(f_RO_mod=qubit.f_RO_mod(),
+                    RO_amp=qubit.RO_amp(), RO_pulse_length=qubit.RO_pulse_length(),
+                    acquisition_delay=270e-9)
+        qubit.RO_pulse_type('MW_IQmod_pulse_UHFQC')
+        qubit.RO_acq_marker_delay(-100e-9)
+        qubit.acquisition_instr('UHFQC_1')
+        qubit.RO_acq_marker_channel('ch3_marker2')
+        qubit.RO_I_channel('0')
+        qubit.RO_Q_channel('1')
+        qubit.RO_acq_weight_function_I(0)
+        qubit.RO_acq_weight_function_Q(1)
+else:
+    def switch_to_pulsed_RO_CBox(qubit):
+        qubit.RO_pulse_type('Gated_MW_RO_pulse')
+        qubit.RO_acq_marker_delay(175e-9)
+        qubit.acquisition_instr('CBox')
+        qubit.RO_acq_marker_channel('ch3_marker1')
+        qubit.RO_acq_weight_function_I(0)
+        qubit.RO_acq_weight_function_Q(1)
+
+
+q0 = AncT
+q1 = DataT
 
 #preparing UHFQC readout with IQ mod pulses
 
-switch_to_pulsed_RO_CBox(q0)
-switch_to_pulsed_RO_CBox(q1)
+switch_to_pulsed_RO_CBox(AncT)
+switch_to_pulsed_RO_CBox(DataT)

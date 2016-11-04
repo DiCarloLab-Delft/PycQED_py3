@@ -377,7 +377,7 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
     def __init__(self, measurement_name,  MC, AWG, acquisition_instr, pulse_pars, RO_pars,
                  raw=True, analyze=True, upload=True, IF=None, weight_function_I=0, weight_function_Q=1,
                  optimized_weights=False, wait=0.0, close_fig=True, SSB=False,
-                 nr_averages=1024, integration_length=1e-6, **kw):
+                 nr_averages=1024, integration_length=1e-6, nr_shots=4095, **kw):
         self.detector_control = 'soft'
         self.name = 'SSRO_Fidelity'
         # For an explanation of the difference between the different
@@ -411,6 +411,8 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
         self.integration_length = integration_length
         self.weight_function_I = weight_function_I
         self.weight_function_Q = weight_function_Q
+        self.nr_shots=nr_shots
+        print('weights', weight_function_I, weight_function_Q)
 
 
     def prepare(self, **kw):
@@ -437,17 +439,18 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
 
 
             elif 'UHFQC' in str(self.acquisition_instr):
+                print('loading {} shots into UHFQC'.format(self.nr_shots))
                 self.MC.set_detector_function(
                     det.UHFQC_integration_logging_det(self.acquisition_instr,
-                                                          self.AWG, channels=[0,1],
-                                                          integration_length=self.integration_length))
+                                                          self.AWG, channels=[self.weight_function_I,self.weight_function_Q],
+                                                          integration_length=self.integration_length, nr_shots=self.nr_shots))
                 if self.SSB:
-                    self.UHFQC.prepare_SSB_weight_and_rotation(IF=self.IF)
+                    self.UHFQC.prepare_SSB_weight_and_rotation(IF=self.IF, weight_function_I=self.weight_function_I, weight_function_Q=self.weight_function_Q)
                 else:
                     if self.IF==None:
                         raise ValueError('IF has to be provided when not using optimized weights')
                     else:
-                        self.UHFQC.prepare_DSB_weight_and_rotation(IF=self.IF)
+                        self.UHFQC.prepare_DSB_weight_and_rotation(IF=self.IF, weight_function_I=self.weight_function_I, weight_function_Q=self.weight_function_Q)
 
     def acquire_data_point(self, *args, **kw):
         self.time_start = time.time()
@@ -517,6 +520,7 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
             elif 'UHFQC' in str(self.acquisition_instr):
                 nr_samples = 4096
                 self.AWG.stop()
+                self.UHFQC.awgs_0_userregs_1(1)#0 for rl, 1 for iavg
                 self.UHFQC.quex_iavg_length(nr_samples)
                 self.UHFQC.quex_iavg_avgcnt(int(np.log2(self.nr_averages)))
                 SWF = awg_swf.OffOn(
@@ -531,6 +535,7 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
                 while self.UHFQC.awgs_0_enable() == 1:
                     time.sleep(0.1)
                 time.sleep(1)
+
 
                 dataset = self.UHFQC.quex_iavg_data_0()
                 transient0_I=dataset[0]['vector']
@@ -556,7 +561,8 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
                 transient1_I=dataset[0]['vector']
                 dataset = self.UHFQC.quex_iavg_data_1()
                 transient1_Q=dataset[0]['vector']
-
+                print("transients_I", transient1_I)
+                print("transients_Q", transient1_Q)
                 optimized_weights_I = (transient1_I-transient0_I)
                 optimized_weights_I = optimized_weights_I-np.mean(optimized_weights_I)
                 weight_scale_factor = 1./np.max(np.abs(optimized_weights_I))
@@ -568,7 +574,6 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
                 optimized_weights_Q = weight_scale_factor*optimized_weights_Q
 
                 eval('self.UHFQC.quex_wint_weights_{}_real(np.array(optimized_weights_I))'.format(self.weight_function_I))
-
                 if self.SSB:
                     eval('self.UHFQC.quex_wint_weights_{}_imag(np.array(optimized_weights_Q))'.format(self.weight_function_I))
                     eval('self.UHFQC.quex_wint_weights_{}_real(np.array(optimized_weights_I))'.format(self.weight_function_Q))
@@ -585,6 +590,13 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
                     eval('self.UHFQC.quex_rot_{}_imag(0.0)'.format(self.weight_function_I))
                     eval('self.UHFQC.quex_rot_{}_real(0.0)'.format(self.weight_function_Q))
                     eval('self.UHFQC.quex_rot_{}_imag(0.0)'.format(self.weight_function_Q))
+
+                eval('self.UHFQC.quex_wint_weights_{}_real()'.format(self.weight_function_I)) #disabling the other weight fucntions
+                eval('self.UHFQC.quex_wint_weights_{}_imag()'.format(self.weight_function_I)) #disabling the other weight fucntions
+                eval('self.UHFQC.quex_wint_weights_{}_real()'.format(self.weight_function_Q)) #disabling the other weight fucntions
+                eval('self.UHFQC.quex_wint_weights_{}_imag()'.format(self.weight_function_Q)) #disabling the other weight fucntions
+
+
                 self.MC.set_sweep_function(awg_swf.OffOn(
                                            pulse_pars=self.pulse_pars,
                                            RO_pars=self.RO_pars))
@@ -608,7 +620,6 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
                 dset[:, 1] = transient0_Q
                 dset[:, 2] = transient1_I
                 dset[:, 3] = transient1_Q
-                # print('Done!')
             ana.data_file.close()
 
             # Arbitrary choice, does not think about the deffinition
@@ -950,7 +961,7 @@ class CBox_RB_detector(det.Soft_Detector):
 
 class Chevron_optimization_v1(det.Soft_Detector):
     '''
-
+    Chevron optimization.
     '''
     def __init__(self, flux_channel, dist_dict, AWG, MC_nested, qubit,
                  kernel_obj, cost_function_opt=0, **kw):
@@ -994,17 +1005,17 @@ class Chevron_optimization_v1(det.Soft_Detector):
 
 
         self.qubit.dist_dict = self.dist_dict
+        self.qubit.RO_acq_averages(self.nr_averages)
         self.qubit.measure_chevron(amps=[self.awg_amp_par()],
                                    length=np.arange(0, 81e-9, 1e-9),
-                                   MC=self.MC_nested,
-                                   nr_averages=self.nr_averages)
+                                   MC=self.MC_nested)
 
         # # fit it
-        ma_obj = ma.chevron_optimization_v1(auto=True, label='Chevron_slice',
-                                            cost_function=self.cost_function_opt)
+        ma_obj = ma.chevron_optimization_v2(auto=True, label='Chevron_slice')
+        cost_val = ma_obj.cost_value[self.cost_function_opt]
 
         # # Return the cost function sum(min)+sum(1-max)
-        return ma_obj.cost_value,0.5*ma_obj.period
+        return cost_val, 0.5*ma_obj.period
 
 
 

@@ -347,13 +347,62 @@ class Hard_Sweep(Sweep_function):
 # NOTE: AWG_sweeps are located in AWG_sweep_functions
 
 
-class VNA_sweep(Hard_Sweep):
-    def __init__(self):
-        super(VNA_sweep,self).__init__()
-        self.name = 'VNA_sweep'
+class  ZNB_VNA_sweep(Hard_Sweep):
+    def __init__(self, VNA,
+                 start_freq=None, stop_freq=None,
+                 center_freq=None, span=None,
+                 npts=100, force_reset=False):
+        '''
+        Frequencies are in Hz.
+        Defines the frequency sweep by one of the two methods:
+        1) start a and stop frequency
+        2) center frequency and span
+
+        If force_reset = True the VNA is reset to default settings
+        '''
+        super(ZNB_VNA_sweep,self).__init__()
+        self.VNA = VNA
+        self.name = 'ZNB_VNA_sweep'
         self.parameter_name = 'frequency'
-        self.unit = 'GHz'
+        self.unit = 'Hz'
         self.filename = 'VNA_sweep'
+
+        self.start_freq = start_freq
+        self.stop_freq = stop_freq
+        self.center_freq = center_freq
+        self.span = span
+        self.npts = npts
+
+        if force_reset == True:
+            VNA.reset()
+
+    def prepare(self):
+        '''
+        Prepare the VNA for measurements by defining basic settings.
+        Set the frequency sweep and get the frequency points back from the insturment
+        '''
+        # Define basic settings for measurements
+        # if self.force_reset == True:
+        #     print('reset')
+        #     self.VNA.reset() # reset to default settings
+
+        self.VNA.continuous_mode_all('off') # measure only once required
+        self.VNA.min_sweep_time('on') # optimize the sweep time for the fastest measurement
+        self.VNA.trigger_source('immediate') # start a measurement once the trigger signal arrive
+                                        # trigger signal is generated with the command:
+                                        # VNA.start_single_sweep_all()
+
+        if self.start_freq != None and self.stop_freq != None:
+            self.VNA.start_frequency(self.start_freq)
+            self.VNA.stop_frequency(self.stop_freq)
+        elif self.center_freq != None and self.span != None:
+            self.VNA.center_frequency(self.center_freq)
+            self.VNA.span_frequency(self.span)
+
+        self.VNA.npts(self.npts)
+
+        # get the list of frequency used in the span from the VNA
+        self.sweep_points = self.VNA.get_stimulus()
 
 ###############################################################################
 ####################        for JPA calibrations  ############################
