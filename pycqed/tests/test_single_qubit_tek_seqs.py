@@ -125,9 +125,9 @@ class Test_SingleQubitTek(unittest.TestCase):
                 self.assertEqual(p0.phase, 0)
                 p1 = el.pulses['pulse_1-0']
 
-                exp_phase = (360*f_detuning*(t1-t0)) #% 360
-                # if exp_phase == 360:
-                #     exp_phase = 0
+                exp_phase = (360*f_detuning*(t1-t0)) % 360
+                if exp_phase == 360:
+                    exp_phase = 0
                 self.assertAlmostEqual(p1.phase, exp_phase, places=10)
             else:
                 # Calibration points do not have two pulses

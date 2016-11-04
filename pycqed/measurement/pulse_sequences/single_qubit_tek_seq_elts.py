@@ -286,7 +286,8 @@ def Ramsey_seq(times, pulse_pars, RO_pars,
         pulse_pars_x2['pulse_delay'] = tau
 
         if artificial_detuning is not None:
-            pulse_pars_x2['phase'] = (tau-times[0]) * artificial_detuning * 360
+            Dphase = ((tau-times[0]) * artificial_detuning * 360) % 360
+            pulse_pars_x2['phase'] = Dphase
 
         if cal_points and (i == (len(times)-4) or i == (len(times)-3)):
                 el = multi_pulse_elt(i, station, [pulses['I'], RO_pars])
