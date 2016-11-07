@@ -1373,17 +1373,23 @@ class UHFQC_input_average_detector(Hard_Detector):
 
     def get_values(self):
         self.UHFQC.awgs_0_enable(1)
-        temp = self.UHFQC.awgs_0_enable()
-        del temp
+        #temp = self.UHFQC.awgs_0_enable()
+        #del temp
         if self.AWG is not None:
             self.AWG.start()
-        while self.UHFQC.awgs_0_enable() == 1:
-            time.sleep(0.1)
-        time.sleep(1)
-        data = ['']*len(self.channels)
-        for i, channel in enumerate(self.channels):
-            dataset = eval("self.UHFQC.quex_iavg_data_{}()".format(channel))
-            data[i] = dataset[0]['vector']
+        # while self.UHFQC.awgs_0_enable() == 1:
+        #     time.sleep(0.1)
+        # time.sleep(1)
+        #data = ['']*len(self.channels)
+        # for i, channel in enumerate(self.channels):
+        #     dataset = eval("self.UHFQC.quex_iavg_data_{}()".format(channel))
+        #     data[i] = dataset[0]['vector']
+        data = self.UHFQC.single_acquisition(self.nr_sweep_points,
+                                             self.poll_time, timeout=0,
+                                             channels=set(self.channels),
+                                             mode='iavg')
+        data = np.array([data[key] for key in data.keys()])
+
         return data
 
     def prepare(self, sweep_points):
@@ -1393,6 +1399,16 @@ class UHFQC_input_average_detector(Hard_Detector):
         self.UHFQC.quex_iavg_avgcnt(int(np.log2(self.nr_averages)))
         self.UHFQC.awgs_0_userregs_1(1)  # 0 for rl, 1 for iavg
         self.UHFQC.awgs_0_userregs_0(int(self.nr_averages))  # 0 for rl, 1 for iavg
+        self.nr_sweep_points = self.nr_samples
+        if self.nr_sweep_points < 128:
+            self.poll_time = 0.01
+        elif self.nr_sweep_points < 256:
+            self.poll_time = 0.05
+        elif self.nr_sweep_points < 512:
+            self.poll_time = 0.1
+        else:
+            self.poll_time = 0.7
+
 
     def finish(self):
         if self.AWG is not None:

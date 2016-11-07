@@ -522,6 +522,7 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
             elif 'UHFQC' in str(self.acquisition_instr):
                 nr_samples = 4096
                 self.AWG.stop()
+                self.UHFQC.awgs_0_userregs_0(int(self.nr_averages))#0 for rl, 1 for iavg
                 self.UHFQC.awgs_0_userregs_1(1)#0 for rl, 1 for iavg
                 self.UHFQC.quex_iavg_length(nr_samples)
                 self.UHFQC.quex_iavg_avgcnt(int(np.log2(self.nr_averages)))
@@ -534,15 +535,18 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
                 self.UHFQC.awgs_0_single(1)
                 self.UHFQC.awgs_0_enable(1)
                 self.AWG.start()
-                while self.UHFQC.awgs_0_enable() == 1:
-                    time.sleep(0.1)
-                time.sleep(1)
+                # while self.UHFQC.awgs_0_enable() == 1:
+                #     time.sleep(0.1)
+                # time.sleep(1)
 
-
-                dataset = self.UHFQC.quex_iavg_data_0()
-                transient0_I=dataset[0]['vector']
-                dataset = self.UHFQC.quex_iavg_data_1()
-                transient0_Q=dataset[0]['vector']
+                self.poll_time=0.7
+                data = self.UHFQC.single_acquisition(nr_samples,
+                                             self.poll_time, timeout=0,
+                                             channels=set([0,1]),
+                                             mode='iavg')
+                data = np.array([data[key] for key in data.keys()])
+                transient0_I = data[0]
+                transient0_Q = data[1]
 
                 self.AWG.stop()
                 self.UHFQC.quex_iavg_length(nr_samples)
@@ -555,25 +559,30 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
                 self.UHFQC.awgs_0_single(1)
                 self.UHFQC.awgs_0_enable(1)
                 self.AWG.start()
-                while self.UHFQC.awgs_0_enable() == 1:
-                    time.sleep(0.1)
-                time.sleep(1)
+                # while self.UHFQC.awgs_0_enable() == 1:
+                #     time.sleep(0.1)
+                # time.sleep(1)
+                data = self.UHFQC.single_acquisition(nr_samples,
+                                             self.poll_time, timeout=0,
+                                             channels=set([0,1]),
+                                             mode='iavg')
+                data = np.array([data[key] for key in data.keys()])
+                transient1_I = data[0]
+                transient1_Q = data[1]
 
-                dataset = self.UHFQC.quex_iavg_data_0()
-                transient1_I=dataset[0]['vector']
-                dataset = self.UHFQC.quex_iavg_data_1()
-                transient1_Q=dataset[0]['vector']
-                print("transients_I", transient1_I)
-                print("transients_Q", transient1_Q)
+
                 optimized_weights_I = (transient1_I-transient0_I)
                 optimized_weights_I = optimized_weights_I-np.mean(optimized_weights_I)
                 weight_scale_factor = 1./np.max(np.abs(optimized_weights_I))
                 optimized_weights_I = weight_scale_factor*optimized_weights_I
+                print("optimized weights I", optimized_weights_I)
+
 
                 optimized_weights_Q = (transient1_Q-transient0_Q)
                 optimized_weights_Q = optimized_weights_Q-np.mean(optimized_weights_Q)
                 weight_scale_factor = 1./np.max(np.abs(optimized_weights_Q))
                 optimized_weights_Q = weight_scale_factor*optimized_weights_Q
+                print("optimized weights Q", optimized_weights_Q)
 
                 eval('self.UHFQC.quex_wint_weights_{}_real(np.array(optimized_weights_I))'.format(self.weight_function_I))
                 if self.SSB:
