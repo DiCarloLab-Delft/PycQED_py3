@@ -761,6 +761,28 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                 self.motzoi.set(a.optimal_motzoi)
             return a
 
+    def measure_freq_XY(self, f_span, n_f, MC=None, analyze=True, close_fig=True,
+                          verbose=True, update=True):
+
+        self.prepare_for_timedomain()
+        if MC is None:
+            MC = self.MC
+
+        freqs = np.linspace(-f_span*0.5, f_span*0.5, n_f) + self.f_pulse_mod.get()
+
+        MC.set_sweep_function(awg_swf.Freq_XY(
+            pulse_pars=self.pulse_pars, RO_pars=self.RO_pars, freqs=freqs))
+        MC.set_detector_function(self.int_avg_det)
+        MC.run('Freq_XY'+self.msmt_suffix)
+
+        # if analyze:
+        #     a = ma.Motzoi_XY_analysis(close_fig=close_fig)
+        #     if update:
+        #         self.motzoi.set(a.optimal_motzoi)
+        #     return a
+
+
+
     def measure_chevron(self, amps, length, MC=None, nr_averages=512):
 
         if MC is None:
