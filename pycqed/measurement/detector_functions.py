@@ -107,12 +107,10 @@ class Dummy_Detector_Hard(Hard_Detector):
 
     def prepare(self, sweep_points):
         self.sweep_points = sweep_points
-        self.data = np.zeros(len(sweep_points))
 
     def get_values(self):
         x = self.sweep_points
         self.data = [np.sin(x / np.pi), np.cos(x/np.pi)]
-
         return self.data
 
 

@@ -13,7 +13,7 @@ class Test_MeasurementControl(unittest.TestCase):
     def setUp(self):
         # set up a pulsar with some mock settings for the element
         self.MC = measurement_control.MeasurementControl(
-            'MC', live_plot_enabled=False)
+            'MC', live_plot_enabled=False, verbose=False)
         self.MC.station = station
 
     def test_soft_sweep_1D(self):
@@ -69,7 +69,6 @@ class Test_MeasurementControl(unittest.TestCase):
         np.testing.assert_array_almost_equal(z0, z[0, :])
         np.testing.assert_array_almost_equal(z1, z[1, :])
 
-
     def test_hard_sweep_2D(self):
         """
         Hard inner loop, soft outer loop
@@ -87,8 +86,10 @@ class Test_MeasurementControl(unittest.TestCase):
         z = self.data = [np.sin(x / np.pi), np.cos(x/np.pi)]
         z0 = dat[:, 2]
         z1 = dat[:, 3]
-        np.testing.assert_array_almost_equal(x, sweep_pts)
-        np.testing.assert_array_almost_equal(y, sweep_pts_2D)
+
+        x_tiled = np.tile(sweep_pts, len(sweep_pts_2D))
+        y_rep = np.repeat(sweep_pts_2D, len(sweep_pts))
+        np.testing.assert_array_almost_equal(x, x_tiled)
+        np.testing.assert_array_almost_equal(y, y_rep)
         np.testing.assert_array_almost_equal(z0, z[0])
         np.testing.assert_array_almost_equal(z1, z[1])
-
