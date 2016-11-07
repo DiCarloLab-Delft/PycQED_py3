@@ -115,7 +115,7 @@ class MeasurementControl:
             if len(self.sweep_functions) == 1:
                 self.detector_function.prepare(
                     sweep_points=self.get_sweep_points())
-                    # needed because self.get_sweep_points returns all of them
+
                 self.get_measurement_preparetime()
                 self.measure_hard()
             elif len(self.sweep_functions) == 2:
@@ -274,11 +274,6 @@ class MeasurementControl:
 
         datasetshape = self.dset.shape
         self.iteration = datasetshape[0] + 1
-
-        # TODO: REMOVE THIS ONLY FOR BENCHMARKING
-        # if self.iteration > 2:
-        #     print('Time of iteration: {:.4g}'.format(time.time()-self.it_time))
-        # self.it_time = time.time()
 
         vals = self.detector_function.acquire_data_point()
         # Resizing dataset and saving
@@ -674,6 +669,7 @@ class MeasurementControl:
                     t_left=round((100.-percdone)/(percdone) *
                                  elapsed_time, 1) if
                     percdone != 0 else '')
+
             if percdone != 100:
                 end_char = '\r'
             else:
@@ -681,28 +677,29 @@ class MeasurementControl:
             print(progress_message, end=end_char)
 
     def print_progress_static_hard(self):
-        acquired_points = self.dset.shape[0]
-        total_nr_pts = len(self.get_sweep_points())
-        if acquired_points == total_nr_pts:
-            self.complete = True  # Note is self.complete ever used?
-        elif acquired_points > total_nr_pts:
-            self.complete = True
+        if self.verbose:
+            acquired_points = self.dset.shape[0]
+            total_nr_pts = len(self.get_sweep_points())
+            if acquired_points == total_nr_pts:
+                self.complete = True  # Note is self.complete ever used?
+            elif acquired_points > total_nr_pts:
+                self.complete = True
 
-        percdone = acquired_points*1./total_nr_pts*100
-        elapsed_time = time.time() - self.begintime
-        progress_message = "\r {percdone}% completed \telapsed time: "\
-            "{t_elapsed}s \ttime left: {t_left}s".format(
-                percdone=int(percdone),
-                t_elapsed=round(elapsed_time, 1),
-                t_left=round((100.-percdone)/(percdone) *
-                             elapsed_time, 1) if
-                percdone != 0 else '')
+            percdone = acquired_points*1./total_nr_pts*100
+            elapsed_time = time.time() - self.begintime
+            progress_message = "\r {percdone}% completed \telapsed time: "\
+                "{t_elapsed}s \ttime left: {t_left}s".format(
+                    percdone=int(percdone),
+                    t_elapsed=round(elapsed_time, 1),
+                    t_left=round((100.-percdone)/(percdone) *
+                                 elapsed_time, 1) if
+                    percdone != 0 else '')
 
-        if percdone != 100:
-            end_char = '\r'
-        else:
-            end_char = '\n'
-        print(progress_message, end=end_char)
+            if percdone != 100:
+                end_char = '\r'
+            else:
+                end_char = '\n'
+            print(progress_message, end=end_char)
 
     def print_measurement_start_msg(self):
         if self.verbose:

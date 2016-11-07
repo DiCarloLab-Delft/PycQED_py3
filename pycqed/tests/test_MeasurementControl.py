@@ -93,3 +93,22 @@ class Test_MeasurementControl(unittest.TestCase):
         np.testing.assert_array_almost_equal(y, y_rep)
         np.testing.assert_array_almost_equal(z0, z[0])
         np.testing.assert_array_almost_equal(z1, z[1])
+
+
+    def test_many_shots_hard_sweep(self):
+        """
+        Tests acquiring more than the maximum number of shots for a hard
+        detector by setting the number of sweep points high
+        """
+        sweep_pts = np.arange(500)
+        self.MC.set_sweep_function(None_Sweep(sweep_control='hard'))
+        self.MC.set_sweep_points(sweep_pts)
+        self.MC.set_detector_function(det.Dummy_Shots_Detector(max_shots=50))
+        dat = self.MC.run('man_shots')
+        x = dat[:, 0]
+        y = dat[:, 1]
+
+        self.assertEqual(np.shape(dat), (len(sweep_pts), 2))
+        np.testing.assert_array_almost_equal(x, sweep_pts)
+        np.testing.assert_array_almost_equal(y, sweep_pts)
+
