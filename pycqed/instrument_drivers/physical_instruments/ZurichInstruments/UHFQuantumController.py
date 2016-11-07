@@ -271,19 +271,16 @@ class UHFQC(Instrument):
         # Define the channels to use
         paths = dict()
         data = dict()
-        print('single acq')
         if mode == 'rl':
             for c in channels:
                 paths[c] = '/' + self._device + '/quex/rl/data/{}'.format(c)
                 data[c] = []
                 self._daq.subscribe(paths[c])
-                print("rl mode now")
         else:
             for c in channels:
                 paths[c] = '/' + self._device + '/quex/iavg/data/{}'.format(c)
                 data[c] = []
                 self._daq.subscribe(paths[c])
-                print("iavg mode now")
 
 
         #self._daq.setInt('/' + self._device + '/awgs/0/single', 1)
