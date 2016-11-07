@@ -94,7 +94,6 @@ class Test_MeasurementControl(unittest.TestCase):
         np.testing.assert_array_almost_equal(z0, z[0])
         np.testing.assert_array_almost_equal(z1, z[1])
 
-
     def test_many_shots_hard_sweep(self):
         """
         Tests acquiring more than the maximum number of shots for a hard

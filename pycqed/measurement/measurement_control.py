@@ -96,50 +96,34 @@ class MeasurementControl:
             self.detector_function.prepare()
             self.get_measurement_preparetime()
             self.measure_soft_static()
-        elif (self.sweep_functions[0].sweep_control == 'soft' and
-              self.detector_function.detector_control == 'hard'):
-            """
-            This is a special combination for when the detector returns
-            data in chunks, the detector function needs to take care of
-            going over all the sweep points by using all that are specified
-            """
-            self.detector_function.prepare(
-                sweep_points=self.get_sweep_points())
-            self.get_measurement_preparetime()
-            # self.complete gets updated in self.print_progress_static_hard
-            self.complete = False
-            while not self.complete:
-                self.measure_hard()
+
         elif self.sweep_functions[0].sweep_control == 'hard':
             self.iteration = 0
+            self.xlen = len(self.get_sweep_points())
             if len(self.sweep_functions) == 1:
                 self.detector_function.prepare(
                     sweep_points=self.get_sweep_points())
-
                 self.get_measurement_preparetime()
                 self.measure_hard()
             elif len(self.sweep_functions) == 2:
                 self.tile_sweep_pts_for_2D()
-                # self.xlen = len(self.sweep_points)
-                # self.ylen = len(self.sweep_points_2D)
-
-                self.complete = False
                 self.get_measurement_preparetime()
-                for j in range(self.ylen):
-                    # added specifically for 2D hard sweeps
-                    if not self.complete:
-                        for i, sweep_function in enumerate(self.sweep_functions):
-                            idx = int(self.iteration*self.xlen)
-                            sweep_points = self.get_sweep_points()[:, i]
-                            if i != 0:
-                                val = sweep_points[idx]
-                                sweep_function.set_parameter(val)
-                        self.detector_function.prepare(
-                            sweep_points=self.get_sweep_points()[0: self.xlen, 0])
-                        self.measure_hard()
-            else:
-                raise Exception(
-                    'hard measurements have not been generalized to N-D yet')
+
+            while not self.is_complete():
+                idx = self.dset.shape[0]
+                for i, sweep_function in enumerate(self.sweep_functions):
+                    sweep_points = self.get_sweep_points()
+                    if len(self.sweep_functions) != 1:
+                        sweep_points = sweep_points[:, i]
+                    if i != 0:
+                        val = sweep_points[idx]
+                        sweep_function.set_parameter(val)
+                sweep_points_0 = self.get_sweep_points()
+                if len(self.sweep_functions) != 1:
+                    sweep_points_0 = sweep_points_0[:, 0]
+                self.detector_function.prepare(
+                    sweep_points=sweep_points_0[idx:])
+                self.measure_hard()
         else:
             raise Exception('Sweep and Detector functions not of the same type.'
                             + 'Aborting measurement')
@@ -213,7 +197,6 @@ class MeasurementControl:
         shape_new_data = (shape_new_data[0], shape_new_data[1]+1)
 
         datasetshape = self.dset.shape
-
         self.iteration = datasetshape[0]/shape_new_data[0] + 1
         start_idx = int(shape_new_data[0]*(self.iteration-1))
         new_datasetshape = (shape_new_data[0]*self.iteration, datasetshape[1])
@@ -330,9 +313,7 @@ class MeasurementControl:
 
     def finish(self):
         '''
-        Deletes arrays to clean up memory
-        (Note better way to do is also overload the remove function and make
-        sure all attributes are removed.
+        Deletes arrays to clean up memory and avoid memory related mistakes
         '''
         try:
             del(self.TwoD_array)
@@ -346,6 +327,10 @@ class MeasurementControl:
             del(self.sweep_points)
         except AttributeError:
             pass
+        try:
+            del(self.sweep_functions)
+        except AttributeError:
+            pass
 
     ###################
     # 2D-measurements #
@@ -355,9 +340,9 @@ class MeasurementControl:
         self.run(name=name, mode='2D', **kw)
 
     def tile_sweep_pts_for_2D(self):
+        self.xlen = len(self.get_sweep_points())
+        self.ylen = len(self.sweep_points_2D)
         if np.size(self.get_sweep_points()[0]) == 1:
-            self.xlen = len(self.get_sweep_points())
-            self.ylen = len(self.sweep_points_2D)
             # create inner loop pts
             self.sweep_pts_x = self.get_sweep_points()
             x_tiled = np.tile(self.sweep_pts_x, self.ylen)
@@ -676,14 +661,21 @@ class MeasurementControl:
                 end_char = '\n'
             print(progress_message, end=end_char)
 
+    def is_complete(self):
+        """
+        Returns True if enough data has been acquired.
+        """
+        acquired_points = self.dset.shape[0]
+        total_nr_pts = len(self.get_sweep_points())
+        if acquired_points < total_nr_pts:
+            return False
+        elif acquired_points >= total_nr_pts:
+            return True
+
     def print_progress_static_hard(self):
         if self.verbose:
             acquired_points = self.dset.shape[0]
             total_nr_pts = len(self.get_sweep_points())
-            if acquired_points == total_nr_pts:
-                self.complete = True  # Note is self.complete ever used?
-            elif acquired_points > total_nr_pts:
-                self.complete = True
 
             percdone = acquired_points*1./total_nr_pts*100
             elapsed_time = time.time() - self.begintime

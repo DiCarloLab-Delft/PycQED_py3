@@ -129,7 +129,8 @@ class Dummy_Shots_Detector(Hard_Detector):
 
     def get_values(self):
         x = self.sweep_points
-        return x[:self.max_shots]
+        dat = x[:self.max_shots]
+        return dat
 
 
 class Sweep_pts_detector(Detector_Function):
