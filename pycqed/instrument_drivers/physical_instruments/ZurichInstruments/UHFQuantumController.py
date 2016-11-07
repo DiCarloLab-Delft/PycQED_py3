@@ -53,36 +53,36 @@ class UHFQC(Instrument):
         self._s_file_name = os.path.join(dir_path, 'zi_parameter_files', 's_node_pars.txt')
         self._d_file_name = os.path.join(dir_path, 'zi_parameter_files', 'd_node_pars.txt')
 
-        init=True
+        init = True
         try:
-            f=open(self._s_file_name).read()
+            f = open(self._s_file_name).read()
             s_node_pars = json.loads(f)
         except:
             print("parameter file for gettable parameters {} not found".format(self._s_file_name))
             init=False
         try:
-            f=open(self._d_file_name).read()
+            f = open(self._d_file_name).read()
             d_node_pars = json.loads(f)
         except:
             print("parameter file for settable parameters {} not found".format(self._d_file_name))
-            init=False
+            init = False
 
         for parameter in s_node_pars:
             parname=parameter[0].replace("/","_")
             parfunc="/"+device+"/"+parameter[0]
-            if parameter[1]=='float':
+            if parameter[1] == 'float':
                 self.add_parameter(
                     parname,
                     set_cmd=self._gen_set_func(self.setd, parfunc),
                     get_cmd=self._gen_get_func(self.getd, parfunc),
                     vals=vals.Numbers(parameter[2], parameter[3]))
-            elif parameter[1]=='float_small':
+            elif parameter[1] == 'float_small':
                 self.add_parameter(
                     parname,
                     set_cmd=self._gen_set_func(self.setd, parfunc),
                     get_cmd=self._gen_get_func(self.getd, parfunc),
                     vals=vals.Numbers(parameter[2], parameter[3]))
-            elif parameter[1]=='int_8bit':
+            elif parameter[1] == 'int_8bit':
                 self.add_parameter(
                     parname,
                     set_cmd=self._gen_set_func(self.seti, parfunc),
@@ -267,15 +267,24 @@ class UHFQC(Instrument):
 
         return nodes
 
-    def single_acquisition(self, samples, acquisition_time=0.010, timeout=0, channels=set([0, 1])):
+    def single_acquisition(self, samples, acquisition_time=0.010, timeout=0, channels=set([0, 1]), mode='rl'):
         # Define the channels to use
-
         paths = dict()
         data = dict()
-        for c in channels:
-            paths[c] = '/' + self._device + '/quex/rl/data/{}'.format(c)
-            data[c] = []
-            self._daq.subscribe(paths[c])
+        print('single acq')
+        if mode == 'rl':
+            for c in channels:
+                paths[c] = '/' + self._device + '/quex/rl/data/{}'.format(c)
+                data[c] = []
+                self._daq.subscribe(paths[c])
+                print("rl mode now")
+        else:
+            for c in channels:
+                paths[c] = '/' + self._device + '/quex/iavg/data/{}'.format(c)
+                data[c] = []
+                self._daq.subscribe(paths[c])
+                print("iavg mode now")
+
 
         #self._daq.setInt('/' + self._device + '/awgs/0/single', 1)
         #self._daq.setInt('/' + self._device + '/awgs/0/enable', 1)
