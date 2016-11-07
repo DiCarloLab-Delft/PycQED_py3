@@ -117,3 +117,4 @@ $RECYCLE.BIN/
 # micro instruction assembly files
 *.asm
 *.txt
+data/*
