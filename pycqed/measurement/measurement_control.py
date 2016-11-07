@@ -70,8 +70,8 @@ class MeasurementControl:
             # Such that it is also saved if the measurement fails
             # (might want to overwrite again at the end)
             self.save_instrument_settings(self.data_object)
-
             self.create_experimentaldata_dataset()
+            self.xlen = len(self.get_sweep_points())
             if self.mode == '1D':
                 self.measure()
             elif self.mode == '2D':
@@ -99,14 +99,12 @@ class MeasurementControl:
 
         elif self.sweep_functions[0].sweep_control == 'hard':
             self.iteration = 0
-            self.xlen = len(self.get_sweep_points())
             if len(self.sweep_functions) == 1:
                 self.detector_function.prepare(
                     sweep_points=self.get_sweep_points())
                 self.get_measurement_preparetime()
                 self.measure_hard()
-            elif len(self.sweep_functions) == 2:
-                self.tile_sweep_pts_for_2D()
+            else:
                 self.get_measurement_preparetime()
 
             while not self.is_complete():
@@ -122,7 +120,7 @@ class MeasurementControl:
                 if len(self.sweep_functions) != 1:
                     sweep_points_0 = sweep_points_0[:, 0]
                 self.detector_function.prepare(
-                    sweep_points=sweep_points_0[idx:])
+                    sweep_points=sweep_points_0[idx:idx+self.xlen])
                 self.measure_hard()
         else:
             raise Exception('Sweep and Detector functions not of the same type.'
@@ -480,7 +478,7 @@ class MeasurementControl:
         to the QC_QtPlot.
         '''
         if self.live_plot_enabled:
-            i = self.iteration-1
+            i = int(self.iteration-1)
             x_ind = i % self.xlen
             y_ind = i / self.xlen
             for j in range(len(self.detector_function.value_names)):

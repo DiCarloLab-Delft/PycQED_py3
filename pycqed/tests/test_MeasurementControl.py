@@ -80,7 +80,7 @@ class Test_MeasurementControl(unittest.TestCase):
         self.MC.set_sweep_points(sweep_pts)
         self.MC.set_sweep_points_2D(sweep_pts_2D)
         self.MC.set_detector_function(det.Dummy_Detector_Hard())
-        dat = self.MC.run('2D_hard')
+        dat = self.MC.run('2D_hard', mode='2D')
         x = dat[:, 0]
         y = dat[:, 1]
         z = self.data = [np.sin(x / np.pi), np.cos(x/np.pi)]
