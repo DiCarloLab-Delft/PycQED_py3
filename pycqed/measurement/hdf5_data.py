@@ -5,8 +5,7 @@ Wolfgang Pfaff.
 
 Contains:
 - a data class (HDF5Data) which is essentially a wrapper of a h5py data
-  object, adapted for usage with qcodes
-- name generators in the style of qtlab Data objects
+  object, adapted for usage with PycQED/qcodes
 - functions to create standard data sets
 """
 
@@ -15,18 +14,15 @@ import logging
 import time
 import h5py
 import numpy as np
-from uuid import getnode as get_mac
-# Hardcoded datadir, not cool :)
+import pycqed as pq
+
 try:
     qc_config
 except NameError:
-    from pycqed.init.config import setup_dict
-    mac = get_mac()
-    setup_name = setup_dict.mac_dict[str(mac)]
+    # Stores data in the default data location (pycqed_py3/data/)
+    datadir = os.path.join(os.path.dirname(pq.__file__), os.pardir, 'data')
     logging.warning('Creating qc_config for datadir')
-    # logging.warning('Data directory set to:',
-    #                 setup_dict.data_dir_dict[setup_name])
-    qc_config = {'datadir': setup_dict.data_dir_dict[setup_name]}
+    qc_config = {'datadir': datadir}
 
 
 class DateTimeGenerator:
