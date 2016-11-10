@@ -1,13 +1,8 @@
 import logging
 import numpy as np
 from copy import deepcopy
-try:
-    from math import gcd
-except:  # Moved to math in python 3.5, this is to be 3.4 compatible
-    from fractions import gcd
-from ..waveform_control import pulsar
 from ..waveform_control import element
-from ..waveform_control.element import calculate_time_corr
+from ..waveform_control.element import calculate_time_correction
 from ..waveform_control import pulse
 from ..waveform_control import sequence
 from pycqed.measurement.randomized_benchmarking import randomized_benchmarking as rb
@@ -24,7 +19,7 @@ reload(element)
 # I guess there are cleaner solutions :)
 
 
-def Pulsed_spec_seq(spec_pars, RO_pars, return_seq=False):
+def Pulsed_spec_seq(spec_pars, RO_pars, upload=True, return_seq=False):
     '''
     Pulsed spectroscopy sequence using the tektronix.
     Input pars:
@@ -67,12 +62,13 @@ def Pulsed_spec_seq(spec_pars, RO_pars, return_seq=False):
             i, station, pulse_list)
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
-    station.components['AWG'].stop()
-    station.pulsar.program_awg(seq, *el_list, verbose=False)
+    if upload:
+        station.components['AWG'].stop()
+        station.pulsar.program_awg(seq, *el_list, verbose=False)
     return seq
 
 
-def photon_number_splitting_seq(spec_pars, RO_pars, disp_pars, return_seq=False):
+def photon_number_splitting_seq(spec_pars, RO_pars, disp_pars, upload=True, return_seq=False):
     '''
     Pulsed spectroscopy sequence using the tektronix.
     Input pars:
@@ -106,13 +102,14 @@ def photon_number_splitting_seq(spec_pars, RO_pars, disp_pars, return_seq=False)
             i, station, pulse_list)
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
-    station.components['AWG'].stop()
-    station.pulsar.program_awg(seq, *el_list, verbose=False)
+    if upload:
+        station.components['AWG'].stop()
+        station.pulsar.program_awg(seq, *el_list, verbose=False)
     return seq
 
 
 def Rabi_seq(amps, pulse_pars, RO_pars, n=1, post_msmt_delay=3e-6,
-             verbose=False, return_seq=False):
+             verbose=False, upload=True, return_seq=False):
     '''
     Rabi sequence for a single qubit using the tektronix.
     Input pars:
@@ -137,8 +134,9 @@ def Rabi_seq(amps, pulse_pars, RO_pars, n=1, post_msmt_delay=3e-6,
         el = multi_pulse_elt(i, station, pulse_list)
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
-    station.components['AWG'].stop()
-    station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+    if upload:
+        station.components['AWG'].stop()
+        station.pulsar.program_awg(seq, *el_list, verbose=verbose)
     if return_seq:
         return seq, el_list
     else:
@@ -146,7 +144,7 @@ def Rabi_seq(amps, pulse_pars, RO_pars, n=1, post_msmt_delay=3e-6,
 
 
 def Flipping_seq(pulse_pars, RO_pars, n=1, post_msmt_delay=10e-9,
-             verbose=False, return_seq=False):
+             verbose=False, upload=True, return_seq=False):
     '''
     Flipping sequence for a single qubit using the tektronix.
     Input pars:
@@ -176,8 +174,9 @@ def Flipping_seq(pulse_pars, RO_pars, n=1, post_msmt_delay=10e-9,
             el = multi_pulse_elt(i, station, pulse_list)
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
-    station.components['AWG'].stop()
-    station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+    if upload:
+        station.components['AWG'].stop()
+        station.pulsar.program_awg(seq, *el_list, verbose=verbose)
     if return_seq:
         return seq, el_list
     else:
@@ -185,7 +184,7 @@ def Flipping_seq(pulse_pars, RO_pars, n=1, post_msmt_delay=10e-9,
 
 
 def Rabi_amp90_seq(scales, pulse_pars, RO_pars, n=1, post_msmt_delay=3e-6,
-             verbose=False, return_seq=False):
+             verbose=False, upload=True, return_seq=False):
     '''
     Rabi sequence to determine amp90 scaling factor for a single qubit using the tektronix.
     Input pars:
@@ -210,10 +209,11 @@ def Rabi_amp90_seq(scales, pulse_pars, RO_pars, n=1, post_msmt_delay=3e-6,
         el = multi_pulse_elt(i, station, pulse_list)
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
-    station.components['AWG'].stop()
-    station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+    if upload:
+        station.components['AWG'].stop()
+        station.pulsar.program_awg(seq, *el_list, verbose=verbose)
     if return_seq:
-        return seq,el_list
+        return seq, el_list
     else:
         return seq_name
 
@@ -221,7 +221,7 @@ def Rabi_amp90_seq(scales, pulse_pars, RO_pars, n=1, post_msmt_delay=3e-6,
 def T1_seq(times,
            pulse_pars, RO_pars,
            cal_points=True,
-           verbose=False, return_seq=False):
+           verbose=False, upload=True, return_seq=False):
     '''
     Rabi sequence for a single qubit using the tektronix.
     SSB_Drag pulse is used for driving, simple modualtion used for RO
@@ -250,8 +250,9 @@ def T1_seq(times,
                 el = multi_pulse_elt(i, station, [pulses['X180'], RO_pars])
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
-    station.components['AWG'].stop()
-    station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+    if upload:
+        station.components['AWG'].stop()
+        station.pulsar.program_awg(seq, *el_list, verbose=verbose)
     if return_seq:
         return seq, el_list
     else:
@@ -262,7 +263,7 @@ def Ramsey_seq(times, pulse_pars, RO_pars,
                artificial_detuning=None,
                cal_points=True,
                verbose=False,
-               return_seq=False):
+               upload=True, return_seq=False):
     '''
     Ramsey sequence for a single qubit using the tektronix.
     SSB_Drag pulse is used for driving, simple modualtion used for RO
@@ -285,7 +286,8 @@ def Ramsey_seq(times, pulse_pars, RO_pars,
         pulse_pars_x2['pulse_delay'] = tau
 
         if artificial_detuning is not None:
-            pulse_pars_x2['phase'] = (tau-times[0]) * artificial_detuning * 360
+            Dphase = ((tau-times[0]) * artificial_detuning * 360) % 360
+            pulse_pars_x2['phase'] = Dphase
 
         if cal_points and (i == (len(times)-4) or i == (len(times)-3)):
                 el = multi_pulse_elt(i, station, [pulses['I'], RO_pars])
@@ -296,8 +298,9 @@ def Ramsey_seq(times, pulse_pars, RO_pars,
                                  [pulses['X90'], pulse_pars_x2, RO_pars])
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
-    station.components['AWG'].stop()
-    station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+    if upload:
+        station.components['AWG'].stop()
+        station.pulsar.program_awg(seq, *el_list, verbose=verbose)
     if return_seq:
         return seq, el_list
     else:
@@ -308,7 +311,7 @@ def Echo_seq(times, pulse_pars, RO_pars,
              artificial_detuning=None,
              cal_points=True,
              verbose=False,
-             return_seq=False):
+             upload=True, return_seq=False):
     '''
     Echo sequence for a single qubit using the tektronix.
     Input pars:
@@ -341,8 +344,9 @@ def Echo_seq(times, pulse_pars, RO_pars,
                                   final_X90, RO_pars])
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
-    station.components['AWG'].stop()
-    station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+    if upload:
+        station.components['AWG'].stop()
+        station.pulsar.program_awg(seq, *el_list, verbose=verbose)
     if return_seq:
         return seq, el_list
     else:
@@ -350,7 +354,7 @@ def Echo_seq(times, pulse_pars, RO_pars,
 
 
 def AllXY_seq(pulse_pars, RO_pars, double_points=False,
-              verbose=False, return_seq=False):
+              verbose=False, upload=True, return_seq=False):
     '''
     AllXY sequence for a single qubit using the tektronix.
     SSB_Drag pulse is used for driving, simple modualtion used for RO
@@ -386,8 +390,9 @@ def AllXY_seq(pulse_pars, RO_pars, double_points=False,
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
 
-    station.components['AWG'].stop()
-    station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+    if upload:
+        station.components['AWG'].stop()
+        station.pulsar.program_awg(seq, *el_list, verbose=verbose)
     if return_seq:
         return seq, el_list
     else:
@@ -395,7 +400,7 @@ def AllXY_seq(pulse_pars, RO_pars, double_points=False,
 
 
 def OffOn_seq(pulse_pars, RO_pars,
-              verbose=False, pulse_comb='OffOn', return_seq=False):
+              verbose=False, pulse_comb='OffOn', upload=True, return_seq=False):
     '''
     OffOn sequence for a single qubit using the tektronix.
     SSB_Drag pulse is used for driving, simple modualtion used for RO
@@ -426,8 +431,9 @@ def OffOn_seq(pulse_pars, RO_pars,
         el = multi_pulse_elt(i, station, [pulses[pulse_comb], RO_pars])
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
-    station.components['AWG'].stop()
-    station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+    if upload:
+        station.components['AWG'].stop()
+        station.pulsar.program_awg(seq, *el_list, verbose=verbose)
     if return_seq:
         return seq, el_list
     else:
@@ -435,7 +441,7 @@ def OffOn_seq(pulse_pars, RO_pars,
 
 
 def Butterfly_seq(pulse_pars, RO_pars, initialize=False,
-                  post_msmt_delay=2000e-9, verbose=False):
+                  post_msmt_delay=2000e-9, upload=True, verbose=False):
     '''
     Butterfly sequence to measure single shot readout fidelity to the
     pre-and post-measurement state. This is the way to veify the QND-ness off
@@ -474,7 +480,7 @@ def Butterfly_seq(pulse_pars, RO_pars, initialize=False,
             if fixed_point_freq==None:
                 extra_delay = 0
             else:
-                extra_delay = calculate_time_corr(
+                extra_delay = calculate_time_correction(
                     sub_seq_duration+post_msmt_delay, fixed_point_freq)
             initial_pulse_delay = post_msmt_delay + extra_delay
             start_pulse = deepcopy(pulse_sub_list[0])
@@ -486,8 +492,9 @@ def Butterfly_seq(pulse_pars, RO_pars, initialize=False,
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
 
-    station.components['AWG'].stop()
-    station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+    if upload:
+        station.components['AWG'].stop()
+        station.pulsar.program_awg(seq, *el_list, verbose=verbose)
     return seq_name
 
 
@@ -582,7 +589,7 @@ def Randomized_Benchmarking_seq(pulse_pars, RO_pars,
 
 
 def Motzoi_XY(motzois, pulse_pars, RO_pars,
-              cal_points=True, verbose=False, return_seq=False):
+              cal_points=True, verbose=False, upload=True, return_seq=False):
     '''
     Sequence used for calibrating the motzoi parameter.
     Consists of Xy and Yx
@@ -623,8 +630,9 @@ def Motzoi_XY(motzois, pulse_pars, RO_pars,
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
 
-    station.components['AWG'].stop()
-    station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+    if upload:
+        station.components['AWG'].stop()
+        station.pulsar.program_awg(seq, *el_list, verbose=verbose)
     if return_seq:
         return seq, el_list
     else:
@@ -639,7 +647,7 @@ def Motzoi_XY(motzois, pulse_pars, RO_pars,
 
 
 def Rising_seq(amps, pulse_pars, RO_pars, n=1, post_msmt_delay=3e-6,
-             verbose=False, return_seq=False):
+             verbose=False, upload=True, return_seq=False):
     '''
     Rabi sequence for a single qubit using the tektronix.
     Input pars:
@@ -658,8 +666,9 @@ def Rising_seq(amps, pulse_pars, RO_pars, n=1, post_msmt_delay=3e-6,
     el = multi_pulse_elt(0, station, pulse_list)
     el_list.append(el)
     seq.append_element(el, trigger_wait=True)
-    station.components['AWG'].stop()
-    station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+    if upload:
+        station.components['AWG'].stop()
+        station.pulsar.program_awg(seq, *el_list, verbose=verbose)
     if return_seq:
         return seq,el_list
     else:

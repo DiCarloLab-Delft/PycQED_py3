@@ -22,32 +22,37 @@ def pfunc(n_vec, pg, pr):
     return [100*(0.5-(1-2*pg)**n*(0.5-pr)) for n in n_vec]
 
 
-# Function that I'm fitting to
-def sfunc(n_vec, pg, pr, sg, sr):
+def sfunc(n_vec, pg, pr, sg, sr, covar_gr=0):
+    """
+    noise function version two, including covariances.
+
+
+    """
 
     # Get variances
-    sr2 = sr**2
-    sg2 = sg**2
+    var_rest = sr**2
+    var_gate = sg**2
 
     # init return data list
     sm_vec = []
-    for n in n_vec:
-
+    for Ncl in n_vec:
         # Calculate error probability
         # P=0.5-(1-2pg)^n(0.5-pr)
-        P = (0.5-(1-2*pg)**n*(0.5-pr))
+        P = (0.5-(1-2*pg)**Ncl*(0.5-pr))
 
         # Calculate standard deviation of probability of error in
         # one round of error correction.
-        # Calculated assuming independent errors via:
         # s_{P}^2=(dP/dpg)^2s_{pg}^2+(dP/dpr)^2s_{pr}^2
-        sp2 = (2*n*(1-2*pg)**(n-1)*(0.5-pr))**2*sg2 + (1-2*pg)**(2*n)*sr2
+        sp2 = ((1-2*pg)**(2*Ncl)*var_rest +
+               Ncl**2*(1-2*pr)**2*(1-2*pg)**(2*(Ncl-1))*var_gate +
+               2*Ncl*(1-2*pr)*(1-2*pg)**(2*Ncl - 1)*covar_gr)
 
         # Combine variance from distribution of P and variance
         # from the binomial distribution that we take in a fairly
         # crude manner.
         N = 8000  # number of shots that go into each error fraction
-        sm_vec.append(np.sqrt(P*(1-P)/N + sp2)*100)
+        var_sm = P*(1-P)/N + (N-1)*sp2/N
+        sm_vec.append(np.sqrt(var_sm)*100)
 
     # Return to user
     return sm_vec

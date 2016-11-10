@@ -37,9 +37,6 @@ class Detector_Function(object):
     def prepare(self, **kw):
         pass
 
-    def initialize_data_arrays(self, sweep_points):
-        pass
-
     def finish(self, **kw):
         pass
 
@@ -108,14 +105,32 @@ class Dummy_Detector_Hard(Hard_Detector):
         self.value_names = ['distance', 'Power']
         self.value_units = ['m', 'nW']
 
-    def initialize_data_arrays(self, sweep_points):
-        self.data = np.zeros(len(sweep_points))
+    def prepare(self, sweep_points):
+        self.sweep_points = sweep_points
 
     def get_values(self):
-        x = np.arange(0, 10, .1)
+        x = self.sweep_points
         self.data = [np.sin(x / np.pi), np.cos(x/np.pi)]
-
         return self.data
+
+
+class Dummy_Shots_Detector(Hard_Detector):
+    def __init__(self, max_shots=10, **kw):
+        super().__init__()
+        self.set_kw()
+        self.detector_control = 'hard'
+        self.name = 'Dummy_Detector'
+        self.value_names = ['shots']
+        self.value_units = ['m']
+        self.max_shots = max_shots
+
+    def prepare(self, sweep_points):
+        self.sweep_points = sweep_points
+
+    def get_values(self):
+        x = self.sweep_points
+        dat = x[:self.max_shots]
+        return dat
 
 
 class Sweep_pts_detector(Detector_Function):
@@ -883,6 +898,39 @@ class Dummy_Detector_Soft(Soft_Detector):
         self.i += 1
         time.sleep(self.delay)
         return np.array([np.sin(x/np.pi), np.cos(x/np.pi)])
+
+
+class QX_Detector(Soft_Detector):
+    def __init__(self, qxc, delay=0, **kw):
+        self.set_kw()
+        self.delay = delay
+        self.detector_control = 'soft'
+        self.name = 'QX_Detector'
+        self.value_names = ['F'] #['F', 'F']
+        self.value_units = ['Error Rate'] # ['mV', 'mV']
+        self.__qxc = qxc
+        self.__cnt = 0
+
+    def acquire_data_point(self, **kw):
+        circuit_name = ("circuit%i" % self.__cnt)
+        errors = 0
+        executions = 1000
+        p_error    = 0.0001+self.__cnt*0.0002
+        for i in range(0,executions):
+        	self.__qxc.run_noisy_circuit(circuit_name,p_error)
+        	m0 = self.__qxc.get_measurement(0)
+        	# m1 = self.__qxc.get_measurement(1)
+        	if int(m0) != 0 :
+        		errors += 1
+        	# print("[+] measurement outcome : %s %s" % (m0,m1))
+        # x = self.__cnt/15.
+        print("[+] p error  :",p_error)
+        print("[+] errors   :",errors)
+        f = (executions-errors)/executions
+        print("[+] fidelity :",f)
+        time.sleep(self.delay)
+        self.__cnt = self.__cnt+1
+        return f
 
 
 class Source_frequency_detector(Soft_Detector):

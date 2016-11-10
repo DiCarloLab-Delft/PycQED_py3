@@ -124,42 +124,6 @@ class Element:
 
 
 
-    def calculate_time_corr(self, t0, fixed_point_freq):
-            '''
-            calculates a time shift to make sure a the "fixed point"  reference
-            is fixed in phase. It calculates the required time shift based on
-            the fixed_point_freq.
-
-            Time correction is rounded to a full clock cycle.
-            '''
-            return calculate_time_corr(t0, fixed_point_freq, self.clock)
-            # phase_diff = (360 * fixed_point_freq * t0) % (360)
-            # fixed_point_freq = abs(fixed_point_freq)
-            # phase_corr = 360 - phase_diff  # Correction in degrees
-            # time_corr_0 = phase_corr/(360*fixed_point_freq)
-            # time_corr = time_corr_0
-
-            # i = 0
-            # while not self.is_divisible_by_clock(time_corr):
-            #     i += 1
-            #     if i > 100:
-            #         print('time_corr_0: %s' % time_corr_0)
-            #         print('1/fixed_point_freq: %s' % (1/fixed_point_freq))
-            #         raise Exception('Could not find time corr for fixed point')
-            #     elif time_corr > 10e-6:
-            #         print('time_corr_0: %s' % time_corr_0)
-            #         print('1/fixed_point_freq: %s' % (1/fixed_point_freq))
-            #         raise Exception('Could not find time corr for fixed point')
-            #     time_corr += 1/fixed_point_freq
-            # time_corr = round(time_corr, 9)  # Rounds to ns
-            # if time_corr < 0:
-            #     raise ValueError(
-            #         'Time correction "{}" cannot be negative'.format(time_corr))
-            #     # Cannot be negative because it will give unexpected behaviour
-            #     # This should not be possible to happen but I ran into this
-            #     # a few time so I leave the exception here
-            # return time_corr
-
     def shift_all_pulses(self, dt):
         '''
         Shifts all pulses by a time dt, this is used for correcting the phase
@@ -261,9 +225,8 @@ class Element:
         pulse._t0 = t0
         self.pulses[name] = pulse
         self._last_added_pulse = name
-
         if fixed_point_freq is not None:
-            time_corr = self.calculate_time_corr(t0, fixed_point_freq)
+            time_corr = calculate_time_correction(t0, fixed_point_freq)
             self.shift_all_pulses(time_corr)
         return name
 
@@ -363,6 +326,9 @@ class Element:
 
     def waveforms(self):
         """
+        return:
+            tvals, wfs
+
         Returns the waveforms for all used channels.
         Trunctates/clips (channel-imposed) all values
         that are out of bounds
@@ -439,7 +405,7 @@ class Element:
 # sequencer)
 
 
-def calculate_time_corr(t0, fixed_point_freq, clock=1e9):
+def calculate_time_correction(t0, fixed_point_freq, clock=1e9):
         '''
         calculates a time shift to make sure a the "fixed point"  reference
         is fixed in phase. It calculates the required time shift based on

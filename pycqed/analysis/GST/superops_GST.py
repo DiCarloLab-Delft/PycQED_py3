@@ -6,9 +6,9 @@ import scipy
 # For keeping self contained only
 import sys
 import os
-PycQEDdir = (os.path.abspath('../../..'))
+PycQEDdir = (os.path.abspath('../..'))
 sys.path.append(PycQEDdir)
-print(PycQEDdir)
+print('PycQEDdir:', PycQEDdir)
 
 from pycqed.measurement.randomized_benchmarking.clifford_decompositions \
     import(gate_decomposition)

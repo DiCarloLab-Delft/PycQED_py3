@@ -18,6 +18,12 @@ def running_mean(x, N):
 
 def calc_T1_limited_fidelity(T1, pulse_delay):
         '''
+        input:
+            T1: (float) T1 in s
+            pulse_delay: (float) in s length between start of pulses
+        return:
+            F_cl, p
+
         Formula from Asaad et al.
         pulse separation is time between start of pulses
         '''

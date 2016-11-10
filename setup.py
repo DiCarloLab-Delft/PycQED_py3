@@ -27,7 +27,7 @@ def readme():
 
 
 def license():
-    with open('LICENSE.md') as f:
+    with open('LICENSE') as f:
         return f.read()
 
 setup(name='PycQED',
