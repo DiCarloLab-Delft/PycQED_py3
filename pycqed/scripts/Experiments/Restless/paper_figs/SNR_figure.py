@@ -38,9 +38,12 @@ params = {  # 'backend': 'ps',
 def make_figure(F_vec, idxs, Ncl,
                 mn_eps, sem_eps, std_eps, sem_std,
                 fig_name='signal_noise',
+                Ncl_cont=None,
                 simple_std=None,
                 model_avg=None, model_std=None):
 
+    if Ncl_cont is None:
+        Ncl_cont = Ncl
     if model_avg is not None:
         avg1, avg2, avg3 = model_avg
     if model_std is not None:
@@ -77,11 +80,11 @@ def make_figure(F_vec, idxs, Ncl,
     markers = ['o', 'd', '^']
     # Model averages
     if model_avg is not None:
-        ax.plot(Ncl, np.array(avg1)/100.,
+        ax.plot(Ncl_cont, np.array(avg1),
                 color=colors[0])
-        ax.plot(Ncl, np.array(avg2)/100.,
+        ax.plot(Ncl_cont, np.array(avg2),
                 color=colors[1])
-        ax.plot(Ncl, np.array(avg3)/100.,
+        ax.plot(Ncl_cont, np.array(avg3),
                 color=colors[2])
 
     # Data averages
@@ -108,20 +111,20 @@ def make_figure(F_vec, idxs, Ncl,
     # Model sigmas
     ax2 = plt.subplot(gs[1], sharex=ax)
     if model_std is not None:
-        ax2.plot(Ncl, np.array(std1),
+        ax2.plot(Ncl_cont, np.array(std1),
                  color=colors[0])
-        ax2.plot(Ncl, np.array(std2),
+        ax2.plot(Ncl_cont, np.array(std2),
                  color=colors[1])
-        ax2.plot(Ncl, np.array(std3),
+        ax2.plot(Ncl_cont, np.array(std3),
                  color=colors[2])
 
     # simple model
     if simple_std is not None:
-        ax2.plot(Ncl, np.array(std_fix1),
+        ax2.plot(Ncl_cont, np.array(std_fix1),
                  color=colors[0], linestyle='--')
-        ax2.plot(Ncl, np.array(std_fix2),
+        ax2.plot(Ncl_cont, np.array(std_fix2),
                  color=colors[1], linestyle='--')
-        ax2.plot(Ncl, np.array(std_fix3),
+        ax2.plot(Ncl_cont, np.array(std_fix3),
                  color=colors[2], linestyle='--')
     # data sigma
     for i, id_pair in enumerate(idxs):
