@@ -1451,9 +1451,9 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         self.UHFQC.awgs_0_single(1)
         self.UHFQC.awgs_0_enable(1)
         # probing the values to be sure communication is finished before
-        temp = self.UHFQC.awgs_0_enable()
         temp = self.UHFQC.awgs_0_single()
-        #print("enable is set to {}".format(temp))
+        temp = self.UHFQC.awgs_0_enable()
+        print("enable is set to {}".format(temp))
         del temp
         # starting AWG
         if self.AWG is not None:
