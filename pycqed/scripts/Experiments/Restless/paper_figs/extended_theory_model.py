@@ -1,6 +1,4 @@
-import numpy as np
 from math import exp, sqrt
-from scipy import optimize
 
 # Set experimental parameters (ta,tb fixed by Leo's measurement model + my
 # interpretation thereof)
@@ -132,17 +130,6 @@ def stder(T1, sT1, pcl, ncl):
     varpe = sT1**2*dpedT_val**2
     return sqrt((N-1)/N*varpe + pe_val*(1-pe_val)/N)
 
+
 def pe_for_fit(ncls, T1, pcl):
-    return [pe(T1,pcl,ncl) for ncl in ncls]
-
-
-# We need to fit for pcl. As T1 here just determines the SPAM,
-# we can just to a fit to T1 and pcl to extract the pcl value
-# pcl_vec = []
-# def pe_for_fit(ncls, T1, pcl):
-#     return [pe(T1,pcl,ncl) for ncl in ncls]
-# T1_vec = []
-# for err_vec, std_vec in zip(err_vecs,std_vecs):
-#     T1,pcl = optimize.curve_fit(pe_for_fit,ncl_vec,err_vec,[20,0.01])[0]
-#     T1_vec.append(T1)
-#     pcl_vec.append(pcl)
+    return [pe(T1, pcl, ncl) for ncl in ncls]

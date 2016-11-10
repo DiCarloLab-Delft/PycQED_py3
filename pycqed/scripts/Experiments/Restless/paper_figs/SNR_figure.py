@@ -1,14 +1,8 @@
-from mpl_toolkits.axes_grid1 import make_axes_locatable
 import numpy as np
-import lmfit
 import matplotlib.gridspec as gridspec
-from pycqed.analysis import fitting_models as fit_mods
-from pycqed.analysis import measurement_analysis as ma
 from pycqed.analysis import analysis_toolbox as a_tools
-import matplotlib.gridspec as gridspec
-from pycqed.utilities import general as gen
+
 import seaborn.apionly as sns
-import matplotlib.patheffects as pe
 sns.set_palette('muted')
 cls = (sns.color_palette())
 import matplotlib.pyplot as plt
