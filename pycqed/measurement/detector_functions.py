@@ -1422,7 +1422,7 @@ class UHFQC_integrated_average_detector(Hard_Detector):
     '''
 
     def __init__(self, UHFQC, AWG, integration_length=1e-6, nr_averages=1024, rotate=False,
-                 channels=[0, 1, 2, 3], seg_per_point=1, **kw):
+                 channels=[0, 1, 2, 3], cross_talk_suppression=False, seg_per_point=1, **kw):
         super(UHFQC_integrated_average_detector, self).__init__()
         self.UHFQC = UHFQC
         self.name = 'UHFQC_integrated_average'
@@ -1445,6 +1445,7 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         self.nr_averages = nr_averages
         self.integration_length = integration_length
         self.rotate = rotate
+        self.cross_talk_suppression = cross_talk_suppression
 
     def get_values(self):
         self.UHFQC.awgs_0_single(1)
@@ -1498,7 +1499,11 @@ class UHFQC_integrated_average_detector(Hard_Detector):
             self.AWG.stop()
         self.nr_sweep_points = len(sweep_points)
         # this sets the result to integration and rotation outcome
-        self.UHFQC.quex_rl_source(2)
+        if self.cross_talk_suppression:
+            self.UHFQC.quex_rl_source(0) # 2/0/1 raw/crosstalk supressed /digitized
+        else:
+            self.UHFQC.quex_rl_source(2) # 2/0/1 raw/crosstalk supressed /digitized
+
         self.UHFQC.quex_rl_length(self.nr_sweep_points)
         self.UHFQC.quex_rl_avgcnt(int(np.log2(self.nr_averages)))
         self.UHFQC.quex_wint_length(int(self.integration_length*(1.8e9)))
@@ -1529,7 +1534,8 @@ class UHFQC_integration_logging_det(Hard_Detector):
     '''
 
     def __init__(self, UHFQC, AWG, integration_length=1e-6,
-                 channels=[0, 1, 2, 3], nr_shots=4095, **kw):
+                 channels=[0, 1, 2, 3], nr_shots=4095,
+                 cross_talk_suppression=False,  **kw):
         super(UHFQC_integration_logging_det, self).__init__()
         self.UHFQC = UHFQC
         self.name = 'UHFQC_integration_logging_det'
@@ -1545,10 +1551,11 @@ class UHFQC_integration_logging_det(Hard_Detector):
         self.AWG = AWG
         self.integration_length = integration_length
         self.nr_shots = nr_shots
+        self.cross_talk_suppression=cross_talk_suppression
 
     def get_values(self):
-        self.UHFQC.awgs_0_single(1)
         self.UHFQC.awgs_0_enable(1)
+        self.UHFQC.awgs_0_single(1)
         # probing the values to be sure communication is finished before
         temp = self.UHFQC.awgs_0_enable()
         temp = self.UHFQC.awgs_0_single()
@@ -1584,7 +1591,11 @@ class UHFQC_integration_logging_det(Hard_Detector):
         self.UHFQC.quex_rl_avgcnt(0)  # 1 for single shot readout
         self.UHFQC.quex_wint_length(int(self.integration_length*(1.8e9)))
         # this sets the result to integration and rotation outcome
-        self.UHFQC.quex_rl_source(2)
+        if self.cross_talk_suppression:
+            self.UHFQC.quex_rl_source(0) # 2/0/1 raw/crosstalk supressed /digitized
+        else:
+            self.UHFQC.quex_rl_source(2) # 2/0/1 raw/crosstalk supressed /digitized
+
         if self.nr_shots < 128:
             self.poll_time = 0.01
         elif self.nr_shots < 256:
