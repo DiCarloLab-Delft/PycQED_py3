@@ -383,10 +383,10 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
         # For an explanation of the difference between the different
         # Fidelities look in the analysis script
         if raw:
-            self.value_names = ['F-raw', 'theta']
+            self.value_names = ['F_a', 'theta']
             self.value_units = [' ', 'rad']
         else:
-            self.value_names = ['F-raw', 'F corrected', 'SNR']
+            self.value_names = ['F_a', 'F_d', 'SNR']
             self.value_units = [' ', ' ', ' ']
         self.measurement_name = measurement_name
         self.MC = MC
@@ -641,9 +641,9 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
             if nett_wait>0:
                 time.sleep(nett_wait)
             if self.raw:
-                return ana.F_raw, ana.theta
+                return ana.F_a, ana.theta
             else:
-                return ana.F_raw, ana.F_corrected, ana.SNR
+                return ana.F_a, ana.F_d, ana.SNR
 '''
     def acquire_data_point(self, *args, **kw):
         self.time_start = time.time()
@@ -742,8 +742,8 @@ class CBox_trace_error_fraction_detector(det.Soft_Detector):
         rot_mat = [np.cos(theta), -np.sin(theta),
                    np.sin(theta), np.cos(theta)]
         self.CBox.lin_trans_coeffs.set(rot_mat)
-        self.threshold = a.V_opt_raw  # allows
-        self.CBox.sig0_threshold_line.set(int(a.V_opt_raw))
+        self.threshold = a.V_th_a  # allows
+        self.CBox.sig0_threshold_line.set(int(a.V_th_a))
         self.sequence_swf.upload = True
         # make sure the sequence gets uploaded
         return int(self.threshold)
