@@ -10,6 +10,10 @@ class CBox_tests_v3(test_suite.CBox_tests):
         super().__init__(*args, **kwargs)
         self.loadSaveDataFile = False
 
+    @classmethod
+    def setUpClass(self):
+        self.CBox = CBox
+
     def LoadSavedData(self):
         if(not self.loadSaveDataFile):
             try:

@@ -66,17 +66,15 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
 
     def run_test_suite(self):
         from importlib import reload  # Useful for testing
-
-        from ._controlbox import test_suite as test_suite_v2
         from ._controlbox import test_suite_v3 as test_suite
         reload(test_suite)
-        reload(test_suite_v2)
-        test_suite_v2.CBox = self
         # pass the CBox to the module so it can be used in the tests
-        self.c = c
-        # make the codec callable from the testsuite
+        self.c = c # make the codec callable from the testsuite
+        test_suite.CBox = self
         suite = unittest.TestLoader().loadTestsFromTestCase(
             test_suite.CBox_tests_v3)
+        print('test suite got:',
+            unittest.TestLoader().getTestCaseNames(test_suite.CBox_tests_v3))
         unittest.TextTestRunner(verbosity=2).run(suite)
 
     def _do_get_firmware_version(self):
@@ -259,7 +257,8 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
                                              core_state='idle',
                                              acquisition_mode='idle',
                                              trigger_source='internal',
-                                             demodulation_mode='double side band demodulation'):
+                                             demodulation_mode=
+                                             'double side band demodulation'):
         '''
         @param core_states: activate the core or disable it:
                         > idle,

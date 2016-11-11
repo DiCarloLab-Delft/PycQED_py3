@@ -351,7 +351,6 @@ class Assembler():
             cur_addr = len(instructions) + 1
 
             head, sep, tail = line.partition(':')
-            logging.info("head, sep, tail: ", head, sep, tail)
             if (sep == ":"):
                 tag_addr_dict[head.strip().lower()] = cur_addr
                 instr = tail
@@ -376,10 +375,7 @@ class Assembler():
         return tag_addr_dict
 
     def convert_to_instructions(self):
-        logging.info("new version assembler.")
         tag_addr_dict = self.ParseLabel()
-        logging.info("ParseLabel executed successfully.")
-        logging.info("tag_addr_dict: ", tag_addr_dict)
 
         try:
             Asm_File = open(self.asmfilename, 'r', encoding="utf-8")

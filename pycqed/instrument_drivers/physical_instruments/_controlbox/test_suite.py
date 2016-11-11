@@ -1,8 +1,8 @@
 import unittest
 import numpy as np
 from . import defHeaders
-CBox = None
 from pycqed.analysis.tools import data_manipulation as dm_tools
+CBox = None
 
 
 class CBox_tests(unittest.TestCase):
@@ -109,10 +109,14 @@ class CBox_tests(unittest.TestCase):
             self.CBox.set('sig{}_threshold_line'.format(i), t)
 
     def test_adc_offset(self):
+        print("test_suite: test_adc_offset.")
         offs = self.CBox.get('adc_offset')
         self.CBox.set('adc_offset', 123)
+        print('adc_offset get:', self.CBox.get('adc_offset'))
         self.assertEqual(self.CBox.get('adc_offset'), 123)
+
         self.CBox.set('adc_offset', -123)
+        print('adc_offset get:', self.CBox.get('adc_offset'))
         self.assertEqual(self.CBox.get('adc_offset'), -123)
         self.CBox.set('adc_offset', offs)
 
