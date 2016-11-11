@@ -244,6 +244,76 @@ class BusT1(swf.Hard_Sweep):
                               self.flux_pulse_pars,
                               distortion_dict=self.dist_dict, return_seq=True)
 
+
+class BusT2(swf.Hard_Sweep):
+    def __init__(self, times_vec, mw_pulse_pars, RO_pars,
+                 flux_pulse_pars, dist_dict, AWG, upload=True,
+                 return_seq=False):
+        super().__init__()
+        self.times_vec = times_vec
+        self.mw_pulse_pars = mw_pulse_pars
+        self.RO_pars = RO_pars
+        self.flux_pulse_pars = flux_pulse_pars
+        self.dist_dict = dist_dict
+        self.upload = upload
+        self.name = 'Chevron'
+        self.parameter_name = 'Time'
+        self.unit = 's'
+        self.return_seq = return_seq
+        self.AWG = AWG
+
+    def prepare(self, **kw):
+        if self.upload:
+            fsqs.BusT2(self.times_vec,
+                       self.mw_pulse_pars,
+                       self.RO_pars,
+                       self.flux_pulse_pars,
+                       distortion_dict=self.dist_dict)
+
+    def pre_upload(self, **kw):
+        self.seq = fsqs.BusT2(self.times_vec,
+                              self.mw_pulse_pars,
+                              self.RO_pars,
+                              self.flux_pulse_pars,
+                              distortion_dict=self.dist_dict, return_seq=True)
+
+
+class BusEcho(swf.Hard_Sweep):
+    def __init__(self, times_vec, mw_pulse_pars, RO_pars, artificial_detuning,
+                 flux_pulse_pars, dist_dict, AWG, upload=True,
+                 return_seq=False):
+        super().__init__()
+        self.times_vec = times_vec
+        self.mw_pulse_pars = mw_pulse_pars
+        self.RO_pars = RO_pars
+        self.flux_pulse_pars = flux_pulse_pars
+        self.dist_dict = dist_dict
+        self.artificial_detuning = artificial_detuning
+        self.upload = upload
+        self.name = 'Chevron'
+        self.parameter_name = 'Time'
+        self.unit = 's'
+        self.return_seq = return_seq
+        self.AWG = AWG
+
+    def prepare(self, **kw):
+        if self.upload:
+            fsqs.BusEcho(self.times_vec,
+                         self.mw_pulse_pars,
+                         self.RO_pars,
+                         self.artificial_detuning,
+                         self.flux_pulse_pars,
+                         distortion_dict=self.dist_dict)
+
+    def pre_upload(self, **kw):
+        self.seq = fsqs.BusEcho(self.times_vec,
+                                self.mw_pulse_pars,
+                                self.RO_pars,
+                                self.artificial_detuning,
+                                self.flux_pulse_pars,
+                                distortion_dict=self.dist_dict, return_seq=True)
+
+
 class Ramsey_2nd_exc(swf.Hard_Sweep):
     def __init__(self, pulse_pars, pulse_pars_2nd,
                  RO_pars, times=None, n=1, cal_points=True, upload=True):
