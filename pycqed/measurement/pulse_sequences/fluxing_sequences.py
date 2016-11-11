@@ -8,7 +8,7 @@ except:  # Moved to math in python 3.5, this is to be 3.4 compatible
     from fractions import gcd
 from ..waveform_control import pulsar
 from ..waveform_control import element
-from ..waveform_control.element import calculate_time_corr
+from ..waveform_control.element import calculate_time_correction
 from ..waveform_control import pulse
 from ..waveform_control import sequence
 from pycqed.measurement.pulse_sequences.standard_elements import multi_pulse_elt
