@@ -2388,11 +2388,11 @@ class SSRO_Analysis(MeasurementAnalysis):
 
         #setting hint parameters for double gaussfit of 'on' measurements
         NormCdf2Model.set_param_hint('mu0', value=mu0, vary=False)
-        NormCdf2Model.set_param_hint('sigma0', value=sigma0, min=0)
+        NormCdf2Model.set_param_hint('sigma0', value=sigma0, min=0, vary=False)
         NormCdf2Model.set_param_hint('mu1', value=np.average(shots_I_1_rot))
         NormCdf2Model.set_param_hint('sigma1', value=np.std(shots_I_1_rot), min=0)
         NormCdf2Model.set_param_hint('frac1', value=0.9, min=0, max=1)
-        
+
 
         # performing the double gaussfits of on 1 data
         params = NormCdf2Model.make_params()
@@ -2416,7 +2416,7 @@ class SSRO_Analysis(MeasurementAnalysis):
         NormCdf2Model.set_param_hint('mu1', value=mu1_1, vary=False)
         NormCdf2Model.set_param_hint('sigma1', value=sigma1_1, min=0, vary=False)
         NormCdf2Model.set_param_hint('frac1', value=0.025, min=0, max=1, vary=True)
-       
+
         params = NormCdf2Model.make_params()
         fit_res_double_0 = NormCdf2Model.fit(
                             data=p_norm_I_0,
@@ -2451,8 +2451,8 @@ class SSRO_Analysis(MeasurementAnalysis):
             y0 = -abs(NormCdf(x, mu0, sigma0)-NormCdf(x, mu1, sigma1))
             return y0
 
-        # V_d = optimize.brent(NormCdfdiff)
-        # F_d = 1-(NormCdfdiff(x=V_d))/2
+        self.V_th_d = optimize.brent(NormCdfdiff)
+        F_d = 1-(1+NormCdfdiff(x=self.V_th_d))/2
         #print 'F_corrected',F_corrected
 
         def NormCdfdiffDouble(x, mu0_0=mu0_0,
@@ -2469,8 +2469,8 @@ class SSRO_Analysis(MeasurementAnalysis):
             return y
 
         # print "refresh"
-        self.V_th_d = optimize.brent(NormCdfdiffDouble)
-        F_d = -NormCdfdiffDouble(x=self.V_th_d)
+        # self.V_th_d = optimize.brent(NormCdfdiffDouble)
+        # F_d = -NormCdfdiffDouble(x=self.V_th_d)
 
         #calculating the signal-to-noise ratio
         signal= abs(mu0_0-mu1_1)

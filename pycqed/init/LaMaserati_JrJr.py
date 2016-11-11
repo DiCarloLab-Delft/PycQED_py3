@@ -309,7 +309,7 @@ if UHFQC:
     def switch_to_pulsed_RO_CBox(qubit):
         UHFQC_1.awg_sequence_acquisition()
         qubit.RO_pulse_type('Gated_MW_RO_pulse')
-        qubit.RO_acq_marker_delay(175e-9)
+        qubit.RO_acq_marker_delay(145e-9)
         qubit.acquisition_instr('CBox')
         qubit.RO_acq_marker_channel('ch3_marker1')
         qubit.RO_acq_weight_function_I(0)
@@ -318,19 +318,18 @@ if UHFQC:
     def switch_to_pulsed_RO_UHFQC(qubit):
         UHFQC_1.awg_sequence_acquisition()
         qubit.RO_pulse_type('Gated_MW_RO_pulse')
-        qubit.RO_acq_marker_delay(175e-9)
+        qubit.RO_acq_marker_delay(75e-9)
         qubit.acquisition_instr('UHFQC_1')
         qubit.RO_acq_marker_channel('ch3_marker2')
         qubit.RO_acq_weight_function_I(0)
         qubit.RO_acq_weight_function_Q(1)
 
-
     def switch_to_IQ_mod_RO_UHFQC(qubit):
         UHFQC_1.awg_sequence_acquisition_and_pulse_SSB(f_RO_mod=qubit.f_RO_mod(),
                     RO_amp=qubit.RO_amp(), RO_pulse_length=qubit.RO_pulse_length(),
-                    acquisition_delay=270e-9)
+                    acquisition_delay=285e-9)
         qubit.RO_pulse_type('MW_IQmod_pulse_UHFQC')
-        qubit.RO_acq_marker_delay(-100e-9)
+        qubit.RO_acq_marker_delay(-200e-9)
         qubit.acquisition_instr('UHFQC_1')
         qubit.RO_acq_marker_channel('ch3_marker2')
         qubit.RO_I_channel('0')
@@ -340,13 +339,11 @@ if UHFQC:
 else:
     def switch_to_pulsed_RO_CBox(qubit):
         qubit.RO_pulse_type('Gated_MW_RO_pulse')
-        qubit.RO_acq_marker_delay(175e-9)
+        qubit.RO_acq_marker_delay(145e-9)
         qubit.acquisition_instr('CBox')
         qubit.RO_acq_marker_channel('ch3_marker1')
         qubit.RO_acq_weight_function_I(0)
         qubit.RO_acq_weight_function_Q(1)
-
-
 
 
 q0 = AncT
@@ -357,6 +354,7 @@ q1 = DataT
 list_qubits = [q0, q1, AncB, DataM, DataB]
 for qubit in list_qubits:
     qubit.RO_fixed_point_correction(True)
+    qubit.RO_pulse_delay(25e-9)
     #qubit.RO_acq_averages(2**13)
 
 
