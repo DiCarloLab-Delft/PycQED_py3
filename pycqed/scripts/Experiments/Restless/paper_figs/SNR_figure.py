@@ -95,7 +95,7 @@ def make_figure(F_vec, idxs, Ncl,
     ax.legend(handles[::-1], labels[::-1], frameon=False, loc=(.0, .63))
     ax.text(.65, .85, r'$\Delta F_\mathrm{Cl} = F_\mathrm{Cl}^\mathrm{b} - F_\mathrm{Cl}^\mathrm{a}$',
             transform=ax.transAxes, fontsize=7)
-    ax.hlines(0, 0, 1600, linestyle='--')
+    ax.hlines(0, 0, 1600, linestyle='dotted')
     ax.set_ylim(-0.02, 0.17)
 
     ax.set_ylabel('')
