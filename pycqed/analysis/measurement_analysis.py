@@ -2272,18 +2272,18 @@ class SSRO_Analysis(MeasurementAnalysis):
 
         cumsum_diff = (abs(self.cumsum_1-self.cumsum_0))
         cumsum_diff_list = cumsum_diff.tolist()
-        self.index_V_opt_raw = int(cumsum_diff_list.index(np.max(
+        self.index_V_th_a = int(cumsum_diff_list.index(np.max(
                                    cumsum_diff_list)))
-        V_opt_raw = bins[self.index_V_opt_raw]+(bins[1]-bins[0])/2
+        V_th_a = bins[self.index_V_th_a]+(bins[1]-bins[0])/2
         # adding half a bin size
-        F_raw = cumsum_diff_list[self.index_V_opt_raw]
+        F_a = 1-(1-cumsum_diff_list[self.index_V_th_a])/2
 
         fig, ax = plt.subplots()
         ax.plot(bins[0:-1], self.cumsum_1, label='cumsum_1', color='red')
         ax.plot(bins[0:-1], self.cumsum_0, label='cumsum_0', color='blue')
-        ax.axvline(V_opt_raw, ls='--', label="V_opt_raw = %.3f" % V_opt_raw,
+        ax.axvline(V_th_a, ls='--', label="V_th_a = %.3f" % V_th_a,
                    linewidth=2, color='grey')
-        ax.text(.7, .6, 'F-raw = %.4f' % F_raw, transform=ax.transAxes,
+        ax.text(.7, .6, '$Fa$ = %.4f' %F_a, transform=ax.transAxes,
                 fontsize='large')
         ax.set_title('raw cumulative histograms')
         plt.xlabel('DAQ voltage integrated (AU)', fontsize=14)
@@ -2299,11 +2299,11 @@ class SSRO_Analysis(MeasurementAnalysis):
             fid_grp = self.analysis_group.create_group('SSRO_Fidelity')
         else:
             fid_grp = self.analysis_group['SSRO_Fidelity']
-        fid_grp.attrs.create(name='V_opt_raw', data=V_opt_raw)
-        fid_grp.attrs.create(name='F_raw', data=F_raw)
+        fid_grp.attrs.create(name='V_th_a', data=V_th_a)
+        fid_grp.attrs.create(name='F_a', data=F_a)
 
-        self.F_raw = F_raw
-        self.V_opt_raw = V_opt_raw
+        self.F_a = F_a
+        self.V_th_a = V_th_a
 
 
     def s_curve_fits(self, shots_I_1_rot, shots_I_0_rot, min_len,
@@ -2393,6 +2393,7 @@ class SSRO_Analysis(MeasurementAnalysis):
         NormCdf2Model.set_param_hint('sigma1', value=np.std(shots_I_1_rot), min=0)
         NormCdf2Model.set_param_hint('frac1', value=0.9, min=0, max=1)
 
+
         # performing the double gaussfits of on 1 data
         params = NormCdf2Model.make_params()
         fit_res_double_1 = NormCdf2Model.fit(
@@ -2407,12 +2408,14 @@ class SSRO_Analysis(MeasurementAnalysis):
         mu1_1 = fit_res_double_1.params['mu1'].value
         frac1_1 = fit_res_double_1.params['frac1'].value
 
+        NormCdf2Model = lmfit.Model(NormCdf2)
+        print('frac1 in 1', frac1_1)
         # adding hint parameters for double gaussfit of 'off' measurements
         NormCdf2Model.set_param_hint('mu0', value=mu0)
         NormCdf2Model.set_param_hint('sigma0', value=sigma0, min=0)
         NormCdf2Model.set_param_hint('mu1', value=mu1_1, vary=False)
-        NormCdf2Model.set_param_hint('sigma1', value=sigma1, min=0)
-        NormCdf2Model.set_param_hint('frac1', value=0.1, min=0, max=1)
+        NormCdf2Model.set_param_hint('sigma1', value=sigma1_1, min=0, vary=False)
+        NormCdf2Model.set_param_hint('frac1', value=0.025, min=0, max=1, vary=True)
 
         params = NormCdf2Model.make_params()
         fit_res_double_0 = NormCdf2Model.fit(
@@ -2426,6 +2429,7 @@ class SSRO_Analysis(MeasurementAnalysis):
         mu0_0 = fit_res_double_0.params['mu0'].value
         mu1_0 = fit_res_double_0.params['mu1'].value
         frac1_0 = fit_res_double_0.params['frac1'].value
+        print('frac1 in 0',frac1_0)
 
         def NormCdf(x, mu, sigma):
             t = x-mu
@@ -2447,8 +2451,8 @@ class SSRO_Analysis(MeasurementAnalysis):
             y0 = -abs(NormCdf(x, mu0, sigma0)-NormCdf(x, mu1, sigma1))
             return y0
 
-        V_opt_corrected = optimize.brent(NormCdfdiff)
-        F_corrected = -NormCdfdiff(x=V_opt_corrected)
+        self.V_th_d = optimize.brent(NormCdfdiff)
+        F_d = 1-(1+NormCdfdiff(x=self.V_th_d))/2
         #print 'F_corrected',F_corrected
 
         def NormCdfdiffDouble(x, mu0_0=mu0_0,
@@ -2465,8 +2469,8 @@ class SSRO_Analysis(MeasurementAnalysis):
             return y
 
         # print "refresh"
-        V_opt = optimize.brent(NormCdfdiffDouble)
-        F = -NormCdfdiffDouble(x=V_opt)
+        # self.V_th_d = optimize.brent(NormCdfdiffDouble)
+        # F_d = -NormCdfdiffDouble(x=self.V_th_d)
 
         #calculating the signal-to-noise ratio
         signal= abs(mu0_0-mu1_1)
@@ -2496,12 +2500,12 @@ class SSRO_Analysis(MeasurementAnalysis):
         ax.plot(S_sorted_I_1, fit_res_double_1.best_fit,
                 label='1 I double gaussfit', ls='--', linewidth=3,
                 color='darkred')
-        labelstring = 'V_opt= %.3f V \nF= %.4f'%(V_opt,F)
-        labelstring_corrected = 'V_opt_corrected= %.3f V \nF_corrected= %.4f\ndiscarding fraction 0 in 1= %.2f \nand fraction 1 in 0= %.2f' %(V_opt_corrected,F_corrected,frac1_0,1-frac1_1)
+        labelstring = 'V_th_a= %.3f V'%(self.V_th_a)
+        labelstring_corrected = 'V_th_d= %.3f V' %(self.V_th_d)
 
-        ax.axvline(V_opt, ls='--', label=labelstring,
+        ax.axvline(self.V_th_a, ls='--', label=labelstring,
                    linewidth=2, color='grey')
-        ax.axvline(V_opt_corrected, ls='--', label=labelstring_corrected,
+        ax.axvline(self.V_th_d, ls='--', label=labelstring_corrected,
                    linewidth=2, color='black')
 
         leg = ax.legend(loc='best')
@@ -2533,14 +2537,14 @@ class SSRO_Analysis(MeasurementAnalysis):
 
         # add lines showing the fitted distribution
         #building up the histogram fits for off measurements
-        y0 = (1-frac1_0)*pylab.normpdf(bins0, mu0_0, sigma0_0)+frac1_0*pylab.normpdf(bins0, mu1_1, sigma1_1)
-        y1_0 = frac1_0*pylab.normpdf(bins0, mu1_1, sigma1_1)
+        y0 = (1-frac1_0)*pylab.normpdf(bins0, mu0_0, sigma0_0)+frac1_0*pylab.normpdf(bins0, mu1_0, sigma1_0)
+        y1_0 = frac1_0*pylab.normpdf(bins0, mu1_0, sigma1_0)
         y0_0 = (1-frac1_0)*pylab.normpdf(bins0, mu0_0, sigma0_0)
 
         #building up the histogram fits for on measurements
-        y1 = (1-frac1_1)*pylab.normpdf(bins1, mu0_0, sigma0_0)+frac1_1*pylab.normpdf(bins1, mu1_1, sigma1_1)
+        y1 = (1-frac1_1)*pylab.normpdf(bins1, mu0_1, sigma0_1)+frac1_1*pylab.normpdf(bins1, mu1_1, sigma1_1)
         y1_1 = frac1_1*pylab.normpdf(bins1, mu1_1, sigma1_1)
-        y0_1 = (1-frac1_1)*pylab.normpdf(bins1, mu0_0, sigma0_0)
+        y0_1 = (1-frac1_1)*pylab.normpdf(bins1, mu0_1, sigma0_1)
 
 
         pylab.semilogy(bins0, y0, 'b',linewidth=1.5)
@@ -2557,11 +2561,11 @@ class SSRO_Analysis(MeasurementAnalysis):
         axes.set_title('Histograms of shots on rotaded IQ plane optimized for I, %s shots'%min_len)
         plt.xlabel('DAQ voltage integrated (V)')#, fontsize=14)
         plt.ylabel('Fraction of counts')#, fontsize=14)
+        print(frac1_0)
 
-
-        plt.axvline(V_opt, ls='--',
-                   linewidth=2, color='grey' ,label='SNR={0:.2f}\n Fa={1:.4f}\n Fd={2:.4f}'.format(SNR, 1-(1-self.F_raw)/2, 1-(1-F_corrected)/2))
-        plt.axvline(V_opt_corrected, ls='--',
+        plt.axvline(self.V_th_a, ls='--',
+                   linewidth=2, color='grey' ,label='SNR={0:.2f}\n $F_a$={1:.4f}\n $F_d$={2:.4f}\n $p_e$={3:.4f}'.format(SNR, self.F_a, F_d, frac1_0))
+        plt.axvline(self.V_th_d, ls='--',
                    linewidth=2, color='black')
         plt.legend()
         leg2 = ax.legend(loc='best')
@@ -2585,13 +2589,16 @@ class SSRO_Analysis(MeasurementAnalysis):
 
         fid_grp.attrs.create(name='sigma0_0', data=sigma0_0)
         fid_grp.attrs.create(name='sigma1_1', data=sigma1_1)
+        fid_grp.attrs.create(name='sigma0_1', data=sigma0_1)
+        fid_grp.attrs.create(name='sigma1_0', data=sigma1_0)
+        fid_grp.attrs.create(name='mu0_1', data=mu0_1)
+        fid_grp.attrs.create(name='mu1_0', data=mu1_0)
+
         fid_grp.attrs.create(name='mu0_0', data=mu0_0)
         fid_grp.attrs.create(name='mu1_1', data=mu1_1)
         fid_grp.attrs.create(name='frac1_0', data=frac1_0)
         fid_grp.attrs.create(name='frac1_1', data=frac1_1)
-        fid_grp.attrs.create(name='V_opt', data=V_opt)
-        fid_grp.attrs.create(name='F', data=F)
-        fid_grp.attrs.create(name='F_corrected', data=F_corrected)
+        fid_grp.attrs.create(name='F_d', data=F_d)
         fid_grp.attrs.create(name='SNR', data=SNR)
 
         self.sigma0_0 = sigma0_0
@@ -2600,9 +2607,7 @@ class SSRO_Analysis(MeasurementAnalysis):
         self.mu1_1 = mu1_1
         self.frac1_0 = frac1_0
         self.frac1_1 = frac1_1
-        self.V_opt = V_opt
-        self.F = F
-        self.F_corrected = F_corrected
+        self.F_d = F_d
         self.SNR = SNR
 
 
@@ -5279,10 +5284,10 @@ class butterfly_analysis(MeasurementAnalysis):
                                                      initial_state=1)
         self.butterfly_coeffs = dm_tools.butterfly_matrix_inversion(exc_coeffs,
                                                                     rel_coeffs)
-        F_bf = 1-(self.butterfly_coeffs.get('eps00_1') +
+        F_bf = 1-(1-(self.butterfly_coeffs.get('eps00_1') +
                   self.butterfly_coeffs.get('eps01_1') +
                   self.butterfly_coeffs.get('eps10_0') +
-                  self.butterfly_coeffs.get('eps11_0'))
+                  self.butterfly_coeffs.get('eps11_0')))/2
         mmt_ind_rel = (self.butterfly_coeffs.get('eps00_1') +
                        self.butterfly_coeffs.get('eps10_1'))
         mmt_ind_exc = (self.butterfly_coeffs.get('eps11_0') +
@@ -5291,7 +5296,7 @@ class butterfly_analysis(MeasurementAnalysis):
             print('SSRO Fid', F_bf)
             print('mmt_ind_rel', mmt_ind_rel)
             print('mmt_ind_exc', mmt_ind_exc)
-        self.butterfly_coeffs['F_bf'] = F_bf
+        self.butterfly_coeffs['F_a_bf'] = F_a_bf
         self.butterfly_coeffs['mmt_ind_exc'] = mmt_ind_exc
         self.butterfly_coeffs['mmt_ind_rel'] = mmt_ind_rel
         return self.butterfly_coeffs
@@ -6103,8 +6108,8 @@ def fit_qubit_frequency(sweep_points, data, mode='dac',
 #             y0 = -abs(NormCdf(x, mu0, sigma0)-NormCdf(x, mu1, sigma1))
 #             return y0
 
-#         V_opt_corrected = optimize.brent(NormCdfdiff)
-#         F_corrected = -NormCdfdiff(x=V_opt_corrected)
+#         V_d = optimize.brent(NormCdfdiff)
+#         F_corrected = -NormCdfdiff(x=V_d)
 #         #print 'F_corrected',F_corrected
 
 #         def NormCdfdiffDouble(x, mu0_0=mu0_0,
@@ -6153,11 +6158,11 @@ def fit_qubit_frequency(sweep_points, data, mode='dac',
 #                 label='1 I double gaussfit', ls='--', linewidth=3,
 #                 color='darkred')
 #         labelstring = 'V_opt= %.3f V \nF= %.4f'%(V_opt,F)
-#         labelstring_corrected = 'V_opt_corrected= %.3f V \nF_corrected= %.4f\ndiscarding fraction 0 in 1= %.2f \nand fraction 1 in 0= %.2f' %(V_opt_corrected,F_corrected,frac1_0,1-frac1_1)
+#         labelstring_corrected = 'V_d= %.3f V \nF_corrected= %.4f\ndiscarding fraction 0 in 1= %.2f \nand fraction 1 in 0= %.2f' %(V_d,F_corrected,frac1_0,1-frac1_1)
 
 #         ax.axvline(V_opt, ls='--', label=labelstring,
 #                    linewidth=2, color='grey')
-#         ax.axvline(V_opt_corrected, ls='--', label=labelstring_corrected,
+#         ax.axvline(V_d, ls='--', label=labelstring_corrected,
 #                    linewidth=2, color='black')
 
 #         leg = ax.legend(loc='best')
@@ -6217,7 +6222,7 @@ def fit_qubit_frequency(sweep_points, data, mode='dac',
 
 #         plt.axvline(V_opt, ls='--',
 #                    linewidth=2, color='grey' ,label='SNR={0:.2f}\n Fa={1:.4f}\n Fd={2:.4f}'.format(SNR, 1-(1-self.F_raw)/2, 1-(1-F_corrected)/2))
-#         plt.axvline(V_opt_corrected, ls='--',
+#         plt.axvline(V_d, ls='--',
 #                    linewidth=2, color='black')
 #         plt.legend()
 #         leg2 = ax.legend(loc='best')
