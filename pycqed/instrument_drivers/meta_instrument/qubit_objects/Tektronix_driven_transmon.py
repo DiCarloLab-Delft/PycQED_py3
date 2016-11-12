@@ -227,6 +227,11 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                            initial_value=.5,
                            vals=vals.Numbers(min_value=-1., max_value=1.),
                            parameter_class=ManualParameter)
+        self.add_parameter('swap_amp',
+                           label='SWAP amplitude', units='V',
+                           initial_value=0.02,
+                           vals=vals.Numbers(min_value=0.02, max_value=4.5),
+                           parameter_class=ManualParameter)
         self.add_parameter('swap_time',
                            label='SWAP Time', units='s',
                            initial_value=0.,
@@ -1077,6 +1082,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                            'channel': 'ch%d'%self.fluxing_channel(),
                            'amplitude': self.fluxing_amp(),
                            'length': self.swap_time(),
+                           'swap_amp': self.swap_amp(),
                            'dead_time_length': self.flux_dead_time()}
         return flux_pulse_pars, self._dist_dict
 
