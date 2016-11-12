@@ -48,8 +48,8 @@ class CBox_tests(unittest.TestCase):
         encoded_128 = self.CBox.c.encode_byte(128, 7)
         self.assertTrue(type(encoded_128) == bytes)
         self.assertTrue(len(encoded_128) == 2)
-        self.assertTrue(bytes_to_binary(encoded_128)
-                        == '1000000110000000')
+        self.assertTrue(bytes_to_binary(encoded_128) ==
+                        '1000000110000000')
         encoded_128 = self.CBox.c.encode_byte(128, 4)
         self.assertTrue(type(encoded_128) == bytes)
         self.assertTrue(len(encoded_128) == 2)
@@ -154,8 +154,8 @@ class CBox_tests(unittest.TestCase):
     def test_lin_trans_coeffs(self):
         initial_val = self.CBox.get('lin_trans_coeffs')
 
-        self.CBox.set('lin_trans_coeffs', [1,.4, 0, 1.33])
-        self.assertEqual(self.CBox.get('lin_trans_coeffs'), [1,.4, 0, 1.33])
+        self.CBox.set('lin_trans_coeffs', [1, .4, 0, 1.33])
+        self.assertEqual(self.CBox.get('lin_trans_coeffs'), [1, .4, 0, 1.33])
         self.CBox.set('lin_trans_coeffs', [1, .4, .2, 1])
         self.assertEqual(self.CBox.get('lin_trans_coeffs'), [1, .4, .2, 1])
 
@@ -250,13 +250,9 @@ class CBox_tests(unittest.TestCase):
         self.assertTrue((software_err_fracs_0 == counters[0]).all())
         self.assertTrue((software_err_fracs_1 == counters[1]).all())
 
-
-
-
     def test_integration_average_mode(self):
         self.CBox.set('acquisition_mode', 0)
         NoSamples = 60
-
 
         weights0 = np.ones(512) * 1
         weights1 = np.ones(512) * 0

@@ -14,6 +14,7 @@ from pycqed.measurement import mc_parameter_wrapper as pw
 reload(pw)
 
 from pycqed.instrument_drivers.physical_instruments import QuTech_ControlBoxdriver as qcb
+from pycqed.instrument_drivers.physical_instruments._controlbox import Mock_QuTech_ControlBoxdriver as mqcb
 from pycqed.instrument_drivers.physical_instruments import QuTech_ControlBox_v3 as qcb3
 from pycqed.instrument_drivers.physical_instruments._controlbox import test_suite_v3
 from pycqed.instrument_drivers.physical_instruments._controlbox import defHeaders_CBox_v3 as header

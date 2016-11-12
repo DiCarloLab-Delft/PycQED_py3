@@ -1,28 +1,18 @@
-# Note to Xiang, remove the imports that are not used :)
-import time
 import numpy as np
-import sys
-# import visa
 import unittest
 import logging
 
-qcpath = 'D:\GitHubRepos\Qcodes'
-if qcpath not in sys.path:
-    sys.path.append(qcpath)
-
-from qcodes.instrument.visa import VisaInstrument
 from qcodes.utils import validators as vals
+from ._controlbox import codec as c
+from ._controlbox import Assembler
+from . import QuTech_ControlBoxdriver as qcb
+from ._controlbox import defHeaders_CBox_v3 as defHeaders
 
 # cython drivers for encoding and decoding
 import pyximport
 pyximport.install(setup_args={"script_args": ["--compiler=msvc"],
                               "include_dirs": np.get_include()},
                   reload_support=True)
-
-from ._controlbox import codec as c
-from ._controlbox import Assembler
-from . import QuTech_ControlBoxdriver as qcb
-from ._controlbox import defHeaders_CBox_v3 as defHeaders
 
 '''
 @author: Xiang Fu
@@ -69,12 +59,12 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
         from ._controlbox import test_suite_v3 as test_suite
         reload(test_suite)
         # pass the CBox to the module so it can be used in the tests
-        self.c = c # make the codec callable from the testsuite
+        self.c = c  # make the codec callable from the testsuite
         test_suite.CBox = self
         suite = unittest.TestLoader().loadTestsFromTestCase(
             test_suite.CBox_tests_v3)
         print('test suite got:',
-            unittest.TestLoader().getTestCaseNames(test_suite.CBox_tests_v3))
+              unittest.TestLoader().getTestCaseNames(test_suite.CBox_tests_v3))
         unittest.TextTestRunner(verbosity=2).run(suite)
 
     def _do_get_firmware_version(self):
