@@ -640,7 +640,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         MC.run('Echo'+label+self.msmt_suffix)
 
         if analyze:
-            a = ma.Ramsey_Analysis(auto=True, close_fig=close_fig, label='Echo')
+            a = ma.Ramsey_analysis(auto=True, close_fig=close_fig)
             return a
 
     def measure_allxy(self, double_points=True,

@@ -130,7 +130,7 @@ Flux_Control.inv_transfer_matrix(invA)
 
 Flux_Control.dac_mapping([1, 2, 3, 4, 5])
 
-Flux_Control.flux_offsets(np.array([ 0.04648826, -0.03898104,  0.03993164, -0.00092295, -0.04454162]))
+Flux_Control.flux_offsets(np.array([3.21499683e-02,-2.91992550e-02,2.88520021e-02,-2.26225717e-06,-9.35805778e-03]))
 
 
 
@@ -206,40 +206,39 @@ gen.load_settings_onto_instrument(DataM)
 gen.load_settings_onto_instrument(DataT)
 gen.load_settings_onto_instrument(HS)
 
-AncT.E_c(0.28e9)
-AncT.asymmetry(0)
-AncT.dac_flux_coefficient(0.0014832606276941286)
-AncT.dac_sweet_spot(-80.843401134877467)
-AncT.f_max(5.942865842632016e9)
-AncT.f_qubit_calc('flux')
+DataT.E_c(0.28e9)
+DataT.asymmetry(0)
+DataT.dac_flux_coefficient(0.0016813942523375956)
+DataT.dac_sweet_spot(-53.472554718672427)
+DataT.f_max(5.688884012383026e9)
+DataT.f_qubit_calc('flux')
 
 AncB.E_c(0.28e9)
 AncB.asymmetry(0)
-AncB.dac_flux_coefficient(0.0020108167368328178)
-AncB.dac_sweet_spot(46.64580507835808)
-AncB.f_max(6.3772306731019359e9)
+AncB.dac_flux_coefficient(0.002028986705064149)
+AncB.dac_sweet_spot(36.460579336820274)
+AncB.f_max(6.381268822811037e9)
 AncB.f_qubit_calc('flux')
 
-DataT.E_c(0.28e9)
-DataT.asymmetry(0)
-DataT.dac_flux_coefficient(0.0016802077647335939)
-DataT.dac_sweet_spot(-59.871260477923215)
-DataT.f_max(5.6884932787721443e9)
-DataT.f_qubit_calc('flux')
-
+AncT.E_c(0.28e9)
+AncT.asymmetry(0)
+AncT.dac_flux_coefficient(0.0015092699034525462)
+AncT.dac_sweet_spot(-64.682660992718183)
+AncT.f_max(5.9419418666592483e9)
+AncT.f_qubit_calc('flux')
 
 DataM.E_c(0.28e9)
 DataM.asymmetry(0)
-DataM.dac_flux_coefficient(0.0013648395455073477)
-DataM.dac_sweet_spot(23.632250360310309)
-DataM.f_max(6.1091409419040268e9)
+DataM.dac_flux_coefficient(0.0012685027014113798)
+DataM.dac_sweet_spot(2.4196012752483966)
+DataM.f_max(6.1113712558694182)
 DataM.f_qubit_calc('flux')
 
 DataB.E_c(0.28e9)
 DataB.asymmetry(0)
-DataB.dac_flux_coefficient(0.00076044591994623627)
-DataB.dac_sweet_spot(89.794843711783415)
-DataB.f_max(6.7145280717783091e9)
+DataB.dac_flux_coefficient(0.00094498809508039799)
+DataB.dac_sweet_spot(31.549597601272581)
+DataB.f_max(6.7138650690678894)
 DataB.f_qubit_calc('flux')
 
 
@@ -347,19 +346,10 @@ else:
         qubit.RO_acq_weight_function_Q(1)
 
 
-
-
 q0 = AncT
 q1 = DataT
 
 #preparing UHFQC readout with IQ mod pulses
-
-list_qubits = [q0, q1, AncB, DataM, DataB]
-for qubit in list_qubits:
-    qubit.RO_fixed_point_correction(True)
-    #qubit.RO_acq_averages(2**13)
-
-
 
 switch_to_pulsed_RO_CBox(AncT)
 switch_to_pulsed_RO_CBox(DataT)
