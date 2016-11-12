@@ -15,6 +15,7 @@ class Test_MeasurementControl(unittest.TestCase):
         self.MC = measurement_control.MeasurementControl(
             'MC', live_plot_enabled=False, verbose=False)
         self.MC.station = station
+        station.add_component(self.MC)
 
     def test_soft_sweep_1D(self):
         sweep_pts = np.linspace(0, 10, 30)
@@ -111,3 +112,6 @@ class Test_MeasurementControl(unittest.TestCase):
         np.testing.assert_array_almost_equal(x, sweep_pts)
         np.testing.assert_array_almost_equal(y, sweep_pts)
 
+    def tearDown(self):
+        self.MC.close()
+        del station.components['MC']

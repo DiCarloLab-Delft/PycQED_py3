@@ -14,6 +14,10 @@ from pycqed.measurement import detector_functions as det
 from pycqed.measurement.mc_parameter_wrapper import wrap_par_to_swf
 from pycqed.measurement.mc_parameter_wrapper import wrap_par_to_det
 
+from qcodes.instrument.base import Instrument
+from qcodes.instrument.parameter import ManualParameter
+from qcodes.utils import validators as vals
+
 try:
     import pyqtgraph as pg
     import pyqtgraph.multiprocess as pgmp
@@ -26,7 +30,7 @@ except Exception:
           ' be sure to set live_plot_enabled=False')
 
 
-class MeasurementControl:
+class MeasurementControl(Instrument):
 
     '''
     New version of Measurement Control that allows for adaptively determining
@@ -35,7 +39,14 @@ class MeasurementControl:
 
     def __init__(self, name, plot_theme=((60, 60, 60), 'w'),
                  plotting_interval=2,  live_plot_enabled=True, verbose=True):
-        self.name = name
+        super().__init__(name=name, server_name=None)
+        self.add_parameter('soft_avg',
+                           label='Number of soft averages',
+                           parameter_class=ManualParameter,
+                           vals=vals.Ints(1, int(1e8)),
+                           initial_value=1)
+
+        # self.name = name # happens in super
 
         self.verbose = verbose  # enables printing of the start message
         # starting the process for the pyqtgraph plotting
@@ -857,3 +868,11 @@ class MeasurementControl:
 
     def get_optimization_method(self):
         return self.optimization_method
+
+    def get_idn(self):
+        """
+        Required as a standard interface for QCoDeS instruments.
+        """
+        return {'vendor': 'PycQED', 'model': 'MeasurementControl',
+        'serial': '', 'firmware': ''}
+
