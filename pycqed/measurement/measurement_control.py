@@ -45,23 +45,29 @@ class MeasurementControl(Instrument):
                            parameter_class=ManualParameter,
                            vals=vals.Ints(1, int(1e8)),
                            initial_value=1)
+        self.add_parameter('verbose',
+                           parameter_class=ManualParameter,
+                           vals=vals.Bool(),
+                           initial_value=verbose)
+        self.add_parameter('live_plot_enabled',
+                           parameter_class=ManualParameter,
+                           vals=vals.Bool(),
+                           initial_value=live_plot_enabled)
+
 
         # self.name = name # happens in super
 
-        self.verbose = verbose  # enables printing of the start message
+        # self.verbose() = verbose  # enables printing of the start message
         # starting the process for the pyqtgraph plotting
         # You do not want a new process to be created every time you start a
         # run. This can be removed when I replace my custom process with the
         # pyqtgraph one.
-        if live_plot_enabled:
+        if self.live_plot_enabled():
             pg.mkQApp()
             self.proc = pgmp.QtProcess()  # pyqtgraph multiprocessing
             self.rpg = self.proc._import('pyqtgraph')
             self.new_plotmon_window(plot_theme=plot_theme,
                                     interval=plotting_interval)
-            self.live_plot_enabled = True
-        else:
-            self.live_plot_enabled = False
 
     ##############################################
     # Functions used to control the measurements #
@@ -96,7 +102,7 @@ class MeasurementControl(Instrument):
         return result
 
     def measure(self, *kw):
-        if self.live_plot_enabled:
+        if self.live_plot_enabled():
             self.initialize_plot_monitor()
 
         for sweep_function in self.sweep_functions:
@@ -423,7 +429,7 @@ class MeasurementControl(Instrument):
         return self.win, self.curves
 
     def update_plotmon(self, force_update=False):
-        if self.live_plot_enabled:
+        if self.live_plot_enabled():
             i = 0
             try:
                 time_since_last_mon_update = time.time() - self._mon_upd_time
@@ -465,7 +471,7 @@ class MeasurementControl(Instrument):
         Made to work with at most 2 2D arrays (as this is how the labview code
         works). It should be easy to extend this function for more vals.
         '''
-        if self.live_plot_enabled:
+        if self.live_plot_enabled():
             self.time_last_2Dplot_update = time.time()
             n = len(self.sweep_pts_y)
             m = len(self.sweep_pts_x)
@@ -488,7 +494,7 @@ class MeasurementControl(Instrument):
         Adds latest measured value to the TwoD_array and sends it
         to the QC_QtPlot.
         '''
-        if self.live_plot_enabled:
+        if self.live_plot_enabled():
             i = int(self.iteration-1)
             x_ind = i % self.xlen
             y_ind = i / self.xlen
@@ -518,7 +524,7 @@ class MeasurementControl(Instrument):
                                symbol='o', symbolSize=5)
 
     def update_plotmon_adaptive(self, force_update=False):
-        if self.live_plot_enabled:
+        if self.live_plot_enabled():
             if (time.time() - self.time_last_ad_plot_update >
                     self.QC_QtPlot.interval or force_update):
                 for j in range(len(self.detector_function.value_names)):
@@ -536,7 +542,7 @@ class MeasurementControl(Instrument):
         to the QC_QtPlot.
         Note that the plotmon only supports evenly spaced lattices.
         '''
-        if self.live_plot_enabled:
+        if self.live_plot_enabled():
             i = int(self.iteration-1)
             y_ind = i
             for j in range(len(self.detector_function.value_names)):
@@ -650,10 +656,10 @@ class MeasurementControl(Instrument):
 
         set_grp.attrs['mode'] = self.mode
         set_grp.attrs['measurement_name'] = self.measurement_name
-        set_grp.attrs['live_plot_enabled'] = self.live_plot_enabled
+        set_grp.attrs['live_plot_enabled'] = self.live_plot_enabled()
 
     def print_progress_static_soft_sweep(self, i):
-        if self.verbose:
+        if self.verbose():
             percdone = (i+1)*1./len(self.sweep_points)*100
             elapsed_time = time.time() - self.begintime
             progress_message = "\r {percdone}% completed \telapsed time: "\
@@ -682,7 +688,7 @@ class MeasurementControl(Instrument):
             return True
 
     def print_progress_static_hard(self):
-        if self.verbose:
+        if self.verbose():
             acquired_points = self.dset.shape[0]
             total_nr_pts = len(self.get_sweep_points())
 
@@ -703,7 +709,7 @@ class MeasurementControl(Instrument):
             print(progress_message, end=end_char)
 
     def print_measurement_start_msg(self):
-        if self.verbose:
+        if self.verbose():
             if len(self.sweep_functions) == 1:
                 print('Starting measurement: %s' % self.get_measurement_name())
                 print('Sweep function: %s' %
