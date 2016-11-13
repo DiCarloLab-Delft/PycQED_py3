@@ -97,21 +97,28 @@ class Soft_Detector(Detector_Function):
 
 class Dummy_Detector_Hard(Hard_Detector):
 
-    def __init__(self, **kw):
+    def __init__(self, delay=0, noise=0, **kw):
         super(Dummy_Detector_Hard, self).__init__()
         self.set_kw()
         self.detector_control = 'hard'
         self.name = 'Dummy_Detector'
         self.value_names = ['distance', 'Power']
         self.value_units = ['m', 'nW']
+        self.delay = delay
+        self.noise = noise
 
     def prepare(self, sweep_points):
         self.sweep_points = sweep_points
 
     def get_values(self):
         x = self.sweep_points
-        self.data = [np.sin(x / np.pi), np.cos(x/np.pi)]
-        return self.data
+        noise = self.noise * np.random.rand(2, len(x))
+        data = np.array([np.sin(x / np.pi),
+                         np.cos(x/np.pi)])
+        data += noise
+        time.sleep(self.delay)
+
+        return data
 
 
 class Dummy_Shots_Detector(Hard_Detector):

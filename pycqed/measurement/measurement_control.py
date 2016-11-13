@@ -54,10 +54,6 @@ class MeasurementControl(Instrument):
                            vals=vals.Bool(),
                            initial_value=live_plot_enabled)
 
-
-        # self.name = name # happens in super
-
-        # self.verbose() = verbose  # enables printing of the start message
         # starting the process for the pyqtgraph plotting
         # You do not want a new process to be created every time you start a
         # run. This can be removed when I replace my custom process with the
@@ -117,10 +113,11 @@ class MeasurementControl(Instrument):
         elif self.sweep_functions[0].sweep_control == 'hard':
             self.iteration = 0
             if len(self.sweep_functions) == 1:
-                self.detector_function.prepare(
-                    sweep_points=self.get_sweep_points())
                 self.get_measurement_preparetime()
-                self.measure_hard()
+                for soft_iter in range(self.soft_avg()):
+                    self.detector_function.prepare(
+                        sweep_points=self.get_sweep_points())
+                    self.measure_hard()
             else:
                 self.get_measurement_preparetime()
 
@@ -213,7 +210,9 @@ class MeasurementControl(Instrument):
 
         datasetshape = self.dset.shape
         self.iteration = datasetshape[0]/shape_new_data[0] + 1
-        start_idx = int(shape_new_data[0]*(self.iteration-1))
+        max_sweep_points = np.shape(self.get_sweep_points())[0]
+        start_idx = int((shape_new_data[0]*(self.iteration-1))%max_sweep_points)
+        print('start idx:', start_idx)
         new_datasetshape = (shape_new_data[0]*self.iteration, datasetshape[1])
         self.dset.resize(new_datasetshape)
         len_new_data = shape_new_data[0]
