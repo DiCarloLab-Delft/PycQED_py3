@@ -405,7 +405,8 @@ def XSWAPxy(phis, mw_pulse_pars, RO_pars, flux_pulse_pars=None,
 
 
 def chevron_seq_cphase(lengths, mw_pulse_pars, RO_pars, flux_pulse_pars=None,
-                       cphase_pulse_pars=None, verbose=False,
+                       cphase_pulse_pars=None, artificial_detuning=None,
+                       verbose=False,
                        distortion_dict=None,
                        upload=True,
                        return_seq=False):
@@ -445,8 +446,8 @@ def chevron_seq_cphase(lengths, mw_pulse_pars, RO_pars, flux_pulse_pars=None,
         minus_cphase_pulse_pars['length'] = lngt
         cphase_pulse_pars['frequency'] = 0.5/lngt
         minus_cphase_pulse_pars['frequency'] = 0.5/lngt
-        cphase_pulse_pars['phase'] = -(90./np.pi)*cphase_pulse_pars['pulse_delay']/lngt
-        minus_cphase_pulse_pars['phase'] = -(90./np.pi)*minus_cphase_pulse_pars['pulse_delay']/lngt
+        # cphase_pulse_pars['phase'] = -(90./np.pi)*(cphase_pulse_pars['pulse_delay'])/lngt
+        # minus_cphase_pulse_pars['phase'] = -(90./np.pi)*(minus_cphase_pulse_pars['pulse_delay'])/lngt
         # correcting timings
         pulse_buffer = 50e-9
         flux_pulse_pars['pulse_delay'] = pulse_buffer + (mw_pulse_pars['sigma'] *
@@ -457,10 +458,13 @@ def chevron_seq_cphase(lengths, mw_pulse_pars, RO_pars, flux_pulse_pars=None,
 
         dead_time = 3e-6
         minus_flux_pulse_pars['pulse_delay'] = dead_time + RO_pars['length']
-        firstY90m = deepcopy(pulses['mY90'])
-        firstY90m['pulse_delay'] = flux_pulse_pars['length'] + 20e-9
-        secondY90m = deepcopy(pulses['mY90'])
-        secondY90m['pulse_delay'] = cphase_pulse_pars['pulse_delay'] + 20e-9
+        firstY90m = deepcopy(pulses['Y90'])
+        firstY90m['pulse_delay'] = flux_pulse_pars['length'] + 30e-9
+        secondY90m = deepcopy(pulses['X90'])
+
+        if artificial_detuning is not None:
+            secondY90m['phase'] = (lngt-lengths[0]) * artificial_detuning * 360
+        secondY90m['pulse_delay'] = lngt + 20e-9
         pulse_list = [pulses['X180'],
                       flux_pulse_pars,
                       firstY90m,

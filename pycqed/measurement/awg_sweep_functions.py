@@ -155,6 +155,7 @@ class chevron_cphase_length(swf.Hard_Sweep):
         self.RO_pars = RO_pars
         self.flux_pulse_pars = flux_pulse_pars
         self.dist_dict = dist_dict
+        self.artificial_detuning = 4./length_vec[-1]
         self.upload = upload
         self.name = 'Chevron'
         self.parameter_name = 'Time'
@@ -170,6 +171,7 @@ class chevron_cphase_length(swf.Hard_Sweep):
                                     self.RO_pars,
                                     self.flux_pulse_pars,
                                     self.cphase_pulse_pars,
+                                    self.artificial_detuning,
                                     distortion_dict=self.dist_dict)
 
     def pre_upload(self, **kw):
@@ -178,6 +180,7 @@ class chevron_cphase_length(swf.Hard_Sweep):
                                     self.RO_pars,
                                     self.flux_pulse_pars,
                                     self.cphase_pulse_pars,
+                                    self.artificial_detuning,
                                     distortion_dict=self.dist_dict, return_seq=True)
 
 class repeat_swap(swf.Hard_Sweep):
