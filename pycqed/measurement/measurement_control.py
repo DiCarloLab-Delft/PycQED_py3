@@ -193,9 +193,6 @@ class MeasurementControl(Instrument):
         return
 
     def measure_hard(self):
-        '''
-        ToDo: integrate soft averaging into MC
-        '''
         new_data = np.array(self.detector_function.get_values()).T
 
         if len(np.shape(new_data)) == 1:
@@ -488,7 +485,7 @@ class MeasurementControl(Instrument):
                                    subplot=j+1,
                                    cmap='viridis')
 
-    def update_plotmon_2D(self):
+    def update_plotmon_2D(self, force_update=False):
         '''
         Adds latest measured value to the TwoD_array and sends it
         to the QC_QtPlot.
@@ -553,7 +550,7 @@ class MeasurementControl(Instrument):
 
             if (time.time() - self.time_last_2Dplot_update >
                     self.QC_QtPlot.interval
-                    or self.iteration == len(self.sweep_points)):
+                    or self.iteration == len(self.sweep_points)/self.xlen):
                 self.time_last_2Dplot_update = time.time()
                 self.QC_QtPlot.update_plot()
 
