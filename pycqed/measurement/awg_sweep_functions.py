@@ -146,6 +146,42 @@ class chevron_length(swf.Hard_Sweep):
                                     self.flux_pulse_pars,
                                     distortion_dict=self.dist_dict, return_seq=True)
 
+class chevron_cphase_length(swf.Hard_Sweep):
+    def __init__(self, length_vec, mw_pulse_pars,RO_pars,
+                 flux_pulse_pars, cphase_pulse_pars, dist_dict, AWG, upload=True, return_seq=False):
+        super().__init__()
+        self.length_vec = length_vec
+        self.mw_pulse_pars = mw_pulse_pars
+        self.RO_pars = RO_pars
+        self.flux_pulse_pars = flux_pulse_pars
+        self.dist_dict = dist_dict
+        self.artificial_detuning = 4./length_vec[-1]
+        self.upload = upload
+        self.name = 'Chevron'
+        self.parameter_name = 'Time'
+        self.unit = 's'
+        self.return_seq = return_seq
+        self.cphase_pulse_pars = cphase_pulse_pars
+        self.AWG = AWG
+
+    def prepare(self, **kw):
+        if self.upload:
+            fsqs.chevron_seq_cphase(self.length_vec,
+                                    self.mw_pulse_pars,
+                                    self.RO_pars,
+                                    self.flux_pulse_pars,
+                                    self.cphase_pulse_pars,
+                                    self.artificial_detuning,
+                                    distortion_dict=self.dist_dict)
+
+    def pre_upload(self, **kw):
+        self.seq = fsqs.chevron_seq_cphase(self.length_vec,
+                                    self.mw_pulse_pars,
+                                    self.RO_pars,
+                                    self.flux_pulse_pars,
+                                    self.cphase_pulse_pars,
+                                    self.artificial_detuning,
+                                    distortion_dict=self.dist_dict, return_seq=True)
 
 class repeat_swap(swf.Hard_Sweep):
     def __init__(self, rep_max, mw_pulse_pars, RO_pars,
@@ -210,6 +246,76 @@ class BusT1(swf.Hard_Sweep):
                               self.RO_pars,
                               self.flux_pulse_pars,
                               distortion_dict=self.dist_dict, return_seq=True)
+
+
+class BusT2(swf.Hard_Sweep):
+    def __init__(self, times_vec, mw_pulse_pars, RO_pars,
+                 flux_pulse_pars, dist_dict, AWG, upload=True,
+                 return_seq=False):
+        super().__init__()
+        self.times_vec = times_vec
+        self.mw_pulse_pars = mw_pulse_pars
+        self.RO_pars = RO_pars
+        self.flux_pulse_pars = flux_pulse_pars
+        self.dist_dict = dist_dict
+        self.upload = upload
+        self.name = 'Chevron'
+        self.parameter_name = 'Time'
+        self.unit = 's'
+        self.return_seq = return_seq
+        self.AWG = AWG
+
+    def prepare(self, **kw):
+        if self.upload:
+            fsqs.BusT2(self.times_vec,
+                       self.mw_pulse_pars,
+                       self.RO_pars,
+                       self.flux_pulse_pars,
+                       distortion_dict=self.dist_dict)
+
+    def pre_upload(self, **kw):
+        self.seq = fsqs.BusT2(self.times_vec,
+                              self.mw_pulse_pars,
+                              self.RO_pars,
+                              self.flux_pulse_pars,
+                              distortion_dict=self.dist_dict, return_seq=True)
+
+
+class BusEcho(swf.Hard_Sweep):
+    def __init__(self, times_vec, mw_pulse_pars, RO_pars, artificial_detuning,
+                 flux_pulse_pars, dist_dict, AWG, upload=True,
+                 return_seq=False):
+        super().__init__()
+        self.times_vec = times_vec
+        self.mw_pulse_pars = mw_pulse_pars
+        self.RO_pars = RO_pars
+        self.flux_pulse_pars = flux_pulse_pars
+        self.dist_dict = dist_dict
+        self.artificial_detuning = artificial_detuning
+        self.upload = upload
+        self.name = 'Chevron'
+        self.parameter_name = 'Time'
+        self.unit = 's'
+        self.return_seq = return_seq
+        self.AWG = AWG
+
+    def prepare(self, **kw):
+        if self.upload:
+            fsqs.BusEcho(self.times_vec,
+                         self.mw_pulse_pars,
+                         self.RO_pars,
+                         self.artificial_detuning,
+                         self.flux_pulse_pars,
+                         distortion_dict=self.dist_dict)
+
+    def pre_upload(self, **kw):
+        self.seq = fsqs.BusEcho(self.times_vec,
+                                self.mw_pulse_pars,
+                                self.RO_pars,
+                                self.artificial_detuning,
+                                self.flux_pulse_pars,
+                                distortion_dict=self.dist_dict, return_seq=True)
+
 
 class Ramsey_2nd_exc(swf.Hard_Sweep):
     def __init__(self, pulse_pars, pulse_pars_2nd,
@@ -429,6 +535,30 @@ class Motzoi_XY(swf.Hard_Sweep):
         sweep_pts = np.repeat(motzois, 2)
         self.sweep_points = np.append(sweep_pts,
                                    [motzois[-1]+(motzois[-1]-motzois[-2])]*4)
+
+    def prepare(self, **kw):
+        if self.upload:
+            sqs.Motzoi_XY(motzois=self.sweep_points,
+                          pulse_pars=self.pulse_pars,
+                          RO_pars=self.RO_pars)
+
+
+class Freq_XY(swf.Hard_Sweep):
+    def __init__(self, freqs, pulse_pars, RO_pars, upload=True):
+        '''
+        Measures 2 points per motzoi value specified in freqs and adds 4
+        calibration points to it.
+        '''
+        super().__init__()
+        self.pulse_pars = pulse_pars
+        self.RO_pars = RO_pars
+        self.upload = upload
+        self.name = 'Motzoi_XY'
+        self.parameter_name = 'motzoi'
+        self.unit = ' '
+        sweep_pts = np.repeat(freqs, 2)
+        self.sweep_points = np.append(sweep_pts,
+                                   [freqs[-1]+(freqs[-1]-freqs[-2])]*4)
 
     def prepare(self, **kw):
         if self.upload:
