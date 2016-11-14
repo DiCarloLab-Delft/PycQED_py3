@@ -18,11 +18,20 @@ import pycqed as pq
 
 try:
     qc_config
-except NameError:
-    # Stores data in the default data location (pycqed_py3/data/)
-    datadir = os.path.join(os.path.dirname(pq.__file__), os.pardir, 'data')
-    logging.warning('Creating qc_config for datadir')
-    qc_config = {'datadir': datadir}
+except:
+    try:
+        mac = get_mac()
+        try:
+            setup_name = setup_dict.mac_dict[str(mac)]
+            datadir = setup_dict.data_dir_dict[setup_name]
+        except:
+            datadir = None
+        print('Data directory set to:', datadir)
+    except:
+        # Stores data in the default data location (pycqed_py3/data/)
+        datadir = os.path.join(os.path.dirname(pq.__file__), os.pardir, 'data')
+        logging.warning('Creating qc_config for datadir')
+        qc_config = {'datadir': datadir}
 
 
 class DateTimeGenerator:
