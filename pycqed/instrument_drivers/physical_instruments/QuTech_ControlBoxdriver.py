@@ -15,7 +15,7 @@ pyximport.install(setup_args={"script_args": ["--compiler=msvc"],
                   reload_support=True)
 
 from ._controlbox import defHeaders  # File containing bytestring commands
-from ._controlbox import codec as c
+from ._controlbox import codec as c # must be below pyximport.install
 
 
 class QuTech_ControlBox(VisaInstrument):
