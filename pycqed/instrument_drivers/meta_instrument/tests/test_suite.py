@@ -3,6 +3,7 @@ lm = None
 
 
 class LutManTests(unittest.TestCase):
+
     '''
     This is a test suite for the LutMan at this point it is still very primitive
 
@@ -13,9 +14,11 @@ class LutManTests(unittest.TestCase):
     # def test_get_all(self):
     #     CBox.get_all()
     #     return True
+
     def test_pars(self):
         for par in self.LutMan.parameters:
             self.LutMan.get(par)
+
     def test_uploading_waveforms(self):
         self.LutMan.CBox.set('acquisition_mode', 'idle')
         self.LutMan.generate_standard_pulses()
