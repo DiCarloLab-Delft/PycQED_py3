@@ -40,6 +40,8 @@ class MeasurementControl(Instrument):
     def __init__(self, name, plot_theme=((60, 60, 60), 'w'),
                  plotting_interval=2,  live_plot_enabled=True, verbose=True):
         super().__init__(name=name, server_name=None)
+        # Soft average is currently only available for "hard"
+        # measurements. It does not work with adaptive measurements.
         self.add_parameter('soft_avg',
                            label='Number of soft averages',
                            parameter_class=ManualParameter,
@@ -65,6 +67,9 @@ class MeasurementControl(Instrument):
             self.new_plotmon_window(plot_theme=plot_theme,
                                     interval=plotting_interval)
 
+        self.soft_iteration = 0  # used as a counter for soft_avg
+
+
     ##############################################
     # Functions used to control the measurements #
     ##############################################
@@ -73,6 +78,8 @@ class MeasurementControl(Instrument):
         '''
         Core of the Measurement control.
         '''
+        # Setting to zero at the start of every run, used in soft avg
+        self.soft_iteration = 0
         self.set_measurement_name(name)
         self.print_measurement_start_msg()
         self.mode = mode
@@ -193,36 +200,34 @@ class MeasurementControl(Instrument):
         return
 
     def measure_hard(self):
+        self.iteration +=1
         new_data = np.array(self.detector_function.get_values()).T
 
-        if len(np.shape(new_data)) == 1:
-            single_col = True
-            shape_new_data = (len(new_data), 1)
-        else:
-            single_col = False
-            shape_new_data = np.shape(new_data)
 
-        # resizing only for 1 set of new_data  now... needs to improve
-        shape_new_data = (shape_new_data[0], shape_new_data[1]+1)
-
+        ###########################
+        # Shape determining block #
+        ###########################
         datasetshape = self.dset.shape
-        self.iteration = datasetshape[0]/shape_new_data[0] + 1
-        max_sweep_points = np.shape(self.get_sweep_points())[0]
-        start_idx = int((shape_new_data[0]*(self.iteration-1))%max_sweep_points)
-        print('start idx:', start_idx)
-        new_datasetshape = (shape_new_data[0]*self.iteration, datasetshape[1])
+        start_idx, stop_idx = self.get_datawriting_indices(new_data)
+
+        new_datasetshape = (np.max(datasetshape[0], stop_idx),
+                            datasetshape[1])
         self.dset.resize(new_datasetshape)
-        len_new_data = shape_new_data[0]
+        len_new_data = stop_idx-start_idx #np.shapeshape_new_data[0]
         if single_col:
-            self.dset[start_idx:,
+            self.dset[start_idx:stop_idx,
                       len(self.sweep_functions)] = new_data
         else:
-            self.dset[start_idx:,
+            self.dset[start_idx:stop_idx,
                       len(self.sweep_functions):] = new_data
 
         sweep_len = len(self.get_sweep_points().T)
         # Only add sweep points if these make sense (i.e. same shape as
         # new_data)
+
+        ######################
+        # DATA STORING BLOCK #
+        ######################
         if sweep_len == len_new_data:  # 1D sweep
             self.dset[:, 0] = self.get_sweep_points().T
         else:
@@ -723,6 +728,28 @@ class MeasurementControl(Instrument):
     def get_datetimestamp(self):
         return time.strftime('%Y%m%d_%H%M%S', time.localtime())
 
+    def get_datawriting_indices(self, new_data):
+        """
+        Calculates the start and stop indices required for
+        storing a hard measurement.
+        """
+        if len(np.shape(new_data)) == 1:
+            single_col = True
+            shape_new_data = (len(new_data), 1)
+        else:
+            single_col = False
+            shape_new_data = np.shape(new_data)
+
+        # resizing only for 1 set of new_data  now... needs to improve
+        shape_new_data = (shape_new_data[0], shape_new_data[1]+1)
+
+        max_sweep_points = np.shape(self.get_sweep_points())[0]
+        start_idx = int((shape_new_data[0]*(self.iteration-1))%max_sweep_points)
+
+        stop_idx = start_idx + shape_new_data[0]
+
+        return start_idx, stop_idx
+
     ####################################
     # Non-parameter get/set functions  #
     ####################################
@@ -871,10 +898,13 @@ class MeasurementControl(Instrument):
     def get_optimization_method(self):
         return self.optimization_method
 
+    ################################
+    # Actual parameters            #
+    ################################
+
     def get_idn(self):
         """
         Required as a standard interface for QCoDeS instruments.
         """
         return {'vendor': 'PycQED', 'model': 'MeasurementControl',
-        'serial': '', 'firmware': ''}
-
+                'serial': '', 'firmware': '2.0'}
