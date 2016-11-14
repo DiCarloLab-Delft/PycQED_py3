@@ -34,7 +34,8 @@ def make_figure(F_vec, idxs, Ncl,
                 fig_name='signal_noise',
                 Ncl_cont=None,
                 simple_std=None,
-                model_avg=None, model_std=None):
+                model_avg=None, model_std=None,
+                proj_avg=None, proj_std=None):
 
     if Ncl_cont is None:
         Ncl_cont = Ncl
@@ -80,6 +81,9 @@ def make_figure(F_vec, idxs, Ncl,
                 color=colors[1])
         ax.plot(Ncl_cont, np.array(avg3),
                 color=colors[2])
+    if proj_avg is not None:
+        ax.plot(Ncl_cont, np.array(proj_avg),
+                color=colors[3])
 
     # Data averages
     print(np.shape(mn_eps))
@@ -111,6 +115,9 @@ def make_figure(F_vec, idxs, Ncl,
                  color=colors[1])
         ax2.plot(Ncl_cont, np.array(std3),
                  color=colors[2])
+    if proj_std is not None:
+        ax2.plot(Ncl_cont, np.array(proj_std),
+                 color=colors[3])
 
     # simple model
     if simple_std is not None:
