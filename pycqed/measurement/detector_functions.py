@@ -1434,7 +1434,7 @@ class UHFQC_integrated_average_detector(Hard_Detector):
             self.value_names[i] = 'w{}'.format(channel)
             self.value_units[i] = 'V'
         self.rotate = rotate
-        if self.channels == [0, 1] or self.channels == [2, 3]:
+        if len(self.channels) == 2:
             self.value_names = ['I', 'Q']
             self.value_units = ['V', 'V']
         else:
@@ -1545,7 +1545,7 @@ class UHFQC_integration_logging_det(Hard_Detector):
         for i, channel in enumerate(self.channels):
             self.value_names[i] = 'w{}'.format(channel)
             self.value_units[i] = 'V'
-        if channels == [0, 1] or channels == [2, 3]:
+        if len(self.channels) == 2:
             self.value_names = ['I', 'Q']
             self.value_units = ['V', 'V']
         self.AWG = AWG

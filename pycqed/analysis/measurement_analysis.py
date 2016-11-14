@@ -1997,21 +1997,27 @@ class SSRO_Analysis(MeasurementAnalysis):
         self.no_fits = no_fits
         # plotting histograms of the raw shots on I and Q axis
 
-
-        try:
+        if len(channels)==1:
             shots_I_data = self.get_values(key=channels[0])
-            shots_Q_data = self.get_values(key=channels[1])
             shots_I_data_0, shots_I_data_1 = a_tools.zigzag(shots_I_data,
                                                 sample_0, sample_1, nr_samples)
-            shots_Q_data_0, shots_Q_data_1 = a_tools.zigzag(shots_Q_data,
-                                                sample_0, sample_1, nr_samples)
+            shots_Q_data_0 = shots_I_data_0*0
+            shots_Q_data_1 = shots_I_data_1*0
 
+        else:
+            try:
+                shots_I_data = self.get_values(key=channels[0])
+                shots_Q_data = self.get_values(key=channels[1])
+                shots_I_data_0, shots_I_data_1 = a_tools.zigzag(shots_I_data,
+                                                    sample_0, sample_1, nr_samples)
+                shots_Q_data_0, shots_Q_data_1 = a_tools.zigzag(shots_Q_data,
+                                                    sample_0, sample_1, nr_samples)
 
-        except(KeyError):  # used for different naming when using TD_meas shots
-            shots_I_data_0 = self.get_values(key='single_shot_I')[:, 0]
-            shots_I_data_1 = self.get_values(key='single_shot_I')[:, 1]
-            shots_Q_data_0 = self.get_values(key='single_shot_Q')[:, 0]
-            shots_Q_data_1 = self.get_values(key='single_shot_Q')[:, 1]
+            except(KeyError):  # used for different naming when using TD_meas shots
+                shots_I_data_0 = self.get_values(key='single_shot_I')[:, 0]
+                shots_I_data_1 = self.get_values(key='single_shot_I')[:, 1]
+                shots_Q_data_0 = self.get_values(key='single_shot_Q')[:, 0]
+                shots_Q_data_1 = self.get_values(key='single_shot_Q')[:, 1]
 
         # cutting off half data points (odd number of data points)
         min_len = np.min([np.size(shots_I_data_0), np.size(shots_I_data_1),
@@ -6389,3 +6395,4 @@ class Chevron_2D(object):
         if close_fig:
             plt.close(fig)
         return
+

@@ -199,11 +199,11 @@ DataT = qbt.Tektronix_driven_transmon('DataT', LO=LO, cw_source=Spec_source,
 station.add_component(DataT)
 
 # load settings onto qubits
-gen.load_settings_onto_instrument(AncB)
-gen.load_settings_onto_instrument(AncT)
-gen.load_settings_onto_instrument(DataB)
-gen.load_settings_onto_instrument(DataM)
-gen.load_settings_onto_instrument(DataT)
+gen.load_settings_onto_instrument(AncB)#, timestamp='20161111_165442')
+gen.load_settings_onto_instrument(AncT)#, timestamp='20161111_165442')
+gen.load_settings_onto_instrument(DataB)#, timestamp='20161111_165442')
+gen.load_settings_onto_instrument(DataM)#, timestamp='20161111_165442')
+gen.load_settings_onto_instrument(DataT)#, timestamp='20161111_165442')
 gen.load_settings_onto_instrument(HS)
 
 AncT.E_c(0.28e9)
