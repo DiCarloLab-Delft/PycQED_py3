@@ -354,7 +354,7 @@ q1 = DataT
 list_qubits = [q0, q1, AncB, DataM, DataB]
 for qubit in list_qubits:
     qubit.RO_fixed_point_correction(True)
-    qubit.RO_pulse_delay(25e-9)
+    qubit.RO_pulse_delay(15e-9)
     #qubit.RO_acq_averages(2**13)
 
 
