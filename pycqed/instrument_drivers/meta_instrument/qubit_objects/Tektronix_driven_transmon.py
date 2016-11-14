@@ -347,7 +347,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         elif self.RO_pulse_type() is 'MW_IQmod_pulse_UHFQC':
             eval('self._acquisition_instr.sigouts_{}_offset({})'.format(self.RO_I_channel(),self.RO_I_offset()))
             eval('self._acquisition_instr.sigouts_{}_offset({})'.format(self.RO_Q_channel(),self.RO_Q_offset()))
-            self._acquisition_instr.awg_sequence_acquisition_and_pulse_SSB(f_RO_mod=self.f_RO_mod(), RO_amp=self.RO_amp(), RO_pulse_length=self.RO_pulse_length(), acquisition_delay=270e-9)
+            #self._acquisition_instr.awg_sequence_acquisition_and_pulse_SSB(f_RO_mod=self.f_RO_mod(), RO_amp=self.RO_amp(), RO_pulse_length=self.RO_pulse_length(), acquisition_delay=270e-9)
         elif self.RO_pulse_type.get() is 'Gated_MW_RO_pulse':
             self.rf_RO_source.pulsemod_state.set('on')
             self.rf_RO_source.frequency(self.f_RO.get())
@@ -389,7 +389,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
 
         offset_I, offset_Q = mixer_carrier_cancellation_5014(
             AWG=self.AWG, SH=signal_hound, source=source, MC=self.MC,
-            AWG_channel1=AWG_channel1, AWG_channel2=AWG_channel2)
+            AWG_channel1=AWG_channel1, AWG_channel2=AWG_channel2, xtol=0.0003)
 
         if update:
             if offs_type == 'pulse':
@@ -640,7 +640,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         MC.run('Echo'+label+self.msmt_suffix)
 
         if analyze:
-            a = ma.Ramsey_analysis(auto=True, close_fig=close_fig)
+            a = ma.Ramsey_Analysis(auto=True, close_fig=close_fig, label='Echo')
             return a
 
     def measure_allxy(self, double_points=True,

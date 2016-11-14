@@ -99,27 +99,24 @@ class MeasurementControl:
                 self.measure_hard()
         elif self.sweep_functions[0].sweep_control == 'hard':
             self.iteration = 0
-            if len(self.sweep_functions) == 1:
-                self.detector_function.prepare(
-                    sweep_points=self.get_sweep_points())
-                self.get_measurement_preparetime()
+            self.complete = False
+
+            self.detector_function.prepare(
+                sweep_points=self.get_sweep_points())
+            self.get_measurement_preparetime()
+            self.measure_hard()
+            while not self.complete:
+                if len(self.sweep_functions) != 1:
+                    for i, sweep_function in enumerate(self.sweep_functions):
+                        x = self.get_sweep_points()[
+                            int(self.iteration*self.xlen)]
+                        if i != 0:
+                            sweep_function.set_parameter(x[i])
+                    self.detector_function.prepare(
+                        sweep_points=self.get_sweep_points()[0: self.xlen, 0])
+                else:
+                    self.detector_function.prepare(self.get_sweep_points())
                 self.measure_hard()
-            elif len(self.sweep_functions) == 2:
-                self.complete = False
-                self.get_measurement_preparetime()
-                for j in range(self.ylen):
-                    # added specifically for 2D hard sweeps
-                    if not self.complete:
-                        for i, sweep_function in enumerate(self.sweep_functions):
-                            x = self.get_sweep_points()[
-                                int(self.iteration*self.xlen)]
-                            if i != 0:
-                                sweep_function.set_parameter(x[i])
-                        self.detector_function.prepare(
-                            sweep_points=self.get_sweep_points()[0: self.xlen, 0])
-                        self.measure_hard()
-            else:
-                raise Exception('hard measurements have not been generalized to N-D yet')
         else:
             raise Exception('Sweep and Detector functions not of the same type.'
                             + 'Aborting measurement')
@@ -233,6 +230,10 @@ class MeasurementControl:
         else:
             self.print_progress_static_hard()
 
+        acquired_points = self.dset.shape[0]
+        total_nr_pts = len(self.get_sweep_points())
+        if acquired_points >= total_nr_pts:
+            self.complete = True  # Note is self.complete ever used?
         return new_data
 
     def measurement_function(self, x):
@@ -656,11 +657,6 @@ class MeasurementControl:
     def print_progress_static_hard(self):
         acquired_points = self.dset.shape[0]
         total_nr_pts = len(self.get_sweep_points())
-        if acquired_points == total_nr_pts:
-            self.complete = True  # Note is self.complete ever used?
-        elif acquired_points > total_nr_pts:
-            self.complete = True
-
         percdone = acquired_points*1./total_nr_pts*100
         elapsed_time = time.time() - self.begintime
         progress_message = "\r {percdone}% completed \telapsed time: "\

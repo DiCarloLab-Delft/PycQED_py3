@@ -54,7 +54,7 @@ def multi_pulse_elt(i, station, pulse_list):
         # exists to ensure that channel is not high when waiting for trigger
         last_pulse = el.add(pulse.SquarePulse(name='refpulse_0', channel='ch1',
                                               amplitude=0, length=1e-9,),
-                            start=100e-9)
+                            start=300e-9)
         for i, pulse_pars in enumerate(pulse_list):
             if pulse_pars['pulse_type'] == 'SSB_DRAG_pulse':
                 last_pulse = el.add(

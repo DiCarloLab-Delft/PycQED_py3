@@ -383,10 +383,10 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
         # For an explanation of the difference between the different
         # Fidelities look in the analysis script
         if raw:
-            self.value_names = ['F-raw', 'theta']
+            self.value_names = ['F_a', 'theta']
             self.value_units = [' ', 'rad']
         else:
-            self.value_names = ['F-raw', 'F corrected', 'SNR']
+            self.value_names = ['F_a', 'F_d', 'SNR']
             self.value_units = [' ', ' ', ' ']
         self.measurement_name = measurement_name
         self.MC = MC
@@ -403,15 +403,16 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
         self.close_fig = close_fig
         self.SSB = SSB
         self.IF=IF
+        self.nr_shots = nr_shots
         if 'CBox' in str(self.acquisition_instr):
             self.CBox = self.acquisition_instr
+
         elif 'UHFQC' in str(self.acquisition_instr):
             self.UHFQC = self.acquisition_instr
         self.nr_averages = nr_averages
         self.integration_length = integration_length
         self.weight_function_I = weight_function_I
         self.weight_function_Q = weight_function_Q
-        self.nr_shots=nr_shots
         print('weights', weight_function_I, weight_function_Q)
 
 
@@ -422,6 +423,7 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
                                        pulse_pars=self.pulse_pars,
                                        RO_pars=self.RO_pars,
                                        upload=self.upload))
+            self.MC.set_sweep_points(np.arange(self.nr_shots))
             if 'CBox' in str(self.acquisition_instr):
                 self.MC.set_detector_function(
                     det.CBox_integration_logging_det(self.acquisition_instr,
@@ -443,7 +445,7 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
                 self.MC.set_detector_function(
                     det.UHFQC_integration_logging_det(self.acquisition_instr,
                                                           self.AWG, channels=[self.weight_function_I,self.weight_function_Q],
-                                                          integration_length=self.integration_length, nr_shots=self.nr_shots))
+                                                          integration_length=self.integration_length, nr_shots=min(self.nr_shots, 256)))
                 if self.SSB:
                     self.UHFQC.prepare_SSB_weight_and_rotation(IF=self.IF, weight_function_I=self.weight_function_I, weight_function_Q=self.weight_function_Q)
                 else:
@@ -513,7 +515,7 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
                 self.MC.set_sweep_function(awg_swf.OffOn(
                                            pulse_pars=self.pulse_pars,
                                            RO_pars=self.RO_pars))
-
+                self.MC.set_sweep_points(np.arange(self.nr_shots))
                 self.MC.set_detector_function(
                     det.CBox_integration_logging_det(self.CBox, self.AWG, integration_length=self.integration_length))
 
@@ -572,14 +574,14 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
                 optimized_weights_I = (transient1_I-transient0_I)
                 optimized_weights_I = optimized_weights_I-np.mean(optimized_weights_I)
                 weight_scale_factor = 1./np.max(np.abs(optimized_weights_I))
-                optimized_weights_I = weight_scale_factor*optimized_weights_I
+                optimized_weights_I = np.array(weight_scale_factor*optimized_weights_I)
                 print("optimized weights I", optimized_weights_I)
 
 
                 optimized_weights_Q = (transient1_Q-transient0_Q)
                 optimized_weights_Q = optimized_weights_Q-np.mean(optimized_weights_Q)
                 weight_scale_factor = 1./np.max(np.abs(optimized_weights_Q))
-                optimized_weights_Q = weight_scale_factor*optimized_weights_Q
+                optimized_weights_Q = np.array(weight_scale_factor*optimized_weights_Q)
                 print("optimized weights Q", optimized_weights_Q)
 
                 eval('self.UHFQC.quex_wint_weights_{}_real(np.array(optimized_weights_I))'.format(self.weight_function_I))
@@ -600,19 +602,20 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
                     eval('self.UHFQC.quex_rot_{}_real(0.0)'.format(self.weight_function_Q))
                     eval('self.UHFQC.quex_rot_{}_imag(0.0)'.format(self.weight_function_Q))
 
-                eval('self.UHFQC.quex_wint_weights_{}_real()'.format(self.weight_function_I)) #disabling the other weight fucntions
-                eval('self.UHFQC.quex_wint_weights_{}_imag()'.format(self.weight_function_I)) #disabling the other weight fucntions
-                eval('self.UHFQC.quex_wint_weights_{}_real()'.format(self.weight_function_Q)) #disabling the other weight fucntions
-                eval('self.UHFQC.quex_wint_weights_{}_imag()'.format(self.weight_function_Q)) #disabling the other weight fucntions
+                # eval('self.UHFQC.quex_wint_weights_{}_real()'.format(self.weight_function_I)) #reading out weights as check
+                # eval('self.UHFQC.quex_wint_weights_{}_imag()'.format(self.weight_function_I)) #reading out weights as check
+                # eval('self.UHFQC.quex_wint_weights_{}_real()'.format(self.weight_function_Q)) #reading out weights as check
+                # eval('self.UHFQC.quex_wint_weights_{}_imag()'.format(self.weight_function_Q)) #reading out weights as check
 
 
                 self.MC.set_sweep_function(awg_swf.OffOn(
                                            pulse_pars=self.pulse_pars,
                                            RO_pars=self.RO_pars))
+                self.MC.set_sweep_points(np.arange(self.nr_shots))
                 self.MC.set_detector_function(
                     det.UHFQC_integration_logging_det(self.UHFQC, self.AWG,
                                                       channels=[self.weight_function_I,self.weight_function_Q],
-                                                      integration_length=self.integration_length))
+                                                      integration_length=self.integration_length, nr_shots=min(self.nr_shots, 256)))
         self.i += 1
         self.MC.run(name=self.measurement_name+'_'+str(self.i))
 
@@ -638,9 +641,9 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
             if nett_wait>0:
                 time.sleep(nett_wait)
             if self.raw:
-                return ana.F_raw, ana.theta
+                return ana.F_a, ana.theta
             else:
-                return ana.F_raw, ana.F_corrected, ana.SNR
+                return ana.F_a, ana.F_d, ana.SNR
 '''
     def acquire_data_point(self, *args, **kw):
         self.time_start = time.time()
@@ -739,8 +742,8 @@ class CBox_trace_error_fraction_detector(det.Soft_Detector):
         rot_mat = [np.cos(theta), -np.sin(theta),
                    np.sin(theta), np.cos(theta)]
         self.CBox.lin_trans_coeffs.set(rot_mat)
-        self.threshold = a.V_opt_raw  # allows
-        self.CBox.sig0_threshold_line.set(int(a.V_opt_raw))
+        self.threshold = a.V_th_a  # allows
+        self.CBox.sig0_threshold_line.set(int(a.V_th_a))
         self.sequence_swf.upload = True
         # make sure the sequence gets uploaded
         return int(self.threshold)

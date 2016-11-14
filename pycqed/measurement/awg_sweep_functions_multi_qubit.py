@@ -33,3 +33,30 @@ class two_qubit_off_on(swf.Hard_Sweep):
                                 RO_pars=self.RO_pars,
                                 return_seq=self.return_seq,
                                 verbose=self.verbose)
+
+
+class three_qubit_off_on(swf.Hard_Sweep):
+    def __init__(self, q0_pulse_pars, q1_pulse_pars, q2_pulse_pars, RO_pars, upload=True,
+                 return_seq=False, nr_samples=4, verbose=False):
+        super().__init__()
+        self.q0_pulse_pars = q0_pulse_pars
+        self.q1_pulse_pars = q1_pulse_pars
+        self.q2_pulse_pars = q2_pulse_pars
+        self.RO_pars = RO_pars
+        self.upload = upload
+        self.parameter_name = 'sample'
+        self.unit = '#'
+        self.sweep_points = np.arange(nr_samples)
+        self.verbose = verbose
+        self.return_seq = return_seq
+        self.name = 'three_qubit_off_on'
+
+
+    def prepare(self, **kw):
+        if self.upload:
+            sqs2.three_qubit_off_on(q0_pulse_pars=self.q0_pulse_pars,
+                                  q1_pulse_pars=self.q1_pulse_pars,
+                                  q2_pulse_pars=self.q2_pulse_pars,
+                                RO_pars=self.RO_pars,
+                                return_seq=self.return_seq,
+                                verbose=self.verbose)
