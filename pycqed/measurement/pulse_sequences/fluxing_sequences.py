@@ -6,9 +6,9 @@ try:
     from math import gcd
 except:  # Moved to math in python 3.5, this is to be 3.4 compatible
     from fractions import gcd
-from pycqed.waveform_control import element
-from pycqed.waveform_control import pulse
-from pycqed.waveform_control import sequence
+from pycqed.measurement.waveform_control import element
+from pycqed.measurement.waveform_control import pulse
+from pycqed.measurement.waveform_control import sequence
 from pycqed.measurement.pulse_sequences.standard_elements import multi_pulse_elt
 
 from importlib import reload
