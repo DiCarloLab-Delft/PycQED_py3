@@ -33,7 +33,7 @@ data_dir_dict = {'tud276606_FPGA_PC': 'D:\Experiments/CBox_Testing/Data',
                  'La_Maserati_Jr': 'D:\\Experiments\\1610_QcodesTests\\Data',
                  # 'La_Maserati_JrJr': 'D:\\Experimentsp7_Qcodes_5qubit\data',
                  'La_Maserati_JrJr': 'D:\\Experiments\\1607_Qcodes_5qubit\\data',
-                 'La_Vespa': 'D:\\Experiments\\161108_LaVespa_several_gap_resonators\\Data',
+                 'La_Vespa': 'D:\\Experiments\\161111_LaVespa_Intel_HR\\Data',
 
                  'Xiang_PC' : 'D:\PycQED\data',
                  'Serwans_Laptop': 'W:/tnw/NS/qt/Serwan/MuxMon/',
