@@ -997,13 +997,13 @@ def calculate_distance_ground_state(data_real, data_imag, percentile=70,
     return data_dist
 
 # def rotate_data_to_zero(data_I, data_Q, NoCalPoints):
-def zigzag(seq):
+def zigzag(seq, sample_0,sample_1, nr_samples):
     '''
     Splits a sequence in two sequences, one containing the odd entries, the
     other containing the even entries.
     e.g. in-> [0,1,2,3,4,5] -> out0 = [0,2,4] , out1[1,3,5]
     '''
-    return seq[::2], seq[1::2]
+    return seq[sample_0::nr_samples], seq[sample_1::nr_samples]
 
 def calculate_rotation_matrix(delta_I, delta_Q):
     '''
@@ -1089,7 +1089,27 @@ def rotate_and_normalize_data(data, cal_zero_points, cal_one_points,
 
     return [normalized_data, zero_coord, one_coord]
 
+def normalize_data_v3(data, cal_zero_points=np.arange(-4, -2, 1),
+                      cal_one_points=np.arange(-2, 0, 1), **kw):
+    '''
+    Normalizes data according to calibration points
+    Inputs:
+        data (numpy array) : 1D dataset that has to be normalized
+        cal_zero_points (range) : range specifying what indices in 'data'
+                                  correspond to zero
+        cal_one_points (range) : range specifying what indices in 'data'
+                                 correspond to one
+    '''
+    # Extract zero and one coordinates
+    I_zero = np.mean(data[cal_zero_points])
+    I_one = np.mean(data[cal_one_points])
+    # Translate the date
+    trans_data = data - I_zero
+    # Normalize the data
+    one_zero_dist = I_one-I_zero
+    normalized_data = trans_data/one_zero_dist
 
+    return normalized_data
 
 def datetime_from_timestamp(timestamp):
     if len(timestamp) == 14:

@@ -10,6 +10,24 @@ default_gauss_width = 10  # magic number should be removed,
 # note magic number only used in old mathematica seqs
 
 
+class File(swf.Hard_Sweep):
+    def __init__(self, filename, AWG, title=None, NoElements=None, upload=True):
+        self.upload = upload
+        self.AWG = AWG
+        if title:
+            self.name = title
+        else:
+            self.name = filename
+        self.filename = filename + '_FILE'
+        self.upload = upload
+        self.parameter_name = 'amplitude'
+        self.unit = 'V'
+
+    def prepare(self, **kw):
+        if self.upload:
+            self.AWG.set_setup_filename(self.filename)
+
+
 class Rabi(swf.Hard_Sweep):
     def __init__(self, pulse_pars, RO_pars, n=1, upload=True, return_seq=False):
         super().__init__()
@@ -26,6 +44,25 @@ class Rabi(swf.Hard_Sweep):
         if self.upload:
             sqs.Rabi_seq(amps=self.sweep_points,
                          pulse_pars=self.pulse_pars,
+                         RO_pars=self.RO_pars,
+                         n=self.n, return_seq=self.return_seq)
+
+
+class Flipping(swf.Hard_Sweep):
+    def __init__(self, pulse_pars, RO_pars, n=1, upload=True, return_seq=False):
+        super().__init__()
+        self.pulse_pars = pulse_pars
+        self.RO_pars = RO_pars
+        self.n = n
+        self.upload = upload
+        self.name = 'Rabi'
+        self.parameter_name = 'amplitude'
+        self.unit = 'V'
+        self.return_seq = return_seq
+
+    def prepare(self, **kw):
+        if self.upload:
+            sqs.Flipping_seq(pulse_pars=self.pulse_pars,
                          RO_pars=self.RO_pars,
                          n=self.n, return_seq=self.return_seq)
 
@@ -101,7 +138,6 @@ class chevron_length(swf.Hard_Sweep):
                                     self.RO_pars,
                                     self.flux_pulse_pars,
                                     distortion_dict=self.dist_dict)
-        self.AWG.start()
 
     def pre_upload(self, **kw):
         self.seq = fsqs.chevron_seq_length(self.length_vec,
@@ -111,6 +147,69 @@ class chevron_length(swf.Hard_Sweep):
                                     distortion_dict=self.dist_dict, return_seq=True)
 
 
+class repeat_swap(swf.Hard_Sweep):
+    def __init__(self, rep_max, mw_pulse_pars, RO_pars,
+                 flux_pulse_pars,dist_dict, AWG, upload=True, return_seq=False):
+        super().__init__()
+        self.rep_max = rep_max
+        self.mw_pulse_pars = mw_pulse_pars
+        self.RO_pars = RO_pars
+        self.flux_pulse_pars = flux_pulse_pars
+        self.dist_dict = dist_dict
+        self.upload = upload
+        self.name = 'Chevron'
+        self.parameter_name = 'SWAP pulses'
+        self.unit = '#'
+        self.return_seq = return_seq
+        self.AWG = AWG
+
+    def prepare(self, **kw):
+        if self.upload:
+            fsqs.repeat_swap(self.rep_max,
+                                    self.mw_pulse_pars,
+                                    self.RO_pars,
+                                    self.flux_pulse_pars,
+                                    distortion_dict=self.dist_dict)
+
+    def pre_upload(self, **kw):
+        self.seq = fsqs.repeat_swap(self.rep_max,
+                                    self.mw_pulse_pars,
+                                    self.RO_pars,
+                                    self.flux_pulse_pars,
+                                    distortion_dict=self.dist_dict, return_seq=True)
+
+
+class BusT1(swf.Hard_Sweep):
+    def __init__(self, times_vec, mw_pulse_pars, RO_pars,
+                 flux_pulse_pars, dist_dict, AWG, upload=True,
+                 return_seq=False):
+        super().__init__()
+        self.times_vec = times_vec
+        self.mw_pulse_pars = mw_pulse_pars
+        self.RO_pars = RO_pars
+        self.flux_pulse_pars = flux_pulse_pars
+        self.dist_dict = dist_dict
+        self.upload = upload
+        self.name = 'Chevron'
+        self.parameter_name = 'Time'
+        self.unit = 's'
+        self.return_seq = return_seq
+        self.AWG = AWG
+
+    def prepare(self, **kw):
+        if self.upload:
+            fsqs.BusT1(self.times_vec,
+                       self.mw_pulse_pars,
+                       self.RO_pars,
+                       self.flux_pulse_pars,
+                       distortion_dict=self.dist_dict)
+
+    def pre_upload(self, **kw):
+        self.seq = fsqs.BusT1(self.times_vec,
+                              self.mw_pulse_pars,
+                              self.RO_pars,
+                              self.flux_pulse_pars,
+                              distortion_dict=self.dist_dict, return_seq=True)
 
 class Ramsey_2nd_exc(swf.Hard_Sweep):
     def __init__(self, pulse_pars, pulse_pars_2nd,
@@ -190,7 +289,6 @@ class OffOn(swf.Hard_Sweep):
         self.pulse_pars = pulse_pars
         self.RO_pars = RO_pars
         self.upload = upload
-
         self.parameter_name = 'sample'
         self.unit = '#'
         self.name = pulse_comb
@@ -823,6 +921,23 @@ class Two_d_CBox_RB_seq(swf.Soft_Sweep):
         explicitly does not reupload the AWG sequence.
         '''
         self.CBox_RB_sweepfunction.prepare(upload_tek_seq=False)
+
+
+class Load_Sequence_Tek(swf.Hard_Sweep):
+    def __init__(self, AWG, sequence_name, seq_elements, upload=True):
+        super().__init__()
+        self.sweep_points = seq_elements
+        self.len = len(seq_elements)
+        self.name = sequence_name
+        self.parameter_name = 'amplitude'
+        self.unit = 'V'
+        self.upload = upload
+        self.sequence_name = sequence_name
+        self.AWG = AWG
+
+    def prepare(self, **kw):
+        if self.upload:
+            self.AWG.set_setup_filename(self.sequence_name)
 
 
 

@@ -38,7 +38,6 @@ def _test_core(test_pattern='test*.py', **kwargs):
 if __name__ == '__main__':
     import argparse
     import os
-    import multiprocessing as mp
 
     try:
         import coverage

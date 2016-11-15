@@ -10,6 +10,7 @@ Bugs:
 
 from qcodes import IPInstrument
 from qcodes import validators as vals
+import socket
 
 """
 FIXME: we would like to be able to choose the base class separately, so the
@@ -24,6 +25,14 @@ class SCPI(IPInstrument):
         super().__init__(name, address, port,
                          write_confirmation=False,  # required for QWG
                          **kwargs)
+
+        # send things immediately
+        self._socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+
+        # beef up buffer, to prevent socket.send() not sending all our data
+        # in one go
+        self._socket.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, 512*1024)
+
         # FIXME convert operation etc to parameters
         # IDN is implemented in the instrument base class
 
@@ -33,10 +42,18 @@ class SCPI(IPInstrument):
     def _recv(self):
         """
         Overwrites base IP recv command to ensuring read till EOM
+        FIXME: should be in parent class
         """
+        return self._socket.makefile().readline().rstrip()
+    ###
+    # Helpers
+    ###
 
-        resp = self._socket.makefile().readline().rstrip()
-        return resp
+    def readBinary(self, size):
+        return self._socket.recv(size)  # FIXME: should be in parent class
+
+    def writeBinary(self, binMsg):
+        self._socket.send(binMsg)       # FIXME: should be in parent class
 
     def ask_float(self, str):
         return float(self.ask(str))
@@ -114,15 +131,17 @@ class SCPI(IPInstrument):
     ###
 
     def binBlockWrite(self, binBlock, header):
-        ''' write IEEE488.2 binblock
-                Input:
-                        binBlock    bytearray
-                        header      string
+        '''
+        write IEEE488.2 binblock
+
+        Args:
+            binBlock (bytearray): binary data to send
+
+            header (string): command string to use
         '''
         totHdr = header + SCPI.buildHeaderString(len(binBlock))
         binMsg = totHdr.encode() + binBlock
-#       self.writeBinary(binMsg)
-        self._socket.send(binMsg)       # FIXME: hack
+        self.writeBinary(binMsg)
         self.write('')                  # add a Line Terminator
 
     def binBlockRead(self):
@@ -130,14 +149,15 @@ class SCPI(IPInstrument):
         ''' read IEEE488.2 binblock
         '''
         # get and decode header
-        headerA = self.readBinary(2)                        # consume '#N'
-        # FIXME: Matlab code
-        digitCnt = str2double(char(headerA(2)))
-        headerB = obj.readBinary(digitCnt)
-        byteCnt = str2double(char(headerB))
-
-        # get binblock
-        binBlock = obj.readBinary(byteCnt)
+        headerA = self.readBinary(2)                        # read '#N'
+        headerAstr = headerA.decode()
+        if(headerAstr[0] != '#'):
+            s = 'SCPI header error: received {}'.format(headerA)
+            raise RuntimeError(s)
+        digitCnt = int(headerAstr[1])
+        headerB = self.readBinary(digitCnt)
+        byteCnt = int(headerB.decode())
+        binBlock = self.readBinary(byteCnt)
         self.readBinary(2)                                  # consume <CR><LF>
         return binBlock
 
@@ -149,14 +169,3 @@ class SCPI(IPInstrument):
         digitCntStr = str(len(byteCntStr))
         binHeaderStr = '#' + digitCntStr + byteCntStr
         return binHeaderStr
-
-    @staticmethod
-    def getByteCntFromHeader(headerStr):
-        ''' decode IEEE488.2 binblock header
-        '''
-        # FIXME: old Matlab code
-        digitCnt = sscanf(headerStr, '#%1d')
-        formatString = sprintf('%%%dd', digitCnt)           # e.g. '%3d'
-        # byteCnt = sscanf(headerStr(3:end), formatString)        # NB: skip
-        # first '#N'
-        return byteCnt

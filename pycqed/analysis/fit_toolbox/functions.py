@@ -193,3 +193,16 @@ def get_eta(r_off,r_ol,r_cl, u_r_off = 0.003, u_r_ol = 0.003, u_r_cl = 0.003):
     deta_dr_off = eta/log(r_ol/r_off)*1./r_off
     u_eta = np.sqrt((deta_dr_ol*u_r_ol)**2 +(deta_dr_off*u_r_off)**2+(deta_dr_cl*u_r_cl)**2)
     return eta, u_eta
+
+
+def PSD(array, time_step):
+    """
+    PSD function by Niels
+    """
+    f_axis = np.fft.fftfreq(len(array), time_step)
+    idx = np.argsort(f_axis)
+    f_axis = f_axis[idx]
+    period = time_step*len(array)
+    psd = time_step*time_step/period*(np.abs(np.fft.fft(array)))**2
+    psd = psd[idx]
+    return f_axis[len(psd)/2:], psd[len(psd)/2:]

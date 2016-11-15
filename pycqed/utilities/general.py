@@ -219,3 +219,7 @@ def list_available_serial_ports():
         except (OSError, serial.SerialException):
             pass
     return result
+
+
+def add_suffix_to_dict_keys(inputDict, suffix):
+    return {str(key)+suffix : (value ) for key, value in inputDict.items()}

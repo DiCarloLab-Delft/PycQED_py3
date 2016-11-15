@@ -8,7 +8,6 @@ import numpy as np
 from qcodes.instrument.base import Instrument
 from qcodes.utils import validators as vals
 from fnmatch import fnmatch
-import zhinst.zishell as zis
 #from instrument_drivers.physical_instruments.ZurichInstruments import UHFQuantumController as ZI_UHFQC
 
 
@@ -20,11 +19,10 @@ class UHFQC(Instrument):
 
     Requirements:
     Installation instructions for Zurich Instrument Libraries.
-    1. install ziPython 3.5 ucs4 16.04 for 64bit Windows from http://www.zhinst.com/downloads
+    1. install ziPython 3.5 ucs4 16.04 for 64bit Windows from http://www.zhinst.com/downloads, https://people.zhinst.com/~niels/
     2. pip install dependencies: httplib2, plotly, pyqtgraph
-    3. manually paste zishell.py one directory above the zhinst directory (C:/Anaconda3/side) (can be found in transmon/inventory/firmware_Nielsb)
-    4. upload the latest firmware to the UHFQC by opening reboot.bat in 'Transmon\Inventory\ZurichInstruments\firmware_Nielsb\firmware_x'. WIth x the highest available number.
-    5. find out where sequences are stored by saving a sequence from the GUI and then check :"showLog" to see where it is stored. This is the location where AWG sequences can be loaded from.
+    3. upload the latest firmware to the UHFQC by opening reboot.bat in 'Transmon\Inventory\ZurichInstruments\firmware_Nielsb\firmware_x'. WIth x the highest available number.
+    4. find out where sequences are stored by saving a sequence from the GUI and then check :"showLog" to see where it is stored. This is the location where AWG sequences can be loaded from.
     misc: when device crashes, check the log file in
     EOM
     """
@@ -36,7 +34,7 @@ class UHFQC(Instrument):
             server_name:    (str) qcodes instrument server
             address:        (int) the address of the data server e.g. 8006
         '''
-
+        #self.socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1) #suggestion W vlothuizen
         t0 = time.time()
         super().__init__(name, server_name)
 
@@ -52,8 +50,8 @@ class UHFQC(Instrument):
 
         path = os.path.abspath(__file__)
         dir_path = os.path.dirname(path)
-        self._s_file_name = dir_path+'\\zi_parameter_files\\s_node_pars.txt'
-        self._d_file_name = dir_path+'\\zi_parameter_files\\d_node_pars.txt'
+        self._s_file_name = os.path.join(dir_path, 'zi_parameter_files', 's_node_pars.txt')
+        self._d_file_name = os.path.join(dir_path, 'zi_parameter_files', 'd_node_pars.txt')
 
         init=True
         try:
@@ -70,66 +68,68 @@ class UHFQC(Instrument):
             init=False
 
         for parameter in s_node_pars:
-            parname=parameter[0][9:].replace("/","_")
+            parname=parameter[0].replace("/","_")
+            parfunc="/"+device+"/"+parameter[0]
             if parameter[1]=='float':
                 self.add_parameter(
                     parname,
-                    set_cmd=self._gen_set_func(zis.setd, parameter[0]),
-                    get_cmd=self._gen_get_func(zis.getd, parameter[0]),
+                    set_cmd=self._gen_set_func(self.setd, parfunc),
+                    get_cmd=self._gen_get_func(self.getd, parfunc),
                     vals=vals.Numbers(parameter[2], parameter[3]))
             elif parameter[1]=='float_small':
                 self.add_parameter(
                     parname,
-                    set_cmd=self._gen_set_func(zis.setd, parameter[0]),
-                    get_cmd=self._gen_get_func(zis.getd, parameter[0]),
+                    set_cmd=self._gen_set_func(self.setd, parfunc),
+                    get_cmd=self._gen_get_func(self.getd, parfunc),
                     vals=vals.Numbers(parameter[2], parameter[3]))
             elif parameter[1]=='int_8bit':
                 self.add_parameter(
                     parname,
-                    set_cmd=self._gen_set_func(zis.seti, parameter[0]),
-                    get_cmd=self._gen_get_func(zis.geti, parameter[0]),
-                    vals=vals.Ints(parameter[2], parameter[3]))
+                    set_cmd=self._gen_set_func(self.seti, parfunc),
+                    get_cmd=self._gen_get_func(self.geti, parfunc),
+                    vals=vals.Ints(int(parameter[2]), int(parameter[3])))
             elif parameter[1]=='int':
                 self.add_parameter(
                     parname,
-                    set_cmd=self._gen_set_func(zis.seti, parameter[0]),
-                    get_cmd=self._gen_get_func(zis.geti, parameter[0]),
-                    vals=vals.Ints(parameter[2], parameter[3]))
+                    set_cmd=self._gen_set_func(self.seti, parfunc),
+                    get_cmd=self._gen_get_func(self.geti, parfunc),
+                    vals=vals.Ints(int(parameter[2]), int(parameter[3])))
             elif parameter[1]=='int_64':
                 self.add_parameter(
                     parname,
-                    set_cmd=self._gen_set_func(zis.seti, parameter[0]),
-                    get_cmd=self._gen_get_func(zis.geti, parameter[0]),
-                    vals=vals.Ints(parameter[2], parameter[3]))
+                    set_cmd=self._gen_set_func(self.seti, parfunc),
+                    get_cmd=self._gen_get_func(self.geti, parfunc),
+                    vals=vals.Ints(int(parameter[2]), int(parameter[3])))
             elif parameter[1]=='bool':
                 self.add_parameter(
                     parname,
-                    set_cmd=self._gen_set_func(zis.seti, parameter[0]),
-                    get_cmd=self._gen_get_func(zis.geti, parameter[0]),
-                    vals=vals.Ints(parameter[2], parameter[3]))
+                    set_cmd=self._gen_set_func(self.seti, parfunc),
+                    get_cmd=self._gen_get_func(self.geti, parfunc),
+                    vals=vals.Ints(int(parameter[2]), int(parameter[3])))
             else:
                 print("parameter {} type {} from from s_node_pars not recognized".format(parname,parameter[1]))
 
         for parameter in d_node_pars:
-            parname=parameter[0][9:].replace("/","_")
+            parname=parameter[0].replace("/","_")
+            parfunc="/"+device+"/"+parameter[0]
             if parameter[1]=='float':
                 self.add_parameter(
                     parname,
-                    get_cmd=self._gen_get_func(zis.getd, parameter[0]))
+                    get_cmd=self._gen_get_func(self.getd, parfunc))
             elif parameter[1]=='vector_g':
                 self.add_parameter(
                     parname,
-                    get_cmd=self._gen_get_func(zis.getv, parameter[0]))
+                    get_cmd=self._gen_get_func(self.getv, parfunc))
             elif parameter[1]=='vector_s':
                 self.add_parameter(
                     parname,
-                    set_cmd=self._gen_set_func(zis.setv, parameter[0]),
+                    set_cmd=self._gen_set_func(self.setv, parfunc),
                     vals=vals.Anything())
             elif parameter[1]=='vector_gs':
                 self.add_parameter(
                     parname,
-                    set_cmd=self._gen_set_func(zis.setv, parameter[0]),
-                    get_cmd=self._gen_get_func(zis.getv, parameter[0]),
+                    set_cmd=self._gen_set_func(self.setv, parfunc),
+                    get_cmd=self._gen_get_func(self.getv, parfunc),
                     vals=vals.Anything())
             else:
                 print("parameter {} type {} from d_node_pars not recognized".format(parname,parameter[1]))
@@ -138,8 +138,6 @@ class UHFQC(Instrument):
         self.add_parameter('AWG_file',
                            set_cmd=self._do_set_AWG_file,
                            vals=vals.Anything())
-        zis.connect_server('localhost', port)
-        zis.connect_device(self._device, 'USB')
         if init:
             self.load_default_settings()
         t1 = time.time()
@@ -158,18 +156,11 @@ class UHFQC(Instrument):
         LOG2_RL_AVG_CNT = 0
 
         # Load an AWG program (from Zurich Instruments/LabOne/WebServer/awg/src)
-        self.AWG_file('traditional.seqc')
-
-        # The AWG program uses userregs/0 to define the number o iterations in the loop
-        self.awgs_0_userregs_0(pow(2, LOG2_AVG_CNT)*pow(2, LOG2_RL_AVG_CNT))
+        self.awg_sequence_acquisition()
 
         # Turn on both outputs
         self.sigouts_0_on(1)
         self.sigouts_1_on(1)
-
-        # Configure the input averager length and averaging count
-        self.quex_iavg_length(4096)
-        self.quex_iavg_avgcnt(LOG2_AVG_CNT)
 
         # QuExpress thresholds on DIO (mode == 2), AWG control of DIO (mode == 1)
         self.dios_0_mode(2)
@@ -181,25 +172,13 @@ class UHFQC(Instrument):
         self.awgs_0_triggers_0_level(0.000000000)
         self.awgs_0_triggers_0_channel(2)
 
+
         # Straight connection, signal input 1 to channel 1, signal input 2 to channel 2
         self.quex_deskew_0_col_0(1.0)
         self.quex_deskew_0_col_1(0.0)
         self.quex_deskew_1_col_0(0.0)
         self.quex_deskew_1_col_1(1.0)
 
-        # Configure the weighted integration units with constant values, each channel gets
-        # one, two, three and four non-zero weights, respectively
-        self.quex_wint_weights_0_real(np.array([1.0]*1 + [0.0]*127))
-        self.quex_wint_weights_0_imag(np.array([1.0]*1 + [0.0]*127))
-        self.quex_wint_weights_1_real(np.array([1.0]*2 + [0.0]*126))
-        self.quex_wint_weights_1_imag(np.array([1.0]*2 + [0.0]*126))
-        self.quex_wint_weights_2_real(np.array([1.0]*3 + [0.0]*125))
-        self.quex_wint_weights_2_imag(np.array([1.0]*3 + [0.0]*125))
-        self.quex_wint_weights_3_real(np.array([1.0]*12 + [0.0]*116))
-        self.quex_wint_weights_3_imag(np.array([1.0]*12 + [0.0]*116))
-
-        # Length is set in units of 1 samples
-        self.quex_wint_length(4096)
         self.quex_wint_delay(0)
 
         # Setting the clock to external
@@ -249,31 +228,25 @@ class UHFQC(Instrument):
     def reconnect(self):
         zi_utils.autoDetect(self._daq)
 
+    def awg(self, filename):
+        print(filename)
+        with open(filename, 'r') as awg_file:
+            sourcestring = awg_file.read()
+            self.awg_string(sourcestring)
+
     def _do_set_AWG_file(self, filename):
-        zis.awg(filename)
+        self.awg('UHFLI_AWG_sequences/'+filename)
 
-        # code to upload AWG sequence as a string
-        # def awg(self, filename):
-        #         for device in self._devices:
-        #             h = self.daq.awgModule()
-        #             h.set('awgModule/device', device)
-        #             h.set('awgModule/index', 0)
-        #             h.execute()
-        #             h.set('awgModule/compiler/sourcefile', filename)
-        #             h.set('awgModule/compiler/start', 1)
-        #             h.set('awgModule/elf/file', '’)
 
-        # Now, if you would change it to:
+    def awg_string(self, sourcestring):
+        h = self._daq.awgModule()
+        h.set('awgModule/device', self._device)
+        h.set('awgModule/index', 0)
+        h.execute()
+        h.set('awgModule/compiler/sourcestring', sourcestring)
+        h.set('awgModule/compiler/start', 1)
+        h.set('awgModule/elf/file', '')
 
-        #  def awg(self, sourcestring):
-        #         for device in self._devices:
-        #             h = self.daq.awgModule()
-        #             h.set('awgModule/device', device)
-        #             h.set('awgModule/index', 0)
-        #             h.execute()
-        #             h.set('awgModule/compiler/sourcestring', sourcestring)
-        #             h.set('awgModule/compiler/start', 1)
-        #             h.set('awgModule/elf/file', '’)
 
     def close(self):
         self._daq.disconnectDevice(self._device)
@@ -294,6 +267,40 @@ class UHFQC(Instrument):
 
         return nodes
 
+    def single_acquisition(self, samples, acquisition_time=0.010, timeout=0, channels=set([0, 1])):
+        # Define the channels to use
+
+        paths = dict()
+        data = dict()
+        for c in channels:
+            paths[c] = '/' + self._device + '/quex/rl/data/{}'.format(c)
+            data[c] = []
+            self._daq.subscribe(paths[c])
+
+        #self._daq.setInt('/' + self._device + '/awgs/0/single', 1)
+        #self._daq.setInt('/' + self._device + '/awgs/0/enable', 1)
+
+        timeout = 0
+        gotem = [False]*len(channels)
+        while not all(gotem) and timeout < 100:
+            dataset = self._daq.poll(acquisition_time, timeout, 4, True)
+            for n, c in enumerate(channels):
+                p = paths[c]
+                if p in dataset:
+                    for v in dataset[p]:
+                        data[c] = np.concatenate((data[c], v['vector']))
+                    if len(data[c]) >= samples:
+                        gotem[n] = True
+
+            timeout += 1
+
+        if not all(gotem):
+            print("Error: Didn't get all results!")
+            for n, c in enumerate(channels):
+                print("    : Channel {}: Got {} of {} samples", c, len(data[c]), samples)
+            return (None, None)
+        # print("data type {}".format(type(data)))
+        return data
 
     def create_parameter_files(self):
         #this functions retrieves all possible settable and gettable parameters from the device.
@@ -302,8 +309,6 @@ class UHFQC(Instrument):
         s_node_pars=[]
         d_node_pars=[]
         patterns = ["awgs", "sigins", "sigouts", "quex", "dios","system/extclk"] #["quex/iavg", "quex/wint"]
-        s_file = open(self._s_file_name, 'w')
-        d_file = open(self._d_file_name, 'w')
         #json.dump([, s_file, default=int)
         #json.dump([, d_file, default=int)
         for pattern in patterns:
@@ -314,44 +319,48 @@ class UHFQC(Instrument):
             print(len(all_nodes))
             # extracting info from the setting nodes
             s_nodes = list(s_nodes)
-            default_values=zis.getd(s_nodes, True)
+            default_values=self.getd(s_nodes)
             for s_node in s_nodes:
-                zis.setd(s_node,  1e12)
-            max_values = zis.getd(s_nodes, True)
+                self.setd(s_node,  1e12)
+            max_values = self.getd(s_nodes)
             for s_node in s_nodes:
-                zis.setd(s_node, -1e12)
-            min_values = zis.getd(s_nodes, True)
-            float_values = [np.pi]*len(s_nodes)
-            for i, s_node in enumerate(s_nodes):
-                if np.pi > max_values[i]:
-                    float_values[i] = max_values[i]/np.pi;
-                zis.setd(s_node, float_values[i])
-            actual_float_values = zis.getd(s_nodes, True)
-            node_types = ['']*len(s_nodes)
-            for i, s_node in enumerate(s_nodes):
-                #self.setd(node,default_values[i])
-                fraction, integer = np.modf(actual_float_values[i])
-                if fraction != 0:
-                    node_types[i] = 'float'
-                    if min_values[i]==max_values[i]:
-                        node_types[i]='float_small'
-                        min_values[i]=0
-                    elif abs(min_values[i])<0.01:
-                        min_values[i]=0
+                self.setd(s_node, -1e12)
+            min_values = self.getd(s_nodes)
+            float_values = dict.fromkeys(s_nodes)
+            for s_node in s_nodes:
+                if np.pi > max_values[s_node]:
+                    float_values[s_node] = max_values[s_node]/np.pi;
                 else:
-                    node_types[i] = 'int'
-                    min_values[i]=0
-                    if  max_values[i]==3567587328:
-                        node_types[i] = 'int_64'
-                        max_values[i]=4294967295
-                    elif  max_values[i]==1:
-                        node_types[i] = 'bool'
-                    elif max_values[i]==0:
-                        max_values[i]=255
-                        node_types[i] = 'int_8bit'
-                    elif max_values[i]>4294967295:
-                        node_types[i] = 'float'
-                line=[s_node, node_types[i], min_values[i], max_values[i]]
+                    float_values[s_node] = np.pi
+                self.setd(s_node, float_values[s_node])
+            actual_float_values = self.getd(s_nodes)
+
+            node_types = dict.fromkeys(s_nodes)
+            for s_node in sorted(s_nodes):
+                #self.setd(node,default_values[s_node])
+                fraction, integer = np.modf(actual_float_values[s_node])
+                if fraction != 0:
+                    node_types[s_node] = 'float'
+                    if min_values[s_node]==max_values[s_node]:
+                        node_types[s_node]='float_small'
+                        min_values[s_node]=0
+                    elif abs(min_values[s_node])<0.01:
+                        min_values[s_node]=0
+                else:
+                    node_types[s_node] = 'int'
+                    min_values[s_node]=0
+                    if  max_values[s_node]==3567587328:
+                        node_types[s_node] = 'int_64'
+                        max_values[s_node]=4294967295
+                    elif  max_values[s_node]==1:
+                        node_types[s_node] = 'bool'
+                    elif max_values[s_node]==0:
+                        max_values[s_node]=255
+                        node_types[s_node] = 'int_8bit'
+                    elif max_values[s_node]>4294967295:
+                        node_types[s_node] = 'float'
+
+                line=[s_node.replace('/' + self._device + '/', ''), node_types[s_node], min_values[s_node], max_values[s_node]]
                 print(line)
                 s_node_pars.append(line)
                 #json.dump(line, s_file, indent=2, default=int)
@@ -359,19 +368,19 @@ class UHFQC(Instrument):
 
             #extracting info from the data nodes
             d_nodes = list(d_nodes)
-            #default_values=self.getd(d_nodes, True)
+            #default_values=self.getd(d_nodes)
             default_values=np.zeros(len(d_nodes))
             node_types = ['']*len(d_nodes)
 
             for i, d_node in enumerate(d_nodes):
                 try:
-                    answer=zis.getv(d_node)
+                    answer=self.getv(d_node)
                     if isinstance(answer, dict):
                         value=answer['value'][0]
                         node_types[i]='float'
                     elif  isinstance(answer, list):
                         try:
-                            zis.setv(d_node,np.array([0,0,0]))
+                            self.setv(d_node,np.array([0,0,0]))
                             node_types[i]='vector_gs'
                         except:
                             value=answer[0]['vector']
@@ -380,183 +389,226 @@ class UHFQC(Instrument):
                         print("unknown type")
                 except:
                     node_types[i]='vector_s'
-                line=[d_node, node_types[i]]#, default_values[i]]
+                line=[d_node.replace('/' + self._device + '/', ''), node_types[i]]#, default_values[i]]
                 print(line)
                 d_node_pars.append(line)
                 #json.dump(line, d_file, indent=2, default=int)
 
-        json.dump(s_node_pars, s_file, default=int, indent=2)
-        json.dump(d_node_pars, d_file, default=int, indent=2)
-        s_file.close()
-        d_file.close()
+        with open(self._s_file_name, 'w') as s_file:
+            json.dump(s_node_pars, s_file, default=int, indent=2)
 
-    def prepare_SSB_weight_and_rotation(self, IF):
+        with open(self._d_file_name, 'w') as d_file:
+            json.dump(d_node_pars, d_file, default=int, indent=2)
+
+    def prepare_SSB_weight_and_rotation(self, IF,  weight_function_I=0, weight_function_Q=1):
         trace_length = 4096
         tbase = np.arange(0, trace_length/1.8e9, 1/1.8e9)
-        cosI = np.cos(2*np.pi*IF*tbase)
-        sinI = np.sin(2*np.pi*IF*tbase)
-        self.quex_wint_weights_0_real(np.array(cosI))
-        self.quex_wint_weights_0_imag(np.array(sinI))
-        self.quex_wint_weights_1_real(np.array(sinI))
-        self.quex_wint_weights_1_imag(np.array(cosI))
-        self.quex_rot_0_real(1.0)
-        self.quex_rot_0_imag(1.0)
-        self.quex_rot_1_real(1.0)
-        self.quex_rot_1_imag(-1.0)
+        cosI = np.array(np.cos(2*np.pi*IF*tbase))
+        sinI = np.array(np.sin(2*np.pi*IF*tbase))
+        eval('self.quex_wint_weights_{}_real(np.array(cosI))'.format(weight_function_I))
+        eval('self.quex_wint_weights_{}_imag(np.array(sinI))'.format(weight_function_I))
+        eval('self.quex_wint_weights_{}_real(np.array(sinI))'.format(weight_function_Q))
+        eval('self.quex_wint_weights_{}_real(np.array(cosI))'.format(weight_function_Q))
+        eval('self.quex_rot_{}_real(1.0)'.format(weight_function_I))
+        eval('self.quex_rot_{}_imag(1.0)'.format(weight_function_I))
+        eval('self.quex_rot_{}_real(1.0)'.format(weight_function_Q))
+        eval('self.quex_rot_{}_imag(-1.0)'.format(weight_function_Q))
 
-    def prepare_DSB_weight_and_rotation(self, IF):
+    def prepare_DSB_weight_and_rotation(self, IF, weight_function_I=0, weight_function_Q=1):
         trace_length = 4096
         tbase = np.arange(0, trace_length/1.8e9, 1/1.8e9)
-        cosI = np.cos(2*np.pi*IF*tbase)
-        sinI = np.sin(2*np.pi*IF*tbase)
-        self.quex_wint_weights_0_real(np.array(cosI))
-        self.quex_wint_weights_0_imag(np.array(sinI)*0)
-        self.quex_wint_weights_1_real(np.array(sinI))
-        self.quex_wint_weights_1_imag(np.array(cosI)*0)
-        self.quex_rot_0_real(1.0)
-        self.quex_rot_0_imag(0.0)
-        self.quex_rot_1_real(1.0)
-        self.quex_rot_1_imag(0.0)
+        cosI = np.array(np.cos(2*np.pi*IF*tbase))
+        sinI = np.array(np.sin(2*np.pi*IF*tbase))
+        eval('self.quex_wint_weights_{}_real(np.array(cosI))'.format(weight_function_I))
+        eval('self.quex_wint_weights_{}_real(np.array(sinI))'.format(weight_function_I))
+        eval('self.quex_wint_weights_{}_real(np.array(sinI))'.format(weight_function_Q))
+        eval('self.quex_wint_weights_{}_real(np.array(cosI))'.format(weight_function_Q))
+        eval('self.quex_rot_{}_real(1.0)'.format(weight_function_I))
+        eval('self.quex_rot_{}_imag(0.0)'.format(weight_function_I))
+        eval('self.quex_rot_{}_real(1.0)'.format(weight_function_Q))
+        eval('self.quex_rot_{}_imag(0.0)'.format(weight_function_Q))
+
+    def _make_full_path(self, paths):
+        full_paths = []
+        for p in paths:
+            if p[0] == '/':
+                full_paths.append(p)
+            else:
+                full_paths.append('/' + self._device + '/' + p)
+        return full_paths
+
+    def seti(self, path, value):
+        # Handle absolute path
+        if path[0] == '/':
+            self._daq.setInt(path, int(value))
+        else:
+            self._daq.setInt('/' + self._device + '/' + path, int(value))
+
+    def setd(self, path, value):
+        # Handle absolute path
+        if path[0] == '/':
+            self._daq.setDouble(path, float(value))
+        else:
+            self._daq.setDouble('/' + self._device + '/' + path, float(value))
+
+    def get(self, paths, convert=None):
+        if type(paths) is not list:
+            paths = [ paths ]
+            single = 1
+        else:
+            single = 0
+
+        paths = self._make_full_path(paths)
+        values = {}
+
+        for p in paths:
+            self._daq.getAsEvent(p)
+
+        while len(values) < len(paths):
+            tmp = self._daq.poll(0.001, 500, 4, True)
+            for p in tmp:
+                if convert:
+                    values[p] = convert(tmp[p]['value'][0])
+                else:
+                    values[p] = tmp[p]['value'][0]
+
+        if single:
+            return values[paths[0]]
+        else:
+            return values
+
+    def geti(self, paths):
+        return self.get(paths, int)
+
+    def getd(self, paths):
+        return self.get(paths, float)
+
+    def getv(self, paths):
+        if type(paths) is not list:
+            paths = [ paths ]
+            single = 1
+        else:
+            single = 0
+
+        paths = self._make_full_path(paths)
+        values = {}
+
+        for p in paths:
+            self._daq.getAsEvent(p)
+
+        tries = 0
+        while len(values) < len(paths) and tries < 10:
+            try:
+                tmp = self._daq.poll(0.001, 500, 4, True)
+                for p in tmp:
+                    values[p] = tmp[p]
+            except ZIException:
+                pass
+
+        if single:
+            return values[paths[0]]
+        else:
+            return values
+
+    def setv(self, path, value):
+        # Handle absolute path
+        if path[0] == '/':
+            self._daq.vectorWrite(path, value)
+        else:
+            self._daq.vectorWrite('/' + self._device + '/' + path, value)
 
 
-    # def render_weights(self, wave_name, show=True, time_units='lut_index',
-    #             reload_pulses=True):
-    #     if reload_pulses:
-    #         self.generate_standard_pulses()
-    #     fig, ax = plt.subplots(1, 1)
-    #     if time_units == 'lut_index':
-    #         x = np.arange(len(self._wave_dict[wave_name][0]))
-    #         ax.set_xlabel('Lookuptable index (i)')
-    #         ax.vlines(128, self._voltage_min, self._voltage_max, linestyle='--')
-    #     elif time_units == 's':
-    #         x = (np.arange(len(self._wave_dict[wave_name][0]))
-    #              / self.sampling_rate.get())
-    #         ax.set_xlabel('time (s)')
-    #         ax.vlines(128 / self.sampling_rate.get(),
-    #                   self._voltage_min, self._voltage_max, linestyle='--')
 
-    #     ax.plot(x, self._wave_dict[wave_name][0],
-    #             marker='o', label=wave_name+' chI')
-    #     ax.plot(x, self._wave_dict[wave_name][1],
-    #             marker='o', label=wave_name+' chQ')
-    #     ax.set_ylabel('Amplitude (V)')
-    #     ax.set_axis_bgcolor('gray')
-    #     ax.axhspan(self._voltage_min, self._voltage_max, facecolor='w',
-    #                linewidth=0)
-    #     ax.legend()
-    #     ax.set_ylim(self._voltage_min*1.1, self._voltage_max*1.1)
-    #     ax.set_xlim(0, x[-1])
-    #     if show:
-    #         plt.show()
-    #     return fig, ax
+    ## sequencer functions
 
-    # def setd(self, path, value):
-    #     # Handle absolute path
-    #     if path[0] == '/':
-    #         self._daq.setDouble(path, value)
-    #     else:
-    #         self._daq.setDouble('/' + self._device + '/' + path, value)
+    def awg_sequence_acquisition_and_pulse(self, Iwave, Qwave, acquisition_delay):
+        if np.max(Iwave)>1.0 or np.min(Iwave)<-1.0:
+            raise KeyError("exceeding AWG range for I channel, all values should be withing +/-1")
+        elif np.max(Qwave)>1.0 or np.min(Qwave)<-1.0:
+            raise KeyError("exceeding AWG range for Q channel, all values should be withing +/-1")
+        elif len(Iwave)>1493:
+            raise KeyError("exceeding max AWG wave lenght of 1493 samples for I channel, trying to upload {} samples".format(len(Iwave)))
+        elif len(Qwave)>1493:
+            raise KeyError("exceeding max AWG wave lenght of 1493 samples for Q channel, trying to upload {} samples".format(len(Qwave)))
 
-    # def seti(self, path, value):
-    #     # Handle absolute path
-    #     if path[0] == '/':
-    #         self._daq.setInt(path, value)
-    #     else:
-    #         self._daq.setInt('/' + self._device + '/' + path, value)
+        Iwave_strip=",".join(str(bit) for bit in Iwave)
+        Qwave_strip=",".join(str(bit) for bit in Qwave)
+        wave_I_string = "wave Iwave = vect("+Iwave_strip+");\n"
+        wave_Q_string = "wave Qwave = vect("+Qwave_strip+");\n"
 
-    # def setv(self, path, value):
-    #     # Handle absolute path
-    #     if path[0] == '/':
-    #         self._daq.vectorWrite(path, value)
-    #     else:
-    #         self._daq.vectorWrite('/' + self._device + '/' + path, value)
-
-    # def geti(self, paths, deep=True):
-    #     if type(paths) is not list:
-    #         paths = [ paths ]
-    #         single = 1
-    #     else:
-    #         single = 0
-
-    #     values = []
-    #     for p in paths:
-    #         if p[0] == '/':
-    #             if deep:
-    #                 self._daq.getAsEvent(p)
-    #                 tmp = self._daq.poll(0.1, 500, 4, True)
-    #                 if p in tmp:
-    #                     values.append(tmp[p]['value'][0])
-    #             else:
-    #                 values.append(self._daq.getInt(p))
-    #         else:
-    #             tmp_p = '/' + self._device + '/' + p
-    #             if deep:
-    #                 self._daq.getAsEvent(tmp_p)
-    #                 tmp = self._daq.poll(0.1, 500, 4, True)
-    #                 if tmp_p in tmp:
-    #                     values.append(tmp[tmp_p]['value'][0])
-    #             else:
-    #                 values.append(self._daq.getInt(tmp_p))
-    #     if single:
-    #         return values[0]
-    #     else:
-    #         return values
-
-    # def getd(self, paths, deep=True):
-    #     if type(paths) is not list:
-    #         paths = [ paths ]
-    #         single = 1
-    #     else:
-    #         single = 0
-
-    #     values = []
-    #     for p in paths:
-    #         if p[0] == '/':
-    #             if deep:
-    #                 self._daq.getAsEvent(p)
-    #                 tmp = self._daq.poll(0.1, 500, 4, True)
-    #                 if p in tmp:
-    #                     values.append(tmp[p]['value'][0])
-    #             else:
-    #                 values.append(self._daq.getDouble(p))
-    #         else:
-    #             tmp_p = '/' + self._device + '/' + p
-    #             if deep:
-    #                 self._daq.getAsEvent(tmp_p)
-    #                 tmp = self._daq.poll(0.1, 500, 4, True)
-    #                 if tmp_p in tmp:
-    #                     values.append(tmp[tmp_p]['value'][0])
-    #             else:
-    #                 values.append(self._daq.getDouble(tmp_p))
-    #     if single:
-    #         return values[0]
-    #     else:
-    #         return values
-
-    # def getv(self, paths):
-    #     if type(paths) is not list:
-    #         paths = [ paths ]
-    #         single = 1
-    #     else:
-    #         single = 0
-
-    #     values = []
-    #     for p in paths:
-    #         if p[0] == '/':
-    #             self._daq.getAsEvent(p)
-    #             tmp = self._daq.poll(0.5, 500, 4, True)
-    #             if p in tmp:
-    #                 values.append(tmp[p])
-    #         else:
-    #             tmp_p = '/' + self._device + '/' + p
-    #             self._daq.getAsEvent(tmp_p)
-    #             tmp = self._daq.poll(0.5, 500, 4, True)
-    #             if tmp_p in tmp:
-    #                 values.append(tmp[tmp_p])
-    #     if single:
-    #         return values[0]
-    #     else:
-    #         return values
+        delay_samples = int(acquisition_delay*1.8e9/8)
+        delay_string='\twait({});\n'.format(delay_samples)
 
 
+        preamble="""
+const TRIGGER1  = 0x000001;
+const WINT_TRIG = 0x000010;
+const IAVG_TRIG = 0x000020;
+const WINT_EN   = 0x0f0000;
+
+setTrigger(WINT_EN);
+var loop_cnt = getUserReg(0);
+var RO_TRIG;
+if(getUserReg(1)){
+  RO_TRIG=IAVG_TRIG;
+}else{
+  RO_TRIG=WINT_TRIG;
+}\n"""
+
+        loop_start="""
+repeat(loop_cnt) {
+\twaitDigTrigger(1, 0);
+\twaitDigTrigger(1, 1);
+\tplayWave(Iwave,Qwave);\n"""
+
+
+        end_string="""
+\tsetTrigger(WINT_EN +RO_TRIG);
+\tsetTrigger(WINT_EN);
+\twaitWave();
+}
+wait(300);
+setTrigger(0);"""
+
+        string = preamble+wave_I_string+wave_Q_string+loop_start+delay_string+end_string
+        self.awg_string(string)
+
+    def awg_sequence_acquisition(self):
+        string="""
+const TRIGGER1  = 0x000001;
+const WINT_TRIG = 0x000010;
+const IAVG_TRIG = 0x000020;
+const WINT_EN   = 0x0f0000;
+
+setTrigger(WINT_EN);
+var loop_cnt = getUserReg(0);
+var RO_TRIG;
+if(getUserReg(1)){
+  RO_TRIG=IAVG_TRIG;
+}else{
+  RO_TRIG=WINT_TRIG;
+}
+
+repeat(loop_cnt) {
+\twaitDigTrigger(1, 0);
+\twaitDigTrigger(1, 1);\n
+\tsetTrigger(WINT_EN +RO_TRIG);
+\tsetTrigger(WINT_EN);
+\twait(300);
+}
+setTrigger(0);"""
+        self.awg_string(string)
+
+
+
+    def awg_sequence_acquisition_and_pulse_SSB(self, f_RO_mod, RO_amp, RO_pulse_length, acquisition_delay):
+        f_sampling=1.8e9
+        samples=RO_pulse_length*f_sampling
+        array=np.arange(int(samples))
+        sinwave=RO_amp*np.sin(2*np.pi*array*f_RO_mod/f_sampling)
+        coswave=RO_amp*np.cos(2*np.pi*array*f_RO_mod/f_sampling)
+        Iwave = coswave+sinwave;
+        Qwave = coswave-sinwave;
+        # Iwave, Qwave = PG.mod_pulse(np.ones(samples), np.zeros(samples), f=f_RO_mod, phase=0, sampling_rate=f_sampling)
+        self.awg_sequence_acquisition_and_pulse(Iwave, Qwave, acquisition_delay)
 

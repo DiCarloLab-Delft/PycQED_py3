@@ -29,6 +29,11 @@ class Flux_Control(Instrument):
                            set_cmd=self.do_set_transfer_matrix,
                            get_cmd=self.do_get_transfer_matrix,
                            vals=vals.Anything())
+        self.add_parameter('inv_transfer_matrix',
+                           label='Transfer Matrix',
+                           set_cmd=self.do_set_inv_transfer_matrix,
+                           get_cmd=self.do_get_inv_transfer_matrix,
+                           vals=vals.Anything())
         self.add_parameter('flux_offsets', units='mV',
                            label='Flux offsets',
                            set_cmd=self.do_set_flux_offsets,
@@ -46,28 +51,34 @@ class Flux_Control(Instrument):
                            vals=vals.Anything())
 
     def do_set_transfer_matrix(self, matrix):
-        self.transfer_matrix = matrix
+        self._transfer_matrix = matrix
     def do_get_transfer_matrix(self):
-        return self.transfer_matrix
+        return self._transfer_matrix
+
+    def do_set_inv_transfer_matrix(self, matrix):
+        self._inv_transfer_matrix = matrix
+    def do_get_inv_transfer_matrix(self):
+        return self._inv_transfer_matrix
 
     def do_set_flux_offsets(self, vector):
-        self.flux_offsets = vector
+        self._flux_offsets = vector
     def do_get_flux_offsets(self):
-        return self.flux_offsets
+        return self._flux_offsets
 
     def do_set_flux_vector(self, vector):
-        currents = np.dot(np.linalg.inv(self.transfer_matrix),
-                          (vector-self.flux_offsets))
-        for i in range(len(self.dac_mapping)):
-            self.IVVI._set_dac(self.dac_mapping[i], currents[i])
+        currents = np.dot(self._inv_transfer_matrix,
+                          (vector-self._flux_offsets))
+        for i in range(len(self._dac_mapping)):
+            self.IVVI._set_dac(self._dac_mapping[i], currents[i])
+        return currents
     def do_get_flux_vector(self):
-        currents = np.zeros(len(self.dac_mapping))
-        for i in range(len(self.dac_mapping)):
-            currents[i] = self.IVVI._get_dac(self.dac_mapping[i])
-        flux_vector = np.dot(self.transfer_matrix, currents) + self.flux_offsets
+        currents = np.zeros(len(self._dac_mapping))
+        for i in range(len(self._dac_mapping)):
+            currents[i] = self.IVVI._get_dac(self._dac_mapping[i])
+        flux_vector = np.dot(self._transfer_matrix, currents) + self._flux_offsets
         return flux_vector
 
     def do_set_dac_mapping(self, vector):
-        self.dac_mapping = vector
+        self._dac_mapping = vector
     def do_get_dac_mapping(self):
-        return self.dac_mapping
+        return self._dac_mapping

@@ -6,6 +6,7 @@ import h5py
 from matplotlib import pyplot as plt
 from pycqed.analysis import analysis_toolbox as a_tools
 from pycqed.analysis import fitting_models as fit_mods
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 import scipy.optimize as optimize
 import lmfit
 from collections import Counter  # used in counting string fractions
@@ -16,7 +17,14 @@ from pycqed.analysis.tools import data_manipulation as dm_tools
 import imp
 import math
 from math import erfc
-from scipy.signal import argrelextrema
+from scipy.signal import argrelextrema,argrelmax,argrelmin
+
+try:
+    from nathan_plotting_tools import *
+except:
+    pass
+from pycqed.analysis import ramiro_analysis as RA
+
 imp.reload(dm_tools)
 
 
@@ -934,6 +942,119 @@ class chevron_optimization_v1(TD_Analysis):
 
         return sum_max+sum_min
 
+class chevron_optimization_v2(TD_Analysis):
+    def __init__(self, NoCalPoints=4, center_point=31, make_fig=True,
+                 zero_coord=None, one_coord=None, cal_points=None,
+                 plot_cal_points=True, **kw):
+        super(chevron_optimization_v2, self).__init__(**kw)
+
+    def run_default_analysis(self,
+                             close_main_fig=True,  **kw):
+        super(chevron_optimization_v2, self).run_default_analysis(**kw)
+        measured_values = a_tools.normalize_data_v3(self.measured_values[0])
+        self.cost_value_1, self.period = self.sum_cost(self.sweep_points*1e9,
+                                                       measured_values)
+        self.cost_value_2 = self.swap_cost(self.sweep_points*1e9,
+                                           measured_values)
+        self.cost_value = [self.cost_value_1, self.cost_value_2]
+
+        fig, ax = plt.subplots(1, figsize=(8, 6))
+
+        min_idx, max_idx = self.return_max_min(self.sweep_points*1e9,
+                                               measured_values, 1)
+        ax.plot(self.sweep_points*1e9, measured_values, 'b-')
+        ax.plot(self.sweep_points[min_idx]*1e9, measured_values[min_idx], 'r*')
+        ax.plot(self.sweep_points[max_idx]*1e9, measured_values[max_idx], 'g*')
+        ax.plot(self.period*0.5, self.cost_value_2, 'b*', label='SWAP cost')
+        ax.set_ylim(-0.05, 1.05)
+        ax.text(35, 0.05, r'%.3f'%(self.cost_value_1), color='red')
+        ax.xaxis.label.set_fontsize(13)
+        ax.yaxis.label.set_fontsize(13)
+        ax.set_xlabel('Time (ns)')
+        ax.set_ylabel(r'$F |1\rangle$')
+
+        ax.set_title('%s: Chevorn slice: Cost functions'%self.timestamp_string)
+
+        self.save_fig(fig, fig_tight=False, **kw)
+
+    def analysis_on_fig(self, ax):
+        measured_values = a_tools.normalize_data_v3(self.measured_values[0])
+        self.cost_value_1, self.period = self.sum_cost(self.sweep_points*1e9,
+                                                       measured_values)
+        self.cost_value_2 = self.swap_cost(self.sweep_points*1e9,
+                                           measured_values)
+        self.cost_value = [self.cost_value_1, self.cost_value_2]
+
+        min_idx, max_idx = self.return_max_min(self.sweep_points*1e9,
+                                               measured_values, 1)
+        ax.plot(self.sweep_points*1e9, measured_values, 'b-')
+        ax.plot(self.sweep_points[min_idx]*1e9, measured_values[min_idx], 'r*')
+        ax.plot(self.sweep_points[max_idx]*1e9, measured_values[max_idx], 'g*')
+        ax.plot(self.period*0.5, self.cost_value_2, 'b*', label='SWAP cost')
+        ax.set_ylim(-0.05, 1.05)
+        ax.text(35, 0.05, r'%.3f'%(self.cost_value_1), color='red')
+        ax.xaxis.label.set_fontsize(13)
+        ax.yaxis.label.set_fontsize(13)
+        ax.set_xlabel('Time (ns)')
+        ax.set_ylabel(r'$F |1\rangle$')
+
+        ax.set_title('%s: Chevorn slice: Cost functions'%self.timestamp_string)
+
+
+    def return_max_min(self, data_x, data_y, window):
+        x_points = data_x[:-4]
+        y_points = a_tools.smooth(data_y[:-4],window_len=window)
+        return argrelmin(y_points), argrelmax(y_points)
+
+    def get_period(self, min_array, max_array):
+        all_toghether = np.concatenate((min_array, max_array))
+        sorted_vec = np.sort(all_toghether)
+        diff = sorted_vec[1:] - sorted_vec[:-1]
+        avg = np.mean(diff)
+        std = np.std(diff)
+        diff_filtered = np.where(np.abs(diff-avg)<std, diff, np.nan)
+        diff_filtered = diff_filtered[~np.isnan(diff_filtered)]
+    #     diff_filtered = diff
+        return 2.*np.mean(diff_filtered), np.std(diff_filtered)
+
+    def spec_power(self, data_x, data_y):
+        x_points = data_x[:-4]
+        y_points = data_y[:-4]
+        min_idx, max_idx = self.return_max_min(data_x, data_y, 1)
+        period, st = self.get_period(data_x[min_idx], data_x[max_idx])
+        f = 1./period
+
+        output_fft = np.real_if_close(np.fft.rfft(y_points))
+        ax_fft = np.fft.rfftfreq(len(y_points),
+                                 d=x_points[1]-x_points[0])
+        order_mask = np.argsort(ax_fft)
+        y = output_fft[order_mask]
+        y = y/np.sum(np.abs(y))
+        return -np.interp(f,ax_fft,np.abs(y))
+
+    def sum_cost(self, data_x, data_y):
+        x_points = data_x[:-4]
+        y_points = data_y[:-4]
+        min_idx, max_idx = self.return_max_min(data_x, data_y, 4)
+        period, st = self.get_period(data_x[min_idx], data_x[max_idx])
+        num_periods = np.floor(x_points[-1]/period)
+
+        sum_min = 0.
+        for i in range(int(num_periods)):
+            sum_min += np.interp((i+0.5)*period, x_points, y_points)
+        sum_max = 0.
+        for i in range(int(num_periods)):
+            sum_max += 1.-np.interp(i*period, x_points, y_points)
+
+        return sum_max+sum_min, period
+
+    def swap_cost(self, data_x, data_y):
+        x_points = data_x[:-4]
+        y_points = data_y[:-4]
+        min_idx, max_idx = self.return_max_min(data_x, data_y, 4)
+        period, st = self.get_period(data_x[min_idx], data_x[max_idx])
+        return np.interp(period*0.5, x_points, y_points)
+
 class Rabi_Analysis(TD_Analysis):
     def __init__(self, label='Rabi', **kw):
         kw['label'] = label
@@ -994,6 +1115,30 @@ class Rabi_Analysis(TD_Analysis):
                 params=params)
             self.save_fitted_parameters(fit_res=self.fit_res[i],
                                         var_name=self.value_names[i])
+
+class TD_UHFQC(TD_Analysis):
+    def __init__(self, NoCalPoints=4, center_point=31, make_fig=True,
+                 zero_coord=None, one_coord=None, cal_points=None,
+                 plot_cal_points=True, **kw):
+        super(TD_UHFQC, self).__init__(**kw)
+
+    def run_default_analysis(self,
+                             close_main_fig=True,  **kw):
+        super(TD_UHFQC, self).run_default_analysis(**kw)
+        measured_values = a_tools.normalize_data_v3(self.measured_values[0])
+
+        fig, ax = plt.subplots(1, figsize=(8, 6))
+
+        ax.plot(self.sweep_points*1e9, measured_values, '-o')
+        ax.set_ylim(-0.05, 1.05)
+        ax.xaxis.label.set_fontsize(13)
+        ax.yaxis.label.set_fontsize(13)
+        ax.set_xlabel('Time (ns)')
+        ax.set_ylabel(r'$F |1\rangle$')
+
+        ax.set_title('%s: TD Scan'%self.timestamp_string)
+
+        self.save_fig(fig, fig_tight=False, **kw)
 
 
 class Echo_analysis(TD_Analysis):
@@ -1840,17 +1985,27 @@ class SSRO_Analysis(MeasurementAnalysis):
         self.rotate = kw.pop('rotate',True)
         super(self.__class__, self).__init__(**kw)
 
-    def run_default_analysis(self, rotate=True, no_fits=False,
+    def run_default_analysis(self, rotate=True,
+                             nr_samples=2,
+                             sample_0=0,
+                             sample_1=1,
+                             channels=['I','Q'],
+                             no_fits=False,
                              print_fit_results=False, **kw):
 
         self.add_analysis_datagroup_to_file()
         self.no_fits = no_fits
         # plotting histograms of the raw shots on I and Q axis
+
+
         try:
-            shots_I_data = self.get_values(key='I')
-            shots_Q_data = self.get_values(key='Q')
-            shots_I_data_0, shots_I_data_1 = a_tools.zigzag(shots_I_data)
-            shots_Q_data_0, shots_Q_data_1 = a_tools.zigzag(shots_Q_data)
+            shots_I_data = self.get_values(key=channels[0])
+            shots_Q_data = self.get_values(key=channels[1])
+            shots_I_data_0, shots_I_data_1 = a_tools.zigzag(shots_I_data,
+                                                sample_0, sample_1, nr_samples)
+            shots_Q_data_0, shots_Q_data_1 = a_tools.zigzag(shots_Q_data,
+                                                sample_0, sample_1, nr_samples)
+
 
         except(KeyError):  # used for different naming when using TD_meas shots
             shots_I_data_0 = self.get_values(key='single_shot_I')[:, 0]
@@ -2819,8 +2974,9 @@ class T1_Analysis(TD_Analysis):
             ax.text(0.4, 0.95, textstr, transform=ax.transAxes,
                     fontsize=11, verticalalignment='top',
                     bbox=self.box_props)
-            self.save_fig(fig, figname=self.measurementstring+'_' +
-                          self.value_names[i], **kw)
+            self.save_fig(fig, figname=self.measurementstring+'_Fit', **kw)
+            # self.save_fig(fig, figname=self.measurementstring+'_' +
+            #               self.value_names[i], **kw)
             self.save_fig(self.figarray, figname=self.measurementstring, **kw)
         if close_file:
             self.data_file.close()
@@ -3780,7 +3936,12 @@ class Homodyne_Analysis(MeasurementAnalysis):
 
     def run_default_analysis(self, print_fit_results=False,
                              close_file=False, fitting_model='hanger',
-                             show_guess=False, show=False, **kw):
+                             show_guess=False, show=False,
+                             fit_window=None, **kw):
+        '''
+        fit_window allows to select the windows of data to fit.
+        Example: fit_window=[100,-100]
+        '''
         super(self.__class__, self).run_default_analysis(
             close_file=False, **kw)
         self.add_analysis_datagroup_to_file()
@@ -3795,7 +3956,7 @@ class Homodyne_Analysis(MeasurementAnalysis):
         self.max_frequency = self.sweep_points[max_index]
 
         self.peaks = a_tools.peak_finder((self.sweep_points),
-                                         self.measured_values[0])
+                                         self.measured_powers)
 
         if self.peaks['dip'] is not None:    # look for dips first
             f0 = self.peaks['dip']
@@ -3810,15 +3971,24 @@ class Homodyne_Analysis(MeasurementAnalysis):
             # If this error is raised, it should continue the analysis but
             # not use it to update the qubit object
 
-        if fitting_model == 'hanger':
-            HangerModel = fit_mods.SlopedHangerAmplitudeModel
+        if 'hanger' in fitting_model:
+            if fitting_model == 'hanger':
+                HangerModel = fit_mods.SlopedHangerAmplitudeModel
+            elif fitting_model == 'simple_hanger': # this in not working at the moment (need to be fixed)
+                HangerModel = fit_mods.HangerAmplitudeModel
             # added reject outliers to be robust agains CBox data acq bug.
             # this should have no effect on regular data acquisition and is
             # only used in the guess.
-            amplitude_guess = (max(dm_tools.reject_outliers(
-                                   self.measured_powers)) -
-                               min(dm_tools.reject_outliers(
-                                   self.measured_powers)))
+
+            # Stefano: amplitude guess is the max value of the signal (out of resonance)
+            #          not the diffference max-min.
+            #          I comment this line out, and revrite it.
+            # amplitude_guess = (max(dm_tools.reject_outliers(
+            #                        self.measured_powers)) -
+            #                    min(dm_tools.reject_outliers(
+            #                        self.measured_powers)))
+            amplitude_guess = max(dm_tools.reject_outliers(self.measured_values[0]))
+
             # Creating parameters and estimations
             S21min = (min(dm_tools.reject_outliers(self.measured_values[0])) /
                       max(dm_tools.reject_outliers(self.measured_values[0])))
@@ -3826,24 +3996,45 @@ class Homodyne_Analysis(MeasurementAnalysis):
             Q = kw.pop('Q', f0 / abs(self.min_frequency - self.max_frequency))
             Qe = abs(Q / abs(1 - S21min))
 
+            # Note: input to the fit function is in GHz for convenience
             HangerModel.set_param_hint('f0', value=f0*1e-9,
-                                       min=min(self.sweep_points*1e-9),
-                                       max=max(self.sweep_points*1e-9))
+                                       min=min(self.sweep_points)*1e-9,
+                                       max=max(self.sweep_points)*1e-9)
             HangerModel.set_param_hint('A', value=amplitude_guess)
-            HangerModel.set_param_hint('Q', value=Q)
-            HangerModel.set_param_hint('Qe', value=Qe)
+            HangerModel.set_param_hint('Q', value=Q, min=1, max=50e6)
+            HangerModel.set_param_hint('Qe', value=Qe, min=1, max=50e6)
             # NB! Expressions are broken in lmfit for python 3.5 this has
             # been fixed in the lmfit repository but is not yet released
             # the newest upgrade to lmfit should fix this (MAR 18-2-2016)
-            # HangerModel.set_param_hint('Qi', expr='1./(1./Q-1./Qe*cos(theta))',
-            #                            vary=False)
-            # HangerModel.set_param_hint('Qc', expr='Qe/cos(theta)', vary=False)
+            HangerModel.set_param_hint('Qi', expr='1./(1./Q-1./Qe*cos(theta))',
+                                       vary=False)
+            HangerModel.set_param_hint('Qc', expr='Qe/cos(theta)', vary=False)
             HangerModel.set_param_hint('theta', value=0, min=-np.pi/2,
                                        max=np.pi/2)
             HangerModel.set_param_hint('slope', value=0, vary=True)
             self.params = HangerModel.make_params()
-            fit_res = HangerModel.fit(data=self.measured_powers,
-                                      f=self.sweep_points, verbose=False)
+
+
+            if fit_window == None:
+                data_x = self.sweep_points
+                data_y = self.measured_values[0]
+            else:
+                data_x = self.sweep_points[fit_window[0]:fit_window[1]]
+                data_y_temp = self.measured_values[0]
+                data_y = data_y_temp[fit_window[0]:fit_window[1]]
+
+            # make sure that frequencies are in Hz
+            if np.floor(data_x[0]/1e8)==0: # frequency is defined in GHz
+                data_x = data_x*1e9
+
+
+            # Stefano: fit needs to be done on linear data, not the power.
+            #          Commenting this line and write the proper fit
+            # fit_res = HangerModel.fit(data=self.measured_powers,
+            #                           f=self.sweep_points, verbose=False)
+            fit_res = HangerModel.fit(data=data_y,
+                                      f=data_x, verbose=False)
+
 
         elif fitting_model == 'lorentzian':
             LorentzianModel = fit_mods.LorentzianModel
@@ -3886,15 +4077,39 @@ class Homodyne_Analysis(MeasurementAnalysis):
 
         fig, ax = self.default_ax()
         textstr = '$f_{\mathrm{center}}$ = %.4f $\pm$ (%.3g) GHz' % (
-            fit_res.params['f0'].value, fit_res.params['f0'].stderr)
+            fit_res.params['f0'].value, fit_res.params['f0'].stderr) + '\n' \
+            '$Qc$ = %.1f $\pm$ (%.1f)' % (fit_res.params['Qc'].value, fit_res.params['Qc'].stderr) + '\n' \
+            '$Qi$ = %.1f $\pm$ (%.1f)' % (fit_res.params['Qi'].value, fit_res.params['Qi'].stderr)
+
+        # textstr = '$f_{\mathrm{center}}$ = %.4f $\pm$ (%.3g) GHz' % (
+        #     fit_res.params['f0'].value, fit_res.params['f0'].stderr)
+
         ax.text(0.05, 0.95, textstr, transform=ax.transAxes, fontsize=11,
                 verticalalignment='top', bbox=self.box_props)
-        self.plot_results_vs_sweepparam(x=self.sweep_points,
-                                        y=self.measured_powers,
-                                        fig=fig, ax=ax,
-                                        xlabel=self.xlabel,
-                                        ylabel=str('Power (arb. units)'),
-                                        save=False)
+
+
+        if 'hanger' in fitting_model:
+            self.plot_results_vs_sweepparam(x=self.sweep_points,
+                                            y=self.measured_values[0],
+                                            fig=fig, ax=ax,
+                                            xlabel=self.xlabel,
+                                            ylabel=str('S21_mag (arb. units)'),
+                                            save=False)
+
+        elif fitting_model == 'lorentzian':
+            self.plot_results_vs_sweepparam(x=self.sweep_points,
+                                            y=self.measured_powers,
+                                            fig=fig, ax=ax,
+                                            xlabel=self.xlabel,
+                                            ylabel=str('Power (arb. units)'),
+                                            save=False)
+
+
+        if fit_window == None:
+            data_x = self.sweep_points
+        else:
+            data_x = self.sweep_points[fit_window[0]:fit_window[1]]
+
         if show_guess:
             ax.plot(self.sweep_points, fit_res.init_fit, 'k--')
         ax.plot(self.sweep_points, fit_res.best_fit, 'r-')
@@ -3902,7 +4117,7 @@ class Homodyne_Analysis(MeasurementAnalysis):
         plt.plot(f0*1e9, fit_res.eval(f=f0*1e9), 'o', ms=8)
         if show:
             plt.show()
-        self.save_fig(fig, xlabel=self.xlabel, ylabel='Power', **kw)
+        self.save_fig(fig, xlabel=self.xlabel, ylabel='Mag', **kw)
         if close_file:
             self.data_file.close()
         return fit_res
@@ -4974,6 +5189,7 @@ class butterfly_analysis(MeasurementAnalysis):
     def __init__(self,  auto=True, label='Butterfly', close_file=True,
                  timestamp=None,
                  threshold=None,
+                 threshold_init=None,
                  theta_in=0,
                  initialize=False,
                 digitize=True,
@@ -4994,7 +5210,11 @@ class butterfly_analysis(MeasurementAnalysis):
 
         # if close_file:
         #     self.data_file.close()
+
         if initialize:
+            if threshold_init==None:
+                threshold_init=threshold
+
             #reshuffeling the data to endup with two arrays for the diffeent input states
             shots=np.size(self.data)
             shots_per_mmt = np.floor_divide(shots,6)
@@ -5013,10 +5233,10 @@ class butterfly_analysis(MeasurementAnalysis):
             self.data_exc[:,0] = m0_off
             self.data_exc[:,1] = m1_off
             self.data_exc[:,2] = m2_off
-            self.data_exc = dm_tools.postselect(threshold=threshold,
+            self.data_exc = dm_tools.postselect(threshold=threshold_init,
                                               data=self.data_exc,
                                               positive_case=case)
-            self.data_rel = dm_tools.postselect(threshold=threshold,
+            self.data_rel = dm_tools.postselect(threshold=threshold_init,
                                               data=self.data_rel,
                                               positive_case=case)
             self.data_exc_post = self.data_exc[:,1:]
@@ -5402,3 +5622,765 @@ def fit_qubit_frequency(sweep_points, data, mode='dac',
 
         fit_res = Qubit_freq_mod.fit(data=data, flux=sweep_points)
     return fit_res
+
+# class SSRO_Analysis_multi_qubit(MeasurementAnalysis):
+#     '''
+#     Analysis class for Single Shot Readout when using multiplexed readout of n qubits.
+#     That ar prepared respectively in 00...0 to 11...11 with the last number being the least significant qubit.
+#     Weight functions w0, w1 target I and Q of q0 and w2n-1, wn target qn
+#     Scripts finds optimum rotation of IQ plane leaving all information in the
+#     I-quadrature.
+#     Then, for both On and Off datasets unbinned s-curves are fitted with the
+#     sum of two gaussians. From the fits two fidelity numbers are extracted:
+
+#     outputs two fidelity numbers:
+#         - F: the maximum separation between the two double gauss fits
+#         - F_corrected: the maximum separation between the largest normalized
+#                     gausses of both double gauss fits
+#                     this thereby aims to correct the data for
+#                     - imperfect pulses
+#                     - relaxation
+#                     - residual excitation
+#                     This figure of merit is unstable for low (<0.30 fidelity)
+#     outputs one optimum voltage
+#         -V_opt: the optimum threshold voltage is equal for both definitions of
+#                 fidelity.
+
+#     Nofits option is added to skip the double gaussian fitting and extract
+#     the optimum threshold and fidelity from cumulative histograms.
+#     '''
+
+#     def __init__(self, **kw):
+#         kw['h5mode'] = 'r+'
+#         self.rotate = kw.pop('rotate',True)
+#         super(self.__class__, self).__init__(**kw)
+
+#     def run_default_analysis(self,
+#                              rotate=True,
+#                              nr_qubits=1,
+#                              no_fits=False,
+#                              print_fit_results=False, **kw):
+
+#         self.add_analysis_datagroup_to_file()
+#         self.no_fits = no_fits
+#         # plotting histograms of the raw shots on I and Q axis
+#         # Extract I and Q data based on name of variable.
+#         self.get_naming_and_values()
+#         for qubit in nr_qubits:
+#             channels = [qubit*2, qubit*2+1]
+#             shots_I_{}.format(qubit) = self.measured_values[channels[0]] #these contain all samples
+#             shots_Q_{}.format(qubit) = self.measured_values[channels[1]]
+#             sample_0 = 0
+#             sample_1 = 2**(nr_qubits-1) #selecting the 1 for the qubit and 0 for all others
+#             shots_I_{}_0.format(qubit), shots_I_{}_1.format(qubit) = a_tools.zigzag(shots_I_{}_{}.format(sample, qubit),
+#                                             sample_0, sample_1, nr_samples)
+#             shots_Q_{}_0.format(qubit), shots_Q_{}_1.format(qubit) = a_tools.zigzag(shots_Q_{}_{}.format(sample, qubit),
+#                                             sample_0, sample_1, nr_samples)
+
+#         # rotating IQ-plane to transfer all information to the I-axis
+#         if self.rotate:
+#             theta, shots_I_1_rot, shots_I_0_rot = \
+#                 self.optimize_IQ_angle(shots_I_1, shots_Q_1,
+#                                        shots_I_0, shots_Q_0, min_len,
+#                                        **kw)
+#             self.theta = theta
+#         else:
+#             self.theta = 0
+#             shots_I_1_rot = shots_I_1
+#             shots_I_0_rot = shots_I_0
+
+#             cmap = kw.pop('cmap', 'viridis')
+#             #plotting 2D histograms of mmts with pulse
+
+
+#             n_bins = 120  # the bins we want to have around our data
+#             I_min = min(min(shots_I_0), min(shots_I_1))
+#             I_max = max(max(shots_I_0), max(shots_I_1))
+#             Q_min = min(min(shots_Q_0), min(shots_Q_1))
+#             Q_max = max(max(shots_Q_0), max(shots_Q_1))
+#             edge = max(abs(I_min), abs(I_max), abs(Q_min), abs(Q_max))
+#             H0, xedges0, yedges0 = np.histogram2d(shots_I_0, shots_Q_0,
+#                                            bins=n_bins,
+#                                            range=[[I_min, I_max],
+#                                                   [Q_min, Q_max]],
+#                                            normed=True)
+#             H1, xedges1, yedges1 = np.histogram2d(shots_I_1, shots_Q_1,
+#                                            bins=n_bins,
+#                                            range=[[I_min, I_max,],
+#                                                   [Q_min, Q_max,]],
+#                                            normed=True)
+#             fig, axarray = plt.subplots(nrows=1, ncols=2)
+#             axarray[0].tick_params(axis='both', which='major',
+#                                    labelsize=5, direction='out')
+#             axarray[1].tick_params(axis='both', which='major',
+#                                    labelsize=5, direction='out')
+
+#             plt.subplots_adjust(hspace=20)
+
+#             axarray[0].set_title('2D histogram, pi pulse')
+#             im1 = axarray[0].imshow(np.transpose(H1), interpolation='nearest', origin='low',
+#                                     extent=[xedges1[0], xedges1[-1],
+#                                             yedges1[0], yedges1[-1]], cmap=cmap)
+#             axarray[0].set_xlabel('Int. I (V)')
+#             axarray[0].set_ylabel('Int. Q (V)')
+#             axarray[0].set_xlim(-edge, edge)
+#             axarray[0].set_ylim(-edge, edge)
+
+#             # plotting 2D histograms of mmts with no pulse
+#             axarray[1].set_title('2D histogram, no pi pulse')
+#             im0 = axarray[1].imshow(np.transpose(H0), interpolation='nearest', origin='low',
+#                                     extent=[xedges0[0], xedges0[-1], yedges0[0],
+#                                     yedges0[-1]], cmap=cmap)
+#             axarray[1].set_xlabel('Int. I (V)')
+#             axarray[1].set_ylabel('Int. Q (V)')
+#             axarray[1].set_xlim(-edge, edge)
+#             axarray[1].set_ylim(-edge, edge)
+
+
+#             self.save_fig(fig, figname='SSRO_Density_Plots', **kw)
+
+#             self.avg_0_I = np.mean(shots_I_0)
+#             self.avg_1_I = np.mean(shots_I_1)
+#             self.avg_0_Q = np.mean(shots_Q_0)
+#             self.avg_1_Q = np.mean(shots_Q_1)
+#         # making gaussfits of s-curves
+
+#         self.no_fits_analysis(shots_I_1_rot, shots_I_0_rot, min_len,
+#                               **kw)
+#         if self.no_fits is False:
+#             self.s_curve_fits(shots_I_1_rot, shots_I_0_rot, min_len,
+#                               **kw)
+#         self.finish(**kw)
+
+#     def optimize_IQ_angle(self, shots_I_1, shots_Q_1, shots_I_0,
+#                           shots_Q_0, min_len, plot_2D_histograms=True,
+#                           **kw):
+#         cmap = kw.pop('cmap', 'viridis')
+#         #plotting 2D histograms of mmts with pulse
+
+
+#         n_bins = 120  # the bins we want to have around our data
+#         I_min = min(min(shots_I_0), min(shots_I_1))
+#         I_max = max(max(shots_I_0), max(shots_I_1))
+#         Q_min = min(min(shots_Q_0), min(shots_Q_1))
+#         Q_max = max(max(shots_Q_0), max(shots_Q_1))
+#         edge = max(abs(I_min), abs(I_max), abs(Q_min), abs(Q_max))
+#         H0, xedges0, yedges0 = np.histogram2d(shots_I_0, shots_Q_0,
+#                                        bins=n_bins,
+#                                        range=[[I_min, I_max],
+#                                               [Q_min, Q_max]],
+#                                        normed=True)
+#         H1, xedges1, yedges1 = np.histogram2d(shots_I_1, shots_Q_1,
+#                                        bins=n_bins,
+#                                        range=[[I_min, I_max,],
+#                                               [Q_min, Q_max,]],
+#                                        normed=True)
+
+#         if plot_2D_histograms:
+#             fig, axarray = plt.subplots(nrows=1, ncols=2)
+#             axarray[0].tick_params(axis='both', which='major',
+#                                    labelsize=5, direction='out')
+#             axarray[1].tick_params(axis='both', which='major',
+#                                    labelsize=5, direction='out')
+
+#             plt.subplots_adjust(hspace=20)
+
+#             axarray[0].set_title('2D histogram, pi pulse')
+#             im1 = axarray[0].imshow(np.transpose(H1), interpolation='nearest', origin='low',
+#                                     extent=[xedges1[0], xedges1[-1],
+#                                             yedges1[0], yedges1[-1]], cmap=cmap)
+#             axarray[0].set_xlabel('Int. I (V)')
+#             axarray[0].set_ylabel('Int. Q (V)')
+#             axarray[0].set_xlim(-edge, edge)
+#             axarray[0].set_ylim(-edge, edge)
+
+#             # plotting 2D histograms of mmts with no pulse
+#             axarray[1].set_title('2D histogram, no pi pulse')
+#             im0 = axarray[1].imshow(np.transpose(H0), interpolation='nearest', origin='low',
+#                                     extent=[xedges0[0], xedges0[-1], yedges0[0],
+#                                     yedges0[-1]], cmap=cmap)
+#             axarray[1].set_xlabel('Int. I (V)')
+#             axarray[1].set_ylabel('Int. Q (V)')
+#             axarray[1].set_xlim(-edge, edge)
+#             axarray[1].set_ylim(-edge, edge)
+
+
+#             self.save_fig(fig, figname='SSRO_Density_Plots', **kw)
+
+#         #this part performs 2D gaussian fits and calculates coordinates of the maxima
+#         def gaussian(height, center_x, center_y, width_x, width_y):
+#             width_x = float(width_x)
+#             width_y = float(width_y)
+#             return lambda x, y: height*np.exp(-(((center_x-x)/width_x)**2+(
+#                                               (center_y-y)/width_y)**2)/2)
+
+#         def fitgaussian(data):
+#             params = moments(data)
+#             errorfunction = lambda p: np.ravel(gaussian(*p)(*np.indices(
+#                                                data.shape))-data)
+#             p, success = optimize.leastsq(errorfunction, params)
+#             return p
+
+#         def moments(data):
+#             total = data.sum()
+#             X, Y = np.indices(data.shape)
+#             x = (X*data).sum()/total
+#             y = (Y*data).sum()/total
+#             col = data[:, int(y)]
+#             eps = 1e-8  # To prevent division by zero
+#             width_x = np.sqrt(abs((np.arange(col.size)-y)**2*col).sum()/(
+#                               col.sum()+eps))
+#             row = data[int(x), :]
+#             width_y = np.sqrt(abs((np.arange(row.size)-x)**2*row).sum()/(
+#                               row.sum()+eps))
+#             height = data.max()
+#             return height, x, y, width_x, width_y
+
+#         data0 = H0
+#         params0 = fitgaussian(data0)
+#         fit0 = gaussian(*params0)
+#         data1 = H1
+#         params1 = fitgaussian(data1)
+#         fit1 = gaussian(*params1)
+#         # interpolating to find the gauss top x and y coordinates
+#         x_lin = np.linspace(0, n_bins, n_bins+1)
+#         y_lin = np.linspace(0, n_bins, n_bins+1)
+#         f_x_1 = interp1d(x_lin, xedges1)
+#         x_1_max = f_x_1(params1[1])
+#         f_y_1 = interp1d(y_lin, yedges1)
+#         y_1_max = f_y_1(params1[2])
+
+#         f_x_0 = interp1d(x_lin, xedges0)
+#         x_0_max = f_x_0(params0[1])
+#         f_y_0 = interp1d(y_lin, yedges0)
+#         y_0_max = f_y_0(params0[2])
+
+#         # following part will calculate the angle to rotate the IQ plane
+#         # All information is to be rotated to the I channel
+#         y_diff = y_1_max-y_0_max
+#         x_diff = x_1_max-x_0_max
+#         theta = -np.arctan2(y_diff,x_diff)
+
+#         shots_I_1_rot = np.cos(theta)*shots_I_1 - np.sin(theta)*shots_Q_1
+#         shots_Q_1_rot = np.sin(theta)*shots_I_1 + np.cos(theta)*shots_Q_1
+
+#         shots_I_0_rot = np.cos(theta)*shots_I_0 - np.sin(theta)*shots_Q_0
+#         shots_Q_0_rot = np.sin(theta)*shots_I_0 + np.cos(theta)*shots_Q_0
+
+#         # # plotting the histograms before rotation
+#         # fig, axes = plt.subplots()
+#         # axes.hist(shots_Q_1, bins=40, label='1 Q',
+#         #           histtype='step', normed=1, color='r')
+#         # axes.hist(shots_Q_0, bins=40, label='0 Q',
+#         #           histtype='step', normed=1, color='b')
+#         # axes.hist(shots_I_1, bins=40, label='1 I',
+#         #           histtype='step', normed=1, color='m')
+#         # axes.hist(shots_I_0, bins=40, label='0 I',
+#         #           histtype='step', normed=1, color='c')
+
+#         # axes.set_title('Histograms of shots on IQ plane as measured, %s shots'%min_len)
+#         # plt.xlabel('DAQ voltage integrated (a.u.)', fontsize=14)
+#         # plt.ylabel('Fraction', fontsize=14)
+
+#         # #plt.hist(SS_Q_data, bins=40,label='0 Q')
+#         # plt.legend(loc='best')
+#         # self.save_fig(fig, figname='raw-histograms', **kw)
+#         # plt.show()
+#         # #plotting the histograms after rotation
+#         # fig, axes = plt.subplots()
+
+#         # axes.hist(shots_I_1_rot, bins=40, label='|1>',
+#         #           histtype='step', normed=1, color='r')
+#         # axes.hist(shots_I_0_rot, bins=40, label='|0>',
+#         #           histtype='step', normed=1, color='b')
+
+#         # axes.set_title('Histograms of shots on rotaded IQ plane, %s shots' %
+#         #                min_len)
+#         # plt.xlabel('DAQ voltage integrated (a.u.)', fontsize=14)
+#         # plt.ylabel('Fraction', fontsize=14)
+
+#         # plt.legend()
+#         # self.save_fig(fig, figname='rotated-histograms', **kw)
+#         # plt.show()
+#         return(theta, shots_I_1_rot, shots_I_0_rot)
+
+#     def no_fits_analysis(self, shots_I_1_rot, shots_I_0_rot, min_len,
+#                          **kw):
+#         min_voltage_1 = np.min(shots_I_1_rot)
+#         min_voltage_0 = np.min(shots_I_0_rot)
+#         min_voltage = np.min([min_voltage_1, min_voltage_0])
+
+#         max_voltage_1 = np.max(shots_I_1_rot)
+#         max_voltage_0 = np.max(shots_I_0_rot)
+#         max_voltage = np.max([max_voltage_1, max_voltage_0])
+
+#         hist_1, bins = np.histogram(shots_I_1_rot, bins=1000,
+#                                     range=(min_voltage, max_voltage),
+#                                     density=1)
+#         cumsum_1 = np.cumsum(hist_1)
+#         self.cumsum_1 = cumsum_1/cumsum_1[-1]  # renormalizing
+
+#         hist_0, bins = np.histogram(shots_I_0_rot, bins=1000,
+#                                     range=(min_voltage, max_voltage),
+#                                     density=1)
+#         cumsum_0 = np.cumsum(hist_0)
+#         self.cumsum_0 = cumsum_0/cumsum_0[-1]  # renormalizing
+
+#         cumsum_diff = (abs(self.cumsum_1-self.cumsum_0))
+#         cumsum_diff_list = cumsum_diff.tolist()
+#         self.index_V_opt_raw = int(cumsum_diff_list.index(np.max(
+#                                    cumsum_diff_list)))
+#         V_opt_raw = bins[self.index_V_opt_raw]+(bins[1]-bins[0])/2
+#         # adding half a bin size
+#         F_raw = cumsum_diff_list[self.index_V_opt_raw]
+
+#         fig, ax = plt.subplots()
+#         ax.plot(bins[0:-1], self.cumsum_1, label='cumsum_1', color='red')
+#         ax.plot(bins[0:-1], self.cumsum_0, label='cumsum_0', color='blue')
+#         ax.axvline(V_opt_raw, ls='--', label="V_opt_raw = %.3f" % V_opt_raw,
+#                    linewidth=2, color='grey')
+#         ax.text(.7, .6, 'F-raw = %.4f' % F_raw, transform=ax.transAxes,
+#                 fontsize='large')
+#         ax.set_title('raw cumulative histograms')
+#         plt.xlabel('DAQ voltage integrated (AU)', fontsize=14)
+#         plt.ylabel('Fraction', fontsize=14)
+
+#         #plt.hist(SS_Q_data, bins=40,label = '0 Q')
+#         plt.legend(loc=2)
+#         self.save_fig(fig, figname='raw-cumulative-histograms', **kw)
+#         plt.show()
+
+#         # saving the results
+#         if 'SSRO_Fidelity' not in self.analysis_group:
+#             fid_grp = self.analysis_group.create_group('SSRO_Fidelity')
+#         else:
+#             fid_grp = self.analysis_group['SSRO_Fidelity']
+#         fid_grp.attrs.create(name='V_opt_raw', data=V_opt_raw)
+#         fid_grp.attrs.create(name='F_raw', data=F_raw)
+
+#         self.F_raw = F_raw
+#         self.V_opt_raw = V_opt_raw
+
+
+#     def s_curve_fits(self, shots_I_1_rot, shots_I_0_rot, min_len,
+#                      **kw):
+#         # Sorting data for analytical fitting
+#         S_sorted_I_1 = np.sort(shots_I_1_rot)
+#         S_sorted_I_0 = np.sort(shots_I_0_rot)
+#         p_norm_I_1 = 1. * np.arange(len(S_sorted_I_1)) / \
+#             (len(S_sorted_I_1) - 1)
+#         p_norm_I_0 = 1. * np.arange(len(S_sorted_I_0)) / \
+#             (len(S_sorted_I_0) - 1)
+
+
+#         # fitting the curves with integral normal distribution
+#         def erfcc(x):
+#             """
+#             Complementary error function.
+#             """
+#             z = abs(x)
+#             out=np.zeros(np.size(x))
+#             t = 1. / (1. + 0.5*z)
+#             r = t * np.exp(-z*z-1.26551223+t*(1.00002368+t*(.37409196+
+#                 t*(.09678418+t*(-.18628806+t*(.27886807+
+#                 t*(-1.13520398+t*(1.48851587+t*(-.82215223+
+#                 t*.17087277)))))))))
+#             if np.size(x)>1:
+#                 for k in range(np.size(x)):
+#                     if (x[k] >= 0.):
+#                         out[k] = r[k]
+#                     else:
+#                         out[k] = 2. - r[k]
+#             else:
+#                 if (x > 0):
+#                     out=r
+#                 else:
+#                     out=2-r
+#             return out
+
+#         def NormCdf(x, mu, sigma):
+#             t = x-mu
+#             y = 0.5*erfcc(-t/(sigma*np.sqrt(2.0)))
+#             for k in range(np.size(x)):
+#                 if y[k] > 1.0:
+#                     y[k] = 1.0
+#             return y
+
+#         NormCdfModel = lmfit.Model(NormCdf)
+
+#         def NormCdf2(x, mu0, mu1, sigma0, sigma1, frac1):
+#             t0 = x-mu0
+#             t1 = x-mu1
+#             frac0=1-frac1
+#             y = frac1*0.5*erfcc(-t1/(sigma1*np.sqrt(2.0)))+frac0*0.5*erfcc(-t0/(sigma0*np.sqrt(2.0)));
+#             for k in range(np.size(x)):
+#                 if y[k]>1.0:
+#                     y[k] = 1.0
+#             return y
+
+#         NormCdf2Model = lmfit.Model(NormCdf2)
+#         NormCdfModel.set_param_hint('mu', value=(np.average(shots_I_0_rot)
+#                                     + np.average(shots_I_0_rot))/2)
+#         NormCdfModel.set_param_hint('sigma', value=(np.std(shots_I_0_rot)
+#                                     + np.std(shots_I_0_rot))/2, min=0)
+
+#         params = NormCdfModel.make_params()
+
+#         fit_res_0 = NormCdfModel.fit(
+#                             data=p_norm_I_0,
+#                             x=S_sorted_I_0,
+#                             params=params)
+
+#         fit_res_1 = NormCdfModel.fit(
+#                             data=p_norm_I_1,
+#                             x=S_sorted_I_1,
+#                             params=params)
+#         #extracting the fitted parameters for the gaussian fits
+#         mu0 = fit_res_0.params['mu'].value
+#         sigma0 = fit_res_0.params['sigma'].value
+#         mu1 = fit_res_1.params['mu'].value
+#         sigma1 = fit_res_1.params['sigma'].value
+
+
+#         #setting hint parameters for double gaussfit of 'on' measurements
+#         NormCdf2Model.set_param_hint('mu0', value=mu0, vary=False)
+#         NormCdf2Model.set_param_hint('sigma0', value=sigma0, min=0, vary=False)
+#         NormCdf2Model.set_param_hint('mu1', value=np.average(shots_I_1_rot))
+#         NormCdf2Model.set_param_hint('sigma1', value=np.std(shots_I_1_rot), min=0)
+#         NormCdf2Model.set_param_hint('frac1', value=0.9, min=0, max=1)
+
+#         # performing the double gaussfits of on 1 data
+#         params = NormCdf2Model.make_params()
+#         fit_res_double_1 = NormCdf2Model.fit(
+#                             data=p_norm_I_1,
+#                             x=S_sorted_I_1,
+#                             params=params)
+
+#         # extracting the fitted parameters for the double gaussian fit 'on'
+#         sigma0_1 = fit_res_double_1.params['sigma0'].value
+#         sigma1_1 = fit_res_double_1.params['sigma1'].value
+#         mu0_1 = fit_res_double_1.params['mu0'].value
+#         mu1_1 = fit_res_double_1.params['mu1'].value
+#         frac1_1 = fit_res_double_1.params['frac1'].value
+
+#         # adding hint parameters for double gaussfit of 'off' measurements
+#         NormCdf2Model.set_param_hint('mu0', value=mu0)
+#         NormCdf2Model.set_param_hint('sigma0', value=sigma0, min=0)
+#         NormCdf2Model.set_param_hint('mu1', value=mu1_1, vary=False)
+#         NormCdf2Model.set_param_hint('sigma1', value=sigma1, min=0)
+#         NormCdf2Model.set_param_hint('frac1', value=0.1, min=0, max=1)
+
+#         params = NormCdf2Model.make_params()
+#         fit_res_double_0 = NormCdf2Model.fit(
+#                             data=p_norm_I_0,
+#                             x=S_sorted_I_0,
+#                             params=params)
+
+#         # extracting the fitted parameters for the double gaussian fit 'off'
+#         sigma0_0 = fit_res_double_0.params['sigma0'].value
+#         sigma1_0 = fit_res_double_0.params['sigma1'].value
+#         mu0_0 = fit_res_double_0.params['mu0'].value
+#         mu1_0 = fit_res_double_0.params['mu1'].value
+#         frac1_0 = fit_res_double_0.params['frac1'].value
+
+#         def NormCdf(x, mu, sigma):
+#             t = x-mu
+#             y=0.5*erfcc(-t/(sigma*np.sqrt(2.0)))
+#             return y
+
+#         def NormCdfdiff(x, mu0=mu0, mu1=mu1, sigma0=sigma0, sigma1=sigma1):
+#             y = -abs(NormCdf(x, mu0, sigma0)-NormCdf(x, mu1, sigma1))
+#             return y
+
+#         V_opt_single = optimize.brent(NormCdfdiff)
+#         F_single = -NormCdfdiff(x=V_opt_single)
+#         # print 'V_opt_single', V_opt_single
+#         # print 'F_single', F_single
+
+
+#         #redefining the function with different variables to avoid problems with arguments in brent optimization
+#         def NormCdfdiff(x, mu0=mu0_0, mu1=mu1_1, sigma0=sigma0_0, sigma1=sigma1_1):
+#             y0 = -abs(NormCdf(x, mu0, sigma0)-NormCdf(x, mu1, sigma1))
+#             return y0
+
+#         V_opt_corrected = optimize.brent(NormCdfdiff)
+#         F_corrected = -NormCdfdiff(x=V_opt_corrected)
+#         #print 'F_corrected',F_corrected
+
+#         def NormCdfdiffDouble(x, mu0_0=mu0_0,
+#                               sigma0_0=sigma0_0, sigma1_0=sigma1_0,
+#                               frac1_0=frac1_0, mu1_1=mu1_1,
+#                               sigma0_1=sigma0_1, sigma1_1=sigma1_1,
+#                               frac1_1=frac1_1):
+#             distr0 = (1-frac1_0)*NormCdf(x, mu0_0, sigma0_0) + \
+#                  (frac1_0)*NormCdf(x, mu1_1, sigma1_1)
+
+#             distr1 = (1-frac1_1)*NormCdf(x, mu0_0, sigma0_0) + \
+#                     (frac1_1)*NormCdf(x, mu1_1, sigma1_1)
+#             y = - abs(distr1-distr0)
+#             return y
+
+#         # print "refresh"
+#         V_opt = optimize.brent(NormCdfdiffDouble)
+#         F = -NormCdfdiffDouble(x=V_opt)
+
+#         #calculating the signal-to-noise ratio
+#         signal= abs(mu0_0-mu1_1)
+#         noise = (sigma0_0 +sigma1_1)/2
+#         SNR = signal/noise
+
+#         #plotting s-curves
+#         fig, ax = plt.subplots(figsize=(8, 4))
+#         ax.set_title('S-curves (not binned) and fits, determining fidelity and threshold optimum, %s shots'%min_len)
+#         ax.set_xlabel('DAQ voltage integrated (V)')#, fontsize=14)
+#         ax.set_ylabel('Fraction of counts')#, fontsize=14)
+#         ax.set_ylim((-.01, 1.01))
+#         ax.plot(S_sorted_I_0, p_norm_I_0, label='0 I', linewidth=2,
+#                 color='blue')
+#         ax.plot(S_sorted_I_1, p_norm_I_1, label='1 I', linewidth=2,
+#                 color='red')
+
+#         # ax.plot(S_sorted_I_0, fit_res_0.best_fit,
+#         #         label='0 I single gaussian fit', ls='--', linewidth=3,
+#         #         color='lightblue')
+#         # ax.plot(S_sorted_I_1, fit_res_1.best_fit, label='1 I',
+#         #         linewidth=2, color='red')
+
+#         ax.plot(S_sorted_I_0, fit_res_double_0.best_fit,
+#                 label='0 I double gaussfit', ls='--', linewidth=3,
+#                 color='lightblue')
+#         ax.plot(S_sorted_I_1, fit_res_double_1.best_fit,
+#                 label='1 I double gaussfit', ls='--', linewidth=3,
+#                 color='darkred')
+#         labelstring = 'V_opt= %.3f V \nF= %.4f'%(V_opt,F)
+#         labelstring_corrected = 'V_opt_corrected= %.3f V \nF_corrected= %.4f\ndiscarding fraction 0 in 1= %.2f \nand fraction 1 in 0= %.2f' %(V_opt_corrected,F_corrected,frac1_0,1-frac1_1)
+
+#         ax.axvline(V_opt, ls='--', label=labelstring,
+#                    linewidth=2, color='grey')
+#         ax.axvline(V_opt_corrected, ls='--', label=labelstring_corrected,
+#                    linewidth=2, color='black')
+
+#         leg = ax.legend(loc='best')
+#         leg.get_frame().set_alpha(0.5)
+#         self.save_fig(fig, figname='S-curves', **kw)
+#         plt.show()
+
+#         #plotting the histograms
+#         fig, axes = plt.subplots(figsize=(8, 4))
+#         n1, bins1, patches = pylab.hist(shots_I_1_rot, bins=int(min_len/50),
+#                                       label = '1 I',histtype='step',
+#                                       color='red', normed=True)
+#         n0, bins0, patches = pylab.hist(shots_I_0_rot, bins=int(min_len/50),
+#                                       label = '0 I',histtype='step',
+#                                       color='blue', normed=True)
+#         pylab.clf()
+#         # n0, bins0 = np.histogram(shots_I_0_rot, bins=int(min_len/50), normed=1)
+#         # n1, bins1 = np.histogram(shots_I_1_rot, bins=int(min_len/50), normed=1)
+
+#         pylab.plot(bins1[:-1]+0.5*(bins1[1]-bins1[0]),n1,'ro')
+#         pylab.plot(bins0[:-1]+0.5*(bins0[1]-bins0[0]),n0,'bo')
+
+#         # n, bins1, patches = np.hist(shots_I_1_rot, bins=int(min_len/50),
+#         #                               label = '1 I',histtype='step',
+#         #                               color='red',normed=1)
+#         # n, bins0, patches = pylab.hist(shots_I_0_rot, bins=int(min_len/50),
+#         #                               label = '0 I',histtype='step',
+#         #                               color='blue',normed=1)
+
+#         # add lines showing the fitted distribution
+#         #building up the histogram fits for off measurements
+#         y0 = (1-frac1_0)*pylab.normpdf(bins0, mu0_0, sigma0_0)+frac1_0*pylab.normpdf(bins0, mu1_1, sigma1_1)
+#         y1_0 = frac1_0*pylab.normpdf(bins0, mu1_1, sigma1_1)
+#         y0_0 = (1-frac1_0)*pylab.normpdf(bins0, mu0_0, sigma0_0)
+
+#         #building up the histogram fits for on measurements
+#         y1 = (1-frac1_1)*pylab.normpdf(bins1, mu0_0, sigma0_0)+frac1_1*pylab.normpdf(bins1, mu1_1, sigma1_1)
+#         y1_1 = frac1_1*pylab.normpdf(bins1, mu1_1, sigma1_1)
+#         y0_1 = (1-frac1_1)*pylab.normpdf(bins1, mu0_0, sigma0_0)
+
+
+#         pylab.semilogy(bins0, y0, 'b',linewidth=1.5)
+#         pylab.semilogy(bins0, y1_0, 'b--', linewidth=3.5)
+#         pylab.semilogy(bins0, y0_0, 'b--', linewidth=3.5)
+
+#         pylab.semilogy(bins1, y1, 'r',linewidth=1.5)
+#         pylab.semilogy(bins1, y0_1, 'r--', linewidth=3.5)
+#         pylab.semilogy(bins1, y1_1, 'r--', linewidth=3.5)
+#         #(pylab.gca()).set_ylim(1e-6,1e-3)
+#         pdf_max=(max(max(y0),max(y1)))
+#         (pylab.gca()).set_ylim(pdf_max/1000,2*pdf_max)
+
+#         axes.set_title('Histograms of shots on rotaded IQ plane optimized for I, %s shots'%min_len)
+#         plt.xlabel('DAQ voltage integrated (V)')#, fontsize=14)
+#         plt.ylabel('Fraction of counts')#, fontsize=14)
+
+
+#         plt.axvline(V_opt, ls='--',
+#                    linewidth=2, color='grey' ,label='SNR={0:.2f}\n Fa={1:.4f}\n Fd={2:.4f}'.format(SNR, 1-(1-self.F_raw)/2, 1-(1-F_corrected)/2))
+#         plt.axvline(V_opt_corrected, ls='--',
+#                    linewidth=2, color='black')
+#         plt.legend()
+#         leg2 = ax.legend(loc='best')
+#         leg2.get_frame().set_alpha(0.5)
+#         #plt.hist(SS_Q_data, bins=40,label = '0 Q')
+#         self.save_fig(fig, figname='Histograms', **kw)
+#         plt.show()
+
+#         self.save_fitted_parameters(fit_res_double_0,
+#                                     var_name='fit_res_double_0')
+#         self.save_fitted_parameters(fit_res_double_1,
+#                                     var_name='fit_res_double_1')
+
+
+#         if 'SSRO_Fidelity' not in self.analysis_group:
+#             fid_grp = self.analysis_group.create_group('SSRO_Fidelity')
+#         else:
+#             fid_grp = self.analysis_group['SSRO_Fidelity']
+
+
+
+#         fid_grp.attrs.create(name='sigma0_0', data=sigma0_0)
+#         fid_grp.attrs.create(name='sigma1_1', data=sigma1_1)
+#         fid_grp.attrs.create(name='mu0_0', data=mu0_0)
+#         fid_grp.attrs.create(name='mu1_1', data=mu1_1)
+#         fid_grp.attrs.create(name='frac1_0', data=frac1_0)
+#         fid_grp.attrs.create(name='frac1_1', data=frac1_1)
+#         fid_grp.attrs.create(name='V_opt', data=V_opt)
+#         fid_grp.attrs.create(name='F', data=F)
+#         fid_grp.attrs.create(name='F_corrected', data=F_corrected)
+#         fid_grp.attrs.create(name='SNR', data=SNR)
+
+#         self.sigma0_0 = sigma0_0
+#         self.sigma1_1 = sigma1_1
+#         self.mu0_0 = mu0_0
+#         self.mu1_1 = mu1_1
+#         self.frac1_0 = frac1_0
+#         self.frac1_1 = frac1_1
+#         self.V_opt = V_opt
+#         self.F = F
+#         self.F_corrected = F_corrected
+#         self.SNR = SNR
+
+### Ramiro's routines
+
+
+class Chevron_2D(object):
+    def __init__(self, auto=True, label='', timestamp=None):
+            if timestamp is None:
+                self.folder = a_tools.latest_data('Chevron')
+                splitted = self.folder.split('\\')
+                self.scan_start = splitted[-2]+'_'+splitted[-1][:6]
+                self.scan_stop = self.scan_start
+            else:
+                self.scan_start = timestamp
+                self.scan_stop = timestamp
+                self.folder = a_tools.get_folder(timestamp=self.scan_start)
+            self.pdict = {'I':'amp',
+                     'sweep_points':'sweep_points'}
+            self.opt_dict = {'scan_label':'Chevron_2D'}
+            self.nparams = ['I', 'sweep_points']
+            self.label = label
+            if auto==True:
+                self.analysis()
+    def analysis(self):
+            chevron_scan = RA.quick_analysis(t_start=self.scan_start,
+                                           t_stop=self.scan_stop,
+                                           options_dict=self.opt_dict,
+                                           params_dict_TD=self.pdict,
+                                           numeric_params=self.nparams)
+            x, y, z = self.reshape_data(chevron_scan.TD_dict['sweep_points'][0],
+                                 chevron_scan.TD_dict['I'][0])
+            plot_times = y
+            plot_step = plot_times[1]-plot_times[0]
+
+            plot_x = x
+            x_step = plot_x[1]-plot_x[0]
+
+            result = z
+
+            fig = plt.figure(figsize=(8,6))
+            ax = fig.add_subplot(111)
+            cmin, cmax = 0, 1
+            fig_clim = [cmin, cmax]
+            out = flex_colormesh_plot_vs_xy(ax=ax,clim=fig_clim,cmap='viridis',
+                                 xvals=plot_times,
+                                 yvals=plot_x,
+                                 zvals=result)
+            ax.set_xlabel(r'AWG Amp (Vpp)')
+            ax.set_ylabel(r'Time (ns)')
+            ax.set_title('%s: Chevron scan'%self.scan_start)
+            # ax.set_xlim(xmin, xmax)
+            ax.set_ylim(plot_x.min()-x_step/2.,plot_x.max()+x_step/2.)
+            ax.set_xlim(plot_times.min()-plot_step/2.,plot_times.max()+plot_step/2.)
+            #     ax.set_xlim(plot_times.min()-plot_step/2.,plot_times.max()+plot_step/2.)
+            # ax.set_xlim(0,50)
+            #     print('Bounce %d ns amp=%.3f; Pole %d ns amp=%.3f'%(list_values[iter_idx,0],
+            #                                                                list_values[iter_idx,1],
+            #                                                                list_values[iter_idx,2],
+            #                                                                list_values[iter_idx,3]))
+            ax_divider = make_axes_locatable(ax)
+            cax = ax_divider.append_axes('right',size='10%', pad='5%')
+            cbar = plt.colorbar(out['cmap'],cax=cax)
+            cbar.set_ticks(np.arange(fig_clim[0],1.01*fig_clim[1],(fig_clim[1]-fig_clim[0])/5.))
+            cbar.set_ticklabels([str(fig_clim[0]),'','','','',str(fig_clim[1])])
+            cbar.set_label('Qubit excitation probability')
+
+            fig.tight_layout()
+            self.save_fig(fig)
+
+
+    def reshape_axis_2d(self,axis_array):
+        x = axis_array[0, :]
+        y = axis_array[1, :]
+    #     print(y)
+        dimx = np.sum(np.where(x==x[0],1,0))
+        dimy = len(x) // dimx
+    #     print(dimx,dimy)
+        if dimy*dimx<len(x):
+            logging.warning.warn('Data was cut-off. Probably due to an interrupted scan')
+            dimy_c = dimy + 1
+        else:
+            dimy_c = dimy
+    #     print(dimx,dimy,dimy_c,dimx*dimy)
+        return x[:dimy_c],(y[::dimy_c])
+    def reshape_data(self,sweep_points,data):
+        x, y = self.reshape_axis_2d(sweep_points)
+    #     print(x,y)
+        dimx = len(x)
+        dimy = len(y)
+        dim  = dimx*dimy
+        if dim>len(data):
+            dimy = dimy - 1
+        return x,y[:dimy],(data[:dimx*dimy].reshape((dimy,dimx))).transpose()
+
+    def save_fig(self, fig, figname=None, xlabel='x', ylabel='y',
+                 fig_tight=True, **kw):
+        plot_formats = kw.pop('plot_formats', ['png'])
+        fail_counter = False
+        close_fig = kw.pop('close_fig', True)
+        if type(plot_formats) == str:
+            plot_formats = [plot_formats]
+        for plot_format in plot_formats:
+            if figname is None:
+                figname = (self.scan_start+'_Chevron_2D_'+'.'+plot_format)
+            else:
+                figname = (figname+'.' + plot_format)
+            self.savename = os.path.abspath(os.path.join(
+                self.folder, figname))
+            if fig_tight:
+                try:
+                    fig.tight_layout()
+                except ValueError:
+                    print('WARNING: Could not set tight layout')
+            try:
+                fig.savefig(
+                    self.savename, dpi=300,
+                    # value of 300 is arbitrary but higher than default
+                    format=plot_format)
+            except:
+                fail_counter = True
+        if fail_counter:
+            logging.warning('Figure "%s" has not been saved.' % self.savename)
+        if close_fig:
+            plt.close(fig)
+        return
