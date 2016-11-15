@@ -152,7 +152,7 @@ def make_figure(F_vec, idxs, Ncl,
     ax.text(0.92, .88, '(a)', transform=ax.transAxes)
     ax2.text(0.92, .88, '(b)', transform=ax2.transAxes)
 
-    ax.text(-0.14, .5, r'Signal, $ \overline{\Delta\varepsilon_\mathrm{R}}$',
+    ax.text(-0.14, .5, r'Signal, $ {\Delta\overline{\varepsilon_\mathrm{R}}}$',
             color='k', transform=ax.transAxes,
             ha='center', va='center',
             rotation='90')
