@@ -275,6 +275,7 @@ for i in range(4):
 # to make the pulsar available to the standard awg seqs
 st_seqs.station = station
 sq.station = station
+awg_swf.fsqs.station = station
 cal_elts.station = station
 
 t1 = time.time()
@@ -309,7 +310,7 @@ if UHFQC:
     def switch_to_pulsed_RO_CBox(qubit):
         UHFQC_1.awg_sequence_acquisition()
         qubit.RO_pulse_type('Gated_MW_RO_pulse')
-        qubit.RO_acq_marker_delay(145e-9)
+        qubit.RO_acq_marker_delay(155e-9)
         qubit.acquisition_instr('CBox')
         qubit.RO_acq_marker_channel('ch3_marker1')
         qubit.RO_acq_weight_function_I(0)
@@ -346,15 +347,13 @@ else:
         qubit.RO_acq_weight_function_Q(1)
 
 
-q0 = AncT
-q1 = DataT
 
 #preparing UHFQC readout with IQ mod pulses
 
-list_qubits = [q0, q1, AncB, DataM, DataB]
+list_qubits = [DataT, AncT, DataM, AncB,  DataB]
 for qubit in list_qubits:
     qubit.RO_fixed_point_correction(True)
-    qubit.RO_pulse_delay(15e-9)
+    qubit.RO_pulse_delay(20e-9)
     #qubit.RO_acq_averages(2**13)
 
 

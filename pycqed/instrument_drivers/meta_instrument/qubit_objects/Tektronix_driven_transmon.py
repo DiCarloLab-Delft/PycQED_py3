@@ -1076,6 +1076,15 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                                     self.spec_pulse_depletion_time.get())
         return spec_pars, RO_pars
 
+    def get_cphase_pars(self):
+        cphase_pars = {'pulse_type': 'CosPulse',
+                       'length': 'ch%d'%self.fluxing_channel(),
+                       'channel': 'ch4',
+                       'phase': 30.,
+                       'pulse_delay': 30e-9,
+                       'amplitude': 0.04}
+        return cphase_pars
+
     def get_flux_pars(self):
         flux_pulse_pars = {'pulse_type': 'SquarePulse',
                            'pulse_delay': self.flux_pulse_delay(),
@@ -1083,7 +1092,8 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                            'amplitude': self.fluxing_amp(),
                            'length': self.swap_time(),
                            'swap_amp': self.swap_amp(),
-                           'dead_time_length': self.flux_dead_time()}
+                           'dead_time_length': self.flux_dead_time(),
+                           'pulse_type': 'SquarePulse'}
         return flux_pulse_pars, self._dist_dict
 
 
