@@ -4159,6 +4159,8 @@ class Homodyne_Analysis(MeasurementAnalysis):
             self.plot_complex_results(data_complex, fig=fig, ax=ax, show=False, save=False)
             # second figure with amplitude
             fig2, ax2 = self.default_ax()
+            ax2.text(0.05, 0.95, textstr, transform=ax.transAxes, fontsize=11,
+                verticalalignment='top', bbox=self.box_props)
             self.plot_results_vs_sweepparam(x=self.sweep_points, y=data_amp,
                                             fig=fig2, ax=ax2, show=False, save=False)
 
