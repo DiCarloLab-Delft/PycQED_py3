@@ -203,18 +203,18 @@ class MeasurementControl(Instrument):
         self.iteration +=1
         new_data = np.array(self.detector_function.get_values()).T
 
-
         ###########################
         # Shape determining block #
         ###########################
+
         datasetshape = self.dset.shape
         start_idx, stop_idx = self.get_datawriting_indices(new_data)
 
-        new_datasetshape = (np.max(datasetshape[0], stop_idx),
+        new_datasetshape = (np.max([datasetshape[0], stop_idx]),
                             datasetshape[1])
         self.dset.resize(new_datasetshape)
-        len_new_data = stop_idx-start_idx #np.shapeshape_new_data[0]
-        if single_col:
+        len_new_data = stop_idx-start_idx
+        if len(np.shape(new_data)) == 1:
             self.dset[start_idx:stop_idx,
                       len(self.sweep_functions)] = new_data
         else:
