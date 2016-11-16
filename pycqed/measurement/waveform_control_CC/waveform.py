@@ -80,7 +80,7 @@ def gauss_pulse(amp, sigma_length, axis='x', nr_sigma=4, sampling_rate=2e8,
         # remove offset from Q
         offset_Q = (pulse_Q[0]+pulse_Q[-1])/2
         pulse_Q = pulse_Q-offset_Q
-    Zeros = np.zeros(delay_samples)
+    Zeros = np.zeros(int(delay_samples))
     pulse_I = list(Zeros)+list(pulse_I)
     pulse_Q = list(Zeros)+list(pulse_Q)
     return pulse_I, pulse_Q
@@ -102,7 +102,7 @@ def block_pulse(amp, length, sampling_rate=2e8, delay=0, phase=0):
     amp_Q = amp*np.sin(phase*2*np.pi/360)
     block_I = amp_I * np.ones(pulse_samples)
     block_Q = amp_Q * np.ones(pulse_samples)
-    Zeros = np.zeros(delay_samples)
+    Zeros = np.zeros(int(delay_samples))
     pulse_I = list(Zeros)+list(block_I)
     pulse_Q = list(Zeros)+list(block_Q)
     return pulse_I, pulse_Q

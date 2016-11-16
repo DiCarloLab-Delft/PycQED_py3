@@ -165,6 +165,12 @@ def create_operation_dict(required_ops, pulse_pars):
             # no insruction yet
             operation_dict[op_line]['instruction'] = ' \n'
 
+        elif elts[0] == 'I':
+            operation_dict[op_line] = {'instruction': 'WaitReg r0 \n',
+                                          'prepare_function': None,
+                                          'prepare_function_kwargs': None,
+                                          'duration': None}
+
         elif elts[0] == 'init_all':
             operation_dict['init_all'] = {'instruction': 'WaitReg r0 \n',
                                           'prepare_function': None,

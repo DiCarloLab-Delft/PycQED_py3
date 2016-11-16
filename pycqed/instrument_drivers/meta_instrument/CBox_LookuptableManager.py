@@ -367,19 +367,4 @@ class QuTech_ControlBox_LookuptableManager(Instrument):
         for i in indices:
             self.CBox.set_awg_lookuptable(awg_nr, i, I_ch, I_wave)
             self.CBox.set_awg_lookuptable(awg_nr, i, Q_ch, Q_wave)
-            # print("awg %d pulse %d:" % (awg_nr, i))
-            # fig, ax = plt.subplots(1, 1)
-            # x = np.arange(len(I_wave))
-            # ax.set_xlabel('Lookuptable index (i)')
-            # ax.vlines(128, self._voltage_min, self._voltage_max, linestyle='--')
 
-            # ax.plot(x, I_wave, marker='o', label=pulse_name+' chI')
-            # ax.plot(x, Q_wave, marker='o', label=pulse_name+' chQ')
-            # ax.set_ylabel('Amplitude (mV)')
-            # ax.set_axis_bgcolor('gray')
-            # ax.axhspan(self._voltage_min, self._voltage_max, facecolor='w',
-            #            linewidth=0)
-            # ax.legend()
-            # ax.set_ylim(self._voltage_min*1.1, self._voltage_max*1.1)
-            # ax.set_xlim(0, x[-1])
-            # plt.show()
