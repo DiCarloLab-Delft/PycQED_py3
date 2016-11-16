@@ -112,7 +112,7 @@ class Dummy_Detector_Hard(Hard_Detector):
 
     def get_values(self):
         x = self.sweep_points
-        noise = self.noise * np.random.rand(2, len(x))
+        noise = self.noise * (np.random.rand(2, len(x)) - .5)
         data = np.array([np.sin(x / np.pi),
                          np.cos(x/np.pi)])
         data += noise

@@ -39,7 +39,7 @@ class Test_MeasurementControl(unittest.TestCase):
         self.MC.set_detector_function(det.Dummy_Detector_Hard())
         dat = self.MC.run('1D_hard')
         x = dat[:, 0]
-        y = self.data = [np.sin(x / np.pi), np.cos(x/np.pi)]
+        y =  [np.sin(x / np.pi), np.cos(x/np.pi)]
         y0 = dat[:, 1]
         y1 = dat[:, 2]
         np.testing.assert_array_almost_equal(x, sweep_pts)
@@ -111,6 +111,36 @@ class Test_MeasurementControl(unittest.TestCase):
         self.assertEqual(np.shape(dat), (len(sweep_pts), 2))
         np.testing.assert_array_almost_equal(x, sweep_pts)
         np.testing.assert_array_almost_equal(y, sweep_pts)
+
+    def test_soft_averages_hard_sweep_1D(self):
+        """
+        Tests acquiring more than the maximum number of shots for a hard
+        detector by setting the number of sweep points high
+        """
+        sweep_pts = np.arange(50)
+        self.MC.soft_avg(1)
+        self.MC.set_sweep_function(None_Sweep(sweep_control='hard'))
+        self.MC.set_sweep_points(sweep_pts)
+        self.MC.set_detector_function(det.Dummy_Detector_Hard(noise=.5))
+        noisy_dat = self.MC.run('noisy_dat')
+        x = noisy_dat[:, 0]
+        y = [np.sin(x / np.pi), np.cos(x/np.pi)]
+        yn_0 = abs(noisy_dat[:, 1] - y[0])
+        yn_1 = abs(noisy_dat[:, 2] - y[1])
+
+        self.MC.soft_avg(1000)
+        avg_dat = self.MC.run('averaged_dat')
+        yavg_0 = abs(avg_dat[:, 1] - y[0])
+        yavg_1 = abs(avg_dat[:, 2] - y[1])
+
+        np.testing.assert_array_almost_equal(x, sweep_pts)
+        self.assertGreater(np.mean(yn_0), np.mean(yavg_0))
+        self.assertGreater(np.mean(yn_1), np.mean(yavg_1))
+
+        np.testing.assert_array_almost_equal(yavg_0, np.zeros(len(x)),
+                                             decimal=2)
+        np.testing.assert_array_almost_equal(yavg_1, np.zeros(len(x)),
+                                             decimal=2)
 
     def tearDown(self):
         self.MC.close()
