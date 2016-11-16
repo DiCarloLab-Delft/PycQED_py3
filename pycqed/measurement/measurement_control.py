@@ -69,7 +69,6 @@ class MeasurementControl(Instrument):
 
         self.soft_iteration = 0  # used as a counter for soft_avg
 
-
     ##############################################
     # Functions used to control the measurements #
     ##############################################
@@ -160,7 +159,7 @@ class MeasurementControl(Instrument):
     def measure_soft_static(self):
         for i, sweep_point in enumerate(self.sweep_points):
             self.measurement_function(sweep_point)
-            self.print_progress_static_soft_sweep(i)
+            self.print_progress()
 
     def measure_soft_adaptive(self, method=None):
         '''
@@ -214,14 +213,19 @@ class MeasurementControl(Instrument):
                             datasetshape[1])
         self.dset.resize(new_datasetshape)
         len_new_data = stop_idx-start_idx
-        old_vals = self.dset[start_idx:stop_idx,
-                             len(self.sweep_functions):]
-        new_vals = ((new_data + old_vals*self.soft_iteration)/
-                    (1+self.soft_iteration))
         if len(np.shape(new_data)) == 1:
+            old_vals = self.dset[start_idx:stop_idx,
+                                 len(self.sweep_functions)]
+            new_vals = ((new_data + old_vals*self.soft_iteration) /
+                        (1+self.soft_iteration))
+
             self.dset[start_idx:stop_idx,
                       len(self.sweep_functions)] = new_vals
         else:
+            old_vals = self.dset[start_idx:stop_idx,
+                                 len(self.sweep_functions):]
+            new_vals = ((new_data + old_vals*self.soft_iteration) /
+                        (1+self.soft_iteration))
 
             self.dset[start_idx:stop_idx,
                       len(self.sweep_functions):] = new_vals
@@ -252,7 +256,7 @@ class MeasurementControl(Instrument):
         self.update_plotmon()
         if self.mode == '2D':
             self.update_plotmon_2D_hard()
-        self.print_progress_static_hard()
+        self.print_progress()
 
         return new_data
 
@@ -499,8 +503,8 @@ class MeasurementControl(Instrument):
         '''
         if self.live_plot_enabled():
             i = int(self.iteration-1)
-            x_ind = i % self.xlen
-            y_ind = i / self.xlen
+            x_ind = int(i % self.xlen)
+            y_ind = int(i / self.xlen)
             for j in range(len(self.detector_function.value_names)):
                 z_ind = len(self.sweep_functions) + j
                 self.TwoD_array[y_ind, x_ind, j] = self.dset[i, z_ind]
@@ -661,36 +665,7 @@ class MeasurementControl(Instrument):
         set_grp.attrs['measurement_name'] = self.measurement_name
         set_grp.attrs['live_plot_enabled'] = self.live_plot_enabled()
 
-    def print_progress_static_soft_sweep(self, i):
-        if self.verbose():
-            percdone = (i+1)*1./len(self.sweep_points)*100
-            elapsed_time = time.time() - self.begintime
-            progress_message = "\r {percdone}% completed \telapsed time: "\
-                "{t_elapsed}s \ttime left: {t_left}s".format(
-                    percdone=int(percdone),
-                    t_elapsed=round(elapsed_time, 1),
-                    t_left=round((100.-percdone)/(percdone) *
-                                 elapsed_time, 1) if
-                    percdone != 0 else '')
-
-            if percdone != 100:
-                end_char = '\r'
-            else:
-                end_char = '\n'
-            print(progress_message, end=end_char)
-
-    def is_complete(self):
-        """
-        Returns True if enough data has been acquired.
-        """
-        acquired_points = self.dset.shape[0]
-        total_nr_pts = len(self.get_sweep_points())
-        if acquired_points < total_nr_pts:
-            return False
-        elif acquired_points >= total_nr_pts:
-            return True
-
-    def print_progress_static_hard(self):
+    def print_progress(self):
         if self.verbose():
             acquired_points = self.dset.shape[0]
             total_nr_pts = len(self.get_sweep_points())
@@ -708,10 +683,21 @@ class MeasurementControl(Instrument):
                     percdone != 0 else '')
 
             if percdone != 100:
-                end_char = '\r'
+                end_char = ''
             else:
                 end_char = '\n'
-            print(progress_message, end=end_char)
+            print('\r', progress_message, end=end_char)
+
+    def is_complete(self):
+        """
+        Returns True if enough data has been acquired.
+        """
+        acquired_points = self.dset.shape[0]
+        total_nr_pts = len(self.get_sweep_points())
+        if acquired_points < total_nr_pts:
+            return False
+        elif acquired_points >= total_nr_pts:
+            return True
 
     def print_measurement_start_msg(self):
         if self.verbose():
@@ -748,7 +734,8 @@ class MeasurementControl(Instrument):
         shape_new_data = (shape_new_data[0], shape_new_data[1]+1)
 
         max_sweep_points = np.shape(self.get_sweep_points())[0]
-        start_idx = int((shape_new_data[0]*(self.iteration-1))%max_sweep_points)
+        start_idx = int(
+            (shape_new_data[0]*(self.iteration-1)) % max_sweep_points)
 
         stop_idx = start_idx + shape_new_data[0]
 
