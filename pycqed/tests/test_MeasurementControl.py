@@ -45,6 +45,8 @@ class Test_MeasurementControl(unittest.TestCase):
         np.testing.assert_array_almost_equal(x, sweep_pts)
         np.testing.assert_array_almost_equal(y0, y[0])
         np.testing.assert_array_almost_equal(y1, y[1])
+        d = self.MC.detector_function
+        self.assertEqual(d.times_called, 1)
 
     def test_soft_sweep_2D(self):
         sweep_pts = np.linspace(0, 10, 30)
@@ -94,6 +96,8 @@ class Test_MeasurementControl(unittest.TestCase):
         np.testing.assert_array_almost_equal(y, y_rep)
         np.testing.assert_array_almost_equal(z0, z[0])
         np.testing.assert_array_almost_equal(z1, z[1])
+        d = self.MC.detector_function
+        self.assertEqual(d.times_called, 5)
 
     def test_many_shots_hard_sweep(self):
         """
@@ -112,6 +116,9 @@ class Test_MeasurementControl(unittest.TestCase):
         np.testing.assert_array_almost_equal(x, sweep_pts)
         np.testing.assert_array_almost_equal(y, sweep_pts)
 
+        d = self.MC.detector_function
+        self.assertEqual(d.times_called, 10)
+
     def test_soft_averages_hard_sweep_1D(self):
         sweep_pts = np.arange(50)
         self.MC.soft_avg(1)
@@ -124,7 +131,10 @@ class Test_MeasurementControl(unittest.TestCase):
         yn_0 = abs(noisy_dat[:, 1] - y[0])
         yn_1 = abs(noisy_dat[:, 2] - y[1])
 
-        self.MC.soft_avg(1000)
+        d = self.MC.detector_function
+        self.assertEqual(d.times_called, 1)
+
+        self.MC.soft_avg(5000)
         avg_dat = self.MC.run('averaged_dat')
         yavg_0 = abs(avg_dat[:, 1] - y[0])
         yavg_1 = abs(avg_dat[:, 2] - y[1])
@@ -137,6 +147,7 @@ class Test_MeasurementControl(unittest.TestCase):
                                              decimal=2)
         np.testing.assert_array_almost_equal(yavg_1, np.zeros(len(x)),
                                              decimal=2)
+        self.assertEqual(d.times_called, 5001)
 
     def test_soft_averages_hard_sweep_2D(self):
         self.MC.soft_avg(1)
@@ -159,6 +170,9 @@ class Test_MeasurementControl(unittest.TestCase):
         np.testing.assert_array_almost_equal(x, x_tiled)
         np.testing.assert_array_almost_equal(y, y_rep)
 
+        d = self.MC.detector_function
+        self.assertEqual(d.times_called, 5)
+
         self.MC.set_sweep_points(sweep_pts)
         self.MC.set_sweep_points_2D(sweep_pts_2D)
         self.MC.soft_avg(1000)
@@ -176,6 +190,8 @@ class Test_MeasurementControl(unittest.TestCase):
                                              decimal=2)
         np.testing.assert_array_almost_equal(zavg_1, np.zeros(len(x)),
                                              decimal=2)
+
+        self.assertEqual(d.times_called, 5*1000+5)
 
     def tearDown(self):
         self.MC.close()

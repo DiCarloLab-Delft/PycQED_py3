@@ -143,7 +143,7 @@ class MeasurementControl(Instrument):
                 req_nr_iterations = int(swp_len/pts_per_iter)
                 total_iterations = req_nr_iterations * self.soft_avg()
 
-                for i in range(total_iterations):
+                for i in range(total_iterations-1):
                     start_idx, stop_idx = self.get_datawriting_indices(
                         pts_per_iter=pts_per_iter)
                     if start_idx == 0:
@@ -248,8 +248,6 @@ class MeasurementControl(Instrument):
             self.dset[start_idx:stop_idx,
                       len(self.sweep_functions):] = new_vals
         sweep_len = len(self.get_sweep_points().T)
-        # Only add sweep points if these make sense (i.e. same shape as
-        # new_data)
 
         ######################
         # DATA STORING BLOCK #
@@ -274,7 +272,7 @@ class MeasurementControl(Instrument):
         self.update_plotmon()
         if self.mode == '2D':
             self.update_plotmon_2D_hard()
-        self.print_progress()
+        self.print_progress(stop_idx)
         self.iteration += 1
         return new_data
 
@@ -682,12 +680,13 @@ class MeasurementControl(Instrument):
         set_grp.attrs['measurement_name'] = self.measurement_name
         set_grp.attrs['live_plot_enabled'] = self.live_plot_enabled()
 
-    def print_progress(self):
+    def print_progress(self, stop_idx=None):
         if self.verbose():
             acquired_points = self.dset.shape[0]
             total_nr_pts = len(self.get_sweep_points())
             if self.soft_avg() != 1:
-                percdone = self.soft_iteration/self.soft_avg()*100
+                progr = 1 if stop_idx == None else stop_idx/total_nr_pts
+                percdone = (self.soft_iteration+progr)/self.soft_avg()*100
             else:
                 percdone = acquired_points*1./total_nr_pts*100
             elapsed_time = time.time() - self.begintime

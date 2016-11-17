@@ -133,9 +133,11 @@ class Dummy_Shots_Detector(Hard_Detector):
         self.value_names = ['shots']
         self.value_units = ['m']
         self.max_shots = max_shots
+        self.times_called = 0
 
     def prepare(self, sweep_points):
         self.sweep_points = sweep_points
+        self.times_called += 1
 
     def get_values(self):
         x = self.sweep_points
