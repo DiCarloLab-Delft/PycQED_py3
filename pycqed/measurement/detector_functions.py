@@ -106,6 +106,7 @@ class Dummy_Detector_Hard(Hard_Detector):
         self.value_units = ['m', 'nW']
         self.delay = delay
         self.noise = noise
+        self.times_called = 0
 
     def prepare(self, sweep_points):
         self.sweep_points = sweep_points
@@ -117,6 +118,8 @@ class Dummy_Detector_Hard(Hard_Detector):
                          np.cos(x/np.pi)])
         data += noise
         time.sleep(self.delay)
+        # Counter used in test suite to test how many times data was acquired.
+        self.times_called += 1
 
         return data
 
