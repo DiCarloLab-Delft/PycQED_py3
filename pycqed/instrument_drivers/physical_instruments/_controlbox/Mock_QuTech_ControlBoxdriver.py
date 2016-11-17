@@ -1,3 +1,4 @@
+import sys
 from . import defHeaders_CBox_v3 as defHeaders
 from .. import QuTech_ControlBox_v3 as qcb3
 
@@ -9,9 +10,15 @@ to a real CBox.
 
 
 class Mock_QuTech_ControlBox(qcb3.QuTech_ControlBox_v3):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, os_par=sys.stdout, *args, **kwargs):
+        self.SetupStream(os_par)
         super(Mock_QuTech_ControlBox, self).__init__(*args, **kwargs)
+
         print('Mock driver has been initialized.')
+
+    def SetupStream(self, os_par):
+        print('initialized outstream')
+        self.outstream = os_par
 
     def set_address(self, address=None):
         return True
@@ -39,7 +46,9 @@ class Mock_QuTech_ControlBox(qcb3.QuTech_ControlBox_v3):
         if type(command) != bytes:
             raise TypeError('command must be type bytes')
 
-        print('Command: %s' % self.format_hex_string(command.hex()))
+        self.outstream.write('Command: %s\n' %
+                           self.format_hex_string(command.hex()))
+
         return (True, bytes.fromhex('7F'))
 
     def format_hex_string(self, hexstr):
