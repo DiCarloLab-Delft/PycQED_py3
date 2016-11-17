@@ -1,6 +1,7 @@
 ﻿import string
 from sys import exit
 import logging
+import tempfile
 
 
 def is_number(s):
@@ -45,6 +46,7 @@ class Assembler():
 
     def __init__(self, asm_filename):
         self.asmfilename = asm_filename
+        self.tfp = None
 
     InstOpCode = {'add':     '000000',
                   'sub':     '000000',
@@ -330,6 +332,28 @@ class Assembler():
     def NopFormat(self):
         return "00000000000000000000000000000000"
 
+    # def AppendTail(self):
+    #     try:
+    #         Asm_File = open(self.asmfilename, 'r', encoding="utf-8")
+    #     except:
+    #         print('\tError: Fail to open file ' + self.asmfilename + ".")
+    #         exit(0)
+
+    #     self.tfp = tempfile.TemporaryFile('w')
+
+    #     for line in Asm_File:
+    #         self.tfp.write("%s" % line)
+    #     self.tfp.write("EndOfFileLoop: wait 1000\n")
+    #     self.tfp.write("trigger 0000001 10000\n")
+    #     self.tfp.write('beq r0, r0, EndOfFileLoop\n')
+
+    #     self.tfp.seek(0)
+
+    #     for line in self.tfp:
+    #         print(line)
+
+    #     Asm_File.close()
+
     def ParseLabel(self):
         try:
             Asm_File = open(self.asmfilename, 'r', encoding="utf-8")
@@ -375,6 +399,7 @@ class Assembler():
         return tag_addr_dict
 
     def convert_to_instructions(self):
+        # self.AppendTail()
         tag_addr_dict = self.ParseLabel()
 
         try:
@@ -424,8 +449,8 @@ class Assembler():
                 # print('parsing add instruction.')
                 if (elements[1][0] != 'r' or elements[2][0] != 'r' or
                         elements[3][0] != 'r'):
-                    print('Error: Add instruction only receive three registers\
-                           as input.')
+                    raise ValueError('Add instruction only receive three registers'
+                          ' as input.')
                     exit()
 
                 instructions.append(int(self.AddFormat(elements[1],
@@ -436,8 +461,8 @@ class Assembler():
                 # print('parsing sub instruction.')
                 if (elements[1][0] != 'r' or elements[2][0] != 'r' or
                         elements[3][0] != 'r'):
-                    print('Error: Sub instruction only receive three \
-                           registers as input.')
+                    raise ValueError('Sub instruction only receive three'
+                           'registers as input.')
                     exit()
 
                 instructions.append(int(self.SubFormat(elements[1],
@@ -448,15 +473,15 @@ class Assembler():
                 # print('parsing beq instruction.')
 
                 if (elements[1][0] != 'r' or elements[2][0] != 'r'):
-                    print('Error: beq instruction only receive registers as \
-                           the first two parameter.')
+                    raise ValueError('beq instruction only receive registers as'
+                           ' the first two parameter.')
                     exit()
 
                 if elements[3].strip().lower() in tag_addr_dict:
                     target_addr = tag_addr_dict[elements[3].strip().lower()] -\
                                   (cur_addr + 1)
                 else:
-                    print("Error: beq. Cannot find the target: ",
+                    raise ValueError("beq. Cannot find the branch target label: ",
                           elements[3].strip().lower())
                     exit()
 
@@ -468,8 +493,8 @@ class Assembler():
                 # print('parsing bne instruction.')
 
                 if (elements[1][0] != 'r' or elements[2][0] != 'r'):
-                    print('Error: bne instruction only receive registers as \
-                           the first two parameter.')
+                    raise ValueError('bne instruction only receive registers as '
+                           'the first two parameter.')
                     exit()
 
                 if elements[3].strip().lower() in tag_addr_dict:
@@ -477,7 +502,7 @@ class Assembler():
                                   (cur_addr + 1)
                     # print("bne, target_addr: ", target_addr)
                 else:
-                    print("Error: bne. Cannot find the target: ",
+                    raise ValueError("bne. Cannot find the branch target label: ",
                           elements[3].strip().lower())
                     exit()
 
@@ -489,32 +514,20 @@ class Assembler():
                 # print('parsing addi instruction.')
 
                 if (elements[1][0] != 'r' or elements[2][0] != 'r'):
-                    print('Error: addi instruction only receive registers as \
-                           the first two parameter.')
+                    raise ValueError('addi instruction only receive registers as '
+                           'the first two parameter.')
                     exit()
 
                 instructions.append(int(self.AddiFormat(elements[1],
                                                         elements[2],
                                                         elements[3]), 2))
 
-            elif (elements[0].lower() == 'ori'):   # ori rt, rs, imm
-                # print('parsing ori instruction.')
-
-                if (elements[1][0] != 'r' or elements[2][0] != 'r'):
-                    print('Error: Ori instruction only receive registers as \
-                           the first two parameter.')
-                    exit()
-
-                instructions.append(int(self.OriFormat(elements[1],
-                                                       elements[2],
-                                                       elements[3]), 2))
-
             elif (elements[0].lower() == 'waitreg'):   # WaitReg rs
                 # print('parsing WaitReg instruction.')
 
                 if (elements[1][0] != 'r'):
-                    print('Error: WaitReg instruction only a register as the \
-                           parameter.')
+                    raise ValueError('WaitReg instruction only a register as the '
+                           'parameter.')
                     exit()
 
                 instructions.append(int(self.WaitRegFormat(elements[1]), 2))
@@ -527,11 +540,8 @@ class Assembler():
 
             elif (elements[0].lower() == 'measure'):   # Measure
                 # print('parsing Measure instruction.')
-
-                # if (elements[1][0] != 'r'):
-                #     print('Error: measure instruction only a register as the\
-                #            parameter.')
-                #     exit()
+                if (len(elements) > 1):
+                    print("Parameters in the measure instruction is omitted.")
 
                 instructions.append(int(self.MeasureFormat(), 2))
 
@@ -555,5 +565,15 @@ class Assembler():
                 return False
 
         Asm_File.close()
+
+        # Append the following instructions at the end of the file
+        # It loops forever and the marker 7 will always be high
+        # EndOfFileLoop:
+        #   wait 1000
+        #   trigger 0000001 1000
+        #   beq r0, r0, EndOfFileLoop
+        instructions.append(int('c08003e8', 16))
+        instructions.append(int('a08203e8', 16))
+        instructions.append(int('12007ffd', 16))
 
         return instructions
