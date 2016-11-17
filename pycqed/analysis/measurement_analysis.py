@@ -4069,7 +4069,9 @@ class Homodyne_Analysis(MeasurementAnalysis):
             guess_A = max(data_amp)
             guess_Q = f0 / abs(self.min_frequency - self.max_frequency) # this has to been improved
             guess_Qe = guess_Q/(1-(max(data_amp)-min(data_amp)))
-            guess_phi_v = (data_angle[0]-data_angle[-1])/(self.sweep_points[0] - self.sweep_points[-1])
+            # phi_v
+            nbr_phase_jumps = (np.diff(data_angle)>4).sum() # number of 2*pi phase jumps
+            guess_phi_v = (2*np.pi*nbr_phase_jumps+(data_angle[0]-data_angle[-1]))/(self.sweep_points[0] - self.sweep_points[-1])
             # phi_0
             angle_resonance = data_angle[int(len(self.sweep_points)/2)]
             phase_evolution_resonance = np.exp(1j*guess_phi_v*f0)
