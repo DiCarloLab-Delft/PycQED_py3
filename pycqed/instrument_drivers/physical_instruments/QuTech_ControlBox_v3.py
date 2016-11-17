@@ -3,7 +3,6 @@ import unittest
 import logging
 
 from qcodes.utils import validators as vals
-from ._controlbox import codec as c
 from ._controlbox import Assembler
 from . import QuTech_ControlBoxdriver as qcb
 from ._controlbox import defHeaders_CBox_v3 as defHeaders
@@ -13,6 +12,8 @@ import pyximport
 pyximport.install(setup_args={"script_args": ["--compiler=msvc"],
                               "include_dirs": np.get_include()},
                   reload_support=True)
+# important codec is after pyximport.install
+from ._controlbox import codec as c
 
 '''
 @author: Xiang Fu

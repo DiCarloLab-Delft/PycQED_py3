@@ -20,7 +20,7 @@ def T1(qubit_name, times, clock_cycle=5e-9,
     qasm_file = mopen(filename, mode='w')
     qasm_file.writelines('qubit {} \n'.format(qubit_name))
     for i, cl in enumerate(clocks):
-        qasm_file.writelines('init_all\n')
+        qasm_file.writelines('\ninit_all\n')
         if cal_points and (i == (len(clocks)-4) or
                            i == (len(clocks)-3)):
             qasm_file.writelines('RO {}  \n'.format(qubit_name))
@@ -55,7 +55,7 @@ def AllXY(qubit_name, double_points=False):
     qasm_file.writelines('qubit {} \n'.format(qubit_name))
 
     for pulse_comb in pulse_combinations:
-        qasm_file.writelines('init_all\n')
+        qasm_file.writelines('\ninit_all\n')
         if pulse_comb[0] != 'I':
             qasm_file.writelines('{} {}\n'.format(pulse_comb[0], qubit_name))
         if pulse_comb[1] != 'I':
@@ -70,7 +70,7 @@ def Rabi(qubit_name, amps, n=1):
     qasm_file = mopen(filename, mode='w')
     qasm_file.writelines('qubit {} \n'.format(qubit_name))
     for amp in amps:
-        qasm_file.writelines('init_all\n')
+        qasm_file.writelines('\ninit_all\n')
         for i in range(n):
             qasm_file.writelines('Rx {} {} \n'.format(qubit_name, amp))
         qasm_file.writelines('RO {}  \n'.format(qubit_name))
@@ -105,11 +105,11 @@ def Ramsey(qubit_name, times, clock_cycle=5e-9,
         phases = np.zeros(len(times))
 
     clocks = np.round(times/clock_cycle)
-    filename = join(base_qasm_path, 'T1.qasm')
+    filename = join(base_qasm_path, 'Ramsey.qasm')
     qasm_file = mopen(filename, mode='w')
     qasm_file.writelines('qubit {} \n'.format(qubit_name))
     for i, cl in enumerate(clocks):
-        qasm_file.writelines('init_all\n')
+        qasm_file.writelines('\ninit_all\n')
         if cal_points and (i == (len(clocks)-4) or
                            i == (len(clocks)-3)):
             qasm_file.writelines('RO {}  \n'.format(qubit_name))
@@ -156,11 +156,11 @@ def echo(qubit_name, times, clock_cycle=5e-9,
         phases = np.zeros(len(times))
 
     clocks = np.round(times/clock_cycle)
-    filename = join(base_qasm_path, 'T1.qasm')
+    filename = join(base_qasm_path, 'echo.qasm')
     qasm_file = mopen(filename, mode='w')
     qasm_file.writelines('qubit {} \n'.format(qubit_name))
     for i, cl in enumerate(clocks):
-        qasm_file.writelines('init_all\n')
+        qasm_file.writelines('\ninit_all\n')
         if cal_points and (i == (len(clocks)-4) or
                            i == (len(clocks)-3)):
             qasm_file.writelines('RO {}  \n'.format(qubit_name))
@@ -186,10 +186,10 @@ def off_on(qubit_name):
     qasm_file.writelines('qubit {} \n'.format(qubit_name))
 
     # Off
-    qasm_file.writelines('init_all\n')
+    qasm_file.writelines('\ninit_all\n')
     qasm_file.writelines('RO {}  \n'.format(qubit_name))
     # On
-    qasm_file.writelines('init_all\n')
+    qasm_file.writelines('\ninit_all\n')
     qasm_file.writelines('X180 {}     # On \n'.format(qubit_name))
     qasm_file.writelines('RO {}  \n'.format(qubit_name))
 
@@ -208,22 +208,22 @@ def butterfly(qubit_name, initialize=False):
     qasm_file = mopen(filename, mode='w')
     qasm_file.writelines('qubit {} \n'.format(qubit_name))
     if initialize:
-        qasm_file.writelines('init_all\n')
+        qasm_file.writelines('\ninit_all\n')
         qasm_file.writelines('RO {}  \n'.format(qubit_name))
         qasm_file.writelines('RO {}  \n'.format(qubit_name))
         qasm_file.writelines('RO {}  \n'.format(qubit_name))
 
-        qasm_file.writelines('init_all\n')
+        qasm_file.writelines('\ninit_all\n')
         qasm_file.writelines('RO {}  \n'.format(qubit_name))
         qasm_file.writelines('X180 {}  \n'.format(qubit_name))
         qasm_file.writelines('RO {}  \n'.format(qubit_name))
         qasm_file.writelines('RO {}  \n'.format(qubit_name))
     else:
-        qasm_file.writelines('init_all\n')
+        qasm_file.writelines('\ninit_all\n')
         qasm_file.writelines('RO {}  \n'.format(qubit_name))
         qasm_file.writelines('RO {}  \n'.format(qubit_name))
 
-        qasm_file.writelines('init_all\n')
+        qasm_file.writelines('\ninit_all\n')
         qasm_file.writelines('X180 {}  \n'.format(qubit_name))
         qasm_file.writelines('RO {}  \n'.format(qubit_name))
         qasm_file.writelines('RO {}  \n'.format(qubit_name))
@@ -300,7 +300,7 @@ def MotzoiXY(qubit_name, motzois, cal_points=True):
     qasm_file = mopen(filename, mode='w')
     qasm_file.writelines('qubit {} \n'.format(qubit_name))
     for i, motzoi in enumerate(motzois):
-        qasm_file.writelines('init_all\n')
+        qasm_file.writelines('\ninit_all\n')
         if cal_points and (i == (len(motzois)-4) or
                            i == (len(motzois)-3)):
             qasm_file.writelines('RO {}  \n'.format(qubit_name))
@@ -310,21 +310,15 @@ def MotzoiXY(qubit_name, motzois, cal_points=True):
             qasm_file.writelines('RO {}  \n'.format(qubit_name))
         if i % 2:
             qasm_file.writelines(
-                'X180_M {} {} \n'.format(qubit_name, motzoi))
+                'X180_Motz {} {} \n'.format(qubit_name, motzoi))
             qasm_file.writelines(
-                'Y90_M {} {} \n'.format(qubit_name, motzoi))
+                'Y90_Motz {} {} \n'.format(qubit_name, motzoi))
             qasm_file.writelines('RO {}  \n'.format(qubit_name))
         else:
             qasm_file.writelines(
-                'Y180_M {} {} \n'.format(qubit_name, motzoi))
+                'Y180_Motz {} {} \n'.format(qubit_name, motzoi))
             qasm_file.writelines(
-                'X90_M {} {} \n'.format(qubit_name, motzoi))
+                'X90_Motz {} {} \n'.format(qubit_name, motzoi))
             qasm_file.writelines('RO {}  \n'.format(qubit_name))
     qasm_file.close()
     return qasm_file
-
-
-
-
-
-
