@@ -117,7 +117,7 @@ class Test_MeasurementControl(unittest.TestCase):
         self.MC.soft_avg(1)
         self.MC.set_sweep_function(None_Sweep(sweep_control='hard'))
         self.MC.set_sweep_points(sweep_pts)
-        self.MC.set_detector_function(det.Dummy_Detector_Hard(noise=.5))
+        self.MC.set_detector_function(det.Dummy_Detector_Hard(noise=.4))
         noisy_dat = self.MC.run('noisy_dat')
         x = noisy_dat[:, 0]
         y = [np.sin(x / np.pi), np.cos(x/np.pi)]
@@ -140,8 +140,8 @@ class Test_MeasurementControl(unittest.TestCase):
 
     def test_soft_averages_hard_sweep_2D(self):
         self.MC.soft_avg(1)
-        sweep_pts = np.arange(50)
-        sweep_pts_2D = np.linspace(0, 10, 5)
+        sweep_pts = np.arange(5)
+        sweep_pts_2D = np.linspace(5, 10, 5)
         self.MC.set_sweep_function(None_Sweep(sweep_control='hard'))
         self.MC.set_sweep_function_2D(None_Sweep(sweep_control='soft'))
         self.MC.set_sweep_points(sweep_pts)
@@ -159,15 +159,16 @@ class Test_MeasurementControl(unittest.TestCase):
         np.testing.assert_array_almost_equal(x, x_tiled)
         np.testing.assert_array_almost_equal(y, y_rep)
 
-        np.testing.assert_array_almost_equal(z0, z[0])
-        np.testing.assert_array_almost_equal(z1, z[1])
-
+        self.MC.set_sweep_points(sweep_pts)
+        self.MC.set_sweep_points_2D(sweep_pts_2D)
         self.MC.soft_avg(1000)
-        avg_dat = self.MC.run('averaged_dat')
-        zavg_0 = abs(avg_dat[:, 1] - z[0])
-        zavg_1 = abs(avg_dat[:, 2] - z[1])
+        avg_dat = self.MC.run('averaged_dat', mode='2D')
+        x = avg_dat[:, 0]
+        y = avg_dat[:, 1]
+        zavg_0 = abs(avg_dat[:, 2] - z[0])
+        zavg_1 = abs(avg_dat[:, 3] - z[1])
 
-        np.testing.assert_array_almost_equal(x, sweep_pts)
+        np.testing.assert_array_almost_equal(x, x_tiled)
         self.assertGreater(np.mean(z0), np.mean(zavg_0))
         self.assertGreater(np.mean(z1), np.mean(zavg_1))
 

@@ -358,6 +358,7 @@ class MeasurementControl(Instrument):
         for attr in [self.TwoD_array,
                      self.dset,
                      self.sweep_points,
+                     self.sweep_points_2D,
                      self.sweep_functions,
                      self.xlen,
                      self.ylen,
@@ -566,7 +567,7 @@ class MeasurementControl(Instrument):
         Note that the plotmon only supports evenly spaced lattices.
         '''
         if self.live_plot_enabled():
-            i = int((self.iteration-1)%self.ylen)
+            i = int((self.iteration)%self.ylen)
             y_ind = i
             for j in range(len(self.detector_function.value_names)):
                 z_ind = len(self.sweep_functions) + j
@@ -713,11 +714,8 @@ class MeasurementControl(Instrument):
         if acquired_points < total_nr_pts:
             return False
         elif acquired_points >= total_nr_pts:
-            if self.soft_avg() != 1:
-                if self.soft_iteration == self.soft_avg():
-                    return True
-                else:
-                    return False
+            if self.soft_avg() != 1 and self.soft_iteration == 0:
+                return False
             else:
                 return True
 
