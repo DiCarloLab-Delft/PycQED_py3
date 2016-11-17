@@ -15,14 +15,23 @@ import time
 import h5py
 import numpy as np
 import pycqed as pq
+from uuid import getnode as get_mac
+
 
 try:
     qc_config
 except NameError:
-    # Stores data in the default data location (pycqed_py3/data/)
-    datadir = os.path.join(os.path.dirname(pq.__file__), os.pardir, 'data')
-    logging.warning('Creating qc_config for datadir')
-    qc_config = {'datadir': datadir}
+    try:
+        from pycqed.init.config import setup_dict
+        mac = get_mac()
+        setup_name = setup_dict.mac_dict[str(mac)]
+        logging.warning('Creating qc_config for datadir')
+        qc_config = {'datadir': setup_dict.data_dir_dict[setup_name]}
+    except:
+        # Stores data in the default data location (pycqed_py3/data/)
+        datadir = os.path.join(os.path.dirname(pq.__file__), os.pardir, 'data')
+        logging.warning('Creating qc_config for datadir')
+        qc_config = {'datadir': datadir}
 
 
 class DateTimeGenerator:
