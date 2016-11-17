@@ -20,7 +20,7 @@ class qx_client:
 	"""  
 	encoding    = "utf-8"
 	ack         = "OK"
-	timeout     = 5.0
+	timeout     = 7.0
 	buffer_size = 8192
 	IllegalOperationException = Exception("Illegal Operation !")
 
@@ -75,6 +75,7 @@ class qx_client:
 		"""
 		# type safety check 
 		assert isinstance(n, int)
+		assert (n>1)  # 2 or more qubits are quired in this version (measurement outcome has to be parsed correctly for single qubit)
 		
 		# qubit number check 
 		if self.__qubits != 0:
@@ -99,16 +100,37 @@ class qx_client:
 		self.__circuits.append("default")  # default main circuit is always there
 
 
-	def create_circuit(self,name,batch_cmd):
+	# def create_circuit(self,name,batch_cmd):
+	def create_circuit(self,name,gates):
 		"""
 		  create a circuit named 'name' using a batch command (batch command should be in the format 'cmd1; cmd2; cmd3;...' 
 		  note: circuit should be created after creating the qubits, else an error code will be returned from the server
+		  batch command is problematic: it can be truncated causing errors on the server side...
 		"""
 		# safety check 
 		if self.__qubits == 0:   # error : qubits should be created first
 			raise IllegalOperationException
+		'''
+		if (len(batch_cmd) < self.buffer_size):
+			self.send_cmd(".%s" % name)   # create the circuit named 'name'
+			self.send_cmd(batch_cmd)    # build  the circuit using the batch command
+		else:
+			gates = batch_cmd.split("; ")
+			batch = ""
+			seq   = 0
+			for g in gates:
+				batch = batch + g + "; "
+				seq = seq + 1
+				if seq == 100:
+					self.send_cmd(batch) 
+					seq = 0
+					batch = ""
+			if seq != 0:
+			   self.send_cmd(batch)
+		'''
 		self.send_cmd(".%s" % name)   # create the circuit named 'name'
-		self.send_cmd(batch_cmd)    # build  the circuit using the batch command
+		for g in gates:
+			self.send_cmd(g)
 		self.__circuits.append(name) # add    the circuit to our local circuit list
 	
 	def run_circuit(self,name):
@@ -124,9 +146,11 @@ class qx_client:
 		'''
 		  noisy execution of the circuit named 'name' using the specified error model and error probability
 		'''
+		print("[~] qx_client : trying to execute ",name)
 		if name in self.__circuits:
 			self.send_cmd("run_noisy %s %s %f" % (name,error_model, error_probability))
 		else:
+			print(self.__circuits)
 			raise IllegalOperationException   # circuit does not exist
 
 	def get_measurement(self,qubit):
@@ -138,11 +162,15 @@ class qx_client:
 		start = measurement_register.find("|")
 		end   = measurement_register.rfind("|")
 		measurement_register = measurement_register[start+2:end-1]
+		# print("[+] sub-measurments register : ",measurement_register)
 		bits = measurement_register.split(" | ")
-		# print("[+] measurments bits: ",bits)
+		print("[+] measurments bits: ",bits)
 		assert(len(bits) == self.__qubits)  # measurement bits should correspond to the qubit number
 		return bits[len(bits)-qubit-1]
-
+	
+	def list_circuits(self):
+		circuits = self.send_cmd("circuits")
+		print("[+] created circuits: ", circuits)
 
 	def disconnect(self):
 		self.__trace("qx_client::disconnect : stopping qx server...")
