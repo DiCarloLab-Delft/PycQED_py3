@@ -275,36 +275,49 @@ class UHFQC(Instrument):
             for c in channels:
                 paths[c] = '/' + self._device + '/quex/rl/data/{}'.format(c)
                 data[c] = []
-                self._daq.subscribe(paths[c])
         else:
             for c in channels:
                 paths[c] = '/' + self._device + '/quex/iavg/data/{}'.format(c)
                 data[c] = []
-                self._daq.subscribe(paths[c])
 
+        # It would be better to move this call in to the initialization function
+        # in order to save time here
+        enable_path = '/' + self._device + '/awgs/0/enable'
+        self._daq.subscribe(enable_path)
 
-        #self._daq.setInt('/' + self._device + '/awgs/0/single', 1)
-        #self._daq.setInt('/' + self._device + '/awgs/0/enable', 1)
+        # Added for testing purposes, remove again according to how the AWG is started
+        self._daq.setInt('/' + self._device + '/awgs/0/single', 1)
+        self._daq.setInt(enable_path, 1)
 
         timeout = 0
-        gotem = [False]*len(channels)
-        while not all(gotem) and timeout < 100:
+        gotit = False
+        while not gotit and timeout < 100:
             dataset = self._daq.poll(acquisition_time, timeout, 4, True)
-            for n, c in enumerate(channels):
-                p = paths[c]
-                if p in dataset:
-                    for v in dataset[p]:
-                        data[c] = np.concatenate((data[c], v['vector']))
-                    if len(data[c]) >= samples:
-                        gotem[n] = True
+            if enable_path in dataset and dataset[enable_path]['value'][0] == 0:
+                gotit = True
+            else:
+                timeout += 1
 
-            timeout += 1
+        if not gotit:
+            print("Error: AWG did not finish in time!")
+            return (None, None)
+
+        gotem = [False]*len(channels)
+        for n, c in enumerate(channels):
+            p = paths[c]
+            dataset = self._daq.get(p, True, 0)
+            if p in dataset:
+                for v in dataset[p]:
+                    data[c] = np.concatenate((data[c], v['vector']))
+                if len(data[c]) >= samples:
+                    gotem[n] = True
 
         if not all(gotem):
             print("Error: Didn't get all results!")
             for n, c in enumerate(channels):
                 print("    : Channel {}: Got {} of {} samples", c, len(data[c]), samples)
             return (None, None)
+
         # print("data type {}".format(type(data)))
         return data
 
