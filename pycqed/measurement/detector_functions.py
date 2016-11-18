@@ -921,21 +921,29 @@ class QX_Detector(Soft_Detector):
     def acquire_data_point(self, **kw):
         circuit_name = ("circuit%i" % self.__cnt)
         errors = 0
+
+
         executions = 1000
-        p_error    = 0.0001+self.__cnt*0.0002
+        p_error    = 0.001+self.__cnt*0.003
+        '''
         for i in range(0,executions):
-        	self.__qxc.run_noisy_circuit(circuit_name,p_error)
-        	m0 = self.__qxc.get_measurement(0)
-        	# m1 = self.__qxc.get_measurement(1)
-        	if int(m0) != 0 :
-        		errors += 1
-        	# print("[+] measurement outcome : %s %s" % (m0,m1))
+            self.__qxc.run_noisy_circuit(circuit_name,p_error)
+            m0 = self.__qxc.get_measurement(0)
+            # m1 = self.__qxc.get_measurement(1)
+            if int(m0) != 0 :
+                errors += 1
+            # print("[+] measurement outcome : %s %s" % (m0,m1))
         # x = self.__cnt/15.
+        '''
         print("[+] p error  :",p_error)
-        print("[+] errors   :",errors)
-        f = (executions-errors)/executions
+        # print("[+] errors   :",errors)
+        # f = (executions-errors)/executions
+        self.__qxc.send_cmd("reset_measurement_averaging")
+        self.__qxc.run_noisy_circuit(circuit_name,p_error,"depolarizing_channel",executions)
+        f = self.__qxc.get_measurement_average(0)
         print("[+] fidelity :",f)
-        time.sleep(self.delay)
+        self.__qxc.send_cmd("reset_measurement_averaging")
+        # time.sleep(self.delay)
         self.__cnt = self.__cnt+1
         return f
 

@@ -76,8 +76,7 @@ class QX_Sweep(Soft_Sweep):
 
     def set_parameter(self, val):
         circuit_name = ("circuit%i" % self.__cnt)
-        self.__qxc.create_circuit(circuit_name,
-                                  "prepz q0; h q0; x q0; z q0; y q0; y q0; z q0; x q0; h q0; measure q0;")
+        self.__qxc.create_circuit(circuit_name,["prepz q0", "h q0", "x q0", "z q0", "y q0", "y q0", "z q0", "x q0", "h q0", "measure q0"])
         self.__cnt = self.__cnt+1
         # pass
 
@@ -99,7 +98,7 @@ class QX_RB_Sweep(Soft_Sweep):
         self.num_circuits = num_circuits
         qasm = ql.qasm_loader(filename)
         qasm.load_circuits()
-        self.circuits = qasm.get_circuits() 
+        self.circuits = qasm.get_circuits()
         for c in self.circuits:
                 self.__qxc.create_circuit(c[0],c[1])
 
