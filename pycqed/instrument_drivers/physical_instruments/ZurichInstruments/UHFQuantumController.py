@@ -500,16 +500,8 @@ class UHFQC(Instrument):
         values = {}
 
         for p in paths:
-            self._daq.getAsEvent(p)
-
-        tries = 0
-        while len(values) < len(paths) and tries < 10:
-            try:
-                tmp = self._daq.poll(0.001, 500, 4, True)
-                for p in tmp:
-                    values[p] = tmp[p]
-            except ZIException:
-                pass
+            tmp = self._daq.get(p, True, 0)
+            values[p] = tmp[p]
 
         if single:
             return values[paths[0]]
