@@ -49,6 +49,33 @@ class Rabi(swf.Hard_Sweep):
                          n=self.n, return_seq=self.return_seq)
 
 
+class two_qubit_tomo_cardinal(swf.Hard_Sweep):
+    def __init__(self, cardinal, q0_pulse_pars, q1_pulse_pars,
+                 RO_pars, timings_dict, upload=True, return_seq=False):
+        super().__init__()
+        self.cardinal = cardinal
+        self.q0_pulse_pars = q0_pulse_pars
+        self.q1_pulse_pars = q1_pulse_pars
+        self.RO_pars = RO_pars
+        self.timings_dict = timings_dict
+        self.upload = upload
+        self.return_seq = return_seq
+        self.name = 'Tomo2Q_%d'%cardinal
+        self.parameter_name = 'Tomo Pulses'
+        self.unit = 'V'
+
+    def prepare(self, **kw):
+        if self.upload:
+            self.seq = mq_sqs.two_qubit_tomo_cardinal(cardinal=self.cardinal,
+                                    q0_pulse_pars=self.q0_pulse_pars,
+                                    q1_pulse_pars=self.q1_pulse_pars,
+                                    RO_pars=self.RO_pars,
+                                    timings_dict=self.timings_dict,
+                                    upload=self.upload,
+                                    return_seq=self.return_seq)
+
+
+
 class Flipping(swf.Hard_Sweep):
     def __init__(self, pulse_pars, RO_pars, n=1, upload=True, return_seq=False):
         super().__init__()
@@ -188,17 +215,19 @@ class chevron_cphase_length(swf.Hard_Sweep):
                                            distortion_dict=self.dist_dict,
                                            return_seq=True)
 
-class repeat_swap(swf.Hard_Sweep):
+class SwapN(swf.Hard_Sweep):
     def __init__(self, rep_max, mw_pulse_pars, RO_pars,
-                 flux_pulse_pars,dist_dict, AWG, upload=True, return_seq=False):
+                 flux_pulse_pars, dist_dict, AWG, timings_dict,
+                 upload=True, return_seq=False):
         super().__init__()
         self.rep_max = rep_max
         self.mw_pulse_pars = mw_pulse_pars
         self.RO_pars = RO_pars
         self.flux_pulse_pars = flux_pulse_pars
         self.dist_dict = dist_dict
+        self.timings_dict = timings_dict
         self.upload = upload
-        self.name = 'Chevron'
+        self.name = 'SWAPN'
         self.parameter_name = 'SWAP pulses'
         self.unit = '#'
         self.return_seq = return_seq
@@ -206,18 +235,24 @@ class repeat_swap(swf.Hard_Sweep):
 
     def prepare(self, **kw):
         if self.upload:
-            fsqs.repeat_swap(self.rep_max,
-                                    self.mw_pulse_pars,
-                                    self.RO_pars,
-                                    self.flux_pulse_pars,
-                                    distortion_dict=self.dist_dict)
+            old_val = self.AWG.get('%s_amp'%self.flux_pulse_pars['channel'])
+            self.AWG.set('%s_amp'%self.flux_pulse_pars['channel'],2.)
+            fsqs.SwapN(self.rep_max,
+                       self.mw_pulse_pars,
+                       self.RO_pars,
+                       self.flux_pulse_pars,
+                       distortion_dict=self.dist_dict,
+                       timings_dict=self.timings_dict,upload=self.upload)
+            self.AWG.set('%s_amp'%self.flux_pulse_pars['channel'],old_val)
 
     def pre_upload(self, **kw):
-        self.seq = fsqs.repeat_swap(self.rep_max,
-                                    self.mw_pulse_pars,
-                                    self.RO_pars,
-                                    self.flux_pulse_pars,
-                                    distortion_dict=self.dist_dict, return_seq=True)
+        self.seq = fsqs.SwapN(self.rep_max,
+                              self.mw_pulse_pars,
+                              self.RO_pars,
+                              self.flux_pulse_pars,
+                              distortion_dict=self.dist_dict,
+                              timings_dict=self.timings_dict,
+                              return_seq=True)
 
 class repeat_swap_even(swf.Hard_Sweep):
     def __init__(self, rep_max, mw_pulse_pars, RO_pars,

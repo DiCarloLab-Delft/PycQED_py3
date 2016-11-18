@@ -176,6 +176,210 @@ def four_qubit_off_on(q0_pulse_pars,
     else:
         return seq_name
 
+def five_qubit_off_on(q0_pulse_pars,
+                      q1_pulse_pars,
+                      q2_pulse_pars,
+                      q3_pulse_pars,
+                      q4_pulse_pars,
+                      RO_pars,
+                   return_seq=False, verbose=False):
+
+    seq_name = '5_qubit_OffOn_sequence'
+    seq = sequence.Sequence(seq_name)
+    station.pulsar.update_channel_settings()
+    el_list = []
+    # Create a dict with the parameters for all the pulses
+    q0_pulses = add_suffix_to_dict_keys(
+        get_pulse_dict_from_pars(q0_pulse_pars), ' q0')
+    q1_pulses = add_suffix_to_dict_keys(
+        get_pulse_dict_from_pars(q1_pulse_pars), ' q1')
+    q2_pulses = add_suffix_to_dict_keys(
+        get_pulse_dict_from_pars(q2_pulse_pars), ' q2')
+    q3_pulses = add_suffix_to_dict_keys(
+        get_pulse_dict_from_pars(q3_pulse_pars), ' q3')
+    q4_pulses = add_suffix_to_dict_keys(
+        get_pulse_dict_from_pars(q4_pulse_pars), ' q4')
+    RO_dict = {'RO': RO_pars}
+
+    pulse_dict = {}
+    pulse_dict.update(q0_pulses)
+    pulse_dict.update(q1_pulses)
+    pulse_dict.update(q2_pulses)
+    pulse_dict.update(q3_pulses)
+    pulse_dict.update(q4_pulses)
+    pulse_dict.update(RO_dict)
+
+    # N.B. Identities not needed in all cases
+    pulse_combinations = [['I q0', 'I q1', 'I q2', 'I q3', 'I q4','RO'],
+                          ['X180 q0', 'I q1', 'I q2', 'I q3', 'I q4','RO'],
+                          ['I q0', 'X180 q1','I q2', 'I q3', 'I q4', 'RO'],
+                          ['X180 q0', 'X180 q1','I q2', 'I q3', 'I q4', 'RO'],
+                          ['I q0', 'I q1', 'X180 q2', 'I q3', 'I q4', 'RO'],
+                          ['X180 q0', 'I q1', 'X180 q2', 'I q3', 'I q4','RO'],
+                          ['I q0', 'X180 q1','X180 q2',  'I q3', 'I q4','RO'],
+                          ['X180 q0', 'X180 q1','X180 q2',  'I q3', 'I q4','RO'],
+                          ['I q0', 'I q1', 'I q2', 'X180 q3', 'I q4','RO'],
+                          ['X180 q0', 'I q1', 'I q2', 'X180 q3', 'I q4','RO'],
+                          ['I q0', 'X180 q1','I q2', 'X180 q3', 'I q4', 'RO'],
+                          ['X180 q0', 'X180 q1','I q2', 'X180 q3', 'I q4', 'RO'],
+                          ['I q0', 'I q1', 'X180 q2', 'X180 q3', 'I q4', 'RO'],
+                          ['X180 q0', 'I q1', 'X180 q2', 'X180 q3', 'I q4','RO'],
+                          ['I q0', 'X180 q1','X180 q2',  'X180 q3', 'I q4','RO'],
+                          ['X180 q0', 'X180 q1','X180 q2',  'X180 q3', 'I q4','RO'],
+                          ['I q0', 'I q1', 'I q2', 'I q3', 'X180 q4','RO'],
+                          ['X180 q0', 'I q1', 'I q2', 'I q3', 'X180 q4','RO'],
+                          ['I q0', 'X180 q1','I q2', 'I q3', 'X180 q4', 'RO'],
+                          ['X180 q0', 'X180 q1','I q2', 'I q3', 'X180 q4', 'RO'],
+                          ['I q0', 'I q1', 'X180 q2', 'I q3', 'X180 q4', 'RO'],
+                          ['X180 q0', 'I q1', 'X180 q2', 'I q3', 'X180 q4','RO'],
+                          ['I q0', 'X180 q1','X180 q2',  'I q3', 'X180 q4','RO'],
+                          ['X180 q0', 'X180 q1','X180 q2',  'I q3', 'X180 q4','RO'],
+                          ['I q0', 'I q1', 'I q2', 'X180 q3', 'X180 q4','RO'],
+                          ['X180 q0', 'I q1', 'I q2', 'X180 q3', 'X180 q4','RO'],
+                          ['I q0', 'X180 q1','I q2', 'X180 q3', 'X180 q4', 'RO'],
+                          ['X180 q0', 'X180 q1','I q2', 'X180 q3', 'X180 q4', 'RO'],
+                          ['I q0', 'I q1', 'X180 q2', 'X180 q3', 'X180 q4', 'RO'],
+                          ['X180 q0', 'I q1', 'X180 q2', 'X180 q3', 'X180 q4','RO'],
+                          ['I q0', 'X180 q1','X180 q2',  'X180 q3', 'X180 q4','RO'],
+                          ['X180 q0', 'X180 q1','X180 q2',  'X180 q3', 'X180 q4','RO']]
+
+    for i, pulse_comb in enumerate(pulse_combinations):
+        pulses = []
+        for p in pulse_comb:
+            pulses += [pulse_dict[p]]
+
+        el = multi_pulse_elt(i, station, pulses)
+        el_list.append(el)
+        seq.append_element(el, trigger_wait=True)
+    station.components['AWG'].stop()
+    station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+    if return_seq:
+        return seq, el_list
+    else:
+        return seq_name
+
+
+
+
+def two_qubit_tomo_cardinal(cardinal,
+                            q0_pulse_pars,
+                            q1_pulse_pars,
+                            RO_pars,
+                            timings_dict,
+                            verbose=False,
+                            upload=True,
+                            return_seq=False):
+
+    seq_name = '2_qubit_Card_%d_seq'%cardinal
+    seq = sequence.Sequence(seq_name)
+    station.pulsar.update_channel_settings()
+    el_list = []
+    # Create a dict with the parameters for all the pulses
+    q0_pulses = add_suffix_to_dict_keys(
+        get_pulse_dict_from_pars(q0_pulse_pars), ' q0')
+    q1_pulses = add_suffix_to_dict_keys(
+        get_pulse_dict_from_pars(q1_pulse_pars), ' q1')
+    RO_dict = {'RO': RO_pars}
+
+    pulse_dict = {}
+    pulse_dict.update(q0_pulses)
+    pulse_dict.update(q1_pulses)
+    pulse_dict.update(RO_dict)
+
+    # Timings
+    QQ_buffer = timings_dict['QQ_buffer']
+    wait_time = timings_dict['wait_time']
+    msmt_buffer = timings_dict['msmt_buffer']
+
+    tomo_list_q0 = ['I q0', 'X180 q0', 'Y90 q0',
+                     'mY90 q0', 'X90 q0', 'mX90 q0']
+    tomo_list_q1 = ['I q1', 'X180 q1', 'Y90 q1',
+                     'mY90 q1', 'X90 q1', 'mX90 q1']
+
+    # inner loop on q0
+    prep_idx_q0 = int(cardinal % 6)
+    prep_idx_q1 = int(((cardinal - prep_idx_q0)/6) % 6)
+
+    prep_pulse_q0 = pulse_dict[tomo_list_q0[prep_idx_q0]]
+    prep_pulse_q1 = pulse_dict[tomo_list_q1[prep_idx_q1]]
+
+    prep_pulse_q1['pulse_delay'] = QQ_buffer + (prep_pulse_q0['sigma']*
+                                                prep_pulse_q0['nr_sigma'])
+
+    RO_pars['pulse_delay'] += msmt_buffer - (prep_pulse_q1['sigma']*
+                                                prep_pulse_q1['nr_sigma'])
+
+    # Calibration points
+    cal_points = [['I q0', 'I q1', 'RO'],
+                  ['I q0', 'I q1', 'RO'],
+                  ['I q0', 'I q1', 'RO'],
+                  ['I q0', 'I q1', 'RO'],
+                  ['I q0', 'I q1', 'RO'],
+                  ['I q0', 'I q1', 'RO'],
+                  ['I q0', 'I q1', 'RO'],
+                  ['X180 q0', 'I q1', 'RO'],
+                  ['X180 q0', 'I q1', 'RO'],
+                  ['X180 q0', 'I q1', 'RO'],
+                  ['X180 q0', 'I q1', 'RO'],
+                  ['X180 q0', 'I q1', 'RO'],
+                  ['X180 q0', 'I q1', 'RO'],
+                  ['X180 q0', 'I q1', 'RO'],
+                  ['I q0', 'X180 q1', 'RO'],
+                  ['I q0', 'X180 q1', 'RO'],
+                  ['I q0', 'X180 q1', 'RO'],
+                  ['I q0', 'X180 q1', 'RO'],
+                  ['I q0', 'X180 q1', 'RO'],
+                  ['I q0', 'X180 q1', 'RO'],
+                  ['I q0', 'X180 q1', 'RO'],
+                  ['X180 q0', 'X180 q1', 'RO'],
+                  ['X180 q0', 'X180 q1', 'RO'],
+                  ['X180 q0', 'X180 q1', 'RO'],
+                  ['X180 q0', 'X180 q1', 'RO'],
+                  ['X180 q0', 'X180 q1', 'RO'],
+                  ['X180 q0', 'X180 q1', 'RO'],
+                  ['X180 q0', 'X180 q1', 'RO']]
+
+    for i in range(36):
+        tomo_idx_q0 = int(i % 6)
+        tomo_idx_q1 = int(((i - tomo_idx_q0)/6) % 6)
+
+        # print(i,tomo_idx_q0,tomo_idx_q1)
+
+        tomo_pulse_q0 = pulse_dict[tomo_list_q0[tomo_idx_q0]]
+        tomo_pulse_q1 = pulse_dict[tomo_list_q1[tomo_idx_q1]]
+
+        tomo_pulse_q0['pulse_delay'] = wait_time + (prep_pulse_q1['sigma']*
+                                                prep_pulse_q1['nr_sigma'])
+
+        tomo_pulse_q1['pulse_delay'] = QQ_buffer + (tomo_pulse_q0['sigma']*
+                                                tomo_pulse_q0['nr_sigma'])
+        pulse_list = [prep_pulse_q0,
+                      prep_pulse_q1,
+                      tomo_pulse_q0,
+                      tomo_pulse_q1,
+                      RO_pars]
+        pulse_list[0]['pulse_delay'] += 0.01e-6
+        el = multi_pulse_elt(i, station, pulse_list)
+        el_list.append(el)
+        seq.append_element(el, trigger_wait=True)
+
+    for i, pulse_comb in enumerate(cal_points):
+        pulses = []
+        for p in pulse_comb:
+            pulses += [pulse_dict[p]]
+        pulses[0]['pulse_delay'] += 0.01e-6
+
+        el = multi_pulse_elt(35+i, station, pulses)
+        el_list.append(el)
+        seq.append_element(el, trigger_wait=True)
+
+    station.components['AWG'].stop()
+    station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+    if return_seq:
+        return seq, el_list
+    else:
+        return seq_name
+
 
 def cphase_fringes(phases, q0_pulse_pars, q1_pulse_pars, RO_pars,
                    swap_pars_q0, cphase_pars_q1, timings_dict,
@@ -309,8 +513,6 @@ def cphase_fringes(phases, q0_pulse_pars, q1_pulse_pars, RO_pars,
         return seq, el_list
     else:
         return seq
-
-
 
 
 def preload_kernels_func(distortion_dict):

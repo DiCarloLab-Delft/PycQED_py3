@@ -179,10 +179,11 @@ def chevron_seq_length(lengths, mw_pulse_pars, RO_pars, flux_pulse_pars=None,
     else:
         return seq
 
-def repeat_swap(rep_max, mw_pulse_pars, RO_pars, flux_pulse_pars=None,
+def SwapN(rep_max, mw_pulse_pars, RO_pars, flux_pulse_pars=None,
                        excite=True,
                        verbose=False,
                        distortion_dict=None,
+                       timings_dict=None,
                        upload=True,
                        return_seq=False):
     '''
@@ -209,35 +210,36 @@ def repeat_swap(rep_max, mw_pulse_pars, RO_pars, flux_pulse_pars=None,
                    'amplitude': 0,
                    'length': 0.}
 
-    seq_name = 'Chevron_seq'
+    seq_name = 'SWAPN_seq'
     seq = sequence.Sequence(seq_name)
     station.pulsar.update_channel_settings()
     el_list = []
     pulses = get_pulse_dict_from_pars(mw_pulse_pars)
     lngt = flux_pulse_pars['length']
     minus_flux_pulse_pars['length'] = lngt
+    # Timings
+    buffer_mw_flux = timings_dict['buffer_mw_flux']
+    buffer_flux_flux = timings_dict['buffer_flux_flux']
+    msmt_buffer = timings_dict['msmt_buffer']
+    dead_time = timings_dict['dead_time']
     for i in range(rep_max):  # seq has to have at least 2 elts
         # correcting timings
-        pulse_buffer = 50e-9
-        flux_pulse_pars['pulse_delay'] = pulse_buffer + (mw_pulse_pars['sigma'] *
+        flux_pulse_pars['pulse_delay'] = buffer_mw_flux + (mw_pulse_pars['sigma'] *
                                                          mw_pulse_pars['nr_sigma'])
-        msmt_buffer = 50e-9
-        RO_pars['pulse_delay'] = msmt_buffer + lngt
+        RO_pars['pulse_delay'] += msmt_buffer + lngt - (mw_pulse_pars['sigma'] *
+                                                        mw_pulse_pars['nr_sigma'])
         dead_time_pulse['pulse_delay'] = RO_pars['pulse_delay']
 
-        dead_time = 3e-6
         minus_flux_pulse_pars['pulse_delay'] = dead_time + RO_pars['length']
         if excite:
             init_pulse = pulses['X180']
         else:
             init_pulse = pulses['I']
 
-        buffer_swap = 50e-9
-
         sec_flux_pulse_pars = deepcopy(flux_pulse_pars)
-        flux_pulse_pars['pulse_delay'] = flux_pulse_pars['length'] + buffer_swap
+        sec_flux_pulse_pars['pulse_delay'] = flux_pulse_pars['length'] + buffer_flux_flux
         sec_minus_flux_pulse_pars = deepcopy(minus_flux_pulse_pars)
-        sec_minus_flux_pulse_pars['pulse_delay'] = minus_flux_pulse_pars['length'] + buffer_swap
+        sec_minus_flux_pulse_pars['pulse_delay'] = minus_flux_pulse_pars['length'] + buffer_flux_flux
         if i == 0:
             pulse_list = [init_pulse,
                           flux_pulse_pars,
@@ -261,7 +263,6 @@ def repeat_swap(rep_max, mw_pulse_pars, RO_pars, flux_pulse_pars=None,
             el_list[i] = el
         seq.append_element(el, trigger_wait=True)
     cal_points = 4
-    RO_pars['pulse_delay'] = original_delay
     for i in range(int(cal_points/2)):
         pulse_list = [pulses['I'], RO_pars]
         # copy first element and set extra wait
@@ -280,6 +281,7 @@ def repeat_swap(rep_max, mw_pulse_pars, RO_pars, flux_pulse_pars=None,
         el = multi_pulse_elt(len(np.arange(rep_max))+int(cal_points/2)+i, station, pulse_list)
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
+    RO_pars['pulse_delay'] = original_delay
 
 
     if upload:
