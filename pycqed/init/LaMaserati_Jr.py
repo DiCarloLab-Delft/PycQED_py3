@@ -22,7 +22,7 @@ import qcodes as qc
 # Globally defined config
 # qc_config = {'datadir': r'D:\\Experimentsp7_Qcodes_5qubit',
 #              'PycQEDdir': 'D:\GitHubRepos\PycQED_py3'}
-qc_config = {'datadir': r'D:\\Experiments\\1611_vertical_delivery_chipA_W15_NW21\\Data',
+qc_config = {'datadir': r'D:\\Experiments\\1611_Starmon\\Data',
              'PycQEDdir': 'D:\GitHubRepos\PycQED_py3'}
 
 # makes sure logging messages show up in the notebook
@@ -92,8 +92,8 @@ VNA = ZNB20.ZNB20(name='VNA', address='TCPIP0::192.168.0.55', server_name=None) 
 station.add_component(VNA)
 
 # variable attenuator
-ATT = Weinschel_8320_novisa.Weinschel_8320(name='ATT',address='192.168.0.54', server_name=None)
-station.add_component(ATT)
+# ATT = Weinschel_8320_novisa.Weinschel_8320(name='ATT',address='192.168.0.54', server_name=None)
+# station.add_component(ATT)
 
 
 MC = mc.MeasurementControl('MC')
