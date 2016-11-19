@@ -174,6 +174,9 @@ class chevron_length(swf.Hard_Sweep):
                                     self.flux_pulse_pars,
                                     distortion_dict=self.dist_dict, return_seq=True)
 
+    def set_parameter(self, val, **kw):
+        pass
+
 class chevron_cphase_length(swf.Hard_Sweep):
     def __init__(self, length_vec, mw_pulse_pars,RO_pars,
                  flux_pulse_pars, cphase_pulse_pars, phase_2, dist_dict, AWG, upload=True, return_seq=False):
