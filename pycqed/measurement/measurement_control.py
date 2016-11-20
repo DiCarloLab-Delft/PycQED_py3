@@ -90,7 +90,8 @@ class MeasurementControl(Instrument):
             # (might want to overwrite again at the end)
             self.save_instrument_settings(self.data_object)
             self.create_experimentaldata_dataset()
-            self.xlen = len(self.get_sweep_points())
+            if mode is not 'adaptive':
+                self.xlen = len(self.get_sweep_points())
             if self.mode == '1D':
                 self.measure()
             elif self.mode == '2D':
@@ -176,9 +177,10 @@ class MeasurementControl(Instrument):
         return
 
     def measure_soft_static(self):
-        for i, sweep_point in enumerate(self.sweep_points):
-            self.measurement_function(sweep_point)
-            self.print_progress()
+        for self.soft_iteration in range(self.soft_avg()):
+            for i, sweep_point in enumerate(self.sweep_points):
+                self.measurement_function(sweep_point)
+                self.print_progress()
 
     def measure_soft_adaptive(self, method=None):
         '''
@@ -187,9 +189,9 @@ class MeasurementControl(Instrument):
         '''
         self.save_optimization_settings()
         adaptive_function = self.af_pars.pop('adaptive_function')
-
-        self.initialize_plot_monitor()
-        self.initialize_plot_monitor_adaptive()
+        if self.live_plot_enabled():
+            self.initialize_plot_monitor()
+            self.initialize_plot_monitor_adaptive()
         for sweep_function in self.sweep_functions:
             sweep_function.prepare()
         self.detector_function.prepare()
@@ -213,8 +215,9 @@ class MeasurementControl(Instrument):
         self.update_plotmon(force_update=True)
         self.update_plotmon_adaptive(force_update=True)
         self.get_measurement_endtime()
-        print('Optimization completed in {:.4g}s'.format(
-            self.endtime-self.begintime))
+        if self.verbose:
+            print('Optimization completed in {:.4g}s'.format(
+                self.endtime-self.begintime))
         return
 
     def measure_hard(self):
