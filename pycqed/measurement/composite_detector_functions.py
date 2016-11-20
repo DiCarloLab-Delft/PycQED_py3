@@ -449,7 +449,7 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
                 self.MC.set_detector_function(
                     det.UHFQC_integration_logging_det(self.acquisition_instr,
                                                           self.AWG, channels=[self.weight_function_I,self.weight_function_Q],
-                                                          integration_length=self.integration_length, nr_shots=min(self.nr_shots, 256)))
+                                                          integration_length=self.integration_length, nr_shots=min(self.nr_shots, 4095)))
                 if self.SSB:
                     self.UHFQC.prepare_SSB_weight_and_rotation(IF=self.IF, weight_function_I=self.weight_function_I, weight_function_Q=self.weight_function_Q)
                 else:
@@ -530,50 +530,66 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
                 self.UHFQC.awgs_0_userregs_1(1)#0 for rl, 1 for iavg
                 self.UHFQC.quex_iavg_length(nr_samples)
                 self.UHFQC.quex_iavg_avgcnt(int(np.log2(self.nr_averages)))
+                self.UHFQC.awgs_0_single(1)
                 SWF = awg_swf.OffOn(
                                     pulse_pars=self.pulse_pars,
                                     RO_pars=self.RO_pars,
                                     pulse_comb='OffOff',
                                     nr_samples=nr_samples)
                 SWF.prepare()
-                self.UHFQC.awgs_0_single(1)
                 self.UHFQC.awgs_0_enable(1)
+                try:
+                    temp = self.UHFQC.awgs_0_enable()
+                except:
+                    temp = self.UHFQC.awgs_0_enable()
+                del temp
                 self.AWG.start()
-                # while self.UHFQC.awgs_0_enable() == 1:
-                #     time.sleep(0.1)
-                # time.sleep(1)
+                while self.UHFQC.awgs_0_enable() == 1:
+                    time.sleep(0.01)
 
-                self.poll_time=0.7
-                data = self.UHFQC.single_acquisition(nr_samples,
-                                             self.poll_time, timeout=0,
-                                             channels=set([0,1]),
-                                             mode='iavg')
-                data = np.array([data[key] for key in data.keys()])
+                self.channels=[0,1]
+                data = ['']*len(self.channels)
+                for i, channel in enumerate(self.channels):
+                    dataset = eval("self.UHFQC.quex_iavg_data_{}()".format(channel))
+                    data[i] = dataset[0]['vector']
+                # data = self.UHFQC.single_acquisition(nr_samples,
+                #                              self.poll_time, timeout=0,
+                #                              channels=set([0,1]),
+                #                              mode='iavg')
+                # data = np.array([data[key] for key in data.keys()])
                 transient0_I = data[0]
                 transient0_Q = data[1]
-
                 self.AWG.stop()
                 self.UHFQC.quex_iavg_length(nr_samples)
+
                 SWF = awg_swf.OffOn(
                                     pulse_pars=self.pulse_pars,
                                     RO_pars=self.RO_pars,
                                     pulse_comb='OnOn',
                                     nr_samples=nr_samples)
                 SWF.prepare()
-                self.UHFQC.awgs_0_single(1)
                 self.UHFQC.awgs_0_enable(1)
+                try:
+                    temp = self.UHFQC.awgs_0_enable()
+                except:
+                    temp = self.UHFQC.awgs_0_enable()
+                del temp
+
                 self.AWG.start()
-                # while self.UHFQC.awgs_0_enable() == 1:
-                #     time.sleep(0.1)
-                # time.sleep(1)
-                data = self.UHFQC.single_acquisition(nr_samples,
-                                             self.poll_time, timeout=0,
-                                             channels=set([0,1]),
-                                             mode='iavg')
-                data = np.array([data[key] for key in data.keys()])
+
+                while self.UHFQC.awgs_0_enable() == 1:
+                    time.sleep(0.01)
+                data = ['']*len(self.channels)
+                for i, channel in enumerate(self.channels):
+                    dataset = eval("self.UHFQC.quex_iavg_data_{}()".format(channel))
+                    data[i] = dataset[0]['vector']
+                # data = self.UHFQC.single_acquisition(nr_samples,
+                #                              self.poll_time, timeout=0,
+                #                              channels=set([0,1]),
+                #                              mode='iavg')
+                # data = np.array([data[key] for key in data.keys()])
                 transient1_I = data[0]
                 transient1_Q = data[1]
-
 
                 optimized_weights_I = (transient1_I-transient0_I)
                 optimized_weights_I = optimized_weights_I-np.mean(optimized_weights_I)
@@ -626,7 +642,7 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
                 self.MC.set_detector_function(
                     det.UHFQC_integration_logging_det(self.UHFQC, self.AWG,
                                                       channels=[self.weight_function_I,self.weight_function_Q],
-                                                      integration_length=self.integration_length, nr_shots=min(self.nr_shots, 256)))
+                                                      integration_length=self.integration_length, nr_shots=min(self.nr_shots, 4095)))
         self.i += 1
         self.MC.run(name=self.measurement_name+'_'+str(self.i))
 
