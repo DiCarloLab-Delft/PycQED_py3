@@ -82,6 +82,7 @@ class MeasurementControl(Instrument):
         self.set_measurement_name(name)
         self.print_measurement_start_msg()
         self.mode = mode
+        self.iteration = 0  # used in determining data writing indices
         with h5d.Data(name=self.get_measurement_name()) as self.data_object:
             self.get_measurement_begintime()
             # Commented out because requires git shell interaction from python
@@ -118,7 +119,6 @@ class MeasurementControl(Instrument):
             self.measure_soft_static()
 
         elif self.sweep_functions[0].sweep_control == 'hard':
-            self.iteration = 0  # gets incremented in measure_hard
             sweep_points = self.get_sweep_points()
             if len(self.sweep_functions) == 1:
                 self.get_measurement_preparetime()
@@ -180,7 +180,6 @@ class MeasurementControl(Instrument):
         for self.soft_iteration in range(self.soft_avg()):
             for i, sweep_point in enumerate(self.sweep_points):
                 self.measurement_function(sweep_point)
-                self.print_progress()
 
     def measure_soft_adaptive(self, method=None):
         '''
@@ -215,7 +214,7 @@ class MeasurementControl(Instrument):
         self.update_plotmon(force_update=True)
         self.update_plotmon_adaptive(force_update=True)
         self.get_measurement_endtime()
-        if self.verbose:
+        if self.verbose():
             print('Optimization completed in {:.4g}s'.format(
                 self.endtime-self.begintime))
         return
@@ -297,20 +296,27 @@ class MeasurementControl(Instrument):
             # of an agilent generator is reset to 0 when the frequency is set.
 
         datasetshape = self.dset.shape
-        self.iteration = datasetshape[0] + 1
-
+        # self.iteration = datasetshape[0] + 1
+        start_idx, stop_idx = self.get_datawriting_indices(pts_per_iter=1)
         vals = self.detector_function.acquire_data_point()
         # Resizing dataset and saving
-        new_datasetshape = (self.iteration, datasetshape[1])
+        new_datasetshape = (np.max([datasetshape[0], stop_idx]),
+                            datasetshape[1])
         self.dset.resize(new_datasetshape)
-        savable_data = np.append(x, vals)
-        self.dset[self.iteration-1, :] = savable_data
+        new_data = np.append(x, vals)
+        old_vals = self.dset[start_idx:stop_idx, :]
+        new_vals = ((new_data + old_vals*self.soft_iteration) /
+                    (1+self.soft_iteration))
+        self.dset[start_idx:stop_idx, :] = new_vals
         # update plotmon
         self.update_plotmon()
         if self.mode == '2D':
             self.update_plotmon_2D()
         elif self.mode == 'adaptive':
             self.update_plotmon_adaptive()
+        self.iteration += 1
+        if self.mode != 'adaptive':
+            self.print_progress(stop_idx)
         return vals
 
     def optimization_function(self, x):
@@ -756,8 +762,10 @@ class MeasurementControl(Instrument):
             xlen = shape_new_data[0]
         else:
             xlen = pts_per_iter
-
-        max_sweep_points = np.shape(self.get_sweep_points())[0]
+        if self.mode == 'adaptive':
+            max_sweep_points = np.inf
+        else:
+            max_sweep_points = np.shape(self.get_sweep_points())[0]
         start_idx = int(
             (xlen*(self.iteration)) % max_sweep_points)
 
@@ -893,7 +901,6 @@ class MeasurementControl(Instrument):
         # Determines if the optimization will minimize or maximize
         self.minimize_optimization = self.af_pars.pop('minimize', True)
         self.f_termination = self.af_pars.pop('f_termination', None)
-        print(self.f_termination)
 
     def get_adaptive_function_parameters(self):
         return self.af_pars

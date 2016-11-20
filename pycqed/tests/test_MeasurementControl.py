@@ -204,6 +204,11 @@ class Test_MeasurementControl(unittest.TestCase):
         self.assertEqual(d.times_called, 5*1000+5)
 
     def test_soft_sweep_1D_soft_averages(self):
+        self.mock_parabola.noise(0)
+        self.mock_parabola.x(0)
+        self.mock_parabola.y(0)
+        self.mock_parabola.z(0)
+
         sweep_pts = np.linspace(0, 10, 30)
         self.MC.soft_avg(1)
         self.MC.set_sweep_function(self.mock_parabola.x)
