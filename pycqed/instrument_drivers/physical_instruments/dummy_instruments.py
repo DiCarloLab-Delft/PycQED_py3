@@ -34,7 +34,6 @@ class DummyParHolder(Instrument):
                            parameter_class=ManualParameter,
                            vals=vals.Numbers(), initial_value=0)
 
-
         self.add_parameter('parabola', units='a.u.',
                            get_cmd=self._measure_parabola)
         self.add_parameter('skewed_parabola', units='a.u.',

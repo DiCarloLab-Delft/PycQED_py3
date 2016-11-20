@@ -526,7 +526,7 @@ class MeasurementControl(Instrument):
         to the QC_QtPlot.
         '''
         if self.live_plot_enabled():
-            i = int(self.iteration-1)
+            i = int((self.iteration) % (self.xlen*self.ylen))
             x_ind = int(i % self.xlen)
             y_ind = int(i / self.xlen)
             for j in range(len(self.detector_function.value_names)):
