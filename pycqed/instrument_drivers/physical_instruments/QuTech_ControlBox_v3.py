@@ -383,6 +383,8 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
         if len(instructions) == 0:
             raise ValueError("The instruction list is empty.")
 
+        self.set('core_state', 'idle')
+
         cmd = defHeaders.LoadInstructionsHeader
         data_bytes = bytearray()
 
