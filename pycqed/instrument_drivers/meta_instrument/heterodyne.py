@@ -163,7 +163,9 @@ class HeterodyneInstrument(Instrument):
                 # Configure the result logger to not do any averaging
                 # The AWG program uses userregs/0 to define the number o iterations in the loop
                 self._acquisition_instr.awgs_0_userregs_0(int(self.nr_averages()))
-                self._acquisition_instr.awgs_0_userregs_1(1)#0 for rl, 1 for iavg
+                self._acquisition_instr.awgs_0_userregs_1(0)#0 for rl, 1 for iavg
+                self._acquisition_instr.awgs_0_single(1)
+
 
         self.LO.on()
         # Changes are now incorporated in the awg seq
@@ -194,19 +196,19 @@ class HeterodyneInstrument(Instrument):
         elif 'UHFQC' in self.acquisition_instr():
             t0 = time.time()
             self._acquisition_instr.awgs_0_enable(1)
-            temp = self._acquisition_instr.awgs_0_enable()  #probing the values to be sure communication is finished before starting AWG
+            try:
+                temp = self._acquisition_instr.awgs_0_enable()
+            except:
+                temp = self._acquisition_instr.awgs_0_enable()
             del temp
-            # self.AWG.start()
 
             while self._acquisition_instr.awgs_0_enable() == 1:
                 time.sleep(0.01)
-            time.sleep(0.2)
             channels=[0,1]
             data = ['']*len(channels)
             for i, channel in enumerate(channels):
                 dataset = eval("self._acquisition_instr.quex_rl_data_{}()".format(channel))
                 data[i] = dataset[0]['vector']
-            print(np.size(data))
             dat=data[0]+1j*data[1]
             t1 = time.time()
             print("time for UHFQC polling", t1-t0)

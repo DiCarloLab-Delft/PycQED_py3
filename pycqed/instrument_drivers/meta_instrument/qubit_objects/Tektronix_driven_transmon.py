@@ -214,6 +214,45 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                            get_cmd=self._do_get_acquisition_instr,
                            vals=vals.Strings())
 
+        self.add_parameter('flux_pulse_delay',
+                           label='Flux Pulse Delay', units='s',
+                           initial_value=0.,
+                           vals=vals.Numbers(min_value=0., max_value=50e-6),
+                           parameter_class=ManualParameter)
+        self.add_parameter('fluxing_channel', initial_value=0,
+                           vals=vals.Enum(0, 1, 2, 3, 4),
+                           parameter_class=ManualParameter)
+        self.add_parameter('fluxing_amp',
+                           label='SWAP resolution', units='V',
+                           initial_value=.5,
+                           vals=vals.Numbers(min_value=-1., max_value=1.),
+                           parameter_class=ManualParameter)
+        self.add_parameter('swap_amp',
+                           label='SWAP amplitude', units='V',
+                           initial_value=0.02,
+                           vals=vals.Numbers(min_value=0.02, max_value=4.5),
+                           parameter_class=ManualParameter)
+        self.add_parameter('swap_time',
+                           label='SWAP Time', units='s',
+                           initial_value=0.,
+                           vals=vals.Numbers(min_value=0., max_value=1e-6),
+                           parameter_class=ManualParameter)
+        self.add_parameter('flux_dead_time',
+                           label='Time between mmt and comp.', units='s',
+                           initial_value=0.,
+                           vals=vals.Numbers(min_value=0., max_value=50e-6),
+                           parameter_class=ManualParameter)
+        self.add_parameter('dist_dict',
+                           get_cmd=self.get_dist_dict,
+                           set_cmd=self.set_dist_dict,
+                           vals=vals.Anything())
+
+    def get_dist_dict(self):
+        return self._dist_dict
+
+    def set_dist_dict(self,dist_dict):
+        self._dist_dict = dist_dict
+
     def prepare_for_continuous_wave(self):
         # makes sure the settings of the acquisition instrument are reloaded
         self.acquisition_instr(self.acquisition_instr())
@@ -308,7 +347,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         elif self.RO_pulse_type() is 'MW_IQmod_pulse_UHFQC':
             eval('self._acquisition_instr.sigouts_{}_offset({})'.format(self.RO_I_channel(),self.RO_I_offset()))
             eval('self._acquisition_instr.sigouts_{}_offset({})'.format(self.RO_Q_channel(),self.RO_Q_offset()))
-            self._acquisition_instr.awg_sequence_acquisition_and_pulse_SSB(f_RO_mod=self.f_RO_mod(), RO_amp=self.RO_amp(), RO_pulse_length=self.RO_pulse_length(), acquisition_delay=270e-9)
+            #self._acquisition_instr.awg_sequence_acquisition_and_pulse_SSB(f_RO_mod=self.f_RO_mod(), RO_amp=self.RO_amp(), RO_pulse_length=self.RO_pulse_length(), acquisition_delay=270e-9)
         elif self.RO_pulse_type.get() is 'Gated_MW_RO_pulse':
             self.rf_RO_source.pulsemod_state.set('on')
             self.rf_RO_source.frequency(self.f_RO.get())
@@ -350,7 +389,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
 
         offset_I, offset_Q = mixer_carrier_cancellation_5014(
             AWG=self.AWG, SH=signal_hound, source=source, MC=self.MC,
-            AWG_channel1=AWG_channel1, AWG_channel2=AWG_channel2)
+            AWG_channel1=AWG_channel1, AWG_channel2=AWG_channel2, xtol=0.0003)
 
         if update:
             if offs_type == 'pulse':
@@ -601,7 +640,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         MC.run('Echo'+label+self.msmt_suffix)
 
         if analyze:
-            a = ma.Ramsey_analysis(auto=True, close_fig=close_fig)
+            a = ma.Ramsey_Analysis(auto=True, close_fig=close_fig, label='Echo')
             return a
 
     def measure_allxy(self, double_points=True,
@@ -648,6 +687,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                      analyze=True,
                      close_fig=True,
                      verbose=True, optimized_weights=False, SSB=False,
+                     one_weight_function_UHFQC=False,
                      multiplier=1, nr_shots=4095):
         self.prepare_for_timedomain()
         if MC is None:
@@ -659,7 +699,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
             MC=MC,
             AWG=self.AWG, acquisition_instr=self._acquisition_instr,
             pulse_pars=self.pulse_pars, RO_pars=self.RO_pars, IF=self.f_RO_mod(), weight_function_I=self.RO_acq_weight_function_I(),
-            weight_function_Q=self.RO_acq_weight_function_Q(), nr_shots=nr_shots,
+            weight_function_Q=self.RO_acq_weight_function_Q(), nr_shots=nr_shots, one_weight_function_UHFQC=one_weight_function_UHFQC,
             optimized_weights=optimized_weights, integration_length=self.RO_acq_integration_length(),
             close_fig=close_fig, SSB=SSB, multiplier=multiplier, nr_averages=self.RO_acq_averages())
         if return_detector:
@@ -761,6 +801,28 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                 self.motzoi.set(a.optimal_motzoi)
             return a
 
+    def measure_freq_XY(self, f_span, n_f, MC=None, analyze=True, close_fig=True,
+                          verbose=True, update=True):
+
+        self.prepare_for_timedomain()
+        if MC is None:
+            MC = self.MC
+
+        freqs = np.linspace(-f_span*0.5, f_span*0.5, n_f) + self.f_pulse_mod.get()
+
+        MC.set_sweep_function(awg_swf.Freq_XY(
+            pulse_pars=self.pulse_pars, RO_pars=self.RO_pars, freqs=freqs))
+        MC.set_detector_function(self.int_avg_det)
+        MC.run('Freq_XY'+self.msmt_suffix)
+
+        # if analyze:
+        #     a = ma.Motzoi_XY_analysis(close_fig=close_fig)
+        #     if update:
+        #         self.motzoi.set(a.optimal_motzoi)
+        #     return a
+
+
+
     def measure_chevron(self, amps, length, MC=None, nr_averages=512):
 
         if MC is None:
@@ -778,8 +840,8 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         #                                                                     nr_averages=nr_averages)
         flux_pulse_pars = {'pulse_type': 'SquarePulse',
                       'pulse_delay': .1e-6,
-                      'channel': 'ch%d'%self.fluxing_channel,
-                      'amplitude': self.fluxing_amp,
+                      'channel': 'ch%d'%self.fluxing_channel(),
+                      'amplitude': self.fluxing_amp(),
                       'length': 10e-6,
                       'dead_time_length': 10e-6}
 
@@ -795,29 +857,122 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                                              mw_pulse_pars,
                                              RO_pars,
                                              flux_pulse_pars,
-                                             dist_dict=self.dist_dict,
+                                             dist_dict=self._dist_dict,
                                              AWG=self.AWG,
                                              upload=False)
         # upload sequence
-        exec('self.AWG.ch%d_amp(2.)'%self.fluxing_channel)
+        exec('self.AWG.ch%d_amp(2.)'%self.fluxing_channel())
         chevron_swf.pre_upload()
         # MC configuration
         MC.set_sweep_function(chevron_swf)
         MC.set_sweep_points(lengths_vec)
 
         if not slice_scan:
-            MC.set_sweep_function_2D(swf.AWG_amp(self.fluxing_channel, self.AWG))
+            MC.set_sweep_function_2D(swf.AWG_amp(self.fluxing_channel(), self.AWG))
             MC.set_sweep_points_2D(amps)
 
         MC.set_detector_function(self.int_avg_det_rot)
         if slice_scan:
-            swf_temp = swf.AWG_amp(self.fluxing_channel, self.AWG)
+            swf_temp = swf.AWG_amp(self.fluxing_channel(), self.AWG)
             swf_temp.set_parameter(amps[0])
             MC.run('Chevron_slice_%s'%self.name)
             ma.TD_Analysis(auto=True)
         else:
             MC.run('Chevron_2D_%s'%self.name, mode='2D')
             ma.Chevron_2D(auto=True)
+
+    def measure_BusT1(self, times, MC=None):
+
+        if MC is None:
+            MC = self.MC
+
+        cal_points = 4
+        lengths_cal = times[-1] + np.arange(1,1+cal_points)*(times[1]-times[0])
+        lengths_vec = np.concatenate((times,lengths_cal))
+
+        mw_pulse_pars, RO_pars = self.get_pulse_pars()
+        flux_pulse_pars, dist_dict = self.get_flux_pars()
+        BusT1 = awg_swf.BusT1(times,
+                              mw_pulse_pars,
+                              RO_pars,
+                              flux_pulse_pars,
+                              dist_dict=dist_dict,
+                              AWG=self.AWG,
+                              upload=False, return_seq=True)
+
+        exec('self.AWG.ch%d_amp(2.)'%self.fluxing_channel())
+        seq = BusT1.pre_upload()
+
+        MC.set_sweep_function(BusT1)
+        MC.set_sweep_points(lengths_vec)
+
+        MC.set_detector_function(self.int_avg_det)
+        self.AWG.ch4_amp(flux_pulse_pars['swap_amp'])
+        MC.run('Bus_T1')
+        ma.T1_Analysis(auto=True,label='Bus_T1')
+
+    def measure_BusT2(self, times, MC=None):
+
+        if MC is None:
+            MC = self.MC
+
+        cal_points = 4
+        lengths_cal = times[-1] + np.arange(1,1+cal_points)*(times[1]-times[0])
+        lengths_vec = np.concatenate((times,lengths_cal))
+
+        mw_pulse_pars, RO_pars = self.get_pulse_pars()
+        flux_pulse_pars, dist_dict = self.get_flux_pars()
+        BusT2 = awg_swf.BusT2(times_vec=times,
+                                  mw_pulse_pars=mw_pulse_pars,
+                                  RO_pars=RO_pars,
+                                  # artificial_detuning=artificial_detuning,
+                                  flux_pulse_pars=flux_pulse_pars,
+                                  dist_dict=dist_dict,
+                                  AWG=self.AWG,
+                                  upload=False, return_seq=True)
+
+        exec('self.AWG.ch%d_amp(2.)'%self.fluxing_channel())
+        seq = BusT2.pre_upload()
+
+        MC.set_sweep_function(BusT2)
+        MC.set_sweep_points(lengths_vec)
+
+        MC.set_detector_function(self.int_avg_det)
+        self.AWG.ch4_amp(flux_pulse_pars['swap_amp'])
+        MC.run('Bus_Echo')
+        ma.Ramsey_Analysis(auto=True,label='Bus_T2')
+
+    def measure_BusEcho(self, times, artificial_detuning, MC=None):
+
+        if MC is None:
+            MC = self.MC
+
+        cal_points = 4
+        lengths_cal = times[-1] + np.arange(1,1+cal_points)*(times[1]-times[0])
+        lengths_vec = np.concatenate((times,lengths_cal))
+
+        mw_pulse_pars, RO_pars = self.get_pulse_pars()
+        flux_pulse_pars, dist_dict = self.get_flux_pars()
+        BusEcho = awg_swf.BusEcho(times_vec=times,
+                                  mw_pulse_pars=mw_pulse_pars,
+                                  RO_pars=RO_pars,
+                                  artificial_detuning=artificial_detuning,
+                                  flux_pulse_pars=flux_pulse_pars,
+                                  dist_dict=dist_dict,
+                                  AWG=self.AWG,
+                                  upload=False, return_seq=True)
+
+        exec('self.AWG.ch%d_amp(2.)'%self.fluxing_channel())
+        seq = BusEcho.pre_upload()
+
+        MC.set_sweep_function(BusEcho)
+        MC.set_sweep_points(lengths_vec)
+
+        MC.set_detector_function(self.int_avg_det)
+        self.AWG.ch4_amp(flux_pulse_pars['swap_amp'])
+        MC.run('Bus_Echo')
+        ma.Ramsey_Analysis(auto=True,label='Bus_Echo')
+
 
 
     def _do_get_acquisition_instr(self):
@@ -922,6 +1077,24 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                                     self.spec_pulse_depletion_time.get())
         return spec_pars, RO_pars
 
+    def get_cphase_pars(self):
+        cphase_pars = {'pulse_type': 'CosPulse',
+                       'length': 'ch%d'%self.fluxing_channel(),
+                       'channel': 'ch4',
+                       'phase': 30.,
+                       'pulse_delay': 30e-9,
+                       'amplitude': 0.04}
+        return cphase_pars
 
+    def get_flux_pars(self):
+        flux_pulse_pars = {'pulse_type': 'SquarePulse',
+                           'pulse_delay': self.flux_pulse_delay(),
+                           'channel': 'ch%d'%self.fluxing_channel(),
+                           'amplitude': self.fluxing_amp(),
+                           'length': self.swap_time(),
+                           'swap_amp': self.swap_amp(),
+                           'dead_time_length': self.flux_dead_time(),
+                           'pulse_type': 'SquarePulse'}
+        return flux_pulse_pars, self._dist_dict
 
 

@@ -5,7 +5,8 @@ Wolfgang Pfaff.
 
 Contains:
 - a data class (HDF5Data) which is essentially a wrapper of a h5py data
-  object, adapted for usage with PycQED/qcodes
+  object, adapted for usage with qcodes
+- name generators in the style of qtlab Data objects
 - functions to create standard data sets
 """
 
