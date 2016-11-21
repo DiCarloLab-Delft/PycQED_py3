@@ -163,8 +163,8 @@ class HeterodyneInstrument(Instrument):
                 # Configure the result logger to not do any averaging
                 # The AWG program uses userregs/0 to define the number o iterations in the loop
                 self._acquisition_instr.awgs_0_userregs_0(int(self.nr_averages()))
-                self._acquisition_instr.awgs_0_userregs_1(1)#0 for rl, 1 for iavg
-                self.UHFQC.awgs_0_single(1)
+                self._acquisition_instr.awgs_0_userregs_1(0)#0 for rl, 1 for iavg
+                self._acquisition_instr.awgs_0_single(1)
 
 
         self.LO.on()
@@ -197,9 +197,9 @@ class HeterodyneInstrument(Instrument):
             t0 = time.time()
             self._acquisition_instr.awgs_0_enable(1)
             try:
-                temp = self.UHFQC.awgs_0_enable()
-            except:     
-                temp = self.UHFQC.awgs_0_enable()
+                temp = self._acquisition_instr.awgs_0_enable()
+            except:
+                temp = self._acquisition_instr.awgs_0_enable()
             del temp
 
             while self._acquisition_instr.awgs_0_enable() == 1:

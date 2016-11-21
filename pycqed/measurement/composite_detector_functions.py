@@ -380,7 +380,7 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
                  optimized_weights=False, one_weight_function_UHFQC=False,
                  wait=0.0, close_fig=True, SSB=False,
                  nr_averages=1024, integration_length=1e-6,
-                 nr_shots=4095, **kw):
+                 nr_shots=4094, **kw):
         self.detector_control = 'soft'
         self.name = 'SSRO_Fidelity'
         # For an explanation of the difference between the different
@@ -449,7 +449,7 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
                 self.MC.set_detector_function(
                     det.UHFQC_integration_logging_det(self.acquisition_instr,
                                                           self.AWG, channels=[self.weight_function_I,self.weight_function_Q],
-                                                          integration_length=self.integration_length, nr_shots=min(self.nr_shots, 4095)))
+                                                          integration_length=self.integration_length, nr_shots=min(self.nr_shots, 4094)))
                 if self.SSB:
                     self.UHFQC.prepare_SSB_weight_and_rotation(IF=self.IF, weight_function_I=self.weight_function_I, weight_function_Q=self.weight_function_Q)
                 else:
@@ -642,7 +642,7 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
                 self.MC.set_detector_function(
                     det.UHFQC_integration_logging_det(self.UHFQC, self.AWG,
                                                       channels=[self.weight_function_I,self.weight_function_Q],
-                                                      integration_length=self.integration_length, nr_shots=min(self.nr_shots, 4095)))
+                                                      integration_length=self.integration_length, nr_shots=min(self.nr_shots, 4094)))
         self.i += 1
         self.MC.run(name=self.measurement_name+'_'+str(self.i))
 
