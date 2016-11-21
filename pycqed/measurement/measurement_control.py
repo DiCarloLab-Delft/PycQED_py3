@@ -117,7 +117,8 @@ class MeasurementControl(Instrument):
             self.measure_soft_static()
 
         elif self.sweep_functions[0].sweep_control == 'hard':
-            self.iteration = 0
+            self.iteration = 0  # gets incremented in measure_hard
+            sweep_points = self.get_sweep_points()
             if len(self.sweep_functions) == 1:
                 self.get_measurement_preparetime()
                 for self.soft_iteration in range(self.soft_avg()):
@@ -125,26 +126,44 @@ class MeasurementControl(Instrument):
                         sweep_points=self.get_sweep_points())
                     self.measure_hard()
             else:
+                # Do one iteration to see how many points per data point we get
                 self.get_measurement_preparetime()
-
-            while not self.is_complete():
-                idx = self.dset.shape[0]
                 for i, sweep_function in enumerate(self.sweep_functions):
-                    sweep_points = self.get_sweep_points()
-                    if len(self.sweep_functions) != 1:
-                        sweep_points = sweep_points[:, i]
-                    if i != 0:
-                        val = sweep_points[idx]
-                        sweep_function.set_parameter(val)
-                sweep_points_0 = self.get_sweep_points()
-                if len(self.sweep_functions) != 1:
-                    sweep_points_0 = sweep_points_0[:, 0]
+                    swf_sweep_points = sweep_points[:, i]
+                    val = swf_sweep_points[0]
+                    sweep_function.set_parameter(val)
                 self.detector_function.prepare(
-                    sweep_points=sweep_points_0[idx:idx+self.xlen])
+                    sweep_points=sweep_points[:self.xlen, 0])
                 self.measure_hard()
+
+            # will not be complet if it is a 2D loop, soft avg or many shots
+            if not self.is_complete():
+                pts_per_iter = self.dset.shape[0]
+                swp_len = np.shape(sweep_points)[0]
+                req_nr_iterations = int(swp_len/pts_per_iter)
+                total_iterations = req_nr_iterations * self.soft_avg()
+
+                for i in range(total_iterations-1):
+                    start_idx, stop_idx = self.get_datawriting_indices(
+                        pts_per_iter=pts_per_iter)
+                    if start_idx == 0:
+                        self.soft_iteration += 1
+                    xlen = stop_idx - start_idx
+                    for i, sweep_function in enumerate(self.sweep_functions):
+                        if len(self.sweep_functions) != 1:
+                            swf_sweep_points = sweep_points[:, i]
+                            sweep_points_0 = sweep_points[:, 0]
+                        else:
+                            swf_sweep_points = sweep_points
+                            sweep_points_0 = sweep_points
+                        val = swf_sweep_points[0]
+                        sweep_function.set_parameter(val)
+                    self.detector_function.prepare(
+                        sweep_points=sweep_points_0[start_idx:stop_idx])
+                    self.measure_hard()
         else:
-            raise Exception('Sweep and Detector functions not of the same type.'
-                            + 'Aborting measurement')
+            raise Exception('Sweep and Detector functions not '
+                            + 'of the same type. \nAborting measurement')
             print(self.sweep_function.sweep_control)
             print(self.detector_function.detector_control)
 
@@ -199,7 +218,6 @@ class MeasurementControl(Instrument):
         return
 
     def measure_hard(self):
-        self.iteration += 1
         new_data = np.array(self.detector_function.get_values()).T
 
         ###########################
@@ -230,8 +248,6 @@ class MeasurementControl(Instrument):
             self.dset[start_idx:stop_idx,
                       len(self.sweep_functions):] = new_vals
         sweep_len = len(self.get_sweep_points().T)
-        # Only add sweep points if these make sense (i.e. same shape as
-        # new_data)
 
         ######################
         # DATA STORING BLOCK #
@@ -256,8 +272,8 @@ class MeasurementControl(Instrument):
         self.update_plotmon()
         if self.mode == '2D':
             self.update_plotmon_2D_hard()
-        self.print_progress()
-
+        self.print_progress(stop_idx)
+        self.iteration += 1
         return new_data
 
     def measurement_function(self, x):
@@ -337,22 +353,21 @@ class MeasurementControl(Instrument):
         '''
         Deletes arrays to clean up memory and avoid memory related mistakes
         '''
-        try:
-            del(self.TwoD_array)
-        except AttributeError:
-            pass
-        try:
-            del(self.dset)
-        except AttributeError:
-            pass
-        try:
-            del(self.sweep_points)
-        except AttributeError:
-            pass
-        try:
-            del(self.sweep_functions)
-        except AttributeError:
-            pass
+        for attr in [self.TwoD_array,
+                     self.dset,
+                     self.sweep_points,
+                     self.sweep_points_2D,
+                     self.sweep_functions,
+                     self.xlen,
+                     self.ylen,
+                     self.iteration,
+                     self.soft_iteration]:
+            try:
+                del attr
+            except AttributeError:
+                pass
+
+
 
     ###################
     # 2D-measurements #
@@ -550,7 +565,7 @@ class MeasurementControl(Instrument):
         Note that the plotmon only supports evenly spaced lattices.
         '''
         if self.live_plot_enabled():
-            i = int(self.iteration-1)
+            i = int((self.iteration)%self.ylen)
             y_ind = i
             for j in range(len(self.detector_function.value_names)):
                 z_ind = len(self.sweep_functions) + j
@@ -665,12 +680,13 @@ class MeasurementControl(Instrument):
         set_grp.attrs['measurement_name'] = self.measurement_name
         set_grp.attrs['live_plot_enabled'] = self.live_plot_enabled()
 
-    def print_progress(self):
+    def print_progress(self, stop_idx=None):
         if self.verbose():
             acquired_points = self.dset.shape[0]
             total_nr_pts = len(self.get_sweep_points())
             if self.soft_avg() != 1:
-                percdone = self.soft_iteration/self.soft_avg()*100
+                progr = 1 if stop_idx == None else stop_idx/total_nr_pts
+                percdone = (self.soft_iteration+progr)/self.soft_avg()*100
             else:
                 percdone = acquired_points*1./total_nr_pts*100
             elapsed_time = time.time() - self.begintime
@@ -693,11 +709,14 @@ class MeasurementControl(Instrument):
         Returns True if enough data has been acquired.
         """
         acquired_points = self.dset.shape[0]
-        total_nr_pts = len(self.get_sweep_points())
+        total_nr_pts = np.shape(self.get_sweep_points())[0]
         if acquired_points < total_nr_pts:
             return False
         elif acquired_points >= total_nr_pts:
-            return True
+            if self.soft_avg() != 1 and self.soft_iteration == 0:
+                return False
+            else:
+                return True
 
     def print_measurement_start_msg(self):
         if self.verbose():
@@ -718,26 +737,28 @@ class MeasurementControl(Instrument):
     def get_datetimestamp(self):
         return time.strftime('%Y%m%d_%H%M%S', time.localtime())
 
-    def get_datawriting_indices(self, new_data):
+    def get_datawriting_indices(self, new_data=None, pts_per_iter=None):
         """
         Calculates the start and stop indices required for
         storing a hard measurement.
         """
-        if len(np.shape(new_data)) == 1:
-            single_col = True
-            shape_new_data = (len(new_data), 1)
+        if new_data is None and pts_per_iter is None:
+            raise(ValueError())
+        elif new_data is not None:
+            if len(np.shape(new_data)) == 1:
+                shape_new_data = (len(new_data), 1)
+            else:
+                shape_new_data = np.shape(new_data)
+            shape_new_data = (shape_new_data[0], shape_new_data[1]+1)
+            xlen = shape_new_data[0]
         else:
-            single_col = False
-            shape_new_data = np.shape(new_data)
-
-        # resizing only for 1 set of new_data  now... needs to improve
-        shape_new_data = (shape_new_data[0], shape_new_data[1]+1)
+            xlen = pts_per_iter
 
         max_sweep_points = np.shape(self.get_sweep_points())[0]
         start_idx = int(
-            (shape_new_data[0]*(self.iteration-1)) % max_sweep_points)
+            (xlen*(self.iteration)) % max_sweep_points)
 
-        stop_idx = start_idx + shape_new_data[0]
+        stop_idx = start_idx + xlen
 
         return start_idx, stop_idx
 

@@ -28,7 +28,7 @@ except NameError:
         setup_name = setup_dict.mac_dict[str(mac)]
         logging.warning('Creating qc_config for datadir')
         qc_config = {'datadir': setup_dict.data_dir_dict[setup_name]}
-    except:
+    except Exception:
         # Stores data in the default data location (pycqed_py3/data/)
         datadir = os.path.join(os.path.dirname(pq.__file__), os.pardir, 'data')
         logging.warning('Creating qc_config for datadir')
