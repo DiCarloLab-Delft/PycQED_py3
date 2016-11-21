@@ -88,6 +88,12 @@ class Test_single_qubit_seqs(TestCase):
         asm = Assembler.Assembler(asm_file.name)
         instructions = asm.convert_to_instructions()
 
+    def test_qasm_single_elt_on(self):
+        qasm_file = sq_qasm.single_elt_on(self.qubit_name)
+        asm_file = qta.qasm_to_asm(qasm_file.name, self.operation_dict)
+        asm = Assembler.Assembler(asm_file.name)
+        instructions = asm.convert_to_instructions()
+
     def test_qasm_seq_OffOn(self):
         qasm_file = sq_qasm.off_on(self.qubit_name)
         asm_file = qta.qasm_to_asm(qasm_file.name, self.operation_dict)

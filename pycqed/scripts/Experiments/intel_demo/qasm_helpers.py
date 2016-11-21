@@ -84,7 +84,10 @@ class CBox_integrated_average_detector_CC(det.Hard_Detector):
         else:
             return data
 
-    def prepare(self, sweep_points):
+    def acquire_data_point(self):
+        return self.get_values()
+
+    def prepare(self, sweep_points=[0]):
         self.CBox.set('nr_samples', self.seg_per_point*len(sweep_points))
         self.CBox.nr_averages(int(self.nr_averages))
         self.CBox.integration_length(int(self.integration_length/(5e-9)))
@@ -93,3 +96,40 @@ class CBox_integrated_average_detector_CC(det.Hard_Detector):
 
     def finish(self):
         self.CBox.set('acquisition_mode', 'idle')
+
+
+def create_CBox_op_dict(qubit_name, pulse_length=8, RO_length=50):
+    operation_dict = {
+        'init_all': {'instruction': 'WaitReg r0 \n WaitReg r0 \n'},
+        'I {}'.format(qubit_name): {
+            'duration': pulse_length, 'instruction': 'wait {} \n'},
+        'X180 {}'.format(qubit_name): {
+            'duration': pulse_length, 'instruction':
+            'pulse 1000 0000 0000, {} \n wait {}\n'.format(pulse_length,
+                                                           pulse_length)},
+        'X90 {}'.format(qubit_name): {
+            'duration': pulse_length, 'instruction':
+            'pulse 1000 0000 0000, {} \n wait {}\n'.format(pulse_length,
+                                                           pulse_length)},
+        'Y180 {}'.format(qubit_name): {
+            'duration': pulse_length, 'instruction':
+            'pulse 1000 0000 0000, {} \n wait {}\n'.format(pulse_length,
+                                                           pulse_length)},
+        'Y90 {}'.format(qubit_name): {
+            'duration': pulse_length, 'instruction':
+            'pulse 1000 0000 0000, {} \n wait {}\n'.format(pulse_length,
+                                                           pulse_length)},
+        'mX90 {}'.format(qubit_name): {
+            'duration': pulse_length, 'instruction':
+            'pulse 1000 0000 0000, {} \n wait {}\n'.format(pulse_length,
+                                                           pulse_length)},
+        'mY90 {}'.format(qubit_name): {
+            'duration': pulse_length, 'instruction':
+            'pulse 1000 0000 0000, {} \n wait {}\n'.format(pulse_length,
+                                                           pulse_length)},
+        'RO {}'.format(qubit_name): {
+            'duration': RO_length, 'instruction':
+            'trigger 1000000 300, measure \n'.format(pulse_length)}}
+    return operation_dict
+
+op_dict = create_CBox_op_dict('AncT')

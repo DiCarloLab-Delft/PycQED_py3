@@ -120,8 +120,8 @@ class LutMan_amp180_90(Soft_Sweep):
         self.LutMan = LutMan
 
     def set_parameter(self, val):
-        self.LutMan.set('amp180', val)
-        self.LutMan.set('amp90', val/2.0)
+        self.LutMan.set('Q_amp180', val)
+        self.LutMan.set('Q_amp90', val/2.0)
         if self.reload_pulses:
             self.LutMan.load_pulses_onto_AWG_lookuptable(self.awg_nr)
 
