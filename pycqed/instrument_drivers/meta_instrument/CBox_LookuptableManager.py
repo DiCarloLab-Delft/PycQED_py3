@@ -352,10 +352,8 @@ class QuTech_ControlBox_LookuptableManager(Instrument):
             wave_dict = self.generate_standard_pulses()
         else:
             wave_dict = self._wave_dict
-        # This is to account for the odd definition in CBox (see CBox Issue
-        # #13)
-        I_ch = 1
-        Q_ch = 0
+        I_ch = 0
+        Q_ch = 1
         I_wave = np.clip(wave_dict[pulse_name][0],
                          self._voltage_min, self._voltage_max)
         Q_wave = np.clip(np.multiply(self.get('mixer_QI_amp_ratio'),
