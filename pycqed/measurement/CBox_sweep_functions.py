@@ -104,6 +104,29 @@ class Lutman_par_with_reload(Soft_Sweep):
             self.LutMan.load_pulses_onto_AWG_lookuptable(awg_nr)
 
 
+class Lutman_par_with_reload_single_pulse(Soft_Sweep):
+    def __init__(self, LutMan, parameter, pulse_names=['X180'], awg_nrs=[0]):
+        '''
+        Generic sweep function that combines setting a LutMan parameter
+        with reloading lookuptables.
+        '''
+        super().__init__()
+        self.LutMan = LutMan
+        self.parameter = parameter
+        self.name = parameter.name
+        self.parameter_name = parameter.label
+        self.unit = parameter.units
+        self.awg_nrs = awg_nrs
+        self.pulse_names = pulse_names
+
+    def set_parameter(self, val):
+        self.parameter.set(val)
+        for awg_nr in self.awg_nrs:
+            for pulse_name in self.pulse_names:
+                self.LutMan.load_pulse_onto_AWG_lookuptable(pulse_name, awg_nr)
+
+
+
 class LutMan_amp180_90(Soft_Sweep):
     '''
     Sweeps both the amp180 parameter and the amp90 of the CBox_lut_man
