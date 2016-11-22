@@ -149,7 +149,6 @@ class MeasurementControl(Instrument):
                         pts_per_iter=pts_per_iter)
                     if start_idx == 0:
                         self.soft_iteration += 1
-                    xlen = stop_idx - start_idx
                     for i, sweep_function in enumerate(self.sweep_functions):
                         if len(self.sweep_functions) != 1:
                             swf_sweep_points = sweep_points[:, i]
@@ -158,7 +157,8 @@ class MeasurementControl(Instrument):
                             swf_sweep_points = sweep_points
                             sweep_points_0 = sweep_points
                         val = swf_sweep_points[0]
-                        sweep_function.set_parameter(val)
+                        if sweep_function.sweep_control is 'soft':
+                            sweep_function.set_parameter(val)
                     self.detector_function.prepare(
                         sweep_points=sweep_points_0[start_idx:stop_idx])
                     self.measure_hard()
