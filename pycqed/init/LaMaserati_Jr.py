@@ -60,7 +60,7 @@ from qcodes.instrument_drivers.agilent.E8527D import Agilent_E8527D
 from qcodes.instrument_drivers.rohde_schwarz import ZNB20 as ZNB20
 from qcodes.instrument_drivers.weinschel import Weinschel_8320 as Weinschel_8320
 from pycqed.instrument_drivers.physical_instruments import Weinschel_8320_novisa
-
+from pycqed.instrument_drivers.physical_instruments import Fridge_monitor as fm
 # from qcodes.instrument_drivers.tektronix import AWG5014 as tek
 # from qcodes.instrument_drivers.tektronix import AWG520 as tk520
 
@@ -90,6 +90,8 @@ station = qc.Station()
 # VNA
 VNA = ZNB20.ZNB20(name='VNA', address='TCPIP0::192.168.0.55', server_name=None)  #
 station.add_component(VNA)
+Fridge_mon = fm.Fridge_Monitor('Fridge monitor', 'LaMaserati')
+station.add_component(Fridge_mon)
 
 # variable attenuator
 # ATT = Weinschel_8320_novisa.Weinschel_8320(name='ATT',address='192.168.0.54', server_name=None)
