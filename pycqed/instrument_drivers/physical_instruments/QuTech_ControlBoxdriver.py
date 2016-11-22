@@ -59,6 +59,7 @@ class QuTech_ControlBox(VisaInstrument):
         self.add_parameter('demodulation_mode',
                            set_cmd=self._do_set_demodulation_mode,
                            get_cmd=self._do_get_demodulation_mode,
+                           label='single or double sideband modulation',
                            # single or double sideband demodulation
                            vals=vals.Enum('double', 'single'))
         self.add_parameter('run_mode',

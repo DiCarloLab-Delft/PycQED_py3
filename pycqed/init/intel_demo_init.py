@@ -92,6 +92,8 @@ station = qc.Station()
 CBox = qcb.QuTech_ControlBox_v3(
     'CBox', address='Com6', run_tests=False, server_name=None)
 station.add_component(CBox)
+CBox.trigger_source('external')
+
 LutMan = cbl.QuTech_ControlBox_LookuptableManager('Lutman', CBox, server_name=None)
 station.add_component(LutMan)
 

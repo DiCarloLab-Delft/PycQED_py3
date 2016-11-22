@@ -464,14 +464,14 @@ class CBox_single_integration_average_det(Soft_Detector):
         success = False
         i = 0
         while not success:
-            self.CBox.set('acquisition_mode', 4)
+            self.CBox.acquisition_mode('integration averaging')
             try:
                 data = self.CBox.get_integrated_avg_results()
                 success = True
             except Exception as e:
                 logging.warning(e)
                 logging.warning('Exception caught retrying')
-            self.CBox.set('acquisition_mode', 0)
+            self.CBox.acquisition_mode('idle')
             i += 1
             if i > 10:
                 break
@@ -484,10 +484,10 @@ class CBox_single_integration_average_det(Soft_Detector):
 
     def prepare(self):
         self.CBox.set('nr_samples', 1)
-        self.CBox.set('acquisition_mode', 0)
+        self.CBox.set('acquisition_mode', 'idle')
 
     def finish(self):
-        self.CBox.set('acquisition_mode', 0)
+        self.CBox.set('acquisition_mode', 'idle')
 
 
 class CBox_single_int_avg_with_LutReload(CBox_single_integration_average_det):
@@ -558,7 +558,7 @@ class CBox_integration_logging_det(Hard_Detector):
 
     def _get_values(self):
         self.AWG.stop()
-        self.CBox.set('acquisition_mode', 0)
+        self.CBox.set('acquisition_mode', 'idle')
         if self.awg_nrs is not None:
             for awg_nr in self.awg_nrs:
                 self.CBox.restart_awg_tape(awg_nr)
@@ -569,14 +569,14 @@ class CBox_integration_logging_det(Hard_Detector):
 
         data = self.CBox.get_integration_log_results()
 
-        self.CBox.set('acquisition_mode', 0)
+        self.CBox.set('acquisition_mode', 'idle')
         return data
 
     def prepare(self, sweep_points):
         self.CBox.integration_length(int(self.integration_length/(5e-9)))
 
     def finish(self):
-        self.CBox.set('acquisition_mode', 0)
+        self.CBox.set('acquisition_mode', 'idle')
         self.AWG.stop()
 
 
@@ -628,7 +628,7 @@ class CBox_integration_logging_det_shots(Hard_Detector):
 
     def _get_values(self):
         self.AWG.stop()
-        self.CBox.set('acquisition_mode', 0)
+        self.CBox.set('acquisition_mode', 'idle')
         if self.awg_nrs is not None:
             for awg_nr in self.awg_nrs:
                 self.CBox.restart_awg_tape(awg_nr)
@@ -639,11 +639,11 @@ class CBox_integration_logging_det_shots(Hard_Detector):
 
         data = self.CBox.get_integration_log_results()
 
-        self.CBox.set('acquisition_mode', 0)
+        self.CBox.set('acquisition_mode', 'idle')
         return data
 
     def finish(self):
-        self.CBox.set('acquisition_mode', 0)
+        self.CBox.set('acquisition_mode', 'idle')
         self.AWG.stop()
 
 
@@ -674,15 +674,15 @@ class CBox_state_counters_det(Soft_Detector):
 
     def _get_values(self):
 
-        self.CBox.set('acquisition_mode', 0)
+        self.CBox.set('acquisition_mode', 'idle')
         self.CBox.set('acquisition_mode', 'integration logging')
 
         data = self.CBox.get_qubit_state_log_counters()
-        self.CBox.set('acquisition_mode', 0)
+        self.CBox.set('acquisition_mode', 'idle')
         return np.concatenate(data)  # concatenates counters A and B
 
     def finish(self):
-        self.CBox.set('acquisition_mode', 0)
+        self.CBox.set('acquisition_mode', 'idle')
 
 
 class CBox_single_qubit_event_s_fraction(CBox_state_counters_det):
@@ -759,133 +759,6 @@ class CBox_digitizing_shots_det(CBox_integration_logging_det):
         return (d > self.threshold).astype(int)
 
 
-
-# class QuTechCBox_AlternatingShots_Logging_Detector_Touch_N_Go(Hard_Detector):
-#     def __init__(self, NoSamples=10000, AWG='AWG', **kw):
-#         super(QuTechCBox_AlternatingShots_Logging_Detector_Touch_N_Go, self).__init__()
-#         self.CBox = qt.instruments['CBox']
-#         self.name = 'CBox_Streaming_data'
-#         self.value_names = ['I_0', 'Q_0', 'I_1', 'Q_1']
-#         self.value_units = ['a.u.', 'a.u.', 'a.u.', 'a.u.']
-#         self.NoSamples = NoSamples
-#         if AWG is not None:
-#             self.AWG = qt.instruments[AWG]
-
-#     def get_values(self):
-#         exception_mode = True
-#         if exception_mode:
-#             success = False
-#             i = 0
-#             while not success and i < 10:
-#                 try:
-#                     d = self._get_values()
-#                     success = True
-#                 except Exception as e:
-#                     print()
-#                     print('Timeout exception caught, retaking data points')
-#                     print(str(e))
-#                     i += 1
-#                     self.CBox.set_run_mode(0)
-#                     self.CBox.set('acquisition_mode', 0)
-#                     self.CBox.restart_awg_tape(0)
-#                     self.CBox.restart_awg_tape(1)
-#                     self.CBox.restart_awg_tape(2)
-#                     self.prepare()
-#         else:
-#             d = self._get_values()
-#         return d
-
-#     def _get_values(self):
-#         raw_data = self.CBox.get_integration_log_results()
-#         I_data_0, I_data_1 = a_tools.zigzag(raw_data[0])
-#         Q_data_0, Q_data_1 = a_tools.zigzag(raw_data[1])
-#         data = [I_data_0, Q_data_0, I_data_1, Q_data_1]
-#         print(np.shape(data))
-#         return data
-
-#     def prepare(self, **kw):
-#         if self.AWG is not None:
-#             self.AWG.stop()
-#         self.CBox.set('acquisition_mode', 6)
-#         self.CBox.set_run_mode(1)
-
-#     def finish(self):
-#         counters = np.array(self.CBox.get_sequencer_counters())
-#         triggerfraction = float(counters[1])/float(counters[0])
-#         print("trigger fraction", triggerfraction)
-#         self.CBox.set('acquisition_mode', 0)
-#         self.CBox.set_run_mode(0)
-#         if self.AWG is not None:
-#             self.AWG.stop()
-
-
-# class QuTechCBox_Shots_Logging_Detector_Touch_N_Go(Hard_Detector):
-#     def __init__(self, digitize=True,  timeout=2, **kw):
-#         super(QuTechCBox_Shots_Logging_Detector_Touch_N_Go,
-#               self).__init__()
-#         self.CBox = qt.instruments['CBox']
-#         self.name = 'CBox_shots_data'
-#         self.digitize = digitize
-#         self.timeout = timeout
-#         if self.digitize:
-#             self.value_names = ['digitized values']
-#             self.value_units = ['a.u.']
-#             self.threshold_weight0 = self.CBox.get_signal_threshold_line0()
-#         else:
-#             self.value_names = ['integration result']
-#             self.value_units = ['a.u.']
-
-#     def prepare(self, **kw):
-#         self.old_timeout = self.CBox.get_measurement_timeout()
-#         self.CBox.set_measurement_timeout(self.timeout)
-#         # ensures quick detection of the CBox crash
-
-#     def get_values(self):
-#         exception_mode = True
-#         if exception_mode:
-#             success = False
-#             i = 0
-#             while not success and i < 10:
-#                 try:
-#                     d = self._get_values()
-#                     success = True
-#                 except Exception as e:
-#                     print()
-#                     print('Timeout exception caught, retaking data points')
-#                     print(str(e))
-#                     i += 1
-#                     time.sleep(.1)
-#                     self.CBox.set_run_mode(0)
-#                     self.CBox.set('acquisition_mode', 0)
-#                     self.CBox.restart_awg_tape(0)
-#                     self.CBox.restart_awg_tape(1)
-#                     self.CBox.restart_awg_tape(2)
-#             # mode = raw_input('Press any key to continue')
-#         else:
-#             d = self._get_values()
-#         return d
-
-#     def _get_values(self):
-#         '''
-#         private version of the acquisition command used for the workaround
-#         '''
-#         self.CBox.set('acquisition_mode', 6)
-#         self.CBox.set_run_mode(1)
-
-#         raw_data = self.CBox.get_integration_log_results()
-#         weight0_data = raw_data[0]
-#         if self.digitize:
-#             data_0 = [1 if d < self.threshold_weight0 else -1
-#                       for d in weight0_data]
-#         else:
-#             data_0 = weight0_data
-#         self.CBox.set_run_mode(0)
-#         self.CBox.set('acquisition_mode', 0)
-
-#         return data_0
-
-#     def finish(self, **kw):
-#         self.CBox.set_measurement_timeout(self.old_timeout)
 
 ##############################################################################
 ##############################################################################
@@ -1304,7 +1177,7 @@ class CBox_v3_integrated_average_detector(Hard_Detector):
             except Exception as e:
                 logging.warning('Exception caught retrying')
                 logging.warning(e)
-                self.CBox.set('acquisition_mode', 0)
+                self.CBox.set('acquisition_mode', 'idle')
                 self.CBox.set('acquisition_mode', 'integration averaging mode')
             i += 1
             if i > 20:
@@ -1320,7 +1193,7 @@ class CBox_v3_integrated_average_detector(Hard_Detector):
         self.CBox.run_mode(1)
 
     def finish(self):
-        self.CBox.set('acquisition_mode', 0)
+        self.CBox.set('acquisition_mode', 'idle')
 
 class CBox_v3_single_integration_average_det(Soft_Detector):
 
@@ -1358,7 +1231,7 @@ class CBox_v3_single_integration_average_det(Soft_Detector):
             except Exception as e:
                 logging.warning(e)
                 logging.warning('Exception caught retrying')
-            self.CBox.set('acquisition_mode', 0)
+            self.CBox.set('acquisition_mode', 'idle')
             i += 1
             if i > 20:
                 break
@@ -1372,11 +1245,11 @@ class CBox_v3_single_integration_average_det(Soft_Detector):
     def prepare(self):
         self.CBox.run_mode(0)
         self.CBox.set('nr_samples', 1)
-        self.CBox.set('acquisition_mode', 0)
+        self.CBox.set('acquisition_mode', 'idle')
         self.CBox.run_mode(1)
 
     def finish(self):
-        self.CBox.set('acquisition_mode', 0)
+        self.CBox.set('acquisition_mode', 'idle')
 
 class CBox_v3_single_int_avg_with_LutReload(CBox_v3_single_integration_average_det):
 
