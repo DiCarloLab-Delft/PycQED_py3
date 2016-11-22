@@ -39,7 +39,6 @@ from pycqed.instrument_drivers.physical_instruments._controlbox \
 
 # Importing instruments
 from pycqed.instrument_drivers.physical_instruments import QuTech_ControlBox_v3 as qcb
-import pycqed.instrument_drivers.meta_instrument.CBox_LookuptableManager as lm
 from pycqed.instrument_drivers.meta_instrument.qubit_objects import duplexer_tek_transmon as dt
 from pycqed.instrument_drivers.meta_instrument import CBox_LookuptableManager as cbl
 
@@ -51,13 +50,10 @@ from pycqed.measurement import awg_sweep_functions as awg_swf
 from pycqed.measurement import detector_functions as det
 from pycqed.measurement import composite_detector_functions as cdet
 from pycqed.measurement import calibration_toolbox as cal_tools
-from pycqed.measurement import mc_parameter_wrapper as pw
 from pycqed.measurement import CBox_sweep_functions as cb_swf
-from pycqed.measurement.optimization import nelder_mead
 from pycqed.analysis import measurement_analysis as ma
 from pycqed.analysis import analysis_toolbox as a_tools
-from pycqed.measurement import awg_sweep_functions_multi_qubit as awg_swf_m
-from pycqed.measurement.pulse_sequences import multi_qubit_tek_seq_elts as sq_m
+
 
 
 from pycqed.utilities import general as gen
@@ -72,15 +68,11 @@ from qcodes.instrument_drivers.rohde_schwarz import SGS100A as rs
 import qcodes.instrument_drivers.signal_hound.USB_SA124B as sh
 import qcodes.instrument_drivers.QuTech.IVVI as iv
 from qcodes.instrument_drivers.tektronix import AWG5014 as tek
-from qcodes.instrument_drivers.agilent.E8527D import Agilent_E8527D
 
 
 import pycqed.instrument_drivers.meta_instrument.qubit_objects.Tektronix_driven_transmon as qbt
 from pycqed.instrument_drivers.meta_instrument import heterodyne as hd
-import pycqed.instrument_drivers.meta_instrument.CBox_LookuptableManager as lm
 
-from pycqed.instrument_drivers.meta_instrument.qubit_objects import CBox_driven_transmon as qb
-from pycqed.instrument_drivers.physical_instruments import QuTech_Duplexer as qdux
 if UHFQC:
     from pycqed.instrument_drivers.physical_instruments.ZurichInstruments import UHFQuantumController as ZI_UHFQC
 from pycqed.instrument_drivers.physical_instruments import Weinschel_8320_novisa
@@ -183,9 +175,6 @@ print('starting meta instruments')
 HS = hd.HeterodyneInstrument('HS', LO=LO, RF=RF, AWG=AWG, acquisition_instr=CBox.name,
                              server_name=None)
 station.add_component(HS)
-# LutMan = lm.QuTech_ControlBox_LookuptableManager('LutMan', CBox=CBox,
-#                                                  server_name=None)
-# server_name='metaLM')
 print('starting qubit objects')
 AncB = qbt.Tektronix_driven_transmon('AncB', LO=LO, cw_source=Spec_source,
                                      td_source=Qubit_LO,
@@ -321,7 +310,19 @@ AWG.clock_freq(1e9)
 
 print('Ran initialization in %.2fs' % (t1-t0))
 
+#########################################
+# Demo parameters
+#########################################
 
+CBox.integration_length(120) # samples
+LutMan.Q_gauss_width(20e-9)
+CBox.AWG0_dac0_offset(-11.10517597)
+CBox.AWG0_dac1_offset(-21.095)
+
+
+##############
+# Defining useful function
+###############
 def all_sources_off():
     LO.off()
     RF.off()
@@ -336,10 +337,6 @@ def print_instr_params(instr):
         print('{}: {} {}'.format(snapshot['parameters'][par]['name'],
                                  snapshot['parameters'][par]['value'],
                                  snapshot['parameters'][par]['units']))
-
-
-# from scripts.Experiments.FiveQubits import common_functions as cfct
-# cfct.set_AWG_limits(station, 1.7)
 
 
 if UHFQC:

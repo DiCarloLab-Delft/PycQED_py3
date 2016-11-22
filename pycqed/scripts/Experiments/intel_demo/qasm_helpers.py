@@ -1,6 +1,24 @@
 import logging
 import pycqed.measurement.sweep_functions as swf
 import pycqed.measurement.detector_functions as det
+from pycqed.measurement.waveform_control_CC import qasm_to_asm as qta
+
+
+class QASM_Sweep(swf.Hard_Sweep):
+
+    def __init__(self, filename, CBox, op_dict, upload=True):
+        super().__init__()
+        self.name = 'QASM_Sweep'
+        self.filename = filename
+        self.upload = upload
+        self.CBox = CBox
+        self.op_dict = op_dict
+
+    def prepare(self, **kw):
+        if self.upload:
+            asm_file = qta.qasm_to_asm(self.filename, self.op_dict)
+            self.CBox.trigger_source('internal')
+            self.CBox.load_instructions(asm_file.name)
 
 
 class ASM_Sweep(swf.Hard_Sweep):
@@ -16,17 +34,8 @@ class ASM_Sweep(swf.Hard_Sweep):
 
     def prepare(self, **kw):
         if self.upload:
-            self.CBox.AWG0_mode('Codeword-trigger mode')
-            self.CBox.AWG1_mode('Codeword-trigger mode')
-            self.CBox.AWG2_mode('Codeword-trigger mode')
-            # self.CBox.set_master_controller_working_state(0, 0, 0)
-            self.CBox.core_state('idle')
-            self.CBox.acquisition_mode('idle')
             self.CBox.trigger_source('internal')
-            self.CBox.demodulation_mode('double')
             self.CBox.load_instructions(self.filename)
-
-            # self.CBox.set_master_controller_working_state(1, 0, 0)
 
 
 class CBox_integrated_average_detector_CC(det.Hard_Detector):
@@ -69,10 +78,6 @@ class CBox_integrated_average_detector_CC(det.Hard_Detector):
             except Exception as e:
                 logging.warning('Exception caught retrying')
                 logging.warning(e)
-                self.CBox.set('acquisition_mode', 'idle')
-
-                self.CBox.set('acquisition_mode', 'integration averaging')
-
             i += 1
             if i > 20:
                 break
@@ -107,6 +112,44 @@ class CBox_single_integration_average_det_CC(
         return self.get_values()
 
 
+class CBox_integration_logging_det_CC(det.Hard_Detector):
+    def __init__(self, CBox, **kw):
+        '''
+        If you want AWG reloading you should give a LutMan and specify
+        on what AWG nr to reload default is no reloading of pulses.
+        '''
+        super().__init__()
+        self.CBox = CBox
+        self.name = 'CBox_integration_logging_detector'
+        self.value_names = ['I', 'Q']
+        self.value_units = ['a.u.', 'a.u.']
+
+    def get_values(self):
+        succes = False
+        i = 0
+        while not succes:
+            try:
+                self.CBox.set('run_mode', 'idle')
+                self.CBox.core_state('idle')
+                self.CBox.core_state('active')
+                self.CBox.set('acquisition_mode', 'idle')
+                self.CBox.set('acquisition_mode', 'integration logging')
+                self.CBox.set('run_mode', 'run')
+                # does not restart AWG tape in CBox as we don't use it anymore
+                data = self.CBox.get_integration_log_results()
+                succes = True
+            except Exception as e:
+                logging.warning('Exception caught retrying')
+                logging.warning(e)
+            i += 1
+            if i > 20:
+                break
+        return data
+
+    def finish(self):
+        self.CBox.set('acquisition_mode', 'idle')
+
+
 def create_CBox_op_dict(qubit_name, pulse_length=8, RO_length=50, RO_delay=10):
     operation_dict = {
         'init_all': {'instruction': 'WaitReg r0 \nWaitReg r0 \n'},
@@ -136,3 +179,4 @@ def create_CBox_op_dict(qubit_name, pulse_length=8, RO_length=50, RO_delay=10):
     return operation_dict
 
 op_dict = create_CBox_op_dict('AncT')
+

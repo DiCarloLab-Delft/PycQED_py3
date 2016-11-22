@@ -30,7 +30,6 @@ class File(swf.Hard_Sweep):
             self.AWG.set_setup_filename(self.filename)
 
 
-
 class Rabi(swf.Hard_Sweep):
     def __init__(self, pulse_pars, RO_pars, n=1, upload=True, return_seq=False):
         super().__init__()
