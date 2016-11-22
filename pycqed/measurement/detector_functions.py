@@ -492,11 +492,13 @@ class CBox_single_integration_average_det(Soft_Detector):
 
 
 class CBox_single_int_avg_with_LutReload(CBox_single_integration_average_det):
+
     '''
     Detector used for acquiring single points of the CBox while externally
     triggered by the AWG.
     Very similar to the regular integrated avg detector.
     '''
+
     def __init__(self, CBox, LutMan, reload_pulses='all', awg_nrs=[0], **kw):
         super().__init__(CBox, **kw)
         self.LutMan = LutMan
@@ -758,8 +760,6 @@ class CBox_digitizing_shots_det(CBox_integration_logging_det):
         return (d > self.threshold).astype(int)
 
 
-
-
 ##############################################################################
 ##############################################################################
 ####################     Software Controlled Detectors     ###################
@@ -804,10 +804,8 @@ class QX_Detector(Soft_Detector):
         circuit_name = ("circuit%i" % self.__cnt)
         errors = 0
 
-
         executions = 1000
-<<<<<<< HEAD
-        p_error    = 0.001+self.__cnt*0.003
+        p_error = 0.001+self.__cnt*0.003
         '''
         for i in range(0,executions):
             self.__qxc.run_noisy_circuit(circuit_name,p_error)
@@ -818,31 +816,16 @@ class QX_Detector(Soft_Detector):
             # print("[+] measurement outcome : %s %s" % (m0,m1))
         # x = self.__cnt/15.
         '''
-        print("[+] p error  :",p_error)
+        print("[+] p error  :", p_error)
         # print("[+] errors   :",errors)
         # f = (executions-errors)/executions
         self.__qxc.send_cmd("reset_measurement_averaging")
-        self.__qxc.run_noisy_circuit(circuit_name,p_error,"depolarizing_channel",executions)
+        self.__qxc.run_noisy_circuit(
+            circuit_name, p_error, "depolarizing_channel", executions)
         f = self.__qxc.get_measurement_average(0)
-        print("[+] fidelity :",f)
-        self.__qxc.send_cmd("reset_measurement_averaging")
-        # time.sleep(self.delay)
-=======
-        p_error = 0.0001+self.__cnt*0.0002
-        for i in range(0, executions):
-            self.__qxc.run_noisy_circuit(circuit_name, p_error)
-            m0 = self.__qxc.get_measurement(0)
-            # m1 = self.__qxc.get_measurement(1)
-            if int(m0) != 0:
-                errors += 1
-            # print("[+] measurement outcome : %s %s" % (m0,m1))
-        # x = self.__cnt/15.
-        print("[+] p error  :", p_error)
-        print("[+] errors   :", errors)
-        f = (executions-errors)/executions
         print("[+] fidelity :", f)
-        time.sleep(self.delay)
->>>>>>> 53eb970ef965c475e5955cc33e826fd5bf739af9
+        self.__qxc.send_cmd("reset_measurement_averaging")
+
         self.__cnt = self.__cnt+1
         return f
 
@@ -1363,10 +1346,10 @@ class UHFQC_input_average_detector(Hard_Detector):
         self.UHFQC.quex_iavg_length(self.nr_samples)
         self.UHFQC.quex_iavg_avgcnt(int(np.log2(self.nr_averages)))
         self.UHFQC.awgs_0_userregs_1(1)  # 0 for rl, 1 for iavg
-        self.UHFQC.awgs_0_userregs_0(int(self.nr_averages))  # 0 for rl, 1 for iavg
+        self.UHFQC.awgs_0_userregs_0(
+            int(self.nr_averages))  # 0 for rl, 1 for iavg
         self.nr_sweep_points = self.nr_samples
         self.UHFQC.awgs_0_single(1)
-
 
     def finish(self):
         if self.AWG is not None:
@@ -1457,9 +1440,11 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         self.nr_sweep_points = len(sweep_points)
         # this sets the result to integration and rotation outcome
         if self.cross_talk_suppression:
-            self.UHFQC.quex_rl_source(0) # 2/0/1 raw/crosstalk supressed /digitized
+            # 2/0/1 raw/crosstalk supressed /digitized
+            self.UHFQC.quex_rl_source(0)
         else:
-            self.UHFQC.quex_rl_source(2) # 2/0/1 raw/crosstalk supressed /digitized
+            # 2/0/1 raw/crosstalk supressed /digitized
+            self.UHFQC.quex_rl_source(2)
         self.UHFQC.quex_rl_length(self.nr_sweep_points)
         self.UHFQC.quex_rl_avgcnt(int(np.log2(self.nr_averages)))
         self.UHFQC.quex_wint_length(int(self.integration_length*(1.8e9)))
@@ -1470,7 +1455,6 @@ class UHFQC_integrated_average_detector(Hard_Detector):
             int(self.nr_averages*self.nr_sweep_points))
         self.UHFQC.awgs_0_userregs_1(0)  # 0 for rl, 1 for iavg
         self.UHFQC.awgs_0_single(1)
-
 
     def finish(self):
         if self.AWG is not None:
@@ -1502,7 +1486,7 @@ class UHFQC_integration_logging_det(Hard_Detector):
         self.AWG = AWG
         self.integration_length = integration_length
         self.nr_shots = nr_shots
-        self.cross_talk_suppression=cross_talk_suppression
+        self.cross_talk_suppression = cross_talk_suppression
 
     def get_values(self):
         self.UHFQC.awgs_0_enable(1)
@@ -1544,9 +1528,11 @@ class UHFQC_integration_logging_det(Hard_Detector):
         self.UHFQC.quex_wint_length(int(self.integration_length*(1.8e9)))
         # this sets the result to integration and rotation outcome
         if self.cross_talk_suppression:
-            self.UHFQC.quex_rl_source(0) # 2/0/1 raw/crosstalk supressed /digitized
+            # 2/0/1 raw/crosstalk supressed /digitized
+            self.UHFQC.quex_rl_source(0)
         else:
-            self.UHFQC.quex_rl_source(2) # 2/0/1 raw/crosstalk supressed /digitized
+            # 2/0/1 raw/crosstalk supressed /digitized
+            self.UHFQC.quex_rl_source(2)
 
     def finish(self):
         if self.AWG is not None:
