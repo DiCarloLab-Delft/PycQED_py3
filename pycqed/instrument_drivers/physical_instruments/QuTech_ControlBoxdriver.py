@@ -65,7 +65,7 @@ class QuTech_ControlBox(VisaInstrument):
         self.add_parameter('run_mode',
                            set_cmd=self._do_set_run_mode,
                            get_cmd=self._do_get_run_mode,
-                           vals=vals.Anything())
+                           vals=vals.Enum('idle', 'run'))
         self.add_parameter('signal_delay',
                            label='signal delay (# samples)',
                            get_cmd=self._do_get_signal_delay,

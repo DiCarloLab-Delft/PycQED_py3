@@ -359,10 +359,11 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
 
     def load_instructions(self, asm_filename, PrintHex=False):
         '''
-        set the weights of the integregration
-
         @param instructions : the instructions, an array of 32-bit instructions
         @return stat : 0 if the upload succeeded and 1 if the upload failed.
+
+        Additionally it starts by setting the core state to idle before
+        uploading instructions and ends by setting the core state to active.
         '''
 
         asm = Assembler.Assembler(asm_filename)
@@ -400,5 +401,5 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
 
         if not stat:
             raise Exception('Failed to load instructions')
-
+        self.set('core_state', 'active')
         return (stat, mesg)
