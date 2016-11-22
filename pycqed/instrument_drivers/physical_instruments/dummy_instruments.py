@@ -3,6 +3,7 @@ import numpy as np
 from qcodes.instrument.base import Instrument
 from qcodes.utils import validators as vals
 from qcodes.instrument.parameter import ManualParameter
+import time
 
 
 class DummyParHolder(Instrument):
@@ -28,6 +29,10 @@ class DummyParHolder(Instrument):
                            label='white noise amplitude',
                            parameter_class=ManualParameter,
                            vals=vals.Numbers(), initial_value=0)
+        self.add_parameter('delay', units='s',
+                           label='Sampling delay',
+                           parameter_class=ManualParameter,
+                           vals=vals.Numbers(), initial_value=0)
 
         self.add_parameter('parabola', units='a.u.',
                            get_cmd=self._measure_parabola)
@@ -35,15 +40,17 @@ class DummyParHolder(Instrument):
                            get_cmd=self._measure_skewwed_parabola)
 
     def _measure_parabola(self):
-        return (self.x.get()**2 + self.y.get()**2 + self.z.get()**2 +
-                self.noise.get()*np.random.rand(1))
+        time.sleep(self.delay())
+        return (self.x()**2 + self.y()**2 + self.z()**2 +
+                self.noise()*np.random.rand(1))
 
     def _measure_skewwed_parabola(self):
         '''
         Adds a -x term to add a corelation between the parameters.
         '''
-        return ((self.x.get()**2 + self.y.get()**2 +
-                self.z.get()**2)*(1 + abs(self.y.get()-self.x.get())) +
-                self.noise.get()*np.random.rand(1))
+        time.sleep(self.delay())
+        return ((self.x()**2 + self.y()**2 +
+                self.z()**2)*(1 + abs(self.y()-self.x())) +
+                self.noise()*np.random.rand(1))
 
 
