@@ -365,6 +365,6 @@ class QuTech_ControlBox_LookuptableManager(Instrument):
         indices = [i for i, x in enumerate(self.get('lut_mapping')) if
                    x == pulse_name]
         for i in indices:
-            self.CBox.set_awg_lookuptable(awg_nr, i, I_ch, I_wave)
-            self.CBox.set_awg_lookuptable(awg_nr, i, Q_ch, Q_wave)
+            self.CBox.set_awg_lookuptable(int(awg_nr), int(i), I_ch, I_wave)
+            self.CBox.set_awg_lookuptable(int(awg_nr), int(i), Q_ch, Q_wave)
 

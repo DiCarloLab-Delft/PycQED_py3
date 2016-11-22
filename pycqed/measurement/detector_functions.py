@@ -491,13 +491,11 @@ class CBox_single_integration_average_det(Soft_Detector):
 
 
 class CBox_single_int_avg_with_LutReload(CBox_single_integration_average_det):
-
     '''
     Detector used for acquiring single points of the CBox while externally
     triggered by the AWG.
     Very similar to the regular integrated avg detector.
     '''
-
     def __init__(self, CBox, LutMan, reload_pulses='all', awg_nrs=[0], **kw):
         super().__init__(CBox, **kw)
         self.LutMan = LutMan

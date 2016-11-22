@@ -241,7 +241,7 @@ class Assembler():
 
         except ValueError as detail:
             raise ValueError('WaitReg instruction format error: {}'.format(
-                                 detail.args))
+                detail.args))
 
     # pulse AWG0, AWG1, AWG2
     def PulseFormat(self, awg0, awg1, awg2):
@@ -254,7 +254,7 @@ class Assembler():
 
         except ValueError as detail:
             raise ValueError('Pulse instruction format error: {}'.format(
-                                 detail.args))
+                detail.args))
 
     # measure rt
     # def MeasureFormat(self, dst_reg):
@@ -284,7 +284,7 @@ class Assembler():
 
         except ValueError as detail:
             raise ValueError('Measure instruction format error: {}'.format(
-                                 detail.args))
+                detail.args))
 
     # wait imm
     def WaitFormat(self, imm15):
@@ -450,7 +450,7 @@ class Assembler():
                 if (elements[1][0] != 'r' or elements[2][0] != 'r' or
                         elements[3][0] != 'r'):
                     raise ValueError('Add instruction only receive three registers'
-                          ' as input.')
+                                     ' as input.')
                     exit()
 
                 instructions.append(int(self.AddFormat(elements[1],
@@ -462,7 +462,7 @@ class Assembler():
                 if (elements[1][0] != 'r' or elements[2][0] != 'r' or
                         elements[3][0] != 'r'):
                     raise ValueError('Sub instruction only receive three'
-                           'registers as input.')
+                                     'registers as input.')
                     exit()
 
                 instructions.append(int(self.SubFormat(elements[1],
@@ -474,15 +474,15 @@ class Assembler():
 
                 if (elements[1][0] != 'r' or elements[2][0] != 'r'):
                     raise ValueError('beq instruction only receive registers as'
-                           ' the first two parameter.')
+                                     ' the first two parameter.')
                     exit()
 
                 if elements[3].strip().lower() in tag_addr_dict:
                     target_addr = tag_addr_dict[elements[3].strip().lower()] -\
-                                  (cur_addr + 1)
+                        (cur_addr + 1)
                 else:
                     raise ValueError("beq. Cannot find the branch target label: ",
-                          elements[3].strip().lower())
+                                     elements[3].strip().lower())
                     exit()
 
                 instructions.append(int(self.BeqFormat(elements[1],
@@ -494,16 +494,16 @@ class Assembler():
 
                 if (elements[1][0] != 'r' or elements[2][0] != 'r'):
                     raise ValueError('bne instruction only receive registers as '
-                           'the first two parameter.')
+                                     'the first two parameter.')
                     exit()
 
                 if elements[3].strip().lower() in tag_addr_dict:
                     target_addr = tag_addr_dict[elements[3].strip().lower()] -\
-                                  (cur_addr + 1)
+                        (cur_addr + 1)
                     # print("bne, target_addr: ", target_addr)
                 else:
                     raise ValueError("bne. Cannot find the branch target label: ",
-                          elements[3].strip().lower())
+                                     elements[3].strip().lower())
                     exit()
 
                 instructions.append(int(self.BneFormat(elements[1],
@@ -515,7 +515,7 @@ class Assembler():
 
                 if (elements[1][0] != 'r' or elements[2][0] != 'r'):
                     raise ValueError('addi instruction only receive registers as '
-                           'the first two parameter.')
+                                     'the first two parameter.')
                     exit()
 
                 instructions.append(int(self.AddiFormat(elements[1],
@@ -527,7 +527,7 @@ class Assembler():
 
                 if (elements[1][0] != 'r'):
                     raise ValueError('WaitReg instruction only a register as the '
-                           'parameter.')
+                                     'parameter.')
                     exit()
 
                 instructions.append(int(self.WaitRegFormat(elements[1]), 2))
@@ -560,7 +560,7 @@ class Assembler():
 
             else:
                 raise ValueError('Error: unsupported instruction "{}" found on line "{}". '.format(
-                      elements[0], line))
+                    elements[0], line))
                 Asm_File.close()
                 return False
 
