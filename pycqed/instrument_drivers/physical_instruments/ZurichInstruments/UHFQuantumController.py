@@ -19,11 +19,10 @@ class UHFQC(Instrument):
 
     Requirements:
     Installation instructions for Zurich Instrument Libraries.
-    1. install ziPython 3.5 ucs4 16.04 for 64bit Windows from http://www.zhinst.com/downloads
+    1. install ziPython 3.5 ucs4 16.04 for 64bit Windows from http://www.zhinst.com/downloads, https://people.zhinst.com/~niels/
     2. pip install dependencies: httplib2, plotly, pyqtgraph
-    3. manually paste zishell.py one directory above the zhinst directory (C:/Anaconda3/side) (can be found in transmon/inventory/firmware_Nielsb)
-    4. upload the latest firmware to the UHFQC by opening reboot.bat in 'Transmon\Inventory\ZurichInstruments\firmware_Nielsb\firmware_x'. WIth x the highest available number.
-    5. find out where sequences are stored by saving a sequence from the GUI and then check :"showLog" to see where it is stored. This is the location where AWG sequences can be loaded from.
+    3. upload the latest firmware to the UHFQC by opening reboot.bat in 'Transmon\Inventory\ZurichInstruments\firmware_Nielsb\firmware_x'. WIth x the highest available number.
+    4. find out where sequences are stored by saving a sequence from the GUI and then check :"showLog" to see where it is stored. This is the location where AWG sequences can be loaded from.
     misc: when device crashes, check the log file in
     EOM
     """
@@ -54,36 +53,36 @@ class UHFQC(Instrument):
         self._s_file_name = os.path.join(dir_path, 'zi_parameter_files', 's_node_pars.txt')
         self._d_file_name = os.path.join(dir_path, 'zi_parameter_files', 'd_node_pars.txt')
 
-        init=True
+        init = True
         try:
-            f=open(self._s_file_name).read()
+            f = open(self._s_file_name).read()
             s_node_pars = json.loads(f)
         except:
             print("parameter file for gettable parameters {} not found".format(self._s_file_name))
             init=False
         try:
-            f=open(self._d_file_name).read()
+            f = open(self._d_file_name).read()
             d_node_pars = json.loads(f)
         except:
             print("parameter file for settable parameters {} not found".format(self._d_file_name))
-            init=False
+            init = False
 
         for parameter in s_node_pars:
             parname=parameter[0].replace("/","_")
             parfunc="/"+device+"/"+parameter[0]
-            if parameter[1]=='float':
+            if parameter[1] == 'float':
                 self.add_parameter(
                     parname,
                     set_cmd=self._gen_set_func(self.setd, parfunc),
                     get_cmd=self._gen_get_func(self.getd, parfunc),
                     vals=vals.Numbers(parameter[2], parameter[3]))
-            elif parameter[1]=='float_small':
+            elif parameter[1] == 'float_small':
                 self.add_parameter(
                     parname,
                     set_cmd=self._gen_set_func(self.setd, parfunc),
                     get_cmd=self._gen_get_func(self.getd, parfunc),
                     vals=vals.Numbers(parameter[2], parameter[3]))
-            elif parameter[1]=='int_8bit':
+            elif parameter[1] == 'int_8bit':
                 self.add_parameter(
                     parname,
                     set_cmd=self._gen_set_func(self.seti, parfunc),
@@ -268,6 +267,59 @@ class UHFQC(Instrument):
 
         return nodes
 
+    def single_acquisition(self, samples, acquisition_time=0.010, timeout=0, channels=set([0, 1]), mode='rl'):
+        # Define the channels to use
+        paths = dict()
+        data = dict()
+        if mode == 'rl':
+            for c in channels:
+                paths[c] = '/' + self._device + '/quex/rl/data/{}'.format(c)
+                data[c] = []
+        else:
+            for c in channels:
+                paths[c] = '/' + self._device + '/quex/iavg/data/{}'.format(c)
+                data[c] = []
+
+        # It would be better to move this call in to the initialization function
+        # in order to save time here
+        enable_path = '/' + self._device + '/awgs/0/enable'
+        self._daq.subscribe(enable_path)
+
+        # Added for testing purposes, remove again according to how the AWG is started
+        self._daq.setInt('/' + self._device + '/awgs/0/single', 1)
+        self._daq.setInt(enable_path, 1)
+
+        timeout = 0
+        gotit = False
+        while not gotit and timeout < 100:
+            dataset = self._daq.poll(acquisition_time, timeout, 4, True)
+            if enable_path in dataset and dataset[enable_path]['value'][0] == 0:
+                gotit = True
+            else:
+                timeout += 1
+
+        if not gotit:
+            print("Error: AWG did not finish in time!")
+            return (None, None)
+
+        gotem = [False]*len(channels)
+        for n, c in enumerate(channels):
+            p = paths[c]
+            dataset = self._daq.get(p, True, 0)
+            if p in dataset:
+                for v in dataset[p]:
+                    data[c] = np.concatenate((data[c], v['vector']))
+                if len(data[c]) >= samples:
+                    gotem[n] = True
+
+        if not all(gotem):
+            print("Error: Didn't get all results!")
+            for n, c in enumerate(channels):
+                print("    : Channel {}: Got {} of {} samples", c, len(data[c]), samples)
+            return (None, None)
+
+        # print("data type {}".format(type(data)))
+        return data
 
     def create_parameter_files(self):
         #this functions retrieves all possible settable and gettable parameters from the device.
@@ -461,16 +513,8 @@ class UHFQC(Instrument):
         values = {}
 
         for p in paths:
-            self._daq.getAsEvent(p)
-
-        tries = 0
-        while len(values) < len(paths) and tries < 10:
-            try:
-                tmp = self._daq.poll(0.001, 500, 4, True)
-                for p in tmp:
-                    values[p] = tmp[p]
-            except ZIException:
-                pass
+            tmp = self._daq.get(p, True, 0)
+            values[p] = tmp[p]
 
         if single:
             return values[paths[0]]
@@ -493,19 +537,15 @@ class UHFQC(Instrument):
             raise KeyError("exceeding AWG range for I channel, all values should be withing +/-1")
         elif np.max(Qwave)>1.0 or np.min(Qwave)<-1.0:
             raise KeyError("exceeding AWG range for Q channel, all values should be withing +/-1")
-        elif len(Iwave)>1493:
-            raise KeyError("exceeding max AWG wave lenght of 1493 samples for I channel, trying to upload {} samples".format(len(Iwave)))
-        elif len(Qwave)>1493:
-            raise KeyError("exceeding max AWG wave lenght of 1493 samples for Q channel, trying to upload {} samples".format(len(Qwave)))
+        elif len(Iwave)>16384:
+            raise KeyError("exceeding max AWG wave lenght of 16384 samples for I channel, trying to upload {} samples".format(len(Iwave)))
+        elif len(Qwave)>16384:
+            raise KeyError("exceeding max AWG wave lenght of 16384 samples for Q channel, trying to upload {} samples".format(len(Qwave)))
 
-        Iwave_strip=",".join(str(bit) for bit in Iwave)
-        Qwave_strip=",".join(str(bit) for bit in Qwave)
-        wave_I_string = "wave Iwave = vect("+Iwave_strip+");\n"
-        wave_Q_string = "wave Qwave = vect("+Qwave_strip+");\n"
-
+        wave_I_string = self.array_to_combined_vector_string(Iwave, "Iwave")
+        wave_Q_string = self.array_to_combined_vector_string(Qwave, "Qwave")
         delay_samples = int(acquisition_delay*1.8e9/8)
         delay_string='\twait({});\n'.format(delay_samples)
-
 
         preamble="""
 const TRIGGER1  = 0x000001;
@@ -540,6 +580,31 @@ setTrigger(0);"""
         string = preamble+wave_I_string+wave_Q_string+loop_start+delay_string+end_string
         self.awg_string(string)
 
+    def array_to_combined_vector_string(self, array, name):
+        # this function cuts up arrays into several vectors of maximum length 1024 that are joined.
+        # this is to avoid python crashes (was found to crash for vectors of lenght> 1490)
+        string = 'vect('
+        join = False
+        n = 0
+        while n < len(array):
+            string += '{:.3f}'.format(array[n])
+            if ((n+1) % 1024 != 0) and n < len(array)-1:
+                string += ','
+
+            if ((n+1) % 1024 == 0):
+                string += ')'
+                if n < len(array)-1:
+                    string += ',\nvect('
+                    join = True
+            n += 1
+
+        string += ')'
+        if join:
+            string = 'wave '+ name +' = join(' + string + ');\n'
+        else:
+            string = 'wave '+ name +' = '+ string + ';\n'
+        return string
+
     def awg_sequence_acquisition(self):
         string="""
 const TRIGGER1  = 0x000001;
@@ -570,12 +635,28 @@ setTrigger(0);"""
 
     def awg_sequence_acquisition_and_pulse_SSB(self, f_RO_mod, RO_amp, RO_pulse_length, acquisition_delay):
         f_sampling=1.8e9
-        samples=RO_pulse_length*f_sampling
-        array=np.arange(int(samples))
-        sinwave=RO_amp*np.sin(2*np.pi*array*f_RO_mod/f_sampling)
-        coswave=RO_amp*np.cos(2*np.pi*array*f_RO_mod/f_sampling)
+        samples = RO_pulse_length*f_sampling
+        array = np.arange(int(samples))
+        sinwave = RO_amp*np.sin(2*np.pi*array*f_RO_mod/f_sampling)
+        coswave = RO_amp*np.cos(2*np.pi*array*f_RO_mod/f_sampling)
         Iwave = coswave+sinwave;
         Qwave = coswave-sinwave;
         # Iwave, Qwave = PG.mod_pulse(np.ones(samples), np.zeros(samples), f=f_RO_mod, phase=0, sampling_rate=f_sampling)
         self.awg_sequence_acquisition_and_pulse(Iwave, Qwave, acquisition_delay)
 
+
+    def upload_transformation_matrix(self, matrix):
+        for i in range(np.shape(matrix)[0]): #looping over the rows
+            for j in range(np.shape(matrix)[1]): #looping over the colums
+                #value =matrix[i,j]
+                #print(value)
+                eval('self.quex_trans_{}_col_{}_real(matrix[{}][{}])'.format(j,i,i,j))
+
+    def download_transformation_matrix(self, nr_rows=4, nr_cols=4):
+        matrix = np.zeros([nr_rows,nr_cols])
+        for i in range(np.shape(matrix)[0]): #looping over the rows
+            for j in range(np.shape(matrix)[1]): #looping over the colums
+                matrix[i][j]=(eval('self.quex_trans_{}_col_{}_real()'.format(j,i)))
+                #print(value)
+                #matrix[i,j]=value
+        return matrix

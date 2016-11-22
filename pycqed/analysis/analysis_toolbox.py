@@ -15,7 +15,7 @@ from pycqed.init.config import setup_dict
 from scipy.interpolate import griddata
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import h5py
-
+from scipy.signal import argrelextrema
 # to allow backwards compatibility with old a_tools code
 from .tools.file_handling import *
 from .tools.data_manipulation import *
@@ -842,6 +842,18 @@ def smooth(x, window_len=11, window='hanning'):
     edge = int(edge)
     return y[edge:-edge]
 
+def peak_finder_v2(x, y, perc=90, window_len=11):
+    '''
+    Peak finder based on argrelextrema function from scipy
+    only finds maximums, this can be changed to minimum by using -y instead of y
+    '''
+    smoothed_y = smooth(y,window_len=window_len)
+    percval = np.percentile(smoothed_y, perc)
+    filtered_y = np.where(smoothed_y>percval,smoothed_y,percval)
+    array_peaks = argrelextrema(filtered_y, np.greater)
+    peaks_x = x[array_peaks]
+    sort_mask = np.argsort(y[array_peaks])[::-1]
+    return peaks_x[sort_mask]
 
 def peak_finder(x, y, percentile=70, num_sigma_threshold=5, window_len=11):
 

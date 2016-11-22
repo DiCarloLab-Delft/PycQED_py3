@@ -134,11 +134,11 @@ def simple_mod_pulse(pulse_I, pulse_Q, f_modulation,
 
 def mod_gauss(amp, sigma_length, f_modulation, axis='x',
               motzoi=0, sampling_rate=2e8,
-              Q_phase_delay=0, delay=0):
+              Q_phase_delay=0, delay=0, nr_sigma=4):
     '''
     Simple gauss pulse maker for CBOX. All inputs are in s and Hz.
     '''
-    pulse_I, pulse_Q = gauss_pulse(amp, sigma_length, nr_sigma=4,
+    pulse_I, pulse_Q = gauss_pulse(amp, sigma_length, nr_sigma=nr_sigma,
                                    sampling_rate=sampling_rate, axis=axis,
                                    motzoi=motzoi, delay=delay)
     pulse_I_mod, pulse_Q_mod = mod_pulse(pulse_I, pulse_Q, f_modulation,

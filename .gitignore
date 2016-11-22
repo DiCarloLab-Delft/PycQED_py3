@@ -23,6 +23,7 @@ var/
 *.egg-info/
 .installed.cfg
 *.egg
+*.ipynb_checkpoints*
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
@@ -117,3 +118,4 @@ $RECYCLE.BIN/
 # micro instruction assembly files
 *.asm
 *.txt
+data/*

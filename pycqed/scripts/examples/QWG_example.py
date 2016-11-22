@@ -1,13 +1,14 @@
 
 #!/usr/bin/python
 import unittest
-from instrument_drivers.physical_instruments.QuTech_AWG_Module \
+from pycqed.instrument_drivers.physical_instruments.QuTech_AWG_Module \
     import QuTech_AWG_Module
 from pycqed.measurement.waveform_control_CC.waveform import Waveform
 import time
 import numpy as np
 from socket import timeout
 from qcodes.utils import validators as vals
+import matplotlib.pyplot as plt
 
 
 # create waveforms
@@ -32,29 +33,25 @@ wvGauss = Waveform.gauss(fs, sampleCnt, mu, sigma)
 wvDerivGauss = Waveform.derivGauss(fs, sampleCnt, mu, sigma, dirAmpl)
 wvGauss2 = Waveform.gauss(fs, sampleCnt, mu2, sigma2)
 wvDerivGauss2 = Waveform.derivGauss(fs, sampleCnt, mu2, sigma2, dirAmpl2)
-marker1 = []
-marker2 = []
 
-
-# if 1:
-# qwg1 = QuTech_AWG_Module('QWG-1', '192.168.42.10', 5025, server_name=None)
-# else:
-#     # local variant, in combination with 'nc -l 5025' run locally from a
-#     # terminal
-#     qwg1 = QuTech_AWG_Module('QWG-1', '127.0.0.1', 5025, server_name=None)
-qwg1 = QWG
+try:
+    qwg1 = QWG
+except:
+    qwg1 = QuTech_AWG_Module(
+        'QWG', address='192.168.42.10',
+        port=5025, server_name=None)
 qwg1.reset()
 
 if __name__ == '__main__':
 
     if 1:  # continuous
-        qwg1.createWaveformReal('cos', wvCos, marker1, marker2)
-        qwg1.createWaveformReal('sin', wvSin, marker1, marker2)
-        qwg1.createWaveformReal('zero', wvZero, marker1, marker2)
-        qwg1.createWaveformReal('hi', wvHi, marker1, marker2)
-        qwg1.createWaveformReal('lo', wvLo, marker1, marker2)
-        qwg1.createWaveformReal('gauss', wvGauss, marker1, marker2)
-        qwg1.createWaveformReal('derivGauss', wvDerivGauss, marker1, marker2)
+        qwg1.createWaveformReal('cos', wvCos)
+        qwg1.createWaveformReal('sin', wvSin)
+        qwg1.createWaveformReal('zero', wvZero)
+        qwg1.createWaveformReal('hi', wvHi)
+        qwg1.createWaveformReal('lo', wvLo)
+        qwg1.createWaveformReal('gauss', wvGauss)
+        qwg1.createWaveformReal('derivGauss', wvDerivGauss)
 
         qwg1.set('ch1_default_waveform', 'gauss')
         qwg1.set('ch2_default_waveform', 'derivGauss')
@@ -64,15 +61,15 @@ if __name__ == '__main__':
         qwg1.run_mode('CONt')
 
     else:  # codeword based
-        qwg1.createWaveformReal('zero', wvZero, marker1, marker2)
-        qwg1.createWaveformReal('hi', wvHi, marker1, marker2)
-        qwg1.createWaveformReal('lo', wvLo, marker1, marker2)
-        qwg1.createWaveformReal('gauss', wvGauss, marker1, marker2)
-        qwg1.createWaveformReal('derivGauss', wvDerivGauss, marker1, marker2)
-        qwg1.createWaveformReal('gauss2', wvGauss2, marker1, marker2)
-        qwg1.createWaveformReal('derivGauss2', wvDerivGauss2, marker1, marker2)
+        qwg1.createWaveformReal('zero', wvZero)
+        qwg1.createWaveformReal('hi', wvHi)
+        qwg1.createWaveformReal('lo', wvLo)
+        qwg1.createWaveformReal('gauss', wvGauss)
+        qwg1.createWaveformReal('derivGauss', wvDerivGauss)
+        qwg1.createWaveformReal('gauss2', wvGauss2)
+        qwg1.createWaveformReal('derivGauss2', wvDerivGauss2)
 
-        qwg1.createWaveformReal('gaussNeg', -wvGauss, marker1, marker2)
+        qwg1.createWaveformReal('gaussNeg', -wvGauss)
 
         # segment 0: idle
         qwg1.set('ch1_default_waveform', 'zero')
@@ -134,7 +131,6 @@ if __name__ == '__main__':
 
         qwg1.setRunModeCodeword()
 
-
     qwg1.ch_pair1_sideband_frequency.set(100e6)
     qwg1.ch_pair3_sideband_frequency.set(100e6)
     qwg1.syncSidebandGenerators()
@@ -146,11 +142,51 @@ if __name__ == '__main__':
 
     qwg1.start()
 
+    # read back
+    qwg1.getOperationComplete()
+    wvCosReadBack = qwg1.getWaveformDataFloat('cos')
+    plt.plot(wvCosReadBack)
+    plt.ylabel('cos')
+    plt.show()
+
+    # waveform upload performance
+    sizes = [100, 500, 1000, 1500, 2000, 2500]
+    nrIter = 50
+    durations = []
+    megaBytesPerSecond = []
+    for size in sizes:
+        wvTest = Waveform.sin(fs, size, f)
+        qwg1.getOperationComplete()
+        markStart = time.perf_counter()
+        for i in range(nrIter):
+            qwg1.createWaveformReal('testSize{}Nr{}'.format(size, i), wvTest)
+        qwg1.getOperationComplete()
+        markEnd = time.perf_counter()
+        duration = (markEnd-markStart)/nrIter
+        durations.append(duration*1e3)
+        megaBytesPerSecond.append(size*4/duration/1e6)
+    print(sizes)
+    print(durations)
+    print(megaBytesPerSecond)
+    plt.figure(1)
+    plt.subplot(211)
+    plt.plot(sizes, durations, 'bs')
+    plt.xlabel('upload size [samples]')
+    plt.ylabel('duration per upload [ms]')
+    plt.axis([0, 2600, 0, 5])
+    plt.subplot(212)
+    plt.plot(sizes, megaBytesPerSecond, 'g^')
+    plt.xlabel('upload size [samples]')
+    plt.ylabel('performance [MB/s]')
+    plt.axis([0, 2600, 0, 20])
+    plt.show()
+
+    # list waveforms
     wlistSize = qwg1.WlistSize()
     print('WLIST size: ', wlistSize)
     print('WLIST: ', qwg1.Wlist())
 
-
+    # show some info
     print('Identity: ', qwg1.getIdentity())
     print('Error messages: ')
     for i in range(qwg1.getSystemErrorCount()):
