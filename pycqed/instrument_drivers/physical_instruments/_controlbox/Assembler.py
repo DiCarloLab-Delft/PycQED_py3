@@ -402,12 +402,8 @@ class Assembler():
         # self.AppendTail()
         tag_addr_dict = self.ParseLabel()
 
-        try:
-            Asm_File = open(self.asmfilename, 'r', encoding="utf-8")
-            logging.info("open file", self.asmfilename, "successfully.")
-        except:
-            print('\tError: Fail to open file ' + self.asmfilename + ".")
-            exit(0)
+        Asm_File = open(self.asmfilename, 'r', encoding="utf-8")
+        logging.info("open file", self.asmfilename, "successfully.")
 
         cur_addr = 0
         instructions = []
@@ -562,7 +558,6 @@ class Assembler():
                 raise ValueError('Error: unsupported instruction "{}" found on line "{}". '.format(
                     elements[0], line))
                 Asm_File.close()
-                return False
 
         Asm_File.close()
 

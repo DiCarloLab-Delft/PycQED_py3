@@ -1,4 +1,3 @@
-import unittest
 import numpy as np
 from . import defHeaders_CBox_v3 as defHeaders
 from . import test_suite
@@ -6,6 +5,7 @@ CBox = None
 
 
 class CBox_tests_v3(test_suite.CBox_tests):
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.loadSaveDataFile = False
@@ -46,9 +46,19 @@ class CBox_tests_v3(test_suite.CBox_tests):
                 self.loadSaveDataFile = False
                 self.assertTrue(False)
 
+    def test_parameter_read_back(self):
+        for par in ['core_state', 'trigger_source', 'adc_offset',
+                    'signal_delay', 'integration_length', 'lin_trans_coeffs',
+                    'sig0_threshold_line', 'sig1_threshold_line', 'log_length',
+                    'nr_samples', 'nr_averages']:
+            p = self.CBox.get(par)
+            self.CBox.set(par, p)
+            self.CBox.firmware_version.get()
+            p2 = self.CBox.get(par)
+            np.testing.assert_array_equal(p, p2)
+
     def test_firmware_version(self):
         v = self.CBox.get('firmware_version')
-        print(v)
         self.assertTrue(int(v[1]) == 3)  # major version
         self.assertTrue(int(v[3]) == 2)  # minor version
 
@@ -109,10 +119,10 @@ class CBox_tests_v3(test_suite.CBox_tests):
             for awg_nr in range(3):
                 for dac_nr in range(2):
                     for pulse_nr in range(8):
-                            self.CBox.set_awg_lookuptable(
-                                 awg_nr, pulse_nr, dac_nr,
-                                 sine_waves[pulse_nr],
-                                 units='dac', length=waveLength)
+                        self.CBox.set_awg_lookuptable(
+                            awg_nr, pulse_nr, dac_nr,
+                            sine_waves[pulse_nr],
+                            units='dac', length=waveLength)
 
         self.CBox.set('acquisition_mode', 'idle')    # set to idle state
         self.CBox.set_master_controller_working_state(0, 0, 0)
@@ -130,7 +140,6 @@ class CBox_tests_v3(test_suite.CBox_tests):
                                            self.SavedInputAvgRes0))
 
     def test_Integration_logging(self):
-        print("test_suite_v3: test_Integration_logging.")
         self.LoadSavedData()
         # initalizing waveform LUT in awgs
         triggerlength = 2
@@ -190,7 +199,6 @@ class CBox_tests_v3(test_suite.CBox_tests):
                                           self.SavedIntLogResult1_200))
 
     def test_integration_average_mode(self):
-        print("test_suite_v3: test_integration_average_mode.")
         self.LoadSavedData()
 
         triggerlength = 20
@@ -231,17 +239,12 @@ class CBox_tests_v3(test_suite.CBox_tests):
         self.CBox.set('run_mode', 1)
         [IntAvgRst0, IntAvgRst1] = self.CBox.get_integrated_avg_results()
         self.CBox.set('acquisition_mode', 'idle')
-        print("IntAvgRst0: ", IntAvgRst0)
-        print("SavedIntAvgResult0: ", self.SavedIntAvgResult0)
-        print("IntAvgRst1: ", IntAvgRst1)
-        print("SavedIntAvgResult1: ", self.SavedIntAvgResult1)
         self.assertTrue(self.Appx_Cmp_Wave(IntAvgRst0,
                                            self.SavedIntAvgResult0))
         self.assertTrue(self.Appx_Cmp_Wave(IntAvgRst1,
                                            self.SavedIntAvgResult1))
 
     def test_state_logging_and_counters(self):
-        print("test_suite_v3: test_state_logging_and_counters.")
         self.LoadSavedData()
         # initalizing waveform LUT in awgs
         triggerlength = 20
@@ -281,14 +284,6 @@ class CBox_tests_v3(test_suite.CBox_tests):
         [ch0_counters, ch1_counters] = self.CBox.get_qubit_state_log_counters()
         [ch0_result, ch1_result] = self.CBox.get_qubit_state_log_results()
         self.CBox.set('acquisition_mode', 'idle')
-        print("ch0_counters: ", ch0_counters)
-        print("SavedCh0Counters: ", self.SavedCh0Counters)
-        print("ch1_counters: ", ch1_counters)
-        print("SavedCh1Counters: ", self.SavedCh1Counters)
-        print("ch0_result: ", ch0_result)
-        print("SavedCh0Result: ", self.SavedCh0Result)
-        print("ch1_result: ", ch1_result)
-        print("SavedCh1Result: ", self.SavedCh1Result)
         self.assertEqual(ch0_counters, self.SavedCh0Counters)
         self.assertEqual(ch1_counters, self.SavedCh1Counters)
         self.assertEqual(ch0_result, self.SavedCh0Result)
@@ -304,7 +299,6 @@ class CBox_tests_v3(test_suite.CBox_tests):
             for j in range(i+1):
                 tape.extend(self.CBox.create_timing_tape_entry(i*10, i, False))
             tape.extend(self.CBox.create_timing_tape_entry(0, 7, True))
-            print(tape)
             for awg_nr in range(3):
                 self.CBox.set_conditional_tape(awg_nr, i, tape)
 

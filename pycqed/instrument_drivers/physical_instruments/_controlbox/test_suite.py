@@ -14,7 +14,6 @@ class CBox_tests(unittest.TestCase):
     @classmethod
     def setUpClass(self):
         self.CBox = CBox
-        print('CBox: ', self.CBox)
 
     def test_firmware_version(self):
         v = CBox.get('firmware_version')
@@ -109,14 +108,11 @@ class CBox_tests(unittest.TestCase):
             self.CBox.set('sig{}_threshold_line'.format(i), t)
 
     def test_adc_offset(self):
-        print("test_suite: test_adc_offset.")
         offs = self.CBox.get('adc_offset')
         self.CBox.set('adc_offset', 123)
-        print('adc_offset get:', self.CBox.get('adc_offset'))
         self.assertEqual(self.CBox.get('adc_offset'), 123)
 
         self.CBox.set('adc_offset', -123)
-        print('adc_offset get:', self.CBox.get('adc_offset'))
         self.assertEqual(self.CBox.get('adc_offset'), -123)
         self.CBox.set('adc_offset', offs)
 

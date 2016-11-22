@@ -83,8 +83,6 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
         v_list = []
         for byte in bytes(param_msg):
             v_list.append(int(byte) - 128)  # Remove the MSb 1 for data_bytes
-            # print(byte, ": ", "{0:{fill}8b}".format(byte, fill='0'))
-
         version = 'v' + str(v_list[0])+'.'+str(v_list[1]) + \
             '.'+str(v_list[2])
 
@@ -103,12 +101,12 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
         a12 = (v_list[14] << 7) + v_list[15]
         a21 = (v_list[16] << 7) + v_list[17]
         a22 = (v_list[18] << 7) + v_list[19]
-        self._lin_trans_coeffs = np.array([a11, a12, a21, a22])
+        self._lin_trans_coeffs = np.array([a11, a12, a21, a22])/2**12
         self._sig_thres[0] = (v_list[20] << 21) + (v_list[21] << 14) + \
             (v_list[22] << 7) + v_list[23]
         self._sig_thres[1] = (v_list[24] << 21) + (v_list[25] << 14) + \
             (v_list[26] << 7) + v_list[27]
-        self._log_length = (v_list[28] << 7) + v_list[29]
+        self._log_length = (v_list[28] << 7) + v_list[29] + 1
         self._nr_samples = (v_list[30] << 7) + v_list[31]
         self._avg_size = v_list[32]
         self._nr_averages = 2**self._avg_size
@@ -204,7 +202,6 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
 
         if self.get('core_state') is not None:
             tmp_core_state = self.get('core_state')
-            # print('_do_set_trigger_source\got_core_state: ', tmp_core_state)
         else:
             tmp_core_state = 'idle'
 
@@ -341,7 +338,6 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
         data_bytes += c.encode_byte(core_state_int, 7,
                                     expected_number_of_bytes=1)
         message = c.create_message(cmd, data_bytes)
-        # print("set master controller command: ",  message)
 
         (stat, mesg) = self.serial_write(message)
         if stat:
@@ -369,10 +365,6 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
         asm = Assembler.Assembler(asm_filename)
 
         instructions = asm.convert_to_instructions()
-
-        if instructions is False:
-            print("Error: the assembly file is of errors.")
-            return False
 
         if PrintHex:
             i = 0

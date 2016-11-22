@@ -92,7 +92,8 @@ def Ramsey(qubit_name, times, clock_cycle=5e-9,
             if int: number of wiggles
             if float: artificial_detuning in (Hz)
             if None: adds no artificial detuning
-                implemented using phase of the second pi/2 pulse
+                implemented using phase of the second pi/2 pulse (R90_phi),
+                if None it will use X90 as the recovery pulse
         cal_points:          whether to use calibration points or not
     '''
     # if int interpret artificial detuning as desired nr of wiggles
@@ -123,8 +124,12 @@ def Ramsey(qubit_name, times, clock_cycle=5e-9,
             qasm_file.writelines('X90 {}     \n'.format(
                                  qubit_name))
             qasm_file.writelines('I {} {:d} \n'.format(qubit_name, int(cl)))
-            qasm_file.writelines('R90_phi {} {}\n'.format(
-                qubit_name, phases[i]))
+            if artificial_detuning is not None:
+                qasm_file.writelines('R90_phi {} {}\n'.format(
+                    qubit_name, phases[i]))
+            else:
+                qasm_file.writelines('X90 {}     \n'.format(
+                                     qubit_name))
             qasm_file.writelines('RO {}  \n'.format(qubit_name))
     qasm_file.close()
     return qasm_file
