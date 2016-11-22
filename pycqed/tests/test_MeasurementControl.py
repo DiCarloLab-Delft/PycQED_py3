@@ -3,21 +3,31 @@ import numpy as np
 from pycqed.measurement import measurement_control
 from pycqed.measurement.sweep_functions import None_Sweep
 import pycqed.measurement.detector_functions as det
+from pycqed.instrument_drivers.physical_instruments.dummy_instruments import DummyParHolder
+from pycqed.measurement.optimization import nelder_mead
 
 from qcodes import station
-station = station.Station()
 
 
 class Test_MeasurementControl(unittest.TestCase):
 
-    def setUp(self):
+    @classmethod
+    def setUpClass(self):
+        self.station = station.Station()
         # set up a pulsar with some mock settings for the element
         self.MC = measurement_control.MeasurementControl(
             'MC', live_plot_enabled=False, verbose=False)
-        self.MC.station = station
-        station.add_component(self.MC)
+        self.MC.station = self.station
+        self.station.add_component(self.MC)
+
+        self.mock_parabola = DummyParHolder('mock_parabola')
+        self.station.add_component(self.mock_parabola)
+
+    def setUp(self):
+        self.MC.soft_avg(1)
 
     def test_soft_sweep_1D(self):
+
         sweep_pts = np.linspace(0, 10, 30)
         self.MC.set_sweep_function(None_Sweep())
         self.MC.set_sweep_points(sweep_pts)
@@ -193,6 +203,55 @@ class Test_MeasurementControl(unittest.TestCase):
 
         self.assertEqual(d.times_called, 5*1000+5)
 
-    def tearDown(self):
+    def test_soft_sweep_1D_soft_averages(self):
+        self.mock_parabola.noise(0)
+        self.mock_parabola.x(0)
+        self.mock_parabola.y(0)
+        self.mock_parabola.z(0)
+
+        sweep_pts = np.linspace(0, 10, 30)
+        self.MC.soft_avg(1)
+        self.MC.set_sweep_function(self.mock_parabola.x)
+        self.MC.set_sweep_points(sweep_pts)
+        self.MC.set_detector_function(self.mock_parabola.parabola)
+        dat = self.MC.run('1D_soft')
+        x = dat[:, 0]
+        y_exp = x**2
+        y0 = dat[:, 1]
+        np.testing.assert_array_almost_equal(x, sweep_pts)
+        np.testing.assert_array_almost_equal(y0, y_exp, decimal=5)
+
+        sweep_pts = np.linspace(0, 10, 30)
+        self.MC.soft_avg(10)
+        self.MC.set_sweep_function(self.mock_parabola.x)
+        self.MC.set_sweep_points(sweep_pts)
+        self.MC.set_detector_function(self.mock_parabola.parabola)
+        dat = self.MC.run('1D_soft')
+        x = dat[:, 0]
+        y_exp = x**2
+        y0 = dat[:, 1]
+        np.testing.assert_array_almost_equal(x, sweep_pts)
+        np.testing.assert_array_almost_equal(y0, y_exp, decimal=5)
+
+    def test_adaptive_measurement(self):
+        self.MC.soft_avg(1)
+        self.mock_parabola.noise(0)
+        self.MC.set_sweep_functions(
+            [self.mock_parabola.x, self.mock_parabola.y])
+        self.MC.set_adaptive_function_parameters(
+            {'adaptive_function': nelder_mead,
+             'x0': [-50, -50], 'initial_step': [2.5, 2.5]})
+        self.mock_parabola.noise(.5)
+        self.MC.set_detector_function(self.mock_parabola.parabola)
+        dat = self.MC.run('1D test', mode='adaptive')
+        xf, yf, pf = dat[-1]
+        self.assertLess(xf, 0.5)
+        self.assertLess(yf, 0.5)
+        self.assertLess(pf, 0.5)
+
+    @classmethod
+    def tearDownClass(self):
         self.MC.close()
-        del station.components['MC']
+        self.mock_parabola.close()
+        del self.station.components['MC']
+        del self.station.components['mock_parabola']
