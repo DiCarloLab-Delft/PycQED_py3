@@ -15,9 +15,9 @@ class QASM_Sweep(swf.Hard_Sweep):
         self.op_dict = op_dict
 
     def prepare(self, **kw):
+        self.CBox.trigger_source('internal')
         if self.upload:
             asm_file = qta.qasm_to_asm(self.filename, self.op_dict)
-            self.CBox.trigger_source('internal')
             self.CBox.load_instructions(asm_file.name)
 
 
@@ -31,8 +31,8 @@ class ASM_Sweep(swf.Hard_Sweep):
         self.CBox = CBox
 
     def prepare(self, **kw):
+        self.CBox.trigger_source('internal')
         if self.upload:
-            self.CBox.trigger_source('internal')
             self.CBox.load_instructions(self.filename)
 
 
@@ -148,6 +148,29 @@ class CBox_integration_logging_det_CC(det.Hard_Detector):
 
     def finish(self):
         self.CBox.set('acquisition_mode', 'idle')
+
+
+class CBox_int_avg_func_prep_det_CC(CBox_integrated_average_detector_CC):
+
+    def __init__(self, CBox, prepare_function, prepare_function_kwargs=None,
+                 seg_per_point=1,
+                 nr_averages=1024, integration_length=1e-6, **kw):
+        '''
+        int avg detector with additional option to run a specific function
+        everytime the prepare is called.
+        '''
+        super().__init__(CBox, seg_per_point, nr_averages,
+                         integration_length, **kw)
+        self.prepare_function = prepare_function
+        self.prepare_function_kwargs = prepare_function_kwargs
+
+    def prepare(self, sweep_points=[0]):
+        super().prepare(sweep_points)
+        if self.prepare_function_kwargs is not None:
+            self.prepare_function(**self.prepare_function_kwargs)
+        else:
+            self.prepare_function()
+
 
 
 def create_CBox_op_dict(qubit_name, pulse_length=8, RO_length=50, RO_delay=10,
