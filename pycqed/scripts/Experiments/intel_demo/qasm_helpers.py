@@ -26,8 +26,6 @@ class ASM_Sweep(swf.Hard_Sweep):
     def __init__(self, filename, CBox, upload=True):
         super().__init__()
         self.name = 'ASM'
-        # self.parameter_name = 'tau'
-        # self.unit = 's'
         self.filename = filename
         self.upload = upload
         self.CBox = CBox
@@ -102,6 +100,7 @@ class CBox_single_integration_average_det_CC(
     Detector used for acquiring single points of the CBox
     Soft version of the regular integrated avg detector.
     '''
+
     def __init__(self, CBox, seg_per_point=1,
                  nr_averages=1024, integration_length=1e-6, **kw):
         super().__init__(CBox, seg_per_point=1,
@@ -113,6 +112,7 @@ class CBox_single_integration_average_det_CC(
 
 
 class CBox_integration_logging_det_CC(det.Hard_Detector):
+
     def __init__(self, CBox, **kw):
         '''
         If you want AWG reloading you should give a LutMan and specify
@@ -150,33 +150,38 @@ class CBox_integration_logging_det_CC(det.Hard_Detector):
         self.CBox.set('acquisition_mode', 'idle')
 
 
-def create_CBox_op_dict(qubit_name, pulse_length=8, RO_length=50, RO_delay=10):
+def create_CBox_op_dict(qubit_name, pulse_length=8, RO_length=50, RO_delay=10,
+                        modulated_RO=True):
     operation_dict = {
         'init_all': {'instruction': 'WaitReg r0 \nWaitReg r0 \n'},
         'I {}'.format(qubit_name): {
             'duration': pulse_length, 'instruction': 'wait {} \n'},
         'X180 {}'.format(qubit_name): {
             'duration': pulse_length, 'instruction':
-            'pulse 1001 1001 1001  \nwait {}\n'.format(pulse_length)},
+            'pulse 1001 0000 1001  \nwait {}\n'.format(pulse_length)},
         'Y180 {}'.format(qubit_name): {
             'duration': pulse_length, 'instruction':
-            'pulse 1010 1010 1010  \nwait {}\n'.format(pulse_length)},
+            'pulse 1010 0000 1010  \nwait {}\n'.format(pulse_length)},
         'X90 {}'.format(qubit_name): {
             'duration': pulse_length, 'instruction':
-            'pulse 1011 1011 1011  \nwait {}\n'.format(pulse_length)},
+            'pulse 1011 0000 1011  \nwait {}\n'.format(pulse_length)},
         'Y90 {}'.format(qubit_name): {
             'duration': pulse_length, 'instruction':
-            'pulse 1100 1100 1100  \nwait {}\n'.format(pulse_length)},
+            'pulse 1100 0000 1100  \nwait {}\n'.format(pulse_length)},
         'mX90 {}'.format(qubit_name): {
             'duration': pulse_length, 'instruction':
-            'pulse 1101 1101 1101  \nwait {}\n'.format(pulse_length)},
+            'pulse 1101 0000 1101  \nwait {}\n'.format(pulse_length)},
         'mY90 {}'.format(qubit_name): {
             'duration': pulse_length, 'instruction':
-            'pulse 1110 1110 1110  \nwait {}\n'.format(pulse_length)},
-        'RO {}'.format(qubit_name): {
+            'pulse 1110 0000 1110  \nwait {}\n'.format(pulse_length)}}
+    if modulated_RO:
+        operation_dict['RO {}'.format(qubit_name)] = {
             'duration': RO_length, 'instruction':
-            'wait {} \ntrigger 1000000, {} \n measure \n'.format(RO_delay, RO_length)}}
+            'wait {} \npulse 0000 1111 1111 \nwait {} \nmeasure \n'.format(
+                RO_delay, RO_length)}
+    else:
+        operation_dict['RO {}'.format(qubit_name)] = {
+            'duration': RO_length, 'instruction':
+            'wait {} \ntrigger 1000000, {} \n measure \n'.format(RO_delay,
+                                                                 RO_length)}
     return operation_dict
-
-op_dict = create_CBox_op_dict('AncT')
-

@@ -179,8 +179,11 @@ def echo(qubit_name, times, clock_cycle=5e-9,
             qasm_file.writelines('I {} {:d} \n'.format(qubit_name, int(cl//2)))
             qasm_file.writelines('X180 {}     \n'.format(qubit_name))
             qasm_file.writelines('I {} {:d} \n'.format(qubit_name, int(cl//2)))
-            qasm_file.writelines('R90_phi {} {}\n'.format(
-                qubit_name, phases[i]))
+            if artificial_detuning is not None:
+                qasm_file.writelines('R90_phi {} {}\n'.format(
+                    qubit_name, phases[i]))
+            else:
+                qasm_file.writelines('X90 {}     \n'.format(qubit_name))
             qasm_file.writelines('RO {}  \n'.format(qubit_name))
     qasm_file.close()
     return qasm_file

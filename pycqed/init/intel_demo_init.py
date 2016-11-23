@@ -14,7 +14,6 @@ from pycqed.instrument_drivers.meta_instrument.qubit_objects import duplexer_tek
 from importlib import reload  # Useful for reloading while testing
 import numpy as np
 import matplotlib.pyplot as plt
-import pandas as pd
 import qcodes as qc
 # Globally defined config
 
@@ -39,7 +38,6 @@ from pycqed.instrument_drivers.physical_instruments._controlbox \
 
 # Importing instruments
 from pycqed.instrument_drivers.physical_instruments import QuTech_ControlBox_v3 as qcb
-from pycqed.instrument_drivers.meta_instrument.qubit_objects import duplexer_tek_transmon as dt
 from pycqed.instrument_drivers.meta_instrument import CBox_LookuptableManager as cbl
 
 
@@ -223,11 +221,7 @@ DataT = qbt.Tektronix_driven_transmon('DataT', LO=LO, cw_source=Spec_source,
 station.add_component(DataT)
 
 # load settings onto qubits
-gen.load_settings_onto_instrument(AncB)  # , timestamp='20161111_165442')
 gen.load_settings_onto_instrument(AncT)  # , timestamp='20161111_165442')
-gen.load_settings_onto_instrument(DataB)  # , timestamp='20161111_165442')
-gen.load_settings_onto_instrument(DataM)  # , timestamp='20161111_165442')
-gen.load_settings_onto_instrument(DataT)  # , timestamp='20161111_165442')
 gen.load_settings_onto_instrument(HS)
 
 AncT.E_c(0.28e9)
@@ -236,34 +230,6 @@ AncT.dac_flux_coefficient(0.0014870990568855082)
 AncT.dac_sweet_spot(-85.264803738253249)
 AncT.f_max(5.9425723344778003e9)
 AncT.f_qubit_calc('flux')
-
-AncB.E_c(0.28e9)
-AncB.asymmetry(0)
-AncB.dac_flux_coefficient(0.002018468019869781)
-AncB.dac_sweet_spot(49.642908651335802)
-AncB.f_max(6.3772624329237129e9)
-AncB.f_qubit_calc('flux')
-
-DataT.E_c(0.28e9)
-DataT.asymmetry(0)
-DataT.dac_flux_coefficient(0.0016801372162345157)
-DataT.dac_sweet_spot(-60.8929818139693)
-DataT.f_max(5.6887668700747032e9)
-DataT.f_qubit_calc('flux')
-
-DataM.E_c(0.28e9)
-DataM.asymmetry(0)
-DataM.dac_flux_coefficient(0.0013658186571963834)
-DataM.dac_sweet_spot(13.037283518727691)
-DataM.f_max(6.1084117003758607e9)
-DataM.f_qubit_calc('flux')
-
-DataB.E_c(0.28e9)
-DataB.asymmetry(0)
-DataB.dac_flux_coefficient(0.0010984957196944138)
-DataB.dac_sweet_spot(49.569365350054795)
-DataB.f_max(6.7131183080187489e9)
-DataB.f_qubit_calc('flux')
 
 
 
@@ -314,11 +280,23 @@ print('Ran initialization in %.2fs' % (t1-t0))
 # Demo parameters
 #########################################
 
+AncT.f_modulation(-20e-6)
+
 CBox.integration_length(120) # samples
-LutMan.Q_gauss_width(20e-9)
 CBox.AWG0_dac0_offset(-11.10517597)
 CBox.AWG0_dac1_offset(-21.095)
 
+
+LutMan.Q_modulation(-20e6)
+LutMan.Q_gauss_width(20e-9)
+LutMan.Q_amp180(0.133)
+LutMan.Q_amp90(0.133/2)
+
+
+LutMan.lut_mapping(['I', 'X180', 'Y180', 'X90', 'Y90', 'mX90', 'mY90', 'M_square'])
+LutMan.M_modulation(-20e6)
+LutMan.M_amp(0.2)
+LutMan.M_length(600e-9)
 
 ##############
 # Defining useful function
