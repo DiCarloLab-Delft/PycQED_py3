@@ -49,37 +49,36 @@ class Waveform():
         return np.concatenate((negative, positive), axis=0)
 
 
-def gauss_pulse(amp, sigma_length, axis='x', nr_sigma=4, sampling_rate=2e8,
+def gauss_pulse(amp, sigma_length, nr_sigma=4, sampling_rate=2e8,
+                axis='x',
                 motzoi=0, delay=0):
     '''
     All inputs are in s and Hz.
     '''
-    # why the Gaussian pulse has different values at [0] and [-1]?
-    nr_sigma_samples = int(sigma_length * sampling_rate)
-    nr_pulse_samples = int(nr_sigma*nr_sigma_samples)
-    mu = ((nr_pulse_samples-1)/2.)
-    pulse_samples = np.linspace(0, nr_pulse_samples, nr_pulse_samples,
-                                endpoint=False)
+    sigma = sigma_length  # old legacy naming, to be replaced
+    # nr_sigma_samples = int(sigma_length * sampling_rate)
+    # nr_pulse_samples = int(nr_sigma*nr_sigma_samples)
+    length = sigma*nr_sigma
+    mu = length/2.
+
+    t_step = 1/sampling_rate
+    t = np.arange(0, nr_sigma*sigma + .1*t_step, t_step)
+
+    gauss_env = amp*np.exp(-(0.5 * ((t-mu)**2) / sigma**2))
+    deriv_gauss_env = motzoi * -1 * (t-mu)/(sigma**1) * gauss_env
+    # substract offsets
+    gauss_env -= (gauss_env[0]+gauss_env[-1])/2.
+    deriv_gauss_env -= (deriv_gauss_env[0]+deriv_gauss_env[-1])/2.
+
     delay_samples = delay*sampling_rate
+
     # generate pulses
     if axis == 'x':
-        pulse_I = amp*np.exp(-0.5*(np.square((pulse_samples-mu) /
-                                             nr_sigma_samples)))
-        pulse_Q = -amp*motzoi*(((pulse_samples-mu)/(nr_sigma_samples**2)) *
-                               np.exp(-0.5*(np.square((pulse_samples-mu) /
-                                                      nr_sigma_samples))))
-        # remove offset from I
-        offset_I = (pulse_I[0]+pulse_I[-1])/2
-        pulse_I = pulse_I-offset_I
+        pulse_I = gauss_env
+        pulse_Q = deriv_gauss_env
     elif axis == 'y':
-        pulse_I = amp*motzoi*(((pulse_samples-mu)/(nr_sigma_samples**2)) *
-                              np.exp(-0.5*(np.square((pulse_samples-mu) /
-                                                     nr_sigma_samples))))
-        pulse_Q = amp*np.exp(-0.5*(np.square((pulse_samples-mu) /
-                                             nr_sigma_samples)))
-        # remove offset from Q
-        offset_Q = (pulse_Q[0]+pulse_Q[-1])/2
-        pulse_Q = pulse_Q-offset_Q
+        pulse_I = -1*deriv_gauss_env
+        pulse_Q = gauss_env
     Zeros = np.zeros(int(delay_samples))
     pulse_I = list(Zeros)+list(pulse_I)
     pulse_Q = list(Zeros)+list(pulse_Q)
