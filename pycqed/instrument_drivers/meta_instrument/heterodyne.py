@@ -211,7 +211,7 @@ class HeterodyneInstrument(Instrument):
                 data[i] = dataset[0]['vector']
             dat=data[0]+1j*data[1]
             t1 = time.time()
-            print("time for UHFQC polling", t1-t0)
+            #print("time for UHFQC polling", t1-t0)
         return dat
 
 
