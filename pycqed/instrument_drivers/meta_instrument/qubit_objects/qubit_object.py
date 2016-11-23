@@ -17,6 +17,7 @@ from pycqed.analysis import measurement_analysis as ma
 from pycqed.measurement.pulse_sequences import standard_sequences as st_seqs
 from analysis import fitting_models as fit_mods
 
+
 class Qubit(Instrument):
     '''
     Abstract base class for the qubit object.

@@ -258,6 +258,7 @@ def randomized_benchmarking(qubit_name, nr_cliffords, nr_seeds,
     i = 0
     for seed in range(nr_seeds):
         for j, n_cl in enumerate(nr_cliffords):
+            qasm_file.writelines('init_all  \n')
             if cal_points and (j == (len(nr_cliffords)-4) or
                                j == (len(nr_cliffords)-3)):
                 qasm_file.writelines('RO {}  \n'.format(qubit_name))
@@ -276,6 +277,7 @@ def randomized_benchmarking(qubit_name, nr_cliffords, nr_seeds,
                     if pulse != 'I':
                         qasm_file.writelines('{} {}\n'.format(
                             pulse, qubit_name))
+                qasm_file.writelines('RO {}  \n'.format(qubit_name))
     qasm_file.close()
     return qasm_file
 

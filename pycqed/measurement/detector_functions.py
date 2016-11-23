@@ -97,24 +97,35 @@ class Soft_Detector(Detector_Function):
 
 class Dummy_Detector_Hard(Hard_Detector):
 
-    def __init__(self, **kw):
+    def __init__(self, delay=0, noise=0, **kw):
         super(Dummy_Detector_Hard, self).__init__()
         self.set_kw()
         self.detector_control = 'hard'
         self.name = 'Dummy_Detector'
         self.value_names = ['distance', 'Power']
         self.value_units = ['m', 'nW']
+        self.delay = delay
+        self.noise = noise
+        self.times_called = 0
 
     def prepare(self, sweep_points):
         self.sweep_points = sweep_points
 
     def get_values(self):
         x = self.sweep_points
-        self.data = [np.sin(x / np.pi), np.cos(x/np.pi)]
-        return self.data
+        noise = self.noise * (np.random.rand(2, len(x)) - .5)
+        data = np.array([np.sin(x / np.pi),
+                         np.cos(x/np.pi)])
+        data += noise
+        time.sleep(self.delay)
+        # Counter used in test suite to test how many times data was acquired.
+        self.times_called += 1
+
+        return data
 
 
 class Dummy_Shots_Detector(Hard_Detector):
+
     def __init__(self, max_shots=10, **kw):
         super().__init__()
         self.set_kw()
@@ -123,9 +134,11 @@ class Dummy_Shots_Detector(Hard_Detector):
         self.value_names = ['shots']
         self.value_units = ['m']
         self.max_shots = max_shots
+        self.times_called = 0
 
     def prepare(self, sweep_points):
         self.sweep_points = sweep_points
+        self.times_called += 1
 
     def get_values(self):
         x = self.sweep_points
@@ -744,7 +757,6 @@ class CBox_digitizing_shots_det(CBox_integration_logging_det):
         return (d > self.threshold).astype(int)
 
 
-
 # class QuTechCBox_AlternatingShots_Logging_Detector_Touch_N_Go(Hard_Detector):
 #     def __init__(self, NoSamples=10000, AWG='AWG', **kw):
 #         super(QuTechCBox_AlternatingShots_Logging_Detector_Touch_N_Go, self).__init__()
@@ -889,22 +901,26 @@ class Dummy_Detector_Soft(Soft_Detector):
         self.value_names = ['I', 'Q']
         self.value_units = ['mV', 'mV']
         self.i = 0
+        # self.x can be used to set x value externally
+        self.x = None
 
     def acquire_data_point(self, **kw):
-        x = self.i/15.
+        if self.x is None:
+            x = self.i/15.
         self.i += 1
         time.sleep(self.delay)
         return np.array([np.sin(x/np.pi), np.cos(x/np.pi)])
 
 
 class QX_Detector(Soft_Detector):
+
     def __init__(self, qxc, delay=0, **kw):
         self.set_kw()
         self.delay = delay
         self.detector_control = 'soft'
         self.name = 'QX_Detector'
-        self.value_names = ['F'] #['F', 'F']
-        self.value_units = ['Error Rate'] # ['mV', 'mV']
+        self.value_names = ['F']  # ['F', 'F']
+        self.value_units = ['Error Rate']  # ['mV', 'mV']
         self.__qxc = qxc
         self.__cnt = 0
 
@@ -912,19 +928,19 @@ class QX_Detector(Soft_Detector):
         circuit_name = ("circuit%i" % self.__cnt)
         errors = 0
         executions = 1000
-        p_error    = 0.0001+self.__cnt*0.0002
-        for i in range(0,executions):
-        	self.__qxc.run_noisy_circuit(circuit_name,p_error)
-        	m0 = self.__qxc.get_measurement(0)
-        	# m1 = self.__qxc.get_measurement(1)
-        	if int(m0) != 0 :
-        		errors += 1
-        	# print("[+] measurement outcome : %s %s" % (m0,m1))
+        p_error = 0.0001+self.__cnt*0.0002
+        for i in range(0, executions):
+            self.__qxc.run_noisy_circuit(circuit_name, p_error)
+            m0 = self.__qxc.get_measurement(0)
+            # m1 = self.__qxc.get_measurement(1)
+            if int(m0) != 0:
+                errors += 1
+            # print("[+] measurement outcome : %s %s" % (m0,m1))
         # x = self.__cnt/15.
-        print("[+] p error  :",p_error)
-        print("[+] errors   :",errors)
+        print("[+] p error  :", p_error)
+        print("[+] errors   :", errors)
         f = (executions-errors)/executions
-        print("[+] fidelity :",f)
+        print("[+] fidelity :", f)
         time.sleep(self.delay)
         self.__cnt = self.__cnt+1
         return f
@@ -943,6 +959,7 @@ class Source_frequency_detector(Soft_Detector):
 
     def acquire_data_point(self, **kw):
         return self.S.get('frequency')
+
 
 class Function_Detector(Soft_Detector):
 
@@ -987,6 +1004,7 @@ class Detect_simulated_hanger_Soft(Soft_Detector):
         IQ = fn.disp_hanger_S21_complex(*(f, f0, Q, Qe, A, theta))
         return IQ.real+Inoise, IQ.imag+Qnoise
 
+
 class Heterodyne_probe(Soft_Detector):
 
     def __init__(self, HS, threshold=1.75, trigger_separation=20e-6, demod_int=0, **kw):
@@ -1026,7 +1044,6 @@ class Heterodyne_probe(Soft_Detector):
         self.first = False
         self.last = abs(S21)
         return abs(S21), np.angle(S21)/(2*np.pi)*360,  # S21.real, S21.imag
-
 
 
 class Heterodyne_probe_soft_avg(Soft_Detector):
@@ -1078,7 +1095,6 @@ class Heterodyne_probe_soft_avg(Soft_Detector):
         self.first = False
         self.last = abs(S21)
         return S21.real, S21.imag
-
 
 
 class PulsedSpectroscopyDetector(Soft_Detector):
@@ -1297,6 +1313,7 @@ class CBox_v3_integrated_average_detector(Hard_Detector):
     def finish(self):
         self.CBox.set('acquisition_mode', 0)
 
+
 class CBox_v3_single_integration_average_det(Soft_Detector):
 
     '''
@@ -1352,6 +1369,7 @@ class CBox_v3_single_integration_average_det(Soft_Detector):
 
     def finish(self):
         self.CBox.set('acquisition_mode', 0)
+
 
 class CBox_v3_single_int_avg_with_LutReload(CBox_v3_single_integration_average_det):
 
@@ -1451,6 +1469,7 @@ class UHFQC_input_average_detector(Hard_Detector):
     def finish(self):
         if self.AWG is not None:
             self.AWG.stop()
+
 
 class UHFQC_integrated_average_detector(Hard_Detector):
 
@@ -1554,6 +1573,7 @@ class UHFQC_integrated_average_detector(Hard_Detector):
     def finish(self):
         if self.AWG is not None:
             self.AWG.stop()
+
 
 class UHFQC_integration_logging_det(Hard_Detector):
 
@@ -1660,4 +1680,3 @@ class Chevron_sim(Hard_Detector):
                                       self.t_start,
                                       self.dt,
                                       self.simulation_dict['dist_step'])
-
