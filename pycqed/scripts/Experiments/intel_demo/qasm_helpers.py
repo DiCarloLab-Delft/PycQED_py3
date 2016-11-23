@@ -103,9 +103,19 @@ class CBox_single_integration_average_det_CC(
 
     def __init__(self, CBox, seg_per_point=1,
                  nr_averages=1024, integration_length=1e-6, **kw):
-        super().__init__(CBox, seg_per_point=1,
-                         nr_averages=1024, integration_length=1e-6, **kw)
-        self.detector_control = 'soft'
+        super().__init__(CBox, seg_per_point,
+                         nr_averages, integration_length, **kw)
+        if self.seg_per_point == 1:
+            self.detector_control = 'soft'
+        else:  # this is already implicitly the case through inheritance
+            self.detector_control = 'hard'
+
+    def prepare(self, sweep_points=[0]):
+        self.CBox.nr_samples(self.seg_per_point)
+        self.CBox.nr_averages(int(self.nr_averages))
+        self.CBox.integration_length(int(self.integration_length/(5e-9)))
+
+
 
     def acquire_data_point(self, **kw):
         return self.get_values()
@@ -170,7 +180,6 @@ class CBox_int_avg_func_prep_det_CC(CBox_integrated_average_detector_CC):
             self.prepare_function(**self.prepare_function_kwargs)
         else:
             self.prepare_function()
-
 
 
 def create_CBox_op_dict(qubit_name, pulse_length=8, RO_length=50, RO_delay=10,

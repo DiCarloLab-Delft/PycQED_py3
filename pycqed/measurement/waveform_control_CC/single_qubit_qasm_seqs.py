@@ -202,6 +202,30 @@ def single_elt_on(qubit_name):
     return qasm_file
 
 
+def two_elt_MotzoiXY(qubit_name):
+    '''
+    Sequence used for calibrating the motzoi parameter.
+    Consists of Xy and Yx
+
+    needs to reload the points for every data point.
+    '''
+    filename = join(base_qasm_path, 'Motzoi_XY.qasm')
+    qasm_file = mopen(filename, mode='w')
+    qasm_file.writelines('qubit {} \n'.format(qubit_name))
+    qasm_file.writelines('\ninit_all\n')
+    qasm_file.writelines('X180 {} \n'.format(qubit_name))
+    qasm_file.writelines('Y90 {} \n'.format(qubit_name))
+    qasm_file.writelines('RO {}  \n'.format(qubit_name))
+
+    qasm_file.writelines('\ninit_all\n')
+    qasm_file.writelines('Y180 {} \n'.format(qubit_name))
+    qasm_file.writelines('X90 {} \n'.format(qubit_name))
+    qasm_file.writelines('RO {}  \n'.format(qubit_name))
+
+    qasm_file.close()
+    return qasm_file
+
+
 def off_on(qubit_name):
     filename = join(base_qasm_path, 'off_on.qasm')
     qasm_file = mopen(filename, mode='w')
@@ -302,6 +326,7 @@ def randomized_benchmarking(qubit_name, nr_cliffords, nr_seeds,
                 qasm_file.writelines('RO {}  \n'.format(qubit_name))
     qasm_file.close()
     return qasm_file
+
 
 
 def MotzoiXY(qubit_name, motzois, cal_points=True):
