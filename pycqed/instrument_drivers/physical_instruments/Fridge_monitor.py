@@ -91,22 +91,10 @@ class Fridge_Monitor(Instrument):
                 temperaturegroups = re.findall(
                     r'<br>(T_[\w_]+(?: \(P\))?) = ([\d\.]+)', str(source))
 
-<<<<<<< HEAD
-                woerterbuch = {elem[0]: float(elem[1])
-                               for elem in temperaturegroups}
-            except:
-                print('\nTemperatures could not be extracted from website\n')
-                for temperature_name in self.temperature_names:
-                    woerterbuch[temperature_name] = 0
-
-            return woerterbuch
-
-=======
-                self.temp_dict = {elem[0]: float(elem[1])
-                                  for elem in temperaturegroups}
+                self.temp_dict = {elem[0]: float(elem[1]) for elem in temperaturegroups}
             except Exception:
                 logging.warning(
                     '\nTemperatures could not be extracted from website\n')
                 for temperature_name in self.monitored_pars:
                     self.temp_dict[temperature_name] = 0
->>>>>>> origin/fridge_monitor
+

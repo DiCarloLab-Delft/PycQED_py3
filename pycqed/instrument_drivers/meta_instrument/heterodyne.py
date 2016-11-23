@@ -68,7 +68,7 @@ class HeterodyneInstrument(Instrument):
 
         self.set('single_sideband_demod', single_sideband_demod)
         self._awg_seq_filename = 'Heterodyne_marker_seq_RF_mod'
-        self._disable_auto_seq_loading = False
+        self._disable_auto_seq_loading = True
         self.acquisition_instr(acquisition_instr)
 
     def set_sources(self, status):
@@ -124,7 +124,7 @@ class HeterodyneInstrument(Instrument):
         self.set('status', 'Off')
         return
 
-    def prepare(self, get_t_base=True, RO_length=500e-9, trigger_separation=20e-6):
+    def prepare(self, get_t_base=True, RO_length=2274e-9, trigger_separation=10e-6):
         '''
         This function needs to be overwritten for the ATS based version of this
         driver
@@ -137,7 +137,7 @@ class HeterodyneInstrument(Instrument):
                 IF=self.get('f_RO_mod'), mod_amp=0.5)
 
         self.AWG.run()
-
+        print('RO_length heterodyne', RO_length)
         if get_t_base is True:
             if 'CBox' in self.acquisition_instr():
                 trace_length = 512
@@ -151,7 +151,7 @@ class HeterodyneInstrument(Instrument):
 
             elif 'UHFQC' in self.acquisition_instr():
                 print("f_RO_mod", self.get('f_RO_mod'))
-                #self._acquisition_instr.prepare_SSB_weight_and_rotation(IF=self.get('f_RO_mod'),
+                # self._acquisition_instr.prepare_SSB_weight_and_rotation(IF=self.get('f_RO_mod'),
                 #                                        weight_function_I=0, weight_function_Q=1)
                 self._acquisition_instr.prepare_DSB_weight_and_rotation(IF=self.get('f_RO_mod'),
                                                         weight_function_I=0, weight_function_Q=1)
@@ -311,7 +311,7 @@ class LO_modulated_Heterodyne(HeterodyneInstrument):
         self._frequency = None
         self.set('f_RO_mod', -10e6)
         self.set('mod_amp', .5)
-        self._disable_auto_seq_loading = False
+        self._disable_auto_seq_loading = True
         self._awg_seq_parameters_changed = True
         self._mod_amp_changed = True
         self.acquisition_instr(acquisition_instr)
@@ -331,7 +331,7 @@ class LO_modulated_Heterodyne(HeterodyneInstrument):
                 self._awg_seq_parameters_changed) and
                 not self._disable_auto_seq_loading):
             self.seq_name = st_seqs.generate_and_upload_marker_sequence(
-                500e-9, 20e-6, RF_mod=True,
+                50e-9, 5e-6, RF_mod=True,
                 IF=self.get('f_RO_mod'), mod_amp=0.5)
 
         self.AWG.run()

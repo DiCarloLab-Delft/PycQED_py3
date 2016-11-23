@@ -5,8 +5,8 @@ from pycqed.measurement.randomized_benchmarking import randomized_benchmarking a
 from pycqed.measurement.pulse_sequences import standard_sequences as st_seqs
 from pycqed.measurement.pulse_sequences import single_qubit_tek_seq_elts as sqs
 from pycqed.measurement.pulse_sequences import single_qubit_2nd_exc_seqs as sqs2
-from measurement.pulse_sequences import fluxing_sequences as fsqs
-from measurement.pulse_sequences import multi_qubit_tek_seq_elts as mq_sqs
+from pycqed.measurement.pulse_sequences import fluxing_sequences as fsqs
+from pycqed.measurement.pulse_sequences import multi_qubit_tek_seq_elts as mq_sqs
 default_gauss_width = 10  # magic number should be removed,
 # note magic number only used in old mathematica seqs
 

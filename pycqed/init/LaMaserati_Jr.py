@@ -60,6 +60,8 @@ from qcodes.instrument_drivers.weinschel import Weinschel_8320 as Weinschel_8320
 from pycqed.instrument_drivers.physical_instruments import Weinschel_8320_novisa
 from pycqed.instrument_drivers.physical_instruments import Fridge_monitor as fm
 from qcodes.instrument_drivers.tektronix import AWG5014 as tek
+from pycqed.instrument_drivers.physical_instruments import QuTech_ControlBoxdriver as qcb
+
 # from qcodes.instrument_drivers.tektronix import AWG520 as tk520
 from pycqed.instrument_drivers.physical_instruments.ZurichInstruments import UHFQuantumController as ZI_UHFQC
 from pycqed.instrument_drivers.meta_instrument import Flux_Control as FluxCtrl
@@ -98,6 +100,10 @@ station.add_component(Fridge_mon)
 #Initializing UHFQC
 UHFQC_1 = ZI_UHFQC.UHFQC('UHFQC_1', device='dev2214', server_name=None)
 station.add_component(UHFQC_1)
+
+#Initializing CBox
+CBox = qcb.QuTech_ControlBox('CBox', address='COM3', run_tests=False, server_name=None)
+station.add_component(CBox)
 
 
 MC = mc.MeasurementControl('MC')
@@ -234,6 +240,14 @@ def switch_to_IQ_mod_RO_UHFQC(qubit):
     qubit.RO_acq_weight_function_I(0)
     qubit.RO_acq_weight_function_Q(1)
 
+def switch_to_pulsed_RO_CBox(qubit):
+    UHFQC_1.awg_sequence_acquisition()
+    qubit.RO_pulse_type('Gated_MW_RO_pulse')
+    qubit.RO_acq_marker_delay(155e-9)
+    qubit.acquisition_instr('CBox')
+    qubit.RO_acq_marker_channel('ch3_marker1')
+    qubit.RO_acq_weight_function_I(0)
+    qubit.RO_acq_weight_function_Q(1)
 
 # #preparing UHFQC readout with IQ mod pulses
 
