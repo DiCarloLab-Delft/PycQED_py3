@@ -1734,7 +1734,7 @@ class ATS_integrated_average_continuous_detector(Hard_Detector):
         )
         self.ATS.update_acquisitionkwargs(samples_per_record=1024,
                          records_per_buffer=70,
-                         buffers_per_acquisition=1,
+                         buffers_per_acquisition=self.nr_averages,
                          channel_selection='AB',
                          transfer_offset=0,
                          external_startcapture='ENABLED',
@@ -1743,7 +1743,7 @@ class ATS_integrated_average_continuous_detector(Hard_Detector):
                          fifo_only_streaming='DISABLED',
                          interleave_samples='DISABLED',
                          get_processed_data='DISABLED',
-                         allocated_buffers=1,
+                         allocated_buffers=self.nr_averages,
                          buffer_timeout=1000
         )
 
