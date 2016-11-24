@@ -38,6 +38,12 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
                            get_cmd=self._do_get_trigger_source,
                            vals=vals.Enum('internal', 'external',
                                           'mixed'))
+        self.add_parameter('instr_mem_size',
+                           units='#',
+                           label='instruction memory size',
+                           get_cmd=self._get_instr_mem_size)
+        # hardcoded memory limit, depends on firmware of the CBox
+        self._instr_mem_size = 2**15
 
     def init_params(self):
         self.add_params()
@@ -220,6 +226,9 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
                                                   tmp_trigger_source,
                                                   demodulation_mode)
 
+    def _get_instr_mem_size(self):
+        return self._instr_mem_size
+
     def _do_get_core_state(self):
         return self._core_state[3:]
 
@@ -365,6 +374,11 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
         asm = Assembler.Assembler(asm_filename)
 
         instructions = asm.convert_to_instructions()
+        if len(instructions) > self.instr_mem_size():
+            raise MemoryError(
+                'asm file contains too many "{}" instructions'.format(
+                    len(instructions)) + 'max number of instructions ' +
+                'is {}'.format(self.instr_mem_size()))
 
         if PrintHex:
             i = 0
