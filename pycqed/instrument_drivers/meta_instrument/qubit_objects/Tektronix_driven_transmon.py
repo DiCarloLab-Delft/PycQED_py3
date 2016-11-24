@@ -147,7 +147,9 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                            parameter_class=ManualParameter)
 
         self.add_parameter('RO_pulse_type', initial_value='MW_IQmod_pulse_tek',
-                           vals=vals.Enum('MW_IQmod_pulse_tek', 'MW_IQmod_pulse_UHFQC', 'Gated_MW_RO_pulse'),
+                           vals=vals.Enum('MW_IQmod_pulse_tek',
+                                          'MW_IQmod_pulse_UHFQC',
+                                          'Gated_MW_RO_pulse'),
                            parameter_class=ManualParameter)
         # Relevant when using a marker channel to gate a MW-RO tone.
         self.add_parameter('RO_pulse_marker_channel',

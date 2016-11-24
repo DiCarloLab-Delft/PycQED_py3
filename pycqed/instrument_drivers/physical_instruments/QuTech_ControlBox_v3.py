@@ -376,8 +376,8 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
         instructions = asm.convert_to_instructions()
         if len(instructions) > self.instr_mem_size():
             raise MemoryError(
-                'asm file contains too many "{}" instructions'.format(
-                    len(instructions)) + 'max number of instructions ' +
+                'asm file contains too many "{}" instructions,'.format(
+                    len(instructions)) + ' max number of instructions ' +
                 'is {}'.format(self.instr_mem_size()))
 
         if PrintHex:
