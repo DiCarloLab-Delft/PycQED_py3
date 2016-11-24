@@ -11,6 +11,8 @@ from pycqed.measurement.waveform_control import pulse
 from pycqed.measurement.waveform_control import element
 from pycqed.measurement.waveform_control import sequence
 
+from pycqed.instrument_drivers.virtual_instruments.pyqx import qasm_loader as ql
+
 
 class Detector_Function(object):
 
@@ -122,6 +124,175 @@ class Dummy_Detector_Hard(Hard_Detector):
         self.times_called += 1
 
         return data
+
+
+class QX_Hard_Detector(Hard_Detector):
+
+    def __init__(self, qxc, circuits_names, p_error=0.004, num_avg=512, **kw):
+        super(QX_Hard_Detector, self).__init__()
+        self.set_kw()
+        self.detector_control = 'hard'
+        self.name = 'QX_Hard_Detector'
+        self.value_names = ['N Gates', 'N Gates']
+        self.value_units = ['gates', 'a.u.']
+        self.times_called = 0
+        self.__qxc = qxc
+        self.num_avg = num_avg
+        self.circuits_names = circuits_names
+        self.p_error = p_error
+        self.delay = 1
+
+    def prepare(self, sweep_points):
+        self.sweep_points = sweep_points
+        assert(len(self.sweep_points) == len(self.circuits_names))
+        print("QX_Hard_Detector.prepare() : ")
+        print(sweep_points)
+
+    def get_values(self):
+        x = self.sweep_points
+        # noise = 0.05 * (np.random.rand(2, len(x)) - .5)
+        data = np.array([np.sin(x / np.pi),
+                         np.cos(x/np.pi)])
+        # data += noise
+        # time.sleep(self.delay)
+        # Counter used in test suite to test how many times data was acquired.
+        self.times_called += 1
+        print("QX_Hard_Detector.get_values() called.")
+        i = 0
+        for c in self.circuits_names:
+           self.__qxc.send_cmd("reset_measurement_averaging")
+           self.__qxc.run_noisy_circuit(c, self.p_error, "depolarizing_channel", self.num_avg)
+           f = self.__qxc.get_measurement_average(0)
+           data[0][i] = f
+           data[1][i] = f
+           # noise = 0.03*np.random.random()
+           # data[0][i] = 1-0.01*i+noise
+           # data[1][i] = 1-0.01*i+noise
+           i = i+1
+           # print(c)
+
+        return data
+
+'''
+QX Hard Detector for the Randomized Benchmarking 
+'''
+class QX_RB_Hard_Detector(Hard_Detector):
+
+    def __init__(self, qxc, filename_prefix, num_files, p_error=0.004, num_avg=512, **kw):
+        super(QX_RB_Hard_Detector, self).__init__()
+        self.set_kw()
+        self.detector_control = 'hard'
+        self.name = 'QX_RB_Hard_Detector'
+        self.value_names = ['N Gates', 'N Gates']
+        self.value_units = ['a.u.', 'a.u.']
+        self.times_called = 0
+        self.__qxc = qxc
+        self.num_avg = num_avg
+        self.filename_prefix = filename_prefix 
+        self.num_files = num_files
+        self.p_error = p_error
+        self.delay = 1
+        self.current = 0
+
+    def prepare(self, sweep_points):
+        self.sweep_points = sweep_points
+        file_name = self.filename_prefix+'_'+str(self.current)+'.qasm'
+        self.current = self.current + 1
+        # print("QX_RB_Hard_Detector.prepare() : loading '"+file_name+"'...")
+        qasm = ql.qasm_loader(file_name)
+        qasm.load_circuits()
+        self.circuits = qasm.get_circuits()
+        # print("QX_RB_Hard_Detector.prepare() : creating circuits...")
+        for c in self.circuits:
+           self.__qxc.create_circuit(c[0],c[1])
+        assert(len(self.sweep_points) == len(self.circuits))
+        # print("QX_RB_Hard_Detector.prepare() : ")
+        # print(sweep_points)
+
+    def get_values(self):
+        x = self.sweep_points
+        # noise = 0.05 * (np.random.rand(2, len(x)) - .5)
+        # data = np.array([np.array(x),np.array(x)])
+        data = np.array([np.sin(x / np.pi),np.cos(x/np.pi)])
+        # data += noise
+        # time.sleep(self.delay)
+        # Counter used in test suite to test how many times data was acquired.
+        self.times_called += 1
+        # print("QX_RB_Hard_Detector.get_values() called.")
+        i = 0
+        for c in self.circuits:
+           self.__qxc.send_cmd("reset_measurement_averaging")
+           self.__qxc.run_noisy_circuit(c[0], self.p_error, "depolarizing_channel", self.num_avg)
+           f = self.__qxc.get_measurement_average(0)
+           data[0][i] = f
+           data[1][i] = f
+           # noise = 0.03*np.random.random()
+           # data[0][i] = 1-0.01*i+noise
+           # data[1][i] = 1-0.01*i+noise
+           i = i+1
+           # print(c)
+        return data
+
+
+class QX_RB_Hard_Detector_Fast(Hard_Detector):
+
+    def __init__(self, qxc, filename_prefix, num_files, p_error=0.004, num_avg=512, **kw):
+        super(QX_RB_Hard_Detector_Fast, self).__init__()
+        self.set_kw()
+        self.detector_control = 'hard'
+        self.name = 'QX_RB_Hard_Detector_Fast'
+        self.value_names = ['N Gates', 'N Gates']
+        self.value_units = ['a.u.', 'a.u.']
+        self.times_called = 0
+        self.__qxc = qxc
+        self.num_avg = num_avg
+        self.filename_prefix = filename_prefix 
+        self.num_files = num_files
+        self.p_error = p_error
+        self.delay = 1
+        self.current = 0
+        self.randomizations = []
+        # load files
+        print("QX_RB_Hard_Detector : loading qasm files...")
+        for i in range(0,num_files):
+           file_name = self.filename_prefix+'_'+str(i)+'.qasm'
+           print("QX_RB_Hard_Detector : loading '"+file_name+"'...")
+           qasm = ql.qasm_loader(file_name)
+           qasm.load_circuits()
+           circuits = qasm.get_circuits()
+           self.randomizations.append(circuits)
+
+    def prepare(self, sweep_points):
+        self.sweep_points = sweep_points
+        # print("QX_RB_Hard_Detector.prepare() : creating circuits for randomization "+str(self.current)+"...")
+        self.circuits = self.randomizations[self.current]
+        assert(len(self.sweep_points) == len(self.circuits))
+        for c in self.circuits:
+           self.__qxc.create_circuit(c[0],c[1])
+        self.current = self.current + 1
+
+    def get_values(self):
+        x = self.sweep_points
+        # data = np.array([np.array(x),np.array(x)])
+        data = np.array([np.sin(x / np.pi), np.cos(x/np.pi)])
+        # print("QX_RB_Hard_Detector.get_values() called.")
+        i = 0
+        for c in self.circuits:
+           self.__qxc.send_cmd("reset_measurement_averaging")
+           self.__qxc.run_noisy_circuit(c[0], self.p_error, "depolarizing_channel", self.num_avg)
+           f = self.__qxc.get_measurement_average(0)
+           data[0][i] = f
+           data[1][i] = f
+           # noise = 0.03*np.random.random()
+           # data[0][i] = 1-0.01*i+noise
+           # data[1][i] = 1-0.01*i+noise
+           i = i+1
+           # print(f)
+        return data
+
+
+
+
 
 
 class Dummy_Shots_Detector(Hard_Detector):

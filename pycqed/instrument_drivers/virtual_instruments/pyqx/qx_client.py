@@ -82,7 +82,9 @@ class qx_client:
 
         # qubit number check
         if self.__qubits != 0:
-            raise Exception(n)
+            print("[!] warning : qx_client::create_qubits : qubit number redefined, all qubits and circuits will be reset before creation of new qubits !")
+            self.send_cmd("reset")
+            # raise Exception(n)
         if n <= 0:
             raise Exception(n)
 
@@ -160,8 +162,7 @@ class qx_client:
         """
            display the measurement of qubit 'qubit' (quantum circuit programmer is responsible of measuring the qubit before)
         """
-        measurement_register = self.send_cmd(
-            "get_measurements")   # create the circuit named 'name'
+        measurement_register = self.send_cmd("get_measurements")   # create the circuit named 'name'
         # print("[+] measurments register: ",measurement_register)
         start = measurement_register.find("|")
         end = measurement_register.rfind("|")
@@ -178,12 +179,12 @@ class qx_client:
            display the measurement of qubit 'qubit' (quantum circuit programmer is responsible of measuring the qubit before)
         """
         m = self.send_cmd("measurement_average %i" % qubit)   # create the circuit named 'name'
-        print("[+] measurement_average: ",m)
+        # print("[+] measurement_average: ",m)
         return float(m.split('\n')[0])
 
     def list_circuits(self):
         circuits = self.send_cmd("circuits")
-        print("[+] created circuits: ", circuits)
+        # print("[+] created circuits: ", circuits)
 
     def disconnect(self):
         self.__trace("qx_client::disconnect : stopping qx server...")
