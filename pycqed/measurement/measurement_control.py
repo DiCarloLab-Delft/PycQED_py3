@@ -118,14 +118,14 @@ class MeasurementControl(Instrument):
             self.get_measurement_preparetime()
             self.measure_soft_static()
 
-        elif self.sweep_functions[0].sweep_control == 'hard':
+        elif self.detector_function.detector_control == 'hard':
             sweep_points = self.get_sweep_points()
             if len(self.sweep_functions) == 1:
                 self.get_measurement_preparetime()
-                for self.soft_iteration in range(self.soft_avg()):
-                    self.detector_function.prepare(
-                        sweep_points=self.get_sweep_points())
-                    self.measure_hard()
+                # for self.soft_iteration in range(self.soft_avg()):
+                self.detector_function.prepare(
+                    sweep_points=self.get_sweep_points())
+                self.measure_hard()
             else:
                 # Do one iteration to see how many points per data point we get
                 self.get_measurement_preparetime()
@@ -156,7 +156,7 @@ class MeasurementControl(Instrument):
                         else:
                             swf_sweep_points = sweep_points
                             sweep_points_0 = sweep_points
-                        val = swf_sweep_points[0]
+                        val = swf_sweep_points[start_idx]
                         if sweep_function.sweep_control is 'soft':
                             sweep_function.set_parameter(val)
                     self.detector_function.prepare(
