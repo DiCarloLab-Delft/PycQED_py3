@@ -202,9 +202,18 @@ class UHFQC(Instrument):
         self.quex_rl_avgcnt(LOG2_RL_AVG_CNT)
         self.quex_rl_source(2)
 
-        # Ready for readout
-        self.quex_iavg_readout(1)
-        self.quex_rl_readout(1)
+        # Ready for readout. Writing a '1' to these nodes activates the automatic readout of results.
+        # This functionality should be used once the ziPython driver has been improved to handle
+        # the 'poll' commands of these results correctly. Until then, we write a '0' to the nodes
+        # to prevent automatic result readout. It is then necessary to poll e.g. the AWG in order to
+        # detect when the measurement is complete, and then manually fetch the results using the 'get'
+        # command. Disabling the automatic result readout speeds up the operation a bit, since we avoid
+        # sending the same data twice.
+        self.quex_iavg_readout(0)
+        self.quex_rl_readout(0)
+
+
+
 
         # The custom firmware will feed through the signals on Signal Input 1 to Signal Output 1 and Signal Input 2 to Signal Output 2
         # when the AWG is OFF. For most practical applications this is not really useful. We, therefore, disable the generation of
@@ -246,7 +255,8 @@ class UHFQC(Instrument):
         h.set('awgModule/compiler/sourcestring', sourcestring)
         h.set('awgModule/compiler/start', 1)
         h.set('awgModule/elf/file', '')
-
+        while h.get('awgModule/progress')['progress'][0] < 1.0:
+            time.sleep(0.01)
 
     def close(self):
         self._daq.disconnectDevice(self._device)
@@ -551,7 +561,7 @@ class UHFQC(Instrument):
 const TRIGGER1  = 0x000001;
 const WINT_TRIG = 0x000010;
 const IAVG_TRIG = 0x000020;
-const WINT_EN   = 0x0f0000;
+const WINT_EN   = 0x1f0000;
 
 setTrigger(WINT_EN);
 var loop_cnt = getUserReg(0);
@@ -610,7 +620,7 @@ setTrigger(0);"""
 const TRIGGER1  = 0x000001;
 const WINT_TRIG = 0x000010;
 const IAVG_TRIG = 0x000020;
-const WINT_EN   = 0x0f0000;
+const WINT_EN   = 0x1f0000;
 
 setTrigger(WINT_EN);
 var loop_cnt = getUserReg(0);
