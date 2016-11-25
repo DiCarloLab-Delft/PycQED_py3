@@ -257,6 +257,7 @@ class UHFQC(Instrument):
         h.set('awgModule/elf/file', '')
         while h.get('awgModule/progress')['progress'][0] < 1.0:
             time.sleep(0.01)
+        time.sleep(0.2)
 
     def close(self):
         self._daq.disconnectDevice(self._device)
