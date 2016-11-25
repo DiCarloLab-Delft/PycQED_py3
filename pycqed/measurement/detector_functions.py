@@ -174,7 +174,7 @@ class QX_Hard_Detector(Hard_Detector):
         return data
 
 '''
-QX Hard Detector for the Randomized Benchmarking 
+QX Hard Detector for the Randomized Benchmarking
 '''
 class QX_RB_Hard_Detector(Hard_Detector):
 
@@ -188,7 +188,7 @@ class QX_RB_Hard_Detector(Hard_Detector):
         self.times_called = 0
         self.__qxc = qxc
         self.num_avg = num_avg
-        self.filename_prefix = filename_prefix 
+        self.filename_prefix = filename_prefix
         self.num_files = num_files
         self.p_error = p_error
         self.delay = 1
@@ -246,7 +246,7 @@ class QX_RB_Hard_Detector_Fast(Hard_Detector):
         self.times_called = 0
         self.__qxc = qxc
         self.num_avg = num_avg
-        self.filename_prefix = filename_prefix 
+        self.filename_prefix = filename_prefix
         self.num_files = num_files
         self.p_error = p_error
         self.delay = 1
@@ -264,7 +264,7 @@ class QX_RB_Hard_Detector_Fast(Hard_Detector):
 
     def prepare(self, sweep_points):
         self.sweep_points = sweep_points
-        # print("QX_RB_Hard_Detector.prepare() : creating circuits for randomization "+str(self.current)+"...")
+        print("QX_RB_Hard_Detector.prepare() : creating circuits for randomization "+str(self.current)+"...")
         self.circuits = self.randomizations[self.current]
         assert(len(self.sweep_points) == len(self.circuits))
         for c in self.circuits:

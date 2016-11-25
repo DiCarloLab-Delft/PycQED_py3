@@ -149,114 +149,15 @@ LutMan = cbl.QuTech_ControlBox_LookuptableManager(
     'Lutman', CBox, server_name=None)
 station.add_component(LutMan)
 
-
-# Dux = qdux.QuTech_Duplexer('Dux', address='TCPIP0::192.168.0.101',
-#                             server_name=None)
-# SH = sh.SignalHound_USB_SA124B('Signal hound', server_name=None)
-# #commented because of 8s load time
-
 # Meta-instruments
 print('starting meta instruments')
-# HS = hd.HeterodyneInstrument('HS', LO=LO, RF=RF, AWG=AWG, acquisition_instr=CBox.name,
-#                              server_name=None)
-# station.add_component(HS)
 print('starting qubit objects')
-# AncB = qbt.Tektronix_driven_transmon('AncB', LO=LO, cw_source=Spec_source,
-#                                      td_source=Qubit_LO,
-#                                      IVVI=IVVI, rf_RO_source=RF,
-#                                      AWG=AWG,
-#                                      heterodyne_instr=HS,
-#                                      FluxCtrl=Flux_Control,
-#                                      MC=MC,
-#                                      server_name=None)
-# station.add_component(AncB)
 from pycqed.instrument_drivers.meta_instrument.qubit_objects import CBox_v3_driven_transmon as cq
 
 AncT_CB = cq.CBox_v3_driven_transmon('AncT_CB', LO=LO, cw_source=Spec_source,
                                      td_source=Qubit_LO, IVVI=IVVI,
                                      LutMan=LutMan, CBox=CBox, MC=MC)
-# AncT = qbt.Tektronix_driven_transmon('AncT', LO=LO, cw_source=Spec_source,
-#                                      td_source=Qubit_LO,
-#                                      IVVI=IVVI, rf_RO_source=RF,
-#                                      AWG=AWG,
-#                                      heterodyne_instr=HS,
-#                                      FluxCtrl=Flux_Control,
-#                                      MC=MC,
-#                                      server_name=None)
-# station.add_component(AncT)
-# DataB = qbt.Tektronix_driven_transmon('DataB', LO=LO, cw_source=Spec_source,
-#                                       td_source=Qubit_LO,
-#                                       IVVI=IVVI, rf_RO_source=RF,
-#                                       AWG=AWG,
-#                                       heterodyne_instr=HS,
-#                                       FluxCtrl=Flux_Control,
-#                                       MC=MC,
-#                                       server_name=None)
-# station.add_component(DataB)
-# DataM = qbt.Tektronix_driven_transmon('DataM', LO=LO, cw_source=Spec_source,
-#                                       td_source=Qubit_LO,
-#                                       IVVI=IVVI, rf_RO_source=RF,
-#                                       AWG=AWG,
-#                                       heterodyne_instr=HS,
-#                                       FluxCtrl=Flux_Control,
-#                                       MC=MC,
-#                                       server_name=None)
-# station.add_component(DataM)
-# DataT = qbt.Tektronix_driven_transmon('DataT', LO=LO, cw_source=Spec_source,
-#                                       td_source=Qubit_LO,
-#                                       IVVI=IVVI, rf_RO_source=RF,
-#                                       AWG=AWG,
-#                                       heterodyne_instr=HS,
-#                                       FluxCtrl=Flux_Control,
-#                                       MC=MC,
-#                                       server_name=None)
-# station.add_component(DataT)
-
-# load settings onto qubits
-# gen.load_settings_onto_instrument(AncT)  # , timestamp='20161111_165442')
-# gen.load_settings_onto_instrument(HS)
-
-# AncT.E_c(0.28e9)
-# AncT.asymmetry(0)
-# AncT.dac_flux_coefficient(0.0014870990568855082)
-# AncT.dac_sweet_spot(-85.264803738253249)
-# AncT.f_max(5.9425723344778003e9)
-# AncT.f_qubit_calc('flux')
-
-
-# nested_MC = mc.MeasurementControl('nested_MC')
-# nested_MC.station = station
-
-# The AWG sequencer
-# station.pulsar = ps.Pulsar()
-# station.pulsar.AWG = station.components['AWG']
-# marker1highs = [2, 2, 2.7, 2]
-# for i in range(4):
-#     # Note that these are default parameters and should be kept so.
-#     # the channel offset is set in the AWG itself. For now the amplitude is
-#     # hardcoded. You can set it by hand but this will make the value in the
-#     # sequencer different.
-#     station.pulsar.define_channel(id='ch{}'.format(i+1),
-#                                   name='ch{}'.format(i+1), type='analog',
-#                                   # max safe IQ voltage
-#                                   high=.7, low=-.7,
-#                                   offset=0.0, delay=0, active=True)
-#     station.pulsar.define_channel(id='ch{}_marker1'.format(i+1),
-#                                   name='ch{}_marker1'.format(i+1),
-#                                   type='marker',
-#                                   high=marker1highs[i], low=0, offset=0.,
-#                                   delay=0, active=True)
-#     station.pulsar.define_channel(id='ch{}_marker2'.format(i+1),
-#                                   name='ch{}_marker2'.format(i+1),
-#                                   type='marker',
-#                                   high=2.0, low=0, offset=0.,
-#                                   delay=0, active=True)
-# # to make the pulsar available to the standard awg seqs
-# st_seqs.station = station
-# sq.station = station
-# awg_swf.fsqs.station = station
-# cal_elts.station = station
-
+station.add_component(AncT_CB)
 t1 = time.time()
 
 # manually setting the clock, to be done automatically
@@ -291,7 +192,7 @@ CBox.upload_standard_weights(modulation_frequency)
 
 LutMan.Q_modulation(modulation_frequency)
 LutMan.Q_gauss_width(10e-9)
-LutMan.Q_amp180(0.249955)
+LutMan.Q_amp180(0.2513)
 LutMan.Q_amp90(LutMan.Q_amp180()/2)
 
 LutMan.lut_mapping(['I', 'X180', 'Y180', 'X90', 'Y90', 'mX90', 'mY90',
@@ -302,28 +203,27 @@ LutMan.M_length(600e-9)
 
 LutMan.load_pulses_onto_AWG_lookuptable(0)
 
+gen.load_settings_onto_instrument(AncT_CB)
 
-AncT_CB.f_RO()
-AncT_CB.f_qubit(5941438225.31)
-AncT_CB.f_pulse_mod(-20e6)
-AncT_CB.f_RO(7094199808.0)
-AncT_CB.f_RO_mod(-20e6)
+# AncT_CB.f_RO()
+# AncT_CB.f_qubit(5941438225.31)
+# AncT_CB.f_pulse_mod(-20e6)
+# AncT_CB.f_RO(7094199808.0)
+# AncT_CB.f_RO_mod(-20e6)
 
-AncT_CB.f_pulse_mod(modulation_frequency)
-AncT_CB.gauss_width(10e-9)
-AncT_CB.amp180(0.249955)
-AncT_CB.amp90(LutMan.Q_amp180()/2)
+# AncT_CB.f_pulse_mod(modulation_frequency)
+# AncT_CB.gauss_width(10e-9)
+# AncT_CB.amp180(0.249955)
+# AncT_CB.amp90(LutMan.Q_amp180()/2)
+# AncT_CB.motzoi(LutMan.Q_amp180()/2)
 
-AncT_CB.RO_pulse_delay(60*5e-9)
-AncT_CB.RO_pulse_length(50*5e-9)
-AncT_CB.RO_amp(0.2)
-AncT_CB.td_source_pow(16)
+# AncT_CB.RO_pulse_delay(60*5e-9)
+# AncT_CB.RO_pulse_length(50*5e-9)
+# AncT_CB.RO_amp(0.2)
+# AncT_CB.td_source_pow(16)
 
 
 op_dict = AncT_CB.get_operation_dict()
-# op_dict = qh.create_CBox_op_dict(qubit_name, pulse_length=10, RO_length=50,
-#                                  RO_delay=60, modulated_RO=True)
-
 
 ##############
 # Defining useful function
@@ -369,7 +269,10 @@ def measure_rabi(qubit_name, op_dict):
     MC.set_detector_function(d)
     MC.run('ASM_rabi')
     a = ma.Rabi_Analysis(close_fig=False, label='ASM_rabi')
-    return a
+    fr = a.fit_res[0]
+    amp180 = 1/(2*fr.best_values['frequency'])
+    print('amp180: {:.4g}'.format(amp180))
+    return a, amp180
 
 
 def measure_T1():
@@ -451,8 +354,9 @@ def measure_motzoi():
     prepare_motzoi_seq_CC(qubit_name, op_dict)
     MC.soft_avg(5)
     motzois = np.repeat(np.linspace(-.4, .2, 41), 2)
-    motzoi_swf = cbs.Lutman_par_with_reload_single_pulse(LutMan=LutMan, parameter=LutMan.Q_motzoi_parameter,
-                                                         pulse_names=['X180', 'X90', 'Y180', 'Y90'], awg_nrs=[0])
+    motzoi_swf = cbs.Lutman_par_with_reload_single_pulse(
+        LutMan=LutMan, parameter=LutMan.Q_motzoi_parameter,
+        pulse_names=['X180', 'X90', 'Y180', 'Y90'], awg_nrs=[0])
     d = qh.CBox_single_integration_average_det_CC(
         CBox, seg_per_point=2, nr_averages=512)
 
