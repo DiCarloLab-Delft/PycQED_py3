@@ -5,6 +5,7 @@ from pycqed.measurement.waveform_control_CC import qasm_to_asm as qta
 from qcodes.instrument.parameter import ManualParameter
 import numpy as np
 import os
+import json
 
 class QASM_Sweep(swf.Hard_Sweep):
 
@@ -181,24 +182,24 @@ class CBox_int_avg_func_prep_det_CC(CBox_integrated_average_detector_CC):
         else:
             self.prepare_function()
 
+
 def load_range_of_asm_files(asm_filenames, counter_param, CBox):
     asm_filename = asm_filenames[counter_param()]
     counter_param((counter_param()+1) % len(asm_filenames))
     CBox.load_instructions(asm_filename)
 
 
-def extract_msmt_pts_from_config(config_file):
+def extract_msmt_pts_from_config(config_filename):
     """
     This is a dummy version that
     """
-    nr_cliffords = 2**(np.arange(10)+1)
-    # add calibration points
-    nr_cliffords = np.append(
-        nr_cliffords, [nr_cliffords[-1]+.5]*2 + [nr_cliffords[-1]+1.5]*2)
-    return nr_cliffords
+    config_opened = open(config_filename, 'r')
+    config_dict = json.load(config_opened)
+    config_opened.close()
+    return config_dict['measurement_points']
 
 
-def measure_asm_files(asm_filenames, config_file, qubit, MC):
+def measure_asm_files(asm_filenames, config_filename, qubit, MC):
     """
     Takes one or more asm_files as input and runs them on the hardware
     """
@@ -225,7 +226,7 @@ def measure_asm_files(asm_filenames, config_file, qubit, MC):
         prepare_function_kwargs=prepare_function_kwargs,
         nr_averages=nr_hard_averages)
 
-    measurement_points = extract_msmt_pts_from_config(config_file)
+    measurement_points = extract_msmt_pts_from_config(config_filename)
 
     MC.set_sweep_function(swf.None_Sweep())
     MC.set_sweep_points(measurement_points)
