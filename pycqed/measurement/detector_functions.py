@@ -253,10 +253,10 @@ class QX_RB_Hard_Detector_Fast(Hard_Detector):
         self.current = 0
         self.randomizations = []
         # load files
-        print("QX_RB_Hard_Detector : loading qasm files...")
+        # print("QX_RB_Hard_Detector : loading qasm files...")
         for i in range(0,num_files):
            file_name = self.filename_prefix+'_'+str(i)+'.qasm'
-           print("QX_RB_Hard_Detector : loading '"+file_name+"'...")
+           # print("QX_RB_Hard_Detector : loading '"+file_name+"'...")
            qasm = ql.qasm_loader(file_name)
            qasm.load_circuits()
            circuits = qasm.get_circuits()
@@ -264,7 +264,7 @@ class QX_RB_Hard_Detector_Fast(Hard_Detector):
 
     def prepare(self, sweep_points):
         self.sweep_points = sweep_points
-        print("QX_RB_Hard_Detector.prepare() : creating circuits for randomization "+str(self.current)+"...")
+        # print("QX_RB_Hard_Detector.prepare() : creating circuits for randomization "+str(self.current)+"...")
         self.circuits = self.randomizations[self.current]
         assert(len(self.sweep_points) == len(self.circuits))
         for c in self.circuits:

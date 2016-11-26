@@ -82,7 +82,7 @@ class qx_client:
 
         # qubit number check
         if self.__qubits != 0:
-            print("[!] warning : qx_client::create_qubits : qubit number redefined, all qubits and circuits will be reset before creation of new qubits !")
+            # print("[!] warning : qx_client::create_qubits : qubit number redefined, all qubits and circuits will be reset before creation of new qubits !")
             self.send_cmd("reset")
             # raise Exception(n)
         if n <= 0:
@@ -133,8 +133,23 @@ class qx_client:
                self.send_cmd(batch)
         '''
         self.send_cmd(".%s" % name)   # create the circuit named 'name'
-        for g in gates:
-            self.send_cmd(g)
+        #for g in gates:
+        #    self.send_cmd(g)
+        threshold  = 50
+        chunk_size = int(20) 
+        if (len(gates) > threshold):
+           chunks  = int(len(gates)/chunk_size)
+           remains = len(gates)%chunk_size
+           for c in range(0,chunks):
+              batch = ''
+              for i in range(0,chunk_size):
+                 batch = batch + gates[c*chunk_size+i] + ' ; '
+              self.send_cmd(batch)
+           for i in range(chunks*chunk_size,len(gates)):
+              self.send_cmd(gates[i])
+        else:
+           for g in gates:
+              self.send_cmd(g)
         self.__circuits.append(name)  # add    the circuit to our local circuit list
 
     def run_circuit(self, name):
