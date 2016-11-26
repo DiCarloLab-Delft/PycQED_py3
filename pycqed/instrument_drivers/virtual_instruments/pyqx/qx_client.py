@@ -29,7 +29,8 @@ class qx_client:
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.__qubits = 0
         self.__circuits = []
-        self.__circuits.append("default")  # default main circuit is always there
+        # default main circuit is always there
+        self.__circuits.append("default")
         self.__debug = 0
 
     def connect(self, host="localhost", port=5555):
@@ -102,7 +103,8 @@ class qx_client:
         # update our local information
         self.__qubits = 0
         self.__circuits = []
-        self.__circuits.append("default")  # default main circuit is always there
+        # default main circuit is always there
+        self.__circuits.append("default")
 
     # def create_circuit(self,name,batch_cmd):
     def create_circuit(self, name, gates):
@@ -133,24 +135,27 @@ class qx_client:
                self.send_cmd(batch)
         '''
         self.send_cmd(".%s" % name)   # create the circuit named 'name'
-        #for g in gates:
+        # for g in gates:
         #    self.send_cmd(g)
-        threshold  = 50
-        chunk_size = int(20) 
+
+        threshold = 100
+        chunk_size = int(50)
         if (len(gates) > threshold):
-           chunks  = int(len(gates)/chunk_size)
-           remains = len(gates)%chunk_size
-           for c in range(0,chunks):
-              batch = ''
-              for i in range(0,chunk_size):
-                 batch = batch + gates[c*chunk_size+i] + ' ; '
-              self.send_cmd(batch)
-           for i in range(chunks*chunk_size,len(gates)):
-              self.send_cmd(gates[i])
+            chunks = int(len(gates)/chunk_size)
+            remains = len(gates) % chunk_size
+            for c in range(0, chunks):
+                batch = ''
+                for i in range(0, chunk_size):
+                    batch = batch + gates[c*chunk_size+i] + ' ; '
+                self.send_cmd(batch)
+            for i in range(chunks*chunk_size, len(gates)):
+                self.send_cmd(gates[i])
         else:
-           for g in gates:
-              self.send_cmd(g)
-        self.__circuits.append(name)  # add    the circuit to our local circuit list
+            for g in gates:
+                self.send_cmd(g)
+
+        # add    the circuit to our local circuit list
+        self.__circuits.append(name)
 
     def run_circuit(self, name):
         '''
@@ -161,7 +166,8 @@ class qx_client:
         else:
             raise IllegalOperationException
 
-    def run_noisy_circuit(self, name, error_probability, error_model="depolarizing_channel", iterations=1):
+    def run_noisy_circuit(self, name, error_probability,
+                          error_model="depolarizing_channel", iterations=1):
         '''
           noisy execution of the circuit named 'name' using the specified error model and error probability
         '''
@@ -177,7 +183,8 @@ class qx_client:
         """
            display the measurement of qubit 'qubit' (quantum circuit programmer is responsible of measuring the qubit before)
         """
-        measurement_register = self.send_cmd("get_measurements")   # create the circuit named 'name'
+        measurement_register = self.send_cmd(
+            "get_measurements")   # create the circuit named 'name'
         # print("[+] measurments register: ",measurement_register)
         start = measurement_register.find("|")
         end = measurement_register.rfind("|")
@@ -189,11 +196,12 @@ class qx_client:
         assert(len(bits) == self.__qubits)
         return bits[len(bits)-qubit-1]
 
-    def get_measurement_average(self,qubit):
+    def get_measurement_average(self, qubit):
         """
            display the measurement of qubit 'qubit' (quantum circuit programmer is responsible of measuring the qubit before)
         """
-        m = self.send_cmd("measurement_average %i" % qubit)   # create the circuit named 'name'
+        m = self.send_cmd("measurement_average %i" %
+                          qubit)   # create the circuit named 'name'
         # print("[+] measurement_average: ",m)
         return float(m.split('\n')[0])
 
@@ -209,7 +217,7 @@ class qx_client:
         self.sock.close()
         print("[+] disconnected.")
 
-#######################################################################################
+##########################################################################
 
 """
   Test code :
