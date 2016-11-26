@@ -2,7 +2,9 @@ import logging
 import pycqed.measurement.sweep_functions as swf
 import pycqed.measurement.detector_functions as det
 from pycqed.measurement.waveform_control_CC import qasm_to_asm as qta
-
+from qcodes.instrument.parameter import ManualParameter
+import numpy as np
+import os
 
 class QASM_Sweep(swf.Hard_Sweep):
 
@@ -115,8 +117,6 @@ class CBox_single_integration_average_det_CC(
         self.CBox.nr_averages(int(self.nr_averages))
         self.CBox.integration_length(int(self.integration_length/(5e-9)))
 
-
-
     def acquire_data_point(self, **kw):
         return self.get_values()
 
@@ -181,39 +181,54 @@ class CBox_int_avg_func_prep_det_CC(CBox_integrated_average_detector_CC):
         else:
             self.prepare_function()
 
+def load_range_of_asm_files(asm_filenames, counter_param, CBox):
+    asm_filename = asm_filenames[counter_param()]
+    counter_param((counter_param()+1) % len(asm_filenames))
+    CBox.load_instructions(asm_filename)
 
-def create_CBox_op_dict(qubit_name, pulse_length=8, RO_length=50, RO_delay=10,
-                        modulated_RO=True):
-    operation_dict = {
-        'init_all': {'instruction': 'WaitReg r0 \nWaitReg r0 \n'},
-        'I {}'.format(qubit_name): {
-            'duration': pulse_length, 'instruction': 'wait {} \n'},
-        'X180 {}'.format(qubit_name): {
-            'duration': pulse_length, 'instruction':
-            'pulse 1001 0000 1001  \nwait {}\n'.format(pulse_length)},
-        'Y180 {}'.format(qubit_name): {
-            'duration': pulse_length, 'instruction':
-            'pulse 1010 0000 1010  \nwait {}\n'.format(pulse_length)},
-        'X90 {}'.format(qubit_name): {
-            'duration': pulse_length, 'instruction':
-            'pulse 1011 0000 1011  \nwait {}\n'.format(pulse_length)},
-        'Y90 {}'.format(qubit_name): {
-            'duration': pulse_length, 'instruction':
-            'pulse 1100 0000 1100  \nwait {}\n'.format(pulse_length)},
-        'mX90 {}'.format(qubit_name): {
-            'duration': pulse_length, 'instruction':
-            'pulse 1101 0000 1101  \nwait {}\n'.format(pulse_length)},
-        'mY90 {}'.format(qubit_name): {
-            'duration': pulse_length, 'instruction':
-            'pulse 1110 0000 1110  \nwait {}\n'.format(pulse_length)}}
-    if modulated_RO:
-        operation_dict['RO {}'.format(qubit_name)] = {
-            'duration': RO_length, 'instruction':
-            'wait {} \npulse 0000 1111 1111 \nwait {} \nmeasure \n'.format(
-                RO_delay, RO_length)}
+
+def extract_msmt_pts_from_config(config_file):
+    """
+    This is a dummy version that
+    """
+    nr_cliffords = 2**(np.arange(10)+1)
+    # add calibration points
+    nr_cliffords = np.append(
+        nr_cliffords, [nr_cliffords[-1]+.5]*2 + [nr_cliffords[-1]+1.5]*2)
+    return nr_cliffords
+
+
+def measure_asm_files(asm_filenames, config_file, qubit, MC):
+    """
+    Takes one or more asm_files as input and runs them on the hardware
+    """
+    qubit.prepare_for_timedomain()
+    CBox = qubit.CBox  # The qubit object contains a reference to the CBox
+
+    counter_param = ManualParameter('name_ctr', initial_value=0)
+
+    if len(asm_filenames) > 1:
+        MC.soft_avg(len(asm_filenames))
+        nr_hard_averages = 256
+
     else:
-        operation_dict['RO {}'.format(qubit_name)] = {
-            'duration': RO_length, 'instruction':
-            'wait {} \ntrigger 1000000, {} \n measure \n'.format(RO_delay,
-                                                                 RO_length)}
-    return operation_dict
+        CBox.nr_averages
+        nr_hard_averages = 512
+        MC.soft_avg(5)
+
+    prepare_function_kwargs = {
+        'counter_param': counter_param,  'asm_filenames': asm_filenames,
+        'CBox': CBox}
+
+    detector = CBox_int_avg_func_prep_det_CC(
+        CBox, prepare_function=load_range_of_asm_files,
+        prepare_function_kwargs=prepare_function_kwargs,
+        nr_averages=nr_hard_averages)
+
+    measurement_points = extract_msmt_pts_from_config(config_file)
+
+    MC.set_sweep_function(swf.None_Sweep())
+    MC.set_sweep_points(measurement_points)
+    MC.set_detector_function(detector)
+
+    MC.run('Demo {}'.format(os.path.split(asm_filenames[0])[-1]))
