@@ -11,13 +11,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 import qcodes as qc
 # Globally defined config
-
+from qcodes.instrument.parameter import ManualParameter
 qc_config = {'datadir': r'D:\Experiments\\1611_intel_demo\data',
              'PycQEDdir': 'D:\GitHubRepos\PycQED_py3'}
 
+# Disabled for the demo
 # makes sure logging messages show up in the notebook
-root = logging.getLogger()
-root.addHandler(logging.StreamHandler())
+# root = logging.getLogger()
+# root.addHandler(logging.StreamHandler())
 
 
 # General PycQED modules
@@ -91,19 +92,16 @@ station.add_component(Spec_source)
 Qubit_LO = rs.RohdeSchwarz_SGS100A(
     name='Qubit_LO', address='TCPIP0::192.168.0.86', server_name=None)  #
 station.add_component(Qubit_LO)
-TWPA_Pump = rs.RohdeSchwarz_SGS100A(
-    name='TWPA_Pump', address='TCPIP0::192.168.0.90', server_name=None)  #
-station.add_component(TWPA_Pump)
+# TWPA_Pump = rs.RohdeSchwarz_SGS100A(
+#     name='TWPA_Pump', address='TCPIP0::192.168.0.90', server_name=None)  #
+# station.add_component(TWPA_Pump)
 
 # step attenuator
 ATT = Weinschel_8320_novisa.Weinschel_8320(
     name='ATT', address='192.168.0.54', server_name=None)
 station.add_component(ATT)
 
-# AWG = tek.Tektronix_AWG5014(name='AWG', setup_folder=None, timeout=2,
-#                             address='GPIB0::6::INSTR', server_name=None)
-# station.add_component(AWG)
-# Current sources
+
 IVVI = iv.IVVI('IVVI', address='COM4', numdacs=16, server_name=None)
 station.add_component(IVVI)
 
@@ -150,8 +148,6 @@ LutMan = cbl.QuTech_ControlBox_LookuptableManager(
 station.add_component(LutMan)
 
 # Meta-instruments
-print('starting meta instruments')
-print('starting qubit objects')
 from pycqed.instrument_drivers.meta_instrument.qubit_objects import CBox_v3_driven_transmon as cq
 
 AncT_CB = cq.CBox_v3_driven_transmon('AncT_CB', LO=LO, cw_source=Spec_source,
@@ -159,9 +155,6 @@ AncT_CB = cq.CBox_v3_driven_transmon('AncT_CB', LO=LO, cw_source=Spec_source,
                                      LutMan=LutMan, CBox=CBox, MC=MC)
 station.add_component(AncT_CB)
 t1 = time.time()
-
-# manually setting the clock, to be done automatically
-# AWG.clock_freq(1e9)
 
 
 print('Ran initialization in %.2fs' % (t1-t0))
@@ -205,35 +198,20 @@ LutMan.load_pulses_onto_AWG_lookuptable(0)
 
 gen.load_settings_onto_instrument(AncT_CB)
 
-# AncT_CB.f_RO()
-# AncT_CB.f_qubit(5941438225.31)
-# AncT_CB.f_pulse_mod(-20e6)
-# AncT_CB.f_RO(7094199808.0)
-# AncT_CB.f_RO_mod(-20e6)
-
-# AncT_CB.f_pulse_mod(modulation_frequency)
-# AncT_CB.gauss_width(10e-9)
-# AncT_CB.amp180(0.249955)
-# AncT_CB.amp90(LutMan.Q_amp180()/2)
-# AncT_CB.motzoi(LutMan.Q_amp180()/2)
-
-# AncT_CB.RO_pulse_delay(60*5e-9)
-# AncT_CB.RO_pulse_length(50*5e-9)
-# AncT_CB.RO_amp(0.2)
-# AncT_CB.td_source_pow(16)
-
 
 op_dict = AncT_CB.get_operation_dict()
 
 ##############
 # Defining useful function
 ###############
+
+
 def all_sources_off():
     LO.off()
     RF.off()
     Spec_source.off()
     Qubit_LO.off()
-    TWPA_Pump.off()
+    # TWPA_Pump.off()
 
 
 def print_instr_params(instr):
@@ -256,7 +234,9 @@ def prepare_rabi_seq_CC(qubit_name, op_dict):
     CBox.load_instructions(asm_file.name)
 
 
-def measure_rabi(qubit_name, op_dict):
+def measure_rabi(qubit_name='AncT_CB', op_dict=op_dict):
+    MC.soft_avg(3)
+    AncT_CB.prepare_for_timedomain()
     prepare_rabi_seq_CC(qubit_name=qubit_name, op_dict=op_dict)
     amp_swf = cbs.Lutman_par_with_reload_single_pulse(
         LutMan=LutMan, parameter=LutMan.Q_amp180,
@@ -276,6 +256,7 @@ def measure_rabi(qubit_name, op_dict):
 
 
 def measure_T1():
+    AncT_CB.prepare_for_timedomain()
     MC.soft_avg(5)
     times = np.arange(50e-9, 80e-6, 3e-6)
     T1 = sq_qasm.T1(qubit_name, times=times)
@@ -289,6 +270,7 @@ def measure_T1():
 
 
 def measure_ramsey():
+    AncT_CB.prepare_for_timedomain()
     MC.soft_avg(5)
     times = np.arange(50e-9, 50e-6, 1e-6)
     Ramsey = sq_qasm.Ramsey(qubit_name, times=times, artificial_detuning=None)
@@ -302,6 +284,7 @@ def measure_ramsey():
 
 
 def measure_echo():
+    AncT_CB.prepare_for_timedomain()
     MC.soft_avg(5)
 
     times = np.arange(50e-9, 80e-6, 3e-6)
@@ -316,6 +299,7 @@ def measure_echo():
 
 
 def measure_AllXY():
+    AncT_CB.prepare_for_timedomain()
     MC.soft_avg(5)
     reload(qh)
     AllXY = sq_qasm.AllXY(qubit_name, double_points=True)
@@ -330,6 +314,7 @@ def measure_AllXY():
 
 
 def measure_ssro():
+    AncT_CB.prepare_for_timedomain()
     MC.soft_avg(1)
     reload(qh)
     CBox.log_length(8000)
@@ -351,6 +336,7 @@ def prepare_motzoi_seq_CC(qubit_name, op_dict):
 
 
 def measure_motzoi():
+    AncT_CB.prepare_for_timedomain()
     prepare_motzoi_seq_CC(qubit_name, op_dict)
     MC.soft_avg(5)
     motzois = np.repeat(np.linspace(-.4, .2, 41), 2)
@@ -368,3 +354,54 @@ def measure_motzoi():
 
 
 AncT_CB.prepare_for_timedomain()
+
+
+def RB_prepare(nr_cliffords, op_dict, CBox, nr_seeds=1):
+    RB_qasm = sq_qasm.randomized_benchmarking('AncT_CB', nr_cliffords=nr_cliffords, nr_seeds=nr_seeds,
+                                              double_curves=False)
+    asm_file = qta.qasm_to_asm(RB_qasm.name, op_dict)
+    CBox.load_instructions(asm_file.name)
+    return RB_qasm, asm_file
+
+
+def measure_RB():
+    AncT_CB.prepare_for_timedomain()
+    progr_path = r'D:\GitHubRepos\iPython-Notebooks\Experiments\1611 Intel_demo\programs\rb_1k_100r\asm'
+    base_asm_filename = progr_path+r'\rb_{}.asm'
+
+    counter_param = ManualParameter('name_ctr', initial_value=0)
+
+    nr_seeds = 100
+    nr_averages_per_seed = 256
+
+    def load_range_of_asm_files(counter_param=counter_param,
+                                base_asm_filename=base_asm_filename):
+        asm_filename = base_asm_filename.format(counter_param())
+        counter_param((counter_param()+1) % nr_seeds)
+        CBox.load_instructions(asm_filename)
+
+    prepare_function_kwargs = {
+        'counter_param': counter_param,  'base_asm_filename': base_asm_filename}
+
+    demo_det = qh.CBox_int_avg_func_prep_det_CC(
+        CBox, prepare_function=load_range_of_asm_files,
+        prepare_function_kwargs=prepare_function_kwargs,
+        nr_averages=nr_averages_per_seed)
+
+    nr_cliffords = 2**(np.arange(10)+1)
+    # add calibration points
+    nr_cliffords = np.append(
+        nr_cliffords, [nr_cliffords[-1]+.5]*2 + [nr_cliffords[-1]+1.5]*2)
+
+    MC.soft_avg(nr_seeds)
+    s = swf.None_Sweep()
+
+    MC.set_sweep_function(s)
+    MC.set_sweep_points(nr_cliffords)
+    MC.set_detector_function(demo_det)
+    MC.run('RB_qasm_demo')
+    ma.RandomizedBenchmarking_Analysis(
+        close_fig=False, label='RB_qasm', pulse_delay=50e-9, T1=20e-6)
+
+
+MC.QC_QtPlot.interval = 0.4
