@@ -216,7 +216,7 @@ def measure_asm_files(asm_filenames, config_filename, qubit, MC):
     else:
         CBox.nr_averages
         nr_hard_averages = 512
-        MC.soft_avg(5)
+        MC.soft_avg(10)
 
     prepare_function_kwargs = {
         'counter_param': counter_param,  'asm_filenames': asm_filenames,
@@ -241,12 +241,15 @@ def simulate_qasm_files(qasm_filenames, config_filename, qxc, MC):
     Takes one or more asm_files as input and runs them on the hardware
     """
 
-    counter_param = ManualParameter('name_ctr', initial_value=0)
-
-    MC.soft_avg(len(qasm_filenames))
+    if len(qasm_filenames) > 1:
+        MC.soft_avg(len(qasm_filenames))
+        nr_hard_averages = 256
+    else:
+        nr_hard_averages = 512
+        MC.soft_avg(10)
 
     qx_det = det.QX_Hard_Detector(qxc, qasm_filenames,
-                                  p_error=0.006, num_avg=128)
+                                  p_error=0.006, num_avg=nr_hard_averages)
     measurement_points = extract_msmt_pts_from_config(config_filename)
 
     MC.set_sweep_function(swf.None_Sweep())
@@ -298,7 +301,9 @@ def getHomoFiles(fn):
     dirpath = getFilePath(fn)
     basename = getBaseName(fn)
     ext = getExtension(fn)
-    ncore, sep, tail = basename.rpartition('_')
+    name_core, sep, tail = basename.rpartition('_')
+    if name_core == '':
+        name_core = tail
     homo_files = []
     if not RepresentsInt(tail):
         homo_files.append(fn)
@@ -308,9 +313,9 @@ def getHomoFiles(fn):
             if (getExtension(f) != ext):
                 continue
             head, sep, tail = getBaseName(f).rpartition('_')
-            if (RepresentsInt(tail) and (head == ncore)):
+            if (RepresentsInt(tail) and (head == name_core)):
                 homo_files.append(dirpath + '\\'+f)
 
-    config_file = dirpath + "\\config.json"
+    config_file = dirpath + "\\{}_config.json".format(name_core)
 
     return (config_file, homo_files)

@@ -159,7 +159,6 @@ class QX_Hard_Detector(Hard_Detector):
     def prepare(self, sweep_points):
         self.sweep_points = sweep_points
         self.circuits = self.randomizations[self.current]
-        assert(len(self.sweep_points) == len(self.circuits))
 
     def get_values(self):
         # x = self.sweep_points
