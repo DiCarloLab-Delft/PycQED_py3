@@ -7,6 +7,7 @@ import numpy as np
 import os
 import json
 
+
 class QASM_Sweep(swf.Hard_Sweep):
 
     def __init__(self, filename, CBox, op_dict, upload=True):
@@ -233,3 +234,22 @@ def measure_asm_files(asm_filenames, config_filename, qubit, MC):
     MC.set_detector_function(detector)
 
     MC.run('Demo {}'.format(os.path.split(asm_filenames[0])[-1]))
+
+
+def simulate_qasm_files(qasm_filenames, config_filename, qxc, MC):
+    """
+    Takes one or more asm_files as input and runs them on the hardware
+    """
+
+    counter_param = ManualParameter('name_ctr', initial_value=0)
+
+    MC.soft_avg(len(qasm_filenames))
+
+    qx_det = det.QX_Hard_Detector(qxc, qasm_filenames,
+                                     p_error=0.006, num_avg=128)
+    measurement_points = extract_msmt_pts_from_config(config_filename)
+
+    MC.set_sweep_function(swf.None_Sweep())
+    MC.set_detector_function(qx_det)
+    MC.set_sweep_points(measurement_points)
+    MC.run('Demo QX sim {}'.format(os.path.split(qasm_filenames[0])[-1]))

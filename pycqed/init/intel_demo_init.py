@@ -32,6 +32,10 @@ from pycqed.measurement.waveform_control_CC import single_qubit_qasm_seqs as sq_
 from pycqed.instrument_drivers.physical_instruments._controlbox \
     import Assembler
 
+# QX client modules
+from pycqed.instrument_drivers.virtual_instruments.pyqx import qx_client as qx
+from pycqed.instrument_drivers.virtual_instruments.pyqx import qasm_loader as ql
+
 # Importing instruments
 from pycqed.instrument_drivers.physical_instruments import QuTech_ControlBox_v3 as qcb
 from pycqed.instrument_drivers.meta_instrument import CBox_LookuptableManager as cbl
@@ -201,6 +205,12 @@ gen.load_settings_onto_instrument(AncT_CB)
 
 op_dict = AncT_CB.get_operation_dict()
 
+
+
+qxc = qx.qx_client()
+QX_Server_IP = "192.168.56.101"
+QX_Server_Port = 5555
+qxc.connect(QX_Server_IP, QX_Server_Port)
 ##############
 # Defining useful function
 ###############
