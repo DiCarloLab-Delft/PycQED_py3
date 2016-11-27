@@ -201,12 +201,12 @@ class QX_Hard_Sweep(Hard_Sweep):
         qasm.load_circuits()
         self.circuits = qasm.get_circuits()
         # print(self.circuits[0])
-    
+
     def get_circuits_names(self):
         ids = []
         for c in self.circuits:
                 ids.append(c[0])
-        return ids 
+        return ids
 
     def prepare(self, **kw):
         # self.CBox.trigger_source('internal')
@@ -221,11 +221,12 @@ QX RB Sweep (Multi QASM Files)
 '''
 class QX_RB_Hard_Sweep(Hard_Sweep):
 
-    def __init__(self, qxc, qubits=2): 
+    def __init__(self, qxc, qubits=2):
         super().__init__()
         self.name   = 'QX_RB_Hard_Sweep'
         self.qubits = qubits
         self.__qxc  = qxc
+        self.__qxc.create_qubits(2)
         # qasm = ql.qasm_loader(filename)
         # qasm.load_circuits()
         # self.circuits = qasm.get_circuits()
@@ -234,7 +235,6 @@ class QX_RB_Hard_Sweep(Hard_Sweep):
     def prepare(self, **kw):
         # self.CBox.trigger_source('internal')
         print("QX_Hard_Sweep.prepare() called...")
-        self.__qxc.create_qubits(2)
         # for c in self.circuits:
            # self.__qxc.create_circuit(c[0],c[1])
 

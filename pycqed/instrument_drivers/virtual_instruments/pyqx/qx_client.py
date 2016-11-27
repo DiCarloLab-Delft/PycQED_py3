@@ -139,14 +139,15 @@ class qx_client:
         #    self.send_cmd(g)
 
         threshold = 100
-        chunk_size = int(50)
+        chunk_size = int(100)
         if (len(gates) > threshold):
             chunks = int(len(gates)/chunk_size)
-            remains = len(gates) % chunk_size
             for c in range(0, chunks):
                 batch = ''
                 for i in range(0, chunk_size):
                     batch = batch + gates[c*chunk_size+i] + ' ; '
+                # print("batch: ", batch,
+                #       "gates:", gates[c*chunk_size:(c+1)*chunk_size])
                 self.send_cmd(batch)
             for i in range(chunks*chunk_size, len(gates)):
                 self.send_cmd(gates[i])

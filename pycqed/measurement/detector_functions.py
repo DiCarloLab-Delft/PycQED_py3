@@ -255,20 +255,25 @@ class QX_RB_Hard_Detector_Fast(Hard_Detector):
         # load files
         # print("QX_RB_Hard_Detector : loading qasm files...")
         for i in range(0,num_files):
-           file_name = self.filename_prefix+'_'+str(i)+'.qasm'
-           # print("QX_RB_Hard_Detector : loading '"+file_name+"'...")
-           qasm = ql.qasm_loader(file_name)
-           qasm.load_circuits()
-           circuits = qasm.get_circuits()
-           self.randomizations.append(circuits)
+            file_name = self.filename_prefix+'_'+str(i)+'.qasm'
+            # print("QX_RB_Hard_Detector : loading '"+file_name+"'...")
+            qasm = ql.qasm_loader(file_name)
+            qasm.load_circuits()
+            circuits = qasm.get_circuits()
+            self.randomizations.append(circuits)
+            # create the circuits on the server
+            for c in circuits:
+                circuit_name = c[0] + "_{}".format(i)
+                # print(circuit_name)
+                self.__qxc.create_circuit(circuit_name, c[1])
 
     def prepare(self, sweep_points):
         self.sweep_points = sweep_points
         # print("QX_RB_Hard_Detector.prepare() : creating circuits for randomization "+str(self.current)+"...")
         self.circuits = self.randomizations[self.current]
         assert(len(self.sweep_points) == len(self.circuits))
-        for c in self.circuits:
-           self.__qxc.create_circuit(c[0],c[1])
+        # for c in self.circuits:
+        #   self.__qxc.create_circuit(c[0],c[1])
         self.current = self.current + 1
 
     def get_values(self):
@@ -278,16 +283,14 @@ class QX_RB_Hard_Detector_Fast(Hard_Detector):
         # print("QX_RB_Hard_Detector.get_values() called.")
         i = 0
         for c in self.circuits:
-           self.__qxc.send_cmd("reset_measurement_averaging")
-           self.__qxc.run_noisy_circuit(c[0], self.p_error, "depolarizing_channel", self.num_avg)
-           f = self.__qxc.get_measurement_average(0)
-           data[0][i] = f
-           data[1][i] = f
-           # noise = 0.03*np.random.random()
-           # data[0][i] = 1-0.01*i+noise
-           # data[1][i] = 1-0.01*i+noise
-           i = i+1
-           # print(f)
+            self.__qxc.send_cmd("reset_measurement_averaging")
+            circuit_name = c[0] + "_{}".format(i)
+            self.__qxc.run_noisy_circuit(circuit_name, self.p_error,
+                                         "depolarizing_channel", self.num_avg)
+            f = self.__qxc.get_measurement_average(0)
+            data[0][i] = f
+            data[1][i] = f
+            i = i + 1
         return data
 
 
