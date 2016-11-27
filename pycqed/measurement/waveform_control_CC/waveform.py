@@ -99,8 +99,8 @@ def block_pulse(amp, length, sampling_rate=2e8, delay=0, phase=0):
     pulse_samples = nr_samples - delay_samples
     amp_I = amp*np.cos(phase*2*np.pi/360)
     amp_Q = amp*np.sin(phase*2*np.pi/360)
-    block_I = amp_I * np.ones(pulse_samples)
-    block_Q = amp_Q * np.ones(pulse_samples)
+    block_I = amp_I * np.ones(int(pulse_samples))
+    block_Q = amp_Q * np.ones(int(pulse_samples))
     Zeros = np.zeros(int(delay_samples))
     pulse_I = list(Zeros)+list(block_I)
     pulse_Q = list(Zeros)+list(block_Q)
@@ -157,7 +157,7 @@ def simple_mod_pulse(pulse_I, pulse_Q, f_modulation,
     Q_phase_delay_rad = 2*np.pi * Q_phase_delay/360.
     nr_pulse_samples = len(pulse_I)
     f_mod_samples = f_modulation/sampling_rate
-    pulse_samples = np.linspace(0, nr_pulse_samples, nr_pulse_samples,
+    pulse_samples = np.linspace(0, nr_pulse_samples, int(nr_pulse_samples),
                                 endpoint=False)
 
     pulse_I_mod = pulse_I*np.cos(2*np.pi*f_mod_samples*pulse_samples)

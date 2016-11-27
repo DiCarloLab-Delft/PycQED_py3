@@ -339,7 +339,7 @@ class QuTech_ControlBox_LookuptableManager(Instrument):
         '''
         self.generate_standard_pulses()
         for i, pulse_name in enumerate(self.get('lut_mapping')):
-            self.load_pulse_onto_AWG_lookuptable(pulse_name, awg_nr,
+            self.load_pulse_onto_AWG_lookuptable(pulse_name, int(awg_nr),
                                                  regenerate_pulses=False)
 
     def load_pulse_onto_AWG_lookuptable(self, pulse_name, awg_nr,
