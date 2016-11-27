@@ -206,11 +206,16 @@ gen.load_settings_onto_instrument(AncT_CB)
 op_dict = AncT_CB.get_operation_dict()
 
 
+try:
+    qxc = qx.qx_client()
+    QX_Server_IP = "192.168.56.101"
+    QX_Server_Port = 5555
+    qxc.connect(QX_Server_IP, QX_Server_Port)
+    qxc.create_qubits(2)
 
-qxc = qx.qx_client()
-QX_Server_IP = "192.168.56.101"
-QX_Server_Port = 5555
-qxc.connect(QX_Server_IP, QX_Server_Port)
+except Exception as e:
+    logging.warning('Could not connect to QX simulator')
+    logging.warning(e)
 ##############
 # Defining useful function
 ###############

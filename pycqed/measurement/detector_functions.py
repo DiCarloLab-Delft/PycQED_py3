@@ -160,7 +160,6 @@ class QX_Hard_Detector(Hard_Detector):
         self.sweep_points = sweep_points
         self.circuits = self.randomizations[self.current]
         assert(len(self.sweep_points) == len(self.circuits))
-        self.current = self.current + 1
 
     def get_values(self):
         # x = self.sweep_points
@@ -170,13 +169,14 @@ class QX_Hard_Detector(Hard_Detector):
         data = np.zeros(len(self.sweep_points))
         for c in self.circuits:
             self.__qxc.send_cmd("reset_measurement_averaging")
-            circuit_name = c[0] + "_{}".format(i)
+            circuit_name = c[0] + "_{}".format(self.current)
             self.__qxc.run_noisy_circuit(circuit_name, self.p_error,
                                          "depolarizing_channel", self.num_avg)
             f = self.__qxc.get_measurement_average(0)
             data[i] = f
             # data[1][i] = f
             i = i + 1
+        self.current = int((self.current + 1) % self.num_files)
         return data
 
 

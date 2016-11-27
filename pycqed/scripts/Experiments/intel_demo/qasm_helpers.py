@@ -246,10 +246,71 @@ def simulate_qasm_files(qasm_filenames, config_filename, qxc, MC):
     MC.soft_avg(len(qasm_filenames))
 
     qx_det = det.QX_Hard_Detector(qxc, qasm_filenames,
-                                     p_error=0.006, num_avg=128)
+                                  p_error=0.006, num_avg=128)
     measurement_points = extract_msmt_pts_from_config(config_filename)
 
     MC.set_sweep_function(swf.None_Sweep())
     MC.set_detector_function(qx_det)
     MC.set_sweep_points(measurement_points)
     MC.run('Demo QX sim {}'.format(os.path.split(qasm_filenames[0])[-1]))
+
+
+###########
+
+def getFilePath(filename):
+    '''
+    get the absolute path to the directory containing the file
+    '''
+    return os.path.dirname(os.path.abspath(filename))
+
+
+def getBaseName(filename):
+    '''
+    return the basename without path and extension
+    '''
+    return os.path.splitext(os.path.basename(filename))[0]
+
+
+def getExtension(filename):
+    '''
+    get the extension starting with a dot.
+    '''
+    return os.path.splitext(filename)[1]
+
+
+def removeExtension(filename):
+    '''
+    remove the extension from the file name. The path is kept.
+    '''
+    return os.path.splitext(filename)[0]
+
+
+def RepresentsInt(s):
+    return s.isdigit()
+
+
+def list_files_in_dir(dirpath):
+    return [f for f in os.listdir(dirpath) if
+            os.path.isfile(os.path.join(dirpath, f))]
+
+
+def getHomoFiles(fn):
+    dirpath = getFilePath(fn)
+    basename = getBaseName(fn)
+    ext = getExtension(fn)
+    ncore, sep, tail = basename.rpartition('_')
+    homo_files = []
+    if not RepresentsInt(tail):
+        homo_files.append(fn)
+    else:
+        files_in_dir = list_files_in_dir(dirpath)
+        for f in files_in_dir:
+            if (getExtension(f) != ext):
+                continue
+            head, sep, tail = getBaseName(f).rpartition('_')
+            if (RepresentsInt(tail) and (head == ncore)):
+                homo_files.append(dirpath + '\\'+f)
+
+    config_file = dirpath + "\\config.json"
+
+    return (config_file, homo_files)

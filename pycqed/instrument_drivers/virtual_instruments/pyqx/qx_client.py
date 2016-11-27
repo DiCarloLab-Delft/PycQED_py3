@@ -172,11 +172,11 @@ class qx_client:
         '''
           noisy execution of the circuit named 'name' using the specified error model and error probability
         '''
-        # print("[~] qx_client : trying to execute ",name)
         if name in self.__circuits:
             self.send_cmd("run_noisy %s %s %f %i" %
                           (name, error_model, error_probability, iterations))
         else:
+            print("[~] qx_client : trying to execute ", name)
             print(self.__circuits)
             raise IllegalOperationException   # circuit does not exist
 
