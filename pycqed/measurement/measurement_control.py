@@ -55,6 +55,11 @@ class MeasurementControl(Instrument):
                            parameter_class=ManualParameter,
                            vals=vals.Bool(),
                            initial_value=live_plot_enabled)
+        self.add_parameter('plot_interval',
+                           units='s',
+                           vals=vals.Numbers(min_value=0.001),
+                           set_cmd=self._set_plot_interval,
+                           get_cmd=self._get_plot_interval)
 
         # starting the process for the pyqtgraph plotting
         # You do not want a new process to be created every time you start a
@@ -64,10 +69,23 @@ class MeasurementControl(Instrument):
             pg.mkQApp()
             self.proc = pgmp.QtProcess()  # pyqtgraph multiprocessing
             self.rpg = self.proc._import('pyqtgraph')
-            self.new_plotmon_window(plot_theme=plot_theme,
-                                    interval=plotting_interval)
+            self.main_QtPlot = self.new_plotmon_window(
+                plot_theme=plot_theme,
+                base_name='Main plotmon of {}')
+
+            self.QC_QtPlot = self.new_plotmon_window(
+                plot_theme=plot_theme,
+                base_name='2nd plotmon of {}')
+            self.plot_interval(plotting_interval)
 
         self.soft_iteration = 0  # used as a counter for soft_avg
+
+    def _set_plot_interval(self, plot_interval):
+        self.main_QtPlot.interval = plot_interval
+        self.QC_QtPlot.interval = plot_interval
+
+    def _get_plot_interval(self):
+        return self.main_QtPlot.interval
 
     ##############################################
     # Functions used to control the measurements #
@@ -376,8 +394,6 @@ class MeasurementControl(Instrument):
             except AttributeError:
                 pass
 
-
-
     ###################
     # 2D-measurements #
     ###################
@@ -441,23 +457,41 @@ class MeasurementControl(Instrument):
     '''
 
     def initialize_plot_monitor(self):
-        self.win.clear()  # clear out previous data
+        # new code
+        self.main_QtPlot.clear()
         self.curves = []
         xlabels = self.column_names[0:len(self.sweep_function_names)]
         ylabels = self.column_names[len(self.sweep_function_names):]
+        j = 0
         for ylab in ylabels:
             for xlab in xlabels:
-                p = self.win.addPlot(pen=self.plot_theme[0])
-                b_ax = p.getAxis('bottom')
-                p.setLabel('bottom', xlab, pen=self.plot_theme[0])
-                b_ax.setPen(self.plot_theme[0])
-                l_ax = p.getAxis('left')
-                l_ax.setPen(self.plot_theme[0])
-                p.setLabel('left', ylab, pen=self.plot_theme[0])
-                c = p.plot(symbol='o', symbolSize=7, pen=self.plot_theme[0])
-                self.curves.append(c)
-            self.win.nextRow()
-        return self.win, self.curves
+                self.main_QtPlot.add(x=[0], y=[0],
+                                     xlabel=xlab, ylabel=ylab,
+                                     subplot=j+1,
+                                     symbol='o', symbolSize=5)
+                self.curves.append(self.main_QtPlot.traces[j])
+                j += 1
+
+        return self.curves
+
+        # old code
+        # self.win.clear()  # clear out previous data
+        # self.curves = []
+        # xlabels = self.column_names[0:len(self.sweep_function_names)]
+        # ylabels = self.column_names[len(self.sweep_function_names):]
+        # for ylab in ylabels:
+        #     for xlab in xlabels:
+        #         p = self.win.addPlot(pen=self.plot_theme[0])
+        #         b_ax = p.getAxis('bottom')
+        #         p.setLabel('bottom', xlab, pen=self.plot_theme[0])
+        #         b_ax.setPen(self.plot_theme[0])
+        #         l_ax = p.getAxis('left')
+        #         l_ax.setPen(self.plot_theme[0])
+        #         p.setLabel('left', ylab, pen=self.plot_theme[0])
+        #         c = p.plot(symbol='o', symbolSize=7, pen=self.plot_theme[0])
+        #         self.curves.append(c)
+        #     self.win.nextRow()
+        # return self.win, self.curves
 
     def update_plotmon(self, force_update=False):
         if self.live_plot_enabled():
@@ -476,11 +510,14 @@ class MeasurementControl(Instrument):
                     for x_ind in range(nr_sweep_funcs):
                         x = self.dset[:, x_ind]
                         y = self.dset[:, nr_sweep_funcs+y_ind]
-                        self.curves[i].setData(x, y)
+                        self.main_QtPlot.traces[i]['config']['x'] = x
+                        self.main_QtPlot.traces[i]['config']['y'] = y
                         i += 1
                 self._mon_upd_time = time.time()
+                self.main_QtPlot.update_plot()
 
-    def new_plotmon_window(self, plot_theme=None, interval=2):
+    def new_plotmon_window(self, plot_theme=None,
+                           base_name='Plotmon of {}', interval=2):
         '''
         respawns the pyqtgraph plotting window
         Creates self.win       : a direct pyqtgraph window
@@ -491,8 +528,8 @@ class MeasurementControl(Instrument):
         self.win = self.rpg.GraphicsWindow(
             title='Plot monitor of %s' % self.name)
         self.win.setBackground(self.plot_theme[1])
-        self.QC_QtPlot = QtPlot(
-            windowTitle='QC-Plot monitor of %s' % self.name,
+        return QtPlot(
+            windowTitle=base_name.format(self.name),
             interval=interval)
 
     def initialize_plot_monitor_2D(self):
@@ -574,7 +611,7 @@ class MeasurementControl(Instrument):
         Note that the plotmon only supports evenly spaced lattices.
         '''
         if self.live_plot_enabled():
-            i = int((self.iteration)%self.ylen)
+            i = int((self.iteration) % self.ylen)
             y_ind = i
             for j in range(len(self.detector_function.value_names)):
                 z_ind = len(self.sweep_functions) + j
