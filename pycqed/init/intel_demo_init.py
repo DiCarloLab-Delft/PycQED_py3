@@ -419,4 +419,4 @@ def measure_RB():
         close_fig=False, label='RB_qasm', pulse_delay=50e-9, T1=20e-6)
 
 
-MC.QC_QtPlot.interval = 0.4
+MC.plotting_interval(0.25)
