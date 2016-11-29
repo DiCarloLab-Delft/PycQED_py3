@@ -18,6 +18,7 @@ from qcodes.instrument.base import Instrument
 from qcodes.instrument.parameter import ManualParameter
 from qcodes.utils import validators as vals
 from copy import deepcopy
+from qcodes.plots.colors import color_cycle
 
 try:
     # import pyqtgraph as pg
@@ -67,15 +68,15 @@ class MeasurementControl(Instrument):
                            parameter_class=ManualParameter,
                            initial_value=True)
 
-        # starting the process for the pyqtgraph plotting
-        # This plotting process is reused for different measurements.
+        # pyqtgraph plotting process is reused for different measurements.
         if self.live_plot_enabled():
-            self.main_QtPlot = self.new_plotmon_window(
-                base_name='Main plotmon of {}')
+            self.main_QtPlot = QtPlot(
+                windowTitle='Main plotmon of {}'.format(self.name),
+                figsize=(600, 400))
+            self.secondary_QtPlot = QtPlot(
+                windowTitle='Secondary plotmon of {}'.format(self.name),
+                figsize=(600, 400))
 
-            self.secondary_QtPlot = self.new_plotmon_window(
-                base_name='Secondary plotmon of {}')
-            self.plotting_interval(plotting_interval)
         self.soft_iteration = 0  # used as a counter for soft_avg
         self._persist_dat = None
         self._persist_xlabs = None
@@ -169,7 +170,7 @@ class MeasurementControl(Instrument):
                         else:
                             swf_sweep_points = sweep_points
                             sweep_points_0 = sweep_points
-                        val = swf_sweep_points[0]
+                        val = swf_sweep_points[start_idx]
                         if sweep_function.sweep_control is 'soft':
                             sweep_function.set_parameter(val)
                     self.detector_function.prepare(
@@ -375,16 +376,13 @@ class MeasurementControl(Instrument):
         '''
         Deletes arrays to clean up memory and avoid memory related mistakes
         '''
-        if self.persist_mode():
-            self._persist_dat = result
-            self._persist_xlabs = self.column_names[
-                0:len(self.sweep_function_names)]
-            self._persist_ylabs = self.column_names[
-                len(self.sweep_function_names):]
-        else:
-            self._persist_dat = None
-            self._persist_xlabs = None
-            self._persist_ylabs = None
+        # this data can be plotted by enabling persist_mode
+        self._persist_dat = result
+        self._persist_xlabs = self.column_names[
+            0:len(self.sweep_function_names)]
+        self._persist_ylabs = self.column_names[
+            len(self.sweep_function_names):]
+
         for attr in ['TwoD_array',
                      'dset',
                      'sweep_points',
@@ -464,7 +462,8 @@ class MeasurementControl(Instrument):
 
     def initialize_plot_monitor(self):
         # new code
-        self.main_QtPlot.clear()
+        if self.main_QtPlot.traces != []:
+            self.main_QtPlot.clear()
         self.curves = []
         xlabels = self.column_names[0:len(self.sweep_function_names)]
         ylabels = self.column_names[len(self.sweep_function_names):]
@@ -487,6 +486,7 @@ class MeasurementControl(Instrument):
                 self.main_QtPlot.add(x=[0], y=[0],
                                      xlabel=xlab, ylabel=ylab,
                                      subplot=j+1,
+                                     color=color_cycle[j],
                                      symbol='o', symbolSize=5)
                 self.curves.append(self.main_QtPlot.traces[-1])
                 j += 1
@@ -514,15 +514,6 @@ class MeasurementControl(Instrument):
                         i += 1
                 self._mon_upd_time = time.time()
                 self.main_QtPlot.update_plot()
-
-    def new_plotmon_window(self,
-                           base_name='Plotmon of {}', interval=2):
-        '''
-        returns a qcodes plotting monitor
-        '''
-        return QtPlot(
-            windowTitle=base_name.format(self.name),
-            interval=interval)
 
     def initialize_plot_monitor_2D(self):
         '''
@@ -623,6 +614,11 @@ class MeasurementControl(Instrument):
 
     def _get_plotting_interval(self):
         return self.main_QtPlot.interval
+
+    def clear_persitent_plot(self):
+        self._persist_dat = None
+        self._persist_xlabs = None
+        self._persist_ylabs = None
 
     ##################################
     # Small helper/utility functions #

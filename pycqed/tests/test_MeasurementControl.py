@@ -245,9 +245,9 @@ class Test_MeasurementControl(unittest.TestCase):
         self.MC.set_detector_function(self.mock_parabola.parabola)
         dat = self.MC.run('1D test', mode='adaptive')
         xf, yf, pf = dat[-1]
-        self.assertLess(xf, 0.5)
-        self.assertLess(yf, 0.5)
-        self.assertLess(pf, 0.5)
+        self.assertLess(xf, 0.7)
+        self.assertLess(yf, 0.7)
+        self.assertLess(pf, 0.7)
 
     @classmethod
     def tearDownClass(self):
@@ -272,4 +272,17 @@ class Test_MeasurementControl(unittest.TestCase):
         np.testing.assert_array_almost_equal(y1, y[1])
         d = self.MC.detector_function
         self.assertEqual(d.times_called, 1)
-        self.MC.persist_mode(False)
+
+        persist_dat = self.MC._persist_dat
+        x_p = persist_dat[:, 0]
+        y0_p = persist_dat[:, 1]
+        y1_p = persist_dat[:, 2]
+        np.testing.assert_array_almost_equal(x, x_p)
+        np.testing.assert_array_almost_equal(y0, y0_p)
+        np.testing.assert_array_almost_equal(y1, y1_p)
+
+        self.MC.clear_persitent_plot()
+        self.assertEqual(self.MC._persist_dat, None)
+
+
+
