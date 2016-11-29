@@ -495,7 +495,7 @@ class MeasurementControl(Instrument):
                                          subplot=j+1,
                                          color=0.75,  # a grayscale value
                                          symbol='o', symbolSize=5)
-                j += 1
+                    j += 1
 
     def update_plotmon(self, force_update=False):
         if self.live_plot_enabled():
