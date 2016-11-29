@@ -469,33 +469,28 @@ class MeasurementControl(Instrument):
         xlabels = self.column_names[0:len(self.sweep_function_names)]
         ylabels = self.column_names[len(self.sweep_function_names):]
         j = 0
-        for ylab in ylabels:
-            for xlab in xlabels:
+        if (self._persist_ylabs == ylabels and
+                self._persist_xlabs == xlabels) and self.persist_mode():
+            persist = True
+        else:
+            persist = False
+        for yi, ylab in enumerate(ylabels):
+            for xi, xlab in enumerate(xlabels):
+                if persist:  # plotting persist first so new data on top
+                    yp = self._persist_dat[
+                        :, yi+len(self.sweep_function_names)]
+                    xp = self._persist_dat[:, xi]
+                    self.main_QtPlot.add(x=xp, y=yp,
+                                         subplot=j+1,
+                                         color=0.75,  # a grayscale value
+                                         symbol='o', symbolSize=5)
                 self.main_QtPlot.add(x=[0], y=[0],
                                      xlabel=xlab, ylabel=ylab,
                                      subplot=j+1,
                                      symbol='o', symbolSize=5)
+                self.curves.append(self.main_QtPlot.traces[-1])
                 j += 1
             self.main_QtPlot.win.nextRow()
-        if self.persist_mode():
-            self.add_perist_curves_to_plotmon()
-
-    def add_perist_curves_to_plotmon(self):
-        xlabels = self.column_names[0:len(self.sweep_function_names)]
-        ylabels = self.column_names[len(self.sweep_function_names):]
-        if (self._persist_ylabs == ylabels and
-                self._persist_xlabs == xlabels):
-                j = 0
-                for yi, ylab in enumerate(ylabels):
-                    y = self._persist_dat[
-                        :, yi+len(self.sweep_function_names)]
-                    for xi, xlab in enumerate(xlabels):
-                        x = self._persist_dat[:, xi]
-                    self.main_QtPlot.add(x=x, y=y,
-                                         subplot=j+1,
-                                         color=0.75,  # a grayscale value
-                                         symbol='o', symbolSize=5)
-                    j += 1
 
     def update_plotmon(self, force_update=False):
         if self.live_plot_enabled():
@@ -513,8 +508,9 @@ class MeasurementControl(Instrument):
                     for x_ind in range(nr_sweep_funcs):
                         x = self.dset[:, x_ind]
                         y = self.dset[:, nr_sweep_funcs+y_ind]
-                        self.main_QtPlot.traces[i]['config']['x'] = x
-                        self.main_QtPlot.traces[i]['config']['y'] = y
+
+                        self.curves[i]['config']['x'] = x
+                        self.curves[i]['config']['y'] = y
                         i += 1
                 self._mon_upd_time = time.time()
                 self.main_QtPlot.update_plot()
