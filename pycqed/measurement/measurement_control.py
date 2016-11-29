@@ -17,6 +17,7 @@ from pycqed.measurement.mc_parameter_wrapper import wrap_par_to_det
 from qcodes.instrument.base import Instrument
 from qcodes.instrument.parameter import ManualParameter
 from qcodes.utils import validators as vals
+from copy import deepcopy
 
 try:
     # import pyqtgraph as pg
@@ -37,7 +38,7 @@ class MeasurementControl(Instrument):
     data points.
     '''
 
-    def __init__(self, name, plot_theme=((60, 60, 60), 'w'),
+    def __init__(self, name,
                  plotting_interval=0.25,
                  live_plot_enabled=True, verbose=True):
         super().__init__(name=name, server_name=None)
@@ -61,6 +62,10 @@ class MeasurementControl(Instrument):
                            vals=vals.Numbers(min_value=0.001),
                            set_cmd=self._set_plotting_interval,
                            get_cmd=self._get_plotting_interval)
+        self.add_parameter('persist_mode',
+                           vals=vals.Bool(),
+                           parameter_class=ManualParameter,
+                           initial_value=True)
 
         # starting the process for the pyqtgraph plotting
         # This plotting process is reused for different measurements.
@@ -72,6 +77,9 @@ class MeasurementControl(Instrument):
                 base_name='Secondary plotmon of {}')
             self.plotting_interval(plotting_interval)
         self.soft_iteration = 0  # used as a counter for soft_avg
+        self._persist_dat = None
+        self._persist_xlabs = None
+        self._persist_ylabs = None
 
     ##############################################
     # Functions used to control the measurements #
@@ -107,6 +115,7 @@ class MeasurementControl(Instrument):
                 raise ValueError('mode %s not recognized' % self.mode)
             result = self.dset[()]
             self.save_MC_metadata(self.data_object)  # timing labels etc
+        self.finish(result)
         return result
 
     def measure(self, *kw):
@@ -363,20 +372,31 @@ class MeasurementControl(Instrument):
                 vals = vals[self.par_idx]
         return vals
 
-    def finish(self):
+    def finish(self, result):
         '''
         Deletes arrays to clean up memory and avoid memory related mistakes
         '''
-        for attr in [self.TwoD_array,
-                     self.dset,
-                     self.sweep_points,
-                     self.sweep_points_2D,
-                     self.sweep_functions,
-                     self.xlen,
-                     self.ylen,
-                     self.iteration,
-                     self.soft_iteration]:
+        if self.persist_mode():
+            self._persist_dat = result
+            self._persist_xlabs = self.column_names[
+                0:len(self.sweep_function_names)]
+            self._persist_ylabs = self.column_names[
+                len(self.sweep_function_names):]
+        else:
+            self._persist_dat = None
+            self._persist_xlabs = None
+            self._persist_ylabs = None
+        for attr in ['TwoD_array',
+                     'dset',
+                     'sweep_points',
+                     'sweep_points_2D',
+                     'sweep_functions',
+                     'xlen',
+                     'ylen',
+                     'iteration',
+                     'soft_iteration']:
             try:
+                attr = getattr(self, attr)
                 del attr
             except AttributeError:
                 pass
@@ -458,6 +478,25 @@ class MeasurementControl(Instrument):
                                      symbol='o', symbolSize=5)
                 j += 1
             self.main_QtPlot.win.nextRow()
+        if self.persist_mode():
+            self.add_perist_curves_to_plotmon()
+
+    def add_perist_curves_to_plotmon(self):
+        xlabels = self.column_names[0:len(self.sweep_function_names)]
+        ylabels = self.column_names[len(self.sweep_function_names):]
+        if (self._persist_ylabs == ylabels and
+                self._persist_xlabs == xlabels):
+                j = 0
+                for yi, ylab in enumerate(ylabels):
+                    y = self._persist_dat[
+                        :, yi+len(self.sweep_function_names)]
+                    for xi, xlab in enumerate(xlabels):
+                        x = self._persist_dat[:, xi]
+                    self.main_QtPlot.add(x=x, y=y,
+                                         subplot=j+1,
+                                         color=0.75,  # a grayscale value
+                                         symbol='o', symbolSize=5)
+                    j += 1
 
     def update_plotmon(self, force_update=False):
         if self.live_plot_enabled():

@@ -255,3 +255,21 @@ class Test_MeasurementControl(unittest.TestCase):
         self.mock_parabola.close()
         del self.station.components['MC']
         del self.station.components['mock_parabola']
+
+    def test_persist_mode(self):
+        sweep_pts = np.linspace(0, 10, 5)
+        self.MC.persist_mode(True)
+        self.MC.set_sweep_function(None_Sweep(sweep_control='hard'))
+        self.MC.set_sweep_points(sweep_pts)
+        self.MC.set_detector_function(det.Dummy_Detector_Hard())
+        dat = self.MC.run('1D_hard')
+        x = dat[:, 0]
+        y = [np.sin(x / np.pi), np.cos(x/np.pi)]
+        y0 = dat[:, 1]
+        y1 = dat[:, 2]
+        np.testing.assert_array_almost_equal(x, sweep_pts)
+        np.testing.assert_array_almost_equal(y0, y[0])
+        np.testing.assert_array_almost_equal(y1, y[1])
+        d = self.MC.detector_function
+        self.assertEqual(d.times_called, 1)
+        self.MC.persist_mode(False)
