@@ -58,9 +58,9 @@ from qcodes.instrument_drivers.agilent.E8527D import Agilent_E8527D
 from qcodes.instrument_drivers.rohde_schwarz import ZNB20 as ZNB20
 from qcodes.instrument_drivers.weinschel import Weinschel_8320 as Weinschel_8320
 from pycqed.instrument_drivers.physical_instruments import Weinschel_8320_novisa
-# from pycqed.instrument_drivers.physical_instruments import Fridge_monitor as fm
+from pycqed.instrument_drivers.physical_instruments import Fridge_monitor as fm
 from qcodes.instrument_drivers.tektronix import AWG5014 as tek
-# from pycqed.instrument_drivers.physical_instruments import QuTech_ControlBoxdriver as qcb
+from pycqed.instrument_drivers.physical_instruments import QuTech_ControlBoxdriver as qcb
 
 # from qcodes.instrument_drivers.tektronix import AWG520 as tk520
 from pycqed.instrument_drivers.physical_instruments.ZurichInstruments import UHFQuantumController as ZI_UHFQC
@@ -91,10 +91,10 @@ Spec_source = rs.RohdeSchwarz_SGS100A(name='Spec_source', address='TCPIP0::192.1
 station.add_component(Spec_source)
 
 # VNA
-#VNA = ZNB20.ZNB20(name='VNA', address='TCPIP0::192.168.0.55', server_name=None)  #
-#station.add_component(VNA)
-# Fridge_mon = fm.Fridge_Monitor('Fridge monitor', 'LaMaserati')
-# station.add_component(Fridge_mon)
+# VNA = ZNB20.ZNB20(name='VNA', address='TCPIP0::192.168.0.55', server_name=None)  #
+# station.add_component(VNA)
+Fridge_mon = fm.Fridge_Monitor('Fridge monitor', 'LaMaserati')
+station.add_component(Fridge_mon)
 
 
 #Initializing UHFQC
@@ -102,8 +102,8 @@ UHFQC_1 = ZI_UHFQC.UHFQC('UHFQC_1', device='dev2214', server_name=None)
 station.add_component(UHFQC_1)
 
 #Initializing CBox
-# CBox = qcb.QuTech_ControlBox('CBox', address='COM3', run_tests=False, server_name=None)
-# station.add_component(CBox)
+CBox = qcb.QuTech_ControlBox('CBox', address='COM3', run_tests=False, server_name=None)
+station.add_component(CBox)
 
 
 MC = mc.MeasurementControl('MC')
@@ -118,18 +118,36 @@ AWG.timeout(180)
 # AWG520 = tk520.Tektronix_AWG520('AWG520', address='GPIB0::17::INSTR',
 #                                 server_name='')
 # station.add_component(AWG520)
-IVVI = iv.IVVI('IVVI', address='COM6', numdacs=8, server_name=None)
+IVVI = iv.IVVI('IVVI', address='COM8', numdacs=8, server_name=None)
 station.add_component(IVVI)
+
 Flux_Control = FluxCtrl.Flux_Control(name='FluxControl',IVVI=station.IVVI)
 station.add_component(Flux_Control)
+
+transfer_matrix_dec = np.array([[-2.65242043e-04,8.57272397e-06],
+                               [-2.78023425e-06,-5.04464337e-04]])
+invA = np.array([[-3769.4989774,-63.90380129],
+                [20.77417118,-1977.18301844]])
+Flux_Control.transfer_matrix(transfer_matrix_dec)
+Flux_Control.inv_transfer_matrix(invA)
+
+Flux_Control.dac_mapping([1, 2])
+
+
+sweet_spots_mv = [39.554428186906307,38.214217958774498]
+offsets = np.dot(Flux_Control.transfer_matrix(), sweet_spots_mv)
+Flux_Control.flux_offsets(-offsets)
+
 
 # # Dux = qdux.QuTech_Duplexer('Dux', address='TCPIP0::192.168.0.101',
 # #                             server_name=None)
 # # SH = sh.SignalHound_USB_SA124B('Signal hound', server_name=None) #commented because of 8s load time
 
 # Meta-instruments
-HS = hd.HeterodyneInstrument('HS', LO=LO, RF=RF, AWG=AWG, acquisition_instr=UHFQC_1.name,
+HS = hd.HeterodyneInstrument('HS', LO=LO, RF=RF, AWG=AWG, acquisition_instr=CBox.name,
                              server_name=None)
+# HS = hd.HeterodyneInstrument('HS', LO=LO, RF=RF, AWG=AWG, acquisition_instr=UHFQC_1.name,
+#                              server_name=None)
 station.add_component(HS)
 
 QL = qbt.Tektronix_driven_transmon('QL', LO=LO, cw_source=Spec_source,
@@ -151,11 +169,21 @@ QR = qbt.Tektronix_driven_transmon('QR', LO=LO, cw_source=Spec_source,
                                               server_name=None)
 station.add_component(QR)
 
+Bus_m = qbt.Tektronix_driven_transmon('Bus_m', LO=LO, cw_source=Spec_source,
+                                              td_source=QR_LO,
+                                              IVVI=IVVI, rf_RO_source=RF,
+                                              AWG=AWG,
+                                              heterodyne_instr=HS,
+                                              MC=MC,
+                                              FluxCtrl=Flux_Control,
+                                              server_name=None)
+station.add_component(Bus_m)
+
 # # load settings onto qubits
 gen.load_settings_onto_instrument(QL)
 gen.load_settings_onto_instrument(QR)
 gen.load_settings_onto_instrument(HS)
-
+gen.load_settings_onto_instrument(Bus_m)
 
 nested_MC = mc.MeasurementControl('nested_MC')
 nested_MC.station = station
@@ -241,7 +269,7 @@ def switch_to_IQ_mod_RO_UHFQC(qubit):
     qubit.RO_acq_weight_function_Q(1)
 
 def switch_to_pulsed_RO_CBox(qubit):
-    UHFQC_1.awg_sequence_acquisition()
+    # UHFQC_1.awg_sequence_acquisition()
     qubit.RO_pulse_type('Gated_MW_RO_pulse')
     qubit.RO_acq_marker_delay(155e-9)
     qubit.acquisition_instr('CBox')
@@ -251,5 +279,5 @@ def switch_to_pulsed_RO_CBox(qubit):
 
 # #preparing UHFQC readout with IQ mod pulses
 
-switch_to_pulsed_RO_UHFQC(QL)
-switch_to_pulsed_RO_UHFQC(QR)
+# switch_to_pulsed_RO_CBox(QL)
+# switch_to_pulsed_RO_CBox(QR)
