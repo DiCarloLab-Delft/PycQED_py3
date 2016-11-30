@@ -4075,7 +4075,7 @@ class Homodyne_Analysis(MeasurementAnalysis):
             data_amp = self.measured_values[0]
             data_angle = self.measured_values[1]
             data_complex =  np.add(self.measured_values[2], 1j*self.measured_values[3])
-            
+
             # Initial guesses
             guess_A = max(data_amp)
             guess_Q = f0 / abs(self.min_frequency - self.max_frequency) # this has to been improved
@@ -4101,7 +4101,7 @@ class Homodyne_Analysis(MeasurementAnalysis):
                        ('phi_0', guess_phi_0, True,   -np.pi,   np.pi,  None))
             P.add('Qi', expr='1./(1./Q-1./Qe*cos(theta))', vary=False)
             P.add('Qc', expr='Qe/cos(theta)', vary=False)
-            
+
             # Fit
             fit_res = lmfit.minimize(fit_mods.residual_complex_fcn, P,
                         args=(fit_mods.HangerFuncComplex, self.sweep_points, data_complex))
@@ -4211,7 +4211,7 @@ class Homodyne_Analysis(MeasurementAnalysis):
 
             # save figure
             self.save_fig(fig, xlabel=self.xlabel, ylabel='Mag', **kw)
-        
+
         if show:
             plt.show()
         # self.save_fig(fig, xlabel=self.xlabel, ylabel='Mag', **kw)
@@ -4434,13 +4434,12 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
         self.fit_results.append(fit_res)
         self.save_fitted_parameters(fit_res,
                                     var_name='distance', save_peaks=True)
-
         if print_fit_results is True:
             print(fit_res.fit_report())
 
         for k in range(len(self.measured_values)):
             ax = axes[k]
-            textstr = '$f_{\mathrm{center}}$ = %.5g $\pm$ (%.3g) GHz' % (
+            textstr = '$f_{\mathrm{center}}$ = %.5g $\pm$ (%.3g) GHz\n' % (
                 fit_res.params['f0'].value,
                 fit_res.params['f0'].stderr)
             ax.text(0.05, 0.95, textstr, transform=ax.transAxes,
@@ -4458,18 +4457,21 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
             axes[k].plot(f0, self.measured_values[k][f0_idx], 'o', ms=8)
 
         # Plotting distance from |0>
+        label = r'f0={:.5}$\pm$ {:.2} MHz, linewidth={:.4}$\pm${:.2} MHz'.format(fit_res.params['f0'].value/1e6, fit_res.params['f0'].stderr/1e6, fit_res.params['kappa'].value/1e6, fit_res.params['kappa'].stderr/1e6)
         fig_dist, ax_dist = self.default_ax()
         self.plot_results_vs_sweepparam(x=self.sweep_points,
                                         y=self.data_dist,
                                         fig=fig_dist, ax=ax_dist,
                                         xlabel=self.xlabel,
                                         ylabel='S21 distance (V)',
+                                        label=False,
                                         save=False)
         ax_dist.plot(self.sweep_points, fit_res.best_fit, 'r-')
         ax_dist.plot(f0, fit_res.best_fit[f0_idx], 'o', ms=8)
         if show_guess:
             ax_dist.plot(self.sweep_points, fit_res.init_fit, 'k--')
-
+        ax_dist.text(0.05, 0.95, label, transform=ax_dist.transAxes,
+                    fontsize=11, verticalalignment='top', bbox=self.box_props)
         self.save_fig(fig, figname=self.savename, **kw)
         if show:
             plt.show()
@@ -4767,9 +4769,11 @@ class TwoD_Analysis(MeasurementAnalysis):
                 print("normalize on")
             # print "unransposed",meas_vals
             # print "transposed", meas_vals.transpose()
-            fig_title = '{timestamp}_{measurement}'.format(
+            print("i",i)
+            fig_title = '{timestamp}_{measurement}_{z_label}'.format(
                 timestamp=self.timestamp_string,
-                measurement=self.measurementstring)
+                measurement=self.measurementstring,
+                z_label=i)
             a_tools.color_plot(x=self.sweep_points,
                                y=self.sweep_points_2D,
                                z=meas_vals.transpose(),
@@ -4782,6 +4786,7 @@ class TwoD_Analysis(MeasurementAnalysis):
                                normalize=normalize,
                                **kw)
             if save_fig:
+                print("saving fig_title",fig_title)
                 self.save_fig(fig, figname=fig_title, **kw)
         if close_file:
             self.finish()
