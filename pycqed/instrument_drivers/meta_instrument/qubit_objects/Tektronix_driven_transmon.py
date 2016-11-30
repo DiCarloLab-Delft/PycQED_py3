@@ -582,13 +582,13 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
             ma.Rabi_Analysis(auto=True, close_fig=close_fig)
 
     def measure_T1(self, times, MC=None,
-                   analyze=True, close_fig=True):
+                   analyze=True, upload=True, close_fig=True):
         self.prepare_for_timedomain()
         if MC is None:
             MC = self.MC
 
         MC.set_sweep_function(awg_swf.T1(
-            pulse_pars=self.pulse_pars, RO_pars=self.RO_pars))
+            pulse_pars=self.pulse_pars, RO_pars=self.RO_pars, upload=upload))
         MC.set_sweep_points(times)
         MC.set_detector_function(self.int_avg_det)
         MC.run('T1'+self.msmt_suffix)
