@@ -731,6 +731,7 @@ class OptimizationAnalysis(MeasurementAnalysis):
         if close_file:
             self.data_file.close()
 
+
 class TD_Analysis(MeasurementAnalysis):
     '''
     Parent class for Time Domain (TD) analysis. Contains functions for
@@ -738,6 +739,7 @@ class TD_Analysis(MeasurementAnalysis):
     '''
     def __init__(self, NoCalPoints=4, center_point=31, make_fig=True,
                  zero_coord=None, one_coord=None, cal_points=None,
+                 rotate_and_normalize=True,
                  plot_cal_points=True, **kw):
         self.NoCalPoints = NoCalPoints
         self.normalized_values = []
@@ -745,7 +747,7 @@ class TD_Analysis(MeasurementAnalysis):
         self.normalized_data_points = []
         self.cal_points = cal_points
         self.make_fig = make_fig
-
+        self.rotate_and_normalize = rotate_and_normalize
         self.zero_coord = zero_coord
         self.one_coord = one_coord
         self.center_point = center_point
@@ -759,7 +761,6 @@ class TD_Analysis(MeasurementAnalysis):
     #     if close_file:
     #         self.data_file.close()
     #     return self.fit_res
-
 
     def rotate_and_normalize_data(self):
         if self.cal_points is None:
@@ -801,8 +802,10 @@ class TD_Analysis(MeasurementAnalysis):
         close_file = kw.pop('close_file', True)
         self.add_analysis_datagroup_to_file()
         self.get_naming_and_values()
-
-        self.rotate_and_normalize_data()
+        if self.rotate_and_normalize:
+            self.rotate_and_normalize_data()
+        else:
+            self.corr_data = self.measured_values[0]
         self.add_dataset_to_analysisgroup('Corrected data',
                                           self.corr_data)
         self.analysis_group.attrs.create('corrected data based on',
@@ -811,9 +814,12 @@ class TD_Analysis(MeasurementAnalysis):
         # Plotting
         if self.make_fig:
             self.fig1, fig2, self.ax1, axarray = self.setup_figures_and_axes()
-            for i in range(2):
+            # print(len(self.value_names))
+            for i in range(len(self.value_names)):
                 if len(self.value_names) >= 4:
                         ax = axarray[i/2, i % 2]
+                elif len(self.value_names) ==1:
+                    ax = self.ax1
                 else:
                     ax = axarray[i]
                 self.plot_results_vs_sweepparam(x=self.sweep_points,
@@ -2415,7 +2421,6 @@ class SSRO_Analysis(MeasurementAnalysis):
         frac1_1 = fit_res_double_1.params['frac1'].value
 
         NormCdf2Model = lmfit.Model(NormCdf2)
-        print('frac1 in 1', frac1_1)
         # adding hint parameters for double gaussfit of 'off' measurements
         NormCdf2Model.set_param_hint('mu0', value=mu0)
         NormCdf2Model.set_param_hint('sigma0', value=sigma0, min=0)
@@ -3646,7 +3651,7 @@ class RandomizedBenchmarking_Analysis(TD_Analysis):
     def __init__(self, label='RB', T1=None, pulse_delay=None, **kw):
         self.T1 = T1
         self.pulse_delay = pulse_delay
-        kw['label'] = label
+
         super().__init__(**kw)
 
     def run_default_analysis(self, **kw):

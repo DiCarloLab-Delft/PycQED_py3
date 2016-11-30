@@ -10,6 +10,7 @@ from importlib import reload  # Useful for reloading while testing
 import numpy as np
 import matplotlib.pyplot as plt
 import qcodes as qc
+from ast import literal_eval as make_tuple
 # Globally defined config
 from qcodes.instrument.parameter import ManualParameter
 qc_config = {'datadir': r'D:\Experiments\\1611_intel_demo\data',
@@ -315,8 +316,6 @@ def measure_echo():
 
 def measure_AllXY():
     AncT_CB.prepare_for_timedomain()
-    MC.soft_avg(5)
-    reload(qh)
     AllXY = sq_qasm.AllXY(qubit_name, double_points=True)
     s = qh.QASM_Sweep(AllXY.name, CBox, op_dict)
     d = qh.CBox_integrated_average_detector_CC(CBox, nr_averages=256)
@@ -326,6 +325,17 @@ def measure_AllXY():
     MC.run('AllXY_qasm')
 
     ma.AllXY_Analysis(close_fig=False)
+
+
+def recalibrate_cal_pts():
+    MC.soft_avg(40)
+    measure_AllXY()
+    a = ma.MeasurementAnalysis()
+    cal_pt_zero = (np.mean(a.measured_values[0][:8]), np.mean(a.measured_values[1][:8]))
+    cal_pt_one = (np.mean(a.measured_values[0][-8:]), np.mean(a.measured_values[1][-8:]))
+
+    AncT_CB.cal_pt_zero(cal_pt_zero)
+    AncT_CB.cal_pt_one(cal_pt_one)
 
 
 def measure_ssro():
@@ -418,5 +428,16 @@ def measure_RB():
     ma.RandomizedBenchmarking_Analysis(
         close_fig=False, label='RB_qasm', pulse_delay=50e-9, T1=20e-6)
 
+
+CBox.lin_trans_coeffs([1, 0, 0, 1])
+
+cpt_one_str = AncT_CB.cal_pt_one()
+tuple_val = make_tuple(cpt_one_str)
+AncT_CB.cal_pt_one(tuple_val)
+
+
+cpt_zero_str = AncT_CB.cal_pt_zero()
+tuple_val = make_tuple(cpt_zero_str)
+AncT_CB.cal_pt_zero(tuple_val)
 
 MC.plotting_interval(0.25)

@@ -128,6 +128,20 @@ class CBox_v3_driven_transmon(Transmon):
                                'MW_IQmod_pulse', 'Gated_MW_RO_pulse'),
                            parameter_class=ManualParameter)
 
+        self.add_parameter('cal_pt_zero',
+                           initial_value=None,
+                           vals=vals.Anything(),  # should be a tuple validator
+                           label='Calibration point |0>',
+                           parameter_class=ManualParameter)
+
+        self.add_parameter('cal_pt_one',
+                           initial_value=None,
+                           vals=vals.Anything(),  # should be a tuple validator
+                           label='Calibration point |1>',
+                           parameter_class=ManualParameter)
+
+
+
     def prepare_for_continuous_wave(self):
         raise NotImplementedError()
 

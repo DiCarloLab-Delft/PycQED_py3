@@ -129,13 +129,13 @@ class Dummy_Detector_Hard(Hard_Detector):
 class QX_Hard_Detector(Hard_Detector):
 
     def __init__(self, qxc, qasm_filenames, p_error=0.004,
-                 num_avg=512, **kw):
+                 num_avg=128, **kw):
         super().__init__()
         self.set_kw()
         self.detector_control = 'hard'
         self.name = 'QX_Hard_Detector_Fast'
-        self.value_names = ['F (|0>)']
-        self.value_units = ['']
+        self.value_names = ['F']
+        self.value_units = ['|1>']
         self.times_called = 0
         self.__qxc = qxc
         self.num_avg = num_avg
@@ -147,14 +147,20 @@ class QX_Hard_Detector(Hard_Detector):
         # load files
         print("QX_RB_Hard_Detector : loading qasm files...")
         for i, file_name in enumerate(qasm_filenames):
+            t1 = time.time()
             qasm = ql.qasm_loader(file_name)
             qasm.load_circuits()
+            # t2 = time.time()
+            #print("[+] qasm loading time :",t2-t1)
             circuits = qasm.get_circuits()
             self.randomizations.append(circuits)
             # create the circuits on the server
+            #t1 = time.time()
             for c in circuits:
                 circuit_name = c[0] + "_{}".format(i)
                 self.__qxc.create_circuit(circuit_name, c[1])
+            t2 = time.time()
+            print("[+] qasm loading time :",t2-t1)
 
     def prepare(self, sweep_points):
         self.sweep_points = sweep_points
@@ -176,7 +182,7 @@ class QX_Hard_Detector(Hard_Detector):
             # data[1][i] = f
             i = i + 1
         self.current = int((self.current + 1) % self.num_files)
-        return data
+        return (1-np.array(data))
 
 
 

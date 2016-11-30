@@ -1,8 +1,10 @@
 import logging
 import pycqed.measurement.sweep_functions as swf
 import pycqed.measurement.detector_functions as det
+from pycqed.analysis.analysis_toolbox import rotate_and_normalize_data
 from pycqed.measurement.waveform_control_CC import qasm_to_asm as qta
 from qcodes.instrument.parameter import ManualParameter
+import pycqed.analysis.measurement_analysis as ma
 import numpy as np
 import os
 import json
@@ -43,7 +45,8 @@ class ASM_Sweep(swf.Hard_Sweep):
 class CBox_integrated_average_detector_CC(det.Hard_Detector):
 
     def __init__(self, CBox, seg_per_point=1,
-                 nr_averages=1024, integration_length=1e-6, **kw):
+                 nr_averages=1024, integration_length=1e-6,
+                 cal_pts=None, **kw):
         '''
         Integration average detector.
         Defaults to averaging data in a number of segments equal to the
@@ -57,8 +60,13 @@ class CBox_integrated_average_detector_CC(det.Hard_Detector):
         super().__init__(**kw)
         self.CBox = CBox
         self.name = 'CBox_integrated_average_detector_CC'
-        self.value_names = ['I', 'Q']
-        self.value_units = ['a.u.', 'a.u.']
+        self.cal_pts = cal_pts
+        if self.cal_pts == None:
+            self.value_names = ['I', 'Q']
+            self.value_units = ['a.u.', 'a.u.']
+        else:
+            self.value_names = ['F']
+            self.value_units = ['|1>']
         self.seg_per_point = seg_per_point
         self.nr_averages = nr_averages
         self.integration_length = integration_length
@@ -83,6 +91,9 @@ class CBox_integrated_average_detector_CC(det.Hard_Detector):
             i += 1
             if i > 20:
                 break
+        if self.cal_pts:
+            data = rotate_and_normalize_data(data, zero_coord=self.cal_pts[0],
+                                             one_coord=self.cal_pts[1])[0]
         return data
 
     def acquire_data_point(self):
@@ -106,9 +117,10 @@ class CBox_single_integration_average_det_CC(
     '''
 
     def __init__(self, CBox, seg_per_point=1,
-                 nr_averages=1024, integration_length=1e-6, **kw):
+                 nr_averages=1024, integration_length=1e-6,
+                 cal_pts=None, **kw):
         super().__init__(CBox, seg_per_point,
-                         nr_averages, integration_length, **kw)
+                         nr_averages, integration_length, cal_pts, **kw)
         if self.seg_per_point == 1:
             self.detector_control = 'soft'
         else:  # this is already implicitly the case through inheritance
@@ -166,13 +178,14 @@ class CBox_int_avg_func_prep_det_CC(CBox_integrated_average_detector_CC):
 
     def __init__(self, CBox, prepare_function, prepare_function_kwargs=None,
                  seg_per_point=1,
-                 nr_averages=1024, integration_length=1e-6, **kw):
+                 nr_averages=1024, integration_length=1e-6,
+                 cal_pts=None, **kw):
         '''
         int avg detector with additional option to run a specific function
         everytime the prepare is called.
         '''
         super().__init__(CBox, seg_per_point, nr_averages,
-                         integration_length, **kw)
+                         integration_length, cal_pts, **kw)
         self.prepare_function = prepare_function
         self.prepare_function_kwargs = prepare_function_kwargs
 
@@ -217,6 +230,7 @@ def measure_asm_files(asm_filenames, config_filename, qubit, MC):
         CBox.nr_averages
         nr_hard_averages = 512
         MC.soft_avg(10)
+    cal_pts = (qubit.cal_pt_zero(), qubit.cal_pt_one())
 
     prepare_function_kwargs = {
         'counter_param': counter_param,  'asm_filenames': asm_filenames,
@@ -225,16 +239,30 @@ def measure_asm_files(asm_filenames, config_filename, qubit, MC):
     detector = CBox_int_avg_func_prep_det_CC(
         CBox, prepare_function=load_range_of_asm_files,
         prepare_function_kwargs=prepare_function_kwargs,
-        nr_averages=nr_hard_averages)
+        nr_averages=nr_hard_averages,
+        cal_pts=cal_pts)
 
     measurement_points = extract_msmt_pts_from_config(config_filename)
 
-    MC.set_sweep_function(swf.None_Sweep())
+    s = swf.None_Sweep()
+    if 'rb' in asm_filenames[0]:
+        s.parameter_name = 'Number of Cliffords'
+        s.unit = '#'
+    MC.set_sweep_function(s)
     MC.set_sweep_points(measurement_points)
     MC.set_detector_function(detector)
 
     MC.run('Demo {}'.format(os.path.split(asm_filenames[0])[-1]))
-
+    if 'rb' in asm_filenames[0]:
+        a = ma.RandomizedBenchmarking_Analysis(
+               label='Demo rb', rotate_and_normalize=False, close_fig=True)
+        p = a.fit_res.best_values['p']
+        Fcl = p+(1-p)/2
+        Fg = Fcl**(1/1.875)
+        print('Clifford Fidelity:\t{:.4f}\nGate Fidelity: \t\t{:.4f}'.format(Fcl, Fg))
+        Ncl = np.arange(a.sweep_points[0], a.sweep_points[-1])
+        RB_fit = ma.fit_mods.RandomizedBenchmarkingDecay(Ncl, **a.fit_res.best_values)
+        MC.main_QtPlot.add(x=Ncl, y=RB_fit, subplot=0)
 
 def simulate_qasm_files(qasm_filenames, config_filename, qxc, MC):
     """
@@ -245,11 +273,11 @@ def simulate_qasm_files(qasm_filenames, config_filename, qxc, MC):
         MC.soft_avg(len(qasm_filenames))
         nr_hard_averages = 256
     else:
-        nr_hard_averages = 512
-        MC.soft_avg(10)
+        nr_hard_averages = 10000
+        MC.soft_avg(1)
 
     qx_det = det.QX_Hard_Detector(qxc, qasm_filenames,
-                                  p_error=0.006, num_avg=nr_hard_averages)
+                                  p_error=0.002, num_avg=nr_hard_averages)
     measurement_points = extract_msmt_pts_from_config(config_filename)
 
     MC.set_sweep_function(swf.None_Sweep())
