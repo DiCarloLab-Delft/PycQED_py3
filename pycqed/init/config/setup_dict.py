@@ -16,7 +16,7 @@ mac_dict = {'203178706891063': 'CDickel_Desktop',
             '167746772205643': 'NuovaFerrari',
             '167746772714689': 'Xiang_PC',
             '180725258210527': 'Niels_macbook',
-            # '109952948723616': 'Ramiro_Desktop',
+            '109952948723616': 'Ramiro_Desktop',
             '215977245834050': 'Ramiro_Desktop',
             '31054844829911': 'Sjoerd_laptop'
             }
