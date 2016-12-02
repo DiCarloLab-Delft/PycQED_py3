@@ -53,36 +53,36 @@ class UHFQC(Instrument):
         self._s_file_name = os.path.join(dir_path, 'zi_parameter_files', 's_node_pars.txt')
         self._d_file_name = os.path.join(dir_path, 'zi_parameter_files', 'd_node_pars.txt')
 
-        init=True
+        init = True
         try:
-            f=open(self._s_file_name).read()
+            f = open(self._s_file_name).read()
             s_node_pars = json.loads(f)
         except:
             print("parameter file for gettable parameters {} not found".format(self._s_file_name))
             init=False
         try:
-            f=open(self._d_file_name).read()
+            f = open(self._d_file_name).read()
             d_node_pars = json.loads(f)
         except:
             print("parameter file for settable parameters {} not found".format(self._d_file_name))
-            init=False
+            init = False
 
         for parameter in s_node_pars:
             parname=parameter[0].replace("/","_")
             parfunc="/"+device+"/"+parameter[0]
-            if parameter[1]=='float':
+            if parameter[1] == 'float':
                 self.add_parameter(
                     parname,
                     set_cmd=self._gen_set_func(self.setd, parfunc),
                     get_cmd=self._gen_get_func(self.getd, parfunc),
                     vals=vals.Numbers(parameter[2], parameter[3]))
-            elif parameter[1]=='float_small':
+            elif parameter[1] == 'float_small':
                 self.add_parameter(
                     parname,
                     set_cmd=self._gen_set_func(self.setd, parfunc),
                     get_cmd=self._gen_get_func(self.getd, parfunc),
                     vals=vals.Numbers(parameter[2], parameter[3]))
-            elif parameter[1]=='int_8bit':
+            elif parameter[1] == 'int_8bit':
                 self.add_parameter(
                     parname,
                     set_cmd=self._gen_set_func(self.seti, parfunc),
@@ -267,38 +267,57 @@ class UHFQC(Instrument):
 
         return nodes
 
-    def single_acquisition(self, samples, acquisition_time=0.010, timeout=0, channels=set([0, 1])):
+    def single_acquisition(self, samples, acquisition_time=0.010, timeout=0, channels=set([0, 1]), mode='rl'):
         # Define the channels to use
-
         paths = dict()
         data = dict()
-        for c in channels:
-            paths[c] = '/' + self._device + '/quex/rl/data/{}'.format(c)
-            data[c] = []
-            self._daq.subscribe(paths[c])
+        if mode == 'rl':
+            for c in channels:
+                paths[c] = '/' + self._device + '/quex/rl/data/{}'.format(c)
+                data[c] = []
+        else:
+            for c in channels:
+                paths[c] = '/' + self._device + '/quex/iavg/data/{}'.format(c)
+                data[c] = []
 
-        #self._daq.setInt('/' + self._device + '/awgs/0/single', 1)
-        #self._daq.setInt('/' + self._device + '/awgs/0/enable', 1)
+        # It would be better to move this call in to the initialization function
+        # in order to save time here
+        enable_path = '/' + self._device + '/awgs/0/enable'
+        self._daq.subscribe(enable_path)
+
+        # Added for testing purposes, remove again according to how the AWG is started
+        self._daq.setInt('/' + self._device + '/awgs/0/single', 1)
+        self._daq.setInt(enable_path, 1)
 
         timeout = 0
-        gotem = [False]*len(channels)
-        while not all(gotem) and timeout < 100:
+        gotit = False
+        while not gotit and timeout < 100:
             dataset = self._daq.poll(acquisition_time, timeout, 4, True)
-            for n, c in enumerate(channels):
-                p = paths[c]
-                if p in dataset:
-                    for v in dataset[p]:
-                        data[c] = np.concatenate((data[c], v['vector']))
-                    if len(data[c]) >= samples:
-                        gotem[n] = True
+            if enable_path in dataset and dataset[enable_path]['value'][0] == 0:
+                gotit = True
+            else:
+                timeout += 1
 
-            timeout += 1
+        if not gotit:
+            print("Error: AWG did not finish in time!")
+            return (None, None)
+
+        gotem = [False]*len(channels)
+        for n, c in enumerate(channels):
+            p = paths[c]
+            dataset = self._daq.get(p, True, 0)
+            if p in dataset:
+                for v in dataset[p]:
+                    data[c] = np.concatenate((data[c], v['vector']))
+                if len(data[c]) >= samples:
+                    gotem[n] = True
 
         if not all(gotem):
             print("Error: Didn't get all results!")
             for n, c in enumerate(channels):
                 print("    : Channel {}: Got {} of {} samples", c, len(data[c]), samples)
             return (None, None)
+
         # print("data type {}".format(type(data)))
         return data
 
@@ -494,16 +513,8 @@ class UHFQC(Instrument):
         values = {}
 
         for p in paths:
-            self._daq.getAsEvent(p)
-
-        tries = 0
-        while len(values) < len(paths) and tries < 10:
-            try:
-                tmp = self._daq.poll(0.001, 500, 4, True)
-                for p in tmp:
-                    values[p] = tmp[p]
-            except ZIException:
-                pass
+            tmp = self._daq.get(p, True, 0)
+            values[p] = tmp[p]
 
         if single:
             return values[paths[0]]
@@ -603,12 +614,28 @@ setTrigger(0);"""
 
     def awg_sequence_acquisition_and_pulse_SSB(self, f_RO_mod, RO_amp, RO_pulse_length, acquisition_delay):
         f_sampling=1.8e9
-        samples=RO_pulse_length*f_sampling
-        array=np.arange(int(samples))
-        sinwave=RO_amp*np.sin(2*np.pi*array*f_RO_mod/f_sampling)
-        coswave=RO_amp*np.cos(2*np.pi*array*f_RO_mod/f_sampling)
+        samples = RO_pulse_length*f_sampling
+        array = np.arange(int(samples))
+        sinwave = RO_amp*np.sin(2*np.pi*array*f_RO_mod/f_sampling)
+        coswave = RO_amp*np.cos(2*np.pi*array*f_RO_mod/f_sampling)
         Iwave = coswave+sinwave;
         Qwave = coswave-sinwave;
         # Iwave, Qwave = PG.mod_pulse(np.ones(samples), np.zeros(samples), f=f_RO_mod, phase=0, sampling_rate=f_sampling)
         self.awg_sequence_acquisition_and_pulse(Iwave, Qwave, acquisition_delay)
 
+
+    def upload_transformation_matrix(self, matrix):
+        for i in range(np.shape(matrix)[0]): #looping over the rows
+            for j in range(np.shape(matrix)[1]): #looping over the colums
+                #value =matrix[i,j]
+                #print(value)
+                eval('self.quex_trans_{}_col_{}_real(matrix[{}][{}])'.format(j,i,i,j))
+
+    def download_transformation_matrix(self, nr_rows=4, nr_cols=4):
+        matrix = np.zeros([nr_rows,nr_cols])
+        for i in range(np.shape(matrix)[0]): #looping over the rows
+            for j in range(np.shape(matrix)[1]): #looping over the colums
+                matrix[i][j]=(eval('self.quex_trans_{}_col_{}_real()'.format(j,i)))
+                #print(value)
+                #matrix[i,j]=value
+        return matrix

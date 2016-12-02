@@ -17,10 +17,12 @@ from pycqed.measurement.mc_parameter_wrapper import wrap_par_to_det
 from qcodes.instrument.base import Instrument
 from qcodes.instrument.parameter import ManualParameter
 from qcodes.utils import validators as vals
+from copy import deepcopy
+from qcodes.plots.colors import color_cycle
 
 try:
-    import pyqtgraph as pg
-    import pyqtgraph.multiprocess as pgmp
+    # import pyqtgraph as pg
+    # import pyqtgraph.multiprocess as pgmp
     from qcodes.plots.pyqtgraph import QtPlot
 except Exception:
     print('pyqtgraph plotting not supported, '
@@ -37,8 +39,9 @@ class MeasurementControl(Instrument):
     data points.
     '''
 
-    def __init__(self, name, plot_theme=((60, 60, 60), 'w'),
-                 plotting_interval=2,  live_plot_enabled=True, verbose=True):
+    def __init__(self, name,
+                 plotting_interval=0.25,
+                 live_plot_enabled=True, verbose=True):
         super().__init__(name=name, server_name=None)
         # Soft average is currently only available for "hard"
         # measurements. It does not work with adaptive measurements.
@@ -55,19 +58,29 @@ class MeasurementControl(Instrument):
                            parameter_class=ManualParameter,
                            vals=vals.Bool(),
                            initial_value=live_plot_enabled)
+        self.add_parameter('plotting_interval',
+                           units='s',
+                           vals=vals.Numbers(min_value=0.001),
+                           set_cmd=self._set_plotting_interval,
+                           get_cmd=self._get_plotting_interval)
+        self.add_parameter('persist_mode',
+                           vals=vals.Bool(),
+                           parameter_class=ManualParameter,
+                           initial_value=True)
 
-        # starting the process for the pyqtgraph plotting
-        # You do not want a new process to be created every time you start a
-        # run. This can be removed when I replace my custom process with the
-        # pyqtgraph one.
+        # pyqtgraph plotting process is reused for different measurements.
         if self.live_plot_enabled():
-            pg.mkQApp()
-            self.proc = pgmp.QtProcess()  # pyqtgraph multiprocessing
-            self.rpg = self.proc._import('pyqtgraph')
-            self.new_plotmon_window(plot_theme=plot_theme,
-                                    interval=plotting_interval)
+            self.main_QtPlot = QtPlot(
+                windowTitle='Main plotmon of {}'.format(self.name),
+                figsize=(600, 400))
+            self.secondary_QtPlot = QtPlot(
+                windowTitle='Secondary plotmon of {}'.format(self.name),
+                figsize=(600, 400))
 
         self.soft_iteration = 0  # used as a counter for soft_avg
+        self._persist_dat = None
+        self._persist_xlabs = None
+        self._persist_ylabs = None
 
     ##############################################
     # Functions used to control the measurements #
@@ -103,6 +116,7 @@ class MeasurementControl(Instrument):
                 raise ValueError('mode %s not recognized' % self.mode)
             result = self.dset[()]
             self.save_MC_metadata(self.data_object)  # timing labels etc
+        self.finish(result)
         return result
 
     def measure(self, *kw):
@@ -118,14 +132,13 @@ class MeasurementControl(Instrument):
             self.get_measurement_preparetime()
             self.measure_soft_static()
 
-        elif self.sweep_functions[0].sweep_control == 'hard':
+        elif self.detector_function.detector_control == 'hard':
             sweep_points = self.get_sweep_points()
             if len(self.sweep_functions) == 1:
                 self.get_measurement_preparetime()
-                for self.soft_iteration in range(self.soft_avg()):
-                    self.detector_function.prepare(
-                        sweep_points=self.get_sweep_points())
-                    self.measure_hard()
+                self.detector_function.prepare(
+                    sweep_points=self.get_sweep_points())
+                self.measure_hard()
             else:
                 # Do one iteration to see how many points per data point we get
                 self.get_measurement_preparetime()
@@ -156,7 +169,8 @@ class MeasurementControl(Instrument):
                         else:
                             swf_sweep_points = sweep_points
                             sweep_points_0 = sweep_points
-                        val = swf_sweep_points[0]
+                        val = swf_sweep_points[start_idx]
+
                         if sweep_function.sweep_control is 'soft':
                             sweep_function.set_parameter(val)
                     self.detector_function.prepare(
@@ -358,25 +372,31 @@ class MeasurementControl(Instrument):
                 vals = vals[self.par_idx]
         return vals
 
-    def finish(self):
+    def finish(self, result):
         '''
         Deletes arrays to clean up memory and avoid memory related mistakes
         '''
-        for attr in [self.TwoD_array,
-                     self.dset,
-                     self.sweep_points,
-                     self.sweep_points_2D,
-                     self.sweep_functions,
-                     self.xlen,
-                     self.ylen,
-                     self.iteration,
-                     self.soft_iteration]:
+        # this data can be plotted by enabling persist_mode
+        self._persist_dat = result
+        self._persist_xlabs = self.column_names[
+            0:len(self.sweep_function_names)]
+        self._persist_ylabs = self.column_names[
+            len(self.sweep_function_names):]
+
+        for attr in ['TwoD_array',
+                     'dset',
+                     'sweep_points',
+                     'sweep_points_2D',
+                     'sweep_functions',
+                     'xlen',
+                     'ylen',
+                     'iteration',
+                     'soft_iteration']:
             try:
+                attr = getattr(self, attr)
                 del attr
             except AttributeError:
                 pass
-
-
 
     ###################
     # 2D-measurements #
@@ -441,23 +461,36 @@ class MeasurementControl(Instrument):
     '''
 
     def initialize_plot_monitor(self):
-        self.win.clear()  # clear out previous data
+        # new code
+        if self.main_QtPlot.traces != []:
+            self.main_QtPlot.clear()
         self.curves = []
         xlabels = self.column_names[0:len(self.sweep_function_names)]
         ylabels = self.column_names[len(self.sweep_function_names):]
-        for ylab in ylabels:
-            for xlab in xlabels:
-                p = self.win.addPlot(pen=self.plot_theme[0])
-                b_ax = p.getAxis('bottom')
-                p.setLabel('bottom', xlab, pen=self.plot_theme[0])
-                b_ax.setPen(self.plot_theme[0])
-                l_ax = p.getAxis('left')
-                l_ax.setPen(self.plot_theme[0])
-                p.setLabel('left', ylab, pen=self.plot_theme[0])
-                c = p.plot(symbol='o', symbolSize=7, pen=self.plot_theme[0])
-                self.curves.append(c)
-            self.win.nextRow()
-        return self.win, self.curves
+        j = 0
+        if (self._persist_ylabs == ylabels and
+                self._persist_xlabs == xlabels) and self.persist_mode():
+            persist = True
+        else:
+            persist = False
+        for yi, ylab in enumerate(ylabels):
+            for xi, xlab in enumerate(xlabels):
+                if persist:  # plotting persist first so new data on top
+                    yp = self._persist_dat[
+                        :, yi+len(self.sweep_function_names)]
+                    xp = self._persist_dat[:, xi]
+                    self.main_QtPlot.add(x=xp, y=yp,
+                                         subplot=j+1,
+                                         color=0.75,  # a grayscale value
+                                         symbol='o', symbolSize=5)
+                self.main_QtPlot.add(x=[0], y=[0],
+                                     xlabel=xlab, ylabel=ylab,
+                                     subplot=j+1,
+                                     color=color_cycle[j],
+                                     symbol='o', symbolSize=5)
+                self.curves.append(self.main_QtPlot.traces[-1])
+                j += 1
+            self.main_QtPlot.win.nextRow()
 
     def update_plotmon(self, force_update=False):
         if self.live_plot_enabled():
@@ -467,33 +500,20 @@ class MeasurementControl(Instrument):
             except:
                 self._mon_upd_time = time.time()
                 time_since_last_mon_update = 1e9
-            # Update always if just a few points otherwise wait for the refresh
-            # timer
+            # Update always if there are very few points
             if (self.dset.shape[0] < 20 or time_since_last_mon_update >
-                    self.QC_QtPlot.interval or force_update):
+                    self.plotting_interval() or force_update):
                 nr_sweep_funcs = len(self.sweep_function_names)
                 for y_ind in range(len(self.detector_function.value_names)):
                     for x_ind in range(nr_sweep_funcs):
                         x = self.dset[:, x_ind]
                         y = self.dset[:, nr_sweep_funcs+y_ind]
-                        self.curves[i].setData(x, y)
+
+                        self.curves[i]['config']['x'] = x
+                        self.curves[i]['config']['y'] = y
                         i += 1
                 self._mon_upd_time = time.time()
-
-    def new_plotmon_window(self, plot_theme=None, interval=2):
-        '''
-        respawns the pyqtgraph plotting window
-        Creates self.win       : a direct pyqtgraph window
-                self.QC_QtPlot : the qcodes pyqtgraph window
-        '''
-        if plot_theme is not None:
-            self.plot_theme = plot_theme
-        self.win = self.rpg.GraphicsWindow(
-            title='Plot monitor of %s' % self.name)
-        self.win.setBackground(self.plot_theme[1])
-        self.QC_QtPlot = QtPlot(
-            windowTitle='QC-Plot monitor of %s' % self.name,
-            interval=interval)
+                self.main_QtPlot.update_plot()
 
     def initialize_plot_monitor_2D(self):
         '''
@@ -509,9 +529,9 @@ class MeasurementControl(Instrument):
             self.TwoD_array = np.empty(
                 [n, m, len(self.detector_function.value_names)])
             self.TwoD_array[:] = np.NAN
-            self.QC_QtPlot.clear()
+            self.secondary_QtPlot.clear()
             for j in range(len(self.detector_function.value_names)):
-                self.QC_QtPlot.add(x=self.sweep_pts_x,
+                self.secondary_QtPlot.add(x=self.sweep_pts_x,
                                    y=self.sweep_pts_y,
                                    z=self.TwoD_array[:, :, j],
                                    xlabel=self.column_names[0],
@@ -532,22 +552,21 @@ class MeasurementControl(Instrument):
             for j in range(len(self.detector_function.value_names)):
                 z_ind = len(self.sweep_functions) + j
                 self.TwoD_array[y_ind, x_ind, j] = self.dset[i, z_ind]
-            self.QC_QtPlot.traces[j]['config']['z'] = self.TwoD_array[:, :, j]
-
+            self.secondary_QtPlot.traces[j]['config']['z'] = self.TwoD_array[:, :, j]
             if (time.time() - self.time_last_2Dplot_update >
-                    self.QC_QtPlot.interval
+                    self.plotting_interval()
                     or self.iteration == len(self.sweep_points)):
                 self.time_last_2Dplot_update = time.time()
-                self.QC_QtPlot.update_plot()
+                self.secondary_QtPlot.update_plot()
 
     def initialize_plot_monitor_adaptive(self):
         '''
         Uses the Qcodes plotting windows for plotting adaptive plot updates
         '''
         self.time_last_ad_plot_update = time.time()
-        self.QC_QtPlot.clear()
+        self.secondary_QtPlot.clear()
         for j in range(len(self.detector_function.value_names)):
-            self.QC_QtPlot.add(x=[0],
+            self.secondary_QtPlot.add(x=[0],
                                y=[0],
                                xlabel='iteration',
                                ylabel=self.detector_function.value_names[j],
@@ -557,15 +576,15 @@ class MeasurementControl(Instrument):
     def update_plotmon_adaptive(self, force_update=False):
         if self.live_plot_enabled():
             if (time.time() - self.time_last_ad_plot_update >
-                    self.QC_QtPlot.interval or force_update):
+                    self.plotting_interval() or force_update):
                 for j in range(len(self.detector_function.value_names)):
                     y_ind = len(self.sweep_functions) + j
                     y = self.dset[:, y_ind]
                     x = range(len(y))
-                    self.QC_QtPlot.traces[j]['config']['x'] = x
-                    self.QC_QtPlot.traces[j]['config']['y'] = y
+                    self.secondary_QtPlot.traces[j]['config']['x'] = x
+                    self.secondary_QtPlot.traces[j]['config']['y'] = y
                     self.time_last_ad_plot_update = time.time()
-                    self.QC_QtPlot.update_plot()
+                    self.secondary_QtPlot.update_plot()
 
     def update_plotmon_2D_hard(self):
         '''
@@ -574,20 +593,32 @@ class MeasurementControl(Instrument):
         Note that the plotmon only supports evenly spaced lattices.
         '''
         if self.live_plot_enabled():
-            i = int((self.iteration)%self.ylen)
+            i = int((self.iteration) % self.ylen)
             y_ind = i
             for j in range(len(self.detector_function.value_names)):
                 z_ind = len(self.sweep_functions) + j
                 self.TwoD_array[y_ind, :, j] = self.dset[
                     i*self.xlen:(i+1)*self.xlen, z_ind]
-                self.QC_QtPlot.traces[j]['config']['z'] = \
+                self.secondary_QtPlot.traces[j]['config']['z'] = \
                     self.TwoD_array[:, :, j]
 
             if (time.time() - self.time_last_2Dplot_update >
-                    self.QC_QtPlot.interval
+                    self.plotting_interval()
                     or self.iteration == len(self.sweep_points)/self.xlen):
                 self.time_last_2Dplot_update = time.time()
-                self.QC_QtPlot.update_plot()
+                self.secondary_QtPlot.update_plot()
+
+    def _set_plotting_interval(self, plotting_interval):
+        self.main_QtPlot.interval = plotting_interval
+        self.secondary_QtPlot.interval = plotting_interval
+
+    def _get_plotting_interval(self):
+        return self.main_QtPlot.interval
+
+    def clear_persitent_plot(self):
+        self._persist_dat = None
+        self._persist_xlabs = None
+        self._persist_ylabs = None
 
     ##################################
     # Small helper/utility functions #

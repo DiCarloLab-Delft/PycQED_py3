@@ -112,19 +112,12 @@ MC_TestHeader = b"\x40"
 
 # Modes index in list corresponds to the integer that will be sent
 
-
-
 acquisition_modes = ['0: idle',
-                     '1: integration logging mode',
-
-                     '2: feedback mode,',  # This mode does not do anything
-                     '3: input averaging mode',
-                     '4: integration averaging mode',
-
-
-
-
-                     '5: integration streaming mode',
+                     '1: integration logging',
+                     '2: feedback,',  # This mode does not do anything
+                     '3: input averaging',
+                     '4: integration averaging',
+                     '5: integration streaming',
                      "6: touch 'n go"]
 
 run_modes = ['0: idle',
@@ -135,5 +128,5 @@ awg_modes = ['0: Codeword-trigger mode',
              '2: Tape mode',
              '3: Segmented tape mode']
 
-demodulation_modes = ['0: double side band demodulation',
-                      '1: single side band demodulation']
+demodulation_modes = ['0: double',
+                      '1: single']
