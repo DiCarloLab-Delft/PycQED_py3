@@ -587,6 +587,55 @@ def Randomized_Benchmarking_seq(pulse_pars, RO_pars,
     else:
         return seq, el_list
 
+def Freq_XY(freqs, pulse_pars, RO_pars,
+              cal_points=True, verbose=False, return_seq=False):
+    '''
+    Sequence used for calibrating the frequency.
+    Consists of Xy and Yx
+
+    Beware that the elements alternate, if you want to measure both Xy and Yx
+    at each motzoi you need repeating motzoi parameters. This was chosen
+    to be more easily compatible with standard detector functions and sweep pts
+
+    Input pars:
+        freqs:               array of frequency parameters
+        pulse_pars:          dict containing the pulse parameters
+        RO_pars:             dict containing the RO parameters
+        cal_points:          if True, replaces the last 2*4 segments with
+                             calibration points
+    '''
+    seq_name = 'MotzoiXY'
+    seq = sequence.Sequence(seq_name)
+    station.pulsar.update_channel_settings()
+    el_list = []
+    pulse_combinations = [['X180', 'Y90'], ['Y180', 'X90']]
+    pulses = get_pulse_dict_from_pars(pulse_pars)
+    for i, ff in enumerate(freqs):
+        pulse_keys = pulse_combinations[i % 2]
+        for p_name in ['X180', 'Y180', 'X90', 'Y90']:
+            pulses[p_name]['mod_frequency'] = ff
+        if cal_points and (i == (len(freqs)-4) or
+                           i == (len(freqs)-3)):
+            el = multi_pulse_elt(i, station, [pulses['I'], RO_pars])
+        elif cal_points and (i == (len(freqs)-2) or
+                             i == (len(freqs)-1)):
+            # pick motzoi for calpoint in the middle of the range
+            pulses['X180']['mod_frequency'] = np.mean(freqs)
+            el = multi_pulse_elt(i, station, [pulses['X180'], RO_pars])
+        else:
+            pulse_list = [pulses[x] for x in pulse_keys]
+            pulse_list += [RO_pars]
+            el = multi_pulse_elt(i, station, pulse_list)
+        el_list.append(el)
+        seq.append_element(el, trigger_wait=True)
+
+    station.components['AWG'].stop()
+    station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+    if return_seq:
+        return seq, el_list
+    else:
+        return seq_name
+
 
 def Motzoi_XY(motzois, pulse_pars, RO_pars,
               cal_points=True, verbose=False, upload=True, return_seq=False):

@@ -18,7 +18,9 @@ def calculate_net_clifford(cliffords):
     '''
     net_cl = 0  # assumes element 0 is the Identity
     for i in range(len(cliffords)):
-        net_cl = clifford_lookuptable[net_cl, cliffords[i]]
+        # int is added to avoid deprecation warning, input is assumed to
+        # be int in the first place
+        net_cl = clifford_lookuptable[net_cl, int(cliffords[i])]
     return net_cl
 
 

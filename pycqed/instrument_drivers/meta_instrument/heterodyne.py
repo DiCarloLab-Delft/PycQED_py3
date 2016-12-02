@@ -13,6 +13,7 @@ import time
 
 
 class HeterodyneInstrument(Instrument):
+
     '''
     This is a virtual instrument for a homodyne source
 
@@ -62,7 +63,7 @@ class HeterodyneInstrument(Instrument):
                            get_cmd=self._do_get_acquisition_instr,
                            vals=vals.Strings())
         self.add_parameter('nr_averages',
-                            parameter_class=ManualParameter,
+                           parameter_class=ManualParameter,
                            initial_value=1024,
                            vals=vals.Numbers(min_value=0, max_value=1e6))
 
@@ -87,7 +88,6 @@ class HeterodyneInstrument(Instrument):
         if LO_freq != freq-self.f_RO_mod():
             logging.warning('f_RO_mod between RF and LO is not set correctly')
         return freq
-
 
     def do_set_RF_power(self, val):
         self.RF.power(val)
@@ -142,76 +142,91 @@ class HeterodyneInstrument(Instrument):
             if 'CBox' in self.acquisition_instr():
                 trace_length = 512
                 tbase = np.arange(0, 5*trace_length, 5)*1e-9
-                self.cosI = np.floor(127.*np.cos(2*np.pi*self.get('f_RO_mod')*tbase))
-                self.sinI = np.floor(127.*np.sin(2*np.pi*self.get('f_RO_mod')*tbase))
+                self.cosI = np.floor(
+                    127.*np.cos(2*np.pi*self.get('f_RO_mod')*tbase))
+                self.sinI = np.floor(
+                    127.*np.sin(2*np.pi*self.get('f_RO_mod')*tbase))
                 self._acquisition_instr.sig0_integration_weights(self.cosI)
                 self._acquisition_instr.sig1_integration_weights(self.sinI)
-                self._acquisition_instr.set('nr_samples', 1)  # because using integrated avg
+                # because using integrated avg
+                self._acquisition_instr.set('nr_samples', 1)
                 self._acquisition_instr.nr_averages(int(self.nr_averages()))
 
             elif 'UHFQC' in self.acquisition_instr():
                 print("f_RO_mod", self.get('f_RO_mod'))
-                #self._acquisition_instr.prepare_SSB_weight_and_rotation(IF=self.get('f_RO_mod'),
-                #                                        weight_function_I=0, weight_function_Q=1)
-                self._acquisition_instr.prepare_DSB_weight_and_rotation(IF=self.get('f_RO_mod'),
-                                                        weight_function_I=0, weight_function_Q=1)
-                self._acquisition_instr.quex_rl_source(2) #this sets the result to integration and rotation outcome
-                self._acquisition_instr.quex_rl_length(1) #only one sample to average over
-                self._acquisition_instr.quex_rl_avgcnt(int(np.log2(self.nr_averages())))
-                print("preparing UHFQ with avg", self._acquisition_instr.quex_rl_avgcnt())
-                self._acquisition_instr.quex_wint_length(int(RO_length*(1.8e9)))
+                # self._acquisition_instr.prepare_SSB_weight_and_rotation(IF=self.get('f_RO_mod'),
+                # weight_function_I=0, weight_function_Q=1)
+                self._acquisition_instr.prepare_DSB_weight_and_rotation(
+                    IF=self.get('f_RO_mod'),
+                    weight_function_I=0, weight_function_Q=1)
+                # this sets the result to integration and rotation outcome
+                self._acquisition_instr.quex_rl_source(2)
+                # only one sample to average over
+                self._acquisition_instr.quex_rl_length(1)
+                self._acquisition_instr.quex_rl_avgcnt(
+                    int(np.log2(self.nr_averages())))
+                print("preparing UHFQ with avg",
+                      self._acquisition_instr.quex_rl_avgcnt())
+                self._acquisition_instr.quex_wint_length(
+                    int(RO_length*(1.8e9)))
                 # Configure the result logger to not do any averaging
-                # The AWG program uses userregs/0 to define the number o iterations in the loop
-                self._acquisition_instr.awgs_0_userregs_0(int(self.nr_averages()))
-                self._acquisition_instr.awgs_0_userregs_1(1)#0 for rl, 1 for iavg
+                # The AWG program uses userregs/0 to define the number o
+                # iterations in the loop
+                self._acquisition_instr.awgs_0_userregs_0(
+                    int(self.nr_averages()))
+                # 0 for rl, 1 for iavg
+                self._acquisition_instr.awgs_0_userregs_1(0)
+                self._acquisition_instr.awgs_0_single(1)
 
         self.LO.on()
         # Changes are now incorporated in the awg seq
         self._awg_seq_parameters_changed = False
 
-
         # self.CBox.set('acquisition_mode', 'idle') # aded with xiang
 
-    def probe(self, demodulation_mode=0, **kw):
+    def probe(self, demodulation_mode='double', **kw):
         '''
         Starts acquisition and returns the data
             'COMP' : returns data as a complex point in the I-Q plane in Volts
         '''
         if 'CBox' in self.acquisition_instr():
             self._acquisition_instr.set('acquisition_mode', 'idle')
-            self._acquisition_instr.set('acquisition_mode', 'integration averaging')
+            self._acquisition_instr.set(
+                'acquisition_mode', 'integration averaging')
             self._acquisition_instr.demodulation_mode(demodulation_mode)
             # d = self.CBox.get_integrated_avg_results()
             # quick fix for spec units. Need to properrly implement it later
             # after this, output is in mV
             scale_factor_dacmV = 1000.*0.75/128.
             # scale_factor_integration = 1./float(self.f_RO_mod()*self.CBox.nr_samples()*5e-9)
-            scale_factor_integration = 1./(64.*self._acquisition_instr.integration_length())
+            scale_factor_integration = 1. / \
+                (64.*self._acquisition_instr.integration_length())
             factor = scale_factor_dacmV*scale_factor_integration
-            d = np.double(self._acquisition_instr.get_integrated_avg_results())*np.double(factor)
+            d = np.double(
+                self._acquisition_instr.get_integrated_avg_results())*np.double(factor)
             # print(np.size(d))
             dat = d[0][0]+1j*d[1][0]
         elif 'UHFQC' in self.acquisition_instr():
             t0 = time.time()
             self._acquisition_instr.awgs_0_enable(1)
-            temp = self._acquisition_instr.awgs_0_enable()  #probing the values to be sure communication is finished before starting AWG
+            try:
+                temp = self._acquisition_instr.awgs_0_enable()
+            except:
+                temp = self._acquisition_instr.awgs_0_enable()
             del temp
-            # self.AWG.start()
 
             while self._acquisition_instr.awgs_0_enable() == 1:
                 time.sleep(0.01)
-            time.sleep(0.2)
-            channels=[0,1]
+            channels = [0, 1]
             data = ['']*len(channels)
             for i, channel in enumerate(channels):
-                dataset = eval("self._acquisition_instr.quex_rl_data_{}()".format(channel))
+                dataset = eval(
+                    "self._acquisition_instr.quex_rl_data_{}()".format(channel))
                 data[i] = dataset[0]['vector']
-            print(np.size(data))
-            dat=data[0]+1j*data[1]
+            dat = data[0]+1j*data[1]
             t1 = time.time()
             print("time for UHFQC polling", t1-t0)
         return dat
-
 
         # return s21
 
@@ -252,6 +267,7 @@ class HeterodyneInstrument(Instrument):
 
 
 class LO_modulated_Heterodyne(HeterodyneInstrument):
+
     '''
     Heterodyne instrument for pulse modulated LO.
     Inherits functionality for the HeterodyneInstrument
@@ -299,7 +315,7 @@ class LO_modulated_Heterodyne(HeterodyneInstrument):
                            vals=vals.Strings())
 
         self.add_parameter('nr_averages',
-                            parameter_class=ManualParameter,
+                           parameter_class=ManualParameter,
                            initial_value=1024,
                            vals=vals.Numbers(min_value=0, max_value=1e6))
         # Negative vals should be done by setting the f_RO_mod negative
@@ -386,11 +402,8 @@ class LO_modulated_Heterodyne(HeterodyneInstrument):
         # or potential digitizer acquisition easily
         return self._acquisition_instr.name
 
-
     def _do_set_acquisition_instr(self, acquisition_instr):
         # Specifying the int_avg det here should allow replacing it with ATS
         # or potential digitizer acquisition easily
 
         self._acquisition_instr = self.find_instrument(acquisition_instr)
-
-
