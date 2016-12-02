@@ -159,6 +159,8 @@ class QuTech_ControlBox(VisaInstrument):
 
     def init_params(self):
         self.add_params()
+        self._acquisition_mode = 'idle'
+        self._demodulation_mode = 'double'
 
         self.set('demodulation_mode', 'double')
         self.set('acquisition_mode', 'idle')
@@ -992,7 +994,7 @@ class QuTech_ControlBox(VisaInstrument):
         else:
             tmp_acquisition_mode = 'idle'
 
-        self._set_master_controller_working_mode(tmp_acquisition_mode,
+        self._set_master_controller_working_state(tmp_acquisition_mode,
                                                  demodulation_mode)
 
     def _do_get_demodulation_mode(self):
@@ -1018,7 +1020,7 @@ class QuTech_ControlBox(VisaInstrument):
         self._set_master_controller_working_state(acquisition_mode,
                                                   tmp_demodulation_mode)
 
-    def _set_master_controller_working_mode(self, acquisition_mode,
+    def _set_master_controller_working_state(self, acquisition_mode,
                                             demodulation_mode):
         '''
         @param acquisition_mode : acquisition_mode of the fpga,
