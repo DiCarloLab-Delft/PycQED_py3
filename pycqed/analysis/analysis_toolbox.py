@@ -1058,7 +1058,7 @@ def normalize_2D_data_on_elements(data_2D, elements):
         data_2D[:, k] /= np.mean(data_2D[elements, k])
     return data_2D
 
-def rotate_and_normalize_data(data, cal_zero_points, cal_one_points,
+def rotate_and_normalize_data(data, cal_zero_points=None, cal_one_points=None,
                               zero_coord=None, one_coord=None, **kw):
     '''
     Rotates and normalizes data with respect to some reference coordinates.

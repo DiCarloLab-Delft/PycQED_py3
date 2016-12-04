@@ -25,7 +25,6 @@ class two_qubit_off_on(swf.Hard_Sweep):
         self.return_seq = return_seq
         self.name = 'two_qubit_off_on'
 
-
     def prepare(self, **kw):
         if self.upload:
             sqs2.two_qubit_off_on(q0_pulse_pars=self.q0_pulse_pars,
