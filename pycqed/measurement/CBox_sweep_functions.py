@@ -2,7 +2,7 @@ import numpy as np
 import logging
 from pycqed.measurement import sweep_functions as swf
 from pycqed.measurement.sweep_functions import Soft_Sweep
-from pycqed.measurement import Pulse_Generator as PG
+from pycqed.measurement.waveform_control_CC import waveform as wf
 
 # Commented out as there is no module named Experiments.CLEAR.prepare_for_CLEAR.prepare_for_CLEAR
 # from Experiments.CLEAR.prepare_for_CLEAR import prepare_for_CLEAR
@@ -10,7 +10,7 @@ from pycqed.measurement import Pulse_Generator as PG
 import time
 import imp
 gauss_width = 10
-imp.reload(PG)
+imp.reload(wf)
 
 
 class CBox_Sweep(swf.Hard_Sweep):
@@ -70,7 +70,7 @@ class T1(CBox_Sweep):
         self.AWG.set_setup_filename(self.filename,
                                     force_load=False)
 
-        Wave_I, Wave_Q = PG.mod_gauss(self.amp180, self.gauss_width,
+        Wave_I, Wave_Q = wf.mod_gauss(self.amp180, self.gauss_width,
                                       self.f_modulation)
         self.CBox.set_awg_lookuptable(0, 0, 1, np.round(Wave_I))
         self.CBox.set_awg_lookuptable(0, 0, 0, np.round(Wave_Q))
@@ -104,6 +104,29 @@ class Lutman_par_with_reload(Soft_Sweep):
             self.LutMan.load_pulses_onto_AWG_lookuptable(awg_nr)
 
 
+class Lutman_par_with_reload_single_pulse(Soft_Sweep):
+    def __init__(self, LutMan, parameter, pulse_names=['X180'], awg_nrs=[0]):
+        '''
+        Generic sweep function that combines setting a LutMan parameter
+        with reloading lookuptables.
+        '''
+        super().__init__()
+        self.LutMan = LutMan
+        self.parameter = parameter
+        self.name = parameter.name
+        self.parameter_name = parameter.label
+        self.unit = parameter.units
+        self.awg_nrs = awg_nrs
+        self.pulse_names = pulse_names
+
+    def set_parameter(self, val):
+        self.parameter.set(val)
+        for awg_nr in self.awg_nrs:
+            for pulse_name in self.pulse_names:
+                self.LutMan.load_pulse_onto_AWG_lookuptable(pulse_name, awg_nr)
+
+
+
 class LutMan_amp180_90(Soft_Sweep):
     '''
     Sweeps both the amp180 parameter and the amp90 of the CBox_lut_man
@@ -120,8 +143,8 @@ class LutMan_amp180_90(Soft_Sweep):
         self.LutMan = LutMan
 
     def set_parameter(self, val):
-        self.LutMan.set('amp180', val)
-        self.LutMan.set('amp90', val/2.0)
+        self.LutMan.set('Q_amp180', val)
+        self.LutMan.set('Q_amp90', val/2.0)
         if self.reload_pulses:
             self.LutMan.load_pulses_onto_AWG_lookuptable(self.awg_nr)
 
@@ -287,9 +310,9 @@ class Echo(CBox_Sweep):
         self.AWG.set_setup_filename(self.filename,
                                     force_load=False)
 
-        Wave_I_180, Wave_Q_180 = PG.mod_gauss(self.amp180, self.gauss_width,
+        Wave_I_180, Wave_Q_180 = wf.mod_gauss(self.amp180, self.gauss_width,
                                               self.f_modulation)
-        Wave_I_90, Wave_Q_90 = PG.mod_gauss(self.amp90, self.gauss_width,
+        Wave_I_90, Wave_Q_90 = wf.mod_gauss(self.amp90, self.gauss_width,
                                             self.f_modulation)
         self.CBox.set_awg_lookuptable(0, 7, 1, np.round(Wave_I_180))
         self.CBox.set_awg_lookuptable(0, 7, 0, np.round(Wave_Q_180))
@@ -340,7 +363,7 @@ class T1_tape(CBox_Sweep):
         self.AWG.set_setup_filename(self.filename,
                                     force_load=False)
 
-        Wave_I_180, Wave_Q_180 = PG.mod_gauss(self.amp180, self.gauss_width,
+        Wave_I_180, Wave_Q_180 = wf.mod_gauss(self.amp180, self.gauss_width,
                                       self.f_modulation)
         Wave_I_0=Wave_I_180*0
         Wave_Q_0=Wave_I_0

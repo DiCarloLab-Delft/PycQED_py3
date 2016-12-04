@@ -15,23 +15,26 @@ import logging
 import time
 import h5py
 import numpy as np
+import pycqed as pq
 from uuid import getnode as get_mac
-# Hardcoded datadir, not cool :)
+
+
 try:
+    # This method is currently not working robustly
     qc_config
 except NameError:
     try:
+        # The datadict is the first (hard coded) fall back option
         from pycqed.init.config import setup_dict
         mac = get_mac()
         setup_name = setup_dict.mac_dict[str(mac)]
-        logging.warning('Creating qc_config for datadir')
         qc_config = {'datadir': setup_dict.data_dir_dict[setup_name]}
     except Exception:
+        # the default data directory location is the last fall back option
         # Stores data in the default data location (pycqed_py3/data/)
         datadir = os.path.join(os.path.dirname(pq.__file__), os.pardir, 'data')
-        logging.warning('Creating qc_config for datadir')
+        logging.warning('Setting datadir to default location')
         qc_config = {'datadir': datadir}
-
 
 
 class DateTimeGenerator:
