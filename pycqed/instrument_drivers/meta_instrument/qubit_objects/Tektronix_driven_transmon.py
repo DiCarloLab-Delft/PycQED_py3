@@ -663,7 +663,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
     def measure_randomized_benchmarking(self, nr_cliffords,
                                         nr_seeds=50, T1=None,
                                         MC=None, analyze=True, close_fig=True,
-                                        verbose=False):
+                                        verbose=False, upload=True):
         '''
         Performs a randomized benchmarking fidelity.
         Optionally specifying T1 also shows the T1 limited fidelity.
@@ -674,7 +674,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         MC.set_sweep_function(awg_swf.Randomized_Benchmarking(
             pulse_pars=self.pulse_pars, RO_pars=self.RO_pars,
             double_curves=True,
-            nr_cliffords=nr_cliffords, nr_seeds=nr_seeds))
+            nr_cliffords=nr_cliffords, nr_seeds=nr_seeds, upload=upload))
         MC.set_detector_function(self.int_avg_det)
         MC.run('RB_{}seeds'.format(nr_seeds)+self.msmt_suffix)
         ma.RB_double_curve_Analysis(

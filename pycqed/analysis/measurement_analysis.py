@@ -4745,9 +4745,10 @@ class TwoD_Analysis(MeasurementAnalysis):
                 fig, ax = self.default_ax(figsize=(8, 5))
                 self.fig_array.append(fig)
                 self.ax_array.append(ax)
-                fig_title = '{timestamp}_{measurement}_linecut'.format(
+                fig_title = '{timestamp}_{measurement}_linecut_{z_label}'.format(
                     timestamp=self.timestamp_string,
-                    measurement=self.measurementstring)
+                    measurement=self.measurementstring,
+                    z_label=i)
                 a_tools.linecut_plot(x=self.sweep_points,
                                      y=self.sweep_points_2D,
                                      z=self.measured_values[i],

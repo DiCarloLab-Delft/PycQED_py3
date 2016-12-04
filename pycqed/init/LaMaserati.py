@@ -68,6 +68,13 @@ from pycqed.instrument_drivers.meta_instrument import Flux_Control as FluxCtrl
 
 import pycqed.instrument_drivers.meta_instrument.qubit_objects.Tektronix_driven_transmon as qbt
 from pycqed.instrument_drivers.meta_instrument import heterodyne as hd
+import pycqed.instrument_drivers.meta_instrument.UHFQC_LookuptableManager as lm_UHFQC
+import pycqed.instrument_drivers.meta_instrument.UHFQC_LookuptableManagerManager as lmm_UHFQC
+from pycqed.measurement import awg_sweep_functions_multi_qubit as awg_swf_m
+from pycqed.measurement.pulse_sequences import multi_qubit_tek_seq_elts as sq_m
+from numpy.linalg import inv
+import pylab
+
 #import pycqed.instrument_drivers.meta_instrument.CBox_LookuptableManager as lm
 
 ############################
@@ -79,7 +86,7 @@ station = qc.Station()
 ###########
 # Sources #
 ###########
-LO = Agilent_E8527D(name='LO', address='GPIB0::25', server_name=None)  #
+LO = rs.RohdeSchwarz_SGS100A(name='LO', address='TCPIP0::192.168.0.85', server_name=None)
 station.add_component(LO)
 RF = rs.RohdeSchwarz_SGS100A(name='RF', address='TCPIP0::192.168.0.80', server_name=None)  #
 station.add_component(RF)
@@ -98,12 +105,29 @@ station.add_component(Fridge_mon)
 
 
 #Initializing UHFQC
-UHFQC_1 = ZI_UHFQC.UHFQC('UHFQC_1', device='dev2214', server_name=None)
+UHFQC_1 = ZI_UHFQC.UHFQC('UHFQC_1', device='dev2209', server_name=None)
 station.add_component(UHFQC_1)
 
+#initializing lookuptable managers for multi-qubit readout
+LutMan0 = lm_UHFQC.UHFQC_LookuptableManager('LutMan0', UHFQC=UHFQC_1,
+                                                 server_name=None)
+station.add_component(LutMan0)
+
+LutMan1 = lm_UHFQC.UHFQC_LookuptableManager('LutMan1', UHFQC=UHFQC_1,
+                                                 server_name=None)
+station.add_component(LutMan1)
+
+
+LutManMan = lmm_UHFQC.UHFQC_LookuptableManagerManager('LutManMan', UHFQC=UHFQC_1,
+                                                 server_name=None)
+station.add_component(LutManMan)
+
+LutManMan.LutMans([LutMan0.name,LutMan1.name])
+
+
 #Initializing CBox
-CBox = qcb.QuTech_ControlBox('CBox', address='COM3', run_tests=False, server_name=None)
-station.add_component(CBox)
+# CBox = qcb.QuTech_ControlBox('CBox', address='COM3', run_tests=False, server_name=None)
+# station.add_component(CBox)
 
 
 MC = mc.MeasurementControl('MC')
@@ -144,7 +168,7 @@ Flux_Control.flux_offsets(-offsets)
 # # SH = sh.SignalHound_USB_SA124B('Signal hound', server_name=None) #commented because of 8s load time
 
 # Meta-instruments
-HS = hd.HeterodyneInstrument('HS', LO=LO, RF=RF, AWG=AWG, acquisition_instr=CBox.name,
+HS = hd.HeterodyneInstrument('HS', LO=LO, RF=RF, AWG=AWG, acquisition_instr=UHFQC_1.name,
                              server_name=None)
 # HS = hd.HeterodyneInstrument('HS', LO=LO, RF=RF, AWG=AWG, acquisition_instr=UHFQC_1.name,
 #                              server_name=None)

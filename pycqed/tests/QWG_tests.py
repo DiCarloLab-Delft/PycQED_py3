@@ -10,10 +10,6 @@ from qcodes.utils import validators as vals
 
 
 class QWG_tests(unittest.TestCase):
-    '''
-    This is a test suite for testing the HeterodyneSource Instrument.
-    '''
-
     @classmethod
     def setUpClass(self):
         '''
@@ -23,7 +19,7 @@ class QWG_tests(unittest.TestCase):
             self.qwg = QWG
         except:
             self.qwg = QuTech_AWG_Module(
-                'QWG', address='192.168.42.10',
+                'QWG_test', address='192.168.0.10',
                 port=5025, server_name=None)
 
         self.qwg.reset()

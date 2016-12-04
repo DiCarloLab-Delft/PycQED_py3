@@ -608,13 +608,11 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
                 if self.SSB:
                     eval('self.UHFQC.quex_wint_weights_{}_imag(np.array(optimized_weights_Q))'.format(self.weight_function_I))
                     if not self.one_weight_function_UHFQC:
-                        print("setting the weight functions in Q")
                         eval('self.UHFQC.quex_wint_weights_{}_real(np.array(optimized_weights_I))'.format(self.weight_function_Q))
                         eval('self.UHFQC.quex_wint_weights_{}_imag(np.array(optimized_weights_Q))'.format(self.weight_function_Q))
                     eval('self.UHFQC.quex_rot_{}_real(1.0)'.format(self.weight_function_I))
                     eval('self.UHFQC.quex_rot_{}_imag(-1.0)'.format(self.weight_function_I))
                     if not self.one_weight_function_UHFQC:
-                        print("setting the weight functions in Q")
                         eval('self.UHFQC.quex_rot_{}_real(1.0)'.format(self.weight_function_Q))
                         eval('self.UHFQC.quex_rot_{}_imag(1.0)'.format(self.weight_function_Q))
                 else:

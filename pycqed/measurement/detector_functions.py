@@ -1765,4 +1765,5 @@ class ATS_integrated_average_continuous_detector(Hard_Detector):
         )
 
     def finish(self):
+        print("bla")
 
