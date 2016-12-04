@@ -12,13 +12,17 @@ import json
 
 class QASM_Sweep(swf.Hard_Sweep):
 
-    def __init__(self, filename, CBox, op_dict, upload=True):
+    def __init__(self, filename, CBox, op_dict,
+                 parameter_name='Points', unit='a.u.', upload=True):
         super().__init__()
         self.name = 'QASM_Sweep'
         self.filename = filename
         self.upload = upload
         self.CBox = CBox
         self.op_dict = op_dict
+        self.parameter_name = parameter_name
+        self.unit = unit
+
 
     def prepare(self, **kw):
         self.CBox.trigger_source('internal')

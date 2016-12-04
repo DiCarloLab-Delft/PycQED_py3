@@ -278,6 +278,7 @@ def butterfly(qubit_name, initialize=False):
 
 def randomized_benchmarking(qubit_name, nr_cliffords, nr_seeds,
                             net_clifford=0,
+                            label='randomized_benchmarking',
                             cal_points=True,
                             double_curves=True):
     '''
@@ -286,6 +287,7 @@ def randomized_benchmarking(qubit_name, nr_cliffords, nr_seeds,
         nr_seeds:      int  nr_seeds for which to generate RB seqs
         net_clifford:  int index of net clifford the sequence should perform
                        0 corresponds to Identity and 3 corresponds to X180
+        label:           some string that can be used as a label.
         cal_points:    bool whether to replace the last two elements with
                        calibration points, set to False if you want
                        to measure a single element (for e.g. optimization)
@@ -298,7 +300,7 @@ def randomized_benchmarking(qubit_name, nr_cliffords, nr_seeds,
     benchmarking.
     '''
     net_cliffords = [0, 3]  # Exists purely for the double curves mode
-    filename = join(base_qasm_path, 'randomized_benchmarking.qasm')
+    filename = join(base_qasm_path, label+'.qasm')
     qasm_file = mopen(filename, mode='w')
     qasm_file.writelines('qubit {} \n'.format(qubit_name))
     i = 0

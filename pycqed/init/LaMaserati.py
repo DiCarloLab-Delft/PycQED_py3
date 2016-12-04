@@ -65,6 +65,8 @@ from pycqed.instrument_drivers.physical_instruments import QuTech_ControlBoxdriv
 # from qcodes.instrument_drivers.tektronix import AWG520 as tk520
 from pycqed.instrument_drivers.physical_instruments.ZurichInstruments import UHFQuantumController as ZI_UHFQC
 from pycqed.instrument_drivers.meta_instrument import Flux_Control as FluxCtrl
+from pycqed.instrument_drivers.physical_instruments import QuTech_ControlBox_v3 as qcb
+
 
 import pycqed.instrument_drivers.meta_instrument.qubit_objects.Tektronix_driven_transmon as qbt
 from pycqed.instrument_drivers.meta_instrument import heterodyne as hd
@@ -109,7 +111,7 @@ UHFQC_1 = ZI_UHFQC.UHFQC('UHFQC_1', device='dev2209', server_name=None)
 station.add_component(UHFQC_1)
 
 #setting the input range and coupling
-UHFQC_1.sigins_0_range(0.05)
+UHFQC_1.sigins_0_range(0.2)
 UHFQC_1.sigins_0_ac(1)
 UHFQC_1.sigins_1_ac(1)
 
@@ -131,10 +133,9 @@ station.add_component(LutManMan)
 LutManMan.LutMans([LutMan0.name,LutMan1.name])
 
 
-#Initializing CBox
-# CBox = qcb.QuTech_ControlBox('CBox', address='COM3', run_tests=False, server_name=None)
-# station.add_component(CBox)
 
+CBox = qcb.QuTech_ControlBox_v3('CBox', address='Com7')
+station.add_component(CBox)
 
 MC = mc.MeasurementControl('MC')
 
@@ -265,11 +266,13 @@ def all_sources_off():
 
 def print_instr_params(instr):
     snapshot = instr.snapshot()
+    print('{0:23} {1} \t ({2})'.format('\t parameter ', 'value', 'units'))
+    print('-'*80)
     for par in sorted(snapshot['parameters']):
-        print('{}: {} {}'.format(snapshot['parameters'][par]['name'],
-                                 snapshot['parameters'][par]['value'],
-                                 snapshot['parameters'][par]['units']))
-
+        print('{0:25}: \t{1}\t ({2})'.format(
+            snapshot['parameters'][par]['name'],
+            snapshot['parameters'][par]['value'],
+            snapshot['parameters'][par]['units']))
 
 # from scripts.Experiments.FiveQubits import common_functions as cfct
 # cfct.set_AWG_limits(station,1.7)

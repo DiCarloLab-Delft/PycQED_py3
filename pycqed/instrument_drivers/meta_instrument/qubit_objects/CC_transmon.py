@@ -78,6 +78,12 @@ class CC_transmon(Transmon):
         self.add_parameter('mixer_offs_drive_Q',
                            parameter_class=ManualParameter, initial_value=0)
 
+        self.add_parameter('mixer_offs_RO_I',
+                           parameter_class=ManualParameter, initial_value=0)
+        self.add_parameter('mixer_offs_RO_Q',
+                           parameter_class=ManualParameter, initial_value=0)
+
+
         self.add_parameter('mod_amp_cw', label='RO modulation ampl cw',
                            units='V', initial_value=0.5,
                            parameter_class=ManualParameter)
