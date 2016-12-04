@@ -108,6 +108,12 @@ station.add_component(Fridge_mon)
 UHFQC_1 = ZI_UHFQC.UHFQC('UHFQC_1', device='dev2209', server_name=None)
 station.add_component(UHFQC_1)
 
+#setting the input range and coupling
+UHFQC_1.sigins_0_range(0.05)
+UHFQC_1.sigins_0_ac(1)
+UHFQC_1.sigins_1_ac(1)
+
+
 #initializing lookuptable managers for multi-qubit readout
 LutMan0 = lm_UHFQC.UHFQC_LookuptableManager('LutMan0', UHFQC=UHFQC_1,
                                                  server_name=None)
