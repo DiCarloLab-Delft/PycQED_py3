@@ -16,6 +16,7 @@ import pandas as pd
 
 # Qcodes
 import qcodes as qc
+import pycqed as pq
 # currently on a Windows machine
 # qc.set_mp_method('spawn')  # force Windows behavior on mac
 # qc.show_subprocess_widget()
@@ -76,6 +77,9 @@ from pycqed.measurement import awg_sweep_functions_multi_qubit as awg_swf_m
 from pycqed.measurement.pulse_sequences import multi_qubit_tek_seq_elts as sq_m
 from numpy.linalg import inv
 import pylab
+from pycqed.instrument_drivers.meta_instrument import CBox_LookuptableManager as cbl
+from pycqed.measurement.waveform_control_CC import qasm_to_asm as qta
+from pycqed.instrument_drivers.meta_instrument.qubit_objects import CBox_v3_driven_transmon as cq
 
 #import pycqed.instrument_drivers.meta_instrument.CBox_LookuptableManager as lm
 
@@ -83,6 +87,7 @@ import pylab
 # Initializing instruments #
 ############################
 station = qc.Station()
+pq.station = station
 
 
 ###########
@@ -115,6 +120,8 @@ UHFQC_1.sigins_0_range(0.2)
 UHFQC_1.sigins_0_ac(1)
 UHFQC_1.sigins_1_ac(1)
 
+CBox = qcb.QuTech_ControlBox_v3('CBox', address='Com7')
+station.add_component(CBox)
 
 #initializing lookuptable managers for multi-qubit readout
 LutMan0 = lm_UHFQC.UHFQC_LookuptableManager('LutMan0', UHFQC=UHFQC_1,
@@ -132,10 +139,9 @@ station.add_component(LutManMan)
 
 LutManMan.LutMans([LutMan0.name,LutMan1.name])
 
-
-
-CBox = qcb.QuTech_ControlBox_v3('CBox', address='Com7')
-station.add_component(CBox)
+LutMan_CB = cbl.QuTech_ControlBox_LookuptableManager(
+    'LutMan_CB', CBox, server_name=None)
+station.add_component(LutMan_CB)
 
 MC = mc.MeasurementControl('MC')
 
@@ -190,6 +196,12 @@ QL = qbt.Tektronix_driven_transmon('QL', LO=LO, cw_source=Spec_source,
                                               FluxCtrl=Flux_Control,
                                               server_name=None)
 station.add_component(QL)
+
+QL_CB = cq.CBox_v3_driven_transmon('QL_CB', LO=LO, cw_source=Spec_source,
+                                     td_source=QL_LO, IVVI=IVVI,
+                                     LutMan=LutMan_CB, CBox=CBox, MC=MC)
+station.add_component(QL_CB)
+
 QR = qbt.Tektronix_driven_transmon('QR', LO=LO, cw_source=Spec_source,
                                               td_source=QR_LO,
                                               IVVI=IVVI, rf_RO_source=RF,

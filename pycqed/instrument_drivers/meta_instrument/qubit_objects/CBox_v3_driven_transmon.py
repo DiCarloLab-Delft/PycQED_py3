@@ -773,6 +773,14 @@ class CBox_v3_driven_transmon(Transmon):
         self.prepare_for_timedomain()
         if MC is None:
             MC = self.MC
+
+        # append the calibration points, times are for location in plot
+        times = np.concatenate([times,
+                                (times[-1]+times[0],
+                                 times[-1]+times[1],
+                                 times[-1]+times[2],
+                                 times[-1]+times[3])])
+
         # # This is required because I cannot change the phase in the pulses
         if not all([np.round(t*1e9) % (1/self.f_pulse_mod.get()*1e9)
                     == 0 for t in times]):
@@ -787,7 +795,7 @@ class CBox_v3_driven_transmon(Transmon):
         Ramsey = sq_qasm.Ramsey(
             self.name, times=times, artificial_detuning=None)
         s = qh.QASM_Sweep(Ramsey.name, self.CBox, self.get_operation_dict(),
-                          parameter_name='time', unit='s')
+                          parameter_name='Time', unit='s')
         d = qh.CBox_integrated_average_detector_CC(
             self.CBox, nr_averages=self.RO_acq_averages()//MC.soft_avg())
         MC.set_sweep_function(s)
@@ -812,6 +820,13 @@ class CBox_v3_driven_transmon(Transmon):
         self.prepare_for_timedomain()
         if MC is None:
             MC = self.MC
+
+        # append the calibration points, times are for location in plot
+        times = np.concatenate([times,
+                                (times[-1]+times[0],
+                                 times[-1]+times[1],
+                                 times[-1]+times[2],
+                                 times[-1]+times[3])])
         # # This is required because I cannot change the phase in the pulses
         if not all([np.round(t*1e9) % (1/self.f_pulse_mod.get()*1e9)
                     == 0 for t in times]):
@@ -819,7 +834,7 @@ class CBox_v3_driven_transmon(Transmon):
 
         echo = sq_qasm.echo(self.name, times=times, artificial_detuning=None)
         s = qh.QASM_Sweep(echo.name, self.CBox, self.get_operation_dict(),
-                          parameter_name='time', unit='s')
+                          parameter_name='Time', unit='s')
         d = qh.CBox_integrated_average_detector_CC(
             self.CBox, nr_averages=self.RO_acq_averages()//MC.soft_avg())
         MC.set_sweep_function(s)

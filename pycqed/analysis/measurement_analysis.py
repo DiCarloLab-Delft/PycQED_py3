@@ -3048,7 +3048,7 @@ class Ramsey_Analysis(TD_Analysis):
 
         ft_of_data = np.fft.fft(self.normalized_data_points)
         index_of_fourier_maximum = np.argmax(np.abs(
-            ft_of_data[1:len(ft_of_data)/2]))+1
+            ft_of_data[1:len(ft_of_data)//2]))+1
         max_ramsey_delay = self.sweep_points[-self.NoCalPoints] - \
             self.sweep_points[0]
 

@@ -351,3 +351,72 @@ def getHomoFiles(fn):
     config_file = dirpath + "\\{}_config.json".format(name_core)
 
     return (config_file, homo_files)
+
+
+
+def convert_to_clocks(duration, f_sampling=200e6, rounding_period=None):
+    """
+    convert a duration in seconds to an integer number of clocks
+
+        f_sampling: 200e6 is the CBox sampling frequency
+    """
+    if rounding_period is not None:
+        duration = (duration//rounding_period+1)*rounding_period
+    clock_duration = int(duration*f_sampling)
+    return clock_duration
+
+
+def get_operation_dict(qubit, operation_dict={}):
+
+    pulse_period_clocks = convert_to_clocks(
+        qubit.gauss_width()*4, rounding_period=1/abs(qubit.f_pulse_mod()))
+    RO_length_clocks = convert_to_clocks(qubit.RO_pulse_length())
+    RO_pulse_delay_clocks = convert_to_clocks(qubit.RO_pulse_delay())
+
+    operation_dict['init_all'] = {'instruction':
+                                  'WaitReg r0 \nWaitReg r0 \n'}
+    operation_dict['I {}'.format(qubit.name)] = {
+        'duration': pulse_period_clocks, 'instruction': 'wait {} \n'}
+    operation_dict['X180 {}'.format(qubit.name)] = {
+        'duration': pulse_period_clocks, 'instruction':
+            'trigger 0111110, 1 \nwait 1\n'+
+            'trigger 1001001, 1  \nwait {}\n'.format( #1001001
+                pulse_period_clocks-1)}
+    operation_dict['Y180 {}'.format(qubit.name)] = {
+        'duration': pulse_period_clocks, 'instruction':
+            'trigger 0010000, 1 \nwait 1\n'+
+            'trigger 1010001, 1  \nwait {}\n'.format(
+                pulse_period_clocks-1)}
+    operation_dict['X90 {}'.format(qubit.name)] = {
+        'duration': pulse_period_clocks, 'instruction':
+            'trigger 0011000, 1 \nwait 1\n'+
+            'trigger 1011001, 1  \nwait {}\n'.format(
+                pulse_period_clocks-1)}
+    operation_dict['Y90 {}'.format(qubit.name)] = {
+        'duration': pulse_period_clocks, 'instruction':
+            'trigger 0100000, 1 \nwait 1\n'+
+            'trigger 1100001, 1  \nwait {}\n'.format(
+                pulse_period_clocks-1)}
+    operation_dict['mX90 {}'.format(qubit.name)] = {
+        'duration': pulse_period_clocks, 'instruction':
+            'trigger 0101000, 1 \nwait 1\n'+
+            'trigger 1101001, 1  \nwait {}\n'.format(
+                pulse_period_clocks-1)}
+    operation_dict['mY90 {}'.format(qubit.name)] = {
+        'duration': pulse_period_clocks, 'instruction':
+            'trigger 0110000, 1 \nwait 1\n'+
+            'trigger 1110001, 1  \nwait {}\n'.format(
+                pulse_period_clocks-1)}
+    if qubit.RO_pulse_type() == 'MW_IQmod_pulse':
+        operation_dict['RO {}'.format(qubit.name)] = {
+            'duration': RO_length_clocks,
+            'instruction': 'wait {} \npulse 0000 1111 1111 '.format(
+                RO_pulse_delay_clocks)
+            + '\nwait {} \nmeasure \n'.format(RO_length_clocks)}
+    elif qubit.RO_pulse_type() == 'Gated_MW_RO_pulse':
+        operation_dict['RO {}'.format(qubit.name)] = {
+            'duration': RO_length_clocks, 'instruction':
+            'wait {} \ntrigger 1000000, {} \n measure \n'.format(
+                RO_pulse_delay_clocks, RO_length_clocks)}
+
+    return operation_dict
