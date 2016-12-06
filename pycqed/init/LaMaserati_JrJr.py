@@ -2,14 +2,14 @@
 This scripts initializes the instruments and imports the modules
 """
 
-UHFQC=True
+UHFQC=False
 
 # General imports
 
 import time
 import logging
 t0 = time.time()  # to print how long init takes
-from instrument_drivers.meta_instrument.qubit_objects import duplexer_tek_transmon as dt
+from pycqed.instrument_drivers.meta_instrument.qubit_objects import duplexer_tek_transmon as dt
 
 from importlib import reload  # Useful for reloading while testing
 import numpy as np
@@ -85,17 +85,17 @@ Spec_source = rs.RohdeSchwarz_SGS100A(name='Spec_source', address='TCPIP0::192.1
 station.add_component(Spec_source)
 Qubit_LO = rs.RohdeSchwarz_SGS100A(name='Qubit_LO', address='TCPIP0::192.168.0.86', server_name=None)  #
 station.add_component(Qubit_LO)
-TWPA_Pump = rs.RohdeSchwarz_SGS100A(name='TWPA_Pump', address='TCPIP0::192.168.0.90', server_name=None)  #
-station.add_component(TWPA_Pump)
+# TWPA_Pump = rs.RohdeSchwarz_SGS100A(name='TWPA_Pump', address='TCPIP0::192.168.0.90', server_name=None)  #
+# station.add_component(TWPA_Pump)
 CBox = qcb.QuTech_ControlBox('CBox', address='Com5', run_tests=False, server_name=None)
 station.add_component(CBox)
 AWG = tek.Tektronix_AWG5014(name='AWG', setup_folder=None, timeout=2,
                             address='GPIB0::6::INSTR', server_name=None)
 station.add_component(AWG)
 AWG.timeout(180)
-AWG520 = tk520.Tektronix_AWG520('AWG520', address='GPIB0::17::INSTR',
-                                server_name='')
-station.add_component(AWG520)
+# AWG520 = tk520.Tektronix_AWG520('AWG520', address='GPIB0::17::INSTR',
+#                                 server_name='')
+# station.add_component(AWG520)
 IVVI = iv.IVVI('IVVI', address='COM4', numdacs=16, server_name=None)
 station.add_component(IVVI)
 
@@ -133,7 +133,7 @@ Flux_Control.dac_mapping([1, 2, 3, 4, 5])
 
 sweet_spots_mv = [85.265,-49.643,60.893,-13.037,-49.570]
 offsets = np.dot(Flux_Control.transfer_matrix(), sweet_spots_mv)
-Flux_Control.flux_offsets(offsets)
+Flux_Control.flux_offsets(-offsets)
 
 
 
@@ -152,7 +152,7 @@ station.add_component(HS)
                                                  # server_name='metaLM')
 MC = mc.MeasurementControl('MC')
 
-
+# HS = None
 
 AncB = qbt.Tektronix_driven_transmon('AncB', LO=LO, cw_source=Spec_source,
                                               td_source=Qubit_LO,
@@ -201,12 +201,12 @@ DataT = qbt.Tektronix_driven_transmon('DataT', LO=LO, cw_source=Spec_source,
 station.add_component(DataT)
 
 # load settings onto qubits
-gen.load_settings_onto_instrument(AncB)#, timestamp='20161111_165442')
-gen.load_settings_onto_instrument(AncT)#, timestamp='20161111_165442')
-gen.load_settings_onto_instrument(DataB)#, timestamp='20161111_165442')
-gen.load_settings_onto_instrument(DataM)#, timestamp='20161111_165442')
-gen.load_settings_onto_instrument(DataT)#, timestamp='20161111_165442')
-gen.load_settings_onto_instrument(HS)
+gen.load_settings_onto_instrument(AncB, timestamp='20161120_004220')
+gen.load_settings_onto_instrument(AncT, timestamp='20161120_004220')
+gen.load_settings_onto_instrument(DataB, timestamp='20161120_004220')
+gen.load_settings_onto_instrument(DataM, timestamp='20161120_004220')
+gen.load_settings_onto_instrument(DataT, timestamp='20161120_004220')
+gen.load_settings_onto_instrument(HS, timestamp='20161120_004220')
 
 AncT.E_c(0.28e9)
 AncT.asymmetry(0)
@@ -304,8 +304,8 @@ def print_instr_params(instr):
                                  snapshot['parameters'][par]['units']))
 
 
-from scripts.Experiments.FiveQubits import common_functions as cfct
-cfct.set_AWG_limits(station,1.7)
+# from scripts.Experiments.FiveQubits import common_functions as cfct
+# cfct.set_AWG_limits(station,1.7)
 
 
 if UHFQC:
@@ -360,5 +360,5 @@ for qubit in list_qubits:
 
 
 
-switch_to_pulsed_RO_CBox(AncT)
-switch_to_pulsed_RO_CBox(DataT)
+# switch_to_pulsed_RO_CBox(AncT)
+# switch_to_pulsed_RO_CBox(DataT)

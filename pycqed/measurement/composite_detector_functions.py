@@ -437,7 +437,7 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
                     raise ValueError('SSB is only possible in CBox with optimized weights')
                 else:
                     self.CBox.lin_trans_coeffs([1,0,0,1])
-                    self.CBox.demodulation_mode(0)
+                    self.CBox.demodulation_mode('double')
                     if self.IF==None:
                         raise ValueError('IF has to be provided when not using optimized weights')
                     else:

@@ -19,11 +19,11 @@ core_states = ['0: idle',
                '1: active']
 
 acquisition_modes = ['0: idle',
-                     '1: integration logging mode',
-                     '2: integration averaging mode',
-                     '3: input averaging mode',
-                     '4: integration streaming mode']
+                     '1: integration logging',
+                     '2: integration averaging',
+                     '3: input averaging',
+                     '4: integration streaming']
 
-trigger_sources = ['0: internal MC trigger',
-                   '1: external MC trigger',
-                   '2: mixed MC trigger']
+trigger_sources = ['0: internal',
+                   '1: external',
+                   '2: mixed']

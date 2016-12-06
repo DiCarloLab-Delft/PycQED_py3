@@ -15,7 +15,8 @@ from pycqed.measurement import sweep_functions as swf
 from pycqed.measurement import awg_sweep_functions as awg_swf
 from pycqed.analysis import measurement_analysis as ma
 from pycqed.measurement.pulse_sequences import standard_sequences as st_seqs
-from analysis import fitting_models as fit_mods
+from pycqed.analysis import fitting_models as fit_mods
+
 
 class Qubit(Instrument):
     '''

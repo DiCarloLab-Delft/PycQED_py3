@@ -5,7 +5,7 @@ from pycqed.measurement.randomized_benchmarking import randomized_benchmarking a
 from pycqed.measurement.pulse_sequences import standard_sequences as st_seqs
 from pycqed.measurement.pulse_sequences import single_qubit_tek_seq_elts as sqs
 from pycqed.measurement.pulse_sequences import multi_qubit_tek_seq_elts as sqs2
-from measurement.pulse_sequences import fluxing_sequences as fsqs
+from pycqed.measurement.pulse_sequences import fluxing_sequences as fsqs
 default_gauss_width = 10  # magic number should be removed,
 # note magic number only used in old mathematica seqs
 
@@ -24,7 +24,6 @@ class two_qubit_off_on(swf.Hard_Sweep):
         self.verbose = verbose
         self.return_seq = return_seq
         self.name = 'two_qubit_off_on'
-
 
     def prepare(self, **kw):
         if self.upload:
