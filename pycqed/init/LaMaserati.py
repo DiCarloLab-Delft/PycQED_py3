@@ -79,7 +79,7 @@ from numpy.linalg import inv
 import pylab
 from pycqed.instrument_drivers.meta_instrument import CBox_LookuptableManager as cbl
 from pycqed.measurement.waveform_control_CC import qasm_to_asm as qta
-from pycqed.instrument_drivers.meta_instrument.qubit_objects import CBox_v3_driven_transmon as cq
+import pycqed.instrument_drivers.meta_instrument.qubit_objects.CC_transmon as cq
 
 #import pycqed.instrument_drivers.meta_instrument.CBox_LookuptableManager as lm
 

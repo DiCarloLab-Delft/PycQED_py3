@@ -29,11 +29,43 @@ def mixer_carrier_cancellation_duplexer(**kw):
     raise NotImplementedError('see archived calibration toolbox')
 
 
-def mixer_carrier_cancellation(**kw):
-    raise NotImplementedError('Use either mixer'
-                              + 'mixer_carrier_cancellation_CBox or' +
-                              'mixer_carrier_cancellation_5014' +
-                              'See the archived folder for the old function')
+def mixer_carrier_cancellation(SH, source, MC,
+                               chI_par, chQ_par,
+                               frequency=None,
+                               voltage_grid=[0.050, 0.020, 0.010, 0.005, 0.002],
+                               range_min = None,
+                               range_max = None):
+
+    ch_min = [0, 0]  # Initializing variables used later on
+    source.on()
+    if frequency is None:
+        frequency = source.get('frequency')
+    else:
+        source.set('frequency', frequency)
+
+
+    for voltage_span in voltage_grid:
+        # Channel 0
+        for i, ch_par in enumerate([chI_par, chQ_par]):
+            MC.set_sweep_function(ch_par)
+            MC.set_detector_function(
+                det.Signal_Hound_fixed_frequency(signal_hound=SH, frequency=frequency))
+
+            swp_start = ch_min[i] + voltage_span
+            swp_end = ch_min[i] - voltage_span
+            swp_pts = np.linspace(swp_start, swp_end,  11)
+            print(swp_pts)
+            MC.set_sweep_points(swp_pts)
+            MC.run(name='Mixer_cal_{}'.format(ch_par.name),
+                   sweep_delay=.1)
+            Mixer_Calibration_Analysis = MA.Mixer_Calibration_Analysis(
+                label='Mixer_cal')
+            ch_min[i] = Mixer_Calibration_Analysis.fit_results[0]
+            ch_par(ch_min[i])
+
+    chI_par(ch_min[0])
+    chQ_par(ch_min[1])
+    return ch_min
 
 
 def mixer_skewness_calibration_5014(SH, source, station,
@@ -102,7 +134,6 @@ def mixer_skewness_calibration_5014(SH, source, station,
     phi = -1*a.optimization_result[0][1]
 
     return phi, alpha
-
 
 
 def mixer_skewness_calibration_adaptive(**kw):
@@ -193,7 +224,7 @@ def mixer_carrier_cancellation_5014(AWG, SH, source, MC,
         # channel 1 finer sweep
         MC.set_sweep_function(ch1_swf)
         MC.set_sweep_points(np.linspace(ch_1_min - dac_resolution*6,
-                            ch_1_min + dac_resolution*6, 13))
+                                        ch_1_min + dac_resolution*6, 13))
         MC.run(name='Mixer_cal_Offset_%s' % AWG_channel1,
                sweep_delay=.1, debug_mode=True)
         Mixer_Calibration_Analysis = MA.Mixer_Calibration_Analysis(
@@ -220,12 +251,13 @@ def mixer_carrier_cancellation_5014(AWG, SH, source, MC,
     print(ch_1_min, ch_2_min)
     return ch_1_min, ch_2_min
 
+
 def mixer_carrier_cancellation_UHFQC(UHFQC, SH, source, MC,
-                                    frequency=None,
-                                    AWG_channel1=0,
-                                    AWG_channel2=1,
-                                    voltage_grid=[.1, 0.05, 0.02],
-                                    xtol=0.001, **kw):
+                                     frequency=None,
+                                     AWG_channel1=0,
+                                     AWG_channel2=1,
+                                     voltage_grid=[.1, 0.05, 0.02],
+                                     xtol=0.001, **kw):
     '''
     Varies the mixer offsets to minimize leakage at the carrier frequency.
     this is the version for a UHFQC.
@@ -298,7 +330,7 @@ def mixer_carrier_cancellation_UHFQC(UHFQC, SH, source, MC,
         # channel 1 finer sweep
         MC.set_sweep_function(ch1_swf)
         MC.set_sweep_points(np.linspace(ch_1_min - dac_resolution*6,
-                            ch_1_min + dac_resolution*6, 13))
+                                        ch_1_min + dac_resolution*6, 13))
         MC.run(name='Mixer_cal_Offset_%s' % AWG_channel1,
                sweep_delay=.1, debug_mode=True)
         Mixer_Calibration_Analysis = MA.Mixer_Calibration_Analysis(
@@ -325,11 +357,12 @@ def mixer_carrier_cancellation_UHFQC(UHFQC, SH, source, MC,
     print(ch_1_min, ch_2_min)
     return ch_1_min, ch_2_min
 
+
 def mixer_carrier_cancellation_CBox(CBox, SH, source, MC,
                                     frequency=None,
                                     awg_nr=0,
                                     voltage_grid=[50, 20, 10, 5, 2],
-                                    xtol=1, **kw):
+                                    xtol=1):
     '''
     Varies the mixer offsets to minimize leakage at the carrier frequency.
     this is the version for the QuTech ControlBox
@@ -341,84 +374,17 @@ def mixer_carrier_cancellation_CBox(CBox, SH, source, MC,
 
     Note: Updated for QCodes
     '''
-    ch_0_min = 0  # Initializing variables used later on
-    ch_1_min = 0
-    last_ch_0_min = 1
-    last_ch_1_min = 1
-    ii = 0
-    min_power = 0
-    source.on()
-    if frequency is None:
-        frequency = source.get('frequency')
-    else:
-        source.set('frequency', frequency)
-
-    '''
-    Make coarse sweeps to approximate the minimum
-    '''
-
+    logging.DeprecationWarning('CBox carrier cancelation is deprecated. \n' +
+                    'Replace it with mixer carrier cancelation and pass'
+                    ' the channel parameters directly.')
     ch0_swf = CB_swf.DAC_offset(awg_nr, dac_ch=0, CBox=CBox)
     ch1_swf = CB_swf.DAC_offset(awg_nr, dac_ch=1, CBox=CBox)
-    for voltage_span in voltage_grid:
-        # Channel 0
-        MC.set_sweep_function(ch0_swf)
-        MC.set_detector_function(
-            det.Signal_Hound_fixed_frequency(signal_hound=SH, frequency=frequency))
-        MC.set_sweep_points(np.linspace(ch_0_min + voltage_span,
-                                        ch_0_min - voltage_span, 11))
-        MC.run(name='Mixer_cal_Offset_awg{}_dac{}'.format(awg_nr, 0),
-               sweep_delay=.1, debug_mode=True)
-        Mixer_Calibration_Analysis = MA.Mixer_Calibration_Analysis(
-            label='Mixer_cal', auto=True)
-        ch_0_min = Mixer_Calibration_Analysis.fit_results[0]
-        CBox.set_dac_offset(awg_nr, 0, ch_0_min)
 
-        # Channel 2
-        MC.set_sweep_function(ch1_swf)
-        MC.set_sweep_points(np.linspace(ch_1_min + voltage_span,
-                                        ch_1_min - voltage_span, 11))
-        MC.run(name='Mixer_cal_Offset_awg{}_dac{}'.format(awg_nr, 1),
-               sweep_delay=.1, debug_mode=True)
-        Mixer_Calibration_Analysis = MA.Mixer_Calibration_Analysis(
-            label='Mixer_cal', auto=True)
-        ch_1_min = Mixer_Calibration_Analysis.fit_results[0]
-        CBox.set_dac_offset(awg_nr, 1, ch_1_min)
+    return mixer_carrier_cancellation(SH, source, MC,
+                               chI_par=ch0_swf, chQ_par=ch1_swf,
+                               frequency=frequency, voltage_grid=voltage_grid,
+                               xtol=xtol)
 
-    # Refine and repeat the sweeps to find the minimum
-    while(abs(last_ch_0_min - ch_0_min) > xtol
-          and abs(last_ch_1_min - ch_1_min) > xtol):
-        ii += 1
-        dac_resolution = 1000/2**14  # quantization of the dacs
-        # channel 1 finer sweep
-        MC.set_sweep_function(ch0_swf)
-        MC.set_sweep_points(np.linspace(ch_0_min - dac_resolution*6,
-                            ch_0_min + dac_resolution*6, 13))
-        MC.run(name='Mixer_cal_Offset_awg{}_dac{}'.format(awg_nr, 0),
-               sweep_delay=.1, debug_mode=True)
-        Mixer_Calibration_Analysis = MA.Mixer_Calibration_Analysis(
-            label='Mixer_cal', auto=True)
-        last_ch_0_min = ch_0_min
-        ch_0_min = Mixer_Calibration_Analysis.fit_results[0]
-        CBox.set_dac_offset(awg_nr, 0, ch_0_min)
-        # Channel 2 finer sweep
-        MC.set_sweep_function(ch1_swf)
-        MC.set_sweep_points(np.linspace(ch_1_min - dac_resolution*6,
-                                        ch_1_min + dac_resolution*6, 13))
-        MC.run(name='Mixer_cal_Offset_awg{}_dac{}'.format(awg_nr, 1),
-               sweep_delay=.1, debug_mode=True)
-        Mixer_Calibration_Analysis = MA.Mixer_Calibration_Analysis(
-            label='Mixer_cal', auto=True)
-        last_ch_1_min = ch_1_min
-        min_power = min(Mixer_Calibration_Analysis.measured_powers)
-        ch_1_min = Mixer_Calibration_Analysis.fit_results[0]
-        CBox.set_dac_offset(awg_nr, 1, ch_1_min)
-        if ii > 10:
-            logging.error('Mixer calibration did not converge')
-            break
-
-    CBox.set_dac_offset(awg_nr, 0, ch_0_min)
-    CBox.set_dac_offset(awg_nr, 1, ch_1_min)
-    return ch_0_min, ch_1_min
 
 
 def mixer_skewness_cal_CBox_adaptive(CBox, SH, source,
