@@ -56,6 +56,9 @@ class CBox_v3_driven_transmon(Transmon):
         self.LutMan = LutMan
         self.CBox = CBox
         self.MC = MC
+        self.add_parameters()
+
+    def add_parameters(self):
         self.add_parameter('mod_amp_cw', label='RO modulation ampl cw',
                            units='V', initial_value=0.5,
                            parameter_class=ManualParameter)
@@ -151,12 +154,12 @@ class CBox_v3_driven_transmon(Transmon):
                            vals=vals.Anything(),  # should be a tuple validator
                            label='Calibration point |0>',
                            parameter_class=ManualParameter)
-
         self.add_parameter('cal_pt_one',
                            initial_value=None,
                            vals=vals.Anything(),  # should be a tuple validator
                            label='Calibration point |1>',
                            parameter_class=ManualParameter)
+
 
     def prepare_for_continuous_wave(self):
         raise NotImplementedError()
@@ -1021,4 +1024,145 @@ def convert_to_clocks(duration, f_sampling=200e6, rounding_period=None):
     return clock_duration
 
 
-class QWG_driven_transmon(Transmon):
+class QWG_driven_transmon(CBox_v3_driven_transmon):
+    def __init__(self, name,
+                 LO, cw_source, td_source,
+                 IVVI, LutMan,
+                 CBox,
+                 MC, **kw):
+        super(CBox_v3_driven_transmon, self).__init__(name, **kw)
+        '''
+        '''
+        self.LO = LO
+        self.cw_source = cw_source
+        self.td_source = td_source
+        self.IVVI = IVVI
+        self.LutMan = LutMan
+        self.CBox = CBox
+        self.MC = MC
+        super().add_parameters()
+        self.add_parameters()
+
+    def add_parameters(self):
+        pass
+
+
+    def prepare_for_timedomain(self):
+        self.MC.soft_avg(self.RO_soft_averages())
+        self.LO.on()
+        self.cw_source.off()
+        self.td_source.on()
+        # Set source to fs =f-f_mod such that pulses appear at f = fs+f_mod
+        self.td_source.frequency.set(self.f_qubit.get()
+                                     - self.f_pulse_mod.get())
+        # self.CBox.trigger_source('internal')
+        # Use resonator freq unless explicitly specified
+        if self.f_RO.get() is None:
+            f_RO = self.f_res.get()
+        else:
+            f_RO = self.f_RO.get()
+        self.LO.frequency.set(f_RO - self.f_RO_mod.get())
+
+        self.td_source.power.set(self.td_source_pow.get())
+
+        # Mixer offsets correction
+        # self.CBox.set('AWG{:.0g}_dac0_offset'.format(self.awg_nr.get()),
+        #               self.mixer_offs_drive_I.get())
+        # self.CBox.set('AWG{:.0g}_dac1_offset'.format(self.awg_nr.get()),
+        #               self.mixer_offs_drive_Q.get())
+        # self.CBox.set('AWG{:.0g}_dac0_offset'.format(self.RO_awg_nr.get()),
+        #               self.mixer_offs_RO_I.get())
+        # self.CBox.set('AWG{:.0g}_dac1_offset'.format(self.RO_awg_nr.get()),
+        #               self.mixer_offs_RO_Q.get())
+
+        # pulse pars
+        # self.LutMan.Q_amp180.set(self.amp180.get())
+        # self.LutMan.Q_amp90.set(self.amp90.get())
+        # self.LutMan.Q_gauss_width.set(self.gauss_width.get())
+        # self.LutMan.Q_motzoi_parameter.set(self.motzoi.get())
+        # self.LutMan.Q_modulation.set(self.f_pulse_mod.get())
+
+        # RO pars
+        # self.LutMan.M_modulation(self.f_RO_mod())
+        # self.LutMan.M_amp(self.RO_amp())
+        # self.LutMan.M_length(self.RO_pulse_length())
+
+        # self.LutMan.lut_mapping(['I', 'X180', 'Y180', 'X90', 'Y90', 'mX90',
+        #                          'mY90', 'M_square'])
+
+        # Mixer skewness correction
+        # self.LutMan.mixer_IQ_phase_skewness.set(0)
+        # self.LutMan.mixer_QI_amp_ratio.set(1)
+        # self.LutMan.mixer_apply_predistortion_matrix.set(True)
+        # self.LutMan.mixer_alpha.set(self.alpha.get())
+        # self.LutMan.mixer_phi.set(self.phi.get())
+
+        # self.LutMan.load_pulses_onto_AWG_lookuptable(self.awg_nr.get())
+
+        # self.LutMan.load_pulses_onto_AWG_lookuptable(self.RO_awg_nr.get())
+
+        # self.CBox.set('sig{}_threshold_line'.format(
+        #               int(self.signal_line.get())),
+        #               int(self.RO_threshold.get()))
+        print('hoi')
+
+
+    def get_operation_dict(self, operation_dict={}):
+        """
+        Returns a (currently hardcoded) operation dictionary for the QWG
+        codewords
+        """
+
+        pulse_period_clocks = convert_to_clocks(
+            self.gauss_width()*4, rounding_period=1/abs(self.f_pulse_mod()))
+        RO_length_clocks = convert_to_clocks(self.RO_pulse_length())
+        RO_pulse_delay_clocks = convert_to_clocks(self.RO_pulse_delay())
+
+        operation_dict['init_all'] = {'instruction':
+                                      'WaitReg r0 \nWaitReg r0 \n'}
+        operation_dict['I {}'.format(self.name)] = {
+            'duration': pulse_period_clocks, 'instruction': 'wait {} \n'}
+        operation_dict['X180 {}'.format(self.name)] = {
+            'duration': pulse_period_clocks, 'instruction':
+                'trigger 0000000, 1 \nwait 1\n'+
+                'trigger 1000001, 1  \nwait {}\n'.format( #1001001
+                    pulse_period_clocks-1)}
+        operation_dict['Y180 {}'.format(self.name)] = {
+            'duration': pulse_period_clocks, 'instruction':
+                'trigger 0100000, 1 \nwait 1\n'+
+                'trigger 1100001, 1  \nwait {}\n'.format(
+                    pulse_period_clocks-1)}
+        operation_dict['X90 {}'.format(self.name)] = {
+            'duration': pulse_period_clocks, 'instruction':
+                'trigger 0010000, 1 \nwait 1\n'+
+                'trigger 1010000, 1  \nwait {}\n'.format(
+                    pulse_period_clocks-1)}
+        operation_dict['Y90 {}'.format(self.name)] = {
+            'duration': pulse_period_clocks, 'instruction':
+                'trigger 0110000, 1 \nwait 1\n'+
+                'trigger 1110000, 1  \nwait {}\n'.format(
+                    pulse_period_clocks-1)}
+        operation_dict['mX90 {}'.format(self.name)] = {
+            'duration': pulse_period_clocks, 'instruction':
+                'trigger 0001000, 1 \nwait 1\n'+
+                'trigger 1001000, 1  \nwait {}\n'.format(
+                    pulse_period_clocks-1)}
+        operation_dict['mY90 {}'.format(self.name)] = {
+            'duration': pulse_period_clocks, 'instruction':
+                'trigger 0101000, 1 \nwait 1\n'+
+                'trigger 1101000, 1  \nwait {}\n'.format(
+                    pulse_period_clocks-1)}
+
+        if self.RO_pulse_type() == 'MW_IQmod_pulse':
+            operation_dict['RO {}'.format(self.name)] = {
+                'duration': RO_length_clocks,
+                'instruction': 'wait {} \npulse 0000 1111 1111 '.format(
+                    RO_pulse_delay_clocks)
+                + '\nwait {} \nmeasure \n'.format(RO_length_clocks)}
+        elif self.RO_pulse_type() == 'Gated_MW_RO_pulse':
+            operation_dict['RO {}'.format(self.name)] = {
+                'duration': RO_length_clocks, 'instruction':
+                'wait {} \ntrigger 1000000, {} \n measure \n'.format(
+                    RO_pulse_delay_clocks, RO_length_clocks)}
+
+        return operation_dict
