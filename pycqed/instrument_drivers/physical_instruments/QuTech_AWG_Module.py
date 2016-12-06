@@ -132,11 +132,12 @@ class QuTech_AWG_Module(SCPI):
                                set_cmd=waveform_cmd+' "{}"',
                                vals=vals.Strings())
 
-        for i in range(self.device_descriptor.numCodewords):
-            cw = i+1
+        for cw in range(self.device_descriptor.numCodewords):
             for j in range(self.device_descriptor.numChannels):
                 ch = j+1
-                cw_cmd = 'sequence:element{:d}:waveform{:d}'.format(cw, ch)
+                # Codeword 0 corresponds to bitcode 0
+                # +1 is to correct for SCPI command in software see issue #74
+                cw_cmd = 'sequence:element{:d}:waveform{:d}'.format(cw+1, ch)
                 self.add_parameter('codeword_{}_ch{}_waveform'.format(cw, ch),
                                    get_cmd=cw_cmd+'?',
                                    set_cmd=cw_cmd+' "{:s}"',
