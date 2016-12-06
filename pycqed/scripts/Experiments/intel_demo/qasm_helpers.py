@@ -379,34 +379,35 @@ def get_operation_dict(qubit, operation_dict={}):
         'duration': pulse_period_clocks, 'instruction': 'wait {} \n'}
     operation_dict['X180 {}'.format(qubit.name)] = {
         'duration': pulse_period_clocks, 'instruction':
-            'trigger 0111110, 1 \nwait 1\n'+
-            'trigger 1001001, 1  \nwait {}\n'.format( #1001001
+            'trigger 0000000, 1 \nwait 1\n'+
+            'trigger 1000001, 1  \nwait {}\n'.format( #1001001
                 pulse_period_clocks-1)}
     operation_dict['Y180 {}'.format(qubit.name)] = {
-        'duration': pulse_period_clocks, 'instruction':
-            'trigger 0010000, 1 \nwait 1\n'+
-            'trigger 1010001, 1  \nwait {}\n'.format(
-                pulse_period_clocks-1)}
-    operation_dict['X90 {}'.format(qubit.name)] = {
-        'duration': pulse_period_clocks, 'instruction':
-            'trigger 0011000, 1 \nwait 1\n'+
-            'trigger 1011001, 1  \nwait {}\n'.format(
-                pulse_period_clocks-1)}
-    operation_dict['Y90 {}'.format(qubit.name)] = {
         'duration': pulse_period_clocks, 'instruction':
             'trigger 0100000, 1 \nwait 1\n'+
             'trigger 1100001, 1  \nwait {}\n'.format(
                 pulse_period_clocks-1)}
+    operation_dict['X90 {}'.format(qubit.name)] = {
+        'duration': pulse_period_clocks, 'instruction':
+            'trigger 0010000, 1 \nwait 1\n'+
+            'trigger 1010000, 1  \nwait {}\n'.format(
+                pulse_period_clocks-1)}
+    operation_dict['Y90 {}'.format(qubit.name)] = {
+        'duration': pulse_period_clocks, 'instruction':
+            'trigger 0110000, 1 \nwait 1\n'+
+            'trigger 1110000, 1  \nwait {}\n'.format(
+                pulse_period_clocks-1)}
     operation_dict['mX90 {}'.format(qubit.name)] = {
         'duration': pulse_period_clocks, 'instruction':
-            'trigger 0101000, 1 \nwait 1\n'+
-            'trigger 1101001, 1  \nwait {}\n'.format(
+            'trigger 0001000, 1 \nwait 1\n'+
+            'trigger 1001000, 1  \nwait {}\n'.format(
                 pulse_period_clocks-1)}
     operation_dict['mY90 {}'.format(qubit.name)] = {
         'duration': pulse_period_clocks, 'instruction':
-            'trigger 0110000, 1 \nwait 1\n'+
-            'trigger 1110001, 1  \nwait {}\n'.format(
+            'trigger 0101000, 1 \nwait 1\n'+
+            'trigger 1101000, 1  \nwait {}\n'.format(
                 pulse_period_clocks-1)}
+
     if qubit.RO_pulse_type() == 'MW_IQmod_pulse':
         operation_dict['RO {}'.format(qubit.name)] = {
             'duration': RO_length_clocks,

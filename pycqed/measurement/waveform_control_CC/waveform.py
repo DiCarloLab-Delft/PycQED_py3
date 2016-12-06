@@ -80,8 +80,8 @@ def gauss_pulse(amp, sigma_length, nr_sigma=4, sampling_rate=2e8,
         pulse_I = -1*deriv_gauss_env
         pulse_Q = gauss_env
     Zeros = np.zeros(int(delay_samples))
-    pulse_I = list(Zeros)+list(pulse_I)
-    pulse_Q = list(Zeros)+list(pulse_Q)
+    pulse_I = np.array(list(Zeros)+list(pulse_I))
+    pulse_Q = np.array(list(Zeros)+list(pulse_Q))
     return pulse_I, pulse_Q
 
 

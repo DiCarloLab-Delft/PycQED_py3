@@ -186,8 +186,7 @@ class CBox_v3_driven_transmon(Transmon):
         self.LO.frequency.set(f_RO - self.f_RO_mod.get())
 
         self.td_source.power.set(self.td_source_pow.get())
-        # self.CBox.set('AWG{:.0g}_mode'.format(self.awg_nr.get()),
-        #               'segmented tape')
+
         # Mixer offsets correction
         self.CBox.set('AWG{:.0g}_dac0_offset'.format(self.awg_nr.get()),
                       self.mixer_offs_drive_I.get())
