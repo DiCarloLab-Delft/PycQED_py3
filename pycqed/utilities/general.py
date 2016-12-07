@@ -119,7 +119,7 @@ def load_settings_onto_instrument(instrument, load_from_instr=None, folder=None,
                     else:
                         try:
                             instrument.set(parameter, float(value))
-                        except ValueError:
+                        except Exception:
                             try:
                                 instrument.set(parameter, value)
                             except:

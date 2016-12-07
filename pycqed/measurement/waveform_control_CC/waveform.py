@@ -179,3 +179,9 @@ def mod_gauss(amp, sigma_length, f_modulation, axis='x',
                                          sampling_rate=sampling_rate,
                                          Q_phase_delay=Q_phase_delay)
     return pulse_I_mod, pulse_Q_mod
+
+def mixer_predistortion_matrix(alpha, phi):
+    predistortion_matrix = np.array(
+        [[1,  np.tan(phi*2*np.pi/360)],
+         [0, 1/alpha * 1/np.cos(phi*2*np.pi/360)]])
+    return predistortion_matrix

@@ -1,9 +1,3 @@
-import logging
-import numpy as np
-
-from .qubit_object import Transmon
-from qcodes.utils import validators as vals
-from qcodes.instrument.parameter import ManualParameter
 '''
 File:               CC_transmon.py
 Author:             Adriaan Rol
@@ -12,7 +6,15 @@ Usage:
 Notes:
 Bugs:
 '''
+import time
+import logging
+import numpy as np
 
+from .qubit_object import Transmon
+from qcodes.utils import validators as vals
+from qcodes.instrument.parameter import ManualParameter
+from pycqed.measurement.waveform_control_CC import waveform as wf
+import pycqed.measurement.mc_parameter_wrapper as pw
 from pycqed.analysis import measurement_analysis as ma
 
 from pycqed.measurement.calibration_toolbox import mixer_carrier_cancellation_CBox
@@ -129,9 +131,9 @@ class CBox_v3_driven_transmon(Transmon):
                            vals=vals.Enum(0, 1), initial_value=0)
 
         # Mixer skewness correction
-        self.add_parameter('phi', units='deg',
+        self.add_parameter('mixer_drive_phi', units='deg',
                            parameter_class=ManualParameter, initial_value=0)
-        self.add_parameter('alpha', units='',
+        self.add_parameter('mixer_drive_alpha', units='',
                            parameter_class=ManualParameter, initial_value=1)
         # Mixer offsets correction, qubit drive
         self.add_parameter('mixer_offs_drive_I',
@@ -148,6 +150,10 @@ class CBox_v3_driven_transmon(Transmon):
                            vals=vals.Enum(
                                'MW_IQmod_pulse', 'Gated_MW_RO_pulse'),
                            parameter_class=ManualParameter)
+        self.add_parameter('RO_depletion_time', initial_value=1e-6,
+                           units='s',
+                           parameter_class=ManualParameter,
+                           vals=vals.Numbers(min_value=0))
 
         self.add_parameter('cal_pt_zero',
                            initial_value=None,
@@ -159,7 +165,6 @@ class CBox_v3_driven_transmon(Transmon):
                            vals=vals.Anything(),  # should be a tuple validator
                            label='Calibration point |1>',
                            parameter_class=ManualParameter)
-
 
     def prepare_for_continuous_wave(self):
         raise NotImplementedError()
@@ -225,8 +230,8 @@ class CBox_v3_driven_transmon(Transmon):
         self.LutMan.mixer_IQ_phase_skewness.set(0)
         self.LutMan.mixer_QI_amp_ratio.set(1)
         self.LutMan.mixer_apply_predistortion_matrix.set(True)
-        self.LutMan.mixer_alpha.set(self.alpha.get())
-        self.LutMan.mixer_phi.set(self.phi.get())
+        self.LutMan.mixer_alpha.set(self.mixer_drive_alpha.get())
+        self.LutMan.mixer_phi.set(self.mixer_drive_phi.get())
 
         self.LutMan.load_pulses_onto_AWG_lookuptable(self.awg_nr.get())
         self.LutMan.load_pulses_onto_AWG_lookuptable(self.RO_awg_nr.get())
@@ -482,8 +487,8 @@ class CBox_v3_driven_transmon(Transmon):
             LutMan=self.LutMan, AWG=self.AWG, MC=self.MC,
             awg_nrs=[self.awg_nr.get()], calibrate_both_sidebands=True)
         if update:
-            self.phi.set(phi)
-            self.alpha.set(alpha)
+            self.mixer_drive_phi.set(phi)
+            self.mixer_drive_alpha.set(alpha)
 
     def calibrate_RO_threshold(self, method='conventional',
                                MC=None, close_fig=True,
@@ -717,10 +722,10 @@ class CBox_v3_driven_transmon(Transmon):
         asm_filenames = []
         for i in range(nr_seeds):
             RB_qasm = sqqs.randomized_benchmarking(self.name,
-                                                      nr_cliffords=nr_cliffords, nr_seeds=1,
-                                                      label='randomized_benchmarking_' +
-                                                      str(i),
-                                                      double_curves=False)
+                                                   nr_cliffords=nr_cliffords, nr_seeds=1,
+                                                   label='randomized_benchmarking_' +
+                                                   str(i),
+                                                   double_curves=False)
             asm_file = qta.qasm_to_asm(RB_qasm.name, self.get_operation_dict())
             asm_filenames.append(asm_file.name)
 
@@ -744,7 +749,7 @@ class CBox_v3_driven_transmon(Transmon):
         MC.run('RB_{}seeds'.format(nr_seeds)+self.msmt_suffix)
         ma.RandomizedBenchmarking_Analysis(
             close_main_fig=close_fig, T1=T1,
-            pulse_delay=self.pulse_delay.get())
+            pulse_delay=self.gauss_width.get()*4)
 
     def measure_T1(self, times, MC=None,
                    analyze=True, close_fig=True):
@@ -870,6 +875,36 @@ class CBox_v3_driven_transmon(Transmon):
         MC.run('AllXY'+label+self.msmt_suffix)
         if analyze:
             a = ma.AllXY_Analysis(close_main_fig=close_fig)
+            return a
+
+    def measure_flipping_sequence(self, number_of_flips, MC=None, label='',
+                                  equator=False,
+                                  analyze=True, close_fig=True, verbose=True):
+
+        self.prepare_for_timedomain()
+        if MC is None:
+            MC = self.MC
+
+        number_of_flips = np.concatenate([number_of_flips,
+                                          (number_of_flips[-1]+number_of_flips[0],
+                                           number_of_flips[-1] +
+                                           number_of_flips[1],
+                                           number_of_flips[-1] +
+                                           number_of_flips[2],
+                                           number_of_flips[-1]+number_of_flips[3])])
+        flipping_sequence = sqqs.flipping_seq(self.name, number_of_flips,
+                                              equator=equator)
+        s = qh.QASM_Sweep(flipping_sequence.name, self.CBox,
+                          self.get_operation_dict())
+        d = qh.CBox_integrated_average_detector_CC(
+            self.CBox, nr_averages=self.RO_acq_averages()//MC.soft_avg())
+
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(number_of_flips)
+        MC.set_detector_function(d)
+        MC.run('flipping_sequence'+label+self.msmt_suffix)
+        if analyze:
+            a = ma.MeasurementAnalysis(close_main_fig=close_fig)
             return a
 
     def measure_ssro(self, no_fits=False,
@@ -1025,9 +1060,10 @@ def convert_to_clocks(duration, f_sampling=200e6, rounding_period=None):
 
 
 class QWG_driven_transmon(CBox_v3_driven_transmon):
+
     def __init__(self, name,
                  LO, cw_source, td_source,
-                 IVVI, LutMan,
+                 IVVI, QWG,
                  CBox,
                  MC, **kw):
         super(CBox_v3_driven_transmon, self).__init__(name, **kw)
@@ -1037,15 +1073,49 @@ class QWG_driven_transmon(CBox_v3_driven_transmon):
         self.cw_source = cw_source
         self.td_source = td_source
         self.IVVI = IVVI
-        self.LutMan = LutMan
+        self.QWG = QWG
         self.CBox = CBox
         self.MC = MC
         super().add_parameters()
         self.add_parameters()
 
     def add_parameters(self):
-        pass
+        self.add_parameter('amp90_scale',
+                           label='pulse amplitude scaling factor',
+                           units='',
+                           initial_value=.5,
+                           vals=vals.Numbers(min_value=0, max_value=1.0),
+                           parameter_class=ManualParameter)
 
+    def measure_rabi(self, amps, n=1,
+                     MC=None, analyze=True, close_fig=True,
+                     verbose=False):
+        self.prepare_for_timedomain()
+        if MC is None:
+            MC = self.MC
+        if n != 1:
+            raise NotImplementedError('QASM/QuMis sequence for n>1')
+
+        # Generating the qumis file
+        single_pulse_elt = sqqs.single_elt_on(self.name)
+        single_pulse_asm = qta.qasm_to_asm(single_pulse_elt.name,
+                                           self.get_operation_dict())
+        qumis_file = single_pulse_asm
+        self.CBox.load_instructions(qumis_file.name)
+        ch_amp = pw.wrap_pars_to_swf([self.QWG.ch1_amp, self.QWG.ch2_amp,
+                                      self.QWG.ch3_amp])
+
+        d = qh.CBox_single_integration_average_det_CC(
+            self.CBox, nr_averages=self.RO_acq_averages()//MC.soft_avg(),
+            seg_per_point=1)
+        MC.set_sweep_function(ch_amp)
+        MC.set_sweep_points(amps)
+        MC.set_detector_function(d)
+
+        MC.run('Rabi-n{}'.format(n)+self.msmt_suffix)
+        if analyze:
+            a = ma.Rabi_Analysis(auto=True, close_fig=close_fig)
+            return a
 
     def prepare_for_timedomain(self):
         self.MC.soft_avg(self.RO_soft_averages())
@@ -1064,6 +1134,7 @@ class QWG_driven_transmon(CBox_v3_driven_transmon):
         self.LO.frequency.set(f_RO - self.f_RO_mod.get())
 
         self.td_source.power.set(self.td_source_pow.get())
+        self.load_QWG_pulses()
 
         # Mixer offsets correction
         # self.CBox.set('AWG{:.0g}_dac0_offset'.format(self.awg_nr.get()),
@@ -1075,37 +1146,98 @@ class QWG_driven_transmon(CBox_v3_driven_transmon):
         # self.CBox.set('AWG{:.0g}_dac1_offset'.format(self.RO_awg_nr.get()),
         #               self.mixer_offs_RO_Q.get())
 
-        # pulse pars
-        # self.LutMan.Q_amp180.set(self.amp180.get())
-        # self.LutMan.Q_amp90.set(self.amp90.get())
-        # self.LutMan.Q_gauss_width.set(self.gauss_width.get())
-        # self.LutMan.Q_motzoi_parameter.set(self.motzoi.get())
-        # self.LutMan.Q_modulation.set(self.f_pulse_mod.get())
-
         # RO pars
         # self.LutMan.M_modulation(self.f_RO_mod())
         # self.LutMan.M_amp(self.RO_amp())
         # self.LutMan.M_length(self.RO_pulse_length())
 
-        # self.LutMan.lut_mapping(['I', 'X180', 'Y180', 'X90', 'Y90', 'mX90',
-        #                          'mY90', 'M_square'])
+        self.CBox.upload_standard_weights(self.f_RO_mod())
 
-        # Mixer skewness correction
-        # self.LutMan.mixer_IQ_phase_skewness.set(0)
-        # self.LutMan.mixer_QI_amp_ratio.set(1)
-        # self.LutMan.mixer_apply_predistortion_matrix.set(True)
-        # self.LutMan.mixer_alpha.set(self.alpha.get())
-        # self.LutMan.mixer_phi.set(self.phi.get())
+    def load_QWG_pulses(self):
+        # NOTE: this is currently hardcoded to use ch1 and ch2 of the QWG
 
-        # self.LutMan.load_pulses_onto_AWG_lookuptable(self.awg_nr.get())
+        t0 = time.time()
+        self.QWG.reset()
 
-        # self.LutMan.load_pulses_onto_AWG_lookuptable(self.RO_awg_nr.get())
+        # Amplitude is set using the channel amplitude (at least for now)
+        G, D = wf.gauss_pulse(1, self.gauss_width(),
+                              motzoi=self.motzoi(),
+                              sampling_rate=1e9)  # sampling rate of QWG
+        self.QWG.deleteWaveformAll()
+        self.QWG.createWaveformReal('X180_q0_I', G)
+        self.QWG.createWaveformReal('X180_q0_Q', D)
+        self.QWG.createWaveformReal('X90_q0_I', self.amp90_scale()*G)
+        self.QWG.createWaveformReal('X90_q0_Q', self.amp90_scale()*D)
 
-        # self.CBox.set('sig{}_threshold_line'.format(
-        #               int(self.signal_line.get())),
-        #               int(self.RO_threshold.get()))
-        print('hoi')
+        self.QWG.createWaveformReal('Y180_q0_I', D)
+        self.QWG.createWaveformReal('Y180_q0_Q', -G)
+        self.QWG.createWaveformReal('Y90_q0_I', self.amp90_scale()*D)
+        self.QWG.createWaveformReal('Y90_q0_Q', -self.amp90_scale()*G)
 
+        self.QWG.createWaveformReal('mX90_q0_I', -self.amp90_scale()*G)
+        self.QWG.createWaveformReal('mX90_q0_Q', -self.amp90_scale()*D)
+        self.QWG.createWaveformReal('mY90_q0_I', -self.amp90_scale()*D)
+        self.QWG.createWaveformReal('mY90_q0_Q', self.amp90_scale()*G)
+
+        # Filler waveform
+        self.QWG.createWaveformReal('zero', [0]*4)
+
+        self.QWG.codeword_0_ch1_waveform('X180_q0_I')
+        self.QWG.codeword_0_ch2_waveform('X180_q0_Q')
+        self.QWG.codeword_0_ch3_waveform('X180_q0_I')
+        self.QWG.codeword_0_ch4_waveform('X180_q0_Q')
+
+        self.QWG.codeword_1_ch1_waveform('Y180_q0_I')
+        self.QWG.codeword_1_ch2_waveform('Y180_q0_Q')
+        self.QWG.codeword_1_ch3_waveform('Y180_q0_I')
+        self.QWG.codeword_1_ch4_waveform('Y180_q0_Q')
+
+        self.QWG.codeword_2_ch1_waveform('X90_q0_I')
+        self.QWG.codeword_2_ch2_waveform('X90_q0_Q')
+        self.QWG.codeword_2_ch3_waveform('X90_q0_I')
+        self.QWG.codeword_2_ch4_waveform('X90_q0_Q')
+
+        self.QWG.codeword_3_ch1_waveform('Y90_q0_I')
+        self.QWG.codeword_3_ch2_waveform('Y90_q0_Q')
+        self.QWG.codeword_3_ch3_waveform('Y90_q0_I')
+        self.QWG.codeword_3_ch4_waveform('Y90_q0_Q')
+
+        self.QWG.codeword_4_ch1_waveform('mX90_q0_I')
+        self.QWG.codeword_4_ch2_waveform('mX90_q0_Q')
+        self.QWG.codeword_4_ch3_waveform('mX90_q0_I')
+        self.QWG.codeword_4_ch4_waveform('mX90_q0_Q')
+
+        self.QWG.codeword_5_ch1_waveform('mY90_q0_I')
+        self.QWG.codeword_5_ch2_waveform('mY90_q0_Q')
+        self.QWG.codeword_5_ch3_waveform('mY90_q0_I')
+        self.QWG.codeword_5_ch4_waveform('mY90_q0_Q')
+
+        predistortion_matrix = wf.mixer_predistortion_matrix(
+            alpha=self.mixer_drive_alpha(),
+            phi=self.mixer_drive_phi())
+
+        self.QWG.ch_pair1_transform_matrix(predistortion_matrix)
+
+        for ch in [1, 2, 3, 4]:
+            self.QWG.set('ch{}_amp'.format(ch), self.amp180())
+            self.QWG.set('ch{}_state'.format(ch), True)
+
+        self.QWG.ch1_offset(self.mixer_offs_drive_I())
+        self.QWG.ch2_offset(self.mixer_offs_drive_Q())
+
+        # - is to correct for wrong sign of sideband generators
+        self.QWG.ch_pair1_sideband_frequency(-self.f_pulse_mod())
+        self.QWG.ch_pair3_sideband_frequency(-self.f_pulse_mod())
+        self.QWG.syncSidebandGenerators()
+
+        self.QWG.stop()
+        self.QWG.run_mode('CODeword')
+        self.QWG.start()
+        # Check for errors at the end
+        for i in range(self.QWG.getSystemErrorCount()):
+            logging.warning(self.QWG.getError())
+        t1 = time.time()
+        logging.info('Initializing QWG took {:.2f}'.format(t1-t0))
 
     def get_operation_dict(self, operation_dict={}):
         """
@@ -1114,51 +1246,54 @@ class QWG_driven_transmon(CBox_v3_driven_transmon):
         """
 
         pulse_period_clocks = convert_to_clocks(
-            self.gauss_width()*4, rounding_period=1/abs(self.f_pulse_mod()))
+            max(self.gauss_width()*4, self.pulse_delay()))
         RO_length_clocks = convert_to_clocks(self.RO_pulse_length())
+        RO_acq_marker_del_clocks = convert_to_clocks(
+            self.RO_acq_marker_delay())
         RO_pulse_delay_clocks = convert_to_clocks(self.RO_pulse_delay())
-
+        RO_depletion_clocks = convert_to_clocks(self.RO_depletion_time())
         operation_dict['init_all'] = {'instruction':
                                       'WaitReg r0 \nWaitReg r0 \n'}
         operation_dict['I {}'.format(self.name)] = {
             'duration': pulse_period_clocks, 'instruction': 'wait {} \n'}
         operation_dict['X180 {}'.format(self.name)] = {
             'duration': pulse_period_clocks, 'instruction':
-                'trigger 0000000, 1 \nwait 1\n'+
-                'trigger 1000001, 1  \nwait {}\n'.format( #1001001
-                    pulse_period_clocks-1)}
+                'trigger 0000000, 2 \nwait 2\n' +
+                'trigger 1000001, 2  \nwait {}\n'.format(  # 1001001
+                    pulse_period_clocks-2)}
         operation_dict['Y180 {}'.format(self.name)] = {
             'duration': pulse_period_clocks, 'instruction':
-                'trigger 0100000, 1 \nwait 1\n'+
-                'trigger 1100001, 1  \nwait {}\n'.format(
-                    pulse_period_clocks-1)}
+                'trigger 0100000, 2 \nwait 2\n' +
+                'trigger 1100001, 2  \nwait {}\n'.format(
+                    pulse_period_clocks-2)}
         operation_dict['X90 {}'.format(self.name)] = {
             'duration': pulse_period_clocks, 'instruction':
-                'trigger 0010000, 1 \nwait 1\n'+
-                'trigger 1010000, 1  \nwait {}\n'.format(
-                    pulse_period_clocks-1)}
+                'trigger 0010000, 2 \nwait 2\n' +
+                'trigger 1010000, 2  \nwait {}\n'.format(
+                    pulse_period_clocks-2)}
         operation_dict['Y90 {}'.format(self.name)] = {
             'duration': pulse_period_clocks, 'instruction':
-                'trigger 0110000, 1 \nwait 1\n'+
-                'trigger 1110000, 1  \nwait {}\n'.format(
-                    pulse_period_clocks-1)}
+                'trigger 0110000, 2 \nwait 2\n' +
+                'trigger 1110000, 2  \nwait {}\n'.format(
+                    pulse_period_clocks-2)}
         operation_dict['mX90 {}'.format(self.name)] = {
             'duration': pulse_period_clocks, 'instruction':
-                'trigger 0001000, 1 \nwait 1\n'+
-                'trigger 1001000, 1  \nwait {}\n'.format(
-                    pulse_period_clocks-1)}
+                'trigger 0001000, 2 \nwait 2\n' +
+                'trigger 1001000, 2  \nwait {}\n'.format(
+                    pulse_period_clocks-2)}
         operation_dict['mY90 {}'.format(self.name)] = {
             'duration': pulse_period_clocks, 'instruction':
-                'trigger 0101000, 1 \nwait 1\n'+
-                'trigger 1101000, 1  \nwait {}\n'.format(
-                    pulse_period_clocks-1)}
+                'trigger 0101000, 2 \nwait 2\n' +
+                'trigger 1101000, 2  \nwait {}\n'.format(
+                    pulse_period_clocks-2)}
 
         if self.RO_pulse_type() == 'MW_IQmod_pulse':
             operation_dict['RO {}'.format(self.name)] = {
-                'duration': RO_length_clocks,
+                'duration': RO_pulse_delay_clocks+RO_acq_marker_del_clocks+RO_depletion_clocks,
                 'instruction': 'wait {} \npulse 0000 1111 1111 '.format(
                     RO_pulse_delay_clocks)
-                + '\nwait {} \nmeasure \n'.format(RO_length_clocks)}
+                + '\nwait {} \nmeasure '.format(RO_acq_marker_del_clocks)
+                + '\nwait {}\n'.format(RO_depletion_clocks)}
         elif self.RO_pulse_type() == 'Gated_MW_RO_pulse':
             operation_dict['RO {}'.format(self.name)] = {
                 'duration': RO_length_clocks, 'instruction':

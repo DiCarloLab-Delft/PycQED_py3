@@ -1,10 +1,12 @@
 '''
-File:               QuTech_AWG_Module.py
-Author:             Wouter Vlothuizen, TNO/QuTech,
-                    edited by Adriaan Rol
-Purpose:            Instrument driver for Qutech QWG
+File:       QuTech_AWG_Module.py
+Author:     Wouter Vlothuizen, TNO/QuTech,
+            edited by Adriaan Rol
+Purpose:    Instrument driver for Qutech QWG
 Usage:
-Notes:
+Notes:      It is possible to view the QWG log using ssh. To do this connect
+            using ssh e.g., "ssh root@192.168.0.10"
+            Logging can be enabled using "tail -f /tmpLog/qwg.log"
 Bugs:
 '''
 
@@ -107,7 +109,6 @@ class QuTech_AWG_Module(SCPI):
             triglev_cmd = 'qutech:trigger{}:level'.format(i)
             # individual trigger level per trigger input:
             self.add_parameter('tr{}_trigger_level'.format(i),
-                               parameter_class=HandshakeParameter,
                                units='V',
                                label='Trigger level channel {} (V)'.format(i),
                                get_cmd=triglev_cmd + '?',
@@ -116,7 +117,6 @@ class QuTech_AWG_Module(SCPI):
                                get_parser=float)
 
         self.add_parameter('run_mode',
-                           parameter_class=HandshakeParameter,
                            get_cmd='AWGC:RMO?',
                            set_cmd='AWGC:RMO ' + '{}',
                            vals=vals.Enum('NONE', 'CONt', 'SEQ', 'CODeword'))
@@ -131,7 +131,6 @@ class QuTech_AWG_Module(SCPI):
             # Set channel first to ensure sensible sorting of pars
             # Compatibility: 5014, QWG
             self.add_parameter('ch{}_state'.format(ch),
-                               parameter_class=HandshakeParameter,
                                label='Status channel {}'.format(ch),
                                get_cmd=state_cmd + '?',
                                set_cmd=state_cmd + ' {}',
@@ -157,7 +156,6 @@ class QuTech_AWG_Module(SCPI):
                                get_parser=float)
 
             self.add_parameter('ch{}_default_waveform'.format(ch),
-                               parameter_class=HandshakeParameter,
                                get_cmd=waveform_cmd+'?',
                                set_cmd=waveform_cmd+' "{}"',
                                vals=vals.Strings())
@@ -169,20 +167,17 @@ class QuTech_AWG_Module(SCPI):
                 # +1 is to correct for SCPI command in software see issue #74
                 cw_cmd = 'sequence:element{:d}:waveform{:d}'.format(cw+1, ch)
                 self.add_parameter('codeword_{}_ch{}_waveform'.format(cw, ch),
-                                   parameter_class=HandshakeParameter,
                                    get_cmd=cw_cmd+'?',
                                    set_cmd=cw_cmd+' "{:s}"',
                                    vals=vals.Strings())
 
         # Waveform parameters
         self.add_parameter('WlistSize',
-                           parameter_class=HandshakeParameter,
                            label='Waveform list size',
                            units='#',
                            get_cmd='wlist:size?',
                            get_parser=int)
         self.add_parameter('Wlist',
-                           parameter_class=HandshakeParameter,
                            label='Waveform list',
                            get_cmd=self._getWlist)
 

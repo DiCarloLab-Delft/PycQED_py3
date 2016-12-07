@@ -66,7 +66,7 @@ class Fridge_Monitor(Instrument):
 
                 return float(self.temp_dict[par_name])
             except:
-                logging.warning('Could not extract {} from {}'.format(
+                logging.info('Could not extract {} from {}'.format(
                     par_name, self.url))
         return get_cmd
 
@@ -93,7 +93,7 @@ class Fridge_Monitor(Instrument):
 
                 self.temp_dict = {elem[0]: float(elem[1]) for elem in temperaturegroups}
             except Exception:
-                logging.warning(
+                logging.info(
                     '\nTemperatures could not be extracted from website\n')
                 for temperature_name in self.monitored_pars:
                     self.temp_dict[temperature_name] = 0

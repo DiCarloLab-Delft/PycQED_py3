@@ -17,12 +17,7 @@ import pandas as pd
 # Qcodes
 import qcodes as qc
 import pycqed as pq
-# currently on a Windows machine
-# qc.set_mp_method('spawn')  # force Windows behavior on mac
-# qc.show_subprocess_widget()
-# Globally defined config
-# qc_config = {'datadir': r'D:\\Experimentsp7_Qcodes_5qubit',
-#              'PycQEDdir': 'D:\GitHubRepos\PycQED_py3'}
+
 qc_config = {'datadir': r'D:\\Experiments\\1611_Starmon\\Data',
              'PycQEDdir': 'D:\GitHubRepos\PycQED_py3'}
 
@@ -80,7 +75,7 @@ import pylab
 from pycqed.instrument_drivers.meta_instrument import CBox_LookuptableManager as cbl
 from pycqed.measurement.waveform_control_CC import qasm_to_asm as qta
 import pycqed.instrument_drivers.meta_instrument.qubit_objects.CC_transmon as cq
-
+import pycqed.instrument_drivers.physical_instruments.QuTech_AWG_Module as qwg
 #import pycqed.instrument_drivers.meta_instrument.CBox_LookuptableManager as lm
 
 ############################
@@ -93,7 +88,7 @@ pq.station = station
 ###########
 # Sources #
 ###########
-LO = rs.RohdeSchwarz_SGS100A(name='LO', address='TCPIP0::192.168.0.85', server_name=None)
+LO = rs.RohdeSchwarz_SGS100A(name='LO', address='TCPIP0::192.168.0.79', server_name=None)
 station.add_component(LO)
 RF = rs.RohdeSchwarz_SGS100A(name='RF', address='TCPIP0::192.168.0.80', server_name=None)  #
 station.add_component(RF)
@@ -101,8 +96,9 @@ QL_LO = rs.RohdeSchwarz_SGS100A(name='QL_LO', address='TCPIP0::192.168.0.71', se
 station.add_component(QL_LO)
 QR_LO = rs.RohdeSchwarz_SGS100A(name='QR_LO', address='TCPIP0::192.168.0.72', server_name=None)  #
 station.add_component(QR_LO)
-Spec_source = rs.RohdeSchwarz_SGS100A(name='Spec_source', address='TCPIP0::192.168.0.79', server_name=None)  #
-station.add_component(Spec_source)
+
+
+
 
 # VNA
 # VNA = ZNB20.ZNB20(name='VNA', address='TCPIP0::192.168.0.55', server_name=None)  #
@@ -152,6 +148,12 @@ AWG = tek.Tektronix_AWG5014(name='AWG', setup_folder=None, timeout=2,
                             address='GPIB0::8::INSTR', server_name=None)
 station.add_component(AWG)
 AWG.timeout(180)
+
+QWG = qwg.QuTech_AWG_Module(
+    'QWG', address='192.168.0.10',
+    port=5025, server_name=None)
+station.add_component(QWG)
+
 # AWG520 = tk520.Tektronix_AWG520('AWG520', address='GPIB0::17::INSTR',
 #                                 server_name='')
 # station.add_component(AWG520)
@@ -187,7 +189,7 @@ HS = hd.HeterodyneInstrument('HS', LO=LO, RF=RF, AWG=AWG, acquisition_instr=UHFQ
 #                              server_name=None)
 station.add_component(HS)
 
-QL = qbt.Tektronix_driven_transmon('QL', LO=LO, cw_source=Spec_source,
+QL = qbt.Tektronix_driven_transmon('QL', LO=LO, cw_source=None,
                                               td_source=QL_LO,
                                               IVVI=IVVI, rf_RO_source=RF,
                                               AWG=AWG,
@@ -197,12 +199,12 @@ QL = qbt.Tektronix_driven_transmon('QL', LO=LO, cw_source=Spec_source,
                                               server_name=None)
 station.add_component(QL)
 
-QL_CB = cq.CBox_v3_driven_transmon('QL_CB', LO=LO, cw_source=Spec_source,
+QL_CB = cq.CBox_v3_driven_transmon('QL_CB', LO=LO, cw_source=None,
                                      td_source=QL_LO, IVVI=IVVI,
                                      LutMan=LutMan_CB, CBox=CBox, MC=MC)
 station.add_component(QL_CB)
 
-QR = qbt.Tektronix_driven_transmon('QR', LO=LO, cw_source=Spec_source,
+QR = qbt.Tektronix_driven_transmon('QR', LO=LO, cw_source=None,
                                               td_source=QR_LO,
                                               IVVI=IVVI, rf_RO_source=RF,
                                               AWG=AWG,
@@ -212,7 +214,14 @@ QR = qbt.Tektronix_driven_transmon('QR', LO=LO, cw_source=Spec_source,
                                               server_name=None)
 station.add_component(QR)
 
-Bus_m = qbt.Tektronix_driven_transmon('Bus_m', LO=LO, cw_source=Spec_source,
+
+QL_QWG = cq.QWG_driven_transmon('QL_QWG', LO=LO, cw_source=RF,
+                                     td_source=QL_LO, IVVI=IVVI,
+                                     QWG=QWG, CBox=CBox, MC=MC)
+
+station.add_component(QL_QWG)
+
+Bus_m = qbt.Tektronix_driven_transmon('Bus_m', LO=LO, cw_source=None,
                                               td_source=QR_LO,
                                               IVVI=IVVI, rf_RO_source=RF,
                                               AWG=AWG,
@@ -225,6 +234,8 @@ station.add_component(Bus_m)
 # # load settings onto qubits
 gen.load_settings_onto_instrument(QL)
 gen.load_settings_onto_instrument(QR)
+gen.load_settings_onto_instrument(QL_QWG)
+gen.load_settings_onto_instrument(QL_CB)
 gen.load_settings_onto_instrument(HS)
 gen.load_settings_onto_instrument(Bus_m)
 
@@ -271,7 +282,6 @@ print('Ran initialization in %.2fs' % (t1-t0))
 def all_sources_off():
     LO.off()
     RF.off()
-    Spec_source.off()
     QL_LO.off()
     QR_LO.off()
 
@@ -326,3 +336,7 @@ def switch_to_pulsed_RO_CBox(qubit):
 
 # switch_to_pulsed_RO_CBox(QL)
 # switch_to_pulsed_RO_CBox(QR)
+
+
+CBox.AWG0_dac0_offset(-.279999)
+CBox.AWG0_dac1_offset( -26.600000)

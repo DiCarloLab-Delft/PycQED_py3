@@ -153,7 +153,7 @@ def Flipping_seq(pulse_pars, RO_pars, n=1, post_msmt_delay=10e-9,
         n:               iterations (up to 2n+1 pulses)
         post_msmt_delay: extra wait time for resetless compatibility
     '''
-    seq_name = 'Rabi_sequence'
+    seq_name = 'Flipping_sequence'
     seq = sequence.Sequence(seq_name)
     station.pulsar.update_channel_settings()
     el_list = []

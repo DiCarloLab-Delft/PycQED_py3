@@ -37,6 +37,31 @@ def T1(qubit_name, times, clock_cycle=5e-9,
     return qasm_file
 
 
+def flipping_seq(qubit_name, number_of_flips, clock_cycle=5e-9,
+                 equator=False, cal_points=True):
+    filename = join(base_qasm_path, 'Flipping.qasm')
+    qasm_file = mopen(filename, mode='w')
+    qasm_file.writelines('qubit {} \n'.format(qubit_name))
+    for i, n in enumerate(number_of_flips):
+        qasm_file.writelines('\ninit_all\n')
+        if cal_points and (i == (len(number_of_flips)-4) or
+                           i == (len(number_of_flips)-3)):
+            qasm_file.writelines('RO {}  \n'.format(qubit_name))
+        elif cal_points and (i == (len(number_of_flips)-2) or
+                             i == (len(number_of_flips)-1)):
+            qasm_file.writelines('X180 {} \n'.format(qubit_name))
+            qasm_file.writelines('RO {}  \n'.format(qubit_name))
+        else:
+            if equator:
+                qasm_file.writelines('X90 {} \n'.format(qubit_name))
+            for j in range(n):
+                qasm_file.writelines('X180 {} \n'.format(
+                                     qubit_name))
+            qasm_file.writelines('RO {}  \n'.format(qubit_name))
+    qasm_file.close()
+    return qasm_file
+
+
 def AllXY(qubit_name, double_points=False):
     pulse_combinations = [['I', 'I'], ['X180', 'X180'], ['Y180', 'Y180'],
                           ['X180', 'Y180'], ['Y180', 'X180'],
@@ -63,7 +88,6 @@ def AllXY(qubit_name, double_points=False):
         qasm_file.writelines('RO {}  \n'.format(qubit_name))
     qasm_file.close()
     return qasm_file
-
 
 
 def Rabi(qubit_name, amps, n=1):
@@ -277,7 +301,7 @@ def butterfly(qubit_name, initialize=False):
 
 
 def randomized_benchmarking(qubit_name, nr_cliffords, nr_seeds,
-                            net_clifford=0,
+                            net_clifford=0, restless=False,
                             label='randomized_benchmarking',
                             cal_points=True,
                             double_curves=True):
@@ -287,10 +311,12 @@ def randomized_benchmarking(qubit_name, nr_cliffords, nr_seeds,
         nr_seeds:      int  nr_seeds for which to generate RB seqs
         net_clifford:  int index of net clifford the sequence should perform
                        0 corresponds to Identity and 3 corresponds to X180
+        restless:      bool, does not initialize if restless is True
         label:           some string that can be used as a label.
         cal_points:    bool whether to replace the last two elements with
                        calibration points, set to False if you want
                        to measure a single element (for e.g. optimization)
+
         double_curves: Alternates between net clifford 0 and 3
 
     returns:
@@ -306,7 +332,8 @@ def randomized_benchmarking(qubit_name, nr_cliffords, nr_seeds,
     i = 0
     for seed in range(nr_seeds):
         for j, n_cl in enumerate(nr_cliffords):
-            qasm_file.writelines('init_all  \n')
+            if not restless:
+                qasm_file.writelines('init_all  \n')
             if cal_points and (j == (len(nr_cliffords)-4) or
                                j == (len(nr_cliffords)-3)):
                 qasm_file.writelines('RO {}  \n'.format(qubit_name))
@@ -328,7 +355,6 @@ def randomized_benchmarking(qubit_name, nr_cliffords, nr_seeds,
                 qasm_file.writelines('RO {}  \n'.format(qubit_name))
     qasm_file.close()
     return qasm_file
-
 
 
 def MotzoiXY(qubit_name, motzois, cal_points=True):
