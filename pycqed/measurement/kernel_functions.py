@@ -56,6 +56,7 @@ def kernel_from_kernel_stepvec(kernel_stepvec, width=1):
     kernel_out = np.zeros(kernel_stepvec.shape)
     kernel_out[:width] = kernel_stepvec[:width]
     kernel_out[width:] = kernel_stepvec[width:]-kernel_stepvec[:-width]
+    # kernel_out = kernel_out / np.sum(kernel_out)
     return kernel_out
 
 

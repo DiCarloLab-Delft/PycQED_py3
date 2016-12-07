@@ -466,10 +466,12 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
                 self.CBox.nr_averages(int(self.nr_averages))
                 if self.SSB:
                     self.CBox.lin_trans_coeffs([1,1,-1,1])
-                    self.CBox.demodulation_mode(1)
+                    # self.CBox.demodulation_mode(1)
+                    self.CBox.demodulation_mode('single')
                 else:
                     self.CBox.lin_trans_coeffs([1,0,0,1])
-                    self.CBox.demodulation_mode(0)
+                    # self.CBox.demodulation_mode(0)
+                    self.CBox.demodulation_mode('double')
                 nr_samples = 512
                 self.CBox.nr_samples.set(nr_samples)
                 SWF = awg_swf.OffOn(
@@ -478,7 +480,7 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
                                     pulse_comb='OffOff',
                                     nr_samples=nr_samples)
                 SWF.prepare()
-                self.CBox.acquisition_mode(0)
+                self.CBox.acquisition_mode('idle')
                 self.AWG.start()
                 self.CBox.acquisition_mode('input averaging')
                 inp_avg_res = self.CBox.get_input_avg_results()
@@ -492,11 +494,11 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
                                     pulse_comb='OnOn',
                                     nr_samples=nr_samples)
                 SWF.prepare()
-                self.CBox.acquisition_mode(0)
+                self.CBox.acquisition_mode('idle')
                 self.CBox.acquisition_mode('input averaging')
                 self.AWG.start()
                 inp_avg_res = self.CBox.get_input_avg_results()
-                self.CBox.acquisition_mode(0)
+                self.CBox.acquisition_mode('idle')
                 transient1_I = inp_avg_res[0]
                 transient1_Q = inp_avg_res[1]
 

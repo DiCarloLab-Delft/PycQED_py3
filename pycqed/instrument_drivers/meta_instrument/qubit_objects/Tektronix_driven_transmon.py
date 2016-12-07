@@ -765,6 +765,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                                                  RO_pars=self.RO_pars,
                                                  pulse_comb='OffOff',
                                                  nr_samples=nr_samples))
+        self.MC.set_sweep_points(np.arange(nr_samples))
         self.input_average_detector.nr_samples = nr_samples
         self.MC.set_detector_function(self.input_average_detector)
         self.MC.run('Measure_transients_{}_0'.format(self.msmt_suffix))
@@ -773,6 +774,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                                                  RO_pars=self.RO_pars,
                                                  pulse_comb='OnOn',
                                                  nr_samples=nr_samples))
+        # self.MC.set_sweep_points(np.arange(nr_samples))
         self.input_average_detector.nr_samples = nr_samples
         self.MC.set_detector_function(self.input_average_detector)
         self.MC.run('Measure_transients_{}_1'.format(self.msmt_suffix))

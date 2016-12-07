@@ -237,6 +237,9 @@ class SwapN(swf.Hard_Sweep):
         self.return_seq = return_seq
         self.AWG = AWG
 
+    def set_parameter(self,val):
+        pass
+
     def prepare(self, **kw):
         if self.upload:
             old_val = self.AWG.get('%s_amp'%self.flux_pulse_pars['channel'])

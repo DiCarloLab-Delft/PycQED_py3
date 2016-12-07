@@ -1383,6 +1383,7 @@ class UHFQC_input_average_detector(Hard_Detector):
         self.AWG = AWG
         self.nr_samples = nr_samples
         self.nr_averages = nr_averages
+        print(nr_samples)
 
     def get_values(self):
         self.UHFQC.awgs_0_enable(1)

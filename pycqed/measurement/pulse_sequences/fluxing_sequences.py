@@ -54,6 +54,12 @@ def single_pulse_seq(pulse_pars=None,
                        'channel': pulse_pars['channel'],
                        'amplitude': 0,
                        'length': pulse_pars['dead_time_length']}
+
+    trig_marker = {'pulse_type': 'SquarePulse',
+                   'pulse_delay': 0.,
+                   'channel': 'ch1_marker1',
+                   'amplitude': 1.,
+                   'length': .1e-6}
                        # 'length': 5e-6}
     seq_name = 'Square_seq'
     seq = sequence.Sequence(seq_name)
@@ -62,9 +68,9 @@ def single_pulse_seq(pulse_pars=None,
     for i, iter in enumerate([0, 1]):  # seq has to have at least 2 elts
 
         if comp_pulse:
-            pulse_list = [pulse_pars, minus_pulse_pars,dead_time_pulse]
+            pulse_list = [pulse_pars, trig_marker, minus_pulse_pars,dead_time_pulse]
         else:
-            pulse_list = [pulse_pars, dead_time_pulse]
+            pulse_list = [pulse_pars, trig_marker, dead_time_pulse]
         # pulse_list = [pulse_pars, dead_time_pulse]
 
         el = multi_pulse_elt(i, station, pulse_list)
@@ -110,6 +116,9 @@ def chevron_seq_length(lengths, mw_pulse_pars, RO_pars, flux_pulse_pars=None,
                   'amplitude': -flux_pulse_pars['amplitude'],
                   'length': flux_pulse_pars['length']}
     original_delay = deepcopy(RO_pars)['pulse_delay']
+    # msmt_buffer = 0e-9
+    RO_pars['pulse_delay'] += lengths[0] - (mw_pulse_pars['sigma'] *
+                                                    mw_pulse_pars['nr_sigma'])
 
     dead_time_pulse = {'pulse_type': 'SquarePulse',
                    'pulse_delay': (minus_flux_pulse_pars['length']),
@@ -129,9 +138,10 @@ def chevron_seq_length(lengths, mw_pulse_pars, RO_pars, flux_pulse_pars=None,
         pulse_buffer = 50e-9
         flux_pulse_pars['pulse_delay'] = pulse_buffer + (mw_pulse_pars['sigma'] *
                                                          mw_pulse_pars['nr_sigma'])
-        msmt_buffer = 50e-9
-        RO_pars['pulse_delay'] += msmt_buffer + lngt - (mw_pulse_pars['sigma'] *
-                                                        mw_pulse_pars['nr_sigma'])
+
+        if i>0:
+            RO_pars['pulse_delay'] += lngt - lengths[i-1]
+
         dead_time_pulse['pulse_delay'] = RO_pars['pulse_delay']
 
         dead_time = 3e-6
@@ -154,6 +164,8 @@ def chevron_seq_length(lengths, mw_pulse_pars, RO_pars, flux_pulse_pars=None,
             el_list[i] = el
         seq.append_element(el, trigger_wait=True)
     cal_points = 4
+
+    RO_pars['pulse_delay'] = original_delay
     for i in range(int(cal_points/2)):
         pulse_list = [pulses['I'], RO_pars]
         # copy first element and set extra wait
@@ -172,7 +184,6 @@ def chevron_seq_length(lengths, mw_pulse_pars, RO_pars, flux_pulse_pars=None,
         el = multi_pulse_elt(len(lengths)+int(cal_points/2)+i, station, pulse_list)
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
-    RO_pars['pulse_delay'] = original_delay
 
 
     if upload:
