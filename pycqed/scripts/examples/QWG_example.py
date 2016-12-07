@@ -53,9 +53,9 @@ def run(continuous=True):
         qwg1.createWaveformReal('gauss', wvGauss)
         qwg1.createWaveformReal('derivGauss', wvDerivGauss)
 
-        qwg1.set('ch1_default_waveform', 'gauss')
-        qwg1.set('ch2_default_waveform', 'derivGauss')
-        qwg1.set('ch3_default_waveform', 'gauss')
+        qwg1.set('ch1_default_waveform', 'hi')
+        qwg1.set('ch2_default_waveform', 'zero')
+        qwg1.set('ch3_default_waveform', 'hi')
         qwg1.set('ch4_default_waveform', 'zero')
 
         qwg1.run_mode('CONt')

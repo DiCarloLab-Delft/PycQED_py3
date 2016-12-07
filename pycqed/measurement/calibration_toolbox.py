@@ -68,6 +68,70 @@ def mixer_carrier_cancellation(SH, source, MC,
     return ch_min
 
 
+
+def mixer_skewness_calibration_QWG(SH, source, QWG,
+                                    alpha, phi,
+                                    MC,
+                                    ch_pair=1,
+                                    frequency=None, f_mod=None,
+                                    name='mixer_skewness_calibration_QWG'):
+    '''
+    Inputs:
+        SH              (instrument)
+        Source          (instrument)     MW-source used for driving
+        alpha           (parameter)
+        phi             (parameter)
+        frequency       (float Hz)       Spurious SB freq: f_source - f_mod
+        f_mod           (float Hz)       Modulation frequency
+        I_ch/Q_ch       (int or str)     Specifies the AWG channels
+
+    returns:
+        alpha, phi     the coefficients that go in the predistortion matrix
+    For the spurious sideband:
+        alpha = 1/QI_amp_optimal
+        phi = -IQ_phase_optimal
+    For details, see Leo's notes on mixer skewness calibration in the docs
+    '''
+
+    QWG.ch1_default_waveform('zero')
+    QWG.ch2_default_waveform('zero')
+    QWG.ch3_default_waveform('zero')
+    QWG.ch4_default_waveform('zero')
+
+    QWG.run_mode('CONt')
+    QWG.stop()
+    QWG.start()
+
+    if f_mod is None:
+        f_mod = QWG.get('ch_pair{}_sideband_frequency'.format(ch_pair))
+    else:
+        QWG.set('ch_pair{}_sideband_frequency'.format(ch_pair), f_mod)
+    if frequency is None:
+        # Corresponds to the frequency where to minimize with the SH
+        frequency = source.frequency.get() - f_mod
+
+
+    d = det.Signal_Hound_fixed_frequency(SH, frequency)
+
+    ad_func_pars = {'adaptive_function': nelder_mead,
+                    'x0': [1.0, 0.0],
+                    'initial_step': [.15, 10],
+                    'no_improv_break': 10,
+                    'minimize': True,
+                    'maxiter': 500}
+    MC.set_sweep_functions([alpha, phi])
+    MC.set_detector_function(d)
+    MC.set_adaptive_function_parameters(ad_func_pars)
+    MC.run(name=name, mode='adaptive')
+    a = MA.OptimizationAnalysis()
+    # phi and alpha are the coefficients that go in the predistortion matrix
+    alpha = a.optimization_result[0][0]
+    phi = a.optimization_result[0][1]
+
+    return phi, alpha
+
+
+
 def mixer_skewness_calibration_5014(SH, source, station,
                                     MC=None,
                                     QI_amp_ratio=None, IQ_phase=None,

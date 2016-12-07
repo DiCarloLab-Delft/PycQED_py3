@@ -31,7 +31,6 @@ class HandshakeParameter(StandardParameter):
         exec_str = self._instrument.ask if self._instrument else None
         if isinstance(set_cmd, str):
             set_cmd += '\n *OPC?'
-            print(set_cmd)
         self._set = Command(arg_count=1, cmd=set_cmd, exec_str=exec_str,
                             input_parser=set_parser, no_cmd_function=no_setter)
 
