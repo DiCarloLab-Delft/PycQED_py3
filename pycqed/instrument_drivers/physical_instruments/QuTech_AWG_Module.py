@@ -57,10 +57,7 @@ class QuTech_AWG_Module(SCPI):
         # valid values
         self.device_descriptor.mvals_trigger_impedance = vals.Enum(50),
         self.device_descriptor.mvals_trigger_level = vals.Numbers(0, 2.5)
-        self.device_descriptor.mvals_channel_amplitude = vals.Numbers(
-            0, 1)  # FIXME: not in [V]
         # FIXME: not in [V]
-        self.device_descriptor.mvals_channel_offset = vals.Numbers(-0.05, 0.05)
 
         self.add_parameters()
         self.connect_message()
@@ -143,16 +140,16 @@ class QuTech_AWG_Module(SCPI):
                                units='Vpp',
                                get_cmd=amp_cmd + '?',
                                set_cmd=amp_cmd + ' {:.6f}',
-                               vals=vals.Numbers(0.0, 0.45),
+                               vals=vals.Numbers(-0.45, 0.45),
                                get_parser=float)
 
             self.add_parameter('ch{}_offset'.format(ch),
                                # parameter_class=HandshakeParameter,
-                               label='Offset channel {} (V)'.format(ch),
+                               label='Offset channel {}'.format(ch),
                                units='V',
                                get_cmd=offset_cmd + '?',
                                set_cmd=offset_cmd + ' {:.3f}',
-                               vals=vals.Numbers(-.05, .05),
+                               vals=vals.Numbers(-.25, .25),
                                get_parser=float)
 
             self.add_parameter('ch{}_default_waveform'.format(ch),
