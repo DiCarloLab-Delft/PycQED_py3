@@ -1292,8 +1292,8 @@ class QWG_driven_transmon(CBox_v3_driven_transmon):
                 'duration': RO_pulse_delay_clocks+RO_acq_marker_del_clocks+RO_depletion_clocks,
                 'instruction': 'wait {} \npulse 0000 1111 1111 '.format(
                     RO_pulse_delay_clocks)
-                + '\nwait {} \nmeasure '.format(RO_acq_marker_del_clocks)
-                + '\nwait {}\n'.format(RO_depletion_clocks)}
+                + '\nwait {} \nmeasure \n'.format(RO_acq_marker_del_clocks)}
+                # + 'wait {}\n'.format(RO_depletion_clocks)}
         elif self.RO_pulse_type() == 'Gated_MW_RO_pulse':
             operation_dict['RO {}'.format(self.name)] = {
                 'duration': RO_length_clocks, 'instruction':

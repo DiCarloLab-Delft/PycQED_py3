@@ -145,7 +145,8 @@ class QX_Hard_Detector(Hard_Detector):
         self.current = 0
         self.randomizations = []
         # load files
-        print("QX_RB_Hard_Detector : loading qasm files...")
+        logging.info("QX_RB_Hard_Detector : loading qasm files...")
+        # print(qasm_filenames)
         for i, file_name in enumerate(qasm_filenames):
             t1 = time.time()
             qasm = ql.qasm_loader(file_name)
@@ -160,7 +161,7 @@ class QX_Hard_Detector(Hard_Detector):
                 circuit_name = c[0] + "_{}".format(i)
                 self.__qxc.create_circuit(circuit_name, c[1])
             t2 = time.time()
-            print("[+] qasm loading time :",t2-t1)
+            logging.info("[+] qasm loading time :",t2-t1)
 
     def prepare(self, sweep_points):
         self.sweep_points = sweep_points

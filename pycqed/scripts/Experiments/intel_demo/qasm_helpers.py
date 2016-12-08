@@ -234,7 +234,10 @@ def measure_asm_files(asm_filenames, config_filename, qubit, MC):
         CBox.nr_averages
         nr_hard_averages = 512
         MC.soft_avg(10)
-    cal_pts = (qubit.cal_pt_zero(), qubit.cal_pt_one())
+    if qubit.cal_pt_zero() is not None:
+        cal_pts = (qubit.cal_pt_zero(), qubit.cal_pt_one())
+    else:
+        cal_pts = None
 
     prepare_function_kwargs = {
         'counter_param': counter_param,  'asm_filenames': asm_filenames,
