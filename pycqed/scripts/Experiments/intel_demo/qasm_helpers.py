@@ -229,11 +229,10 @@ def measure_asm_files(asm_filenames, config_filename, qubit, MC):
     if len(asm_filenames) > 1:
         MC.soft_avg(len(asm_filenames))
         nr_hard_averages = 256
-
     else:
-        CBox.nr_averages
-        nr_hard_averages = 512
-        MC.soft_avg(10)
+        MC.soft_avg(8)
+        nr_hard_averages = qubit.RO_acq_averages()//MC.soft_avg()
+
     if qubit.cal_pt_zero() is not None:
         cal_pts = (qubit.cal_pt_zero(), qubit.cal_pt_one())
     else:
@@ -271,7 +270,8 @@ def measure_asm_files(asm_filenames, config_filename, qubit, MC):
         RB_fit = ma.fit_mods.RandomizedBenchmarkingDecay(Ncl, **a.fit_res.best_values)
         MC.main_QtPlot.add(x=Ncl, y=RB_fit, subplot=0)
 
-def simulate_qasm_files(qasm_filenames, config_filename, qxc, MC):
+def simulate_qasm_files(qasm_filenames, config_filename, qxc, MC,
+                        error_rate = 0, nr_averages=int(1e4)):
     """
     Takes one or more asm_files as input and runs them on the hardware
     """
@@ -280,11 +280,11 @@ def simulate_qasm_files(qasm_filenames, config_filename, qxc, MC):
         MC.soft_avg(len(qasm_filenames))
         nr_hard_averages = 256
     else:
-        nr_hard_averages = 10000
+        nr_hard_averages = nr_averages
         MC.soft_avg(1)
 
     qx_det = det.QX_Hard_Detector(qxc, qasm_filenames,
-                                  p_error=0.002, num_avg=nr_hard_averages)
+                                  p_error=error_rate, num_avg=nr_hard_averages)
     measurement_points = extract_msmt_pts_from_config(config_filename)
 
     MC.set_sweep_function(swf.None_Sweep())

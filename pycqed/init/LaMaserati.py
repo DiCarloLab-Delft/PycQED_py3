@@ -337,6 +337,12 @@ def switch_to_pulsed_RO_CBox(qubit):
 # switch_to_pulsed_RO_CBox(QL)
 # switch_to_pulsed_RO_CBox(QR)
 
-
-CBox.AWG0_dac0_offset(-.279999)
+# mixer offsets corrected with the bias tee
+CBox.AWG0_dac0_offset(-0.279999)
 CBox.AWG0_dac1_offset( -26.600000)
+
+from pycqed.scripts.Experiments.intel_demo import qasm_helpers as qh
+from pycqed.instrument_drivers.virtual_instruments.pyqx import qx_client as qx
+from pycqed.instrument_drivers.virtual_instruments.pyqx import qasm_loader as ql
+qxc = qx.qx_client()
+qxc.connect("127.0.0.1",5555)
