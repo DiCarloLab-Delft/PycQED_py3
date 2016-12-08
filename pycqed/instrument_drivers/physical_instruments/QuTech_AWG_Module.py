@@ -214,7 +214,7 @@ class QuTech_AWG_Module(SCPI):
         M = np.zeros(4)
         for i, x in enumerate(mstring.split(',')):
             M[i] = x
-        M = M.reshape(2, 2)
+        M = M.reshape(2, 2, order='F')
         return(M)
 
     ##########################################################################
