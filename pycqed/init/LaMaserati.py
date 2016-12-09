@@ -90,8 +90,8 @@ pq.station = station
 ###########
 LO = rs.RohdeSchwarz_SGS100A(name='LO', address='TCPIP0::192.168.0.79', server_name=None)
 station.add_component(LO)
-RF = rs.RohdeSchwarz_SGS100A(name='RF', address='TCPIP0::192.168.0.80', server_name=None)  #
-station.add_component(RF)
+# RF = rs.RohdeSchwarz_SGS100A(name='RF', address='TCPIP0::192.168.0.80', server_name=None)  #
+# station.add_component(RF)
 QL_LO = rs.RohdeSchwarz_SGS100A(name='QL_LO', address='TCPIP0::192.168.0.71', server_name=None)  #
 station.add_component(QL_LO)
 QR_LO = rs.RohdeSchwarz_SGS100A(name='QR_LO', address='TCPIP0::192.168.0.72', server_name=None)  #
@@ -144,10 +144,10 @@ MC = mc.MeasurementControl('MC')
 MC.station = station
 station.MC = MC
 
-AWG = tek.Tektronix_AWG5014(name='AWG', setup_folder=None, timeout=2,
-                            address='GPIB0::8::INSTR', server_name=None)
-station.add_component(AWG)
-AWG.timeout(180)
+# AWG = tek.Tektronix_AWG5014(name='AWG', setup_folder=None, timeout=2,
+#                             address='GPIB0::8::INSTR', server_name=None)
+# station.add_component(AWG)
+# AWG.timeout(180)
 
 QWG = qwg.QuTech_AWG_Module(
     'QWG', address='192.168.0.10',
@@ -183,105 +183,105 @@ Flux_Control.flux_offsets(-offsets)
 # # SH = sh.SignalHound_USB_SA124B('Signal hound', server_name=None) #commented because of 8s load time
 
 # Meta-instruments
-HS = hd.HeterodyneInstrument('HS', LO=LO, RF=RF, AWG=AWG, acquisition_instr=UHFQC_1.name,
-                             server_name=None)
 # HS = hd.HeterodyneInstrument('HS', LO=LO, RF=RF, AWG=AWG, acquisition_instr=UHFQC_1.name,
 #                              server_name=None)
-station.add_component(HS)
+# HS = hd.HeterodyneInstrument('HS', LO=LO, RF=RF, AWG=AWG, acquisition_instr=UHFQC_1.name,
+#                              server_name=None)
+# station.add_component(HS)
 
-QL = qbt.Tektronix_driven_transmon('QL', LO=LO, cw_source=None,
-                                              td_source=QL_LO,
-                                              IVVI=IVVI, rf_RO_source=RF,
-                                              AWG=AWG,
-                                              heterodyne_instr=HS,
-                                              MC=MC,
-                                              FluxCtrl=Flux_Control,
-                                              server_name=None)
-station.add_component(QL)
+# QL = qbt.Tektronix_driven_transmon('QL', LO=LO, cw_source=None,
+#                                               td_source=QL_LO,
+#                                               IVVI=IVVI, rf_RO_source=RF,
+#                                               AWG=AWG,
+#                                               heterodyne_instr=HS,
+#                                               MC=MC,
+#                                               FluxCtrl=Flux_Control,
+#                                               server_name=None)
+# station.add_component(QL)
 
-QL_CB = cq.CBox_v3_driven_transmon('QL_CB', LO=LO, cw_source=None,
-                                     td_source=QL_LO, IVVI=IVVI,
-                                     LutMan=LutMan_CB, CBox=CBox, MC=MC)
-station.add_component(QL_CB)
+# QL_CB = cq.CBox_v3_driven_transmon('QL_CB', LO=LO, cw_source=None,
+#                                      td_source=QL_LO, IVVI=IVVI,
+#                                      LutMan=LutMan_CB, CBox=CBox, MC=MC)
+# station.add_component(QL_CB)
 
-QR = qbt.Tektronix_driven_transmon('QR', LO=LO, cw_source=None,
-                                              td_source=QR_LO,
-                                              IVVI=IVVI, rf_RO_source=RF,
-                                              AWG=AWG,
-                                              heterodyne_instr=HS,
-                                              MC=MC,
-                                              FluxCtrl=Flux_Control,
-                                              server_name=None)
-station.add_component(QR)
+# QR = qbt.Tektronix_driven_transmon('QR', LO=LO, cw_source=None,
+#                                               td_source=QR_LO,
+#                                               IVVI=IVVI, rf_RO_source=RF,
+#                                               AWG=AWG,
+#                                               heterodyne_instr=HS,
+#                                               MC=MC,
+#                                               FluxCtrl=Flux_Control,
+#                                               server_name=None)
+# station.add_component(QR)
 
 
-QL_QWG = cq.QWG_driven_transmon('QL_QWG', LO=LO, cw_source=RF,
+QL_QWG = cq.QWG_driven_transmon('QL_QWG', LO=LO, cw_source=QR_LO,
                                      td_source=QL_LO, IVVI=IVVI,
                                      QWG=QWG, CBox=CBox, MC=MC)
 
 station.add_component(QL_QWG)
 
-Bus_m = qbt.Tektronix_driven_transmon('Bus_m', LO=LO, cw_source=None,
-                                              td_source=QR_LO,
-                                              IVVI=IVVI, rf_RO_source=RF,
-                                              AWG=AWG,
-                                              heterodyne_instr=HS,
-                                              MC=MC,
-                                              FluxCtrl=Flux_Control,
-                                              server_name=None)
-station.add_component(Bus_m)
+# Bus_m = qbt.Tektronix_driven_transmon('Bus_m', LO=LO, cw_source=None,
+#                                               td_source=QR_LO,
+#                                               IVVI=IVVI, rf_RO_source=RF,
+#                                               AWG=AWG,
+#                                               heterodyne_instr=HS,
+#                                               MC=MC,
+#                                               FluxCtrl=Flux_Control,
+#                                               server_name=None)
+# station.add_component(Bus_m)
 
 # # load settings onto qubits
-gen.load_settings_onto_instrument(QL)
-gen.load_settings_onto_instrument(QR)
+# gen.load_settings_onto_instrument(QL)
+# gen.load_settings_onto_instrument(QR)
 gen.load_settings_onto_instrument(QL_QWG)
-gen.load_settings_onto_instrument(QL_CB)
-gen.load_settings_onto_instrument(HS)
-gen.load_settings_onto_instrument(Bus_m)
+# gen.load_settings_onto_instrument(QL_CB)
+# gen.load_settings_onto_instrument(HS)
+# gen.load_settings_onto_instrument(Bus_m)
 
 nested_MC = mc.MeasurementControl('nested_MC')
 nested_MC.station = station
 
 # The AWG sequencer
-station.pulsar = ps.Pulsar()
-station.pulsar.AWG = station.components['AWG']
-marker1highs=[2,2,2.7,2]
-for i in range(4):
-    # Note that these are default parameters and should be kept so.
-    # the channel offset is set in the AWG itself. For now the amplitude is
-    # hardcoded. You can set it by hand but this will make the value in the
-    # sequencer different.
-    station.pulsar.define_channel(id='ch{}'.format(i+1),
-                                  name='ch{}'.format(i+1), type='analog',
-                                  # max safe IQ voltage
-                                  high=.7, low=-.7,
-                                  offset=0.0, delay=0, active=True)
-    station.pulsar.define_channel(id='ch{}_marker1'.format(i+1),
-                                  name='ch{}_marker1'.format(i+1),
-                                  type='marker',
-                                  high=marker1highs[i], low=0, offset=0.,
-                                  delay=0, active=True)
-    station.pulsar.define_channel(id='ch{}_marker2'.format(i+1),
-                                  name='ch{}_marker2'.format(i+1),
-                                  type='marker',
-                                  high=2.0, low=0, offset=0.,
-                                  delay=0, active=True)
+# station.pulsar = ps.Pulsar()
+# station.pulsar.AWG = station.components['AWG']
+# marker1highs=[2,2,2.7,2]
+# for i in range(4):
+#     # Note that these are default parameters and should be kept so.
+#     # the channel offset is set in the AWG itself. For now the amplitude is
+#     # hardcoded. You can set it by hand but this will make the value in the
+#     # sequencer different.
+#     station.pulsar.define_channel(id='ch{}'.format(i+1),
+#                                   name='ch{}'.format(i+1), type='analog',
+#                                   # max safe IQ voltage
+#                                   high=.7, low=-.7,
+#                                   offset=0.0, delay=0, active=True)
+#     station.pulsar.define_channel(id='ch{}_marker1'.format(i+1),
+#                                   name='ch{}_marker1'.format(i+1),
+#                                   type='marker',
+#                                   high=marker1highs[i], low=0, offset=0.,
+#                                   delay=0, active=True)
+#     station.pulsar.define_channel(id='ch{}_marker2'.format(i+1),
+#                                   name='ch{}_marker2'.format(i+1),
+#                                   type='marker',
+#                                   high=2.0, low=0, offset=0.,
+#                                   delay=0, active=True)
 # to make the pulsar available to the standard awg seqs
-st_seqs.station = station
-sq.station = station
-cal_elts.station = station
+# st_seqs.station = station
+# sq.station = station
+# cal_elts.station = station
 
 t1 = time.time()
 
 #manually setting the clock, to be done automatically
-AWG.clock_freq(1e9)
+# AWG.clock_freq(1e9)
 
 
 print('Ran initialization in %.2fs' % (t1-t0))
 
 def all_sources_off():
     LO.off()
-    RF.off()
+    # RF.off()
     QL_LO.off()
     QR_LO.off()
 
@@ -301,48 +301,63 @@ def print_instr_params(instr):
 
 
 
-def switch_to_pulsed_RO_UHFQC(qubit):
-    UHFQC_1.awg_sequence_acquisition()
-    qubit.RO_pulse_type('Gated_MW_RO_pulse')
-    qubit.RO_acq_marker_delay(75e-9)
-    qubit.acquisition_instr('UHFQC_1')
-    qubit.RO_acq_marker_channel('ch3_marker2')
-    qubit.RO_acq_weight_function_I(0)
-    qubit.RO_acq_weight_function_Q(1)
+# def switch_to_pulsed_RO_UHFQC(qubit):
+#     UHFQC_1.awg_sequence_acquisition()
+#     qubit.RO_pulse_type('Gated_MW_RO_pulse')
+#     qubit.RO_acq_marker_delay(75e-9)
+#     qubit.acquisition_instr('UHFQC_1')
+#     qubit.RO_acq_marker_channel('ch3_marker2')
+#     qubit.RO_acq_weight_function_I(0)
+#     qubit.RO_acq_weight_function_Q(1)
 
-def switch_to_IQ_mod_RO_UHFQC(qubit):
-    UHFQC_1.awg_sequence_acquisition_and_pulse_SSB(f_RO_mod=qubit.f_RO_mod(),
-                RO_amp=qubit.RO_amp(), RO_pulse_length=qubit.RO_pulse_length(),
-                acquisition_delay=285e-9)
-    qubit.RO_pulse_type('MW_IQmod_pulse_UHFQC')
-    qubit.RO_acq_marker_delay(-200e-9)
-    qubit.acquisition_instr('UHFQC_1')
-    qubit.RO_acq_marker_channel('ch3_marker2')
-    qubit.RO_I_channel('0')
-    qubit.RO_Q_channel('1')
-    qubit.RO_acq_weight_function_I(0)
-    qubit.RO_acq_weight_function_Q(1)
+# def switch_to_IQ_mod_RO_UHFQC(qubit):
+#     UHFQC_1.awg_sequence_acquisition_and_pulse_SSB(f_RO_mod=qubit.f_RO_mod(),
+#                 RO_amp=qubit.RO_amp(), RO_pulse_length=qubit.RO_pulse_length(),
+#                 acquisition_delay=285e-9)
+#     qubit.RO_pulse_type('MW_IQmod_pulse_UHFQC')
+#     qubit.RO_acq_marker_delay(-200e-9)
+#     qubit.acquisition_instr('UHFQC_1')
+#     qubit.RO_acq_marker_channel('ch3_marker2')
+#     qubit.RO_I_channel('0')
+#     qubit.RO_Q_channel('1')
+#     qubit.RO_acq_weight_function_I(0)
+#     qubit.RO_acq_weight_function_Q(1)
 
-def switch_to_pulsed_RO_CBox(qubit):
-    # UHFQC_1.awg_sequence_acquisition()
-    qubit.RO_pulse_type('Gated_MW_RO_pulse')
-    qubit.RO_acq_marker_delay(155e-9)
-    qubit.acquisition_instr('CBox')
-    qubit.RO_acq_marker_channel('ch3_marker1')
-    qubit.RO_acq_weight_function_I(0)
-    qubit.RO_acq_weight_function_Q(1)
+# def switch_to_pulsed_RO_CBox(qubit):
+#     # UHFQC_1.awg_sequence_acquisition()
+#     qubit.RO_pulse_type('Gated_MW_RO_pulse')
+#     qubit.RO_acq_marker_delay(155e-9)
+#     qubit.acquisition_instr('CBox')
+#     qubit.RO_acq_marker_channel('ch3_marker1')
+#     qubit.RO_acq_weight_function_I(0)
+#     qubit.RO_acq_weight_function_Q(1)
 
 # #preparing UHFQC readout with IQ mod pulses
 
 # switch_to_pulsed_RO_CBox(QL)
 # switch_to_pulsed_RO_CBox(QR)
 
-# mixer offsets corrected with the bias tee
-CBox.AWG0_dac0_offset(-0.279999)
-CBox.AWG0_dac1_offset( -26.600000)
+
 
 from pycqed.scripts.Experiments.intel_demo import qasm_helpers as qh
 from pycqed.instrument_drivers.virtual_instruments.pyqx import qx_client as qx
 from pycqed.instrument_drivers.virtual_instruments.pyqx import qasm_loader as ql
 qxc = qx.qx_client()
 qxc.connect("127.0.0.1",5555)
+
+qxc.create_qubits(1)
+
+
+def update_cal_pts(qubit):
+    """
+    Performs a T1 measurement and uses the cal points to update the qubit
+    object cal points
+    """
+    qubit.measure_T1(np.arange(1e-6, 80e-6, 2e-6))
+    a=ma.MeasurementAnalysis()
+    I1 = np.mean(a.measured_values[0][-2:])
+    I0 = np.mean(a.measured_values[0][-4:-2])
+    Q1 = np.mean(a.measured_values[1][-2:])
+    Q0 = np.mean(a.measured_values[1][-4:-2])
+    qubit.cal_pt_one([I1, Q1])
+    qubit.cal_pt_zero([I0, Q0])
