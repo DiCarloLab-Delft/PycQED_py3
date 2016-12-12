@@ -64,10 +64,10 @@ from pycqed.instrument_drivers.meta_instrument import Flux_Control as FluxCtrl
 from pycqed.instrument_drivers.physical_instruments import QuTech_ControlBox_v3 as qcb
 
 
-import pycqed.instrument_drivers.meta_instrument.qubit_objects.Tektronix_driven_transmon as qbt
+# import pycqed.instrument_drivers.meta_instrument.qubit_objects.Tektronix_driven_transmon as qbt
 from pycqed.instrument_drivers.meta_instrument import heterodyne as hd
-import pycqed.instrument_drivers.meta_instrument.UHFQC_LookuptableManager as lm_UHFQC
-import pycqed.instrument_drivers.meta_instrument.UHFQC_LookuptableManagerManager as lmm_UHFQC
+# import pycqed.instrument_drivers.meta_instrument.UHFQC_LookuptableManager as lm_UHFQC
+# import pycqed.instrument_drivers.meta_instrument.UHFQC_LookuptableManagerManager as lmm_UHFQC
 from pycqed.measurement import awg_sweep_functions_multi_qubit as awg_swf_m
 from pycqed.measurement.pulse_sequences import multi_qubit_tek_seq_elts as sq_m
 from numpy.linalg import inv
@@ -108,32 +108,32 @@ station.add_component(Fridge_mon)
 
 
 #Initializing UHFQC
-UHFQC_1 = ZI_UHFQC.UHFQC('UHFQC_1', device='dev2209', server_name=None)
-station.add_component(UHFQC_1)
+# UHFQC_1 = ZI_UHFQC.UHFQC('UHFQC_1', device='dev2209', server_name=None)
+# station.add_component(UHFQC_1)
 
-#setting the input range and coupling
-UHFQC_1.sigins_0_range(0.2)
-UHFQC_1.sigins_0_ac(1)
-UHFQC_1.sigins_1_ac(1)
+# #setting the input range and coupling
+# UHFQC_1.sigins_0_range(0.2)
+# UHFQC_1.sigins_0_ac(1)
+# UHFQC_1.sigins_1_ac(1)
 
 CBox = qcb.QuTech_ControlBox_v3('CBox', address='Com7')
 station.add_component(CBox)
 
 #initializing lookuptable managers for multi-qubit readout
-LutMan0 = lm_UHFQC.UHFQC_LookuptableManager('LutMan0', UHFQC=UHFQC_1,
-                                                 server_name=None)
-station.add_component(LutMan0)
+# LutMan0 = lm_UHFQC.UHFQC_LookuptableManager('LutMan0', UHFQC=UHFQC_1,
+#                                                  server_name=None)
+# station.add_component(LutMan0)
 
-LutMan1 = lm_UHFQC.UHFQC_LookuptableManager('LutMan1', UHFQC=UHFQC_1,
-                                                 server_name=None)
-station.add_component(LutMan1)
+# LutMan1 = lm_UHFQC.UHFQC_LookuptableManager('LutMan1', UHFQC=UHFQC_1,
+#                                                  server_name=None)
+# station.add_component(LutMan1)
 
 
-LutManMan = lmm_UHFQC.UHFQC_LookuptableManagerManager('LutManMan', UHFQC=UHFQC_1,
-                                                 server_name=None)
-station.add_component(LutManMan)
+# LutManMan = lmm_UHFQC.UHFQC_LookuptableManagerManager('LutManMan', UHFQC=UHFQC_1,
+#                                                  server_name=None)
+# station.add_component(LutManMan)
 
-LutManMan.LutMans([LutMan0.name,LutMan1.name])
+# LutManMan.LutMans([LutMan0.name,LutMan1.name])
 
 LutMan_CB = cbl.QuTech_ControlBox_LookuptableManager(
     'LutMan_CB', CBox, server_name=None)
@@ -215,11 +215,11 @@ Flux_Control.flux_offsets(-offsets)
 # station.add_component(QR)
 
 
-QL_QWG = cq.QWG_driven_transmon('QL_QWG', LO=LO, cw_source=QR_LO,
+QL = cq.QWG_driven_transmon('QL', LO=LO, cw_source=QR_LO,
                                      td_source=QL_LO, IVVI=IVVI,
                                      QWG=QWG, CBox=CBox, MC=MC)
 
-station.add_component(QL_QWG)
+station.add_component(QL)
 
 # Bus_m = qbt.Tektronix_driven_transmon('Bus_m', LO=LO, cw_source=None,
 #                                               td_source=QR_LO,
@@ -234,7 +234,7 @@ station.add_component(QL_QWG)
 # # load settings onto qubits
 # gen.load_settings_onto_instrument(QL)
 # gen.load_settings_onto_instrument(QR)
-gen.load_settings_onto_instrument(QL_QWG)
+gen.load_settings_onto_instrument(QL, load_from_instr='QL_QWG')
 # gen.load_settings_onto_instrument(QL_CB)
 # gen.load_settings_onto_instrument(HS)
 # gen.load_settings_onto_instrument(Bus_m)
