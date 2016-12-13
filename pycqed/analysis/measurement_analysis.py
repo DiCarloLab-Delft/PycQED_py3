@@ -2470,7 +2470,7 @@ class SSRO_Analysis(MeasurementAnalysis):
         mu0_0 = fit_res_double_0.params['mu0'].value
         mu1_0 = fit_res_double_0.params['mu1'].value
         frac1_0 = fit_res_double_0.params['frac1'].value
-        print('frac1 in 0',frac1_0)
+        print('frac1 in 0: {:.4f}'.format(frac1_0))
 
         def NormCdf(x, mu, sigma):
             t = x-mu
@@ -2602,7 +2602,6 @@ class SSRO_Analysis(MeasurementAnalysis):
         axes.set_title('Histograms of shots on rotaded IQ plane optimized for I, %s shots'%min_len)
         plt.xlabel('DAQ voltage integrated (V)')#, fontsize=14)
         plt.ylabel('Fraction of counts')#, fontsize=14)
-        print(frac1_0)
 
         plt.axvline(self.V_th_a, ls='--',
                    linewidth=2, color='grey' ,label='SNR={0:.2f}\n $F_a$={1:.4f}\n $F_d$={2:.4f}\n $p_e$={3:.4f}'.format(SNR, self.F_a, F_d, frac1_0))
@@ -5302,6 +5301,7 @@ class butterfly_analysis(MeasurementAnalysis):
                  initialize=False,
                 digitize=True,
                 case=False,
+                # FIXME better variable name for 1>th or 1<th
                  **kw):
         self.folder = a_tools.get_folder(timestamp=timestamp,
                                              label=label, **kw)
@@ -5387,7 +5387,8 @@ class butterfly_analysis(MeasurementAnalysis):
                                                      initial_state=1)
         self.butterfly_coeffs = dm_tools.butterfly_matrix_inversion(exc_coeffs,
                                                                     rel_coeffs)
-        F_bf = 1-(1-(self.butterfly_coeffs.get('eps00_1') +
+        # eps,declaration,output_input
+        F_a_butterfly = 1-(1-(self.butterfly_coeffs.get('eps00_1') +
                   self.butterfly_coeffs.get('eps01_1') +
                   self.butterfly_coeffs.get('eps10_0') +
                   self.butterfly_coeffs.get('eps11_0')))/2
@@ -5396,10 +5397,10 @@ class butterfly_analysis(MeasurementAnalysis):
         mmt_ind_exc = (self.butterfly_coeffs.get('eps11_0') +
                        self.butterfly_coeffs.get('eps01_0'))
         if verbose:
-            print('SSRO Fid', F_bf)
+            print('SSRO Fid', F_a_butterfly)
             print('mmt_ind_rel', mmt_ind_rel)
             print('mmt_ind_exc', mmt_ind_exc)
-        self.butterfly_coeffs['F_a_bf'] = F_a_bf
+        self.butterfly_coeffs['F_a_butterfly'] = F_a_butterfly
         self.butterfly_coeffs['mmt_ind_exc'] = mmt_ind_exc
         self.butterfly_coeffs['mmt_ind_rel'] = mmt_ind_rel
         return self.butterfly_coeffs

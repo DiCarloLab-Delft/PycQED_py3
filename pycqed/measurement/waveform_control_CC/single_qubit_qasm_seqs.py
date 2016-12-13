@@ -274,7 +274,7 @@ def butterfly(qubit_name, initialize=False):
 
     The duration of the RO + depletion is specified in the definition of RO
     """
-    filename = join(base_qasm_path, 'butterfly.qasm')
+    filename = join(base_qasm_path, 'butterfly_init_{}.qasm'.format(initialize))
     qasm_file = mopen(filename, mode='w')
     qasm_file.writelines('qubit {} \n'.format(qubit_name))
     if initialize:
@@ -297,6 +297,7 @@ def butterfly(qubit_name, initialize=False):
         qasm_file.writelines('X180 {}  \n'.format(qubit_name))
         qasm_file.writelines('RO {}  \n'.format(qubit_name))
         qasm_file.writelines('RO {}  \n'.format(qubit_name))
+    qasm_file.close()
     return qasm_file
 
 
