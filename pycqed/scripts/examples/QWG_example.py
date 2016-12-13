@@ -9,7 +9,7 @@ import numpy as np
 from socket import timeout
 from qcodes.utils import validators as vals
 import matplotlib.pyplot as plt
-
+import pycqed as pq
 
 # create waveforms
 sampleCnt = 96
@@ -35,16 +35,16 @@ wvGauss2 = Waveform.gauss(fs, sampleCnt, mu2, sigma2)
 wvDerivGauss2 = Waveform.derivGauss(fs, sampleCnt, mu2, sigma2, dirAmpl2)
 
 try:
-    qwg1 = QWG
+    qwg1 = pq.station['QWG']
 except:
     qwg1 = QuTech_AWG_Module(
         'QWG', address='192.168.42.10',
         port=5025, server_name=None)
 qwg1.reset()
 
-if __name__ == '__main__':
+def run(continuous=True):
 
-    if 1:  # continuous
+    if continuous:
         qwg1.createWaveformReal('cos', wvCos)
         qwg1.createWaveformReal('sin', wvSin)
         qwg1.createWaveformReal('zero', wvZero)
@@ -53,9 +53,9 @@ if __name__ == '__main__':
         qwg1.createWaveformReal('gauss', wvGauss)
         qwg1.createWaveformReal('derivGauss', wvDerivGauss)
 
-        qwg1.set('ch1_default_waveform', 'gauss')
-        qwg1.set('ch2_default_waveform', 'derivGauss')
-        qwg1.set('ch3_default_waveform', 'gauss')
+        qwg1.set('ch1_default_waveform', 'hi')
+        qwg1.set('ch2_default_waveform', 'zero')
+        qwg1.set('ch3_default_waveform', 'hi')
         qwg1.set('ch4_default_waveform', 'zero')
 
         qwg1.run_mode('CONt')
@@ -144,50 +144,54 @@ if __name__ == '__main__':
 
     # read back
     qwg1.getOperationComplete()
-    wvCosReadBack = qwg1.getWaveformDataFloat('cos')
-    plt.plot(wvCosReadBack)
-    plt.ylabel('cos')
-    plt.show()
+    # wvCosReadBack = qwg1.getWaveformDataFloat('cos')
+    # plt.plot(wvCosReadBack)
+    # plt.ylabel('cos')
+    # plt.show()
 
-    # waveform upload performance
-    sizes = [100, 500, 1000, 1500, 2000, 2500]
-    nrIter = 50
-    durations = []
-    megaBytesPerSecond = []
-    for size in sizes:
-        wvTest = Waveform.sin(fs, size, f)
-        qwg1.getOperationComplete()
-        markStart = time.perf_counter()
-        for i in range(nrIter):
-            qwg1.createWaveformReal('testSize{}Nr{}'.format(size, i), wvTest)
-        qwg1.getOperationComplete()
-        markEnd = time.perf_counter()
-        duration = (markEnd-markStart)/nrIter
-        durations.append(duration*1e3)
-        megaBytesPerSecond.append(size*4/duration/1e6)
-    print(sizes)
-    print(durations)
-    print(megaBytesPerSecond)
-    plt.figure(1)
-    plt.subplot(211)
-    plt.plot(sizes, durations, 'bs')
-    plt.xlabel('upload size [samples]')
-    plt.ylabel('duration per upload [ms]')
-    plt.axis([0, 2600, 0, 5])
-    plt.subplot(212)
-    plt.plot(sizes, megaBytesPerSecond, 'g^')
-    plt.xlabel('upload size [samples]')
-    plt.ylabel('performance [MB/s]')
-    plt.axis([0, 2600, 0, 20])
-    plt.show()
+    # # waveform upload performance
+    # sizes = [100, 500, 1000, 1500, 2000, 2500]
+    # nrIter = 50
+    # durations = []
+    # megaBytesPerSecond = []
+    # for size in sizes:
+    #     wvTest = Waveform.sin(fs, size, f)
+    #     qwg1.getOperationComplete()
+    #     markStart = time.perf_counter()
+    #     for i in range(nrIter):
+    #         qwg1.createWaveformReal('testSize{}Nr{}'.format(size, i), wvTest)
+    #     qwg1.getOperationComplete()
+    #     markEnd = time.perf_counter()
+    #     duration = (markEnd-markStart)/nrIter
+    #     durations.append(duration*1e3)
+    #     megaBytesPerSecond.append(size*4/duration/1e6)
+    # print(sizes)
+    # print(durations)
+    # print(megaBytesPerSecond)
+    # plt.figure(1)
+    # plt.subplot(211)
+    # plt.plot(sizes, durations, 'bs')
+    # plt.xlabel('upload size [samples]')
+    # plt.ylabel('duration per upload [ms]')
+    # plt.axis([0, 2600, 0, 5])
+    # plt.subplot(212)
+    # plt.plot(sizes, megaBytesPerSecond, 'g^')
+    # plt.xlabel('upload size [samples]')
+    # plt.ylabel('performance [MB/s]')
+    # plt.axis([0, 2600, 0, 20])
+    # plt.show()
 
-    # list waveforms
-    wlistSize = qwg1.WlistSize()
-    print('WLIST size: ', wlistSize)
-    print('WLIST: ', qwg1.Wlist())
+    # # list waveforms
+    # wlistSize = qwg1.WlistSize()
+    # print('WLIST size: ', wlistSize)
+    # print('WLIST: ', qwg1.Wlist())
 
-    # show some info
-    print('Identity: ', qwg1.getIdentity())
+    # # show some info
+    # print('Identity: ', qwg1.getIdentity())
     print('Error messages: ')
     for i in range(qwg1.getSystemErrorCount()):
         print(qwg1.getError())
+
+
+if __name__ == '__main__':
+    run()

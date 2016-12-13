@@ -216,9 +216,13 @@ class MeasurementAnalysis(object):
             fit_grp = self.analysis_group.create_group(fit_name)
         else:
             fit_grp = self.analysis_group[fit_name]
+        # fit_grp.attrs['Fit Report'] = \
+        #     '\n'+'*'*80+'\n' + \
+        #     fit_res.fit_report() + \
+        #     '\n'+'*'*80 + '\n\n'
         fit_grp.attrs['Fit Report'] = \
             '\n'+'*'*80+'\n' + \
-            fit_res.fit_report() + \
+            lmfit.fit_report(fit_res) + \
             '\n'+'*'*80 + '\n\n'
 
         fit_grp.attrs.create(name='chisqr', data=fit_res.chisqr)
@@ -436,6 +440,32 @@ class MeasurementAnalysis(object):
                 self.save_fig(fig, xlabel=xlabel, ylabel=(ylabel+'_log'), **kw)
             else:
                 self.save_fig(fig, xlabel=xlabel, ylabel=ylabel, **kw)
+        return
+
+    def plot_complex_results(self, cmp_data, fig, ax, show=False, marker='.', **kw):
+        '''
+        Plot real and imaginary values measured vs a sweeped parameter
+        Example: complex S21 of a resonator
+
+        Author: Stefano Poletto
+        Data: November 15, 2016
+        '''
+        save = kw.pop('save', False)
+        self.plot_title = kw.pop('plot_title',
+                                 textwrap.fill(self.timestamp_string + '_' +
+                                               self.measurementstring, 40))
+
+        xlabel = 'Real'
+        ylabel = 'Imag'
+        ax.set_title(self.plot_title)
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel(ylabel)
+        ax.plot(np.real(cmp_data), np.imag(cmp_data), marker)
+        if show:
+            plt.show()
+        if save:
+            self.save_fig(fig, xlabel=xlabel, ylabel=ylabel, **kw)
+
         return
 
     def get_naming_and_values_2D(self):
@@ -3018,7 +3048,7 @@ class Ramsey_Analysis(TD_Analysis):
 
         ft_of_data = np.fft.fft(self.normalized_data_points)
         index_of_fourier_maximum = np.argmax(np.abs(
-            ft_of_data[1:len(ft_of_data)/2]))+1
+            ft_of_data[1:len(ft_of_data)//2]))+1
         max_ramsey_delay = self.sweep_points[-self.NoCalPoints] - \
             self.sweep_points[0]
 
@@ -3955,8 +3985,12 @@ class Homodyne_Analysis(MeasurementAnalysis):
                              show_guess=False, show=False,
                              fit_window=None, **kw):
         '''
-        fit_window allows to select the windows of data to fit.
-        Example: fit_window=[100,-100]
+        Available fitting_models:
+            - 'hanger' = amplitude fit with slope
+            - 'complex' = complex transmission fit WITHOUT slope
+
+        'fit_window': allows to select the windows of data to fit.
+                      Example: fit_window=[100,-100]
         '''
         super(self.__class__, self).run_default_analysis(
             close_file=False, **kw)
@@ -3974,6 +4008,7 @@ class Homodyne_Analysis(MeasurementAnalysis):
         self.peaks = a_tools.peak_finder((self.sweep_points),
                                          self.measured_powers)
 
+        # Search for peak
         if self.peaks['dip'] is not None:    # look for dips first
             f0 = self.peaks['dip']
             amplitude_factor = -1.
@@ -3987,6 +4022,8 @@ class Homodyne_Analysis(MeasurementAnalysis):
             # If this error is raised, it should continue the analysis but
             # not use it to update the qubit object
 
+
+        # Fit data according to the model required
         if 'hanger' in fitting_model:
             if fitting_model == 'hanger':
                 HangerModel = fit_mods.SlopedHangerAmplitudeModel
@@ -3995,14 +4032,6 @@ class Homodyne_Analysis(MeasurementAnalysis):
             # added reject outliers to be robust agains CBox data acq bug.
             # this should have no effect on regular data acquisition and is
             # only used in the guess.
-
-            # Stefano: amplitude guess is the max value of the signal (out of resonance)
-            #          not the diffference max-min.
-            #          I comment this line out, and revrite it.
-            # amplitude_guess = (max(dm_tools.reject_outliers(
-            #                        self.measured_powers)) -
-            #                    min(dm_tools.reject_outliers(
-            #                        self.measured_powers)))
             amplitude_guess = max(dm_tools.reject_outliers(self.measured_values[0]))
 
             # Creating parameters and estimations
@@ -4043,13 +4072,44 @@ class Homodyne_Analysis(MeasurementAnalysis):
             if np.floor(data_x[0]/1e8)==0: # frequency is defined in GHz
                 data_x = data_x*1e9
 
-
-            # Stefano: fit needs to be done on linear data, not the power.
-            #          Commenting this line and write the proper fit
-            # fit_res = HangerModel.fit(data=self.measured_powers,
-            #                           f=self.sweep_points, verbose=False)
             fit_res = HangerModel.fit(data=data_y,
                                       f=data_x, verbose=False)
+
+        elif fitting_model == 'complex':
+            # this is the fit with a complex transmission curve WITHOUT slope
+            data_amp = self.measured_values[0]
+            data_angle = self.measured_values[1]
+            data_complex =  np.add(self.measured_values[2], 1j*self.measured_values[3])
+
+            # Initial guesses
+            guess_A = max(data_amp)
+            guess_Q = f0 / abs(self.min_frequency - self.max_frequency) # this has to been improved
+            guess_Qe = guess_Q/(1-(max(data_amp)-min(data_amp)))
+            # phi_v
+            nbr_phase_jumps = (np.diff(data_angle)>4).sum() # number of 2*pi phase jumps
+            guess_phi_v = (2*np.pi*nbr_phase_jumps+(data_angle[0]-data_angle[-1]))/(self.sweep_points[0] - self.sweep_points[-1])
+            # phi_0
+            angle_resonance = data_angle[int(len(self.sweep_points)/2)]
+            phase_evolution_resonance = np.exp(1j*guess_phi_v*f0)
+            angle_phase_evolution = np.arctan2(np.imag(phase_evolution_resonance), np.real(phase_evolution_resonance))
+            guess_phi_0 = angle_resonance - angle_phase_evolution
+
+            # prepare the parameter dictionary
+            P = lmfit.Parameters()
+            #           (Name,         Value, Vary,      Min,     Max,  Expr)
+            P.add_many(('f0',         f0/1e9, True,     None,    None,  None),
+                       ('Q',         guess_Q, True,        1,    50e6,  None),
+                       ('Qe',       guess_Qe, True,        1,    50e6,  None),
+                       ('A',         guess_A, True,        0,    None,  None),
+                       ('theta',           0, True, -np.pi/2, np.pi/2,  None),
+                       ('phi_v', guess_phi_v, True,     None,    None,  None),
+                       ('phi_0', guess_phi_0, True,   -np.pi,   np.pi,  None))
+            P.add('Qi', expr='1./(1./Q-1./Qe*cos(theta))', vary=False)
+            P.add('Qc', expr='Qe/cos(theta)', vary=False)
+
+            # Fit
+            fit_res = lmfit.minimize(fit_mods.residual_complex_fcn, P,
+                        args=(fit_mods.HangerFuncComplex, self.sweep_points, data_complex))
 
 
         elif fitting_model == 'lorentzian':
@@ -4089,7 +4149,8 @@ class Homodyne_Analysis(MeasurementAnalysis):
         self.save_fitted_parameters(fit_res, var_name='HM')
 
         if print_fit_results is True:
-            print(fit_res.fit_report())
+            # print(fit_res.fit_report())
+            print(lmfit.fit_report(fit_res))
 
         fig, ax = self.default_ax()
         textstr = '$f_{\mathrm{center}}$ = %.4f $\pm$ (%.3g) GHz' % (
@@ -4112,6 +4173,15 @@ class Homodyne_Analysis(MeasurementAnalysis):
                                             ylabel=str('S21_mag (arb. units)'),
                                             save=False)
 
+        elif 'complex' in fitting_model:
+            self.plot_complex_results(data_complex, fig=fig, ax=ax, show=False, save=False)
+            # second figure with amplitude
+            fig2, ax2 = self.default_ax()
+            ax2.text(0.05, 0.95, textstr, transform=ax.transAxes, fontsize=11,
+                verticalalignment='top', bbox=self.box_props)
+            self.plot_results_vs_sweepparam(x=self.sweep_points, y=data_amp,
+                                            fig=fig2, ax=ax2, show=False, save=False)
+
         elif fitting_model == 'lorentzian':
             self.plot_results_vs_sweepparam(x=self.sweep_points,
                                             y=self.measured_powers,
@@ -4128,12 +4198,28 @@ class Homodyne_Analysis(MeasurementAnalysis):
 
         if show_guess:
             ax.plot(self.sweep_points, fit_res.init_fit, 'k--')
-        ax.plot(self.sweep_points, fit_res.best_fit, 'r-')
-        f0 = self.fit_results.values['f0']
-        plt.plot(f0*1e9, fit_res.eval(f=f0*1e9), 'o', ms=8)
+
+        # this part is necessary to separate fit perfomed with lmfit.minimize
+        if 'complex' in fitting_model:
+            fit_values = fit_mods.HangerFuncComplex(self.sweep_points, fit_res.params)
+            ax.plot(np.real(fit_values),np.imag(fit_values), 'r-')
+
+            ax2.plot(self.sweep_points, np.abs(fit_values), 'r-')
+
+            # save both figures
+            self.save_fig(fig, figname='complex', **kw)
+            self.save_fig(fig2, xlabel='Mag', **kw)
+        else:
+            ax.plot(self.sweep_points, fit_res.best_fit, 'r-')
+            f0 = self.fit_results.values['f0']
+            plt.plot(f0*1e9, fit_res.eval(f=f0*1e9), 'o', ms=8)
+
+            # save figure
+            self.save_fig(fig, xlabel=self.xlabel, ylabel='Mag', **kw)
+
         if show:
             plt.show()
-        self.save_fig(fig, xlabel=self.xlabel, ylabel='Mag', **kw)
+        # self.save_fig(fig, xlabel=self.xlabel, ylabel='Mag', **kw)
         if close_file:
             self.data_file.close()
         return fit_res
@@ -4353,13 +4439,12 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
         self.fit_results.append(fit_res)
         self.save_fitted_parameters(fit_res,
                                     var_name='distance', save_peaks=True)
-
         if print_fit_results is True:
             print(fit_res.fit_report())
 
         for k in range(len(self.measured_values)):
             ax = axes[k]
-            textstr = '$f_{\mathrm{center}}$ = %.5g $\pm$ (%.3g) GHz' % (
+            textstr = '$f_{\mathrm{center}}$ = %.5g $\pm$ (%.3g) GHz\n' % (
                 fit_res.params['f0'].value,
                 fit_res.params['f0'].stderr)
             ax.text(0.05, 0.95, textstr, transform=ax.transAxes,
@@ -4377,18 +4462,21 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
             axes[k].plot(f0, self.measured_values[k][f0_idx], 'o', ms=8)
 
         # Plotting distance from |0>
+        label = r'f0={:.5}$\pm$ {:.2} MHz, linewidth={:.4}$\pm${:.2} MHz'.format(fit_res.params['f0'].value/1e6, fit_res.params['f0'].stderr/1e6, fit_res.params['kappa'].value/1e6, fit_res.params['kappa'].stderr/1e6)
         fig_dist, ax_dist = self.default_ax()
         self.plot_results_vs_sweepparam(x=self.sweep_points,
                                         y=self.data_dist,
                                         fig=fig_dist, ax=ax_dist,
                                         xlabel=self.xlabel,
                                         ylabel='S21 distance (V)',
+                                        label=False,
                                         save=False)
         ax_dist.plot(self.sweep_points, fit_res.best_fit, 'r-')
         ax_dist.plot(f0, fit_res.best_fit[f0_idx], 'o', ms=8)
         if show_guess:
             ax_dist.plot(self.sweep_points, fit_res.init_fit, 'k--')
-
+        ax_dist.text(0.05, 0.95, label, transform=ax_dist.transAxes,
+                    fontsize=11, verticalalignment='top', bbox=self.box_props)
         self.save_fig(fig, figname=self.savename, **kw)
         if show:
             plt.show()
@@ -4662,9 +4750,10 @@ class TwoD_Analysis(MeasurementAnalysis):
                 fig, ax = self.default_ax(figsize=(8, 5))
                 self.fig_array.append(fig)
                 self.ax_array.append(ax)
-                fig_title = '{timestamp}_{measurement}_linecut'.format(
+                fig_title = '{timestamp}_{measurement}_linecut_{z_label}'.format(
                     timestamp=self.timestamp_string,
-                    measurement=self.measurementstring)
+                    measurement=self.measurementstring,
+                    z_label=i)
                 a_tools.linecut_plot(x=self.sweep_points,
                                      y=self.sweep_points_2D,
                                      z=self.measured_values[i],
@@ -4686,9 +4775,11 @@ class TwoD_Analysis(MeasurementAnalysis):
                 print("normalize on")
             # print "unransposed",meas_vals
             # print "transposed", meas_vals.transpose()
-            fig_title = '{timestamp}_{measurement}'.format(
+            print("i",i)
+            fig_title = '{timestamp}_{measurement}_{z_label}'.format(
                 timestamp=self.timestamp_string,
-                measurement=self.measurementstring)
+                measurement=self.measurementstring,
+                z_label=i)
             a_tools.color_plot(x=self.sweep_points,
                                y=self.sweep_points_2D,
                                z=meas_vals.transpose(),
@@ -4701,6 +4792,7 @@ class TwoD_Analysis(MeasurementAnalysis):
                                normalize=normalize,
                                **kw)
             if save_fig:
+                print("saving fig_title",fig_title)
                 self.save_fig(fig, figname=fig_title, **kw)
         if close_file:
             self.finish()

@@ -80,8 +80,8 @@ def gauss_pulse(amp, sigma_length, nr_sigma=4, sampling_rate=2e8,
         pulse_I = -1*deriv_gauss_env
         pulse_Q = gauss_env
     Zeros = np.zeros(int(delay_samples))
-    pulse_I = list(Zeros)+list(pulse_I)
-    pulse_Q = list(Zeros)+list(pulse_Q)
+    pulse_I = np.array(list(Zeros)+list(pulse_I))
+    pulse_Q = np.array(list(Zeros)+list(pulse_Q))
     return pulse_I, pulse_Q
 
 
@@ -179,3 +179,9 @@ def mod_gauss(amp, sigma_length, f_modulation, axis='x',
                                          sampling_rate=sampling_rate,
                                          Q_phase_delay=Q_phase_delay)
     return pulse_I_mod, pulse_Q_mod
+
+def mixer_predistortion_matrix(alpha, phi):
+    predistortion_matrix = np.array(
+        [[1,  np.tan(phi*2*np.pi/360)],
+         [0, 1/alpha * 1/np.cos(phi*2*np.pi/360)]])
+    return predistortion_matrix

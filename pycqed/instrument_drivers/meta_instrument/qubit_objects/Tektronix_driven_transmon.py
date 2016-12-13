@@ -584,13 +584,13 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
             ma.Rabi_Analysis(auto=True, close_fig=close_fig)
 
     def measure_T1(self, times, MC=None,
-                   analyze=True, close_fig=True):
+                   analyze=True, upload=True, close_fig=True):
         self.prepare_for_timedomain()
         if MC is None:
             MC = self.MC
 
         MC.set_sweep_function(awg_swf.T1(
-            pulse_pars=self.pulse_pars, RO_pars=self.RO_pars))
+            pulse_pars=self.pulse_pars, RO_pars=self.RO_pars, upload=upload))
         MC.set_sweep_points(times)
         MC.set_detector_function(self.int_avg_det)
         MC.run('T1'+self.msmt_suffix)
@@ -665,7 +665,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
     def measure_randomized_benchmarking(self, nr_cliffords,
                                         nr_seeds=50, T1=None,
                                         MC=None, analyze=True, close_fig=True,
-                                        verbose=False):
+                                        verbose=False, upload=True):
         '''
         Performs a randomized benchmarking fidelity.
         Optionally specifying T1 also shows the T1 limited fidelity.
@@ -676,7 +676,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         MC.set_sweep_function(awg_swf.Randomized_Benchmarking(
             pulse_pars=self.pulse_pars, RO_pars=self.RO_pars,
             double_curves=True,
-            nr_cliffords=nr_cliffords, nr_seeds=nr_seeds))
+            nr_cliffords=nr_cliffords, nr_seeds=nr_seeds, upload=upload))
         MC.set_detector_function(self.int_avg_det)
         MC.run('RB_{}seeds'.format(nr_seeds)+self.msmt_suffix)
         ma.RB_double_curve_Analysis(
@@ -1007,8 +1007,6 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                 self._acquisition_instr,
                 self.AWG, nr_averages=self.RO_acq_averages())
 
-
-
         elif 'UHFQC' in acquisition_instr:
             logging.info("setting UHFQC acquisition")
             self.input_average_detector = det.UHFQC_input_average_detector(
@@ -1026,6 +1024,13 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                 UHFQC=self._acquisition_instr, AWG=self.AWG,
                 channels=[self.RO_acq_weight_function_I(), self.RO_acq_weight_function_Q()],
                 integration_length=self.RO_acq_integration_length())
+
+        elif 'ATS' in acquisition_instr:
+            logging.info("setting ATS acquisition")
+            self.int_avg_det = det.ATS_integrated_average_continuous_detector(
+                ATS=self._acquisition_instr.card,
+                ATS_acq=self._acquisition_instr.controller, AWG=self.AWG,
+                nr_averages=self.RO_acq_averages())
 
     def get_pulse_pars(self):
         self.pulse_pars = {

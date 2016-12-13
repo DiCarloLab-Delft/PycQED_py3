@@ -250,12 +250,18 @@ class ZNB_VNA_sweep(Hard_Sweep):
     def __init__(self, VNA,
                  start_freq=None, stop_freq=None,
                  center_freq=None, span=None,
+                 segment_list = None,
                  npts=100, force_reset=False):
         '''
         Frequencies are in Hz.
-        Defines the frequency sweep by one of the two methods:
+        Defines the frequency sweep using one of the following methods:
         1) start a and stop frequency
         2) center frequency and span
+        3) segment sweep (this requires a list of elements. Each element fully defines a sweep)
+           segment_list = [[start_frequency, stop_frequency, nbr_points, power, segment_time, mesurement_delay, bandwidth],
+                           [elements for segment #2],
+                           ...,
+                           [elements for segment #n]]
 
         If force_reset = True the VNA is reset to default settings
         '''
@@ -269,6 +275,7 @@ class ZNB_VNA_sweep(Hard_Sweep):
         self.start_freq = start_freq
         self.stop_freq = stop_freq
         self.center_freq = center_freq
+        self.segment_list = segment_list
         self.span = span
         self.npts = npts
 
@@ -280,28 +287,35 @@ class ZNB_VNA_sweep(Hard_Sweep):
         Prepare the VNA for measurements by defining basic settings.
         Set the frequency sweep and get the frequency points back from the insturment
         '''
-        # Define basic settings for measurements
-        # if self.force_reset == True:
-        #     print('reset')
-        #     self.VNA.reset() # reset to default settings
+        self.VNA.continuous_mode_all('off') # measure only if required
+        self.VNA.min_sweep_time('on') # optimize the sweep time for the fastest measurement
+        self.VNA.trigger_source('immediate') # start a measurement once the trigger signal arrives
+                                        # trigger signal is generated with the command:
+                                        # VNA.start_sweep_all()
 
-        self.VNA.continuous_mode_all('off')  # measure only once required
-        # optimize the sweep time for the fastest measurement
-        self.VNA.min_sweep_time('on')
-        # start a measurement once the trigger signal arrive
-        self.VNA.trigger_source('immediate')
-        # trigger signal is generated with the command:
-        # VNA.start_single_sweep_all()
+        if self.segment_list == None:
+            self.VNA.sweep_type('linear') # set a linear sweep
+            if self.start_freq != None and self.stop_freq != None:
+                self.VNA.start_frequency(self.start_freq)
+                self.VNA.stop_frequency(self.stop_freq)
+            elif self.center_freq != None and self.span != None:
+                self.VNA.center_frequency(self.center_freq)
+                self.VNA.span_frequency(self.span)
 
-        if self.start_freq != None and self.stop_freq != None:
-            self.VNA.start_frequency(self.start_freq)
-            self.VNA.stop_frequency(self.stop_freq)
-        elif self.center_freq != None and self.span != None:
-            self.VNA.center_frequency(self.center_freq)
-            self.VNA.span_frequency(self.span)
+            self.VNA.npts(self.npts)
+        elif self.segment_list!= None:
+            # delete all previous stored segments
+            self.VNA.delete_all_segments()
 
-        self.VNA.npts(self.npts)
+            # Load segments in reverse order to have them executed properly
+            for idx_segment in range(len(self.segment_list), 0 ,-1):
+                current_segment = self.segment_list[idx_segment-1]
+                str_to_write = 'SENSE:SEGMENT:INSERT %s, %s, %s, %s, %s, %s, %s'%(current_segment[0], current_segment[1], current_segment[2], current_segment[3], current_segment[4], current_segment[5], current_segment[6])
+                self.VNA.write(str_to_write)
+
+
+            self.VNA.sweep_type('segment') # set a segment sweep
+
 
         # get the list of frequency used in the span from the VNA
-        self.sweep_points = self.VNA.get_stimulus()
-
+        self.sweep_points = self.VNA.get_stimulus();

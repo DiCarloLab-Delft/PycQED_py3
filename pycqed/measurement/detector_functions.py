@@ -145,7 +145,8 @@ class QX_Hard_Detector(Hard_Detector):
         self.current = 0
         self.randomizations = []
         # load files
-        print("QX_RB_Hard_Detector : loading qasm files...")
+        logging.info("QX_RB_Hard_Detector : loading qasm files...")
+        # print(qasm_filenames)
         for i, file_name in enumerate(qasm_filenames):
             t1 = time.time()
             qasm = ql.qasm_loader(file_name)
@@ -160,7 +161,7 @@ class QX_Hard_Detector(Hard_Detector):
                 circuit_name = c[0] + "_{}".format(i)
                 self.__qxc.create_circuit(circuit_name, c[1])
             t2 = time.time()
-            print("[+] qasm loading time :",t2-t1)
+            logging.info("[+] qasm loading time :",t2-t1)
 
     def prepare(self, sweep_points):
         self.sweep_points = sweep_points
@@ -354,12 +355,9 @@ class ZNB_VNA_detector(Hard_Detector):
         Return real and imaginary transmission coefficients +
         amplitude (linear) and phase (deg or radians)
         '''
-        self.VNA.start_single_sweep_all()  # start a measurement
-        # wait untill the end of measurement before moving on
-        self.VNA.wait_to_continue()
-        # for visualization on the VNA screen (no effect on data)
-        self.VNA.autoscale_trace()
-
+        self.VNA.start_sweep_all()# start a measurement
+        self.VNA.wait_to_continue() # wait untill the end of measurement before moving on
+        self.VNA.autoscale_trace() # for visualization on the VNA screen (no effect on data)
         # get data and process them
         real_data, imag_data = self.VNA.get_real_imaginary_data()
 
@@ -1633,3 +1631,90 @@ class Chevron_sim(Hard_Detector):
                                       self.t_start,
                                       self.dt,
                                       self.simulation_dict['dist_step'])
+
+class ATS_integrated_average_continuous_detector(Hard_Detector):
+
+    def __init__(self, ATS, ATS_acq, AWG, seg_per_point=1, normalize=False, rotate=False,
+                 nr_averages=1024, integration_length=1e-6, **kw):
+        '''
+        Integration average detector.
+        '''
+        super().__init__(**kw)
+        self.ATS_acq = ATS_acq
+        self.ATS = ATS
+        self.name = 'ATS_integrated_average_detector'
+        self.value_names = ['I', 'Q']
+        self.value_units = ['a.u.', 'a.u.']
+        self.AWG = AWG
+        self.seg_per_point = seg_per_point
+        self.rotate = rotate
+        self.normalize = normalize
+        self.cal_points = kw.get('cal_points', None)
+        self.nr_averages = nr_averages
+        self.integration_length = integration_length
+
+    def get_values(self):
+        self.AWG.stop()
+        self.AWG.start()
+        data = self.ATS_acq.acquisition()
+        return data
+
+    def rotate_and_normalize(self, data):
+        """
+        Rotates and normalizes
+        """
+        if self.cal_points is None:
+            self.corr_data, self.zero_coord, self.one_coord = \
+                a_tools.rotate_and_normalize_data(
+                    data=data,
+                    cal_zero_points=list(range(-4, -2)),
+                    cal_one_points=list(range(-2, 0)))
+        else:
+            self.corr_data, self.zero_coord, self.one_coord = \
+                a_tools.rotate_and_normalize_data(
+                    data=self.measured_values[0:2],
+                    cal_zero_points=self.cal_points[0],
+                    cal_one_points=self.cal_points[1])
+        return self.corr_data, self.corr_data
+
+    def prepare(self, sweep_points):
+        self.ATS.config(clock_source='INTERNAL_CLOCK',
+                        sample_rate=100000000,
+                        clock_edge='CLOCK_EDGE_RISING',
+                        decimation=0,
+                        coupling=['AC','AC'],
+                        channel_range=[2.,2.],
+                        impedance=[50,50],
+                        bwlimit=['DISABLED','DISABLED'],
+                        trigger_operation='TRIG_ENGINE_OP_J',
+                        trigger_engine1='TRIG_ENGINE_J',
+                        trigger_source1='EXTERNAL',
+                        trigger_slope1='TRIG_SLOPE_POSITIVE',
+                        trigger_level1=128,
+                        trigger_engine2='TRIG_ENGINE_K',
+                        trigger_source2='DISABLE',
+                        trigger_slope2='TRIG_SLOPE_POSITIVE',
+                        trigger_level2=128,
+                        external_trigger_coupling='AC',
+                        external_trigger_range='ETR_5V',
+                        trigger_delay=0,
+                        timeout_ticks=0
+        )
+        self.ATS.update_acquisitionkwargs(samples_per_record=1024,
+                         records_per_buffer=70,
+                         buffers_per_acquisition=self.nr_averages,
+                         channel_selection='AB',
+                         transfer_offset=0,
+                         external_startcapture='ENABLED',
+                         enable_record_headers='DISABLED',
+                         alloc_buffers='DISABLED',
+                         fifo_only_streaming='DISABLED',
+                         interleave_samples='DISABLED',
+                         get_processed_data='DISABLED',
+                         allocated_buffers=self.nr_averages,
+                         buffer_timeout=1000
+        )
+
+    def finish(self):
+        print("bla")
+

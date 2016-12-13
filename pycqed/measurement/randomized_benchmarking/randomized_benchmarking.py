@@ -74,10 +74,10 @@ def randomized_benchmarking_sequence(n_cl, desired_net_cl=0,
     the desired_net_cl to "3" (corresponds to Pauli X).
     '''
     if seed is None:
-        rb_cliffords = np.random.randint(0, 24, n_cl)
+        rb_cliffords = np.random.randint(0, 24, int(n_cl))
     else:
         rng_seed = np.random.RandomState(seed)
-        rb_cliffords = rng_seed.randint(0, 24, n_cl)
+        rb_cliffords = rng_seed.randint(0, 24, int(n_cl))
 
     net_clifford = calculate_net_clifford(rb_cliffords)
     recovery_clifford = calculate_recovery_clifford(

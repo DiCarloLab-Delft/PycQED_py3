@@ -27,7 +27,7 @@ class UHFQC(Instrument):
     EOM
     """
 
-    def __init__(self, name, server_name, device='auto', interface='USB', address='127.0.0.1', port=8004, **kw):
+    def __init__(self, name, device='auto', interface='USB', address='127.0.0.1', port=8004, **kw):
         '''
         Input arguments:
             name:           (str) name of the instrument
@@ -36,7 +36,7 @@ class UHFQC(Instrument):
         '''
         #self.socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1) #suggestion W vlothuizen
         t0 = time.time()
-        super().__init__(name, server_name)
+        super().__init__(name, **kw)
 
         self._daq = zi.ziDAQServer(address, int(port), 5)
         if device.lower() == 'auto':
@@ -202,9 +202,18 @@ class UHFQC(Instrument):
         self.quex_rl_avgcnt(LOG2_RL_AVG_CNT)
         self.quex_rl_source(2)
 
-        # Ready for readout
-        self.quex_iavg_readout(1)
-        self.quex_rl_readout(1)
+        # Ready for readout. Writing a '1' to these nodes activates the automatic readout of results.
+        # This functionality should be used once the ziPython driver has been improved to handle
+        # the 'poll' commands of these results correctly. Until then, we write a '0' to the nodes
+        # to prevent automatic result readout. It is then necessary to poll e.g. the AWG in order to
+        # detect when the measurement is complete, and then manually fetch the results using the 'get'
+        # command. Disabling the automatic result readout speeds up the operation a bit, since we avoid
+        # sending the same data twice.
+        self.quex_iavg_readout(0)
+        self.quex_rl_readout(0)
+
+
+
 
         # The custom firmware will feed through the signals on Signal Input 1 to Signal Output 1 and Signal Input 2 to Signal Output 2
         # when the AWG is OFF. For most practical applications this is not really useful. We, therefore, disable the generation of
@@ -246,7 +255,9 @@ class UHFQC(Instrument):
         h.set('awgModule/compiler/sourcestring', sourcestring)
         h.set('awgModule/compiler/start', 1)
         h.set('awgModule/elf/file', '')
-
+        while h.get('awgModule/progress')['progress'][0] < 1.0:
+            time.sleep(0.01)
+        time.sleep(0.2)
 
     def close(self):
         self._daq.disconnectDevice(self._device)
@@ -537,25 +548,21 @@ class UHFQC(Instrument):
             raise KeyError("exceeding AWG range for I channel, all values should be withing +/-1")
         elif np.max(Qwave)>1.0 or np.min(Qwave)<-1.0:
             raise KeyError("exceeding AWG range for Q channel, all values should be withing +/-1")
-        elif len(Iwave)>1493:
-            raise KeyError("exceeding max AWG wave lenght of 1493 samples for I channel, trying to upload {} samples".format(len(Iwave)))
-        elif len(Qwave)>1493:
-            raise KeyError("exceeding max AWG wave lenght of 1493 samples for Q channel, trying to upload {} samples".format(len(Qwave)))
+        elif len(Iwave)>16384:
+            raise KeyError("exceeding max AWG wave lenght of 16384 samples for I channel, trying to upload {} samples".format(len(Iwave)))
+        elif len(Qwave)>16384:
+            raise KeyError("exceeding max AWG wave lenght of 16384 samples for Q channel, trying to upload {} samples".format(len(Qwave)))
 
-        Iwave_strip=",".join(str(bit) for bit in Iwave)
-        Qwave_strip=",".join(str(bit) for bit in Qwave)
-        wave_I_string = "wave Iwave = vect("+Iwave_strip+");\n"
-        wave_Q_string = "wave Qwave = vect("+Qwave_strip+");\n"
-
+        wave_I_string = self.array_to_combined_vector_string(Iwave, "Iwave")
+        wave_Q_string = self.array_to_combined_vector_string(Qwave, "Qwave")
         delay_samples = int(acquisition_delay*1.8e9/8)
         delay_string='\twait({});\n'.format(delay_samples)
-
 
         preamble="""
 const TRIGGER1  = 0x000001;
 const WINT_TRIG = 0x000010;
 const IAVG_TRIG = 0x000020;
-const WINT_EN   = 0x0f0000;
+const WINT_EN   = 0x1f0000;
 
 setTrigger(WINT_EN);
 var loop_cnt = getUserReg(0);
@@ -584,12 +591,37 @@ setTrigger(0);"""
         string = preamble+wave_I_string+wave_Q_string+loop_start+delay_string+end_string
         self.awg_string(string)
 
+    def array_to_combined_vector_string(self, array, name):
+        # this function cuts up arrays into several vectors of maximum length 1024 that are joined.
+        # this is to avoid python crashes (was found to crash for vectors of lenght> 1490)
+        string = 'vect('
+        join = False
+        n = 0
+        while n < len(array):
+            string += '{:.3f}'.format(array[n])
+            if ((n+1) % 1024 != 0) and n < len(array)-1:
+                string += ','
+
+            if ((n+1) % 1024 == 0):
+                string += ')'
+                if n < len(array)-1:
+                    string += ',\nvect('
+                    join = True
+            n += 1
+
+        string += ')'
+        if join:
+            string = 'wave '+ name +' = join(' + string + ');\n'
+        else:
+            string = 'wave '+ name +' = '+ string + ';\n'
+        return string
+
     def awg_sequence_acquisition(self):
         string="""
 const TRIGGER1  = 0x000001;
 const WINT_TRIG = 0x000010;
 const IAVG_TRIG = 0x000020;
-const WINT_EN   = 0x0f0000;
+const WINT_EN   = 0x1f0000;
 
 setTrigger(WINT_EN);
 var loop_cnt = getUserReg(0);
