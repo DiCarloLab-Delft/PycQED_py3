@@ -15,7 +15,8 @@ class Test_SSRO_discrimination_analysis(unittest.TestCase):
     def setUpClass(self):
         self.datadir = os.path.join(pq.__path__[0],'tests','test_data')
         ma.a_tools.datadir = self.datadir
-        self.a_discr = ma.SSRO_discrimination_analysis(label='dummy_Butterfly')
+        self.a_discr = ma.SSRO_discrimination_analysis(label='dummy_Butterfly',
+                                                       plot_2D_histograms=False)
         self.a_discr_rot = ma.SSRO_discrimination_analysis(
             label='dummy_Butterfly', theta_in=-self.a_discr.theta,
             plot_2D_histograms=False)
