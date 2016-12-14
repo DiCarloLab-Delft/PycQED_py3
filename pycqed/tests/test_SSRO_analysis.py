@@ -2,9 +2,9 @@ import unittest
 import numpy as np
 import pycqed as pq
 import os
-# hack for badly installed matplotlib on maserati pc
-import matplotlib
-matplotlib.use('QT4Agg')
+# # hack for badly installed matplotlib on maserati pc
+# import matplotlib
+# matplotlib.use('QT4Agg')
 from pycqed.analysis import measurement_analysis as ma
 
 from pycqed.analysis.tools.data_manipulation import rotate_complex

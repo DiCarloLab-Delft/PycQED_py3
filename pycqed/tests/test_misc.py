@@ -2,8 +2,8 @@ import unittest
 import numpy as np
 
 # hack for badly installed matplotlib on maserati pc
-import matplotlib
-matplotlib.use('QT4Agg')
+# import matplotlib
+# matplotlib.use('QT4Agg')
 
 from pycqed.analysis.tools.data_manipulation import rotation_matrix, rotate_complex
 
