@@ -119,4 +119,5 @@ $RECYCLE.BIN/
 *.asm
 *.qumis
 *.txt
+*.png
 data/*

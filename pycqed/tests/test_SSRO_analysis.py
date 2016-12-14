@@ -1,6 +1,7 @@
 import unittest
 import numpy as np
 import pycqed as pq
+import os
 # hack for badly installed matplotlib on maserati pc
 import matplotlib
 matplotlib.use('QT4Agg')
@@ -12,7 +13,7 @@ class Test_SSRO_discrimination_analysis(unittest.TestCase):
 
     @classmethod
     def setUpClass(self):
-        self.datadir = pq.__path__[0]+'\\tests\\test_data'
+        self.datadir = os.path.join(pq.__path__[0],'tests','test_data')
         ma.a_tools.datadir = self.datadir
         self.a_discr = ma.SSRO_discrimination_analysis(label='dummy_Butterfly')
         self.a_discr_rot = ma.SSRO_discrimination_analysis(
@@ -23,7 +24,7 @@ class Test_SSRO_discrimination_analysis(unittest.TestCase):
         # Test the correct file is loaded
         self.assertEqual(
             self.a_discr.folder,
-            self.datadir+'\\20161214\\120000_dummy_Butterfly')
+            os.path.join(self.datadir,'20161214','120000_dummy_Butterfly'))
         mu_a = self.a_discr.mu_a
         mu_b = self.a_discr.mu_b
 
@@ -49,7 +50,7 @@ class Test_SSRO_discrimination_analysis(unittest.TestCase):
     def test_rotated_discrimination_fidelity(self):
         self.assertEqual(
             self.a_discr_rot.folder,
-            self.datadir+'\\20161214\\120000_dummy_Butterfly')
+            os.path.join(self.datadir,'20161214','120000_dummy_Butterfly'))
 
         # self.assertAlmostEqual(self.a_discr_rot.theta, 0)
         mu_a = self.a_discr_rot.mu_a
