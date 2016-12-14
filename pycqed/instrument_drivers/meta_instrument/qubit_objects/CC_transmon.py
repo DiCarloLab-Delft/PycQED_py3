@@ -100,6 +100,9 @@ class CBox_v3_driven_transmon(Transmon):
                            initial_value=1,
                            parameter_class=ManualParameter)
 
+        self.add_parameter('RO_acq_integration_length', initial_value=500e-9,
+                           vals=vals.Numbers(min_value=0, max_value=20e6),
+                           parameter_class=ManualParameter)
         self.add_parameter('RO_acq_averages', initial_value=1024,
                            vals=vals.Numbers(min_value=0, max_value=1e6),
                            parameter_class=ManualParameter)
@@ -1060,7 +1063,7 @@ class CBox_v3_driven_transmon(Transmon):
             label='Butterfly',
             current_threshold=None,
             close_fig=close_fig,
-            plot_2D_histograms=True, theta_in=-a.theta)
+            plot_2D_histograms=False, theta_in=-a.theta)
 
         c = ma.butterfly_analysis(
             close_main_fig=close_fig, initialize=initialize,
@@ -1162,9 +1165,11 @@ class QWG_driven_transmon(CBox_v3_driven_transmon):
 
     def __init__(self, name,
                  LO, cw_source, td_source,
-                 IVVI, QWG,
-                 CBox,
-                 MC, **kw):
+                 IVVI, QWG, 
+                 CBox, 
+                 MC, 
+                 RO_LutMan=None, 
+                 **kw):
         super(CBox_v3_driven_transmon, self).__init__(name, **kw)
         '''
         '''
@@ -1175,6 +1180,7 @@ class QWG_driven_transmon(CBox_v3_driven_transmon):
         self.QWG = QWG
         self.CBox = CBox
         self.MC = MC
+        self.RO_LutMan = RO_LutMan
         super().add_parameters()
         self.add_parameters()
 
@@ -1246,10 +1252,13 @@ class QWG_driven_transmon(CBox_v3_driven_transmon):
         #               self.mixer_offs_RO_Q.get())
 
         # RO pars
-        # self.LutMan.M_modulation(self.f_RO_mod())
-        # self.LutMan.M_amp(self.RO_amp())
-        # self.LutMan.M_length(self.RO_pulse_length())
-
+        if self.RO_LutMan != None: 
+            self.RO_LutMan.M_modulation(self.f_RO_mod())
+            self.RO_LutMan.M_amp(self.RO_amp())
+            self.RO_LutMan.M_length(self.RO_pulse_length())
+            self.RO_LutMan.load_pulses_onto_AWG_lookuptable(self.RO_awg_nr())
+            self.RO_LutMan.lut_mapping(
+                ['I', 'X180', 'Y180', 'X90', 'Y90', 'mX90', 'mY90', 'M_square'])
         self.CBox.upload_standard_weights(self.f_RO_mod())
 
     def load_QWG_pulses(self):

@@ -2670,18 +2670,16 @@ class SSRO_discrimination_analysis(MeasurementAnalysis):
     def run_default_analysis(self, plot_2D_histograms=True,
                              current_threshold=None, theta_in=0, **kw):
         self.add_analysis_datagroup_to_file()
-        # Extract I and Q data based on name of variable.
-        # I_shots = self.get_values(key='I')
-        # Q_shots = self.get_values(key='Q')
         self.get_naming_and_values()
         I_shots = self.measured_values[0]
         Q_shots = self.measured_values[1]
 
-        # rotating according to theta
-        I_shots = (np.cos(theta_in*2*np.pi/360)*I_shots -
-                   np.sin(theta_in*2*np.pi/360)*Q_shots)
-        Q_shots = (np.sin(theta_in*2*np.pi/360)*I_shots +
-                   np.cos(theta_in*2*np.pi/360)*Q_shots)
+        if theta_in != 0:
+            shots = I_shots+1j*Q_shots
+            rot_shots = dm_tools.rotate_complex(shots, angle=theta_in, deg=True)
+            I_shots = rot_shots.real
+            Q_shots = rot_shots.imag
+
 
         # Reshaping the data
         n_bins = 120  # the bins we want to have around our data
@@ -2736,18 +2734,17 @@ class SSRO_discrimination_analysis(MeasurementAnalysis):
                      1j * self.fit_res.params['A_center_y'].value)
         self.mu_b = (self.fit_res.params['B_center_x'].value +
                      1j * self.fit_res.params['B_center_y'].value)
+
+
         # only look at sigma x because we assume sigma_x = sigma_y
         sig_a = self.fit_res.params['A_sigma_x'].value
         sig_b = self.fit_res.params['B_sigma_x'].value
         # Picking threshold in the middle assumes same sigma for both
         # distributions, this can be improved by optimizing the F_discr
-        if abs(self.mu_a) > abs(self.mu_b):
-            diff_vec = self.mu_a - self.mu_b
-            self.opt_I_threshold = (self.mu_b.real + diff_vec.real/2)
-        else:
-            diff_vec = self.mu_b - self.mu_a
-            self.opt_I_threshold = (self.mu_a.real + diff_vec.real/2)
-        self.theta = np.arctan2(diff_vec.imag,diff_vec.real)/(2*np.pi)*360-theta_in
+        diff_vec = self.mu_a - self.mu_b
+
+        self.opt_I_threshold = np.mean([self.mu_a.real, self.mu_b.real])
+        self.theta = np.angle(diff_vec, deg=True)
         self.mean_sigma = np.mean([sig_a, sig_b])
         # relative separation of the gaussians in units of sigma
         self.relative_separation = abs(diff_vec)/self.mean_sigma
@@ -2771,6 +2768,7 @@ class SSRO_discrimination_analysis(MeasurementAnalysis):
                                (np.sqrt(2)*sig_a))
         CDF_b = .5 * math.erfc((self.mu_b.real - self.opt_I_threshold) /
                                (np.sqrt(2)*sig_b))
+
         self.F_discr_I = abs(CDF_a - CDF_b)
         # Current threshold projected on the I-axis
         if current_threshold is not None:
