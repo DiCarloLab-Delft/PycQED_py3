@@ -1,5 +1,5 @@
-##Simple but useful tutorial explaining most of the git commands you will need
-http://rogerdudler.github.io/git-guide/
+# Basic git use
+Check out my [git flowchart](GitFlowchart.pdf). This should cover basic use. 
 
 ##Branching
 ###To Create a new branch
