@@ -1069,6 +1069,77 @@ class Chevron_optimization_v1(det.Soft_Detector):
 
 
 
+class SWAPN_optimization(det.Soft_Detector):
+    '''
+    SWAPN optimization.
+    '''
+    def __init__(self, flux_channel, AWG, MC_nested, qubit,
+                 kernel_obj, num_iter, cache, cost_choice='sum',**kw):
+        super().__init__()
+        self.name = 'swapn_optimization'
+        self.value_names = ['Cost function', 'Single SWAP Fid']
+        self.value_units = ['a.u.', 'ns']
+        self.kernel_obj = kernel_obj
+        self.cache_obj = cache
+        self.AWG = AWG
+        self.MC_nested = MC_nested
+        self.qubit = qubit
+        self.num_iter = num_iter
+        self.cost_choice = cost_choice
+
+    def acquire_data_point(self, **kw):
+        # # Update kernel from kernel object
+
+        # # Measure the swapn
+
+        tdict = {'buffer_mw_flux': 50e-9,
+                 'buffer_flux_flux': 50e-9,
+                 'msmt_buffer': 0e-9,
+                 'dead_time': 3e-6}
+
+        times_vec = 1+np.arange(self.num_iter)*2
+        cal_points = 4
+        lengths_cal = times_vec[-1] + np.arange(1,1+cal_points)*(times_vec[1]-times_vec[0])
+        lengths_vec = np.concatenate((times_vec, lengths_cal))
+
+        flux_pulse_pars = self.qubit.get_flux_pars()[0]
+        mw_pulse_pars, RO_pars = self.qubit.get_pulse_pars()
+        repSWAP = awg_swf.SwapN(self.num_iter,
+                                mw_pulse_pars,
+                                RO_pars,
+                                flux_pulse_pars,
+                                dist_dict=self.qubit._dist_dict,
+                                timings_dict=tdict,
+                                AWG=self.AWG,
+                                upload=False, return_seq=True)
+
+        self.kernel_obj.kernel_to_cache(self.cache_obj)
+
+        self.AWG.set('ch%d_amp'%self.qubit.fluxing_channel(), 2.)
+        seq = repSWAP.pre_upload()
+
+        self.MC_nested.set_sweep_function(repSWAP)
+        self.MC_nested.set_sweep_points(lengths_vec)
+
+        self.MC_nested.set_detector_function(self.qubit.int_avg_det_rot)
+        self.AWG.set('ch%d_amp'%self.qubit.fluxing_channel(),
+                     self.qubit.swap_amp())
+        self.MC_nested.run('SWAPN_%s'%self.qubit.name)
+
+        # # fit it
+        ma_obj = ma.SWAPN_cost(auto=True, cost_func=self.cost_choice)
+        return ma_obj.cost_val, ma_obj.single_swap_fid
+
+    def prepare(self):
+        pass
+
+    def finish(self):
+        pass
+
+
+
+
+
 
 
 class AllXY_devition_detector_CBox(det.Soft_Detector):

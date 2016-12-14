@@ -222,7 +222,7 @@ class chevron_cphase_length(swf.Hard_Sweep):
 class SwapN(swf.Hard_Sweep):
     def __init__(self, rep_max, mw_pulse_pars, RO_pars,
                  flux_pulse_pars, dist_dict, AWG, timings_dict,
-                 upload=True, return_seq=False):
+                 upload=True, return_seq=False, even=True):
         super().__init__()
         self.rep_max = rep_max
         self.mw_pulse_pars = mw_pulse_pars
@@ -236,6 +236,7 @@ class SwapN(swf.Hard_Sweep):
         self.unit = '#'
         self.return_seq = return_seq
         self.AWG = AWG
+        self.even = even
 
     def set_parameter(self,val):
         pass
@@ -249,8 +250,11 @@ class SwapN(swf.Hard_Sweep):
                        self.RO_pars,
                        self.flux_pulse_pars,
                        distortion_dict=self.dist_dict,
-                       timings_dict=self.timings_dict,upload=self.upload)
+                       timings_dict=self.timings_dict,
+                       upload=self.upload,
+                       even=self.even)
             self.AWG.set('%s_amp'%self.flux_pulse_pars['channel'],old_val)
+            print("even prepare",self.even)
 
     def pre_upload(self, **kw):
         self.seq = fsqs.SwapN(self.rep_max,
@@ -259,38 +263,39 @@ class SwapN(swf.Hard_Sweep):
                               self.flux_pulse_pars,
                               distortion_dict=self.dist_dict,
                               timings_dict=self.timings_dict,
-                              return_seq=True)
+                              return_seq=True, even=self.even)
+        print("even pre_upload",self.even)
 
-class repeat_swap_even(swf.Hard_Sweep):
-    def __init__(self, rep_max, mw_pulse_pars, RO_pars,
-                 flux_pulse_pars,dist_dict, AWG, upload=True, return_seq=False):
-        super().__init__()
-        self.rep_max = rep_max
-        self.mw_pulse_pars = mw_pulse_pars
-        self.RO_pars = RO_pars
-        self.flux_pulse_pars = flux_pulse_pars
-        self.dist_dict = dist_dict
-        self.upload = upload
-        self.name = 'Chevron'
-        self.parameter_name = 'SWAP pulses'
-        self.unit = '#'
-        self.return_seq = return_seq
-        self.AWG = AWG
+# class repeat_swap_even(swf.Hard_Sweep):
+#     def __init__(self, rep_max, mw_pulse_pars, RO_pars,
+#                  flux_pulse_pars,dist_dict, AWG, upload=True, return_seq=False):
+#         super().__init__()
+#         self.rep_max = rep_max
+#         self.mw_pulse_pars = mw_pulse_pars
+#         self.RO_pars = RO_pars
+#         self.flux_pulse_pars = flux_pulse_pars
+#         self.dist_dict = dist_dict
+#         self.upload = upload
+#         self.name = 'Chevron'
+#         self.parameter_name = 'SWAP pulses'
+#         self.unit = '#'
+#         self.return_seq = return_seq
+#         self.AWG = AWG
 
-    def prepare(self, **kw):
-        if self.upload:
-            fsqs.repeat_swap_even(self.rep_max,
-                                    self.mw_pulse_pars,
-                                    self.RO_pars,
-                                    self.flux_pulse_pars,
-                                    distortion_dict=self.dist_dict)
+#     def prepare(self, **kw):
+#         if self.upload:
+#             fsqs.repeat_swap_even(self.rep_max,
+#                                     self.mw_pulse_pars,
+#                                     self.RO_pars,
+#                                     self.flux_pulse_pars,
+#                                     distortion_dict=self.dist_dict)
 
-    def pre_upload(self, **kw):
-        self.seq = fsqs.repeat_swap_even(self.rep_max,
-                                    self.mw_pulse_pars,
-                                    self.RO_pars,
-                                    self.flux_pulse_pars,
-                                    distortion_dict=self.dist_dict, return_seq=True)
+#     def pre_upload(self, **kw):
+#         self.seq = fsqs.repeat_swap_even(self.rep_max,
+#                                     self.mw_pulse_pars,
+#                                     self.RO_pars,
+#                                     self.flux_pulse_pars,
+#                                     distortion_dict=self.dist_dict, return_seq=True)
 
 
 class BusT1(swf.Hard_Sweep):

@@ -200,10 +200,12 @@ def SwapN(rep_max, mw_pulse_pars, RO_pars, flux_pulse_pars=None,
                        distortion_dict=None,
                        timings_dict=None,
                        upload=True,
-                       return_seq=False):
+                       return_seq=False,
+                       even=True):
     '''
 
     '''
+    print("even sequence", even)
     preloaded_kernels_vec = preload_kernels_func(distortion_dict)
     if flux_pulse_pars is None:
         flux_pulse_pars = {'pulse_type': 'SquarePulse',
@@ -237,12 +239,13 @@ def SwapN(rep_max, mw_pulse_pars, RO_pars, flux_pulse_pars=None,
     buffer_flux_flux = timings_dict['buffer_flux_flux']
     msmt_buffer = timings_dict['msmt_buffer']
     dead_time = timings_dict['dead_time']
+    print("pulse delay", flux_pulse_pars['pulse_delay'])
     for i in range(rep_max):  # seq has to have at least 2 elts
         # correcting timings
-        flux_pulse_pars['pulse_delay'] = buffer_mw_flux + (mw_pulse_pars['sigma'] *
-                                                         mw_pulse_pars['nr_sigma'])
-        RO_pars['pulse_delay'] += msmt_buffer + lngt - (mw_pulse_pars['sigma'] *
-                                                        mw_pulse_pars['nr_sigma'])
+        flux_pulse_pars['pulse_delay'] = buffer_mw_flux + (mw_pulse_pars['pulse_delay'])
+        print("pulse delay", flux_pulse_pars['pulse_delay'])
+        RO_pars['pulse_delay'] += msmt_buffer + lngt - (mw_pulse_pars['pulse_delay'])
+        print("RO pulse delay", RO_pars['pulse_delay'])
         dead_time_pulse['pulse_delay'] = RO_pars['pulse_delay']
 
         minus_flux_pulse_pars['pulse_delay'] = dead_time + RO_pars['length']
@@ -256,15 +259,25 @@ def SwapN(rep_max, mw_pulse_pars, RO_pars, flux_pulse_pars=None,
         sec_minus_flux_pulse_pars = deepcopy(minus_flux_pulse_pars)
         sec_minus_flux_pulse_pars['pulse_delay'] = minus_flux_pulse_pars['length'] + buffer_flux_flux
         if i == 0:
-            pulse_list = [init_pulse,
-                          flux_pulse_pars,
-                          RO_pars,
-                          minus_flux_pulse_pars,
-                          dead_time_pulse]
+            if even:
+                pulse_list = [init_pulse,
+                              RO_pars,
+                              dead_time_pulse]
+            else:
+                pulse_list = [init_pulse,
+                              flux_pulse_pars,
+                              RO_pars,
+                              minus_flux_pulse_pars,
+                              dead_time_pulse]
         else:
-            pulse_list = [init_pulse,
+            if even:
+                pulse_list = [init_pulse] + [sec_flux_pulse_pars]*(2*i) +[RO_pars] + [sec_minus_flux_pulse_pars]*(2*i) + [dead_time_pulse]
+            else:
+                pulse_list = [init_pulse,
                           flux_pulse_pars] + [sec_flux_pulse_pars]*(2*i) +[RO_pars,
                           minus_flux_pulse_pars] + [sec_minus_flux_pulse_pars]*(2*i) + [dead_time_pulse]
+
+
         # copy first element and set extra wait
         pulse_list[0] = deepcopy(pulse_list[0])
         pulse_list[0]['pulse_delay'] += 0.01e-6 #+ ((-int(lngt*1e9)) % 50)*1e-9

@@ -18,6 +18,7 @@ import imp
 import math
 from math import erfc
 from scipy.signal import argrelextrema,argrelmax,argrelmin
+from copy import deepcopy
 
 try:
     from nathan_plotting_tools import *
@@ -4189,9 +4190,10 @@ class TwoD_Analysis(MeasurementAnalysis):
                 fig, ax = self.default_ax(figsize=(8, 5))
                 self.fig_array.append(fig)
                 self.ax_array.append(ax)
-                fig_title = '{timestamp}_{measurement}_linecut'.format(
+                fig_title = '{timestamp}_{measurement}_linecut_{i}'.format(
                     timestamp=self.timestamp_string,
-                    measurement=self.measurementstring)
+                    measurement=self.measurementstring,
+                    i=i)
                 a_tools.linecut_plot(x=self.sweep_points,
                                      y=self.sweep_points_2D,
                                      z=self.measured_values[i],
@@ -4213,9 +4215,10 @@ class TwoD_Analysis(MeasurementAnalysis):
                 print("normalize on")
             # print "unransposed",meas_vals
             # print "transposed", meas_vals.transpose()
-            fig_title = '{timestamp}_{measurement}'.format(
+            fig_title = '{timestamp}_{measurement}_{i}'.format(
                 timestamp=self.timestamp_string,
-                measurement=self.measurementstring)
+                measurement=self.measurementstring,
+                i=i)
             a_tools.color_plot(x=self.sweep_points,
                                y=self.sweep_points_2D,
                                z=meas_vals.transpose(),
@@ -5288,6 +5291,7 @@ class Chevron_2D(object):
             plt.close(fig)
         return
 
+
 class DoubleFrequency(object):
     def __init__(self, auto=True, label='Ramsey', timestamp=None, stepsize=10):
             if timestamp is None:
@@ -5419,3 +5423,104 @@ class DoubleFrequency(object):
             plt.close(fig)
         return
 
+
+class SWAPN_cost(object):
+    def __init__(self, auto=True, label='SWAPN', cost_func='sum', timestamp=None, stepsize=10):
+            if timestamp is None:
+                self.folder = a_tools.latest_data(label)
+                splitted = self.folder.split('\\')
+                self.scan_start = splitted[-2]+'_'+splitted[-1][:6]
+                self.scan_stop = self.scan_start
+            else:
+                self.scan_start = timestamp
+                self.scan_stop = timestamp
+                self.folder = a_tools.get_folder(timestamp=self.scan_start)
+            self.pdict = {'I':'amp',
+                     'sweep_points':'sweep_points'}
+            self.opt_dict = {'scan_label':label}
+            self.nparams = ['I', 'sweep_points']
+            self.stepsize = stepsize
+            self.label = label
+            self.cost_func = cost_func
+            if auto==True:
+                self.analysis()
+
+    def analysis(self):
+            print(self.scan_start,self.scan_stop,self.opt_dict,self.pdict,self.nparams)
+            sawpn_scan = RA.quick_analysis(t_start=self.scan_start,
+                                            t_stop=self.scan_stop,
+                                            options_dict=self.opt_dict,
+                                            params_dict_TD=self.pdict,
+                                            numeric_params=self.nparams)
+            x = sawpn_scan.TD_dict['sweep_points'][0]
+            y = sawpn_scan.TD_dict['I'][0]
+
+            if self.cost_func == 'sum':
+                self.cost_val = np.sum(np.power(y[:-4], np.divide(1, x[:-4])))/float(len(y[:-4]))
+            elif self.cost_func == 'slope':
+                self.cost_val = abs(y[0]*(y[1]-y[0]))+abs(y[0])
+            elif self.cost_func == 'dumb-sum':
+                self.cost_val = (np.sum(y[:-4])/float(len(y[:-4])))-y[:-4].min()
+            elif self.cost_func == 'until-nonmono-sum':
+                i=0
+                y_fil=deepcopy(y)
+                lastval = y_fil[0]
+                keep_going=1
+                while(keep_going):
+                    if i>5:
+                        latestthreevals = (y_fil[i]+y_fil[i-1]+ y_fil[i-2])/3
+                        threevalsbefore = (y_fil[i-3]+y_fil[i-4]+ y_fil[i-5])/3
+                        if latestthreevals<threevalsbefore or i>len(y_fil)-4:
+                            keep_going = 0
+                    i += 1
+                y_fil[i-1:-4]=threevalsbefore
+                self.cost_val = (np.sum(y_fil[:-4])/float(len(y_fil[:-4])))
+            self.single_swap_fid = y[0]
+
+            fig = plt.figure()
+            ax = fig.add_subplot(111)
+
+            plot_x = x
+            plot_step = plot_x[1]-plot_x[0]
+
+            ax.set_xlabel(r'# Swap pulses')
+            ax.set_ylabel(r'$F |1\rangle$')
+            ax.set_title('%s: SWAPN sequence' % self.scan_start)
+            ax.set_xlim(plot_x.min()-plot_step/2.,plot_x.max()+plot_step/2.)
+
+            ax.plot(plot_x, y, 'bo')
+
+            fig.tight_layout()
+            self.save_fig(fig)
+
+    def save_fig(self, fig, figname=None, xlabel='x', ylabel='y',
+                 fig_tight=True, **kw):
+        plot_formats = kw.pop('plot_formats', ['png'])
+        fail_counter = False
+        close_fig = kw.pop('close_fig', True)
+        if type(plot_formats) == str:
+            plot_formats = [plot_formats]
+        for plot_format in plot_formats:
+            if figname is None:
+                figname = (self.scan_start+'_DoubleFreq_'+'.'+plot_format)
+            else:
+                figname = (figname+'.' + plot_format)
+            self.savename = os.path.abspath(os.path.join(
+                self.folder, figname))
+            if fig_tight:
+                try:
+                    fig.tight_layout()
+                except ValueError:
+                    print('WARNING: Could not set tight layout')
+            try:
+                fig.savefig(
+                    self.savename, dpi=300,
+                    # value of 300 is arbitrary but higher than default
+                    format=plot_format)
+            except:
+                fail_counter = True
+        if fail_counter:
+            logging.warning('Figure "%s" has not been saved.' % self.savename)
+        if close_fig:
+            plt.close(fig)
+        return
