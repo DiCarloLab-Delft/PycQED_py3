@@ -238,7 +238,7 @@ class SwapN(swf.Hard_Sweep):
         self.AWG = AWG
         self.even = even
 
-    def set_parameter(self,val):
+    def set_parameter(self, val):
         pass
 
     def prepare(self, **kw):

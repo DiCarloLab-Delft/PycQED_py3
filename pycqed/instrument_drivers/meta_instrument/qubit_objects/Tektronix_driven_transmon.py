@@ -252,7 +252,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
     def get_dist_dict(self):
         return self._dist_dict
 
-    def set_dist_dict(self,dist_dict):
+    def set_dist_dict(self, dist_dict):
         self._dist_dict = dist_dict
 
     def prepare_for_continuous_wave(self):

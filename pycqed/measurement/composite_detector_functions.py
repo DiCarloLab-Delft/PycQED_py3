@@ -1072,9 +1072,14 @@ class Chevron_optimization_v1(det.Soft_Detector):
 class SWAPN_optimization(det.Soft_Detector):
     '''
     SWAPN optimization.
+    Wrapper around a SWAPN sequence to create a cost function.
+
+    The kernel object is used to determine the (pre)distortion kernel.
+    It is common to do a sweep over one of the kernel parameters as a sweep
+    function.
     '''
     def __init__(self, flux_channel, AWG, MC_nested, qubit,
-                 kernel_obj, num_iter, cache, cost_choice='sum',**kw):
+                 kernel_obj, num_iter, cache, cost_choice='sum', **kw):
         super().__init__()
         self.name = 'swapn_optimization'
         self.value_names = ['Cost function', 'Single SWAP Fid']
@@ -1099,7 +1104,7 @@ class SWAPN_optimization(det.Soft_Detector):
 
         times_vec = 1+np.arange(self.num_iter)*2
         cal_points = 4
-        lengths_cal = times_vec[-1] + np.arange(1,1+cal_points)*(times_vec[1]-times_vec[0])
+        lengths_cal = times_vec[-1] + np.arange(1, 1+cal_points)*(times_vec[1]-times_vec[0])
         lengths_vec = np.concatenate((times_vec, lengths_cal))
 
         flux_pulse_pars = self.qubit.get_flux_pars()[0]
