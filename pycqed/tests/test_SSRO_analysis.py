@@ -45,7 +45,7 @@ class Test_SSRO_discrimination_analysis(unittest.TestCase):
 
         self.assertAlmostEqual(self.a_discr.opt_I_threshold,
                                np.mean([mu_a.real, mu_b.real]), places=1)
-        self.assertAlmostEqual(self.a_discr.F_discr, 0.908, places=3)
+        self.assertAlmostEqual(self.a_discr.F_discr, 0.954, places=3)
         self.assertAlmostEqual(self.a_discr.F_discr_I, 0.5427, places=3)
 
     def test_rotated_discrimination_fidelity(self):
@@ -61,5 +61,5 @@ class Test_SSRO_discrimination_analysis(unittest.TestCase):
 
         self.assertAlmostEqual(self.a_discr_rot.F_discr, self.a_discr_rot.F_discr_I,
                                places=3)
-        self.assertAlmostEqual(self.a_discr_rot.F_discr, 0.908, places=3)
+        self.assertAlmostEqual(self.a_discr_rot.F_discr, 0.954, places=3)
 
