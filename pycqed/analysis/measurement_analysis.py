@@ -2031,6 +2031,7 @@ class SSRO_Analysis(MeasurementAnalysis):
 
         self.add_analysis_datagroup_to_file()
         self.no_fits = no_fits
+        self.get_naming_and_values()
         # plotting histograms of the raw shots on I and Q axis
 
         if len(channels)==1:
@@ -2041,19 +2042,18 @@ class SSRO_Analysis(MeasurementAnalysis):
             shots_Q_data_1 = shots_I_data_1*0
 
         else:
+            # Try getting data by name first and by index otherwise
             try:
                 shots_I_data = self.get_values(key=channels[0])
                 shots_Q_data = self.get_values(key=channels[1])
-                shots_I_data_0, shots_I_data_1 = a_tools.zigzag(shots_I_data,
-                                                    sample_0, sample_1, nr_samples)
-                shots_Q_data_0, shots_Q_data_1 = a_tools.zigzag(shots_Q_data,
-                                                    sample_0, sample_1, nr_samples)
-
-            except(KeyError):  # used for different naming when using TD_meas shots
-                shots_I_data_0 = self.get_values(key='single_shot_I')[:, 0]
-                shots_I_data_1 = self.get_values(key='single_shot_I')[:, 1]
-                shots_Q_data_0 = self.get_values(key='single_shot_Q')[:, 0]
-                shots_Q_data_1 = self.get_values(key='single_shot_Q')[:, 1]
+            except: 
+                shots_I_data = self.measured_values[0]
+                shots_Q_data = self.measured_values[1]
+                
+            shots_I_data_0, shots_I_data_1 = a_tools.zigzag(shots_I_data,
+                                                sample_0, sample_1, nr_samples)
+            shots_Q_data_0, shots_Q_data_1 = a_tools.zigzag(shots_Q_data,
+                                                sample_0, sample_1, nr_samples)
 
         # cutting off half data points (odd number of data points)
         min_len = np.min([np.size(shots_I_data_0), np.size(shots_I_data_1),
@@ -2725,7 +2725,7 @@ class SSRO_discrimination_analysis(MeasurementAnalysis):
             axs[0].set_ylabel('Q')
             #axs[0].ticklabel_format(style = 'sci',  fontsize=4)
 
-            self.save_fig(fig, figname='2D-Histograms', **kw)
+            self.save_fig(fig, figname='2D-Histograms_{}'.format(theta_in), **kw)
 
         #######################################################
         #         Extract quantities of interest              #
@@ -2741,7 +2741,7 @@ class SSRO_discrimination_analysis(MeasurementAnalysis):
         sig_b = self.fit_res.params['B_sigma_x'].value
         # Picking threshold in the middle assumes same sigma for both
         # distributions, this can be improved by optimizing the F_discr
-        diff_vec = self.mu_a - self.mu_b
+        diff_vec = self.mu_b - self.mu_a 
 
         self.opt_I_threshold = np.mean([self.mu_a.real, self.mu_b.real])
         self.theta = np.angle(diff_vec, deg=True)
@@ -2761,7 +2761,7 @@ class SSRO_discrimination_analysis(MeasurementAnalysis):
                                (np.sqrt(2)*sig_a))
         CDF_b = .5 * math.erfc((-abs(diff_vec/2)) /
                                (np.sqrt(2)*sig_b))
-        self.F_discr = abs(CDF_a - CDF_b)
+        self.F_discr = 1-(1-abs(CDF_a - CDF_b))/2
 
         # Projected on the I-axis
         CDF_a = .5 * math.erfc((self.mu_a.real - self.opt_I_threshold) /
@@ -2776,7 +2776,7 @@ class SSRO_discrimination_analysis(MeasurementAnalysis):
                                    (np.sqrt(2)*sig_a))
             CDF_b = .5 * math.erfc((self.mu_b.real - current_threshold) /
                                    (np.sqrt(2)*sig_b))
-            self.F_discr_curr_t = abs(CDF_a - CDF_b)
+            self.F_discr_curr_t = 1-(1-abs(CDF_a - CDF_b))/2
 
         self.finish(**kw)
 
@@ -5309,13 +5309,12 @@ class butterfly_analysis(MeasurementAnalysis):
         I_shots = self.measured_values[0]
         Q_shots = self.measured_values[1]
 
-        #rotating according to theta
-        I_shots = np.cos(theta_in*2*np.pi/360)*I_shots - np.sin(theta_in*2*np.pi/360)*Q_shots
-        Q_shots = np.sin(theta_in*2*np.pi/360)*I_shots + np.cos(theta_in*2*np.pi/360)*Q_shots
-        self.data=I_shots
+        shots = I_shots+1j*Q_shots
+        rot_shots = dm_tools.rotate_complex(shots, angle=theta_in, deg=True)
+        I_shots = rot_shots.real
+        Q_shots = rot_shots.imag
 
-        # if close_file:
-        #     self.data_file.close()
+        self.data=I_shots
 
         if initialize:
             if threshold_init==None:
@@ -5386,10 +5385,11 @@ class butterfly_analysis(MeasurementAnalysis):
         self.butterfly_coeffs = dm_tools.butterfly_matrix_inversion(exc_coeffs,
                                                                     rel_coeffs)
         # eps,declaration,output_input
-        F_a_butterfly = 1-(1-(self.butterfly_coeffs.get('eps00_1') +
+        F_a_butterfly = (1-(self.butterfly_coeffs.get('eps00_1') +
                   self.butterfly_coeffs.get('eps01_1') +
                   self.butterfly_coeffs.get('eps10_0') +
-                  self.butterfly_coeffs.get('eps11_0')))/2
+                  self.butterfly_coeffs.get('eps11_0'))/2)
+
         mmt_ind_rel = (self.butterfly_coeffs.get('eps00_1') +
                        self.butterfly_coeffs.get('eps10_1'))
         mmt_ind_exc = (self.butterfly_coeffs.get('eps11_0') +

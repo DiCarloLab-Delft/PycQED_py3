@@ -149,7 +149,7 @@ class CBox_integration_logging_det_CC(det.Hard_Detector):
         super().__init__()
         self.CBox = CBox
         self.name = 'CBox_integration_logging_detector'
-        self.value_names = ['I', 'Q']
+        self.value_names = ['I shots', 'Q shots']
         self.value_units = ['a.u.', 'a.u.']
 
     def get_values(self):
@@ -173,6 +173,47 @@ class CBox_integration_logging_det_CC(det.Hard_Detector):
             if i > 20:
                 break
         return data
+
+    def finish(self):
+        self.CBox.set('acquisition_mode', 'idle')
+
+class CBox_state_counters_det_CC(det.Hard_Detector):
+
+    def __init__(self, CBox, **kw):
+        super().__init__()
+        self.CBox = CBox
+        self.name = 'CBox_state_counters_detector'
+        # A and B refer to the counts for the different weight functions
+        self.value_names = ['no error A', 'single error A', 'double error A',
+                            '|0> A', '|1> A',
+                            'no error B', 'single error B', 'double error B',
+                            '|0> B', '|1> B', ]
+        self.value_units = ['#']*10
+
+    def acquire_data_point(self):
+        return self.get_values()
+
+    def get_values(self):
+        succes = False
+        i = 0
+        while not succes:
+            try:
+                self.CBox.set('run_mode', 'idle')
+                self.CBox.core_state('idle')
+                self.CBox.core_state('active')
+                self.CBox.set('acquisition_mode', 'idle')
+                self.CBox.set('acquisition_mode', 'integration logging')
+                self.CBox.set('run_mode', 'run')
+                # does not restart AWG tape in CBox as we don't use it anymore
+                data = self.CBox.get_qubit_state_log_counters()
+                succes = True
+            except Exception as e:
+                logging.warning('Exception caught retrying')
+                logging.warning(e)
+            i += 1
+            if i > 20:
+                break
+        return np.concatenate(data)  # concatenates counters A and B
 
     def finish(self):
         self.CBox.set('acquisition_mode', 'idle')

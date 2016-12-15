@@ -327,7 +327,7 @@ def reject_outliers(data, m=6.):
     s = d/mdev if mdev else 0.
     return data[s < m]
 
-def rotation_matrix(angle):
+def rotation_matrix(angle, as_array=False):
     """
     Returns a 2x2 rotation matrix based on an angle in degrees.
 
@@ -335,6 +335,8 @@ def rotation_matrix(angle):
     """
     rot_mat = np.matrix([[np.cos(2*np.pi*angle/360), - np.sin(2*np.pi*angle/360)],
              [np.sin(2*np.pi*angle/360),  np.cos(2*np.pi*angle/360)]])
+    if as_array:
+        rot_mat = np.array(rot_mat)
     return rot_mat
 
 def rotate_complex(complex_number, angle, deg=True):
