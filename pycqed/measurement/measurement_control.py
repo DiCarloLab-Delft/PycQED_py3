@@ -393,8 +393,7 @@ class MeasurementControl(Instrument):
                      'iteration',
                      'soft_iteration']:
             try:
-                attr = getattr(self, attr)
-                del attr
+                delattr(self, attr)
             except AttributeError:
                 pass
 
@@ -888,7 +887,7 @@ class MeasurementControl(Instrument):
         self.preparetime = time.time()
         return time.strftime('%Y-%m-%d %H:%M:%S')
 
-    def set_sweep_points(self, sweep_points, OneD=True):
+    def set_sweep_points(self, sweep_points):
         self.sweep_points = np.array(sweep_points)
         # line below is because some sweep funcs have their own sweep points
         # attached
