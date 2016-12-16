@@ -888,16 +888,20 @@ class MeasurementControl(Instrument):
         self.preparetime = time.time()
         return time.strftime('%Y-%m-%d %H:%M:%S')
 
-    def set_sweep_points(self, sweep_points):
+    def set_sweep_points(self, sweep_points, OneD=True):
         self.sweep_points = np.array(sweep_points)
         # line below is because some sweep funcs have their own sweep points
         # attached
         # This is a mighty bad line! Should be adding sweep points to the
         # individual sweep funcs
-        self.sweep_functions[0].sweep_points = np.array(sweep_points)
+        if len(np.shape(sweep_points)) == 1:
+            self.sweep_functions[0].sweep_points = np.array(sweep_points)
 
     def get_sweep_points(self):
-        return self.sweep_functions[0].sweep_points
+        if hasattr(self, 'sweep_points'):
+            return self.sweep_points
+        else:
+            return self.sweep_functions[0].sweep_points
 
     def set_adaptive_function_parameters(self, adaptive_function_parameters):
         """
