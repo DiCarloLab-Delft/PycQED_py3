@@ -152,6 +152,8 @@ class Transmon(Qubit):
                            parameter_class=ManualParameter)
         # Time between start of pulses
         self.add_parameter('pulse_delay', units='s',
+                           initial_value=0,
+                           vals=vals.Numbers(0, 1e-6),
                            parameter_class=ManualParameter)
 
         self.add_parameter('f_qubit_calc', vals=vals.Enum(None, 'dac', 'flux'),
