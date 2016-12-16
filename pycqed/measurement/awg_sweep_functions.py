@@ -232,7 +232,7 @@ class chevron_cphase_length(swf.Hard_Sweep):
 class SwapN(swf.Hard_Sweep):
 
     def __init__(self, mw_pulse_pars, RO_pars,
-                 flux_pulse_pars, dist_dict,
+                 flux_pulse_pars, dist_dict, AWG,
                  upload=True,
                  ):
         super().__init__()
@@ -244,23 +244,27 @@ class SwapN(swf.Hard_Sweep):
         self.name = 'SWAPN'
         self.parameter_name = 'SWAP pulses'
         self.unit = '#'
+        self.AWG = AWG
 
     def set_parameter(self, val):
         pass
 
     def prepare(self, **kw):
         if self.upload:
-            # old_val = self.AWG.get(
-            #     '{}_amp'.format(self.flux_pulse_pars['channel']))
-            # self.AWG.set('{}_amp'.format(self.flux_pulse_pars['channel']), 2.)
+            old_val = self.AWG.get(
+                '{}_amp'.format(self.flux_pulse_pars['channel']))
+            # Rescaling the AWG channel amp is done to ensure that the dac
+            # values of the flux pulses (including kernels) are defined on
+            # a 2Vpp scale.
+            self.AWG.set('{}_amp'.format(self.flux_pulse_pars['channel']), 2.)
             fsqs.SwapN(self.mw_pulse_pars,
                        self.RO_pars,
                        self.flux_pulse_pars,
                        nr_pulses_list=self.sweep_points,
                        distortion_dict=self.dist_dict,
                        upload=True)
-            # self.AWG.set('{}_amp'.format(self.flux_pulse_pars['channel']),
-            #              old_val)
+            self.AWG.set('{}_amp'.format(self.flux_pulse_pars['channel']),
+                         old_val)
 
     def pre_upload(self, **kw):
         # Removed this as we don't understand why it is here

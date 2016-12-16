@@ -1106,16 +1106,14 @@ class SWAPN_optimization(det.Soft_Detector):
         mw_pulse_pars, RO_pars = self.qubit.get_pulse_pars()
         repSWAP = awg_swf.SwapN(mw_pulse_pars,
                                 RO_pars,
-                                flux_pulse_pars,
+                                flux_pulse_pars, AWG=self.AWG,
                                 dist_dict=self.qubit._dist_dict,
-                                AWG=self.AWG,
-                                upload=False, return_seq=True,
-                                nr_pulses_list=self.nr_pulses_list)
+                                upload=True)
 
         self.kernel_obj.kernel_to_cache(self.cache_obj)
 
-        self.AWG.set('ch%d_amp'%self.qubit.fluxing_channel(), 2.)
-        seq = repSWAP.pre_upload()
+        # self.AWG.set('ch%d_amp'%self.qubit.fluxing_channel(), 2.)
+        # seq = repSWAP.pre_upload()
 
         self.MC_nested.set_sweep_function(repSWAP)
         self.MC_nested.set_sweep_points(lengths_vec)

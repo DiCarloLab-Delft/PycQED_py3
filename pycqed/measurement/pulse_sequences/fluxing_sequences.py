@@ -254,26 +254,6 @@ def SwapN(mw_pulse_pars, RO_pars,
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
 
-    # for i, el in enumerate(el_list):
-    #         el_list[i] = el
-    # cal_points = 4
-    # for i in range(int(cal_points/2)):
-    #     pulse_list = [pulses['I'], RO_pars]
-    #     # copy first element and set extra wait
-    #     pulse_list[0] = deepcopy(pulse_list[0])
-    #     el = multi_pulse_elt(len(nr_pulses_list)+i, station, pulse_list)
-    #     el_list.append(el)
-    #     seq.append_element(el, trigger_wait=True)
-    # for i in range(int(cal_points/2)):
-    #     pulse_list = [pulses['X180'], RO_pars]
-    #     # copy first element and set extra wait
-    #     pulse_list[0] = deepcopy(pulse_list[0])
-
-    #     el = multi_pulse_elt(
-    #         len(nr_pulses_list)+int(cal_points/2)+i, station, pulse_list)
-    #     el_list.append(el)
-    #     seq.append_element(el, trigger_wait=True)
-
     if upload:
         station.components['AWG'].stop()
         station.pulsar.program_awg(seq, *el_list, verbose=verbose)
