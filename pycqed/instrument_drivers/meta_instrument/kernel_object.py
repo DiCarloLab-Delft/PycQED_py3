@@ -157,7 +157,8 @@ class Distortion(Instrument):
         return kernels
 
     def kernel_to_cache(self, cache):
-        kernel_list = [self.get_bounce_kernel(), self.get_skin_kernel(),
+        kernel_list = [self.get_bounce_kernel(),
+                        self.get_skin_kernel(),
                        self.get_decay_kernel_1(),
                        self.get_decay_kernel_2()]
         cache.update({'OPT_chevron.tmp':self.convolve_kernel(kernel_list)})
@@ -175,8 +176,9 @@ class Distortion(Instrument):
                                         length=self.corrections_length())
 
     def save_corrections_kernel(self, filename, kernel_list_before=None):
-        if type(kernel_list_before) is not list:
-            kernel_list_before = [kernel_list_before]
+
+        # if type(kernel_list_before) is not list:
+        #     kernel_list_before = [kernel_list_before]
         save_kernel(self.get_corrections_kernel(kernel_list_before),
                     save_file=filename)
         return filename

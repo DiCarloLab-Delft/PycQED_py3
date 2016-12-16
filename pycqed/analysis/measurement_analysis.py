@@ -5470,7 +5470,7 @@ class SWAPN_cost(object):
                     if i>5:
                         latestthreevals = (y_fil[i]+y_fil[i-1]+ y_fil[i-2])/3
                         threevalsbefore = (y_fil[i-3]+y_fil[i-4]+ y_fil[i-5])/3
-                        if latestthreevals<threevalsbefore or i>len(y_fil)-4:
+                        if latestthreevals<(threevalsbefore-0.12) or i>len(y_fil)-4:
                             keep_going = 0
                     i += 1
                 y_fil[i-1:-4]=threevalsbefore

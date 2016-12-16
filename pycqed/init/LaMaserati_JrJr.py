@@ -81,6 +81,9 @@ from pycqed.measurement import awg_sweep_functions_multi_qubit as awg_swf_m
 from pycqed.measurement.pulse_sequences import multi_qubit_tek_seq_elts as sq_m
 import pycqed.scripts.personal_folders.Niels.two_qubit_readout_analysis as Niels
 
+#for flux pulses
+import instrument_drivers.meta_instrument.kernel_object as k_obj
+
 # Initializing instruments
 
 
@@ -106,6 +109,12 @@ AWG.timeout(180)
 # station.add_component(AWG520)
 IVVI = iv.IVVI('IVVI', address='COM4', numdacs=16, server_name=None)
 station.add_component(IVVI)
+
+#flux pulsing
+k1 = k_obj.Distortion(name='ch3_fs')
+station.add_component(k1)
+k0 = k_obj.Distortion(name='ch_fs')
+station.add_component(k0)
 
 if UHFQC:
     #Initializing UHFQC
@@ -238,6 +247,9 @@ gen.load_settings_onto_instrument(DataB)
 gen.load_settings_onto_instrument(DataM)
 gen.load_settings_onto_instrument(DataT)
 gen.load_settings_onto_instrument(HS)
+gen.load_settings_onto_instrument(k0)
+gen.load_settings_onto_instrument(k1)
+
 
 AncT.E_c(0.28e9)
 AncT.asymmetry(0)

@@ -240,7 +240,12 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                            vals=vals.Numbers(min_value=0., max_value=1e-6),
                            parameter_class=ManualParameter)
         self.add_parameter('flux_dead_time',
-                           label='Time between mmt and comp.', units='s',
+                           label='Time between flux pulse and comp.', units='s',
+                           initial_value=0.,
+                           vals=vals.Numbers(min_value=0., max_value=50e-6),
+                           parameter_class=ManualParameter)
+        self.add_parameter('mw_to_flux_delay',
+                           label='time between and mw pulse and start of flux pulse', units='s',
                            initial_value=0.,
                            vals=vals.Numbers(min_value=0., max_value=50e-6),
                            parameter_class=ManualParameter)
@@ -1102,7 +1107,8 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                            'amplitude': self.fluxing_amp(),
                            'length': self.swap_time(),
                            'swap_amp': self.swap_amp(),
-                           'dead_time_length': self.flux_dead_time(),
+                           'dead_time': self.flux_dead_time(),
+                           'mw_to_flux_delay': self.mw_to_flux_delay(),
                            'pulse_type': 'SquarePulse'}
         return flux_pulse_pars, self._dist_dict
 
