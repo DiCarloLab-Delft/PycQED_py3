@@ -57,6 +57,10 @@ def multi_pulse_elt(i, station, pulse_list):
                                           amplitude=0, length=1e-9,),
                         start=300e-9)
     for i, pulse_pars in enumerate(pulse_list):
+        if 'refpoint' not in pulse_pars.keys():
+            # default refpoint for backwards compatibility
+            pulse_pars['refpoint'] = 'end'
+
         if pulse_pars['pulse_type'] == 'SSB_DRAG_pulse':
             last_pulse = el.add(
                 SSB_DRAG_pulse(name='pulse_{}'.format(i),
@@ -71,34 +75,34 @@ def multi_pulse_elt(i, station, pulse_list):
                                phi_skew=pulse_pars['phi_skew'],
                                alpha=pulse_pars['alpha']),
                 start=pulse_pars['pulse_delay'],
-                refpulse=last_pulse, refpoint='end')
+                refpulse=last_pulse, refpoint=pulse_pars['refpoint'])
         elif pulse_pars['pulse_type'] == 'Mux_DRAG_pulse':
             # pulse_pars.pop('pulse_type')
             last_pulse = el.add(Mux_DRAG_pulse(name='pulse_{}'.format(i),
                                                **pulse_pars),
                                 start=pulse_pars['pulse_delay'],
-                                refpulse=last_pulse, refpoint='end')
+                                refpulse=last_pulse, refpoint=pulse_pars['refpoint'])
         elif pulse_pars['pulse_type'] == 'CosPulse':
             last_pulse = el.add(CosPulse(name='pulse_{}'.format(i),
                                          **pulse_pars),
                                 start=pulse_pars['pulse_delay'],
-                                refpulse=last_pulse, refpoint='end')
+                                refpulse=last_pulse, refpoint=pulse_pars['refpoint'])
         elif pulse_pars['pulse_type'] == 'SquarePulse':
             last_pulse = el.add(SquarePulse(name='pulse_{}'.format(i),
                                             **pulse_pars),
                                 start=pulse_pars['pulse_delay'],
-                                refpulse=last_pulse, refpoint='end')
+                                refpulse=last_pulse, refpoint=pulse_pars['refpoint'])
         elif pulse_pars['pulse_type'] == 'SquareFluxPulse':
             last_pulse = el.add(SquareFluxPulse(name='pulse_{}'.format(i),
                                                 **pulse_pars),
                                 start=pulse_pars['pulse_delay'],
-                                refpulse=last_pulse, refpoint='end')
+                                refpulse=last_pulse, refpoint=pulse_pars['refpoint'])
 
         elif pulse_pars['pulse_type'] == 'ModSquare':
             last_pulse = el.add(MW_IQmod_pulse(name='pulse_{}'.format(i),
                                                **pulse_pars),
                                 start=pulse_pars['pulse_delay'],
-                                refpulse=last_pulse, refpoint='end')
+                                refpulse=last_pulse, refpoint=pulse_pars['refpoint'])
 
         elif (pulse_pars['pulse_type'] == 'MW_IQmod_pulse_tek' or
               pulse_pars['pulse_type'] == 'MW_IQmod_pulse_UHFQC' or
@@ -114,7 +118,7 @@ def multi_pulse_elt(i, station, pulse_list):
                     amplitude=pulse_pars['amplitude'],
                     mod_frequency=pulse_pars['mod_frequency']),
                     start=pulse_pars['pulse_delay'],
-                    refpulse=last_pulse, refpoint='end',
+                    refpulse=last_pulse, refpoint=pulse_pars['refpoint'],
                     fixed_point_freq=pulse_pars['fixed_point_frequency'])
             elif pulse_pars['pulse_type'] == 'Gated_MW_RO_pulse':
                 last_pulse = el.add(pulse.SquarePulse(
@@ -122,7 +126,7 @@ def multi_pulse_elt(i, station, pulse_list):
                     length=pulse_pars['length'],
                     channel=pulse_pars['RO_pulse_marker_channel']),
                     start=pulse_pars['pulse_delay'], refpulse=last_pulse,
-                    refpoint='end',
+                    refpoint=pulse_pars['refpoint'],
                     fixed_point_freq=pulse_pars['fixed_point_frequency'])
             elif pulse_pars['pulse_type'] == 'MW_IQmod_pulse_UHFQC':
                 #"adding a 0 amp pulse because the sequencer needs an element for timing
@@ -131,7 +135,7 @@ def multi_pulse_elt(i, station, pulse_list):
                     length=pulse_pars['length'],
                     channel=pulse_pars['RO_pulse_marker_channel']),
                     start=pulse_pars['pulse_delay'], refpulse=last_pulse,
-                    refpoint='end',
+                    refpoint=pulse_pars['refpoint'],
                     fixed_point_freq=pulse_pars['fixed_point_frequency'])
             # Start Acquisition marker
             if type(pulse_pars['acq_marker_channel']) is str:
@@ -141,9 +145,12 @@ def multi_pulse_elt(i, station, pulse_list):
                     Acq_marker = pulse.SquarePulse(
                         name='Acq-trigger', amplitude=1, length=20e-9,
                         channel=channel)
+                    # Note that refpoint here is an exception because the
+                    # refpulse is always the RO pulse that is added in the
+                    # block just above here.
                     el.add(
                         Acq_marker, start=pulse_pars['acq_marker_delay'],
-                        refpulse=last_pulse, refpoint='end')
+                        refpulse=last_pulse, refpoint='start')
             else:
                 # TODO: remove hacked in second marker and support list
                 # functionality

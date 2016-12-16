@@ -151,11 +151,10 @@ class Rabi_2nd_exc(swf.Hard_Sweep):
 
 
 class chevron_length(swf.Hard_Sweep):
-
-    def __init__(self, length_vec, mw_pulse_pars, RO_pars,
-                 flux_pulse_pars, dist_dict, AWG, upload=True, return_seq=False):
+    def __init__(self, mw_pulse_pars, RO_pars,
+                 flux_pulse_pars, dist_dict, AWG, upload=True,
+                 return_seq=False):
         super().__init__()
-        self.length_vec = length_vec
         self.mw_pulse_pars = mw_pulse_pars
         self.RO_pars = RO_pars
         self.flux_pulse_pars = flux_pulse_pars
@@ -169,18 +168,19 @@ class chevron_length(swf.Hard_Sweep):
 
     def prepare(self, **kw):
         if self.upload:
-            fsqs.chevron_seq_length(self.length_vec,
-                                    self.mw_pulse_pars,
-                                    self.RO_pars,
-                                    self.flux_pulse_pars,
-                                    distortion_dict=self.dist_dict)
-
-    def pre_upload(self, **kw):
-        self.seq = fsqs.chevron_seq_length(self.length_vec,
-                                           self.mw_pulse_pars,
-                                           self.RO_pars,
-                                           self.flux_pulse_pars,
-                                           distortion_dict=self.dist_dict, return_seq=True)
+            old_val = self.AWG.get(
+                '{}_amp'.format(self.flux_pulse_pars['channel']))
+            # Rescaling the AWG channel amp is done to ensure that the dac
+            # values of the flux pulses (including kernels) are defined on
+            # a 2Vpp scale.
+            self.AWG.set('{}_amp'.format(self.flux_pulse_pars['channel']), 2.)
+            fsqs.chevron_seq(self.mw_pulse_pars,
+                             self.RO_pars,
+                             self.flux_pulse_pars,
+                             pulse_lengths=self.sweep_points,
+                             distortion_dict=self.dist_dict)
+            self.AWG.set('{}_amp'.format(self.flux_pulse_pars['channel']),
+                         old_val)
 
     def set_parameter(self, val, **kw):
         pass
@@ -274,7 +274,7 @@ class SwapN(swf.Hard_Sweep):
         #                       self.RO_pars,
         #                       self.flux_pulse_pars,
         #                       distortion_dict=self.dist_dict,
-        #                       return_seq=True, nr_pulses_list=self.nr_pulses_list)
+        # return_seq=True, nr_pulses_list=self.nr_pulses_list)
 
 
 class BusT1(swf.Hard_Sweep):

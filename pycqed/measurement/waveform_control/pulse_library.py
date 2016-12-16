@@ -284,7 +284,9 @@ class Mux_DRAG_pulse(SSB_DRAG_pulse):
 
 # Some simple pulse definitions.
 class SquareFluxPulse(Pulse):
-    def __init__(self, channel=None, channels=None, name='square flux pulse', **kw):
+    def __init__(self, channel=None, channels=None, name='square flux pulse',
+                 **kw):
+        print('creating the flux pulse')
         Pulse.__init__(self, name)
         if channel is None and channels is None:
             raise ValueError('Must specify either channel or channels')
@@ -296,7 +298,10 @@ class SquareFluxPulse(Pulse):
             self.channels = channels
 
         self.amplitude = kw.pop('amplitude', 0)
-        self.length = kw.pop('length', 0)
+        self.square_pulse_length = kw.pop('square_pulse_length', 0)
+        self.square_pulse_buffer = kw.pop('square_pulse_buffer', 0)
+        self.length = self.square_pulse_length + self.square_pulse_buffer
+
         self.kernel_path = kw.get('kernel_path', None)
         if self.kernel_path is not None:
             kernelvec = np.loadtxt(self.kernel_path)
@@ -310,12 +315,18 @@ class SquareFluxPulse(Pulse):
 
     def __call__(self, **kw):
         self.amplitude = kw.pop('amplitude', self.amplitude)
-        self.length = kw.pop('length', self.length)
+        self.square_pulse_length = kw.pop('square_pulse_length',
+                                          self.square_pulse_length)
+        self.square_pulse_buffer = kw.pop('square_pulse_buffer',
+                                          self.square_pulse_buffer)
+        self.length = self.square_pulse_length + self.square_pulse_buffer
+
         self.channel = kw.pop('channel', self.channel)
         self.channels = kw.pop('channels', self.channels)
         self.channels.append(self.channel)
         return self
 
     def chan_wf(self, chan, tvals):
-        return np.ones(len(tvals)) * self.amplitude
-
+        sq_pulse = np.ones(int((self.square_pulse_length)*1e9)) * self.amplitude
+        buff_pulse = np.zeros(int((self.length-self.square_pulse_length)*1e9))
+        return np.concatenate([sq_pulse, buff_pulse])
