@@ -13,6 +13,7 @@ default_gauss_width = 10  # magic number should be removed,
 
 
 class File(swf.Hard_Sweep):
+
     def __init__(self, filename, AWG, title=None, NoElements=None, upload=True):
         self.upload = upload
         self.AWG = AWG
@@ -31,6 +32,7 @@ class File(swf.Hard_Sweep):
 
 
 class Rabi(swf.Hard_Sweep):
+
     def __init__(self, pulse_pars, RO_pars, n=1, upload=True, return_seq=False):
         super().__init__()
         self.pulse_pars = pulse_pars
@@ -51,6 +53,7 @@ class Rabi(swf.Hard_Sweep):
 
 
 class two_qubit_tomo_cardinal(swf.Hard_Sweep):
+
     def __init__(self, cardinal, q0_pulse_pars, q1_pulse_pars,
                  RO_pars, timings_dict, upload=True, return_seq=False):
         super().__init__()
@@ -61,23 +64,23 @@ class two_qubit_tomo_cardinal(swf.Hard_Sweep):
         self.timings_dict = timings_dict
         self.upload = upload
         self.return_seq = return_seq
-        self.name = 'Tomo2Q_%d'%cardinal
+        self.name = 'Tomo2Q_%d' % cardinal
         self.parameter_name = 'Tomo Pulses'
         self.unit = 'V'
 
     def prepare(self, **kw):
         if self.upload:
             self.seq = mq_sqs.two_qubit_tomo_cardinal(cardinal=self.cardinal,
-                                    q0_pulse_pars=self.q0_pulse_pars,
-                                    q1_pulse_pars=self.q1_pulse_pars,
-                                    RO_pars=self.RO_pars,
-                                    timings_dict=self.timings_dict,
-                                    upload=self.upload,
-                                    return_seq=self.return_seq)
-
+                                                      q0_pulse_pars=self.q0_pulse_pars,
+                                                      q1_pulse_pars=self.q1_pulse_pars,
+                                                      RO_pars=self.RO_pars,
+                                                      timings_dict=self.timings_dict,
+                                                      upload=self.upload,
+                                                      return_seq=self.return_seq)
 
 
 class Flipping(swf.Hard_Sweep):
+
     def __init__(self, pulse_pars, RO_pars, n=1, upload=True, return_seq=False):
         super().__init__()
         self.pulse_pars = pulse_pars
@@ -92,11 +95,12 @@ class Flipping(swf.Hard_Sweep):
     def prepare(self, **kw):
         if self.upload:
             sqs.Flipping_seq(pulse_pars=self.pulse_pars,
-                         RO_pars=self.RO_pars,
-                         n=self.n, return_seq=self.return_seq)
+                             RO_pars=self.RO_pars,
+                             n=self.n, return_seq=self.return_seq)
 
 
 class Rabi_amp90(swf.Hard_Sweep):
+
     def __init__(self, pulse_pars, RO_pars, n=1, upload=True):
         super().__init__()
         self.pulse_pars = pulse_pars
@@ -116,6 +120,7 @@ class Rabi_amp90(swf.Hard_Sweep):
 
 
 class Rabi_2nd_exc(swf.Hard_Sweep):
+
     def __init__(self, pulse_pars, pulse_pars_2nd,
                  RO_pars, amps=None, n=1, cal_points=True, upload=True):
         super().__init__()
@@ -129,12 +134,12 @@ class Rabi_2nd_exc(swf.Hard_Sweep):
         self.unit = 'V'
         if cal_points and amps is not None:
             self.sweep_points = np.concatenate([amps,
-                                               [amps[-1]*1.05,
-                                                amps[-1]*1.06,
-                                                amps[-1]*1.07,
-                                                amps[-1]*1.08,
-                                                amps[-1]*1.09,
-                                                amps[-1]*1.1]])
+                                                [amps[-1]*1.05,
+                                                 amps[-1]*1.06,
+                                                 amps[-1]*1.07,
+                                                 amps[-1]*1.08,
+                                                 amps[-1]*1.09,
+                                                 amps[-1]*1.1]])
 
     def prepare(self, **kw):
         if self.upload:
@@ -144,9 +149,11 @@ class Rabi_2nd_exc(swf.Hard_Sweep):
                                   RO_pars=self.RO_pars,
                                   n=self.n)
 
+
 class chevron_length(swf.Hard_Sweep):
-    def __init__(self, length_vec, mw_pulse_pars,RO_pars,
-                 flux_pulse_pars,dist_dict, AWG, upload=True, return_seq=False):
+
+    def __init__(self, length_vec, mw_pulse_pars, RO_pars,
+                 flux_pulse_pars, dist_dict, AWG, upload=True, return_seq=False):
         super().__init__()
         self.length_vec = length_vec
         self.mw_pulse_pars = mw_pulse_pars
@@ -170,16 +177,18 @@ class chevron_length(swf.Hard_Sweep):
 
     def pre_upload(self, **kw):
         self.seq = fsqs.chevron_seq_length(self.length_vec,
-                                    self.mw_pulse_pars,
-                                    self.RO_pars,
-                                    self.flux_pulse_pars,
-                                    distortion_dict=self.dist_dict, return_seq=True)
+                                           self.mw_pulse_pars,
+                                           self.RO_pars,
+                                           self.flux_pulse_pars,
+                                           distortion_dict=self.dist_dict, return_seq=True)
 
     def set_parameter(self, val, **kw):
         pass
 
+
 class chevron_cphase_length(swf.Hard_Sweep):
-    def __init__(self, length_vec, mw_pulse_pars,RO_pars,
+
+    def __init__(self, length_vec, mw_pulse_pars, RO_pars,
                  flux_pulse_pars, cphase_pulse_pars, phase_2, dist_dict, AWG, upload=True, return_seq=False):
         super().__init__()
         self.length_vec = length_vec
@@ -219,86 +228,53 @@ class chevron_cphase_length(swf.Hard_Sweep):
                                            distortion_dict=self.dist_dict,
                                            return_seq=True)
 
+
 class SwapN(swf.Hard_Sweep):
-    def __init__(self, rep_max, mw_pulse_pars, RO_pars,
-                 flux_pulse_pars, dist_dict, AWG, timings_dict,
-                 upload=True, return_seq=False, even=True):
+
+    def __init__(self, mw_pulse_pars, RO_pars,
+                 flux_pulse_pars, dist_dict,
+                 upload=True,
+                 ):
         super().__init__()
-        self.rep_max = rep_max
         self.mw_pulse_pars = mw_pulse_pars
         self.RO_pars = RO_pars
         self.flux_pulse_pars = flux_pulse_pars
         self.dist_dict = dist_dict
-        self.timings_dict = timings_dict
         self.upload = upload
         self.name = 'SWAPN'
         self.parameter_name = 'SWAP pulses'
         self.unit = '#'
-        self.return_seq = return_seq
-        self.AWG = AWG
-        self.even = even
 
-    def set_parameter(self,val):
+    def set_parameter(self, val):
         pass
 
     def prepare(self, **kw):
         if self.upload:
-            old_val = self.AWG.get('%s_amp'%self.flux_pulse_pars['channel'])
-            self.AWG.set('%s_amp'%self.flux_pulse_pars['channel'],2.)
-            fsqs.SwapN(self.rep_max,
-                       self.mw_pulse_pars,
+            # old_val = self.AWG.get(
+            #     '{}_amp'.format(self.flux_pulse_pars['channel']))
+            # self.AWG.set('{}_amp'.format(self.flux_pulse_pars['channel']), 2.)
+            fsqs.SwapN(self.mw_pulse_pars,
                        self.RO_pars,
                        self.flux_pulse_pars,
+                       nr_pulses_list=self.sweep_points,
                        distortion_dict=self.dist_dict,
-                       timings_dict=self.timings_dict,
-                       upload=self.upload,
-                       even=self.even)
-            self.AWG.set('%s_amp'%self.flux_pulse_pars['channel'],old_val)
-            print("even prepare",self.even)
+                       upload=True)
+            # self.AWG.set('{}_amp'.format(self.flux_pulse_pars['channel']),
+            #              old_val)
 
     def pre_upload(self, **kw):
-        self.seq = fsqs.SwapN(self.rep_max,
-                              self.mw_pulse_pars,
-                              self.RO_pars,
-                              self.flux_pulse_pars,
-                              distortion_dict=self.dist_dict,
-                              timings_dict=self.timings_dict,
-                              return_seq=True, even=self.even)
-        print("even pre_upload",self.even)
-
-# class repeat_swap_even(swf.Hard_Sweep):
-#     def __init__(self, rep_max, mw_pulse_pars, RO_pars,
-#                  flux_pulse_pars,dist_dict, AWG, upload=True, return_seq=False):
-#         super().__init__()
-#         self.rep_max = rep_max
-#         self.mw_pulse_pars = mw_pulse_pars
-#         self.RO_pars = RO_pars
-#         self.flux_pulse_pars = flux_pulse_pars
-#         self.dist_dict = dist_dict
-#         self.upload = upload
-#         self.name = 'Chevron'
-#         self.parameter_name = 'SWAP pulses'
-#         self.unit = '#'
-#         self.return_seq = return_seq
-#         self.AWG = AWG
-
-#     def prepare(self, **kw):
-#         if self.upload:
-#             fsqs.repeat_swap_even(self.rep_max,
-#                                     self.mw_pulse_pars,
-#                                     self.RO_pars,
-#                                     self.flux_pulse_pars,
-#                                     distortion_dict=self.dist_dict)
-
-#     def pre_upload(self, **kw):
-#         self.seq = fsqs.repeat_swap_even(self.rep_max,
-#                                     self.mw_pulse_pars,
-#                                     self.RO_pars,
-#                                     self.flux_pulse_pars,
-#                                     distortion_dict=self.dist_dict, return_seq=True)
+        # Removed this as we don't understand why it is here
+        # will delete if everything can work without it.
+        raise NotImplementedError()
+        # self.seq = fsqs.SwapN(self.mw_pulse_pars,
+        #                       self.RO_pars,
+        #                       self.flux_pulse_pars,
+        #                       distortion_dict=self.dist_dict,
+        #                       return_seq=True, nr_pulses_list=self.nr_pulses_list)
 
 
 class BusT1(swf.Hard_Sweep):
+
     def __init__(self, times_vec, mw_pulse_pars, RO_pars,
                  flux_pulse_pars, dist_dict, AWG, upload=True,
                  return_seq=False):
@@ -332,6 +308,7 @@ class BusT1(swf.Hard_Sweep):
 
 
 class BusT2(swf.Hard_Sweep):
+
     def __init__(self, times_vec, mw_pulse_pars, RO_pars,
                  flux_pulse_pars, dist_dict, AWG, upload=True,
                  return_seq=False):
@@ -365,6 +342,7 @@ class BusT2(swf.Hard_Sweep):
 
 
 class BusEcho(swf.Hard_Sweep):
+
     def __init__(self, times_vec, mw_pulse_pars, RO_pars, artificial_detuning,
                  flux_pulse_pars, dist_dict, AWG, upload=True,
                  return_seq=False):
@@ -401,6 +379,7 @@ class BusEcho(swf.Hard_Sweep):
 
 
 class Ramsey_2nd_exc(swf.Hard_Sweep):
+
     def __init__(self, pulse_pars, pulse_pars_2nd,
                  RO_pars, times=None, n=1, cal_points=True, upload=True):
         super().__init__()
@@ -414,12 +393,13 @@ class Ramsey_2nd_exc(swf.Hard_Sweep):
         self.unit = 'V'
         if cal_points and times is not None:
             self.sweep_points = np.concatenate([times,
-                                               [times[-1]*1.05,
-                                                times[-1]*1.06,
-                                                times[-1]*1.07,
-                                                times[-1]*1.08,
-                                                times[-1]*1.09,
-                                                times[-1]*1.1]])
+                                                [times[-1]*1.05,
+                                                 times[-1]*1.06,
+                                                 times[-1]*1.07,
+                                                 times[-1]*1.08,
+                                                 times[-1]*1.09,
+                                                 times[-1]*1.1]])
+
     def prepare(self, **kw):
         if self.upload:
             sqs2.Ramsey_2nd_exc_seq(times=self.sweep_points,
@@ -430,6 +410,7 @@ class Ramsey_2nd_exc(swf.Hard_Sweep):
 
 
 class cphase_fringes(swf.Hard_Sweep):
+
     def __init__(self, phases, q0_pulse_pars, q1_pulse_pars, RO_pars,
                  swap_pars_q0, cphase_pars_q1, timings_dict,
                  dist_dict, upload=True, return_seq=False):
@@ -451,26 +432,28 @@ class cphase_fringes(swf.Hard_Sweep):
     def prepare(self, **kw):
         if self.upload:
             mq_sqs.cphase_fringes(phases=self.phases,
-                                q0_pulse_pars=self.q0_pulse_pars,
-                                q1_pulse_pars=self.q1_pulse_pars,
-                                RO_pars=self.RO_pars,
-                                swap_pars_q0=self.swap_pars_q0,
-                                cphase_pars_q1=self.cphase_pars_q1,
-                                timings_dict=self.timings_dict,
-                                distortion_dict=self.dist_dict)
+                                  q0_pulse_pars=self.q0_pulse_pars,
+                                  q1_pulse_pars=self.q1_pulse_pars,
+                                  RO_pars=self.RO_pars,
+                                  swap_pars_q0=self.swap_pars_q0,
+                                  cphase_pars_q1=self.cphase_pars_q1,
+                                  timings_dict=self.timings_dict,
+                                  distortion_dict=self.dist_dict)
 
     def pre_upload(self, **kw):
         self.seq = mq_sqs.cphase_fringes(phases=self.phases,
-                                       q0_pulse_pars=self.q0_pulse_pars,
-                                       q1_pulse_pars=self.q1_pulse_pars,
-                                       RO_pars=self.RO_pars,
-                                       swap_pars_q0=self.swap_pars_q0,
-                                       cphase_pars_q1=self.cphase_pars_q1,
-                                       timings_dict=self.timings_dict,
-                                       distortion_dict=self.dist_dict,
-                                       return_seq=True)
+                                         q0_pulse_pars=self.q0_pulse_pars,
+                                         q1_pulse_pars=self.q1_pulse_pars,
+                                         RO_pars=self.RO_pars,
+                                         swap_pars_q0=self.swap_pars_q0,
+                                         cphase_pars_q1=self.cphase_pars_q1,
+                                         timings_dict=self.timings_dict,
+                                         distortion_dict=self.dist_dict,
+                                         return_seq=True)
+
 
 class T1(swf.Hard_Sweep):
+
     def __init__(self, pulse_pars, RO_pars, upload=True):
         super().__init__()
         self.pulse_pars = pulse_pars
@@ -489,6 +472,7 @@ class T1(swf.Hard_Sweep):
 
 
 class AllXY(swf.Hard_Sweep):
+
     def __init__(self, pulse_pars, RO_pars, double_points=False, upload=True):
         super().__init__()
         self.pulse_pars = pulse_pars
@@ -512,6 +496,7 @@ class AllXY(swf.Hard_Sweep):
 
 
 class OffOn(swf.Hard_Sweep):
+
     def __init__(self, pulse_pars, RO_pars, upload=True,
                  pulse_comb='OffOn', nr_samples=2):
         super().__init__()
@@ -530,6 +515,7 @@ class OffOn(swf.Hard_Sweep):
 
 
 class Butterfly(swf.Hard_Sweep):
+
     def __init__(self, pulse_pars, RO_pars, initialize=False, upload=True,
                  post_msmt_delay=2000e-9):
         super().__init__()
@@ -551,6 +537,7 @@ class Butterfly(swf.Hard_Sweep):
 
 
 class Randomized_Benchmarking(swf.Hard_Sweep):
+
     def __init__(self, pulse_pars, RO_pars,
                  nr_seeds, nr_cliffords,
                  cal_points=True,
@@ -577,10 +564,10 @@ class Randomized_Benchmarking(swf.Hard_Sweep):
 
         if self.cal_points:
             self.sweep_points = np.concatenate([nr_cliffords,
-                                   [nr_cliffords[-1]+.2,
-                                    nr_cliffords[-1]+.3,
-                                    nr_cliffords[-1]+.7,
-                                    nr_cliffords[-1]+.8]])
+                                                [nr_cliffords[-1]+.2,
+                                                 nr_cliffords[-1]+.3,
+                                                 nr_cliffords[-1]+.7,
+                                                 nr_cliffords[-1]+.8]])
 
     def prepare(self, **kw):
         if self.upload:
@@ -594,6 +581,7 @@ class Randomized_Benchmarking(swf.Hard_Sweep):
 
 
 class Ramsey(swf.Hard_Sweep):
+
     def __init__(self, pulse_pars, RO_pars,
                  artificial_detuning=None,
                  cal_points=True,
@@ -619,6 +607,7 @@ class Ramsey(swf.Hard_Sweep):
 
 
 class Echo(swf.Hard_Sweep):
+
     def __init__(self, pulse_pars, RO_pars,
                  artificial_detuning=None,
                  cal_points=True,
@@ -643,6 +632,7 @@ class Echo(swf.Hard_Sweep):
 
 
 class Motzoi_XY(swf.Hard_Sweep):
+
     def __init__(self, motzois, pulse_pars, RO_pars, upload=True):
         '''
         Measures 2 points per motzoi value specified in motzois and adds 4
@@ -657,7 +647,7 @@ class Motzoi_XY(swf.Hard_Sweep):
         self.unit = ' '
         sweep_pts = np.repeat(motzois, 2)
         self.sweep_points = np.append(sweep_pts,
-                                   [motzois[-1]+(motzois[-1]-motzois[-2])]*4)
+                                      [motzois[-1]+(motzois[-1]-motzois[-2])]*4)
 
     def prepare(self, **kw):
         if self.upload:
@@ -667,6 +657,7 @@ class Motzoi_XY(swf.Hard_Sweep):
 
 
 class Freq_XY(swf.Hard_Sweep):
+
     def __init__(self, freqs, pulse_pars, RO_pars, upload=True):
         '''
         Measures 2 points per motzoi value specified in freqs and adds 4
@@ -681,7 +672,7 @@ class Freq_XY(swf.Hard_Sweep):
         self.unit = ' '
         sweep_pts = np.repeat(freqs, 2)
         self.sweep_points = np.append(sweep_pts,
-                                   [freqs[-1]+(freqs[-1]-freqs[-2])]*4)
+                                      [freqs[-1]+(freqs[-1]-freqs[-2])]*4)
 
     def prepare(self, **kw):
         if self.upload:
@@ -691,6 +682,7 @@ class Freq_XY(swf.Hard_Sweep):
 
 
 class CBox_T1(swf.Hard_Sweep):
+
     def __init__(self, IF, RO_pulse_delay, RO_trigger_delay, mod_amp, AWG,
                  upload=True):
         super().__init__()
@@ -715,7 +707,9 @@ class CBox_T1(swf.Hard_Sweep):
             self.AWG.set('ch3_amp', ch3_amp)
             self.AWG.set('ch4_amp', ch4_amp)
 
+
 class CBox_v3_T1(swf.Hard_Sweep):
+
     def __init__(self, CBox, upload=True):
         super().__init__()
         self.name = 'T1'
@@ -723,7 +717,6 @@ class CBox_v3_T1(swf.Hard_Sweep):
         self.unit = 's'
         self.upload = upload
         self.CBox = CBox
-
 
     def prepare(self, **kw):
         if self.upload:
@@ -734,7 +727,9 @@ class CBox_v3_T1(swf.Hard_Sweep):
             self.CBox.load_instructions('CBox_v3_test_program\T1.asm')
             self.CBox.set_master_controller_working_state(1, 0, 0)
 
+
 class CBox_v3_T1(swf.Hard_Sweep):
+
     def __init__(self, CBox, upload=True):
         super().__init__()
         self.name = 'T1'
@@ -754,6 +749,7 @@ class CBox_v3_T1(swf.Hard_Sweep):
 
 
 class CBox_Ramsey(swf.Hard_Sweep):
+
     def __init__(self, IF, RO_pulse_length,
                  RO_pulse_delay, RO_trigger_delay, pulse_delay,
                  AWG, CBox, cal_points=True,
@@ -804,6 +800,7 @@ class CBox_Ramsey(swf.Hard_Sweep):
 
 
 class CBox_Echo(swf.Hard_Sweep):
+
     def __init__(self, IF,
                  RO_pulse_delay, RO_trigger_delay, pulse_delay,
                  AWG, CBox, cal_points=True,
@@ -852,6 +849,7 @@ class CBox_Echo(swf.Hard_Sweep):
 
 
 class CBox_OffOn(swf.Hard_Sweep):
+
     def __init__(self, IF, RO_pulse_delay, RO_trigger_delay,
                  RO_pulse_length,
                  AWG, CBox,
@@ -898,6 +896,7 @@ class CBox_OffOn(swf.Hard_Sweep):
 
 
 class CBox_AllXY(swf.Hard_Sweep):
+
     def __init__(self, IF, pulse_delay,
                  RO_pulse_delay,
                  RO_trigger_delay,
@@ -938,7 +937,8 @@ class CBox_AllXY(swf.Hard_Sweep):
                 for j in range(2):
                     double_tape.extend((self.tape[2*i:2*i+2]))
             self.tape = double_tape
-        self.sweep_points = np.arange(int(len(self.tape)/2))  # 2 pulses per elt
+        self.sweep_points = np.arange(
+            int(len(self.tape)/2))  # 2 pulses per elt
 
         # Making input pars available to prepare
         # Required instruments
@@ -974,6 +974,7 @@ class CBox_AllXY(swf.Hard_Sweep):
 
 
 class CBox_multi_element_tape(swf.Hard_Sweep):
+
     def __init__(self, n_pulses, tape,
                  pulse_delay,
                  IF, RO_pulse_delay, RO_trigger_delay,
@@ -1026,6 +1027,7 @@ class CBox_multi_element_tape(swf.Hard_Sweep):
 
 
 class Resetless_tape(swf.Hard_Sweep):
+
     def __init__(self, n_pulses, tape,
                  pulse_delay, resetless_interval,
                  IF, RO_pulse_delay, RO_trigger_delay,
@@ -1077,6 +1079,7 @@ class Resetless_tape(swf.Hard_Sweep):
 
 
 class CBox_RB_sweep(swf.Hard_Sweep):
+
     def __init__(self,
                  IF, RO_pulse_length,
                  RO_pulse_delay, RO_trigger_delay,
@@ -1110,10 +1113,10 @@ class CBox_RB_sweep(swf.Hard_Sweep):
         # Funny last sweep point values are to make the cal points appear
         # in sensible (visible) places in the plot
         self.sweep_points = np.concatenate([nr_cliffords,
-                                           [nr_cliffords[-1]+.2,
-                                            nr_cliffords[-1]+.3,
-                                            nr_cliffords[-1]+.7,
-                                            nr_cliffords[-1]+.8]])
+                                            [nr_cliffords[-1]+.2,
+                                             nr_cliffords[-1]+.3,
+                                             nr_cliffords[-1]+.7,
+                                             nr_cliffords[-1]+.8]])
 
     def prepare(self, upload_tek_seq=True, **kw):
         self.AWG.stop()
@@ -1161,6 +1164,7 @@ class CBox_RB_sweep(swf.Hard_Sweep):
 
 
 class Two_d_CBox_RB_seq(swf.Soft_Sweep):
+
     def __init__(self, CBox_RB_sweepfunction):
         super().__init__()
         self.parameter_name = 'Idx'
@@ -1177,6 +1181,7 @@ class Two_d_CBox_RB_seq(swf.Soft_Sweep):
 
 
 class Load_Sequence_Tek(swf.Hard_Sweep):
+
     def __init__(self, AWG, sequence_name, seq_elements, upload=True):
         super().__init__()
         self.sweep_points = seq_elements
@@ -1191,8 +1196,6 @@ class Load_Sequence_Tek(swf.Hard_Sweep):
     def prepare(self, **kw):
         if self.upload:
             self.AWG.set_setup_filename(self.sequence_name)
-
-
 
 
 # class PiHalfX360(AWG_Sweep):
@@ -1256,4 +1259,3 @@ class Load_Sequence_Tek(swf.Hard_Sweep):
 #         # self.TD_Meas.set_NoSegments(len(self.sweep_points))
 #         super(AWG_Sweep_File, self).__init__(
 #             add_filename_tags=add_filename_tags, **kw)
-

@@ -1073,8 +1073,8 @@ class SWAPN_optimization(det.Soft_Detector):
     '''
     SWAPN optimization.
     '''
-    def __init__(self, flux_channel, AWG, MC_nested, qubit,
-                 kernel_obj, num_iter, cache, cost_choice='sum',**kw):
+    def __init__(self,nr_pulses_list, AWG, MC_nested, qubit,
+                 kernel_obj,  cache, cost_choice='sum',**kw):
         super().__init__()
         self.name = 'swapn_optimization'
         self.value_names = ['Cost function', 'Single SWAP Fid']
@@ -1083,35 +1083,28 @@ class SWAPN_optimization(det.Soft_Detector):
         self.cache_obj = cache
         self.AWG = AWG
         self.MC_nested = MC_nested
-        self.qubit = qubit
-        self.num_iter = num_iter
         self.cost_choice = cost_choice
+        self.nr_pulses_list = nr_pulses_list
+        self.qubit = qubit
 
     def acquire_data_point(self, **kw):
         # # Update kernel from kernel object
 
         # # Measure the swapn
-
-        tdict = {'buffer_mw_flux': 50e-9,
-                 'buffer_flux_flux': 50e-9,
-                 'msmt_buffer': 0e-9,
-                 'dead_time': 3e-6}
-
-        times_vec = 1+np.arange(self.num_iter)*2
+        times_vec = self.nr_pulses_list
         cal_points = 4
         lengths_cal = times_vec[-1] + np.arange(1,1+cal_points)*(times_vec[1]-times_vec[0])
         lengths_vec = np.concatenate((times_vec, lengths_cal))
 
         flux_pulse_pars = self.qubit.get_flux_pars()[0]
         mw_pulse_pars, RO_pars = self.qubit.get_pulse_pars()
-        repSWAP = awg_swf.SwapN(self.num_iter,
-                                mw_pulse_pars,
+        repSWAP = awg_swf.SwapN(mw_pulse_pars,
                                 RO_pars,
                                 flux_pulse_pars,
                                 dist_dict=self.qubit._dist_dict,
-                                timings_dict=tdict,
                                 AWG=self.AWG,
-                                upload=False, return_seq=True)
+                                upload=False, return_seq=True,
+                                nr_pulses_list=self.nr_pulses_list)
 
         self.kernel_obj.kernel_to_cache(self.cache_obj)
 
