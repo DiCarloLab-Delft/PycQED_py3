@@ -161,7 +161,7 @@ class Distortion(Instrument):
                         self.get_skin_kernel(),
                        self.get_decay_kernel_1(),
                        self.get_decay_kernel_2()]
-        cache.update({'OPT_chevron.tmp':self.convolve_kernel(kernel_list)})
+        cache.update({'OPT_chevron.tmp': self.convolve_kernel(kernel_list)})
 
     def get_corrections_kernel(self, kernel_list_before=None):
         kernel_list = [self.get_bounce_kernel(), self.get_skin_kernel(),

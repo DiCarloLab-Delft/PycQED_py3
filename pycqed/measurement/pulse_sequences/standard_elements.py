@@ -9,7 +9,7 @@ from ..waveform_control import pulsar
 from ..waveform_control import element
 from ..waveform_control import pulse
 from ..waveform_control.pulse_library import MW_IQmod_pulse, SSB_DRAG_pulse, \
-    Mux_DRAG_pulse, SquareFluxPulse
+    Mux_DRAG_pulse, SquareFluxPulse, MartinisFluxPulse
 from ..waveform_control.pulse import CosPulse, SquarePulse
 from pycqed.measurement.randomized_benchmarking import randomized_benchmarking as rb
 
@@ -97,6 +97,12 @@ def multi_pulse_elt(i, station, pulse_list):
                                                 **pulse_pars),
                                 start=pulse_pars['pulse_delay'],
                                 refpulse=last_pulse, refpoint=pulse_pars['refpoint'])
+        elif pulse_pars['pulse_type'] == 'MartinisFluxPulse':
+            last_pulse = el.add(MartinisFluxPulse(name='pulse_{}'.format(i),
+                                                **pulse_pars),
+                                start=pulse_pars['pulse_delay'],
+                                refpulse=last_pulse, refpoint=pulse_pars['refpoint'])
+
 
         elif pulse_pars['pulse_type'] == 'ModSquare':
             last_pulse = el.add(MW_IQmod_pulse(name='pulse_{}'.format(i),

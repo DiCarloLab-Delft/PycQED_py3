@@ -1078,7 +1078,7 @@ class SWAPN_optimization(det.Soft_Detector):
     It is common to do a sweep over one of the kernel parameters as a sweep
     function.
     '''
-    def __init__(self,nr_pulses_list, AWG, MC_nested, qubit,
+    def __init__(self, nr_pulses_list, AWG, MC_nested, qubit,
                  kernel_obj,  cache, cost_choice='sum',**kw):
 
         super().__init__()
@@ -1102,7 +1102,7 @@ class SWAPN_optimization(det.Soft_Detector):
         lengths_cal = times_vec[-1] + np.arange(1, 1+cal_points)*(times_vec[1]-times_vec[0])
         lengths_vec = np.concatenate((times_vec, lengths_cal))
 
-        flux_pulse_pars = self.qubit.get_flux_pars()[0]
+        flux_pulse_pars = self.qubit.get_flux_pars()
         mw_pulse_pars, RO_pars = self.qubit.get_pulse_pars()
         repSWAP = awg_swf.SwapN(mw_pulse_pars,
                                 RO_pars,
