@@ -415,8 +415,11 @@ def swap_CP_swap_2Qubits(mw_pulse_pars_q0, mw_pulse_pars_q1,
                          cal_points=True):
     '''
     Sequence of N swap operations
-        X180 q1 - Ym90 q0 - swap q1,B - block q0,B - swap q1,B - fphi90 q0 -
+        X180 q1 - Ym90 q0 - swap q1,B - CPhase q0,B - swap q1,B - fphi90 q0 -
         - X180 q1 - RO
+
+    q1 is the "control"
+    q0 is the "target"
 
     Fluxing on q1
     Readout and pulses on q0

@@ -123,8 +123,8 @@ class CPhase_cost_func_det(det.Soft_Detector):
                  upload=True,  **kw):
 
         self.name = 'CPhase_cost_func_det'
-        self.value_names = ['Cost function']
-        self.value_units = ['a.u.']
+        self.value_names = ['Cost function', 'phase_diff', 'amp_no_id', 'amp_id']
+        self.value_units = ['a.u.', 'deg', '', '']
         self.detector_control = 'soft'
         self.upload = upload
         self.AWG = q0.AWG
@@ -135,7 +135,6 @@ class CPhase_cost_func_det(det.Soft_Detector):
         self.q0 = q0
         self.q1 = q1
         self.lambda1 = lambda1
-        q0.swap_time(50e-9)
         q0.swap_amp(1.132)
 
         q0_pulse_pars, RO_pars_q0 = q0.get_pulse_pars()
@@ -150,12 +149,14 @@ class CPhase_cost_func_det(det.Soft_Detector):
         self.s0 = awg_swf.swap_CP_swap_2Qubits(
             q0_pulse_pars, q1_pulse_pars,
             flux_pulse_pars_q0, flux_pulse_pars_q1, RO_pars_q0,
-            dist_dict, AWG=self.AWG,  inter_swap_wait=50e-9, identity=False)
+            dist_dict, AWG=self.AWG,  inter_swap_wait=100e-9-q0.swap_time(),
+            identity=False)
         self.s0.sweep_points = phases
         self.s1 = awg_swf.swap_CP_swap_2Qubits(
             q0_pulse_pars, q1_pulse_pars,
             flux_pulse_pars_q0, flux_pulse_pars_q1, RO_pars_q0,
-            dist_dict, AWG=self.AWG,  inter_swap_wait=50e-9, identity=True)
+            dist_dict, AWG=self.AWG,  inter_swap_wait=100e-9-q0.swap_time(),
+            identity=True)
         self.s1.sweep_points = phases
         self.MC_nested = MC_nested
 
@@ -197,8 +198,13 @@ class CPhase_cost_func_det(det.Soft_Detector):
         mab = max(a.measured_values[0][:-4] - b.measured_values[0][:-4])
         mba = max(b.measured_values[0][:-4] - a.measured_values[0][:-4])
         cf = mab+mba
-        return a.cost_func_val
+        amp_a = a.fit_res[0].best_values['amplitude']
+        amp_b = b.fit_res[0].best_values['amplitude']
+        phi_a = a.fit_res[0].best_values['phase']
+        phi_b = b.fit_res[0].best_values['phase']
+        phase_diff = ((phi_b-phi_a)/(2*np.pi)*360)%360
 
+        return cf, phase_diff, amp_a, amp_b
 
 class lambda1_sweep(swf.Soft_Sweep):
     def __init__(self, comp_det, **kw):
