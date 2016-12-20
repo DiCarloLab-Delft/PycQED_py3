@@ -170,7 +170,7 @@ class Test_MeasurementControl(unittest.TestCase):
         self.MC.set_sweep_function_2D(None_Sweep(sweep_control='soft'))
         self.MC.set_sweep_points(sweep_pts)
         self.MC.set_sweep_points_2D(sweep_pts_2D)
-        self.MC.set_detector_function(det.Dummy_Detector_Hard(noise=.5))
+        self.MC.set_detector_function(det.Dummy_Detector_Hard(noise=.2))
         noisy_dat = self.MC.run('2D_hard', mode='2D')
         x = noisy_dat[:, 0]
         y = noisy_dat[:, 1]
