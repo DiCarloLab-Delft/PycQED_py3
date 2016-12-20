@@ -17,11 +17,13 @@ htilde = lambda fun, t, params, width=1: fun(t, params)-fun(t-width, params)
 filter_matrix_generic = lambda fun, t, *params: np.sum(
     np.array(map(lambda ii: np.diag(fun(t[ii], *params)*np.ones(len(t)-ii), k=-ii), range(len(t)))), 0)
 
-kernel_generic = lambda fun, t, * \
-    params: np.linalg.inv(filter_matrix_generic(fun, t, *params))[:, 0]
 
-kernel_generic2 = lambda fun, t, * \
-    params: np.linalg.inv(filter_matrix_generic2(fun, t, *params))[:, 0]
+def kernel_generic(fun, t, *params):
+    return np.linalg.inv(filter_matrix_generic(fun, t, *params))[:, 0]
+
+
+def kernel_generic2(fun, t, *params):
+    return np.linalg.inv(filter_matrix_generic2(fun, t, *params))[:, 0]
 
 
 def filter_matrix_generic2(fun, t, *params):
@@ -76,10 +78,14 @@ def kernel_from_kernel_stepvec(kernel_stepvec, width=1):
 step_lowpass = lambda t, tau: heaviside(t+1)*(1-np.exp(-(t+1)/tau))
 htilde_lowpass = lambda t, tau: htilde(step_lowpass, t, tau)
 
+
 # response functions for the low-pass filter arising from the skin effect of a coax
 # model parameter: alpha (attenuation at 1 GHz)
-step_skineffect = lambda t, alpha: heaviside(
-    t+1)*(1-special.erf(alpha/21./np.sqrt(t+1)))
+def step_skineffect(t, alpha):
+    # Surpresses the numpy divide by zero warning temporarily
+    with np.errstate(divide='ignore'):
+        return heaviside(t+1)*(1-special.erf(alpha/21./np.sqrt(t+1)))
+
 htilde_skineffect = lambda t, alpha: step_skineffect(
     t, alpha) - step_skineffect(t-1, alpha)
 # response functions for the high-pass filter arising from a bias-tee, modelled as a simple single-pole high-pass filter

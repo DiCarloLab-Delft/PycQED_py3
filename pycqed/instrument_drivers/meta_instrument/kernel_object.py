@@ -30,6 +30,7 @@ class Distortion(Instrument):
                            parameter_class=ManualParameter,
                            initial_value=600,
                            vals=vals.Numbers())
+
         self.add_parameter('decay_amp_1', units='',
                            parameter_class=ManualParameter,
                            vals=vals.Numbers())
@@ -48,6 +49,7 @@ class Distortion(Instrument):
         self.add_parameter('decay_length_2', units='ns',
                            parameter_class=ManualParameter,
                            vals=vals.Numbers())
+
         self.add_parameter('bounce_amp', units='',
                            parameter_class=ManualParameter,
                            vals=vals.Numbers())
@@ -57,6 +59,7 @@ class Distortion(Instrument):
         self.add_parameter('bounce_length', units='ns',
                            parameter_class=ManualParameter,
                            vals=vals.Numbers())
+
         self.add_parameter('poly_a', units='',
                            parameter_class=ManualParameter,
                            vals=vals.Numbers())
@@ -69,8 +72,10 @@ class Distortion(Instrument):
         self.add_parameter('poly_length', units='ns',
                            parameter_class=ManualParameter,
                            vals=vals.Numbers())
+
         self.add_parameter('corrections_length', units='ns',
                            parameter_class=ManualParameter,
+                           initial_value=1000,
                            vals=vals.Numbers())
 
     def get_idn(self):
@@ -100,12 +105,23 @@ class Distortion(Instrument):
     #                        length=self.poly_length())
 
     def convolve_kernel(self, kernel_list, length=None):
+        """
+        kernel_list : (list of arrays)
+        length      : (int) maximum length for convolution
+        Performs a convolution of different kernels
+        """
         kernels = kernel_list[0]
         for k in kernel_list[1:]:
             kernels = np.convolve(k, kernels)[:max(len(k), len(kernels))]
         return kernels
 
     def kernel_to_cache(self, cache):
+        """
+        cache (dict): a dictionary containing predistortion kernels
+
+        This will add 'OPT_Chevron.tmp' to the cache dictionary that
+        contains an array with the distortions based on the kernel object.
+        """
         kernel_list = [self.get_bounce_kernel(),
                        self.get_skin_kernel(),
                        self.get_decay_kernel_1(),

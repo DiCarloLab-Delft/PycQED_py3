@@ -11,13 +11,13 @@ from qcodes import station
 Kernel TODO's:
  - Rename distortions class
  - path for saving the kernels should not be the notebook directory
- - move kernels to kernel functions
  - test saving and loading
  - add calculate only if parameters changed option
  - Way to include RT corrections or any generic file
  - Change parameters to SI units
  - Automatically pick order of distortions to speed
    up convolutions
+ - Add shortening of kernel if possible
 """
 
 
@@ -65,6 +65,34 @@ class Test_KernelObject(unittest.TestCase):
 
         np.testing.assert_array_equal(kf_dec, kObj_dec1)
         np.testing.assert_array_equal(kf_dec, kObj_dec2)
+
+    # def test_convolve_kernels(self):
+    #     kernel_list
+    #     self.k0.convolve_kernel(kernel_list, length)
+
+    def test_kernel_to_cache(self):
+        # Turn off all kernels except the skin effect
+        self.k0.decay_length_1(1)
+        self.k0.decay_length_2(1)
+        self.k0.decay_amp_1(0)
+        self.k0.decay_amp_2(0)
+        self.k0.bounce_length(1)
+        self.k0.bounce_amp(0)
+
+        self.k0.skineffect_alpha(0.1)
+        self.k0.skineffect_length(40)
+        kObj_skin = self.k0.get_skin_kernel()
+
+        # cache is an empty dictionary
+        cache = {}
+        self.k0.kernel_to_cache(cache=cache)
+        self.assertTrue('OPT_chevron.tmp' in cache.keys())
+        skin_cache = cache['OPT_chevron.tmp']
+
+        np.testing.assert_array_equal(kObj_skin, skin_cache)
+
+    def test_convolve_kernel(self):
+        pass
 
     # def test_kernel_loading(self):
         # self.k0.corrections_length(50)  # ns todo rescale.
