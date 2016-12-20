@@ -1426,7 +1426,8 @@ class UHFQC_integrated_average_detector(Hard_Detector):
     '''
 
     def __init__(self, UHFQC, AWG, integration_length=1e-6, nr_averages=1024, rotate=False,
-                 channels=[0, 1, 2, 3], cross_talk_suppression=False, seg_per_point=1, **kw):
+                 channels=[0, 1, 2, 3], cross_talk_suppression=False, seg_per_point=1,
+                 normalize_individually=False,**kw):
         super(UHFQC_integrated_average_detector, self).__init__()
         self.UHFQC = UHFQC
         self.name = 'UHFQC_integrated_average'
@@ -1469,6 +1470,9 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         for i, channel in enumerate(self.channels):
             dataset = eval("self.UHFQC.quex_rl_data_{}()".format(channel))
             data[i] = dataset[0]['vector']/self.nr_averages
+            if self.cross_talk_suppression:
+                data[i]=data[i]-eval("self.UHFQC.quex_trans_offset_weightfunction_{}()".format(channel))
+
         # data = self.UHFQC.single_acquisition(self.nr_sweep_points,
         #                                      self.poll_time, timeout=0,
         #                                      channels=set(self.channels))
@@ -1495,6 +1499,7 @@ class UHFQC_integrated_average_detector(Hard_Detector):
                     cal_zero_points=self.cal_points[0],
                     cal_one_points=self.cal_points[1])
         return self.corr_data, self.corr_data
+
 
     def prepare(self, sweep_points):
         if self.AWG is not None:
@@ -1572,6 +1577,8 @@ class UHFQC_integration_logging_det(Hard_Detector):
         for i, channel in enumerate(self.channels):
             dataset = eval("self.UHFQC.quex_rl_data_{}()".format(channel))
             data[i] = dataset[0]['vector']
+            if self.cross_talk_suppression:
+                data[i]=data[i]-eval("self.UHFQC.quex_trans_offset_weightfunction_{}()".format(channel))
         return data
 
     def prepare(self, sweep_points):

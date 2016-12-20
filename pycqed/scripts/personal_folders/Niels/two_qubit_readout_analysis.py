@@ -49,10 +49,6 @@ def two_qubit_ssro_fidelity(label, fig_format='png'):
          namespace['w1_data_{}'.format(state)]=namespace['w1_data_r{}'.format(state)]
 
     min_len_all=min_len/2
-    for  state in states:
-         namespace['w0_data_{}'.format(state)]=namespace['w0_data_r{}'.format(state)]
-         namespace['w1_data_{}'.format(state)]=namespace['w1_data_r{}'.format(state)]
-
 
     #plot results for q0
     ma.SSRO_Analysis(label=label, auto=True, channels=['w0'], sample_0=0,
@@ -215,5 +211,6 @@ def two_qubit_ssro_fidelity(label, fig_format='png'):
             mu_matrix[i, j]=np.average(eval('w{}_data_{}'.format(weight, state)))-mu_0_vec[j]
 
     mu_matrix_inv = inv(mu_matrix)
-    V_th_cor = np.dot(mu_matrix_inv,V_th)
-    return mu_matrix, V_th, mu_matrix_inv, V_th_cor
+    V_th_cor = np.dot(mu_matrix_inv, V_th)
+    V_offset_cor = np.dot(mu_matrix_inv, mu_0_vec)
+    return mu_matrix,  V_th, mu_matrix_inv, V_th_cor,  V_offset_cor
