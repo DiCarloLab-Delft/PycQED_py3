@@ -53,10 +53,10 @@ def run(continuous=True):
         qwg1.createWaveformReal('gauss', wvGauss)
         qwg1.createWaveformReal('derivGauss', wvDerivGauss)
 
-        qwg1.set('ch1_default_waveform', 'hi')
-        qwg1.set('ch2_default_waveform', 'zero')
+        # qwg1.set('ch1_default_waveform', 'hi')
+        # qwg1.set('ch2_default_waveform', 'zero')
         qwg1.set('ch3_default_waveform', 'hi')
-        qwg1.set('ch4_default_waveform', 'zero')
+        # qwg1.set('ch4_default_waveform', 'zero')
 
         qwg1.run_mode('CONt')
 
@@ -77,59 +77,14 @@ def run(continuous=True):
         qwg1.set('ch3_default_waveform', 'zero')
         qwg1.set('ch4_default_waveform', 'zero')
 
-        seg = 0
+        # set some standard waveform to all codewords
+        for seg in range(8):
+            qwg1.set('codeword_{}_ch{}_waveform'.format(seg, 1), 'gauss')
+            qwg1.set('codeword_{}_ch{}_waveform'.format(seg, 2), 'derivGauss')
+            qwg1.set('codeword_{}_ch{}_waveform'.format(seg, 3), 'gauss2')
+            qwg1.set('codeword_{}_ch{}_waveform'.format(seg, 4), 'derivGauss2')
 
-        # segment 1:
-        seg = seg+1
-        # Seg corresponds to codeword
-        qwg1.setSeqElemWaveform(seg, 1, 'hi')
-        qwg1.setSeqElemWaveform(seg, 2, 'hi')
-        qwg1.setSeqElemWaveform(seg, 3, 'gauss')
-        qwg1.setSeqElemWaveform(seg, 4, 'derivGauss')
-
-        seg = seg+1
-        qwg1.setSeqElemWaveform(seg, 1, 'gauss')
-        qwg1.setSeqElemWaveform(seg, 2, 'gaussNeg')
-        qwg1.setSeqElemWaveform(seg, 3, 'gauss2')
-        qwg1.setSeqElemWaveform(seg, 4, 'derivGauss2')
-
-        seg = seg+1
-        qwg1.setSeqElemWaveform(seg, 1, 'gauss')
-        qwg1.setSeqElemWaveform(seg, 2, 'derivGauss')
-        qwg1.setSeqElemWaveform(seg, 3, 'gauss2')
-        qwg1.setSeqElemWaveform(seg, 4, 'derivGauss2')
-
-        seg = seg+1
-        qwg1.setSeqElemWaveform(seg, 1, 'gauss2')
-        qwg1.setSeqElemWaveform(seg, 2, 'derivGauss2')
-        qwg1.setSeqElemWaveform(seg, 3, 'gauss')
-        qwg1.setSeqElemWaveform(seg, 4, 'derivGauss')
-
-        seg = seg+1
-        qwg1.setSeqElemWaveform(seg, 1, 'zero')
-        qwg1.setSeqElemWaveform(seg, 2, 'zero')
-        qwg1.setSeqElemWaveform(seg, 3, 'gauss')
-        qwg1.setSeqElemWaveform(seg, 4, 'gaussNeg')
-
-        seg = seg+1
-        qwg1.setSeqElemWaveform(seg, 1, 'zero')
-        qwg1.setSeqElemWaveform(seg, 2, 'zero')
-        qwg1.setSeqElemWaveform(seg, 3, 'derivGauss')
-        qwg1.setSeqElemWaveform(seg, 4, 'zero')
-
-        seg = seg+1
-        qwg1.setSeqElemWaveform(seg, 1, 'zero')
-        qwg1.setSeqElemWaveform(seg, 2, 'gauss2')
-        qwg1.setSeqElemWaveform(seg, 3, 'zero')
-        qwg1.setSeqElemWaveform(seg, 4, 'zero')
-
-        seg = seg+1
-        qwg1.setSeqElemWaveform(seg, 1, 'zero')
-        qwg1.setSeqElemWaveform(seg, 2, 'zero')
-        qwg1.setSeqElemWaveform(seg, 3, 'gauss2')
-        qwg1.setSeqElemWaveform(seg, 4, 'zero')
-
-        qwg1.setRunModeCodeword()
+        qwg1.run_mode('CODeword')
 
     qwg1.ch_pair1_sideband_frequency.set(100e6)
     qwg1.ch_pair3_sideband_frequency.set(100e6)

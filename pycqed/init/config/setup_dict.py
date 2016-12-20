@@ -31,12 +31,12 @@ data_dir_dict = {'tud276606_FPGA_PC': 'D:\Experiments/CBox_Testing/Data',
                  'La_Maserati_Jr': 'D:\\Experiments\\1610_QcodesTests\\Data',
                  'La_Maserati_JrJr': 'D:\\Experiments\\1607_Qcodes_5qubit\\data',
                  'La_Vespa': 'D:\\Experiments\\161111_LaVespa_Intel_HR\\Data',
-                 'Xiang_PC' : 'D:\PycQED\data',
+                 'Xiang_PC': 'D:\PycQED\data',
                  'Serwans_Laptop': 'W:/tnw/NS/qt/Serwan/MuxMon/',
                  'La_Ducati': 'D:\Experiments/Simultaneous_Driving/Data',
-                'La_Ducati_Jr': 'D:\Experiments/1611_Starmon/Data',
+                 'La_Ducati_Jr': 'D:\Experiments/1611_Starmon/Data',
                  'Simulation_PC': 'D:\Experiments/testSingleShotFidelityAnalysis/Data',
                  'Ramiro_Desktop': r'\\131.180.82.81\\data',
                  r'Nathans_Laptop': 'D:/nlangford\My Documents\Projects\Rabi Model\Experiment_1504\Data',
-                 'Bart_Laptop' : 'C:\Experiments/NumericalOptimization/Data'
-                }
+                 'Bart_Laptop': 'C:\Experiments/NumericalOptimization/Data'
+                 }

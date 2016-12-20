@@ -23,6 +23,18 @@ filter_matrix_generic = lambda fun, t, *params: np.sum(np.array(map(lambda ii:
 kernel_generic = lambda fun, t, * \
     params: np.linalg.inv(filter_matrix_generic(fun, t, *params))[:, 0]
 
+kernel_generic2 = lambda fun, t, *params: np.linalg.inv(filter_matrix_generic2(fun, t, *params))[:,0]
+
+def filter_matrix_generic2(fun, t, *params):
+    A = np.zeros((len(t),len(t)))
+    for i in range(len(t)):
+        for j in range(len(t)):
+            if t[i] < t[j]:
+                A[i, j] = 0.
+            else:
+                A[i, j] = heaviside(i-j)*fun(t[i]-t[j], *params)
+    return A
+
 
 def save_kernel(kernel, save_file=None):
     '''Save kernel to specified kernels directory.'''
@@ -56,6 +68,7 @@ def kernel_from_kernel_stepvec(kernel_stepvec, width=1):
     kernel_out = np.zeros(kernel_stepvec.shape)
     kernel_out[:width] = kernel_stepvec[:width]
     kernel_out[width:] = kernel_stepvec[width:]-kernel_stepvec[:-width]
+    # kernel_out = kernel_out / np.sum(kernel_out)
     return kernel_out
 
 
@@ -68,8 +81,7 @@ htilde_lowpass = lambda t, tau: htilde(step_lowpass, t, tau)
 # model parameter: alpha (attenuation at 1 GHz)
 step_skineffect = lambda t, alpha: heaviside(
     t+1)*(1-special.erf(alpha/21./np.sqrt(t+1)))
-htilde_skineffect = lambda t, alpha: htilde(step_skineffect, t, alpha)
-
+htilde_skineffect = lambda t, alpha: step_skineffect(t,alpha) - step_skineffect(t-1,alpha)
 # response functions for the high-pass filter arising from a bias-tee, modelled as a simple single-pole high-pass filter
 # model parameter: tau (time constant)
 step_biastee = lambda t, tau: heaviside(t)*(np.exp(-t/tau))

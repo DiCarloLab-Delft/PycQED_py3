@@ -17,6 +17,7 @@ from pycqed.measurement.waveform_control_CC import waveform as wf
 import pycqed.measurement.mc_parameter_wrapper as pw
 from pycqed.analysis import measurement_analysis as ma
 
+from pycqed.analysis.tools.data_manipulation import rotation_matrix
 from pycqed.measurement.calibration_toolbox import mixer_carrier_cancellation_CBox
 from pycqed.measurement.calibration_toolbox import mixer_skewness_cal_CBox_adaptive
 
@@ -35,10 +36,6 @@ class CBox_v3_driven_transmon(Transmon):
         Acquisition:           CBox
         Readout pulse configuration: LO modulated using AWG
     '''
-    shared_kwargs = ['LO', 'cw_source', 'td_source', 'IVVI', 'AWG', 'LutMan',
-                     'CBox',
-                     'heterodyne_instr',  'MC']
-
     def __init__(self, name,
                  LO, cw_source, td_source,
                  IVVI, LutMan,
@@ -61,6 +58,10 @@ class CBox_v3_driven_transmon(Transmon):
         self.add_parameters()
 
     def add_parameters(self):
+        self.add_parameter('acquisition_instrument',
+                           set_cmd=self._set_acquisition_instr,
+                           get_cmd=self._get_acquisition_instr,
+                           vals=vals.Strings())
         self.add_parameter('mod_amp_cw', label='RO modulation ampl cw',
                            units='V', initial_value=0.5,
                            parameter_class=ManualParameter)
@@ -100,6 +101,9 @@ class CBox_v3_driven_transmon(Transmon):
                            initial_value=1,
                            parameter_class=ManualParameter)
 
+        self.add_parameter('RO_acq_integration_length', initial_value=500e-9,
+                           vals=vals.Numbers(min_value=0, max_value=20e6),
+                           parameter_class=ManualParameter)
         self.add_parameter('RO_acq_averages', initial_value=1024,
                            vals=vals.Numbers(min_value=0, max_value=1e6),
                            parameter_class=ManualParameter)
@@ -126,6 +130,10 @@ class CBox_v3_driven_transmon(Transmon):
         # Single shot readout specific parameters
         self.add_parameter('RO_threshold', units='dac-value',
                            initial_value=0,
+                           parameter_class=ManualParameter)
+        self.add_parameter('RO_rotation_angle', units='deg',
+                           initial_value=0,
+                           vals=vals.Numbers(0, 360),
                            parameter_class=ManualParameter)
         self.add_parameter('signal_line', parameter_class=ManualParameter,
                            vals=vals.Enum(0, 1), initial_value=0)
@@ -239,6 +247,45 @@ class CBox_v3_driven_transmon(Transmon):
         self.CBox.set('sig{}_threshold_line'.format(
                       int(self.signal_line.get())),
                       int(self.RO_threshold.get()))
+
+    def _get_acquisition_instr(self):
+        return self._acquisition_instrument
+
+    def _set_acquisition_instr(self, acq_instr_name):
+        self._acquisition_instr = self.find_instrument(acq_instr_name)
+        if 'CBox' in acq_instr_name:
+            logging.info("setting CBox acquisition")
+            self.int_avg_det = None # FIXME: Not implemented
+            self.int_avg_det_rot = None # FIXME: Not implemented
+            self.int_log_det = qh.CBox_integration_logging_det_CC(self.CBox)
+            self.input_average_detector = None # FIXME: Not implemented
+        elif 'UHFQC' in acq_instr_name:
+            logging.info("setting UHFQC acquisition")
+            self.input_average_detector = det.UHFQC_input_average_detector(
+                UHFQC=self._acquisition_instr,
+                AWG=self.AWG, nr_averages=self.RO_acq_averages())
+            self.int_avg_det = det.UHFQC_integrated_average_detector(
+                UHFQC=self._acquisition_instr, AWG=self.AWG,
+                channels=[self.RO_acq_weight_function_I(), self.RO_acq_weight_function_Q()], nr_averages=self.RO_acq_averages(),
+                integration_length=self.RO_acq_integration_length())
+            self.int_avg_det_rot = det.UHFQC_integrated_average_detector(
+                UHFQC=self._acquisition_instr, AWG=self.AWG,
+                channels=[self.RO_acq_weight_function_I(), self.RO_acq_weight_function_Q()], nr_averages=self.RO_acq_averages(),
+                integration_length=self.RO_acq_integration_length(), rotate=True)
+            self.int_log_det = det.UHFQC_integration_logging_det(
+                UHFQC=self._acquisition_instr, AWG=self.AWG,
+                channels=[self.RO_acq_weight_function_I(), self.RO_acq_weight_function_Q()],
+                integration_length=self.RO_acq_integration_length())
+
+        elif 'ATS' in acq_instr_name:
+            logging.info("setting ATS acquisition")
+            self.int_avg_det = det.ATS_integrated_average_continuous_detector(
+                ATS=self._acquisition_instr.card,
+                ATS_acq=self._acquisition_instr.controller, AWG=self.AWG,
+                nr_averages=self.RO_acq_averages())
+        return
+
+
 
     def find_resonator_frequency(self, use_min=False,
                                  update=True,
@@ -490,62 +537,6 @@ class CBox_v3_driven_transmon(Transmon):
             self.mixer_drive_phi.set(phi)
             self.mixer_drive_alpha.set(alpha)
 
-    def calibrate_RO_threshold(self, method='conventional',
-                               MC=None, close_fig=True,
-                               verbose=False, make_fig=True):
-        '''
-        Calibrates the RO threshold and applies the correct rotation to the
-        data either using a conventional SSRO experiment or by using the
-        self-consistent method.
-
-        For details see measure_ssro() and measure_discrimination_fid()
-
-        method: 'conventional' or 'self-consistent
-
-        '''
-        self.prepare_for_timedomain()
-        raise NotImplementedError()
-        # if method.lower() == 'conventional':
-        #     self.CBox.lin_trans_coeffs.set([1, 0, 0, 1])
-        #     self.measure_ssro(MC=MC, analyze=False, close_fig=close_fig,
-        #                       verbose=verbose)
-        #     a = ma.SSRO_Analysis(auto=True, close_fig=True,
-        #                          label='SSRO', no_fits=True,
-        #                          close_file=True)
-        #     # SSRO analysis returns the angle to rotate by
-        #     theta = a.theta  # analysis returns theta in rad
-
-        #     rot_mat = [np.cos(theta), -np.sin(theta),
-        #                np.sin(theta), np.cos(theta)]
-        #     self.CBox.lin_trans_coeffs.set(rot_mat)
-        #     self.threshold = a.V_opt_raw  # allows
-        #     self.RO_threshold.set(int(a.V_opt_raw))
-
-        # elif method.lower() == 'self-consistent':
-        #     self.CBox.lin_trans_coeffs.set([1, 0, 0, 1])
-        #     discr_vals = self.measure_discrimination_fid(
-        # MC=MC, close_fig=close_fig, make_fig=make_fig, verbose=verbose)
-
-        #     # hardcoded indices correspond to values in CBox SSRO discr det
-        #     theta = discr_vals[2] * 2 * np.pi/360
-
-        #     # Discr returns the current angle, rotation is - that angle
-        #     rot_mat = [np.cos(-1*theta), -np.sin(-1*theta),
-        #                np.sin(-1*theta), np.cos(-1*theta)]
-        #     self.CBox.lin_trans_coeffs.set(rot_mat)
-
-        #     # Measure it again to determine the threshold after rotating
-        #     discr_vals = self.measure_discrimination_fid(
-        # MC=MC, close_fig=close_fig, make_fig=make_fig, verbose=verbose)
-
-        #     # hardcoded indices correspond to values in CBox SSRO discr det
-        #     theta = discr_vals[2]
-        #     self.threshold = int(discr_vals[3])
-
-        #     self.RO_threshold.set(int(self.threshold))
-        # else:
-        #     raise ValueError('method %s not recognized, can be' % method +
-        #                      ' either "conventional" or "self-consistent"')
 
     def measure_heterodyne_spectroscopy(self, freqs, MC=None,
                                         analyze=True, close_fig=True):
@@ -909,71 +900,101 @@ class CBox_v3_driven_transmon(Transmon):
 
     def measure_ssro(self, no_fits=False,
                      return_detector=False,
-                     MC=None, nr_shots=16000,
+                     MC=None, nr_shots=1024*24,
                      analyze=True, close_fig=True, verbose=True):
         # No fancy SSRO detector here @Niels, this may be something for you
 
         self.prepare_for_timedomain()
         if MC is None:
             MC = self.MC
+        # plotting really slows down SSRO (16k shots plotting is slow)
+        old_plot_setting = MC.live_plot_enabled()
+        MC.live_plot_enabled(False)
         MC.soft_avg(1)  # don't want to average single shots
-        self.CBox.log_length(8000)
+        self.CBox.log_length(1024*6)  # FIXME: remove when integrating UHFQC
         off_on = sqqs.off_on(self.name)
-        s = qh.QASM_Sweep(off_on.name, self.CBox, self.get_operation_dict())
-        d = qh.CBox_integration_logging_det_CC(self.CBox, )
+        s = qh.QASM_Sweep(off_on.name, self.CBox, self.get_operation_dict(),
+                          parameter_name='Shots')
+        d = qh.CBox_integration_logging_det_CC(self.CBox)
         MC.set_sweep_function(s)
         MC.set_sweep_points(np.arange(nr_shots))
         MC.set_detector_function(d)
         MC.run('SSRO'+self.msmt_suffix)
-
+        # turn plotting back on
+        MC.live_plot_enabled(old_plot_setting)
         if analyze:
-            ma.SSRO_Analysis(label='SSRO'+self.msmt_suffix,
-                             no_fits=no_fits, close_fig=close_fig)
+            a = ma.SSRO_Analysis(label='SSRO'+self.msmt_suffix,
+                                 no_fits=no_fits, close_fig=close_fig)
+            if verbose:
+                print('Avg. Assignement fidelity: \t{:.4f}\n'.format(a.F_a) +
+                      'Avg. Discrimination fidelity: \t{:.4f}'.format(a.F_d))
+            return a
 
-    def measure_discrimination_fid(self, no_fits=False,
-                                   return_detector=False,
-                                   MC=None,
-                                   analyze=True,
-                                   close_fig=True, make_fig=True,
-                                   verbose=True):
-        '''
-        Measures the single shot discrimination fidelity.
-        Uses whatever sequence is currently loaded and takes 8000 single shots
-        Constructs histograms based on those and uses it to extract the
-        single-shot discrimination fidelity.
-        '''
+    def measure_butterfly(self, return_detector=False, MC=None,
+                          analyze=True, close_fig=True,
+                          verbose=True,
+                          initialize=False, nr_shots=1024*24,
+                          update_threshold=True):
 
-        raise NotImplementedError()
-        # self.prepare_for_timedomain()
+        self.prepare_for_timedomain()
+        if update_threshold:
+            self.CBox.lin_trans_coeffs(np.reshape(rotation_matrix(0, as_array=True), (4,)))
+        if MC is None:
+            MC = self.MC
+        MC.soft_avg(1)
+        # plotting slows down single shots
+        old_plot_setting = MC.live_plot_enabled()
+        MC.live_plot_enabled(False)
 
-        # if MC is None:
-        #     MC = self.MC
+        # Number of shots chosen to be a multiple of 6 as req for post select
+        self.CBox.log_length(1024*6)  # FIXME: remove when integrating UHFQC
+        qasm_file = sqqs.butterfly(self.name, initialize=initialize)
+        s = qh.QASM_Sweep(qasm_file.name, self.CBox, self.get_operation_dict(),
+                          parameter_name='Shots')
+        d = qh.CBox_integration_logging_det_CC(self.CBox)
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(np.arange(nr_shots))
+        MC.set_detector_function(d)
 
-        # # If I return the detector to use it must do analysis internally
-        # # Otherwise I do it here in the qubit object so that I can pass args
-        # analysis_in_det = return_detector
-        # d = cdet.CBox_SSRO_discrimination_detector(
-        #     'SSRO-disc'+self.msmt_suffix,
-        #     analyze=analysis_in_det,
-        #     MC=MC, AWG=self.AWG, CBox=self.CBox,
-        #     sequence_swf=swf.None_Sweep(sweep_control='hard',
-        #                                 sweep_points=np.arange(10)))
-        # if return_detector:
-        #     return d
-        # d.prepare()
-        # discr_vals = d.acquire_data_point()
-        # if analyze:
-        #     current_threshold = self.CBox.sig0_threshold_line.get()
-        #     a = ma.SSRO_discrimination_analysis(
-        #         label='SSRO-disc'+self.msmt_suffix,
-        #         current_threshold=current_threshold,
-        #         close_fig=close_fig,
-        #         plot_2D_histograms=make_fig)
+        MC.set_detector_function(self.int_log_det)
+        MC.run('Butterfly{}_initialize_{}'.format(
+            self.msmt_suffix, initialize))
+        # turn plotting back on
+        MC.live_plot_enabled(old_plot_setting)
+        # first perform SSRO analysis to extract the optimal rotation angle
+        # theta
+        a = ma.SSRO_discrimination_analysis(
+            label='Butterfly',
+            current_threshold=None,
+            close_fig=close_fig,
+            plot_2D_histograms=True)
 
-        #     return (a.F_discr_curr_t*100, a.F_discr*100,
-        #             a.theta, a.opt_I_threshold,
-        #             a.relative_separation, a.relative_separation_I)
-        # return discr_vals
+        # the, run it a second time to determine the optimal threshold along the
+        # rotated I axis
+        b = ma.SSRO_discrimination_analysis(
+            label='Butterfly',
+            current_threshold=None,
+            close_fig=close_fig,
+            plot_2D_histograms=True, theta_in=-a.theta)
+
+        c0 = ma.butterfly_analysis(
+            close_main_fig=close_fig, initialize=initialize,
+            theta_in=-a.theta,
+            threshold=b.opt_I_threshold, digitize=True, case=False)
+        c1 = ma.butterfly_analysis(
+            close_main_fig=close_fig, initialize=initialize,
+            theta_in=-a.theta%360,
+            threshold=b.opt_I_threshold, digitize=True, case=True)
+        if c0.butterfly_coeffs['F_a_butterfly'] > c1.butterfly_coeffs['F_a_butterfly']:
+            bf_coeffs = c0.butterfly_coeffs
+        else:
+            bf_coeffs = c1.butterfly_coeffs
+        bf_coeffs['theta'] = -a.theta%360
+        bf_coeffs['threshold'] = b.opt_I_threshold
+        if update_threshold:
+            self.RO_rotation_angle(bf_coeffs['theta'])
+            self.RO_threshold(bf_coeffs['threshold'])
+        return bf_coeffs
 
     def measure_rb_vs_amp(self, amps, nr_cliff=1,
                           resetless=True,
@@ -1002,9 +1023,11 @@ class CBox_v3_driven_transmon(Transmon):
             self.gauss_width()*4, rounding_period=1/abs(self.f_pulse_mod()))
         RO_length_clocks = convert_to_clocks(self.RO_pulse_length())
         RO_pulse_delay_clocks = convert_to_clocks(self.RO_pulse_delay())
+        RO_depletion_clocks = convert_to_clocks(self.RO_depletion_time())
+
 
         operation_dict['init_all'] = {'instruction':
-                                      'WaitReg r0 \nWaitReg r0 \n'}
+                                      '\nWaitReg r0 \nWaitReg r0 \n'}
         operation_dict['I {}'.format(self.name)] = {
             'duration': pulse_period_clocks, 'instruction': 'wait {} \n'}
         operation_dict['X180 {}'.format(self.name)] = {
@@ -1043,6 +1066,9 @@ class CBox_v3_driven_transmon(Transmon):
                 'duration': RO_length_clocks, 'instruction':
                 'wait {} \ntrigger 1000000, {} \n measure \n'.format(
                     RO_pulse_delay_clocks, RO_length_clocks)}
+        if RO_depletion_clocks != 0:
+            operation_dict['RO {}'.format(self.name)]['instruction'] += \
+                'wait {}\n'.format(RO_depletion_clocks)
 
         return operation_dict
 
@@ -1065,7 +1091,9 @@ class QWG_driven_transmon(CBox_v3_driven_transmon):
                  LO, cw_source, td_source,
                  IVVI, QWG,
                  CBox,
-                 MC, **kw):
+                 MC,
+                 RO_LutMan=None,
+                 **kw):
         super(CBox_v3_driven_transmon, self).__init__(name, **kw)
         '''
         '''
@@ -1076,6 +1104,7 @@ class QWG_driven_transmon(CBox_v3_driven_transmon):
         self.QWG = QWG
         self.CBox = CBox
         self.MC = MC
+        self.RO_LutMan = RO_LutMan
         super().add_parameters()
         self.add_parameters()
 
@@ -1102,8 +1131,9 @@ class QWG_driven_transmon(CBox_v3_driven_transmon):
                                            self.get_operation_dict())
         qumis_file = single_pulse_asm
         self.CBox.load_instructions(qumis_file.name)
-        ch_amp = pw.wrap_pars_to_swf([self.QWG.ch1_amp, self.QWG.ch2_amp,
-                                      self.QWG.ch3_amp])
+        for ch in [1, 2, 3, 4]:
+            self.QWG.set('ch{}_amp'.format(ch), .45)
+        ch_amp = swf.QWG_qubit_par(self, self.amp180)
 
         d = qh.CBox_single_integration_average_det_CC(
             self.CBox, nr_averages=self.RO_acq_averages()//MC.soft_avg(),
@@ -1116,6 +1146,36 @@ class QWG_driven_transmon(CBox_v3_driven_transmon):
         if analyze:
             a = ma.Rabi_Analysis(auto=True, close_fig=close_fig)
             return a
+
+    def measure_motzoi(self, motzois, MC=None, analyze=True, close_fig=True,
+                       verbose=False):
+        self.prepare_for_timedomain()
+        if MC is None:
+            MC = self.MC
+
+        # Generating the qumis file
+        motzoi_elt = sqqs.two_elt_MotzoiXY(self.name)
+        single_pulse_asm = qta.qasm_to_asm(
+            motzoi_elt.name, self.get_operation_dict())
+        asm_file = single_pulse_asm
+        self.CBox.load_instructions(asm_file.name)
+
+        motzoi_swf = swf.QWG_qubit_par(self, self.motzoi)
+
+        d = qh.CBox_single_integration_average_det_CC(
+            self.CBox, nr_averages=self.RO_acq_averages()//MC.soft_avg(),
+            seg_per_point=2)
+
+        MC.set_sweep_function(motzoi_swf)
+        MC.set_sweep_points(np.repeat(motzois, 2))
+        MC.set_detector_function(d)
+
+        MC.run('Motzoi_XY'+self.msmt_suffix)
+        if analyze:
+            a = ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
+            return a
+
+
 
     def prepare_for_timedomain(self):
         self.MC.soft_avg(self.RO_soft_averages())
@@ -1147,20 +1207,37 @@ class QWG_driven_transmon(CBox_v3_driven_transmon):
         #               self.mixer_offs_RO_Q.get())
 
         # RO pars
-        # self.LutMan.M_modulation(self.f_RO_mod())
-        # self.LutMan.M_amp(self.RO_amp())
-        # self.LutMan.M_length(self.RO_pulse_length())
-
+        if self.RO_LutMan != None:
+            self.RO_LutMan.M_modulation(self.f_RO_mod())
+            self.RO_LutMan.M_amp(self.RO_amp())
+            self.RO_LutMan.M_length(self.RO_pulse_length())
+            self.RO_LutMan.load_pulses_onto_AWG_lookuptable(self.RO_awg_nr())
+            self.RO_LutMan.lut_mapping(
+                ['I', 'X180', 'Y180', 'X90', 'Y90', 'mX90', 'mY90', 'M_square'])
         self.CBox.upload_standard_weights(self.f_RO_mod())
+        self.CBox.integration_length(
+            convert_to_clocks(self.RO_acq_integration_length()))
+
+        self.CBox.set('sig{}_threshold_line'.format(
+                      int(self.signal_line.get())),
+                      int(self.RO_threshold.get()))
+        self.CBox.lin_trans_coeffs(
+            np.reshape(rotation_matrix(self.RO_rotation_angle(), as_array=True), (4,)))
+
+        # Sets the QWG channel amplitudes
+        for ch in [1, 2, 3, 4]:
+            self.QWG.set('ch{}_amp'.format(ch), self.amp180()*1.1)
 
     def load_QWG_pulses(self):
         # NOTE: this is currently hardcoded to use ch1 and ch2 of the QWG
 
         t0 = time.time()
         self.QWG.reset()
+        # FIXME:  Currently hardcoded to use channel 1
+        G_amp = self.amp180()/self.QWG.get('ch{}_amp'.format(1))
 
         # Amplitude is set using the channel amplitude (at least for now)
-        G, D = wf.gauss_pulse(1, self.gauss_width(),
+        G, D = wf.gauss_pulse(G_amp, self.gauss_width(),
                               motzoi=self.motzoi(),
                               sampling_rate=1e9)  # sampling rate of QWG
         self.QWG.deleteWaveformAll()
@@ -1219,15 +1296,13 @@ class QWG_driven_transmon(CBox_v3_driven_transmon):
         self.QWG.ch_pair1_transform_matrix(predistortion_matrix)
 
         for ch in [1, 2, 3, 4]:
-            self.QWG.set('ch{}_amp'.format(ch), self.amp180())
             self.QWG.set('ch{}_state'.format(ch), True)
 
         self.QWG.ch1_offset(self.mixer_offs_drive_I())
         self.QWG.ch2_offset(self.mixer_offs_drive_Q())
 
-        # - is to correct for wrong sign of sideband generators
-        self.QWG.ch_pair1_sideband_frequency(-self.f_pulse_mod())
-        self.QWG.ch_pair3_sideband_frequency(-self.f_pulse_mod())
+        self.QWG.ch_pair1_sideband_frequency(self.f_pulse_mod())
+        self.QWG.ch_pair3_sideband_frequency(self.f_pulse_mod())
         self.QWG.syncSidebandGenerators()
 
         self.QWG.stop()
@@ -1252,8 +1327,9 @@ class QWG_driven_transmon(CBox_v3_driven_transmon):
             self.RO_acq_marker_delay())
         RO_pulse_delay_clocks = convert_to_clocks(self.RO_pulse_delay())
         RO_depletion_clocks = convert_to_clocks(self.RO_depletion_time())
+
         operation_dict['init_all'] = {'instruction':
-                                      'WaitReg r0 \nWaitReg r0 \n'}
+                                      '\nWaitReg r0 \nWaitReg r0 \n'}
         operation_dict['I {}'.format(self.name)] = {
             'duration': pulse_period_clocks, 'instruction': 'wait {} \n'}
         operation_dict['X180 {}'.format(self.name)] = {
@@ -1287,17 +1363,25 @@ class QWG_driven_transmon(CBox_v3_driven_transmon):
                 'trigger 1101000, 2  \nwait {}\n'.format(
                     pulse_period_clocks-2)}
 
+        # RO part
         if self.RO_pulse_type() == 'MW_IQmod_pulse':
             operation_dict['RO {}'.format(self.name)] = {
-                'duration': RO_pulse_delay_clocks+RO_acq_marker_del_clocks+RO_depletion_clocks,
+                'duration': (RO_pulse_delay_clocks+RO_acq_marker_del_clocks
+                             +RO_depletion_clocks),
                 'instruction': 'wait {} \npulse 0000 1111 1111 '.format(
                     RO_pulse_delay_clocks)
-                + '\nwait {} \nmeasure \n'.format(RO_acq_marker_del_clocks)}
-                # + 'wait {}\n'.format(RO_depletion_clocks)}
+                + '\nwait {} \nmeasure \n'.format(
+                    RO_acq_marker_del_clocks)}
+            # + 'wait {}\n'.format(RO_depletion_clocks)}
         elif self.RO_pulse_type() == 'Gated_MW_RO_pulse':
             operation_dict['RO {}'.format(self.name)] = {
                 'duration': RO_length_clocks, 'instruction':
                 'wait {} \ntrigger 1000000, {} \n measure \n'.format(
                     RO_pulse_delay_clocks, RO_length_clocks)}
+
+
+        if RO_depletion_clocks != 0:
+            operation_dict['RO {}'.format(self.name)]['instruction'] += \
+                'wait {}\n'.format(RO_depletion_clocks)
 
         return operation_dict

@@ -393,8 +393,7 @@ class MeasurementControl(Instrument):
                      'iteration',
                      'soft_iteration']:
             try:
-                attr = getattr(self, attr)
-                del attr
+                delattr(self, attr)
             except AttributeError:
                 pass
 
@@ -486,7 +485,7 @@ class MeasurementControl(Instrument):
                 self.main_QtPlot.add(x=[0], y=[0],
                                      xlabel=xlab, ylabel=ylab,
                                      subplot=j+1,
-                                     color=color_cycle[j],
+                                     color=color_cycle[j%len(color_cycle)],
                                      symbol='o', symbolSize=5)
                 self.curves.append(self.main_QtPlot.traces[-1])
                 j += 1
@@ -894,10 +893,14 @@ class MeasurementControl(Instrument):
         # attached
         # This is a mighty bad line! Should be adding sweep points to the
         # individual sweep funcs
-        self.sweep_functions[0].sweep_points = np.array(sweep_points)
+        if len(np.shape(sweep_points)) == 1:
+            self.sweep_functions[0].sweep_points = np.array(sweep_points)
 
     def get_sweep_points(self):
-        return self.sweep_functions[0].sweep_points
+        if hasattr(self, 'sweep_points'):
+            return self.sweep_points
+        else:
+            return self.sweep_functions[0].sweep_points
 
     def set_adaptive_function_parameters(self, adaptive_function_parameters):
         """

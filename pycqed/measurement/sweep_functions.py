@@ -318,4 +318,24 @@ class ZNB_VNA_sweep(Hard_Sweep):
 
 
         # get the list of frequency used in the span from the VNA
-        self.sweep_points = self.VNA.get_stimulus();
+        self.sweep_points = self.VNA.get_stimulus()
+
+class QWG_qubit_par(Soft_Sweep):
+
+    def __init__(self, qubit, qubit_parameter, **kw):
+        self.set_kw()
+        self.name= qubit_parameter.name
+        self.parameter_name = qubit_parameter.label
+        self.unit = qubit_parameter.units
+        self.sweep_control = 'soft'
+        self.qubit=qubit
+        self.qubit_parameter=qubit_parameter
+
+    def set_parameter(self, val):
+        '''
+        Set the parameter(s) to be sweeped. Differs per sweep function
+        '''
+
+        self.qubit_parameter.set(val)
+        self.qubit.load_QWG_pulses()
+        # self.qubit.QWG.getOperationComplete()

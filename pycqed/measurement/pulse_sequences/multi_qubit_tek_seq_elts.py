@@ -26,7 +26,7 @@ cached_kernels = {}
 
 
 def two_qubit_off_on(q0_pulse_pars, q1_pulse_pars, RO_pars,
-                   return_seq=False, verbose=False):
+                     return_seq=False, verbose=False):
 
     seq_name = '2_qubit_OffOn_sequence'
     seq = sequence.Sequence(seq_name)
@@ -67,7 +67,7 @@ def two_qubit_off_on(q0_pulse_pars, q1_pulse_pars, RO_pars,
 
 
 def three_qubit_off_on(q0_pulse_pars, q1_pulse_pars, q2_pulse_pars, RO_pars,
-                   return_seq=False, verbose=False):
+                       return_seq=False, verbose=False):
 
     seq_name = '3_qubit_OffOn_sequence'
     seq = sequence.Sequence(seq_name)
@@ -90,13 +90,13 @@ def three_qubit_off_on(q0_pulse_pars, q1_pulse_pars, q2_pulse_pars, RO_pars,
 
     # N.B. Identities not needed in all cases
     pulse_combinations = [['I q0', 'I q1', 'I q2', 'RO'],
-                          ['X180 q0', 'I q1', 'I q2','RO'],
-                          ['I q0', 'X180 q1','I q2', 'RO'],
-                          ['X180 q0', 'X180 q1','I q2', 'RO'],
+                          ['X180 q0', 'I q1', 'I q2', 'RO'],
+                          ['I q0', 'X180 q1', 'I q2', 'RO'],
+                          ['X180 q0', 'X180 q1', 'I q2', 'RO'],
                           ['I q0', 'I q1', 'X180 q2', 'RO'],
-                          ['X180 q0', 'I q1', 'X180 q2','RO'],
-                          ['I q0', 'X180 q1','X180 q2', 'RO'],
-                          ['X180 q0', 'X180 q1','X180 q2', 'RO']]
+                          ['X180 q0', 'I q1', 'X180 q2', 'RO'],
+                          ['I q0', 'X180 q1', 'X180 q2', 'RO'],
+                          ['X180 q0', 'X180 q1', 'X180 q2', 'RO']]
 
     for i, pulse_comb in enumerate(pulse_combinations):
         pulses = []
@@ -119,7 +119,7 @@ def four_qubit_off_on(q0_pulse_pars,
                       q2_pulse_pars,
                       q3_pulse_pars,
                       RO_pars,
-                   return_seq=False, verbose=False):
+                      return_seq=False, verbose=False):
 
     seq_name = '4_qubit_OffOn_sequence'
     seq = sequence.Sequence(seq_name)
@@ -144,22 +144,22 @@ def four_qubit_off_on(q0_pulse_pars,
     pulse_dict.update(RO_dict)
 
     # N.B. Identities not needed in all cases
-    pulse_combinations = [['I q0', 'I q1', 'I q2', 'I q3','RO'],
-                          ['X180 q0', 'I q1', 'I q2', 'I q3','RO'],
-                          ['I q0', 'X180 q1','I q2', 'I q3', 'RO'],
-                          ['X180 q0', 'X180 q1','I q2', 'I q3', 'RO'],
+    pulse_combinations = [['I q0', 'I q1', 'I q2', 'I q3', 'RO'],
+                          ['X180 q0', 'I q1', 'I q2', 'I q3', 'RO'],
+                          ['I q0', 'X180 q1', 'I q2', 'I q3', 'RO'],
+                          ['X180 q0', 'X180 q1', 'I q2', 'I q3', 'RO'],
                           ['I q0', 'I q1', 'X180 q2', 'I q3', 'RO'],
-                          ['X180 q0', 'I q1', 'X180 q2', 'I q3','RO'],
-                          ['I q0', 'X180 q1','X180 q2',  'I q3','RO'],
-                          ['X180 q0', 'X180 q1','X180 q2',  'I q3','RO'],
-                          ['I q0', 'I q1', 'I q2', 'X180 q3','RO'],
-                          ['X180 q0', 'I q1', 'I q2', 'X180 q3','RO'],
-                          ['I q0', 'X180 q1','I q2', 'X180 q3', 'RO'],
-                          ['X180 q0', 'X180 q1','I q2', 'X180 q3', 'RO'],
+                          ['X180 q0', 'I q1', 'X180 q2', 'I q3', 'RO'],
+                          ['I q0', 'X180 q1', 'X180 q2',  'I q3', 'RO'],
+                          ['X180 q0', 'X180 q1', 'X180 q2',  'I q3', 'RO'],
+                          ['I q0', 'I q1', 'I q2', 'X180 q3', 'RO'],
+                          ['X180 q0', 'I q1', 'I q2', 'X180 q3', 'RO'],
+                          ['I q0', 'X180 q1', 'I q2', 'X180 q3', 'RO'],
+                          ['X180 q0', 'X180 q1', 'I q2', 'X180 q3', 'RO'],
                           ['I q0', 'I q1', 'X180 q2', 'X180 q3', 'RO'],
-                          ['X180 q0', 'I q1', 'X180 q2', 'X180 q3','RO'],
-                          ['I q0', 'X180 q1','X180 q2',  'X180 q3','RO'],
-                          ['X180 q0', 'X180 q1','X180 q2',  'X180 q3','RO']]
+                          ['X180 q0', 'I q1', 'X180 q2', 'X180 q3', 'RO'],
+                          ['I q0', 'X180 q1', 'X180 q2',  'X180 q3', 'RO'],
+                          ['X180 q0', 'X180 q1', 'X180 q2',  'X180 q3', 'RO']]
 
     for i, pulse_comb in enumerate(pulse_combinations):
         pulses = []
@@ -176,13 +176,14 @@ def four_qubit_off_on(q0_pulse_pars,
     else:
         return seq_name
 
+
 def five_qubit_off_on(q0_pulse_pars,
                       q1_pulse_pars,
                       q2_pulse_pars,
                       q3_pulse_pars,
                       q4_pulse_pars,
                       RO_pars,
-                   return_seq=False, verbose=False):
+                      return_seq=False, verbose=False):
 
     seq_name = '5_qubit_OffOn_sequence'
     seq = sequence.Sequence(seq_name)
@@ -210,38 +211,54 @@ def five_qubit_off_on(q0_pulse_pars,
     pulse_dict.update(RO_dict)
 
     # N.B. Identities not needed in all cases
-    pulse_combinations = [['I q0', 'I q1', 'I q2', 'I q3', 'I q4','RO'],
-                          ['X180 q0', 'I q1', 'I q2', 'I q3', 'I q4','RO'],
-                          ['I q0', 'X180 q1','I q2', 'I q3', 'I q4', 'RO'],
-                          ['X180 q0', 'X180 q1','I q2', 'I q3', 'I q4', 'RO'],
+    pulse_combinations = [['I q0', 'I q1', 'I q2', 'I q3', 'I q4', 'RO'],
+                          ['X180 q0', 'I q1', 'I q2', 'I q3', 'I q4', 'RO'],
+                          ['I q0', 'X180 q1', 'I q2', 'I q3', 'I q4', 'RO'],
+                          ['X180 q0', 'X180 q1', 'I q2', 'I q3', 'I q4', 'RO'],
                           ['I q0', 'I q1', 'X180 q2', 'I q3', 'I q4', 'RO'],
-                          ['X180 q0', 'I q1', 'X180 q2', 'I q3', 'I q4','RO'],
-                          ['I q0', 'X180 q1','X180 q2',  'I q3', 'I q4','RO'],
-                          ['X180 q0', 'X180 q1','X180 q2',  'I q3', 'I q4','RO'],
-                          ['I q0', 'I q1', 'I q2', 'X180 q3', 'I q4','RO'],
-                          ['X180 q0', 'I q1', 'I q2', 'X180 q3', 'I q4','RO'],
-                          ['I q0', 'X180 q1','I q2', 'X180 q3', 'I q4', 'RO'],
-                          ['X180 q0', 'X180 q1','I q2', 'X180 q3', 'I q4', 'RO'],
+                          ['X180 q0', 'I q1', 'X180 q2', 'I q3', 'I q4', 'RO'],
+                          ['I q0', 'X180 q1', 'X180 q2',
+                              'I q3', 'I q4', 'RO'],
+                          ['X180 q0', 'X180 q1', 'X180 q2',
+                              'I q3', 'I q4', 'RO'],
+                          ['I q0', 'I q1', 'I q2', 'X180 q3', 'I q4', 'RO'],
+                          ['X180 q0', 'I q1', 'I q2', 'X180 q3', 'I q4', 'RO'],
+                          ['I q0', 'X180 q1', 'I q2', 'X180 q3', 'I q4', 'RO'],
+                          ['X180 q0', 'X180 q1', 'I q2',
+                              'X180 q3', 'I q4', 'RO'],
                           ['I q0', 'I q1', 'X180 q2', 'X180 q3', 'I q4', 'RO'],
-                          ['X180 q0', 'I q1', 'X180 q2', 'X180 q3', 'I q4','RO'],
-                          ['I q0', 'X180 q1','X180 q2',  'X180 q3', 'I q4','RO'],
-                          ['X180 q0', 'X180 q1','X180 q2',  'X180 q3', 'I q4','RO'],
-                          ['I q0', 'I q1', 'I q2', 'I q3', 'X180 q4','RO'],
-                          ['X180 q0', 'I q1', 'I q2', 'I q3', 'X180 q4','RO'],
-                          ['I q0', 'X180 q1','I q2', 'I q3', 'X180 q4', 'RO'],
-                          ['X180 q0', 'X180 q1','I q2', 'I q3', 'X180 q4', 'RO'],
+                          ['X180 q0', 'I q1', 'X180 q2',
+                              'X180 q3', 'I q4', 'RO'],
+                          ['I q0', 'X180 q1', 'X180 q2',
+                              'X180 q3', 'I q4', 'RO'],
+                          ['X180 q0', 'X180 q1', 'X180 q2',
+                              'X180 q3', 'I q4', 'RO'],
+                          ['I q0', 'I q1', 'I q2', 'I q3', 'X180 q4', 'RO'],
+                          ['X180 q0', 'I q1', 'I q2', 'I q3', 'X180 q4', 'RO'],
+                          ['I q0', 'X180 q1', 'I q2', 'I q3', 'X180 q4', 'RO'],
+                          ['X180 q0', 'X180 q1', 'I q2',
+                              'I q3', 'X180 q4', 'RO'],
                           ['I q0', 'I q1', 'X180 q2', 'I q3', 'X180 q4', 'RO'],
-                          ['X180 q0', 'I q1', 'X180 q2', 'I q3', 'X180 q4','RO'],
-                          ['I q0', 'X180 q1','X180 q2',  'I q3', 'X180 q4','RO'],
-                          ['X180 q0', 'X180 q1','X180 q2',  'I q3', 'X180 q4','RO'],
-                          ['I q0', 'I q1', 'I q2', 'X180 q3', 'X180 q4','RO'],
-                          ['X180 q0', 'I q1', 'I q2', 'X180 q3', 'X180 q4','RO'],
-                          ['I q0', 'X180 q1','I q2', 'X180 q3', 'X180 q4', 'RO'],
-                          ['X180 q0', 'X180 q1','I q2', 'X180 q3', 'X180 q4', 'RO'],
-                          ['I q0', 'I q1', 'X180 q2', 'X180 q3', 'X180 q4', 'RO'],
-                          ['X180 q0', 'I q1', 'X180 q2', 'X180 q3', 'X180 q4','RO'],
-                          ['I q0', 'X180 q1','X180 q2',  'X180 q3', 'X180 q4','RO'],
-                          ['X180 q0', 'X180 q1','X180 q2',  'X180 q3', 'X180 q4','RO']]
+                          ['X180 q0', 'I q1', 'X180 q2',
+                              'I q3', 'X180 q4', 'RO'],
+                          ['I q0', 'X180 q1', 'X180 q2',
+                              'I q3', 'X180 q4', 'RO'],
+                          ['X180 q0', 'X180 q1', 'X180 q2',
+                              'I q3', 'X180 q4', 'RO'],
+                          ['I q0', 'I q1', 'I q2', 'X180 q3', 'X180 q4', 'RO'],
+                          ['X180 q0', 'I q1', 'I q2',
+                              'X180 q3', 'X180 q4', 'RO'],
+                          ['I q0', 'X180 q1', 'I q2',
+                              'X180 q3', 'X180 q4', 'RO'],
+                          ['X180 q0', 'X180 q1', 'I q2',
+                              'X180 q3', 'X180 q4', 'RO'],
+                          ['I q0', 'I q1', 'X180 q2',
+                              'X180 q3', 'X180 q4', 'RO'],
+                          ['X180 q0', 'I q1', 'X180 q2',
+                              'X180 q3', 'X180 q4', 'RO'],
+                          ['I q0', 'X180 q1', 'X180 q2',
+                              'X180 q3', 'X180 q4', 'RO'],
+                          ['X180 q0', 'X180 q1', 'X180 q2',  'X180 q3', 'X180 q4', 'RO']]
 
     for i, pulse_comb in enumerate(pulse_combinations):
         pulses = []
@@ -259,6 +276,64 @@ def five_qubit_off_on(q0_pulse_pars,
         return seq_name
 
 
+def two_qubit_AllXY(q0_pulse_pars, q1_pulse_pars, RO_pars,
+                    double_points=True,
+                    verbose=False, upload=True,
+                    return_seq=False, ):
+    """
+    Performs an AllXY on the first qubit will doing a pi-pulse before
+    and after the AllXY on the second qubit
+    AllXY q0 - RO
+    X180 q1 - AllXY q0 - X180 q1 - RO
+    """
+    seq_name = '2_qubit_AllXY_sequence'
+    seq = sequence.Sequence(seq_name)
+    station.pulsar.update_channel_settings()
+    el_list = []
+    # Create a dict with the parameters for all the pulses
+    q0_pulses = add_suffix_to_dict_keys(
+        get_pulse_dict_from_pars(q0_pulse_pars), ' q0')
+    q1_pulses = add_suffix_to_dict_keys(
+        get_pulse_dict_from_pars(q1_pulse_pars), ' q1')
+    RO_dict = {'RO': RO_pars}
+
+    pulse_dict = {}
+    pulse_dict.update(q0_pulses)
+    pulse_dict.update(q1_pulses)
+    pulse_dict.update(RO_dict)
+    AllXY_pulse_combinations = [
+        ['I q0', 'I q0'], ['X180 q0', 'X180 q0'], ['Y180 q0', 'Y180 q0'],
+        ['X180 q0', 'Y180 q0'], ['Y180 q0', 'X180 q0'],
+        ['X90 q0', 'I q0'], ['Y90 q0', 'I q0'], ['X90 q0', 'Y90 q0'],
+        ['Y90 q0', 'X90 q0'], ['X90 q0', 'Y180 q0'], ['Y90 q0', 'X180 q0'],
+        ['X180 q0', 'Y90 q0'], ['Y180 q0', 'X90 q0'], ['X90 q0', 'X180 q0'],
+        ['X180 q0', 'X90 q0'], ['Y90 q0', 'Y180 q0'], ['Y180 q0', 'Y90 q0'],
+        ['X180 q0', 'I q0'], ['Y180 q0', 'I q0'], ['X90 q0', 'X90 q0'],
+        ['Y90 q0', 'Y90 q0']]
+
+    if double_points:
+        AllXY_pulse_combinations = [val for val in AllXY_pulse_combinations
+                                    for _ in (0, 1)]
+    pulse_list = []
+    for pulse_comb in (AllXY_pulse_combinations):
+        pulse_list += [pulse_comb + ['RO']]
+    for pulse_comb in (AllXY_pulse_combinations):
+            pulse_list += [['X180 q1'] + pulse_comb + ['X180 q1', 'RO']]
+    for i, pulse_comb in enumerate(pulse_list):
+        pulses = []
+        for p in pulse_comb:
+            pulses += [pulse_dict[p]]
+        el = multi_pulse_elt(i, station, pulses)
+        el_list.append(el)
+        seq.append_element(el, trigger_wait=True)
+
+    station.components['AWG'].stop()
+    station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+    if return_seq:
+        return seq, el_list
+    else:
+        return seq_name
+
 
 
 def two_qubit_tomo_cardinal(cardinal,
@@ -270,7 +345,7 @@ def two_qubit_tomo_cardinal(cardinal,
                             upload=True,
                             return_seq=False):
 
-    seq_name = '2_qubit_Card_%d_seq'%cardinal
+    seq_name = '2_qubit_Card_%d_seq' % cardinal
     seq = sequence.Sequence(seq_name)
     station.pulsar.update_channel_settings()
     el_list = []
@@ -292,9 +367,9 @@ def two_qubit_tomo_cardinal(cardinal,
     msmt_buffer = timings_dict['msmt_buffer']
 
     tomo_list_q0 = ['I q0', 'X180 q0', 'Y90 q0',
-                     'mY90 q0', 'X90 q0', 'mX90 q0']
+                    'mY90 q0', 'X90 q0', 'mX90 q0']
     tomo_list_q1 = ['I q1', 'X180 q1', 'Y90 q1',
-                     'mY90 q1', 'X90 q1', 'mX90 q1']
+                    'mY90 q1', 'X90 q1', 'mX90 q1']
 
     # inner loop on q0
     prep_idx_q0 = int(cardinal % 6)
@@ -303,11 +378,11 @@ def two_qubit_tomo_cardinal(cardinal,
     prep_pulse_q0 = pulse_dict[tomo_list_q0[prep_idx_q0]]
     prep_pulse_q1 = pulse_dict[tomo_list_q1[prep_idx_q1]]
 
-    prep_pulse_q1['pulse_delay'] = QQ_buffer + (prep_pulse_q0['sigma']*
+    prep_pulse_q1['pulse_delay'] = QQ_buffer + (prep_pulse_q0['sigma'] *
                                                 prep_pulse_q0['nr_sigma'])
 
-    RO_pars['pulse_delay'] += msmt_buffer - (prep_pulse_q1['sigma']*
-                                                prep_pulse_q1['nr_sigma'])
+    RO_pars['pulse_delay'] += msmt_buffer - (prep_pulse_q1['sigma'] *
+                                             prep_pulse_q1['nr_sigma'])
 
     # Calibration points
     cal_points = [['I q0', 'I q1', 'RO'],
@@ -348,11 +423,11 @@ def two_qubit_tomo_cardinal(cardinal,
         tomo_pulse_q0 = pulse_dict[tomo_list_q0[tomo_idx_q0]]
         tomo_pulse_q1 = pulse_dict[tomo_list_q1[tomo_idx_q1]]
 
-        tomo_pulse_q0['pulse_delay'] = wait_time + (prep_pulse_q1['sigma']*
-                                                prep_pulse_q1['nr_sigma'])
+        tomo_pulse_q0['pulse_delay'] = wait_time + (prep_pulse_q1['sigma'] *
+                                                    prep_pulse_q1['nr_sigma'])
 
-        tomo_pulse_q1['pulse_delay'] = QQ_buffer + (tomo_pulse_q0['sigma']*
-                                                tomo_pulse_q0['nr_sigma'])
+        tomo_pulse_q1['pulse_delay'] = QQ_buffer + (tomo_pulse_q0['sigma'] *
+                                                    tomo_pulse_q0['nr_sigma'])
         pulse_list = [prep_pulse_q0,
                       prep_pulse_q1,
                       tomo_pulse_q0,
@@ -416,18 +491,21 @@ def cphase_fringes(phases, q0_pulse_pars, q1_pulse_pars, RO_pars,
     exc_pulse['pulse_delay'] += 0.01e-6
     swap_pulse_1 = deepcopy(swap_pars_q0[0])
     # print(swap_pulse_1)
-    swap_pulse_1['pulse_delay'] = buffer_mw_flux + exc_pulse['sigma']*exc_pulse['nr_sigma']
+    swap_pulse_1['pulse_delay'] = buffer_mw_flux + \
+        exc_pulse['sigma']*exc_pulse['nr_sigma']
 
     ramsey_1 = deepcopy(pulse_dict['Y90 q1'])
     ramsey_1['pulse_delay'] = buffer_flux_mw + swap_pulse_1['length']
     cphase_pulse = cphase_pars_q1[0]
     cphase_amp = cphase_pulse['amplitude']
-    cphase_pulse['pulse_delay'] = buffer_mw_flux + ramsey_1['sigma']*ramsey_1['nr_sigma']
+    cphase_pulse['pulse_delay'] = buffer_mw_flux + \
+        ramsey_1['sigma']*ramsey_1['nr_sigma']
     ramsey_2 = deepcopy(pulse_dict['X90 q1'])
     ramsey_2['pulse_delay'] = buffer_flux_mw + cphase_pulse['length']
 
     swap_pulse_2 = deepcopy(swap_pars_q0[0])
-    swap_pulse_2['pulse_delay'] = buffer_mw_flux + ramsey_2['sigma']*ramsey_2['nr_sigma']
+    swap_pulse_2['pulse_delay'] = buffer_mw_flux + \
+        ramsey_2['sigma']*ramsey_2['nr_sigma']
     RO_pars[0]['pulse_delay'] = msmt_buffer + swap_pulse_2['length']
 
     # defining compensation pulses
@@ -479,7 +557,8 @@ def cphase_fringes(phases, q0_pulse_pars, q1_pulse_pars, RO_pars,
     # Compensations
     for i, el in enumerate(el_list):
         if distortion_dict is not None:
-            el = distort_and_compensate(el, distortion_dict, preloaded_kernels_vec)
+            el = distort_and_compensate(
+                el, distortion_dict, preloaded_kernels_vec)
             el_list[i] = el
         seq.append_element(el, trigger_wait=True)
     cal_points = 4
@@ -539,8 +618,8 @@ def distort_and_compensate(element, distortion_dict, preloaded_kernels):
         element._channels[ch]['distorted'] = True
         length = len(outputs_dict[ch])
         for kernelvec in preloaded_kernels[ch]:
-            outputs_dict[ch] = np.convolve(outputs_dict[ch], kernelvec)[:length]
+            outputs_dict[ch] = np.convolve(
+                outputs_dict[ch], kernelvec)[:length]
 
         element.distorted_wfs[ch] = outputs_dict[ch][:len(t_vals)]
     return element
-
