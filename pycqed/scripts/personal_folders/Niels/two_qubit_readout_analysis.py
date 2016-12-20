@@ -213,4 +213,4 @@ def two_qubit_ssro_fidelity(label, fig_format='png'):
     mu_matrix_inv = inv(mu_matrix)
     V_th_cor = np.dot(mu_matrix_inv, V_th)
     V_offset_cor = np.dot(mu_matrix_inv, mu_0_vec)
-    return mu_matrix_inv, mu_matrix,  V_th, mu_matrix_inv, V_th_cor,  V_offset_cor
+    return mu_matrix,  V_th, mu_matrix_inv, V_th_cor,  V_offset_cor
