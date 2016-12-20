@@ -1472,7 +1472,7 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         data = ['']*len(self.channels)
         for i, channel in enumerate(self.channels):
             dataset = eval("self.UHFQC.quex_rl_data_{}()".format(channel))
-            data[i] = dataset[0]['vector']
+            data[i] = dataset[0]['vector']/self.nr_averages
         # data = self.UHFQC.single_acquisition(self.nr_sweep_points,
         #                                      self.poll_time, timeout=0,
         #                                      channels=set(self.channels))
@@ -1594,10 +1594,10 @@ class UHFQC_integration_logging_det(Hard_Detector):
         self.UHFQC.quex_wint_length(int(self.integration_length*(1.8e9)))
         # this sets the result to integration and rotation outcome
         if self.cross_talk_suppression:
-            # 2/0/1 raw/crosstalk supressed /digitized
+            # 0/1/2 crosstalk supressed /digitized/raw
             self.UHFQC.quex_rl_source(0)
         else:
-            # 2/0/1 raw/crosstalk supressed /digitized
+            # 0/1/2 crosstalk supressed /digitized/raw
             self.UHFQC.quex_rl_source(2)
 
     def finish(self):

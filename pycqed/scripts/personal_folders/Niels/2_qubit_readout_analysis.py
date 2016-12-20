@@ -43,6 +43,29 @@ return for  state in states:
      namespace['w0_data_{}'.format(state)]=namespace['w0_data_r{}'.format(state)]
      namespace['w1_data_{}'.format(state)]=namespace['w1_data_r{}'.format(state)]
 
+#uploading the cross-talk suppression matrix
+ground_state='00'
+weights=[0,1]
+cal_states=['01','10']
+print(ground_state)
+
+mu_0_vec = np.zeros(len(weights))
+
+for j, weight in enumerate(weights):
+    mu_0_vec[j]=np.average(eval('w{}_data_00'.format(weight)))
+
+print('mu_0_vec', mu_0_vec)
+
+mu_matrix = np.zeros((len(cal_states), len(weights)))
+for i,state in enumerate(cal_states):
+    for j, weight in enumerate(weights):
+        mu_matrix[i, j]=np.average(eval('w{}_data_{}'.format(weight, state)))-mu_0_vec[j]
+
+
+print('mu_matrix',mu_matrix)
+mu_matrix_inv = inv(mu_matrix)
+return mu_matrix_inv
+
 
 #plot results for q0
 ma.SSRO_Analysis(label=label, auto=True, channels=['w0'], sample_0=0,
