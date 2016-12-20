@@ -98,8 +98,6 @@ Qubit_LO = rs.RohdeSchwarz_SGS100A(name='Qubit_LO', address='TCPIP0::192.168.0.8
 station.add_component(Qubit_LO)
 # TWPA_Pump = rs.RohdeSchwarz_SGS100A(name='TWPA_Pump', address='TCPIP0::192.168.0.90', server_name=None)  #
 # station.add_component(TWPA_Pump)
-CBox = qcb.QuTech_ControlBox('CBox', address='Com5', run_tests=False, server_name=None)
-station.add_component(CBox)
 AWG = tek.Tektronix_AWG5014(name='AWG', setup_folder=None, timeout=2,
                             address='GPIB0::6::INSTR', server_name=None)
 station.add_component(AWG)
@@ -184,7 +182,7 @@ Flux_Control.flux_offsets(-offsets)
 # SH = sh.SignalHound_USB_SA124B('Signal hound', server_name=None) #commented because of 8s load time
 
 # Meta-instruments
-HS = hd.HeterodyneInstrument('HS', LO=LO, RF=RF, AWG=AWG, acquisition_instr=CBox.name,
+HS = hd.HeterodyneInstrument('HS', LO=LO, RF=RF, AWG=AWG, acquisition_instr=UHFQC_1.name,
                              server_name=None)
 station.add_component(HS)
 # LutMan = lm.QuTech_ControlBox_LookuptableManager('LutMan', CBox=CBox,
@@ -375,7 +373,7 @@ if UHFQC:
                     RO_amp=qubit.RO_amp(), RO_pulse_length=qubit.RO_pulse_length(),
                     acquisition_delay=270e-9)
         qubit.RO_pulse_type('MW_IQmod_pulse_UHFQC')
-        qubit.RO_acq_marker_delay(-185e-9)
+        qubit.RO_acq_marker_delay(-165e-9)
         qubit.acquisition_instr('UHFQC_1')
         qubit.RO_acq_marker_channel('ch3_marker2')
         qubit.RO_I_channel('0')
