@@ -135,14 +135,28 @@ def HangerFuncAmplitude(f, f0, Q, Qe, A, theta):
     return abs(A*(1.-Q/Qe*np.exp(1.j*theta)/(1.+2.j*Q*(f/1.e9-f0)/f0)))
 
 
-def HangerFuncComplex(f, f0, Q, Qe, A, theta):
-    # This is the function for a hanger which does not
-    # take into account a possible slope
-    # This function may be preferred over SlopedHangerFunc if the area around
-    # the hanger is small.
-    # In this case it may misjudge the slope
-    # Theta is the asymmetry parameter
-    return A*(1.-Q/Qe*np.exp(1.j*theta)/(1.+2.j*Q*(f/1.e9-f0)/f0))
+def HangerFuncComplex(f, pars):
+    '''
+    This is the complex function for a hanger which DOES NOT
+    take into account a possible slope
+    Input:
+        f = frequency
+        pars = parameters dictionary
+               f0, Q, Qe, A, theta, phi_v, phi_0
+    
+    Author: Stefano Poletto
+    '''
+    f0 = pars['f0']
+    Q = pars['Q']
+    Qe = pars['Qe']
+    A = pars['A']
+    theta = pars['theta']
+    phi_v = pars['phi_v']
+    phi_0 = pars['phi_0']
+    
+    S21 = A*(1-Q/Qe*np.exp(1j*theta)/(1+2.j*Q*(f/1.e9-f0)/f0))*np.exp(1j*(phi_v*f+phi_0))
+
+    return S21
 
 
 def PolyBgHangerFuncAmplitude(f, f0, Q, Qe, A, theta, poly_coeffs):
@@ -201,11 +215,34 @@ def gaussian_2D(x, y, amplitude=1,
 def TripleExpDecayFunc(t, tau1, tau2, tau3, amp1, amp2, amp3, offset, n):
     return offset+amp1*np.exp(-(t/tau1)**n)+amp2*np.exp(-(t/tau2)**n)+amp3*np.exp(-(t/tau3)**n)
 
+
+######################
+# Residual functions #
+######################
+def residual_complex_fcn(pars, cmp_fcn, x, y):
+    '''
+    Residual of a complex function with complex results 'y' and
+    real input values 'x'
+    For resonators 'x' is the the frequency, 'y' the complex transmission
+    Input:
+        pars = parameters dictionary (check the corresponding function 'cmp_fcn' for the parameters to pass)
+        cmp_fcn = complex function
+        x = input real values to 'cmp_fcn'
+        y = output complex values from 'cmp_fcn'
+
+    Author = Stefano Poletto
+    '''
+    cmp_values = cmp_fcn(x, pars)
+
+    res = cmp_values-y
+    res = np.append(res.real, res.imag)
+
+    return res
+
+
 ####################
 # Guess functions  #
 ####################
-
-
 def exp_dec_guess(model, data, t):
     '''
     Assumes exponential decay in estimating the parameters

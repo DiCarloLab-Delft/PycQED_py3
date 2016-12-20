@@ -106,6 +106,7 @@ class QuTech_ControlBox(VisaInstrument):
 
         self.add_parameter('log_length',
                            label='Log length (# shots)',
+                           units='# shots',
                            get_cmd=self._do_get_log_length,
                            set_cmd=self._do_set_log_length,
                            vals=vals.Ints(1, 8192))

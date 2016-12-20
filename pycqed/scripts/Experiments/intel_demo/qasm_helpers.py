@@ -12,13 +12,17 @@ import json
 
 class QASM_Sweep(swf.Hard_Sweep):
 
-    def __init__(self, filename, CBox, op_dict, upload=True):
+    def __init__(self, filename, CBox, op_dict,
+                 parameter_name='Points', unit='a.u.', upload=True):
         super().__init__()
         self.name = 'QASM_Sweep'
         self.filename = filename
         self.upload = upload
         self.CBox = CBox
         self.op_dict = op_dict
+        self.parameter_name = parameter_name
+        self.unit = unit
+
 
     def prepare(self, **kw):
         self.CBox.trigger_source('internal')
@@ -145,7 +149,7 @@ class CBox_integration_logging_det_CC(det.Hard_Detector):
         super().__init__()
         self.CBox = CBox
         self.name = 'CBox_integration_logging_detector'
-        self.value_names = ['I', 'Q']
+        self.value_names = ['I shots', 'Q shots']
         self.value_units = ['a.u.', 'a.u.']
 
     def get_values(self):
@@ -169,6 +173,47 @@ class CBox_integration_logging_det_CC(det.Hard_Detector):
             if i > 20:
                 break
         return data
+
+    def finish(self):
+        self.CBox.set('acquisition_mode', 'idle')
+
+class CBox_state_counters_det_CC(det.Hard_Detector):
+
+    def __init__(self, CBox, **kw):
+        super().__init__()
+        self.CBox = CBox
+        self.name = 'CBox_state_counters_detector'
+        # A and B refer to the counts for the different weight functions
+        self.value_names = ['no error A', 'single error A', 'double error A',
+                            '|0> A', '|1> A',
+                            'no error B', 'single error B', 'double error B',
+                            '|0> B', '|1> B', ]
+        self.value_units = ['#']*10
+
+    def acquire_data_point(self):
+        return self.get_values()
+
+    def get_values(self):
+        succes = False
+        i = 0
+        while not succes:
+            try:
+                self.CBox.set('run_mode', 'idle')
+                self.CBox.core_state('idle')
+                self.CBox.core_state('active')
+                self.CBox.set('acquisition_mode', 'idle')
+                self.CBox.set('acquisition_mode', 'integration logging')
+                self.CBox.set('run_mode', 'run')
+                # does not restart AWG tape in CBox as we don't use it anymore
+                data = self.CBox.get_qubit_state_log_counters()
+                succes = True
+            except Exception as e:
+                logging.warning('Exception caught retrying')
+                logging.warning(e)
+            i += 1
+            if i > 20:
+                break
+        return np.concatenate(data)  # concatenates counters A and B
 
     def finish(self):
         self.CBox.set('acquisition_mode', 'idle')
@@ -225,12 +270,14 @@ def measure_asm_files(asm_filenames, config_filename, qubit, MC):
     if len(asm_filenames) > 1:
         MC.soft_avg(len(asm_filenames))
         nr_hard_averages = 256
-
     else:
-        CBox.nr_averages
-        nr_hard_averages = 512
-        MC.soft_avg(10)
-    cal_pts = (qubit.cal_pt_zero(), qubit.cal_pt_one())
+        MC.soft_avg(8)
+        nr_hard_averages = qubit.RO_acq_averages()//MC.soft_avg()
+
+    if qubit.cal_pt_zero() is not None:
+        cal_pts = (qubit.cal_pt_zero(), qubit.cal_pt_one())
+    else:
+        cal_pts = None
 
     prepare_function_kwargs = {
         'counter_param': counter_param,  'asm_filenames': asm_filenames,
@@ -264,7 +311,8 @@ def measure_asm_files(asm_filenames, config_filename, qubit, MC):
         RB_fit = ma.fit_mods.RandomizedBenchmarkingDecay(Ncl, **a.fit_res.best_values)
         MC.main_QtPlot.add(x=Ncl, y=RB_fit, subplot=0)
 
-def simulate_qasm_files(qasm_filenames, config_filename, qxc, MC):
+def simulate_qasm_files(qasm_filenames, config_filename, qxc, MC,
+                        error_rate = 0, nr_averages=int(1e4)):
     """
     Takes one or more asm_files as input and runs them on the hardware
     """
@@ -273,11 +321,11 @@ def simulate_qasm_files(qasm_filenames, config_filename, qxc, MC):
         MC.soft_avg(len(qasm_filenames))
         nr_hard_averages = 256
     else:
-        nr_hard_averages = 10000
+        nr_hard_averages = nr_averages
         MC.soft_avg(1)
 
     qx_det = det.QX_Hard_Detector(qxc, qasm_filenames,
-                                  p_error=0.002, num_avg=nr_hard_averages)
+                                  p_error=error_rate, num_avg=nr_hard_averages)
     measurement_points = extract_msmt_pts_from_config(config_filename)
 
     MC.set_sweep_function(swf.None_Sweep())
@@ -347,3 +395,73 @@ def getHomoFiles(fn):
     config_file = dirpath + "\\{}_config.json".format(name_core)
 
     return (config_file, homo_files)
+
+
+
+def convert_to_clocks(duration, f_sampling=200e6, rounding_period=None):
+    """
+    convert a duration in seconds to an integer number of clocks
+
+        f_sampling: 200e6 is the CBox sampling frequency
+    """
+    if rounding_period is not None:
+        duration = (duration//rounding_period+1)*rounding_period
+    clock_duration = int(duration*f_sampling)
+    return clock_duration
+
+
+def get_operation_dict(qubit, operation_dict={}):
+
+    pulse_period_clocks = convert_to_clocks(
+        qubit.gauss_width()*4, rounding_period=1/abs(qubit.f_pulse_mod()))
+    RO_length_clocks = convert_to_clocks(qubit.RO_pulse_length())
+    RO_pulse_delay_clocks = convert_to_clocks(qubit.RO_pulse_delay())
+
+    operation_dict['init_all'] = {'instruction':
+                                  'WaitReg r0 \nWaitReg r0 \n'}
+    operation_dict['I {}'.format(qubit.name)] = {
+        'duration': pulse_period_clocks, 'instruction': 'wait {} \n'}
+    operation_dict['X180 {}'.format(qubit.name)] = {
+        'duration': pulse_period_clocks, 'instruction':
+            'trigger 0000000, 1 \nwait 1\n'+
+            'trigger 1000001, 1  \nwait {}\n'.format( #1001001
+                pulse_period_clocks-1)}
+    operation_dict['Y180 {}'.format(qubit.name)] = {
+        'duration': pulse_period_clocks, 'instruction':
+            'trigger 0100000, 1 \nwait 1\n'+
+            'trigger 1100001, 1  \nwait {}\n'.format(
+                pulse_period_clocks-1)}
+    operation_dict['X90 {}'.format(qubit.name)] = {
+        'duration': pulse_period_clocks, 'instruction':
+            'trigger 0010000, 1 \nwait 1\n'+
+            'trigger 1010000, 1  \nwait {}\n'.format(
+                pulse_period_clocks-1)}
+    operation_dict['Y90 {}'.format(qubit.name)] = {
+        'duration': pulse_period_clocks, 'instruction':
+            'trigger 0110000, 1 \nwait 1\n'+
+            'trigger 1110000, 1  \nwait {}\n'.format(
+                pulse_period_clocks-1)}
+    operation_dict['mX90 {}'.format(qubit.name)] = {
+        'duration': pulse_period_clocks, 'instruction':
+            'trigger 0001000, 1 \nwait 1\n'+
+            'trigger 1001000, 1  \nwait {}\n'.format(
+                pulse_period_clocks-1)}
+    operation_dict['mY90 {}'.format(qubit.name)] = {
+        'duration': pulse_period_clocks, 'instruction':
+            'trigger 0101000, 1 \nwait 1\n'+
+            'trigger 1101000, 1  \nwait {}\n'.format(
+                pulse_period_clocks-1)}
+
+    if qubit.RO_pulse_type() == 'MW_IQmod_pulse':
+        operation_dict['RO {}'.format(qubit.name)] = {
+            'duration': RO_length_clocks,
+            'instruction': 'wait {} \npulse 0000 1111 1111 '.format(
+                RO_pulse_delay_clocks)
+            + '\nwait {} \nmeasure \n'.format(RO_length_clocks)}
+    elif qubit.RO_pulse_type() == 'Gated_MW_RO_pulse':
+        operation_dict['RO {}'.format(qubit.name)] = {
+            'duration': RO_length_clocks, 'instruction':
+            'wait {} \ntrigger 1000000, {} \n measure \n'.format(
+                RO_pulse_delay_clocks, RO_length_clocks)}
+
+    return operation_dict

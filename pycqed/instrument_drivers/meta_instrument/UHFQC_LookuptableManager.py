@@ -7,7 +7,7 @@ import logging
 from pycqed.measurement import Pulse_Generator as PG
 import unittest
 import matplotlib.pyplot as plt
-import imp 
+import imp
 from pycqed.analysis.fit_toolbox import functions as func
 
 imp.reload(PG)
@@ -55,7 +55,7 @@ class UHFQC_LookuptableManager(Instrument):
         self.add_parameter('Q_gauss_width', vals=vals.Numbers(), units='s',
                            parameter_class=ManualParameter,
                            initial_value=10e-9)
-        self.add_parameter('Q_gauss_nr_sigma', vals=vals.Numbers(), 
+        self.add_parameter('Q_gauss_nr_sigma', vals=vals.Numbers(),
                            parameter_class=ManualParameter,
                            initial_value=4)
         self.add_parameter('mixer_QI_amp_ratio', vals=vals.Numbers(),
@@ -87,7 +87,7 @@ class UHFQC_LookuptableManager(Instrument):
                            parameter_class=ManualParameter,
                            initial_value=20.0e6)
         self.add_parameter('M_length', units='s',
-                           vals=vals.Numbers(1e-9, 640e-9),
+                           vals=vals.Numbers(1e-9, 8000e-9),
                            parameter_class=ManualParameter,
                            initial_value=300e-9)
         self.add_parameter('M_amp', units='V',
@@ -165,7 +165,7 @@ class UHFQC_LookuptableManager(Instrument):
                                   self.get('Q_modulation'), axis='x',
                                   motzoi=self.get('Q_motzoi_parameter'),
                                   sampling_rate=self.get('sampling_rate'),
-                                  Q_phase_delay=self.get('mixer_IQ_phase_skewness'), 
+                                  Q_phase_delay=self.get('mixer_IQ_phase_skewness'),
                                   nr_sigma=self.Q_gauss_nr_sigma())
         Wave_X_90 = PG.mod_gauss(self.get('Q_amp90'), self.get('Q_gauss_width'),
                                  self.get('Q_modulation'), axis='x',
@@ -320,7 +320,7 @@ class UHFQC_LookuptableManager(Instrument):
             self.generate_standard_pulses()
         fig, ax = plt.subplots(1, 1)
         f_axis, PSD_I = func.PSD(self._wave_dict[wave_name][0], 1/self.sampling_rate())
-        f_axis, PSD_Q = func.PSD(self._wave_dict[wave_name][1], 1/self.sampling_rate())         
+        f_axis, PSD_Q = func.PSD(self._wave_dict[wave_name][1], 1/self.sampling_rate())
 
         ax.set_xlabel('frequency (Hz)')
         ax.set_title(wave_name)

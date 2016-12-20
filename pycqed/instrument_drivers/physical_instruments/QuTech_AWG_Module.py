@@ -1,10 +1,12 @@
 '''
-File:               QuTech_AWG_Module.py
-Author:             Wouter Vlothuizen, TNO/QuTech,
-                    edited by Adriaan Rol
-Purpose:            Instrument driver for Qutech QWG
+File:       QuTech_AWG_Module.py
+Author:     Wouter Vlothuizen, TNO/QuTech,
+            edited by Adriaan Rol
+Purpose:    Instrument driver for Qutech QWG
 Usage:
-Notes:
+Notes:      It is possible to view the QWG log using ssh. To do this connect
+            using ssh e.g., "ssh root@192.168.0.10"
+            Logging can be enabled using "tail -f /tmpLog/qwg.log"
 Bugs:
 '''
 
@@ -12,8 +14,29 @@ from .SCPI import SCPI
 
 import numpy as np
 import struct
-import array
 from qcodes import validators as vals
+
+
+from qcodes.instrument.parameter import StandardParameter
+from qcodes.instrument.parameter import Command, no_setter
+
+
+# Note: the HandshakeParameter is a temporary param that should be replaced
+# once qcodes issue #236 is closed
+class HandshakeParameter(StandardParameter):
+    """
+    If a string is specified as a set command it will append '*OPC?' and use
+    instrument.ask instead of instrument.write
+    """
+    # pass
+    def _set_set(self, set_cmd, set_parser):
+        exec_str = self._instrument.ask if self._instrument else None
+        if isinstance(set_cmd, str):
+            set_cmd += '\n *OPC?'
+        self._set = Command(arg_count=1, cmd=set_cmd, exec_str=exec_str,
+                            input_parser=set_parser, no_cmd_function=no_setter)
+
+        self.has_set = set_cmd is not None
 
 
 class QuTech_AWG_Module(SCPI):
@@ -34,10 +57,7 @@ class QuTech_AWG_Module(SCPI):
         # valid values
         self.device_descriptor.mvals_trigger_impedance = vals.Enum(50),
         self.device_descriptor.mvals_trigger_level = vals.Numbers(0, 2.5)
-        self.device_descriptor.mvals_channel_amplitude = vals.Numbers(
-            0, 1)  # FIXME: not in [V]
         # FIXME: not in [V]
-        self.device_descriptor.mvals_channel_offset = vals.Numbers(-0.05, 0.05)
 
         self.add_parameters()
         self.connect_message()
@@ -53,6 +73,7 @@ class QuTech_AWG_Module(SCPI):
             sph_cmd = 'qutech:output{}:phase'.format(ch_pair)
             # NB: sideband frequency has a resolution of ~0.23 Hz:
             self.add_parameter('ch_pair{}_sideband_frequency'.format(ch_pair),
+                               parameter_class=HandshakeParameter,
                                units='Hz',
                                label=('Sideband frequency channel ' +
                                       'pair {} (Hz)'.format(i)),
@@ -61,6 +82,7 @@ class QuTech_AWG_Module(SCPI):
                                vals=vals.Numbers(-300e6, 300e6),
                                get_parser=float)
             self.add_parameter('ch_pair{}_sideband_phase'.format(ch_pair),
+                               parameter_class=HandshakeParameter,
                                units='deg',
                                label=('Sideband phase channel' +
                                       ' pair {} (deg)'.format(i)),
@@ -70,6 +92,7 @@ class QuTech_AWG_Module(SCPI):
                                get_parser=float)
 
             self.add_parameter('ch_pair{}_transform_matrix'.format(ch_pair),
+                               parameter_class=HandshakeParameter,
                                label=('Transformation matrix channel' +
                                       'pair {}'.format(i)),
                                get_cmd=self._gen_ch_get_func(
@@ -112,19 +135,21 @@ class QuTech_AWG_Module(SCPI):
                                vals=vals.Bool())
 
             self.add_parameter('ch{}_amp'.format(ch),
+                               parameter_class=HandshakeParameter,
                                label='Amplitude channel {} (Vpp into 50 Ohm)'.format(ch),
                                units='Vpp',
                                get_cmd=amp_cmd + '?',
                                set_cmd=amp_cmd + ' {:.6f}',
-                               vals=vals.Numbers(0.0, 0.45),
+                               vals=vals.Numbers(-0.45, 0.45),
                                get_parser=float)
 
             self.add_parameter('ch{}_offset'.format(ch),
-                               label='Offset channel {} (V)'.format(ch),
+                               # parameter_class=HandshakeParameter,
+                               label='Offset channel {}'.format(ch),
                                units='V',
                                get_cmd=offset_cmd + '?',
                                set_cmd=offset_cmd + ' {:.3f}',
-                               vals=vals.Numbers(-.05, .05),
+                               vals=vals.Numbers(-.25, .25),
                                get_parser=float)
 
             self.add_parameter('ch{}_default_waveform'.format(ch),
@@ -132,11 +157,12 @@ class QuTech_AWG_Module(SCPI):
                                set_cmd=waveform_cmd+' "{}"',
                                vals=vals.Strings())
 
-        for i in range(self.device_descriptor.numCodewords):
-            cw = i+1
+        for cw in range(self.device_descriptor.numCodewords):
             for j in range(self.device_descriptor.numChannels):
                 ch = j+1
-                cw_cmd = 'sequence:element{:d}:waveform{:d}'.format(cw, ch)
+                # Codeword 0 corresponds to bitcode 0
+                # +1 is to correct for SCPI command in software see issue #74
+                cw_cmd = 'sequence:element{:d}:waveform{:d}'.format(cw+1, ch)
                 self.add_parameter('codeword_{}_ch{}_waveform'.format(cw, ch),
                                    get_cmd=cw_cmd+'?',
                                    set_cmd=cw_cmd+' "{:s}"',
@@ -185,7 +211,7 @@ class QuTech_AWG_Module(SCPI):
         M = np.zeros(4)
         for i, x in enumerate(mstring.split(',')):
             M[i] = x
-        M = M.reshape(2, 2)
+        M = M.reshape(2, 2, order='F')
         return(M)
 
     ##########################################################################

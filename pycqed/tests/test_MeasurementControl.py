@@ -145,6 +145,9 @@ class Test_MeasurementControl(unittest.TestCase):
         self.assertEqual(d.times_called, 1)
 
         self.MC.soft_avg(5000)
+        self.MC.set_sweep_function(None_Sweep(sweep_control='hard'))
+        self.MC.set_sweep_points(sweep_pts)
+        self.MC.set_detector_function(d)
         avg_dat = self.MC.run('averaged_dat')
         yavg_0 = abs(avg_dat[:, 1] - y[0])
         yavg_1 = abs(avg_dat[:, 2] - y[1])
@@ -183,6 +186,8 @@ class Test_MeasurementControl(unittest.TestCase):
         d = self.MC.detector_function
         self.assertEqual(d.times_called, 5)
 
+        self.MC.set_sweep_function(None_Sweep(sweep_control='hard'))
+        self.MC.set_sweep_function_2D(None_Sweep(sweep_control='soft'))
         self.MC.set_sweep_points(sweep_pts)
         self.MC.set_sweep_points_2D(sweep_pts_2D)
         self.MC.soft_avg(1000)

@@ -27,7 +27,7 @@ class UHFQC(Instrument):
     EOM
     """
 
-    def __init__(self, name, server_name, device='auto', interface='USB', address='127.0.0.1', port=8004, **kw):
+    def __init__(self, name, device='auto', interface='USB', address='127.0.0.1', port=8004, **kw):
         '''
         Input arguments:
             name:           (str) name of the instrument
@@ -36,7 +36,7 @@ class UHFQC(Instrument):
         '''
         #self.socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1) #suggestion W vlothuizen
         t0 = time.time()
-        super().__init__(name, server_name)
+        super().__init__(name, **kw)
 
         self._daq = zi.ziDAQServer(address, int(port), 5)
         if device.lower() == 'auto':

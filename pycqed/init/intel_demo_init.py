@@ -304,8 +304,8 @@ def measure_echo():
     MC.soft_avg(5)
 
     times = np.arange(50e-9, 80e-6, 3e-6)
-    Ecjp = sq_qasm.echo(qubit_name, times=times, artificial_detuning=None)
-    s = qh.QASM_Sweep(Ecjp.name, CBox, op_dict)
+    echo_seq = sq_qasm.echo(qubit_name, times=times, artificial_detuning=None)
+    s = qh.QASM_Sweep(echo_seq.name, CBox, op_dict)
     d = qh.CBox_integrated_average_detector_CC(CBox, nr_averages=128)
     MC.set_sweep_function(s)
     MC.set_sweep_points(times)

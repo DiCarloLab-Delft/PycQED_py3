@@ -217,9 +217,13 @@ class MeasurementAnalysis(object):
             fit_grp = self.analysis_group.create_group(fit_name)
         else:
             fit_grp = self.analysis_group[fit_name]
+        # fit_grp.attrs['Fit Report'] = \
+        #     '\n'+'*'*80+'\n' + \
+        #     fit_res.fit_report() + \
+        #     '\n'+'*'*80 + '\n\n'
         fit_grp.attrs['Fit Report'] = \
             '\n'+'*'*80+'\n' + \
-            fit_res.fit_report() + \
+            lmfit.fit_report(fit_res) + \
             '\n'+'*'*80 + '\n\n'
 
         fit_grp.attrs.create(name='chisqr', data=fit_res.chisqr)
@@ -437,6 +441,32 @@ class MeasurementAnalysis(object):
                 self.save_fig(fig, xlabel=xlabel, ylabel=(ylabel+'_log'), **kw)
             else:
                 self.save_fig(fig, xlabel=xlabel, ylabel=ylabel, **kw)
+        return
+
+    def plot_complex_results(self, cmp_data, fig, ax, show=False, marker='.', **kw):
+        '''
+        Plot real and imaginary values measured vs a sweeped parameter
+        Example: complex S21 of a resonator
+
+        Author: Stefano Poletto
+        Data: November 15, 2016
+        '''
+        save = kw.pop('save', False)
+        self.plot_title = kw.pop('plot_title',
+                                 textwrap.fill(self.timestamp_string + '_' +
+                                               self.measurementstring, 40))
+
+        xlabel = 'Real'
+        ylabel = 'Imag'
+        ax.set_title(self.plot_title)
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel(ylabel)
+        ax.plot(np.real(cmp_data), np.imag(cmp_data), marker)
+        if show:
+            plt.show()
+        if save:
+            self.save_fig(fig, xlabel=xlabel, ylabel=ylabel, **kw)
+
         return
 
     def get_naming_and_values_2D(self):
@@ -1529,6 +1559,7 @@ class SSRO_Analysis(MeasurementAnalysis):
 
         self.add_analysis_datagroup_to_file()
         self.no_fits = no_fits
+        self.get_naming_and_values()
         # plotting histograms of the raw shots on I and Q axis
 
         if len(channels)==1:
@@ -1539,19 +1570,18 @@ class SSRO_Analysis(MeasurementAnalysis):
             shots_Q_data_1 = shots_I_data_1*0
 
         else:
+            # Try getting data by name first and by index otherwise
             try:
                 shots_I_data = self.get_values(key=channels[0])
                 shots_Q_data = self.get_values(key=channels[1])
-                shots_I_data_0, shots_I_data_1 = a_tools.zigzag(shots_I_data,
-                                                    sample_0, sample_1, nr_samples)
-                shots_Q_data_0, shots_Q_data_1 = a_tools.zigzag(shots_Q_data,
-                                                    sample_0, sample_1, nr_samples)
+            except:
+                shots_I_data = self.measured_values[0]
+                shots_Q_data = self.measured_values[1]
 
-            except(KeyError):  # used for different naming when using TD_meas shots
-                shots_I_data_0 = self.get_values(key='single_shot_I')[:, 0]
-                shots_I_data_1 = self.get_values(key='single_shot_I')[:, 1]
-                shots_Q_data_0 = self.get_values(key='single_shot_Q')[:, 0]
-                shots_Q_data_1 = self.get_values(key='single_shot_Q')[:, 1]
+            shots_I_data_0, shots_I_data_1 = a_tools.zigzag(shots_I_data,
+                                                sample_0, sample_1, nr_samples)
+            shots_Q_data_0, shots_Q_data_1 = a_tools.zigzag(shots_Q_data,
+                                                sample_0, sample_1, nr_samples)
 
         # cutting off half data points (odd number of data points)
         min_len = np.min([np.size(shots_I_data_0), np.size(shots_I_data_1),
@@ -1968,7 +1998,7 @@ class SSRO_Analysis(MeasurementAnalysis):
         mu0_0 = fit_res_double_0.params['mu0'].value
         mu1_0 = fit_res_double_0.params['mu1'].value
         frac1_0 = fit_res_double_0.params['frac1'].value
-        print('frac1 in 0',frac1_0)
+        print('frac1 in 0: {:.4f}'.format(frac1_0))
 
         def NormCdf(x, mu, sigma):
             t = x-mu
@@ -2100,7 +2130,6 @@ class SSRO_Analysis(MeasurementAnalysis):
         plt.title('Histograms of {} shots, {}'.format(min_len, self.timestamp_string))
         plt.xlabel('DAQ voltage integrated (V)')#, fontsize=14)
         plt.ylabel('Fraction of counts')#, fontsize=14)
-        print(frac1_0)
 
         plt.axvline(self.V_th_a, ls='--',
                    linewidth=2, color='grey' ,label='SNR={0:.2f}\n $F_a$={1:.4f}\n $F_d$={2:.4f}\n $p_e$={3:.4f}'.format(SNR, self.F_a, F_d, frac1_0))
@@ -2169,18 +2198,16 @@ class SSRO_discrimination_analysis(MeasurementAnalysis):
     def run_default_analysis(self, plot_2D_histograms=True,
                              current_threshold=None, theta_in=0, **kw):
         self.add_analysis_datagroup_to_file()
-        # Extract I and Q data based on name of variable.
-        # I_shots = self.get_values(key='I')
-        # Q_shots = self.get_values(key='Q')
         self.get_naming_and_values()
         I_shots = self.measured_values[0]
         Q_shots = self.measured_values[1]
 
-        # rotating according to theta
-        I_shots = (np.cos(theta_in*2*np.pi/360)*I_shots -
-                   np.sin(theta_in*2*np.pi/360)*Q_shots)
-        Q_shots = (np.sin(theta_in*2*np.pi/360)*I_shots +
-                   np.cos(theta_in*2*np.pi/360)*Q_shots)
+        if theta_in != 0:
+            shots = I_shots+1j*Q_shots
+            rot_shots = dm_tools.rotate_complex(shots, angle=theta_in, deg=True)
+            I_shots = rot_shots.real
+            Q_shots = rot_shots.imag
+
 
         # Reshaping the data
         n_bins = 120  # the bins we want to have around our data
@@ -2226,7 +2253,7 @@ class SSRO_discrimination_analysis(MeasurementAnalysis):
             axs[0].set_ylabel('Q')
             #axs[0].ticklabel_format(style = 'sci',  fontsize=4)
 
-            self.save_fig(fig, figname='2D-Histograms', **kw)
+            self.save_fig(fig, figname='2D-Histograms_{}'.format(theta_in), **kw)
 
         #######################################################
         #         Extract quantities of interest              #
@@ -2235,18 +2262,17 @@ class SSRO_discrimination_analysis(MeasurementAnalysis):
                      1j * self.fit_res.params['A_center_y'].value)
         self.mu_b = (self.fit_res.params['B_center_x'].value +
                      1j * self.fit_res.params['B_center_y'].value)
+
+
         # only look at sigma x because we assume sigma_x = sigma_y
         sig_a = self.fit_res.params['A_sigma_x'].value
         sig_b = self.fit_res.params['B_sigma_x'].value
         # Picking threshold in the middle assumes same sigma for both
         # distributions, this can be improved by optimizing the F_discr
-        if abs(self.mu_a) > abs(self.mu_b):
-            diff_vec = self.mu_a - self.mu_b
-            self.opt_I_threshold = (self.mu_b.real + diff_vec.real/2)
-        else:
-            diff_vec = self.mu_b - self.mu_a
-            self.opt_I_threshold = (self.mu_a.real + diff_vec.real/2)
-        self.theta = np.arctan2(diff_vec.imag,diff_vec.real)/(2*np.pi)*360-theta_in
+        diff_vec = self.mu_b - self.mu_a
+
+        self.opt_I_threshold = np.mean([self.mu_a.real, self.mu_b.real])
+        self.theta = np.angle(diff_vec, deg=True)
         self.mean_sigma = np.mean([sig_a, sig_b])
         # relative separation of the gaussians in units of sigma
         self.relative_separation = abs(diff_vec)/self.mean_sigma
@@ -2263,13 +2289,14 @@ class SSRO_discrimination_analysis(MeasurementAnalysis):
                                (np.sqrt(2)*sig_a))
         CDF_b = .5 * math.erfc((-abs(diff_vec/2)) /
                                (np.sqrt(2)*sig_b))
-        self.F_discr = abs(CDF_a - CDF_b)
+        self.F_discr = 1-(1-abs(CDF_a - CDF_b))/2
 
         # Projected on the I-axis
         CDF_a = .5 * math.erfc((self.mu_a.real - self.opt_I_threshold) /
                                (np.sqrt(2)*sig_a))
         CDF_b = .5 * math.erfc((self.mu_b.real - self.opt_I_threshold) /
                                (np.sqrt(2)*sig_b))
+
         self.F_discr_I = abs(CDF_a - CDF_b)
         # Current threshold projected on the I-axis
         if current_threshold is not None:
@@ -2277,7 +2304,7 @@ class SSRO_discrimination_analysis(MeasurementAnalysis):
                                    (np.sqrt(2)*sig_a))
             CDF_b = .5 * math.erfc((self.mu_b.real - current_threshold) /
                                    (np.sqrt(2)*sig_b))
-            self.F_discr_curr_t = abs(CDF_a - CDF_b)
+            self.F_discr_curr_t = 1-(1-abs(CDF_a - CDF_b))/2
 
         self.finish(**kw)
 
@@ -2546,7 +2573,7 @@ class Ramsey_Analysis(TD_Analysis):
 
         ft_of_data = np.fft.fft(self.normalized_data_points)
         index_of_fourier_maximum = np.argmax(np.abs(
-            ft_of_data[1:len(ft_of_data)/2]))+1
+            ft_of_data[1:len(ft_of_data)//2]))+1
         max_ramsey_delay = self.sweep_points[-self.NoCalPoints] - \
             self.sweep_points[0]
 
@@ -3483,8 +3510,12 @@ class Homodyne_Analysis(MeasurementAnalysis):
                              show_guess=False, show=False,
                              fit_window=None, **kw):
         '''
-        fit_window allows to select the windows of data to fit.
-        Example: fit_window=[100,-100]
+        Available fitting_models:
+            - 'hanger' = amplitude fit with slope
+            - 'complex' = complex transmission fit WITHOUT slope
+
+        'fit_window': allows to select the windows of data to fit.
+                      Example: fit_window=[100,-100]
         '''
         super(self.__class__, self).run_default_analysis(
             close_file=False, **kw)
@@ -3502,6 +3533,7 @@ class Homodyne_Analysis(MeasurementAnalysis):
         self.peaks = a_tools.peak_finder((self.sweep_points),
                                          self.measured_powers)
 
+        # Search for peak
         if self.peaks['dip'] is not None:    # look for dips first
             f0 = self.peaks['dip']
             amplitude_factor = -1.
@@ -3515,6 +3547,8 @@ class Homodyne_Analysis(MeasurementAnalysis):
             # If this error is raised, it should continue the analysis but
             # not use it to update the qubit object
 
+
+        # Fit data according to the model required
         if 'hanger' in fitting_model:
             if fitting_model == 'hanger':
                 HangerModel = fit_mods.SlopedHangerAmplitudeModel
@@ -3523,14 +3557,6 @@ class Homodyne_Analysis(MeasurementAnalysis):
             # added reject outliers to be robust agains CBox data acq bug.
             # this should have no effect on regular data acquisition and is
             # only used in the guess.
-
-            # Stefano: amplitude guess is the max value of the signal (out of resonance)
-            #          not the diffference max-min.
-            #          I comment this line out, and revrite it.
-            # amplitude_guess = (max(dm_tools.reject_outliers(
-            #                        self.measured_powers)) -
-            #                    min(dm_tools.reject_outliers(
-            #                        self.measured_powers)))
             amplitude_guess = max(dm_tools.reject_outliers(self.measured_values[0]))
 
             # Creating parameters and estimations
@@ -3571,13 +3597,44 @@ class Homodyne_Analysis(MeasurementAnalysis):
             if np.floor(data_x[0]/1e8)==0: # frequency is defined in GHz
                 data_x = data_x*1e9
 
-
-            # Stefano: fit needs to be done on linear data, not the power.
-            #          Commenting this line and write the proper fit
-            # fit_res = HangerModel.fit(data=self.measured_powers,
-            #                           f=self.sweep_points, verbose=False)
             fit_res = HangerModel.fit(data=data_y,
                                       f=data_x, verbose=False)
+
+        elif fitting_model == 'complex':
+            # this is the fit with a complex transmission curve WITHOUT slope
+            data_amp = self.measured_values[0]
+            data_angle = self.measured_values[1]
+            data_complex =  np.add(self.measured_values[2], 1j*self.measured_values[3])
+
+            # Initial guesses
+            guess_A = max(data_amp)
+            guess_Q = f0 / abs(self.min_frequency - self.max_frequency) # this has to been improved
+            guess_Qe = guess_Q/(1-(max(data_amp)-min(data_amp)))
+            # phi_v
+            nbr_phase_jumps = (np.diff(data_angle)>4).sum() # number of 2*pi phase jumps
+            guess_phi_v = (2*np.pi*nbr_phase_jumps+(data_angle[0]-data_angle[-1]))/(self.sweep_points[0] - self.sweep_points[-1])
+            # phi_0
+            angle_resonance = data_angle[int(len(self.sweep_points)/2)]
+            phase_evolution_resonance = np.exp(1j*guess_phi_v*f0)
+            angle_phase_evolution = np.arctan2(np.imag(phase_evolution_resonance), np.real(phase_evolution_resonance))
+            guess_phi_0 = angle_resonance - angle_phase_evolution
+
+            # prepare the parameter dictionary
+            P = lmfit.Parameters()
+            #           (Name,         Value, Vary,      Min,     Max,  Expr)
+            P.add_many(('f0',         f0/1e9, True,     None,    None,  None),
+                       ('Q',         guess_Q, True,        1,    50e6,  None),
+                       ('Qe',       guess_Qe, True,        1,    50e6,  None),
+                       ('A',         guess_A, True,        0,    None,  None),
+                       ('theta',           0, True, -np.pi/2, np.pi/2,  None),
+                       ('phi_v', guess_phi_v, True,     None,    None,  None),
+                       ('phi_0', guess_phi_0, True,   -np.pi,   np.pi,  None))
+            P.add('Qi', expr='1./(1./Q-1./Qe*cos(theta))', vary=False)
+            P.add('Qc', expr='Qe/cos(theta)', vary=False)
+
+            # Fit
+            fit_res = lmfit.minimize(fit_mods.residual_complex_fcn, P,
+                        args=(fit_mods.HangerFuncComplex, self.sweep_points, data_complex))
 
 
         elif fitting_model == 'lorentzian':
@@ -3617,7 +3674,8 @@ class Homodyne_Analysis(MeasurementAnalysis):
         self.save_fitted_parameters(fit_res, var_name='HM')
 
         if print_fit_results is True:
-            print(fit_res.fit_report())
+            # print(fit_res.fit_report())
+            print(lmfit.fit_report(fit_res))
 
         fig, ax = self.default_ax()
         textstr = '$f_{\mathrm{center}}$ = %.4f $\pm$ (%.3g) GHz' % (
@@ -3640,6 +3698,15 @@ class Homodyne_Analysis(MeasurementAnalysis):
                                             ylabel=str('S21_mag (arb. units)'),
                                             save=False)
 
+        elif 'complex' in fitting_model:
+            self.plot_complex_results(data_complex, fig=fig, ax=ax, show=False, save=False)
+            # second figure with amplitude
+            fig2, ax2 = self.default_ax()
+            ax2.text(0.05, 0.95, textstr, transform=ax.transAxes, fontsize=11,
+                verticalalignment='top', bbox=self.box_props)
+            self.plot_results_vs_sweepparam(x=self.sweep_points, y=data_amp,
+                                            fig=fig2, ax=ax2, show=False, save=False)
+
         elif fitting_model == 'lorentzian':
             self.plot_results_vs_sweepparam(x=self.sweep_points,
                                             y=self.measured_powers,
@@ -3656,12 +3723,28 @@ class Homodyne_Analysis(MeasurementAnalysis):
 
         if show_guess:
             ax.plot(self.sweep_points, fit_res.init_fit, 'k--')
-        ax.plot(self.sweep_points, fit_res.best_fit, 'r-')
-        f0 = self.fit_results.values['f0']
-        plt.plot(f0*1e9, fit_res.eval(f=f0*1e9), 'o', ms=8)
+
+        # this part is necessary to separate fit perfomed with lmfit.minimize
+        if 'complex' in fitting_model:
+            fit_values = fit_mods.HangerFuncComplex(self.sweep_points, fit_res.params)
+            ax.plot(np.real(fit_values),np.imag(fit_values), 'r-')
+
+            ax2.plot(self.sweep_points, np.abs(fit_values), 'r-')
+
+            # save both figures
+            self.save_fig(fig, figname='complex', **kw)
+            self.save_fig(fig2, xlabel='Mag', **kw)
+        else:
+            ax.plot(self.sweep_points, fit_res.best_fit, 'r-')
+            f0 = self.fit_results.values['f0']
+            plt.plot(f0*1e9, fit_res.eval(f=f0*1e9), 'o', ms=8)
+
+            # save figure
+            self.save_fig(fig, xlabel=self.xlabel, ylabel='Mag', **kw)
+
         if show:
             plt.show()
-        self.save_fig(fig, xlabel=self.xlabel, ylabel='Mag', **kw)
+        # self.save_fig(fig, xlabel=self.xlabel, ylabel='Mag', **kw)
         if close_file:
             self.data_file.close()
         return fit_res
@@ -3881,13 +3964,12 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
         self.fit_results.append(fit_res)
         self.save_fitted_parameters(fit_res,
                                     var_name='distance', save_peaks=True)
-
         if print_fit_results is True:
             print(fit_res.fit_report())
 
         for k in range(len(self.measured_values)):
             ax = axes[k]
-            textstr = '$f_{\mathrm{center}}$ = %.5g $\pm$ (%.3g) GHz' % (
+            textstr = '$f_{\mathrm{center}}$ = %.5g $\pm$ (%.3g) GHz\n' % (
                 fit_res.params['f0'].value,
                 fit_res.params['f0'].stderr)
             ax.text(0.05, 0.95, textstr, transform=ax.transAxes,
@@ -3905,18 +3987,21 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
             axes[k].plot(f0, self.measured_values[k][f0_idx], 'o', ms=8)
 
         # Plotting distance from |0>
+        label = r'f0={:.5}$\pm$ {:.2} MHz, linewidth={:.4}$\pm${:.2} MHz'.format(fit_res.params['f0'].value/1e6, fit_res.params['f0'].stderr/1e6, fit_res.params['kappa'].value/1e6, fit_res.params['kappa'].stderr/1e6)
         fig_dist, ax_dist = self.default_ax()
         self.plot_results_vs_sweepparam(x=self.sweep_points,
                                         y=self.data_dist,
                                         fig=fig_dist, ax=ax_dist,
                                         xlabel=self.xlabel,
                                         ylabel='S21 distance (V)',
+                                        label=False,
                                         save=False)
         ax_dist.plot(self.sweep_points, fit_res.best_fit, 'r-')
         ax_dist.plot(f0, fit_res.best_fit[f0_idx], 'o', ms=8)
         if show_guess:
             ax_dist.plot(self.sweep_points, fit_res.init_fit, 'k--')
-
+        ax_dist.text(0.05, 0.95, label, transform=ax_dist.transAxes,
+                    fontsize=11, verticalalignment='top', bbox=self.box_props)
         self.save_fig(fig, figname=self.savename, **kw)
         if show:
             plt.show()
@@ -4231,6 +4316,7 @@ class TwoD_Analysis(MeasurementAnalysis):
                                normalize=normalize,
                                **kw)
             if save_fig:
+                print("saving fig_title",fig_title)
                 self.save_fig(fig, figname=fig_title, **kw)
         if close_file:
             self.finish()
@@ -4740,6 +4826,7 @@ class butterfly_analysis(MeasurementAnalysis):
                  initialize=False,
                 digitize=True,
                 case=False,
+                # FIXME better variable name for 1>th or 1<th
                  **kw):
         self.folder = a_tools.get_folder(timestamp=timestamp,
                                              label=label, **kw)
@@ -4749,13 +4836,12 @@ class butterfly_analysis(MeasurementAnalysis):
         I_shots = self.measured_values[0]
         Q_shots = self.measured_values[1]
 
-        #rotating according to theta
-        I_shots = np.cos(theta_in*2*np.pi/360)*I_shots - np.sin(theta_in*2*np.pi/360)*Q_shots
-        Q_shots = np.sin(theta_in*2*np.pi/360)*I_shots + np.cos(theta_in*2*np.pi/360)*Q_shots
-        self.data=I_shots
+        shots = I_shots+1j*Q_shots
+        rot_shots = dm_tools.rotate_complex(shots, angle=theta_in, deg=True)
+        I_shots = rot_shots.real
+        Q_shots = rot_shots.imag
 
-        # if close_file:
-        #     self.data_file.close()
+        self.data=I_shots
 
         if initialize:
             if threshold_init==None:
@@ -4825,19 +4911,21 @@ class butterfly_analysis(MeasurementAnalysis):
                                                      initial_state=1)
         self.butterfly_coeffs = dm_tools.butterfly_matrix_inversion(exc_coeffs,
                                                                     rel_coeffs)
-        F_bf = 1-(1-(self.butterfly_coeffs.get('eps00_1') +
+        # eps,declaration,output_input
+        F_a_butterfly = (1-(self.butterfly_coeffs.get('eps00_1') +
                   self.butterfly_coeffs.get('eps01_1') +
                   self.butterfly_coeffs.get('eps10_0') +
-                  self.butterfly_coeffs.get('eps11_0')))/2
+                  self.butterfly_coeffs.get('eps11_0'))/2)
+
         mmt_ind_rel = (self.butterfly_coeffs.get('eps00_1') +
                        self.butterfly_coeffs.get('eps10_1'))
         mmt_ind_exc = (self.butterfly_coeffs.get('eps11_0') +
                        self.butterfly_coeffs.get('eps01_0'))
         if verbose:
-            print('SSRO Fid', F_bf)
+            print('SSRO Fid', F_a_butterfly)
             print('mmt_ind_rel', mmt_ind_rel)
             print('mmt_ind_exc', mmt_ind_exc)
-        self.butterfly_coeffs['F_a_bf'] = F_a_bf
+        self.butterfly_coeffs['F_a_butterfly'] = F_a_butterfly
         self.butterfly_coeffs['mmt_ind_exc'] = mmt_ind_exc
         self.butterfly_coeffs['mmt_ind_rel'] = mmt_ind_rel
         return self.butterfly_coeffs
