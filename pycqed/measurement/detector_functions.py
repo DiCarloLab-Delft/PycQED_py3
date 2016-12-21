@@ -468,6 +468,8 @@ class CBox_integrated_average_detector(Hard_Detector):
         else:
             return data
 
+
+
     def rotate_and_normalize(self, data):
         """
         Rotates and normalizes
@@ -1426,8 +1428,8 @@ class UHFQC_integrated_average_detector(Hard_Detector):
     '''
 
     def __init__(self, UHFQC, AWG, integration_length=1e-6, nr_averages=1024, rotate=False,
-                 channels=[0, 1, 2, 3], cross_talk_suppression=False, seg_per_point=1,
-                 normalize_individually=False,**kw):
+                 channels=[0, 1, 2, 3], cross_talk_suppression=False,
+                 **kw):
         super(UHFQC_integrated_average_detector, self).__init__()
         self.UHFQC = UHFQC
         self.name = 'UHFQC_integrated_average'
@@ -1439,13 +1441,7 @@ class UHFQC_integrated_average_detector(Hard_Detector):
             self.value_names[i] = 'w{}'.format(channel)
             self.value_units[i] = 'V'
         self.rotate = rotate
-        if len(self.channels) == 2:
-            self.value_names = ['I', 'Q']
-            self.value_units = ['V', 'V']
-        else:
-            if self.rotate:
-                raise ValueError(
-                    'rortate only possible for two weight_function acquisition')
+
         self.AWG = AWG
         self.nr_averages = nr_averages
         self.integration_length = integration_length
@@ -1482,6 +1478,9 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         else:
             return data
 
+    def acquire_data_point(self):
+        return self.get_values()
+
     def rotate_and_normalize(self, data):
         """
         Rotates and normalizes
@@ -1501,10 +1500,13 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         return self.corr_data, self.corr_data
 
 
-    def prepare(self, sweep_points):
+    def prepare(self, sweep_points=None):
         if self.AWG is not None:
             self.AWG.stop()
-        self.nr_sweep_points = len(sweep_points)
+        if sweep_points is None:
+            self.nr_sweep_points = 1
+        else:
+            self.nr_sweep_points = len(sweep_points)
         # this sets the result to integration and rotation outcome
         if self.cross_talk_suppression:
             # 2/0/1 raw/crosstalk supressed /digitized

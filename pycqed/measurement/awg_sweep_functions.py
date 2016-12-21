@@ -295,6 +295,67 @@ class swap_CP_swap_2Qubits(swf.Hard_Sweep):
     def set_parameter(self, val, **kw):
         pass
 
+class chevron_with_excited_bus_2Qubits(swf.Hard_Sweep):
+
+    def __init__(self,
+                 mw_pulse_pars_qCP, mw_pulse_pars_qS,
+                 flux_pulse_pars_qCP, flux_pulse_pars_qS,
+                 RO_pars,
+                 dist_dict,
+                 AWG,
+                 CPhase=True,
+                 excitations=1,
+                 upload=True,
+                 return_seq=False):
+        super().__init__()
+        self.mw_pulse_pars_qCP = mw_pulse_pars_qCP
+        self.mw_pulse_pars_qS = mw_pulse_pars_qS
+        self.flux_pulse_pars_qCP = flux_pulse_pars_qCP
+        self.flux_pulse_pars_qS = flux_pulse_pars_qS
+        self.RO_pars = RO_pars
+        self.dist_dict = dist_dict
+        self.CPhase = CPhase
+        self.excitations = excitations
+        self.upload = upload
+        self.name = 'swap-CP length'
+        self.parameter_name = 'swap-CP length'
+        self.unit = 's'
+        self.return_seq = return_seq
+        self.AWG = AWG
+
+    def prepare(self, **kw):
+        if self.upload:
+
+            old_val_qS = self.AWG.get(
+                '{}_amp'.format(self.flux_pulse_pars_qS['channel']))
+            old_val_qCP = self.AWG.get(
+                '{}_amp'.format(self.flux_pulse_pars_qCP['channel']))
+            # Rescaling the AWG channel amp is done to ensure that the dac
+            # values of the flux pulses (including kernels) are defined on
+            # a 2Vpp scale.
+            self.AWG.set(
+                '{}_amp'.format(self.flux_pulse_pars_qCP['channel']), 2.)
+            self.AWG.set(
+                '{}_amp'.format(self.flux_pulse_pars_qS['channel']), 2.)
+            fsqs.chevron_with_excited_bus_2Qubits(
+                mw_pulse_pars_qCP=self.mw_pulse_pars_qCP,
+                mw_pulse_pars_qS=self.mw_pulse_pars_qS,
+                flux_pulse_pars_qCP=self.flux_pulse_pars_qCP,
+                flux_pulse_pars_qS=self.flux_pulse_pars_qS,
+                RO_pars=self.RO_pars,
+                distortion_dict=self.dist_dict,
+                excitations=self.excitations,
+                chevron_pulse_lengths=self.sweep_points,
+            )
+            self.AWG.set('{}_amp'.format(self.flux_pulse_pars_qCP['channel']),
+                         old_val_qCP)
+
+            self.AWG.set('{}_amp'.format(self.flux_pulse_pars_qS['channel']),
+                         old_val_qS)
+
+    def set_parameter(self, val, **kw):
+        pass
+
 
 class chevron_cphase_length(swf.Hard_Sweep):
     # TODO: Delete this function it is deprecasted
