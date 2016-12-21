@@ -4259,6 +4259,7 @@ class TwoD_Analysis(MeasurementAnalysis):
     def run_default_analysis(self, normalize=False, plot_linecuts=True,
                              linecut_log=False, colorplot_log=False,
                              plot_all=False, save_fig=True,
+                             transpose=False,
                              **kw):
         close_file = kw.pop('close_file', True)
 
@@ -4313,6 +4314,7 @@ class TwoD_Analysis(MeasurementAnalysis):
                                zlabel=self.zlabels[i],
                                fig=fig, ax=ax,
                                log=colorplot_log,
+                               transpose=transpose,
                                normalize=normalize,
                                **kw)
             if save_fig:
