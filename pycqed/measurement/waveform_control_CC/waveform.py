@@ -168,25 +168,66 @@ def simple_mod_pulse(pulse_I, pulse_Q, f_modulation,
 
 def martinis_flux_pulse(amplitude,
                         length,
-                        lambda0, lambda1,
+                        lambda_coeffs,
                         g2,
-                        sampling_rate=1e9):
+                        E_c,
+                        f_bus,
+                        sampling_rate=1e9,
+                        return_unit='V'):
     """
-    Function to get a Martinis pulse as described in
-    Phys. Rev. A 90 022307 (2014)
+    Returns the pulse specified by Martinis and Geller
+    Phys. Rev. A 90 022307 (2014).
+
+    th = lambda_0 + sum_{n=1}^\infty  (\lambda_n*(1-\cos(n*2*pi*t/t_p))/2
+
+    amplitude       (float)
+    length          (float)
+    lambda_coeffs   (list of floats)
+
+    g2              (float) coupling between 11-02 (Hz),
+                            approx sqrt(2) g1 (the 10-01 coupling).
+    E_c             (float) Charging energy of the transmon (Hz).
+    f_bus           (float) frequency of the bus (Hz).
+    dac_flux_coeff  (float) conversion factor for dac voltage to flux (1/V)
+
+    Vref            (float) Voltage at which the 11-02 (bus, transmon) crossing
+                            is resonant.
+
+
+    sampling_rate   (float)
+    return_unit     (enum: ['V', 'eps', 'theta']) wehter to return the pulse
+                    expressed in units of theta: the reference frame of the
+                    interaction, units of epsilon: detuning to the bus
+                    eps=f12-f_bus
+
+
     """
 
-    nr_samples = int((length)*sampling_rate)
+    nr_samples = int((length)*sampling_rate)+1  # +1 include the endpoint
     t_step = 1/sampling_rate
-    t = np.arange(0, nr_samples + .1*t_step, t_step)
+    t = np.arange(0, length + .1*t_step, t_step)
+
+
+    mart_pulse_theta = np.ones(nr_samples)*lambda_coeffs[0]
+    for n, lambda_coeff in enumerate(lambda_coeffs):
+        mart_pulse_theta += lambda_coeff*(1-np.cos(n*2*np.pi*t/length))/2
 
     # martinis pulse expressed in units of "theta" (see P
-    mart_pulse_theta = (lambda0 + lambda1*(
-            np.sin(np.pi/(length) * t)-1))
+    # mart_pulse_theta = (lambda_coeffs[0] + lambda_coeffs[1]*(
+    #         np.sin(np.pi/(length) * t)-1))
+    if return_unit == 'theta':
+        return mart_pulse_theta
 
     # Convert theta to detuning to the bus frequency
     # Watch out for infinite detuning!
     mart_pulse_eps = (2*g2)/(np.tan(mart_pulse_theta))
+    if return_unit == 'eps':
+        return mart_pulse_eps
+
+    # pulse parameterized in tge f01 frequency
+    mart_pulse_f01 = mart_pulse_eps + 2*E_c
+    mart_pulse_V = QubitDacFreq(mart_pulse_f01)
+
 
     mart_pulse_V = mart_pulse_eps
 

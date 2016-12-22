@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import lmfit
+import logging
 #################################
 #   Fitting Functions Library   #
 #################################
@@ -55,16 +56,74 @@ def TwinLorentzFunc(f, amplitude_a, amplitude_b, center_a, center_b,
     return val
 
 
-def QubitFreqDac(dac_voltage, f_max, E_c,
+def Qubit_dac_to_freq(dac_voltage, f_max, E_c,
                  dac_sweet_spot, dac_flux_coefficient, asymmetry=0):
     '''
     The cosine Arc model for uncalibrated flux for asymmetric qubit.
-    dac_voltage (mV), f_max (GHz), E_c (MHz),
+
+    dac_voltage (V)
+    f_max (Hz)
+    E_c (Hz)
+    dac_sweet_spot (V)
+    dac_flux_coefficient (1/V)
     asym (dimensionless asymmetry param) = abs((EJ1-EJ2)/(EJ1+EJ2)),
-    dac_sweet_spot (mV),
-    dac_flux_coefficient (1/mV)
     '''
-    calculated_frequency = (f_max + E_c)*(asymmetry**2 + (1-asymmetry**2) *
+    qubit_freq = (f_max + E_c)*(
+        asymmetry**2 + (1-asymmetry**2) *
+        np.sqrt(abs(np.cos(dac_flux_coefficient*(dac_voltage-dac_sweet_spot)))))-E_c
+    return qubit_freq
+
+
+def Qubit_freq_to_dac(frequency, f_max, E_c,
+        dac_sweet_spot, dac_flux_coefficient, asymmetry=0,
+        branch='positive'):
+    '''
+    The cosine Arc model for uncalibrated flux for asymmetric qubit.
+    This function implements the inverse of "Qubit_dac_to_freq"
+
+    frequency (Hz)
+    f_max (Hz)
+    E_c (Hz)
+    dac_sweet_spot (V)
+    dac_flux_coefficient (1/V)
+    asym (dimensionless asymmetry param) = abs((EJ1-EJ2)/(EJ1+EJ2)),
+    branch (enum: 'positive' 'negative')
+    '''
+
+    asymm_term = (asymmetry**2 + (1-asymmetry**2))
+    dac_term = np.arccos(((frequency+E_c)/((f_max+E_c) *asymm_term))**2)
+    if branch == 'positive':
+        dac_voltage = (dac_term)/dac_flux_coefficient+dac_sweet_spot
+    elif branch == 'negative':
+            dac_voltage = -(dac_term)/dac_flux_coefficient+dac_sweet_spot
+    else:
+        raise ValueError('branch {} not recognized'.format(branch))
+
+    return dac_voltage
+
+
+
+def QubitFreqDac(dac_voltage, f_max, E_c,
+                 dac_sweet_spot, dac_flux_coefficient, asymmetry=0):
+    logging.warning('deprecated, replace QubitFreqDac with Qubit_dac_to_freq')
+    return Qubit_dac_to_freq(dac_voltage, f_max, E_c,
+                 dac_sweet_spot, dac_flux_coefficient, asymmetry)
+
+
+def Qubit_(dac_voltage, f_max, E_c,
+                 dac_sweet_spot, dac_flux_coefficient, asymmetry=0):
+    '''
+    The cosine Arc model for uncalibrated flux for asymmetric qubit.
+
+    dac_voltage (V)
+    f_max (Hz)
+    E_c (Hz)
+    dac_sweet_spot (V)
+    dac_flux_coefficient (1/V)
+    asym (dimensionless asymmetry param) = abs((EJ1-EJ2)/(EJ1+EJ2)),
+    '''
+    calculated_frequency = (f_max + E_c)*(
+        asymmetry**2 + (1-asymmetry**2) *
         np.cos(dac_flux_coefficient*(dac_voltage-dac_sweet_spot))**2)**0.25-E_c
     return calculated_frequency
 

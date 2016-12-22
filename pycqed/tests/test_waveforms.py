@@ -94,3 +94,16 @@ class Test_Waveforms(unittest.TestCase):
                               motzoi=motzoi, delay=0)
         np.testing.assert_almost_equal(I, -d_env)
         np.testing.assert_almost_equal(Q, g_env)
+
+    def test_martinis_flux_pulse(self):
+        lamb0 = .9
+
+        lamb1 = .1
+        th_pulse = wf.martinis_flux_pulse(
+            1, length=20e-9, lambda_coeffs=[lamb0, lamb1], g2=50e6,
+            return_unit='theta')
+        self.assertEqual(np.max(th_pulse), lamb0+lamb1)
+        self.assertEqual(len(th_pulse), 21)
+
+        self.assertEqual(np.argmax(th_pulse), 10)
+
