@@ -37,7 +37,8 @@ class Test_Flux_formula(unittest.TestCase):
     def test_dac_to_freq(self):
         f_max = 6.01e9
         dac_sweet_spot = .02
-        dac_voltages_pos_branch = np.linspace(dac_sweet_spot,3*dac_sweet_spot, 201)
+        dac_voltages_pos_branch = np.linspace(
+            dac_sweet_spot, 3*dac_sweet_spot, 201)
         freqs = fit_mods.Qubit_dac_to_freq(
             dac_voltages_pos_branch, f_max=f_max, E_c=300e6,
             dac_sweet_spot=dac_sweet_spot, dac_flux_coefficient=1/.2,
@@ -52,7 +53,8 @@ class Test_Flux_formula(unittest.TestCase):
         np.testing.assert_array_almost_equal(dac_voltages_pos_branch,
                                              recovered_dac_voltages)
 
-        dac_voltages_neg_branch = np.linspace(dac_sweet_spot, -3*dac_sweet_spot, 201)
+        dac_voltages_neg_branch = np.linspace(
+            dac_sweet_spot, -3*dac_sweet_spot, 201)
         freqs = fit_mods.Qubit_dac_to_freq(
             dac_voltages_neg_branch, f_max=f_max, E_c=300e6,
             dac_sweet_spot=dac_sweet_spot, dac_flux_coefficient=1/.2,

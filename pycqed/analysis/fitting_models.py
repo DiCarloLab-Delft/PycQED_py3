@@ -8,7 +8,7 @@ import logging
 
 
 def RandomizedBenchmarkingDecay(numCliff, Amplitude, p, offset):
-    val = Amplitude * (p**numCliff)+ offset
+    val = Amplitude * (p**numCliff) + offset
     return val
 
 
@@ -16,6 +16,8 @@ def DoubleExpDampOscFunc(t, tau_1, tau_2, freq_1, freq_2, phase_1, phase_2, amp_
     cos_1 = amp_1 * (np.cos(2*np.pi*freq_1*t+phase_1)) * np.exp(-(t/tau_1))
     cos_2 = amp_2 * (np.cos(2*np.pi*freq_2*t+phase_2)) * np.exp(-(t/tau_2))
     return cos_1 + cos_2 + osc_offset
+
+
 
 def double_RandomizedBenchmarkingDecay(numCliff, p, offset,
                                        invert=1):
@@ -57,7 +59,7 @@ def TwinLorentzFunc(f, amplitude_a, amplitude_b, center_a, center_b,
 
 
 def Qubit_dac_to_freq(dac_voltage, f_max, E_c,
-                 dac_sweet_spot, dac_flux_coefficient, asymmetry=0):
+                      dac_sweet_spot, dac_flux_coefficient, asymmetry=0):
     '''
     The cosine Arc model for uncalibrated flux for asymmetric qubit.
 
@@ -75,8 +77,8 @@ def Qubit_dac_to_freq(dac_voltage, f_max, E_c,
 
 
 def Qubit_freq_to_dac(frequency, f_max, E_c,
-        dac_sweet_spot, dac_flux_coefficient, asymmetry=0,
-        branch='positive'):
+                      dac_sweet_spot, dac_flux_coefficient, asymmetry=0,
+                      branch='positive'):
     '''
     The cosine Arc model for uncalibrated flux for asymmetric qubit.
     This function implements the inverse of "Qubit_dac_to_freq"
@@ -91,27 +93,26 @@ def Qubit_freq_to_dac(frequency, f_max, E_c,
     '''
 
     asymm_term = (asymmetry**2 + (1-asymmetry**2))
-    dac_term = np.arccos(((frequency+E_c)/((f_max+E_c) *asymm_term))**2)
+    dac_term = np.arccos(((frequency+E_c)/((f_max+E_c) * asymm_term))**2)
     if branch == 'positive':
         dac_voltage = (dac_term)/dac_flux_coefficient+dac_sweet_spot
     elif branch == 'negative':
-            dac_voltage = -(dac_term)/dac_flux_coefficient+dac_sweet_spot
+        dac_voltage = -(dac_term)/dac_flux_coefficient+dac_sweet_spot
     else:
         raise ValueError('branch {} not recognized'.format(branch))
 
     return dac_voltage
 
 
-
 def QubitFreqDac(dac_voltage, f_max, E_c,
                  dac_sweet_spot, dac_flux_coefficient, asymmetry=0):
     logging.warning('deprecated, replace QubitFreqDac with Qubit_dac_to_freq')
     return Qubit_dac_to_freq(dac_voltage, f_max, E_c,
-                 dac_sweet_spot, dac_flux_coefficient, asymmetry)
+                             dac_sweet_spot, dac_flux_coefficient, asymmetry)
 
 
 def Qubit_(dac_voltage, f_max, E_c,
-                 dac_sweet_spot, dac_flux_coefficient, asymmetry=0):
+           dac_sweet_spot, dac_flux_coefficient, asymmetry=0):
     '''
     The cosine Arc model for uncalibrated flux for asymmetric qubit.
 
@@ -213,7 +214,8 @@ def HangerFuncComplex(f, pars):
     phi_v = pars['phi_v']
     phi_0 = pars['phi_0']
 
-    S21 = A*(1-Q/Qe*np.exp(1j*theta)/(1+2.j*Q*(f/1.e9-f0)/f0))*np.exp(1j*(phi_v*f+phi_0))
+    S21 = A*(1-Q/Qe*np.exp(1j*theta)/(1+2.j*Q*(f/1.e9-f0)/f0)) * \
+        np.exp(1j*(phi_v*f+phi_0))
 
     return S21
 
@@ -222,7 +224,7 @@ def PolyBgHangerFuncAmplitude(f, f0, Q, Qe, A, theta, poly_coeffs):
     # This is the function for a hanger (lambda/4 resonator) which takes into
     # account a possible polynomial background
     # NOT DEBUGGED
-    return np.abs((1.+np.polyval(poly_coeffs,(f/1.e9-f0)/f0)) *
+    return np.abs((1.+np.polyval(poly_coeffs, (f/1.e9-f0)/f0)) *
                   HangerFuncAmplitude(f, f0, Q, Qe, A, theta))
 
 
@@ -239,11 +241,13 @@ def SlopedHangerFuncComplex(f, f0, Q, Qe, A, theta, phi_v, phi_0, slope):
     return (1.+slope*(f/1.e9-f0)/f0)*np.exp(1.j*(phi_v*f+phi_0-phi_v*f[0])) * \
         HangerFuncComplex(f, f0, Q, Qe, A, theta)
 
+
 def linear_with_offset(x, a, b):
     '''
     A linear signal with a fixed offset.
     '''
     return a*x + b
+
 
 def linear_with_background(x, a, b):
     '''
@@ -251,7 +255,8 @@ def linear_with_background(x, a, b):
     '''
     return np.sqrt((a*x)**2 + b**2)
 
-def linear_with_background_and_offset(x, a, b,c):
+
+def linear_with_background_and_offset(x, a, b, c):
     '''
     A linear signal with a fixed background.
     '''
@@ -509,7 +514,7 @@ def plot_fitres2D_heatmap(fit_res, x, y, axs=None, cmap='viridis'):
     model) but I put it here as it is closely related to all the stuff we do
     with lmfit. If anyone has a better location in mind, let me know (MAR).
     '''
-    #fixing the data rotation with [::-1]
+    # fixing the data rotation with [::-1]
     nr_cols = len(np.unique(x))
     data_2D = fit_res.data.reshape(-1, nr_cols, order='C')[::-1]
     fit_2D = fit_res.best_fit.reshape(-1, nr_cols, order='C')[::-1]

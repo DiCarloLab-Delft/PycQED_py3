@@ -9,7 +9,7 @@
 '''
 
 import numpy as np
-
+from pycqed.analysis.fitting_models import Qubit_freq_to_dac
 
 class Waveform():
     # complex waveforms
@@ -166,71 +166,77 @@ def simple_mod_pulse(pulse_I, pulse_Q, f_modulation,
     return pulse_I_mod, pulse_Q_mod
 
 
-def martinis_flux_pulse(amplitude,
-                        length,
-                        lambda_coeffs,
+def martinis_flux_pulse(length, lambda_coeffs, theta_f,
+                        f_01_max,
+                        f_bus,
                         g2,
                         E_c,
-                        f_bus,
+                        dac_flux_coefficient,
+                        asymmetry=0,
                         sampling_rate=1e9,
                         return_unit='V'):
     """
     Returns the pulse specified by Martinis and Geller
     Phys. Rev. A 90 022307 (2014).
 
-    th = lambda_0 + sum_{n=1}^\infty  (\lambda_n*(1-\cos(n*2*pi*t/t_p))/2
+    \theta = \theta _0 + \sum_{n=1}^\infty  (\lambda_n*(1-\cos(n*2*pi*t/t_p))/2
 
-    amplitude       (float)
     length          (float)
     lambda_coeffs   (list of floats)
+    theta_f         (float) final angle of the interaction. This determines the
+                    Voltage for the centerpoint of the waveform.
 
+    f_01_max        (float) qubit sweet spot frequency (Hz).
+    f_bus           (float) frequency of the bus (Hz).
     g2              (float) coupling between 11-02 (Hz),
                             approx sqrt(2) g1 (the 10-01 coupling).
     E_c             (float) Charging energy of the transmon (Hz).
-    f_bus           (float) frequency of the bus (Hz).
-    dac_flux_coeff  (float) conversion factor for dac voltage to flux (1/V)
-
-    Vref            (float) Voltage at which the 11-02 (bus, transmon) crossing
-                            is resonant.
-
+    dac_flux_coefficient  (float) conversion factor for AWG voltage to flux (1/V)
+    asymmetry       (float) qubit asymmetry
 
     sampling_rate   (float)
-    return_unit     (enum: ['V', 'eps', 'theta']) wehter to return the pulse
+    return_unit     (enum: ['V', 'eps', 'f01', 'theta']) wehter to return the pulse
                     expressed in units of theta: the reference frame of the
                     interaction, units of epsilon: detuning to the bus
                     eps=f12-f_bus
-
-
     """
-
+    lambda_coeffs = np.array(lambda_coeffs)
     nr_samples = int((length)*sampling_rate)+1  # +1 include the endpoint
     t_step = 1/sampling_rate
     t = np.arange(0, length + .1*t_step, t_step)
 
+    theta_0 = np.arctan(2*g2/(f_01_max-E_c-f_bus))
 
-    mart_pulse_theta = np.ones(nr_samples)*lambda_coeffs[0]
-    for n, lambda_coeff in enumerate(lambda_coeffs):
+    # you can not have weaker coupling than the initial coupling
+    assert(theta_f > theta_0)
+    delta_theta = theta_f - theta_0
+    # Summing all odd elements see eq 16 of Martinis paper
+    odd_coeff_lambda_sum = np.sum(lambda_coeffs[::2])
+
+    th_scale_factor = delta_theta/odd_coeff_lambda_sum
+    scaled_lambda_coeffs = th_scale_factor*lambda_coeffs
+    mart_pulse_theta = np.ones(nr_samples)*theta_0
+    for i, lambda_coeff in enumerate(scaled_lambda_coeffs):
+        n = i+1
         mart_pulse_theta += lambda_coeff*(1-np.cos(n*2*np.pi*t/length))/2
-
-    # martinis pulse expressed in units of "theta" (see P
-    # mart_pulse_theta = (lambda_coeffs[0] + lambda_coeffs[1]*(
-    #         np.sin(np.pi/(length) * t)-1))
     if return_unit == 'theta':
         return mart_pulse_theta
 
     # Convert theta to detuning to the bus frequency
-    # Watch out for infinite detuning!
     mart_pulse_eps = (2*g2)/(np.tan(mart_pulse_theta))
     if return_unit == 'eps':
         return mart_pulse_eps
 
-    # pulse parameterized in tge f01 frequency
-    mart_pulse_f01 = mart_pulse_eps + 2*E_c
-    mart_pulse_V = QubitDacFreq(mart_pulse_f01)
-
-
-    mart_pulse_V = mart_pulse_eps
-
+    # pulse parameterized in the f01 frequency
+    mart_pulse_f01 = mart_pulse_eps + E_c + f_bus
+    if return_unit == 'f01':
+        return mart_pulse_f01
+    mart_pulse_V = Qubit_freq_to_dac(
+        frequency=mart_pulse_f01,
+        f_max=f_01_max, E_c=E_c,
+        dac_sweet_spot=0,
+        dac_flux_coefficient=dac_flux_coefficient,
+        asymmetry=asymmetry, branch='positive')
     return mart_pulse_V
 
 
