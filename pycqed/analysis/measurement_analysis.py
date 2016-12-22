@@ -270,7 +270,7 @@ class MeasurementAnalysis(object):
             fit_grp.attrs.create(name='weighted_chisqr', data=weighted_chisqr)
 
     def run_default_analysis(self, TwoD=False, close_file=True,
-                             show=False, log=False, **kw):
+                             show=False, log=False, transpose=False, **kw):
         if TwoD is False:
             self.get_naming_and_values()
             self.sweep_points = kw.pop('sweep_points', self.sweep_points)
@@ -343,7 +343,7 @@ class MeasurementAnalysis(object):
                     ylabel=self.ylabel,
                     zlabel=self.zlabels[i],
                     save=False,
-                    transpose=True)
+                    transpose=transpose)
 
             fig.tight_layout(h_pad=1.5)
             fig.subplots_adjust(top=0.9)
