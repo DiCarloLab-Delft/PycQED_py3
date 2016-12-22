@@ -143,7 +143,7 @@ def HangerFuncComplex(f, pars):
         f = frequency
         pars = parameters dictionary
                f0, Q, Qe, A, theta, phi_v, phi_0
-    
+
     Author: Stefano Poletto
     '''
     f0 = pars['f0']
@@ -153,7 +153,7 @@ def HangerFuncComplex(f, pars):
     theta = pars['theta']
     phi_v = pars['phi_v']
     phi_0 = pars['phi_0']
-    
+
     S21 = A*(1-Q/Qe*np.exp(1j*theta)/(1+2.j*Q*(f/1.e9-f0)/f0))*np.exp(1j*(phi_v*f+phi_0))
 
     return S21

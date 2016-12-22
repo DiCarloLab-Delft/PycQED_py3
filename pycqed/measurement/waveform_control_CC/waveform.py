@@ -166,6 +166,33 @@ def simple_mod_pulse(pulse_I, pulse_Q, f_modulation,
     return pulse_I_mod, pulse_Q_mod
 
 
+def martinis_flux_pulse(amplitude,
+                        length,
+                        lambda0, lambda1,
+                        g2,
+                        sampling_rate=1e9):
+    """
+    Function to get a Martinis pulse as described in
+    Phys. Rev. A 90 022307 (2014)
+    """
+
+    nr_samples = int((length)*sampling_rate)
+    t_step = 1/sampling_rate
+    t = np.arange(0, nr_samples + .1*t_step, t_step)
+
+    # martinis pulse expressed in units of "theta" (see P
+    mart_pulse_theta = (lambda0 + lambda1*(
+            np.sin(np.pi/(length) * t)-1))
+
+    # Convert theta to detuning to the bus frequency
+    # Watch out for infinite detuning!
+    mart_pulse_eps = (2*g2)/(np.tan(mart_pulse_theta))
+
+    mart_pulse_V = mart_pulse_eps
+
+    return mart_pulse_V
+
+
 def mod_gauss(amp, sigma_length, f_modulation, axis='x',
               motzoi=0, sampling_rate=2e8,
               Q_phase_delay=0, delay=0):
@@ -179,6 +206,7 @@ def mod_gauss(amp, sigma_length, f_modulation, axis='x',
                                          sampling_rate=sampling_rate,
                                          Q_phase_delay=Q_phase_delay)
     return pulse_I_mod, pulse_Q_mod
+
 
 def mixer_predistortion_matrix(alpha, phi):
     predistortion_matrix = np.array(
