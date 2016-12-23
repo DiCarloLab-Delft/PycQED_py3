@@ -86,7 +86,7 @@ def single_pulse_seq(pulse_pars=None,
     for i, el in enumerate(el_list):
         if distortion_dict is not None:
             el = distort_and_compensate(
-                el, distortion_dict, preloaded_kernels_vec)
+                el, distortion_dict)
             el_list[i] = el
         seq.append_element(el, trigger_wait=True)
     station.components['AWG'].stop()
@@ -442,7 +442,7 @@ def swap_CP_swap_2Qubits(mw_pulse_pars_qCP, mw_pulse_pars_qS,
         el = multi_pulse_elt(i, station, pulses)
         if distortion_dict is not None:
             el = distort_and_compensate(
-                el, distortion_dict, preloaded_kernels_vec)
+                el, distortion_dict)
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
 
@@ -583,7 +583,7 @@ def chevron_with_excited_bus_2Qubits(mw_pulse_pars_qCP, mw_pulse_pars_qS,
         el = multi_pulse_elt(i, station, pulses)
         if distortion_dict is not None:
             el = distort_and_compensate(
-                el, distortion_dict, preloaded_kernels_vec)
+                el, distortion_dict)
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
 
@@ -675,7 +675,7 @@ def XSWAPxy(phis, mw_pulse_pars, RO_pars, flux_pulse_pars=None,
     for i, el in enumerate(el_list):
         if distortion_dict is not None:
             el = distort_and_compensate(
-                el, distortion_dict, preloaded_kernels_vec)
+                el, distortion_dict)
             el_list[i] = el
         seq.append_element(el, trigger_wait=True)
     cal_points = 4
@@ -794,7 +794,7 @@ def chevron_seq_cphase(lengths, mw_pulse_pars, RO_pars, flux_pulse_pars=None,
     for i, el in enumerate(el_list):
         if distortion_dict is not None:
             el = distort_and_compensate(
-                el, distortion_dict, preloaded_kernels_vec)
+                el, distortion_dict)
             el_list[i] = el
         seq.append_element(el, trigger_wait=True)
     cal_points = 4
@@ -888,7 +888,7 @@ def BusT1(times, mw_pulse_pars, RO_pars, flux_pulse_pars=None,
     for i, el in enumerate(el_list):
         if distortion_dict is not None:
             el = distort_and_compensate(
-                el, distortion_dict, preloaded_kernels_vec)
+                el, distortion_dict)
             el_list[i] = el
         seq.append_element(el, trigger_wait=True)
     cal_points = 4
@@ -982,7 +982,7 @@ def BusT2(times, mw_pulse_pars, RO_pars, flux_pulse_pars=None,
     for i, el in enumerate(el_list):
         if distortion_dict is not None:
             el = distort_and_compensate(
-                el, distortion_dict, preloaded_kernels_vec)
+                el, distortion_dict)
             el_list[i] = el
         seq.append_element(el, trigger_wait=True)
     cal_points = 4
@@ -1081,7 +1081,7 @@ def BusEcho(times, mw_pulse_pars, RO_pars, artificial_detuning=None, flux_pulse_
     for i, el in enumerate(el_list):
         if distortion_dict is not None:
             el = distort_and_compensate(
-                el, distortion_dict, preloaded_kernels_vec)
+                el, distortion_dict)
             el_list[i] = el
         seq.append_element(el, trigger_wait=True)
     cal_points = 4
@@ -1147,7 +1147,7 @@ def distort_and_compensate(element, distortion_dict):
     for ch in distortion_dict['ch_list']:
         element._channels[ch]['distorted'] = True
         length = len(outputs_dict[ch])
-        kernelvec = distortion_dict['ch']
+        kernelvec = distortion_dict[ch]
         outputs_dict[ch] = np.convolve(
             outputs_dict[ch], kernelvec)[:length]
         element.distorted_wfs[ch] = outputs_dict[ch][:len(t_vals)]
