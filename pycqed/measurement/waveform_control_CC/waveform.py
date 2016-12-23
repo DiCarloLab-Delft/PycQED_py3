@@ -181,6 +181,9 @@ def martinis_flux_pulse(length, lambda_coeffs, theta_f,
 
     \theta = \theta _0 + \sum_{n=1}^\infty  (\lambda_n*(1-\cos(n*2*pi*t/t_p))/2
 
+    note that the lambda coefficients are rescaled to ensure that the center
+    of the pulse has a value corresponding to theta_f.
+
     length          (float)
     lambda_coeffs   (list of floats)
     theta_f         (float) final angle of the interaction. This determines the
@@ -201,9 +204,9 @@ def martinis_flux_pulse(length, lambda_coeffs, theta_f,
                     eps=f12-f_bus
     """
     lambda_coeffs = np.array(lambda_coeffs)
-    nr_samples = int((length)*sampling_rate)+1  # +1 include the endpoint
+    nr_samples = int((length)*sampling_rate)
     t_step = 1/sampling_rate
-    t = np.arange(0, length + .1*t_step, t_step)
+    t = np.arange(0, length, t_step)
 
     theta_0 = np.arctan(2*g2/(f_01_max-E_c-f_bus))
 

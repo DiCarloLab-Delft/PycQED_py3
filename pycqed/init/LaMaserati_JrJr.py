@@ -82,7 +82,7 @@ from pycqed.measurement.pulse_sequences import multi_qubit_tek_seq_elts as sq_m
 import pycqed.scripts.personal_folders.Niels.two_qubit_readout_analysis as Niels
 
 #for flux pulses
-import instrument_drivers.meta_instrument.kernel_object as k_obj
+import pycqed.instrument_drivers.meta_instrument.kernel_object as k_obj
 from pycqed.measurement.pulse_sequences import fluxing_sequences as fsqs
 # Initializing instruments
 

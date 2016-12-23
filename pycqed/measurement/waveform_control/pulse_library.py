@@ -5,6 +5,7 @@ Library containing pulse shapes.
 
 
 from pycqed.measurement.waveform_control.pulse import Pulse, apply_modulation
+from pycqed.measurement.waveform_control_CC.waveform import martinis_flux_pulse
 
 
 class MW_IQmod_pulse(Pulse):
@@ -306,8 +307,8 @@ class SquareFluxPulse(Pulse):
 
         self.amplitude = kw.pop('amplitude', 0)
         self.square_pulse_length = kw.pop('square_pulse_length', 0)
-        self.square_pulse_buffer = kw.pop('square_pulse_buffer', 0)
-        self.length = self.square_pulse_length + self.square_pulse_buffer
+        self.pulse_buffer = kw.pop('pulse_buffer', 0)
+        self.length = self.square_pulse_length + self.pulse_buffer
 
         self.kernel_path = kw.get('kernel_path', None)
         if self.kernel_path is not None:
@@ -324,9 +325,9 @@ class SquareFluxPulse(Pulse):
         self.amplitude = kw.pop('amplitude', self.amplitude)
         self.square_pulse_length = kw.pop('square_pulse_length',
                                           self.square_pulse_length)
-        self.square_pulse_buffer = kw.pop('square_pulse_buffer',
-                                          self.square_pulse_buffer)
-        self.length = self.square_pulse_length + self.square_pulse_buffer
+        self.pulse_buffer = kw.pop('pulse_buffer',
+                                   self.pulse_buffer)
+        self.length = self.square_pulse_length + self.pulse_buffer
 
         self.channel = kw.pop('channel', self.channel)
         self.channels = kw.pop('channels', self.channels)
@@ -354,17 +355,21 @@ class MartinisFluxPulse(Pulse):
         else:
             self.channels = channels
 
-        self.amplitude = kw.pop('amplitude', 0)
-        # square pulse forms the basis of the pulse
-        self.square_pulse_length = kw.pop('square_pulse_length', 0)
         self.phase_corr_pulse_length = kw.pop('phase_corr_pulse_length', 0)
         self.phase_corr_pulse_amp = kw.pop('phase_corr_pulse_amp', 0)
-        self.square_pulse_buffer = kw.pop('pulse_buffer', 0)
+        self.pulse_buffer = kw.pop('pulse_buffer', 0)
+        self.amplitude = kw.pop('amplitude', 1)
 
-        self.lambda0 = kw.pop('lambda0', 0)
-        self.lambda1 = kw.pop('lambda1', 0)
+        self.flux_pulse_length = kw.pop('flux_pulse_length', None)
+        self.lambda_coeffs = kw.pop('lambda_coeffs', None)
+        self.theta_f = kw.pop('theta_f', None)
+        self.g2 = kw.pop('g2', None)
+        self.E_c = kw.pop('E_c', None)
+        self.f_bus = kw.pop('f_bus', None)
+        self.f_01_max = kw.pop('f_01_max', None)
+        self.dac_flux_coefficient = kw.pop('dac_flux_coefficient', None)
 
-        self.length = (self.square_pulse_length + self.phase_corr_pulse_length +
+        self.length = (self.flux_pulse_length + self.phase_corr_pulse_length +
                        self.pulse_buffer)
 
         self.kernel_path = kw.get('kernel_path', None)
@@ -380,20 +385,27 @@ class MartinisFluxPulse(Pulse):
 
     def __call__(self, **kw):
         self.amplitude = kw.pop('amplitude', self.amplitude)
-        self.square_pulse_length = kw.pop('square_pulse_length',
-                                          self.square_pulse_length)
-        self.phase_corr_pulse_length = kw.pop('phase_corr_pulse_length',
-                                              self.phase_corr_pulse_length)
-        self.phase_corr_pulse_amp = kw.pop('phase_corr_pulse_amp',
-                                           self.phase_corr_pulse_amp)
-        self.pulse_buffer = kw.pop('pulse_buffer',
-                                   self.pulse_buffer)
+        self.phase_corr_pulse_length = kw.pop(
+            'phase_corr_pulse_length', self.phase_corr_pulse_length)
+        self.phase_corr_pulse_amp = kw.pop(
+            'phase_corr_pulse_amp', self.phase_corr_pulse_amp)
+        self.pulse_buffer = kw.pop(
+            'pulse_buffer', self.pulse_buffer)
+
+        self.flux_pulse_length = kw.pop(
+            'flux_pulse_length', self.flux_pulse_length)
+        self.lambda_coeffs = kw.pop('lambda_coeffs', self.lambda_coeffs)
+        self.theta_f = kw.pop('theta_f', self.theta_f)
+        self.g2 = kw.pop('g2', self.g2)
+        self.E_c = kw.pop('E_c', self.E_c)
+        self.f_bus = kw.pop('f_bus', self.f_bus)
+        self.f_01_max = kw.pop('f_01_max', self.f_01_max)
+        self.dac_flux_coefficient = kw.pop(
+            'dac_flux_coefficient', self.dac_flux_coefficient)
 
         self.length = (self.square_pulse_length + self.phase_corr_pulse_length +
                        self.pulse_buffer)
 
-        self.lambda0 = kw.pop('lambda0', self.lambda0)
-        self.lambda1 = kw.pop('lambda1', self.lambda1)
         self.channel = kw.pop('channel', self.channel)
         self.channels = kw.pop('channels', self.channels)
         self.channels.append(self.channel)
@@ -402,9 +414,17 @@ class MartinisFluxPulse(Pulse):
     def chan_wf(self, chan, tvals):
 
         t = tvals - tvals[0]
-        # TODO: this waveform should be a function in "waveforms"
-        martinis_pulse = self.amplitude*(self.lambda0 + self.lambda1*(
-            np.sin(np.pi/(self.square_pulse_length) * t)-1))
+        martinis_pulse = martinis_flux_pulse(
+            length=self.flux_pulse_length,
+            lambda_coeffs=self.lambda_coeffs,
+            theta_f=self.theta_f, g2=self.g2,
+            E_c=self.E_c, f_bus=self.f_bus,
+            f_01_max=self.f_01_max,
+            dac_flux_coefficient=self.dac_flux_coefficient,
+            return_unit='V')
+        # This exists to allow flux depletion pulses.
+        if self.amplitude < 0:
+            martinis_pulse = -martinis_pulse
         ph_corr_pulse = self.phase_corr_pulse_amp*np.ones(
             int(self.phase_corr_pulse_length*1e9))
         buff_pulse = np.zeros(int((self.pulse_buffer)*1e9))

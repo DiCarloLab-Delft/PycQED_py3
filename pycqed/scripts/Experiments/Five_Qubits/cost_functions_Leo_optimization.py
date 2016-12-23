@@ -117,8 +117,8 @@ class CPhase_cost_func_det(det.Soft_Detector):
                  qS,
                  dist_dict,
                  MC_nested,
-                 lambda1,
                  int_avg_det,
+                 flux_pulse_pars_qCP=None,
                  phases=np.arange(0, 780, 20),
                  inter_swap_wait=100e-9,
                  upload=True,  **kw):
@@ -137,17 +137,16 @@ class CPhase_cost_func_det(det.Soft_Detector):
         self.inter_swap_wait = inter_swap_wait
         self.qCP = qCP
         self.qS = qS
-        self.lambda1 = lambda1
-        qCP.swap_amp(1.132)
 
         qCP_pulse_pars, RO_pars_qCP = qCP.get_pulse_pars()
         qS_pulse_pars, RO_pars_qS = qS.get_pulse_pars()
-        flux_pulse_pars_qCP = qCP.get_flux_pars()
-        flux_pulse_pars_qCP['pulse_type'] = 'MartinisFluxPulse'
-        flux_pulse_pars_qCP['lambda0'] = 1
-        flux_pulse_pars_qCP['lambda1'] = lambda1
+        # flux_pulse_pars_qCP = qCP.get_flux_pars()
 
         flux_pulse_pars_qS = qS.get_flux_pars()
+        self.theta_f = flux_pulse_pars_qCP['theta_f']
+        self.lambda1 = flux_pulse_pars_qCP['lambda_coeffs'][0]
+        self.amplitude = flux_pulse_pars_qCP['amplitude']
+
         self.s = awg_swf.swap_CP_swap_2Qubits(
             qCP_pulse_pars, qS_pulse_pars,
             flux_pulse_pars_qCP, flux_pulse_pars_qS, RO_pars_qCP,
@@ -161,12 +160,14 @@ class CPhase_cost_func_det(det.Soft_Detector):
     def acquire_data_point(self, **kw):
         if self.pars_changed:
             self.s.upload = True
-            self.s.flux_pulse_pars_qCP['lambda1'] = self.lambda1
+            self.s.flux_pulse_pars_qCP['theta_f'] = self.theta_f
+            self.s.flux_pulse_pars_qCP['lambda_coeffs'][0] = self.lambda1
+            self.s.flux_pulse_pars_qCP['amplitude'] = self.amplitude
+
             self.s.prepare()
             self.s.upload = False
         self.pars_changed = False
         self.AWG.ch3_amp(self.qS.swap_amp())
-        self.AWG.ch4_amp(self.qCP.swap_amp())
 
         self.MC_nested.set_sweep_function(self.s)
         self.MC_nested.set_detector_function(self.int_avg_det)
@@ -191,6 +192,38 @@ class lambda1_sweep(swf.Soft_Sweep):
         old_lambda1 = self.comp_det.lambda1
         if old_lambda1 != val:
             self.comp_det.lambda1 = val
+            self.comp_det.pars_changed = True
+
+class theta_f_sweep(swf.Soft_Sweep):
+
+    def __init__(self, comp_det, **kw):
+        self.sweep_control = 'soft'
+        self.name = 'theta_f'
+        self.parameter_name = 'theta_f'
+        self.unit = 'a.u.'
+        self.set_kw()
+        self.comp_det = comp_det
+
+    def set_parameter(self, val):
+        old_theta_f = self.comp_det.theta_f
+        if old_theta_f != val:
+            self.comp_det.theta_f = val
+            self.comp_det.pars_changed = True
+
+class amplitude_sweep(swf.Soft_Sweep):
+
+    def __init__(self, comp_det, **kw):
+        self.sweep_control = 'soft'
+        self.name = 'amplitude'
+        self.parameter_name = 'amplitude'
+        self.unit = 'a.u.'
+        self.set_kw()
+        self.comp_det = comp_det
+
+    def set_parameter(self, val):
+        old_amplitude = self.comp_det.amplitude
+        if old_amplitude != val:
+            self.comp_det.amplitude = val
             self.comp_det.pars_changed = True
 
 
