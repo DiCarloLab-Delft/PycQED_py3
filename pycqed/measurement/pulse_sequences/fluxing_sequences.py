@@ -1116,32 +1116,40 @@ def BusEcho(times, mw_pulse_pars, RO_pars, artificial_detuning=None, flux_pulse_
 
 
 def preload_kernels_func(distortion_dict):
-    output_dict = {ch: [] for ch in distortion_dict['ch_list']}
-    for ch in distortion_dict['ch_list']:
-        for kernel in distortion_dict[ch]:
-            if kernel is not '':
-                if kernel in cached_kernels.keys():
-                    print('Cached {}'.format(kernel_dir_path+kernel))
-                    output_dict[ch].append(cached_kernels[kernel])
-                else:
-                    print('Loading {}'.format(kernel_dir_path+kernel))
-                    # print(os.path.isfile('kernels/'+kernel))
-                    kernel_vec = np.loadtxt(kernel_dir_path+kernel)
-                    output_dict[ch].append(kernel_vec)
-                    cached_kernels.update({kernel: kernel_vec})
-    return output_dict
+    logging.warning('deprecated. you should use the kernel object directly')
+    # output_dict = {ch: [] for ch in distortion_dict['ch_list']}
+    # for ch in distortion_dict['ch_list']:
+    #     for kernel in distortion_dict[ch]:
+    #         if kernel is not '':
+    #             if kernel in cached_kernels.keys():
+    #                 print('Cached {}'.format(kernel_dir_path+kernel))
+    #                 output_dict[ch].append(cached_kernels[kernel])
+    #             else:
+    #                 print('Loading {}'.format(kernel_dir_path+kernel))
+    #                 # print(os.path.isfile('kernels/'+kernel))
+    #                 kernel_vec = np.loadtxt(kernel_dir_path+kernel)
+    #                 output_dict[ch].append(kernel_vec)
+    #                 cached_kernels.update({kernel: kernel_vec})
+    # return output_dict
+    return None
 
 
-def distort_and_compensate(element, distortion_dict, preloaded_kernels):
+def distort_and_compensate(element, distortion_dict):
+    """
+    Distorts an element using the contenst of a distortion dictionary.
+    The distortion dictionary should be formatted as follows.
+
+    dist_dict{'ch_list': ['chx', 'chy'],
+              'chx': np.array(.....),
+              'chy': np.array(.....)}
+    """
     t_vals, outputs_dict = element.waveforms()
-    # print(len(t_vals),t_vals[-1])
     for ch in distortion_dict['ch_list']:
         element._channels[ch]['distorted'] = True
         length = len(outputs_dict[ch])
-        for kernelvec in preloaded_kernels[ch]:
-            outputs_dict[ch] = np.convolve(
-                outputs_dict[ch], kernelvec)[:length]
-
+        kernelvec = distortion_dict['ch']
+        outputs_dict[ch] = np.convolve(
+            outputs_dict[ch], kernelvec)[:length]
         element.distorted_wfs[ch] = outputs_dict[ch][:len(t_vals)]
     return element
 

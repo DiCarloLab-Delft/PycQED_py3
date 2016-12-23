@@ -1,3 +1,4 @@
+import logging
 import numpy as np
 from scipy import special
 
@@ -39,6 +40,9 @@ def filter_matrix_generic2(fun, t, *params):
 
 def save_kernel(kernel, save_file=None):
     '''Save kernel to specified kernels directory.'''
+    # TODO: make this into a smarter safe function using the datadir of the
+    # kernel object
+    logging.warning('this does not save where you think it does')
     if save_file is None:
         save_file = kernel_name
     with open(kernel_path+save_file+'.txt', 'w') as f:

@@ -1,3 +1,5 @@
+import os
+import pycqed as pq
 import unittest
 import numpy as np
 
@@ -67,14 +69,24 @@ class Test_KernelObject(unittest.TestCase):
         np.testing.assert_array_equal(kf_dec, kObj_dec2)
 
     def test_config_changed_flag(self):
-        self.k0.decay_amp_1(1)
+        self.k0.decay_amp_1(.9)
         self.assertEqual(self.k0.config_changed(), True)
         self.k0.kernel()
         self.assertEqual(self.k0.config_changed(), False)
-        self.k0.decay_amp_1(1)
+        self.k0.decay_amp_1(.9)
         self.assertEqual(self.k0.config_changed(), False)
-        self.k0.decay_amp_1(1.1)
+        self.k0.decay_amp_1(.91)
         self.assertEqual(self.k0.config_changed(), True)
+
+    def test_kernel_loading(self):
+        datadir = os.path.join(pq.__path__[0], 'tests', 'test_data',
+                               'test_kernels')
+        self.k0.kernel_dir_path(datadir)
+        print(self.k0.kernel_dir_path())
+        self.k0.kernel_list(['precompiled_RT_20161206.txt'])
+        kernel = self.k0.kernel()
+        print(kernel[0:50])
+
 
     # def test_convolve_kernels(self):
     #     kernel_list

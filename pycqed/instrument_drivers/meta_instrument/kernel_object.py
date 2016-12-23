@@ -1,3 +1,4 @@
+import os
 import logging
 import numpy as np
 
@@ -22,6 +23,37 @@ class Distortion(Instrument):
 
     def __init__(self, name, **kw):
         super().__init__(name, **kw)
+
+        self.add_parameter('channel',
+                           initial_value=1,
+                           vals=vals.Ints(),
+                           parameter_class=ManualParameter)
+
+        self.add_parameter('kernel_list',
+                           initial_value=[],
+                           vals=vals.Anything(),
+                           parameter_class=ConfigParameter,
+                           docstring='List of external kernels to be loaded')
+
+        self.add_parameter('kernel_dir_path',
+                           initial_value='kernels/',
+                           vals=vals.Strings(),
+                           parameter_class=ManualParameter,
+                           docstring='Path for loading external kernels,' +
+                           'such as room temperature correction kernels.')
+
+        self.add_parameter('config_changed',
+                           vals=vals.Bool(),
+                           get_cmd=self._get_config_changed)
+        self.add_parameter(
+            'kernel', vals=vals.Arrays(), get_cmd=self._get_kernel,
+            docstring=('Returns the predistortion kernel. \n' +
+                       'Recalculates if the parameters changed,\n' +
+                       'otherwise returns a precalculated kernel.\n' +
+                       'Kernel is based on parameters in kernel object \n' +
+                       'and files specified in the kernel list.'))
+
+
         self.add_parameter('skineffect_alpha', units='',
                            parameter_class=ConfigParameter,
                            initial_value=0,
@@ -32,44 +64,57 @@ class Distortion(Instrument):
                            vals=vals.Numbers())
 
         self.add_parameter('decay_amp_1', units='',
+                           initial_value=0,
                            parameter_class=ConfigParameter,
                            vals=vals.Numbers())
         self.add_parameter('decay_tau_1', units='ns',
+                           initial_value=1,
                            parameter_class=ConfigParameter,
                            vals=vals.Numbers())
         self.add_parameter('decay_length_1', units='ns',
+                           initial_value=100,
                            parameter_class=ConfigParameter,
                            vals=vals.Numbers())
         self.add_parameter('decay_amp_2', units='',
+                           initial_value=0,
                            parameter_class=ConfigParameter,
                            vals=vals.Numbers())
         self.add_parameter('decay_tau_2', units='ns',
+                           initial_value=1,
                            parameter_class=ConfigParameter,
                            vals=vals.Numbers())
         self.add_parameter('decay_length_2', units='ns',
+                           initial_value=100,
                            parameter_class=ConfigParameter,
                            vals=vals.Numbers())
 
         self.add_parameter('bounce_amp', units='',
+                           initial_value=0,
                            parameter_class=ConfigParameter,
                            vals=vals.Numbers())
         self.add_parameter('bounce_tau', units='ns',
+                           initial_value=0,
                            parameter_class=ConfigParameter,
                            vals=vals.Numbers())
         self.add_parameter('bounce_length', units='ns',
+                           initial_value=0,
                            parameter_class=ConfigParameter,
                            vals=vals.Numbers())
 
         self.add_parameter('poly_a', units='',
+                           initial_value=0,
                            parameter_class=ConfigParameter,
                            vals=vals.Numbers())
         self.add_parameter('poly_b', units='',
+                           initial_value=0,
                            parameter_class=ConfigParameter,
                            vals=vals.Numbers())
         self.add_parameter('poly_c', units='',
+                           initial_value=0,
                            parameter_class=ConfigParameter,
                            vals=vals.Numbers())
         self.add_parameter('poly_length', units='ns',
+                           initial_value=0,
                            parameter_class=ConfigParameter,
                            vals=vals.Numbers())
 
@@ -77,14 +122,6 @@ class Distortion(Instrument):
                            parameter_class=ConfigParameter,
                            initial_value=1000,
                            vals=vals.Numbers())
-
-        self.add_parameter('config_changed',
-                           vals=vals.Bool(),
-                           get_cmd=self._get_config_changed)
-
-        self.add_parameter('kernel',
-                           vals=vals.Arrays(),
-                           get_cmd=self._get_kernel)
 
     def _get_config_changed(self):
         return self._config_changed
@@ -94,27 +131,26 @@ class Distortion(Instrument):
 
     def get_bounce_kernel(self):
         return kf.bounce_kernel(amp=self.bounce_amp(),
-                             time=self.bounce_tau(),
-                             length=self.bounce_length())
+                                time=self.bounce_tau(),
+                                length=self.bounce_length())
 
     def get_skin_kernel(self):
         return kf.skin_kernel(alpha=self.skineffect_alpha(),
-                           length=self.skineffect_length())
+                              length=self.skineffect_length())
 
     def get_decay_kernel_1(self):
         return kf.decay_kernel(amp=self.decay_amp_1(), tau=self.decay_tau_1(),
-                            length=self.decay_length_1())
+                               length=self.decay_length_1())
 
     def get_decay_kernel_2(self):
         return kf.decay_kernel(amp=self.decay_amp_2(), tau=self.decay_tau_2(),
-                            length=self.decay_length_2())
+                               length=self.decay_length_2())
 
     # def get_poly_kernel(self):
     #     return poly_kernel(a=self.poly_a(),
     #                        b=self.poly_b(),
     #                        c=self.poly_c(),
     #                        length=self.poly_length())
-
 
     def convolve_kernel(self, kernel_list, length=None):
         """
@@ -134,29 +170,40 @@ class Distortion(Instrument):
         This will add 'OPT_Chevron.tmp' to the cache dictionary that
         contains an array with the distortions based on the kernel object.
         """
+        logging.warning('deprecated, do not use!')
         kernel_list = [self.get_bounce_kernel(),
                        self.get_skin_kernel(),
                        self.get_decay_kernel_1(),
                        self.get_decay_kernel_2()]
         cache.update({'OPT_chevron.tmp': self.convolve_kernel(kernel_list)})
 
-    def get_corrections_kernel(self, kernel_list_before=None):
-        kernel_list = [self.get_bounce_kernel(), self.get_skin_kernel(),
-                       self.get_decay_kernel_1(),
-                       self.get_decay_kernel_2()]
-        if kernel_list_before is not None:
-            kernel_list_before.extend(kernel_list)
-            return self.convolve_kernel(kernel_list_before,
-                                        length=self.corrections_length())
-        else:
-            return self.convolve_kernel(kernel_list,
-                                        length=self.corrections_length())
+    def get_corrections_kernel(self):
 
-    def save_corrections_kernel(self, filename, kernel_list_before=None):
+        kernel_list_before = self.kernel_list()
+
+        external_kernels = []
+        for k_name in kernel_list_before:
+            f_name = os.path.join(self.kernel_dir_path(), k_name)
+            print('Loading {}'.format(f_name))
+
+            kernel_vec = np.loadtxt(f_name)
+            external_kernels.append(kernel_vec)
+
+        kernel_object_kernels = [
+            self.get_bounce_kernel(),
+            self.get_skin_kernel(),
+            self.get_decay_kernel_1(),
+            self.get_decay_kernel_2()]
+
+        kernel_list = external_kernels + kernel_object_kernels
+        return self.convolve_kernel(kernel_list,
+                                    length=self.corrections_length())
+
+    def save_corrections_kernel(self, filename):
 
         # if type(kernel_list_before) is not list:
         #     kernel_list_before = [kernel_list_before]
-        save_kernel(self.get_corrections_kernel(kernel_list_before),
+        save_kernel(self.get_corrections_kernel(),
                     save_file=filename)
         return filename
 
@@ -167,14 +214,15 @@ class Distortion(Instrument):
         if self.config_changed():
             print('{} configuration changed, recalculating kernels'.format(
                   self.name))
-            self._precalculated_kernel = None
-            # self._precalculated_kernel = self.get_corrections_kernel()
+            self._precalculated_kernel = self.get_corrections_kernel()
             self._config_changed = False
 
         return self._precalculated_kernel
 
 
 class ConfigParameter(ManualParameter):
+    # TODO: move this to qcodes as a pull request
+
     """
     Define one parameter that reflects a manual configuration setting.
 
@@ -190,6 +238,7 @@ class ConfigParameter(ManualParameter):
 
         **kwargs: Passed to Parameter parent class
     """
+
     def __init__(self, name, instrument=None, initial_value=None, **kwargs):
         super().__init__(name=name, **kwargs)
         self._instrument = instrument
