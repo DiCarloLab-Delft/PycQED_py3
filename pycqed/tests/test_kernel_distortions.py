@@ -66,6 +66,16 @@ class Test_KernelObject(unittest.TestCase):
         np.testing.assert_array_equal(kf_dec, kObj_dec1)
         np.testing.assert_array_equal(kf_dec, kObj_dec2)
 
+    def test_config_changed_flag(self):
+        self.k0.decay_amp_1(1)
+        self.assertEqual(self.k0.config_changed(), True)
+        self.k0.kernel()
+        self.assertEqual(self.k0.config_changed(), False)
+        self.k0.decay_amp_1(1)
+        self.assertEqual(self.k0.config_changed(), False)
+        self.k0.decay_amp_1(1.1)
+        self.assertEqual(self.k0.config_changed(), True)
+
     # def test_convolve_kernels(self):
     #     kernel_list
     #     self.k0.convolve_kernel(kernel_list, length)
