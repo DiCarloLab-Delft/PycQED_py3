@@ -2,8 +2,6 @@ import numpy as np
 '''
 Library containing pulse shapes.
 '''
-
-
 from pycqed.measurement.waveform_control.pulse import Pulse, apply_modulation
 from pycqed.measurement.waveform_control_CC.waveform import martinis_flux_pulse
 
@@ -341,6 +339,8 @@ class SquareFluxPulse(Pulse):
         return np.concatenate([sq_pulse, buff_pulse])
 
 
+
+
 class MartinisFluxPulse(Pulse):
 
     def __init__(self, channel=None, channels=None, name='Martinis flux pulse',
@@ -362,6 +362,7 @@ class MartinisFluxPulse(Pulse):
 
         self.flux_pulse_length = kw.pop('flux_pulse_length', None)
         self.lambda_coeffs = kw.pop('lambda_coeffs', None)
+
         self.theta_f = kw.pop('theta_f', None)
         self.g2 = kw.pop('g2', None)
         self.E_c = kw.pop('E_c', None)
@@ -384,7 +385,7 @@ class MartinisFluxPulse(Pulse):
             ValueError('Must specify kernel path')
 
     def __call__(self, **kw):
-        self.amplitude = kw.pop('amplitude', self.amplitude)
+        # self.amplitude = kw.pop('amplitude', self.amplitude)
         self.phase_corr_pulse_length = kw.pop(
             'phase_corr_pulse_length', self.phase_corr_pulse_length)
         self.phase_corr_pulse_amp = kw.pop(
@@ -412,7 +413,6 @@ class MartinisFluxPulse(Pulse):
         return self
 
     def chan_wf(self, chan, tvals):
-
         t = tvals - tvals[0]
         martinis_pulse = martinis_flux_pulse(
             length=self.flux_pulse_length,
@@ -422,11 +422,17 @@ class MartinisFluxPulse(Pulse):
             f_01_max=self.f_01_max,
             dac_flux_coefficient=self.dac_flux_coefficient,
             return_unit='V')
+        #adding a square pulse for single qubit phase correction
+        ph_corr_pulse = self.phase_corr_pulse_amp*np.ones(
+            int(self.phase_corr_pulse_length*1e9))
+
         # This exists to allow flux depletion pulses.
         if self.amplitude < 0:
             martinis_pulse = -martinis_pulse
-        ph_corr_pulse = self.phase_corr_pulse_amp*np.ones(
-            int(self.phase_corr_pulse_length*1e9))
+            ph_corr_pulse = -ph_corr_pulse
+        elif self.amplitude == 0:
+            martinis_pulse = 0*martinis_pulse
+
         buff_pulse = np.zeros(int((self.pulse_buffer)*1e9))
 
         return np.concatenate([martinis_pulse, ph_corr_pulse, buff_pulse])

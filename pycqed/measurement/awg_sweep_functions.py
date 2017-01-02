@@ -240,7 +240,9 @@ class swap_CP_swap_2Qubits(swf.Hard_Sweep):
                  inter_swap_wait=100e-9,
                  upload=True,
                  identity=False,
-                 return_seq=False):
+                 return_seq=False,
+                 reverse_control_target=False,
+                 phase_corr_qS=False):
         super().__init__()
         self.mw_pulse_pars_qCP = mw_pulse_pars_qCP
         self.mw_pulse_pars_qS = mw_pulse_pars_qS
@@ -259,10 +261,11 @@ class swap_CP_swap_2Qubits(swf.Hard_Sweep):
         self.unit = 'deg'
         self.return_seq = return_seq
         self.AWG = AWG
+        self.reverse_control_target=reverse_control_target
+        self.phase_corr_qS=phase_corr_qS
 
     def prepare(self, **kw):
         if self.upload:
-
             old_val_qS = self.AWG.get(
                 '{}_amp'.format(self.flux_pulse_pars_qS['channel']))
             old_val_qCP = self.AWG.get(
@@ -285,6 +288,8 @@ class swap_CP_swap_2Qubits(swf.Hard_Sweep):
                 excitations=self.excitations,
                 phases=self.sweep_points,
                 inter_swap_wait=self.inter_swap_wait,
+                reverse_control_target=self.reverse_control_target,
+                phase_corr_qS=self.phase_corr_qS
             )
             self.AWG.set('{}_amp'.format(self.flux_pulse_pars_qCP['channel']),
                          old_val_qCP)
@@ -1322,7 +1327,6 @@ class CBox_RB_sweep(swf.Hard_Sweep):
                 wait_time = self.max_seq_duration*1e9 - pulse_length
                 time_tape.extend(self.CBox.create_timing_tape_entry(
                     wait_time, cal_pt, True, prepend_elt=0))
-        # print('Total tape length', len(time_tape))
         for awg in range(3):
             self.CBox.set('AWG{}_mode'.format(awg), 'Segmented')
             self.CBox.set_segmented_tape(awg, time_tape)

@@ -600,7 +600,6 @@ class OptimizationAnalysis_v2(MeasurementAnalysis):
         return
 
     def make_figures(self, **kw):
-
         base_figname = 'optimization of ' + self.value_names[0]
         if np.shape(self.sweep_points)[0] == 2:
             f, ax = plt.subplots()
@@ -621,7 +620,7 @@ class OptimizationAnalysis_v2(MeasurementAnalysis):
             self.save_fig(f, figname=base_figname, **kw)
 
 class OptimizationAnalysis(MeasurementAnalysis):
-    def run_default_analysis(self, close_file=True, show=False, **kw):
+    def run_default_analysis(self, close_file=True, show=False, plot_all=False, **kw):
         self.get_naming_and_values()
         try:
             optimization_method = self.data_file['Instrument settings']\
@@ -633,35 +632,41 @@ class OptimizationAnalysis(MeasurementAnalysis):
             logging.warning('Could not extract optimization method from' +
                             ' data file')
 
-        base_figname = optimization_method + ' optimization of ' + \
-            self.value_names[0]
+        for i, meas_vals in enumerate(self.measured_values):
+            if (not plot_all) & (i >= 1):
+                break
 
-        # Optimizable value vs n figure
-        fig1_type = '%s vs n' % self.value_names[0]
-        figname1 = base_figname + '\n' + fig1_type
-        savename1 = self.timestamp_string + '_' + base_figname + '_' + \
-            fig1_type
-        fig1, ax = self.default_ax()
-        ax.plot(self.measured_values[0], marker='o')
-        # assumes only one value exists because it is an optimization
-        ax.set_xlabel('iteration (n)')
-        ax.set_ylabel(self.ylabels[0])
-        ax.set_title(self.timestamp_string + ' ' + figname1)
+            base_figname = optimization_method + ' optimization of ' + \
+                self.value_names[i]
+            # Optimizable value vs n figure
+            fig1_type = '%s vs n' % self.value_names[i]
+            figname1 = base_figname + '\n' + fig1_type
+            savename1 = self.timestamp_string + '_' + base_figname + '_' + \
+                fig1_type
+            fig1, ax = self.default_ax()
+            ax.plot(self.measured_values[i], marker='o')
+            # assumes only one value exists because it is an optimization
+            ax.set_xlabel('iteration (n)')
+            ax.set_ylabel(self.ylabels[i])
+            ax.set_title(self.timestamp_string + ' ' + figname1)
 
-        textstr = 'Optimization converged to: \n   %s: %.3g %s' % (
-            self.value_names[0], self.measured_values[0][-1],
-            self.value_units[0])
-        for i in range(len(self.parameter_names)):
-            textstr += '\n   %s: %.4g %s' % (self.parameter_names[i],
-                                             self.sweep_points[i][-1],
-                                             self.parameter_units[i])
+            textstr = 'Optimization converged to: \n   %s: %.3g %s' % (
+                self.value_names[i], self.measured_values[0][-1],
+                self.value_units[i])
+            for j in range(len(self.parameter_names)):
+                textstr += '\n   %s: %.4g %s' % (self.parameter_names[j],
+                                                 self.sweep_points[j][-1],
+                                                 self.parameter_units[j])
 
-        # y coord 0.4 ensures there is no overlap for both maximizing and minim
-        ax.text(0.95, 0.4, textstr,
-                transform=ax.transAxes,
-                fontsize=11, verticalalignment='bottom',
-                horizontalalignment='right',
-                bbox=self.box_props)
+            # y coord 0.4 ensures there is no overlap for both maximizing and minim
+            if i==0:
+                ax.text(0.95, 0.4, textstr,
+                        transform=ax.transAxes,
+                        fontsize=11, verticalalignment='bottom',
+                        horizontalalignment='right',
+                        bbox=self.box_props)
+
+            self.save_fig(fig1, figname=savename1, **kw)
 
         # Parameters vs n figure
         fig2, axarray = plt.subplots(len(self.parameter_names), 1,
@@ -726,7 +731,7 @@ class OptimizationAnalysis(MeasurementAnalysis):
             cbar = fig3.colorbar(sc)
             cbar.set_label('iteration (n)')
 
-        self.save_fig(fig1, figname=savename1, **kw)
+
         self.save_fig(fig2, figname=savename2, **kw)
         self.save_fig(fig3, figname=savename3, fig_tight=False, **kw)
 
