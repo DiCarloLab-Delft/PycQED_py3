@@ -393,6 +393,7 @@ def bounce_kernel(amp=0.02, time=4, length=601):
     else:
         kernel_bounce = np.zeros(length)
         kernel_bounce[0] = 1.
+    kernel_bounce = kernel_bounce / np.sum(kernel_bounce)
     return kernel_bounce
 
 

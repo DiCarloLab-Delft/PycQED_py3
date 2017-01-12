@@ -99,7 +99,7 @@ station.add_component(Qubit_LO)
 # TWPA_Pump = rs.RohdeSchwarz_SGS100A(name='TWPA_Pump', address='TCPIP0::192.168.0.90', server_name=None)  #
 # station.add_component(TWPA_Pump)
 AWG = tek.Tektronix_AWG5014(name='AWG', setup_folder=None, timeout=2,
-                            address='GPIB0::6::INSTR', server_name=None)
+                            address='TCPIP0::192.168.0.99', server_name=None)
 station.add_component(AWG)
 AWG.timeout(180)
 # AWG520 = tk520.Tektronix_AWG520('AWG520', address='GPIB0::17::INSTR',
@@ -109,9 +109,9 @@ IVVI = iv.IVVI('IVVI', address='COM4', numdacs=16, server_name=None)
 station.add_component(IVVI)
 
 #flux pulsing
-k1 = k_obj.Distortion(name='ch3_fs')
+k1 = k_obj.Distortion(name='k1')
 station.add_component(k1)
-k0 = k_obj.Distortion(name='ch_fs')
+k0 = k_obj.Distortion(name='k0')
 station.add_component(k0)
 
 if UHFQC:
@@ -169,10 +169,9 @@ Flux_Control.inv_transfer_matrix(invA)
 Flux_Control.dac_mapping([1, 2, 3, 4, 5])
 
 
-sweet_spots_mv = [-85.265,49.643,-60.893,13.037,49.570]
+sweet_spots_mv = [-55.265,49.643,-38.5,13.037,49.570]
 offsets = np.dot(Flux_Control.transfer_matrix(), sweet_spots_mv)
 Flux_Control.flux_offsets(-offsets)
-
 
 
 # ATT = Weinschel_8320_novisa.Weinschel_8320(name='ATT',address='192.168.0.54', server_name=None)
@@ -294,7 +293,7 @@ nested_MC.station = station
 # The AWG sequencer
 station.pulsar = ps.Pulsar()
 station.pulsar.AWG = station.components['AWG']
-marker1highs=[2,2,2.7,2]
+markerhighs=[2,2,2.7,2]
 for i in range(4):
     # Note that these are default parameters and should be kept so.
     # the channel offset is set in the AWG itself. For now the amplitude is
@@ -308,12 +307,12 @@ for i in range(4):
     station.pulsar.define_channel(id='ch{}_marker1'.format(i+1),
                                   name='ch{}_marker1'.format(i+1),
                                   type='marker',
-                                  high=marker1highs[i], low=0, offset=0.,
+                                  high=markerhighs[i], low=0, offset=0.,
                                   delay=0, active=True)
     station.pulsar.define_channel(id='ch{}_marker2'.format(i+1),
                                   name='ch{}_marker2'.format(i+1),
                                   type='marker',
-                                  high=2.0, low=0, offset=0.,
+                                  high=markerhighs[i], low=0, offset=0.,
                                   delay=0, active=True)
 # to make the pulsar available to the standard awg seqs
 st_seqs.station = station

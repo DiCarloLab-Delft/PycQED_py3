@@ -334,8 +334,9 @@ class SquareFluxPulse(Pulse):
 
     def chan_wf(self, chan, tvals):
         sq_pulse = np.ones(
-            int((self.square_pulse_length)*1e9)) * self.amplitude
-        buff_pulse = np.zeros(int((self.length-self.square_pulse_length)*1e9))
+            round((self.square_pulse_length)*1e9)) * self.amplitude
+        buff_pulse = np.zeros(round((self.length-self.square_pulse_length)*1e9))
+        #using round instead of int to avoid crashing
         return np.concatenate([sq_pulse, buff_pulse])
 
 
@@ -424,15 +425,12 @@ class MartinisFluxPulse(Pulse):
             return_unit='V')
         #adding a square pulse for single qubit phase correction
         ph_corr_pulse = self.phase_corr_pulse_amp*np.ones(
-            int(self.phase_corr_pulse_length*1e9))
-
+            round(self.phase_corr_pulse_length*1e9))
         # This exists to allow flux depletion pulses.
         if self.amplitude < 0:
             martinis_pulse = -martinis_pulse
             ph_corr_pulse = -ph_corr_pulse
         elif self.amplitude == 0:
             martinis_pulse = 0*martinis_pulse
-
-        buff_pulse = np.zeros(int((self.pulse_buffer)*1e9))
-
+        buff_pulse = np.zeros(round((self.pulse_buffer)*1e9))
         return np.concatenate([martinis_pulse, ph_corr_pulse, buff_pulse])

@@ -302,7 +302,6 @@ class TimeDomainDetector_integrated(det.Soft_Detector):
         self.MC_timedomain.set_sweep_function(awg_swf.Off())
         self.MC_timedomain.set_detector_function(
             det.TimeDomainDetector())
-        print('prepare worked')
 
     def finish(self, **kw):
         self.MC_timedomain.remove()
@@ -416,7 +415,6 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
         self.weight_function_I = weight_function_I
         self.weight_function_Q = weight_function_Q
         self.one_weight_function_UHFQC = one_weight_function_UHFQC
-        print('weights', weight_function_I, weight_function_Q)
 
 
     def prepare(self, **kw):
@@ -445,7 +443,6 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
 
 
             elif 'UHFQC' in str(self.acquisition_instr):
-                print('loading {} shots into UHFQC'.format(self.nr_shots))
                 self.MC.set_detector_function(
                     det.UHFQC_integration_logging_det(self.acquisition_instr,
                                                           self.AWG, channels=[self.weight_function_I,self.weight_function_Q],
@@ -597,14 +594,12 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
                 optimized_weights_I = optimized_weights_I-np.mean(optimized_weights_I)
                 weight_scale_factor = 1./np.max(np.abs(optimized_weights_I))
                 optimized_weights_I = np.array(weight_scale_factor*optimized_weights_I)
-                print("optimized weights I", optimized_weights_I)
 
 
                 optimized_weights_Q = (transient1_Q-transient0_Q)
                 optimized_weights_Q = optimized_weights_Q-np.mean(optimized_weights_Q)
                 weight_scale_factor = 1./np.max(np.abs(optimized_weights_Q))
                 optimized_weights_Q = np.array(weight_scale_factor*optimized_weights_Q)
-                print("optimized weights Q", optimized_weights_Q)
 
                 eval('self.UHFQC.quex_wint_weights_{}_real(np.array(optimized_weights_I))'.format(self.weight_function_I))
                 if self.SSB:
@@ -628,7 +623,6 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
 
                         eval('self.UHFQC.quex_rot_{}_real(0.0)'.format(self.weight_function_Q))
                         eval('self.UHFQC.quex_rot_{}_imag(0.0)'.format(self.weight_function_Q))
-                print('changed')
                 eval('self.UHFQC.quex_wint_weights_{}_real()'.format(self.weight_function_I)) #reading out weights as check
                 eval('self.UHFQC.quex_wint_weights_{}_imag()'.format(self.weight_function_I)) #reading out weights as check
                 eval('self.UHFQC.quex_wint_weights_{}_real()'.format(self.weight_function_Q)) #reading out weights as check
@@ -1102,14 +1096,12 @@ class SWAPN_optimization(det.Soft_Detector):
 
         flux_pulse_pars = self.qubit.get_flux_pars()
         mw_pulse_pars, RO_pars = self.qubit.get_pulse_pars()
+
         repSWAP = awg_swf.SwapN(mw_pulse_pars,
                                 RO_pars,
                                 flux_pulse_pars, AWG=self.AWG,
-                                dist_dict=self.qubit._dist_dict,
+                                dist_dict=self.kernel_obj.kernel(),
                                 upload=True)
-
-        self.kernel_obj.kernel_to_cache(self.cache_obj)
-
         # self.AWG.set('ch%d_amp'%self.qubit.fluxing_channel(), 2.)
         # seq = repSWAP.pre_upload()
 

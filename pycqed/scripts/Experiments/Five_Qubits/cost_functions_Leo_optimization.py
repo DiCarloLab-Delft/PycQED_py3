@@ -33,7 +33,7 @@ class Leo_optim_det(det.Soft_Detector):
         if not upload:
             self.s.upload = False
 
-        self.AWG.ch3_amp(qubit.swap_amp())
+        self.AWG.ch4_amp(qubit.swap_amp())
 
         self.MC_nested = MC_nested
 
@@ -123,7 +123,7 @@ class CPhase_cost_func_det(det.Soft_Detector):
                  phases=np.arange(0, 780, 20),
                  inter_swap_wait=100e-9,
                  upload=True, CPhase=True,
-                 phase_corr_qS=False,
+                 single_qubit_phase_cost=False,
                  reverse_control_target=False, **kw):
 
         self.name = 'CPhase_cost_func_det'
@@ -139,15 +139,15 @@ class CPhase_cost_func_det(det.Soft_Detector):
         self.qS = qS
         self.CPhase = CPhase
         self.reverse_control_target = reverse_control_target
-        self.phase_corr_qS = phase_corr_qS
+        self.single_qubit_phase_cost = single_qubit_phase_cost
         if self.reverse_control_target:
             self.value_names = [
-               'Cost function', 'phase_diff', 'phi_0_qCP', 'phi_0_qS']
-            self.value_units = ['a.u.', 'deg', 'deg', 'deg']
+               'Cost function', 'phase_diff', 'phi_0_qCP', 'phi_0_qS', 'amp1_qCP-amp0_qCP']
+            self.value_units = ['a.u.', 'deg', 'deg', 'deg', 'a.u.']
         else:
             self.value_names = [
-                'Cost function', 'phase_diff', 'amp_single_exc', 'amp_no_exc', 'phi_0']
-            self.value_units = ['a.u.', 'deg', '', '', 'deg']
+                'Cost function', 'phase_diff',  'amp_no_exc', 'amp_single_exc', 'phi_0', 'amp1-amp0']
+            self.value_units = ['a.u.', 'deg', '', '', 'deg', 'a.u.']
 
         qCP_pulse_pars, RO_pars_qCP = qCP.get_pulse_pars()
         qS_pulse_pars, RO_pars_qS = qS.get_pulse_pars()
@@ -169,7 +169,6 @@ class CPhase_cost_func_det(det.Soft_Detector):
             flux_pulse_pars_qCP, flux_pulse_pars_qS, RO_pars_qCP,
             dist_dict, AWG=qS.AWG,  inter_swap_wait=self.inter_swap_wait,
             excitations='both', CPhase=self.CPhase,
-            phase_corr_qS=self.phase_corr_qS,
             reverse_control_target=self.reverse_control_target)
         self.s.sweep_points = phases
         self.MC_nested = MC_nested
@@ -184,27 +183,27 @@ class CPhase_cost_func_det(det.Soft_Detector):
             self.s.flux_pulse_pars_qCP['lambda_coeffs'][1] = self.lambda2
             self.s.flux_pulse_pars_qCP['lambda_coeffs'][2] = self.lambda3
             self.s.flux_pulse_pars_qCP['amplitude'] = self.amplitude
-            self.s.flux_pulse_pars_qCP['phase_corr_pulse_length']=self.phase_corr_pulse_length_qCP
-            self.s.flux_pulse_pars_qCP['phase_corr_pulse_amp']=self.phase_corr_pulse_amp_qCP
+            self.s.flux_pulse_pars_qCP['phase_corr_pulse_length'] = self.phase_corr_pulse_length_qCP
+            self.s.flux_pulse_pars_qCP['phase_corr_pulse_amp'] = self.phase_corr_pulse_amp_qCP
 
-            self.s.flux_pulse_pars_qS['phase_corr_pulse_length']=self.phase_corr_pulse_length_qS
-            self.s.flux_pulse_pars_qS['phase_corr_pulse_amp']=self.phase_corr_pulse_amp_qS
+            self.s.flux_pulse_pars_qS['phase_corr_pulse_length'] = self.phase_corr_pulse_length_qS
+            self.s.flux_pulse_pars_qS['phase_corr_pulse_amp'] = self.phase_corr_pulse_amp_qS
             self.s.prepare()
             self.s.upload = False
         self.pars_changed = False
-        self.AWG.ch3_amp(self.qS.swap_amp())
-
+        self.AWG.ch4_amp(self.qS.swap_amp())
         self.MC_nested.set_sweep_function(self.s)
         self.MC_nested.set_detector_function(self.int_avg_det)
         self.MC_nested.set_sweep_points(self.phases)
-        self.MC_nested.run('swap-CP-swap')
+        label='swap_CP_swap_amp_{0:.3f}_l1_{1:.2f}_l2_{2:.2f}'.format(self.AWG.ch3_amp(),self.lambda1, self.lambda2)
+        self.MC_nested.run(label)
         if not self.reverse_control_target:
-            a = SWAP_Cost(show_guess=False, label='swap-CP-swap')
-            return a.cost_func_val, a.dphi, a.osc_amp_0, a.osc_amp_1, a.phi_0
+            a = SWAP_Cost(show_guess=False, label=label)
+            return a.cost_func_val, a.dphi, a.osc_amp_0, a.osc_amp_1, a.phi_0, a.osc_amp_1-a.osc_amp_0
 
         else:
-            a = SWAP_Cost_qubit_phases(show_guess=False, label='swap-CP-swap')
-            return a.cost_func_val, a.dphi, a.phi_0_qCP, a.phi_0_qS
+            a = SWAP_Cost_reverse_control_target(show_guess=False, label=label, single_qubit_phase_cost=self.single_qubit_phase_cost)
+            return a.cost_func_val, a.dphi, a.phi_0_qCP, a.phi_0_qS, a.osc_amp_1_qCP-a.osc_amp_0_qCP
 
 
 
@@ -237,9 +236,9 @@ class SWAP_Cost(ma.Rabi_Analysis):
         self.phi_0_rad = self.fit_res[0].best_values['phase']
         self.phi_1_rad = self.fit_res[1].best_values['phase']
 
-        self.dphi = ((self.phi_1_rad-self.phi_0_rad)/(2*np.pi)*360) % 360
+        self.dphi = ((((self.phi_1_rad-self.phi_0_rad)/(2*np.pi)*360)+180)% 360)-180
         # wrapping the phase at +270/-90 degrees
-        self.phi_0 = ((((self.phi_0_rad)/(2*np.pi)*360)+90 )% 360)-90
+        self.phi_0 = ((((self.phi_0_rad)/(2*np.pi)*360)+180 )% 360)-180
         self.phi_1 = ((self.phi_1_rad)/(2*np.pi)*360) % 360
         if close_file:
             self.data_file.close()
@@ -300,7 +299,7 @@ class SWAP_Cost(ma.Rabi_Analysis):
                                             xlabel=self.xlabel,
                                             ylabel=self.ylabels[i],
                                             save=False,
-                                            plot_title=plot_title)
+                                            plot_title=plot_title, marker='--o')
 
             fine_fit = self.fit_res[i].model.func(
                 self.x_fine, **self.fit_res[i].best_values)
@@ -312,12 +311,13 @@ class SWAP_Cost(ma.Rabi_Analysis):
                 self.axs[i].legend(loc='best')
         self.save_fig(self.fig, fig_tight=False, **kw)
 
-class SWAP_Cost_qubit_phases(ma.Rabi_Analysis):
+class SWAP_Cost_reverse_control_target(ma.Rabi_Analysis):
 
     def __init__(self, label='', **kw):
         super().__init__(label=label, **kw)
 
-    def run_default_analysis(self, close_file=True, **kw):
+    def run_default_analysis(self, close_file=True,
+                             single_qubit_phase_cost=False, **kw):
 
         self.get_naming_and_values()
 
@@ -332,7 +332,7 @@ class SWAP_Cost_qubit_phases(ma.Rabi_Analysis):
             self.measured_values[1] - cal_0Q)/(cal_1Q-cal_0Q)
         self.measured_values = self.measured_values
         self.sweep_points = self.sweep_points
-        self.fit_data(**kw)
+        self.fit_data(single_qubit_phase_cost, **kw)
         self.make_figures(**kw)
 
         #analysing the qCP fits
@@ -341,7 +341,7 @@ class SWAP_Cost_qubit_phases(ma.Rabi_Analysis):
         self.phi_0_rad_qCP = self.fit_res[0].best_values['phase']
         self.phi_1_rad_qCP = self.fit_res[1].best_values['phase']
 
-        self.dphi_qCP = ((self.phi_1_rad_qCP-self.phi_0_rad_qCP)/(2*np.pi)*360) % 360
+        self.dphi_qCP = ((((self.phi_1_rad_qCP-self.phi_0_rad_qCP)/(2*np.pi)*360)+180)% 360)-180
         # wrapping the phase at +270/-90 degrees
         self.phi_0_qCP = ((((self.phi_0_rad_qCP)/(2*np.pi)*360)+90 )% 360)-90
         self.phi_1_qCP = ((self.phi_1_rad_qCP)/(2*np.pi)*360) % 360
@@ -352,25 +352,23 @@ class SWAP_Cost_qubit_phases(ma.Rabi_Analysis):
         self.phi_1_rad_qS = self.fit_res[3].best_values['phase']
 
         #analysing the qS fits
-        self.dphi_qS = ((self.phi_1_rad_qS-self.phi_0_rad_qS)/(2*np.pi)*360) % 360
+        self.dphi_qS = ((((self.phi_1_rad_qS-self.phi_0_rad_qS)/(2*np.pi)*360)+180)% 360)-180
         # wrapping the phase at +270/-90 degrees
         self.phi_0_qS = ((((self.phi_0_rad_qS)/(2*np.pi)*360)+90 )% 360)-90
         self.phi_1_qS = ((self.phi_1_rad_qS)/(2*np.pi)*360) % 360
 
         self.dphi = (self.dphi_qS+self.dphi_qCP)/2
-
-
         #constructing the cost function with subparts that scale from 0 to 1
         # contrast_cost = (self.cost_CPHASE_qCP+self.cost_CPHASE_qS)/2
         # cost_2Q_phase_error =  abs(self.dphi-180)/180
         # single_qubit_phase_cost = abs(self.phi_0_qCP-90)/90 + abs(self.phi_0_qS-90)/90
         # self.cost_func_val = 3*cost_2Q_phase_error + contrast_cost + single_qubit_phase_cost
         self.cost_func_val = (self.cost_CPHASE_qCP+self.cost_CPHASE_qS)/2
-        print(self.cost_func_val)
+
         if close_file:
             self.data_file.close()
 
-    def fit_data(self, **kw):
+    def fit_data(self, single_qubit_phase_cost, **kw):
         self.add_analysis_datagroup_to_file()
         self.fit_res = ['', '', '', '']
         # It would be best to do 1 fit to both datasets but since it is
@@ -414,7 +412,6 @@ class SWAP_Cost_qubit_phases(ma.Rabi_Analysis):
 
         self.x_fine = np.linspace(min(self.sweep_points[:-4]), max(self.sweep_points[:-4]),
                              721)
-        print(self.x_fine[90])
         self.fine_fit_0 = self.fit_res[0].model.func(
                 self.x_fine, **self.fit_res[0].best_values)
         self.fine_fit_1 = self.fit_res[1].model.func(
@@ -430,10 +427,20 @@ class SWAP_Cost_qubit_phases(ma.Rabi_Analysis):
         #                         max(self.fine_fit_1-self.fine_fit_0)))/2
         # self.cost_CPHASE_qS= (2-(max(self.fine_fit_2-self.fine_fit_3) +
         #                         max(self.fine_fit_2-self.fine_fit_3)))/2
-        self.cost_CPHASE_qCP = (abs(self.fine_fit_0[0]-0.5)+abs(self.fine_fit_0[90])+
-                                abs(self.fine_fit_1[0]-0.5)+abs(self.fine_fit_1[90]-1))/4
-        self.cost_CPHASE_qS = (abs(self.fine_fit_2[0]-0.5)+abs(self.fine_fit_2[90])+
-                                abs(self.fine_fit_3[0]-0.5)+abs(self.fine_fit_3[90]-1))/4
+        if single_qubit_phase_cost:
+            self.cost_CPHASE_qCP = (abs(self.fine_fit_0[0]-0.5)+2*abs(self.fine_fit_0[90])+
+                                    abs(self.fine_fit_1[0]-0.5)+
+                                    abs(self.fine_fit_0[180]-0.5)+
+                                    abs(self.fine_fit_1[180]-0.5)+2*abs(self.fine_fit_1[270]))/8
+            self.cost_CPHASE_qS = (abs(self.fine_fit_2[0]-0.5)+2*abs(self.fine_fit_2[90])+
+                                    abs(self.fine_fit_3[0]-0.5)+
+                                    abs(self.fine_fit_2[180]-0.5)+
+                                    abs(self.fine_fit_3[180]-0.5)+2*abs(self.fine_fit_3[270]))/8
+        else:
+            self.cost_CPHASE_qCP = (2-(max(self.fine_fit_0-self.fine_fit_1) +
+                        max(self.fine_fit_1-self.fine_fit_0)))/2
+            self.cost_CPHASE_qS = (2-(max(self.fine_fit_2-self.fine_fit_3) +
+                        max(self.fine_fit_3-self.fine_fit_2)))/2
 
 
 
@@ -457,7 +464,8 @@ class SWAP_Cost_qubit_phases(ma.Rabi_Analysis):
                                             xlabel=self.xlabel,
                                             ylabel=self.ylabels[i],
                                             save=False,
-                                            plot_title=plot_title)
+                                            plot_title=plot_title,
+                                            marker='--o')
 
             fine_fit_0 = self.fit_res[i*2].model.func(
                 self.x_fine, **self.fit_res[i*2].best_values)
@@ -490,6 +498,8 @@ class lambda1_sweep(swf.Soft_Sweep):
         if old_lambda1 != val:
             self.comp_det.lambda1 = val
             self.comp_det.pars_changed = True
+
+
 
 class lambda2_sweep(swf.Soft_Sweep):
 
@@ -604,18 +614,4 @@ class theta_f_sweep(swf.Soft_Sweep):
             self.comp_det.theta_f = val
             self.comp_det.pars_changed = True
 
-class amplitude_sweep(swf.Soft_Sweep):
 
-    def __init__(self, comp_det, **kw):
-        self.sweep_control = 'soft'
-        self.name = 'amplitude'
-        self.parameter_name = 'amplitude'
-        self.unit = 'a.u.'
-        self.set_kw()
-        self.comp_det = comp_det
-
-    def set_parameter(self, val):
-        old_amplitude = self.comp_det.amplitude
-        if old_amplitude != val:
-            self.comp_det.amplitude = val
-            self.comp_det.pars_changed = True

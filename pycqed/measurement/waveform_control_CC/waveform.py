@@ -204,24 +204,27 @@ def martinis_flux_pulse(length, lambda_coeffs, theta_f,
                     eps=f12-f_bus
     """
     lambda_coeffs = np.array(lambda_coeffs)
-    nr_samples = int((length)*sampling_rate)
+    nr_samples = round((length)*sampling_rate) # rounds the nr samples
+    length= nr_samples/sampling_rate # gives back the rounded length
     t_step = 1/sampling_rate
     t = np.arange(0, length, t_step)
-
     theta_0 = np.arctan(2*g2/(f_01_max-E_c-f_bus))
-
     # you can not have weaker coupling than the initial coupling
     assert(theta_f > theta_0)
-    delta_theta = theta_f - theta_0
-    # Summing all odd elements see eq 16 of Martinis paper
     odd_coeff_lambda_sum = np.sum(lambda_coeffs[::2])
-
-    th_scale_factor = delta_theta/odd_coeff_lambda_sum
-    scaled_lambda_coeffs = th_scale_factor*lambda_coeffs
+    delta_theta = theta_f - theta_0
+    #add a square pulse that reaches theta_f, for this, lambda0 is used
+    lambda0=1-lambda_coeffs[0] # only use lambda_coeffs[0] for scaling, this
+    #enables fixing the square to 0 in optimizations by setting lambda_coeffs[0]=1
+    th_scale_factor = delta_theta/(lambda0+odd_coeff_lambda_sum)
     mart_pulse_theta = np.ones(nr_samples)*theta_0
-    for i, lambda_coeff in enumerate(scaled_lambda_coeffs):
-        n = i+1
-        mart_pulse_theta += lambda_coeff*(1-np.cos(n*2*np.pi*t/length))/2
+    mart_pulse_theta += th_scale_factor*np.ones(nr_samples)*lambda0
+
+    for i, lambda_coeff in enumerate(lambda_coeffs):
+       n = i+1
+       mart_pulse_theta += th_scale_factor*lambda_coeff*(1-np.cos(n*2*np.pi*t/length))/2
+    #adding square pulse scaling with lambda0 satisfying the condition
+    #lamb0=1-lambda1
     if return_unit == 'theta':
         return mart_pulse_theta
 

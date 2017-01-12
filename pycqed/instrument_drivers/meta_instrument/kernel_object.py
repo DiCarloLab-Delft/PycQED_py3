@@ -88,15 +88,28 @@ class Distortion(Instrument):
                            parameter_class=ConfigParameter,
                            vals=vals.Numbers())
 
-        self.add_parameter('bounce_amp', units='',
+        self.add_parameter('bounce_amp_1', units='',
                            initial_value=0,
                            parameter_class=ConfigParameter,
                            vals=vals.Numbers())
-        self.add_parameter('bounce_tau', units='ns',
+        self.add_parameter('bounce_tau_1', units='ns',
                            initial_value=0,
                            parameter_class=ConfigParameter,
                            vals=vals.Numbers())
-        self.add_parameter('bounce_length', units='ns',
+        self.add_parameter('bounce_length_1', units='ns',
+                           initial_value=0,
+                           parameter_class=ConfigParameter,
+                           vals=vals.Numbers())
+
+        self.add_parameter('bounce_amp_2', units='',
+                           initial_value=0,
+                           parameter_class=ConfigParameter,
+                           vals=vals.Numbers())
+        self.add_parameter('bounce_tau_2', units='ns',
+                           initial_value=0,
+                           parameter_class=ConfigParameter,
+                           vals=vals.Numbers())
+        self.add_parameter('bounce_length_2', units='ns',
                            initial_value=0,
                            parameter_class=ConfigParameter,
                            vals=vals.Numbers())
@@ -129,10 +142,15 @@ class Distortion(Instrument):
     def get_idn(self):
         return self.name
 
-    def get_bounce_kernel(self):
-        return kf.bounce_kernel(amp=self.bounce_amp(),
-                                time=self.bounce_tau(),
-                                length=self.bounce_length())
+    def get_bounce_kernel_1(self):
+        return kf.bounce_kernel(amp=self.bounce_amp_1(),
+                                time=self.bounce_tau_1(),
+                                length=self.bounce_length_1())
+
+    def get_bounce_kernel_2(self):
+        return kf.bounce_kernel(amp=self.bounce_amp_2(),
+                                time=self.bounce_tau_2(),
+                                length=self.bounce_length_2())
 
     def get_skin_kernel(self):
         return kf.skin_kernel(alpha=self.skineffect_alpha(),
@@ -171,7 +189,8 @@ class Distortion(Instrument):
         contains an array with the distortions based on the kernel object.
         """
         logging.warning('deprecated, do not use!')
-        kernel_list = [self.get_bounce_kernel(),
+        kernel_list = [self.get_bounce_kernel_1(),
+                       self.get_bounce_kernel_2(),
                        self.get_skin_kernel(),
                        self.get_decay_kernel_1(),
                        self.get_decay_kernel_2()]
@@ -190,7 +209,8 @@ class Distortion(Instrument):
             external_kernels.append(kernel_vec)
 
         kernel_object_kernels = [
-            self.get_bounce_kernel(),
+            self.get_bounce_kernel_1(),
+            self.get_bounce_kernel_2(),
             self.get_skin_kernel(),
             self.get_decay_kernel_1(),
             self.get_decay_kernel_2()]
