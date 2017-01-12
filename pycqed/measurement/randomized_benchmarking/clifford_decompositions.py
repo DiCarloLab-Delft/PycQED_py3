@@ -69,3 +69,10 @@ gate_decomposition[20] = ['X90', 'mY90', 'X90']
 gate_decomposition[21] = ['Y90']
 gate_decomposition[22] = ['mX90', 'Y180']
 gate_decomposition[23] = ['X90', 'Y90', 'mX90']
+
+
+
+
+
+
+

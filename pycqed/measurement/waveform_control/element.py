@@ -300,13 +300,11 @@ class Element:
         # we first compute the ideal function values
         for p in self.pulses:
             psamples = self.pulse_samples(p)
-
             if not self.global_time:
                 pulse_tvals = tvals.copy()[:psamples]
                 pulsewfs = self.pulses[p].get_wfs(pulse_tvals)
             else:
                 chan_tvals = {}
-
                 for c in self.pulses[p].channels:
                     idx0 = self.pulse_start_sample(p, c)
                     idx1 = self.pulse_end_sample(p, c) + 1
@@ -353,7 +351,6 @@ class Element:
             elif self._channels[wf]['type'] == 'marker':
                 wfs[wf][wfs[wf] > lo] = hi
                 wfs[wf][wfs[wf] < lo] = lo
-
         return tvals, wfs
 
     def normalized_waveforms(self):

@@ -1,28 +1,19 @@
-# Note to Xiang, remove the imports that are not used :)
-import time
 import numpy as np
-import sys
-# import visa
 import unittest
 import logging
 
-qcpath = 'D:\GitHubRepos\Qcodes'
-if qcpath not in sys.path:
-    sys.path.append(qcpath)
-
-from qcodes.instrument.visa import VisaInstrument
 from qcodes.utils import validators as vals
+from ._controlbox import Assembler
+from . import QuTech_ControlBoxdriver as qcb
+from ._controlbox import defHeaders_CBox_v3 as defHeaders
 
 # cython drivers for encoding and decoding
 import pyximport
 pyximport.install(setup_args={"script_args": ["--compiler=msvc"],
                               "include_dirs": np.get_include()},
                   reload_support=True)
-
+# important codec is after pyximport.install
 from ._controlbox import codec as c
-from ._controlbox import Assembler
-from . import QuTech_ControlBoxdriver as qcb
-from ._controlbox import defHeaders_CBox_v3 as defHeaders
 
 '''
 @author: Xiang Fu
@@ -47,6 +38,12 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
                            get_cmd=self._do_get_trigger_source,
                            vals=vals.Enum('internal', 'external',
                                           'mixed'))
+        self.add_parameter('instr_mem_size',
+                           units='#',
+                           label='instruction memory size',
+                           get_cmd=self._get_instr_mem_size)
+        # hardcoded memory limit, depends on firmware of the CBox
+        self._instr_mem_size = 2**15
 
     def init_params(self):
         self.add_params()
@@ -66,17 +63,15 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
 
     def run_test_suite(self):
         from importlib import reload  # Useful for testing
-
-        from ._controlbox import test_suite as test_suite_v2
         from ._controlbox import test_suite_v3 as test_suite
         reload(test_suite)
-        reload(test_suite_v2)
-        test_suite_v2.CBox = self
         # pass the CBox to the module so it can be used in the tests
-        self.c = c
-        # make the codec callable from the testsuite
+        self.c = c  # make the codec callable from the testsuite
+        test_suite.CBox = self
         suite = unittest.TestLoader().loadTestsFromTestCase(
             test_suite.CBox_tests_v3)
+        print('test suite got:',
+              unittest.TestLoader().getTestCaseNames(test_suite.CBox_tests_v3))
         unittest.TextTestRunner(verbosity=2).run(suite)
 
     def _do_get_firmware_version(self):
@@ -94,8 +89,6 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
         v_list = []
         for byte in bytes(param_msg):
             v_list.append(int(byte) - 128)  # Remove the MSb 1 for data_bytes
-            # print(byte, ": ", "{0:{fill}8b}".format(byte, fill='0'))
-
         version = 'v' + str(v_list[0])+'.'+str(v_list[1]) + \
             '.'+str(v_list[2])
 
@@ -114,12 +107,12 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
         a12 = (v_list[14] << 7) + v_list[15]
         a21 = (v_list[16] << 7) + v_list[17]
         a22 = (v_list[18] << 7) + v_list[19]
-        self._lin_trans_coeffs = np.array([a11, a12, a21, a22])
+        self._lin_trans_coeffs = np.array([a11, a12, a21, a22])/2**12
         self._sig_thres[0] = (v_list[20] << 21) + (v_list[21] << 14) + \
             (v_list[22] << 7) + v_list[23]
         self._sig_thres[1] = (v_list[24] << 21) + (v_list[25] << 14) + \
             (v_list[26] << 7) + v_list[27]
-        self._log_length = (v_list[28] << 7) + v_list[29]
+        self._log_length = (v_list[28] << 7) + v_list[29] + 1
         self._nr_samples = (v_list[30] << 7) + v_list[31]
         self._avg_size = v_list[32]
         self._nr_averages = 2**self._avg_size
@@ -215,7 +208,6 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
 
         if self.get('core_state') is not None:
             tmp_core_state = self.get('core_state')
-            # print('_do_set_trigger_source\got_core_state: ', tmp_core_state)
         else:
             tmp_core_state = 'idle'
 
@@ -233,6 +225,9 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
                                                   tmp_acquisition_mode,
                                                   tmp_trigger_source,
                                                   demodulation_mode)
+
+    def _get_instr_mem_size(self):
+        return self._instr_mem_size
 
     def _do_get_core_state(self):
         return self._core_state[3:]
@@ -259,7 +254,8 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
                                              core_state='idle',
                                              acquisition_mode='idle',
                                              trigger_source='internal',
-                                             demodulation_mode='double side band demodulation'):
+                                             demodulation_mode=
+                                             'double side band demodulation'):
         '''
         @param core_states: activate the core or disable it:
                         > idle,
@@ -351,7 +347,6 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
         data_bytes += c.encode_byte(core_state_int, 7,
                                     expected_number_of_bytes=1)
         message = c.create_message(cmd, data_bytes)
-        # print("set master controller command: ",  message)
 
         (stat, mesg) = self.serial_write(message)
         if stat:
@@ -369,19 +364,21 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
 
     def load_instructions(self, asm_filename, PrintHex=False):
         '''
-        set the weights of the integregration
-
         @param instructions : the instructions, an array of 32-bit instructions
         @return stat : 0 if the upload succeeded and 1 if the upload failed.
+
+        Additionally it starts by setting the core state to idle before
+        uploading instructions and ends by setting the core state to active.
         '''
 
         asm = Assembler.Assembler(asm_filename)
 
         instructions = asm.convert_to_instructions()
-
-        if instructions is False:
-            print("Error: the assembly file is of errors.")
-            return False
+        if len(instructions) > self.instr_mem_size():
+            raise MemoryError(
+                'asm file contains too many "{}" instructions,'.format(
+                    len(instructions)) + ' max number of instructions ' +
+                'is {}'.format(self.instr_mem_size()))
 
         if PrintHex:
             i = 0
@@ -392,6 +389,8 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
         # Check the instruction list length
         if len(instructions) == 0:
             raise ValueError("The instruction list is empty.")
+
+        self.set('core_state', 'idle')
 
         cmd = defHeaders.LoadInstructionsHeader
         data_bytes = bytearray()
@@ -408,5 +407,5 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
 
         if not stat:
             raise Exception('Failed to load instructions')
-
+        self.set('core_state', 'active')
         return (stat, mesg)

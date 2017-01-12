@@ -11,6 +11,8 @@ from pycqed.measurement.waveform_control import pulse
 from pycqed.measurement.waveform_control import element
 from pycqed.measurement.waveform_control import sequence
 
+from pycqed.instrument_drivers.virtual_instruments.pyqx import qasm_loader as ql
+
 
 class Detector_Function(object):
 
@@ -97,24 +99,95 @@ class Soft_Detector(Detector_Function):
 
 class Dummy_Detector_Hard(Hard_Detector):
 
-    def __init__(self, **kw):
+    def __init__(self, delay=0, noise=0, **kw):
         super(Dummy_Detector_Hard, self).__init__()
         self.set_kw()
         self.detector_control = 'hard'
         self.name = 'Dummy_Detector'
         self.value_names = ['distance', 'Power']
         self.value_units = ['m', 'nW']
+        self.delay = delay
+        self.noise = noise
+        self.times_called = 0
 
     def prepare(self, sweep_points):
         self.sweep_points = sweep_points
 
     def get_values(self):
         x = self.sweep_points
-        self.data = [np.sin(x / np.pi), np.cos(x/np.pi)]
-        return self.data
+        noise = self.noise * (np.random.rand(2, len(x)) - .5)
+        data = np.array([np.sin(x / np.pi),
+                         np.cos(x/np.pi)])
+        data += noise
+        time.sleep(self.delay)
+        # Counter used in test suite to test how many times data was acquired.
+        self.times_called += 1
+
+        return data
+
+
+class QX_Hard_Detector(Hard_Detector):
+
+    def __init__(self, qxc, qasm_filenames, p_error=0.004,
+                 num_avg=128, **kw):
+        super().__init__()
+        self.set_kw()
+        self.detector_control = 'hard'
+        self.name = 'QX_Hard_Detector_Fast'
+        self.value_names = ['F']
+        self.value_units = ['|1>']
+        self.times_called = 0
+        self.__qxc = qxc
+        self.num_avg = num_avg
+        self.num_files = len(qasm_filenames)
+        self.p_error = p_error
+        self.delay = 1
+        self.current = 0
+        self.randomizations = []
+        # load files
+        logging.info("QX_RB_Hard_Detector : loading qasm files...")
+        # print(qasm_filenames)
+        for i, file_name in enumerate(qasm_filenames):
+            t1 = time.time()
+            qasm = ql.qasm_loader(file_name)
+            qasm.load_circuits()
+            # t2 = time.time()
+            #print("[+] qasm loading time :",t2-t1)
+            circuits = qasm.get_circuits()
+            self.randomizations.append(circuits)
+            # create the circuits on the server
+            #t1 = time.time()
+            for c in circuits:
+                circuit_name = c[0] + "_{}".format(i)
+                self.__qxc.create_circuit(circuit_name, c[1])
+            t2 = time.time()
+            logging.info("[+] qasm loading time :", t2-t1)
+
+    def prepare(self, sweep_points):
+        self.sweep_points = sweep_points
+        self.circuits = self.randomizations[self.current]
+
+    def get_values(self):
+        # x = self.sweep_points
+        # only serves to initialize the arrays
+        # data = np.array([np.sin(x / np.pi), np.cos(x/np.pi)])
+        i = 0
+        data = np.zeros(len(self.sweep_points))
+        for c in self.circuits:
+            self.__qxc.send_cmd("reset_measurement_averaging")
+            circuit_name = c[0] + "_{}".format(self.current)
+            self.__qxc.run_noisy_circuit(circuit_name, self.p_error,
+                                         "depolarizing_channel", self.num_avg)
+            f = self.__qxc.get_measurement_average(0)
+            data[i] = f
+            # data[1][i] = f
+            i = i + 1
+        self.current = int((self.current + 1) % self.num_files)
+        return (1-np.array(data))
 
 
 class Dummy_Shots_Detector(Hard_Detector):
+
     def __init__(self, max_shots=10, **kw):
         super().__init__()
         self.set_kw()
@@ -123,9 +196,11 @@ class Dummy_Shots_Detector(Hard_Detector):
         self.value_names = ['shots']
         self.value_units = ['m']
         self.max_shots = max_shots
+        self.times_called = 0
 
     def prepare(self, sweep_points):
         self.sweep_points = sweep_points
+        self.times_called += 1
 
     def get_values(self):
         x = self.sweep_points
@@ -276,12 +351,11 @@ class ZNB_VNA_detector(Hard_Detector):
         Return real and imaginary transmission coefficients +
         amplitude (linear) and phase (deg or radians)
         '''
-        self.VNA.start_single_sweep_all()  # start a measurement
+        self.VNA.start_sweep_all()  # start a measurement
         # wait untill the end of measurement before moving on
         self.VNA.wait_to_continue()
         # for visualization on the VNA screen (no effect on data)
         self.VNA.autoscale_trace()
-
         # get data and process them
         real_data, imag_data = self.VNA.get_real_imaginary_data()
 
@@ -394,6 +468,8 @@ class CBox_integrated_average_detector(Hard_Detector):
         else:
             return data
 
+
+
     def rotate_and_normalize(self, data):
         """
         Rotates and normalizes
@@ -415,11 +491,11 @@ class CBox_integrated_average_detector(Hard_Detector):
     def prepare(self, sweep_points):
         self.CBox.set('nr_samples', self.seg_per_point*len(sweep_points))
         self.AWG.stop()  # needed to align the samples
+        self.CBox.nr_averages(int(self.nr_averages))
+        self.CBox.integration_length(int(self.integration_length/(5e-9)))
         self.CBox.set('acquisition_mode', 'idle')
         self.CBox.set('acquisition_mode', 'integration averaging')
         self.AWG.start()  # Is needed here to ensure data aligns with seq elt
-        self.CBox.nr_averages(int(self.nr_averages))
-        self.CBox.integration_length(int(self.integration_length/(5e-9)))
 
     def finish(self):
         self.CBox.set('acquisition_mode', 'idle')
@@ -452,14 +528,14 @@ class CBox_single_integration_average_det(Soft_Detector):
         success = False
         i = 0
         while not success:
-            self.CBox.set('acquisition_mode', 4)
+            self.CBox.acquisition_mode('integration averaging')
             try:
                 data = self.CBox.get_integrated_avg_results()
                 success = True
             except Exception as e:
                 logging.warning(e)
                 logging.warning('Exception caught retrying')
-            self.CBox.set('acquisition_mode', 0)
+            self.CBox.acquisition_mode('idle')
             i += 1
             if i > 10:
                 break
@@ -472,10 +548,10 @@ class CBox_single_integration_average_det(Soft_Detector):
 
     def prepare(self):
         self.CBox.set('nr_samples', 1)
-        self.CBox.set('acquisition_mode', 0)
+        self.CBox.set('acquisition_mode', 'idle')
 
     def finish(self):
-        self.CBox.set('acquisition_mode', 0)
+        self.CBox.set('acquisition_mode', 'idle')
 
 
 class CBox_single_int_avg_with_LutReload(CBox_single_integration_average_det):
@@ -546,7 +622,7 @@ class CBox_integration_logging_det(Hard_Detector):
 
     def _get_values(self):
         self.AWG.stop()
-        self.CBox.set('acquisition_mode', 0)
+        self.CBox.set('acquisition_mode', 'idle')
         if self.awg_nrs is not None:
             for awg_nr in self.awg_nrs:
                 self.CBox.restart_awg_tape(awg_nr)
@@ -557,14 +633,14 @@ class CBox_integration_logging_det(Hard_Detector):
 
         data = self.CBox.get_integration_log_results()
 
-        self.CBox.set('acquisition_mode', 0)
+        self.CBox.set('acquisition_mode', 'idle')
         return data
 
     def prepare(self, sweep_points):
         self.CBox.integration_length(int(self.integration_length/(5e-9)))
 
     def finish(self):
-        self.CBox.set('acquisition_mode', 0)
+        self.CBox.set('acquisition_mode', 'idle')
         self.AWG.stop()
 
 
@@ -616,7 +692,7 @@ class CBox_integration_logging_det_shots(Hard_Detector):
 
     def _get_values(self):
         self.AWG.stop()
-        self.CBox.set('acquisition_mode', 0)
+        self.CBox.set('acquisition_mode', 'idle')
         if self.awg_nrs is not None:
             for awg_nr in self.awg_nrs:
                 self.CBox.restart_awg_tape(awg_nr)
@@ -627,11 +703,11 @@ class CBox_integration_logging_det_shots(Hard_Detector):
 
         data = self.CBox.get_integration_log_results()
 
-        self.CBox.set('acquisition_mode', 0)
+        self.CBox.set('acquisition_mode', 'idle')
         return data
 
     def finish(self):
-        self.CBox.set('acquisition_mode', 0)
+        self.CBox.set('acquisition_mode', 'idle')
         self.AWG.stop()
 
 
@@ -662,15 +738,15 @@ class CBox_state_counters_det(Soft_Detector):
 
     def _get_values(self):
 
-        self.CBox.set('acquisition_mode', 0)
+        self.CBox.set('acquisition_mode', 'idle')
         self.CBox.set('acquisition_mode', 'integration logging')
 
         data = self.CBox.get_qubit_state_log_counters()
-        self.CBox.set('acquisition_mode', 0)
+        self.CBox.set('acquisition_mode', 'idle')
         return np.concatenate(data)  # concatenates counters A and B
 
     def finish(self):
-        self.CBox.set('acquisition_mode', 0)
+        self.CBox.set('acquisition_mode', 'idle')
 
 
 class CBox_single_qubit_event_s_fraction(CBox_state_counters_det):
@@ -747,134 +823,6 @@ class CBox_digitizing_shots_det(CBox_integration_logging_det):
         return (d > self.threshold).astype(int)
 
 
-
-# class QuTechCBox_AlternatingShots_Logging_Detector_Touch_N_Go(Hard_Detector):
-#     def __init__(self, NoSamples=10000, AWG='AWG', **kw):
-#         super(QuTechCBox_AlternatingShots_Logging_Detector_Touch_N_Go, self).__init__()
-#         self.CBox = qt.instruments['CBox']
-#         self.name = 'CBox_Streaming_data'
-#         self.value_names = ['I_0', 'Q_0', 'I_1', 'Q_1']
-#         self.value_units = ['a.u.', 'a.u.', 'a.u.', 'a.u.']
-#         self.NoSamples = NoSamples
-#         if AWG is not None:
-#             self.AWG = qt.instruments[AWG]
-
-#     def get_values(self):
-#         exception_mode = True
-#         if exception_mode:
-#             success = False
-#             i = 0
-#             while not success and i < 10:
-#                 try:
-#                     d = self._get_values()
-#                     success = True
-#                 except Exception as e:
-#                     print()
-#                     print('Timeout exception caught, retaking data points')
-#                     print(str(e))
-#                     i += 1
-#                     self.CBox.set_run_mode(0)
-#                     self.CBox.set('acquisition_mode', 0)
-#                     self.CBox.restart_awg_tape(0)
-#                     self.CBox.restart_awg_tape(1)
-#                     self.CBox.restart_awg_tape(2)
-#                     self.prepare()
-#         else:
-#             d = self._get_values()
-#         return d
-
-#     def _get_values(self):
-#         raw_data = self.CBox.get_integration_log_results()
-#         I_data_0, I_data_1 = a_tools.zigzag(raw_data[0])
-#         Q_data_0, Q_data_1 = a_tools.zigzag(raw_data[1])
-#         data = [I_data_0, Q_data_0, I_data_1, Q_data_1]
-#         print(np.shape(data))
-#         return data
-
-#     def prepare(self, **kw):
-#         if self.AWG is not None:
-#             self.AWG.stop()
-#         self.CBox.set('acquisition_mode', 6)
-#         self.CBox.set_run_mode(1)
-
-#     def finish(self):
-#         counters = np.array(self.CBox.get_sequencer_counters())
-#         triggerfraction = float(counters[1])/float(counters[0])
-#         print("trigger fraction", triggerfraction)
-#         self.CBox.set('acquisition_mode', 0)
-#         self.CBox.set_run_mode(0)
-#         if self.AWG is not None:
-#             self.AWG.stop()
-
-
-# class QuTechCBox_Shots_Logging_Detector_Touch_N_Go(Hard_Detector):
-#     def __init__(self, digitize=True,  timeout=2, **kw):
-#         super(QuTechCBox_Shots_Logging_Detector_Touch_N_Go,
-#               self).__init__()
-#         self.CBox = qt.instruments['CBox']
-#         self.name = 'CBox_shots_data'
-#         self.digitize = digitize
-#         self.timeout = timeout
-#         if self.digitize:
-#             self.value_names = ['digitized values']
-#             self.value_units = ['a.u.']
-#             self.threshold_weight0 = self.CBox.get_signal_threshold_line0()
-#         else:
-#             self.value_names = ['integration result']
-#             self.value_units = ['a.u.']
-
-#     def prepare(self, **kw):
-#         self.old_timeout = self.CBox.get_measurement_timeout()
-#         self.CBox.set_measurement_timeout(self.timeout)
-#         # ensures quick detection of the CBox crash
-
-#     def get_values(self):
-#         exception_mode = True
-#         if exception_mode:
-#             success = False
-#             i = 0
-#             while not success and i < 10:
-#                 try:
-#                     d = self._get_values()
-#                     success = True
-#                 except Exception as e:
-#                     print()
-#                     print('Timeout exception caught, retaking data points')
-#                     print(str(e))
-#                     i += 1
-#                     time.sleep(.1)
-#                     self.CBox.set_run_mode(0)
-#                     self.CBox.set('acquisition_mode', 0)
-#                     self.CBox.restart_awg_tape(0)
-#                     self.CBox.restart_awg_tape(1)
-#                     self.CBox.restart_awg_tape(2)
-#             # mode = raw_input('Press any key to continue')
-#         else:
-#             d = self._get_values()
-#         return d
-
-#     def _get_values(self):
-#         '''
-#         private version of the acquisition command used for the workaround
-#         '''
-#         self.CBox.set('acquisition_mode', 6)
-#         self.CBox.set_run_mode(1)
-
-#         raw_data = self.CBox.get_integration_log_results()
-#         weight0_data = raw_data[0]
-#         if self.digitize:
-#             data_0 = [1 if d < self.threshold_weight0 else -1
-#                       for d in weight0_data]
-#         else:
-#             data_0 = weight0_data
-#         self.CBox.set_run_mode(0)
-#         self.CBox.set('acquisition_mode', 0)
-
-#         return data_0
-
-#     def finish(self, **kw):
-#         self.CBox.set_measurement_timeout(self.old_timeout)
-
 ##############################################################################
 ##############################################################################
 ####################     Software Controlled Detectors     ###################
@@ -892,43 +840,55 @@ class Dummy_Detector_Soft(Soft_Detector):
         self.value_names = ['I', 'Q']
         self.value_units = ['mV', 'mV']
         self.i = 0
+        # self.x can be used to set x value externally
+        self.x = None
 
     def acquire_data_point(self, **kw):
-        x = self.i/15.
+        if self.x is None:
+            x = self.i/15.
         self.i += 1
         time.sleep(self.delay)
         return np.array([np.sin(x/np.pi), np.cos(x/np.pi)])
 
 
 class QX_Detector(Soft_Detector):
+
     def __init__(self, qxc, delay=0, **kw):
         self.set_kw()
         self.delay = delay
         self.detector_control = 'soft'
         self.name = 'QX_Detector'
-        self.value_names = ['F'] #['F', 'F']
-        self.value_units = ['Error Rate'] # ['mV', 'mV']
+        self.value_names = ['F']  # ['F', 'F']
+        self.value_units = ['Error Rate']  # ['mV', 'mV']
         self.__qxc = qxc
         self.__cnt = 0
 
     def acquire_data_point(self, **kw):
         circuit_name = ("circuit%i" % self.__cnt)
         errors = 0
+
         executions = 1000
-        p_error    = 0.0001+self.__cnt*0.0002
+        p_error = 0.001+self.__cnt*0.003
+        '''
         for i in range(0,executions):
-        	self.__qxc.run_noisy_circuit(circuit_name,p_error)
-        	m0 = self.__qxc.get_measurement(0)
-        	# m1 = self.__qxc.get_measurement(1)
-        	if int(m0) != 0 :
-        		errors += 1
-        	# print("[+] measurement outcome : %s %s" % (m0,m1))
+            self.__qxc.run_noisy_circuit(circuit_name,p_error)
+            m0 = self.__qxc.get_measurement(0)
+            # m1 = self.__qxc.get_measurement(1)
+            if int(m0) != 0 :
+                errors += 1
+            # print("[+] measurement outcome : %s %s" % (m0,m1))
         # x = self.__cnt/15.
-        print("[+] p error  :",p_error)
-        print("[+] errors   :",errors)
-        f = (executions-errors)/executions
-        print("[+] fidelity :",f)
-        time.sleep(self.delay)
+        '''
+        print("[+] p error  :", p_error)
+        # print("[+] errors   :",errors)
+        # f = (executions-errors)/executions
+        self.__qxc.send_cmd("reset_measurement_averaging")
+        self.__qxc.run_noisy_circuit(
+            circuit_name, p_error, "depolarizing_channel", executions)
+        f = self.__qxc.get_measurement_average(0)
+        print("[+] fidelity :", f)
+        self.__qxc.send_cmd("reset_measurement_averaging")
+
         self.__cnt = self.__cnt+1
         return f
 
@@ -946,6 +906,7 @@ class Source_frequency_detector(Soft_Detector):
 
     def acquire_data_point(self, **kw):
         return self.S.get('frequency')
+
 
 class Function_Detector(Soft_Detector):
 
@@ -990,9 +951,11 @@ class Detect_simulated_hanger_Soft(Soft_Detector):
         IQ = fn.disp_hanger_S21_complex(*(f, f0, Q, Qe, A, theta))
         return IQ.real+Inoise, IQ.imag+Qnoise
 
+
 class Heterodyne_probe(Soft_Detector):
 
-    def __init__(self, HS, threshold=1.75, trigger_separation=20e-6, demod_int=0, **kw):
+    def __init__(self, HS, threshold=1.75, trigger_separation=20e-6,
+                 demod_mode='double', **kw):
         super().__init__(**kw)
         self.HS = HS
         self.name = 'Heterodyne probe'
@@ -1003,7 +966,7 @@ class Heterodyne_probe(Soft_Detector):
         self.threshold = threshold
         self.last = 1.
         self.trigger_separation = trigger_separation
-        self.demod_int = demod_int
+        self.demod_mode = demod_mode
 
     def prepare(self):
         self.HS.prepare(trigger_separation=self.trigger_separation)
@@ -1012,7 +975,7 @@ class Heterodyne_probe(Soft_Detector):
         passed = False
         c = 0
         while(not passed):
-            S21 = self.HS.probe(demod_int=self.demod_int)
+            S21 = self.HS.probe(demod_mode=self.demod_mode)
             cond_a = ((abs(S21)/self.last) >
                       self.threshold) or ((self.last/abs(S21)) > self.threshold)
             cond_b = self.HS.frequency() >= self.last_frequency
@@ -1029,7 +992,6 @@ class Heterodyne_probe(Soft_Detector):
         self.first = False
         self.last = abs(S21)
         return abs(S21), np.angle(S21)/(2*np.pi)*360,  # S21.real, S21.imag
-
 
 
 class Heterodyne_probe_soft_avg(Soft_Detector):
@@ -1081,7 +1043,6 @@ class Heterodyne_probe_soft_avg(Soft_Detector):
         self.first = False
         self.last = abs(S21)
         return S21.real, S21.imag
-
 
 
 class PulsedSpectroscopyDetector(Soft_Detector):
@@ -1282,7 +1243,7 @@ class CBox_v3_integrated_average_detector(Hard_Detector):
             except Exception as e:
                 logging.warning('Exception caught retrying')
                 logging.warning(e)
-                self.CBox.set('acquisition_mode', 0)
+                self.CBox.set('acquisition_mode', 'idle')
                 self.CBox.set('acquisition_mode', 'integration averaging mode')
             i += 1
             if i > 20:
@@ -1298,7 +1259,8 @@ class CBox_v3_integrated_average_detector(Hard_Detector):
         self.CBox.run_mode(1)
 
     def finish(self):
-        self.CBox.set('acquisition_mode', 0)
+        self.CBox.set('acquisition_mode', 'idle')
+
 
 class CBox_v3_single_integration_average_det(Soft_Detector):
 
@@ -1336,7 +1298,7 @@ class CBox_v3_single_integration_average_det(Soft_Detector):
             except Exception as e:
                 logging.warning(e)
                 logging.warning('Exception caught retrying')
-            self.CBox.set('acquisition_mode', 0)
+            self.CBox.set('acquisition_mode', 'idle')
             i += 1
             if i > 20:
                 break
@@ -1350,11 +1312,12 @@ class CBox_v3_single_integration_average_det(Soft_Detector):
     def prepare(self):
         self.CBox.run_mode(0)
         self.CBox.set('nr_samples', 1)
-        self.CBox.set('acquisition_mode', 0)
+        self.CBox.set('acquisition_mode', 'idle')
         self.CBox.run_mode(1)
 
     def finish(self):
-        self.CBox.set('acquisition_mode', 0)
+        self.CBox.set('acquisition_mode', 'idle')
+
 
 class CBox_v3_single_int_avg_with_LutReload(CBox_v3_single_integration_average_det):
 
@@ -1418,26 +1381,27 @@ class UHFQC_input_average_detector(Hard_Detector):
         self.AWG = AWG
         self.nr_samples = nr_samples
         self.nr_averages = nr_averages
+        print(nr_samples)
 
     def get_values(self):
         self.UHFQC.awgs_0_enable(1)
-        #temp = self.UHFQC.awgs_0_enable()
-        #del temp
+        try:
+            temp = self.UHFQC.awgs_0_enable()
+        except:
+            temp = self.UHFQC.awgs_0_enable()
         if self.AWG is not None:
             self.AWG.start()
-        # while self.UHFQC.awgs_0_enable() == 1:
-        #     time.sleep(0.1)
-        # time.sleep(1)
-        #data = ['']*len(self.channels)
-        # for i, channel in enumerate(self.channels):
-        #     dataset = eval("self.UHFQC.quex_iavg_data_{}()".format(channel))
-        #     data[i] = dataset[0]['vector']
-        data = self.UHFQC.single_acquisition(self.nr_sweep_points,
-                                             self.poll_time, timeout=0,
-                                             channels=set(self.channels),
-                                             mode='iavg')
-        data = np.array([data[key] for key in data.keys()])
-
+        while self.UHFQC.awgs_0_enable() == 1:
+            time.sleep(0.01)
+        data = ['']*len(self.channels)
+        for i, channel in enumerate(self.channels):
+            dataset = eval("self.UHFQC.quex_iavg_data_{}()".format(channel))
+            data[i] = dataset[0]['vector']
+        # data = self.UHFQC.single_acquisition(self.nr_sweep_points,
+        #                                      self.poll_time, timeout=0,
+        #                                      channels=set(self.channels),
+        #                                      mode='iavg')
+        # data = np.array([data[key] for key in data.keys()])
         return data
 
     def prepare(self, sweep_points):
@@ -1446,21 +1410,15 @@ class UHFQC_input_average_detector(Hard_Detector):
         self.UHFQC.quex_iavg_length(self.nr_samples)
         self.UHFQC.quex_iavg_avgcnt(int(np.log2(self.nr_averages)))
         self.UHFQC.awgs_0_userregs_1(1)  # 0 for rl, 1 for iavg
-        self.UHFQC.awgs_0_userregs_0(int(self.nr_averages))  # 0 for rl, 1 for iavg
+        self.UHFQC.awgs_0_userregs_0(
+            int(self.nr_averages))  # 0 for rl, 1 for iavg
         self.nr_sweep_points = self.nr_samples
-        if self.nr_sweep_points < 128:
-            self.poll_time = 0.01
-        elif self.nr_sweep_points < 256:
-            self.poll_time = 0.05
-        elif self.nr_sweep_points < 512:
-            self.poll_time = 0.1
-        else:
-            self.poll_time = 0.7
-
+        self.UHFQC.awgs_0_single(1)
 
     def finish(self):
         if self.AWG is not None:
             self.AWG.stop()
+
 
 class UHFQC_integrated_average_detector(Hard_Detector):
 
@@ -1470,7 +1428,8 @@ class UHFQC_integrated_average_detector(Hard_Detector):
     '''
 
     def __init__(self, UHFQC, AWG, integration_length=1e-6, nr_averages=1024, rotate=False,
-                 channels=[0, 1, 2, 3], cross_talk_suppression=False, seg_per_point=1, **kw):
+                 channels=[0, 1, 2, 3], cross_talk_suppression=False,
+                 **kw):
         super(UHFQC_integrated_average_detector, self).__init__()
         self.UHFQC = UHFQC
         self.name = 'UHFQC_integrated_average'
@@ -1482,13 +1441,7 @@ class UHFQC_integrated_average_detector(Hard_Detector):
             self.value_names[i] = 'w{}'.format(channel)
             self.value_units[i] = 'V'
         self.rotate = rotate
-        if len(self.channels) == 2:
-            self.value_names = ['I', 'Q']
-            self.value_units = ['V', 'V']
-        else:
-            if self.rotate:
-                raise ValueError(
-                    'rortate only possible for two weight_function acquisition')
+
         self.AWG = AWG
         self.nr_averages = nr_averages
         self.integration_length = integration_length
@@ -1496,38 +1449,37 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         self.cross_talk_suppression = cross_talk_suppression
 
     def get_values(self):
-        self.UHFQC.awgs_0_single(1)
         self.UHFQC.awgs_0_enable(1)
         # probing the values to be sure communication is finished before
         try:
-            temp = self.UHFQC.awgs_0_single()
             temp = self.UHFQC.awgs_0_enable()
         except:
-            temp = self.UHFQC.awgs_0_single()
             temp = self.UHFQC.awgs_0_enable()
-
-        print("enable is set to {}".format(temp))
         del temp
         # starting AWG
         if self.AWG is not None:
             self.AWG.start()
 
-        # while self.UHFQC.awgs_0_enable() == 1:
-        #     time.sleep(0.1)
-        # time.sleep(1)
-        # data = ['']*len(self.channels)
-        # for i, channel in enumerate(self.channels):
-        #     dataset = eval("self.UHFQC.quex_rl_data_{}()".format(channel))
-        #     data[i] = dataset[0]['vector']
+        while self.UHFQC.awgs_0_enable() == 1:
+            time.sleep(0.01)
+        data = ['']*len(self.channels)
+        for i, channel in enumerate(self.channels):
+            dataset = eval("self.UHFQC.quex_rl_data_{}()".format(channel))
+            data[i] = dataset[0]['vector']/self.nr_averages
+            if self.cross_talk_suppression:
+                data[i]=data[i]-eval("self.UHFQC.quex_trans_offset_weightfunction_{}()".format(channel))
 
-        data = self.UHFQC.single_acquisition(self.nr_sweep_points,
-                                             self.poll_time, timeout=0,
-                                             channels=set(self.channels))
-        data = np.array([data[key] for key in data.keys()])
+        # data = self.UHFQC.single_acquisition(self.nr_sweep_points,
+        #                                      self.poll_time, timeout=0,
+        #                                      channels=set(self.channels))
+        # data = np.array([data[key] for key in data.keys()])
         if self.rotate:
             return self.rotate_and_normalize(data)
         else:
             return data
+
+    def acquire_data_point(self):
+        return self.get_values()
 
     def rotate_and_normalize(self, data):
         """
@@ -1547,16 +1499,21 @@ class UHFQC_integrated_average_detector(Hard_Detector):
                     cal_one_points=self.cal_points[1])
         return self.corr_data, self.corr_data
 
-    def prepare(self, sweep_points):
+
+    def prepare(self, sweep_points=None):
         if self.AWG is not None:
             self.AWG.stop()
-        self.nr_sweep_points = len(sweep_points)
+        if sweep_points is None:
+            self.nr_sweep_points = 1
+        else:
+            self.nr_sweep_points = len(sweep_points)
         # this sets the result to integration and rotation outcome
         if self.cross_talk_suppression:
-            self.UHFQC.quex_rl_source(0) # 2/0/1 raw/crosstalk supressed /digitized
+            # 2/0/1 raw/crosstalk supressed /digitized
+            self.UHFQC.quex_rl_source(0)
         else:
-            self.UHFQC.quex_rl_source(2) # 2/0/1 raw/crosstalk supressed /digitized
-
+            # 2/0/1 raw/crosstalk supressed /digitized
+            self.UHFQC.quex_rl_source(2)
         self.UHFQC.quex_rl_length(self.nr_sweep_points)
         self.UHFQC.quex_rl_avgcnt(int(np.log2(self.nr_averages)))
         self.UHFQC.quex_wint_length(int(self.integration_length*(1.8e9)))
@@ -1566,18 +1523,12 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         self.UHFQC.awgs_0_userregs_0(
             int(self.nr_averages*self.nr_sweep_points))
         self.UHFQC.awgs_0_userregs_1(0)  # 0 for rl, 1 for iavg
-        if self.nr_sweep_points < 128:
-            self.poll_time = 0.01
-        elif self.nr_sweep_points < 256:
-            self.poll_time = 0.05
-        elif self.nr_sweep_points < 512:
-            self.poll_time = 0.1
-        else:
-            self.poll_time = 0.2
+        self.UHFQC.awgs_0_single(1)
 
     def finish(self):
         if self.AWG is not None:
             self.AWG.stop()
+
 
 class UHFQC_integration_logging_det(Hard_Detector):
 
@@ -1587,7 +1538,7 @@ class UHFQC_integration_logging_det(Hard_Detector):
     '''
 
     def __init__(self, UHFQC, AWG, integration_length=1e-6,
-                 channels=[0, 1, 2, 3], nr_shots=4095,
+                 channels=[0, 1], nr_shots=4095,
                  cross_talk_suppression=False,  **kw):
         super(UHFQC_integration_logging_det, self).__init__()
         self.UHFQC = UHFQC
@@ -1604,34 +1555,32 @@ class UHFQC_integration_logging_det(Hard_Detector):
         self.AWG = AWG
         self.integration_length = integration_length
         self.nr_shots = nr_shots
-        self.cross_talk_suppression=cross_talk_suppression
+        self.cross_talk_suppression = cross_talk_suppression
 
     def get_values(self):
         self.UHFQC.awgs_0_enable(1)
-        self.UHFQC.awgs_0_single(1)
         # probing the values to be sure communication is finished before
         try:
-            temp = self.UHFQC.awgs_0_single()
             temp = self.UHFQC.awgs_0_enable()
         except:
-            temp = self.UHFQC.awgs_0_single()
             temp = self.UHFQC.awgs_0_enable()
         del temp
         # starting AWG
         if self.AWG is not None:
             self.AWG.start()
+        # data = self.UHFQC.single_acquisition(self.nr_shots,
+        #                                      self.poll_time, timeout=0,
+        #                                      channels=set(self.channels))
+        # data = np.array([data[key] for key in data.keys()])
+        while self.UHFQC.awgs_0_enable() == 1:
+            time.sleep(0.01)
 
-        data = self.UHFQC.single_acquisition(self.nr_shots,
-                                             self.poll_time, timeout=0,
-                                             channels=set(self.channels))
-        data = np.array([data[key] for key in data.keys()])
-        # while self.UHFQC.awgs_0_enable() == 1:
-        #     time.sleep(0.1)
-        # time.sleep(1)
-        # data = ['']*len(self.channels)
-        # for i, channel in enumerate(self.channels):
-        #     dataset = eval("self.UHFQC.quex_rl_data_{}()".format(channel))
-        #     data[i] = dataset[0]['vector']
+        data = ['']*len(self.channels)
+        for i, channel in enumerate(self.channels):
+            dataset = eval("self.UHFQC.quex_rl_data_{}()".format(channel))
+            data[i] = dataset[0]['vector']
+            if self.cross_talk_suppression:
+                data[i]=data[i]-eval("self.UHFQC.quex_trans_offset_weightfunction_{}()".format(channel))
         return data
 
     def prepare(self, sweep_points):
@@ -1642,6 +1591,7 @@ class UHFQC_integration_logging_det(Hard_Detector):
 
         # The AWG program uses userregs/0 to define the number o iterations in
         # the loop
+        self.UHFQC.awgs_0_single(1)
         self.UHFQC.awgs_0_userregs_1(0)  # 0 for rl, 1 for iavg
         self.UHFQC.awgs_0_userregs_0(self.nr_shots+1)
         self.UHFQC.quex_rl_length(self.nr_shots)
@@ -1649,18 +1599,11 @@ class UHFQC_integration_logging_det(Hard_Detector):
         self.UHFQC.quex_wint_length(int(self.integration_length*(1.8e9)))
         # this sets the result to integration and rotation outcome
         if self.cross_talk_suppression:
-            self.UHFQC.quex_rl_source(0) # 2/0/1 raw/crosstalk supressed /digitized
+            # 0/1/2 crosstalk supressed /digitized/raw
+            self.UHFQC.quex_rl_source(0)
         else:
-            self.UHFQC.quex_rl_source(2) # 2/0/1 raw/crosstalk supressed /digitized
-
-        if self.nr_shots < 128:
-            self.poll_time = 0.01
-        elif self.nr_shots < 256:
-            self.poll_time = 0.05
-        elif self.nr_shots < 512:
-            self.poll_time = 0.1
-        else:
-            self.poll_time = 0.2
+            # 0/1/2 crosstalk supressed /digitized/raw
+            self.UHFQC.quex_rl_source(2)
 
     def finish(self):
         if self.AWG is not None:
@@ -1697,3 +1640,89 @@ class Chevron_sim(Hard_Detector):
                                       self.dt,
                                       self.simulation_dict['dist_step'])
 
+
+class ATS_integrated_average_continuous_detector(Hard_Detector):
+
+    def __init__(self, ATS, ATS_acq, AWG, seg_per_point=1, normalize=False, rotate=False,
+                 nr_averages=1024, integration_length=1e-6, **kw):
+        '''
+        Integration average detector.
+        '''
+        super().__init__(**kw)
+        self.ATS_acq = ATS_acq
+        self.ATS = ATS
+        self.name = 'ATS_integrated_average_detector'
+        self.value_names = ['I', 'Q']
+        self.value_units = ['a.u.', 'a.u.']
+        self.AWG = AWG
+        self.seg_per_point = seg_per_point
+        self.rotate = rotate
+        self.normalize = normalize
+        self.cal_points = kw.get('cal_points', None)
+        self.nr_averages = nr_averages
+        self.integration_length = integration_length
+
+    def get_values(self):
+        self.AWG.stop()
+        self.AWG.start()
+        data = self.ATS_acq.acquisition()
+        return data
+
+    def rotate_and_normalize(self, data):
+        """
+        Rotates and normalizes
+        """
+        if self.cal_points is None:
+            self.corr_data, self.zero_coord, self.one_coord = \
+                a_tools.rotate_and_normalize_data(
+                    data=data,
+                    cal_zero_points=list(range(-4, -2)),
+                    cal_one_points=list(range(-2, 0)))
+        else:
+            self.corr_data, self.zero_coord, self.one_coord = \
+                a_tools.rotate_and_normalize_data(
+                    data=self.measured_values[0:2],
+                    cal_zero_points=self.cal_points[0],
+                    cal_one_points=self.cal_points[1])
+        return self.corr_data, self.corr_data
+
+    def prepare(self, sweep_points):
+        self.ATS.config(clock_source='INTERNAL_CLOCK',
+                        sample_rate=100000000,
+                        clock_edge='CLOCK_EDGE_RISING',
+                        decimation=0,
+                        coupling=['AC', 'AC'],
+                        channel_range=[2., 2.],
+                        impedance=[50, 50],
+                        bwlimit=['DISABLED', 'DISABLED'],
+                        trigger_operation='TRIG_ENGINE_OP_J',
+                        trigger_engine1='TRIG_ENGINE_J',
+                        trigger_source1='EXTERNAL',
+                        trigger_slope1='TRIG_SLOPE_POSITIVE',
+                        trigger_level1=128,
+                        trigger_engine2='TRIG_ENGINE_K',
+                        trigger_source2='DISABLE',
+                        trigger_slope2='TRIG_SLOPE_POSITIVE',
+                        trigger_level2=128,
+                        external_trigger_coupling='AC',
+                        external_trigger_range='ETR_5V',
+                        trigger_delay=0,
+                        timeout_ticks=0
+                        )
+        self.ATS.update_acquisitionkwargs(samples_per_record=1024,
+                                          records_per_buffer=70,
+                                          buffers_per_acquisition=self.nr_averages,
+                                          channel_selection='AB',
+                                          transfer_offset=0,
+                                          external_startcapture='ENABLED',
+                                          enable_record_headers='DISABLED',
+                                          alloc_buffers='DISABLED',
+                                          fifo_only_streaming='DISABLED',
+                                          interleave_samples='DISABLED',
+                                          get_processed_data='DISABLED',
+                                          allocated_buffers=self.nr_averages,
+                                          buffer_timeout=1000
+                                          )
+
+    def finish(self):
+        pass

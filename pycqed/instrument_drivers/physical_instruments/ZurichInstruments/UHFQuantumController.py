@@ -8,6 +8,7 @@ import numpy as np
 from qcodes.instrument.base import Instrument
 from qcodes.utils import validators as vals
 from fnmatch import fnmatch
+from qcodes.instrument.parameter import ManualParameter
 #from instrument_drivers.physical_instruments.ZurichInstruments import UHFQuantumController as ZI_UHFQC
 
 
@@ -27,7 +28,7 @@ class UHFQC(Instrument):
     EOM
     """
 
-    def __init__(self, name, server_name, device='auto', interface='USB', address='127.0.0.1', port=8004, **kw):
+    def __init__(self, name, device='auto', interface='USB', address='127.0.0.1', port=8004, **kw):
         '''
         Input arguments:
             name:           (str) name of the instrument
@@ -36,7 +37,7 @@ class UHFQC(Instrument):
         '''
         #self.socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1) #suggestion W vlothuizen
         t0 = time.time()
-        super().__init__(name, server_name)
+        super().__init__(name, **kw)
 
         self._daq = zi.ziDAQServer(address, int(port), 5)
         if device.lower() == 'auto':
@@ -138,6 +139,15 @@ class UHFQC(Instrument):
         self.add_parameter('AWG_file',
                            set_cmd=self._do_set_AWG_file,
                            vals=vals.Anything())
+        #storing an offset correction parameter for all weight functions,
+        #this allows normalized calibration when performing cross-talk suppressed
+        #readout
+        for i in range(5):
+            self.add_parameter("quex_trans_offset_weightfunction_{}".format(i),
+                   units='V',
+                   label='RO normalization offset (V)',
+                   initial_value=0.0,
+                   parameter_class=ManualParameter)
         if init:
             self.load_default_settings()
         t1 = time.time()
@@ -202,9 +212,18 @@ class UHFQC(Instrument):
         self.quex_rl_avgcnt(LOG2_RL_AVG_CNT)
         self.quex_rl_source(2)
 
-        # Ready for readout
-        self.quex_iavg_readout(1)
-        self.quex_rl_readout(1)
+        # Ready for readout. Writing a '1' to these nodes activates the automatic readout of results.
+        # This functionality should be used once the ziPython driver has been improved to handle
+        # the 'poll' commands of these results correctly. Until then, we write a '0' to the nodes
+        # to prevent automatic result readout. It is then necessary to poll e.g. the AWG in order to
+        # detect when the measurement is complete, and then manually fetch the results using the 'get'
+        # command. Disabling the automatic result readout speeds up the operation a bit, since we avoid
+        # sending the same data twice.
+        self.quex_iavg_readout(0)
+        self.quex_rl_readout(0)
+
+
+
 
         # The custom firmware will feed through the signals on Signal Input 1 to Signal Output 1 and Signal Input 2 to Signal Output 2
         # when the AWG is OFF. For most practical applications this is not really useful. We, therefore, disable the generation of
@@ -246,7 +265,9 @@ class UHFQC(Instrument):
         h.set('awgModule/compiler/sourcestring', sourcestring)
         h.set('awgModule/compiler/start', 1)
         h.set('awgModule/elf/file', '')
-
+        while h.get('awgModule/progress')['progress'][0] < 1.0:
+            time.sleep(0.01)
+        time.sleep(0.2)
 
     def close(self):
         self._daq.disconnectDevice(self._device)
@@ -275,36 +296,49 @@ class UHFQC(Instrument):
             for c in channels:
                 paths[c] = '/' + self._device + '/quex/rl/data/{}'.format(c)
                 data[c] = []
-                self._daq.subscribe(paths[c])
         else:
             for c in channels:
                 paths[c] = '/' + self._device + '/quex/iavg/data/{}'.format(c)
                 data[c] = []
-                self._daq.subscribe(paths[c])
 
+        # It would be better to move this call in to the initialization function
+        # in order to save time here
+        enable_path = '/' + self._device + '/awgs/0/enable'
+        self._daq.subscribe(enable_path)
 
-        #self._daq.setInt('/' + self._device + '/awgs/0/single', 1)
-        #self._daq.setInt('/' + self._device + '/awgs/0/enable', 1)
+        # Added for testing purposes, remove again according to how the AWG is started
+        self._daq.setInt('/' + self._device + '/awgs/0/single', 1)
+        self._daq.setInt(enable_path, 1)
 
         timeout = 0
-        gotem = [False]*len(channels)
-        while not all(gotem) and timeout < 100:
+        gotit = False
+        while not gotit and timeout < 100:
             dataset = self._daq.poll(acquisition_time, timeout, 4, True)
-            for n, c in enumerate(channels):
-                p = paths[c]
-                if p in dataset:
-                    for v in dataset[p]:
-                        data[c] = np.concatenate((data[c], v['vector']))
-                    if len(data[c]) >= samples:
-                        gotem[n] = True
+            if enable_path in dataset and dataset[enable_path]['value'][0] == 0:
+                gotit = True
+            else:
+                timeout += 1
 
-            timeout += 1
+        if not gotit:
+            print("Error: AWG did not finish in time!")
+            return (None, None)
+
+        gotem = [False]*len(channels)
+        for n, c in enumerate(channels):
+            p = paths[c]
+            dataset = self._daq.get(p, True, 0)
+            if p in dataset:
+                for v in dataset[p]:
+                    data[c] = np.concatenate((data[c], v['vector']))
+                if len(data[c]) >= samples:
+                    gotem[n] = True
 
         if not all(gotem):
             print("Error: Didn't get all results!")
             for n, c in enumerate(channels):
                 print("    : Channel {}: Got {} of {} samples", c, len(data[c]), samples)
             return (None, None)
+
         # print("data type {}".format(type(data)))
         return data
 
@@ -500,16 +534,8 @@ class UHFQC(Instrument):
         values = {}
 
         for p in paths:
-            self._daq.getAsEvent(p)
-
-        tries = 0
-        while len(values) < len(paths) and tries < 10:
-            try:
-                tmp = self._daq.poll(0.001, 500, 4, True)
-                for p in tmp:
-                    values[p] = tmp[p]
-            except ZIException:
-                pass
+            tmp = self._daq.get(p, True, 0)
+            values[p] = tmp[p]
 
         if single:
             return values[paths[0]]
@@ -532,25 +558,21 @@ class UHFQC(Instrument):
             raise KeyError("exceeding AWG range for I channel, all values should be withing +/-1")
         elif np.max(Qwave)>1.0 or np.min(Qwave)<-1.0:
             raise KeyError("exceeding AWG range for Q channel, all values should be withing +/-1")
-        elif len(Iwave)>1493:
-            raise KeyError("exceeding max AWG wave lenght of 1493 samples for I channel, trying to upload {} samples".format(len(Iwave)))
-        elif len(Qwave)>1493:
-            raise KeyError("exceeding max AWG wave lenght of 1493 samples for Q channel, trying to upload {} samples".format(len(Qwave)))
+        elif len(Iwave)>16384:
+            raise KeyError("exceeding max AWG wave lenght of 16384 samples for I channel, trying to upload {} samples".format(len(Iwave)))
+        elif len(Qwave)>16384:
+            raise KeyError("exceeding max AWG wave lenght of 16384 samples for Q channel, trying to upload {} samples".format(len(Qwave)))
 
-        Iwave_strip=",".join(str(bit) for bit in Iwave)
-        Qwave_strip=",".join(str(bit) for bit in Qwave)
-        wave_I_string = "wave Iwave = vect("+Iwave_strip+");\n"
-        wave_Q_string = "wave Qwave = vect("+Qwave_strip+");\n"
-
+        wave_I_string = self.array_to_combined_vector_string(Iwave, "Iwave")
+        wave_Q_string = self.array_to_combined_vector_string(Qwave, "Qwave")
         delay_samples = int(acquisition_delay*1.8e9/8)
         delay_string='\twait({});\n'.format(delay_samples)
-
 
         preamble="""
 const TRIGGER1  = 0x000001;
 const WINT_TRIG = 0x000010;
 const IAVG_TRIG = 0x000020;
-const WINT_EN   = 0x0f0000;
+const WINT_EN   = 0x1f0000;
 
 setTrigger(WINT_EN);
 var loop_cnt = getUserReg(0);
@@ -579,12 +601,37 @@ setTrigger(0);"""
         string = preamble+wave_I_string+wave_Q_string+loop_start+delay_string+end_string
         self.awg_string(string)
 
+    def array_to_combined_vector_string(self, array, name):
+        # this function cuts up arrays into several vectors of maximum length 1024 that are joined.
+        # this is to avoid python crashes (was found to crash for vectors of lenght> 1490)
+        string = 'vect('
+        join = False
+        n = 0
+        while n < len(array):
+            string += '{:.3f}'.format(array[n])
+            if ((n+1) % 1024 != 0) and n < len(array)-1:
+                string += ','
+
+            if ((n+1) % 1024 == 0):
+                string += ')'
+                if n < len(array)-1:
+                    string += ',\nvect('
+                    join = True
+            n += 1
+
+        string += ')'
+        if join:
+            string = 'wave '+ name +' = join(' + string + ');\n'
+        else:
+            string = 'wave '+ name +' = '+ string + ';\n'
+        return string
+
     def awg_sequence_acquisition(self):
         string="""
 const TRIGGER1  = 0x000001;
 const WINT_TRIG = 0x000010;
 const IAVG_TRIG = 0x000020;
-const WINT_EN   = 0x0f0000;
+const WINT_EN   = 0x1f0000;
 
 setTrigger(WINT_EN);
 var loop_cnt = getUserReg(0);
@@ -627,10 +674,10 @@ setTrigger(0);"""
                 eval('self.quex_trans_{}_col_{}_real(matrix[{}][{}])'.format(j,i,i,j))
 
     def download_transformation_matrix(self, nr_rows=4, nr_cols=4):
-        matrix = np.zeros([nr_rows,nr_cols])
+        matrix = np.zeros([nr_rows, nr_cols])
         for i in range(np.shape(matrix)[0]): #looping over the rows
             for j in range(np.shape(matrix)[1]): #looping over the colums
-                matrix[i][j]=(eval('self.quex_trans_{}_col_{}_real()'.format(j,i)))
+                matrix[i][j] = (eval('self.quex_trans_{}_col_{}_real()'.format(j,i)))
                 #print(value)
                 #matrix[i,j]=value
         return matrix

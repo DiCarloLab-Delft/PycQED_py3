@@ -6,6 +6,7 @@ omit =
     tests/*
     instrument_drivers/*
     instrument_drivers/*/*
+    analysis/*
     scripts/*
     utils/reload_code.py
     version.py

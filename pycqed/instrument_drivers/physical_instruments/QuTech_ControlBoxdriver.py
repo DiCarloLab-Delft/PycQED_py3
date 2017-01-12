@@ -15,38 +15,58 @@ pyximport.install(setup_args={"script_args": ["--compiler=msvc"],
                   reload_support=True)
 
 from ._controlbox import defHeaders  # File containing bytestring commands
-from ._controlbox import codec as c
+from ._controlbox import codec as c  # must be below pyximport.install
 
 
 class QuTech_ControlBox(VisaInstrument):
+
     '''
-    This is the qcodes driver for the 250 MS/s control box developed in
+    This is the qcodes driver for the 200 MS/s control box developed in
     collaboration with EWI.
     This is a direct port of the 'old' qtlab driver.
 
     Requirements:
     defHeaders.py,  codec.pyx and working cython installation
-
-    TODO:
-    - test streaming mode
-    - add parameters for lookuptables
-    - Add touch n go parameters (probably not needed for CBox v3?
     '''
 
     def __init__(self, name, address, reset=False, run_tests=False, **kw):
         t0 = time.time()
         super().__init__(name, address)
         # Establish communications
+        self.init_params()
+
+        self.set('measurement_timeout', kw.pop('measurement_timeout', 120))
+
+        t1 = time.time()
+        print('Initialized CBox', self.get('firmware_version'),
+              'in %.2fs' % (t1-t0))
+
+    def add_params(self):
+        self._i_wait = 0  # used in _print_waiting_char()
+
+        # once the demodulation_mode can be get from the FPGA, this
+        # line setting _demodulation_mode should be removed.
+        self._demodulation_mode = 'double'
         self.add_parameter('firmware_version',
                            get_cmd=self._do_get_firmware_version)
         self.add_parameter('acquisition_mode',
                            set_cmd=self._do_set_acquisition_mode,
                            get_cmd=self._do_get_acquisition_mode,
-                           vals=vals.Anything())
+                           vals=vals.Enum('idle', 'integration logging',
+                                          'feedback', 'input averaging',
+                                          'integration averaging',
+                                          'integration streaming',
+                                          'touch \'n go'))
+        self.add_parameter('demodulation_mode',
+                           set_cmd=self._do_set_demodulation_mode,
+                           get_cmd=self._do_get_demodulation_mode,
+                           label='single or double sideband modulation',
+                           # single or double sideband demodulation
+                           vals=vals.Enum('double', 'single'))
         self.add_parameter('run_mode',
                            set_cmd=self._do_set_run_mode,
                            get_cmd=self._do_get_run_mode,
-                           vals=vals.Anything())
+                           vals=vals.Enum('idle', 'run'))
         self.add_parameter('signal_delay',
                            label='signal delay (# samples)',
                            get_cmd=self._do_get_signal_delay,
@@ -57,11 +77,7 @@ class QuTech_ControlBox(VisaInstrument):
                            units='# samples',
                            get_cmd=self._do_get_integration_length,
                            set_cmd=self._do_set_integration_length,
-                           vals=vals.Ints(1, 512))
-        self.add_parameter('demodulation_mode',
-                           set_cmd=self._do_set_demodulation_mode,
-                           get_cmd=self._do_get_demodulation_mode,
-                           vals=vals.Ints(0, 255))
+                           vals=vals.Ints(2, 512))
 
         nr_inputs = 2
         for i in range(nr_inputs):
@@ -90,27 +106,27 @@ class QuTech_ControlBox(VisaInstrument):
 
         self.add_parameter('log_length',
                            label='Log length (# shots)',
+                           units='# shots',
                            get_cmd=self._do_get_log_length,
                            set_cmd=self._do_set_log_length,
-                           vals=vals.Ints(1, 8000))
+                           vals=vals.Ints(1, 8192))
 
         self.add_parameter('nr_samples',
                            label='Number of samples (#)',
                            get_cmd=self._do_get_nr_samples,
                            set_cmd=self._do_set_nr_samples,
-                           vals=vals.Ints(1, 2000))
+                           vals=vals.Ints(1, 2047))
         self.add_parameter('nr_averages',
                            label='Averages per sample (#)',
                            get_cmd=self._do_get_nr_averages,
                            set_cmd=self._do_set_nr_averages,
                            vals=vals.Ints(1, 2**17))
-        self._nr_samples = 200
-        self._nr_averages = 2
-        self._demodulation_mode = 0
         nr_awgs = 3
+        self._dac_offsets = np.empty([3, 2])
+        self._dac_offsets[:] = np.NAN
+        self._awg_mode = [defHeaders.awg_modes[0]]*nr_awgs
+        self._tape = [[0]]*nr_awgs
         for awg_nr in range(nr_awgs):
-            self._awg_mode = [0]*nr_awgs
-            self._tape = [[0]]*nr_awgs
             self.add_parameter(
                 'AWG{}_mode'.format(awg_nr),
                 get_cmd=self._gen_awg_mode_get_func(awg_nr),
@@ -121,7 +137,6 @@ class QuTech_ControlBox(VisaInstrument):
                 get_cmd=self._gen_ch_get_func(self._get_awg_tape, awg_nr),
                 set_cmd=self._gen_ch_set_func(self._set_awg_tape, awg_nr),
                 vals=vals.Anything())
-
             for dac_ch in range(2):
                 self.add_parameter(
                     'AWG{}_dac{}_offset'.format(awg_nr, dac_ch),
@@ -143,73 +158,57 @@ class QuTech_ControlBox(VisaInstrument):
                            get_cmd=self._get_lin_trans_coeffs,
                            vals=vals.Anything())
 
-        # Setting default arguments
-        # print('kw.pop(\'measurement_timeout\', 120): ',
-        #        kw.pop('measurement_timeout', 120))
-        self.set('measurement_timeout', kw.pop('measurement_timeout', 120))
+    def init_params(self):
+        self.add_params()
+        self._acquisition_mode = 'idle'
+        self._demodulation_mode = 'double'
+
+        self.set('demodulation_mode', 'double')
         self.set('acquisition_mode', 'idle')
-        self.set('run_mode', 0)
+        self.set('run_mode', 'idle')
         self.set('signal_delay', 0)
         self.set('integration_length', 100)
         self.set('adc_offset', 0)
-        self.set('log_length', 8000)
+        self.set('log_length', 100)
         self.set('nr_samples', 100)
         self.set('nr_averages', 512)
         self.set('lin_trans_coeffs', [1, 0, 0, 1])
 
-        self._i_wait = 0  # used in _print_waiting_char()
-
-        self._dac_offsets = np.empty([3, 2])
-        self._dac_offsets[:] = np.NAN
-
-        # if run_tests:
-        #     self.run_test_suite()
-        t1 = time.time()
-        print('Initialized CBox', self.get('firmware_version'),
-              'in %.2fs' % (t1-t0))
-
     def run_test_suite(self):
-            from importlib import reload  # Useful for testing
-            from ._controlbox import test_suite
-            reload(test_suite)
-            # pass the CBox to the module so it can be used in the tests
-            self.c = c  # make the codec callable from the testsuite
-            test_suite.CBox = self
-            suite = unittest.TestLoader().loadTestsFromTestCase(
-                test_suite.CBox_tests)
-            unittest.TextTestRunner(verbosity=2).run(suite)
+        from importlib import reload  # Useful for testing
+        from ._controlbox import test_suite
+        reload(test_suite)
+        # pass the CBox to the module so it can be used in the tests
+        self.c = c  # make the codec callable from the testsuite
+        test_suite.CBox = self
+        suite = unittest.TestLoader().loadTestsFromTestCase(
+            test_suite.CBox_tests)
+        unittest.TextTestRunner(verbosity=2).run(suite)
 
     def get_all(self):
         for par in self.parameters:
-                        self[par].get()
+            self[par].get()
         return self.snapshot()
 
     def upload_standard_weights(self, IF):
-            trace_length = 512
-            tbase = np.arange(0, 5*trace_length, 5)*1e-9
-            cosI = np.floor(127.*np.cos(2*np.pi*IF*tbase))
-            sinI = np.floor(127.*np.sin(2*np.pi*IF*tbase))
-            self.sig0_integration_weights(cosI)
-            self.sig1_integration_weights(sinI)
+        trace_length = 512
+        tbase = np.arange(0, 5*trace_length, 5)*1e-9
+        cosI = np.floor(127.*np.cos(2*np.pi*IF*tbase))
+        sinI = np.floor(127.*np.sin(2*np.pi*IF*tbase))
+        self.sig0_integration_weights(cosI)
+        self.sig1_integration_weights(sinI)
 
     def _do_set_measurement_timeout(self, val):
         '''
         Sets the measurement timeout in seconds.
         This is distinct from the timeout of the read operation (5s default)
         '''
-        print('function _do_set_measurement_timeout invoked with parameter timeout = ', val)
+        print(
+            'function _do_set_measurement_timeout invoked with parameter timeout = ', val)
         self._timeout = val
 
     def _do_get_measurement_timeout(self):
         return self._timeout
-
-
-    # TODO: This set does not actually update to the CBox. Requires change.
-    def _do_set_demodulation_mode(self, val):
-        self._demodulation_mode = val
-
-    def _do_get_demodulation_mode(self):
-        return self._demodulation_mode
 
     def _do_get_firmware_version(self):
         message = c.create_message(defHeaders.ReadVersion)
@@ -278,37 +277,11 @@ class QuTech_ControlBox(VisaInstrument):
                     byte_val = iteration_bytes[(cum_bytes_per_val[j-1]):
                                                (cum_bytes_per_val[j])]
                 val = self.decode_byte(byte_val,
-                                       data_bits_per_byte=data_bits_per_byte[j],
+                                       data_bits_per_byte=data_bits_per_byte[
+                                           j],
                                        signed_integer=signed_integer[j])
                 values[i, j] = val
         return values
-
-    # def decode_byte(self, data_bytes, data_bits_per_byte=7,
-    #                 signed_integer=False):
-    #     '''
-    #     Exists for legacy purposes, only used in integration streaming mode.
-    #     Otherwise use the cython version of this function.
-
-    #     Inverse function of encode byte. Protocol is described in docstring
-    #     of encode_byte().
-
-    #     Takes the message data bytes as input, converts them to a a BitArray
-    #     and removes the MSB indicating it is a data byte and puts them together
-    #     '''
-    #     data_bit_val = BitArray()
-    #     # loop over bytes and only add data bits to final BitArray.
-    #     for byte in data_bytes:
-    #         bit_val = BitArray(bin(byte))
-    #         data_bit = bit_val[-data_bits_per_byte:]
-    #         data_bit_val.append(data_bit)
-
-    #     # Convert BitArray to value as unsigned integer
-    #     if signed_integer:
-    #         value = data_bit_val.int
-    #     else:
-    #         value = data_bit_val.uint
-
-    #     return value
 
     def create_message(self, cmd, data_bytes=None,
                        EOM=defHeaders.EndOfMessageHeader):
@@ -339,8 +312,8 @@ class QuTech_ControlBox(VisaInstrument):
         '''
         nr_samples = self.get('nr_samples')
         # Information on the encoding
-        data_bits_per_byte = 7#4
-        bytes_per_value = 4#2
+        data_bits_per_byte = 7  # 4
+        bytes_per_value = 4  # 2
         succes = False
         t0 = time.time()
         # While loop is to make sure measurement finished before querying.
@@ -680,17 +653,18 @@ class QuTech_ControlBox(VisaInstrument):
         cmd = defHeaders.AwgLUTHeader
         data_bytes = bytes()
         data_bytes += (c.encode_byte(awg_nr, 4,
-                       expected_number_of_bytes=1))
+                                     expected_number_of_bytes=1))
         data_bytes += (c.encode_byte(table_nr, 4,
-                       expected_number_of_bytes=1))
+                                     expected_number_of_bytes=1))
         data_bytes += (c.encode_byte(dac_ch, 4,
-                       expected_number_of_bytes=1))
+                                     expected_number_of_bytes=1))
         # This length is substracted by 1, because the FPGA counts from 0
-        # With 1 substracted, the hardware will work properly.  -- 14-7-2015.               # With 1 substracted, the hardware will work properly.  -- 14-7-2015.
+        # With 1 substracted, the hardware will work properly.  -- 14-7-2015.
+        # # With 1 substracted, the hardware will work properly.  -- 14-7-2015.
         data_bytes += (c.encode_byte(length-1, 7,
-                       expected_number_of_bytes=1))
+                                     expected_number_of_bytes=1))
         data_bytes += (c.encode_array(lut,
-                       data_bits_per_byte=7, bytes_per_value=2))
+                                      data_bits_per_byte=7, bytes_per_value=2))
         message = c.create_message(cmd, data_bytes)
         (stat, mesg) = self.serial_write(message)
         if not stat:
@@ -743,15 +717,16 @@ class QuTech_ControlBox(VisaInstrument):
             cmd = defHeaders.AwgTapeHeader
             data_bytes = bytes()
             data_bytes += (c.encode_byte(awg_nr, 4,
-                           expected_number_of_bytes=1))
+                                         expected_number_of_bytes=1))
             data_bytes += (c.encode_byte(length, 7,
-                           expected_number_of_bytes=2))
+                                         expected_number_of_bytes=2))
 
             data_bytes += (c.encode_array(tape, 4, 1))
 
             message = c.create_message(cmd, data_bytes)
             (stat, mesg) = self.serial_write(message)
-            self._tape[awg_nr] = tape  # updates the software version of the tape
+            # updates the software version of the tape
+            self._tape[awg_nr] = tape
 
             return (stat, mesg)
 
@@ -850,7 +825,7 @@ class QuTech_ControlBox(VisaInstrument):
         data_bytes += (c.encode_byte(awg_nr, 4, 1))
         data_bytes += (c.encode_byte(dac_ch_code, 4, 1))
         data_bytes += (c.encode_byte(offset_dac, data_bits_per_byte=7,
-                       expected_number_of_bytes=2))
+                                     expected_number_of_bytes=2))
         message = c.create_message(cmd, data_bytes)
         (stat, mesg) = self.serial_write(message)
         if not stat:
@@ -879,7 +854,7 @@ class QuTech_ControlBox(VisaInstrument):
                             returned.
                             ! this parameter is overloaded and has two different
                               ranges.
-                            Range: [1 - 2000]
+                            Range: [1 - 2047]
                             In input average this corresponds to trace length
                             In integration averaging this corresponds to the
                             number of integration results.
@@ -887,17 +862,17 @@ class QuTech_ControlBox(VisaInstrument):
                            into the averaging calculation.
                         Range: [0 - 17].
         '''
-        if nr_samples < 1 or nr_samples > 2000:  # 2**11: # max is 2000
+        if nr_samples < 1 or nr_samples > 2047:  # 2**11
             raise ValueError
         if avg_size < 0 or avg_size > 17:  # 32: # max is 17
             raise ValueError
 
         cmd = defHeaders.UpdateAverageSettings
         data_bytes = bytes()
-        data_bytes+=(c.encode_byte(nr_samples, 7,
-                          expected_number_of_bytes=2))
-        data_bytes+=(c.encode_byte(avg_size, 7,
-                          expected_number_of_bytes=1))
+        data_bytes += (c.encode_byte(nr_samples, 7,
+                                     expected_number_of_bytes=2))
+        data_bytes += (c.encode_byte(avg_size, 7,
+                                     expected_number_of_bytes=1))
         message = c.create_message(cmd, data_bytes)
         (stat, mesg) = self.serial_write(message)
         if stat:
@@ -927,8 +902,8 @@ class QuTech_ControlBox(VisaInstrument):
         Rounded_avg_size = int(avg_size)
         if avg_size % 1 != 0.0:
             logging.warning(
-                'nr_averages must be power of 2, converting rounding down to 2**%d' \
-                    % Rounded_avg_size)
+                'nr_averages must be power of 2, converting rounding down to 2**%d'
+                % Rounded_avg_size)
 
         if self.get('nr_samples') is not None:
             self.set_averaging_parameters(self.get('nr_samples'),
@@ -968,14 +943,14 @@ class QuTech_ControlBox(VisaInstrument):
         a21_dac = int(a21*2**12)
         a22_dac = int(a22*2**12)
         data_bytes = bytes()
-        data_bytes+=(c.encode_byte(a11_dac, data_bits_per_byte=7,
-                                   expected_number_of_bytes=2))
-        data_bytes+=(c.encode_byte(a12_dac, data_bits_per_byte=7,
-                                   expected_number_of_bytes=2))
-        data_bytes+=(c.encode_byte(a21_dac, data_bits_per_byte=7,
-                                   expected_number_of_bytes=2))
-        data_bytes+=(c.encode_byte(a22_dac, data_bits_per_byte=7,
-                                   expected_number_of_bytes=2))
+        data_bytes += (c.encode_byte(a11_dac, data_bits_per_byte=7,
+                                     expected_number_of_bytes=2))
+        data_bytes += (c.encode_byte(a12_dac, data_bits_per_byte=7,
+                                     expected_number_of_bytes=2))
+        data_bytes += (c.encode_byte(a21_dac, data_bits_per_byte=7,
+                                     expected_number_of_bytes=2))
+        data_bytes += (c.encode_byte(a22_dac, data_bits_per_byte=7,
+                                     expected_number_of_bytes=2))
 
         message = c.create_message(cmd, data_bytes)
         (stat, mesg) = self.serial_write(message)
@@ -994,20 +969,12 @@ class QuTech_ControlBox(VisaInstrument):
         @param length : the number of measurements range (1, 8000)
         @return stat : 0 if the upload succeeded and 1 if the upload failed.
         '''
-        v = self.get('firmware_version')
-        if (int(v[1]) == 2) and (int(int(v[3:5])) >= 15):
-            n_bytes = 3
-        else:
-            # logging.warning('Version != 2.15 using old protocol for\
-            # log length')
-            n_bytes = 2
+        n_bytes = 3
 
         cmd = defHeaders.UpdateLoggerMaxCounterHeader
         data_bytes = c.encode_byte(length-1, 7,
                                    expected_number_of_bytes=n_bytes)
-        # Changed from version 2.15 onwards
         message = c.create_message(cmd, data_bytes)
-        # print("set log length command: ",  format(message, 'x').zfill(8))
         (stat, mesg) = self.serial_write(message)
         if stat:
             self._log_length = length
@@ -1018,39 +985,104 @@ class QuTech_ControlBox(VisaInstrument):
     def _do_get_log_length(self):
         return self._log_length
 
+    def _do_set_demodulation_mode(self, demodulation_mode):
+        if not isinstance(demodulation_mode, str):
+            raise KeyError('demodulation_mode %s not recognized.'
+                           'It should be a string:\'double\', or \'single\'')
+
+        if self.get('acquisition_mode') is not None:
+            tmp_acquisition_mode = self.get('acquisition_mode')
+        else:
+            tmp_acquisition_mode = 'idle'
+
+        self._set_master_controller_working_state(tmp_acquisition_mode,
+                                                 demodulation_mode)
+
+    def _do_get_demodulation_mode(self):
+        return self._demodulation_mode[3:]
+
     def _do_set_acquisition_mode(self, acquisition_mode):
+        if not isinstance(acquisition_mode, str):
+            raise KeyError('acquisition_mode %s not recognized.'
+                           'It should be a string: '
+                           '\'idle\', '
+                           '\'integration logging\', '
+                           '\'feedback\', '
+                           '\'integration averaging\', '
+                           '\'input averaging\', '
+                           '\'integration streaming\', or '
+                           '\'touch \'n go\'.')
+
+        if self.get('demodulation_mode') is not None:
+            tmp_demodulation_mode = self.get('demodulation_mode')
+        else:
+            tmp_demodulation_mode = 'double'
+
+        self._set_master_controller_working_state(acquisition_mode,
+                                                  tmp_demodulation_mode)
+
+    def _set_master_controller_working_state(self, acquisition_mode,
+                                            demodulation_mode):
         '''
         @param acquisition_mode : acquisition_mode of the fpga,
-            0 = idle,
-            1 = integration logging mode,
-            2 = feedback mode,
-            3 = input_average.
-            4 = integration_averaging
-            5 = integration_streaming
-            6 = touch 'n go
+            > idle,
 
-        srcw1_int denotes the adc input mode. When set at 1, ADC input 1 is used with
+            > integration logging mode,
+            > feedback mode,
+            > input_average.
+            > integration_averaging
+            > integration_streaming
+            > touch 'n go
+
+        @param demodulation_mode: the method to demodulate the signal:
+                        > double side band demodulation (default),
+                        > single side band demodulation.
+
+        demodulation_mode_int denotes the adc input mode. When set at 1, ADC input 1 is used with
         both weights(0 and 1). Otherwise, weights are applied to each ADC input:
         ADC 1 is mutiplied by weight0 and ADC 2 is multiplied by weight1.
         @return stat : True if the upload succeeded and False if the upload
                        failed
         '''
-        srcw1_int = self._demodulation_mode
-        acquisition_mode = str(acquisition_mode)
+        if not isinstance(acquisition_mode, str):
+            raise KeyError('acquisition_mode %s not recognized.'
+                           'It should be a string: '
+                           '\'idle\', '
+                           '\'integration logging\', '
+                           '\'feedback\', '
+                           '\'integration averaging\', '
+                           '\'input averaging\', '
+                           '\'integration streaming\', or '
+                           '\'touch \'n go\'.')
+
+        if not isinstance(demodulation_mode, str):
+            raise KeyError('demodulation_mode %s not recognized.'
+                           'It should be a string:\'double\', or \'single\'')
+
         mode_int = None
         for i in range(len(defHeaders.acquisition_modes)):
             if acquisition_mode.upper() in\
-                   defHeaders.acquisition_modes[i].upper():
+                    defHeaders.acquisition_modes[i].upper():
                 mode_int = i
                 break
         if mode_int is None:
             raise KeyError('acquisition_mode %s not recognized')
         if mode_int == 3 and self._log_length > 8000:
             logging.warning('Log length can be max 8000 in int. log. mode')
+
+        demodulation_mode_int = None
+        for i in range(len(defHeaders.demodulation_modes)):
+            if demodulation_mode.upper() in defHeaders.demodulation_modes[i].upper():
+                demodulation_mode_int = i
+                break
+        if demodulation_mode_int is None:
+            raise KeyError('demodulation_mode %s not recognized')
+
         # Here the actual acquisition_mode is set
         cmd = defHeaders.UpdateModeHeader
         data_bytes = c.encode_byte(mode_int, 7, expected_number_of_bytes=1)
-        data_bytes += c.encode_byte(srcw1_int, 7, expected_number_of_bytes=1)
+        data_bytes += c.encode_byte(demodulation_mode_int,
+                                    7, expected_number_of_bytes=1)
         message = c.create_message(cmd, data_bytes)
         (stat, mesg) = self.serial_write(message)
         if stat:
@@ -1066,7 +1098,7 @@ class QuTech_ControlBox(VisaInstrument):
     def _do_set_run_mode(self, run_mode):
         '''
         @param mode : mode of the fpga,
-            0 = stop,
+            0 = idle,
             1 = run,
         @return stat :True if the upload succeeded and False if the upload
                       failed.
@@ -1115,6 +1147,11 @@ class QuTech_ControlBox(VisaInstrument):
 
         @return stat : 0 if the upload succeeded and 1 if the upload failed.
         '''
+        if not isinstance(awg_mode, str):
+            raise KeyError('awg_mode %s not recognized'
+                           'It should be a string: \'Codeword-trigger\','
+                           ' \'No-codeword\', \'Tape\', or \'Segmented tape\'.')
+
         awg_mode = str(awg_mode)
         mode_int = None
         for i in range(len(defHeaders.awg_modes)):
@@ -1136,7 +1173,7 @@ class QuTech_ControlBox(VisaInstrument):
         return (stat, message)
 
     def _get_awg_mode(self, awg_nr):
-        return self._awg_mode[awg_nr]
+        return self._awg_mode[awg_nr][3:]
 
     def _do_set_adc_offset(self, adc_offset):
         '''
@@ -1191,12 +1228,10 @@ class QuTech_ControlBox(VisaInstrument):
         '''
         set length of the signal for integration.
 
-        @param length : number of samples of the integration delay, (1,512)
+        @param length : number of samples of the integration delay, (2,512)
 
-        Warning! this is the excpetion that is one nibble (4bit/bte) and one
-        5 bit/byte). Range is limited until VHDL code is updated.
         '''
-        if length < 0 or length > 512:
+        if length < 2 or length > 512:
             raise ValueError
         cmd = defHeaders.UpdIntegrationLengthHeader
         data_bytes = c.encode_byte(length, 7, expected_number_of_bytes=2)
@@ -1392,7 +1427,7 @@ class QuTech_ControlBox(VisaInstrument):
         in_wait = self.visa_handle.bytes_in_buffer
         while in_wait > 0:  # Clear any leftover messages in the buffer
             self.visa_handle.clear()
-            print("Extra flush! Flushed %s bytes" % in_wait)
+            logging.warning("Extra flush! Flushed %s bytes" % in_wait)
             in_wait = self.visa_handle.bytes_in_buffer
         self.visa_handle.write_raw(command)
         # Done writing , verify message executed
@@ -1439,7 +1474,7 @@ class QuTech_ControlBox(VisaInstrument):
                              tng_heartbeat_interval)
         if (self.tng_burst_heartbeat_interval*self.tng_burst_heartbeat_n >
                 tng_heartbeat_interval):
-            raise ValueError('%s x %s does not fit in the heartbeatinterval %s'%(
+            raise ValueError('%s x %s does not fit in the heartbeatinterval %s' % (
                              self.tng_burst_heartbeat_interval,
                              self.tng_burst_heartbeat_n,
                              tng_heartbeat_interval))
@@ -1466,7 +1501,7 @@ class QuTech_ControlBox(VisaInstrument):
                              tng_burst_heartbeat_interval)
         if tng_burst_heartbeat_interval*self.tng_burst_heartbeat_n > self.tng_heartbeat_interval:
             #self.tng_burst_heartbeat_interval = self.tng_heartbeat_interval
-            raise ValueError('%s x %s does not fit in the heartbeatinterval %s.'%(
+            raise ValueError('%s x %s does not fit in the heartbeatinterval %s.' % (
                              tng_burst_heartbeat_interval,
                              self.tng_burst_heartbeat_n,
                              self.tng_heartbeat_interval))
@@ -1509,7 +1544,6 @@ class QuTech_ControlBox(VisaInstrument):
 
     def _do_get_tng_burst_heartbeat_n(self):
         return self.tng_burst_heartbeat_n
-
 
     def _do_set_tng_readout_delay(self, tng_readout_delay):
         '''
@@ -1566,7 +1600,6 @@ class QuTech_ControlBox(VisaInstrument):
         self.tng_calibration_mode = tng_calibration_mode
         self._set_touch_n_go_parameters()
 
-
     def _do_get_tng_calibration_mode(self):
         return self.tng_calibration_mode
 
@@ -1583,7 +1616,6 @@ class QuTech_ControlBox(VisaInstrument):
             raise ValueError("%s is not a three bit integer")
         self.tng_awg_mask = tng_awg_mask
         self._set_touch_n_go_parameters()
-
 
     def _do_get_tng_awg_mask(self):
         return self.tng_awg_mask
@@ -1607,7 +1639,6 @@ class QuTech_ControlBox(VisaInstrument):
         self.tng_readout_pulse_length = tng_readout_pulse_length
         self._set_touch_n_go_parameters()
 
-
     def _do_get_tng_readout_pulse_length(self):
         return self.tng_readout_pulse_length
 
@@ -1622,13 +1653,13 @@ class QuTech_ControlBox(VisaInstrument):
         '''
         if tng_readout_wave_interval < 10 or tng_readout_wave_interval > 640:
             raise ValueError("%s, out of range 10 to 640 ns"
-                             %tng_readout_wave_interval)
+                             % tng_readout_wave_interval)
         if np.mod(tng_readout_wave_interval, 5) != 0.0:
-            raise ValueError("%s, not multiple of 5 ns" %tng_readout_wave_interval)
+            raise ValueError("%s, not multiple of 5 ns" %
+                             tng_readout_wave_interval)
 
         self.tng_readout_wave_interval = tng_readout_wave_interval
         self._set_touch_n_go_parameters()
-
 
     def _do_get_tng_readout_wave_interval(self):
         return self.tng_readout_wave_interval
@@ -1641,9 +1672,10 @@ class QuTech_ControlBox(VisaInstrument):
         '''
         if tng_output_trigger_delay < 0 or tng_output_trigger_delay > 6300:
             raise ValueError("%s, out of range 0 to 6300 ns"
-                             %tng_output_trigger_delay)
+                             % tng_output_trigger_delay)
         if np.mod(tng_output_trigger_delay, 100) != 0.0:
-            raise ValueError("%s, not multiple of 100 ns" %tng_output_trigger_delay)
+            raise ValueError("%s, not multiple of 100 ns" %
+                             tng_output_trigger_delay)
 
         self.tng_output_trigger_delay = tng_output_trigger_delay
         self._set_touch_n_go_parameters()
@@ -1774,10 +1806,10 @@ class QuTech_ControlBox(VisaInstrument):
         cmd = defHeaders.UpdateSequencerParametersHeader
         data_bytes = bytearray()
         data_bytes.extend(c.encode_byte(heartbeat_interval, 7,
-                          expected_number_of_bytes=2))
+                                        expected_number_of_bytes=2))
         data_bytes.extend(c.encode_byte(burst_heartbeat_interval, 7, 1))
         data_bytes.extend(c.encode_byte(burst_heartbeat_n, 7,
-                          expected_number_of_bytes=2))
+                                        expected_number_of_bytes=2))
         data_bytes.extend(c.encode_byte(readout_delay, 7, 1))
         # Comment back in for v 2.12 +
         data_bytes.extend(c.encode_byte(second_pre_rot_delay, 7, 1))

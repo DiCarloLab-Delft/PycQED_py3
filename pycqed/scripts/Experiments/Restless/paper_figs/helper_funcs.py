@@ -17,22 +17,22 @@ def running_mean(x, N):
 
 
 def calc_T1_limited_fidelity(T1, pulse_delay):
-        '''
-        input:
-            T1: (float) T1 in s
-            pulse_delay: (float) in s length between start of pulses
-        return:
-            F_cl, p
+    '''
+    input:
+        T1: (float) T1 in s
+        pulse_delay: (float) in s length between start of pulses
+    return:
+        F_cl, p
 
-        Formula from Asaad et al.
-        pulse separation is time between start of pulses
-        '''
-        Np = 1.875  # Number of gates per Clifford
-        F_cl = (1/6*(3 + 2*np.e**(-1*pulse_delay/(2*T1)) +
-                     np.e**(-pulse_delay/T1)))**Np
-        p = 2*F_cl - 1
+    Formula from Asaad et al.
+    pulse separation is time between start of pulses
+    '''
+    Np = 1.875  # Number of gates per Clifford
+    F_cl = (1/6*(3 + 2*np.e**(-1*pulse_delay/(2*T1)) +
+                 np.e**(-pulse_delay/T1)))**Np
+    p = 2*F_cl - 1
 
-        return F_cl, p
+    return F_cl, p
 
 
 def get_duration_in_min(a):
@@ -50,8 +50,8 @@ def t_stampt_to_hours(timestamp, start_timestamp):
 
 def t_stampt_to_seconds(timestamp, start_timestamp):
     return 3600*(float(timestamp[-2:])/3600+float(timestamp[-4:-2])/60
-                  + float(timestamp[-6:-4])
-            + 24*float(timestamp[-9:-7]))-24*float(start_timestamp[-9:-7])
+                 + float(timestamp[-6:-4])
+                 + 24*float(timestamp[-9:-7]))-24*float(start_timestamp[-9:-7])
 
 
 def extract_durations(start_timestamp, end_timestamp, label):
@@ -79,9 +79,9 @@ def extract_data(start_timestamp, end_timestamp, label):
         cl_idx1 = a.measurementstring.find('cl')
 
         if 'conv' in label:
-            cl_idx0 = a.measurementstring.find('l_') # for conventional
+            cl_idx0 = a.measurementstring.find('l_')  # for conventional
         else:
-            cl_idx0 = a.measurementstring.find('s_') # for restless
+            cl_idx0 = a.measurementstring.find('s_')  # for restless
         n_cl = int(a.measurementstring[cl_idx0+2:cl_idx1])
         a.get_naming_and_values()
         a.sweep_points
@@ -181,8 +181,10 @@ def extract_mn_sig_from_data_dict(data_dict):
             mean_eps[i, j] = np.mean(np.mean(data_dict[n_cl][att], axis=1))
             std_eps[i, j] = np.mean(np.std(data_dict[n_cl][att], axis=1))
             # Standard error of mean on the 10 means and 10 std's measured
-            sem_eps[i, j] = scipy.stats.sem(np.mean(data_dict[n_cl][att], axis=1))
-            sem_std[i, j] = scipy.stats.sem(np.std(data_dict[n_cl][att], axis=1))
+            sem_eps[i, j] = scipy.stats.sem(
+                np.mean(data_dict[n_cl][att], axis=1))
+            sem_std[i, j] = scipy.stats.sem(
+                np.std(data_dict[n_cl][att], axis=1))
     return n_cls, atts, mean_eps, std_eps, sem_eps, sem_std, data_dict
 
 
@@ -215,14 +217,18 @@ def extract_verification_data(start_timestamp, end_timestamp):
                      'in1_out1_phase': np.zeros(cycles/2)}
     Dux_rstl_dict = deepcopy(Dux_trad_dict)
     m = ma.MeasurementAnalysis(auto=False, timestamp=timestamps_T1[0])
-    starting_time = t_stampt_to_hours(m.timestamp, start_timestamp=start_timestamp)
+    starting_time = t_stampt_to_hours(
+        m.timestamp, start_timestamp=start_timestamp)
 
     # extracting T1 data
     for j in range(cycles):
         m = ma.MeasurementAnalysis(auto=False, timestamp=timestamps_T1[j])
-        T1_dict['time'][j] = t_stampt_to_hours(m.timestamp, start_timestamp=start_timestamp) - starting_time
-        T1_dict['mean'][j] = m.data_file['Analysis']['Fitted Params F|1>']['tau'].attrs['value']
-        T1_dict['stderr'][j] = m.data_file['Analysis']['Fitted Params F|1>']['tau'].attrs['stderr']
+        T1_dict['time'][j] = t_stampt_to_hours(
+            m.timestamp, start_timestamp=start_timestamp) - starting_time
+        T1_dict['mean'][j] = m.data_file['Analysis'][
+            'Fitted Params F|1>']['tau'].attrs['value']
+        T1_dict['stderr'][j] = m.data_file['Analysis'][
+            'Fitted Params F|1>']['tau'].attrs['stderr']
         T1_val = uncertainties.ufloat(T1_dict['mean'][j], T1_dict['stderr'][j])
         F_T1, p_T1 = calc_T1_limited_fidelity(T1_val, 20e-9)
         T1_dict['F'][j] = 100*F_T1.nominal_value
@@ -235,14 +241,20 @@ def extract_verification_data(start_timestamp, end_timestamp):
         m = ma.MeasurementAnalysis(auto=False, timestamp=timestamps_RB[2*j])
         RB_trad_dict['time'][j] = t_stampt_to_hours(
             m.timestamp, start_timestamp=start_timestamp) - starting_time
-        RB_trad_dict['F'][j] = 100*m.data_file['Analysis']['Fitted Params Double_curve_RB']['fidelity_per_Clifford'].attrs['value']
-        RB_trad_dict['F_std'][j] = 100*m.data_file['Analysis']['Fitted Params Double_curve_RB']['fidelity_per_Clifford'].attrs['stderr']
-        RB_trad_dict['offset'][j] = m.data_file['Analysis']['Fitted Params Double_curve_RB']['offset'].attrs['value']
-        RB_trad_dict['offset_std'][j] = m.data_file['Analysis']['Fitted Params Double_curve_RB']['offset'].attrs['stderr']
+        RB_trad_dict['F'][j] = 100*m.data_file['Analysis'][
+            'Fitted Params Double_curve_RB']['fidelity_per_Clifford'].attrs['value']
+        RB_trad_dict['F_std'][j] = 100*m.data_file['Analysis'][
+            'Fitted Params Double_curve_RB']['fidelity_per_Clifford'].attrs['stderr']
+        RB_trad_dict['offset'][j] = m.data_file['Analysis'][
+            'Fitted Params Double_curve_RB']['offset'].attrs['value']
+        RB_trad_dict['offset_std'][j] = m.data_file['Analysis'][
+            'Fitted Params Double_curve_RB']['offset'].attrs['stderr']
         Dux_trad_dict['in1_out1_attenuation'][j] = \
-            m.data_file['Instrument settings']['Dux'].attrs['in1_out1_attenuation']
+            m.data_file['Instrument settings'][
+                'Dux'].attrs['in1_out1_attenuation']
         Dux_trad_dict['in2_out1_attenuation'][j] = \
-            m.data_file['Instrument settings']['Dux'].attrs['in2_out1_attenuation']
+            m.data_file['Instrument settings'][
+                'Dux'].attrs['in2_out1_attenuation']
         Dux_trad_dict['in1_out1_phase'][j] = \
             m.data_file['Instrument settings']['Dux'].attrs['in1_out1_phase']
 
@@ -251,14 +263,20 @@ def extract_verification_data(start_timestamp, end_timestamp):
         m = ma.MeasurementAnalysis(auto=False, timestamp=timestamps_RB[2*j+1])
         RB_rstl_dict['time'][j] = t_stampt_to_hours(
             m.timestamp, start_timestamp=start_timestamp) - starting_time
-        RB_rstl_dict['F'][j] = 100*m.data_file['Analysis']['Fitted Params Double_curve_RB']['fidelity_per_Clifford'].attrs['value']
-        RB_rstl_dict['F_std'][j] = 100*m.data_file['Analysis']['Fitted Params Double_curve_RB']['fidelity_per_Clifford'].attrs['stderr']
-        RB_rstl_dict['offset'][j] = m.data_file['Analysis']['Fitted Params Double_curve_RB']['offset'].attrs['value']
-        RB_rstl_dict['offset_std'][j] = m.data_file['Analysis']['Fitted Params Double_curve_RB']['offset'].attrs['stderr']
+        RB_rstl_dict['F'][j] = 100*m.data_file['Analysis'][
+            'Fitted Params Double_curve_RB']['fidelity_per_Clifford'].attrs['value']
+        RB_rstl_dict['F_std'][j] = 100*m.data_file['Analysis'][
+            'Fitted Params Double_curve_RB']['fidelity_per_Clifford'].attrs['stderr']
+        RB_rstl_dict['offset'][j] = m.data_file['Analysis'][
+            'Fitted Params Double_curve_RB']['offset'].attrs['value']
+        RB_rstl_dict['offset_std'][j] = m.data_file['Analysis'][
+            'Fitted Params Double_curve_RB']['offset'].attrs['stderr']
         Dux_rstl_dict['in1_out1_attenuation'][j] = \
-            m.data_file['Instrument settings']['Dux'].attrs['in1_out1_attenuation']
+            m.data_file['Instrument settings'][
+                'Dux'].attrs['in1_out1_attenuation']
         Dux_rstl_dict['in2_out1_attenuation'][j] = \
-            m.data_file['Instrument settings']['Dux'].attrs['in2_out1_attenuation']
+            m.data_file['Instrument settings'][
+                'Dux'].attrs['in2_out1_attenuation']
         Dux_rstl_dict['in1_out1_phase'][j] = \
             m.data_file['Instrument settings']['Dux'].attrs['in1_out1_phase']
 
@@ -295,29 +313,29 @@ def latexify(fig_width=None, fig_height=None, columns=1):
               "so will reduce to" + MAX_HEIGHT_INCHES + "inches.")
         fig_height = MAX_HEIGHT_INCHES
 
-    params = {#'backend': 'ps',
-#               'text.latex.preamble': [r'\usepackage{gensymb}'],
-              'lines.markersize': 5,
-              'axes.labelsize': 8, # fontsize for x and y labels (was 10)
-              'axes.labelpad': 0,
-              'axes.titlesize': 8,
-              'text.fontsize': 8, # was 10
-              'legend.fontsize': 8, # was 10
-              'xtick.labelsize': 8,
-              'ytick.labelsize': 8,
+    params = {  # 'backend': 'ps',
+        #               'text.latex.preamble': [r'\usepackage{gensymb}'],
+        'lines.markersize': 5,
+        'axes.labelsize': 8,  # fontsize for x and y labels (was 10)
+        'axes.labelpad': 0,
+        'axes.titlesize': 8,
+        'text.fontsize': 8,  # was 10
+        'legend.fontsize': 8,  # was 10
+        'xtick.labelsize': 8,
+        'ytick.labelsize': 8,
 
-              'axes.labelpad': 0.2,
-#               'text.usetex': True,
-              'figure.figsize': [fig_width, fig_height],
-              'font.family': 'sans-serif',
-              'font.sans-serif': 'arial',
-              'legend.fontsize': 8,
-              'legend.numpoints': 1,
-              'legend.frameon': False,
-              'legend.markerscale': .75,
-              'legend.handlelength': 2,
-              'legend.columnspacing': 1,
-              'legend.handletextpad': .2
+        'axes.labelpad': 0.2,
+        #               'text.usetex': True,
+        'figure.figsize': [fig_width, fig_height],
+        'font.family': 'sans-serif',
+        'font.sans-serif': 'arial',
+        'legend.fontsize': 8,
+        'legend.numpoints': 1,
+        'legend.frameon': False,
+        'legend.markerscale': .75,
+        'legend.handlelength': 2,
+        'legend.columnspacing': 1,
+        'legend.handletextpad': .2
     }
 
     plt.rcParams.update(params)

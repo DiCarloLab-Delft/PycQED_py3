@@ -1,31 +1,48 @@
-import sys
+import logging
 import numpy as np
-import csv
-from scipy import optimize
-from scipy import interpolate
-from scipy import constants
 from scipy import special
-import lmfit
-from analysis import fitting_models as fit_mods
 
-# heaviside function
-heaviside = lambda t: t >= 0
 
-# unit impulse function
-square = lambda t, width=1: heaviside(t)-heaviside(t-width)
+def heaviside(t):
+    return t >= 0
+
+
+def square(t, width=1, t0=0):
+    return heaviside(t-t0)-heaviside(t-t0-width)
 
 # generic function calculating the htilde (discrete impulse response) from
 # a known step function
 htilde = lambda fun, t, params, width=1: fun(t, params)-fun(t-width, params)
 
-filter_matrix_generic = lambda fun, t, *params: np.sum(np.array(map(lambda ii:
-                                                                    np.diag(fun(t[ii], *params)*np.ones(len(t)-ii), k=-ii), range(len(t)))), 0)
-kernel_generic = lambda fun, t, * \
-    params: np.linalg.inv(filter_matrix_generic(fun, t, *params))[:, 0]
+
+filter_matrix_generic = lambda fun, t, *params: np.sum(
+    np.array(map(lambda ii: np.diag(fun(t[ii], *params)*np.ones(len(t)-ii), k=-ii), range(len(t)))), 0)
+
+
+def kernel_generic(fun, t, *params):
+    return np.linalg.inv(filter_matrix_generic(fun, t, *params))[:, 0]
+
+
+def kernel_generic2(fun, t, *params):
+    return np.linalg.inv(filter_matrix_generic2(fun, t, *params))[:, 0]
+
+
+def filter_matrix_generic2(fun, t, *params):
+    A = np.zeros((len(t), len(t)))
+    for i in range(len(t)):
+        for j in range(len(t)):
+            if t[i] < t[j]:
+                A[i, j] = 0.
+            else:
+                A[i, j] = heaviside(i-j)*fun(t[i]-t[j], *params)
+    return A
 
 
 def save_kernel(kernel, save_file=None):
     '''Save kernel to specified kernels directory.'''
+    # TODO: make this into a smarter safe function using the datadir of the
+    # kernel object
+    logging.warning('this does not save where you think it does')
     if save_file is None:
         save_file = kernel_name
     with open(kernel_path+save_file+'.txt', 'w') as f:
@@ -56,6 +73,7 @@ def kernel_from_kernel_stepvec(kernel_stepvec, width=1):
     kernel_out = np.zeros(kernel_stepvec.shape)
     kernel_out[:width] = kernel_stepvec[:width]
     kernel_out[width:] = kernel_stepvec[width:]-kernel_stepvec[:-width]
+    # kernel_out = kernel_out / np.sum(kernel_out)
     return kernel_out
 
 
@@ -64,12 +82,16 @@ def kernel_from_kernel_stepvec(kernel_stepvec, width=1):
 step_lowpass = lambda t, tau: heaviside(t+1)*(1-np.exp(-(t+1)/tau))
 htilde_lowpass = lambda t, tau: htilde(step_lowpass, t, tau)
 
+
 # response functions for the low-pass filter arising from the skin effect of a coax
 # model parameter: alpha (attenuation at 1 GHz)
-step_skineffect = lambda t, alpha: heaviside(
-    t+1)*(1-special.erf(alpha/21./np.sqrt(t+1)))
-htilde_skineffect = lambda t, alpha: htilde(step_skineffect, t, alpha)
+def step_skineffect(t, alpha):
+    # Surpresses the numpy divide by zero warning temporarily
+    with np.errstate(divide='ignore'):
+        return heaviside(t+1)*(1-special.erf(alpha/21./np.sqrt(t+1)))
 
+htilde_skineffect = lambda t, alpha: step_skineffect(
+    t, alpha) - step_skineffect(t-1, alpha)
 # response functions for the high-pass filter arising from a bias-tee, modelled as a simple single-pole high-pass filter
 # model parameter: tau (time constant)
 step_biastee = lambda t, tau: heaviside(t)*(np.exp(-t/tau))
@@ -206,7 +228,8 @@ def step_raw(file_name, process_step=True, step_params=None, norm_type='max'):
                         'must specify "step_top" if "norm_type" is not "max"')
 
         step_norm = (
-            step-step_params['baseline'])/(step_params['step_top']-step_params['baseline'])
+            step-step_params['baseline'])/(step_params['step_top'] -
+                                           step_params['baseline'])
 
         return step_norm, step_params
 
@@ -262,10 +285,12 @@ def htilde_sampled(file_name, step_width_ns, points_per_ns, step_params=None, no
     return my_htilde[idx_sample.astype(int)+int(my_step_width_points/2)], t_sample+step_width_ns/2
 
 
-def kernel_sampled(file_name, step_width_ns, points_per_ns, step_params=None, max_points=600, return_step=True, norm_type='max'):
+def kernel_sampled(file_name, step_width_ns, points_per_ns, step_params=None,
+                   max_points=600, return_step=True, norm_type='max'):
 
     my_htilde_sampled, my_htilde_t_sampled = htilde_sampled(
-        file_name, step_width_ns, points_per_ns, step_params=step_params, norm_type=norm_type)
+        file_name, step_width_ns, points_per_ns, step_params=step_params,
+        norm_type=norm_type)
     if max_points is None:
         max_points = len(my_htilde_sampled)
     my_filter_matrix = filter_matrix_from_htilde(
@@ -275,13 +300,15 @@ def kernel_sampled(file_name, step_width_ns, points_per_ns, step_params=None, ma
 
     if return_step:
         my_kernel_step = np.dot(
-            np.linalg.inv(my_filter_matrix), np.ones((len(my_filter_matrix), 1))).flatten()
+            np.linalg.inv(my_filter_matrix),
+            np.ones((len(my_filter_matrix), 1))).flatten()
         return my_kernel, my_kernel_step
     else:
         return my_kernel
 
 
-def get_all_sampled(file_name, step_width_ns, points_per_ns, max_points=600, step_params=None, norm_type='max'):
+def get_all_sampled(file_name, step_width_ns, points_per_ns, max_points=600,
+                    step_params=None, norm_type='max'):
 
     f = open('kernels\\'+file_name, 'r')
     step_direct = np.double(f.readlines())
@@ -303,12 +330,15 @@ def get_all_sampled(file_name, step_width_ns, points_per_ns, max_points=600, ste
     t_my_htilde_raw = (np.arange(my_step_width_points, len(
         my_step_zeros))-my_step_params['step_start'])/np.float(points_per_ns)
     my_step_sampled, t_my_step_sampled = step_sampled(
-        file_name, step_width_ns, points_per_ns, step_params=step_params, norm_type=norm_type)
+        file_name, step_width_ns, points_per_ns, step_params=step_params,
+        norm_type=norm_type)
     my_htilde_sampled, t_my_htilde_sampled = htilde_sampled(
-        file_name, step_width_ns, points_per_ns, step_params=step_params, norm_type=norm_type)
+        file_name, step_width_ns, points_per_ns, step_params=step_params,
+        norm_type=norm_type)
 
     my_kernel_simple, my_kernel_step = kernel_sampled(
-        file_name, step_width_ns, points_per_ns, step_params=step_params, max_points=max_points, return_step=True, norm_type=norm_type)
+        file_name, step_width_ns, points_per_ns, step_params=step_params,
+        max_points=max_points, return_step=True, norm_type=norm_type)
     t_my_kernel = np.arange(len(my_kernel_step))*step_width_ns
 
     output_dict = {}
@@ -328,6 +358,7 @@ def get_all_sampled(file_name, step_width_ns, points_per_ns, max_points=600, ste
     output_dict['t_kernel'] = t_my_kernel
 
     return output_dict
+
 kernel_path = 'D:\\GitHubRepos\\iPython-Notebooks\\Experiments\\1607_Qcodes_5qubit\\kernels\\'
 kernel_name = 'my_current_kernel'
 matrix_kernel_time = 400.
@@ -343,3 +374,61 @@ matrix_kernel_time = 400.
 #                  'bounce':get_bounce_response,
 #                  'scope':get_scope_trace_params,
 #                  'on_chip':get_on_chip_response}
+
+
+def bounce_kernel(amp=0.02, time=4, length=601):
+    """
+    Generates a bounce kernel, with the specified parameters.
+
+    kernel_step_function:
+        heaviside(t) + amp*heaviside(t-time)
+    """
+    bounce = lambda t, amp, time: heaviside(
+        t) - amp*np.double((t+1) > time)*heaviside(t)
+    htilde_bounce = lambda t, time: bounce(
+        t, amp, time) - bounce(t-1, amp, time)
+    t_kernel = np.arange(length)
+    if abs(amp) > 0.:
+        kernel_bounce = kernel_generic2(htilde_bounce, t_kernel, time)
+    else:
+        kernel_bounce = np.zeros(length)
+        kernel_bounce[0] = 1.
+    kernel_bounce = kernel_bounce / np.sum(kernel_bounce)
+    return kernel_bounce
+
+
+def decay_kernel(amp=1., tau=11000, length=2000):
+    """
+    Generates a decay kernel, with the specified parameters
+
+    kernel_step_function
+        1 + amp*np.exp(-t_kernel/tau)
+    """
+    tau_k = (1.-amp)*tau
+    amp_k = amp/(amp-1)
+    t_kernel = np.arange(length)
+    if abs(amp) > 0.:
+        kernel_decay_step = 1 + amp_k*np.exp(-t_kernel/tau_k)
+        kernel_decay = np.zeros(kernel_decay_step.shape)
+        kernel_decay[0] = kernel_decay_step[0]
+        kernel_decay[1:] = kernel_decay_step[1:]-kernel_decay_step[:-1]
+    else:
+        kernel_decay = np.zeros(length)
+        kernel_decay[0] = 1.
+    return kernel_decay
+
+
+def skin_kernel(alpha=0., length=601):
+    """
+    Generates a skin effect kernel, with the specified parameters
+    kernel_step_function
+        heaviside(t+1)*(1-errf(alpha/21./np.sqrt(t+1)))
+    """
+    t_kernel = np.arange(length)
+    if abs(alpha) > 0.:
+        kernel_skineffect = kernel_generic2(htilde_skineffect,
+                                            t_kernel, alpha)
+    else:
+        kernel_skineffect = np.zeros(length)
+        kernel_skineffect[0] = 1.
+    return kernel_skineffect
