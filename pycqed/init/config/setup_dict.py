@@ -17,12 +17,14 @@ mac_dict = {'203178706891063': 'CDickel_Desktop',
             '180725258210527': 'Niels_macbook',
             # '109952948723616': 'Ramiro_Desktop',
             '215977245834050': 'Ramiro_Desktop',
+            '23213':'Malay_Laptop',
             '31054844829911': 'Sjoerd_laptop'
             }
 
 data_dir_dict = {'tud276606_FPGA_PC': 'D:\Experiments/CBox_Testing/Data',
                  'CDickel_Desktop': 'D:\Experiments/ExperimentName/Data',
                  'Sjoerd_laptop': 'D:\data',
+                 'Malay_Laptop':'D:\Tomo datasets',
                  # 'Adriaans_Macbook': ('/Users/Adriaan/Dropbox/PhD-Delft/' +
                  #    'DataFolders/ExperimentalDataTUD277620/CBox_Testing/Data'),
                  'Adriaans_Macbook': ('/Users/Adriaan/Documents/Testing/Data'),
