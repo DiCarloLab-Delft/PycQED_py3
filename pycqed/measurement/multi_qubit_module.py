@@ -116,7 +116,9 @@ def tomo2Q_cardinal(cardinal, qubit0, qubit1, timings_dict, nr_shots=512, mmt_la
                                      mmt_label))
     return tomo.seq
 
-def tomo2Q_bell(bell_state, qubit0, qubit1, timings_dict, nr_shots=256, mmt_label='', MC=None, run=True):
+def tomo2Q_bell(bell_state, qubit0, qubit1, flux_pars_q0, flux_pars_q1,
+                distortion_dict, timings_dict, CPhase=True,
+                nr_shots=256, nr_rep=1, mmt_label='', MC=None, run=True):
     """
     Performs the fringe measurements of a resonant cphase gate between two qubits.
     low_qubit is gonna be swapped with the bus
@@ -126,7 +128,7 @@ def tomo2Q_bell(bell_state, qubit0, qubit1, timings_dict, nr_shots=256, mmt_labe
         MC = station.MC
     cal_points = 28
     # sweep_points = np.arange(cal_points+36)
-    sweep_points = np.arange(nr_shots*(36+cal_points))
+    sweep_points = np.arange(nr_shots*nr_rep*(36+cal_points))
 
     q0_pulse_pars, RO_pars = qubit0.get_pulse_pars()
     q1_pulse_pars, RO_pars = qubit1.get_pulse_pars()
@@ -134,10 +136,15 @@ def tomo2Q_bell(bell_state, qubit0, qubit1, timings_dict, nr_shots=256, mmt_labe
     tomo = awg_swf.two_qubit_tomo_bell(bell_state=bell_state,
                                            q0_pulse_pars=q0_pulse_pars,
                                            q1_pulse_pars=q1_pulse_pars,
+                                           q0_flux_pars=flux_pars_q0,
+                                           q1_flux_pars=flux_pars_q1,
                                            RO_pars=RO_pars,
+                                           distortion_dict=distortion_dict,
+                                           AWG=station.AWG,
                                            timings_dict=timings_dict,
+                                           CPhase=CPhase,
                                            upload=True,
-                                           return_seq=False)
+                                           return_seq=True)
 
     # detector = det.UHFQC_integrated_average_detector(
     #     UHFQC=qubit0._acquisition_instr,
@@ -161,7 +168,7 @@ def tomo2Q_bell(bell_state, qubit0, qubit1, timings_dict, nr_shots=256, mmt_labe
     MC.set_sweep_points(sweep_points)
     MC.set_detector_function(detector)
     if run:
-        MC.run('Tomo_%s_%s_%s_%s' % (bell_state,
+        MC.run('BellTomo_%s_%s_%s_%s' % (bell_state,
                                      qubit0.name,
                                      qubit1.name,
                                      mmt_label))

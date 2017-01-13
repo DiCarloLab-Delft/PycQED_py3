@@ -81,13 +81,20 @@ class two_qubit_tomo_cardinal(swf.Hard_Sweep):
 class two_qubit_tomo_bell(swf.Hard_Sweep):
 
     def __init__(self, bell_state, q0_pulse_pars, q1_pulse_pars,
-                 RO_pars, timings_dict, upload=True, return_seq=False):
+                 q0_flux_pars, q1_flux_pars,
+                 RO_pars, distortion_dict, AWG,
+                 timings_dict, CPhase=True, upload=True, return_seq=False):
         super().__init__()
         self.bell_state = bell_state
         self.q0_pulse_pars = q0_pulse_pars
         self.q1_pulse_pars = q1_pulse_pars
+        self.q0_flux_pars = q0_flux_pars
+        self.q1_flux_pars = q1_flux_pars
         self.RO_pars = RO_pars
+        self.CPhase = CPhase
+        self.distortion_dict = distortion_dict
         self.timings_dict = timings_dict
+        self.AWG = AWG
         self.upload = upload
         self.return_seq = return_seq
         self.name = 'Tomo2Q_%d' % bell_state
@@ -96,13 +103,36 @@ class two_qubit_tomo_bell(swf.Hard_Sweep):
 
     def prepare(self, **kw):
         if self.upload:
+            old_val_qS = self.AWG.get(
+                '{}_amp'.format(self.q0_flux_pars['channel']))
+            old_val_qCP = self.AWG.get(
+                '{}_amp'.format(self.q1_flux_pars['channel']))
+
+            # Rescaling the AWG channel amp is done to ensure that the dac
+            # values of the flux pulses (including kernels) are defined on
+            # a 2Vpp scale.
+            self.AWG.set(
+                '{}_amp'.format(self.q1_flux_pars['channel']), 2.)
+            self.AWG.set(
+                '{}_amp'.format(self.q0_flux_pars['channel']), 2.)
+
             self.seq = mq_sqs.two_qubit_tomo_bell(bell_state=self.bell_state,
                                                       q0_pulse_pars=self.q0_pulse_pars,
                                                       q1_pulse_pars=self.q1_pulse_pars,
+                                                      q0_flux_pars=self.q0_flux_pars,
+                                                      q1_flux_pars=self.q1_flux_pars,
                                                       RO_pars=self.RO_pars,
+                                                      distortion_dict=self.distortion_dict,
                                                       timings_dict=self.timings_dict,
+                                                      CPhase=self.CPhase,
                                                       upload=self.upload,
                                                       return_seq=self.return_seq)
+            self.AWG.set('{}_amp'.format(self.q1_flux_pars['channel']),
+                         old_val_qCP)
+
+            self.AWG.set('{}_amp'.format(self.q0_flux_pars['channel']),
+                         old_val_qS)
+            self.upload = False
 
 class Flipping(swf.Hard_Sweep):
 

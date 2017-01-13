@@ -427,6 +427,8 @@ def swap_CP_swap_2Qubits(mw_pulse_pars_qCP, mw_pulse_pars_qS,
     if not CPhase:
         pulse_dict['CPhase qCP']['amplitude'] = 0
         pulse_dict['mCPhase qCP']['amplitude'] = 0
+        pulse_dict['phase corr qS']['amplitude'] = 0
+        pulse_dict['CPhase qCP']['phase_corr_pulse_amp'] = 0
 
     recovery_swap['pulse_delay'] = inter_swap_wait/2
     pulse_dict['recovery swap qS'] = recovery_swap
