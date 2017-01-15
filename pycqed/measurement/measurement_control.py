@@ -486,7 +486,7 @@ class MeasurementControl(Instrument):
                 self.main_QtPlot.add(x=[0], y=[0],
                                      xlabel=xlab, ylabel=ylab,
                                      subplot=j+1,
-                                     color=color_cycle[j],
+                                     color=color_cycle[j%len(color_cycle)],
                                      symbol='o', symbolSize=5)
                 self.curves.append(self.main_QtPlot.traces[-1])
                 j += 1
