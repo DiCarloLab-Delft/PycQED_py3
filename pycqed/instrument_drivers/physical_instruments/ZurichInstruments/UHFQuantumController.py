@@ -8,6 +8,7 @@ import numpy as np
 from qcodes.instrument.base import Instrument
 from qcodes.utils import validators as vals
 from fnmatch import fnmatch
+from qcodes.instrument.parameter import ManualParameter
 #from instrument_drivers.physical_instruments.ZurichInstruments import UHFQuantumController as ZI_UHFQC
 
 
@@ -138,6 +139,15 @@ class UHFQC(Instrument):
         self.add_parameter('AWG_file',
                            set_cmd=self._do_set_AWG_file,
                            vals=vals.Anything())
+        #storing an offset correction parameter for all weight functions,
+        #this allows normalized calibration when performing cross-talk suppressed
+        #readout
+        for i in range(5):
+            self.add_parameter("quex_trans_offset_weightfunction_{}".format(i),
+                   units='V',
+                   label='RO normalization offset (V)',
+                   initial_value=0.0,
+                   parameter_class=ManualParameter)
         if init:
             self.load_default_settings()
         t1 = time.time()
@@ -664,10 +674,10 @@ setTrigger(0);"""
                 eval('self.quex_trans_{}_col_{}_real(matrix[{}][{}])'.format(j,i,i,j))
 
     def download_transformation_matrix(self, nr_rows=4, nr_cols=4):
-        matrix = np.zeros([nr_rows,nr_cols])
+        matrix = np.zeros([nr_rows, nr_cols])
         for i in range(np.shape(matrix)[0]): #looping over the rows
             for j in range(np.shape(matrix)[1]): #looping over the colums
-                matrix[i][j]=(eval('self.quex_trans_{}_col_{}_real()'.format(j,i)))
+                matrix[i][j] = (eval('self.quex_trans_{}_col_{}_real()'.format(j,i)))
                 #print(value)
                 #matrix[i,j]=value
         return matrix

@@ -240,6 +240,7 @@ def T1_seq(times,
 
     for i, tau in enumerate(times):  # seq has to have at least 2 elts
         RO_pars['pulse_delay'] = RO_pulse_delay + tau
+        RO_pars['refpoint'] = 'start' # time defined between start of ops
         if cal_points:
             if (i == (len(times)-4) or i == (len(times)-3)):
                 el = multi_pulse_elt(i, station, [pulses['I'], RO_pars])
@@ -282,6 +283,7 @@ def Ramsey_seq(times, pulse_pars, RO_pars,
     pulses = get_pulse_dict_from_pars(pulse_pars)
 
     pulse_pars_x2 = deepcopy(pulses['X90'])
+    pulse_pars_x2['refpoint'] = 'start'
     for i, tau in enumerate(times):
         pulse_pars_x2['pulse_delay'] = tau
 
@@ -329,6 +331,9 @@ def Echo_seq(times, pulse_pars, RO_pars,
     pulses = get_pulse_dict_from_pars(pulse_pars)
     center_X180 = deepcopy(pulses['X180'])
     final_X90 = deepcopy(pulses['X90'])
+    center_X180['refpoint'] = 'start'
+    final_X90['refpoint'] = 'start'
+
     for i, tau in enumerate(times):
         center_X180['pulse_delay'] = tau/2
         final_X90['pulse_delay'] = tau/2

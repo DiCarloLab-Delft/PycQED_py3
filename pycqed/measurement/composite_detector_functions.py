@@ -302,7 +302,6 @@ class TimeDomainDetector_integrated(det.Soft_Detector):
         self.MC_timedomain.set_sweep_function(awg_swf.Off())
         self.MC_timedomain.set_detector_function(
             det.TimeDomainDetector())
-        print('prepare worked')
 
     def finish(self, **kw):
         self.MC_timedomain.remove()
@@ -416,7 +415,6 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
         self.weight_function_I = weight_function_I
         self.weight_function_Q = weight_function_Q
         self.one_weight_function_UHFQC = one_weight_function_UHFQC
-        print('weights', weight_function_I, weight_function_Q)
 
 
     def prepare(self, **kw):
@@ -445,7 +443,6 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
 
 
             elif 'UHFQC' in str(self.acquisition_instr):
-                print('loading {} shots into UHFQC'.format(self.nr_shots))
                 self.MC.set_detector_function(
                     det.UHFQC_integration_logging_det(self.acquisition_instr,
                                                           self.AWG, channels=[self.weight_function_I,self.weight_function_Q],
@@ -466,10 +463,12 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
                 self.CBox.nr_averages(int(self.nr_averages))
                 if self.SSB:
                     self.CBox.lin_trans_coeffs([1,1,-1,1])
-                    self.CBox.demodulation_mode(1)
+                    # self.CBox.demodulation_mode(1)
+                    self.CBox.demodulation_mode('single')
                 else:
                     self.CBox.lin_trans_coeffs([1,0,0,1])
-                    self.CBox.demodulation_mode(0)
+                    # self.CBox.demodulation_mode(0)
+                    self.CBox.demodulation_mode('double')
                 nr_samples = 512
                 self.CBox.nr_samples.set(nr_samples)
                 SWF = awg_swf.OffOn(
@@ -478,7 +477,7 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
                                     pulse_comb='OffOff',
                                     nr_samples=nr_samples)
                 SWF.prepare()
-                self.CBox.acquisition_mode(0)
+                self.CBox.acquisition_mode('idle')
                 self.AWG.start()
                 self.CBox.acquisition_mode('input averaging')
                 inp_avg_res = self.CBox.get_input_avg_results()
@@ -492,11 +491,11 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
                                     pulse_comb='OnOn',
                                     nr_samples=nr_samples)
                 SWF.prepare()
-                self.CBox.acquisition_mode(0)
+                self.CBox.acquisition_mode('idle')
                 self.CBox.acquisition_mode('input averaging')
                 self.AWG.start()
                 inp_avg_res = self.CBox.get_input_avg_results()
-                self.CBox.acquisition_mode(0)
+                self.CBox.acquisition_mode('idle')
                 transient1_I = inp_avg_res[0]
                 transient1_Q = inp_avg_res[1]
 
@@ -595,14 +594,12 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
                 optimized_weights_I = optimized_weights_I-np.mean(optimized_weights_I)
                 weight_scale_factor = 1./np.max(np.abs(optimized_weights_I))
                 optimized_weights_I = np.array(weight_scale_factor*optimized_weights_I)
-                print("optimized weights I", optimized_weights_I)
 
 
                 optimized_weights_Q = (transient1_Q-transient0_Q)
                 optimized_weights_Q = optimized_weights_Q-np.mean(optimized_weights_Q)
                 weight_scale_factor = 1./np.max(np.abs(optimized_weights_Q))
                 optimized_weights_Q = np.array(weight_scale_factor*optimized_weights_Q)
-                print("optimized weights Q", optimized_weights_Q)
 
                 eval('self.UHFQC.quex_wint_weights_{}_real(np.array(optimized_weights_I))'.format(self.weight_function_I))
                 if self.SSB:
@@ -626,7 +623,6 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
 
                         eval('self.UHFQC.quex_rot_{}_real(0.0)'.format(self.weight_function_Q))
                         eval('self.UHFQC.quex_rot_{}_imag(0.0)'.format(self.weight_function_Q))
-                print('changed')
                 eval('self.UHFQC.quex_wint_weights_{}_real()'.format(self.weight_function_I)) #reading out weights as check
                 eval('self.UHFQC.quex_wint_weights_{}_imag()'.format(self.weight_function_I)) #reading out weights as check
                 eval('self.UHFQC.quex_wint_weights_{}_real()'.format(self.weight_function_Q)) #reading out weights as check
@@ -1061,6 +1057,72 @@ class Chevron_optimization_v1(det.Soft_Detector):
 
     def finish(self):
         pass
+
+
+
+
+class SWAPN_optimization(det.Soft_Detector):
+    '''
+    SWAPN optimization.
+    Wrapper around a SWAPN sequence to create a cost function.
+
+    The kernel object is used to determine the (pre)distortion kernel.
+    It is common to do a sweep over one of the kernel parameters as a sweep
+    function.
+    '''
+    def __init__(self, nr_pulses_list, AWG, MC_nested, qubit,
+                 kernel_obj,  cache, cost_choice='sum',**kw):
+
+        super().__init__()
+        self.name = 'swapn_optimization'
+        self.value_names = ['Cost function', 'Single SWAP Fid']
+        self.value_units = ['a.u.', 'ns']
+        self.kernel_obj = kernel_obj
+        self.cache_obj = cache
+        self.AWG = AWG
+        self.MC_nested = MC_nested
+        self.cost_choice = cost_choice
+        self.nr_pulses_list = nr_pulses_list
+        self.qubit = qubit
+
+    def acquire_data_point(self, **kw):
+        # # Update kernel from kernel object
+
+        # # Measure the swapn
+        times_vec = self.nr_pulses_list
+        cal_points = 4
+        lengths_cal = times_vec[-1] + np.arange(1, 1+cal_points)*(times_vec[1]-times_vec[0])
+        lengths_vec = np.concatenate((times_vec, lengths_cal))
+
+        flux_pulse_pars = self.qubit.get_flux_pars()
+        mw_pulse_pars, RO_pars = self.qubit.get_pulse_pars()
+
+        repSWAP = awg_swf.SwapN(mw_pulse_pars,
+                                RO_pars,
+                                flux_pulse_pars, AWG=self.AWG,
+                                dist_dict=self.kernel_obj.kernel(),
+                                upload=True)
+        # self.AWG.set('ch%d_amp'%self.qubit.fluxing_channel(), 2.)
+        # seq = repSWAP.pre_upload()
+
+        self.MC_nested.set_sweep_function(repSWAP)
+        self.MC_nested.set_sweep_points(lengths_vec)
+
+        self.MC_nested.set_detector_function(self.qubit.int_avg_det_rot)
+        self.AWG.set('ch%d_amp'%self.qubit.fluxing_channel(),
+                     self.qubit.swap_amp())
+        self.MC_nested.run('SWAPN_%s'%self.qubit.name)
+
+        # # fit it
+        ma_obj = ma.SWAPN_cost(auto=True, cost_func=self.cost_choice)
+        return ma_obj.cost_val, ma_obj.single_swap_fid
+
+    def prepare(self):
+        pass
+
+    def finish(self):
+        pass
+
 
 
 

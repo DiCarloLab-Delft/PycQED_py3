@@ -9,12 +9,13 @@ UHFQC=True
 import time
 import logging
 t0 = time.time()  # to print how long init takes
-from instrument_drivers.meta_instrument.qubit_objects import duplexer_tek_transmon as dt
+from pycqed.instrument_drivers.meta_instrument.qubit_objects import duplexer_tek_transmon as dt
 
 from importlib import reload  # Useful for reloading while testing
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
+import pylab
 
 # Qcodes
 import qcodes as qc
@@ -73,6 +74,16 @@ if UHFQC:
     from pycqed.instrument_drivers.physical_instruments.ZurichInstruments import UHFQuantumController as ZI_UHFQC
 from pycqed.instrument_drivers.physical_instruments import Weinschel_8320_novisa
 from pycqed.instrument_drivers.meta_instrument import Flux_Control as FluxCtrl
+#for multiplexed readout
+import pycqed.instrument_drivers.meta_instrument.UHFQC_LookuptableManager as lm_UHFQC
+import pycqed.instrument_drivers.meta_instrument.UHFQC_LookuptableManagerManager as lmm_UHFQC
+from pycqed.measurement import awg_sweep_functions_multi_qubit as awg_swf_m
+from pycqed.measurement.pulse_sequences import multi_qubit_tek_seq_elts as sq_m
+import pycqed.scripts.personal_folders.Niels.two_qubit_readout_analysis as Niels
+
+#for flux pulses
+import pycqed.instrument_drivers.meta_instrument.kernel_object as k_obj
+from pycqed.measurement.pulse_sequences import fluxing_sequences as fsqs
 # Initializing instruments
 
 
@@ -85,24 +96,51 @@ Spec_source = rs.RohdeSchwarz_SGS100A(name='Spec_source', address='TCPIP0::192.1
 station.add_component(Spec_source)
 Qubit_LO = rs.RohdeSchwarz_SGS100A(name='Qubit_LO', address='TCPIP0::192.168.0.86', server_name=None)  #
 station.add_component(Qubit_LO)
-TWPA_Pump = rs.RohdeSchwarz_SGS100A(name='TWPA_Pump', address='TCPIP0::192.168.0.90', server_name=None)  #
-station.add_component(TWPA_Pump)
-CBox = qcb.QuTech_ControlBox('CBox', address='Com5', run_tests=False, server_name=None)
-station.add_component(CBox)
+# TWPA_Pump = rs.RohdeSchwarz_SGS100A(name='TWPA_Pump', address='TCPIP0::192.168.0.90', server_name=None)  #
+# station.add_component(TWPA_Pump)
 AWG = tek.Tektronix_AWG5014(name='AWG', setup_folder=None, timeout=2,
-                            address='GPIB0::6::INSTR', server_name=None)
+                            address='TCPIP0::192.168.0.99', server_name=None)
 station.add_component(AWG)
 AWG.timeout(180)
-AWG520 = tk520.Tektronix_AWG520('AWG520', address='GPIB0::17::INSTR',
-                                server_name='')
-station.add_component(AWG520)
+# AWG520 = tk520.Tektronix_AWG520('AWG520', address='GPIB0::17::INSTR',
+#                                 server_name='')
+# station.add_component(AWG520)
 IVVI = iv.IVVI('IVVI', address='COM4', numdacs=16, server_name=None)
 station.add_component(IVVI)
+
+#flux pulsing
+k1 = k_obj.Distortion(name='k1')
+station.add_component(k1)
+k0 = k_obj.Distortion(name='k0')
+station.add_component(k0)
 
 if UHFQC:
     #Initializing UHFQC
     UHFQC_1 = ZI_UHFQC.UHFQC('UHFQC_1', device='dev2178', server_name=None)
     station.add_component(UHFQC_1)
+    UHFQC_1.sigins_0_ac()
+    UHFQC_1.sigins_1_ac()
+    # preparing the lookuptables for readout
+    LutMan0 = lm_UHFQC.UHFQC_LookuptableManager('LutMan0', UHFQC=UHFQC_1,
+                                               server_name=None)
+    station.add_component(LutMan0)
+    LutMan1 = lm_UHFQC.UHFQC_LookuptableManager('LutMan1', UHFQC=UHFQC_1,
+                                                   server_name=None)
+    station.add_component(LutMan1)
+    LutMan2 = lm_UHFQC.UHFQC_LookuptableManager('LutMan2', UHFQC=UHFQC_1,
+                                                   server_name=None)
+    station.add_component(LutMan2)
+    LutMan3 = lm_UHFQC.UHFQC_LookuptableManager('LutMan3', UHFQC=UHFQC_1,
+                                                   server_name=None)
+    station.add_component(LutMan3)
+    LutMan4 = lm_UHFQC.UHFQC_LookuptableManager('LutMan4', UHFQC=UHFQC_1,
+                                                   server_name=None)
+    station.add_component(LutMan4)
+    LutManMan = lmm_UHFQC.UHFQC_LookuptableManagerManager('LutManMan', UHFQC=UHFQC_1,
+                                                 server_name=None)
+    station.add_component(LutManMan)
+    LutManMan.LutMans([LutMan0.name,LutMan1.name, LutMan2.name, LutMan3.name, LutMan4.name])
+
 else:
     UHFQC_1=None
 
@@ -131,20 +169,19 @@ Flux_Control.inv_transfer_matrix(invA)
 Flux_Control.dac_mapping([1, 2, 3, 4, 5])
 
 
-sweet_spots_mv = [85.265,-49.643,60.893,-13.037,-49.570]
+sweet_spots_mv = [-55.265,49.643,-38.5,13.037,49.570]
 offsets = np.dot(Flux_Control.transfer_matrix(), sweet_spots_mv)
-Flux_Control.flux_offsets(offsets)
+Flux_Control.flux_offsets(-offsets)
 
 
-
-ATT = Weinschel_8320_novisa.Weinschel_8320(name='ATT',address='192.168.0.54', server_name=None)
-station.add_component(ATT)
+# ATT = Weinschel_8320_novisa.Weinschel_8320(name='ATT',address='192.168.0.54', server_name=None)
+# station.add_component(ATT)
 # Dux = qdux.QuTech_Duplexer('Dux', address='TCPIP0::192.168.0.101',
 #                             server_name=None)
 # SH = sh.SignalHound_USB_SA124B('Signal hound', server_name=None) #commented because of 8s load time
 
 # Meta-instruments
-HS = hd.HeterodyneInstrument('HS', LO=LO, RF=RF, AWG=AWG, acquisition_instr=CBox.name,
+HS = hd.HeterodyneInstrument('HS', LO=LO, RF=RF, AWG=AWG, acquisition_instr=UHFQC_1.name,
                              server_name=None)
 station.add_component(HS)
 # LutMan = lm.QuTech_ControlBox_LookuptableManager('LutMan', CBox=CBox,
@@ -152,7 +189,7 @@ station.add_component(HS)
                                                  # server_name='metaLM')
 MC = mc.MeasurementControl('MC')
 
-
+# HS = None
 
 AncB = qbt.Tektronix_driven_transmon('AncB', LO=LO, cw_source=Spec_source,
                                               td_source=Qubit_LO,
@@ -201,12 +238,15 @@ DataT = qbt.Tektronix_driven_transmon('DataT', LO=LO, cw_source=Spec_source,
 station.add_component(DataT)
 
 # load settings onto qubits
-gen.load_settings_onto_instrument(AncB)#, timestamp='20161111_165442')
-gen.load_settings_onto_instrument(AncT)#, timestamp='20161111_165442')
-gen.load_settings_onto_instrument(DataB)#, timestamp='20161111_165442')
-gen.load_settings_onto_instrument(DataM)#, timestamp='20161111_165442')
-gen.load_settings_onto_instrument(DataT)#, timestamp='20161111_165442')
+gen.load_settings_onto_instrument(AncB)
+gen.load_settings_onto_instrument(AncT)
+gen.load_settings_onto_instrument(DataB)
+gen.load_settings_onto_instrument(DataM)
+gen.load_settings_onto_instrument(DataT)
 gen.load_settings_onto_instrument(HS)
+gen.load_settings_onto_instrument(k0)
+gen.load_settings_onto_instrument(k1)
+
 
 AncT.E_c(0.28e9)
 AncT.asymmetry(0)
@@ -253,7 +293,7 @@ nested_MC.station = station
 # The AWG sequencer
 station.pulsar = ps.Pulsar()
 station.pulsar.AWG = station.components['AWG']
-marker1highs=[2,2,2.7,2]
+markerhighs=[2,2,2.7,2]
 for i in range(4):
     # Note that these are default parameters and should be kept so.
     # the channel offset is set in the AWG itself. For now the amplitude is
@@ -267,12 +307,12 @@ for i in range(4):
     station.pulsar.define_channel(id='ch{}_marker1'.format(i+1),
                                   name='ch{}_marker1'.format(i+1),
                                   type='marker',
-                                  high=marker1highs[i], low=0, offset=0.,
+                                  high=markerhighs[i], low=0, offset=0.,
                                   delay=0, active=True)
     station.pulsar.define_channel(id='ch{}_marker2'.format(i+1),
                                   name='ch{}_marker2'.format(i+1),
                                   type='marker',
-                                  high=2.0, low=0, offset=0.,
+                                  high=markerhighs[i], low=0, offset=0.,
                                   delay=0, active=True)
 # to make the pulsar available to the standard awg seqs
 st_seqs.station = station
@@ -304,8 +344,8 @@ def print_instr_params(instr):
                                  snapshot['parameters'][par]['units']))
 
 
-from scripts.Experiments.FiveQubits import common_functions as cfct
-cfct.set_AWG_limits(station,1.7)
+# from scripts.Experiments.FiveQubits import common_functions as cfct
+# cfct.set_AWG_limits(station,1.7)
 
 
 if UHFQC:
@@ -330,9 +370,9 @@ if UHFQC:
     def switch_to_IQ_mod_RO_UHFQC(qubit):
         UHFQC_1.awg_sequence_acquisition_and_pulse_SSB(f_RO_mod=qubit.f_RO_mod(),
                     RO_amp=qubit.RO_amp(), RO_pulse_length=qubit.RO_pulse_length(),
-                    acquisition_delay=285e-9)
+                    acquisition_delay=270e-9)
         qubit.RO_pulse_type('MW_IQmod_pulse_UHFQC')
-        qubit.RO_acq_marker_delay(-200e-9)
+        qubit.RO_acq_marker_delay(-165e-9)
         qubit.acquisition_instr('UHFQC_1')
         qubit.RO_acq_marker_channel('ch3_marker2')
         qubit.RO_I_channel('0')
@@ -342,7 +382,7 @@ if UHFQC:
 else:
     def switch_to_pulsed_RO_CBox(qubit):
         qubit.RO_pulse_type('Gated_MW_RO_pulse')
-        qubit.RO_acq_marker_delay(145e-9)
+        qubit.RO_acq_marker_delay(155e-9)
         qubit.acquisition_instr('CBox')
         qubit.RO_acq_marker_channel('ch3_marker1')
         qubit.RO_acq_weight_function_I(0)
@@ -358,7 +398,7 @@ for qubit in list_qubits:
     qubit.RO_pulse_delay(20e-9)
     #qubit.RO_acq_averages(2**13)
 
+q1, q0, q3, q2, q4 = AncT, DataT, AncB, DataM, DataB
 
-
-switch_to_pulsed_RO_CBox(AncT)
-switch_to_pulsed_RO_CBox(DataT)
+# switch_to_pulsed_RO_CBox(AncT)
+# switch_to_pulsed_RO_CBox(DataT)

@@ -2,12 +2,12 @@ import numpy as np
 '''
 Library containing pulse shapes.
 '''
-
-
 from pycqed.measurement.waveform_control.pulse import Pulse, apply_modulation
+from pycqed.measurement.waveform_control_CC.waveform import martinis_flux_pulse
 
 
 class MW_IQmod_pulse(Pulse):
+
     '''
     Block pulse on the I channel modulated with IQ modulation.
 
@@ -23,6 +23,7 @@ class MW_IQmod_pulse(Pulse):
     [I_mod] = [cos(wt+phi)   0] [I_env]
     [Q_mod]   [-sin(wt+phi)  0] [0]
     '''
+
     def __init__(self, name, I_channel, Q_channel, **kw):
         super().__init__(name)
         self.I_channel = I_channel
@@ -66,6 +67,7 @@ class MW_IQmod_pulse(Pulse):
 
 
 class SSB_DRAG_pulse(Pulse):
+
     '''
     Gauss pulse on the I channel, derivative of Gauss on the Q channel.
     modulated with Single Sideband (SSB)  modulation.
@@ -110,6 +112,7 @@ class SSB_DRAG_pulse(Pulse):
     Reduces to a Gaussian pulse if motzoi == 0
     Reduces to an unmodulated pulse if mod_frequency == 0
     '''
+
     def __init__(self, name, I_channel, Q_channel, **kw):
         super().__init__(name)
         self.I_channel = I_channel
@@ -180,12 +183,14 @@ class SSB_DRAG_pulse(Pulse):
 
 
 class Mux_DRAG_pulse(SSB_DRAG_pulse):
+
     '''
     Uses 4 AWG channels to play a multiplexer compatible SSB DRAG pulse
     uses channels GI and GQ (default 1 and 2) for the SSB-modulated gaussian
     and uses channels DI and DQ (default 3 and 4) for the modulated derivative
     components.
     '''
+
     def __init__(self, name, GI_channel='ch1', GQ_channel='ch2',
                  DI_channel='ch3', DQ_channel='ch4', **kw):
         # Ideally I'd use grandparent inheritance here but I couldn't get it
@@ -235,7 +240,8 @@ class Mux_DRAG_pulse(SSB_DRAG_pulse):
 
         # skewness parameters
         self.G_alpha = kw.pop('G_alpha', self.G_alpha)        # QI amp ratio
-        self.G_phi_skew = kw.pop('G_phi_skew', self.G_phi_skew)  # IQ phase skewness
+        self.G_phi_skew = kw.pop(
+            'G_phi_skew', self.G_phi_skew)  # IQ phase skewness
         self.D_alpha = kw.pop('D_alpha', self.D_alpha)
         self.D_phi_skew = kw.pop('D_phi_skew', self.D_phi_skew)
 
@@ -284,7 +290,9 @@ class Mux_DRAG_pulse(SSB_DRAG_pulse):
 
 # Some simple pulse definitions.
 class SquareFluxPulse(Pulse):
-    def __init__(self, channel=None, channels=None, name='square flux pulse', **kw):
+
+    def __init__(self, channel=None, channels=None, name='square flux pulse',
+                 **kw):
         Pulse.__init__(self, name)
         if channel is None and channels is None:
             raise ValueError('Must specify either channel or channels')
@@ -296,11 +304,14 @@ class SquareFluxPulse(Pulse):
             self.channels = channels
 
         self.amplitude = kw.pop('amplitude', 0)
-        self.length = kw.pop('length', 0)
+        self.square_pulse_length = kw.pop('square_pulse_length', 0)
+        self.pulse_buffer = kw.pop('pulse_buffer', 0)
+        self.length = self.square_pulse_length + self.pulse_buffer
+
         self.kernel_path = kw.get('kernel_path', None)
         if self.kernel_path is not None:
             kernelvec = np.loadtxt(self.kernel_path)
-            self.kernel = np.zeros((len(kernelvec),len(kernelvec)))
+            self.kernel = np.zeros((len(kernelvec), len(kernelvec)))
             for i in range(len(kernelvec)):
                 for j in range(len(kernelvec)):
                     self.kernel[i, j] = kernelvec[i-j]
@@ -310,12 +321,116 @@ class SquareFluxPulse(Pulse):
 
     def __call__(self, **kw):
         self.amplitude = kw.pop('amplitude', self.amplitude)
-        self.length = kw.pop('length', self.length)
+        self.square_pulse_length = kw.pop('square_pulse_length',
+                                          self.square_pulse_length)
+        self.pulse_buffer = kw.pop('pulse_buffer',
+                                   self.pulse_buffer)
+        self.length = self.square_pulse_length + self.pulse_buffer
+
         self.channel = kw.pop('channel', self.channel)
         self.channels = kw.pop('channels', self.channels)
         self.channels.append(self.channel)
         return self
 
     def chan_wf(self, chan, tvals):
-        return np.ones(len(tvals)) * self.amplitude
+        sq_pulse = np.ones(
+            round((self.square_pulse_length)*1e9)) * self.amplitude
+        buff_pulse = np.zeros(round((self.length-self.square_pulse_length)*1e9))
+        #using round instead of int to avoid crashing
+        return np.concatenate([sq_pulse, buff_pulse])
 
+
+
+
+class MartinisFluxPulse(Pulse):
+
+    def __init__(self, channel=None, channels=None, name='Martinis flux pulse',
+                 **kw):
+        Pulse.__init__(self, name)
+        if channel is None and channels is None:
+            raise ValueError('Must specify either channel or channels')
+        elif channels is None:
+            self.channel = channel  # this is just for convenience, internally
+            # this is the part the sequencer element wants to communicate with
+            self.channels.append(channel)
+        else:
+            self.channels = channels
+
+        self.phase_corr_pulse_length = kw.pop('phase_corr_pulse_length', 0)
+        self.phase_corr_pulse_amp = kw.pop('phase_corr_pulse_amp', 0)
+        self.pulse_buffer = kw.pop('pulse_buffer', 0)
+        self.amplitude = kw.pop('amplitude', 1)
+
+        self.flux_pulse_length = kw.pop('flux_pulse_length', None)
+        self.lambda_coeffs = kw.pop('lambda_coeffs', None)
+
+        self.theta_f = kw.pop('theta_f', None)
+        self.g2 = kw.pop('g2', None)
+        self.E_c = kw.pop('E_c', None)
+        self.f_bus = kw.pop('f_bus', None)
+        self.f_01_max = kw.pop('f_01_max', None)
+        self.dac_flux_coefficient = kw.pop('dac_flux_coefficient', None)
+
+        self.length = (self.flux_pulse_length + self.phase_corr_pulse_length +
+                       self.pulse_buffer)
+
+        self.kernel_path = kw.get('kernel_path', None)
+        if self.kernel_path is not None:
+            kernelvec = np.loadtxt(self.kernel_path)
+            self.kernel = np.zeros((len(kernelvec), len(kernelvec)))
+            for i in range(len(kernelvec)):
+                for j in range(len(kernelvec)):
+                    self.kernel[i, j] = kernelvec[i-j]
+            del(kernelvec)
+        else:
+            ValueError('Must specify kernel path')
+
+    def __call__(self, **kw):
+        # self.amplitude = kw.pop('amplitude', self.amplitude)
+        self.phase_corr_pulse_length = kw.pop(
+            'phase_corr_pulse_length', self.phase_corr_pulse_length)
+        self.phase_corr_pulse_amp = kw.pop(
+            'phase_corr_pulse_amp', self.phase_corr_pulse_amp)
+        self.pulse_buffer = kw.pop(
+            'pulse_buffer', self.pulse_buffer)
+
+        self.flux_pulse_length = kw.pop(
+            'flux_pulse_length', self.flux_pulse_length)
+        self.lambda_coeffs = kw.pop('lambda_coeffs', self.lambda_coeffs)
+        self.theta_f = kw.pop('theta_f', self.theta_f)
+        self.g2 = kw.pop('g2', self.g2)
+        self.E_c = kw.pop('E_c', self.E_c)
+        self.f_bus = kw.pop('f_bus', self.f_bus)
+        self.f_01_max = kw.pop('f_01_max', self.f_01_max)
+        self.dac_flux_coefficient = kw.pop(
+            'dac_flux_coefficient', self.dac_flux_coefficient)
+
+        self.length = (self.square_pulse_length + self.phase_corr_pulse_length +
+                       self.pulse_buffer)
+
+        self.channel = kw.pop('channel', self.channel)
+        self.channels = kw.pop('channels', self.channels)
+        self.channels.append(self.channel)
+        return self
+
+    def chan_wf(self, chan, tvals):
+        t = tvals - tvals[0]
+        martinis_pulse = martinis_flux_pulse(
+            length=self.flux_pulse_length,
+            lambda_coeffs=self.lambda_coeffs,
+            theta_f=self.theta_f, g2=self.g2,
+            E_c=self.E_c, f_bus=self.f_bus,
+            f_01_max=self.f_01_max,
+            dac_flux_coefficient=self.dac_flux_coefficient,
+            return_unit='V')
+        #adding a square pulse for single qubit phase correction
+        ph_corr_pulse = self.phase_corr_pulse_amp*np.ones(
+            round(self.phase_corr_pulse_length*1e9))
+        # This exists to allow flux depletion pulses.
+        if self.amplitude < 0:
+            martinis_pulse = -martinis_pulse
+            ph_corr_pulse = -ph_corr_pulse
+        elif self.amplitude == 0:
+            martinis_pulse = 0*martinis_pulse
+        buff_pulse = np.zeros(round((self.pulse_buffer)*1e9))
+        return np.concatenate([martinis_pulse, ph_corr_pulse, buff_pulse])

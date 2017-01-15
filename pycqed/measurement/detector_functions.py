@@ -161,7 +161,7 @@ class QX_Hard_Detector(Hard_Detector):
                 circuit_name = c[0] + "_{}".format(i)
                 self.__qxc.create_circuit(circuit_name, c[1])
             t2 = time.time()
-            logging.info("[+] qasm loading time :",t2-t1)
+            logging.info("[+] qasm loading time :", t2-t1)
 
     def prepare(self, sweep_points):
         self.sweep_points = sweep_points
@@ -184,10 +184,6 @@ class QX_Hard_Detector(Hard_Detector):
             i = i + 1
         self.current = int((self.current + 1) % self.num_files)
         return (1-np.array(data))
-
-
-
-
 
 
 class Dummy_Shots_Detector(Hard_Detector):
@@ -355,9 +351,11 @@ class ZNB_VNA_detector(Hard_Detector):
         Return real and imaginary transmission coefficients +
         amplitude (linear) and phase (deg or radians)
         '''
-        self.VNA.start_sweep_all()# start a measurement
-        self.VNA.wait_to_continue() # wait untill the end of measurement before moving on
-        self.VNA.autoscale_trace() # for visualization on the VNA screen (no effect on data)
+        self.VNA.start_sweep_all()  # start a measurement
+        # wait untill the end of measurement before moving on
+        self.VNA.wait_to_continue()
+        # for visualization on the VNA screen (no effect on data)
+        self.VNA.autoscale_trace()
         # get data and process them
         real_data, imag_data = self.VNA.get_real_imaginary_data()
 
@@ -469,6 +467,8 @@ class CBox_integrated_average_detector(Hard_Detector):
             return self.rotate_and_normalize(data)
         else:
             return data
+
+
 
     def rotate_and_normalize(self, data):
         """
@@ -1381,6 +1381,7 @@ class UHFQC_input_average_detector(Hard_Detector):
         self.AWG = AWG
         self.nr_samples = nr_samples
         self.nr_averages = nr_averages
+        print(nr_samples)
 
     def get_values(self):
         self.UHFQC.awgs_0_enable(1)
@@ -1427,7 +1428,8 @@ class UHFQC_integrated_average_detector(Hard_Detector):
     '''
 
     def __init__(self, UHFQC, AWG, integration_length=1e-6, nr_averages=1024, rotate=False,
-                 channels=[0, 1, 2, 3], cross_talk_suppression=False, seg_per_point=1, **kw):
+                 channels=[0, 1, 2, 3], cross_talk_suppression=False,
+                 **kw):
         super(UHFQC_integrated_average_detector, self).__init__()
         self.UHFQC = UHFQC
         self.name = 'UHFQC_integrated_average'
@@ -1439,13 +1441,7 @@ class UHFQC_integrated_average_detector(Hard_Detector):
             self.value_names[i] = 'w{}'.format(channel)
             self.value_units[i] = 'V'
         self.rotate = rotate
-        if len(self.channels) == 2:
-            self.value_names = ['I', 'Q']
-            self.value_units = ['V', 'V']
-        else:
-            if self.rotate:
-                raise ValueError(
-                    'rortate only possible for two weight_function acquisition')
+
         self.AWG = AWG
         self.nr_averages = nr_averages
         self.integration_length = integration_length
@@ -1469,7 +1465,10 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         data = ['']*len(self.channels)
         for i, channel in enumerate(self.channels):
             dataset = eval("self.UHFQC.quex_rl_data_{}()".format(channel))
-            data[i] = dataset[0]['vector']
+            data[i] = dataset[0]['vector']/self.nr_averages
+            if self.cross_talk_suppression:
+                data[i]=data[i]-eval("self.UHFQC.quex_trans_offset_weightfunction_{}()".format(channel))
+
         # data = self.UHFQC.single_acquisition(self.nr_sweep_points,
         #                                      self.poll_time, timeout=0,
         #                                      channels=set(self.channels))
@@ -1478,6 +1477,9 @@ class UHFQC_integrated_average_detector(Hard_Detector):
             return self.rotate_and_normalize(data)
         else:
             return data
+
+    def acquire_data_point(self):
+        return self.get_values()
 
     def rotate_and_normalize(self, data):
         """
@@ -1497,10 +1499,14 @@ class UHFQC_integrated_average_detector(Hard_Detector):
                     cal_one_points=self.cal_points[1])
         return self.corr_data, self.corr_data
 
-    def prepare(self, sweep_points):
+
+    def prepare(self, sweep_points=None):
         if self.AWG is not None:
             self.AWG.stop()
-        self.nr_sweep_points = len(sweep_points)
+        if sweep_points is None:
+            self.nr_sweep_points = 1
+        else:
+            self.nr_sweep_points = len(sweep_points)
         # this sets the result to integration and rotation outcome
         if self.cross_talk_suppression:
             # 2/0/1 raw/crosstalk supressed /digitized
@@ -1573,6 +1579,8 @@ class UHFQC_integration_logging_det(Hard_Detector):
         for i, channel in enumerate(self.channels):
             dataset = eval("self.UHFQC.quex_rl_data_{}()".format(channel))
             data[i] = dataset[0]['vector']
+            if self.cross_talk_suppression:
+                data[i]=data[i]-eval("self.UHFQC.quex_trans_offset_weightfunction_{}()".format(channel))
         return data
 
     def prepare(self, sweep_points):
@@ -1591,10 +1599,10 @@ class UHFQC_integration_logging_det(Hard_Detector):
         self.UHFQC.quex_wint_length(int(self.integration_length*(1.8e9)))
         # this sets the result to integration and rotation outcome
         if self.cross_talk_suppression:
-            # 2/0/1 raw/crosstalk supressed /digitized
+            # 0/1/2 crosstalk supressed /digitized/raw
             self.UHFQC.quex_rl_source(0)
         else:
-            # 2/0/1 raw/crosstalk supressed /digitized
+            # 0/1/2 crosstalk supressed /digitized/raw
             self.UHFQC.quex_rl_source(2)
 
     def finish(self):
@@ -1631,6 +1639,7 @@ class Chevron_sim(Hard_Detector):
                                       self.t_start,
                                       self.dt,
                                       self.simulation_dict['dist_step'])
+
 
 class ATS_integrated_average_continuous_detector(Hard_Detector):
 
@@ -1682,10 +1691,10 @@ class ATS_integrated_average_continuous_detector(Hard_Detector):
                         sample_rate=100000000,
                         clock_edge='CLOCK_EDGE_RISING',
                         decimation=0,
-                        coupling=['AC','AC'],
-                        channel_range=[2.,2.],
-                        impedance=[50,50],
-                        bwlimit=['DISABLED','DISABLED'],
+                        coupling=['AC', 'AC'],
+                        channel_range=[2., 2.],
+                        impedance=[50, 50],
+                        bwlimit=['DISABLED', 'DISABLED'],
                         trigger_operation='TRIG_ENGINE_OP_J',
                         trigger_engine1='TRIG_ENGINE_J',
                         trigger_source1='EXTERNAL',
@@ -1699,22 +1708,21 @@ class ATS_integrated_average_continuous_detector(Hard_Detector):
                         external_trigger_range='ETR_5V',
                         trigger_delay=0,
                         timeout_ticks=0
-        )
+                        )
         self.ATS.update_acquisitionkwargs(samples_per_record=1024,
-                         records_per_buffer=70,
-                         buffers_per_acquisition=self.nr_averages,
-                         channel_selection='AB',
-                         transfer_offset=0,
-                         external_startcapture='ENABLED',
-                         enable_record_headers='DISABLED',
-                         alloc_buffers='DISABLED',
-                         fifo_only_streaming='DISABLED',
-                         interleave_samples='DISABLED',
-                         get_processed_data='DISABLED',
-                         allocated_buffers=self.nr_averages,
-                         buffer_timeout=1000
-        )
+                                          records_per_buffer=70,
+                                          buffers_per_acquisition=self.nr_averages,
+                                          channel_selection='AB',
+                                          transfer_offset=0,
+                                          external_startcapture='ENABLED',
+                                          enable_record_headers='DISABLED',
+                                          alloc_buffers='DISABLED',
+                                          fifo_only_streaming='DISABLED',
+                                          interleave_samples='DISABLED',
+                                          get_processed_data='DISABLED',
+                                          allocated_buffers=self.nr_averages,
+                                          buffer_timeout=1000
+                                          )
 
     def finish(self):
-        print("bla")
-
+        pass
