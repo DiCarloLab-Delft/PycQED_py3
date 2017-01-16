@@ -38,7 +38,7 @@ class TomoAnalysis():
         measurements_cal --- Should be an array of length 2 ** n_qubits
         measurements_tomo --- Should be an array of length length(rotation_matrixes) ** n_qubits
         n_qubits --- default(2) the amount of qubits present in the expirement
-        n_quadratures --- default(1(either I or Q)) The amount of complete measurement data sets. For example a combined IQ measurement has 2 measurement sets. 
+        n_quadratures --- default(1(either I or Q)) The amount of complete measurement data sets. For example a combined IQ measurement has 2 measurement sets.
 
         """
         self.measurements_cal = measurements_cal
@@ -56,6 +56,8 @@ class TomoAnalysis():
             self.readout_basis, n_qubits)
         self.rotation_vector = self._calculate_matrix_set(
             self.rotation_matrixes, n_qubits)
+
+
 
     def execute_linear_tomo(self):
         """
@@ -106,6 +108,7 @@ class TomoAnalysis():
                         i] * rotation.dag() * self.readout_vector[i] * rotation
         # save it in the object for use in optimization
         self.measurement_vector = measurement_vector
+        self.measurement_vector_numpy = [vec.full() for vec in measurement_vector]
         tlinear = time.time()
         # find out the starting rho by the linear tomo
         discard, rho0 = self.execute_linear_tomo()
@@ -127,11 +130,12 @@ class TomoAnalysis():
             print(" Time to do linear tomo %.2f " % (tcholesky-tlinear))
             print(" Time to build T %.2f " % (topt-tcholesky))
             print(" Time to optimize %.2f" % (time.time()-topt))
-        return qtp.Qobj(self.build_rho_from_triangular_params(t_optimal))
+        return qtp.Qobj(self.build_rho_from_triangular_params(t_optimal),
+         dims=[[2 for i in range(self.n_qubits)], [2 for i in range(self.n_qubits)]])
 
     def get_basis_labels(self, n_qubits):
         """
-        Returns the basis labels in the same order as the basis vector is parsed. 
+        Returns the basis labels in the same order as the basis vector is parsed.
         Requires self.measurement_basis_labels to be set with the correct order corresponding to the matrixes in self.measurement_basis
         """
         if(n_qubits > 1):
@@ -162,7 +166,7 @@ class TomoAnalysis():
 
     def _max_likelihood_optimization_function(self, t_params):
         """
-        Optimization function that is evaluated many times in the maximum likelihood method. 
+        Optimization function that is evaluated many times in the maximum likelihood method.
         Calculates the difference between expected measurement values and the actual measurement values based on a guessed rho
 
         Keyword arguments:
@@ -174,7 +178,7 @@ class TomoAnalysis():
         L = 0 + 0j
         for i in range(len(self.measurement_vector)):
             expectation = np.trace(
-                np.dot(self.measurement_vector[i].full(), rho))
+                np.dot(self.measurement_vector_numpy[i], rho))
             L += ((expectation -
                    self.measurements_tomo[i]) ** 2) * self.weights[i]
         return L
@@ -186,7 +190,7 @@ class TomoAnalysis():
         <0|Z|0> = 1, <1|Z|1> = -1
 
         Keyword arguments:
-        measurements_cal --- array(2 ** n_qubits) should be ordered correctly (00, 01, 10, 11) for 2 qubits 
+        measurements_cal --- array(2 ** n_qubits) should be ordered correctly (00, 01, 10, 11) for 2 qubits
         """
         cal_matrix = np.zeros((self.n_states, self.n_states))
         # get the coefficient matrix for the betas
@@ -239,7 +243,7 @@ class TomoAnalysis():
     def _calculate_matrix_set(self, starting_set, n_qubits):
         """recursive function that returns len(starting_set) ** n_qubits measurement_basis states tensored with eachother based on the amount of qubits
 
-        So for 2 qubits assuming your basis set is {I, X, Y, Z} you get II IX IY IZ XI XX XY XZ ... 
+        So for 2 qubits assuming your basis set is {I, X, Y, Z} you get II IX IY IZ XI XX XY XZ ...
         """
         if(n_qubits > 1):
             return [qtp.tensor(y, x) for x in self._calculate_matrix_set(starting_set, n_qubits - 1)
