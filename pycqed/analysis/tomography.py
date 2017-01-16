@@ -4,11 +4,13 @@ import time
 import scipy
 
 
-class TomoAnalysis():
+class TomoAnalysis_JointRO():
 
     """Performs state tomography based on an overcomplete set of measurements
      and calibration measurements. Uses qutip to calculate resulting basis states
-     from applied rotations
+     from applied rotations.
+     
+    Works for Joint RO (like REM experiment).
 
     Uses binary counting as general guideline in ordering states. Calculates
      rotations by using the qutip library
