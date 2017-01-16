@@ -320,22 +320,21 @@ class ZNB_VNA_sweep(Hard_Sweep):
         # get the list of frequency used in the span from the VNA
         self.sweep_points = self.VNA.get_stimulus()
 
-class QWG_qubit_par(Soft_Sweep):
+class QWG_lutman_par(Soft_Sweep):
 
-    def __init__(self, qubit, qubit_parameter, **kw):
+    def __init__(self, LutMan, LutMan_parameter, **kw):
         self.set_kw()
-        self.name= qubit_parameter.name
-        self.parameter_name = qubit_parameter.label
-        self.unit = qubit_parameter.units
+        self.name= LutMan_parameter.name
+        self.parameter_name = LutMan_parameter.label
+        self.unit = LutMan_parameter.units
         self.sweep_control = 'soft'
-        self.qubit=qubit
-        self.qubit_parameter=qubit_parameter
+        self.LutMan=LutMan
+        self.LutMan_parameter=LutMan_parameter
 
     def set_parameter(self, val):
         '''
         Set the parameter(s) to be sweeped. Differs per sweep function
         '''
 
-        self.qubit_parameter.set(val)
-        self.qubit.load_QWG_pulses()
-        # self.qubit.QWG.getOperationComplete()
+        self.LutMan_parameter.set(val)
+        self.LutMan.load_pulses_onto_AWG_lookuptable()
