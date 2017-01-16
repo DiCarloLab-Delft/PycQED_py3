@@ -195,7 +195,7 @@ class CPhase_cost_func_det(det.Soft_Detector):
         self.MC_nested.set_sweep_function(self.s)
         self.MC_nested.set_detector_function(self.int_avg_det)
         self.MC_nested.set_sweep_points(self.phases)
-        label='swap_CP_swap_amp_{0:.3f}_l1_{1:.2f}_l2_{2:.2f}'.format(self.AWG.ch3_amp(),self.lambda1, self.lambda2)
+        label='swap_CP_swap_amp_{0:.4f}_l1_{1:.2f}_l2_{2:.2f}'.format(self.AWG.ch3_amp(),self.lambda1, self.lambda2)
         self.MC_nested.run(label)
         if not self.reverse_control_target:
             a = SWAP_Cost(show_guess=False, label=label)
@@ -416,7 +416,6 @@ class SWAP_Cost_reverse_control_target(ma.Rabi_Analysis):
                 self.x_fine, **self.fit_res[0].best_values)
         self.fine_fit_1 = self.fit_res[1].model.func(
                 self.x_fine, **self.fit_res[1].best_values)
-
         self.fine_fit_2 = self.fit_res[2].model.func(
                 self.x_fine, **self.fit_res[2].best_values)
         self.fine_fit_3 = self.fit_res[3].model.func(
