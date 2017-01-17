@@ -276,66 +276,88 @@ def five_qubit_off_on(q0_pulse_pars,
         return seq_name
 
 
-def two_qubit_AllXY(q0_pulse_pars, q1_pulse_pars, RO_pars,
+def two_qubit_AllXY(pulse_dict, q0='q0', q1='q1', RO_target='all',
+                    sequence_type ='simultaneous',
+                    replace_q1_pulses_X180=False,
                     double_points=True,
                     verbose=False, upload=True,
-                    return_seq=False, X_mid=False, simultaneous=False):
+                    return_seq=False):
     """
-    Performs an AllXY on the first qubit will doing a pi-pulse before
-    and after the AllXY on the second qubit
-    AllXY q0 - RO
-    X180 q1 - AllXY q0 - X180 q1 - RO
+    Performs an AllXY sequence on two qubits.
+    Has the option of replacing pulses on q1 with pi pulses
+
+    Args:
+        pulse_dict   (dict) : dictionary containing all pulse parameters
+        q0, q1        (str) : target qubits for the sequence
+        RO_target     (str) : target for the RO, can be a qubit name or 'all'
+        sequence_type (str) : sequential| interleaved|simultaneous|sandwiched
+            describes the order of the AllXY pulses
+        replace_q1_pulses_X180 (bool) : if True replaces all pulses on q1 with
+            X180 pulses.
+
+        double_points (bool) : if True measures each point in the AllXY twice
+        verbose       (bool) : verbose sequence generation
+        upload        (bool) :
     """
-    seq_name = '2_qubit_AllXY_sequence'
+    seq_name = 'two_qubit_AllXY_{}_{}'.format(q0, q1)
     seq = sequence.Sequence(seq_name)
     station.pulsar.update_channel_settings()
     el_list = []
-    # Create a dict with the parameters for all the pulses
-    q0_pulses = add_suffix_to_dict_keys(
-        get_pulse_dict_from_pars(q0_pulse_pars), ' q0')
-    q1_pulses = add_suffix_to_dict_keys(
-        get_pulse_dict_from_pars(q1_pulse_pars), ' q1')
-    RO_dict = {'RO': RO_pars}
 
-    pulse_dict = {}
-    pulse_dict.update(q0_pulses)
-    pulse_dict.update(q1_pulses)
-    pulse_dict.update(RO_dict)
-
-
-    AllXY_pulse_combinations = [
-            ['I q0', 'I q0'], ['X180 q0', 'X180 q0'], ['Y180 q0', 'Y180 q0'],
-            ['X180 q0', 'Y180 q0'], ['Y180 q0', 'X180 q0'],
-            ['X90 q0', 'I q0'], ['Y90 q0', 'I q0'], ['X90 q0', 'Y90 q0'],
-            ['Y90 q0', 'X90 q0'], ['X90 q0', 'Y180 q0'], ['Y90 q0', 'X180 q0'],
-            ['X180 q0', 'Y90 q0'], ['Y180 q0', 'X90 q0'], ['X90 q0', 'X180 q0'],
-            ['X180 q0', 'X90 q0'], ['Y90 q0', 'Y180 q0'], ['Y180 q0', 'Y90 q0'],
-            ['X180 q0', 'I q0'], ['Y180 q0', 'I q0'], ['X90 q0', 'X90 q0'],
-            ['Y90 q0', 'Y90 q0']]
-
-
+    AllXY_pulse_combinations = [['I ', 'I '], ['X180 ', 'X180 '], ['Y180 ', 'Y180 '],
+                          ['X180 ', 'Y180 '], ['Y180 ', 'X180 '],
+                          ['X90 ', 'I '], ['Y90 ', 'I '], ['X90 ', 'Y90 '],
+                          ['Y90 ', 'X90 '], ['X90 ', 'Y180 '], ['Y90 ', 'X180 '],
+                          ['X180 ', 'Y90 '], ['Y180 ', 'X90 '], ['X90 ', 'X180 '],
+                          ['X180 ', 'X90 '], ['Y90 ', 'Y180 '], ['Y180 ', 'Y90 '],
+                          ['X180 ', 'I '], ['Y180 ', 'I '], ['X90 ', 'X90 '],
+                          ['Y90 ', 'Y90 ']]
     if double_points:
         AllXY_pulse_combinations = [val for val in AllXY_pulse_combinations
                                     for _ in (0, 1)]
+
+    if sequence_type == 'simultaneous':
+        pulse_dict = deepcopy(pulse_dict) # prevents overwriting of dict
+        for key in pulse_dict.keys():
+            if q1 in key:
+                pulse_dict[key]['refpoint'] = 'start'
+                pulse_dict[key]['pulse_delay'] = 0
+
     pulse_list = []
-    for pulse_comb in (AllXY_pulse_combinations):
-        pulse_list += [pulse_comb + ['RO']]
-    for pulse_comb in (AllXY_pulse_combinations):
-
-        if X_mid:
-            if simultaneous:
-                print('simultaneous!!! allxy and pi pulse gates')
-                print("before", pulse_dict['X180 q1']['pulse_delay'])
-                pulse_dict[pulse_comb[0]]['pulse_delay']=-20e-9
-                # pulse_dict[pulse_comb[1]]['pulse_delay']=-20e-9
-                pulse_dict['X180 q1']['pulse_delay']=-20
-                print("after", pulse_dict['X180 q1']['pulse_delay'])
-            pulse_list += [['X180 q1'] + [pulse_comb[0]] + ['X180 q1'] + [pulse_comb[1]]+ ['RO']]
-
-        else:
-            pulse_list += [['X180 q1'] + pulse_comb + ['X180 q1', 'RO']]
-
-
+    if not replace_q1_pulses_X180:
+        for pulse_comb in AllXY_pulse_combinations:
+            if sequence_type == 'interleaved' or sequence_type=='simultaneous':
+                pulse_list+= [[pulse_comb[0] + q0] + [pulse_comb[0] + q1] +
+                              [pulse_comb[1] + q0] + [pulse_comb[1] + q1] +
+                              ['RO ' + RO_target]]
+            elif sequence_type == 'sequential':
+                pulse_list+= [[pulse_comb[0] + q0] + [pulse_comb[1] + q0] +
+                              [pulse_comb[0] + q1] + [pulse_comb[1] + q1] +
+                              ['RO ' + RO_target]]
+            elif sequence_type == 'sandwiched':
+                pulse_list+= [[pulse_comb[0] + q1] + [pulse_comb[0] + q0] +
+                              [pulse_comb[1] + q0] + [pulse_comb[1] + q1] +
+                              ['RO ' + RO_target]]
+            else:
+                raise ValueError("sequence_type {} must be in".format(sequence_type)+
+                    " ['interleaved', simultaneous', 'sequential', 'sandwiched']")
+    else:
+        for pulse_comb in AllXY_pulse_combinations:
+            if sequence_type == 'interleaved' or sequence_type=='simultaneous':
+                pulse_list+= [[pulse_comb[0] + q0] + ['X180 ' + q1] +
+                              [pulse_comb[1] + q0] + ['X180 ' + q1] +
+                              ['RO ' + RO_target]]
+            elif sequence_type == 'sequential':
+                pulse_list+= [[pulse_comb[0] + q0] + [pulse_comb[1] + q0] +
+                              ['X180 ' + q1] + ['X180 ' + q1] +
+                              ['RO ' + RO_target]]
+            elif sequence_type == 'sandwiched':
+                pulse_list+= [['X180 ' + q1] + [pulse_comb[0] + q0] +
+                              [pulse_comb[1] + q0] + ['X180 ' + q1] +
+                              ['RO ' + RO_target]]
+            else:
+                raise ValueError("sequence_type {} must be in".format(sequence_type)+
+                    " ['interleaved', simultaneous', 'sequential', 'sandwiched']")
 
     for i, pulse_comb in enumerate(pulse_list):
         pulses = []
@@ -351,6 +373,9 @@ def two_qubit_AllXY(q0_pulse_pars, q1_pulse_pars, RO_pars,
         return seq, el_list
     else:
         return seq_name
+
+
+
 
 
 def two_qubit_tomo_cardinal(cardinal,
