@@ -1381,7 +1381,6 @@ class UHFQC_input_average_detector(Hard_Detector):
         self.AWG = AWG
         self.nr_samples = nr_samples
         self.nr_averages = nr_averages
-        print(nr_samples)
 
     def get_values(self):
         self.UHFQC.quex_rl_readout(0) # resets UHFQC internal readout counters
@@ -1592,7 +1591,7 @@ class UHFQC_integration_logging_det(Hard_Detector):
         # the loop
         self.UHFQC.awgs_0_single(1)
         self.UHFQC.awgs_0_userregs_1(0)  # 0 for rl, 1 for iavg
-        self.UHFQC.awgs_0_userregs_0(self.nr_shots+1)
+        self.UHFQC.awgs_0_userregs_0(self.nr_shots)
         self.UHFQC.quex_rl_length(self.nr_shots)
         self.UHFQC.quex_rl_avgcnt(0)  # 1 for single shot readout
         self.UHFQC.quex_wint_length(int(self.integration_length*(1.8e9)))
