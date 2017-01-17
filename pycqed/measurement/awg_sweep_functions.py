@@ -514,7 +514,7 @@ class swap_CP_swap_2Qubits_1qphasesweep_amp(swf.Hard_Sweep):
                 '{}_amp'.format(self.flux_pulse_pars_qCP['channel']), 2.)
             self.AWG.set(
                 '{}_amp'.format(self.flux_pulse_pars_qS['channel']), 2.)
-            fsqs.swap_CP_swap_2Qubits_1qphasesweep_amp(
+            seq = fsqs.swap_CP_swap_2Qubits_1qphasesweep_amp(
                 mw_pulse_pars_qCP=self.mw_pulse_pars_qCP,
                 mw_pulse_pars_qS=self.mw_pulse_pars_qS,
                 flux_pulse_pars_qCP=self.flux_pulse_pars_qCP,
@@ -532,6 +532,7 @@ class swap_CP_swap_2Qubits_1qphasesweep_amp(swf.Hard_Sweep):
 
             self.AWG.set('{}_amp'.format(self.flux_pulse_pars_qS['channel']),
                          old_val_qS)
+            return seq
 
     def set_parameter(self, val, **kw):
         pass

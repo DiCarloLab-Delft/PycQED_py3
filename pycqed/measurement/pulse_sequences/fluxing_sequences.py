@@ -1436,12 +1436,12 @@ def swap_CP_swap_2Qubits_1qphasesweep_amp(mw_pulse_pars_qCP, mw_pulse_pars_qS,
                 if excitation:
                     pulse_combinations = ['X180 qS', 'Y90 qCP', 'swap qS'] + \
                         ['CPhase qCP'] + \
-                        ['recovery swap qS','phase corr qS', 'rphi90 qCP', 'X180 qS', 'RO'] + \
+                        ['recovery swap qS','phase corr qS', 'rphi90 qCP', 'I qCP', 'X180 qS', 'RO'] + \
                         ['dead_time_pulse']+['mswap qS']*2+['mCPhase qCP']+['mphase corr qS']
                 else:
                     pulse_combinations = ['I qS', 'Y90 qCP', 'swap qS'] + \
                         ['CPhase qCP'] + \
-                        ['recovery swap qS','phase corr qS', 'rphi90 qCP', 'I qS', 'RO'] + \
+                        ['recovery swap qS','phase corr qS', 'rphi90 qCP', 'I qCP', 'I qS', 'RO'] + \
                         ['dead_time_pulse']+['mswap qS']*2+['mCPhase qCP']+['mphase corr qS']
 
             else:
@@ -1614,17 +1614,17 @@ def swap_CP_swap_2Qubits_1qphasesweep(mw_pulse_pars_qCP, mw_pulse_pars_qS,
             pulse_combinations = ['X180 qCP', 'X180 qS', 'RO']
         else:
             if sweep_q == 0:
+                # ramsey on qCP
                 pulse_combinations = ['I qS', 'Y90 qCP', 'swap qS'] + \
                     ['CPhase qCP'] + \
-                    ['recovery swap qS','phase corr qS', 'mY90 qCP', 'I qS', 'RO'] + \
+                    ['recovery swap qS','phase corr qS', 'mY90 qCP', 'I qCP', 'I qS', 'RO'] + \
                     ['dead_time_pulse']+['mswap qS']*2+['mCPhase qCP']+['mphase corr qS']
             else:
-                pulse_combinations = ['I qS', 'Y90 qS', 'swap qS'] + \
+                # ramsey on qS
+                pulse_combinations = ['Y90 qS', 'swap qS'] + \
                     ['CPhase qCP'] + \
-                    ['recovery swap qS','phase corr qS', 'mY90 qS', 'I qS', 'RO'] + \
+                    ['recovery swap qS','phase corr qS', 'mY90 qCP', 'Y90 qCP', 'mY90 qS', 'RO'] + \
                     ['dead_time_pulse']+['mswap qS']*2+['mCPhase qCP']+['mphase corr qS']
-
-
 
         pulses = []
         for p in pulse_combinations:

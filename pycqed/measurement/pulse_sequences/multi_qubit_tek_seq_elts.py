@@ -635,13 +635,13 @@ def two_qubit_tomo_bell(bell_state,
         tomo_pulse_q0 = pulse_dict[tomo_list_q0[tomo_idx_q0]]
         tomo_pulse_q1 = pulse_dict[tomo_list_q1[tomo_idx_q1]]
 
-        tomo_pulse_q0['pulse_delay'] = wait_time
-        tomo_pulse_q1['pulse_delay'] = QQ_buffer + (tomo_pulse_q0['sigma'] *
-                                                    tomo_pulse_q0['nr_sigma'])
+        # tomo_pulse_q0['pulse_delay'] = wait_time
+        # tomo_pulse_q1['pulse_delay'] = QQ_buffer + (tomo_pulse_q0['sigma'] *
+        #                                             tomo_pulse_q0['nr_sigma'])
 
-        pulse_dict['swap q0']['pulse_delay'] = QQ_buffer + (gate2['sigma'] *
-                                                    gate2['nr_sigma'])
-        gate2['pulse_delay'] = QQ_buffer + (gate1['sigma'] * gate1['nr_sigma'])
+        # pulse_dict['swap q0']['pulse_delay'] = QQ_buffer + (gate2['sigma'] *
+        #                                             gate2['nr_sigma'])
+        # gate2['pulse_delay'] = QQ_buffer + (gate1['sigma'] * gate1['nr_sigma'])
         pulse_list = [gate2, gate1, pulse_dict['swap q0']] + \
                      [pulse_dict['CPhase q1']] + \
                      [pulse_dict['recovery swap q0'], pulse_dict['phase corr q0'], after_pulse] + \

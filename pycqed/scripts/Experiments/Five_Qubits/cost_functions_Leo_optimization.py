@@ -287,7 +287,7 @@ class CPhase_cost_func_det_Ramiro(det.Soft_Detector):
 
         self.s.sweep_points = sphasesweep
         self.s.upload = True
-        self.s.prepare()
+        self.last_seq = self.s.prepare()
         self.s.upload = False
         self.MC_nested = MC_nested
 
@@ -307,7 +307,7 @@ class CPhase_cost_func_det_Ramiro(det.Soft_Detector):
 
             self.s.flux_pulse_pars_qS['phase_corr_pulse_length'] = self.phase_corr_pulse_length_qS
             self.s.flux_pulse_pars_qS['phase_corr_pulse_amp'] = self.phase_corr_pulse_amp_qS
-            self.s.prepare()
+            self.last_seq = self.s.prepare()
             self.s.upload = False
         self.pars_changed = False
         self.AWG.ch4_amp(self.qS.swap_amp())
