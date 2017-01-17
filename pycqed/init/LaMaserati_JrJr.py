@@ -101,7 +101,7 @@ station.add_component(Qubit_LO)
 AWG = tek.Tektronix_AWG5014(name='AWG', setup_folder=None, timeout=2,
                             address='TCPIP0::192.168.0.99', server_name=None)
 station.add_component(AWG)
-AWG.timeout(180)
+AWG.timeout(180) #timeout long for uploading wait.
 # AWG520 = tk520.Tektronix_AWG520('AWG520', address='GPIB0::17::INSTR',
 #                                 server_name='')
 # station.add_component(AWG520)

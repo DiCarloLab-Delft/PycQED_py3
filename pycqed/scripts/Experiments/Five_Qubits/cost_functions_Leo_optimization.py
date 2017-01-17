@@ -718,10 +718,10 @@ class SWAP_Cost_Ramiro_amp(ma.Rabi_Analysis):
 
         self.get_naming_and_values()
 
-        cal_0I = self.measured_values[0][-4]
-        cal_0Q = self.measured_values[1][-4]
-        cal_1I = self.measured_values[0][-1]
-        cal_1Q = self.measured_values[1][-1]
+        cal_0I = np.mean([self.measured_values[0][-4],self.measured_values[0][-3]])
+        cal_0Q = np.mean([self.measured_values[0][-4],self.measured_values[0][-2]])
+        cal_1I = np.mean([self.measured_values[0][-1],self.measured_values[0][-2]])
+        cal_1Q = np.mean([self.measured_values[0][-1],self.measured_values[0][-3]])
 
         self.measured_values[0][:] = (
             self.measured_values[0] - cal_0I)/(cal_1I-cal_0I)

@@ -1623,7 +1623,7 @@ def swap_CP_swap_2Qubits_1qphasesweep(mw_pulse_pars_qCP, mw_pulse_pars_qS,
                 # ramsey on qS
                 pulse_combinations = ['Y90 qS', 'swap qS'] + \
                     ['CPhase qCP'] + \
-                    ['recovery swap qS','phase corr qS', 'mY90 qCP', 'Y90 qCP', 'mY90 qS', 'RO'] + \
+                    ['recovery swap qS','phase corr qS', 'mY90 qCP', 'mY90 qCP', 'mY90 qS', 'RO'] + \
                     ['dead_time_pulse']+['mswap qS']*2+['mCPhase qCP']+['mphase corr qS']
 
         pulses = []
