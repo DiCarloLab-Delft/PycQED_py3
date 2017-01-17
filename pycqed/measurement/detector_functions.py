@@ -1392,7 +1392,7 @@ class UHFQC_input_average_detector(Hard_Detector):
         if self.AWG is not None:
             self.AWG.start()
         while self.UHFQC.awgs_0_enable() == 1:
-            time.sleep(0.01)
+            time.sleep(0.01+5)
         data = ['']*len(self.channels)
         for i, channel in enumerate(self.channels):
             dataset = eval("self.UHFQC.quex_iavg_data_{}()".format(channel))

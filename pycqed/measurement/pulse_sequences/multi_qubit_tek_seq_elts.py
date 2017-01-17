@@ -599,7 +599,7 @@ def two_qubit_tomo_bell(bell_state,
         elif bell_state == 1:
             gate1 = pulse_dict['Y90 q0']
             gate2 = pulse_dict['Y90 q1']
-            after_pulse = pulse_dict['mY90 q0']
+            after_pulse = pulse_dict['mY90 q1']
         elif bell_state == 2:
             gate1 = pulse_dict['Y90 q0']
             gate2 = pulse_dict['mY90 q1']
@@ -645,7 +645,7 @@ def two_qubit_tomo_bell(bell_state,
         pulse_list = [gate2, gate1, pulse_dict['swap q0']] + \
                      [pulse_dict['CPhase q1']] + \
                      [pulse_dict['recovery swap q0'], pulse_dict['phase corr q0'], after_pulse] + \
-                     [tomo_pulse_q0, tomo_pulse_q1, RO_pars] + \
+                     [tomo_pulse_q1, tomo_pulse_q0, RO_pars] + \
                      [pulse_dict['dead_time_pulse']] + \
                      [pulse_dict['mswap q0']]*2+[pulse_dict['mCPhase q1']]+[pulse_dict['mphase corr q0']]
         # print(pulse_list)

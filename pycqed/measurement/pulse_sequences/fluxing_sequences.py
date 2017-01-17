@@ -1264,3 +1264,381 @@ def get_pulse_dict_from_pars(pulse_pars):
 
 
 
+def swap_CP_swap_2Qubits_1qphasesweep_amp(mw_pulse_pars_qCP, mw_pulse_pars_qS,
+                         flux_pulse_pars_qCP, flux_pulse_pars_qS,
+                         RO_pars,
+                         distortion_dict,
+                         CPhase=True,
+                         excitations='both',
+                         inter_swap_wait=100e-9,
+                         sphasesweep=np.arange(0.75,1.251+0.04,0.01),
+                         verbose=False,
+                         upload=True,
+                         reverse_control_target=False,
+                         sweep_q=0,
+                         cal_points=True):
+    '''
+    Sequence that swaps qS with the bus and does CPhase between qCP and the bus
+        X180 qS - Ym90 qCP - swap qS,B - CPhase qCP,B - swap qS,B - fphi90 qCP
+        - X180 qS - RO
+
+    the keyword swap target and control reverses the
+    qubit roles during a second sweep:
+
+        X180 qCP - Ym90 qS - swap qS,B - CPhase qCP,B - swap qS,B - fphi90 qS
+        - X180 qCP - RO
+
+    qS is the "swap qubit"
+    qCP is the "CPhase qubit"
+
+    mw_pulse_pars qCP:    (dict) qubit control pulse pars
+    mw_pulse_pars qS:     (dict) qubit control pulse pars
+    flux_pulse_pars qCP:  (dict) flux puplse pars
+    flux_pulse_pars qS:   (dict) flux puplse pars
+    RO_pars:              (dict) qubit RO pars, ideally a multiplexed readout
+    distortion_dict=None: (dict) flux_pulse predistortion kernels
+
+    CPhase:               (bool) if False replaces CPhase with an identity
+    excitations:          (enum) [0, 1, 'both'] whether to put an excitation in
+                          the swap qubit, both does the sequence both ways.
+    phases                (list) phases used for the recovery pulse
+    inter_swap_wait       (float) wait time in seconds between the two swaps
+    verbose=False:        (bool) used for verbosity printing in the pulsar
+    upload=True:          (bool) uploads to AWG, set False for testing purposes
+    cal_points=True:      (bool) wether to use calibration points
+
+    TODO:
+        - move getting the pulse dict to a single function
+        - default to the single qubit swap-wait-swap sequence if no pulse pars
+          for qCP
+        - Add all four calibration points
+    '''
+
+    # ############ This getting pulse dict should be a single function
+    mw_pulses_qCP = add_suffix_to_dict_keys(
+        get_pulse_dict_from_pars(mw_pulse_pars_qCP), ' qCP')
+    mw_pulses_qS = add_suffix_to_dict_keys(
+        get_pulse_dict_from_pars(mw_pulse_pars_qS), ' qS')
+    # This should come out of this dict in a smarter way
+    CPhase_qCP = {'CPhase qCP': flux_pulse_pars_qCP}# pulse incluse single qubit phase correction
+    swap_qS = {'swap qS': flux_pulse_pars_qS}
+    RO_dict = {'RO': RO_pars}
+    pulse_dict = {}
+    pulse_dict.update(mw_pulses_qCP)
+    pulse_dict.update(mw_pulses_qS)
+    pulse_dict.update(CPhase_qCP)
+    pulse_dict.update(swap_qS)
+    pulse_dict.update(RO_dict)
+    ## End of the getting pulse dict
+
+
+    # Preloading should be almost instant (no preloading here)
+    #preloaded_kernels_vec = preload_kernels_func(distortion_dict)
+    # renamed as the dict contains the pulse directly
+
+    # Getting the minus flux pulses should also be in the get pulse dict
+    # minus_flux_pulse_pars = deepcopy(flux_pulse_pars_qCP) not used
+    pulse_dict['mCPhase qCP'] = deepcopy(pulse_dict['CPhase qCP'])
+    pulse_dict['mswap qS'] = deepcopy(pulse_dict['swap qS'])
+    pulse_dict['mCPhase qCP']['amplitude'] = -pulse_dict['CPhase qCP']['amplitude']
+    pulse_dict['mswap qS']['amplitude'] = -pulse_dict['swap qS']['amplitude']
+
+    # pulse_dict.update({'mFlux_pulse': minus_flux_pulse_pars}) not used
+    pulse_dict.update({'dead_time_pulse':
+                       {'pulse_type': 'SquarePulse',
+                        'pulse_delay': flux_pulse_pars_qCP['dead_time'],
+                        'channel': flux_pulse_pars_qCP['channel'],
+                        'amplitude': 0,
+                        'length': 0.}})
+
+    # Pulse is used to set the starting refpoint for the compensation pulses
+
+    seq_name = 'swap_CP_swap_2Qubits'
+    seq = sequence.Sequence(seq_name)
+    station.pulsar.update_channel_settings()
+    el_list = []
+
+    recovery_swap = deepcopy(pulse_dict['swap qS'])
+
+    #pulse to correct single-qubit phase error in the swap qubit
+    pulse_dict['phase corr qS'] = deepcopy(pulse_dict['swap qS'])
+    pulse_dict['phase corr qS']['square_pulse_length'] = flux_pulse_pars_qS['phase_corr_pulse_length']
+    pulse_dict['phase corr qS']['amplitude'] = flux_pulse_pars_qS['phase_corr_pulse_amp']
+    pulse_dict['mphase corr qS'] = deepcopy(pulse_dict['swap qS'])
+    pulse_dict['mphase corr qS']['square_pulse_length'] = flux_pulse_pars_qS['phase_corr_pulse_length']
+    pulse_dict['mphase corr qS']['amplitude'] = -flux_pulse_pars_qS['phase_corr_pulse_amp']
+    orig_amp_qs_phase = pulse_dict['phase corr qS']['amplitude']
+    orig_amp_qcp_phase = pulse_dict['CPhase qCP']['phase_corr_pulse_amp']
+
+    if not CPhase:
+        pulse_dict['CPhase qCP']['amplitude'] = 0
+        pulse_dict['mCPhase qCP']['amplitude'] = 0
+        pulse_dict['phase corr qS']['amplitude'] = 0
+        pulse_dict['CPhase qCP']['phase_corr_pulse_amp'] = 0
+
+    recovery_swap['pulse_delay'] = inter_swap_wait/2
+    pulse_dict['recovery swap qS'] = recovery_swap
+    pulse_dict['CPhase qCP']['pulse_delay'] = inter_swap_wait/2
+
+    # seq has to have at least 2 elts
+    for i, amp_s in enumerate(sphasesweep):
+        if sweep_q == 0:
+            pulse_dict['phase corr qS']['amplitude'] = amp_s
+            pulse_dict['mphase corr qS']['amplitude'] = -amp_s
+        else:
+            pulse_dict['CPhase qCP']['phase_corr_pulse_amp'] = amp_s
+            pulse_dict['mCPhase qCP']['phase_corr_pulse_amp'] = -amp_s
+        if reverse_control_target:
+            if (i < (len(sphasesweep)-4*cal_points)/4):
+                reverse = False
+                excitation = False
+            elif (i < (len(sphasesweep)-4*cal_points)/2):
+                reverse = False
+                excitation = True
+            elif (i < (len(sphasesweep)-4*cal_points)*3/4):
+                reverse = True
+                excitation = False
+            else:
+                reverse = True
+                excitation = True
+        else:
+            reverse = False
+            if excitations == 'both':
+                reverse=False
+                if (i < (len(sphasesweep)-4*cal_points)/2):
+                    excitation = False
+                else:
+                    excitation = True
+            elif excitations == 0:
+                excitation = False
+            elif excitations == 1:
+                excitation = True
+            else:
+                raise ValueError(
+                    'excitations {} not recognized'.format(excitations))
+
+
+        if cal_points and (i == (len(sphasesweep)-4)):
+            pulse_combinations = ['I qCP', 'I qS', 'RO']
+        elif cal_points and (i == (len(sphasesweep)-3)):
+            pulse_combinations = ['I qCP', 'X180 qS', 'RO']
+        elif cal_points and ((i == len(sphasesweep)-2)):
+            pulse_combinations = ['X180 qCP', 'I qS', 'RO']
+        elif cal_points and (i == (len(sphasesweep)-1)):
+            pulse_combinations = ['X180 qCP', 'X180 qS', 'RO']
+        else:
+            if not reverse:
+                # pulse_dict['CPhase qCP']['phase_corr_pulse_amp'] = amp_s
+                # pulse_dict['mCPhase qCP']['phase_corr_pulse_amp'] = -amp_s
+                rphi90_qCP = deepcopy(pulse_dict['X90 qCP'])
+                rphi90_qCP['phase'] = 270
+                pulse_dict['rphi90 qCP'] = rphi90_qCP
+                if excitation:
+                    pulse_combinations = ['X180 qS', 'Y90 qCP', 'swap qS'] + \
+                        ['CPhase qCP'] + \
+                        ['recovery swap qS','phase corr qS', 'rphi90 qCP', 'X180 qS', 'RO'] + \
+                        ['dead_time_pulse']+['mswap qS']*2+['mCPhase qCP']+['mphase corr qS']
+                else:
+                    pulse_combinations = ['I qS', 'Y90 qCP', 'swap qS'] + \
+                        ['CPhase qCP'] + \
+                        ['recovery swap qS','phase corr qS', 'rphi90 qCP', 'I qS', 'RO'] + \
+                        ['dead_time_pulse']+['mswap qS']*2+['mCPhase qCP']+['mphase corr qS']
+
+            else:
+                # pulse_dict['phase corr qS']['amplitude'] = amp_s
+                # pulse_dict['mphase corr qS']['amplitude'] = -amp_s
+                rphi90_qS = deepcopy(pulse_dict['X90 qS'])
+                rphi90_qS['phase'] = 270
+                pulse_dict['rphi90 qS'] = rphi90_qS
+                if excitation:
+                    pulse_combinations = ['X180 qCP', 'Y90 qS', 'swap qS'] + \
+                        ['CPhase qCP'] + \
+                        ['recovery swap qS','phase corr qS', 'rphi90 qS', 'X180 qCP', 'RO'] + \
+                        ['dead_time_pulse']+['mswap qS']*2+['mCPhase qCP']+['mphase corr qS']
+                else:
+                    pulse_combinations = ['I qCP', 'Y90 qS', 'swap qS'] + \
+                        ['CPhase qCP'] + \
+                        ['recovery swap qS','phase corr qS', 'rphi90 qS', 'I qCP', 'RO'] + \
+                        ['dead_time_pulse']+['mswap qS']*2+['mCPhase qCP']+['mphase corr qS']
+
+        pulses = []
+        for p in pulse_combinations:
+            pulses += [pulse_dict[p]]
+        el = multi_pulse_elt(i, station, pulses)
+        if distortion_dict is not None:
+            el = distort_and_compensate(
+                el, distortion_dict)
+        el_list.append(el)
+        seq.append_element(el, trigger_wait=True)
+
+    if upload:
+        station.components['AWG'].stop()
+        station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+
+    return seq, el_list
+
+
+
+def swap_CP_swap_2Qubits_1qphasesweep(mw_pulse_pars_qCP, mw_pulse_pars_qS,
+                         flux_pulse_pars_qCP, flux_pulse_pars_qS,
+                         RO_pars,
+                         distortion_dict,
+                         CPhase=True,
+                         excitations='both',
+                         inter_swap_wait=100e-9,
+                         sphasesweep=np.arange(0.1,0.51+0.04,0.01),
+                         verbose=False,
+                         upload=True,
+                         reverse_control_target=False,
+                         sweep_q=0,
+                         cal_points=True):
+    '''
+    Sequence that swaps qS with the bus and does CPhase between qCP and the bus
+        X180 qS - Ym90 qCP - swap qS,B - CPhase qCP,B - swap qS,B - fphi90 qCP
+        - X180 qS - RO
+
+    the keyword swap target and control reverses the
+    qubit roles during a second sweep:
+
+        X180 qCP - Ym90 qS - swap qS,B - CPhase qCP,B - swap qS,B - fphi90 qS
+        - X180 qCP - RO
+
+    qS is the "swap qubit"
+    qCP is the "CPhase qubit"
+
+    mw_pulse_pars qCP:    (dict) qubit control pulse pars
+    mw_pulse_pars qS:     (dict) qubit control pulse pars
+    flux_pulse_pars qCP:  (dict) flux puplse pars
+    flux_pulse_pars qS:   (dict) flux puplse pars
+    RO_pars:              (dict) qubit RO pars, ideally a multiplexed readout
+    distortion_dict=None: (dict) flux_pulse predistortion kernels
+
+    CPhase:               (bool) if False replaces CPhase with an identity
+    excitations:          (enum) [0, 1, 'both'] whether to put an excitation in
+                          the swap qubit, both does the sequence both ways.
+    phases                (list) phases used for the recovery pulse
+    inter_swap_wait       (float) wait time in seconds between the two swaps
+    verbose=False:        (bool) used for verbosity printing in the pulsar
+    upload=True:          (bool) uploads to AWG, set False for testing purposes
+    cal_points=True:      (bool) wether to use calibration points
+
+    TODO:
+        - move getting the pulse dict to a single function
+        - default to the single qubit swap-wait-swap sequence if no pulse pars
+          for qCP
+        - Add all four calibration points
+    '''
+
+    # ############ This getting pulse dict should be a single function
+    mw_pulses_qCP = add_suffix_to_dict_keys(
+        get_pulse_dict_from_pars(mw_pulse_pars_qCP), ' qCP')
+    mw_pulses_qS = add_suffix_to_dict_keys(
+        get_pulse_dict_from_pars(mw_pulse_pars_qS), ' qS')
+    # This should come out of this dict in a smarter way
+    CPhase_qCP = {'CPhase qCP': flux_pulse_pars_qCP}# pulse incluse single qubit phase correction
+    swap_qS = {'swap qS': flux_pulse_pars_qS}
+    RO_dict = {'RO': RO_pars}
+    pulse_dict = {}
+    pulse_dict.update(mw_pulses_qCP)
+    pulse_dict.update(mw_pulses_qS)
+    pulse_dict.update(CPhase_qCP)
+    pulse_dict.update(swap_qS)
+    pulse_dict.update(RO_dict)
+    ## End of the getting pulse dict
+
+
+    # Preloading should be almost instant (no preloading here)
+    #preloaded_kernels_vec = preload_kernels_func(distortion_dict)
+    # renamed as the dict contains the pulse directly
+
+    # Getting the minus flux pulses should also be in the get pulse dict
+    # minus_flux_pulse_pars = deepcopy(flux_pulse_pars_qCP) not used
+    pulse_dict['mCPhase qCP'] = deepcopy(pulse_dict['CPhase qCP'])
+    pulse_dict['mswap qS'] = deepcopy(pulse_dict['swap qS'])
+    pulse_dict['mCPhase qCP']['amplitude'] = -pulse_dict['CPhase qCP']['amplitude']
+    pulse_dict['mswap qS']['amplitude'] = -pulse_dict['swap qS']['amplitude']
+
+    # pulse_dict.update({'mFlux_pulse': minus_flux_pulse_pars}) not used
+    pulse_dict.update({'dead_time_pulse':
+                       {'pulse_type': 'SquarePulse',
+                        'pulse_delay': flux_pulse_pars_qCP['dead_time'],
+                        'channel': flux_pulse_pars_qCP['channel'],
+                        'amplitude': 0,
+                        'length': 0.}})
+
+    # Pulse is used to set the starting refpoint for the compensation pulses
+
+    seq_name = 'swap_CP_swap_2Qubits'
+    seq = sequence.Sequence(seq_name)
+    station.pulsar.update_channel_settings()
+    el_list = []
+
+    recovery_swap = deepcopy(pulse_dict['swap qS'])
+
+    #pulse to correct single-qubit phase error in the swap qubit
+    pulse_dict['phase corr qS'] = deepcopy(pulse_dict['swap qS'])
+    pulse_dict['phase corr qS']['square_pulse_length'] = flux_pulse_pars_qS['phase_corr_pulse_length']
+    pulse_dict['phase corr qS']['amplitude'] = flux_pulse_pars_qS['phase_corr_pulse_amp']
+    pulse_dict['mphase corr qS'] = deepcopy(pulse_dict['swap qS'])
+    pulse_dict['mphase corr qS']['square_pulse_length'] = flux_pulse_pars_qS['phase_corr_pulse_length']
+    pulse_dict['mphase corr qS']['amplitude'] = -flux_pulse_pars_qS['phase_corr_pulse_amp']
+    orig_amp_qs_phase = pulse_dict['phase corr qS']['amplitude']
+    orig_amp_qcp_phase = pulse_dict['CPhase qCP']['phase_corr_pulse_amp']
+
+    if not CPhase:
+        pulse_dict['CPhase qCP']['amplitude'] = 0
+        pulse_dict['mCPhase qCP']['amplitude'] = 0
+        pulse_dict['phase corr qS']['amplitude'] = 0
+        pulse_dict['CPhase qCP']['phase_corr_pulse_amp'] = 0
+
+    recovery_swap['pulse_delay'] = inter_swap_wait/2
+    pulse_dict['recovery swap qS'] = recovery_swap
+    pulse_dict['CPhase qCP']['pulse_delay'] = inter_swap_wait/2
+
+    # seq has to have at least 2 elts
+    for i, amp_s in enumerate(sphasesweep):
+        if sweep_q == 0:
+            pulse_dict['CPhase qCP']['phase_corr_pulse_amp'] = amp_s
+            pulse_dict['mCPhase qCP']['phase_corr_pulse_amp'] = -amp_s
+        else:
+            pulse_dict['phase corr qS']['amplitude'] = amp_s
+            pulse_dict['mphase corr qS']['amplitude'] = -amp_s
+
+        if cal_points and (i == (len(sphasesweep)-4)):
+            pulse_combinations = ['I qCP', 'I qS', 'RO']
+        elif cal_points and (i == (len(sphasesweep)-3)):
+            pulse_combinations = ['I qCP', 'X180 qS', 'RO']
+        elif cal_points and ((i == len(sphasesweep)-2)):
+            pulse_combinations = ['X180 qCP', 'I qS', 'RO']
+        elif cal_points and (i == (len(sphasesweep)-1)):
+            pulse_combinations = ['X180 qCP', 'X180 qS', 'RO']
+        else:
+            if sweep_q == 0:
+                pulse_combinations = ['I qS', 'Y90 qCP', 'swap qS'] + \
+                    ['CPhase qCP'] + \
+                    ['recovery swap qS','phase corr qS', 'mY90 qCP', 'I qS', 'RO'] + \
+                    ['dead_time_pulse']+['mswap qS']*2+['mCPhase qCP']+['mphase corr qS']
+            else:
+                pulse_combinations = ['I qS', 'Y90 qS', 'swap qS'] + \
+                    ['CPhase qCP'] + \
+                    ['recovery swap qS','phase corr qS', 'mY90 qS', 'I qS', 'RO'] + \
+                    ['dead_time_pulse']+['mswap qS']*2+['mCPhase qCP']+['mphase corr qS']
+
+
+
+        pulses = []
+        for p in pulse_combinations:
+            pulses += [pulse_dict[p]]
+        el = multi_pulse_elt(i, station, pulses)
+        if distortion_dict is not None:
+            el = distort_and_compensate(
+                el, distortion_dict)
+        el_list.append(el)
+        seq.append_element(el, trigger_wait=True)
+
+    if upload:
+        station.components['AWG'].stop()
+        station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+
+    return seq, el_list
+
