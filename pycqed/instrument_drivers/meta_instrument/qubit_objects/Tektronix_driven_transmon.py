@@ -6,6 +6,8 @@ from qcodes import Instrument
 from qcodes.utils import validators as vals
 from qcodes.instrument.parameter import ManualParameter
 
+from pycqed.utilities.general import add_suffix_to_dict_keys
+
 from pycqed.measurement import detector_functions as det
 from pycqed.measurement import composite_detector_functions as cdet
 from pycqed.measurement import mc_parameter_wrapper as pw
@@ -288,15 +290,16 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         self.td_source.off()
 
         # Updating Spec source
-        self.cw_source.power(self.spec_pow())
-        self.cw_source.frequency(self.f_qubit())
-        self.cw_source.off()
-        if hasattr(self.cw_source, 'pulsemod_state'):
-            self.cw_source.pulsemod_state('off')
-        if hasattr(self.rf_RO_source, 'pulsemod_state'):
-            self.rf_RO_source.pulsemod_state('Off')
-
-
+        if self.cw_source !=None:
+            self.cw_source.power(self.spec_pow())
+            self.cw_source.frequency(self.f_qubit())
+            self.cw_source.off()
+            if hasattr(self.cw_source, 'pulsemod_state'):
+                self.cw_source.pulsemod_state('off')
+            if hasattr(self.rf_RO_source, 'pulsemod_state'):
+                self.rf_RO_source.pulsemod_state('Off')
+        else:
+            logging.warning('No spectrocscopy source (cw_source) specified')
     def prepare_for_pulsed_spec(self):
         # TODO: fix prepare for pulsed spec
         # TODO: make measure pulsed spec
@@ -311,13 +314,15 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                 'Spec source for pulsed spectroscopy does not support pulsing!')
         self.cw_source.on()
 
+
     def prepare_for_timedomain(self, input_averaging=False):
         # makes sure the settings of the acquisition instrument are reloaded
         self.acquisition_instr(self.acquisition_instr())
         self.rf_RO_source.pulsemod_state('On')
         self.td_source.pulsemod_state('Off')
         self.LO.on()
-        self.cw_source.off()
+        if self.cw_source !=None:
+            self.cw_source.off()
         self.td_source.on()
         # Ensures the self.pulse_pars and self.RO_pars get created and updated
         self.get_pulse_pars()
@@ -354,7 +359,11 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         elif self.RO_pulse_type() is 'MW_IQmod_pulse_UHFQC':
             eval('self._acquisition_instr.sigouts_{}_offset({})'.format(self.RO_I_channel(),self.RO_I_offset()))
             eval('self._acquisition_instr.sigouts_{}_offset({})'.format(self.RO_Q_channel(),self.RO_Q_offset()))
-            #self._acquisition_instr.awg_sequence_acquisition_and_pulse_SSB(f_RO_mod=self.f_RO_mod(), RO_amp=self.RO_amp(), RO_pulse_length=self.RO_pulse_length(), acquisition_delay=270e-9)
+            # This is commented out as doing this by default breaks multiplexed readout
+            # it should instead be done using the lutmanman
+            # self._acquisition_instr.awg_sequence_acquisition_and_pulse_SSB(
+            #     f_RO_mod=self.f_RO_mod(), RO_amp=self.RO_amp(),
+            #     RO_pulse_length=self.RO_pulse_length(), acquisition_delay=270e-9)
         elif self.RO_pulse_type.get() is 'Gated_MW_RO_pulse':
             self.rf_RO_source.pulsemod_state.set('on')
             self.rf_RO_source.frequency(self.f_RO.get())
@@ -1004,16 +1013,21 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
             self.input_average_detector = det.UHFQC_input_average_detector(
                 UHFQC=self._acquisition_instr,
                 AWG=self.AWG, nr_averages=self.RO_acq_averages())
+
             self.int_avg_det = det.UHFQC_integrated_average_detector(
                 UHFQC=self._acquisition_instr, AWG=self.AWG,
                 channels=[self.RO_acq_weight_function_I(),
                           self.RO_acq_weight_function_Q()],
                 nr_averages=self.RO_acq_averages(),
                 integration_length=self.RO_acq_integration_length())
+
             self.int_avg_det_rot = det.UHFQC_integrated_average_detector(
                 UHFQC=self._acquisition_instr, AWG=self.AWG,
-                channels=[self.RO_acq_weight_function_I(), self.RO_acq_weight_function_Q()], nr_averages=self.RO_acq_averages(),
+                channels=[self.RO_acq_weight_function_I(),
+                          self.RO_acq_weight_function_Q()],
+                nr_averages=self.RO_acq_averages(),
                 integration_length=self.RO_acq_integration_length(), rotate=True)
+
             self.int_log_det = det.UHFQC_integration_logging_det(
                 UHFQC=self._acquisition_instr, AWG=self.AWG,
                 channels=[self.RO_acq_weight_function_I(), self.RO_acq_weight_function_Q()],
@@ -1025,6 +1039,29 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                 ATS=self._acquisition_instr.card,
                 ATS_acq=self._acquisition_instr.controller, AWG=self.AWG,
                 nr_averages=self.RO_acq_averages())
+
+    def get_pulse_dict(self, pulse_dict={}):
+        '''
+        Returns a dictionary containing the pulse parameters of the qubit.
+        This function is intended to replace the old get_pulse_pars.
+        Dictionary contains the keys formatted as follows:
+            operation self.name
+
+        Input args:
+            pulse_dict (dict):  Optionally specify an existing pulse dict to update
+
+        (currently only contains single qubit pulses)
+        '''
+        drive_pars, RO_pars = self.get_pulse_pars()
+        pulse_dict.update(add_suffix_to_dict_keys(
+            sq.get_pulse_dict_from_pars(drive_pars), ' ' + self.name))
+        pulse_dict.update({'RO {}'.format(self.name): RO_pars})
+
+        spec_pars, RO_pars = self.get_spec_pars()
+        pulse_dict.update({'Spec {}'.format(self.name): spec_pars})
+
+        return pulse_dict
+
 
     def get_pulse_pars(self):
         self.pulse_pars = {
