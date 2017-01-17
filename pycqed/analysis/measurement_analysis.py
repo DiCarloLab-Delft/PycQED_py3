@@ -31,7 +31,8 @@ imp.reload(dm_tools)
 
 class MeasurementAnalysis(object):
 
-    def __init__(self, TwoD=False, folder=None, auto=True, **kw):
+    def __init__(self, TwoD=False, folder=None, auto=True,
+                 cmap_chosen='viridis',**kw):
         if folder is None:
             self.folder = a_tools.get_folder(**kw)
         else:
@@ -40,6 +41,7 @@ class MeasurementAnalysis(object):
         self.load_hdf5data(**kw)
         self.fit_results = []
         self.box_props = dict(boxstyle='Square', facecolor='white', alpha=0.8)
+        self.cmap_chosen = cmap_chosen
         if auto is True:
             self.run_default_analysis(TwoD=TwoD, **kw)
 
@@ -343,7 +345,9 @@ class MeasurementAnalysis(object):
                     ylabel=self.ylabel,
                     zlabel=self.zlabels[i],
                     save=False,
-                    transpose=transpose)
+                    transpose=transpose,
+                    cmap_chosen=self.cmap_chosen,
+                    **kw)
 
             fig.tight_layout(h_pad=1.5)
             fig.subplots_adjust(top=0.9)

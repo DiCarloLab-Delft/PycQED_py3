@@ -1233,6 +1233,7 @@ def color_plot(x, y, z, fig, ax, cax=None,
     y_vertices[1:-1] = (y[:-1]+y[1:])/2.
     y_vertices[0] = y[0] - (y[1]-y[0])/2.
     y_vertices[-1] = y[-1] + (y[-1]-y[-2])/2.
+    cmap_chosen = kw.get('cmap_chosen','viridis')
 
     # This version (below) does not plot the last row, but it possibly fixes
     # an issue where it wouldn't plot at all on one computer
@@ -1252,10 +1253,10 @@ def color_plot(x, y, z, fig, ax, cax=None,
     if normalize:
         z = normalize_data_v2(z, axis=1, order=2)
 
-    cmap = plt.get_cmap(kw.pop('cmap', 'viridis'))
+    cmap = plt.get_cmap(kw.pop('cmap', cmap_chosen))
     # CMRmap is our old default
 
-    clim = kw.pop('clim', [None, None])
+    clim = kw.get('clim', [None, None])
     if log:
         norm = colors.LogNorm()
     else:

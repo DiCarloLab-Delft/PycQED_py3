@@ -594,20 +594,36 @@ def two_qubit_tomo_bell(bell_state,
 
         if bell_state == 0:
             gate1 = pulse_dict['Y90 q0']
-            gate2 = pulse_dict['mY90 q1']
-            after_pulse = pulse_dict['mY90 q0']
+            gate2 = pulse_dict['Y90 q1']
+            after_pulse = pulse_dict['Y90 q0']
         elif bell_state == 1:
             gate1 = pulse_dict['Y90 q0']
             gate2 = pulse_dict['Y90 q1']
-            after_pulse = pulse_dict['Y90 q0']
+            after_pulse = pulse_dict['mY90 q0']
         elif bell_state == 2:
-            gate1 = pulse_dict['mY90 q0']
+            gate1 = pulse_dict['Y90 q0']
             gate2 = pulse_dict['mY90 q1']
             after_pulse = pulse_dict['Y90 q0']
         elif bell_state == 3:
             gate1 = pulse_dict['Y90 q0']
             gate2 = pulse_dict['mY90 q1']
+            after_pulse = pulse_dict['mY90 q0']
+        elif bell_state == 4:
+            gate1 = pulse_dict['mY90 q0']
+            gate2 = pulse_dict['Y90 q1']
             after_pulse = pulse_dict['Y90 q0']
+        elif bell_state == 5:
+            gate1 = pulse_dict['mY90 q0']
+            gate2 = pulse_dict['Y90 q1']
+            after_pulse = pulse_dict['mY90 q0']
+        elif bell_state == 6:
+            gate1 = pulse_dict['mY90 q0']
+            gate2 = pulse_dict['mY90 q1']
+            after_pulse = pulse_dict['Y90 q0']
+        elif bell_state == 7:
+            gate1 = pulse_dict['mY90 q0']
+            gate2 = pulse_dict['mY90 q1']
+            after_pulse = pulse_dict['mY90 q0']
 
 
     for i in range(36):
