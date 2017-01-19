@@ -1147,7 +1147,6 @@ class Rabi_Analysis(TD_Analysis):
         self.save_fig(self.fig, fig_tight=False, **kw)
 
     def fit_data(self, print_fit_results=False, **kw):
-        self.add_analysis_datagroup_to_file()
         model = fit_mods.CosModel
         self.fit_res = ['', '']
         # It would be best to do 1 fit to both datasets but since it is
@@ -1159,8 +1158,12 @@ class Rabi_Analysis(TD_Analysis):
                 data=self.measured_values[i],
                 t=self.sweep_points,
                 params=params)
-            self.save_fitted_parameters(fit_res=self.fit_res[i],
-                                        var_name=self.value_names[i])
+            try:
+                self.add_analysis_datagroup_to_file()
+                self.save_fitted_parameters(fit_res=self.fit_res[i],
+                                            var_name=self.value_names[i])
+            except Exception as e:
+                logging.warning(e)
 
 class TD_UHFQC(TD_Analysis):
     def __init__(self, NoCalPoints=4, center_point=31, make_fig=True,

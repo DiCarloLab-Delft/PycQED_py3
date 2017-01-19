@@ -309,7 +309,7 @@ def switch_to_IQ_mod_RO_UHFQC(qubit):
                 RO_amp=qubit.RO_amp(), RO_pulse_length=qubit.RO_pulse_length(),
                 acquisition_delay=285e-9)
     qubit.RO_pulse_type('MW_IQmod_pulse_UHFQC')
-    qubit.RO_acq_marker_delay(-200e-9)
+    qubit.RO_acq_marker_delay(0e-9)
     qubit.acquisition_instr('UHFQC_1')
     qubit.RO_acq_marker_channel('ch3_marker2')
     qubit.RO_I_channel('0')

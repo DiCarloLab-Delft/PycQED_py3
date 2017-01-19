@@ -318,7 +318,6 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
     def prepare_for_timedomain(self, input_averaging=False):
         # makes sure the settings of the acquisition instrument are reloaded
         self.acquisition_instr(self.acquisition_instr())
-        self.rf_RO_source.pulsemod_state('On')
         self.td_source.pulsemod_state('Off')
         self.LO.on()
         if self.cw_source !=None:
@@ -365,7 +364,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
             #     f_RO_mod=self.f_RO_mod(), RO_amp=self.RO_amp(),
             #     RO_pulse_length=self.RO_pulse_length(), acquisition_delay=270e-9)
         elif self.RO_pulse_type.get() is 'Gated_MW_RO_pulse':
-            self.rf_RO_source.pulsemod_state.set('on')
+            self.rf_RO_source.pulsemod_state('On')
             self.rf_RO_source.frequency(self.f_RO.get())
             self.rf_RO_source.power(self.RO_pulse_power.get())
             self.rf_RO_source.frequency(self.f_RO())
@@ -714,10 +713,14 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
             raw=no_fits,
             MC=MC,
             AWG=self.AWG, acquisition_instr=self._acquisition_instr,
-            pulse_pars=self.pulse_pars, RO_pars=self.RO_pars, IF=self.f_RO_mod(), weight_function_I=self.RO_acq_weight_function_I(),
-            weight_function_Q=self.RO_acq_weight_function_Q(), nr_shots=nr_shots, one_weight_function_UHFQC=one_weight_function_UHFQC,
-            optimized_weights=optimized_weights, integration_length=self.RO_acq_integration_length(),
-            close_fig=close_fig, SSB=SSB, multiplier=multiplier, nr_averages=self.RO_acq_averages())
+            pulse_pars=self.pulse_pars, RO_pars=self.RO_pars, IF=self.f_RO_mod(),
+            weight_function_I=self.RO_acq_weight_function_I(),
+            weight_function_Q=self.RO_acq_weight_function_Q(),
+            nr_shots=nr_shots, one_weight_function_UHFQC=one_weight_function_UHFQC,
+            optimized_weights=optimized_weights,
+            integration_length=self.RO_acq_integration_length(),
+            close_fig=close_fig, SSB=SSB, multiplier=multiplier,
+            nr_averages=self.RO_acq_averages())
         if return_detector:
             return d
         d.prepare()

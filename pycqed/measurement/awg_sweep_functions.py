@@ -31,6 +31,32 @@ class File(swf.Hard_Sweep):
             self.AWG.set_setup_filename(self.filename)
 
 
+class awg_seq_swf(swf.Hard_Sweep):
+    def __init__(self, awg_seq_func, awg_seq_func_kwargs,
+                 parameter_name=None, unit='a.u.',
+                 upload=True, return_seq=False):
+        """
+        A wrapper for awg sequence generating functions.
+        Works as a general awg sweep function.
+        """
+        super().__init__()
+        self.upload = upload
+        self.awg_seq_func = awg_seq_func
+        self.awg_seq_func_kwargs = awg_seq_func_kwargs
+        self.unit = unit
+        self.name = 'swf_'+ awg_seq_func.__name__
+
+        if parameter_name != None:
+            self.parameter_name = parameter_name
+        else:
+            self.parameter_name = 'points'
+
+    def prepare(self, **kw):
+        if self.parameter_name != 'points':
+            self.awg_seq_func_kwargs[self.parameter_name] = self.sweep_points
+        if self.upload:
+            self.awg_seq_func(**self.awg_seq_func_kwargs)
+
 class Rabi(swf.Hard_Sweep):
 
     def __init__(self, pulse_pars, RO_pars, n=1, upload=True, return_seq=False):

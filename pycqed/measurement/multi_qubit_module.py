@@ -65,7 +65,8 @@ def resonant_cphase(phases, low_qubit, high_qubit, timings_dict, mmt_label='', M
     return cphase.seq
 
 
-def tomo2Q_cardinal(cardinal, qubit0, qubit1, timings_dict, nr_shots=512, mmt_label='', MC=None, run=True):
+def tomo2Q_cardinal(cardinal, qubit0, qubit1, timings_dict,
+                    nr_shots=512, nr_rep=10, mmt_label='', MC=None, run=True):
     """
     Performs the fringe measurements of a resonant cphase gate between two qubits.
     low_qubit is gonna be swapped with the bus
@@ -75,7 +76,7 @@ def tomo2Q_cardinal(cardinal, qubit0, qubit1, timings_dict, nr_shots=512, mmt_la
         MC = station.MC
     cal_points = 28
     # sweep_points = np.arange(cal_points+36)
-    sweep_points = np.arange(nr_shots*(36+cal_points))
+    sweep_points = np.arange(nr_shots*nr_rep*(36+cal_points))
 
     q0_pulse_pars, RO_pars = qubit0.get_pulse_pars()
     q1_pulse_pars, RO_pars = qubit1.get_pulse_pars()

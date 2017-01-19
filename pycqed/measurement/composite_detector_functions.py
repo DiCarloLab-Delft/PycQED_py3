@@ -444,16 +444,23 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
 
             elif 'UHFQC' in str(self.acquisition_instr):
                 self.MC.set_detector_function(
-                    det.UHFQC_integration_logging_det(self.acquisition_instr,
-                                                          self.AWG, channels=[self.weight_function_I,self.weight_function_Q],
-                                                          integration_length=self.integration_length, nr_shots=min(self.nr_shots, 4094)))
+                    det.UHFQC_integration_logging_det(
+                        self.acquisition_instr, self.AWG,
+                        channels=[self.weight_function_I,self.weight_function_Q],
+                        integration_length=self.integration_length,
+                        nr_shots=min(self.nr_shots, 4094)))
                 if self.SSB:
-                    self.UHFQC.prepare_SSB_weight_and_rotation(IF=self.IF, weight_function_I=self.weight_function_I, weight_function_Q=self.weight_function_Q)
+                    self.UHFQC.prepare_SSB_weight_and_rotation(
+                        IF=self.IF, weight_function_I=self.weight_function_I,
+                        weight_function_Q=self.weight_function_Q)
                 else:
                     if self.IF==None:
                         raise ValueError('IF has to be provided when not using optimized weights')
                     else:
-                        self.UHFQC.prepare_DSB_weight_and_rotation(IF=self.IF, weight_function_I=self.weight_function_I, weight_function_Q=self.weight_function_Q)
+                        self.UHFQC.prepare_DSB_weight_and_rotation(
+                            IF=self.IF,
+                            weight_function_I=self.weight_function_I,
+                            weight_function_Q=self.weight_function_Q)
 
     def acquire_data_point(self, *args, **kw):
         self.time_start = time.time()
