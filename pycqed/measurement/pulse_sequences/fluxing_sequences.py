@@ -1361,7 +1361,7 @@ def swap_CP_swap_2Qubits_1qphasesweep_amp(mw_pulse_pars_qCP, mw_pulse_pars_qS,
                        {'pulse_type': 'SquarePulse',
                         'pulse_delay': 0.,
                         'channel': pulse_dict['CPhase qCP']['channel'],
-                        'amplitude': 0.,#pulse_dict['CPhase qCP']['phase_corr_pulse_amp'],
+                        'amplitude': pulse_dict['CPhase qCP']['phase_corr_pulse_amp'],
                         'length': pulse_dict['CPhase qCP']['phase_corr_pulse_length']}})
 
     pulse_dict['mphase corr qCP'] = deepcopy(pulse_dict['phase corr qCP'])
@@ -1403,14 +1403,16 @@ def swap_CP_swap_2Qubits_1qphasesweep_amp(mw_pulse_pars_qCP, mw_pulse_pars_qS,
     # seq has to have at least 2 elts
     mid_point_phase_amp = sphasesweep[len(sphasesweep[:-4])//4]
     for i, amp_s in enumerate(sphasesweep):
-        # pulse_dict['CPhase qCP']['phase_corr_pulse_amp'] = 0.
-        # pulse_dict['mCPhase qCP']['phase_corr_pulse_amp'] = 0.
+        pulse_dict['CPhase qCP']['phase_corr_pulse_amp'] = 0.
+        pulse_dict['mCPhase qCP']['phase_corr_pulse_amp'] = 0.
         if sweep_q == 0:
             pulse_dict['phase corr qS']['amplitude'] = amp_s
             pulse_dict['mphase corr qS']['amplitude'] = -amp_s
         else:
-            pulse_dict['CPhase qCP']['phase_corr_pulse_amp'] = amp_s
-            pulse_dict['mCPhase qCP']['phase_corr_pulse_amp'] = -amp_s
+            pulse_dict['phase corr qCP']['amplitude']  = amp_s
+            pulse_dict['mphase corr qCP']['amplitude']  = -amp_s
+            # pulse_dict['CPhase qCP']['phase_corr_pulse_amp'] = amp_s
+            # pulse_dict['mCPhase qCP']['phase_corr_pulse_amp'] = -amp_s
         if reverse_control_target:
             if (i < (len(sphasesweep)-4*cal_points)/4):
                 reverse = False
@@ -1469,8 +1471,10 @@ def swap_CP_swap_2Qubits_1qphasesweep_amp(mw_pulse_pars_qCP, mw_pulse_pars_qS,
                 pulse_dict['phase corr qS']['amplitude'] = mid_point_phase_amp
                 pulse_dict['mphase corr qS']['amplitude'] = -mid_point_phase_amp
             else:
-                pulse_dict['CPhase qCP']['phase_corr_pulse_amp'] = mid_point_phase_amp
-                pulse_dict['mCPhase qCP']['phase_corr_pulse_amp'] = -mid_point_phase_amp
+                pulse_dict['phase corr qCP']['amplitude'] = mid_point_phase_amp
+                pulse_dict['mphase corr qCP']['amplitude']= -mid_point_phase_amp
+                # pulse_dict['CPhase qCP']['phase_corr_pulse_amp'] = mid_point_phase_amp
+                # pulse_dict['mCPhase qCP']['phase_corr_pulse_amp'] = -mid_point_phase_amp
             if excitation:
                 pulse_combinations = ['I qS', 'dummy_pulse', 'I qCP', 'swap qS'] + \
                     ['CPhase qCP'] + \
@@ -1492,8 +1496,10 @@ def swap_CP_swap_2Qubits_1qphasesweep_amp(mw_pulse_pars_qCP, mw_pulse_pars_qS,
                 pulse_dict['phase corr qS']['amplitude'] = mid_point_phase_amp
                 pulse_dict['mphase corr qS']['amplitude'] = -mid_point_phase_amp
             else:
-                pulse_dict['CPhase qCP']['phase_corr_pulse_amp'] = mid_point_phase_amp
-                pulse_dict['mCPhase qCP']['phase_corr_pulse_amp'] = -mid_point_phase_amp
+                pulse_dict['phase corr qCP']['amplitude'] = mid_point_phase_amp
+                pulse_dict['mphase corr qCP']['amplitude'] = -mid_point_phase_amp
+                # pulse_dict['CPhase qCP']['phase_corr_pulse_amp'] = mid_point_phase_amp
+                # pulse_dict['mCPhase qCP']['phase_corr_pulse_amp'] = -mid_point_phase_amp
             if excitation:
                 pulse_combinations = ['I qS', 'dummy_pulse', 'I qCP', 'swap qS'] + \
                     ['CPhase qCP'] + \
@@ -1515,8 +1521,10 @@ def swap_CP_swap_2Qubits_1qphasesweep_amp(mw_pulse_pars_qCP, mw_pulse_pars_qS,
                 pulse_dict['phase corr qS']['amplitude'] = mid_point_phase_amp
                 pulse_dict['mphase corr qS']['amplitude'] = -mid_point_phase_amp
             else:
-                pulse_dict['CPhase qCP']['phase_corr_pulse_amp'] = mid_point_phase_amp
-                pulse_dict['mCPhase qCP']['phase_corr_pulse_amp'] = -mid_point_phase_amp
+                pulse_dict['phase corr qCP']['amplitude'] = mid_point_phase_amp
+                pulse_dict['mphase corr qCP']['amplitude'] = -mid_point_phase_amp
+                # pulse_dict['CPhase qCP']['phase_corr_pulse_amp'] = mid_point_phase_amp
+                # pulse_dict['mCPhase qCP']['phase_corr_pulse_amp'] = -mid_point_phase_amp
             if excitation:
                 pulse_combinations = ['I qS', 'dummy_pulse', 'I qCP', 'swap qS'] + \
                     ['CPhase qCP'] + \
@@ -1538,8 +1546,10 @@ def swap_CP_swap_2Qubits_1qphasesweep_amp(mw_pulse_pars_qCP, mw_pulse_pars_qS,
                 pulse_dict['phase corr qS']['amplitude'] = mid_point_phase_amp
                 pulse_dict['mphase corr qS']['amplitude'] = -mid_point_phase_amp
             else:
-                pulse_dict['CPhase qCP']['phase_corr_pulse_amp'] = mid_point_phase_amp
-                pulse_dict['mCPhase qCP']['phase_corr_pulse_amp'] = -mid_point_phase_amp
+                pulse_dict['phase corr qCP']['amplitude'] = mid_point_phase_amp
+                pulse_dict['mphase corr qCP']['amplitude'] = -mid_point_phase_amp
+                # pulse_dict['CPhase qCP']['phase_corr_pulse_amp'] = mid_point_phase_amp
+                # pulse_dict['mCPhase qCP']['phase_corr_pulse_amp'] = -mid_point_phase_amp
             if excitation:
                 pulse_combinations = ['I qS', 'dummy_pulse', 'I qCP', 'swap qS'] + \
                     ['CPhase qCP'] + \
@@ -1711,7 +1721,7 @@ def swap_CP_swap_2Qubits_1qphasesweep(mw_pulse_pars_qCP, mw_pulse_pars_qS,
                        {'pulse_type': 'SquarePulse',
                         'pulse_delay': 0.,
                         'channel': pulse_dict['CPhase qCP']['channel'],
-                        'amplitude': 0.,#pulse_dict['CPhase qCP']['phase_corr_pulse_amp'],
+                        'amplitude': pulse_dict['CPhase qCP']['phase_corr_pulse_amp'],
                         'length': pulse_dict['CPhase qCP']['phase_corr_pulse_length']}})
 
     pulse_dict['mphase corr qCP'] = deepcopy(pulse_dict['phase corr qCP'])
@@ -1754,11 +1764,13 @@ def swap_CP_swap_2Qubits_1qphasesweep(mw_pulse_pars_qCP, mw_pulse_pars_qS,
     # seq has to have at least 2 elts
     mid_point_phase_amp = sphasesweep[len(sphasesweep[:-4])//4]
     for i, amp_s in enumerate(sphasesweep):
-        # pulse_dict['CPhase qCP']['phase_corr_pulse_amp'] = 0.
-        # pulse_dict['mCPhase qCP']['phase_corr_pulse_amp'] = 0.
+        pulse_dict['CPhase qCP']['phase_corr_pulse_amp'] = 0.
+        pulse_dict['mCPhase qCP']['phase_corr_pulse_amp'] = 0.
         if sweep_q == 0:
-            pulse_dict['CPhase qCP']['phase_corr_pulse_amp'] = amp_s
-            pulse_dict['mCPhase qCP']['phase_corr_pulse_amp'] = -amp_s
+            pulse_dict['phase corr qCP']['amplitude'] = amp_s
+            pulse_dict['mphase corr qCP']['amplitude'] = -amp_s
+            # pulse_dict['CPhase qCP']['phase_corr_pulse_amp'] = amp_s
+            # pulse_dict['mCPhase qCP']['phase_corr_pulse_amp'] = -amp_s
         else:
             pulse_dict['phase corr qS']['amplitude'] = amp_s
             pulse_dict['mphase corr qS']['amplitude'] = -amp_s
@@ -1799,8 +1811,10 @@ def swap_CP_swap_2Qubits_1qphasesweep(mw_pulse_pars_qCP, mw_pulse_pars_qS,
 
         if cal_points and (i == (len(sphasesweep)-4)):
             if sweep_q == 0:
-                pulse_dict['CPhase qCP']['phase_corr_pulse_amp'] = mid_point_phase_amp
-                pulse_dict['mCPhase qCP']['phase_corr_pulse_amp'] = -mid_point_phase_amp
+                pulse_dict['phase corr qCP']['amplitude'] = mid_point_phase_amp
+                pulse_dict['mphase corr qCP']['amplitude'] = -mid_point_phase_amp
+                # pulse_dict['CPhase qCP']['phase_corr_pulse_amp'] = mid_point_phase_amp
+                # pulse_dict['mCPhase qCP']['phase_corr_pulse_amp'] = -mid_point_phase_amp
                 # ramsey on qCP
                 # pulse_combinations = ['Y90 qCP', 'I qS', 'swap qS'] + \
                 pulse_combinations = ['I qS', 'dummy_pulse', 'I qCP', 'swap qS'] + \
@@ -1825,8 +1839,10 @@ def swap_CP_swap_2Qubits_1qphasesweep(mw_pulse_pars_qCP, mw_pulse_pars_qS,
             pulse_combinations = ['I qCP', 'I qS', 'RO']
         elif cal_points and (i == (len(sphasesweep)-3)):
             if sweep_q == 0:
-                pulse_dict['CPhase qCP']['phase_corr_pulse_amp'] = mid_point_phase_amp
-                pulse_dict['mCPhase qCP']['phase_corr_pulse_amp'] = -mid_point_phase_amp
+                pulse_dict['phase corr qCP']['amplitude'] = mid_point_phase_amp
+                pulse_dict['mphase corr qCP']['amplitude'] = -mid_point_phase_amp
+                # pulse_dict['CPhase qCP']['phase_corr_pulse_amp'] = mid_point_phase_amp
+                # pulse_dict['mCPhase qCP']['phase_corr_pulse_amp'] = -mid_point_phase_amp
                 # ramsey on qCP
                 # pulse_combinations = ['Y90 qCP', 'I qS', 'swap qS'] + \
                 pulse_combinations = ['I qS', 'dummy_pulse', 'I qCP', 'swap qS'] + \
@@ -1850,8 +1866,10 @@ def swap_CP_swap_2Qubits_1qphasesweep(mw_pulse_pars_qCP, mw_pulse_pars_qS,
                     'mphase corr qCP','dead_time_pulse']
         elif cal_points and ((i == len(sphasesweep)-2)):
             if sweep_q == 0:
-                pulse_dict['CPhase qCP']['phase_corr_pulse_amp'] = mid_point_phase_amp
-                pulse_dict['mCPhase qCP']['phase_corr_pulse_amp'] = -mid_point_phase_amp
+                pulse_dict['phase corr qCP']['amplitude'] = mid_point_phase_amp
+                pulse_dict['mphase corr qCP']['amplitude'] = -mid_point_phase_amp
+                # pulse_dict['CPhase qCP']['phase_corr_pulse_amp'] = mid_point_phase_amp
+                # pulse_dict['mCPhase qCP']['phase_corr_pulse_amp'] = -mid_point_phase_amp
                 # ramsey on qCP
                 # pulse_combinations = ['Y90 qCP', 'I qS', 'swap qS'] + \
                 pulse_combinations = ['I qS', 'dummy_pulse', 'I qCP', 'swap qS'] + \
@@ -1875,8 +1893,10 @@ def swap_CP_swap_2Qubits_1qphasesweep(mw_pulse_pars_qCP, mw_pulse_pars_qS,
                     'mphase corr qCP','dead_time_pulse']
         elif cal_points and (i == (len(sphasesweep)-1)):
             if sweep_q == 0:
-                pulse_dict['CPhase qCP']['phase_corr_pulse_amp'] = mid_point_phase_amp
-                pulse_dict['mCPhase qCP']['phase_corr_pulse_amp'] = -mid_point_phase_amp
+                pulse_dict['phase corr qCP']['amplitude'] = mid_point_phase_amp
+                pulse_dict['mphase corr qCP']['amplitude'] = -mid_point_phase_amp
+                # pulse_dict['CPhase qCP']['phase_corr_pulse_amp'] = mid_point_phase_amp
+                # pulse_dict['mCPhase qCP']['phase_corr_pulse_amp'] = -mid_point_phase_amp
                 # ramsey on qCP
                 # pulse_combinations = ['Y90 qCP', 'I qS', 'swap qS'] + \
                 pulse_combinations = ['I qS', 'dummy_pulse', 'I qCP', 'swap qS'] + \

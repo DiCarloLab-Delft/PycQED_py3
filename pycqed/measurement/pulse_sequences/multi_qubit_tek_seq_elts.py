@@ -552,14 +552,14 @@ def two_qubit_tomo_bell(bell_state,
                        {'pulse_type': 'SquarePulse',
                         'pulse_delay': 0.,
                         'channel': pulse_dict['CPhase q1']['channel'],
-                        'amplitude': 0.,#pulse_dict['CPhase q1']['phase_corr_pulse_amp'],
+                        'amplitude': pulse_dict['CPhase q1']['phase_corr_pulse_amp'],
                         'length': pulse_dict['CPhase q1']['phase_corr_pulse_length']}})
 
     pulse_dict['mphase corr q1'] = deepcopy(pulse_dict['phase corr q1'])
     pulse_dict['mphase corr q1']['amplitude'] = -pulse_dict['mphase corr q1']['amplitude']
 
-    # pulse_dict['CPhase q1']['phase_corr_pulse_amp'] = 0.
-    # pulse_dict['mCPhase q1']['phase_corr_pulse_amp'] = 0.
+    pulse_dict['CPhase q1']['phase_corr_pulse_amp'] = 0.
+    pulse_dict['mCPhase q1']['phase_corr_pulse_amp'] = 0.
 
     # Calibration points
     cal_points = [['I q1', 'dummy_pulse', 'I q0', 'RO'],
@@ -638,8 +638,8 @@ def two_qubit_tomo_bell(bell_state,
             gate2 = pulse_dict['mY90 q1']
             after_pulse = pulse_dict['mY90 q0']
 
-    print('Compensation qCP %.3f'%pulse_dict['CPhase q1']['phase_corr_pulse_amp'])
-    # print('Compensation qCP %.3f'%pulse_dict['phase corr qCP']['amplitude'])
+    # print('Compensation qCP %.3f'%pulse_dict['CPhase q1']['phase_corr_pulse_amp'])
+    print('Compensation qCP %.3f'%pulse_dict['phase corr q1']['amplitude'])
     print('Compensation qS %.3f'%pulse_dict['phase corr q0']['amplitude'])
 
     dummy_pulse = deepcopy(pulse_dict['I q1'])
@@ -651,7 +651,7 @@ def two_qubit_tomo_bell(bell_state,
         tomo_idx_q0 = int(i % 6)
         tomo_idx_q1 = int(((i - tomo_idx_q0)/6) % 6)
 
-        # gate1 = pulse_dict['I q0']
+        gate1 = pulse_dict['I q0']
         # gate2 = pulse_dict['I q1']
 
         # print(i,tomo_idx_q0,tomo_idx_q1)
