@@ -1268,6 +1268,7 @@ def swap_CP_swap_2Qubits_1qphasesweep_amp(mw_pulse_pars_qCP, mw_pulse_pars_qS,
                          flux_pulse_pars_qCP, flux_pulse_pars_qS,
                          RO_pars,
                          distortion_dict,
+                         timings_dict,
                          CPhase=True,
                          excitations='both',
                          inter_swap_wait=100e-9,
@@ -1330,6 +1331,11 @@ def swap_CP_swap_2Qubits_1qphasesweep_amp(mw_pulse_pars_qCP, mw_pulse_pars_qS,
     pulse_dict.update(swap_qS)
     pulse_dict.update(RO_dict)
     ## End of the getting pulse dict
+    # Timings
+    buffer_MW_FLUX = timings_dict['buffer_MW_FLUX']
+    buffer_MW_MW = timings_dict['buffer_MW_MW']
+    buffer_FLUX_FLUX = timings_dict['buffer_FLUX_FLUX']
+    buffer_FLUX_MW = timings_dict['buffer_FLUX_MW']
 
 
     # Preloading should be almost instant (no preloading here)
@@ -1350,6 +1356,16 @@ def swap_CP_swap_2Qubits_1qphasesweep_amp(mw_pulse_pars_qCP, mw_pulse_pars_qS,
                         'channel': flux_pulse_pars_qCP['channel'],
                         'amplitude': 0,
                         'length': 0.}})
+
+    pulse_dict.update({'phase corr qCP':
+                       {'pulse_type': 'SquarePulse',
+                        'pulse_delay': 0.,
+                        'channel': pulse_dict['CPhase qCP']['channel'],
+                        'amplitude': 0.,#pulse_dict['CPhase qCP']['phase_corr_pulse_amp'],
+                        'length': pulse_dict['CPhase qCP']['phase_corr_pulse_length']}})
+
+    pulse_dict['mphase corr qCP'] = deepcopy(pulse_dict['phase corr qCP'])
+    pulse_dict['mphase corr qCP']['amplitude'] = -pulse_dict['mphase corr qCP']['amplitude']
 
     # Pulse is used to set the starting refpoint for the compensation pulses
 
@@ -1380,8 +1396,14 @@ def swap_CP_swap_2Qubits_1qphasesweep_amp(mw_pulse_pars_qCP, mw_pulse_pars_qS,
     pulse_dict['recovery swap qS'] = recovery_swap
     pulse_dict['CPhase qCP']['pulse_delay'] = inter_swap_wait/2
 
+    print('Compensation qCP %.3f'%pulse_dict['CPhase qCP']['phase_corr_pulse_amp'])
+    # print('Compensation qCP %.3f'%pulse_dict['phase corr qCP']['amplitude'])
+    print('Compensation qS %.3f'%pulse_dict['phase corr qS']['amplitude'])
+
     # seq has to have at least 2 elts
     for i, amp_s in enumerate(sphasesweep):
+        # pulse_dict['CPhase qCP']['phase_corr_pulse_amp'] = 0.
+        # pulse_dict['mCPhase qCP']['phase_corr_pulse_amp'] = 0.
         if sweep_q == 0:
             pulse_dict['phase corr qS']['amplitude'] = amp_s
             pulse_dict['mphase corr qS']['amplitude'] = -amp_s
@@ -1427,22 +1449,41 @@ def swap_CP_swap_2Qubits_1qphasesweep_amp(mw_pulse_pars_qCP, mw_pulse_pars_qS,
         elif cal_points and (i == (len(sphasesweep)-1)):
             pulse_combinations = ['X180 qCP', 'X180 qS', 'RO']
         else:
+            pulse_dict['X180 qS']['pulse_delay'] = buffer_MW_MW
+            pulse_dict['I qS']['pulse_delay'] = buffer_MW_MW
+            pulse_dict['Y90 qCP']['pulse_delay'] = buffer_MW_MW
+            pulse_dict['swap qS']['pulse_delay'] = buffer_MW_FLUX
+            pulse_dict['mswap qS']['pulse_delay'] = buffer_MW_FLUX
+            pulse_dict['CPhase qCP']['pulse_delay'] = buffer_FLUX_FLUX
+            pulse_dict['mCPhase qCP']['pulse_delay'] = buffer_FLUX_FLUX
+            pulse_dict['recovery swap qS']['pulse_delay'] = buffer_FLUX_FLUX
+            pulse_dict['phase corr qS']['pulse_delay'] = buffer_FLUX_FLUX
+            pulse_dict['mphase corr qS']['pulse_delay'] = buffer_FLUX_FLUX
+            # print(pulse_dict['phase corr qS'])
+
+            pulse_dict['phase corr qCP']['pulse_delay'] = -pulse_dict['phase corr qS']['square_pulse_length']
+            pulse_dict['mphase corr qCP']['pulse_delay'] = -pulse_dict['phase corr qS']['square_pulse_length']
+            pulse_dict['mY90 qCP']['pulse_delay'] = buffer_FLUX_MW
+            pulse_dict['I qCP']['pulse_delay'] = buffer_MW_MW
+
+
             if not reverse:
                 # pulse_dict['CPhase qCP']['phase_corr_pulse_amp'] = amp_s
                 # pulse_dict['mCPhase qCP']['phase_corr_pulse_amp'] = -amp_s
-                rphi90_qCP = deepcopy(pulse_dict['X90 qCP'])
-                rphi90_qCP['phase'] = 270
-                pulse_dict['rphi90 qCP'] = rphi90_qCP
                 if excitation:
                     pulse_combinations = ['X180 qS', 'Y90 qCP', 'swap qS'] + \
                         ['CPhase qCP'] + \
-                        ['recovery swap qS','phase corr qS', 'rphi90 qCP', 'I qCP', 'X180 qS', 'RO'] + \
-                        ['dead_time_pulse']+['mswap qS']*2+['mCPhase qCP']+['mphase corr qS']
+                        ['recovery swap qS','phase corr qS', 'phase corr qCP',
+                        'mY90 qCP', 'I qCP', 'X180 qS', 'RO'] + \
+                        ['dead_time_pulse']+['mswap qS']+['mCPhase qCP']+\
+                        ['mswap qS', 'mphase corr qS', 'mphase corr qCP']
                 else:
                     pulse_combinations = ['I qS', 'Y90 qCP', 'swap qS'] + \
                         ['CPhase qCP'] + \
-                        ['recovery swap qS','phase corr qS', 'rphi90 qCP', 'I qCP', 'I qS', 'RO'] + \
-                        ['dead_time_pulse']+['mswap qS']*2+['mCPhase qCP']+['mphase corr qS']
+                        ['recovery swap qS','phase corr qS', 'phase corr qCP',
+                        'mY90 qCP', 'I qCP', 'I qS', 'RO'] + \
+                        ['dead_time_pulse']+['mswap qS']+['mCPhase qCP']+\
+                        ['mswap qS', 'mphase corr qS', 'mphase corr qCP']
 
             else:
                 # pulse_dict['phase corr qS']['amplitude'] = amp_s
@@ -1454,12 +1495,12 @@ def swap_CP_swap_2Qubits_1qphasesweep_amp(mw_pulse_pars_qCP, mw_pulse_pars_qS,
                     pulse_combinations = ['X180 qCP', 'Y90 qS', 'swap qS'] + \
                         ['CPhase qCP'] + \
                         ['recovery swap qS','phase corr qS', 'rphi90 qS', 'X180 qCP', 'RO'] + \
-                        ['dead_time_pulse']+['mswap qS']*2+['mCPhase qCP']+['mphase corr qS']
+                        ['dead_time_pulse']+['mswap qS']+['mCPhase qCP']+['mswap qS']+['mphase corr qS']
                 else:
                     pulse_combinations = ['I qCP', 'Y90 qS', 'swap qS'] + \
                         ['CPhase qCP'] + \
                         ['recovery swap qS','phase corr qS', 'rphi90 qS', 'I qCP', 'RO'] + \
-                        ['dead_time_pulse']+['mswap qS']*2+['mCPhase qCP']+['mphase corr qS']
+                        ['dead_time_pulse']+['mswap qS']+['mCPhase qCP']+['mswap qS']+['mphase corr qS']
 
         pulses = []
         for p in pulse_combinations:
@@ -1483,6 +1524,7 @@ def swap_CP_swap_2Qubits_1qphasesweep(mw_pulse_pars_qCP, mw_pulse_pars_qS,
                          flux_pulse_pars_qCP, flux_pulse_pars_qS,
                          RO_pars,
                          distortion_dict,
+                         timings_dict,
                          CPhase=True,
                          excitations='both',
                          inter_swap_wait=100e-9,
@@ -1545,6 +1587,11 @@ def swap_CP_swap_2Qubits_1qphasesweep(mw_pulse_pars_qCP, mw_pulse_pars_qS,
     pulse_dict.update(swap_qS)
     pulse_dict.update(RO_dict)
     ## End of the getting pulse dict
+    # Timings
+    buffer_MW_FLUX = timings_dict['buffer_MW_FLUX']
+    buffer_MW_MW = timings_dict['buffer_MW_MW']
+    buffer_FLUX_FLUX = timings_dict['buffer_FLUX_FLUX']
+    buffer_FLUX_MW = timings_dict['buffer_FLUX_MW']
 
 
     # Preloading should be almost instant (no preloading here)
@@ -1565,6 +1612,16 @@ def swap_CP_swap_2Qubits_1qphasesweep(mw_pulse_pars_qCP, mw_pulse_pars_qS,
                         'channel': flux_pulse_pars_qCP['channel'],
                         'amplitude': 0,
                         'length': 0.}})
+
+    pulse_dict.update({'phase corr qCP':
+                       {'pulse_type': 'SquarePulse',
+                        'pulse_delay': 0.,
+                        'channel': pulse_dict['CPhase qCP']['channel'],
+                        'amplitude': 0.,#pulse_dict['CPhase qCP']['phase_corr_pulse_amp'],
+                        'length': pulse_dict['CPhase qCP']['phase_corr_pulse_length']}})
+
+    pulse_dict['mphase corr qCP'] = deepcopy(pulse_dict['phase corr qCP'])
+    pulse_dict['mphase corr qCP']['amplitude'] = -pulse_dict['mphase corr qCP']['amplitude']
 
     # Pulse is used to set the starting refpoint for the compensation pulses
 
@@ -1595,8 +1652,15 @@ def swap_CP_swap_2Qubits_1qphasesweep(mw_pulse_pars_qCP, mw_pulse_pars_qS,
     pulse_dict['recovery swap qS'] = recovery_swap
     pulse_dict['CPhase qCP']['pulse_delay'] = inter_swap_wait/2
 
+    print('Compensation qCP %.3f'%pulse_dict['CPhase qCP']['phase_corr_pulse_amp'])
+    # print('Compensation qCP %.3f'%pulse_dict['phase corr qCP']['amplitude'])
+    print('Compensation qS %.3f'%pulse_dict['phase corr qS']['amplitude'])
+
+
     # seq has to have at least 2 elts
     for i, amp_s in enumerate(sphasesweep):
+        # pulse_dict['CPhase qCP']['phase_corr_pulse_amp'] = 0.
+        # pulse_dict['mCPhase qCP']['phase_corr_pulse_amp'] = 0.
         if sweep_q == 0:
             pulse_dict['CPhase qCP']['phase_corr_pulse_amp'] = amp_s
             pulse_dict['mCPhase qCP']['phase_corr_pulse_amp'] = -amp_s
@@ -1613,18 +1677,49 @@ def swap_CP_swap_2Qubits_1qphasesweep(mw_pulse_pars_qCP, mw_pulse_pars_qS,
         elif cal_points and (i == (len(sphasesweep)-1)):
             pulse_combinations = ['X180 qCP', 'X180 qS', 'RO']
         else:
+            pulse_dict['I qS']['pulse_delay'] = buffer_MW_MW
+            pulse_dict['Y90 qCP']['pulse_delay'] = buffer_MW_MW
+            pulse_dict['swap qS']['pulse_delay'] = buffer_MW_FLUX
+            pulse_dict['mswap qS']['pulse_delay'] = buffer_MW_FLUX
+            pulse_dict['CPhase qCP']['pulse_delay'] = buffer_FLUX_FLUX
+            pulse_dict['mCPhase qCP']['pulse_delay'] = buffer_FLUX_FLUX
+            pulse_dict['recovery swap qS']['pulse_delay'] = buffer_FLUX_FLUX
+            pulse_dict['phase corr qS']['pulse_delay'] = buffer_FLUX_FLUX
+            pulse_dict['mphase corr qS']['pulse_delay'] = buffer_FLUX_FLUX
+            # print(pulse_dict['phase corr qS'])
+
+            pulse_dict['phase corr qCP']['pulse_delay'] = -pulse_dict['phase corr qS']['square_pulse_length']
+            pulse_dict['mphase corr qCP']['pulse_delay'] = -pulse_dict['phase corr qS']['square_pulse_length']
+
+
+            pulse_dict['mY90 qCP']['pulse_delay'] = buffer_FLUX_MW
+            pulse_dict['I qCP']['pulse_delay'] = buffer_MW_MW
+            pulse_dict['I qS']['pulse_delay'] = buffer_MW_MW
+
+            pulse_dict['Y90 qS']['pulse_delay'] = buffer_MW_MW
+            pulse_dict['I qCP']['pulse_delay'] = buffer_MW_MW
+            # fluxbuffers already defined above
+            pulse_dict['mY90 qCP']['pulse_delay'] = buffer_FLUX_MW
+            pulse_dict['mY90 qS']['pulse_delay'] = buffer_MW_MW
+
             if sweep_q == 0:
                 # ramsey on qCP
+                # pulse_combinations = ['Y90 qCP', 'I qS', 'swap qS'] + \
                 pulse_combinations = ['I qS', 'Y90 qCP', 'swap qS'] + \
                     ['CPhase qCP'] + \
-                    ['recovery swap qS','phase corr qS', 'mY90 qCP', 'I qCP', 'I qS', 'RO'] + \
-                    ['dead_time_pulse']+['mswap qS']*2+['mCPhase qCP']+['mphase corr qS']
+                    ['recovery swap qS','phase corr qS', 'phase corr qCP',
+                    'mY90 qCP', 'I qCP', 'I qS', 'RO'] + \
+                    ['dead_time_pulse']+['mswap qS']+['mCPhase qCP']+\
+                    ['mphase corr qS', 'mswap qS', 'mphase corr qCP']
             else:
                 # ramsey on qS
-                pulse_combinations = ['Y90 qS', 'swap qS'] + \
+                # pulse_combinations = ['I qCP', 'Y90 qS', 'swap qS'] + \
+                pulse_combinations = ['Y90 qS', 'I qCP', 'swap qS'] + \
                     ['CPhase qCP'] + \
-                    ['recovery swap qS','phase corr qS', 'mY90 qCP', 'mY90 qCP', 'mY90 qS', 'RO'] + \
-                    ['dead_time_pulse']+['mswap qS']*2+['mCPhase qCP']+['mphase corr qS']
+                    ['recovery swap qS','phase corr qS', 'phase corr qCP',
+                    'mY90 qCP', 'mY90 qCP', 'mY90 qS', 'RO'] + \
+                    ['dead_time_pulse']+['mswap qS']+['mCPhase qCP']+\
+                    ['mphase corr qS', 'mswap qS', 'mphase corr qCP']
 
         pulses = []
         for p in pulse_combinations:
