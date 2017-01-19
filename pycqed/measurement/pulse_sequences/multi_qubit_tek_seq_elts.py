@@ -562,34 +562,34 @@ def two_qubit_tomo_bell(bell_state,
     # pulse_dict['mCPhase q1']['phase_corr_pulse_amp'] = 0.
 
     # Calibration points
-    cal_points = [['I q0', 'I q1', 'RO'],
-                  ['I q0', 'I q1', 'RO'],
-                  ['I q0', 'I q1', 'RO'],
-                  ['I q0', 'I q1', 'RO'],
-                  ['I q0', 'I q1', 'RO'],
-                  ['I q0', 'I q1', 'RO'],
-                  ['I q0', 'I q1', 'RO'],
-                  ['X180 q0', 'I q1', 'RO'],
-                  ['X180 q0', 'I q1', 'RO'],
-                  ['X180 q0', 'I q1', 'RO'],
-                  ['X180 q0', 'I q1', 'RO'],
-                  ['X180 q0', 'I q1', 'RO'],
-                  ['X180 q0', 'I q1', 'RO'],
-                  ['X180 q0', 'I q1', 'RO'],
-                  ['I q0', 'X180 q1', 'RO'],
-                  ['I q0', 'X180 q1', 'RO'],
-                  ['I q0', 'X180 q1', 'RO'],
-                  ['I q0', 'X180 q1', 'RO'],
-                  ['I q0', 'X180 q1', 'RO'],
-                  ['I q0', 'X180 q1', 'RO'],
-                  ['I q0', 'X180 q1', 'RO'],
-                  ['X180 q0', 'X180 q1', 'RO'],
-                  ['X180 q0', 'X180 q1', 'RO'],
-                  ['X180 q0', 'X180 q1', 'RO'],
-                  ['X180 q0', 'X180 q1', 'RO'],
-                  ['X180 q0', 'X180 q1', 'RO'],
-                  ['X180 q0', 'X180 q1', 'RO'],
-                  ['X180 q0', 'X180 q1', 'RO']]
+    cal_points = [['I q1', 'dummy_pulse', 'I q0', 'RO'],
+                  ['I q1', 'dummy_pulse', 'I q0', 'RO'],
+                  ['I q1', 'dummy_pulse', 'I q0', 'RO'],
+                  ['I q1', 'dummy_pulse', 'I q0', 'RO'],
+                  ['I q1', 'dummy_pulse', 'I q0', 'RO'],
+                  ['I q1', 'dummy_pulse', 'I q0', 'RO'],
+                  ['I q1', 'dummy_pulse', 'I q0', 'RO'],
+                  ['I q1', 'dummy_pulse', 'X180 q0', 'RO'],
+                  ['I q1', 'dummy_pulse', 'X180 q0', 'RO'],
+                  ['I q1', 'dummy_pulse', 'X180 q0', 'RO'],
+                  ['I q1', 'dummy_pulse', 'X180 q0', 'RO'],
+                  ['I q1', 'dummy_pulse', 'X180 q0', 'RO'],
+                  ['I q1', 'dummy_pulse', 'X180 q0', 'RO'],
+                  ['I q1', 'dummy_pulse', 'X180 q0', 'RO'],
+                  ['X180 q1', 'dummy_pulse', 'I q0', 'RO'],
+                  ['X180 q1', 'dummy_pulse', 'I q0', 'RO'],
+                  ['X180 q1', 'dummy_pulse', 'I q0', 'RO'],
+                  ['X180 q1', 'dummy_pulse', 'I q0', 'RO'],
+                  ['X180 q1', 'dummy_pulse', 'I q0', 'RO'],
+                  ['X180 q1', 'dummy_pulse', 'I q0', 'RO'],
+                  ['X180 q1', 'dummy_pulse', 'I q0', 'RO'],
+                  ['X180 q1', 'dummy_pulse', 'X180 q0', 'RO'],
+                  ['X180 q1', 'dummy_pulse', 'X180 q0', 'RO'],
+                  ['X180 q1', 'dummy_pulse', 'X180 q0', 'RO'],
+                  ['X180 q1', 'dummy_pulse', 'X180 q0', 'RO'],
+                  ['X180 q1', 'dummy_pulse', 'X180 q0', 'RO'],
+                  ['X180 q1', 'dummy_pulse', 'X180 q0', 'RO'],
+                  ['X180 q1', 'dummy_pulse', 'X180 q0', 'RO']]
 
     if not CPhase:
         pulse_dict['CPhase q1']['amplitude'] = 0
@@ -642,6 +642,11 @@ def two_qubit_tomo_bell(bell_state,
     # print('Compensation qCP %.3f'%pulse_dict['phase corr qCP']['amplitude'])
     print('Compensation qS %.3f'%pulse_dict['phase corr q0']['amplitude'])
 
+    dummy_pulse = deepcopy(pulse_dict['I q1'])
+    dummy_pulse['pulse_delay'] = -(dummy_pulse['sigma'] *
+                                            dummy_pulse['nr_sigma'])
+    pulse_dict.update({'dummy_pulse':dummy_pulse})
+
     for i in range(36):
         tomo_idx_q0 = int(i % 6)
         tomo_idx_q1 = int(((i - tomo_idx_q0)/6) % 6)
@@ -670,14 +675,15 @@ def two_qubit_tomo_bell(bell_state,
         tomo_pulse_q0['pulse_delay'] = buffer_MW_MW
 
         # pulse_list = [gate2, gate1, pulse_dict['swap q0']] + \
-        pulse_list = [gate1, gate2, pulse_dict['swap q0']] + \
+        pulse_list = [gate1, dummy_pulse, gate2, pulse_dict['swap q0']] + \
                      [pulse_dict['CPhase q1']] + \
                      [pulse_dict['recovery swap q0'], pulse_dict['phase corr q0'],
                      pulse_dict['phase corr q1'], after_pulse] + \
                      [tomo_pulse_q1, tomo_pulse_q0, RO_pars] + \
                      [pulse_dict['dead_time_pulse']] + \
                      [pulse_dict['mswap q0'],pulse_dict['mCPhase q1']]+\
-                     [pulse_dict['mphase corr q0'],pulse_dict['mswap q0'],pulse_dict['mphase corr q1']]
+                     [pulse_dict['mphase corr q0'],pulse_dict['mswap q0'],
+                     pulse_dict['mphase corr q1'],pulse_dict['dead_time_pulse']]
         # print(pulse_list)
 
         # pulse_list[0]['pulse_delay'] += 0.01e-6
@@ -689,12 +695,46 @@ def two_qubit_tomo_bell(bell_state,
         seq.append_element(el, trigger_wait=True)
 
     for i, pulse_comb in enumerate(cal_points):
+        gate1 = pulse_dict['I q0']
+        gate2 = pulse_dict['I q1']
+        after_pulse = pulse_dict['I q0']
+        pulse_dict['swap q0']['pulse_delay'] = buffer_MW_FLUX
+        pulse_dict['mswap q0']['pulse_delay'] = buffer_MW_FLUX
+        gate1['pulse_delay'] = buffer_MW_MW
+        gate2['pulse_delay'] = buffer_MW_MW
+        pulse_dict['CPhase q1']['pulse_delay'] = buffer_FLUX_FLUX
+        pulse_dict['mCPhase q1']['pulse_delay'] = buffer_FLUX_FLUX
+        pulse_dict['phase corr q0']['pulse_delay'] = buffer_FLUX_FLUX
+        pulse_dict['mphase corr q0']['pulse_delay'] = buffer_FLUX_FLUX
+        pulse_dict['phase corr q1']['pulse_delay'] = -pulse_dict['phase corr q0']['square_pulse_length']
+        pulse_dict['mphase corr q1']['pulse_delay'] = -pulse_dict['phase corr q0']['square_pulse_length']
+        pulse_dict['recovery swap q0']['pulse_delay'] = buffer_FLUX_FLUX
+        after_pulse['pulse_delay'] = buffer_FLUX_MW
+
+        # gets pulse list for calibrations
+        pulse_dict['I q0']['pulse_delay'] = buffer_MW_MW
+        pulse_dict['X180 q0']['pulse_delay'] = buffer_MW_MW
+        pulse_dict['I q1']['pulse_delay'] = buffer_MW_MW
+        pulse_dict['X180 q1']['pulse_delay'] = buffer_MW_MW
         pulses = []
         for p in pulse_comb:
             pulses += [pulse_dict[p]]
-        pulses[0]['pulse_delay'] += 0.01e-6
 
-        el = multi_pulse_elt(35+i, station, pulses)
+        # pulse_list = [gate2, gate1, pulse_dict['swap q0']] + \
+        pulse_list = [gate1, dummy_pulse, gate2, pulse_dict['swap q0']] + \
+                     [pulse_dict['CPhase q1']] + \
+                     [pulse_dict['recovery swap q0'], pulse_dict['phase corr q0'],
+                     pulse_dict['phase corr q1'], after_pulse] + \
+                     pulses + \
+                     [pulse_dict['dead_time_pulse']] + \
+                     [pulse_dict['mswap q0'],pulse_dict['mCPhase q1']]+\
+                     [pulse_dict['mphase corr q0'],pulse_dict['mswap q0'],
+                     pulse_dict['mphase corr q1'],pulse_dict['dead_time_pulse']]
+
+        el = multi_pulse_elt(36+i, station, pulse_list)
+        if distortion_dict is not None:
+            el = distort_and_compensate(
+                el, distortion_dict)
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
 
