@@ -404,6 +404,8 @@ def two_qubit_tomo_cardinal(cardinal,
     pulse_dict.update(RO_dict)
 
     # Timings
+    # FIXME: This dictionary should not be required? -MAR
+    # NOTE: required in the CPhase tomo as input but not used
     QQ_buffer = timings_dict['QQ_buffer']
     wait_time = timings_dict['wait_time']
     msmt_buffer = timings_dict['msmt_buffer']
