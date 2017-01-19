@@ -102,7 +102,7 @@ class Test_Waveforms(unittest.TestCase):
         dac_flux_coefficient = 0.679
         E_c = 369.2e6
         theta_f = .4
-        length=40e-9
+        length = 40e-9
         lambda_coeffs_list = [[.1, 0], [.4, .2, .1, .01, .2]]
         for lambda_coeffs in lambda_coeffs_list:
 
