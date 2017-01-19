@@ -397,6 +397,7 @@ class swap_CP_swap_2Qubits_1qphasesweep(swf.Hard_Sweep):
                  flux_pulse_pars_qCP, flux_pulse_pars_qS,
                  RO_pars,
                  dist_dict,
+                 timings_dict,
                  AWG,
                  CPhase=True,
                  excitations='both',
@@ -413,6 +414,7 @@ class swap_CP_swap_2Qubits_1qphasesweep(swf.Hard_Sweep):
         self.flux_pulse_pars_qS = flux_pulse_pars_qS
         self.RO_pars = RO_pars
         self.dist_dict = dist_dict
+        self.timings_dict = timings_dict
 
         self.CPhase = CPhase
         self.excitations = excitations
@@ -441,13 +443,14 @@ class swap_CP_swap_2Qubits_1qphasesweep(swf.Hard_Sweep):
                 '{}_amp'.format(self.flux_pulse_pars_qCP['channel']), 2.)
             self.AWG.set(
                 '{}_amp'.format(self.flux_pulse_pars_qS['channel']), 2.)
-            fsqs.swap_CP_swap_2Qubits_1qphasesweep(
+            self.last_seq = fsqs.swap_CP_swap_2Qubits_1qphasesweep(
                 mw_pulse_pars_qCP=self.mw_pulse_pars_qCP,
                 mw_pulse_pars_qS=self.mw_pulse_pars_qS,
                 flux_pulse_pars_qCP=self.flux_pulse_pars_qCP,
                 flux_pulse_pars_qS=self.flux_pulse_pars_qS,
                 RO_pars=self.RO_pars,
                 distortion_dict=self.dist_dict,
+                timings_dict=self.timings_dict,
                 CPhase=self.CPhase,
                 excitations=self.excitations,
                 sphasesweep=self.sweep_points,
@@ -459,6 +462,7 @@ class swap_CP_swap_2Qubits_1qphasesweep(swf.Hard_Sweep):
 
             self.AWG.set('{}_amp'.format(self.flux_pulse_pars_qS['channel']),
                          old_val_qS)
+        return self.last_seq
 
     def set_parameter(self, val, **kw):
         pass
@@ -470,6 +474,7 @@ class swap_CP_swap_2Qubits_1qphasesweep_amp(swf.Hard_Sweep):
                  flux_pulse_pars_qCP, flux_pulse_pars_qS,
                  RO_pars,
                  dist_dict,
+                 timings_dict,
                  AWG,
                  CPhase=True,
                  excitations='both',
@@ -486,6 +491,7 @@ class swap_CP_swap_2Qubits_1qphasesweep_amp(swf.Hard_Sweep):
         self.flux_pulse_pars_qS = flux_pulse_pars_qS
         self.RO_pars = RO_pars
         self.dist_dict = dist_dict
+        self.timings_dict = timings_dict
 
         self.CPhase = CPhase
         self.excitations = excitations
@@ -514,13 +520,14 @@ class swap_CP_swap_2Qubits_1qphasesweep_amp(swf.Hard_Sweep):
                 '{}_amp'.format(self.flux_pulse_pars_qCP['channel']), 2.)
             self.AWG.set(
                 '{}_amp'.format(self.flux_pulse_pars_qS['channel']), 2.)
-            seq = fsqs.swap_CP_swap_2Qubits_1qphasesweep_amp(
+            self.last_seq = fsqs.swap_CP_swap_2Qubits_1qphasesweep_amp(
                 mw_pulse_pars_qCP=self.mw_pulse_pars_qCP,
                 mw_pulse_pars_qS=self.mw_pulse_pars_qS,
                 flux_pulse_pars_qCP=self.flux_pulse_pars_qCP,
                 flux_pulse_pars_qS=self.flux_pulse_pars_qS,
                 RO_pars=self.RO_pars,
                 distortion_dict=self.dist_dict,
+                timings_dict=self.timings_dict,
                 CPhase=self.CPhase,
                 excitations=self.excitations,
                 sphasesweep=self.sweep_points,
@@ -532,7 +539,7 @@ class swap_CP_swap_2Qubits_1qphasesweep_amp(swf.Hard_Sweep):
 
             self.AWG.set('{}_amp'.format(self.flux_pulse_pars_qS['channel']),
                          old_val_qS)
-            return seq
+        return self.last_seq
 
     def set_parameter(self, val, **kw):
         pass

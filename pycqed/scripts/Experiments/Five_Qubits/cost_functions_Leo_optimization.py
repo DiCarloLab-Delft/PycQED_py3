@@ -266,11 +266,17 @@ class CPhase_cost_func_det_Ramiro(det.Soft_Detector):
         self.phase_corr_pulse_length_qS = flux_pulse_pars_qS['phase_corr_pulse_length']
         self.phase_corr_pulse_amp_qS = flux_pulse_pars_qS['phase_corr_pulse_amp']
 
+        timings_dict = {'buffer_MW_FLUX': 10e-9,
+                        'buffer_MW_MW': 10e-9,
+                        'buffer_FLUX_FLUX': 10e-9,
+                        'buffer_FLUX_MW': 10e-9}
+
         if self.cost_function_choice==0:
             self.s = awg_swf.swap_CP_swap_2Qubits_1qphasesweep(
                 qCP_pulse_pars, qS_pulse_pars,
                 flux_pulse_pars_qCP, flux_pulse_pars_qS, RO_pars_qCP,
-                dist_dict, AWG=qS.AWG,  inter_swap_wait=self.inter_swap_wait,
+                dist_dict, timings_dict=timings_dict,
+                AWG=qS.AWG, inter_swap_wait=self.inter_swap_wait,
                 upload=False,
                 excitations='both', CPhase=self.CPhase,
                 reverse_control_target=self.reverse_control_target,
@@ -279,7 +285,8 @@ class CPhase_cost_func_det_Ramiro(det.Soft_Detector):
             self.s = awg_swf.swap_CP_swap_2Qubits_1qphasesweep_amp(
                 qCP_pulse_pars, qS_pulse_pars,
                 flux_pulse_pars_qCP, flux_pulse_pars_qS, RO_pars_qCP,
-                dist_dict, AWG=qS.AWG,  inter_swap_wait=self.inter_swap_wait,
+                dist_dict, timings_dict=timings_dict,
+                AWG=qS.AWG,  inter_swap_wait=self.inter_swap_wait,
                 upload=False,
                 excitations='both', CPhase=self.CPhase,
                 reverse_control_target=self.reverse_control_target,
