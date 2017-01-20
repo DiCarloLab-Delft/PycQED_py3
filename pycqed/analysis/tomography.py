@@ -139,7 +139,7 @@ class TomoAnalysis_JointRO():
         discard, rho0 = self.execute_linear_tomo()
         # now fetch the starting t_params from the cholesky decomp of rho
         tcholesky = time.time()
-        T0 = np.linalg.cholesky((rho0.dag() * rho0).full() / 2)
+        T0 = np.linalg.cholesky(scipy.linalg.sqrtm((rho0.dag() * rho0).full()))
         t0 = np.zeros(4 ** self.n_qubits, dtype='complex')
         di = np.diag_indices(2 ** self.n_qubits)
         tri = np.tril_indices(2 ** self.n_qubits, -1)
@@ -414,10 +414,12 @@ def get_cardianal_pauli_exp(cardinal_idx):
     '''
     Returns a expectation values for the puali operators for the cardinal
     states. Input is the index of the cardinal state.
-    Ordering of the cardinals is binary counting over [Z, -Z, X, -X, Y, -Y]
-
+    Ordering of the cardinals is binary counting over [Z, -Z, X, -X, -Y, Y]
     Returns expectation values of:
         II|XI YI ZI|IX IY IZ|XX YX ZX XY YY ZY XZ YZ ZZ
+
+    N.B. The cardinal counting is defined by the preparation pulses
+    in
     '''
     X = np.array([1, 0, 0])
     Y = np.array([0, 1, 0])
