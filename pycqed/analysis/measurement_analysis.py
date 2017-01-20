@@ -17,7 +17,7 @@ from pycqed.analysis.tools import data_manipulation as dm_tools
 import imp
 import math
 from math import erfc
-from scipy.signal import argrelextrema,argrelmax,argrelmin
+from scipy.signal import argrelextrema, argrelmax, argrelmin
 from copy import deepcopy
 
 try:

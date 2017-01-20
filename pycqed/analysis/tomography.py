@@ -91,7 +91,7 @@ class TomoAnalysis_JointRO():
                    for i in range(len(basis_decomposition))])
         return (basis_decomposition, rho)
 
-    def execute_max_likelihood(self, use_weights=True, show_time=True,
+    def execute_max_likelihood(self, use_weights=True, show_time=False,
                                ftol=0.01, xtol=0.001, full_output=0,
                                max_iter=100):
         """
@@ -157,8 +157,8 @@ class TomoAnalysis_JointRO():
             print(" Time to build T %.2f " % (topt-tcholesky))
             print(" Time to optimize %.2f" % (time.time()-topt))
         return qtp.Qobj(self.build_rho_from_triangular_params(t_optimal),
-                        dims=[[2 for i in range(self.n_qubits)], [2 for i in
-                                                                  range(self.n_qubits)]])
+                        dims=[[2 for i in range(self.n_qubits)],
+                        [2 for i in range(self.n_qubits)]])
 
     def get_basis_labels(self, n_qubits):
         """
@@ -358,27 +358,25 @@ def pauli_ops_from_density_matrix(rho):
 
 
 def plot_target_pauli_set(pauli_set, ax):
-    width = 0.35
+    width = 0.6
     ind = np.arange(15)
-    ax.bar(ind, pauli_set[1:], width, color='gray')
+    ax.bar(ind, pauli_set[1:], width, color='lightgray', align='center')
+
 
 def plot_operators(results, ax):
-    #     fig = plt.figure(figsize=(8,6))
-    #     ax = fig.add_subplot(111)
+    # NB: reorders the pauli expectation values to correct for convention
     pauli_1, pauli_2, pauli_cor = order_pauli_output2(results)
     width = 0.35
     ind1 = np.arange(3)
     ind2 = np.arange(3, 6)
     ind3 = np.arange(6, 15)
-    ind = np.arange(15)
-    q1 = ax.bar(ind1, pauli_1, width, color='r')
-    q1 = ax.bar(ind2, pauli_2, width, color='b')
-    q2 = ax.bar(ind3, pauli_cor, width, color='purple')
+    ax.bar(ind1, pauli_1, width, color='r', align='center')
+    ax.bar(ind2, pauli_2, width, color='b', align='center')
+    ax.bar(ind3, pauli_cor, width, color='purple', align='center')
 
-    ax.set_title('2 Qubit State Tomography')
-#         ax.set_ylim(-1,1)
     ax.set_xticks(np.arange(0, 2**4))
     ax.set_xticklabels(get_operators_label())
+    ax.set_ylim(-1.05, 1.05)
 
 
 def get_pauli_op_vector(pauli_number):
@@ -436,6 +434,30 @@ def get_cardianal_pauli_exp(cardinal_idx):
     return pauli_vec
 
 
+def get_bell_pauli_exp(bell_idx, theta=0):
+    if bell_idx == 0:
+        sets_bell = np.array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, np.cos(
+            theta), np.sin(theta), 0, 0, np.sin(theta), -np.cos(theta)])
+    elif bell_idx == 3:
+        sets_bell = np.array(
+            [1, 0, 0, 0, 0, -1, 0, 0, 0, 0,
+             -np.cos(theta), -np.sin(theta),
+             0, 0, np.sin(theta), -np.cos(theta)])
+    elif bell_idx == 2:
+        sets_bell = np.array(
+            [1, 0, 0, 0, 0, 1, 0, 0, 0, 0,
+             -np.cos(theta), -np.sin(theta),
+             0, 0, np.sin(theta), np.cos(theta)])
+    elif bell_idx == 1:
+        sets_bell = np.array(
+            [1, 0, 0, 0, 0, -1, 0, 0, 0, 0,
+             np.cos(theta), -np.sin(theta),
+             0, 0, np.sin(theta), np.cos(theta)])
+    pauli1, pauli2, paulic = order_pauli_output2(sets_bell)
+    return np.concatenate(([1],pauli1, pauli2, paulic ))
+    # return sets_bell
+
+
 def calc_fid2_cardinal(pauli_op_dis, cardinal_state):
     """
     Calculates fidelity using the pauli set representation of the state
@@ -451,60 +473,48 @@ def calc_fid2_cardinal(pauli_op_dis, cardinal_state):
     return 0.25*(1 + np.dot(pauli_expectations, target_expectations[1:]))
 
 
-def calc_fid2_bell(pauli_expectations, bell):
-    sets_bell = [np.array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, -1]),
-                 np.array([1, 0, 0, 0, 0, -1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]),
-                 np.array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, -1, 0, 0, 0, 0, 1]),
-                 np.array([1, 0, 0, 0, 0, -1, 0, 0, 0, 0, -1, 0, 0, 0, 0, -1])]
-    return 0.25*np.dot(pauli_expectations, sets_bell[bell])
-
-
-def calc_fid2_bell_theta(pauli_set, theta, bell):
-    if bell == 0:
-        sets_bell = np.array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, np.cos(
-            theta), np.sin(theta), 0, 0, np.sin(theta), -np.cos(theta)])
-    elif bell == 3:
-        sets_bell = np.array(
-            [1, 0, 0, 0, 0, -1, 0, 0, 0, 0,
-             -np.cos(theta), -np.sin(theta),
-             0, 0, np.sin(theta), -np.cos(theta)])
-    elif bell == 2:
-        sets_bell = np.array(
-            [1, 0, 0, 0, 0, 1, 0, 0, 0, 0,
-             -np.cos(theta), -np.sin(theta),
-             0, 0, np.sin(theta), np.cos(theta)])
-    elif bell == 1:
-        sets_bell = np.array(
-            [1, 0, 0, 0, 0, -1, 0, 0, 0, 0,
-             np.cos(theta), -np.sin(theta),
-             0, 0, np.sin(theta), np.cos(theta)])
-    return 0.25*np.dot(pauli_set, sets_bell)
+def calc_fid2_bell(pauli_op_dis, target_bell_idx, theta=0):
+    """
+    Calculates fidelity to one of the 4 bell states. Allows varying the angle
+    """
+    sets_bell = get_bell_pauli_exp(target_bell_idx, theta)
+    pauli_expectations = np.concatenate(order_pauli_output2(pauli_op_dis))
+    return 0.25*(1 + np.dot(pauli_expectations, sets_bell[1:]))
 
 
 def analyse_tomo(t_start, t_stop=None, label='',
                  target_cardinal=None, target_bell=None,
+                 MLE=True,
                  save_figures=True, fig_format='png',
-                 cut_shots=False,
-                 MLE = True, close_fig=True,
-                 start_shot=0, end_shot=-1, verbose=0):
+                 close_fig=True,
+                 q0='q0', q1='q1',
+                 start_shot=0, end_shot=-1, verbose=-1):
     """
     TODO: add phase manhattan plot
     Performs two qubit linear inversion (LE) and maximum likelihood
     estimation (MLE) tomography analysis on different datasets.
 
-    Args:
-        t_start         (str) : starting timestamp to scan for files
-        t_stop          (str) : stopping timestamp to scan for files
-        label           (str) : label used for selecting files
-        target_cardinal (int) : calculates fidelity to target state specified
-        target_bell     (int) : calculates fidelity to target state specified
-        save_figures    (bool): save figures next to the data
-        fig_format      (str) : format for matplotlib savefig function
-        cut_shots       (bool): ???
-        start_shot      (int) : ??
-        end_shot        (int) : ???
-        verbose         (int) : verbosity level in print statements, higher is
-                                more print statements
+    Arguments:
+    t_start         (str) : starting timestamp to scan for files
+    t_stop          (str) : stopping timestamp to scan for files
+    label           (str) : label used for selecting files
+    target_cardinal (int) : calculates fidelity to target state specified
+            order of the cardinals is specified by the preparation pulses,
+            see the function get_cardianal_pauli_exp() for the convention
+    target_bell     (int) : calculates fidelity to target state specified
+            order of the bell states
+    MLE             (bool): if True performs maximum likelihood tomography,
+                            otherwise only performs linear inversion tomo
+    save_figures    (bool): save figures next to the data
+    fig_format      (str) : format for matplotlib savefig function
+    close_fig       (bool): closes figures after executing function
+    q0, q1          (str) : plotting labels used for qubit 0 and qubit 1
+    start_shot      (int) : used for selecting a subset of the data
+    end_shot        (int) : used for selecting a subset of the data start
+            and end shot selection can be useful when investigating if the
+            performance of the gate fluctuates with time.
+    verbose         (int) : verbosity level in print statements, higher is
+                            more print statements
 
     Analysis creates 3 figures for each analyzed tomography.
         - Plot of I and Q values vs measurement
@@ -527,8 +537,6 @@ def analyse_tomo(t_start, t_stop=None, label='',
                                    options_dict=opt_dict,
                                    params_dict_TD=pdict,
                                    numeric_params=nparams)
-    # save_folder = a_tools.get_folder(tomo_scans.TD_timestamps[0])
-    # print(save_folder)
 
     # hard coded number of segments for a 2 qubit state tomography
     nr_segments = 64
@@ -541,10 +549,10 @@ def analyse_tomo(t_start, t_stop=None, label='',
         shots_q0[i, :] = tomo_scans.TD_dict['I'][0][i::nr_segments]
         shots_q1[i, :] = tomo_scans.TD_dict['Q'][0][i::nr_segments]
 
+    # Get correlations between shots
     shots_q0q1 = np.multiply(shots_q1, shots_q0)
 
-    # discarding shots FIXME: is this required or can we remove this feature?
-    if cut_shots:
+    if start_shot != 0 or end_shot != -1:
         shots_q0 = shots_q0[:, start_shot:end_shot]
         shots_q1 = shots_q1[:, start_shot:end_shot]
         shots_q0q1 = shots_q0q1[:, start_shot:end_shot]
@@ -557,67 +565,43 @@ def analyse_tomo(t_start, t_stop=None, label='',
     figname = 'Tomography_shots_Exp_{}.{}'.format(exp_name, fig_format)
     fig1, axs = plt.subplots(1, 3, figsize=(17, 4))
     fig1.suptitle(exp_name+' ' + tomo_scans.TD_timestamps[0], size=16)
-    # fig1.set_title(figname)
     ax = axs[0]
     ax.plot(np.arange(nr_segments), np.mean(shots_q0, axis=1), 'o-')
-    ax.set_title('Qubit 0'.format(exp_name))
-    # ax.plot(np.arange(nr_segments),shots_q0[:,2])
+    ax.set_title('{}'.format(q0))
     ax = axs[1]
     ax.plot(np.arange(nr_segments), np.mean(shots_q1, axis=1), 'o-')
-    ax.set_title('Qubit 1'.format(exp_name))
-    # ax.plot(np.arange(nr_segments),shots_q1[:,2])
+    ax.set_title('{}'.format(q1))
     ax = axs[2]
     ax.plot(np.arange(nr_segments), np.mean(shots_q0q1, axis=1), 'o-')
-    ax.set_title('Correlations'.format(exp_name))
+    ax.set_title('Correlations {}-{}'.format(q0, q1))
     if save_figures:
         savename = os.path.abspath(os.path.join(
             savefolder, figname))
-        fig1.savefig(savename, format=fig_format)
+        # value of 450dpi is arbitrary but higher than default
+        fig1.savefig(savename, format=fig_format, dpi=450)
     if close_fig:
         plt.close(fig1)
     # Putting calibration points together for crosstalk correction (beta)
     avg_h1 = np.mean(shots_q0, axis=1)
-    # FIXME unused matrices? Can be deleted but double check
-    matrix = np.array(
-        [[1, 1, 1, 1],
-         [1, -1, 1, -1],
-         [1, 1, -1, -1],
-         [1, -1, -1, 1]])
 
+    # Binning all the points required for the tomo
     h1_00 = np.mean(avg_h1[36:36+7])
     h1_01 = np.mean(avg_h1[43:43+7])
     h1_10 = np.mean(avg_h1[50:50+7])
     h1_11 = np.mean(avg_h1[57:])
 
-    h1_vec = np.array([h1_00, h1_01, h1_10, h1_11])
-
     avg_h2 = np.mean(shots_q1, axis=1)
-    matrix = np.array(
-        [[1, 1, 1, 1], [1, -1, 1, -1], [1, 1, -1, -1], [1, -1, -1, 1]])
-
     h2_00 = np.mean(avg_h2[36:36+7])
     h2_01 = np.mean(avg_h2[43:43+7])
     h2_10 = np.mean(avg_h2[50:50+7])
     h2_11 = np.mean(avg_h2[57:])
 
-    h2_vec = np.array([h2_00, h2_01, h2_10, h2_11])
-
     avg_h12 = np.mean(shots_q0q1, axis=1)
-    matrix = np.array(
-        [[1, 1, 1, 1],
-         [1, -1, 1, -1],
-         [1, 1, -1, -1],
-         [1, -1, -1, 1]])
     h12_00 = np.mean(avg_h12[36:36+7])
     h12_01 = np.mean(avg_h12[43:43+7])
     h12_10 = np.mean(avg_h12[50:50+7])
     h12_11 = np.mean(avg_h12[57:])
 
-    h12_vec = np.array([h12_00, h12_01, h12_10, h12_11])
-
-    np.concatenate((h1_vec, h2_vec, h12_vec), axis=0)
-
-    np.shape(avg_h1)
     avg_h12 = np.mean(shots_q0q1, axis=1)
 
     #############################
@@ -652,18 +636,17 @@ def analyse_tomo(t_start, t_stop=None, label='',
     # Making  the second figure, LI tomo
     fig2 = plt.figure(figsize=(15, 5))
     ax = fig2.add_subplot(121)
-    # ax.set_xticks(np.arange(0,15))
-    # ax.set_xticklabels(tomo.get_basis_labels(2)[1:])
-    # ax.bar(range(len(operators)-1),operators[1:])
-    if target_cardinal != None:
+    if target_cardinal is not None:
         fidelity = calc_fid2_cardinal(operators, target_cardinal)
-        # cardinal_labels = ['ZZ', 'ZX', 'ZY']  # fixme
-        target_state = target_cardinal
         target_expectations = get_cardianal_pauli_exp(target_cardinal)
         plot_target_pauli_set(target_expectations, ax)
+    if target_bell is not None:
+        fidelity = calc_fid2_bell(operators, target_bell)
+        target_expectations = get_bell_pauli_exp(target_bell)
+        plot_target_pauli_set(target_expectations, ax)
+
     plot_operators(operators, ax)
     ax.set_title('Least squares tomography.')
-    ax.set_ylim(-1, 1)
     if verbose > 0:
         print(rho)
     qtp.matrix_histogram_complex(rho, xlabels=['00', '01', '10', '11'],
@@ -671,22 +654,17 @@ def analyse_tomo(t_start, t_stop=None, label='',
                                  fig=fig2, ax=fig2.add_subplot(
         122, projection='3d'))
     purity = (rho*rho).tr()
-    print(purity, target_state, fidelity)
-    msg = 'Purity: {:.3f}\nTarget state {}\nFidelity to target {:.3f}'.format(
-        purity, target_state, fidelity)
+    msg = 'Purity: {:.3f}\nFidelity to target {:.3f}'.format(
+        purity, fidelity)
     ax.text(1, -.5, msg)
-    # extra_text_info = AnchoredText(msg, loc='lower left')
-    # ax.add_artist(extra_text_info)
-
-    # fidelity to target cardinal
-    # fidelity to target bell
 
     figname = 'LI-Tomography_Exp_{}.{}'.format(exp_name, fig_format)
     fig2.suptitle(exp_name+' ' + tomo_scans.TD_timestamps[0], size=16)
     if save_figures:
         savename = os.path.abspath(os.path.join(
             savefolder, figname))
-        fig2.savefig(savename, format=fig_format)
+        # value of 450dpi is arbitrary but higher than default
+        fig2.savefig(savename, format=fig_format, dpi=450)
     # FIXME: Here the Fidelity and purity should be added to the figure
     if close_fig:
         plt.close(fig2)
@@ -698,49 +676,37 @@ def analyse_tomo(t_start, t_stop=None, label='',
         # mle reconstruction of density matrix
         rho_2 = tomo.execute_max_likelihood(ftol=0.000001, xtol=0.0001)
         # reconstructing the pauli vector
-    #     print(rho_2.shape,pauli[0].shape)
         if verbose > 1:
             print(rho_2)
         if verbose > 0:
             print('Purity %.3f' % (rho_2*rho_2).tr())
         # calculates the Pauli operator expectation values based on the matrix
-        # operators_mle = np.zeros(16, dtype=np.complex128)
-        # pauli = [qtp.identity(2), qtp.sigmaz(), qtp.sigmax(), qtp.sigmay()]
-        # for k in range(16):
-        #     i = int(k % 4)
-        #     j = int(((k - i)/4) % 4)
-        #     operators_mle[k] = (rho_2*qtp.tensor(pauli[i], pauli[j])).tr()
         operators_mle = pauli_ops_from_density_matrix(rho_2)
-    #     fid_sq = calc_fid1_bell(rho_2,bell_state_x)*100.
         if verbose > 0:
             print(operators_mle)
-        print(rho_2)
-        print("MLE", operators_mle)
-        fid_p = calc_fid2_bell(np.real(operators_mle), bell_state_x)*100.
-        print('Fidelity (product): %.1f %%' % fid_p)
-    #     print('Fidelity (sqrt): %.1f %%'%fid_sq)
-        # plot the data
+        # fid_p = calc_fid2_bell(np.real(operators_mle), bell_state_x)*100.
 
         # Figure 3 MLE reconstruction
         fig3 = plt.figure(figsize=(15, 5))
         ax = fig3.add_subplot(121)
 
-        purity = (rho_2*rho_2).tr()
-        if target_cardinal != None:
+        if target_cardinal is not None:
             fidelity_mle = calc_fid2_cardinal(operators_mle, target_cardinal)
-            target_state = target_cardinal
-        print(purity, target_state, fidelity_mle)
-        msg = 'Purity: {:.3f}\nTarget state {}\nFidelity to target {:.3f}'.format(
-            purity, target_state, fidelity_mle)
+            target_expectations = get_cardianal_pauli_exp(target_cardinal)
+            plot_target_pauli_set(target_expectations, ax)
+        if target_bell is not None:
+            fidelity_mle = calc_fid2_bell(operators_mle, target_bell)
+            target_expectations = get_bell_pauli_exp(target_bell)
+            plot_target_pauli_set(target_expectations, ax)
+
+        purity = (rho_2*rho_2).tr()
+        msg = 'Purity: {:.3f}\nFidelity to target {:.3f}'.format(
+            purity, fidelity_mle)
         ax.text(1, -.5, msg)
 
-        # ax.set_xticks(np.arange(0,15))
-        # ax.set_xticklabels(tomo.get_basis_labels(2)[1:])
-        # ax.bar(range(len(operators)-1),operators[1:])
         plot_operators(operators_mle, ax)
         ax.set_title('%s Max likelihood reconstructed tomography.' %
                      tomo_scans.TD_timestamps[0])
-        ax.set_ylim(-1, 1)
         qtp.matrix_histogram_complex(rho_2, xlabels=['00', '01', '10', '11'],
                                      ylabels=['00', '01', '10', '11'],
                                      fig=fig3,
@@ -751,33 +717,46 @@ def analyse_tomo(t_start, t_stop=None, label='',
         if save_figures:
             savename = os.path.abspath(os.path.join(
                 savefolder, figname))
-            fig3.savefig(savename, format=fig_format)
+            # value of 450dpi is arbitrary but higher than default
+            fig3.savefig(savename, format=fig_format, dpi=450)
         if close_fig:
             plt.close(fig3)
 
-    # Fidelity angle sweep
-    # theta_vec = np.linspace(0., 2*np.pi, 100)
-    # fid_vec = np.zeros(theta_vec.shape)
-    # for i, theta in enumerate(theta_vec):
-    #     fid_vec[i] = calc_fid2_bell_theta(operators_mle, theta, target_bell)
+    ###############################
+    # Bell fidelity angle sweep
+    ###############################
 
-    # fig = plt.figure(figsize=(8, 5))
-    # ax = fig.add_subplot(111)
-    # ax.plot(theta_vec, fid_vec)
-    # label_str = 'MAX Fidelity %.3f at %.1f deg' % (
-    #     np.max(fid_vec), theta_vec[np.argmax(fid_vec)]*180./np.pi)
-    # ax.plot(theta_vec[np.argmax(fid_vec)], np.max(
-    #     fid_vec), 'o', label=label_str)
-    # ax.legend(loc='best')
-    # ax.set_ylabel('Fidelity')
-    # ax.set_xlabel('Phase (rad)')
-    # ax.set_ylim(0, 1)
-    # ax.set_xlim(0, 2*np.pi)
-    # ax.set_title('%s Angle Sweep for best Bell-state fidelity' %
-    #              tomo_scans.TD_timestamps[0])
-    # save_name = os.path.abspath(
-    #     save_folder+'\\%s_angle_sweep.PNG' % tomo_scans.TD_timestamps[0])
-#     fig.savefig(save_name, format=save_format)
-    # return rho_2, operators_mle, theta_vec[np.argmax(fid_vec)], np.max(fid_vec)
-        return fidelity, fidelity_mle
-    return fidelity
+    if target_bell is not None:
+        if MLE:
+            ops_bell_comp = operators_mle
+        else:
+            ops_bell_comp = operators
+        theta_vec = np.linspace(0., 2*np.pi, 100)
+        fid_vec = np.zeros(theta_vec.shape)
+        for i, theta in enumerate(theta_vec):
+            fid_vec[i] = calc_fid2_bell(ops_bell_comp, target_bell, theta)
+
+        fig4 = plt.figure(figsize=(8, 5))
+        ax = fig4.add_subplot(111)
+        ax.plot(theta_vec, fid_vec)
+        label_str = 'MAX Fidelity %.3f at %.1f deg' % (
+            np.max(fid_vec), theta_vec[np.argmax(fid_vec)]*180./np.pi)
+        ax.plot(theta_vec[np.argmax(fid_vec)], np.max(
+            fid_vec), 'o', label=label_str)
+        ax.legend(loc='best')
+        ax.set_ylabel('Fidelity')
+        ax.set_xlabel('Phase (rad)')
+        ax.set_ylim(0, 1)
+        ax.set_xlim(0, 2*np.pi)
+        ax.set_title('%s Angle Sweep for best Bell-state fidelity' %
+                     tomo_scans.TD_timestamps[0])
+        figname = 'Bell_angle_sweep_Exp_{}.{}'.format(exp_name, fig_format)
+        fig4.suptitle(exp_name+' ' + tomo_scans.TD_timestamps[0], size=16)
+        if save_figures:
+            savename = os.path.abspath(os.path.join(
+                savefolder, figname))
+            # value of 450dpi is arbitrary but higher than default
+            fig4.savefig(savename, format=fig_format, dpi=450)
+        if close_fig:
+            plt.close(fig3)
+
