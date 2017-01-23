@@ -35,16 +35,13 @@ from pycqed.measurement import sweep_functions as swf
 from pycqed.measurement import awg_sweep_functions as awg_swf
 from pycqed.measurement import detector_functions as det
 from pycqed.measurement import composite_detector_functions as cdet
-from pycqed.measurement import calibration_toolbox as cal_tools
-from pycqed.measurement import mc_parameter_wrapper as pw
-from pycqed.measurement import CBox_sweep_functions as cb_swf
 from pycqed.measurement.optimization import nelder_mead
 from pycqed.analysis import measurement_analysis as ma
 from pycqed.analysis import analysis_toolbox as a_tools
 from pycqed.measurement import awg_sweep_functions_multi_qubit as awg_swf_m
 from pycqed.measurement.pulse_sequences import multi_qubit_tek_seq_elts as sq_m
 
-
+from pycqed.instrument_drivers.physical_instruments import Fridge_monitor as fm
 from pycqed.utilities import general as gen
 # Standarad awg sequences
 from pycqed.measurement.waveform_control import pulsar as ps
@@ -77,6 +74,8 @@ import pycqed.instrument_drivers.meta_instrument.CBox_LookuptableManager as lm
 ############################
 station = qc.Station()
 
+Fridge_mon = fm.Fridge_Monitor('Fridge monitor', 'LaMaserati')
+station.add_component(Fridge_mon)
 
 ###########
 # Sources #
@@ -100,4 +99,15 @@ MC = mc.MeasurementControl('MC')
 
 MC.station = station
 station.MC = MC
+station.add_component(MC)
 
+
+def print_instr_params(instr):
+    snapshot = instr.snapshot()
+    print('{0:23} {1} \t ({2})'.format('\t parameter ', 'value', 'units'))
+    print('-'*80)
+    for par in sorted(snapshot['parameters']):
+        print('{0:25}: \t{1}\t ({2})'.format(
+            snapshot['parameters'][par]['name'],
+            snapshot['parameters'][par]['value'],
+            snapshot['parameters'][par]['units']))

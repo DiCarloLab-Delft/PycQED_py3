@@ -111,7 +111,13 @@ class MeasurementControl(Instrument):
             self.save_instrument_settings(self.data_object)
             self.create_experimentaldata_dataset()
             if mode is not 'adaptive':
-                self.xlen = len(self.get_sweep_points())
+                try:
+                    # required for 2D plotting and data storing.
+                    # try except because some swf get the sweep points in the
+                    # prepare statement. This needs a proper fix
+                    self.xlen = len(self.get_sweep_points())
+                except:
+                    self.xlen = 1
             if self.mode == '1D':
                 self.measure()
             elif self.mode == '2D':
