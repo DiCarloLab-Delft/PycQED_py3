@@ -24,7 +24,7 @@ try:
     from nathan_plotting_tools import *
 except:
     pass
-from pycqed.analysis import ramiro_analysis as RA
+from pycqed.analysis import composite_analysis as ca
 
 imp.reload(dm_tools)
 
@@ -5291,7 +5291,7 @@ class Chevron_2D(object):
             if auto==True:
                 self.analysis()
     def analysis(self):
-            chevron_scan = RA.quick_analysis(t_start=self.scan_start,
+            chevron_scan = ca.quick_analysis(t_start=self.scan_start,
                                            t_stop=self.scan_stop,
                                            options_dict=self.opt_dict,
                                            params_dict_TD=self.pdict,
@@ -5416,7 +5416,7 @@ class DoubleFrequency(object):
 
     def analysis(self):
             print(self.scan_start,self.scan_stop,self.opt_dict,self.pdict,self.nparams)
-            ramsey_scan = RA.quick_analysis(t_start=self.scan_start,
+            ramsey_scan = ca.quick_analysis(t_start=self.scan_start,
                                             t_stop=self.scan_stop,
                                             options_dict=self.opt_dict,
                                             params_dict_TD=self.pdict,
@@ -5549,7 +5549,7 @@ class SWAPN_cost(object):
 
     def analysis(self):
             print(self.scan_start,self.scan_stop,self.opt_dict,self.pdict,self.nparams)
-            sawpn_scan = RA.quick_analysis(t_start=self.scan_start,
+            sawpn_scan = ca.quick_analysis(t_start=self.scan_start,
                                             t_stop=self.scan_stop,
                                             options_dict=self.opt_dict,
                                             params_dict_TD=self.pdict,
