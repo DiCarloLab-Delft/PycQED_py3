@@ -476,13 +476,14 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                               self.heterodyne_instr.frequency))
         MC.set_sweep_points(freqs)
         MC.set_detector_function(
-            det.Heterodyne_probe(self.heterodyne_instr, trigger_separation=4e-6))
+            det.Heterodyne_probe(self.heterodyne_instr,
+                                 trigger_separation=4e-6))
         MC.run(name='Resonator_scan'+self.msmt_suffix)
         if analyze:
             ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
 
     def measure_spectroscopy(self, freqs, pulsed=False, MC=None,
-                             analyze=True, close_fig=True, mode='ROGated_SpecGate',
+                             analyze=True, close_fig=True,
                              force_load=True, use_max=False, update=True):
         self.prepare_for_continuous_wave()
         self.cw_source.on()
@@ -548,12 +549,14 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
             if analyze or update:
                 ma_obj = ma.Qubit_Spectroscopy_Analysis(
                     auto=True, label='pulsed', close_fig=close_fig)
+                if use_max:
+                    f_qubit = ma_obj.peaks['peak']
+                else:
+                    f_qubit = ma_obj.fitted_freq
                 if update:
-                    if use_max:
-                        self.f_qubit(ma_obj.peaks['peak'])
-                    else:
-                        self.f_qubit(ma_obj.fitted_freq)
-        self.cw_source.off()
+                    self.f_qubit(f_qubit)
+            self.cw_source.off()
+            return f_qubit
 
     def measure_rabi(self, amps=np.linspace(-.5, .5, 31), n=1,
                      MC=None, analyze=True, close_fig=True,

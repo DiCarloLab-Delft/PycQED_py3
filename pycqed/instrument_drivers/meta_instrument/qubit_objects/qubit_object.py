@@ -19,6 +19,7 @@ from pycqed.analysis import fitting_models as fit_mods
 
 
 class Qubit(Instrument):
+
     '''
     Abstract base class for the qubit object.
     Contains a template for all the functions a qubit should have.
@@ -66,6 +67,7 @@ class Qubit(Instrument):
           that has it's own frequency parameter, attach a mixer object that has
           it's own calibration routines.
     '''
+
     def __init__(self, name, **kw):
         super().__init__(name, **kw)
         self.msmt_suffix = '_' + name  # used to append to measuremnet labels
@@ -98,10 +100,12 @@ class Qubit(Instrument):
 
 
 class Transmon(Qubit):
+
     '''
     circuit-QED Transmon as used in DiCarlo Lab.
     Adds transmon specific parameters as well
     '''
+
     def __init__(self, name, **kw):
         super().__init__(name, **kw)
         self.add_parameter('EC', units='Hz',
@@ -160,8 +164,6 @@ class Transmon(Qubit):
                            # in the future add 'tracked_dac', 'tracked_flux',
                            parameter_class=ManualParameter)
 
-
-
     def calculate_frequency(self, EC=None, EJ=None, assymetry=None,
                             dac_voltage=None, flux=None,
                             no_transitions=1):
@@ -218,23 +220,28 @@ class Transmon(Qubit):
                                       self.f_qubit.get()+f_span/2,
                                       f_step)
                 elif self.f_qubit_calc() is 'dac':
-                    f_pred = fit_mods.QubitFreqDac(dac_voltage=self.IVVI.get('dac%d'%self.dac_channel()),
-                                                   f_max=self.f_max()*1e-9,
-                                                   E_c=self.E_c()*1e-9,
-                                                   dac_sweet_spot=self.dac_sweet_spot(),
-                                                   dac_flux_coefficient=self.dac_flux_coefficient(),
-                                                   asymmetry=self.asymmetry())*1e9
+                    f_pred = fit_mods.QubitFreqDac(
+                        dac_voltage=self.IVVI.get(
+                            'dac%d' % self.dac_channel()),
+                        f_max=self.f_max()*1e-9,
+                        E_c=self.E_c()*1e-9,
+                        dac_sweet_spot=self.dac_sweet_spot(),
+                        dac_flux_coefficient=self.dac_flux_coefficient(),
+                        asymmetry=self.asymmetry())*1e9
                     freqs = np.arange(f_pred-f_span/2,
                                       f_pred+f_span/2,
                                       f_step)
                 elif self.f_qubit_calc() is 'flux':
                     fluxes = self.FluxCtrl.flux_vector()
                     mappings = np.array(self.FluxCtrl.dac_mapping())
+                    # FIXME: this statement is super unclear
                     my_flux = np.sum(np.where(mappings == self.dac_channel(),
                                               mappings,
                                               0))-1
-                    print(mappings, my_flux, self.dac_channel())
-                    omega = lambda flux, f_max, EC, asym: (f_max + EC) * (asym**2 + (1-asym**2)*np.cos(np.pi*flux)**2)**0.25 - EC
+                    # print(mappings, my_flux, self.dac_channel())
+                    omega = lambda flux, f_max, EC, asym: ((
+                        f_max + EC) * (asym**2 + (1-asym**2) *
+                                       np.cos(np.pi*flux)**2)**0.25 - EC)
                     f_pred_calc = lambda flux: omega(flux=flux,
                                                      f_max=self.f_max()*1e-9,
                                                      EC=self.E_c()*1e-9,
@@ -243,15 +250,17 @@ class Transmon(Qubit):
                     freqs = np.arange(f_pred-f_span/2,
                                       f_pred+f_span/2,
                                       f_step)
-                    print(freqs.min(),freqs.max())
+                    # print(freqs.min(), freqs.max())
             # args here should be handed down from the top.
             self.measure_spectroscopy(freqs, pulsed=pulsed, MC=None,
-                                      analyze=True, close_fig=close_fig, use_max=use_max, update=update)
+                                      analyze=True, close_fig=close_fig,
+                                      use_max=use_max, update=update)
             if pulsed:
                 label = 'pulsed-spec'
             else:
                 label = 'spectroscopy'
-            analysis_spec = ma.Qubit_Spectroscopy_Analysis(label=label,close_fig=True)
+            analysis_spec = ma.Qubit_Spectroscopy_Analysis(
+                label=label, close_fig=True)
             if use_max:
                 self.f_qubit(analysis_spec.peaks['peak'])
             else:
@@ -296,7 +305,7 @@ class Transmon(Qubit):
                 print('Converged to: {:.9e}'.format(cur_freq))
             if update:
                 self.f_qubit.set(cur_freq)
-                print("update",update)
+                print("update", update)
             return cur_freq
 
     def find_resonator_frequency(self, **kw):
@@ -320,8 +329,8 @@ class Transmon(Qubit):
             self.measure_rabi(amps, n=1, MC=MC, analyze=False)
             a = ma.Rabi_Analysis(close_fig=close_fig)
             if take_fit_I:
-                    ampl = abs(a.fit_res[0].params['period'].value)/2
-                    print("taking I")
+                ampl = abs(a.fit_res[0].params['period'].value)/2
+                print("taking I")
             else:
                 if (a.fit_res[0].params['period'].stderr <=
                         a.fit_res[1].params['period'].stderr):
@@ -378,7 +387,7 @@ class Transmon(Qubit):
             self.measure_rabi_amp90(scales=scales, n=1, MC=MC, analyze=False)
             a = ma.Rabi_Analysis(close_fig=close_fig)
             if take_fit_I:
-                    scale = abs(a.fit_res[0].params['period'].value)/2
+                scale = abs(a.fit_res[0].params['period'].value)/2
             else:
                 if (a.fit_res[0].params['period'].stderr <=
                         a.fit_res[1].params['period'].stderr):
