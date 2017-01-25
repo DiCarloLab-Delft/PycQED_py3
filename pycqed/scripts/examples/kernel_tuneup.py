@@ -19,8 +19,6 @@ k1.kernel_dir_path(
     r'D:\GitHubRepos\iPython-Notebooks\Experiments\1607_Qcodes_5qubit\kernels')
 k1.kernel_list(['precompiled_AncT_RT_20161203.txt',
                 'kernel_fridge_lowpass_20161024_1.00.txt',
-                #                      'kernel_fridge_slow1_20161203_5_-0.030.txt',
-                #                      'kernel_bounce_-0.050_16.txt',
                 'kernel_skineffect_0.7.txt',
                 'kernel_fridge_slow1_20161203_15_-0.013.txt'])
 
@@ -33,6 +31,45 @@ k1.bounce_amp_2(-0.04)
 dist_dict = {'ch_list': ['ch4', 'ch3'],
              'ch4': k0.kernel(),
              'ch3': k1.kernel()}
+
+
+###########################################
+# Simple chevron DataT
+# Conventional SWAP chevron
+###########################################
+MC.live_plot_enabled(True)
+MC.soft_avg(1)
+
+
+int_avg_det = det.UHFQC_integrated_average_detector(
+    UHFQC=qubit._acquisition_instr, AWG=qubit.AWG,
+    channels=[DataT.RO_acq_weight_function_I()], nr_averages=AncT.RO_acq_averages(),
+    integration_length=AncT.RO_acq_integration_length(), cross_talk_suppression=True)
+# reload(fsqs)
+# reload(awg_swf)
+# fsqs.station=station
+mw_pulse_pars_DataT, RO_pars_DataT = DataT.get_pulse_pars()
+mw_pulse_pars_AncT, RO_pars_AncT = AncT.get_pulse_pars()
+flux_pulse_pars_DataT = DataT.get_flux_pars()
+flux_pulse_pars_AncT = AncT.get_flux_pars()
+
+chevron_pulse_lengths = np.arange(0e-9, 120e-9, 2e-9)  # [100e-9]*10
+# chevron_pulse_lengths=[100e-9]*30
+s = awg_swf.chevron_length(mw_pulse_pars_DataT, RO_pars_DataT, flux_pulse_pars_DataT,
+                           dist_dict=combined_dist_dict, AWG=AWG)
+s.upload = True
+
+MC.set_detector_function(int_avg_det)
+MC.set_sweep_function(s)
+MC.set_sweep_points(chevron_pulse_lengths)
+MC.set_sweep_function_2D(AWG.ch4_amp)
+MC.set_sweep_points_2D(np.arange(1.13, 1.17, 0.001))
+# MC.set_sweep_points_2D(np.linspace(1.08, 1.25, 41))
+label = 'chevron_DataT'
+MC.run(label, mode='2D')
+ma.MeasurementAnalysis(label=label, transpose=True, TwoD=True)
+
+
 
 ###########################################
 # 2 exciation chevron to test if initial kernels worked
@@ -75,40 +112,5 @@ MC.set_sweep_points(chevron_pulse_lengths)
 MC.set_sweep_function_2D(AWG.ch3_amp)
 MC.set_sweep_points_2D(np.linspace(1.1, 1.6, 61))
 label = 'chevron_with_excited_bus_2D'
-MC.run(label, mode='2D')
-ma.MeasurementAnalysis(label=label, transpose=True, TwoD=True)
-
-###########################################
-# Simple chevron DataT
-# Conventional SWAP chevron
-###########################################
-MC.live_plot_enabled(True)
-
-
-int_avg_det = det.UHFQC_integrated_average_detector(
-    UHFQC=qubit._acquisition_instr, AWG=qubit.AWG,
-    channels=[DataT.RO_acq_weight_function_I()], nr_averages=AncT.RO_acq_averages(),
-    integration_length=AncT.RO_acq_integration_length(), cross_talk_suppression=True)
-# reload(fsqs)
-# reload(awg_swf)
-# fsqs.station=station
-mw_pulse_pars_DataT, RO_pars_DataT = DataT.get_pulse_pars()
-mw_pulse_pars_AncT, RO_pars_AncT = AncT.get_pulse_pars()
-flux_pulse_pars_DataT = DataT.get_flux_pars()
-flux_pulse_pars_AncT = AncT.get_flux_pars()
-
-chevron_pulse_lengths = np.arange(0e-9, 120e-9, 2e-9)  # [100e-9]*10
-# chevron_pulse_lengths=[100e-9]*30
-s = awg_swf.chevron_length(mw_pulse_pars_DataT, RO_pars_DataT, flux_pulse_pars_DataT,
-                           dist_dict=combined_dist_dict, AWG=AWG)
-s.upload = True
-
-MC.set_detector_function(int_avg_det)
-MC.set_sweep_function(s)
-MC.set_sweep_points(chevron_pulse_lengths)
-MC.set_sweep_function_2D(AWG.ch4_amp)
-MC.set_sweep_points_2D(np.arange(1.13, 1.17, 0.001))
-# MC.set_sweep_points_2D(np.linspace(1.08, 1.25, 41))
-label = 'chevron_DataT'
 MC.run(label, mode='2D')
 ma.MeasurementAnalysis(label=label, transpose=True, TwoD=True)

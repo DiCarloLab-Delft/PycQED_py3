@@ -160,7 +160,8 @@ int_avg_det = det.UHFQC_integrated_average_detector(
             channels=[DataT.RO_acq_weight_function_I(),
                       AncT.RO_acq_weight_function_I()],
             nr_averages=AncT.RO_acq_averages(),
-            integration_length=AncT.RO_acq_integration_length(), cross_talk_suppression=True)
+            integration_length=AncT.RO_acq_integration_length(),
+            cross_talk_suppression=True)
 
 pulse_dict ={}
 q0.get_pulse_dict(pulse_dict)
