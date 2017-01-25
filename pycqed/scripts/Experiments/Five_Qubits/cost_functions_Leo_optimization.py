@@ -98,7 +98,7 @@ def simple_cos_guess(model, data, t):
     amp_guess = abs(max(data)-min(data))/2  # amp is positive by convention
     offs_guess = np.mean(data)
 
-    freq_guess = 5#1/360
+    freq_guess = 1/360
     ph_guess = -2*np.pi*t[data == max(data)]/360
 
     model.set_param_hint('period', expr='1/frequency')
@@ -202,7 +202,8 @@ class CPhase_cost_func_det(det.Soft_Detector):
             return a.cost_func_val, a.dphi, a.osc_amp_0, a.osc_amp_1, a.phi_0, a.osc_amp_1-a.osc_amp_0
 
         else:
-            a = SWAP_Cost_reverse_control_target(show_guess=False, label=label, single_qubit_phase_cost=self.single_qubit_phase_cost)
+            a = SWAP_Cost_reverse_control_target(show_guess=False,
+                                                 label=label, single_qubit_phase_cost=self.single_qubit_phase_cost)
             return a.cost_func_val, a.dphi, a.phi_0_qCP, a.phi_0_qS, a.osc_amp_1_qCP-a.osc_amp_0_qCP
 
 
@@ -291,6 +292,8 @@ class CPhase_cost_func_det_Ramiro(det.Soft_Detector):
                 excitations='both', CPhase=self.CPhase,
                 reverse_control_target=self.reverse_control_target,
                 sweep_q=self.sweep_q)
+        else:
+            raise Exception
 
         self.s.sweep_points = sphasesweep
         self.s.upload = True
