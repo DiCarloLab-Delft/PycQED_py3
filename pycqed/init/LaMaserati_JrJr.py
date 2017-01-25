@@ -179,7 +179,7 @@ Flux_Control.inv_transfer_matrix(invA)
 Flux_Control.dac_mapping([1, 2, 3, 4, 5])
 
 
-sweet_spots_mv = [-55.265, 49.643, -38.5, 13.037, 49.570]
+# sweet_spots_mv = [-55.265, 49.643, -38.5, 13.037, 49.570]
 sweet_spots_mv = [-31.5251, 54.1695, -0.3967, 4.9744, 60.3341]
 offsets = np.dot(Flux_Control.transfer_matrix(), sweet_spots_mv)
 Flux_Control.flux_offsets(-offsets)
