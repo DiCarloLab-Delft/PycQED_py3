@@ -61,16 +61,21 @@ class Qubit(Instrument):
         - Should the pulse-parameters be grouped here in some convenient way?
             (e.g. parameter prefixes)
 
-
-    Future music (too complicated for now):
-        - Instead of having a parameter resonator, attach a resonator object
-          that has it's own frequency parameter, attach a mixer object that has
-          it's own calibration routines.
     '''
 
     def __init__(self, name, **kw):
         super().__init__(name, **kw)
         self.msmt_suffix = '_' + name  # used to append to measuremnet labels
+        self._operations = {}
+        self.add_parameter('operations',
+                           docstring='a list of all operations available on the qubit',
+                           get_cmd=self._get_operations)
+
+    def get_idn(self):
+        return self.name
+
+    def _get_operations(self):
+        return self._operations
 
     def measure_T1(self):
         # Note: I made all functions lowercase but for T1 it just looks too
@@ -97,6 +102,69 @@ class Qubit(Instrument):
 
     def measure_heterodyne_spectroscopy(self):
         raise NotImplementedError()
+
+    def add_operation(self, operation_name):
+        self._operations[operation_name] = {}
+
+    def link_param_to_operation(self, parameter_name,
+                                 argument_name,
+                                 operation_name):
+        if parameter_name not in self.parameters:
+            raise KeyError('Parameter {} needs to be added first'.format(
+                parameter_name))
+
+        if operation_name in self.operations().keys():
+            self._operations[operation_name][argument_name] = parameter_name
+        else:
+            raise KeyError('Unknown operation {}, add '.format(operation_name) +
+                           'first using add operation')
+
+    def add_pulse_parameter(self,
+                            parameter_name,
+                            argument_name,
+                            operation_name,
+                            initial_value=None,
+                            vals=vals.Numbers(),
+                            **kwargs):
+        """
+        Add a pulse parameter to the qubit.
+
+        Args:
+            parameter_name (str): Name of the parameter
+            argument_name  (str): Name of the arugment as used in the sequencer
+            operation_name (str): The operation of which this parameter is an
+                argument. e.g. mw_control or CZ
+            **kwargs get passed to the add_parameter function
+        Raises:
+            KeyError: if this instrument already has a parameter with this
+                name.
+        """
+        if parameter_name in self.parameters:
+            raise KeyError('Duplicate parameter name {}'.format(parameter_name))
+
+        if operation_name in self.operations().keys():
+            self._operations[operation_name][argument_name] = parameter_name
+        else:
+            raise KeyError('Unknown operation {}, add '.format(operation_name) +
+                           'first using add operation')
+
+        self.add_parameter(parameter_name,
+                           initial_value=initial_value,
+                           vals=vals,
+                           parameter_class=ManualParameter, **kwargs)
+
+        # for use in RemoteInstruments to add parameters to the server
+        # we return the info they need to construct their proxy
+        return
+
+    def get_operation_dict(self):
+        operation_dict = {}
+        for op_name, op in self.operations().items():
+            operation_dict[op_name + ' ' + self.name] = {}
+            for argument_name, parameter_name in op.items():
+                operation_dict[op_name + ' ' + self.name][argument_name] = \
+                    self.get(parameter_name)
+        return operation_dict
 
 
 class Transmon(Qubit):
