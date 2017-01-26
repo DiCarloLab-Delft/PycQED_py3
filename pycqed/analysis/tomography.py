@@ -7,6 +7,7 @@ import os
 import matplotlib.pyplot as plt
 from matplotlib.offsetbox import AnchoredText
 from pycqed.analysis import composite_analysis as ca
+from pycqed.analysis import measurement_analysis as ma
 
 
 class TomoAnalysis_JointRO():
@@ -482,7 +483,7 @@ def calc_fid2_bell(pauli_op_dis, target_bell_idx, theta=0):
     return 0.25*(1 + np.dot(pauli_expectations, sets_bell[1:]))
 
 
-def analyse_tomo(t_start, t_stop=None, label='',
+def analyse_tomo(timestamp=None, label='',
                  target_cardinal=None, target_bell=None,
                  MLE=True,
                  save_figures=True, fig_format='png',
@@ -495,9 +496,8 @@ def analyse_tomo(t_start, t_stop=None, label='',
     estimation (MLE) tomography analysis on different datasets.
 
     Arguments:
-    t_start         (str) : starting timestamp to scan for files
-    t_stop          (str) : stopping timestamp to scan for files
-    label           (str) : label used for selecting files
+    timestamp       (str) : timestamp of data, if None uses label to find data
+    label           (str) : label used for selecting data file
     target_cardinal (int) : calculates fidelity to target state specified
             order of the cardinals is specified by the preparation pulses,
             see the function get_cardianal_pauli_exp() for the convention
@@ -521,33 +521,23 @@ def analyse_tomo(t_start, t_stop=None, label='',
         - LI bar and Manhattan plot of state reconstruction
         - MLE bar and Manhattan plot of state reconstruction
     """
-    if t_stop is None:
-        t_stop = t_start
-    opt_dict = {'scan_label': label}
 
-    pdict = {'I': 'I',
-             'Q': 'Q',
-             'times': 'sweep_points'}
-    # Important that the shots returned are labeled I and Q
-    # default shot detector do this but something to watch out for
-    nparams = ['I', 'Q', 'times']
-
-    # used to extract data from multiple files
-    tomo_scans = ca.quick_analysis(t_start=t_start, t_stop=t_stop,
-                                   options_dict=opt_dict,
-                                   params_dict_TD=pdict,
-                                   numeric_params=nparams)
+    a = ma.MeasurementAnalysis(auto=False, label=label,
+                               timestamp=timestamp)
+    a.get_naming_and_values()
+    t_stamp = a.timestamp_string
+    savefolder = a.folder
 
     # hard coded number of segments for a 2 qubit state tomography
     nr_segments = 64
-    # reshaping the data from a 1D array to a 64*nr_shots array
+
     shots_q0 = np.zeros(
-        (nr_segments, int(len(tomo_scans.TD_dict['I'][0])/nr_segments)))
+        (nr_segments, int(len(a.measured_values[0])/nr_segments)))
     shots_q1 = np.zeros(
-        (nr_segments, int(len(tomo_scans.TD_dict['Q'][0])/nr_segments)))
+        (nr_segments, int(len(a.measured_values[1])/nr_segments)))
     for i in range(nr_segments):
-        shots_q0[i, :] = tomo_scans.TD_dict['I'][0][i::nr_segments]
-        shots_q1[i, :] = tomo_scans.TD_dict['Q'][0][i::nr_segments]
+        shots_q0[i, :] = a.measured_values[0][i::nr_segments]
+        shots_q1[i, :] = a.measured_values[1][i::nr_segments]
 
     # Get correlations between shots
     shots_q0q1 = np.multiply(shots_q1, shots_q0)
@@ -560,11 +550,10 @@ def analyse_tomo(t_start, t_stop=None, label='',
     ##########################################
     # Making  the first figure, tomo shots
     ##########################################
-    savefolder = ca.a_tools.get_folder(tomo_scans.TD_timestamps[0])
     exp_name = os.path.split(savefolder)[-1][7:]
     figname = 'Tomography_shots_Exp_{}.{}'.format(exp_name, fig_format)
     fig1, axs = plt.subplots(1, 3, figsize=(17, 4))
-    fig1.suptitle(exp_name+' ' + tomo_scans.TD_timestamps[0], size=16)
+    fig1.suptitle(exp_name+' ' + t_stamp, size=16)
     ax = axs[0]
     ax.plot(np.arange(nr_segments), np.mean(shots_q0, axis=1), 'o-')
     ax.set_title('{}'.format(q0))
@@ -659,13 +648,12 @@ def analyse_tomo(t_start, t_stop=None, label='',
     ax.text(1, -.5, msg)
 
     figname = 'LI-Tomography_Exp_{}.{}'.format(exp_name, fig_format)
-    fig2.suptitle(exp_name+' ' + tomo_scans.TD_timestamps[0], size=16)
+    fig2.suptitle(exp_name+' ' + t_stamp, size=16)
     if save_figures:
         savename = os.path.abspath(os.path.join(
             savefolder, figname))
         # value of 450dpi is arbitrary but higher than default
         fig2.savefig(savename, format=fig_format, dpi=450)
-    # FIXME: Here the Fidelity and purity should be added to the figure
     if close_fig:
         plt.close(fig2)
     #############################
@@ -702,18 +690,17 @@ def analyse_tomo(t_start, t_stop=None, label='',
         purity = (rho_2*rho_2).tr()
         msg = 'Purity: {:.3f}\nFidelity to target {:.3f}'.format(
             purity, fidelity_mle)
-        ax.text(1, -.5, msg)
+        ax.text(0.5, .5, msg)
 
         plot_operators(operators_mle, ax)
-        ax.set_title('%s Max likelihood reconstructed tomography.' %
-                     tomo_scans.TD_timestamps[0])
+        ax.set_title('Max likelihood estimation tomography')
         qtp.matrix_histogram_complex(rho_2, xlabels=['00', '01', '10', '11'],
                                      ylabels=['00', '01', '10', '11'],
                                      fig=fig3,
                                      ax=fig3.add_subplot(122, projection='3d'))
 
         figname = 'MLE-Tomography_Exp_{}.{}'.format(exp_name, fig_format)
-        fig3.suptitle(exp_name+' ' + tomo_scans.TD_timestamps[0], size=16)
+        fig3.suptitle(exp_name+' ' + t_stamp, size=16)
         if save_figures:
             savename = os.path.abspath(os.path.join(
                 savefolder, figname))
@@ -749,14 +736,14 @@ def analyse_tomo(t_start, t_stop=None, label='',
         ax.set_ylim(0, 1)
         ax.set_xlim(0, 2*np.pi)
         ax.set_title('%s Angle Sweep for best Bell-state fidelity' %
-                     tomo_scans.TD_timestamps[0])
+                     t_stamp)
         figname = 'Bell_angle_sweep_Exp_{}.{}'.format(exp_name, fig_format)
-        fig4.suptitle(exp_name+' ' + tomo_scans.TD_timestamps[0], size=16)
+        fig4.suptitle(exp_name+' ' + t_stamp, size=16)
         if save_figures:
             savename = os.path.abspath(os.path.join(
                 savefolder, figname))
             # value of 450dpi is arbitrary but higher than default
             fig4.savefig(savename, format=fig_format, dpi=450)
         if close_fig:
-            plt.close(fig3)
+            plt.close(fig4)
 
