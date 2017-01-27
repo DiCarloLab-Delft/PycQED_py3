@@ -42,8 +42,8 @@ class DeviceObject(Instrument):
             self._qubits[name] = qubits
             return name
 
-    def get_pulse_dict(self):
-        pulse_dict = {}
+    def get_operation_dict(self):
+        operation_dict = {}
         for name, q in self.qubits().items():
-            q.get_pulse_dict(pulse_dict)
-        return pulse_dict
+            q.get_operation_dict(operation_dict)
+        return operation_dict

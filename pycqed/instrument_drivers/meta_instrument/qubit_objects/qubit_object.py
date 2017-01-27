@@ -106,9 +106,11 @@ class Qubit(Instrument):
     def add_operation(self, operation_name):
         self._operations[operation_name] = {}
 
-    def link_param_to_operation(self, parameter_name,
-                                 argument_name,
-                                 operation_name):
+    def link_param_to_operation(self, operation_name, parameter_name,
+                                argument_name):
+        """
+        Links an existing param to an operation for use in the operation dict.
+        """
         if parameter_name not in self.parameters:
             raise KeyError('Parameter {} needs to be added first'.format(
                 parameter_name))
@@ -120,9 +122,9 @@ class Qubit(Instrument):
                            'first using add operation')
 
     def add_pulse_parameter(self,
+                            operation_name,
                             parameter_name,
                             argument_name,
-                            operation_name,
                             initial_value=None,
                             vals=vals.Numbers(),
                             **kwargs):
@@ -176,11 +178,11 @@ class Transmon(Qubit):
 
     def __init__(self, name, **kw):
         super().__init__(name, **kw)
-        self.add_parameter('EC', units='Hz',
+        self.add_parameter('E_c', units='Hz',
                            parameter_class=ManualParameter,
                            vals=vals.Numbers())
 
-        self.add_parameter('EJ', units='Hz',
+        self.add_parameter('E_j', units='Hz',
                            parameter_class=ManualParameter,
                            vals=vals.Numbers())
         self.add_parameter('assymetry',
@@ -189,8 +191,6 @@ class Transmon(Qubit):
         self.add_parameter('dac_voltage', units='mV',
                            parameter_class=ManualParameter)
         self.add_parameter('dac_sweet_spot', units='mV',
-                           parameter_class=ManualParameter)
-        self.add_parameter('E_c', units='Hz',
                            parameter_class=ManualParameter)
         self.add_parameter('dac_flux_coefficient', units='',
                            parameter_class=ManualParameter)
