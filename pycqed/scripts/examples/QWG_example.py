@@ -38,7 +38,7 @@ try:
     qwg1 = pq.station['QWG']
 except:
     qwg1 = QuTech_AWG_Module(
-        'QWG', address='192.168.42.10',
+        'QWG', address='192.168.0.10',
         port=5025, server_name=None)
 qwg1.reset()
 
