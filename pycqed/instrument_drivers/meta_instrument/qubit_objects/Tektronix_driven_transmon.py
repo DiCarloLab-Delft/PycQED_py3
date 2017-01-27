@@ -219,8 +219,8 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                            initial_value=0.,
                            vals=vals.Numbers(min_value=0., max_value=50e-6),
                            parameter_class=ManualParameter)
-        self.add_parameter('fluxing_channel',
-                           vals=vals.Ints(min_value=1, max_value=4),
+        self.add_parameter('fluxing_channel', initial_value='ch1',
+                           vals=vals.Strings(),
                            parameter_class=ManualParameter)
         self.add_parameter('fluxing_amp',
                            label='SWAP resolution', units='V',
@@ -1106,6 +1106,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         return self.pulse_pars, self.RO_pars
 
     def get_spec_pars(self):
+        # logging.warning('deprecated use get_operation_dict')
         pulse_pars, RO_pars = self.get_pulse_pars()
         spec_pars = {'pulse_type': 'SquarePulse',
                      'length': self.spec_pulse_length.get(),
@@ -1118,6 +1119,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         return spec_pars, RO_pars
 
     def get_cphase_pars(self):
+        logging.warning('deprecated use get_operation_dict')
         cphase_pars = {'pulse_type': 'CosPulse',
                        'length': 'ch%d'%self.fluxing_channel(),
                        'channel': 'ch4',
@@ -1127,6 +1129,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         return cphase_pars
 
     def get_flux_pars(self):
+        logging.warning('deprecated use get_operation_dict')
         flux_pulse_pars = {'pulse_type': 'SquareFluxPulse',
                            'channel': 'ch%d'%self.fluxing_channel(),
                            'amplitude': self.fluxing_amp(),

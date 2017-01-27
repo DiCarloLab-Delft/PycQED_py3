@@ -2,8 +2,9 @@ import numpy as np
 from pycqed.measurement import awg_sweep_functions as awg_swf
 from pycqed.measurement import detector_functions as det
 from pycqed.analysis import measurement_analysis as ma
+import qcodes as qc
 
-station = None
+station = qc.station
 dist_dict = None
 
 """

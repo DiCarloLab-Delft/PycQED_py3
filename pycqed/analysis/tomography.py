@@ -159,7 +159,7 @@ class TomoAnalysis_JointRO():
             print(" Time to optimize %.2f" % (time.time()-topt))
         return qtp.Qobj(self.build_rho_from_triangular_params(t_optimal),
                         dims=[[2 for i in range(self.n_qubits)],
-                        [2 for i in range(self.n_qubits)]])
+                              [2 for i in range(self.n_qubits)]])
 
     def get_basis_labels(self, n_qubits):
         """
@@ -457,7 +457,7 @@ def get_bell_pauli_exp(bell_idx, theta=0):
     else:
         raise ValueError('bell_idx must be 0, 1, 2 or 3')
     pauli1, pauli2, paulic = order_pauli_output2(sets_bell)
-    return np.concatenate(([1],pauli1, pauli2, paulic ))
+    return np.concatenate(([1], pauli1, pauli2, paulic))
     # return sets_bell
 
 
@@ -631,10 +631,14 @@ def analyse_tomo(timestamp=None, label='',
         fidelity = calc_fid2_cardinal(operators, target_cardinal)
         target_expectations = get_cardianal_pauli_exp(target_cardinal)
         plot_target_pauli_set(target_expectations, ax)
+
     if target_bell is not None:
         fidelity = calc_fid2_bell(operators, target_bell)
         target_expectations = get_bell_pauli_exp(target_bell)
         plot_target_pauli_set(target_expectations, ax)
+        txt_x_pos = 0
+    else:
+        txt_x_pos = 10
 
     plot_operators(operators, ax)
     ax.set_title('Least squares tomography.')
@@ -647,7 +651,15 @@ def analyse_tomo(timestamp=None, label='',
     purity = (rho*rho).tr()
     msg = 'Purity: {:.3f}\nFidelity to target {:.3f}'.format(
         purity, fidelity)
-    ax.text(1, -.5, msg)
+    if target_bell is not None:
+        theta_vec = np.linspace(0., 2*np.pi, 100)
+        fid_vec = np.zeros(theta_vec.shape)
+        for i, theta in enumerate(theta_vec):
+            fid_vec[i] = calc_fid2_bell(operators, target_bell, theta)
+        msg += '\nMAX Fidelity {:.3f} at {:.1f} deg'.format(
+            np.max(fid_vec),
+            theta_vec[np.argmax(fid_vec)]*180./np.pi)
+    ax.text(0, .7, msg)
 
     figname = 'LI-Tomography_Exp_{}.{}'.format(exp_name, fig_format)
     fig2.suptitle(exp_name+' ' + t_stamp, size=16)
@@ -662,7 +674,6 @@ def analyse_tomo(timestamp=None, label='',
     # MLE reconstruction
     #############################
     if MLE:
-        bell_state_x = 2
         # mle reconstruction of density matrix
         rho_2 = tomo.execute_max_likelihood(ftol=0.000001, xtol=0.0001)
         # reconstructing the pauli vector
@@ -674,7 +685,6 @@ def analyse_tomo(timestamp=None, label='',
         operators_mle = pauli_ops_from_density_matrix(rho_2)
         if verbose > 0:
             print(operators_mle)
-        # fid_p = calc_fid2_bell(np.real(operators_mle), bell_state_x)*100.
 
         # Figure 3 MLE reconstruction
         fig3 = plt.figure(figsize=(15, 5))
@@ -690,9 +700,18 @@ def analyse_tomo(timestamp=None, label='',
             plot_target_pauli_set(target_expectations, ax)
 
         purity = (rho_2*rho_2).tr()
+
         msg = 'Purity: {:.3f}\nFidelity to target {:.3f}'.format(
             purity, fidelity_mle)
-        ax.text(0.5, .5, msg)
+        if target_bell is not None:
+            theta_vec = np.linspace(0., 2*np.pi, 100)
+            fid_vec = np.zeros(theta_vec.shape)
+            for i, theta in enumerate(theta_vec):
+                fid_vec[i] = calc_fid2_bell(operators_mle, target_bell, theta)
+            msg += '\nMAX Fidelity {:.3f} at {:.1f} deg'.format(
+                np.max(fid_vec),
+                theta_vec[np.argmax(fid_vec)]*180./np.pi)
+        ax.text(txt_x_pos, .7, msg)
 
         plot_operators(operators_mle, ax)
         ax.set_title('Max likelihood estimation tomography')
@@ -720,16 +739,11 @@ def analyse_tomo(timestamp=None, label='',
             ops_bell_comp = operators_mle
         else:
             ops_bell_comp = operators
-        theta_vec = np.linspace(0., 2*np.pi, 100)
-        fid_vec = np.zeros(theta_vec.shape)
-        for i, theta in enumerate(theta_vec):
-            fid_vec[i] = calc_fid2_bell(ops_bell_comp, target_bell, theta)
 
         fig4 = plt.figure(figsize=(8, 5))
         ax = fig4.add_subplot(111)
         ax.plot(theta_vec, fid_vec)
-        label_str = 'MAX Fidelity %.3f at %.1f deg' % (
-            np.max(fid_vec), theta_vec[np.argmax(fid_vec)]*180./np.pi)
+
         ax.plot(theta_vec[np.argmax(fid_vec)], np.max(
             fid_vec), 'o', label=label_str)
         ax.legend(loc='best')
@@ -748,4 +762,3 @@ def analyse_tomo(timestamp=None, label='',
             fig4.savefig(savename, format=fig_format, dpi=450)
         if close_fig:
             plt.close(fig4)
-

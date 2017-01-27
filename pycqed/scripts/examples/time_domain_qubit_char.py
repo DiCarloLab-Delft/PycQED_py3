@@ -17,7 +17,7 @@ for q in [AncT, DataT]:
     MC.soft_avg(4)
     q.measure_rabi()
     q.find_pulse_amplitude(np.linspace(-.5, .5, 31))
-    q.find_frequency(method='ramsey')
+    # q.find_frequency(method='ramsey')
     q.measure_motzoi_XY(np.linspace(-.3, .3, 61))
     q.find_pulse_amplitude(q.amp180())
     times = np.arange(0.5e-6, 80e-6, 1e-6)
@@ -26,4 +26,4 @@ for q in [AncT, DataT]:
     q.measure_allxy()
 
     # leakage and skewness calibration
-    q.measure_ssro()
+    # q.measure_ssro()

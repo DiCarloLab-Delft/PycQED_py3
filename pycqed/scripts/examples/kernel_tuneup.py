@@ -56,7 +56,7 @@ flux_pulse_pars_AncT = AncT.get_flux_pars()
 chevron_pulse_lengths = np.arange(0e-9, 120e-9, 2e-9)  # [100e-9]*10
 # chevron_pulse_lengths=[100e-9]*30
 s = awg_swf.chevron_length(mw_pulse_pars_DataT, RO_pars_DataT, flux_pulse_pars_DataT,
-                           dist_dict=combined_dist_dict, AWG=AWG)
+                           dist_dict=dist_dict, AWG=AWG)
 s.upload = True
 
 MC.set_detector_function(int_avg_det)
@@ -79,7 +79,7 @@ AncT.swap_amp(1.48)
 # 2-excitation chevron
 MC.live_plot_enabled(True)
 
-# DataT.dist_dict(combined_dist_dict)
+# DataT.dist_dict(dist_dict)
 AncT.RO_acq_averages(256)
 
 DataT.fluxing_channel(4)
@@ -103,7 +103,7 @@ AWG.ch4_amp(DataT.swap_amp())
 
 s = awg_swf.chevron_with_excited_bus_2Qubits(mw_pulse_pars_AncT, mw_pulse_pars_DataT,
                                              flux_pulse_pars_AncT, flux_pulse_pars_DataT, RO_pars_AncT,
-                                             dist_dict=combined_dist_dict, AWG=AWG, excitations=1)
+                                             dist_dict=dist_dict, AWG=AWG, excitations=1)
 s.upload = True
 
 MC.set_detector_function(int_avg_det)

@@ -35,7 +35,6 @@ phases2 = np.tile(np.linspace(0, 720, 16), 2)
 phases2 = np.concatenate([phases2, [730, 740, 750, 760]])
 
 
-pulse_lengths = [40]
 # pulse_lengths=[30]
 reload(ca)
 reload(det)
@@ -43,7 +42,7 @@ reload(det)
 #######
 # AAAAAAARGH too many magic numbers
 #######
-for pulse_length in pulse_lengths:
+for pulse_length in [40]:
     flux_pulse_pars_AncT = AncT.get_flux_pars()
     flux_pulse_pars_AncT['pulse_type'] = 'MartinisFluxPulse'
     # flux_pulse_pars_AncT['pulse_type']='SquareFluxPulse'
@@ -66,13 +65,6 @@ for pulse_length in pulse_lengths:
     flux_pulse_pars_DataT['phase_corr_pulse_length'] = 10e-9
     flux_pulse_pars_DataT['phase_corr_pulse_amp'] = -0.00
 
-    # f_bus = 4.8e9
-    # f_01_max = 5.94e9
-    # dac_flux_coefficient = 0.679
-
-    # flux_pulse_pars_AncT
-    # flux_pulse_pars_DataT
-    dist_dict = combined_dist_dict
 
 # 2D Sweep
 d = cl.CPhase_cost_func_det(qCP=AncT, qS=DataT, dist_dict=dist_dict,
@@ -108,6 +100,11 @@ phases = np.concatenate([phases, [730, 740, 750, 760]])
 qCP_pulse_pars = AncT.get_pulse_pars()[0]
 qS_pulse_pars = DataT.get_pulse_pars()[0]
 RO_pars = RO_pars_AncT
+flux_pulse_pars_AncT = AncT.get_operation_dict()['CZ AncT']
+flux_pulse_pars_DataT = DataT.get_operation_dict()['SWAP DataT']
+AWG.ch3_amp(AncT.CZ_channel_amp())
+
+
 
 s = awg_swf.swap_CP_swap_2Qubits(
     qCP_pulse_pars, qS_pulse_pars,
@@ -124,9 +121,9 @@ MC.set_sweep_points(phases)
 
 s.prepare()
 s.upload = False
-AWG.ch3_amp(AncT.swap_amp())
-AncT.swap_amp(1.03)
-AWG.ch4_amp(DataT.swap_amp())
+# AWG.ch3_amp(AncT.swap_amp())
+# AncT.swap_amp(1.03)
+# AWG.ch4_amp(DataT.swap_amp())
 MC.run('test')
 cl.SWAP_Cost()
 
@@ -139,18 +136,16 @@ cl.SWAP_Cost()
 
 
 def measure_phase_qcp(points=np.arange(0., 0.15+0.005*4, 0.005), soft_avg=10):
-    th90 = np.pi/2
-    reload(det)
+    flux_pulse_pars_AncT = AncT.get_operation_dict()['CZ AncT']
+    flux_pulse_pars_DataT = DataT.get_operation_dict()['SWAP DataT']
+    AWG.ch3_amp(AncT.CZ_channel_amp())
+
     int_avg_det = det.UHFQC_integrated_average_detector(
         UHFQC=AncT._acquisition_instr, AWG=AncT.AWG,
-        channels=[
-            AncT.RO_acq_weight_function_I(), DataT.RO_acq_weight_function_I()],
+        channels=[AncT.RO_acq_weight_function_I(), DataT.RO_acq_weight_function_I()],
         nr_averages=AncT.RO_acq_averages(),
         integration_length=AncT.RO_acq_integration_length(), cross_talk_suppression=True)
     cphasesweep = points
-
-    pulse_lengths = [40]
-    dist_dict = combined_dist_dict
 
     d = cl.CPhase_cost_func_det_Ramiro(qCP=AncT, qS=DataT, dist_dict=dist_dict,
                                        MC_nested=nested_MC, sphasesweep=cphasesweep,
@@ -172,8 +167,10 @@ def measure_phase_qcp(points=np.arange(0., 0.15+0.005*4, 0.005), soft_avg=10):
 ###############################################################################
 
 def measure_phase_qs(points=np.arange(0., 0.15+0.005*4, 0.005), soft_avg=10):
-    th90 = np.pi/2
-    reload(det)
+    flux_pulse_pars_AncT = AncT.get_operation_dict()['CZ AncT']
+    flux_pulse_pars_DataT = DataT.get_operation_dict()['SWAP DataT']
+    AWG.ch3_amp(AncT.CZ_channel_amp())
+
     int_avg_det = det.UHFQC_integrated_average_detector(
         UHFQC=AncT._acquisition_instr, AWG=AncT.AWG,
         channels=[
@@ -184,9 +181,8 @@ def measure_phase_qs(points=np.arange(0., 0.15+0.005*4, 0.005), soft_avg=10):
 
     from pycqed.scripts.Experiments.Five_Qubits import cost_functions_Leo_optimization as ca
 
-    pulse_lengths = [40]
 
-    dist_dict = combined_dist_dict
+
 
     d = cl.CPhase_cost_func_det_Ramiro(qCP=AncT, qS=DataT, dist_dict=dist_dict,
                                        MC_nested=nested_MC, sphasesweep=sphasesweep,
@@ -204,9 +200,11 @@ def measure_phase_qs(points=np.arange(0., 0.15+0.005*4, 0.005), soft_avg=10):
 
 
 def measure_cphase_amp(points=np.arange(1.03, 1.07, 0.005), soft_avg=10):
-    #     nested_MC.soft_avg(soft_avg)
+    flux_pulse_pars_AncT = AncT.get_operation_dict()['CZ AncT']
+    flux_pulse_pars_DataT = DataT.get_operation_dict()['SWAP DataT']
+    AWG.ch3_amp(AncT.CZ_channel_amp())
+    nested_MC.soft_avg(soft_avg)
     th90 = np.pi/2
-    reload(det)
     int_avg_det = det.UHFQC_integrated_average_detector(
         UHFQC=AncT._acquisition_instr, AWG=AncT.AWG,
         channels=[
@@ -217,13 +215,10 @@ def measure_cphase_amp(points=np.arange(1.03, 1.07, 0.005), soft_avg=10):
     sphasesweep = np.tile(np.arange(0., 0.21, dt), 2)
     sphasesweep = np.concatenate([sphasesweep, [0.22, 0.23, 0.24, 0.25]])
 
-    from pycqed.scripts.Experiments.Five_Qubits import cost_functions_Leo_optimization as ca
+        # pulse_lengths=[30]
+    for pulse_length in [40]:
 
-    pulse_lengths = [40]
-    # pulse_lengths=[30]
-    for pulse_length in pulse_lengths:
 
-        dist_dict = combined_dist_dict
 
         d = cl.CPhase_cost_func_det_Ramiro(qCP=AncT, qS=DataT, dist_dict=dist_dict,
                                            MC_nested=nested_MC, sphasesweep=sphasesweep,
@@ -431,7 +426,79 @@ for lll in range(1):
     AncT.RO_acq_averages(nr_shots)
     DataT.RO_acq_averages(nr_shots)
 
-    for kkk in range(1):
-        seq_bell = mq_mod.tomo2Q_bell(1, DataT, AncT, flux_pulse_pars_DataT, flux_pulse_pars_AncT, timings_dict=t_dict,
-                                      distortion_dict=dist_dict, CPhase=True, nr_shots=nr_shots, nr_rep=1, mmt_label='BellTomo')
+    ######### TOMO snippet
+    for i in range(2):
+        AWG.ch3_amp(AncT.CZ_channel_amp())
+        AWG.ch4_amp(DataT.SWAP_amp())
+        for target_bell in range(4):
+            MC.soft_avg(1)
+            seq_bell = mq_mod.tomo2Q_bell(target_bell, DataT, AncT,
+                                          DataT.get_operation_dict()['SWAP DataT'],
+                                          AncT.get_operation_dict()['CZ AncT'],
+                                          timings_dict=t_dict,
+                                          distortion_dict=dist_dict,
+                                          CPhase=True, nr_shots=nr_shots,
+                                          nr_rep=1, mmt_label='BellTomo')
+            tomo.analyse_tomo(MLE=False, target_bell=1)
+        MC.live_plot_enabled(True)
+
+
+
+def reload_mod_stuff():
+    from pycqed.measurement.waveform_control_CC import waveform as wf
+    reload(wf)
+
+    from pycqed.measurement.pulse_sequences import fluxing_sequences as fqqs
+    reload(fqqs)
+    from pycqed.scripts.Experiments.Five_Qubits import cost_functions_Leo_optimization as ca
+    reload(ca)
+    from pycqed.measurement.waveform_control import pulse_library as pl
+    reload(pl)
+    from pycqed.measurement.pulse_sequences import standard_elements as ste
+    reload(ste)
+
+    from pycqed.measurement.pulse_sequences import multi_qubit_tek_seq_elts as mqs
+    reload(mqs)
+    from pycqed.measurement import awg_sweep_functions_multi_qubit as awg_mswf
+    reload(awg_mswf)
+    reload(awg_swf)
+    mqs.station = station
+    fqqs.station = station
+    reload(mq_mod)
+    mq_mod.station = station
+
+    reload(fsqs)
+    reload(awg_swf)
+    fsqs.station=station
+    reload(det)
+    reload(ca)
+reload_mod_stuff()
+
+##########################
+# Calibration snippet
+##########################
+
+
+measure_cphase_amp()
+AncT.CZ_channel_amp(fix_phase_2Q())
+AWG.ch3_amp(AncT.CZ_channel_amp())
+for i in range(2):
+    measure_phase_qcp()
+    AncT.CZ_phase_corr_amp(fix_phase_qcp())
+    measure_phase_qs()
+    DataT.SWAP_phase_corr_amp(fix_phase_qs())
+
+for i in range(2):
+    AWG.ch3_amp(AncT.CZ_channel_amp())
+    AWG.ch4_amp(DataT.SWAP_amp())
+    for target_bell in range(4):
+        MC.soft_avg(1)
+        seq_bell = mq_mod.tomo2Q_bell(target_bell, DataT, AncT,
+                                      DataT.get_operation_dict()['SWAP DataT'],
+                                      AncT.get_operation_dict()['CZ AncT'],
+                                      timings_dict=t_dict,
+                                      distortion_dict=dist_dict,
+                                      CPhase=True, nr_shots=nr_shots,
+                                      nr_rep=1, mmt_label='BellTomo')
+        tomo.analyse_tomo(MLE=False, target_bell=target_bell)
     MC.live_plot_enabled(True)

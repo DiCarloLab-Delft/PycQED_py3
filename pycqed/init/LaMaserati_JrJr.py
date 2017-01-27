@@ -46,7 +46,7 @@ from pycqed.analysis import measurement_analysis as ma
 from pycqed.analysis import analysis_toolbox as a_tools
 from pycqed.measurement import awg_sweep_functions_multi_qubit as awg_swf_m
 from pycqed.measurement.pulse_sequences import multi_qubit_tek_seq_elts as sq_m
-
+from pycqed.analysis import tomography as tomo
 
 from pycqed.utilities import general as gen
 # Standarad awg sequences
@@ -82,8 +82,10 @@ from pycqed.measurement.pulse_sequences import multi_qubit_tek_seq_elts as sq_m
 import pycqed.scripts.personal_folders.Niels.two_qubit_readout_analysis as Niels
 
 # for flux pulses
+from pycqed.scripts.Experiments.Five_Qubits import cost_functions_Leo_optimization as cl
 import pycqed.instrument_drivers.meta_instrument.kernel_object as k_obj
 from pycqed.measurement.pulse_sequences import fluxing_sequences as fsqs
+from pycqed.measurement.pulse_sequences import multi_qubit_tek_seq_elts as mqs
 # Initializing instruments
 
 
@@ -331,6 +333,8 @@ st_seqs.station = station
 sq.station = station
 awg_swf.fsqs.station = station
 cal_elts.station = station
+mqs.station=station
+
 
 t1 = time.time()
 
@@ -414,3 +418,41 @@ q1, q0, q3, q2, q4 = AncT, DataT, AncB, DataM, DataB
 
 # switch_to_pulsed_RO_CBox(AncT)
 # switch_to_pulsed_RO_CBox(DataT)
+
+
+
+
+
+
+
+
+
+
+
+
+#######################################################
+# These settings don't get automotically restored upon init
+#######################################################
+
+k0.channel(4)
+k0.kernel_dir_path(
+    r'D:\GitHubRepos\iPython-Notebooks\Experiments\1607_Qcodes_5qubit\kernels')
+k0.kernel_list(['precompiled_RT_20161206.txt'])
+
+k1.channel(3)
+k1.kernel_dir_path(
+    r'D:\GitHubRepos\iPython-Notebooks\Experiments\1607_Qcodes_5qubit\kernels')
+k1.kernel_list(['precompiled_AncT_RT_20161203.txt',
+                'kernel_fridge_lowpass_20161024_1.00.txt',
+                'kernel_skineffect_0.7.txt',
+                'kernel_fridge_slow1_20161203_15_-0.013.txt'])
+
+k1.bounce_tau_1(16)
+k1.bounce_amp_1(-0.03)
+
+k1.bounce_tau_2(1)
+k1.bounce_amp_2(-0.04)
+
+dist_dict = {'ch_list': ['ch4', 'ch3'],
+             'ch4': k0.kernel(),
+             'ch3': k1.kernel()}
