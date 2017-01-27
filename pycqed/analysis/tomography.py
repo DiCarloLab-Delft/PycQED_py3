@@ -437,14 +437,6 @@ def get_cardianal_pauli_exp(cardinal_idx):
 
 def get_bell_pauli_exp(bell_idx, theta=0):
     if bell_idx == 0:
-        sets_bell = np.array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, np.cos(
-            theta), np.sin(theta), 0, 0, np.sin(theta), -np.cos(theta)])
-    elif bell_idx == 3:
-        sets_bell = np.array(
-            [1, 0, 0, 0, 0, -1, 0, 0, 0, 0,
-             -np.cos(theta), -np.sin(theta),
-             0, 0, np.sin(theta), -np.cos(theta)])
-    elif bell_idx == 2:
         sets_bell = np.array(
             [1, 0, 0, 0, 0, 1, 0, 0, 0, 0,
              -np.cos(theta), -np.sin(theta),
@@ -452,8 +444,18 @@ def get_bell_pauli_exp(bell_idx, theta=0):
     elif bell_idx == 1:
         sets_bell = np.array(
             [1, 0, 0, 0, 0, -1, 0, 0, 0, 0,
+             -np.cos(theta), -np.sin(theta),
+             0, 0, np.sin(theta), -np.cos(theta)])
+    elif bell_idx == 2:
+        sets_bell = np.array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, np.cos(
+            theta), np.sin(theta), 0, 0, np.sin(theta), -np.cos(theta)])
+    elif bell_idx == 3:
+        sets_bell = np.array(
+            [1, 0, 0, 0, 0, -1, 0, 0, 0, 0,
              np.cos(theta), -np.sin(theta),
              0, 0, np.sin(theta), np.cos(theta)])
+    else:
+        raise ValueError('bell_idx must be 0, 1, 2 or 3')
     pauli1, pauli2, paulic = order_pauli_output2(sets_bell)
     return np.concatenate(([1],pauli1, pauli2, paulic ))
     # return sets_bell
