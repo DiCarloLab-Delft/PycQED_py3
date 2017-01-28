@@ -1141,8 +1141,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                            'mw_to_flux_delay': self.mw_to_flux_delay()}
         return flux_pulse_pars
 
-    def get_operation_dict(self):
-
-        operation_dict = super().get_operation_dict()
+    def get_operation_dict(self, operation_dict={}):
+        operation_dict = super().get_operation_dict(operation_dict)
         self.get_pulse_dict(operation_dict)
         return operation_dict

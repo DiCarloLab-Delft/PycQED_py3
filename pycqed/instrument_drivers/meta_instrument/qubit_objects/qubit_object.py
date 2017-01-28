@@ -159,8 +159,7 @@ class Qubit(Instrument):
         # we return the info they need to construct their proxy
         return
 
-    def get_operation_dict(self):
-        operation_dict = {}
+    def get_operation_dict(self, operation_dict={}):
         for op_name, op in self.operations().items():
             operation_dict[op_name + ' ' + self.name] = {}
             for argument_name, parameter_name in op.items():

@@ -515,7 +515,7 @@ def two_qubit_tomo_bell(bell_state,
         q1 is cphase qubit
     '''
 
-    seq_name = '2_qubit_Card_%d_seq' % bell_state
+    seq_name = '2_qubit_Bell_Tomo_%d_seq' % bell_state
     seq = sequence.Sequence(seq_name)
     station.pulsar.update_channel_settings()
     el_list = []

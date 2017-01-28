@@ -298,7 +298,7 @@ def fix_phase_2Q():
 # SWAPN
 
 
-def SWAPN_DataT():
+def SWAPN_DataT(swap_amps = np.arange(1.150, 1.171, 0.001)):
     qubit = DataT
     qubit.swap_amp(1.161)
     # qubit.swap_time(11e-9) #initial guess, one of the parameters
@@ -307,10 +307,11 @@ def SWAPN_DataT():
     AncT.RO_acq_averages(1024)
     int_avg_det = det.UHFQC_integrated_average_detector(
         UHFQC=AncT._acquisition_instr, AWG=AncT.AWG,
-        channels=[
-            DataT.RO_acq_weight_function_I(),  AncT.RO_acq_weight_function_I()],
+        channels=[DataT.RO_acq_weight_function_I(),  
+                  AncT.RO_acq_weight_function_I()],
         nr_averages=AncT.RO_acq_averages(),
-        integration_length=AncT.RO_acq_integration_length(), cross_talk_suppression=True)
+        integration_length=AncT.RO_acq_integration_length(), 
+        cross_talk_suppression=True)
 
     times_vec = np.arange(num_iter)*2
     cal_points = 4
@@ -318,7 +319,7 @@ def SWAPN_DataT():
         np.arange(1, 1+cal_points)*(times_vec[1]-times_vec[0])
     lengths_vec = np.concatenate((times_vec, lengths_cal))
 
-    flux_pulse_pars = qubit.get_flux_pars()
+    flux_pulse_pars = DataT.get_operation_dict()['SWAP DataT']
     mw_pulse_pars, RO_pars = qubit.get_pulse_pars()
     repSWAP = awg_swf.SwapN(mw_pulse_pars,
                             RO_pars,
@@ -333,10 +334,10 @@ def SWAPN_DataT():
     MC.set_sweep_points(lengths_vec)
 
     MC.set_sweep_function_2D(AWG.ch4_amp)
-    MC.set_sweep_points_2D(np.arange(1.150, 1.171, 0.001))
+    MC.set_sweep_points_2D(swap_amps)
 
     MC.set_detector_function(int_avg_det)
-    AWG.set('ch%d_amp' % qubit.fluxing_channel(), qubit.swap_amp())
+    AWG.set('%s_amp' % qubit.fluxing_channel(), qubit.swap_amp())
     MC.run('SWAPN_%s' % qubit.name, mode='2D')
     ma.TwoD_Analysis(auto=True)
 
