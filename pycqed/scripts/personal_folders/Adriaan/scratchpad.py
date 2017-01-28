@@ -83,6 +83,24 @@ AncT.add_pulse_parameter('CZ', 'CZ_swap_amp',
 AncT.add_pulse_parameter('CZ', 'CZ_theta', 'theta_f', np.pi/2)
 
 
+AncT.add_operation('Z')
+
+AncT.link_param_to_operation('Z', 'fluxing_channel', 'channel')
+AncT.link_param_to_operation('Z', 'CZ_refpoint', 'refpoint')
+AncT.link_param_to_operation('Z', 'CZ_phase_corr_amp', 'amplitude')
+AncT.link_param_to_operation('Z', 'CZ_phase_corr_length', 'square_pulse_length')
+AncT.link_param_to_operation('Z', 'CZ_pulse_buffer', 'pulse_buffer')
+AncT.add_pulse_parameter('Z', 'Z_pulse_type', 'pulse_type',
+                         initial_value='SquareFluxPulse',
+                         vals=vals.Strings())
+AncT.add_pulse_parameter('Z', 'Z_pulse_delay',
+                         'pulse_delay', 0)
+
+
+
+
+
+
 DataT.add_operation('SWAP')
 DataT.link_param_to_operation('SWAP', 'fluxing_amp', 'amplitude')
 DataT.link_param_to_operation('SWAP', 'fluxing_channel', 'channel')
@@ -99,24 +117,37 @@ DataT.add_pulse_parameter('SWAP', 'SWAP_refpoint',
                           'refpoint', 'end', vals=vals.Strings())
 DataT.add_pulse_parameter('SWAP', 'SWAP_amp',
                           'swap_amp', 1.)
-DataT.add_pulse_parameter('SWAP', 'SWAP_square_pulse_buffer',
-                          'square_pulse_buffer', 100e-9)
+DataT.add_pulse_parameter('SWAP', 'SWAP_pulse_buffer',
+                          'pulse_buffer', 100e-9)
 DataT.add_pulse_parameter('SWAP', 'SWAP_square_pulse_length',
                           'square_pulse_length', 40e-9)
 
 DataT.add_pulse_parameter('SWAP', 'SWAP_pulse_delay',
                           'pulse_delay', 10e-9)
 
+DataT.add_operation('Z')
+DataT.link_param_to_operation('Z', 'fluxing_channel', 'channel')
+DataT.link_param_to_operation('Z', 'SWAP_refpoint', 'refpoint')
+DataT.link_param_to_operation('Z', 'SWAP_phase_corr_amp', 'amplitude')
+DataT.link_param_to_operation('Z', 'SWAP_phase_corr_length', 'square_pulse_length')
+DataT.link_param_to_operation('Z', 'SWAP_pulse_buffer', 'pulse_buffer')
+DataT.add_pulse_parameter('Z', 'Z_pulse_type', 'pulse_type',
+                         initial_value='SquareFluxPulse', vals=vals.Strings())
+DataT.add_pulse_parameter('Z', 'Z_pulse_delay',
+                         'pulse_delay', 0)
 
-AncT.CZ_phase_corr_amp(0.075)
-AncT.CZ_length(40e-9)
-AncT.CZ_swap_amp(1.48)
-AncT.E_c(369.2e6)
 
-DataT.SWAP_phase_corr_amp(0.145)
-DataT.SWAP_amp(1.05)
-DataT.SWAP_square_pulse_buffer(10e-9)
-DataT.SWAP_square_pulse_length(10e-9)
+gen.load_settings_onto_instrument(AncT)
+gen.load_settings_onto_instrument(DataT)
+# AncT.CZ_phase_corr_amp(0.075)
+# AncT.CZ_length(40e-9)
+# AncT.CZ_swap_amp(1.48)
+# AncT.E_c(369.2e6)
+
+# DataT.SWAP_phase_corr_amp(0.145)
+# DataT.SWAP_amp(1.05)
+# DataT.SWAP_square_pulse_buffer(10e-9)
+# DataT.SWAP_square_pulse_length(10e-9)
 
 
 # Verifying flux dicts
@@ -153,3 +184,7 @@ except:
 S5 = do.DeviceObject('S5')
 station.add_component(S5)
 S5.add_qubits([AncT, DataT])
+
+
+
+

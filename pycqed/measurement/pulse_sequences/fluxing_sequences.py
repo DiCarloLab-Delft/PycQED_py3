@@ -95,6 +95,73 @@ def single_pulse_seq(pulse_pars=None,
         return seq
 
 
+def Ram_Z_seq(pulse_dict, q0, distortion_dict,
+              inter_pulse_delay=300e-9, recovery_phase=0,
+              RO_delay=3e-6,
+              times=np.arange(-100e-9, 400e-9, 25e-9),
+              cal_points=True,
+              verbose=False, upload=True,
+              return_seq=False):
+    '''
+    Performs a Ram-Z sequence useful for calibrating timings of flux pulses
+
+    Timings of sequence
+              <-tau_inter_pulse->
+        |mX90|  ---   |Z|  ---   |recPi2|---|RO|
+              <- t -> <-- dt1 -->
+
+    '''
+    seq_name = 'Ram-Z-seq_{}'.format(q0)
+    seq = sequence.Sequence(seq_name)
+    station.pulsar.update_channel_settings()
+    el_list = []
+
+    # Flux correction pulse, should be added automatically
+    mZ = deepcopy(pulse_dict['Z '+q0])
+    mZ['pulse_delay'] = 1e-6
+    mZ['amplitude'] = - mZ['amplitude']
+    pulse_dict['mZ '+q0] = mZ
+
+    # Setting the RO very high to ensure no overlap when moving the flux pulse
+    pulse_dict['RO ' + q0]['pulse_delay'] = RO_delay
+    for i, tau in enumerate(times):  # seq has to have at least 2 elts
+        # Calibration points
+        if (i == (len(times)-4) or i == (len(times)-3)):
+            pulse_list = ['I '+q0, 'RO ' + q0]
+        elif (i == (len(times)-2) or i == (len(times)-1)):
+            pulse_list = ['X180 '+q0, 'RO ' + q0]
+        else:
+            pulse_dict['Z '+q0]['pulse_delay'] = tau
+            t1 = inter_pulse_delay - tau  # refpoint is start of flux pulse
+
+            recPi2 = deepcopy(pulse_dict['X90 '+q0])
+            recPi2['refpoint'] = 'start'
+            recPi2['phase'] = recovery_phase
+            recPi2['pulse_delay'] = t1
+            pulse_dict['recPi2 ' + q0] = recPi2
+            pulse_list = ['mX90 '+q0, 'Z '+q0, 'recPi2 ' + q0, 'RO ' + q0,
+                          'mZ ' + q0]
+        pulses = []
+        for p in pulse_list:
+            pulses += [pulse_dict[p]]
+        el = multi_pulse_elt(i, station, pulses)
+        el_list.append(el)
+        seq.append_element(el, trigger_wait=True)
+        if distortion_dict is not None:
+            el = distort_and_compensate(
+                el, distortion_dict)
+
+    if upload:
+        station.components['AWG'].stop()
+        station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+    if return_seq:
+        return seq, el_list
+    else:
+        return seq_name
+
+
+
+
 def chevron_seq(mw_pulse_pars, RO_pars,
                 flux_pulse_pars,
                 pulse_lengths=np.arange(0, 120e-9, 2e-9),

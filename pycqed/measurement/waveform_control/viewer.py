@@ -1,16 +1,20 @@
 # module for visualizing sequences.
 #
 # author: Wolfgang Pfaff
-# modified by: Adriaan Rol
+# modified by: Adriaan Rol and Ramiro Sagastizabal
 
 import numpy as np
 from matplotlib import pyplot as plt
 
 
-def show_element_dclab(element, delay=True, channels='all', axs=None):
-    if axs is None:
-        fig, axs = plt.subplots(1, 1, figsize=(16, 8))
-    axs2 = axs.twinx()
+def show_element_dclab(element, delay=True, channels='all', ax=None):
+    if ax is None:
+        add_extra_labs = True
+        fig, ax = plt.subplots(1, 1, figsize=(16, 8))
+    else:
+        # prevents super long legends if plots are combined
+        add_extra_labs = False
+    axs2 = ax.twinx()
     colors_dict = {'ch1': 'red',
                    'ch1_marker1': 'orangered',
                    'ch1_marker2': 'darkred',
@@ -30,23 +34,24 @@ def show_element_dclab(element, delay=True, channels='all', axs=None):
             axs2.plot(
                 t_vals, outputs_dict[key], label=key, color=colors_dict[key])
         else:
-            axs.plot(
+            ax.plot(
                 t_vals, outputs_dict[key], label=key, color=colors_dict[key])
-    axs.set_xlabel('Time (ns)')
-    axs.set_ylabel('Analog output (V)')
-    axs2.set_ylabel('Marker output (V)')
+    ax.set_xlabel('Time (ns)')
+    ax.set_ylabel('Analog output (V)')
+    if add_extra_labs:  # only set it once otherwise we end up with 20 labels
+        axs2.set_ylabel('Marker output (V)')
 
     hi = element._channels['ch1']['high']
     lo = element._channels['ch1']['low']
-    axs.set_ylim(lo-0.1*(hi-lo), hi+0.1*(hi-lo))
+    ax.set_ylim(lo-0.1*(hi-lo), hi+0.1*(hi-lo))
     hi = element._channels['ch1_marker1']['high']
     lo = element._channels['ch1_marker1']['low']
     axs2.set_ylim(lo-0.1*(hi-lo), hi+0.1*(hi-lo))
 
-    axs.set_xlim(t_vals.min(), t_vals.max())
-
-    axs.legend(loc='best')
-    return axs
+    ax.set_xlim(t_vals.min(), t_vals.max())
+    if add_extra_labs:
+        ax.legend(loc='best')
+    return ax
 
 
 def show_wf(tvals, wf, name='', ax=None, ret=None, dt=None):
