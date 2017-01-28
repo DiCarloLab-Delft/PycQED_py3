@@ -2,7 +2,7 @@
 This scripts initializes the instruments and imports the modules
 """
 
-UHFQC=True
+UHFQC = True
 
 # General imports
 
@@ -46,7 +46,7 @@ from pycqed.analysis import measurement_analysis as ma
 from pycqed.analysis import analysis_toolbox as a_tools
 from pycqed.measurement import awg_sweep_functions_multi_qubit as awg_swf_m
 from pycqed.measurement.pulse_sequences import multi_qubit_tek_seq_elts as sq_m
-
+from pycqed.analysis import tomography as tomo
 
 from pycqed.utilities import general as gen
 # Standarad awg sequences
@@ -73,171 +73,182 @@ from pycqed.instrument_drivers.physical_instruments import QuTech_Duplexer as qd
 if UHFQC:
     from pycqed.instrument_drivers.physical_instruments.ZurichInstruments import UHFQuantumController as ZI_UHFQC
 from pycqed.instrument_drivers.physical_instruments import Weinschel_8320_novisa
-from pycqed.instrument_drivers.meta_instrument import Flux_Control as FluxCtrl
-#for multiplexed readout
+from pycqed.instrument_drivers.meta_instrument import Flux_Control as fc
+# for multiplexed readout
 import pycqed.instrument_drivers.meta_instrument.UHFQC_LookuptableManager as lm_UHFQC
 import pycqed.instrument_drivers.meta_instrument.UHFQC_LookuptableManagerManager as lmm_UHFQC
 from pycqed.measurement import awg_sweep_functions_multi_qubit as awg_swf_m
 from pycqed.measurement.pulse_sequences import multi_qubit_tek_seq_elts as sq_m
 import pycqed.scripts.personal_folders.Niels.two_qubit_readout_analysis as Niels
 
-#for flux pulses
-import instrument_drivers.meta_instrument.kernel_object as k_obj
-
+# for flux pulses
+from pycqed.scripts.Experiments.Five_Qubits import cost_functions_Leo_optimization as cl
+import pycqed.instrument_drivers.meta_instrument.kernel_object as k_obj
+from pycqed.measurement.pulse_sequences import fluxing_sequences as fsqs
+from pycqed.measurement.pulse_sequences import multi_qubit_tek_seq_elts as mqs
 # Initializing instruments
 
 
 station = qc.Station()
-LO = rs.RohdeSchwarz_SGS100A(name='LO', address='TCPIP0::192.168.0.73', server_name=None)  #
+LO = rs.RohdeSchwarz_SGS100A(
+    name='LO', address='TCPIP0::192.168.0.73', server_name=None)  #
 station.add_component(LO)
-RF = rs.RohdeSchwarz_SGS100A(name='RF', address='TCPIP0::192.168.0.74', server_name=None)  #
+RF = rs.RohdeSchwarz_SGS100A(
+    name='RF', address='TCPIP0::192.168.0.74', server_name=None)  #
 station.add_component(RF)
-Spec_source = rs.RohdeSchwarz_SGS100A(name='Spec_source', address='TCPIP0::192.168.0.87', server_name=None)  #
+Spec_source = rs.RohdeSchwarz_SGS100A(
+    name='Spec_source', address='TCPIP0::192.168.0.87', server_name=None)  #
 station.add_component(Spec_source)
-Qubit_LO = rs.RohdeSchwarz_SGS100A(name='Qubit_LO', address='TCPIP0::192.168.0.86', server_name=None)  #
+Qubit_LO = rs.RohdeSchwarz_SGS100A(
+    name='Qubit_LO', address='TCPIP0::192.168.0.86', server_name=None)  #
 station.add_component(Qubit_LO)
 # TWPA_Pump = rs.RohdeSchwarz_SGS100A(name='TWPA_Pump', address='TCPIP0::192.168.0.90', server_name=None)  #
 # station.add_component(TWPA_Pump)
-CBox = qcb.QuTech_ControlBox('CBox', address='Com5', run_tests=False, server_name=None)
-station.add_component(CBox)
 AWG = tek.Tektronix_AWG5014(name='AWG', setup_folder=None, timeout=2,
-                            address='GPIB0::6::INSTR', server_name=None)
+                            address='TCPIP0::192.168.0.99', server_name=None)
 station.add_component(AWG)
-AWG.timeout(180)
+AWG.timeout(180)  # timeout long for uploading wait.
 # AWG520 = tk520.Tektronix_AWG520('AWG520', address='GPIB0::17::INSTR',
 #                                 server_name='')
 # station.add_component(AWG520)
+CBox = qcb.QuTech_ControlBox('CBox', address='Com5', run_tests=False, server_name=None)
+station.add_component(CBox)
 IVVI = iv.IVVI('IVVI', address='COM4', numdacs=16, server_name=None)
 station.add_component(IVVI)
 
-#flux pulsing
-k1 = k_obj.Distortion(name='ch3_fs')
+# flux pulsing
+k1 = k_obj.Distortion(name='k1')
 station.add_component(k1)
-k0 = k_obj.Distortion(name='ch_fs')
+k0 = k_obj.Distortion(name='k0')
 station.add_component(k0)
 
 if UHFQC:
-    #Initializing UHFQC
+    # Initializing UHFQC
     UHFQC_1 = ZI_UHFQC.UHFQC('UHFQC_1', device='dev2178', server_name=None)
     station.add_component(UHFQC_1)
     UHFQC_1.sigins_0_ac()
     UHFQC_1.sigins_1_ac()
     # preparing the lookuptables for readout
     LutMan0 = lm_UHFQC.UHFQC_LookuptableManager('LutMan0', UHFQC=UHFQC_1,
-                                               server_name=None)
+                                                server_name=None)
     station.add_component(LutMan0)
     LutMan1 = lm_UHFQC.UHFQC_LookuptableManager('LutMan1', UHFQC=UHFQC_1,
-                                                   server_name=None)
+                                                server_name=None)
     station.add_component(LutMan1)
     LutMan2 = lm_UHFQC.UHFQC_LookuptableManager('LutMan2', UHFQC=UHFQC_1,
-                                                   server_name=None)
+                                                server_name=None)
     station.add_component(LutMan2)
     LutMan3 = lm_UHFQC.UHFQC_LookuptableManager('LutMan3', UHFQC=UHFQC_1,
-                                                   server_name=None)
+                                                server_name=None)
     station.add_component(LutMan3)
     LutMan4 = lm_UHFQC.UHFQC_LookuptableManager('LutMan4', UHFQC=UHFQC_1,
-                                                   server_name=None)
+                                                server_name=None)
     station.add_component(LutMan4)
     LutManMan = lmm_UHFQC.UHFQC_LookuptableManagerManager('LutManMan', UHFQC=UHFQC_1,
-                                                 server_name=None)
+                                                          server_name=None)
     station.add_component(LutManMan)
-    LutManMan.LutMans([LutMan0.name,LutMan1.name, LutMan2.name, LutMan3.name, LutMan4.name])
+    LutManMan.LutMans(
+        [LutMan0.name, LutMan1.name, LutMan2.name, LutMan3.name, LutMan4.name])
 
 else:
-    UHFQC_1=None
+    UHFQC_1 = None
 
 
-Flux_Control = FluxCtrl.Flux_Control(name='FluxControl',IVVI=station.IVVI)
+Flux_Control = fc.Flux_Control(name='FluxControl', IVVI=station.IVVI)
 station.add_component(Flux_Control)
 
-transfer_matrix_dec = np.array([[  4.70306717e-04,  -8.41312977e-05,   3.64442804e-05,  -1.00489353e-05,
-   -2.36455362e-05],
- [ -6.70464355e-05,   6.39386703e-04,  -4.37263640e-05,  -2.01374983e-05,
-    1.77516922e-05],
- [  7.69376917e-06,  -4.09893480e-05,   5.35184092e-04,  -2.36755094e-05,
-   -5.34108608e-05],
- [  3.08518924e-05,   1.11315677e-05,   7.36191927e-05,   4.09078121e-04,
-   -2.63031372e-05],
- [ -4.51217544e-05,  -1.35430841e-05,  -9.52349548e-05,  -4.18415379e-05,
-    4.09962523e-04]])
-invA = np.array([[  2.17320666e+03,2.79414032e+02,-1.16652799e+02,7.08814870e+01,1.02595827e+02],
-                 [2.16689677e+02,1.59642752e+03,9.70544635e+01,8.55894771e+01,-3.84925724e+01],
-                 [1.52695260e+00,1.25113953e+02,1.90389457e+03,1.42143094e+02,2.51834186e+02],
-                 [-1.55226336e+02,-8.03197377e+01,-3.10695549e+02,2.43001891e+03,1.09956406e+02],
-                 [2.30860259e+02,1.04357646e+02,4.00934628e+02,2.91661201e+02,2.51899161e+03]])
+transfer_matrix_dec = np.array([[4.70306717e-04,  -8.41312977e-05,   3.64442804e-05,  -1.00489353e-05,
+                                 -2.36455362e-05],
+                                [-6.70464355e-05,   6.39386703e-04,  -4.37263640e-05,  -2.01374983e-05,
+                                 1.77516922e-05],
+                                [7.69376917e-06,  -4.09893480e-05,   5.35184092e-04,  -2.36755094e-05,
+                                 -5.34108608e-05],
+                                [3.08518924e-05,   1.11315677e-05,   7.36191927e-05,   4.09078121e-04,
+                                 -2.63031372e-05],
+                                [-4.51217544e-05,  -1.35430841e-05,  -9.52349548e-05,  -4.18415379e-05,
+                                 4.09962523e-04]])
+invA = np.array([[2.17320666e+03, 2.79414032e+02, -1.16652799e+02, 7.08814870e+01, 1.02595827e+02],
+                 [2.16689677e+02, 1.59642752e+03, 9.70544635e+01,
+                     8.55894771e+01, -3.84925724e+01],
+                 [1.52695260e+00, 1.25113953e+02, 1.90389457e+03,
+                     1.42143094e+02, 2.51834186e+02],
+                 [-1.55226336e+02, -8.03197377e+01, -3.10695549e+02,
+                     2.43001891e+03, 1.09956406e+02],
+                 [2.30860259e+02, 1.04357646e+02, 4.00934628e+02, 2.91661201e+02, 2.51899161e+03]])
 Flux_Control.transfer_matrix(transfer_matrix_dec)
 Flux_Control.inv_transfer_matrix(invA)
 
 Flux_Control.dac_mapping([1, 2, 3, 4, 5])
 
 
-sweet_spots_mv = [-85.265,49.643,-60.893,13.037,49.570]
+# sweet_spots_mv = [-55.265, 49.643, -38.5, 13.037, 49.570]
+sweet_spots_mv = [-31.5251, 54.1695, -0.3967, 4.9744, 60.3341]
 offsets = np.dot(Flux_Control.transfer_matrix(), sweet_spots_mv)
 Flux_Control.flux_offsets(-offsets)
-
 
 
 # ATT = Weinschel_8320_novisa.Weinschel_8320(name='ATT',address='192.168.0.54', server_name=None)
 # station.add_component(ATT)
 # Dux = qdux.QuTech_Duplexer('Dux', address='TCPIP0::192.168.0.101',
 #                             server_name=None)
-# SH = sh.SignalHound_USB_SA124B('Signal hound', server_name=None) #commented because of 8s load time
+# SH = sh.SignalHound_USB_SA124B('Signal hound', server_name=None)
+# #commented because of 8s load time
 
 # Meta-instruments
-HS = hd.HeterodyneInstrument('HS', LO=LO, RF=RF, AWG=AWG, acquisition_instr=CBox.name,
+HS = hd.HeterodyneInstrument('HS', LO=LO, RF=RF, AWG=AWG, acquisition_instr=UHFQC_1.name,
                              server_name=None)
 station.add_component(HS)
-# LutMan = lm.QuTech_ControlBox_LookuptableManager('LutMan', CBox=CBox,
-#                                                  server_name=None)
-                                                 # server_name='metaLM')
+LutMan = lm.QuTech_ControlBox_LookuptableManager('LutMan', CBox=CBox,
+                                                 server_name=None)
+
 MC = mc.MeasurementControl('MC')
 
 # HS = None
 
 AncB = qbt.Tektronix_driven_transmon('AncB', LO=LO, cw_source=Spec_source,
-                                              td_source=Qubit_LO,
-                                              IVVI=IVVI, rf_RO_source=RF,
-                                              AWG=AWG,
-                                              heterodyne_instr=HS,
-                                              FluxCtrl=Flux_Control,
-                                              MC=MC,
-                                              server_name=None)
+                                     td_source=Qubit_LO,
+                                     IVVI=IVVI, rf_RO_source=RF,
+                                     AWG=AWG,
+                                     heterodyne_instr=HS,
+                                     FluxCtrl=Flux_Control,
+                                     MC=MC,
+                                     server_name=None)
 station.add_component(AncB)
 AncT = qbt.Tektronix_driven_transmon('AncT', LO=LO, cw_source=Spec_source,
-                                              td_source=Qubit_LO,
-                                              IVVI=IVVI, rf_RO_source=RF,
-                                              AWG=AWG,
-                                              heterodyne_instr=HS,
-                                              FluxCtrl=Flux_Control,
-                                              MC=MC,
-                                              server_name=None)
+                                     td_source=Qubit_LO,
+                                     IVVI=IVVI, rf_RO_source=RF,
+                                     AWG=AWG,
+                                     heterodyne_instr=HS,
+                                     FluxCtrl=Flux_Control,
+                                     MC=MC,
+                                     server_name=None)
 station.add_component(AncT)
 DataB = qbt.Tektronix_driven_transmon('DataB', LO=LO, cw_source=Spec_source,
-                                              td_source=Qubit_LO,
-                                              IVVI=IVVI, rf_RO_source=RF,
-                                              AWG=AWG,
-                                              heterodyne_instr=HS,
-                                              FluxCtrl=Flux_Control,
-                                              MC=MC,
-                                              server_name=None)
+                                      td_source=Qubit_LO,
+                                      IVVI=IVVI, rf_RO_source=RF,
+                                      AWG=AWG,
+                                      heterodyne_instr=HS,
+                                      FluxCtrl=Flux_Control,
+                                      MC=MC,
+                                      server_name=None)
 station.add_component(DataB)
 DataM = qbt.Tektronix_driven_transmon('DataM', LO=LO, cw_source=Spec_source,
-                                              td_source=Qubit_LO,
-                                              IVVI=IVVI, rf_RO_source=RF,
-                                              AWG=AWG,
-                                              heterodyne_instr=HS,
-                                              FluxCtrl=Flux_Control,
-                                              MC=MC,
-                                              server_name=None)
+                                      td_source=Qubit_LO,
+                                      IVVI=IVVI, rf_RO_source=RF,
+                                      AWG=AWG,
+                                      heterodyne_instr=HS,
+                                      FluxCtrl=Flux_Control,
+                                      MC=MC,
+                                      server_name=None)
 station.add_component(DataM)
 DataT = qbt.Tektronix_driven_transmon('DataT', LO=LO, cw_source=Spec_source,
-                                              td_source=Qubit_LO,
-                                              IVVI=IVVI, rf_RO_source=RF,
-                                              AWG=AWG,
-                                              heterodyne_instr=HS,
-                                              FluxCtrl=Flux_Control,
-                                              MC=MC,
-                                              server_name=None)
+                                      td_source=Qubit_LO,
+                                      IVVI=IVVI, rf_RO_source=RF,
+                                      AWG=AWG,
+                                      heterodyne_instr=HS,
+                                      FluxCtrl=Flux_Control,
+                                      MC=MC,
+                                      server_name=None)
 station.add_component(DataT)
 
 # load settings onto qubits
@@ -296,7 +307,7 @@ nested_MC.station = station
 # The AWG sequencer
 station.pulsar = ps.Pulsar()
 station.pulsar.AWG = station.components['AWG']
-marker1highs=[2,2,2.7,2]
+markerhighs = [2, 2, 2.7, 2]
 for i in range(4):
     # Note that these are default parameters and should be kept so.
     # the channel offset is set in the AWG itself. For now the amplitude is
@@ -310,26 +321,29 @@ for i in range(4):
     station.pulsar.define_channel(id='ch{}_marker1'.format(i+1),
                                   name='ch{}_marker1'.format(i+1),
                                   type='marker',
-                                  high=marker1highs[i], low=0, offset=0.,
+                                  high=markerhighs[i], low=0, offset=0.,
                                   delay=0, active=True)
     station.pulsar.define_channel(id='ch{}_marker2'.format(i+1),
                                   name='ch{}_marker2'.format(i+1),
                                   type='marker',
-                                  high=2.0, low=0, offset=0.,
+                                  high=markerhighs[i], low=0, offset=0.,
                                   delay=0, active=True)
 # to make the pulsar available to the standard awg seqs
 st_seqs.station = station
 sq.station = station
 awg_swf.fsqs.station = station
 cal_elts.station = station
+mqs.station=station
+
 
 t1 = time.time()
 
-#manually setting the clock, to be done automatically
+# manually setting the clock, to be done automatically
 AWG.clock_freq(1e9)
 
 
 print('Ran initialization in %.2fs' % (t1-t0))
+
 
 def all_sources_off():
     LO.off()
@@ -372,10 +386,10 @@ if UHFQC:
 
     def switch_to_IQ_mod_RO_UHFQC(qubit):
         UHFQC_1.awg_sequence_acquisition_and_pulse_SSB(f_RO_mod=qubit.f_RO_mod(),
-                    RO_amp=qubit.RO_amp(), RO_pulse_length=qubit.RO_pulse_length(),
-                    acquisition_delay=270e-9)
+                                                       RO_amp=qubit.RO_amp(), RO_pulse_length=qubit.RO_pulse_length(),
+                                                       acquisition_delay=270e-9)
         qubit.RO_pulse_type('MW_IQmod_pulse_UHFQC')
-        qubit.RO_acq_marker_delay(-185e-9)
+        qubit.RO_acq_marker_delay(-165e-9)
         qubit.acquisition_instr('UHFQC_1')
         qubit.RO_acq_marker_channel('ch3_marker2')
         qubit.RO_I_channel('0')
@@ -392,16 +406,53 @@ else:
         qubit.RO_acq_weight_function_Q(1)
 
 
-
-#preparing UHFQC readout with IQ mod pulses
+# preparing UHFQC readout with IQ mod pulses
 
 list_qubits = [DataT, AncT, DataM, AncB,  DataB]
 for qubit in list_qubits:
     qubit.RO_fixed_point_correction(True)
     qubit.RO_pulse_delay(20e-9)
-    #qubit.RO_acq_averages(2**13)
+    # qubit.RO_acq_averages(2**13)
 
 q1, q0, q3, q2, q4 = AncT, DataT, AncB, DataM, DataB
 
 # switch_to_pulsed_RO_CBox(AncT)
 # switch_to_pulsed_RO_CBox(DataT)
+
+
+
+
+
+
+
+
+
+
+
+
+#######################################################
+# These settings don't get automotically restored upon init
+#######################################################
+
+k0.channel(4)
+k0.kernel_dir_path(
+    r'D:\GitHubRepos\iPython-Notebooks\Experiments\1607_Qcodes_5qubit\kernels')
+k0.kernel_list(['precompiled_RT_20161206.txt'])
+
+k1.channel(3)
+k1.kernel_dir_path(
+    r'D:\GitHubRepos\iPython-Notebooks\Experiments\1607_Qcodes_5qubit\kernels')
+k1.kernel_list(['precompiled_AncT_RT_20161203.txt',
+                'kernel_fridge_lowpass_20161024_1.00.txt',
+                'kernel_skineffect_0.7.txt',
+                'kernel_fridge_slow1_20161203_15_-0.013.txt'])
+
+k1.bounce_tau_1(16)
+k1.bounce_amp_1(-0.03)
+
+k1.bounce_tau_2(1)
+k1.bounce_amp_2(-0.04)
+
+dist_dict = {'ch_list': ['ch4', 'ch3'],
+             'ch4': k0.kernel(),
+             'ch3': k1.kernel()}

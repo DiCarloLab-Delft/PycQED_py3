@@ -126,7 +126,7 @@ class five_qubit_off_on(swf.Hard_Sweep):
 class two_qubit_AllXY(swf.Hard_Sweep):
 
     def __init__(self, q0_pulse_pars, q1_pulse_pars, RO_pars, upload=True,
-                 return_seq=False, verbose=False):
+                 return_seq=False, verbose=False, X_mid=False, simultaneous=False):
         super().__init__()
         self.q0_pulse_pars = q0_pulse_pars
         self.q1_pulse_pars = q1_pulse_pars
@@ -138,6 +138,8 @@ class two_qubit_AllXY(swf.Hard_Sweep):
         self.verbose = verbose
         self.return_seq = return_seq
         self.name = 'two_qubit_AllXY'
+        self.X_mid = X_mid
+        self.simultaneous = simultaneous
 
     def prepare(self, **kw):
         if self.upload:
@@ -146,4 +148,6 @@ class two_qubit_AllXY(swf.Hard_Sweep):
                                   RO_pars=self.RO_pars,
                                   double_points=True,
                                   return_seq=self.return_seq,
-                                  verbose=self.verbose)
+                                  verbose=self.verbose,
+                                  X_mid=self.X_mid,
+                                  simultaneous=self.simultaneous)
