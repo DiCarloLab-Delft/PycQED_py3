@@ -79,7 +79,6 @@ flux_pulse_pars_DataT = DataT.get_operation_dict()['SWAP DataT']
 AWG.ch3_amp(AncT.CZ_channel_amp())
 
 
-
 s = awg_swf.swap_CP_swap_2Qubits(
     qCP_pulse_pars, qS_pulse_pars,
     flux_pulse_pars_qCP=flux_pulse_pars_AncT, flux_pulse_pars_qS=flux_pulse_pars_DataT,
@@ -116,7 +115,8 @@ def measure_phase_qcp(points=np.arange(0., 0.15+0.005*4, 0.005)):
 
     int_avg_det = det.UHFQC_integrated_average_detector(
         UHFQC=AncT._acquisition_instr, AWG=AncT.AWG,
-        channels=[AncT.RO_acq_weight_function_I(), DataT.RO_acq_weight_function_I()],
+        channels=[
+            AncT.RO_acq_weight_function_I(), DataT.RO_acq_weight_function_I()],
         nr_averages=AncT.RO_acq_averages(),
         integration_length=AncT.RO_acq_integration_length(), cross_talk_suppression=True)
     cphasesweep = points
@@ -155,9 +155,6 @@ def measure_phase_qs(points=np.arange(0., 0.15+0.005*4, 0.005)):
 
     from pycqed.scripts.Experiments.Five_Qubits import cost_functions_Leo_optimization as ca
 
-
-
-
     d = cl.CPhase_cost_func_det_Ramiro(qCP=AncT, qS=DataT, dist_dict=dist_dict,
                                        MC_nested=nested_MC, sphasesweep=sphasesweep,
                                        timings_dict=t_dict,
@@ -187,7 +184,7 @@ def measure_cphase_amp(points=np.arange(1.03, 1.07, 0.005)):
     sphasesweep = np.tile(np.arange(0., 0.21, dt), 2)
     sphasesweep = np.concatenate([sphasesweep, [0.22, 0.23, 0.24, 0.25]])
 
-        # pulse_lengths=[30]
+    # pulse_lengths=[30]
     for pulse_length in [40]:
 
         d = cl.CPhase_cost_func_det_Ramiro(qCP=AncT, qS=DataT, dist_dict=dist_dict,
@@ -215,36 +212,22 @@ def measure_cphase_amp(points=np.arange(1.03, 1.07, 0.005)):
 
 def fix_phase_qcp():
     label = 'swap_CP_swap'
-    folder = a_tools.latest_data(label)
-    splitted = folder.split('\\')
-    scan_start = splitted[-2]+'_'+splitted[-1][:6]
-    scan_stop = scan_start
-    opt_dict = {'scan_label': label}
-
-    pdict = {'I': 'I',
-             'Q': 'Q',
-             'times': 'sweep_points'}
-    nparams = ['I', 'Q', 'times']
-    amp_scans = ca.quick_analysis(t_start=scan_start, t_stop=scan_stop, options_dict=opt_dict,
-                                  params_dict_TD=pdict, numeric_params=nparams)
-    return amp_scans.TD_dict['times'][0][np.argmin(amp_scans.TD_dict['I'][0, :-4])]
+    a = ma.MeasurementAnalysis(label=label, auto=False)
+    a.get_naming_and_values()
+    x = a.sweep_points[:-4]
+    cp_acq_weight = 0
+    y = a.measured_values[cp_acq_weight, :-4]
+    return a_tools.find_min(x, y)
 
 
 def fix_phase_qs():
     label = 'swap_CP_swap'
-    folder = a_tools.latest_data(label)
-    splitted = folder.split('\\')
-    scan_start = splitted[-2]+'_'+splitted[-1][:6]
-    scan_stop = scan_start
-    opt_dict = {'scan_label': label}
-
-    pdict = {'I': 'I',
-             'Q': 'Q',
-             'times': 'sweep_points'}
-    nparams = ['I', 'Q', 'times']
-    amp_scans = ca.quick_analysis(t_start=scan_start, t_stop=scan_stop, options_dict=opt_dict,
-                                  params_dict_TD=pdict, numeric_params=nparams)
-    return amp_scans.TD_dict['times'][0][np.argmin(amp_scans.TD_dict['Q'][0, :-4])]
+    a = ma.MeasurementAnalysis(label=label, auto=False)
+    a.get_naming_and_values()
+    x = a.sweep_points[:-4]
+    qs_acq_weigth = 1
+    y = a.measured_values[qs_acq_weigth, :-4]
+    return a_tools.find_min(x, y)
 
 
 def fix_phase_2Q():
@@ -391,14 +374,15 @@ for lll in range(1):
     AncT.RO_acq_averages(nr_shots)
     DataT.RO_acq_averages(nr_shots)
 
-    ######### TOMO snippet
+    # TOMO snippet
     for i in range(2):
         AWG.ch3_amp(AncT.CZ_channel_amp())
         AWG.ch4_amp(DataT.SWAP_amp())
         for target_bell in range(4):
             MC.soft_avg(1)
             seq_bell = mq_mod.tomo2Q_bell(target_bell, DataT, AncT,
-                                          DataT.get_operation_dict()['SWAP DataT'],
+                                          DataT.get_operation_dict()[
+                                              'SWAP DataT'],
                                           AncT.get_operation_dict()['CZ AncT'],
                                           timings_dict=t_dict,
                                           distortion_dict=dist_dict,
@@ -406,7 +390,6 @@ for lll in range(1):
                                           nr_rep=1, mmt_label='BellTomo')
             tomo.analyse_tomo(MLE=False, target_bell=1)
         MC.live_plot_enabled(True)
-
 
 
 
