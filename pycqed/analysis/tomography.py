@@ -94,7 +94,7 @@ class TomoAnalysis_JointRO():
 
     def execute_max_likelihood(self, use_weights=True, show_time=False,
                                ftol=0.01, xtol=0.001, full_output=0,
-                               max_iter=100):
+                               max_iter=1000):
         """
         Performs a max likelihood optimization using fmin_powell in order to
         get the closest physically realisable state.
@@ -329,6 +329,10 @@ def get_operators_label():
 
 
 def order_pauli_output2(pauli_op_dis):
+    '''
+    Converts Pauli counting fromatted as  IXYZ q0 | IXYZ q1  to
+    pauli q0 | paulis q1 | pauli correlators
+    '''
     pauli_1 = np.array([pauli_op_dis[2], pauli_op_dis[3], pauli_op_dis[1]])
     pauli_2 = np.array([pauli_op_dis[8], pauli_op_dis[12], pauli_op_dis[4]])
     pauli_corr = np.array([pauli_op_dis[10], pauli_op_dis[11], pauli_op_dis[9],
@@ -436,19 +440,31 @@ def get_cardianal_pauli_exp(cardinal_idx):
 
 
 def get_bell_pauli_exp(bell_idx, theta=0):
+    """
+    Get's the pauli operators for the bell states.
+    Args:
+        bell_idx (int) : integer referring to a specific bell state.
+            1: |Psi_m> = |00> - |11>   (<XX>,<YY>,<ZZ>) = (-1,+1,+1)
+            2: |Psi_p> = |00> + |11>   (<XX>,<YY>,<ZZ>) = (+1,-1,+1)
+            3: |Psi_m> = |01> - |10>   (<XX>,<YY>,<ZZ>) = (-1,-1,-1)
+            4: |Psi_m> = |01> + |10>   (<XX>,<YY>,<ZZ>) = (+1,+1,-1)
+        theta  (float) :
+
+
+    """
     if bell_idx == 0:
         sets_bell = np.array(
             [1, 0, 0, 0, 0, 1, 0, 0, 0, 0,
              -np.cos(theta), -np.sin(theta),
              0, 0, np.sin(theta), np.cos(theta)])
     elif bell_idx == 1:
+        sets_bell = np.array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, np.cos(
+            theta), np.sin(theta), 0, 0, np.sin(theta), -np.cos(theta)])
+    elif bell_idx == 2:
         sets_bell = np.array(
             [1, 0, 0, 0, 0, -1, 0, 0, 0, 0,
              -np.cos(theta), -np.sin(theta),
              0, 0, np.sin(theta), -np.cos(theta)])
-    elif bell_idx == 2:
-        sets_bell = np.array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, np.cos(
-            theta), np.sin(theta), 0, 0, np.sin(theta), -np.cos(theta)])
     elif bell_idx == 3:
         sets_bell = np.array(
             [1, 0, 0, 0, 0, -1, 0, 0, 0, 0,
@@ -652,7 +668,7 @@ def analyse_tomo(timestamp=None, label='',
     msg = 'Purity: {:.3f}\nFidelity to target {:.3f}'.format(
         purity, fidelity)
     if target_bell is not None:
-        theta_vec = np.linspace(0., 2*np.pi, 100)
+        theta_vec = np.linspace(0., 2*np.pi, 1001)
         fid_vec = np.zeros(theta_vec.shape)
         for i, theta in enumerate(theta_vec):
             fid_vec[i] = calc_fid2_bell(operators, target_bell, theta)
@@ -704,7 +720,7 @@ def analyse_tomo(timestamp=None, label='',
         msg = 'Purity: {:.3f}\nFidelity to target {:.3f}'.format(
             purity, fidelity_mle)
         if target_bell is not None:
-            theta_vec = np.linspace(0., 2*np.pi, 100)
+            theta_vec = np.linspace(0., 2*np.pi, 1001)
             fid_vec = np.zeros(theta_vec.shape)
             for i, theta in enumerate(theta_vec):
                 fid_vec[i] = calc_fid2_bell(operators_mle, target_bell, theta)
@@ -743,7 +759,9 @@ def analyse_tomo(timestamp=None, label='',
         fig4 = plt.figure(figsize=(8, 5))
         ax = fig4.add_subplot(111)
         ax.plot(theta_vec, fid_vec)
-
+        label_str = '\nMAX Fidelity {:.3f} at {:.1f} deg'.format(
+                np.max(fid_vec),
+                theta_vec[np.argmax(fid_vec)]*180./np.pi)
         ax.plot(theta_vec[np.argmax(fid_vec)], np.max(
             fid_vec), 'o', label=label_str)
         ax.legend(loc='best')

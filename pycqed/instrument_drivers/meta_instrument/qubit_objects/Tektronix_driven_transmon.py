@@ -227,7 +227,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                            initial_value=.5,
                            vals=vals.Numbers(min_value=-1., max_value=1.),
                            parameter_class=ManualParameter)
-        self.add_parameter('swap_amp',
+        self.add_parameter('SWAP_amp',
                            label='SWAP amplitude', units='V',
                            initial_value=0.02,
                            vals=vals.Numbers(min_value=0.02, max_value=4.5),
@@ -852,7 +852,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         else:
             slice_scan = False
 
-        flux_pulse_pars = self.get_flux_pars()
+        flux_pulse_pars = self.get_operation_dict()['SWAP '+self.name]
 
         # preparation of sweep points and cal points
         cal_points = 4
@@ -865,7 +865,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         chevron_swf = awg_swf.chevron_length(mw_pulse_pars,
                                              RO_pars,
                                              flux_pulse_pars,
-                                             dist_dict=self._dist_dict,
+                                             dist_dict=self.dist_dict(),
                                              AWG=self.AWG,
                                              upload=True)
         # MC configuration
@@ -1133,7 +1133,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         flux_pulse_pars = {'pulse_type': 'SquareFluxPulse',
                            'channel': 'ch%d'%self.fluxing_channel(),
                            'amplitude': self.fluxing_amp(),
-                           'swap_amp': self.swap_amp(),
+                           'swap_amp': self.SWAP_amp(),
                            'square_pulse_length': self.swap_time(),
                            'square_pulse_buffer': self.flux_pulse_buffer(),
                            'pulse_delay': 0,

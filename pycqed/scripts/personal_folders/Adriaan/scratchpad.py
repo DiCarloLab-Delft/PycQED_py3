@@ -1,7 +1,7 @@
 ################################
 # Reloading qubit snippet
 ################################
-
+from qcodes.utils import validators as vals
 from pycqed.instrument_drivers.meta_instrument.qubit_objects import qubit_object as qo
 from pycqed.instrument_drivers.meta_instrument.qubit_objects import CBox_driven_transmon as cbt
 from pycqed.instrument_drivers.meta_instrument.qubit_objects import Tektronix_driven_transmon as qbt
@@ -23,7 +23,7 @@ for i, name in enumerate(['AncT', 'DataT']):
                                       FluxCtrl=Flux_Control,
                                       MC=MC)
     station.add_component(q)
-    gen.load_settings_onto_instrument(q)
+
     if i == 0:
         q.dac_channel(1)
         q.RO_acq_weight_function_I(1)
@@ -96,11 +96,6 @@ AncT.add_pulse_parameter('Z', 'Z_pulse_type', 'pulse_type',
 AncT.add_pulse_parameter('Z', 'Z_pulse_delay',
                          'pulse_delay', 0)
 
-
-
-
-
-
 DataT.add_operation('SWAP')
 DataT.link_param_to_operation('SWAP', 'fluxing_amp', 'amplitude')
 DataT.link_param_to_operation('SWAP', 'fluxing_channel', 'channel')
@@ -115,10 +110,11 @@ DataT.add_pulse_parameter('SWAP', 'SWAP_pulse_type', 'pulse_type',
                           initial_value='SquareFluxPulse', vals=vals.Strings())
 DataT.add_pulse_parameter('SWAP', 'SWAP_refpoint',
                           'refpoint', 'end', vals=vals.Strings())
-DataT.add_pulse_parameter('SWAP', 'SWAP_amp',
-                          'swap_amp', 1.)
+DataT.link_param_to_operation('SWAP', 'SWAP_amp', 'SWAP_amp')
 DataT.add_pulse_parameter('SWAP', 'SWAP_pulse_buffer',
                           'pulse_buffer', 100e-9)
+DataT.add_pulse_parameter('SWAP', 'SWAP_square_pulse_buffer',
+                          'square_pulse_buffer', 100e-9)
 DataT.add_pulse_parameter('SWAP', 'SWAP_square_pulse_length',
                           'square_pulse_length', 40e-9)
 
@@ -137,43 +133,17 @@ DataT.add_pulse_parameter('Z', 'Z_pulse_delay',
                          'pulse_delay', 0)
 
 
-gen.load_settings_onto_instrument(AncT)
-gen.load_settings_onto_instrument(DataT)
-# AncT.CZ_phase_corr_amp(0.075)
-# AncT.CZ_length(40e-9)
-# AncT.CZ_swap_amp(1.48)
-# AncT.E_c(369.2e6)
-
-# DataT.SWAP_phase_corr_amp(0.145)
-# DataT.SWAP_amp(1.05)
-# DataT.SWAP_square_pulse_buffer(10e-9)
-# DataT.SWAP_square_pulse_length(10e-9)
+gen.load_settings_onto_instrument(AncT, timestamp='020234')
+gen.load_settings_onto_instrument(DataT, timestamp='020234')
 
 
-# Verifying flux dicts
-fp_DT = DataT.get_operation_dict()['SWAP DataT']
-for key in flux_pulse_pars_DataT.keys():
-    if key in fp_DT:
-        if not fp_DT[key] == flux_pulse_pars_DataT[key]:
-            print('Key "{}" does not match {}, {}'.format(key, fp_DT[key], flux_pulse_pars_DataT[key]))
-    else:
-        print('* Missing key', key)
-
-
-fp_AT = AncT.get_operation_dict()['CZ AncT']
-for key in flux_pulse_pars_AncT.keys():
-    if key in fp_AT:
-        try:
-            if not fp_AT[key] == flux_pulse_pars_AncT[key]:
-                print('Key "{}" does not match {}, {}'.format(key, fp_AT[key], flux_pulse_pars_AncT[key]))
-        except:
-            print(fp_AT[key], flux_pulse_pars_AncT[key])
-    else:
-        print('* Missing key', key)
+DataT.RO_acq_weight_function_I(0)
+DataT.RO_acq_weight_function_Q(0)
+AncT.RO_acq_weight_function_I(1)
+AncT.RO_acq_weight_function_Q(1)
 
 
 # Reloading device type object
-
 from pycqed.instrument_drivers.meta_instrument import device_object as do
 reload(do)
 try:
@@ -185,6 +155,6 @@ S5 = do.DeviceObject('S5')
 station.add_component(S5)
 S5.add_qubits([AncT, DataT])
 
-
-
-
+# Required for the Niels naming scheme
+q0 = DataT
+q1 = AncT

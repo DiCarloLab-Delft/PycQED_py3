@@ -95,7 +95,7 @@ class CPhase_cost_func_det(det.Soft_Detector):
             self.s.prepare()
             self.s.upload = False
         self.pars_changed = False
-        self.AWG.ch4_amp(self.qS.swap_amp())
+        self.AWG.ch4_amp(self.qS.SWAP_amp())
         self.MC_nested.set_sweep_function(self.s)
         self.MC_nested.set_detector_function(self.int_avg_det)
         self.MC_nested.set_sweep_points(self.phases)

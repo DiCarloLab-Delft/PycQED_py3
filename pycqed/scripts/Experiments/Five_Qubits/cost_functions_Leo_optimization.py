@@ -33,7 +33,7 @@ class Leo_optim_det(det.Soft_Detector):
         if not upload:
             self.s.upload = False
 
-        self.AWG.ch4_amp(qubit.swap_amp())
+        self.AWG.ch4_amp(qubit.SWAP_amp())
 
         self.MC_nested = MC_nested
 
@@ -133,7 +133,6 @@ class CPhase_cost_func_det(det.Soft_Detector):
         self.phases = phases
         self.MC = MC_nested
         self.int_avg_det = int_avg_det
-        self.MC.soft_avg(1)
         self.inter_swap_wait = inter_swap_wait
         self.qCP = qCP
         self.qS = qS
@@ -176,12 +175,12 @@ class CPhase_cost_func_det(det.Soft_Detector):
         self.pars_changed = True
 
     def acquire_data_point(self, **kw):
+
         if self.pars_changed:
             self.s.upload = True
             self.s.flux_pulse_pars_qCP['theta_f'] = self.theta_f
-            self.s.flux_pulse_pars_qCP['lambda_coeffs'][0] = self.lambda1
-            self.s.flux_pulse_pars_qCP['lambda_coeffs'][1] = self.lambda2
-            self.s.flux_pulse_pars_qCP['lambda_coeffs'][2] = self.lambda3
+            self.s.flux_pulse_pars_qCP['lambda_coeffs'] = np.array([
+                self.lambda1, self.lambda2, self.lambda3])
             self.s.flux_pulse_pars_qCP['amplitude'] = self.amplitude
             self.s.flux_pulse_pars_qCP['phase_corr_pulse_length'] = self.phase_corr_pulse_length_qCP
             self.s.flux_pulse_pars_qCP['phase_corr_pulse_amp'] = self.phase_corr_pulse_amp_qCP
@@ -191,11 +190,12 @@ class CPhase_cost_func_det(det.Soft_Detector):
             self.s.prepare()
             self.s.upload = False
         self.pars_changed = False
-        self.AWG.ch4_amp(self.qS.swap_amp())
+        self.AWG.ch4_amp(self.qS.SWAP_amp())
         self.MC_nested.set_sweep_function(self.s)
         self.MC_nested.set_detector_function(self.int_avg_det)
         self.MC_nested.set_sweep_points(self.phases)
-        label='swap_CP_swap_amp_{0:.4f}_l1_{1:.2f}_l2_{2:.2f}'.format(self.AWG.ch3_amp(),self.lambda1, self.lambda2)
+        label='swap_CP_swap_amp_{0:.4f}_l1_{1:.2f}_l2_{2:.2f}'.format(
+            self.AWG.ch3_amp(), self.lambda1, self.lambda2)
         self.MC_nested.run(label)
         if not self.reverse_control_target:
             a = SWAP_Cost(show_guess=False, label=label)
@@ -217,6 +217,7 @@ class CPhase_cost_func_det_Ramiro(det.Soft_Detector):
                  int_avg_det,
                  flux_pulse_pars_qCP,
                  flux_pulse_pars_qS,
+                 timings_dict,
                  sphasesweep=np.arange(0.75, 1.251+0.04, 0.01),
                  inter_swap_wait=100e-9,
                  upload=True, CPhase=True,
@@ -231,7 +232,6 @@ class CPhase_cost_func_det_Ramiro(det.Soft_Detector):
         self.sphasesweep = sphasesweep
         self.MC = MC_nested
         self.int_avg_det = int_avg_det
-        self.MC.soft_avg(1)
         self.inter_swap_wait = inter_swap_wait
         self.qCP = qCP
         self.qS = qS
@@ -244,8 +244,6 @@ class CPhase_cost_func_det_Ramiro(det.Soft_Detector):
         if self.cost_function_choice==0:
             self.value_names = ['Cost function']
             self.value_units = ['a.u.']
-            # self.value_names = ['Cost function', 'phase_0', 'phase_1']
-            # self.value_units = ['a.u.', 'deg', 'deg']
         elif self.cost_function_choice==1:
             self.value_names = ['Cost function']
             self.value_units = ['a.u.']
@@ -254,9 +252,6 @@ class CPhase_cost_func_det_Ramiro(det.Soft_Detector):
             self.value_units = ['a.u.', 'deg', 'deg']
         qCP_pulse_pars, RO_pars_qCP = qCP.get_pulse_pars()
         qS_pulse_pars, RO_pars_qS = qS.get_pulse_pars()
-        #flux_pulse_pars_qCP = qCP.get_flux_pars()
-
-        #flux_pulse_pars_qS = qS.get_flux_pars()
         self.theta_f = flux_pulse_pars_qCP['theta_f']
         self.lambda1 = flux_pulse_pars_qCP['lambda_coeffs'][0]
         self.lambda2 = flux_pulse_pars_qCP['lambda_coeffs'][1]
@@ -267,10 +262,6 @@ class CPhase_cost_func_det_Ramiro(det.Soft_Detector):
         self.phase_corr_pulse_length_qS = flux_pulse_pars_qS['phase_corr_pulse_length']
         self.phase_corr_pulse_amp_qS = flux_pulse_pars_qS['phase_corr_pulse_amp']
 
-        timings_dict = {'buffer_MW_FLUX': 10e-9,
-                        'buffer_MW_MW': 10e-9,
-                        'buffer_FLUX_FLUX': 10e-9,
-                        'buffer_FLUX_MW': 10e-9}
 
         if self.cost_function_choice==0:
             self.s = awg_swf.swap_CP_swap_2Qubits_1qphasesweep(
@@ -320,11 +311,12 @@ class CPhase_cost_func_det_Ramiro(det.Soft_Detector):
             self.last_seq = self.s.prepare()
             self.s.upload = False
         self.pars_changed = False
-        self.AWG.ch4_amp(self.qS.swap_amp())
+        self.AWG.ch4_amp(self.qS.SWAP_amp())
         self.MC_nested.set_sweep_function(self.s)
         self.MC_nested.set_detector_function(self.int_avg_det)
         self.MC_nested.set_sweep_points(self.sphasesweep)
-        label='swap_CP_swap_amp_{0:.4f}_l1_{1:.2f}_l2_{2:.2f}'.format(self.AWG.ch3_amp(),self.lambda1, self.lambda2)
+        label='swap_CP_swap_amp_{0:.4f}_l1_{1:.2f}_l2_{2:.2f}'.format(
+            self.AWG.ch3_amp(), self.lambda1, self.lambda2)
         self.MC_nested.run(label)
         if self.cost_function_choice==0:
             a = SWAP_Cost_Ramiro(show_guess=False, label=label)
@@ -626,26 +618,9 @@ class SWAP_Cost_Ramiro(ma.Rabi_Analysis):
             self.measured_values[0] - cal_0I)/(cal_1I-cal_0I)
         self.measured_values[1][:] = (
             self.measured_values[1] - cal_0Q)/(cal_1Q-cal_0Q)
-        # self.measured_values = self.measured_values
         self.sweep_points = self.sweep_points
-        # self.fit_data(**kw)
         self.make_figures(**kw)
 
-        # self.osc_amp_0 = self.fit_res[0].best_values['amplitude']
-        # self.osc_amp_1 = self.fit_res[1].best_values['amplitude']
-        # self.phi_0_rad = self.fit_res[0].best_values['phase']
-        # self.phi_1_rad = self.fit_res[1].best_values['phase']
-        # print(self.osc_amp_0, self.osc_amp_1)
-
-        # self.dphi = ((((self.phi_1_rad-self.phi_0_rad)/(2*np.pi)*360)+180)% 360)-180
-
-        # self.phi_0 = ((((self.phi_0_rad)/(2*np.pi)*360)+360)% 360)
-        # self.phi_1 = ((((self.phi_1_rad)/(2*np.pi)*360)+360)% 360)
-        # num_points = len(self.sweep_points)-4
-        # idx_0 = (num_points//2)//2
-        # idx_1 = (num_points//4)//2
-        # self.phi_0 = np.abs(self.measured_values[0][idx_0])
-        # self.phi_1 = np.abs(self.measured_values[1][idx_1])
         self.cost_func_val = self.sweep_points[np.argmin(self.measured_values[0][:-4])]
         if close_file:
             self.data_file.close()
@@ -719,6 +694,7 @@ class SWAP_Cost_Ramiro(ma.Rabi_Analysis):
                 self.axs[i].legend(loc='best')
         self.save_fig(self.fig, fig_tight=False, **kw)
 
+
 class SWAP_Cost_Ramiro_amp(ma.Rabi_Analysis):
 
     def __init__(self, label='', **kw):
@@ -742,22 +718,6 @@ class SWAP_Cost_Ramiro_amp(ma.Rabi_Analysis):
         self.fit_data(**kw)
         self.make_figures(**kw)
 
-        # self.osc_amp_0 = self.fit_res[0].best_values['amplitude']
-        # self.osc_amp_1 = self.fit_res[1].best_values['amplitude']
-        # self.phi_0_rad = self.fit_res[0].best_values['phase']
-        # self.phi_1_rad = self.fit_res[1].best_values['phase']
-        # print(self.osc_amp_0, self.osc_amp_1)
-
-        # self.dphi = ((((self.phi_1_rad-self.phi_0_rad)/(2*np.pi)*360)+180)% 360)-180
-
-        # self.phi_0 = ((((self.phi_0_rad)/(2*np.pi)*360)+360)% 360)
-        # self.phi_1 = ((((self.phi_1_rad)/(2*np.pi)*360)+360)% 360)
-        # num_points = len(self.sweep_points)-4
-        # idx_0 = (num_points//2)//2
-        # idx_1 = (num_points//4)//2
-        # self.phi_0 = np.abs(self.measured_values[0][idx_0])
-        # self.phi_1 = np.abs(self.measured_values[1][idx_1])
-        # self.cost_func_val = self.sweep_points[np.argmin(self.measured_values[0][:-4])]
         if close_file:
             self.data_file.close()
 

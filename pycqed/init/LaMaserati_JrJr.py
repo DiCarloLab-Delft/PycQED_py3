@@ -47,7 +47,7 @@ from pycqed.analysis import analysis_toolbox as a_tools
 from pycqed.measurement import awg_sweep_functions_multi_qubit as awg_swf_m
 from pycqed.measurement.pulse_sequences import multi_qubit_tek_seq_elts as sq_m
 from pycqed.analysis import tomography as tomo
-
+import pycqed.scripts.Experiments.Five_Qubits.cost_functions_Leo_optimization as ca
 from pycqed.utilities import general as gen
 # Standarad awg sequences
 from pycqed.measurement.waveform_control import pulsar as ps
@@ -90,6 +90,7 @@ from pycqed.measurement.pulse_sequences import multi_qubit_tek_seq_elts as mqs
 
 
 station = qc.Station()
+qc.station = station  # makes it easily findable from inside files
 LO = rs.RohdeSchwarz_SGS100A(
     name='LO', address='TCPIP0::192.168.0.73', server_name=None)  #
 station.add_component(LO)
@@ -456,3 +457,35 @@ k1.bounce_amp_2(-0.04)
 dist_dict = {'ch_list': ['ch4', 'ch3'],
              'ch4': k0.kernel(),
              'ch3': k1.kernel()}
+
+
+
+def reload_mod_stuff():
+    from pycqed.measurement.waveform_control_CC import waveform as wf
+    reload(wf)
+
+    from pycqed.measurement.pulse_sequences import fluxing_sequences as fqqs
+    reload(fqqs)
+    from pycqed.scripts.Experiments.Five_Qubits import cost_functions_Leo_optimization as ca
+    reload(ca)
+    from pycqed.measurement.waveform_control import pulse_library as pl
+    reload(pl)
+    from pycqed.measurement.pulse_sequences import standard_elements as ste
+    reload(ste)
+
+    from pycqed.measurement.pulse_sequences import multi_qubit_tek_seq_elts as mqs
+    reload(mqs)
+    from pycqed.measurement import awg_sweep_functions_multi_qubit as awg_mswf
+    reload(awg_mswf)
+    reload(awg_swf)
+    mqs.station = station
+    fqqs.station = station
+    reload(mq_mod)
+    mq_mod.station = station
+
+    reload(fsqs)
+    reload(awg_swf)
+    fsqs.station=station
+    reload(det)
+    reload(ca)
+reload_mod_stuff()

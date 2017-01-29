@@ -18,12 +18,13 @@ from pycqed.scripts.Experiments.Five_Qubits import cost_functions_Leo_optimizati
 import pycqed.measurement.multi_qubit_module as mq_mod
 
 
+t_dict = {}
+t_dict['buffer_FLUX_MW'] = 40e-9
+t_dict['buffer_MW_FLUX'] = 40e-9
+t_dict['buffer_MW_MW'] = 40e-9
+t_dict['buffer_FLUX_FLUX'] = 40e-9
+
 # 2D scan, V versus lambda 1
-AncT.RO_acq_averages(512)
-MC.live_plot_enabled(True)
-nested_MC.soft_avg(1)
-th90 = np.pi/2
-reload(det)
 int_avg_det = det.UHFQC_integrated_average_detector(
     UHFQC=AncT._acquisition_instr, AWG=AncT.AWG,
     channels=[AncT.RO_acq_weight_function_I(),
@@ -38,49 +39,22 @@ phases2 = np.concatenate([phases2, [730, 740, 750, 760]])
 # pulse_lengths=[30]
 reload(ca)
 reload(det)
+flux_pulse_pars_AncT = AncT.get_operation_dict()['CZ AncT']
 
-#######
-# AAAAAAARGH too many magic numbers
-#######
-for pulse_length in [40]:
-    flux_pulse_pars_AncT = AncT.get_flux_pars()
-    flux_pulse_pars_AncT['pulse_type'] = 'MartinisFluxPulse'
-    # flux_pulse_pars_AncT['pulse_type']='SquareFluxPulse'
-    flux_pulse_pars_AncT['amplitude'] = .45
-    flux_pulse_pars_AncT['flux_pulse_length'] = pulse_length*1e-9
-    flux_pulse_pars_AncT['lambda_coeffs'] = [1, 0, 0]  # [.1, .0]
-    flux_pulse_pars_AncT['theta_f'] = th90  # .3
-    flux_pulse_pars_AncT['square_pulse_length'] = pulse_length*1e-9
-    flux_pulse_pars_AncT['E_c'] = AncT.EC()
-    flux_pulse_pars_AncT['f_bus'] = 4.8e9
-    flux_pulse_pars_AncT['f_01_max'] = AncT.f_qubit()
-    flux_pulse_pars_AncT['dac_flux_coefficient'] = 0.679*2
-    flux_pulse_pars_AncT['g2'] = 33.3e6  # 1/(120e-9/(14.5/2))
-    flux_pulse_pars_AncT['pulse_buffer'] = 0
-    flux_pulse_pars_AncT['phase_corr_pulse_length'] = 10e-9
-    flux_pulse_pars_AncT['phase_corr_pulse_amp'] = -0.0
-
-    # preparing flux parameters for the swap pulse
-    flux_pulse_pars_DataT = DataT.get_flux_pars()
-    flux_pulse_pars_DataT['phase_corr_pulse_length'] = 10e-9
-    flux_pulse_pars_DataT['phase_corr_pulse_amp'] = -0.00
-
-
+flux_pulse_pars_DataT = DataT.get_operation_dict()['SWAP DataT']
 # 2D Sweep
-d = cl.CPhase_cost_func_det(qCP=AncT, qS=DataT, dist_dict=dist_dict,
+d = cl.CPhase_cost_func_det(qCP=AncT, qS=DataT, dist_dict=DataT.dist_dict(),
                             MC_nested=nested_MC, phases=phases2,
                             flux_pulse_pars_qCP=flux_pulse_pars_AncT,
                             flux_pulse_pars_qS=flux_pulse_pars_DataT,
                             int_avg_det=int_avg_det, CPhase=True,
                             single_qubit_phase_cost=True,
                             reverse_control_target=False,
-                            inter_swap_wait=10e-9)
+                            inter_swap_wait=t_dict['buffer_FLUX_FLUX']*2)
 
-AWG.ch3_amp(1.025)  # (1.145)
-AWG.ch4_amp(1.1575)
-
+AWG.ch3_amp(AncT.CZ_channel_amp())
+AWG.ch4_amp(DataT.SWAP_amp())
 MC.set_sweep_function(AWG.ch3_amp)
-# MC.set_sweep_function_2D(cl.lambda1_sweep(d))
 MC.set_sweep_function_2D(cl.lambda2_sweep(d))
 MC.set_detector_function(d)
 MC.set_sweep_points(np.linspace(0.9, 1.1, 51)*AWG.ch3_amp())
@@ -121,9 +95,9 @@ MC.set_sweep_points(phases)
 
 s.prepare()
 s.upload = False
-# AWG.ch3_amp(AncT.swap_amp())
-# AncT.swap_amp(1.03)
-# AWG.ch4_amp(DataT.swap_amp())
+# AWG.ch3_amp(AncT.SWAP_amp())
+# AncT.SWAP_amp(1.03)
+# AWG.ch4_amp(DataT.SWAP_amp())
 MC.run('test')
 cl.SWAP_Cost()
 
@@ -135,7 +109,7 @@ cl.SWAP_Cost()
 ############################################################################
 
 
-def measure_phase_qcp(points=np.arange(0., 0.15+0.005*4, 0.005), soft_avg=10):
+def measure_phase_qcp(points=np.arange(0., 0.15+0.005*4, 0.005)):
     flux_pulse_pars_AncT = AncT.get_operation_dict()['CZ AncT']
     flux_pulse_pars_DataT = DataT.get_operation_dict()['SWAP DataT']
     AWG.ch3_amp(AncT.CZ_channel_amp())
@@ -149,6 +123,7 @@ def measure_phase_qcp(points=np.arange(0., 0.15+0.005*4, 0.005), soft_avg=10):
 
     d = cl.CPhase_cost_func_det_Ramiro(qCP=AncT, qS=DataT, dist_dict=dist_dict,
                                        MC_nested=nested_MC, sphasesweep=cphasesweep,
+                                       timings_dict=t_dict,
                                        flux_pulse_pars_qCP=flux_pulse_pars_AncT,
                                        flux_pulse_pars_qS=flux_pulse_pars_DataT,
                                        int_avg_det=int_avg_det, CPhase=True,
@@ -158,7 +133,6 @@ def measure_phase_qcp(points=np.arange(0., 0.15+0.005*4, 0.005), soft_avg=10):
                                        cost_function_choice=0, sweep_q=0)
     # lambda2 not actrive, cphae off and reverse on
 
-    d.MC_nested.soft_avg(soft_avg)
     d.s.upload = True
     d.acquire_data_point()
     return d.last_seq
@@ -166,7 +140,7 @@ def measure_phase_qcp(points=np.arange(0., 0.15+0.005*4, 0.005), soft_avg=10):
 
 ###############################################################################
 
-def measure_phase_qs(points=np.arange(0., 0.15+0.005*4, 0.005), soft_avg=10):
+def measure_phase_qs(points=np.arange(0., 0.15+0.005*4, 0.005)):
     flux_pulse_pars_AncT = AncT.get_operation_dict()['CZ AncT']
     flux_pulse_pars_DataT = DataT.get_operation_dict()['SWAP DataT']
     AWG.ch3_amp(AncT.CZ_channel_amp())
@@ -186,25 +160,23 @@ def measure_phase_qs(points=np.arange(0., 0.15+0.005*4, 0.005), soft_avg=10):
 
     d = cl.CPhase_cost_func_det_Ramiro(qCP=AncT, qS=DataT, dist_dict=dist_dict,
                                        MC_nested=nested_MC, sphasesweep=sphasesweep,
+                                       timings_dict=t_dict,
                                        flux_pulse_pars_qCP=flux_pulse_pars_AncT,
                                        flux_pulse_pars_qS=flux_pulse_pars_DataT,
                                        int_avg_det=int_avg_det, CPhase=True,
                                        single_qubit_phase_corr=True, reverse_control_target=True,
                                        inter_swap_wait=10e-9, cost_function_choice=0, sweep_q=1)  # lambda2 not actrive, cphae off and reverse on
 
-    d.MC_nested.soft_avg(soft_avg)
     d.s.upload = True
     d.acquire_data_point()
     return d.last_seq
 #################################################################
 
 
-def measure_cphase_amp(points=np.arange(1.03, 1.07, 0.005), soft_avg=10):
+def measure_cphase_amp(points=np.arange(1.03, 1.07, 0.005)):
     flux_pulse_pars_AncT = AncT.get_operation_dict()['CZ AncT']
     flux_pulse_pars_DataT = DataT.get_operation_dict()['SWAP DataT']
     AWG.ch3_amp(AncT.CZ_channel_amp())
-    nested_MC.soft_avg(soft_avg)
-    th90 = np.pi/2
     int_avg_det = det.UHFQC_integrated_average_detector(
         UHFQC=AncT._acquisition_instr, AWG=AncT.AWG,
         channels=[
@@ -218,10 +190,9 @@ def measure_cphase_amp(points=np.arange(1.03, 1.07, 0.005), soft_avg=10):
         # pulse_lengths=[30]
     for pulse_length in [40]:
 
-
-
         d = cl.CPhase_cost_func_det_Ramiro(qCP=AncT, qS=DataT, dist_dict=dist_dict,
                                            MC_nested=nested_MC, sphasesweep=sphasesweep,
+                                           timings_dict=t_dict,
                                            flux_pulse_pars_qCP=flux_pulse_pars_AncT,
                                            flux_pulse_pars_qS=flux_pulse_pars_DataT,
                                            int_avg_det=int_avg_det, CPhase=True,
@@ -233,8 +204,6 @@ def measure_cphase_amp(points=np.arange(1.03, 1.07, 0.005), soft_avg=10):
 
         MC.set_detector_function(d)
         MC.set_sweep_points(points)
-        d.MC_nested.soft_avg(soft_avg)
-    #     MC.set_sweep_points(np.arange(1.04,1.051,0.001))
 
         label = 'CP_amp3sweep_1D'
         MC.run(label)
@@ -298,46 +267,44 @@ def fix_phase_2Q():
 # SWAPN
 
 
-def SWAPN_DataT(swap_amps = np.arange(1.150, 1.171, 0.001)):
-    qubit = DataT
-    qubit.swap_amp(1.161)
-    # qubit.swap_time(11e-9) #initial guess, one of the parameters
-    # qubit.swap_amp(1.152) # comes from scaler
-    num_iter = 30
-    AncT.RO_acq_averages(1024)
-    int_avg_det = det.UHFQC_integrated_average_detector(
-        UHFQC=AncT._acquisition_instr, AWG=AncT.AWG,
-        channels=[DataT.RO_acq_weight_function_I(),  
-                  AncT.RO_acq_weight_function_I()],
-        nr_averages=AncT.RO_acq_averages(),
-        integration_length=AncT.RO_acq_integration_length(), 
-        cross_talk_suppression=True)
-
-    times_vec = np.arange(num_iter)*2
+def SWAPN(qubit, swap_amps=np.arange(1.150, 1.171, 0.001),
+          number_of_swaps=30,
+          int_avg_det=None):
+    # These are the sweep points
+    swap_vec = np.arange(number_of_swaps)*2
     cal_points = 4
-    lengths_cal = times_vec[-1] + \
-        np.arange(1, 1+cal_points)*(times_vec[1]-times_vec[0])
-    lengths_vec = np.concatenate((times_vec, lengths_cal))
+    lengths_cal = swap_vec[-1] + \
+        np.arange(1, 1+cal_points)*(swap_vec[1]-swap_vec[0])
+    swap_vec = np.concatenate((swap_vec, lengths_cal))
 
-    flux_pulse_pars = DataT.get_operation_dict()['SWAP DataT']
+    if int_avg_det is None:
+        int_avg_det = det.UHFQC_integrated_average_detector(
+            UHFQC=AncT._acquisition_instr, AWG=AncT.AWG,
+            channels=[DataT.RO_acq_weight_function_I(),
+                      AncT.RO_acq_weight_function_I()],
+            nr_averages=AncT.RO_acq_averages(),
+            integration_length=AncT.RO_acq_integration_length(),
+            cross_talk_suppression=True)
+
+    op_dict = qubit.get_operation_dict()
+    flux_pulse_pars = op_dict['SWAP '+qubit.name]
     mw_pulse_pars, RO_pars = qubit.get_pulse_pars()
+    dist_dict = qubit.dist_dict()
+    AWG = qubit.AWG
+
     repSWAP = awg_swf.SwapN(mw_pulse_pars,
                             RO_pars,
                             flux_pulse_pars,
                             dist_dict=dist_dict,
                             AWG=AWG,
                             upload=True)
-
-    qubit.RO_acq_averages(1024)
-
     MC.set_sweep_function(repSWAP)
-    MC.set_sweep_points(lengths_vec)
+    MC.set_sweep_points(swap_vec)
 
     MC.set_sweep_function_2D(AWG.ch4_amp)
     MC.set_sweep_points_2D(swap_amps)
 
     MC.set_detector_function(int_avg_det)
-    AWG.set('%s_amp' % qubit.fluxing_channel(), qubit.swap_amp())
     MC.run('SWAPN_%s' % qubit.name, mode='2D')
     ma.TwoD_Analysis(auto=True)
 
@@ -377,7 +344,7 @@ for lll in range(1):
 
     AWG.ch3_amp(cphase_ch_amp)
     AWG.ch4_amp(swap_ch_amp)
-    seq_2q = measure_cphase_amp(soft_avg=1)
+    seq_2q = measure_cphase_amp()
     cphase_ch_amp = fix_phase_2Q()
     print('############################################################')
     print(cphase_ch_amp)
@@ -390,7 +357,7 @@ for lll in range(1):
         points_qcp = np.concatenate(
             [np.linspace(0., 0.21, 60), [0.211, 0.212, 0.213, 0.214]])
 #         points_qcp = np.concatenate([np.linspace(0.,0.19,60),[0.191,0.192,0.193,0.194]])
-        seq_cp = measure_phase_qcp(points=points_qcp, soft_avg=5)
+        seq_cp = measure_phase_qcp(points=points_qcp, )
         phase_qcp_vec[k] = fix_phase_qcp()
         flux_pulse_pars_AncT['phase_corr_pulse_amp'] = phase_qcp_vec[k]
         print('############################################################')
@@ -402,7 +369,7 @@ for lll in range(1):
         points_qs = np.concatenate(
             [np.linspace(0., 0.18, 60), [0.181, 0.182, 0.183, 0.184]])
 #         points_qs = np.concatenate([np.linspace(0.,0.18,60),[0.181,0.182,0.183,0.184]])
-        seq_qs = measure_phase_qs(points=points_qs, soft_avg=5)
+        seq_qs = measure_phase_qs(points=points_qs, )
         phase_qs_vec[k] = fix_phase_qs()
         flux_pulse_pars_DataT['phase_corr_pulse_amp'] = phase_qs_vec[k]
         print('############################################################')
@@ -421,9 +388,6 @@ for lll in range(1):
               'buffer_MW_MW': 10e-9,
               'buffer_FLUX_FLUX': 10e-9,
               'buffer_FLUX_MW': 10e-9}
-    nr_shots = 1024
-
-    MC.live_plot_enabled(False)
     AncT.RO_acq_averages(nr_shots)
     DataT.RO_acq_averages(nr_shots)
 
@@ -445,46 +409,21 @@ for lll in range(1):
 
 
 
-def reload_mod_stuff():
-    from pycqed.measurement.waveform_control_CC import waveform as wf
-    reload(wf)
-
-    from pycqed.measurement.pulse_sequences import fluxing_sequences as fqqs
-    reload(fqqs)
-    from pycqed.scripts.Experiments.Five_Qubits import cost_functions_Leo_optimization as ca
-    reload(ca)
-    from pycqed.measurement.waveform_control import pulse_library as pl
-    reload(pl)
-    from pycqed.measurement.pulse_sequences import standard_elements as ste
-    reload(ste)
-
-    from pycqed.measurement.pulse_sequences import multi_qubit_tek_seq_elts as mqs
-    reload(mqs)
-    from pycqed.measurement import awg_sweep_functions_multi_qubit as awg_mswf
-    reload(awg_mswf)
-    reload(awg_swf)
-    mqs.station = station
-    fqqs.station = station
-    reload(mq_mod)
-    mq_mod.station = station
-
-    reload(fsqs)
-    reload(awg_swf)
-    fsqs.station=station
-    reload(det)
-    reload(ca)
-reload_mod_stuff()
 
 ##########################
 # Calibration snippet
 ##########################
 
 
-measure_cphase_amp()
+AWG.ch3_amp(AncT.CZ_channel_amp())
+AWG.ch4_amp(DataT.SWAP_amp())
+
+measure_cphase_amp(np.arange(1.044, 1.05, .001))
 AncT.CZ_channel_amp(fix_phase_2Q())
 AWG.ch3_amp(AncT.CZ_channel_amp())
+
 for i in range(2):
-    measure_phase_qcp()
+    measure_phase_qcp(points=np.linspace(0.1, 0.25, 64))
     AncT.CZ_phase_corr_amp(fix_phase_qcp())
     measure_phase_qs()
     DataT.SWAP_phase_corr_amp(fix_phase_qs())
@@ -503,3 +442,5 @@ for i in range(2):
                                       nr_rep=1, mmt_label='BellTomo')
         tomo.analyse_tomo(MLE=False, target_bell=target_bell)
     MC.live_plot_enabled(True)
+
+
