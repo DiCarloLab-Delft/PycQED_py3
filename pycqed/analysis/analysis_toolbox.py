@@ -1499,3 +1499,32 @@ def solve_quadratic_equation(a, b, c, verbose=False):
         if verbose:
             print("This equation has two solutions: ", x1, " or", x2)
         return [x1, x2]
+
+def find_min(x, y, return_fit=False, perc=30):
+    from lmfit.models import QuadraticModel
+    from functools import reduce
+    # filtering through percentiles
+    th_perc = np.percentile(y, perc)
+    mask = np.where(y<th_perc,True,False)
+    # function that multiplies all elements in vector
+    multiply_vec = lambda vec: reduce(lambda x,y: x*y,vec)
+    # function that multiplies all elements in vector from idx_min
+    idx_min = np.argmin(y)
+    mask_ii = lambda ii: multiply_vec(mask[min(idx_min,ii):max(idx_min,ii+1)])
+    # function that returns mask_ii applied for all elements of the vector mask
+    continuous_mask = np.array([m for m in map(mask_ii,np.arange(len(mask)))],dtype=np.bool)
+    # doing the fit
+    my_fit_model = QuadraticModel()
+    x_fit = x[continuous_mask]
+    y_fit = y[continuous_mask]
+    my_fit_params = my_fit_model.guess(data=y_fit, x=x_fit)
+    my_fit_res = my_fit_model.fit(data=y_fit,
+                                  x=x_fit,
+                                  pars=my_fit_params)
+    x_min = -0.5*my_fit_res.best_values['b']/my_fit_res.best_values['a']
+    y_min = my_fit_model.func(x_min,**my_fit_res.best_values)
+    
+    if return_fit:
+        return x_min, y_min, my_fit_res
+    else:
+        return x_min, y_min
