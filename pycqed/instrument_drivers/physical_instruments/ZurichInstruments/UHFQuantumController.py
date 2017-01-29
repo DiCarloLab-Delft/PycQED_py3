@@ -440,7 +440,9 @@ class UHFQC(Instrument):
         with open(self._d_file_name, 'w') as d_file:
             json.dump(d_node_pars, d_file, default=int, indent=2)
 
-    def prepare_SSB_weight_and_rotation(self, IF,  weight_function_I=0, weight_function_Q=1):
+    def prepare_SSB_weight_and_rotation(self, IF,
+                                        weight_function_I=0,
+                                        weight_function_Q=1):
         trace_length = 4096
         tbase = np.arange(0, trace_length/1.8e9, 1/1.8e9)
         cosI = np.array(np.cos(2*np.pi*IF*tbase))

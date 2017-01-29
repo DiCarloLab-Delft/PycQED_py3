@@ -360,6 +360,7 @@ class MartinisFluxPulse(Pulse):
         self.phase_corr_pulse_amp = kw.pop('phase_corr_pulse_amp', 0)
         self.pulse_buffer = kw.pop('pulse_buffer', 0)
         self.amplitude = kw.pop('amplitude', 1)
+        # self.phase_corr_delay = kw.pop('phase_corr_delay', 1)
 
         self.flux_pulse_length = kw.pop('flux_pulse_length', None)
         self.lambda_coeffs = kw.pop('lambda_coeffs', None)
@@ -433,4 +434,5 @@ class MartinisFluxPulse(Pulse):
         elif self.amplitude == 0:
             martinis_pulse = 0*martinis_pulse
         buff_pulse = np.zeros(round((self.pulse_buffer)*1e9))
+        # buff_corr = np.zeros(round((self.phase_corr_delay)*1e9))
         return np.concatenate([martinis_pulse, ph_corr_pulse, buff_pulse])

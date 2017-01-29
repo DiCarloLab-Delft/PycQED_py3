@@ -195,15 +195,144 @@ class CPhase_cost_func_det(det.Soft_Detector):
         self.MC_nested.set_sweep_function(self.s)
         self.MC_nested.set_detector_function(self.int_avg_det)
         self.MC_nested.set_sweep_points(self.phases)
-        label='swap_CP_swap_amp_{0:.3f}_l1_{1:.2f}_l2_{2:.2f}'.format(self.AWG.ch3_amp(),self.lambda1, self.lambda2)
+        label='swap_CP_swap_amp_{0:.4f}_l1_{1:.2f}_l2_{2:.2f}'.format(self.AWG.ch3_amp(),self.lambda1, self.lambda2)
         self.MC_nested.run(label)
         if not self.reverse_control_target:
             a = SWAP_Cost(show_guess=False, label=label)
             return a.cost_func_val, a.dphi, a.osc_amp_0, a.osc_amp_1, a.phi_0, a.osc_amp_1-a.osc_amp_0
 
         else:
-            a = SWAP_Cost_reverse_control_target(show_guess=False, label=label, single_qubit_phase_cost=self.single_qubit_phase_cost)
+            a = SWAP_Cost_reverse_control_target(show_guess=False,
+                                                 label=label, single_qubit_phase_cost=self.single_qubit_phase_cost)
             return a.cost_func_val, a.dphi, a.phi_0_qCP, a.phi_0_qS, a.osc_amp_1_qCP-a.osc_amp_0_qCP
+
+
+class CPhase_cost_func_det_Ramiro(det.Soft_Detector):
+    #function ment to only tune-up CPhase pulse
+    def __init__(self,
+                 qCP,
+                 qS,
+                 dist_dict,
+                 MC_nested,
+                 int_avg_det,
+                 flux_pulse_pars_qCP,
+                 flux_pulse_pars_qS,
+                 sphasesweep=np.arange(0.75, 1.251+0.04, 0.01),
+                 inter_swap_wait=100e-9,
+                 upload=True, CPhase=True,
+                 single_qubit_phase_cost=False,
+                 reverse_control_target=False,
+                 cost_function_choice=0, sweep_q=0, **kw):
+
+        self.name = 'CPhase_cost_func_det'
+        self.detector_control = 'soft'
+        self.upload = upload
+        self.AWG = qCP.AWG
+        self.sphasesweep = sphasesweep
+        self.MC = MC_nested
+        self.int_avg_det = int_avg_det
+        self.MC.soft_avg(1)
+        self.inter_swap_wait = inter_swap_wait
+        self.qCP = qCP
+        self.qS = qS
+        self.CPhase = CPhase
+        self.reverse_control_target = reverse_control_target
+        self.single_qubit_phase_cost = single_qubit_phase_cost
+        self.cost_function_choice = cost_function_choice
+        self.sweep_q = sweep_q
+
+        if self.cost_function_choice==0:
+            self.value_names = ['Cost function']
+            self.value_units = ['a.u.']
+            # self.value_names = ['Cost function', 'phase_0', 'phase_1']
+            # self.value_units = ['a.u.', 'deg', 'deg']
+        elif self.cost_function_choice==1:
+            self.value_names = ['Cost function']
+            self.value_units = ['a.u.']
+        elif self.cost_function_choice==2:
+            self.value_names = ['Cost function', 'Fringe distance', 'phase_0']
+            self.value_units = ['a.u.', 'deg', 'deg']
+        qCP_pulse_pars, RO_pars_qCP = qCP.get_pulse_pars()
+        qS_pulse_pars, RO_pars_qS = qS.get_pulse_pars()
+        #flux_pulse_pars_qCP = qCP.get_flux_pars()
+
+        #flux_pulse_pars_qS = qS.get_flux_pars()
+        self.theta_f = flux_pulse_pars_qCP['theta_f']
+        self.lambda1 = flux_pulse_pars_qCP['lambda_coeffs'][0]
+        self.lambda2 = flux_pulse_pars_qCP['lambda_coeffs'][1]
+        self.lambda3 = flux_pulse_pars_qCP['lambda_coeffs'][2]
+        self.amplitude = flux_pulse_pars_qCP['amplitude']
+        self.phase_corr_pulse_length_qCP = flux_pulse_pars_qCP['phase_corr_pulse_length']
+        self.phase_corr_pulse_amp_qCP = flux_pulse_pars_qCP['phase_corr_pulse_amp']
+        self.phase_corr_pulse_length_qS = flux_pulse_pars_qS['phase_corr_pulse_length']
+        self.phase_corr_pulse_amp_qS = flux_pulse_pars_qS['phase_corr_pulse_amp']
+
+        timings_dict = {'buffer_MW_FLUX': 10e-9,
+                        'buffer_MW_MW': 10e-9,
+                        'buffer_FLUX_FLUX': 10e-9,
+                        'buffer_FLUX_MW': 10e-9}
+
+        if self.cost_function_choice==0:
+            self.s = awg_swf.swap_CP_swap_2Qubits_1qphasesweep(
+                qCP_pulse_pars, qS_pulse_pars,
+                flux_pulse_pars_qCP, flux_pulse_pars_qS, RO_pars_qCP,
+                dist_dict, timings_dict=timings_dict,
+                AWG=qS.AWG, inter_swap_wait=self.inter_swap_wait,
+                upload=False,
+                excitations='both', CPhase=self.CPhase,
+                reverse_control_target=self.reverse_control_target,
+                sweep_q=self.sweep_q)
+        elif self.cost_function_choice==1:
+            self.s = awg_swf.swap_CP_swap_2Qubits_1qphasesweep_amp(
+                qCP_pulse_pars, qS_pulse_pars,
+                flux_pulse_pars_qCP, flux_pulse_pars_qS, RO_pars_qCP,
+                dist_dict, timings_dict=timings_dict,
+                AWG=qS.AWG,  inter_swap_wait=self.inter_swap_wait,
+                upload=False,
+                excitations='both', CPhase=self.CPhase,
+                reverse_control_target=self.reverse_control_target,
+                sweep_q=self.sweep_q)
+        else:
+            raise Exception
+
+        self.s.sweep_points = sphasesweep
+        self.s.upload = True
+        self.last_seq = self.s.prepare()
+        self.s.upload = False
+        self.MC_nested = MC_nested
+
+        self.pars_changed = True
+        self.cost_function_choice = cost_function_choice
+
+    def acquire_data_point(self, **kw):
+        if self.pars_changed:
+            self.s.upload = False
+            self.s.flux_pulse_pars_qCP['theta_f'] = self.theta_f
+            self.s.flux_pulse_pars_qCP['lambda_coeffs'][0] = self.lambda1
+            self.s.flux_pulse_pars_qCP['lambda_coeffs'][1] = self.lambda2
+            self.s.flux_pulse_pars_qCP['lambda_coeffs'][2] = self.lambda3
+            self.s.flux_pulse_pars_qCP['amplitude'] = self.amplitude
+            self.s.flux_pulse_pars_qCP['phase_corr_pulse_length'] = self.phase_corr_pulse_length_qCP
+            self.s.flux_pulse_pars_qCP['phase_corr_pulse_amp'] = self.phase_corr_pulse_amp_qCP
+
+            self.s.flux_pulse_pars_qS['phase_corr_pulse_length'] = self.phase_corr_pulse_length_qS
+            self.s.flux_pulse_pars_qS['phase_corr_pulse_amp'] = self.phase_corr_pulse_amp_qS
+            self.last_seq = self.s.prepare()
+            self.s.upload = False
+        self.pars_changed = False
+        self.AWG.ch4_amp(self.qS.swap_amp())
+        self.MC_nested.set_sweep_function(self.s)
+        self.MC_nested.set_detector_function(self.int_avg_det)
+        self.MC_nested.set_sweep_points(self.sphasesweep)
+        label='swap_CP_swap_amp_{0:.4f}_l1_{1:.2f}_l2_{2:.2f}'.format(self.AWG.ch3_amp(),self.lambda1, self.lambda2)
+        self.MC_nested.run(label)
+        if self.cost_function_choice==0:
+            a = SWAP_Cost_Ramiro(show_guess=False, label=label)
+            return 1.-np.abs(a.cost_func_val)
+            # return a.cost_func_val, a.phi_0, a.phi_1
+        elif self.cost_function_choice==1:
+            a = SWAP_Cost_Ramiro_amp(show_guess=False, label=label)
+            return a.cost_func_val
 
 
 
@@ -416,7 +545,6 @@ class SWAP_Cost_reverse_control_target(ma.Rabi_Analysis):
                 self.x_fine, **self.fit_res[0].best_values)
         self.fine_fit_1 = self.fit_res[1].model.func(
                 self.x_fine, **self.fit_res[1].best_values)
-
         self.fine_fit_2 = self.fit_res[2].model.func(
                 self.x_fine, **self.fit_res[2].best_values)
         self.fine_fit_3 = self.fit_res[3].model.func(
@@ -480,6 +608,233 @@ class SWAP_Cost_reverse_control_target(ma.Rabi_Analysis):
                 self.axs[i].legend(loc=0)
         self.save_fig(self.fig, fig_tight=False, **kw)
 
+class SWAP_Cost_Ramiro(ma.Rabi_Analysis):
+
+    def __init__(self, label='', **kw):
+        super().__init__(label=label, **kw)
+
+    def run_default_analysis(self, close_file=True, **kw):
+
+        self.get_naming_and_values()
+
+        cal_0I = self.measured_values[0][-4]
+        cal_0Q = self.measured_values[1][-4]
+        cal_1I = self.measured_values[0][-1]
+        cal_1Q = self.measured_values[1][-1]
+
+        self.measured_values[0][:] = (
+            self.measured_values[0] - cal_0I)/(cal_1I-cal_0I)
+        self.measured_values[1][:] = (
+            self.measured_values[1] - cal_0Q)/(cal_1Q-cal_0Q)
+        # self.measured_values = self.measured_values
+        self.sweep_points = self.sweep_points
+        # self.fit_data(**kw)
+        self.make_figures(**kw)
+
+        # self.osc_amp_0 = self.fit_res[0].best_values['amplitude']
+        # self.osc_amp_1 = self.fit_res[1].best_values['amplitude']
+        # self.phi_0_rad = self.fit_res[0].best_values['phase']
+        # self.phi_1_rad = self.fit_res[1].best_values['phase']
+        # print(self.osc_amp_0, self.osc_amp_1)
+
+        # self.dphi = ((((self.phi_1_rad-self.phi_0_rad)/(2*np.pi)*360)+180)% 360)-180
+
+        # self.phi_0 = ((((self.phi_0_rad)/(2*np.pi)*360)+360)% 360)
+        # self.phi_1 = ((((self.phi_1_rad)/(2*np.pi)*360)+360)% 360)
+        # num_points = len(self.sweep_points)-4
+        # idx_0 = (num_points//2)//2
+        # idx_1 = (num_points//4)//2
+        # self.phi_0 = np.abs(self.measured_values[0][idx_0])
+        # self.phi_1 = np.abs(self.measured_values[1][idx_1])
+        self.cost_func_val = self.sweep_points[np.argmin(self.measured_values[0][:-4])]
+        if close_file:
+            self.data_file.close()
+
+    def fit_data(self, **kw):
+        self.add_analysis_datagroup_to_file()
+        self.fit_res = ['', '']
+        # It would be best to do 1 fit to both datasets but since it is
+        # easier to do just one fit we stick to that.
+
+        num_points = len(self.sweep_points)-4
+        id_dat = self.measured_values[1][num_points//2:3*num_points//4]
+        id_swp = self.sweep_points[num_points//2:3*num_points//4]
+        ex_dat = self.measured_values[1][3*num_points//4:-4]
+        ex_swp = self.sweep_points[3*num_points//4:-4]
+
+        # self.cost_func_val = 2-(max(id_dat-ex_dat) + max(ex_dat-id_dat))
+        # we can calculate the cost function disreclty from the fit-parameters
+
+        model = lmfit.Model(ma.fit_mods.CosFunc)
+        params = simple_cos_guess(model, data=id_dat, t=id_swp)
+        self.fit_res[0] = model.fit(data=id_dat, t=id_swp, params=params)
+        self.save_fitted_parameters(fit_res=self.fit_res[0],
+                                    var_name='id_fit')
+
+        model = lmfit.Model(ma.fit_mods.CosFunc)
+        params = simple_cos_guess(model, data=ex_dat, t=ex_swp)
+        self.fit_res[1] = model.fit(data=ex_dat, t=ex_swp, params=params)
+        self.save_fitted_parameters(fit_res=self.fit_res[1],
+                                    var_name='ex_fit')
+        self.x_fine = np.linspace(min(self.sweep_points[:-4]),
+                                  max(self.sweep_points[:-4]),
+                                  1000)
+        self.fine_fit_0 = self.fit_res[0].model.func(
+                self.x_fine, **self.fit_res[0].best_values)
+        self.fine_fit_1 = self.fit_res[1].model.func(
+                self.x_fine, **self.fit_res[1].best_values)
+        # cost funcations penalizes extra for deviations from 180 degrees phase
+        # difference and also penalizes the single-qubit error in the q_CPhase
+        # self.cost_func_val = max(abs(self.fine_fit_0-self.fine_fit_1))
+        self.cost_func_val = max(abs(id_dat-ex_dat))
+
+    def make_figures(self, **kw):
+        show_guess = kw.pop('show_guess', False)
+        self.fig, self.axs = ma.plt.subplots(2, 1, figsize=(5, 6))
+
+        self.ylabels = ['q_CP', 'q_S']
+        for i in [0, 1]:
+            if i == 0:
+                plot_title = kw.pop('plot_title', ma.textwrap.fill(
+                                    self.timestamp_string + '_' +
+                                    self.measurementstring, 40))
+            else:
+                plot_title = ''
+            self.axs[i].ticklabel_format(useOffset=False)
+            self.plot_results_vs_sweepparam(x=self.sweep_points,
+                                            y=self.measured_values[i],
+                                            fig=self.fig, ax=self.axs[i],
+                                            xlabel=self.xlabel,
+                                            ylabel=self.ylabels[i],
+                                            save=False,
+                                            plot_title=plot_title, marker='--o')
+
+            # fine_fit = self.fit_res[i].model.func(
+            #     self.x_fine, **self.fit_res[i].best_values)
+            # self.axs[0].plot(self.x_fine, fine_fit, label='fit')
+            if show_guess:
+                fine_fit = self.fit_res[i].model.func(
+                    self.x_fine, **self.fit_res[i].init_values)
+                self.axs[0].plot(self.x_fine, fine_fit, label='guess')
+                self.axs[i].legend(loc='best')
+        self.save_fig(self.fig, fig_tight=False, **kw)
+
+class SWAP_Cost_Ramiro_amp(ma.Rabi_Analysis):
+
+    def __init__(self, label='', **kw):
+        super().__init__(label=label, **kw)
+
+    def run_default_analysis(self, close_file=True, **kw):
+
+        self.get_naming_and_values()
+
+        cal_0I = np.mean([self.measured_values[0][-4],self.measured_values[0][-3]])
+        cal_0Q = np.mean([self.measured_values[0][-4],self.measured_values[0][-2]])
+        cal_1I = np.mean([self.measured_values[0][-1],self.measured_values[0][-2]])
+        cal_1Q = np.mean([self.measured_values[0][-1],self.measured_values[0][-3]])
+
+        self.measured_values[0][:] = (
+            self.measured_values[0] - cal_0I)/(cal_1I-cal_0I)
+        self.measured_values[1][:] = (
+            self.measured_values[1] - cal_0Q)/(cal_1Q-cal_0Q)
+        # self.measured_values = self.measured_values
+        self.sweep_points = self.sweep_points
+        self.fit_data(**kw)
+        self.make_figures(**kw)
+
+        # self.osc_amp_0 = self.fit_res[0].best_values['amplitude']
+        # self.osc_amp_1 = self.fit_res[1].best_values['amplitude']
+        # self.phi_0_rad = self.fit_res[0].best_values['phase']
+        # self.phi_1_rad = self.fit_res[1].best_values['phase']
+        # print(self.osc_amp_0, self.osc_amp_1)
+
+        # self.dphi = ((((self.phi_1_rad-self.phi_0_rad)/(2*np.pi)*360)+180)% 360)-180
+
+        # self.phi_0 = ((((self.phi_0_rad)/(2*np.pi)*360)+360)% 360)
+        # self.phi_1 = ((((self.phi_1_rad)/(2*np.pi)*360)+360)% 360)
+        # num_points = len(self.sweep_points)-4
+        # idx_0 = (num_points//2)//2
+        # idx_1 = (num_points//4)//2
+        # self.phi_0 = np.abs(self.measured_values[0][idx_0])
+        # self.phi_1 = np.abs(self.measured_values[1][idx_1])
+        # self.cost_func_val = self.sweep_points[np.argmin(self.measured_values[0][:-4])]
+        if close_file:
+            self.data_file.close()
+
+    def fit_data(self, **kw):
+        self.add_analysis_datagroup_to_file()
+        self.fit_res = ['', '']
+        # It would be best to do 1 fit to both datasets but since it is
+        # easier to do just one fit we stick to that.
+
+        # num_points = len(self.sweep_points)-4
+        # id_dat = self.measured_values[1][num_points//2:3*num_points//4]
+        # id_swp = self.sweep_points[num_points//2:3*num_points//4]
+        # ex_dat = self.measured_values[1][3*num_points//4:-4]
+        # ex_swp = self.sweep_points[3*num_points//4:-4]
+
+        num_points = len(self.sweep_points)-4
+        id_dat = self.measured_values[0][:num_points//2]
+        id_swp = self.sweep_points[:num_points//2]
+        ex_dat = self.measured_values[0][num_points//2:-4]
+        ex_swp = self.sweep_points[num_points//2:-4]
+
+        # self.cost_func_val = 2-(max(id_dat-ex_dat) + max(ex_dat-id_dat))
+        # we can calculate the cost function disreclty from the fit-parameters
+
+        model = lmfit.Model(ma.fit_mods.CosFunc)
+        params = simple_cos_guess(model, data=id_dat, t=id_swp)
+        self.fit_res[0] = model.fit(data=id_dat, t=id_swp, params=params)
+        self.save_fitted_parameters(fit_res=self.fit_res[0],
+                                    var_name='id_fit')
+
+        model = lmfit.Model(ma.fit_mods.CosFunc)
+        params = simple_cos_guess(model, data=ex_dat, t=ex_swp)
+        self.fit_res[1] = model.fit(data=ex_dat, t=ex_swp, params=params)
+        self.save_fitted_parameters(fit_res=self.fit_res[1],
+                                    var_name='ex_fit')
+        self.x_fine = np.linspace(min(self.sweep_points[:-4]),
+                                  max(self.sweep_points[:-4]),
+                                  1000)
+        self.fine_fit_0 = self.fit_res[0].model.func(
+                self.x_fine, **self.fit_res[0].best_values)
+        self.fine_fit_1 = self.fit_res[1].model.func(
+                self.x_fine, **self.fit_res[1].best_values)
+        # cost funcations penalizes extra for deviations from 180 degrees phase
+        # difference and also penalizes the single-qubit error in the q_CPhase
+        # self.cost_func_val = max(abs(self.fine_fit_0-self.fine_fit_1))
+        self.cost_func_val = max(abs(id_dat-ex_dat))
+
+    def make_figures(self, **kw):
+        show_guess = kw.pop('show_guess', False)
+        self.fig, self.axs = ma.plt.subplots(2, 1, figsize=(5, 6))
+
+        self.ylabels = ['q_CP', 'q_S']
+        for i in [0, 1]:
+            if i == 0:
+                plot_title = kw.pop('plot_title', ma.textwrap.fill(
+                                    self.timestamp_string + '_' +
+                                    self.measurementstring, 40))
+            else:
+                plot_title = ''
+            self.axs[i].ticklabel_format(useOffset=False)
+            self.plot_results_vs_sweepparam(x=self.sweep_points,
+                                            y=self.measured_values[i],
+                                            fig=self.fig, ax=self.axs[i],
+                                            xlabel=self.xlabel,
+                                            ylabel=self.ylabels[i],
+                                            save=False,
+                                            plot_title=plot_title, marker='--o')
+
+            # fine_fit = self.fit_res[i].model.func(
+            #     self.x_fine, **self.fit_res[i].best_values)
+            # self.axs[0].plot(self.x_fine, fine_fit, label='fit')
+            if show_guess:
+                fine_fit = self.fit_res[i].model.func(
+                    self.x_fine, **self.fit_res[i].init_values)
+                self.axs[0].plot(self.x_fine, fine_fit, label='guess')
+                self.axs[i].legend(loc='best')
+        self.save_fig(self.fig, fig_tight=False, **kw)
 
 
 # sweep functions
@@ -614,4 +969,18 @@ class theta_f_sweep(swf.Soft_Sweep):
             self.comp_det.theta_f = val
             self.comp_det.pars_changed = True
 
+class phase_corr_pulse_amp_sweep_qCP(swf.Soft_Sweep):
 
+    def __init__(self, comp_det, **kw):
+        self.sweep_control = 'soft'
+        self.name = 'phase_corr_pulse_amp_qCP'
+        self.parameter_name = 'phase correction pulse amp qCP'
+        self.unit = 'a.u.'
+        self.set_kw()
+        self.comp_det = comp_det
+
+    def set_parameter(self, val):
+        old_phase_corr_pulse_amp = self.comp_det.phase_corr_pulse_amp_qCP
+        if old_phase_corr_pulse_amp != val:
+            self.comp_det.phase_corr_pulse_amp_qCP = val
+            self.comp_det.pars_changed = True

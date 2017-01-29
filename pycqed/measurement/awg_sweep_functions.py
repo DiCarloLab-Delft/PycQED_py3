@@ -31,6 +31,32 @@ class File(swf.Hard_Sweep):
             self.AWG.set_setup_filename(self.filename)
 
 
+class awg_seq_swf(swf.Hard_Sweep):
+    def __init__(self, awg_seq_func, awg_seq_func_kwargs,
+                 parameter_name=None, unit='a.u.',
+                 upload=True, return_seq=False):
+        """
+        A wrapper for awg sequence generating functions.
+        Works as a general awg sweep function.
+        """
+        super().__init__()
+        self.upload = upload
+        self.awg_seq_func = awg_seq_func
+        self.awg_seq_func_kwargs = awg_seq_func_kwargs
+        self.unit = unit
+        self.name = 'swf_'+ awg_seq_func.__name__
+
+        if parameter_name != None:
+            self.parameter_name = parameter_name
+        else:
+            self.parameter_name = 'points'
+
+    def prepare(self, **kw):
+        if self.parameter_name != 'points':
+            self.awg_seq_func_kwargs[self.parameter_name] = self.sweep_points
+        if self.upload:
+            self.awg_seq_func(**self.awg_seq_func_kwargs)
+
 class Rabi(swf.Hard_Sweep):
 
     def __init__(self, pulse_pars, RO_pars, n=1, upload=True, return_seq=False):
@@ -81,13 +107,20 @@ class two_qubit_tomo_cardinal(swf.Hard_Sweep):
 class two_qubit_tomo_bell(swf.Hard_Sweep):
 
     def __init__(self, bell_state, q0_pulse_pars, q1_pulse_pars,
-                 RO_pars, timings_dict, upload=True, return_seq=False):
+                 q0_flux_pars, q1_flux_pars,
+                 RO_pars, distortion_dict, AWG,
+                 timings_dict, CPhase=True, upload=True, return_seq=False):
         super().__init__()
         self.bell_state = bell_state
         self.q0_pulse_pars = q0_pulse_pars
         self.q1_pulse_pars = q1_pulse_pars
+        self.q0_flux_pars = q0_flux_pars
+        self.q1_flux_pars = q1_flux_pars
         self.RO_pars = RO_pars
+        self.CPhase = CPhase
+        self.distortion_dict = distortion_dict
         self.timings_dict = timings_dict
+        self.AWG = AWG
         self.upload = upload
         self.return_seq = return_seq
         self.name = 'Tomo2Q_%d' % bell_state
@@ -96,13 +129,36 @@ class two_qubit_tomo_bell(swf.Hard_Sweep):
 
     def prepare(self, **kw):
         if self.upload:
+            old_val_qS = self.AWG.get(
+                '{}_amp'.format(self.q0_flux_pars['channel']))
+            old_val_qCP = self.AWG.get(
+                '{}_amp'.format(self.q1_flux_pars['channel']))
+
+            # Rescaling the AWG channel amp is done to ensure that the dac
+            # values of the flux pulses (including kernels) are defined on
+            # a 2Vpp scale.
+            self.AWG.set(
+                '{}_amp'.format(self.q1_flux_pars['channel']), 2.)
+            self.AWG.set(
+                '{}_amp'.format(self.q0_flux_pars['channel']), 2.)
+
             self.seq = mq_sqs.two_qubit_tomo_bell(bell_state=self.bell_state,
                                                       q0_pulse_pars=self.q0_pulse_pars,
                                                       q1_pulse_pars=self.q1_pulse_pars,
+                                                      q0_flux_pars=self.q0_flux_pars,
+                                                      q1_flux_pars=self.q1_flux_pars,
                                                       RO_pars=self.RO_pars,
+                                                      distortion_dict=self.distortion_dict,
                                                       timings_dict=self.timings_dict,
+                                                      CPhase=self.CPhase,
                                                       upload=self.upload,
                                                       return_seq=self.return_seq)
+            self.AWG.set('{}_amp'.format(self.q1_flux_pars['channel']),
+                         old_val_qCP)
+
+            self.AWG.set('{}_amp'.format(self.q0_flux_pars['channel']),
+                         old_val_qS)
+            self.upload = False
 
 class Flipping(swf.Hard_Sweep):
 
@@ -289,7 +345,6 @@ class swap_swap_wait(swf.Hard_Sweep):
     def set_parameter(self, val, **kw):
         pass
 
-
 class swap_CP_swap_2Qubits(swf.Hard_Sweep):
 
     def __init__(self,
@@ -357,6 +412,160 @@ class swap_CP_swap_2Qubits(swf.Hard_Sweep):
 
             self.AWG.set('{}_amp'.format(self.flux_pulse_pars_qS['channel']),
                          old_val_qS)
+
+    def set_parameter(self, val, **kw):
+        pass
+
+class swap_CP_swap_2Qubits_1qphasesweep(swf.Hard_Sweep):
+
+    def __init__(self,
+                 mw_pulse_pars_qCP, mw_pulse_pars_qS,
+                 flux_pulse_pars_qCP, flux_pulse_pars_qS,
+                 RO_pars,
+                 dist_dict,
+                 timings_dict,
+                 AWG,
+                 CPhase=True,
+                 excitations='both',
+                 inter_swap_wait=100e-9,
+                 upload=True,
+                 identity=False,
+                 return_seq=False,
+                 reverse_control_target=False,
+                 sweep_q=0):
+        super().__init__()
+        self.mw_pulse_pars_qCP = mw_pulse_pars_qCP
+        self.mw_pulse_pars_qS = mw_pulse_pars_qS
+        self.flux_pulse_pars_qCP = flux_pulse_pars_qCP
+        self.flux_pulse_pars_qS = flux_pulse_pars_qS
+        self.RO_pars = RO_pars
+        self.dist_dict = dist_dict
+        self.timings_dict = timings_dict
+
+        self.CPhase = CPhase
+        self.excitations = excitations
+        self.inter_swap_wait = inter_swap_wait
+
+        self.upload = upload
+        self.name = 'swap-CP-swap'
+        self.parameter_name = 'phase'
+        self.unit = 'deg'
+        self.return_seq = return_seq
+        self.AWG = AWG
+        self.sweep_q = sweep_q
+        self.reverse_control_target=reverse_control_target
+
+    def prepare(self, **kw):
+        if self.upload:
+            old_val_qS = self.AWG.get(
+                '{}_amp'.format(self.flux_pulse_pars_qS['channel']))
+            old_val_qCP = self.AWG.get(
+                '{}_amp'.format(self.flux_pulse_pars_qCP['channel']))
+
+            # Rescaling the AWG channel amp is done to ensure that the dac
+            # values of the flux pulses (including kernels) are defined on
+            # a 2Vpp scale.
+            self.AWG.set(
+                '{}_amp'.format(self.flux_pulse_pars_qCP['channel']), 2.)
+            self.AWG.set(
+                '{}_amp'.format(self.flux_pulse_pars_qS['channel']), 2.)
+            self.last_seq = fsqs.swap_CP_swap_2Qubits_1qphasesweep(
+                mw_pulse_pars_qCP=self.mw_pulse_pars_qCP,
+                mw_pulse_pars_qS=self.mw_pulse_pars_qS,
+                flux_pulse_pars_qCP=self.flux_pulse_pars_qCP,
+                flux_pulse_pars_qS=self.flux_pulse_pars_qS,
+                RO_pars=self.RO_pars,
+                distortion_dict=self.dist_dict,
+                timings_dict=self.timings_dict,
+                CPhase=self.CPhase,
+                excitations=self.excitations,
+                sphasesweep=self.sweep_points,
+                inter_swap_wait=self.inter_swap_wait,
+                reverse_control_target=self.reverse_control_target,
+                sweep_q=self.sweep_q)
+            self.AWG.set('{}_amp'.format(self.flux_pulse_pars_qCP['channel']),
+                         old_val_qCP)
+
+            self.AWG.set('{}_amp'.format(self.flux_pulse_pars_qS['channel']),
+                         old_val_qS)
+        return self.last_seq
+
+    def set_parameter(self, val, **kw):
+        pass
+
+class swap_CP_swap_2Qubits_1qphasesweep_amp(swf.Hard_Sweep):
+
+    def __init__(self,
+                 mw_pulse_pars_qCP, mw_pulse_pars_qS,
+                 flux_pulse_pars_qCP, flux_pulse_pars_qS,
+                 RO_pars,
+                 dist_dict,
+                 timings_dict,
+                 AWG,
+                 CPhase=True,
+                 excitations='both',
+                 inter_swap_wait=100e-9,
+                 upload=True,
+                 identity=False,
+                 return_seq=False,
+                 reverse_control_target=False,
+                 sweep_q=0):
+        super().__init__()
+        self.mw_pulse_pars_qCP = mw_pulse_pars_qCP
+        self.mw_pulse_pars_qS = mw_pulse_pars_qS
+        self.flux_pulse_pars_qCP = flux_pulse_pars_qCP
+        self.flux_pulse_pars_qS = flux_pulse_pars_qS
+        self.RO_pars = RO_pars
+        self.dist_dict = dist_dict
+        self.timings_dict = timings_dict
+
+        self.CPhase = CPhase
+        self.excitations = excitations
+        self.inter_swap_wait = inter_swap_wait
+
+        self.upload = upload
+        self.name = 'swap-CP-swap'
+        self.parameter_name = 'phase'
+        self.unit = 'deg'
+        self.return_seq = return_seq
+        self.AWG = AWG
+        self.sweep_q = sweep_q
+        self.reverse_control_target=reverse_control_target
+
+    def prepare(self, **kw):
+        if self.upload:
+            old_val_qS = self.AWG.get(
+                '{}_amp'.format(self.flux_pulse_pars_qS['channel']))
+            old_val_qCP = self.AWG.get(
+                '{}_amp'.format(self.flux_pulse_pars_qCP['channel']))
+
+            # Rescaling the AWG channel amp is done to ensure that the dac
+            # values of the flux pulses (including kernels) are defined on
+            # a 2Vpp scale.
+            self.AWG.set(
+                '{}_amp'.format(self.flux_pulse_pars_qCP['channel']), 2.)
+            self.AWG.set(
+                '{}_amp'.format(self.flux_pulse_pars_qS['channel']), 2.)
+            self.last_seq = fsqs.swap_CP_swap_2Qubits_1qphasesweep_amp(
+                mw_pulse_pars_qCP=self.mw_pulse_pars_qCP,
+                mw_pulse_pars_qS=self.mw_pulse_pars_qS,
+                flux_pulse_pars_qCP=self.flux_pulse_pars_qCP,
+                flux_pulse_pars_qS=self.flux_pulse_pars_qS,
+                RO_pars=self.RO_pars,
+                distortion_dict=self.dist_dict,
+                timings_dict=self.timings_dict,
+                CPhase=self.CPhase,
+                excitations=self.excitations,
+                sphasesweep=self.sweep_points,
+                inter_swap_wait=self.inter_swap_wait,
+                reverse_control_target=self.reverse_control_target,
+                sweep_q=self.sweep_q)
+            self.AWG.set('{}_amp'.format(self.flux_pulse_pars_qCP['channel']),
+                         old_val_qCP)
+
+            self.AWG.set('{}_amp'.format(self.flux_pulse_pars_qS['channel']),
+                         old_val_qS)
+        return self.last_seq
 
     def set_parameter(self, val, **kw):
         pass

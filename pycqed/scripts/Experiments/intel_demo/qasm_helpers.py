@@ -219,6 +219,84 @@ class CBox_state_counters_det_CC(det.Hard_Detector):
         self.CBox.set('acquisition_mode', 'idle')
 
 
+class CBox_single_qubit_frac1_counter_CC(CBox_state_counters_det_CC):
+
+    '''
+    Based on the shot counters, returns the fraction of shots that corresponds
+    to a specific state.
+    Note that this is not corrected for RO-fidelity.
+
+    Also note that depending on the side of the RO the F|1> and F|0> could be
+    inverted
+    '''
+
+    def __init__(self, CBox):
+        super().__init__(CBox=CBox)
+        self.detector_control = 'soft'
+        # self.CBox = CBox
+        self.name = 'CBox_single_qubit_frac1_counter'
+        # A and B refer to the counts for the different weight functions
+        self.value_names = ['Frac_1']
+        self.value_units = ['']
+
+    def acquire_data_point(self):
+        d = super().acquire_data_point()
+        data = d[4]/(d[3]+d[4])
+        return data
+
+class CBox_err_frac_CC(CBox_state_counters_det_CC):
+
+    '''
+    Child of the state counters detector
+    Returns fraction of event type s by using state counters 1 and 2
+    Rescales the measured counts to percentages.
+    '''
+
+    def __init__(self, CBox):
+        super().__init__(CBox=CBox)
+        self.detector_control = 'soft'
+        self.name = 'CBox_err_frac_CC'
+        self.value_names = ['frac. err.']
+        self.value_units = ['']
+
+    def prepare(self, **kw):
+        self.nr_shots = self.CBox.log_length.get()
+
+    def acquire_data_point(self):
+        d = super().acquire_data_point()
+        data = d[1]/self.nr_shots*100
+        return data
+
+
+class CBox_single_qubit_event_s_fraction_CC(CBox_state_counters_det_CC):
+
+    '''
+    Child of the state counters detector
+    Returns fraction of event type s by using state counters 1 and 2
+    Rescales the measured counts to percentages.
+    '''
+
+    def __init__(self, CBox):
+        super().__init__(CBox=CBox)
+        self.detector_control = 'soft'
+        self.name = 'CBox_single_qubit_event_s_fraction'
+        self.value_names = ['frac. err.', 'frac. 2 or more', 'frac. event s']
+        self.value_units = ['%', '%', '%']
+
+    def prepare(self, **kw):
+        self.nr_shots = self.CBox.log_length.get()
+
+    def acquire_data_point(self):
+        d = super().acquire_data_point()
+        # data = d[1]/(d[1]+d[2])
+        data = [
+            d[1]/self.nr_shots*100,
+            d[2]/self.nr_shots*100,
+            (d[1]-d[2])/self.nr_shots*100]
+        return data
+
+
+
 class CBox_int_avg_func_prep_det_CC(CBox_integrated_average_detector_CC):
 
     def __init__(self, CBox, prepare_function, prepare_function_kwargs=None,

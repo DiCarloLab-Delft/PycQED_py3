@@ -57,6 +57,7 @@ def multi_pulse_elt(i, station, pulse_list):
                                           amplitude=0, length=1e-9,),
                         start=300e-9)
     for i, pulse_pars in enumerate(pulse_list):
+        # print(i)
         if 'refpoint' not in pulse_pars.keys():
             # default refpoint for backwards compatibility
             pulse_pars['refpoint'] = 'end'

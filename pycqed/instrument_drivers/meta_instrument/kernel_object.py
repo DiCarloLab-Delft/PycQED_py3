@@ -97,7 +97,7 @@ class Distortion(Instrument):
                            parameter_class=ConfigParameter,
                            vals=vals.Numbers())
         self.add_parameter('bounce_length_1', units='ns',
-                           initial_value=0,
+                           initial_value=1,
                            parameter_class=ConfigParameter,
                            vals=vals.Numbers())
 
@@ -110,7 +110,7 @@ class Distortion(Instrument):
                            parameter_class=ConfigParameter,
                            vals=vals.Numbers())
         self.add_parameter('bounce_length_2', units='ns',
-                           initial_value=0,
+                           initial_value=1,
                            parameter_class=ConfigParameter,
                            vals=vals.Numbers())
 

@@ -19,6 +19,7 @@ from pycqed.analysis import fitting_models as fit_mods
 
 
 class Qubit(Instrument):
+
     '''
     Abstract base class for the qubit object.
     Contains a template for all the functions a qubit should have.
@@ -60,15 +61,21 @@ class Qubit(Instrument):
         - Should the pulse-parameters be grouped here in some convenient way?
             (e.g. parameter prefixes)
 
-
-    Future music (too complicated for now):
-        - Instead of having a parameter resonator, attach a resonator object
-          that has it's own frequency parameter, attach a mixer object that has
-          it's own calibration routines.
     '''
+
     def __init__(self, name, **kw):
         super().__init__(name, **kw)
         self.msmt_suffix = '_' + name  # used to append to measuremnet labels
+        self._operations = {}
+        self.add_parameter('operations',
+                           docstring='a list of all operations available on the qubit',
+                           get_cmd=self._get_operations)
+
+    def get_idn(self):
+        return self.name
+
+    def _get_operations(self):
+        return self._operations
 
     def measure_T1(self):
         # Note: I made all functions lowercase but for T1 it just looks too
@@ -96,19 +103,85 @@ class Qubit(Instrument):
     def measure_heterodyne_spectroscopy(self):
         raise NotImplementedError()
 
+    def add_operation(self, operation_name):
+        self._operations[operation_name] = {}
+
+    def link_param_to_operation(self, operation_name, parameter_name,
+                                argument_name):
+        """
+        Links an existing param to an operation for use in the operation dict.
+        """
+        if parameter_name not in self.parameters:
+            raise KeyError('Parameter {} needs to be added first'.format(
+                parameter_name))
+
+        if operation_name in self.operations().keys():
+            self._operations[operation_name][argument_name] = parameter_name
+        else:
+            raise KeyError('Unknown operation {}, add '.format(operation_name) +
+                           'first using add operation')
+
+    def add_pulse_parameter(self,
+                            operation_name,
+                            parameter_name,
+                            argument_name,
+                            initial_value=None,
+                            vals=vals.Numbers(),
+                            **kwargs):
+        """
+        Add a pulse parameter to the qubit.
+
+        Args:
+            parameter_name (str): Name of the parameter
+            argument_name  (str): Name of the arugment as used in the sequencer
+            operation_name (str): The operation of which this parameter is an
+                argument. e.g. mw_control or CZ
+            **kwargs get passed to the add_parameter function
+        Raises:
+            KeyError: if this instrument already has a parameter with this
+                name.
+        """
+        if parameter_name in self.parameters:
+            raise KeyError('Duplicate parameter name {}'.format(parameter_name))
+
+        if operation_name in self.operations().keys():
+            self._operations[operation_name][argument_name] = parameter_name
+        else:
+            raise KeyError('Unknown operation {}, add '.format(operation_name) +
+                           'first using add operation')
+
+        self.add_parameter(parameter_name,
+                           initial_value=initial_value,
+                           vals=vals,
+                           parameter_class=ManualParameter, **kwargs)
+
+        # for use in RemoteInstruments to add parameters to the server
+        # we return the info they need to construct their proxy
+        return
+
+    def get_operation_dict(self, operation_dict={}):
+        for op_name, op in self.operations().items():
+            operation_dict[op_name + ' ' + self.name] = {}
+            for argument_name, parameter_name in op.items():
+                operation_dict[op_name + ' ' + self.name][argument_name] = \
+                    self.get(parameter_name)
+        return operation_dict
+
 
 class Transmon(Qubit):
+
     '''
     circuit-QED Transmon as used in DiCarlo Lab.
     Adds transmon specific parameters as well
     '''
+
     def __init__(self, name, **kw):
         super().__init__(name, **kw)
-        self.add_parameter('EC', units='Hz',
+        self.add_parameter('E_c', units='Hz',
                            parameter_class=ManualParameter,
                            vals=vals.Numbers())
 
-        self.add_parameter('EJ', units='Hz',
+        self.add_parameter('E_j', units='Hz',
                            parameter_class=ManualParameter,
                            vals=vals.Numbers())
         self.add_parameter('assymetry',
@@ -117,8 +190,6 @@ class Transmon(Qubit):
         self.add_parameter('dac_voltage', units='mV',
                            parameter_class=ManualParameter)
         self.add_parameter('dac_sweet_spot', units='mV',
-                           parameter_class=ManualParameter)
-        self.add_parameter('E_c', units='Hz',
                            parameter_class=ManualParameter)
         self.add_parameter('dac_flux_coefficient', units='',
                            parameter_class=ManualParameter)
@@ -159,8 +230,6 @@ class Transmon(Qubit):
         self.add_parameter('f_qubit_calc', vals=vals.Enum(None, 'dac', 'flux'),
                            # in the future add 'tracked_dac', 'tracked_flux',
                            parameter_class=ManualParameter)
-
-
 
     def calculate_frequency(self, EC=None, EJ=None, assymetry=None,
                             dac_voltage=None, flux=None,
@@ -218,23 +287,28 @@ class Transmon(Qubit):
                                       self.f_qubit.get()+f_span/2,
                                       f_step)
                 elif self.f_qubit_calc() is 'dac':
-                    f_pred = fit_mods.QubitFreqDac(dac_voltage=self.IVVI.get('dac%d'%self.dac_channel()),
-                                                   f_max=self.f_max()*1e-9,
-                                                   E_c=self.E_c()*1e-9,
-                                                   dac_sweet_spot=self.dac_sweet_spot(),
-                                                   dac_flux_coefficient=self.dac_flux_coefficient(),
-                                                   asymmetry=self.asymmetry())*1e9
+                    f_pred = fit_mods.QubitFreqDac(
+                        dac_voltage=self.IVVI.get(
+                            'dac%d' % self.dac_channel()),
+                        f_max=self.f_max()*1e-9,
+                        E_c=self.E_c()*1e-9,
+                        dac_sweet_spot=self.dac_sweet_spot(),
+                        dac_flux_coefficient=self.dac_flux_coefficient(),
+                        asymmetry=self.asymmetry())*1e9
                     freqs = np.arange(f_pred-f_span/2,
                                       f_pred+f_span/2,
                                       f_step)
                 elif self.f_qubit_calc() is 'flux':
                     fluxes = self.FluxCtrl.flux_vector()
                     mappings = np.array(self.FluxCtrl.dac_mapping())
+                    # FIXME: this statement is super unclear
                     my_flux = np.sum(np.where(mappings == self.dac_channel(),
                                               mappings,
                                               0))-1
-                    print(mappings, my_flux, self.dac_channel())
-                    omega = lambda flux, f_max, EC, asym: (f_max + EC) * (asym**2 + (1-asym**2)*np.cos(np.pi*flux)**2)**0.25 - EC
+                    # print(mappings, my_flux, self.dac_channel())
+                    omega = lambda flux, f_max, EC, asym: ((
+                        f_max + EC) * (asym**2 + (1-asym**2) *
+                                       np.cos(np.pi*flux)**2)**0.25 - EC)
                     f_pred_calc = lambda flux: omega(flux=flux,
                                                      f_max=self.f_max()*1e-9,
                                                      EC=self.E_c()*1e-9,
@@ -243,15 +317,17 @@ class Transmon(Qubit):
                     freqs = np.arange(f_pred-f_span/2,
                                       f_pred+f_span/2,
                                       f_step)
-                    print(freqs.min(),freqs.max())
+                    # print(freqs.min(), freqs.max())
             # args here should be handed down from the top.
             self.measure_spectroscopy(freqs, pulsed=pulsed, MC=None,
-                                      analyze=True, close_fig=close_fig, use_max=use_max, update=update)
+                                      analyze=True, close_fig=close_fig,
+                                      use_max=use_max, update=update)
             if pulsed:
                 label = 'pulsed-spec'
             else:
                 label = 'spectroscopy'
-            analysis_spec = ma.Qubit_Spectroscopy_Analysis(label=label,close_fig=True)
+            analysis_spec = ma.Qubit_Spectroscopy_Analysis(
+                label=label, close_fig=True)
             if use_max:
                 self.f_qubit(analysis_spec.peaks['peak'])
             else:
@@ -296,7 +372,7 @@ class Transmon(Qubit):
                 print('Converged to: {:.9e}'.format(cur_freq))
             if update:
                 self.f_qubit.set(cur_freq)
-                print("update",update)
+                print("update", update)
             return cur_freq
 
     def find_resonator_frequency(self, **kw):
@@ -320,8 +396,8 @@ class Transmon(Qubit):
             self.measure_rabi(amps, n=1, MC=MC, analyze=False)
             a = ma.Rabi_Analysis(close_fig=close_fig)
             if take_fit_I:
-                    ampl = abs(a.fit_res[0].params['period'].value)/2
-                    print("taking I")
+                ampl = abs(a.fit_res[0].params['period'].value)/2
+                print("taking I")
             else:
                 if (a.fit_res[0].params['period'].stderr <=
                         a.fit_res[1].params['period'].stderr):
@@ -378,7 +454,7 @@ class Transmon(Qubit):
             self.measure_rabi_amp90(scales=scales, n=1, MC=MC, analyze=False)
             a = ma.Rabi_Analysis(close_fig=close_fig)
             if take_fit_I:
-                    scale = abs(a.fit_res[0].params['period'].value)/2
+                scale = abs(a.fit_res[0].params['period'].value)/2
             else:
                 if (a.fit_res[0].params['period'].stderr <=
                         a.fit_res[1].params['period'].stderr):

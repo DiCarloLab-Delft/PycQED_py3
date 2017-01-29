@@ -17,21 +17,22 @@ from pycqed.analysis.tools import data_manipulation as dm_tools
 import imp
 import math
 from math import erfc
-from scipy.signal import argrelextrema,argrelmax,argrelmin
+from scipy.signal import argrelextrema, argrelmax, argrelmin
 from copy import deepcopy
 
 try:
     from nathan_plotting_tools import *
 except:
     pass
-from pycqed.analysis import ramiro_analysis as RA
+from pycqed.analysis import composite_analysis as ca
 
 imp.reload(dm_tools)
 
 
 class MeasurementAnalysis(object):
 
-    def __init__(self, TwoD=False, folder=None, auto=True, **kw):
+    def __init__(self, TwoD=False, folder=None, auto=True,
+                 cmap_chosen='viridis',**kw):
         if folder is None:
             self.folder = a_tools.get_folder(**kw)
         else:
@@ -40,6 +41,7 @@ class MeasurementAnalysis(object):
         self.load_hdf5data(**kw)
         self.fit_results = []
         self.box_props = dict(boxstyle='Square', facecolor='white', alpha=0.8)
+        self.cmap_chosen = cmap_chosen
         if auto is True:
             self.run_default_analysis(TwoD=TwoD, **kw)
 
@@ -343,7 +345,9 @@ class MeasurementAnalysis(object):
                     ylabel=self.ylabel,
                     zlabel=self.zlabels[i],
                     save=False,
-                    transpose=transpose)
+                    transpose=transpose,
+                    cmap_chosen=self.cmap_chosen,
+                    **kw)
 
             fig.tight_layout(h_pad=1.5)
             fig.subplots_adjust(top=0.9)
@@ -1143,7 +1147,6 @@ class Rabi_Analysis(TD_Analysis):
         self.save_fig(self.fig, fig_tight=False, **kw)
 
     def fit_data(self, print_fit_results=False, **kw):
-        self.add_analysis_datagroup_to_file()
         model = fit_mods.CosModel
         self.fit_res = ['', '']
         # It would be best to do 1 fit to both datasets but since it is
@@ -1155,8 +1158,12 @@ class Rabi_Analysis(TD_Analysis):
                 data=self.measured_values[i],
                 t=self.sweep_points,
                 params=params)
-            self.save_fitted_parameters(fit_res=self.fit_res[i],
-                                        var_name=self.value_names[i])
+            try:
+                self.add_analysis_datagroup_to_file()
+                self.save_fitted_parameters(fit_res=self.fit_res[i],
+                                            var_name=self.value_names[i])
+            except Exception as e:
+                logging.warning(e)
 
 class TD_UHFQC(TD_Analysis):
     def __init__(self, NoCalPoints=4, center_point=31, make_fig=True,
@@ -5284,7 +5291,7 @@ class Chevron_2D(object):
             if auto==True:
                 self.analysis()
     def analysis(self):
-            chevron_scan = RA.quick_analysis(t_start=self.scan_start,
+            chevron_scan = ca.quick_analysis(t_start=self.scan_start,
                                            t_stop=self.scan_stop,
                                            options_dict=self.opt_dict,
                                            params_dict_TD=self.pdict,
@@ -5409,7 +5416,7 @@ class DoubleFrequency(object):
 
     def analysis(self):
             print(self.scan_start,self.scan_stop,self.opt_dict,self.pdict,self.nparams)
-            ramsey_scan = RA.quick_analysis(t_start=self.scan_start,
+            ramsey_scan = ca.quick_analysis(t_start=self.scan_start,
                                             t_stop=self.scan_stop,
                                             options_dict=self.opt_dict,
                                             params_dict_TD=self.pdict,
@@ -5542,7 +5549,7 @@ class SWAPN_cost(object):
 
     def analysis(self):
             print(self.scan_start,self.scan_stop,self.opt_dict,self.pdict,self.nparams)
-            sawpn_scan = RA.quick_analysis(t_start=self.scan_start,
+            sawpn_scan = ca.quick_analysis(t_start=self.scan_start,
                                             t_stop=self.scan_stop,
                                             options_dict=self.opt_dict,
                                             params_dict_TD=self.pdict,

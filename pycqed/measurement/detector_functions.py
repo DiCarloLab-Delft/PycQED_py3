@@ -1381,14 +1381,15 @@ class UHFQC_input_average_detector(Hard_Detector):
         self.AWG = AWG
         self.nr_samples = nr_samples
         self.nr_averages = nr_averages
-        print(nr_samples)
 
     def get_values(self):
+        self.UHFQC.quex_rl_readout(0) # resets UHFQC internal readout counters
         self.UHFQC.awgs_0_enable(1)
         try:
             temp = self.UHFQC.awgs_0_enable()
         except:
             temp = self.UHFQC.awgs_0_enable()
+        del temp
         if self.AWG is not None:
             self.AWG.start()
         while self.UHFQC.awgs_0_enable() == 1:
@@ -1397,11 +1398,7 @@ class UHFQC_input_average_detector(Hard_Detector):
         for i, channel in enumerate(self.channels):
             dataset = eval("self.UHFQC.quex_iavg_data_{}()".format(channel))
             data[i] = dataset[0]['vector']
-        # data = self.UHFQC.single_acquisition(self.nr_sweep_points,
-        #                                      self.poll_time, timeout=0,
-        #                                      channels=set(self.channels),
-        #                                      mode='iavg')
-        # data = np.array([data[key] for key in data.keys()])
+
         return data
 
     def prepare(self, sweep_points):
@@ -1449,8 +1446,11 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         self.cross_talk_suppression = cross_talk_suppression
 
     def get_values(self):
+        self.AWG.stop()
+        self.UHFQC.quex_rl_readout(0) # resets UHFQC internal readout counters
         self.UHFQC.awgs_0_enable(1)
         # probing the values to be sure communication is finished before
+        # this way of checking the UHFQC should be OK according to Niels H
         try:
             temp = self.UHFQC.awgs_0_enable()
         except:
@@ -1464,6 +1464,7 @@ class UHFQC_integrated_average_detector(Hard_Detector):
             time.sleep(0.01)
         data = ['']*len(self.channels)
         for i, channel in enumerate(self.channels):
+            # FIXME: better to use dataset = self.UHFQC.get('quex_rl_data_{}'.format(channel))
             dataset = eval("self.UHFQC.quex_rl_data_{}()".format(channel))
             data[i] = dataset[0]['vector']/self.nr_averages
             if self.cross_talk_suppression:
@@ -1558,6 +1559,7 @@ class UHFQC_integration_logging_det(Hard_Detector):
         self.cross_talk_suppression = cross_talk_suppression
 
     def get_values(self):
+        self.UHFQC.quex_rl_readout(0) # resets UHFQC internal readout counters
         self.UHFQC.awgs_0_enable(1)
         # probing the values to be sure communication is finished before
         try:
@@ -1568,10 +1570,6 @@ class UHFQC_integration_logging_det(Hard_Detector):
         # starting AWG
         if self.AWG is not None:
             self.AWG.start()
-        # data = self.UHFQC.single_acquisition(self.nr_shots,
-        #                                      self.poll_time, timeout=0,
-        #                                      channels=set(self.channels))
-        # data = np.array([data[key] for key in data.keys()])
         while self.UHFQC.awgs_0_enable() == 1:
             time.sleep(0.01)
 
@@ -1593,7 +1591,7 @@ class UHFQC_integration_logging_det(Hard_Detector):
         # the loop
         self.UHFQC.awgs_0_single(1)
         self.UHFQC.awgs_0_userregs_1(0)  # 0 for rl, 1 for iavg
-        self.UHFQC.awgs_0_userregs_0(self.nr_shots+1)
+        self.UHFQC.awgs_0_userregs_0(self.nr_shots)
         self.UHFQC.quex_rl_length(self.nr_shots)
         self.UHFQC.quex_rl_avgcnt(0)  # 1 for single shot readout
         self.UHFQC.quex_wint_length(int(self.integration_length*(1.8e9)))

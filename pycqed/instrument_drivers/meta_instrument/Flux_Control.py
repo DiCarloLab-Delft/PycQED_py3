@@ -62,6 +62,7 @@ class Flux_Control(Instrument):
 
     def do_set_flux_offsets(self, vector):
         self._flux_offsets = vector
+
     def do_get_flux_offsets(self):
         return self._flux_offsets
 
@@ -71,6 +72,8 @@ class Flux_Control(Instrument):
         for i in range(len(self._dac_mapping)):
             self.IVVI._set_dac(self._dac_mapping[i], currents[i])
         return currents
+
+
     def do_get_flux_vector(self):
         currents = np.zeros(len(self._dac_mapping))
         for i in range(len(self._dac_mapping)):
