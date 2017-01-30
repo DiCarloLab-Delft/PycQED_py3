@@ -44,6 +44,10 @@ DataT = station.components['DataT']
 AncT.add_operation('CZ')
 # AncT.add_operation('CZ_phase_corr') # to be added as separate later
 AncT.link_param_to_operation('CZ', 'fluxing_amp', 'amplitude', )
+AncT.add_pulse_parameter('CZ', 'fluxing_operation_type', 'operation_type',
+                         initial_value='Flux', vals=vals.Strings())
+
+
 AncT.add_pulse_parameter('CZ', 'CZ_channel_amp', 'channel_amplitude',
                          initial_value=2.)
 AncT.link_param_to_operation('CZ', 'fluxing_channel', 'channel')
@@ -85,6 +89,7 @@ AncT.add_pulse_parameter('CZ', 'CZ_theta', 'theta_f', np.pi/2)
 
 AncT.add_operation('Z')
 
+AncT.link_param_to_operation('Z', 'fluxing_operation_type', 'operation_type')
 AncT.link_param_to_operation('Z', 'fluxing_channel', 'channel')
 AncT.link_param_to_operation('Z', 'CZ_refpoint', 'refpoint')
 AncT.link_param_to_operation('Z', 'CZ_phase_corr_amp', 'amplitude')
@@ -97,6 +102,9 @@ AncT.add_pulse_parameter('Z', 'Z_pulse_delay',
                          'pulse_delay', 0)
 
 DataT.add_operation('SWAP')
+
+DataT.add_pulse_parameter('SWAP', 'fluxing_operation_type', 'operation_type',
+                         initial_value='Flux', vals=vals.Strings())
 DataT.link_param_to_operation('SWAP', 'fluxing_amp', 'amplitude')
 DataT.link_param_to_operation('SWAP', 'fluxing_channel', 'channel')
 DataT.add_pulse_parameter('SWAP', 'SWAP_dead_time', 'dead_time',
@@ -113,8 +121,6 @@ DataT.add_pulse_parameter('SWAP', 'SWAP_refpoint',
 DataT.link_param_to_operation('SWAP', 'SWAP_amp', 'SWAP_amp')
 DataT.add_pulse_parameter('SWAP', 'SWAP_pulse_buffer',
                           'pulse_buffer', 100e-9)
-DataT.add_pulse_parameter('SWAP', 'SWAP_square_pulse_buffer',
-                          'square_pulse_buffer', 100e-9)
 
 DataT.link_param_to_operation('SWAP', 'SWAP_time', 'square_pulse_length')
 
@@ -123,6 +129,7 @@ DataT.add_pulse_parameter('SWAP', 'SWAP_pulse_delay',
                           'pulse_delay', 10e-9)
 
 DataT.add_operation('Z')
+DataT.link_param_to_operation('Z', 'fluxing_operation_type', 'operation_type')
 DataT.link_param_to_operation('Z', 'fluxing_channel', 'channel')
 DataT.link_param_to_operation('Z', 'SWAP_refpoint', 'refpoint')
 DataT.link_param_to_operation('Z', 'SWAP_phase_corr_amp', 'amplitude')

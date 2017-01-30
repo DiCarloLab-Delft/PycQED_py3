@@ -1064,7 +1064,6 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
 
         return pulse_dict
 
-
     def get_pulse_pars(self):
         self.pulse_pars = {
             'I_channel': self.pulse_I_channel.get(),
@@ -1079,6 +1078,8 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
             'phi_skew': self.phi_skew.get(),
             'alpha': self.alpha.get(),
             'phase': 0,
+            'operation_type': 'MW',
+            'target_qubit': self.name,
             'pulse_type': 'SSB_DRAG_pulse'}
 
         if self.RO_fixed_point_correction():
@@ -1102,6 +1103,8 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
             'acq_marker_delay': self.RO_acq_marker_delay.get(),
             'acq_marker_channel': self.RO_acq_marker_channel.get(),
             'phase': 0,
+            'operation_type': 'RO',
+            'target_qubit': self.name,
             'pulse_type': self.RO_pulse_type.get()}
         return self.pulse_pars, self.RO_pars
 
@@ -1111,6 +1114,8 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         spec_pars = {'pulse_type': 'SquarePulse',
                      'length': self.spec_pulse_length.get(),
                      'amplitude': 1,
+                     'operation_type': 'MW',
+                     'target_qubit': self.name,
                      'channel': self.spec_pulse_marker_channel.get()}
 
         RO_pars['pulse_delay'] += spec_pars['length']
@@ -1118,28 +1123,6 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                                     self.spec_pulse_depletion_time.get())
         return spec_pars, RO_pars
 
-    def get_cphase_pars(self):
-        logging.warning('deprecated use get_operation_dict')
-        cphase_pars = {'pulse_type': 'CosPulse',
-                       'length': 'ch%d'%self.fluxing_channel(),
-                       'channel': 'ch4',
-                       'phase': 30.,
-                       'pulse_delay': 30e-9,
-                       'amplitude': 0.04}
-        return cphase_pars
-
-    def get_flux_pars(self):
-        logging.warning('deprecated use get_operation_dict')
-        flux_pulse_pars = {'pulse_type': 'SquareFluxPulse',
-                           'channel': 'ch%d'%self.fluxing_channel(),
-                           'amplitude': self.fluxing_amp(),
-                           'swap_amp': self.SWAP_amp(),
-                           'square_pulse_length': self.swap_time(),
-                           'square_pulse_buffer': self.flux_pulse_buffer(),
-                           'pulse_delay': 0,
-                           'dead_time': self.flux_dead_time(),
-                           'mw_to_flux_delay': self.mw_to_flux_delay()}
-        return flux_pulse_pars
 
     def get_operation_dict(self, operation_dict={}):
         operation_dict = super().get_operation_dict(operation_dict)

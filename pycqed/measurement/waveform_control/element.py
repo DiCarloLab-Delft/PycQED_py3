@@ -31,6 +31,10 @@ class Element:
         self.time_offset = kw.pop('time_offset', 0)
 
         self.ignore_delays = kw.pop('ignore_delays', False)
+        # Default fixed point, used for aligning RO elements. Aligns first RO
+        self.readout_fixed_point = kw.pop('readout_fixed_point', 1e-6)
+        # used to track if a correction has been applied
+        self.fixed_point_applied = False
 
         self.pulses = {}
         self._channels = {}
@@ -123,7 +127,6 @@ class Element:
                 + 0.5).astype(int) / self.clock
 
 
-
     def shift_all_pulses(self, dt):
         '''
         Shifts all pulses by a time dt, this is used for correcting the phase
@@ -132,6 +135,7 @@ class Element:
         self.ignore_offset_correction = True
         for name, pulse in self.pulses.items():
             pulse._t0 += dt
+
     ######################
     # channel management #
     ######################
@@ -163,6 +167,7 @@ class Element:
 
     def add(self, pulse, name=None, start=0,
             refpulse=None, refpoint='end', refpoint_new='start',
+            operation_type='other',
             fixed_point_freq=None):
         '''
         Function adds a pulse to the element, there are several options to set
@@ -184,6 +189,7 @@ class Element:
 
         '''
         pulse = deepcopy(pulse)
+        pulse.operation_type = operation_type
         if name is None:
             name = self._auto_pulse_name(pulse.name)
 
@@ -225,9 +231,11 @@ class Element:
         pulse._t0 = t0
         self.pulses[name] = pulse
         self._last_added_pulse = name
-        if fixed_point_freq is not None:
-            time_corr = calculate_time_correction(t0, fixed_point_freq)
+        # Shift all pulses to the fixed point for the first RO pulse encountered
+        if operation_type == 'RO' and self.fixed_point_applied is False:
+            time_corr = calculate_time_correction(t0, self.readout_fixed_point)
             self.shift_all_pulses(time_corr)
+            self.fixed_point_applied = True
         return name
 
     def append(self, *pulses):
@@ -402,40 +410,8 @@ class Element:
 # sequencer)
 
 
-def calculate_time_correction(t0, fixed_point_freq, clock=1e9):
-        '''
-        calculates a time shift to make sure a the "fixed point"  reference
-        is fixed in phase. It calculates the required time shift based on
-        the fixed_point_freq.
-
-        Time correction is rounded to a full clock cycle.
-        '''
-        fixed_point_freq = abs(fixed_point_freq)
-        phase_diff = (360 * fixed_point_freq * t0) % (360)
-        phase_corr = 360 - phase_diff  # Correction in degrees
-        time_corr_0 = phase_corr/(360*fixed_point_freq)
-        time_corr = time_corr_0
-
-        i = 0
-        while not is_divisible_by_clock(time_corr, clock):
-            i += 1
-            if i > 100:
-                print('time_corr_0: %s' % time_corr_0)
-                print('1/fixed_point_freq: %s' % (1/fixed_point_freq))
-                raise Exception('Could not find time corr for fixed point')
-            elif time_corr > 10e-6:
-                print('time_corr_0: %s' % time_corr_0)
-                print('1/fixed_point_freq: %s' % (1/fixed_point_freq))
-                raise Exception('Could not find time corr for fixed point')
-            time_corr += 1/fixed_point_freq
-        time_corr = round(time_corr, 9)  # Rounds to ns
-        if time_corr < 0:
-            raise ValueError(
-                'Time correction "{}" cannot be negative'.format(time_corr))
-            # Cannot be negative because it will give unexpected behaviour
-            # This should not be possible to happen but I ran into this
-            # a few time so I leave the exception here
-        return time_corr
+def calculate_time_correction(t0, fixed_point=1e-6):
+    return np.round((fixed_point-t0) % fixed_point, decimals=9)
 
 
 def is_divisible_by_clock(value, clock=1e9):

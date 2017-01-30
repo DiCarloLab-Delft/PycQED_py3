@@ -167,7 +167,8 @@ class Qubit(Instrument):
 
     def get_operation_dict(self, operation_dict={}):
         for op_name, op in self.operations().items():
-            operation_dict[op_name + ' ' + self.name] = {}
+            operation_dict[op_name + ' ' + self.name] = {'target_qubit':
+                                                         self.name}
             for argument_name, parameter_name in op.items():
                 operation_dict[op_name + ' ' + self.name][argument_name] = \
                     self.get(parameter_name)
