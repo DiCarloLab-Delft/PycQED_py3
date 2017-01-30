@@ -106,7 +106,6 @@ list_qubits = [AncT, DataT, AncB, DataM, DataB]
 for qubit in list_qubits:
     qubit.f_RO_mod(-20e6)
     qubit.f_pulse_mod(-100e6)
-    qubit.RO_fixed_point_correction(True)
     qubit.RO_acq_averages(2**13)
     # we use the CBox as it has fast data acquisiotn compared to the UHFQC
     switch_to_pulsed_RO_CBox(qubit)
@@ -210,7 +209,6 @@ DataT.f_qubit_calc('flux')
 
 # First test that find frequency and find qubit works
 for q in [AncT, AncB, DataT, DataM, DataB]:
-    q.RO_fixed_point_correction(True)
     q.f_qubit_calc('dac')
     q.RO_acq_averages(2**13)
     q.find_resonator_frequency(freqs=None,

@@ -53,7 +53,6 @@ class Test_SingleQubitTek(unittest.TestCase):
             'length': 300e-9,
             'pulse_delay': 0,
             'mod_frequency': 50e6,
-            'fixed_point_frequency': -50e6,
             'acq_marker_delay': 0,
             'acq_marker_channel': 'ch1_marker1',
             'phase': 0,
@@ -98,7 +97,6 @@ class Test_SingleQubitTek(unittest.TestCase):
     def test_ramsey_freq_detuning(self):
         times = np.linspace(0, 5e-6, 41)
         for f_fix_pt in [50e-6, -50e-6]:
-            self.RO_pars['fixed_point_frequency'] = f_fix_pt
             for RO_pulse_type in ['Gated_MW_RO_pulse', 'MW_IQmod_pulse_tek']:
                 self.RO_pars['pulse_type'] = RO_pulse_type
                 f_detuning = 300e3  # 300 kHz detuning

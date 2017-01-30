@@ -8,8 +8,6 @@ from pycqed.measurement.pulse_sequences import single_qubit_2nd_exc_seqs as sqs2
 from pycqed.measurement.pulse_sequences import fluxing_sequences as fsqs
 from pycqed.measurement.pulse_sequences import multi_qubit_tek_seq_elts as mq_sqs
 import time
-default_gauss_width = 10  # magic number should be removed,
-# note magic number only used in old mathematica seqs
 
 
 class File(swf.Hard_Sweep):
@@ -34,6 +32,8 @@ class File(swf.Hard_Sweep):
 class awg_seq_swf(swf.Hard_Sweep):
     def __init__(self, awg_seq_func, awg_seq_func_kwargs,
                  parameter_name=None, unit='a.u.',
+                 AWG=None,
+                 fluxing_channels=[],
                  upload=True, return_seq=False):
         """
         A wrapper for awg sequence generating functions.
@@ -44,9 +44,11 @@ class awg_seq_swf(swf.Hard_Sweep):
         self.awg_seq_func = awg_seq_func
         self.awg_seq_func_kwargs = awg_seq_func_kwargs
         self.unit = unit
-        self.name = 'swf_'+ awg_seq_func.__name__
+        self.name = 'swf_' + awg_seq_func.__name__
+        self.fluxing_channels = fluxing_channels
+        self.AWG = AWG
 
-        if parameter_name != None:
+        if parameter_name is not None:
             self.parameter_name = parameter_name
         else:
             self.parameter_name = 'points'
@@ -54,8 +56,22 @@ class awg_seq_swf(swf.Hard_Sweep):
     def prepare(self, **kw):
         if self.parameter_name != 'points':
             self.awg_seq_func_kwargs[self.parameter_name] = self.sweep_points
+
         if self.upload:
+            old_vals = np.zeros(len(self.fluxing_channels))
+            for i, ch in enumerate(self.fluxing_channels):
+                old_vals[i] = self.AWG.get('{}_amp'.format(ch))
+                self.AWG.set('{}_amp'.format(ch), 2)
+
             self.awg_seq_func(**self.awg_seq_func_kwargs)
+
+            for i, ch in enumerate(self.fluxing_channels):
+                self.AWG.set('{}_amp'.format(ch), old_vals[i])
+
+    def set_parameter(self, val, **kw):
+        # exists for compatibility reasons with 2D sweeps
+        pass
+
 
 class Rabi(swf.Hard_Sweep):
 
@@ -231,41 +247,45 @@ class Rabi_2nd_exc(swf.Hard_Sweep):
                                   n=self.n)
 
 
-class chevron_length(swf.Hard_Sweep):
+# class chevron_length(swf.Hard_Sweep):
 
-    def __init__(self, mw_pulse_pars, RO_pars,
-                 flux_pulse_pars, dist_dict, AWG, upload=True,
-                 return_seq=False):
-        super().__init__()
-        self.mw_pulse_pars = mw_pulse_pars
-        self.RO_pars = RO_pars
-        self.flux_pulse_pars = flux_pulse_pars
-        self.dist_dict = dist_dict
-        self.upload = upload
-        self.name = 'Chevron'
-        self.parameter_name = 'Time'
-        self.unit = 's'
-        self.return_seq = return_seq
-        self.AWG = AWG
+#     def __init__(self, operation_dict,
+#                  # mw_pulse_pars, RO_pars,
+#                  # flux_pulse_pars,
+#                  dist_dict, AWG, upload=True,
+#                  return_seq=False):
+#         super().__init__()
+#         # self.mw_pulse_pars = mw_pulse_pars
+#         # self.RO_pars = RO_pars
+#         # self.flux_pulse_pars = flux_pulse_pars
+#         self.operation_dict = operation_dict
+#         self.fluxing_channel = fluxing_channel
+#         self.dist_dict = dist_dict
+#         self.upload = upload
+#         self.name = 'Chevron'
+#         self.parameter_name = 'Time'
+#         self.unit = 's'
+#         self.return_seq = return_seq
+#         self.AWG = AWG
 
-    def prepare(self, **kw):
-        if self.upload:
-            old_val = self.AWG.get(
-                '{}_amp'.format(self.flux_pulse_pars['channel']))
-            # Rescaling the AWG channel amp is done to ensure that the dac
-            # values of the flux pulses (including kernels) are defined on
-            # a 2Vpp scale.
-            self.AWG.set('{}_amp'.format(self.flux_pulse_pars['channel']), 2.)
-            fsqs.chevron_seq(self.mw_pulse_pars,
-                             self.RO_pars,
-                             self.flux_pulse_pars,
-                             pulse_lengths=self.sweep_points,
-                             distortion_dict=self.dist_dict)
-            self.AWG.set('{}_amp'.format(self.flux_pulse_pars['channel']),
-                         old_val)
+#     def prepare(self, **kw):
+#         if self.upload:
+#             old_val = self.AWG.get(
+#                 '{}_amp'.format(self.flux_pulse_pars['channel']))
+#             # Rescaling the AWG channel amp is done to ensure that the dac
+#             # values of the flux pulses (including kernels) are defined on
+#             # a 2Vpp scale.
+#             self.AWG.set('{}_amp'.format(self.flux_pulse_pars['channel']), 2.)
+#             fsqs.chevron_seq(self.mw_pulse_pars,
+#                              self.RO_pars,
+#                              self.flux_pulse_pars,
+#                              pulse_lengths=self.sweep_points,
+#                              distortion_dict=self.dist_dict)
+#             self.AWG.set('{}_amp'.format(self.flux_pulse_pars['channel']),
+#                          old_val)
 
-    def set_parameter(self, val, **kw):
-        pass
+#     def set_parameter(self, val, **kw):
+#         pass
 
 class chevron_single_element(swf.Soft_Sweep):
 
@@ -686,10 +706,10 @@ class chevron_cphase_length(swf.Hard_Sweep):
 
 class SwapN(swf.Hard_Sweep):
 
-    def __init__(self, pulse_dict, q0, dist_dict, AWG,
+    def __init__(self, operation_dict, q0, dist_dict, AWG,
                  upload=True):
         super().__init__()
-        self.pulse_dict = pulse_dict
+        self.operation_dict = operation_dict
         self.q0 = q0
         self.dist_dict = dist_dict
         self.upload = upload
@@ -704,16 +724,16 @@ class SwapN(swf.Hard_Sweep):
     def prepare(self, **kw):
         if self.upload:
             old_val = self.AWG.get(
-                '{}_amp'.format(self.pulse_dict['SWAP '+self.q0]['channel']))
+                '{}_amp'.format(self.operation_dict['SWAP '+self.q0]['channel']))
             # Rescaling the AWG channel amp is done to ensure that the dac
             # values of the flux pulses (including kernels) are defined on
             # a 2Vpp scale.
-            self.AWG.set('{}_amp'.format(self.pulse_dict['SWAP '+self.q0]['channel']), 2.)
-            fsqs.SwapN(pulse_dict=self.pulse_dict, q0=self.q0,
+            self.AWG.set('{}_amp'.format(self.operation_dict['SWAP '+self.q0]['channel']), 2.)
+            fsqs.SwapN(operation_dict=self.operation_dict, q0=self.q0,
                        nr_pulses_list=self.sweep_points,
                        distortion_dict=self.dist_dict,
                        upload=True)
-            self.AWG.set('{}_amp'.format(self.pulse_dict['SWAP '+self.q0]['channel']),
+            self.AWG.set('{}_amp'.format(self.operation_dict['SWAP '+self.q0]['channel']),
                          old_val)
 
 
@@ -1640,65 +1660,3 @@ class Load_Sequence_Tek(swf.Hard_Sweep):
         if self.upload:
             self.AWG.set_setup_filename(self.sequence_name)
 
-
-# class PiHalfX360(AWG_Sweep):
-#     def __init__(self, gauss_width=default_gauss_width,
-#                  qubit_suffix="", **kw):
-#         self.sweep_control = 'hard'
-#         self.name = 'PiHalfX360'
-#         self.parameter_name = 'repetitions'
-#         self.unit = 'Arb.unit'
-#         self.filename = 'PiHalfX360%s_%i' % (qubit_suffix, gauss_width)
-#         super(self.__class__, self).__init__(**kw)
-
-
-# class PiX360(AWG_Sweep):
-#     def __init__(self, gauss_width=default_gauss_width,
-#                  qubit_suffix="", **kw):
-#         self.sweep_control = 'hard'
-#         self.name = 'PiX360'
-#         self.parameter_name = 'repetitions'
-#         self.unit = 'Arb.unit'
-#         self.sweep_points = np.linspace(1, 60, 60)
-#         self.filename = 'PiX360%s_%i' % (qubit_suffix, gauss_width)
-#         super(self.__class__, self).__init__(**kw)
-
-
-# class PiHalfY180(AWG_Sweep):
-#     def __init__(self, gauss_width=default_gauss_width,
-#                  qubit_suffix="", **kw):
-#         self.sweep_control = 'hard'
-#         self.name = 'PiHalfY180'
-#         self.parameter_name = 'repetitions'
-#         self.unit = 'Arb.unit'
-#         self.filename = 'PiHalfY180%s_%i' % (qubit_suffix, gauss_width)
-#         super(self.__class__, self).__init__(**kw)
-
-
-# class PiHalfY360(AWG_Sweep):
-#     def __init__(self, gauss_width=default_gauss_width,
-#                  qubit_suffix="", **kw):
-#         self.sweep_control = 'hard'
-#         self.name = 'PiHalfY360'
-#         self.parameter_name = 'repetitions'
-#         self.unit = 'Arb.unit'
-#         self.filename = 'PiHalfY360%s_%i' % (qubit_suffix, gauss_width)
-#         super(self.__class__, self).__init__(**kw)
-
-
-# class AWG_Sweep_File(AWG_Sweep):
-#     def __init__(self, filename, NoSegments=None,
-#                  gauss_width=default_gauss_width,
-#                  add_filename_tags=True, **kw):
-#         self.sweep_control = 'hard'
-#         self.filename = filename
-#         if add_filename_tags:
-#             self.filename += '_%i' % gauss_width
-#         self.name = filename
-#         if NoSegments:
-#             self.sweep_points = np.linspace(1, NoSegments, NoSegments)
-#         self.parameter_name = 'Pulse Number'
-#         self.unit = 'Arb.unit'
-#         # self.TD_Meas.set_NoSegments(len(self.sweep_points))
-#         super(AWG_Sweep_File, self).__init__(
-#             add_filename_tags=add_filename_tags, **kw)

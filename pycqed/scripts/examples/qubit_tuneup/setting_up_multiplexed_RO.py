@@ -11,7 +11,6 @@ LutManMan = qc.station.components['LutManMan']
 
 list_qubits = [q0, q1, q2, q3, q4]
 for q in list_qubits:
-    q.RO_fixed_point_correction(False)
     q.RO_acq_averages(2**10)
     q.pulse_I_offset(0.001)
     q.pulse_Q_offset(-0.006)
@@ -151,29 +150,5 @@ print("residual cross-talk matrix",  mu_matrix)
 # Two qubit AllXY to verify multiplexed driving and RO
 #############################################################
 
-
-mqs.station=station
-#AllXY on Data top
-AncT.RO_acq_averages(1024)
-int_avg_det = det.UHFQC_integrated_average_detector(
-            UHFQC=AncT._acquisition_instr, AWG=AncT.AWG,
-            channels=[DataT.RO_acq_weight_function_I(),
-                      AncT.RO_acq_weight_function_I()],
-            nr_averages=AncT.RO_acq_averages(),
-            integration_length=AncT.RO_acq_integration_length(),
-            cross_talk_suppression=True)
-
-pulse_dict ={}
-q0.get_pulse_dict(pulse_dict)
-q1.get_pulse_dict(pulse_dict)
-two_qubit_AllXY_sweep = awg_swf.awg_seq_swf(mqs.two_qubit_AllXY,
-    awg_seq_func_kwargs={'pulse_dict':pulse_dict, 'q0':'AncT', 'q1':'DataT',
-                         'RO_target':'AncT',
-                         'sequence_type': 'sequential'})
-
-
-MC.set_sweep_function(two_qubit_AllXY_sweep)
-MC.set_sweep_points(np.arange(42))
-MC.set_detector_function(int_avg_det)
-MC.run('2 qubit AllXY sequential')
-ma.MeasurementAnalysis()
+# S5 is the device object
+mq_mod.measure_two_qubit_AllXY(S5, 'DataT', 'AncT')

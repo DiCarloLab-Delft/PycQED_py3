@@ -659,8 +659,6 @@ class Tektronix_driven_transmon_v2(Transmon):
             'length': self.RO_pulse_length.get(),
             'pulse_delay': self.RO_pulse_delay.get(),
             'mod_frequency': self.f_RO_mod.get(),
-            'fixed_point_frequency': gcd(int(self.f_RO_mod()),
-                                         int(self.f_JPA_pump_mod())),
             'acq_marker_delay': self.RO_acq_marker_delay.get(),
             'acq_marker_channel': self.RO_acq_marker_channel.get(),
             'phase': 0,

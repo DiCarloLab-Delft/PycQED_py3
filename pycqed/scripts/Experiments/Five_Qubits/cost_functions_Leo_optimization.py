@@ -247,9 +247,7 @@ class CPhase_cost_func_det_Ramiro(det.Soft_Detector):
         elif self.cost_function_choice == 1:
             self.value_names = ['Maximum amp diff', 'missing swap pop']
             self.value_units = ['a.u.', 'a.u.']
-        elif self.cost_function_choice == 2:
-            self.value_names = ['Cost function', 'Fringe distance', 'phase_0']
-            self.value_units = ['a.u.', 'deg', 'deg']
+
         qCP_pulse_pars, RO_pars_qCP = qCP.get_pulse_pars()
         qS_pulse_pars, RO_pars_qS = qS.get_pulse_pars()
         self.theta_f = flux_pulse_pars_qCP['theta_f']

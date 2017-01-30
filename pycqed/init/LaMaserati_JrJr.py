@@ -412,7 +412,6 @@ else:
 
 list_qubits = [DataT, AncT, DataM, AncB,  DataB]
 for qubit in list_qubits:
-    qubit.RO_fixed_point_correction(True)
     qubit.RO_pulse_delay(20e-9)
     # qubit.RO_acq_averages(2**13)
 

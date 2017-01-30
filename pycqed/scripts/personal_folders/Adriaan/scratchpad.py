@@ -120,13 +120,13 @@ DataT.add_pulse_parameter('SWAP', 'SWAP_refpoint',
                           'refpoint', 'end', vals=vals.Strings())
 DataT.link_param_to_operation('SWAP', 'SWAP_amp', 'SWAP_amp')
 DataT.add_pulse_parameter('SWAP', 'SWAP_pulse_buffer',
-                          'pulse_buffer', 100e-9)
+                          'pulse_buffer', 0e-9)
 
 DataT.link_param_to_operation('SWAP', 'SWAP_time', 'square_pulse_length')
 
 
 DataT.add_pulse_parameter('SWAP', 'SWAP_pulse_delay',
-                          'pulse_delay', 10e-9)
+                          'pulse_delay', 0e-9)
 
 DataT.add_operation('Z')
 DataT.link_param_to_operation('Z', 'fluxing_operation_type', 'operation_type')

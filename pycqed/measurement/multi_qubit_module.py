@@ -3,22 +3,174 @@ from pycqed.measurement import awg_sweep_functions as awg_swf
 from pycqed.measurement import detector_functions as det
 from pycqed.analysis import measurement_analysis as ma
 import qcodes as qc
-
+from pycqed.measurement.pulse_sequences import multi_qubit_tek_seq_elts as mqs
+import pycqed.measurement.pulse_sequences.fluxing_sequences as fsqs
 station = qc.station
 dist_dict = None
 
-"""
-Multiplexed detector
-detector = det.UHFQC_integration_logging_det(
-                UHFQC=UHFQC_1, AWG=AWG,
-                channels=[0,1,2,3],
-                integration_length=integration_length,
-                nr_shots=256,
-                cross_talk_suppression=True)
-"""
+
+def measure_two_qubit_AllXY(device, q0_name, q1_name,
+                            sequence_type='sequential', MC=None):
+    if MC is None:
+        MC = qc.station.components['MC']
+    q0 = station.components[q0_name]
+    q1 = station.components[q1_name]
+    # AllXY on Data top
+    # FIXME: multiplexed RO should come from the device
+    int_avg_det = det.UHFQC_integrated_average_detector(
+        UHFQC=q0._acquisition_instr, AWG=q0.AWG,
+        channels=[q1.RO_acq_weight_function_I(),
+                  q0.RO_acq_weight_function_I()],
+        nr_averages=q0.RO_acq_averages(),
+        integration_length=q0.RO_acq_integration_length(),
+        cross_talk_suppression=True)
+
+    operation_dict = device.get_operation_dict()
+
+    two_qubit_AllXY_sweep = awg_swf.awg_seq_swf(
+        mqs.two_qubit_AllXY,
+        awg_seq_func_kwargs={'operation_dict': operation_dict,
+                             'q0': q0_name,
+                             'q1': q1_name,
+                             'RO_target': q0_name,
+                             'sequence_type': sequence_type})
+
+    MC.set_sweep_function(two_qubit_AllXY_sweep)
+    MC.set_sweep_points(np.arange(42))
+    MC.set_detector_function(int_avg_det)
+    MC.run('2 qubit AllXY sequential')
+    ma.MeasurementAnalysis()
 
 
-def resonant_cphase(phases, low_qubit, high_qubit, timings_dict, mmt_label='', MC=None, run=True):
+def measure_chevron(device, q0_name, amps, length, MC=None):
+    # Might belong better in some fluxing module but that does not exist yet
+    if MC is None:
+        MC = qc.station.components['MC']
+
+    if len(amps) == 1:
+        slice_scan = True
+    else:
+        slice_scan = False
+
+    operation_dict = device.get_operation_dict()
+
+    # preparation of sweep points and cal points
+    cal_points = 4
+    lengths_cal = length[-1] + \
+        np.arange(1, 1+cal_points)*(length[1]-length[0])
+    lengths_vec = np.concatenate((length, lengths_cal))
+
+    # start preparations
+    q0 = device.qubits()[q0_name]
+    q0.prepare_for_timedomain()
+    dist_dict = q0.dist_dict()
+
+    chevron_swf = awg_swf.awg_seq_swf(
+        fsqs.chevron_seq,
+        parameter_name='pulse_lengths',
+        AWG=q0.AWG,
+        fluxing_channels=[q0.fluxing_channel()],
+        awg_seq_func_kwargs={'operation_dict': operation_dict,
+                             'q0': q0_name,
+                             'distortion_dict': q0.dist_dict()})
+
+    MC.set_sweep_function(chevron_swf)
+    MC.set_sweep_points(lengths_vec)
+    if not slice_scan:
+        MC.set_sweep_function_2D(
+            q0.AWG.parameters[q0.fluxing_channel()+'_amp'])
+        MC.set_sweep_points_2D(amps)
+
+    MC.set_detector_function(q0.int_avg_det_rot)
+    if slice_scan:
+        q0.AWG.parameters[q0.fluxing_channel()+'_amp'].set(amps[0])
+        MC.run('Chevron_slice_%s' % q0.name)
+        ma.TD_Analysis(auto=True)
+    else:
+        MC.run('Chevron_2D_%s' % q0.name, mode='2D')
+        ma.Chevron_2D(auto=True)
+
+
+def measure_SWAPN(device, q0_name, swap_amps,
+                  number_of_swaps=30, MC=None):
+    if MC is None:
+        MC = qc.station.components['MC']
+    q0 = device.qubits()[q0_name]
+    # These are the sweep points
+    swap_vec = np.arange(number_of_swaps)*2
+    cal_points = 4
+    lengths_cal = swap_vec[-1] + \
+        np.arange(1, 1+cal_points)*(swap_vec[1]-swap_vec[0])
+    swap_vec = np.concatenate((swap_vec, lengths_cal))
+
+    operation_dict = device.get_operation_dict()
+    AWG = q0.AWG
+
+    repSWAP = awg_swf.awg_seq_swf(
+        fsqs.SwapN,
+        parameter_name='nr_pulses_list',
+        unit='#',
+        AWG=q0.AWG,
+        fluxing_channels=[q0.fluxing_channel()],
+        awg_seq_func_kwargs={'operation_dict': operation_dict,
+                             'q0': q0_name,
+                             'distortion_dict': q0.dist_dict()})
+
+    # repSWAP = awg_swf.SwapN(op_dict, q0.name,
+    #                         dist_dict=dist_dict,
+    #                         AWG=AWG,
+    #                         upload=True)
+    MC.set_sweep_function(repSWAP)
+    MC.set_sweep_points(swap_vec)
+
+    MC.set_sweep_function_2D(AWG.ch4_amp)
+    MC.set_sweep_points_2D(swap_amps)
+
+    MC.set_detector_function(q0.int_avg_det_rot)
+    MC.run('SWAPN_%s' % q0.name, mode='2D')
+    ma.TwoD_Analysis(auto=True)
+
+
+
+def measure_S_CZ_S(device, q0_name, q1_name, CZ_phase_corr_amps, MC=None):
+
+    self.s = awg_swf.swap_CP_swap_2Qubits_1qphasesweep_amp(
+        qCP_pulse_pars, qS_pulse_pars,
+        flux_pulse_pars_qCP, flux_pulse_pars_qS, RO_pars_qCP,
+        dist_dict, timings_dict=timings_dict,
+        AWG=qS.AWG,  inter_swap_wait=self.inter_swap_wait,
+        upload=False,
+        excitations='both', CPhase=self.CPhase,
+        reverse_control_target=self.reverse_control_target,
+        sweep_q=self.sweep_q)
+
+    int_avg_det = det.UHFQC_integrated_average_detector(
+        UHFQC=q0._acquisition_instr, AWG=q0.AWG,
+        channels=[q1.RO_acq_weight_function_I(),
+                  q0.RO_acq_weight_function_I()],
+        nr_averages=q0.RO_acq_averages(),
+        integration_length=q0.RO_acq_integration_length(),
+        cross_talk_suppression=True)
+
+    operation_dict = device.get_operation_dict()
+
+    two_qubit_AllXY_sweep = awg_swf.awg_seq_swf(
+        mqs.two_qubit_AllXY,
+        awg_seq_func_kwargs={'operation_dict': operation_dict,
+                             'q0': q0_name,
+                             'q1': q1_name,
+                             'RO_target': q0_name,
+                             'sequence_type': sequence_type})
+
+    MC.set_sweep_function(two_qubit_AllXY_sweep)
+    MC.set_sweep_points(np.arange(42))
+    MC.set_detector_function(int_avg_det)
+    MC.run('2 qubit AllXY sequential')
+    ma.MeasurementAnalysis()
+
+
+def resonant_cphase(phases, low_qubit, high_qubit,
+                    timings_dict, mmt_label='', MC=None, run=True):
     """
     Performs the fringe measurements of a resonant cphase gate between two qubits.
     low_qubit is gonna be swapped with the bus
@@ -118,6 +270,7 @@ def tomo2Q_cardinal(cardinal, qubit0, qubit1, timings_dict,
                                      mmt_label))
     return tomo.seq
 
+
 def tomo2Q_bell(bell_state, qubit0, qubit1, flux_pars_q0, flux_pars_q1,
                 distortion_dict, timings_dict, CPhase=True,
                 nr_shots=256, nr_rep=1, mmt_label='', MC=None, run=True):
@@ -136,17 +289,17 @@ def tomo2Q_bell(bell_state, qubit0, qubit1, flux_pars_q0, flux_pars_q1,
     q1_pulse_pars, RO_pars = qubit1.get_pulse_pars()
     # print(phases)
     tomo = awg_swf.two_qubit_tomo_bell(bell_state=bell_state,
-                                           q0_pulse_pars=q0_pulse_pars,
-                                           q1_pulse_pars=q1_pulse_pars,
-                                           q0_flux_pars=flux_pars_q0,
-                                           q1_flux_pars=flux_pars_q1,
-                                           RO_pars=RO_pars,
-                                           distortion_dict=distortion_dict,
-                                           AWG=station.AWG,
-                                           timings_dict=timings_dict,
-                                           CPhase=CPhase,
-                                           upload=True,
-                                           return_seq=True)
+                                       q0_pulse_pars=q0_pulse_pars,
+                                       q1_pulse_pars=q1_pulse_pars,
+                                       q0_flux_pars=flux_pars_q0,
+                                       q1_flux_pars=flux_pars_q1,
+                                       RO_pars=RO_pars,
+                                       distortion_dict=distortion_dict,
+                                       AWG=station.AWG,
+                                       timings_dict=timings_dict,
+                                       CPhase=CPhase,
+                                       upload=True,
+                                       return_seq=True)
 
     # detector = det.UHFQC_integrated_average_detector(
     #     UHFQC=qubit0._acquisition_instr,
@@ -171,7 +324,7 @@ def tomo2Q_bell(bell_state, qubit0, qubit1, flux_pars_q0, flux_pars_q1,
     MC.set_detector_function(detector)
     if run:
         MC.run('BellTomo_%s_%s_%s_%s' % (bell_state,
-                                     qubit0.name,
-                                     qubit1.name,
-                                     mmt_label))
+                                         qubit0.name,
+                                         qubit1.name,
+                                         mmt_label))
     return tomo.seq

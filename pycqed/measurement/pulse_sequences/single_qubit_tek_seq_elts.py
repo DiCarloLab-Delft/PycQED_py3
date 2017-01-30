@@ -27,23 +27,23 @@ def Pulsed_spec_seq(spec_pars, RO_pars, upload=True, return_seq=False):
         RO_pars:        dict containing RO pars
     '''
     period = spec_pars['pulse_delay'] + RO_pars['pulse_delay']
-    fixed_point_freq = RO_pars['fixed_point_frequency']
-    if fixed_point_freq == None:
+    f_RO_mod = RO_pars['f_RO_mod']
+    if f_RO_mod == None:
         remainder = 0.0
     else:
-        remainder = period % (1/RO_pars['fixed_point_frequency'])
+        remainder = period % (1/RO_pars['f_RO_mod'])
 
     if (remainder != 0.0):
         msg = ('Period of spec seq ({})'.format(period) +
                'must be multiple of RO modulation period ({})'.format(
-               1/RO_pars['fixed_point_frequency']) +
+               1/RO_pars['f_RO_mod']) +
                "\nAdding {}s to spec_pars['pulse_delay']".format(
-            1/RO_pars['fixed_point_frequency'] - remainder) +
+            1/RO_pars['f_RO_mod'] - remainder) +
             '\nConsider updating parameter')
         logging.warning(msg)
         print(msg)
         spec_pars['pulse_delay'] += 1 / \
-            RO_pars['fixed_point_frequency'] - remainder
+            RO_pars['f_RO_mod'] - remainder
 
     # Nr of pulse reps is set to ensure max nr of pulses and end 10us before
     # next trigger comes in. Assumes 200us trigger period, also works for
@@ -80,9 +80,9 @@ def photon_number_splitting_seq(spec_pars, RO_pars, disp_pars, upload=True, retu
 
     msg = ('Period of spec seq ({})'.format(period) +
            'must be multiple of RO modulation period ({})'.format(
-           1/RO_pars['fixed_point_frequency']))
+           1/RO_pars['f_RO_mod']))
 
-    if (period % (1/RO_pars['fixed_point_frequency'])) != 0.0:
+    if (period % (1/RO_pars['f_RO_mod'])) != 0.0:
         raise ValueError(msg)
 
     # Nr of pulse reps is set to ensure max nr of pulses and end 10us before
@@ -465,8 +465,6 @@ def Butterfly_seq(pulse_pars, RO_pars, initialize=False,
     el_list = []
     # Create a dict with the parameters for all the pulses
     pulses = get_pulse_dict_from_pars(pulse_pars)
-    fixed_point_freq = RO_pars['fixed_point_frequency']
-    RO_pars['fixed_point_frequency'] = None
 
     pulses['RO'] = RO_pars
     pulse_lists = ['', '']
@@ -484,11 +482,11 @@ def Butterfly_seq(pulse_pars, RO_pars, initialize=False,
         for pulse_keys in pulse_keys_sub_list:
             pulse_sub_list = [pulses[key] for key in pulse_keys]
             sub_seq_duration = sum([p['pulse_delay'] for p in pulse_sub_list])
-            if fixed_point_freq == None:
+            if RO_pars['f_RO_mod'] == None:
                 extra_delay = 0
             else:
                 extra_delay = calculate_time_correction(
-                    sub_seq_duration+post_msmt_delay, fixed_point_freq)
+                    sub_seq_duration+post_msmt_delay, RO_pars['f_RO_mod'])
             initial_pulse_delay = post_msmt_delay + extra_delay
             start_pulse = deepcopy(pulse_sub_list[0])
             start_pulse['pulse_delay'] += initial_pulse_delay

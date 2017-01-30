@@ -39,11 +39,15 @@ AncT.dist_dict(dist_dict)
 # Simple chevron DataT
 # Conventional SWAP chevron
 ###########################################
-DataT.measure_chevron(amps=np.arange(1.025,1.065,0.001),
-                           length=np.arange(0, 30e-9, 1e-9),
+# S5 is the device type object
+mq_mod.measure_chevron(S5, 'DataT', amps=np.arange(1.0,1.1,0.005),
+                           length=np.arange(0, 120e-9, 2e-9),
                            MC=station.MC)
-ma.Chevron_2D(auto=True)
 
+###########################################
+#   SWAP-N
+###########################################
+mq_mod.measure_SWAPN(S5, 'DataT', swap_amps=np.arange(1.05, 1.06, 0.001))
 
 ###########################################
 # 2 exciation chevron to test if initial kernels worked

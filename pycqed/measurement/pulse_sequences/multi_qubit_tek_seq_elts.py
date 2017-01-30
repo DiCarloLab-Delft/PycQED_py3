@@ -272,7 +272,7 @@ def five_qubit_off_on(q0_pulse_pars,
         return seq_name
 
 
-def two_qubit_AllXY(pulse_dict, q0='q0', q1='q1', RO_target='all',
+def two_qubit_AllXY(operation_dict, q0='q0', q1='q1', RO_target='all',
                     sequence_type='simultaneous',
                     replace_q1_pulses_X180=False,
                     double_points=True,
@@ -283,10 +283,10 @@ def two_qubit_AllXY(pulse_dict, q0='q0', q1='q1', RO_target='all',
     Has the option of replacing pulses on q1 with pi pulses
 
     Args:
-        pulse_dict   (dict) : dictionary containing all pulse parameters
-        q0, q1        (str) : target qubits for the sequence
-        RO_target     (str) : target for the RO, can be a qubit name or 'all'
-        sequence_type (str) : sequential | interleaved | simultaneous | sandwiched
+        operation_dict (dict) : dictionary containing all pulse parameters
+        q0, q1         (str) : target qubits for the sequence
+        RO_target      (str) : target for the RO, can be a qubit name or 'all'
+        sequence_type  (str) : sequential | interleaved | simultaneous | sandwiched
                               q0|q0|q1|q1   q0|q1|q0|q1   q01|q01      q1|q0|q0|q1
             describes the order of the AllXY pulses
         replace_q1_pulses_X180 (bool) : if True replaces all pulses on q1 with
@@ -300,6 +300,7 @@ def two_qubit_AllXY(pulse_dict, q0='q0', q1='q1', RO_target='all',
     seq = sequence.Sequence(seq_name)
     station.pulsar.update_channel_settings()
     el_list = []
+    sequencer_config = operation_dict['sequencer_config']
 
     AllXY_pulse_combinations = [['I ', 'I '], ['X180 ', 'X180 '], ['Y180 ', 'Y180 '],
                                 ['X180 ', 'Y180 '], ['Y180 ', 'X180 '],
@@ -319,11 +320,11 @@ def two_qubit_AllXY(pulse_dict, q0='q0', q1='q1', RO_target='all',
                                     for _ in (0, 1)]
 
     if sequence_type == 'simultaneous':
-        pulse_dict = deepcopy(pulse_dict)  # prevents overwriting of dict
-        for key in pulse_dict.keys():
+        operation_dict = deepcopy(operation_dict)  # prevents overwriting of dict
+        for key in operation_dict.keys():
             if q1 in key:
-                pulse_dict[key]['refpoint'] = 'start'
-                pulse_dict[key]['pulse_delay'] = 0
+                operation_dict[key]['refpoint'] = 'start'
+                operation_dict[key]['pulse_delay'] = 0
 
     pulse_list = []
     if not replace_q1_pulses_X180:
@@ -364,8 +365,9 @@ def two_qubit_AllXY(pulse_dict, q0='q0', q1='q1', RO_target='all',
     for i, pulse_comb in enumerate(pulse_list):
         pulses = []
         for p in pulse_comb:
-            pulses += [pulse_dict[p]]
-        el = multi_pulse_elt(i, station, pulses)
+            pulses += [operation_dict[p]]
+
+        el = multi_pulse_elt(i, station, pulses, sequencer_config)
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
     if upload:

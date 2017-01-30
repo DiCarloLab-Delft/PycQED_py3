@@ -241,46 +241,7 @@ def fix_phase_2Q():
 
 # SWAPN
 
-
-def SWAPN(qubit, swap_amps=np.arange(1.150, 1.171, 0.001),
-          number_of_swaps=30,
-          int_avg_det=None):
-    # These are the sweep points
-    swap_vec = np.arange(number_of_swaps)*2
-    cal_points = 4
-    lengths_cal = swap_vec[-1] + \
-        np.arange(1, 1+cal_points)*(swap_vec[1]-swap_vec[0])
-    swap_vec = np.concatenate((swap_vec, lengths_cal))
-
-    if int_avg_det is None:
-        int_avg_det = det.UHFQC_integrated_average_detector(
-            UHFQC=AncT._acquisition_instr, AWG=AncT.AWG,
-            channels=[DataT.RO_acq_weight_function_I(),
-                      AncT.RO_acq_weight_function_I()],
-            nr_averages=AncT.RO_acq_averages(),
-            integration_length=AncT.RO_acq_integration_length(),
-            cross_talk_suppression=True)
-
-    op_dict = qubit.get_operation_dict()
-    # flux_pulse_pars = op_dict['SWAP '+qubit.name]
-    # mw_pulse_pars, RO_pars = qubit.get_pulse_pars()
-    dist_dict = qubit.dist_dict()
-    AWG = qubit.AWG
-
-    repSWAP = awg_swf.SwapN(op_dict, DataT.name,
-                            dist_dict=dist_dict,
-                            AWG=AWG,
-                            upload=True)
-    MC.set_sweep_function(repSWAP)
-    MC.set_sweep_points(swap_vec)
-
-    MC.set_sweep_function_2D(AWG.ch4_amp)
-    MC.set_sweep_points_2D(swap_amps)
-
-    MC.set_detector_function(int_avg_det)
-    MC.run('SWAPN_%s' % qubit.name, mode='2D')
-    ma.TwoD_Analysis(auto=True)
-
+mq_mod.measure_SWAPN(S5, 'DataT', swap_amps=np.arange(1.05, 1.06, 0.001))
 
 ###########################
 #  2D CPHase SWAP heatmap #
