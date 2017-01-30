@@ -232,7 +232,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                            initial_value=0.02,
                            vals=vals.Numbers(min_value=0.02, max_value=4.5),
                            parameter_class=ManualParameter)
-        self.add_parameter('swap_time',
+        self.add_parameter('SWAP_time',
                            label='SWAP Time', units='s',
                            initial_value=0.,
                            vals=vals.Numbers(min_value=0., max_value=1e-6),

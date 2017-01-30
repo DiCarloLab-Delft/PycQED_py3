@@ -241,13 +241,13 @@ class CPhase_cost_func_det_Ramiro(det.Soft_Detector):
         self.cost_function_choice = cost_function_choice
         self.sweep_q = sweep_q
 
-        if self.cost_function_choice==0:
+        if self.cost_function_choice == 0:
             self.value_names = ['Cost function']
             self.value_units = ['a.u.']
-        elif self.cost_function_choice==1:
-            self.value_names = ['Cost function']
-            self.value_units = ['a.u.']
-        elif self.cost_function_choice==2:
+        elif self.cost_function_choice == 1:
+            self.value_names = ['Maximum amp diff', 'missing swap pop']
+            self.value_units = ['a.u.', 'a.u.']
+        elif self.cost_function_choice == 2:
             self.value_names = ['Cost function', 'Fringe distance', 'phase_0']
             self.value_units = ['a.u.', 'deg', 'deg']
         qCP_pulse_pars, RO_pars_qCP = qCP.get_pulse_pars()
@@ -311,7 +311,6 @@ class CPhase_cost_func_det_Ramiro(det.Soft_Detector):
             self.last_seq = self.s.prepare()
             self.s.upload = False
         self.pars_changed = False
-        self.AWG.ch4_amp(self.qS.SWAP_amp())
         self.MC_nested.set_sweep_function(self.s)
         self.MC_nested.set_detector_function(self.int_avg_det)
         self.MC_nested.set_sweep_points(self.sphasesweep)
@@ -322,9 +321,10 @@ class CPhase_cost_func_det_Ramiro(det.Soft_Detector):
             a = SWAP_Cost_Ramiro(show_guess=False, label=label)
             return 1.-np.abs(a.cost_func_val)
             # return a.cost_func_val, a.phi_0, a.phi_1
-        elif self.cost_function_choice==1:
-            a = SWAP_Cost_Ramiro_amp(show_guess=False, label=label)
-            return a.cost_func_val
+        elif self.cost_function_choice == 1:
+            a = CPhase_2Q_amp_cost_analysis(label=label)
+            maximum_difference, missing_swap_pop = a.cost_func_val
+            return maximum_difference, missing_swap_pop
 
 
 
@@ -609,10 +609,15 @@ class SWAP_Cost_Ramiro(ma.Rabi_Analysis):
 
         self.get_naming_and_values()
 
-        cal_0I = self.measured_values[0][-4]
-        cal_0Q = self.measured_values[1][-4]
-        cal_1I = self.measured_values[0][-1]
-        cal_1Q = self.measured_values[1][-1]
+        cal_0I = np.mean([self.measured_values[0][-4],
+                          self.measured_values[0][-3]])
+        cal_1I = np.mean([self.measured_values[0][-2],
+                          self.measured_values[0][-1]])
+
+        cal_0Q = np.mean([self.measured_values[1][-4],
+                          self.measured_values[1][-2]])
+        cal_1Q = np.mean([self.measured_values[1][-3],
+                          self.measured_values[1][-1]])
 
         self.measured_values[0][:] = (
             self.measured_values[0] - cal_0I)/(cal_1I-cal_0I)
@@ -695,7 +700,7 @@ class SWAP_Cost_Ramiro(ma.Rabi_Analysis):
         self.save_fig(self.fig, fig_tight=False, **kw)
 
 
-class SWAP_Cost_Ramiro_amp(ma.Rabi_Analysis):
+class CPhase_2Q_amp_cost_analysis(ma.Rabi_Analysis):
 
     def __init__(self, label='', **kw):
         super().__init__(label=label, **kw)
@@ -704,10 +709,15 @@ class SWAP_Cost_Ramiro_amp(ma.Rabi_Analysis):
 
         self.get_naming_and_values()
 
-        cal_0I = np.mean([self.measured_values[0][-4],self.measured_values[0][-3]])
-        cal_0Q = np.mean([self.measured_values[0][-4],self.measured_values[0][-2]])
-        cal_1I = np.mean([self.measured_values[0][-1],self.measured_values[0][-2]])
-        cal_1Q = np.mean([self.measured_values[0][-1],self.measured_values[0][-3]])
+        cal_0I = np.mean([self.measured_values[0][-4],
+                          self.measured_values[0][-3]])
+        cal_1I = np.mean([self.measured_values[0][-2],
+                          self.measured_values[0][-1]])
+
+        cal_0Q = np.mean([self.measured_values[1][-4],
+                          self.measured_values[1][-2]])
+        cal_1Q = np.mean([self.measured_values[1][-3],
+                          self.measured_values[1][-1]])
 
         self.measured_values[0][:] = (
             self.measured_values[0] - cal_0I)/(cal_1I-cal_0I)
@@ -715,60 +725,29 @@ class SWAP_Cost_Ramiro_amp(ma.Rabi_Analysis):
             self.measured_values[1] - cal_0Q)/(cal_1Q-cal_0Q)
         # self.measured_values = self.measured_values
         self.sweep_points = self.sweep_points
-        self.fit_data(**kw)
+        self.calculate_cost_func(**kw)
         self.make_figures(**kw)
 
         if close_file:
             self.data_file.close()
 
-    def fit_data(self, **kw):
-        self.add_analysis_datagroup_to_file()
-        self.fit_res = ['', '']
-        # It would be best to do 1 fit to both datasets but since it is
-        # easier to do just one fit we stick to that.
-
-        # num_points = len(self.sweep_points)-4
-        # id_dat = self.measured_values[1][num_points//2:3*num_points//4]
-        # id_swp = self.sweep_points[num_points//2:3*num_points//4]
-        # ex_dat = self.measured_values[1][3*num_points//4:-4]
-        # ex_swp = self.sweep_points[3*num_points//4:-4]
-
+    def calculate_cost_func(self, **kw):
         num_points = len(self.sweep_points)-4
-        id_dat = self.measured_values[0][:num_points//2]
-        id_swp = self.sweep_points[:num_points//2]
-        ex_dat = self.measured_values[0][num_points//2:-4]
-        ex_swp = self.sweep_points[num_points//2:-4]
 
-        # self.cost_func_val = 2-(max(id_dat-ex_dat) + max(ex_dat-id_dat))
-        # we can calculate the cost function disreclty from the fit-parameters
+        id_dat_swp = self.measured_values[1][:num_points//2]
+        ex_dat_swp = self.measured_values[1][num_points//2:-4]
 
-        model = lmfit.Model(ma.fit_mods.CosFunc)
-        params = simple_cos_guess(model, data=id_dat, t=id_swp)
-        self.fit_res[0] = model.fit(data=id_dat, t=id_swp, params=params)
-        self.save_fitted_parameters(fit_res=self.fit_res[0],
-                                    var_name='id_fit')
+        id_dat_cp = self.measured_values[0][:num_points//2]
+        ex_dat_cp = self.measured_values[0][num_points//2:-4]
 
-        model = lmfit.Model(ma.fit_mods.CosFunc)
-        params = simple_cos_guess(model, data=ex_dat, t=ex_swp)
-        self.fit_res[1] = model.fit(data=ex_dat, t=ex_swp, params=params)
-        self.save_fitted_parameters(fit_res=self.fit_res[1],
-                                    var_name='ex_fit')
-        self.x_fine = np.linspace(min(self.sweep_points[:-4]),
-                                  max(self.sweep_points[:-4]),
-                                  1000)
-        self.fine_fit_0 = self.fit_res[0].model.func(
-                self.x_fine, **self.fit_res[0].best_values)
-        self.fine_fit_1 = self.fit_res[1].model.func(
-                self.x_fine, **self.fit_res[1].best_values)
-        # cost funcations penalizes extra for deviations from 180 degrees phase
-        # difference and also penalizes the single-qubit error in the q_CPhase
-        # self.cost_func_val = max(abs(self.fine_fit_0-self.fine_fit_1))
-        self.cost_func_val = max(abs(id_dat-ex_dat))
+        maximum_difference = max((id_dat_cp-ex_dat_cp))
+        # I think the labels are wrong in excited and identity but the value
+        # we get is correct
+        missing_swap_pop = np.mean(ex_dat_swp- id_dat_swp)
+        self.cost_func_val = maximum_difference, missing_swap_pop
 
     def make_figures(self, **kw):
-        show_guess = kw.pop('show_guess', False)
         self.fig, self.axs = ma.plt.subplots(2, 1, figsize=(5, 6))
-
         self.ylabels = ['q_CP', 'q_S']
         for i in [0, 1]:
             if i == 0:
@@ -786,14 +765,6 @@ class SWAP_Cost_Ramiro_amp(ma.Rabi_Analysis):
                                             save=False,
                                             plot_title=plot_title, marker='--o')
 
-            # fine_fit = self.fit_res[i].model.func(
-            #     self.x_fine, **self.fit_res[i].best_values)
-            # self.axs[0].plot(self.x_fine, fine_fit, label='fit')
-            if show_guess:
-                fine_fit = self.fit_res[i].model.func(
-                    self.x_fine, **self.fit_res[i].init_values)
-                self.axs[0].plot(self.x_fine, fine_fit, label='guess')
-                self.axs[i].legend(loc='best')
         self.save_fig(self.fig, fig_tight=False, **kw)
 
 

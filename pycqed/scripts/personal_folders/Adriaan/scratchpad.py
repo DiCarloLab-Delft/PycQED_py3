@@ -115,8 +115,9 @@ DataT.add_pulse_parameter('SWAP', 'SWAP_pulse_buffer',
                           'pulse_buffer', 100e-9)
 DataT.add_pulse_parameter('SWAP', 'SWAP_square_pulse_buffer',
                           'square_pulse_buffer', 100e-9)
-DataT.add_pulse_parameter('SWAP', 'SWAP_square_pulse_length',
-                          'square_pulse_length', 40e-9)
+
+DataT.link_param_to_operation('SWAP', 'SWAP_time', 'square_pulse_length')
+
 
 DataT.add_pulse_parameter('SWAP', 'SWAP_pulse_delay',
                           'pulse_delay', 10e-9)
@@ -133,8 +134,8 @@ DataT.add_pulse_parameter('Z', 'Z_pulse_delay',
                          'pulse_delay', 0)
 
 
-gen.load_settings_onto_instrument(AncT, timestamp='020234')
-gen.load_settings_onto_instrument(DataT, timestamp='020234')
+gen.load_settings_onto_instrument(AncT)
+gen.load_settings_onto_instrument(DataT)
 
 
 DataT.RO_acq_weight_function_I(0)

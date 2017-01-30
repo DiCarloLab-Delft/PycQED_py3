@@ -46,6 +46,7 @@ from pycqed.analysis import measurement_analysis as ma
 from pycqed.analysis import analysis_toolbox as a_tools
 from pycqed.measurement import awg_sweep_functions_multi_qubit as awg_swf_m
 from pycqed.measurement.pulse_sequences import multi_qubit_tek_seq_elts as sq_m
+from pycqed.measurement import multi_qubit_module as mq_mod
 from pycqed.analysis import tomography as tomo
 import pycqed.scripts.Experiments.Five_Qubits.cost_functions_Leo_optimization as ca
 from pycqed.utilities import general as gen

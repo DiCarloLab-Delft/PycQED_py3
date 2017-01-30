@@ -287,7 +287,7 @@ def two_qubit_AllXY(pulse_dict, q0='q0', q1='q1', RO_target='all',
         q0, q1        (str) : target qubits for the sequence
         RO_target     (str) : target for the RO, can be a qubit name or 'all'
         sequence_type (str) : sequential | interleaved | simultaneous | sandwiched
-                              q0|q0|qq|q1   q0|q1|q0|q1   q01|q01      q1|q0|q0|q1
+                              q0|q0|q1|q1   q0|q1|q0|q1   q01|q01      q1|q0|q0|q1
             describes the order of the AllXY pulses
         replace_q1_pulses_X180 (bool) : if True replaces all pulses on q1 with
             X180 pulses.
@@ -476,7 +476,6 @@ def two_qubit_tomo_cardinal(cardinal,
                       tomo_pulse_q0,
                       tomo_pulse_q1,
                       RO_pars]
-        pulse_list[0]['pulse_delay'] += 0.01e-6
         el = multi_pulse_elt(i, station, pulse_list)
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
@@ -485,7 +484,6 @@ def two_qubit_tomo_cardinal(cardinal,
         pulses = []
         for p in pulse_comb:
             pulses += [pulse_dict[p]]
-        pulses[0]['pulse_delay'] += 0.01e-6
 
         el = multi_pulse_elt(35+i, station, pulses)
         el_list.append(el)
@@ -593,34 +591,34 @@ def two_qubit_tomo_bell(bell_state,
     pulse_dict['mCPhase q1']['phase_corr_pulse_amp'] = 0.
 
     # Calibration points
-    cal_points = [['I q1', 'dummy_pulse', 'I q0', 'RO'],
-                  ['I q1', 'dummy_pulse', 'I q0', 'RO'],
-                  ['I q1', 'dummy_pulse', 'I q0', 'RO'],
-                  ['I q1', 'dummy_pulse', 'I q0', 'RO'],
-                  ['I q1', 'dummy_pulse', 'I q0', 'RO'],
-                  ['I q1', 'dummy_pulse', 'I q0', 'RO'],
-                  ['I q1', 'dummy_pulse', 'I q0', 'RO'],
-                  ['I q1', 'dummy_pulse', 'X180 q0', 'RO'],
-                  ['I q1', 'dummy_pulse', 'X180 q0', 'RO'],
-                  ['I q1', 'dummy_pulse', 'X180 q0', 'RO'],
-                  ['I q1', 'dummy_pulse', 'X180 q0', 'RO'],
-                  ['I q1', 'dummy_pulse', 'X180 q0', 'RO'],
-                  ['I q1', 'dummy_pulse', 'X180 q0', 'RO'],
-                  ['I q1', 'dummy_pulse', 'X180 q0', 'RO'],
-                  ['X180 q1', 'dummy_pulse', 'I q0', 'RO'],
-                  ['X180 q1', 'dummy_pulse', 'I q0', 'RO'],
-                  ['X180 q1', 'dummy_pulse', 'I q0', 'RO'],
-                  ['X180 q1', 'dummy_pulse', 'I q0', 'RO'],
-                  ['X180 q1', 'dummy_pulse', 'I q0', 'RO'],
-                  ['X180 q1', 'dummy_pulse', 'I q0', 'RO'],
-                  ['X180 q1', 'dummy_pulse', 'I q0', 'RO'],
-                  ['X180 q1', 'dummy_pulse', 'X180 q0', 'RO'],
-                  ['X180 q1', 'dummy_pulse', 'X180 q0', 'RO'],
-                  ['X180 q1', 'dummy_pulse', 'X180 q0', 'RO'],
-                  ['X180 q1', 'dummy_pulse', 'X180 q0', 'RO'],
-                  ['X180 q1', 'dummy_pulse', 'X180 q0', 'RO'],
-                  ['X180 q1', 'dummy_pulse', 'X180 q0', 'RO'],
-                  ['X180 q1', 'dummy_pulse', 'X180 q0', 'RO']]
+    cal_points = [['I q1', 'dummy_pulse', 'I q0', 'RO']*7,
+                  # ['I q1', 'dummy_pulse', 'I q0', 'RO'],
+                  # ['I q1', 'dummy_pulse', 'I q0', 'RO'],
+                  # ['I q1', 'dummy_pulse', 'I q0', 'RO'],
+                  # ['I q1', 'dummy_pulse', 'I q0', 'RO'],
+                  # ['I q1', 'dummy_pulse', 'I q0', 'RO'],
+                  # ['I q1', 'dummy_pulse', 'I q0', 'RO'],
+                  ['I q1', 'dummy_pulse', 'X180 q0', 'RO']*7,
+                  # ['I q1', 'dummy_pulse', 'X180 q0', 'RO'],
+                  # ['I q1', 'dummy_pulse', 'X180 q0', 'RO'],
+                  # ['I q1', 'dummy_pulse', 'X180 q0', 'RO'],
+                  # ['I q1', 'dummy_pulse', 'X180 q0', 'RO'],
+                  # ['I q1', 'dummy_pulse', 'X180 q0', 'RO'],
+                  # ['I q1', 'dummy_pulse', 'X180 q0', 'RO'],
+                  ['X180 q1', 'dummy_pulse', 'I q0', 'RO']*7,
+                  # ['X180 q1', 'dummy_pulse', 'I q0', 'RO'],
+                  # ['X180 q1', 'dummy_pulse', 'I q0', 'RO'],
+                  # ['X180 q1', 'dummy_pulse', 'I q0', 'RO'],
+                  # ['X180 q1', 'dummy_pulse', 'I q0', 'RO'],
+                  # ['X180 q1', 'dummy_pulse', 'I q0', 'RO'],
+                  # ['X180 q1', 'dummy_pulse', 'I q0', 'RO'],
+                  # ['X180 q1', 'dummy_pulse', 'X180 q0', 'RO'],
+                  # ['X180 q1', 'dummy_pulse', 'X180 q0', 'RO'],
+                  # ['X180 q1', 'dummy_pulse', 'X180 q0', 'RO'],
+                  # ['X180 q1', 'dummy_pulse', 'X180 q0', 'RO'],
+                  # ['X180 q1', 'dummy_pulse', 'X180 q0', 'RO'],
+                  # ['X180 q1', 'dummy_pulse', 'X180 q0', 'RO'],
+                  ['X180 q1', 'dummy_pulse', 'X180 q0', 'RO']*7]
 
     if not CPhase:
         pulse_dict['CPhase q1']['amplitude'] = 0
