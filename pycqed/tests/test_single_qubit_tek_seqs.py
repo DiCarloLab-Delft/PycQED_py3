@@ -47,6 +47,7 @@ class Test_SingleQubitTek(unittest.TestCase):
         self.RO_pars = {
             'I_channel': 'ch3',
             'Q_channel': 'ch4',
+            'operation_type': 'RO',
             'RO_pulse_marker_channel': 'ch3_marker1',
             'amplitude': '.5',
             'length': 300e-9,
@@ -82,12 +83,12 @@ class Test_SingleQubitTek(unittest.TestCase):
             self.assertTrue(element.is_divisible_by_clock(t_RO, abs(f_fix_pt)))
             # Check pulse delay
             if i < (len(times)-4):
-                t0 = el.effective_pulse_start_time('pulse_0-0', 'ch1')
-                t1 = el.effective_pulse_start_time('pulse_1-0', 'ch1')
+                t0 = el.effective_pulse_start_time('SSB_DRAG_pulse_0-0', 'ch1')
+                t1 = el.effective_pulse_start_time('SSB_DRAG_pulse_1-0', 'ch1')
                 self.assertAlmostEqual(t1-t0, times[i], places=10)
-                p0 = el.pulses['pulse_0-0']
+                p0 = el.pulses['SSB_DRAG_pulse_0-0']
                 self.assertEqual(p0.phase, 0)
-                p1 = el.pulses['pulse_1-0']
+                p1 = el.pulses['SSB_DRAG_pulse_1-0']
                 self.assertEqual(p1.phase, 0)
             else:
                 # Calibration points do not have two pulses
@@ -123,19 +124,18 @@ class Test_SingleQubitTek(unittest.TestCase):
                     self.assertAlmostEqual(t_RO, t_ROm, places=10)
 
                     # test if fix point put pulses at the right spot.
-                    self.assertTrue(
-                        element.is_divisible_by_clock(t_RO, f_fix_pt))
+                    self.assertAlmostEqual(t_RO % 1e-6, 0)
 
                     # Check Ramsey pulse spacing
                     if i < (len(times)-4):
                         t0 = el.effective_pulse_start_time(
-                            'pulse_0-0', 'ch1')
+                            'SSB_DRAG_pulse_0-0', 'ch1')
                         t1 = el.effective_pulse_start_time(
-                            'pulse_1-0', 'ch1')
+                            'SSB_DRAG_pulse_1-0', 'ch1')
                         self.assertAlmostEqual(t1-t0, times[i], places=10)
-                        p0 = el.pulses['pulse_0-0']
+                        p0 = el.pulses['SSB_DRAG_pulse_0-0']
                         self.assertEqual(p0.phase, 0)
-                        p1 = el.pulses['pulse_1-0']
+                        p1 = el.pulses['SSB_DRAG_pulse_1-0']
                         exp_phase = (360*f_detuning*(t1-t0)) % 360
                         if exp_phase == 360:
                             exp_phase = 0

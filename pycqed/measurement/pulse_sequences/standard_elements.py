@@ -186,7 +186,8 @@ def multi_pulse_elt(i, station, pulse_list, sequencer_config=None):
         i:          index of the element, ensures unique element name
         station:    qcodes station object, contains AWG etc
         pulse_list: list of pulse_dicts containing pulse parameters
-        sequencer_config:   config
+        sequencer_config:   configuration containg values like pulse buffers
+                            and fixed point
     Returns:
         element:    for use with the pulsar sequencer
 
@@ -196,20 +197,24 @@ def multi_pulse_elt(i, station, pulse_list, sequencer_config=None):
     last_op_type = 'other'  # used for determining relevant buffers
     flux_compensation_pulse_list = []
 
-    if sequencer_config == None:
-        logging.warning('No sequencer config detected, using default config')
-        sequencer_config = {'RO_fixed_point': 1e-6,
-                            'Buffer_Flux_Flux': 0,
-                            'Buffer_Flux_MW': 0,
-                            'Buffer_Flux_RO': 0,
-                            'Buffer_MW_Flux': 0,
-                            'Buffer_MW_MW': 0,
-                            'Buffer_MW_RO': 0,
-                            'Buffer_RO_Flux': 0,
-                            'Buffer_RO_MW': 0,
-                            'Buffer_RO_RO': 0,
-                            'Flux_comp_dead_time': 3e-6,
-                            }
+    if sequencer_config is None:
+        logging.warning('No sequencer config detected, using default config ' +
+                        'from station')
+        if hasattr(station, 'sequencer_config'):
+            sequencer_config = station.sequencer_config
+        else:
+            sequencer_config = {'RO_fixed_point': 1e-6,
+                                'Buffer_Flux_Flux': 0,
+                                'Buffer_Flux_MW': 0,
+                                'Buffer_Flux_RO': 0,
+                                'Buffer_MW_Flux': 0,
+                                'Buffer_MW_MW': 0,
+                                'Buffer_MW_RO': 0,
+                                'Buffer_RO_Flux': 0,
+                                'Buffer_RO_MW': 0,
+                                'Buffer_RO_RO': 0,
+                                'Flux_comp_dead_time': 3e-6,
+                                }
 
     ##########################
     # Instantiate an element #

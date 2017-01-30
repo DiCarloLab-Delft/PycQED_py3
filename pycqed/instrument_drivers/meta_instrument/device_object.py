@@ -46,7 +46,7 @@ class DeviceObject(Instrument):
                        'multiple of the fixpoint.'),
             parameter_class=ManualParameter,
             vals=vals.Numbers(1e-9, 500e-6))
-        self.add_sequencer_config_param(self.readout_fixed_point)
+        self.add_sequencer_config_param(self.RO_fixed_point)
         self.add_parameter(
             'Flux_comp_dead_time', units='s',
             initial_value=3e-6,

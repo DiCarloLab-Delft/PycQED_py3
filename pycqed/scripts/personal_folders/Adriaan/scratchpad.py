@@ -163,6 +163,13 @@ S5 = do.DeviceObject('S5')
 station.add_component(S5)
 S5.add_qubits([AncT, DataT])
 
+S5.Buffer_Flux_Flux(10e-9)
+S5.Buffer_Flux_MW(40e-9)
+S5.Buffer_MW_MW(10e-9)
+S5.Buffer_MW_Flux(10e-9)
+station.sequencer_config = S5.get_operation_dict()['sequencer_config']
+
+
 # Required for the Niels naming scheme
 q0 = DataT
 q1 = AncT
