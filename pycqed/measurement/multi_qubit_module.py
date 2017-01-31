@@ -116,10 +116,6 @@ def measure_SWAPN(device, q0_name, swap_amps,
                              'q0': q0_name,
                              'distortion_dict': q0.dist_dict()})
 
-    # repSWAP = awg_swf.SwapN(op_dict, q0.name,
-    #                         dist_dict=dist_dict,
-    #                         AWG=AWG,
-    #                         upload=True)
     MC.set_sweep_function(repSWAP)
     MC.set_sweep_points(swap_vec)
 
@@ -131,18 +127,21 @@ def measure_SWAPN(device, q0_name, swap_amps,
     ma.TwoD_Analysis(auto=True)
 
 
+def measure_SWAP_CZ_SWAP(device, q0_name, q1_name,
+                         CZ_phase_corr_amps,
+                         sweep_qubit,
+                         excitations=0.5,
+                         MC=None, upload=True):
+    if MC is None:
+        MC = station.components['MC']
+    if excitations == 0.5:
+        CZ_phase_corr_amps = np.tile(CZ_phase_corr_amps, 2)
+    amp_step = CZ_phase_corr_amps[1]-CZ_phase_corr_amps[0]
+    swp_pts = np.concatenate([CZ_phase_corr_amps,
+                             np.arange(4)*amp_step+CZ_phase_corr_amps[-1]])
 
-def measure_S_CZ_S(device, q0_name, q1_name, CZ_phase_corr_amps, MC=None):
-
-    self.s = awg_swf.swap_CP_swap_2Qubits_1qphasesweep_amp(
-        qCP_pulse_pars, qS_pulse_pars,
-        flux_pulse_pars_qCP, flux_pulse_pars_qS, RO_pars_qCP,
-        dist_dict, timings_dict=timings_dict,
-        AWG=qS.AWG,  inter_swap_wait=self.inter_swap_wait,
-        upload=False,
-        excitations='both', CPhase=self.CPhase,
-        reverse_control_target=self.reverse_control_target,
-        sweep_q=self.sweep_q)
+    q0 = device.qubits()[q0_name]
+    q1 = device.qubits()[q1_name]
 
     int_avg_det = det.UHFQC_integrated_average_detector(
         UHFQC=q0._acquisition_instr, AWG=q0.AWG,
@@ -151,22 +150,29 @@ def measure_S_CZ_S(device, q0_name, q1_name, CZ_phase_corr_amps, MC=None):
         nr_averages=q0.RO_acq_averages(),
         integration_length=q0.RO_acq_integration_length(),
         cross_talk_suppression=True)
-
     operation_dict = device.get_operation_dict()
+    S_CZ_S_swf = awg_swf.awg_seq_swf(
+            fsqs.SWAP_CZ_SWAP_phase_corr_swp,
+            parameter_name='phase_corr_amps',
+            unit='V',
+            AWG=q0.AWG,
+            fluxing_channels=[q0.fluxing_channel(), q1.fluxing_channel()],
+            awg_seq_func_kwargs={'operation_dict': operation_dict,
+                                 'qS': q0.name,
+                                 'qCZ': q1.name,
+                                 'sweep_qubit': sweep_qubit,
+                                 'RO_target': q1.name,
+                                 'excitations': 0.5,
+                                 'upload':upload,
+                                 'distortion_dict': q0.dist_dict()})
 
-    two_qubit_AllXY_sweep = awg_swf.awg_seq_swf(
-        mqs.two_qubit_AllXY,
-        awg_seq_func_kwargs={'operation_dict': operation_dict,
-                             'q0': q0_name,
-                             'q1': q1_name,
-                             'RO_target': q0_name,
-                             'sequence_type': sequence_type})
-
-    MC.set_sweep_function(two_qubit_AllXY_sweep)
-    MC.set_sweep_points(np.arange(42))
+    MC.set_sweep_function(S_CZ_S_swf)
     MC.set_detector_function(int_avg_det)
-    MC.run('2 qubit AllXY sequential')
-    ma.MeasurementAnalysis()
+    MC.set_sweep_points(swp_pts)
+    # MC.set_sweep_points(phases)
+
+    MC.run('SWAP_CP_SWAP_{}_{}'.format(q0_name, q1_name))
+    ma.MeasurementAnalysis()  # N.B. you may want to run different analysis
 
 
 def resonant_cphase(phases, low_qubit, high_qubit,

@@ -193,7 +193,8 @@ def multi_pulse_elt(i, station, pulse_list, sequencer_config=None):
 
     Note: this function is used to generate most standard elements we use.
     '''
-
+    # Prevents accidently overwriting pulse pars in this list
+    pulse_list = deepcopy(pulse_list)
     last_op_type = 'other'  # used for determining relevant buffers
     flux_compensation_pulse_list = []
 
@@ -238,6 +239,14 @@ def multi_pulse_elt(i, station, pulse_list, sequencer_config=None):
     ##############################
 
     for i, pulse_pars in enumerate(pulse_list):
+        # Default values for backwards compatibility
+        if 'refpoint' not in pulse_pars.keys():
+            # default refpoint for backwards compatibility
+            pulse_pars['refpoint'] = 'end'
+        if 'operation_type' not in pulse_pars.keys():
+            # default operation_type for backwards compatibility
+            pulse_pars['operation_type'] = 'other'
+
         ###################################
         # Determine timings of the pulses #
         ###################################
@@ -252,15 +261,13 @@ def multi_pulse_elt(i, station, pulse_list, sequencer_config=None):
         except KeyError:
             buffer_delay = 0
         last_op_type = cur_op_type
-
         t0 = pulse_pars['pulse_delay'] + buffer_delay
 
-        if 'refpoint' not in pulse_pars.keys():
-            # default refpoint for backwards compatibility
-            pulse_pars['refpoint'] = 'end'
-        if 'operation_type' not in pulse_pars.keys():
-            # default operation_type for backwards compatibility
-            pulse_pars['operation_type'] = 'other'
+        # Buffers and delays get overwritten if two pulses have to be executed
+        # simultaneous
+        if pulse_pars['refpoint'] == 'simultaneous':
+            pulse_pars['refpoint'] = 'start'
+            t0 = 0
 
         if cur_op_type == 'Flux':
             # Adds flux pulses to a list for automatic compensation pulses

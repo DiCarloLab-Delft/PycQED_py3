@@ -1,18 +1,13 @@
 # Example of how to view a tektronix sequence
 import qcodes as qc
-import pycqed.measurement.pulse_sequences.fluxing_sequences as fsqs
 from pycqed.measurement.waveform_control import viewer
-fsqs.station = qc.station
+station = qc.station
 
+# Shows the first two elements of the last uploaded AWG sequence
 
-seq, elts = fsqs.Ram_Z_seq(AncT.get_operation_dict(), 'AncT',
-               dist_dict, t_dict, upload=False, return_seq=True)
-
-
-ax = viewer.show_element_dclab(element=elts[0])
-ax = viewer.show_element_dclab(element=elts[4], ax=ax)
-ax = viewer.show_element_dclab(element=elts[10], ax=ax)
-
-
-ax.set_xlim(0, 2600)
-ax.set_ylim(-3, 3)
+# By uncommenting this you can reuse the plotting window
+vw = None
+# vw.clear()
+for i in [0, 1]:
+    vw = viewer.show_element_pyqt(
+        station.pulsar.last_elements[i], vw, color_idx=i)

@@ -151,4 +151,4 @@ print("residual cross-talk matrix",  mu_matrix)
 #############################################################
 
 # S5 is the device object
-mq_mod.measure_two_qubit_AllXY(S5, 'DataT', 'AncT')
+mq_mod.measure_two_qubit_AllXY(S5, q0.name, q1.name)

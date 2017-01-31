@@ -165,43 +165,52 @@ def measure_phase_qs(points=np.arange(0., 0.15+0.005*4, 0.005)):
     return d.last_seq
 #################################################################
 
+AWG.ch4_amp(DataT.SWAP_amp())
+corr_amps = np.arange(.0, .1, 0.01)
+CZ_amps = np.linspace(1.03, 1.07, 21)
+MC.set_sweep_function(AWG.ch3_amp)
+MC.set_sweep_points(CZ_amps)
 
-def measure_cphase_amp(points=np.arange(1.03, 1.07, 0.005),
-                       AWG_channel=AWG.ch3_amp):
-    flux_pulse_pars_AncT = AncT.get_operation_dict()['CZ AncT']
-    flux_pulse_pars_DataT = DataT.get_operation_dict()['SWAP DataT']
-    AWG.ch3_amp(AncT.CZ_channel_amp())
-    int_avg_det = det.UHFQC_integrated_average_detector(
-        UHFQC=AncT._acquisition_instr, AWG=AncT.AWG,
-        channels=[
-            AncT.RO_acq_weight_function_I(), DataT.RO_acq_weight_function_I()],
-        nr_averages=AncT.RO_acq_averages(),
-        integration_length=AncT.RO_acq_integration_length(), cross_talk_suppression=True)
-    dt = 0.005  # 25
-    sphasesweep = np.tile(np.arange(0., 0.21, dt), 2)
-    sphasesweep = np.concatenate([sphasesweep, [0.22, 0.23, 0.24, 0.25]])
-    d = cl.CPhase_cost_func_det_Ramiro(qCP=AncT, qS=DataT, dist_dict=dist_dict,
-                                       MC_nested=nested_MC,
-                                       sphasesweep=sphasesweep,
-                                       timings_dict=t_dict,
-                                       flux_pulse_pars_qCP=flux_pulse_pars_AncT,
-                                       flux_pulse_pars_qS=flux_pulse_pars_DataT,
-                                       int_avg_det=int_avg_det, CPhase=True,
-                                       single_qubit_phase_corr=True,
-                                       reverse_control_target=False,
-                                       inter_swap_wait=10e-9,
-                                       cost_function_choice=1, sweep_q=1)  # lambda2 not actrive, cphae off and reverse on
+d=czt.CPhase_cost_func_det(S5, DataT, AncT, nested_MC, corr_amps)
+MC.set_detector_function(d)
+MC.run('CZ_cost_function')
 
-    # lambda_swf =
-    MC.set_sweep_function(AWG_channel)
+# def measure_cphase_amp(points=np.arange(1.03, 1.07, 0.005),
+#                        AWG_channel=AWG.ch3_amp):
+#     flux_pulse_pars_AncT = AncT.get_operation_dict()['CZ AncT']
+#     flux_pulse_pars_DataT = DataT.get_operation_dict()['SWAP DataT']
+#     AWG.ch3_amp(AncT.CZ_channel_amp())
+#     int_avg_det = det.UHFQC_integrated_average_detector(
+#         UHFQC=AncT._acquisition_instr, AWG=AncT.AWG,
+#         channels=[
+#             AncT.RO_acq_weight_function_I(), DataT.RO_acq_weight_function_I()],
+#         nr_averages=AncT.RO_acq_averages(),
+#         integration_length=AncT.RO_acq_integration_length(), cross_talk_suppression=True)
+#     dt = 0.005  # 25
+#     sphasesweep = np.tile(np.arange(0., 0.21, dt), 2)
+#     sphasesweep = np.concatenate([sphasesweep, [0.22, 0.23, 0.24, 0.25]])
+#     d = cl.CPhase_cost_func_det_Ramiro(qCP=AncT, qS=DataT, dist_dict=dist_dict,
+#                                        MC_nested=nested_MC,
+#                                        sphasesweep=sphasesweep,
+#                                        timings_dict=t_dict,
+#                                        flux_pulse_pars_qCP=flux_pulse_pars_AncT,
+#                                        flux_pulse_pars_qS=flux_pulse_pars_DataT,
+#                                        int_avg_det=int_avg_det, CPhase=True,
+#                                        single_qubit_phase_corr=True,
+#                                        reverse_control_target=False,
+#                                        inter_swap_wait=10e-9,
+#                                        cost_function_choice=1, sweep_q=1)  # lambda2 not actrive, cphae off and reverse on
 
-    MC.set_detector_function(d)
-    MC.set_sweep_points(points)
+#     # lambda_swf =
+#     MC.set_sweep_function(AWG_channel)
 
-    label = 'CP_amp3sweep_1D'
-    MC.run(label)
-    ma.MeasurementAnalysis(label=label, plot_all=True)
-    return d.last_seq
+#     MC.set_detector_function(d)
+#     MC.set_sweep_points(points)
+
+#     label = 'CP_amp3sweep_1D'
+#     MC.run(label)
+#     ma.MeasurementAnalysis(label=label, plot_all=True)
+#     return d.last_seq
 
     #################################################################
 

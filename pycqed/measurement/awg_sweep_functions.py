@@ -704,39 +704,6 @@ class chevron_cphase_length(swf.Hard_Sweep):
                                            return_seq=True)
 
 
-class SwapN(swf.Hard_Sweep):
-
-    def __init__(self, operation_dict, q0, dist_dict, AWG,
-                 upload=True):
-        super().__init__()
-        self.operation_dict = operation_dict
-        self.q0 = q0
-        self.dist_dict = dist_dict
-        self.upload = upload
-        self.name = 'SWAPN'
-        self.parameter_name = 'SWAP pulses'
-        self.unit = '#'
-        self.AWG = AWG
-
-    def set_parameter(self, val):
-        pass
-
-    def prepare(self, **kw):
-        if self.upload:
-            old_val = self.AWG.get(
-                '{}_amp'.format(self.operation_dict['SWAP '+self.q0]['channel']))
-            # Rescaling the AWG channel amp is done to ensure that the dac
-            # values of the flux pulses (including kernels) are defined on
-            # a 2Vpp scale.
-            self.AWG.set('{}_amp'.format(self.operation_dict['SWAP '+self.q0]['channel']), 2.)
-            fsqs.SwapN(operation_dict=self.operation_dict, q0=self.q0,
-                       nr_pulses_list=self.sweep_points,
-                       distortion_dict=self.dist_dict,
-                       upload=True)
-            self.AWG.set('{}_amp'.format(self.operation_dict['SWAP '+self.q0]['channel']),
-                         old_val)
-
-
 class BusT1(swf.Hard_Sweep):
 
     def __init__(self, times_vec, mw_pulse_pars, RO_pars,
