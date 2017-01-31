@@ -8,6 +8,7 @@ import numpy as np
 from qcodes.instrument.base import Instrument
 from qcodes.utils import validators as vals
 from fnmatch import fnmatch
+from qcodes.instrument.parameter import ManualParameter
 #from instrument_drivers.physical_instruments.ZurichInstruments import UHFQuantumController as ZI_UHFQC
 
 
@@ -138,6 +139,15 @@ class UHFQC(Instrument):
         self.add_parameter('AWG_file',
                            set_cmd=self._do_set_AWG_file,
                            vals=vals.Anything())
+        #storing an offset correction parameter for all weight functions,
+        #this allows normalized calibration when performing cross-talk suppressed
+        #readout
+        for i in range(5):
+            self.add_parameter("quex_trans_offset_weightfunction_{}".format(i),
+                   units='V',
+                   label='RO normalization offset (V)',
+                   initial_value=0.0,
+                   parameter_class=ManualParameter)
         if init:
             self.load_default_settings()
         t1 = time.time()
@@ -430,7 +440,9 @@ class UHFQC(Instrument):
         with open(self._d_file_name, 'w') as d_file:
             json.dump(d_node_pars, d_file, default=int, indent=2)
 
-    def prepare_SSB_weight_and_rotation(self, IF,  weight_function_I=0, weight_function_Q=1):
+    def prepare_SSB_weight_and_rotation(self, IF,
+                                        weight_function_I=0,
+                                        weight_function_Q=1):
         trace_length = 4096
         tbase = np.arange(0, trace_length/1.8e9, 1/1.8e9)
         cosI = np.array(np.cos(2*np.pi*IF*tbase))

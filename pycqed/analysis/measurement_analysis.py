@@ -31,7 +31,8 @@ imp.reload(dm_tools)
 
 class MeasurementAnalysis(object):
 
-    def __init__(self, TwoD=False, folder=None, auto=True, **kw):
+    def __init__(self, TwoD=False, folder=None, auto=True,
+                 cmap_chosen='viridis',**kw):
         if folder is None:
             self.folder = a_tools.get_folder(**kw)
         else:
@@ -40,6 +41,7 @@ class MeasurementAnalysis(object):
         self.load_hdf5data(**kw)
         self.fit_results = []
         self.box_props = dict(boxstyle='Square', facecolor='white', alpha=0.8)
+        self.cmap_chosen = cmap_chosen
         if auto is True:
             self.run_default_analysis(TwoD=TwoD, **kw)
 
@@ -270,7 +272,7 @@ class MeasurementAnalysis(object):
             fit_grp.attrs.create(name='weighted_chisqr', data=weighted_chisqr)
 
     def run_default_analysis(self, TwoD=False, close_file=True,
-                             show=False, log=False, **kw):
+                             show=False, log=False, transpose=False, **kw):
         if TwoD is False:
             self.get_naming_and_values()
             self.sweep_points = kw.pop('sweep_points', self.sweep_points)
@@ -343,7 +345,9 @@ class MeasurementAnalysis(object):
                     ylabel=self.ylabel,
                     zlabel=self.zlabels[i],
                     save=False,
-                    transpose=True)
+                    transpose=transpose,
+                    cmap_chosen=self.cmap_chosen,
+                    **kw)
 
             fig.tight_layout(h_pad=1.5)
             fig.subplots_adjust(top=0.9)
@@ -600,7 +604,6 @@ class OptimizationAnalysis_v2(MeasurementAnalysis):
         return
 
     def make_figures(self, **kw):
-
         base_figname = 'optimization of ' + self.value_names[0]
         if np.shape(self.sweep_points)[0] == 2:
             f, ax = plt.subplots()
@@ -621,7 +624,7 @@ class OptimizationAnalysis_v2(MeasurementAnalysis):
             self.save_fig(f, figname=base_figname, **kw)
 
 class OptimizationAnalysis(MeasurementAnalysis):
-    def run_default_analysis(self, close_file=True, show=False, **kw):
+    def run_default_analysis(self, close_file=True, show=False, plot_all=False, **kw):
         self.get_naming_and_values()
         try:
             optimization_method = self.data_file['Instrument settings']\
@@ -633,35 +636,41 @@ class OptimizationAnalysis(MeasurementAnalysis):
             logging.warning('Could not extract optimization method from' +
                             ' data file')
 
-        base_figname = optimization_method + ' optimization of ' + \
-            self.value_names[0]
+        for i, meas_vals in enumerate(self.measured_values):
+            if (not plot_all) & (i >= 1):
+                break
 
-        # Optimizable value vs n figure
-        fig1_type = '%s vs n' % self.value_names[0]
-        figname1 = base_figname + '\n' + fig1_type
-        savename1 = self.timestamp_string + '_' + base_figname + '_' + \
-            fig1_type
-        fig1, ax = self.default_ax()
-        ax.plot(self.measured_values[0], marker='o')
-        # assumes only one value exists because it is an optimization
-        ax.set_xlabel('iteration (n)')
-        ax.set_ylabel(self.ylabels[0])
-        ax.set_title(self.timestamp_string + ' ' + figname1)
+            base_figname = optimization_method + ' optimization of ' + \
+                self.value_names[i]
+            # Optimizable value vs n figure
+            fig1_type = '%s vs n' % self.value_names[i]
+            figname1 = base_figname + '\n' + fig1_type
+            savename1 = self.timestamp_string + '_' + base_figname + '_' + \
+                fig1_type
+            fig1, ax = self.default_ax()
+            ax.plot(self.measured_values[i], marker='o')
+            # assumes only one value exists because it is an optimization
+            ax.set_xlabel('iteration (n)')
+            ax.set_ylabel(self.ylabels[i])
+            ax.set_title(self.timestamp_string + ' ' + figname1)
 
-        textstr = 'Optimization converged to: \n   %s: %.3g %s' % (
-            self.value_names[0], self.measured_values[0][-1],
-            self.value_units[0])
-        for i in range(len(self.parameter_names)):
-            textstr += '\n   %s: %.4g %s' % (self.parameter_names[i],
-                                             self.sweep_points[i][-1],
-                                             self.parameter_units[i])
+            textstr = 'Optimization converged to: \n   %s: %.3g %s' % (
+                self.value_names[i], self.measured_values[0][-1],
+                self.value_units[i])
+            for j in range(len(self.parameter_names)):
+                textstr += '\n   %s: %.4g %s' % (self.parameter_names[j],
+                                                 self.sweep_points[j][-1],
+                                                 self.parameter_units[j])
 
-        # y coord 0.4 ensures there is no overlap for both maximizing and minim
-        ax.text(0.95, 0.4, textstr,
-                transform=ax.transAxes,
-                fontsize=11, verticalalignment='bottom',
-                horizontalalignment='right',
-                bbox=self.box_props)
+            # y coord 0.4 ensures there is no overlap for both maximizing and minim
+            if i==0:
+                ax.text(0.95, 0.4, textstr,
+                        transform=ax.transAxes,
+                        fontsize=11, verticalalignment='bottom',
+                        horizontalalignment='right',
+                        bbox=self.box_props)
+
+            self.save_fig(fig1, figname=savename1, **kw)
 
         # Parameters vs n figure
         fig2, axarray = plt.subplots(len(self.parameter_names), 1,
@@ -726,7 +735,7 @@ class OptimizationAnalysis(MeasurementAnalysis):
             cbar = fig3.colorbar(sc)
             cbar.set_label('iteration (n)')
 
-        self.save_fig(fig1, figname=savename1, **kw)
+
         self.save_fig(fig2, figname=savename2, **kw)
         self.save_fig(fig3, figname=savename3, fig_tight=False, **kw)
 
@@ -1138,7 +1147,6 @@ class Rabi_Analysis(TD_Analysis):
         self.save_fig(self.fig, fig_tight=False, **kw)
 
     def fit_data(self, print_fit_results=False, **kw):
-        self.add_analysis_datagroup_to_file()
         model = fit_mods.CosModel
         self.fit_res = ['', '']
         # It would be best to do 1 fit to both datasets but since it is
@@ -1150,8 +1158,12 @@ class Rabi_Analysis(TD_Analysis):
                 data=self.measured_values[i],
                 t=self.sweep_points,
                 params=params)
-            self.save_fitted_parameters(fit_res=self.fit_res[i],
-                                        var_name=self.value_names[i])
+            try:
+                self.add_analysis_datagroup_to_file()
+                self.save_fitted_parameters(fit_res=self.fit_res[i],
+                                            var_name=self.value_names[i])
+            except Exception as e:
+                logging.warning(e)
 
 class TD_UHFQC(TD_Analysis):
     def __init__(self, NoCalPoints=4, center_point=31, make_fig=True,
@@ -4259,6 +4271,7 @@ class TwoD_Analysis(MeasurementAnalysis):
     def run_default_analysis(self, normalize=False, plot_linecuts=True,
                              linecut_log=False, colorplot_log=False,
                              plot_all=False, save_fig=True,
+                             transpose=False,
                              **kw):
         close_file = kw.pop('close_file', True)
 
@@ -4313,6 +4326,7 @@ class TwoD_Analysis(MeasurementAnalysis):
                                zlabel=self.zlabels[i],
                                fig=fig, ax=ax,
                                log=colorplot_log,
+                               transpose=transpose,
                                normalize=normalize,
                                **kw)
             if save_fig:

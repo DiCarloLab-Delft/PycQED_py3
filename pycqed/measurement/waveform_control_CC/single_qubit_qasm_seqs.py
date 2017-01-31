@@ -305,7 +305,7 @@ def randomized_benchmarking(qubit_name, nr_cliffords, nr_seeds,
                             net_clifford=0, restless=False,
                             label='randomized_benchmarking',
                             cal_points=True,
-                            double_curves=True):
+                            double_curves=False):
     '''
     Input pars:
         nr_cliffords:  list nr_cliffords for which to generate RB seqs

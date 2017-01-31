@@ -115,7 +115,11 @@ def load_settings_onto_instrument(instrument, load_from_instr=None, folder=None,
             if value != 'None':  # None is saved as string in hdf5
                 if type(value) == str:
                     if value == 'False':
-                        instrument.set(parameter, False)
+                        try:
+                            instrument.set(parameter, False)
+                        except:
+                            print('Could not set parameter: "%s" to "%s" for instrument "%s"' % (
+                                parameter, value, instrument_name))
                     else:
                         try:
                             instrument.set(parameter, float(value))
