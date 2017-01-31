@@ -306,8 +306,7 @@ def multi_pulse_elt(i, station, pulse_list, sequencer_config=None):
                     mod_frequency=pulse_pars['mod_frequency']),
                     operation_type=pulse_pars['operation_type'],
                     start=t0,
-                    refpulse=last_pulse, refpoint=pulse_pars['refpoint'],
-                    fixed_point_freq=pulse_pars['fixed_point_frequency'])
+                    refpulse=last_pulse, refpoint=pulse_pars['refpoint'])
             elif pulse_pars['pulse_type'] == 'Gated_MW_RO_pulse':
                 last_pulse = el.add(pulse.SquarePulse(
                     name='RO_marker', amplitude=1,
@@ -315,8 +314,7 @@ def multi_pulse_elt(i, station, pulse_list, sequencer_config=None):
                     channel=pulse_pars['RO_pulse_marker_channel']),
                     operation_type=pulse_pars['operation_type'],
                     start=t0, refpulse=last_pulse,
-                    refpoint=pulse_pars['refpoint'],
-                    fixed_point_freq=pulse_pars['fixed_point_frequency'])
+                    refpoint=pulse_pars['refpoint'])
 
             elif pulse_pars['pulse_type'] == 'MW_IQmod_pulse_UHFQC':
                 # "adding a 0 amp pulse because the sequencer needs an element for timing
@@ -326,8 +324,7 @@ def multi_pulse_elt(i, station, pulse_list, sequencer_config=None):
                     channel=pulse_pars['RO_pulse_marker_channel']),
                     operation_type=pulse_pars['operation_type'],
                     start=t0, refpulse=last_pulse,
-                    refpoint=pulse_pars['refpoint'],
-                    fixed_point_freq=pulse_pars['fixed_point_frequency'])
+                    refpoint=pulse_pars['refpoint'])
             # Start Acquisition marker
             if type(pulse_pars['acq_marker_channel']) is str:
                 channels = pulse_pars['acq_marker_channel']

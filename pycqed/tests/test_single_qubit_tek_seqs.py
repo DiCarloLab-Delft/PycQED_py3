@@ -63,7 +63,6 @@ class Test_SingleQubitTek(unittest.TestCase):
 
     def test_ramsey_no_detuning(self):
         times = np.linspace(0, 5e-6, 41)
-        f_fix_pt = self.RO_pars['fixed_point_frequency']
 
         # Sequence with no artificial detuning
         seq, el_list = sqs.Ramsey_seq(times, self.pulse_pars, self.RO_pars,
@@ -79,7 +78,7 @@ class Test_SingleQubitTek(unittest.TestCase):
             t_ROm = el.effective_pulse_start_time('Acq-trigger-0', 'ch1')
             self.assertAlmostEqual(t_RO, t_ROm, places=10)
             # test if fix point put pulses at the right spot.
-            self.assertTrue(element.is_divisible_by_clock(t_RO, abs(f_fix_pt)))
+            self.assertAlmostEqual(t_RO % 1e-6, 0)
             # Check pulse delay
             if i < (len(times)-4):
                 t0 = el.effective_pulse_start_time('SSB_DRAG_pulse_0-0', 'ch1')
