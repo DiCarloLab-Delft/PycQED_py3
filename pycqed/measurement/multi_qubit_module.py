@@ -277,7 +277,60 @@ def tomo2Q_cardinal(cardinal, qubit0, qubit1, timings_dict,
     return tomo.seq
 
 
-def tomo2Q_bell(bell_state, qubit0, qubit1, flux_pars_q0, flux_pars_q1,
+
+def tomo2Q_bell(bell_state, device, qS_name, qCP_name, CPhase=True,
+                nr_shots=256, nr_rep=1, mmt_label='', MC=None, run=True):
+    """
+    Performs the fringe measurements of a resonant cphase gate between two qubits.
+    low_qubit is gonna be swapped with the bus
+    high_qubit is gonna be adiabatically pulsed
+    """
+    if MC is None:
+        MC = station.MC
+    cal_points = 28
+    sweep_points = np.arange(nr_shots*nr_rep*(36+cal_points))
+
+    operation_dict = device.get_operation_dict()
+    qS = device.qubits()[qS_name]
+    qCZ ...# you know what to do
+
+
+    int_avg_det = det.UHFQC_integrated_average_detector(
+        UHFQC=qS._acquisition_instr, AWG=qS.AWG,
+        channels=[qCZ.RO_acq_weight_function_I(),
+                  qS.RO_acq_weight_function_I()],
+        nr_averages=qS.RO_acq_averages(),
+        integration_length=qS.RO_acq_integration_length(),
+        cross_talk_suppression=True)
+
+
+    tomo_swf = awg_swf.awg_seq_swf(
+            mult q tek tomo seq ,
+            parameter_name='Pre-rotation',
+            AWG=qS.AWG,
+            fluxing_channels=[qS.fluxing_channel(), qCZ.fluxing_channel()],
+            # pass the args you want here ! (don't forget to delete the old awg_Swf
+            awg_seq_func_kwargs={'operation_dict': operation_dict,
+                                 'qS': qS.name,
+                                 'qCZ': qCZ.name,
+                                 'sweep_qubit': sweep_qubit,
+                                 'RO_target': qCZ.name,
+                                 'excitations': excitations,
+                                 'upload':upload,
+                                 'distortion_dict': qS.dist_dict()})
+    MC.set_sweep_function(tomo)
+    MC.set_sweep_points(sweep_points)
+    MC.set_detector_function(detector)
+    if run:
+        MC.run('BellTomo_%s_%s_%s_%s' % (bell_state,
+                                         qubit0.name,
+                                         qubit1.name,
+                                         mmt_label))
+    return tomo.seq
+
+
+
+def tomo2Q_bell_old(bell_state, qubit0, qubit1, flux_pars_q0, flux_pars_q1,
                 distortion_dict, timings_dict, CPhase=True,
                 nr_shots=256, nr_rep=1, mmt_label='', MC=None, run=True):
     """
@@ -306,15 +359,6 @@ def tomo2Q_bell(bell_state, qubit0, qubit1, flux_pars_q0, flux_pars_q1,
                                        CPhase=CPhase,
                                        upload=True,
                                        return_seq=True)
-
-    # detector = det.UHFQC_integrated_average_detector(
-    #     UHFQC=qubit0._acquisition_instr,
-    #     AWG=station.AWG,
-    #     channels=[qubit0.RO_acq_weight_function_I(),
-    #               qubit1.RO_acq_weight_function_I()],
-    #     nr_averages=qubit0.RO_acq_averages(),
-    #     integration_length=qubit0.RO_acq_integration_length(),
-    #     cross_talk_suppression=True)
 
     detector = det.UHFQC_integration_logging_det(
         UHFQC=qubit0._acquisition_instr,
