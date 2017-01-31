@@ -1649,7 +1649,8 @@ def SWAP_CZ_SWAP_phase_corr_swp(operation_dict, qS, qCZ,
                                 phase_corr_amps=None,
                                 distortion_dict=None,
                                 CZ_disabled=False,
-                                excitations=0.5,  # 0 in 1st half and 1 in 2nd
+                                excitations='both_cases',
+                                # 0 in 1st half and 1 in 2nd
                                 cal_points_with_flux_pulses=True,
                                 verbose=False,
                                 upload=True):
@@ -1729,7 +1730,7 @@ def SWAP_CZ_SWAP_phase_corr_swp(operation_dict, qS, qCZ,
                  'SWAP '+qS, 'CZ ' + qCZ, 'rSWAP ' + qS,
                  'SWAP_corr ' + qS, 'CZ_corr ' + qCZ,
                  'phi90 ' + qCZ, 'I '+qCZ, 'I '+qS, 'RO '+RO_target])
-            if (excitations == 1 or (excitations == 0.5 and
+            if (excitations == 1 or (excitations == 'both_cases' and
                                      i >= (len(phase_corr_amps)-4)/2)):
                 # Put a single excitation in the Swap qubit by replacing Id
                 pulse_combinations[0] = 'X180 ' + qS
@@ -1742,7 +1743,7 @@ def SWAP_CZ_SWAP_phase_corr_swp(operation_dict, qS, qCZ,
                  'SWAP_corr ' + qS, 'CZ_corr ' + qCZ,
                  'mY90 ' + qCZ, 'Y90 '+qCZ, 'phi90 '+qS, 'RO '+RO_target])
             # Two pulses on the CZ qubit are to emulate tomo pulses
-            if (excitations == 1 or (excitations == 0.5 and
+            if (excitations == 1 or (excitations == 'both_cases' and
                                      (i >= len(phase_corr_amps)-4)/2)):
                 # Put a single excitation in the CZ qubit by replacing Id
                 pulse_combinations[1] = 'X180 ' + qCZ

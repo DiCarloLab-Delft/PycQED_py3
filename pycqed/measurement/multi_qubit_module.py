@@ -127,51 +127,51 @@ def measure_SWAPN(device, q0_name, swap_amps,
     ma.TwoD_Analysis(auto=True)
 
 
-def measure_SWAP_CZ_SWAP(device, q0_name, q1_name,
+def measure_SWAP_CZ_SWAP(device, qS_name, qCZ_name,
                          CZ_phase_corr_amps,
                          sweep_qubit,
-                         excitations=0.5,
+                         excitations='both_cases',
                          MC=None, upload=True):
     if MC is None:
         MC = station.components['MC']
-    if excitations == 0.5:
+    if excitations == 'both_cases':
         CZ_phase_corr_amps = np.tile(CZ_phase_corr_amps, 2)
     amp_step = CZ_phase_corr_amps[1]-CZ_phase_corr_amps[0]
     swp_pts = np.concatenate([CZ_phase_corr_amps,
                              np.arange(4)*amp_step+CZ_phase_corr_amps[-1]])
 
-    q0 = device.qubits()[q0_name]
-    q1 = device.qubits()[q1_name]
+    qS = device.qubits()[qS_name]
+    qCZ = device.qubits()[qCZ_name]
 
     int_avg_det = det.UHFQC_integrated_average_detector(
-        UHFQC=q0._acquisition_instr, AWG=q0.AWG,
-        channels=[q1.RO_acq_weight_function_I(),
-                  q0.RO_acq_weight_function_I()],
-        nr_averages=q0.RO_acq_averages(),
-        integration_length=q0.RO_acq_integration_length(),
+        UHFQC=qS._acquisition_instr, AWG=qS.AWG,
+        channels=[qCZ.RO_acq_weight_function_I(),
+                  qS.RO_acq_weight_function_I()],
+        nr_averages=qS.RO_acq_averages(),
+        integration_length=qS.RO_acq_integration_length(),
         cross_talk_suppression=True)
     operation_dict = device.get_operation_dict()
     S_CZ_S_swf = awg_swf.awg_seq_swf(
             fsqs.SWAP_CZ_SWAP_phase_corr_swp,
             parameter_name='phase_corr_amps',
             unit='V',
-            AWG=q0.AWG,
-            fluxing_channels=[q0.fluxing_channel(), q1.fluxing_channel()],
+            AWG=qS.AWG,
+            fluxing_channels=[qS.fluxing_channel(), qCZ.fluxing_channel()],
             awg_seq_func_kwargs={'operation_dict': operation_dict,
-                                 'qS': q0.name,
-                                 'qCZ': q1.name,
+                                 'qS': qS.name,
+                                 'qCZ': qCZ.name,
                                  'sweep_qubit': sweep_qubit,
-                                 'RO_target': q1.name,
-                                 'excitations': 0.5,
+                                 'RO_target': qCZ.name,
+                                 'excitations': excitations,
                                  'upload':upload,
-                                 'distortion_dict': q0.dist_dict()})
+                                 'distortion_dict': qS.dist_dict()})
 
     MC.set_sweep_function(S_CZ_S_swf)
     MC.set_detector_function(int_avg_det)
     MC.set_sweep_points(swp_pts)
     # MC.set_sweep_points(phases)
 
-    MC.run('SWAP_CP_SWAP_{}_{}'.format(q0_name, q1_name))
+    MC.run('SWAP_CP_SWAP_{}_{}'.format(qS_name, qCZ_name))
     ma.MeasurementAnalysis()  # N.B. you may want to run different analysis
 
 

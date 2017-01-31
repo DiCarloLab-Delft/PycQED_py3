@@ -378,7 +378,7 @@ class MartinisFluxPulse(Pulse):
             ValueError('Must specify kernel path')
 
     def __call__(self, **kw):
-        # self.amplitude = kw.pop('amplitude', self.amplitude)
+        self.amplitude = kw.pop('amplitude', self.amplitude)
 
         self.pulse_buffer = kw.pop(
             'pulse_buffer', self.pulse_buffer)
@@ -409,4 +409,7 @@ class MartinisFluxPulse(Pulse):
             f_01_max=self.f_01_max,
             dac_flux_coefficient=self.dac_flux_coefficient,
             return_unit='V')
-        return martinis_pulse
+
+        # amplitude is not used because of parameterization but
+        # we use the sign of the amplitude to set the flux compensation
+        return martinis_pulse*np.sign(self.amplitude)
