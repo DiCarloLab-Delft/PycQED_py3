@@ -34,7 +34,7 @@ class CPhase_cost_func_det(det.Soft_Detector):
         self.pars_changed = True
 
     def acquire_data_point(self, **kw):
-        if not self.pars_changed:
+        if self.pars_changed:
             self.qCZ.CZ_theta(self.theta_f)
             l_coeffs = np.array([self.lambda1, self.lambda2, self.lambda3])
             self.qCZ.CZ_lambda_coeffs(l_coeffs)
