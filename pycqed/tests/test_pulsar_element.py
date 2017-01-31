@@ -86,7 +86,7 @@ class Test_Element(unittest.TestCase):
         expected_wf[1000:1020] = .3
         np.testing.assert_array_almost_equal(ch1_wf, expected_wf)
 
-    def test_operation_dependent_buffers(self):
+    def test_operation_dependent_buffers_and_compensation(self):
         # Fixed point should shift both elements by 2 ns
 
         RO_amp = 0.1
@@ -130,7 +130,7 @@ class Test_Element(unittest.TestCase):
             pulses += [operation_dict[p]]
         test_elt = multi_pulse_elt(0, self.station, pulses, sequencer_config)
 
-        min_samples = 1304+3040  # 1us fixpoint, 300ns RO pulse and 4ns zeros
+        min_samples = 1800+3040  # 1us fixpoint, 300ns RO pulse and 4ns zeros
         ch1_wf = test_elt.waveforms()[1]['ch1']
         self.assertEqual(len(ch1_wf), min_samples)
 

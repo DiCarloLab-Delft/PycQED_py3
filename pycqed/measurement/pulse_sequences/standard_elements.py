@@ -368,9 +368,13 @@ def multi_pulse_elt(i, station, pulse_list, sequencer_config=None):
             operation_type=pulse_pars['operation_type'])
 
     # This pulse ensures that the sequence always ends at zero amp
+    if len(flux_compensation_pulse_list) > 0:
+        final_len = 500e-9
+    else:
+        final_len = 1e-9
     last_pulse = el.add(pulse.SquarePulse(name='final_empty_pulse',
                                           channel='ch1',
-                                          amplitude=0, length=1e-9),
+                                          amplitude=0, length=final_len),
                         refpulse=last_pulse, refpoint='end')
 
     return el
