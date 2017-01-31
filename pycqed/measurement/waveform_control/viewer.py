@@ -58,7 +58,7 @@ def show_element_dclab(element, delay=True, channels='all', ax=None):
 
 def show_element_pyqt(element, QtPlot_win=None,
                       color_idx=None,
-                      channels='all', ):
+                      channels=['ch1', 'ch2', 'ch3', 'ch4']):
     if QtPlot_win is None:
         QtPlot_win = QtPlot(windowTitle='Seq_plot', figsize=(600, 400))
     # FIXME: Add a legend
@@ -68,18 +68,32 @@ def show_element_pyqt(element, QtPlot_win=None,
 
     t_vals = t_vals*1e9
     xlabel = 'Time (ns)'
-    ylabel = 'Analog output (V)'
-    for i, key in enumerate(sorted(outputs_dict)):
+    for i, ch in enumerate(channels):
+        ylabel = 'Output ch {} (V)'.format(ch)
         if color_idx == None:
             color = color_cycle[i % len(color_cycle)]
         else:
             color = color_cycle[color_idx]
-        if channels == ['all'] or key in channels:
+        if i+1 > len(QtPlot_win.subplots):
+            QtPlot_win.win.nextRow()
             QtPlot_win.add(
-                x=t_vals, y=outputs_dict[key], name=key,
+                x=t_vals, y=outputs_dict[ch], name=ch,
                 color=color,
+                subplot=i+1,
                 symbol='o', symbolSize=5,
                 xlabel=xlabel, ylabel=ylabel)
+        else:
+            QtPlot_win.add(
+                x=t_vals, y=outputs_dict[ch], name=ch,
+                color=color,
+                subplot=i+1,
+                symbol='o', symbolSize=5,
+                xlabel=xlabel, ylabel=ylabel)
+    # links all the x-axes
+    p0 = QtPlot_win.subplots[0]
+    for j, p in enumerate(QtPlot_win.subplots):
+        if j > 0:
+            p.setXLink(p0)
     return QtPlot_win
 
 
