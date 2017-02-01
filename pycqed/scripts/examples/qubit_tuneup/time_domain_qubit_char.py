@@ -1,7 +1,13 @@
 import numpy as np
+import qcodes as qc
 
 f_span = 30e6
-for q in [AncT, DataT]:
+# These names have to be replaced with whatever you have named them
+q0 = qc.station['q0_name']
+device = qc.station['device_name']
+qubits = [q0]
+
+for q in qubits:
     # CW experiments
     # MC.soft_avg(1)
     # q.RO_acq_averages(2**8)
@@ -27,3 +33,13 @@ for q in [AncT, DataT]:
 
     # leakage and skewness calibration
     # q.measure_ssro()
+
+
+########################################
+# Bus characterization T1
+
+sq_flm.measure_SWAPN(device, q0.name,
+                     swap_amps = np.arange(1.04, 1.06, 0.01))
+sq_flm.measure_BusT1(device, q0.name,
+                     times=np.arange(0, 40e-6, 1e-6))
+
