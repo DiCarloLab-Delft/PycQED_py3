@@ -5415,16 +5415,19 @@ class DoubleFrequency(object):
                 self.analysis()
 
     def analysis(self):
-            print(self.scan_start,self.scan_stop,self.opt_dict,self.pdict,self.nparams)
+            # print(self.scan_start,self.scan_stop,self.opt_dict,self.pdict,self.nparams)
             ramsey_scan = ca.quick_analysis(t_start=self.scan_start,
                                             t_stop=self.scan_stop,
                                             options_dict=self.opt_dict,
                                             params_dict_TD=self.pdict,
                                             numeric_params=self.nparams)
             x = ramsey_scan.TD_dict['sweep_points'][0]*1e6
-            y = ramsey_scan.TD_dict['I'][0]
+            y = a_tools.normalize_data_v3(ramsey_scan.TD_dict['I'][0])
+            # print(y)
 
             fit_res = self.fit(x[:-4], y[:-4])
+            self.fit_res = fit_res
+            # print(fit_res.best_values)
 
             fig = plt.figure()
             ax = fig.add_subplot(111)
@@ -5463,13 +5466,13 @@ class DoubleFrequency(object):
     def fit(self, sweep_values, measured_values):
         Double_Cos_Model = fit_mods.DoubleExpDampOscModel
         fourier_max_pos = a_tools.peak_finder_v2(np.arange(1,len(sweep_values)/2,1),
-                                            abs(np.fft.fft(measured_values))[1:len(measured_values)/2],
+                                            abs(np.fft.fft(measured_values))[1:len(measured_values)//2],
                                             window_len = 1, perc = 95)
         if len(fourier_max_pos)==1:
             freq_guess = 1./sweep_values[-1]*(fourier_max_pos[0]+np.array([-1,1]))
         else:
             freq_guess = 1./sweep_values[-1]*fourier_max_pos
-        print(abs(np.fft.fft(measured_values))[1:len(measured_values)/2])
+        # print(abs(np.fft.fft(measured_values))[1:len(measured_values)/2])
         Double_Cos_Model.set_param_hint('tau_1',value = 10., min = 1., max = 250., vary=True)
         Double_Cos_Model.set_param_hint('tau_2',value = 9., min = 1., max = 250., vary=True)
         # Double_Cos_Model.set_param_hint('tau_2',expr='tau_1', min = 1., max = 250.)
