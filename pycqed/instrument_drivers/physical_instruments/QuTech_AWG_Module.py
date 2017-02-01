@@ -52,11 +52,11 @@ class QuTech_AWG_Module(SCPI):
         self.device_descriptor.numMarkersPerChannel = 2
         self.device_descriptor.numMarkers = 8
         self.device_descriptor.numTriggers = 8
-        self.device_descriptor.numCodewords = 8
+        self.device_descriptor.numCodewords = 128
 
         # valid values
         self.device_descriptor.mvals_trigger_impedance = vals.Enum(50),
-        self.device_descriptor.mvals_trigger_level = vals.Numbers(0, 2.5)
+        self.device_descriptor.mvals_trigger_level = vals.Numbers(0, 5.0)
         # FIXME: not in [V]
 
         self.add_parameters()
@@ -140,7 +140,7 @@ class QuTech_AWG_Module(SCPI):
                                units='Vpp',
                                get_cmd=amp_cmd + '?',
                                set_cmd=amp_cmd + ' {:.6f}',
-                               vals=vals.Numbers(-0.45, 0.45),
+                               vals=vals.Numbers(-2.0, 2.0),
                                get_parser=float)
 
             self.add_parameter('ch{}_offset'.format(ch),
@@ -161,8 +161,7 @@ class QuTech_AWG_Module(SCPI):
             for j in range(self.device_descriptor.numChannels):
                 ch = j+1
                 # Codeword 0 corresponds to bitcode 0
-                # +1 is to correct for SCPI command in software see issue #74
-                cw_cmd = 'sequence:element{:d}:waveform{:d}'.format(cw+1, ch)
+                cw_cmd = 'sequence:element{:d}:waveform{:d}'.format(cw, ch)
                 self.add_parameter('codeword_{}_ch{}_waveform'.format(cw, ch),
                                    get_cmd=cw_cmd+'?',
                                    set_cmd=cw_cmd+' "{:s}"',
