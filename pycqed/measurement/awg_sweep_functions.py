@@ -704,39 +704,6 @@ class chevron_cphase_length(swf.Hard_Sweep):
                                            return_seq=True)
 
 
-class BusT1(swf.Hard_Sweep):
-
-    def __init__(self, times_vec, mw_pulse_pars, RO_pars,
-                 flux_pulse_pars, dist_dict, AWG, upload=True,
-                 return_seq=False):
-        super().__init__()
-        self.times_vec = times_vec
-        self.mw_pulse_pars = mw_pulse_pars
-        self.RO_pars = RO_pars
-        self.flux_pulse_pars = flux_pulse_pars
-        self.dist_dict = dist_dict
-        self.upload = upload
-        self.name = 'Chevron'
-        self.parameter_name = 'Time'
-        self.unit = 's'
-        self.return_seq = return_seq
-        self.AWG = AWG
-
-    def prepare(self, **kw):
-        if self.upload:
-            fsqs.BusT1(self.times_vec,
-                       self.mw_pulse_pars,
-                       self.RO_pars,
-                       self.flux_pulse_pars,
-                       distortion_dict=self.dist_dict)
-
-    def pre_upload(self, **kw):
-        self.seq = fsqs.BusT1(self.times_vec,
-                              self.mw_pulse_pars,
-                              self.RO_pars,
-                              self.flux_pulse_pars,
-                              distortion_dict=self.dist_dict, return_seq=True)
-
 
 class BusT2(swf.Hard_Sweep):
 

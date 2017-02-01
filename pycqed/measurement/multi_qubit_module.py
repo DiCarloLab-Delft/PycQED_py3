@@ -3,10 +3,11 @@ from pycqed.measurement import awg_sweep_functions as awg_swf
 from pycqed.measurement import detector_functions as det
 from pycqed.analysis import measurement_analysis as ma
 import qcodes as qc
+from pycqed.analysis import tomography as tomo
+
 from pycqed.measurement.pulse_sequences import multi_qubit_tek_seq_elts as mqs
 import pycqed.measurement.pulse_sequences.fluxing_sequences as fsqs
 station = qc.station
-dist_dict = None
 
 
 def measure_two_qubit_AllXY(device, q0_name, q1_name,
@@ -40,91 +41,6 @@ def measure_two_qubit_AllXY(device, q0_name, q1_name,
     MC.set_detector_function(int_avg_det)
     MC.run('2 qubit AllXY sequential')
     ma.MeasurementAnalysis()
-
-
-def measure_chevron(device, q0_name, amps, length, MC=None):
-    # Might belong better in some fluxing module but that does not exist yet
-    if MC is None:
-        MC = qc.station.components['MC']
-
-    if len(amps) == 1:
-        slice_scan = True
-    else:
-        slice_scan = False
-
-    operation_dict = device.get_operation_dict()
-
-    # preparation of sweep points and cal points
-    cal_points = 4
-    lengths_cal = length[-1] + \
-        np.arange(1, 1+cal_points)*(length[1]-length[0])
-    lengths_vec = np.concatenate((length, lengths_cal))
-
-    # start preparations
-    q0 = device.qubits()[q0_name]
-    q0.prepare_for_timedomain()
-    dist_dict = q0.dist_dict()
-
-    chevron_swf = awg_swf.awg_seq_swf(
-        fsqs.chevron_seq,
-        parameter_name='pulse_lengths',
-        AWG=q0.AWG,
-        fluxing_channels=[q0.fluxing_channel()],
-        awg_seq_func_kwargs={'operation_dict': operation_dict,
-                             'q0': q0_name,
-                             'distortion_dict': q0.dist_dict()})
-
-    MC.set_sweep_function(chevron_swf)
-    MC.set_sweep_points(lengths_vec)
-    if not slice_scan:
-        MC.set_sweep_function_2D(
-            q0.AWG.parameters[q0.fluxing_channel()+'_amp'])
-        MC.set_sweep_points_2D(amps)
-
-    MC.set_detector_function(q0.int_avg_det_rot)
-    if slice_scan:
-        q0.AWG.parameters[q0.fluxing_channel()+'_amp'].set(amps[0])
-        MC.run('Chevron_slice_%s' % q0.name)
-        ma.TD_Analysis(auto=True)
-    else:
-        MC.run('Chevron_2D_%s' % q0.name, mode='2D')
-        ma.Chevron_2D(auto=True)
-
-
-def measure_SWAPN(device, q0_name, swap_amps,
-                  number_of_swaps=30, MC=None):
-    if MC is None:
-        MC = qc.station.components['MC']
-    q0 = device.qubits()[q0_name]
-    # These are the sweep points
-    swap_vec = np.arange(number_of_swaps)*2
-    cal_points = 4
-    lengths_cal = swap_vec[-1] + \
-        np.arange(1, 1+cal_points)*(swap_vec[1]-swap_vec[0])
-    swap_vec = np.concatenate((swap_vec, lengths_cal))
-
-    operation_dict = device.get_operation_dict()
-    AWG = q0.AWG
-
-    repSWAP = awg_swf.awg_seq_swf(
-        fsqs.SwapN,
-        parameter_name='nr_pulses_list',
-        unit='#',
-        AWG=q0.AWG,
-        fluxing_channels=[q0.fluxing_channel()],
-        awg_seq_func_kwargs={'operation_dict': operation_dict,
-                             'q0': q0_name,
-                             'distortion_dict': q0.dist_dict()})
-
-    MC.set_sweep_function(repSWAP)
-    MC.set_sweep_points(swap_vec)
-
-    MC.set_sweep_function_2D(AWG.ch4_amp)
-    MC.set_sweep_points_2D(swap_amps)
-
-    MC.set_detector_function(q0.int_avg_det_rot)
-    MC.run('SWAPN_%s' % q0.name, mode='2D')
-    ma.TwoD_Analysis(auto=True)
 
 
 def measure_SWAP_CZ_SWAP(device, qS_name, qCZ_name,
@@ -280,7 +196,7 @@ def tomo2Q_cardinal(cardinal, qubit0, qubit1, timings_dict,
 
 def tomo2Q_bell(bell_state, device, qS_name, qCZ_name, CPhase=True,
                 nr_shots=256, nr_rep=1, mmt_label='',
-                MLE=False, 
+                MLE=False,
                 MC=None, run=True):
     """
     Performs the fringe measurements of a resonant cphase gate between two qubits.
@@ -316,7 +232,7 @@ def tomo2Q_bell(bell_state, device, qS_name, qCZ_name, CPhase=True,
                              'qCZ': qCZ.name,
                              'RO_target': qCZ.name,
                              'distortion_dict': qS.dist_dict()})
-    MC.soft_avg(1) # Single shots cannot be averaged. 
+    MC.soft_avg(1) # Single shots cannot be averaged.
     MC.set_sweep_function(tomo_swf)
     MC.set_sweep_points(sweep_points)
     MC.set_detector_function(detector)
