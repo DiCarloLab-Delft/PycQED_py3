@@ -138,7 +138,7 @@ def measure_SWAP_CZ_SWAP(device, qS_name, qCZ_name,
         CZ_phase_corr_amps = np.tile(CZ_phase_corr_amps, 2)
     amp_step = CZ_phase_corr_amps[1]-CZ_phase_corr_amps[0]
     swp_pts = np.concatenate([CZ_phase_corr_amps,
-                             np.arange(4)*amp_step+CZ_phase_corr_amps[-1]])
+                              np.arange(4)*amp_step+CZ_phase_corr_amps[-1]])
 
     qS = device.qubits()[qS_name]
     qCZ = device.qubits()[qCZ_name]
@@ -152,20 +152,20 @@ def measure_SWAP_CZ_SWAP(device, qS_name, qCZ_name,
         cross_talk_suppression=True)
     operation_dict = device.get_operation_dict()
     S_CZ_S_swf = awg_swf.awg_seq_swf(
-            fsqs.SWAP_CZ_SWAP_phase_corr_swp,
-            parameter_name='phase_corr_amps',
-            unit='V',
-            AWG=qS.AWG,
-            fluxing_channels=[qS.fluxing_channel(), qCZ.fluxing_channel()],
-            upload=upload,
-            awg_seq_func_kwargs={'operation_dict': operation_dict,
-                                 'qS': qS.name,
-                                 'qCZ': qCZ.name,
-                                 'sweep_qubit': sweep_qubit,
-                                 'RO_target': qCZ.name,
-                                 'excitations': excitations,
-                                 'upload': upload,
-                                 'distortion_dict': qS.dist_dict()})
+        fsqs.SWAP_CZ_SWAP_phase_corr_swp,
+        parameter_name='phase_corr_amps',
+        unit='V',
+        AWG=qS.AWG,
+        fluxing_channels=[qS.fluxing_channel(), qCZ.fluxing_channel()],
+        upload=upload,
+        awg_seq_func_kwargs={'operation_dict': operation_dict,
+                             'qS': qS.name,
+                             'qCZ': qCZ.name,
+                             'sweep_qubit': sweep_qubit,
+                             'RO_target': qCZ.name,
+                             'excitations': excitations,
+                             'upload': upload,
+                             'distortion_dict': qS.dist_dict()})
 
     MC.set_sweep_function(S_CZ_S_swf)
     MC.set_detector_function(int_avg_det)
@@ -278,9 +278,10 @@ def tomo2Q_cardinal(cardinal, qubit0, qubit1, timings_dict,
     return tomo.seq
 
 
-
 def tomo2Q_bell(bell_state, device, qS_name, qCZ_name, CPhase=True,
-                nr_shots=256, nr_rep=1, mmt_label='', MC=None, run=True):
+                nr_shots=256, nr_rep=1, mmt_label='',
+                MLE=False, 
+                MC=None, run=True):
     """
     Performs the fringe measurements of a resonant cphase gate between two qubits.
     low_qubit is gonna be swapped with the bus
@@ -295,84 +296,34 @@ def tomo2Q_bell(bell_state, device, qS_name, qCZ_name, CPhase=True,
     qS = device.qubits()[qS_name]
     qCZ = device.qubits()[qCZ_name]
 
-
-    int_avg_det = det.UHFQC_integrated_average_detector(
-        UHFQC=qS._acquisition_instr, AWG=qS.AWG,
+    detector = det.UHFQC_integration_logging_det(
+        UHFQC=qS._acquisition_instr,
+        AWG=qS.AWG,
         channels=[qCZ.RO_acq_weight_function_I(),
                   qS.RO_acq_weight_function_I()],
-        nr_averages=qS.RO_acq_averages(),
+        nr_shots=nr_shots,
         integration_length=qS.RO_acq_integration_length(),
         cross_talk_suppression=True)
 
-
     tomo_swf = awg_swf.awg_seq_swf(
-            mqs.two_qubit_tomo_bell,
-            parameter_name='Pre-rotation',
-            AWG=qS.AWG,
-            fluxing_channels=[qS.fluxing_channel(), qCZ.fluxing_channel()],
-            awg_seq_func_kwargs={'bell_state': bell_state,
-                                 'operation_dict': operation_dict,
-                                 'qS': qS.name,
-                                 'qCZ': qCZ.name,
-                                 'RO_target': qCZ.name,
-                                 'distortion_dict': qS.dist_dict()})
+        mqs.two_qubit_tomo_bell,
+        # parameter_name='Pre-rotation',
+        AWG=qS.AWG,
+        fluxing_channels=[qS.fluxing_channel(), qCZ.fluxing_channel()],
+        awg_seq_func_kwargs={'bell_state': bell_state,
+                             'operation_dict': operation_dict,
+                             'qS': qS.name,
+                             'qCZ': qCZ.name,
+                             'RO_target': qCZ.name,
+                             'distortion_dict': qS.dist_dict()})
+    MC.soft_avg(1) # Single shots cannot be averaged. 
     MC.set_sweep_function(tomo_swf)
     MC.set_sweep_points(sweep_points)
-    MC.set_detector_function(int_avg_det)
+    MC.set_detector_function(detector)
     if run:
         MC.run('BellTomo_%s_%s_%s_%s' % (bell_state,
                                          qS_name,
                                          qCZ_name,
                                          mmt_label))
+    tomo.analyse_tomo(MLE=MLE, target_bell=bell_state%10)
     # return tomo_swf.seq
-
-
-
-def tomo2Q_bell_old(bell_state, qubit0, qubit1, flux_pars_q0, flux_pars_q1,
-                distortion_dict, timings_dict, CPhase=True,
-                nr_shots=256, nr_rep=1, mmt_label='', MC=None, run=True):
-    """
-    Performs the fringe measurements of a resonant cphase gate between two qubits.
-    low_qubit is gonna be swapped with the bus
-    high_qubit is gonna be adiabatically pulsed
-    """
-    if MC is None:
-        MC = station.MC
-    cal_points = 28
-    # sweep_points = np.arange(cal_points+36)
-    sweep_points = np.arange(nr_shots*nr_rep*(36+cal_points))
-
-    q0_pulse_pars, RO_pars = qubit0.get_pulse_pars()
-    q1_pulse_pars, RO_pars = qubit1.get_pulse_pars()
-    # print(phases)
-    tomo = awg_swf.two_qubit_tomo_bell(bell_state=bell_state,
-                                       q0_pulse_pars=q0_pulse_pars,
-                                       q1_pulse_pars=q1_pulse_pars,
-                                       q0_flux_pars=flux_pars_q0,
-                                       q1_flux_pars=flux_pars_q1,
-                                       RO_pars=RO_pars,
-                                       distortion_dict=distortion_dict,
-                                       AWG=station.AWG,
-                                       timings_dict=timings_dict,
-                                       CPhase=CPhase,
-                                       upload=True,
-                                       return_seq=True)
-
-    detector = det.UHFQC_integration_logging_det(
-        UHFQC=qubit0._acquisition_instr,
-        AWG=station.AWG,
-        channels=[qubit0.RO_acq_weight_function_I(),
-                  qubit1.RO_acq_weight_function_I()],
-        nr_shots=nr_shots,
-        integration_length=qubit0.RO_acq_integration_length(),
-        cross_talk_suppression=True)
-
-    MC.set_sweep_function(tomo)
-    MC.set_sweep_points(sweep_points)
-    MC.set_detector_function(detector)
-    if run:
-        MC.run('BellTomo_%s_%s_%s_%s' % (bell_state,
-                                         qubit0.name,
-                                         qubit1.name,
-                                         mmt_label))
-    return tomo.seq

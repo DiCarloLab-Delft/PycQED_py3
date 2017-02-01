@@ -513,6 +513,7 @@ def two_qubit_tomo_bell(bell_state,
         qS is swap qubit
         qCZ is cphase qubit
     '''
+    sequencer_config = operation_dict['sequencer_config']
 
     seq_name = '2_qubit_Bell_Tomo_%d_seq' % bell_state
     seq = sequence.Sequence(seq_name)
@@ -540,10 +541,10 @@ def two_qubit_tomo_bell(bell_state,
 
     # Calibration points
     # every calibration point is repeated 7 times to have 64 elts in total
-    cal_points = [['I '+qCZ, 'I '+qS, 'RO '+RO_target]*7,
-                  ['I '+qCZ, 'X180 '+qS, 'RO '+RO_target]*7,
-                  ['X180 '+qCZ, 'I '+qS, 'RO '+RO_target]*7,
-                  ['X180 '+qCZ, 'X180 '+qS, 'RO '+RO_target]*7]
+    cal_points = [['I '+qCZ, 'I '+qS, 'RO '+RO_target]]*7 +\
+                  [['I '+qCZ, 'X180 '+qS, 'RO '+RO_target]]*7 +\
+                  [['X180 '+qCZ, 'I '+qS, 'RO '+RO_target]]*7 +\
+                  [['X180 '+qCZ, 'X180 '+qS, 'RO '+RO_target]]*7
 
     if CZ_disabled:
         # FIXME!
@@ -627,16 +628,26 @@ def two_qubit_tomo_bell(bell_state,
         base_sequence[8] = tomo_list_qCZ[tomo_idx_qCZ]
         base_sequence[9] = tomo_list_qS[tomo_idx_qS]
         seq_pulse_list += [deepcopy(base_sequence)]
+    print(len(cal_points))
     for cal_pulses in cal_points:
         if cal_points_with_flux_pulses:
+            base_sequence[0] = 'I ' + qS
+            base_sequence[1] = 'I ' + qCZ
+            base_sequence[7] = 'I ' + qCZ
             base_sequence[-3:] = cal_pulses
             seq_pulse_list += [deepcopy(base_sequence)]
         else:
             seq_pulse_list += [cal_pulses]
 
     for i, pulse_list in enumerate(seq_pulse_list):
-        el = multi_pulse_elt(36+i, station, pulse_list)
+        pulses = []
+        for p in pulse_list:
+            pulses += [operation_dict[p]]
+        el = multi_pulse_elt(i, station, pulses, sequencer_config)
         if distortion_dict is not None:
+            print('\rDistorting element {}/{} '.format(i+1,
+                                                       len(seq_pulse_list)),
+                  end='')
             el = distort_and_compensate(
                 el, distortion_dict)
         el_list.append(el)
