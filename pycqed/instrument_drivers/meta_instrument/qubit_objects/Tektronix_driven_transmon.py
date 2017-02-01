@@ -272,7 +272,8 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         self.heterodyne_instr.nr_averages(self.RO_acq_averages())
 
         # Turning of TD source
-        self.td_source.off()
+        if self.td_source !=None:
+            self.td_source.off()
 
         # Updating Spec source
         if self.cw_source != None:
@@ -986,10 +987,10 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
 
         elif 'ATS' in acquisition_instr:
             logging.info("setting ATS acquisition")
-            self.int_avg_det = det.ATS_integrated_average_continuous_detector(
-                ATS=self._acquisition_instr.card,
-                ATS_acq=self._acquisition_instr.controller, AWG=self.AWG,
-                nr_averages=self.RO_acq_averages())
+            # self.int_avg_det = det.ATS_integrated_average_continuous_detector(
+            #     ATS=self._acquisition_instr.card,
+            #     ATS_acq=self._acquisition_instr.controller, AWG=self.AWG,
+            #     nr_averages=self.RO_acq_averages())
 
     def get_pulse_dict(self, pulse_dict={}):
         '''

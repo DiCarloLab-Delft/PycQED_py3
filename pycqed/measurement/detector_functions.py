@@ -1640,7 +1640,7 @@ class Chevron_sim(Hard_Detector):
 
 
 class ATS_integrated_average_continuous_detector(Hard_Detector):
-
+    #deprecated
     def __init__(self, ATS, ATS_acq, AWG, seg_per_point=1, normalize=False, rotate=False,
                  nr_averages=1024, integration_length=1e-6, **kw):
         '''
