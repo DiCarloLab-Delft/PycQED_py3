@@ -439,7 +439,7 @@ def get_cardianal_pauli_exp(cardinal_idx):
     return pauli_vec
 
 
-def get_bell_pauli_exp(bell_idx, theta=0):
+def get_bell_pauli_exp(bell_idx, theta_q0=0, theta_q1=0):
     """
     Get's the pauli operators for the bell states.
     Args:
@@ -448,31 +448,65 @@ def get_bell_pauli_exp(bell_idx, theta=0):
             2: |Psi_p> = |00> + |11>   (<XX>,<YY>,<ZZ>) = (+1,-1,+1)
             3: |Psi_m> = |01> - |10>   (<XX>,<YY>,<ZZ>) = (-1,-1,-1)
             4: |Psi_m> = |01> + |10>   (<XX>,<YY>,<ZZ>) = (+1,+1,-1)
-        theta  (float) :
 
+        theta_q0  (float): angle to correct for single qubit phase errors
+        theta_q1  (float):
 
+    Phase error on the MSQ/q1:
+        keeps <XX> unchanged
+        exchanges <YY> with <ZY)
+        exchanges <ZZ> with <YZ>
+
+        if <YY> and <ZZ> have same sign, the residual <ZY> and <YZ> have
+        opposite sign, and viceversa.
+
+    Phase error on the LSQ/q0:
+        exchanges <XX> with <XY>
+        exchanges <YY> with <YX>
+        keeps <ZZ> unchanged
+
+        if <XX> and <YY> have same sign, the residual <XY> and <YX> have
+        opposite sign, and viceversa.
     """
+
+    # This snippet is for the WIP two qubit phases
+    # single_q_paulis = [1] + [0]*3 + [0]*3
+
+    # base_bell_paulis
+
+    # paulic = [-np.cos(theta_q0)*np.cos(theta_q1),  # XX
+    #           np.sin(theta_q0),
+    #           0,
+    #           np.sin(theta_q0),
+    #           np.cos(theta_q0)*np.cos(theta_q1),  # YY
+    #           np.sin(theta_q1),
+    #           0,
+    #           np.sin(theta_q1),
+    #           np.cos(theta_q0)*np.cos(theta_q1)]  # ZZ
+
+
     if bell_idx == 0:
         sets_bell = np.array(
             [1, 0, 0, 0, 0, 1, 0, 0, 0, 0,
-             -np.cos(theta), -np.sin(theta),
-             0, 0, np.sin(theta), np.cos(theta)])
+             -np.cos(theta_q0), -np.sin(theta_q0),
+             0, 0, np.sin(theta_q0), np.cos(theta_q0)])
     elif bell_idx == 1:
         sets_bell = np.array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, np.cos(
-            theta), np.sin(theta), 0, 0, np.sin(theta), -np.cos(theta)])
+            theta_q0), np.sin(theta_q0), 0, 0, np.sin(theta_q0), -np.cos(theta_q0)])
     elif bell_idx == 2:
         sets_bell = np.array(
             [1, 0, 0, 0, 0, -1, 0, 0, 0, 0,
-             -np.cos(theta), -np.sin(theta),
-             0, 0, np.sin(theta), -np.cos(theta)])
+             -np.cos(theta_q0), -np.sin(theta_q0),
+             0, 0, np.sin(theta_q0), -np.cos(theta_q0)])
     elif bell_idx == 3:
         sets_bell = np.array(
             [1, 0, 0, 0, 0, -1, 0, 0, 0, 0,
-             np.cos(theta), -np.sin(theta),
-             0, 0, np.sin(theta), np.cos(theta)])
+             np.cos(theta_q0), -np.sin(theta_q0),
+             0, 0, np.sin(theta_q0), np.cos(theta_q0)])
     else:
         raise ValueError('bell_idx must be 0, 1, 2 or 3')
     pauli1, pauli2, paulic = order_pauli_output2(sets_bell)
+
     return np.concatenate(([1], pauli1, pauli2, paulic))
     # return sets_bell
 
