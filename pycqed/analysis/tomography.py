@@ -1,4 +1,8 @@
-import qutip as qtp
+import logging
+try:
+    import qutip as qtp
+except ImportError as e:
+    logging.warning('Could not import qutip, tomo code will not work')
 import numpy as np
 import time
 import scipy
