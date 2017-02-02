@@ -32,6 +32,7 @@ pytz==2016.4
 PyVISA==1.8
 scipy==0.18.1
 pyzmq==15.2.0
+qutip (3.1.0)
 simplegeneric==0.8.1
 six==1.10.0
 snowballstemmer==1.2.1
