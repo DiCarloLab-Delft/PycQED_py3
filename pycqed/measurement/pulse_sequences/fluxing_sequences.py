@@ -1034,7 +1034,9 @@ def SWAP_CZ_SWAP_phase_corr_swp(operation_dict, qS, qCZ,
 
     operation_dict['phi90 ' + qCZ] = deepcopy(operation_dict['Y90 ' + qCZ])
     operation_dict['phi90 ' + qS] = deepcopy(operation_dict['Y90 ' + qS])
-    operation_dict['rSWAP ' + qS] = deepcopy(operation_dict['SWAP ' + qS])
+    # operation_dict['rSWAP ' + qS] = deepcopy(operation_dict['SWAP ' + qS])
+    if ('rSWAP ' + qS) not in operation_dict.keys():
+        operation_dict['rSWAP ' + qS] = deepcopy(operation_dict['SWAP ' + qS])
     operation_dict['CZ_corr ' + qCZ]['refpoint'] = 'simultaneous'
 
     # seq has to have at least 2 elts

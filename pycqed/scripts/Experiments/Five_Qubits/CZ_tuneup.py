@@ -32,8 +32,13 @@ class CPhase_cost_func_det(det.Soft_Detector):
         self.lambda2 = l_coeffs[1]
         self.lambda3 = l_coeffs[2]
         self.pars_changed = True
+        self.rSWAP_param = kw.pop('rSWAP_param', None)
+        self.last_rSWAP_amp = self.rSWAP_param.get()
 
     def acquire_data_point(self, **kw):
+        new_rSWAP_amp = self.rSWAP_param.get()
+        if new_rSWAP_amp != self.last_rSWAP_amp:
+            self.pars_changed = True
         if self.pars_changed:
             self.qCZ.CZ_theta(self.theta_f)
             l_coeffs = np.array([self.lambda1, self.lambda2, self.lambda3])
