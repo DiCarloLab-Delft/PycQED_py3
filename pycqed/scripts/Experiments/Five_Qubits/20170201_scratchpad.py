@@ -107,17 +107,20 @@ def fix_phase_2Q():
 ################################
 from pycqed.measurement.optimization import nelder_mead
 
+opt_init_CZ_amp = 1.04
+opt_init_SWAP_amp = 1.045
+
 MC.set_sweep_function(AWG.ch3_amp)
 MC.set_sweep_function_2D(AWG.ch4_amp)
 d = czt.CPhase_cost_func_det(S5, DataT, AncT, nested_MC, corr_amps)
 MC.set_detector_function(d)
 
 ad_func_pars = {'adaptive_function': nelder_mead,
-                'x0': [AncT.CZ_channel_amp(), DataT.SWAP_amp()],
-                'initial_step': 0.1, 'minimize': False}
+                'x0': [opt_init_CZ_amp, opt_init_SWAP_amp],
+                'initial_step': [0.1, 0.03], 'minimize': False}
 MC.set_adaptive_function_parameters(ad_func_pars)
 MC.run(name='CZ_cost_function_optimization', mode='adaptive')
 
-
-ma.OptimizationAnalysis(label='CZ_cost_function_optimization')
+ma_obj = ma.OptimizationAnalysis(label='CZ_cost_function_optimization')
 ma.OptimizationAnalysis_v2(label='CZ_cost_function_optimization')
+opt_CZ_amp, opt_SWAP_amp = ma_obj.sweep_points[0][-1],ma_obj.sweep_points[1][-1]
