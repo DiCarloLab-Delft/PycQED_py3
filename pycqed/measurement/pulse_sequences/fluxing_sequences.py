@@ -1029,6 +1029,8 @@ def SWAP_CZ_SWAP_phase_corr_swp(operation_dict, qS, qCZ,
     ################################################
     # Creating additional pulses for this sequence #
     ################################################
+    # the recovery SWAP is identical to the regular SWAP operation, unless
+    # an rSWAP is explicitly contained in the operation dict
 
     operation_dict['phi90 ' + qCZ] = deepcopy(operation_dict['Y90 ' + qCZ])
     operation_dict['phi90 ' + qS] = deepcopy(operation_dict['Y90 ' + qS])
@@ -1130,6 +1132,123 @@ def SWAP_CZ_SWAP_phase_corr_swp(operation_dict, qS, qCZ,
                                                        len(phase_corr_amps)),
                   end='')
             if i == len(phase_corr_amps):
+                print()
+            el = distort_and_compensate(
+                el, distortion_dict)
+        el_list.append(el)
+        seq.append_element(el, trigger_wait=True)
+
+    if upload:
+        station.components['AWG'].stop()
+        station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+
+    return seq, el_list
+
+
+def rSWAP_amp_sweep(operation_dict, qS, qCZ,
+                    RO_target='all',
+                    recovery_swap_amps=np.arange(0.3, 0.55, 0.01),
+                    distortion_dict=None,
+                    CZ_disabled=False,
+                    emulate_cross_driving=False,
+                    cal_points_with_flux_pulses=True,
+                    verbose=False,
+                    upload=True, **kw):
+    '''
+    Sequence that swaps qS with the bus and does CPhase between qCZ and the bus
+        X180 qS - Ym90 qCZ - swap qS,B - CPhase qCZ,B - swap qS,B - fphi90 qCZ
+        - X180 qS - RO
+
+    kw is not used, but implemented to avoid crashing when passed argument name
+
+    the keyword swap target and control reverses the
+    qubit roles during a second sweep:
+
+        X180 qCZ - Ym90 qS - swap qS,B - CPhase qCZ,B - swap qS,B - fphi90 qS
+        - X180 qCZ - RO
+
+    qS is the "SWAP qubit"
+    qCZ is the "C-Phase qubit"
+    '''
+    sequencer_config = operation_dict['sequencer_config']
+
+    seq_name = 'SWAP_CZ_SWAP_phase_corr_swp_{}_{}'.format(qS, qCZ)
+    seq = sequence.Sequence(seq_name)
+    station.pulsar.update_channel_settings()
+    el_list = []
+
+    if CZ_disabled:
+        operation_dict['CZ '+qCZ]['amplitude'] = 0
+        operation_dict['CZ '+qCZ]['phase_corr_pulse_amp'] = 0
+
+    ################################################
+    # Creating additional pulses for this sequence #
+    ################################################
+    # the recovery SWAP is identical to the regular SWAP operation, unless
+    # an rSWAP is explicitly contained in the operation dict
+    if ('rSWAP ' + qS) not in operation_dict.keys():
+        operation_dict['rSWAP ' + qS] = deepcopy(operation_dict['SWAP ' + qS])
+    operation_dict['CZ_corr ' + qCZ]['refpoint'] = 'simultaneous'
+
+    rSWAP_cals = np.mean(recovery_swap_amps[:-4])
+
+    ############################################
+    # Generating the elements  #
+    ############################################
+    for i in range(len(recovery_swap_amps)):
+        operation_dict['rSWAP ' + qS]['amplitude'] = recovery_swap_amps[i]
+        ######################
+        # The base sequence  #
+        ######################
+        pulse_combinations = (
+            ['X180 ' + qS, 'I ' + qCZ,
+             'SWAP '+qS, 'CZ ' + qCZ, 'rSWAP ' + qS,
+             'SWAP_corr ' + qS, 'CZ_corr ' + qCZ,
+             'I ' + qCZ, 'I '+qCZ, 'I '+qS, 'RO '+RO_target])
+        if emulate_cross_driving is True:
+            pulse_combinations[1] = 'Y90 ' + qCZ
+            pulse_combinations[7] = 'mY90 ' + qCZ
+        ############################################
+        #             calibration points           #
+        ############################################
+        if i == (len(recovery_swap_amps) - 4):
+            operation_dict['rSWAP ' + qS]['amplitude'] = rSWAP_cals
+            pulse_combinations = (
+                ['I ' + qS, 'I ' + qCZ,
+                 'SWAP '+qS, 'CZ ' + qCZ, 'rSWAP ' + qS,
+                 'SWAP_corr ' + qS, 'CZ_corr ' + qCZ,
+                 'I ' + qCZ, 'I '+qCZ, 'I '+qS, 'RO '+RO_target])
+        elif i == (len(recovery_swap_amps) - 3):
+            operation_dict['rSWAP ' + qS]['amplitude'] = rSWAP_cals
+            pulse_combinations = (
+                ['I ' + qS, 'I ' + qCZ,
+                 'SWAP '+qS, 'CZ ' + qCZ, 'rSWAP ' + qS,
+                 'SWAP_corr ' + qS, 'CZ_corr ' + qCZ,
+                 'I ' + qCZ, 'I '+qCZ, 'X180 '+qS, 'RO '+RO_target])
+        elif i == (len(recovery_swap_amps) - 2):
+            operation_dict['rSWAP ' + qS]['amplitude'] = rSWAP_cals
+            pulse_combinations = (
+                ['I ' + qS, 'I ' + qCZ,
+                 'SWAP '+qS, 'CZ ' + qCZ, 'rSWAP ' + qS,
+                 'SWAP_corr ' + qS, 'CZ_corr ' + qCZ,
+                 'I ' + qCZ, 'X180 '+qCZ, 'I '+qS, 'RO '+RO_target])
+        elif i == (len(recovery_swap_amps) - 1):
+            operation_dict['rSWAP ' + qS]['amplitude'] = rSWAP_cals
+            pulse_combinations = (
+                ['I ' + qS, 'I ' + qCZ,
+                 'SWAP '+qS, 'CZ ' + qCZ, 'rSWAP ' + qS,
+                 'SWAP_corr ' + qS, 'CZ_corr ' + qCZ,
+                 'I ' + qCZ, 'X180 '+qCZ, 'X180 '+qS, 'RO '+RO_target])
+
+        pulses = []
+        for p in pulse_combinations:
+            pulses += [operation_dict[p]]
+        el = multi_pulse_elt(i, station, pulses, sequencer_config)
+        if distortion_dict is not None:
+            print('\rDistorting element {}/{} '.format(i+1,
+                                                       len(recovery_swap_amps)),
+                  end='')
+            if i == len(recovery_swap_amps):
                 print()
             el = distort_and_compensate(
                 el, distortion_dict)

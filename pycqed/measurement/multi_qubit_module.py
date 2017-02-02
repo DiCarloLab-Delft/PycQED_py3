@@ -243,3 +243,49 @@ def tomo2Q_bell(bell_state, device, qS_name, qCZ_name, CPhase=True,
                                          mmt_label))
     tomo.analyse_tomo(MLE=MLE, target_bell=bell_state%10)
     # return tomo_swf.seq
+
+
+def rSWAP_scan(device, qS_name, qCZ_name,
+               recovery_swap_amps, emulate_cross_driving=False,
+               MC=None, upload=True):
+    if MC is None:
+        MC = station.components['MC']
+    amp_step = recovery_swap_amps[1]-recovery_swap_amps[0]
+    swp_pts = np.concatenate([recovery_swap_amps,
+                              np.arange(4)*amp_step+recovery_swap_amps[-1]])
+
+    qS = device.qubits()[qS_name]
+    qCZ = device.qubits()[qCZ_name]
+
+    int_avg_det = det.UHFQC_integrated_average_detector(
+        UHFQC=qS._acquisition_instr, AWG=qS.AWG,
+        channels=[qCZ.RO_acq_weight_function_I(),
+                  qS.RO_acq_weight_function_I()],
+        nr_averages=qS.RO_acq_averages(),
+        integration_length=qS.RO_acq_integration_length(),
+        cross_talk_suppression=True)
+    operation_dict = device.get_operation_dict()
+    rSWAP_swf = awg_swf.awg_seq_swf(
+        fsqs.rSWAP_amp_sweep,
+        parameter_name='rSWAP amplitude',
+        unit=r'% dac resolution',
+        AWG=qS.AWG,
+        fluxing_channels=[qS.fluxing_channel(), qCZ.fluxing_channel()],
+        upload=upload,
+        awg_seq_func_kwargs={'operation_dict': operation_dict,
+                             'qS': qS.name,
+                             'qCZ': qCZ.name,
+                             'recovery_swap_amps': swp_pts,
+                             'RO_target': qCZ.name,
+                             'emulate_cross_driving': emulate_cross_driving,
+                             'upload': upload,
+                             'distortion_dict': qS.dist_dict()})
+
+    MC.set_sweep_function(rSWAP_swf)
+    MC.set_detector_function(int_avg_det)
+    MC.set_sweep_points(swp_pts)
+    # MC.set_sweep_points(phases)
+
+    MC.run('rSWAP_{}_{}'.format(qS_name, qCZ_name))
+    ma.MeasurementAnalysis()  # N.B. you may want to run different analysis
+

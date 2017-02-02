@@ -583,7 +583,7 @@ AncT.link_param_to_operation('CZ_corr', 'CZ_refpoint', 'refpoint')
 
 AncT.add_pulse_parameter('CZ_corr', 'CZ_corr_amp', 'amplitude', 0)
 AncT.add_pulse_parameter('CZ_corr', 'CZ_corr_length',
-                         'corr_pulse_length', 10e-9)
+                         'square_pulse_length', 10e-9)
 #
 AncT.add_pulse_parameter('CZ_corr', 'CZ_corr_pulse_type', 'pulse_type',
                          initial_value='SquareFluxPulse',
@@ -619,13 +619,29 @@ DataT.link_param_to_operation('SWAP_corr', 'fluxing_operation_type', 'operation_
 DataT.link_param_to_operation('SWAP_corr', 'fluxing_channel', 'channel')
 DataT.link_param_to_operation('SWAP_corr', 'SWAP_refpoint', 'refpoint')
 DataT.add_pulse_parameter('SWAP_corr', 'SWAP_corr_length',
-                          'corr_pulse_length', 10e-9)
+                          'square_pulse_length', 10e-9)
 # DataT.link_param_to_operation('SWAP_corr', 'SWAP_corr_amp', 'amplitude')
 # DataT.link_param_to_operation('SWAP_corr', 'SWAP_corr_length', 'square_pulse_length')
 DataT.add_pulse_parameter('SWAP_corr', 'SWAP_corr_pulse_type', 'pulse_type',
                           initial_value='SquareFluxPulse', vals=vals.Strings())
 DataT.add_pulse_parameter('SWAP_corr', 'SWAP_corr_pulse_delay',
                           'pulse_delay', 0)
+
+DataT.add_operation('rSWAP')
+DataT.link_param_to_operation('rSWAP', 'fluxing_operation_type', 'operation_type')
+DataT.link_param_to_operation('rSWAP', 'fluxing_channel', 'channel')
+DataT.link_param_to_operation('rSWAP', 'SWAP_refpoint', 'refpoint')
+DataT.link_param_to_operation('rSWAP', 'SWAP_pulse_type', 'pulse_type')
+DataT.link_param_to_operation('rSWAP', 'SWAP_amp', 'SWAP_amp')
+
+
+DataT.link_param_to_operation('rSWAP', 'SWAP_pulse_buffer', 'pulse_buffer')
+DataT.link_param_to_operation('rSWAP', 'SWAP_pulse_delay', 'pulse_delay')
+
+DataT.add_pulse_parameter('rSWAP', 'rSWAP_time', 'square_pulse_length',
+                          initial_value=10e-9)
+DataT.add_pulse_parameter('rSWAP', 'rSWAP_pulse_amp', 'amplitude',
+                          initial_value=0.5)
 
 
 gen.load_settings_onto_instrument(AncT)

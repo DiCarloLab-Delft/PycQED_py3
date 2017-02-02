@@ -548,8 +548,18 @@ def two_qubit_tomo_bell(bell_state,
                   [['X180 '+qCZ, 'X180 '+qS, 'RO '+RO_target]]*7
 
     if CZ_disabled:
-        # FIXME!
-        print('FIXME!!! CPhase disabled')
+        operation_dict['CZ '+qCZ]['amplitude'] = 0
+        operation_dict['CZ '+qCZ]['phase_corr_pulse_amp'] = 0
+
+    ################################################
+    # Creating additional pulses for this sequence #
+    ################################################
+    # the recovery SWAP is identical to the regular SWAP operation, unless
+    # an rSWAP is explicitly contained in the operation dict
+    if ('rSWAP ' + qS) not in operation_dict.keys():
+        operation_dict['rSWAP ' + qS] = deepcopy(operation_dict['SWAP ' + qS])
+    operation_dict['CZ_corr ' + qCZ]['refpoint'] = 'simultaneous'
+
     ################
     # Bell states  #
     ################
