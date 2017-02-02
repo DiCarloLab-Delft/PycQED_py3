@@ -111,17 +111,17 @@ class UHFQC_LookuptableManagerManager(Instrument):
 
         return self._wave_dict
 
-    def render_wave(self, wave_name, show=True, time_units='lut_index'):
+    def render_wave(self, wave_name, show=True, time_units='lut_index', title=None):
         fig, ax = plt.subplots(1, 1)
         if time_units == 'lut_index':
             x = np.arange(len(self._wave_dict[wave_name][0]))
             ax.set_xlabel('Lookuptable index (i)')
             ax.vlines(2048, self._voltage_min, self._voltage_max, linestyle='--')
-        elif time_units == 's':
+        elif time_units == 'ns':
             x = (np.arange(len(self._wave_dict[wave_name][0]))
                  / self.sampling_rate.get())
-            ax.set_xlabel('time (s)')
-            ax.vlines(2048 / self.sampling_rate.get(),
+            ax.set_xlabel('time (ns)')
+            ax.vlines(2048 / self.sampling_rate.get()*1e9,
                       self._voltage_min, self._voltage_max, linestyle='--')
         print(wave_name)
         ax.set_title(wave_name)
@@ -130,7 +130,7 @@ class UHFQC_LookuptableManagerManager(Instrument):
         ax.plot(x, self._wave_dict[wave_name][1],
                 marker='o', label='chQ')
         ax.set_ylabel('Amplitude (V)')
-        ax.set_axis_bgcolor('gray')
+        #ax.set_axis_bgcolor('gray')
         ax.axhspan(self._voltage_min, self._voltage_max, facecolor='w',
                    linewidth=0)
         ax.legend()
