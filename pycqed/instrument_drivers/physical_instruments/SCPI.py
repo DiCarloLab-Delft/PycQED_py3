@@ -37,7 +37,7 @@ class SCPI(IPInstrument):
         # IDN is implemented in the instrument base class
 
         # example of how the commands could look
-        self.add_function('reset', call_cmd='*RST')
+        #self.add_function('reset', call_cmd='*RST')
 
     def _recv(self):
         """
@@ -50,7 +50,18 @@ class SCPI(IPInstrument):
     ###
 
     def readBinary(self, size):
-        return self._socket.recv(size)  # FIXME: should be in parent class
+        data = self._socket.recv(size)
+        actLen = len(data)
+        expLen = size
+        #actLen = 0
+        
+        i=1
+        while (actLen != expLen):
+            data += self._socket.recv(expLen-actLen)
+            actLen = len(data)
+            i=i+1
+            print('i=%d' % i)
+        return data  # FIXME: should be in parent class
 
     def writeBinary(self, binMsg):
         self._socket.send(binMsg)       # FIXME: should be in parent class

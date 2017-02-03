@@ -8,13 +8,13 @@
 '''
 
 
-from .SCPIddm import SCPIddm
+from .SCPI import SCPI
 import numpy as np
 import struct
 from qcodes import validators as vals
 
 
-class DDMq(SCPIddm):
+class DDMq(SCPI):
 
     # def __init__(self, logging=True, simMode=False, paranoid=False):
     def __init__(self, name, address, port, **kwargs):
@@ -226,7 +226,8 @@ class DDMq(SCPIddm):
                                get_cmd=self._gen_ch_get_func(
                                    self.getInputAverage, ch),
 
-                               vals=vals.Numbers(-128, 127)
+                               #vals=vals.Numbers(-128, 127)
+                               vals=vals.Arrays(-128, 127)
                                )
             srotres_cmd = 'qutech:wintrot{}:result'.format(ch)
             self.add_parameter('ch{}_wintrot_result'.format(ch),

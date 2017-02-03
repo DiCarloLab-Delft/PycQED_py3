@@ -63,18 +63,21 @@ class SCPIddm(IPInstrument):
         # FIXME: logging
         # FIXME: check for SCPI errors (in debug mode)
 
-    def writeBinary(self, data):
+    def writeBinary(self, binMsg):
+        self._socket.send(binMsg)       # FIXME: should be in parent class
+
+    #def writeBinary(self, data):
         ''' send binary data
                 Input:
                         data    bytearray
         '''
-        expLen = len(data)
-        actLen = self._socket.send(data)
-        if(actLen != expLen):
+       # expLen = len(data)
+        #actLen = self._socket.send(data)
+       # if(actLen != expLen):
                 # FIXME: handle this case by calling send again. Or enlarge
                 # socket.SO_SNDBUF even further
-            raise UserWarning(
-                'not all data sent: expected %d, actual %d' % (expLen, actLen))
+       #     raise UserWarning(
+       #         'not all data sent: expected %d, actual %d' % (expLen, actLen))
 
         # FIXME: logging
         # FIXME: check for SCPI errors (in debug mode)
@@ -84,14 +87,17 @@ class SCPIddm(IPInstrument):
         '''
         #if not self.simMode:
         data = self._socket.recv(byteCnt)
+        
         expLen = byteCnt
         actLen = len(data)
+        
         i=1
         while (actLen != expLen):
             data += self._socket.recv(expLen-actLen)
             actLen = len(data)
             i=i+1
-            print('i=%d' % i)   
+            print('i=%d' % i)
+           
                 #raise UserWarning(
                     #'not all data sent: expected %d, actual %d' % (expLen, actLen))
 
@@ -181,7 +187,7 @@ class SCPIddm(IPInstrument):
         totHdr = header + SCPIddm.buildHeaderString(len(binBlock))
         binMsg = totHdr.encode() + binBlock
         self.writeBinary(binMsg)
-        self.write('')                                      # add a Line Terminator
+        self.write('')                                # add a Line Terminator
 
     def binBlockRead(self):
         # FIXME: untested
