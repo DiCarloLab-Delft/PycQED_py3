@@ -479,7 +479,7 @@ def get_bell_pauli_exp(bell_idx, theta_q0=0, theta_q1=0):
     #           0,
     #           np.sin(theta_q0),
     #           np.cos(theta_q0)*np.cos(theta_q1),  # YY
-    #           np.sin(theta_q1),
+    #           -np.sin(theta_q1),         !!!!!!!!!!!!!!!! HERE MINUS SIGN ADDED
     #           0,
     #           np.sin(theta_q1),
     #           np.cos(theta_q0)*np.cos(theta_q1)]  # ZZ
@@ -814,3 +814,5 @@ def analyse_tomo(timestamp=None, label='',
             fig4.savefig(savename, format=fig_format, dpi=450)
         if close_fig:
             plt.close(fig4)
+
+    return rho_2, operators_mle, max(fid_vec)
