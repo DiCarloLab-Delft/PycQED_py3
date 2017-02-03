@@ -583,10 +583,10 @@ AncT.link_param_to_operation('CZ_corr', 'CZ_refpoint', 'refpoint')
 
 AncT.add_pulse_parameter('CZ_corr', 'CZ_corr_amp', 'amplitude', 0)
 AncT.add_pulse_parameter('CZ_corr', 'CZ_corr_length',
-                         'square_pulse_length', 10e-9)
+                         'length', 10e-9)
 #
 AncT.add_pulse_parameter('CZ_corr', 'CZ_corr_pulse_type', 'pulse_type',
-                         initial_value='SquareFluxPulse',
+                         initial_value='SquarePulse',
                          vals=vals.Strings())
 AncT.add_pulse_parameter('CZ_corr', 'CZ_corr_pulse_delay',
                          'pulse_delay', 0)
@@ -599,14 +599,14 @@ DataT.add_pulse_parameter('SWAP', 'SWAP_pulse_amp', 'amplitude',
 DataT.link_param_to_operation('SWAP', 'fluxing_channel', 'channel')
 
 DataT.add_pulse_parameter('SWAP', 'SWAP_pulse_type', 'pulse_type',
-                          initial_value='SquareFluxPulse', vals=vals.Strings())
+                          initial_value='SquarePulse', vals=vals.Strings())
 DataT.add_pulse_parameter('SWAP', 'SWAP_refpoint',
                           'refpoint', 'end', vals=vals.Strings())
 DataT.link_param_to_operation('SWAP', 'SWAP_amp', 'SWAP_amp')
 DataT.add_pulse_parameter('SWAP', 'SWAP_pulse_buffer',
                           'pulse_buffer', 0e-9)
 
-DataT.link_param_to_operation('SWAP', 'SWAP_time', 'square_pulse_length')
+DataT.link_param_to_operation('SWAP', 'SWAP_time', 'length')
 
 
 DataT.add_pulse_parameter('SWAP', 'SWAP_pulse_delay',
@@ -619,11 +619,11 @@ DataT.link_param_to_operation('SWAP_corr', 'fluxing_operation_type', 'operation_
 DataT.link_param_to_operation('SWAP_corr', 'fluxing_channel', 'channel')
 DataT.link_param_to_operation('SWAP_corr', 'SWAP_refpoint', 'refpoint')
 DataT.add_pulse_parameter('SWAP_corr', 'SWAP_corr_length',
-                          'square_pulse_length', 10e-9)
+                          'length', 10e-9)
 # DataT.link_param_to_operation('SWAP_corr', 'SWAP_corr_amp', 'amplitude')
 # DataT.link_param_to_operation('SWAP_corr', 'SWAP_corr_length', 'square_pulse_length')
 DataT.add_pulse_parameter('SWAP_corr', 'SWAP_corr_pulse_type', 'pulse_type',
-                          initial_value='SquareFluxPulse', vals=vals.Strings())
+                          initial_value='SquarePulse', vals=vals.Strings())
 DataT.add_pulse_parameter('SWAP_corr', 'SWAP_corr_pulse_delay',
                           'pulse_delay', 0)
 
@@ -638,7 +638,7 @@ DataT.link_param_to_operation('rSWAP', 'SWAP_amp', 'SWAP_amp')
 DataT.link_param_to_operation('rSWAP', 'SWAP_pulse_buffer', 'pulse_buffer')
 DataT.link_param_to_operation('rSWAP', 'SWAP_pulse_delay', 'pulse_delay')
 
-DataT.add_pulse_parameter('rSWAP', 'rSWAP_time', 'square_pulse_length',
+DataT.add_pulse_parameter('rSWAP', 'rSWAP_time', 'length',
                           initial_value=10e-9)
 DataT.add_pulse_parameter('rSWAP', 'rSWAP_pulse_amp', 'amplitude',
                           initial_value=0.5)
