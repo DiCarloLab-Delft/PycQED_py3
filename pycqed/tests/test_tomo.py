@@ -3,12 +3,12 @@ import pycqed as pq
 import os
 import numpy as np
 from pycqed.analysis import measurement_analysis as ma
-from pycqed.analysis import tomography as tomo
 
 ma.a_tools.datadir = os.path.join(pq.__path__[0], 'tests', 'test_data')
 
 try:
     import qutip
+    from pycqed.analysis import tomography as tomo
 
     class Test_tomo_analysis(unittest.TestCase):
 
