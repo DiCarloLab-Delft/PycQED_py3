@@ -325,8 +325,8 @@ Bell-state Tomography
 """
 MC.soft_avg(1)  # To be removed later, should not be needed
 for iii in range(10):
-    for target_bell in [0]:
+    for target_bell in [0, 1, 2 ,3]:
         mq_mod.tomo2Q_bell(bell_state=target_bell, device=S5,
                            qS_name='DataT', qCZ_name='AncT',
-                           nr_shots=1024, nr_rep=1)
+                           nr_shots=1024, nr_rep=10)
         tomo.analyse_tomo(MLE=False, target_bell=target_bell % 10)

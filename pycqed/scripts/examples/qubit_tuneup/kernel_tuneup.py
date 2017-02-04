@@ -108,7 +108,7 @@ int_avg_det = det.UHFQC_integrated_average_detector(
 
 pulse_dict = AncT.get_operation_dict()
 
-ram_Z_sweep = awg_swf.awg_seq_swf(fsqs.Ram_Z_seq,
+ram_Z_sweep = awg_swf.awg_seq_swf(fsqs.Ram_Z_delay_seq,
     awg_seq_func_kwargs={'pulse_dict':pulse_dict, 'q0':'AncT',
                          'inter_pulse_delay':40e-9,
                          'distortion_dict': dist_dict},

@@ -7,7 +7,7 @@ fsqs.station = qc.station
 
 reload_mod_stuff()
 
-seq, elts = fsqs.Ram_Z_seq(AncT.get_operation_dict(), 'AncT',
+seq, elts = fsqs.Ram_Z_delay_seq(AncT.get_operation_dict(), 'AncT',
                dist_dict, t_dict, upload=False, return_seq=True)
 
 
@@ -35,12 +35,13 @@ int_avg_det = det.UHFQC_integrated_average_detector(
             integration_length=AncT.RO_acq_integration_length(),
             cross_talk_suppression=True)
 
-pulse_dict = AncT.get_operation_dict()
+operation_dict = S5.get_operation_dict()
 
-ram_Z_sweep = awg_swf.awg_seq_swf(fsqs.Ram_Z_seq,
-    awg_seq_func_kwargs={'pulse_dict':pulse_dict, 'q0':'AncT',
+ram_Z_sweep = awg_swf.awg_seq_swf(fsqs.Ram_Z_delay_seq,
+    awg_seq_func_kwargs={'operation_dict':operation_dict, 'q0':'AncT',
                          'inter_pulse_delay':100e-9,
-                         'distortion_dict': dist_dict},
+                         'operation_name':'CZ_corr',
+                         'distortion_dict': AncT.dist_dict()},
                          parameter_name='times')
 
 

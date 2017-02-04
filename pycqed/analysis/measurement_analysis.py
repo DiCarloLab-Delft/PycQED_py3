@@ -39,7 +39,6 @@ class MeasurementAnalysis(object):
             self.folder = a_tools.get_folder(**kw)
         else:
             self.folder = folder
-
         self.load_hdf5data(**kw)
         self.fit_results = []
         self.box_props = dict(boxstyle='Square', facecolor='white', alpha=0.8)
