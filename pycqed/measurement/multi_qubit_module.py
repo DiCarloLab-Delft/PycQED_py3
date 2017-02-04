@@ -289,3 +289,52 @@ def rSWAP_scan(device, qS_name, qCZ_name,
     MC.run('rSWAP_{}_{}'.format(qS_name, qCZ_name))
     ma.MeasurementAnalysis()  # N.B. you may want to run different analysis
 
+def tomo2Q_cphase_cardinal(cardinal_state, device, qS_name, qCZ_name, CPhase=True,
+                nr_shots=256, nr_rep=1, mmt_label='',
+                MLE=False,
+                MC=None, run=True):
+    """
+    Performs the fringe measurements of a resonant cphase gate between two qubits.
+    low_qubit is gonna be swapped with the bus
+    high_qubit is gonna be adiabatically pulsed
+    """
+    if MC is None:
+        MC = station.MC
+    cal_points = 28
+    sweep_points = np.arange(nr_shots*nr_rep*(36+cal_points))
+
+    operation_dict = device.get_operation_dict()
+    qS = device.qubits()[qS_name]
+    qCZ = device.qubits()[qCZ_name]
+
+    detector = det.UHFQC_integration_logging_det(
+        UHFQC=qS._acquisition_instr,
+        AWG=qS.AWG,
+        channels=[qCZ.RO_acq_weight_function_I(),
+                  qS.RO_acq_weight_function_I()],
+        nr_shots=nr_shots,
+        integration_length=qS.RO_acq_integration_length(),
+        cross_talk_suppression=True)
+
+    tomo_swf = awg_swf.awg_seq_swf(
+        mqs.two_qubit_tomo_cphase_cardinal,
+        # parameter_name='Pre-rotation',
+        AWG=qS.AWG,
+        fluxing_channels=[qS.fluxing_channel(), qCZ.fluxing_channel()],
+        awg_seq_func_kwargs={'cardinal_state': cardinal_state,
+                             'operation_dict': operation_dict,
+                             'qS': qS.name,
+                             'qCZ': qCZ.name,
+                             'RO_target': qCZ.name,
+                             'distortion_dict': qS.dist_dict()})
+    MC.soft_avg(1) # Single shots cannot be averaged.
+    MC.set_sweep_function(tomo_swf)
+    MC.set_sweep_points(sweep_points)
+    MC.set_detector_function(detector)
+    if run:
+        MC.run('CPhaseTomo_%s_%s_%s_%s' % (cardinal_state,
+                                         qS_name,
+                                         qCZ_name,
+                                         mmt_label))
+    tomo.analyse_tomo(MLE=MLE, target_bell=cardinal_state%10)
+    # return tomo_swf.seq
