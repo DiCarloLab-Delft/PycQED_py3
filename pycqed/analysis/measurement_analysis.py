@@ -5838,8 +5838,6 @@ class Tomo_Multiplexed(object):
         # mat
         (self.operators, self.rho) = tomo.execute_linear_tomo()
 
-        self.plot_LI()
-
         if self.MLE:
             # mle reconstruction of density matrix
             self.rho_2 = tomo.execute_max_likelihood(
@@ -5855,8 +5853,6 @@ class Tomo_Multiplexed(object):
                 self.rho_2)
             if self.verbose > 0:
                 print(self.operators_mle)
-
-            self.plot_MLE()
         ########################
         # FIT PHASE CORRECTIONS
         ########################
@@ -5864,8 +5860,15 @@ class Tomo_Multiplexed(object):
             self.operators_fit = self.operators_mle
         else:
             self.operators_fit = self.operators
-
-        def rotated_bell_state(dummy_x, angle_MSQ, angle_LSQ, contrast):
+        """
+        bell_idx (int) : integer referring to a specific bell state.
+            0: |Psi_m> = |00> - |11>   (<XX>,<YY>,<ZZ>) = (-1,+1,+1)
+            1: |Psi_p> = |00> + |11>   (<XX>,<YY>,<ZZ>) = (+1,-1,+1)
+            2: |Psi_m> = |01> - |10>   (<XX>,<YY>,<ZZ>) = (-1,-1,-1)
+            3: |Psi_m> = |01> + |10>   (<XX>,<YY>,<ZZ>) = (+1,+1,-1)
+        """
+        def rotated_bell_state(dummy_x, angle_MSQ, angle_LSQ,
+                               contrast, target_bell=0):
             # only works for target_bell=0 for now.
             # to expand, need to figure out the signs in the elements.
             # order is set by looping I,Z,X,Y
@@ -5873,16 +5876,45 @@ class Tomo_Multiplexed(object):
             # II IZ IX IY ZI ZZ ZX ZY XI XZ XX XY YI YZ YX YY
             state = np.zeros(16)
             state[0] = 1.
-            state[5] = np.cos(angle_LSQ)*contrast
-            state[7] = np.sin(angle_LSQ)*contrast
-            state[10] = -np.cos(angle_MSQ)*contrast
-            state[11] = np.sin(angle_MSQ)*contrast
-            state[13] = -np.sin(angle_LSQ)*contrast
-            state[14] = np.sin(angle_MSQ)*contrast
-            state[15] = np.cos(angle_LSQ)*np.cos(angle_LSQ)*contrast
+            if target_bell == 0:
+                state[5] = np.cos(angle_LSQ)*contrast
+                state[7] = np.sin(angle_LSQ)*contrast
+                state[10] = -np.cos(angle_MSQ)*contrast
+                state[11] = np.sin(angle_MSQ)*contrast
+                state[13] = -np.sin(angle_LSQ)*contrast
+                state[14] = np.sin(angle_MSQ)*contrast
+                state[15] = np.cos(angle_LSQ)*np.cos(angle_MSQ)*contrast
+            elif target_bell == 1:
+                state[5] = np.cos(angle_LSQ)*contrast
+                state[7] = np.sin(angle_LSQ)*contrast
+                state[10] = np.cos(angle_MSQ)*contrast
+                state[11] = np.sin(angle_MSQ)*contrast
+                state[13] = np.sin(angle_LSQ)*contrast
+                state[14] = np.sin(angle_MSQ)*contrast
+                state[15] = -np.cos(angle_LSQ)*np.cos(angle_MSQ)*contrast
+            elif target_bell == 2:
+                state[5] = -np.cos(angle_LSQ)*contrast
+                state[7] = -np.sin(angle_LSQ)*contrast
+                state[10] = -np.cos(angle_MSQ)*contrast
+                state[11] = -np.sin(angle_MSQ)*contrast
+                state[13] = np.sin(angle_LSQ)*contrast
+                state[14] = np.sin(angle_MSQ)*contrast
+                state[15] = -np.cos(angle_LSQ)*np.cos(angle_MSQ)*contrast
+            elif target_bell == 3:
+                state[5] = -np.cos(angle_LSQ)*contrast
+                state[7] = np.sin(angle_LSQ)*contrast
+                state[10] = np.cos(angle_MSQ)*contrast
+                state[11] = np.sin(angle_MSQ)*contrast
+                state[13] = np.sin(angle_LSQ)*contrast
+                state[14] = np.sin(angle_MSQ)*contrast
+                state[15] = np.cos(angle_LSQ)*np.cos(angle_MSQ)*contrast
             return state
 
-        angles_model = lmfit.Model(rotated_bell_state)
+        fit_func_wrapper = lambda dummy_x, angle_MSQ,\
+            angle_LSQ, contrast: rotated_bell_state(dummy_x,
+                                                    angle_MSQ, angle_LSQ,
+                                                    contrast, self.target_bell)
+        angles_model = lmfit.Model(fit_func_wrapper)
 
         angles_model.set_param_hint(
             'angle_MSQ', value=0., min=-np.pi, max=np.pi, vary=True)
@@ -5897,6 +5929,8 @@ class Tomo_Multiplexed(object):
                                             len(self.operators_fit)),
                                         params=params)
         self.plot_phase_corr()
+        self.plot_LI()
+        self.plot_MLE()
 
     def plot_TV_mode(self):
         self.exp_name = os.path.split(self.savefolder)[-1][7:]
@@ -6005,9 +6039,10 @@ class Tomo_Multiplexed(object):
             for i, theta in enumerate(theta_vec):
                 fid_vec[i] = tomo_mod.calc_fid2_bell(self.operators_mle,
                                                      self.target_bell, theta)
-            msg += '\nMAX Fidelity {:.3f} at {:.1f} deg'.format(
-                np.max(fid_vec),
-                theta_vec[np.argmax(fid_vec)]*180./np.pi)
+            msg += '\nMAX Fidelity {:.3f} at LSQ={:.1f} deg \nand MSQ={:.1f} deg'.format(
+                self.best_fidelity,
+                self.fit_res.best_values['angle_LSQ']*180./np.pi,
+                self.fit_res.best_values['angle_MSQ']*180./np.pi)
         ax.text(txt_x_pos, .7, msg)
 
         tomo_mod.plot_operators(self.operators_mle, ax)
