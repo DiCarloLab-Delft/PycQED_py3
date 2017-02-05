@@ -2720,3 +2720,44 @@ class Tracked_Qubit_Spectroscopy(det.Soft_Detector):
 #     def finish(self, **kw):
 #         self.HomodyneDetector.finish()
 #         self.Signal_Hound_fixed_frequency.finish()
+
+class FluxTrack(det.Soft_Detector):
+    '''
+    '''
+    def __init__(self, qubit, MC, AWG, **kw):
+        self.detector_control = 'soft'
+        self.name = 'FluxTrack'
+        self.value_names = [r'$F |1\rangle$']
+        self.value_units = ['']
+        self.qubit = qubit
+
+        self.cal_points = 4
+        self.AWG = AWG
+        self.operations_dict = qubit.operations()
+        self.dist_dict = qubit.dist_dict()
+        self.nested_MC = MC
+
+    def prepare(self, **kw):
+        self.FluxTrack_swf = awg_swf.awg_seq_swf(
+            fsqs.FluxTrack,
+            parameter_name='Amplitude',
+            unit='V',
+            AWG=self.AWG,
+            fluxing_channels=[q0.fluxing_channel()],
+            awg_seq_func_kwargs={'operation_dict': self.operations_dict,
+                                 'q0': q0_name,
+                                 'distortion_dict': self.dist_dict})
+
+
+    def acquire_data_point(self, *args, **kw):
+            # acquire with MC_nested
+        self.MC.set_sweep_function(self.FluxTrack_swf)
+        self.MC.set_sweep_points(np.arange(6))
+
+        self.MC.set_detector_function(q0.int_avg_det_rot)
+        self.MC.run('FluxTrack_point_%s' % self.qubit.name)
+
+        ma_obj = MA.TD_Analysis(auto=True, label='FluxTrack_point')
+        x = ma_obj.sweep_points[0]
+        y = np.mean(ma_obj.measured_values[0, :-5])
+        return y
