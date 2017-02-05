@@ -1547,3 +1547,66 @@ def BusT1(operation_dict, q0,
         station.pulsar.program_awg(seq, *el_list, verbose=verbose)
 
     return seq, el_list
+
+
+def FluxTrack(operation_dict, q0,
+                pulse_lengths=np.arange(0, 120e-9, 2e-9),
+                verbose=False,
+                distortion_dict=None,
+                upload=True,
+                cal_points=True):
+    '''
+    FluxTrack sequence where a poitive and negative SWAP are implemented
+    amplitude and length are not varied.
+        X180 - SWAP(l) - RO
+
+
+    verbose=False:        (bool) used for verbosity printing in the pulsar
+    distortion_dict=None: (dict) flux_pulse predistortion kernels
+    upload=True:          (bool) uploads to AWG, set False for testing purposes
+    cal_points=True:      (bool) wether to use calibration points
+    '''
+
+    seq_name = 'FluxTrack_seq'
+    seq = sequence.Sequence(seq_name)
+    station.pulsar.update_channel_settings()
+    el_list = []
+    sequencer_config = operation_dict['sequencer_config']
+
+    SWAP_amp = operation_dict['SWAP '+q0]['amplitude']
+    # seq has to have at least 2 elts
+    total_elts = 2 + cal_points*4
+    for i in range(total_elts):
+        # this converts negative pulse lenghts to negative pulse amplitudes
+        operation_dict['SWAP '+q0]['amplitude'] = np.abs(operation_dict['SWAP '+q0]['amplitude'])*(-1)**i
+        if cal_points and (i == (len(pulse_lengths)-4) or
+                           i == (len(pulse_lengths)-3)):
+            pulse_combinations = ['RO '+q0]
+        elif cal_points and (i == (len(pulse_lengths)-2) or
+                             i == (len(pulse_lengths)-1)):
+            pulse_combinations = ['X180 ' + q0, 'RO ' + q0]
+        else:
+            pulse_combinations = ['X180 '+q0, 'SWAP ' + q0, 'RO '+q0]
+
+        pulses = []
+        for p in pulse_combinations:
+            pulses += [operation_dict[p]]
+
+        el = multi_pulse_elt(i, station, pulses, sequencer_config)
+        if distortion_dict is not None:
+            print('\r Distorting element {}/{}'.format(i+1, len(pulse_lengths)),
+                  end='')
+            if i == len(pulse_lengths):
+                print()
+            el = distort_and_compensate(
+                el, distortion_dict)
+        el_list.append(el)
+        seq.append_element(el, trigger_wait=True)
+    if upload:
+        station.components['AWG'].stop()
+        station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+
+    # after looping, the amplitude ends up negative, we correct that
+    operation_dict['SWAP '+q0]['amplitude'] = np.abs(operation_dict['SWAP '+q0]['amplitude'])
+    return seq, el_list
+
