@@ -85,3 +85,17 @@ class Flux_Control(Instrument):
         self._dac_mapping = vector
     def do_get_dac_mapping(self):
         return self._dac_mapping
+
+    def define_parameters(self):
+        for id_flux in range(len(self._dac_mapping)):
+            self.flux_pars[id_flux] = qc.Parameter(name='Flux_%d'%id_flux, label='Flux %d'%id_flux, units=r'$\Phi_0$')
+            def wrap_set(val, id_flux):
+                current_flux = self.self.flux_vector()
+                new_flux = current_flux
+                new_flux[id_flux] = val
+                self.flux_vector(new_flux)
+            def wrap_get(val, id_flux):
+                val = self.flux_vector()
+                return val[id_flux]
+            new_par.set = wrap_set
+            new_par.get = wrap_get
