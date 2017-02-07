@@ -5878,37 +5878,41 @@ class Tomo_Multiplexed(object):
             state = np.zeros(16)
             state[0] = 1.
             if target_bell == 0:
-                state[5] = np.cos(angle_LSQ)*contrast
-                state[7] = np.sin(angle_LSQ)*contrast
-                state[10] = -np.cos(angle_MSQ)*contrast
-                state[11] = np.sin(angle_MSQ)*contrast
-                state[13] = -np.sin(angle_LSQ)*contrast
-                state[14] = np.sin(angle_MSQ)*contrast
-                state[15] = np.cos(angle_LSQ)*np.cos(angle_MSQ)*contrast
+                state[5] = np.cos(angle_MSQ)
+                state[6] = np.sin(angle_LSQ)*np.sin(angle_MSQ)
+                state[7] = np.cos(angle_LSQ)*np.sin(angle_MSQ)
+                state[10] = -np.cos(angle_LSQ)
+                state[11] = np.sin(angle_LSQ)
+                state[13] = -np.sin(angle_MSQ)
+                state[14] = np.cos(angle_MSQ)*np.sin(angle_LSQ)
+                state[15] = np.cos(angle_MSQ)*np.cos(angle_LSQ)
             elif target_bell == 1:
-                state[5] = np.cos(angle_LSQ)*contrast
-                state[7] = np.sin(angle_LSQ)*contrast
-                state[10] = np.cos(angle_MSQ)*contrast
-                state[11] = np.sin(angle_MSQ)*contrast
-                state[13] = np.sin(angle_LSQ)*contrast
-                state[14] = np.sin(angle_MSQ)*contrast
-                state[15] = -np.cos(angle_LSQ)*np.cos(angle_MSQ)*contrast
+                state[5] = np.cos(angle_MSQ)
+                state[6] = -np.sin(angle_LSQ)*np.sin(angle_MSQ)
+                state[7] = -np.cos(angle_LSQ)*np.sin(angle_MSQ)
+                state[10] = np.cos(angle_LSQ)
+                state[11] = -np.sin(angle_LSQ)
+                state[13] = -np.sin(angle_MSQ)
+                state[14] = -np.cos(angle_MSQ)*np.sin(angle_LSQ)
+                state[15] = -np.cos(angle_MSQ)*np.cos(angle_LSQ)
             elif target_bell == 2:
-                state[5] = -np.cos(angle_LSQ)*contrast
-                state[7] = -np.sin(angle_LSQ)*contrast
-                state[10] = -np.cos(angle_MSQ)*contrast
-                state[11] = -np.sin(angle_MSQ)*contrast
-                state[13] = np.sin(angle_LSQ)*contrast
-                state[14] = np.sin(angle_MSQ)*contrast
-                state[15] = -np.cos(angle_LSQ)*np.cos(angle_MSQ)*contrast
+                state[5] = -np.cos(angle_MSQ)
+                state[6] = -np.sin(angle_LSQ)*np.sin(angle_MSQ)
+                state[7] = -np.cos(angle_LSQ)*np.sin(angle_MSQ)
+                state[10] = -np.cos(angle_LSQ)
+                state[11] = np.sin(angle_LSQ)
+                state[13] = np.sin(angle_MSQ)
+                state[14] = -np.cos(angle_MSQ)*np.sin(angle_LSQ)
+                state[15] = -np.cos(angle_MSQ)*np.cos(angle_LSQ)
             elif target_bell == 3:
-                state[5] = -np.cos(angle_LSQ)*contrast
-                state[7] = np.sin(angle_LSQ)*contrast
-                state[10] = np.cos(angle_MSQ)*contrast
-                state[11] = np.sin(angle_MSQ)*contrast
-                state[13] = np.sin(angle_LSQ)*contrast
-                state[14] = np.sin(angle_MSQ)*contrast
-                state[15] = np.cos(angle_LSQ)*np.cos(angle_MSQ)*contrast
+                state[5] = -np.cos(angle_MSQ)
+                state[6] = np.sin(angle_LSQ)*np.sin(angle_MSQ)
+                state[7] = np.cos(angle_LSQ)*np.sin(angle_MSQ)
+                state[10] = np.cos(angle_LSQ)
+                state[11] = -np.sin(angle_LSQ)
+                state[13] = np.sin(angle_MSQ)
+                state[14] = np.cos(angle_MSQ)*np.sin(angle_LSQ)
+                state[15] = np.cos(angle_MSQ)*np.cos(angle_LSQ)
             return state
 
         fit_func_wrapper = lambda dummy_x, angle_MSQ,\
@@ -6031,6 +6035,7 @@ class Tomo_Multiplexed(object):
             txt_x_pos = 10
 
         purity = (self.rho_2*self.rho_2).tr()
+        self.purity = purity
 
         msg = 'Purity: {:.3f}\nFidelity to target {:.3f}'.format(
             purity, fidelity_mle)
@@ -6075,10 +6080,10 @@ class Tomo_Multiplexed(object):
         angle_LSQ_deg = self.fit_res.best_values['angle_LSQ']*180./np.pi
         angle_MSQ_deg = self.fit_res.best_values['angle_MSQ']*180./np.pi
         ax.set_title('Fit of single qubit phase errors')
-        msg = r'MAX Fidelity at %.3f $\phi_{MSQ}=$%.1f deg and $\phi_{LSQ}=$%.1f deg' % (
+        msg = r'MAX Fidelity at %.3f $\phi_{MSQ}=$%.1f deg' % (
             fidelity,
-            angle_LSQ_deg,
-            angle_MSQ_deg)
+            angle_LSQ_deg)
+        msg += "\n and $\phi_{LSQ}=$%.1f deg"%angle_MSQ_deg
         msg += "\n Chi sqr. %.3f" % self.fit_res.chisqr
         ax.text(0.5, .7, msg)
         figname = 'Fit_report_{}.{}'.format(self.exp_name,
@@ -6093,10 +6098,10 @@ class Tomo_Multiplexed(object):
         angle_LSQ_deg = self.fit_res.best_values['angle_LSQ']*180./np.pi
         angle_MSQ_deg = self.fit_res.best_values['angle_MSQ']*180./np.pi
         ax.set_title('Fit of single qubit phase errors')
-        msg = r'MAX Fidelity at %.3f $\phi_{MSQ}=$%.1f deg and $\phi_{LSQ}=$%.1f deg' % (
+        msg = r'MAX Fidelity at %.3f $\phi_{MSQ}=$%.1f deg' % (
             fidelity,
-            angle_LSQ_deg,
-            angle_MSQ_deg)
+            angle_LSQ_deg)
+        msg += "\n and $\phi_{LSQ}=$%.1f deg"%angle_MSQ_deg
         msg += "\n Chi sqr. %.3f" % self.fit_res.chisqr
         ax.text(0.5, .7, msg)
         figname = 'Fit_report_{}.{}'.format(self.exp_name,
