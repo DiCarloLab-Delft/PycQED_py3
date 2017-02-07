@@ -156,7 +156,9 @@ else:
     UHFQC_1 = None
 
 
-Flux_Control = fc.Flux_Control(name='FluxControl', IVVI=station.IVVI)
+Flux_Control = fc.Flux_Control(name='FluxControl',
+                               num_channels=5,
+                               IVVI=station.IVVI)
 station.add_component(Flux_Control)
 
 transfer_matrix_dec = np.array([[4.70306717e-04,  -8.41312977e-05,   3.64442804e-05,  -1.00489353e-05,

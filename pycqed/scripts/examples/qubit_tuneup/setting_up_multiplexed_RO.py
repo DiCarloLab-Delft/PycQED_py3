@@ -70,7 +70,7 @@ LutManMan.render_wave_PSD(
 LutManMan.load_pulse_onto_AWG_lookuptable('Multiplexed_pulse')
 
 # configuring a joint qubit gate LO
-Qubit_LO_frequency = q0.f_qubit()+0.05e9
+Qubit_LO_frequency = q0.f_qubit()+0.1e9
 q0.f_pulse_mod(q0.f_qubit()-Qubit_LO_frequency)
 q1.f_pulse_mod(q1.f_qubit()-Qubit_LO_frequency)
 q2.f_pulse_mod(q2.f_qubit()-Qubit_LO_frequency)

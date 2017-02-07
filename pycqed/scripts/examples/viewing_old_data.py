@@ -1,7 +1,7 @@
 import qcodes as qc
-from pycqed.measurement.waveform_control import viewer
-from pycqed.analysis import MeasurementAnalysis as ma
+from pycqed.analysis import measurement_analysis as ma
 from pycqed.analysis import analysis_toolbox as a_tools
+from qcodes.plots.pyqtgraph import QtPlot
 station = qc.station
 
 
