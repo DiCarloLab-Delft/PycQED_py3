@@ -1,6 +1,7 @@
 import numpy as np
 from pycqed.measurement import awg_sweep_functions as awg_swf
 from pycqed.measurement import detector_functions as det
+from pycqed.measurement import composite_detector_functions as cdet
 from pycqed.analysis import measurement_analysis as ma
 import qcodes as qc
 from pycqed.measurement.pulse_sequences import multi_qubit_tek_seq_elts as mqs
@@ -57,7 +58,7 @@ def measure_chevron(device, q0_name, amps, length, MC=None):
         ma.Chevron_2D(auto=True)
 
 
-def measure_SWAPN(device, q0_name, swap_amps,
+def measure_SWAPN(device, q0_name, swap_amps, alpha=1.,
                   number_of_swaps=30, MC=None):
     if MC is None:
         MC = qc.station.components['MC']
@@ -74,42 +75,6 @@ def measure_SWAPN(device, q0_name, swap_amps,
 
     repSWAP = awg_swf.awg_seq_swf(
         fsqs.SwapN,
-        parameter_name='nr_pulses_list',
-        unit='#',
-        AWG=q0.AWG,
-        fluxing_channels=[q0.fluxing_channel()],
-        awg_seq_func_kwargs={'operation_dict': operation_dict,
-                             'q0': q0_name,
-                             'distortion_dict': q0.dist_dict()})
-
-    MC.set_sweep_function(repSWAP)
-    MC.set_sweep_points(swap_vec)
-
-    MC.set_sweep_function_2D(AWG.ch4_amp)
-    MC.set_sweep_points_2D(swap_amps)
-
-    MC.set_detector_function(q0.int_avg_det_rot)
-    MC.run('SWAPN_%s' % q0.name, mode='2D')
-    ma.TwoD_Analysis(auto=True)
-
-
-def measure_SWAPN_alpha(device, q0_name, swap_amps, alpha,
-                        number_of_swaps=30, MC=None):
-    if MC is None:
-        MC = qc.station.components['MC']
-    q0 = device.qubits()[q0_name]
-    # These are the sweep points
-    swap_vec = np.arange(number_of_swaps)*2
-    cal_points = 4
-    lengths_cal = swap_vec[-1] + \
-        np.arange(1, 1+cal_points)*(swap_vec[1]-swap_vec[0])
-    swap_vec = np.concatenate((swap_vec, lengths_cal))
-
-    operation_dict = device.get_operation_dict()
-    AWG = q0.AWG
-
-    repSWAP = awg_swf.awg_seq_swf(
-        fsqs.SwapN_alpha,
         parameter_name='nr_pulses_list',
         unit='#',
         AWG=q0.AWG,
@@ -164,31 +129,20 @@ def measure_FluxTrack(device, q0_name, amps, fluxes, MC=None):
     if MC is None:
         MC = qc.station.components['MC']
     q0 = device.qubits()[q0_name]
-    # These are the sweep points
-    cal_points = 4
-    amps_cal = amps[-1] + \
-        np.arange(1, 1+cal_points)*(amps[1]-amps[0])
-    amps_vec = np.concatenate((amps, amps_cal))
 
     operation_dict = device.get_operation_dict()
     AWG = q0.AWG
 
-    FluxTrack_swf = awg_swf.awg_seq_swf(
-        fsqs.SwapN,
-        parameter_name='Amplitude',
-        unit='V',
-        AWG=q0.AWG,
-        fluxing_channels=[q0.fluxing_channel()],
-        awg_seq_func_kwargs={'operation_dict': operation_dict,
-                             'q0': q0_name,
-                             'distortion_dict': q0.dist_dict()})
+    FluxTrack_det = cdet.FluxTrack(qubit=q0,
+                                   MC=qc.station.components['MC_nested'],
+                                   AWG=AWG)
 
-    MC.set_sweep_function(repSWAP)
-    MC.set_sweep_points(swap_vec)
+    MC.set_sweep_function(AWG.ch4_amp)
+    MC.set_sweep_points(amps)
 
-    MC.set_sweep_function_2D(AWG.ch4_amp)
-    MC.set_sweep_points_2D(swap_amps)
+    MC.set_sweep_function_2D(Flux_Control)
+    MC.set_sweep_points_2D(fluxes)
 
     MC.set_detector_function(q0.int_avg_det_rot)
-    MC.run('SWAPN_%s' % q0.name, mode='2D')
+    MC.run('FluxTrack_%s' % q0.name, mode='2D')
     ma.TwoD_Analysis(auto=True)

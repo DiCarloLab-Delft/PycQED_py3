@@ -120,7 +120,7 @@ class UHFQC_LookuptableManagerManager(Instrument):
         elif time_units == 's':
             x = (np.arange(len(self._wave_dict[wave_name][0]))
                  / self.sampling_rate.get())
-            ax.set_xlabel('time (s)')
+            ax.set_xlabel('Time (s)')
             ax.vlines(2048 / self.sampling_rate.get(),
                       self._voltage_min, self._voltage_max, linestyle='--')
         print(wave_name)

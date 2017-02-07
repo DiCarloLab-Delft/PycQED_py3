@@ -819,4 +819,4 @@ def analyse_tomo(timestamp=None, label='',
         if close_fig:
             plt.close(fig4)
 
-    return rho_2, operators_mle, max(fid_vec)
+    # return rho_2, operators_mle, max(fid_vec)
