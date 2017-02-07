@@ -369,6 +369,7 @@ def chevron_seq(operation_dict, q0,
 
 def SwapN(operation_dict, q0,
           nr_pulses_list=[0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20],
+          alpha=1.,
           verbose=False,
           distortion_dict=None,
           upload=True,
@@ -386,131 +387,44 @@ def SwapN(operation_dict, q0,
     upload=True:          (bool) uploads to AWG, set False for testing purposes
     cal_points=True:      (bool) wether to use calibration points
     '''
-    fluxing_channel = operation_dict['SWAP '+q0]['channel']
+    seq_name = 'SWAPN_seq'
+    seq = sequence.Sequence(seq_name)
+    station.pulsar.update_channel_settings()
+    el_list = []
+
     sequencer_config = operation_dict['sequencer_config']
 
     # Create the correction pulses
     operation_dict['FluxId '+q0] = deepcopy(operation_dict['SWAP ' + q0])
     # Flux identity
     operation_dict['FluxId '+q0]['amplitude'] = 0
-
-    seq_name = 'SWAPN_seq'
-    seq = sequence.Sequence(seq_name)
-    station.pulsar.update_channel_settings()
-    el_list = []
     n_max = nr_pulses_list[-1]
-    # seq has to have at least 2 elts
+    for j in range(n_max):
+        SWAP_pulse_j = deepcopy(operation_dict['SWAP '+q0])
+        SWAP_pulse_j['amplitude'] = SWAP_pulse_j['amplitude']*(alpha**j)
+        # SWAP_pulse_train.append(SWAP_pulse_j)
+        operation_dict['SWAP_{} {}'.format(j, q0)] = SWAP_pulse_j
+
     for i, n in enumerate(nr_pulses_list):
+        # SWAP_pulse_train = []
         pulse_combinations = (['X180 ' + q0] +
-                              ['FluxId '+q0]*(n_max-n) +
-                              ['SWAP '+q0]*(n) +
-                              ['X180 ' + q0] + ['RO '+q0])
-
-        # calibration points overwrite the pulse_combinations list
-        if cal_points and (i == (len(nr_pulses_list)-4) or
-                           i == (len(nr_pulses_list)-3)):
-            pulse_combinations = (['I ' + q0] +
-                                  ['FluxId '+q0]*(n_max) +
-                                  ['I ' + q0] + ['RO '+q0])
-        elif cal_points and (i == (len(nr_pulses_list)-2) or
-                             i == (len(nr_pulses_list)-1)):
-            pulse_combinations = (['I ' + q0] +
-                                  ['FluxId '+q0]*(n_max) +
-                                  ['X180 ' + q0] + ['RO '+q0])
-        pulses = []
-        for p in pulse_combinations:
-            pulses += [operation_dict[p]]
-
-        el = multi_pulse_elt(i, station, pulses, sequencer_config)
-        if distortion_dict is not None:
-            print('\rDistorting element {}/{} '.format(i+1,
-                                                       len(nr_pulses_list)),
-                  end='')
-            if i == len(nr_pulses_list):
-                print()
-            el = distort_and_compensate(
-                el, distortion_dict)
-        el_list.append(el)
-        seq.append_element(el, trigger_wait=True)
-
-    if upload:
-        station.components['AWG'].stop()
-        station.pulsar.program_awg(seq, *el_list, verbose=verbose)
-
-    return seq, el_list
-
-
-def SwapN_alpha(operation_dict, q0,
-                nr_pulses_list=[0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20],
-                alpha=1.,
-                verbose=False,
-                distortion_dict=None,
-                upload=True,
-                cal_points=True,
-                inter_swap_wait=10e-9):
-    '''
-    Sequence of N swap operations
-        (N_max-N)* FluxID - X180 - N*SWAP - X180 RO
-
-    pulse_dict:           (dict) dictionary containing the pulse parameters
-    q0                    (str)  name of the target qubit
-    nr_pulses_list        (list) nr of swaps gates for each element
-    verbose=False:        (bool) used for verbosity printing in the pulsar
-    distortion_dict=None: (dict) flux_pulse predistortion kernels
-    upload=True:          (bool) uploads to AWG, set False for testing purposes
-    cal_points=True:      (bool) wether to use calibration points
-    '''
-    fluxing_channel = operation_dict['SWAP '+q0]['channel']
-    sequencer_config = operation_dict['sequencer_config']
-
-    # Create the correction pulses
-    operation_dict['FluxId '+q0] = deepcopy(operation_dict['SWAP ' + q0])
-    # Flux identity
-    operation_dict['FluxId '+q0]['amplitude'] = 0
-
-    seq_name = 'SWAPN_seq'
-    seq = sequence.Sequence(seq_name)
-    station.pulsar.update_channel_settings()
-    el_list = []
-    n_max = nr_pulses_list[-1]
-    # seq has to have at least 2 elts
-    for i, n in enumerate(nr_pulses_list):
-        SWAP_pulse_train = []
-
+                              ['FluxId '+q0]*(n_max-n))
         for j in range(n):
-            SWAP_pulse = deepcopy(operation_dict['SWAP '+q0])
-            # print(SWAP_pulse)
-            SWAP_pulse['amplitude'] = SWAP_pulse['amplitude']*(alpha**j)
-            SWAP_pulse_train.append(SWAP_pulse)
-        pulse_combinations = (['X180 ' + q0] +
-                              ['FluxId '+q0]*(n_max-n) +
-                              SWAP_pulse_train +
-                              ['X180 ' + q0] + ['RO '+q0])
+            pulse_combinations += ['SWAP_{} {}'.format(j, q0)]
+        pulse_combinations += ['RO '+q0]
 
         # calibration points overwrite the pulse_combinations list
         # All pulses are replaced with identities.
         if cal_points and (i == (len(nr_pulses_list)-4) or
                            i == (len(nr_pulses_list)-3)):
-            pulse_combinations = (['I ' + q0] +
-                                  ['FluxId '+q0]*(n_max) +
-                                  ['I ' + q0] + ['RO '+q0])
+            pulse_combinations = (['RO '+q0])
         elif cal_points and (i == (len(nr_pulses_list)-2) or
                              i == (len(nr_pulses_list)-1)):
-            pulse_combinations = (['I ' + q0] +
-                                  ['FluxId '+q0]*(n_max) +
-                                  ['X180 ' + q0] + ['RO '+q0])
+            pulse_combinations = (['X180 ' + q0] + ['RO '+q0])
+
         pulses = []
-        if cal_points and (i > (len(nr_pulses_list)-5)):
-            for p in pulse_combinations:
-                pulses += [operation_dict[p]]
-        else:
-            for j, p in enumerate(pulse_combinations):
-                if j < (n_max-n):
-                    pulses += [operation_dict[p]]
-                elif j == (n_max-n+1):
-                    pulses += SWAP_pulse_train
-                elif j > n_max:
-                    pulses += [operation_dict[p]]
+        for p in pulse_combinations:
+            pulses += [operation_dict[p]]
 
         el = multi_pulse_elt(i, station, pulses, sequencer_config)
         if distortion_dict is not None:
@@ -1550,11 +1464,11 @@ def BusT1(operation_dict, q0,
 
 
 def FluxTrack(operation_dict, q0,
-                pulse_lengths=np.arange(0, 120e-9, 2e-9),
-                verbose=False,
-                distortion_dict=None,
-                upload=True,
-                cal_points=True):
+              pulse_lengths=np.arange(0, 120e-9, 2e-9),
+              verbose=False,
+              distortion_dict=None,
+              upload=True,
+              cal_points=True):
     '''
     FluxTrack sequence where a poitive and negative SWAP are implemented
     amplitude and length are not varied.
@@ -1573,20 +1487,36 @@ def FluxTrack(operation_dict, q0,
     el_list = []
     sequencer_config = operation_dict['sequencer_config']
 
-    SWAP_amp = operation_dict['SWAP '+q0]['amplitude']
+    # SWAP_amp = operation_dict['SWAP '+q0]['amplitude']
+    mSWAP = deepcopy(operation_dict['SWAP ' + q0])
+    mSWAP['amplitude'] *= -1
+    operation_dict['mSWAP ' + q0] = mSWAP
     # seq has to have at least 2 elts
     total_elts = 2 + cal_points*4
     for i in range(total_elts):
-        # this converts negative pulse lenghts to negative pulse amplitudes
-        operation_dict['SWAP '+q0]['amplitude'] = np.abs(operation_dict['SWAP '+q0]['amplitude'])*(-1)**i
-        if cal_points and (i == (len(pulse_lengths)-4) or
-                           i == (len(pulse_lengths)-3)):
+        if i == 0:
+            pulse_combinations = ['X180 ' + q0, 'SWAP ' + q0, 'RO '+q0]
+        elif i == 1:
+            pulse_combinations = ['X180 ' + q0, 'mSWAP ' + q0, 'RO '+q0]
+        # Calibration points
+        elif i == 2 or i == 3:
             pulse_combinations = ['RO '+q0]
-        elif cal_points and (i == (len(pulse_lengths)-2) or
-                             i == (len(pulse_lengths)-1)):
-            pulse_combinations = ['X180 ' + q0, 'RO ' + q0]
+        elif i == 4 or i == 5:
+            pulse_combinations = ['X180 ' + q0, 'RO '+q0]
         else:
-            pulse_combinations = ['X180 '+q0, 'SWAP ' + q0, 'RO '+q0]
+            raise Exception('larger index than expected')
+
+        # # this converts negative pulse lenghts to negative pulse amplitudes
+        # operation_dict[
+        #     'SWAP '+q0]['amplitude'] = np.abs(operation_dict['SWAP '+q0]['amplitude'])*(-1)**i
+        # if cal_points and (i == (len(pulse_lengths)-4) or
+        #                    i == (len(pulse_lengths)-3)):
+        #     pulse_combinations = ['RO '+q0]
+        # elif cal_points and (i == (len(pulse_lengths)-2) or
+        #                      i == (len(pulse_lengths)-1)):
+        #     pulse_combinations = ['X180 ' + q0, 'RO ' + q0]
+        # else:
+        #     pulse_combinations = ['X180 '+q0, 'SWAP ' + q0, 'RO '+q0]
 
         pulses = []
         for p in pulse_combinations:
@@ -1594,10 +1524,8 @@ def FluxTrack(operation_dict, q0,
 
         el = multi_pulse_elt(i, station, pulses, sequencer_config)
         if distortion_dict is not None:
-            print('\r Distorting element {}/{}'.format(i+1, len(pulse_lengths)),
+            print('\r Distorting element {}/{} '.format(i+1, total_elts),
                   end='')
-            if i == len(pulse_lengths):
-                print()
             el = distort_and_compensate(
                 el, distortion_dict)
         el_list.append(el)
@@ -1606,7 +1534,4 @@ def FluxTrack(operation_dict, q0,
         station.components['AWG'].stop()
         station.pulsar.program_awg(seq, *el_list, verbose=verbose)
 
-    # after looping, the amplitude ends up negative, we correct that
-    operation_dict['SWAP '+q0]['amplitude'] = np.abs(operation_dict['SWAP '+q0]['amplitude'])
     return seq, el_list
-
