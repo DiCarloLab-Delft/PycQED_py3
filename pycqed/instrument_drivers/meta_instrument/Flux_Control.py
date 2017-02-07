@@ -1,6 +1,8 @@
 import logging
 import numpy as np
+from copy import deepcopy,copy
 
+import qcodes as qc
 from qcodes.instrument.base import Instrument
 from qcodes.utils import validators as vals
 from qcodes.instrument.parameter import ManualParameter
@@ -13,12 +15,14 @@ from qcodes.instrument.parameter import ManualParameter
 
 
 class Flux_Control(Instrument):
+
     '''
 
     Flux Control object
 
     '''
-    def __init__(self, name, IVVI=None, **kw):
+
+    def __init__(self, name, num_channels, IVVI=None, **kw):
         super().__init__(name, **kw)
 
         self.IVVI = IVVI
@@ -34,12 +38,12 @@ class Flux_Control(Instrument):
                            set_cmd=self.do_set_inv_transfer_matrix,
                            get_cmd=self.do_get_inv_transfer_matrix,
                            vals=vals.Anything())
-        self.add_parameter('flux_offsets', units='mV',
+        self.add_parameter('flux_offsets', units='Phi_0',
                            label='Flux offsets',
                            set_cmd=self.do_set_flux_offsets,
                            get_cmd=self.do_get_flux_offsets,
                            vals=vals.Anything())
-        self.add_parameter('flux_vector', units='Phi0',
+        self.add_parameter('flux_vector', units='Phi_0',
                            label='Linear transformation coefficients',
                            set_cmd=self.do_set_flux_vector,
                            get_cmd=self.do_get_flux_vector,
@@ -50,13 +54,34 @@ class Flux_Control(Instrument):
                            get_cmd=self.do_get_dac_mapping,
                            vals=vals.Anything())
 
+        for i in range(0, num_channels):
+            self.add_parameter(
+                'flux{}'.format(i),
+                label='Flux {}'.format(i),
+                units=r'$\Phi_0$',
+                get_cmd=self._gen_ch_get_func(self._get_flux, i),
+                set_cmd=self._gen_ch_set_func(self._set_flux, i),
+                vals=vals.Numbers(-10, 10.))
+
+    def _set_flux(self, id_flux, val):
+        current_flux = self.flux_vector()
+        new_flux = current_flux
+        new_flux[id_flux] = val
+        self.flux_vector(new_flux)
+
+    def _get_flux(self, id_flux):
+        val = self.flux_vector()
+        return val[id_flux]
+
     def do_set_transfer_matrix(self, matrix):
         self._transfer_matrix = matrix
+
     def do_get_transfer_matrix(self):
         return self._transfer_matrix
 
     def do_set_inv_transfer_matrix(self, matrix):
         self._inv_transfer_matrix = matrix
+
     def do_get_inv_transfer_matrix(self):
         return self._inv_transfer_matrix
 
@@ -73,29 +98,27 @@ class Flux_Control(Instrument):
             self.IVVI._set_dac(self._dac_mapping[i], currents[i])
         return currents
 
-
     def do_get_flux_vector(self):
         currents = np.zeros(len(self._dac_mapping))
         for i in range(len(self._dac_mapping)):
             currents[i] = self.IVVI._get_dac(self._dac_mapping[i])
-        flux_vector = np.dot(self._transfer_matrix, currents) + self._flux_offsets
+        flux_vector = np.dot(
+            self._transfer_matrix, currents) + self._flux_offsets
         return flux_vector
 
     def do_set_dac_mapping(self, vector):
         self._dac_mapping = vector
+
     def do_get_dac_mapping(self):
         return self._dac_mapping
 
-    def define_parameters(self):
-        for id_flux in range(len(self._dac_mapping)):
-            self.flux_pars[id_flux] = qc.Parameter(name='Flux_%d'%id_flux, label='Flux %d'%id_flux, units=r'$\Phi_0$')
-            def wrap_set(val, id_flux):
-                current_flux = self.self.flux_vector()
-                new_flux = current_flux
-                new_flux[id_flux] = val
-                self.flux_vector(new_flux)
-            def wrap_get(val, id_flux):
-                val = self.flux_vector()
-                return val[id_flux]
-            new_par.set = wrap_set
-            new_par.get = wrap_get
+
+    def _gen_ch_set_func(self, fun, ch):
+        def set_func(val):
+            return fun(ch, val)
+        return set_func
+
+    def _gen_ch_get_func(self, fun, ch):
+        def get_func():
+            return fun(ch)
+        return get_func

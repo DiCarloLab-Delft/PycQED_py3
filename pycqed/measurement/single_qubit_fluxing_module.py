@@ -164,12 +164,14 @@ def measure_BusT1(device, q0_name, times, MC=None):
 def measure_FluxTrack(device, q0_name, amps, fluxes, MC=None):
     if MC is None:
         MC = qc.station.components['MC']
-    q0 = device.qubits()[q0_name
+    q0 = device.qubits()[q0_name]
 
     operation_dict = device.get_operation_dict()
     AWG = q0.AWG
 
-    FluxTrack_det = cdet.FluxTrack(qubit=q0, MC=MC_nested, AWG=AWG)
+    FluxTrack_det = cdet.FluxTrack(qubit=q0,
+                                   MC=qc.station.components['MC_nested'],
+                                   AWG=AWG)
 
     MC.set_sweep_function(AWG.ch4_amp)
     MC.set_sweep_points(amps)
