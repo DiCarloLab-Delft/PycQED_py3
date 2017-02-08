@@ -7,6 +7,7 @@ import numpy as np
 import time
 import scipy
 import os
+import lmfit
 
 import matplotlib.pyplot as plt
 from matplotlib.offsetbox import AnchoredText
@@ -820,3 +821,378 @@ def analyse_tomo(timestamp=None, label='',
             plt.close(fig4)
 
     # return rho_2, operators_mle, max(fid_vec)
+
+
+class Tomo_Multiplexed(object):
+
+    def __init__(self, auto=True, label='', timestamp=None,
+                 MLE=False, target_cardinal=None, target_bell=None,
+                 start_shot=0, end_shot=-1,
+                 verbose=0,
+                 fig_format='png', q0_label='q0', q1_label='q1', close_fig=True):
+        self.label = label
+        self.timestamp = timestamp
+        self.target_cardinal = target_cardinal
+        self.target_bell = target_bell
+        self.start_shot = start_shot
+        self.end_shot = end_shot
+        self.MLE = MLE
+        self.verbose = verbose
+        self.fig_format = fig_format
+        self.q0_label = q0_label
+        self.q1_label = q1_label
+        self.close_fig = close_fig
+        if auto is True:
+            self.run_default_analysis()
+
+    def run_default_analysis(self):
+        # hard coded number of segments for a 2 qubit state tomography
+        # constraint imposed by UHFLI
+        a = ma.MeasurementAnalysis(auto=False, label=self.label,
+                                   timestamp=self.timestamp)
+        a.get_naming_and_values()
+        self.t_stamp = a.timestamp_string
+        self.savefolder = a.folder
+        self.nr_segments = 64
+
+        self.shots_q0 = np.zeros(
+            (self.nr_segments, int(len(a.measured_values[0])/self.nr_segments)))
+        self.shots_q1 = np.zeros(
+            (self.nr_segments, int(len(a.measured_values[1])/self.nr_segments)))
+        for i in range(self.nr_segments):
+            self.shots_q0[i, :] = a.measured_values[0][i::self.nr_segments]
+            self.shots_q1[i, :] = a.measured_values[1][i::self.nr_segments]
+
+        # Get correlations between shots
+        self.shots_q0q1 = np.multiply(self.shots_q1, self.shots_q0)
+
+        if self.start_shot != 0 or self.end_shot != -1:
+            self.shots_q0 = self.shots_q0[:, self.start_shot:self.end_shot]
+            self.shots_q1 = self.shots_q1[:, self.start_shot:self.end_shot]
+            self.shots_q0q1 = self.shots_q0q1[:, self.start_shot:self.end_shot]
+        ##########################################
+        # Making  the first figure, tomo shots
+        ##########################################
+        self.plot_TV_mode()
+
+        avg_h1 = np.mean(self.shots_q0, axis=1)
+
+        # Binning all the points required for the tomo
+        h1_00 = np.mean(avg_h1[36:36+7])
+        h1_01 = np.mean(avg_h1[43:43+7])
+        h1_10 = np.mean(avg_h1[50:50+7])
+        h1_11 = np.mean(avg_h1[57:])
+
+        avg_h2 = np.mean(self.shots_q1, axis=1)
+        h2_00 = np.mean(avg_h2[36:36+7])
+        h2_01 = np.mean(avg_h2[43:43+7])
+        h2_10 = np.mean(avg_h2[50:50+7])
+        h2_11 = np.mean(avg_h2[57:])
+
+        avg_h12 = np.mean(self.shots_q0q1, axis=1)
+        h12_00 = np.mean(avg_h12[36:36+7])
+        h12_01 = np.mean(avg_h12[43:43+7])
+        h12_10 = np.mean(avg_h12[50:50+7])
+        h12_11 = np.mean(avg_h12[57:])
+
+        avg_h12 = np.mean(self.shots_q0q1, axis=1)
+
+        #############################
+        # Linear inversion tomo #
+        #############################
+
+        measurements_tomo = (
+            np.array([avg_h1[0:36], avg_h2[0:36], avg_h12[0:36]])).flatten()  # 108 x 1
+        # get the calibration points by averaging over the five measurements taken
+        # knowing the initial state we put in
+        measurements_cal = np.array(
+            [h1_00, h1_01, h1_10, h1_11,
+             h2_00, h2_01, h2_10, h2_11,
+             h12_00, h12_01, h12_10, h12_11])
+
+        # before we calculate the tomo we need to set the correct order of the
+        # rotation matrixes
+        TomoAnalysis_JointRO.rotation_matrixes = [
+            qtp.identity(2),
+            qtp.sigmax(),
+            qtp.rotation(qtp.sigmay(), np.pi / 2),
+            qtp.rotation(qtp.sigmay(), -np.pi / 2),
+            qtp.rotation(qtp.sigmax(), np.pi / 2),
+            qtp.rotation(qtp.sigmax(), -np.pi / 2)]
+
+        # calculate the tomo
+        tomo = TomoAnalysis_JointRO(
+            measurements_cal, measurements_tomo, n_qubits=2, n_quadratures=3)
+        # operators are expectation values of Pauli operators, rho is density
+        # mat
+        (self.operators, self.rho) = tomo.execute_linear_tomo()
+
+        if self.MLE:
+            # mle reconstruction of density matrix
+            self.rho_2 = tomo.execute_max_likelihood(
+                ftol=0.000001, xtol=0.0001)
+            # reconstructing the pauli vector
+            if self.verbose > 1:
+                print(self.rho_2)
+            if self.verbose > 0:
+                print('Purity %.3f' % (self.rho_2*self.rho_2).tr())
+            # calculates the Pauli operator expectation values based on the
+            # matrix
+            self.operators_mle = pauli_ops_from_density_matrix(
+                self.rho_2)
+            if self.verbose > 0:
+                print(self.operators_mle)
+        ########################
+        # FIT PHASE CORRECTIONS
+        ########################
+        if self.MLE:
+            self.operators_fit = self.operators_mle
+        else:
+            self.operators_fit = self.operators
+        """
+        bell_idx (int) : integer referring to a specific bell state.
+            0: |Psi_m> = |00> - |11>   (<XX>,<YY>,<ZZ>) = (-1,+1,+1)
+            1: |Psi_p> = |00> + |11>   (<XX>,<YY>,<ZZ>) = (+1,-1,+1)
+            2: |Psi_m> = |01> - |10>   (<XX>,<YY>,<ZZ>) = (-1,-1,-1)
+            3: |Psi_m> = |01> + |10>   (<XX>,<YY>,<ZZ>) = (+1,+1,-1)
+        """
+        def rotated_bell_state(dummy_x, angle_MSQ, angle_LSQ,
+                               contrast, target_bell=0):
+            # only works for target_bell=0 for now.
+            # to expand, need to figure out the signs in the elements.
+            # order is set by looping I,Z,X,Y
+            # 0  1  2  3  4  5  6  7  8  9  10 11 12 13 14 15
+            # II IZ IX IY ZI ZZ ZX ZY XI XZ XX XY YI YZ YX YY
+            state = np.zeros(16)
+            state[0] = 1.
+            if target_bell == 0:
+                state[5] = np.cos(angle_LSQ)*contrast
+                state[7] = np.sin(angle_LSQ)*contrast
+                state[10] = -np.cos(angle_MSQ)*contrast
+                state[11] = np.sin(angle_MSQ)*contrast
+                state[13] = -np.sin(angle_LSQ)*contrast
+                state[14] = np.sin(angle_MSQ)*contrast
+                state[15] = np.cos(angle_LSQ)*np.cos(angle_MSQ)*contrast
+            elif target_bell == 1:
+                state[5] = np.cos(angle_LSQ)*contrast
+                state[7] = np.sin(angle_LSQ)*contrast
+                state[10] = np.cos(angle_MSQ)*contrast
+                state[11] = np.sin(angle_MSQ)*contrast
+                state[13] = np.sin(angle_LSQ)*contrast
+                state[14] = np.sin(angle_MSQ)*contrast
+                state[15] = -np.cos(angle_LSQ)*np.cos(angle_MSQ)*contrast
+            elif target_bell == 2:
+                state[5] = -np.cos(angle_LSQ)*contrast
+                state[7] = -np.sin(angle_LSQ)*contrast
+                state[10] = -np.cos(angle_MSQ)*contrast
+                state[11] = -np.sin(angle_MSQ)*contrast
+                state[13] = np.sin(angle_LSQ)*contrast
+                state[14] = np.sin(angle_MSQ)*contrast
+                state[15] = -np.cos(angle_LSQ)*np.cos(angle_MSQ)*contrast
+            elif target_bell == 3:
+                state[5] = -np.cos(angle_LSQ)*contrast
+                state[7] = np.sin(angle_LSQ)*contrast
+                state[10] = np.cos(angle_MSQ)*contrast
+                state[11] = np.sin(angle_MSQ)*contrast
+                state[13] = np.sin(angle_LSQ)*contrast
+                state[14] = np.sin(angle_MSQ)*contrast
+                state[15] = np.cos(angle_LSQ)*np.cos(angle_MSQ)*contrast
+            return state
+
+        fit_func_wrapper = lambda dummy_x, angle_MSQ,\
+            angle_LSQ, contrast: rotated_bell_state(dummy_x,
+                                                    angle_MSQ, angle_LSQ,
+                                                    contrast, self.target_bell)
+        angles_model = lmfit.Model(fit_func_wrapper)
+
+        angles_model.set_param_hint(
+            'angle_MSQ', value=0., min=-np.pi, max=np.pi, vary=True)
+        angles_model.set_param_hint(
+            'angle_LSQ', value=0., min=-np.pi, max=np.pi, vary=True)
+        angles_model.set_param_hint(
+            'contrast', value=1., min=0., max=1., vary=False)
+        params = angles_model.make_params()
+
+        self.fit_res = angles_model.fit(data=self.operators_fit,
+                                        dummy_x=np.arange(
+                                            len(self.operators_fit)),
+                                        params=params)
+        self.plot_phase_corr()
+        self.plot_LI()
+        self.plot_MLE()
+
+    def plot_TV_mode(self):
+        self.exp_name = os.path.split(self.savefolder)[-1][7:]
+        figname = 'Tomography_shots_Exp_{}.{}'.format(self.exp_name,
+                                                      self.fig_format)
+        fig1, axs = plt.subplots(1, 3, figsize=(17, 4))
+        fig1.suptitle(self.exp_name+' ' + self.t_stamp, size=16)
+        ax = axs[0]
+        ax.plot(np.arange(self.nr_segments), np.mean(self.shots_q0, axis=1),
+                'o-')
+        ax.set_title('{}'.format(self.q0_label))
+        ax = axs[1]
+        ax.plot(np.arange(self.nr_segments), np.mean(self.shots_q1, axis=1),
+                'o-')
+        ax.set_title('{}'.format(self.q1_label))
+        ax = axs[2]
+        ax.plot(np.arange(self.nr_segments), np.mean(self.shots_q0q1, axis=1),
+                'o-')
+        ax.set_title('Correlations {}-{}'.format(self.q0_label, self.q1_label))
+        savename = os.path.abspath(os.path.join(
+            self.savefolder, figname))
+        # value of 450dpi is arbitrary but higher than default
+        fig1.savefig(savename, format=self.fig_format, dpi=450)
+        if self.close_fig:
+            plt.close(fig1)
+
+    def plot_LI(self):
+        # Making  the second figure, LI tomo
+        fig2 = plt.figure(figsize=(15, 5))
+        ax = fig2.add_subplot(121)
+        if self.target_cardinal is not None:
+            fidelity = calc_fid2_cardinal(self.operators,
+                                                   self.target_cardinal)
+            target_expectations = get_cardianal_pauli_exp(
+                self.target_cardinal)
+            plot_target_pauli_set(target_expectations, ax)
+
+        if self.target_bell is not None:
+            fidelity = calc_fid2_bell(
+                self.operators, self.target_bell)
+            target_expectations = get_bell_pauli_exp(self.target_bell)
+            plot_target_pauli_set(target_expectations, ax)
+            txt_x_pos = 0
+        else:
+            txt_x_pos = 10
+
+        plot_operators(self.operators, ax)
+        ax.set_title('Least squares tomography.')
+        if self.verbose > 0:
+            print(self.rho)
+        qtp.matrix_histogram_complex(self.rho, xlabels=['00', '01', '10', '11'],
+                                     ylabels=['00', '01', '10', '11'],
+                                     fig=fig2, ax=fig2.add_subplot(
+            122, projection='3d'))
+        purity = (self.rho*self.rho).tr()
+        msg = 'Purity: {:.3f}\nFidelity to target {:.3f}'.format(
+            purity, fidelity)
+        if self.target_bell is not None:
+            theta_vec = np.linspace(0., 2*np.pi, 1001)
+            fid_vec = np.zeros(theta_vec.shape)
+            for i, theta in enumerate(theta_vec):
+                fid_vec[i] = calc_fid2_bell(self.operators,
+                                                     self.target_bell, theta)
+            msg += '\nMAX Fidelity {:.3f} at {:.1f} deg'.format(
+                np.max(fid_vec),
+                theta_vec[np.argmax(fid_vec)]*180./np.pi)
+        ax.text(0, .7, msg)
+
+        figname = 'LI-Tomography_Exp_{}.{}'.format(self.exp_name,
+                                                   self.fig_format)
+        fig2.suptitle(self.exp_name+' ' + self.t_stamp, size=16)
+        savename = os.path.abspath(os.path.join(
+            self.savefolder, figname))
+        # value of 450dpi is arbitrary but higher than default
+        fig2.savefig(savename, format=self.fig_format, dpi=450)
+        if self.close_fig:
+            plt.close(fig2)
+
+    def plot_MLE(self):
+        # Figure 3 MLE reconstruction
+        fig3 = plt.figure(figsize=(15, 5))
+        ax = fig3.add_subplot(121)
+
+        if self.target_cardinal is not None:
+            fidelity_mle = calc_fid2_cardinal(self.operators_mle,
+                                                       self.target_cardinal)
+            target_expectations = get_cardianal_pauli_exp(
+                self.target_cardinal)
+            plot_target_pauli_set(target_expectations, ax)
+        if self.target_bell is not None:
+            fidelity_mle = calc_fid2_bell(self.operators_mle,
+                                                   self.target_bell)
+            target_expectations = get_bell_pauli_exp(self.target_bell)
+            plot_target_pauli_set(target_expectations, ax)
+            txt_x_pos = 0
+        else:
+            txt_x_pos = 10
+
+        purity = (self.rho_2*self.rho_2).tr()
+
+        msg = 'Purity: {:.3f}\nFidelity to target {:.3f}'.format(
+            purity, fidelity_mle)
+        if self.target_bell is not None:
+            theta_vec = np.linspace(0., 2*np.pi, 1001)
+            fid_vec = np.zeros(theta_vec.shape)
+            for i, theta in enumerate(theta_vec):
+                fid_vec[i] = calc_fid2_bell(self.operators_mle,
+                                                     self.target_bell, theta)
+            msg += '\nMAX Fidelity {:.3f} at LSQ={:.1f} deg \nand MSQ={:.1f} deg'.format(
+                self.best_fidelity,
+                self.fit_res.best_values['angle_LSQ']*180./np.pi,
+                self.fit_res.best_values['angle_MSQ']*180./np.pi)
+        ax.text(txt_x_pos, .7, msg)
+
+        plot_operators(self.operators_mle, ax)
+        ax.set_title('Max likelihood estimation tomography')
+        qtp.matrix_histogram_complex(self.rho_2, xlabels=['00', '01', '10', '11'],
+                                     ylabels=['00', '01', '10', '11'],
+                                     fig=fig3,
+                                     ax=fig3.add_subplot(122, projection='3d'))
+
+        figname = 'MLE-Tomography_Exp_{}.{}'.format(self.exp_name,
+                                                    self.fig_format)
+        fig3.suptitle(self.exp_name+' ' + self.t_stamp, size=16)
+        savename = os.path.abspath(os.path.join(
+            self.savefolder, figname))
+        # value of 450dpi is arbitrary but higher than default
+        fig3.savefig(savename, format=self.fig_format, dpi=450)
+        if self.close_fig:
+            plt.close(fig3)
+
+    def plot_phase_corr(self):
+        fig2 = plt.figure(figsize=(15, 5))
+        ax = fig2.add_subplot(111)
+        ordered_fit = np.concatenate(
+            ([1], np.concatenate(order_pauli_output2(self.fit_res.best_fit))))
+        plot_target_pauli_set(ordered_fit, ax)
+        plot_operators(self.operators_fit, ax=ax)
+        fidelity = np.dot(self.fit_res.best_fit, self.operators_fit)*0.25
+        self.best_fidelity = fidelity
+        angle_LSQ_deg = self.fit_res.best_values['angle_LSQ']*180./np.pi
+        angle_MSQ_deg = self.fit_res.best_values['angle_MSQ']*180./np.pi
+        ax.set_title('Fit of single qubit phase errors')
+        msg = r'MAX Fidelity at %.3f $\phi_{MSQ}=$%.1f deg and $\phi_{LSQ}=$%.1f deg' % (
+            fidelity,
+            angle_LSQ_deg,
+            angle_MSQ_deg)
+        msg += "\n Chi sqr. %.3f" % self.fit_res.chisqr
+        ax.text(0.5, .7, msg)
+        figname = 'Fit_report_{}.{}'.format(self.exp_name,
+                                            self.fig_format)
+        fig2.suptitle(self.exp_name+' ' + self.t_stamp, size=16)
+        savename = os.path.abspath(os.path.join(
+            self.savefolder, figname))
+        # value of 450dpi is arbitrary but higher than default
+        fig2.savefig(savename, format=self.fig_format, dpi=450)
+        if self.close_fig:
+            plt.close(fig2)
+        angle_LSQ_deg = self.fit_res.best_values['angle_LSQ']*180./np.pi
+        angle_MSQ_deg = self.fit_res.best_values['angle_MSQ']*180./np.pi
+        ax.set_title('Fit of single qubit phase errors')
+        msg = r'MAX Fidelity at %.3f $\phi_{MSQ}=$%.1f deg and $\phi_{LSQ}=$%.1f deg' % (
+            fidelity,
+            angle_LSQ_deg,
+            angle_MSQ_deg)
+        msg += "\n Chi sqr. %.3f" % self.fit_res.chisqr
+        ax.text(0.5, .7, msg)
+        figname = 'Fit_report_{}.{}'.format(self.exp_name,
+                                            self.fig_format)
+        fig2.suptitle(self.exp_name+' ' + self.t_stamp, size=16)
+        savename = os.path.abspath(os.path.join(
+            self.savefolder, figname))
+        # value of 450dpi is arbitrary but higher than default
+        fig2.savefig(savename, format=self.fig_format, dpi=450)
+        if self.close_fig:
+            plt.close(fig2)
