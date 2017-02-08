@@ -12,7 +12,10 @@ def RandomizedBenchmarkingDecay(numCliff, Amplitude, p, offset):
     return val
 
 
-def DoubleExpDampOscFunc(t, tau_1, tau_2, freq_1, freq_2, phase_1, phase_2, amp_1, amp_2, osc_offset):
+def DoubleExpDampOscFunc(t, tau_1, tau_2,
+                         freq_1, freq_2,
+                         phase_1, phase_2,
+                         amp_1, amp_2, osc_offset):
     cos_1 = amp_1 * (np.cos(2*np.pi*freq_1*t+phase_1)) * np.exp(-(t/tau_1))
     cos_2 = amp_2 * (np.cos(2*np.pi*freq_2*t+phase_2)) * np.exp(-(t/tau_2))
     return cos_1 + cos_2 + osc_offset

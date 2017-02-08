@@ -1,10 +1,8 @@
 import unittest
 import pycqed as pq
 import os
-# # hack for badly installed matplotlib on maserati pc
-# import matplotlib
-# matplotlib.use('QT4Agg')
 from pycqed.analysis import measurement_analysis as ma
+
 
 class Test_DoubleFreq_analysis(unittest.TestCase):
 
@@ -24,10 +22,10 @@ class Test_DoubleFreq_analysis(unittest.TestCase):
         # Test if the fit gives the expected means
         self.assertAlmostEqual(fit_res['osc_offset'], 0.507, places=3)
         self.assertAlmostEqual(fit_res['phase_1'], -0.006, places=3)
-        self.assertAlmostEqual(fit_res['phase_2'], -6.273, places=3)
-        self.assertAlmostEqual(fit_res['freq_1'], 0.286, places=3)
-        self.assertAlmostEqual(fit_res['freq_2'], 0.235, places=3)
-        self.assertAlmostEqual(fit_res['tau_1'], 23.8, places=1)
-        self.assertAlmostEqual(fit_res['tau_2'], 15.1, places=1)
+        self.assertAlmostEqual(fit_res['phase_2'], 6.293, places=3)
+        self.assertAlmostEqual(fit_res['freq_1']*1e-6, 0.286, places=3)
+        self.assertAlmostEqual(fit_res['freq_2']*1e-6, 0.235, places=3)
+        self.assertAlmostEqual(fit_res['tau_1']*1e6, 23.8, places=1)
+        self.assertAlmostEqual(fit_res['tau_2']*1e6, 15.1, places=1)
         self.assertAlmostEqual(fit_res['amp_1'], 0.25, places=2)
         self.assertAlmostEqual(fit_res['amp_2'], 0.25, places=2)

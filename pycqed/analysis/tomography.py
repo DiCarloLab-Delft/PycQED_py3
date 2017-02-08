@@ -966,38 +966,43 @@ class Tomo_Multiplexed(object):
             state = np.zeros(16)
             state[0] = 1.
             if target_bell == 0:
-                state[5] = np.cos(angle_LSQ)*contrast
-                state[7] = np.sin(angle_LSQ)*contrast
-                state[10] = -np.cos(angle_MSQ)*contrast
-                state[11] = np.sin(angle_MSQ)*contrast
-                state[13] = -np.sin(angle_LSQ)*contrast
-                state[14] = np.sin(angle_MSQ)*contrast
-                state[15] = np.cos(angle_LSQ)*np.cos(angle_MSQ)*contrast
+                state[5] = np.cos(angle_MSQ)
+                state[6] = np.sin(angle_LSQ)*np.sin(angle_MSQ)
+                state[7] = np.cos(angle_LSQ)*np.sin(angle_MSQ)
+                state[10] = -np.cos(angle_LSQ)
+                state[11] = np.sin(angle_LSQ)
+                state[13] = -np.sin(angle_MSQ)
+                state[14] = np.cos(angle_MSQ)*np.sin(angle_LSQ)
+                state[15] = np.cos(angle_MSQ)*np.cos(angle_LSQ)
             elif target_bell == 1:
-                state[5] = np.cos(angle_LSQ)*contrast
-                state[7] = np.sin(angle_LSQ)*contrast
-                state[10] = np.cos(angle_MSQ)*contrast
-                state[11] = np.sin(angle_MSQ)*contrast
-                state[13] = np.sin(angle_LSQ)*contrast
-                state[14] = np.sin(angle_MSQ)*contrast
-                state[15] = -np.cos(angle_LSQ)*np.cos(angle_MSQ)*contrast
+                state[5] = np.cos(angle_MSQ)
+                state[6] = -np.sin(angle_LSQ)*np.sin(angle_MSQ)
+                state[7] = -np.cos(angle_LSQ)*np.sin(angle_MSQ)
+                state[10] = np.cos(angle_LSQ)
+                state[11] = -np.sin(angle_LSQ)
+                state[13] = -np.sin(angle_MSQ)
+                state[14] = -np.cos(angle_MSQ)*np.sin(angle_LSQ)
+                state[15] = -np.cos(angle_MSQ)*np.cos(angle_LSQ)
             elif target_bell == 2:
-                state[5] = -np.cos(angle_LSQ)*contrast
-                state[7] = -np.sin(angle_LSQ)*contrast
-                state[10] = -np.cos(angle_MSQ)*contrast
-                state[11] = -np.sin(angle_MSQ)*contrast
-                state[13] = np.sin(angle_LSQ)*contrast
-                state[14] = np.sin(angle_MSQ)*contrast
-                state[15] = -np.cos(angle_LSQ)*np.cos(angle_MSQ)*contrast
+                state[5] = -np.cos(angle_MSQ)
+                state[6] = -np.sin(angle_LSQ)*np.sin(angle_MSQ)
+                state[7] = -np.cos(angle_LSQ)*np.sin(angle_MSQ)
+                state[10] = -np.cos(angle_LSQ)
+                state[11] = np.sin(angle_LSQ)
+                state[13] = np.sin(angle_MSQ)
+                state[14] = -np.cos(angle_MSQ)*np.sin(angle_LSQ)
+                state[15] = -np.cos(angle_MSQ)*np.cos(angle_LSQ)
             elif target_bell == 3:
-                state[5] = -np.cos(angle_LSQ)*contrast
-                state[7] = np.sin(angle_LSQ)*contrast
-                state[10] = np.cos(angle_MSQ)*contrast
-                state[11] = np.sin(angle_MSQ)*contrast
-                state[13] = np.sin(angle_LSQ)*contrast
-                state[14] = np.sin(angle_MSQ)*contrast
-                state[15] = np.cos(angle_LSQ)*np.cos(angle_MSQ)*contrast
+                state[5] = -np.cos(angle_MSQ)
+                state[6] = np.sin(angle_LSQ)*np.sin(angle_MSQ)
+                state[7] = np.cos(angle_LSQ)*np.sin(angle_MSQ)
+                state[10] = np.cos(angle_LSQ)
+                state[11] = -np.sin(angle_LSQ)
+                state[13] = np.sin(angle_MSQ)
+                state[14] = np.cos(angle_MSQ)*np.sin(angle_LSQ)
+                state[15] = np.cos(angle_MSQ)*np.cos(angle_LSQ)
             return state
+
 
         fit_func_wrapper = lambda dummy_x, angle_MSQ,\
             angle_LSQ, contrast: rotated_bell_state(dummy_x,

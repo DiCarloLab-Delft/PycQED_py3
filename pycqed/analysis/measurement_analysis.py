@@ -5225,118 +5225,84 @@ class Chevron_2D(object):
         return
 
 
-class DoubleFrequency(object):
+class DoubleFrequency(MeasurementAnalysis):
 
-    def __init__(self, auto=True, label='Ramsey', timestamp=None):
-        if timestamp is None:
-            self.folder = a_tools.latest_data(label)
-            splitted = self.folder.split('\\')
-            self.scan_start = splitted[-2]+'_'+splitted[-1][:6]
-            self.scan_stop = self.scan_start
-        else:
-            self.scan_start = timestamp
-            self.scan_stop = timestamp
-            self.folder = a_tools.get_folder(timestamp=self.scan_start)
-        self.pdict = {'I': 'amp',
-                      'sweep_points': 'sweep_points'}
-        self.opt_dict = {'scan_label': label}
-        self.nparams = ['I', 'sweep_points']
-        self.label = label
-        if auto == True:
-            self.analysis()
+    def __init__(self, auto=True, label='Ramsey', timestamp=None, **kw):
+        super().__init__(**kw)
 
-    def analysis(self):
-        # print(self.scan_start,self.scan_stop,self.opt_dict,self.pdict,self.nparams)
-        ramsey_scan = ca.quick_analysis(t_start=self.scan_start,
-                                        t_stop=self.scan_stop,
-                                        options_dict=self.opt_dict,
-                                        params_dict_TD=self.pdict,
-                                        numeric_params=self.nparams)
-        x = ramsey_scan.TD_dict['sweep_points'][0]*1e6
-        y = a_tools.normalize_data_v3(ramsey_scan.TD_dict['I'][0])
-        # print(y)
+    def run_default_analysis(self, **kw):
+        self.get_naming_and_values()
+        x = self.sweep_points
+        y = a_tools.normalize_data_v3(self.measured_values[0])
 
         fit_res = self.fit(x[:-4], y[:-4])
         self.fit_res = fit_res
-        # print(fit_res.best_values)
+        print(x[1])
 
         fig = plt.figure()
         ax = fig.add_subplot(111)
         self.box_props = dict(boxstyle='Square', facecolor='white', alpha=0.8)
 
-        textstr = ('  $f_1$  \t= %.3g $ \t \pm$ (%.3g) MHz'
-                   % (fit_res.params['freq_1'].value,
-                      fit_res.params['freq_1'].stderr) +
-                   '\n$f_2$ \t= %.3g $ \t \pm$ (%.3g) MHz'
-                   % (fit_res.params['freq_2'].value,
-                       fit_res.params['freq_2'].stderr) +
-                   '\n$T_2^\star (1)$ = %.3g $\t \pm$ (%.3g) s '
-                   % (fit_res.params['tau_1'].value,
-                       fit_res.params['tau_1'].stderr) +
-                   '\n$T_2^\star (2)$ = %.3g $\t \pm$ (%.3g) s '
-                   % (fit_res.params['tau_2'].value,
-                       fit_res.params['tau_2'].stderr))
+        f1 = fit_res.params['freq_1'].value
+        f2 = fit_res.params['freq_2'].value
+        A1 = fit_res.params['amp_1'].value
+        A2 = fit_res.params['amp_2'].value
+        tau1 = fit_res.params['tau_1'].value
+        tau2 = fit_res.params['tau_2'].value
+
+        textstr = ('$A_1$: {:.3f}       \t$A_2$: {:.3f} \n'.format(A1, A2) +
+                   '$f_1$: {:.3f} MHz\t$f_2$: {:.3f} MHz \n'.format(
+                        f1*1e-6, f2*1e-6) +
+                   r'$\tau _1$: {:.2f} $\mu$s'.format(tau1*1e6) +
+                   '  \t'+r'$\tau _2$: {:.2f}$\mu$s'.format(tau2*1e6))
+
         ax.text(0.4, 0.95, textstr,
                 transform=ax.transAxes, fontsize=11,
                 verticalalignment='top', bbox=self.box_props)
-
         plot_x = x
-        plot_step = plot_x[1]-plot_x[0]
 
-        ax.set_xlabel(r'Time ($\mu s$)')
         ax.set_ylabel(r'$F |1\rangle$')
-        ax.set_title('%s: Double Frequency analysis' % self.scan_start)
-        ax.set_xlim(plot_x.min()-plot_step/2., plot_x.max()+plot_step/2.)
-
-        ax.plot(plot_x, y, 'bo')
-        ax.plot(plot_x[:-4], self.fit_plot, 'r-')
-
+        ax.set_title('%s: Double Frequency analysis' % self.timestamp)
+        ax.set_xlabel(r'Time ($\mu s$)')
+        ax.plot(plot_x*1e6, y, 'bo')
+        ax.plot(plot_x[:-4]*1e6, self.fit_plot, 'r-')
         fig.tight_layout()
-        self.save_fig(fig)
+        self.save_fig(fig, **kw)
 
     def fit(self, sweep_values, measured_values):
         Double_Cos_Model = fit_mods.DoubleExpDampOscModel
-        fourier_max_pos = a_tools.peak_finder_v2(np.arange(1, len(sweep_values)/2, 1),
-                                                 abs(np.fft.fft(measured_values))[
-                                                     1:len(measured_values)//2],
-                                                 window_len=1, perc=95)
+        fourier_max_pos = a_tools.peak_finder_v2(
+            np.arange(1, len(sweep_values)/2, 1),
+            abs(np.fft.fft(measured_values))[1:len(measured_values)//2],
+            window_len=1, perc=95)
         if len(fourier_max_pos) == 1:
             freq_guess = 1./sweep_values[-1] * \
                 (fourier_max_pos[0]+np.array([-1, 1]))
         else:
             freq_guess = 1./sweep_values[-1]*fourier_max_pos
-        # print(abs(np.fft.fft(measured_values))[1:len(measured_values)/2])
         Double_Cos_Model.set_param_hint(
-            'tau_1', value=10., min=1., max=250., vary=True)
+            'tau_1', value=.3*sweep_values[-1], vary=True)
         Double_Cos_Model.set_param_hint(
-            'tau_2', value=9., min=1., max=250., vary=True)
-        # Double_Cos_Model.set_param_hint('tau_2',expr='tau_1', min = 1., max = 250.)
+            'tau_2', value=.3*sweep_values[-1], vary=True)
         Double_Cos_Model.set_param_hint(
-            'freq_1', value=freq_guess[0], min=0)  # 9.9
+            'freq_1', value=freq_guess[0], min=0)
         Double_Cos_Model.set_param_hint(
-            'freq_2', value=freq_guess[1], min=0)  # 8.26
-        # , min = -2*np.pi, max = 2* np.pi)
+            'freq_2', value=freq_guess[1], min=0)
         Double_Cos_Model.set_param_hint('phase_1', value=1*np.pi/2.)
-        # , min = -2*np.pi, max = 2* np.pi)
-        Double_Cos_Model.set_param_hint('phase_2', value=-3*np.pi/2.)
+        Double_Cos_Model.set_param_hint('phase_2', value=3*np.pi/2.)
         Double_Cos_Model.set_param_hint(
             'amp_1', value=0.25, min=0.1, max=0.4, vary=True)
         Double_Cos_Model.set_param_hint(
             'amp_2', value=0.25, min=0.1, max=0.4, vary=True)
-        # Double_Cos_Model.set_param_hint('amp_2',expr='0.5-amp_1', vary=False)
         Double_Cos_Model.set_param_hint('osc_offset', value=0.5, min=0, max=1)
         params = Double_Cos_Model.make_params()
-        # if self.fitparams_guess:
-        #     for key, val in self.fitparams_guess.items():
-        #         if key in params:
-        #             params[key].value = val
         fit_res = Double_Cos_Model.fit(data=measured_values,
                                        t=sweep_values,
                                        params=params)
         self.fit_plot = fit_res.model.func(sweep_values, **fit_res.best_values)
         return fit_res
 
-    def save_fig(self, fig, figname=None, xlabel='x', ylabel='y',
+    def save_fig(self, fig, figname='_DoubleFreq_', xlabel='x', ylabel='y',
                  fig_tight=True, **kw):
         plot_formats = kw.pop('plot_formats', ['png'])
         fail_counter = False
@@ -5345,7 +5311,7 @@ class DoubleFrequency(object):
             plot_formats = [plot_formats]
         for plot_format in plot_formats:
             if figname is None:
-                figname = (self.scan_start+'_DoubleFreq_'+'.'+plot_format)
+                figname = (self.timestamp+figname+'.'+plot_format)
             else:
                 figname = (figname+'.' + plot_format)
             self.savename = os.path.abspath(os.path.join(
