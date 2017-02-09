@@ -2,6 +2,9 @@ language: python
 notifications:
   email: false
 
+os:
+  - linux
+  - osx
 python:
   - "3.5"
   # whitelist
@@ -15,6 +18,12 @@ install:
     - pip install -r develop_requirements.txt
     - pip install qcodes # Added explictly here
     - python setup.py develop
+
+before_script: # configure a headless display to test plot generation
+- "export DISPLAY=:99.0"
+- "sh -e /etc/init.d/xvfb start"
+- sleep 3 # give xvfb some time to start
+
 # command to run tests
 script:
     - python  pycqed/test.py -v --skip-coverage
