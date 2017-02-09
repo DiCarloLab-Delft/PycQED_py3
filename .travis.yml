@@ -4,7 +4,7 @@ notifications:
 
 os:
   - linux
-  - osx
+
 python:
   - "3.5"
   # whitelist
