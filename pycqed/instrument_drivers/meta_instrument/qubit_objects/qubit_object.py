@@ -240,10 +240,11 @@ class Transmon(Qubit):
 
     def calculate_frequency(self, EC=None, EJ=None, assymetry=None,
                             dac_voltage=None, flux=None,
-                            no_transitions=1):
+                            no_transitions=1, calc_method='Hamiltonian'):
         '''
         Calculates transmon energy levels from the full transmon qubit
         Hamiltonian.
+
 
         Parameters of the qubit object are used unless specified.
         Flux can be specified both in terms of dac voltage or flux but not

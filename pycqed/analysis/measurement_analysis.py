@@ -5239,8 +5239,7 @@ class DoubleFrequency(MeasurementAnalysis):
         self.fit_res = fit_res
         print(x[1])
 
-        fig = plt.figure()
-        ax = fig.add_subplot(111)
+        fig, ax = plt.subplots()
         self.box_props = dict(boxstyle='Square', facecolor='white', alpha=0.8)
 
         f1 = fit_res.params['freq_1'].value
