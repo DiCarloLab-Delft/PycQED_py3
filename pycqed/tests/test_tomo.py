@@ -18,16 +18,17 @@ try:
 
         def test_tomo_analysis_cardinal_state(self):
 
-            # res = tomo.analyse_tomo(label='Tomo_{}'.format(31),
-            #                         target_cardinal=None,
-            #                         MLE=True)
-            res = tomo.analyse_tomo(label='Tomo_{}'.format(31), target_cardinal=31,
-                                    MLE=True)
+            res = ma.Tomo_Multiplexed(label='Tomo_{}'.format(31),
+                                      target_cardinal=None,
+                                      MLE=False)
+            res = ma.Tomo_Multiplexed(label='Tomo_{}'.format(31),
+                                      target_cardinal=31,
+                                      MLE=True)
 
         def test_tomo_analysis_bell_state(self):
-            res = tomo.analyse_tomo(label='Tomo_{}'.format(31), target_cardinal=None,
-                                    target_bell=0,
-                                    MLE=False)
+            res = ma.Tomo_Multiplexed(label='Tomo_{}'.format(31), target_cardinal=None,
+                                      target_bell=0,
+                                      MLE=False)
 
     class Test_tomo_helpers(unittest.TestCase):
 
