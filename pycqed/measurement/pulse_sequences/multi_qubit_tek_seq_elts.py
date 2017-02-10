@@ -824,7 +824,7 @@ def preload_kernels_func(distortion_dict):
                     cached_kernels.update({kernel: kernel_vec})
     return output_dict
 
-def two_qubit_tomo_cphase_cardinal(bell_state,
+def two_qubit_tomo_cphase_cardinal(cardinal_state,
                         operation_dict,
                         qS,
                         qCZ,
@@ -840,7 +840,7 @@ def two_qubit_tomo_cphase_cardinal(bell_state,
     '''
     sequencer_config = operation_dict['sequencer_config']
 
-    seq_name = '2_qubit_Bell_Tomo_%d_seq' % bell_state
+    seq_name = '2_qubit_CPhase_Cardinal_Tomo_%d_seq' % cardinal_state
     seq = sequence.Sequence(seq_name)
     station.pulsar.update_channel_settings()
     el_list = []
@@ -885,62 +885,11 @@ def two_qubit_tomo_cphase_cardinal(bell_state,
     operation_dict['CZ_corr ' + qCZ]['refpoint'] = 'simultaneous'
 
     ################
-    # Bell states  #
+    # cardinal states  #
     ################
-    if bell_state == 0:  # |Phi_m>=|00>-|11>
-        gate1 = 'Y90 ' + qS
-        gate2 = 'Y90 ' + qCZ
-        after_pulse = 'mY90 ' + qCZ
-    elif bell_state == 1:  # |Phi_p>=|00>+|11>
-        gate1 = 'mY90 ' + qS
-        gate2 = 'Y90 ' + qCZ
-        after_pulse = 'mY90 ' + qCZ
-    elif bell_state == 2:  # |Psi_m>=|01> - |10>
-        gate1 = 'Y90 ' + qS
-        gate2 = 'mY90 ' + qCZ
-        after_pulse = 'mY90 ' + qCZ
-    elif bell_state == 3:  # |Psi_p>=|01> + |10>
-        gate1 = 'mY90 ' + qS
-        gate2 = 'mY90 ' + qCZ
-        after_pulse = 'mY90 ' + qCZ
-
-    # Below are states with the initial pulse on the CP-qubit disabled
-    # these are not Bell states but are used for debugging
-    elif bell_state == 0+10:  # |00>+|11>
-        gate1 = 'Y90 ' + qS
-        gate2 = 'I ' + qCZ
-        after_pulse = 'mY90 ' + qCZ
-    elif bell_state == 1+10:
-        gate1 = 'mY90 ' + qS
-        gate2 = 'I ' + qCZ
-        after_pulse = 'mY90 ' + qCZ
-    elif bell_state == 2+10:  # |01> - |10>
-        gate1 = 'Y90 ' + qS
-        gate2 = 'I ' + qCZ
-        after_pulse = 'mY90 ' + qCZ
-    elif bell_state == 3+10:
-        gate1 = 'mY90 ' + qS
-        gate2 = 'I ' + qCZ
-        after_pulse = 'mY90 ' + qCZ
-
-    # Below are states with the initial pulse on the SWAP-qubit disabled
-    # these are not Bell states but are used for debugging
-    elif bell_state == 0 + 20:  # |00>+|11>
-        gate1 = 'I ' + qS
-        gate2 = 'Y90 ' + qCZ
-        after_pulse = 'mY90 ' + qCZ
-    elif bell_state == 1 + 20:  # |01> - |10>
-        gate1 = 'I ' + qS
-        gate2 = 'Y90 ' + qCZ
-        after_pulse = 'mY90 ' + qCZ
-    elif bell_state == 2 + 20:
-        gate1 = 'I ' + qS
-        gate2 = 'mY90 ' + qCZ
-        after_pulse = 'mY90 ' + qCZ
-    elif bell_state == 3 + 20:
-        gate1 = 'mY90 ' + qS
-        gate2 = 'mY90 ' + qCZ
-        after_pulse = 'mY90 ' + qCZ
+    # here select the qubit gates (depending on cardinal_state)
+    prep_idx_qS = int(cardinal_state % 6)
+    prep_idx_qCZ = int(((cardinal_state - prep_idx_qS)/6) % 6)
 
     print('Compensation qCP {:.3f}'.format(
         operation_dict['CZ_corr ' + qCZ]['amplitude']))
@@ -951,9 +900,9 @@ def two_qubit_tomo_cphase_cardinal(bell_state,
     #  Here the actual pulses of all elements get defined  #
     ########################################################
     # We start by replacing the state prepartion pulses
-    base_sequence[0] = gate1
-    base_sequence[1] = gate2
-    base_sequence[7] = after_pulse
+    base_sequence[0] = tomo_list_qS[prep_idx_qS]
+    base_sequence[1] = tomo_list_qCZ[prep_idx_qCZ]
+    base_sequence[7] = 'I ' + qCZ
 
     seq_pulse_list = []
 
@@ -992,4 +941,5 @@ def two_qubit_tomo_cphase_cardinal(bell_state,
     station.pulsar.program_awg(seq, *el_list, verbose=verbose)
 
     return seq, el_list
+
 

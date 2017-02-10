@@ -336,5 +336,4 @@ def tomo2Q_cphase_cardinal(cardinal_state, device, qS_name, qCZ_name, CPhase=Tru
                                          qS_name,
                                          qCZ_name,
                                          mmt_label))
-    tomo.analyse_tomo(MLE=MLE, target_bell=cardinal_state%10)
     # return tomo_swf.seq
