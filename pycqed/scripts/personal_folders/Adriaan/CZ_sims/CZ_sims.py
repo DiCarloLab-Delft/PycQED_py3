@@ -9,6 +9,8 @@ parameters, specifically those in the conversion from theta to Volts,
 more so than the individual lambda coefficients.
 """
 import numpy as np
+import qutip as qtp
+from pycqed.measurement.waveform_control_CC.waveform import martinis_flux_pulse
 
 
 def SetupFluxPulsing(manifold=1, g1=250e6):
@@ -65,7 +67,7 @@ def theta_from_V(V):
     # //print eps, f01
 
 
-def V_from_theta(theta):
+def V_from_theta(theta, manifold):
     eps = 2*g/np.tan(theta)
     if(manifold == 1):
         V = V0*np.acos(((Fbus+eps+Ec)/(f01_max+Ec))**2)
@@ -74,7 +76,8 @@ def V_from_theta(theta):
     return V
 
 
-def eps_from_V(V):
+def eps_from_V(V, manifold):
+    # detuning from V
     if(manifold == 1):
         eps = ((f01_max+Ec)*np.sqrt(np.cos(V/V0))-Ec)-Fbus
     else:
@@ -82,42 +85,48 @@ def eps_from_V(V):
     return eps
 
 
-def getFlux_pulse(tp, thetamax,
+def getFlux_pulse(tau_pulse, thetamax,
                   frac,  # numerical overhead?
                   manifold=2,
-                  lambda1=1, lambda2=0, lambda3=0):
+                  lambda1=1, lambda2=0, lambda3=0, lambda4=0,
+                  V_max=1):
     """
+    Input args:
+        tau_pulse: time pulse in ns
+        thetamax: final angle
+        frac: numerical overhead?
+        manifold: 1 or 2 excitation manifold
+
     Replace this with waveform
     """
     SetupFluxPulsing(manifold=manifold)
-    numt = tp*frac+1
+    numt = tau_pulse*frac+1
     ThetaVec = np.zeros(numt)
+    x = np.arange(numt)  # hacked in here to get what I think is x
     lambda0 = 1-lambda1
-    Thetamin = theta_from_V(0, manifold=manifold)
+
+    thetamin = theta_from_V(0, manifold=manifold)
     # this formula seems wrong
 
     # Martinis version
-    dThetavec = lambda0+lambda1*(1-cos(1*2*pi*x/tp))/2+lambda2*(1-cos(2*2*pi*x/tp))/2 // + lambda2*(
-        1-cos(2*2*pi*x/tp)) // + lambda3*(1-cos(3*2*pi*x/tp)) + lambda4*(1-cos(4*2*pi*x/tp))
-    # My version
-    # dThetavec=lambda0+lambda1*sin(2*pi*x/tp/2)//+lambda2*sin(2*pi*x/tp*3/2)+lambda3*sin(2*pi*x/tp*5/2)
+    dThetavec = lambda0 + lambda1*(1-np.cos(1*2*np.pi*x/tau_pulse))/2 + \
+        lambda2*(1-np.cos(2*2*np.pi*x/tau_pulse))/2 // + \
+        lambda2*(1-np.cos(2*2*np.pi*x/tau_pulse)) // + \
+        lambda3*(1-np.cos(3*2*np.pi*x/tau_pulse)) + \
+        lambda4*(1-np.cos(4*2*np.pi*x/tau_pulse))
 
     # Scaling the dTheta vector
-    # Wavestats/q dThetavec
-    Thetavec = ThetaMin+dThetaVec*(ThetaMax-ThetaMin)/V_max
-
+    ThetaVec = thetamin+dThetavec*(thetamax-thetamin)/V_max
     # For debugging only: square pulse
     # ThetaVec=ThetaMax;
 
-    # duplicate/o ThetaVec Vvec
-    # duplicate/o ThetaVec DetVec
-    # Vvec = Nan
-    # Detvec = Nan
+    VVec = V_from_theta(ThetaVec, manifold=manifold)
+    eps_vec = eps_from_V(VVec, manifold=manifold)
 
-    # Vvec[] = getVfromTheta(ThetaVec[p], manifold=manifold)
+    return eps_vec
 
 
-def evolveH(tp, ThetaMax, frac, manifold=2, lambda1=1, lambda2=0):
+def evolveH(tau_pulse, ThetaMax, frac, manifold=2, lambda1=1, lambda2=0):
     """
     Evolves the time-dependent hamiltonian as defined by the detuning vector.
 
@@ -128,10 +137,11 @@ def evolveH(tp, ThetaMax, frac, manifold=2, lambda1=1, lambda2=0):
     SetupFluxPulsing(manifold=manifold)
 
     # Get the detuning vector
-    eps_vec = getFluxPulse(
-        tp, ThetaMax, frac, manifold=manifold, lambda1=lambda1, lambda2=lambda2)
+    eps_vec = getFlux_pulse(
+        tau_pulse, ThetaMax, frac,
+        manifold=manifold, lambda1=lambda1, lambda2=lambda2)
     numT = len(eps_vec)
-    dT = taup/numT
+    dT = tau_pulse/numT
 
     thisH = np.empty(2, 2)
     thisHm = np.empty(2, 2)
@@ -146,14 +156,14 @@ def evolveH(tp, ThetaMax, frac, manifold=2, lambda1=1, lambda2=0):
     # setscale/P x, 0, dt, ReA11Vec
 
     # make/o/n = (2)/C PsiT = 0
-    Delta = getDetFromV(0, manifold=manifold)
-    Em = Delta/2-sqrt(g ^ 2+(Delta/2) ^ 2)
-    # Pnorm = sqrt(1+(Em/g) ^ 2)
+    Delta = eps_from_V(0, manifold=manifold)
+    Em = Delta/2-np.sqrt(g ^ 2+(Delta/2) ^ 2)
+    Pnorm = np.sqrt(1+(Em/g) ^ 2)
 
     # get eigenbasis in OFF state
-    # PsiT[0] = Em/g
-    # PsiT[1] = 1
-    # PsiT /= Pnorm
+    PsiT[0] = Em/g
+    PsiT[1] = 1
+    PsiT /= Pnorm
     # duplicate/o PsiT PsiStart
 
     # matrixop/o/c  overlap = PsiStart ^ h x PsiT
@@ -161,27 +171,26 @@ def evolveH(tp, ThetaMax, frac, manifold=2, lambda1=1, lambda2=0):
     # PhaseVec[0] = atan2(imag(PsiT[1]), real(PsiT[1]))/pi
     # ReA11Vec[0] = real(PsiT[1])
 
-    # variable i = 1
-    # for i in range(numT):
-    #     # construct the hamiltonian
-    #     thisH[0][0] = DetVec[i-1]
-    #     thisH[0][1] = g
-    #     thisH[1][0] = g
-    #     thisH[1][1] = 0 # Why is there a zero here?
+    for i in range(numT):
+        # construct the hamiltonian
+        thisH[0][0] = eps_vec[i]
+        thisH[0][1] = g
+        thisH[1][0] = g
+        thisH[1][1] = 0  # Why is there a zero here?
 
-        # Jos Thijssen's trick: see his book
-        # thisHm = (Eye+cmplx(0, -1)*thisH/2*dt*2*pi)
-        # thisHp = (Eye+cmplx(0, 1) * thisH/2*dt*2*pi)
-        # matrixop/o/c PsiT = inv(thisHp) x thisHm x PsiT
+    # Jos Thijssen's trick: see his book
+    thisHm = (Eye + (0 + 1j*-1)*thisH/2*dt*2*pi)
+    thisHp = (Eye + (0 + 1j*1) * thisH/2*dt*2*pi)
+    # matrixop/o/c PsiT = inv(thisHp) x thisHm x PsiT
 
-        # normalize
-        # matrixop/o  foo = PsiT ^ h x PsiT
-        # PsiT = sqrt(foo[0])
+    # normalize
+    # matrixop/o  foo = PsiT ^ h x PsiT
+    # PsiT = sqrt(foo[0])
 
-        # matrixop/o/c  overlap = PsiStart ^ h x PsiT
-        # Pop11vec[i] = cabs(overlap[0]) ^ 2
-        # PhaseVec[i] = atan2(imag(PsiT[1]), real(PsiT[1]))
-        # ReA11Vec[i] = real(PsiT[1])
+    # matrixop/o/c  overlap = PsiStart ^ h x PsiT
+    # Pop11vec[i] = cabs(overlap[0]) ^ 2
+    # PhaseVec[i] = atan2(imag(PsiT[1]), real(PsiT[1]))
+    # ReA11Vec[i] = real(PsiT[1])
 
     # phaseunwrap(PhaseVec)
     # PhaseVec = pi
@@ -205,9 +214,80 @@ print('Theta90?: {:.4g} (rad)'.format(theta_from_V(V0)))
 
 # Below here is helper functions for my own model using qutip
 
+
 def ket_to_phase(states):
     phases = np.zeros(len(states))
     for i in range(len(states)):
-        phases[i] = np.arctan2(float(np.imag(states[i][1])),
-                               float(np.real(states[i][1])))
+        phases[i] = np.arctan2(float(np.imag(states[i][0])),
+                               float(np.real(states[i][0])))
     return phases
+
+
+def simulate_CZ_trajectory(length, lambda_coeffs, theta_f,
+                           f_01_max,
+                           f_interaction,
+                           J2,
+                           E_c,
+                           dac_flux_coefficient=1,
+                           asymmetry=0,
+                           sampling_rate=2e9, return_all=False):
+    """
+    Input args:
+        tp: pulse length
+    Returns:
+        picked_up_phase in degree
+        leakage         population leaked to the 02 state
+    N.B. the function only returns the quantities below if return_all is True
+        res1:           vector of qutip results for 1 excitation
+        res2:           vector of qutip results for 1 excitation
+        eps_vec :       vector of detunings as function of time
+        tlist:          vector of times used in the simulation
+    """
+
+    psi0 = qtp.basis(2, 0)
+
+    Hx = qtp.sigmax()*2*np.pi  # so that freqs are real and not radial
+    Hz = qtp.sigmaz()*2*np.pi  # so that freqs are real and not radial
+
+    def J1_t(t, args=None):
+        # if there is only one excitation, there is no interaction
+        return 0
+
+    def J2_t(t, args=None):
+        return J2
+
+    tlist = (np.arange(0, length, 1/sampling_rate))
+
+    f_pulse = martinis_flux_pulse(length, lambda_coeffs, theta_f,
+                                  f01_max, f_interaction, J2,
+                                  Ec, dac_flux_coefficient,
+                                  return_unit='eps',
+                                  sampling_rate=sampling_rate)
+
+    eps_vec = np.ones(len(tlist))*f_pulse[0]
+    eps_vec[0:len(f_pulse)] = f_pulse
+
+    # function used for qutip simulation
+    def eps_t(t, args=None):
+        idx = np.argmin(abs(tlist-t))
+        return float(eps_vec[idx])
+
+    H1_t = [[Hx, J1_t], [Hz, eps_t]]
+    H2_t = [[Hx, J2_t], [Hz, eps_t]]
+
+    res1 = qtp.mesolve(H1_t, psi0, tlist, [], [])  # ,progress_bar=False )
+    res2 = qtp.mesolve(H2_t, psi0, tlist, [], [])  # ,progress_bar=False )
+
+    phases1 = (ket_to_phase(res1.states) % (2*np.pi))/(2*np.pi)*360
+    phases2 = (ket_to_phase(res2.states) % (2*np.pi))/(2*np.pi)*360
+    phase_diff_deg = (phases2 - phases1) % 360
+    leakage_vec = 1-(qtp.expect(qtp.sigmaz(), res2.states[:])+1)/2
+
+    leakage = leakage_vec[-1]
+    picked_up_phase = phase_diff_deg[-1]
+    print('Picked up phase: {:.1f} (deg) \nLeakage: \t {:.3f} (%)'.format(
+        picked_up_phase, leakage*100))
+    if return_all:
+        return picked_up_phase, leakage, res1, res2, eps_vec, tlist
+    else:
+        return picked_up_phase, leakage

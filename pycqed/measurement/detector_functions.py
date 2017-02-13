@@ -97,6 +97,7 @@ class Soft_Detector(Detector_Function):
 ##########################################################################
 
 
+
 class Dummy_Detector_Hard(Hard_Detector):
 
     def __init__(self, delay=0, noise=0, **kw):
@@ -893,39 +894,30 @@ class QX_Detector(Soft_Detector):
         return f
 
 
-class Source_frequency_detector(Soft_Detector):
-
-    def __init__(self, source, **kw):
-        self.set_kw()
-        self.S = source
-        self.detector_control = 'soft'
-        self.name = 'Source frequency detector'
-        self.value_names = ['frequency']
-        self.value_units = ['Hz']
-        self.i = 0
-
-    def acquire_data_point(self, **kw):
-        return self.S.get('frequency')
-
-
 class Function_Detector(Soft_Detector):
 
-    def __init__(self, sweep_function, result_keys, value_names=None,
-                 value_units=None, msmt_kw={}, **kw):
-        super(Function_Detector, self).__init__()
-        self.sweep_function = sweep_function
-        self.result_keys = result_keys
+    def __init__(self, function, parameters_dictionary, value_names=None,
+                 value_units=None):
+        super().__init__()
+        self.function = function
+        self.parameters_dictionary = parameters_dictionary
         self.value_names = value_names
         self.value_units = value_units
-        self.msmt_kw = msmt_kw
-        if self.value_names is None:
-            self.value_names = result_keys
         if self.value_units is None:
-            self.value_units = [""] * len(result_keys)
+            self.value_units = ['a.u.'] * len(value_names)
 
-    def acquire_data_points(self, **kw):
-        result = self.sweep_function(**self.msmt_kw)
-        return [result[key] for key in result.keys()]
+    def acquire_data_point(self, **kw):
+        measurement_kwargs = {}
+        for key, item in self.parameters_dictionary.items():
+            if hasattr(item, 'get'):
+                value = item.get()
+            else:
+                value = item
+            measurement_kwargs[key] = value
+        print(measurement_kwargs)
+        result = self.function(**measurement_kwargs)
+
+        return result
 
 
 class Detect_simulated_hanger_Soft(Soft_Detector):
