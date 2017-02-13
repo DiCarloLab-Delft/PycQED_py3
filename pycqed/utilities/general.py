@@ -87,7 +87,8 @@ def load_settings_onto_instrument(instrument, load_from_instr=None, folder=None,
         while success is False and count < 10:
             try:
                 if folder is None:
-                    folder = a_tools.get_folder(timestamp, older_than, **kw)
+                    folder = a_tools.get_folder(timestamp=timestamp,
+                                                older_than=older_than, **kw)
                 else:
                     folder = folder
                 filepath = a_tools.measurement_filename(folder)
@@ -101,7 +102,7 @@ def load_settings_onto_instrument(instrument, load_from_instr=None, folder=None,
                 success = True
             except:
                 older_than = os.path.split(folder)[0][-8:] \
-                             +'_'+ os.path.split(folder)[1][:6]
+                             + '_' + os.path.split(folder)[1][:6]
                 folder = None
                 success = False
             count += 1

@@ -20,6 +20,7 @@ from scipy.signal import argrelextrema
 from .tools.file_handling import *
 from .tools.data_manipulation import *
 from .tools.plotting import *
+import colorsys as colors
 
 try:
     # currently not recognized, does not do anything
@@ -1233,7 +1234,7 @@ def color_plot(x, y, z, fig, ax, cax=None,
     y_vertices[1:-1] = (y[:-1]+y[1:])/2.
     y_vertices[0] = y[0] - (y[1]-y[0])/2.
     y_vertices[-1] = y[-1] + (y[-1]-y[-2])/2.
-    cmap_chosen = kw.get('cmap_chosen','viridis')
+    cmap_chosen = kw.get('cmap_chosen', 'viridis')
 
     # This version (below) does not plot the last row, but it possibly fixes
     # an issue where it wouldn't plot at all on one computer
@@ -1500,3 +1501,84 @@ def solve_quadratic_equation(a, b, c, verbose=False):
         if verbose:
             print("This equation has two solutions: ", x1, " or", x2)
         return [x1, x2]
+
+
+# def find_min(x, y, min_target=None, return_fit=False, perc=30):
+#     from scipy.signal import argrelextrema
+#     from lmfit.models import QuadraticModel
+#     from functools import reduce
+#     # filtering through percentiles
+#     th_perc = np.percentile(y, perc)
+#     mask = np.where(y < th_perc, True, False)
+
+#     # function that multiplies all elements in vector
+#     multiply_vec = lambda vec: reduce(lambda x, y: x*y, vec)
+
+#     # function that multiplies all elements in vector from idx_min
+#     if min_target is None:
+#         idx_min = np.argmin(y)
+#     else:
+#         local_min_array = argrelextrema(y, np.less)[0]
+#         idx_min = local_min_array[
+#             np.argmin(np.abs(x[local_min_array]-min_target))]
+
+#     mask_ii = lambda ii: multiply_vec(
+#         mask[min(idx_min, ii):max(idx_min, ii+1)])
+#     # function that returns mask_ii applied for all elements of the vector mask
+#     continuous_mask = np.array(
+#         [m for m in map(mask_ii, np.arange(len(mask)))], dtype=np.bool)
+#     # doing the fit
+#     my_fit_model = QuadraticModel()
+
+#     # !!!!! @Ramiro the continuous mask does not seem to work (all False array)
+#     # I used the regular mask for now. We should discuss this
+#     # x_fit = x[continuous_mask]
+#     # y_fit = y[continuous_mask]
+
+#     x_fit = x[mask]
+#     y_fit = y[mask]
+#     my_fit_params = my_fit_model.guess(data=y_fit, x=x_fit)
+#     my_fit_res = my_fit_model.fit(data=y_fit,
+#                                   x=x_fit,
+#                                   pars=my_fit_params)
+#     x_min = -0.5*my_fit_res.best_values['b']/my_fit_res.best_values['a']
+#     y_min = my_fit_model.func(x_min, **my_fit_res.best_values)
+
+#     if return_fit:
+#         return x_min, y_min, my_fit_res
+#     else:
+#         return x_min, y_min
+
+def find_min(x, y, return_fit=False, perc=30):
+    from lmfit.models import QuadraticModel
+    from functools import reduce
+    # filtering through percentiles
+    th_perc = np.percentile(y, perc)
+    mask = np.where(y<th_perc,True,False)
+    # function that multiplies all elements in vector
+    multiply_vec = lambda vec: reduce(lambda x,y: x*y,vec)
+    # function that multiplies all elements in vector from idx_min
+    idx_min = np.argmin(y)
+    mask_ii = lambda ii: multiply_vec(mask[min(idx_min,ii):max(idx_min,ii+1)])
+    # function that returns mask_ii applied for all elements of the vector mask
+    continuous_mask = np.array([m for m in map(mask_ii,np.arange(len(mask)))],dtype=np.bool)
+    # doing the fit
+    my_fit_model = QuadraticModel()
+    x_fit = x[continuous_mask]
+    y_fit = y[continuous_mask]
+    my_fit_params = my_fit_model.guess(data=y_fit, x=x_fit)
+    my_fit_res = my_fit_model.fit(data=y_fit,
+                                  x=x_fit,
+                                  pars=my_fit_params)
+    x_min = -0.5*my_fit_res.best_values['b']/my_fit_res.best_values['a']
+    y_min = my_fit_model.func(x_min,**my_fit_res.best_values)
+
+    if return_fit:
+        return x_min, y_min, my_fit_res
+    else:
+        return x_min, y_min
+
+def get_color_order(i, max_num):
+    # take a blue to red scale from 0 to max_num
+    # uses HSV system, H_red = 0, H_green = 1/3 H_blue=2/3
+    return colors.hsv_to_rgb(2.*float(i)/(float(max_num)*3.), 1., 1.)

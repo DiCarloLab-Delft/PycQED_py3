@@ -1,50 +1,101 @@
 # module for visualizing sequences.
 #
 # author: Wolfgang Pfaff
-# modified by: Adriaan Rol
+# modified by: Adriaan Rol and Ramiro Sagastizabal
 
 import numpy as np
 from matplotlib import pyplot as plt
+from qcodes.plots.pyqtgraph import QtPlot
+from qcodes.plots.colors import color_cycle
 
 
-def show_element_dclab(element, delay=True, channels='all', axs=None):
-    if axs is None:
-        fig, axs = plt.subplots(1,1, figsize=(16,8))
-    axs2 = axs.twinx()
-    colors_dict = {'ch1':'red',
-                   'ch1_marker1':'orangered',
-                   'ch1_marker2':'darkred',
-                   'ch2':'gold',
-                   'ch2_marker1':'orange',
-                   'ch2_marker2':'yellow',
-                   'ch3':'green',
-                   'ch3_marker1':'lime',
-                   'ch3_marker2':'turquoise',
-                   'ch4':'darkblue',
-                   'ch4_marker1':'indigo',
-                   'ch4_marker2':'navy'}
+def show_element_dclab(element, delay=True, channels='all', ax=None):
+    if ax is None:
+        add_extra_labs = True
+        fig, ax = plt.subplots(1, 1, figsize=(16, 8))
+    else:
+        # prevents super long legends if plots are combined
+        add_extra_labs = False
+    axs2 = ax.twinx()
+    colors_dict = {'ch1': 'red',
+                   'ch1_marker1': 'orangered',
+                   'ch1_marker2': 'darkred',
+                   'ch2': 'gold',
+                   'ch2_marker1': 'orange',
+                   'ch2_marker2': 'yellow',
+                   'ch3': 'green',
+                   'ch3_marker1': 'lime',
+                   'ch3_marker2': 'turquoise',
+                   'ch4': 'darkblue',
+                   'ch4_marker1': 'indigo',
+                   'ch4_marker2': 'navy'}
     t_vals, outputs_dict = element.waveforms()
     t_vals = t_vals*1e9
     for key in outputs_dict:
         if 'marker' in key:
-            axs2.plot(t_vals, outputs_dict[key],label=key,color=colors_dict[key])
+            axs2.plot(
+                t_vals, outputs_dict[key], label=key, color=colors_dict[key])
         else:
-            axs.plot(t_vals, outputs_dict[key],label=key,color=colors_dict[key])
-    axs.set_xlabel('Time (ns)')
-    axs.set_ylabel('Analog output (V)')
-    axs2.set_ylabel('Marker output (V)')
+            ax.plot(
+                t_vals, outputs_dict[key], label=key, color=colors_dict[key])
+    ax.set_xlabel('Time (ns)')
+    ax.set_ylabel('Analog output (V)')
+    if add_extra_labs:  # only set it once otherwise we end up with 20 labels
+        axs2.set_ylabel('Marker output (V)')
 
     hi = element._channels['ch1']['high']
     lo = element._channels['ch1']['low']
-    axs.set_ylim(lo-0.1*(hi-lo),hi+0.1*(hi-lo))
+    ax.set_ylim(lo-0.1*(hi-lo), hi+0.1*(hi-lo))
     hi = element._channels['ch1_marker1']['high']
     lo = element._channels['ch1_marker1']['low']
-    axs2.set_ylim(lo-0.1*(hi-lo),hi+0.1*(hi-lo))
+    axs2.set_ylim(lo-0.1*(hi-lo), hi+0.1*(hi-lo))
 
-    axs.set_xlim(t_vals.min(),t_vals.max())
+    ax.set_xlim(t_vals.min(), t_vals.max())
+    if add_extra_labs:
+        ax.legend(loc='best')
+    return ax
 
-    axs.legend(loc='best')
-    return  axs
+
+def show_element_pyqt(element, QtPlot_win=None,
+                      color_idx=None,
+                      channels=['ch1', 'ch2', 'ch3', 'ch4']):
+    if QtPlot_win is None:
+        QtPlot_win = QtPlot(windowTitle='Seq_plot', figsize=(600, 400))
+    # FIXME: Add a legend
+    t_vals, outputs_dict = element.waveforms()
+    if type(channels) == str:
+        channels = [channels]
+
+    t_vals = t_vals*1e9
+    xlabel = 'Time (ns)'
+    for i, ch in enumerate(channels):
+        ylabel = 'Output ch {} (V)'.format(ch)
+        if color_idx == None:
+            color = color_cycle[i % len(color_cycle)]
+        else:
+            color = color_cycle[color_idx]
+        if i+1 > len(QtPlot_win.subplots):
+            QtPlot_win.win.nextRow()
+            QtPlot_win.add(
+                x=t_vals, y=outputs_dict[ch], name=ch,
+                color=color,
+                subplot=i+1,
+                symbol='o', symbolSize=5,
+                xlabel=xlabel, ylabel=ylabel)
+        else:
+            QtPlot_win.add(
+                x=t_vals, y=outputs_dict[ch], name=ch,
+                color=color,
+                subplot=i+1,
+                symbol='o', symbolSize=5,
+                xlabel=xlabel, ylabel=ylabel)
+    # links all the x-axes
+    p0 = QtPlot_win.subplots[0]
+    for j, p in enumerate(QtPlot_win.subplots):
+        if j > 0:
+            p.setXLink(p0)
+    return QtPlot_win
+
 
 
 def show_wf(tvals, wf, name='', ax=None, ret=None, dt=None):

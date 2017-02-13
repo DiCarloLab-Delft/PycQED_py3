@@ -1,11 +1,12 @@
 import logging
 import numpy as np
 from copy import deepcopy
-from ..waveform_control import element
-from ..waveform_control import pulse
-from ..waveform_control import sequence
+from pycqed.measurement.waveform_control import element
+from pycqed.measurement.waveform_control import pulse
+from pycqed.measurement.waveform_control import sequence
 from pycqed.utilities.general import add_suffix_to_dict_keys
 from pycqed.measurement.pulse_sequences.standard_elements import multi_pulse_elt
+from pycqed.measurement.pulse_sequences.standard_elements import distort_and_compensate
 
 from pycqed.measurement.pulse_sequences.single_qubit_tek_seq_elts import get_pulse_dict_from_pars
 from importlib import reload
@@ -272,7 +273,7 @@ def five_qubit_off_on(q0_pulse_pars,
         return seq_name
 
 
-def two_qubit_AllXY(pulse_dict, q0='q0', q1='q1', RO_target='all',
+def two_qubit_AllXY(operation_dict, q0='q0', q1='q1', RO_target='all',
                     sequence_type='simultaneous',
                     replace_q1_pulses_X180=False,
                     double_points=True,
@@ -283,10 +284,11 @@ def two_qubit_AllXY(pulse_dict, q0='q0', q1='q1', RO_target='all',
     Has the option of replacing pulses on q1 with pi pulses
 
     Args:
-        pulse_dict   (dict) : dictionary containing all pulse parameters
-        q0, q1        (str) : target qubits for the sequence
-        RO_target     (str) : target for the RO, can be a qubit name or 'all'
-        sequence_type (str) : sequential| interleaved|simultaneous|sandwiched
+        operation_dict (dict) : dictionary containing all pulse parameters
+        q0, q1         (str) : target qubits for the sequence
+        RO_target      (str) : target for the RO, can be a qubit name or 'all'
+        sequence_type  (str) : sequential | interleaved | simultaneous | sandwiched
+                              q0|q0|q1|q1   q0|q1|q0|q1   q01|q01      q1|q0|q0|q1
             describes the order of the AllXY pulses
         replace_q1_pulses_X180 (bool) : if True replaces all pulses on q1 with
             X180 pulses.
@@ -299,6 +301,7 @@ def two_qubit_AllXY(pulse_dict, q0='q0', q1='q1', RO_target='all',
     seq = sequence.Sequence(seq_name)
     station.pulsar.update_channel_settings()
     el_list = []
+    sequencer_config = operation_dict['sequencer_config']
 
     AllXY_pulse_combinations = [['I ', 'I '], ['X180 ', 'X180 '], ['Y180 ', 'Y180 '],
                                 ['X180 ', 'Y180 '], ['Y180 ', 'X180 '],
@@ -318,11 +321,11 @@ def two_qubit_AllXY(pulse_dict, q0='q0', q1='q1', RO_target='all',
                                     for _ in (0, 1)]
 
     if sequence_type == 'simultaneous':
-        pulse_dict = deepcopy(pulse_dict)  # prevents overwriting of dict
-        for key in pulse_dict.keys():
+        operation_dict = deepcopy(operation_dict)  # prevents overwriting of dict
+        for key in operation_dict.keys():
             if q1 in key:
-                pulse_dict[key]['refpoint'] = 'start'
-                pulse_dict[key]['pulse_delay'] = 0
+                operation_dict[key]['refpoint'] = 'start'
+                operation_dict[key]['pulse_delay'] = 0
 
     pulse_list = []
     if not replace_q1_pulses_X180:
@@ -363,13 +366,14 @@ def two_qubit_AllXY(pulse_dict, q0='q0', q1='q1', RO_target='all',
     for i, pulse_comb in enumerate(pulse_list):
         pulses = []
         for p in pulse_comb:
-            pulses += [pulse_dict[p]]
-        el = multi_pulse_elt(i, station, pulses)
+            pulses += [operation_dict[p]]
+
+        el = multi_pulse_elt(i, station, pulses, sequencer_config)
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
-
-    station.components['AWG'].stop()
-    station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+    if upload:
+        station.components['AWG'].stop()
+        station.pulsar.program_awg(seq, *el_list, verbose=verbose)
     if return_seq:
         return seq, el_list
     else:
@@ -475,7 +479,6 @@ def two_qubit_tomo_cardinal(cardinal,
                       tomo_pulse_q0,
                       tomo_pulse_q1,
                       RO_pars]
-        pulse_list[0]['pulse_delay'] += 0.01e-6
         el = multi_pulse_elt(i, station, pulse_list)
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
@@ -484,7 +487,6 @@ def two_qubit_tomo_cardinal(cardinal,
         pulses = []
         for p in pulse_comb:
             pulses += [pulse_dict[p]]
-        pulses[0]['pulse_delay'] += 0.01e-6
 
         el = multi_pulse_elt(35+i, station, pulses)
         el_list.append(el)
@@ -499,249 +501,164 @@ def two_qubit_tomo_cardinal(cardinal,
 
 
 def two_qubit_tomo_bell(bell_state,
-                        q0_pulse_pars,
-                        q1_pulse_pars,
-                        q0_flux_pars,
-                        q1_flux_pars,
-                        RO_pars,
+                        operation_dict,
+                        qS,
+                        qCZ,
+                        RO_target,
                         distortion_dict,
-                        timings_dict,
-                        CPhase=True,
+                        CZ_disabled=False,
+                        cal_points_with_flux_pulses=True,
                         verbose=False,
-                        upload=True,
-                        return_seq=False):
+                        upload=True):
     '''
-        q0 is swap qubit
-        q1 is cphase qubit
+        qS is swap qubit
+        qCZ is cphase qubit
     '''
+    sequencer_config = operation_dict['sequencer_config']
 
-    seq_name = '2_qubit_Card_%d_seq' % bell_state
+    seq_name = '2_qubit_Bell_Tomo_%d_seq' % bell_state
     seq = sequence.Sequence(seq_name)
     station.pulsar.update_channel_settings()
     el_list = []
-    # Create a dict with the parameters for all the pulses
-    q0_pulses = add_suffix_to_dict_keys(
-        get_pulse_dict_from_pars(q0_pulse_pars), ' q0')
-    q1_pulses = add_suffix_to_dict_keys(
-        get_pulse_dict_from_pars(q1_pulse_pars), ' q1')
-    # here I decide, q0 is the swap qubit, q1 is the CP qubit
-    # pulse incluse single qubit phase correction
-    CPhase_qCP = {'CPhase q1': q1_flux_pars}
-    swap_qS = {'swap q0': q0_flux_pars}
-    RO_dict = {'RO': RO_pars}
+    tomo_list_qS = []
+    tomo_list_qCZ = []
+    # Tomo pulses span a basis covering all the cardinal points
+    tomo_pulses = ['I ', 'X180 ', 'Y90 ', 'mY90 ', 'X90 ', 'mX90 ']
+    for tp in tomo_pulses:
+        tomo_list_qS += [tp+qS]
+        tomo_list_qCZ += [tp+qCZ]
 
-    pulse_dict = {}
-    pulse_dict.update(q0_pulses)
-    pulse_dict.update(q1_pulses)
-    pulse_dict.update(CPhase_qCP)
-    pulse_dict.update(swap_qS)
-    pulse_dict.update(RO_dict)
-
-    # Timings
-    buffer_MW_FLUX = timings_dict['buffer_MW_FLUX']
-    buffer_MW_MW = timings_dict['buffer_MW_MW']
-    buffer_FLUX_FLUX = timings_dict['buffer_FLUX_FLUX']
-    buffer_FLUX_MW = timings_dict['buffer_FLUX_MW']
-
-    tomo_list_q0 = ['I q0', 'X180 q0', 'Y90 q0',
-                    'mY90 q0', 'X90 q0', 'mX90 q0']
-    tomo_list_q1 = ['I q1', 'X180 q1', 'Y90 q1',
-                    'mY90 q1', 'X90 q1', 'mX90 q1']
-
-    # defining pulses
-    pulse_dict['mCPhase q1'] = deepcopy(pulse_dict['CPhase q1'])
-    pulse_dict['mswap q0'] = deepcopy(pulse_dict['swap q0'])
-    pulse_dict['mCPhase q1']['amplitude'] = - \
-        pulse_dict['CPhase q1']['amplitude']
-    pulse_dict['mswap q0']['amplitude'] = -pulse_dict['swap q0']['amplitude']
-
-    recovery_swap = deepcopy(pulse_dict['swap q0'])
-    pulse_dict['phase corr q0'] = deepcopy(pulse_dict['swap q0'])
-    pulse_dict['phase corr q0']['square_pulse_length'] = q0_flux_pars[
-        'phase_corr_pulse_length']
-    pulse_dict['phase corr q0'][
-        'amplitude'] = q0_flux_pars['phase_corr_pulse_amp']
-    pulse_dict['mphase corr q0'] = deepcopy(pulse_dict['swap q0'])
-    pulse_dict['mphase corr q0']['square_pulse_length'] = q0_flux_pars[
-        'phase_corr_pulse_length']
-    pulse_dict['mphase corr q0']['amplitude'] = - \
-        q0_flux_pars['phase_corr_pulse_amp']
-
-    pulse_dict['recovery swap q0'] = recovery_swap
-
-    # Pulse is used to set the starting refpoint for the compensation pulses
-    pulse_dict.update({'dead_time_pulse':
-                       {'pulse_type': 'SquarePulse',
-                        'pulse_delay': q1_flux_pars['dead_time'],
-                        'channel': q1_flux_pars['channel'],
-                        'amplitude': 0,
-                        'length': 0.}})
-
-    pulse_dict.update({'phase corr q1':
-                       {'pulse_type': 'SquarePulse',
-                        'pulse_delay': 0.,
-                        'channel': pulse_dict['CPhase q1']['channel'],
-                        'amplitude': pulse_dict['CPhase q1']['phase_corr_pulse_amp'],
-                        'length': pulse_dict['CPhase q1']['phase_corr_pulse_length']}})
-
-    pulse_dict['mphase corr q1'] = deepcopy(pulse_dict['phase corr q1'])
-    pulse_dict['mphase corr q1']['amplitude'] = - \
-        pulse_dict['mphase corr q1']['amplitude']
-
-    pulse_dict['CPhase q1']['phase_corr_pulse_amp'] = 0.
-    pulse_dict['mCPhase q1']['phase_corr_pulse_amp'] = 0.
+    ###########################
+    # Defining sub sequences #
+    ###########################
+    # This forms the base sequence, note that gate1, gate2 and after_pulse will
+    # be replaced to prepare the desired state and tomo1 and tomo2 will be
+    # replaced with tomography pulses
+    base_sequence = (
+        ['gate1 ' + qS, 'gate2 ' + qCZ,
+         'SWAP '+qS, 'CZ ' + qCZ, 'rSWAP ' + qS,
+         'SWAP_corr ' + qS, 'CZ_corr ' + qCZ,
+         'after_pulse ' + qCZ, 'tomo1 '+qCZ, 'tomo2 '+qS, 'RO '+RO_target])
 
     # Calibration points
-    cal_points = [['I q1', 'dummy_pulse', 'I q0', 'RO'],
-                  ['I q1', 'dummy_pulse', 'I q0', 'RO'],
-                  ['I q1', 'dummy_pulse', 'I q0', 'RO'],
-                  ['I q1', 'dummy_pulse', 'I q0', 'RO'],
-                  ['I q1', 'dummy_pulse', 'I q0', 'RO'],
-                  ['I q1', 'dummy_pulse', 'I q0', 'RO'],
-                  ['I q1', 'dummy_pulse', 'I q0', 'RO'],
-                  ['I q1', 'dummy_pulse', 'X180 q0', 'RO'],
-                  ['I q1', 'dummy_pulse', 'X180 q0', 'RO'],
-                  ['I q1', 'dummy_pulse', 'X180 q0', 'RO'],
-                  ['I q1', 'dummy_pulse', 'X180 q0', 'RO'],
-                  ['I q1', 'dummy_pulse', 'X180 q0', 'RO'],
-                  ['I q1', 'dummy_pulse', 'X180 q0', 'RO'],
-                  ['I q1', 'dummy_pulse', 'X180 q0', 'RO'],
-                  ['X180 q1', 'dummy_pulse', 'I q0', 'RO'],
-                  ['X180 q1', 'dummy_pulse', 'I q0', 'RO'],
-                  ['X180 q1', 'dummy_pulse', 'I q0', 'RO'],
-                  ['X180 q1', 'dummy_pulse', 'I q0', 'RO'],
-                  ['X180 q1', 'dummy_pulse', 'I q0', 'RO'],
-                  ['X180 q1', 'dummy_pulse', 'I q0', 'RO'],
-                  ['X180 q1', 'dummy_pulse', 'I q0', 'RO'],
-                  ['X180 q1', 'dummy_pulse', 'X180 q0', 'RO'],
-                  ['X180 q1', 'dummy_pulse', 'X180 q0', 'RO'],
-                  ['X180 q1', 'dummy_pulse', 'X180 q0', 'RO'],
-                  ['X180 q1', 'dummy_pulse', 'X180 q0', 'RO'],
-                  ['X180 q1', 'dummy_pulse', 'X180 q0', 'RO'],
-                  ['X180 q1', 'dummy_pulse', 'X180 q0', 'RO'],
-                  ['X180 q1', 'dummy_pulse', 'X180 q0', 'RO']]
+    # every calibration point is repeated 7 times to have 64 elts in totalb
+    cal_points = [['I '+qCZ, 'I '+qS, 'RO '+RO_target]]*7 +\
+                  [['I '+qCZ, 'X180 '+qS, 'RO '+RO_target]]*7 +\
+                  [['X180 '+qCZ, 'I '+qS, 'RO '+RO_target]]*7 +\
+                  [['X180 '+qCZ, 'X180 '+qS, 'RO '+RO_target]]*7
 
-    if not CPhase:
-        pulse_dict['CPhase q1']['amplitude'] = 0
-        pulse_dict['mCPhase q1']['amplitude'] = 0
-        pulse_dict['swap q0']['amplitude'] = 0
-        pulse_dict['mswap q0']['amplitude'] = 0
-        pulse_dict['recovery swap q0']['amplitude'] = 0
-        pulse_dict['phase corr q0']['amplitude'] = 0
-        pulse_dict['mCPhase q1']['phase_corr_pulse_amp'] = 0
-        pulse_dict['CPhase q1']['phase_corr_pulse_amp'] = 0
-        pulse_dict['mphase corr q0']['amplitude'] = 0
-        after_pulse = pulse_dict['I q0']
-        print('CPhase disabled')
-    else:
-        if bell_state == 0:  # |00>+|11>
-            gate1 = pulse_dict['Y90 q0']
-            gate2 = pulse_dict['Y90 q1']
-            after_pulse = pulse_dict['mY90 q1']
-        elif bell_state == 1:
-            gate1 = pulse_dict['Y90 q0']
-            gate2 = pulse_dict['mY90 q1']
-            after_pulse = pulse_dict['mY90 q1']
-        elif bell_state == 2:
-            gate1 = pulse_dict['mY90 q0']
-            gate2 = pulse_dict['Y90 q1']
-            after_pulse = pulse_dict['mY90 q1']
-        elif bell_state == 3:
-            gate1 = pulse_dict['mY90 q0']
-            gate2 = pulse_dict['mY90 q1']
-            after_pulse = pulse_dict['mY90 q1']
+    if CZ_disabled:
+        operation_dict['CZ '+qCZ]['amplitude'] = 0
+        operation_dict['CZ '+qCZ]['phase_corr_pulse_amp'] = 0
+
+    ################################################
+    # Creating additional pulses for this sequence #
+    ################################################
+    # the recovery SWAP is identical to the regular SWAP operation, unless
+    # an rSWAP is explicitly contained in the operation dict
+    if ('rSWAP ' + qS) not in operation_dict.keys():
+        operation_dict['rSWAP ' + qS] = deepcopy(operation_dict['SWAP ' + qS])
+    operation_dict['CZ_corr ' + qCZ]['refpoint'] = 'simultaneous'
+
+    ################
+    # Bell states  #
+    ################
+    if bell_state == 0:  # |Phi_m>=|00>-|11>
+        gate1 = 'Y90 ' + qS
+        gate2 = 'Y90 ' + qCZ
+        after_pulse = 'mY90 ' + qCZ
+    elif bell_state == 1:  # |Phi_p>=|00>+|11>
+        gate1 = 'mY90 ' + qS
+        gate2 = 'Y90 ' + qCZ
+        after_pulse = 'mY90 ' + qCZ
+    elif bell_state == 2:  # |Psi_m>=|01> - |10>
+        gate1 = 'Y90 ' + qS
+        gate2 = 'mY90 ' + qCZ
+        after_pulse = 'mY90 ' + qCZ
+    elif bell_state == 3:  # |Psi_p>=|01> + |10>
+        gate1 = 'mY90 ' + qS
+        gate2 = 'mY90 ' + qCZ
+        after_pulse = 'mY90 ' + qCZ
+
+    # Below are states with the initial pulse on the CP-qubit disabled
+    # these are not Bell states but are used for debugging
+    elif bell_state == 0+10:  # |00>+|11>
+        gate1 = 'Y90 ' + qS
+        gate2 = 'I ' + qCZ
+        after_pulse = 'mY90 ' + qCZ
+    elif bell_state == 1+10:
+        gate1 = 'mY90 ' + qS
+        gate2 = 'I ' + qCZ
+        after_pulse = 'mY90 ' + qCZ
+    elif bell_state == 2+10:  # |01> - |10>
+        gate1 = 'Y90 ' + qS
+        gate2 = 'I ' + qCZ
+        after_pulse = 'mY90 ' + qCZ
+    elif bell_state == 3+10:
+        gate1 = 'mY90 ' + qS
+        gate2 = 'I ' + qCZ
+        after_pulse = 'mY90 ' + qCZ
+
+    # Below are states with the initial pulse on the SWAP-qubit disabled
+    # these are not Bell states but are used for debugging
+    elif bell_state == 0 + 20:  # |00>+|11>
+        gate1 = 'I ' + qS
+        gate2 = 'Y90 ' + qCZ
+        after_pulse = 'mY90 ' + qCZ
+    elif bell_state == 1 + 20:  # |01> - |10>
+        gate1 = 'I ' + qS
+        gate2 = 'Y90 ' + qCZ
+        after_pulse = 'mY90 ' + qCZ
+    elif bell_state == 2 + 20:
+        gate1 = 'I ' + qS
+        gate2 = 'mY90 ' + qCZ
+        after_pulse = 'mY90 ' + qCZ
+    elif bell_state == 3 + 20:
+        gate1 = 'mY90 ' + qS
+        gate2 = 'mY90 ' + qCZ
+        after_pulse = 'mY90 ' + qCZ
 
     print('Compensation qCP {:.3f}'.format(
-        pulse_dict['phase corr q1']['amplitude']))
+        operation_dict['CZ_corr ' + qCZ]['amplitude']))
     print('Compensation qS {:.3f}'.format(
-        pulse_dict['phase corr q0']['amplitude']))
+        operation_dict['SWAP_corr ' + qS]['amplitude']))
 
-    dummy_pulse = deepcopy(pulse_dict['I q1'])
-    dummy_pulse['pulse_delay'] = -(dummy_pulse['sigma'] *
-                                   dummy_pulse['nr_sigma'])
-    pulse_dict.update({'dummy_pulse': dummy_pulse})
+    ########################################################
+    #  Here the actual pulses of all elements get defined  #
+    ########################################################
+    # We start by replacing the state prepartion pulses
+    base_sequence[0] = gate1
+    base_sequence[1] = gate2
+    base_sequence[7] = after_pulse
+
+    seq_pulse_list = []
 
     for i in range(36):
-        tomo_idx_q0 = int(i % 6)
-        tomo_idx_q1 = int(((i - tomo_idx_q0)/6) % 6)
+        tomo_idx_qS = int(i % 6)
+        tomo_idx_qCZ = int(((i - tomo_idx_qS)/6) % 6)
+        base_sequence[8] = tomo_list_qCZ[tomo_idx_qCZ]
+        base_sequence[9] = tomo_list_qS[tomo_idx_qS]
+        seq_pulse_list += [deepcopy(base_sequence)]
+    print(len(cal_points))
+    for cal_pulses in cal_points:
+        if cal_points_with_flux_pulses:
+            base_sequence[0] = 'I ' + qS
+            base_sequence[1] = 'I ' + qCZ
+            base_sequence[7] = 'I ' + qCZ
+            base_sequence[-3:] = cal_pulses
+            seq_pulse_list += [deepcopy(base_sequence)]
+        else:
+            seq_pulse_list += [cal_pulses]
 
-        tomo_pulse_q0 = pulse_dict[tomo_list_q0[tomo_idx_q0]]
-        tomo_pulse_q1 = pulse_dict[tomo_list_q1[tomo_idx_q1]]
-
-        pulse_dict['swap q0']['pulse_delay'] = buffer_MW_FLUX
-        pulse_dict['mswap q0']['pulse_delay'] = buffer_MW_FLUX
-        gate1['pulse_delay'] = buffer_MW_MW
-        gate2['pulse_delay'] = buffer_MW_MW
-        pulse_dict['CPhase q1']['pulse_delay'] = buffer_FLUX_FLUX
-        pulse_dict['mCPhase q1']['pulse_delay'] = buffer_FLUX_FLUX
-        pulse_dict['phase corr q0']['pulse_delay'] = buffer_FLUX_FLUX
-        pulse_dict['mphase corr q0']['pulse_delay'] = buffer_FLUX_FLUX
-        pulse_dict['phase corr q1']['pulse_delay'] = - \
-            pulse_dict['phase corr q0']['square_pulse_length']
-        pulse_dict['mphase corr q1']['pulse_delay'] = - \
-            pulse_dict['phase corr q0']['square_pulse_length']
-        pulse_dict['recovery swap q0']['pulse_delay'] = buffer_FLUX_FLUX
-        after_pulse['pulse_delay'] = buffer_FLUX_MW
-        tomo_pulse_q1['pulse_delay'] = buffer_MW_MW
-        tomo_pulse_q0['pulse_delay'] = buffer_MW_MW
-
-        pulse_list = [gate1, dummy_pulse, gate2, pulse_dict['swap q0']] + \
-                     [pulse_dict['CPhase q1']] + \
-                     [pulse_dict['recovery swap q0'], pulse_dict['phase corr q0'],
-                      pulse_dict['phase corr q1'], after_pulse] + \
-                     [tomo_pulse_q1, tomo_pulse_q0, RO_pars] + \
-                     [pulse_dict['dead_time_pulse']] + \
-                     [pulse_dict['mswap q0'], pulse_dict['mCPhase q1']] +\
-                     [pulse_dict['mphase corr q0'], pulse_dict['mswap q0'],
-                      pulse_dict['mphase corr q1'], pulse_dict['dead_time_pulse']]
-
-        el = multi_pulse_elt(i, station, pulse_list)
-        if distortion_dict is not None:
-            el = distort_and_compensate(
-                el, distortion_dict)
-        el_list.append(el)
-        seq.append_element(el, trigger_wait=True)
-
-    for i, pulse_comb in enumerate(cal_points):
-        gate1 = pulse_dict['I q0']
-        gate2 = pulse_dict['I q1']
-        after_pulse = pulse_dict['I q0']
-        pulse_dict['swap q0']['pulse_delay'] = buffer_MW_FLUX
-        pulse_dict['mswap q0']['pulse_delay'] = buffer_MW_FLUX
-        gate1['pulse_delay'] = buffer_MW_MW
-        gate2['pulse_delay'] = buffer_MW_MW
-        pulse_dict['CPhase q1']['pulse_delay'] = buffer_FLUX_FLUX
-        pulse_dict['mCPhase q1']['pulse_delay'] = buffer_FLUX_FLUX
-        pulse_dict['phase corr q0']['pulse_delay'] = buffer_FLUX_FLUX
-        pulse_dict['mphase corr q0']['pulse_delay'] = buffer_FLUX_FLUX
-        pulse_dict['phase corr q1']['pulse_delay'] = - \
-            pulse_dict['phase corr q0']['square_pulse_length']
-        pulse_dict['mphase corr q1']['pulse_delay'] = - \
-            pulse_dict['phase corr q0']['square_pulse_length']
-        pulse_dict['recovery swap q0']['pulse_delay'] = buffer_FLUX_FLUX
-        after_pulse['pulse_delay'] = buffer_FLUX_MW
-
-        # gets pulse list for calibrations
-        pulse_dict['I q0']['pulse_delay'] = buffer_MW_MW
-        pulse_dict['X180 q0']['pulse_delay'] = buffer_MW_MW
-        pulse_dict['I q1']['pulse_delay'] = buffer_MW_MW
-        pulse_dict['X180 q1']['pulse_delay'] = buffer_MW_MW
+    for i, pulse_list in enumerate(seq_pulse_list):
         pulses = []
-        for p in pulse_comb:
-            pulses += [pulse_dict[p]]
-
-        pulse_list = [gate1, dummy_pulse, gate2, pulse_dict['swap q0']] + \
-                     [pulse_dict['CPhase q1']] + \
-                     [pulse_dict['recovery swap q0'], pulse_dict['phase corr q0'],
-                      pulse_dict['phase corr q1'], after_pulse] + \
-            pulses + \
-                     [pulse_dict['dead_time_pulse']] + \
-                     [pulse_dict['mswap q0'], pulse_dict['mCPhase q1']] +\
-                     [pulse_dict['mphase corr q0'], pulse_dict['mswap q0'],
-                      pulse_dict['mphase corr q1'], pulse_dict['dead_time_pulse']]
-
-        el = multi_pulse_elt(36+i, station, pulse_list)
+        for p in pulse_list:
+            pulses += [operation_dict[p]]
+        el = multi_pulse_elt(i, station, pulses, sequencer_config)
         if distortion_dict is not None:
+            print('\rDistorting element {}/{} '.format(i+1,
+                                                       len(seq_pulse_list)),
+                  end='')
             el = distort_and_compensate(
                 el, distortion_dict)
         el_list.append(el)
@@ -749,10 +666,8 @@ def two_qubit_tomo_bell(bell_state,
 
     station.components['AWG'].stop()
     station.pulsar.program_awg(seq, *el_list, verbose=verbose)
-    if return_seq:
-        return seq, el_list
-    else:
-        return seq_name
+
+    return seq, el_list
 
 
 def cphase_fringes(phases, q0_pulse_pars, q1_pulse_pars, RO_pars,
@@ -909,40 +824,122 @@ def preload_kernels_func(distortion_dict):
                     cached_kernels.update({kernel: kernel_vec})
     return output_dict
 
+def two_qubit_tomo_cphase_cardinal(cardinal_state,
+                        operation_dict,
+                        qS,
+                        qCZ,
+                        RO_target,
+                        distortion_dict,
+                        CZ_disabled=False,
+                        cal_points_with_flux_pulses=True,
+                        verbose=False,
+                        upload=True):
+    '''
+        qS is swap qubit
+        qCZ is cphase qubit
+    '''
+    sequencer_config = operation_dict['sequencer_config']
 
-def distort_and_compensate(element, distortion_dict):
-    """
-    Distorts an element using the contenst of a distortion dictionary.
-    The distortion dictionary should be formatted as follows.
+    seq_name = '2_qubit_CPhase_Cardinal_Tomo_%d_seq' % cardinal_state
+    seq = sequence.Sequence(seq_name)
+    station.pulsar.update_channel_settings()
+    el_list = []
+    tomo_list_qS = []
+    tomo_list_qCZ = []
+    # Tomo pulses span a basis covering all the cardinal points
+    tomo_pulses = ['I ', 'X180 ', 'Y90 ', 'mY90 ', 'X90 ', 'mX90 ']
+    for tp in tomo_pulses:
+        tomo_list_qS += [tp+qS]
+        tomo_list_qCZ += [tp+qCZ]
 
-    dist_dict{'ch_list': ['chx', 'chy'],
-              'chx': np.array(.....),
-              'chy': np.array(.....)}
-    """
+    ###########################
+    # Defining sub sequences #
+    ###########################
+    # This forms the base sequence, note that gate1, gate2 and after_pulse will
+    # be replaced to prepare the desired state and tomo1 and tomo2 will be
+    # replaced with tomography pulses
+    base_sequence = (
+        ['gate1 ' + qS, 'gate2 ' + qCZ,
+         'SWAP '+qS, 'CZ ' + qCZ, 'rSWAP ' + qS,
+         'SWAP_corr ' + qS, 'CZ_corr ' + qCZ,
+         'after_pulse ' + qCZ, 'tomo1 '+qCZ, 'tomo2 '+qS, 'RO '+RO_target])
 
-    t_vals, outputs_dict = element.waveforms()
-    for ch in distortion_dict['ch_list']:
-        element._channels[ch]['distorted'] = True
-        length = len(outputs_dict[ch])
-        kernelvec = distortion_dict[ch]
-        outputs_dict[ch] = np.convolve(
-            outputs_dict[ch], kernelvec)[:length]
-        element.distorted_wfs[ch] = outputs_dict[ch][:len(t_vals)]
-    return element
+    # Calibration points
+    # every calibration point is repeated 7 times to have 64 elts in total
+    cal_points = [['I '+qCZ, 'I '+qS, 'RO '+RO_target]]*7 +\
+                  [['I '+qCZ, 'X180 '+qS, 'RO '+RO_target]]*7 +\
+                  [['X180 '+qCZ, 'I '+qS, 'RO '+RO_target]]*7 +\
+                  [['X180 '+qCZ, 'X180 '+qS, 'RO '+RO_target]]*7
 
-'''
-def distort_and_compensate(element, distortion_dict, preloaded_kernels):
-    t_vals, outputs_dict = element.waveforms()
-    # print(len(t_vals),t_vals[-1])
-    for ch in distortion_dict['ch_list']:
-        element._channels[ch]['distorted'] = True
-        length = len(outputs_dict[ch])
-        for kernelvec in preloaded_kernels[ch]:
-            outputs_dict[ch] = np.convolve(
-                outputs_dict[ch], kernelvec)[:length]
+    if CZ_disabled:
+        operation_dict['CZ '+qCZ]['amplitude'] = 0
+        operation_dict['CZ '+qCZ]['phase_corr_pulse_amp'] = 0
 
-        element.distorted_wfs[ch] = outputs_dict[ch][:len(t_vals)]
-    return element
+    ################################################
+    # Creating additional pulses for this sequence #
+    ################################################
+    # the recovery SWAP is identical to the regular SWAP operation, unless
+    # an rSWAP is explicitly contained in the operation dict
+    if ('rSWAP ' + qS) not in operation_dict.keys():
+        operation_dict['rSWAP ' + qS] = deepcopy(operation_dict['SWAP ' + qS])
+    operation_dict['CZ_corr ' + qCZ]['refpoint'] = 'simultaneous'
+
+    ################
+    # cardinal states  #
+    ################
+    # here select the qubit gates (depending on cardinal_state)
+    prep_idx_qS = int(cardinal_state % 6)
+    prep_idx_qCZ = int(((cardinal_state - prep_idx_qS)/6) % 6)
+
+    print('Compensation qCP {:.3f}'.format(
+        operation_dict['CZ_corr ' + qCZ]['amplitude']))
+    print('Compensation qS {:.3f}'.format(
+        operation_dict['SWAP_corr ' + qS]['amplitude']))
+
+    ########################################################
+    #  Here the actual pulses of all elements get defined  #
+    ########################################################
+    # We start by replacing the state prepartion pulses
+    base_sequence[0] = tomo_list_qS[prep_idx_qS]
+    base_sequence[1] = tomo_list_qCZ[prep_idx_qCZ]
+    base_sequence[7] = 'I ' + qCZ
+
+    seq_pulse_list = []
+
+    for i in range(36):
+        tomo_idx_qS = int(i % 6)
+        tomo_idx_qCZ = int(((i - tomo_idx_qS)/6) % 6)
+        base_sequence[8] = tomo_list_qCZ[tomo_idx_qCZ]
+        base_sequence[9] = tomo_list_qS[tomo_idx_qS]
+        seq_pulse_list += [deepcopy(base_sequence)]
+    print(len(cal_points))
+    for cal_pulses in cal_points:
+        if cal_points_with_flux_pulses:
+            base_sequence[0] = 'I ' + qS
+            base_sequence[1] = 'I ' + qCZ
+            base_sequence[7] = 'I ' + qCZ
+            base_sequence[-3:] = cal_pulses
+            seq_pulse_list += [deepcopy(base_sequence)]
+        else:
+            seq_pulse_list += [cal_pulses]
+
+    for i, pulse_list in enumerate(seq_pulse_list):
+        pulses = []
+        for p in pulse_list:
+            pulses += [operation_dict[p]]
+        el = multi_pulse_elt(i, station, pulses, sequencer_config)
+        if distortion_dict is not None:
+            print('\rDistorting element {}/{} '.format(i+1,
+                                                       len(seq_pulse_list)),
+                  end='')
+            el = distort_and_compensate(
+                el, distortion_dict)
+        el_list.append(el)
+        seq.append_element(el, trigger_wait=True)
+
+    station.components['AWG'].stop()
+    station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+
+    return seq, el_list
 
 
-'''

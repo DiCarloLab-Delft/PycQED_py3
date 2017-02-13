@@ -5,6 +5,7 @@ from pycqed.measurement import awg_sweep_functions as awg_swf
 from pycqed.measurement import CBox_sweep_functions as CB_swf
 from pycqed.measurement import detector_functions as det
 from pycqed.analysis import measurement_analysis as ma
+from pycqed.measurement.pulse_sequences import fluxing_sequences as fsqs
 from pycqed.analysis import analysis_toolbox as a_tools
 from qcodes.instrument.parameter import ManualParameter
 import imp
@@ -1166,7 +1167,7 @@ class SWAPN_optimization(det.Soft_Detector):
 
         self.MC_nested.set_detector_function(self.qubit.int_avg_det_rot)
         self.AWG.set('ch%d_amp' % self.qubit.fluxing_channel(),
-                     self.qubit.swap_amp())
+                     self.qubit.SWAP_amp())
         self.MC_nested.run('SWAPN_%s' % self.qubit.name)
 
         # # fit it
@@ -2574,149 +2575,54 @@ class Tracked_Qubit_Spectroscopy(det.Soft_Detector):
         pass
 
 
-# class T1_Detector(Qubit_Characterization_Detector):
-#     def __init__(self, qubit,
-#                  spec_start=None,
-#                  spec_stop=None,
-#                  pulse_amp_guess=0.7,
-#                  AWG_name='AWG',
-#                  **kw):
-#         from pycqed.measurement import calibration_toolbox as cal_tools
-#         imp.reload(cal_tools)
-#         self.detector_control = 'soft'
-#         self.name = 'T1_Detector'
-#         self.value_names = ['f_resonator', 'f_resonator_stderr',
-#                             'f_qubit', 'f_qubit_stderr', 'T1', 'T1_stderr']
-#         self.value_units = ['GHz', 'GHz', 'GHz', 'GHz', 'us', 'us']
+class FluxTrack(det.Soft_Detector):
+    '''
+    '''
+    def __init__(self, qubit, device, MC, AWG, cal_points=False, **kw):
+        self.detector_control = 'soft'
+        self.name = 'FluxTrack'
+        self.cal_points=cal_points
+        self.value_names = [r' +/- $F |1\rangle$', r' + $F |1\rangle$', r' - $F |1\rangle$']
+        self.value_units = ['', '', '']
+        self.qubit = qubit
+        self.AWG = AWG
+        self.MC = MC
+        self.operations_dict = device.get_operation_dict()
+        self.dist_dict = qubit.dist_dict()
+        self.nested_MC = MC
 
-#         self.AWG = qt.instruments[AWG_name]
-#         self.pulse_amp_guess = pulse_amp_guess
-#         self.cal_tools = cal_tools
-#         self.qubit = qubit
-#         self.nested_MC_name = 'MC_T1_detector'
-#         self.nested_MC = qt.instruments[self.nested_MC_name]
-#         self.cal_tools = cal_tools
-#         self.spec_start = spec_start
-#         self.spec_stop = spec_stop
-#         self.qubit_drive_ins = qt.instruments[self.qubit.get_qubit_drive()]
-#         self.HM = qt.instruments['HM']
-#         self.TD_Meas = qt.instruments['TD_Meas']
-#         # Setting the constants
-#         self.calreadoutevery = 1
-#         self.loopcnt = 0
-#         self.T1_stepsize = 500
+        self.FluxTrack_swf = awg_swf.awg_seq_swf(
+            fsqs.FluxTrack,
+            # parameter_name='Amplitude',
+            unit='V',
+            AWG=self.AWG,
+            fluxing_channels=[self.qubit.fluxing_channel()],
+            awg_seq_func_kwargs={'operation_dict': self.operations_dict,
+                                 'q0': self.qubit.name,
+                                 'cal_points':self.cal_points,
+                                 'distortion_dict': self.dist_dict,
+                                 'upload': True})
 
-#     def prepare(self, **kw):
+    def prepare(self, **kw):
+        self.FluxTrack_swf.prepare()
+        self.FluxTrack_swf.upload=False
 
-#         self.nested_MC = qt.instruments.create(
-#             self.nested_MC_name,
-#             'MeasurementControl')
+    def acquire_data_point(self, *args, **kw):
+            # acquire with MC_nested
+        self.MC.set_sweep_function(self.FluxTrack_swf)
+        self.MC.set_sweep_points(np.arange(2+4*self.cal_points))
+        if self.cal_points:
+            d =self.qubit.int_avg_det_rot
+        else:
+            d =self.qubit.int_avg_det
 
-#     def acquire_data_point(self, *args, **kw):
-#         self.loopcnt += 1
 
-#         self.switch_to_freq_sweep()
+        self.MC.set_detector_function(d)
+        self.MC.run('FluxTrack_point_%s' % self.qubit.name)
 
-#         cur_f_RO = self.qubit.get_current_RO_frequency()
-#         resonator_scan = self.cal_tools.find_resonator_frequency(
-#             MC_name=self.nested_MC_name,
-#             start_freq=cur_f_RO-0.002,
-#             end_freq=cur_f_RO+0.002,
-#             suppress_print_statements=True)
-#         f_resonator = resonator_scan['f_resonator']
-#         f_resonator_stderr = resonator_scan['f_resonator_stderr']
-#         print('Readout frequency: ', f_resonator)
-
-#         self.qubit.set_current_RO_frequency(f_resonator)
-#         self.HM.set_frequency(self.qubit.get_current_RO_frequency()*1e9)
-
-#         qubit_scan = self.cal_tools.find_qubit_frequency_spec(
-#             MC_name=self.nested_MC_name,
-#             qubit=self.qubit,
-#             start_freq=None,
-#             end_freq=None,
-#             suppress_print_statements=True)
-#         f_qubit = qubit_scan['f_qubit']
-#         f_qubit_stderr = qubit_scan['f_qubit_stderr']
-
-#         print('Estimated qubit frequency: ', f_qubit)
-#         self.qubit.set_current_frequency(f_qubit)
-
-#         #############################
-#         # Start of Time Domain part #
-#         #############################
-
-#         self.TD_Meas.set_f_readout(self.qubit.get_current_RO_frequency()*1e9)
-#         self.qubit_drive_ins.set_frequency(
-#             (self.qubit.get_current_frequency() +
-#              self.qubit.get_sideband_modulation_frequency()) * 1e9)
-#         self.switch_to_time_domain_measurement()
-
-#         self.qubit.set_pulse_amplitude_I(self.pulse_amp_guess)
-#         self.qubit.set_pulse_amplitude_Q(self.pulse_amp_guess)
-#         amp_ch1, amp_ch2 = self.cal_tools.calibrate_pulse_amplitude(
-#             MC_name=self.nested_MC_name,
-#             qubit=self.qubit,
-#             max_nr_iterations=3, desired_accuracy=.1, Navg=4,
-#             suppress_print_statements=False)
-
-#         self.qubit.set_pulse_amplitude_I(amp_ch1)
-#         self.qubit.set_pulse_amplitude_Q(amp_ch2)
-
-#         self.nested_MC.set_detector_function(det.TimeDomainDetector_cal())
-
-#         if self.qubit.pulse_amp_control == 'AWG':
-#             self.nested_MC.set_sweep_function(awg_swf.T1(
-#                 stepsize=self.T1_stepsize,
-#                 gauss_width=self.qubit.get_gauss_width()))
-#         elif self.qubit.pulse_amp_control == 'Duplexer':
-#             self.nested_MC.set_sweep_function(awg_swf.T1(
-#                 stepsize=self.T1_stepsize,
-#                 gauss_width=self.qubit.get_gauss_width(),
-#                 Duplexer=True))
-
-#         self.nested_MC.run()
-#         T1_a = ma.T1_Analysis(auto=True, close_file=False)
-#         T1, T1_stderr = T1_a.get_measured_T1()
-#         T1_a.finish()
-#         self.qubit_drive_ins.off()
-
-#         return_vals = [f_resonator, f_resonator_stderr,
-#                        f_qubit, f_qubit_stderr, T1, T1_stderr]
-#         return return_vals
-
-#     def finish(self, **kw):
-#         self.HM.set_sources('Off')
-#         self.nested_MC.remove()
-
-# class HM_SH(det.Soft_Detector):
-#     '''
-#     Combining a Homodyne measurment and the Signal Hound power at a fixed
-#     frequency
-#     '''
-
-#     def __init__(self, frequency, **kw):
-#         # super(TimeDomainDetector_integrated, self).__init__()
-
-#         self.detector_control = 'soft'
-#         self.name = 'HM_SH'
-#         self.value_names = ['S21_magn', 'S21_phase', 'Power']
-#         self.value_units = ['V', 'deg', 'dBm']
-#         self.HomodyneDetector = det.HomodyneDetector()
-#         self.Signal_Hound_fixed_frequency = det.Signal_Hound_fixed_frequency(
-#                                                     frequency=frequency)
-
-#     def acquire_data_point(self, *args, **kw):
-#         HM_data = self.HomodyneDetector.acquire_data_point()
-#         SH_data = self.Signal_Hound_fixed_frequency.acquire_data_point()
-
-#         return [HM_data[0], HM_data[1], SH_data]
-
-#     def prepare(self, **kw):
-#         self.HomodyneDetector.prepare()
-#         self.Signal_Hound_fixed_frequency.prepare()
-#         print('prepare worked')
-
-#     def finish(self, **kw):
-#         self.HomodyneDetector.finish()
-#         self.Signal_Hound_fixed_frequency.finish()
+        ma_obj = ma.MeasurementAnalysis(auto=True, label='FluxTrack_point')
+        y = np.mean(ma_obj.measured_values[0, :2])
+        y_p = ma_obj.measured_values[0, 0]
+        y_m = ma_obj.measured_values[0, 1]
+        y_mean = np.mean([y_p, y_m])
+        return (y_mean, y_p, y_m)

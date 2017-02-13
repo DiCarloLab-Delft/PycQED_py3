@@ -46,8 +46,9 @@ from pycqed.analysis import measurement_analysis as ma
 from pycqed.analysis import analysis_toolbox as a_tools
 from pycqed.measurement import awg_sweep_functions_multi_qubit as awg_swf_m
 from pycqed.measurement.pulse_sequences import multi_qubit_tek_seq_elts as sq_m
+from pycqed.measurement import multi_qubit_module as mq_mod
 from pycqed.analysis import tomography as tomo
-
+import pycqed.scripts.Experiments.Five_Qubits.cost_functions_Leo_optimization as ca
 from pycqed.utilities import general as gen
 # Standarad awg sequences
 from pycqed.measurement.waveform_control import pulsar as ps
@@ -90,6 +91,7 @@ from pycqed.measurement.pulse_sequences import multi_qubit_tek_seq_elts as mqs
 
 
 station = qc.Station()
+qc.station = station  # makes it easily findable from inside files
 LO = rs.RohdeSchwarz_SGS100A(
     name='LO', address='TCPIP0::192.168.0.73', server_name=None)  #
 station.add_component(LO)
@@ -111,8 +113,8 @@ AWG.timeout(180)  # timeout long for uploading wait.
 # AWG520 = tk520.Tektronix_AWG520('AWG520', address='GPIB0::17::INSTR',
 #                                 server_name='')
 # station.add_component(AWG520)
-CBox = qcb.QuTech_ControlBox('CBox', address='Com5', run_tests=False, server_name=None)
-station.add_component(CBox)
+# CBox = qcb.QuTech_ControlBox('CBox', address='Com5', run_tests=False, server_name=None)
+# station.add_component(CBox)
 IVVI = iv.IVVI('IVVI', address='COM4', numdacs=16, server_name=None)
 station.add_component(IVVI)
 
@@ -154,7 +156,9 @@ else:
     UHFQC_1 = None
 
 
-Flux_Control = fc.Flux_Control(name='FluxControl', IVVI=station.IVVI)
+Flux_Control = fc.Flux_Control(name='FluxControl',
+                               num_channels=5,
+                               IVVI=station.IVVI)
 station.add_component(Flux_Control)
 
 transfer_matrix_dec = np.array([[4.70306717e-04,  -8.41312977e-05,   3.64442804e-05,  -1.00489353e-05,
@@ -198,11 +202,11 @@ Flux_Control.flux_offsets(-offsets)
 HS = hd.HeterodyneInstrument('HS', LO=LO, RF=RF, AWG=AWG, acquisition_instr=UHFQC_1.name,
                              server_name=None)
 station.add_component(HS)
-LutMan = lm.QuTech_ControlBox_LookuptableManager('LutMan', CBox=CBox,
+LutMan = lm.QuTech_ControlBox_LookuptableManager('LutMan', CBox=None,
                                                  server_name=None)
 
 MC = mc.MeasurementControl('MC')
-
+station.add_component(MC)
 # HS = None
 
 AncB = qbt.Tektronix_driven_transmon('AncB', LO=LO, cw_source=Spec_source,
@@ -410,7 +414,6 @@ else:
 
 list_qubits = [DataT, AncT, DataM, AncB,  DataB]
 for qubit in list_qubits:
-    qubit.RO_fixed_point_correction(True)
     qubit.RO_pulse_delay(20e-9)
     # qubit.RO_acq_averages(2**13)
 
@@ -456,3 +459,235 @@ k1.bounce_amp_2(-0.04)
 dist_dict = {'ch_list': ['ch4', 'ch3'],
              'ch4': k0.kernel(),
              'ch3': k1.kernel()}
+
+
+
+def reload_mod_stuff():
+    from pycqed.measurement.waveform_control import pulse_library as pl
+    reload(pl)
+    from pycqed.measurement.waveform_control import pulsar as ps
+    reload(ps)
+    # The AWG sequencer
+    qc.station.pulsar = ps.Pulsar()
+    station.pulsar.AWG = station.components['AWG']
+    markerhighs = [2, 2, 2.7, 2]
+    for i in range(4):
+        # Note that these are default parameters and should be kept so.
+        # the channel offset is set in the AWG itself. For now the amplitude is
+        # hardcoded. You can set it by hand but this will make the value in the
+        # sequencer different.
+        station.pulsar.define_channel(id='ch{}'.format(i+1),
+                                      name='ch{}'.format(i+1), type='analog',
+                                      # max safe IQ voltage
+                                      high=.7, low=-.7,
+                                      offset=0.0, delay=0, active=True)
+        station.pulsar.define_channel(id='ch{}_marker1'.format(i+1),
+                                      name='ch{}_marker1'.format(i+1),
+                                      type='marker',
+                                      high=markerhighs[i], low=0, offset=0.,
+                                      delay=0, active=True)
+        station.pulsar.define_channel(id='ch{}_marker2'.format(i+1),
+                                      name='ch{}_marker2'.format(i+1),
+                                      type='marker',
+                                      high=markerhighs[i], low=0, offset=0.,
+                                      delay=0, active=True)
+
+
+    from pycqed.measurement.waveform_control_CC import waveform as wf
+    reload(wf)
+
+    from pycqed.measurement.pulse_sequences import fluxing_sequences as fqqs
+    reload(fqqs)
+    from pycqed.scripts.Experiments.Five_Qubits import cost_functions_Leo_optimization as ca
+    reload(ca)
+    from pycqed.measurement.waveform_control import pulse_library as pl
+    reload(pl)
+    from pycqed.measurement.pulse_sequences import standard_elements as ste
+    reload(ste)
+
+    from pycqed.measurement.pulse_sequences import multi_qubit_tek_seq_elts as mqs
+    reload(mqs)
+    from pycqed.measurement import awg_sweep_functions_multi_qubit as awg_mswf
+    reload(awg_mswf)
+    reload(awg_swf)
+    mqs.station = station
+    fqqs.station = station
+    reload(mq_mod)
+    mq_mod.station = station
+
+    reload(fsqs)
+    reload(awg_swf)
+    fsqs.station=station
+    reload(det)
+    reload(ca)
+reload_mod_stuff()
+
+
+
+
+
+
+################################
+# Reloading qubit snippet
+################################
+import qcodes as qc
+station = qc.station
+from qcodes.utils import validators as vals
+from pycqed.instrument_drivers.meta_instrument.qubit_objects import qubit_object as qo
+from pycqed.instrument_drivers.meta_instrument.qubit_objects import CBox_driven_transmon as cbt
+from pycqed.instrument_drivers.meta_instrument.qubit_objects import Tektronix_driven_transmon as qbt
+
+##
+AncT.add_operation('CZ')
+# AncT.add_operation('CZ_phase_corr') # to be added as separate later
+AncT.add_pulse_parameter('CZ', 'CZ_pulse_amp', 'amplitude', initial_value=.5)
+AncT.add_pulse_parameter('CZ', 'fluxing_operation_type', 'operation_type',
+                         initial_value='Flux', vals=vals.Strings())
+AncT.add_pulse_parameter('CZ', 'CZ_channel_amp', 'channel_amplitude',
+                         initial_value=2.)
+AncT.link_param_to_operation('CZ', 'fluxing_channel', 'channel')
+AncT.link_param_to_operation('CZ', 'E_c', 'E_c')
+AncT.add_pulse_parameter('CZ', 'CZ_pulse_type', 'pulse_type',
+                         initial_value='MartinisFluxPulse', vals=vals.Strings())
+AncT.add_pulse_parameter('CZ', 'CZ_dac_flux_coeff', 'dac_flux_coefficient',
+                         initial_value=1.358)
+AncT.add_pulse_parameter('CZ', 'CZ_dead_time', 'dead_time',
+                         initial_value=3e-6)
+AncT.link_param_to_operation('CZ', 'f_qubit', 'f_01_max')
+AncT.add_pulse_parameter('CZ', 'CZ_bus', 'f_bus', 4.8e9)
+AncT.add_pulse_parameter('CZ', 'CZ_length', 'length', 40e-9)
+# AncT.link_param_to_operation('CZ', 'CZ_length', 'flux_pulse_length')
+
+AncT.add_pulse_parameter('CZ', 'g2', 'g2', 33.3e6)
+AncT.add_pulse_parameter('CZ', 'CZ_lambda_coeffs', 'lambda_coeffs',
+                         np.array([1, 0, 0]),
+                         vals=vals.Arrays())
+AncT.link_param_to_operation('CZ', 'mw_to_flux_delay', 'mw_to_flux_delay')#, 0)
+
+
+AncT.add_pulse_parameter('CZ', 'CZ_pulse_delay',
+                         'pulse_delay', 0e-9)
+AncT.add_pulse_parameter('CZ', 'CZ_refpoint',
+                         'refpoint', 'end', vals=vals.Strings())
+
+# AncT.add_pulse_parameter('CZ', 'CZ_square_pulse_buffer',
+#                          'square_pulse_buffer', 100e-9)
+# AncT.add_pulse_parameter('CZ', 'CZ_square_pulse_length',
+#                          'square_pulse_length', 40e-9)
+AncT.add_pulse_parameter('CZ', 'CZ_theta', 'theta_f', np.pi/2)
+
+
+AncT.add_operation('CZ_corr')
+AncT.link_param_to_operation('CZ_corr', 'fluxing_operation_type', 'operation_type')
+AncT.link_param_to_operation('CZ_corr', 'fluxing_channel', 'channel')
+
+AncT.link_param_to_operation('CZ_corr', 'CZ_refpoint', 'refpoint')
+
+AncT.add_pulse_parameter('CZ_corr', 'CZ_corr_amp', 'amplitude', 0)
+AncT.add_pulse_parameter('CZ_corr', 'CZ_corr_length',
+                         'square_pulse_length', 10e-9)
+#
+AncT.add_pulse_parameter('CZ_corr', 'CZ_corr_pulse_type', 'pulse_type',
+                         initial_value='SquareFluxPulse',
+                         vals=vals.Strings())
+AncT.add_pulse_parameter('CZ_corr', 'CZ_corr_pulse_delay',
+                         'pulse_delay', 0)
+
+DataT.add_operation('SWAP')
+DataT.add_pulse_parameter('SWAP', 'fluxing_operation_type', 'operation_type',
+                          initial_value='Flux', vals=vals.Strings())
+DataT.add_pulse_parameter('SWAP', 'SWAP_pulse_amp', 'amplitude',
+                          initial_value=0.5)
+DataT.link_param_to_operation('SWAP', 'fluxing_channel', 'channel')
+
+DataT.add_pulse_parameter('SWAP', 'SWAP_pulse_type', 'pulse_type',
+                          initial_value='SquareFluxPulse', vals=vals.Strings())
+DataT.add_pulse_parameter('SWAP', 'SWAP_refpoint',
+                          'refpoint', 'end', vals=vals.Strings())
+DataT.link_param_to_operation('SWAP', 'SWAP_amp', 'SWAP_amp')
+DataT.add_pulse_parameter('SWAP', 'SWAP_pulse_buffer',
+                          'pulse_buffer', 0e-9)
+
+DataT.link_param_to_operation('SWAP', 'SWAP_time', 'square_pulse_length')
+
+
+DataT.add_pulse_parameter('SWAP', 'SWAP_pulse_delay',
+                          'pulse_delay', 0e-9)
+
+DataT.add_operation('SWAP_corr')
+DataT.add_pulse_parameter(
+    'SWAP_corr', 'SWAP_corr_amp', 'amplitude', 0)
+DataT.link_param_to_operation('SWAP_corr', 'fluxing_operation_type', 'operation_type')
+DataT.link_param_to_operation('SWAP_corr', 'fluxing_channel', 'channel')
+DataT.link_param_to_operation('SWAP_corr', 'SWAP_refpoint', 'refpoint')
+DataT.add_pulse_parameter('SWAP_corr', 'SWAP_corr_length',
+                          'square_pulse_length', 10e-9)
+# DataT.link_param_to_operation('SWAP_corr', 'SWAP_corr_amp', 'amplitude')
+# DataT.link_param_to_operation('SWAP_corr', 'SWAP_corr_length', 'square_pulse_length')
+DataT.add_pulse_parameter('SWAP_corr', 'SWAP_corr_pulse_type', 'pulse_type',
+                          initial_value='SquareFluxPulse', vals=vals.Strings())
+DataT.add_pulse_parameter('SWAP_corr', 'SWAP_corr_pulse_delay',
+                          'pulse_delay', 0)
+
+DataT.add_operation('rSWAP')
+DataT.link_param_to_operation('rSWAP', 'fluxing_operation_type', 'operation_type')
+DataT.link_param_to_operation('rSWAP', 'fluxing_channel', 'channel')
+DataT.link_param_to_operation('rSWAP', 'SWAP_refpoint', 'refpoint')
+DataT.link_param_to_operation('rSWAP', 'SWAP_pulse_type', 'pulse_type')
+DataT.link_param_to_operation('rSWAP', 'SWAP_amp', 'SWAP_amp')
+
+
+DataT.link_param_to_operation('rSWAP', 'SWAP_pulse_buffer', 'pulse_buffer')
+DataT.link_param_to_operation('rSWAP', 'SWAP_pulse_delay', 'pulse_delay')
+
+DataT.add_pulse_parameter('rSWAP', 'rSWAP_time', 'square_pulse_length',
+                          initial_value=10e-9)
+DataT.add_pulse_parameter('rSWAP', 'rSWAP_pulse_amp', 'amplitude',
+                          initial_value=0.5)
+
+
+gen.load_settings_onto_instrument(AncT)
+gen.load_settings_onto_instrument(DataT)
+
+
+DataT.RO_acq_weight_function_I(0)
+DataT.RO_acq_weight_function_Q(0)
+AncT.RO_acq_weight_function_I(1)
+AncT.RO_acq_weight_function_Q(1)
+
+
+# Reloading device type object
+from pycqed.instrument_drivers.meta_instrument import device_object as do
+reload(do)
+# print(S5)
+try:
+    S5 = station.components['S5']
+    S5.close()
+    del station.components['S5']
+except:
+    pass
+S5 = do.DeviceObject('S5')
+station.add_component(S5)
+S5.add_qubits([AncT, DataT])
+
+S5.Buffer_Flux_Flux(10e-9)
+S5.Buffer_Flux_MW(40e-9)
+S5.Buffer_MW_MW(10e-9)
+S5.Buffer_MW_Flux(10e-9)
+station.sequencer_config = S5.get_operation_dict()['sequencer_config']
+
+
+# Required for the Niels naming scheme
+q0 = DataT
+q1 = AncT
+
+
+dist_dict = {'ch_list': ['ch4', 'ch3'],
+             'ch4': k0.kernel(),
+             'ch3': k1.kernel()}
+
+DataT.dist_dict(dist_dict)
+AncT.dist_dict(dist_dict)
+
+AWG.ch4_amp(DataT.SWAP_amp())
+AWG.ch3_amp(AncT.CZ_channel_amp())

@@ -148,7 +148,10 @@ class AWG_amp(Soft_Sweep):
 
     def set_parameter(self, val, **kw):
         self.AWG.stop()
-        exec('self.AWG.ch{}_amp({})'.format(self.channel, val))
+        if type(self.channel) == int:
+            exec('self.AWG.ch{}_amp({})'.format(self.channel, val))
+        else:
+            exec('self.AWG.{}_amp({})'.format(self.channel, val))
         self.AWG.start()
 
 
