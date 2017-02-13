@@ -162,12 +162,12 @@ def evolveH(tp, ThetaMax, frac, manifold=2, lambda1=1, lambda2=0):
     # ReA11Vec[0] = real(PsiT[1])
 
     # variable i = 1
-    for i in range(numT):
-        # construct the hamiltonian
-        thisH[0][0] = DetVec[i-1]
-        thisH[0][1] = g
-        thisH[1][0] = g
-        thisH[1][1] = 0 # Why is there a zero here?
+    # for i in range(numT):
+    #     # construct the hamiltonian
+    #     thisH[0][0] = DetVec[i-1]
+    #     thisH[0][1] = g
+    #     thisH[1][0] = g
+    #     thisH[1][1] = 0 # Why is there a zero here?
 
         # Jos Thijssen's trick: see his book
         # thisHm = (Eye+cmplx(0, -1)*thisH/2*dt*2*pi)
@@ -182,15 +182,15 @@ def evolveH(tp, ThetaMax, frac, manifold=2, lambda1=1, lambda2=0):
         # Pop11vec[i] = cabs(overlap[0]) ^ 2
         # PhaseVec[i] = atan2(imag(PsiT[1]), real(PsiT[1]))
         # ReA11Vec[i] = real(PsiT[1])
-x
-    phaseunwrap(PhaseVec)
+
+    # phaseunwrap(PhaseVec)
     # PhaseVec = pi
 
     # make/o/n = (2) latestValues
     # latestValues[0] = 1-Pop11vec[numT]
     # latestValues[1] = PhaseVec[numT]
-
-    return latestValues[1]
+#
+    # return latestValues[1]
 
 
 print('g: {:.4g} (MHz)'.format(g*1e-6))
