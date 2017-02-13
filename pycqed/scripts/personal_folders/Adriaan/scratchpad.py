@@ -34,9 +34,14 @@ elif bell_state == 3:  # |Psi_p>=|01> + |10>
     after_pulse = 'mY90 ' + qCZ
 
 
-theta_0 = np.exp(-1j*phase_q0)
-theta_1 = np.exp(-1j*phase_q1)
+theta_q0 = np.exp(-1j*phase_q0)
+theta_q1 = np.exp(-1j*phase_q1)
 theta_2q = np.exp(-1j*phase_2q)
+
+CZ_err = [  [1, 0, 0, 0],
+            [0, theta_q0, 0, 0],
+            [0, 0, theta_q1, 0],
+            [0, 0, 0, theta_2q]]
 
 psi_b0 = (theta_2q*qtp.tensor([theta_0*up,
                               theta_1*up])

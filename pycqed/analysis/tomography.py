@@ -778,14 +778,14 @@ class Tomo_Multiplexed(object):
         fig2 = plt.figure(figsize=(15, 5))
         ax = fig2.add_subplot(121)
         if self.target_cardinal is not None:
-            fidelity = calc_fid2_cardinal(self.operators,
+            self.fidelity = calc_fid2_cardinal(self.operators,
                                           self.target_cardinal)
             target_expectations = get_cardianal_pauli_exp(
                 self.target_cardinal)
             plot_target_pauli_set(target_expectations, ax)
 
         if self.target_bell is not None:
-            fidelity = calc_fid2_bell(
+            self.fidelity = calc_fid2_bell(
                 self.operators, self.target_bell)
             target_expectations = get_bell_pauli_exp(self.target_bell)
             plot_target_pauli_set(target_expectations, ax)
@@ -805,7 +805,7 @@ class Tomo_Multiplexed(object):
         msg = 'Purity: {:.3f}'.format(
             purity)
         if self.target_bell is not None or self.target_cardinal is not None:
-            msg += '\nFidelity to target {:.3f}'.format(fidelity)
+            msg += '\nFidelity to target {:.3f}'.format(self.fidelity)
         if self.target_bell is not None:
             theta_vec = np.linspace(0., 2*np.pi, 1001)
             fid_vec = np.zeros(theta_vec.shape)
@@ -833,13 +833,13 @@ class Tomo_Multiplexed(object):
         ax = fig3.add_subplot(121)
 
         if self.target_cardinal is not None:
-            fidelity_mle = calc_fid2_cardinal(self.operators_mle,
+            self.fidelity_mle = calc_fid2_cardinal(self.operators_mle,
                                               self.target_cardinal)
             target_expectations = get_cardianal_pauli_exp(
                 self.target_cardinal)
             plot_target_pauli_set(target_expectations, ax)
         if self.target_bell is not None:
-            fidelity_mle = calc_fid2_bell(self.operators_mle,
+            self.fidelity_mle = calc_fid2_bell(self.operators_mle,
                                           self.target_bell)
             target_expectations = get_bell_pauli_exp(self.target_bell)
             plot_target_pauli_set(target_expectations, ax)
@@ -850,7 +850,7 @@ class Tomo_Multiplexed(object):
         purity = (self.rho_2*self.rho_2).tr()
 
         msg = 'Purity: {:.3f}\nFidelity to target {:.3f}'.format(
-            purity, fidelity_mle)
+            purity, self.fidelity_mle)
         if self.target_bell is not None:
             theta_vec = np.linspace(0., 2*np.pi, 1001)
             fid_vec = np.zeros(theta_vec.shape)
