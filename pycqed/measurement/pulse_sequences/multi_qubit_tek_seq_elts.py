@@ -541,7 +541,7 @@ def two_qubit_tomo_bell(bell_state,
          'after_pulse ' + qCZ, 'tomo1 '+qCZ, 'tomo2 '+qS, 'RO '+RO_target])
 
     # Calibration points
-    # every calibration point is repeated 7 times to have 64 elts in total
+    # every calibration point is repeated 7 times to have 64 elts in totalb
     cal_points = [['I '+qCZ, 'I '+qS, 'RO '+RO_target]]*7 +\
                   [['I '+qCZ, 'X180 '+qS, 'RO '+RO_target]]*7 +\
                   [['X180 '+qCZ, 'I '+qS, 'RO '+RO_target]]*7 +\
