@@ -394,10 +394,14 @@ class UHFQC(Instrument):
 
     def single_acquisition(self, samples, acquisition_time=0.010, timeout=0, channels=set([0, 1]), mode='rl'):
         # Shorter acquisitions can use the poll function
-        if samples <= 256:
-            return self.single_acquisition_poll(samples, acquisition_time, timeout, channels, mode)
-        else:
-            return self.single_acquisition_get(samples, acquisition_time, timeout, channels, mode)
+        #if samples <= 256:
+        #    return self.single_acquisition_poll(samples, acquisition_time, timeout, channels, mode)
+        #else:
+        #    return self.single_acquisition_get(samples, acquisition_time, timeout, channels, mode)
+        self.single_acquisition_initialize(channels, mode)
+        data = self.single_acquisition_poll(samples, acquisition_time, timeout)
+        self.single_acquisition_finalize()
+        return data 
 
     def single_acquisition_initialize(self, channels=set([0, 1]), mode='rl'):
         # Define the channels to use
@@ -407,18 +411,19 @@ class UHFQC(Instrument):
             for c in channels:
                 self.single_acquisition_paths.append('/' + self._device + '/quex/rl/data/{}'.format(c))
             self._daq.subscribe('/' + self._device + '/quex/rl/data/*')
+            # Enable automatic readout
+            self._daq.setInt('/' + self._device + '/quex/rl/readout', 1)
         else:
             for c in channels:
                 self.single_acquisition_paths.append('/' + self._device + '/quex/iavg/data/{}'.format(c))
             self._daq.subscribe('/' + self._device + '/quex/iavg/data/*')
+            # Enable automatic readout
+            self._daq.setInt('/' + self._device + '/quex/iavg/readout', 1)
 
         self._daq.subscribe('/' + self._device + '/auxins/0/sample')
 
-        # Enable automatic readout
-        self._daq.setInt('/' + self._device + '/quex/rl/readout', 1)
-
         # Generate more dummy data
-        self._daq.setInt('/' + self._device + '/auxins/0/averaging', 2);
+        self._daq.setInt('/' + self._device + '/auxins/0/averaging', 4  );
 
 
     def single_acquisition_finalize(self):
