@@ -7,6 +7,7 @@ from pycqed.measurement import sweep_functions as swf
 from pycqed.measurement import detector_functions as det
 import time
 
+
 def wrap_par_to_swf(parameter):
     '''
      - only soft sweep_functions
@@ -22,6 +23,31 @@ def wrap_par_to_swf(parameter):
     sweep_function.set_parameter = parameter.set
     return sweep_function
 
+
+def wrap_vector_par_to_swf(parameter, index):
+    '''
+     - only soft sweep_functions
+    Wraps a vector parameter so that one can sweep over a component of a
+    vector.
+    '''
+    sweep_function = swf.Sweep_function()
+    sweep_function.sweep_control = 'soft'
+    sweep_function.name = parameter.name
+    sweep_function.parameter_name = parameter.label
+    sweep_function.unit = parameter.units
+
+    def wrapped_set(val):
+        old_val = parameter.get()
+        vector_value = old_val
+        vector_value[index] = val
+        parameter.set(vector_value)
+
+    sweep_function.prepare = pass_function
+    sweep_function.finish = pass_function
+    sweep_function.set_parameter = wrapped_set
+    return sweep_function
+
+
 def wrap_pars_to_swf(parameters):
     '''
      - only soft sweep_functions
@@ -34,16 +60,14 @@ def wrap_pars_to_swf(parameters):
 
     sweep_function.prepare = pass_function
     sweep_function.finish = pass_function
+
     def set_par(val):
         for par in parameters:
             par.set(val)
 
     sweep_function.set_parameter = set_par
 
-
     return sweep_function
-
-
 
 
 def wrap_par_to_det(parameter, control='soft'):
@@ -64,6 +88,7 @@ def wrap_par_to_det(parameter, control='soft'):
     detector_function.get_values = parameter.get
     return detector_function
 
+
 def pass_function(**kw):
     pass
 
@@ -77,6 +102,7 @@ def wrap_func_to_det(func, name, value_names, units, control='soft',  **kw):
 
     detector_function.prepare = pass_function
     detector_function.finish = pass_function
+
     def wrapped_func():
         return func(**kw)
 
@@ -84,8 +110,10 @@ def wrap_func_to_det(func, name, value_names, units, control='soft',  **kw):
     detector_function.get_values = wrapped_func
     return detector_function
 
+
 def wrap_par_remainder(par, remainder=1):
     new_par = qc.Parameter(name=par.name, label=par.label, units=par.units)
+
     def wrap_set(val):
         val = val % remainder
         par.set(val)
@@ -93,8 +121,10 @@ def wrap_par_remainder(par, remainder=1):
     new_par.set = wrap_set
     return new_par
 
+
 def wrap_par_set_get(par):
     new_par = qc.Parameter(name=par.name, label=par.label, units=par.units)
+
     def wrap_set(val):
         par.set(val)
         par.get()

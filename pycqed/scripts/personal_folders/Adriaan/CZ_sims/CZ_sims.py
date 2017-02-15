@@ -11,7 +11,7 @@ more so than the individual lambda coefficients.
 import numpy as np
 import qutip as qtp
 from pycqed.measurement.waveform_control_CC.waveform import martinis_flux_pulse
-
+import logging
 
 def SetupFluxPulsing(manifold=1, g1=250e6):
     """
@@ -274,9 +274,13 @@ def simulate_CZ_trajectory(length, lambda_coeffs, theta_f,
 
     H1_t = [[Hx, J1_t], [Hz, eps_t]]
     H2_t = [[Hx, J2_t], [Hz, eps_t]]
-
-    res1 = qtp.mesolve(H1_t, psi0, tlist, [], [])  # ,progress_bar=False )
-    res2 = qtp.mesolve(H2_t, psi0, tlist, [], [])  # ,progress_bar=False )
+    try:
+        res1 = qtp.mesolve(H1_t, psi0, tlist, [], [])  # ,progress_bar=False )
+        res2 = qtp.mesolve(H2_t, psi0, tlist, [], [])  # ,progress_bar=False )
+    except Exception as e:
+        logging.warning(e)
+        # This is exception handling to be able to use this in a loop
+        return 0, 0
 
     phases1 = (ket_to_phase(res1.states) % (2*np.pi))/(2*np.pi)*360
     phases2 = (ket_to_phase(res2.states) % (2*np.pi))/(2*np.pi)*360

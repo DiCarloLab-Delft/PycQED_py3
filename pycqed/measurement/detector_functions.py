@@ -914,7 +914,6 @@ class Function_Detector(Soft_Detector):
             else:
                 value = item
             measurement_kwargs[key] = value
-        print(measurement_kwargs)
         result = self.function(**measurement_kwargs)
 
         return result
