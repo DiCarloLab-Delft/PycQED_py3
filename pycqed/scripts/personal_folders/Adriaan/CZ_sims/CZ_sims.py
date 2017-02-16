@@ -226,11 +226,12 @@ def ket_to_phase(states):
 def simulate_CZ_trajectory(length, lambda_coeffs, theta_f,
                            f_01_max,
                            f_interaction,
-                           J2,
+                           J_2,
                            E_c,
                            dac_flux_coefficient=1,
                            asymmetry=0,
-                           sampling_rate=2e9, return_all=False):
+                           sampling_rate=2e9, return_all=False,
+                           verbose=False):
     """
     Input args:
         tp: pulse length
@@ -253,13 +254,13 @@ def simulate_CZ_trajectory(length, lambda_coeffs, theta_f,
         # if there is only one excitation, there is no interaction
         return 0
 
-    def J2_t(t, args=None):
-        return J2
+    def J_2_t(t, args=None):
+        return J_2
 
     tlist = (np.arange(0, length, 1/sampling_rate))
 
     f_pulse = martinis_flux_pulse(length, lambda_coeffs, theta_f,
-                                  f01_max, f_interaction, J2,
+                                  f01_max, f_interaction, J_2,
                                   Ec, dac_flux_coefficient,
                                   return_unit='eps',
                                   sampling_rate=sampling_rate)
@@ -273,7 +274,7 @@ def simulate_CZ_trajectory(length, lambda_coeffs, theta_f,
         return float(eps_vec[idx])
 
     H1_t = [[Hx, J1_t], [Hz, eps_t]]
-    H2_t = [[Hx, J2_t], [Hz, eps_t]]
+    H2_t = [[Hx, J_2_t], [Hz, eps_t]]
     try:
         res1 = qtp.mesolve(H1_t, psi0, tlist, [], [])  # ,progress_bar=False )
         res2 = qtp.mesolve(H2_t, psi0, tlist, [], [])  # ,progress_bar=False )
@@ -289,8 +290,9 @@ def simulate_CZ_trajectory(length, lambda_coeffs, theta_f,
 
     leakage = leakage_vec[-1]
     picked_up_phase = phase_diff_deg[-1]
-    print('Picked up phase: {:.1f} (deg) \nLeakage: \t {:.3f} (%)'.format(
-        picked_up_phase, leakage*100))
+    if verbose:
+        print('Picked up phase: {:.1f} (deg) \nLeakage: \t {:.3f} (%)'.format(
+            picked_up_phase, leakage*100))
     if return_all:
         return picked_up_phase, leakage, res1, res2, eps_vec, tlist
     else:
