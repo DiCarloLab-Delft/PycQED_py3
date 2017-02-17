@@ -169,10 +169,11 @@ def simple_mod_pulse(pulse_I, pulse_Q, f_modulation,
 
 def martinis_flux_pulse(length, lambda_coeffs, theta_f,
                         f_01_max,
-                        f_bus,
                         g2,
                         E_c,
                         dac_flux_coefficient,
+                        f_interaction=None,
+                        f_bus=None,
                         asymmetry=0,
                         sampling_rate=1e9,
                         return_unit='V'):
@@ -191,15 +192,17 @@ def martinis_flux_pulse(length, lambda_coeffs, theta_f,
                     Voltage for the centerpoint of the waveform.
 
     f_01_max        (float) qubit sweet spot frequency (Hz).
-    f_bus           (float) frequency of the bus (Hz).
     g2              (float) coupling between 11-02 (Hz),
                             approx sqrt(2) g1 (the 10-01 coupling).
     E_c             (float) Charging energy of the transmon (Hz).
+        N.B. specify either f_interaction or f_bus
+    f_interaction   (float) interaction frequency (Hz).
+    f_bus           (float) frequency of the bus (Hz).
     dac_flux_coefficient  (float) conversion factor for AWG voltage to flux (1/V)
     asymmetry       (float) qubit asymmetry
 
     sampling_rate   (float)
-    return_unit     (enum: ['V', 'eps', 'f01', 'theta']) wehter to return the pulse
+    return_unit     (enum: ['V', 'eps', 'f01', 'theta']) whether to return the pulse
                     expressed in units of theta: the reference frame of the
                     interaction, units of epsilon: detuning to the bus
                     eps=f12-f_bus
@@ -209,7 +212,9 @@ def martinis_flux_pulse(length, lambda_coeffs, theta_f,
     length = nr_samples/sampling_rate  # gives back the rounded length
     t_step = 1/sampling_rate
     t = np.arange(0, length, t_step)
-    theta_0 = np.arctan(2*g2/(f_01_max-E_c-f_bus))
+    if f_interaction is None:
+        f_interaction = f_bus + E_c
+    theta_0 = np.arctan(2*g2/(f_01_max-f_interaction))
     # you can not have weaker coupling than the initial coupling
     assert(theta_f > theta_0)
     odd_coeff_lambda_sum = np.sum(lambda_coeffs[::2])
@@ -237,7 +242,7 @@ def martinis_flux_pulse(length, lambda_coeffs, theta_f,
         return mart_pulse_eps
 
     # pulse parameterized in the f01 frequency
-    mart_pulse_f01 = mart_pulse_eps + E_c + f_bus
+    mart_pulse_f01 = mart_pulse_eps + f_interaction
     if return_unit == 'f01':
         return mart_pulse_f01
     mart_pulse_V = Qubit_freq_to_dac(

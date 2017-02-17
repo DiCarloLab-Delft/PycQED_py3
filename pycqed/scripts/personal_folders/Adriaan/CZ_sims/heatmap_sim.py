@@ -20,9 +20,9 @@ station.add_component(MC)
 MC.station = station
 station.MC = MC
 
-MC_outer = mc.MeasurementControl('MC_outer')
-station.add_component(MC_outer)
-MC_outer.station = station
+# MC_outer = mc.MeasurementControl('MC_outer')
+# station.add_component(MC_outer)
+# MC_outer.station = station
 
 
 # I create an empty instrument here that does nothing and will contain
@@ -72,7 +72,7 @@ params_dict = {'length': s_pars.pulse_length,
 # These are the params of the 5 qubit chip for swapping with the bus resonator
 s_pars.E_c(300e6)
 s_pars.J_2(np.sqrt(2)*25e6)
-s_pars.lambda_coeffs(np.array([1, 0, 0]))
+s_pars.lambda_coeffs(np.array([1., 0, 0]))
 s_pars.theta_f(np.pi/2)
 s_pars.f_interaction(4.8e9+s_pars.E_c())
 s_pars.f_01_max(5.94e9)
@@ -81,14 +81,6 @@ s_pars.f_01_max(5.94e9)
 sim_det = det.Function_Detector(czs.simulate_CZ_trajectory, params_dict,
                                 value_names=['Conditional Phase', 'leakage'],
                                 value_units=['deg', ' '])
-
-# MC.set_sweep_function(s_pars.pulse_length)
-# MC.set_sweep_points(np.arange(20e-9, 60e-9, 5e-9))
-# MC.set_detector_function(sim_det)
-# MC.run('Pulse_length_sweep')
-# ma.MeasurementAnalysis()
-
-
 
 # Quickly defining a cost function
 def CZ_cost(**params_dict):
@@ -105,59 +97,15 @@ sim_cost_det = det.Function_Detector(
 
 
 l1_swf = mc_parameter_wrapper.wrap_vector_par_to_swf(s_pars.lambda_coeffs, 0)
-
+l1_swf.parameter_name = 'Lambda 1'
 l2_swf = mc_parameter_wrapper.wrap_vector_par_to_swf(s_pars.lambda_coeffs, 1)
-lengths=np.arange(20e-9, 61e-9, 5e-9)
-# for l in lengths:
-#     s_pars.pulse_length(l)
-    # Finding minimal leakage for a range of lengths:
-def optimal_pars():
-    MC.set_sweep_functions([s_pars.theta_f])
-    ad_func_pars = {'adaptive_function': scipy.optimize.minimize_scalar,
-                    'bounds': [.1, 1.9],
-                    'method': 'Bounded',
-                    'tol':1e-5, 'minimize': True}
-    MC.set_detector_function(sim_cost_det)
-    MC.set_adaptive_function_parameters(ad_func_pars)
-    MC.run('Adaptive_opt_{:.2f}ns'.format(s_pars.pulse_length()*1e9),
-           mode='adaptive')
-    a=ma.MeasurementAnalysis(label='Adaptive_opt')
-    return a.measured_values[1:, -1]
+l2_swf.parameter_name = 'Lambda 2'
 
-f_det = det.Function_Detector(
-    optimal_pars, parameters_dictionary={},
-    value_names=['Conditional Phase', 'Leakage'],
-    value_units=['deg', ' '])
-
-MC.live_plot_enabled(False)
-MC_outer.live_plot_enabled(False)
-
-MC_outer.set_sweep_function(s_pars.pulse_length)
-MC_outer.set_sweep_points(lengths)
-MC_outer.set_detector_function(f_det)
-MC_outer.run('Leakage_vs_pulse_length')
-ma.MeasurementAnalysis(label='Leakage_vs_pulse_length')
-
-# MC_outer.set_sweep_function(s_pars.pulse_length)
-# MC_outer.set_sweep_points(lengths)
-# MC_outer.set_sweep_function_2D(l2_swf)
-# MC_outer.set_sweep_points_2D([0, .02, 0.04, 0.06])
-# MC_outer.set_detector_function(f_det)
-# MC_outer.run('Leakage_vs_pulse_length_lambda2', mode='2D')
-# ma.TwoD_Analysis(label='Leakage_vs_')
-
-
-# l2_swf = mc_parameter_wrapper.wrap_vector_par_to_swf(s_pars.lambda_coeffs, 2)
-
-
-# MC.set_sweep_functions([s_pars.theta_f, l1_swf, l2_swf])
-# MC.set_detector_function(sim_cost_det)
-# ad_func_pars = {'adaptive_function': nelder_mead,
-#                 'x0': [1.5, .2, 0],
-#                 'initial_step': [0.1, 0.05, 0.05], 'minimize': True}
-# MC.set_adaptive_function_parameters(ad_func_pars)
-
-
-# MC.run('Adaptive simulation', mode='adaptive')
-# ma.OptimizationAnalysis(auto=True, label='Adaptive')
-# ma.OptimizationAnalysis_v2(label = 'adaptive')
+s_pars.pulse_length(50e-9)
+MC.set_sweep_functions([s_pars.theta_f, l1_swf])
+MC.set_sweep_points(np.linspace(.4*np.pi/2, 1.2*np.pi/2, 31))
+MC.set_sweep_points_2D(np.linspace(0, 1, 11))
+MC.set_detector_function(sim_cost_det)
+MC.run('heatmap_{:.2f}ns'.format(s_pars.pulse_length()*1e9),
+       mode='2D')
+a = ma.MeasurementAnalysis(TwoD=True)

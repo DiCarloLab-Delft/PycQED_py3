@@ -515,20 +515,23 @@ class MeasurementControl(Instrument):
                 # creates the time variables if they did not exists yet
                 self._mon_upd_time = time.time()
                 time_since_last_mon_update = 1e9
-            if (time_since_last_mon_update > self.plotting_interval() or
-                    force_update) :
+            try:
+                if (time_since_last_mon_update > self.plotting_interval() or
+                        force_update) :
 
-                nr_sweep_funcs = len(self.sweep_function_names)
-                for y_ind in range(len(self.detector_function.value_names)):
-                    for x_ind in range(nr_sweep_funcs):
-                        x = self.dset[:, x_ind]
-                        y = self.dset[:, nr_sweep_funcs+y_ind]
+                    nr_sweep_funcs = len(self.sweep_function_names)
+                    for y_ind in range(len(self.detector_function.value_names)):
+                        for x_ind in range(nr_sweep_funcs):
+                            x = self.dset[:, x_ind]
+                            y = self.dset[:, nr_sweep_funcs+y_ind]
 
-                        self.curves[i]['config']['x'] = x
-                        self.curves[i]['config']['y'] = y
-                        i += 1
-                self._mon_upd_time = time.time()
-                self.main_QtPlot.update_plot()
+                            self.curves[i]['config']['x'] = x
+                            self.curves[i]['config']['y'] = y
+                            i += 1
+                    self._mon_upd_time = time.time()
+                    self.main_QtPlot.update_plot()
+            except Exception as e:
+                logging.warning(e)
 
     def initialize_plot_monitor_2D(self):
         '''
@@ -561,18 +564,21 @@ class MeasurementControl(Instrument):
         to the QC_QtPlot.
         '''
         if self.live_plot_enabled():
-            i = int((self.iteration) % (self.xlen*self.ylen))
-            x_ind = int(i % self.xlen)
-            y_ind = int(i / self.xlen)
-            for j in range(len(self.detector_function.value_names)):
-                z_ind = len(self.sweep_functions) + j
-                self.TwoD_array[y_ind, x_ind, j] = self.dset[i, z_ind]
-            self.secondary_QtPlot.traces[j]['config']['z'] = self.TwoD_array[:, :, j]
-            if (time.time() - self.time_last_2Dplot_update >
-                    self.plotting_interval()
-                    or self.iteration == len(self.sweep_points)):
-                self.time_last_2Dplot_update = time.time()
-                self.secondary_QtPlot.update_plot()
+            try:
+                i = int((self.iteration) % (self.xlen*self.ylen))
+                x_ind = int(i % self.xlen)
+                y_ind = int(i / self.xlen)
+                for j in range(len(self.detector_function.value_names)):
+                    z_ind = len(self.sweep_functions) + j
+                    self.TwoD_array[y_ind, x_ind, j] = self.dset[i, z_ind]
+                self.secondary_QtPlot.traces[j]['config']['z'] = self.TwoD_array[:, :, j]
+                if (time.time() - self.time_last_2Dplot_update >
+                        self.plotting_interval()
+                        or self.iteration == len(self.sweep_points)):
+                    self.time_last_2Dplot_update = time.time()
+                    self.secondary_QtPlot.update_plot()
+            except Exception as e:
+                logging.warning(e)
 
     def initialize_plot_monitor_adaptive(self):
         '''
@@ -590,16 +596,19 @@ class MeasurementControl(Instrument):
 
     def update_plotmon_adaptive(self, force_update=False):
         if self.live_plot_enabled():
-            if (time.time() - self.time_last_ad_plot_update >
-                    self.plotting_interval() or force_update):
-                for j in range(len(self.detector_function.value_names)):
-                    y_ind = len(self.sweep_functions) + j
-                    y = self.dset[:, y_ind]
-                    x = range(len(y))
-                    self.secondary_QtPlot.traces[j]['config']['x'] = x
-                    self.secondary_QtPlot.traces[j]['config']['y'] = y
-                    self.time_last_ad_plot_update = time.time()
-                    self.secondary_QtPlot.update_plot()
+            try:
+                if (time.time() - self.time_last_ad_plot_update >
+                        self.plotting_interval() or force_update):
+                    for j in range(len(self.detector_function.value_names)):
+                        y_ind = len(self.sweep_functions) + j
+                        y = self.dset[:, y_ind]
+                        x = range(len(y))
+                        self.secondary_QtPlot.traces[j]['config']['x'] = x
+                        self.secondary_QtPlot.traces[j]['config']['y'] = y
+                        self.time_last_ad_plot_update = time.time()
+                        self.secondary_QtPlot.update_plot()
+            except Exception as e:
+                logging.warning(e)
 
     def update_plotmon_2D_hard(self):
         '''
@@ -607,21 +616,24 @@ class MeasurementControl(Instrument):
         to the QC_QtPlot.
         Note that the plotmon only supports evenly spaced lattices.
         '''
-        if self.live_plot_enabled():
-            i = int((self.iteration) % self.ylen)
-            y_ind = i
-            for j in range(len(self.detector_function.value_names)):
-                z_ind = len(self.sweep_functions) + j
-                self.TwoD_array[y_ind, :, j] = self.dset[
-                    i*self.xlen:(i+1)*self.xlen, z_ind]
-                self.secondary_QtPlot.traces[j]['config']['z'] = \
-                    self.TwoD_array[:, :, j]
+        try:
+            if self.live_plot_enabled():
+                i = int((self.iteration) % self.ylen)
+                y_ind = i
+                for j in range(len(self.detector_function.value_names)):
+                    z_ind = len(self.sweep_functions) + j
+                    self.TwoD_array[y_ind, :, j] = self.dset[
+                        i*self.xlen:(i+1)*self.xlen, z_ind]
+                    self.secondary_QtPlot.traces[j]['config']['z'] = \
+                        self.TwoD_array[:, :, j]
 
-            if (time.time() - self.time_last_2Dplot_update >
-                    self.plotting_interval()
-                    or self.iteration == len(self.sweep_points)/self.xlen):
-                self.time_last_2Dplot_update = time.time()
-                self.secondary_QtPlot.update_plot()
+                if (time.time() - self.time_last_2Dplot_update >
+                        self.plotting_interval()
+                        or self.iteration == len(self.sweep_points)/self.xlen):
+                    self.time_last_2Dplot_update = time.time()
+                    self.secondary_QtPlot.update_plot()
+        except Exception as e:
+                logging.warning(e)
 
     def _set_plotting_interval(self, plotting_interval):
         self.main_QtPlot.interval = plotting_interval
