@@ -7,7 +7,7 @@ import logging
 from pycqed.measurement import Pulse_Generator as PG
 import unittest
 import matplotlib.pyplot as plt
-import imp 
+import imp
 from pycqed.analysis.fit_toolbox import functions as func
 
 imp.reload(PG)
@@ -17,7 +17,7 @@ global lm  # Global used for passing value to the testsuite
 
 class UHFQC_LookuptableManagerManager(Instrument):
     '''
-    meta-instrument that can produce multiplexed pulses by adding pulses 
+    meta-instrument that can produce multiplexed pulses by adding pulses
     from different lookupotable managers.
 
     For now this is a test version that only stores the parameters for a
@@ -51,10 +51,10 @@ class UHFQC_LookuptableManagerManager(Instrument):
                            parameter_class=ManualParameter,
                            initial_value=False)
 
-        self.add_parameter('acquisition_delay', vals=vals.Numbers(), units='ns',
+        self.add_parameter('acquisition_delay', vals=vals.Numbers(), units='s',
                            parameter_class=ManualParameter,
                            initial_value=270e-9)
-        self.add_parameter('LutMans', vals=vals.Anything(),  
+        self.add_parameter('LutMans', vals=vals.Anything(),
                    set_cmd=self._attach_lutmans_to_Lutmanman)
         self.add_parameter('sampling_rate', vals=vals.Numbers(), units='Hz',
                            parameter_class=ManualParameter,
@@ -69,7 +69,7 @@ class UHFQC_LookuptableManagerManager(Instrument):
             LutManthis=self.find_instrument(LutMan)
             setattr(self, LutMan, LutManthis) #equivalent to: self.LutMan= LutManthis
 
-  
+
     def generate_multiplexed_pulse(self, multiplexed_wave):
         '''
         Generates a basic set of pulses (I, X-180, Y-180, x-90, y-90, Block,
@@ -81,10 +81,10 @@ class UHFQC_LookuptableManagerManager(Instrument):
         Serwan's thesis.
         '''
         # Standard qubit pulses
-       
+
         ###### RO pulses
         Wave_multi_I=np.array(np.zeros(2))
-        Wave_multi_Q=np.array(np.zeros(2))         
+        Wave_multi_Q=np.array(np.zeros(2))
         for LutMan, pulse in multiplexed_wave:
             print("loading {} from {}".format(pulse, LutMan))
             LutManthis=self.find_instrument(LutMan)
@@ -120,7 +120,7 @@ class UHFQC_LookuptableManagerManager(Instrument):
         elif time_units == 's':
             x = (np.arange(len(self._wave_dict[wave_name][0]))
                  / self.sampling_rate.get())
-            ax.set_xlabel('time (s)')
+            ax.set_xlabel('Time (s)')
             ax.vlines(2048 / self.sampling_rate.get(),
                       self._voltage_min, self._voltage_max, linestyle='--')
         print(wave_name)
@@ -143,7 +143,7 @@ class UHFQC_LookuptableManagerManager(Instrument):
     def render_wave_PSD(self, wave_name, show=True, f_bounds=None, y_bounds=None):
         fig, ax = plt.subplots(1, 1)
         f_axis, PSD_I = func.PSD(self._wave_dict[wave_name][0], 1/self.sampling_rate())
-        f_axis, PSD_Q = func.PSD(self._wave_dict[wave_name][1], 1/self.sampling_rate())         
+        f_axis, PSD_Q = func.PSD(self._wave_dict[wave_name][1], 1/self.sampling_rate())
 
         ax.set_xlabel('frequency (Hz)')
         ax.set_title(wave_name)

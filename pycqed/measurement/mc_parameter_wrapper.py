@@ -22,6 +22,29 @@ def wrap_par_to_swf(parameter):
     sweep_function.set_parameter = parameter.set
     return sweep_function
 
+def wrap_pars_to_swf(parameters):
+    '''
+     - only soft sweep_functions
+    '''
+    sweep_function = swf.Sweep_function()
+    sweep_function.sweep_control = 'soft'
+    sweep_function.name = parameters[0].name
+    sweep_function.parameter_name = parameters[0].label
+    sweep_function.unit = parameters[0].units
+
+    sweep_function.prepare = pass_function
+    sweep_function.finish = pass_function
+    def set_par(val):
+        for par in parameters:
+            par.set(val)
+
+    sweep_function.set_parameter = set_par
+
+
+    return sweep_function
+
+
+
 
 def wrap_par_to_det(parameter, control='soft'):
     '''

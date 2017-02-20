@@ -149,7 +149,3 @@ A little document containing some handy git commands.
 
 Lecture series on scientific python
 [Scientific Computing with Python](https://github.com/jrjohansson/scientific-python-lectures)
-
-QuTip: Quantum Toolbox in python
-[Qutip](http://qutip.org/)
-[Qutip Lectures](https://github.com/jrjohansson/scientific-python-lectures)

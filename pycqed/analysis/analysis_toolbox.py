@@ -20,9 +20,11 @@ from scipy.signal import argrelextrema
 from .tools.file_handling import *
 from .tools.data_manipulation import *
 from .tools.plotting import *
+import colorsys as colors
 
 try:
-    datadir = qc_config['datadir']  # currently not recognized, does not do anything
+    # currently not recognized, does not do anything
+    datadir = qc_config['datadir']
     print('Data directory set to:', datadir)
 except:
     mac = get_mac()
@@ -86,7 +88,6 @@ def is_older(ts0, ts1, or_equal=False):
             return ((dstamp0+tstamp0) <= (dstamp1+tstamp1))
 
 
-
 def is_equal(ts0, ts1, or_equal=False):
     '''
     returns True if timestamp ts0 is an the same data as timestamp ts1,
@@ -107,10 +108,9 @@ def return_last_n_timestamps(n, contains=''):
             timestamps.append(timestamp)
         else:
             timestamps.append(latest_data(contains=contains,
-                              older_than=timestamps[-1],
-                              return_timestamp=True)[0])
+                                          older_than=timestamps[-1],
+                                          return_timestamp=True)[0])
     return timestamps
-
 
 
 def latest_data(contains='', older_than=None, newer_than=None, or_equal=False,
@@ -241,13 +241,17 @@ def get_start_stop_time(timestamp):
     '''
     from pycqed.analysis import measurement_analysis as MA
     ma = MA.MeasurementAnalysis(timestamp=timestamp)
-    timestring_start = a_tools.get_instrument_setting(ma,'MC','measurement_begintime')
-    timestring_stop = a_tools.get_instrument_setting(ma,'MC','measurement_endtime')
+    timestring_start = a_tools.get_instrument_setting(
+        ma, 'MC', 'measurement_begintime')
+    timestring_stop = a_tools.get_instrument_setting(
+        ma, 'MC', 'measurement_endtime')
     date_start, time_start = timestring_start.split(' ')
     date_stop, time_stop = timestring_stop.split(' ')
-    timestamp_start = date_start.replace('-','')+'_'+time_start.replace(':','')
-    timestamp_stop = date_stop.replace('-','')+'_'+time_stop.replace(':','')
+    timestamp_start = date_start.replace(
+        '-', '')+'_'+time_start.replace(':', '')
+    timestamp_stop = date_stop.replace('-', '')+'_'+time_stop.replace(':', '')
     return timestamp_start, timestamp_stop
+
 
 def get_data_from_timestamp_legacy(timestamps, param_names, TwoD=False, max_files=None):
     from pycqed.analysis import measurement_analysis as MA
@@ -264,23 +268,28 @@ def get_data_from_timestamp_legacy(timestamps, param_names, TwoD=False, max_file
             ma.get_naming_and_values()
         for param in param_names:
             if '.' not in param:
-                special_output = {'amp':0, 'phase':1, 'I':2, 'Q':3}
-                special_output.update({'I_raw':0, 'Q_raw':1, 'I_cal':2, 'Q_cal':3})
-                special_output.update({'I':0, 'Q':1})
-                #print special_output
+                special_output = {'amp': 0, 'phase': 1, 'I': 2, 'Q': 3}
+                special_output.update(
+                    {'I_raw': 0, 'Q_raw': 1, 'I_cal': 2, 'Q_cal': 3})
+                special_output.update({'I': 0, 'Q': 1})
+                # print special_output
                 if param in list(special_output.keys()):
-                    data[param].append(getattr(ma,'measured_values')[special_output[param]])
+                    data[param].append(
+                        getattr(ma, 'measured_values')[special_output[param]])
                 elif param in dir(ma):
-                    data[param].append(getattr(ma,param))
-                elif param in ma.data_file.get('Experimental Data',{}):
-                    data[param].append(np.double(ma.data_file['Experimental Data'][param]))
+                    data[param].append(getattr(ma, param))
+                elif param in ma.data_file.get('Experimental Data', {}):
+                    data[param].append(
+                        np.double(ma.data_file['Experimental Data'][param]))
                 else:
-                    warnings.warn('This data file attribute does not exist or hasn''t been coded for extraction.')
+                    warnings.warn(
+                        'This data file attribute does not exist or hasn''t been coded for extraction.')
 
             else:
-                if param.split('.')[0] in ma.data_file.get('Instrument settings',{}):
-                    data[param].append(ma.data_file['Instrument settings'][param.split('.')[0]].attrs[param.split('.')[1]])
-                elif param.split('.')[0] in ma.data_file.get('Analysis',{}):
+                if param.split('.')[0] in ma.data_file.get('Instrument settings', {}):
+                    data[param].append(ma.data_file['Instrument settings'][
+                                       param.split('.')[0]].attrs[param.split('.')[1]])
+                elif param.split('.')[0] in ma.data_file.get('Analysis', {}):
                     temp = ma.data_file['Analysis']
                     for ii in range(len(param.split('.'))-1):
                         temp = temp[param.split('.')[ii]]
@@ -291,7 +300,8 @@ def get_data_from_timestamp_legacy(timestamps, param_names, TwoD=False, max_file
                         temp = temp[param.split('.')[ii]]
                     data[param].append(temp[param.split('.')[-1]])
                 else:
-                    warnings.warn('This data file attribute does not exist or hasn''t been coded for extraction.')
+                    warnings.warn(
+                        'This data file attribute does not exist or hasn''t been coded for extraction.')
         ma.data_file.close()
     return data
 
@@ -300,23 +310,28 @@ def get_data_from_ma_v1(ma, param_names):
     data = od([(param, None) for param in param_names])
     for param in param_names:
         if '.' not in param:
-            special_output = {'amp':0, 'phase':1, 'I':2, 'Q':3}
-            special_output.update({'I_raw':0, 'Q_raw':1, 'I_cal':2, 'Q_cal':3})
-            special_output.update({'I':0, 'Q':1})
-            #print special_output
+            special_output = {'amp': 0, 'phase': 1, 'I': 2, 'Q': 3}
+            special_output.update(
+                {'I_raw': 0, 'Q_raw': 1, 'I_cal': 2, 'Q_cal': 3})
+            special_output.update({'I': 0, 'Q': 1})
+            # print special_output
             if param in list(special_output.keys()):
-                data[param] = getattr(ma,'measured_values')[special_output[param]]
+                data[param] = getattr(
+                    ma, 'measured_values')[special_output[param]]
             elif param in dir(ma):
-                data[param] = getattr(ma,param)
-            elif param in ma.data_file.get('Experimental Data',{}):
-                data[param] = np.double(ma.data_file['Experimental Data'][param])
+                data[param] = getattr(ma, param)
+            elif param in ma.data_file.get('Experimental Data', {}):
+                data[param] = np.double(
+                    ma.data_file['Experimental Data'][param])
             else:
-                warnings.warn('This data file attribute does not exist or hasn''t been coded for extraction.')
+                warnings.warn(
+                    'This data file attribute does not exist or hasn''t been coded for extraction.')
 
         else:
-            if param.split('.')[0] in ma.data_file.get('Instrument settings',{}):
-                data[param] = ma.data_file['Instrument settings'][param.split('.')[0]].attrs[param.split('.')[1]]
-            elif param.split('.')[0] in ma.data_file.get('Analysis',{}):
+            if param.split('.')[0] in ma.data_file.get('Instrument settings', {}):
+                data[param] = ma.data_file['Instrument settings'][
+                    param.split('.')[0]].attrs[param.split('.')[1]]
+            elif param.split('.')[0] in ma.data_file.get('Analysis', {}):
                 temp = ma.data_file['Analysis']
                 for ii in range(len(param.split('.'))-1):
                     temp = temp[param.split('.')[ii]]
@@ -327,13 +342,14 @@ def get_data_from_ma_v1(ma, param_names):
                     temp = temp[param.split('.')[ii]]
                 data[param] = temp[param.split('.')[-1]]
             else:
-                warnings.warn('This data file attribute does not exist or hasn''t been coded for extraction.')
+                warnings.warn(
+                    'This data file attribute does not exist or hasn''t been coded for extraction.')
     return data
 
 
 def get_data_from_ma_v2(ma, param_names, numeric_params=None):
     data = od([(param, None) for param in param_names])
-    #print 'boo7', data['amp']
+    # print 'boo7', data['amp']
     for param in param_names:
         if param == 'all_data':
             data[param] = ma.measured_values
@@ -345,62 +361,74 @@ def get_data_from_ma_v2(ma, param_names, numeric_params=None):
             temp = temp[fit_key]
             # print temp.keys()
             # for key in temp.keys():
-                # print key
-                # print temp[key].attrs['value']
-            data[param] = {key:temp[key].attrs['value'] for key in list(temp.keys()) if key != 'covar'}
+            # print key
+            # print temp[key].attrs['value']
+            data[param] = {key: temp[key].attrs['value']
+                           for key in list(temp.keys()) if key != 'covar'}
             free_vars = 0
             for key in list(data[param].keys()):
                 if temp[key].attrs['vary']:
                     free_vars += 1
-            data[param].update({key+'_err':temp[key].attrs['stderr'] for key in list(temp.keys()) if key != 'covar'})
-            data[param].update({'chi_squared':temp.attrs['chisqr']})
+            data[param].update({key+'_err': temp[key].attrs['stderr']
+                                for key in list(temp.keys()) if key != 'covar'})
+            data[param].update({'chi_squared': temp.attrs['chisqr']})
 
             # tmp_var is a temporary fix!
             # should be removed at some point
             try:
-                tmp_var = ma.data_file['Instrument settings']['MC'].attrs['detector_function_name']
+                tmp_var = ma.data_file['Instrument settings'][
+                    'MC'].attrs['detector_function_name']
             except:
                 tmp_var = None
             if tmp_var == 'TimeDomainDetector':
                 temp2 = ma.data_file['Instrument settings']['TD_Meas']
-                exec(('cal_zero = %s'%(temp2.attrs['cal_zero_points'])), locals())
-                exec(('cal_one = %s'%(temp2.attrs['cal_one_points'])), locals())
-                dofs = int(temp2.attrs['NoSegments']) - len(cal_zero) - len(cal_one)
+                exec(
+                    ('cal_zero = %s' % (temp2.attrs['cal_zero_points'])), locals())
+                exec(
+                    ('cal_one = %s' % (temp2.attrs['cal_one_points'])), locals())
+                dofs = int(temp2.attrs['NoSegments']) - \
+                    len(cal_zero) - len(cal_one)
             else:
                 dofs = len(ma.sweep_points)
             dofs -= free_vars+1
-            data[param].update({'chi_squared_reduced':temp.attrs['chisqr']/dofs})
-            data[param].update({'chi_squared_dofs':dofs})
+            data[param].update(
+                {'chi_squared_reduced': temp.attrs['chisqr']/dofs})
+            data[param].update({'chi_squared_dofs': dofs})
         elif '.' not in param:
-            special_output = {'amp':0, 'phase':1, 'I':2, 'Q':3}
-            special_output.update({'I_raw':0, 'Q_raw':1, 'I_cal':2, 'Q_cal':3})
-            special_output.update({'I':0, 'Q':1})
-            #print special_output
-            #print 'boo8', ma.measured_values[special_output[param]]
+            special_output = {'amp': 0, 'phase': 1, 'I': 2, 'Q': 3}
+            special_output.update(
+                {'I_raw': 0, 'Q_raw': 1, 'I_cal': 2, 'Q_cal': 3})
+            special_output.update({'I': 0, 'Q': 1})
+            # print special_output
+            # print 'boo8', ma.measured_values[special_output[param]]
             if param in special_output:
                 data[param] = ma.measured_values[special_output[param]]
             elif param in dir(ma):
-                data[param] = getattr(ma,param)
-            elif param in list(ma.data_file.get('Experimental Data',{}).keys()):
-                data[param] = np.double(ma.data_file['Experimental Data'][param])
-            elif param in list(ma.data_file.get('Analysis',{}).keys()):
+                data[param] = getattr(ma, param)
+            elif param in list(ma.data_file.get('Experimental Data', {}).keys()):
+                data[param] = np.double(
+                    ma.data_file['Experimental Data'][param])
+            elif param in list(ma.data_file.get('Analysis', {}).keys()):
                 data[param] = np.double(ma.data_file['Analysis'][param])
             else:
-                warnings.warn('The data file attribute %s does not exist or hasn''t been coded for extraction.'%(param))
-            #print 'boo9', data['amp']
+                warnings.warn(
+                    'The data file attribute %s does not exist or hasn''t been coded for extraction.' % (param))
+            # print 'boo9', data['amp']
 
         else:
-            if param.split('.')[0] in list(ma.data_file.get('Instrument settings',{}).keys()):
-                data[param] = ma.data_file['Instrument settings'][param.split('.')[0]].attrs[param.split('.')[1]]
+            if param.split('.')[0] in list(ma.data_file.get('Instrument settings', {}).keys()):
+                data[param] = ma.data_file['Instrument settings'][
+                    param.split('.')[0]].attrs[param.split('.')[1]]
             else:
-                extract_param=True
-                if param.split('.')[0] in list(ma.data_file.get('Analysis',{}).keys()):
+                extract_param = True
+                if param.split('.')[0] in list(ma.data_file.get('Analysis', {}).keys()):
                     temp = ma.data_file['Analysis']
                 elif param.split('.')[0] in list(ma.data_file.keys()):
                     temp = ma.data_file
                 else:
-                    extract_param=False
-                    warnings.warn('The data file attribute %s does not exist or hasn''t been coded for extraction.'%(param))
+                    extract_param = False
+                    warnings.warn(
+                        'The data file attribute %s does not exist or hasn''t been coded for extraction.' % (param))
                 if extract_param:
                     for ii in range(len(param.split('.'))-1):
                         temp = temp[param.split('.')[ii]]
@@ -420,10 +448,10 @@ def get_data_from_ma_v2(ma, param_names, numeric_params=None):
 def get_data_from_ma(ma, param_names, data_version=2, numeric_params=None):
     if data_version == 1:
         data = get_data_from_ma_v1(ma, param_names,
-                                    numeric_params=numeric_params)
+                                   numeric_params=numeric_params)
     elif data_version == 2:
         data = get_data_from_ma_v2(ma, param_names,
-                                    numeric_params=numeric_params)
+                                   numeric_params=numeric_params)
     return data
 
 
@@ -472,16 +500,17 @@ def get_data_from_timestamp_list(timestamps,
                 del ana
             except:
                 pass
-            warnings.warn('This data file does not exist or has been corrupted.')
+            warnings.warn(
+                'This data file does not exist or has been corrupted.')
             remove_timestamps.append(timestamp)
         else:
             try:
-                do_analysis=True
+                do_analysis = True
                 if filter_no_analysis:
                     if 'Analysis' in ana.data_file.keys():
-                        do_analysis=True
+                        do_analysis = True
                     else:
-                        do_analysis=False
+                        do_analysis = False
 
                 if do_analysis:
                     if TwoD:
@@ -492,7 +521,8 @@ def get_data_from_timestamp_list(timestamps,
                     if 'datasaving_format' in ana.data_file['Experimental Data'].attrs:
                         datasaving_format = ana.get_key('datasaving_format')
                     else:
-                        print('Using legacy data loading, assuming old formatting')
+                        print(
+                            'Using legacy data loading, assuming old formatting')
                         datasaving_format = 'Version 1'
 
                     if datasaving_format == 'Version 1':
@@ -506,19 +536,21 @@ def get_data_from_timestamp_list(timestamps,
                     elif datasaving_format == 'Version 2':
                         if single_timestamp:
                             data = get_data_from_ma(ana, param_names.values(),
-                                                     data_version=2)
+                                                    data_version=2)
                         else:
-                            append_data_from_ma(ana, param_names.values(), data, data_version=2)
+                            append_data_from_ma(
+                                ana, param_names.values(), data, data_version=2)
 
                 else:
                     remove_timestamps.append(timestamp)
-                    do_analysis=True
+                    do_analysis = True
                 ana.finish()
             except Exception as inst:
-                print('Error "%s" when processing timestamp %s' % (inst, timestamp))
+                print('Error "%s" when processing timestamp %s' %
+                      (inst, timestamp))
                 raise
 
-    if len(remove_timestamps)>0:
+    if len(remove_timestamps) > 0:
         for timestamp in remove_timestamps:
             get_timestamps.remove(timestamp)
         print('timestamps removed by filtering:', remove_timestamps)
@@ -527,16 +559,18 @@ def get_data_from_timestamp_list(timestamps,
     if type(param_names) is list:
         out_data = data
     elif type(param_names) is dict:
-        out_data = od([(key,data[val]) for key, val in param_names.items()])
+        out_data = od([(key, data[val]) for key, val in param_names.items()])
 
     if numeric_params is not None:
         for nparam in numeric_params:
             if nparam in out_data.keys():
                 try:
-                    out_data[nparam] = np.array([np.double(val) for val in out_data[nparam]])
+                    out_data[nparam] = np.array(
+                        [np.double(val) for val in out_data[nparam]])
                 except ValueError as instance:
                     if 'could not broadcast' in instance.message:
-                        out_data[nparam] = [np.double(val) for val in out_data[nparam]]
+                        out_data[nparam] = [
+                            np.double(val) for val in out_data[nparam]]
                     else:
                         raise(instance)
 
@@ -553,7 +587,7 @@ def convert_instr_str_list_to_numeric_array(string_list):
 def get_plot_title_from_folder(folder):
     measurementstring = os.path.split(folder)[1]
     timestamp = os.path.split(os.path.split(folder)[0])[1] \
-            + '/' + measurementstring[:6]
+        + '/' + measurementstring[:6]
     measurementstring = measurementstring[7:]
     default_plot_title = timestamp+'\n'+measurementstring
     return default_plot_title
@@ -563,8 +597,9 @@ def file_in_folder(folder, timestamp):
     all_files = [f for f in os.listdir(folder) if timestamp in f]
     all_files.sort()
 
-    if (len(all_files)>1):
-        print('More than one file satisfies the requirements! Import: '+all_files[0])
+    if (len(all_files) > 1):
+        print(
+            'More than one file satisfies the requirements! Import: '+all_files[0])
 
     return all_files[0]
 
@@ -573,7 +608,7 @@ def get_all_msmt_filepaths(folder, suffix='hdf5', pattern=''):
     filepaths = []
     suffixlen = len(suffix)
 
-    for root,dirs,files in os.walk(folder):
+    for root, dirs, files in os.walk(folder):
         for f in files:
             if len(f) > suffixlen and f[-suffixlen:] == suffix and pattern in f:
                 filepaths.append(os.path.join(root, f))
@@ -623,17 +658,18 @@ def compare_instrument_settings_timestamp(timestamp_a, timestamp_b):
                 if ins_a.attrs[par_key] == ins_b.attrs[par_key]:
                     pass
                 else:
-                    print('    "%s" has a different value '\
-                        ' "%s" for %s, "%s" for %s' % (
-                            par_key, ins_a.attrs[par_key], timestamp_a,
-                            ins_b.attrs[par_key],timestamp_b))
+                    print('    "%s" has a different value '
+                          ' "%s" for %s, "%s" for %s' % (
+                              par_key, ins_a.attrs[par_key], timestamp_a,
+                              ins_b.attrs[par_key], timestamp_b))
                     diffs_found = True
 
             if not diffs_found:
                 print('    No differences found')
         except KeyError:
-            print('Instrument "%s" not present in second settings file' \
-                % ins_key)
+            print('Instrument "%s" not present in second settings file'
+                  % ins_key)
+
 
 def compare_instrument_settings(analysis_object_a, analysis_object_b):
     '''
@@ -662,17 +698,17 @@ def compare_instrument_settings(analysis_object_a, analysis_object_b):
                 if ins_a.attrs[par_key] == ins_b.attrs[par_key]:
                     pass
                 else:
-                    print('    "%s" has a different value '\
-                        ' "%s" for a, "%s" for b' % (
-                            par_key, ins_a.attrs[par_key],
-                            ins_b.attrs[par_key]))
+                    print('    "%s" has a different value '
+                          ' "%s" for a, "%s" for b' % (
+                              par_key, ins_a.attrs[par_key],
+                              ins_b.attrs[par_key]))
                     diffs_found = True
 
             if not diffs_found:
                 print('    No differences found')
         except KeyError:
-            print('Instrument "%s" not present in second settings file' \
-                % ins_key)
+            print('Instrument "%s" not present in second settings file'
+                  % ins_key)
 
 
 def get_timestamps_in_range(timestamp_start, timestamp_end=None,
@@ -698,17 +734,19 @@ def get_timestamps_in_range(timestamp_start, timestamp_end=None,
             # Check if newer than starting timestamp
             timemark_start = timemark_from_datetime(datetime_start)
             all_measdirs = [dirname for dirname in all_measdirs if int(dirname[:6]) >=
-                                  int(timemark_start)]
+                            int(timemark_start)]
 
         if (date.date() - datetime_end.date()).days == 0:
             # Check if older than ending timestamp
             timemark_end = timemark_from_datetime(datetime_end)
             all_measdirs = [dirname for dirname in all_measdirs if int(dirname[:6]) <=
-                                  int(timemark_end)]
-        timestamps = ['{}_{}'.format(datemark, dirname[:6]) for dirname in all_measdirs]
+                            int(timemark_end)]
+        timestamps = ['{}_{}'.format(datemark, dirname[:6])
+                      for dirname in all_measdirs]
         timestamps.reverse()
         all_timestamps += timestamps
-    all_timestamps.reverse()  # Ensures the order of the timestamps is ascending
+    # Ensures the order of the timestamps is ascending
+    all_timestamps.reverse()
     return all_timestamps
 
 
@@ -779,6 +817,7 @@ def get_folder(timestamp=None, older_than=None, label='',
                 folder, label))
     return folder
 
+
 def smooth(x, window_len=11, window='hanning'):
     """smooth the data using a window with requested size.
 
@@ -814,7 +853,7 @@ def smooth(x, window_len=11, window='hanning'):
 
     """
     if int(window_len) & 0x1 == 0:
-        window_len+=1
+        window_len += 1
 
     if x.ndim != 1:
         raise ValueError("smooth only accepts 1 dimension arrays.")
@@ -826,7 +865,8 @@ def smooth(x, window_len=11, window='hanning'):
         return x
 
     if not window in ['flat', 'hanning', 'hamming', 'bartlett', 'blackman']:
-        raise ValueError("Window is on of 'flat', 'hanning', 'hamming', 'bartlett', 'blackman'")
+        raise ValueError(
+            "Window is on of 'flat', 'hanning', 'hamming', 'bartlett', 'blackman'")
 
     s = np.r_[x[window_len-1:0:-1], x, x[-1:-window_len:-1]]
 
@@ -842,18 +882,20 @@ def smooth(x, window_len=11, window='hanning'):
     edge = int(edge)
     return y[edge:-edge]
 
+
 def peak_finder_v2(x, y, perc=90, window_len=11):
     '''
     Peak finder based on argrelextrema function from scipy
     only finds maximums, this can be changed to minimum by using -y instead of y
     '''
-    smoothed_y = smooth(y,window_len=window_len)
+    smoothed_y = smooth(y, window_len=window_len)
     percval = np.percentile(smoothed_y, perc)
-    filtered_y = np.where(smoothed_y>percval,smoothed_y,percval)
+    filtered_y = np.where(smoothed_y > percval, smoothed_y, percval)
     array_peaks = argrelextrema(filtered_y, np.greater)
     peaks_x = x[array_peaks]
     sort_mask = np.argsort(y[array_peaks])[::-1]
     return peaks_x[sort_mask]
+
 
 def peak_finder(x, y, percentile=70, num_sigma_threshold=5, window_len=11):
 
@@ -908,14 +950,14 @@ def peak_finder(x, y, percentile=70, num_sigma_threshold=5, window_len=11):
             try:
                 if elem[0] != elem[1]:
                     peak_indices += [elem[0] +
-                                    np.argmax(y_smoothed[elem[0]:elem[1]])]
+                                     np.argmax(y_smoothed[elem[0]:elem[1]])]
                 else:
                     peak_indices += [elem[0]]
                 peak_widths += [x[elem[1]] - x[elem[0]]]
             except:
                 pass
-        peaks = np.take(x, peak_indices) # Frequencies of peaks
-        peak_vals = np.take(y_smoothed, peak_indices) # values of peaks
+        peaks = np.take(x, peak_indices)  # Frequencies of peaks
+        peak_vals = np.take(y_smoothed, peak_indices)  # values of peaks
         peak_index = peak_indices[np.argmax(peak_vals)]  # idx of highest peak
         peak = x[peak_index]
         peak_width = peak_widths[np.argmax(peak_vals)]
@@ -996,9 +1038,9 @@ def calculate_distance_ground_state(data_real, data_imag, percentile=70,
     perc_imag = np.percentile(data_imag, percentile)
 
     mean_real = np.mean(np.take(data_real,
-                        np.where(data_real < perc_real)[0]))
+                                np.where(data_real < perc_real)[0]))
     mean_imag = np.mean(np.take(data_imag,
-                        np.where(data_imag < perc_imag)[0]))
+                                np.where(data_imag < perc_imag)[0]))
 
     data_real_dist = data_real - mean_real
     data_imag_dist = data_imag - mean_imag
@@ -1009,13 +1051,16 @@ def calculate_distance_ground_state(data_real, data_imag, percentile=70,
     return data_dist
 
 # def rotate_data_to_zero(data_I, data_Q, NoCalPoints):
-def zigzag(seq, sample_0,sample_1, nr_samples):
+
+
+def zigzag(seq, sample_0, sample_1, nr_samples):
     '''
     Splits a sequence in two sequences, one containing the odd entries, the
     other containing the even entries.
     e.g. in-> [0,1,2,3,4,5] -> out0 = [0,2,4] , out1[1,3,5]
     '''
     return seq[sample_0::nr_samples], seq[sample_1::nr_samples]
+
 
 def calculate_rotation_matrix(delta_I, delta_Q):
     '''
@@ -1030,11 +1075,14 @@ def calculate_rotation_matrix(delta_I, delta_Q):
                    [np.sin(angle), np.cos(angle)]]))
     return rotation_matrix
 
+
 def normalize_TD_data(data, data_zero, data_one):
     return (data - data_zero) / (data_one - data_zero)
 
+
 def normalize_data(data):
-    print('a_tools.normalize_data is deprecated, recommend using a_tools.normalize_data_v2()')
+    print(
+        'a_tools.normalize_data is deprecated, recommend using a_tools.normalize_data_v2()')
     return data / np.mean(data)
 
 
@@ -1049,6 +1097,7 @@ def normalize_2D_data(data_2D):
         data_2D[:, k] /= np.mean(data_2D[:, k])
     return data_2D
 
+
 def normalize_2D_data_on_elements(data_2D, elements):
     '''
     Normalizes every row in a 2D array by normalizing on the mean
@@ -1057,6 +1106,7 @@ def normalize_2D_data_on_elements(data_2D, elements):
     for k in range(data_2D.shape[1]):
         data_2D[:, k] /= np.mean(data_2D[elements, k])
     return data_2D
+
 
 def rotate_and_normalize_data(data, cal_zero_points=None, cal_one_points=None,
                               zero_coord=None, one_coord=None, **kw):
@@ -1101,6 +1151,7 @@ def rotate_and_normalize_data(data, cal_zero_points=None, cal_one_points=None,
 
     return [normalized_data, zero_coord, one_coord]
 
+
 def normalize_data_v3(data, cal_zero_points=np.arange(-4, -2, 1),
                       cal_one_points=np.arange(-2, 0, 1), **kw):
     '''
@@ -1122,6 +1173,7 @@ def normalize_data_v3(data, cal_zero_points=np.arange(-4, -2, 1),
     normalized_data = trans_data/one_zero_dist
 
     return normalized_data
+
 
 def datetime_from_timestamp(timestamp):
     if len(timestamp) == 14:
@@ -1153,6 +1205,7 @@ def current_timestamp():
 def current_datemark():
     return time.strftime('%Y%m%d', time.localtime())
 
+
 def current_timemark():
     return time.strftime('%H%M%S', time.localtime())
 
@@ -1163,7 +1216,7 @@ def current_timemark():
 
 def color_plot(x, y, z, fig, ax, cax=None,
                show=False, normalize=False, log=False,
-               do_transpose=False, add_colorbar=True, **kw):
+               transpose=False, add_colorbar=True, **kw):
     '''
     x, and y are lists, z is a matrix with shape (len(x), len(y))
     In the future this function can be overloaded to handle different
@@ -1181,6 +1234,7 @@ def color_plot(x, y, z, fig, ax, cax=None,
     y_vertices[1:-1] = (y[:-1]+y[1:])/2.
     y_vertices[0] = y[0] - (y[1]-y[0])/2.
     y_vertices[-1] = y[-1] + (y[-1]-y[-2])/2.
+    cmap_chosen = kw.get('cmap_chosen', 'viridis')
 
     # This version (below) does not plot the last row, but it possibly fixes
     # an issue where it wouldn't plot at all on one computer
@@ -1200,16 +1254,16 @@ def color_plot(x, y, z, fig, ax, cax=None,
     if normalize:
         z = normalize_data_v2(z, axis=1, order=2)
 
-    cmap = plt.get_cmap(kw.pop('cmap', 'viridis'))
+    cmap = plt.get_cmap(kw.pop('cmap', cmap_chosen))
     # CMRmap is our old default
 
-    clim = kw.pop('clim', [None, None])
+    clim = kw.get('clim', [None, None])
     if log:
         norm = colors.LogNorm()
     else:
         norm = None
 
-    if do_transpose:
+    if transpose:
         print('Inverting x and y axis for colormap plot')
         colormap = ax.pcolormesh(y_grid.transpose(),
                                  x_grid.transpose(),
@@ -1232,7 +1286,7 @@ def color_plot(x, y, z, fig, ax, cax=None,
 
     if plot_title is not None:
         ax.set_title(plot_title, y=1.05)
-    if do_transpose:
+    if transpose:
         ax.set_xlabel(ylabel)
         ax.set_ylabel(xlabel)
         ax.set_xlim(y_vertices[0], y_vertices[-1])
@@ -1310,7 +1364,7 @@ def color_plot_slices(xvals, yvals, zvals, ax=None,
     hold = kw.pop('hold', False)
     for xx in range(len(xvals)):
         tempzvals = np.array([np.append(zvals[xx], np.array(0)),
-                             np.append(zvals[xx], np.array(0))]).transpose()
+                              np.append(zvals[xx], np.array(0))]).transpose()
         im = ax.pcolor(xvertices[xx:xx+2],
                        yvertices[xx],
                        tempzvals, cmap=cmap)
@@ -1447,3 +1501,84 @@ def solve_quadratic_equation(a, b, c, verbose=False):
         if verbose:
             print("This equation has two solutions: ", x1, " or", x2)
         return [x1, x2]
+
+
+# def find_min(x, y, min_target=None, return_fit=False, perc=30):
+#     from scipy.signal import argrelextrema
+#     from lmfit.models import QuadraticModel
+#     from functools import reduce
+#     # filtering through percentiles
+#     th_perc = np.percentile(y, perc)
+#     mask = np.where(y < th_perc, True, False)
+
+#     # function that multiplies all elements in vector
+#     multiply_vec = lambda vec: reduce(lambda x, y: x*y, vec)
+
+#     # function that multiplies all elements in vector from idx_min
+#     if min_target is None:
+#         idx_min = np.argmin(y)
+#     else:
+#         local_min_array = argrelextrema(y, np.less)[0]
+#         idx_min = local_min_array[
+#             np.argmin(np.abs(x[local_min_array]-min_target))]
+
+#     mask_ii = lambda ii: multiply_vec(
+#         mask[min(idx_min, ii):max(idx_min, ii+1)])
+#     # function that returns mask_ii applied for all elements of the vector mask
+#     continuous_mask = np.array(
+#         [m for m in map(mask_ii, np.arange(len(mask)))], dtype=np.bool)
+#     # doing the fit
+#     my_fit_model = QuadraticModel()
+
+#     # !!!!! @Ramiro the continuous mask does not seem to work (all False array)
+#     # I used the regular mask for now. We should discuss this
+#     # x_fit = x[continuous_mask]
+#     # y_fit = y[continuous_mask]
+
+#     x_fit = x[mask]
+#     y_fit = y[mask]
+#     my_fit_params = my_fit_model.guess(data=y_fit, x=x_fit)
+#     my_fit_res = my_fit_model.fit(data=y_fit,
+#                                   x=x_fit,
+#                                   pars=my_fit_params)
+#     x_min = -0.5*my_fit_res.best_values['b']/my_fit_res.best_values['a']
+#     y_min = my_fit_model.func(x_min, **my_fit_res.best_values)
+
+#     if return_fit:
+#         return x_min, y_min, my_fit_res
+#     else:
+#         return x_min, y_min
+
+def find_min(x, y, return_fit=False, perc=30):
+    from lmfit.models import QuadraticModel
+    from functools import reduce
+    # filtering through percentiles
+    th_perc = np.percentile(y, perc)
+    mask = np.where(y<th_perc,True,False)
+    # function that multiplies all elements in vector
+    multiply_vec = lambda vec: reduce(lambda x,y: x*y,vec)
+    # function that multiplies all elements in vector from idx_min
+    idx_min = np.argmin(y)
+    mask_ii = lambda ii: multiply_vec(mask[min(idx_min,ii):max(idx_min,ii+1)])
+    # function that returns mask_ii applied for all elements of the vector mask
+    continuous_mask = np.array([m for m in map(mask_ii,np.arange(len(mask)))],dtype=np.bool)
+    # doing the fit
+    my_fit_model = QuadraticModel()
+    x_fit = x[continuous_mask]
+    y_fit = y[continuous_mask]
+    my_fit_params = my_fit_model.guess(data=y_fit, x=x_fit)
+    my_fit_res = my_fit_model.fit(data=y_fit,
+                                  x=x_fit,
+                                  pars=my_fit_params)
+    x_min = -0.5*my_fit_res.best_values['b']/my_fit_res.best_values['a']
+    y_min = my_fit_model.func(x_min,**my_fit_res.best_values)
+
+    if return_fit:
+        return x_min, y_min, my_fit_res
+    else:
+        return x_min, y_min
+
+def get_color_order(i, max_num):
+    # take a blue to red scale from 0 to max_num
+    # uses HSV system, H_red = 0, H_green = 1/3 H_blue=2/3
+    return colors.hsv_to_rgb(2.*float(i)/(float(max_num)*3.), 1., 1.)

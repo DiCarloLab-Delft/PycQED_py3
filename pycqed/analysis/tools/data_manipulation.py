@@ -326,3 +326,24 @@ def reject_outliers(data, m=6.):
     mdev = np.median(d)
     s = d/mdev if mdev else 0.
     return data[s < m]
+
+def rotation_matrix(angle, as_array=False):
+    """
+    Returns a 2x2 rotation matrix based on an angle in degrees.
+
+    rot_mat * vec shape(2,1) rotates the vector clockwise
+    """
+    rot_mat = np.matrix([[np.cos(2*np.pi*angle/360), - np.sin(2*np.pi*angle/360)],
+             [np.sin(2*np.pi*angle/360),  np.cos(2*np.pi*angle/360)]])
+    if as_array:
+        rot_mat = np.array(rot_mat)
+    return rot_mat
+
+def rotate_complex(complex_number, angle, deg=True):
+    """
+    Rotates a complex number by an angle specified in degrees
+    """
+    if deg:
+        angle = angle/360*2*np.pi
+    rotated_number = complex_number*np.exp(1j*angle)
+    return rotated_number

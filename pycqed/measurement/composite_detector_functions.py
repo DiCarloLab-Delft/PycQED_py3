@@ -5,6 +5,7 @@ from pycqed.measurement import awg_sweep_functions as awg_swf
 from pycqed.measurement import CBox_sweep_functions as CB_swf
 from pycqed.measurement import detector_functions as det
 from pycqed.analysis import measurement_analysis as ma
+from pycqed.measurement.pulse_sequences import fluxing_sequences as fsqs
 from pycqed.analysis import analysis_toolbox as a_tools
 from qcodes.instrument.parameter import ManualParameter
 import imp
@@ -13,6 +14,7 @@ imp.reload(awg_swf)
 
 
 class Qubit_Characterization_Detector(det.Soft_Detector):
+
     '''
     Performs a set of measurements that finds f_resonator, f_qubit,
     T1, T2*, and T2-echo.
@@ -125,14 +127,14 @@ class Qubit_Characterization_Detector(det.Soft_Detector):
             self.HM.set_RF_power(self.qubit.get_RF_CW_power())
             self.HM.set_frequency(self.qubit.get_current_RO_frequency()*1e9)
         qubit_scan = self.cal_tools.find_qubit_frequency_spec(
-                MC_name=self.nested_MC_name,
-                qubit=self.qubit,
-                start_freq=self.spec_start,
-                end_freq=self.spec_stop,
-                spec_sweep_range=self.spec_sweep_range,
-                source_power='qubit',
-                freq_calc=self.freq_calc,
-                suppress_print_statements=True, pulsed=self.pulsed)
+            MC_name=self.nested_MC_name,
+            qubit=self.qubit,
+            start_freq=self.spec_start,
+            end_freq=self.spec_stop,
+            spec_sweep_range=self.spec_sweep_range,
+            source_power='qubit',
+            freq_calc=self.freq_calc,
+            suppress_print_statements=True, pulsed=self.pulsed)
         f_qubit = qubit_scan['f_qubit']
 
         print('Estimated qubit frequency: ', f_qubit)
@@ -177,7 +179,8 @@ class Qubit_Characterization_Detector(det.Soft_Detector):
             amp_ch1, amp_ch2 = self.cal_tools.calibrate_pulse_amplitude(
                 MC_name=self.nested_MC_name,
                 qubit=self.qubit,
-                # max nr iterations is kept lower than when full tuneup is required
+                # max nr iterations is kept lower than when full tuneup is
+                # required
                 max_nr_iterations=5, desired_accuracy=.05, Navg=5,
                 # desired accuracy is not very high as it only needs to be good
                 # enough for a Ramsey, T1 and T2-echo
@@ -235,14 +238,12 @@ class Qubit_Characterization_Detector(det.Soft_Detector):
         print(return_vals)
         return return_vals
 
-
-
     def switch_to_freq_sweep(self):
         self.qubit_drive_ins.off()
         if self.qubit.get_pulse_amp_control == 'Duplexer':
             self.Duplexer.set_all_switches_to('OFF')
             self.Duplexer.set_switch(3, self.qubit.get_duplexer_output_channel(),
-                                  'ON')
+                                     'ON')
         self.AWG.start()
         self.HM.init()
         self.AWG.stop()
@@ -259,22 +260,23 @@ class Qubit_Characterization_Detector(det.Soft_Detector):
             print('Duplexer Time Domain prep')
             self.Duplexer.set_all_switches_to('OFF')
             self.Duplexer.set_switch(3,
-                                  self.qubit.get_duplexer_output_channel(),
-                                  'OFF')
+                                     self.qubit.get_duplexer_output_channel(),
+                                     'OFF')
             self.Duplexer.set_switch(1,
-                                  self.qubit.get_duplexer_output_channel(),
-                                  'ON')
+                                     self.qubit.get_duplexer_output_channel(),
+                                     'ON')
             self.Duplexer.set_attenuation(1,
-                                       self.qubit.get_duplexer_output_channel(),
-                                       self.pulse_amp_guess)
+                                          self.qubit.get_duplexer_output_channel(),
+                                          self.pulse_amp_guess)
             self.Duplexer.set_switch(2, self.qubit.get_duplexer_output_channel(),
-                                  'ON')
+                                     'ON')
             self.Duplexer.set_attenuation(2,
-                                       self.qubit.get_duplexer_output_channel(),
-                                       0)
+                                          self.qubit.get_duplexer_output_channel(),
+                                          0)
 
 
 class TimeDomainDetector_integrated(det.Soft_Detector):
+
     '''
     This is a detector that turns the hard time Domain Detector into
     a soft detector by integrating over it and returning a number instead
@@ -302,16 +304,17 @@ class TimeDomainDetector_integrated(det.Soft_Detector):
         self.MC_timedomain.set_sweep_function(awg_swf.Off())
         self.MC_timedomain.set_detector_function(
             det.TimeDomainDetector())
-        print('prepare worked')
 
     def finish(self, **kw):
         self.MC_timedomain.remove()
 
 
 class SSRO_Fidelity_Detector_CBox(det.Soft_Detector):
+
     '''
     Currently only for CBox.
     '''
+
     def __init__(self, measurement_name, MC, AWG, CBox,
                  RO_pulse_length, RO_pulse_delay, RO_trigger_delay,
                  raw=True, analyze=True, **kw):
@@ -371,9 +374,11 @@ class SSRO_Fidelity_Detector_CBox(det.Soft_Detector):
 
 
 class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
+
     '''
     For Qcodes. Readout with CBox, pulse generation with 5014
     '''
+
     def __init__(self, measurement_name,  MC, AWG, acquisition_instr,
                  pulse_pars, RO_pars, raw=True, analyze=True, upload=True,
                  IF=None, weight_function_I=0, weight_function_Q=1,
@@ -416,12 +421,10 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
         self.weight_function_I = weight_function_I
         self.weight_function_Q = weight_function_Q
         self.one_weight_function_UHFQC = one_weight_function_UHFQC
-        print('weights', weight_function_I, weight_function_Q)
-
 
     def prepare(self, **kw):
         if not self.optimized_weights:
-            self.soft_rotate=True
+            self.soft_rotate = True
             self.MC.set_sweep_function(awg_swf.OffOn(
                                        pulse_pars=self.pulse_pars,
                                        RO_pars=self.RO_pars,
@@ -431,32 +434,41 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
                 self.MC.set_detector_function(
                     det.CBox_integration_logging_det(self.acquisition_instr,
                                                      self.AWG,
-                                 integration_length=self.integration_length))
+                                                     integration_length=self.integration_length))
                 self.CBox = self.acquisition_instr
                 if self.SSB:
-                    raise ValueError('SSB is only possible in CBox with optimized weights')
+                    raise ValueError(
+                        'SSB is only possible in CBox with optimized weights')
                 else:
-                    self.CBox.lin_trans_coeffs([1,0,0,1])
+                    self.CBox.lin_trans_coeffs([1, 0, 0, 1])
                     self.CBox.demodulation_mode('double')
-                    if self.IF==None:
-                        raise ValueError('IF has to be provided when not using optimized weights')
+                    if self.IF == None:
+                        raise ValueError(
+                            'IF has to be provided when not using optimized weights')
                     else:
                         self.CBox.upload_standard_weights(IF=self.IF)
 
-
             elif 'UHFQC' in str(self.acquisition_instr):
-                print('loading {} shots into UHFQC'.format(self.nr_shots))
                 self.MC.set_detector_function(
-                    det.UHFQC_integration_logging_det(self.acquisition_instr,
-                                                          self.AWG, channels=[self.weight_function_I,self.weight_function_Q],
-                                                          integration_length=self.integration_length, nr_shots=min(self.nr_shots, 4094)))
+                    det.UHFQC_integration_logging_det(
+                        self.acquisition_instr, self.AWG,
+                        channels=[
+                            self.weight_function_I, self.weight_function_Q],
+                        integration_length=self.integration_length,
+                        nr_shots=min(self.nr_shots, 4094)))
                 if self.SSB:
-                    self.UHFQC.prepare_SSB_weight_and_rotation(IF=self.IF, weight_function_I=self.weight_function_I, weight_function_Q=self.weight_function_Q)
+                    self.UHFQC.prepare_SSB_weight_and_rotation(
+                        IF=self.IF, weight_function_I=self.weight_function_I,
+                        weight_function_Q=self.weight_function_Q)
                 else:
-                    if self.IF==None:
-                        raise ValueError('IF has to be provided when not using optimized weights')
+                    if self.IF == None:
+                        raise ValueError(
+                            'IF has to be provided when not using optimized weights')
                     else:
-                        self.UHFQC.prepare_DSB_weight_and_rotation(IF=self.IF, weight_function_I=self.weight_function_I, weight_function_Q=self.weight_function_Q)
+                        self.UHFQC.prepare_DSB_weight_and_rotation(
+                            IF=self.IF,
+                            weight_function_I=self.weight_function_I,
+                            weight_function_Q=self.weight_function_Q)
 
     def acquire_data_point(self, *args, **kw):
         self.time_start = time.time()
@@ -465,20 +477,22 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
             if 'CBox' in str(self.acquisition_instr):
                 self.CBox.nr_averages(int(self.nr_averages))
                 if self.SSB:
-                    self.CBox.lin_trans_coeffs([1,1,-1,1])
-                    self.CBox.demodulation_mode(1)
+                    self.CBox.lin_trans_coeffs([1, 1, -1, 1])
+                    # self.CBox.demodulation_mode(1)
+                    self.CBox.demodulation_mode('single')
                 else:
-                    self.CBox.lin_trans_coeffs([1,0,0,1])
-                    self.CBox.demodulation_mode(0)
+                    self.CBox.lin_trans_coeffs([1, 0, 0, 1])
+                    # self.CBox.demodulation_mode(0)
+                    self.CBox.demodulation_mode('double')
                 nr_samples = 512
                 self.CBox.nr_samples.set(nr_samples)
                 SWF = awg_swf.OffOn(
-                                    pulse_pars=self.pulse_pars,
-                                    RO_pars=self.RO_pars,
-                                    pulse_comb='OffOff',
-                                    nr_samples=nr_samples)
+                    pulse_pars=self.pulse_pars,
+                    RO_pars=self.RO_pars,
+                    pulse_comb='OffOff',
+                    nr_samples=nr_samples)
                 SWF.prepare()
-                self.CBox.acquisition_mode(0)
+                self.CBox.acquisition_mode('idle')
                 self.AWG.start()
                 self.CBox.acquisition_mode('input averaging')
                 inp_avg_res = self.CBox.get_input_avg_results()
@@ -487,35 +501,40 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
                 transient0_Q = inp_avg_res[1]
 
                 SWF = awg_swf.OffOn(
-                                    pulse_pars=self.pulse_pars,
-                                    RO_pars=self.RO_pars,
-                                    pulse_comb='OnOn',
-                                    nr_samples=nr_samples)
+                    pulse_pars=self.pulse_pars,
+                    RO_pars=self.RO_pars,
+                    pulse_comb='OnOn',
+                    nr_samples=nr_samples)
                 SWF.prepare()
-                self.CBox.acquisition_mode(0)
+                self.CBox.acquisition_mode('idle')
                 self.CBox.acquisition_mode('input averaging')
                 self.AWG.start()
                 inp_avg_res = self.CBox.get_input_avg_results()
-                self.CBox.acquisition_mode(0)
+                self.CBox.acquisition_mode('idle')
                 transient1_I = inp_avg_res[0]
                 transient1_Q = inp_avg_res[1]
 
                 optimized_weights_I = (transient1_I-transient0_I)
-                optimized_weights_I = optimized_weights_I-np.mean(optimized_weights_I)
+                optimized_weights_I = optimized_weights_I - \
+                    np.mean(optimized_weights_I)
                 weight_scale_factor = 127./np.max(np.abs(optimized_weights_I))
-                optimized_weights_I = np.floor(weight_scale_factor*optimized_weights_I).astype(int)
+                optimized_weights_I = np.floor(
+                    weight_scale_factor*optimized_weights_I).astype(int)
 
                 optimized_weights_Q = (transient1_Q-transient0_Q)
-                optimized_weights_Q = optimized_weights_Q-np.mean(optimized_weights_Q)
+                optimized_weights_Q = optimized_weights_Q - \
+                    np.mean(optimized_weights_Q)
                 weight_scale_factor = 127./np.max(np.abs(optimized_weights_Q))
-                optimized_weights_Q = np.floor(weight_scale_factor*optimized_weights_Q).astype(int)
-
+                optimized_weights_Q = np.floor(
+                    weight_scale_factor*optimized_weights_Q).astype(int)
 
                 self.CBox.sig0_integration_weights.set(optimized_weights_I)
                 if self.SSB:
-                    self.CBox.sig1_integration_weights.set(optimized_weights_Q)  # disabling the Q quadrature
+                    self.CBox.sig1_integration_weights.set(
+                        optimized_weights_Q)  # disabling the Q quadrature
                 else:
-                    self.CBox.sig1_integration_weights.set(np.multiply(optimized_weights_Q,0))  # disabling the Q quadrature
+                    self.CBox.sig1_integration_weights.set(
+                        np.multiply(optimized_weights_Q, 0))  # disabling the Q quadrature
                 self.MC.set_sweep_function(awg_swf.OffOn(
                                            pulse_pars=self.pulse_pars,
                                            RO_pars=self.RO_pars))
@@ -526,16 +545,17 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
             elif 'UHFQC' in str(self.acquisition_instr):
                 nr_samples = 4096
                 self.AWG.stop()
-                self.UHFQC.awgs_0_userregs_0(int(self.nr_averages))#0 for rl, 1 for iavg
-                self.UHFQC.awgs_0_userregs_1(1)#0 for rl, 1 for iavg
+                # 0 for rl, 1 for iavg
+                self.UHFQC.awgs_0_userregs_0(int(self.nr_averages))
+                self.UHFQC.awgs_0_userregs_1(1)  # 0 for rl, 1 for iavg
                 self.UHFQC.quex_iavg_length(nr_samples)
                 self.UHFQC.quex_iavg_avgcnt(int(np.log2(self.nr_averages)))
                 self.UHFQC.awgs_0_single(1)
                 SWF = awg_swf.OffOn(
-                                    pulse_pars=self.pulse_pars,
-                                    RO_pars=self.RO_pars,
-                                    pulse_comb='OffOff',
-                                    nr_samples=nr_samples)
+                    pulse_pars=self.pulse_pars,
+                    RO_pars=self.RO_pars,
+                    pulse_comb='OffOff',
+                    nr_samples=nr_samples)
                 SWF.prepare()
                 self.UHFQC.awgs_0_enable(1)
                 try:
@@ -547,10 +567,11 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
                 while self.UHFQC.awgs_0_enable() == 1:
                     time.sleep(0.01)
 
-                self.channels=[0,1]
+                self.channels = [0, 1]
                 data = ['']*len(self.channels)
                 for i, channel in enumerate(self.channels):
-                    dataset = eval("self.UHFQC.quex_iavg_data_{}()".format(channel))
+                    dataset = eval(
+                        "self.UHFQC.quex_iavg_data_{}()".format(channel))
                     data[i] = dataset[0]['vector']
                 # data = self.UHFQC.single_acquisition(nr_samples,
                 #                              self.poll_time, timeout=0,
@@ -563,10 +584,10 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
                 self.UHFQC.quex_iavg_length(nr_samples)
 
                 SWF = awg_swf.OffOn(
-                                    pulse_pars=self.pulse_pars,
-                                    RO_pars=self.RO_pars,
-                                    pulse_comb='OnOn',
-                                    nr_samples=nr_samples)
+                    pulse_pars=self.pulse_pars,
+                    RO_pars=self.RO_pars,
+                    pulse_comb='OnOn',
+                    nr_samples=nr_samples)
                 SWF.prepare()
                 self.UHFQC.awgs_0_enable(1)
                 try:
@@ -581,7 +602,8 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
                     time.sleep(0.01)
                 data = ['']*len(self.channels)
                 for i, channel in enumerate(self.channels):
-                    dataset = eval("self.UHFQC.quex_iavg_data_{}()".format(channel))
+                    dataset = eval(
+                        "self.UHFQC.quex_iavg_data_{}()".format(channel))
                     data[i] = dataset[0]['vector']
                 # data = self.UHFQC.single_acquisition(nr_samples,
                 #                              self.poll_time, timeout=0,
@@ -592,48 +614,69 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
                 transient1_Q = data[1]
 
                 optimized_weights_I = (transient1_I-transient0_I)
-                optimized_weights_I = optimized_weights_I-np.mean(optimized_weights_I)
+                optimized_weights_I = optimized_weights_I - \
+                    np.mean(optimized_weights_I)
                 weight_scale_factor = 1./np.max(np.abs(optimized_weights_I))
-                optimized_weights_I = np.array(weight_scale_factor*optimized_weights_I)
-                print("optimized weights I", optimized_weights_I)
-
+                optimized_weights_I = np.array(
+                    weight_scale_factor*optimized_weights_I)
 
                 optimized_weights_Q = (transient1_Q-transient0_Q)
-                optimized_weights_Q = optimized_weights_Q-np.mean(optimized_weights_Q)
+                optimized_weights_Q = optimized_weights_Q - \
+                    np.mean(optimized_weights_Q)
                 weight_scale_factor = 1./np.max(np.abs(optimized_weights_Q))
-                optimized_weights_Q = np.array(weight_scale_factor*optimized_weights_Q)
-                print("optimized weights Q", optimized_weights_Q)
+                optimized_weights_Q = np.array(
+                    weight_scale_factor*optimized_weights_Q)
 
-                eval('self.UHFQC.quex_wint_weights_{}_real(np.array(optimized_weights_I))'.format(self.weight_function_I))
+                eval('self.UHFQC.quex_wint_weights_{}_real(np.array(optimized_weights_I))'.format(
+                    self.weight_function_I))
                 if self.SSB:
-                    eval('self.UHFQC.quex_wint_weights_{}_imag(np.array(optimized_weights_Q))'.format(self.weight_function_I))
+                    eval('self.UHFQC.quex_wint_weights_{}_imag(np.array(optimized_weights_Q))'.format(
+                        self.weight_function_I))
                     if not self.one_weight_function_UHFQC:
-                        print("setting the weight functions in Q")
-                        eval('self.UHFQC.quex_wint_weights_{}_real(np.array(optimized_weights_I))'.format(self.weight_function_Q))
-                        eval('self.UHFQC.quex_wint_weights_{}_imag(np.array(optimized_weights_Q))'.format(self.weight_function_Q))
-                    eval('self.UHFQC.quex_rot_{}_real(1.0)'.format(self.weight_function_I))
-                    eval('self.UHFQC.quex_rot_{}_imag(-1.0)'.format(self.weight_function_I))
+                        eval('self.UHFQC.quex_wint_weights_{}_real(np.array(optimized_weights_I))'.format(
+                            self.weight_function_Q))
+                        eval('self.UHFQC.quex_wint_weights_{}_imag(np.array(optimized_weights_Q))'.format(
+                            self.weight_function_Q))
+                    eval(
+                        'self.UHFQC.quex_rot_{}_real(1.0)'.format(self.weight_function_I))
+                    eval(
+                        'self.UHFQC.quex_rot_{}_imag(-1.0)'.format(self.weight_function_I))
                     if not self.one_weight_function_UHFQC:
-                        print("setting the weight functions in Q")
-                        eval('self.UHFQC.quex_rot_{}_real(1.0)'.format(self.weight_function_Q))
-                        eval('self.UHFQC.quex_rot_{}_imag(1.0)'.format(self.weight_function_Q))
+                        eval(
+                            'self.UHFQC.quex_rot_{}_real(1.0)'.format(self.weight_function_Q))
+                        eval(
+                            'self.UHFQC.quex_rot_{}_imag(1.0)'.format(self.weight_function_Q))
                 else:
-                    eval('self.UHFQC.quex_wint_weights_{}_imag(0*np.array(optimized_weights_Q))'.format(self.weight_function_I)) #disabling the other weight fucntions
+                    # disabling the other weight fucntions
+                    eval(
+                        'self.UHFQC.quex_wint_weights_{}_imag(0*np.array(optimized_weights_Q))'.format(self.weight_function_I))
                     if not self.one_weight_function_UHFQC:
-                        eval('self.UHFQC.quex_wint_weights_{}_real(0*np.array(optimized_weights_I))'.format(self.weight_function_Q))
-                        eval('self.UHFQC.quex_wint_weights_{}_imag(0*np.array(optimized_weights_Q))'.format(self.weight_function_Q))
-                    eval('self.UHFQC.quex_rot_{}_real(1.0)'.format(self.weight_function_I))
-                    eval('self.UHFQC.quex_rot_{}_imag(0.0)'.format(self.weight_function_I))
+                        eval(
+                            'self.UHFQC.quex_wint_weights_{}_real(0*np.array(optimized_weights_I))'.format(self.weight_function_Q))
+                        eval(
+                            'self.UHFQC.quex_wint_weights_{}_imag(0*np.array(optimized_weights_Q))'.format(self.weight_function_Q))
+                    eval(
+                        'self.UHFQC.quex_rot_{}_real(1.0)'.format(self.weight_function_I))
+                    eval(
+                        'self.UHFQC.quex_rot_{}_imag(0.0)'.format(self.weight_function_I))
                     if not self.one_weight_function_UHFQC:
 
-                        eval('self.UHFQC.quex_rot_{}_real(0.0)'.format(self.weight_function_Q))
-                        eval('self.UHFQC.quex_rot_{}_imag(0.0)'.format(self.weight_function_Q))
-                print('changed')
-                eval('self.UHFQC.quex_wint_weights_{}_real()'.format(self.weight_function_I)) #reading out weights as check
-                eval('self.UHFQC.quex_wint_weights_{}_imag()'.format(self.weight_function_I)) #reading out weights as check
-                eval('self.UHFQC.quex_wint_weights_{}_real()'.format(self.weight_function_Q)) #reading out weights as check
-                eval('self.UHFQC.quex_wint_weights_{}_imag()'.format(self.weight_function_Q)) #reading out weights as check
-
+                        eval(
+                            'self.UHFQC.quex_rot_{}_real(0.0)'.format(self.weight_function_Q))
+                        eval(
+                            'self.UHFQC.quex_rot_{}_imag(0.0)'.format(self.weight_function_Q))
+                # reading out weights as check
+                eval('self.UHFQC.quex_wint_weights_{}_real()'.format(
+                    self.weight_function_I))
+                # reading out weights as check
+                eval('self.UHFQC.quex_wint_weights_{}_imag()'.format(
+                    self.weight_function_I))
+                # reading out weights as check
+                eval('self.UHFQC.quex_wint_weights_{}_real()'.format(
+                    self.weight_function_Q))
+                # reading out weights as check
+                eval('self.UHFQC.quex_wint_weights_{}_imag()'.format(
+                    self.weight_function_Q))
 
                 self.MC.set_sweep_function(awg_swf.OffOn(
                                            pulse_pars=self.pulse_pars,
@@ -641,7 +684,8 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
                 self.MC.set_sweep_points(np.arange(self.nr_shots))
                 self.MC.set_detector_function(
                     det.UHFQC_integration_logging_det(self.UHFQC, self.AWG,
-                                                      channels=[self.weight_function_I,self.weight_function_Q],
+                                                      channels=[
+                                                          self.weight_function_I, self.weight_function_Q],
                                                       integration_length=self.integration_length, nr_shots=min(self.nr_shots, 4094)))
         self.i += 1
         self.MC.run(name=self.measurement_name+'_'+str(self.i))
@@ -662,10 +706,10 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
             ana.data_file.close()
 
             # Arbitrary choice, does not think about the deffinition
-            time_end=time.time()
+            time_end = time.time()
             nett_wait = self.wait-time_end+self.time_start
             print(self.time_start)
-            if nett_wait>0:
+            if nett_wait > 0:
                 time.sleep(nett_wait)
             if self.raw:
                 return ana.F_a, ana.theta
@@ -727,7 +771,9 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
                 return ana.F, ana.F_corrected
 '''
 
+
 class CBox_trace_error_fraction_detector(det.Soft_Detector):
+
     def __init__(self, measurement_name, MC, AWG, CBox,
                  sequence_swf=None,
                  threshold=None,
@@ -863,6 +909,7 @@ class CBox_trace_error_fraction_detector(det.Soft_Detector):
 
 
 class CBox_SSRO_discrimination_detector(det.Soft_Detector):
+
     def __init__(self, measurement_name, MC, AWG, CBox,
                  sequence_swf,
                  threshold=None,
@@ -920,6 +967,7 @@ class CBox_SSRO_discrimination_detector(det.Soft_Detector):
 
 
 class CBox_RB_detector(det.Soft_Detector):
+
     def __init__(self, measurement_name, MC, AWG, CBox, LutMan,
                  nr_cliffords, desired_nr_seeds,
                  IF,
@@ -953,7 +1001,7 @@ class CBox_RB_detector(det.Soft_Detector):
         max_idling_waveforms_per_seed = max_seq_duration/(1200e-9)
         max_nr_waveforms = 29184  # hard limit from the CBox
         max_nr_seeds = int(max_nr_waveforms/((max_idling_waveforms_per_seed +
-                           np.mean(nr_cliffords)*1.875)*(len(nr_cliffords)+4)))
+                                              np.mean(nr_cliffords)*1.875)*(len(nr_cliffords)+4)))
         return max_seq_duration, max_nr_seeds
 
     def prepare(self, **kw):
@@ -987,28 +1035,29 @@ class CBox_RB_detector(det.Soft_Detector):
                                       self.CBox, self.AWG))
 
     def acquire_data_point(self, **kw):
-            self.i += 1
-            self.MC.run(self.name+'_{}_{}seeds'.format(
-                        self.i, self.total_nr_seeds), mode='2D')
-            a = ma.RandomizedBench_2D_flat_Analysis(
-                auto=True, close_main_fig=True, T1=self.T1,
-                pulse_delay=self.pulse_delay)
-            F_cl = a.fit_res.params['fidelity_per_Clifford'].value
-            return F_cl
-
+        self.i += 1
+        self.MC.run(self.name+'_{}_{}seeds'.format(
+                    self.i, self.total_nr_seeds), mode='2D')
+        a = ma.RandomizedBench_2D_flat_Analysis(
+            auto=True, close_main_fig=True, T1=self.T1,
+            pulse_delay=self.pulse_delay)
+        F_cl = a.fit_res.params['fidelity_per_Clifford'].value
+        return F_cl
 
 
 class Chevron_optimization_v1(det.Soft_Detector):
+
     '''
     Chevron optimization.
     '''
+
     def __init__(self, flux_channel, dist_dict, AWG, MC_nested, qubit,
                  kernel_obj, cost_function_opt=0, **kw):
         super().__init__()
         kernel_dir_path = 'kernels/'
         self.name = 'chevron_optimization_v1'
-        self.value_names = ['Cost function','SWAP Time']
-        self.value_units = ['a.u.','ns']
+        self.value_names = ['Cost function', 'SWAP Time']
+        self.value_units = ['a.u.', 'ns']
         self.kernel_obj = kernel_obj
         self.AWG = AWG
         self.MC_nested = MC_nested
@@ -1016,15 +1065,18 @@ class Chevron_optimization_v1(det.Soft_Detector):
         self.dist_dict = dist_dict
         self.flux_channel = flux_channel
         self.cost_function_opt = cost_function_opt
-        self.dist_dict['ch%d'%self.flux_channel].append('')
+        self.dist_dict['ch%d' % self.flux_channel].append('')
         self.nr_averages = kw.get('nr_averages', 1024)
 
-        self.awg_amp_par = ManualParameter(name='AWG_amp', units='Vpp', label='AWG Amplitude')
-        self.awg_amp_par.get = lambda: self.AWG.get('ch{}_amp'.format(self.flux_channel))
-        self.awg_amp_par.set = lambda val: self.AWG.set('ch{}_amp'.format(self.flux_channel),val)
+        self.awg_amp_par = ManualParameter(
+            name='AWG_amp', units='Vpp', label='AWG Amplitude')
+        self.awg_amp_par.get = lambda: self.AWG.get(
+            'ch{}_amp'.format(self.flux_channel))
+        self.awg_amp_par.set = lambda val: self.AWG.set(
+            'ch{}_amp'.format(self.flux_channel), val)
         self.awg_value = 2.0
 
-        kernel_before_list = self.dist_dict['ch%d'%self.flux_channel]
+        kernel_before_list = self.dist_dict['ch%d' % self.flux_channel]
         kernel_before_loaded = []
         for k in kernel_before_list:
             if k is not '':
@@ -1038,10 +1090,10 @@ class Chevron_optimization_v1(det.Soft_Detector):
 
         # # Update kernel from kernel object
 
-        kernel_file = 'optimizing_kernel_%s'%a_tools.current_timestamp()
-        self.kernel_obj.save_corrections_kernel(kernel_file, self.kernel_before,)
-        self.dist_dict['ch%d'%self.flux_channel][-1] = kernel_file+'.txt'
-
+        kernel_file = 'optimizing_kernel_%s' % a_tools.current_timestamp()
+        self.kernel_obj.save_corrections_kernel(
+            kernel_file, self.kernel_before,)
+        self.dist_dict['ch%d' % self.flux_channel][-1] = kernel_file+'.txt'
 
         self.qubit.dist_dict = self.dist_dict
         self.qubit.RO_acq_averages(self.nr_averages)
@@ -1056,7 +1108,71 @@ class Chevron_optimization_v1(det.Soft_Detector):
         # # Return the cost function sum(min)+sum(1-max)
         return cost_val, 0.5*ma_obj.period
 
+    def prepare(self):
+        pass
 
+    def finish(self):
+        pass
+
+
+class SWAPN_optimization(det.Soft_Detector):
+
+    '''
+    SWAPN optimization.
+    Wrapper around a SWAPN sequence to create a cost function.
+
+    The kernel object is used to determine the (pre)distortion kernel.
+    It is common to do a sweep over one of the kernel parameters as a sweep
+    function.
+    '''
+
+    def __init__(self, nr_pulses_list, AWG, MC_nested, qubit,
+                 kernel_obj,  cache, cost_choice='sum', **kw):
+
+        super().__init__()
+        self.name = 'swapn_optimization'
+        self.value_names = ['Cost function', 'Single SWAP Fid']
+        self.value_units = ['a.u.', 'ns']
+        self.kernel_obj = kernel_obj
+        self.cache_obj = cache
+        self.AWG = AWG
+        self.MC_nested = MC_nested
+        self.cost_choice = cost_choice
+        self.nr_pulses_list = nr_pulses_list
+        self.qubit = qubit
+
+    def acquire_data_point(self, **kw):
+        # # Update kernel from kernel object
+
+        # # Measure the swapn
+        times_vec = self.nr_pulses_list
+        cal_points = 4
+        lengths_cal = times_vec[-1] + \
+            np.arange(1, 1+cal_points)*(times_vec[1]-times_vec[0])
+        lengths_vec = np.concatenate((times_vec, lengths_cal))
+
+        flux_pulse_pars = self.qubit.get_flux_pars()
+        mw_pulse_pars, RO_pars = self.qubit.get_pulse_pars()
+
+        repSWAP = awg_swf.SwapN(mw_pulse_pars,
+                                RO_pars,
+                                flux_pulse_pars, AWG=self.AWG,
+                                dist_dict=self.kernel_obj.kernel(),
+                                upload=True)
+        # self.AWG.set('ch%d_amp'%self.qubit.fluxing_channel(), 2.)
+        # seq = repSWAP.pre_upload()
+
+        self.MC_nested.set_sweep_function(repSWAP)
+        self.MC_nested.set_sweep_points(lengths_vec)
+
+        self.MC_nested.set_detector_function(self.qubit.int_avg_det_rot)
+        self.AWG.set('ch%d_amp' % self.qubit.fluxing_channel(),
+                     self.qubit.SWAP_amp())
+        self.MC_nested.run('SWAPN_%s' % self.qubit.name)
+
+        # # fit it
+        ma_obj = ma.SWAPN_cost(auto=True, cost_func=self.cost_choice)
+        return ma_obj.cost_val, ma_obj.single_swap_fid
 
     def prepare(self):
         pass
@@ -1065,15 +1181,13 @@ class Chevron_optimization_v1(det.Soft_Detector):
         pass
 
 
-
-
-
-
 class AllXY_devition_detector_CBox(det.Soft_Detector):
+
     '''
     Currently only for CBox.
     Todo: remove the predefined values for the sequence
     '''
+
     def __init__(self, measurement_name, MC, AWG, CBox,
                  IF, RO_trigger_delay, RO_pulse_delay, RO_pulse_length,
                  pulse_delay,
@@ -1334,7 +1448,7 @@ class AllXY_devition_detector_CBox(det.Soft_Detector):
 #             return ana.F_raw, ana.V_opt_raw, average_weight
 #         else:
 #             signal = np.abs(ana.mu1_1 - ana.mu0_0)
-#             return ana.F, ana.F_corrected, ana.V_opt_raw, average_weight, signal
+# return ana.F, ana.F_corrected, ana.V_opt_raw, average_weight, signal
 
 #     def finish(self, **kw):
 #         self.TD_Meas.set_MC('MC')
@@ -1588,8 +1702,8 @@ class AllXY_devition_detector_CBox(det.Soft_Detector):
 #         if self.no_fits:
 #             return a.mean_rtf, a.std_err_rtf, a.RO_err_frac, a.flip_err_frac, self.F_raw
 #         else:
-#             return a.mean_rtf, a.std_err_rtf, a.RO_err_frac, a.flip_err_frac, self.F_raw, self.F_corrected
-
+# return a.mean_rtf, a.std_err_rtf, a.RO_err_frac, a.flip_err_frac,
+# self.F_raw, self.F_corrected
 
 
 # class Photon_number_detector(det.Soft_Detector):
@@ -1741,11 +1855,11 @@ class AllXY_devition_detector_CBox(det.Soft_Detector):
 #             phia1 = self.CBox_lut_man_2.get_M_phase_CLEAR_a1()
 #             phib1 = self.CBox_lut_man_2.get_M_phase_CLEAR_b1()
 #             print("total deviation", deviation)
-#             return deviation, error_g, error_e, amp1, amp2, phi1, phi2, ampa1, ampb1, phia1, phib1
+# return deviation, error_g, error_e, amp1, amp2, phi1, phi2, ampa1,
+# ampb1, phia1, phib1
 
 #     def finish(self, **kw):
         self.MC_AllXY.remove()
-
 
 
 # class AllXY_deviation_detector(det.Soft_Detector):
@@ -1934,6 +2048,7 @@ class AllXY_devition_detector_CBox(det.Soft_Detector):
 
 
 class TwoTone_Spectroscopy(det.Soft_Detector):
+
     '''
     Performs a two tone spectroscopy.
     First the resonator is scanned and its resonance is found
@@ -2026,6 +2141,7 @@ class TwoTone_Spectroscopy(det.Soft_Detector):
 
 
 class Qubit_Spectroscopy(det.Soft_Detector):
+
     '''
     Performs a set of measurements that finds f_resonator, f_qubit,
     '''
@@ -2182,7 +2298,7 @@ class Qubit_Spectroscopy(det.Soft_Detector):
             f_step=self.spec_freq_step,
             f_start=self.spec_start,
             f_stop=self.spec_stop,
-            update_qubit=False,  # We do not want a failed track to update
+            # update_qubit=False,  # We do not want a failed track to update
             suppress_print_statements=True,
             source_power=self.qubit_source_power,
             pulsed=self.pulsed)
@@ -2206,6 +2322,7 @@ class Qubit_Spectroscopy(det.Soft_Detector):
 
 
 class Tracked_Qubit_Spectroscopy(det.Soft_Detector):
+
     '''
     Performs a set of measurements that finds f_resonator, f_qubit, and
     tracks them.
@@ -2217,35 +2334,34 @@ class Tracked_Qubit_Spectroscopy(det.Soft_Detector):
     '''
 
     def __init__(self, qubit,
+                 nested_MC,
                  qubit_initial_frequency=None,
-                 qubit_span=0.04,
+                 qubit_span=0.04e9,
                  qubit_init_factor=5,
-                 qubit_stepsize=0.0005,
-                 qubit_t_int=None,
+                 qubit_stepsize=0.0005e9,
                  resonator_initial_frequency=None,
-                 resonator_span=0.010,
-                 resonator_stepsize=0.0001,
+                 resonator_span=0.010e9,
+                 resonator_stepsize=0.0001e9,
                  resonator_use_min=False,
                  resonator_use_max=False,
-                 resonator_t_int=None,
                  No_of_fitpoints=10,
                  sweep_points=None,
                  fitting_model='hanger',
                  pulsed=False,
                  **kw):
-
-        # import placed here to prevent circular import statement
-        #   as some cal_tools use composite detectors.
-        from pycqed.measurement import calibration_toolbox \
-            as cal_tools
-        self.cal_tools = cal_tools
+        self.nested_MC = nested_MC
         self.qubit = qubit
-        self.nested_MC_name = 'Qubit_Spectroscopy_MC'
-        self.cal_tools = cal_tools
-        self.resonator_frequency = resonator_initial_frequency
+        if resonator_initial_frequency != None:
+
+            self.resonator_frequency = resonator_initial_frequency
+        else:
+            self.resonator_frequency = self.qubit.f_res()
         self.resonator_span = resonator_span
         self.resonator_stepsize = resonator_stepsize
-        self.qubit_frequency = qubit_initial_frequency
+        if qubit_initial_frequency != None:
+            self.qubit_frequency = qubit_initial_frequency
+        else:
+            self.qubit_frequency = self.qubit.f_qubit()
         self.qubit_span = qubit_span
         self.qubit_init_factor = qubit_init_factor
         self.qubit_stepsize = qubit_stepsize
@@ -2255,53 +2371,42 @@ class Tracked_Qubit_Spectroscopy(det.Soft_Detector):
         self.resonator_use_max = resonator_use_max
         self.sweep_points = sweep_points
 
-        if (resonator_t_int is not None) and (qubit_t_int is not None):
-            self.resonator_t_int = resonator_t_int
-            self.qubit_t_int = qubit_t_int
-            self.alternate_t_int = True
-        else:
-            self.alternate_t_int = False
-
         # Instruments
-        if self.pulsed is True:
-            self.Pulsed_Spec = qt.instruments['Pulsed_Spec']
         self.fitting_model = fitting_model
-        self.AWG = qt.instruments['AWG']  # only for triggering
-        self.HM = qt.instruments['HM']
 
-        self.qubit_source = qt.instruments[self.qubit.get_qubit_source()]
-        self.RF_power = kw.pop('RF_power', self.qubit.get_RF_CW_power())
-        self.qubit_source_power = kw.pop('qubit_source_power',
-                                         self.qubit.get_source_power())
+        # self.qubit_source = qubit.cw_source
+        # self.RF_power = kw.pop('RF_power', self.qubit.RO_power_cw())
+        # if pulsed:
+        #     self.qubit_source_power = kw.pop('qubit_source_power',
+        #                                      self.qubit.get_source_power())
+        # else:
 
         self.detector_control = 'soft'
         self.name = 'Qubit_Spectroscopy'
-        self.value_names = ['f_resonator', 'f_resonator_stderr',
-                            'f_qubit', 'f_qubit_stderr']
-        self.value_units = ['GHz', 'GHz', 'GHz', 'GHz']
+        self.value_names = ['f_resonator',  # 'f_resonator_stderr',
+                            'f_qubit']  # , 'f_qubit_stderr']
+        self.value_units = ['Hz', 'Hz']  # , 'Hz', 'Hz']
 
     def prepare(self, **kw):
-        self.nested_MC = qt.instruments.create(
-            self.nested_MC_name, 'MeasurementControl')
 
-        if self.pulsed is True:
-            if self.qubit.get_RF_source() is not None:
-                self.Pulsed_Spec.set_RF_source(self.qubit.get_RF_source())
-                self.HM.set_RF_source(self.qubit.get_RF_source())
-            self.Pulsed_Spec.set_RF_power(self.RF_power)
-            self.HM.set_RF_power(self.RF_power)
-        else:
-            if self.qubit.get_RF_source() is not None:
-                self.HM.set_RF_source(self.qubit.get_RF_source())
-                print('Setting RF source of HM to'+self.qubit.get_RF_source())
-            self.HM.set_RF_power(self.RF_power)
-        self.qubit_source.set_power(self.qubit_source_power)
+        # if self.pulsed is True:
+        #     if self.qubit.get_RF_source() is not None:
+        #         self.Pulsed_Spec.set_RF_source(self.qubit.get_RF_source())
+        #         self.HM.set_RF_source(self.qubit.get_RF_source())
+        #     self.Pulsed_Spec.set_RF_power(self.RF_power)
+        #     self.HM.set_RF_power(self.RF_power)
+        # else:
+        #     if self.qubit.get_RF_source() is not None:
+        #         self.HM.set_RF_source(self.qubit.get_RF_source())
+        #         print('Setting RF source of HM to'+self.qubit.get_RF_source())
+        #     self.HM.set_RF_power(self.RF_power)
+        # self.qubit_source.set_power(self.qubit_source_power)
 
-        self.AWG.start()
-        self.HM.init()
-        self.AWG.stop()
+        # self.AWG.start()
+        # self.HM.init()
+        # self.AWG.stop()
 
-        self.HM.set_sources('On')
+        # self.HM.set_sources('On')
         self.resonator_frequencies = np.zeros(len(self.sweep_points))
         self.qubit_frequencies = np.zeros(len(self.sweep_points))
         self.loopcnt = 0
@@ -2385,244 +2490,139 @@ class Tracked_Qubit_Spectroscopy(det.Soft_Detector):
                 'f_qubit': f_qubit}
 
     def acquire_data_point(self, *args, **kw):
-        self.HM.set_sources('On')
+        # self.HM.set_sources('On')
 
         frequencies = self.determine_frequencies(self.loopcnt)
 
         # Resonator
-        print('\nScanning for resonator.' + \
-            'range: {fmin} - {fmax} GHz   span {span} MHz'.format(
-                fmin=frequencies['f_resonator_start'],
-                fmax=frequencies['f_resonator_end'],
-                span=(frequencies['f_resonator_end'] -
-                      frequencies['f_resonator_start']) * 1e3))
+        print('\nScanning for resonator.' +
+              'range: {fmin} - {fmax} GHz   span {span} MHz'.format(
+                  fmin=frequencies['f_resonator_start'],
+                  fmax=frequencies['f_resonator_end'],
+                  span=(frequencies['f_resonator_end'] -
+                        frequencies['f_resonator_start']) ))
 
-        if self.alternate_t_int:
-            self.HM.set_t_int(self.resonator_t_int)
-            self.HM.init(optimize=True)
+        # if self.alternate_t_int:
+        #     self.HM.set_t_int(self.resonator_t_int)
+        #     self.HM.init(optimize=True)
 
-        resonator_scan = self.qubit.find_resonator_frequency(
-            MC_name='Qubit_Spectroscopy_MC',
-            f_start=frequencies['f_resonator_start'],
-            f_stop=frequencies['f_resonator_end'],
-            f_step=self.resonator_stepsize,
-            suppress_print_statements=True,
-            fitting_model=self.fitting_model,
-            use_min=self.resonator_use_min,
-            use_max=self.resonator_use_max)
+        freqs_res = np.arange(frequencies['f_resonator_start'],
+                              frequencies['f_resonator_end'],
+                              self.resonator_stepsize)
+        f_resonator = self.qubit.find_resonator_frequency(
+            MC=self.nested_MC,
+            freqs=freqs_res, update=False,
+            use_min=self.resonator_use_min)*1e9 # to correct for fit
+        # FIXME: remove the 1e9 after reloading the qubit object
 
-        f_resonator = resonator_scan['f_resonator']
-        self.resonator_frequency = f_resonator  # in 2nd loop value is updated
-        f_resonator_stderr = resonator_scan['f_resonator_stderr']
-        Q_resonator = resonator_scan['quality_factor']
+        # FIXME not returned in newest version
+        # self.resonator_frequency = f_resonator  # in 2nd loop value is updated
+        # f_resonator_stderr = resonator_scan['f_resonator_stderr']
+        # Q_resonator = resonator_scan['quality_factor']
         # Q_resonator_stderr = resonator_scan['quality_factor_stderr']
         print('Finished resonator scan. Readout frequency: ', f_resonator)
 
         # Qubit
-        print('Scanning for qubit.' + \
-            'range: {fmin} - {fmax} GHz   span {span} MHz'.format(
-                fmin=frequencies['f_qubit_start'],
-                fmax=frequencies['f_qubit_end'],
-                span=(frequencies['f_qubit_end'] -
-                      frequencies['f_qubit_start']) * 1e3))
+        print('Scanning for qubit.' +
+              'range: {fmin} - {fmax} GHz   span {span} MHz'.format(
+                  fmin=frequencies['f_qubit_start'],
+                  fmax=frequencies['f_qubit_end'],
+                  span=(frequencies['f_qubit_end'] -
+                        frequencies['f_qubit_start'])))
 
-        self.qubit.set_current_RO_frequency(f_resonator)
-        if self.pulsed is False:
-            self.HM.set_frequency(self.qubit.get_current_RO_frequency()*1e9)
-        elif self.pulsed is True:
-            self.Pulsed_Spec.set_f_readout(
-                self.qubit.get_current_RO_frequency()*1e9)
+        self.qubit.f_RO(f_resonator)
+        freqs_qub = np.arange(frequencies['f_qubit_start'],
+                              frequencies['f_qubit_end'],
+                              self.qubit_stepsize)
 
-        if self.alternate_t_int:
-            self.HM.set_t_int(self.qubit_t_int)
-            self.HM.init(optimize=True)
-
-        qubit_scan = self.qubit.find_frequency_spec(
-            MC_name='Qubit_Spectroscopy_MC',
-            f_step=self.qubit_stepsize,
-            f_start=frequencies['f_qubit_start'],
-            f_stop=frequencies['f_qubit_end'],
-            update_qubit=False,  # We do not want a failed track to update
-            suppress_print_statements=True,
-            source_power=self.qubit_source_power,
+        self.qubit.measure_spectroscopy(
+            freqs=freqs_qub,
+            MC=self.nested_MC,
             pulsed=self.pulsed)
-
-        f_qubit = qubit_scan['f_qubit']
-        f_qubit_stderr = qubit_scan['f_qubit_stderr']
-        qubit_linewidth = qubit_scan['qubit_linewidth']
+        a = ma.Qubit_Spectroscopy_Analysis(label=self.qubit.msmt_suffix)
+        f_qubit, std_err_f_qubit = a.get_frequency_estimate()
+        # f_qubit = qubit_scan['f_qubit']
+        # f_qubit_stderr = qubit_scan['f_qubit_stderr']
+        # qubit_linewidth = qubit_scan['qubit_linewidth']
+        # self.qubit_frequency = f_qubit
         self.qubit_frequency = f_qubit
         print('Measured Qubit frequency: ', f_qubit)
 
         self.qubit.set_current_frequency(f_qubit)
-        self.resonator_linewidth = f_resonator / Q_resonator
-        self.qubit_linewidth = qubit_linewidth
+        # self.resonator_linewidth = f_resonator / Q_resonator
+        # self.qubit_linewidth = qubit_linewidth
 
         if self.loopcnt == 1:
             self.resonator_span = max(min(5*self.resonator_linewidth, 0.005),
                                       self.resonator_span)
 
-        print('Resonator width = {linewidth}, span = {span}'.format(
-            linewidth=self.resonator_linewidth, span=self.resonator_span))
-        print('Qubit width = {}'.format(self.qubit_linewidth))
+        # print('Resonator width = {linewidth}, span = {span}'.format(
+        #     linewidth=self.resonator_linewidth, span=self.resonator_span))
+        # print('Qubit width = {}'.format(self.qubit_linewidth))
 
         self.resonator_frequencies[self.loopcnt] = f_resonator
         self.qubit_frequencies[self.loopcnt] = f_qubit
 
-        self.HM.set_sources('Off')
+        # self.HM.set_sources('Off')
         self.loopcnt += 1
-
-        return_vals = [f_resonator, f_resonator_stderr,
-                       f_qubit, f_qubit_stderr]
+        return_vals = [f_resonator, f_qubit]
+        # return_vals = [f_resonator, f_resonator_stderr,
+        #                f_qubit, f_qubit_stderr]
         return return_vals
 
     def finish(self, **kw):
-        self.HM.set_sources('Off')
-        self.nested_MC.remove()
+        # self.HM.set_sources('Off')
+        pass
 
 
-# class T1_Detector(Qubit_Characterization_Detector):
-#     def __init__(self, qubit,
-#                  spec_start=None,
-#                  spec_stop=None,
-#                  pulse_amp_guess=0.7,
-#                  AWG_name='AWG',
-#                  **kw):
-#         from pycqed.measurement import calibration_toolbox as cal_tools
-#         imp.reload(cal_tools)
-#         self.detector_control = 'soft'
-#         self.name = 'T1_Detector'
-#         self.value_names = ['f_resonator', 'f_resonator_stderr',
-#                             'f_qubit', 'f_qubit_stderr', 'T1', 'T1_stderr']
-#         self.value_units = ['GHz', 'GHz', 'GHz', 'GHz', 'us', 'us']
+class FluxTrack(det.Soft_Detector):
+    '''
+    '''
+    def __init__(self, qubit, device, MC, AWG, cal_points=False, **kw):
+        self.detector_control = 'soft'
+        self.name = 'FluxTrack'
+        self.cal_points=cal_points
+        self.value_names = [r' +/- $F |1\rangle$', r' + $F |1\rangle$', r' - $F |1\rangle$']
+        self.value_units = ['', '', '']
+        self.qubit = qubit
+        self.AWG = AWG
+        self.MC = MC
+        self.operations_dict = device.get_operation_dict()
+        self.dist_dict = qubit.dist_dict()
+        self.nested_MC = MC
 
-#         self.AWG = qt.instruments[AWG_name]
-#         self.pulse_amp_guess = pulse_amp_guess
-#         self.cal_tools = cal_tools
-#         self.qubit = qubit
-#         self.nested_MC_name = 'MC_T1_detector'
-#         self.nested_MC = qt.instruments[self.nested_MC_name]
-#         self.cal_tools = cal_tools
-#         self.spec_start = spec_start
-#         self.spec_stop = spec_stop
-#         self.qubit_drive_ins = qt.instruments[self.qubit.get_qubit_drive()]
-#         self.HM = qt.instruments['HM']
-#         self.TD_Meas = qt.instruments['TD_Meas']
-#         # Setting the constants
-#         self.calreadoutevery = 1
-#         self.loopcnt = 0
-#         self.T1_stepsize = 500
+        self.FluxTrack_swf = awg_swf.awg_seq_swf(
+            fsqs.FluxTrack,
+            # parameter_name='Amplitude',
+            unit='V',
+            AWG=self.AWG,
+            fluxing_channels=[self.qubit.fluxing_channel()],
+            awg_seq_func_kwargs={'operation_dict': self.operations_dict,
+                                 'q0': self.qubit.name,
+                                 'cal_points':self.cal_points,
+                                 'distortion_dict': self.dist_dict,
+                                 'upload': True})
 
-#     def prepare(self, **kw):
+    def prepare(self, **kw):
+        self.FluxTrack_swf.prepare()
+        self.FluxTrack_swf.upload=False
 
-#         self.nested_MC = qt.instruments.create(
-#             self.nested_MC_name,
-#             'MeasurementControl')
+    def acquire_data_point(self, *args, **kw):
+            # acquire with MC_nested
+        self.MC.set_sweep_function(self.FluxTrack_swf)
+        self.MC.set_sweep_points(np.arange(2+4*self.cal_points))
+        if self.cal_points:
+            d =self.qubit.int_avg_det_rot
+        else:
+            d =self.qubit.int_avg_det
 
-#     def acquire_data_point(self, *args, **kw):
-#         self.loopcnt += 1
 
-#         self.switch_to_freq_sweep()
+        self.MC.set_detector_function(d)
+        self.MC.run('FluxTrack_point_%s' % self.qubit.name)
 
-#         cur_f_RO = self.qubit.get_current_RO_frequency()
-#         resonator_scan = self.cal_tools.find_resonator_frequency(
-#             MC_name=self.nested_MC_name,
-#             start_freq=cur_f_RO-0.002,
-#             end_freq=cur_f_RO+0.002,
-#             suppress_print_statements=True)
-#         f_resonator = resonator_scan['f_resonator']
-#         f_resonator_stderr = resonator_scan['f_resonator_stderr']
-#         print('Readout frequency: ', f_resonator)
-
-#         self.qubit.set_current_RO_frequency(f_resonator)
-#         self.HM.set_frequency(self.qubit.get_current_RO_frequency()*1e9)
-
-#         qubit_scan = self.cal_tools.find_qubit_frequency_spec(
-#             MC_name=self.nested_MC_name,
-#             qubit=self.qubit,
-#             start_freq=None,
-#             end_freq=None,
-#             suppress_print_statements=True)
-#         f_qubit = qubit_scan['f_qubit']
-#         f_qubit_stderr = qubit_scan['f_qubit_stderr']
-
-#         print('Estimated qubit frequency: ', f_qubit)
-#         self.qubit.set_current_frequency(f_qubit)
-
-#         #############################
-#         # Start of Time Domain part #
-#         #############################
-
-#         self.TD_Meas.set_f_readout(self.qubit.get_current_RO_frequency()*1e9)
-#         self.qubit_drive_ins.set_frequency(
-#             (self.qubit.get_current_frequency() +
-#              self.qubit.get_sideband_modulation_frequency()) * 1e9)
-#         self.switch_to_time_domain_measurement()
-
-#         self.qubit.set_pulse_amplitude_I(self.pulse_amp_guess)
-#         self.qubit.set_pulse_amplitude_Q(self.pulse_amp_guess)
-#         amp_ch1, amp_ch2 = self.cal_tools.calibrate_pulse_amplitude(
-#             MC_name=self.nested_MC_name,
-#             qubit=self.qubit,
-#             max_nr_iterations=3, desired_accuracy=.1, Navg=4,
-#             suppress_print_statements=False)
-
-#         self.qubit.set_pulse_amplitude_I(amp_ch1)
-#         self.qubit.set_pulse_amplitude_Q(amp_ch2)
-
-#         self.nested_MC.set_detector_function(det.TimeDomainDetector_cal())
-
-#         if self.qubit.pulse_amp_control == 'AWG':
-#             self.nested_MC.set_sweep_function(awg_swf.T1(
-#                 stepsize=self.T1_stepsize,
-#                 gauss_width=self.qubit.get_gauss_width()))
-#         elif self.qubit.pulse_amp_control == 'Duplexer':
-#             self.nested_MC.set_sweep_function(awg_swf.T1(
-#                 stepsize=self.T1_stepsize,
-#                 gauss_width=self.qubit.get_gauss_width(),
-#                 Duplexer=True))
-
-#         self.nested_MC.run()
-#         T1_a = ma.T1_Analysis(auto=True, close_file=False)
-#         T1, T1_stderr = T1_a.get_measured_T1()
-#         T1_a.finish()
-#         self.qubit_drive_ins.off()
-
-#         return_vals = [f_resonator, f_resonator_stderr,
-#                        f_qubit, f_qubit_stderr, T1, T1_stderr]
-#         return return_vals
-
-#     def finish(self, **kw):
-#         self.HM.set_sources('Off')
-#         self.nested_MC.remove()
-
-# class HM_SH(det.Soft_Detector):
-#     '''
-#     Combining a Homodyne measurment and the Signal Hound power at a fixed
-#     frequency
-#     '''
-
-#     def __init__(self, frequency, **kw):
-#         # super(TimeDomainDetector_integrated, self).__init__()
-
-#         self.detector_control = 'soft'
-#         self.name = 'HM_SH'
-#         self.value_names = ['S21_magn', 'S21_phase', 'Power']
-#         self.value_units = ['V', 'deg', 'dBm']
-#         self.HomodyneDetector = det.HomodyneDetector()
-#         self.Signal_Hound_fixed_frequency = det.Signal_Hound_fixed_frequency(
-#                                                     frequency=frequency)
-
-#     def acquire_data_point(self, *args, **kw):
-#         HM_data = self.HomodyneDetector.acquire_data_point()
-#         SH_data = self.Signal_Hound_fixed_frequency.acquire_data_point()
-
-#         return [HM_data[0], HM_data[1], SH_data]
-
-#     def prepare(self, **kw):
-#         self.HomodyneDetector.prepare()
-#         self.Signal_Hound_fixed_frequency.prepare()
-#         print('prepare worked')
-
-#     def finish(self, **kw):
-#         self.HomodyneDetector.finish()
-#         self.Signal_Hound_fixed_frequency.finish()
+        ma_obj = ma.MeasurementAnalysis(auto=True, label='FluxTrack_point')
+        y = np.mean(ma_obj.measured_values[0, :2])
+        y_p = ma_obj.measured_values[0, 0]
+        y_m = ma_obj.measured_values[0, 1]
+        y_mean = np.mean([y_p, y_m])
+        return (y_mean, y_p, y_m)

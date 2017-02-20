@@ -1,20 +1,26 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import lmfit
+import logging
 #################################
 #   Fitting Functions Library   #
 #################################
 
 
 def RandomizedBenchmarkingDecay(numCliff, Amplitude, p, offset):
-    val = Amplitude * (p**numCliff)+ offset
+    val = Amplitude * (p**numCliff) + offset
     return val
 
 
-def DoubleExpDampOscFunc(t, tau_1, tau_2, freq_1, freq_2, phase_1, phase_2, amp_1, amp_2, osc_offset):
+def DoubleExpDampOscFunc(t, tau_1, tau_2,
+                         freq_1, freq_2,
+                         phase_1, phase_2,
+                         amp_1, amp_2, osc_offset):
     cos_1 = amp_1 * (np.cos(2*np.pi*freq_1*t+phase_1)) * np.exp(-(t/tau_1))
     cos_2 = amp_2 * (np.cos(2*np.pi*freq_2*t+phase_2)) * np.exp(-(t/tau_2))
     return cos_1 + cos_2 + osc_offset
+
+
 
 def double_RandomizedBenchmarkingDecay(numCliff, p, offset,
                                        invert=1):
@@ -55,16 +61,73 @@ def TwinLorentzFunc(f, amplitude_a, amplitude_b, center_a, center_b,
     return val
 
 
-def QubitFreqDac(dac_voltage, f_max, E_c,
-                 dac_sweet_spot, dac_flux_coefficient, asymmetry=0):
+def Qubit_dac_to_freq(dac_voltage, f_max, E_c,
+                      dac_sweet_spot, dac_flux_coefficient, asymmetry=0):
     '''
     The cosine Arc model for uncalibrated flux for asymmetric qubit.
-    dac_voltage (mV), f_max (GHz), E_c (MHz),
+
+    dac_voltage (V)
+    f_max (Hz)
+    E_c (Hz)
+    dac_sweet_spot (V)
+    dac_flux_coefficient (1/V)
     asym (dimensionless asymmetry param) = abs((EJ1-EJ2)/(EJ1+EJ2)),
-    dac_sweet_spot (mV),
-    dac_flux_coefficient (1/mV)
     '''
-    calculated_frequency = (f_max + E_c)*(asymmetry**2 + (1-asymmetry**2) *
+    qubit_freq = (f_max + E_c)*(
+        asymmetry**2 + (1-asymmetry**2) *
+        np.sqrt(abs(np.cos(dac_flux_coefficient*(dac_voltage-dac_sweet_spot)))))-E_c
+    return qubit_freq
+
+
+def Qubit_freq_to_dac(frequency, f_max, E_c,
+                      dac_sweet_spot, dac_flux_coefficient, asymmetry=0,
+                      branch='positive'):
+    '''
+    The cosine Arc model for uncalibrated flux for asymmetric qubit.
+    This function implements the inverse of "Qubit_dac_to_freq"
+
+    frequency (Hz)
+    f_max (Hz)
+    E_c (Hz)
+    dac_sweet_spot (V)
+    dac_flux_coefficient (1/V)
+    asym (dimensionless asymmetry param) = abs((EJ1-EJ2)/(EJ1+EJ2)),
+    branch (enum: 'positive' 'negative')
+    '''
+
+    asymm_term = (asymmetry**2 + (1-asymmetry**2))
+    dac_term = np.arccos(((frequency+E_c)/((f_max+E_c) * asymm_term))**2)
+    if branch == 'positive':
+        dac_voltage = (dac_term)/dac_flux_coefficient+dac_sweet_spot
+    elif branch == 'negative':
+        dac_voltage = -(dac_term)/dac_flux_coefficient+dac_sweet_spot
+    else:
+        raise ValueError('branch {} not recognized'.format(branch))
+
+    return dac_voltage
+
+
+def QubitFreqDac(dac_voltage, f_max, E_c,
+                 dac_sweet_spot, dac_flux_coefficient, asymmetry=0):
+    logging.warning('deprecated, replace QubitFreqDac with Qubit_dac_to_freq')
+    return Qubit_dac_to_freq(dac_voltage, f_max, E_c,
+                             dac_sweet_spot, dac_flux_coefficient, asymmetry)
+
+
+def Qubit_(dac_voltage, f_max, E_c,
+           dac_sweet_spot, dac_flux_coefficient, asymmetry=0):
+    '''
+    The cosine Arc model for uncalibrated flux for asymmetric qubit.
+
+    dac_voltage (V)
+    f_max (Hz)
+    E_c (Hz)
+    dac_sweet_spot (V)
+    dac_flux_coefficient (1/V)
+    asym (dimensionless asymmetry param) = abs((EJ1-EJ2)/(EJ1+EJ2)),
+    '''
+    calculated_frequency = (f_max + E_c)*(
+        asymmetry**2 + (1-asymmetry**2) *
         np.cos(dac_flux_coefficient*(dac_voltage-dac_sweet_spot))**2)**0.25-E_c
     return calculated_frequency
 
@@ -135,21 +198,36 @@ def HangerFuncAmplitude(f, f0, Q, Qe, A, theta):
     return abs(A*(1.-Q/Qe*np.exp(1.j*theta)/(1.+2.j*Q*(f/1.e9-f0)/f0)))
 
 
-def HangerFuncComplex(f, f0, Q, Qe, A, theta):
-    # This is the function for a hanger which does not
-    # take into account a possible slope
-    # This function may be preferred over SlopedHangerFunc if the area around
-    # the hanger is small.
-    # In this case it may misjudge the slope
-    # Theta is the asymmetry parameter
-    return A*(1.-Q/Qe*np.exp(1.j*theta)/(1.+2.j*Q*(f/1.e9-f0)/f0))
+def HangerFuncComplex(f, pars):
+    '''
+    This is the complex function for a hanger which DOES NOT
+    take into account a possible slope
+    Input:
+        f = frequency
+        pars = parameters dictionary
+               f0, Q, Qe, A, theta, phi_v, phi_0
+
+    Author: Stefano Poletto
+    '''
+    f0 = pars['f0']
+    Q = pars['Q']
+    Qe = pars['Qe']
+    A = pars['A']
+    theta = pars['theta']
+    phi_v = pars['phi_v']
+    phi_0 = pars['phi_0']
+
+    S21 = A*(1-Q/Qe*np.exp(1j*theta)/(1+2.j*Q*(f/1.e9-f0)/f0)) * \
+        np.exp(1j*(phi_v*f+phi_0))
+
+    return S21
 
 
 def PolyBgHangerFuncAmplitude(f, f0, Q, Qe, A, theta, poly_coeffs):
     # This is the function for a hanger (lambda/4 resonator) which takes into
     # account a possible polynomial background
     # NOT DEBUGGED
-    return np.abs((1.+np.polyval(poly_coeffs,(f/1.e9-f0)/f0)) *
+    return np.abs((1.+np.polyval(poly_coeffs, (f/1.e9-f0)/f0)) *
                   HangerFuncAmplitude(f, f0, Q, Qe, A, theta))
 
 
@@ -166,11 +244,13 @@ def SlopedHangerFuncComplex(f, f0, Q, Qe, A, theta, phi_v, phi_0, slope):
     return (1.+slope*(f/1.e9-f0)/f0)*np.exp(1.j*(phi_v*f+phi_0-phi_v*f[0])) * \
         HangerFuncComplex(f, f0, Q, Qe, A, theta)
 
+
 def linear_with_offset(x, a, b):
     '''
     A linear signal with a fixed offset.
     '''
     return a*x + b
+
 
 def linear_with_background(x, a, b):
     '''
@@ -178,7 +258,8 @@ def linear_with_background(x, a, b):
     '''
     return np.sqrt((a*x)**2 + b**2)
 
-def linear_with_background_and_offset(x, a, b,c):
+
+def linear_with_background_and_offset(x, a, b, c):
     '''
     A linear signal with a fixed background.
     '''
@@ -201,11 +282,34 @@ def gaussian_2D(x, y, amplitude=1,
 def TripleExpDecayFunc(t, tau1, tau2, tau3, amp1, amp2, amp3, offset, n):
     return offset+amp1*np.exp(-(t/tau1)**n)+amp2*np.exp(-(t/tau2)**n)+amp3*np.exp(-(t/tau3)**n)
 
+
+######################
+# Residual functions #
+######################
+def residual_complex_fcn(pars, cmp_fcn, x, y):
+    '''
+    Residual of a complex function with complex results 'y' and
+    real input values 'x'
+    For resonators 'x' is the the frequency, 'y' the complex transmission
+    Input:
+        pars = parameters dictionary (check the corresponding function 'cmp_fcn' for the parameters to pass)
+        cmp_fcn = complex function
+        x = input real values to 'cmp_fcn'
+        y = output complex values from 'cmp_fcn'
+
+    Author = Stefano Poletto
+    '''
+    cmp_values = cmp_fcn(x, pars)
+
+    res = cmp_values-y
+    res = np.append(res.real, res.imag)
+
+    return res
+
+
 ####################
 # Guess functions  #
 ####################
-
-
 def exp_dec_guess(model, data, t):
     '''
     Assumes exponential decay in estimating the parameters
@@ -413,7 +517,7 @@ def plot_fitres2D_heatmap(fit_res, x, y, axs=None, cmap='viridis'):
     model) but I put it here as it is closely related to all the stuff we do
     with lmfit. If anyone has a better location in mind, let me know (MAR).
     '''
-    #fixing the data rotation with [::-1]
+    # fixing the data rotation with [::-1]
     nr_cols = len(np.unique(x))
     data_2D = fit_res.data.reshape(-1, nr_cols, order='C')[::-1]
     fit_2D = fit_res.best_fit.reshape(-1, nr_cols, order='C')[::-1]

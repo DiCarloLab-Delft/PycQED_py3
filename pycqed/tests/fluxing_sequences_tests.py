@@ -1,4 +1,3 @@
-# TODO make this file run :)
 
 import numpy as np
 import os
@@ -11,12 +10,13 @@ from measurement.waveform_control.pulsar import Pulsar
 from pycqed.measurement.waveform_control import element
 from pycqed.measurement.waveform_control.pulse import SquarePulse
 from pycqed.measurement.pulse_sequences import fluxing_sequences as fsqs
-
+import qcodes as qc
 
 class element_distortion(unittest.TestCase):
     def setUp(self):
         # set up a pulsar with some mock settings for the element
         self.pulsar= Pulsar()
+
         for i in range(4):
             self.pulsar.define_channel(id='ch{}'.format(i+1),
                                           name='ch{}'.format(i+1), type='analog',

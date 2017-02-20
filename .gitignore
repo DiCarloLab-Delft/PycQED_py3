@@ -117,5 +117,7 @@ $RECYCLE.BIN/
 *.qasm
 # micro instruction assembly files
 *.asm
+*.qumis
 *.txt
+*.png
 data/*

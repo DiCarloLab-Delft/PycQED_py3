@@ -50,6 +50,12 @@ class MeasurementControl(Instrument):
                            parameter_class=ManualParameter,
                            vals=vals.Ints(1, int(1e8)),
                            initial_value=1)
+
+        self.add_parameter('plotting_max_pts',
+                           label='Maximum number of live plotting points',
+                           parameter_class=ManualParameter,
+                           vals=vals.Ints(1),
+                           initial_value=4000)
         self.add_parameter('verbose',
                            parameter_class=ManualParameter,
                            vals=vals.Bool(),
@@ -105,7 +111,13 @@ class MeasurementControl(Instrument):
             self.save_instrument_settings(self.data_object)
             self.create_experimentaldata_dataset()
             if mode is not 'adaptive':
-                self.xlen = len(self.get_sweep_points())
+                try:
+                    # required for 2D plotting and data storing.
+                    # try except because some swf get the sweep points in the
+                    # prepare statement. This needs a proper fix
+                    self.xlen = len(self.get_sweep_points())
+                except:
+                    self.xlen = 1
             if self.mode == '1D':
                 self.measure()
             elif self.mode == '2D':
@@ -393,8 +405,7 @@ class MeasurementControl(Instrument):
                      'iteration',
                      'soft_iteration']:
             try:
-                attr = getattr(self, attr)
-                del attr
+                delattr(self, attr)
             except AttributeError:
                 pass
 
@@ -479,30 +490,34 @@ class MeasurementControl(Instrument):
                     yp = self._persist_dat[
                         :, yi+len(self.sweep_function_names)]
                     xp = self._persist_dat[:, xi]
-                    self.main_QtPlot.add(x=xp, y=yp,
-                                         subplot=j+1,
-                                         color=0.75,  # a grayscale value
-                                         symbol='o', symbolSize=5)
+                    if len(xp) < self.plotting_max_pts():
+                        self.main_QtPlot.add(x=xp, y=yp,
+                                             subplot=j+1,
+                                             color=0.75,  # a grayscale value
+                                             symbol='o', symbolSize=5)
                 self.main_QtPlot.add(x=[0], y=[0],
                                      xlabel=xlab, ylabel=ylab,
                                      subplot=j+1,
-                                     color=color_cycle[j],
+                                     color=color_cycle[j%len(color_cycle)],
                                      symbol='o', symbolSize=5)
                 self.curves.append(self.main_QtPlot.traces[-1])
                 j += 1
             self.main_QtPlot.win.nextRow()
 
     def update_plotmon(self, force_update=False):
-        if self.live_plot_enabled():
+        # Note: plotting_max_pts takes precendence over force update
+        if self.live_plot_enabled() and (self.dset.shape[0] <
+                                         self.plotting_max_pts()):
             i = 0
             try:
                 time_since_last_mon_update = time.time() - self._mon_upd_time
             except:
+                # creates the time variables if they did not exists yet
                 self._mon_upd_time = time.time()
                 time_since_last_mon_update = 1e9
-            # Update always if there are very few points
-            if (self.dset.shape[0] < 20 or time_since_last_mon_update >
-                    self.plotting_interval() or force_update):
+            if (time_since_last_mon_update > self.plotting_interval() or
+                    force_update) :
+
                 nr_sweep_funcs = len(self.sweep_function_names)
                 for y_ind in range(len(self.detector_function.value_names)):
                     for x_ind in range(nr_sweep_funcs):
@@ -894,10 +909,14 @@ class MeasurementControl(Instrument):
         # attached
         # This is a mighty bad line! Should be adding sweep points to the
         # individual sweep funcs
-        self.sweep_functions[0].sweep_points = np.array(sweep_points)
+        if len(np.shape(sweep_points)) == 1:
+            self.sweep_functions[0].sweep_points = np.array(sweep_points)
 
     def get_sweep_points(self):
-        return self.sweep_functions[0].sweep_points
+        if hasattr(self, 'sweep_points'):
+            return self.sweep_points
+        else:
+            return self.sweep_functions[0].sweep_points
 
     def set_adaptive_function_parameters(self, adaptive_function_parameters):
         """

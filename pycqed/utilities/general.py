@@ -87,7 +87,8 @@ def load_settings_onto_instrument(instrument, load_from_instr=None, folder=None,
         while success is False and count < 10:
             try:
                 if folder is None:
-                    folder = a_tools.get_folder(timestamp, older_than, **kw)
+                    folder = a_tools.get_folder(timestamp=timestamp,
+                                                older_than=older_than, **kw)
                 else:
                     folder = folder
                 filepath = a_tools.measurement_filename(folder)
@@ -101,7 +102,7 @@ def load_settings_onto_instrument(instrument, load_from_instr=None, folder=None,
                 success = True
             except:
                 older_than = os.path.split(folder)[0][-8:] \
-                             +'_'+ os.path.split(folder)[1][:6]
+                             + '_' + os.path.split(folder)[1][:6]
                 folder = None
                 success = False
             count += 1
@@ -112,38 +113,24 @@ def load_settings_onto_instrument(instrument, load_from_instr=None, folder=None,
             return False
 
         for parameter, value in ins_group.attrs.items():
-            """
-            try:
-                if value != 'None':  # None is saved as string in hdf5
-                    if type(value) == str:
-                        if value == 'False':
-                            instrument.set(parameter, False)
-                        else:
-                            if has_chr(value):
-                                print(value)
-                                instrument.set(parameter, value)
-                            else:
-                                instrument.set(parameter, float(value))
-                    else:
-                        instrument.set(parameter, value)
-            except:
-                print('Could not set parameter: "%s" to "%s" for instrument "%s"' % (
-                    parameter, value, instrument_name))
-            """
             if value != 'None':  # None is saved as string in hdf5
                 if type(value) == str:
                     if value == 'False':
-                        instrument.set(parameter, False)
+                        try:
+                            instrument.set(parameter, False)
+                        except:
+                            print('Could not set parameter: "%s" to "%s" for instrument "%s"' % (
+                                parameter, value, instrument_name))
                     else:
                         try:
                             instrument.set(parameter, float(value))
-                        except ValueError:
+                        except Exception:
                             try:
                                 instrument.set(parameter, value)
                             except:
                                 print('Could not set parameter: "%s" to "%s" for instrument "%s"' % (
                                     parameter, value, instrument_name))
-                        except TypeError:
+                        except Exception:
                             try:
                                 instrument.set(parameter, int(value))
                             except:
