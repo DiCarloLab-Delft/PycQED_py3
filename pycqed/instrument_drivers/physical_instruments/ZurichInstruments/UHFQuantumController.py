@@ -649,7 +649,8 @@ class UHFQC(Instrument):
         wave_I_string = self.array_to_combined_vector_string(Iwave, "Iwave")
         wave_Q_string = self.array_to_combined_vector_string(Qwave, "Qwave")
         delay_samples = int(acquisition_delay*1.8e9/8)
-        delay_string='\twait({});\n'.format(delay_samples)
+        delay_string = '\twait(getUserReg(2));\n'
+        self.awgs_0_userregs_2(delay_samples)
 
         preamble="""
 const TRIGGER1  = 0x000001;
@@ -746,8 +747,8 @@ setTrigger(0);"""
         array = np.arange(int(samples))
         sinwave = RO_amp*np.sin(2*np.pi*array*f_RO_mod/f_sampling)
         coswave = RO_amp*np.cos(2*np.pi*array*f_RO_mod/f_sampling)
-        Iwave = coswave+sinwave;
-        Qwave = coswave-sinwave;
+        Iwave = (coswave+sinwave)/np.sqrt(2)
+        Qwave = (coswave-sinwave)/np.sqrt(2)
         # Iwave, Qwave = PG.mod_pulse(np.ones(samples), np.zeros(samples), f=f_RO_mod, phase=0, sampling_rate=f_sampling)
         self.awg_sequence_acquisition_and_pulse(Iwave, Qwave, acquisition_delay)
 
