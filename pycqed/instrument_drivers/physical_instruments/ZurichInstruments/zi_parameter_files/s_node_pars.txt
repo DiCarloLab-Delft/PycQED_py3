@@ -1,9 +1,33 @@
 [
   [
-    "awgs/0/triggers/1/falling",
-    "bool",
+    "awgs/0/auxtriggers/0/channel",
+    "int",
     0,
-    1
+    7.0
+  ],
+  [
+    "awgs/0/auxtriggers/1/channel",
+    "int",
+    0,
+    7.0
+  ],
+  [
+    "awgs/0/enable",
+    "int_8bit",
+    0,
+    255
+  ],
+  [
+    "awgs/0/outputs/0/amplitude",
+    "float",
+    -1.0,
+    1.0
+  ],
+  [
+    "awgs/0/outputs/0/mode",
+    "int",
+    0,
+    2.0
   ],
   [
     "awgs/0/outputs/1/amplitude",
@@ -12,70 +36,70 @@
     1.0
   ],
   [
-    "awgs/0/triggers/1/hysteresis/mode",
-    "bool",
+    "awgs/0/outputs/1/mode",
+    "int",
     0,
-    1
+    2.0
   ],
   [
-    "awgs/0/userregs/6",
-    "int_64",
+    "awgs/0/single",
+    "bool",
     0,
-    4294967295
+    1.0
   ],
   [
     "awgs/0/time",
     "int",
     0,
-    13
+    13.0
   ],
   [
-    "awgs/0/userregs/13",
+    "awgs/0/triggers/0/channel",
     "int_64",
     0,
     4294967295
   ],
   [
-    "awgs/0/userregs/8",
-    "int_64",
-    0,
-    4294967295
-  ],
-  [
-    "awgs/0/userregs/14",
-    "int_64",
-    0,
-    4294967295
-  ],
-  [
-    "awgs/0/outputs/0/mode",
-    "int",
-    0,
-    2
-  ],
-  [
-    "awgs/0/triggers/0/rising",
+    "awgs/0/triggers/0/falling",
     "bool",
     0,
-    1
+    1.0
   ],
   [
-    "awgs/0/auxtriggers/0/channel",
-    "int",
+    "awgs/0/triggers/0/force",
+    "int_8bit",
     0,
-    7
+    255
   ],
   [
-    "awgs/0/userregs/5",
-    "int_64",
+    "awgs/0/triggers/0/gate/enable",
+    "bool",
     0,
-    4294967295
+    1.0
   ],
   [
-    "awgs/0/userregs/7",
-    "int_64",
+    "awgs/0/triggers/0/gate/inputselect",
+    "int_8bit",
     0,
-    4294967295
+    255
+  ],
+  [
+    "awgs/0/triggers/0/hysteresis/absolute",
+    "float",
+    0,
+    20.0
+  ],
+  [
+    "awgs/0/triggers/0/hysteresis/mode",
+    "bool",
+    0,
+    1.0
+  ],
+  [
+    "awgs/0/triggers/0/hysteresis/relative",
+    "float",
+    0,
+    20.0
   ],
   [
     "awgs/0/triggers/0/level",
@@ -84,7 +108,79 @@
     999999995904.0
   ],
   [
-    "awgs/0/triggers/0/channel",
+    "awgs/0/triggers/0/rising",
+    "bool",
+    0,
+    1.0
+  ],
+  [
+    "awgs/0/triggers/1/channel",
+    "int_64",
+    0,
+    4294967295
+  ],
+  [
+    "awgs/0/triggers/1/falling",
+    "bool",
+    0,
+    1.0
+  ],
+  [
+    "awgs/0/triggers/1/force",
+    "int_8bit",
+    0,
+    255
+  ],
+  [
+    "awgs/0/triggers/1/gate/enable",
+    "bool",
+    0,
+    1.0
+  ],
+  [
+    "awgs/0/triggers/1/gate/inputselect",
+    "int_8bit",
+    0,
+    255
+  ],
+  [
+    "awgs/0/triggers/1/hysteresis/absolute",
+    "float",
+    0,
+    999999995904.0
+  ],
+  [
+    "awgs/0/triggers/1/hysteresis/mode",
+    "bool",
+    0,
+    1.0
+  ],
+  [
+    "awgs/0/triggers/1/hysteresis/relative",
+    "float",
+    0,
+    999999995904.0
+  ],
+  [
+    "awgs/0/triggers/1/level",
+    "float",
+    -999999995904.0,
+    999999995904.0
+  ],
+  [
+    "awgs/0/triggers/1/rising",
+    "bool",
+    0,
+    1.0
+  ],
+  [
+    "awgs/0/waveform/index",
+    "int_8bit",
+    0,
+    255
+  ],
+  [
+    "awgs/0/userregs/0",
     "int_64",
     0,
     4294967295
@@ -102,37 +198,37 @@
     4294967295
   ],
   [
-    "awgs/0/outputs/0/amplitude",
-    "float",
-    -1.0,
-    1.0
-  ],
-  [
-    "awgs/0/triggers/0/hysteresis/relative",
-    "float",
+    "awgs/0/userregs/11",
+    "int_64",
     0,
-    3.1415927410125732
-  ],
-  [
-    "awgs/0/triggers/1/rising",
-    "bool",
-    0,
-    1
-  ],
-  [
-    "awgs/0/triggers/1/gate/inputselect",
-    "int_8bit",
-    0,
-    255
-  ],
-  [
-    "awgs/0/triggers/1/gate/enable",
-    "bool",
-    0,
-    1
+    4294967295
   ],
   [
     "awgs/0/userregs/12",
+    "int_64",
+    0,
+    4294967295
+  ],
+  [
+    "awgs/0/userregs/13",
+    "int_64",
+    0,
+    4294967295
+  ],
+  [
+    "awgs/0/userregs/14",
+    "int_64",
+    0,
+    4294967295
+  ],
+  [
+    "awgs/0/userregs/15",
+    "int_64",
+    0,
+    4294967295
+  ],
+  [
+    "awgs/0/userregs/2",
     "int_64",
     0,
     4294967295
@@ -144,109 +240,31 @@
     4294967295
   ],
   [
-    "awgs/0/auxtriggers/1/channel",
-    "int",
-    0,
-    7
-  ],
-  [
-    "awgs/0/userregs/15",
-    "int_64",
-    0,
-    4294967295
-  ],
-  [
-    "awgs/0/enable",
-    "bool",
-    0,
-    1
-  ],
-  [
-    "awgs/0/userregs/0",
-    "int_64",
-    0,
-    4294967295
-  ],
-  [
-    "awgs/0/single",
-    "bool",
-    0,
-    1
-  ],
-  [
-    "awgs/0/triggers/0/gate/inputselect",
-    "int_8bit",
-    0,
-    255
-  ],
-  [
-    "awgs/0/triggers/0/hysteresis/mode",
-    "bool",
-    0,
-    1
-  ],
-  [
-    "awgs/0/triggers/0/gate/enable",
-    "bool",
-    0,
-    1
-  ],
-  [
-    "awgs/0/userregs/11",
-    "int_64",
-    0,
-    4294967295
-  ],
-  [
-    "awgs/0/outputs/1/mode",
-    "int",
-    0,
-    2
-  ],
-  [
-    "awgs/0/triggers/0/hysteresis/absolute",
-    "float",
-    0,
-    3.1415927410125732
-  ],
-  [
-    "awgs/0/userregs/2",
-    "int_64",
-    0,
-    4294967295
-  ],
-  [
-    "awgs/0/triggers/1/hysteresis/absolute",
-    "float",
-    0,
-    999999995904.0
-  ],
-  [
-    "awgs/0/triggers/1/force",
-    "int_8bit",
-    0,
-    255
-  ],
-  [
-    "awgs/0/triggers/0/force",
-    "int_8bit",
-    0,
-    255
-  ],
-  [
-    "awgs/0/triggers/1/level",
-    "float",
-    -999999995904.0,
-    999999995904.0
-  ],
-  [
-    "awgs/0/triggers/1/channel",
-    "int_64",
-    0,
-    4294967295
-  ],
-  [
     "awgs/0/userregs/4",
+    "int_64",
+    0,
+    4294967295
+  ],
+  [
+    "awgs/0/userregs/5",
+    "int_64",
+    0,
+    4294967295
+  ],
+  [
+    "awgs/0/userregs/6",
+    "int_64",
+    0,
+    4294967295
+  ],
+  [
+    "awgs/0/userregs/7",
+    "int_64",
+    0,
+    4294967295
+  ],
+  [
+    "awgs/0/userregs/8",
     "int_64",
     0,
     4294967295
@@ -258,94 +276,34 @@
     4294967295
   ],
   [
-    "awgs/0/triggers/0/falling",
-    "bool",
-    0,
-    1
-  ],
-  [
-    "awgs/0/triggers/1/hysteresis/relative",
-    "float",
-    0,
-    999999995904.0
-  ],
-  [
-    "sigins/0/scaling",
-    "float",
-    0,
-    999999995904.0
-  ],
-  [
     "sigins/0/ac",
     "bool",
     0,
-    1
-  ],
-  [
-    "sigins/0/diff",
-    "int_8bit",
-    0,
-    255
-  ],
-  [
-    "sigins/0/imp50",
-    "bool",
-    0,
-    1
-  ],
-  [
-    "sigins/1/bw",
-    "bool",
-    0,
-    1
-  ],
-  [
-    "sigins/1/range",
-    "float",
-    0,
-    1.5
-  ],
-  [
-    "sigins/1/diff",
-    "int",
-    0,
-    3
+    1.0
   ],
   [
     "sigins/0/bw",
     "bool",
     0,
-    1
+    1.0
   ],
   [
-    "sigins/1/on",
+    "sigins/0/diff",
+    "int",
+    0,
+    3.0
+  ],
+  [
+    "sigins/0/imp50",
     "bool",
     0,
-    1
-  ],
-  [
-    "sigins/1/scaling",
-    "float",
-    0,
-    999999995904.0
-  ],
-  [
-    "sigins/1/ac",
-    "bool",
-    0,
-    1
-  ],
-  [
-    "sigins/1/imp50",
-    "bool",
-    0,
-    1
+    1.0
   ],
   [
     "sigins/0/on",
     "bool",
     0,
-    1
+    1.0
   ],
   [
     "sigins/0/range",
@@ -354,19 +312,55 @@
     1.5
   ],
   [
-    "sigouts/0/range",
-    "float_small",
+    "sigins/0/scaling",
+    "float",
     0,
-    0.75
+    999999995904.0
   ],
   [
-    "sigouts/0/enables/3",
+    "sigins/1/ac",
     "bool",
     0,
-    1
+    1.0
   ],
   [
-    "sigouts/1/amplitudes/7",
+    "sigins/1/bw",
+    "bool",
+    0,
+    1.0
+  ],
+  [
+    "sigins/1/diff",
+    "int_8bit",
+    0,
+    255
+  ],
+  [
+    "sigins/1/imp50",
+    "bool",
+    0,
+    1.0
+  ],
+  [
+    "sigins/1/on",
+    "bool",
+    0,
+    1.0
+  ],
+  [
+    "sigins/1/range",
+    "float",
+    0,
+    1.5
+  ],
+  [
+    "sigins/1/scaling",
+    "float",
+    0,
+    999999995904.0
+  ],
+  [
+    "sigouts/0/amplitudes/3",
     "float",
     -0.75,
     0.75
@@ -375,13 +369,19 @@
     "sigouts/0/autorange",
     "bool",
     0,
-    1
+    1.0
   ],
   [
-    "sigouts/1/enables/7",
+    "sigouts/0/enables/3",
     "bool",
     0,
-    1
+    1.0
+  ],
+  [
+    "sigouts/0/imp50",
+    "bool",
+    0,
+    1.0
   ],
   [
     "sigouts/0/offset",
@@ -390,10 +390,40 @@
     0.7499771118164062
   ],
   [
+    "sigouts/0/on",
+    "bool",
+    0,
+    1.0
+  ],
+  [
+    "sigouts/0/range",
+    "float_small",
+    0,
+    0.75
+  ],
+  [
+    "sigouts/1/amplitudes/7",
+    "float",
+    -0.75,
+    0.75
+  ],
+  [
     "sigouts/1/autorange",
     "bool",
     0,
-    1
+    1.0
+  ],
+  [
+    "sigouts/1/enables/7",
+    "bool",
+    0,
+    1.0
+  ],
+  [
+    "sigouts/1/imp50",
+    "bool",
+    0,
+    1.0
   ],
   [
     "sigouts/1/offset",
@@ -405,259 +435,13 @@
     "sigouts/1/on",
     "bool",
     0,
-    1
-  ],
-  [
-    "sigouts/0/amplitudes/3",
-    "float",
-    -0.75,
-    0.75
-  ],
-  [
-    "sigouts/0/on",
-    "bool",
-    0,
-    1
-  ],
-  [
-    "sigouts/1/imp50",
-    "bool",
-    0,
-    1
+    1.0
   ],
   [
     "sigouts/1/range",
     "float_small",
     0,
     0.75
-  ],
-  [
-    "sigouts/0/imp50",
-    "bool",
-    0,
-    1
-  ],
-  [
-    "quex/deskew/1/col/1",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
-    "quex/rot/2/imag",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
-    "quex/rl/source",
-    "int_64",
-    0,
-    4294967295
-  ],
-  [
-    "quex/trans/2/col/0/real",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
-    "quex/trans/4/col/0/imag",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
-    "quex/trans/2/col/3/real",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
-    "quex/rot/0/real",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
-    "quex/trans/1/col/0/imag",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
-    "quex/trans/4/col/2/imag",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
-    "quex/trans/2/col/4/imag",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
-    "quex/trans/2/col/2/imag",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
-    "quex/trans/3/col/2/real",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
-    "quex/rot/0/imag",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
-    "quex/trans/1/col/3/real",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
-    "quex/wint/delay",
-    "int",
-    0,
-    1020
-  ],
-  [
-    "quex/trans/0/col/0/real",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
-    "quex/trans/0/col/4/imag",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
-    "quex/iavg/delay",
-    "int",
-    0,
-    1020
-  ],
-  [
-    "quex/rot/1/imag",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
-    "quex/trans/0/col/2/real",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
-    "quex/iavg/avgcnt",
-    "int",
-    0,
-    15
-  ],
-  [
-    "quex/trans/1/col/0/real",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
-    "quex/trans/2/col/2/real",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
-    "quex/iavg/length",
-    "int",
-    0,
-    4096
-  ],
-  [
-    "quex/rl/avgcnt",
-    "int",
-    0,
-    17
-  ],
-  [
-    "quex/rl/acqcnt",
-    "int_8bit",
-    0,
-    255
-  ],
-  [
-    "quex/thres/1/level",
-    "float",
-    -32.0,
-    32.0
-  ],
-  [
-    "quex/rot/3/imag",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
-    "quex/rot/4/imag",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
-    "quex/trans/2/col/0/imag",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
-    "quex/iavg/readout",
-    "int_8bit",
-    0,
-    255
-  ],
-  [
-    "quex/rl/length",
-    "int",
-    0,
-    4095
-  ],
-  [
-    "quex/trans/3/col/1/imag",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
-    "quex/rot/4/real",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
-    "quex/trans/1/col/2/real",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
-    "quex/trans/4/col/2/real",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
-    "quex/wint/length",
-    "int",
-    0,
-    16384
   ],
   [
     "quex/deskew/0/col/0",
@@ -672,49 +456,13 @@
     2.0
   ],
   [
-    "quex/trans/3/col/4/real",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
-    "quex/trans/3/col/0/imag",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
     "quex/deskew/1/col/0",
     "float",
     -2.0,
     2.0
   ],
   [
-    "quex/trans/2/col/3/imag",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
-    "quex/trans/3/col/2/imag",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
-    "quex/rot/3/real",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
-    "quex/trans/0/col/3/imag",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
-    "quex/trans/1/col/1/real",
+    "quex/deskew/1/col/1",
     "float",
     -2.0,
     2.0
@@ -726,28 +474,46 @@
     255
   ],
   [
-    "quex/trans/2/col/1/real",
-    "float",
-    -2.0,
-    2.0
+    "quex/iavg/avgcnt",
+    "int",
+    0,
+    15.0
   ],
   [
-    "quex/trans/4/col/1/imag",
-    "float",
-    -2.0,
-    2.0
+    "quex/iavg/delay",
+    "int",
+    0,
+    1020.0
   ],
   [
-    "quex/trans/4/col/3/imag",
-    "float",
-    -2.0,
-    2.0
+    "quex/iavg/length",
+    "int",
+    0,
+    4096.0
   ],
   [
-    "quex/trans/2/col/1/imag",
-    "float",
-    -2.0,
-    2.0
+    "quex/iavg/readout",
+    "int_8bit",
+    0,
+    255
+  ],
+  [
+    "quex/rl/acqcnt",
+    "int_8bit",
+    0,
+    255
+  ],
+  [
+    "quex/rl/avgcnt",
+    "int",
+    0,
+    17.0
+  ],
+  [
+    "quex/rl/length",
+    "int",
+    0,
+    4095.0
   ],
   [
     "quex/rl/readout",
@@ -756,115 +522,37 @@
     255
   ],
   [
-    "quex/trans/1/col/4/imag",
+    "quex/rl/source",
+    "int_64",
+    0,
+    4294967295
+  ],
+  [
+    "quex/sl/length",
+    "int",
+    0,
+    4095.0
+  ],
+  [
+    "quex/sl/readout",
+    "int_8bit",
+    0,
+    255
+  ],
+  [
+    "quex/rot/0/imag",
     "float",
     -2.0,
     2.0
   ],
   [
-    "quex/thres/4/level",
-    "float",
-    -32.0,
-    32.0
-  ],
-  [
-    "quex/trans/3/col/1/real",
+    "quex/rot/0/real",
     "float",
     -2.0,
     2.0
   ],
   [
-    "quex/trans/4/col/4/imag",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
-    "quex/trans/4/col/1/real",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
-    "quex/trans/0/col/4/real",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
-    "quex/trans/3/col/3/real",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
-    "quex/trans/3/col/3/imag",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
-    "quex/thres/0/level",
-    "float",
-    -32.0,
-    32.0
-  ],
-  [
-    "quex/trans/0/col/1/real",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
-    "quex/trans/2/col/4/real",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
-    "quex/trans/4/col/0/real",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
-    "quex/trans/1/col/2/imag",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
-    "quex/trans/0/col/2/imag",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
-    "quex/trans/1/col/1/imag",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
-    "quex/trans/3/col/4/imag",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
-    "quex/trans/4/col/4/real",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
-    "quex/trans/0/col/1/imag",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
-    "quex/trans/1/col/3/imag",
+    "quex/rot/1/imag",
     "float",
     -2.0,
     2.0
@@ -876,31 +564,7 @@
     2.0
   ],
   [
-    "quex/trans/3/col/0/real",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
-    "quex/trans/1/col/4/real",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
-    "quex/thres/2/level",
-    "float",
-    -32.0,
-    32.0
-  ],
-  [
-    "quex/trans/0/col/3/real",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
-    "quex/trans/4/col/3/real",
+    "quex/rot/2/imag",
     "float",
     -2.0,
     2.0
@@ -912,7 +576,55 @@
     2.0
   ],
   [
+    "quex/rot/3/imag",
+    "float",
+    -2.0,
+    2.0
+  ],
+  [
+    "quex/rot/3/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+  [
+    "quex/rot/4/imag",
+    "float",
+    -2.0,
+    2.0
+  ],
+  [
+    "quex/rot/4/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+  [
+    "quex/thres/0/level",
+    "float",
+    -32.0,
+    32.0
+  ],
+  [
+    "quex/thres/1/level",
+    "float",
+    -32.0,
+    32.0
+  ],
+  [
+    "quex/thres/2/level",
+    "float",
+    -32.0,
+    32.0
+  ],
+  [
     "quex/thres/3/level",
+    "float",
+    -32.0,
+    32.0
+  ],
+  [
+    "quex/thres/4/level",
     "float",
     -32.0,
     32.0
@@ -924,10 +636,316 @@
     2.0
   ],
   [
-    "dios/0/extclk",
-    "bool",
+    "quex/trans/0/col/0/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+  [
+    "quex/trans/0/col/1/imag",
+    "float",
+    -2.0,
+    2.0
+  ],
+  [
+    "quex/trans/0/col/1/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+  [
+    "quex/trans/0/col/2/imag",
+    "float",
+    -2.0,
+    2.0
+  ],
+  [
+    "quex/trans/0/col/2/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+  [
+    "quex/trans/0/col/3/imag",
+    "float",
+    -2.0,
+    2.0
+  ],
+  [
+    "quex/trans/0/col/3/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+  [
+    "quex/trans/0/col/4/imag",
+    "float",
+    -2.0,
+    2.0
+  ],
+  [
+    "quex/trans/0/col/4/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+  [
+    "quex/trans/1/col/0/imag",
+    "float",
+    -2.0,
+    2.0
+  ],
+  [
+    "quex/trans/1/col/0/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+  [
+    "quex/trans/1/col/1/imag",
+    "float",
+    -2.0,
+    2.0
+  ],
+  [
+    "quex/trans/1/col/1/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+  [
+    "quex/trans/1/col/2/imag",
+    "float",
+    -2.0,
+    2.0
+  ],
+  [
+    "quex/trans/1/col/2/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+  [
+    "quex/trans/1/col/3/imag",
+    "float",
+    -2.0,
+    2.0
+  ],
+  [
+    "quex/trans/1/col/3/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+  [
+    "quex/trans/1/col/4/imag",
+    "float",
+    -2.0,
+    2.0
+  ],
+  [
+    "quex/trans/1/col/4/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+  [
+    "quex/trans/2/col/0/imag",
+    "float",
+    -2.0,
+    2.0
+  ],
+  [
+    "quex/trans/2/col/0/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+  [
+    "quex/trans/2/col/1/imag",
+    "float",
+    -2.0,
+    2.0
+  ],
+  [
+    "quex/trans/2/col/1/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+  [
+    "quex/trans/2/col/2/imag",
+    "float",
+    -2.0,
+    2.0
+  ],
+  [
+    "quex/trans/2/col/2/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+  [
+    "quex/trans/2/col/3/imag",
+    "float",
+    -2.0,
+    2.0
+  ],
+  [
+    "quex/trans/2/col/3/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+  [
+    "quex/trans/2/col/4/imag",
+    "float",
+    -2.0,
+    2.0
+  ],
+  [
+    "quex/trans/2/col/4/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+  [
+    "quex/trans/3/col/0/imag",
+    "float",
+    -2.0,
+    2.0
+  ],
+  [
+    "quex/trans/3/col/0/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+  [
+    "quex/trans/3/col/1/imag",
+    "float",
+    -2.0,
+    2.0
+  ],
+  [
+    "quex/trans/3/col/1/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+  [
+    "quex/trans/3/col/2/imag",
+    "float",
+    -2.0,
+    2.0
+  ],
+  [
+    "quex/trans/3/col/2/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+  [
+    "quex/trans/3/col/3/imag",
+    "float",
+    -2.0,
+    2.0
+  ],
+  [
+    "quex/trans/3/col/3/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+  [
+    "quex/trans/3/col/4/imag",
+    "float",
+    -2.0,
+    2.0
+  ],
+  [
+    "quex/trans/3/col/4/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+  [
+    "quex/trans/4/col/0/imag",
+    "float",
+    -2.0,
+    2.0
+  ],
+  [
+    "quex/trans/4/col/0/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+  [
+    "quex/trans/4/col/1/imag",
+    "float",
+    -2.0,
+    2.0
+  ],
+  [
+    "quex/trans/4/col/1/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+  [
+    "quex/trans/4/col/2/imag",
+    "float",
+    -2.0,
+    2.0
+  ],
+  [
+    "quex/trans/4/col/2/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+  [
+    "quex/trans/4/col/3/imag",
+    "float",
+    -2.0,
+    2.0
+  ],
+  [
+    "quex/trans/4/col/3/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+  [
+    "quex/trans/4/col/4/imag",
+    "float",
+    -2.0,
+    2.0
+  ],
+  [
+    "quex/trans/4/col/4/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+  [
+    "quex/wint/delay",
+    "int",
     0,
-    1
+    1020.0
+  ],
+  [
+    "quex/wint/length",
+    "int",
+    0,
+    16384.0
+  ],
+  [
+    "dios/0/decimation",
+    "int_64",
+    0,
+    4294967295
   ],
   [
     "dios/0/drive",
@@ -936,16 +954,16 @@
     255
   ],
   [
+    "dios/0/extclk",
+    "bool",
+    0,
+    1.0
+  ],
+  [
     "dios/0/mode",
     "int_8bit",
     0,
     255
-  ],
-  [
-    "dios/0/decimation",
-    "int_64",
-    0,
-    4294967295
   ],
   [
     "dios/0/output",
@@ -957,6 +975,6 @@
     "system/extclk",
     "bool",
     0,
-    1
+    1.0
   ]
 ]

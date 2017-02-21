@@ -38,7 +38,7 @@ def qasm_to_asm(qasm_filepath, operation_dict):
         with the central controller in the future.
     """
     filename = splitext(basename(qasm_filepath))[0]
-    asm_filepath = join(base_asm_path, filename+'.asm')
+    asm_filepath = join(base_asm_path, filename+'.qumis')
     asm_file = mopen(asm_filepath, mode='w')
     asm_file.writelines(preamble)
 

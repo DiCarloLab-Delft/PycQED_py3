@@ -186,6 +186,10 @@ class Pulsar:
         Advantage is that it's much faster, since sequence information is sent
         to the AWG in a single file.
         """
+        # Stores the last uploaded elements for easy access and plotting
+        self.last_sequence = sequence
+        self.last_elements = elements
+
         old_timeout = self.AWG.timeout()
         self.AWG.timeout(max(180, old_timeout))
 

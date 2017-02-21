@@ -79,7 +79,7 @@ class qx_client:
         assert isinstance(n, int)
         # 2 or more qubits are quired in this version (measurement outcome has to
         # be parsed correctly for single qubit)
-        assert (n > 1)
+        # assert (n > 1)
 
         # qubit number check
         if self.__qubits != 0:

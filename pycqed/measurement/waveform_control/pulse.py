@@ -108,7 +108,6 @@ class SquarePulse(Pulse):
             self.channels.append(channel)
         else:
             self.channels = channels
-
         self.amplitude = kw.pop('amplitude', 0)
         self.length = kw.pop('length', 0)
 

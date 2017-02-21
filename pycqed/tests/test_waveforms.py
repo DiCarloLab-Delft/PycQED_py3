@@ -42,7 +42,7 @@ class Test_Waveforms(unittest.TestCase):
                           0.01165567,  0.0056186,  0.])
 
         d_env = np.array([0.07903581,  0.08505798,
-                         0.09125043,  0.09758165,  0.10401556,
+                          0.09125043,  0.09758165,  0.10401556,
                           0.1105115,  0.11702435,  0.12350468,
                           0.12989903,  0.13615021,
                           0.14219778,  0.14797855,  0.15342718,
@@ -94,3 +94,37 @@ class Test_Waveforms(unittest.TestCase):
                               motzoi=motzoi, delay=0)
         np.testing.assert_almost_equal(I, -d_env)
         np.testing.assert_almost_equal(Q, g_env)
+
+    def test_martinis_flux_pulse(self):
+        pass
+        # This test is disabled and needs to be recreated as per issue #89
+        # g2 = 1/(120e-9/(14.5/2))
+        # f_bus = 4.8e9
+        # f_01_max = 5.94e9
+        # dac_flux_coefficient = 0.679
+        # E_c = 369.2e6
+        # theta_f = .4
+        # length = 40e-9
+        # lambda_coeffs_list = [[.1, 0], [.4, .2, .1, .01, .2]]
+        # for lambda_coeffs in lambda_coeffs_list:
+
+        #     th_pulse = wf.martinis_flux_pulse(
+        #         length=length, theta_f=theta_f, lambda_coeffs=lambda_coeffs,
+        #         g2=g2, E_c=E_c, f_01_max=f_01_max, f_bus=f_bus,
+        #         dac_flux_coefficient=dac_flux_coefficient,
+        #         return_unit='theta')
+        #     V_pulse = wf.martinis_flux_pulse(
+        #         length=length, theta_f=theta_f, lambda_coeffs=lambda_coeffs,
+        #         g2=g2, E_c=E_c, f_01_max=f_01_max, f_bus=f_bus,
+        #         dac_flux_coefficient=dac_flux_coefficient,
+        #         return_unit='V')
+
+        #     theta_0 = np.arctan(2*g2/(f_01_max-E_c-f_bus))
+        #     np.testing.assert_almost_equal(theta_0, th_pulse[0])
+        #     np.testing.assert_almost_equal(0, V_pulse[0])
+
+        #     self.assertEqual(len(th_pulse), 40)
+        #     np.testing.assert_almost_equal(np.max(th_pulse), theta_f)
+
+        #     self.assertEqual(np.argmax(th_pulse), 20)
+        #     self.assertEqual(np.argmax(V_pulse), 20)
