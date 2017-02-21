@@ -1,4 +1,3 @@
-import qt
 import numpy as np
 import time
 from pycqed.measurement.waveform_control import pulsar
@@ -6,6 +5,9 @@ from pycqed.measurement.waveform_control import pulse
 from pycqed.measurement.waveform_control import element
 import pprint
 import imp
+import qcodes as qc
+station = qc.station
+
 
 imp.reload(pulse)
 imp.reload(element)
@@ -13,16 +15,16 @@ imp.reload(pulsar)
 
 # Making sure we have our global pulsar configured
 # Warning! This does overwrite your pulsar settings (if such a device exists)
-qt.pulsar = pulsar.Pulsar()
-qt.pulsar.AWG = qt.instruments['AWG']
-qt.pulsar.define_channel(id='ch1', name='RF', type='analog',
-                         high=0.541, low=-0.541,
-                         offset=0., delay=211e-9, active=True)
-qt.pulsar.define_channel(id='ch1_marker1', name='MW_pulsemod', type='marker',
-                         high=2.0, low=0, offset=0.,
-                         delay=(44+166-8)*1e-9, active=True)
+station.pulsar = pulsar.Pulsar()
+station.pulsar.AWG = station.components['AWG']
+station.pulsar.define_channel(id='ch1', name='RF', type='analog',
+                              high=0.541, low=-0.541,
+                              offset=0., delay=211e-9, active=True)
+station.pulsar.define_channel(id='ch1_marker1', name='MW_pulsemod', type='marker',
+                              high=2.0, low=0, offset=0.,
+                              delay=(44+166-8)*1e-9, active=True)
 
-qt.pulsar.AWG_sequence_cfg = {
+station.pulsar.AWG_sequence_cfg = {
     'SAMPLING_RATE': 1e9,
     'CLOCK_SOURCE': 1,  # Internal | External
     'REFERENCE_SOURCE':   1,  # Internal | External
@@ -43,7 +45,7 @@ qt.pulsar.AWG_sequence_cfg = {
 
 
 # Generating an example sequence
-test_element = element.Element('a_test_element', pulsar=qt.pulsar)
+test_element = element.Element('a_test_element', pulsar=station.pulsar)
 # we copied the channel definition from out global pulsar
 print('Channel definitions: ')
 pprint.pprint(test_element._channels)
@@ -72,7 +74,7 @@ print('Element overview:')
 # test_element.print_overview()
 print()
 
-special_element = element.Element('Another_element', pulsar=qt.pulsar)
+special_element = element.Element('Another_element', pulsar=station.pulsar)
 special_element.add(special_pulse)
 
 # create the sequnce
@@ -89,4 +91,4 @@ seq.append('second special element', 'Another_element',
            repetitions=5)
 
 # program the Sequence
-qt.pulsar.program_awg(seq, test_element, special_element)
+station.pulsar.program_awg(seq, test_element, special_element)

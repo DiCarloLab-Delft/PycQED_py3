@@ -286,7 +286,8 @@ def two_qubit_AllXY(pulse_dict, q0='q0', q1='q1', RO_target='all',
         pulse_dict   (dict) : dictionary containing all pulse parameters
         q0, q1        (str) : target qubits for the sequence
         RO_target     (str) : target for the RO, can be a qubit name or 'all'
-        sequence_type (str) : sequential| interleaved|simultaneous|sandwiched
+        sequence_type (str) : sequential | interleaved | simultaneous | sandwiched
+                              q0|q0|q1|q1   q0|q1|q0|q1   q01|q01      q1|q0|q0|q1
             describes the order of the AllXY pulses
         replace_q1_pulses_X180 (bool) : if True replaces all pulses on q1 with
             X180 pulses.
@@ -367,9 +368,9 @@ def two_qubit_AllXY(pulse_dict, q0='q0', q1='q1', RO_target='all',
         el = multi_pulse_elt(i, station, pulses)
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
-
-    station.components['AWG'].stop()
-    station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+    if upload:
+        station.components['AWG'].stop()
+        station.pulsar.program_awg(seq, *el_list, verbose=verbose)
     if return_seq:
         return seq, el_list
     else:
@@ -475,7 +476,6 @@ def two_qubit_tomo_cardinal(cardinal,
                       tomo_pulse_q0,
                       tomo_pulse_q1,
                       RO_pars]
-        pulse_list[0]['pulse_delay'] += 0.01e-6
         el = multi_pulse_elt(i, station, pulse_list)
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
@@ -484,7 +484,6 @@ def two_qubit_tomo_cardinal(cardinal,
         pulses = []
         for p in pulse_comb:
             pulses += [pulse_dict[p]]
-        pulses[0]['pulse_delay'] += 0.01e-6
 
         el = multi_pulse_elt(35+i, station, pulses)
         el_list.append(el)
@@ -515,7 +514,7 @@ def two_qubit_tomo_bell(bell_state,
         q1 is cphase qubit
     '''
 
-    seq_name = '2_qubit_Card_%d_seq' % bell_state
+    seq_name = '2_qubit_Bell_Tomo_%d_seq' % bell_state
     seq = sequence.Sequence(seq_name)
     station.pulsar.update_channel_settings()
     el_list = []
@@ -592,34 +591,34 @@ def two_qubit_tomo_bell(bell_state,
     pulse_dict['mCPhase q1']['phase_corr_pulse_amp'] = 0.
 
     # Calibration points
-    cal_points = [['I q1', 'dummy_pulse', 'I q0', 'RO'],
-                  ['I q1', 'dummy_pulse', 'I q0', 'RO'],
-                  ['I q1', 'dummy_pulse', 'I q0', 'RO'],
-                  ['I q1', 'dummy_pulse', 'I q0', 'RO'],
-                  ['I q1', 'dummy_pulse', 'I q0', 'RO'],
-                  ['I q1', 'dummy_pulse', 'I q0', 'RO'],
-                  ['I q1', 'dummy_pulse', 'I q0', 'RO'],
-                  ['I q1', 'dummy_pulse', 'X180 q0', 'RO'],
-                  ['I q1', 'dummy_pulse', 'X180 q0', 'RO'],
-                  ['I q1', 'dummy_pulse', 'X180 q0', 'RO'],
-                  ['I q1', 'dummy_pulse', 'X180 q0', 'RO'],
-                  ['I q1', 'dummy_pulse', 'X180 q0', 'RO'],
-                  ['I q1', 'dummy_pulse', 'X180 q0', 'RO'],
-                  ['I q1', 'dummy_pulse', 'X180 q0', 'RO'],
-                  ['X180 q1', 'dummy_pulse', 'I q0', 'RO'],
-                  ['X180 q1', 'dummy_pulse', 'I q0', 'RO'],
-                  ['X180 q1', 'dummy_pulse', 'I q0', 'RO'],
-                  ['X180 q1', 'dummy_pulse', 'I q0', 'RO'],
-                  ['X180 q1', 'dummy_pulse', 'I q0', 'RO'],
-                  ['X180 q1', 'dummy_pulse', 'I q0', 'RO'],
-                  ['X180 q1', 'dummy_pulse', 'I q0', 'RO'],
-                  ['X180 q1', 'dummy_pulse', 'X180 q0', 'RO'],
-                  ['X180 q1', 'dummy_pulse', 'X180 q0', 'RO'],
-                  ['X180 q1', 'dummy_pulse', 'X180 q0', 'RO'],
-                  ['X180 q1', 'dummy_pulse', 'X180 q0', 'RO'],
-                  ['X180 q1', 'dummy_pulse', 'X180 q0', 'RO'],
-                  ['X180 q1', 'dummy_pulse', 'X180 q0', 'RO'],
-                  ['X180 q1', 'dummy_pulse', 'X180 q0', 'RO']]
+    cal_points = [['I q1', 'dummy_pulse', 'I q0', 'RO']*7,
+                  # ['I q1', 'dummy_pulse', 'I q0', 'RO'],
+                  # ['I q1', 'dummy_pulse', 'I q0', 'RO'],
+                  # ['I q1', 'dummy_pulse', 'I q0', 'RO'],
+                  # ['I q1', 'dummy_pulse', 'I q0', 'RO'],
+                  # ['I q1', 'dummy_pulse', 'I q0', 'RO'],
+                  # ['I q1', 'dummy_pulse', 'I q0', 'RO'],
+                  ['I q1', 'dummy_pulse', 'X180 q0', 'RO']*7,
+                  # ['I q1', 'dummy_pulse', 'X180 q0', 'RO'],
+                  # ['I q1', 'dummy_pulse', 'X180 q0', 'RO'],
+                  # ['I q1', 'dummy_pulse', 'X180 q0', 'RO'],
+                  # ['I q1', 'dummy_pulse', 'X180 q0', 'RO'],
+                  # ['I q1', 'dummy_pulse', 'X180 q0', 'RO'],
+                  # ['I q1', 'dummy_pulse', 'X180 q0', 'RO'],
+                  ['X180 q1', 'dummy_pulse', 'I q0', 'RO']*7,
+                  # ['X180 q1', 'dummy_pulse', 'I q0', 'RO'],
+                  # ['X180 q1', 'dummy_pulse', 'I q0', 'RO'],
+                  # ['X180 q1', 'dummy_pulse', 'I q0', 'RO'],
+                  # ['X180 q1', 'dummy_pulse', 'I q0', 'RO'],
+                  # ['X180 q1', 'dummy_pulse', 'I q0', 'RO'],
+                  # ['X180 q1', 'dummy_pulse', 'I q0', 'RO'],
+                  # ['X180 q1', 'dummy_pulse', 'X180 q0', 'RO'],
+                  # ['X180 q1', 'dummy_pulse', 'X180 q0', 'RO'],
+                  # ['X180 q1', 'dummy_pulse', 'X180 q0', 'RO'],
+                  # ['X180 q1', 'dummy_pulse', 'X180 q0', 'RO'],
+                  # ['X180 q1', 'dummy_pulse', 'X180 q0', 'RO'],
+                  # ['X180 q1', 'dummy_pulse', 'X180 q0', 'RO'],
+                  ['X180 q1', 'dummy_pulse', 'X180 q0', 'RO']*7]
 
     if not CPhase:
         pulse_dict['CPhase q1']['amplitude'] = 0
@@ -634,19 +633,57 @@ def two_qubit_tomo_bell(bell_state,
         after_pulse = pulse_dict['I q0']
         print('CPhase disabled')
     else:
-        if bell_state == 0:  # |00>+|11>
+        if bell_state == 0:  # |Phi_m>=|00>-|11>
             gate1 = pulse_dict['Y90 q0']
             gate2 = pulse_dict['Y90 q1']
             after_pulse = pulse_dict['mY90 q1']
-        elif bell_state == 1:
-            gate1 = pulse_dict['Y90 q0']
-            gate2 = pulse_dict['mY90 q1']
-            after_pulse = pulse_dict['mY90 q1']
-        elif bell_state == 2:
+        elif bell_state == 1:  # |Phi_p>=|00>+|11>
             gate1 = pulse_dict['mY90 q0']
             gate2 = pulse_dict['Y90 q1']
             after_pulse = pulse_dict['mY90 q1']
-        elif bell_state == 3:
+        elif bell_state == 2:  # |Psi_m>=|01> - |10>
+            gate1 = pulse_dict['Y90 q0']
+            gate2 = pulse_dict['mY90 q1']
+            after_pulse = pulse_dict['mY90 q1']
+        elif bell_state == 3:  # |Psi_p>=|01> + |10>
+            gate1 = pulse_dict['mY90 q0']
+            gate2 = pulse_dict['mY90 q1']
+            after_pulse = pulse_dict['mY90 q1']
+
+        # Below are states with the initial pulse on the CP-qubit disabled
+        # these are not Bell states but are used for debugging
+        elif bell_state == 0+10:  # |00>+|11>
+            gate1 = pulse_dict['Y90 q0']
+            gate2 = pulse_dict['I q1']
+            after_pulse = pulse_dict['mY90 q1']
+        elif bell_state == 1+10:
+            gate1 = pulse_dict['mY90 q0']
+            gate2 = pulse_dict['I q1']
+            after_pulse = pulse_dict['mY90 q1']
+        elif bell_state == 2+10:  # |01> - |10>
+            gate1 = pulse_dict['Y90 q0']
+            gate2 = pulse_dict['I q1']
+            after_pulse = pulse_dict['mY90 q1']
+        elif bell_state == 3+10:
+            gate1 = pulse_dict['mY90 q0']
+            gate2 = pulse_dict['I q1']
+            after_pulse = pulse_dict['mY90 q1']
+
+        # Below are states with the initial pulse on the SWAP-qubit disabled
+        # these are not Bell states but are used for debugging
+        elif bell_state == 0 + 20:  # |00>+|11>
+            gate1 = pulse_dict['I q0']
+            gate2 = pulse_dict['Y90 q1']
+            after_pulse = pulse_dict['mY90 q1']
+        elif bell_state == 1 + 20:  # |01> - |10>
+            gate1 = pulse_dict['I q0']
+            gate2 = pulse_dict['Y90 q1']
+            after_pulse = pulse_dict['mY90 q1']
+        elif bell_state == 2 + 20:
+            gate1 = pulse_dict['I q0']
+            gate2 = pulse_dict['mY90 q1']
+            after_pulse = pulse_dict['mY90 q1']
+        elif bell_state == 3 + 20:
             gate1 = pulse_dict['mY90 q0']
             gate2 = pulse_dict['mY90 q1']
             after_pulse = pulse_dict['mY90 q1']

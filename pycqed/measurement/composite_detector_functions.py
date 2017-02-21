@@ -1166,7 +1166,7 @@ class SWAPN_optimization(det.Soft_Detector):
 
         self.MC_nested.set_detector_function(self.qubit.int_avg_det_rot)
         self.AWG.set('ch%d_amp' % self.qubit.fluxing_channel(),
-                     self.qubit.swap_amp())
+                     self.qubit.SWAP_amp())
         self.MC_nested.run('SWAPN_%s' % self.qubit.name)
 
         # # fit it

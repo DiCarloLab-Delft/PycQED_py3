@@ -110,6 +110,12 @@ class Qubit(Instrument):
                                 argument_name):
         """
         Links an existing param to an operation for use in the operation dict.
+        Args:
+            operation_name (str): The operation of which this parameter is an
+                argument. e.g. mw_control or CZ
+            parameter_name (str): Name of the parameter
+            argument_name  (str): Name of the arugment as used in the sequencer
+            **kwargs get passed to the add_parameter function
         """
         if parameter_name not in self.parameters:
             raise KeyError('Parameter {} needs to be added first'.format(
@@ -132,10 +138,10 @@ class Qubit(Instrument):
         Add a pulse parameter to the qubit.
 
         Args:
-            parameter_name (str): Name of the parameter
-            argument_name  (str): Name of the arugment as used in the sequencer
             operation_name (str): The operation of which this parameter is an
                 argument. e.g. mw_control or CZ
+            parameter_name (str): Name of the parameter
+            argument_name  (str): Name of the arugment as used in the sequencer
             **kwargs get passed to the add_parameter function
         Raises:
             KeyError: if this instrument already has a parameter with this
@@ -159,8 +165,7 @@ class Qubit(Instrument):
         # we return the info they need to construct their proxy
         return
 
-    def get_operation_dict(self):
-        operation_dict = {}
+    def get_operation_dict(self, operation_dict={}):
         for op_name, op in self.operations().items():
             operation_dict[op_name + ' ' + self.name] = {}
             for argument_name, parameter_name in op.items():

@@ -55,9 +55,9 @@ def resonant_cphase(phases, low_qubit, high_qubit, timings_dict, mmt_label='', M
     MC.set_sweep_points(lengths_vec)
 
     p = 'ch%d_amp' % high_qubit.fluxing_channel()
-    station.AWG.set(p, high_qubit.swap_amp())
+    station.AWG.set(p, high_qubit.SWAP_amp())
     p = 'ch%d_amp' % low_qubit.fluxing_channel()
-    station.AWG.set(p, low_qubit.swap_amp())
+    station.AWG.set(p, low_qubit.SWAP_amp())
     MC.set_detector_function(high_qubit.int_avg_det)
     if run:
         MC.run('CPHASE_Fringes_%s_%s_%s' %
