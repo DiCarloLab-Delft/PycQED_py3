@@ -16,6 +16,7 @@ from qcodes import validators as vals
 import logging
 
 logging.warning('my warning ')
+logging.info('my info ')
 
 class DDMq(SCPI):
 
@@ -37,8 +38,8 @@ class DDMq(SCPI):
             ch_pair = 2*i+1
             snavg_cmd = 'qutech:inputavg{}:naverages'.format(ch_pair)
             self.add_parameter('ch_pair{}_inavg_Navg'.format(ch_pair),
-                               units='#',
-                               label=('number of averages' +
+                               unit='#',
+                               label=('Number of averages' +
                                       'ch_pair {} '.format(ch_pair)),
                                get_cmd=snavg_cmd + '?',
                                set_cmd=snavg_cmd + ' {}',
@@ -46,8 +47,8 @@ class DDMq(SCPI):
                                )
             snsamp_cmd = 'qutech:inputavg{}:scansize'.format(ch_pair)
             self.add_parameter('ch_pair{}_inavg_scansize'.format(ch_pair),
-                               units='#',
-                               label=('number of samples' +
+                               unit='#',
+                               label=('Number of samples' +
                                       'ch_pair {} '.format(ch_pair)),
                                get_cmd=snsamp_cmd + '?',
                                set_cmd=snsamp_cmd + ' {}',
@@ -55,7 +56,7 @@ class DDMq(SCPI):
                                )
             senable_cmd = 'qutech:inputavg{}:enable'.format(ch_pair)
             self.add_parameter('ch_pair{}_inavg_enable'.format(ch_pair),
-                               label=('enable input averaging' +
+                               label=('Enable input averaging' +
                                       'chpair {} '.format(ch_pair)),
                                get_cmd=senable_cmd + '?',
                                set_cmd=senable_cmd
@@ -63,7 +64,7 @@ class DDMq(SCPI):
                                )
             sdisable_cmd = 'qutech:inputavg{}:disable'.format(ch_pair)
             self.add_parameter('ch_pair{}_inavg_disable'.format(ch_pair),
-                               label=('disable input averaging' +
+                               label=('Disable input averaging' +
                                       'ch_pair {} '.format(ch_pair)),
                                get_cmd=senable_cmd + '?',
                                set_cmd=sdisable_cmd,
@@ -71,7 +72,7 @@ class DDMq(SCPI):
                                )
             sholdoff_cmd = 'qutech:input{}:holdoff'.format(ch_pair)
             self.add_parameter('ch_pair{}_inavg_holdoff'.format(ch_pair),
-                               label=('set holdoff' +
+                               label=('Set holdoff' +
                                       'ch_pair {} '.format(ch_pair)),
                                get_cmd=sholdoff_cmd + '?',
                                set_cmd=sholdoff_cmd + ' {}',
@@ -82,7 +83,7 @@ class DDMq(SCPI):
             '''
             swinten_cmd = 'qutech:wint{}:enable'.format(ch_pair)
             self.add_parameter('ch_pair{}_wint_enable'.format(ch_pair),
-                               label=('enable wighted integral' +
+                               label=('Enable wighted integral' +
                                       'chpair {} '.format(ch_pair)),
                                get_cmd=swinten_cmd + '?',
                                set_cmd=swinten_cmd
@@ -98,8 +99,8 @@ class DDMq(SCPI):
                                )
             sintlength_cmd = 'qutech:wint{}:intlength'.format(ch_pair)
             self.add_parameter('ch_pair{}_wint_intlength'.format(ch_pair),
-                               units='#',
-                               label=('the number of sample pairs that' +
+                               unit='#',
+                               label=('The number of sample pairs that' +
                                       'is used for one integration of' +
                                       'ch_pair {} '.format(ch_pair)),
                                get_cmd=sintlength_cmd + '?',
@@ -108,16 +109,16 @@ class DDMq(SCPI):
                                )
             swintstat_cmd = 'qutech:wint{}:status'.format(ch_pair)
             self.add_parameter('ch_pair{}_wint_status'.format(ch_pair),
-                               units='#',
-                               label=('weighted integral status of' +
+                               unit='#',
+                               label=('Weighted integral status of' +
                                       'ch_pair {} '.format(ch_pair)),
                                get_cmd=swintstat_cmd + '?'
                                # vals=vals.Numbers(1,2048)
                                )
             srotmat00_cmd = 'qutech:rotmat{}:rotmat00'.format(ch_pair)
             self.add_parameter('ch_pair{}_rotmat_rotmat00'.format(ch_pair),
-                               units='#',
-                               label=('rotation matrix value 00 of' +
+                               unit='#',
+                               label=('Rotation matrix value 00 of' +
                                       'ch_pair {} '.format(ch_pair)),
                                get_cmd=srotmat00_cmd + '?',
                                set_cmd=srotmat00_cmd + ' {}'
@@ -125,8 +126,8 @@ class DDMq(SCPI):
                                )
             srotmat01_cmd = 'qutech:rotmat{}:rotmat01'.format(ch_pair)
             self.add_parameter('ch_pair{}_rotmat_rotmat01'.format(ch_pair),
-                               units='#',
-                               label=('rotation matrix value 00 of' +
+                               unit='#',
+                               label=('Rotation matrix value 00 of' +
                                       'ch_pair {} '.format(ch_pair)),
                                get_cmd=srotmat01_cmd + '?',
                                set_cmd=srotmat01_cmd + ' {}'
@@ -134,8 +135,8 @@ class DDMq(SCPI):
                                )
             srotmat10_cmd = 'qutech:rotmat{}:rotmat10'.format(ch_pair)
             self.add_parameter('ch_pair{}_rotmat_rotmat10'.format(ch_pair),
-                               units='#',
-                               label=('rotation matrix value 10 of' +
+                               unit='#',
+                               label=('Rotation matrix value 10 of' +
                                       'ch_pair {} '.format(ch_pair)),
                                get_cmd=srotmat10_cmd + '?',
                                set_cmd=srotmat10_cmd + ' {}'
@@ -143,8 +144,8 @@ class DDMq(SCPI):
                                )
             srotmat11_cmd = 'qutech:rotmat{}:rotmat11'.format(ch_pair)
             self.add_parameter('ch_pair{}_rotmat_rotmat11'.format(ch_pair),
-                               units='#',
-                               label=('rotation matrix value 11 of' +
+                               unit='#',
+                               label=('Rotation matrix value 11 of' +
                                       'ch_pair {} '.format(ch_pair)),
                                get_cmd=srotmat11_cmd + '?',
                                set_cmd=srotmat11_cmd + ' {}'
@@ -155,8 +156,8 @@ class DDMq(SCPI):
             '''
             sintavg_cmd = 'qutech:tvmode{}:naverages'.format(ch_pair)
             self.add_parameter('ch_pair{}_tvmode_naverages'.format(ch_pair),
-                               units='#',
-                               label=('the number of integration averages' +
+                               unit='#',
+                               label=('The number of integration averages' +
                                       'of ch_pair {} '.format(ch_pair)),
                                get_cmd=sintavg_cmd + '?',
                                set_cmd=sintavg_cmd + ' {}',
@@ -164,8 +165,8 @@ class DDMq(SCPI):
                                )
             stvseg_cmd = 'qutech:tvmode{}:nsegments'.format(ch_pair)
             self.add_parameter('ch_pair{}_tvmode_nsegments'.format(ch_pair),
-                               units='#',
-                               label=('the number of TV segments of' +
+                               unit='#',
+                               label=('The number of TV segments of' +
                                       'ch_pair {} '.format(ch_pair)),
                                get_cmd=stvseg_cmd + '?',
                                set_cmd=stvseg_cmd + ' {}',
@@ -173,7 +174,7 @@ class DDMq(SCPI):
                                )
             stven_cmd = 'qutech:tvmode{}:enable'.format(ch_pair)
             self.add_parameter('ch_pair{}_tvmode_enable'.format(ch_pair),
-                               label=('enable tv mode' +
+                               label=('Enable tv mode' +
                                       'ch_pair {} '.format(ch_pair)),
                                get_cmd=stven_cmd + '?',
                                set_cmd=stven_cmd
@@ -181,20 +182,20 @@ class DDMq(SCPI):
                                )
             stvdis_cmd = 'qutech:tvmode{}:disable'.format(ch_pair)
             self.add_parameter('ch_pair{}_tvmode_disable'.format(ch_pair),
-                               label=('disable tv mode' +
+                               label=('Disable tv mode' +
                                       'ch_pair {} '.format(ch_pair)),
                                get_cmd=stven_cmd + '?',
                                set_cmd=stvdis_cmd,
                                # vals=vals.Bool()
                                )
             self.add_parameter('ch_pair{}_tvmode_data'.format(ch_pair),
-                               label=('get TV data ch {} '.format(ch_pair)),
+                               label=('Get TV data ch {} '.format(ch_pair)),
                                get_cmd=self._gen_ch_get_func(
-                                   self.getTVdata, ch_pair)
+                                   self._getTVdata, ch_pair)
 
                                # vals=vals.Numbers(-128,127)
                                )
-            scaladc_cmd = 'qutech:caladc{}'.format(ch_pair)
+            scaladc_cmd = 'qutech:adc{}:cal'.format(ch_pair)
             self.add_parameter('ch_pair{}_cal_adc'.format(ch_pair),
                                label=('Calibrate ADC{}'.format(ch_pair)),
                                #get_cmd=snsamp_cmd + '?',
@@ -203,81 +204,87 @@ class DDMq(SCPI):
                                )
             sthl_cmd = 'qutech:qstate{}:threshold'.format(ch_pair)
             self.add_parameter('ch_pair{}_qstate_threshold'.format(ch_pair),
-                               units='#',
-                               label=('set threshold of' +
+                               unit='#',
+                               label=('Set threshold of' +
                                'ch_pair {} '.format(ch_pair)),
                                get_cmd=sthl_cmd + '?',
                                set_cmd=sthl_cmd + ' {}'
                                # vals=vals.Numbers(-134217728,134217727)
                                )
             self.add_parameter('ch_pair{}_qstate_cnt_data'.format(ch_pair),
-                               label=('get qstate counter' +
+                               label=('Get qstate counter' +
                                       'ch_pair {} '.format(ch_pair)),
                                get_cmd=self._gen_ch_get_func(
-                                   self.getQstateCNT, ch_pair),
+                                   self._getQstateCNT, ch_pair),
 
                                # vals=vals.Numbers(-128,127)
                                )
             self.add_parameter('ch_pair{}_qstate_avg_data'.format(ch_pair),
-                               label=('get qstate average' +
+                               label=('Get qstate average' +
                                       'ch_pair {} '.format(ch_pair)),
                                get_cmd=self._gen_ch_get_func(
-                                   self.getQstateAVG, ch_pair),
+                                   self._getQstateAVG, ch_pair),
 
                                # vals=vals.Numbers(-128,127)
                                )
         for i in range(self.device_descriptor.numChannels):
             ch = i+1
             self.add_parameter('ch{}_inavg_data'.format(ch),
-                               label=('get data ch {} '.format(ch)),
+                               label=('Get data ch {} '.format(ch)),
                                get_cmd=self._gen_ch_get_func(
-                                   self.getInputAverage, ch),
-
-                               #vals=vals.Numbers(-128, 127)
+                                   self._getInputAverage, ch),                           
                                vals=vals.Arrays(-128, 127)
                                )
             srotres_cmd = 'qutech:wintrot{}:result'.format(ch)
             self.add_parameter('ch{}_wintrot_result'.format(ch),
-                               units='#',
-                               label=('rotated integration result of' +
+                               unit='#',
+
+                               label=('Rotated integration result of' +
                                       'channel {} '.format(ch)),
                                get_cmd=srotres_cmd + '?'
                                # vals=vals.Numbers(-134217728,134217727)
                                )
             self.add_parameter('ch{}_weight_data'.format(ch),
-                               label=('get weigtht data ch {} '.format(ch)),
+                               label=('Get weigtht data ch {} '.format(ch)),
                                get_cmd=self._gen_ch_get_func(
-                                   self.getWeightData, ch),
+                                   self._getWeightData, ch),
                                set_cmd=self._gen_ch_set_func(
-                                   self.sendWeightData, ch),
+                                   self._sendWeightData, ch),
                                vals=vals.Arrays(-128, 127)
                                )
 
-    def getInputAverage(self, ch):
+    def _getInputAverage(self, ch):
         ch_pair = math.ceil(ch/2)
         finished = 0
         while (finished != '1'):
-            finished = self.getInAvgFinished(ch_pair)
-        print(finished)
+            finished = self._getInAvgFinished(ch_pair)
+            if (finished == 'ffffffff'):
+                logging.warning('Trigger is not received: DDM timeout')
+                break
+        #print(finished)
         self.write('qutech:inputavg{:d}:data? '.format(ch))
         binBlock = self.binBlockRead()
-        print('inputavgLen in bytes {:d}'.format(len(binBlock)))
+        #print('inputavgLen in bytes {:d}'.format(len(binBlock)))
         inputavg = np.frombuffer(binBlock, dtype=np.float32)
         return inputavg
 
-    def getTVdata(self, ch_pair):
+    def _getTVdata(self, ch_pair):
         finished = 0
+        complete = 0     
+        #while (complete != '1'):
+        #    complete = self._getTVpercentage(ch_pair)
         while (finished != '1'):
-            finished = self.getTVFinished(ch_pair)
-            print(self.getTVpercentage(ch_pair), end=' ')
-        print(finished)
+            finished = self._getTVFinished(ch_pair)
+            if (finished == 'ffffffff'):
+                logging.warning('Trigger is not received: DDM timeout')
+                break
         self.write('qutech:tvmode{:d}:data? '.format(ch_pair))
         binBlock = self.binBlockRead()
-        print('TV data in bytes {:d}'.format(len(binBlock)))
+        #print('TV data in bytes {:d}'.format(len(binBlock)))
         tvmodedata = np.frombuffer(binBlock, dtype=np.float32)
         return tvmodedata
 
-    def sendWeightData(self, ch, weight):
+    def _sendWeightData(self, ch, weight):
         # generate the binblock
         if 1:   # high performance
             arr = np.asarray(weight, dtype=np.int8)
@@ -291,7 +298,7 @@ class DDMq(SCPI):
         hdr = 'qutech:wint:data {:d},'.format(ch)
         self.binBlockWrite(binBlock, hdr)
 
-    def getWeightData(self, ch):
+    def _getWeightData(self, ch):
 
         self.write('qutech:wint{:d}:data? '.format(ch))
         binBlock = self.binBlockRead()
@@ -299,7 +306,16 @@ class DDMq(SCPI):
         weightdata = np.frombuffer(binBlock, dtype=np.int8)
         return weightdata
 
-    def getQstateCNT(self, ch_pair):
+    def _getQstateCNT(self, ch_pair):
+        finished = 0
+        complete = 0     
+        #while (complete != '1'):
+        #    complete = self._getTVpercentage(ch_pair)
+        while (finished != '1'):
+            finished = self._getTVFinished(ch_pair)
+            if (finished == 'ffffffff'):
+                logging.warning('Trigger is not received: DDM timeout')
+                break
 
         self.write('qutech:qstate{:d}:counter:data? '.format(ch_pair))
         binBlock = self.binBlockRead()
@@ -307,27 +323,83 @@ class DDMq(SCPI):
         qstatecnt = np.frombuffer(binBlock, dtype=np.float32)
         return qstatecnt
 
-    def getQstateAVG(self, ch_pair):
-
+    def _getQstateAVG(self, ch_pair):
+        finished = 0
+        complete = 0     
+        #while (complete != '1'):
+        #    complete = self._getTVpercentage(ch_pair)
+        while (finished != '1'):
+            finished = self._getTVFinished(ch_pair)
+            if (finished == 'ffffffff'):
+                logging.warning('Trigger is not received: DDM timeout')
+                break
         self.write('qutech:qstate{:d}:average:data? '.format(ch_pair))
         binBlock = self.binBlockRead()
         #print('Qu state average {:d}'.format(len(binBlock)))
         qstateavg = np.frombuffer(binBlock, dtype=np.float32)
         return qstateavg
-    def getInAvgStatus(self, adcnr):
+    def _getInAvgStatus(self, adcnr):
         return self.ask('qutech:inputavg%d:status? ' % (adcnr))
-    def getInAvgFinished(self, adcnr):
-        return self.ask('qutech:inputavg%d:finished? ' % (adcnr))
-    def getInAvgBusy(self, adcnr):
+    def _getInAvgFinished(self, adcnr):
+        finished = self.ask('qutech:inputavg%d:finished? ' % (adcnr))
+        fmt_finished = format(int(finished),'x')
+        return fmt_finished
+    def _getInAvgBusy(self, adcnr):
         return self.ask('qutech:inputavg%d:busy? ' % (adcnr))
-    def getTVStatus(self, adcnr):
+    def _getTVStatus(self, adcnr):
         return self.ask('qutech:tvmode%d:status? ' % (adcnr))
-    def getTVFinished(self, adcnr):
-        return self.ask('qutech:tvmode%d:finished? ' % (adcnr))
-    def getTVBusy(self, adcnr):
+
+    def _getTVFinished(self, adcnr):
+        finished = self.ask('qutech:tvmode%d:finished? ' % (adcnr))
+        fmt_finished = format(int(finished),'x')
+        return fmt_finished
+    def _getTVBusy(self, adcnr):
         return self.ask('qutech:tvmode%d:busy? ' % (adcnr))
-    def getTVpercentage(self, adcnr):
+    def _getTVpercentage(self, adcnr):
         return self.ask('qutech:tvmode%d:percentage? ' % (adcnr))
+    def _getADCstatus(self, adcnr):
+        status = self.ask('qutech:adc%d:status? ' % (adcnr))
+        statusstr = format(int(status), 'b')
+        reversestatusstr = statusstr[::-1]
+        def _DI():
+            if (reversestatusstr[0] == '1'):
+                logging.warning('\nOver range on DI input. ')
+            elif(reversestatusstr[1] == '1'):
+                logging.warning('\nUnder range on DI input.' +
+                          'Input signal is less than 25% of ADC resolution. ')
+            else:
+                print("\nDI input is Okay.") 
+            return ((reversestatusstr[0] != '1') & (reversestatusstr[1] != '1')) 
+        def _DQ():
+            if (reversestatusstr[2] == '1'):
+                logging.warning('\nOver range on DQ input. ')
+            elif(reversestatusstr[3] == '1'):
+                logging.warning('\nUnder range on DQ input.' +
+                        ' Input signal is less than 25% of ADC resolution. ')
+            else:
+                print("\nDI input is Okay.") 
+            return ((reversestatusstr[2] != '1') & (reversestatusstr[3] != '1')) 
+
+        def _DCLK_PLL_LOCKED():
+            if (reversestatusstr[4] == '1'):
+                print("\nDCLK PLL has a phase lock. There is an ADC clock.")
+            else:
+                print("\nThere is no ADC clock.")
+            return reversestatusstr[4] == '1'    
+        def _CalRun():
+            if (reversestatusstr[5] == '1'):
+                logging.warning("\nADC calibration is in progress.")
+            else:
+                print("\nADC calibration is not in progress.")
+            return reversestatusstr[5] == '1'
+        ADCstatus = {   0 : _DI,
+                        1 : _DQ,
+                        2 : _DCLK_PLL_LOCKED,
+                        3 : _CalRun,
+        }
+        for x in range(0 , 4):
+            print(ADCstatus[x]())                         
+        return statusstr
     def _gen_ch_get_func(self, fun, ch):
         def get_func():
             return fun(ch)
@@ -339,8 +411,37 @@ class DDMq(SCPI):
         return set_func
 
 
+    def get_idn(self):
+        try:
+            idstr = ''  # in case self.ask fails
+            idstr = self.ask('*IDN?')
+            # form is supposed to be comma-separated, but we've seen
+            # other separators occasionally
+            for separator in ',;:':
+                # split into no more than 4 parts, so we don't lose info
+                idparts = [p.strip() for p in idstr.split(separator, 8)]
+                if len(idparts) > 1:
+                    break
+            # in case parts at the end are missing, fill in None
+            if len(idparts) < 9:
+                idparts += [None] * (9 - len(idparts))
+        except:
+            logging.warn('Error getting or interpreting *IDN?: ' + repr(idstr))
+            idparts = [None, None, None, None, None, None]
+
+        # some strings include the word 'model' at the front of model
+        if str(idparts[1]).lower().startswith('model'):
+            idparts[1] = str(idparts[1])[9:].strip()
+
+        return dict(zip(('vendor', 'model', 'serial', 'fwVersion', 'fwBuild',
+                         'swVersion', 'swBuild', 'kmodVersion',
+                         'kmodBuild'), idparts))
 
 
+
+
+
+#########@ NIKITA LOOK HERE!
 class MyCustomValidator(vals.Validator):
     """
     Validator for numerical numpy arrays
