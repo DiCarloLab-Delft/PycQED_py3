@@ -18,16 +18,18 @@ mac_dict = {'203178706891063': 'CDickel_Desktop',
             '180725258210527': 'Niels_macbook',
             '109952948723616': 'Ramiro_Desktop',
             '215977245834050': 'Ramiro_Desktop',
+            '23213':'Malay_Laptop',
             '31054844829911': 'Sjoerd_laptop'
             }
 
 data_dir_dict = {'tud276606_FPGA_PC': 'D:\Experiments/CBox_Testing/Data',
                  'CDickel_Desktop': 'D:\Experiments/ExperimentName/Data',
                  'Sjoerd_laptop': 'D:\data',
+                 'Malay_Laptop':'D:\Tomo datasets',
                  'Adriaans_Macbook': ('/Users/Adriaan/Documents/Testing/Data'),
                  'Niels_macbook': '/Users/nbultink/temp_data',
                  'La_Ferrari':  'D:\Experiments/1511_RabiSims2/Data',
-                 'La_Maserati': 'D:\Experiments/1611_Starmon/Data',
+                 'La_Maserati': 'D:\Experiments/1701_Vertical_IO_W16_chipA/Data',
                  'La_Maserati_Jr': 'D:\\Experiments\\1610_QcodesTests\\Data',
                  'La_Maserati_JrJr': 'D:\\Experiments\\1607_Qcodes_5qubit\\data',
                  'La_Vespa': 'D:\\Experiments\\161111_LaVespa_Intel_HR\\Data',
@@ -37,6 +39,7 @@ data_dir_dict = {'tud276606_FPGA_PC': 'D:\Experiments/CBox_Testing/Data',
                  'La_Ducati_Jr': 'D:\Experiments/1611_Starmon/Data',
                  'Simulation_PC': 'D:\Experiments/testSingleShotFidelityAnalysis/Data',
                  'Ramiro_Desktop': r'\\131.180.82.81\\data',
+                 # 'Ramiro_Desktop': r'\\131.180.82.190\\Experiments\\1611_Starmon\\Data',
                  r'Nathans_Laptop': 'D:/nlangford\My Documents\Projects\Rabi Model\Experiment_1504\Data',
                  'Bart_Laptop': 'C:\Experiments/NumericalOptimization/Data'
                  }

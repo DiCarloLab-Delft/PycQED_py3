@@ -36,6 +36,7 @@ class CBox_v3_driven_transmon(Transmon):
         Acquisition:           CBox
         Readout pulse configuration: LO modulated using AWG
     '''
+
     def __init__(self, name,
                  LO, cw_source, td_source,
                  IVVI, LutMan,
@@ -162,6 +163,13 @@ class CBox_v3_driven_transmon(Transmon):
                            units='s',
                            parameter_class=ManualParameter,
                            vals=vals.Numbers(min_value=0))
+        self.add_parameter('init_time',
+                           label='Qubit initialization time',
+                           units='s', initial_value=200e-6,
+                           parameter_class=ManualParameter,
+                           # max value based on register size
+                           vals=vals.Numbers(min_value=1e-6,
+                                             max_value=327668e-9))
 
         self.add_parameter('cal_pt_zero',
                            initial_value=None,
@@ -255,10 +263,10 @@ class CBox_v3_driven_transmon(Transmon):
         self._acquisition_instr = self.find_instrument(acq_instr_name)
         if 'CBox' in acq_instr_name:
             logging.info("setting CBox acquisition")
-            self.int_avg_det = None # FIXME: Not implemented
-            self.int_avg_det_rot = None # FIXME: Not implemented
+            self.int_avg_det = None  # FIXME: Not implemented
+            self.int_avg_det_rot = None  # FIXME: Not implemented
             self.int_log_det = qh.CBox_integration_logging_det_CC(self.CBox)
-            self.input_average_detector = None # FIXME: Not implemented
+            self.input_average_detector = None  # FIXME: Not implemented
         elif 'UHFQC' in acq_instr_name:
             logging.info("setting UHFQC acquisition")
             self.input_average_detector = det.UHFQC_input_average_detector(
@@ -274,7 +282,8 @@ class CBox_v3_driven_transmon(Transmon):
                 integration_length=self.RO_acq_integration_length(), rotate=True)
             self.int_log_det = det.UHFQC_integration_logging_det(
                 UHFQC=self._acquisition_instr, AWG=self.AWG,
-                channels=[self.RO_acq_weight_function_I(), self.RO_acq_weight_function_Q()],
+                channels=[
+                    self.RO_acq_weight_function_I(), self.RO_acq_weight_function_Q()],
                 integration_length=self.RO_acq_integration_length())
 
         elif 'ATS' in acq_instr_name:
@@ -284,8 +293,6 @@ class CBox_v3_driven_transmon(Transmon):
                 ATS_acq=self._acquisition_instr.controller, AWG=self.AWG,
                 nr_averages=self.RO_acq_averages())
         return
-
-
 
     def find_resonator_frequency(self, use_min=False,
                                  update=True,
@@ -537,7 +544,6 @@ class CBox_v3_driven_transmon(Transmon):
             self.mixer_drive_phi.set(phi)
             self.mixer_drive_alpha.set(alpha)
 
-
     def measure_heterodyne_spectroscopy(self, freqs, MC=None,
                                         analyze=True, close_fig=True):
         raise NotImplementedError()
@@ -742,6 +748,40 @@ class CBox_v3_driven_transmon(Transmon):
             close_main_fig=close_fig, T1=T1,
             pulse_delay=self.gauss_width.get()*4)
 
+    def measure_randomized_benchmarking_vs_pars(self, amps=None, motzois=None, freqs=None,
+                                                nr_cliffords=80, nr_seeds=50,
+                                                restless=False,
+                                                log_length=8000):
+        self.prepare_for_timedomain()
+
+        if freqs!= None:
+            raise NotImplementedError()
+        if restless:
+            net_clifford = 3
+            d = qh.CBox_single_qubit_event_s_fraction_CC(self.CBox)
+        else:
+            d = qh.CBox_err_frac_CC(self.CBox)
+            net_clifford = 0
+        RB_elt = sqqs.randomized_benchmarking(self.name, nr_cliffords=[nr_cliffords], cal_points=False, nr_seeds=nr_seeds,
+                                              double_curves=False, net_clifford=net_clifford, restless=restless)
+        single_pulse_asm = qta.qasm_to_asm(RB_elt.name,
+                                           self.get_operation_dict())
+        qumis_file = single_pulse_asm
+        self.CBox.load_instructions(qumis_file.name)
+
+        ch_amp = swf.QWG_lutman_par(self.Q_LutMan, self.Q_LutMan.Q_amp180)
+        motzoi = swf.QWG_lutman_par(self.Q_LutMan, self.Q_LutMan.Q_motzoi)
+
+        self.CBox.log_length(log_length)
+        self.MC.set_sweep_function(ch_amp)
+        self.MC.set_sweep_function_2D(motzoi)
+        self.MC.set_sweep_points(amps)
+        self.MC.set_sweep_points_2D(motzois)
+        self.MC.set_detector_function(d)
+
+        self.MC.run('RB_amp_ncl{}_sds{}'.format(nr_cliffords, nr_seeds)+self.msmt_suffix, mode='2D')
+        ma.TwoD_Analysis()
+
     def measure_T1(self, times, MC=None,
                    analyze=True, close_fig=True):
         self.prepare_for_timedomain()
@@ -933,12 +973,13 @@ class CBox_v3_driven_transmon(Transmon):
     def measure_butterfly(self, return_detector=False, MC=None,
                           analyze=True, close_fig=True,
                           verbose=True,
-                          initialize=False, nr_shots=1024*24,
+                          initialize=True, nr_shots=1024*24,
                           update_threshold=True):
 
         self.prepare_for_timedomain()
         if update_threshold:
-            self.CBox.lin_trans_coeffs(np.reshape(rotation_matrix(0, as_array=True), (4,)))
+            self.CBox.lin_trans_coeffs(
+                np.reshape(rotation_matrix(0, as_array=True), (4,)))
         if MC is None:
             MC = self.MC
         MC.soft_avg(1)
@@ -983,13 +1024,13 @@ class CBox_v3_driven_transmon(Transmon):
             threshold=b.opt_I_threshold, digitize=True, case=False)
         c1 = ma.butterfly_analysis(
             close_main_fig=close_fig, initialize=initialize,
-            theta_in=-a.theta%360,
+            theta_in=-a.theta % 360,
             threshold=b.opt_I_threshold, digitize=True, case=True)
         if c0.butterfly_coeffs['F_a_butterfly'] > c1.butterfly_coeffs['F_a_butterfly']:
             bf_coeffs = c0.butterfly_coeffs
         else:
             bf_coeffs = c1.butterfly_coeffs
-        bf_coeffs['theta'] = -a.theta%360
+        bf_coeffs['theta'] = -a.theta % 360
         bf_coeffs['threshold'] = b.opt_I_threshold
         if update_threshold:
             self.RO_rotation_angle(bf_coeffs['theta'])
@@ -1024,7 +1065,6 @@ class CBox_v3_driven_transmon(Transmon):
         RO_length_clocks = convert_to_clocks(self.RO_pulse_length())
         RO_pulse_delay_clocks = convert_to_clocks(self.RO_pulse_delay())
         RO_depletion_clocks = convert_to_clocks(self.RO_depletion_time())
-
 
         operation_dict['init_all'] = {'instruction':
                                       '\nWaitReg r0 \nWaitReg r0 \n'}
@@ -1092,7 +1132,7 @@ class QWG_driven_transmon(CBox_v3_driven_transmon):
                  IVVI, QWG,
                  CBox,
                  MC,
-                 RO_LutMan=None,
+                 RO_LutMan=None, Q_LutMan=None,
                  **kw):
         super(CBox_v3_driven_transmon, self).__init__(name, **kw)
         '''
@@ -1105,6 +1145,7 @@ class QWG_driven_transmon(CBox_v3_driven_transmon):
         self.CBox = CBox
         self.MC = MC
         self.RO_LutMan = RO_LutMan
+        self.Q_LutMan = Q_LutMan
         super().add_parameters()
         self.add_parameters()
 
@@ -1133,7 +1174,8 @@ class QWG_driven_transmon(CBox_v3_driven_transmon):
         self.CBox.load_instructions(qumis_file.name)
         for ch in [1, 2, 3, 4]:
             self.QWG.set('ch{}_amp'.format(ch), .45)
-        ch_amp = swf.QWG_qubit_par(self, self.amp180)
+        ch_amp = swf.QWG_lutman_par(self.Q_LutMan,
+                                    self.Q_LutMan.Q_amp180)
 
         d = qh.CBox_single_integration_average_det_CC(
             self.CBox, nr_averages=self.RO_acq_averages()//MC.soft_avg(),
@@ -1160,7 +1202,8 @@ class QWG_driven_transmon(CBox_v3_driven_transmon):
         asm_file = single_pulse_asm
         self.CBox.load_instructions(asm_file.name)
 
-        motzoi_swf = swf.QWG_qubit_par(self, self.motzoi)
+        motzoi_swf = swf.QWG_lutman_par(self.Q_LutMan,
+                                        self.Q_LutMan.Q_motzoi)
 
         d = qh.CBox_single_integration_average_det_CC(
             self.CBox, nr_averages=self.RO_acq_averages()//MC.soft_avg(),
@@ -1174,8 +1217,6 @@ class QWG_driven_transmon(CBox_v3_driven_transmon):
         if analyze:
             a = ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
             return a
-
-
 
     def prepare_for_timedomain(self):
         self.MC.soft_avg(self.RO_soft_averages())
@@ -1194,7 +1235,6 @@ class QWG_driven_transmon(CBox_v3_driven_transmon):
         self.LO.frequency.set(f_RO - self.f_RO_mod.get())
 
         self.td_source.power.set(self.td_source_pow.get())
-        self.load_QWG_pulses()
 
         # Mixer offsets correction
         # self.CBox.set('AWG{:.0g}_dac0_offset'.format(self.awg_nr.get()),
@@ -1224,71 +1264,76 @@ class QWG_driven_transmon(CBox_v3_driven_transmon):
         self.CBox.lin_trans_coeffs(
             np.reshape(rotation_matrix(self.RO_rotation_angle(), as_array=True), (4,)))
 
-        # Sets the QWG channel amplitudes
-        for ch in [1, 2, 3, 4]:
-            self.QWG.set('ch{}_amp'.format(ch), self.amp180()*1.1)
+        self.load_QWG_pulses()
 
     def load_QWG_pulses(self):
         # NOTE: this is currently hardcoded to use ch1 and ch2 of the QWG
 
         t0 = time.time()
         self.QWG.reset()
+
+        # Sets the QWG channel amplitudes
+        for ch in [1, 2, 3, 4]:
+            self.QWG.set('ch{}_amp'.format(ch), self.amp180()*1.1)
         # FIXME:  Currently hardcoded to use channel 1
-        G_amp = self.amp180()/self.QWG.get('ch{}_amp'.format(1))
+        self.Q_LutMan.Q_amp180(self.amp180())
+        self.Q_LutMan.Q_amp90_scale(self.amp90_scale())
+        self.Q_LutMan.Q_motzoi(self.motzoi())
 
-        # Amplitude is set using the channel amplitude (at least for now)
-        G, D = wf.gauss_pulse(G_amp, self.gauss_width(),
-                              motzoi=self.motzoi(),
-                              sampling_rate=1e9)  # sampling rate of QWG
-        self.QWG.deleteWaveformAll()
-        self.QWG.createWaveformReal('X180_q0_I', G)
-        self.QWG.createWaveformReal('X180_q0_Q', D)
-        self.QWG.createWaveformReal('X90_q0_I', self.amp90_scale()*G)
-        self.QWG.createWaveformReal('X90_q0_Q', self.amp90_scale()*D)
+        self.Q_LutMan.load_pulses_onto_AWG_lookuptable()
+        # G, D = wf.gauss_pulse(G_amp, self.gauss_width(),
+        #                       motzoi=self.motzoi(),
+        #                       sampling_rate=1e9)  # sampling rate of QWG
+        # self.QWG.deleteWaveformAll()
+        # self.QWG.createWaveformReal('X180_q0_I', G)
+        # self.QWG.createWaveformReal('X180_q0_Q', D)
+        # self.QWG.createWaveformReal('X90_q0_I', self.amp90_scale()*G)
+        # self.QWG.createWaveformReal('X90_q0_Q', self.amp90_scale()*D)
 
-        self.QWG.createWaveformReal('Y180_q0_I', D)
-        self.QWG.createWaveformReal('Y180_q0_Q', -G)
-        self.QWG.createWaveformReal('Y90_q0_I', self.amp90_scale()*D)
-        self.QWG.createWaveformReal('Y90_q0_Q', -self.amp90_scale()*G)
+        # self.QWG.createWaveformReal('Y180_q0_I', D)
+        # self.QWG.createWaveformReal('Y180_q0_Q', -G)
+        # self.QWG.createWaveformReal('Y90_q0_I', self.amp90_scale()*D)
+        # self.QWG.createWaveformReal('Y90_q0_Q', -self.amp90_scale()*G)
 
-        self.QWG.createWaveformReal('mX90_q0_I', -self.amp90_scale()*G)
-        self.QWG.createWaveformReal('mX90_q0_Q', -self.amp90_scale()*D)
-        self.QWG.createWaveformReal('mY90_q0_I', -self.amp90_scale()*D)
-        self.QWG.createWaveformReal('mY90_q0_Q', self.amp90_scale()*G)
+        # self.QWG.createWaveformReal('mX90_q0_I', -self.amp90_scale()*G)
+        # self.QWG.createWaveformReal('mX90_q0_Q', -self.amp90_scale()*D)
+        # self.QWG.createWaveformReal('mY90_q0_I', -self.amp90_scale()*D)
+        # self.QWG.createWaveformReal('mY90_q0_Q', self.amp90_scale()*G)
 
-        # Filler waveform
-        self.QWG.createWaveformReal('zero', [0]*4)
+        # # Filler waveform
+        # self.QWG.createWaveformReal('zero', [0]*4)
 
-        self.QWG.codeword_0_ch1_waveform('X180_q0_I')
-        self.QWG.codeword_0_ch2_waveform('X180_q0_Q')
-        self.QWG.codeword_0_ch3_waveform('X180_q0_I')
-        self.QWG.codeword_0_ch4_waveform('X180_q0_Q')
+        # self.QWG.codeword_0_ch1_waveform('X180_q0_I')
+        # self.QWG.codeword_0_ch2_waveform('X180_q0_Q')
+        # self.QWG.codeword_0_ch3_waveform('X180_q0_I')
+        # self.QWG.codeword_0_ch4_waveform('X180_q0_Q')
 
-        self.QWG.codeword_1_ch1_waveform('Y180_q0_I')
-        self.QWG.codeword_1_ch2_waveform('Y180_q0_Q')
-        self.QWG.codeword_1_ch3_waveform('Y180_q0_I')
-        self.QWG.codeword_1_ch4_waveform('Y180_q0_Q')
+        # self.QWG.codeword_1_ch1_waveform('Y180_q0_I')
+        # self.QWG.codeword_1_ch2_waveform('Y180_q0_Q')
+        # self.QWG.codeword_1_ch3_waveform('Y180_q0_I')
+        # self.QWG.codeword_1_ch4_waveform('Y180_q0_Q')
 
-        self.QWG.codeword_2_ch1_waveform('X90_q0_I')
-        self.QWG.codeword_2_ch2_waveform('X90_q0_Q')
-        self.QWG.codeword_2_ch3_waveform('X90_q0_I')
-        self.QWG.codeword_2_ch4_waveform('X90_q0_Q')
+        # self.QWG.codeword_2_ch1_waveform('X90_q0_I')
+        # self.QWG.codeword_2_ch2_waveform('X90_q0_Q')
+        # self.QWG.codeword_2_ch3_waveform('X90_q0_I')
+        # self.QWG.codeword_2_ch4_waveform('X90_q0_Q')
 
-        self.QWG.codeword_3_ch1_waveform('Y90_q0_I')
-        self.QWG.codeword_3_ch2_waveform('Y90_q0_Q')
-        self.QWG.codeword_3_ch3_waveform('Y90_q0_I')
-        self.QWG.codeword_3_ch4_waveform('Y90_q0_Q')
+        # self.QWG.codeword_3_ch1_waveform('Y90_q0_I')
+        # self.QWG.codeword_3_ch2_waveform('Y90_q0_Q')
+        # self.QWG.codeword_3_ch3_waveform('Y90_q0_I')
+        # self.QWG.codeword_3_ch4_waveform('Y90_q0_Q')
 
-        self.QWG.codeword_4_ch1_waveform('mX90_q0_I')
-        self.QWG.codeword_4_ch2_waveform('mX90_q0_Q')
-        self.QWG.codeword_4_ch3_waveform('mX90_q0_I')
-        self.QWG.codeword_4_ch4_waveform('mX90_q0_Q')
+        # self.QWG.codeword_4_ch1_waveform('mX90_q0_I')
+        # self.QWG.codeword_4_ch2_waveform('mX90_q0_Q')
+        # self.QWG.codeword_4_ch3_waveform('mX90_q0_I')
+        # self.QWG.codeword_4_ch4_waveform('mX90_q0_Q')
 
-        self.QWG.codeword_5_ch1_waveform('mY90_q0_I')
-        self.QWG.codeword_5_ch2_waveform('mY90_q0_Q')
-        self.QWG.codeword_5_ch3_waveform('mY90_q0_I')
-        self.QWG.codeword_5_ch4_waveform('mY90_q0_Q')
+        # self.QWG.codeword_5_ch1_waveform('mY90_q0_I')
+        # self.QWG.codeword_5_ch2_waveform('mY90_q0_Q')
+        # self.QWG.codeword_5_ch3_waveform('mY90_q0_I')
+        # self.QWG.codeword_5_ch4_waveform('mY90_q0_Q')
 
+        self.QWG.stop()
         predistortion_matrix = wf.mixer_predistortion_matrix(
             alpha=self.mixer_drive_alpha(),
             phi=self.mixer_drive_phi())
@@ -1327,9 +1372,11 @@ class QWG_driven_transmon(CBox_v3_driven_transmon):
             self.RO_acq_marker_delay())
         RO_pulse_delay_clocks = convert_to_clocks(self.RO_pulse_delay())
         RO_depletion_clocks = convert_to_clocks(self.RO_depletion_time())
+        init_clocks = convert_to_clocks(self.init_time()/2)
 
-        operation_dict['init_all'] = {'instruction':
-                                      '\nWaitReg r0 \nWaitReg r0 \n'}
+        operation_dict['init_all'] = {
+            'instruction':'\wait {} \wait {} \n'.format(
+                init_clocks, init_clocks)}
         operation_dict['I {}'.format(self.name)] = {
             'duration': pulse_period_clocks, 'instruction': 'wait {} \n'}
         operation_dict['X180 {}'.format(self.name)] = {
@@ -1367,7 +1414,7 @@ class QWG_driven_transmon(CBox_v3_driven_transmon):
         if self.RO_pulse_type() == 'MW_IQmod_pulse':
             operation_dict['RO {}'.format(self.name)] = {
                 'duration': (RO_pulse_delay_clocks+RO_acq_marker_del_clocks
-                             +RO_depletion_clocks),
+                             + RO_depletion_clocks),
                 'instruction': 'wait {} \npulse 0000 1111 1111 '.format(
                     RO_pulse_delay_clocks)
                 + '\nwait {} \nmeasure \n'.format(
@@ -1378,7 +1425,6 @@ class QWG_driven_transmon(CBox_v3_driven_transmon):
                 'duration': RO_length_clocks, 'instruction':
                 'wait {} \ntrigger 1000000, {} \n measure \n'.format(
                     RO_pulse_delay_clocks, RO_length_clocks)}
-
 
         if RO_depletion_clocks != 0:
             operation_dict['RO {}'.format(self.name)]['instruction'] += \
