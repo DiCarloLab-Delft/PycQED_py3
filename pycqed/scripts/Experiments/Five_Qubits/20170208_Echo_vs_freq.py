@@ -1,5 +1,11 @@
 import numpy as np
 from qcodes.plots.pyqtgraph import QtPlot
+from pycqed.instrument_drivers.physical_instruments import QuTech_AWG_Module as qwg
+QWG = qwg.QuTech_AWG_Module(
+                'QWG', address='192.168.0.10',
+                port=5025, server_name=None)
+
+
 vw = QtPlot(windowTitle='Seq_plot', figsize=(600, 400))
 
 omega = lambda flux, f_max, EC, asym: (
@@ -217,3 +223,50 @@ T2s_std_r = echo_scans.TD_dict['T2e_std']
 
 T1s_r = T1_scans.TD_dict['T1']
 T1s_std_r = T1_scans.TD_dict['T1_std']
+
+
+
+scan_start = '20170209_143000'
+scan_stop = '20170209_183000'
+qubit_name = 'DataT'
+###############################################
+pdict = {'f_q': 'DataT.f_qubit',
+         'flux': 'FluxControl.flux2',
+         'T2e': 'Analysis.Fitted Params w0.tau.value',
+         'T2e_std': 'Analysis.Fitted Params w0.tau.stderr', }
+opt_dict = {'scan_label': 'Echo_DataT'}
+nparams = ['f_q', 'T2e', 'T2e_std', 'flux']
+echo_scans = ca.quick_analysis(t_start=scan_start, t_stop=scan_stop,
+                               options_dict=opt_dict,
+                               params_dict_TD=pdict, numeric_params=nparams)
+qubit_name = 'DataT'
+###############################################
+pdict = {'f_q': 'DataT.f_qubit',
+         'flux': 'FluxControl.flux2',
+         'T1': 'Analysis.Fitted Params F|1>.tau.value',
+         'T1_std': 'Analysis.Fitted Params F|1>.tau.stderr', }
+opt_dict = {'scan_label': 'T1_DataT'}
+nparams = ['f_q', 'T1', 'T1_std', 'flux']
+T1_scans = ca.quick_analysis(t_start=scan_start, t_stop=scan_stop,
+                             options_dict=opt_dict,
+                             params_dict_TD=pdict, numeric_params=nparams)
+
+
+freqs_q = echo_scans.TD_dict['f_q']
+flux_q = echo_scans.TD_dict['flux']
+T2s_q = echo_scans.TD_dict['T2e']
+T2s_std_q = echo_scans.TD_dict['T2e_std']
+
+T1s_q = T1_scans.TD_dict['T1']
+T1s_std_q = T1_scans.TD_dict['T1_std']
+
+
+
+
+
+#####################################
+# Preparing the QWG settings
+#####################################
+for ch in range(4):
+    QWG.set('ch{}_amp'.format(ch+1), 2)
+    QWG.set('ch{}_state'.format(ch+1), True)
