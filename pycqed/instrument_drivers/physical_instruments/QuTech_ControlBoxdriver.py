@@ -1301,10 +1301,6 @@ class QuTech_ControlBox(VisaInstrument):
         '''
 
         # 2 bytes per array val + cmd_header and EOM
-        if max(weights) > 127:
-            raise ValueError('Weights must be between -128 and 127')
-        if min(weights) < -128:
-            raise ValueError('Weights must be between -128 and 127')
         if len(weights) != 512:
             raise ValueError('Length of array must be 512 elements')
 
