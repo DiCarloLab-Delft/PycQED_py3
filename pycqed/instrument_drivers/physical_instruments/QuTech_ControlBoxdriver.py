@@ -94,7 +94,7 @@ class QuTech_ControlBox(VisaInstrument):
                 label='Integraion weights input {}'.format(i),
                 get_cmd=self._wrap_ch_get_fun(self._get_int_weights, i),
                 set_cmd=self._wrap_ch_set_fun(self._set_int_weights, i),
-                vals=vals.Anything())
+                vals=vals.Ints(-128, 127))
 
             self._integration_weights = [[], []]
 
