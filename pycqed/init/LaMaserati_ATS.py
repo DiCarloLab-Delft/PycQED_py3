@@ -22,7 +22,7 @@ import qcodes as qc
 # Globally defined config
 # qc_config = {'datadir': r'D:\\Experimentsp7_Qcodes_5qubit',
 #              'PycQEDdir': 'D:\GitHubRepos\PycQED_py3'}
-qc_config = {'datadir': r'D:\\Experiments\\1701_Vertical_IO_W16_chipA\\Data',
+qc_config = {'datadir': r'D:\\Experiments\\1702_S7m_W16_NW22\\Data',
              'PycQEDdir': 'D:\GitHubRepos\PycQED_py3'}
 
 # makes sure logging messages show up in the notebook
@@ -74,10 +74,10 @@ from pycqed.instrument_drivers.physical_instruments.ZurichInstruments import UHF
 import qcodes.instrument.parameter as parameter
 import qcodes.instrument_drivers.AlazarTech.ATS9870 as ATSdriver
 import qcodes.instrument_drivers.AlazarTech.ATS_acquisition_controllers as ats_contr
+from pycqed.instrument_drivers.meta_instrument import Flux_Control as FluxCtrl
 
 
-
-
+t0 = time.time()  # to print how long init takes
 ############################
 # Initializing instruments #
 ############################
@@ -93,14 +93,28 @@ LO = rs.RohdeSchwarz_SGS100A(name='LO', address='TCPIP0::192.168.0.71', server_n
 station.add_component(LO)
 RF = rs.RohdeSchwarz_SGS100A(name='RF', address='TCPIP0::192.168.0.72', server_name=None)  #
 station.add_component(RF)
+cw_source = rs.RohdeSchwarz_SGS100A(name='cw_source', address='TCPIP0::192.168.0.85', server_name=None)  #
+station.add_component(cw_source)
+Qubit_LO = rs.RohdeSchwarz_SGS100A(name='Qubit_LO', address='TCPIP0::192.168.0.90', server_name=None)  #
+station.add_component(Qubit_LO)
+
 
 #Initializing UHFQC
 # UHFQC_1 = ZI_UHFQC.UHFQC('UHFQC_1', device='dev2209', server_name=None)
 # station.add_component(UHFQC_1)
 
 #initializing AWG
-# AWG = tek.Tektronix_AWG5014(name='AWG', setup_folder=None, timeout=2,
-#                             address='GPIB0::8::INSTR', server_name=None)
+AWG = tek.Tektronix_AWG5014(name='AWG',  timeout=2,
+                            address='GPIB0::8::INSTR', server_name=None)
+station.add_component(AWG)
+AWG.timeout(180)  # timeout long for uploading wait.
+
+#IVVI
+IVVI = iv.IVVI('IVVI', address='COM10', numdacs=16, server_name=None)
+station.add_component(IVVI)
+Flux_Control = FluxCtrl.Flux_Control(name='FluxControl',IVVI=station.IVVI, num_channels=16)
+station.add_component(Flux_Control)
+
 
 #Initializaing ATS,
 ATSdriver.AlazarTech_ATS.find_boards()
@@ -161,14 +175,6 @@ HS = hd.HeterodyneInstrument('HS', LO=LO, RF=RF, AWG=None,
                              server_name=None)
 station.add_component(HS)
 
-# VNA
-# VNA = ZNB20.ZNB20(name='VNA', address='TCPIP0::192.168.0.55', server_name=None)  #
-# station.add_component(VNA)
-
-# variable attenuator
-# ATT = Weinschel_8320_novisa.Weinschel_8320(name='ATT',address='192.168.0.54', server_name=None)
-# station.add_component(ATT)
-
 
 MC = mc.MeasurementControl('MC')
 
@@ -177,6 +183,96 @@ station.MC = MC
 station.add_component(MC)
 
 
+#qubit objects
+QR1 = qbt.Tektronix_driven_transmon('QR1', LO=LO, cw_source=cw_source,
+                                              td_source=Qubit_LO,
+                                              IVVI=IVVI,
+                                              rf_RO_source=RF,
+                                              AWG=AWG,
+                                              heterodyne_instr=HS,
+                                              MC=MC,
+                                              FluxCtrl=None,
+                                              server_name=None)
+station.add_component(QR1)
+gen.load_settings_onto_instrument(QR1)
+QR1.acquisition_instr('ATS')
+
+QR2 = qbt.Tektronix_driven_transmon('QR2', LO=LO, cw_source=cw_source,
+                                              td_source=Qubit_LO,
+                                              IVVI=IVVI,
+                                              rf_RO_source=RF,
+                                              AWG=AWG,
+                                              heterodyne_instr=HS,
+                                              MC=MC,
+                                              FluxCtrl=None,
+                                              server_name=None)
+station.add_component(QR2)
+gen.load_settings_onto_instrument(QR2)
+QR2.acquisition_instr('ATS')
+
+QR3 = qbt.Tektronix_driven_transmon('QR3', LO=LO, cw_source=cw_source,
+                                              td_source=Qubit_LO,
+                                              IVVI=IVVI,
+                                              rf_RO_source=RF,
+                                              AWG=AWG,
+                                              heterodyne_instr=HS,
+                                              MC=MC,
+                                              FluxCtrl=None,
+                                              server_name=None)
+station.add_component(QR3)
+gen.load_settings_onto_instrument(QR3)
+QR3.acquisition_instr('ATS')
+
+QR4 = qbt.Tektronix_driven_transmon('QR4', LO=LO, cw_source=cw_source,
+                                              td_source=Qubit_LO,
+                                              IVVI=IVVI,
+                                              rf_RO_source=RF,
+                                              AWG=AWG,
+                                              heterodyne_instr=HS,
+                                              MC=MC,
+                                              FluxCtrl=None,
+                                              server_name=None)
+station.add_component(QR4)
+gen.load_settings_onto_instrument(QR4)
+QR4.acquisition_instr('ATS')
+
+# The AWG sequencer
+station.pulsar = ps.Pulsar()
+station.pulsar.AWG = station.components['AWG']
+markerhighs = [2, 2, 2.7, 2]
+
+for i in range(4):
+    # Note that these are default parameters and should be kept so.
+    # the channel offset is set in the AWG itself. For now the amplitude is
+    # hardcoded. You can set it by hand but this will make the value in the
+    # sequencer different.
+    station.pulsar.define_channel(id='ch{}'.format(i+1),
+                                  name='ch{}'.format(i+1), type='analog',
+                                  # max safe IQ voltage
+                                  high=.7, low=-.7,
+                                  offset=0.0, delay=0, active=True)
+    station.pulsar.define_channel(id='ch{}_marker1'.format(i+1),
+                                  name='ch{}_marker1'.format(i+1),
+                                  type='marker',
+                                  high=markerhighs[i], low=0, offset=0.,
+                                  delay=0, active=True)
+    station.pulsar.define_channel(id='ch{}_marker2'.format(i+1),
+                                  name='ch{}_marker2'.format(i+1),
+                                  type='marker',
+                                  high=2.0, low=0, offset=0.,
+                                  delay=0, active=True)
+# to make the pulsar available to the standard awg seqs
+st_seqs.station = station
+sq.station = station
+cal_elts.station = station
+
+t1 = time.time()
+
+#manually setting the clock, to be done automatically
+AWG.clock_freq(1e9)
+
+
+print('Ran initialization in %.2fs' % (t1-t0))
 
 
 def print_instr_params(instr):

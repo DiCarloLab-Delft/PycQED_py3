@@ -22,7 +22,7 @@ import qcodes as qc
 # Globally defined config
 # qc_config = {'datadir': r'D:\\Experimentsp7_Qcodes_5qubit',
 #              'PycQEDdir': 'D:\GitHubRepos\PycQED_py3'}
-qc_config = {'datadir': r'D:\\Experiments\\1701_Vertical_IO_W16_chipA\\Data',
+qc_config = {'datadir': r'D:\\Experiments\\1702_S7m_W16_NW22\\Data',
              'PycQEDdir': 'D:\GitHubRepos\PycQED_py3'}
 
 # makes sure logging messages show up in the notebook

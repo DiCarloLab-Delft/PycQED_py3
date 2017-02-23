@@ -549,7 +549,7 @@ class CBox_driven_transmon(Transmon):
         if analyze:
             ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
 
-    def measure_resonator_power(self, freqs, mod_amps,
+    def measure_resonator_power(self, freqs, powers,
                                 MC=None, analyze=True, close_fig=True):
         '''
         N.B. This one does not use powers but varies the mod-amp.
@@ -560,9 +560,9 @@ class CBox_driven_transmon(Transmon):
             MC = self.MC
         MC.set_sweep_functions(
             [pw.wrap_par_to_swf(self.heterodyne_instr.frequency),
-             pw.wrap_par_to_swf(self.heterodyne_instr.mod_amp)])
+             pw.wrap_par_to_swf(self.heterodyne_instr.RF_power)])
         MC.set_sweep_points(freqs)
-        MC.set_sweep_points_2D(mod_amps)
+        MC.set_sweep_points_2D(powers)
         MC.set_detector_function(det.Heterodyne_probe(self.heterodyne_instr))
         MC.run(name='Resonator_power_scan'+self.msmt_suffix, mode='2D')
         if analyze:
