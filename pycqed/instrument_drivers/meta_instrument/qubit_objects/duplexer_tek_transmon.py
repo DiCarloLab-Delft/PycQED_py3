@@ -35,19 +35,19 @@ class Duplexer_tek_transmon(Tektronix_driven_transmon):
         del self.parameters['pulse_Q_offset']
 
         self.add_parameter('G_phi_skew', label='IQ phase skewness',
-                           units='deg', vals=vals.Numbers(-180, 180),
+                           unit='deg', vals=vals.Numbers(-180, 180),
                            initial_value=0,
                            parameter_class=ManualParameter)
         self.add_parameter('G_alpha', label='QI amplitude skewness',
-                           units='', vals=vals.Numbers(.1, 2),
+                           unit='', vals=vals.Numbers(.1, 2),
                            initial_value=1,
                            parameter_class=ManualParameter)
         self.add_parameter('D_phi_skew', label='IQ phase skewness',
-                           units='deg', vals=vals.Numbers(-180, 180),
+                           unit='deg', vals=vals.Numbers(-180, 180),
                            initial_value=0,
                            parameter_class=ManualParameter)
         self.add_parameter('D_alpha', label='QI amplitude skewness',
-                           units='', vals=vals.Numbers(.1, 2),
+                           unit='', vals=vals.Numbers(.1, 2),
                            initial_value=1,
                            parameter_class=ManualParameter)
         self.add_parameter('pulse_GI_channel', initial_value='ch1',
@@ -89,11 +89,11 @@ class Duplexer_tek_transmon(Tektronix_driven_transmon):
                            vals=vals.Numbers(0, 1),
                            parameter_class=ManualParameter)
         self.add_parameter('Mux_G_phase', initial_value=30000,
-                           units='dac',
+                           unit='dac',
                            vals=vals.Ints(0, 65536),
                            parameter_class=ManualParameter)
         self.add_parameter('Mux_D_phase', initial_value=30000,
-                           units='dac',
+                           unit='dac',
                            vals=vals.Ints(0, 65536),
                            parameter_class=ManualParameter)
 
