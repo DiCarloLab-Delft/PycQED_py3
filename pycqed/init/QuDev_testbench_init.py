@@ -35,21 +35,25 @@ from pycqed.instrument_drivers.meta_instrument.qubit_objects.QuDev_transmon \
     import QuDev_transmon
 
 station = qc.Station()
+print("initializing SGS100A")
 LO = rs.RohdeSchwarz_SGS100A(name='LO', address='TCPIP0::192.168.1.14',
                              server_name=None)
-RF = rs.RohdeSchwarz_SGS100A(name='RF', address='TCPIP0::192.168.1.16',
-                             server_name=None)
-AWG = tek.Tektronix_AWG5014(name='AWG', setup_folder="Setup_Folder", timeout=20,
+#RF = rs.RohdeSchwarz_SGS100A(name='RF', address='TCPIP0::192.168.1.16',
+#                             server_name=None)
+print("initializing AWG5014")
+AWG = tek.Tektronix_AWG5014(name='AWG', timeout=20,
                             address='TCPIP0::192.168.1.15::inst0::INSTR',
                             server_name=None)
+print("initializing UHFQC")
 UHFQC_1 = ZI_UHFQC.UHFQC('UHFQC_1', device='dev2204', server_name=None,
                          port=8004)
-#HS = hd.LO_modulated_Heterodyne('HS', LO=LO, AWG=AWG,
-#                                acquisition_instr=UHFQC_1.name,
-#                                server_name=None)
-HS = hd.HeterodyneInstrument('HS', RF=RF, LO=LO, AWG=AWG,
+print("initializing heterodyne")
+HS = hd.LO_modulated_Heterodyne('HS', LO=LO, AWG=AWG,
                                 acquisition_instr=UHFQC_1.name,
                                 server_name=None)
+#HS = hd.HeterodyneInstrument('HS', RF=RF, LO=LO, AWG=AWG,
+#                                acquisition_instr=UHFQC_1.name,
+#                                server_name=None)
 # CW = rs.RohdeSchwarz_SGS100A(name='CW', address='TCPIP0::192.168.1.16',
 #                              server_name=None)  # CW source for probing qubit
 
@@ -129,8 +133,8 @@ HS.LO.power(LO_power)
 HS.f_RO_mod(f_RO_mod)
 HS.nr_averages(averages)
 HS.RO_length(RO_length)
-#HS.mod_amp(mod_amp)
-HS.RF_power(RF_power)
+HS.mod_amp(mod_amp)
+#HS.RF_power(RF_power)
 
 # Create qubit object
 qubit = QuDev_transmon("qubit", MC, HS, None)
