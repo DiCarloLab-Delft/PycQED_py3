@@ -85,7 +85,7 @@ def wrap_func_to_det(func, name, value_names, units, control='soft',  **kw):
     return detector_function
 
 def wrap_par_remainder(par, remainder=1):
-    new_par = qc.Parameter(name=par.name, label=par.label, units=par.units)
+    new_par = qc.Parameter(name=par.name, label=par.label, unit=par.units)
     def wrap_set(val):
         val = val % remainder
         par.set(val)
@@ -94,7 +94,7 @@ def wrap_par_remainder(par, remainder=1):
     return new_par
 
 def wrap_par_set_get(par):
-    new_par = qc.Parameter(name=par.name, label=par.label, units=par.units)
+    new_par = qc.Parameter(name=par.name, label=par.label, unit=par.units)
     def wrap_set(val):
         par.set(val)
         par.get()

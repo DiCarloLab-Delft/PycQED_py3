@@ -124,9 +124,9 @@ number_of_shots = chunk_size*3
 
 
 # Parameters are only used for labels and units in the datafile
-RO_basis = ManualParameter('RO_basis', units='')
-prep_basis = ManualParameter('prep_basis', units='')
-state = ManualParameter('state', units='')
+RO_basis = ManualParameter('RO_basis', unit='')
+prep_basis = ManualParameter('prep_basis', unit='')
+state = ManualParameter('state', unit='')
 sweep_pars = [RO_basis, prep_basis, state]
 
 # MC is the MeasurementControl that controls the data acquisition loop

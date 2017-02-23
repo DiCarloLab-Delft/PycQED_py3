@@ -1069,7 +1069,7 @@ class Chevron_optimization_v1(det.Soft_Detector):
         self.nr_averages = kw.get('nr_averages', 1024)
 
         self.awg_amp_par = ManualParameter(
-            name='AWG_amp', units='Vpp', label='AWG Amplitude')
+            name='AWG_amp', unit='Vpp', label='AWG Amplitude')
         self.awg_amp_par.get = lambda: self.AWG.get(
             'ch{}_amp'.format(self.flux_channel))
         self.awg_amp_par.set = lambda val: self.AWG.set(
