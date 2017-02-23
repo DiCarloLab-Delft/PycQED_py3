@@ -1281,57 +1281,7 @@ class QWG_driven_transmon(CBox_v3_driven_transmon):
         self.Q_LutMan.Q_motzoi(self.motzoi())
 
         self.Q_LutMan.load_pulses_onto_AWG_lookuptable()
-        # G, D = wf.gauss_pulse(G_amp, self.gauss_width(),
-        #                       motzoi=self.motzoi(),
-        #                       sampling_rate=1e9)  # sampling rate of QWG
-        # self.QWG.deleteWaveformAll()
-        # self.QWG.createWaveformReal('X180_q0_I', G)
-        # self.QWG.createWaveformReal('X180_q0_Q', D)
-        # self.QWG.createWaveformReal('X90_q0_I', self.amp90_scale()*G)
-        # self.QWG.createWaveformReal('X90_q0_Q', self.amp90_scale()*D)
 
-        # self.QWG.createWaveformReal('Y180_q0_I', D)
-        # self.QWG.createWaveformReal('Y180_q0_Q', -G)
-        # self.QWG.createWaveformReal('Y90_q0_I', self.amp90_scale()*D)
-        # self.QWG.createWaveformReal('Y90_q0_Q', -self.amp90_scale()*G)
-
-        # self.QWG.createWaveformReal('mX90_q0_I', -self.amp90_scale()*G)
-        # self.QWG.createWaveformReal('mX90_q0_Q', -self.amp90_scale()*D)
-        # self.QWG.createWaveformReal('mY90_q0_I', -self.amp90_scale()*D)
-        # self.QWG.createWaveformReal('mY90_q0_Q', self.amp90_scale()*G)
-
-        # # Filler waveform
-        # self.QWG.createWaveformReal('zero', [0]*4)
-
-        # self.QWG.codeword_0_ch1_waveform('X180_q0_I')
-        # self.QWG.codeword_0_ch2_waveform('X180_q0_Q')
-        # self.QWG.codeword_0_ch3_waveform('X180_q0_I')
-        # self.QWG.codeword_0_ch4_waveform('X180_q0_Q')
-
-        # self.QWG.codeword_1_ch1_waveform('Y180_q0_I')
-        # self.QWG.codeword_1_ch2_waveform('Y180_q0_Q')
-        # self.QWG.codeword_1_ch3_waveform('Y180_q0_I')
-        # self.QWG.codeword_1_ch4_waveform('Y180_q0_Q')
-
-        # self.QWG.codeword_2_ch1_waveform('X90_q0_I')
-        # self.QWG.codeword_2_ch2_waveform('X90_q0_Q')
-        # self.QWG.codeword_2_ch3_waveform('X90_q0_I')
-        # self.QWG.codeword_2_ch4_waveform('X90_q0_Q')
-
-        # self.QWG.codeword_3_ch1_waveform('Y90_q0_I')
-        # self.QWG.codeword_3_ch2_waveform('Y90_q0_Q')
-        # self.QWG.codeword_3_ch3_waveform('Y90_q0_I')
-        # self.QWG.codeword_3_ch4_waveform('Y90_q0_Q')
-
-        # self.QWG.codeword_4_ch1_waveform('mX90_q0_I')
-        # self.QWG.codeword_4_ch2_waveform('mX90_q0_Q')
-        # self.QWG.codeword_4_ch3_waveform('mX90_q0_I')
-        # self.QWG.codeword_4_ch4_waveform('mX90_q0_Q')
-
-        # self.QWG.codeword_5_ch1_waveform('mY90_q0_I')
-        # self.QWG.codeword_5_ch2_waveform('mY90_q0_Q')
-        # self.QWG.codeword_5_ch3_waveform('mY90_q0_I')
-        # self.QWG.codeword_5_ch4_waveform('mY90_q0_Q')
 
         self.QWG.stop()
         predistortion_matrix = wf.mixer_predistortion_matrix(
