@@ -401,7 +401,7 @@ class UHFQC(Instrument):
         self.single_acquisition_initialize(channels, mode)
         data = self.single_acquisition_poll(samples, acquisition_time, timeout)
         self.single_acquisition_finalize()
-        return data 
+        return data
 
     def single_acquisition_initialize(self, channels=set([0, 1]), mode='rl'):
         # Define the channels to use
@@ -579,7 +579,7 @@ class UHFQC(Instrument):
 
         func(self._make_full_path(path), float(value))
 
-    def get(self, paths, convert=None):
+    def _get(self, paths, convert=None):
         if type(paths) is not list:
             paths = [ paths ]
             single = 1
@@ -597,10 +597,10 @@ class UHFQC(Instrument):
             return values
 
     def geti(self, paths):
-        return self.get(paths, int)
+        return self._get(paths, int)
 
     def getd(self, paths):
-        return self.get(paths, float)
+        return self._get(paths, float)
 
     def getv(self, paths):
         if type(paths) is not list:
