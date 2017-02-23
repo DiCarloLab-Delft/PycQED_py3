@@ -29,14 +29,14 @@ class DeviceObject(Instrument):
         for pt_a in pulse_types:
             for pt_b in pulse_types:
                 self.add_parameter('Buffer_{}_{}'.format(pt_a, pt_b),
-                                   units='s',
+                                   unit='s',
                                    initial_value=0,
                                    parameter_class=ManualParameter)
                 self.add_sequencer_config_param(
                     self.parameters['Buffer_{}_{}'.format(pt_a, pt_b)])
 
         self.add_parameter(
-            'RO_fixed_point', units='s',
+            'RO_fixed_point', unit='s',
             initial_value=1e-6,
             docstring=('The Tektronix sequencer shifts all elements in a ' +
                        'sequence such that the first RO encountered in each ' +
@@ -48,7 +48,7 @@ class DeviceObject(Instrument):
             vals=vals.Numbers(1e-9, 500e-6))
         self.add_sequencer_config_param(self.RO_fixed_point)
         self.add_parameter(
-            'Flux_comp_dead_time', units='s',
+            'Flux_comp_dead_time', unit='s',
             initial_value=3e-6,
             docstring=('Used to determine the wait time between the end of a' +
                        'sequence and the beginning of Flux compensation' +

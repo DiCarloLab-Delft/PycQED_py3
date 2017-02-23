@@ -151,7 +151,7 @@ class UHFQC(Instrument):
         #readout
         for i in range(5):
             self.add_parameter("quex_trans_offset_weightfunction_{}".format(i),
-                   units='V',
+                   unit='V',
                    label='RO normalization offset (V)',
                    initial_value=0.0,
                    parameter_class=ManualParameter)

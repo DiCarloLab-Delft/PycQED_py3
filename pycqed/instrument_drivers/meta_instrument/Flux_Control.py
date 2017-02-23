@@ -38,12 +38,12 @@ class Flux_Control(Instrument):
                            set_cmd=self.do_set_inv_transfer_matrix,
                            get_cmd=self.do_get_inv_transfer_matrix,
                            vals=vals.Anything())
-        self.add_parameter('flux_offsets', units='Phi_0',
+        self.add_parameter('flux_offsets', unit='Phi_0',
                            label='Flux offsets',
                            set_cmd=self.do_set_flux_offsets,
                            get_cmd=self.do_get_flux_offsets,
                            vals=vals.Anything())
-        self.add_parameter('flux_vector', units='Phi_0',
+        self.add_parameter('flux_vector', unit='Phi_0',
                            label='Linear transformation coefficients',
                            set_cmd=self.do_set_flux_vector,
                            get_cmd=self.do_get_flux_vector,
@@ -58,7 +58,7 @@ class Flux_Control(Instrument):
             self.add_parameter(
                 'flux{}'.format(i),
                 label='Flux {}'.format(i),
-                units=r'$\Phi_0$',
+                unit=r'$\Phi_0$',
                 get_cmd=self._gen_ch_get_func(self._get_flux, i),
                 set_cmd=self._gen_ch_set_func(self._set_flux, i),
                 vals=vals.Numbers(-10, 10.))

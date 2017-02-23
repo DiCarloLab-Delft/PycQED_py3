@@ -184,52 +184,52 @@ class Transmon(Qubit):
 
     def __init__(self, name, **kw):
         super().__init__(name, **kw)
-        self.add_parameter('E_c', units='Hz',
+        self.add_parameter('E_c', unit='Hz',
                            parameter_class=ManualParameter,
                            vals=vals.Numbers())
 
-        self.add_parameter('E_j', units='Hz',
+        self.add_parameter('E_j', unit='Hz',
                            parameter_class=ManualParameter,
                            vals=vals.Numbers())
         self.add_parameter('assymetry',
                            parameter_class=ManualParameter)
 
-        self.add_parameter('dac_voltage', units='mV',
+        self.add_parameter('dac_voltage', unit='mV',
                            parameter_class=ManualParameter)
-        self.add_parameter('dac_sweet_spot', units='mV',
+        self.add_parameter('dac_sweet_spot', unit='mV',
                            parameter_class=ManualParameter)
-        self.add_parameter('dac_flux_coefficient', units='',
+        self.add_parameter('dac_flux_coefficient', unit='',
                            parameter_class=ManualParameter)
-        self.add_parameter('asymmetry', units='',
+        self.add_parameter('asymmetry', unit='',
                            parameter_class=ManualParameter)
         self.add_parameter('dac_channel', vals=vals.Ints(),
                            parameter_class=ManualParameter)
         self.add_parameter('flux',
                            parameter_class=ManualParameter)
 
-        self.add_parameter('f_qubit', label='qubit frequency', units='Hz',
+        self.add_parameter('f_qubit', label='qubit frequency', unit='Hz',
                            parameter_class=ManualParameter)
-        self.add_parameter('f_max', label='qubit frequency', units='Hz',
+        self.add_parameter('f_max', label='qubit frequency', unit='Hz',
                            parameter_class=ManualParameter)
-        self.add_parameter('f_res', label='resonator frequency', units='Hz',
+        self.add_parameter('f_res', label='resonator frequency', unit='Hz',
                            parameter_class=ManualParameter)
-        self.add_parameter('f_RO', label='readout frequency', units='Hz',
+        self.add_parameter('f_RO', label='readout frequency', unit='Hz',
                            parameter_class=ManualParameter)
 
         # Sequence/pulse parameters
-        self.add_parameter('RO_pulse_delay', units='s',
+        self.add_parameter('RO_pulse_delay', unit='s',
                            parameter_class=ManualParameter)
-        self.add_parameter('RO_pulse_length', units='s',
+        self.add_parameter('RO_pulse_length', unit='s',
                            parameter_class=ManualParameter)
-        self.add_parameter('RO_acq_marker_delay', units='s',
+        self.add_parameter('RO_acq_marker_delay', unit='s',
                            parameter_class=ManualParameter)
         self.add_parameter('RO_acq_marker_channel',
                            parameter_class=ManualParameter,
                            vals=vals.Strings())
-        self.add_parameter('RO_amp', units='V',
+        self.add_parameter('RO_amp', unit='V',
                            parameter_class=ManualParameter)
         # Time between start of pulses
-        self.add_parameter('pulse_delay', units='s',
+        self.add_parameter('pulse_delay', unit='s',
                            initial_value=0,
                            vals=vals.Numbers(0, 1e-6),
                            parameter_class=ManualParameter)
