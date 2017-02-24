@@ -105,15 +105,19 @@ class QX_Sweep(Soft_Sweep):
 
     def set_parameter(self, val):
         circuit_name = ("circuit%i" % self.__cnt)
-        self.__qxc.create_circuit(circuit_name,["prepz q0", "h q0", "x q0", "z q0", "y q0", "y q0", "z q0", "x q0", "h q0", "measure q0"])
+        self.__qxc.create_circuit(circuit_name, [
+                                  "prepz q0", "h q0", "x q0", "z q0", "y q0", "y q0", "z q0", "x q0", "h q0", "measure q0"])
         self.__cnt = self.__cnt+1
         # pass
 
+
 class QX_RB_Sweep(Soft_Sweep):
+
     """
        QX Randomized Benchmarking Test
     """
-    def __init__(self, qxc, filename, num_circuits, sweep_control='soft', sweep_points=None,**kw):
+
+    def __init__(self, qxc, filename, num_circuits, sweep_control='soft', sweep_points=None, **kw):
         super(QX_RB_Sweep, self).__init__()
         self.sweep_control = sweep_control
         self.name = 'QX_RB_Sweep'
@@ -129,11 +133,12 @@ class QX_RB_Sweep(Soft_Sweep):
         qasm.load_circuits()
         self.circuits = qasm.get_circuits()
         for c in self.circuits:
-                self.__qxc.create_circuit(c[0],c[1])
+            self.__qxc.create_circuit(c[0], c[1])
 
     def set_parameter(self, val):
         assert(self.__cnt < self.num_circuits)
         self.__cnt = self.__cnt+1
+
 
 class Delayed_None_Sweep(Soft_Sweep):
 
@@ -221,11 +226,11 @@ class Hard_Sweep(Sweep_function):
 
 class QX_Hard_Sweep(Hard_Sweep):
 
-    def __init__(self, qxc, filename): # , num_circuits):
+    def __init__(self, qxc, filename):  # , num_circuits):
         super().__init__()
         self.name = 'QX_Hard_Sweep'
-        self.filename     = filename
-        self.__qxc        = qxc
+        self.filename = filename
+        self.__qxc = qxc
         # self.num_circuits = num_circuits
         qasm = ql.qasm_loader(filename)
         qasm.load_circuits()
@@ -235,7 +240,7 @@ class QX_Hard_Sweep(Hard_Sweep):
     def get_circuits_names(self):
         ids = []
         for c in self.circuits:
-                ids.append(c[0])
+            ids.append(c[0])
         return ids
 
     def prepare(self, **kw):
@@ -243,19 +248,21 @@ class QX_Hard_Sweep(Hard_Sweep):
         print("QX_Hard_Sweep.prepare() called...")
         self.__qxc.create_qubits(2)
         for c in self.circuits:
-           # print(c)
-           self.__qxc.create_circuit(c[0],c[1])
+            # print(c)
+            self.__qxc.create_circuit(c[0], c[1])
 
 '''
 QX RB Sweep (Multi QASM Files)
 '''
+
+
 class QX_RB_Hard_Sweep(Hard_Sweep):
 
     def __init__(self, qxc, qubits=2):
         super().__init__()
-        self.name   = 'QX_RB_Hard_Sweep'
+        self.name = 'QX_RB_Hard_Sweep'
         self.qubits = qubits
-        self.__qxc  = qxc
+        self.__qxc = qxc
         self.__qxc.create_qubits(2)
         # qasm = ql.qasm_loader(filename)
         # qasm.load_circuits()
@@ -266,10 +273,7 @@ class QX_RB_Hard_Sweep(Hard_Sweep):
         # self.CBox.trigger_source('internal')
         print("QX_Hard_Sweep.prepare() called...")
         # for c in self.circuits:
-           # self.__qxc.create_circuit(c[0],c[1])
-
-
-
+        # self.__qxc.create_circuit(c[0],c[1])
 
 
 # NOTE: AWG_sweeps are located in AWG_sweep_functions
@@ -280,7 +284,7 @@ class ZNB_VNA_sweep(Hard_Sweep):
     def __init__(self, VNA,
                  start_freq=None, stop_freq=None,
                  center_freq=None, span=None,
-                 segment_list = None,
+                 segment_list=None,
                  npts=100, force_reset=False):
         '''
         Frequencies are in Hz.
@@ -317,14 +321,16 @@ class ZNB_VNA_sweep(Hard_Sweep):
         Prepare the VNA for measurements by defining basic settings.
         Set the frequency sweep and get the frequency points back from the insturment
         '''
-        self.VNA.continuous_mode_all('off') # measure only if required
-        self.VNA.min_sweep_time('on') # optimize the sweep time for the fastest measurement
-        self.VNA.trigger_source('immediate') # start a measurement once the trigger signal arrives
-                                        # trigger signal is generated with the command:
-                                        # VNA.start_sweep_all()
+        self.VNA.continuous_mode_all('off')  # measure only if required
+        # optimize the sweep time for the fastest measurement
+        self.VNA.min_sweep_time('on')
+        # start a measurement once the trigger signal arrives
+        self.VNA.trigger_source('immediate')
+        # trigger signal is generated with the command:
+        # VNA.start_sweep_all()
 
         if self.segment_list == None:
-            self.VNA.sweep_type('linear') # set a linear sweep
+            self.VNA.sweep_type('linear')  # set a linear sweep
             if self.start_freq != None and self.stop_freq != None:
                 self.VNA.start_frequency(self.start_freq)
                 self.VNA.stop_frequency(self.stop_freq)
@@ -333,33 +339,33 @@ class ZNB_VNA_sweep(Hard_Sweep):
                 self.VNA.span_frequency(self.span)
 
             self.VNA.npts(self.npts)
-        elif self.segment_list!= None:
+        elif self.segment_list != None:
             # delete all previous stored segments
             self.VNA.delete_all_segments()
 
             # Load segments in reverse order to have them executed properly
-            for idx_segment in range(len(self.segment_list), 0 ,-1):
+            for idx_segment in range(len(self.segment_list), 0, -1):
                 current_segment = self.segment_list[idx_segment-1]
-                str_to_write = 'SENSE:SEGMENT:INSERT %s, %s, %s, %s, %s, %s, %s'%(current_segment[0], current_segment[1], current_segment[2], current_segment[3], current_segment[4], current_segment[5], current_segment[6])
+                str_to_write = 'SENSE:SEGMENT:INSERT %s, %s, %s, %s, %s, %s, %s' % (current_segment[0], current_segment[
+                                                                                    1], current_segment[2], current_segment[3], current_segment[4], current_segment[5], current_segment[6])
                 self.VNA.write(str_to_write)
 
-
-            self.VNA.sweep_type('segment') # set a segment sweep
-
+            self.VNA.sweep_type('segment')  # set a segment sweep
 
         # get the list of frequency used in the span from the VNA
         self.sweep_points = self.VNA.get_stimulus()
+
 
 class QWG_lutman_par(Soft_Sweep):
 
     def __init__(self, LutMan, LutMan_parameter, **kw):
         self.set_kw()
-        self.name= LutMan_parameter.name
+        self.name = LutMan_parameter.name
         self.parameter_name = LutMan_parameter.label
         self.unit = LutMan_parameter.units
         self.sweep_control = 'soft'
-        self.LutMan=LutMan
-        self.LutMan_parameter=LutMan_parameter
+        self.LutMan = LutMan
+        self.LutMan_parameter = LutMan_parameter
 
     def set_parameter(self, val):
         '''

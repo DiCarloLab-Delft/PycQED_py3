@@ -1424,7 +1424,8 @@ class UHFQC_integrated_average_detector(Hard_Detector):
 
     '''
 
-    def __init__(self, UHFQC, AWG, integration_length=1e-6, nr_averages=1024, rotate=False,
+    def __init__(self, UHFQC, AWG, integration_length=1e-6, nr_averages=1024,
+                 rotate=False, real_imag=False,
                  channels=[0, 1, 2, 3], cross_talk_suppression=False,
                  **kw):
         super(UHFQC_integrated_average_detector, self).__init__()
@@ -1437,6 +1438,11 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         for i, channel in enumerate(self.channels):
             self.value_names[i] = 'w{}'.format(channel)
             self.value_units[i] = 'V'
+        self.real_imag = real_imag
+        if self.real_imag:
+            self.value_names[0] = 'Magn'
+            self.value_names[1] = 'Phase'
+
         self.rotate = rotate
 
         self.AWG = AWG
@@ -1446,7 +1452,8 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         self.cross_talk_suppression = cross_talk_suppression
 
     def get_values(self):
-        self.AWG.stop()
+        if self.AWG is not None:
+            self.AWG.stop()
         self.UHFQC.quex_rl_readout(0) # resets UHFQC internal readout counters
         self.UHFQC.awgs_0_enable(1)
         # probing the values to be sure communication is finished before
@@ -1465,15 +1472,22 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         data = ['']*len(self.channels)
         for i, channel in enumerate(self.channels):
             # FIXME: better to use dataset = self.UHFQC.get('quex_rl_data_{}'.format(channel))
-            dataset = eval("self.UHFQC.quex_rl_data_{}()".format(channel))
+            dataset = self.UHFQC.get('quex_rl_data_{:d}'.format(channel))
             data[i] = dataset[0]['vector']/self.nr_averages
             if self.cross_talk_suppression:
-                data[i]=data[i]-eval("self.UHFQC.quex_trans_offset_weightfunction_{}()".format(channel))
+                data[i] = data[i]-self.UHFQC.get(
+                    'quex_trans_offset_weightfunction_{:d}'.format(channel))
 
         # data = self.UHFQC.single_acquisition(self.nr_sweep_points,
         #                                      self.poll_time, timeout=0,
         #                                      channels=set(self.channels))
         # data = np.array([data[key] for key in data.keys()])
+        if self.real_imag:
+            I = data[0]
+            Q =data[1]
+            S21 = I +1j*Q
+            data[0] = np.abs(S21)
+            data[1] = np.angle(S21)
         if self.rotate:
             return self.rotate_and_normalize(data)
         else:
@@ -1499,7 +1513,6 @@ class UHFQC_integrated_average_detector(Hard_Detector):
                     cal_zero_points=self.cal_points[0],
                     cal_one_points=self.cal_points[1])
         return self.corr_data, self.corr_data
-
 
     def prepare(self, sweep_points=None):
         if self.AWG is not None:

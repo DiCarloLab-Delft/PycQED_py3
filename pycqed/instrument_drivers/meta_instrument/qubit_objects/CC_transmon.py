@@ -16,7 +16,7 @@ from qcodes.instrument.parameter import ManualParameter
 from pycqed.measurement.waveform_control_CC import waveform as wf
 import pycqed.measurement.mc_parameter_wrapper as pw
 from pycqed.analysis import measurement_analysis as ma
-
+from copy import deepcopy
 from pycqed.analysis.tools.data_manipulation import rotation_matrix
 from pycqed.measurement.calibration_toolbox import mixer_carrier_cancellation_CBox
 from pycqed.measurement.calibration_toolbox import mixer_skewness_cal_CBox_adaptive
@@ -202,36 +202,22 @@ class CBox_v3_driven_transmon(Transmon):
     def prepare_for_continuous_wave(self):
         self.LO.on()
         self.td_source.off()
-        # if self.RO_pulse_type() == "Gated_MW_RO_pulse":
-        #     RF = self.find_instrument(self.RF_RO_source())
+
+        # Use resonator freq unless explicitly specified
+        if self.f_RO.get() is None:
+            f_RO = self.f_res.get()
+        else:
+            f_RO = self.f_RO.get()
+        self.LO.frequency.set(f_RO - self.f_RO_mod.get())
+        if self.RO_pulse_type() == "Gated_MW_RO_pulse":
+            RF = self.find_instrument(self.RF_RO_source())
+            RF.power(self.RO_power_cw())
+            RF.frequency(f_RO)
+
 
         self.cw_source.off()
         self.cw_source.pulsemod_state.set('off')
         self.cw_source.power.set(self.spec_pow.get())
-
-
-        # REMOVE ME !!!!!!!
-        # To be replaced once spec mode is there 
-        # self.heterodyne_instr.acquisition_instr(self.acquisition_instrument())
-        # # Heterodyne tone configuration
-        # if not self.f_RO():
-        #     RO_freq = self.f_res()
-        # else:
-        #     RO_freq = self.f_RO()
-
-        # self.heterodyne_instr._disable_auto_seq_loading = False
-
-        # self.heterodyne_instr.RF.on()
-        # self.heterodyne_instr.LO.on()
-        # if hasattr(self.heterodyne_instr, 'mod_amp'):
-        #     self.heterodyne_instr.set('mod_amp', self.mod_amp_cw.get())
-        # else:
-        #     self.heterodyne_instr.RF_power(self.RO_power_cw())
-        # self.heterodyne_instr.set('f_RO_mod', self.f_RO_mod.get())
-        # self.heterodyne_instr.frequency.set(RO_freq)
-        # self.heterodyne_instr.RF.power(self.RO_power_cw())
-        # self.heterodyne_instr.RF_power(self.RO_power_cw())
-        # self.heterodyne_instr.nr_averages(self.RO_acq_averages())
 
 
     def prepare_for_timedomain(self):
@@ -319,7 +305,7 @@ class CBox_v3_driven_transmon(Transmon):
                 AWG=self.AWG, nr_averages=self.RO_acq_averages())
             self.int_avg_det_single = det.UHFQC_integrated_average_detector(
                 UHFQC=self._acquisition_instrument, AWG=self.AWG,
-                channels=[self.RO_acq_weight_function_I(), self.RO_acq_weight_function_Q()], 
+                channels=[self.RO_acq_weight_function_I(), self.RO_acq_weight_function_Q()],
                 nr_averages=self.RO_acq_averages(),
                 real_imag=True,
                 integration_length=self.RO_acq_integration_length())
@@ -327,7 +313,7 @@ class CBox_v3_driven_transmon(Transmon):
 
             self.int_avg_det = det.UHFQC_integrated_average_detector(
                 UHFQC=self._acquisition_instrument, AWG=self.AWG,
-                channels=[self.RO_acq_weight_function_I(), self.RO_acq_weight_function_Q()], 
+                channels=[self.RO_acq_weight_function_I(), self.RO_acq_weight_function_Q()],
                 nr_averages=self.RO_acq_averages(),
                 integration_length=self.RO_acq_integration_length())
             self.int_avg_det_rot = det.UHFQC_integrated_average_detector(
@@ -585,7 +571,7 @@ class CBox_v3_driven_transmon(Transmon):
                                              self.get_operation_dict())
         qumis_file = CW_RO_sequence_asm
         self.CBox.load_instructions(qumis_file.name)
-        self.CBox.run_mode('run') 
+        self.CBox.run_mode('run')
 
         if MC is None:
             MC = self.MC
@@ -609,24 +595,21 @@ class CBox_v3_driven_transmon(Transmon):
 
     def measure_spectroscopy(self, freqs, pulsed=False, MC=None,
                              analyze=True, close_fig=True):
-        raise NotImplementedError()
-        # self.prepare_for_continuous_wave()
-        # if MC is None:
-        #     MC = self.MC
-        # if pulsed:
-        #     # Redirect to the pulsed spec function
-        #     return self.measure_pulsed_spectroscopy(freqs,
-        #                                             MC, analyze, close_fig)
+        self.prepare_for_continuous_wave()
+        self.cw_source.on()
+        if MC is None:
+            MC = self.MC
+        if pulsed:
+            # Redirect to the pulsed spec function
+            return self.measure_pulsed_spectroscopy(freqs,
+                                                    MC, analyze, close_fig)
+        MC.set_sweep_function(self.cw_source.frequency)
+        MC.set_sweep_points(freqs)
+        MC.set_detector_function(self.int_avg_det_single)
+        MC.run(name='spectroscopy'+self.msmt_suffix)
 
-        # MC.set_sweep_function(pw.wrap_par_to_swf(
-        #                       self.cw_source.frequency))
-        # MC.set_sweep_points(freqs)
-        # MC.set_detector_function(
-        #     det.Heterodyne_probe(self.heterodyne_instr))
-        # MC.run(name='spectroscopy'+self.msmt_suffix)
-
-        # if analyze:
-        #     ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
+        if analyze:
+            ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
 
     def measure_pulsed_spectroscopy(self, freqs, MC=None,
                                     analyze=True, close_fig=True):
@@ -949,6 +932,7 @@ class CBox_v3_driven_transmon(Transmon):
         s = qh.QASM_Sweep(AllXY.name, self.CBox, self.get_operation_dict())
         d = qh.CBox_integrated_average_detector_CC(
             self.CBox, nr_averages=self.RO_acq_averages()//MC.soft_avg())
+        d = self.int_avg_det
         MC.set_sweep_function(s)
         MC.set_sweep_points(np.arange(42))
         MC.set_detector_function(d)
@@ -1211,6 +1195,12 @@ class QWG_driven_transmon(CBox_v3_driven_transmon):
         self.add_parameter('RO_acq_weight_function_Q', initial_value=1,
                            vals=vals.Enum(0, 1, 2, 3, 4, 5),
                            parameter_class=ManualParameter)
+        self.add_parameter('RO_I_channel', initial_value='ch3',
+                           vals=vals.Strings(),
+                           parameter_class=ManualParameter)
+        self.add_parameter('RO_Q_channel', initial_value='ch4',
+                           vals=vals.Strings(),
+                           parameter_class=ManualParameter)
 
 
     def measure_rabi(self, amps, n=1,
@@ -1228,19 +1218,25 @@ class QWG_driven_transmon(CBox_v3_driven_transmon):
                                            self.get_operation_dict())
         qumis_file = single_pulse_asm
         self.CBox.load_instructions(qumis_file.name)
+        self.CBox.run_mode('run')
         for ch in [1, 2, 3, 4]:
             self.QWG.set('ch{}_amp'.format(ch), .45)
         ch_amp = swf.QWG_lutman_par(self.Q_LutMan,
                                     self.Q_LutMan.Q_amp180)
 
-        d = qh.CBox_single_integration_average_det_CC(
-            self.CBox, nr_averages=self.RO_acq_averages()//MC.soft_avg(),
-            seg_per_point=1)
+        d = self.int_avg_det
+        d.detector_control = 'soft' # FIXME THIS overwrites something!
+
+        # d = qh.CBox_single_integration_average_det_CC(
+        #     self.CBox, nr_averages=self.RO_acq_averages()//MC.soft_avg(),
+        #     seg_per_point=1)
+        self.CBox.run_mode('run')
         MC.set_sweep_function(ch_amp)
         MC.set_sweep_points(amps)
         MC.set_detector_function(d)
 
         MC.run('Rabi-n{}'.format(n)+self.msmt_suffix)
+        d.detector_control ='hard'
         if analyze:
             a = ma.Rabi_Analysis(auto=True, close_fig=close_fig)
             return a
@@ -1303,22 +1299,23 @@ class QWG_driven_transmon(CBox_v3_driven_transmon):
         #               self.mixer_offs_RO_Q.get())
 
         # RO pars
-        if self.RO_LutMan != None:
-            self.RO_LutMan.M_modulation(self.f_RO_mod())
-            self.RO_LutMan.M_amp(self.RO_amp())
-            self.RO_LutMan.M_length(self.RO_pulse_length())
-            self.RO_LutMan.load_pulses_onto_AWG_lookuptable(self.RO_awg_nr())
-            self.RO_LutMan.lut_mapping(
-                ['I', 'X180', 'Y180', 'X90', 'Y90', 'mX90', 'mY90', 'M_square'])
-        self.CBox.upload_standard_weights(self.f_RO_mod())
-        self.CBox.integration_length(
-            convert_to_clocks(self.RO_acq_integration_length()))
+        if 'CBox' in self.acquisition_instrument():
+            if self.RO_LutMan != None:
+                self.RO_LutMan.M_modulation(self.f_RO_mod())
+                self.RO_LutMan.M_amp(self.RO_amp())
+                self.RO_LutMan.M_length(self.RO_pulse_length())
+                self.RO_LutMan.load_pulse_onto_AWG_lookuptable(self.RO_awg_nr())
+                self.RO_LutMan.lut_mapping(
+                    ['I', 'X180', 'Y180', 'X90', 'Y90', 'mX90', 'mY90', 'M_square'])
+            self.CBox.upload_standard_weights(self.f_RO_mod())
+            self.CBox.integration_length(
+                convert_to_clocks(self.RO_acq_integration_length()))
 
-        self.CBox.set('sig{}_threshold_line'.format(
-                      int(self.signal_line.get())),
-                      int(self.RO_threshold.get()))
-        self.CBox.lin_trans_coeffs(
-            np.reshape(rotation_matrix(self.RO_rotation_angle(), as_array=True), (4,)))
+            self.CBox.set('sig{}_threshold_line'.format(
+                          int(self.signal_line.get())),
+                          int(self.RO_threshold.get()))
+            self.CBox.lin_trans_coeffs(
+                np.reshape(rotation_matrix(self.RO_rotation_angle(), as_array=True), (4,)))
 
         self.load_QWG_pulses()
 
