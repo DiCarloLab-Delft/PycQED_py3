@@ -1199,8 +1199,7 @@ class SH_mixer_skewness_det(Soft_Detector):
         seq = sequence.Sequence('Sideband_modulation_seq')
         seq.append(name='SSB_modulation_el', wfname='SSB_modulation_el',
                    trigger_wait=False)
-        self.pulsar.AWG.stop()
-        self.pulsar.program_awg(seq, SSB_modulation_el)
+        self.pulsar.program_awgs(seq, SSB_modulation_el)
 
     def prepare(self, **kw):
         self.SH.prepare_for_measurement()

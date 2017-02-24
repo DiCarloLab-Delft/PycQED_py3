@@ -75,8 +75,7 @@ def generate_and_upload_T1_sequence():
         seq.append_element(el, trigger_wait=True)
 
     # show_element(el)
-    station.components['AWG'].stop()
-    station.pulsar.program_awg(seq, *el_list)
+    station.pulsar.program_awgs(seq, *el_list)
 
 if __name__ == '__main__':
     t0 = time()

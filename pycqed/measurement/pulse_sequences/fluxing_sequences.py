@@ -82,8 +82,7 @@ def single_pulse_seq(pulse_pars=None,
                 el, distortion_dict)
             el_list[i] = el
         seq.append_element(el, trigger_wait=True)
-    station.components['AWG'].stop()
-    station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+    station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
     if return_seq:
         return seq, el_list
     else:
@@ -145,8 +144,7 @@ def Ram_Z_seq(operation_dict, q0, distortion_dict,
                 el, distortion_dict)
 
     if upload:
-        station.components['AWG'].stop()
-        station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
 
     return seq, el_list
 
@@ -229,8 +227,7 @@ def Echo_Z_seq(operation_dict, q0, distortion_dict,
                 el, distortion_dict)
 
     if upload:
-        station.components['AWG'].stop()
-        station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
 
     return seq, el_list
 
@@ -295,8 +292,7 @@ def Ram_Z_delay_seq(operation_dict, q0, distortion_dict,
                 el, distortion_dict)
 
     if upload:
-        station.components['AWG'].stop()
-        station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
     if return_seq:
         return seq, el_list
     else:
@@ -361,8 +357,7 @@ def chevron_seq(operation_dict, q0,
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
     if upload:
-        station.components['AWG'].stop()
-        station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
 
     return seq, el_list
 
@@ -439,8 +434,7 @@ def SwapN(operation_dict, q0,
         seq.append_element(el, trigger_wait=True)
 
     if upload:
-        station.components['AWG'].stop()
-        station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
 
     return seq, el_list
 
@@ -514,8 +508,7 @@ def swap_swap_wait(mw_pulse_pars, RO_pars,
         seq.append_element(el, trigger_wait=True)
 
     if upload:
-        station.components['AWG'].stop()
-        station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
 
     return seq, el_list
 
@@ -651,8 +644,7 @@ def chevron_with_excited_bus_2Qubits(mw_pulse_pars_qCP, mw_pulse_pars_qS,
         seq.append_element(el, trigger_wait=True)
 
     if upload:
-        station.components['AWG'].stop()
-        station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
 
     return seq, el_list
 
@@ -764,8 +756,7 @@ def XSWAPxy(phis, mw_pulse_pars, RO_pars, flux_pulse_pars=None,
         seq.append_element(el, trigger_wait=True)
 
     if upload:
-        station.components['AWG'].stop()
-        station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
     if return_seq:
         return seq, el_list
     else:
@@ -882,8 +873,7 @@ def chevron_seq_cphase(lengths, mw_pulse_pars, RO_pars, flux_pulse_pars=None,
         seq.append_element(el, trigger_wait=True)
 
     if upload:
-        station.components['AWG'].stop()
-        station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
     if return_seq:
         return seq, el_list
     else:
@@ -975,8 +965,7 @@ def BusT2(times, mw_pulse_pars, RO_pars, flux_pulse_pars=None,
         seq.append_element(el, trigger_wait=True)
 
     if upload:
-        station.components['AWG'].stop()
-        station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
     if return_seq:
         return seq, el_list
     else:
@@ -1073,8 +1062,7 @@ def BusEcho(times, mw_pulse_pars, RO_pars, artificial_detuning=None, flux_pulse_
         seq.append_element(el, trigger_wait=True)
 
     if upload:
-        station.components['AWG'].stop()
-        station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
     if return_seq:
         return seq, el_list
     else:
@@ -1293,8 +1281,7 @@ def SWAP_CZ_SWAP_phase_corr_swp(operation_dict, qS, qCZ,
         seq.append_element(el, trigger_wait=True)
 
     if upload:
-        station.components['AWG'].stop()
-        station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
 
     return seq, el_list
 
@@ -1410,8 +1397,7 @@ def rSWAP_amp_sweep(operation_dict, qS, qCZ,
         seq.append_element(el, trigger_wait=True)
 
     if upload:
-        station.components['AWG'].stop()
-        station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
 
     return seq, el_list
 
@@ -1457,8 +1443,7 @@ def BusT1(operation_dict, q0,
         seq.append_element(el, trigger_wait=True)
 
     if upload:
-        station.components['AWG'].stop()
-        station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
 
     return seq, el_list
 
@@ -1531,7 +1516,6 @@ def FluxTrack(operation_dict, q0,
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
     if upload:
-        station.components['AWG'].stop()
-        station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
 
     return seq, el_list

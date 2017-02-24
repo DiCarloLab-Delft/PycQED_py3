@@ -194,8 +194,7 @@ for i, (Z_signs, echo_MW_pulse) in enumerate(zip(Z_signs_lst, echo_MW_pulses)):
 
 #         old_vals = AWG.get('ch3_amp')
 #         AWG.set('ch3_amp', 2)
-#         station.components['AWG'].stop()
-#         station.pulsar.program_awg(seq_list[i], *elts_list[i],
+#         station.pulsar.program_awgs(seq_list[i], *elts_list[i],
 #                                    verbose=False)
 #         AWG.set('ch3_amp', Flux_amp)
 
@@ -339,8 +338,7 @@ class echo_Z_cost_det(det.Soft_Detector):
 
             old_val = AWG.get('ch3_amp')
             AWG.set('ch3_amp', 2)
-            station.components['AWG'].stop()
-            station.pulsar.program_awg(self.seq_list[i], *self.elts_list[i],
+            station.pulsar.program_awgs(self.seq_list[i], *self.elts_list[i],
                                        verbose=False)
             AWG.set('ch3_amp', old_val)
 

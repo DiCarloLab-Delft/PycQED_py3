@@ -79,8 +79,7 @@ def capacity_tomo_seq(bases, states, idle_time, pulse_pars, RO_pars,
         seq.append(name='elt_{}'.format(i),
                    wfname=el_list[idx].name, trigger_wait=True)
     if upload:
-        station.components['AWG'].stop()
-        station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
     return seq, el_list
 
 

@@ -11,6 +11,8 @@
 import time
 import numpy as np
 import logging
+import warnings
+from qcodes.instrument.base import Instrument
 
 # some pulses use rounding when determining the correct sample at which to
 # insert a particular value. this might require correct rounding -- the pulses
@@ -26,28 +28,26 @@ class Pulsar:
     This is the object that communicates with the AWG.
     """
 
+    # the default AWG instance
     AWG = None
     AWG_type = 'regular'  # other option at this point is 'opt09'
-    clock = 1e9
-    channel_ids = ['ch1', 'ch1_marker1', 'ch1_marker2',
-                   'ch2', 'ch2_marker1', 'ch2_marker2',
-                   'ch3', 'ch3_marker1', 'ch3_marker2',
-                   'ch3', 'ch3_marker1', 'ch3_marker2']
-    AWG_sequence_cfg = {}
 
-    def __init__(self):
+    def __init__(self, clock=1e9):
         self.channels = {}
+        self.clock = clock
 
     # channel handling
     def define_channel(self, id, name, type, delay, offset,
-                       high, low, active):
+                       high, low, active, AWG=None):
+        if AWG is None:
+            AWG = self.AWG.name
 
         _doubles = []
-        for c in self.channels:
-            if self.channels[c]['id'] == id:
-                logging.warning(
-                    "Channel '%s' already in use, will overwrite." % id)
-                _doubles.append(c)
+        for c_name, c_dict in self.channels.items():
+            if c_dict['id'] == id and c_dict['AWG'] == AWG:
+                logging.warning("Channel '{}' on {} already in use, will "
+                                "overwrite.".format(id, AWG))
+                _doubles.append(c_name)
         for c in _doubles:
             del self.channels[c]
 
@@ -57,7 +57,8 @@ class Pulsar:
                                'offset': offset,
                                'high': high,
                                'low': low,
-                               'active': active}
+                               'active': active,
+                               'AWG': AWG}
 
     def set_channel_opt(self, name, option, value):
         self.channels[name][option] = value
@@ -65,149 +66,163 @@ class Pulsar:
     def get_subchannels(self, id):
         return [id[:3], id[:3]+'_marker1', id[:3]+'_marker2']
 
-    def get_channel_names_by_id(self, id):
+    def get_used_AWGs(self):
+        AWGs = set()
+        for c_dict in self.channels.values():
+            AWGs.add(c_dict['AWG'])
+        return AWGs
+
+
+    def get_channel_names_by_id(self, id, AWG=None):
+        if AWG is None:
+            AWG = self.AWG.name
         chans = {id: None, id+'_marker1': None, id+'_marker2': None}
-        for c in self.channels:
-            if self.channels[c]['id'] in chans:
-                chans[self.channels[c]['id']] = c
+        for c_name, c_dict in self.channels.items():
+            if c_dict['id'] in chans and c_dict['AWG'] == AWG:
+                chans[c_dict['id']] = c_name
         return chans
 
-    def get_channel_name_by_id(self, id):
-        for c in self.channels:
-            if self.channels[c]['id'] == id:
+    def get_channel_name_by_id(self, id, AWG=None):
+        if AWG is None:
+            AWG = self.AWG.name
+        for c_dict in self.channels.values():
+            if c_dict['id'] == id and c_dict['AWG'] == AWG:
                 return c
 
-    def get_used_subchannel_ids(self, all_subchannels=True):
-        chans = []
-
-        for c in self.channels:
-            if self.channels[c]['active'] and \
-                    self.channels[c]['id'] not in chans:
+    def get_used_subchannel_ids(self, all_subchannels=True, AWG=None):
+        if AWG is None:
+            AWG = self.AWG.name
+        chans = set()
+        for c_dict in self.channels.values():
+            if c_dict['active'] and c_dict['AWG'] == AWG:
                 if all_subchannels:
-                    [chans.append(id) for id in
-                        self.get_subchannels(self.channels[c]['id'])]
+                    for id in self.get_subchannels(c_dict['id']):
+                        chans.add(id)
                 else:
-                    chans.append(self.channels[c]['id'])
-
+                    chans.add(c_dict['id'])
         return chans
 
-    def get_used_channel_ids(self):
-        chans = []
-        for c in self.channels:
-            if self.channels[c]['active'] and \
-                    self.channels[c]['id'][:3] not in chans:
-                chans.append(self.channels[c]['id'][:3])
+    def get_used_channel_ids(self, AWG=None):
+        if AWG is None:
+            AWG = self.AWG.name
+        chans = set()
+        for c_dict in self.channels.values():
+            if c_dict['active'] and c_dict['AWG'] == AWG:
+                chans.add(c_dict['id'][:3])
         return chans
 
-    def setup_channels(self, output=False, reset_unused=True):
-        '''
-        Function seems to be unused (10/09/15) remove?
-        '''
+    def activate_channels(self, channels='all', AWGs='all'):
+        if AWGs == 'all':
+            AWGs = self.get_used_AWGs()
+        for AWG in AWGs:
+            ids = self.get_used_channel_ids(AWG)
+            for id in ids:
+                output = False
+                names = self.get_channel_names_by_id(id, AWG)
+                for sid in names:
+                    if names[sid] is None:
+                        continue
+                    if channels != 'all' and names[sid] not in channels:
+                        continue
+                    if self.channels[names[sid]]['active']:
+                        output = True
+                if output:
+                    Instrument.find_instrument(AWG).set('{}_state'.format(id), 1)
 
-        for n in self.channel_ids:
-            getattr(self.AWG, 'set_%s_status' % n[:3])('off')
-
-        if reset_unused:
-            for n in self.channel_ids:
-                if 'marker' in n:
-                    getattr(self.AWG, 'set_%s_low' % n)(0)
-                    getattr(self.AWG, 'set_%s_high' % n)(1)
-                else:
-                    getattr(self.AWG, 'set_%s_amplitude' % n)(1.)
-                    getattr(self.AWG, 'set_%s_offset' % n)(0.)
-
-        for c in self.channels:
-            n = self.channels[c]['id']
-
-            # set correct bounds
-            if self.channels[c]['type'] == 'analog':
-                a = self.channels[c]['high'] - self.channels[c]['low']
-                o = (self.channels[c]['high'] + self.channels[c]['low'])/2.
-                getattr(self.AWG, 'set_%s_amplitude' % n)(a)
-                getattr(self.AWG, 'set_%s_offset' % n)(o)
-            elif self.channels[c]['type'] == 'marker':
-                getattr(self.AWG, 'set_%s_low' % n)(self.channels[c]['low'])
-                getattr(self.AWG, 'set_%s_high' % n)(self.channels[c]['high'])
-
-            # turn on the used channels
-            if output and self.channels[c]['active']:
-                getattr(self.AWG, 'set_%s_status' % n[:3])('on')
-
-    def activate_channels(self, channels='all'):
-        ids = self.get_used_channel_ids()
-        for id in ids:
-            output = False
-            names = self.get_channel_names_by_id(id)
-            for sid in names:
-                if names[sid] is None:
-                    continue
-                if channels != 'all' and names[sid] not in channels:
-                    continue
-                if self.channels[names[sid]]['active']:
-                    output = True
-            if output:
-                self.AWG.set('{}_state'.format(id), 1)
-
-    def get_awg_channel_cfg(self):
+    def get_awg_channel_cfg(self, AWG=None):
+        if AWG is None:
+            AWG = self.AWG.name
         channel_cfg = {}
 
-        for c in self.channels:
-            ch_id = self.channels[c]['id']
-            if self.channels[c]['type'] == 'analog':
+        for c_dict in self.channels.values():
+            if c_dict['AWG'] != AWG:
+                continue
+            ch_id = c_dict['id']
+            if c_dict['type'] == 'analog':
                 channel_cfg['ANALOG_METHOD_%s' % ch_id[-1]] = 1
-                a = self.channels[c]['high'] - self.channels[c]['low']
-                o = (self.channels[c]['high'] + self.channels[c]['low'])/2.
+                a = c_dict['high'] - c_dict['low']
+                o = (c_dict['high'] + c_dict['low'])/2.
                 channel_cfg['ANALOG_AMPLITUDE_%s' % ch_id[-1]] = a
                 channel_cfg['ANALOG_OFFSET_%s' % ch_id[-1]] = o
-            elif self.channels[c]['type'] == 'marker':
+            elif c_dict['type'] == 'marker':
                 channel_cfg['MARKER1_METHOD_%s' % ch_id[2]] = 2
                 channel_cfg['MARKER2_METHOD_%s' % ch_id[2]] = 2
                 channel_cfg['MARKER%s_LOW_%s' % (ch_id[-1], ch_id[2])] = \
-                    self.channels[c]['low']
+                    c_dict['low']
                 channel_cfg['MARKER%s_HIGH_%s' % (ch_id[-1], ch_id[2])] = \
-                    self.channels[c]['high']
+                    c_dict['high']
 
-            # activate the used channels
-            if self.channels[c]['active']:
-                channel_cfg['CHANNEL_STATE_%s' % ch_id[-1]] = 1
-            else:
-                channel_cfg['CHANNEL_STATE_%s' % ch_id[-1]] = 0
+            channel_cfg['CHANNEL_STATE_%s' % ch_id[2]] = 0
+
+        # activate the used channels
+        active_chans = self.get_used_channel_ids(AWG)
+        for chan_id in active_chans:
+            channel_cfg['CHANNEL_STATE_%s' % chan_id[2]] = 1
         return channel_cfg
 
     # waveform/file handling
 
-    def delete_all_waveforms(self):
-        self.AWG.delete_all_waveforms_from_list()
+    def delete_all_waveforms(self, AWG=None):
+        if AWG is None:
+            AWG = self.AWG
+        else:
+            AWG = Instrument.find_instrument(AWG)
+        AWG.delete_all_waveforms_from_list()
 
-    def program_awg(self, sequence, *elements, **kw):
+    def program_awgs(self, sequence, *elements, **kw):
+        # Stores the last uploaded elements for easy access and plotting
+        self.last_sequence = sequence
+        self.last_elements = elements
+
+        AWGs = kw.pop('AWGs', 'all')
+
+        if AWGs == 'all':
+            AWGs = self.get_used_AWGs()
+
+        # Store offset settings to restore them after upload the seq
+        # Note that this is the AWG setting offset, as distinct from the
+        # channel parameter offset.
+        chn, offsets = self.update_channel_settings()
+
+        for AWGn in AWGs:
+            AWG = Instrument.find_instrument(AWGn)
+            AWG.stop()
+            self._program_awg(AWG, sequence, *elements, **kw)
+
+        for c, offset in offsets.items():
+            Instrument.find_instrument(self.channels[c]['AWG']).\
+                set(self.channels[c]['id']+'_offset', offset)
+
+    def _program_awg(self, AWG, sequence, *elements, **kw):
         """
         Upload a single file to the AWG (.awg) which contains all waveforms
         AND sequence information (i.e. nr of repetitions, event jumps etc)
         Advantage is that it's much faster, since sequence information is sent
         to the AWG in a single file.
         """
-        # Stores the last uploaded elements for easy access and plotting
-        self.last_sequence = sequence
-        self.last_elements = elements
-
-        old_timeout = self.AWG.timeout()
-        self.AWG.timeout(max(180, old_timeout))
 
         verbose = kw.pop('verbose', False)
         debug = kw.pop('debug', False)
         channels = kw.pop('channels', 'all')
         loop = kw.pop('loop', True)
         allow_non_zero_first_point_on_trigger_wait = \
-            kw.pop('allow_first_zero', False)
+            kw.pop('allow_first_nonzero', False)
         elt_cnt = len(elements)
-        chan_ids = self.get_used_channel_ids()
+
         packed_waveforms = {}
 
-        # Store offset settings to restore them after upload the seq
-        # Note that this is the AWG setting offset, as distinct from the
-        # channel parameter offset.
+        # determine which channels are involved in the sequence
+        if channels == 'all':
+            chan_ids = self.get_used_channel_ids(AWG.name)
+        else:
+            chan_ids = {}
+            for c in channels:
+                if self.channels[c]['AWG'] == AWG.name:
+                    chan_ids.add(self.channels[c]['id'][:3])
+        chan_ids = list(chan_ids) # to make sure we iterate in a certain order
 
-        channels, offsets = self.update_channel_settings()
+        old_timeout = AWG.timeout()
+        AWG.timeout(max(180, old_timeout))
 
         elements_with_non_zero_first_points = []
 
@@ -215,29 +230,22 @@ class Pulsar:
         # make empty sequences where necessary
         for i, element in enumerate(elements):
             if verbose:
-                print("%d / %d: %s (%d samples)... " % \
-                    (i+1, elt_cnt, element.name, element.samples()))
-                print("Generate/upload '%s' (%d samples)... " \
-                    % (element.name, element.samples()), end=' ')
+                print("Generate %s element %d / %d: %s (%d samples)... " %
+                      (AWG.name, i+1, elt_cnt, element.name,
+                       element.samples()), end='')
             _t0 = time.time()
 
             tvals, wfs = element.normalized_waveforms()
-            '''
-            channels_to_print=['MW_Imod']
-            for i in channels_to_print:
-                if len(np.where(wfs[i]>0)[0]) !=0:
-                    print i, np.where(wfs[i]>0)
-            '''
+
             for id in chan_ids:
                 wfname = element.name + '_%s' % id
 
                 # determine if we actually want to upload this channel
-                upload = False
-                if channels == 'all':
-                    upload = True
-                else:
+                if channels != 'all':
+                    upload = False
                     for c in channels:
-                        if self.channels[c]['id'][:3] == id:
+                        if self.channels[c]['id'][:3] == id and \
+                                self.channels[c]['AWG'] == AWG.name:
                             upload = True
                     if not upload:
                         continue
@@ -245,7 +253,7 @@ class Pulsar:
                 chan_wfs = {id: None,
                             id+'_marker1': None,
                             id+'_marker2': None}
-                grp = self.get_channel_names_by_id(id)
+                grp = self.get_channel_names_by_id(id, AWG.name)
 
                 for sid in grp:
                     if grp[sid] != None and grp[sid] in wfs:
@@ -257,7 +265,7 @@ class Pulsar:
                         chan_wfs[sid] = np.zeros(element.samples())
 
                 # Create wform files
-                packed_waveforms[wfname] = self.AWG.pack_waveform(
+                packed_waveforms[wfname] = AWG.pack_waveform(
                     chan_wfs[id],
                     chan_wfs[id+'_marker1'],
                     chan_wfs[id+'_marker2'])
@@ -276,17 +284,8 @@ class Pulsar:
                             "8000 elements, Aborting", end=' ')
             return
 
-        print("Programming '%s' (%d element(s)) \t"
-              % (sequence.name, sequence.element_count()), end=' ')
-
-        # determine which channels are involved in the sequence
-        if channels == 'all':
-            chan_ids = self.get_used_channel_ids()
-        else:
-            chan_ids = []
-            for c in channels:
-                if self.channels[c]['id'][:3] not in chan_ids:
-                    chan_ids.append(self.channels[c]['id'][:3])
+        print("Programming %s sequence '%s' (%d element(s)) \t"
+              % (AWG.name, sequence.name, sequence.element_count()), end=' ')
 
         # Create lists with sequence information:
         # wfname_l = list of waveform names [[wf1_ch1,wf2_ch1..],[wf1_ch2,wf2_ch2..],...]
@@ -328,35 +327,38 @@ class Pulsar:
                 logic_jump_l.append(0)
             if elt['trigger_wait']:
                 wait_l.append(1)
-                # if (elt['wfname'] in elements_with_non_zero_first_points) and not(allow_non_zero_first_point_on_trigger_wait):
-                #     print 'warning Trigger wait set for element with a non-zero first point'
-                #     raise Exception('pulsar: Trigger wait set for element {} with a non-zero first point'.format(elt['wfname']))
+                if elt['wfname'] in elements_with_non_zero_first_points and \
+                        not allow_non_zero_first_point_on_trigger_wait:
+                    raise Exception('pulsar: Trigger wait set for element {} '
+                                    'with a non-zero first point'
+                                    .format(elt['wfname']))
             else:
                 wait_l.append(0)
 
-        if loop:
+        if loop and len(goto_l) > 0:
             goto_l[-1] = 1
 
         # setting jump modes and loading the djump table
-        if sequence.djump_table != None and self.AWG_type not in ['opt09']:
-            raise Exception('pulsar: The AWG configured does not support dynamic jumping')
-
-        if self.AWG_type in ['opt09']:
-            # TODO as self.AWG_sequence_cfg no longer exists but is generated
-            # from the sequence_cfg file, make these set the values on the AWG
-            # itself.
-            if sequence.djump_table != None:
-                # self.AWG.set_event_jump_mode('DJUM')
-                self.AWG_sequence_cfg['EVENT_JUMP_MODE'] = 2  # DYNAMIC JUMP
-                print('AWG set to dynamical jump')
-                awg_djump_table = np.zeros(16, dtype='l')
-                for i in list(sequence.djump_table.keys()):
-                    el_idx = sequence.element_index(sequence.djump_table[i])
-                    awg_djump_table[i] = el_idx
-                self.AWG_sequence_cfg['TABLE_JUMP_DEFINITION'] = awg_djump_table
-
+        if sequence.djump_table != None:
+            if self.AWG_type not in ['opt09']:
+                raise Exception('pulsar: The AWG configured does not support'
+                                ' dynamic jumping')
             else:
-                self.AWG_sequence_cfg['EVENT_JUMP_MODE'] = 1  # EVENT JUMP
+                # TODO as self.AWG_sequence_cfg no longer exists but is
+                # generated from the sequence_cfg file, make these set the
+                # values on the AWG itself.
+                logging.warning("Dynamical jumping not implemented in current "
+                                "implementation of Pulsar class")
+                # self.AWG.set_event_jump_mode('DJUM')
+                # self.AWG_sequence_cfg['EVENT_JUMP_MODE'] = 2  # DYNAMIC JUMP
+                # print('AWG set to dynamical jump')
+                # awg_djump_table = np.zeros(16, dtype='l')
+                # for i in list(sequence.djump_table.keys()):
+                    # el_idx = sequence.element_index(sequence.djump_table[i])
+                    # awg_djump_table[i] = el_idx
+                # self.AWG_sequence_cfg['TABLE_JUMP_DEFINITION'] = awg_djump_table
+            # else:
+                # self.AWG_sequence_cfg['EVENT_JUMP_MODE'] = 1  # EVENT JUMP
 
         if debug:
             self.check_sequence_consistency(packed_waveforms,
@@ -364,25 +366,23 @@ class Pulsar:
                                             nrep_l, wait_l, goto_l,
                                             logic_jump_l)
 
-        filename = sequence.name+'_FILE.AWG'
+        if len(wfname_l) > 0:
+            filename = sequence.name+'_FILE.AWG'
 
-        awg_file = self.AWG.generate_awg_file(
-            packed_waveforms,
-            np.array(wfname_l),
-            nrep_l, wait_l, goto_l, logic_jump_l,
-            self.get_awg_channel_cfg())
-        self.AWG.send_awg_file(filename, awg_file)
-        self.AWG.load_awg_file(filename)
-        self.AWG.timeout(old_timeout)
+            awg_file = AWG.generate_awg_file(
+                packed_waveforms,
+                np.array(wfname_l),
+                nrep_l, wait_l, goto_l, logic_jump_l,
+                self.get_awg_channel_cfg(AWG.name))
+            AWG.send_awg_file(filename, awg_file)
+            AWG.load_awg_file(filename)
+        AWG.timeout(old_timeout)
 
         time.sleep(.1)
         # Waits for AWG to be ready
-        self.AWG.is_awg_ready()
+        AWG.is_awg_ready()
 
-        for channel, offset in offsets.items():
-            self.AWG.set(channel+'_offset', offset)
-
-        self.activate_channels(channels)
+        self.activate_channels(channels, AWGs=[AWG.name])
 
         _t = time.time() - _t0
         print(" finished in %.2f seconds." % _t)
@@ -398,7 +398,8 @@ class Pulsar:
                 len(wfname_l[2]) == len(wfname_l[3]) ==
                 len(nrep_l) == len(wait_l) == len(goto_l) ==
                 len(logic_jump_l)):
-            raise Exception('pulsar: sequence list of elements/properties has unequal length')
+            raise Exception('pulsar: sequence list of elements/properties has '
+                            'unequal length')
         ch = 0
         for ch_wf in wfname_l:
             ch += 1
@@ -411,56 +412,66 @@ class Pulsar:
                                     ' , channel ' + str(ch) +
                                     ' does not exist in waveform dictionary')
 
-    def load_awg_file(self, filename, **kw):
-            """
-            Function to load an AWG sequence from its internal hard drive
-            No possibility for jump statements
-            """
-            old_timeout = self.AWG.timeout()
-            self.AWG.timeout(max(180, old_timeout))
-            channels = kw.pop('channels', 'all')
-            chan_ids = self.get_used_channel_ids()
-            _t0 = time.time()
-
-            # Store offset settings to restore them after upload the seq
-            # Note that this is the AWG setting offset, as distinct from the
-            # channel parameter offset.
-            offsets = {}
-            for c in self.channels:
-                if self.channels[c]['type'] == 'analog':
-                    offsets[c] = self.AWG.get(c+'_offset')
-
-            filename = filename
-            self.AWG.load_awg_file(filename)
-            self.AWG.timeout(old_timeout)
-
-            time.sleep(.1)
-            # Waits for AWG to be ready
-            self.AWG.is_awg_ready()
-
-            for channel, offset in offsets.items():
-                self.AWG.set(channel+'_offset', offset)
-
-            self.activate_channels(channels)
-
-            _t = time.time() - _t0
-            print(" finished in %.2f seconds." % _t)
-
-    def update_channel_settings(self):
-        offsets = {}
-        if self.AWG is not None:
-            for ch_name, chan_dict in self.channels.items():
-                if chan_dict['type'] == 'analog':
-                    exec('offsets[ch_name] = self.AWG.{}_offset.get_latest()'.format(ch_name))
-                    if offsets[ch_name] is None:
-                        offsets[ch_name] = self.AWG.get(ch_name+'_offset')
-                    ch_amp = None  # to prevent linting error showing up
-                    exec('ch_amp = self.AWG.{}_amp.get_latest()'.format(ch_name))
-                    if ch_amp is None:
-                        ch_amp = self.AWG.get('{}_amp'.format(ch_name))
-                    chan_dict['low'] = -ch_amp/2
-                    chan_dict['high'] = ch_amp/2
+    def load_awg_file(self, filename, AWG=None, **kw):
+        """
+        Function to load an AWG sequence from its internal hard drive
+        No possibility for jump statements
+        """
+        if AWG is None:
+            AWG = self.AWG
         else:
-            offsets = {ch_name+'_offset': 0 for (ch_name, chan_dict) in self.channels.items()}
+            AWG = Instrument.find_instrument(AWG)
+        old_timeout = AWG.timeout()
+        AWG.timeout(max(180, old_timeout))
+        channels = kw.pop('channels', 'all')
+        chan_ids = self.get_used_channel_ids(AWG.name)
+        _t0 = time.time()
+
+        # Store offset settings to restore them after upload the seq
+        # Note that this is the AWG setting offset, as distinct from the
+        # channel parameter offset.
+        offsets = {}
+        for c_dict in self.channels.items():
+            if c_dict['type'] == 'analog' and c_dict['AWG'] == AWG.name:
+                offsets[c_dict['id']] = AWG.get(c_dict['id']+'_offset')
+
+        AWG.load_awg_file(filename)
+        AWG.timeout(old_timeout)
+
+        time.sleep(.1)
+        # Waits for AWG to be ready
+        AWG.is_awg_ready()
+
+        for channel, offset in offsets.items():
+            AWG.set(channel+'_offset', offset)
+
+        self.activate_channels(channels, AWG.name)
+
+        _t = time.time() - _t0
+        print(" finished in %.2f seconds." % _t)
+
+    def update_channel_settings(self, AWGs='all'):
+        """
+        gets the latest offset and amplitude from the used AWG analog channels,
+        updates the self.channels dictionary accordingly (high = -low = amp/2)
+        and returns the channel dictionary and a separate dictionary of offsets
+        """
+        offsets = {}
+
+        for c_name, c_dict in self.channels.items():
+            if AWGs == 'all' or c_dict['AWG'] in AWGs:
+                if c_dict['type'] == 'analog':
+                    AWG = Instrument.find_instrument(c_dict['AWG'])
+                    exec('offsets[c_name] = AWG.{}_offset.get_latest()'
+                         .format(c_dict['id']))
+                    if offsets[c_name] is None:
+                        offsets[c_name] = AWG.get(c_dict['id']+'_offset')
+                    ch_amp = None  # to prevent linting error showing up
+                    exec('ch_amp = AWG.{}_amp.get_latest()'
+                         .format(c_dict['id']))
+                    if ch_amp is None:
+                        ch_amp = AWG.get('{}_amp'.format(c_dict['id']))
+                    c_dict['low'] = -ch_amp/2
+                    c_dict['high'] = ch_amp/2
 
         return self.channels, offsets

@@ -9,8 +9,7 @@ def Pulsed_spec_seq_RF_gated(RO_pars, spec_pulse_length=1e-6):
             i, station, RO_pars,spec_pulse_length=spec_pulse_length)
         el_list.append(el)
         seq.append_element(el, trigger_wait=False) # Ensures a continuously running sequence
-    station.components['AWG'].stop()
-    station.pulsar.program_awg(seq, *el_list, verbose=False)
+    station.pulsar.program_awgs(seq, *el_list, verbose=False)
 
 # for st_elts
 def pulsed_spec_elt_with_RF_gated(i, station, RO_pars,

@@ -118,8 +118,7 @@ def two_qubit_AllXY(pulse_dict, q0='q0', q1='q1', RO_target='all',
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
 
-    station.components['AWG'].stop()
-    station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+    station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
     if return_seq:
         return seq, el_list
     else:

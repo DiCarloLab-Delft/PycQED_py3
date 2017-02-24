@@ -48,8 +48,7 @@ def Rabi_2nd_exc_seq(amps, pulse_pars, pulse_pars_2nd, RO_pars, n=1,
             el = multi_pulse_elt(i, station, pulse_list)
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
-    station.components['AWG'].stop()
-    station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+    station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
     return seq_name
 
 
@@ -97,8 +96,7 @@ def Ramsey_2nd_exc_seq(times, pulse_pars, pulse_pars_2nd, RO_pars, n=1,
             el = multi_pulse_elt(i, station, pulse_list)
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
-    station.components['AWG'].stop()
-    station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+    station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
     return seq_name
 
 
@@ -121,6 +119,5 @@ def SSRO_2nd_exc_state(pulse_pars, pulse_pars_2nd, RO_pars, verbose=False):
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
     seq.append_element(el, trigger_wait=True)
-    station.components['AWG'].stop()
-    station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+    station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
     return seq_name
