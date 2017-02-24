@@ -261,102 +261,124 @@ def all_sources_off():
     QL_LO.off()
     QR_LO.off()
 
-# if UHFQC:
-#     def switch_to_pulsed_RO_CBox(qubit):
-#         UHFQC_1.awg_sequence_acquisition()
-#         qubit.RO_pulse_type('Gated_MW_RO_pulse')
-#         qubit.RO_acq_marker_delay(155e-9)
-#         qubit.acquisition_instr('CBox')
-#         qubit.RO_acq_marker_channel('ch3_marker1')
-#         qubit.RO_acq_weight_function_I(0)
-#         qubit.RO_acq_weight_function_Q(1)
+if UHFQC:
+    def switch_to_pulsed_RO_CBox(qubit):
+        UHFQC_1.awg_sequence_acquisition()
+        qubit.RO_pulse_type('Gated_MW_RO_pulse')
+        qubit.RO_acq_marker_delay(155e-9)
+        qubit.acquisition_instrument('CBox')
+        qubit.RO_acq_marker_channel('ch3_marker1')
+        qubit.RO_acq_weight_function_I(0)
+        qubit.RO_acq_weight_function_Q(1)
 
-#     def switch_to_pulsed_RO_UHFQC(qubit):
-#         UHFQC_1.awg_sequence_acquisition()
-#         qubit.RO_pulse_type('Gated_MW_RO_pulse')
-#         qubit.RO_acq_marker_delay(75e-9)
-#         qubit.acquisition_instr('UHFQC_1')
-#         qubit.RO_acq_marker_channel('ch3_marker2')
-#         qubit.RO_acq_weight_function_I(0)
-#         qubit.RO_acq_weight_function_Q(1)
+    def switch_to_pulsed_RO_UHFQC(qubit):
+        UHFQC_1.awg_sequence_acquisition()
+        qubit.RO_pulse_type('Gated_MW_RO_pulse')
+        qubit.RO_acq_marker_delay(75e-9)
+        qubit.acquisition_instrument('UHFQC_1')
+        qubit.RO_acq_marker_channel('ch3_marker2')
+        qubit.RO_acq_weight_function_I(0)
+        qubit.RO_acq_weight_function_Q(1)
 
-#     def switch_to_IQ_mod_RO_UHFQC(qubit):
-#         UHFQC_1.awg_sequence_acquisition_and_pulse_SSB(f_RO_mod=qubit.f_RO_mod(),
-#                                                        RO_amp=qubit.RO_amp(), RO_pulse_length=qubit.RO_pulse_length(),
-#                                                        acquisition_delay=270e-9)
-#         qubit.RO_pulse_type('MW_IQmod_pulse_UHFQC')
-#         qubit.RO_acq_marker_delay(-165e-9)
-#         qubit.acquisition_instr('UHFQC_1')
-#         qubit.RO_acq_marker_channel('ch3_marker2')
-#         qubit.RO_I_channel('0')
-#         qubit.RO_Q_channel('1')
-#         qubit.RO_acq_weight_function_I(0)
-#         qubit.RO_acq_weight_function_Q(1)
-# else:
-#     def switch_to_pulsed_RO_CBox(qubit):
-#         qubit.RO_pulse_type('Gated_MW_RO_pulse')
-#         qubit.RO_acq_marker_delay(155e-9)
-#         qubit.acquisition_instr('CBox')
-#         qubit.RO_acq_marker_channel('ch3_marker1')
-#         qubit.RO_acq_weight_function_I(0)
-#         qubit.RO_acq_weight_function_Q(1)
+    def switch_to_IQ_mod_RO_UHFQC(qubit):
+        UHFQC_1.awg_sequence_acquisition_and_pulse_SSB(f_RO_mod=qubit.f_RO_mod(),
+                                                       RO_amp=qubit.RO_amp(),
+                                                       RO_pulse_length=qubit.RO_pulse_length(),
+                                                       acquisition_delay=270e-9)
+        qubit.RO_pulse_type('MW_IQmod_pulse_UHFQC')
+        qubit.RO_acq_marker_delay(-165e-9)
+        qubit.acquisition_instrument('UHFQC_1')
+        qubit.RO_acq_marker_channel('ch3_marker2')
+        qubit.RO_I_channel('0')
+        qubit.RO_Q_channel('1')
+        qubit.RO_acq_weight_function_I(0)
+        qubit.RO_acq_weight_function_Q(1)
+else:
+    def switch_to_pulsed_RO_CBox(qubit):
+        qubit.RO_pulse_type('Gated_MW_RO_pulse')
+        qubit.RO_acq_marker_delay(155e-9)
+        qubit.acquisition_instrument('CBox')
+        qubit.RO_acq_marker_channel('ch3_marker1')
+        qubit.RO_acq_weight_function_I(0)
+        qubit.RO_acq_weight_function_Q(1)
 
 
-def reload_mod_stuff():
-    from pycqed.measurement.waveform_control import pulse_library as pl
-    reload(pl)
-    from pycqed.measurement.waveform_control import pulsar as ps
-    reload(ps)
-    # The AWG sequencer
-    qc.station.pulsar = ps.Pulsar()
-    station.pulsar.AWG = station.components['AWG']
-    markerhighs = [2, 2, 2.7, 2]
-    for i in range(4):
-        # Note that these are default parameters and should be kept so.
-        # the channel offset is set in the AWG itself. For now the amplitude is
-        # hardcoded. You can set it by hand but this will make the value in the
-        # sequencer different.
-        station.pulsar.define_channel(id='ch{}'.format(i+1),
-                                      name='ch{}'.format(i+1), type='analog',
-                                      # max safe IQ voltage
-                                      high=.7, low=-.7,
-                                      offset=0.0, delay=0, active=True)
-        station.pulsar.define_channel(id='ch{}_marker1'.format(i+1),
-                                      name='ch{}_marker1'.format(i+1),
-                                      type='marker',
-                                      high=markerhighs[i], low=0, offset=0.,
-                                      delay=0, active=True)
-        station.pulsar.define_channel(id='ch{}_marker2'.format(i+1),
-                                      name='ch{}_marker2'.format(i+1),
-                                      type='marker',
-                                      high=markerhighs[i], low=0, offset=0.,
-                                      delay=0, active=True)
+# def reload_mod_stuff():
+#
 
-    from pycqed.measurement.waveform_control_CC import waveform as wf
-    reload(wf)
+def reload_qubit(qubit):
+    reload(qb)
+    try:
+        qubit_name = qubit.name
+        qubit.close()
+        del station.components[qubit_name]
 
-    from pycqed.measurement.pulse_sequences import fluxing_sequences as fqqs
-    reload(fqqs)
-    from pycqed.scripts.Experiments.Five_Qubits import cost_functions_Leo_optimization as ca
-    reload(ca)
-    from pycqed.measurement.waveform_control import pulse_library as pl
-    reload(pl)
-    from pycqed.measurement.pulse_sequences import standard_elements as ste
-    reload(ste)
+    except Exception as e:
+        logging.warning(e)
+    qubit = qb.QWG_driven_transmon(qubit_name, LO, cw_source=QL_LO, td_source=QL_LO,
+                                IVVI=IVVI, QWG=QWG, CBox=CBox,
+                                RO_LutMan=LutMan0, Q_LutMan=QL_LutMan,
+                                MC=MC)
+    station.add_component(qubit)
+    gen.load_settings_onto_instrument(qubit)
+    return qubit
 
-    from pycqed.measurement.pulse_sequences import multi_qubit_tek_seq_elts as mqs
-    reload(mqs)
-    from pycqed.measurement import awg_sweep_functions_multi_qubit as awg_mswf
-    reload(awg_mswf)
-    reload(awg_swf)
-    mqs.station = station
-    fqqs.station = station
-    reload(mq_mod)
-    mq_mod.station = station
+# QL = reload_qubit(QL)
 
-    reload(fsqs)
-    reload(awg_swf)
-    fsqs.station = station
-    reload(det)
-    reload(ca)
-reload_mod_stuff()
+#     from pycqed.measurement.waveform_control import pulse_library as pl
+#     reload(pl)
+#     from pycqed.measurement.waveform_control import pulsar as ps
+#     reload(ps)
+#     # The AWG sequencer
+#     qc.station.pulsar = ps.Pulsar()
+#     station.pulsar.AWG = station.components['AWG']
+#     markerhighs = [2, 2, 2.7, 2]
+#     for i in range(4):
+#         # Note that these are default parameters and should be kept so.
+#         # the channel offset is set in the AWG itself. For now the amplitude is
+#         # hardcoded. You can set it by hand but this will make the value in the
+#         # sequencer different.
+#         station.pulsar.define_channel(id='ch{}'.format(i+1),
+#                                       name='ch{}'.format(i+1), type='analog',
+#                                       # max safe IQ voltage
+#                                       high=.7, low=-.7,
+#                                       offset=0.0, delay=0, active=True)
+#         station.pulsar.define_channel(id='ch{}_marker1'.format(i+1),
+#                                       name='ch{}_marker1'.format(i+1),
+#                                       type='marker',
+#                                       high=markerhighs[i], low=0, offset=0.,
+#                                       delay=0, active=True)
+#         station.pulsar.define_channel(id='ch{}_marker2'.format(i+1),
+#                                       name='ch{}_marker2'.format(i+1),
+#                                       type='marker',
+#                                       high=markerhighs[i], low=0, offset=0.,
+#                                       delay=0, active=True)
+
+#     from pycqed.measurement.waveform_control_CC import waveform as wf
+#     reload(wf)
+
+#     from pycqed.measurement.pulse_sequences import fluxing_sequences as fqqs
+#     reload(fqqs)
+#     from pycqed.scripts.Experiments.Five_Qubits import cost_functions_Leo_optimization as ca
+#     reload(ca)
+#     from pycqed.measurement.waveform_control import pulse_library as pl
+#     reload(pl)
+#     from pycqed.measurement.pulse_sequences import standard_elements as ste
+#     reload(ste)
+
+#     from pycqed.measurement.pulse_sequences import multi_qubit_tek_seq_elts as mqs
+#     reload(mqs)
+#     from pycqed.measurement import awg_sweep_functions_multi_qubit as awg_mswf
+#     reload(awg_mswf)
+#     reload(awg_swf)
+#     mqs.station = station
+#     fqqs.station = station
+#     reload(mq_mod)
+#     mq_mod.station = station
+
+#     reload(fsqs)
+#     reload(awg_swf)
+#     fsqs.station = station
+#     reload(det)
+#     reload(ca)
+# reload_mod_stuff()

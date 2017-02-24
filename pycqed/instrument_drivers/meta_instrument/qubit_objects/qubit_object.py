@@ -383,8 +383,33 @@ class Transmon(Qubit):
                 print("update", update)
             return cur_freq
 
-    def find_resonator_frequency(self, **kw):
-        raise NotImplementedError()
+    def find_resonator_frequency(self, use_min=False,
+                                 update=True,
+                                 freqs=None,
+                                 MC=None, close_fig=True):
+        '''
+        Finds the resonator frequency by performing a heterodyne experiment
+        if freqs == None it will determine a default range dependent on the
+        last known frequency of the resonator.
+        '''
+        if freqs is None:
+            f_center = self.f_res.get()
+            f_span = 10e6
+            f_step = 50e3
+            freqs = np.arange(f_center-f_span/2, f_center+f_span/2, f_step)
+        self.measure_heterodyne_spectroscopy(freqs, MC, analyze=False)
+        a = ma.Homodyne_Analysis(label=self.msmt_suffix, close_fig=close_fig)
+        if use_min:
+            f_res = a.min_frequency
+        else:
+            f_res = a.fit_results.params['f0'].value*1e9  # fit converts to Hz
+        if f_res > max(freqs) or f_res < min(freqs):
+            logging.warning('exracted frequency outside of range of scan')
+        elif update:  # don't update if the value is out of the scan range
+            self.f_res.set(f_res)
+        self.f_RO(self.f_res())
+        return f_res
+
 
     def find_pulse_amplitude(self, amps,
                              N_steps=[3, 7, 13, 17], max_n=18,

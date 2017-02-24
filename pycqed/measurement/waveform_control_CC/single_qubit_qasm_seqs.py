@@ -12,6 +12,21 @@ from pycqed.measurement.randomized_benchmarking import randomized_benchmarking a
 base_qasm_path = join(dirname(__file__), 'qasm_files')
 
 
+def CW_RO_sequence(qubit_name, trigger_separation, clock_cycle=5e-9):
+    # N.B.! this delay is not correct because it does not take the
+    # trigger length into account
+    delay = np.round(trigger_separation/clock_cycle)
+
+    filename = join(base_qasm_path, 'CW_RO_sequence.qasm')
+    qasm_file = mopen(filename, mode='w')
+    qasm_file.writelines('qubit {} \n'.format(qubit_name))
+    qasm_file.writelines('I {} {:d} \n'.format(
+                         qubit_name, int(delay)))
+    qasm_file.writelines('RO {}  \n'.format(qubit_name))
+    qasm_file.close()
+    return qasm_file
+
+
 def T1(qubit_name, times, clock_cycle=5e-9,
        cal_points=True):
     #

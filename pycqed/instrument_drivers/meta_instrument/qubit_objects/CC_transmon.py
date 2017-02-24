@@ -27,6 +27,8 @@ import pycqed.measurement.CBox_sweep_functions as cbs
 from pycqed.scripts.Experiments.intel_demo import qasm_helpers as qh
 from pycqed.measurement.waveform_control_CC import qasm_to_asm as qta
 
+from pycqed.measurement import detector_functions as det
+
 
 class CBox_v3_driven_transmon(Transmon):
 
@@ -41,7 +43,8 @@ class CBox_v3_driven_transmon(Transmon):
                  LO, cw_source, td_source,
                  IVVI, LutMan,
                  CBox,
-                 MC, **kw):
+                 MC,
+                 **kw):
         super().__init__(name, **kw)
         '''
         Adds the parameters to the qubit insrument, it provides initial values
@@ -63,6 +66,13 @@ class CBox_v3_driven_transmon(Transmon):
                            set_cmd=self._set_acquisition_instr,
                            get_cmd=self._get_acquisition_instr,
                            vals=vals.Strings())
+
+        self._RF_RO_Source_instr = None
+        self.add_parameter('RF_RO_source',
+                           set_cmd=self._set_RF_RO_source,
+                           get_cmd=self._get_RF_RO_source,
+                           vals=vals.Strings())
+
         self.add_parameter('mod_amp_cw', label='RO modulation ampl cw',
                            unit='V', initial_value=0.5,
                            parameter_class=ManualParameter)
@@ -163,6 +173,13 @@ class CBox_v3_driven_transmon(Transmon):
                            unit='s',
                            parameter_class=ManualParameter,
                            vals=vals.Numbers(min_value=0))
+
+        self.add_parameter('RO_acq_period_cw', unit='s',
+                           parameter_class=ManualParameter,
+                           vals=vals.Numbers(0, 500e-6),
+                           initial_value=10e-6)
+
+
         self.add_parameter('init_time',
                            label='Qubit initialization time',
                            unit='s', initial_value=200e-6,
@@ -183,21 +200,39 @@ class CBox_v3_driven_transmon(Transmon):
                            parameter_class=ManualParameter)
 
     def prepare_for_continuous_wave(self):
-        raise NotImplementedError()
+        self.LO.on()
+        self.td_source.off()
+        # if self.RO_pulse_type() == "Gated_MW_RO_pulse":
+        #     RF = self.find_instrument(self.RF_RO_source())
+
+        self.cw_source.off()
+        self.cw_source.pulsemod_state.set('off')
+        self.cw_source.power.set(self.spec_pow.get())
+
+
+        # REMOVE ME !!!!!!!
+        # To be replaced once spec mode is there 
+        # self.heterodyne_instr.acquisition_instr(self.acquisition_instrument())
+        # # Heterodyne tone configuration
+        # if not self.f_RO():
+        #     RO_freq = self.f_res()
+        # else:
+        #     RO_freq = self.f_RO()
 
         # self.heterodyne_instr._disable_auto_seq_loading = False
-        # self.LO.on()
-        # self.td_source.off()
-        # self.cw_source.on()
+
+        # self.heterodyne_instr.RF.on()
+        # self.heterodyne_instr.LO.on()
         # if hasattr(self.heterodyne_instr, 'mod_amp'):
         #     self.heterodyne_instr.set('mod_amp', self.mod_amp_cw.get())
         # else:
         #     self.heterodyne_instr.RF_power(self.RO_power_cw())
-        # # TODO: Update IF to f_RO_mod in heterodyne instr
-        # self.heterodyne_instr.set('IF', self.f_RO_mod.get())
-        # self.heterodyne_instr.frequency.set(self.f_res.get())
-        # self.cw_source.pulsemod_state.set('off')
-        # self.cw_source.power.set(self.spec_pow.get())
+        # self.heterodyne_instr.set('f_RO_mod', self.f_RO_mod.get())
+        # self.heterodyne_instr.frequency.set(RO_freq)
+        # self.heterodyne_instr.RF.power(self.RO_power_cw())
+        # self.heterodyne_instr.RF_power(self.RO_power_cw())
+        # self.heterodyne_instr.nr_averages(self.RO_acq_averages())
+
 
     def prepare_for_timedomain(self):
         self.MC.soft_avg(self.RO_soft_averages())
@@ -256,11 +291,21 @@ class CBox_v3_driven_transmon(Transmon):
                       int(self.signal_line.get())),
                       int(self.RO_threshold.get()))
 
+    def _get_RF_RO_source(self):
+        return self._RF_RO_Source_instr.name
+
+    def _set_RF_RO_source(self, RF_RO_source_name):
+        self._RF_RO_Source_instr = self.find_instrument(RF_RO_source_name)
+
+
+
     def _get_acquisition_instr(self):
-        return self._acquisition_instrument
+        # _acquisition_instrument is the class
+        # acquisition_instrument (qcodes param) contains the string
+        return self._acquisition_instrument.name
 
     def _set_acquisition_instr(self, acq_instr_name):
-        self._acquisition_instr = self.find_instrument(acq_instr_name)
+        self._acquisition_instrument = self.find_instrument(acq_instr_name)
         if 'CBox' in acq_instr_name:
             logging.info("setting CBox acquisition")
             self.int_avg_det = None  # FIXME: Not implemented
@@ -270,18 +315,27 @@ class CBox_v3_driven_transmon(Transmon):
         elif 'UHFQC' in acq_instr_name:
             logging.info("setting UHFQC acquisition")
             self.input_average_detector = det.UHFQC_input_average_detector(
-                UHFQC=self._acquisition_instr,
+                UHFQC=self._acquisition_instrument,
                 AWG=self.AWG, nr_averages=self.RO_acq_averages())
+            self.int_avg_det_single = det.UHFQC_integrated_average_detector(
+                UHFQC=self._acquisition_instrument, AWG=self.AWG,
+                channels=[self.RO_acq_weight_function_I(), self.RO_acq_weight_function_Q()], 
+                nr_averages=self.RO_acq_averages(),
+                real_imag=True,
+                integration_length=self.RO_acq_integration_length())
+            self.int_avg_det_single.detector_control = 'soft'
+
             self.int_avg_det = det.UHFQC_integrated_average_detector(
-                UHFQC=self._acquisition_instr, AWG=self.AWG,
-                channels=[self.RO_acq_weight_function_I(), self.RO_acq_weight_function_Q()], nr_averages=self.RO_acq_averages(),
+                UHFQC=self._acquisition_instrument, AWG=self.AWG,
+                channels=[self.RO_acq_weight_function_I(), self.RO_acq_weight_function_Q()], 
+                nr_averages=self.RO_acq_averages(),
                 integration_length=self.RO_acq_integration_length())
             self.int_avg_det_rot = det.UHFQC_integrated_average_detector(
-                UHFQC=self._acquisition_instr, AWG=self.AWG,
+                UHFQC=self._acquisition_instrument, AWG=self.AWG,
                 channels=[self.RO_acq_weight_function_I(), self.RO_acq_weight_function_Q()], nr_averages=self.RO_acq_averages(),
                 integration_length=self.RO_acq_integration_length(), rotate=True)
             self.int_log_det = det.UHFQC_integration_logging_det(
-                UHFQC=self._acquisition_instr, AWG=self.AWG,
+                UHFQC=self._acquisition_instrument, AWG=self.AWG,
                 channels=[
                     self.RO_acq_weight_function_I(), self.RO_acq_weight_function_Q()],
                 integration_length=self.RO_acq_integration_length())
@@ -289,37 +343,11 @@ class CBox_v3_driven_transmon(Transmon):
         elif 'ATS' in acq_instr_name:
             logging.info("setting ATS acquisition")
             self.int_avg_det = det.ATS_integrated_average_continuous_detector(
-                ATS=self._acquisition_instr.card,
-                ATS_acq=self._acquisition_instr.controller, AWG=self.AWG,
+                ATS=self._acquisition_instrument.card,
+                ATS_acq=self._acquisition_instrument.controller, AWG=self.AWG,
                 nr_averages=self.RO_acq_averages())
         return
 
-    def find_resonator_frequency(self, use_min=False,
-                                 update=True,
-                                 freqs=None,
-                                 MC=None, close_fig=True):
-        '''
-        Finds the resonator frequency by performing a heterodyne experiment
-        if freqs == None it will determine a default range dependent on the
-        last known frequency of the resonator.
-        '''
-        raise NotImplementedError()
-        # if freqs is None:
-        #     f_center = self.f_res.get()
-        #     f_span = 10e6
-        #     f_step = 50e3
-        #     freqs = np.arange(f_center-f_span/2, f_center+f_span/2, f_step)
-        # self.measure_heterodyne_spectroscopy(freqs, MC, analyze=False)
-        # a = ma.Homodyne_Analysis(label=self.msmt_suffix, close_fig=close_fig)
-        # if use_min:
-        #     f_res = a.min_frequency
-        # else:
-        #     f_res = a.fit_results.params['f0'].value
-        # if f_res > max(freqs) or f_res < min(freqs):
-        #     logging.warning('exracted frequency outside of range of scan')
-        # elif update:  # don't update if the value is out of the scan range
-        #     self.f_res.set(f_res)
-        # return f_res
 
     def get_resetless_rb_detector(self, nr_cliff, starting_seed=1,
                                   nr_seeds='max', pulse_p_elt='min',
@@ -546,17 +574,38 @@ class CBox_v3_driven_transmon(Transmon):
 
     def measure_heterodyne_spectroscopy(self, freqs, MC=None,
                                         analyze=True, close_fig=True):
-        raise NotImplementedError()
-        # self.prepare_for_continuous_wave()
-        # if MC is None:
-        #     MC = self.MC
-        # MC.set_sweep_function(pw.wrap_par_to_swf(
-        #                       self.heterodyne_instr.frequency))
-        # MC.set_sweep_points(freqs)
-        # MC.set_detector_function(det.Heterodyne_probe(self.heterodyne_instr))
-        # MC.run(name='Resonator_scan'+self.msmt_suffix)
-        # if analyze:
-        #     ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
+        self.prepare_for_continuous_wave()
+        if MC is None:
+            MC = self.MC
+
+        # Loading the right qumis instructions
+        CW_RO_sequence = sqqs.CW_RO_sequence(self.name,
+                                             self.RO_acq_period_cw())
+        CW_RO_sequence_asm = qta.qasm_to_asm(CW_RO_sequence.name,
+                                             self.get_operation_dict())
+        qumis_file = CW_RO_sequence_asm
+        self.CBox.load_instructions(qumis_file.name)
+        self.CBox.run_mode('run') 
+
+        if MC is None:
+            MC = self.MC
+
+
+        # Create a new sweep function that sweeps two frequencies.
+        # use only if the RO pulse type is the CW-RF scan, else only sweep the LO
+
+        # MC.set_sweep_function(self.heterodyne_instr.frequency)
+        MC.set_sweep_function(swf.Heterodyne_Frequency_Sweep(
+                                    RO_pulse_type=self.RO_pulse_type(),
+                                    RF_source=self.find_instrument(self.RF_RO_source()),
+                                    LO_source=self.LO,IF=self.f_RO_mod()))
+        MC.set_sweep_points(freqs)
+        # make sure we use the right acquision detector. Mind the new UHFQC spec mode
+        MC.set_detector_function(self.int_avg_det_single)
+        # det.Heterodyne_probe(self.heterodyne_instr)
+        MC.run(name='Resonator_scan'+self.msmt_suffix)
+        if analyze:
+            ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
 
     def measure_spectroscopy(self, freqs, pulsed=False, MC=None,
                              analyze=True, close_fig=True):
@@ -1146,16 +1195,23 @@ class QWG_driven_transmon(CBox_v3_driven_transmon):
         self.MC = MC
         self.RO_LutMan = RO_LutMan
         self.Q_LutMan = Q_LutMan
-        super().add_parameters()
         self.add_parameters()
 
     def add_parameters(self):
+        super().add_parameters()
         self.add_parameter('amp90_scale',
                            label='pulse amplitude scaling factor',
                            unit='',
                            initial_value=.5,
                            vals=vals.Numbers(min_value=0, max_value=1.0),
                            parameter_class=ManualParameter)
+        self.add_parameter('RO_acq_weight_function_I', initial_value=0,
+                           vals=vals.Enum(0, 1, 2, 3, 4, 5),
+                           parameter_class=ManualParameter)
+        self.add_parameter('RO_acq_weight_function_Q', initial_value=1,
+                           vals=vals.Enum(0, 1, 2, 3, 4, 5),
+                           parameter_class=ManualParameter)
+
 
     def measure_rabi(self, amps, n=1,
                      MC=None, analyze=True, close_fig=True,
@@ -1361,23 +1417,37 @@ class QWG_driven_transmon(CBox_v3_driven_transmon):
                     pulse_period_clocks-2)}
 
         # RO part
+        measure_instruction = ''
+        acq_instr = self._get_acquisition_instr()
+        if 'CBox' in acq_instr:
+            measure_instruction = 'measure\n'
+        elif (('ATS' in acq_instr) or ('UHFQC' in acq_instr)):
+            # measure_instruction = 'trigger 0000001, {}\n'.format(RO_length_clocks)
+            measure_instruction = 'trigger 1111111, {}\n'.format(RO_length_clocks)
+        else:
+            raise NotImplementedError('Unknown acquisition device.')
+
         if self.RO_pulse_type() == 'MW_IQmod_pulse':
             operation_dict['RO {}'.format(self.name)] = {
                 'duration': (RO_pulse_delay_clocks+RO_acq_marker_del_clocks
                              + RO_depletion_clocks),
                 'instruction': 'wait {} \npulse 0000 1111 1111 '.format(
                     RO_pulse_delay_clocks)
-                + '\nwait {} \nmeasure \n'.format(
-                    RO_acq_marker_del_clocks)}
+                + '\nwait {} \n{}'.format(
+                    RO_acq_marker_del_clocks, measure_instruction)}
             # + 'wait {}\n'.format(RO_depletion_clocks)}
         elif self.RO_pulse_type() == 'Gated_MW_RO_pulse':
             operation_dict['RO {}'.format(self.name)] = {
                 'duration': RO_length_clocks, 'instruction':
-                'wait {} \ntrigger 1000000, {} \n measure \n'.format(
-                    RO_pulse_delay_clocks, RO_length_clocks)}
+                'wait {} \n{}'.format(RO_pulse_delay_clocks,
+                                      measure_instruction)}
 
         if RO_depletion_clocks != 0:
             operation_dict['RO {}'.format(self.name)]['instruction'] += \
                 'wait {}\n'.format(RO_depletion_clocks)
+
+        return operation_dict
+
+    def _get_RO_instruction(operation_dict):
 
         return operation_dict
