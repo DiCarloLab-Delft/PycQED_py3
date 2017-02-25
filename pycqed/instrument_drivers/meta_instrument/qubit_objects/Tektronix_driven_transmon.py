@@ -457,6 +457,8 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
     def measure_heterodyne_spectroscopy(self, freqs, MC=None,
                                         analyze=True, close_fig=True):
         self.prepare_for_continuous_wave()
+
+        # sqts.Pulsed_spec_seq(spec_pars, RO_pars)
         if MC is None:
             MC = self.MC
         MC.set_sweep_function(pw.wrap_par_to_swf(
@@ -603,7 +605,8 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
 
     def measure_ramsey(self, times, artificial_detuning=0,
                        f_qubit=None, label='',
-                       MC=None, analyze=True, close_fig=True, verbose=True):
+                       MC=None, analyze=True, close_fig=True, verbose=True,
+                       upload=True):
         self.prepare_for_timedomain()
         if MC is None:
             MC = self.MC
@@ -613,7 +616,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         self.td_source.set('frequency', f_qubit - self.f_pulse_mod.get())
         Rams_swf = awg_swf.Ramsey(
             pulse_pars=self.pulse_pars, RO_pars=self.RO_pars,
-            artificial_detuning=artificial_detuning)
+            artificial_detuning=artificial_detuning, upload=upload)
         MC.set_sweep_function(Rams_swf)
         MC.set_sweep_points(times)
         MC.set_detector_function(self.int_avg_det)
@@ -630,7 +633,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                       fitted_freq-artificial_detuning))
 
     def measure_echo(self, times, label='', MC=None,
-                     artificial_detuning=None,
+                     artificial_detuning=None, upload=True,
                      analyze=True, close_fig=True, verbose=True):
         self.prepare_for_timedomain()
         if MC is None:
@@ -638,7 +641,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
 
         Echo_swf = awg_swf.Echo(
             pulse_pars=self.pulse_pars, RO_pars=self.RO_pars,
-            artificial_detuning=artificial_detuning)
+            artificial_detuning=artificial_detuning, upload=upload)
         MC.set_sweep_function(Echo_swf)
         MC.set_sweep_points(times)
         MC.set_detector_function(self.int_avg_det)

@@ -993,6 +993,9 @@ class Heterodyne_probe(Soft_Detector):
         self.last = abs(S21)
         return abs(S21), np.angle(S21)/(2*np.pi)*360,  # S21.real, S21.imag
 
+    def finish(self):
+        self.HS.finish()
+
 
 class Heterodyne_probe_soft_avg(Soft_Detector):
 
@@ -1043,6 +1046,9 @@ class Heterodyne_probe_soft_avg(Soft_Detector):
         self.first = False
         self.last = abs(S21)
         return S21.real, S21.imag
+
+    def finish(self):
+        self.HS.finish()
 
 
 class PulsedSpectroscopyDetector(Soft_Detector):

@@ -157,8 +157,6 @@ class HeterodyneInstrument(Instrument):
                 self._acquisition_instr.nr_averages(int(self.nr_averages()))
 
             elif 'UHFQC' in self.acquisition_instr():
-                # self._acquisition_instr.prepare_SSB_weight_and_rotation(IF=self.get('f_RO_mod'),
-                # weight_function_I=0, weight_function_Q=1)
                 self._acquisition_instr.prepare_DSB_weight_and_rotation(
                     IF=self.get('f_RO_mod'),
                     weight_function_I=0, weight_function_Q=1)
@@ -178,6 +176,9 @@ class HeterodyneInstrument(Instrument):
                 # 0 for rl, 1 for iavg
                 self._acquisition_instr.awgs_0_userregs_1(0)
                 self._acquisition_instr.awgs_0_single(1)
+                self._acquisition_instr.single_acquisition_initialize([0,1], 'rl')
+
+
             elif 'ATS' in self.acquisition_instr():
                 self._acquisition_instr_controller.demodulation_frequency=self.get('f_RO_mod')
                 buffers_per_acquisition = 8
@@ -231,23 +232,10 @@ class HeterodyneInstrument(Instrument):
         elif 'UHFQC' in self.acquisition_instr():
             t0 = time.time()
             self._acquisition_instr.awgs_0_enable(1)
-            try:
-                temp = self._acquisition_instr.awgs_0_enable()
-            except:
-                temp = self._acquisition_instr.awgs_0_enable()
-            del temp
-
-            while self._acquisition_instr.awgs_0_enable() == 1:
-                time.sleep(0.01)
-            channels = [0, 1]
-            data = ['']*len(channels)
-            for i, channel in enumerate(channels):
-                dataset = eval(
-                    "self._acquisition_instr.quex_rl_data_{}()".format(channel))
-                data[i] = dataset[0]['vector']
-            dat = data[0]+1j*data[1]
+            dataset = self._acquisition_instr.single_acquisition_poll(1, 0.001, 1000)
+            dat = dataset[0][0]+1j*dataset[1][0]
             t1 = time.time()
-            #print("time for UHFQC polling", t1-t0)
+            # print("time for UHFQC polling", t1-t0)
         elif 'ATS' in self.acquisition_instr():
             t0 = time.time()
             dat = self._acquisition_instr_controller.acquisition()
@@ -255,6 +243,9 @@ class HeterodyneInstrument(Instrument):
             # print("time for ATS polling", t1-t0)
         return dat
 
+    def finish(self):
+        if 'UHFQC' in self.acquisition_instr():
+            self._acquisition_instr.single_acquisition_finalize()
 
     def get_demod_array(self):
         return self.cosI, self.sinI
