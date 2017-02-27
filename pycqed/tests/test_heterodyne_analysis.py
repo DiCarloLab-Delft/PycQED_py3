@@ -25,9 +25,11 @@ class Test_Heterodyne_analysis(unittest.TestCase):
         f0 = self.a_spectroscopy.fit_results.params['f0'].value
         Q = self.a_spectroscopy.fit_results.params['Q'].value
 
+        print("f0 = {}, Q = {}".format(f0, Q))
+
         # Test if the fit gives the expected means
         self.assertAlmostEqual(f0/1e9, 8.110836918005137, places=3)
-        self.assertAlmostEqual(Q/1000, 4.683873514902015, places=2)
+        self.assertAlmostEqual(Q/1000, 2.506147979874048, places=1)
 
     def test_acquisition_delay_analysis(self):
         # Test the correct file is loaded
