@@ -43,12 +43,12 @@ class HeterodyneInstrument(Instrument):
                          single_sideband_demod, **kw)
 
         self.add_parameter('RF_power', label='RF power',
-                           units='dBm', vals=vals.Numbers(),
-                           set_cmd=self.do_set_RF_power,
-                           get_cmd=self.do_get_RF_power)
+                           unit='dBm', vals=vals.Numbers(),
+                           set_cmd=self._set_RF_power,
+                           get_cmd=self._get_RF_power)
         self.add_parameter('acquisition_instr_controller',
-                           set_cmd=self.do_set_acquisition_instr_controller,
-                           get_cmd=self.do_get_acquisition_instr_controller,
+                           set_cmd=self._set_acquisition_instr_controller,
+                           get_cmd=self._get_acquisition_instr_controller,
                            vals=vals.Anything())
         self.acquisition_instr_controller(acquisition_instr_controller)
         self._RF_power = None
@@ -61,36 +61,36 @@ class HeterodyneInstrument(Instrument):
         self.LO = LO
         self.AWG = AWG
         self.add_parameter('frequency', label='Heterodyne frequency',
-                           units='Hz', vals=vals.Numbers(9e3, 40e9),
-                           get_cmd=self.do_get_frequency,
-                           set_cmd=self.do_set_frequency)
+                           unit='Hz', vals=vals.Numbers(9e3, 40e9),
+                           get_cmd=self._get_frequency,
+                           set_cmd=self._set_frequency)
         self.add_parameter('f_RO_mod', label='Intermodulation frequency',
-                           units='Hz', vals=vals.Numbers(-600e6, 600e6),
-                           set_cmd=self.do_set_f_RO_mod,
-                           get_cmd=self.do_get_f_RO_mod)
+                           unit='Hz', vals=vals.Numbers(-600e6, 600e6),
+                           set_cmd=self._set_f_RO_mod,
+                           get_cmd=self._get_f_RO_mod)
         self.add_parameter('single_sideband_demod', vals=vals.Bool(),
                            label='Single sideband demodulation',
                            parameter_class=ManualParameter,
                            initial_value=single_sideband_demod)
         self.add_parameter('acquisition_instr', vals=vals.Strings(),
                            label='Acquisition instrument',
-                           set_cmd=self.do_set_acquisition_instr,
-                           get_cmd=self.do_get_acquisition_instr)
+                           set_cmd=self._set_acquisition_instr,
+                           get_cmd=self._get_acquisition_instr)
         self.add_parameter('nr_averages', label='Number of averages',
                            vals=vals.Numbers(min_value=0, max_value=1e6),
                            parameter_class=ManualParameter,
                            initial_value=1024)
         self.add_parameter('status', vals=vals.Enum('On','Off'),
-                           set_cmd=self.do_set_status,
-                           get_cmd=self.do_get_status)
+                           set_cmd=self._set_status,
+                           get_cmd=self._get_status)
         self.add_parameter('trigger_separation', label='Trigger separation',
-                           units='s', vals=vals.Numbers(0),
-                           set_cmd=self.do_set_trigger_separation,
-                           get_cmd=self.do_get_trigger_separation)
+                           unit='s', vals=vals.Numbers(0),
+                           set_cmd=self._set_trigger_separation,
+                           get_cmd=self._get_trigger_separation)
         self.add_parameter('RO_length', label='Readout length',
-                           units='s', vals=vals.Numbers(0),
-                           set_cmd=self.do_set_RO_length,
-                           get_cmd=self.do_get_RO_length)
+                           unit='s', vals=vals.Numbers(0),
+                           set_cmd=self._set_RO_length,
+                           get_cmd=self._get_RO_length)
         self.add_parameter('auto_seq_loading', vals=vals.Bool(),
                            label='Automatic AWG sequence loading',
                            parameter_class=ManualParameter,
@@ -283,13 +283,13 @@ class HeterodyneInstrument(Instrument):
         self.off()
         self.AWG.stop()
 
-    def do_set_frequency(self, val):
+    def _set_frequency(self, val):
         self._frequency = val
         # this is the definition agreed upon in issue 131
         self.RF.frequency(val)
         self.LO.frequency(val-self._f_RO_mod)
 
-    def do_get_frequency(self):
+    def _get_frequency(self):
         freq = self.RF.frequency()
         LO_freq = self.LO.frequency()
         if abs(LO_freq - freq + self._f_RO_mod) > self._eps:
@@ -300,11 +300,11 @@ class HeterodyneInstrument(Instrument):
             logging.warning('Heterodyne frequency does not match RF frequency')
         return self._frequency
 
-    def do_set_f_RO_mod(self, val):
+    def _set_f_RO_mod(self, val):
         self._f_RO_mod = val
         self.LO.frequency(self._frequency - val)
 
-    def do_get_f_RO_mod(self):
+    def _get_f_RO_mod(self):
         freq = self.RF.frequency()
         LO_freq = self.LO.frequency()
         if abs(LO_freq - freq + self._f_RO_mod) > self._eps:
@@ -313,21 +313,21 @@ class HeterodyneInstrument(Instrument):
                             .format(self._f_RO_mod, LO_freq, freq))
         return self._f_RO_mod
 
-    def do_set_RF_power(self, val):
+    def _set_RF_power(self, val):
         self.RF.power(val)
         self._RF_power = val
         # internally stored to allow setting RF from stored setting
 
-    def do_get_RF_power(self):
+    def _get_RF_power(self):
         return self._RF_power
 
-    def do_set_status(self, val):
+    def _set_status(self, val):
         if val == 'On':
             self.on()
         else:
             self.off()
 
-    def do_get_status(self):
+    def _get_status(self):
         if (self.LO.status().startswith('On') and
             self.RF.status().startswith('On')):
             return 'On'
@@ -353,7 +353,7 @@ class HeterodyneInstrument(Instrument):
         self.LO.off()
         self.RF.off()
 
-    def do_get_acquisition_instr(self):
+    def _get_acquisition_instr(self):
         # Specifying the int_avg det here should allow replacing it with ATS
         # or potential digitizer acquisition easily
         if self._acquisition_instr == None:
@@ -361,7 +361,7 @@ class HeterodyneInstrument(Instrument):
         else:
             return self._acquisition_instr.name
 
-    def do_set_acquisition_instr(self, acquisition_instr):
+    def _set_acquisition_instr(self, acquisition_instr):
         # Specifying the int_avg det here should allow replacing it with ATS
         # or potential digitizer acquisition easily
         if acquisition_instr==None:
@@ -371,7 +371,7 @@ class HeterodyneInstrument(Instrument):
         self._awg_seq_parameters_changed = True
         self._UHFQC_awg_parameters_changed = True
 
-    def do_get_acquisition_instr_controller(self):
+    def _get_acquisition_instr_controller(self):
         # Specifying the int_avg det here should allow replacing it with ATS
         # or potential digitizer acquisition easily
         if self._acquisition_instr_controller == None:
@@ -379,7 +379,7 @@ class HeterodyneInstrument(Instrument):
         else:
             return self._acquisition_instr_controller.name
 
-    def do_set_acquisition_instr_controller(self, acquisition_instr_controller):
+    def _set_acquisition_instr_controller(self, acquisition_instr_controller):
         # Specifying the int_avg det here should allow replacing it with ATS
         # or potential digitizer acquisition easily
         if acquisition_instr_controller == None:
@@ -389,21 +389,21 @@ class HeterodyneInstrument(Instrument):
                 self.find_instrument(acquisition_instr_controller)
             print("controller initialized")
 
-    def do_set_trigger_separation(self, val):
+    def _set_trigger_separation(self, val):
         if val != self._trigger_separation:
             self._awg_seq_parameters_changed = True
         self._trigger_separation = val
 
-    def do_get_trigger_separation(self):
+    def _get_trigger_separation(self):
         return self._trigger_separation
 
-    def do_set_RO_length(self, val):
+    def _set_RO_length(self, val):
         if val != self._RO_length and \
            not 'UHFQC' in self.acquisition_instr():
             self._awg_seq_parameters_changed = True
         self._RO_length = val
 
-    def do_get_RO_length(self):
+    def _get_RO_length(self):
         return self._RO_length
 
     def get_demod_array(self):
@@ -449,16 +449,18 @@ class LO_modulated_Heterodyne(HeterodyneInstrument):
                          single_sideband_demod, **kw)
 
         self.add_parameter('mod_amp', label='Modulation amplitude',
-                           units='V', vals=vals.Numbers(0, 1),
-                           set_cmd=self.do_set_mod_amp,
-                           get_cmd=self.do_get_mod_amp)
+                           unit='V', vals=vals.Numbers(0, 1),
+                           set_cmd=self._set_mod_amp,
+                           get_cmd=self._get_mod_amp)
         self.add_parameter('acquisition_delay', label='Acquisition delay',
-                           units='s', vals=vals.Numbers(0, 1e-3),
-                           set_cmd=self.do_set_acquisition_delay,
-                           get_cmd=self.do_get_acquisition_delay)
+                           unit='s', vals=vals.Numbers(0, 1e-3),
+                           set_cmd=self._set_acquisition_delay,
+                           get_cmd=self._get_acquisition_delay)
 
-        self._f_RO_mod = 0
+        self._f_RO_mod = 10e6
+        self._frequency = 5e9
         self.f_RO_mod(10e6)
+        self.frequency(5e9)
         self._mod_amp = 0
         self.mod_amp(.5)
         self._acquisition_delay = 0
@@ -540,41 +542,42 @@ class LO_modulated_Heterodyne(HeterodyneInstrument):
         d = self.CBox.get_integrated_avg_results()
         return d[0][0]+1j*d[1][0]
 
-    def do_set_frequency(self, val):
+    def _set_frequency(self, val):
         self._frequency = val
         # this is the definition agreed upon in issue 131
         # AWG modulation ensures that signal ends up at RF-frequency
         self.LO.frequency(val-self._f_RO_mod)
 
-    def do_get_frequency(self):
+    def _get_frequency(self):
         freq = self.LO.frequency() + self._f_RO_mod
         if abs(self._frequency - freq) > self._eps:
             logging.warning('Homodyne frequency does not match LO frequency'
                             ' + RO_mod frequency')
         return self._frequency
 
-    def do_set_f_RO_mod(self, val):
+    def _set_f_RO_mod(self, val):
         if val != self._f_RO_mod:
             if 'CBox' in self.acquisition_instr():
                 self._awg_seq_parameters_changed = True
             elif 'UHFQC' in self.acquisition_instr():
                 self._UHFQC_awg_parameters_changed = True
+            self.frequency(self._frequency)
         self._f_RO_mod = val
 
-    def do_get_f_RO_mod(self):
+    def _get_f_RO_mod(self):
         return self._f_RO_mod
 
-    def do_set_mod_amp(self, val):
+    def _set_mod_amp(self, val):
         if val != self._mod_amp:
             if 'UHFQC' in self.acquisition_instr():
                 self._UHFQC_awg_parameters_changed = True
         self._mod_amp = val
 
-    def do_get_mod_amp(self):
+    def _get_mod_amp(self):
         return self._mod_amp
 
 
-    def do_set_acquisition_delay(self, val):
+    def _set_acquisition_delay(self, val):
         if 'UHFQC' in self.acquisition_instr():
             self._acquisition_instr.awgs_0_userregs_2(int(val*1.8e9/8))
         else:
@@ -582,7 +585,7 @@ class LO_modulated_Heterodyne(HeterodyneInstrument):
                                       "implement acquisition delay")
         self._acquisition_delay = val
 
-    def do_get_acquisition_delay(self):
+    def _get_acquisition_delay(self):
         return self._acquisition_delay
 
     def on(self):
@@ -593,5 +596,5 @@ class LO_modulated_Heterodyne(HeterodyneInstrument):
     def off(self):
         self.LO.off()
 
-    def do_get_status(self):
+    def _get_status(self):
         return self.LO.get('status')

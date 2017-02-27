@@ -3709,14 +3709,14 @@ class Homodyne_Analysis(MeasurementAnalysis):
         elif fitting_model == 'lorentzian':
             LorentzianModel = fit_mods.LorentzianModel
 
-            kappa_guess = 0.005
+            kappa_guess = 0.005*1e9
 
             amplitude_guess = amplitude_factor * np.pi*kappa_guess * abs(
                 max(self.measured_powers)-min(self.measured_powers))
 
-            LorentzianModel.set_param_hint('f0', value=f0*1e-9,
-                                           min=min(self.sweep_points*1e-9),
-                                           max=max(self.sweep_points*1e-9))
+            LorentzianModel.set_param_hint('f0', value=f0,
+                                           min=min(self.sweep_points),
+                                           max=max(self.sweep_points))
             LorentzianModel.set_param_hint('A', value=amplitude_guess)
 
             # Fitting
@@ -3756,9 +3756,12 @@ class Homodyne_Analysis(MeasurementAnalysis):
                     fit_res.params['Qi'].value, fit_res.params['Qi'].stderr)
 
         elif fitting_model == 'lorentzian':
-            textstr = '$f_{\mathrm{center}}$ = %.4f $\pm$ (%.3g) GHz' % (
-                fit_res.params['f0'].value, fit_res.params['f0'].stderr) + '\n' \
-                '$Q$ = %1.f $\pm$ (%.1f)' % (fit_res.params['Q'].value, fit_res.params['Q'].stderr)
+            textstr = '$f_{{\mathrm{{center}}}}$ = {:.4f} $\pm$ ({:.3g}) GHz\n' \
+                      '$Q$ = {:.1f} $\pm$ ({:.1f})'.format(
+                          fit_res.params['f0'].value*1e-9,
+                          fit_res.params['f0'].stderr*1e-9,
+                          fit_res.params['Q'].value,
+                          fit_res.params['Q'].stderr)
 
         ax.text(0.05, 0.95, textstr, transform=ax.transAxes, fontsize=11,
                 verticalalignment='top', bbox=self.box_props)
@@ -3811,7 +3814,7 @@ class Homodyne_Analysis(MeasurementAnalysis):
         else:
             ax.plot(self.sweep_points, fit_res.best_fit, 'r-')
             f0 = self.fit_results.values['f0']
-            plt.plot(f0*1e9, fit_res.eval(f=f0*1e9), 'o', ms=8)
+            plt.plot(f0, fit_res.eval(f=f0), 'o', ms=8)
 
             # save figure
             self.save_fig(fig, xlabel=self.xlabel, ylabel='Mag', **kw)
@@ -4037,7 +4040,7 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
 
             else:  # Otherwise take center of range
                 f0 = np.median(self.sweep_points)
-                kappa_guess = 0.005
+                kappa_guess = 0.005*1e9
 
             amplitude_guess = np.pi * kappa_guess * \
                 abs(max(self.data_dist) - min(self.data_dist))
@@ -4063,7 +4066,7 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
             self.params = LorentzianModel.make_params()
 
             fit_res = LorentzianModel.fit(data=self.data_dist,
-                                          f=self.sweep_points*1.e9,
+                                          f=self.sweep_points,
                                           params=self.params)
             print('min ampl', 2*np.var(self.data_dist))
             return fit_res
@@ -4098,8 +4101,8 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
         for k in range(len(self.measured_values)):
             ax = axes[k]
             textstr = '$f_{\mathrm{center}}$ = %.5g $\pm$ (%.3g) GHz\n' % (
-                fit_res.params['f0'].value,
-                fit_res.params['f0'].stderr)
+                fit_res.params['f0'].value*1e-9,
+                fit_res.params['f0'].stderr*1e-9)
             ax.text(0.05, 0.95, textstr, transform=ax.transAxes,
                     fontsize=11, verticalalignment='top', bbox=self.box_props)
 

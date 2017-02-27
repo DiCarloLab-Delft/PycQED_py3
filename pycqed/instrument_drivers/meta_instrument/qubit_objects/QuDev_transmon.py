@@ -20,19 +20,19 @@ class QuDev_transmon(Qubit):
         self.cw_source = cw_source
 
         self.add_parameter('f_RO_resonator', label='RO resonator frequency',
-                           units='Hz', initial_value=0,
+                           unit='Hz', initial_value=0,
                            parameter_class=ManualParameter)
         self.add_parameter('Q_RO_resonator', label='RO resonator Q factor',
                            initial_value=0, parameter_class=ManualParameter)
         self.add_parameter('optimal_acquisition_delay', label='Optimal '
-                           'acquisition delay', units='s', initial_value=0,
+                           'acquisition delay', unit='s', initial_value=0,
                            parameter_class=ManualParameter)
         self.add_parameter('f_qubit_spectroscopy', label='Qubit frequency '
-                           'from spectroscopy', units='Hz', initial_value=0,
+                           'from spectroscopy', unit='Hz', initial_value=0,
                            parameter_class=ManualParameter)
         self.add_parameter('kappa_qubit_spectroscopy',
                            label='Width of qubit from spectroscopy',
-                           units='Hz', initial_value=0,
+                           unit='Hz', initial_value=0,
                            parameter_class=ManualParameter)
 
 
@@ -168,8 +168,8 @@ class QuDev_transmon(Qubit):
 
         HA = ma.Homodyne_Analysis(label=self.msmt_suffix, close_fig=close_fig,
                                   fitting_model='lorentzian')
-        f0 = HA.fit_results.params['f0'].value*1e9
-        df0 = HA.fit_results.params['f0'].stderr*1e9
+        f0 = HA.fit_results.params['f0'].value
+        df0 = HA.fit_results.params['f0'].stderr
         Q = HA.fit_results.params['Q'].value
         dQ = HA.fit_results.params['Q'].stderr
         if f0 > max(freqs) or f0 < min(freqs):
