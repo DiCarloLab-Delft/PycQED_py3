@@ -965,7 +965,7 @@ class Heterodyne_probe(Soft_Detector):
         self.last_frequency = 0.
         self.threshold = threshold
         self.last = 1.
-        HS.trigger_separation(trigger_separation)
+        self.HS.trigger_separation(trigger_separation)
         if 'double' in demod_mode:
             HS.single_sideband_demod(False)
         else:

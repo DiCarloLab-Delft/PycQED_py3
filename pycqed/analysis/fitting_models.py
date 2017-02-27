@@ -48,7 +48,7 @@ def LorentzFunc(f, amplitude, center, sigma):
 
 
 def Lorentzian(f, A, offset, f0, kappa):
-    val = offset + A/np.pi * (kappa / ((f/1.e9-f0)**2 + kappa**2))
+    val = offset + A/np.pi * (kappa / ((f-f0)**2 + kappa**2))
     return val
 
 
