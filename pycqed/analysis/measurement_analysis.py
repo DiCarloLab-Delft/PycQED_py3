@@ -3709,7 +3709,7 @@ class Homodyne_Analysis(MeasurementAnalysis):
         elif fitting_model == 'lorentzian':
             LorentzianModel = fit_mods.LorentzianModel
 
-            kappa_guess = 0.005*1e9
+            kappa_guess = 2.5e6
 
             amplitude_guess = amplitude_factor * np.pi*kappa_guess * abs(
                 max(self.measured_powers)-min(self.measured_powers))
@@ -3728,7 +3728,7 @@ class Homodyne_Analysis(MeasurementAnalysis):
                                            min=0,
                                            vary=True)
             LorentzianModel.set_param_hint('Q',
-                                           expr='f0/kappa',
+                                           expr='0.5*f0/kappa',
                                            vary=False)
             self.params = LorentzianModel.make_params()
 
@@ -5291,6 +5291,10 @@ class Chevron_2D(object):
 class DoubleFrequency(MeasurementAnalysis):
 
     def __init__(self, auto=True, label='Ramsey', timestamp=None, **kw):
+        kw['label'] = label
+        kw['auto'] = auto
+        kw['timestamp'] = timestamp
+        kw['h5mode'] = 'r+'
         super().__init__(**kw)
 
     def run_default_analysis(self, **kw):
