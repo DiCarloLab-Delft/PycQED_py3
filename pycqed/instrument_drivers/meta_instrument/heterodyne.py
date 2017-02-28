@@ -95,6 +95,10 @@ class HeterodyneInstrument(Instrument):
                            label='Automatic AWG sequence loading',
                            parameter_class=ManualParameter,
                            initial_value=True)
+        self.add_parameter('acq_marker_channels', vals=vals.Strings(),
+                           label='Acquisition trigger channels',
+                           set_cmd=self._set_acq_marker_channels,
+                           get_cmd=self._get_acq_marker_channels)
 
         self._trigger_separation = 10e-6
         self._RO_length = 2274e-9
@@ -108,6 +112,8 @@ class HeterodyneInstrument(Instrument):
         self.frequency(5e9)
         self.f_RO_mod(10e6)
         self._eps = 0.01 # Hz slack for comparing frequencies
+        self._acq_marker_channels = 'ch4_marker1,ch4_marker2,' \
+                                    'ch3_marker1,ch3_marker2'
 
 
     def prepare(self, get_t_base=True):
@@ -134,7 +140,8 @@ class HeterodyneInstrument(Instrument):
                 self._awg_seq_filename = \
                     st_seqs.generate_and_upload_marker_sequence(
                         self.RO_length(), self.trigger_separation(),
-                        RF_mod=False)
+                        RF_mod=False,
+                        acq_marker_channels=self.acq_marker_channels())
                 self._awg_seq_parameters_changed = False
 
         print('RO_length heterodyne', self.RO_length())
@@ -159,7 +166,8 @@ class HeterodyneInstrument(Instrument):
                     self.auto_seq_loading():
                 self._awg_seq_filename = \
                     st_seqs.generate_and_upload_marker_sequence(
-                        5e-9, self.trigger_separation(), RF_mod=False)
+                        5e-9, self.trigger_separation(), RF_mod=False,
+                        acq_marker_channels=self.acq_marker_channels())
                 self._awg_seq_parameters_changed = False
 
         if self._UHFQC_awg_parameters_changed and self.auto_seq_loading():
@@ -195,7 +203,8 @@ class HeterodyneInstrument(Instrument):
                 self._awg_seq_filename = \
                     st_seqs.generate_and_upload_marker_sequence(
                         self.RO_length(), self.trigger_separation(),
-                        RF_mod=False)
+                        RF_mod=False,
+                        acq_marker_channels=self.acq_marker_channels())
                 self._awg_seq_parameters_changed = False
 
         if get_t_base:
@@ -406,6 +415,14 @@ class HeterodyneInstrument(Instrument):
     def _get_RO_length(self):
         return self._RO_length
 
+    def _set_acq_marker_channels(self, channels):
+        if channels != self._acq_marker_channels:
+            self._awg_seq_parameters_changed = True
+        self._acq_marker_channels = channels
+
+    def _get_acq_marker_channels(self):
+        return self._acq_marker_channels
+
     def get_demod_array(self):
         return self.cosI, self.sinI
 
@@ -456,6 +473,14 @@ class LO_modulated_Heterodyne(HeterodyneInstrument):
                            unit='s', vals=vals.Numbers(0, 1e-3),
                            set_cmd=self._set_acquisition_delay,
                            get_cmd=self._get_acquisition_delay)
+        self.add_parameter('I_channel', vals=vals.Strings(),
+                           label='I channel',
+                           set_cmd=self._set_I_channel,
+                           get_cmd=self._get_I_channel)
+        self.add_parameter('Q_channel', vals=vals.Strings(),
+                           label='Q channel',
+                           set_cmd=self._set_Q_channel,
+                           get_cmd=self._get_Q_channel)
 
         self._f_RO_mod = 10e6
         self._frequency = 5e9
@@ -465,6 +490,8 @@ class LO_modulated_Heterodyne(HeterodyneInstrument):
         self.mod_amp(.5)
         self._acquisition_delay = 0
         self.acquisition_delay(200e-9)
+        self._I_channel = 'ch3'
+        self._Q_channel = 'ch4'
 
     def prepare_CBox(self, get_t_base=True):
         """
@@ -476,7 +503,9 @@ class LO_modulated_Heterodyne(HeterodyneInstrument):
             self._awg_seq_filename = \
                 st_seqs.generate_and_upload_marker_sequence(
                     self.RO_length(), self.trigger_separation(), RF_mod=True,
-                    IF=self.f_RO_mod(), mod_amp=0.5)
+                    IF=self.f_RO_mod(), mod_amp=0.5,
+                    acq_marker_channels=self.acq_marker_channels(),
+                    I_channel=self.I_channel(), Q_channel=self.Q_channel())
             self.AWG.ch3_amp(self.mod_amp())
             self.AWG.ch4_amp(self.mod_amp())
             self._awg_seq_parameters_changed = False
@@ -502,7 +531,8 @@ class LO_modulated_Heterodyne(HeterodyneInstrument):
                 self._awg_seq_parameters_changed) and self.auto_seq_loading():
             self._awg_seq_filename = \
                 st_seqs.generate_and_upload_marker_sequence(
-                    5e-9, self.trigger_separation(), RF_mod=False)
+                    5e-9, self.trigger_separation(), RF_mod=False,
+                    acq_marker_channels=self.acq_marker_channels())
             self._awg_seq_parameters_changed = False
 
         # reupload the UHFQC pulse generation only if something changed
@@ -598,3 +628,21 @@ class LO_modulated_Heterodyne(HeterodyneInstrument):
 
     def _get_status(self):
         return self.LO.get('status')
+
+    def _set_I_channel(self, channel):
+        if channel != self._I_channel and \
+                not 'UHFQC' in self.acquisition_instr():
+            self._awg_seq_parameters_changed = True
+        self._I_channel = channel
+
+    def _get_I_channel(self):
+        return self._I_channel
+
+    def _set_Q_channel(self, channel):
+        if channel != self._Q_channel and \
+                not 'UHFQC' in self.acquisition_instr():
+            self._awg_seq_parameters_changed = True
+        self._Q_channel = channel
+
+    def _get_Q_channel(self):
+        return self._Q_channel
