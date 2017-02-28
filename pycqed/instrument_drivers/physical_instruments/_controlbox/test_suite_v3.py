@@ -122,7 +122,7 @@ class CBox_tests_v3(test_suite.CBox_tests):
                         self.CBox.set_awg_lookuptable(
                             awg_nr, pulse_nr, dac_nr,
                             sine_waves[pulse_nr],
-                            units='dac', length=waveLength)
+                            unit='dac', length=waveLength)
 
         self.CBox.set('acquisition_mode', 'idle')    # set to idle state
         self.CBox.set_master_controller_working_state(0, 0, 0)
@@ -148,7 +148,7 @@ class CBox_tests_v3(test_suite.CBox_tests):
             for dac_nr in range(2):
                 for pulse_nr in range(8):
                     self.CBox.set_awg_lookuptable(awg_nr, pulse_nr, dac_nr,
-                                                  plane, units='dac',
+                                                  plane, unit='dac',
                                                   length=triggerlength-1)
 
         # Setting parameters.
@@ -207,7 +207,7 @@ class CBox_tests_v3(test_suite.CBox_tests):
             for dac_nr in range(2):
                 for pulse_nr in range(8):
                     self.CBox.set_awg_lookuptable(awg_nr, pulse_nr, dac_nr,
-                                                  plane, units='dac',
+                                                  plane, unit='dac',
                                                   length=triggerlength-1)
 
         # load instructions
@@ -253,7 +253,7 @@ class CBox_tests_v3(test_suite.CBox_tests):
             for dac_nr in range(2):
                 for pulse_nr in range(8):
                     self.CBox.set_awg_lookuptable(awg_nr, pulse_nr, dac_nr,
-                                                  plane, units='dac',
+                                                  plane, unit='dac',
                                                   length=triggerlength-1)
         # load instructions
         self.CBox.set_master_controller_working_state(0, 0, 0)
@@ -365,10 +365,10 @@ class CBox_tests_v3(test_suite.CBox_tests):
             for pulse_nr in range(8):
                 self.CBox.set_awg_lookuptable(awg_nr, pulse_nr, 0,
                                               sine_waves[pulse_nr],
-                                              units='dac', length=waveLength)
+                                              unit='dac', length=waveLength)
                 self.CBox.set_awg_lookuptable(awg_nr, pulse_nr, 1,
                                               cosine_waves[pulse_nr],
-                                              units='dac', length=waveLength)
+                                              unit='dac', length=waveLength)
 
     def Appx_Cmp_Wave(self, wave1, wave2, allowedDev=0.02):
         (dev, pos) = self.MaxDev(wave1, wave2)

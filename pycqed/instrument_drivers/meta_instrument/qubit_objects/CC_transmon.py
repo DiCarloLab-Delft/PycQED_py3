@@ -64,41 +64,41 @@ class CBox_v3_driven_transmon(Transmon):
                            get_cmd=self._get_acquisition_instr,
                            vals=vals.Strings())
         self.add_parameter('mod_amp_cw', label='RO modulation ampl cw',
-                           units='V', initial_value=0.5,
+                           unit='V', initial_value=0.5,
                            parameter_class=ManualParameter)
         self.add_parameter('RO_power_cw', label='RO power cw',
-                           units='dBm',
+                           unit='dBm',
                            parameter_class=ManualParameter)
 
         self.add_parameter('mod_amp_td', label='RO modulation ampl td',
-                           units='V', initial_value=0.5,
+                           unit='V', initial_value=0.5,
                            parameter_class=ManualParameter)
 
         self.add_parameter('spec_pow', label='spectroscopy power',
-                           units='dBm',
+                           unit='dBm',
                            parameter_class=ManualParameter)
         self.add_parameter('spec_pow_pulsed',
                            label='pulsed spectroscopy power',
-                           units='dBm',
+                           unit='dBm',
                            parameter_class=ManualParameter)
         self.add_parameter('td_source_pow',
                            label='Time-domain power',
-                           units='dBm',
+                           unit='dBm',
                            parameter_class=ManualParameter)
         self.add_parameter('f_RO_mod',
-                           label='Readout-modulation frequency', units='Hz',
+                           label='Readout-modulation frequency', unit='Hz',
                            initial_value=-2e6,
                            parameter_class=ManualParameter)
 
         # Time-domain parameters
         self.add_parameter('f_pulse_mod',
                            initial_value=-2e6,
-                           label='pulse-modulation frequency', units='Hz',
+                           label='pulse-modulation frequency', unit='Hz',
                            parameter_class=ManualParameter)
-        self.add_parameter('awg_nr', label='CBox awg nr', units='#',
+        self.add_parameter('awg_nr', label='CBox awg nr', unit='#',
                            initial_value=0,
                            parameter_class=ManualParameter)
-        self.add_parameter('RO_awg_nr', label='CBox RO awg nr', units='#',
+        self.add_parameter('RO_awg_nr', label='CBox RO awg nr', unit='#',
                            initial_value=1,
                            parameter_class=ManualParameter)
 
@@ -113,26 +113,26 @@ class CBox_v3_driven_transmon(Transmon):
                            parameter_class=ManualParameter)
 
         self.add_parameter('amp180',
-                           label='Pi-pulse amplitude', units='V',
+                           label='Pi-pulse amplitude', unit='V',
                            initial_value=0.3,
                            parameter_class=ManualParameter)
         # Amp 90 is hardcoded to be half amp180
         self.add_parameter('amp90',
-                           label='Pi/2-pulse amplitude', units='V',
+                           label='Pi/2-pulse amplitude', unit='V',
                            initial_value=0.3,
                            parameter_class=ManualParameter)
-        self.add_parameter('gauss_width', units='s',
+        self.add_parameter('gauss_width', unit='s',
                            initial_value=10e-9,
                            parameter_class=ManualParameter)
-        self.add_parameter('motzoi', label='Motzoi parameter', units='',
+        self.add_parameter('motzoi', label='Motzoi parameter', unit='',
                            initial_value=0,
                            parameter_class=ManualParameter)
 
         # Single shot readout specific parameters
-        self.add_parameter('RO_threshold', units='dac-value',
+        self.add_parameter('RO_threshold', unit='dac-value',
                            initial_value=0,
                            parameter_class=ManualParameter)
-        self.add_parameter('RO_rotation_angle', units='deg',
+        self.add_parameter('RO_rotation_angle', unit='deg',
                            initial_value=0,
                            vals=vals.Numbers(0, 360),
                            parameter_class=ManualParameter)
@@ -140,9 +140,9 @@ class CBox_v3_driven_transmon(Transmon):
                            vals=vals.Enum(0, 1), initial_value=0)
 
         # Mixer skewness correction
-        self.add_parameter('mixer_drive_phi', units='deg',
+        self.add_parameter('mixer_drive_phi', unit='deg',
                            parameter_class=ManualParameter, initial_value=0)
-        self.add_parameter('mixer_drive_alpha', units='',
+        self.add_parameter('mixer_drive_alpha', unit='',
                            parameter_class=ManualParameter, initial_value=1)
         # Mixer offsets correction, qubit drive
         self.add_parameter('mixer_offs_drive_I',
@@ -160,12 +160,12 @@ class CBox_v3_driven_transmon(Transmon):
                                'MW_IQmod_pulse', 'Gated_MW_RO_pulse'),
                            parameter_class=ManualParameter)
         self.add_parameter('RO_depletion_time', initial_value=1e-6,
-                           units='s',
+                           unit='s',
                            parameter_class=ManualParameter,
                            vals=vals.Numbers(min_value=0))
         self.add_parameter('init_time',
                            label='Qubit initialization time',
-                           units='s', initial_value=200e-6,
+                           unit='s', initial_value=200e-6,
                            parameter_class=ManualParameter,
                            # max value based on register size
                            vals=vals.Numbers(min_value=1e-6,
@@ -1152,7 +1152,7 @@ class QWG_driven_transmon(CBox_v3_driven_transmon):
     def add_parameters(self):
         self.add_parameter('amp90_scale',
                            label='pulse amplitude scaling factor',
-                           units='',
+                           unit='',
                            initial_value=.5,
                            vals=vals.Numbers(min_value=0, max_value=1.0),
                            parameter_class=ManualParameter)

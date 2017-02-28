@@ -18,7 +18,7 @@ class IQ_mixer(Instrument):
                            get_cmd=self._get_QI_amp_ratio,
                            vals=vals.Numbers(0, 2))
 
-        self.add_parameter('IQ_phase_skewness', units='deg',
+        self.add_parameter('IQ_phase_skewness', unit='deg',
                            get_cmd=self._get_IQ_phase_skewness,
                            set_cmd=self._set_IQ_phase_skewness,
                            vals=vals.Numbers(0, 360))
