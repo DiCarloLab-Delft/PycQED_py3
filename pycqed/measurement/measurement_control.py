@@ -65,7 +65,7 @@ class MeasurementControl(Instrument):
                            vals=vals.Bool(),
                            initial_value=live_plot_enabled)
         self.add_parameter('plotting_interval',
-                           units='s',
+                           unit='s',
                            vals=vals.Numbers(min_value=0.001),
                            set_cmd=self._set_plotting_interval,
                            get_cmd=self._get_plotting_interval)
