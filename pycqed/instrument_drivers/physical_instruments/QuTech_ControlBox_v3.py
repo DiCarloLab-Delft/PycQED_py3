@@ -39,11 +39,18 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
                            vals=vals.Enum('internal', 'external',
                                           'mixed'))
         self._pulse_queue_state = defHeaders.pulse_queue_states[0]
-        self.add_parameter('pulse_queue_state',
-                           get_cmd=self._do_get_pulse_queue_state)
+        self.add_parameter(
+            'pulse_queue_state',
+            docstring=('returns 0 if OK. returns 1 if instructions are not'
+                       ' executed fast enough.'),
+            get_cmd=self._do_get_pulse_queue_state)
         self._max_instruction_address = 0
-        self.add_parameter('max_instruction_address',
-                           get_cmd=self._do_get_max_instruction_address)
+        self.add_parameter(
+            'max_instruction_address',
+            docstring=('returns the highest address (index) of instructions '
+                       'that was exectued by the program, should be equal '
+                       'to uploaded_program_length.'),
+            get_cmd=self._do_get_max_instruction_address)
         self._uploaded_program_length = 0
         self.add_parameter('uploaded_program_length',
                            get_cmd=self._do_get_uploaded_program_length)
