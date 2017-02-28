@@ -455,7 +455,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         raise NotImplementedError()
 
     def measure_heterodyne_spectroscopy(self, freqs, MC=None,
-                                        analyze=True, close_fig=True):
+                                        analyze=True, close_fig=True, RO_length=2274e-9):
         self.prepare_for_continuous_wave()
 
         # sqts.Pulsed_spec_seq(spec_pars, RO_pars)
@@ -466,14 +466,14 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         MC.set_sweep_points(freqs)
         MC.set_detector_function(
             det.Heterodyne_probe(self.heterodyne_instr,
-                                 trigger_separation=4e-6))
+                                 trigger_separation=4e-6, RO_length=RO_length))
         MC.run(name='Resonator_scan'+self.msmt_suffix)
         if analyze:
             ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
 
     def measure_spectroscopy(self, freqs, pulsed=False, MC=None,
                              analyze=True, close_fig=True,
-                             force_load=True, use_max=False, update=True):
+                             force_load=True, use_max=False, update=True, RO_length=2274e-9):
         self.prepare_for_continuous_wave()
         self.cw_source.on()
         if MC is None:
@@ -491,7 +491,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                               self.cw_source.frequency))
         MC.set_sweep_points(freqs)
         MC.set_detector_function(
-            det.Heterodyne_probe(self.heterodyne_instr, trigger_separation=2.8e-6))
+            det.Heterodyne_probe(self.heterodyne_instr, trigger_separation=2.8e-6, RO_length=RO_length))
         MC.run(name='spectroscopy'+self.msmt_suffix)
 
         if analyze:

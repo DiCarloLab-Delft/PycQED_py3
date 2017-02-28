@@ -169,7 +169,7 @@ ATS_controller.update_acquisitionkwargs(#mode='NPT',
                  buffer_timeout=1000
 )
 
-HS = hd.HeterodyneInstrument('HS', LO=LO, RF=RF, AWG=None,
+HS = hd.HeterodyneInstrument('HS', LO=LO, RF=RF, AWG=AWG,
                              acquisition_instr=ATS.name,
                              acquisition_instr_controller=ATS_controller.name,
                              server_name=None)
@@ -277,13 +277,13 @@ print('Ran initialization in %.2fs' % (t1-t0))
 
 def print_instr_params(instr):
     snapshot = instr.snapshot()
-    print('{0:23} {1} \t ({2})'.format('\t parameter ', 'value', 'units'))
+    print('{0:23} {1} \t ({2})'.format('\t parameter ', 'value', 'unit'))
     print('-'*80)
     for par in sorted(snapshot['parameters']):
         print('{0:25}: \t{1}\t ({2})'.format(
             snapshot['parameters'][par]['name'],
             snapshot['parameters'][par]['value'],
-            snapshot['parameters'][par]['units']))
+            snapshot['parameters'][par]['unit']))
 
 
 def switch_to_pulsed_RO_UHFQC(qubit):
@@ -304,8 +304,8 @@ def switch_to_pulsed_RO_UHFQC(qubit):
     qubit.RO_acq_averages(1024)
     qubit.RO_acq_marker_delay(100e-9)
     qubit.RO_pulse_delay(100e-9)
-    qubit.spec_pulse_depletion_time(5e-6)
-    qubit.spec_pulse_length(10e-6)
+    qubit.spec_pulse_depletion_time(50e-9)
+    qubit.spec_pulse_length(5e-6)
     qubit.spec_pulse_marker_channel('ch1_marker1')
     qubit.td_source_pow(16)
     qubit.RO_acq_integration_length(2e-6)
