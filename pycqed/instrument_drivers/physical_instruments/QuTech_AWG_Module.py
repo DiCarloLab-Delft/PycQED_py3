@@ -52,11 +52,11 @@ class QuTech_AWG_Module(SCPI):
         self.device_descriptor.numMarkersPerChannel = 2
         self.device_descriptor.numMarkers = 8
         self.device_descriptor.numTriggers = 8
-        self.device_descriptor.numCodewords = 8
+        self.device_descriptor.numCodewords = 128
 
         # valid values
         self.device_descriptor.mvals_trigger_impedance = vals.Enum(50),
-        self.device_descriptor.mvals_trigger_level = vals.Numbers(0, 2.5)
+        self.device_descriptor.mvals_trigger_level = vals.Numbers(0, 5.0)
         # FIXME: not in [V]
 
         self.add_parameters()
@@ -74,7 +74,7 @@ class QuTech_AWG_Module(SCPI):
             # NB: sideband frequency has a resolution of ~0.23 Hz:
             self.add_parameter('ch_pair{}_sideband_frequency'.format(ch_pair),
                                parameter_class=HandshakeParameter,
-                               units='Hz',
+                               unit='Hz',
                                label=('Sideband frequency channel ' +
                                       'pair {} (Hz)'.format(i)),
                                get_cmd=sfreq_cmd + '?',
@@ -83,7 +83,7 @@ class QuTech_AWG_Module(SCPI):
                                get_parser=float)
             self.add_parameter('ch_pair{}_sideband_phase'.format(ch_pair),
                                parameter_class=HandshakeParameter,
-                               units='deg',
+                               unit='deg',
                                label=('Sideband phase channel' +
                                       ' pair {} (deg)'.format(i)),
                                get_cmd=sph_cmd + '?',
@@ -106,7 +106,7 @@ class QuTech_AWG_Module(SCPI):
             triglev_cmd = 'qutech:trigger{}:level'.format(i)
             # individual trigger level per trigger input:
             self.add_parameter('tr{}_trigger_level'.format(i),
-                               units='V',
+                               unit='V',
                                label='Trigger level channel {} (V)'.format(i),
                                get_cmd=triglev_cmd + '?',
                                set_cmd=triglev_cmd + ' {}',
@@ -137,16 +137,16 @@ class QuTech_AWG_Module(SCPI):
             self.add_parameter('ch{}_amp'.format(ch),
                                parameter_class=HandshakeParameter,
                                label='Amplitude channel {} (Vpp into 50 Ohm)'.format(ch),
-                               units='Vpp',
+                               unit='Vpp',
                                get_cmd=amp_cmd + '?',
                                set_cmd=amp_cmd + ' {:.6f}',
-                               vals=vals.Numbers(-0.45, 0.45),
+                               vals=vals.Numbers(-2.0, 2.0),
                                get_parser=float)
 
             self.add_parameter('ch{}_offset'.format(ch),
                                # parameter_class=HandshakeParameter,
                                label='Offset channel {}'.format(ch),
-                               units='V',
+                               unit='V',
                                get_cmd=offset_cmd + '?',
                                set_cmd=offset_cmd + ' {:.3f}',
                                vals=vals.Numbers(-.25, .25),
@@ -161,8 +161,7 @@ class QuTech_AWG_Module(SCPI):
             for j in range(self.device_descriptor.numChannels):
                 ch = j+1
                 # Codeword 0 corresponds to bitcode 0
-                # +1 is to correct for SCPI command in software see issue #74
-                cw_cmd = 'sequence:element{:d}:waveform{:d}'.format(cw+1, ch)
+                cw_cmd = 'sequence:element{:d}:waveform{:d}'.format(cw, ch)
                 self.add_parameter('codeword_{}_ch{}_waveform'.format(cw, ch),
                                    get_cmd=cw_cmd+'?',
                                    set_cmd=cw_cmd+' "{:s}"',
@@ -171,7 +170,7 @@ class QuTech_AWG_Module(SCPI):
         # Waveform parameters
         self.add_parameter('WlistSize',
                            label='Waveform list size',
-                           units='#',
+                           unit='#',
                            get_cmd='wlist:size?',
                            get_parser=int)
         self.add_parameter('Wlist',

@@ -33,26 +33,26 @@ class UHFQC_LookuptableManager(Instrument):
         self.UHFQC = UHFQC
 
         self.add_parameter('Q_amp180',
-                           units='V',
+                           unit='V',
                            vals=vals.Numbers(-1, 1),
                            parameter_class=ManualParameter,
                            initial_value=0.1)
-        self.add_parameter('Q_amp90', units='V',
+        self.add_parameter('Q_amp90', unit='V',
                            vals=vals.Numbers(-1, 1),
                            parameter_class=ManualParameter,
                            initial_value=0.05)
-        self.add_parameter('Q_ampCW', units='V',
+        self.add_parameter('Q_ampCW', unit='V',
                            vals=vals.Numbers(-1, 1),
                            parameter_class=ManualParameter,
                            initial_value=0.05)
-        self.add_parameter('Q_block_length', units='s',
+        self.add_parameter('Q_block_length', unit='s',
                            vals=vals.Numbers(1e-9, 640e-9),
                            parameter_class=ManualParameter,
                            initial_value=500e-9)
         self.add_parameter('Q_motzoi_parameter', vals=vals.Numbers(-2, 2),
                            parameter_class=ManualParameter,
                            initial_value=0.0)
-        self.add_parameter('Q_gauss_width', vals=vals.Numbers(), units='s',
+        self.add_parameter('Q_gauss_width', vals=vals.Numbers(), unit='s',
                            parameter_class=ManualParameter,
                            initial_value=10e-9)
         self.add_parameter('Q_gauss_nr_sigma', vals=vals.Numbers(),
@@ -62,13 +62,13 @@ class UHFQC_LookuptableManager(Instrument):
                            parameter_class=ManualParameter,
                            initial_value=1.0)
         self.add_parameter('mixer_IQ_phase_skewness', vals=vals.Numbers(),
-                           units='deg',
+                           unit='deg',
                            parameter_class=ManualParameter,
                            initial_value=0.0)
-        self.add_parameter('Q_modulation', vals=vals.Numbers(), units='Hz',
+        self.add_parameter('Q_modulation', vals=vals.Numbers(), unit='Hz',
                            parameter_class=ManualParameter,
                            initial_value=20.0e6)
-        self.add_parameter('sampling_rate', vals=vals.Numbers(), units='Hz',
+        self.add_parameter('sampling_rate', vals=vals.Numbers(), unit='Hz',
                            parameter_class=ManualParameter,
                            initial_value=1.8e9)
         # These parameters are added for mixer skewness correction.
@@ -77,62 +77,62 @@ class UHFQC_LookuptableManager(Instrument):
         self.add_parameter('mixer_alpha', vals=vals.Numbers(),
                            parameter_class=ManualParameter,
                            initial_value=1.0)
-        self.add_parameter('mixer_phi', vals=vals.Numbers(), units='deg',
+        self.add_parameter('mixer_phi', vals=vals.Numbers(), unit='deg',
                            parameter_class=ManualParameter,
                            initial_value=0.0)
         self.add_parameter('mixer_apply_predistortion_matrix', vals=vals.Bool(),
                            parameter_class=ManualParameter,
                            initial_value=False)
-        self.add_parameter('M_modulation', vals=vals.Numbers(), units='Hz',
+        self.add_parameter('M_modulation', vals=vals.Numbers(), unit='Hz',
                            parameter_class=ManualParameter,
                            initial_value=20.0e6)
-        self.add_parameter('M_length', units='s',
+        self.add_parameter('M_length', unit='s',
                            vals=vals.Numbers(1e-9, 8000e-9),
                            parameter_class=ManualParameter,
                            initial_value=300e-9)
-        self.add_parameter('M_amp', units='V',
+        self.add_parameter('M_amp', unit='V',
                            vals=vals.Numbers(0, 1),
                            parameter_class=ManualParameter,
                            initial_value=0.1)
-        self.add_parameter('M_phi', units='deg',
+        self.add_parameter('M_phi', unit='deg',
                            parameter_class=ManualParameter,
                            initial_value=0.0)
-        self.add_parameter('M_up_length', units='s',
+        self.add_parameter('M_up_length', unit='s',
                    vals=vals.Numbers(1e-9, 640e-9),
                    parameter_class=ManualParameter,
                    initial_value=100.0e-9)
-        self.add_parameter('M_up_amp', units='V',
+        self.add_parameter('M_up_amp', unit='V',
                            vals=vals.Numbers(0, 1),
                            parameter_class=ManualParameter,
                            initial_value=0.1)
-        self.add_parameter('M_up_phi', units='deg',
+        self.add_parameter('M_up_phi', unit='deg',
                            parameter_class=ManualParameter,
                            initial_value=0.0)
-        self.add_parameter('M_down_length', units='s',
+        self.add_parameter('M_down_length', unit='s',
                            vals=vals.Numbers(1e-9, 640e-9),
                            parameter_class=ManualParameter,
                            initial_value=200.0e-9)
-        self.add_parameter('M_down_amp0', units='V',
+        self.add_parameter('M_down_amp0', unit='V',
                            vals=vals.Numbers(0, 1),
                            parameter_class=ManualParameter,
                            initial_value=0.1)
-        self.add_parameter('M_down_amp1', units='V',
+        self.add_parameter('M_down_amp1', unit='V',
                            vals=vals.Numbers(0, 1),
                            parameter_class=ManualParameter,
                            initial_value=0.1)
-        self.add_parameter('M_down_phi0', units='deg',
+        self.add_parameter('M_down_phi0', unit='deg',
                            parameter_class=ManualParameter,
                            initial_value=180.0)
-        self.add_parameter('M_down_phi1', units='deg',
+        self.add_parameter('M_down_phi1', unit='deg',
                            parameter_class=ManualParameter,
                            initial_value=180.0)
-        self.add_parameter('M0_modulation', vals=vals.Numbers(), units='Hz',
+        self.add_parameter('M0_modulation', vals=vals.Numbers(), unit='Hz',
                            parameter_class=ManualParameter,
                            initial_value=20.0e6)
-        self.add_parameter('M1_modulation', vals=vals.Numbers(), units='Hz',
+        self.add_parameter('M1_modulation', vals=vals.Numbers(), unit='Hz',
                            parameter_class=ManualParameter,
                            initial_value=20.0e6)
-        self.add_parameter('acquisition_delay', vals=vals.Numbers(), units='ns',
+        self.add_parameter('acquisition_delay', vals=vals.Numbers(), unit='ns',
                            parameter_class=ManualParameter,
                            initial_value=270e-9)
 
@@ -283,7 +283,7 @@ class UHFQC_LookuptableManager(Instrument):
 
         return self._wave_dict
 
-    def render_wave(self, wave_name, show=True, time_units='lut_index',
+    def render_wave(self, wave_name, show=True, time_unit='lut_index',
                     reload_pulses=True):
         if reload_pulses:
             self.generate_standard_pulses()

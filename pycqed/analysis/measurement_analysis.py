@@ -19,14 +19,23 @@ import math
 from math import erfc
 from scipy.signal import argrelextrema, argrelmax, argrelmin
 from copy import deepcopy
-import qutip as qtp
-from pycqed.analysis import tomography as tomo_mod
 
 try:
     from nathan_plotting_tools import *
 except:
     pass
 from pycqed.analysis import composite_analysis as ca
+
+try:
+    import qutip as qtp
+    from pycqed.analysis.tomography import Tomo_Multiplexed
+except ImportError as e:
+    if str(e).find('qutip') >= 0:
+        logging.warning('Could not import qutip')
+    else:
+        raise
+
+
 
 imp.reload(dm_tools)
 
@@ -5020,275 +5029,6 @@ class butterfly_analysis(MeasurementAnalysis):
         return self.butterfly_coeffs
 
 
-class Tomo_Analysis(MeasurementAnalysis):
-
-    def __init__(self, num_qubits=2, quad='IQ', over_complete_set=False,
-                 plot_oper=True, folder=None, auto=True, **kw):
-        self.num_qubits = num_qubits
-        self.num_states = 2**num_qubits
-        self.over_complete_set = over_complete_set
-        if over_complete_set:
-            self.num_measurements = 6**num_qubits
-        else:
-            self.num_measurements = 4**num_qubits
-        self.quad = quad
-        self.plot_oper = plot_oper
-        super(self.__class__, self).__init__(**kw)
-
-    def run_default_analysis(self, **kw):
-        self.get_naming_and_values()
-        data_I = self.get_values(key='I')
-        data_Q = self.get_values(key='Q')
-        measurements_tomo = (np.array([data_I[0:36], data_Q[0:36]])).flatten()
-        measurements_cal = np.array([np.average(data_I[36:39]),
-                                     np.average(data_I[39:42]),
-                                     np.average(data_I[42:45]),
-                                     np.average(data_I[45:48]),
-                                     np.average(data_Q[36:39]),
-                                     np.average(data_Q[39:42]),
-                                     np.average(data_Q[42:45]),
-                                     np.average(data_Q[45:48])])
-
-        if self.quad == 'IQ':
-            self.use_both_quad = True
-        else:
-            self.use_both_quad = False
-            if self.quad == 'Q':
-                measurements_tomo[0:self.num_measurements] = measurements_tomo[
-                    self.num_measurements:]
-                measurements_cal[0:self.num_states] = measurements_cal[
-                    self.num_states:]
-            elif self.quad != 'I':
-                raise Error('Quadrature to use is not clear.')
-
-        beta_I = self.calibrate_beta(
-            measurements_cal=measurements_cal[0:self.num_states])
-        beta_Q = np.zeros(self.num_states)
-        if self.use_both_quad == True:
-            beta_Q = self.calibrate_beta(
-                measurements_cal=measurements_cal[self.num_states:])
-
-        if self.use_both_quad == True:
-            max_idx = 2*self.num_measurements
-        else:
-            max_idx = self.num_measurements
-
-        results = self.calc_operators(
-            measurements_tomo[:max_idx], beta_I, beta_Q)
-        self.results = results
-        self.dens_mat = self.calc_density_matrix(results)
-        if self.plot_oper == True:
-            self.plot_operators(**kw)
-
-    def calibrate_beta(self, measurements_cal):
-        # calibrates betas for the measurement operator
-        cal_matrix = np.zeros((self.num_states, self.num_states))
-        for i in range(self.num_states):
-            for j in range(self.num_states):
-                cal_matrix[i, j] = (-1)**(self.get_bit_sum(i & j))
-        beta = np.dot(np.linalg.inv(cal_matrix), measurements_cal)
-        print(beta)
-        return beta
-
-    def calc_operators(self, measurements_tomo, beta_I, beta_Q):
-        M = self.num_measurements
-        K = 4**self.num_qubits - 1
-        if self.use_both_quad == False:
-            measurement_matrix = np.zeros((M, K))
-            measurements_tomo[:M] = measurements_tomo[:M] - beta_I[0]
-            measurements_tomo[M:] = measurements_tomo[M:] - beta_Q[0]
-        else:
-            measurement_matrix = np.zeros((2*M, K))
-
-        for i in range(M):
-            for j in range(1, self.num_states):
-                place, sign = self.rotate_M0_elem(i, j)
-                measurement_matrix[i, place] = sign*beta_I[j]
-        if self.use_both_quad == True:
-            for i in range(M):
-                for j in range(1, self.num_states):
-                    place, sign = self.rotate_M0_elem(i, j)
-                    measurement_matrix[i+M, place] = sign*beta_Q[j]
-
-        inverse = np.linalg.pinv(measurement_matrix)
-        pauli_operators = np.dot(inverse, measurements_tomo)
-
-        p_op = np.zeros(4**self.num_qubits)
-        p_op[0] = 1
-        p_op[1:] = pauli_operators
-        return np.real(p_op)
-
-    def rotate_M0_elem(self, rotation, elem):
-        # moves first the first one
-        rot_vector = self.get_rotation_vector(rotation)
-        # moves first the last one
-        elem_op_vector = self.get_m0_elem_vector(elem)
-
-        res_vector = np.zeros(len(rot_vector))
-        sign = 1
-        for i in range(len(rot_vector)):
-            value = elem_op_vector[i]
-            res_vector[i] = 0
-            if value == 1:
-                if rot_vector[i] == 0:
-                    res_vector[i] = value
-                    sign = sign
-                if rot_vector[i] == 1:
-                    res_vector[i] = value
-                    sign = -1*sign
-                if rot_vector[i] == 2:
-                    res_vector[i] = 3
-                    sign = sign
-                if rot_vector[i] == 3:
-                    res_vector[i] = 2
-                    sign = -1*sign
-                if rot_vector[i] == 4:
-                    res_vector[i] = 3
-                    sign = -1*sign
-                if rot_vector[i] == 5:
-                    res_vector[i] = 2
-                    sign = sign
-            else:
-                res_vector[i] = value
-                sign = sign
-
-        res_number = self.get_pauli_op_number(res_vector) - 1
-        # the minus 1 is to not consider the <II> in the pauli vector
-        return np.array([res_number, sign])
-
-    def calc_density_matrix(self, pauli_operators):
-        Id2 = np.identity(2)
-        Z_op = [[1+0.j, 0+0.j], [0+0.j, -1+0.j]]
-        X_op = [[0+0.j, 1+0.j], [1+0.j, 0+0.j]]
-        Y_op = [[0+0.j, -1.j], [1.j, 0+0.j]]
-        rho = np.zeros((self.num_states, self.num_states))
-        # np.kron works in the same way as bits (the most signifcant at left)
-        for i in range(0, 2**self.num_states):
-            vector = self.get_pauli_op_vector(i)
-            acum = 1
-            for j in range(self.num_qubits-1, -1, -1):
-                if vector[j] == 0:
-                    temp = np.kron(Id2, acum)
-                if vector[j] == 1:
-                    temp = np.kron(Z_op, acum)
-                if vector[j] == 2:
-                    temp = np.kron(X_op, acum)
-                if vector[j] == 3:
-                    temp = np.kron(Y_op, acum)
-                del acum
-                acum = temp
-                del temp
-            rho = rho + acum*pauli_operators[i]
-        return rho/self.num_states
-
-    def get_pauli_op_number(self, pauli_vector):
-        pauli_number = 0
-        N = len(pauli_vector)
-        for i in range(0, N, 1):
-            pauli_number += pauli_vector[N-i-1] * (4**i)
-        return pauli_number
-
-    def get_pauli_op_vector(self, pauli_number):
-        N = self.num_qubits
-        pauli_vector = np.zeros(N)
-        rest = pauli_number
-        for i in range(0, N, 1):
-            value = rest % 4
-            pauli_vector[i] = value
-            rest = (rest-value)/4
-        return pauli_vector
-
-    def get_m0_elem_vector(self, elem_number):
-        elem_vector = np.zeros(self.num_qubits)
-        rest = elem_number
-        for i in range(self.num_qubits-1, -1, -1):
-            value = rest % 2
-            elem_vector[i] = value
-            rest = (rest-value)/2
-        return elem_vector
-
-    def get_rotation_vector(self, rot_number):
-        N = self.num_qubits
-        rot_vector = np.zeros(N)
-        rest = rot_number
-        if self.over_complete_set:
-            total = 6
-        else:
-            total = 4
-        for i in range(N-1, -1, -1):
-            value = rest % total
-            rot_vector[i] = value
-            rest = (rest-value)/total
-        return rot_vector
-
-    def get_bit_sum(self, number):
-        N = self.num_qubits
-        summ = 0
-        rest = number
-        for i in range(N-1, -1, -1):
-            value = rest % 2
-            summ += value
-            rest = (rest-value)/2
-        return summ
-
-    def get_operators_label(self):
-        labels = []
-        for i in range(2**self.num_states):
-            vector = self.get_pauli_op_vector(i)
-            label = ''
-            for j in range(self.num_qubits):
-                if vector[j] == 0:
-                    label = 'I'+label
-                if vector[j] == 1:
-                    label = 'Z'+label
-                if vector[j] == 2:
-                    label = 'X'+label
-                if vector[j] == 3:
-                    label = 'Y'+label
-            labels.append(label)
-
-        labels = ['IX', 'IY', 'IZ', 'XI', 'YI', 'ZI', 'XX',
-                  'XY', 'XZ', 'YX', 'YY', 'YZ', 'ZX', 'ZY', 'ZZ']
-        return labels
-
-    def plot_operators(self, **kw):
-        import qutip as qtip
-        fig = plt.figure(figsize=(15, 5))
-        ax = fig.add_subplot(121)
-        pauli_1, pauli_2, pauli_cor = self.order_pauli_output2(self.results)
-        width = 0.35
-        ind1 = np.arange(3)
-        ind2 = np.arange(3, 6)
-        ind3 = np.arange(6, 15)
-        ind = np.arange(15)
-        q1 = ax.bar(ind1, pauli_1, width, color='r')
-        q1 = ax.bar(ind2, pauli_2, width, color='b')
-        q2 = ax.bar(ind3, pauli_cor, width, color='purple')
-
-        ax.set_title('%d Qubit State Tomography' % self.num_qubits)
-#         ax.set_ylim(-1,1)
-        ax.set_xticks(np.arange(0, 2**self.num_states))
-        ax.set_xticklabels(self.get_operators_label())
-        ax2 = fig.add_subplot(122, projection='3d')
-        qtip.matrix_histogram_complex(qtip.Qobj(self.dens_mat),
-                                      xlabels=['00', '01', '10', '11'], ylabels=['00', '01', '10', '11'],
-                                      fig=fig, ax=ax2)
-        print('working so far')
-        self.save_fig(fig, figname=self.measurementstring, **kw)
-# print 'Concurrence = %f' %
-# qt.concurrence(qt.Qobj(self.dens_mat,dims=[[2, 2], [2, 2]]))
-        return
-
-    def order_pauli_output2(self, pauli_op_dis):
-        pauli_1 = np.array([pauli_op_dis[2], pauli_op_dis[3], pauli_op_dis[1]])
-        pauli_2 = np.array(
-            [pauli_op_dis[8], pauli_op_dis[12], pauli_op_dis[4]])
-        pauli_corr = np.array([pauli_op_dis[10], pauli_op_dis[11], pauli_op_dis[9],
-                               pauli_op_dis[14], pauli_op_dis[
-                                   15], pauli_op_dis[13],
-                               pauli_op_dis[6], pauli_op_dis[7], pauli_op_dis[5]])
-        return pauli_1, pauli_2, pauli_corr
-
 ##########################################
 ### Analysis for data measurement sets ###
 ##########################################
@@ -5485,118 +5225,83 @@ class Chevron_2D(object):
         return
 
 
-class DoubleFrequency(object):
+class DoubleFrequency(MeasurementAnalysis):
 
-    def __init__(self, auto=True, label='Ramsey', timestamp=None):
-        if timestamp is None:
-            self.folder = a_tools.latest_data(label)
-            splitted = self.folder.split('\\')
-            self.scan_start = splitted[-2]+'_'+splitted[-1][:6]
-            self.scan_stop = self.scan_start
-        else:
-            self.scan_start = timestamp
-            self.scan_stop = timestamp
-            self.folder = a_tools.get_folder(timestamp=self.scan_start)
-        self.pdict = {'I': 'amp',
-                      'sweep_points': 'sweep_points'}
-        self.opt_dict = {'scan_label': label}
-        self.nparams = ['I', 'sweep_points']
-        self.label = label
-        if auto == True:
-            self.analysis()
+    def __init__(self, auto=True, label='Ramsey', timestamp=None, **kw):
+        super().__init__(**kw)
 
-    def analysis(self):
-        # print(self.scan_start,self.scan_stop,self.opt_dict,self.pdict,self.nparams)
-        ramsey_scan = ca.quick_analysis(t_start=self.scan_start,
-                                        t_stop=self.scan_stop,
-                                        options_dict=self.opt_dict,
-                                        params_dict_TD=self.pdict,
-                                        numeric_params=self.nparams)
-        x = ramsey_scan.TD_dict['sweep_points'][0]*1e6
-        y = a_tools.normalize_data_v3(ramsey_scan.TD_dict['I'][0])
-        # print(y)
+    def run_default_analysis(self, **kw):
+        self.get_naming_and_values()
+        x = self.sweep_points
+        y = a_tools.normalize_data_v3(self.measured_values[0])
 
         fit_res = self.fit(x[:-4], y[:-4])
         self.fit_res = fit_res
-        # print(fit_res.best_values)
+        print(x[1])
 
-        fig = plt.figure()
-        ax = fig.add_subplot(111)
+        fig, ax = plt.subplots()
         self.box_props = dict(boxstyle='Square', facecolor='white', alpha=0.8)
 
-        textstr = ('  $f_1$  \t= %.3g $ \t \pm$ (%.3g) MHz'
-                   % (fit_res.params['freq_1'].value,
-                      fit_res.params['freq_1'].stderr) +
-                   '\n$f_2$ \t= %.3g $ \t \pm$ (%.3g) MHz'
-                   % (fit_res.params['freq_2'].value,
-                       fit_res.params['freq_2'].stderr) +
-                   '\n$T_2^\star (1)$ = %.3g $\t \pm$ (%.3g) s '
-                   % (fit_res.params['tau_1'].value,
-                       fit_res.params['tau_1'].stderr) +
-                   '\n$T_2^\star (2)$ = %.3g $\t \pm$ (%.3g) s '
-                   % (fit_res.params['tau_2'].value,
-                       fit_res.params['tau_2'].stderr))
+        f1 = fit_res.params['freq_1'].value
+        f2 = fit_res.params['freq_2'].value
+        A1 = fit_res.params['amp_1'].value
+        A2 = fit_res.params['amp_2'].value
+        tau1 = fit_res.params['tau_1'].value
+        tau2 = fit_res.params['tau_2'].value
+
+        textstr = ('$A_1$: {:.3f}       \t$A_2$: {:.3f} \n'.format(A1, A2) +
+                   '$f_1$: {:.3f} MHz\t$f_2$: {:.3f} MHz \n'.format(
+                        f1*1e-6, f2*1e-6) +
+                   r'$\tau _1$: {:.2f} $\mu$s'.format(tau1*1e6) +
+                   '  \t'+r'$\tau _2$: {:.2f}$\mu$s'.format(tau2*1e6))
+
         ax.text(0.4, 0.95, textstr,
                 transform=ax.transAxes, fontsize=11,
                 verticalalignment='top', bbox=self.box_props)
-
         plot_x = x
-        plot_step = plot_x[1]-plot_x[0]
 
-        ax.set_xlabel(r'Time ($\mu s$)')
         ax.set_ylabel(r'$F |1\rangle$')
-        ax.set_title('%s: Double Frequency analysis' % self.scan_start)
-        ax.set_xlim(plot_x.min()-plot_step/2., plot_x.max()+plot_step/2.)
-
-        ax.plot(plot_x, y, 'bo')
-        ax.plot(plot_x[:-4], self.fit_plot, 'r-')
-
+        ax.set_title('%s: Double Frequency analysis' % self.timestamp)
+        ax.set_xlabel(r'Time ($\mu s$)')
+        ax.plot(plot_x*1e6, y, 'bo')
+        ax.plot(plot_x[:-4]*1e6, self.fit_plot, 'r-')
         fig.tight_layout()
-        self.save_fig(fig)
+        self.save_fig(fig, **kw)
 
     def fit(self, sweep_values, measured_values):
         Double_Cos_Model = fit_mods.DoubleExpDampOscModel
-        fourier_max_pos = a_tools.peak_finder_v2(np.arange(1, len(sweep_values)/2, 1),
-                                                 abs(np.fft.fft(measured_values))[
-                                                     1:len(measured_values)//2],
-                                                 window_len=1, perc=95)
+        fourier_max_pos = a_tools.peak_finder_v2(
+            np.arange(1, len(sweep_values)/2, 1),
+            abs(np.fft.fft(measured_values))[1:len(measured_values)//2],
+            window_len=1, perc=95)
         if len(fourier_max_pos) == 1:
             freq_guess = 1./sweep_values[-1] * \
                 (fourier_max_pos[0]+np.array([-1, 1]))
         else:
             freq_guess = 1./sweep_values[-1]*fourier_max_pos
-        # print(abs(np.fft.fft(measured_values))[1:len(measured_values)/2])
         Double_Cos_Model.set_param_hint(
-            'tau_1', value=10., min=1., max=250., vary=True)
+            'tau_1', value=.3*sweep_values[-1], vary=True)
         Double_Cos_Model.set_param_hint(
-            'tau_2', value=9., min=1., max=250., vary=True)
-        # Double_Cos_Model.set_param_hint('tau_2',expr='tau_1', min = 1., max = 250.)
+            'tau_2', value=.3*sweep_values[-1], vary=True)
         Double_Cos_Model.set_param_hint(
-            'freq_1', value=freq_guess[0], min=0)  # 9.9
+            'freq_1', value=freq_guess[0], min=0)
         Double_Cos_Model.set_param_hint(
-            'freq_2', value=freq_guess[1], min=0)  # 8.26
-        # , min = -2*np.pi, max = 2* np.pi)
+            'freq_2', value=freq_guess[1], min=0)
         Double_Cos_Model.set_param_hint('phase_1', value=1*np.pi/2.)
-        # , min = -2*np.pi, max = 2* np.pi)
-        Double_Cos_Model.set_param_hint('phase_2', value=-3*np.pi/2.)
+        Double_Cos_Model.set_param_hint('phase_2', value=3*np.pi/2.)
         Double_Cos_Model.set_param_hint(
             'amp_1', value=0.25, min=0.1, max=0.4, vary=True)
         Double_Cos_Model.set_param_hint(
             'amp_2', value=0.25, min=0.1, max=0.4, vary=True)
-        # Double_Cos_Model.set_param_hint('amp_2',expr='0.5-amp_1', vary=False)
         Double_Cos_Model.set_param_hint('osc_offset', value=0.5, min=0, max=1)
         params = Double_Cos_Model.make_params()
-        # if self.fitparams_guess:
-        #     for key, val in self.fitparams_guess.items():
-        #         if key in params:
-        #             params[key].value = val
         fit_res = Double_Cos_Model.fit(data=measured_values,
                                        t=sweep_values,
                                        params=params)
         self.fit_plot = fit_res.model.func(sweep_values, **fit_res.best_values)
         return fit_res
 
-    def save_fig(self, fig, figname=None, xlabel='x', ylabel='y',
+    def save_fig(self, fig, figname='_DoubleFreq_', xlabel='x', ylabel='y',
                  fig_tight=True, **kw):
         plot_formats = kw.pop('plot_formats', ['png'])
         fail_counter = False
@@ -5605,7 +5310,7 @@ class DoubleFrequency(object):
             plot_formats = [plot_formats]
         for plot_format in plot_formats:
             if figname is None:
-                figname = (self.scan_start+'_DoubleFreq_'+'.'+plot_format)
+                figname = (self.timestamp+figname+'.'+plot_format)
             else:
                 figname = (figname+'.' + plot_format)
             self.savename = os.path.abspath(os.path.join(
@@ -5733,382 +5438,3 @@ class SWAPN_cost(object):
             plt.close(fig)
         return
 
-
-class Tomo_Multiplexed(object):
-
-    def __init__(self, auto=True, label='', timestamp=None,
-                 MLE=False, target_cardinal=None, target_bell=None,
-                 start_shot=0, end_shot=-1,
-                 verbose=0,
-                 fig_format='png', q0_label='q0', q1_label='q1', close_fig=True):
-        self.label = label
-        self.timestamp = timestamp
-        self.target_cardinal = target_cardinal
-        self.target_bell = target_bell
-        self.start_shot = start_shot
-        self.end_shot = end_shot
-        self.MLE = MLE
-        self.verbose = verbose
-        self.fig_format = fig_format
-        self.q0_label = q0_label
-        self.q1_label = q1_label
-        self.close_fig = close_fig
-        if auto is True:
-            self.run_default_analysis()
-
-    def run_default_analysis(self):
-        # hard coded number of segments for a 2 qubit state tomography
-        # constraint imposed by UHFLI
-        a = MeasurementAnalysis(auto=False, label=self.label,
-                                timestamp=self.timestamp)
-        a.get_naming_and_values()
-        self.t_stamp = a.timestamp_string
-        self.savefolder = a.folder
-        self.nr_segments = 64
-
-        self.shots_q0 = np.zeros(
-            (self.nr_segments, int(len(a.measured_values[0])/self.nr_segments)))
-        self.shots_q1 = np.zeros(
-            (self.nr_segments, int(len(a.measured_values[1])/self.nr_segments)))
-        for i in range(self.nr_segments):
-            self.shots_q0[i, :] = a.measured_values[0][i::self.nr_segments]
-            self.shots_q1[i, :] = a.measured_values[1][i::self.nr_segments]
-
-        # Get correlations between shots
-        self.shots_q0q1 = np.multiply(self.shots_q1, self.shots_q0)
-
-        if self.start_shot != 0 or self.end_shot != -1:
-            self.shots_q0 = self.shots_q0[:, self.start_shot:self.end_shot]
-            self.shots_q1 = self.shots_q1[:, self.start_shot:self.end_shot]
-            self.shots_q0q1 = self.shots_q0q1[:, self.start_shot:self.end_shot]
-        ##########################################
-        # Making  the first figure, tomo shots
-        ##########################################
-        self.plot_TV_mode()
-
-        avg_h1 = np.mean(self.shots_q0, axis=1)
-
-        # Binning all the points required for the tomo
-        h1_00 = np.mean(avg_h1[36:36+7])
-        h1_01 = np.mean(avg_h1[43:43+7])
-        h1_10 = np.mean(avg_h1[50:50+7])
-        h1_11 = np.mean(avg_h1[57:])
-
-        avg_h2 = np.mean(self.shots_q1, axis=1)
-        h2_00 = np.mean(avg_h2[36:36+7])
-        h2_01 = np.mean(avg_h2[43:43+7])
-        h2_10 = np.mean(avg_h2[50:50+7])
-        h2_11 = np.mean(avg_h2[57:])
-
-        avg_h12 = np.mean(self.shots_q0q1, axis=1)
-        h12_00 = np.mean(avg_h12[36:36+7])
-        h12_01 = np.mean(avg_h12[43:43+7])
-        h12_10 = np.mean(avg_h12[50:50+7])
-        h12_11 = np.mean(avg_h12[57:])
-
-        avg_h12 = np.mean(self.shots_q0q1, axis=1)
-
-        #############################
-        # Linear inversion tomo #
-        #############################
-
-        measurements_tomo = (
-            np.array([avg_h1[0:36], avg_h2[0:36], avg_h12[0:36]])).flatten()  # 108 x 1
-        # get the calibration points by averaging over the five measurements taken
-        # knowing the initial state we put in
-        measurements_cal = np.array(
-            [h1_00, h1_01, h1_10, h1_11,
-             h2_00, h2_01, h2_10, h2_11,
-             h12_00, h12_01, h12_10, h12_11])
-
-        # before we calculate the tomo we need to set the correct order of the
-        # rotation matrixes
-        tomo_mod.TomoAnalysis_JointRO.rotation_matrixes = [
-            qtp.identity(2),
-            qtp.sigmax(),
-            qtp.rotation(qtp.sigmay(), np.pi / 2),
-            qtp.rotation(qtp.sigmay(), -np.pi / 2),
-            qtp.rotation(qtp.sigmax(), np.pi / 2),
-            qtp.rotation(qtp.sigmax(), -np.pi / 2)]
-
-        # calculate the tomo
-        tomo = tomo_mod.TomoAnalysis_JointRO(
-            measurements_cal, measurements_tomo, n_qubits=2, n_quadratures=3)
-        # operators are expectation values of Pauli operators, rho is density
-        # mat
-        (self.operators, self.rho) = tomo.execute_linear_tomo()
-
-        if self.MLE:
-            # mle reconstruction of density matrix
-            self.rho_2 = tomo.execute_max_likelihood(
-                ftol=0.000001, xtol=0.0001)
-            # reconstructing the pauli vector
-            if self.verbose > 1:
-                print(self.rho_2)
-            if self.verbose > 0:
-                print('Purity %.3f' % (self.rho_2*self.rho_2).tr())
-            # calculates the Pauli operator expectation values based on the
-            # matrix
-            self.operators_mle = tomo_mod.pauli_ops_from_density_matrix(
-                self.rho_2)
-            if self.verbose > 0:
-                print(self.operators_mle)
-        ########################
-        # FIT PHASE CORRECTIONS
-        ########################
-        if self.MLE:
-            self.operators_fit = self.operators_mle
-        else:
-            self.operators_fit = self.operators
-        """
-        bell_idx (int) : integer referring to a specific bell state.
-            0: |Psi_m> = |00> - |11>   (<XX>,<YY>,<ZZ>) = (-1,+1,+1)
-            1: |Psi_p> = |00> + |11>   (<XX>,<YY>,<ZZ>) = (+1,-1,+1)
-            2: |Psi_m> = |01> - |10>   (<XX>,<YY>,<ZZ>) = (-1,-1,-1)
-            3: |Psi_m> = |01> + |10>   (<XX>,<YY>,<ZZ>) = (+1,+1,-1)
-        """
-        def rotated_bell_state(dummy_x, angle_MSQ, angle_LSQ,
-                               contrast, target_bell=0):
-            # only works for target_bell=0 for now.
-            # to expand, need to figure out the signs in the elements.
-            # order is set by looping I,Z,X,Y
-            # 0  1  2  3  4  5  6  7  8  9  10 11 12 13 14 15
-            # II IZ IX IY ZI ZZ ZX ZY XI XZ XX XY YI YZ YX YY
-            state = np.zeros(16)
-            state[0] = 1.
-            if target_bell == 0:
-                state[5] = np.cos(angle_MSQ)
-                state[6] = np.sin(angle_LSQ)*np.sin(angle_MSQ)
-                state[7] = np.cos(angle_LSQ)*np.sin(angle_MSQ)
-                state[10] = -np.cos(angle_LSQ)
-                state[11] = np.sin(angle_LSQ)
-                state[13] = -np.sin(angle_MSQ)
-                state[14] = np.cos(angle_MSQ)*np.sin(angle_LSQ)
-                state[15] = np.cos(angle_MSQ)*np.cos(angle_LSQ)
-            elif target_bell == 1:
-                state[5] = np.cos(angle_MSQ)
-                state[6] = -np.sin(angle_LSQ)*np.sin(angle_MSQ)
-                state[7] = -np.cos(angle_LSQ)*np.sin(angle_MSQ)
-                state[10] = np.cos(angle_LSQ)
-                state[11] = -np.sin(angle_LSQ)
-                state[13] = -np.sin(angle_MSQ)
-                state[14] = -np.cos(angle_MSQ)*np.sin(angle_LSQ)
-                state[15] = -np.cos(angle_MSQ)*np.cos(angle_LSQ)
-            elif target_bell == 2:
-                state[5] = -np.cos(angle_MSQ)
-                state[6] = -np.sin(angle_LSQ)*np.sin(angle_MSQ)
-                state[7] = -np.cos(angle_LSQ)*np.sin(angle_MSQ)
-                state[10] = -np.cos(angle_LSQ)
-                state[11] = np.sin(angle_LSQ)
-                state[13] = np.sin(angle_MSQ)
-                state[14] = -np.cos(angle_MSQ)*np.sin(angle_LSQ)
-                state[15] = -np.cos(angle_MSQ)*np.cos(angle_LSQ)
-            elif target_bell == 3:
-                state[5] = -np.cos(angle_MSQ)
-                state[6] = np.sin(angle_LSQ)*np.sin(angle_MSQ)
-                state[7] = np.cos(angle_LSQ)*np.sin(angle_MSQ)
-                state[10] = np.cos(angle_LSQ)
-                state[11] = -np.sin(angle_LSQ)
-                state[13] = np.sin(angle_MSQ)
-                state[14] = np.cos(angle_MSQ)*np.sin(angle_LSQ)
-                state[15] = np.cos(angle_MSQ)*np.cos(angle_LSQ)
-            return state
-
-        fit_func_wrapper = lambda dummy_x, angle_MSQ,\
-            angle_LSQ, contrast: rotated_bell_state(dummy_x,
-                                                    angle_MSQ, angle_LSQ,
-                                                    contrast, self.target_bell)
-        angles_model = lmfit.Model(fit_func_wrapper)
-
-        angles_model.set_param_hint(
-            'angle_MSQ', value=0., min=-np.pi, max=np.pi, vary=True)
-        angles_model.set_param_hint(
-            'angle_LSQ', value=0., min=-np.pi, max=np.pi, vary=True)
-        angles_model.set_param_hint(
-            'contrast', value=1., min=0., max=1., vary=False)
-        params = angles_model.make_params()
-
-        self.fit_res = angles_model.fit(data=self.operators_fit,
-                                        dummy_x=np.arange(
-                                            len(self.operators_fit)),
-                                        params=params)
-        self.plot_phase_corr()
-        self.plot_LI()
-        self.plot_MLE()
-
-    def plot_TV_mode(self):
-        self.exp_name = os.path.split(self.savefolder)[-1][7:]
-        figname = 'Tomography_shots_Exp_{}.{}'.format(self.exp_name,
-                                                      self.fig_format)
-        fig1, axs = plt.subplots(1, 3, figsize=(17, 4))
-        fig1.suptitle(self.exp_name+' ' + self.t_stamp, size=16)
-        ax = axs[0]
-        ax.plot(np.arange(self.nr_segments), np.mean(self.shots_q0, axis=1),
-                'o-')
-        ax.set_title('{}'.format(self.q0_label))
-        ax = axs[1]
-        ax.plot(np.arange(self.nr_segments), np.mean(self.shots_q1, axis=1),
-                'o-')
-        ax.set_title('{}'.format(self.q1_label))
-        ax = axs[2]
-        ax.plot(np.arange(self.nr_segments), np.mean(self.shots_q0q1, axis=1),
-                'o-')
-        ax.set_title('Correlations {}-{}'.format(self.q0_label, self.q1_label))
-        savename = os.path.abspath(os.path.join(
-            self.savefolder, figname))
-        # value of 450dpi is arbitrary but higher than default
-        fig1.savefig(savename, format=self.fig_format, dpi=450)
-        if self.close_fig:
-            plt.close(fig1)
-
-    def plot_LI(self):
-        # Making  the second figure, LI tomo
-        fig2 = plt.figure(figsize=(15, 5))
-        ax = fig2.add_subplot(121)
-        if self.target_cardinal is not None:
-            fidelity = tomo_mod.calc_fid2_cardinal(self.operators,
-                                                   self.target_cardinal)
-            target_expectations = tomo_mod.get_cardianal_pauli_exp(
-                self.target_cardinal)
-            tomo_mod.plot_target_pauli_set(target_expectations, ax)
-
-        if self.target_bell is not None:
-            fidelity = tomo_mod.calc_fid2_bell(
-                self.operators, self.target_bell)
-            target_expectations = tomo_mod.get_bell_pauli_exp(self.target_bell)
-            tomo_mod.plot_target_pauli_set(target_expectations, ax)
-            txt_x_pos = 0
-        else:
-            txt_x_pos = 10
-
-        tomo_mod.plot_operators(self.operators, ax)
-        ax.set_title('Least squares tomography.')
-        if self.verbose > 0:
-            print(self.rho)
-        qtp.matrix_histogram_complex(self.rho, xlabels=['00', '01', '10', '11'],
-                                     ylabels=['00', '01', '10', '11'],
-                                     fig=fig2, ax=fig2.add_subplot(
-            122, projection='3d'))
-        purity = (self.rho*self.rho).tr()
-        msg = 'Purity: {:.3f}\nFidelity to target {:.3f}'.format(
-            purity, fidelity)
-        if self.target_bell is not None:
-            theta_vec = np.linspace(0., 2*np.pi, 1001)
-            fid_vec = np.zeros(theta_vec.shape)
-            for i, theta in enumerate(theta_vec):
-                fid_vec[i] = tomo_mod.calc_fid2_bell(self.operators,
-                                                     self.target_bell, theta)
-            msg += '\nMAX Fidelity {:.3f} at {:.1f} deg'.format(
-                np.max(fid_vec),
-                theta_vec[np.argmax(fid_vec)]*180./np.pi)
-        ax.text(0, .7, msg)
-
-        figname = 'LI-Tomography_Exp_{}.{}'.format(self.exp_name,
-                                                   self.fig_format)
-        fig2.suptitle(self.exp_name+' ' + self.t_stamp, size=16)
-        savename = os.path.abspath(os.path.join(
-            self.savefolder, figname))
-        # value of 450dpi is arbitrary but higher than default
-        fig2.savefig(savename, format=self.fig_format, dpi=450)
-        if self.close_fig:
-            plt.close(fig2)
-
-    def plot_MLE(self):
-        # Figure 3 MLE reconstruction
-        fig3 = plt.figure(figsize=(15, 5))
-        ax = fig3.add_subplot(121)
-
-        if self.target_cardinal is not None:
-            fidelity_mle = tomo_mod.calc_fid2_cardinal(self.operators_mle,
-                                                       self.target_cardinal)
-            target_expectations = tomo_mod.get_cardianal_pauli_exp(
-                self.target_cardinal)
-            tomo_mod.plot_target_pauli_set(target_expectations, ax)
-        if self.target_bell is not None:
-            fidelity_mle = tomo_mod.calc_fid2_bell(self.operators_mle,
-                                                   self.target_bell)
-            target_expectations = tomo_mod.get_bell_pauli_exp(self.target_bell)
-            tomo_mod.plot_target_pauli_set(target_expectations, ax)
-            txt_x_pos = 0
-        else:
-            txt_x_pos = 10
-
-        purity = (self.rho_2*self.rho_2).tr()
-        self.purity = purity
-
-        msg = 'Purity: {:.3f}\nFidelity to target {:.3f}'.format(
-            purity, fidelity_mle)
-        if self.target_bell is not None:
-            theta_vec = np.linspace(0., 2*np.pi, 1001)
-            fid_vec = np.zeros(theta_vec.shape)
-            for i, theta in enumerate(theta_vec):
-                fid_vec[i] = tomo_mod.calc_fid2_bell(self.operators_mle,
-                                                     self.target_bell, theta)
-            msg += '\nMAX Fidelity {:.3f} at LSQ={:.1f} deg \nand MSQ={:.1f} deg'.format(
-                self.best_fidelity,
-                self.fit_res.best_values['angle_LSQ']*180./np.pi,
-                self.fit_res.best_values['angle_MSQ']*180./np.pi)
-        ax.text(txt_x_pos, .7, msg)
-
-        tomo_mod.plot_operators(self.operators_mle, ax)
-        ax.set_title('Max likelihood estimation tomography')
-        qtp.matrix_histogram_complex(self.rho_2, xlabels=['00', '01', '10', '11'],
-                                     ylabels=['00', '01', '10', '11'],
-                                     fig=fig3,
-                                     ax=fig3.add_subplot(122, projection='3d'))
-
-        figname = 'MLE-Tomography_Exp_{}.{}'.format(self.exp_name,
-                                                    self.fig_format)
-        fig3.suptitle(self.exp_name+' ' + self.t_stamp, size=16)
-        savename = os.path.abspath(os.path.join(
-            self.savefolder, figname))
-        # value of 450dpi is arbitrary but higher than default
-        fig3.savefig(savename, format=self.fig_format, dpi=450)
-        if self.close_fig:
-            plt.close(fig3)
-
-    def plot_phase_corr(self):
-        fig2 = plt.figure(figsize=(15, 5))
-        ax = fig2.add_subplot(111)
-        ordered_fit = np.concatenate(
-            ([1], np.concatenate(tomo_mod.order_pauli_output2(self.fit_res.best_fit))))
-        tomo_mod.plot_target_pauli_set(ordered_fit, ax)
-        tomo_mod.plot_operators(self.operators_fit, ax=ax)
-        fidelity = np.dot(self.fit_res.best_fit, self.operators_fit)*0.25
-        self.best_fidelity = fidelity
-        angle_LSQ_deg = self.fit_res.best_values['angle_LSQ']*180./np.pi
-        angle_MSQ_deg = self.fit_res.best_values['angle_MSQ']*180./np.pi
-        ax.set_title('Fit of single qubit phase errors')
-        msg = r'MAX Fidelity at %.3f $\phi_{MSQ}=$%.1f deg' % (
-            fidelity,
-            angle_LSQ_deg)
-        msg += "\n and $\phi_{LSQ}=$%.1f deg"%angle_MSQ_deg
-        msg += "\n Chi sqr. %.3f" % self.fit_res.chisqr
-        ax.text(0.5, .7, msg)
-        figname = 'Fit_report_{}.{}'.format(self.exp_name,
-                                            self.fig_format)
-        fig2.suptitle(self.exp_name+' ' + self.t_stamp, size=16)
-        savename = os.path.abspath(os.path.join(
-            self.savefolder, figname))
-        # value of 450dpi is arbitrary but higher than default
-        fig2.savefig(savename, format=self.fig_format, dpi=450)
-        if self.close_fig:
-            plt.close(fig2)
-        angle_LSQ_deg = self.fit_res.best_values['angle_LSQ']*180./np.pi
-        angle_MSQ_deg = self.fit_res.best_values['angle_MSQ']*180./np.pi
-        ax.set_title('Fit of single qubit phase errors')
-        msg = r'MAX Fidelity at %.3f $\phi_{MSQ}=$%.1f deg' % (
-            fidelity,
-            angle_LSQ_deg)
-        msg += "\n and $\phi_{LSQ}=$%.1f deg"%angle_MSQ_deg
-        msg += "\n Chi sqr. %.3f" % self.fit_res.chisqr
-        ax.text(0.5, .7, msg)
-        figname = 'Fit_report_{}.{}'.format(self.exp_name,
-                                            self.fig_format)
-        fig2.suptitle(self.exp_name+' ' + self.t_stamp, size=16)
-        savename = os.path.abspath(os.path.join(
-            self.savefolder, figname))
-        # value of 450dpi is arbitrary but higher than default
-        fig2.savefig(savename, format=self.fig_format, dpi=450)
-        if self.close_fig:
-            plt.close(fig2)

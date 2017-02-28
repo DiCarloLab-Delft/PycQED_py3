@@ -55,65 +55,65 @@ class CBox_driven_transmon(Transmon):
         self.CBox = CBox
         self.MC = MC
         self.add_parameter('mod_amp_cw', label='RO modulation ampl cw',
-                           units='V', initial_value=0.5,
+                           unit='V', initial_value=0.5,
                            parameter_class=ManualParameter)
         self.add_parameter('RO_power_cw', label='RO power cw',
-                           units='dBm',
+                           unit='dBm',
                            parameter_class=ManualParameter)
 
         self.add_parameter('mod_amp_td', label='RO modulation ampl td',
-                           units='V', initial_value=0.5,
+                           unit='V', initial_value=0.5,
                            parameter_class=ManualParameter)
 
         self.add_parameter('spec_pow', label='spectroscopy power',
-                           units='dBm',
+                           unit='dBm',
                            parameter_class=ManualParameter)
         self.add_parameter('spec_pow_pulsed',
                            label='pulsed spectroscopy power',
-                           units='dBm',
+                           unit='dBm',
                            parameter_class=ManualParameter)
         self.add_parameter('td_source_pow',
                            label='Time-domain power',
-                           units='dBm',
+                           unit='dBm',
                            parameter_class=ManualParameter)
         self.add_parameter('f_RO_mod',
-                           label='Readout-modulation frequency', units='Hz',
+                           label='Readout-modulation frequency', unit='Hz',
                            initial_value=-2e7,
                            parameter_class=ManualParameter)
         # Time-domain parameters
         self.add_parameter('f_pulse_mod',
                            initial_value=-50e6,
-                           label='pulse-modulation frequency', units='Hz',
+                           label='pulse-modulation frequency', unit='Hz',
                            parameter_class=ManualParameter)
-        self.add_parameter('awg_nr', label='CBox awg nr', units='#',
+        self.add_parameter('awg_nr', label='CBox awg nr', unit='#',
                            parameter_class=ManualParameter)
 
         self.add_parameter('amp180',
-                           label='Pi-pulse amplitude', units='mV',
+                           label='Pi-pulse amplitude', unit='mV',
                            initial_value=300,
                            parameter_class=ManualParameter)
         # Amp 90 is hardcoded to be half amp180
         self.add_parameter('amp90',
-                           label='Pi/2-pulse amplitude', units='mV',
+                           label='Pi/2-pulse amplitude', unit='mV',
                            get_cmd=self._get_amp90)
-        self.add_parameter('gauss_width', units='s',
+        self.add_parameter('gauss_width', unit='s',
                            initial_value=40e-9,
                            parameter_class=ManualParameter)
-        self.add_parameter('motzoi', label='Motzoi parameter', units='',
+        self.add_parameter('motzoi', label='Motzoi parameter', unit='',
                            initial_value=0,
                            parameter_class=ManualParameter)
 
         # Single shot readout specific parameters
-        self.add_parameter('RO_threshold', units='dac-value',
+        self.add_parameter('RO_threshold', unit='dac-value',
                            initial_value=0,
                            parameter_class=ManualParameter)
         self.add_parameter('signal_line', parameter_class=ManualParameter,
                            vals=vals.Enum(0, 1), initial_value=0)
 
         # Mixer skewness correction
-        self.add_parameter('phi', units='deg',
+        self.add_parameter('phi', unit='deg',
                            parameter_class=ManualParameter, initial_value=0)
-        self.add_parameter('alpha', units='',
+        self.add_parameter('alpha', unit='',
                            parameter_class=ManualParameter, initial_value=1)
         # Mixer offsets correction, qubit drive
         self.add_parameter('mixer_offs_drive_I',
@@ -549,7 +549,7 @@ class CBox_driven_transmon(Transmon):
         if analyze:
             ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
 
-    def measure_resonator_power(self, freqs, mod_amps,
+    def measure_resonator_power(self, freqs, powers,
                                 MC=None, analyze=True, close_fig=True):
         '''
         N.B. This one does not use powers but varies the mod-amp.
@@ -560,9 +560,9 @@ class CBox_driven_transmon(Transmon):
             MC = self.MC
         MC.set_sweep_functions(
             [pw.wrap_par_to_swf(self.heterodyne_instr.frequency),
-             pw.wrap_par_to_swf(self.heterodyne_instr.mod_amp)])
+             pw.wrap_par_to_swf(self.heterodyne_instr.RF_power)])
         MC.set_sweep_points(freqs)
-        MC.set_sweep_points_2D(mod_amps)
+        MC.set_sweep_points_2D(powers)
         MC.set_detector_function(det.Heterodyne_probe(self.heterodyne_instr))
         MC.run(name='Resonator_power_scan'+self.msmt_suffix, mode='2D')
         if analyze:

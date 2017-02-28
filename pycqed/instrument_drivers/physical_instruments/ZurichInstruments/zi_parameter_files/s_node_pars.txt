@@ -1,5 +1,11 @@
 [
   [
+    "oscs/0/freq",
+    "float",
+    -900.0e6,
+    900.0e6
+  ],
+  [
     "awgs/0/auxtriggers/0/channel",
     "int",
     0,
@@ -16,6 +22,12 @@
     "int_8bit",
     0,
     255
+  ],
+  [
+    "awgs/0/ready",
+    "bool",
+    0,
+    1
   ],
   [
     "awgs/0/outputs/0/amplitude",
@@ -540,6 +552,66 @@
     255
   ],
   [
+    "quex/corr/0/mode",
+    "bool",
+    0,
+    1
+  ],
+  [
+    "quex/corr/0/source",
+    "int_8bit",
+    0,
+    4
+  ],
+  [
+    "quex/corr/1/mode",
+    "bool",
+    0,
+    1
+  ],
+  [
+    "quex/corr/1/source",
+    "int_8bit",
+    0,
+    4
+  ],
+  [
+    "quex/corr/2/mode",
+    "bool",
+    0,
+    1
+  ],
+  [
+    "quex/corr/2/source",
+    "int_8bit",
+    0,
+    4
+  ],
+  [
+    "quex/corr/3/mode",
+    "bool",
+    0,
+    1
+  ],
+  [
+    "quex/corr/3/source",
+    "int_8bit",
+    0,
+    4
+  ],
+  [
+    "quex/corr/4/mode",
+    "bool",
+    0,
+    1
+  ],
+  [
+    "quex/corr/4/source",
+    "int_8bit",
+    0,
+    4
+  ],
+  [
     "quex/rot/0/imag",
     "float",
     -2.0,
@@ -939,7 +1011,13 @@
     "quex/wint/length",
     "int",
     0,
-    16384.0
+    16777215
+  ],
+  [
+    "quex/wint/mode",
+    "bool",
+    0,
+    1
   ],
   [
     "dios/0/decimation",

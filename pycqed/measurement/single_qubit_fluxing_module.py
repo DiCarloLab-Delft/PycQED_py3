@@ -91,7 +91,7 @@ def measure_SWAPN(device, q0_name, swap_amps, alpha=1.,
     MC.set_sweep_points_2D(swap_amps)
 
     MC.set_detector_function(q0.int_avg_det_rot)
-    MC.run('SWAPN_%s' % q0.name, mode='2D')
+    MC.run('SWAPN_{}_alpha_{}'.format(q0.name, alpha), mode='2D')
     ma.TwoD_Analysis(auto=True)
 
 

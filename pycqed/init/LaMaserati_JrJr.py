@@ -113,8 +113,8 @@ AWG.timeout(180)  # timeout long for uploading wait.
 # AWG520 = tk520.Tektronix_AWG520('AWG520', address='GPIB0::17::INSTR',
 #                                 server_name='')
 # station.add_component(AWG520)
-CBox = qcb.QuTech_ControlBox('CBox', address='Com5', run_tests=False, server_name=None)
-station.add_component(CBox)
+# CBox = qcb.QuTech_ControlBox('CBox', address='Com5', run_tests=False, server_name=None)
+# station.add_component(CBox)
 IVVI = iv.IVVI('IVVI', address='COM4', numdacs=16, server_name=None)
 station.add_component(IVVI)
 
@@ -202,7 +202,7 @@ Flux_Control.flux_offsets(-offsets)
 HS = hd.HeterodyneInstrument('HS', LO=LO, RF=RF, AWG=AWG, acquisition_instr=UHFQC_1.name,
                              server_name=None)
 station.add_component(HS)
-LutMan = lm.QuTech_ControlBox_LookuptableManager('LutMan', CBox=CBox,
+LutMan = lm.QuTech_ControlBox_LookuptableManager('LutMan', CBox=None,
                                                  server_name=None)
 
 MC = mc.MeasurementControl('MC')

@@ -35,7 +35,7 @@ class UHFQC_LookuptableManagerManager(Instrument):
                            parameter_class=ManualParameter,
                            initial_value=1.0)
         self.add_parameter('mixer_IQ_phase_skewness', vals=vals.Numbers(),
-                           units='deg',
+                           unit='deg',
                            parameter_class=ManualParameter,
                            initial_value=0.0)
         # These parameters are added for mixer skewness correction.
@@ -44,19 +44,19 @@ class UHFQC_LookuptableManagerManager(Instrument):
         self.add_parameter('mixer_alpha', vals=vals.Numbers(),
                            parameter_class=ManualParameter,
                            initial_value=1.0)
-        self.add_parameter('mixer_phi', vals=vals.Numbers(), units='deg',
+        self.add_parameter('mixer_phi', vals=vals.Numbers(), unit='deg',
                            parameter_class=ManualParameter,
                            initial_value=0.0)
         self.add_parameter('mixer_apply_predistortion_matrix', vals=vals.Bool(),
                            parameter_class=ManualParameter,
                            initial_value=False)
 
-        self.add_parameter('acquisition_delay', vals=vals.Numbers(), units='s',
+        self.add_parameter('acquisition_delay', vals=vals.Numbers(), unit='s',
                            parameter_class=ManualParameter,
                            initial_value=270e-9)
         self.add_parameter('LutMans', vals=vals.Anything(),
                    set_cmd=self._attach_lutmans_to_Lutmanman)
-        self.add_parameter('sampling_rate', vals=vals.Numbers(), units='Hz',
+        self.add_parameter('sampling_rate', vals=vals.Numbers(), unit='Hz',
                            parameter_class=ManualParameter,
                            initial_value=1.8e9)
 
@@ -111,7 +111,7 @@ class UHFQC_LookuptableManagerManager(Instrument):
 
         return self._wave_dict
 
-    def render_wave(self, wave_name, show=True, time_units='lut_index'):
+    def render_wave(self, wave_name, show=True, time_unit='lut_index'):
         fig, ax = plt.subplots(1, 1)
         if time_units == 'lut_index':
             x = np.arange(len(self._wave_dict[wave_name][0]))

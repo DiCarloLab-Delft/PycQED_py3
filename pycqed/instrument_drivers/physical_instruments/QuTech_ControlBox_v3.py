@@ -39,7 +39,7 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
                            vals=vals.Enum('internal', 'external',
                                           'mixed'))
         self.add_parameter('instr_mem_size',
-                           units='#',
+                           unit='#',
                            label='instruction memory size',
                            get_cmd=self._get_instr_mem_size)
         # hardcoded memory limit, depends on firmware of the CBox
