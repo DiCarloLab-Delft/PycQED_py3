@@ -65,7 +65,7 @@ multiplexed_wave = [['LutMan0', 'M_up_mid_double_dep'],
                     ]
 
 LutManMan.generate_multiplexed_pulse(multiplexed_wave)
-LutManMan.render_wave('Multiplexed_pulse', time_units='s')
+LutManMan.render_wave('Multiplexed_pulse', time_unit='s')
 LutManMan.render_wave_PSD(
     'Multiplexed_pulse', f_bounds=[00e6, 1000e6], y_bounds=[1e-18, 1e-6])
 LutManMan.load_pulse_onto_AWG_lookuptable('Multiplexed_pulse')

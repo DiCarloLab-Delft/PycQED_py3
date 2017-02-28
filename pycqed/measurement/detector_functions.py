@@ -911,7 +911,7 @@ class Source_frequency_detector(Soft_Detector):
 class Function_Detector(Soft_Detector):
 
     def __init__(self, sweep_function, result_keys, value_names=None,
-                 value_units=None, msmt_kw={}, **kw):
+                 value_unit=None, msmt_kw={}, **kw):
         super(Function_Detector, self).__init__()
         self.sweep_function = sweep_function
         self.result_keys = result_keys

@@ -10,7 +10,7 @@ class Distortions(Instrument):
     '''
     def __init__(self, name, **kw):
         super().__init__(name, **kw)
-        self.add_parameter('dist_dict', units='',
+        self.add_parameter('dist_dict', unit='',
                            parameter_class=ManualParameter,
                            vals=vals.Anything()
                            set_cmd=self._do_set_dist_dict,

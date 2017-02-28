@@ -16,7 +16,7 @@ class Weinschel_8320(Instrument):
         self.address = address
         self.timeout = timeout
 
-        self.add_parameter('attenuation', units='dB',
+        self.add_parameter('attenuation', unit='dB',
                            vals=vals.Enum(*np.arange(0, 60.1, 2).tolist()),
                            set_cmd=self._do_set_attenuation,
                            get_cmd=self._do_get_attenuation)
