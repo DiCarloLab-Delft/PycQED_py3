@@ -167,7 +167,8 @@ class CBox_v3_driven_transmon(Transmon):
 
         self.add_parameter('RO_pulse_type', initial_value='MW_IQmod_pulse',
                            vals=vals.Enum(
-                               'MW_IQmod_pulse', 'Gated_MW_RO_pulse'),
+                               'MW_IQmod_pulse', 'Gated_MW_RO_pulse',
+                               'MW_IQmod_pulse_UHFQC'),
                            parameter_class=ManualParameter)
         self.add_parameter('RO_depletion_time', initial_value=1e-6,
                            unit='s',
@@ -615,27 +616,30 @@ class CBox_v3_driven_transmon(Transmon):
                                     analyze=True, close_fig=True):
         # This is a trick so I can reuse the heterodyne instr
         # to do pulsed-spectroscopy
-        raise NotImplementedError()
-        # self.heterodyne_instr._disable_auto_seq_loading = True
-        # if ('Pulsed_spec' not in self.AWG.setup_filename.get()):
-        #     st_seqs.Pulsed_spec_seq_RF_mod(
-        #         IF=self.f_RO_mod.get(),
-        #         spec_pulse_length=16e-6, marker_interval=30e-6,
-        #         RO_pulse_delay=self.RO_pulse_delay.get())
-        # self.cw_source.pulsemod_state.set('on')
-        # self.cw_source.power.set(self.spec_pow_pulsed.get())
 
-        # self.AWG.start()
-        # if hasattr(self.heterodyne_instr, 'mod_amp'):
-        #     self.heterodyne_instr.set('mod_amp', self.mod_amp_cw.get())
-        # else:
-        #     self.heterodyne_instr.RF.power(self.RO_power_cw())
-        # MC.set_sweep_function(pw.wrap_par_to_swf(self.cw_source.frequency))
-        # MC.set_sweep_points(freqs)
-        # MC.set_detector_function(det.Heterodyne_probe(self.heterodyne_instr))
-        # MC.run(name='pulsed-spec'+self.msmt_suffix)
-        # if analyze:
-        #     ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
+        self.prepare_for_timedomain()
+        if MC is None:
+            MC = self.MC
+
+        # Loading the right qumis instructions
+        pulsed_spec_seq = sqqs.pulsed_spec_sequence(self.name)
+        pulsed_spec_seq_asm = qta.qasm_to_asm(pulsed_spec_seq.name,
+                                              self.get_operation_dict())
+        qumis_file = pulsed_spec_seq_asm
+        self.CBox.load_instructions(qumis_file.name)
+        self.CBox.run_mode('run')
+
+        # make sure we use the right acquision detector. Mind the new UHFQC spec mode
+        MC.set_sweep_function(self.td_source.frequency)
+        MC.set_sweep_points(freqs)
+        MC.set_detector_function(self.int_avg_det_single)
+        # det.Heterodyne_probe(self.heterodyne_instr)
+        MC.run(name='pulsed-spec'+self.msmt_suffix)
+        if analyze:
+            ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
+
+
+
 
     def measure_resonator_power(self, freqs, mod_amps,
                                 MC=None, analyze=True, close_fig=True):
@@ -1203,6 +1207,23 @@ class QWG_driven_transmon(CBox_v3_driven_transmon):
                            parameter_class=ManualParameter)
 
 
+        self.add_parameter('spec_pulse_type',
+                           vals=vals.Enum('block', 'gauss'),
+                           parameter_class=ManualParameter,
+                           initial_value='block')
+        self.add_parameter('spec_amp',
+                           unit='V',
+                           vals=vals.Numbers(0, 1),
+                           parameter_class=ManualParameter,
+                           initial_value=0.4)
+        self.add_parameter(
+            'spec_length', vals=vals.Numbers(min_value=1e-9), unit='s',
+            parameter_class=ManualParameter,
+            docstring=('length of the block pulse if spec_pulse_type' +
+                       'is "block", gauss_width if spec_pulse_type is gauss.'),
+            initial_value=100e-9)
+
+
     def measure_rabi(self, amps, n=1,
                      MC=None, analyze=True, close_fig=True,
                      verbose=False):
@@ -1324,6 +1345,7 @@ class QWG_driven_transmon(CBox_v3_driven_transmon):
 
         t0 = time.time()
         self.QWG.reset()
+        self.QWG.run_mode('CODeword')
 
         # Sets the QWG channel amplitudes
         for ch in [1, 2, 3, 4]:
@@ -1333,8 +1355,11 @@ class QWG_driven_transmon(CBox_v3_driven_transmon):
         self.Q_LutMan.Q_amp90_scale(self.amp90_scale())
         self.Q_LutMan.Q_motzoi(self.motzoi())
 
-        self.Q_LutMan.load_pulses_onto_AWG_lookuptable()
+        self.Q_LutMan.spec_pulse_type(self.spec_pulse_type())
+        self.Q_LutMan.spec_amp(self.spec_amp())
+        self.Q_LutMan.spec_length(self.spec_length())
 
+        self.Q_LutMan.load_pulses_onto_AWG_lookuptable()
 
         self.QWG.stop()
         predistortion_matrix = wf.mixer_predistortion_matrix(
@@ -1354,7 +1379,7 @@ class QWG_driven_transmon(CBox_v3_driven_transmon):
         self.QWG.syncSidebandGenerators()
 
         self.QWG.stop()
-        self.QWG.run_mode('CODeword')
+
         self.QWG.start()
         # Check for errors at the end
         for i in range(self.QWG.getSystemErrorCount()):
@@ -1370,6 +1395,12 @@ class QWG_driven_transmon(CBox_v3_driven_transmon):
 
         pulse_period_clocks = convert_to_clocks(
             max(self.gauss_width()*4, self.pulse_delay()))
+
+        if self.spec_pulse_type() == 'gauss':
+            spec_pulse_clocks = convert_to_clocks(self.spec_length()*4)
+        elif self.spec_pulse_type() == 'block':
+            spec_pulse_clocks = convert_to_clocks(self.spec_length())
+
         RO_length_clocks = convert_to_clocks(self.RO_pulse_length())
         RO_acq_marker_del_clocks = convert_to_clocks(
             self.RO_acq_marker_delay())
@@ -1413,6 +1444,12 @@ class QWG_driven_transmon(CBox_v3_driven_transmon):
                 'trigger 1101000, 2  \nwait {}\n'.format(
                     pulse_period_clocks-2)}
 
+        operation_dict['SpecPulse {}'.format(self.name)] = {
+            'duration': spec_pulse_clocks, 'instruction':
+                'trigger 0101000, 2 \nwait 2\n' +
+                'trigger 1101000, 2  \nwait {}\n'.format(
+                    spec_pulse_clocks-2)}
+
         # RO part
         measure_instruction = ''
         acq_instr = self._get_acquisition_instr()
@@ -1432,8 +1469,9 @@ class QWG_driven_transmon(CBox_v3_driven_transmon):
                     RO_pulse_delay_clocks)
                 + '\nwait {} \n{}'.format(
                     RO_acq_marker_del_clocks, measure_instruction)}
-            # + 'wait {}\n'.format(RO_depletion_clocks)}
-        elif self.RO_pulse_type() == 'Gated_MW_RO_pulse':
+
+        elif (self.RO_pulse_type() == 'Gated_MW_RO_pulse' or
+                self.RO_pulse_type() =='MW_IQmod_pulse_UHFQC'):
             operation_dict['RO {}'.format(self.name)] = {
                 'duration': RO_length_clocks, 'instruction':
                 'wait {} \n{}'.format(RO_pulse_delay_clocks,

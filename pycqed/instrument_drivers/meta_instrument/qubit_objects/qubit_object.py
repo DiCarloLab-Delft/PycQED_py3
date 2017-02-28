@@ -328,8 +328,7 @@ class Transmon(Qubit):
                     # print(freqs.min(), freqs.max())
             # args here should be handed down from the top.
             self.measure_spectroscopy(freqs, pulsed=pulsed, MC=None,
-                                      analyze=True, close_fig=close_fig,
-                                      use_max=use_max, update=update)
+                                      analyze=True, close_fig=close_fig)
             if pulsed:
                 label = 'pulsed-spec'
             else:
@@ -395,7 +394,7 @@ class Transmon(Qubit):
         if freqs is None:
             f_center = self.f_res.get()
             f_span = 10e6
-            f_step = 50e3
+            f_step = 100e3
             freqs = np.arange(f_center-f_span/2, f_center+f_span/2, f_step)
         self.measure_heterodyne_spectroscopy(freqs, MC, analyze=False)
         a = ma.Homodyne_Analysis(label=self.msmt_suffix, close_fig=close_fig)

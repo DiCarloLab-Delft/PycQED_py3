@@ -15,7 +15,7 @@ def wrap_par_to_swf(parameter):
     sweep_function.sweep_control = 'soft'
     sweep_function.name = parameter.name
     sweep_function.parameter_name = parameter.label
-    sweep_function.unit = parameter.units
+    sweep_function.unit = parameter.unit
 
     sweep_function.prepare = pass_function
     sweep_function.finish = pass_function
@@ -56,7 +56,7 @@ def wrap_par_to_det(parameter, control='soft'):
     detector_function.detector_control = control
     detector_function.name = parameter.name
     detector_function.value_names = [parameter.label]
-    detector_function.value_units = [parameter.units]
+    detector_function.value_units = [parameter.unit]
 
     detector_function.prepare = pass_function
     detector_function.finish = pass_function
