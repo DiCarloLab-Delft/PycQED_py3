@@ -291,7 +291,8 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         # TODO: fix prepare for pulsed spec
         # TODO: make measure pulsed spec
         self.prepare_for_timedomain()
-        self.td_source.off()
+        if self.td_source !=None:
+            self.td_source.off()
         self.cw_source.frequency(self.f_qubit())
         self.cw_source.power(self.spec_pow_pulsed())
         if hasattr(self.cw_source, 'pulsemod_state'):
@@ -304,17 +305,20 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
     def prepare_for_timedomain(self, input_averaging=False):
         # makes sure the settings of the acquisition instrument are reloaded
         self.acquisition_instr(self.acquisition_instr())
-        self.td_source.pulsemod_state('Off')
+        if self.td_source !=None:
+            self.td_source.pulsemod_state('Off')
         self.LO.on()
         if self.cw_source != None:
             self.cw_source.off()
-        self.td_source.on()
+        if self.td_source !=None:
+            self.td_source.on()
         # Ensures the self.pulse_pars and self.RO_pars get created and updated
         self.get_pulse_pars()
 
         # Set source to fs =f-f_mod such that pulses appear at f = fs+f_mod
-        self.td_source.frequency.set(self.f_qubit.get()
-                                     - self.f_pulse_mod.get())
+        if self.td_source !=None:
+            self.td_source.frequency.set(self.f_qubit.get()
+                                         - self.f_pulse_mod.get())
 
         # Use resonator freq unless explicitly specified
         if self.f_RO.get() is None:
@@ -322,7 +326,8 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         else:
             f_RO = self.f_RO.get()
         self.LO.frequency.set(f_RO - self.f_RO_mod.get())
-        self.td_source.power.set(self.td_source_pow.get())
+        if self.td_source !=None:
+            self.td_source.power.set(self.td_source_pow.get())
 
         # # makes sure dac range is used optimally, 20% overhead for mixer skew
         # # use 60% of based on linear range in mathematica
