@@ -90,6 +90,12 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
               unittest.TestLoader().getTestCaseNames(test_suite.CBox_tests_v3))
         unittest.TextTestRunner(verbosity=2).run(suite)
 
+    def start(self):
+        self.run_mode('run')
+
+    def stop(self):
+        self.run_mode('idle')
+
     def _do_get_firmware_version(self):
         v = self.get_master_controller_params()
         return v
