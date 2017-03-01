@@ -238,7 +238,7 @@ class Transmon(Qubit):
                            # in the future add 'tracked_dac', 'tracked_flux',
                            parameter_class=ManualParameter)
 
-    def calculate_frequency(self, EC=None, EJ=None, assymetry=None,
+    def calculate_frequency(self, E_c=None, E_j=None, assymetry=None,
                             dac_voltage=None, flux=None,
                             no_transitions=1, calc_method='Hamiltonian'):
         '''
@@ -253,10 +253,10 @@ class Transmon(Qubit):
         If specified in terms of a dac voltage it will convert the dac voltage
         to a flux using convert dac to flux (NOT IMPLEMENTED)
         '''
-        if EC is None:
-            EC = self.EC.get()
-        if EJ is None:
-            EJ = self.EJ.get()
+        if E_c is None:
+            E_c = self.E_c.get()
+        if E_j is None:
+            E_j = self.E_j.get()
         if assymetry is None:
             assymetry = self.assymetry.get()
 
@@ -267,7 +267,7 @@ class Transmon(Qubit):
         # Calculating with dac-voltage not implemented yet
 
         freq = calculate_transmon_transitions(
-            EC, EJ, asym=assymetry, reduced_flux=flux, no_transitions=1)
+            E_c, E_j, asym=assymetry, reduced_flux=flux, no_transitions=1)
         return freq
 
     def calculate_flux(self, frequency):

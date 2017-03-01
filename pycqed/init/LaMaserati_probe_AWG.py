@@ -98,12 +98,12 @@ station.add_component(LO)
 RF = rs.RohdeSchwarz_SGS100A(
     name='RF', address='TCPIP0::192.168.0.74', server_name=None)  #
 station.add_component(RF)
-Spec_source = rs.RohdeSchwarz_SGS100A(
-    name='Spec_source', address='TCPIP0::192.168.0.87', server_name=None)  #
-station.add_component(Spec_source)
-Qubit_LO = rs.RohdeSchwarz_SGS100A(
-    name='Qubit_LO', address='TCPIP0::192.168.0.86', server_name=None)  #
-station.add_component(Qubit_LO)
+QL_LO = rs.RohdeSchwarz_SGS100A(
+    name='QL_LO', address='TCPIP0::192.168.0.86', server_name=None)  #
+station.add_component(QL_LO)
+QR_LO = rs.RohdeSchwarz_SGS100A(
+    name='QR_LO', address='TCPIP0::192.168.0.87', server_name=None)  #
+station.add_component(QR_LO)
 # TWPA_Pump = rs.RohdeSchwarz_SGS100A(name='TWPA_Pump', address='TCPIP0::192.168.0.90', server_name=None)  #
 # station.add_component(TWPA_Pump)
 AWG = tek.Tektronix_AWG5014(name='AWG', setup_folder=None, timeout=2,
@@ -124,77 +124,26 @@ station.add_component(IVVI)
 # k0 = k_obj.Distortion(name='k0')
 # station.add_component(k0)
 
-if UHFQC:
-    # Initializing UHFQC
-    UHFQC_1 = ZI_UHFQC.UHFQC('UHFQC_1', device='dev2178', server_name=None)
-    station.add_component(UHFQC_1)
-    UHFQC_1.sigins_0_ac()
-    UHFQC_1.sigins_1_ac()
-    # preparing the lookuptables for readout
-    LutMan0 = lm_UHFQC.UHFQC_LookuptableManager('LutMan0', UHFQC=UHFQC_1,
-                                                server_name=None)
-    station.add_component(LutMan0)
-    LutMan1 = lm_UHFQC.UHFQC_LookuptableManager('LutMan1', UHFQC=UHFQC_1,
-                                                server_name=None)
-    station.add_component(LutMan1)
-    LutMan2 = lm_UHFQC.UHFQC_LookuptableManager('LutMan2', UHFQC=UHFQC_1,
-                                                server_name=None)
-    station.add_component(LutMan2)
-    LutMan3 = lm_UHFQC.UHFQC_LookuptableManager('LutMan3', UHFQC=UHFQC_1,
-                                                server_name=None)
-    station.add_component(LutMan3)
-    LutMan4 = lm_UHFQC.UHFQC_LookuptableManager('LutMan4', UHFQC=UHFQC_1,
-                                                server_name=None)
-    station.add_component(LutMan4)
-    LutManMan = lmm_UHFQC.UHFQC_LookuptableManagerManager('LutManMan', UHFQC=UHFQC_1,
-                                                          server_name=None)
-    station.add_component(LutManMan)
-    LutManMan.LutMans(
-        [LutMan0.name, LutMan1.name, LutMan2.name, LutMan3.name, LutMan4.name])
+# Initializing UHFQC
+UHFQC_1 = ZI_UHFQC.UHFQC('UHFQC_1', device='dev2178', server_name=None)
+station.add_component(UHFQC_1)
+UHFQC_1.sigins_0_ac()
+UHFQC_1.sigins_1_ac()
+# preparing the lookuptables for readout
+LutMan0 = lm_UHFQC.UHFQC_LookuptableManager('LutMan0', UHFQC=UHFQC_1,
+                                            server_name=None)
+station.add_component(LutMan0)
+LutMan1 = lm_UHFQC.UHFQC_LookuptableManager('LutMan1', UHFQC=UHFQC_1,
+                                            server_name=None)
+station.add_component(LutMan1)
 
-else:
-    UHFQC_1 = None
+LutManMan = lmm_UHFQC.UHFQC_LookuptableManagerManager('LutManMan', UHFQC=UHFQC_1,
+                                                      server_name=None)
+station.add_component(LutManMan)
+LutManMan.LutMans(
+    [LutMan0.name, LutMan1.name])
 
 
-# Flux_Control = fc.Flux_Control(name='FluxControl',
-#                                num_channels=5,
-#                                IVVI=station.IVVI)
-# station.add_component(Flux_Control)
-
-# transfer_matrix_dec = np.array([[4.70306717e-04,  -8.41312977e-05,   3.64442804e-05,  -1.00489353e-05,
-#                                  -2.36455362e-05],
-#                                 [-6.70464355e-05,   6.39386703e-04,  -4.37263640e-05,  -2.01374983e-05,
-#                                  1.77516922e-05],
-#                                 [7.69376917e-06,  -4.09893480e-05,   5.35184092e-04,  -2.36755094e-05,
-#                                  -5.34108608e-05],
-#                                 [3.08518924e-05,   1.11315677e-05,   7.36191927e-05,   4.09078121e-04,
-#                                  -2.63031372e-05],
-#                                 [-4.51217544e-05,  -1.35430841e-05,  -9.52349548e-05,  -4.18415379e-05,
-#                                  4.09962523e-04]])
-# invA = np.array([[2.17320666e+03, 2.79414032e+02, -1.16652799e+02, 7.08814870e+01, 1.02595827e+02],
-#                  [2.16689677e+02, 1.59642752e+03, 9.70544635e+01,
-#                      8.55894771e+01, -3.84925724e+01],
-#                  [1.52695260e+00, 1.25113953e+02, 1.90389457e+03,
-#                      1.42143094e+02, 2.51834186e+02],
-#                  [-1.55226336e+02, -8.03197377e+01, -3.10695549e+02,
-#                      2.43001891e+03, 1.09956406e+02],
-#                  [2.30860259e+02, 1.04357646e+02, 4.00934628e+02, 2.91661201e+02, 2.51899161e+03]])
-# Flux_Control.transfer_matrix(transfer_matrix_dec)
-# Flux_Control.inv_transfer_matrix(invA)
-
-# Flux_Control.dac_mapping([1, 2, 3, 4, 5])
-
-
-# # sweet_spots_mv = [-55.265, 49.643, -38.5, 13.037, 49.570]
-# sweet_spots_mv = [-31.5251, 54.1695, -0.3967, 4.9744, 60.3341]
-# offsets = np.dot(Flux_Control.transfer_matrix(), sweet_spots_mv)
-# Flux_Control.flux_offsets(-offsets)
-
-
-# ATT = Weinschel_8320_novisa.Weinschel_8320(name='ATT',address='192.168.0.54', server_name=None)
-# station.add_component(ATT)
-# Dux = qdux.QuTech_Duplexer('Dux', address='TCPIP0::192.168.0.101',
-#                             server_name=None)
 # SH = sh.SignalHound_USB_SA124B('Signal hound', server_name=None)
 # #commented because of 8s load time
 
@@ -209,23 +158,23 @@ MC = mc.MeasurementControl('MC')
 station.add_component(MC)
 # HS = None
 
-QL = qbt.Tektronix_driven_transmon('QL', LO=LO, cw_source=Spec_source,
-                                     td_source=Qubit_LO,
-                                     IVVI=IVVI, rf_RO_source=RF,
-                                     AWG=AWG,
-                                     heterodyne_instr=HS,
-                                     FluxCtrl=None,
-                                     MC=MC,
-                                     server_name=None)
+QL = qbt.Tektronix_driven_transmon('QL', LO=LO, cw_source=QR_LO,
+                                   td_source=QL_LO,
+                                   IVVI=IVVI, rf_RO_source=RF,
+                                   AWG=AWG,
+                                   heterodyne_instr=HS,
+                                   FluxCtrl=None,
+                                   MC=MC,
+                                   server_name=None)
 station.add_component(QL)
-QR = qbt.Tektronix_driven_transmon('QR', LO=LO, cw_source=Qubit_LO,
-                                     td_source=Spec_source,
-                                     IVVI=IVVI, rf_RO_source=RF,
-                                     AWG=AWG,
-                                     heterodyne_instr=HS,
-                                     FluxCtrl=None,
-                                     MC=MC,
-                                     server_name=None)
+QR = qbt.Tektronix_driven_transmon('QR', LO=LO, cw_source=QL_LO,
+                                   td_source=QR_LO,
+                                   IVVI=IVVI, rf_RO_source=RF,
+                                   AWG=AWG,
+                                   heterodyne_instr=HS,
+                                   FluxCtrl=None,
+                                   MC=MC,
+                                   server_name=None)
 station.add_component(QR)
 
 MC.station = station
@@ -262,7 +211,7 @@ st_seqs.station = station
 sq.station = station
 awg_swf.fsqs.station = station
 cal_elts.station = station
-mqs.station=station
+mqs.station = station
 
 
 t1 = time.time()
@@ -298,7 +247,7 @@ if UHFQC:
         UHFQC_1.awg_sequence_acquisition()
         qubit.RO_pulse_type('Gated_MW_RO_pulse')
         qubit.RO_acq_marker_delay(155e-9)
-        qubit.acquisition_instrument('CBox')
+        qubit.acquisition_instr('CBox')
         qubit.RO_acq_marker_channel('ch3_marker1')
         qubit.RO_acq_weight_function_I(0)
         qubit.RO_acq_weight_function_Q(1)
@@ -317,9 +266,9 @@ if UHFQC:
                                                        RO_amp=qubit.RO_amp(),
                                                        RO_pulse_length=qubit.RO_pulse_length(),
                                                        acquisition_delay=270e-9)
-        qubit.RO_pulse_type('MW_IQmod_pulse') # changed to satisfy validator
+        qubit.RO_pulse_type('MW_IQmod_pulse_UHFQC')  # changed to satisfy validator
         qubit.RO_acq_marker_delay(-165e-9)
-        qubit.acquisition_instrument('UHFQC_1')
+        qubit.acquisition_instr('UHFQC_1')
         qubit.RO_acq_marker_channel('ch3_marker2')
         qubit.RO_I_channel('0')
         qubit.RO_Q_channel('1')
@@ -329,7 +278,7 @@ else:
     def switch_to_pulsed_RO_CBox(qubit):
         qubit.RO_pulse_type('Gated_MW_RO_pulse')
         qubit.RO_acq_marker_delay(155e-9)
-        qubit.acquisition_instrument('CBox')
+        qubit.acquisition_instr('CBox')
         qubit.RO_acq_marker_channel('ch3_marker1')
         qubit.RO_acq_weight_function_I(0)
         qubit.RO_acq_weight_function_Q(1)
@@ -346,11 +295,6 @@ for qubit in list_qubits:
 
 # switch_to_pulsed_RO_CBox(AncT)
 # switch_to_pulsed_RO_CBox(DataT)
-
-
-
-
-
 
 
 def reload_mod_stuff():
@@ -387,7 +331,6 @@ def reload_mod_stuff():
                                       high=markerhighs[i], low=0, offset=0.,
                                       delay=0, active=True)
 
-
     from pycqed.measurement.waveform_control_CC import waveform as wf
     reload(wf)
 
@@ -412,14 +355,10 @@ def reload_mod_stuff():
 
     reload(fsqs)
     reload(awg_swf)
-    fsqs.station=station
+    fsqs.station = station
     reload(det)
     reload(ca)
 reload_mod_stuff()
-
-
-
-
 
 
 ################################
