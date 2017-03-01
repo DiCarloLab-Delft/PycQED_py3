@@ -187,7 +187,7 @@ class CBox_driven_transmon(Transmon):
     def find_resonator_frequency(self, use_min=False,
                                  update=True,
                                  freqs=None,
-                                 MC=None, close_fig=True):
+                                 MC=None, close_fig=True, RO_length=2274e-9):
         '''
         Finds the resonator frequency by performing a heterodyne experiment
         if freqs == None it will determine a default range dependent on the
@@ -198,7 +198,7 @@ class CBox_driven_transmon(Transmon):
             f_span = 10e6
             f_step = 50e3
             freqs = np.arange(f_center-f_span/2, f_center+f_span/2, f_step)
-        self.measure_heterodyne_spectroscopy(freqs, MC, analyze=False)
+        self.measure_heterodyne_spectroscopy(freqs, MC, analyze=False, RO_length=RO_length)
         a = ma.Homodyne_Analysis(label=self.msmt_suffix, close_fig=close_fig)
         if use_min:
             f_res = a.min_frequency
@@ -476,14 +476,14 @@ class CBox_driven_transmon(Transmon):
                              ' either "conventional" or "self-consistent"')
 
     def measure_heterodyne_spectroscopy(self, freqs, MC=None,
-                                        analyze=True, close_fig=True):
+                                        analyze=True, close_fig=True, RO_length=2274e-9):
         self.prepare_for_continuous_wave()
         if MC is None:
             MC = self.MC
         MC.set_sweep_function(pw.wrap_par_to_swf(
                               self.heterodyne_instr.frequency))
         MC.set_sweep_points(freqs)
-        MC.set_detector_function(det.Heterodyne_probe(self.heterodyne_instr, trigger_separation=2.8e-6))
+        MC.set_detector_function(det.Heterodyne_probe(self.heterodyne_instr, trigger_separation=2.8e-6, RO_length=2274e-9))
         MC.run(name='Resonator_scan'+self.msmt_suffix)
         if analyze:
             ma.MeasurementAnalysis(auto=True, close_fig=close_fig)

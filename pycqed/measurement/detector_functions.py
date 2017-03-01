@@ -955,7 +955,7 @@ class Detect_simulated_hanger_Soft(Soft_Detector):
 class Heterodyne_probe(Soft_Detector):
 
     def __init__(self, HS, threshold=1.75, trigger_separation=20e-6,
-                 demod_mode='double', **kw):
+                 demod_mode='double', RO_length=2274e-9, **kw):
         super().__init__(**kw)
         self.HS = HS
         self.name = 'Heterodyne probe'
@@ -967,9 +967,10 @@ class Heterodyne_probe(Soft_Detector):
         self.last = 1.
         self.trigger_separation = trigger_separation
         self.demod_mode = demod_mode
+        self.RO_length=RO_length
 
     def prepare(self):
-        self.HS.prepare(trigger_separation=self.trigger_separation)
+        self.HS.prepare(trigger_separation=self.trigger_separation, RO_length=self.RO_length)
 
     def acquire_data_point(self, **kw):
         passed = False
