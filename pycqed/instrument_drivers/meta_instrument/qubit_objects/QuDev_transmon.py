@@ -2,22 +2,28 @@ import logging
 import numpy as np
 
 from qcodes.instrument.parameter import ManualParameter
+from qcodes.utils import validators as vals
 
 from pycqed.measurement import detector_functions as det
 from pycqed.measurement import mc_parameter_wrapper as pw
+from pycqed.measurement import awg_sweep_functions as awg_swf
+from pycqed.measurement.pulse_sequences import single_qubit_tek_seq_elts as sq
 from pycqed.analysis import measurement_analysis as ma
-
+from pycqed.utilities.general import add_suffix_to_dict_keys
 from pycqed.instrument_drivers.meta_instrument.qubit_objects.qubit_object \
     import Qubit
 
 
+
 class QuDev_transmon(Qubit):
-    def __init__(self, name, MC, heterodyne_instr, cw_source, **kw):
+    def __init__(self, name, MC, heterodyne_instr, cw_source, AWG, UHFQC, **kw):
         super().__init__(name, **kw)
 
         self.MC = MC
         self.heterodyne_instr = heterodyne_instr
         self.cw_source = cw_source
+        self.AWG = AWG
+        self.UHFQC = UHFQC
 
         self.add_parameter('f_RO_resonator', label='RO resonator frequency',
                            unit='Hz', initial_value=0,
@@ -27,19 +33,140 @@ class QuDev_transmon(Qubit):
         self.add_parameter('optimal_acquisition_delay', label='Optimal '
                            'acquisition delay', unit='s', initial_value=0,
                            parameter_class=ManualParameter)
-        self.add_parameter('f_qubit_spectroscopy', label='Qubit frequency '
-                           'from spectroscopy', unit='Hz', initial_value=0,
-                           parameter_class=ManualParameter)
-        self.add_parameter('kappa_qubit_spectroscopy',
-                           label='Width of qubit from spectroscopy',
-                           unit='Hz', initial_value=0,
-                           parameter_class=ManualParameter)
+        self.add_parameter('f_qubit', label='Qubit frequency', unit='Hz',
+                           initial_value=0, parameter_class=ManualParameter)
+        self.add_parameter('spec_pow', unit='dBm', initial_value=0,
+                           parameter_class=ManualParameter,
+                           label='Continuous wave qubit spectroscopy power')
+        self.add_parameter('spec_pow_pulsed', unit='dBm', initial_value=0,
+                           parameter_class=ManualParameter,
+                           label='Pulsed qubit spectroscopy power')
+        self.add_parameter('f_RO', unit='Hz', parameter_class=ManualParameter,
+                           label='Readout frequency')
+        self.add_parameter('td_source_pow', unit='dBm',
+                           parameter_class=ManualParameter,
+                           label='Qubit drive pulse mixer LO power')
+        self.add_parameter('pulse_I_offset', unit='V', initial_value=0,
+                           parameter_class=ManualParameter,
+                           label='DC offset for the drive line I channel')
+        self.add_parameter('pulse_Q_offset', unit='V', initial_value=0,
+                           parameter_class=ManualParameter,
+                           label='DC offset for the drive line Q channel')
+        self.add_parameter('RO_I_offset', unit='V', initial_value=0,
+                           parameter_class=ManualParameter,
+                           label='DC offset for the readout I channel')
+        self.add_parameter('RO_Q_offset', unit='V', initial_value=0,
+                           parameter_class=ManualParameter,
+                           label='DC offset for the readout Q channel')
 
+        self.int_avg_det = det.UHFQC_integrated_average_detector(
+            self.UHFQC, self.AWG, integration_length=1e-6, nr_averages=1024)
+
+        # add pulsed spectroscopy pulse parameters
+        self.add_operation('Spec')
+        self.add_pulse_parameter('Spec', 'spec_pulse_type', 'pulse_type',
+                                 vals=vals.Strings(),
+                                 initial_value='SquarePulse')
+        self.add_pulse_parameter('Spec', 'spec_pulse_marker_channel', 'channel',
+                                 initial_value=None, vals=vals.Strings())
+        self.add_pulse_parameter('Spec', 'spec_pulse_amp', 'amplitude',
+                                 vals=vals.Numbers(), initial_value=1)
+        self.add_pulse_parameter('Spec', 'spec_pulse_length', 'length',
+                                 initial_value=None, vals=vals.Numbers())
+        self.add_pulse_parameter('Spec', 'spec_pulse_depletion_time',
+                                 'pulse_delay', vals=vals.Numbers(),
+                                 initial_value=None)
+
+        # add readout pulse parameters
+        self.add_operation('RO')
+        self.add_pulse_parameter('RO', 'RO_pulse_type', 'pulse_type',
+                                 vals=vals.Strings(),
+                                 initial_value='MW_IQmod_pulse_UHFQC')
+        self.add_pulse_parameter('RO', 'RO_I_channel', 'I_channel',
+                                 initial_value=None, vals=vals.Strings())
+        self.add_pulse_parameter('RO', 'RO_Q_channel', 'Q_channel',
+                                 initial_value=None, vals=vals.Strings())
+        self.add_pulse_parameter('RO', 'RO_pulse_marker_channel', 'RO_pulse_marker_channel',
+                                 initial_value=None, vals=vals.Strings())
+        self.add_pulse_parameter('RO', 'RO_amp', 'amplitude',
+                                 initial_value=None, vals=vals.Numbers())
+        self.add_pulse_parameter('RO', 'RO_pulse_length', 'length',
+                                 initial_value=None, vals=vals.Numbers())
+        self.add_pulse_parameter('RO', 'RO_pulse_delay', 'pulse_delay',
+                                 initial_value=None, vals=vals.Numbers())
+        self.add_pulse_parameter('RO', 'f_RO_mod', 'mod_frequency',
+                                 initial_value=None, vals=vals.Numbers())
+        self.add_pulse_parameter('RO', 'RO_acq_marker_delay', 'acq_marker_delay',
+                                 initial_value=None, vals=vals.Numbers())
+        self.add_pulse_parameter('RO', 'RO_acq_marker_channel', 'acq_marker_channel',
+                                 initial_value=None, vals=vals.Strings())
+        self.add_pulse_parameter('RO', 'RO_pulse_phase', 'phase',
+                                 initial_value=None, vals=vals.Numbers())
+
+        # add drive pulse parameters
+        self.add_operation('X180')
+        self.add_pulse_parameter('X180', 'pulse_type', 'pulse_type',
+                                 initial_value=None, vals=vals.Strings())
+        self.add_pulse_parameter('X180', 'pulse_I_channel', 'I_channel',
+                                 initial_value=None, vals=vals.Strings())
+        self.add_pulse_parameter('X180', 'pulse_Q_channel', 'Q_channel',
+                                 initial_value=None, vals=vals.Strings())
+        self.add_pulse_parameter('X180', 'amp180', 'amplitude',
+                                 initial_value=1, vals=vals.Numbers())
+        self.add_pulse_parameter('X180', 'amp90_scale', 'amp90_scale',
+                                 initial_value=0.5, vals=vals.Numbers(0, 1))
+        self.add_pulse_parameter('X180', 'pulse_delay', 'pulse_delay',
+                                 initial_value=None, vals=vals.Numbers())
+        self.add_pulse_parameter('X180', 'gauss_sigma', 'sigma',
+                                 initial_value=None, vals=vals.Numbers())
+        self.add_pulse_parameter('X180', 'nr_sigma', 'nr_sigma',
+                                 initial_value=None, vals=vals.Numbers())
+        self.add_pulse_parameter('X180', 'motzoi', 'motzoi',
+                                 initial_value=None, vals=vals.Numbers())
+        self.add_pulse_parameter('X180', 'f_pulse_mod', 'mod_frequency',
+                                 initial_value=None, vals=vals.Numbers())
+        self.add_pulse_parameter('X180', 'phi_skew', 'phi_skew',
+                                 initial_value=None, vals=vals.Numbers())
+        self.add_pulse_parameter('X180', 'alpha', 'alpha',
+                                 initial_value=None, vals=vals.Numbers())
+        self.add_pulse_parameter('X180', 'X_pulse_phase', 'phase',
+                                 initial_value=None, vals=vals.Numbers())
 
     def prepare_for_continuous_wave(self):
-        # heterodyne instrument is a separate instrument and should always be
-        # prepared for cw experiments
-        pass
+        self.heterodyne_instr.auto_seq_loading(True)
+        self.cw_source.pulsemod_state.set('Off')
+        self.cw_source.power.set(self.spec_pow())
+
+    def prepare_for_pulsed_spec(self):
+        self.heterodyne_instr.auto_seq_loading(False)
+        self.cw_source.pulsemod_state.set('On')
+        self.cw_source.power.set(self.spec_pow_pulsed())
+
+    def prepare_for_timedomain(self):
+        self.td_source.pulsemod_state('Off')
+        self.td_source.frequency.set(self.f_qubit() - self.f_pulse_mod())
+
+        # Use resonator freq unless explicitly specified
+        if self.f_RO() is None:
+            f_RO = self.f_RO_resonator.get()
+        else:
+            f_RO = self.f_RO()
+        self.LO.frequency.set(f_RO - self.f_RO_mod())
+        self.td_source.power.set(self.td_source_pow())
+
+        self.AWG.set(self.pulse_I_channel() + '_offset',
+                     self.pulse_I_offset())
+        self.AWG.set(self.pulse_Q_channel() + '_offset',
+                     self.pulse_Q_offset())
+
+        eval('self.UHFQC.sigouts_{}_offset({})'.format(
+            self.RO_I_channel(), self.RO_I_offset()))
+        eval('self.UHFQC.sigouts_{}_offset({})'.format(
+            self.RO_Q_channel(), self.RO_Q_offset()))
+        self.UHFQC.awg_sequence_acquisition_and_pulse_SSB(
+            f_RO_mod=self.f_RO_mod(), RO_amp=self.RO_amp(),
+            RO_pulse_length=self.RO_pulse_length(),
+            acquisition_delay=270e-9)
 
     def measure_heterodyne_spectroscopy(self, freqs=None, MC=None,
                                         analyze=True, close_fig=True):
@@ -101,34 +228,72 @@ class QuDev_transmon(Qubit):
         if analyze:
             ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
 
-    def measure_spectroscopy(self, freqs=None, MC=None, analyze=True,
-                             close_fig=True, update=False):
+    def measure_spectroscopy(self, freqs=None, pulsed=False, MC=None,
+                             analyze=True, close_fig=True):
         """ Varies qubit drive frequency and measures the resonator
         transmittance """
         if freqs is None:
-            raise ValueError("Unspecified frequencies for "
-                                 "measure_spectroscopy and no previous value")
+            raise ValueError("Unspecified frequencies for measure_spectroscopy")
 
         if MC is None:
             MC = self.MC
 
-        self.prepare_for_continuous_wave()
-        self.cw_source.on()
+        if not pulsed:
 
-        MC.set_sweep_function(pw.wrap_par_to_swf(self.cw_source.frequency))
-        MC.set_sweep_points(freqs)
-        MC.set_detector_function(det.Heterodyne_probe(
-            self.heterodyne_instr, trigger_separation=2.8e-6,
-            demod_mode='single'))
-        MC.run(name='spectroscopy'+self.msmt_suffix)
+            self.prepare_for_continuous_wave()
+            self.cw_source.on()
 
-        self.cw_source.off()
+            MC.set_sweep_function(pw.wrap_par_to_swf(self.cw_source.frequency))
+            MC.set_sweep_points(freqs)
+            MC.set_detector_function(det.Heterodyne_probe(
+                self.heterodyne_instr, trigger_separation=2.8e-6,
+                demod_mode='single'))
+            MC.run(name='spectroscopy'+self.msmt_suffix)
+
+            self.cw_source.off()
+
+        else:
+            self.prepare_for_pulsed_spec()
+
+            spec_pars = self.get_spec_pars()
+            RO_pars = self.get_RO_pars()
+
+            self.cw_source.on()
+
+            sq.Pulsed_spec_seq(spec_pars, RO_pars)
+
+            self.AWG.start()
+
+            MC.set_sweep_function(self.cw_source.frequency)
+            MC.set_sweep_points(freqs)
+            MC.set_detector_function(
+                det.Heterodyne_probe(self.heterodyne_instr))
+            MC.run(name='pulsed-spec' + self.msmt_suffix)
+
+            self.cw_source.off()
 
         if analyze:
             ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
 
-    def measure_rabi(self):
-        raise NotImplementedError()
+    def measure_rabi(self, amps=None, n=1, MC=None, analyze=True,
+                     close_fig=True, verbose=False):
+
+        if amps is None:
+            raise ValueError("Unspecified amplitudes for measure_rabi")
+
+        self.prepare_for_timedomain()
+
+        if MC is None:
+            MC = self.MC
+
+        MC.set_sweep_function(awg_swf.Rabi(
+            pulse_pars=self.get_drive_pars(), RO_pars=self.get_RO_pars(), n=n))
+        MC.set_sweep_points(amps)
+        MC.set_detector_function(self.int_avg_det)
+        MC.run('Rabi-n{}'.format(n) + self.msmt_suffix)
+
+        if analyze:
+            ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
 
     def measure_T1(self):
         raise NotImplementedError()
@@ -173,7 +338,7 @@ class QuDev_transmon(Qubit):
         Q = HA.fit_results.params['Q'].value
         dQ = HA.fit_results.params['Q'].stderr
         if f0 > max(freqs) or f0 < min(freqs):
-            logging.warning('exracted frequency outside of range of scan')
+            logging.warning('extracted frequency outside of range of scan')
         elif df0 > f0:
             logging.warning('resonator frequency uncertainty greater than '
                             'value')
@@ -208,3 +373,58 @@ class QuDev_transmon(Qubit):
             self.optimal_acquisition_delay(d)
             self.heterodyne_instr.acquisition_delay(d)
         return d
+
+    def find_frequency(self, method='cw_spectroscopy', update=True, MC=None,
+                       close_fig=True, **kw):
+        if MC is None:
+            MC = self.MC
+
+        if 'spectroscopy' in method.lower():
+            freqs = kw.get('freqs', None)
+            if freqs is None:
+                f_span = kw.get('f_span', 100e6)
+                f_mean = kw.get('f_mean', self.f_qubit())
+                nr_points = kw.get('nr_points', 100)
+                if f_mean == 0:
+                    logging.warning("find_frequency does not know where to "
+                                    "look for the qubit. Please specify the "
+                                    "f_mean or the freqs function parameter.")
+                    return 0
+                else:
+                    freqs = np.linspace(f_mean - f_span/2, f_mean + f_span/2,
+                                        nr_points)
+
+            if 'pulse' not in method.lower():
+                self.measure_spectroscopy(freqs, pulsed=False, MC=MC,
+                                          close_fig=close_fig)
+                label = 'spectroscopy'
+            else:
+                self.measure_spectroscopy(freqs, pulsed=True, MC=MC,
+                                          close_fig=close_fig)
+                label = 'pulsed-spec'
+
+            SpecA = ma.Qubit_Spectroscopy_Analysis(label=label,
+                                                   close_fig=close_fig)
+            f0 = self.f_qubit(SpecA.fitted_freq)
+            if update:
+                self.f_qubit(f0)
+            return f0
+        else:
+            raise ValueError("Unknown method '{}' for "
+                             "find_frequency".format(method))
+
+    def get_spec_pars(self):
+        return self.get_operation_dict()['Spec ' + self.name]
+
+    def get_RO_pars(self):
+        return self.get_operation_dict()['RO ' + self.name]
+
+    def get_drive_pars(self):
+        return self.get_operation_dict()['X180 ' + self.name]
+
+    def get_operation_dict(self, operation_dict={}):
+        operation_dict = super().get_operation_dict(operation_dict)
+        operation_dict.update(add_suffix_to_dict_keys(
+            sq.get_pulse_dict_from_pars(operation_dict['X180 '+self.name]),
+            ' ' + self.name))
+        return operation_dict
