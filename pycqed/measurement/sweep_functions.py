@@ -2,6 +2,7 @@ import logging
 import time
 
 from pycqed.instrument_drivers.virtual_instruments.pyqx import qasm_loader as ql
+from pycqed.measurement.waveform_control_CC import qasm_to_asm as qta
 
 
 class Sweep_function(object):
@@ -210,8 +211,6 @@ class AWG_multi_channel_amplitude(Soft_Sweep):
 ###############################################################################
 ####################          Hardware Sweeps      ############################
 ###############################################################################
-
-
 class Hard_Sweep(Sweep_function):
 
     def __init__(self, **kw):
@@ -222,6 +221,26 @@ class Hard_Sweep(Sweep_function):
 
     def start_acquistion(self):
         pass
+
+
+class QASM_Sweep(Hard_Sweep):
+
+    def __init__(self, filename, CBox, op_dict,
+                 parameter_name='Points', unit='a.u.', upload=True):
+        super().__init__()
+        self.name = 'QASM_Sweep'
+        self.filename = filename
+        self.upload = upload
+        self.CBox = CBox
+        self.op_dict = op_dict
+        self.parameter_name = parameter_name
+        self.unit = unit
+
+    def prepare(self, **kw):
+        self.CBox.trigger_source('internal')
+        if self.upload:
+            qumis_file = qta.qasm_to_asm(self.filename, self.op_dict)
+            self.CBox.load_instructions(qumis_file.name)
 
 
 class QX_Hard_Sweep(Hard_Sweep):

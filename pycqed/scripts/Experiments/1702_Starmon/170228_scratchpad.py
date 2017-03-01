@@ -1,4 +1,4 @@
-for q in [q, QR]:
+for q in [QL, QR]:
     q.RF_RO_source(RF.name)
 
     q.RO_pulse_type('MW_IQmod_pulse_UHFQC')
@@ -10,7 +10,7 @@ for q in [q, QR]:
     q.RO_pulse_delay(100e-9)
     q.AWG = None
     # q.heterodyne_instr = HS
-    q.f_RO_mod(20e6)
+    q.f_RO_mod(50e6)
 
     q.RO_acq_weight_function_I(0)
     q.RO_acq_weight_function_Q(1)
@@ -26,7 +26,12 @@ for q in [q, QR]:
 QR.find_resonator_frequency()
 QL.find_resonator_frequency()
 
+QR.find_frequency()
+QR.find_frequency(pulsed=True)
 
+integration_length=2e-6
+chi=2e6
+pulse_length=500e-9
 
 q = QR
 q.RO_pulse_length()
@@ -59,10 +64,15 @@ multiplexed_wave = [['LutMan0', 'M_up_mid_double_dep'],
                     ]
 
 LutManMan.generate_multiplexed_pulse(multiplexed_wave)
-LutManMan.render_wave('Multiplexed_pulse', time_unit='s')
-LutManMan.render_wave_PSD(
-    'Multiplexed_pulse', f_bounds=[00e6, 1000e6], y_bounds=[1e-18, 1e-6])
+# LutManMan.render_wave('Multiplexed_pulse', time_unit='s')
+# LutManMan.render_wave_PSD(
+#     'Multiplexed_pulse', f_bounds=[00e6, 1000e6], y_bounds=[1e-18, 1e-6])
 LutManMan.load_pulse_onto_AWG_lookuptable('Multiplexed_pulse')
 
 # Enabling the AWG channel on the UHFQC
 UHFQC_1.awgs_0_enable(1)
+
+RF.off()
+
+# measure spec again to see if it works with TD_settings
+QR.find_frequency(pulsed=True)

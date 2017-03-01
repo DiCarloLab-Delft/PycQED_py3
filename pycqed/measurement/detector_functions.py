@@ -1454,7 +1454,7 @@ class UHFQC_integrated_average_detector(Hard_Detector):
     def get_values(self):
         if self.AWG is not None:
             self.AWG.stop()
-        self.UHFQC.quex_rl_readout(0) # resets UHFQC internal readout counters
+        self.UHFQC.quex_rl_readout(0)  # resets UHFQC internal readout counters
         self.UHFQC.awgs_0_enable(1)
         # probing the values to be sure communication is finished before
         # this way of checking the UHFQC should be OK according to Niels H
@@ -1471,7 +1471,6 @@ class UHFQC_integrated_average_detector(Hard_Detector):
             time.sleep(0.01)
         data = ['']*len(self.channels)
         for i, channel in enumerate(self.channels):
-            # FIXME: better to use dataset = self.UHFQC.get('quex_rl_data_{}'.format(channel))
             dataset = self.UHFQC.get('quex_rl_data_{:d}'.format(channel))
             data[i] = dataset[0]['vector']/self.nr_averages
             if self.cross_talk_suppression:

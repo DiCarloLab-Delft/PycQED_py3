@@ -132,11 +132,10 @@ LutManMan.LutMans(
     [LutMan0.name, LutMan1.name])
 
 
-
 from pycqed.instrument_drivers.physical_instruments import QuTech_AWG_Module as qwg
 QWG = qwg.QuTech_AWG_Module(
-                'QWG', address='192.168.0.10',
-                port=5025, server_name=None)
+    'QWG', address='192.168.0.10',
+    port=5025, server_name=None)
 station.add_component(QWG)
 
 from pycqed.instrument_drivers.meta_instrument import QWG_LookuptableManager as qlm
@@ -144,7 +143,6 @@ QL_LutMan = qlm.QWG_LookuptableManager('QL_LutMan', QWG=QWG)
 station.add_component(QL_LutMan)
 QR_LutMan = qlm.QWG_LookuptableManager('QR_LutMan', QWG=QWG)
 station.add_component(QR_LutMan)
-
 
 
 CBox = qcb.QuTech_ControlBox_v3(
@@ -210,15 +208,15 @@ station.add_component(HS)
 
 
 QL = qb.QWG_driven_transmon('QL', LO, cw_source=QL_LO, td_source=QL_LO,
-                                IVVI=IVVI, QWG=QWG, CBox=CBox,
-                                RO_LutMan=LutMan0, Q_LutMan=QL_LutMan,
-                                MC=MC)
+                            IVVI=IVVI, QWG=QWG, CBox=CBox,
+                            RO_LutMan=LutMan0, Q_LutMan=QL_LutMan,
+                            MC=MC)
 station.add_component(QL)
 
 QR = qb.QWG_driven_transmon('QR', LO, cw_source=QR_LO, td_source=QR_LO,
-                                IVVI=IVVI, QWG=QWG, CBox=CBox,
-                                RO_LutMan=LutMan1, Q_LutMan=QR_LutMan,
-                                MC=MC)
+                            IVVI=IVVI, QWG=QWG, CBox=CBox,
+                            RO_LutMan=LutMan1, Q_LutMan=QR_LutMan,
+                            MC=MC)
 station.add_component(QR)
 
 # load settings onto qubits
@@ -315,10 +313,11 @@ def reload_qubit(qubit):
 
     except Exception as e:
         logging.warning(e)
-    qubit = qb.QWG_driven_transmon(qubit_name, LO, cw_source=QL_LO, td_source=QL_LO,
-                                IVVI=IVVI, QWG=QWG, CBox=CBox,
-                                RO_LutMan=LutMan0, Q_LutMan=QL_LutMan,
-                                MC=MC)
+    qubit = qb.QWG_driven_transmon(qubit_name, LO, cw_source=QL_LO,
+                                   td_source=QL_LO,
+                                   IVVI=IVVI, QWG=QWG, CBox=CBox,
+                                   RO_LutMan=LutMan0, Q_LutMan=QL_LutMan,
+                                   MC=MC)
     station.add_component(qubit)
     gen.load_settings_onto_instrument(qubit)
     return qubit
@@ -331,28 +330,6 @@ def reload_qubit(qubit):
 #     reload(ps)
 #     # The AWG sequencer
 #     qc.station.pulsar = ps.Pulsar()
-#     station.pulsar.AWG = station.components['AWG']
-#     markerhighs = [2, 2, 2.7, 2]
-#     for i in range(4):
-#         # Note that these are default parameters and should be kept so.
-#         # the channel offset is set in the AWG itself. For now the amplitude is
-#         # hardcoded. You can set it by hand but this will make the value in the
-#         # sequencer different.
-#         station.pulsar.define_channel(id='ch{}'.format(i+1),
-#                                       name='ch{}'.format(i+1), type='analog',
-#                                       # max safe IQ voltage
-#                                       high=.7, low=-.7,
-#                                       offset=0.0, delay=0, active=True)
-#         station.pulsar.define_channel(id='ch{}_marker1'.format(i+1),
-#                                       name='ch{}_marker1'.format(i+1),
-#                                       type='marker',
-#                                       high=markerhighs[i], low=0, offset=0.,
-#                                       delay=0, active=True)
-#         station.pulsar.define_channel(id='ch{}_marker2'.format(i+1),
-#                                       name='ch{}_marker2'.format(i+1),
-#                                       type='marker',
-#                                       high=markerhighs[i], low=0, offset=0.,
-#                                       delay=0, active=True)
 
 #     from pycqed.measurement.waveform_control_CC import waveform as wf
 #     reload(wf)

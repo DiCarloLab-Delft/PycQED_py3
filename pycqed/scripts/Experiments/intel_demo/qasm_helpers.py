@@ -23,12 +23,11 @@ class QASM_Sweep(swf.Hard_Sweep):
         self.parameter_name = parameter_name
         self.unit = unit
 
-
     def prepare(self, **kw):
         self.CBox.trigger_source('internal')
         if self.upload:
-            asm_file = qta.qasm_to_asm(self.filename, self.op_dict)
-            self.CBox.load_instructions(asm_file.name)
+            qumis_file = qta.qasm_to_asm(self.filename, self.op_dict)
+            self.CBox.load_instructions(qumis_file.name)
 
 
 class ASM_Sweep(swf.Hard_Sweep):

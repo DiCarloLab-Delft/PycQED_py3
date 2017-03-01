@@ -118,7 +118,7 @@ class CBox_v3_driven_transmon(Transmon):
         self.add_parameter('RO_acq_averages', initial_value=1024,
                            vals=vals.Numbers(min_value=0, max_value=1e6),
                            parameter_class=ManualParameter)
-        self.add_parameter('RO_soft_averages', initial_value=4,
+        self.add_parameter('RO_soft_averages', initial_value=1,
                            vals=vals.Ints(min_value=1),
                            parameter_class=ManualParameter)
 
@@ -295,7 +295,8 @@ class CBox_v3_driven_transmon(Transmon):
         self._acquisition_instrument = self.find_instrument(acq_instr_name)
         if 'CBox' in acq_instr_name:
             logging.info("setting CBox acquisition")
-            self.int_avg_det = None  # FIXME: Not implemented
+            self.int_avg_det = qh.CBox_integrated_average_detector_CC(
+                self.CBox, nr_averages=self.RO_acq_averages()//self.RO_soft_avg())
             self.int_avg_det_rot = None  # FIXME: Not implemented
             self.int_log_det = qh.CBox_integration_logging_det_CC(self.CBox)
             self.input_average_detector = None  # FIXME: Not implemented
@@ -305,7 +306,7 @@ class CBox_v3_driven_transmon(Transmon):
                 UHFQC=self._acquisition_instrument,
                 AWG=self.AWG, nr_averages=self.RO_acq_averages())
             self.int_avg_det_single = det.UHFQC_integrated_average_detector(
-                UHFQC=self._acquisition_instrument, AWG=self.AWG,
+                UHFQC=self._acquisition_instrument, AWG=self.CBox,
                 channels=[self.RO_acq_weight_function_I(), self.RO_acq_weight_function_Q()],
                 nr_averages=self.RO_acq_averages(),
                 real_imag=True,
@@ -313,7 +314,7 @@ class CBox_v3_driven_transmon(Transmon):
             self.int_avg_det_single.detector_control = 'soft'
 
             self.int_avg_det = det.UHFQC_integrated_average_detector(
-                UHFQC=self._acquisition_instrument, AWG=self.AWG,
+                UHFQC=self._acquisition_instrument, AWG=self.CBox,
                 channels=[self.RO_acq_weight_function_I(), self.RO_acq_weight_function_Q()],
                 nr_averages=self.RO_acq_averages(),
                 integration_length=self.RO_acq_integration_length())
@@ -565,6 +566,7 @@ class CBox_v3_driven_transmon(Transmon):
         if MC is None:
             MC = self.MC
 
+
         # Loading the right qumis instructions
         CW_RO_sequence = sqqs.CW_RO_sequence(self.name,
                                              self.RO_acq_period_cw())
@@ -576,7 +578,6 @@ class CBox_v3_driven_transmon(Transmon):
 
         if MC is None:
             MC = self.MC
-
 
         # Create a new sweep function that sweeps two frequencies.
         # use only if the RO pulse type is the CW-RF scan, else only sweep the LO
@@ -680,7 +681,7 @@ class CBox_v3_driven_transmon(Transmon):
         # if analyze:
         #     ma.MeasurementAnalysis(auto=True, TwoD=True, close_fig=close_fig)
 
-    def measure_rabi(self, amps, n=1,
+    def measure_rabi(self, amps=np.linspace(-.5, .5, 21), n=1,
                      MC=None, analyze=True, close_fig=True,
                      verbose=False):
         self.prepare_for_timedomain()
@@ -834,8 +835,7 @@ class CBox_v3_driven_transmon(Transmon):
         T1 = sqqs.T1(self.name, times=times)
         s = qh.QASM_Sweep(T1.name, self.CBox, self.get_operation_dict(),
                           parameter_name='Time', unit='s')
-        d = qh.CBox_integrated_average_detector_CC(
-            self.CBox, nr_averages=self.RO_acq_averages()//MC.soft_avg())
+        d = self.int_avg_det
 
         MC.set_sweep_function(s)
         MC.set_sweep_points(times)
@@ -876,8 +876,7 @@ class CBox_v3_driven_transmon(Transmon):
             self.name, times=times, artificial_detuning=None)
         s = qh.QASM_Sweep(Ramsey.name, self.CBox, self.get_operation_dict(),
                           parameter_name='Time', unit='s')
-        d = qh.CBox_integrated_average_detector_CC(
-            self.CBox, nr_averages=self.RO_acq_averages()//MC.soft_avg())
+        d = self.int_avg_det
         MC.set_sweep_function(s)
         MC.set_sweep_points(times)
         MC.set_detector_function(d)
@@ -915,8 +914,7 @@ class CBox_v3_driven_transmon(Transmon):
         echo = sqqs.echo(self.name, times=times, artificial_detuning=None)
         s = qh.QASM_Sweep(echo.name, self.CBox, self.get_operation_dict(),
                           parameter_name='Time', unit='s')
-        d = qh.CBox_integrated_average_detector_CC(
-            self.CBox, nr_averages=self.RO_acq_averages()//MC.soft_avg())
+        d = self.int_avg_det
         MC.set_sweep_function(s)
         MC.set_sweep_points(times)
         MC.set_detector_function(d)
@@ -934,8 +932,6 @@ class CBox_v3_driven_transmon(Transmon):
 
         AllXY = sqqs.AllXY(self.name, double_points=True)
         s = qh.QASM_Sweep(AllXY.name, self.CBox, self.get_operation_dict())
-        d = qh.CBox_integrated_average_detector_CC(
-            self.CBox, nr_averages=self.RO_acq_averages()//MC.soft_avg())
         d = self.int_avg_det
         MC.set_sweep_function(s)
         MC.set_sweep_points(np.arange(42))
@@ -964,8 +960,7 @@ class CBox_v3_driven_transmon(Transmon):
                                               equator=equator)
         s = qh.QASM_Sweep(flipping_sequence.name, self.CBox,
                           self.get_operation_dict())
-        d = qh.CBox_integrated_average_detector_CC(
-            self.CBox, nr_averages=self.RO_acq_averages()//MC.soft_avg())
+        d = self.int_avg_det
 
         MC.set_sweep_function(s)
         MC.set_sweep_points(number_of_flips)
@@ -1223,8 +1218,7 @@ class QWG_driven_transmon(CBox_v3_driven_transmon):
                        'is "block", gauss_width if spec_pulse_type is gauss.'),
             initial_value=100e-9)
 
-
-    def measure_rabi(self, amps, n=1,
+    def measure_rabi(self, amps=np.linspace(-.5, .5, 21), n=1,
                      MC=None, analyze=True, close_fig=True,
                      verbose=False):
         self.prepare_for_timedomain()
@@ -1239,25 +1233,22 @@ class QWG_driven_transmon(CBox_v3_driven_transmon):
                                            self.get_operation_dict())
         qumis_file = single_pulse_asm
         self.CBox.load_instructions(qumis_file.name)
-        self.CBox.run_mode('run')
+
         for ch in [1, 2, 3, 4]:
             self.QWG.set('ch{}_amp'.format(ch), .45)
         ch_amp = swf.QWG_lutman_par(self.Q_LutMan,
                                     self.Q_LutMan.Q_amp180)
 
         d = self.int_avg_det
-        d.detector_control = 'soft' # FIXME THIS overwrites something!
+        d.detector_control = 'soft'  # FIXME THIS overwrites something!
 
-        # d = qh.CBox_single_integration_average_det_CC(
-        #     self.CBox, nr_averages=self.RO_acq_averages()//MC.soft_avg(),
-        #     seg_per_point=1)
         self.CBox.run_mode('run')
         MC.set_sweep_function(ch_amp)
         MC.set_sweep_points(amps)
         MC.set_detector_function(d)
 
         MC.run('Rabi-n{}'.format(n)+self.msmt_suffix)
-        d.detector_control ='hard'
+        d.detector_control = 'hard'
         if analyze:
             a = ma.Rabi_Analysis(auto=True, close_fig=close_fig)
             return a
@@ -1345,7 +1336,7 @@ class QWG_driven_transmon(CBox_v3_driven_transmon):
 
         t0 = time.time()
         self.QWG.reset()
-        self.QWG.run_mode('CODeword')
+
 
         # Sets the QWG channel amplitudes
         for ch in [1, 2, 3, 4]:
@@ -1354,11 +1345,12 @@ class QWG_driven_transmon(CBox_v3_driven_transmon):
         self.Q_LutMan.Q_amp180(self.amp180())
         self.Q_LutMan.Q_amp90_scale(self.amp90_scale())
         self.Q_LutMan.Q_motzoi(self.motzoi())
+        self.Q_LutMan.Q_gauss_width(self.gauss_width())
 
         self.Q_LutMan.spec_pulse_type(self.spec_pulse_type())
         self.Q_LutMan.spec_amp(self.spec_amp())
         self.Q_LutMan.spec_length(self.spec_length())
-
+        self.QWG.run_mode('CODeword')
         self.Q_LutMan.load_pulses_onto_AWG_lookuptable()
 
         self.QWG.stop()
@@ -1409,19 +1401,19 @@ class QWG_driven_transmon(CBox_v3_driven_transmon):
         init_clocks = convert_to_clocks(self.init_time()/2)
 
         operation_dict['init_all'] = {
-            'instruction':'\wait {} \wait {} \n'.format(
+            'instruction': 'wait {} \nwait {} \n'.format(
                 init_clocks, init_clocks)}
         operation_dict['I {}'.format(self.name)] = {
             'duration': pulse_period_clocks, 'instruction': 'wait {} \n'}
         operation_dict['X180 {}'.format(self.name)] = {
             'duration': pulse_period_clocks, 'instruction':
                 'trigger 0000000, 2 \nwait 2\n' +
-                'trigger 1000001, 2  \nwait {}\n'.format(  # 1001001
+                'trigger 1000000, 2  \nwait {}\n'.format(  # 1001001
                     pulse_period_clocks-2)}
         operation_dict['Y180 {}'.format(self.name)] = {
             'duration': pulse_period_clocks, 'instruction':
                 'trigger 0100000, 2 \nwait 2\n' +
-                'trigger 1100001, 2  \nwait {}\n'.format(
+                'trigger 1100000, 2  \nwait {}\n'.format(
                     pulse_period_clocks-2)}
         operation_dict['X90 {}'.format(self.name)] = {
             'duration': pulse_period_clocks, 'instruction':
@@ -1446,8 +1438,8 @@ class QWG_driven_transmon(CBox_v3_driven_transmon):
 
         operation_dict['SpecPulse {}'.format(self.name)] = {
             'duration': spec_pulse_clocks, 'instruction':
-                'trigger 0101000, 2 \nwait 2\n' +
-                'trigger 1101000, 2  \nwait {}\n'.format(
+                'trigger 0011000, 2 \nwait 2\n' +
+                'trigger 1011000, 2  \nwait {}\n'.format(
                     spec_pulse_clocks-2)}
 
         # RO part
@@ -1457,7 +1449,7 @@ class QWG_driven_transmon(CBox_v3_driven_transmon):
             measure_instruction = 'measure\n'
         elif (('ATS' in acq_instr) or ('UHFQC' in acq_instr)):
             # measure_instruction = 'trigger 0000001, {}\n'.format(RO_length_clocks)
-            measure_instruction = 'trigger 1111111, {}\n'.format(RO_length_clocks)
+            measure_instruction = 'trigger 0000001, {}\n'.format(RO_length_clocks)
         else:
             raise NotImplementedError('Unknown acquisition device.')
 
@@ -1471,7 +1463,7 @@ class QWG_driven_transmon(CBox_v3_driven_transmon):
                     RO_acq_marker_del_clocks, measure_instruction)}
 
         elif (self.RO_pulse_type() == 'Gated_MW_RO_pulse' or
-                self.RO_pulse_type() =='MW_IQmod_pulse_UHFQC'):
+                self.RO_pulse_type() == 'MW_IQmod_pulse_UHFQC'):
             operation_dict['RO {}'.format(self.name)] = {
                 'duration': RO_length_clocks, 'instruction':
                 'wait {} \n{}'.format(RO_pulse_delay_clocks,

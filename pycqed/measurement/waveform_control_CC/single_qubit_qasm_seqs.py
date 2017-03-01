@@ -28,7 +28,7 @@ def CW_RO_sequence(qubit_name, trigger_separation, clock_cycle=5e-9):
 
 
 def pulsed_spec_sequence(qubit_name, clock_cycle=5e-9):
-    filename = join(base_qasm_path, 'CW_RO_sequence.qasm')
+    filename = join(base_qasm_path, 'pulsed_spec.qasm')
     qasm_file = mopen(filename, mode='w')
     qasm_file.writelines('qubit {} \n'.format(qubit_name))
     qasm_file.writelines('SpecPulse {} \n'.format(
