@@ -13,17 +13,27 @@ from pycqed.utilities.general import add_suffix_to_dict_keys
 from pycqed.instrument_drivers.meta_instrument.qubit_objects.qubit_object \
     import Qubit
 
-
-
 class QuDev_transmon(Qubit):
-    def __init__(self, name, MC, heterodyne_instr, cw_source, AWG, UHFQC, **kw):
+    def __init__(self, name, MC,
+                 heterodyne = None, # metainstrument for cw spectroscopy
+                 cw_source = None, # MWG for driving the qubit continuously
+                 readout_LO = None, # MWG for down- (and up)converting RO signal
+                 readout_RF = None, # MWG for driving the readout resonator
+                 drive_LO = None,
+                 AWG = None,  # for generating IQ modulated drive pulses and
+                              # triggering instruments
+                 UHFQC = None, # For readout
+                 **kw):
         super().__init__(name, **kw)
 
         self.MC = MC
-        self.heterodyne_instr = heterodyne_instr
+        self.heterodyne = heterodyne
         self.cw_source = cw_source
         self.AWG = AWG
         self.UHFQC = UHFQC
+        self.readout_LO = readout_LO
+        self.readout_RF = readout_RF
+        self.drive_LO = drive_LO
 
         self.add_parameter('f_RO_resonator', label='RO resonator frequency',
                            unit='Hz', initial_value=0,
@@ -43,7 +53,7 @@ class QuDev_transmon(Qubit):
                            label='Pulsed qubit spectroscopy power')
         self.add_parameter('f_RO', unit='Hz', parameter_class=ManualParameter,
                            label='Readout frequency')
-        self.add_parameter('td_source_pow', unit='dBm',
+        self.add_parameter('drive_LO_pow', unit='dBm',
                            parameter_class=ManualParameter,
                            label='Qubit drive pulse mixer LO power')
         self.add_parameter('pulse_I_offset', unit='V', initial_value=0,
@@ -52,6 +62,9 @@ class QuDev_transmon(Qubit):
         self.add_parameter('pulse_Q_offset', unit='V', initial_value=0,
                            parameter_class=ManualParameter,
                            label='DC offset for the drive line Q channel')
+        self.add_parameter('RO_pulse_power', unit='dBm',
+                           parameter_class=ManualParameter,
+                           label='Readout signal power')
         self.add_parameter('RO_I_offset', unit='V', initial_value=0,
                            parameter_class=ManualParameter,
                            label='DC offset for the readout I channel')
@@ -134,39 +147,65 @@ class QuDev_transmon(Qubit):
 
     def prepare_for_continuous_wave(self):
         self.heterodyne_instr.auto_seq_loading(True)
-        self.cw_source.pulsemod_state.set('Off')
-        self.cw_source.power.set(self.spec_pow())
+        if self.cw_source is not None:
+            self.cw_source.off()
+            self.cw_source.pulsemod_state('Off')
+            self.cw_source.power.set(self.spec_pow())
 
     def prepare_for_pulsed_spec(self):
         self.heterodyne_instr.auto_seq_loading(False)
-        self.cw_source.pulsemod_state.set('On')
-        self.cw_source.power.set(self.spec_pow_pulsed())
+        if self.cw_source is not None:
+            self.cw_source.pulsemod_state('On')
+            self.cw_source.on()
+            self.cw_source.power.set(self.spec_pow_pulsed())
 
     def prepare_for_timedomain(self):
-        self.td_source.pulsemod_state('Off')
-        self.td_source.frequency.set(self.f_qubit() - self.f_pulse_mod())
+        # cw source
+        if self.cw_source is not None:
+            self.cw_source.off()
 
-        # Use resonator freq unless explicitly specified
-        if self.f_RO() is None:
-            f_RO = self.f_RO_resonator.get()
-        else:
-            f_RO = self.f_RO()
-        self.LO.frequency.set(f_RO - self.f_RO_mod())
-        self.td_source.power.set(self.td_source_pow())
+        # drive LO
+        self.drive_LO.pulsemod_state('Off')
+        self.drive_LO.frequency(self.f_qubit() - self.f_pulse_mod())
+        self.drive_LO.power(self.drive_LO_pow())
+        self.drive_LO.on()
 
+        # drive modulation
         self.AWG.set(self.pulse_I_channel() + '_offset',
                      self.pulse_I_offset())
         self.AWG.set(self.pulse_Q_channel() + '_offset',
                      self.pulse_Q_offset())
 
-        eval('self.UHFQC.sigouts_{}_offset({})'.format(
-            self.RO_I_channel(), self.RO_I_offset()))
-        eval('self.UHFQC.sigouts_{}_offset({})'.format(
-            self.RO_Q_channel(), self.RO_Q_offset()))
-        self.UHFQC.awg_sequence_acquisition_and_pulse_SSB(
-            f_RO_mod=self.f_RO_mod(), RO_amp=self.RO_amp(),
-            RO_pulse_length=self.RO_pulse_length(),
-            acquisition_delay=270e-9)
+        # readout LO
+        if self.f_RO() is None:
+            f_RO = self.f_RO_resonator()
+        else:
+            f_RO = self.f_RO()
+        self.readout_LO.pulsemod_state('Off')
+        self.readout_LO.frequency(f_RO - self.f_RO_mod())
+        self.readout_LO.on()
+
+        # readout pulse
+        if self.RO_pulse_type() is 'MW_IQmod_pulse_UHFQC':
+            eval('self._acquisition_instr.sigouts_{}_offset({})'.format(
+                self.RO_I_channel(), self.RO_I_offset()))
+            eval('self._acquisition_instr.sigouts_{}_offset({})'.format(
+                self.RO_Q_channel(), self.RO_Q_offset()))
+            if self.heterodyne is None or \
+                    not hasattr(self.heterodyne, 'acquisition_delay'):
+                acquisition_delay = 270e-9
+            else:
+                acquisition_delay = self.heterodyne.acquisition_delay()
+            self.UHFQC.awg_sequence_acquisition_and_pulse_SSB(
+                f_RO_mod=self.f_RO_mod(), RO_amp=self.RO_amp(),
+                RO_pulse_length=self.RO_pulse_length(),
+                acquisition_delay=acquisition_delay)
+        elif self.RO_pulse_type() is 'Gated_MW_RO_pulse':
+            self.readout_RF.pulsemod_state('On')
+            self.readout_RF.frequency(f_RO)
+            self.readout_RF.power(self.RO_pulse_power())
+            self.readout_RF.on()
+            self.UHFQC.awg_sequence_acquisition()
 
     def measure_heterodyne_spectroscopy(self, freqs=None, MC=None,
                                         analyze=True, close_fig=True):
@@ -185,9 +224,12 @@ class QuDev_transmon(Qubit):
         MC.set_sweep_function(pw.wrap_par_to_swf(
             self.heterodyne_instr.frequency))
         MC.set_sweep_points(freqs)
+        demod_mode = 'single' if self.heterodyne.single_sideband_demod() \
+            else 'double'
         MC.set_detector_function(det.Heterodyne_probe(
-            self.heterodyne_instr, trigger_separation=5e-6,
-            demod_mode='single'))
+            self.heterodyne_instr,
+            trigger_separation=self.heterodyne.trigger_separation(),
+            demod_mode=demod_mode))
         MC.run(name='resonator_scan'+self.msmt_suffix)
 
         self.heterodyne_instr.frequency(previous_freq)
@@ -217,9 +259,12 @@ class QuDev_transmon(Qubit):
         MC.set_sweep_function(pw.wrap_par_to_swf(
             self.heterodyne_instr.acquisition_delay))
         MC.set_sweep_points(delays)
+        demod_mode = 'single' if self.heterodyne.single_sideband_demod() \
+            else 'double'
         MC.set_detector_function(det.Heterodyne_probe(
-            self.heterodyne_instr, trigger_separation=5e-6,
-            demod_mode='single'))
+            self.heterodyne_instr,
+            trigger_separation=self.heterodyne.trigger_separation(),
+            demod_mode=demod_mode))
         MC.run(name='acquisition_delay_scan'+self.msmt_suffix)
 
         self.heterodyne_instr.acquisition_delay(previous_delay)
@@ -245,9 +290,12 @@ class QuDev_transmon(Qubit):
 
             MC.set_sweep_function(pw.wrap_par_to_swf(self.cw_source.frequency))
             MC.set_sweep_points(freqs)
+            demod_mode = 'single' if self.heterodyne.single_sideband_demod() \
+                else 'double'
             MC.set_detector_function(det.Heterodyne_probe(
-                self.heterodyne_instr, trigger_separation=2.8e-6,
-                demod_mode='single'))
+                self.heterodyne_instr,
+                trigger_separation=self.heterodyne.trigger_separation(),
+                demod_mode=demod_mode))
             MC.run(name='spectroscopy'+self.msmt_suffix)
 
             self.cw_source.off()
@@ -266,8 +314,12 @@ class QuDev_transmon(Qubit):
 
             MC.set_sweep_function(self.cw_source.frequency)
             MC.set_sweep_points(freqs)
-            MC.set_detector_function(
-                det.Heterodyne_probe(self.heterodyne_instr))
+            demod_mode = 'single' if self.heterodyne.single_sideband_demod() \
+                else 'double'
+            MC.set_detector_function(det.Heterodyne_probe(
+                self.heterodyne_instr,
+                trigger_separation=self.heterodyne.trigger_separation(),
+                demod_mode=demod_mode))
             MC.run(name='pulsed-spec' + self.msmt_suffix)
 
             self.cw_source.off()
@@ -403,8 +455,9 @@ class QuDev_transmon(Qubit):
                                           close_fig=close_fig)
                 label = 'pulsed-spec'
 
-            SpecA = ma.Qubit_Spectroscopy_Analysis(label=label,
-                                                   close_fig=close_fig)
+            amp_only = hasattr(self.heterodyne, 'RF')
+            SpecA = ma.Qubit_Spectroscopy_Analysis(
+                label=label, amp_only=amp_only, close_fig=close_fig)
             f0 = self.f_qubit(SpecA.fitted_freq)
             if update:
                 self.f_qubit(f0)
@@ -425,6 +478,6 @@ class QuDev_transmon(Qubit):
     def get_operation_dict(self, operation_dict={}):
         operation_dict = super().get_operation_dict(operation_dict)
         operation_dict.update(add_suffix_to_dict_keys(
-            sq.get_pulse_dict_from_pars(operation_dict['X180 '+self.name]),
+            sq.get_pulse_dict_from_pars(operation_dict['X180 ' + self.name]),
             ' ' + self.name))
         return operation_dict

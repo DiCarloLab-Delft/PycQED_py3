@@ -4018,17 +4018,15 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
 
     def run_default_analysis(self, print_fit_results=False,
                              show=False, fit_results_peak=True, **kw):
-        def fit_data():
-            try:
+        def fit_data(amp_only=True):
+            if amp_only:
                 self.data_dist = a_tools.calculate_distance_ground_state(
-                    data_real=self.measured_values[2],
-                    data_imag=self.measured_values[3])
-            except:
-                # Quick fix to make it work with pulsed spec which does not
-                # return both I,Q and, amp and phase
+                     data_amp=self.measured_values[0],
+                     data_phase=None)
+            else:
                 self.data_dist = a_tools.calculate_distance_ground_state(
-                    data_real=self.measured_values[0],
-                    data_imag=self.measured_values[1])
+                    data_amp=self.measured_values[0],
+                    data_phase=self.measured_values[1])
 
             self.peaks = a_tools.peak_finder(
                 self.sweep_points, a_tools.smooth(self.data_dist))
@@ -4088,7 +4086,8 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
 
         use_max = kw.get('use_max', False)
 
-        fit_res = fit_data()
+        amp_only = kw.get('amp_only', True)
+        fit_res = fit_data(amp_only=amp_only)
         self.fitted_freq = fit_res.params['f0'].value
 
         self.fit_results.append(fit_res)

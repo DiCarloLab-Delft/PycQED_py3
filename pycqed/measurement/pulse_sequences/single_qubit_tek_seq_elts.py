@@ -759,13 +759,13 @@ def get_pulse_dict_from_pars(pulse_pars):
     pulses['mX180']['amplitude'] = -pi_amp
     pulses['X90']['amplitude'] = pi2_amp
     pulses['mX90']['amplitude'] = -pi2_amp
-    pulses['Y180']['phase'] = 90
-    pulses['mY180']['phase'] = 90
+    pulses['Y180']['phase'] += 90
+    pulses['mY180']['phase'] += 90
     pulses['mY180']['amplitude'] = -pi_amp
 
     pulses['Y90']['amplitude'] = pi2_amp
-    pulses['Y90']['phase'] = 90
+    pulses['Y90']['phase'] += 90
     pulses['mY90']['amplitude'] = -pi2_amp
-    pulses['mY90']['phase'] = 90
+    pulses['mY90']['phase'] += 90
 
     return pulses

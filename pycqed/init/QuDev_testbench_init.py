@@ -12,6 +12,9 @@ import pandas as pd
 import sys
 import qcodes as qc
 
+qc_config = {'datadir': r'E:\Control software\data',
+             'PycQEDdir': r'E:\Control software\PycQED_py3'}
+
 # makes sure logging messages show up in the notebook
 root = logging.getLogger()
 root.addHandler(logging.StreamHandler())
@@ -35,45 +38,59 @@ from pycqed.instrument_drivers.meta_instrument.qubit_objects.QuDev_transmon \
     import QuDev_transmon
 
 station = qc.Station()
-print("initializing SGS100A")
-LO = rs.RohdeSchwarz_SGS100A(name='LO', address='TCPIP0::192.168.1.14',
-                             server_name=None)
-#RF = rs.RohdeSchwarz_SGS100A(name='RF', address='TCPIP0::192.168.1.16',
-#                             server_name=None)
+print("initializing SGS100A's")
+drive_LO = rs.RohdeSchwarz_SGS100A(name='drive_LO', address='')
+readout_LO = rs.RohdeSchwarz_SGS100A(name='readout_LO', address='')
+readout_RF = rs.RohdeSchwarz_SGS100A(name='readout_RF', address='')
+cw_source = rs.RohdeSchwarz_SGS100A(name='cw_source', address='')
 print("initializing AWG5014")
 AWG = tek.Tektronix_AWG5014(name='AWG', timeout=20,
-                            address='TCPIP0::192.168.1.15::inst0::INSTR',
-                            server_name=None)
+                            address='')
 print("initializing UHFQC")
-UHFQC_1 = ZI_UHFQC.UHFQC('UHFQC_1', device='dev2204', server_name=None,
-                         port=8004)
-print("initializing heterodyne")
-HS = hd.LO_modulated_Heterodyne('HS', LO=LO, AWG=AWG,
-                                acquisition_instr=UHFQC_1.name,
-                                server_name=None)
-#HS = hd.HeterodyneInstrument('HS', RF=RF, LO=LO, AWG=AWG,
-#                                acquisition_instr=UHFQC_1.name,
-#                                server_name=None)
-# CW = rs.RohdeSchwarz_SGS100A(name='CW', address='TCPIP0::192.168.1.16',
-#                              server_name=None)  # CW source for probing qubit
-
-station.add_component(LO)
-station.add_component(AWG)
-station.add_component(UHFQC_1)
-station.add_component(HS)
-# station.add_component(CW)
-
+UHFQC = ZI_UHFQC.UHFQC('UHFQC', device='dev2204', port=8004)
+print("initializing heterodynes")
+homodyne = hd.LO_modulated_Heterodyne('homodyne', LO=readout_LO, AWG=AWG,
+                                      acquisition_instr=UHFQC.name)
+heterodyne = hd.HeterodyneInstrument('heterodyne', RF=readout_RF, LO=readout_LO,
+                                     AWG=AWG, acquisition_instr=UHFQC.name)
+print("initializing qubit")
 MC = mc.MeasurementControl('MC')
 MC.station = station
+qubit = QuDev_transmon('qubit', MC,
+                       heterodyne = heterodyne,
+                       cw_source = cw_source,
+                       readout_LO = readout_LO,
+                       readout_RF = readout_RF,
+                       drive_LO = drive_LO,
+                       AWG = AWG,
+                       UHFQC = UHFQC)
+
+print('configuring parameters')
+station.add_component(drive_LO)
+station.add_component(readout_LO)
+station.add_component(readout_RF)
+station.add_component(cw_source)
+station.add_component(AWG)
+station.add_component(UHFQC)
+station.add_component(homodyne)
+station.add_component(heterodyne)
+station.add_component(qubit)
 
 station.pulsar = ps.Pulsar()
-station.pulsar.AWG = station.components['AWG']
+station.pulsar.AWG = AWG
 
-AWG.stop()
-# set internal reference clock
-AWG.write('SOUR1:ROSC:SOUR INT')
+from pycqed.measurement.pulse_sequences import standard_sequences as st_seqs
+from pycqed.measurement.pulse_sequences import calibration_elements as cal_elts
+from pycqed.measurement.pulse_sequences import single_qubit_tek_seq_elts as sq
+from pycqed.measurement.pulse_sequences import fluxing_sequences as fsqs
+from pycqed.measurement.pulse_sequences import multi_qubit_tek_seq_elts as mqs
+st_seqs.station = station
+sq.station = station
+cal_elts.station = station
+fsqs.station = station
+mqs.station = station
 
-marker1highs=[2,2,2.7,2]
+# configure AWG
 for i in range(4):
     # Note that these are default parameters and should be kept so.
     # the channel offset is set in the AWG itself. For now the amplitude is
@@ -87,7 +104,7 @@ for i in range(4):
     station.pulsar.define_channel(id='ch{}_marker1'.format(i+1),
                                   name='ch{}_marker1'.format(i+1),
                                   type='marker',
-                                  high=marker1highs[i], low=0, offset=0.,
+                                  high=2, low=0, offset=0.,
                                   delay=0, active=True)
     station.pulsar.define_channel(id='ch{}_marker2'.format(i+1),
                                   name='ch{}_marker2'.format(i+1),
@@ -95,6 +112,7 @@ for i in range(4):
                                   high=2.0, low=0, offset=0.,
                                   delay=0, active=True)
 
+AWG.stop()
 AWG.ch1_offset(0.0)
 AWG.ch2_offset(0.0)
 AWG.ch3_offset(0.0)
@@ -108,39 +126,73 @@ AWG.ch2_state(1)
 AWG.ch3_state(1)
 AWG.ch4_state(1)
 
-from pycqed.measurement.pulse_sequences import standard_sequences as st_seqs
-st_seqs.station = station
-
 # set up the UHFQC instrument
 # set awg digital trigger 1 to trigger input 1
-UHFQC_1.awgs_0_auxtriggers_0_channel(0)
+UHFQC.awgs_0_auxtriggers_0_channel(0)
 # set outputs to 50 Ohm
-UHFQC_1.sigouts_0_imp50(1)
-UHFQC_1.sigouts_1_imp50(1)
+UHFQC.sigouts_0_imp50(1)
+UHFQC.sigouts_1_imp50(1)
 # set awg output to 1:1 scale
-UHFQC_1.awgs_0_outputs_0_amplitude(1)
-UHFQC_1.awgs_0_outputs_1_amplitude(1)
+UHFQC.awgs_0_outputs_0_amplitude(1)
+UHFQC.awgs_0_outputs_1_amplitude(1)
 
-# Set up heterodyne instrument parameters
-LO_power = 18 #dBm
-f_RO_mod = 100e6 #Hz
-averages = 1
-RO_length = 500e-9
-mod_amp = 1
-RF_power = 10
+# configure heterodyne instrument parameters
+readout_LO.power(18) #dBm
+readout_RF.power(10) #dBm
 
-HS.LO.power(LO_power)
-HS.f_RO_mod(f_RO_mod)
-HS.nr_averages(averages)
-HS.RO_length(RO_length)
-HS.mod_amp(mod_amp)
-#HS.RF_power(RF_power)
+for hdyne in [heterodyne, homodyne]:
+    hdyne.f_RO_mod(100e6) #Hz
+    hdyne.nr_averages(1024)
+    hdyne.RO_length(500e-9) #s
+    hdyne.trigger_separation(3e-6) #s
+homodyne.mod_amp(1) #V
 
-# Create qubit object
-qubit = QuDev_transmon("qubit", MC, HS, None)
+#configure qubit parameters
+qubit.f_RO_resonator() #Hz
+qubit.Q_RO_resonator()
+qubit.optimal_acquisition_delay() #s
+qubit.f_qubit() #Hz
+qubit.spec_pow() #dBm
+qubit.spec_pow_pulsed() #dBm
+qubit.f_RO() #Hz
+qubit.drive_LO_pow() #dBm
+qubit.pulse_I_offset() #V
+qubit.pulse_Q_offset() #V
+qubit.RO_pulse_power() #dBm
+qubit.RO_I_offset() #V
+qubit.RO_Q_offset() #V
 
-# load settings onto the qubit from the latest hdf5 file
-gen.load_settings_onto_instrument(qubit)
+qubit.spec_pulse_type('SquarePulse')
+qubit.spec_pulse_marker_channel()
+qubit.spec_pulse_amp() #V
+qubit.spec_pulse_length() #s
+qubit.spec_pulse_depletion_time() #s
+
+qubit.RO_pulse_type('MW_IQmod_pulse_UHFQC')
+qubit.RO_I_channel()
+qubit.RO_Q_channel()
+qubit.RO_pulse_marker_channel()
+qubit.RO_amp() #V
+qubit.RO_pulse_length() #s
+qubit.RO_pulse_delay() #s
+qubit.f_RO_mod() #Hz
+qubit.RO_acq_marker_delay() #s
+qubit.RO_acq_marker_channel()
+qubit.RO_pulse_phase(0) #rad
+
+qubit.pulse_type('SSB_DRAG_pulse')
+qubit.pulse_I_channel()
+qubit.pulse_Q_channel()
+qubit.amp180() #V
+qubit.amp90_scale(0.5)
+qubit.pulse_delay()
+qubit.gauss_sigma() #s
+qubit.nr_sigma(4)
+qubit.motzoi(0)
+qubit.f_pulse_mod() #Hz
+qubit.phi_skew(0)
+qubit.alpha(1)
+qubit.X_pulse_phase(0) #rad
 
 t1 = time.time()
 print('Ran initialization in %.2fs' % (t1-t0))

@@ -1029,23 +1029,28 @@ def peak_finder(x, y, percentile=70, num_sigma_threshold=5, window_len=11):
             'dips': dips, 'dips_idx': dip_indices}
 
 
-def calculate_distance_ground_state(data_real, data_imag, percentile=70,
+def calculate_distance_ground_state(data_amp, data_phase=None, percentile=70,
                                     normalize=False):
     ''' Calculates the distance from the ground state by assuming that
         for the largest part of the data, the system is in its ground state
     '''
-    perc_real = np.percentile(data_real, percentile)
-    perc_imag = np.percentile(data_imag, percentile)
+    if data_phase is not None:
+        data_real = data_amp * np.cos(np.pi * data_phase / 180)
+        data_imag = data_amp * np.sin(np.pi * data_phase / 180)
+        perc_real = np.percentile(data_real, percentile)
+        perc_imag = np.percentile(data_imag, percentile)
+        mean_real = np.mean(np.take(data_real,
+                                    np.where(data_real < perc_real)[0]))
+        mean_imag = np.mean(np.take(data_imag,
+                                    np.where(data_imag < perc_imag)[0]))
+        data_real_dist = data_real - mean_real
+        data_imag_dist = data_imag - mean_imag
+        data_dist = np.abs(data_real_dist + 1.j * data_imag_dist)
+    else:
+        perc = np.percentile(data_amp, percentile)
+        mean = np.mean(np.take(data_amp, np.where(data_amp < perc)[0]))
+        data_dist = data_amp - mean
 
-    mean_real = np.mean(np.take(data_real,
-                                np.where(data_real < perc_real)[0]))
-    mean_imag = np.mean(np.take(data_imag,
-                                np.where(data_imag < perc_imag)[0]))
-
-    data_real_dist = data_real - mean_real
-    data_imag_dist = data_imag - mean_imag
-
-    data_dist = np.abs(data_real_dist + 1.j * data_imag_dist)
     if normalize:
         data_dist /= np.max(data_dist)
     return data_dist
