@@ -239,6 +239,11 @@ gen.load_settings_onto_instrument(QR)
 # AncB.f_max(6.3772306731019359e9)
 # AncB.f_qubit_calc('flux')
 
+
+from pycqed.instrument_drivers.physical_instruments.Fridge_monitor import Fridge_Monitor
+Maserati_fridge_mon = Fridge_Monitor('Maserati_fridge_mon', 'LaMaserati')
+station.add_component(Maserati_fridge_mon)
+
 MC.station = station
 station.MC = MC
 nested_MC = mc.MeasurementControl('nested_MC')

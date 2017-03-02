@@ -11,9 +11,10 @@ f_dac_QR = lambda d: fit_mods.Qubit_dac_to_freq(dac_voltage=d, **params_QR)*1e9
 
 params_QL = {'E_c': 0.28,
  'asymmetry': 0,
- 'dac_flux_coefficient': 0.00043891020060318243,
- 'dac_sweet_spot': 85.7,
- 'f_max': 4.683295911524479e9}
+ 'dac_flux_coefficient': 0.00044891020060318243,
+ 'dac_sweet_spot': 75,
+ 'f_max': 4.683295911524479}
+
 
 # Arches parameters for all the qubits
 from pycqed.analysis import fitting_models as fit_mods
@@ -67,13 +68,13 @@ UHFQC_1.awgs_0_enable(1)
 RF.off()
 
 
-fluxes_a = np.linspace(-300, 300, 21)
-fluxes_b = np.linspace(-300, 300, 61)
+fluxes_a = np.linspace(-400, 400, 11)
+fluxes_b = np.linspace(-600, 600, 61)
+fluxes_c = np.linspace(-600, 600, 261)
 
-for fluxes in [fluxes_a, fluxes_b]:
+for fluxes in [fluxes_a, fluxes_b, fluxes_c]:
     for flux in fluxes:
-        # Factor 1.2 is to correct for more steeper flux curves
-
+        MC.soft_avg(4)
         IVVI.dac2(flux)
         QL.f_qubit(f_dac_QL(IVVI.dac2()))
         print('Estimated qubit freq to {:.4g}'.format(QL.f_qubit()))
@@ -88,11 +89,13 @@ for fluxes in [fluxes_a, fluxes_b]:
             QL.f_qubit(QL.f_qubit()-detuning)
 
         QL.find_frequency(method='Ramsey')
-        MC.soft_avg(10)
-        times = np.arange(0, 60e-6, .8e-6)
+        MC.soft_avg(8)
+        # times = np.arange(0, 60e-6, .8e-6)
+        times = np.concatenate([np.arange(0, 5.01e-6, 200e-9),
+                            np.arange(5e-6, 60e-6, .8e-6)])
         QL.measure_echo(times=times, artificial_detuning=4/times[-1])
         QL.measure_ramsey(times=times, artificial_detuning=4/times[-1])
-        times = np.arange(0, 60e-6, 1e-6)
+        # times = np.arange(0, 60e-6, 1e-6)
         QL.measure_T1(times)
-        MC.soft_avg(1)
+
 

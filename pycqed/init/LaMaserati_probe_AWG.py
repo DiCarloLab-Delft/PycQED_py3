@@ -8,9 +8,7 @@ UHFQC = True
 
 import time
 import logging
-t0 = time.time()  # to print how long init takes
-from pycqed.instrument_drivers.meta_instrument.qubit_objects import duplexer_tek_transmon as dt
-
+t0 = time.time()
 from importlib import reload  # Useful for reloading while testing
 import numpy as np
 import matplotlib.pyplot as plt
@@ -65,7 +63,7 @@ from qcodes.instrument_drivers.tektronix import AWG520 as tk520
 from qcodes.instrument_drivers.agilent.E8527D import Agilent_E8527D
 
 from pycqed.instrument_drivers.physical_instruments import QuTech_ControlBoxdriver as qcb
-import pycqed.instrument_drivers.meta_instrument.qubit_objects.Tektronix_driven_transmon as qbt
+
 from pycqed.instrument_drivers.meta_instrument import heterodyne as hd
 import pycqed.instrument_drivers.meta_instrument.CBox_LookuptableManager as lm
 
@@ -157,7 +155,7 @@ LutMan = lm.QuTech_ControlBox_LookuptableManager('LutMan', CBox=None,
 MC = mc.MeasurementControl('MC')
 station.add_component(MC)
 # HS = None
-
+import pycqed.instrument_drivers.meta_instrument.qubit_objects.Tektronix_driven_transmon as qbt
 QL = qbt.Tektronix_driven_transmon('QL', LO=LO, cw_source=QR_LO,
                                    td_source=QL_LO,
                                    IVVI=IVVI, rf_RO_source=RF,
@@ -284,6 +282,10 @@ else:
         qubit.RO_acq_weight_function_Q(1)
 
 
+from pycqed.instrument_drivers.physical_instruments.Fridge_monitor import Fridge_Monitor
+Maserati_fridge_mon = Fridge_Monitor('Maserati_fridge_mon', 'LaMaserati')
+station.add_component(Maserati_fridge_mon)
+
 # def reload_mod_stuff():
 
 # preparing UHFQC readout with IQ mod pulses
@@ -375,3 +377,21 @@ QL.RO_acq_weight_function_I(0)
 QL.RO_acq_weight_function_Q(0)
 QR.RO_acq_weight_function_I(1)
 QR.RO_acq_weight_function_Q(1)
+
+
+gen.load_settings_onto_instrument(QL)
+gen.load_settings_onto_instrument(QR)
+
+
+station.sequencer_config = {'RO_fixed_point': 1e-6,
+                                'Buffer_Flux_Flux': 0,
+                                'Buffer_Flux_MW': 0,
+                                'Buffer_Flux_RO': 0,
+                                'Buffer_MW_Flux': 0,
+                                'Buffer_MW_MW': 0,
+                                'Buffer_MW_RO': 0,
+                                'Buffer_RO_Flux': 0,
+                                'Buffer_RO_MW': 0,
+                                'Buffer_RO_RO': 0,
+                                'Flux_comp_dead_time': 3e-6,
+                                }
