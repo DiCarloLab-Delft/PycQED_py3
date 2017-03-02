@@ -148,7 +148,8 @@ class Qubit(Instrument):
                 name.
         """
         if parameter_name in self.parameters:
-            raise KeyError('Duplicate parameter name {}'.format(parameter_name))
+            raise KeyError(
+                'Duplicate parameter name {}'.format(parameter_name))
 
         if operation_name in self.operations().keys():
             self._operations[operation_name][argument_name] = parameter_name
@@ -191,8 +192,6 @@ class Transmon(Qubit):
         self.add_parameter('E_j', unit='Hz',
                            parameter_class=ManualParameter,
                            vals=vals.Numbers())
-        self.add_parameter('assymetry',
-                           parameter_class=ManualParameter)
 
         self.add_parameter('dac_voltage', unit='mV',
                            parameter_class=ManualParameter)
@@ -201,10 +200,9 @@ class Transmon(Qubit):
         self.add_parameter('dac_flux_coefficient', unit='',
                            parameter_class=ManualParameter)
         self.add_parameter('asymmetry', unit='',
+                           initial_value=0,
                            parameter_class=ManualParameter)
         self.add_parameter('dac_channel', vals=vals.Ints(),
-                           parameter_class=ManualParameter)
-        self.add_parameter('flux',
                            parameter_class=ManualParameter)
 
         self.add_parameter('f_qubit', label='qubit frequency', unit='Hz',
@@ -234,41 +232,55 @@ class Transmon(Qubit):
                            vals=vals.Numbers(0, 1e-6),
                            parameter_class=ManualParameter)
 
-        self.add_parameter('f_qubit_calc', vals=vals.Enum(None, 'dac', 'flux'),
+        self.add_parameter('f_qubit_calc_method',
+                           vals=vals.Enum('latest', 'dac', 'flux'),
                            # in the future add 'tracked_dac', 'tracked_flux',
+                           initial_value='latest',
                            parameter_class=ManualParameter)
 
-    def calculate_frequency(self, E_c=None, E_j=None, assymetry=None,
-                            dac_voltage=None, flux=None,
-                            no_transitions=1, calc_method='Hamiltonian'):
+    def calculate_frequency(self,
+                            dac_voltage=None,
+                            flux=None):
         '''
-        Calculates transmon energy levels from the full transmon qubit
-        Hamiltonian.
-
+        Calculates the f01 transition frequency from the cosine arc model.
+        (function available in fit_mods. Qubit_dac_to_freq)
 
         Parameters of the qubit object are used unless specified.
         Flux can be specified both in terms of dac voltage or flux but not
         both.
-
-        If specified in terms of a dac voltage it will convert the dac voltage
-        to a flux using convert dac to flux (NOT IMPLEMENTED)
         '''
-        if E_c is None:
-            E_c = self.E_c.get()
-        if E_j is None:
-            E_j = self.E_j.get()
-        if assymetry is None:
-            assymetry = self.assymetry.get()
 
         if dac_voltage is not None and flux is not None:
             raise ValueError('Specify either dac voltage or flux but not both')
-        if flux is None:
-            flux = self.flux.get()
-        # Calculating with dac-voltage not implemented yet
 
-        freq = calculate_transmon_transitions(
-            E_c, E_j, asym=assymetry, reduced_flux=flux, no_transitions=1)
-        return freq
+        if self.f_qubit_calc_method() is 'latest':
+            f_qubit_estimate = self.f_qubit()
+
+        elif self.f_qubit_calc_method() == 'dac':
+            if dac_voltage is None:
+                dac_voltage = self.IVVI.get(
+                        'dac{}'.format(self.dac_channel()))
+
+            f_qubit_estimate = fit_mods.Qubit_dac_to_freq(
+                dac_voltage=dac_voltage,
+                f_max=self.f_max(),
+                E_c=self.E_c(),
+                dac_sweet_spot=self.dac_sweet_spot(),
+                dac_flux_coefficient=self.dac_flux_coefficient(),
+                asymmetry=self.asymmetry())
+
+        elif self.f_qubit_calc_method() == 'flux':
+            if flux is None:
+                flux = self.FluxCtrl.get(
+                    'flux{}'.format(self.dac_channel()))
+            f_qubit_estimate = fit_mods.Qubit_dac_to_freq(
+                dac_voltage=flux,
+                f_max=self.f_max(),
+                E_c=self.E_c(),
+                dac_sweet_spot=self.dac_sweet_spot(),
+                dac_flux_coefficient=1,
+                asymmetry=self.asymmetry())
+        return f_qubit_estimate
 
     def calculate_flux(self, frequency):
         raise NotImplementedError()
@@ -285,47 +297,18 @@ class Transmon(Qubit):
                        f_span=100e6, use_max=False, f_step=1e6,
                        verbose=True, update=True,
                        close_fig=True):
+        """
+        Finds the qubit frequency using either the spectroscopy or the Ramsey
+        method.
+        Frequency prediction is done using
+        """
 
         if method.lower() == 'spectroscopy':
             if freqs is None:
-                # If not specified it should specify wether to use the last
-                # known one or wether to calculate and how
-                if self.f_qubit_calc() is None:
-                    freqs = np.arange(self.f_qubit.get()-f_span/2,
-                                      self.f_qubit.get()+f_span/2,
-                                      f_step)
-                elif self.f_qubit_calc() is 'dac':
-                    f_pred = fit_mods.QubitFreqDac(
-                        dac_voltage=self.IVVI.get(
-                            'dac%d' % self.dac_channel()),
-                        f_max=self.f_max()*1e-9,
-                        E_c=self.E_c()*1e-9,
-                        dac_sweet_spot=self.dac_sweet_spot(),
-                        dac_flux_coefficient=self.dac_flux_coefficient(),
-                        asymmetry=self.asymmetry())*1e9
-                    freqs = np.arange(f_pred-f_span/2,
-                                      f_pred+f_span/2,
-                                      f_step)
-                elif self.f_qubit_calc() is 'flux':
-                    fluxes = self.FluxCtrl.flux_vector()
-                    mappings = np.array(self.FluxCtrl.dac_mapping())
-                    # FIXME: this statement is super unclear
-                    my_flux = np.sum(np.where(mappings == self.dac_channel(),
-                                              mappings,
-                                              0))-1
-                    # print(mappings, my_flux, self.dac_channel())
-                    omega = lambda flux, f_max, EC, asym: ((
-                        f_max + EC) * (asym**2 + (1-asym**2) *
-                                       np.cos(np.pi*flux)**2)**0.25 - EC)
-                    f_pred_calc = lambda flux: omega(flux=flux,
-                                                     f_max=self.f_max()*1e-9,
-                                                     EC=self.E_c()*1e-9,
-                                                     asym=self.asymmetry())*1e9
-                    f_pred = f_pred_calc(fluxes[my_flux])
-                    freqs = np.arange(f_pred-f_span/2,
-                                      f_pred+f_span/2,
-                                      f_step)
-                    # print(freqs.min(), freqs.max())
+                f_qubit_estimate = self.calculate_frequency()
+                freqs = np.arange(f_qubit_estimate - f_span/2,
+                                  f_qubit_estimate + f_span/2,
+                                  f_step)
             # args here should be handed down from the top.
             self.measure_spectroscopy(freqs, pulsed=pulsed, MC=None,
                                       analyze=True, close_fig=close_fig)
@@ -408,7 +391,6 @@ class Transmon(Qubit):
             self.f_res.set(f_res)
         self.f_RO(self.f_res())
         return f_res
-
 
     def find_pulse_amplitude(self, amps,
                              N_steps=[3, 7, 13, 17], max_n=18,
