@@ -1,8 +1,9 @@
 import numpy as np
 import lmfit
+from matplotlib import pyplot as plt
 
 
-def PSD_Analysis(table):
+def PSD_Analysis(table, path):
     """
     Requires a table as input:
            Row  | Content
@@ -17,6 +18,8 @@ def PSD_Analysis(table):
             8   | T2 echo exclusion mask (True where data is to be excluded)
     """
     dac, freq, T1, Tramsey, Techo, T1_mask, T2s_mask, T2e_mask = table
+
+    fit_result_arch = fit_frequencies(dac, freq)
 
     # convert dac in flux as unit of Phi_0
     flux = (dac-fit_result_arch.best_values['offset'])\
@@ -38,6 +41,16 @@ def PSD_Analysis(table):
     Gamma_phi_ramsey = Gamma_ramsey - Gamma_1/2.0
     Gamma_phi_echo = Gamma_echo - Gamma_1/2.0
 
+    plot_coherence_times(flux, freq, sensitivity,
+                         T1, Tramsey, Techo)
+    plot_ratios(flux, freq, sensitivity,
+                Gamma_phi_ramsey, Gamma_phi_echo)
+
+    fit_res_gammas = fit_gammas(sensitivity, Gamma_phi_ramsey, Gamma_phi_echo)
+
+    intercept = fit_res_gammas.params['intercept'].value
+    slope_ramsey = fit_res_gammas.params['slope_ramsey'].value
+    slope_echo = fit_res_gammas.params['slope_echo'].value
 
     # after fitting gammas
     # Post processing
@@ -48,7 +61,8 @@ def PSD_Analysis(table):
     # from flux noise
     A = slope_echo**2/np.log(2)
     print(r'Amplitude PSD (freq)= (%s u$\Phi_0$)^2' % (np.sqrt(A)/1e-6))
-    print('Amplitude PSD (omega)= (%s u$\Phi_0$)^2' % (np.sqrt(A)/(2e-6*np.pi)))
+    print('Amplitude PSD (omega)= (%s u$\Phi_0$)^2' %
+          (np.sqrt(A)/(2e-6*np.pi)))
 
     # from white noise
     # using Eq 5 in Nature com. 7,12964 (The flux qubit reviseited to enhanbce
@@ -57,7 +71,6 @@ def PSD_Analysis(table):
     eta = k_r**2/(k_r**2 + 4*chi_shift**2)
     n_avg = intercept*k_r/(4*chi_shift**2*eta)
     print('Estimated residual photon number: %s' % n_avg)
-
 
 
 def prepare_input_table(dac, frequency, T1, T2_star, T2_echo,
@@ -128,12 +141,10 @@ def partial_omega_over_flux(flux, Ec, Ej):
     '''
     model = -np.sign(np.cos(np.pi*flux)) * (np.pi**2)*np.sqrt(8*Ec*Ej) * \
         np.sin(np.pi*flux) / np.sqrt(np.abs(np.cos(np.pi*flux)))
-
     return model
 
 
 def fit_frequencies(dac, freq):
-    # set initial values and perform the fit
     arch_model.set_param_hint('Ec', value=250e6, min=200e6, max=300e6)
     arch_model.set_param_hint('Ej', value=18e9, min=0)
     arch_model.set_param_hint('offset', value=0)
@@ -144,33 +155,15 @@ def fit_frequencies(dac, freq):
     fit_result_arch = arch_model.fit(freq, dac=dac)
     return fit_result_arch
 
-"""
-Test code
-# print the result of the fit and plot data
-print('Offset = %s mV' % (fit_result_arch.best_values['offset']))
-print('Dac/Phi_0 = %s mV' % (fit_result_arch.best_values['dac0']))
-print('Ec = %s MHz' % (fit_result_arch.best_values['Ec']/1e6))
-print('Ej = %s GHz' % (fit_result_arch.best_values['Ej']/1e9))
 
-plt.plot(dac, freq/1e9, '.', label='data')
-plt.plot(dac, fit_result_arch.best_fit/1e9, color='r', label='best fit')
-plt.legend(loc=0)
-plt.title('Full arch QR3')
-plt.ylabel('Freq (GHz)')
-plt.xlabel('Dac (mV)')
-"""
+def plot_coherence_times(flux, freq, sensitivity,
+                         T1, Tramsey, Techo):
+    # font = {'size': 16}
+    # matplotlib.rc('font', **font)
 
+    # f, ax = plt.subplots(1, 3, figsize=[18, 6], sharey=True)
 
-def plot_coherence_times():
-    # Plot data
-
-    # Relaxation and coherence times
-
-    # font size
-    font = {'size': 16}
-    matplotlib.rc('font', **font)
-
-    f, ax = plt.subplots(1, 3, figsize=[18, 6], sharey=True)
+    f, ax = plt.subplots(1, 3, sharey=True)
 
     ax[0].plot(flux/1e-3, T1/1e-6, '.', color='r', label='$T_1$')
     ax[0].plot(flux/1e-3, Tramsey/1e-6, '.', color='g', label='$T_2^*$')
@@ -201,16 +194,18 @@ def plot_coherence_times():
 # ax[0].set_ylim([0,40])
 
 
-def plot_ratios():
+def plot_ratios(flux, freq, sensitivity,
+                Gamma_phi_ramsey, Gamma_phi_echo):
     # Pure dephaning times
 
-    # font size
-    font = {'size': 16}
-    matplotlib.rc('font', **font)
+    # # font size
+    # font = {'size': 16}
+    # matplotlib.rc('font', **font)
+    # f, ax = plt.subplots(1, 3, figsize=[18, 6], sharey=True)
+
+    f, ax = plt.subplots(1, 3, sharey=True)
 
     ratio_gamma = Gamma_phi_ramsey/Gamma_phi_echo
-
-    f, ax = plt.subplots(1, 3, figsize=[18, 6], sharey=True)
 
     ax[0].plot(flux/1e-3, ratio_gamma, '.', color='b')
     ax[0].set_title('$T_\phi^{echo}/T_\phi^{ramsey}$ vs flux')
@@ -225,8 +220,10 @@ def plot_ratios():
     ax[2].set_title('$T_\phi^{echo}/T_\phi^{ramsey}$ vs sensitivity')
     ax[2].set_xlabel(r'$|\partial\nu/\partial\Phi|$ (GHz/$\Phi_0$)')
 
+    f.tight_layout()
 
-def residual_Gamma(pars_dict):
+
+def residual_Gamma(pars_dict, sensitivity, Gamma_phi_ramsey, Gamma_phi_echo):
     slope_ramsey = pars_dict['slope_ramsey']
     slope_echo = pars_dict['slope_echo']
     intercept = pars_dict['intercept']
@@ -246,7 +243,7 @@ def super_residual(p):
     return data.astype(float)
 
 
-def fit_gammas():
+def fit_gammas(sensitivity, Gamma_phi_ramsey, Gamma_phi_echo, verbose=0):
     # create a parametrrer set for the initial guess
     p = lmfit.Parameters()
     p.add('slope_ramsey', value=100.0, vary=True)
@@ -254,30 +251,50 @@ def fit_gammas():
     p.add('intercept', value=100.0, vary=True)
 
     # mi = lmfit.minimize(super_residual, p)
-    mi = lmfit.minimize(residual_Gamma, p)
+    wrap_residual = lambda p: residual_Gamma(p,
+                                             sensitivity=sensitivity,
+                                             Gamma_phi_ramsey=Gamma_phi_ramsey,
+                                             Gamma_phi_echo=Gamma_phi_echo)
+    fit_result_gammas = lmfit.minimize(wrap_residual, p)
+    verbose = 1
+    if verbose > 0:
+        lmfit.printfuncs.report_fit(fit_result_gammas.params)
+    return fit_result_gammas
 
-    lmfit.printfuncs.report_fit(mi.params)
 
-    # font size
-    font = {'size': 16}
-    matplotlib.rc('font', **font)
+def plot_gamma_fit(sensitivity, Gamma_phi_ramsey, Gamma_phi_echo,
+                   slope_ramsey, slope_echo, intercept):
 
-    intercept = mi.params['intercept'].value
-    slope_ramsey = mi.params['slope_ramsey'].value
-    slope_echo = mi.params['slope_echo'].value
+    f, ax = plt.subplots(1, 1)
 
-def plot_gamma_fit():
-    plt.plot(np.abs(sensitivity)/1e9, Gamma_phi_ramsey,
+    ax.plot(np.abs(sensitivity)/1e9, Gamma_phi_ramsey,
              '.', color='g', label='$\Gamma_{Ramsey}$')
-    plt.plot(np.abs(sensitivity)/1e9, slope_ramsey *
+    ax.plot(np.abs(sensitivity)/1e9, slope_ramsey *
              np.abs(sensitivity)+intercept, color='g')
 
-    plt.plot(np.abs(sensitivity)/1e9, Gamma_phi_echo,
+    ax.plot(np.abs(sensitivity)/1e9, Gamma_phi_echo,
              '.', color='b', label='$\Gamma_{Echo}$')
-    plt.plot(np.abs(sensitivity)/1e9, slope_echo *
+    ax.plot(np.abs(sensitivity)/1e9, slope_echo *
              np.abs(sensitivity)+intercept, color='b')
 
-    plt.legend(loc=0)
-    plt.title('Gamma vs |flux sensitivity|')
-    plt.xlabel(r'$|\partial\nu/\partial\Phi|$ (GHz/$\Phi_0$)')
-    plt.ylabel('$\Gamma$ (1/s)')
+    ax.legend(loc=0)
+    ax.set_title('Gamma vs |flux sensitivity|')
+    ax.set_xlabel(r'$|\partial\nu/\partial\Phi|$ (GHz/$\Phi_0$)')
+    ax.set_ylabel('$\Gamma$ (1/s)')
+
+
+"""
+Test code
+# print the result of the fit and plot data
+print('Offset = %s mV' % (fit_result_arch.best_values['offset']))
+print('Dac/Phi_0 = %s mV' % (fit_result_arch.best_values['dac0']))
+print('Ec = %s MHz' % (fit_result_arch.best_values['Ec']/1e6))
+print('Ej = %s GHz' % (fit_result_arch.best_values['Ej']/1e9))
+
+plt.plot(dac, freq/1e9, '.', label='data')
+plt.plot(dac, fit_result_arch.best_fit/1e9, color='r', label='best fit')
+plt.legend(loc=0)
+plt.title('Full arch QR3')
+plt.ylabel('Freq (GHz)')
+plt.xlabel('Dac (mV)')
+"""
