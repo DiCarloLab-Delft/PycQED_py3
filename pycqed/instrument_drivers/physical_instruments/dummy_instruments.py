@@ -21,11 +21,11 @@ class DummyParHolder(Instrument):
 
         # Instrument parameters
         for parname in ['x', 'y', 'z']:
-            self.add_parameter(parname, unit='a.u.',
+            self.add_parameter(parname, unit='m',
                                parameter_class=ManualParameter,
                                vals=vals.Numbers(), initial_value=0)
 
-        self.add_parameter('noise', unit='a.u.',
+        self.add_parameter('noise', unit='V',
                            label='white noise amplitude',
                            parameter_class=ManualParameter,
                            vals=vals.Numbers(), initial_value=0)
@@ -34,11 +34,13 @@ class DummyParHolder(Instrument):
                            parameter_class=ManualParameter,
                            vals=vals.Numbers(), initial_value=0)
 
-        self.add_parameter('parabola', unit='a.u.',
+        self.add_parameter('parabola', unit='V',
                            get_cmd=self._measure_parabola)
-        self.add_parameter('skewed_parabola', unit='a.u.',
+        self.add_parameter('skewed_parabola', unit='V',
                            get_cmd=self._measure_skewwed_parabola)
 
+    def get_idn(self):
+        return 'dummy'
     def _measure_parabola(self):
         time.sleep(self.delay())
         return (self.x()**2 + self.y()**2 + self.z()**2 +
