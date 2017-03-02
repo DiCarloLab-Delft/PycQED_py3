@@ -16,6 +16,7 @@ def PSD_Analysis(table):
             7   | T2 star exclusion mask (True where data is to be excluded)
             8   | T2 echo exclusion mask (True where data is to be excluded)
     """
+    pass
 
 
 def prepare_input_table(dac, frequency, T1, T2_star, T2_echo,
@@ -53,7 +54,7 @@ def prepare_input_table(dac, frequency, T1, T2_star, T2_echo,
 
     return table
 
-"""
+
 def arch(dac, Ec, Ej, offset, dac0):
     '''
     Function for frequency vs flux (in dac) for the transmon
@@ -89,16 +90,20 @@ def partial_omega_over_flux(flux, Ec, Ej):
 
     return model
 
-# set initial values and perform the fit
-arch_model.set_param_hint('Ec', value=250e6, min=200e6, max=300e6)
-arch_model.set_param_hint('Ej', value=18e9, min=0)
-arch_model.set_param_hint('offset', value=0)
-arch_model.set_param_hint('dac0', value=2000, min=0)
 
-arch_model.make_params()
+def fit_frequencies(dac, freq):
+    # set initial values and perform the fit
+    arch_model.set_param_hint('Ec', value=250e6, min=200e6, max=300e6)
+    arch_model.set_param_hint('Ej', value=18e9, min=0)
+    arch_model.set_param_hint('offset', value=0)
+    arch_model.set_param_hint('dac0', value=2000, min=0)
 
-fit_result_arch = arch_model.fit(freq, dac=dac)
+    arch_model.make_params()
 
+    fit_result_arch = arch_model.fit(freq, dac=dac)
+    return fit_result_arch
+
+"""
 # print the result of the fit and plot data
 print('Offset = %s mV' % (fit_result_arch.best_values['offset']))
 print('Dac/Phi_0 = %s mV' % (fit_result_arch.best_values['dac0']))
