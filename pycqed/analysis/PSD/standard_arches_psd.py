@@ -39,6 +39,27 @@ def PSD_Analysis(table):
     Gamma_phi_echo = Gamma_echo - Gamma_1/2.0
 
 
+    # after fitting gammas
+    # Post processing
+    Qc = 8100
+    freq_resonator = 7.188e9
+    chi_shift = 800e3
+
+    # from flux noise
+    A = slope_echo**2/np.log(2)
+    print(r'Amplitude PSD (freq)= (%s u$\Phi_0$)^2' % (np.sqrt(A)/1e-6))
+    print('Amplitude PSD (omega)= (%s u$\Phi_0$)^2' % (np.sqrt(A)/(2e-6*np.pi)))
+
+    # from white noise
+    # using Eq 5 in Nature com. 7,12964 (The flux qubit reviseited to enhanbce
+    # coherence and reporducibility)
+    k_r = 2*np.pi*freq_resonator/Qc
+    eta = k_r**2/(k_r**2 + 4*chi_shift**2)
+    n_avg = intercept*k_r/(4*chi_shift**2*eta)
+    print('Estimated residual photon number: %s' % n_avg)
+
+
+
 def prepare_input_table(dac, frequency, T1, T2_star, T2_echo,
                         T1_mask=None, T2_star_mask=None, T2_echo_mask=None):
     """
@@ -204,24 +225,6 @@ def plot_ratios():
     ax[2].set_title('$T_\phi^{echo}/T_\phi^{ramsey}$ vs sensitivity')
     ax[2].set_xlabel(r'$|\partial\nu/\partial\Phi|$ (GHz/$\Phi_0$)')
 
-    # ax[0].set_ylim([0,10])
-
-    # Fit data
-
-    # font size
-    font = {'size': 16}
-    matplotlib.rc('font', **font)
-
-    plt.plot(np.abs(sensitivity)/1e9, Gamma_phi_ramsey,
-             '.', color='g', label='$\Gamma_{Ramsey}$')
-    plt.plot(np.abs(sensitivity)/1e9, Gamma_phi_echo,
-             '.', color='b', label='$\Gamma_{Echo}$')
-
-    plt.legend(loc=0)
-    plt.title('Gamma vs |flux sensitivity|')
-    plt.xlabel('$|\partial v/\partial\Phi|$ (GHz/$\Phi_0$)')
-    plt.ylabel('$\Gamma$ (1/s)')
-
 
 def residual_Gamma(pars_dict):
     slope_ramsey = pars_dict['slope_ramsey']
@@ -241,57 +244,40 @@ def super_residual(p):
     data = residual_Gamma(p)
     # print(type(data))
     return data.astype(float)
-"""
-# create a parametrrer set for the initial guess
-p = lmfit.Parameters()
-p.add('slope_ramsey', value=100.0, vary=True)
-p.add('slope_echo', value=100.0, vary=True)
-p.add('intercept', value=100.0, vary=True)
 
-# mi = lmfit.minimize(super_residual, p)
-mi = lmfit.minimize(residual_Gamma, p)
 
-lmfit.printfuncs.report_fit(mi.params)
+def fit_gammas():
+    # create a parametrrer set for the initial guess
+    p = lmfit.Parameters()
+    p.add('slope_ramsey', value=100.0, vary=True)
+    p.add('slope_echo', value=100.0, vary=True)
+    p.add('intercept', value=100.0, vary=True)
 
-# font size
-font = {'size': 16}
-matplotlib.rc('font', **font)
+    # mi = lmfit.minimize(super_residual, p)
+    mi = lmfit.minimize(residual_Gamma, p)
 
-intercept = mi.params['intercept'].value
-slope_ramsey = mi.params['slope_ramsey'].value
-slope_echo = mi.params['slope_echo'].value
+    lmfit.printfuncs.report_fit(mi.params)
 
-plt.plot(np.abs(sensitivity)/1e9, Gamma_phi_ramsey,
-         '.', color='g', label='$\Gamma_{Ramsey}$')
-plt.plot(np.abs(sensitivity)/1e9, slope_ramsey *
-         np.abs(sensitivity)+intercept, color='g')
+    # font size
+    font = {'size': 16}
+    matplotlib.rc('font', **font)
 
-plt.plot(np.abs(sensitivity)/1e9, Gamma_phi_echo,
-         '.', color='b', label='$\Gamma_{Echo}$')
-plt.plot(np.abs(sensitivity)/1e9, slope_echo *
-         np.abs(sensitivity)+intercept, color='b')
+    intercept = mi.params['intercept'].value
+    slope_ramsey = mi.params['slope_ramsey'].value
+    slope_echo = mi.params['slope_echo'].value
 
-plt.legend(loc=0)
-plt.title('Gamma vs |flux sensitivity|')
-plt.xlabel(r'$|\partial\nu/\partial\Phi|$ (GHz/$\Phi_0$)')
-plt.ylabel('$\Gamma$ (1/s)')
+def plot_gamma_fit():
+    plt.plot(np.abs(sensitivity)/1e9, Gamma_phi_ramsey,
+             '.', color='g', label='$\Gamma_{Ramsey}$')
+    plt.plot(np.abs(sensitivity)/1e9, slope_ramsey *
+             np.abs(sensitivity)+intercept, color='g')
 
-# Post processing
+    plt.plot(np.abs(sensitivity)/1e9, Gamma_phi_echo,
+             '.', color='b', label='$\Gamma_{Echo}$')
+    plt.plot(np.abs(sensitivity)/1e9, slope_echo *
+             np.abs(sensitivity)+intercept, color='b')
 
-Qc = 8100
-freq_resonator = 7.188e9
-chi_shift = 800e3
-
-# from flux noise
-A = slope_echo**2/np.log(2)
-print(r'Amplitude PSD (freq)= (%s u$\Phi_0$)^2' % (np.sqrt(A)/1e-6))
-print('Amplitude PSD (omega)= (%s u$\Phi_0$)^2' % (np.sqrt(A)/(2e-6*np.pi)))
-
-# from white noise
-# using Eq 5 in Nature com. 7,12964 (The flux qubit reviseited to enhanbce
-# coherence and reporducibility)
-k_r = 2*np.pi*freq_resonator/Qc
-eta = k_r**2/(k_r**2 + 4*chi_shift**2)
-n_avg = intercept*k_r/(4*chi_shift**2*eta)
-print('Estimated residual photon number: %s' % n_avg)
-"""
+    plt.legend(loc=0)
+    plt.title('Gamma vs |flux sensitivity|')
+    plt.xlabel(r'$|\partial\nu/\partial\Phi|$ (GHz/$\Phi_0$)')
+    plt.ylabel('$\Gamma$ (1/s)')
