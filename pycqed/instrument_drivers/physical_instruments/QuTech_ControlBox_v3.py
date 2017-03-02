@@ -38,6 +38,22 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
                            get_cmd=self._do_get_trigger_source,
                            vals=vals.Enum('internal', 'external',
                                           'mixed'))
+        self._pulse_queue_state = defHeaders.pulse_queue_states[0]
+        self.add_parameter(
+            'pulse_queue_state',
+            docstring=('returns 0 if OK. returns 1 if instructions are not'
+                       ' executed fast enough.'),
+            get_cmd=self._do_get_pulse_queue_state)
+        self._max_instruction_address = 0
+        self.add_parameter(
+            'max_instruction_address',
+            docstring=('returns the highest address (index) of instructions '
+                       'that was exectued by the program, should be equal '
+                       'to uploaded_program_length.'),
+            get_cmd=self._do_get_max_instruction_address)
+        self._uploaded_program_length = 0
+        self.add_parameter('uploaded_program_length',
+                           get_cmd=self._do_get_uploaded_program_length)
         self.add_parameter('instr_mem_size',
                            unit='#',
                            label='instruction memory size',
@@ -78,6 +94,17 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
         v = self.get_master_controller_params()
         return v
 
+    def _do_get_pulse_queue_state(self):
+        self.get_master_controller_params()
+        return self._pulse_queue_state
+
+    def _do_get_max_instruction_address(self):
+        self.get_master_controller_params()
+        return self._max_instruction_address
+
+    def _do_get_uploaded_program_length(self):
+        return self._uploaded_program_length
+
     def get_master_controller_params(self):
         message = self.create_message(defHeaders.ReadVersion)
         (stat, mesg) = self.serial_write(message)
@@ -116,6 +143,12 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
         self._nr_samples = (v_list[30] << 7) + v_list[31]
         self._avg_size = v_list[32]
         self._nr_averages = 2**self._avg_size
+        # self._offset_calc_delay = (v_list[33] << 4) + v_list[34]
+        queue_state = v_list[35]
+        self._pulse_queue_state = defHeaders.pulse_queue_states[
+            queue_state]
+        self._max_instruction_address = int(((v_list[36] << 14) + \
+            (v_list[37] << 7) + v_list[38])/4)
 
         return version
 
@@ -407,5 +440,8 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
 
         if not stat:
             raise Exception('Failed to load instructions')
+
+        appending_instr_num = 3
+        self._uploaded_program_length = len(instructions) - appending_instr_num
         self.set('core_state', 'active')
         return (stat, mesg)
