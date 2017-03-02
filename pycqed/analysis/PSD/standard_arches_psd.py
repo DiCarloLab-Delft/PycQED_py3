@@ -1,12 +1,59 @@
 import numpy as np
-import matplotlib.pyplot as plt
-% matplotlib inline
-
-import matplotlib
-
 import lmfit
 
 
+def PSD_Analysis(table):
+    """
+    Requires a table as input:
+           Row  | Content
+        --------+--------
+            1   | dac
+            2   | frequency
+            3   | T1
+            4   | T2 star
+            5   | T2 echo
+            6   | T1 exclusion mask (True where data is to be excluded)
+            7   | T2 star exclusion mask (True where data is to be excluded)
+            8   | T2 echo exclusion mask (True where data is to be excluded)
+    """
+
+
+def prepare_input_table(dac, frequency, T1, T2_star, T2_echo,
+                        T1_mask=None, T2_star_mask=None, T2_echo_mask=None):
+    """
+    Returns a table ready for PSD_Analysis input
+    If sizes are different, it adds nans on the end.
+    """
+    assert(len(dac) >= len(frequency))
+    assert(len(dac) >= len(T1))
+    assert(len(dac) >= len(T2_star))
+    assert(len(dac) >= len(T2_echo))
+
+    if T1_mask is None:
+        T1_mask = np.zeros(len(T1), dtype=np.bool)
+    if T2_star_mask is None:
+        T2_star_mask = np.zeros(len(T2_star), dtype=np.bool)
+    if T2_echo_mask is None:
+        T2_echo_mask = np.zeros(len(T2_echo), dtype=np.bool)
+
+    assert(len(T1) == len(T1_mask))
+    assert(len(T2_star) == len(T2_star_mask))
+    assert(len(T2_echo) == len(T2_echo_mask))
+
+    table = np.ones((8, len(dac)))
+    table = table * np.nan
+    table[0, :] = dac
+    table[1, :len(frequency)] = frequency
+    table[2, :len(T1)] = T1
+    table[3, :len(T2_star)] = T2_star
+    table[4, :len(T2_echo)] = T2_echo
+    table[5, :len(T1_mask)] = T1_mask
+    table[6, :len(T2_star_mask)] = T2_star_mask
+    table[7, :len(T2_echo_mask)] = T2_echo_mask
+
+    return table
+
+"""
 def arch(dac, Ec, Ej, offset, dac0):
     '''
     Function for frequency vs flux (in dac) for the transmon
@@ -236,3 +283,4 @@ k_r = 2*np.pi*freq_resonator/Qc
 eta = k_r**2/(k_r**2 + 4*chi_shift**2)
 n_avg = intercept*k_r/(4*chi_shift**2*eta)
 print('Estimated residual photon number: %s' % n_avg)
+"""
