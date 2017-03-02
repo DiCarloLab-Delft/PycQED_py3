@@ -266,7 +266,7 @@ class ConfigParameter(ManualParameter):
         if not hasattr(self._instrument, '_config_changed'):
             self._instrument._config_changed = True
         self._meta_attrs.extend(['instrument', 'initial_value'])
-
+        logging.warning('use the version of this parameter in pq_parameters')
         if initial_value is not None:
             self.validate(initial_value)
             self._save_val(initial_value)
