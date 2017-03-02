@@ -16,7 +16,27 @@ def PSD_Analysis(table):
             7   | T2 star exclusion mask (True where data is to be excluded)
             8   | T2 echo exclusion mask (True where data is to be excluded)
     """
-    pass
+    dac, freq, T1, Tramsey, Techo, T1_mask, T2s_mask, T2e_mask = table
+
+    # convert dac in flux as unit of Phi_0
+    flux = (dac-fit_result_arch.best_values['offset'])\
+        / fit_result_arch.best_values['dac0']
+
+    # calculate the derivative vs flux
+    sensitivity_angular = partial_omega_over_flux(
+        flux, fit_result_arch.best_values['Ec'],
+        fit_result_arch.best_values['Ej'])
+    sensitivity = sensitivity_angular/(2*np.pi)
+
+    # Pure dephasing times
+    # Calculate pure dephasings
+    Gamma_1 = 1.0/T1[~T1_mask]
+
+    Gamma_ramsey = 1.0/Tramsey[~T2s_mask]
+    Gamma_echo = 1.0/Techo[~T2e_mask]
+
+    Gamma_phi_ramsey = Gamma_ramsey - Gamma_1/2.0
+    Gamma_phi_echo = Gamma_echo - Gamma_1/2.0
 
 
 def prepare_input_table(dac, frequency, T1, T2_star, T2_echo,
@@ -25,7 +45,7 @@ def prepare_input_table(dac, frequency, T1, T2_star, T2_echo,
     Returns a table ready for PSD_Analysis input
     If sizes are different, it adds nans on the end.
     """
-    assert(len(dac) >= len(frequency))
+    assert(len(dac) == len(frequency))
     assert(len(dac) >= len(T1))
     assert(len(dac) >= len(T2_star))
     assert(len(dac) >= len(T2_echo))
@@ -63,8 +83,8 @@ def arch(dac, Ec, Ej, offset, dac0):
         - dac: voltage used in the DAC to generate the flux
         - Ec (Hz): Charging energy of the transmon in Hz
         - Ej (Hz): Josephson energy of the transmon in Hz
-        - offset: voltage offset of the arch (it is in the same unit of the dac)
-        - dac0: dac value to generate 1 Phi_0 (it is in the same unit of the dac)
+        - offset: voltage offset of the arch (same unit of the dac)
+        - dac0: dac value to generate 1 Phi_0 (same unit of the dac)
 
     Note: the Phi_0 (periodicity) dac0
     '''
@@ -104,6 +124,7 @@ def fit_frequencies(dac, freq):
     return fit_result_arch
 
 """
+Test code
 # print the result of the fit and plot data
 print('Offset = %s mV' % (fit_result_arch.best_values['offset']))
 print('Dac/Phi_0 = %s mV' % (fit_result_arch.best_values['dac0']))
@@ -116,105 +137,90 @@ plt.legend(loc=0)
 plt.title('Full arch QR3')
 plt.ylabel('Freq (GHz)')
 plt.xlabel('Dac (mV)')
+"""
 
-# convert dac in flux as unit of Phi_0
-flux = (dac-fit_result_arch.best_values['offset'])\
-    / fit_result_arch.best_values['dac0']
 
-# calculate the derivative vs flux
-sensitivity_angular = partial_omega_over_flux(
-    flux, fit_result_arch.best_values['Ec'], fit_result_arch.best_values['Ej'])
-sensitivity = sensitivity_angular/(2*np.pi)
+def plot_coherence_times():
+    # Plot data
 
-# Pure dephasing times
+    # Relaxation and coherence times
 
-# Calculate pure dephasings
-Gamma_1 = 1.0/T1
+    # font size
+    font = {'size': 16}
+    matplotlib.rc('font', **font)
 
-Gamma_ramsey = 1.0/Tramsey
-Gamma_echo = 1.0/Techo
+    f, ax = plt.subplots(1, 3, figsize=[18, 6], sharey=True)
 
-Gamma_phi_ramsey = Gamma_ramsey - Gamma_1/2.0
-Gamma_phi_echo = Gamma_echo - Gamma_1/2.0
+    ax[0].plot(flux/1e-3, T1/1e-6, '.', color='r', label='$T_1$')
+    ax[0].plot(flux/1e-3, Tramsey/1e-6, '.', color='g', label='$T_2^*$')
+    ax[0].plot(flux/1e-3, Techo/1e-6, '.', color='b', label='$T_2$')
+    ax[0].set_title('$T_1$, $T_2^*$, $T_2$ vs flux')
+    ax[0].set_ylabel('Coherence time ($\mu$s)')
+    ax[0].set_xlabel('Flux (m$\Phi_0$)')
+    ax[0].legend(loc=0)
 
-# Plot data
+    ax[1].plot(freq/1e9, T1/1e-6, '.', color='r', label='$T_1$')
+    ax[1].plot(freq/1e9, Tramsey/1e-6, '.', color='g', label='$T_2^*$')
+    ax[1].plot(freq/1e9, Techo/1e-6, '.', color='b', label='$T_2$')
+    ax[1].set_title('$T_1$, $T_2^*$, $T_2$ vs frequency')
+    ax[1].set_xlabel('Frequency (GHz)')
+    ax[1].legend(loc=0)
 
-# Relaxation and coherence times
+    ax[2].plot(np.abs(sensitivity)/1e9, T1/1e-6, '.', color='r', label='$T_1$')
+    ax[2].plot(np.abs(sensitivity)/1e9, Tramsey/1e-6,
+               '.', color='g', label='$T_2^*$')
+    ax[2].plot(
+        np.abs(sensitivity)/1e9, Techo/1e-6, '.', color='b', label='$T_2$')
+    ax[2].set_title('$T_1$, $T_2^*$, $T_2$ vs sensitivity')
+    ax[2].set_xlabel(r'$|\partial\nu/\partial\Phi|$ (GHz/$\Phi_0$)')
+    ax[2].legend(loc=0)
 
-# font size
-font = {'size': 16}
-matplotlib.rc('font', **font)
-
-f, ax = plt.subplots(1, 3, figsize=[18, 6], sharey=True)
-
-ax[0].plot(flux/1e-3, T1/1e-6, '.', color='r', label='$T_1$')
-ax[0].plot(flux/1e-3, Tramsey/1e-6, '.', color='g', label='$T_2^*$')
-ax[0].plot(flux/1e-3, Techo/1e-6, '.', color='b', label='$T_2$')
-ax[0].set_title('$T_1$, $T_2^*$, $T_2$ vs flux')
-ax[0].set_ylabel('Coherence time ($\mu$s)')
-ax[0].set_xlabel('Flux (m$\Phi_0$)')
-ax[0].legend(loc=0)
-
-ax[1].plot(freq/1e9, T1/1e-6, '.', color='r', label='$T_1$')
-ax[1].plot(freq/1e9, Tramsey/1e-6, '.', color='g', label='$T_2^*$')
-ax[1].plot(freq/1e9, Techo/1e-6, '.', color='b', label='$T_2$')
-ax[1].set_title('$T_1$, $T_2^*$, $T_2$ vs frequency')
-ax[1].set_xlabel('Frequency (GHz)')
-ax[1].legend(loc=0)
-
-ax[2].plot(np.abs(sensitivity)/1e9, T1/1e-6, '.', color='r', label='$T_1$')
-ax[2].plot(np.abs(sensitivity)/1e9, Tramsey/1e-6,
-           '.', color='g', label='$T_2^*$')
-ax[2].plot(np.abs(sensitivity)/1e9, Techo/1e-6, '.', color='b', label='$T_2$')
-ax[2].set_title('$T_1$, $T_2^*$, $T_2$ vs sensitivity')
-ax[2].set_xlabel(r'$|\partial\nu/\partial\Phi|$ (GHz/$\Phi_0$)')
-ax[2].legend(loc=0)
-
-f.tight_layout()
+    f.tight_layout()
 
 # ax[0].set_ylim([0,40])
 
-# Pure dephaning times
 
-# font size
-font = {'size': 16}
-matplotlib.rc('font', **font)
+def plot_ratios():
+    # Pure dephaning times
 
-ratio_gamma = Gamma_phi_ramsey/Gamma_phi_echo
+    # font size
+    font = {'size': 16}
+    matplotlib.rc('font', **font)
 
-f, ax = plt.subplots(1, 3, figsize=[18, 6], sharey=True)
+    ratio_gamma = Gamma_phi_ramsey/Gamma_phi_echo
 
-ax[0].plot(flux/1e-3, ratio_gamma, '.', color='b')
-ax[0].set_title('$T_\phi^{echo}/T_\phi^{ramsey}$ vs flux')
-ax[0].set_ylabel('Ratio')
-ax[0].set_xlabel('Flux (m$\Phi_0$)')
+    f, ax = plt.subplots(1, 3, figsize=[18, 6], sharey=True)
 
-ax[1].plot(freq/1e9, ratio_gamma, '.', color='b')
-ax[1].set_title('$T_\phi^{echo}/T_\phi^{ramsey}$ vs frequency')
-ax[1].set_xlabel('Frequency (GHz)')
+    ax[0].plot(flux/1e-3, ratio_gamma, '.', color='b')
+    ax[0].set_title('$T_\phi^{echo}/T_\phi^{ramsey}$ vs flux')
+    ax[0].set_ylabel('Ratio')
+    ax[0].set_xlabel('Flux (m$\Phi_0$)')
 
-ax[2].plot(np.abs(sensitivity)/1e9, ratio_gamma, '.', color='b')
-ax[2].set_title('$T_\phi^{echo}/T_\phi^{ramsey}$ vs sensitivity')
-ax[2].set_xlabel(r'$|\partial\nu/\partial\Phi|$ (GHz/$\Phi_0$)')
+    ax[1].plot(freq/1e9, ratio_gamma, '.', color='b')
+    ax[1].set_title('$T_\phi^{echo}/T_\phi^{ramsey}$ vs frequency')
+    ax[1].set_xlabel('Frequency (GHz)')
 
-# ax[0].set_ylim([0,10])
+    ax[2].plot(np.abs(sensitivity)/1e9, ratio_gamma, '.', color='b')
+    ax[2].set_title('$T_\phi^{echo}/T_\phi^{ramsey}$ vs sensitivity')
+    ax[2].set_xlabel(r'$|\partial\nu/\partial\Phi|$ (GHz/$\Phi_0$)')
 
-# Fit data
+    # ax[0].set_ylim([0,10])
 
-# font size
-font = {'size': 16}
-matplotlib.rc('font', **font)
+    # Fit data
 
-plt.plot(np.abs(sensitivity)/1e9, Gamma_phi_ramsey,
-         '.', color='g', label='$\Gamma_{Ramsey}$')
-plt.plot(np.abs(sensitivity)/1e9, Gamma_phi_echo,
-         '.', color='b', label='$\Gamma_{Echo}$')
+    # font size
+    font = {'size': 16}
+    matplotlib.rc('font', **font)
 
+    plt.plot(np.abs(sensitivity)/1e9, Gamma_phi_ramsey,
+             '.', color='g', label='$\Gamma_{Ramsey}$')
+    plt.plot(np.abs(sensitivity)/1e9, Gamma_phi_echo,
+             '.', color='b', label='$\Gamma_{Echo}$')
 
-plt.legend(loc=0)
-plt.title('Gamma vs |flux sensitivity|')
-plt.xlabel('$|\partial v/\partial\Phi|$ (GHz/$\Phi_0$)')
-plt.ylabel('$\Gamma$ (1/s)')
+    plt.legend(loc=0)
+    plt.title('Gamma vs |flux sensitivity|')
+    plt.xlabel('$|\partial v/\partial\Phi|$ (GHz/$\Phi_0$)')
+    plt.ylabel('$\Gamma$ (1/s)')
 
 
 def residual_Gamma(pars_dict):
@@ -233,9 +239,9 @@ def residual_Gamma(pars_dict):
 
 def super_residual(p):
     data = residual_Gamma(p)
-    print(type(data))
+    # print(type(data))
     return data.astype(float)
-
+"""
 # create a parametrrer set for the initial guess
 p = lmfit.Parameters()
 p.add('slope_ramsey', value=100.0, vary=True)
