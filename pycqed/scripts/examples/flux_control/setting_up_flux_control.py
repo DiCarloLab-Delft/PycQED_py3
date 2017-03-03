@@ -8,6 +8,7 @@ These steps are
 import numpy as np
 ######################################
 # This part will contain some MC functions most likely?
+# see decoupling.py in this same folder
 ######################################
 # This part will contain a single function call?
 # Ramiro will work on this.
