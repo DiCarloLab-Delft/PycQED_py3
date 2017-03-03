@@ -50,95 +50,98 @@ ax.set_xlabel(a.ylabel)  # the axes are transposed
 ax.set_ylabel(a.xlabel)
 
 
-def qubit_freq_cos(f_max, dac, dac_coeff, dac_offset):
-    return f_max*np.sqrt(np.abs(np.cos(np.pi*(dac-dac_offset)*dac_coeff)))
+def qubit_freq_cos(f_max, flux, flux_offset, flux_coeff, asymmetry, E_c):
+    #     return f_max-flux_coeff*flux-flux_offset*flux*flux
+    # return
+    # f_max*np.sqrt(np.abs(np.cos(np.pi*(flux_coeff*flux-flux_offset))))
+    return (f_max + E_c)*(asymmetry**2 + (1-asymmetry**2)*np.cos(np.pi*(flux-flux_offset)*flux_coeff)**2)**0.25-E_c
 
 
-def avoided_crossing_dac_1d(dacs, f_cte, g, f_max, dac_coeff,
-                            dac_offset, dacs_state):
+def avoided_crossing_flux_1d(fluxes, f_cte, g, f_max, flux_offset, flux_coeff, asymmetry, E_c, fluxes_state):
     result_f = []
 
-    frequencies = np.zeros([len(dacs), 2])
+    frequencies = np.zeros([len(fluxes), 2])
     f2 = f_cte
-    for kk, dac in enumerate(dacs):
-        f1 = qubit_freq_cos(f_max, dac, dac_coeff, dac_offset)
+    for kk, flux in enumerate(fluxes):
+        # requirement for black box: takes in parameters, returns frequencies for the solutions of the hamiltonian
+        # start of black-box
+        f1 = qubit_freq_cos(
+            f_max, flux, flux_offset, flux_coeff, asymmetry, E_c)
         df = f1 - f2
-        determinant = np.sqrt(df**2+4*g**2)
-        frequencies[kk, :] = 0.5*(f1+f2-determinant), 0.5*(f1+f2+determinant)
-    result = np.where(dacs_state, frequencies[:, 0], frequencies[:, 1])
+        Ham = np.matrix([[f1, g], [g, f2]])
+        frequencies[kk, :] = np.sort(np.linalg.eigvals(Ham))
+#         determinant = np.sqrt(df**2+4*g**2)
+# frequencies[kk,:] = 0.5*(f1+f2-determinant),0.5*(f1+f2+determinant)
+# #low,high
+
+        # end of black-box
+    result = np.where(fluxes_state, frequencies[:, 0], frequencies[:, 1])
     return result
 
 
-def avoided_crossing_dac_fit(dacs_lower, dacs_upper, lower_freqs,
-                             upper_freqs, f_max_guess, f_cte_guess,
-                             dac_offset_guess):
+def high_sol(fluxes, f_cte, g, f_max, flux_offset, flux_coeff, asymmetry, E_c):
+    return avoided_crossing_flux_1d(fluxes, f_cte, g, f_max, flux_offset, flux_coeff, asymmetry, E_c, np.array([False]*len(fluxes)))
+
+
+def low_sol(fluxes, f_cte, g, f_max, flux_offset, flux_coeff, asymmetry, E_c):
+    return avoided_crossing_flux_1d(fluxes, f_cte, g, f_max, flux_offset, flux_coeff, asymmetry, E_c, np.array([True]*len(fluxes)))
+
+
+def avoided_crossing_flux_fit(fluxes_lower, fluxes_upper, lower_freqs, upper_freqs, f_max_guess, f_cte_guess, flux_offset_guess, g_guess, asymm_guess, flux_coeff, E_c):
     total_freqs = []
     total_freqs.extend(lower_freqs)
     total_freqs.extend(upper_freqs)
-    total_dacs = []
-    total_dacs.extend(dacs_lower)
-    total_dacs.extend(dacs_upper)
+    total_fluxes = []
+    total_fluxes.extend(fluxes_lower)
+    total_fluxes.extend(fluxes_upper)
     total_mask = []
-    total_mask.extend([True]*np.ones(len(dacs_lower)))
-    total_mask.extend([False]*np.zeros(len(dacs_upper)))
-    resized_fit_func = lambda dacs, f_cte, g, f_max, dac_coeff, dac_offset: avoided_crossing_dac_1d(dacs,
-                                                                                                    f_cte,
-                                                                                                    g,
-                                                                                                    f_max,
-                                                                                                    dac_coeff,
-                                                                                                    dac_offset,
-                                                                                                    total_mask)
+    total_mask.extend([True]*np.ones(len(fluxes_lower)))
+    total_mask.extend([False]*np.zeros(len(fluxes_upper)))
+    resized_fit_func = lambda fluxes, f_cte, g, f_max, flux_offset, flux_coeff, asymmetry, E_c: avoided_crossing_flux_1d(fluxes,
+                                                                                                                         f_cte,
+                                                                                                                         g,
+                                                                                                                         f_max,
+                                                                                                                         flux_offset,
+                                                                                                                         flux_coeff,
+                                                                                                                         asymmetry,
+                                                                                                                         E_c,
+                                                                                                                         total_mask)
     av_crossing_model = lmfit.Model(resized_fit_func)
-
-    coeff_guess = 1/2000.
 
     av_crossing_model.set_param_hint('f_cte', value=f_cte_guess,
                                      min=np.min(total_freqs), max=np.max(total_freqs))
-    av_crossing_model.set_param_hint('g', min=0, value=0.053e9)
-    av_crossing_model.set_param_hint('f_max', vary=True, value=f_max_guess)
-    av_crossing_model.set_param_hint('dac_coeff', value=coeff_guess)
-    av_crossing_model.set_param_hint('dac_offset', value=dac_offset_guess)
+    av_crossing_model.set_param_hint('g', min=0, value=g_guess)
+    av_crossing_model.set_param_hint(
+        'asymmetry', min=0.5, max=0.7, vary=True, value=asymm_guess)
+    av_crossing_model.set_param_hint(
+        'E_c', min=0.2, max=0.26, vary=False, value=E_c)
+    av_crossing_model.set_param_hint(
+        'f_max', min=6.4, max=6.9, vary=True,  value=f_max_guess)
+    av_crossing_model.set_param_hint(
+        'flux_coeff', min=0.9, max=1.1, vary=False, value=flux_coeff)
+    av_crossing_model.set_param_hint(
+        'flux_offset', vary=False, value=flux_offset_guess)
     params = av_crossing_model.make_params()
     fit_res = av_crossing_model.fit(data=np.array(total_freqs),
-                                    dacs=np.array(total_dacs),
+                                    fluxes=np.array(total_fluxes),
                                     params=params)
     return fit_res
 
-fit_res = avoided_crossing_dac_fit(flux[filter_mask_low], flux[filter_mask_high],
-                                   peaks[filter_mask_low, 0],
-                                   peaks[filter_mask_high, 1],
-                                   f_max_guess=6.108392498189497e9,
-                                   f_cte_guess=5.51e9,
-                                   dac_offset_guess=40)
+
+# Make the fit
+
+low_flux = flux[filter_mask_low]
+high_flux = flux[filter_mask_high]
+low_freqs = peaks[filter_mask_low, 0]
+high_freqs = peaks[filter_mask_high, 1]
+
+low_flux = flux[filter_mask_low]
+high_flux = flux[filter_mask_high]
+low_freqs = peaks[filter_mask_low, 0]
+high_freqs = peaks[filter_mask_high, 1]
 
 
-def lowlvl_avcross(v, a1, b1, a2, b2, g):
-    """
-    Return the low level of an avoided crossing
-    """
-    e1 = a1*v + b1
-    e2 = a2*v + b2
-    dE = e1 - e2
-    return 0.5*((e1+e2)-np.sqrt(dE**2+4*g*g))
-
-
-def highlvl_avcross(v, a1, b1, a2, b2, g):
-    """
-    Return the high level of an avoided crossing
-    """
-    e1 = a1*v + b1
-    e2 = a2*v + b2
-    dE = e1 - e2
-    return 0.5*((e1+e2)+np.sqrt(dE**2+4*g*g))
-
-
-def mixlvl_avcross(v, a1, b1, a2, b2, g):
-    """
-    Returns the low/high level of an avoided crossing for v below/above 0
-    """
-    if v > 0:
-        return 0.5*((e1+e2)+np.sqrt(dE**2+4*g*g))
-    else:
-        return 0.5*((e1+e2)-np.sqrt(dE**2+4*g*g))
-
-mixAC_Model = lmfit.Model(mixlvl_avcross)
+fit_res = avoided_crossing_flux_fit(
+    low_flux, high_flux, low_freqs, high_freqs,
+    f_max_guess=6.089e9, f_cte_guess=4.68e9, flux_offset_guess=0,
+    g_guess=100e6, asymm_guess=0, flux_coeff=0.0004, E_c=280e6)
