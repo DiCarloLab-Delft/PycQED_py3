@@ -70,11 +70,6 @@ def PSD_Analysis(table, freq_resonator=None, Qc=None, chi_shift=None, path=None)
                    slope_ramsey, slope_echo, intercept, path)
 
     # after fitting gammas
-    # Post processing
-    Qc = 8100
-    freq_resonator = 7.188e9
-    chi_shift = 800e3
-
     # from flux noise
     A = (slope_echo/(2*np.pi))/np.sqrt(np.log(2))
     print('Amplitude PSD = (%s u\Phi_0)^2' % (A/1e-6))
@@ -82,12 +77,22 @@ def PSD_Analysis(table, freq_resonator=None, Qc=None, chi_shift=None, path=None)
     # from white noise
     # using Eq 5 in Nature com. 7,12964 (The flux qubit reviseited to enhanbce
     # coherence and reporducibility)
+    if not ((freq_resonator is None) and (Qc is None) and (chi_shift is None)):
+        n_avg = calculate_n_avg(freq_resonator, Qc, chi_shift, intercept)
+        print('Estimated residual photon number: %s' % n_avg)
+    else:
+        n_avg = np.nan
+
+    return (A/1e-6), n_avg
+
+def calculate_n_avg(freq_resonator, Qc, chi_shift, intercept):
+    """
+    Returns the avg photon of white noise,assuming photon shot noise from the RO hanger.
+    """
     k_r = 2*np.pi*freq_resonator/Qc
     eta = k_r**2/(k_r**2 + 4*chi_shift**2)
     n_avg = intercept*k_r/(4*chi_shift**2*eta)
-    print('Estimated residual photon number: %s' % n_avg)
-
-    return (A/1e-6),n_avg
+    return n_avg
 
 
 def prepare_input_table(dac, frequency, T1, T2_star, T2_echo,
