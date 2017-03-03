@@ -1,31 +1,30 @@
 import numpy as np
 import logging
-"""
-Flux control scan script.
-Inputs:
-        N               number of qubits
-        f_center_vec    N-dim vector with frequencies where the qubits respond linearly.
-        dac_center      N-dim vector with the biasing corresponding to f_center_vec.
-        f_ranges        N-dim list with the frequency range for the resonator scans.
-        dac_span_low    N-dim vector with the low span for the dac sweep.
-        dac_span_high   N-dim vector with the high span for the dac sweep.
-        use_min         N-dim vector with the flag for resonator fitting.
-        f_span_low      N-dim vector with the low span for the qubit scans.
-        f_span_high     N-dim vector with the high span for the qubit scans.
-        M               number of points per qubit panel.
-        pulsed          N-dim vector with the flag for pulsed(or not) spectroscopy.
-        qubit_list      N-dim vector with the qubit objects.
-        IVVI            Instrument controlling the IVVI rack.
 
-        Order of inputs must match between all vectors.
-
-
-"""
 
 
 def flux_decoupling_scan(N, f_center_vec, dac_center, f_ranges, dac_span_low,
                          dac_span_high, use_min, f_span_low, f_span_high,
                          M, pulsed, qubit_list, IVVI):
+    """
+    Flux decoupling scan script.
+    Inputs:
+            N               number of qubits
+            f_center_vec    N-dim vector with frequencies where the qubits respond linearly.
+            dac_center      N-dim vector with the biasing corresponding to f_center_vec.
+            f_ranges        N-dim list with the frequency range for the resonator scans.
+            dac_span_low    N-dim vector with the low span for the dac sweep.
+            dac_span_high   N-dim vector with the high span for the dac sweep.
+            use_min         N-dim vector with the flag for resonator fitting.
+            f_span_low      N-dim vector with the low span for the qubit scans.
+            f_span_high     N-dim vector with the high span for the qubit scans.
+            M               number of points per qubit panel.
+            pulsed          N-dim vector with the flag for pulsed(or not) spectroscopy.
+            qubit_list      N-dim vector with the qubit objects.
+            IVVI            Instrument controlling the IVVI rack.
+
+            Order of inputs must match between all vectors.
+    """
 
     assert(N == len(qubit_list))
 
