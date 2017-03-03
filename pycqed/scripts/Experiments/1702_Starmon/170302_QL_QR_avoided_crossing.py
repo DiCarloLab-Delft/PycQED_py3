@@ -59,3 +59,20 @@ cbar.set_ticklabels([str(fig_clim[0]),'','','','',str(fig_clim[1])])
 cbar.set_label('Homodine voltage (mV)')
 
 fig.tight_layout()
+
+##################################
+
+
+QR.find_frequency(pulsed=True)
+QR.cw_source.on()
+freqs = np.arange(4.66e9, 4.71e9, 1e6)
+dac_voltages= np.arange(576, 584, .2)
+
+MC.set_sweep_function(QR.cw_source.frequency)
+MC.set_sweep_points(freqs)
+MC.set_sweep_function_2D(FC.flux0)
+MC.set_sweep_points_2D(dac_voltages)
+MC.set_detector_function(
+    det.Heterodyne_probe(QR.heterodyne_instr, trigger_separation=2.8e-6))
+MC.run('QR-avoided crossing', mode='2D')
+QR.cw_source.off()
