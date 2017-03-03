@@ -490,8 +490,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                                                     update=update,
                                                     upload=force_load)
 
-        MC.set_sweep_function(pw.wrap_par_to_swf(
-                              self.cw_source.frequency))
+        MC.set_sweep_function(self.cw_source.frequency)
         MC.set_sweep_points(freqs)
         MC.set_detector_function(
             det.Heterodyne_probe(self.heterodyne_instr, trigger_separation=2.8e-6))

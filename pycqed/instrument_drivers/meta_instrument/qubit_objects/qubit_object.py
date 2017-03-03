@@ -277,7 +277,7 @@ class Transmon(Qubit):
                 dac_voltage=flux,
                 f_max=self.f_max(),
                 E_c=self.E_c(),
-                dac_sweet_spot=self.dac_sweet_spot(),
+                dac_sweet_spot=0,
                 dac_flux_coefficient=1,
                 asymmetry=self.asymmetry())
         return f_qubit_estimate

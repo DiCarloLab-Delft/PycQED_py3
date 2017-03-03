@@ -72,7 +72,6 @@ from pycqed.instrument_drivers.physical_instruments import QuTech_Duplexer as qd
 if UHFQC:
     from pycqed.instrument_drivers.physical_instruments.ZurichInstruments import UHFQuantumController as ZI_UHFQC
 from pycqed.instrument_drivers.physical_instruments import Weinschel_8320_novisa
-from pycqed.instrument_drivers.meta_instrument import Flux_Control as fc
 # for multiplexed readout
 import pycqed.instrument_drivers.meta_instrument.UHFQC_LookuptableManager as lm_UHFQC
 import pycqed.instrument_drivers.meta_instrument.UHFQC_LookuptableManagerManager as lmm_UHFQC
@@ -115,6 +114,12 @@ AWG.timeout(180)  # timeout long for uploading wait.
 # station.add_component(CBox)
 IVVI = iv.IVVI('IVVI', address='COM8', numdacs=16, server_name=None)
 station.add_component(IVVI)
+
+
+from pycqed.instrument_drivers.meta_instruments.flux_control import Flux_Control
+FC = Flux_Control('FC', 2, IVVI.name)
+station.add_component(FC)
+gen.load_settings_onto_instrument(FC)
 
 # # flux pulsing
 # k1 = k_obj.Distortion(name='k1')
@@ -161,7 +166,7 @@ QL = qbt.Tektronix_driven_transmon('QL', LO=LO, cw_source=QR_LO,
                                    IVVI=IVVI, rf_RO_source=RF,
                                    AWG=AWG,
                                    heterodyne_instr=HS,
-                                   FluxCtrl=None,
+                                   FluxCtrl=FC,
                                    MC=MC,
                                    server_name=None)
 station.add_component(QL)
@@ -170,7 +175,7 @@ QR = qbt.Tektronix_driven_transmon('QR', LO=LO, cw_source=QL_LO,
                                    IVVI=IVVI, rf_RO_source=RF,
                                    AWG=AWG,
                                    heterodyne_instr=HS,
-                                   FluxCtrl=None,
+                                   FluxCtrl=FC,
                                    MC=MC,
                                    server_name=None)
 station.add_component(QR)
