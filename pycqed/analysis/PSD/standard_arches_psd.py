@@ -3,7 +3,8 @@ import lmfit
 from matplotlib import pyplot as plt
 import os
 
-def PSD_Analysis(table, path):
+
+def PSD_Analysis(table, freq_resonator=None, Qc=None, chi_shift=None, path=None):
     """
     Requires a table as input:
            Row  | Content
@@ -14,6 +15,21 @@ def PSD_Analysis(table, path):
             4   | T2 star
             5   | T2 echo
             6   | Exclusion mask (True where data is to be excluded)
+
+    Generates 7 plots:
+        > T1, T2, Echo vs flux
+        > T1, T2, Echo vs frequency
+        > T1, T2, Echo vs flux sensitivity
+
+        > ratio Ramsey/Echo vs flux
+        > ratio Ramsey/Echo vs frequency
+        > ratio Ramsey/Echo vs flux sensitivity
+
+        > Dephasing rates Ramsey and Echo vs flux sensitivity
+
+        If properties of resonator are provided (freq_resonator, Qc, chi_shift),
+        it also calculates the number of noise photons.
+
     """
     dac, freq, T1, Tramsey, Techo, exclusion_mask = table
 
@@ -70,6 +86,8 @@ def PSD_Analysis(table, path):
     eta = k_r**2/(k_r**2 + 4*chi_shift**2)
     n_avg = intercept*k_r/(4*chi_shift**2*eta)
     print('Estimated residual photon number: %s' % n_avg)
+
+    return (A/1e-6),n_avg
 
 
 def prepare_input_table(dac, frequency, T1, T2_star, T2_echo,
@@ -270,7 +288,7 @@ def fit_gammas(sensitivity, Gamma_phi_ramsey, Gamma_phi_echo, verbose=0):
 def plot_gamma_fit(sensitivity, Gamma_phi_ramsey, Gamma_phi_echo,
                    slope_ramsey, slope_echo, intercept, path):
 
-    f, ax = plt.subplots(1, 1, figsize=(8,5))
+    f, ax = plt.subplots(1, 1, figsize=(8, 5))
 
     ax.plot(np.abs(sensitivity)/1e9, Gamma_phi_ramsey,
             '.', color='g', label='$\Gamma_{Ramsey}$')
