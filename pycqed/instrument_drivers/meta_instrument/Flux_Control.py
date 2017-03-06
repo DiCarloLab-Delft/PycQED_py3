@@ -21,7 +21,10 @@ class Flux_Control(Instrument):
         self.add_parameter('IVVI',
                            initial_value=IVVI,
                            parameter_class=InstrumentParameter)
-        trnsf_mat_docst = 'Converts dac voltages to virtual flux'
+        trnsf_mat_docst = ('Converts dac voltages to virtual flux.'
+                           'This matrix is defined as'
+                           'flux = T dac_voltages'
+                           'T is then d flux/ d dac')
         # Ramiro will expand this to include the proper equations
         self.add_parameter('transfer_matrix',
                            label='Transfer Matrix',
