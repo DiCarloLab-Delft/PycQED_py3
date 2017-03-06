@@ -39,18 +39,18 @@ from pycqed.instrument_drivers.meta_instrument.qubit_objects.QuDev_transmon \
 
 station = qc.Station()
 print("initializing SGS100A's")
-drive_LO = rs.RohdeSchwarz_SGS100A(name='drive_LO', address='')
-readout_LO = rs.RohdeSchwarz_SGS100A(name='readout_LO', address='')
-readout_RF = rs.RohdeSchwarz_SGS100A(name='readout_RF', address='')
-cw_source = rs.RohdeSchwarz_SGS100A(name='cw_source', address='')
+drive_LO = rs.RohdeSchwarz_SGS100A(name='drive_LO', address='TCPIP0::192.168.1.35')
+readout_LO = rs.RohdeSchwarz_SGS100A(name='readout_LO', address='TCPIP0::192.168.1.31')
+readout_RF = rs.RohdeSchwarz_SGS100A(name='readout_RF', address='TCPIP0::192.168.1.37')
+#cw_source = rs.RohdeSchwarz_SGS100A(name='cw_source', address='TCPIP0::192.168.0.73')
 print("initializing AWG5014")
 AWG = tek.Tektronix_AWG5014(name='AWG', timeout=20,
-                            address='')
+                            address='TCPIP0::192.168.1.4')
 print("initializing UHFQC")
 UHFQC = ZI_UHFQC.UHFQC('UHFQC', device='dev2204', port=8004)
 print("initializing heterodynes")
-homodyne = hd.LO_modulated_Heterodyne('homodyne', LO=readout_LO, AWG=AWG,
-                                      acquisition_instr=UHFQC.name)
+#homodyne = hd.LO_modulated_Heterodyne('homodyne', LO=readout_LO, AWG=AWG,
+#                                      acquisition_instr=UHFQC.name)
 heterodyne = hd.HeterodyneInstrument('heterodyne', RF=readout_RF, LO=readout_LO,
                                      AWG=AWG, acquisition_instr=UHFQC.name)
 print("initializing qubit")
@@ -58,7 +58,7 @@ MC = mc.MeasurementControl('MC')
 MC.station = station
 qubit = QuDev_transmon('qubit', MC,
                        heterodyne = heterodyne,
-                       cw_source = cw_source,
+                       cw_source = drive_LO,
                        readout_LO = readout_LO,
                        readout_RF = readout_RF,
                        drive_LO = drive_LO,
@@ -69,10 +69,10 @@ print('configuring parameters')
 station.add_component(drive_LO)
 station.add_component(readout_LO)
 station.add_component(readout_RF)
-station.add_component(cw_source)
+#station.add_component(cw_source)
 station.add_component(AWG)
 station.add_component(UHFQC)
-station.add_component(homodyne)
+#station.add_component(homodyne)
 station.add_component(heterodyne)
 station.add_component(qubit)
 
@@ -104,12 +104,12 @@ for i in range(4):
     station.pulsar.define_channel(id='ch{}_marker1'.format(i+1),
                                   name='ch{}_marker1'.format(i+1),
                                   type='marker',
-                                  high=2, low=0, offset=0.,
+                                  high=1, low=0, offset=0.,
                                   delay=0, active=True)
     station.pulsar.define_channel(id='ch{}_marker2'.format(i+1),
                                   name='ch{}_marker2'.format(i+1),
                                   type='marker',
-                                  high=2.0, low=0, offset=0.,
+                                  high=1, low=0, offset=0.,
                                   delay=0, active=True)
 
 AWG.stop()
@@ -126,6 +126,8 @@ AWG.ch2_state(1)
 AWG.ch3_state(1)
 AWG.ch4_state(1)
 
+AWG.set_current_folder_name(r"C:\temp\PycQEDwaveforms")
+
 # set up the UHFQC instrument
 # set awg digital trigger 1 to trigger input 1
 UHFQC.awgs_0_auxtriggers_0_channel(0)
@@ -136,60 +138,62 @@ UHFQC.sigouts_1_imp50(1)
 UHFQC.awgs_0_outputs_0_amplitude(1)
 UHFQC.awgs_0_outputs_1_amplitude(1)
 
-# configure heterodyne instrument parameters
-readout_LO.power(18) #dBm
-readout_RF.power(10) #dBm
 
-for hdyne in [heterodyne, homodyne]:
-    hdyne.f_RO_mod(100e6) #Hz
+# configure heterodyne instrument parameters
+readout_LO.power(19) #dBm
+heterodyne.RF_power(-20) #dBm
+
+for hdyne in [heterodyne]:#, homodyne]:
+    hdyne.f_RO_mod(25e6) #Hz
     hdyne.nr_averages(1024)
     hdyne.RO_length(500e-9) #s
     hdyne.trigger_separation(3e-6) #s
-homodyne.mod_amp(1) #V
+    hdyne.acq_marker_channels("ch1_marker2")
+#homodyne.mod_amp(1) #V
 
 #configure qubit parameters
-qubit.f_RO_resonator() #Hz
-qubit.Q_RO_resonator()
-qubit.optimal_acquisition_delay() #s
-qubit.f_qubit() #Hz
-qubit.spec_pow() #dBm
-qubit.spec_pow_pulsed() #dBm
-qubit.f_RO() #Hz
+qubit.f_RO_resonator(0) #Hz
+qubit.Q_RO_resonator(0)
+qubit.optimal_acquisition_delay(0) #s
+qubit.f_qubit(0) #Hz
+qubit.spec_pow(-20) #dBm
+qubit.spec_pow_pulsed(-20) #dBm
+qubit.f_RO(0) #Hz
 qubit.drive_LO_pow() #dBm
-qubit.pulse_I_offset() #V
-qubit.pulse_Q_offset() #V
-qubit.RO_pulse_power() #dBm
-qubit.RO_I_offset() #V
-qubit.RO_Q_offset() #V
+qubit.pulse_I_offset(0) #V
+qubit.pulse_Q_offset(0) #V
+qubit.RO_pulse_power(-20) #dBm
+qubit.RO_I_offset(0) #V
+qubit.RO_Q_offset(0) #V
 
 qubit.spec_pulse_type('SquarePulse')
-qubit.spec_pulse_marker_channel()
-qubit.spec_pulse_amp() #V
-qubit.spec_pulse_length() #s
-qubit.spec_pulse_depletion_time() #s
+qubit.spec_pulse_marker_channel('ch3_marker1') # gate drive LO = cw_source = MWG5
+qubit.spec_pulse_amp(1) #V
+qubit.spec_pulse_length(50e-6) #s
+qubit.spec_pulse_depletion_time(10e-6) #s
 
-qubit.RO_pulse_type('MW_IQmod_pulse_UHFQC')
+qubit.RO_pulse_type('Gated_MW_RO_pulse')
 qubit.RO_I_channel()
 qubit.RO_Q_channel()
-qubit.RO_pulse_marker_channel()
+qubit.RO_pulse_marker_channel('ch2_marker1') # gates readout RF = MWG0
 qubit.RO_amp() #V
-qubit.RO_pulse_length() #s
-qubit.RO_pulse_delay() #s
-qubit.f_RO_mod() #Hz
-qubit.RO_acq_marker_delay() #s
-qubit.RO_acq_marker_channel()
+qubit.RO_pulse_length(800e-9) #s
+qubit.RO_pulse_delay(100e-9) #s
+qubit.f_RO_mod(25e6) #Hz
+qubit.RO_acq_marker_delay(0) #s
+qubit.RO_acq_marker_channel('ch1_marker2') # triggers UHFLI
 qubit.RO_pulse_phase(0) #rad
 
 qubit.pulse_type('SSB_DRAG_pulse')
-qubit.pulse_I_channel()
-qubit.pulse_Q_channel()
-qubit.amp180() #V
+qubit.pulse_I_channel('ch1')
+qubit.pulse_Q_channel('ch2')
+qubit.amp180(300e-3) #V
 qubit.amp90_scale(0.5)
-qubit.pulse_delay()
-qubit.gauss_sigma() #s
-qubit.nr_sigma(4)
+qubit.pulse_delay(0)
+qubit.gauss_sigma(12e-9) #s
+qubit.nr_sigma(6)
 qubit.motzoi(0)
-qubit.f_pulse_mod() #Hz
+qubit.f_pulse_mod(100e6) #Hz
 qubit.phi_skew(0)
 qubit.alpha(1)
 qubit.X_pulse_phase(0) #rad

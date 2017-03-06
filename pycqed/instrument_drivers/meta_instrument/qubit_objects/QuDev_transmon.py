@@ -146,14 +146,14 @@ class QuDev_transmon(Qubit):
                                  initial_value=None, vals=vals.Numbers())
 
     def prepare_for_continuous_wave(self):
-        self.heterodyne_instr.auto_seq_loading(True)
+        self.heterodyne.auto_seq_loading(True)
         if self.cw_source is not None:
             self.cw_source.off()
             self.cw_source.pulsemod_state('Off')
             self.cw_source.power.set(self.spec_pow())
 
     def prepare_for_pulsed_spec(self):
-        self.heterodyne_instr.auto_seq_loading(False)
+        self.heterodyne.auto_seq_loading(False)
         if self.cw_source is not None:
             self.cw_source.pulsemod_state('On')
             self.cw_source.on()
@@ -218,21 +218,21 @@ class QuDev_transmon(Qubit):
         if MC is None:
             MC = self.MC
 
-        previous_freq = self.heterodyne_instr.frequency()
+        previous_freq = self.heterodyne.frequency()
 
         self.prepare_for_continuous_wave()
         MC.set_sweep_function(pw.wrap_par_to_swf(
-            self.heterodyne_instr.frequency))
+            self.heterodyne.frequency))
         MC.set_sweep_points(freqs)
         demod_mode = 'single' if self.heterodyne.single_sideband_demod() \
             else 'double'
         MC.set_detector_function(det.Heterodyne_probe(
-            self.heterodyne_instr,
+            self.heterodyne,
             trigger_separation=self.heterodyne.trigger_separation(),
             demod_mode=demod_mode))
         MC.run(name='resonator_scan'+self.msmt_suffix)
 
-        self.heterodyne_instr.frequency(previous_freq)
+        self.heterodyne.frequency(previous_freq)
 
         if analyze:
             ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
@@ -251,24 +251,24 @@ class QuDev_transmon(Qubit):
             MC = self.MC
 
         # set number of averages to 1 due to a readout bug
-        previous_nr_averages = self.heterodyne_instr.nr_averages()
-        self.heterodyne_instr.nr_averages(1)
-        previous_delay = self.heterodyne_instr.acquisition_delay()
+        previous_nr_averages = self.heterodyne.nr_averages()
+        self.heterodyne.nr_averages(1)
+        previous_delay = self.heterodyne.acquisition_delay()
 
         self.prepare_for_continuous_wave()
         MC.set_sweep_function(pw.wrap_par_to_swf(
-            self.heterodyne_instr.acquisition_delay))
+            self.heterodyne.acquisition_delay))
         MC.set_sweep_points(delays)
         demod_mode = 'single' if self.heterodyne.single_sideband_demod() \
             else 'double'
         MC.set_detector_function(det.Heterodyne_probe(
-            self.heterodyne_instr,
+            self.heterodyne,
             trigger_separation=self.heterodyne.trigger_separation(),
             demod_mode=demod_mode))
         MC.run(name='acquisition_delay_scan'+self.msmt_suffix)
 
-        self.heterodyne_instr.acquisition_delay(previous_delay)
-        self.heterodyne_instr.nr_averages(previous_nr_averages)
+        self.heterodyne.acquisition_delay(previous_delay)
+        self.heterodyne.nr_averages(previous_nr_averages)
 
         if analyze:
             ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
@@ -293,7 +293,7 @@ class QuDev_transmon(Qubit):
             demod_mode = 'single' if self.heterodyne.single_sideband_demod() \
                 else 'double'
             MC.set_detector_function(det.Heterodyne_probe(
-                self.heterodyne_instr,
+                self.heterodyne,
                 trigger_separation=self.heterodyne.trigger_separation(),
                 demod_mode=demod_mode))
             MC.run(name='spectroscopy'+self.msmt_suffix)
@@ -317,7 +317,7 @@ class QuDev_transmon(Qubit):
             demod_mode = 'single' if self.heterodyne.single_sideband_demod() \
                 else 'double'
             MC.set_detector_function(det.Heterodyne_probe(
-                self.heterodyne_instr,
+                self.heterodyne,
                 trigger_separation=self.heterodyne.trigger_separation(),
                 demod_mode=demod_mode))
             MC.run(name='pulsed-spec' + self.msmt_suffix)
@@ -400,7 +400,7 @@ class QuDev_transmon(Qubit):
         elif update:  # don't update if there was trouble
             self.f_RO_resonator(f0)
             self.Q_RO_resonator(Q)
-            self.heterodyne_instr.frequency(f0)
+            self.heterodyne.frequency(f0)
         return f0
 
     def find_homodyne_acqusition_delay(self, delays=None, update=True, MC=None,
@@ -423,7 +423,7 @@ class QuDev_transmon(Qubit):
 
         if update:
             self.optimal_acquisition_delay(d)
-            self.heterodyne_instr.acquisition_delay(d)
+            self.heterodyne.acquisition_delay(d)
         return d
 
     def find_frequency(self, method='cw_spectroscopy', update=True, MC=None,

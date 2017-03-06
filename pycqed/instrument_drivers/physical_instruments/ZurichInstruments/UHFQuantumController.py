@@ -726,7 +726,7 @@ repeat(loop_cnt) {
 \twaitDigTrigger(1, 1);\n
 \tsetTrigger(WINT_EN +RO_TRIG);
 \tsetTrigger(WINT_EN);
-\twait(300);
+\twait(0);
 }
 setTrigger(0);"""
         self.awg_string(string)

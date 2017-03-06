@@ -960,7 +960,7 @@ class Heterodyne_probe(Soft_Detector):
         self.HS = HS
         self.name = 'Heterodyne probe'
         self.value_names = ['|S21|', 'S21 angle']  # , 'Re{S21}', 'Im{S21}']
-        self.value_units = ['mV', 'deg']  # , 'a.u.', 'a.u.']
+        self.value_units = ['arb. units', 'deg']  # , 'a.u.', 'a.u.']
         self.first = True
         self.last_frequency = 0.
         self.threshold = threshold

@@ -366,12 +366,12 @@ class Pulsar:
 
         filename = sequence.name+'_FILE.AWG'
 
-        awg_file = self.AWG.generate_awg_file(
+        self.awg_file = self.AWG.generate_awg_file(
             packed_waveforms,
             np.array(wfname_l),
             nrep_l, wait_l, goto_l, logic_jump_l,
             self.get_awg_channel_cfg())
-        self.AWG.send_awg_file(filename, awg_file)
+        self.AWG.send_awg_file(filename, self.awg_file)
         self.AWG.load_awg_file(filename)
         self.AWG.timeout(old_timeout)
 
@@ -386,7 +386,7 @@ class Pulsar:
 
         _t = time.time() - _t0
         print(" finished in %.2f seconds." % _t)
-        return awg_file
+        return self.awg_file
 
     def check_sequence_consistency(self, packed_waveforms,
                                    wfname_l,
