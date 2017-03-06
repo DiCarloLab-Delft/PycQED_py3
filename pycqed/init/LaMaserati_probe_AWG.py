@@ -116,16 +116,19 @@ IVVI = iv.IVVI('IVVI', address='COM8', numdacs=16, server_name=None)
 station.add_component(IVVI)
 
 
-from pycqed.instrument_drivers.meta_instruments.flux_control import Flux_Control
+from pycqed.instrument_drivers.meta_instrument.flux_control import Flux_Control
 FC = Flux_Control('FC', 2, IVVI.name)
 station.add_component(FC)
-gen.load_settings_onto_instrument(FC)
+# gen.load_settings_onto_instrument(FC)
+dac_offsets= np.array([75, -16.59])
 
-# # flux pulsing
-# k1 = k_obj.Distortion(name='k1')
-# station.add_component(k1)
-# k0 = k_obj.Distortion(name='k0')
-# station.add_component(k0)
+dac_mapping = np.array([2, 1])
+A = np.array([[-1.71408478e-13,   1.00000000e+00],
+              [1.00000000e+00,  -1.32867524e-14]])
+FC.transfer_matrix(A)
+FC.dac_mapping(dac_mapping)
+FC.dac_offsets(dac_offsets)
+
 
 # Initializing UHFQC
 UHFQC_1 = ZI_UHFQC.UHFQC('UHFQC_1', device='dev2178', server_name=None)

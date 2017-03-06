@@ -31,4 +31,5 @@ FC.transfer_matrix(A)
 FC.dac_mapping(dac_mapping)
 FC.dac_offsets(dac_offsets)
 
+# Do not forget to add this to the init as arrays do not get reloaded properly
 
