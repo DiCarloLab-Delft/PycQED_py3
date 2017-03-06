@@ -25,7 +25,7 @@ def gauss_pulse(amp, sigma_length, axis='x', nr_sigma=4, sampling_rate=2e8,
     mu = ((nr_pulse_samples-1)/2.)
     pulse_samples = np.linspace(0, nr_pulse_samples, nr_pulse_samples,
                                 endpoint=False)
-    delay_samples = delay*sampling_rate
+    delay_samples = int(delay*sampling_rate)
     # generate pulses
     if axis == 'x':
         pulse_I = amp*np.exp(-0.5*(np.square((pulse_samples-mu) /

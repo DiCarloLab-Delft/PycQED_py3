@@ -1471,11 +1471,11 @@ class UHFQC_integrated_average_detector(Hard_Detector):
             time.sleep(0.01)
         data = ['']*len(self.channels)
         for i, channel in enumerate(self.channels):
-            dataset = self.UHFQC.get('quex_rl_data_{:d}'.format(channel))
+            dataset = self.UHFQC.get('quex_rl_data_%d'%(channel))
             data[i] = dataset[0]['vector']/self.nr_averages
             if self.cross_talk_suppression:
                 data[i] = data[i]-self.UHFQC.get(
-                    'quex_trans_offset_weightfunction_{:d}'.format(channel))
+                    'quex_trans_offset_weightfunction_%d'%(channel))
 
         # data = self.UHFQC.single_acquisition(self.nr_sweep_points,
         #                                      self.poll_time, timeout=0,

@@ -4455,6 +4455,10 @@ class Three_Tone_Spectroscopy_Analysis(MeasurementAnalysis):
 
     '''
     Analysis for 2D measurement Three tone spectroscopy.
+    **kwargs:
+        f01: fuess for f01
+        f12: guess for f12
+
     '''
 
     def __init__(self, label='Three_tone', **kw):
