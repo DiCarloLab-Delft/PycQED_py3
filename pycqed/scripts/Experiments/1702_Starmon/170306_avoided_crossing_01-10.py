@@ -7,83 +7,84 @@ from pycqed.analysis.plotting_tools import flex_colormesh_plot_vs_xy
 import lmfit
 
 # import data
-a = ma.MeasurementAnalysis(
-    timestamp='20170302_224401', close_fig=False, TwoD=True, transpose=True)
+ac = ma.MeasurementAnalysis(
+    timestamp='20170304_151058', close_fig=True, TwoD=True, transpose=True)
 
 # find peaks
-peaks = np.zeros((len(a.X), 2))
-for i in range(len(a.X)):
-    p_dict = peak_finder_v2(a.X[i], a.Z[0][i])
+peaks = np.zeros((len(ac.X), 2))
+for i in range(len(ac.X)):
+    p_dict = peak_finder_v2(ac.X[i], ac.Z[0][i])
     peaks[i, :] = np.sort(p_dict[:2])
+
+peaks_low = peaks[:, 0]
+peaks_high = peaks[:, 1]
 
 #############
 # Making the figure w/o filtering
 #############
-flux = a.Y[:, 0]
+flux = ac.Y[:, 0]
 f, ax = plt.subplots()
-ax.set_title(a.timestamp_string + ' avoided crossing')
-flex_colormesh_plot_vs_xy(a.X[0], flux, a.Z[0], ax=ax,
+ax.set_title(ac.timestamp_string + ' avoided crossing')
+flex_colormesh_plot_vs_xy(ac.X[0], flux, ac.Z[0], ax=ax,
                           transpose=True, cmap='viridis')
-ax.plot(flux, peaks[:, 0], 'o', c='r')
-ax.plot(flux, peaks[:, 1], 'o', c='y')
-ax.set_xlabel(a.ylabel)  # the axes are transposed
-ax.set_ylabel(a.xlabel)
+ax.plot(flux, peaks_low, 'o', c='r')
+ax.plot(flux, peaks_high, 'o', c='y')
+ax.set_xlabel(ac.ylabel)  # the axes are transposed
+ax.set_ylabel(ac.xlabel)
 
 
+#
 # Setting the filter mask
-filter_mask_high = [True]*len(flux)
-filter_mask_high = np.where(flux < 578, False, filter_mask_high)
-# filter_mask_high =~ ~dm_tools.get_outliers(peaks[:,0], .1e6)
+a = -.00610e9
+x_ac = 520
+y_ac = 4.972e9
 
-filter_mask_low = [True]*len(flux)
-filter_mask_low = ~dm_tools.get_outliers(peaks[:, 1], 2e6)
-filter_mask_low = np.where(flux > 581, False, filter_mask_low)
+filter_func = lambda x: a*(x-x_ac)+y_ac
+
+filter_mask_high = [True] * len(peaks_high)
+filter_mask_high = ~dm_tools.get_outliers(peaks_high, 15e6)
+filter_mask_high = np.where(
+    peaks_high < filter_func(flux), False, filter_mask_high)
+filter_mask_high[-2] = False  # hand remove 1 datapoint
+
+filt_flux_high = flux[filter_mask_high]
+filt_peaks_high = peaks_high[filter_mask_high]
+
+
+filter_mask_low = [True] * len(peaks_low)
+filter_mask_low = ~dm_tools.get_outliers(peaks_low, 15e6)
+filter_mask_low = np.where(
+    peaks_low > filter_func(flux), False, filter_mask_low)
+filter_mask_low[[0, -1]] = False  # hand remove 2 datapoints
+
+filt_flux_low = flux[filter_mask_low]
+filt_peaks_low = peaks_low[filter_mask_low]
 
 #############
 # Plotting filtered data
 #############
-flux = a.Y[:, 0]
 f, ax = plt.subplots()
-ax.set_title(a.timestamp_string + ' filtered avoided crossing')
-flex_colormesh_plot_vs_xy(a.X[0], flux, a.Z[0],
+ax.set_title(ac.timestamp_string + ' filtered avoided crossing')
+flex_colormesh_plot_vs_xy(ac.X[0], flux, ac.Z[0],
                           ax=ax,
                           transpose=True, cmap='viridis')
-ax.plot(flux[filter_mask_high], peaks[filter_mask_high, 0], 'o', c='r')
-ax.plot(flux[filter_mask_low], peaks[filter_mask_low, 1], 'o', c='y')
-ax.set_xlabel(a.ylabel)  # the axes are transposed
-ax.set_ylabel(a.xlabel)
+
+ax.plot(flux, filter_func(flux),  ls='--', c='w')
+ax.plot(filt_flux_high, filt_peaks_high, 'o', c='r')
+ax.plot(filt_flux_low, filt_peaks_low, 'o', c='y')
+ax.set_xlabel(ac.ylabel)  # the axes are transposed
+ax.set_ylabel(ac.xlabel)
+
+ax.plot(flux, filter_func(flux),  ls='--', c='w')
 
 
 ############
 # Sets up the model
 ############
-# Model with bus mediating
-def high_freq(dac, f_bus, f_center1, f_center2, coeff_1, coeff_2, g):
-    ff = np.zeros(len(dac))
-    for kk, d in enumerate(dac):
-        f_1 = d * coeff_1 + f_center1
-        f_2 = d * coeff_2 + f_center2
-        matrix = [[f_bus, g, g],
-                  [g, f_1, 0.],
-                  [g, 0., f_2]]
-        ff[kk] = np.linalg.eigvalsh(matrix)[1]
-    return ff
-
-
-def low_freq(dac, f_bus, f_center1, f_center2, coeff_1, coeff_2, g):
-    ff = np.zeros(len(dac))
-    for kk, d in enumerate(dac):
-        f_1 = d * coeff_1 + f_center1
-        f_2 = d * coeff_2 + f_center2
-        matrix = [[f_bus, g, g],
-                  [g, f_1, 0.],
-                  [g, 0., f_2]]
-        ff[kk] = np.linalg.eigvalsh(matrix)[0]
-    return ff
-
-
-def avoided_crossing_dac_1d(dacs, f_bus, f_center1, f_center2,
-                            coeff_1, coeff_2, g, dacs_state):
+def avoided_crossing_mediated_coupling(dacs, f_bus, f_center1, f_center2,
+                                       coeff_1, coeff_2, g, dacs_state=None):
+    if type(dacs_state) == bool:
+        dacs_state = [dacs_state]*len(dacs)
 
     frequencies = np.zeros([len(dacs), 2])
     for kk, dac in enumerate(dacs):
@@ -96,33 +97,11 @@ def avoided_crossing_dac_1d(dacs, f_bus, f_center1, f_center2,
     result = np.where(dacs_state, frequencies[:, 0], frequencies[:, 1])
     return result
 
-# model with direct coupling
 
-
-def high_freq(dac, f_bus, f_center1, f_center2, coeff_1, coeff_2, g):
-    ff = np.zeros(len(dac))
-    for kk, d in enumerate(dac):
-        f_1 = d * coeff_1 + f_center1
-        f_2 = d * coeff_2 + f_center2
-        matrix = [[f_1, g],
-                  [g, f_2]]
-        ff[kk] = np.linalg.eigvalsh(matrix)[1]
-    return ff
-
-
-def low_freq(dac, f_bus, f_center1, f_center2, coeff_1, coeff_2, g):
-    ff = np.zeros(len(dac))
-    for kk, d in enumerate(dac):
-        f_1 = d * coeff_1 + f_center1
-        f_2 = d * coeff_2 + f_center2
-        matrix = [[f_1, g],
-                  [g, f_2]]
-        ff[kk] = np.linalg.eigvalsh(matrix)[0]
-    return ff
-
-
-def avoided_crossing_dac_1d(dacs, f_bus, f_center1, f_center2,
-                            coeff_1, coeff_2, g, dacs_state):
+def avoided_crossing_direct_coupling(dacs, f_center1, f_center2,
+                                     coeff_1, coeff_2, g, dacs_state=None):
+    if type(dacs_state) == bool:
+        dacs_state = [dacs_state]*len(dacs)
 
     frequencies = np.zeros([len(dacs), 2])
     for kk, dac in enumerate(dacs):
@@ -139,86 +118,84 @@ def avoided_crossing_dac_1d(dacs, f_bus, f_center1, f_center2,
 ########
 
 
-def avoided_crossing_dac_fit(dacs_lower, dacs_upper, lower_freqs, upper_freqs, f1_guess, f2_guess, f_bus_guess, cross_guess):
-    total_freqs = []
-    total_freqs.extend(lower_freqs)
-    total_freqs.extend(upper_freqs)
-    total_dacs = []
-    total_dacs.extend(dacs_lower)
-    total_dacs.extend(dacs_upper)
-    total_mask = []
-    total_mask.extend([True]*np.ones(len(dacs_lower)))
-    total_mask.extend([False]*np.zeros(len(dacs_upper)))
-    resized_fit_func = lambda dacs, f_bus, f_center1, f_center2, coeff_1, coeff_2, g: avoided_crossing_dac_1d(dacs=dacs,
-                                                                                                              f_bus=f_bus,
-                                                                                                              f_center1=f_center1,
-                                                                                                              f_center2=f_center2,
-                                                                                                              coeff_1=coeff_1,
-                                                                                                              coeff_2=coeff_2,
-                                                                                                              g=g,
-                                                                                                              dacs_state=total_mask)
+def avoided_crossing_dac_fit(dacs_lower, dacs_upper, lower_freqs, upper_freqs,
+                             f1_guess, f2_guess, cross_guess):
+
+    total_freqs = np.concatenate([lower_freqs, upper_freqs])
+    total_dacs = np.concatenate([dacs_lower, dacs_upper])
+    total_mask = np.concatenate([np.ones(len(dacs_lower)),
+                                 np.zeros(len(dacs_upper))])
+
+    def resized_fit_func(dacs,
+                         f_center1, f_center2, coeff_1, coeff_2,
+                         g):
+        # removes the mask from the function call to allow fitting
+        return avoided_crossing_direct_coupling(dacs=dacs,
+                                                f_center1=f_center1,
+                                                f_center2=f_center2,
+                                                coeff_1=coeff_1,
+                                                coeff_2=coeff_2,
+                                                g=g,
+                                                dacs_state=total_mask)
+
     av_crossing_model = lmfit.Model(resized_fit_func)
 
     c2_guess = 0.
     c1_guess = c2_guess + (f2_guess-f1_guess)/cross_guess
 
-    av_crossing_model.set_param_hint('f_bus', value=f_bus_guess,
-                                     min=7.8, max=8.5, vary=False)
     av_crossing_model.set_param_hint(
-        'g', min=0., max=0.2, value=0.003, vary=True)
+        'g', min=0., max=0.2e9, value=0.003e9, vary=True)
     av_crossing_model.set_param_hint(
-        'f_center1', min=0, max=12., value=f1_guess, vary=True)
+        'f_center1', min=0, max=12.0e9, value=f1_guess, vary=True)
     av_crossing_model.set_param_hint(
-        'f_center2', min=0., max=5., value=f2_guess, vary=True)
+        'f_center2', min=0., max=12.0e9, value=f2_guess, vary=True)
     av_crossing_model.set_param_hint(
-        'coeff_1', min=-100., max=100., value=c1_guess, vary=True)
+        'coeff_1', min=-100.0e6, max=100.0e6, value=c1_guess, vary=True)
     av_crossing_model.set_param_hint(
-        'coeff_2', min=-10., max=10., value=c2_guess, vary=True)
+        'coeff_2', min=-100.0e6, max=100.0e6, value=c2_guess, vary=True)
     params = av_crossing_model.make_params()
     fit_res = av_crossing_model.fit(data=np.array(total_freqs),
                                     dacs=np.array(total_dacs),
                                     params=params)
     return fit_res
 
-fit_res = avoided_crossing_dac_fit(flux[filter_mask_high], flux[filter_mask_low],
-                                   peaks[filter_mask_high, 0] *
-                                   1e-9, peaks[filter_mask_low, 1]*1e-9,
-                                   f1_guess=8.2, f2_guess=4.68,
-                                   f_bus_guess=8.148809251400813, cross_guess=583)
+fit_res = avoided_crossing_dac_fit(filt_flux_low,
+                                   filt_flux_high,
+                                   filt_peaks_low,
+                                   filt_peaks_high,
+                                   f1_guess=8.2e9, f2_guess=4.68e9,
+                                   cross_guess=520)
 
 ########
 # Plot results
 ########
 
-#############
-# Plotting filtered data
-flux = a.Y[:, 0]
+
+########
+# Plot results
+########
 f, ax = plt.subplots()
-ax.set_title(a.timestamp_string + ' filtered avoided crossing')
-flex_colormesh_plot_vs_xy(a.X[0], flux, a.Z[0],
+ax.set_title(ac.timestamp_string + ' filtered avoided crossing')
+flex_colormesh_plot_vs_xy(1e-9*ac.X[0], flux, ac.Z[0],
                           ax=ax,
                           transpose=True, cmap='viridis')
-ax.plot(flux[filter_mask_high], peaks[filter_mask_high, 0], 'o', c='r')
-ax.plot(flux[filter_mask_low], peaks[filter_mask_low, 1], 'o', c='y')
-ax.set_xlabel(a.ylabel)  # the axes are transposed
-ax.set_ylabel(a.xlabel)
+ax.plot(flux, 1e-9*filter_func(flux),  ls='--', c='w')
+ax.plot(filt_flux_high, 1e-9*filt_peaks_high, 'o',fillstyle='none', c='r')
+ax.plot(filt_flux_low, 1e-9*filt_peaks_low, 'o', fillstyle='none', c='y')
+ax.set_xlabel(ac.ylabel)  # the axes are transposed
+ax.set_ylabel('Frequency (GHz)')
 
-ax.xaxis.label.set_fontsize(14)
-ax.yaxis.label.set_fontsize(14)
-ax.title.set_fontsize(14)
-ax.plot(flux, low_freq(flux, **fit_res.best_values)*1e9, 'r--', linewidth=2)
-ax.plot(flux, high_freq(flux, **fit_res.best_values)*1e9, 'y--', linewidth=2)
+ax.plot(flux, 1e-9*avoided_crossing_direct_coupling(
+    flux, **fit_res.best_values,
+    dacs_state=False), 'r-', label='fit')
+ax.plot(flux, 1e-9*avoided_crossing_direct_coupling(
+    flux, **fit_res.best_values,
+    dacs_state=True), 'y-', label='fit')
 
-
-# ax.plot(flux[filter_mask_high], peaks[filter_mask_high, 0],'wo',fillstyle='full', markeredgewidth=2,markersize=10, markeredgecolor='red')
-# ax.plot(flux[filter_mask_low], peaks[filter_mask_low, 1],'wo',fillstyle='full', markeredgewidth=2,markersize=10, markeredgecolor='blue')
-
-cross_point = (fit_res.best_values['f_center1']-fit_res.best_values['f_center2'])/(
-    fit_res.best_values['coeff_2']-fit_res.best_values['coeff_1'])
-g_legend = 'g = %.2f MHz' % (fit_res.best_values['g']*1e3)
-ax.text(581, 4.7e9, g_legend, color='r', weight='bold')
-ax.axvline(cross_point, linestyle='dashed', color='k')
-ax.set_xlim(np.min(flux), np.max(flux))
-ax.set_ylim(np.min(a.X[0]), np.max(a.X[0]))
-print(cross_point)
-ax.set_xlabel(r'Dac (mV)')
+g_legend = r'$J_2$ = {:.2f}$\pm${:.2f} MHz'.format(
+    fit_res.params['g']*1e-6, fit_res.params['g'].stderr*1e-6)
+# , weight='bold')
+ax.text(.6, .8, g_legend, transform=ax.transAxes, color='white')
+ax.set_xlim(min(flux), max(flux))
+ax.set_ylim(min(ac.X[0]*1e-9), max(ac.X[0]*1e-9))
+f.savefig(ac.folder+'\\avoided_crossing.png', format='png', dpi=600)
