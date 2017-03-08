@@ -27,3 +27,6 @@ acquisition_modes = ['0: idle',
 trigger_sources = ['0: internal',
                    '1: external',
                    '2: mixed']
+
+pulse_queue_states = ['0: normal',
+                      '1: error']

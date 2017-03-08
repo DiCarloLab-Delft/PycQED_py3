@@ -20,7 +20,7 @@ class Fridge_Monitor(Instrument):
 
     def __init__(self, name, fridge_name, update_interval=60, **kw):
         super().__init__(name, **kw)
-        self.add_parameter('update_interval', units='s',
+        self.add_parameter('update_interval', unit='s',
                            initial_value=update_interval,
                            parameter_class=ManualParameter,
                            vals=vals.Numbers(min_value=0))
@@ -49,7 +49,7 @@ class Fridge_Monitor(Instrument):
                                    'T_MClo', 'T_MCStage']
 
         for par_name in self.monitored_pars:
-            self.add_parameter(par_name, units='mK',
+            self.add_parameter(par_name, unit='mK',
                                get_cmd=self._gen_temp_get(par_name))
         self._last_temp_update = 0
         self._update_temperatures()

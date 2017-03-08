@@ -74,7 +74,7 @@ class QuTech_ControlBox(VisaInstrument):
                            vals=vals.Ints(0, 255))
         self.add_parameter('integration_length',
                            label='integration length (# samples)',
-                           units='# samples',
+                           unit='# samples',
                            get_cmd=self._do_get_integration_length,
                            set_cmd=self._do_set_integration_length,
                            vals=vals.Ints(2, 512))
@@ -94,7 +94,7 @@ class QuTech_ControlBox(VisaInstrument):
                 label='Integraion weights input {}'.format(i),
                 get_cmd=self._wrap_ch_get_fun(self._get_int_weights, i),
                 set_cmd=self._wrap_ch_set_fun(self._set_int_weights, i),
-                vals=vals.Anything())
+                vals=vals.Arrays(min_value=-128, max_value=127, shape=(512,)))
 
             self._integration_weights = [[], []]
 
@@ -106,7 +106,7 @@ class QuTech_ControlBox(VisaInstrument):
 
         self.add_parameter('log_length',
                            label='Log length (# shots)',
-                           units='# shots',
+                           unit='# shots',
                            get_cmd=self._do_get_log_length,
                            set_cmd=self._do_set_log_length,
                            vals=vals.Ints(1, 8192))
@@ -140,7 +140,7 @@ class QuTech_ControlBox(VisaInstrument):
             for dac_ch in range(2):
                 self.add_parameter(
                     'AWG{}_dac{}_offset'.format(awg_nr, dac_ch),
-                    label='Dac offset AWG {}', units='mV',
+                    label='Dac offset AWG {}', unit='mV',
                     get_cmd=self._gen_sub_ch_get_func(self.get_dac_offset,
                                                       awg_nr, dac_ch),
                     set_cmd=self._gen_sub_ch_set_func(self.set_dac_offset,
@@ -148,7 +148,7 @@ class QuTech_ControlBox(VisaInstrument):
                     vals=vals.Numbers(-999, 999))
             # Need to add double wrapping for get/set funcs here
 
-        self.add_parameter('measurement_timeout', units='s',
+        self.add_parameter('measurement_timeout', unit='s',
                            set_cmd=self._do_set_measurement_timeout,
                            get_cmd=self._do_get_measurement_timeout)
 
@@ -600,7 +600,7 @@ class QuTech_ControlBox(VisaInstrument):
         return data
 
     def set_awg_lookuptable(self, awg_nr, table_nr, dac_ch, lut,
-                            length=None, units='V'):
+                            length=None, unit='V'):
         '''
         set the 14 bit values of a lut (V2.0)
 
@@ -1299,14 +1299,7 @@ class QuTech_ControlBox(VisaInstrument):
               between -128 and 127, (signed byte)
         @return stat : 0 if the upload succeeded and 1 if the upload failed.
         '''
-
         # 2 bytes per array val + cmd_header and EOM
-        if max(weights) > 127:
-            raise ValueError('Weights must be between -128 and 127')
-        if min(weights) < -128:
-            raise ValueError('Weights must be between -128 and 127')
-        if len(weights) != 512:
-            raise ValueError('Length of array must be 512 elements')
 
         if line == 0:
             cmd = defHeaders.UpdWeightsZeroHeader

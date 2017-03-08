@@ -168,7 +168,7 @@ def mixer_skewness_calibration_5014(SH, source, station,
     if QI_amp_ratio is None:
         QI_amp_ratio = ManualParameter('QI_amp', initial_value=1)
     if IQ_phase is None:
-        IQ_phase = ManualParameter('IQ_phase', units='deg', initial_value=0)
+        IQ_phase = ManualParameter('IQ_phase', unit='deg', initial_value=0)
     if MC is None:
         MC = station.MC
     if type(I_ch) is int:

@@ -123,8 +123,8 @@ chunk_size = 8000
 number_of_shots = chunk_size*130 # 3
 
 # Parameters are only used for labels and units in the datafile
-basis = ManualParameter('basis', units='')
-state = ManualParameter('state', units='')
+basis = ManualParameter('basis', unit='')
+state = ManualParameter('state', unit='')
 
 # MC is the MeasurementControl that controls the data acquisition loop
 
