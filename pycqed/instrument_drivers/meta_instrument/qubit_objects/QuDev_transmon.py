@@ -45,12 +45,9 @@ class QuDev_transmon(Qubit):
                            parameter_class=ManualParameter)
         self.add_parameter('f_qubit', label='Qubit frequency', unit='Hz',
                            initial_value=0, parameter_class=ManualParameter)
-        self.add_parameter('spec_pow', unit='dBm', initial_value=0,
+        self.add_parameter('spec_pow', unit='dBm', initial_value=-20,
                            parameter_class=ManualParameter,
-                           label='Continuous wave qubit spectroscopy power')
-        self.add_parameter('spec_pow_pulsed', unit='dBm', initial_value=0,
-                           parameter_class=ManualParameter,
-                           label='Pulsed qubit spectroscopy power')
+                           label='Qubit spectroscopy power')
         self.add_parameter('f_RO', unit='Hz', parameter_class=ManualParameter,
                            label='Readout frequency')
         self.add_parameter('drive_LO_pow', unit='dBm',
@@ -71,9 +68,18 @@ class QuDev_transmon(Qubit):
         self.add_parameter('RO_Q_offset', unit='V', initial_value=0,
                            parameter_class=ManualParameter,
                            label='DC offset for the readout Q channel')
-
-        self.int_avg_det = det.UHFQC_integrated_average_detector(
-            self.UHFQC, self.AWG, integration_length=1e-6, nr_averages=1024)
+        self.add_parameter('RO_acq_averages', initial_value=1024,
+                           vals=vals.Numbers(0, 1e6),
+                           parameter_class=ManualParameter)
+        self.add_parameter('RO_acq_integration_length', initial_value=2.2e-6,
+                           vals=vals.Numbers(min_value=10e-9, max_value=2.2e-6),
+                           parameter_class=ManualParameter)
+        self.add_parameter('RO_acq_weight_function_I', initial_value=0,
+                           vals=vals.Enum(0, 1, 2, 3, 4, 5),
+                           parameter_class=ManualParameter)
+        self.add_parameter('RO_acq_weight_function_Q', initial_value=1,
+                           vals=vals.Enum(0, 1, 2, 3, 4, 5),
+                           parameter_class=ManualParameter)
 
         # add pulsed spectroscopy pulse parameters
         self.add_operation('Spec')
@@ -145,24 +151,48 @@ class QuDev_transmon(Qubit):
         self.add_pulse_parameter('X180', 'X_pulse_phase', 'phase',
                                  initial_value=None, vals=vals.Numbers())
 
+        self.update_detector_functions()
+
+    def update_detector_functions(self):
+        self.int_log_det = det.UHFQC_integration_logging_det(
+            UHFQC=self.UHFQC, AWG=self.AWG, channels=[
+                self.RO_acq_weight_function_I(),
+                self.RO_acq_weight_function_Q()],
+            integration_length=self.RO_acq_integration_length())
+
+        self.int_avg_det = det.UHFQC_integrated_average_detector(
+            self.UHFQC, self.AWG, nr_averages=self.RO_acq_averages(),
+            channels=[self.RO_acq_weight_function_I(),
+                      self.RO_acq_weight_function_Q()],
+            integration_length=self.RO_acq_integration_length())
+
     def prepare_for_continuous_wave(self):
         self.heterodyne.auto_seq_loading(True)
         if self.cw_source is not None:
             self.cw_source.off()
             self.cw_source.pulsemod_state('Off')
             self.cw_source.power.set(self.spec_pow())
+        if self.readout_RF is not None:
+            self.readout_RF.pulsemod_state('Off')
+        self.readout_LO.pulsemod_state('Off')
 
     def prepare_for_pulsed_spec(self):
         self.heterodyne.auto_seq_loading(False)
         if self.cw_source is not None:
             self.cw_source.pulsemod_state('On')
             self.cw_source.on()
-            self.cw_source.power.set(self.spec_pow_pulsed())
+            self.cw_source.power.set(self.spec_pow())
+        self.readout_RF.pulsemod_state('On')
+
+        #TODO add settings from prepare_for_timedomain?
+
 
     def prepare_for_timedomain(self):
         # cw source
         if self.cw_source is not None:
             self.cw_source.off()
+
+        self.update_detector_functions()
 
         # drive LO
         self.drive_LO.pulsemod_state('Off')
@@ -191,21 +221,16 @@ class QuDev_transmon(Qubit):
                 self.RO_I_channel(), self.RO_I_offset()))
             eval('self._acquisition_instr.sigouts_{}_offset({})'.format(
                 self.RO_Q_channel(), self.RO_Q_offset()))
-            if self.heterodyne is None or \
-                    not hasattr(self.heterodyne, 'acquisition_delay'):
-                acquisition_delay = 270e-9
-            else:
-                acquisition_delay = self.heterodyne.acquisition_delay()
             self.UHFQC.awg_sequence_acquisition_and_pulse_SSB(
                 f_RO_mod=self.f_RO_mod(), RO_amp=self.RO_amp(),
                 RO_pulse_length=self.RO_pulse_length(),
-                acquisition_delay=acquisition_delay)
+                acquisition_delay=0)
         elif self.RO_pulse_type() is 'Gated_MW_RO_pulse':
             self.readout_RF.pulsemod_state('On')
             self.readout_RF.frequency(f_RO)
             self.readout_RF.power(self.RO_pulse_power())
             self.readout_RF.on()
-            self.UHFQC.awg_sequence_acquisition()
+            self.UHFQC.awg_sequence_acquisition(acquisition_delay=0)
 
     def measure_heterodyne_spectroscopy(self, freqs=None, MC=None,
                                         analyze=True, close_fig=True):
@@ -324,11 +349,12 @@ class QuDev_transmon(Qubit):
 
             self.cw_source.off()
 
+
         if analyze:
             ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
 
     def measure_rabi(self, amps=None, n=1, MC=None, analyze=True,
-                     close_fig=True, verbose=False):
+                     close_fig=True, upload=True):
 
         if amps is None:
             raise ValueError("Unspecified amplitudes for measure_rabi")
@@ -339,7 +365,8 @@ class QuDev_transmon(Qubit):
             MC = self.MC
 
         MC.set_sweep_function(awg_swf.Rabi(
-            pulse_pars=self.get_drive_pars(), RO_pars=self.get_RO_pars(), n=n))
+            pulse_pars=self.get_drive_pars(), RO_pars=self.get_RO_pars(), n=n,
+            upload=upload))
         MC.set_sweep_points(amps)
         MC.set_detector_function(self.int_avg_det)
         MC.run('Rabi-n{}'.format(n) + self.msmt_suffix)
@@ -347,17 +374,125 @@ class QuDev_transmon(Qubit):
         if analyze:
             ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
 
-    def measure_T1(self):
-        raise NotImplementedError()
+    def measure_rabi_amp90(self, scales=np.linspace(0.3, 0.7, 31), n=1,
+                           MC=None, analyze=True, close_fig=True, upload=True):
 
-    def measure_ramsey(self):
-        raise NotImplementedError()
+        self.prepare_for_timedomain()
 
-    def measure_echo(self):
-        raise NotImplementedError()
+        if MC is None:
+            MC = self.MC
 
-    def measure_allxy(self):
-        raise NotImplementedError()
+        MC.set_sweep_function(awg_swf.Rabi_amp90(
+            pulse_pars=self.get_drive_pars(), RO_pars=self.get_RO_pars(), n=n,
+            upload=upload))
+        MC.set_sweep_points(scales)
+        MC.set_detector_function(self.int_avg_det)
+        MC.run('Rabi_amp90_scales_n{}'.format(n)+self.msmt_suffix)
+
+    def measure_T1(self, times=None, MC=None, analyze=True, upload=True,
+                   close_fig=True):
+
+        if times is None:
+            raise ValueError("Unspecified times for measure_T1")
+
+        self.prepare_for_timedomain()
+
+        if MC is None:
+            MC = self.MC
+
+        MC.set_sweep_function(awg_swf.T1(
+            pulse_pars=self.get_drive_pars(), RO_pars=self.get_RO_pars(),
+            upload=upload))
+        MC.set_sweep_points(times)
+        MC.set_detector_function(self.int_avg_det)
+        MC.run('T1'+self.msmt_suffix)
+
+        if analyze:
+            ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
+
+    def measure_ramsey(self, times=None, artificial_detuning=0, label='',
+                       MC=None, analyze=True, close_fig=True, cal_points=True,
+                       upload=True):
+
+        if times is None:
+            raise ValueError("Unspecified times for measure_ramsey")
+
+        self.prepare_for_timedomain()
+        if MC is None:
+            MC = self.MC
+
+        Rams_swf = awg_swf.Ramsey(
+            pulse_pars=self.get_drive_pars(), RO_pars=self.get_RO_pars(),
+            artificial_detuning=artificial_detuning, cal_points=cal_points,
+            upload=upload)
+        MC.set_sweep_function(Rams_swf)
+        MC.set_sweep_points(times)
+        MC.set_detector_function(self.int_avg_det)
+        MC.run('Ramsey'+label+self.msmt_suffix)
+
+        if analyze:
+            ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
+
+
+    def measure_echo(self, times=None, MC=None, artificial_detuning=None,
+                     upload=True, analyze=True):
+
+        if times is None:
+            raise ValueError("Unspecified times for measure_echo")
+
+        self.prepare_for_timedomain()
+        if MC is None:
+            MC = self.MC
+
+        Echo_swf = awg_swf.Echo(
+            pulse_pars=self.get_drive_pars(), RO_pars=self.get_RO_pars(),
+            artificial_detuning=artificial_detuning, upload=upload)
+        MC.set_sweep_function(Echo_swf)
+        MC.set_sweep_points(times)
+        MC.set_detector_function(self.int_avg_det)
+        MC.run('Echo'+self.msmt_suffix)
+
+        if analyze:
+            ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
+
+    def measure_allxy(self, double_points=True, MC=None, upload=True,
+                      analyze=True):
+        self.prepare_for_timedomain()
+        if MC is None:
+            MC = self.MC
+
+        MC.set_sweep_function(awg_swf.AllXY(
+            pulse_pars=self.get_drive_pars(), RO_pars=self.get_RO_pars(),
+            double_points=double_points, upload=upload))
+        MC.set_detector_function(self.int_avg_det)
+        MC.run('AllXY'+self.msmt_suffix)
+
+        if analyze:
+            ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
+
+    def measure_randomized_benchmarking(self, nr_cliffords=None, nr_seeds=50,
+                                        T1=None, MC=None, close_fig=True,
+                                        upload=True, analyze=True):
+        '''
+        Performs a randomized benchmarking fidelity.
+        Optionally specifying T1 also shows the T1 limited fidelity.
+        '''
+
+        if nr_cliffords is None:
+            raise ValueError("Unspecified nr_cliffords for measure_echo")
+        self.prepare_for_timedomain()
+        if MC is None:
+            MC = self.MC
+
+        MC.set_sweep_function(awg_swf.Randomized_Benchmarking(
+            pulse_pars=self.get_drive_pars(), RO_pars=self.get_RO_pars(),
+            double_curves=True,
+            nr_cliffords=nr_cliffords, nr_seeds=nr_seeds, upload=upload))
+        MC.set_detector_function(self.int_avg_det)
+        MC.run('RB_{}seeds'.format(nr_seeds)+self.msmt_suffix)
+
+        if analyze:
+            ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
 
     def measure_ssro(self):
         raise NotImplementedError()
@@ -475,8 +610,13 @@ class QuDev_transmon(Qubit):
     def get_drive_pars(self):
         return self.get_operation_dict()['X180 ' + self.name]
 
-    def get_operation_dict(self, operation_dict={}):
+    def get_operation_dict(self, operation_dict=None):
+        if operation_dict is None:
+            operation_dict = {}
         operation_dict = super().get_operation_dict(operation_dict)
+        operation_dict['Spec ' + self.name]['operation_type'] = 'MW'
+        operation_dict['RO ' + self.name]['operation_type'] = 'RO'
+        operation_dict['X180 ' + self.name]['operation_type'] = 'MW'
         operation_dict.update(add_suffix_to_dict_keys(
             sq.get_pulse_dict_from_pars(operation_dict['X180 ' + self.name]),
             ' ' + self.name))

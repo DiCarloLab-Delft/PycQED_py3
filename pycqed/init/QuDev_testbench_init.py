@@ -25,6 +25,7 @@ from pycqed.measurement import measurement_control as mc
 from pycqed.measurement import mc_parameter_wrapper as pw
 from pycqed.measurement import detector_functions as det
 from pycqed.measurement.waveform_control import pulsar as ps
+from pycqed.measurement import awg_sweep_functions as awg_swf
 from pycqed.analysis import measurement_analysis as ma
 from pycqed.analysis import analysis_toolbox as a_tools
 
@@ -56,7 +57,7 @@ heterodyne = hd.HeterodyneInstrument('heterodyne', RF=readout_RF, LO=readout_LO,
 print("initializing qubit")
 MC = mc.MeasurementControl('MC')
 MC.station = station
-qubit = QuDev_transmon('qubit', MC,
+qb2 = QuDev_transmon('qb2', MC,
                        heterodyne = heterodyne,
                        cw_source = drive_LO,
                        readout_LO = readout_LO,
@@ -74,7 +75,7 @@ station.add_component(AWG)
 station.add_component(UHFQC)
 #station.add_component(homodyne)
 station.add_component(heterodyne)
-station.add_component(qubit)
+station.add_component(qb2)
 
 station.pulsar = ps.Pulsar()
 station.pulsar.AWG = AWG
@@ -99,28 +100,30 @@ for i in range(4):
     station.pulsar.define_channel(id='ch{}'.format(i+1),
                                   name='ch{}'.format(i+1), type='analog',
                                   # max safe IQ voltage
-                                  high=.7, low=-.7,
+                                  high=1, low=-1,
                                   offset=0.0, delay=0, active=True)
     station.pulsar.define_channel(id='ch{}_marker1'.format(i+1),
                                   name='ch{}_marker1'.format(i+1),
                                   type='marker',
-                                  high=1, low=0, offset=0.,
+                                  high=2.7, low=0, offset=0.,
                                   delay=0, active=True)
     station.pulsar.define_channel(id='ch{}_marker2'.format(i+1),
                                   name='ch{}_marker2'.format(i+1),
                                   type='marker',
-                                  high=1, low=0, offset=0.,
+                                  high=2.7, low=0, offset=0.,
                                   delay=0, active=True)
+#station.pulsar.set_channel_opt("ch2_marker1", "high", 3)
 
+AWG.clock_freq(1e9)
 AWG.stop()
 AWG.ch1_offset(0.0)
 AWG.ch2_offset(0.0)
 AWG.ch3_offset(0.0)
 AWG.ch4_offset(0.0)
-AWG.ch1_amp(1.4)
-AWG.ch2_amp(1.4)
-AWG.ch3_amp(1.4)
-AWG.ch4_amp(1.4)
+AWG.ch1_amp(2)
+AWG.ch2_amp(2)
+AWG.ch3_amp(2)
+AWG.ch4_amp(2)
 AWG.ch1_state(1)
 AWG.ch2_state(1)
 AWG.ch3_state(1)
@@ -141,62 +144,66 @@ UHFQC.awgs_0_outputs_1_amplitude(1)
 
 # configure heterodyne instrument parameters
 readout_LO.power(19) #dBm
-heterodyne.RF_power(-20) #dBm
+heterodyne.RF_power(-40) #dBm
 
 for hdyne in [heterodyne]:#, homodyne]:
     hdyne.f_RO_mod(25e6) #Hz
-    hdyne.nr_averages(1024)
-    hdyne.RO_length(500e-9) #s
-    hdyne.trigger_separation(3e-6) #s
+    hdyne.nr_averages(4096)
+    hdyne.RO_length(2.2e-6) #s
+    hdyne.trigger_separation(4e-6) #s
     hdyne.acq_marker_channels("ch1_marker2")
+    hdyne.frequency(7.1903e9) #Hz
 #homodyne.mod_amp(1) #V
 
-#configure qubit parameters
-qubit.f_RO_resonator(0) #Hz
-qubit.Q_RO_resonator(0)
-qubit.optimal_acquisition_delay(0) #s
-qubit.f_qubit(0) #Hz
-qubit.spec_pow(-20) #dBm
-qubit.spec_pow_pulsed(-20) #dBm
-qubit.f_RO(0) #Hz
-qubit.drive_LO_pow() #dBm
-qubit.pulse_I_offset(0) #V
-qubit.pulse_Q_offset(0) #V
-qubit.RO_pulse_power(-20) #dBm
-qubit.RO_I_offset(0) #V
-qubit.RO_Q_offset(0) #V
+# configure qubit 2 parameters
+qb2.f_RO_resonator(0) #Hz
+qb2.Q_RO_resonator(0)
+qb2.optimal_acquisition_delay(0) #s
+qb2.f_qubit(6023626529.174219) #Hz
+qb2.spec_pow(-40) #dBm
+qb2.f_RO(7.1903e9) #Hz
+qb2.drive_LO_pow(19) #dBm
+qb2.pulse_I_offset(0) #V
+qb2.pulse_Q_offset(0) #V
+qb2.RO_pulse_power(-20) #dBm
+qb2.RO_I_offset(0) #V
+qb2.RO_Q_offset(0) #V
+qb2.RO_acq_averages(4096)
+qb2.RO_acq_integration_length(2.2e-6)
+qb2.RO_acq_weight_function_I(0)
+qb2.RO_acq_weight_function_Q(1)
 
-qubit.spec_pulse_type('SquarePulse')
-qubit.spec_pulse_marker_channel('ch3_marker1') # gate drive LO = cw_source = MWG5
-qubit.spec_pulse_amp(1) #V
-qubit.spec_pulse_length(50e-6) #s
-qubit.spec_pulse_depletion_time(10e-6) #s
+qb2.spec_pulse_type('SquarePulse')
+qb2.spec_pulse_marker_channel('ch3_marker1') # gate drive LO = cw_source = MWG5
+qb2.spec_pulse_amp(1) #V
+qb2.spec_pulse_length(10e-6) #s
+qb2.spec_pulse_depletion_time(2e-6) #s
 
-qubit.RO_pulse_type('Gated_MW_RO_pulse')
-qubit.RO_I_channel()
-qubit.RO_Q_channel()
-qubit.RO_pulse_marker_channel('ch2_marker1') # gates readout RF = MWG0
-qubit.RO_amp() #V
-qubit.RO_pulse_length(800e-9) #s
-qubit.RO_pulse_delay(100e-9) #s
-qubit.f_RO_mod(25e6) #Hz
-qubit.RO_acq_marker_delay(0) #s
-qubit.RO_acq_marker_channel('ch1_marker2') # triggers UHFLI
-qubit.RO_pulse_phase(0) #rad
+qb2.RO_pulse_type('Gated_MW_RO_pulse')
+qb2.RO_I_channel()
+qb2.RO_Q_channel()
+qb2.RO_pulse_marker_channel('ch2_marker1') # gates readout RF = MWG7
+qb2.RO_amp(2.7) #V
+qb2.RO_pulse_length(800e-9) #s
+qb2.RO_pulse_delay(1e-6) #s
+qb2.f_RO_mod(25e6) #Hz
+qb2.RO_acq_marker_delay(-800e-9) #s
+qb2.RO_acq_marker_channel('ch1_marker2') # triggers UHFLI
+qb2.RO_pulse_phase(0) #rad
 
-qubit.pulse_type('SSB_DRAG_pulse')
-qubit.pulse_I_channel('ch1')
-qubit.pulse_Q_channel('ch2')
-qubit.amp180(300e-3) #V
-qubit.amp90_scale(0.5)
-qubit.pulse_delay(0)
-qubit.gauss_sigma(12e-9) #s
-qubit.nr_sigma(6)
-qubit.motzoi(0)
-qubit.f_pulse_mod(100e6) #Hz
-qubit.phi_skew(0)
-qubit.alpha(1)
-qubit.X_pulse_phase(0) #rad
+qb2.pulse_type('SSB_DRAG_pulse')
+qb2.pulse_I_channel('ch1')
+qb2.pulse_Q_channel('ch2')
+qb2.amp180(0.36428994664187847) #V
+qb2.amp90_scale(0.5119350936368918)
+qb2.pulse_delay(0)
+qb2.gauss_sigma(20e-9) #s
+qb2.nr_sigma(6)
+qb2.motzoi(0)
+qb2.f_pulse_mod(100e6) #Hz
+qb2.phi_skew(0)
+qb2.alpha(1)
+qb2.X_pulse_phase(0) #rad
 
 t1 = time.time()
 print('Ran initialization in %.2fs' % (t1-t0))

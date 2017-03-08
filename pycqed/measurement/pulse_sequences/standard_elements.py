@@ -160,7 +160,7 @@ def multi_pulse_elt(i, station, pulse_list, sequencer_config=None):
                     refpulse=last_pulse, refpoint=pulse_pars['refpoint'])
             elif pulse_pars['pulse_type'] == 'Gated_MW_RO_pulse':
                 last_pulse = el.add(pulse.SquarePulse(
-                    name='RO_marker', amplitude=1,
+                    name='RO_marker', amplitude=pulse_pars['amplitude'],
                     length=pulse_pars['length'],
                     channel=pulse_pars['RO_pulse_marker_channel']),
                     operation_type=pulse_pars['operation_type'],

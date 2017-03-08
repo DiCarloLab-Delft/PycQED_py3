@@ -44,8 +44,7 @@ class HeterodyneInstrument(Instrument):
 
         self.add_parameter('RF_power', label='RF power',
                            unit='dBm', vals=vals.Numbers(),
-                           set_cmd=self._set_RF_power,
-                           get_cmd=self._get_RF_power)
+                           parameter_class=ManualParameter)
         self.add_parameter('acquisition_instr_controller',
                            set_cmd=self._set_acquisition_instr_controller,
                            get_cmd=self._get_acquisition_instr_controller,
@@ -117,6 +116,9 @@ class HeterodyneInstrument(Instrument):
 
 
     def prepare(self, get_t_base=True):
+        if self.RF is not None:
+            self.RF.power(self.RF_power())
+
         if 'CBox' in self.acquisition_instr():
             self.prepare_CBox(get_t_base)
         elif 'UHFQC' in self.acquisition_instr():
@@ -184,13 +186,13 @@ class HeterodyneInstrument(Instrument):
 
         # this sets the result to integration and rotation outcome
         self._acquisition_instr.quex_rl_source(2)
-        self._acquisition_instr.quex_rl_length(1)
+        self._acquisition_instr.quex_rl_length(2)
         self._acquisition_instr.quex_rl_avgcnt(
             int(np.log2(self.nr_averages())))
         self._acquisition_instr.quex_wint_length(int(self.RO_length()*1.8e9))
         # The AWG program uses userregs/0 to define the number of
         # iterations in the loop
-        self._acquisition_instr.awgs_0_userregs_0(int(self.nr_averages()))
+        self._acquisition_instr.awgs_0_userregs_0(2*int(self.nr_averages()))
         # 0 for rl, 1 for iavg
         self._acquisition_instr.awgs_0_userregs_1(0)
         self._acquisition_instr.awgs_0_single(1)
@@ -277,8 +279,8 @@ class HeterodyneInstrument(Instrument):
         while self._acquisition_instr.awgs_0_enable() == 1:
             time.sleep(0.01)
         data = ['', '']
-        data[0] = self._acquisition_instr.quex_rl_data_0()[0]['vector']
-        data[1] = self._acquisition_instr.quex_rl_data_1()[0]['vector']
+        data[0] = self._acquisition_instr.quex_rl_data_0()[0]['vector'][:1]
+        data[1] = self._acquisition_instr.quex_rl_data_1()[0]['vector'][:1]
         return data[0]+1j*data[1]
 
     def probe_ATS(self):
@@ -322,14 +324,6 @@ class HeterodyneInstrument(Instrument):
                             .format(self._f_RO_mod, LO_freq, freq))
         return self._f_RO_mod
 
-    def _set_RF_power(self, val):
-        self.RF.power(val)
-        self._RF_power = val
-        # internally stored to allow setting RF from stored setting
-
-    def _get_RF_power(self):
-        return self._RF_power
-
     def _set_status(self, val):
         if val == 'On':
             self.on()
@@ -338,7 +332,7 @@ class HeterodyneInstrument(Instrument):
 
     def _get_status(self):
         if (self.LO.status().startswith('On') and
-            self.RF.status().startswith('On')):
+                self.RF.status().startswith('On')):
             return 'On'
         elif (self.LO.status().startswith('Off') and
               self.RF.status().startswith('Off')):

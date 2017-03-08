@@ -395,7 +395,7 @@ class UHFQC(Instrument):
     def single_acquisition(self, samples, acquisition_time=0.010, timeout=0, channels=set([0, 1]), mode='rl'):
         # Shorter acquisitions can use the poll function
         if samples <= 256:
-            return self.single_acquisition_poll(samples, acquisition_time, timeout, channels, mode)
+            return self.single_acquisition_poll(samples, acquisition_time, timeout)
         else:
             return self.single_acquisition_get(samples, acquisition_time, timeout, channels, mode)
 
@@ -528,7 +528,7 @@ class UHFQC(Instrument):
                                         weight_function_I=0,
                                         weight_function_Q=1):
         trace_length = 4096
-        tbase = np.arange(0, trace_length/1.8e9, 1/1.8e9)
+        tbase = np.linspace(0, trace_length/1.8e9, trace_length)
         cosI = np.array(np.cos(2*np.pi*IF*tbase))
         sinI = np.array(np.sin(2*np.pi*IF*tbase))
         eval('self.quex_wint_weights_{}_real(np.array(cosI))'.format(weight_function_I))
@@ -542,7 +542,7 @@ class UHFQC(Instrument):
 
     def prepare_DSB_weight_and_rotation(self, IF, weight_function_I=0, weight_function_Q=1):
         trace_length = 4096
-        tbase = np.arange(0, trace_length/1.8e9, 1/1.8e9)
+        tbase = np.linspace(0, trace_length/1.8e9, trace_length)
         cosI = np.array(np.cos(2*np.pi*IF*tbase))
         sinI = np.array(np.sin(2*np.pi*IF*tbase))
         eval('self.quex_wint_weights_{}_real(np.array(cosI))'.format(weight_function_I))
@@ -705,7 +705,9 @@ setTrigger(0);"""
             string = 'wave '+ name +' = '+ string + ';\n'
         return string
 
-    def awg_sequence_acquisition(self):
+    def awg_sequence_acquisition(self, acquisition_delay=0):
+        delay_samples = int(acquisition_delay*1.8e9/8)
+        self.awgs_0_userregs_2(delay_samples)
         string="""
 const TRIGGER1  = 0x000001;
 const WINT_TRIG = 0x000010;
@@ -724,9 +726,9 @@ if(getUserReg(1)){
 repeat(loop_cnt) {
 \twaitDigTrigger(1, 0);
 \twaitDigTrigger(1, 1);\n
+\twait(getUserReg(2));
 \tsetTrigger(WINT_EN +RO_TRIG);
 \tsetTrigger(WINT_EN);
-\twait(0);
 }
 setTrigger(0);"""
         self.awg_string(string)
