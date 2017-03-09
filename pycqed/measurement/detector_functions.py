@@ -1362,18 +1362,9 @@ class UHFQC_input_average_detector(Hard_Detector):
 
     '''
     Detector used for acquiring averaged input traces withe the UHFQC
-
     '''
 
-    '''
-    Detector used for acquiring single points of the CBox while externally
-    triggered by the AWG.
-    Soft version of the regular integrated avg detector.
-
-    Has two acq_modes, 'IQ' and 'AmpPhase'
-    '''
-
-    def __init__(self, UHFQC, AWG, channels=[0, 1], nr_averages=1024, nr_samples=4096, **kw):
+    def __init__(self, UHFQC, pulsar, channels=[0, 1], nr_averages=1024, nr_samples=4096, **kw):
         super(UHFQC_input_average_detector, self).__init__()
         self.UHFQC = UHFQC
         self.name = 'UHFQC_Streaming_data'
@@ -1383,7 +1374,7 @@ class UHFQC_input_average_detector(Hard_Detector):
         for i, channel in enumerate(self.channels):
             self.value_names[i] = 'ch{}'.format(channel)
             self.value_units[i] = 'V'
-        self.AWG = AWG
+        self.pulsar = pulsar
         self.nr_samples = nr_samples
         self.nr_averages = nr_averages
 
@@ -1395,8 +1386,8 @@ class UHFQC_input_average_detector(Hard_Detector):
         except:
             temp = self.UHFQC.awgs_0_enable()
         del temp
-        if self.AWG is not None:
-            self.AWG.start()
+        if self.pulsar is not None:
+            self.pulsar.start()
         while self.UHFQC.awgs_0_enable() == 1:
             time.sleep(0.01)
         data = ['']*len(self.channels)
@@ -1407,8 +1398,8 @@ class UHFQC_input_average_detector(Hard_Detector):
         return data
 
     def prepare(self, sweep_points):
-        if self.AWG is not None:
-            self.AWG.stop()
+        if self.pulsar is not None:
+            self.pulsar.stop()
         self.UHFQC.quex_iavg_length(self.nr_samples)
         self.UHFQC.quex_iavg_avgcnt(int(np.log2(self.nr_averages)))
         self.UHFQC.awgs_0_userregs_1(1)  # 0 for rl, 1 for iavg
@@ -1418,8 +1409,8 @@ class UHFQC_input_average_detector(Hard_Detector):
         self.UHFQC.awgs_0_single(1)
 
     def finish(self):
-        if self.AWG is not None:
-            self.AWG.stop()
+        if self.pulsar is not None:
+            self.pulsar.stop()
 
 
 class UHFQC_integrated_average_detector(Hard_Detector):
@@ -1429,9 +1420,9 @@ class UHFQC_integrated_average_detector(Hard_Detector):
 
     '''
 
-    def __init__(self, UHFQC, AWG, integration_length=1e-6, nr_averages=1024, rotate=False,
-                 channels=[0, 1, 2, 3], cross_talk_suppression=False,
-                 **kw):
+    def __init__(self, UHFQC, pulsar, integration_length=1e-6, nr_averages=1024,
+                 rotate=False, channels=[0, 1, 2, 3],
+                 cross_talk_suppression=False, **kw):
         super(UHFQC_integrated_average_detector, self).__init__()
         self.UHFQC = UHFQC
         self.name = 'UHFQC_integrated_average'
@@ -1444,14 +1435,15 @@ class UHFQC_integrated_average_detector(Hard_Detector):
             self.value_units[i] = 'V'
         self.rotate = rotate
 
-        self.AWG = AWG
+        self.pulsar = pulsar
         self.nr_averages = nr_averages
         self.integration_length = integration_length
         self.rotate = rotate
         self.cross_talk_suppression = cross_talk_suppression
 
     def get_values(self):
-        self.AWG.stop()
+        if self.pulsar is not None:
+            self.pulsar.stop()
         self.UHFQC.quex_rl_readout(0) # resets UHFQC internal readout counters
         self.UHFQC.awgs_0_enable(1)
         # probing the values to be sure communication is finished before
@@ -1461,10 +1453,9 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         except:
             temp = self.UHFQC.awgs_0_enable()
         del temp
-        # starting AWG
-        if self.AWG is not None:
-            self.AWG.start()
 
+        if self.pulsar is not None:
+            self.pulsar.start()
         while self.UHFQC.awgs_0_enable() == 1:
             time.sleep(0.01)
         data = ['']*len(self.channels)
@@ -1507,8 +1498,8 @@ class UHFQC_integrated_average_detector(Hard_Detector):
 
 
     def prepare(self, sweep_points=None):
-        if self.AWG is not None:
-            self.AWG.stop()
+        if self.pulsar is not None:
+            self.pulsar.stop()
         if sweep_points is None:
             self.nr_sweep_points = 1
         else:
@@ -1532,8 +1523,8 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         self.UHFQC.awgs_0_single(1)
 
     def finish(self):
-        if self.AWG is not None:
-            self.AWG.stop()
+        if self.pulsar is not None:
+            self.pulsar.stop()
 
 
 class UHFQC_integration_logging_det(Hard_Detector):
@@ -1543,7 +1534,7 @@ class UHFQC_integration_logging_det(Hard_Detector):
 
     '''
 
-    def __init__(self, UHFQC, AWG, integration_length=1e-6,
+    def __init__(self, UHFQC, pulsar, integration_length=1e-6,
                  channels=[0, 1], nr_shots=4095,
                  cross_talk_suppression=False,  **kw):
         super(UHFQC_integration_logging_det, self).__init__()
@@ -1558,12 +1549,15 @@ class UHFQC_integration_logging_det(Hard_Detector):
         if len(self.channels) == 2:
             self.value_names = ['I', 'Q']
             self.value_units = ['V', 'V']
-        self.AWG = AWG
+        self.pulsar = pulsar
         self.integration_length = integration_length
         self.nr_shots = nr_shots
         self.cross_talk_suppression = cross_talk_suppression
 
     def get_values(self):
+        if self.pulsar is not None:
+            self.pulsar.stop()
+
         self.UHFQC.quex_rl_readout(0) # resets UHFQC internal readout counters
         self.UHFQC.awgs_0_enable(1)
         # probing the values to be sure communication is finished before
@@ -1572,9 +1566,9 @@ class UHFQC_integration_logging_det(Hard_Detector):
         except:
             temp = self.UHFQC.awgs_0_enable()
         del temp
-        # starting AWG
-        if self.AWG is not None:
-            self.AWG.start()
+
+        if self.pulsar is not None:
+            self.pulsar.start()
         while self.UHFQC.awgs_0_enable() == 1:
             time.sleep(0.01)
 
@@ -1587,8 +1581,8 @@ class UHFQC_integration_logging_det(Hard_Detector):
         return data
 
     def prepare(self, sweep_points):
-        if self.AWG is not None:
-            self.AWG.stop()
+        if self.pulsar is not None:
+            self.pulsar.stop()
         # The averaging-count is used to specify how many times the AWG program
         # should run
 
@@ -1609,8 +1603,8 @@ class UHFQC_integration_logging_det(Hard_Detector):
             self.UHFQC.quex_rl_source(2)
 
     def finish(self):
-        if self.AWG is not None:
-            self.AWG.stop()
+        if self.pulsar is not None:
+            self.pulsar.stop()
 
 # --------------------------------------------
 # Fake detectors
