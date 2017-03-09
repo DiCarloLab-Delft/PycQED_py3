@@ -128,7 +128,7 @@ class HeterodyneInstrument(Instrument):
         self.set('status', 'Off')
         return
 
-    def prepare(self, get_t_base=True, RO_length=2274e-9, trigger_separation=10e-6):
+    def prepare(self, get_t_base=True, RO_length=2000e-9, trigger_separation=5e-6):
         '''
         This function needs to be overwritten for the ATS based version of this
         driver
@@ -157,9 +157,9 @@ class HeterodyneInstrument(Instrument):
                 self._acquisition_instr.nr_averages(int(self.nr_averages()))
 
             elif 'UHFQC' in self.acquisition_instr():
-                self._acquisition_instr.prepare_DSB_weight_and_rotation(
-                    IF=self.get('f_RO_mod'),
-                    weight_function_I=0, weight_function_Q=1)
+                # self._acquisition_instr.prepare_DSB_weight_and_rotation(
+                #     IF=self.get('f_RO_mod'),
+                #      weight_function_I=0, weight_function_Q=1)
                 # this sets the result to integration and rotation outcome
                 self._acquisition_instr.quex_rl_source(2)
                 # only one sample to average over
@@ -228,12 +228,13 @@ class HeterodyneInstrument(Instrument):
             d = np.double(
                 self._acquisition_instr.get_integrated_avg_results())*np.double(factor)
             # print(np.size(d))
-            dat = d[0][0]+1j*d[1][0]
+            dat = (d[0][0]+1j*d[1][0])
         elif 'UHFQC' in self.acquisition_instr():
             t0 = time.time()
-            self._acquisition_instr.awgs_0_enable(1)
+            #self._acquisition_instr.awgs_0_enable(1) #this was causing spikes
             dataset = self._acquisition_instr.single_acquisition_poll(1, 0.001, 1000)
-            dat = dataset[0][0]+1j*dataset[1][0]
+            average_fraction=1/self.nr_averages()
+            dat = (average_fraction*dataset[0][0]+average_fraction*1j*dataset[1][0])
             t1 = time.time()
             # print("time for UHFQC polling", t1-t0)
         elif 'ATS' in self.acquisition_instr():

@@ -737,6 +737,7 @@ repeat(loop_cnt) {
 \twaitDigTrigger(1, 0);
 \twaitDigTrigger(1, 1);\n
 \tsetTrigger(WINT_EN +RO_TRIG);
+\twait(1000);
 \tsetTrigger(WINT_EN);
 \twait(300);
 }
