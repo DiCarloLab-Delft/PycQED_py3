@@ -14,6 +14,7 @@ import struct
 import math
 from qcodes import validators as vals
 import logging
+import time
 
 logging.warning('my warning ')
 logging.info('my info ')
@@ -33,9 +34,21 @@ class DDMq(SCPI):
         #######################################################################
         # DDM specific
         #######################################################################
-
+        
         for i in range(self.device_descriptor.numChannels//2):
             ch_pair = 2*i+1
+            srun_cmd = 'qutech:run{}'.format(ch_pair)
+            self.add_parameter(   'ch_pair{}_run'.format(ch_pair),
+                               label=('Run ch_pair{}'.format(ch_pair)),
+                               #get_cmd=swinten_cmd + '?',
+                               set_cmd=srun_cmd
+                               )
+            sreset_int_cmd = 'qutech:reset{}'.format(ch_pair)
+            self.add_parameter(   'ch_pair{}_reset'.format(ch_pair),
+                               label=('Reset DDM integration modes'),
+                               #get_cmd=swinten_cmd + '?',
+                               set_cmd=sreset_int_cmd
+                               )
             snavg_cmd = 'qutech:inputavg{}:naverages'.format(ch_pair)
             self.add_parameter('ch_pair{}_inavg_Navg'.format(ch_pair),
                                unit='#',
@@ -57,18 +70,10 @@ class DDMq(SCPI):
             senable_cmd = 'qutech:inputavg{}:enable'.format(ch_pair)
             self.add_parameter('ch_pair{}_inavg_enable'.format(ch_pair),
                                label=('Enable input averaging' +
-                                      'chpair {} '.format(ch_pair)),
-                               get_cmd=senable_cmd + '?',
-                               set_cmd=senable_cmd
-                               # vals=vals.Numbers(1,4096)
-                               )
-            sdisable_cmd = 'qutech:inputavg{}:disable'.format(ch_pair)
-            self.add_parameter('ch_pair{}_inavg_disable'.format(ch_pair),
-                               label=('Disable input averaging' +
                                       'ch_pair {} '.format(ch_pair)),
                                get_cmd=senable_cmd + '?',
-                               set_cmd=sdisable_cmd,
-                               # vals=vals.Bool()
+                               set_cmd=senable_cmd + ' {}',
+                               vals=vals.Numbers(0,1)
                                )
             sholdoff_cmd = 'qutech:input{}:holdoff'.format(ch_pair)
             self.add_parameter('ch_pair{}_inavg_holdoff'.format(ch_pair),
@@ -76,7 +81,7 @@ class DDMq(SCPI):
                                       'ch_pair {} '.format(ch_pair)),
                                get_cmd=sholdoff_cmd + '?',
                                set_cmd=sholdoff_cmd + ' {}',
-                               vals=vals.Numbers(0, 127)
+                               vals=vals.Numbers(0, 254)
                                )
             '''
             Weighted integral + Rotation matrix + TV mode parameters
@@ -84,19 +89,12 @@ class DDMq(SCPI):
             swinten_cmd = 'qutech:wint{}:enable'.format(ch_pair)
             self.add_parameter('ch_pair{}_wint_enable'.format(ch_pair),
                                label=('Enable wighted integral' +
-                                      'chpair {} '.format(ch_pair)),
-                               get_cmd=swinten_cmd + '?',
-                               set_cmd=swinten_cmd
-                               # vals=vals.Numbers(1,4096)
-                               )
-            swintdis_cmd = 'qutech:wint{}:disable'.format(ch_pair)
-            self.add_parameter('ch_pair{}_wint_disable'.format(ch_pair),
-                               label=('Disable wighted integral' +
                                       'ch_pair {} '.format(ch_pair)),
                                get_cmd=swinten_cmd + '?',
-                               set_cmd=swintdis_cmd,
-                               # vals=vals.Bool()
+                               set_cmd=swinten_cmd + ' {}',
+                               vals=vals.Numbers(0,1)
                                )
+           
             sintlength_cmd = 'qutech:wint{}:intlength'.format(ch_pair)
             self.add_parameter('ch_pair{}_wint_intlength'.format(ch_pair),
                                unit='#',
@@ -121,8 +119,8 @@ class DDMq(SCPI):
                                label=('Rotation matrix value 00 of' +
                                       'ch_pair {} '.format(ch_pair)),
                                get_cmd=srotmat00_cmd + '?',
-                               set_cmd=srotmat00_cmd + ' {}'
-                               # vals=vals.Numbers(1,2048)
+                               set_cmd=srotmat00_cmd + ' {}',
+                               vals=vals.Numbers(-2 , 1.99976)
                                )
             srotmat01_cmd = 'qutech:rotmat{}:rotmat01'.format(ch_pair)
             self.add_parameter('ch_pair{}_rotmat_rotmat01'.format(ch_pair),
@@ -130,8 +128,8 @@ class DDMq(SCPI):
                                label=('Rotation matrix value 00 of' +
                                       'ch_pair {} '.format(ch_pair)),
                                get_cmd=srotmat01_cmd + '?',
-                               set_cmd=srotmat01_cmd + ' {}'
-                               # vals=vals.Numbers(1,2048)
+                               set_cmd=srotmat01_cmd + ' {}',
+                               vals=vals.Numbers(-2 , 1.99976)
                                )
             srotmat10_cmd = 'qutech:rotmat{}:rotmat10'.format(ch_pair)
             self.add_parameter('ch_pair{}_rotmat_rotmat10'.format(ch_pair),
@@ -148,8 +146,8 @@ class DDMq(SCPI):
                                label=('Rotation matrix value 11 of' +
                                       'ch_pair {} '.format(ch_pair)),
                                get_cmd=srotmat11_cmd + '?',
-                               set_cmd=srotmat11_cmd + ' {}'
-                               # vals=vals.Numbers(1,2048)
+                               set_cmd=srotmat11_cmd + ' {}',
+                               vals=vals.Numbers(-2 , 1.99976)
                                )
             '''
             TV mode parameters
@@ -177,17 +175,11 @@ class DDMq(SCPI):
                                label=('Enable tv mode' +
                                       'ch_pair {} '.format(ch_pair)),
                                get_cmd=stven_cmd + '?',
-                               set_cmd=stven_cmd
+                               set_cmd=stven_cmd + ' {}',
+                               vals=vals.Numbers(0,1)
                                # vals=vals.Numbers(1,4096)
                                )
-            stvdis_cmd = 'qutech:tvmode{}:disable'.format(ch_pair)
-            self.add_parameter('ch_pair{}_tvmode_disable'.format(ch_pair),
-                               label=('Disable tv mode' +
-                                      'ch_pair {} '.format(ch_pair)),
-                               get_cmd=stven_cmd + '?',
-                               set_cmd=stvdis_cmd,
-                               # vals=vals.Bool()
-                               )
+       
             self.add_parameter('ch_pair{}_tvmode_data'.format(ch_pair),
                                label=('Get TV data ch {} '.format(ch_pair)),
                                get_cmd=self._gen_ch_get_func(
@@ -208,8 +200,8 @@ class DDMq(SCPI):
                                label=('Set threshold of' +
                                'ch_pair {} '.format(ch_pair)),
                                get_cmd=sthl_cmd + '?',
-                               set_cmd=sthl_cmd + ' {}'
-                               # vals=vals.Numbers(-134217728,134217727)
+                               set_cmd=sthl_cmd + ' {}',
+                               vals=vals.Numbers(-134217728,134217727)
                                )
             self.add_parameter('ch_pair{}_qstate_cnt_data'.format(ch_pair),
                                label=('Get qstate counter' +
@@ -227,6 +219,66 @@ class DDMq(SCPI):
 
                                # vals=vals.Numbers(-128,127)
                                )
+
+            slogen_cmd = 'qutech:logging{}:enable'.format(ch_pair)
+            self.add_parameter('ch_pair{}_logging_enable'.format(ch_pair),
+                               label=('Enable logging mode' +
+                                      'ch_pair {} '.format(ch_pair)),
+                               get_cmd=slogen_cmd + '?',
+                               set_cmd=slogen_cmd + ' {}',
+                               vals=vals.Numbers(0,1)
+                               # vals=vals.Numbers(1,4096)
+                               )
+          
+            slogshots_cmd = 'qutech:logging{}:nshots'.format(ch_pair)
+            self.add_parameter('ch_pair{}_logging_nshots'.format(ch_pair),
+                               unit='#',
+                               label=('The number of logging shots of' +
+                                      'ch_pair {} '.format(ch_pair)),
+                               get_cmd=slogshots_cmd + '?',
+                               set_cmd=slogshots_cmd + ' {}',
+                               vals=vals.Numbers(1, 8192)
+                               )
+            '''
+            Logging
+            '''
+            self.add_parameter('ch_pair{}_logging_int'.format(ch_pair),
+                               label=('Get integration logging ' +
+                                      'ch_pair {} '.format(ch_pair)),
+                               get_cmd=self._gen_ch_get_func(
+                                   self._getLoggingInt, ch_pair),
+
+                               )
+            self.add_parameter('ch_pair{}_logging_qstate'.format(ch_pair),
+                               label=('Get qstate logging ' +
+                                      'ch_pair {} '.format(ch_pair)),
+                               get_cmd=self._gen_ch_get_func(
+                                   self._getLoggingQstate, ch_pair),
+
+                               # vals=vals.Numbers(-128,127)
+                               )
+            '''
+            Error fraction 
+            '''
+            serrfarcten_cmd = 'qutech:errorfraction{}:enable'.format(ch_pair)
+            self.add_parameter('ch_pair{}_err_fract_enable'.format(ch_pair),
+                               label=('Enable error fraction mode' +
+                                      'ch_pair {} '.format(ch_pair)),
+                               get_cmd=serrfarcten_cmd + '?',
+                               set_cmd=serrfarcten_cmd + ' {}',
+                               vals=vals.Numbers(0,1)
+                               )
+            
+            serrfractshots_cmd = 'qutech:errorfraction{}:nshots'.format(ch_pair)
+            self.add_parameter('ch_pair{}_err_fract_nshots'.format(ch_pair),
+                               unit='#',
+                               label=('The number of error fraction shots of' +
+                                      'ch_pair {} '.format(ch_pair)),
+                               get_cmd=serrfractshots_cmd + '?',
+                               set_cmd=serrfractshots_cmd + ' {}',
+                               vals=vals.Numbers(1, 2097152)
+                               )
+
         for i in range(self.device_descriptor.numChannels):
             ch = i+1
             self.add_parameter('ch{}_inavg_data'.format(ch),
@@ -338,6 +390,36 @@ class DDMq(SCPI):
         #print('Qu state average {:d}'.format(len(binBlock)))
         qstateavg = np.frombuffer(binBlock, dtype=np.float32)
         return qstateavg
+    def _getLoggingInt(self, ch_pair):
+        finished = 0
+        complete = 0     
+        #while (complete != '1'):
+        #    complete = self._getTVpercentage(ch_pair)
+        while (finished != '1'):
+            finished = self._getLoggingFinished(ch_pair)
+            if (finished == 'ffffffff'):
+                logging.warning('Trigger is not received: DDM timeout')
+                break
+        self.write('qutech:logging{:d}:data:int? '.format(ch_pair))
+        binBlock = self.binBlockRead()
+        #print('Qu state average {:d}'.format(len(binBlock)))
+        intlogging = np.frombuffer(binBlock, dtype=np.float32)
+        return intlogging
+    def _getLoggingQstate(self, ch_pair):
+        finished = 0
+        complete = 0     
+        #while (complete != '1'):
+        #    complete = self._getTVpercentage(ch_pair)
+        while (finished != '1'):
+            finished = self._getLoggingFinished(ch_pair)
+            if (finished == 'ffffffff'):
+                logging.warning('Trigger is not received: DDM timeout')
+                break
+        self.write('qutech:logging{:d}:data:qstate? '.format(ch_pair))
+        binBlock = self.binBlockRead()
+        #print('Qu state average {:d}'.format(len(binBlock)))
+        qstatelogging = np.frombuffer(binBlock, dtype=np.float32)
+        return qstatelogging        
     def _getInAvgStatus(self, adcnr):
         return self.ask('qutech:inputavg%d:status? ' % (adcnr))
     def _getInAvgFinished(self, adcnr):
@@ -357,6 +439,57 @@ class DDMq(SCPI):
         return self.ask('qutech:tvmode%d:busy? ' % (adcnr))
     def _getTVpercentage(self, adcnr):
         return self.ask('qutech:tvmode%d:percentage? ' % (adcnr))
+    '''
+    Logging 
+    '''
+    def _getLoggingFinished(self, adcnr):
+        finished = self.ask('qutech:logging%d:finished? ' % (adcnr))
+        fmt_finished = format(int(finished),'x')
+        return fmt_finished
+    def _getLoggingBusy(self, adcnr):
+        return self.ask('qutech:logging%d:busy? ' % (adcnr))
+    def _getLoggingpercentage(self, adcnr):
+        return self.ask('qutech:logging%d:percentage? ' % (adcnr))
+    def _getLoggingStatus(self, adcnr):
+        return self.ask('qutech:errorfraction%d:status? ' % (adcnr)) 
+    '''
+    Error fraction counters
+    '''
+    def _sendErrFractSglQbitPattern(self, ch_pair, pattern):
+        self.write('qutech:errorfraction{:d}:pattern {:d},{:d}'.format(
+                   ch_pair, pattern[0], pattern[1]))
+    def _getErrFractSglQbitPattern(self, ch_pair):
+        return self.ask('qutech:errorfraction{:d}:pattern? '.format(ch_pair))
+    def _getErrFractCnt(self, ch_pair):
+        finished = 0
+        complete = 0     
+        #while (complete != '1'):
+        #    complete = self._getTVpercentage(ch_pair)
+        while (finished != '1'):
+            finished = self._getErrFractFinished(ch_pair)
+            if (finished == 'ffffffff'):
+                logging.warning('Trigger is not received: DDM timeout')
+                break
+        self.write('qutech:errorfraction{:d}:data? '.format(ch_pair))
+        binBlock = self.binBlockRead()
+        #print('Qu state average {:d}'.format(len(binBlock)))
+        errfractioncnt = np.frombuffer(binBlock, dtype=np.int32)
+        print('NoErrorCounterReg    = {:d}'.format(errfractioncnt[0]))
+        print('SingleErrorCounterReg= {:d}'.format(errfractioncnt[1]))
+        print('DoubleErrorCounterReg= {:d}'.format(errfractioncnt[2]))
+        print('ZeroStateCounterReg  = {:d}'.format(errfractioncnt[3]))
+        print('OneStateCounterReg   = {:d}'.format(errfractioncnt[4]))
+        return errfractioncnt    
+    def _getErrFractFinished(self, adcnr):
+        finished = self.ask('qutech:errorfraction%d:finished? ' % (adcnr))
+        fmt_finished = format(int(finished),'x')
+        return fmt_finished
+    def _getErrFractBusy(self, adcnr):
+        return self.ask('qutech:errorfraction%d:busy? ' % (adcnr))
+    def _getErrFractpercentage(self, adcnr):
+        return self.ask('qutech:errorfraction%d:percentage? ' % (adcnr))
+    def _getErrFractStatus(self, adcnr):
+        return self.ask('qutech:errorfraction%d:status? ' % (adcnr))
     def _getADCstatus(self, adcnr):
         status = self.ask('qutech:adc%d:status? ' % (adcnr))
         statusstr = format(int(status), 'b')
@@ -377,7 +510,7 @@ class DDMq(SCPI):
                 logging.warning('\nUnder range on DQ input.' +
                         ' Input signal is less than 25% of ADC resolution. ')
             else:
-                print("\nDI input is Okay.") 
+                print("\nDQ input is Okay.") 
             return ((reversestatusstr[2] != '1') & (reversestatusstr[3] != '1')) 
 
         def _DCLK_PLL_LOCKED():
@@ -425,6 +558,8 @@ class DDMq(SCPI):
             # in case parts at the end are missing, fill in None
             if len(idparts) < 9:
                 idparts += [None] * (9 - len(idparts))
+            for i in range(0 , 9):
+                idparts[i] = idparts[i].split('=')[1]
         except:
             logging.warn('Error getting or interpreting *IDN?: ' + repr(idstr))
             idparts = [None, None, None, None, None, None]
@@ -436,7 +571,20 @@ class DDMq(SCPI):
         return dict(zip(('vendor', 'model', 'serial', 'fwVersion', 'fwBuild',
                          'swVersion', 'swBuild', 'kmodVersion',
                          'kmodBuild'), idparts))
+        print (idparts)
+    def connect_message(self, idn_param='IDN', begin_time=None):
+        idn = {'vendor': None, 'model': None,
+               'serial': None, 'fwVersion': None,
+               'swVersion': None, 'kmodVersion': None
+               }
+        idn.update(self.get(idn_param))
+        t = time.time() - (begin_time or self._t0)
 
+        con_msg = ('Connected to: {vendor} {model} '
+                   '(serial:{serial}, fwVersion:{fwVersion} '
+                   'swVersion:{swVersion}, kmodVersion:{kmodVersion}) '
+                   'in {t:.2f}s'.format(t=t, **idn))
+        print(con_msg)
 
 
 
