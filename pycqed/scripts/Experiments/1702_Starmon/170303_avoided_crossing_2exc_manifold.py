@@ -9,8 +9,8 @@ QR_LO.pulsemod_state('off')
 
 
 QR.cw_source.on()
-freqs = np.arange(4.9e9, 5.e9, 1e6)
-dac_voltages= np.arange(520, 540, .5)
+freqs = np.arange(4.8e9, 5.1e9, .3e6)
+dac_voltages= np.arange(505, 540, .5)
 
 MC.set_sweep_function(QR.cw_source.frequency)
 MC.set_sweep_points(freqs)
