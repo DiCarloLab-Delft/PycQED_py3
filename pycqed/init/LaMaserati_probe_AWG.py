@@ -15,8 +15,10 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import pylab
 
+
 # Qcodes
 import qcodes as qc
+from qcodes.utils import validators as vals
 # currently on a Windows machine
 # qc.set_mp_method('spawn')  # force Windows behavior on mac
 # qc.show_subprocess_widget()
@@ -81,7 +83,7 @@ import pycqed.scripts.personal_folders.Niels.two_qubit_readout_analysis as Niels
 
 # for flux pulses
 from pycqed.scripts.Experiments.Five_Qubits import cost_functions_Leo_optimization as cl
-import pycqed.instrument_drivers.meta_instrument.kernel_object as k_obj
+
 from pycqed.measurement.pulse_sequences import fluxing_sequences as fsqs
 from pycqed.measurement.pulse_sequences import multi_qubit_tek_seq_elts as mqs
 # Initializing instruments
@@ -112,15 +114,15 @@ AWG.timeout(180)  # timeout long for uploading wait.
 # station.add_component(AWG520)
 # CBox = qcb.QuTech_ControlBox('CBox', address='Com5', run_tests=False, server_name=None)
 # station.add_component(CBox)
-IVVI = iv.IVVI('IVVI', address='COM8', numdacs=16, server_name=None)
+IVVI = iv.IVVI('IVVI', address='COM8', numdacs=16, safe_version=False)
 station.add_component(IVVI)
 
 
-from pycqed.instrument_drivers.meta_instrument.flux_control import Flux_Control
+from pycqed.instrument_drivers.meta_instrument.Flux_Control import Flux_Control
 FC = Flux_Control('FC', 2, IVVI.name)
 station.add_component(FC)
 # gen.load_settings_onto_instrument(FC)
-dac_offsets= np.array([75, -16.59])
+dac_offsets = np.array([75, -16.59])
 
 dac_mapping = np.array([2, 1])
 A = np.array([[-1.71408478e-13,   1.00000000e+00],
@@ -163,9 +165,27 @@ LutMan = lm.QuTech_ControlBox_LookuptableManager('LutMan', CBox=None,
 MC = mc.MeasurementControl('MC')
 station.add_component(MC)
 # HS = None
+
+#####################################
+# Qubit objects
+#####################################
+
+import pycqed.instrument_drivers.meta_instrument.kernel_object as k_obj
+k0 = k_obj.Distortion(name='k0')
+station.add_component(k0)
+k0.channel(2)
+k0.kernel_dir_path(
+    r'D:\Experiments\1702_Starmon\kernels')
+k0.kernel_list(['id_kernel.txt'])
+
+
+from pycqed.instrument_drivers.meta_instrument import device_object as do
+Starmon = do.DeviceObject('Starmon')
+station.add_component(Starmon)
+
 import pycqed.instrument_drivers.meta_instrument.qubit_objects.Tektronix_driven_transmon as qbt
-QL = qbt.Tektronix_driven_transmon('QL', LO=LO, cw_source=QR_LO,
-                                   td_source=QL_LO,
+QL = qbt.Tektronix_driven_transmon('QL', LO=LO, cw_source=QL_LO,
+                                   td_source=QR_LO,
                                    IVVI=IVVI, rf_RO_source=RF,
                                    AWG=AWG,
                                    heterodyne_instr=HS,
@@ -182,6 +202,50 @@ QR = qbt.Tektronix_driven_transmon('QR', LO=LO, cw_source=QL_LO,
                                    MC=MC,
                                    server_name=None)
 station.add_component(QR)
+
+QR.add_operation('SWAP')
+QR.add_pulse_parameter('SWAP', 'fluxing_operation_type', 'operation_type',
+                       initial_value='Flux', vals=vals.Strings())
+QR.add_pulse_parameter('SWAP', 'SWAP_pulse_amp', 'amplitude',
+                       initial_value=0.5)
+QR.link_param_to_operation('SWAP', 'fluxing_channel', 'channel')
+
+QR.add_pulse_parameter('SWAP', 'SWAP_pulse_type', 'pulse_type',
+                       initial_value='SquareFluxPulse', vals=vals.Strings())
+QR.add_pulse_parameter('SWAP', 'SWAP_refpoint',
+                       'refpoint', 'end', vals=vals.Strings())
+QR.link_param_to_operation('SWAP', 'SWAP_amp', 'SWAP_amp')
+QR.add_pulse_parameter('SWAP', 'SWAP_pulse_buffer',
+                       'pulse_buffer', 0e-9)
+
+QR.link_param_to_operation('SWAP', 'SWAP_time', 'square_pulse_length')
+
+
+QR.add_pulse_parameter('SWAP', 'SWAP_pulse_delay',
+                       'pulse_delay', 0e-9)
+
+gen.load_settings_onto_instrument(QR)
+k0.kernel_list(['RT_Compiled_170308.txt'])
+QR.dist_dict({'ch_list': ['ch2'], 'ch2': k0.kernel()})
+
+k0.decay_amp_1(-1.)
+k0.decay_tau_1(1.)
+QR.dist_dict({'ch_list': ['ch2'], 'ch2': k0.kernel()})
+
+QR.dac_channel(1)
+
+
+Starmon.add_qubits([QL, QR])
+gen.load_settings_onto_instrument(Starmon)
+
+gen.load_settings_onto_instrument(QL)
+station.sequencer_config = Starmon.get_operation_dict()['sequencer_config']
+
+QL.RO_acq_weight_function_I(0)
+QL.RO_acq_weight_function_Q(0)
+QR.RO_acq_weight_function_I(1)
+QR.RO_acq_weight_function_Q(1)
+
 
 MC.station = station
 station.MC = MC
@@ -249,15 +313,6 @@ def print_instr_params(instr):
 # cfct.set_AWG_limits(station,1.7)
 
 if UHFQC:
-    def switch_to_pulsed_RO_CBox(qubit):
-        UHFQC_1.awg_sequence_acquisition()
-        qubit.RO_pulse_type('Gated_MW_RO_pulse')
-        qubit.RO_acq_marker_delay(155e-9)
-        qubit.acquisition_instr('CBox')
-        qubit.RO_acq_marker_channel('ch3_marker1')
-        qubit.RO_acq_weight_function_I(0)
-        qubit.RO_acq_weight_function_Q(1)
-
     def switch_to_pulsed_RO_UHFQC(qubit):
         UHFQC_1.awg_sequence_acquisition()
         qubit.RO_pulse_type('Gated_MW_RO_pulse')
@@ -272,7 +327,8 @@ if UHFQC:
                                                        RO_amp=qubit.RO_amp(),
                                                        RO_pulse_length=qubit.RO_pulse_length(),
                                                        acquisition_delay=270e-9)
-        qubit.RO_pulse_type('MW_IQmod_pulse_UHFQC')  # changed to satisfy validator
+        # changed to satisfy validator
+        qubit.RO_pulse_type('MW_IQmod_pulse_UHFQC')
         qubit.RO_acq_marker_delay(-165e-9)
         qubit.acquisition_instr('UHFQC_1')
         qubit.RO_acq_marker_channel('ch3_marker2')
@@ -371,35 +427,5 @@ def reload_mod_stuff():
 reload_mod_stuff()
 
 
-################################
-# Reloading qubit snippet
-################################
-import qcodes as qc
-station = qc.station
-from qcodes.utils import validators as vals
-from pycqed.instrument_drivers.meta_instrument.qubit_objects import qubit_object as qo
-from pycqed.instrument_drivers.meta_instrument.qubit_objects import CBox_driven_transmon as cbt
-from pycqed.instrument_drivers.meta_instrument.qubit_objects import Tektronix_driven_transmon as qbt
-
-QL.RO_acq_weight_function_I(0)
-QL.RO_acq_weight_function_Q(0)
-QR.RO_acq_weight_function_I(1)
-QR.RO_acq_weight_function_Q(1)
-
-
-gen.load_settings_onto_instrument(QL)
-gen.load_settings_onto_instrument(QR)
-
-
-station.sequencer_config = {'RO_fixed_point': 1e-6,
-                                'Buffer_Flux_Flux': 0,
-                                'Buffer_Flux_MW': 0,
-                                'Buffer_Flux_RO': 0,
-                                'Buffer_MW_Flux': 0,
-                                'Buffer_MW_MW': 0,
-                                'Buffer_MW_RO': 0,
-                                'Buffer_RO_Flux': 0,
-                                'Buffer_RO_MW': 0,
-                                'Buffer_RO_RO': 0,
-                                'Flux_comp_dead_time': 3e-6,
-                                }
+switch_to_pulsed_RO_UHFQC(QL)
+switch_to_pulsed_RO_UHFQC(QR)
