@@ -5142,7 +5142,7 @@ class Chevron_2D(object):
         ax = fig.add_subplot(111)
         cmin, cmax = 0, 1
         fig_clim = [cmin, cmax]
-        out = flex_colormesh_plot_vs_xy(ax=ax, clim=fig_clim, cmap='viridis',
+        out = pl_tools.flex_colormesh_plot_vs_xy(ax=ax, clim=fig_clim, cmap='viridis',
                                         xvals=plot_times,
                                         yvals=plot_x,
                                         zvals=result)
