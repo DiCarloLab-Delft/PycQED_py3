@@ -334,9 +334,9 @@ class SquareFluxPulse(Pulse):
 
     def chan_wf(self, chan, tvals):
         sq_pulse = np.ones(
-            round((self.square_pulse_length)*1e9)) * self.amplitude
-        buff_pulse = np.zeros(round((self.length-self.square_pulse_length)*1e9))
-        #using round instead of int to avoid crashing
+            int(round((self.square_pulse_length)*1e9))) * self.amplitude
+        buff_pulse = np.zeros(int(
+            round((self.length-self.square_pulse_length)*1e9)))
         return np.concatenate([sq_pulse, buff_pulse])
 
 
