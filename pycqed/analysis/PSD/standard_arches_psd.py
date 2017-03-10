@@ -33,6 +33,8 @@ def PSD_Analysis(table, freq_resonator=None, Qc=None, chi_shift=None, path=None)
     """
     dac, freq, T1, Tramsey, Techo, exclusion_mask = table
 
+    exclusion_mask = np.array(exclusion_mask, dtype=np.bool)
+
     fit_result_arch = fit_frequencies(dac, freq)
 
     # convert dac in flux as unit of Phi_0
@@ -117,7 +119,7 @@ def prepare_input_table(dac, frequency, T1, T2_star, T2_echo,
     assert(len(T2_star) == len(T2_star_mask))
     assert(len(T2_echo) == len(T2_echo_mask))
 
-    table = np.ones((8, len(dac)))
+    table = np.ones((6, len(dac)))
     table = table * np.nan
     table[0, :] = dac
     table[1, :len(frequency)] = frequency
