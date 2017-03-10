@@ -102,9 +102,9 @@ def prepare_input_table(dac, frequency, T1, T2_star, T2_echo,
     If sizes are different, it adds nans on the end.
     """
     assert(len(dac) == len(frequency))
-    assert(len(dac) >= len(T1))
-    assert(len(dac) >= len(T2_star))
-    assert(len(dac) >= len(T2_echo))
+    assert(len(dac) == len(T1))
+    assert(len(dac) == len(T2_star))
+    assert(len(dac) == len(T2_echo))
 
     if T1_mask is None:
         T1_mask = np.zeros(len(T1), dtype=np.bool)
@@ -117,7 +117,7 @@ def prepare_input_table(dac, frequency, T1, T2_star, T2_echo,
     assert(len(T2_star) == len(T2_star_mask))
     assert(len(T2_echo) == len(T2_echo_mask))
 
-    table = np.ones((8, len(dac)))
+    table = np.ones((6, len(dac)))
     table = table * np.nan
     table[0, :] = dac
     table[1, :len(frequency)] = frequency
