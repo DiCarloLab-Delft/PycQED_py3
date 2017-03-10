@@ -106,6 +106,7 @@ def prepare_input_table(dac, frequency, T1, T2_star, T2_echo,
     assert(len(dac) == len(T2_star))
     assert(len(dac) == len(T2_echo))
 
+
     if T1_mask is None:
         T1_mask = np.zeros(len(T1), dtype=np.bool)
     if T2_star_mask is None:
