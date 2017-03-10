@@ -32,6 +32,7 @@ def PSD_Analysis(table, freq_resonator=None, Qc=None, chi_shift=None, path=None)
 
     """
     dac, freq, T1, Tramsey, Techo, exclusion_mask = table
+    exclusion_mask = np.array(exclusion_mask, dtype=bool)
 
     fit_result_arch = fit_frequencies(dac, freq)
 
@@ -48,7 +49,6 @@ def PSD_Analysis(table, freq_resonator=None, Qc=None, chi_shift=None, path=None)
     # Pure dephasing times
     # Calculate pure dephasings
     Gamma_1 = 1.0/T1[~exclusion_mask]
-
     Gamma_ramsey = 1.0/Tramsey[~exclusion_mask]
     Gamma_echo = 1.0/Techo[~exclusion_mask]
 
@@ -108,11 +108,11 @@ def prepare_input_table(dac, frequency, T1, T2_star, T2_echo,
 
 
     if T1_mask is None:
-        T1_mask = np.zeros(len(T1), dtype=np.bool)
+        T1_mask = np.zeros(len(T1), dtype=bool)
     if T2_star_mask is None:
-        T2_star_mask = np.zeros(len(T2_star), dtype=np.bool)
+        T2_star_mask = np.zeros(len(T2_star), dtype=bool)
     if T2_echo_mask is None:
-        T2_echo_mask = np.zeros(len(T2_echo), dtype=np.bool)
+        T2_echo_mask = np.zeros(len(T2_echo), dtype=bool)
 
     assert(len(T1) == len(T1_mask))
     assert(len(T2_star) == len(T2_star_mask))
@@ -214,8 +214,9 @@ def plot_coherence_times(flux, freq, sensitivity,
 
     f.tight_layout()
     figname = 'Coherence_times.PNG'
-    savename = os.path.abspath(os.path.join(path, figname))
-    f.savefig(savename, format='PNG', dpi=450)
+    if path is not None:
+        savename = os.path.abspath(os.path.join(path, figname))
+        f.savefig(savename, format='PNG', dpi=450)
 
 # ax[0].set_ylim([0,40])
 
@@ -248,8 +249,9 @@ def plot_ratios(flux, freq, sensitivity,
 
     f.tight_layout()
     figname = 'Gamma_ratios.PNG'
-    savename = os.path.abspath(os.path.join(path, figname))
-    f.savefig(savename, format='PNG', dpi=450)
+    if path is not None:
+        savename = os.path.abspath(os.path.join(path, figname))
+        f.savefig(savename, format='PNG', dpi=450)
 
 
 def residual_Gamma(pars_dict, sensitivity, Gamma_phi_ramsey, Gamma_phi_echo):
@@ -311,8 +313,9 @@ def plot_gamma_fit(sensitivity, Gamma_phi_ramsey, Gamma_phi_echo,
     ax.set_xlabel(r'$|\partial\nu/\partial\Phi|$ (GHz/$\Phi_0$)', size=16)
     ax.set_ylabel('$\Gamma$ (1/s)', size=16)
     figname = 'Gamma_Fit.PNG'
-    savename = os.path.abspath(os.path.join(path, figname))
-    f.savefig(savename, format='PNG', dpi=450)
+    if path is not None:
+        savename = os.path.abspath(os.path.join(path, figname))
+        f.savefig(savename, format='PNG', dpi=450)
 
 
 """

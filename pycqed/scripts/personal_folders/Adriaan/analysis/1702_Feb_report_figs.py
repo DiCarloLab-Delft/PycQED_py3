@@ -120,3 +120,48 @@ std_psd.PSD_Analysis(PSD_input_table)
 
 # std_psd.prepare_input_table(dac, frequency=)
 # std_psd.PSD_Analysis(
+
+
+
+filter_mask= [True]*len(flux)
+# filter_mask = dm_tools.get_outliers(T1s, .1e-6)
+filter_mask=np.where(T1s_std>2e-6, False, filter_mask)
+filter_mask=np.where(T2s_std>2e-6, False, filter_mask)
+filter_mask=np.where(T1s>30e-6, False, filter_mask)
+filter_mask=np.where(flux<-350, False, filter_mask)
+filter_mask=np.where(flux>350, False, filter_mask)
+filter_mask
+
+
+
+flux_filt = flux[filter_mask]
+freqs_filt = freqs[filter_mask]
+T1s_filt = T1s[filter_mask]
+T1s_std_filt = T1s_std[filter_mask]
+T2e_filt =T2e[filter_mask]
+T2e_std_filt = T2e_std[filter_mask]
+T2s_filt = T2s[filter_mask]
+T2s_std_filt = T2s_std[filter_mask]
+
+# Plot unfiltered
+f, ax = plt.subplots()
+ax.errorbar(flux_filt, T1s_filt*1e6, T1s_std_filt*1e6,
+            marker='o', linestyle='',c='C3',
+            label=r'$T_1$', markerfacecolor='none')
+ax.errorbar(flux_filt, T2e_filt*1e6, T2e_std_filt*1e6,
+            marker='o', linestyle = '', c='C2',
+            label=r'$T_2$-echo', markerfacecolor='none')
+ax.errorbar(flux_filt, T2s_filt*1e6, T2s_std_filt*1e6,
+            marker='o', linestyle = '',c='C0',
+            label=r'$T_2^\star$', markerfacecolor='none')
+# ax.set_ylim(0, 40)
+ax.set_xlabel('Dac (mV)')
+ax.set_ylabel(r'$\tau$ ($\mu$s)')
+
+
+PSD_input_table = std_psd.prepare_input_table(flux_filt, freqs_filt,
+                                              T1s_filt, T2s_filt, T2e_filt)
+
+
+std_psd.PSD_Analysis(PSD_input_table, path='',
+                     freq_resonator=7.08e9,Qc =8200, chi_shift=0.1e6)
