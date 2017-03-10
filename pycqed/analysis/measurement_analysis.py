@@ -3708,7 +3708,7 @@ class Homodyne_Analysis(MeasurementAnalysis):
         elif fitting_model == 'lorentzian':
             LorentzianModel = fit_mods.LorentzianModel
 
-            kappa_guess = 0.005
+            kappa_guess = 2.5e6
 
             amplitude_guess = amplitude_factor * np.pi*kappa_guess * abs(
                 max(self.measured_powers)-min(self.measured_powers))
@@ -3727,12 +3727,12 @@ class Homodyne_Analysis(MeasurementAnalysis):
                                            min=0,
                                            vary=True)
             LorentzianModel.set_param_hint('Q',
-                                           expr='f0/kappa',
+                                           expr='0.5*f0/kappa',
                                            vary=False)
             self.params = LorentzianModel.make_params()
 
             fit_res = LorentzianModel.fit(data=self.measured_powers,
-                                          f=self.sweep_points*1.e9,
+                                          f=self.sweep_points,
                                           params=self.params)
         else:
             raise ValueError('fitting model "{}" not recognized'.format(
@@ -3746,14 +3746,21 @@ class Homodyne_Analysis(MeasurementAnalysis):
             print(lmfit.fit_report(fit_res))
 
         fig, ax = self.default_ax()
-        textstr = '$f_{\mathrm{center}}$ = %.4f $\pm$ (%.3g) GHz' % (
-            fit_res.params['f0'].value, fit_res.params['f0'].stderr) + '\n' \
-            '$Qc$ = %.1f $\pm$ (%.1f)' % (fit_res.params['Qc'].value, fit_res.params['Qc'].stderr) + '\n' \
-            '$Qi$ = %.1f $\pm$ (%.1f)' % (
-                fit_res.params['Qi'].value, fit_res.params['Qi'].stderr)
 
-        # textstr = '$f_{\mathrm{center}}$ = %.4f $\pm$ (%.3g) GHz' % (
-        #     fit_res.params['f0'].value, fit_res.params['f0'].stderr)
+        if 'hanger' in fitting_model:
+            textstr = '$f_{\mathrm{center}}$ = %.4f $\pm$ (%.3g) GHz' % (
+                fit_res.params['f0'].value, fit_res.params['f0'].stderr) + '\n' \
+                '$Qc$ = %.1f $\pm$ (%.1f)' % (fit_res.params['Qc'].value, fit_res.params['Qc'].stderr) + '\n' \
+                '$Qi$ = %.1f $\pm$ (%.1f)' % (
+                    fit_res.params['Qi'].value, fit_res.params['Qi'].stderr)
+
+        elif fitting_model == 'lorentzian':
+            textstr = '$f_{{\mathrm{{center}}}}$ = {:.4f} $\pm$ ({:.3g}) GHz\n' \
+                      '$Q$ = {:.1f} $\pm$ ({:.1f})'.format(
+                          fit_res.params['f0'].value*1e-9,
+                          fit_res.params['f0'].stderr*1e-9,
+                          fit_res.params['Q'].value,
+                          fit_res.params['Q'].stderr)
 
         ax.text(0.05, 0.95, textstr, transform=ax.transAxes, fontsize=11,
                 verticalalignment='top', bbox=self.box_props)
@@ -3806,7 +3813,7 @@ class Homodyne_Analysis(MeasurementAnalysis):
         else:
             ax.plot(self.sweep_points, fit_res.best_fit, 'r-')
             f0 = self.fit_results.values['f0']
-            plt.plot(f0*1e9, fit_res.eval(f=f0*1e9), 'o', ms=8)
+            plt.plot(f0, fit_res.eval(f=f0), 'o', ms=8)
 
             # save figure
             self.save_fig(fig, xlabel=self.xlabel, ylabel='Mag', **kw)
@@ -3818,6 +3825,57 @@ class Homodyne_Analysis(MeasurementAnalysis):
             self.data_file.close()
         return fit_res
 
+
+class Acquisition_Delay_Analysis(MeasurementAnalysis):
+    def __init__(self, label='AD', **kw):
+        kw['label'] = label
+        kw['h5mode'] = 'r+'
+        super().__init__(**kw)
+
+    def run_default_analysis(self, print_fit_results=False, window_len=11,
+                             print_results=False, close_file=False, **kw):
+        super(self.__class__, self).run_default_analysis(
+            close_file=False, **kw)
+        self.add_analysis_datagroup_to_file()
+
+        # smooth the results
+        self.y_smoothed = a_tools.smooth(self.measured_values[0],
+                                         window_len=window_len)
+        max_index = np.argmax(self.y_smoothed)
+        self.max_delay = self.sweep_points[max_index]
+
+        grp_name = "Maximum Analysis: Acquisition Delay"
+        if grp_name not in self.analysis_group:
+            grp = self.analysis_group.create_group(grp_name)
+        else:
+            grp = self.analysis_group[grp_name]
+        grp.attrs.create(name='max_delay', data=self.max_delay)
+        grp.attrs.create(name='window_length', data=window_len)
+
+        textstr = "optimal delay = {:.0f} ns".format(self.max_delay*1e9)
+
+        if print_results:
+            print(textstr)
+
+        fig, ax = self.default_ax()
+        ax.text(0.05, 0.95, textstr, transform=ax.transAxes, fontsize=11,
+                verticalalignment='top', bbox=self.box_props)
+
+        self.plot_results_vs_sweepparam(x=self.sweep_points*1e9,
+                                        y=self.measured_values[0],
+                                        fig=fig, ax=ax,
+                                        xlabel='Acquisition delay (ns)',
+                                        ylabel='Signal amplitude (arb. units)',
+                                        save=False)
+
+        ax.plot(self.sweep_points*1e9, self.y_smoothed, 'r-')
+        ax.plot((self.max_delay*1e9, self.max_delay*1e9), ax.get_ylim(), 'g-')
+        self.save_fig(fig, xlabel='delay', ylabel='amplitude', **kw)
+
+        if close_file:
+            self.data_file.close()
+
+        return self.max_delay
 
 class Hanger_Analysis_CosBackground(MeasurementAnalysis):
 
@@ -3981,7 +4039,7 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
 
             else:  # Otherwise take center of range
                 f0 = np.median(self.sweep_points)
-                kappa_guess = 0.005
+                kappa_guess = 0.005*1e9
 
             amplitude_guess = np.pi * kappa_guess * \
                 abs(max(self.data_dist) - min(self.data_dist))
@@ -4007,7 +4065,7 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
             self.params = LorentzianModel.make_params()
 
             fit_res = LorentzianModel.fit(data=self.data_dist,
-                                          f=self.sweep_points*1.e9,
+                                          f=self.sweep_points,
                                           params=self.params)
             print('min ampl', 2*np.var(self.data_dist))
             return fit_res
@@ -4042,8 +4100,8 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
         for k in range(len(self.measured_values)):
             ax = axes[k]
             textstr = '$f_{\mathrm{center}}$ = %.5g $\pm$ (%.3g) GHz\n' % (
-                fit_res.params['f0'].value,
-                fit_res.params['f0'].stderr)
+                fit_res.params['f0'].value*1e-9,
+                fit_res.params['f0'].stderr*1e-9)
             ax.text(0.05, 0.95, textstr, transform=ax.transAxes,
                     fontsize=11, verticalalignment='top', bbox=self.box_props)
 
@@ -5228,6 +5286,10 @@ class Chevron_2D(object):
 class DoubleFrequency(MeasurementAnalysis):
 
     def __init__(self, auto=True, label='Ramsey', timestamp=None, **kw):
+        kw['label'] = label
+        kw['auto'] = auto
+        kw['timestamp'] = timestamp
+        kw['h5mode'] = 'r+'
         super().__init__(**kw)
 
     def run_default_analysis(self, **kw):
