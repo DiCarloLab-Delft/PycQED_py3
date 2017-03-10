@@ -1069,5 +1069,6 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
 
     def get_operation_dict(self, operation_dict={}):
         operation_dict = super().get_operation_dict(operation_dict)
+        operation_dict['SpecPulse '+self.name] = self.get_spec_pars()[0]
         self.get_pulse_dict(operation_dict)
         return operation_dict

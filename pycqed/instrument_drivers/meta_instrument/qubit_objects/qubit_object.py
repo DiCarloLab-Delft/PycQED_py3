@@ -110,6 +110,13 @@ class Qubit(Instrument):
                                 argument_name):
         """
         Links an existing param to an operation for use in the operation dict.
+
+        An example of where to use this would be the flux_channel.
+        Only one parameter is specified but it is relevant for multiple flux
+        pulses. You don't want a different parameter that specifies the channel
+        for the iSWAP and the CZ gate. This can be solved by linking them to
+        your operation.
+
         Args:
             operation_name (str): The operation of which this parameter is an
                 argument. e.g. mw_control or CZ
