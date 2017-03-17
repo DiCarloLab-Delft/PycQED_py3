@@ -38,8 +38,9 @@ class HeterodyneInstrument(Instrument):
                  single_sideband_demod=False, **kw):
 
         self.RF = RF
+        self.LO = LO
 
-        self.common_init(name, LO, AWG, acquisition_instr,
+        self.common_init(name, AWG, acquisition_instr,
                          single_sideband_demod, **kw)
 
         self.add_parameter('RF_power', label='RF power',
@@ -52,12 +53,11 @@ class HeterodyneInstrument(Instrument):
         self.acquisition_instr_controller(acquisition_instr_controller)
         self._RF_power = None
 
-    def common_init(self, name, LO, AWG, acquisition_instr='CBox',
+    def common_init(self, name, AWG, acquisition_instr='CBox',
                     single_sideband_demod=False, **kw):
         logging.info(__name__ + ' : Initializing instrument')
         Instrument.__init__(self, name, **kw)
 
-        self.LO = LO
         self.AWG = AWG
         self.add_parameter('frequency', label='Heterodyne frequency',
                            unit='Hz', vals=vals.Numbers(9e3, 40e9),
@@ -116,7 +116,7 @@ class HeterodyneInstrument(Instrument):
 
 
     def prepare(self, get_t_base=True):
-        if self.RF is not None:
+        if hasattr(self, 'RF'):
             self.RF.power(self.RF_power())
 
         if 'CBox' in self.acquisition_instr():
@@ -197,6 +197,9 @@ class HeterodyneInstrument(Instrument):
         self._acquisition_instr.awgs_0_userregs_1(0)
         self._acquisition_instr.awgs_0_single(1)
 
+        self._acquisition_instr.single_acquisition_initialize(channels=[0,1],
+                                                              mode='rl')
+
     def prepare_ATS(self, get_t_base=True):
         if self.AWG != None:
             if (self._awg_seq_filename not in self.AWG.setup_filename() or
@@ -265,23 +268,13 @@ class HeterodyneInstrument(Instrument):
 
     def probe_UHFQC(self):
         if self._awg_seq_parameters_changed or \
-           self._UHFQC_awg_parameters_changed:
+                self._UHFQC_awg_parameters_changed:
             self.prepare()
 
-        self._acquisition_instr.awgs_0_enable(1)
+        data = self._acquisition_instr.single_acquisition(
+            2, acquisition_time=0.010, timeout=1, channels={0, 1}, mode='rl')
 
-        # why do we need this?
-        try:
-            self._acquisition_instr.awgs_0_enable()
-        except:
-            self._acquisition_instr.awgs_0_enable()
-
-        while self._acquisition_instr.awgs_0_enable() == 1:
-            time.sleep(0.01)
-        data = ['', '']
-        data[0] = self._acquisition_instr.quex_rl_data_0()[0]['vector'][:1]
-        data[1] = self._acquisition_instr.quex_rl_data_1()[0]['vector'][:1]
-        return data[0]+1j*data[1]
+        return data[0][:1] + 1j*data[1][:1]
 
     def probe_ATS(self):
         t0 = time.time()
@@ -291,6 +284,8 @@ class HeterodyneInstrument(Instrument):
         return dat
 
     def finish(self):
+        if 'UHFQC' in self.acquisition_instr():
+            self._acquisition_instr.single_acquisition_finalize()
         self.off()
         self.AWG.stop()
 
@@ -453,10 +448,13 @@ class LO_modulated_Heterodyne(HeterodyneInstrument):
     """
     shared_kwargs = ['RF', 'LO', 'AWG']
 
-    def __init__(self, name, LO, AWG, acquisition_instr='CBox',
+    def __init__(self, name, UC_LO, DC_LO, AWG, acquisition_instr='CBox',
                  single_sideband_demod=False, **kw):
 
-        self.common_init(name, LO, AWG, acquisition_instr,
+        self.UC_LO = UC_LO
+        self.DC_LO = DC_LO
+
+        self.common_init(name, AWG, acquisition_instr,
                          single_sideband_demod, **kw)
 
         self.add_parameter('mod_amp', label='Modulation amplitude',
@@ -546,17 +544,20 @@ class LO_modulated_Heterodyne(HeterodyneInstrument):
 
         # this sets the result to integration and rotation outcome
         self._acquisition_instr.quex_rl_source(2)
-        self._acquisition_instr.quex_rl_length(1)
+        self._acquisition_instr.quex_rl_length(2)
         self._acquisition_instr.quex_rl_avgcnt(
             int(np.log2(self.nr_averages())))
         self._acquisition_instr.quex_wint_length(int(self.RO_length()*1.8e9))
         # The AWG program uses userregs/0 to define the number of
         # iterations in the loop
-        self._acquisition_instr.awgs_0_userregs_0(int(self.nr_averages()))
+        self._acquisition_instr.awgs_0_userregs_0(2*int(self.nr_averages()))
         self._acquisition_instr.awgs_0_userregs_1(0) # 0 for rl, 1 for iavg
         self._acquisition_instr.awgs_0_userregs_2(
             int(self.acquisition_delay()*1.8e9/8))
         self._acquisition_instr.awgs_0_single(1)
+
+        self._acquisition_instr.single_acquisition_initialize(channels={0, 1},
+                                                              mode='rl')
 
     def probe_CBox(self):
         if self._awg_seq_parameters_changed:
@@ -570,12 +571,18 @@ class LO_modulated_Heterodyne(HeterodyneInstrument):
         self._frequency = val
         # this is the definition agreed upon in issue 131
         # AWG modulation ensures that signal ends up at RF-frequency
-        self.LO.frequency(val-self._f_RO_mod)
+        self.UC_LO.frequency(val-self._f_RO_mod)
+        self.DC_LO.frequency(val-self._f_RO_mod)
+        #time.sleep(1)
 
     def _get_frequency(self):
-        freq = self.LO.frequency() + self._f_RO_mod
-        if abs(self._frequency - freq) > self._eps:
-            logging.warning('Homodyne frequency does not match LO frequency'
+        freq1 = self.DC_LO.frequency() + self._f_RO_mod
+        freq2 = self.UC_LO.frequency() + self._f_RO_mod
+        if abs(self._frequency - freq1) > self._eps:
+            logging.warning('Homodyne frequency does not match DC LO frequency'
+                            ' + RO_mod frequency')
+        if abs(self._frequency - freq2) > self._eps:
+            logging.warning('Homodyne frequency does not match UC LO frequency'
                             ' + RO_mod frequency')
         return self._frequency
 
@@ -613,15 +620,29 @@ class LO_modulated_Heterodyne(HeterodyneInstrument):
         return self._acquisition_delay
 
     def on(self):
-        if self.LO.status().startswith('Off'):
-            self.LO.on()
+        wait = False
+        if self.DC_LO.status().startswith('Off') or \
+                self.UC_LO.status().startswith('Off'):
+            wait = True
+        self.UC_LO.on()
+        self.DC_LO.on()
+        if wait:
             time.sleep(1.0)
 
     def off(self):
-        self.LO.off()
+        self.UC_LO.off()
+        self.DC_LO.off()
 
     def _get_status(self):
-        return self.LO.get('status')
+        if (self.UC_LO.status().startswith('On') and
+                self.DC_LO.status().startswith('On')):
+            return 'On'
+        elif (self.UC_LO.status().startswith('Off') and
+                  self.DC_LO.status().startswith('Off')):
+            return 'Off'
+        else:
+            return 'UC LO: {}, DC LO: {}'.format(self.UC_LO.status(),
+                                                 self.DC_LO.status())
 
     def _set_I_channel(self, channel):
         if channel != self._I_channel and \

@@ -325,15 +325,22 @@ class UHFQC(Instrument):
         self._daq.setInt('/' + self._device + '/awgs/0/single', 1)
         self._daq.setInt(enable_path, 1)
 
+        if self.single_acquisition_trigger is not None:
+            self.single_acquisition_trigger.start()
+
         # Wait for the AWG to finish
         gotit = False
         accumulated_time = 0
         while not gotit and accumulated_time < timeout:
             dataset = self._daq.poll(acquisition_time, 1, 4, True)
+            #print(dataset)
             if enable_path in dataset and dataset[enable_path]['value'][0] == 0:
                 gotit = True
             else:
                 accumulated_time += acquisition_time
+
+        if self.single_acquisition_trigger is not None:
+            self.single_acquisition_trigger.stop()
 
         if not gotit:
             print("Error: AWG did not finish in time!")
@@ -353,7 +360,7 @@ class UHFQC(Instrument):
         if not all(gotem):
             print("Error: Didn't get all results!")
             for n, c in enumerate(channels):
-                print("    : Channel {}: Got {} of {} samples", c, len(data[c]), samples)
+                print("    : Channel {}: Got {} of {} samples".format(c, len(data[c]), samples))
             return None
 
         # print("data type {}".format(type(data)))
@@ -365,6 +372,9 @@ class UHFQC(Instrument):
         # Start acquisition
         self._daq.asyncSetInt('/' + self._device + '/awgs/0/single', 1)
         self._daq.asyncSetInt('/' + self._device + '/awgs/0/enable', 1)
+
+        if self.single_acquisition_trigger is not None:
+            self.single_acquisition_trigger.start()
 
         # Acquire data
         gotem = [False]*len(self.single_acquisition_paths)
@@ -384,10 +394,13 @@ class UHFQC(Instrument):
                             gotem[n] = True
             accumulated_time += acquisition_time
 
+        if self.single_acquisition_trigger is not None:
+            self.single_acquisition_trigger.stop()
+
         if not all(gotem):
             print("Error: Didn't get all results!")
             for n, c in enumerate(self.single_acquisition_paths):
-                print("    : Channel {}: Got {} of {} samples", n, len(data[n]), samples)
+                print("    : Channel {}: Got {} of {} samples".format(n, len(data[n]), samples))
             return None
 
         return data
@@ -399,7 +412,10 @@ class UHFQC(Instrument):
         else:
             return self.single_acquisition_get(samples, acquisition_time, timeout, channels, mode)
 
-    def single_acquisition_initialize(self, channels=set([0, 1]), mode='rl'):
+    def single_acquisition_initialize(self, channels=set([0, 1]), mode='rl',
+                                      trigger_device=None):
+        self.single_acquisition_trigger = trigger_device
+
         # Define the channels to use
         self.single_acquisition_paths = []
 
@@ -412,19 +428,19 @@ class UHFQC(Instrument):
                 self.single_acquisition_paths.append('/' + self._device + '/quex/iavg/data/{}'.format(c))
             self._daq.subscribe('/' + self._device + '/quex/iavg/data/*')
 
-        self._daq.subscribe('/' + self._device + '/auxins/0/sample')
+        #self._daq.subscribe('/' + self._device + '/auxins/0/sample')
 
         # Enable automatic readout
         self._daq.setInt('/' + self._device + '/quex/rl/readout', 1)
 
         # Generate more dummy data
-        self._daq.setInt('/' + self._device + '/auxins/0/averaging', 2);
+        #self._daq.setInt('/' + self._device + '/auxins/0/averaging', 2);
 
 
     def single_acquisition_finalize(self):
         for p in self.single_acquisition_paths:
             self._daq.unsubscribe(p)
-        self._daq.unsubscribe('/' + self._device + '/auxins/0/sample')
+        #self._daq.unsubscribe('/' + self._device + '/auxins/0/sample')
 
     def create_parameter_files(self):
         #this functions retrieves all possible settable and gettable parameters from the device.
@@ -644,7 +660,6 @@ class UHFQC(Instrument):
         wave_I_string = self.array_to_combined_vector_string(Iwave, "Iwave")
         wave_Q_string = self.array_to_combined_vector_string(Qwave, "Qwave")
         delay_samples = int(acquisition_delay*1.8e9/8)
-        delay_string = '\twait(getUserReg(2));\n'
         self.awgs_0_userregs_2(delay_samples)
 
         preamble="""
@@ -660,13 +675,16 @@ if(getUserReg(1)){
   RO_TRIG=IAVG_TRIG;
 }else{
   RO_TRIG=WINT_TRIG;
-}\n"""
+}
+
+var wait_delay = getUserReg(2);\n"""
 
         loop_start="""
 repeat(loop_cnt) {
 \twaitDigTrigger(1, 0);
 \twaitDigTrigger(1, 1);
-\tplayWave(Iwave,Qwave);\n"""
+\tplayWave(Iwave,Qwave);
+\twait(wait_delay);\n"""
 
 
         end_string="""
@@ -677,7 +695,7 @@ repeat(loop_cnt) {
 wait(300);
 setTrigger(0);"""
 
-        string = preamble+wave_I_string+wave_Q_string+loop_start+delay_string+end_string
+        string = preamble+wave_I_string+wave_Q_string+loop_start+end_string
         self.awg_string(string)
 
     def array_to_combined_vector_string(self, array, name):
@@ -723,10 +741,12 @@ if(getUserReg(1)){
   RO_TRIG=WINT_TRIG;
 }
 
+var wait_delay = getUserReg(2);
+
 repeat(loop_cnt) {
 \twaitDigTrigger(1, 0);
 \twaitDigTrigger(1, 1);\n
-\twait(getUserReg(2));
+\twait(wait_delay);
 \tsetTrigger(WINT_EN +RO_TRIG);
 \tsetTrigger(WINT_EN);
 }

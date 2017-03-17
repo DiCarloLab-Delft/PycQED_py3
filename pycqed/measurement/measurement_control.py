@@ -77,10 +77,10 @@ class MeasurementControl(Instrument):
         # pyqtgraph plotting process is reused for different measurements.
         if self.live_plot_enabled():
             self.main_QtPlot = QtPlot(
-                windowTitle='Main plotmon of {}'.format(self.name),
+                window_title='Main plotmon of {}'.format(self.name),
                 figsize=(600, 400))
             self.secondary_QtPlot = QtPlot(
-                windowTitle='Secondary plotmon of {}'.format(self.name),
+                window_title='Secondary plotmon of {}'.format(self.name),
                 figsize=(600, 400))
 
         self.soft_iteration = 0  # used as a counter for soft_avg

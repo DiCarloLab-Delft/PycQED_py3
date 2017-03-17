@@ -5,6 +5,7 @@ from qcodes.instrument.parameter import ManualParameter
 from qcodes.utils import validators as vals
 
 from pycqed.measurement import detector_functions as det
+from pycqed.measurement import composite_detector_functions as cdet
 from pycqed.measurement import mc_parameter_wrapper as pw
 from pycqed.measurement import awg_sweep_functions as awg_swf
 from pycqed.measurement.pulse_sequences import single_qubit_tek_seq_elts as sq
@@ -17,7 +18,8 @@ class QuDev_transmon(Qubit):
     def __init__(self, name, MC,
                  heterodyne = None, # metainstrument for cw spectroscopy
                  cw_source = None, # MWG for driving the qubit continuously
-                 readout_LO = None, # MWG for down- (and up)converting RO signal
+                 readout_DC_LO = None, # MWG for downconverting RO signal
+                 readout_UC_LO = None, # MWG for upconverting RO signal
                  readout_RF = None, # MWG for driving the readout resonator
                  drive_LO = None,
                  AWG = None,  # for generating IQ modulated drive pulses and
@@ -31,7 +33,8 @@ class QuDev_transmon(Qubit):
         self.cw_source = cw_source
         self.AWG = AWG
         self.UHFQC = UHFQC
-        self.readout_LO = readout_LO
+        self.readout_DC_LO = readout_DC_LO
+        self.readout_UC_LO = readout_UC_LO
         self.readout_RF = readout_RF
         self.drive_LO = drive_LO
 
@@ -174,7 +177,10 @@ class QuDev_transmon(Qubit):
             self.cw_source.power.set(self.spec_pow())
         if self.readout_RF is not None:
             self.readout_RF.pulsemod_state('Off')
-        self.readout_LO.pulsemod_state('Off')
+        if self.readout_DC_LO is not None:
+            self.readout_DC_LO.pulsemod_state('Off')
+        if self.readout_UC_LO is not None:
+            self.readout_UC_LO.pulsemod_state('Off')
 
     def prepare_for_pulsed_spec(self):
         self.heterodyne.auto_seq_loading(False)
@@ -182,10 +188,28 @@ class QuDev_transmon(Qubit):
             self.cw_source.pulsemod_state('On')
             self.cw_source.on()
             self.cw_source.power.set(self.spec_pow())
-        self.readout_RF.pulsemod_state('On')
 
-        #TODO add settings from prepare_for_timedomain?
-
+        if self.f_RO() is None:
+            f_RO = self.f_RO_resonator()
+        else:
+            f_RO = self.f_RO()
+        if self.RO_pulse_type() == 'Gated_MW_RO_pulse':
+            self.readout_RF.frequency(f_RO)
+            self.readout_RF.power(self.RO_pulse_power())
+            self.readout_RF.on()
+            self.UHFQC.awg_sequence_acquisition(acquisition_delay=0)
+        elif self.RO_pulse_type() == 'MW_IQmod_pulse_UHFQC':
+            eval('self.UHFQC.sigouts_{}_offset({})'.format(
+                self.RO_I_channel(), self.RO_I_offset()))
+            eval('self.UHFQC.sigouts_{}_offset({})'.format(
+                self.RO_Q_channel(), self.RO_Q_offset()))
+            self.UHFQC.awg_sequence_acquisition_and_pulse_SSB(
+                f_RO_mod=self.f_RO_mod(), RO_amp=self.RO_amp(),
+                RO_pulse_length=self.RO_pulse_length(),
+                acquisition_delay=0)
+            self.readout_UC_LO.pulsemod_state('Off')
+            self.readout_UC_LO.frequency(f_RO - self.f_RO_mod())
+            self.readout_UC_LO.on()
 
     def prepare_for_timedomain(self):
         # cw source
@@ -211,20 +235,23 @@ class QuDev_transmon(Qubit):
             f_RO = self.f_RO_resonator()
         else:
             f_RO = self.f_RO()
-        self.readout_LO.pulsemod_state('Off')
-        self.readout_LO.frequency(f_RO - self.f_RO_mod())
-        self.readout_LO.on()
+        self.readout_DC_LO.pulsemod_state('Off')
+        self.readout_DC_LO.frequency(f_RO - self.f_RO_mod())
+        self.readout_DC_LO.on()
 
         # readout pulse
         if self.RO_pulse_type() is 'MW_IQmod_pulse_UHFQC':
-            eval('self._acquisition_instr.sigouts_{}_offset({})'.format(
+            eval('self.UHFQC.sigouts_{}_offset({})'.format(
                 self.RO_I_channel(), self.RO_I_offset()))
-            eval('self._acquisition_instr.sigouts_{}_offset({})'.format(
+            eval('self.UHFQC.sigouts_{}_offset({})'.format(
                 self.RO_Q_channel(), self.RO_Q_offset()))
             self.UHFQC.awg_sequence_acquisition_and_pulse_SSB(
                 f_RO_mod=self.f_RO_mod(), RO_amp=self.RO_amp(),
                 RO_pulse_length=self.RO_pulse_length(),
                 acquisition_delay=0)
+            self.readout_UC_LO.pulsemod_state('Off')
+            self.readout_UC_LO.frequency(f_RO - self.f_RO_mod())
+            self.readout_UC_LO.on()
         elif self.RO_pulse_type() is 'Gated_MW_RO_pulse':
             self.readout_RF.pulsemod_state('On')
             self.readout_RF.frequency(f_RO)
@@ -435,7 +462,7 @@ class QuDev_transmon(Qubit):
 
 
     def measure_echo(self, times=None, MC=None, artificial_detuning=None,
-                     upload=True, analyze=True):
+                     upload=True, analyze=True, close_fig=True):
 
         if times is None:
             raise ValueError("Unspecified times for measure_echo")
@@ -456,7 +483,7 @@ class QuDev_transmon(Qubit):
             ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
 
     def measure_allxy(self, double_points=True, MC=None, upload=True,
-                      analyze=True):
+                      analyze=True, close_fig=True):
         self.prepare_for_timedomain()
         if MC is None:
             MC = self.MC
@@ -494,8 +521,55 @@ class QuDev_transmon(Qubit):
         if analyze:
             ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
 
-    def measure_ssro(self):
-        raise NotImplementedError()
+    def calibrate_ssro(self, no_fits=False,
+                       return_detector=False,
+                       MC=None,
+                       analyze=True,
+                       close_fig=True,
+                       verbose=True, SSB=False,
+                       one_weight_function_UHFQC=False,
+                       multiplier=1, nr_shots=4095):
+        """
+        Calibrates the integration weights of the UHFLI for state neasurement.
+        :param no_fits:
+        :param return_detector:
+        :param MC:
+        :param analyze:
+        :param close_fig:
+        :param verbose:
+        :param SSB:
+        :param one_weight_function_UHFQC:
+        :param multiplier:
+        :param nr_shots:
+        :return:
+        """
+        self.prepare_for_timedomain()
+        if MC is None:
+            MC = self.MC
+        d = cdet.SSRO_Fidelity_Detector_Tek(
+            'SSRO'+self.msmt_suffix,
+            analyze=analyze,
+            raw=no_fits,
+            MC=MC,
+            AWG=self.AWG,
+            acquisition_instr=self.UHFQC,
+            pulse_pars=self.get_drive_pars(),
+            RO_pars=self.get_RO_pars(),
+            IF=self.f_RO_mod(),
+            weight_function_I=self.RO_acq_weight_function_I(),
+            weight_function_Q=self.RO_acq_weight_function_Q(),
+            nr_shots=nr_shots,
+            one_weight_function_UHFQC=one_weight_function_UHFQC,
+            optimized_weights=True,
+            integration_length=self.RO_acq_integration_length(),
+            close_fig=close_fig,
+            SSB=SSB,
+            multiplier=multiplier,
+            nr_averages=self.RO_acq_averages())
+        if return_detector:
+            return d
+        d.prepare()
+        d.acquire_data_point()
 
     def find_resonator_frequency(self, update=True, freqs=None, MC=None,
                                  close_fig=True):

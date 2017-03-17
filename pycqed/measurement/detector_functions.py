@@ -1452,34 +1452,18 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         self.cross_talk_suppression = cross_talk_suppression
 
     def get_values(self):
-        self.AWG.stop()
-        self.UHFQC.quex_rl_readout(0) # resets UHFQC internal readout counters
-        self.UHFQC.awgs_0_enable(1)
-        # probing the values to be sure communication is finished before
-        # this way of checking the UHFQC should be OK according to Niels H
-        try:
-            temp = self.UHFQC.awgs_0_enable()
-        except:
-            temp = self.UHFQC.awgs_0_enable()
-        del temp
-        # starting AWG
-        if self.AWG is not None:
-            self.AWG.start()
 
-        while self.UHFQC.awgs_0_enable() == 1:
-            time.sleep(0.01)
-        data = ['']*len(self.channels)
-        for i, channel in enumerate(self.channels):
-            # FIXME: better to use dataset = self.UHFQC.get('quex_rl_data_{}'.format(channel))
-            dataset = eval("self.UHFQC.quex_rl_data_{}()".format(channel))
-            data[i] = dataset[0]['vector']/self.nr_averages
-            if self.cross_talk_suppression:
-                data[i]=data[i]-eval("self.UHFQC.quex_trans_offset_weightfunction_{}()".format(channel))
+        datatemp = self.UHFQC.single_acquisition(samples=self.nr_sweep_points,
+                                                 acquisition_time=0.010,
+                                                 timeout=1000, mode='rl',
+                                                 channels=self.channels)
+        data = [datatemp[channel] for channel in self.channels]
 
-        # data = self.UHFQC.single_acquisition(self.nr_sweep_points,
-        #                                      self.poll_time, timeout=0,
-        #                                      channels=set(self.channels))
-        # data = np.array([data[key] for key in data.keys()])
+        if self.cross_talk_suppression:
+            for i, channel in enumerate(self.channels):
+                data[i] -= eval("self.UHFQC.quex_trans_offset_weightfunction_"
+                                "{}()".format(channel))
+
         if self.rotate:
             return self.rotate_and_normalize(data)
         else:
@@ -1531,6 +1515,8 @@ class UHFQC_integrated_average_detector(Hard_Detector):
             int(self.nr_averages*self.nr_sweep_points))
         self.UHFQC.awgs_0_userregs_1(0)  # 0 for rl, 1 for iavg
         self.UHFQC.awgs_0_single(1)
+        self.UHFQC.single_acquisition_initialize(self.channels, mode='rl',
+                                                 trigger_device=self.AWG)
 
     def finish(self):
         if self.AWG is not None:
