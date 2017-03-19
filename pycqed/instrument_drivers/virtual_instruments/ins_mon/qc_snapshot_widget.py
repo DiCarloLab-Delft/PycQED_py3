@@ -26,7 +26,7 @@ class QcSnaphotWidget(QtGui.QTreeWidget):
         self.setVerticalScrollMode(self.ScrollPerPixel)
         self.setData(data)
         self.setColumnCount(4)
-        self.setHeaderLabels(['Name', 'Value', 'Unit', 'last update'])
+        self.setHeaderLabels(['Name', 'Value', 'Unit', 'Last update'])
 
     def setData(self, data, hideRoot=False):
         """data should be a QCoDes snapshot of a station."""
