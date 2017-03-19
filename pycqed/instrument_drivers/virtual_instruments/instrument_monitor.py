@@ -56,13 +56,14 @@ class InstrumentMonitor(Instrument):
         pg.mkQApp()
         self.__class__.proc = pgmp.QtProcess()  # pyqtgraph multiprocessing
         self.__class__.rpg = self.proc._import('pyqtgraph')
+        ins_mon_mod = 'pycqed.instrument_drivers.virtual_instruments.ins_mon.qc_snapshot_widget'
+        self.__class__.rpg = self.proc._import(ins_mon_mod)
+
 
     def create_tree(self, figsize=(1000, 600)):
-        snapshot = self.station.snapshot()
-        # self.tree = self.rpg.DataTreeWidget(data=snapshot)
-        self.tree = self.rpg.DataTreeWidget()
-        # self.update()
-        self.tree.setData(snapshot['instruments'], hideRoot=True)
+
+        self.tree = self.rpg.QcSnaphotWidget()
+        self.update()
         self.tree.show()
         self.tree.setWindowTitle('Instrument Monitor')
         self.tree.resize(*figsize)
