@@ -34,8 +34,7 @@ def PSD_Analysis(table, freq_resonator=None, Qc=None, chi_shift=None, path=None)
     dac, freq, T1, Tramsey, Techo, exclusion_mask = table
     exclusion_mask = np.array(exclusion_mask, dtype=bool)
 
-    exclusion_mask = np.array(exclusion_mask, dtype=np.bool)
-
+    # Extract the dac arcs required for getting the sensitivities
     fit_result_arch = fit_frequencies(dac, freq)
 
     # convert dac in flux as unit of Phi_0
@@ -73,19 +72,24 @@ def PSD_Analysis(table, freq_resonator=None, Qc=None, chi_shift=None, path=None)
 
     # after fitting gammas
     # from flux noise
-    A = (slope_echo/(2*np.pi))/np.sqrt(np.log(2))
-    print('Amplitude PSD = (%s u\Phi_0)^2' % (A/1e-6))
+    # Martinis PRA 2003
+    sqrtA_rams = slope_ramsey/(np.pi*np.sqrt(30))
+    sqrtA_echo = slope_echo/(np.pi*np.sqrt(1.386))
+
+
+    print('Amplitude echo PSD = (%s u\Phi_0)^2' % (sqrtA_echo/1e-6))
+    print('Amplitude rams PSD = (%s u\Phi_0)^2' % (sqrtA_rams/1e-6))
 
     # from white noise
-    # using Eq 5 in Nature com. 7,12964 (The flux qubit reviseited to enhanbce
-    # coherence and reporducibility)
+    # using Eq 5 in Nat. Comm. 7,12964 (The flux qubit revisited to enhance
+    # coherence and reproducability)
     if not ((freq_resonator is None) and (Qc is None) and (chi_shift is None)):
         n_avg = calculate_n_avg(freq_resonator, Qc, chi_shift, intercept)
         print('Estimated residual photon number: %s' % n_avg)
     else:
         n_avg = np.nan
 
-    return (A/1e-6), n_avg
+    return (sqrtA_echo/1e-6), n_avg
 
 def calculate_n_avg(freq_resonator, Qc, chi_shift, intercept):
     """
@@ -179,23 +183,10 @@ def fit_frequencies(dac, freq):
     fit_result_arch = arch_model.fit(freq, dac=dac)
     return fit_result_arch
 
-def plot_coherence_times(flux, freq, sensitivity,
+def plot_coherence_times_freq(flux, freq, sensitivity,
                          T1, Tramsey, Techo, path,
                          figname='Coherence_times.PNG'):
-    # font = {'size': 16}
-    # matplotlib.rc('font', **font)
-
-    # f, ax = plt.subplots(1, 3, figsize=[18, 6], sharey=True)
-
-    f, ax = plt.subplots()#1, 3, figsize=(18, 5), sharey=True)
-
-    # ax[0].plot(flux/1e-3, T1/1e-6, 'o', color='C3', label='$T_1$')
-    # ax[0].plot(flux/1e-3, Tramsey/1e-6, 'o', color='C2', label='$T_2^*$')
-    # ax[0].plot(flux/1e-3, Techo/1e-6, 'o', color='C0', label='$T_2$')
-    # ax[0].set_title('$T_1$, $T_2^*$, $T_2$ vs flux', size=16)
-    # ax[0].set_ylabel('Coherence time ($\mu$s)', size=16)
-    # ax[0].set_xlabel('Flux (m$\Phi_0$)', size=16)
-    # # ax[0].legend(loc=0)
+    f, ax = plt.subplots()
 
     ax.plot(freq/1e9, T1/1e-6, 'o', color='C3', label='$T_1$')
     ax.plot(freq/1e9, Tramsey/1e-6, 'o', color='C2', label='$T_2^*$')
@@ -204,60 +195,49 @@ def plot_coherence_times(flux, freq, sensitivity,
     ax.set_xlabel('Frequency (GHz)')
     ax.legend(loc=0)
 
-    # ax[2].plot(np.abs(sensitivity)/1e9, T1/1e-6, 'o', color='C3', label='$T_1$')
-    # ax[2].plot(np.abs(sensitivity)/1e9, Tramsey/1e-6,
-    #            'o', color='C2', label='$T_2^*$')
-    # ax[2].plot(
-    #     np.abs(sensitivity)/1e9, Techo/1e-6, 'o', color='C0', label='$T_2$')
-    # ax[2].set_title('$T_1$, $T_2^*$, $T_2$ vs sensitivity', size=16)
-    # ax[2].set_xlabel(r'$|\partial\nu/\partial\Phi|$ (GHz/$\Phi_0$)', size=16)
-    # # ax[2].legend(loc=0)
 
     f.tight_layout()
     if path is not None:
         savename = os.path.abspath(os.path.join(path, figname))
         f.savefig(savename, format='PNG', dpi=450)
 
-# def plot_coherence_times(flux, freq, sensitivity,
-#                          T1, Tramsey, Techo, path,
-#                          figname='Coherence_times.PNG'):
-#     # font = {'size': 16}
-#     # matplotlib.rc('font', **font)
+def plot_coherence_times(flux, freq, sensitivity,
+                         T1, Tramsey, Techo, path,
+                         figname='Coherence_times.PNG'):
+    # font = {'size': 16}
+    # matplotlib.rc('font', **font)
 
-#     # f, ax = plt.subplots(1, 3, figsize=[18, 6], sharey=True)
+    # f, ax = plt.subplots(1, 3, figsize=[18, 6], sharey=True)
 
-#     f, ax = plt.subplots(1, 3, figsize=(18, 5), sharey=True)
+    f, ax = plt.subplots(1, 3, figsize=(18, 5), sharey=True)
 
-#     ax[0].plot(flux/1e-3, T1/1e-6, 'o', color='C3', label='$T_1$')
-#     ax[0].plot(flux/1e-3, Tramsey/1e-6, 'o', color='C2', label='$T_2^*$')
-#     ax[0].plot(flux/1e-3, Techo/1e-6, 'o', color='C0', label='$T_2$')
-#     ax[0].set_title('$T_1$, $T_2^*$, $T_2$ vs flux', size=16)
-#     ax[0].set_ylabel('Coherence time ($\mu$s)', size=16)
-#     ax[0].set_xlabel('Flux (m$\Phi_0$)', size=16)
-#     # ax[0].legend(loc=0)
+    ax[0].plot(flux/1e-3, T1/1e-6, 'o', color='C3', label='$T_1$')
+    ax[0].plot(flux/1e-3, Tramsey/1e-6, 'o', color='C2', label='$T_2^*$')
+    ax[0].plot(flux/1e-3, Techo/1e-6, 'o', color='C0', label='$T_2$')
+    ax[0].set_title('$T_1$, $T_2^*$, $T_2$ vs flux', size=16)
+    ax[0].set_ylabel('Coherence time ($\mu$s)', size=16)
+    ax[0].set_xlabel('Flux (m$\Phi_0$)', size=16)
 
-#     ax[1].plot(freq/1e9, T1/1e-6, 'o', color='C3', label='$T_1$')
-#     ax[1].plot(freq/1e9, Tramsey/1e-6, 'o', color='C2', label='$T_2^*$')
-#     ax[1].plot(freq/1e9, Techo/1e-6, 'o', color='C0', label='$T_2$')
-#     ax[1].set_title('$T_1$, $T_2^*$, $T_2$ vs frequency', size=16)
-#     ax[1].set_xlabel('Frequency (GHz)', size=16)
-#     ax[1].legend(loc=0)
+    ax[1].plot(freq/1e9, T1/1e-6, 'o', color='C3', label='$T_1$')
+    ax[1].plot(freq/1e9, Tramsey/1e-6, 'o', color='C2', label='$T_2^*$')
+    ax[1].plot(freq/1e9, Techo/1e-6, 'o', color='C0', label='$T_2$')
+    ax[1].set_title('$T_1$, $T_2^*$, $T_2$ vs frequency', size=16)
+    ax[1].set_xlabel('Frequency (GHz)', size=16)
+    ax[1].legend(loc=0)
 
-#     ax[2].plot(np.abs(sensitivity)/1e9, T1/1e-6, 'o', color='C3', label='$T_1$')
-#     ax[2].plot(np.abs(sensitivity)/1e9, Tramsey/1e-6,
-#                'o', color='C2', label='$T_2^*$')
-#     ax[2].plot(
-#         np.abs(sensitivity)/1e9, Techo/1e-6, 'o', color='C0', label='$T_2$')
-#     ax[2].set_title('$T_1$, $T_2^*$, $T_2$ vs sensitivity', size=16)
-#     ax[2].set_xlabel(r'$|\partial\nu/\partial\Phi|$ (GHz/$\Phi_0$)', size=16)
-#     # ax[2].legend(loc=0)
+    ax[2].plot(np.abs(sensitivity)/1e9, T1/1e-6, 'o', color='C3', label='$T_1$')
+    ax[2].plot(np.abs(sensitivity)/1e9, Tramsey/1e-6,
+               'o', color='C2', label='$T_2^*$')
+    ax[2].plot(
+        np.abs(sensitivity)/1e9, Techo/1e-6, 'o', color='C0', label='$T_2$')
+    ax[2].set_title('$T_1$, $T_2^*$, $T_2$ vs sensitivity', size=16)
+    ax[2].set_xlabel(r'$|\partial\nu/\partial\Phi|$ (GHz/$\Phi_0$)', size=16)
 
-#     f.tight_layout()
-#     if path is not None:
-#         savename = os.path.abspath(os.path.join(path, figname))
-#         f.savefig(savename, format='PNG', dpi=450)
+    f.tight_layout()
+    if path is not None:
+        savename = os.path.abspath(os.path.join(path, figname))
+        f.savefig(savename, format='PNG', dpi=450)
 
-# ax[0].set_ylim([0,40])
 
 
 def plot_ratios(flux, freq, sensitivity,
@@ -335,20 +315,22 @@ def plot_gamma_fit(sensitivity, Gamma_phi_ramsey, Gamma_phi_echo,
         f, ax = plt.subplots()
 
     ax.plot(np.abs(sensitivity)/1e9, Gamma_phi_ramsey,
-            'o', color='C2', label='$\Gamma_{\mathrm{Ramsey}}$')
+            'o', color='C2', label='$\Gamma_{\phi,\mathrm{Ramsey}}$')
     ax.plot(np.abs(sensitivity)/1e9, slope_ramsey *
             np.abs(sensitivity)+intercept, color='C2')
 
     ax.plot(np.abs(sensitivity)/1e9, Gamma_phi_echo,
-            'o', color='C0', label='$\Gamma_{\mathrm{Echo}}$')
+            'o', color='C0', label='$\Gamma_{\phi,\mathrm{Echo}}$')
     ax.plot(np.abs(sensitivity)/1e9, slope_echo *
             np.abs(sensitivity)+intercept, color='C0')
 
     ax.legend(loc=0)
-    ax.set_title('Gamma vs |flux sensitivity|')
-    ax.set_xlabel(r'$|\partial\nu/\partial\Phi|$ (GHz/$\Phi_0$)')
-    ax.set_ylabel('$\Gamma$ (1/s)')
+    # ax.set_title('Pure dephasing vs flux sensitivity')
+    ax.set_title('Previous cooldown')
+    ax.set_xlabel(r'$|\partial f/\partial\Phi|$ (GHz/$\Phi_0$)')
+    ax.set_ylabel('$\Gamma_{\phi}$ (1/s)')
     f.tight_layout()
+    ax.set_ylim(0, np.max(Gamma_phi_ramsey)*1.05)
     if path is not None:
         savename = os.path.abspath(os.path.join(path, figname))
         f.savefig(savename, format='PNG', dpi=450)
