@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from pyqtgraph.Qt import QtGui, QtCore
 from pyqtgraph.pgcollections import OrderedDict
+from pyqtgraph.units import SI_PREFIXES, UNITS as SI_UNITS
 import types
 import traceback
 import numpy as np
@@ -62,6 +63,20 @@ class QcSnaphotWidget(QtGui.QTreeWidget):
                     node.addChild(par_node)
 
     def par_val_to_msg(self, val, unit=None):
+        if unit in SI_UNITS:
+            if val == 0:
+                prefix_power = 0
+            else:
+                # The defined prefixes go down to -24 but this is below
+                # the numerical precision of python
+                prefix_power = np.clip(-15, (np.log10(val)//3 *3), 24)
+            # Determine SI prefix, number 8 corresponds to no prefix
+            SI_prefix_idx = int(prefix_power/3 + 8)
+            prefix = SI_PREFIXES[SI_prefix_idx]
+            # Convert the unit
+            val = val*10**-prefix_power
+            unit = prefix+unit
+
         value_str = str(val)
         return value_str, unit
 
