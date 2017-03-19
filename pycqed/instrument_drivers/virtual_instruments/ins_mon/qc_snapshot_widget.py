@@ -53,7 +53,10 @@ class QcSnaphotWidget(QtGui.QTreeWidget):
                                                     par_snap['unit'])
 
                     # Omits printing of the date to make it more readable
-                    latest_str = par_snap['ts'][11:]
+                    if par_snap['ts'] is not None:
+                        latest_str = par_snap['ts'][11:]
+                    else:
+                        latest_str = ''
                     par_node = QtGui.QTreeWidgetItem(
                         [par_name, value_str, unit, latest_str])
                     node.addChild(par_node)
