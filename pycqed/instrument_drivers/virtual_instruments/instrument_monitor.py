@@ -1,5 +1,6 @@
 import logging
 import numpy as np
+import time
 from qcodes.utils.helpers import make_unique, DelegateAttributes
 import pyqtgraph as pg
 import pyqtgraph.multiprocess as pgmp
@@ -16,17 +17,17 @@ class InstrumentMonitor(Instrument):
     proc = None
     rpg = None
     def __init__(self, name, station,
-                 figsize=(1000, 600),
+                 figsize=(600, 600),
                  window_title='', theme=((60, 60, 60), 'w'), show_window=True, remote=True, **kwargs):
         """
         Initializes the plotting window
         """
         super().__init__(name=name, server_name=None)
         self.station = station
-        self.add_parameter('plotting_interval',
+        self.add_parameter('update_interval',
                            unit='s',
                            vals=vals.Numbers(min_value=0.001),
-                           initial_value=1,
+                           initial_value=5,
                            parameter_class=ManualParameter)
         # self.add_parameter
         if remote:
@@ -35,12 +36,17 @@ class InstrumentMonitor(Instrument):
         else:
             # overrule the remote pyqtgraph class
             self.rpg = pg
-
+        # initial value is fake but ensures it will update the first time
+        self.last_update_time = 0
         self.create_tree(figsize=figsize)
 
     def update(self):
-        snapshot = self.station.snapshot()
-        self.tree.setData(snapshot)
+        time_since_last_update = time.time()-self.last_update_time
+        if time_since_last_update > self.update_interval():
+            self.last_update_time = time.time()
+            snapshot = self.station.snapshot()
+            self.tree.setData(snapshot['instruments'], hideRoot=True)
+            # self.tree.buildTree(snapshot['instruments'], self.tree.invisibleRootItem(), hideRoot=True)
 
 
     def _init_qt(self):
@@ -55,7 +61,8 @@ class InstrumentMonitor(Instrument):
         snapshot = self.station.snapshot()
         # self.tree = self.rpg.DataTreeWidget(data=snapshot)
         self.tree = self.rpg.DataTreeWidget()
-        self.update()
+        # self.update()
+        self.tree.setData(snapshot['instruments'], hideRoot=True)
         self.tree.show()
         self.tree.setWindowTitle('Instrument Monitor')
         self.tree.resize(*figsize)
