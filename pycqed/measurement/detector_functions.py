@@ -105,7 +105,7 @@ class Dummy_Detector_Hard(Hard_Detector):
         self.detector_control = 'hard'
         self.name = 'Dummy_Detector'
         self.value_names = ['distance', 'Power']
-        self.value_units = ['m', 'nW']
+        self.value_units = ['m', 'W']
         self.delay = delay
         self.noise = noise
         self.times_called = 0
