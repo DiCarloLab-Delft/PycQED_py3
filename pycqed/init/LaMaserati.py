@@ -97,11 +97,23 @@ cw_source = rs.RohdeSchwarz_SGS100A(name='cw_source', address='TCPIP0::192.168.0
 station.add_component(cw_source)
 Qubit_LO = rs.RohdeSchwarz_SGS100A(name='Qubit_LO', address='TCPIP0::192.168.0.90', server_name=None)  #
 station.add_component(Qubit_LO)
+# TWPA_pump = rs.RohdeSchwarz_SGS100A(name='TWPA_pump', address='TCPIP0::192.168.0.11', server_name=None)  #
+# station.add_component(TWPA_pump)
 
+# TWPA_pump.power(4.0)
+# TWPA_pump.frequency(8.12e9)
+#TWPA_pump.on()
 
-#Initializing UHFQC
-UHFQC_1 = ZI_UHFQC.UHFQC('UHFQC_1', device='dev2209', server_name=None)
-station.add_component(UHFQC_1)
+# VNA
+# VNA = ZNB20.ZNB20(name='VNA', address='TCPIP0::192.168.0.55', server_name=None)  #
+# station.add_component(VNA)
+
+# Initializing UHFQC
+UHFQC_2214 = ZI_UHFQC.UHFQC('UHFQC_2214', device='dev2214', server_name=None)
+station.add_component(UHFQC_2214)
+
+UHFQC_2209 = ZI_UHFQC.UHFQC('UHFQC_2209', device='dev2209', server_name=None)
+station.add_component(UHFQC_2209)
 
 #initializing AWG
 AWG = tek.Tektronix_AWG5014(name='AWG',  timeout=2,
@@ -115,75 +127,123 @@ station.add_component(IVVI)
 Flux_Control = FluxCtrl.Flux_Control(name='FluxControl',IVVI=station.IVVI, num_channels=16)
 station.add_component(Flux_Control)
 
+ATS=False
+if ATS:
+    #Initializaing ATS,
+    ATSdriver.AlazarTech_ATS.find_boards()
+    ATS = ATSdriver.AlazarTech_ATS9870(name='ATS', server_name=None)
+    station.add_component(ATS)
 
-#Initializaing ATS,
-ATSdriver.AlazarTech_ATS.find_boards()
-ATS = ATSdriver.AlazarTech_ATS9870(name='ATS', server_name=None)
-station.add_component(ATS)
 
-# Configure all settings in the ATS
-ATS.config(clock_source='INTERNAL_CLOCK',
-                sample_rate=100000000,
-                clock_edge='CLOCK_EDGE_RISING',
-                decimation=0,
-                coupling=['AC','AC'],
-                channel_range=[2.,2.],
-                impedance=[50,50],
-                bwlimit=['DISABLED','DISABLED'],
-                trigger_operation='TRIG_ENGINE_OP_J',
-                trigger_engine1='TRIG_ENGINE_J',
-                trigger_source1='EXTERNAL',
-                trigger_slope1='TRIG_SLOPE_POSITIVE',
-                trigger_level1=128,
-                trigger_engine2='TRIG_ENGINE_K',
-                trigger_source2='DISABLE',
-                trigger_slope2='TRIG_SLOPE_POSITIVE',
-                trigger_level2=128,
-                external_trigger_coupling='AC',
-                external_trigger_range='ETR_5V',
-                trigger_delay=0,
-                timeout_ticks=0
-)
+    # Configure all settings in the ATS
+    ATS.config(clock_source='INTERNAL_CLOCK',
+                    sample_rate=100000000,
+                    clock_edge='CLOCK_EDGE_RISING',
+                    decimation=0,
+                    coupling=['AC','AC'],
+                    channel_range=[2.,2.],
+                    impedance=[50,50],
+                    bwlimit=['DISABLED','DISABLED'],
+                    trigger_operation='TRIG_ENGINE_OP_J',
+                    trigger_engine1='TRIG_ENGINE_J',
+                    trigger_source1='EXTERNAL',
+                    trigger_slope1='TRIG_SLOPE_POSITIVE',
+                    trigger_level1=160,
+                    trigger_engine2='TRIG_ENGINE_K',
+                    trigger_source2='DISABLE',
+                    trigger_slope2='TRIG_SLOPE_POSITIVE',
+                    trigger_level2=128,
+                    external_trigger_coupling='AC',
+                    external_trigger_range='ETR_1V',
+                    trigger_delay=0,
+                    timeout_ticks=0
+    )
 
-#demodulation frequcnye is first set to 10 MHz
-ATS_controller = ats_contr.Demodulation_AcquisitionController(name='ATS_controller',
-                                                                      demodulation_frequency=10e6,
-                                                                      alazar_name='ATS',
-                                                                      server_name=None)
-station.add_component(ATS_controller)
 
-# configure the ATS controller
-ATS_controller.update_acquisitionkwargs(#mode='NPT',
-                 samples_per_record=64*1000,#4992,
-                 records_per_buffer=8,#70, segmments
-                 buffers_per_acquisition=8,
-                 channel_selection='AB',
-                 transfer_offset=0,
-                 external_startcapture='ENABLED',
-                 enable_record_headers='DISABLED',
-                 alloc_buffers='DISABLED',
-                 fifo_only_streaming='DISABLED',
-                 interleave_samples='DISABLED',
-                 get_processed_data='DISABLED',
-                 allocated_buffers=100,
-                 buffer_timeout=1000
-)
+    # demodulation frequcnye is first set to 10 MHz
+    ATS_controller = ats_contr.Demodulation_AcquisitionController(name='ATS_controller',
+                                                                          demodulation_frequency=10e6,
+                                                                          alazar_name='ATS',
+                                                                          server_name=None)
+    station.add_component(ATS_controller)
+
+    #configure the ATS controller
+    ATS_controller.update_acquisitionkwargs(#mode='NPT',
+                     samples_per_record=64*1000,#4992,
+                     records_per_buffer=8,#70, segmments
+                     buffers_per_acquisition=8,
+                     channel_selection='AB',
+                     transfer_offset=0,
+                     external_startcapture='ENABLED',
+                     enable_record_headers='DISABLED',
+                     alloc_buffers='DISABLED',
+                     fifo_only_streaming='DISABLED',
+                     interleave_samples='DISABLED',
+                     get_processed_data='DISABLED',
+                     allocated_buffers=100,
+                     buffer_timeout=1000
+    )
 
 HS = hd.HeterodyneInstrument('HS', LO=LO, RF=RF, AWG=AWG,
-                             acquisition_instr=ATS.name,
-                             acquisition_instr_controller=ATS_controller.name,
+                             acquisition_instr=UHFQC_2209.name,
+                             acquisition_instr_controller=None,
                              server_name=None)
 station.add_component(HS)
 
 
-MC = mc.MeasurementControl('MC')
+# NH: Turned off live plotting to see if that is the reason why
+# restarting Python is not working
+MC = mc.MeasurementControl('MC', live_plot_enabled=True)
 
 MC.station = station
 station.MC = MC
 station.add_component(MC)
 
+ATT = Weinschel_8320_novisa.Weinschel_8320(name='ATT',address='192.168.0.54', server_name=None)
+station.add_component(ATT)
+
 
 #qubit objects
+QL1 = qbt.Tektronix_driven_transmon('QL1', LO=LO, cw_source=cw_source,
+                                              td_source=Qubit_LO,
+                                              IVVI=IVVI,
+                                              rf_RO_source=RF,
+                                              AWG=AWG,
+                                              heterodyne_instr=HS,
+                                              MC=MC,
+                                              FluxCtrl=None,
+                                              server_name=None)
+station.add_component(QL1)
+gen.load_settings_onto_instrument(QL1)
+
+
+QL2 = qbt.Tektronix_driven_transmon('QL2', LO=LO, cw_source=cw_source,
+                                              td_source=Qubit_LO,
+                                              IVVI=IVVI,
+                                              rf_RO_source=RF,
+                                              AWG=AWG,
+                                              heterodyne_instr=HS,
+                                              MC=MC,
+                                              FluxCtrl=None,
+                                              server_name=None)
+station.add_component(QL2)
+gen.load_settings_onto_instrument(QL2)
+
+
+QL3 = qbt.Tektronix_driven_transmon('QL3', LO=LO, cw_source=cw_source,
+                                              td_source=Qubit_LO,
+                                              IVVI=IVVI,
+                                              rf_RO_source=RF,
+                                              AWG=AWG,
+                                              heterodyne_instr=HS,
+                                              MC=MC,
+                                              FluxCtrl=None,
+                                              server_name=None)
+station.add_component(QL3)
+gen.load_settings_onto_instrument(QL3)
+
+
+
 QR1 = qbt.Tektronix_driven_transmon('QR1', LO=LO, cw_source=cw_source,
                                               td_source=Qubit_LO,
                                               IVVI=IVVI,
@@ -195,7 +255,6 @@ QR1 = qbt.Tektronix_driven_transmon('QR1', LO=LO, cw_source=cw_source,
                                               server_name=None)
 station.add_component(QR1)
 gen.load_settings_onto_instrument(QR1)
-QR1.acquisition_instr('ATS')
 
 QR2 = qbt.Tektronix_driven_transmon('QR2', LO=LO, cw_source=cw_source,
                                               td_source=Qubit_LO,
@@ -208,7 +267,7 @@ QR2 = qbt.Tektronix_driven_transmon('QR2', LO=LO, cw_source=cw_source,
                                               server_name=None)
 station.add_component(QR2)
 gen.load_settings_onto_instrument(QR2)
-QR2.acquisition_instr('ATS')
+
 
 QR3 = qbt.Tektronix_driven_transmon('QR3', LO=LO, cw_source=cw_source,
                                               td_source=Qubit_LO,
@@ -221,7 +280,7 @@ QR3 = qbt.Tektronix_driven_transmon('QR3', LO=LO, cw_source=cw_source,
                                               server_name=None)
 station.add_component(QR3)
 gen.load_settings_onto_instrument(QR3)
-QR3.acquisition_instr('ATS')
+
 
 QR4 = qbt.Tektronix_driven_transmon('QR4', LO=LO, cw_source=cw_source,
                                               td_source=Qubit_LO,
@@ -234,7 +293,8 @@ QR4 = qbt.Tektronix_driven_transmon('QR4', LO=LO, cw_source=cw_source,
                                               server_name=None)
 station.add_component(QR4)
 gen.load_settings_onto_instrument(QR4)
-QR4.acquisition_instr('ATS')
+
+
 
 # The AWG sequencer
 station.pulsar = ps.Pulsar()
@@ -259,7 +319,7 @@ for i in range(4):
     station.pulsar.define_channel(id='ch{}_marker2'.format(i+1),
                                   name='ch{}_marker2'.format(i+1),
                                   type='marker',
-                                  high=2.0, low=0, offset=0.,
+                                  high=markerhighs[i], low=0, offset=0.,
                                   delay=0, active=True)
 # to make the pulsar available to the standard awg seqs
 st_seqs.station = station
@@ -270,7 +330,7 @@ t1 = time.time()
 
 #manually setting the clock, to be done automatically
 AWG.clock_freq(1e9)
-
+AWG.ref_clock_source('EXT')
 
 print('Ran initialization in %.2fs' % (t1-t0))
 
@@ -285,31 +345,73 @@ def print_instr_params(instr):
             snapshot['parameters'][par]['value'],
             snapshot['parameters'][par]['unit']))
 
+if ATS:
+    def switch_to_pulsed_RO_ATS(qubit):
+        qubit.RO_pulse_type('Gated_MW_RO_pulse')
+        qubit.acquisition_instr('ATS')
+        qubit.RO_acq_averages(64)
 
-def switch_to_pulsed_RO_UHFQC(qubit):
 
+def switch_to_pulsed_RO_UHFQC_2214(qubit):
     qubit.RO_pulse_type('Gated_MW_RO_pulse')
-    qubit.acquisition_instr('UHFQC_1')
+    qubit.acquisition_instr('UHFQC_2214')
+    qubit.RO_acq_marker_channel('ch3_marker1')
+    qubit.RO_acq_weight_function_I(0)
+    qubit.RO_acq_weight_function_Q(1)
+
+
+
+def switch_to_pulsed_RO_UHFQC_2209(qubit):
+    qubit.RO_pulse_type('Gated_MW_RO_pulse')
+    qubit.acquisition_instr('UHFQC_2209')
     qubit.RO_acq_marker_channel('ch3_marker2')
     qubit.RO_acq_weight_function_I(0)
     qubit.RO_acq_weight_function_Q(1)
-    qubit.spec_pulse_depletion_time()
-    UHFQC_1.prepare_DSB_weight_and_rotation(qubit.f_RO_mod())
+
+
+def load_default_settings(qubit):
     qubit.pulse_I_offset(11e-3)
     qubit.pulse_Q_offset(-10e-3)
-    qubit.RO_acq_averages(1024)
     qubit.RO_pulse_length(2e-6)
     qubit.RO_pulse_marker_channel('ch1_marker2')
     qubit.f_pulse_mod(50e6)
     qubit.RO_acq_averages(1024)
+    # NH: Reducing number of averages while debugging
+    # UHF-QC spectroscopy mode
+    #qubit.RO_acq_averages(8)
     qubit.RO_acq_marker_delay(100e-9)
-    qubit.RO_pulse_delay(100e-9)
-    qubit.spec_pulse_depletion_time(50e-9)
+    qubit.RO_pulse_delay(200e-9)
     qubit.spec_pulse_length(5e-6)
     qubit.spec_pulse_marker_channel('ch1_marker1')
-    qubit.td_source_pow(16)
+    qubit.spec_pulse_depletion_time(5e-6)
     qubit.RO_acq_integration_length(2e-6)
-list_qubits = [QR1, QR2, QR3, QR4]
-for qubit in list_qubits:
-    switch_to_pulsed_RO_UHFQC(qubit)
-UHFQC_1.awg_sequence_acquisition()
+    qubit.f_RO_mod(10e6)
+
+list_qubits_L = [QL1, QL2, QL3]
+
+list_qubits_R = [QR1, QR2, QR3, QR4]
+
+for qubit in list_qubits_L:
+    switch_to_pulsed_RO_UHFQC_2214(qubit)
+    load_default_settings(qubit)
+
+for qubit in list_qubits_R:
+    switch_to_pulsed_RO_UHFQC_2209(qubit)
+    load_default_settings(qubit)
+
+
+UHFQC_2214.awg_sequence_acquisition()
+UHFQC_2209.awg_sequence_acquisition()
+
+UHFQC_2214.prepare_SSB_weight_and_rotation(QL1.f_RO_mod())
+UHFQC_2209.prepare_SSB_weight_and_rotation(QR1.f_RO_mod())
+
+
+#hardcoding the dacmapping as this is not loaded correcly from the qubit object
+QL1.dac_channel(1)
+QL2.dac_channel(2)
+QL3.dac_channel(3)
+QR1.dac_channel(4)
+QR2.dac_channel(5)
+QR3.dac_channel(6)
+QR4.dac_channel(7)
