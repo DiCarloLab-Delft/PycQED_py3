@@ -128,7 +128,7 @@ class HeterodyneInstrument(Instrument):
         self.set('status', 'Off')
         return
 
-    def prepare(self, get_t_base=True, RO_length=2000e-9, trigger_separation=5e-6):
+    def prepare(self,  trigger_separation, RO_length, get_t_base=True ):
         '''
         This function needs to be overwritten for the ATS based version of this
         driver
@@ -167,7 +167,7 @@ class HeterodyneInstrument(Instrument):
                 self._acquisition_instr.quex_rl_avgcnt(
                     int(np.log2(self.nr_averages())))
                 self._acquisition_instr.quex_wint_length(
-                    int(RO_length*(1.8e9)))
+                    int(RO_length*1.8e9))
                 # Configure the result logger to not do any averaging
                 # The AWG program uses userregs/0 to define the number o
                 # iterations in the loop
@@ -176,7 +176,8 @@ class HeterodyneInstrument(Instrument):
                 # 0 for rl, 1 for iavg
                 self._acquisition_instr.awgs_0_userregs_1(0)
                 self._acquisition_instr.awgs_0_single(1)
-                self._acquisition_instr.single_acquisition_initialize([0,1], 'rl')
+                self._acquisition_instr.acquisition_initialize([0,1], 'rl')
+                self.scale_factor = 1/(1.8e9*RO_length*int(self.nr_averages()))
 
 
             elif 'ATS' in self.acquisition_instr():
@@ -232,9 +233,11 @@ class HeterodyneInstrument(Instrument):
         elif 'UHFQC' in self.acquisition_instr():
             t0 = time.time()
             #self._acquisition_instr.awgs_0_enable(1) #this was causing spikes
-            dataset = self._acquisition_instr.single_acquisition_poll(1, 0.001, 1000)
-            average_fraction=1/self.nr_averages()
-            dat = (average_fraction*dataset[0][0]+average_fraction*1j*dataset[1][0])
+            # NH: Reduced timeout to prevent hangups
+
+
+            dataset = self._acquisition_instr.acquisition_poll(samples=1, acquisition_time=0.001, timeout=10)
+            dat = (self.scale_factor*dataset[0][0]+self.scale_factor*1j*dataset[1][0])
             t1 = time.time()
             # print("time for UHFQC polling", t1-t0)
         elif 'ATS' in self.acquisition_instr():
@@ -246,7 +249,7 @@ class HeterodyneInstrument(Instrument):
 
     def finish(self):
         if 'UHFQC' in self.acquisition_instr():
-            self._acquisition_instr.single_acquisition_finalize()
+            self._acquisition_instr.acquisition_finalize()
 
     def get_demod_array(self):
         return self.cosI, self.sinI
