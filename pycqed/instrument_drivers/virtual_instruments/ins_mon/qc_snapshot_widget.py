@@ -32,7 +32,6 @@ class QcSnaphotWidget(QtGui.QTreeWidget):
         """data should be a QCoDes snapshot of a station."""
         self.clear()
         self.buildTreeSnapshot(snapshot=data)
-        self.expandToDepth(3)
         self.resizeColumnToContents(0)
 
     def buildTreeSnapshot(self, snapshot):
