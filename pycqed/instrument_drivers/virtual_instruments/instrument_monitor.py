@@ -45,8 +45,7 @@ class InstrumentMonitor(Instrument):
         if time_since_last_update > self.update_interval():
             self.last_update_time = time.time()
             snapshot = self.station.snapshot()
-            self.tree.setData(snapshot['instruments'], hideRoot=True)
-            # self.tree.buildTree(snapshot['instruments'], self.tree.invisibleRootItem(), hideRoot=True)
+            self.tree.setData(snapshot['instruments'])
 
 
     def _init_qt(self):
