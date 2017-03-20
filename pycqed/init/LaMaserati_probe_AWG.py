@@ -350,6 +350,12 @@ from pycqed.instrument_drivers.physical_instruments.Fridge_monitor import Fridge
 Maserati_fridge_mon = Fridge_Monitor('Maserati_fridge_mon', 'LaMaserati')
 station.add_component(Maserati_fridge_mon)
 
+
+from pycqed.instrument_drivers.virtual_instruments import instrument_monitor as im
+IM = im.InstrumentMonitor('IM', station)
+station.add_component(IM)
+MC.instrument_monitor(IM.name)
+
 # def reload_mod_stuff():
 
 # preparing UHFQC readout with IQ mod pulses
@@ -357,10 +363,7 @@ station.add_component(Maserati_fridge_mon)
 list_qubits = [QL, QR]
 for qubit in list_qubits:
     qubit.RO_pulse_delay(20e-9)
-    # qubit.RO_acq_averages(2**13)
 
-# switch_to_pulsed_RO_CBox(AncT)
-# switch_to_pulsed_RO_CBox(DataT)
 
 
 def reload_mod_stuff():
