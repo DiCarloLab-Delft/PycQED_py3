@@ -568,14 +568,14 @@ class CBox_driven_transmon(Transmon):
         if analyze:
             ma.MeasurementAnalysis(auto=True, TwoD=True, close_fig=close_fig)
 
-    def measure_resonator_dac(self, freqs, dac_voltages, delay=0,
+    def measure_resonator_dac(self, freqs, dac_voltages,
                               MC=None, analyze=True, close_fig=True):
         self.prepare_for_continuous_wave()
         if MC is None:
             MC = self.MC
         MC.set_sweep_functions(
-            [pw.wrap_par_to_swf(self.heterodyne_instr.frequency),
-             swf.Delayed_Dac_Sweep(self.IVVI, self.dac_channel(), delay=delay)])
+            [self.heterodyne_instr.frequency,
+             self.IVVI.parameters['dac{}'.format(self.dac_channel())]])
         MC.set_sweep_points(freqs)
         MC.set_sweep_points_2D(dac_voltages)
         MC.set_detector_function(det.Heterodyne_probe(self.heterodyne_instr))
