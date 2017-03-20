@@ -18,6 +18,18 @@
     7.0
   ],
   [
+    "awgs/0/auxtriggers/0/slope",
+    "bool",
+    0,
+    1
+  ],
+  [
+    "awgs/0/auxtriggers/1/slope",
+    "bool",
+    0,
+    1
+  ],
+  [
     "awgs/0/enable",
     "int_8bit",
     0,
@@ -1015,6 +1027,36 @@
   ],
   [
     "quex/wint/mode",
+    "bool",
+    0,
+    1
+  ],
+  [
+    "quex/wint/source/0",
+    "bool",
+    0,
+    1
+  ],
+  [
+    "quex/wint/source/1",
+    "bool",
+    0,
+    1
+  ],
+  [
+    "quex/wint/source/2",
+    "bool",
+    0,
+    1
+  ],
+  [
+    "quex/wint/source/3",
+    "bool",
+    0,
+    1
+  ],
+  [
+    "quex/wint/source/4",
     "bool",
     0,
     1
