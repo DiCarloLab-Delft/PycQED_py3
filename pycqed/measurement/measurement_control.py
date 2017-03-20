@@ -864,7 +864,6 @@ class MeasurementControl(Instrument):
         try:  # Try except statement is to make it work on non windows pc
             if msvcrt.kbhit():
                 key = msvcrt.getch()
-                print(key)
                 if b'q' in key:
                     raise KeyboardInterrupt('Human interupt q')
         except Exception:
