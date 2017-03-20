@@ -52,20 +52,20 @@ class Heterodyne_Frequency_Sweep(Soft_Sweep):
                  **kw):
         super(Heterodyne_Frequency_Sweep, self).__init__()
         self.sweep_control = sweep_control
-        self.name = 'None_Sweep'
-        self.parameter_name = 'pts'
-        self.unit = 'arb. unit'
+        self.name = 'Heterodyne frequency'
+        self.parameter_name = 'Frequency'
+        self.unit = 'Hz'
         self.RO_pulse_type = RO_pulse_type
         self.sweep_points = sweep_points
         self.LO_source = LO_source
         self.IF = IF
-        if self.RO_pulse_type == 'Gated_MW_RO_pulse':
+        if 'Gated_MW_RO_pulse' in self.RO_pulse_type:
             self.RF_source = RF_source
 
     def set_parameter(self, val):
         # RF + IF = LO
-        self.LO_source.frequency(val+self.IF)
-        if self.RO_pulse_type == 'Gated_MW_RO_pulse':
+        self.LO_source.frequency(val-self.IF)
+        if 'Gated_MW_RO_pulse' in self.RO_pulse_type:
             self.RF_source.frequency(val)
 
 

@@ -1374,7 +1374,7 @@ class UHFQC_input_average_detector(Hard_Detector):
     Has two acq_modes, 'IQ' and 'AmpPhase'
     '''
 
-    def __init__(self, UHFQC, AWG, channels=[0, 1], nr_averages=1024, nr_samples=4096, **kw):
+    def __init__(self, UHFQC, AWG=None, channels=[0, 1], nr_averages=1024, nr_samples=4096, **kw):
         super(UHFQC_input_average_detector, self).__init__()
         self.UHFQC = UHFQC
         self.name = 'UHFQC_Streaming_data'
