@@ -69,7 +69,7 @@ class QcSnaphotWidget(QtGui.QTreeWidget):
             else:
                 # The defined prefixes go down to -24 but this is below
                 # the numerical precision of python
-                prefix_power = np.clip(-15, (np.log10(val)//3 * 3), 24)
+                prefix_power = np.clip(-15, (np.log10(abs(val))//3 * 3), 24)
             # Determine SI prefix, number 8 corresponds to no prefix
             SI_prefix_idx = int(prefix_power/3 + 8)
             prefix = SI_PREFIXES[SI_prefix_idx]
