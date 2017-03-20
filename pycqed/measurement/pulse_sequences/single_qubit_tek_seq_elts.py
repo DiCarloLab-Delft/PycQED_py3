@@ -241,7 +241,7 @@ def T1_seq(times,
 
     for i, tau in enumerate(times):  # seq has to have at least 2 elts
         RO_pars['pulse_delay'] = RO_pulse_delay + tau
-        RO_pars['refpoint'] = 'start'  # time defined between start of ops
+        #RO_pars['refpoint'] = 'start'  # time defined between start of ops
         if cal_points:
             if (i == (len(times)-4) or i == (len(times)-3)):
                 el = multi_pulse_elt(i, station, [pulses['I'], RO_pars])

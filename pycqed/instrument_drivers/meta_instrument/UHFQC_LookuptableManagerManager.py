@@ -113,11 +113,11 @@ class UHFQC_LookuptableManagerManager(Instrument):
 
     def render_wave(self, wave_name, show=True, time_unit='lut_index'):
         fig, ax = plt.subplots(1, 1)
-        if time_units == 'lut_index':
+        if time_unit == 'lut_index':
             x = np.arange(len(self._wave_dict[wave_name][0]))
             ax.set_xlabel('Lookuptable index (i)')
             ax.vlines(2048, self._voltage_min, self._voltage_max, linestyle='--')
-        elif time_units == 's':
+        elif time_unit == 's':
             x = (np.arange(len(self._wave_dict[wave_name][0]))
                  / self.sampling_rate.get())
             ax.set_xlabel('Time (s)')

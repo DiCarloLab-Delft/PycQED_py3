@@ -203,10 +203,10 @@ class QuDev_transmon(Qubit):
                 self.RO_I_channel(), self.RO_I_offset()))
             eval('self.UHFQC.sigouts_{}_offset({})'.format(
                 self.RO_Q_channel(), self.RO_Q_offset()))
-            self.UHFQC.awg_sequence_acquisition_and_pulse_SSB(
-                f_RO_mod=self.f_RO_mod(), RO_amp=self.RO_amp(),
-                RO_pulse_length=self.RO_pulse_length(),
-                acquisition_delay=0)
+            #self.UHFQC.awg_sequence_acquisition_and_pulse_SSB(
+            #    f_RO_mod=self.f_RO_mod(), RO_amp=self.RO_amp(),
+            #    RO_pulse_length=self.RO_pulse_length(),
+            #    acquisition_delay=0)
             self.readout_UC_LO.pulsemod_state('Off')
             self.readout_UC_LO.frequency(f_RO - self.f_RO_mod())
             self.readout_UC_LO.on()
@@ -245,10 +245,10 @@ class QuDev_transmon(Qubit):
                 self.RO_I_channel(), self.RO_I_offset()))
             eval('self.UHFQC.sigouts_{}_offset({})'.format(
                 self.RO_Q_channel(), self.RO_Q_offset()))
-            self.UHFQC.awg_sequence_acquisition_and_pulse_SSB(
-                f_RO_mod=self.f_RO_mod(), RO_amp=self.RO_amp(),
-                RO_pulse_length=self.RO_pulse_length(),
-                acquisition_delay=0)
+            #self.UHFQC.awg_sequence_acquisition_and_pulse_SSB(
+            #    f_RO_mod=self.f_RO_mod(), RO_amp=self.RO_amp(),
+            #    RO_pulse_length=self.RO_pulse_length(),
+            #    acquisition_delay=0)
             self.readout_UC_LO.pulsemod_state('Off')
             self.readout_UC_LO.frequency(f_RO - self.f_RO_mod())
             self.readout_UC_LO.on()

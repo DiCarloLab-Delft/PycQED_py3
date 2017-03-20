@@ -60,6 +60,15 @@ heterodyne = hd.HeterodyneInstrument('heterodyne', RF=readout_RF_UC_LO,
 print("initializing qubit")
 MC = mc.MeasurementControl('MC')
 MC.station = station
+qb1 = QuDev_transmon('qb1', MC,
+                     heterodyne = homodyne,
+                     cw_source = drive2_LO,
+                     readout_DC_LO = readout_DC_LO,
+                     readout_UC_LO = readout_RF_UC_LO,
+                     readout_RF = readout_RF_UC_LO,
+                     drive_LO = drive2_LO,
+                     AWG = AWG,
+                     UHFQC = UHFQC)
 qb2 = QuDev_transmon('qb2', MC,
                      heterodyne = homodyne,
                      cw_source = drive2_LO,
@@ -69,7 +78,6 @@ qb2 = QuDev_transmon('qb2', MC,
                      drive_LO = drive2_LO,
                      AWG = AWG,
                      UHFQC = UHFQC)
-
 qb3 = QuDev_transmon('qb3', MC,
                      heterodyne = homodyne,
                      cw_source = drive3_LO,
@@ -174,8 +182,60 @@ for hdyne in [heterodyne, homodyne]:
     hdyne.trigger_separation(4e-6) #s
     hdyne.acq_marker_channels("ch1_marker2")
     hdyne.frequency(7.1903e9) #Hz
-homodyne.mod_amp(1) #V
+homodyne.mod_amp(0.01) #V
 homodyne.acquisition_delay(2.3232323087540863e-07)
+
+########################################
+# configure qubit 1 parameters
+qb1.f_RO_resonator(6981752320.0) #Hz
+qb1.Q_RO_resonator(0)
+qb1.optimal_acquisition_delay(2.3232323087540863e-07) #s
+qb1.f_qubit(6440029236.4453087) #Hz
+qb1.spec_pow(-20) #dBm
+qb1.f_RO(6.981e9) #Hz
+qb1.drive_LO_pow(22) #dBm
+qb1.pulse_I_offset(0) #V
+qb1.pulse_Q_offset(0) #V
+qb1.RO_pulse_power(-20) #dBm
+qb1.RO_I_offset(0) #V
+qb1.RO_Q_offset(0) #V
+qb1.RO_acq_averages(4096)
+qb1.RO_acq_integration_length(2.2e-6)
+qb1.RO_acq_weight_function_I(0)
+qb1.RO_acq_weight_function_Q(1)
+
+qb1.spec_pulse_type('SquarePulse')
+qb1.spec_pulse_marker_channel('ch3_marker1') # gate drive LO = cw_source = MWG5
+qb1.spec_pulse_amp(1) #V
+qb1.spec_pulse_length(10e-6) #s
+qb1.spec_pulse_depletion_time(5e-6) #s
+
+qb1.RO_pulse_type('MW_IQmod_pulse_UHFQC')
+qb1.RO_I_channel('0')
+qb1.RO_Q_channel('1')
+qb1.RO_pulse_marker_channel('ch2_marker1') # gates readout RF = MWG7
+qb1.RO_amp(0.4) #V
+qb1.RO_pulse_length(800e-9) #s
+qb1.RO_pulse_delay(0) #s
+qb1.f_RO_mod(25e6) #Hz
+#qb1.RO_acq_marker_delay(-800e-9) #s for Gated_MW_RO_pulse
+qb1.RO_acq_marker_delay(0) #s for MW_IQmod_pulse_UHFQC
+qb1.RO_acq_marker_channel('ch1_marker2') # triggers UHFLI
+qb1.RO_pulse_phase(0) #rad
+
+qb1.pulse_type('SSB_DRAG_pulse')
+qb1.pulse_I_channel('ch1')
+qb1.pulse_Q_channel('ch2')
+qb1.amp180(0.8315167036009768) #V
+qb1.amp90_scale(0.5)
+qb1.pulse_delay(0)
+qb1.gauss_sigma(150e-9) #s
+qb1.nr_sigma(3.5)
+qb1.motzoi(0)
+qb1.f_pulse_mod(100e6) #Hz
+qb1.phi_skew(0)
+qb1.alpha(1)
+qb1.X_pulse_phase(0) #rad
 
 ########################################
 # configure qubit 2 parameters
@@ -193,8 +253,8 @@ qb2.RO_I_offset(0) #V
 qb2.RO_Q_offset(0) #V
 qb2.RO_acq_averages(4096)
 qb2.RO_acq_integration_length(2.2e-6)
-qb2.RO_acq_weight_function_I(0)
-qb2.RO_acq_weight_function_Q(1)
+qb2.RO_acq_weight_function_I(1)
+qb2.RO_acq_weight_function_Q(2)
 
 qb2.spec_pulse_type('SquarePulse')
 qb2.spec_pulse_marker_channel('ch3_marker1') # gate drive LO = cw_source = MWG5
@@ -211,7 +271,7 @@ qb2.RO_pulse_length(800e-9) #s
 qb2.RO_pulse_delay(0) #s
 qb2.f_RO_mod(25e6) #Hz
 #qb2.RO_acq_marker_delay(-800e-9) #s for Gated_MW_RO_pulse
-qb2.RO_acq_marker_delay(0) #s for Gated_MW_RO_pulse
+qb2.RO_acq_marker_delay(0) #s for MW_IQmod_pulse_UHFQC
 qb2.RO_acq_marker_channel('ch1_marker2') # triggers UHFLI
 qb2.RO_pulse_phase(0) #rad
 
@@ -231,12 +291,12 @@ qb2.X_pulse_phase(0) #rad
 
 #########################################################
 # configure qubit 3 parameters
-qb3.f_RO_resonator(7190504960.0) #Hz
+qb3.f_RO_resonator(7027777536.0) #Hz
 qb3.Q_RO_resonator(0)
 qb3.optimal_acquisition_delay(2.3232323087540863e-07) #s
 qb3.f_qubit(5691719461.7654753) #Hz
 qb3.spec_pow(-40) #dBm
-qb3.f_RO(7190504960.0) #Hz
+qb3.f_RO(7027777536.0) #Hz
 qb3.drive_LO_pow(22) #dBm
 qb3.pulse_I_offset(0) #V
 qb3.pulse_Q_offset(0) #V
@@ -245,8 +305,8 @@ qb3.RO_I_offset(0) #V
 qb3.RO_Q_offset(0) #V
 qb3.RO_acq_averages(4096)
 qb3.RO_acq_integration_length(2.2e-6)
-qb3.RO_acq_weight_function_I(0)
-qb3.RO_acq_weight_function_Q(1)
+qb3.RO_acq_weight_function_I(2)
+qb3.RO_acq_weight_function_Q(3)
 
 qb3.spec_pulse_type('SquarePulse')
 qb3.spec_pulse_marker_channel('ch3_marker2') # gate drive LO = cw_source = MWG6
@@ -263,7 +323,7 @@ qb3.RO_pulse_length(800e-9) #s
 qb3.RO_pulse_delay(0) #s
 qb3.f_RO_mod(25e6) #Hz
 #qb3.RO_acq_marker_delay(-800e-9) #s for Gated_MW_RO_pulse
-qb3.RO_acq_marker_delay(0) #s for Gated_MW_RO_pulse
+qb3.RO_acq_marker_delay(0) #s for MW_IQmod_pulse_UHFQC
 qb3.RO_acq_marker_channel('ch1_marker2') # triggers UHFLI
 qb3.RO_pulse_phase(0) #rad
 
