@@ -20,6 +20,12 @@ from qcodes.utils import validators as vals
 from copy import deepcopy
 from qcodes.plots.colors import color_cycle
 
+
+try:
+    import msvcrt  # used on windows to catch keyboard input
+except:
+    print('Could not import msvcrt (used for detecting keystrokes)')
+
 try:
     # import pyqtgraph as pg
     # import pyqtgraph.multiprocess as pgmp
@@ -199,6 +205,7 @@ class MeasurementControl(Instrument):
             print(self.sweep_function.sweep_control)
             print(self.detector_function.detector_control)
 
+        self.check_keyboard_interrupt()
         self.update_instrument_monitor()
         self.update_plotmon(force_update=True)
         for sweep_function in self.sweep_functions:
@@ -243,6 +250,7 @@ class MeasurementControl(Instrument):
         for sweep_function in self.sweep_functions:
             sweep_function.finish()
         self.detector_function.finish()
+        self.check_keyboard_interrupt()
         self.update_instrument_monitor()
         self.update_plotmon(force_update=True)
         self.update_plotmon_adaptive(force_update=True)
@@ -304,6 +312,7 @@ class MeasurementControl(Instrument):
                 # specified that you don't want to crash (e.g. on -off seq)
                 pass
 
+        self.check_keyboard_interrupt()
         self.update_instrument_monitor()
         self.update_plotmon()
         if self.mode == '2D':
@@ -343,6 +352,7 @@ class MeasurementControl(Instrument):
                     (1+self.soft_iteration))
         self.dset[start_idx:stop_idx, :] = new_vals
         # update plotmon
+        self.check_keyboard_interrupt()
         self.update_instrument_monitor()
         self.update_plotmon()
         if self.mode == '2D':
@@ -849,6 +859,16 @@ class MeasurementControl(Instrument):
         stop_idx = start_idx + xlen
 
         return start_idx, stop_idx
+
+    def check_keyboard_interrupt(self):
+        try:  # Try except statement is to make it work on non windows pc
+            if msvcrt.kbhit():
+                key = msvcrt.getch()
+                print(key)
+                if b'q' in key:
+                    raise KeyboardInterrupt('Human interupt q')
+        except Exception:
+            pass
 
     ####################################
     # Non-parameter get/set functions  #
