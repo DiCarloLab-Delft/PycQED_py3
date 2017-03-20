@@ -62,7 +62,10 @@ class DeviceObject(Instrument):
         return self.name
 
     def _get_qubits(self):
-        return self._qubits
+        q_list = []
+        for q in self._qubits:
+            q_list.append(q.name)
+        return q_list
 
     def _get_sequencer_config(self):
         seq_cfg = {}
@@ -73,15 +76,6 @@ class DeviceObject(Instrument):
     def add_qubits(self, qubits):
         """
         Add one or more qubit objects to the device
-
-        Args:
-            component (Any): components to add to the Station.
-            name (str): name of the qubit
-
-        Returns:
-            str: the name assigned this qubit, which may have been changed to
-             make it unique among previously added qubits.
-
         """
 
         if type(qubits) == list:
@@ -100,7 +94,8 @@ class DeviceObject(Instrument):
         return name
 
     def get_operation_dict(self, operation_dict={}):
-        for name, q in self.qubits().items():
+        # uses the private qubits list
+        for name, q in self._qubits.items():
             q.get_operation_dict(operation_dict)
         operation_dict['sequencer_config'] = self.sequencer_config()
         return operation_dict

@@ -28,7 +28,7 @@ class QcSnaphotWidget(QtGui.QTreeWidget):
         self.setColumnCount(4)
         self.setHeaderLabels(['Name', 'Value', 'Unit', 'Last update'])
 
-    def setData(self, data, hideRoot=False):
+    def setData(self, data):
         """data should be a QCoDes snapshot of a station."""
         self.clear()
         self.buildTreeSnapshot(snapshot=data)
@@ -41,17 +41,17 @@ class QcSnaphotWidget(QtGui.QTreeWidget):
             return
         parent = self.invisibleRootItem()
 
-        for ins, ins_snapshot in snapshot.items():
+        for ins in sorted(snapshot.keys()):
+            ins_snapshot = snapshot[ins]
             node = QtGui.QTreeWidgetItem([ins, "", ""])
             parent.addChild(node)
-            for par_name, par_snap in ins_snapshot['parameters'].items():
-
+            for par_name in sorted(ins_snapshot['parameters'].keys()):
+                par_snap = ins_snapshot['parameters'][par_name]
                 # Depending on the type of data stored in value do different
                 # things.
-
                 if not isinstance(par_snap['value'], dict):
                     value_str, unit = self.par_val_to_msg(par_snap['value'],
-                                                    par_snap['unit'])
+                                                          par_snap['unit'])
 
                     # Omits printing of the date to make it more readable
                     if par_snap['ts'] is not None:
@@ -63,13 +63,14 @@ class QcSnaphotWidget(QtGui.QTreeWidget):
                     node.addChild(par_node)
 
     def par_val_to_msg(self, val, unit=None):
-        if unit in SI_UNITS:
+        validtypes = (float, int, np.integer, np.floating)
+        if unit in SI_UNITS and isinstance(val, validtypes):
             if val == 0:
                 prefix_power = 0
             else:
                 # The defined prefixes go down to -24 but this is below
                 # the numerical precision of python
-                prefix_power = np.clip(-15, (np.log10(val)//3 *3), 24)
+                prefix_power = np.clip(-15, (np.log10(val)//3 * 3), 24)
             # Determine SI prefix, number 8 corresponds to no prefix
             SI_prefix_idx = int(prefix_power/3 + 8)
             prefix = SI_PREFIXES[SI_prefix_idx]
