@@ -184,23 +184,29 @@ Starmon = do.DeviceObject('Starmon')
 station.add_component(Starmon)
 
 import pycqed.instrument_drivers.meta_instrument.qubit_objects.Tektronix_driven_transmon as qbt
-QL = qbt.Tektronix_driven_transmon('QL', LO=LO, cw_source=QL_LO,
-                                   td_source=QR_LO,
-                                   IVVI=IVVI, rf_RO_source=RF,
-                                   AWG=AWG,
-                                   heterodyne_instr=HS,
-                                   FluxCtrl=FC,
-                                   MC=MC,
-                                   server_name=None)
+QL = qbt.Tektronix_driven_transmon('QL')
+QL.LO(LO.name)
+QL.cw_source(QL_LO.name)
+QL.td_source(QR_LO.name)
+QL.IVVI(IVVI.name)
+QL.RF_RO_source(RF.name)
+QL.AWG(AWG.name)
+QL.heterodyne_instr(HS.name)
+QL.FluxCtrl(FC.name)
+QL.MC(MC.name)
 station.add_component(QL)
-QR = qbt.Tektronix_driven_transmon('QR', LO=LO, cw_source=QL_LO,
-                                   td_source=QR_LO,
-                                   IVVI=IVVI, rf_RO_source=RF,
-                                   AWG=AWG,
-                                   heterodyne_instr=HS,
-                                   FluxCtrl=FC,
-                                   MC=MC,
-                                   server_name=None)
+
+
+QR = qbt.Tektronix_driven_transmon('QR')
+QR.LO(LO.name)
+QR.cw_source(QL_LO.name)
+QR.td_source(QR_LO.name)
+QR.IVVI(IVVI.name)
+QR.RF_RO_source(RF.name)
+QR.AWG(AWG.name)
+QR.heterodyne_instr(HS.name)
+QR.FluxCtrl(FC.name)
+QR.MC(MC.name)
 station.add_component(QR)
 
 QR.add_operation('SWAP')

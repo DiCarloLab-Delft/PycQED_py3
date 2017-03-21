@@ -29,6 +29,8 @@ CBox = qcb.QuTech_ControlBox_v3(
     'CBox', address='Com6', run_tests=False, server_name=None)
 station.add_component(CBox)
 
+
+############ Reloading the QL_CC
 QL_CC = reload_CC_qubit(QL_CC)
 
 QL_CC.CBox(CBox.name)
@@ -36,35 +38,14 @@ QL_CC.LO(LO.name)
 QL_CC.RF_RO_source(RF.name)
 QL_CC.cw_source('QL_LO')
 QL_CC.td_source('QR_LO')
-
 QL_CC.MC(MC.name)
-QL_CC.RO_acq_weight_function_I(0)
-QL_CC.RO_acq_weight_function_Q(1)
-# apparently only possible after setting integration weight channels
 QL_CC.acquisition_instrument(UHFQC_1.name)
 
-gen.load_settings_onto_instrument(QL_CC, load_from_instr='QL')
+# gen.load_settings_onto_instrument(QL_CC, load_from_instr='QL')
 IM.update()
 
 
-# Testing the heterodyne sequence
-CW_RO_sequence = sqqs.CW_RO_sequence(QL_CC.name,
-                                     QL_CC.RO_acq_period_cw())
-CW_RO_sequence_asm = qta.qasm_to_asm(CW_RO_sequence.name,
-                                     QL_CC.get_operation_dict())
-
-qumis_file = CW_RO_sequence_asm
-CBox.load_instructions(qumis_file.name)
-CBox.run_mode('run')
-
-
-
-def check_keyboard_interrupt():
-    try:  # Try except statement is to make it work on non windows pc
-        if msvcrt.kbhit():
-            key = msvcrt.getch()
-            print(key)
-            if b'q' in key:
-                raise KeyboardInterrupt('Human interupt q')
-    except Exception:
-        pass
+QL.find_resonator_frequency()
+QL_CC.find_resonator_frequency()
+QL_CC.find_frequency()
+QL_CC.find_frequency(pulsed=True)
