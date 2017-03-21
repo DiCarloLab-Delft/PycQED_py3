@@ -1,61 +1,47 @@
-import numpy as np
-import matplotlib.pyplot as plt
-import qutip as qtp
-from pycqed.analysis import tomography as tomo
-from qcodes.plots.pyqtgraph import QtPlot
+UHFQC_1.quex_rl_source(2)
+# only one sample to average over
+UHFQC_1.quex_rl_length(1)
+UHFQC_1.quex_rl_avgcnt(
+    int(np.log2(HS.nr_averages())))
+UHFQC_1.quex_wint_length(
+    int(HS.RO_length()*1.8e9))
+# Configure the result logger to not do any averaging
+# The AWG program uses userregs/0 to define the number o
+# iterations in the loop
+UHFQC_1.awgs_0_userregs_0(
+    int(HS.nr_averages()))
+UHFQC_1.awgs_0_userregs_1(0)  # 0 for rl, 1 for iavg
+UHFQC_1.acquisition_initialize([0, 1], 'rl')
 
 
-# phase_q0 = np.pi/50
-phase_q0 = 0
-# phase_q1 = np.pi/20
-phase_q1 = 0
-phase_2q = np.pi/50
-# phase_2q = 0
-
-up = qtp.basis(2, 0)
-dn = qtp.basis(2, 1)
-bell_state = 0
-
-if bell_state == 0:  # |Phi_m>=|00>-|11>
-    gate1 = 'Y90 ' + qS
-    gate2 = 'Y90 ' + qCZ
-    after_pulse = 'mY90 ' + qCZ
-elif bell_state == 1:  # |Phi_p>=|00>+|11>
-    gate1 = 'mY90 ' + qS
-    gate2 = 'Y90 ' + qCZ
-    after_pulse = 'mY90 ' + qCZ
-elif bell_state == 2:  # |Psi_m>=|01> - |10>
-    gate1 = 'Y90 ' + qS
-    gate2 = 'mY90 ' + qCZ
-    after_pulse = 'mY90 ' + qCZ
-elif bell_state == 3:  # |Psi_p>=|01> + |10>
-    gate1 = 'mY90 ' + qS
-    gate2 = 'mY90 ' + qCZ
-    after_pulse = 'mY90 ' + qCZ
 
 
-theta_q0 = np.exp(-1j*phase_q0)
-theta_q1 = np.exp(-1j*phase_q1)
-theta_2q = np.exp(-1j*phase_2q)
-
-CZ_err = [  [1, 0, 0, 0],
-            [0, theta_q0, 0, 0],
-            [0, 0, theta_q1, 0],
-            [0, 0, 0, theta_2q]]
-
-psi_b0 = (theta_2q*qtp.tensor([theta_0*up,
-                              theta_1*up])
-          + qtp.tensor([dn, dn])).unit()
 
 
-bell0 = qtp.ket2dm(psi_b0)
 
-print(bell0)
-bell0_p = tomo.pauli_ops_from_density_matrix(bell0)
-
-f, ax = plt.subplots()
-tomo.plot_operators(bell0_p, ax)
-
-# tomo.plot_operators(bell0, ax)
-plt.show()
-
+sweep_points=None
+if d.AWG is not None:
+    d.AWG.stop()
+if sweep_points is None:
+    d.nr_sweep_points = 1
+else:
+    d.nr_sweep_points = 1
+# # this sets the result to integration and rotation outcome
+if d.cross_talk_suppression:
+    # 2/0/1 raw/crosstalk supressed /digitized
+    d.UHFQC.quex_rl_source(0)
+else:
+    # 2/0/1 raw/crosstalk supressed /digitized
+    d.UHFQC.quex_rl_source(2)
+d.UHFQC.quex_rl_length(d.nr_sweep_points)
+d.UHFQC.quex_rl_avgcnt(int(np.log2(d.nr_averages)))
+d.UHFQC.quex_wint_length(int(d.integration_length*(1.8e9)))
+# Configure the result logger to not do any averaging
+# The AWG program uses userregs/0 to define the number o iterations in
+# the loop
+d.UHFQC.awgs_0_userregs_0(
+    int(d.nr_averages*d.nr_sweep_points))
+d.UHFQC.awgs_0_userregs_1(0)  # 0 for rl, 1 for iavg
+# d.UHFQC.awgs_0_single(1)
+UHFQC_1.acquisition_initialize([0.0, 1.0], 'rl')
+# d.UHFQC.acquisition_initialize(channels=d.channels, mode='rl')

@@ -42,6 +42,7 @@ QL_CC.MC(MC.name)
 QL_CC.acquisition_instrument(UHFQC_1.name)
 
 # gen.load_settings_onto_instrument(QL_CC, load_from_instr='QL')
+QL_CC.spec_pulse_type('gated')
 IM.update()
 
 
