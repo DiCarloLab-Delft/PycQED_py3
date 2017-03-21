@@ -1456,6 +1456,7 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         if self.real_imag:
             self.value_names[0] = 'Magn'
             self.value_names[1] = 'Phase'
+            self.value_units[1] = 'deg'
 
         self.rotate = rotate
 
@@ -1486,7 +1487,7 @@ class UHFQC_integrated_average_detector(Hard_Detector):
             Q = data[1]
             S21 = I + 1j*Q
             data[0] = np.abs(S21)
-            data[1] = np.angle(S21)
+            data[1] = np.angle(S21)/(2*np.pi)*360
 
         if self.rotate:
             return self.rotate_and_normalize(data)
