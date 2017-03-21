@@ -60,6 +60,33 @@ class CBox_v3_driven_transmon(Transmon):
         self.add_parameter('RF_RO_source',
                            parameter_class=InstrumentParameter)
 
+        # Overwriting some pars from the parent class
+        self.RO_acq_marker_channel._vals = vals.Ints(1, 7)
+        self.RO_acq_marker_channel(7)  # initial value
+        # adding marker channels
+        self.add_parameter('RO_acq_pulse_marker_channel',
+                           vals=vals.Ints(1, 7),
+                           initial_value=6,
+                           parameter_class=ManualParameter)
+
+        self.add_parameter('spec_pulse_marker_channel',
+                           vals=vals.Ints(1, 7),
+                           initial_value=5,
+                           parameter_class=ManualParameter)
+        self.add_parameter('spec_pulse_type',
+                            vals=vals.Enum('gated', 'SquarePulse'),
+                            initial_value='gated',
+                            docstring=('Use either a marker gated spec pulse or'
+                                ' use an AWG pulse to modulate a pulse'),
+                            parameter_class=ManualParameter)
+        self.add_parameter('spec_pulse_length',
+                           label='Pulsed spec pulse duration',
+                           unit='s',
+                           vals=vals.Numbers(5e-9, 20e-6),
+                           initial_value=500e-9,
+                           parameter_class=ManualParameter)
+
+
     def add_parameters(self):
         self.add_parameter('acquisition_instrument',
                            set_cmd=self._set_acquisition_instr,
@@ -73,10 +100,10 @@ class CBox_v3_driven_transmon(Transmon):
                            unit='dBm',
                            parameter_class=ManualParameter)
         self.add_parameter('RO_acq_weight_function_I', initial_value=0,
-                           vals=vals.Enum(0, 1, 2, 3, 4, 5),
+                           vals=vals.Ints(0, 5),
                            parameter_class=ManualParameter)
         self.add_parameter('RO_acq_weight_function_Q', initial_value=1,
-                           vals=vals.Enum(0, 1, 2, 3, 4, 5),
+                           vals=vals.Ints(0, 5),
                            parameter_class=ManualParameter)
 
 
@@ -203,6 +230,7 @@ class CBox_v3_driven_transmon(Transmon):
                            parameter_class=ManualParameter)
 
     def prepare_for_continuous_wave(self):
+        self.acquisition_instrument(self.acquisition_instrument())
         self.LO.get_instr().on()
         self.td_source.get_instr().off()
 
@@ -211,8 +239,9 @@ class CBox_v3_driven_transmon(Transmon):
             f_RO = self.f_res.get()
         else:
             f_RO = self.f_RO.get()
+
         self.LO.get_instr().frequency.set(f_RO - self.f_RO_mod.get())
-        if "Gated_MW_RO_pulse" in self.RO_pulse_type():
+        if "gated" in self.RO_pulse_type().lower():
             RF = self.RF_RO_source.get_instr()
             RF.power(self.RO_power_cw())
             RF.frequency(f_RO)
@@ -223,6 +252,7 @@ class CBox_v3_driven_transmon(Transmon):
 
 
     def prepare_for_timedomain(self):
+        self.acquisition_instrument(self.acquisition_instrument())
         self.MC.get_instr().soft_avg(self.RO_soft_averages())
         self.LO.get_instr().on()
         self.cw_source.get_instr().off()
@@ -618,7 +648,19 @@ class CBox_v3_driven_transmon(Transmon):
         # This is a trick so I can reuse the heterodyne instr
         # to do pulsed-spectroscopy
 
-        self.prepare_for_timedomain()
+        if 'gated' in self.spec_pulse_type().lower():
+            self.prepare_for_continuous_wave()
+            if "gated" in self.RO_pulse_type().lower():
+                self.RF_RO_source.get_instr().pulsemod_state('on')
+            self.cw_source.get_instr().on()
+            self.cw_source.get_instr().pulsemod_state.set('on')
+            self.cw_source.get_instr().power.set(self.spec_pow_pulsed.get())
+            sweep_par = self.cw_source.get_instr().frequency
+
+        else:
+            self.prepare_for_timedomain()
+            sweep_par = self.td_source.get_instr().frequency
+
         if MC is None:
             MC = self.MC.get_instr()
 
@@ -631,7 +673,7 @@ class CBox_v3_driven_transmon(Transmon):
         self.CBox.get_instr().run_mode('run')
 
         # make sure we use the right acquision detector. Mind the new UHFQC spec mode
-        MC.set_sweep_function(self.td_source.get_instr().frequency)
+        MC.set_sweep_function(sweep_par)
         MC.set_sweep_points(freqs)
         MC.set_detector_function(self.int_avg_det_single)
         # det.Heterodyne_probe(self.heterodyne_instr)
@@ -1094,7 +1136,7 @@ class CBox_v3_driven_transmon(Transmon):
 
         pulse_period_clocks = convert_to_clocks(
             self.gauss_width()*4, rounding_period=1/abs(self.f_pulse_mod()))
-        RO_length_clocks = convert_to_clocks(self.RO_pulse_length())
+        RO_pulse_length_clocks = convert_to_clocks(self.RO_pulse_length())
         RO_pulse_delay_clocks = convert_to_clocks(self.RO_pulse_delay())
         RO_depletion_clocks = convert_to_clocks(self.RO_depletion_time())
 
@@ -1126,34 +1168,111 @@ class CBox_v3_driven_transmon(Transmon):
             'duration': pulse_period_clocks, 'instruction':
                 'pulse 1110 0000 1110  \nwait {}\n'.format(
                     pulse_period_clocks)}
-
-        if self.RO_pulse_type() == 'MW_IQmod_pulse_CBox':
-            operation_dict['RO {}'.format(self.name)] = {
-                'duration': RO_length_clocks,
-                'instruction': 'wait {} \npulse 0000 1111 1111 '.format(
-                    RO_pulse_delay_clocks)
-                + '\nwait {} \nmeasure \n'.format(RO_length_clocks)}
-
-        if self.RO_pulse_type() == 'MW_IQmod_pulse_UHFQC':
+        if self.spec_pulse_type() == 'gated':
+            spec_length_clocks = convert_to_clocks(
+                self.spec_pulse_length())
+            spec_instr = trigg_ch_to_instr(
+                self.spec_pulse_marker_channel(), spec_length_clocks)
+            operation_dict['SpecPulse '+self.name] = {
+                'duration': spec_length_clocks, 'instruction': spec_instr}
+        else:
             raise NotImplementedError
 
-        elif self.RO_pulse_type() == 'Gated_MW_RO_pulse_CBox':
-            operation_dict['RO {}'.format(self.name)] = {
-                'duration': RO_length_clocks, 'instruction':
-                'wait {} \ntrigger 1000000, {} \n measure \n'.format(
-                    RO_pulse_delay_clocks, RO_length_clocks)}
+        if 'CBox' in self.acquisition_instrument():
+            if self.RO_pulse_type() == 'MW_IQmod_pulse_CBox':
+                operation_dict['RO {}'.format(self.name)] = {
+                    'duration': RO_pulse_length_clocks,
+                    'instruction': 'wait {} \npulse 0000 1111 1111 '.format(
+                        RO_pulse_delay_clocks)
+                    + '\nwait {} \nmeasure \n'.format(RO_pulse_length_clocks)}
 
-        elif self.RO_pulse_type() == 'Gated_MW_RO_pulse_UHFQC':
-            operation_dict['RO {}'.format(self.name)] = {
-                'duration': RO_length_clocks, 'instruction':
-                'wait {} \ntrigger 1000000, {} \n'.format(
-                    RO_pulse_delay_clocks, RO_length_clocks)}
+            if self.RO_pulse_type() == 'MW_IQmod_pulse_UHFQC':
+                raise NotImplementedError
 
-        if RO_depletion_clocks != 0:
-            operation_dict['RO {}'.format(self.name)]['instruction'] += \
-                'wait {}\n'.format(RO_depletion_clocks)
+            elif self.RO_pulse_type() == 'Gated_MW_RO_pulse_CBox':
+                operation_dict['RO {}'.format(self.name)] = {
+                    'duration': RO_pulse_length_clocks, 'instruction':
+                    'wait {} \ntrigger 1000000, {} \n measure \n'.format(
+                        RO_pulse_delay_clocks, RO_pulse_length_clocks)}
+
+            elif self.RO_pulse_type() == 'Gated_MW_RO_pulse_UHFQC':
+                operation_dict['RO {}'.format(self.name)] = {
+                    'duration': RO_pulse_length_clocks, 'instruction':
+                    (trigg_ch_to_instr(self.RO_acq_marker_channel(),
+                                       RO_pulse_length_clocks)+
+                     'wait {}\n'.format(RO_pulse_delay_clocks) +
+                     trigg_ch_to_instr(self.RO_acq_marker_channel(),
+                                       2))}
+                    # UHF triggers on the rising edge
+
+            if RO_depletion_clocks != 0:
+                operation_dict['RO {}'.format(self.name)]['instruction'] += \
+                    'wait {}\n'.format(RO_depletion_clocks)
+        elif (('ATS' in self.acquisition_instrument()) or
+              ('UHFQC' in self.acquisition_instrument())):
+            if 'Gated' in self.RO_pulse_type():
+                measure_instruction = self._gated_RO_marker_instr()
+            else:
+                measure_instruction = self._triggered_RO_marker_instr()
+
+            operation_dict['RO {}'.format(self.name)] = {
+                    'duration': RO_pulse_length_clocks,
+                    'instruction': measure_instruction}
+        else:
+            raise NotImplementedError('Unknown acquisition device.')
 
         return operation_dict
+
+    def _gated_RO_marker_instr(self):
+
+        # Convert time to clocks
+        RO_pulse_length_clocks = convert_to_clocks(self.RO_pulse_length())
+        RO_acq_marker_del_clocks = convert_to_clocks(
+            self.RO_acq_marker_delay())
+        RO_pulse_delay_clocks = convert_to_clocks(self.RO_pulse_delay())
+        RO_depletion_clocks = convert_to_clocks(self.RO_depletion_time())
+
+        # Define the timings
+        t_RO_p = RO_pulse_delay_clocks
+        t_acq_marker = t_RO_p + RO_acq_marker_del_clocks
+        RO_p_len = RO_pulse_length_clocks
+        acq_marker_len = 2
+        t_RO_p_end = t_RO_p+RO_p_len
+        t_acq_marker_end = t_acq_marker+acq_marker_len
+
+        cw_p = trigg_cw(self.RO_acq_pulse_marker_channel())
+        cw_t = trigg_cw(self.RO_acq_marker_channel())
+        cw_both = bin_add_cw_w7(cw_p, cw_t)
+
+        # Only works for a specific time arangement of the pulses
+        if t_acq_marker > (t_RO_p + 1) and t_RO_p_end > t_acq_marker_end:
+            instr = 'wait {} \n'.format(t_RO_p)
+            instr += 'trigger {}, {}\n'.format(cw_p, t_acq_marker-t_RO_p)
+            instr += 'wait {} \n'.format(t_acq_marker-t_RO_p)
+            instr += 'trigger {}, {}\n'.format(cw_both, acq_marker_len)
+            instr += 'wait {} \n'.format(acq_marker_len)
+            instr += 'trigger {}, {}\n'.format(cw_p, t_RO_p_end-t_acq_marker_end)
+            instr += 'wait {} \n'.format(RO_depletion_clocks + t_RO_p_end-t_acq_marker_end)
+
+        else:
+            raise NotImplementedError
+        return instr
+
+    def _triggered_RO_marker_instr(self):
+
+        # Convert time to clocks
+        RO_pulse_delay_clocks = convert_to_clocks(self.RO_pulse_delay())
+        RO_pulse_length_clocks = convert_to_clocks(self.RO_pulse_length())
+        RO_depletion_clocks = convert_to_clocks(self.RO_depletion_time())
+
+        cw_t = trigg_cw(self.RO_acq_marker_channel())
+
+        instr = 'wait {} \n'.format(RO_pulse_delay_clocks)
+        instr += 'trigger {}, {}\n'.format(cw_t, 2)
+        instr += 'wait {} \n'.format(RO_depletion_clocks
+                                     + RO_pulse_length_clocks -2)
+        return instr
+
 
 
 def convert_to_clocks(duration, f_sampling=200e6, rounding_period=None):
@@ -1282,6 +1401,7 @@ class QWG_driven_transmon(CBox_v3_driven_transmon):
             return a
 
     def prepare_for_timedomain(self):
+        self.acquisition_instrument(self.acquisition_instrument())
         self.MC.get_instr().soft_avg(self.RO_soft_averages())
         self.LO.get_instr().on()
         self.cw_source.get_instr().off()
@@ -1392,7 +1512,8 @@ class QWG_driven_transmon(CBox_v3_driven_transmon):
         elif self.spec_pulse_type() == 'block':
             spec_pulse_clocks = convert_to_clocks(self.spec_length())
 
-        RO_length_clocks = convert_to_clocks(self.RO_pulse_length())
+        # should be able to delete this part
+        RO_pulse_length_clocks = convert_to_clocks(self.RO_pulse_length())
         RO_acq_marker_del_clocks = convert_to_clocks(
             self.RO_acq_marker_delay())
         RO_pulse_delay_clocks = convert_to_clocks(self.RO_pulse_delay())
@@ -1446,34 +1567,69 @@ class QWG_driven_transmon(CBox_v3_driven_transmon):
         acq_instr = self._get_acquisition_instr()
         if 'CBox' in acq_instr:
             measure_instruction = 'measure\n'
+            if self.RO_pulse_type() == 'MW_IQmod_pulse':
+                operation_dict['RO {}'.format(self.name)] = {
+                    'duration': (RO_pulse_delay_clocks+RO_acq_marker_del_clocks
+                                 + RO_depletion_clocks),
+                    'instruction': 'wait {} \npulse 0000 1111 1111 '.format(
+                        RO_pulse_delay_clocks)
+                    + '\nwait {} \n{}'.format(
+                        RO_acq_marker_del_clocks, measure_instruction)}
+
+            elif (self.RO_pulse_type() == 'Gated_MW_RO_pulse' or
+                    self.RO_pulse_type() == 'MW_IQmod_pulse_UHFQC'):
+                operation_dict['RO {}'.format(self.name)] = {
+                    'duration': RO_pulse_length_clocks, 'instruction':
+                    'wait {} \n{}'.format(RO_pulse_delay_clocks,
+                                          measure_instruction)}
+
+            if RO_depletion_clocks != 0:
+                operation_dict['RO {}'.format(self.name)]['instruction'] += \
+                    'wait {}\n'.format(RO_depletion_clocks)
+
         elif (('ATS' in acq_instr) or ('UHFQC' in acq_instr)):
-            # measure_instruction = 'trigger 0000001, {}\n'.format(RO_length_clocks)
-            measure_instruction = 'trigger 0000001, {}\n'.format(RO_length_clocks)
+            if 'gated' in self.RO_pulse_type():
+                measure_instruction = self._gated_RO_marker_instr()
+                operation_dict['RO {}'.format(self.name)]['instruction'] = \
+                    measure_instruction
+            else:
+                measure_instruction = self._triggered_RO_marker_instr()
+                operation_dict['RO {}'.format(self.name)]['instruction'] = \
+                    measure_instruction
         else:
             raise NotImplementedError('Unknown acquisition device.')
 
-        if self.RO_pulse_type() == 'MW_IQmod_pulse':
-            operation_dict['RO {}'.format(self.name)] = {
-                'duration': (RO_pulse_delay_clocks+RO_acq_marker_del_clocks
-                             + RO_depletion_clocks),
-                'instruction': 'wait {} \npulse 0000 1111 1111 '.format(
-                    RO_pulse_delay_clocks)
-                + '\nwait {} \n{}'.format(
-                    RO_acq_marker_del_clocks, measure_instruction)}
-
-        elif (self.RO_pulse_type() == 'Gated_MW_RO_pulse' or
-                self.RO_pulse_type() == 'MW_IQmod_pulse_UHFQC'):
-            operation_dict['RO {}'.format(self.name)] = {
-                'duration': RO_length_clocks, 'instruction':
-                'wait {} \n{}'.format(RO_pulse_delay_clocks,
-                                      measure_instruction)}
-
-        if RO_depletion_clocks != 0:
-            operation_dict['RO {}'.format(self.name)]['instruction'] += \
-                'wait {}\n'.format(RO_depletion_clocks)
-
         return operation_dict
 
-    def _get_RO_instruction(operation_dict):
 
-        return operation_dict
+def trigg_cw(channel):
+    cw = ['0']*7
+    cw[channel-1] = '1'
+    cw = ''.join(cw)
+    return cw
+
+
+def trigg_ch_to_instr(channel, duration):
+    """
+    Specify a trigger channel to be triggered and returns the appropriate
+    qumis instruction
+        channel:  int  between 1 and 7
+        duration: int  duration in clocks, >1
+    """
+    cw = trigg_cw(channel)
+
+    instr = 'trigger {}, {} \n'.format(cw, duration)
+    instr += 'wait {}\n'.format(duration)
+    return instr
+
+
+def bin_add_cw_w7(a, b):
+    """
+    Width 7 binary addition of two codeword strings
+    """
+    c = (int(a, 2) + int(b, 2))
+    return '{0:07b}'.format(c)
+
+
+
+

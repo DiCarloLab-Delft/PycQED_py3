@@ -131,10 +131,10 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                                min_value=10e-9, max_value=1000e-6),
                            parameter_class=ManualParameter)
         self.add_parameter('RO_acq_weight_function_I', initial_value=0,
-                           vals=vals.Enum(0, 1, 2, 3, 4, 5),
+                           vals=vals.Ints(0, 5),
                            parameter_class=ManualParameter)
         self.add_parameter('RO_acq_weight_function_Q', initial_value=1,
-                           vals=vals.Enum(0, 1, 2, 3, 4, 5),
+                           vals=vals.Ints(0, 5),
                            parameter_class=ManualParameter)
         # These parameters are only relevant if using MW_IQmod_pulse type
         # RO
