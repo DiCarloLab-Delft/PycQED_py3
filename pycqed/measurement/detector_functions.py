@@ -1478,8 +1478,7 @@ class UHFQC_integrated_average_detector(Hard_Detector):
             self.AWG.start()
 
         data_raw = self.UHFQC.acquisition_poll(samples=self.nr_sweep_points,
-                                               arm=False, acquisition_time=0.01,
-                                               timeout=1000)
+                                               arm=False, acquisition_time=0.01)
         data = np.array([data_raw[key]
                          for key in data_raw.keys()])*self.scaling_factor
         if self.real_imag:
