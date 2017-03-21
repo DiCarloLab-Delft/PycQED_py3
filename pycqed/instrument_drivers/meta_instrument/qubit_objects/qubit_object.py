@@ -265,7 +265,7 @@ class Transmon(Qubit):
 
         elif self.f_qubit_calc_method() == 'dac':
             if dac_voltage is None:
-                dac_voltage = self.IVVI.get(
+                dac_voltage = self.IVVI.get_instr().get(
                         'dac{}'.format(self.dac_channel()))
 
             f_qubit_estimate = fit_mods.Qubit_dac_to_freq(
@@ -278,7 +278,7 @@ class Transmon(Qubit):
 
         elif self.f_qubit_calc_method() == 'flux':
             if flux is None:
-                flux = self.FluxCtrl.get(
+                flux = self.FluxCtrl.get_instr().get(
                     'flux{}'.format(self.dac_channel()))
             f_qubit_estimate = fit_mods.Qubit_dac_to_freq(
                 dac_voltage=flux,
