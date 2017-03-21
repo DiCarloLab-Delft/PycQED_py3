@@ -573,7 +573,7 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
                     dataset = eval(
                         "self.UHFQC.quex_iavg_data_{}()".format(channel))
                     data[i] = dataset[0]['vector']
-                # data = self.UHFQC.single_acquisition(nr_samples,
+                # data = self.UHFQC.acquisition(nr_samples,
                 #                              self.poll_time, timeout=0,
                 #                              channels=set([0,1]),
                 #                              mode='iavg')
@@ -605,7 +605,7 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
                     dataset = eval(
                         "self.UHFQC.quex_iavg_data_{}()".format(channel))
                     data[i] = dataset[0]['vector']
-                # data = self.UHFQC.single_acquisition(nr_samples,
+                # data = self.UHFQC.acquisition(nr_samples,
                 #                              self.poll_time, timeout=0,
                 #                              channels=set([0,1]),
                 #                              mode='iavg')

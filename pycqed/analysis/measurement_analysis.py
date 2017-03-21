@@ -230,6 +230,7 @@ class MeasurementAnalysis(object):
             fit_grp = self.analysis_group.create_group(fit_name)
         else:
             fit_grp = self.analysis_group[fit_name]
+
         # fit_grp.attrs['Fit Report'] = \
         #     '\n'+'*'*80+'\n' + \
         #     fit_res.fit_report() + \
@@ -1166,7 +1167,14 @@ class Rabi_Analysis(TD_Analysis):
 
             fine_fit = self.fit_res[i].model.func(
                 x_fine, **self.fit_res[i].best_values)
-            self.axs[i].plot(x_fine, fine_fit, label='fit')
+            #adding the fitted amp180
+            label='amp180 = {:.3e}'.format(abs(self.fit_res[i].params['period'].value)/2)
+            self.axs[i].plot(x_fine, fine_fit,label=label )
+            ymin = min(self.measured_values[i])
+            ymax = max(self.measured_values[i])
+            yspan = ymax-ymin
+            self.axs[i].set_ylim(ymin-0.23*yspan, 0.05*yspan+ymax)
+            self.axs[i].legend(frameon=False, loc='lower left')
             if show_guess:
                 fine_fit = self.fit_res[i].model.func(
                     x_fine, **self.fit_res[i].init_values)
@@ -2570,10 +2578,10 @@ class T1_Analysis(TD_Analysis):
         if print_fit_results:
             print(fit_res.fit_report())
         if make_fig:
-            self.plot_results_vs_sweepparam(x=self.sweep_points,
+            self.plot_results_vs_sweepparam(x=self.sweep_points*1e6,
                                             y=self.normalized_values,
                                             fig=fig, ax=ax,
-                                            xlabel=self.xlabel,
+                                            xlabel=r'Time ($\mu s$)',
                                             ylabel=r'$F$ $|1 \rangle$',
                                             **kw)
             if show_guess:
@@ -2590,7 +2598,7 @@ class T1_Analysis(TD_Analysis):
                 amplitude=best_vals['amplitude'],
                 offset=best_vals['offset'])
 
-            ax.plot(t, y, 'r-')
+            ax.plot(t*1e6, y, 'r-')
             textstr = '$T_1$ = %.3g $\pm$ (%.5g) s ' % (
                 fit_res.params['tau'].value, fit_res.params['tau'].stderr)
 
@@ -2717,11 +2725,10 @@ class Ramsey_Analysis(TD_Analysis):
         ax.text(0.4, 0.95, textstr,
                 transform=ax.transAxes, fontsize=11,
                 verticalalignment='top', bbox=self.box_props)
-
-        self.plot_results_vs_sweepparam(x=self.sweep_points,
+        self.plot_results_vs_sweepparam(x=self.sweep_points*1e6,
                                         y=self.normalized_values,
                                         fig=fig, ax=ax,
-                                        xlabel=self.xlabel,
+                                        xlabel=r'Time ($\mu s$)',
                                         ylabel=ylabel,
                                         save=False)
         if show_guess:
@@ -2739,7 +2746,7 @@ class Ramsey_Analysis(TD_Analysis):
             amplitude=best_vals['amplitude'],
             oscillation_offset=best_vals['oscillation_offset'],
             exponential_offset=best_vals['exponential_offset'])
-        ax.plot(x, y, 'r-')
+        ax.plot(x*1e6, y, 'r-')
 
     def run_default_analysis(self, print_fit_results=False, **kw):
 
@@ -4021,15 +4028,17 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
                              show=False, fit_results_peak=True, **kw):
         def fit_data():
             try:
-                self.data_dist = a_tools.calculate_distance_ground_state(
-                    data_real=self.measured_values[2],
-                    data_imag=self.measured_values[3])
+                self.data_dist = np.sqrt(self.measured_values[2]**2 + self.measured_values[3])
+                # self.data_dist = a_tools.calculate_distance_ground_state(
+                #     data_real=self.measured_values[2],
+                #     data_imag=self.measured_values[3])
             except:
                 # Quick fix to make it work with pulsed spec which does not
                 # return both I,Q and, amp and phase
-                self.data_dist = a_tools.calculate_distance_ground_state(
-                    data_real=self.measured_values[0],
-                    data_imag=self.measured_values[1])
+                self.data_dist = self.measured_values[0] #only using the amplitude!!
+                # self.data_dist = a_tools.calculate_distance_ground_state(
+                #     data_real=self.measured_values[0],
+                #     data_imag=self.measured_values[1])
 
             self.peaks = a_tools.peak_finder(
                 self.sweep_points, a_tools.smooth(self.data_dist))
@@ -5288,7 +5297,7 @@ class Chevron_2D(object):
         return
 
 
-class DoubleFrequency(MeasurementAnalysis):
+class DoubleFrequency(TD_Analysis):
 
     def __init__(self, auto=True, label='Ramsey', timestamp=None, **kw):
         kw['label'] = label
@@ -5298,13 +5307,15 @@ class DoubleFrequency(MeasurementAnalysis):
         super().__init__(**kw)
 
     def run_default_analysis(self, **kw):
+        self.add_analysis_datagroup_to_file()
         self.get_naming_and_values()
         x = self.sweep_points
         y = a_tools.normalize_data_v3(self.measured_values[0])
 
         fit_res = self.fit(x[:-4], y[:-4])
         self.fit_res = fit_res
-        print(x[1])
+
+        self.save_fitted_parameters(self.fit_res, var_name='double_fit')
 
         fig, ax = plt.subplots()
         self.box_props = dict(boxstyle='Square', facecolor='white', alpha=0.8)
@@ -5334,6 +5345,8 @@ class DoubleFrequency(MeasurementAnalysis):
         ax.plot(plot_x[:-4]*1e6, self.fit_plot, 'r-')
         fig.tight_layout()
         self.save_fig(fig, **kw)
+        self.data_file.close()
+        return self.fit_res
 
     def fit(self, sweep_values, measured_values):
         Double_Cos_Model = fit_mods.DoubleExpDampOscModel

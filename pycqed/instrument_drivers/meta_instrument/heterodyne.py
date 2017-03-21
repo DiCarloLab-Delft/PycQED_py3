@@ -359,16 +359,78 @@ class HeterodyneInstrument(Instrument):
             time.sleep(1.0)
 
     def off(self):
-        self.LO.off()
-        self.RF.off()
+        self.set('status', 'Off')
+        return
 
-    def _get_acquisition_instr(self):
-        # Specifying the int_avg det here should allow replacing it with ATS
-        # or potential digitizer acquisition easily
-        if self._acquisition_instr == None:
-            return None
-        else:
-            return self._acquisition_instr.name
+    def prepare(self,  trigger_separation, RO_length, get_t_base=True ):
+        '''
+        This function needs to be overwritten for the ATS based version of this
+        driver
+        '''
+        if self.AWG!=None:
+            if ((self._awg_seq_filename not in self.AWG.get('setup_filename')) and
+                    not self._disable_auto_seq_loading):
+                self.seq_name = st_seqs.generate_and_upload_marker_sequence(
+                    RO_length, trigger_separation, RF_mod=False,
+                    IF=self.get('f_RO_mod'), mod_amp=0.5)
+            self.AWG.run()
+        if get_t_base is True:
+            if self.acquisition_instr()==None:
+                print('no acquistion prepare')
+            elif 'CBox' in self.acquisition_instr():
+                trace_length = 512
+                tbase = np.arange(0, 5*trace_length, 5)*1e-9
+                self.cosI = np.floor(
+                    127.*np.cos(2*np.pi*self.get('f_RO_mod')*tbase))
+                self.sinI = np.floor(
+                    127.*np.sin(2*np.pi*self.get('f_RO_mod')*tbase))
+                self._acquisition_instr.sig0_integration_weights(self.cosI)
+                self._acquisition_instr.sig1_integration_weights(self.sinI)
+                # because using integrated avg
+                self._acquisition_instr.set('nr_samples', 1)
+                self._acquisition_instr.nr_averages(int(self.nr_averages()))
+
+            elif 'UHFQC' in self.acquisition_instr():
+                # self._acquisition_instr.prepare_DSB_weight_and_rotation(
+                #     IF=self.get('f_RO_mod'),
+                #      weight_function_I=0, weight_function_Q=1)
+                # this sets the result to integration and rotation outcome
+                self._acquisition_instr.quex_rl_source(2)
+                # only one sample to average over
+                self._acquisition_instr.quex_rl_length(1)
+                self._acquisition_instr.quex_rl_avgcnt(
+                    int(np.log2(self.nr_averages())))
+                self._acquisition_instr.quex_wint_length(
+                    int(RO_length*1.8e9))
+                # Configure the result logger to not do any averaging
+                # The AWG program uses userregs/0 to define the number o
+                # iterations in the loop
+                self._acquisition_instr.awgs_0_userregs_0(
+                    int(self.nr_averages()))
+                # 0 for rl, 1 for iavg
+                self._acquisition_instr.awgs_0_userregs_1(0)
+                self._acquisition_instr.awgs_0_single(1)
+                self._acquisition_instr.acquisition_initialize([0,1], 'rl')
+                self.scale_factor = 1/(1.8e9*RO_length*int(self.nr_averages()))
+
+
+            elif 'ATS' in self.acquisition_instr():
+                self._acquisition_instr_controller.demodulation_frequency=self.get('f_RO_mod')
+                buffers_per_acquisition = 8
+                self._acquisition_instr_controller.update_acquisitionkwargs(#mode='NPT',
+                     samples_per_record=64*1000,#4992,
+                     records_per_buffer=int(self.nr_averages()/buffers_per_acquisition),#70, segmments
+                     buffers_per_acquisition=buffers_per_acquisition,
+                     channel_selection='AB',
+                     transfer_offset=0,
+                     external_startcapture='ENABLED',
+                     enable_record_headers='DISABLED',
+                     alloc_buffers='DISABLED',
+                     fifo_only_streaming='DISABLED',
+                     interleave_samples='DISABLED',
+                     get_processed_data='DISABLED',
+                     allocated_buffers=buffers_per_acquisition,
+                     buffer_timeout=1000)
 
     def _set_acquisition_instr(self, acquisition_instr):
         # Specifying the int_avg det here should allow replacing it with ATS
@@ -398,30 +460,53 @@ class HeterodyneInstrument(Instrument):
                 self.find_instrument(acquisition_instr_controller)
             print("controller initialized")
 
-    def _set_trigger_separation(self, val):
-        if val != self._trigger_separation:
-            self._awg_seq_parameters_changed = True
-        self._trigger_separation = val
 
-    def _get_trigger_separation(self):
-        return self._trigger_separation
+    def probe(self, demodulation_mode='double', **kw):
+        '''
+        Starts acquisition and returns the data
+            'COMP' : returns data as a complex point in the I-Q plane in Volts
+        '''
+        if self.acquisition_instr()==None:
+            dat=[0,0]
+            print('no acquistion probe')
+        elif 'CBox' in self.acquisition_instr():
+            self._acquisition_instr.set('acquisition_mode', 'idle')
+            self._acquisition_instr.set(
+                'acquisition_mode', 'integration averaging')
+            self._acquisition_instr.demodulation_mode(demodulation_mode)
+            # d = self.CBox.get_integrated_avg_results()
+            # quick fix for spec units. Need to properrly implement it later
+            # after this, output is in mV
+            scale_factor_dacmV = 1000.*0.75/128.
+            # scale_factor_integration = 1./float(self.f_RO_mod()*self.CBox.nr_samples()*5e-9)
+            scale_factor_integration = 1. / \
+                (64.*self._acquisition_instr.integration_length())
+            factor = scale_factor_dacmV*scale_factor_integration
+            d = np.double(
+                self._acquisition_instr.get_integrated_avg_results())*np.double(factor)
+            # print(np.size(d))
+            dat = (d[0][0]+1j*d[1][0])
+        elif 'UHFQC' in self.acquisition_instr():
+            t0 = time.time()
+            #self._acquisition_instr.awgs_0_enable(1) #this was causing spikes
+            # NH: Reduced timeout to prevent hangups
 
-    def _set_RO_length(self, val):
-        if val != self._RO_length and \
-           not 'UHFQC' in self.acquisition_instr():
-            self._awg_seq_parameters_changed = True
-        self._RO_length = val
 
-    def _get_RO_length(self):
-        return self._RO_length
+            dataset = self._acquisition_instr.acquisition_poll(samples=1, acquisition_time=0.001, timeout=10)
+            dat = (self.scale_factor*dataset[0][0]+self.scale_factor*1j*dataset[1][0])
+            t1 = time.time()
+            # print("time for UHFQC polling", t1-t0)
+        elif 'ATS' in self.acquisition_instr():
+            t0 = time.time()
+            dat = self._acquisition_instr_controller.acquisition()
+            t1 = time.time()
+            # print("time for ATS polling", t1-t0)
+        return dat
 
-    def _set_acq_marker_channels(self, channels):
-        if channels != self._acq_marker_channels:
-            self._awg_seq_parameters_changed = True
-        self._acq_marker_channels = channels
+    def finish(self):
+        if 'UHFQC' in self.acquisition_instr():
+            self._acquisition_instr.acquisition_finalize()
 
-    def _get_acq_marker_channels(self):
-        return self._acq_marker_channels
 
     def get_demod_array(self):
         return self.cosI, self.sinI

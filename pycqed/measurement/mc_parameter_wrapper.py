@@ -7,7 +7,7 @@ from pycqed.measurement import sweep_functions as swf
 from pycqed.measurement import detector_functions as det
 import time
 
-def wrap_par_to_swf(parameter):
+def wrap_par_to_swf(parameter, retrieve_value=False):
     '''
      - only soft sweep_functions
     '''
@@ -19,10 +19,18 @@ def wrap_par_to_swf(parameter):
 
     sweep_function.prepare = pass_function
     sweep_function.finish = pass_function
-    sweep_function.set_parameter = parameter.set
+    if retrieve_value:
+        def set_par(val):
+            parameter.set(val)
+            parameter.get()
+        sweep_function.set_parameter = set_par
+    else:
+        sweep_function.set_parameter = parameter.set
+
+
     return sweep_function
 
-def wrap_pars_to_swf(parameters):
+def wrap_pars_to_swf(parameters, retrieve_value=False):
     '''
      - only soft sweep_functions
     '''
@@ -37,6 +45,8 @@ def wrap_pars_to_swf(parameters):
     def set_par(val):
         for par in parameters:
             par.set(val)
+            if retrieve_value:
+                par.get()
 
     sweep_function.set_parameter = set_par
 

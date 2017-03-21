@@ -301,8 +301,11 @@ class Transmon(Qubit):
     def find_frequency(self, method='spectroscopy', pulsed=False,
                        steps=[1, 3, 10, 30, 100, 300, 1000],
                        freqs=None,
-                       f_span=100e6, use_max=False, f_step=1e6,
-                       verbose=True, update=True,
+                       f_span=100e6,
+                       use_max=False,
+                       f_step=1e6,
+                       verbose=True,
+                       update=True,
                        close_fig=True):
         """
         Finds the qubit frequency using either the spectroscopy or the Ramsey
@@ -325,11 +328,13 @@ class Transmon(Qubit):
                 label = 'spectroscopy'
             analysis_spec = ma.Qubit_Spectroscopy_Analysis(
                 label=label, close_fig=True)
-            if use_max:
-                self.f_qubit(analysis_spec.peaks['peak'])
-            else:
-                self.f_qubit(analysis_spec.fitted_freq)
-            # TODO: add updating and fitting
+
+            if update:
+                if use_max:
+                    self.f_qubit(analysis_spec.peaks['peak'])
+                else:
+                    self.f_qubit(analysis_spec.fitted_freq)
+                # TODO: add updating and fitting
         elif method.lower() == 'ramsey':
 
             stepsize = abs(1/self.f_pulse_mod.get())
@@ -369,7 +374,6 @@ class Transmon(Qubit):
                 print('Converged to: {:.9e}'.format(cur_freq))
             if update:
                 self.f_qubit.set(cur_freq)
-                print("update", update)
             return cur_freq
 
     def find_resonator_frequency(self, use_min=False,

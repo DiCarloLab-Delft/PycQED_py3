@@ -451,14 +451,14 @@ class CBox_driven_transmon(Transmon):
                              ' either "conventional" or "self-consistent"')
 
     def measure_heterodyne_spectroscopy(self, freqs, MC=None,
-                                        analyze=True, close_fig=True):
+                                        analyze=True, close_fig=True, RO_length=2000e-9):
         self.prepare_for_continuous_wave()
         if MC is None:
             MC = self.MC
         MC.set_sweep_function(pw.wrap_par_to_swf(
                               self.heterodyne_instr.frequency))
         MC.set_sweep_points(freqs)
-        MC.set_detector_function(det.Heterodyne_probe(self.heterodyne_instr, trigger_separation=2.8e-6))
+        MC.set_detector_function(det.Heterodyne_probe(self.heterodyne_instr, trigger_separation=2.8e-6, RO_length=2274e-9))
         MC.run(name='Resonator_scan'+self.msmt_suffix)
         if analyze:
             ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
@@ -524,7 +524,7 @@ class CBox_driven_transmon(Transmon):
         if analyze:
             ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
 
-    def measure_resonator_power(self, freqs, mod_amps,
+    def measure_resonator_power(self, freqs, powers,
                                 MC=None, analyze=True, close_fig=True):
         '''
         N.B. This one does not use powers but varies the mod-amp.
@@ -535,9 +535,9 @@ class CBox_driven_transmon(Transmon):
             MC = self.MC
         MC.set_sweep_functions(
             [pw.wrap_par_to_swf(self.heterodyne_instr.frequency),
-             pw.wrap_par_to_swf(self.heterodyne_instr.mod_amp)])
+             pw.wrap_par_to_swf(self.heterodyne_instr.RF_power)])
         MC.set_sweep_points(freqs)
-        MC.set_sweep_points_2D(mod_amps)
+        MC.set_sweep_points_2D(powers)
         MC.set_detector_function(det.Heterodyne_probe(self.heterodyne_instr))
         MC.run(name='Resonator_power_scan'+self.msmt_suffix, mode='2D')
         if analyze:
@@ -549,10 +549,8 @@ class CBox_driven_transmon(Transmon):
         if MC is None:
             MC = self.MC
         MC.set_sweep_functions(
-            [pw.wrap_par_to_swf(self.heterodyne_instr.frequency),
-             pw.wrap_par_to_swf(
-                self.IVVI['dac{}'.format(self.dac_channel.get())])
-             ])
+            [self.heterodyne_instr.frequency,
+             self.IVVI.parameters['dac{}'.format(self.dac_channel())]])
         MC.set_sweep_points(freqs)
         MC.set_sweep_points_2D(dac_voltages)
         MC.set_detector_function(det.Heterodyne_probe(self.heterodyne_instr))

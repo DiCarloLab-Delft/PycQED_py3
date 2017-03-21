@@ -954,8 +954,8 @@ class Detect_simulated_hanger_Soft(Soft_Detector):
 
 class Heterodyne_probe(Soft_Detector):
 
-    def __init__(self, HS, threshold=1.75, trigger_separation=20e-6,
-                 demod_mode='double', **kw):
+    def __init__(self, HS, threshold=1.75, trigger_separation=10e-6,
+                 demod_mode='double', RO_length=2000e-9, **kw):
         super().__init__(**kw)
         self.HS = HS
         self.name = 'Heterodyne probe'
@@ -971,8 +971,12 @@ class Heterodyne_probe(Soft_Detector):
         else:
             HS.single_sideband_demod(True)
 
+        self.trigger_separation = trigger_separation
+        self.demod_mode = demod_mode
+        self.RO_length=RO_length
+
     def prepare(self):
-        self.HS.prepare()
+        self.HS.prepare(trigger_separation=self.trigger_separation, RO_length=self.RO_length)
 
     def acquire_data_point(self, **kw):
         passed = False
@@ -1049,6 +1053,9 @@ class Heterodyne_probe_soft_avg(Soft_Detector):
         self.first = False
         self.last = abs(S21)
         return S21.real, S21.imag
+
+    def finish(self):
+        self.HS.finish()
 
 
 class PulsedSpectroscopyDetector(Soft_Detector):
@@ -1456,43 +1463,28 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         self.integration_length = integration_length
         self.rotate = rotate
         self.cross_talk_suppression = cross_talk_suppression
+        self.scaling_factor=1/(1.8e9*integration_length*self.nr_averages)
 
     def get_values(self):
-        if self.AWG is not None:
-            self.AWG.stop()
-        self.UHFQC.quex_rl_readout(0)  # resets UHFQC internal readout counters
-        self.UHFQC.awgs_0_enable(1)
-        # probing the values to be sure communication is finished before
-        # this way of checking the UHFQC should be OK according to Niels H
-        try:
-            temp = self.UHFQC.awgs_0_enable()
-        except:
-            temp = self.UHFQC.awgs_0_enable()
-        del temp
+
+        self.AWG.stop()
+        self.UHFQC.quex_rl_readout(1) # resets UHFQC internal readout counters
+        self.UHFQC.acquisition_arm()
         # starting AWG
         if self.AWG is not None:
             self.AWG.start()
 
-        while self.UHFQC.awgs_0_enable() == 1:
-            time.sleep(0.01)
-        data = ['']*len(self.channels)
-        for i, channel in enumerate(self.channels):
-            dataset = self.UHFQC.get('quex_rl_data_%d'%(channel))
-            data[i] = dataset[0]['vector']/self.nr_averages
-            if self.cross_talk_suppression:
-                data[i] = data[i]-self.UHFQC.get(
-                    'quex_trans_offset_weightfunction_%d'%(channel))
-
-        # data = self.UHFQC.single_acquisition(self.nr_sweep_points,
-        #                                      self.poll_time, timeout=0,
-        #                                      channels=set(self.channels))
-        # data = np.array([data[key] for key in data.keys()])
+        data_raw=self.UHFQC.acquisition_poll(samples=self.nr_sweep_points,
+                                             arm=False, acquisition_time=0.01,
+                                             timeout=1000)
+        data = np.array([data_raw[key] for key in data_raw.keys()])*self.scaling_factor
         if self.real_imag:
             I = data[0]
-            Q =data[1]
-            S21 = I +1j*Q
+            Q = data[1]
+            S21 = I + 1j*Q
             data[0] = np.abs(S21)
             data[1] = np.angle(S21)
+
         if self.rotate:
             return self.rotate_and_normalize(data)
         else:
@@ -1543,6 +1535,7 @@ class UHFQC_integrated_average_detector(Hard_Detector):
             int(self.nr_averages*self.nr_sweep_points))
         self.UHFQC.awgs_0_userregs_1(0)  # 0 for rl, 1 for iavg
         self.UHFQC.awgs_0_single(1)
+        self.UHFQC.acquisition_initialize(channels=self.channels, mode='rl')
 
     def finish(self):
         if self.AWG is not None:
