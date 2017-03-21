@@ -80,7 +80,7 @@ class HeterodyneInstrument(Instrument):
                            vals=vals.Numbers(min_value=0, max_value=1e6),
                            parameter_class=ManualParameter,
                            initial_value=1024)
-        self.add_parameter('status', vals=vals.Enum('On','Off'),
+        self.add_parameter('status', vals=vals.Enum('On', 'Off'),
                            set_cmd=self._set_status,
                            get_cmd=self._get_status)
         self.add_parameter('trigger_separation', label='Trigger separation',
@@ -97,6 +97,7 @@ class HeterodyneInstrument(Instrument):
                            initial_value=True)
         self.add_parameter('acq_marker_channels', vals=vals.Strings(),
                            label='Acquisition trigger channels',
+                           docstring='comma (,) separated string of marker channels',
                            set_cmd=self._set_acq_marker_channels,
                            get_cmd=self._get_acq_marker_channels)
 
@@ -111,12 +112,21 @@ class HeterodyneInstrument(Instrument):
         self._frequency = 5e9
         self.frequency(5e9)
         self.f_RO_mod(10e6)
-        self._eps = 0.01 # Hz slack for comparing frequencies
-        self._acq_marker_channels = 'ch4_marker1,ch4_marker2,' \
-                                    'ch3_marker1,ch3_marker2'
-
+        self._eps = 0.01  # Hz slack for comparing frequencies
+        self._acq_marker_channels = ('ch4_marker1,ch4_marker2,' +
+                                     'ch3_marker1,ch3_marker2')
 
     def prepare(self, get_t_base=True):
+        # Uploading the AWG sequence
+        if (self._awg_seq_filename not in self.AWG.setup_filename() or
+                self._awg_seq_parameters_changed) and self.auto_seq_loading():
+            self._awg_seq_filename = \
+                st_seqs.generate_and_upload_marker_sequence(
+                    5e-9, self.trigger_separation(), RF_mod=False,
+                    acq_marker_channels=self.acq_marker_channels())
+            self._awg_seq_parameters_changed = False
+
+        # Preparing the acquisition instruments
         if 'CBox' in self.acquisition_instr():
             self.prepare_CBox(get_t_base)
         elif 'UHFQC' in self.acquisition_instr():
@@ -160,40 +170,23 @@ class HeterodyneInstrument(Instrument):
         # self.CBox.set('acquisition_mode', 'idle') # aded with xiang
 
     def prepare_UHFQC(self):
-        if self.AWG != None:
-            if (self._awg_seq_filename not in self.AWG.setup_filename() or
-                    self._awg_seq_parameters_changed) and \
-                    self.auto_seq_loading():
-                self._awg_seq_filename = \
-                    st_seqs.generate_and_upload_marker_sequence(
-                        5e-9, self.trigger_separation(), RF_mod=False,
-                        acq_marker_channels=self.acq_marker_channels())
-                self._awg_seq_parameters_changed = False
-
-        if self._UHFQC_awg_parameters_changed and self.auto_seq_loading():
-            self._acquisition_instr.awg_sequence_acquisition()
-            self._UHFQC_awg_parameters_changed = False
-
-        # prepare weights and rotation
-        if self.single_sideband_demod():
-            self._acquisition_instr.prepare_SSB_weight_and_rotation(
-                IF=self.f_RO_mod(), weight_function_I=0, weight_function_Q=1)
-        else:
-            self._acquisition_instr.prepare_DSB_weight_and_rotation(
-                IF=self.f_RO_mod(), weight_function_I=0, weight_function_Q=1)
-
         # this sets the result to integration and rotation outcome
         self._acquisition_instr.quex_rl_source(2)
+        # only one sample to average over
         self._acquisition_instr.quex_rl_length(1)
         self._acquisition_instr.quex_rl_avgcnt(
             int(np.log2(self.nr_averages())))
-        self._acquisition_instr.quex_wint_length(int(self.RO_length()*1.8e9))
-        # The AWG program uses userregs/0 to define the number of
+        self._acquisition_instr.quex_wint_length(
+            int(self.RO_length()*1.8e9))
+        # Configure the result logger to not do any averaging
+        # The AWG program uses userregs/0 to define the number o
         # iterations in the loop
-        self._acquisition_instr.awgs_0_userregs_0(int(self.nr_averages()))
-        # 0 for rl, 1 for iavg
-        self._acquisition_instr.awgs_0_userregs_1(0)
-        self._acquisition_instr.awgs_0_single(1)
+        self._acquisition_instr.awgs_0_userregs_0(
+            int(self.nr_averages()))
+        self._acquisition_instr.awgs_0_userregs_1(0)  # 0 for rl, 1 for iavg
+        self._acquisition_instr.acquisition_initialize([0, 1], 'rl')
+        self.scale_factor_UHFQC = 1/(1.8e9*self.RO_length() *
+                                     int(self.nr_averages()))
 
     def prepare_ATS(self, get_t_base=True):
         if self.AWG != None:
@@ -212,10 +205,10 @@ class HeterodyneInstrument(Instrument):
                 self.f_RO_mod()
             buffers_per_acquisition = 8
             self._acquisition_instr_controller.update_acquisitionkwargs(
-                #mode='NPT',
-                samples_per_record=64*1000,#4992,
-                records_per_buffer=
-                    int(self.nr_averages()/buffers_per_acquisition),#70 segments
+                # mode='NPT',
+                samples_per_record=64*1000,  # 4992,
+                records_per_buffer=int(
+                    self.nr_averages()/buffers_per_acquisition),  # 70 segments
                 buffers_per_acquisition=buffers_per_acquisition,
                 channel_selection='AB',
                 transfer_offset=0,
@@ -249,13 +242,13 @@ class HeterodyneInstrument(Instrument):
         self._acquisition_instr.demodulation_mode(demodulation_mode)
         # d = self.CBox.get_integrated_avg_results()
         # quick fix for spec units. Need to properrly implement it later
-        # after this, output is in mV
-        scale_factor_dacmV = 1000.*0.75/128.
+        # after this, output is in V
+        scale_factor_dacV = 1.*0.75/128.
         # scale_factor_integration = 1./float(self.f_RO_mod() *
         #     self.CBox.nr_samples()*5e-9)
         scale_factor_integration = \
             1 / (64.*self._acquisition_instr.integration_length())
-        factor = scale_factor_dacmV*scale_factor_integration
+        factor = scale_factor_dacV*scale_factor_integration
         d = np.double(self._acquisition_instr.get_integrated_avg_results()) \
             * np.double(factor)
         # print(np.size(d))
@@ -266,26 +259,15 @@ class HeterodyneInstrument(Instrument):
            self._UHFQC_awg_parameters_changed:
             self.prepare()
 
-        self._acquisition_instr.awgs_0_enable(1)
-
-        # why do we need this?
-        try:
-            self._acquisition_instr.awgs_0_enable()
-        except:
-            self._acquisition_instr.awgs_0_enable()
-
-        while self._acquisition_instr.awgs_0_enable() == 1:
-            time.sleep(0.01)
-        data = ['', '']
-        data[0] = self._acquisition_instr.quex_rl_data_0()[0]['vector']
-        data[1] = self._acquisition_instr.quex_rl_data_1()[0]['vector']
-        return data[0]+1j*data[1]
+        dataset = self._acquisition_instr.acquisition_poll(
+            samples=1, acquisition_time=0.001, timeout=10)
+        dat = (self.scale_factor_UHFQC*dataset[0][0] +
+               self.scale_factor_UHFQC*1j*dataset[1][0])
+        return dat
 
     def probe_ATS(self):
-        t0 = time.time()
         dat = self._acquisition_instr_controller.acquisition()
-        t1 = time.time()
-        # print("time for ATS polling", t1-t0)
+
         return dat
 
     def finish(self):
@@ -338,7 +320,7 @@ class HeterodyneInstrument(Instrument):
 
     def _get_status(self):
         if (self.LO.status().startswith('On') and
-            self.RF.status().startswith('On')):
+                self.RF.status().startswith('On')):
             return 'On'
         elif (self.LO.status().startswith('Off') and
               self.RF.status().startswith('Off')):
@@ -365,7 +347,7 @@ class HeterodyneInstrument(Instrument):
     def _get_acquisition_instr(self):
         # Specifying the int_avg det here should allow replacing it with ATS
         # or potential digitizer acquisition easily
-        if self._acquisition_instr == None:
+        if self._acquisition_instr is None:
             return None
         else:
             return self._acquisition_instr.name
@@ -373,8 +355,8 @@ class HeterodyneInstrument(Instrument):
     def _set_acquisition_instr(self, acquisition_instr):
         # Specifying the int_avg det here should allow replacing it with ATS
         # or potential digitizer acquisition easily
-        if acquisition_instr==None:
-            self._acquisition_instr=None
+        if acquisition_instr is None:
+            self._acquisition_instr = None
         else:
             self._acquisition_instr = self.find_instrument(acquisition_instr)
         self._awg_seq_parameters_changed = True
@@ -407,8 +389,7 @@ class HeterodyneInstrument(Instrument):
         return self._trigger_separation
 
     def _set_RO_length(self, val):
-        if val != self._RO_length and \
-           not 'UHFQC' in self.acquisition_instr():
+        if val != self._RO_length and 'UHFQC' not in self.acquisition_instr():
             self._awg_seq_parameters_changed = True
         self._RO_length = val
 
@@ -422,6 +403,10 @@ class HeterodyneInstrument(Instrument):
 
     def _get_acq_marker_channels(self):
         return self._acq_marker_channels
+
+    def finish(self):
+        if 'UHFQC' in self.acquisition_instr():
+            self._acquisition_instr.acquisition_finalize()
 
     def get_demod_array(self):
         return self.cosI, self.sinI
@@ -513,7 +498,6 @@ class LO_modulated_Heterodyne(HeterodyneInstrument):
         self.AWG.ch3_amp(self.mod_amp())
         self.AWG.ch4_amp(self.mod_amp())
 
-
         if get_t_base is True:
             trace_length = self.CBox.nr_samples()
             tbase = np.arange(0, 5*trace_length, 5)*1e-9
@@ -521,48 +505,6 @@ class LO_modulated_Heterodyne(HeterodyneInstrument):
             self.sinI = np.sin(2*np.pi*self.f_RO_mod()*tbase)
 
         self.CBox.nr_samples(1)  # because using integrated avg
-
-    def prepare_UHFQC(self):
-        """
-        uses the UHFQC to generate the modulating signal and readout
-        """
-        # only uploads a seq to AWG if something changed
-        if (self._awg_seq_filename not in self.AWG.setup_filename() or
-                self._awg_seq_parameters_changed) and self.auto_seq_loading():
-            self._awg_seq_filename = \
-                st_seqs.generate_and_upload_marker_sequence(
-                    5e-9, self.trigger_separation(), RF_mod=False,
-                    acq_marker_channels=self.acq_marker_channels())
-            self._awg_seq_parameters_changed = False
-
-        # reupload the UHFQC pulse generation only if something changed
-        if self._UHFQC_awg_parameters_changed and self.auto_seq_loading():
-            self._acquisition_instr.awg_sequence_acquisition_and_pulse_SSB(
-                self.f_RO_mod.get(), self.mod_amp(), RO_pulse_length=800e-9,
-                acquisition_delay=self.acquisition_delay())
-            self._UHFQC_awg_parameters_changed = False
-
-        # prepare weights and rotation
-        if self.single_sideband_demod():
-            self._acquisition_instr.prepare_SSB_weight_and_rotation(
-                IF=self.f_RO_mod(), weight_function_I=0, weight_function_Q=1)
-        else:
-            self._acquisition_instr.prepare_DSB_weight_and_rotation(
-                IF=self.f_RO_mod(), weight_function_I=0, weight_function_Q=1)
-
-        # this sets the result to integration and rotation outcome
-        self._acquisition_instr.quex_rl_source(2)
-        self._acquisition_instr.quex_rl_length(1)
-        self._acquisition_instr.quex_rl_avgcnt(
-            int(np.log2(self.nr_averages())))
-        self._acquisition_instr.quex_wint_length(int(self.RO_length()*1.8e9))
-        # The AWG program uses userregs/0 to define the number of
-        # iterations in the loop
-        self._acquisition_instr.awgs_0_userregs_0(int(self.nr_averages()))
-        self._acquisition_instr.awgs_0_userregs_1(0) # 0 for rl, 1 for iavg
-        self._acquisition_instr.awgs_0_userregs_2(
-            int(self.acquisition_delay()*1.8e9/8))
-        self._acquisition_instr.awgs_0_single(1)
 
     def probe_CBox(self):
         if self._awg_seq_parameters_changed:
@@ -605,7 +547,6 @@ class LO_modulated_Heterodyne(HeterodyneInstrument):
 
     def _get_mod_amp(self):
         return self._mod_amp
-
 
     def _set_acquisition_delay(self, val):
         if 'UHFQC' in self.acquisition_instr():
