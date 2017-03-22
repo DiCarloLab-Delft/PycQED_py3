@@ -7,6 +7,7 @@ from ._controlbox import Assembler
 from . import QuTech_ControlBoxdriver as qcb
 from ._controlbox import defHeaders_CBox_v3 as defHeaders
 
+from qcodes.instrument.parameter import ManualParameter
 # cython drivers for encoding and decoding
 import pyximport
 pyximport.install(setup_args={"script_args": ["--compiler=msvc"],
@@ -58,6 +59,9 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
                            unit='#',
                            label='instruction memory size',
                            get_cmd=self._get_instr_mem_size)
+        self.add_parameter('last_loaded_instructions',
+                           vals=vals.Strings(),
+                           parameter_class=ManualParameter)
         # hardcoded memory limit, depends on firmware of the CBox
         self._instr_mem_size = 2**15
 
@@ -91,10 +95,12 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
         unittest.TextTestRunner(verbosity=2).run(suite)
 
     def start(self):
+        self.core_state('active')
         self.run_mode('run')
 
     def stop(self):
         self.run_mode('idle')
+        self.core_state('idle')
 
     def _do_get_firmware_version(self):
         v = self.get_master_controller_params()
@@ -410,6 +416,7 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
         uploading instructions and ends by setting the core state to active.
         '''
 
+
         asm = Assembler.Assembler(asm_filename)
 
         instructions = asm.convert_to_instructions()
@@ -450,4 +457,5 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
         appending_instr_num = 3
         self._uploaded_program_length = len(instructions) - appending_instr_num
         self.set('core_state', 'active')
+        self.last_loaded_instructions(asm_filename)
         return (stat, mesg)
