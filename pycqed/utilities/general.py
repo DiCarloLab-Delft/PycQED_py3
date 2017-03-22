@@ -128,14 +128,11 @@ def load_settings_onto_instrument(instrument, load_from_instr=None, folder=None,
                             try:
                                 instrument.set(parameter, value)
                             except:
-                                print('Could not set parameter: "%s" to "%s" for instrument "%s"' % (
-                                    parameter, value, instrument_name))
-                        except Exception:
-                            try:
-                                instrument.set(parameter, int(value))
-                            except:
-                                print('Could not set parameter: "%s" to "%s" for instrument "%s"' % (
-                                    parameter, value, instrument_name))
+                                try:
+                                    instrument.set(parameter, int(value))
+                                except:
+                                    print('Could not set parameter: "%s" to "%s" for instrument "%s"' % (
+                                        parameter, value, instrument_name))
                 else:
                     instrument.set(parameter, value)
         f.close()
