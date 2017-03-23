@@ -30,8 +30,6 @@ before_script: # configure a headless display to test plot generation
 script:
     - py.test pycqed/tests --cov=pycqed --cov-report xml --cov-config=.coveragerc
 
-
 after_success:
     - pip install codacy-coverage
-    # - coverage xml
     - python-codacy-coverage -r coverage.xml
