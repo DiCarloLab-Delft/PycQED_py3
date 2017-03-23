@@ -1,5 +1,3 @@
-import logging
-import numpy as np
 import time
 from qcodes.utils.helpers import make_unique, DelegateAttributes
 import pyqtgraph as pg
