@@ -1398,20 +1398,16 @@ class UHFQC_input_average_detector(Hard_Detector):
 
     def get_values(self):
         self.UHFQC.quex_rl_readout(0)  # resets UHFQC internal readout counters
-        self.UHFQC.awgs_0_enable(1)
-        try:
-            temp = self.UHFQC.awgs_0_enable()
-        except:
-            temp = self.UHFQC.awgs_0_enable()
-        del temp
+        self.UHFQC.acquisition_arm()
+        # starting AWG
         if self.AWG is not None:
             self.AWG.start()
-        while self.UHFQC.awgs_0_enable() == 1:
-            time.sleep(0.01)
-        data = ['']*len(self.channels)
-        for i, channel in enumerate(self.channels):
-            dataset = eval("self.UHFQC.quex_iavg_data_{}()".format(channel))
-            data[i] = dataset[0]['vector']
+
+        data_raw = self.UHFQC.acquisition_poll(samples=self.nr_sweep_points,
+                                               arm=False, acquisition_time=0.01,
+                                               timeout=100)
+        data = np.array([data_raw[key]
+                         for key in data_raw.keys()])  # *self.scaling_factor
 
         return data
 
@@ -1424,7 +1420,7 @@ class UHFQC_input_average_detector(Hard_Detector):
         self.UHFQC.awgs_0_userregs_0(
             int(self.nr_averages))  # 0 for rl, 1 for iavg
         self.nr_sweep_points = self.nr_samples
-        self.UHFQC.awgs_0_single(1)
+        self.UHFQC.acquisition_initialize(channels=self.channels, mode='iavg')
 
     def finish(self):
         if self.AWG is not None:
@@ -1464,7 +1460,8 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         self.integration_length = integration_length
         self.rotate = rotate
         self.cross_talk_suppression = cross_talk_suppression
-        self.scaling_factor = 1/(1.8e9*integration_length*self.nr_averages)
+        self.scaling_factor = 1 / \
+            (1.8e9*self.integration_length*self.nr_averages)
 
     def get_values(self):
 
@@ -1487,6 +1484,10 @@ class UHFQC_integrated_average_detector(Hard_Detector):
             S21 = I + 1j*Q
             data[0] = np.abs(S21)
             data[1] = np.angle(S21)
+
+        # offset suppression to be reimplemented
+        # if self.cross_talk_suppression:
+        #     data[i]=data[i]-eval("self.UHFQC.quex_trans_offset_weightfunction_{}()".format(channel))
 
         if self.rotate:
             return self.rotate_and_normalize(data)
@@ -1537,7 +1538,6 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         self.UHFQC.awgs_0_userregs_0(
             int(self.nr_averages*self.nr_sweep_points))
         self.UHFQC.awgs_0_userregs_1(0)  # 0 for rl, 1 for iavg
-        self.UHFQC.awgs_0_single(1)
         self.UHFQC.acquisition_initialize(channels=self.channels, mode='rl')
 
     def finish(self):
@@ -1571,29 +1571,26 @@ class UHFQC_integration_logging_det(Hard_Detector):
         self.integration_length = integration_length
         self.nr_shots = nr_shots
         self.cross_talk_suppression = cross_talk_suppression
+        self.scaling_factor = 1/(1.8e9*integration_length)
 
     def get_values(self):
-        self.UHFQC.quex_rl_readout(0)  # resets UHFQC internal readout counters
-        self.UHFQC.awgs_0_enable(1)
-        # probing the values to be sure communication is finished before
-        try:
-            temp = self.UHFQC.awgs_0_enable()
-        except:
-            temp = self.UHFQC.awgs_0_enable()
-        del temp
+
+        self.AWG.stop()
+        self.UHFQC.quex_rl_readout(1)  # resets UHFQC internal readout counters
+        self.UHFQC.acquisition_arm()
         # starting AWG
         if self.AWG is not None:
             self.AWG.start()
-        while self.UHFQC.awgs_0_enable() == 1:
-            time.sleep(0.01)
 
-        data = ['']*len(self.channels)
-        for i, channel in enumerate(self.channels):
-            dataset = eval("self.UHFQC.quex_rl_data_{}()".format(channel))
-            data[i] = dataset[0]['vector']
-            if self.cross_talk_suppression:
-                data[i] = data[
-                    i]-eval("self.UHFQC.quex_trans_offset_weightfunction_{}()".format(channel))
+        data_raw = self.UHFQC.acquisition_poll(samples=self.nr_shots,
+                                               arm=False, acquisition_time=0.01,
+                                               timeout=1000)
+        data = np.array([data_raw[key]
+                         for key in data_raw.keys()])*self.scaling_factor
+
+        # offset suppression to be reimplemented
+        # if self.cross_talk_suppression:
+        #     data[i]=data[i]-eval("self.UHFQC.quex_trans_offset_weightfunction_{}()".format(channel))
         return data
 
     def prepare(self, sweep_points):
@@ -1617,6 +1614,7 @@ class UHFQC_integration_logging_det(Hard_Detector):
         else:
             # 0/1/2 crosstalk supressed /digitized/raw
             self.UHFQC.quex_rl_source(2)
+        self.UHFQC.acquisition_initialize(channels=self.channels, mode='rl')
 
     def finish(self):
         if self.AWG is not None:
