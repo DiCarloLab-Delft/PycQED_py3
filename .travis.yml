@@ -28,7 +28,7 @@ before_script: # configure a headless display to test plot generation
 
 # command to run tests
 script:
-    - py.test pycqed/tests --cov=autodepgraph --cov-report xml --cov-config=.coveragerc
+    - py.test pycqed/tests --cov=pycqed --cov-report xml --cov-config=.coveragerc
 
 
 after_success:
