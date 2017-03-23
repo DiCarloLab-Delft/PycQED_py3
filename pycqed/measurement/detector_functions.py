@@ -914,7 +914,7 @@ class Function_Detector(Soft_Detector):
         self.sweep_function = sweep_function
         self.result_keys = result_keys
         self.value_names = value_names
-        self.value_units = value_units
+        self.value_units = value_unit
         self.msmt_kw = msmt_kw
         if self.value_names is None:
             self.value_names = result_keys
@@ -1438,8 +1438,8 @@ class UHFQC_integrated_average_detector(Hard_Detector):
 
     '''
 
-    def __init__(self, UHFQC, AWG=None, integration_length=1e-6, nr_averages=1024,
-                 rotate=False, real_imag=False,
+    def __init__(self, UHFQC, AWG=None, integration_length=1e-6,
+                 nr_averages=1024, rotate=False, real_imag=False,
                  channels=[0, 1, 2, 3], cross_talk_suppression=False,
                  **kw):
         super(UHFQC_integrated_average_detector, self).__init__()
@@ -1449,15 +1449,8 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         self.value_names = ['']*len(self.channels)
         self.value_units = ['']*len(self.channels)
         self.cal_points = kw.get('cal_points', None)
-        for i, channel in enumerate(self.channels):
-            self.value_names[i] = 'w{}'.format(channel)
-            self.value_units[i] = 'V'
-        self.real_imag = real_imag
-        if self.real_imag:
-            self.value_names[0] = 'Magn'
-            self.value_names[1] = 'Phase'
-            self.value_units[1] = 'deg'
 
+        self._set_real_imag(real_imag)
         self.rotate = rotate
 
         self.AWG = AWG
@@ -1466,6 +1459,21 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         self.rotate = rotate
         self.cross_talk_suppression = cross_talk_suppression
         self.scaling_factor = 1/(1.8e9*integration_length*self.nr_averages)
+
+    def _set_real_imag(self, real_imag=False):
+        """
+        Function so that real imag can be changed after initialization
+        """
+
+        self.real_imag = real_imag
+        for i, channel in enumerate(self.channels):
+            self.value_names[i] = 'w{}'.format(channel)
+            self.value_units[i] = 'V'
+
+        if self.real_imag:
+            self.value_names[0] = 'Magn'
+            self.value_names[1] = 'Phase'
+            self.value_units[1] = 'deg'
 
     def get_values(self):
 
