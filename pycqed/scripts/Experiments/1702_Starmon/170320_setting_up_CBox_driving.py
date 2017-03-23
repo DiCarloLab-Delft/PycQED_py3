@@ -20,8 +20,8 @@ def reload_CC_qubit(qubit):
     return qubit
 
 
-QL_CC = qb.CBox_v3_driven_transmon('QL_CC')
-station.add_component(QL_CC)
+QL = qb.CBox_v3_driven_transmon('QL')
+station.add_component(QL)
 
 
 from pycqed.instrument_drivers.physical_instruments import QuTech_ControlBox_v3 as qcb
@@ -31,22 +31,36 @@ station.add_component(CBox)
 
 
 ############ Reloading the QL_CC
-QL_CC = reload_CC_qubit(QL_CC)
+QL = reload_CC_qubit(QL)
 
-QL_CC.CBox(CBox.name)
-QL_CC.LO(LO.name)
-QL_CC.RF_RO_source(RF.name)
-QL_CC.cw_source('QL_LO')
-QL_CC.td_source('QR_LO')
-QL_CC.MC(MC.name)
-QL_CC.acquisition_instrument(UHFQC_1.name)
+# QL_CC.CBox(CBox.name)
+# QL_CC.LO(LO.name)
+# QL_CC.RF_RO_source(RF.name)
+# QL_CC.cw_source('QL_LO')
+# QL_CC.td_source('QR_LO')
+# QL_CC.MC(MC.name)
+# QL_CC.acquisition_instrument(UHFQC_1.name)
 
-# gen.load_settings_onto_instrument(QL_CC, load_from_instr='QL')
-QL_CC.spec_pulse_type('gated')
+# # gen.load_settings_onto_instrument(QL_CC, load_from_instr='QL')
+# QL_CC.spec_pulse_type('gated')
 IM.update()
 
 
+import pycqed.instrument_drivers.meta_instrument.CBox_LookuptableManager as cbl
+reload(cbl)
+try:
+    CBox_LutMan.close()
+    del station.components['CBox_LutMan']
+except:
+    pass
+CBox_LutMan = cbl.ControlBox_LookuptableManager('CBox_LutMan')
+CBox_LutMan.CBox(CBox.name)
+station.add_component(CBox_LutMan)
+
 QL.find_resonator_frequency()
-QL_CC.find_resonator_frequency()
-QL_CC.find_frequency()
-QL_CC.find_frequency(pulsed=True)
+QL.find_frequency()
+QL.find_frequency(pulsed=True)
+
+SH = sh.SignalHound_USB_SA124B('Signal hound', server_name=None)
+
+QL.measure_rabi()

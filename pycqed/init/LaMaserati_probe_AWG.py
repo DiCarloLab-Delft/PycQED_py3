@@ -109,11 +109,7 @@ AWG = tek.Tektronix_AWG5014(name='AWG', setup_folder=None, timeout=2,
                             address='TCPIP0::192.168.0.99::INSTR', server_name=None)
 station.add_component(AWG)
 AWG.timeout(180)  # timeout long for uploading wait.
-# AWG520 = tk520.Tektronix_AWG520('AWG520', address='GPIB0::17::INSTR',
-#                                 server_name='')
-# station.add_component(AWG520)
-# CBox = qcb.QuTech_ControlBox('CBox', address='Com5', run_tests=False, server_name=None)
-# station.add_component(CBox)
+
 IVVI = iv.IVVI('IVVI', address='COM8', numdacs=16, safe_version=False)
 station.add_component(IVVI)
 
@@ -153,14 +149,11 @@ LutManMan.LutMans(
 
 
 # SH = sh.SignalHound_USB_SA124B('Signal hound', server_name=None)
-# #commented because of 8s load time
 
 # Meta-instruments
 HS = hd.HeterodyneInstrument('HS', LO=LO, RF=RF, AWG=AWG, acquisition_instr=UHFQC_1.name,
                              server_name=None)
 station.add_component(HS)
-LutMan = lm.QuTech_ControlBox_LookuptableManager('LutMan', CBox=None,
-                                                 server_name=None)
 
 MC = mc.MeasurementControl('MC')
 station.add_component(MC)
@@ -183,19 +176,12 @@ from pycqed.instrument_drivers.meta_instrument import device_object as do
 Starmon = do.DeviceObject('Starmon')
 station.add_component(Starmon)
 
-import pycqed.instrument_drivers.meta_instrument.qubit_objects.Tektronix_driven_transmon as qbt
-QL = qbt.Tektronix_driven_transmon('QL')
-QL.LO(LO.name)
-QL.cw_source(QL_LO.name)
-QL.td_source(QR_LO.name)
-QL.IVVI(IVVI.name)
-QL.RF_RO_source(RF.name)
-QL.AWG(AWG.name)
-QL.heterodyne_instr(HS.name)
-QL.FluxCtrl(FC.name)
-QL.MC(MC.name)
+from pycqed.instrument_drivers.meta_instrument.qubit_objects import CC_transmon as qb
+QL = qb.CBox_v3_driven_transmon('QL')
 station.add_component(QL)
+gen.load_settings_onto_instrument(QL)
 
+import pycqed.instrument_drivers.meta_instrument.qubit_objects.Tektronix_driven_transmon as qbt
 
 QR = qbt.Tektronix_driven_transmon('QR')
 QR.LO(LO.name)
@@ -247,10 +233,6 @@ gen.load_settings_onto_instrument(Starmon)
 gen.load_settings_onto_instrument(QL)
 station.sequencer_config = Starmon.get_operation_dict()['sequencer_config']
 
-QL.RO_acq_weight_function_I(0)
-QL.RO_acq_weight_function_Q(0)
-QR.RO_acq_weight_function_I(1)
-QR.RO_acq_weight_function_Q(1)
 
 
 MC.station = station
@@ -436,7 +418,6 @@ def reload_mod_stuff():
 reload_mod_stuff()
 
 
-switch_to_pulsed_RO_UHFQC(QL)
 switch_to_pulsed_RO_UHFQC(QR)
 
 
@@ -449,7 +430,7 @@ import qcodes as qc
 import logging
 station = qc.station
 from pycqed.utilities import general as gen
-from pycqed.instrument_drivers.meta_instrument.qubit_objects import CC_transmon as qb
+
 
 def reload_CC_qubit(qubit):
     reload(qb)
@@ -466,24 +447,22 @@ def reload_CC_qubit(qubit):
     return qubit
 
 
+
+# from pycqed.instrument_drivers.physical_instruments import QuTech_ControlBoxdriver as qcb
+# reload(qcb)
 from pycqed.instrument_drivers.physical_instruments import QuTech_ControlBox_v3 as qcb
+# reload(qcb)
+# CBox.close()
+# del station.components['CBox']
 CBox = qcb.QuTech_ControlBox_v3(
     'CBox', address='Com6', run_tests=False, server_name=None)
 station.add_component(CBox)
 
+import pycqed.instrument_drivers.meta_instrument.CBox_LookuptableManager as cbl
+CBox_LutMan = cbl.ControlBox_LookuptableManager('CBox_LutMan')
+CBox_LutMan.CBox(CBox.name)
+station.add_component(CBox_LutMan)
 
-QL_CC = qb.CBox_v3_driven_transmon('QL_CC')
-station.add_component(QL_CC)
 
-QL_CC.CBox(CBox.name)
-QL_CC.LO(LO.name)
-QL_CC.RF_RO_source(RF.name)
-QL_CC.cw_source('QL_LO')
-QL_CC.td_source('QR_LO')
-QL_CC.MC(MC.name)
-QL_CC.acquisition_instrument(UHFQC_1.name)
-
-gen.load_settings_onto_instrument(QL_CC, load_from_instr='QL')
-gen.load_settings_onto_instrument(QL_CC)
 
 UHFQC_1.timeout(2)
