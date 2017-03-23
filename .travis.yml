@@ -33,5 +33,5 @@ script:
 
 after_success:
     - pip install codacy-coverage
-    - coverage xml
+    # - coverage xml
     - python-codacy-coverage -r coverage.xml
