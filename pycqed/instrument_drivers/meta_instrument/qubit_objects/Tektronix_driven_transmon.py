@@ -278,11 +278,11 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         self.heterodyne_instr.get_instr().RF_power(self.RO_power_cw())
         self.heterodyne_instr.get_instr().nr_averages(self.RO_acq_averages())
         # Turning of TD source
-        if self.td_source.get_instr() != None:
+        if self.td_source.get_instr() is not  None:
             self.td_source.get_instr().off()
 
         # Updating Spec source
-        if self.cw_source.get_instr() != None:
+        if self.cw_source.get_instr() is not None:
             self.cw_source.get_instr().power(self.spec_pow())
             self.cw_source.get_instr().frequency(self.f_qubit())
             self.cw_source.get_instr().off()
