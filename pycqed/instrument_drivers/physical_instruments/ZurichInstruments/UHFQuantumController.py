@@ -82,7 +82,7 @@ class UHFQC(Instrument):
             init = False
 
         self.add_parameter('timeout', unit='s',
-                           initial_value=120,
+                           initial_value=10,
                            parameter_class=ManualParameter)
         for parameter in s_node_pars:
             parname = parameter[0].replace("/", "_")
@@ -602,6 +602,10 @@ class UHFQC(Instrument):
     def prepare_SSB_weight_and_rotation(self, IF,
                                         weight_function_I=0,
                                         weight_function_Q=1):
+        """
+        Sets defualt integration weights for SSB modulation, beware does not
+        load pulses or prepare the UFHQC progarm to do data acquisition
+        """
         trace_length = 4096
         tbase = np.arange(0, trace_length/1.8e9, 1/1.8e9)
         cosI = np.array(np.cos(2*np.pi*IF*tbase))
@@ -823,7 +827,8 @@ setTrigger(0);"""
         self.awgs_0_waveform_data(data)
         self._daq.sync()
 
-    def awg_sequence_acquisition_and_pulse_SSB(self, f_RO_mod, RO_amp, RO_pulse_length, acquisition_delay):
+    def awg_sequence_acquisition_and_pulse_SSB(
+            self, f_RO_mod, RO_amp, RO_pulse_length, acquisition_delay):
         f_sampling = 1.8e9
         samples = RO_pulse_length*f_sampling
         array = np.arange(int(samples))
