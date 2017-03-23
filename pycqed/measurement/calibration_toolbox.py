@@ -32,9 +32,10 @@ def mixer_carrier_cancellation_duplexer(**kw):
 def mixer_carrier_cancellation(SH, source, MC,
                                chI_par, chQ_par,
                                frequency=None,
-                               voltage_grid=[0.050, 0.020, 0.010, 0.005, 0.002],
-                               range_min = None,
-                               range_max = None):
+                               voltage_grid=[
+                                   0.050, 0.020, 0.010, 0.005, 0.002],
+                               range_min=None,
+                               range_max=None):
 
     ch_min = [0, 0]  # Initializing variables used later on
     source.on()
@@ -42,7 +43,6 @@ def mixer_carrier_cancellation(SH, source, MC,
         frequency = source.get('frequency')
     else:
         source.set('frequency', frequency)
-
 
     for voltage_span in voltage_grid:
         # Channel 0
@@ -68,13 +68,12 @@ def mixer_carrier_cancellation(SH, source, MC,
     return ch_min
 
 
-
 def mixer_skewness_calibration_QWG(SH, source, QWG,
-                                    alpha, phi,
-                                    MC,
-                                    ch_pair=1,
-                                    frequency=None, f_mod=None,
-                                    name='mixer_skewness_calibration_QWG'):
+                                   alpha, phi,
+                                   MC,
+                                   ch_pair=1,
+                                   frequency=None, f_mod=None,
+                                   name='mixer_skewness_calibration_QWG'):
     '''
     Inputs:
         SH              (instrument)
@@ -110,7 +109,6 @@ def mixer_skewness_calibration_QWG(SH, source, QWG,
         # Corresponds to the frequency where to minimize with the SH
         frequency = source.frequency.get() - f_mod
 
-
     d = det.Signal_Hound_fixed_frequency(SH, frequency)
 
     ad_func_pars = {'adaptive_function': nelder_mead,
@@ -129,7 +127,6 @@ def mixer_skewness_calibration_QWG(SH, source, QWG,
     phi = a.optimization_result[0][1]
 
     return phi, alpha
-
 
 
 def mixer_skewness_calibration_5014(SH, source, station,
@@ -438,17 +435,16 @@ def mixer_carrier_cancellation_CBox(CBox, SH, source, MC,
 
     Note: Updated for QCodes
     '''
-    logging.DeprecationWarning('CBox carrier cancelation is deprecated. \n' +
+    logging.warning('CBox carrier cancelation is deprecated. \n' +
                     'Replace it with mixer carrier cancelation and pass'
                     ' the channel parameters directly.')
     ch0_swf = CB_swf.DAC_offset(awg_nr, dac_ch=0, CBox=CBox)
     ch1_swf = CB_swf.DAC_offset(awg_nr, dac_ch=1, CBox=CBox)
 
     return mixer_carrier_cancellation(SH, source, MC,
-                               chI_par=ch0_swf, chQ_par=ch1_swf,
-                               frequency=frequency, voltage_grid=voltage_grid,
-                               xtol=xtol)
-
+                                      chI_par=ch0_swf, chQ_par=ch1_swf,
+                                      frequency=frequency, voltage_grid=voltage_grid,
+                                      xtol=xtol)
 
 
 def mixer_skewness_cal_CBox_adaptive(CBox, SH, source,
