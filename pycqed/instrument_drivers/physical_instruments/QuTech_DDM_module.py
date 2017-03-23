@@ -27,6 +27,7 @@ class DDMq(SCPI):
         self.device_descriptor = type('', (), {})()
         self.device_descriptor.model = 'DDM'
         self.device_descriptor.numChannels = 2
+        self.device_descriptor.numWeights = 5
         self.add_parameters()
         self.connect_message()
 
@@ -40,6 +41,7 @@ class DDMq(SCPI):
             srun_cmd = 'qutech:run{}'.format(ch_pair)
             self.add_parameter(   'ch_pair{}_run'.format(ch_pair),
                                label=('Run ch_pair{}'.format(ch_pair)),
+                               #docstring='',
                                #get_cmd=swinten_cmd + '?',
                                set_cmd=srun_cmd
                                )
@@ -48,6 +50,13 @@ class DDMq(SCPI):
                                label=('Reset DDM integration modes'),
                                #get_cmd=swinten_cmd + '?',
                                set_cmd=sreset_int_cmd
+                               )
+            scaladc_cmd = 'qutech:adc{}:cal'.format(ch_pair)
+            self.add_parameter('ch_pair{}_cal_adc'.format(ch_pair),
+                               label=('Calibrate ADC{}'.format(ch_pair)),
+                               #get_cmd=snsamp_cmd + '?',
+                               set_cmd=scaladc_cmd
+                               # vals=vals.Numbers(1,4096)
                                )
             snavg_cmd = 'qutech:inputavg{}:naverages'.format(ch_pair)
             self.add_parameter('ch_pair{}_inavg_Navg'.format(ch_pair),
@@ -83,202 +92,331 @@ class DDMq(SCPI):
                                set_cmd=sholdoff_cmd + ' {}',
                                vals=vals.Numbers(0, 254)
                                )
-            '''
-            Weighted integral + Rotation matrix + TV mode parameters
-            '''
-            swinten_cmd = 'qutech:wint{}:enable'.format(ch_pair)
-            self.add_parameter('ch_pair{}_wint_enable'.format(ch_pair),
-                               label=('Enable wighted integral' +
-                                      'ch_pair {} '.format(ch_pair)),
-                               get_cmd=swinten_cmd + '?',
-                               set_cmd=swinten_cmd + ' {}',
-                               vals=vals.Numbers(0,1)
-                               )
-           
-            sintlength_cmd = 'qutech:wint{}:intlength'.format(ch_pair)
+            sintlengthall_cmd = 'qutech:wint{}:intlength:all'.format(ch_pair)
             self.add_parameter('ch_pair{}_wint_intlength'.format(ch_pair),
-                               unit='#',
-                               label=('The number of sample pairs that' +
-                                      'is used for one integration of' +
-                                      'ch_pair {} '.format(ch_pair)),
-                               get_cmd=sintlength_cmd + '?',
-                               set_cmd=sintlength_cmd + ' {}',
+                                   unit='#',
+                               label=('The number of sample  that' +
+                                     'is used for one integration of' +
+                                     'ch_pair {} all weights'.format(ch_pair)),
+                               get_cmd=sintlengthall_cmd + '?',
+                               set_cmd=sintlengthall_cmd + ' {}',
                                vals=vals.Numbers(1, 2048)
                                )
-            swintstat_cmd = 'qutech:wint{}:status'.format(ch_pair)
-            self.add_parameter('ch_pair{}_wint_status'.format(ch_pair),
-                               unit='#',
-                               label=('Weighted integral status of' +
-                                      'ch_pair {} '.format(ch_pair)),
-                               get_cmd=swintstat_cmd + '?'
-                               # vals=vals.Numbers(1,2048)
-                               )
-            srotmat00_cmd = 'qutech:rotmat{}:rotmat00'.format(ch_pair)
-            self.add_parameter('ch_pair{}_rotmat_rotmat00'.format(ch_pair),
-                               unit='#',
-                               label=('Rotation matrix value 00 of' +
-                                      'ch_pair {} '.format(ch_pair)),
-                               get_cmd=srotmat00_cmd + '?',
-                               set_cmd=srotmat00_cmd + ' {}',
-                               vals=vals.Numbers(-2 , 1.99976)
-                               )
-            srotmat01_cmd = 'qutech:rotmat{}:rotmat01'.format(ch_pair)
-            self.add_parameter('ch_pair{}_rotmat_rotmat01'.format(ch_pair),
-                               unit='#',
-                               label=('Rotation matrix value 00 of' +
-                                      'ch_pair {} '.format(ch_pair)),
-                               get_cmd=srotmat01_cmd + '?',
-                               set_cmd=srotmat01_cmd + ' {}',
-                               vals=vals.Numbers(-2 , 1.99976)
-                               )
-            srotmat10_cmd = 'qutech:rotmat{}:rotmat10'.format(ch_pair)
-            self.add_parameter('ch_pair{}_rotmat_rotmat10'.format(ch_pair),
-                               unit='#',
-                               label=('Rotation matrix value 10 of' +
-                                      'ch_pair {} '.format(ch_pair)),
-                               get_cmd=srotmat10_cmd + '?',
-                               set_cmd=srotmat10_cmd + ' {}'
-                               # vals=vals.Numbers(1,2048)
-                               )
-            srotmat11_cmd = 'qutech:rotmat{}:rotmat11'.format(ch_pair)
-            self.add_parameter('ch_pair{}_rotmat_rotmat11'.format(ch_pair),
-                               unit='#',
-                               label=('Rotation matrix value 11 of' +
-                                      'ch_pair {} '.format(ch_pair)),
-                               get_cmd=srotmat11_cmd + '?',
-                               set_cmd=srotmat11_cmd + ' {}',
-                               vals=vals.Numbers(-2 , 1.99976)
-                               )
             '''
-            TV mode parameters
+            TV mode
             '''
-            sintavg_cmd = 'qutech:tvmode{}:naverages'.format(ch_pair)
+
+            sintavgall_cmd = 'qutech:tvmode{}:naverages:all'.format(ch_pair)
             self.add_parameter('ch_pair{}_tvmode_naverages'.format(ch_pair),
                                unit='#',
                                label=('The number of integration averages' +
-                                      'of ch_pair {} '.format(ch_pair)),
-                               get_cmd=sintavg_cmd + '?',
-                               set_cmd=sintavg_cmd + ' {}',
+                                      'of ch_pair {} all weights'.format(ch_pair)),
+                               get_cmd=sintavgall_cmd + '?',
+                               set_cmd=sintavgall_cmd + ' {}',
                                vals=vals.Numbers(1, 131072)
                                )
-            stvseg_cmd = 'qutech:tvmode{}:nsegments'.format(ch_pair)
+            stvsegall_cmd = 'qutech:tvmode{}:nsegments:all'.format(ch_pair)
             self.add_parameter('ch_pair{}_tvmode_nsegments'.format(ch_pair),
                                unit='#',
                                label=('The number of TV segments of' +
-                                      'ch_pair {} '.format(ch_pair)),
-                               get_cmd=stvseg_cmd + '?',
-                               set_cmd=stvseg_cmd + ' {}',
+                                      'ch_pair {} all weights '.format(ch_pair)),
+                               get_cmd=stvsegall_cmd + '?',
+                               set_cmd=stvsegall_cmd + ' {}',
                                vals=vals.Numbers(1, 256)
                                )
-            stven_cmd = 'qutech:tvmode{}:enable'.format(ch_pair)
+            stvenall_cmd = 'qutech:tvmode{}:enable:all'.format(ch_pair)
             self.add_parameter('ch_pair{}_tvmode_enable'.format(ch_pair),
                                label=('Enable tv mode' +
-                                      'ch_pair {} '.format(ch_pair)),
-                               get_cmd=stven_cmd + '?',
-                               set_cmd=stven_cmd + ' {}',
+                                      'ch_pair {} all weights '.format(ch_pair)),
+                               get_cmd=stvenall_cmd + '?',
+                               set_cmd=stvenall_cmd + ' {}',
                                vals=vals.Numbers(0,1)
                                # vals=vals.Numbers(1,4096)
                                )
-       
-            self.add_parameter('ch_pair{}_tvmode_data'.format(ch_pair),
-                               label=('Get TV data ch {} '.format(ch_pair)),
-                               get_cmd=self._gen_ch_get_func(
-                                   self._getTVdata, ch_pair)
-
-                               # vals=vals.Numbers(-128,127)
-                               )
-            scaladc_cmd = 'qutech:adc{}:cal'.format(ch_pair)
-            self.add_parameter('ch_pair{}_cal_adc'.format(ch_pair),
-                               label=('Calibrate ADC{}'.format(ch_pair)),
-                               #get_cmd=snsamp_cmd + '?',
-                               set_cmd=scaladc_cmd
-                               # vals=vals.Numbers(1,4096)
-                               )
-            sthl_cmd = 'qutech:qstate{}:threshold'.format(ch_pair)
+            '''
+            Threshold
+            '''
+            sthlall_cmd = 'qutech:qstate{}:threshold:all'.format(ch_pair)
             self.add_parameter('ch_pair{}_qstate_threshold'.format(ch_pair),
                                unit='#',
                                label=('Set threshold of' +
-                               'ch_pair {} '.format(ch_pair)),
-                               get_cmd=sthl_cmd + '?',
-                               set_cmd=sthl_cmd + ' {}',
+                               'ch_pair {} all weights'.format(ch_pair)),
+                               get_cmd=sthlall_cmd + '?',
+                               set_cmd=sthlall_cmd + ' {}',
                                vals=vals.Numbers(-134217728,134217727)
-                               )
-            self.add_parameter('ch_pair{}_qstate_cnt_data'.format(ch_pair),
-                               label=('Get qstate counter' +
-                                      'ch_pair {} '.format(ch_pair)),
-                               get_cmd=self._gen_ch_get_func(
-                                   self._getQstateCNT, ch_pair),
-
-                               # vals=vals.Numbers(-128,127)
-                               )
-            self.add_parameter('ch_pair{}_qstate_avg_data'.format(ch_pair),
-                               label=('Get qstate average' +
-                                      'ch_pair {} '.format(ch_pair)),
-                               get_cmd=self._gen_ch_get_func(
-                                   self._getQstateAVG, ch_pair),
-
-                               # vals=vals.Numbers(-128,127)
-                               )
-
-            slogen_cmd = 'qutech:logging{}:enable'.format(ch_pair)
-            self.add_parameter('ch_pair{}_logging_enable'.format(ch_pair),
-                               label=('Enable logging mode' +
-                                      'ch_pair {} '.format(ch_pair)),
-                               get_cmd=slogen_cmd + '?',
-                               set_cmd=slogen_cmd + ' {}',
-                               vals=vals.Numbers(0,1)
-                               # vals=vals.Numbers(1,4096)
-                               )
-          
-            slogshots_cmd = 'qutech:logging{}:nshots'.format(ch_pair)
-            self.add_parameter('ch_pair{}_logging_nshots'.format(ch_pair),
-                               unit='#',
-                               label=('The number of logging shots of' +
-                                      'ch_pair {} '.format(ch_pair)),
-                               get_cmd=slogshots_cmd + '?',
-                               set_cmd=slogshots_cmd + ' {}',
-                               vals=vals.Numbers(1, 8192)
                                )
             '''
             Logging
             '''
-            self.add_parameter('ch_pair{}_logging_int'.format(ch_pair),
-                               label=('Get integration logging ' +
-                                      'ch_pair {} '.format(ch_pair)),
-                               get_cmd=self._gen_ch_get_func(
-                                   self._getLoggingInt, ch_pair),
-
+            slogenall_cmd = 'qutech:logging{}:enable:all'.format(ch_pair)
+            self.add_parameter('ch_pair{}_logging_enable'.format(ch_pair),
+                               label=('Enable logging mode' +
+                                      'ch_pair {} all weights'.format(ch_pair)),
+                               get_cmd=slogenall_cmd + '?',
+                               set_cmd=slogenall_cmd + ' {}',
+                               vals=vals.Numbers(0,1)
+                               # vals=vals.Numbers(1,4096)
                                )
-            self.add_parameter('ch_pair{}_logging_qstate'.format(ch_pair),
-                               label=('Get qstate logging ' +
-                                      'ch_pair {} '.format(ch_pair)),
-                               get_cmd=self._gen_ch_get_func(
-                                   self._getLoggingQstate, ch_pair),
-
-                               # vals=vals.Numbers(-128,127)
+      
+            slogshotsall_cmd = 'qutech:logging{}:nshots:all'.format(ch_pair)
+            self.add_parameter('ch_pair{}_logging_nshots'.format(ch_pair),
+                               unit='#',
+                               label=('The number of logging shots of' +
+                                      'ch_pair {} all weights'.format(ch_pair)),
+                               get_cmd=slogshotsall_cmd + '?',
+                               set_cmd=slogshotsall_cmd + ' {}',
+                               vals=vals.Numbers(1, 8192)
                                )
             '''
             Error fraction 
             '''
-            serrfarcten_cmd = 'qutech:errorfraction{}:enable'.format(ch_pair)
+            serrfarcten_cmd = 'qutech:errorfraction{}:enable:all'.format(ch_pair)
             self.add_parameter('ch_pair{}_err_fract_enable'.format(ch_pair),
                                label=('Enable error fraction mode' +
-                                      'ch_pair {} '.format(ch_pair)),
+                                      'ch_pair {} all weights '.format(ch_pair)),
                                get_cmd=serrfarcten_cmd + '?',
                                set_cmd=serrfarcten_cmd + ' {}',
                                vals=vals.Numbers(0,1)
                                )
             
-            serrfractshots_cmd = 'qutech:errorfraction{}:nshots'.format(ch_pair)
+            serrfractshots_cmd = 'qutech:errorfraction{}:nshots:all'.format(ch_pair)
             self.add_parameter('ch_pair{}_err_fract_nshots'.format(ch_pair),
                                unit='#',
                                label=('The number of error fraction shots of' +
-                                      'ch_pair {} '.format(ch_pair)),
+                                      'ch_pair {} all weights '.format(ch_pair)),
                                get_cmd=serrfractshots_cmd + '?',
                                set_cmd=serrfractshots_cmd + ' {}',
                                vals=vals.Numbers(1, 2097152)
                                )
+            
+            self.add_parameter('ch_pair{}_err_fract_pattern'.format(ch_pair),
+                               label=('Get error fraction pattern ' +
+                                      'ch_pair {}'.format(ch_pair)),
+                               set_cmd=self._gen_ch_set_func(
+                                   self._sendErrFractSglQbitPatternAll, ch_pair),
+                               get_cmd=self._gen_ch_get_func(
+                                   self._getErrFractSglQbitPatternAll, ch_pair),
 
+                               vals=vals.Arrays(0, 1)
+                               ) 
+                
+            for i in range(self.device_descriptor.numWeights):
+                wNr = i+1
+                '''
+                Weighted integral + Rotation matrix + TV mode parameters
+                '''
+                swinten_cmd = 'qutech:wint{}:enable{}'.format(ch_pair, wNr)
+                self.add_parameter('ch_pair{}_weight{}_wint_enable'.format(ch_pair, wNr),
+                                   label=('Enable wighted integral' +
+                                          'ch_pair {} weight {}'.format(ch_pair, wNr)),
+                                   get_cmd=swinten_cmd + '?',
+                                   set_cmd=swinten_cmd + ' {}',
+                                   vals=vals.Numbers(0,1)
+                                   )
+               
+                sintlength_cmd = 'qutech:wint{}:intlength{}'.format(ch_pair, wNr)
+                self.add_parameter('ch_pair{}_weight{}_wint_intlength'.format(ch_pair, wNr),
+                                   unit='#',
+                                   label=('The number of sample  that' +
+                                          'is used for one integration of' +
+                                          'ch_pair {} weight {}'.format(ch_pair, wNr)),
+                                   get_cmd=sintlength_cmd + '?',
+                                   set_cmd=sintlength_cmd + ' {}',
+                                   vals=vals.Numbers(1, 2048)
+                                   )
+                swintstat_cmd = 'qutech:wint{}:status{}'.format(ch_pair, wNr)
+                self.add_parameter('ch_pair{}_weight{}_wint_status'.format(ch_pair, wNr),
+                                   unit='#',
+                                   label=('Weighted integral status of' +
+                                          'ch_pair {} weight {}'.format(ch_pair, wNr)),
+                                   get_cmd=swintstat_cmd + '?'
+                                   # vals=vals.Numbers(1,2048)
+                                   )
+                srotmat00_cmd = 'qutech:rotmat{}:rotmat00{}'.format(ch_pair, wNr)
+                self.add_parameter('ch_pair{}_weight{}_rotmat_rotmat00'.format(ch_pair, wNr, wNr),
+                                   unit='#',
+                                   label=('Rotation matrix value 00 of' +
+                                          'ch_pair {} weight {}'.format(ch_pair, wNr)),
+                                   get_cmd=srotmat00_cmd + '?',
+                                   set_cmd=srotmat00_cmd + ' {}',
+                                   vals=vals.Numbers(-2 , 1.99976)
+                                   )
+                srotmat01_cmd = 'qutech:rotmat{}:rotmat01{}'.format(ch_pair, wNr)
+                self.add_parameter('ch_pair{}_weight{}_rotmat_rotmat01'.format(ch_pair, wNr),
+                                   unit='#',
+                                   label=('Rotation matrix value 00 of' +
+                                          'ch_pair {} weight {}'.format(ch_pair, wNr)),
+                                   get_cmd=srotmat01_cmd + '?',
+                                   set_cmd=srotmat01_cmd + ' {}',
+                                   vals=vals.Numbers(-2 , 1.99976)
+                                   )
+                srotmat10_cmd = 'qutech:rotmat{}:rotmat10{}'.format(ch_pair, wNr)
+                self.add_parameter('ch_pair{}_weight{}_rotmat_rotmat10'.format(ch_pair, wNr),
+                                   unit='#',
+                                   label=('Rotation matrix value 10 of' +
+                                          'ch_pair {} weight {}'.format(ch_pair, wNr)),
+                                   get_cmd=srotmat10_cmd + '?',
+                                   set_cmd=srotmat10_cmd + ' {}'
+                                   # vals=vals.Numbers(1,2048)
+                                   )
+                srotmat11_cmd = 'qutech:rotmat{}:rotmat11{}'.format(ch_pair, wNr)
+                self.add_parameter('ch_pair{}_weight{}_rotmat_rotmat11'.format(ch_pair, wNr),
+                                   unit='#',
+                                   label=('Rotation matrix value 11 of' +
+                                          'ch_pair {} weight {} '.format(ch_pair, wNr)),
+                                   get_cmd=srotmat11_cmd + '?',
+                                   set_cmd=srotmat11_cmd + ' {}',
+                                   vals=vals.Numbers(-2 , 1.99976)
+                                   )
+            
+                '''
+                TV mode parameters
+                '''
+                sintavg_cmd = 'qutech:tvmode{}:naverages{}'.format(ch_pair,wNr)
+                self.add_parameter('ch_pair{}_weight{}_tvmode_naverages'.format(ch_pair,wNr),
+                                   unit='#',
+                                   label=('The number of integration averages' +
+                                          'of ch_pair {} weight {}'.format(ch_pair,wNr)),
+                                   get_cmd=sintavg_cmd + '?',
+                                   set_cmd=sintavg_cmd + ' {}',
+                                   vals=vals.Numbers(1, 131072)
+                                   )
+                stvseg_cmd = 'qutech:tvmode{}:nsegments{}'.format(ch_pair,wNr)
+                self.add_parameter('ch_pair{}_weight{}_tvmode_nsegments'.format(ch_pair,wNr),
+                                   unit='#',
+                                   label=('The number of TV segments of' +
+                                          'ch_pair {} weight {}'.format(ch_pair,wNr)),
+                                   get_cmd=stvseg_cmd + '?',
+                                   set_cmd=stvseg_cmd + ' {}',
+                                   vals=vals.Numbers(1, 256)
+                                   )
+                stven_cmd = 'qutech:tvmode{}:enable{}'.format(ch_pair,wNr)
+                self.add_parameter('ch_pair{}_weight{}_tvmode_enable'.format(ch_pair,wNr),
+                                   label=('Enable tv mode' +
+                                          'ch_pair {} weight {}'.format(ch_pair,wNr)),
+                                   get_cmd=stven_cmd + '?',
+                                   set_cmd=stven_cmd + ' {}',
+                                   vals=vals.Numbers(0,1)
+                                   # vals=vals.Numbers(1,4096)
+                                   )
+           
+                self.add_parameter('ch_pair{}_weight{}_tvmode_data'.format(ch_pair, wNr),
+                                   label=('Get TV data channel {} weight {}'.format(ch_pair,wNr)),
+                                   get_cmd=self._gen_ch_weight_get_func(
+                                       self._getTVdata, ch_pair,wNr)    
+
+                                   # vals=vals.Numbers(-128,127)
+                                   )
+            
+                '''
+                TV mode QSTATE parameters
+                '''
+                sthl_cmd = 'qutech:qstate{}:threshold{}'.format(ch_pair,wNr)
+                self.add_parameter('ch_pair{}_weight{}_qstate_threshold'.format(ch_pair, wNr),
+                                  unit='#',
+                                  label=('Set threshold of' +
+                                  'ch_pair {} weight {}'.format(ch_pair,wNr)),
+                                  get_cmd=sthl_cmd + '?',
+                                  set_cmd=sthl_cmd + ' {}',
+                                  vals=vals.Numbers(-134217728,134217727)
+                                  )
+                self.add_parameter('ch_pair{}_weight{}_qstate_cnt_data'.format(ch_pair, wNr),
+                                   label=('Get qstate counter' +
+                                          'ch_pair {} weight {} '.format(ch_pair, wNr)),
+                                   get_cmd=self._gen_ch_weight_get_func(
+                                   self._getQstateCNT, ch_pair, wNr),
+
+                                   # vals=vals.Numbers(-128,127)
+                                   )
+                self.add_parameter('ch_pair{}_weight{}_qstate_avg_data'.format(ch_pair, wNr),
+                                   label=('Get qstate average' +
+                                          'ch_pair {} weight {}'.format(ch_pair, wNr)),
+                                   get_cmd=self._gen_ch_weight_get_func(
+                                          self._getQstateAVG, ch_pair, wNr),
+
+                                   # vals=vals.Numbers(-128,127)
+                                   )
+                '''
+                Logging
+                '''
+                slogen_cmd = 'qutech:logging{}:enable{}'.format(ch_pair, wNr)
+                self.add_parameter('ch_pair{}_weight{}_logging_enable'.format(ch_pair, wNr),
+                                   label=('Enable logging mode' +
+                                          'ch_pair {} weight {}'.format(ch_pair, wNr)),
+                                   get_cmd=slogen_cmd + '?',
+                                   set_cmd=slogen_cmd + ' {}',
+                                   vals=vals.Numbers(0,1)
+                                   # vals=vals.Numbers(1,4096)
+                                   )
+          
+                slogshots_cmd = 'qutech:logging{}:nshots{}'.format(ch_pair, wNr)
+                self.add_parameter('ch_pair{}_weight{}_logging_nshots'.format(ch_pair, wNr),
+                                   unit='#',
+                                   label=('The number of logging shots of' +
+                                          'ch_pair {} weight {}'.format(ch_pair, wNr)),
+                                   get_cmd=slogshots_cmd + '?',
+                                   set_cmd=slogshots_cmd + ' {}',
+                                   vals=vals.Numbers(1, 8192)
+                                   )
+            
+                self.add_parameter('ch_pair{}_weight{}_logging_int'.format(ch_pair, wNr),
+                                   label=('Get integration logging ' +
+                                          'ch_pair {} weight {}'.format(ch_pair, wNr)),
+                                   get_cmd=self._gen_ch_weight_get_func(
+                                       self._getLoggingInt, ch_pair, wNr),    
+
+                                   )
+                self.add_parameter('ch_pair{}_weight{}_logging_qstate'.format(ch_pair, wNr),
+                                   label=('Get qstate logging ' +
+                                          'ch_pair {} weight {}'.format(ch_pair, wNr)),
+                                   get_cmd=self._gen_ch_weight_get_func(
+                                       self._getLoggingQstate, ch_pair, wNr),    
+
+                                   # vals=vals.Numbers(-128,127)
+                                   )
+                '''
+                Error fraction 
+                '''
+                serrfarcten_cmd = 'qutech:errorfraction{}:enable{}'.format(ch_pair, wNr)
+                self.add_parameter('ch_pair{}_weight{}_err_fract_enable'.format(ch_pair, wNr),
+                                   label=('Enable error fraction mode' +
+                                          'ch_pair {} weight {} '.format(ch_pair, wNr)),
+                                   get_cmd=serrfarcten_cmd + '?',
+                                   set_cmd=serrfarcten_cmd + ' {}',
+                                   vals=vals.Numbers(0,1)
+                                   )
+                
+                serrfractshots_cmd = 'qutech:errorfraction{}:nshots{}'.format(ch_pair, wNr)
+                self.add_parameter('ch_pair{}_weight{}_err_fract_nshots'.format(ch_pair, wNr),
+                                   unit='#',
+                                   label=('The number of error fraction shots of' +
+                                          'ch_pair {} weight {} '.format(ch_pair, wNr)),
+                                   get_cmd=serrfractshots_cmd + '?',
+                                   set_cmd=serrfractshots_cmd + ' {}',
+                                   vals=vals.Numbers(1, 2097152)
+                                   )
+                self.add_parameter('ch_pair{}_weight{}_err_fract_cnt'.format(ch_pair, wNr),
+                                   label=('Get all error fraction counters ' +
+                                          'ch_pair {} weight {}'.format(ch_pair, wNr)),
+                                   get_cmd=self._gen_ch_weight_get_func(
+                                       self._getErrFractCnt, ch_pair, wNr)    
+
+                                   # vals=vals.Numbers(-128,127)
+                                   )
+
+                self.add_parameter('ch_pair{}_weight{}_err_fract_pattern'.format(ch_pair, wNr),
+                                   label=('Get error fraction pattern ' +
+                                          'ch_pair {} weight {}'.format(ch_pair, wNr)),
+                                   set_cmd=self._gen_ch_weight_set_func(
+                                       self._sendErrFractSglQbitPattern, ch_pair, wNr),
+                                   get_cmd=self._gen_ch_weight_get_func(
+                                       self._getErrFractSglQbitPattern, ch_pair, wNr),
+
+                                    vals=vals.Arrays(0, 1)
+                                   )         
+        '''
+        Sorted by channel
+        '''
         for i in range(self.device_descriptor.numChannels):
             ch = i+1
             self.add_parameter('ch{}_inavg_data'.format(ch),
@@ -296,14 +434,17 @@ class DDMq(SCPI):
                                get_cmd=srotres_cmd + '?'
                                # vals=vals.Numbers(-134217728,134217727)
                                )
-            self.add_parameter('ch{}_weight_data'.format(ch),
-                               label=('Get weigtht data ch {} '.format(ch)),
-                               get_cmd=self._gen_ch_get_func(
-                                   self._getWeightData, ch),
-                               set_cmd=self._gen_ch_set_func(
-                                   self._sendWeightData, ch),
-                               vals=vals.Arrays(-128, 127)
-                               )
+            for i in range(self.device_descriptor.numWeights):
+                wNr = i+1
+                self.add_parameter('ch{}_weight{}_data'.format(ch, wNr),
+                                  label=('Get weight data channel {}' +
+                                    'weight number {}  '.format(ch, wNr)),
+                                  get_cmd=self._gen_ch_weight_get_func(
+                                   self._getWeightData, ch, wNr),
+                                  set_cmd=self._gen_ch_weight_set_func(
+                                   self._sendWeightData, ch, wNr),
+                                  vals=vals.Arrays(-128, 127)
+                                  )
 
     def _getInputAverage(self, ch):
         ch_pair = math.ceil(ch/2)
@@ -320,23 +461,23 @@ class DDMq(SCPI):
         inputavg = np.frombuffer(binBlock, dtype=np.float32)
         return inputavg
 
-    def _getTVdata(self, ch_pair):
+    def _getTVdata(self, ch_pair, wNr):
         finished = 0
         complete = 0     
         #while (complete != '1'):
         #    complete = self._getTVpercentage(ch_pair)
         while (finished != '1'):
-            finished = self._getTVFinished(ch_pair)
+            finished = self._getTVFinished(ch_pair, wNr)
             if (finished == 'ffffffff'):
                 logging.warning('Trigger is not received: DDM timeout')
                 break
-        self.write('qutech:tvmode{:d}:data? '.format(ch_pair))
+        self.write('qutech:tvmode{:d}:data{:d}? '.format(ch_pair,wNr))
         binBlock = self.binBlockRead()
         #print('TV data in bytes {:d}'.format(len(binBlock)))
         tvmodedata = np.frombuffer(binBlock, dtype=np.float32)
         return tvmodedata
 
-    def _sendWeightData(self, ch, weight):
+    def _sendWeightData(self, ch, wNr,  weight):
         # generate the binblock
         if 1:   # high performance
             arr = np.asarray(weight, dtype=np.int8)
@@ -347,130 +488,149 @@ class DDMq(SCPI):
                 binBlock = binBlock + struct.pack('<f', weight[i])
 
         # write binblock
-        hdr = 'qutech:wint:data {:d},'.format(ch)
+        hdr = 'qutech:wint:data {:d}, {:d},'.format(ch, wNr)
         self.binBlockWrite(binBlock, hdr)
 
-    def _getWeightData(self, ch):
+    def _getWeightData(self, ch, wNr):
 
-        self.write('qutech:wint{:d}:data? '.format(ch))
+        self.write('qutech:wint{:d}:data{:d}? '.format(ch, wNr))
         binBlock = self.binBlockRead()
         #print('Weight data in bytes {:d}'.format(len(binBlock)))
         weightdata = np.frombuffer(binBlock, dtype=np.int8)
         return weightdata
 
-    def _getQstateCNT(self, ch_pair):
+    def _getQstateCNT(self, ch_pair, wNr):
         finished = 0
         complete = 0     
         #while (complete != '1'):
         #    complete = self._getTVpercentage(ch_pair)
         while (finished != '1'):
-            finished = self._getTVFinished(ch_pair)
+            finished = self._getTVFinished(ch_pair, wNr)
             if (finished == 'ffffffff'):
                 logging.warning('Trigger is not received: DDM timeout')
                 break
 
-        self.write('qutech:qstate{:d}:counter:data? '.format(ch_pair))
+        self.write('qutech:qstate{:d}:data{:d}:counter? '.format(ch_pair, wNr))
         binBlock = self.binBlockRead()
         #print('Qu state counter {:d}'.format(len(binBlock)))
         qstatecnt = np.frombuffer(binBlock, dtype=np.float32)
         return qstatecnt
 
-    def _getQstateAVG(self, ch_pair):
+    def _getQstateAVG(self, ch_pair, wNr):
         finished = 0
         complete = 0     
         #while (complete != '1'):
         #    complete = self._getTVpercentage(ch_pair)
         while (finished != '1'):
-            finished = self._getTVFinished(ch_pair)
+            finished = self._getTVFinished(ch_pair, wNr)
             if (finished == 'ffffffff'):
                 logging.warning('Trigger is not received: DDM timeout')
                 break
-        self.write('qutech:qstate{:d}:average:data? '.format(ch_pair))
+        self.write('qutech:qstate{:d}:data{:d}:average? '.format(ch_pair, wNr))
         binBlock = self.binBlockRead()
         #print('Qu state average {:d}'.format(len(binBlock)))
         qstateavg = np.frombuffer(binBlock, dtype=np.float32)
         return qstateavg
-    def _getLoggingInt(self, ch_pair):
+    def _getLoggingInt(self, ch_pair, wNr):
         finished = 0
         complete = 0     
         #while (complete != '1'):
         #    complete = self._getTVpercentage(ch_pair)
         while (finished != '1'):
-            finished = self._getLoggingFinished(ch_pair)
+            finished = self._getLoggingFinished(ch_pair, wNr)
             if (finished == 'ffffffff'):
                 logging.warning('Trigger is not received: DDM timeout')
                 break
-        self.write('qutech:logging{:d}:data:int? '.format(ch_pair))
+        self.write('qutech:logging{:d}:data{:d}:int? '.format(ch_pair, wNr))
         binBlock = self.binBlockRead()
         #print('Qu state average {:d}'.format(len(binBlock)))
         intlogging = np.frombuffer(binBlock, dtype=np.float32)
         return intlogging
-    def _getLoggingQstate(self, ch_pair):
+    def _getLoggingQstate(self, ch_pair, wNr):
         finished = 0
         complete = 0     
         #while (complete != '1'):
         #    complete = self._getTVpercentage(ch_pair)
         while (finished != '1'):
-            finished = self._getLoggingFinished(ch_pair)
+            finished = self._getLoggingFinished(ch_pair, wNr)
             if (finished == 'ffffffff'):
                 logging.warning('Trigger is not received: DDM timeout')
                 break
-        self.write('qutech:logging{:d}:data:qstate? '.format(ch_pair))
+        self.write('qutech:logging{:d}:data{:d}:qstate? '.format(ch_pair, wNr))
         binBlock = self.binBlockRead()
         #print('Qu state average {:d}'.format(len(binBlock)))
         qstatelogging = np.frombuffer(binBlock, dtype=np.float32)
         return qstatelogging        
-    def _getInAvgStatus(self, adcnr):
-        return self.ask('qutech:inputavg%d:status? ' % (adcnr))
-    def _getInAvgFinished(self, adcnr):
-        finished = self.ask('qutech:inputavg%d:finished? ' % (adcnr))
+    '''
+    Input averaging
+    '''
+    def _getInAvgStatus(self, ch_pair):
+        return self.ask('qutech:inputavg{:d}:status? '.format(ch_pair))
+    def _getInAvgFinished(self, ch_pair):
+        finished = self.ask('qutech:inputavg{:d}:finished? '.format(ch_pair))
         fmt_finished = format(int(finished),'x')
         return fmt_finished
-    def _getInAvgBusy(self, adcnr):
-        return self.ask('qutech:inputavg%d:busy? ' % (adcnr))
-    def _getTVStatus(self, adcnr):
-        return self.ask('qutech:tvmode%d:status? ' % (adcnr))
+    def _getInAvgBusy(self, ch_pair):
+        return self.ask('qutech:inputavg{:d}:busy? '.format(ch_pair))
+    '''
+    TV MODe
+    '''
+    def _getTVStatus(self, ch_pair, wNr):
+        return self.ask('qutech:tvmode{:d}:status{:d}? '.format(ch_pair, wNr))
 
-    def _getTVFinished(self, adcnr):
-        finished = self.ask('qutech:tvmode%d:finished? ' % (adcnr))
+    def _getTVFinished(self, ch_pair, wNr):
+        finished = self.ask('qutech:tvmode{:d}:finished{:d}? '.format(ch_pair, wNr))
         fmt_finished = format(int(finished),'x')
         return fmt_finished
-    def _getTVBusy(self, adcnr):
-        return self.ask('qutech:tvmode%d:busy? ' % (adcnr))
-    def _getTVpercentage(self, adcnr):
-        return self.ask('qutech:tvmode%d:percentage? ' % (adcnr))
+    def _getTVBusy(self, ch_pair, wNr):
+        return self.ask('qutech:tvmode{:d}:busy{:d}? '.format(ch_pair, wNr))
+    def _getTVpercentage(self, ch_pair, wNr):
+        return self.ask('qutech:tvmode{:d}:percentage{:d}? '.format(ch_pair, wNr))
     '''
     Logging 
     '''
-    def _getLoggingFinished(self, adcnr):
-        finished = self.ask('qutech:logging%d:finished? ' % (adcnr))
+    def _getLoggingFinished(self, ch_pair, wNr):
+        finished = self.ask('qutech:logging{:d}:finished{:d}? '.format(ch_pair, wNr))
         fmt_finished = format(int(finished),'x')
         return fmt_finished
-    def _getLoggingBusy(self, adcnr):
-        return self.ask('qutech:logging%d:busy? ' % (adcnr))
-    def _getLoggingpercentage(self, adcnr):
-        return self.ask('qutech:logging%d:percentage? ' % (adcnr))
-    def _getLoggingStatus(self, adcnr):
-        return self.ask('qutech:errorfraction%d:status? ' % (adcnr)) 
+    def _getLoggingBusy(self, ch_pair, wNr):
+        return self.ask('qutech:logging{:d}:busy{:d}? '.format(ch_pair, wNr))
+    def _getLoggingpercentage(self, ch_pair, wNr):
+        return self.ask('qutech:logging{:d}:percentage{:d}? '.format(ch_pair, wNr))
+    def _getLoggingStatus(self, ch_pair, wNr):
+        return self.ask('qutech:errorfraction{:d}:status{:d}? '.format(ch_pair, wNr)) 
     '''
     Error fraction counters
     '''
-    def _sendErrFractSglQbitPattern(self, ch_pair, pattern):
-        self.write('qutech:errorfraction{:d}:pattern {:d},{:d}'.format(
+    def _sendErrFractSglQbitPatternAll(self, ch_pair, pattern):
+        self.write('qutech:errorfraction{:d}:pattern:all {:d},{:d}'.format(
                    ch_pair, pattern[0], pattern[1]))
-    def _getErrFractSglQbitPattern(self, ch_pair):
-        return self.ask('qutech:errorfraction{:d}:pattern? '.format(ch_pair))
-    def _getErrFractCnt(self, ch_pair):
+    def _getErrFractSglQbitPatternAll(self, ch_pair):
+        pstring=self.ask('qutech:errorfraction{:d}:pattern:all? '.format(ch_pair))
+        P = np.zeros(2)
+        for i, x in enumerate(pstring.split(',')):
+            P[i] = x
+        return (P)
+    def _sendErrFractSglQbitPattern(self, ch_pair, wNr, pattern):
+        self.write('qutech:errorfraction{:d}:pattern{:d} {:d},{:d}'.format(
+                   ch_pair, wNr, pattern[0], pattern[1]))
+    def _getErrFractSglQbitPattern(self, ch_pair, wNr):
+        pstring=self.ask('qutech:errorfraction{:d}:pattern{:d}? '.format(ch_pair, wNr))
+        P = np.zeros(2)
+        for i, x in enumerate(pstring.split(',')):
+            P[i] = x
+        return (P)
+    def _getErrFractCnt(self, ch_pair, wNr ):
         finished = 0
         complete = 0     
         #while (complete != '1'):
         #    complete = self._getTVpercentage(ch_pair)
         while (finished != '1'):
-            finished = self._getErrFractFinished(ch_pair)
+            finished = self._getErrFractFinished(ch_pair, wNr)
             if (finished == 'ffffffff'):
                 logging.warning('Trigger is not received: DDM timeout')
                 break
-        self.write('qutech:errorfraction{:d}:data? '.format(ch_pair))
+        self.write('qutech:errorfraction{:d}:data{:d}? '.format(ch_pair, wNr))
         binBlock = self.binBlockRead()
         #print('Qu state average {:d}'.format(len(binBlock)))
         errfractioncnt = np.frombuffer(binBlock, dtype=np.int32)
@@ -480,18 +640,18 @@ class DDMq(SCPI):
         print('ZeroStateCounterReg  = {:d}'.format(errfractioncnt[3]))
         print('OneStateCounterReg   = {:d}'.format(errfractioncnt[4]))
         return errfractioncnt    
-    def _getErrFractFinished(self, adcnr):
-        finished = self.ask('qutech:errorfraction%d:finished? ' % (adcnr))
+    def _getErrFractFinished(self, ch_pair, wNr):
+        finished = self.ask('qutech:errorfraction{:d}:finished{:d}? '.format(ch_pair, wNr))
         fmt_finished = format(int(finished),'x')
         return fmt_finished
-    def _getErrFractBusy(self, adcnr):
-        return self.ask('qutech:errorfraction%d:busy? ' % (adcnr))
-    def _getErrFractpercentage(self, adcnr):
-        return self.ask('qutech:errorfraction%d:percentage? ' % (adcnr))
-    def _getErrFractStatus(self, adcnr):
-        return self.ask('qutech:errorfraction%d:status? ' % (adcnr))
-    def _getADCstatus(self, adcnr):
-        status = self.ask('qutech:adc%d:status? ' % (adcnr))
+    def _getErrFractBusy(self, ch_pair, wNr):
+        return self.ask('qutech:errorfraction{:d}:busy{:d}? '.format(ch_pair, wNr))
+    def _getErrFractpercentage(self, ch_pair, wNr):
+        return self.ask('qutech:errorfraction{:d}:percentage{:d}? '.format(ch_pair, wNr))
+    def _getErrFractStatus(self, ch_pair, wNr):
+        return self.ask('qutech:errorfraction{:d}:status{:d}? '.format(ch_pair, wNr))
+    def _getADCstatus(self, ch_pair):
+        status = self.ask('qutech:adc{:d}:status? '.format(ch_pair))
         statusstr = format(int(status), 'b')
         reversestatusstr = statusstr[::-1]
         def _DI():
@@ -533,6 +693,9 @@ class DDMq(SCPI):
         for x in range(0 , 4):
             print(ADCstatus[x]())                         
         return statusstr
+    def _getTHL(self, ch_pair,weight_nr):
+        ret = self.ask('qutech:qstate{}:threshold{:d}?'.format(ch_pair,weight_nr))
+        return ret    
     def _gen_ch_get_func(self, fun, ch):
         def get_func():
             return fun(ch)
@@ -541,6 +704,14 @@ class DDMq(SCPI):
     def _gen_ch_set_func(self, fun, ch):
         def set_func(val):
             return fun(ch, val)
+        return set_func
+    def _gen_ch_weight_get_func(self, fun, ch, wNr):
+        def get_func():
+            return fun(ch, wNr)
+        return get_func
+    def _gen_ch_weight_set_func(self, fun, ch, wNr):
+        def set_func(val):
+            return fun(ch, wNr, val)
         return set_func
 
 
@@ -585,7 +756,6 @@ class DDMq(SCPI):
                    'swVersion:{swVersion}, kmodVersion:{kmodVersion}) '
                    'in {t:.2f}s'.format(t=t, **idn))
         print(con_msg)
-
 
 
 
