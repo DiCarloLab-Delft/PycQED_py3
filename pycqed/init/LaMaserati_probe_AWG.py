@@ -94,9 +94,9 @@ qc.station = station  # makes it easily findable from inside files
 LO = rs.RohdeSchwarz_SGS100A(
     name='LO', address='TCPIP0::192.168.0.73', server_name=None)  #
 station.add_component(LO)
-RF = rs.RohdeSchwarz_SGS100A(
-    name='RF', address='TCPIP0::192.168.0.74', server_name=None)  #
-station.add_component(RF)
+# RF = rs.RohdeSchwarz_SGS100A(
+#     name='RF', address='TCPIP0::192.168.0.74', server_name=None)  #
+# station.add_component(RF)
 QL_LO = rs.RohdeSchwarz_SGS100A(
     name='QL_LO', address='TCPIP0::192.168.0.86', server_name=None)  #
 station.add_component(QL_LO)
@@ -105,8 +105,10 @@ QR_LO = rs.RohdeSchwarz_SGS100A(
 station.add_component(QR_LO)
 # TWPA_Pump = rs.RohdeSchwarz_SGS100A(name='TWPA_Pump', address='TCPIP0::192.168.0.90', server_name=None)  #
 # station.add_component(TWPA_Pump)
-AWG = tek.Tektronix_AWG5014(name='AWG', setup_folder=None, timeout=2,
-                            address='TCPIP0::192.168.0.99::INSTR', server_name=None)
+# AWG = tek.Tektronix_AWG5014(name='AWG', setup_folder=None, timeout=2,
+#                             address='TCPIP0::192.168.0.99::INSTR', server_name=None)
+AWG = tek.Tektronix_AWG5014(name='AWG', timeout=2, address='TCPIP0::192.168.0.99::INSTR')
+
 station.add_component(AWG)
 AWG.timeout(180)  # timeout long for uploading wait.
 
@@ -151,9 +153,9 @@ LutManMan.LutMans(
 # SH = sh.SignalHound_USB_SA124B('Signal hound', server_name=None)
 
 # Meta-instruments
-HS = hd.HeterodyneInstrument('HS', LO=LO, RF=RF, AWG=AWG, acquisition_instr=UHFQC_1.name,
-                             server_name=None)
-station.add_component(HS)
+# HS = hd.HeterodyneInstrument('HS', LO=LO, RF=RF, AWG=AWG, acquisition_instr=UHFQC_1.name,
+#                              server_name=None)
+# station.add_component(HS)
 
 MC = mc.MeasurementControl('MC')
 station.add_component(MC)
@@ -188,9 +190,9 @@ QR.LO(LO.name)
 QR.cw_source(QL_LO.name)
 QR.td_source(QR_LO.name)
 QR.IVVI(IVVI.name)
-QR.RF_RO_source(RF.name)
+# QR.RF_RO_source(RF.name)
 QR.AWG(AWG.name)
-QR.heterodyne_instr(HS.name)
+# QR.heterodyne_instr(HS.name)
 QR.FluxCtrl(FC.name)
 QR.MC(MC.name)
 station.add_component(QR)
@@ -283,9 +285,9 @@ print('Ran initialization in %.2fs' % (t1-t0))
 
 def all_sources_off():
     LO.off()
-    RF.off()
-    Spec_source.off()
-    Qubit_LO.off()
+    # RF.off()
+    # Spec_source.off()
+    # Qubit_LO.off()
     # TWPA_Pump.off()
 
 
@@ -340,9 +342,9 @@ station.add_component(Maserati_fridge_mon)
 
 
 from pycqed.instrument_drivers.virtual_instruments import instrument_monitor as im
-IM = im.InstrumentMonitor('IM', station)
-station.add_component(IM)
-MC.instrument_monitor(IM.name)
+# IM = im.InstrumentMonitor('IM', station)
+# station.add_component(IM)
+# MC.instrument_monitor(IM.name)
 
 # def reload_mod_stuff():
 
@@ -454,15 +456,21 @@ from pycqed.instrument_drivers.physical_instruments import QuTech_ControlBox_v3 
 # reload(qcb)
 # CBox.close()
 # del station.components['CBox']
-CBox = qcb.QuTech_ControlBox_v3(
-    'CBox', address='Com6', run_tests=False, server_name=None)
-station.add_component(CBox)
+# CBox = qcb.QuTech_ControlBox_v3(
+#     'CBox', address='Com6', run_tests=False, server_name=None)
+# station.add_component(CBox)
 
-import pycqed.instrument_drivers.meta_instrument.CBox_LookuptableManager as cbl
-CBox_LutMan = cbl.ControlBox_LookuptableManager('CBox_LutMan')
-CBox_LutMan.CBox(CBox.name)
-station.add_component(CBox_LutMan)
+# import pycqed.instrument_drivers.meta_instrument.CBox_LookuptableManager as cbl
+# CBox_LutMan = cbl.ControlBox_LookuptableManager('CBox_LutMan')
+# CBox_LutMan.CBox(CBox.name)
+# station.add_component(CBox_LutMan)
 
 
 
 UHFQC_1.timeout(2)
+
+
+
+from pycqed.instrument_drivers.physical_instruments import QuTech_AWG_Module as qwg
+QWG = qwg.QuTech_AWG_Module( 'QWG', address='192.168.0.10', port=5025)
+station.add_component(QWG)

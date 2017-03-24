@@ -133,9 +133,7 @@ LutManMan.LutMans(
 
 
 from pycqed.instrument_drivers.physical_instruments import QuTech_AWG_Module as qwg
-QWG = qwg.QuTech_AWG_Module(
-    'QWG', address='192.168.0.10',
-    port=5025, server_name=None)
+QWG = qwg.QuTech_AWG_Module( 'QWG', address='192.168.0.10', port=5025)
 station.add_component(QWG)
 
 from pycqed.instrument_drivers.meta_instrument import QWG_LookuptableManager as qlm
