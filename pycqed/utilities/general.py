@@ -42,6 +42,16 @@ def bool_to_int_str(b):
         return '0'
 
 
+def int_to_bin(x, w):
+    """
+    Converts an integer to a binary string of a specified width
+    x (int) : input integer to be converted
+    w (int) : desired width
+    """
+    return '{0:{fill}{width}b}'.format((int(x) + 2**w) % 2**w,
+                                       fill='0', width=w)
+
+
 def mopen(filename, mode='w'):
     if not exists(dirname(filename)):
         try:
