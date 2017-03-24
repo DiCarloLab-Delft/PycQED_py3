@@ -66,10 +66,13 @@ def show_element_pyqt(element, QtPlot_win=None,
     if type(channels) == str:
         channels = [channels]
 
-    t_vals = t_vals*1e9
-    xlabel = 'Time (ns)'
+    t_vals = t_vals
+    xlabel = 'Time'
+    xunit = 's'
+    yunit = 'V'
     for i, ch in enumerate(channels):
-        ylabel = 'Output ch {} (V)'.format(ch)
+        ylabel = 'Output ch {}'.format(ch)
+
         if color_idx == None:
             color = color_cycle[i % len(color_cycle)]
         else:
@@ -81,14 +84,14 @@ def show_element_pyqt(element, QtPlot_win=None,
                 color=color,
                 subplot=i+1,
                 symbol='o', symbolSize=5,
-                xlabel=xlabel, ylabel=ylabel)
+                xlabel=xlabel, xunit=xunit, ylabel=ylabel, yunit=yunit)
         else:
             QtPlot_win.add(
                 x=t_vals, y=outputs_dict[ch], name=ch,
                 color=color,
                 subplot=i+1,
                 symbol='o', symbolSize=5,
-                xlabel=xlabel, ylabel=ylabel)
+                xlabel=xlabel, xunit=xunit, ylabel=ylabel, yunit=yunit)
     # links all the x-axes
     p0 = QtPlot_win.subplots[0]
     for j, p in enumerate(QtPlot_win.subplots):

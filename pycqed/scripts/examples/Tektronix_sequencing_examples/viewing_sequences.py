@@ -1,6 +1,7 @@
 # Example of how to view a tektronix sequence
 import qcodes as qc
 from pycqed.measurement.waveform_control import viewer
+reload(viewer)
 station = qc.station
 
 # Shows the first two elements of the last uploaded AWG sequence
