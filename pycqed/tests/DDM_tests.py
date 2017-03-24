@@ -1,15 +1,12 @@
-#!/usr/bin/python
 import unittest
 from pycqed.instrument_drivers.physical_instruments.DDM.DDMq \
     import DDMq
-#from pycqed.measurement.waveform_control_CC.waveform import Waveform
-import time
 import numpy as np
-from socket import timeout
 from qcodes.utils import validators as vals
 
 
 class DDM_tests(unittest.TestCase):
+
     '''
     This is a test suite for testing the HeterodyneSource Instrument.
     '''
@@ -21,12 +18,12 @@ class DDM_tests(unittest.TestCase):
         '''
         try:
             self.ddm = DDM
-        except:
+        except Exception:
             self.ddm = DDMq(
                 'DDM', address='192.168.42.11',
                 port=5025, server_name=None)
 
-        #self.ddm.reset()
+        # self.ddm.reset()
         self.ddm._socket.settimeout(.3)  # set low timeout for tests
 
     def test_IDN(self):
@@ -155,7 +152,6 @@ class DDM_tests(unittest.TestCase):
     def tearDown(self):
         self.ddm._socket.settimeout(5)
         # set timeout back to default
-
 
 
 if __name__ == '__main__':
