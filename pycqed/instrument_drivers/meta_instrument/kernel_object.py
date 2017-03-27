@@ -13,6 +13,7 @@ from pycqed.measurement.kernel_functions import kernel_generic, htilde_bounce, \
 import pycqed.measurement.kernel_functions as kf
 from pycqed.instrument_drivers.pq_parameters import ConfigParameter
 
+
 class Distortion(Instrument):
 
     '''
@@ -53,38 +54,37 @@ class Distortion(Instrument):
                        'Kernel is based on parameters in kernel object \n' +
                        'and files specified in the kernel list.'))
 
-
         self.add_parameter('skineffect_alpha', unit='',
                            parameter_class=ConfigParameter,
                            initial_value=0,
                            vals=vals.Numbers())
-        self.add_parameter('skineffect_length', unit='ns',
+        self.add_parameter('skineffect_length', unit='s',
                            parameter_class=ConfigParameter,
-                           initial_value=600,
+                           initial_value=600e-9,
                            vals=vals.Numbers())
 
         self.add_parameter('decay_amp_1', unit='',
                            initial_value=0,
                            parameter_class=ConfigParameter,
                            vals=vals.Numbers())
-        self.add_parameter('decay_tau_1', unit='ns',
-                           initial_value=1,
+        self.add_parameter('decay_tau_1', unit='s',
+                           initial_value=1e-9,
                            parameter_class=ConfigParameter,
                            vals=vals.Numbers())
-        self.add_parameter('decay_length_1', unit='ns',
-                           initial_value=100,
+        self.add_parameter('decay_length_1', unit='s',
+                           initial_value=100e-9,
                            parameter_class=ConfigParameter,
                            vals=vals.Numbers())
         self.add_parameter('decay_amp_2', unit='',
                            initial_value=0,
                            parameter_class=ConfigParameter,
                            vals=vals.Numbers())
-        self.add_parameter('decay_tau_2', unit='ns',
-                           initial_value=1,
+        self.add_parameter('decay_tau_2', unit='s',
+                           initial_value=1e-9,
                            parameter_class=ConfigParameter,
                            vals=vals.Numbers())
-        self.add_parameter('decay_length_2', unit='ns',
-                           initial_value=100,
+        self.add_parameter('decay_length_2', unit='s',
+                           initial_value=100e-9,
                            parameter_class=ConfigParameter,
                            vals=vals.Numbers())
 
@@ -92,12 +92,12 @@ class Distortion(Instrument):
                            initial_value=0,
                            parameter_class=ConfigParameter,
                            vals=vals.Numbers())
-        self.add_parameter('bounce_tau_1', unit='ns',
+        self.add_parameter('bounce_tau_1', unit='s',
                            initial_value=0,
                            parameter_class=ConfigParameter,
                            vals=vals.Numbers())
-        self.add_parameter('bounce_length_1', unit='ns',
-                           initial_value=1,
+        self.add_parameter('bounce_length_1', unit='s',
+                           initial_value=1e-9,
                            parameter_class=ConfigParameter,
                            vals=vals.Numbers())
 
@@ -105,12 +105,12 @@ class Distortion(Instrument):
                            initial_value=0,
                            parameter_class=ConfigParameter,
                            vals=vals.Numbers())
-        self.add_parameter('bounce_tau_2', unit='ns',
+        self.add_parameter('bounce_tau_2', unit='s',
                            initial_value=0,
                            parameter_class=ConfigParameter,
                            vals=vals.Numbers())
-        self.add_parameter('bounce_length_2', unit='ns',
-                           initial_value=1,
+        self.add_parameter('bounce_length_2', unit='s',
+                           initial_value=1e-9,
                            parameter_class=ConfigParameter,
                            vals=vals.Numbers())
 
@@ -126,14 +126,14 @@ class Distortion(Instrument):
                            initial_value=0,
                            parameter_class=ConfigParameter,
                            vals=vals.Numbers())
-        self.add_parameter('poly_length', unit='ns',
+        self.add_parameter('poly_length', unit='s',
                            initial_value=0,
                            parameter_class=ConfigParameter,
                            vals=vals.Numbers())
 
-        self.add_parameter('corrections_length', unit='ns',
+        self.add_parameter('corrections_length', unit='s',
                            parameter_class=ConfigParameter,
-                           initial_value=1000,
+                           initial_value=1e-6,
                            vals=vals.Numbers())
 
     def _get_config_changed(self):
@@ -144,25 +144,25 @@ class Distortion(Instrument):
 
     def get_bounce_kernel_1(self):
         return kf.bounce_kernel(amp=self.bounce_amp_1(),
-                                time=self.bounce_tau_1(),
-                                length=self.bounce_length_1())
+                                time=self.bounce_tau_1()*1e9,
+                                length=self.bounce_length_1()*1e9)
 
     def get_bounce_kernel_2(self):
         return kf.bounce_kernel(amp=self.bounce_amp_2(),
-                                time=self.bounce_tau_2(),
-                                length=self.bounce_length_2())
+                                time=self.bounce_tau_2()*1e9,
+                                length=self.bounce_length_2()*1e9)
 
     def get_skin_kernel(self):
         return kf.skin_kernel(alpha=self.skineffect_alpha(),
-                              length=self.skineffect_length())
+                              length=self.skineffect_length()*1e9)
 
     def get_decay_kernel_1(self):
-        return kf.decay_kernel(amp=self.decay_amp_1(), tau=self.decay_tau_1(),
-                               length=self.decay_length_1())
+        return kf.decay_kernel(amp=self.decay_amp_1(), tau=self.decay_tau_1()*1e9,
+                               length=self.decay_length_1()*1e9)
 
     def get_decay_kernel_2(self):
-        return kf.decay_kernel(amp=self.decay_amp_2(), tau=self.decay_tau_2(),
-                               length=self.decay_length_2())
+        return kf.decay_kernel(amp=self.decay_amp_2(), tau=self.decay_tau_2()*1e9,
+                               length=self.decay_length_2()*1e9)
 
     # def get_poly_kernel(self):
     #     return poly_kernel(a=self.poly_a(),
@@ -217,7 +217,7 @@ class Distortion(Instrument):
 
         kernel_list = external_kernels + kernel_object_kernels
         return self.convolve_kernel(kernel_list,
-                                    length=self.corrections_length())
+                                    length=self.corrections_length()*1e9)
 
     def save_corrections_kernel(self, filename):
 
@@ -238,4 +238,3 @@ class Distortion(Instrument):
             self._config_changed = False
 
         return self._precalculated_kernel
-
