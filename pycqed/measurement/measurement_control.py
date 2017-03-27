@@ -65,7 +65,7 @@ class MeasurementControl(Instrument):
                            vals=vals.Bool(),
                            initial_value=live_plot_enabled)
         self.add_parameter('plotting_interval',
-                           units='s',
+                           unit='s',
                            vals=vals.Numbers(min_value=0.001),
                            set_cmd=self._set_plotting_interval,
                            get_cmd=self._get_plotting_interval)
@@ -77,10 +77,10 @@ class MeasurementControl(Instrument):
         # pyqtgraph plotting process is reused for different measurements.
         if self.live_plot_enabled():
             self.main_QtPlot = QtPlot(
-                windowTitle='Main plotmon of {}'.format(self.name),
+                window_title='Main plotmon of {}'.format(self.name),
                 figsize=(600, 400))
             self.secondary_QtPlot = QtPlot(
-                windowTitle='Secondary plotmon of {}'.format(self.name),
+                window_title='Secondary plotmon of {}'.format(self.name),
                 figsize=(600, 400))
 
         self.soft_iteration = 0  # used as a counter for soft_avg
@@ -390,10 +390,8 @@ class MeasurementControl(Instrument):
         '''
         # this data can be plotted by enabling persist_mode
         self._persist_dat = result
-        self._persist_xlabs = self.column_names[
-            0:len(self.sweep_function_names)]
-        self._persist_ylabs = self.column_names[
-            len(self.sweep_function_names):]
+        self._persist_xlabs = self.sweep_par_names
+        self._persist_ylabs = self.detector_function.value_names
 
         for attr in ['TwoD_array',
                      'dset',
@@ -476,8 +474,11 @@ class MeasurementControl(Instrument):
         if self.main_QtPlot.traces != []:
             self.main_QtPlot.clear()
         self.curves = []
-        xlabels = self.column_names[0:len(self.sweep_function_names)]
-        ylabels = self.column_names[len(self.sweep_function_names):]
+        xlabels= self.sweep_par_names
+        xunits = self.sweep_par_units
+        ylabels = self.detector_function.value_names
+        yunits = self.detector_function.value_units
+
         j = 0
         if (self._persist_ylabs == ylabels and
                 self._persist_xlabs == xlabels) and self.persist_mode():
@@ -496,7 +497,10 @@ class MeasurementControl(Instrument):
                                              color=0.75,  # a grayscale value
                                              symbol='o', symbolSize=5)
                 self.main_QtPlot.add(x=[0], y=[0],
-                                     xlabel=xlab, ylabel=ylab,
+                                     xlabel=xlab,
+                                     xunit=xunits[xi],
+                                     ylabel=ylab,
+                                     yunit=yunits[yi],
                                      subplot=j+1,
                                      color=color_cycle[j%len(color_cycle)],
                                      symbol='o', symbolSize=5)
@@ -545,13 +549,18 @@ class MeasurementControl(Instrument):
                 [n, m, len(self.detector_function.value_names)])
             self.TwoD_array[:] = np.NAN
             self.secondary_QtPlot.clear()
+            slabels= self.sweep_par_names
+            sunits = self.sweep_par_units
+            zlabels = self.detector_function.value_names
+            zunits = self.detector_function.value_units
+
             for j in range(len(self.detector_function.value_names)):
                 self.secondary_QtPlot.add(x=self.sweep_pts_x,
                                    y=self.sweep_pts_y,
                                    z=self.TwoD_array[:, :, j],
-                                   xlabel=self.column_names[0],
-                                   ylabel=self.column_names[1],
-                                   zlabel=self.column_names[2+j],
+                                   xlabel=slabels[0], xunit=sunits[0],
+                                   ylabel=sunits[1], yunit=sunits[1],
+                                   zlabel=zlabels[j], zunit=zunits[j],
                                    subplot=j+1,
                                    cmap='viridis')
 
@@ -580,11 +589,18 @@ class MeasurementControl(Instrument):
         '''
         self.time_last_ad_plot_update = time.time()
         self.secondary_QtPlot.clear()
+
+        slabels= self.sweep_par_names
+        sunits = self.sweep_par_units
+        zlabels = self.detector_function.value_names
+        zunits = self.detector_function.value_units
+
         for j in range(len(self.detector_function.value_names)):
             self.secondary_QtPlot.add(x=[0],
                                y=[0],
                                xlabel='iteration',
-                               ylabel=self.detector_function.value_names[j],
+                               ylabel=zlabels[j],
+                               yunit=zunits[j],
                                subplot=j+1,
                                symbol='o', symbolSize=5)
 
@@ -655,6 +671,7 @@ class MeasurementControl(Instrument):
         for sweep_function in self.sweep_functions:
             self.column_names.append(sweep_function.parameter_name+' (' +
                                      sweep_function.unit+')')
+
             self.sweep_par_names.append(sweep_function.parameter_name)
             self.sweep_par_units.append(sweep_function.unit)
 

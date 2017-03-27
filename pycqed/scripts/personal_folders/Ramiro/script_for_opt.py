@@ -47,7 +47,7 @@ def set_chevron_amp_par(val, det):
     det.chevron_amp = val
     return det.chevron_amp
 chevron_amp_par = qc.Parameter(name='AWG_amplitude',
-                              units='Vpp',
+                              unit='Vpp',
                               label='AWG amplitude')
 chevron_amp_par.get = lambda: get_chevron_amp_par(chevron_det)
 chevron_amp_par.set = lambda val: set_chevron_amp_par(val, chevron_det)

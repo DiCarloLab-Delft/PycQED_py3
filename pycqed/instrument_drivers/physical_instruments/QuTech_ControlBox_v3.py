@@ -39,16 +39,23 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
                            vals=vals.Enum('internal', 'external',
                                           'mixed'))
         self._pulse_queue_state = defHeaders.pulse_queue_states[0]
-        self.add_parameter('pulse_queue_state',
-                           get_cmd=self._do_get_pulse_queue_state)
+        self.add_parameter(
+            'pulse_queue_state',
+            docstring=('returns 0 if OK. returns 1 if instructions are not'
+                       ' executed fast enough.'),
+            get_cmd=self._do_get_pulse_queue_state)
         self._max_instruction_address = 0
-        self.add_parameter('max_instruction_address',
-                           get_cmd=self._do_get_max_instruction_address)
+        self.add_parameter(
+            'max_instruction_address',
+            docstring=('returns the highest address (index) of instructions '
+                       'that was exectued by the program, should be equal '
+                       'to uploaded_program_length.'),
+            get_cmd=self._do_get_max_instruction_address)
         self._uploaded_program_length = 0
         self.add_parameter('uploaded_program_length',
                            get_cmd=self._do_get_uploaded_program_length)
         self.add_parameter('instr_mem_size',
-                           units='#',
+                           unit='#',
                            label='instruction memory size',
                            get_cmd=self._get_instr_mem_size)
         # hardcoded memory limit, depends on firmware of the CBox
@@ -82,6 +89,12 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
         print('test suite got:',
               unittest.TestLoader().getTestCaseNames(test_suite.CBox_tests_v3))
         unittest.TextTestRunner(verbosity=2).run(suite)
+
+    def start(self):
+        self.run_mode('run')
+
+    def stop(self):
+        self.run_mode('idle')
 
     def _do_get_firmware_version(self):
         v = self.get_master_controller_params()
