@@ -41,7 +41,6 @@ data_dir_dict = {'tud276606_FPGA_PC': 'D:\Experiments/CBox_Testing/Data',
                  'Simulation_PC': 'D:\Experiments/testSingleShotFidelityAnalysis/Data',
                  'Ramiro_Desktop': r'\\131.180.82.81\\Experiments\\1702_Starmon\\data',
                  # 'Ramiro_Desktop': r'\\131.180.82.81\\data',
-
                  # 'Ramiro_Desktop': r'\\131.180.82.190\\Experiments\\1611_Starmon\\Data',
                  r'Nathans_Laptop': 'D:/nlangford\My Documents\Projects\Rabi Model\Experiment_1504\Data',
                  'Bart_Laptop': 'C:\Experiments/NumericalOptimization/Data',
