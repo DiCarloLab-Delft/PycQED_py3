@@ -1737,3 +1737,198 @@ class ATS_integrated_average_continuous_detector(Hard_Detector):
 
     def finish(self):
         pass
+
+
+### DDM detector functions
+class DDM_input_average_detector(Hard_Detector):
+
+    '''
+    Detector used for acquiring averaged input traces withe the DDM
+
+    '''
+
+    '''
+    Detector used for acquiring single points of the DDM while externally
+    triggered by the AWG.
+    Soft version of the regular integrated avg detector.
+    # not yet pair specific
+    '''
+
+    def __init__(self, DDM, AWG, channels=[1, 2], nr_averages=1024, nr_samples=1024, **kw):
+        super(DDM_input_average_detector, self).__init__()
+
+        self.DDM = DDM
+        self.name = 'DDM_input_averaging_data'
+        self.channels = channels
+        self.value_names = ['']*len(self.channels)
+        self.value_units = ['']*len(self.channels)
+        for i, channel in enumerate(self.channels):
+            self.value_names[i] = 'ch{}'.format(channel)
+            self.value_units[i] = 'V'
+        self.AWG = AWG
+        self.nr_samples = nr_samples
+        self.nr_averages = nr_averages
+
+    def prepare(self, sweep_points):
+        if self.AWG is not None:
+            self.AWG.stop()
+        self.DDM.ch_pair1_inavg_scansize.set(self.nr_samples)
+        self.DDM.ch_pair1_inavg_Navg(self.nr_averages)
+        self.nr_sweep_points = self.nr_samples
+
+    def get_values(self):
+        #arming DDM trigger
+        self.DDM.ch_pair1_inavg_enable.set(1)
+        self.DDM.ch_pair1_run.set(1)
+        # starting AWG
+        if self.AWG is not None:
+            self.AWG.start()
+        # polling the data, function checks that measurement is finished
+        data = ['']*len(self.channels)
+        for i, channel in enumerate(self.channels):
+            data[i] = eval("self.DDM.ch{}_inavg_data()".format(channel))/127
+        return data
+
+    def finish(self):
+        if self.AWG is not None:
+            self.AWG.stop()
+
+
+class DDM_integrated_average_detector(Hard_Detector):
+
+    '''
+    Detector used for integrated average results with the DDM
+
+    '''
+
+    def __init__(self, DDM, AWG, integration_length=1e-6, nr_averages=1024, rotate=False,
+                 channels=[1,2,3,4,5], cross_talk_suppression=False,
+                 **kw):
+        super(DDM_integrated_average_detector, self).__init__()
+        self.DDM = DDM
+        self.name = 'DDM_integrated_average'
+        self.channels = channels
+        self.value_names = ['']*len(self.channels)
+        self.value_units = ['']*len(self.channels)
+        self.cal_points = kw.get('cal_points', None)
+        for i, channel in enumerate(self.channels):
+            self.value_names[i] = 'w{}'.format(channel)
+            self.value_units[i] = 'V'
+        self.rotate = rotate
+        self.AWG = AWG
+        self.nr_averages = nr_averages
+        self.integration_length = integration_length
+        self.rotate = rotate
+        self.cross_talk_suppression = cross_talk_suppression
+        self.scaling_factor=1/(500e6*integration_length)/127
+
+    def prepare(self, sweep_points=None):
+        if self.AWG is not None:
+            self.AWG.stop()
+        if sweep_points is None:
+            self.nr_sweep_points = 1
+        else:
+            self.nr_sweep_points = len(sweep_points)
+        # this sets the result to integration and rotation outcome
+        for i, channel in enumerate(self.channels):
+            eval("self.DDM.ch_pair1_weight{}_wint_intlength({})".format(channel, self.integration_length*500e6))
+        self.DDM.ch_pair1_tvmode_naverages(self.nr_averages)
+        self.DDM.ch_pair1_tvmode_nsegments(self.nr_sweep_points)
+
+    def get_values(self):
+        #arming DDM trigger
+        self.DDM.ch_pair1_tvmode_enable.set(1)
+        self.DDM.ch_pair1_run.set(1)
+        # starting AWG
+        if self.AWG is not None:
+            self.AWG.start()
+        # polling the data, function checks that measurement is finished
+        data = ['']*len(self.channels)
+        for i, channel in enumerate(self.channels):
+            data[i] = eval("self.DDM.ch_pair1_weight{}_tvmode_data()".format(channel))*self.scaling_factor
+        if self.rotate:
+            return self.rotate_and_normalize(data)
+        else:
+            return data
+
+    def acquire_data_point(self):
+        return self.get_values()
+
+    def rotate_and_normalize(self, data):
+        """
+        Rotates and normalizes
+        """
+        if self.cal_points is None:
+            self.corr_data, self.zero_coord, self.one_coord = \
+                a_tools.rotate_and_normalize_data(
+                    data=data,
+                    cal_zero_points=list(range(-4, -2)),
+                    cal_one_points=list(range(-2, 0)))
+        else:
+            self.corr_data, self.zero_coord, self.one_coord = \
+                a_tools.rotate_and_normalize_data(
+                    data=self.measured_values[0:2],
+                    cal_zero_points=self.cal_points[0],
+                    cal_one_points=self.cal_points[1])
+        return self.corr_data, self.corr_data
+
+    def finish(self):
+        if self.AWG is not None:
+            self.AWG.stop()
+
+
+class DDM_integration_logging_det(Hard_Detector):
+
+    '''
+    Detector used for integrated average results with the UHFQC
+
+    '''
+
+    def __init__(self, DDM, AWG, integration_length=1e-6,
+                 channels=[1, 2], nr_shots=4096, **kw):
+        super(DDM_integration_logging_det, self).__init__()
+        self.DDM = DDM
+        self.name = 'DDM_integration_logging_det'
+        self.channels = channels
+        self.value_names = ['']*len(self.channels)
+        self.value_units = ['']*len(self.channels)
+        for i, channel in enumerate(self.channels):
+            self.value_names[i] = 'w{}'.format(channel)
+            self.value_units[i] = 'V'
+        if len(self.channels) == 2:
+            self.value_names = ['I', 'Q']
+            self.value_units = ['V', 'V']
+        self.AWG = AWG
+        self.integration_length = integration_length
+        self.nr_shots = nr_shots
+        self.scaling_factor=1/(500e6*integration_length)/127
+
+    def prepare(self, sweep_points):
+        if self.AWG is not None:
+            self.AWG.stop()
+        if sweep_points is None:
+            self.nr_sweep_points = 1
+        else:
+            self.nr_sweep_points = len(sweep_points)
+        # this sets the result to integration and rotation outcome
+        for i, channel in enumerate(self.channels):
+            eval("self.DDM.ch_pair1_weight{}_wint_intlength({})".format(channel, self.integration_length*500e6))
+        self.DDM.ch_pair1_logging_nshots(self.nr_shots)
+
+
+    def get_values(self):
+        #arming DDM trigger
+        self.DDM.ch_pair1_logging_enable.set(1)
+        self.DDM.ch_pair1_run.set(1)
+        # starting AWG
+        if self.AWG is not None:
+            self.AWG.start()
+        # polling the data, function checks that measurement is finished
+        data = ['']*len(self.channels)
+        for i, channel in enumerate(self.channels):
+            data[i] = eval("self.DDM.ch_pair1_weight{}_logging_int()".format(channel))*self.scaling_factor
+        return data
+
+    def finish(self):
+        if self.AWG is not None:
+            self.AWG.stop()

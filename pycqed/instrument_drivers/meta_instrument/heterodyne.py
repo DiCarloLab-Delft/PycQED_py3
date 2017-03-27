@@ -133,6 +133,9 @@ class HeterodyneInstrument(Instrument):
             self.prepare_UHFQC()
         elif 'ATS' in self.acquisition_instr():
             self.prepare_ATS(get_t_base)
+        elif 'DDM' in self.acquisition_instr():
+            self.prepare_DDM()
+
         else:
             raise ValueError("Invalid acquisition instrument {} in {}".format(
                 self.acquisition_instr(), self.__class__.__name__))
@@ -228,6 +231,8 @@ class HeterodyneInstrument(Instrument):
             return self.probe_UHFQC()
         elif 'ATS' in self.acquisition_instr():
             return self.probe_ATS()
+        elif 'DDM' in self.acquisition_instr():
+            return self.probe_DDM()
         else:
             raise ValueError("Invalid acquisition instrument {} in {}".format(
                 self.acquisition_instr(), self.__class__.__name__))
@@ -404,6 +409,7 @@ class HeterodyneInstrument(Instrument):
     def _get_acq_marker_channels(self):
         return self._acq_marker_channels
 
+
     def finish(self):
         if 'UHFQC' in self.acquisition_instr():
             self._acquisition_instr.acquisition_finalize()
@@ -478,6 +484,14 @@ class LO_modulated_Heterodyne(HeterodyneInstrument):
         self._I_channel = 'ch3'
         self._Q_channel = 'ch4'
 
+    def prepare_DDM(self,)
+        for i, channel in enumerate([1,2]):
+            eval("self._acquisition_instr.ch_pair1_weight{}_wint_intlength({})".format(channel, RO_length*500e6))
+        self._acquisition_instr.ch_pair1_tvmode_naverages(self.nr_averages())
+        self._acquisition_instr.ch_pair1_tvmode_nsegments(1)
+        self.scale_factor=1/(500e6*RO_length)/127
+
+
     def prepare_CBox(self, get_t_base=True):
         """
         uses the AWG to generate the modulating signal and CBox for readout
@@ -513,6 +527,17 @@ class LO_modulated_Heterodyne(HeterodyneInstrument):
         self.CBox.acquisition_mode(4)
         d = self.CBox.get_integrated_avg_results()
         return d[0][0]+1j*d[1][0]
+
+    def probe_DDM(self):
+            # t0 = time.time()
+            self._acquisition_instr.ch_pair1_tvmode_enable.set(1)
+            self._acquisition_instr.ch_pair1_run.set(1)
+            dataI = eval("self._acquisition_instr.ch_pair1_weight{}_tvmode_data()".format(1))
+            dataQ = eval("self._acquisition_instr.ch_pair1_weight{}_tvmode_data()".format(2))
+            dat = (self.scale_factor*dataI+self.scale_factor*1j*dataQ)
+            # t1 = time.time()
+            # print("time for DDM polling", t1-t0)
+        return dat
 
     def _set_frequency(self, val):
         self._frequency = val
