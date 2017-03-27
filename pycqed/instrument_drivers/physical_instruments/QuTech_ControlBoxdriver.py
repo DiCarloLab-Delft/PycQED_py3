@@ -17,7 +17,6 @@ pyximport.install(setup_args={"script_args": ["--compiler=msvc"],
 from ._controlbox import defHeaders  # File containing bytestring commands
 from ._controlbox import codec as c  # must be below pyximport.install
 
-
 class QuTech_ControlBox(VisaInstrument):
 
     '''
@@ -94,7 +93,7 @@ class QuTech_ControlBox(VisaInstrument):
                 label='Integraion weights input {}'.format(i),
                 get_cmd=self._wrap_ch_get_fun(self._get_int_weights, i),
                 set_cmd=self._wrap_ch_set_fun(self._set_int_weights, i),
-                vals=vals.Ints(-128, 127))
+                vals=vals.Arrays(-128, 127, shape=(1, 512)))
 
             self._integration_weights = [[], []]
 
@@ -1300,10 +1299,10 @@ class QuTech_ControlBox(VisaInstrument):
         @return stat : 0 if the upload succeeded and 1 if the upload failed.
         '''
 
-        # 2 bytes per array val + cmd_header and EOM
-        if len(weights) != 512:
-            raise ValueError('Length of array must be 512 elements')
+        if not all(isinstance(item, int) for item in weights):
+            raise ValueError('The integration weights must be integers.')
 
+        # 2 bytes per array val + cmd_header and EOM
         if line == 0:
             cmd = defHeaders.UpdWeightsZeroHeader
         elif line == 1:
