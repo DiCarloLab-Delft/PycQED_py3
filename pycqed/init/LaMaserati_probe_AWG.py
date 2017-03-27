@@ -2,7 +2,6 @@
 This scripts initializes the instruments and imports the modules
 """
 
-UHFQC = True
 
 # General imports
 
@@ -19,12 +18,6 @@ import pylab
 # Qcodes
 import qcodes as qc
 from qcodes.utils import validators as vals
-# currently on a Windows machine
-# qc.set_mp_method('spawn')  # force Windows behavior on mac
-# qc.show_subprocess_widget()
-# Globally defined config
-# qc_config = {'datadir': r'D:\\Experimentsp7_Qcodes_5qubit',
-#              'PycQEDdir': 'D:\GitHubRepos\PycQED_py3'}
 qc_config = {'datadir': r'D:\Experiments\\1607_Qcodes_5qubit\data',
              'PycQEDdir': 'D:\GitHubRepos\PycQED_py3'}
 
@@ -70,9 +63,8 @@ from pycqed.instrument_drivers.meta_instrument import heterodyne as hd
 import pycqed.instrument_drivers.meta_instrument.CBox_LookuptableManager as lm
 
 from pycqed.instrument_drivers.meta_instrument.qubit_objects import CBox_driven_transmon as qb
-from pycqed.instrument_drivers.physical_instruments import QuTech_Duplexer as qdux
-if UHFQC:
-    from pycqed.instrument_drivers.physical_instruments.ZurichInstruments import UHFQuantumController as ZI_UHFQC
+
+from pycqed.instrument_drivers.physical_instruments.ZurichInstruments import UHFQuantumController as ZI_UHFQC
 from pycqed.instrument_drivers.physical_instruments import Weinschel_8320_novisa
 # for multiplexed readout
 import pycqed.instrument_drivers.meta_instrument.UHFQC_LookuptableManager as lm_UHFQC
@@ -91,26 +83,19 @@ from pycqed.measurement.pulse_sequences import multi_qubit_tek_seq_elts as mqs
 
 station = qc.Station()
 qc.station = station  # makes it easily findable from inside files
-LO = rs.RohdeSchwarz_SGS100A(
-    name='LO', address='TCPIP0::192.168.0.73', server_name=None)  #
+LO = rs.RohdeSchwarz_SGS100A(name='LO', address='TCPIP0::192.168.0.73')  #
 station.add_component(LO)
-# RF = rs.RohdeSchwarz_SGS100A(
-#     name='RF', address='TCPIP0::192.168.0.74', server_name=None)  #
-# station.add_component(RF)
-QL_LO = rs.RohdeSchwarz_SGS100A(
-    name='QL_LO', address='TCPIP0::192.168.0.86', server_name=None)  #
-station.add_component(QL_LO)
-QR_LO = rs.RohdeSchwarz_SGS100A(
-    name='QR_LO', address='TCPIP0::192.168.0.87', server_name=None)  #
-station.add_component(QR_LO)
-# TWPA_Pump = rs.RohdeSchwarz_SGS100A(name='TWPA_Pump', address='TCPIP0::192.168.0.90', server_name=None)  #
-# station.add_component(TWPA_Pump)
-# AWG = tek.Tektronix_AWG5014(name='AWG', setup_folder=None, timeout=2,
-#                             address='TCPIP0::192.168.0.99::INSTR', server_name=None)
-AWG = tek.Tektronix_AWG5014(name='AWG', timeout=2, address='TCPIP0::192.168.0.99::INSTR')
+RF = rs.RohdeSchwarz_SGS100A(name='RF', address='TCPIP0::192.168.0.74')  #
+station.add_component(RF)
+S86 = rs.RohdeSchwarz_SGS100A(name='S86', address='TCPIP0::192.168.0.86')  #
+station.add_component(S86)
+S87 = rs.RohdeSchwarz_SGS100A(name='S87', address='TCPIP0::192.168.0.87')  #
+station.add_component(S87)
+AWG = tek.Tektronix_AWG5014(name='AWG', timeout=2,
+                            address='TCPIP0::192.168.0.9::INSTR')
 
 station.add_component(AWG)
-AWG.timeout(180)  # timeout long for uploading wait.
+AWG.timeout(15)  # timeout long for uploading wait.
 
 IVVI = iv.IVVI('IVVI', address='COM8', numdacs=16, safe_version=False)
 station.add_component(IVVI)
@@ -130,20 +115,20 @@ FC.dac_mapping(dac_mapping)
 FC.dac_offsets(dac_offsets)
 
 
-# Initializing UHFQC
-UHFQC_1 = ZI_UHFQC.UHFQC('UHFQC_1', device='dev2178', server_name=None)
-station.add_component(UHFQC_1)
-UHFQC_1.sigins_0_ac()
-UHFQC_1.sigins_1_ac()
+# # Initializing UHFQC
+UHFQC2178 = ZI_UHFQC.UHFQC('UHFQC2178', device='dev2178', server_name=None)
+station.add_component(UHFQC2178)
+UHFQC2178.sigins_0_ac()
+UHFQC2178.sigins_1_ac()
 # preparing the lookuptables for readout
-LutMan0 = lm_UHFQC.UHFQC_LookuptableManager('LutMan0', UHFQC=UHFQC_1,
+LutMan0 = lm_UHFQC.UHFQC_LookuptableManager('LutMan0', UHFQC=UHFQC2178,
                                             server_name=None)
 station.add_component(LutMan0)
-LutMan1 = lm_UHFQC.UHFQC_LookuptableManager('LutMan1', UHFQC=UHFQC_1,
+LutMan1 = lm_UHFQC.UHFQC_LookuptableManager('LutMan1', UHFQC=UHFQC2178,
                                             server_name=None)
 station.add_component(LutMan1)
 
-LutManMan = lmm_UHFQC.UHFQC_LookuptableManagerManager('LutManMan', UHFQC=UHFQC_1,
+LutManMan = lmm_UHFQC.UHFQC_LookuptableManagerManager('LutManMan', UHFQC=UHFQC2178,
                                                       server_name=None)
 station.add_component(LutManMan)
 LutManMan.LutMans(
@@ -153,9 +138,9 @@ LutManMan.LutMans(
 # SH = sh.SignalHound_USB_SA124B('Signal hound', server_name=None)
 
 # Meta-instruments
-# HS = hd.HeterodyneInstrument('HS', LO=LO, RF=RF, AWG=AWG, acquisition_instr=UHFQC_1.name,
-#                              server_name=None)
-# station.add_component(HS)
+HS = hd.HeterodyneInstrument('HS', LO=LO, RF=RF, AWG=AWG,
+                             acquisition_instr=UHFQC2178.name)
+station.add_component(HS)
 
 MC = mc.MeasurementControl('MC')
 station.add_component(MC)
@@ -174,27 +159,19 @@ k0.kernel_dir_path(
 k0.kernel_list(['id_kernel.txt'])
 
 
+
 from pycqed.instrument_drivers.meta_instrument import device_object as do
 Starmon = do.DeviceObject('Starmon')
 station.add_component(Starmon)
 
-from pycqed.instrument_drivers.meta_instrument.qubit_objects import CC_transmon as qb
-QL = qb.CBox_v3_driven_transmon('QL')
+from pycqed.instrument_drivers.meta_instrument.qubit_objects import duplexer_tek_transmon as dt
+
+QL = dt.Duplexer_tek_transmon('QL')
 station.add_component(QL)
 gen.load_settings_onto_instrument(QL)
 
 import pycqed.instrument_drivers.meta_instrument.qubit_objects.Tektronix_driven_transmon as qbt
-
 QR = qbt.Tektronix_driven_transmon('QR')
-QR.LO(LO.name)
-QR.cw_source(QL_LO.name)
-QR.td_source(QR_LO.name)
-QR.IVVI(IVVI.name)
-# QR.RF_RO_source(RF.name)
-QR.AWG(AWG.name)
-# QR.heterodyne_instr(HS.name)
-QR.FluxCtrl(FC.name)
-QR.MC(MC.name)
 station.add_component(QR)
 
 QR.add_operation('SWAP')
@@ -233,8 +210,7 @@ Starmon.add_qubits([QL, QR])
 gen.load_settings_onto_instrument(Starmon)
 
 gen.load_settings_onto_instrument(QL)
-station.sequencer_config = Starmon.get_operation_dict()['sequencer_config']
-
+# station.sequencer_config = Starmon.get_operation_dict()['sequencer_config']
 
 
 MC.station = station
@@ -285,38 +261,25 @@ print('Ran initialization in %.2fs' % (t1-t0))
 
 def all_sources_off():
     LO.off()
-    # RF.off()
-    # Spec_source.off()
-    # Qubit_LO.off()
-    # TWPA_Pump.off()
+    RF.off()
+    S86.off()
+    S87.off()
 
-
-def print_instr_params(instr):
-    snapshot = instr.snapshot()
-    for par in sorted(snapshot['parameters']):
-        print('{}: {} {}'.format(snapshot['parameters'][par]['name'],
-                                 snapshot['parameters'][par]['value'],
-                                 snapshot['parameters'][par]['units']))
-
-
-# from scripts.Experiments.FiveQubits import common_functions as cfct
-# cfct.set_AWG_limits(station,1.7)
-
-if UHFQC:
     def switch_to_pulsed_RO_UHFQC(qubit):
-        UHFQC_1.awg_sequence_acquisition()
+        UHFQC2178.awg_sequence_acquisition()
         qubit.RO_pulse_type('Gated_MW_RO_pulse')
         qubit.RO_acq_marker_delay(75e-9)
-        qubit.acquisition_instr('UHFQC_1')
+        qubit.acquisition_instr('UHFQC2178')
         qubit.RO_acq_marker_channel('ch3_marker2')
         qubit.RO_acq_weight_function_I(0)
         qubit.RO_acq_weight_function_Q(1)
 
     def switch_to_IQ_mod_RO_UHFQC(qubit):
-        UHFQC_1.awg_sequence_acquisition_and_pulse_SSB(f_RO_mod=qubit.f_RO_mod(),
-                                                       RO_amp=qubit.RO_amp(),
-                                                       RO_pulse_length=qubit.RO_pulse_length(),
-                                                       acquisition_delay=270e-9)
+        UHFQC2178.awg_sequence_acquisition_and_pulse_SSB(
+            f_RO_mod=qubit.f_RO_mod(),
+            RO_amp=qubit.RO_amp(),
+            RO_pulse_length=qubit.RO_pulse_length(),
+            acquisition_delay=270e-9)
         # changed to satisfy validator
         qubit.RO_pulse_type('MW_IQmod_pulse_UHFQC')
         qubit.RO_acq_marker_delay(-165e-9)
@@ -326,15 +289,6 @@ if UHFQC:
         qubit.RO_Q_channel('1')
         qubit.RO_acq_weight_function_I(0)
         qubit.RO_acq_weight_function_Q(1)
-else:
-    def switch_to_pulsed_RO_CBox(qubit):
-        qubit.RO_pulse_type('Gated_MW_RO_pulse')
-        qubit.RO_acq_marker_delay(155e-9)
-        qubit.acquisition_instr('CBox')
-        qubit.RO_acq_marker_channel('ch3_marker1')
-        qubit.RO_acq_weight_function_I(0)
-        qubit.RO_acq_weight_function_Q(1)
-
 
 from pycqed.instrument_drivers.physical_instruments.Fridge_monitor import Fridge_Monitor
 Maserati_fridge_mon = Fridge_Monitor('Maserati_fridge_mon', 'LaMaserati')
@@ -342,135 +296,54 @@ station.add_component(Maserati_fridge_mon)
 
 
 from pycqed.instrument_drivers.virtual_instruments import instrument_monitor as im
-# IM = im.InstrumentMonitor('IM', station)
-# station.add_component(IM)
-# MC.instrument_monitor(IM.name)
-
-# def reload_mod_stuff():
-
-# preparing UHFQC readout with IQ mod pulses
-
-list_qubits = [QL, QR]
-for qubit in list_qubits:
-    qubit.RO_pulse_delay(20e-9)
-
-
-
-def reload_mod_stuff():
-    from pycqed.measurement.waveform_control import pulse_library as pl
-    reload(pl)
-    from pycqed.measurement.waveform_control import pulsar as ps
-    reload(ps)
-    from pycqed.measurement.pulse_sequences import single_qubit_tek_seq_elts as sq
-    reload(sq)
-    # The AWG sequencer
-    qc.station.pulsar = ps.Pulsar()
-    sq.station = station
-    sq.station.pulsar = qc.station.pulsar
-    station.pulsar.AWG = station.components['AWG']
-    markerhighs = [2, 2, 2.7, 2]
-    for i in range(4):
-        # Note that these are default parameters and should be kept so.
-        # the channel offset is set in the AWG itself. For now the amplitude is
-        # hardcoded. You can set it by hand but this will make the value in the
-        # sequencer different.
-        station.pulsar.define_channel(id='ch{}'.format(i+1),
-                                      name='ch{}'.format(i+1), type='analog',
-                                      # max safe IQ voltage
-                                      high=.7, low=-.7,
-                                      offset=0.0, delay=0, active=True)
-        station.pulsar.define_channel(id='ch{}_marker1'.format(i+1),
-                                      name='ch{}_marker1'.format(i+1),
-                                      type='marker',
-                                      high=markerhighs[i], low=0, offset=0.,
-                                      delay=0, active=True)
-        station.pulsar.define_channel(id='ch{}_marker2'.format(i+1),
-                                      name='ch{}_marker2'.format(i+1),
-                                      type='marker',
-                                      high=markerhighs[i], low=0, offset=0.,
-                                      delay=0, active=True)
-
-    from pycqed.measurement.waveform_control_CC import waveform as wf
-    reload(wf)
-
-    from pycqed.measurement.pulse_sequences import fluxing_sequences as fqqs
-    reload(fqqs)
-    from pycqed.scripts.Experiments.Five_Qubits import cost_functions_Leo_optimization as ca
-    reload(ca)
-    from pycqed.measurement.waveform_control import pulse_library as pl
-    reload(pl)
-    from pycqed.measurement.pulse_sequences import standard_elements as ste
-    reload(ste)
-
-    from pycqed.measurement.pulse_sequences import multi_qubit_tek_seq_elts as mqs
-    reload(mqs)
-    from pycqed.measurement import awg_sweep_functions_multi_qubit as awg_mswf
-    reload(awg_mswf)
-    reload(awg_swf)
-    mqs.station = station
-    fqqs.station = station
-    reload(mq_mod)
-    mq_mod.station = station
-
-    reload(fsqs)
-    reload(awg_swf)
-    fsqs.station = station
-    reload(det)
-    reload(ca)
-reload_mod_stuff()
-
-
-switch_to_pulsed_RO_UHFQC(QR)
+IM = im.InstrumentMonitor('IM', station)
+station.add_component(IM)
+MC.instrument_monitor(IM.name)
+nested_MC.instrument_monitor(IM.name)
 
 
 ###############################################################################
 ###############################################################################
 ###############################################################################
 
-from importlib import reload
-import qcodes as qc
-import logging
-station = qc.station
-from pycqed.utilities import general as gen
+# from importlib import reload
+# import qcodes as qc
+# import logging
+# station = qc.station
+# from pycqed.utilities import general as gen
 
 
-def reload_CC_qubit(qubit):
-    reload(qb)
-    try:
-        qubit_name = qubit.name
-        qubit.close()
-        del station.components[qubit_name]
+# def reload_CC_qubit(qubit):
+#     reload(qb)
+#     try:
+#         qubit_name = qubit.name
+#         qubit.close()
+#         del station.components[qubit_name]
 
-    except Exception as e:
-        logging.warning(e)
-    qubit = qb.CBox_v3_driven_transmon(qubit_name)
-    station.add_component(qubit)
-    gen.load_settings_onto_instrument(qubit)
-    return qubit
-
-
-
-# from pycqed.instrument_drivers.physical_instruments import QuTech_ControlBoxdriver as qcb
-# reload(qcb)
-from pycqed.instrument_drivers.physical_instruments import QuTech_ControlBox_v3 as qcb
-# reload(qcb)
-# CBox.close()
-# del station.components['CBox']
-# CBox = qcb.QuTech_ControlBox_v3(
-#     'CBox', address='Com6', run_tests=False, server_name=None)
-# station.add_component(CBox)
-
-# import pycqed.instrument_drivers.meta_instrument.CBox_LookuptableManager as cbl
-# CBox_LutMan = cbl.ControlBox_LookuptableManager('CBox_LutMan')
-# CBox_LutMan.CBox(CBox.name)
-# station.add_component(CBox_LutMan)
+#     except Exception as e:
+#         logging.warning(e)
+#     qubit = qb.CBox_v3_driven_transmon(qubit_name)
+#     station.add_component(qubit)
+#     gen.load_settings_onto_instrument(qubit)
+#     return qubit
 
 
+# # from pycqed.instrument_drivers.physical_instruments import QuTech_ControlBoxdriver as qcb
+# # reload(qcb)
+# from pycqed.instrument_drivers.physical_instruments import QuTech_ControlBox_v3 as qcb
+# # reload(qcb)
+# # CBox.close()
+# # del station.components['CBox']
+# # CBox = qcb.QuTech_ControlBox_v3(
+# #     'CBox', address='Com6', run_tests=False, server_name=None)
+# # station.add_component(CBox)
 
-UHFQC_1.timeout(2)
+# # import pycqed.instrument_drivers.meta_instrument.CBox_LookuptableManager as cbl
+# # CBox_LutMan = cbl.ControlBox_LookuptableManager('CBox_LutMan')
+# # CBox_LutMan.CBox(CBox.name)
+# # station.add_component(CBox_LutMan)
 
-
-
+# UHFQC_1.timeout(2)
 from pycqed.instrument_drivers.physical_instruments import QuTech_AWG_Module as qwg
-QWG = qwg.QuTech_AWG_Module( 'QWG', address='192.168.0.10', port=5025)
+QWG = qwg.QuTech_AWG_Module('QWG', address='192.168.0.10', port=5025)
 station.add_component(QWG)
