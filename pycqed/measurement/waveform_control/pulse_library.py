@@ -440,7 +440,7 @@ class QWG_Codeword(Pulse):
     def set_codeword(self, codeword):
         self.cw_high_channels = []
         self.cw_low_channels = []
-        bin_cw = int_to_bin(codeword, w=len(self.cw_channels))
+        bin_cw = int_to_bin(codeword, w=len(self.cw_channels), lsb_last=False)
         for i, chan in enumerate(self.cw_channels):
             if bin_cw[i] == '1':
                 self.cw_high_channels.append(chan)
