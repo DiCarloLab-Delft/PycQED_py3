@@ -6,6 +6,8 @@ station = qc.station
 from pycqed.measurement.waveform_control import viewer
 
 
+
+k0 = station.components['k0']
 QWG = station.components['QWG']
 
 QWG.run_mode('CODeword')
@@ -32,19 +34,22 @@ for i in range(8):
     QWG.set('codeword_{}_ch{}_waveform'.format(i, 4), 'wf_Q_{}'.format(i))
 
 
-block_I, block_Q = wf.block_pulse(1, 6e-6, sampling_rate=1e9)
+
+
+square_pulse_cw = 5
+
+block_I, block_Q = wf.block_pulse(1, 4e-6, sampling_rate=1e9)
 block_I = np.array(block_I)
 block_Q = np.array(block_Q)
 
+# # distorted_I = k0.convolve_kernel([block_I, k0.kernel()], length=5e-6)
 
-sqaure_pulse_cw = 5
-QWG.createWaveformReal('wf_I_{}'.format(sqaure_pulse_cw), block_I)
-QWG.createWaveformReal('wf_Q_{}'.format(sqaure_pulse_cw), block_Q)
-print('QWG_square_pulse to CW: ', sqaure_pulse_cw)
-QWG.set('codeword_{}_ch{}_waveform'.format(sqaure_pulse_cw, 1),
-        'wf_I_{}'.format(sqaure_pulse_cw))
-QWG.set('codeword_{}_ch{}_waveform'.format(sqaure_pulse_cw, 2),
-        'wf_Q_{}'.format(sqaure_pulse_cw))
+QWG.createWaveformReal('wf_I_{}'.format(square_pulse_cw), block_I)
+print('QWG_square_pulse to CW: ', square_pulse_cw)
+QWG.set('codeword_{}_ch{}_waveform'.format(square_pulse_cw, 1),
+        'wf_I_{}'.format(square_pulse_cw))
+QWG.set('codeword_{}_ch{}_waveform'.format(square_pulse_cw, 2),
+        'wf_Q_{}'.format(square_pulse_cw))
 
 
 QWG.start()

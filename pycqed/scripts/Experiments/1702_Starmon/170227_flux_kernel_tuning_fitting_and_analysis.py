@@ -130,17 +130,21 @@ vw.add(x=t_kernel, xlabel='Time', xunit='s',
        subplot=2)
 
 # convention is to use the timestamp of the scope file as a base
-save_file_name = 'corr0'
-kf.save_kernel(fit_kernel, save_file=save_file_name+'_fitDPsaveSP')
-print(save_file_name+'_fitDPsaveSP')
+ts = filename[10:-8]
+save_file_name = 'corr0_'+ts
 
+kf.save_kernel(fit_kernel, save_file=save_file_name)
+print(save_file_name)
+
+
+
+# Add the distortion to the kernel object
+k0 = station.components['k0']
+# k0.kernel_list([save_file_name+'.txt'])
+k0.add_kernel_to_kernel_list(save_file_name+'.txt')
 
 
 import pycqed.instrument_drivers.meta_instrument.kernel_object as k_obj
 reload(k_obj)
-k0 = k_obj.Distortion(name='k0')
-station.add_component(k0)
-k0.channel(2)
-k0.kernel_dir_path(
-    r'D:\Experiments\1702_Starmon\kernels')
-k0.kernel_list(['id_kernel.txt'])
+# k0 = k_obj.Distortion(name='k0')
+# station.add_component(k0)
