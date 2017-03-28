@@ -148,6 +148,14 @@ class HeterodyneInstrument(Instrument):
             self._acquisition_instr.nr_averages(int(self.nr_averages()))
 
     def prepare_UHFQC(self):
+        # Upload the correct integration weigths
+        if self.single_sideband_demod():
+            self._acquisition_instr.prepare_SSB_weight_and_rotation(
+                IF=self.f_RO_mod(), weight_function_I=0, weight_function_Q=1)
+        else:
+            self._acquisition_instr.prepare_DSB_weight_and_rotation(
+                IF=self.f_RO_mod(), weight_function_I=0, weight_function_Q=1)
+
         # this sets the result to integration and rotation outcome
         self._acquisition_instr.quex_rl_source(2)
         # only one sample to average over
