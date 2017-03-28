@@ -511,16 +511,16 @@ class LO_modulated_Heterodyne(HeterodyneInstrument):
         return d[0][0]+1j*d[1][0]
 
     def probe_DDM(self):
-            # t0 = time.time()
-            self._acquisition_instr.ch_pair1_tvmode_enable.set(1)
-            self._acquisition_instr.ch_pair1_run.set(1)
-            dataI = eval(
-                "self._acquisition_instr.ch_pair1_weight{}_tvmode_data()".format(1))
-            dataQ = eval(
-                "self._acquisition_instr.ch_pair1_weight{}_tvmode_data()".format(2))
-            dat = (self.scale_factor*dataI+self.scale_factor*1j*dataQ)
-            # t1 = time.time()
-            # print("time for DDM polling", t1-t0)
+        # t0 = time.time()
+        self._acquisition_instr.ch_pair1_tvmode_enable.set(1)
+        self._acquisition_instr.ch_pair1_run.set(1)
+        dataI = eval(
+            "self._acquisition_instr.ch_pair1_weight{}_tvmode_data()".format(1))
+        dataQ = eval(
+            "self._acquisition_instr.ch_pair1_weight{}_tvmode_data()".format(2))
+        dat = (self.scale_factor*dataI+self.scale_factor*1j*dataQ)
+        # t1 = time.time()
+        # print("time for DDM polling", t1-t0)
         return dat
 
     def _set_frequency(self, val):
