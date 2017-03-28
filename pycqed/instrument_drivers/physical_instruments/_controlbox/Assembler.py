@@ -332,33 +332,13 @@ class Assembler():
     def NopFormat(self):
         return "00000000000000000000000000000000"
 
-    # def AppendTail(self):
-    #     try:
-    #         Asm_File = open(self.asmfilename, 'r', encoding="utf-8")
-    #     except:
-    #         print('\tError: Fail to open file ' + self.asmfilename + ".")
-    #         exit(0)
-
-    #     self.tfp = tempfile.TemporaryFile('w')
-
-    #     for line in Asm_File:
-    #         self.tfp.write("%s" % line)
-    #     self.tfp.write("EndOfFileLoop: wait 1000\n")
-    #     self.tfp.write("trigger 0000001 10000\n")
-    #     self.tfp.write('beq r0, r0, EndOfFileLoop\n')
-
-    #     self.tfp.seek(0)
-
-    #     for line in self.tfp:
-    #         print(line)
-
-    #     Asm_File.close()
-
+    @classmethod
     def remove_comment(self, line):
         line = line.split('#', 1)[0]  # remove anything after '#' symbole
         line = line.strip(' \t\n\r')  # remove whitespace
         return line
 
+    @classmethod
     def split_label_instr(self, line):
         head, sep, tail = line.partition(':')
         if (sep == ":"):
@@ -370,6 +350,7 @@ class Assembler():
 
         return (label, instr)
 
+    @classmethod
     def get_instruction_elements(self, pureInstruction):
         return [rawEle.strip(string.punctuation.translate(
                 {ord('-'): None})) for rawEle in pureInstruction.split()]
@@ -583,7 +564,6 @@ class Assembler():
         '''
         Asm_File = open(self.asmfilename, 'r', encoding="utf-8")
 
-        cur_addr = 0
         self.text_instructions = []
 
         for line in Asm_File:
@@ -591,8 +571,6 @@ class Assembler():
 
             if (len(line) == 0):  # skip empty line and comment
                 continue
-
-            cur_addr = len(self.text_instructions) + 1
 
             (label, instr) = self.split_label_instr(line)
             if label is not None:

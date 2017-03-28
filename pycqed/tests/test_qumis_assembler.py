@@ -7,39 +7,32 @@ from pycqed.instrument_drivers.physical_instruments._controlbox \
 
 
 class Test_single_qubit_seqs(TestCase):
-
     @classmethod
     def setUpClass(self):
+        self.asm_filename = os.path.join(
+            pq.__path__[0], 'tests', 'test_data', "20170328",
+            "LabelTest.qumis")
+        self.asm_obj = asm.Assembler(self.asm_filename)
+        self.instructions = self.asm_obj.convert_to_instructions()
+        self.text_instructions = self.asm_obj.getTextInstructions()
         print('this is setting up the test')
 
-    def test_qasm_extract_required_ops(self):
-        print('hello')
-        self.assertTrue(True)
+    def test_is_number(self):
+        self.assertFalse(asm.is_number('5s'))
+        self.assertTrue(asm.is_number('128464'))
+
 
     def test_get_bin(self):
         with self.assertRaises(ValueError):
             asm.get_bin('5s', 3)
 
     def test_program_length(self):
-        asm_filename = os.path.join(pq.__path__[0], 'tests', 'test_data', "20170328", "LabelTest.qumis")
-        asm_obj = asm.Assembler(asm_filename)
-        instructions = asm_obj.convert_to_instructions()
-        tag_addr_dict = asm_obj.ParseLabel()
-
+        self.assertEqual(len(self.instructions), len(self.text_instructions))
 
     def test_insert_nop(self):
-        asm_filename = os.path.join(pq.__path__[0], 'tests', 'test_data', "20170328", "LabelTest.qumis")
-        asm_obj = asm.Assembler(asm_filename)
-        instructions = asm_obj.convert_to_instructions()
-        text_instructions = asm_obj.getTextInstructions()
-
-
-        # assert number of instructions
-        self.assertEqual(len(instructions), len(text_instructions))
-
-        # assert number of nop instructions
+        # count number of nop instructions in the text version
         number_of_text_nop = 0
-        for instr in text_instructions:
+        for instr in self.text_instructions:
             head, sep, tail = instr.partition(':')
             if (sep == ":"):
                 instr = tail
@@ -52,4 +45,6 @@ class Test_single_qubit_seqs(TestCase):
             if elements[0] == 'nop':
                 number_of_text_nop = number_of_text_nop + 1
 
-        self.assertEqual(instructions.count(0), number_of_text_nop)
+        print(self.instructions.count(0), number_of_text_nop)
+        # compare
+        self.assertEqual(self.instructions.count(0), number_of_text_nop)
