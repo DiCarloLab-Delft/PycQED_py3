@@ -20,6 +20,12 @@ from qcodes.utils import validators as vals
 from copy import deepcopy
 from qcodes.plots.colors import color_cycle
 
+
+try:
+    import msvcrt  # used on windows to catch keyboard input
+except:
+    print('Could not import msvcrt (used for detecting keystrokes)')
+
 try:
     # import pyqtgraph as pg
     # import pyqtgraph.multiprocess as pgmp
@@ -73,6 +79,11 @@ class MeasurementControl(Instrument):
                            vals=vals.Bool(),
                            parameter_class=ManualParameter,
                            initial_value=True)
+
+        self.add_parameter('instrument_monitor',
+                           parameter_class=ManualParameter,
+                           initial_value=None,
+                           vals=vals.Strings())
 
         # pyqtgraph plotting process is reused for different measurements.
         if self.live_plot_enabled():
@@ -194,6 +205,8 @@ class MeasurementControl(Instrument):
             print(self.sweep_function.sweep_control)
             print(self.detector_function.detector_control)
 
+        self.check_keyboard_interrupt()
+        self.update_instrument_monitor()
         self.update_plotmon(force_update=True)
         for sweep_function in self.sweep_functions:
             sweep_function.finish()
@@ -237,6 +250,8 @@ class MeasurementControl(Instrument):
         for sweep_function in self.sweep_functions:
             sweep_function.finish()
         self.detector_function.finish()
+        self.check_keyboard_interrupt()
+        self.update_instrument_monitor()
         self.update_plotmon(force_update=True)
         self.update_plotmon_adaptive(force_update=True)
         self.get_measurement_endtime()
@@ -297,6 +312,8 @@ class MeasurementControl(Instrument):
                 # specified that you don't want to crash (e.g. on -off seq)
                 pass
 
+        self.check_keyboard_interrupt()
+        self.update_instrument_monitor()
         self.update_plotmon()
         if self.mode == '2D':
             self.update_plotmon_2D_hard()
@@ -335,6 +352,8 @@ class MeasurementControl(Instrument):
                     (1+self.soft_iteration))
         self.dset[start_idx:stop_idx, :] = new_vals
         # update plotmon
+        self.check_keyboard_interrupt()
+        self.update_instrument_monitor()
         self.update_plotmon()
         if self.mode == '2D':
             self.update_plotmon_2D()
@@ -651,6 +670,11 @@ class MeasurementControl(Instrument):
         self._persist_xlabs = None
         self._persist_ylabs = None
 
+    def update_instrument_monitor(self):
+        if self.instrument_monitor() is not None:
+            inst_mon = self.find_instrument(self.instrument_monitor())
+            inst_mon.update()
+
     ##################################
     # Small helper/utility functions #
     ##################################
@@ -835,6 +859,15 @@ class MeasurementControl(Instrument):
         stop_idx = start_idx + xlen
 
         return start_idx, stop_idx
+
+    def check_keyboard_interrupt(self):
+        try:  # Try except statement is to make it work on non windows pc
+            if msvcrt.kbhit():
+                key = msvcrt.getch()
+                if b'q' in key:
+                    raise KeyboardInterrupt('Human interupt q')
+        except Exception:
+            pass
 
     ####################################
     # Non-parameter get/set functions  #
