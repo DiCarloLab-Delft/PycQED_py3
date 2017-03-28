@@ -169,7 +169,7 @@ class DDMq(SCPI):
                                vals=vals.Numbers(1, 8192)
                                )
             '''
-            Error fraction 
+            Error fraction
             '''
             serrfarcten_cmd = 'qutech:errorfraction{}:enable:all'.format(
                 ch_pair)
@@ -386,7 +386,7 @@ class DDMq(SCPI):
                                    # vals=vals.Numbers(-128,127)
                                    )
                 '''
-                Error fraction 
+                Error fraction
                 '''
                 serrfarcten_cmd = 'qutech:errorfraction{}:enable{}'.format(
                     ch_pair, wNr)
@@ -609,7 +609,7 @@ class DDMq(SCPI):
     def _getTVpercentage(self, ch_pair, wNr):
         return self.ask('qutech:tvmode{:d}:percentage{:d}? '.format(ch_pair, wNr))
     '''
-    Logging 
+    Logging
     '''
 
     def _getLoggingFinished(self, ch_pair, wNr):
@@ -805,6 +805,31 @@ class DDMq(SCPI):
                    'in {t:.2f}s'.format(t=t, **idn))
         print(con_msg)
 
+    #initialization functions
+    def prepare_SSB_weight_and_rotation(self, IF,
+                                        weight_function_I=1,
+                                        weight_function_Q=2):
+        trace_length = 4096
+        tbase = np.arange(0, trace_length/5e8, 1/5e8)
+        cosI = np.array(np.cos(2*np.pi*IF*tbase))
+        sinI = np.array(np.sin(2*np.pi*IF*tbase))
+        #first pair
+        eval('self.ch1_weight{}_data(np.array(cosI))'.format(weight_function_I))
+        eval('self.ch2_weight{}_data(np.array(sinI))'.format(weight_function_I))
+        #second pair
+        eval('self.ch1_weight{}_data(np.array(sinI))'.format(weight_function_Q))
+        eval('self.ch2_weight{}_data(np.array(cosI))'.format(weight_function_Q))
+
+        #setting the rotation matrices... very danagerous
+        eval('self.ch_pair1_weight{}_rotmat_rotmat00(1)'.format(weight_function_I))
+        eval('self.ch_pair1_weight{}_rotmat_rotmat01(1)'.format(weight_function_I))
+        eval('self.ch_pair1_weight{}_rotmat_rotmat00(1)'.format(weight_function_Q))
+        eval('self.ch_pair1_weight{}_rotmat_rotmat01(-1)'.format(weight_function_Q))
+
+
+
+
+
 
 # @ NIKITA LOOK HERE!
 class MyCustomValidator(vals.Validator):
@@ -873,3 +898,5 @@ class MyCustomValidator(vals.Validator):
         maxv = self._max_value if math.isfinite(self._max_value) else None
         return '<Arrays{}, shape: {}>'.format(range_str(minv, maxv, 'v'),
                                               self._shape)
+
+
