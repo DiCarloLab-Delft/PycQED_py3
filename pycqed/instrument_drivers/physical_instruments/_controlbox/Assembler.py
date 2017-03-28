@@ -576,8 +576,11 @@ class Assembler():
 
         return self.instructions
 
-    # used to print the expanded version of instructions uploaded
     def getTextInstructions(self):
+        '''
+        Show the final instructions after expanding the mov instruction
+        and appending nop instruction after labels and beq/bne.
+        '''
         Asm_File = open(self.asmfilename, 'r', encoding="utf-8")
 
         cur_addr = 0
@@ -602,10 +605,10 @@ class Assembler():
                 {ord('-'): None})) for rawEle in instr.split()]
 
             if (elements[0].lower() == 'mov'):
-                self.text_instructions.append("MOV0 " + instr)
-                self.text_instructions.append("MOV1 " + instr)
-                self.text_instructions.append("MOV2 " + instr)
-                self.text_instructions.append("MOV3 " + instr)
+                self.text_instructions.append("LUI0 " + instr)
+                self.text_instructions.append("LUI1 " + instr)
+                self.text_instructions.append("LUI2 " + instr)
+                self.text_instructions.append("LUI3 " + instr)
             elif (elements[0].lower() == 'beq'):
                 self.text_instructions.append(instr)
                 self.add_branch_nop(self.text_instructions, TextVersion=True)
