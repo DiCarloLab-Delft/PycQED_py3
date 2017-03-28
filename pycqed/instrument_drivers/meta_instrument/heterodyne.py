@@ -17,19 +17,8 @@ class HeterodyneInstrument(Instrument):
     """
     This is a virtual instrument for a homodyne source
 
-    Instrument is CBox, UHFQC and ATS compatible
+    Instrument is CBox, UHFQC, ATS and DDM compatible
 
-    Todo:
-        - Add power settings
-        - Add integration time settings
-        - Build test suite
-        - Add parameter Heterodyne voltage (that returns a complex value / two
-          values)
-        - Add different demodulation settings.
-        - Add fading plots that shows the last measured avg transients
-          and points in the IQ-plane in the second window
-        - Add option to use CBox integration averaging mode and verify
-           identical results
     """
     shared_kwargs = ['RF', 'LO', 'AWG']
 
@@ -145,19 +134,6 @@ class HeterodyneInstrument(Instrument):
         self.on()
 
     def prepare_CBox(self, get_t_base=True):
-        # only uploads a seq to AWG if something changed
-        if self.AWG != None:
-            if (self._awg_seq_filename not in self.AWG.setup_filename() or
-                    self._awg_seq_parameters_changed) and \
-                    self.auto_seq_loading():
-                self._awg_seq_filename = \
-                    st_seqs.generate_and_upload_marker_sequence(
-                        self.RO_length(), self.trigger_separation(),
-                        RF_mod=False,
-                        acq_marker_channels=self.acq_marker_channels())
-                self._awg_seq_parameters_changed = False
-
-        print('RO_length heterodyne', self.RO_length())
         if get_t_base:
             trace_length = 512
             tbase = np.arange(0, 5*trace_length, 5)*1e-9
@@ -170,7 +146,6 @@ class HeterodyneInstrument(Instrument):
             # because using integrated avg
             self._acquisition_instr.set('nr_samples', 1)
             self._acquisition_instr.nr_averages(int(self.nr_averages()))
-        # self.CBox.set('acquisition_mode', 'idle') # aded with xiang
 
     def prepare_UHFQC(self):
         # this sets the result to integration and rotation outcome
@@ -409,7 +384,6 @@ class HeterodyneInstrument(Instrument):
     def _get_acq_marker_channels(self):
         return self._acq_marker_channels
 
-
     def finish(self):
         if 'UHFQC' in self.acquisition_instr():
             self._acquisition_instr.acquisition_finalize()
@@ -485,12 +459,12 @@ class LO_modulated_Heterodyne(HeterodyneInstrument):
         self._Q_channel = 'ch4'
 
     def prepare_DDM(self,)
-        for i, channel in enumerate([1,2]):
-            eval("self._acquisition_instr.ch_pair1_weight{}_wint_intlength({})".format(channel, RO_length*500e6))
+        for i, channel in enumerate([1, 2]):
+            eval("self._acquisition_instr.ch_pair1_weight{}_wint_intlength({})".format(
+                channel, RO_length*500e6))
         self._acquisition_instr.ch_pair1_tvmode_naverages(self.nr_averages())
         self._acquisition_instr.ch_pair1_tvmode_nsegments(1)
-        self.scale_factor=1/(500e6*RO_length)/127
-
+        self.scale_factor = 1/(500e6*RO_length)/127
 
     def prepare_CBox(self, get_t_base=True):
         """
@@ -532,8 +506,10 @@ class LO_modulated_Heterodyne(HeterodyneInstrument):
             # t0 = time.time()
             self._acquisition_instr.ch_pair1_tvmode_enable.set(1)
             self._acquisition_instr.ch_pair1_run.set(1)
-            dataI = eval("self._acquisition_instr.ch_pair1_weight{}_tvmode_data()".format(1))
-            dataQ = eval("self._acquisition_instr.ch_pair1_weight{}_tvmode_data()".format(2))
+            dataI = eval(
+                "self._acquisition_instr.ch_pair1_weight{}_tvmode_data()".format(1))
+            dataQ = eval(
+                "self._acquisition_instr.ch_pair1_weight{}_tvmode_data()".format(2))
             dat = (self.scale_factor*dataI+self.scale_factor*1j*dataQ)
             # t1 = time.time()
             # print("time for DDM polling", t1-t0)
