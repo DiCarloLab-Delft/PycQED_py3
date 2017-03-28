@@ -260,7 +260,10 @@ class HeterodyneInstrument(Instrument):
 
     def finish(self):
         self.off()
-        self.AWG.stop()
+        if self.AWG is not None:
+            self.AWG.stop()
+        if 'UHFQC' in self.acquisition_instr():
+            self._acquisition_instr.acquisition_finalize()
 
     def _set_frequency(self, val):
         self._frequency = val
@@ -392,10 +395,6 @@ class HeterodyneInstrument(Instrument):
     def _get_acq_marker_channels(self):
         return self._acq_marker_channels
 
-    def finish(self):
-        if 'UHFQC' in self.acquisition_instr():
-            self._acquisition_instr.acquisition_finalize()
-
     def get_demod_array(self):
         return self.cosI, self.sinI
 
@@ -469,10 +468,10 @@ class LO_modulated_Heterodyne(HeterodyneInstrument):
     def prepare_DDM(self):
         for i, channel in enumerate([1, 2]):
             eval("self._acquisition_instr.ch_pair1_weight{}_wint_intlength({})".format(
-                channel, RO_length*500e6))
+                channel, self.RO_length*500e6))
         self._acquisition_instr.ch_pair1_tvmode_naverages(self.nr_averages())
         self._acquisition_instr.ch_pair1_tvmode_nsegments(1)
-        self.scale_factor = 1/(500e6*RO_length)/127
+        self.scale_factor = 1/(500e6*self.RO_length)/127
 
     def prepare_CBox(self, get_t_base=True):
         """
