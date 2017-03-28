@@ -466,7 +466,7 @@ class LO_modulated_Heterodyne(HeterodyneInstrument):
         self._I_channel = 'ch3'
         self._Q_channel = 'ch4'
 
-    def prepare_DDM(self,)
+    def prepare_DDM(self)
         for i, channel in enumerate([1, 2]):
             eval("self._acquisition_instr.ch_pair1_weight{}_wint_intlength({})".format(
                 channel, RO_length*500e6))
