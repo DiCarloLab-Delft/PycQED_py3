@@ -16,7 +16,7 @@ from pycqed.instrument_drivers.pq_parameters import ConfigParameter
 
 class Distortion(Instrument):
 
-    '''
+    '''fkeren
     Implements a distortion kernel for a flux channel.
     It contains the parameters and functions needed to produce a kernel file
     according to the models shown in the functions.
@@ -32,7 +32,7 @@ class Distortion(Instrument):
 
         self.add_parameter('kernel_list',
                            initial_value=[],
-                           vals=vals.Anything(),
+                           vals=vals.Anything(), # update to vals.List after merge of PR #542 in QCodes
                            parameter_class=ConfigParameter,
                            docstring='List of external kernels to be loaded')
 
@@ -136,6 +136,15 @@ class Distortion(Instrument):
                            initial_value=1e-6,
                            vals=vals.Numbers())
 
+    def add_kernel_to_kernel_list(self, kernel_name):
+        v = vals.Strings()
+        v.validate(kernel_name)
+        kernel_list = self.kernel_list()
+        if kernel_name in kernel_list:
+            raise ValueError('Kernel "{}" already in kernel list'.format(kernel_name))
+        kernel_list.append(kernel_name)
+        self.kernel_list(kernel_list)
+
     def _get_config_changed(self):
         return self._config_changed
 
@@ -178,7 +187,8 @@ class Distortion(Instrument):
         """
         kernels = kernel_list[0]
         for k in kernel_list[1:]:
-            kernels = np.convolve(k, kernels)[:max(len(k), len(kernels))]
+            kernels = np.convolve(k, kernels)[:min(len(k), int(length*1e9))]
+
         return kernels
 
     def kernel_to_cache(self, cache):

@@ -4,7 +4,7 @@ from scipy import special
 
 
 kernel_dir = None  #'D:\\GitHubRepos\\iPython-Notebooks\\Experiments\\1607_Qcodes_5qubit\\kernels\\'
-
+from os.path import join
 
 
 def heaviside(t):
@@ -49,7 +49,7 @@ def save_kernel(kernel, save_file=None):
     logging.warning('this does not save where you think it does')
     if save_file is None:
         save_file = kernel_name
-    with open(kernel_dir+save_file+'.txt', 'w') as f:
+    with open(join(kernel_dir, save_file)+'.txt', 'w') as f:
         for ii in np.arange(len(kernel)-1):
             f.write('%.12e\n' % (kernel[ii]))
         f.write('%.12e' % (kernel[-1]))
