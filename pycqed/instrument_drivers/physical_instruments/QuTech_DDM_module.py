@@ -238,7 +238,7 @@ class DDMq(SCPI):
                                    )
                 srotmat00_cmd = 'qutech:rotmat{}:rotmat00{}'.format(
                     ch_pair, wNr)
-                self.add_parameter('ch_pair{}_weight{}_rotmat_rotmat00'.format(ch_pair, wNr, wNr),
+                self.add_parameter('ch_pair{}_weight{}_rotmat_rotmat00'.format(ch_pair, wNr),
                                    unit='#',
                                    label=('Rotation matrix value 00 of' +
                                           'ch_pair {} weight {}'.format(ch_pair, wNr)),
@@ -450,8 +450,8 @@ class DDMq(SCPI):
             for i in range(self.device_descriptor.numWeights):
                 wNr = i+1
                 self.add_parameter('ch{}_weight{}_data'.format(ch, wNr),
-                                   label=('Get weight data channel {}' +
-                                          'weight number {}  '.format(ch, wNr)),
+                                   label=('Get weight data channel {}'.format(ch ) +
+                                          'weight number {}  '.format(wNr)),
                                    get_cmd=self._gen_ch_weight_get_func(
                                    self._getWeightData, ch, wNr),
                                    set_cmd=self._gen_ch_weight_set_func(
@@ -476,7 +476,7 @@ class DDMq(SCPI):
 
     def _getTVdata(self, ch_pair, wNr):
         finished = 0
-        complete = 0
+        #complete = 0
         # while (complete != '1'):
         #    complete = self._getTVpercentage(ch_pair)
         while (finished != '1'):
@@ -514,7 +514,7 @@ class DDMq(SCPI):
 
     def _getQstateCNT(self, ch_pair, wNr):
         finished = 0
-        complete = 0
+        #complete = 0
         # while (complete != '1'):
         #    complete = self._getTVpercentage(ch_pair)
         while (finished != '1'):
@@ -531,7 +531,7 @@ class DDMq(SCPI):
 
     def _getQstateAVG(self, ch_pair, wNr):
         finished = 0
-        complete = 0
+        #complete = 0
         # while (complete != '1'):
         #    complete = self._getTVpercentage(ch_pair)
         while (finished != '1'):
@@ -547,7 +547,7 @@ class DDMq(SCPI):
 
     def _getLoggingInt(self, ch_pair, wNr):
         finished = 0
-        complete = 0
+        #complete = 0
         # while (complete != '1'):
         #    complete = self._getTVpercentage(ch_pair)
         while (finished != '1'):
@@ -563,7 +563,7 @@ class DDMq(SCPI):
 
     def _getLoggingQstate(self, ch_pair, wNr):
         finished = 0
-        complete = 0
+        #complete = 0
         # while (complete != '1'):
         #    complete = self._getTVpercentage(ch_pair)
         while (finished != '1'):
@@ -656,7 +656,7 @@ class DDMq(SCPI):
 
     def _getErrFractCnt(self, ch_pair, wNr):
         finished = 0
-        complete = 0
+        #complete = 0
         # while (complete != '1'):
         #    complete = self._getTVpercentage(ch_pair)
         while (finished != '1'):
