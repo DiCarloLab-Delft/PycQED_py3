@@ -1,7 +1,6 @@
 ﻿import string
 from sys import exit
 import logging
-import tempfile
 
 
 def is_number(s):
@@ -256,21 +255,6 @@ class Assembler():
             raise ValueError('Pulse instruction format error: {}'.format(
                 detail.args))
 
-    # measure rt
-    # def MeasureFormat(self, dst_reg):
-    #     try:
-    #         opCode = self.InstOpCode['measure']
-    #         FDC = '011'
-    #         zero4 = '0000'
-    #         rt = self.get_reg_num(dst_reg)
-    #         zero9 = '000000000'
-    #         funct = self.InstfunctCode['measure']
-    #         return opCode + FDC + zero4 + rt + zero9 + funct
-
-    #     except ValueError as detail:
-    #         raise ValueError('Measure instruction format error: {}'.format(
-    #                          detail.args))
-
     # measure
     def MeasureFormat(self):
         try:
@@ -431,8 +415,8 @@ class Assembler():
 
             if (elements[0].lower() == 'lui'):     # lui rt, pos, byte_data
                 self.instructions.append(int(self.LuiFormat(elements[1],
-                                                       elements[2],
-                                                       elements[3]), 2))
+                                                            elements[2],
+                                                            elements[3]), 2))
 
             elif (elements[0].lower() == 'mov'):      # mov rt, imm32
                 instr4 = self.MovFormat(elements[1], elements[2])
@@ -447,8 +431,8 @@ class Assembler():
                     exit()
 
                 self.instructions.append(int(self.AddFormat(elements[1],
-                                                       elements[2],
-                                                       elements[3]), 2))
+                                                            elements[2],
+                                                            elements[3]), 2))
 
             elif (elements[0].lower() == 'sub'):   # sub rd, rs, rt
                 if (elements[1][0] != 'r' or elements[2][0] != 'r' or
@@ -458,8 +442,8 @@ class Assembler():
                     exit()
 
                 self.instructions.append(int(self.SubFormat(elements[1],
-                                                       elements[2],
-                                                       elements[3]), 2))
+                                                            elements[2],
+                                                            elements[3]), 2))
 
             elif (elements[0].lower() == 'beq'):   # beq rs, rt, off
                 if (elements[1][0] != 'r' or elements[2][0] != 'r'):
@@ -476,8 +460,8 @@ class Assembler():
                     exit()
 
                 self.instructions.append(int(self.BeqFormat(elements[1],
-                                                       elements[2],
-                                                       target_addr), 2))
+                                                            elements[2],
+                                                            target_addr), 2))
                 self.add_branch_nop(self.instructions)
 
             elif (elements[0].lower() == 'bne'):   # bne rs, rt, off
@@ -495,8 +479,8 @@ class Assembler():
                     exit()
 
                 self.instructions.append(int(self.BneFormat(elements[1],
-                                                       elements[2],
-                                                       target_addr), 2))
+                                                            elements[2],
+                                                            target_addr), 2))
                 self.add_branch_nop(self.instructions)
 
             elif (elements[0].lower() == 'addi'):  # addi rt, rs, imm
@@ -506,8 +490,8 @@ class Assembler():
                     exit()
 
                 self.instructions.append(int(self.AddiFormat(elements[1],
-                                                        elements[2],
-                                                        elements[3]), 2))
+                                                             elements[2],
+                                                             elements[3]), 2))
 
             elif (elements[0].lower() == 'waitreg'):   # WaitReg rs
                 if (elements[1][0] != 'r'):
@@ -515,12 +499,13 @@ class Assembler():
                                      'parameter.')
                     exit()
 
-                self.instructions.append(int(self.WaitRegFormat(elements[1]), 2))
+                self.instructions.append(
+                    int(self.WaitRegFormat(elements[1]), 2))
 
             elif (elements[0].lower() == 'pulse'):   # Pulse awg0, awg1, awg2
                 self.instructions.append(int(self.PulseFormat(elements[1],
-                                                         elements[2],
-                                                         elements[3]), 2))
+                                                              elements[2],
+                                                              elements[3]), 2))
 
             elif (elements[0].lower() == 'measure'):   # Measure
                 if (len(elements) > 1):
@@ -533,7 +518,7 @@ class Assembler():
 
             elif (elements[0].lower() == 'trigger'):   # Trigger mask, duration
                 self.instructions.append(int(self.TriggerFormat(elements[1],
-                                                           elements[2]), 2))
+                                                                elements[2]), 2))
 
             elif (elements[0].lower() == 'nop'):
                 self.instructions.append(int(self.NopFormat(), 2))
@@ -602,11 +587,10 @@ class Assembler():
 
         Asm_File.close()
 
-
         return self.text_instructions
 
     def add_branch_nop(self, instructions, TextVersion=False):
-        number_of_nops_appended = 4
+        number_of_nops_appended = 5
         if (TextVersion):
             for i in range(number_of_nops_appended):
                 instructions.append('nop')
