@@ -38,7 +38,7 @@ for i in range(8):
 
 square_pulse_cw = 5
 
-block_I, block_Q = wf.block_pulse(1, 4e-6, sampling_rate=1e9)
+block_I, block_Q = wf.block_pulse(1, 80e-6, sampling_rate=1e9)
 block_I = np.array(block_I)
 block_Q = np.array(block_Q)
 
@@ -98,8 +98,8 @@ for i in range(10):
                                          'cw_trigger_channel': 'ch1_marker1',
                                          # 'cw_channels': ['ch1_marker2', 'ch2_marker1',
                                          #                 'ch2_marker2'],
-                                         'cw_channels': ['ch2_marker2', 'ch2_marker1',
-                                                         'ch1_marker2'],
+                                         'cw_channels': ['ch1_marker2', 'ch2_marker1',
+                                                         'ch2_marker2'],
                                          'amplitude': 1,
                                          'codeword': i,
                                          'length': 40e-9,

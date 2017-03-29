@@ -4,7 +4,7 @@ import qcodes as qc
 station = qc.station
 
 QWG = station.components['QWG']
-CBox = station.components['CBox']
+# CBox = station.components['CBox']
 
 QWG.stop()
 QWG.deleteWaveformAll()

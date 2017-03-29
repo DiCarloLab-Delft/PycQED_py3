@@ -164,11 +164,17 @@ from pycqed.instrument_drivers.meta_instrument import device_object as do
 Starmon = do.DeviceObject('Starmon')
 station.add_component(Starmon)
 
-from pycqed.instrument_drivers.meta_instrument.qubit_objects import duplexer_tek_transmon as dt
 
-QL = dt.Duplexer_tek_transmon('QL')
+# from pycqed.instrument_drivers.meta_instrument.qubit_objects import duplexer_tek_transmon as dt
+# QL = dt.Duplexer_tek_transmon('QL')
+# station.add_component(QL)
+# gen.load_settings_onto_instrument(QL)
+
+
+from pycqed.instrument_drivers.meta_instrument.qubit_objects import CC_transmon as qb
+QL = qb.CBox_v3_driven_transmon('QL')
 station.add_component(QL)
-gen.load_settings_onto_instrument(QL)
+
 
 import pycqed.instrument_drivers.meta_instrument.qubit_objects.Tektronix_driven_transmon as qbt
 QR = qbt.Tektronix_driven_transmon('QR')
@@ -334,9 +340,9 @@ nested_MC.instrument_monitor(IM.name)
 # # reload(qcb)
 # # CBox.close()
 # # del station.components['CBox']
-# # CBox = qcb.QuTech_ControlBox_v3(
-# #     'CBox', address='Com6', run_tests=False, server_name=None)
-# # station.add_component(CBox)
+CBox = qcb.QuTech_ControlBox_v3(
+    'CBox', address='Com6', run_tests=False, server_name=None)
+station.add_component(CBox)
 
 # # import pycqed.instrument_drivers.meta_instrument.CBox_LookuptableManager as cbl
 # # CBox_LutMan = cbl.ControlBox_LookuptableManager('CBox_LutMan')

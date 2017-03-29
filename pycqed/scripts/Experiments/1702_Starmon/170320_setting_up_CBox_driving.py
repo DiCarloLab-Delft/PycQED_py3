@@ -32,7 +32,7 @@ station.add_component(CBox)
 
 ############ Reloading the QL_CC
 QL = reload_CC_qubit(QL)
-
+gen.load_settings_onto_instrument('QL', timestamp ='20170322_204816')
 # QL_CC.CBox(CBox.name)
 # QL_CC.LO(LO.name)
 # QL_CC.RF_RO_source(RF.name)
