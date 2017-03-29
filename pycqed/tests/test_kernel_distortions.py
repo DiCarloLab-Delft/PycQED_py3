@@ -99,28 +99,6 @@ class Test_KernelObject(unittest.TestCase):
     #     kernel_list
     #     self.k0.convolve_kernel(kernel_list, length)
 
-    def test_kernel_to_cache(self):
-        print('kernel_to cahce')
-
-        # Turn off all kernels except the skin effect
-        self.k0.decay_length_1(1e-9)
-        self.k0.decay_length_2(1e-9)
-        self.k0.decay_amp_1(0)
-        self.k0.decay_amp_2(0)
-        self.k0.bounce_length_1(1e-9)
-        self.k0.bounce_amp_1(0)
-
-        self.k0.skineffect_alpha(0.1)
-        self.k0.skineffect_length(40e-9)
-        kObj_skin = self.k0.get_skin_kernel()
-
-        # cache is an empty dictionary
-        cache = {}
-        self.k0.kernel_to_cache(cache=cache)
-        self.assertTrue('OPT_chevron.tmp' in cache.keys())
-        skin_cache = cache['OPT_chevron.tmp']
-
-        np.testing.assert_array_equal(kObj_skin, skin_cache)
 
     def test_convolve_kernel(self):
         pass
