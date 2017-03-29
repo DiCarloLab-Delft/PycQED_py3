@@ -18,6 +18,7 @@ from pycqed.instrument_drivers.physical_instruments._controlbox import Mock_QuTe
 from pycqed.instrument_drivers.physical_instruments import QuTech_ControlBox_v3 as qcb3
 from pycqed.instrument_drivers.physical_instruments._controlbox import test_suite_v3
 from pycqed.instrument_drivers.physical_instruments._controlbox import defHeaders_CBox_v3 as header
+from pycqed.instrument_drivers.physical_instruments._controlbox import Assembler as Assembler
 
 reload(qcb3)
 reload(test_suite_v3)
