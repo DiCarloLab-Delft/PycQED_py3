@@ -42,24 +42,19 @@ class DDMq(SCPI):
             srun_cmd = 'qutech:run{}'.format(ch_pair)
             self.add_parameter('ch_pair{}_run'.format(ch_pair),
                                label=('Run ch_pair{}'.format(ch_pair)),
-                               docstring='This parameter enables trigger, it is comparable to command "arm".' +
-                               ' After run is set, DDM will accept next comming triggers ',
+                               # docstring='',
                                #get_cmd=swinten_cmd + '?',
                                set_cmd=srun_cmd
                                )
             sreset_int_cmd = 'qutech:reset{}'.format(ch_pair)
             self.add_parameter('ch_pair{}_reset'.format(ch_pair),
                                label=('Reset DDM integration modes'),
-                               docstring='It disables all available modes',
                                #get_cmd=swinten_cmd + '?',
                                set_cmd=sreset_int_cmd
                                )
             scaladc_cmd = 'qutech:adc{}:cal'.format(ch_pair)
             self.add_parameter('ch_pair{}_cal_adc'.format(ch_pair),
                                label=('Calibrate ADC{}'.format(ch_pair)),
-                               docstring='It calibrates ADC. It is required to do if' +
-                               'the temperature changes or with time. It is done automatically' +
-                               'when power is on',
                                #get_cmd=snsamp_cmd + '?',
                                set_cmd=scaladc_cmd
                                # vals=vals.Numbers(1,4096)
@@ -69,8 +64,6 @@ class DDMq(SCPI):
                                unit='#',
                                label=('Number of averages' +
                                       'ch_pair {} '.format(ch_pair)),
-                               docstring='It sets a number of averages per channel pair.' +
-                               'Any integer from 1 to 32768',
                                get_cmd=snavg_cmd + '?',
                                set_cmd=snavg_cmd + ' {}',
                                vals=vals.Numbers(1, 32768)
@@ -111,8 +104,9 @@ class DDMq(SCPI):
                                vals=vals.Numbers(1, 2048)
                                )
             '''
-            TVmode
+            TV mode
             '''
+
             sintavgall_cmd = 'qutech:tvmode{}:naverages:all'.format(ch_pair)
             self.add_parameter('ch_pair{}_tvmode_naverages'.format(ch_pair),
                                unit='#',
@@ -244,7 +238,7 @@ class DDMq(SCPI):
                                    )
                 srotmat00_cmd = 'qutech:rotmat{}:rotmat00{}'.format(
                     ch_pair, wNr)
-                self.add_parameter('ch_pair{}_weight{}_rotmat_rotmat00'.format(ch_pair, wNr),
+                self.add_parameter('ch_pair{}_weight{}_rotmat_rotmat00'.format(ch_pair, wNr, wNr),
                                    unit='#',
                                    label=('Rotation matrix value 00 of' +
                                           'ch_pair {} weight {}'.format(ch_pair, wNr)),
@@ -456,8 +450,8 @@ class DDMq(SCPI):
             for i in range(self.device_descriptor.numWeights):
                 wNr = i+1
                 self.add_parameter('ch{}_weight{}_data'.format(ch, wNr),
-                                   label=('Get weight data channel {}'.format(ch) +
-                                          'weight number {}  '.format(wNr)),
+                                   label=('Get weight data channel {}' +
+                                          'weight number {}  '.format(ch, wNr)),
                                    get_cmd=self._gen_ch_weight_get_func(
                                    self._getWeightData, ch, wNr),
                                    set_cmd=self._gen_ch_weight_set_func(
@@ -482,7 +476,7 @@ class DDMq(SCPI):
 
     def _getTVdata(self, ch_pair, wNr):
         finished = 0
-        #complete = 0
+        complete = 0
         # while (complete != '1'):
         #    complete = self._getTVpercentage(ch_pair)
         while (finished != '1'):
@@ -492,6 +486,7 @@ class DDMq(SCPI):
                 break
         self.write('qutech:tvmode{:d}:data{:d}? '.format(ch_pair, wNr))
         binBlock = self.binBlockRead()
+        #print('TV data in bytes {:d}'.format(len(binBlock)))
         tvmodedata = np.frombuffer(binBlock, dtype=np.float32)
         return tvmodedata
 
@@ -519,7 +514,7 @@ class DDMq(SCPI):
 
     def _getQstateCNT(self, ch_pair, wNr):
         finished = 0
-        #complete = 0
+        complete = 0
         # while (complete != '1'):
         #    complete = self._getTVpercentage(ch_pair)
         while (finished != '1'):
@@ -530,6 +525,7 @@ class DDMq(SCPI):
 
         self.write('qutech:qstate{:d}:data{:d}:counter? '.format(ch_pair, wNr))
         binBlock = self.binBlockRead()
+        #print('Qu state counter {:d}'.format(len(binBlock)))
         qstatecnt = np.frombuffer(binBlock, dtype=np.float32)
         return qstatecnt
 
@@ -551,7 +547,7 @@ class DDMq(SCPI):
 
     def _getLoggingInt(self, ch_pair, wNr):
         finished = 0
-        #complete = 0
+        complete = 0
         # while (complete != '1'):
         #    complete = self._getTVpercentage(ch_pair)
         while (finished != '1'):
@@ -561,12 +557,13 @@ class DDMq(SCPI):
                 break
         self.write('qutech:logging{:d}:data{:d}:int? '.format(ch_pair, wNr))
         binBlock = self.binBlockRead()
+        #print('Qu state average {:d}'.format(len(binBlock)))
         intlogging = np.frombuffer(binBlock, dtype=np.float32)
         return intlogging
 
     def _getLoggingQstate(self, ch_pair, wNr):
         finished = 0
-        #complete = 0
+        complete = 0
         # while (complete != '1'):
         #    complete = self._getTVpercentage(ch_pair)
         while (finished != '1'):
@@ -576,6 +573,7 @@ class DDMq(SCPI):
                 break
         self.write('qutech:logging{:d}:data{:d}:qstate? '.format(ch_pair, wNr))
         binBlock = self.binBlockRead()
+        #print('Qu state average {:d}'.format(len(binBlock)))
         qstatelogging = np.frombuffer(binBlock, dtype=np.float32)
         return qstatelogging
     '''
@@ -591,10 +589,11 @@ class DDMq(SCPI):
         return fmt_finished
 
     def _getInAvgBusy(self, ch_pair):
-        return self.ask('qutech:inputavg{:d}:busy? '.format(ch_pair)) 
+        return self.ask('qutech:inputavg{:d}:busy? '.format(ch_pair))
     '''
     TV MODe
     '''
+
     def _getTVStatus(self, ch_pair, wNr):
         return self.ask('qutech:tvmode{:d}:status{:d}? '.format(ch_pair, wNr))
 
@@ -657,7 +656,7 @@ class DDMq(SCPI):
 
     def _getErrFractCnt(self, ch_pair, wNr):
         finished = 0
-        #complete = 0
+        complete = 0
         # while (complete != '1'):
         #    complete = self._getTVpercentage(ch_pair)
         while (finished != '1'):
@@ -667,6 +666,7 @@ class DDMq(SCPI):
                 break
         self.write('qutech:errorfraction{:d}:data{:d}? '.format(ch_pair, wNr))
         binBlock = self.binBlockRead()
+        #print('Qu state average {:d}'.format(len(binBlock)))
         errfractioncnt = np.frombuffer(binBlock, dtype=np.int32)
         print('NoErrorCounterReg    = {:d}'.format(errfractioncnt[0]))
         print('SingleErrorCounterReg= {:d}'.format(errfractioncnt[1]))
