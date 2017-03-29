@@ -101,7 +101,7 @@ class DDMq(SCPI):
                                       'ch_pair {} all weights'.format(ch_pair)),
                                get_cmd=sintlengthall_cmd + '?',
                                set_cmd=sintlengthall_cmd + ' {}',
-                               vals=vals.Numbers(1, 2048)
+                               vals=vals.Numbers(1, 4096)
                                )
             '''
             TV mode
@@ -226,7 +226,7 @@ class DDMq(SCPI):
                                           'ch_pair {} weight {}'.format(ch_pair, wNr)),
                                    get_cmd=sintlength_cmd + '?',
                                    set_cmd=sintlength_cmd + ' {}',
-                                   vals=vals.Numbers(1, 2048)
+                                   vals=vals.Numbers(1, 4096)
                                    )
                 swintstat_cmd = 'qutech:wint{}:status{}'.format(ch_pair, wNr)
                 self.add_parameter('ch_pair{}_weight{}_wint_status'.format(ch_pair, wNr),
@@ -811,8 +811,8 @@ class DDMq(SCPI):
                                         weight_function_Q=2):
         trace_length = 4096
         tbase = np.arange(0, trace_length/5e8, 1/5e8)
-        cosI = np.array(np.cos(2*np.pi*IF*tbase))
-        sinI = np.array(np.sin(2*np.pi*IF*tbase))
+        cosI = 127*np.array(np.cos(2*np.pi*IF*tbase))
+        sinI = 127*np.array(np.sin(2*np.pi*IF*tbase))
         #first pair
         eval('self.ch1_weight{}_data(np.array(cosI))'.format(weight_function_I))
         eval('self.ch2_weight{}_data(np.array(sinI))'.format(weight_function_I))
@@ -823,8 +823,28 @@ class DDMq(SCPI):
         #setting the rotation matrices... very danagerous
         eval('self.ch_pair1_weight{}_rotmat_rotmat00(1)'.format(weight_function_I))
         eval('self.ch_pair1_weight{}_rotmat_rotmat01(1)'.format(weight_function_I))
+        eval('self.ch_pair1_weight{}_rotmat_rotmat00(-1)'.format(weight_function_Q))
+        eval('self.ch_pair1_weight{}_rotmat_rotmat01(1)'.format(weight_function_Q))
+
+    def prepare_DSB_weight_and_rotation(self, IF,
+                                        weight_function_I=1,
+                                        weight_function_Q=2):
+        trace_length = 4096
+        tbase = np.arange(0, trace_length/5e8, 1/5e8)
+        cosI = 127*np.array(np.cos(2*np.pi*IF*tbase))
+        sinI = 127*np.array(np.sin(2*np.pi*IF*tbase))
+        #first pair
+        eval('self.ch1_weight{}_data(np.array(cosI))'.format(weight_function_I))
+        eval('self.ch2_weight{}_data(np.array(sinI))'.format(weight_function_I))
+        #second pair
+        eval('self.ch1_weight{}_data(np.array(sinI))'.format(weight_function_Q))
+        eval('self.ch2_weight{}_data(np.array(cosI))'.format(weight_function_Q))
+
+        #setting the rotation matrices... very danagerous
+        eval('self.ch_pair1_weight{}_rotmat_rotmat00(1)'.format(weight_function_I))
+        eval('self.ch_pair1_weight{}_rotmat_rotmat01(0)'.format(weight_function_I))
         eval('self.ch_pair1_weight{}_rotmat_rotmat00(1)'.format(weight_function_Q))
-        eval('self.ch_pair1_weight{}_rotmat_rotmat01(-1)'.format(weight_function_Q))
+        eval('self.ch_pair1_weight{}_rotmat_rotmat01(0)'.format(weight_function_Q))
 
 
 
