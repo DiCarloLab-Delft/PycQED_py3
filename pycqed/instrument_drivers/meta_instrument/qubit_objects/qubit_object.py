@@ -72,7 +72,7 @@ class Qubit(Instrument):
                            get_cmd=self._get_operations)
 
     def get_idn(self):
-        return self.name
+        return {'driver': self.__class__, 'name': self.name}
 
     def _get_operations(self):
         return self._operations
