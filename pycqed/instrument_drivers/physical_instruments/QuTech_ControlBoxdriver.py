@@ -140,12 +140,13 @@ class QuTech_ControlBox(VisaInstrument):
             for dac_ch in range(2):
                 self.add_parameter(
                     'AWG{}_dac{}_offset'.format(awg_nr, dac_ch),
-                    label='Dac offset AWG {}', unit='mV',
+                    label='Dac offset AWG {}, dac {}'.format(awg_nr, dac_ch),
+                    unit='V',
                     get_cmd=self._gen_sub_ch_get_func(self.get_dac_offset,
                                                       awg_nr, dac_ch),
                     set_cmd=self._gen_sub_ch_set_func(self.set_dac_offset,
                                                       awg_nr, dac_ch),
-                    vals=vals.Numbers(-999, 999))
+                    vals=vals.Numbers(-1, 1))
             # Need to add double wrapping for get/set funcs here
 
         self.add_parameter('measurement_timeout', unit='s',
@@ -610,8 +611,8 @@ class QuTech_ControlBox(VisaInstrument):
             If version <= 2.15:  0 = Q and 1 = I channel.
             If version >= 2.16:  0 = I and 1 = Q channel.
         @param lut : the array of the with amplitude values,
-            if units is 'mV' the range is (-1000mV, 1000mV)
-            if units is 'dac' range is (-8192, 8191)
+            if unit is 'V' the range is (-1V, 1V)
+            if unit is 'dac' range is (-8192, 8191)
         @param length : the length in samples of the lut, (1,128)
                         can be given for test purposes, default is None
 
@@ -620,14 +621,14 @@ class QuTech_ControlBox(VisaInstrument):
 
         '''
 
-        if units == 'V':
+        if unit == 'V':
             lut = lut * 8192.  # dac_peak/V_peak
             # do conversion
             pass
-        elif units == 'dac':
+        elif unit == 'dac':
             pass
         else:
-            raise ValueError('units: "%s" not understood' % units)
+            raise ValueError('unit: "%s" not understood' % unit)
 
         # Check out of bounds
         if awg_nr < 0 or awg_nr > 2:
@@ -812,10 +813,7 @@ class QuTech_ControlBox(VisaInstrument):
         else:
             dac_ch_code = dac_ch
 
-        if offset > 1000 or offset < -1000:
-            raise ValueError('offset out of range [-1, 1] (volts)')
-
-        offset_dac = int(offset/1000.*2**13)
+        offset_dac = int(offset*2**13)
         # For 14 bit signed value, the acceptable range is -8192 to 8191.
         if offset_dac == 2**13:
             offset_dac = int(2**13-1)
