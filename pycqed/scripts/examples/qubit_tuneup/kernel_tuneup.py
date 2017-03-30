@@ -10,12 +10,12 @@ AncT.fluxing_channel(3)
 
 
 k0.channel(4)
-k0.kernel_dir_path(
+k0.kernel_dir(
     r'D:\GitHubRepos\iPython-Notebooks\Experiments\1607_Qcodes_5qubit\kernels')
 k0.kernel_list(['precompiled_RT_20161206.txt'])
 
 k1.channel(3)
-k1.kernel_dir_path(
+k1.kernel_dir(
     r'D:\GitHubRepos\iPython-Notebooks\Experiments\1607_Qcodes_5qubit\kernels')
 k1.kernel_list(['precompiled_AncT_RT_20161203.txt',
                 'kernel_fridge_lowpass_20161024_1.00.txt',

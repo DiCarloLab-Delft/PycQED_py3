@@ -10,7 +10,7 @@ import pycqed.instrument_drivers.meta_instrument.kernel_object as k_obj
 k0 = k_obj.Distortion(name='k0')
 station.add_component(k0)
 k0.channel(2)
-k0.kernel_dir_path(
+k0.kernel_dir(
     r'D:\Experiments\1702_Starmon\kernels')
 
 # define an identity distortion to start
@@ -55,16 +55,16 @@ k_list = ['kernel_170307_120012_fitSPsaveSP.txt',
                 'kernel_170308_121552_B_fitSPsaveSP.txt',
                 'kernel_170308_122054_fast_corrections.txt']
 length = 100000
-kernels = np.loadtxt(k0.kernel_dir_path()+r'/'+k_list[0])
+kernels = np.loadtxt(k0.kernel_dir()+r'/'+k_list[0])
 for k in k_list[1:]:
-    v = np.loadtxt(k0.kernel_dir_path()+r'/'+k)
+    v = np.loadtxt(k0.kernel_dir()+r'/'+k)
     kernels = np.convolve(v,kernels)[:max(len(v),len(kernels))]
 # kernels /= np.sum(kernels)
 np.sum(kernels)
 
-np.savetxt(k0.kernel_dir_path()+r'/RT_Compiled_170308.txt',kernels)
+np.savetxt(k0.kernel_dir()+r'/RT_Compiled_170308.txt',kernels)
 
-np.savetxt(k0.kernel_dir_path()+r'/RT_Compiled_norm_170308.txt',kernels/np.sum(kernels))
+np.savetxt(k0.kernel_dir()+r'/RT_Compiled_norm_170308.txt',kernels/np.sum(kernels))
 
 
 import qcodes as qc

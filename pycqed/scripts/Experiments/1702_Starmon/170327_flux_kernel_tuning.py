@@ -36,20 +36,20 @@ for i in range(8):
 
 
 
-square_pulse_cw = 5
+# square_pulse_cw = 5
 
-block_I, block_Q = wf.block_pulse(1, 80e-6, sampling_rate=1e9)
-block_I = np.array(block_I)
-block_Q = np.array(block_Q)
+# block_I, block_Q = wf.block_pulse(1, 80e-6, sampling_rate=1e9)
+# block_I = np.array(block_I)
+# block_Q = np.array(block_Q)
 
 # # distorted_I = k0.convolve_kernel([block_I, k0.kernel()], length=5e-6)
 
-QWG.createWaveformReal('wf_I_{}'.format(square_pulse_cw), block_I)
-print('QWG_square_pulse to CW: ', square_pulse_cw)
-QWG.set('codeword_{}_ch{}_waveform'.format(square_pulse_cw, 1),
-        'wf_I_{}'.format(square_pulse_cw))
-QWG.set('codeword_{}_ch{}_waveform'.format(square_pulse_cw, 2),
-        'wf_Q_{}'.format(square_pulse_cw))
+# QWG.createWaveformReal('wf_I_{}'.format(square_pulse_cw), block_I)
+# print('QWG_square_pulse to CW: ', square_pulse_cw)
+# QWG.set('codeword_{}_ch{}_waveform'.format(square_pulse_cw, 1),
+#         'wf_I_{}'.format(square_pulse_cw))
+# QWG.set('codeword_{}_ch{}_waveform'.format(square_pulse_cw, 2),
+#         'wf_Q_{}'.format(square_pulse_cw))
 
 
 QWG.start()
@@ -70,9 +70,9 @@ def QWG_square_flux_pulse_seq(operation_dict, verbose=False):
     station.pulsar.update_channel_settings()
     el_list = []
     sequencer_config = operation_dict['sequencer_config']
-    pulse_combinations = ['Start_pulse', 'CW_5']
-    # for i in range(8):
-    #     pulse_combinations += ['CW_{}'.format(i)]
+    pulse_combinations = ['Start_pulse']#, 'CW_5']
+    for i in range(8):
+        pulse_combinations += ['CW_{}'.format(i)]
     pulses = []
     for p in pulse_combinations:
         pulses += [operation_dict[p]]
