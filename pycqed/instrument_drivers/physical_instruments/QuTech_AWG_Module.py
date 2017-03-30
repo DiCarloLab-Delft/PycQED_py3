@@ -373,9 +373,16 @@ class QuTech_AWG_Module(SCPI):
 
         Compatibility:  QWG
         """
+        wv_val = vals.Arrays(min_value=-1, max_value=1)
+        wv_val.validate(waveform)
+
+        # maxWaveLen = 65532 # FIXME: this is the hardware max
+        maxWaveLen = 32000  # This is a current max until issue #63 is resolved
         waveLen = len(waveform)
-        # FIXME: check waveform is there, problems might arise if it already
-        # existed
+        if waveLen > maxWaveLen:
+            raise ValueError('Waveform length ({}) must be < {}'.format(
+                             waveLen, maxWaveLen))
+
         self.newWaveformReal(name, waveLen)
         self.sendWaveformDataReal(name, waveform)
 
