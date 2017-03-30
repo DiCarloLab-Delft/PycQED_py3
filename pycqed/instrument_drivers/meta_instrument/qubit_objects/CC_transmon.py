@@ -14,20 +14,19 @@ from .qubit_object import Transmon
 from qcodes.utils import validators as vals
 from qcodes.instrument.parameter import ManualParameter
 from pycqed.measurement.waveform_control_CC import waveform as wf
-import pycqed.measurement.mc_parameter_wrapper as pw
 from pycqed.analysis import measurement_analysis as ma
-from copy import deepcopy
 from pycqed.analysis.tools.data_manipulation import rotation_matrix
 # from pycqed.measurement.calibration_toolbox import mixer_carrier_cancellation_CBox
 from pycqed.measurement.calibration_toolbox import mixer_carrier_cancellation
 
 from pycqed.measurement.calibration_toolbox import mixer_skewness_cal_CBox_adaptive
-from pycqed.measurement import CBox_sweep_functions as CB_swf
 from pycqed.measurement import sweep_functions as swf
 from pycqed.measurement.waveform_control_CC import single_qubit_qasm_seqs as sqqs
 import pycqed.measurement.CBox_sweep_functions as cbs
 from pycqed.scripts.Experiments.intel_demo import qasm_helpers as qh
 from pycqed.measurement.waveform_control_CC import qasm_to_asm as qta
+from pycqed.measurement.waveform_control_CC import instruction_lib as ins_lib
+
 
 from pycqed.measurement import detector_functions as det
 from pycqed.instrument_drivers.pq_parameters import InstrumentParameter
@@ -781,8 +780,7 @@ class CBox_v3_driven_transmon(Transmon):
         qumis_file = single_pulse_asm
         self.CBox.get_instr().load_instructions(qumis_file.name)
 
-        self.CBox.get_instr().run_mode('run')
-
+        self.CBox.get_instr().start()
         amp_swf = cbs.Lutman_par_with_reload_single_pulse(
             LutMan=self.Q_LutMan.get_instr(), parameter=self.Q_LutMan.get_instr().Q_amp180,
             pulse_names=['X180'], awg_nrs=[self.Q_awg_nr()])
@@ -1184,7 +1182,7 @@ class CBox_v3_driven_transmon(Transmon):
         # MC.set_detector_function(d)
         # MC.set_sweep_functions([cb_swf.LutMan_amp180_90(self.LutMan)])
         # MC.set_sweep_points(amps)
-        # MC.run('RB-vs-amp_{}cliff'.format(nr_cliff) + self.msmt_suffix)
+        # MC.run('RB-vs-amp_{}cliff'.format(nr_cliff) + self.msImt_suffix)
         # if analyze:
         #     ma.MeasurementAnalysis(close_fig=close_fig)
 
@@ -1195,6 +1193,7 @@ class CBox_v3_driven_transmon(Transmon):
         RO_pulse_length_clocks = convert_to_clocks(self.RO_pulse_length())
         RO_pulse_delay_clocks = convert_to_clocks(self.RO_pulse_delay())
         RO_depletion_clocks = convert_to_clocks(self.RO_depletion_time())
+
 
         operation_dict['init_all'] = {'instruction':
                                       '\nWaitReg r0 \nWaitReg r0 \n'}
@@ -1227,7 +1226,7 @@ class CBox_v3_driven_transmon(Transmon):
         if self.spec_pulse_type() == 'gated':
             spec_length_clocks = convert_to_clocks(
                 self.spec_pulse_length())
-            spec_instr = trigg_ch_to_instr(
+            spec_instr = ins_lib.trigg_ch_to_instr(
                 self.spec_pulse_marker_channel(), spec_length_clocks)
             operation_dict['SpecPulse '+self.name] = {
                 'duration': spec_length_clocks, 'instruction': spec_instr}
@@ -1254,10 +1253,10 @@ class CBox_v3_driven_transmon(Transmon):
             elif self.RO_pulse_type() == 'Gated_MW_RO_pulse_UHFQC':
                 operation_dict['RO {}'.format(self.name)] = {
                     'duration': RO_pulse_length_clocks, 'instruction':
-                    (trigg_ch_to_instr(self.RO_acq_marker_channel(),
+                    (ins_lib.trigg_ch_to_instr(self.RO_acq_marker_channel(),
                                        RO_pulse_length_clocks) +
                      'wait {}\n'.format(RO_pulse_delay_clocks) +
-                     trigg_ch_to_instr(self.RO_acq_marker_channel(),
+                     ins_lib.trigg_ch_to_instr(self.RO_acq_marker_channel(),
                                        2))}
                 # UHF triggers on the rising edge
 
@@ -1296,9 +1295,9 @@ class CBox_v3_driven_transmon(Transmon):
         t_RO_p_end = t_RO_p+RO_p_len
         t_acq_marker_end = t_acq_marker+acq_marker_len
 
-        cw_p = trigg_cw(self.RO_acq_pulse_marker_channel())
-        cw_t = trigg_cw(self.RO_acq_marker_channel())
-        cw_both = bin_add_cw_w7(cw_p, cw_t)
+        cw_p = ins_lib.trigg_cw(self.RO_acq_pulse_marker_channel())
+        cw_t = ins_lib.trigg_cw(self.RO_acq_marker_channel())
+        cw_both = ins_lib.bin_add_cw_w7(cw_p, cw_t)
 
         # Only works for a specific time arangement of the pulses
         if t_acq_marker > (t_RO_p + 1) and t_RO_p_end > t_acq_marker_end:
@@ -1323,7 +1322,7 @@ class CBox_v3_driven_transmon(Transmon):
         RO_pulse_length_clocks = convert_to_clocks(self.RO_pulse_length())
         RO_depletion_clocks = convert_to_clocks(self.RO_depletion_time())
 
-        cw_t = trigg_cw(self.RO_acq_marker_channel())
+        cw_t = ins_lib.trigg_cw(self.RO_acq_marker_channel())
 
         instr = 'wait {} \n'.format(RO_pulse_delay_clocks)
         instr += 'trigger {}, {}\n'.format(cw_t, 2)
@@ -1662,30 +1661,3 @@ class QWG_driven_transmon(CBox_v3_driven_transmon):
         return operation_dict
 
 
-def trigg_cw(channel):
-    cw = ['0']*7
-    cw[channel-1] = '1'
-    cw = ''.join(cw)
-    return cw
-
-
-def trigg_ch_to_instr(channel, duration):
-    """
-    Specify a trigger channel to be triggered and returns the appropriate
-    qumis instruction
-        channel:  int  between 1 and 7
-        duration: int  duration in clocks, >1
-    """
-    cw = trigg_cw(channel)
-
-    instr = 'trigger {}, {} \n'.format(cw, duration)
-    instr += 'wait {}\n'.format(duration)
-    return instr
-
-
-def bin_add_cw_w7(a, b):
-    """
-    Width 7 binary addition of two codeword strings
-    """
-    c = (int(a, 2) + int(b, 2))
-    return '{0:07b}'.format(c)
