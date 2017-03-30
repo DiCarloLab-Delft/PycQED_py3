@@ -15,18 +15,20 @@ def trigg_cw(channel):
 def qwg_cw_trigger(codeword,
                    trigger_channel=1, cw_channels=[2, 3, 4]):
 
-    trigger = trigg_cw(trigger_channel)
-    instr = 'trigger {}, 1\n'.format(trigger)
-    instr += 'wait 1\n'
     cw = int_to_bin(codeword, w=len(cw_channels), lsb_last=False)
-    cw_trigg = ['0']*7
+    cw_marker = ['0']*7
     for i, cw_bit in enumerate(cw):
-        cw_trigg[cw_channels[i]-1] = cw_bit
-    cw_trigg = ''.join(cw_trigg)
+        cw_marker[cw_channels[i]-1] = cw_bit
+    cw_marker = ''.join(cw_marker)
 
-    cw_trigg = bin_add_cw_w7(trigger, cw_trigg)
-    instr += 'trigger {}, 2\n'.format(cw_trigg)
+    trigger = trigg_cw(trigger_channel)
+    instr = 'trigger {}, 1\n'.format(cw_marker)
+    instr += 'wait 1\n'
+
+    cw_ready_trigg = bin_add_cw_w7(trigger, cw_marker)
+    instr += 'trigger {}, 2\n'.format(cw_ready_trigg)
     instr += 'wait 2\n'
+
     return instr
 
 

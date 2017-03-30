@@ -11,27 +11,27 @@ class Test_single_qubit_seqs(TestCase):
 
     def test_qwg_cw_trigger(self):
         cw0_instr = ins_lib.qwg_cw_trigger(0)
-        exp_cw0 = 'trigger 1000000, 1\n'
+        exp_cw0 = 'trigger 0000000, 1\n'
         exp_cw0 += 'wait 1\n'
         exp_cw0 += 'trigger 1000000, 2\n'
         exp_cw0 += 'wait 2\n'
         self.assertEqual(cw0_instr, exp_cw0)
 
         cw1_instr = ins_lib.qwg_cw_trigger(1)
-        exp_cw1 = 'trigger 1000000, 1\n'
+        exp_cw1 = 'trigger 0100000, 1\n'
         exp_cw1 += 'wait 1\n'
         exp_cw1 += 'trigger 1100000, 2\n'
         exp_cw1 += 'wait 2\n'
         self.assertEqual(cw1_instr, exp_cw1)
 
-        exp_cw2 = 'trigger 1000000, 1\n'
+        exp_cw2 = 'trigger 0010000, 1\n'
         exp_cw2 += 'wait 1\n'
         exp_cw2 += 'trigger 1010000, 2\n'
         exp_cw2 += 'wait 2\n'
         cw2_instr = ins_lib.qwg_cw_trigger(2)
         self.assertEqual(cw2_instr, exp_cw2)
 
-        exp_cw3 = 'trigger 1000000, 1\n'
+        exp_cw3 = 'trigger 0110000, 1\n'
         exp_cw3 += 'wait 1\n'
         exp_cw3 += 'trigger 1110000, 2\n'
         exp_cw3 += 'wait 2\n'
@@ -39,7 +39,7 @@ class Test_single_qubit_seqs(TestCase):
         self.assertEqual(cw3_instr, exp_cw3)
 
         # Test if different channels are specified
-        exp_cw3 = 'trigger 0000001, 1\n'
+        exp_cw3 = 'trigger 0011000, 1\n'
         exp_cw3 += 'wait 1\n'
         exp_cw3 += 'trigger 0011001, 2\n'
         exp_cw3 += 'wait 2\n'
