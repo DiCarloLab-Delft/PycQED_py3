@@ -30,6 +30,9 @@ class Test_single_qubit_seqs(TestCase):
         self.assertEqual(len(self.instructions), len(self.text_instructions))
 
     def test_insert_nop(self):
+        print("hex: ", self.instructions)
+        print("text:", self.text_instructions)
+
         # count number of nop instructions in the text version
         number_of_text_nop = 0
         for instr in self.text_instructions:
@@ -45,6 +48,9 @@ class Test_single_qubit_seqs(TestCase):
             if elements[0] == 'nop':
                 number_of_text_nop = number_of_text_nop + 1
 
+        number_of_hex_nop = self.instructions.count(0)
+        for i in range(1, 6):  # five nops added appending branch instructions.
+            number_of_hex_nop = number_of_hex_nop + self.instructions.count(i<<8)
         print(self.instructions.count(0), number_of_text_nop)
         # compare
-        self.assertEqual(self.instructions.count(0), number_of_text_nop)
+        self.assertEqual(number_of_hex_nop, number_of_text_nop)

@@ -381,8 +381,9 @@ class Assembler():
                         label, self.asmfilename))
                 self.tag_addr_dict[label] = cur_addr
 
-                # the nop inserted after the label
-                num_of_instr = num_of_instr + 1
+                if (self.add_nop_after_label):
+                    # the nop inserted after the label
+                    num_of_instr = num_of_instr + 1
 
             if (len(instr) == 0):
                 continue
@@ -400,6 +401,8 @@ class Assembler():
         return self.tag_addr_dict
 
     def convert_to_instructions(self):
+        self.add_nop_after_label = True
+
         self.ParseLabel()
 
         self.NopInstruction = 0
@@ -420,7 +423,8 @@ class Assembler():
 
             (label, instr) = self.split_label_instr(line)
             if label is not None:
-                self.instructions.append(self.NopInstruction)
+                if (self.add_nop_after_label):
+                    self.instructions.append(self.NopInstruction)
 
             if (len(instr) == 0):
                 continue
@@ -562,6 +566,8 @@ class Assembler():
         Show the final instructions after expanding the mov instruction
         and appending nop instruction after labels and beq/bne.
         '''
+        self.ParseLabel()
+
         Asm_File = open(self.asmfilename, 'r', encoding="utf-8")
 
         self.text_instructions = []
@@ -574,7 +580,8 @@ class Assembler():
 
             (label, instr) = self.split_label_instr(line)
             if label is not None:
-                self.text_instructions.append(label + ': nop')
+                if (self.add_nop_after_label):
+                    self.text_instructions.append(label + ': nop')
 
             if (len(instr) == 0):
                 continue
@@ -583,10 +590,10 @@ class Assembler():
                 {ord('-'): None})) for rawEle in instr.split()]
 
             if (elements[0].lower() == 'mov'):
-                self.text_instructions.append("LUI0 " + instr)
-                self.text_instructions.append("LUI1 " + instr)
-                self.text_instructions.append("LUI2 " + instr)
-                self.text_instructions.append("LUI3 " + instr)
+                self.text_instructions.append("lui0 " + instr)
+                self.text_instructions.append("lui1 " + instr)
+                self.text_instructions.append("lui2 " + instr)
+                self.text_instructions.append("lui3 " + instr)
             elif (elements[0].lower() == 'beq'):
                 self.text_instructions.append(instr)
                 self.add_branch_nop(self.text_instructions, TextVersion=True)
@@ -600,16 +607,28 @@ class Assembler():
         self.text_instructions.append("trigger 0000001 10000")
         self.text_instructions.append("beq r0, r0, EndOfFileLoop")
 
+        if (not self.add_nop_after_label):
+            self.show_label_in_text_instruction()
+
         Asm_File.close()
 
 
         return self.text_instructions
 
     def add_branch_nop(self, instructions, TextVersion=False):
-        number_of_nops_appended = 4
+        number_of_nops_appended = 5
         if (TextVersion):
             for i in range(number_of_nops_appended):
                 instructions.append('nop')
         else:
-            for i in range(number_of_nops_appended):
-                instructions.append(self.NopInstruction)
+            instructions.append(1<<8)
+            instructions.append(2<<8)
+            instructions.append(3<<8)
+            instructions.append(4<<8)
+            instructions.append(5<<8)
+            # for i in range(number_of_nops_appended):
+            #     instructions.append(self.NopInstruction)
+
+    def show_label_in_text_instruction(self):
+        for (key, value) in self.tag_addr_dict.items():
+            self.text_instructions[value-1] = key + ":" + self.text_instructions[value-1]
