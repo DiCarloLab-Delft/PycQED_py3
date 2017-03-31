@@ -38,14 +38,19 @@ for i in range(8):
     QWG.set('codeword_{}_ch{}_waveform'.format(i, 4), 'wf_Q_{}'.format(i))
 
 
-block_I, block_Q = wf.block_pulse(1, 10e-6, sampling_rate=1e9)
+# block_I, block_Q = wf.block_pulse(1, 10e-6, sampling_rate=1e9)
+
+sigma = 600e-9
+mod = 1e9
+block_I, block_Q = wf.mod_gauss(1., sigma, mod, nr_sigma=8, sampling_rate=1e9,
+                axis='x', motzoi=0, delay=0)
 block_I = np.array(block_I)
 block_Q = np.array(block_Q)
 
 t0 = time.time()
 block_I *= .5
-distorted_I = k0.convolve_kernel([k0.kernel(), block_I], length_samples=30e3)
-# distorted_I = block_I
+# distorted_I = k0.convolve_kernel([k0.kernel(), block_I], length_samples=30e3)
+distorted_I = block_I
 
 block_cw = 5
 comp_cw = 6

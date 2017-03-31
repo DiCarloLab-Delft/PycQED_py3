@@ -6,8 +6,11 @@ trace_folder = r'D:\Experiments\1702_Starmon\RT_kernel_traces'
 # filename = r'\RefCurve_2017-03-29_2_195314.Wfm.csv'
 # filename = r'\RefCurve_2017-03-30_0_110407.Wfm.csv'
 # filename = r'\RefCurve_2017-03-30_1_111929.Wfm.csv'
-filename = r'\RefCurve_2017-03-30_2_112928.Wfm.csv'
+# filename = r'\RefCurve_2017-03-30_2_112928.Wfm.csv'
 
+# filename = r'\RefCurve_2017-03-30_5_132742.Wfm.csv'
+
+filename = r'\RefCurve_2017-03-30_8_163439.Wfm.csv'
 
 def contains_nan(array):
     return np.isnan(array).any()
@@ -18,6 +21,8 @@ step_width_ns = 10
 kf.kernel_dir = trace_folder
 output_dict = kf.get_all_sampled(filename, step_width_ns, points_per_ns,
                                  step_params=None)
+
+
 try:
     vw.clear()
 except Exception:
@@ -34,10 +39,10 @@ amp_k = output_dict['kernel_step']
 ##########################
 # Setting up the fitting model
 triple_pole_mod = fit_mods.TripleExpDecayModel
-triple_pole_mod.set_param_hint('amp1', max=0., value=-0.003, vary=True)
-triple_pole_mod.set_param_hint('tau1', value=.5e-6, vary=True)
-triple_pole_mod.set_param_hint('amp2', max=0, value=-.001, vary=True)
-triple_pole_mod.set_param_hint('tau2', value=.2e-6, vary=True)
+triple_pole_mod.set_param_hint('amp1', value=0.05, vary=True)
+triple_pole_mod.set_param_hint('tau1', value=.1e-6, vary=True)
+triple_pole_mod.set_param_hint('amp2', value=0, vary=True)#-.001, vary=True)
+triple_pole_mod.set_param_hint('tau2', value=.1e-6, vary=True)
 triple_pole_mod.set_param_hint('amp3', max=0., value=0., vary=False)
 triple_pole_mod.set_param_hint('tau3', value=.2e-6, vary=False)
 triple_pole_mod.set_param_hint('offset', min=0., value=1, vary=True)
@@ -45,8 +50,8 @@ triple_pole_mod.set_param_hint('n', value=1, vary=False)
 my_tp_params = triple_pole_mod.make_params()
 
 # the fit
-start_time_fit = .5e-6
-end_time_fit = 25e-6
+start_time_fit = .1e-6
+end_time_fit = 9.5e-6
 fit_start = np.argmin(np.abs(tvals - start_time_fit))
 fit_end = np.argmin(np.abs(tvals - end_time_fit))
 tvals_fit = tvals[fit_start:fit_end]
@@ -63,7 +68,7 @@ if contains_nan(tvals_fit):
 tp_fit_res = triple_pole_mod.fit(data=norm_amps[fit_start:fit_end],
                                  t=tvals_fit, params=my_tp_params)
 
-print(tp_fit_res.fit_report())
+# print(tp_fit_res.fit_report())
 
 #################################
 # Initial plot
@@ -153,10 +158,10 @@ print(save_file_name)
 # Add the distortion to the kernel object
 k0 = station.components['k0']
 # k0.kernel_list([save_file_name+'.txt'])
-try:
-    k0.add_kernel_to_kernel_list(save_file_name+'.txt')
-except ValueError as va:
-    logging.warning(va)
+# try:
+#     k0.add_kernel_to_kernel_list(save_file_name+'.txt')
+# except ValueError as va:
+#     logging.warning(va)
 
 
 import pycqed.instrument_drivers.meta_instrument.kernel_object as k_obj

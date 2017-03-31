@@ -57,8 +57,6 @@ from qcodes.instrument_drivers.tektronix import AWG5014 as tek
 from qcodes.instrument_drivers.tektronix import AWG520 as tk520
 from qcodes.instrument_drivers.agilent.E8527D import Agilent_E8527D
 
-from pycqed.instrument_drivers.physical_instruments import QuTech_ControlBoxdriver as qcb
-
 from pycqed.instrument_drivers.meta_instrument import heterodyne as hd
 import pycqed.instrument_drivers.meta_instrument.CBox_LookuptableManager as lm
 
@@ -154,7 +152,7 @@ import pycqed.instrument_drivers.meta_instrument.kernel_object as k_obj
 k0 = k_obj.Distortion(name='k0')
 station.add_component(k0)
 k0.channel(2)
-k0.kernel_dir_path(
+k0.kernel_dir(
     r'D:\Experiments\1702_Starmon\kernels')
 k0.kernel_list(['id_kernel.txt'])
 
@@ -336,7 +334,7 @@ nested_MC.instrument_monitor(IM.name)
 
 # # from pycqed.instrument_drivers.physical_instruments import QuTech_ControlBoxdriver as qcb
 # # reload(qcb)
-# from pycqed.instrument_drivers.physical_instruments import QuTech_ControlBox_v3 as qcb
+from pycqed.instrument_drivers.physical_instruments import QuTech_ControlBox_v3 as qcb
 # # reload(qcb)
 # # CBox.close()
 # # del station.components['CBox']
