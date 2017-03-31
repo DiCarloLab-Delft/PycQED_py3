@@ -89,8 +89,8 @@ class Test_KernelObject(unittest.TestCase):
         # restored
         # datadir = os.path.join(pq.__path__[0], 'tests', 'test_data',
         #                        'test_kernels')
-        # self.k0.kernel_dir_path(datadir)
-        # print(self.k0.kernel_dir_path())
+        # self.k0.kernel_dir(datadir)
+        # print(self.k0.kernel_dir())
         # self.k0.kernel_list(['precompiled_RT_20161206.txt'])
         # kernel = self.k0.kernel()
 

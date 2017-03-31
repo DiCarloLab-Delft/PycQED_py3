@@ -1054,7 +1054,7 @@ class Chevron_optimization_v1(det.Soft_Detector):
     def __init__(self, flux_channel, dist_dict, AWG, MC_nested, qubit,
                  kernel_obj, cost_function_opt=0, **kw):
         super().__init__()
-        kernel_dir_path = 'kernels/'
+        kernel_dir = 'kernels/'
         self.name = 'chevron_optimization_v1'
         self.value_names = ['Cost function', 'SWAP Time']
         self.value_units = ['a.u.', 'ns']
@@ -1080,7 +1080,7 @@ class Chevron_optimization_v1(det.Soft_Detector):
         kernel_before_loaded = []
         for k in kernel_before_list:
             if k is not '':
-                kernel_before_loaded.append(np.loadtxt(kernel_dir_path+k))
+                kernel_before_loaded.append(np.loadtxt(kernel_dir+k))
         self.kernel_before = kernel_obj.convolve_kernel(kernel_before_loaded,
                                                         30000)
 

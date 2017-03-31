@@ -49,10 +49,12 @@ def save_kernel(kernel, save_file=None):
     logging.warning('this does not save where you think it does')
     if save_file is None:
         save_file = kernel_name
-    with open(join(kernel_dir, save_file)+'.txt', 'w') as f:
+    fn = join(kernel_dir, save_file)+'.txt'
+    with open(fn, 'w') as f:
         for ii in np.arange(len(kernel)-1):
             f.write('%.12e\n' % (kernel[ii]))
         f.write('%.12e' % (kernel[-1]))
+    print('File saved at {}'.format(fn))
 
 
 # function calculating the filter matrix from an impulse response vector

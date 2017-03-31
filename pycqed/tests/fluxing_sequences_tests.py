@@ -37,7 +37,7 @@ class element_distortion(unittest.TestCase):
 
         # We need to discuss where to store this stuff
 
-        fsqs.kernel_dir_path = 'testing/kernels/'
+        fsqs.kernel_dir = 'testing/kernels/'
         self.kernel_list = ['kernels_rabi/kernel_160208_220046_it1.txt']
 
 

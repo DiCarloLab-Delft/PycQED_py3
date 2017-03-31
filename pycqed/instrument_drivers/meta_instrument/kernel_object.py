@@ -32,11 +32,12 @@ class Distortion(Instrument):
 
         self.add_parameter('kernel_list',
                            initial_value=[],
-                           vals=vals.Anything(), # update to vals.List after merge of PR #542 in QCodes
+                           # update to vals.List after merge of PR #542 in QCodes
+                           vals=vals.Anything(),
                            parameter_class=ConfigParameter,
                            docstring='List of external kernels to be loaded')
 
-        self.add_parameter('kernel_dir_path',
+        self.add_parameter('kernel_dir',
                            initial_value='kernels/',
                            vals=vals.Strings(),
                            parameter_class=ManualParameter,
@@ -133,7 +134,7 @@ class Distortion(Instrument):
 
         self.add_parameter('corrections_length', unit='s',
                            parameter_class=ConfigParameter,
-                           initial_value=1e-6,
+                           initial_value=10e-6,
                            vals=vals.Numbers())
 
     def add_kernel_to_kernel_list(self, kernel_name):
@@ -143,6 +144,8 @@ class Distortion(Instrument):
         if kernel_name in kernel_list:
             raise ValueError('Kernel "{}" already in kernel list'.format(kernel_name))
         kernel_list.append(kernel_name)
+        self._config_changed =True # has to be done by hand as appending to
+        # the list does not correctlyupdate the changed flag
         self.kernel_list(kernel_list)
 
     def _get_config_changed(self):
@@ -179,16 +182,17 @@ class Distortion(Instrument):
     #                        c=self.poly_c(),
     #                        length=self.poly_length())
 
-    def convolve_kernel(self, kernel_list, length=None):
+    def convolve_kernel(self, kernel_list, length_samples=None):
         """
         kernel_list : (list of arrays)
-        length      : (int) maximum length for convolution
+        length_samples      : (int) maximum for convolution
         Performs a convolution of different kernels
         """
         kernels = kernel_list[0]
         for k in kernel_list[1:]:
-            kernels = np.convolve(k, kernels)[:min(len(k), int(length*1e9))]
-
+            kernels = np.convolve(k, kernels)[:max(len(k), int(length_samples))]
+        if length_samples is not None:
+            return kernels[:int(length_samples)]
         return kernels
 
     def kernel_to_cache(self, cache):
@@ -212,7 +216,7 @@ class Distortion(Instrument):
 
         external_kernels = []
         for k_name in kernel_list_before:
-            f_name = os.path.join(self.kernel_dir_path(), k_name)
+            f_name = os.path.join(self.kernel_dir(), k_name)
             print('Loading {}'.format(f_name))
 
             kernel_vec = np.loadtxt(f_name)
@@ -226,8 +230,8 @@ class Distortion(Instrument):
             self.get_decay_kernel_2()]
 
         kernel_list = external_kernels + kernel_object_kernels
-        return self.convolve_kernel(kernel_list,
-                                    length=self.corrections_length()*1e9)
+        return self.convolve_kernel(
+            kernel_list, length_samples=int(self.corrections_length()*1e9))
 
     def save_corrections_kernel(self, filename):
 

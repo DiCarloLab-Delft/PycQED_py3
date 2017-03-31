@@ -16,7 +16,7 @@ reload(pulse_library)
 
 station = None
 reload(element)
-kernel_dir_path = 'kernels/'
+kernel_dir = 'kernels/'
 # You need to explicitly set this before running any functions from this module
 # I guess there are cleaner solutions :)
 cached_kernels = {}
@@ -838,12 +838,12 @@ def preload_kernels_func(distortion_dict):
         for kernel in distortion_dict[ch]:
             if kernel is not '':
                 if kernel in cached_kernels.keys():
-                    print('Cached {}'.format(kernel_dir_path+kernel))
+                    print('Cached {}'.format(kernel_dir+kernel))
                     output_dict[ch].append(cached_kernels[kernel])
                 else:
-                    print('Loading {}'.format(kernel_dir_path+kernel))
+                    print('Loading {}'.format(kernel_dir+kernel))
                     # print(os.path.isfile('kernels/'+kernel))
-                    kernel_vec = np.loadtxt(kernel_dir_path+kernel)
+                    kernel_vec = np.loadtxt(kernel_dir+kernel)
                     output_dict[ch].append(kernel_vec)
                     cached_kernels.update({kernel: kernel_vec})
     return output_dict
