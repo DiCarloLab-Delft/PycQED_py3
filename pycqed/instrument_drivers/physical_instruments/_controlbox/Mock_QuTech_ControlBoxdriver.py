@@ -12,7 +12,8 @@ to a real CBox.
 class Mock_QuTech_ControlBox(qcb3.QuTech_ControlBox_v3):
     def __init__(self, os_par=sys.stdout, *args, **kwargs):
         self.SetupStream(os_par)
-        super(Mock_QuTech_ControlBox, self).__init__(*args, **kwargs)
+        # super(Mock_QuTech_ControlBox, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
         print('Mock driver has been initialized.')
 
@@ -35,7 +36,9 @@ class Mock_QuTech_ControlBox(qcb3.QuTech_ControlBox_v3):
     def get_master_controller_params(self):
         self._core_state = defHeaders.core_states[0]
         self._trigger_source = defHeaders.trigger_sources[0]
-        pass
+        message = self.create_message(defHeaders.ReadVersion)
+        (stat, mesg) = self.serial_write(message)
+        return (stat, mesg)
 
     def serial_read(self, timeout=5, read_all=False, read_N=0):
         print('serial read is invoked and a fake message is sent back'

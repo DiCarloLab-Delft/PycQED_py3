@@ -64,23 +64,23 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         self.FluxCtrl = FluxCtrl
 
         self.add_parameter('mod_amp_cw', label='RO modulation ampl cw',
-                           units='V', initial_value=0.5,
+                           unit='V', initial_value=0.5,
                            parameter_class=ManualParameter)
 
         self.add_parameter('RO_power_cw', label='RO power cw',
-                           units='dBm',
+                           unit='dBm',
                            parameter_class=ManualParameter)
 
         self.add_parameter('spec_pow', label='spectroscopy power',
-                           units='dBm',
+                           unit='dBm',
                            parameter_class=ManualParameter)
         self.add_parameter('spec_pow_pulsed',
                            label='pulsed spectroscopy power',
-                           units='dBm',
+                           unit='dBm',
                            parameter_class=ManualParameter)
         self.add_parameter('td_source_pow',
                            label='Time-domain power',
-                           units='dBm',
+                           unit='dBm',
                            parameter_class=ManualParameter)
 
         self.add_parameter('spec_pulse_type', label='Pulsed spec pulse type',
@@ -90,15 +90,15 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         # we should also implement SSB_DRAG_pulse for pulsed spec
         self.add_parameter('spec_pulse_length',
                            label='Pulsed spec pulse duration',
-                           units='s',
+                           unit='s',
                            vals=vals.Numbers(1e-9, 20e-6),
                            parameter_class=ManualParameter)
         self.add_parameter('spec_pulse_marker_channel',
-                           units='s',
+                           unit='s',
                            vals=vals.Strings(),
                            parameter_class=ManualParameter)
         self.add_parameter('spec_pulse_depletion_time',
-                           units='s',
+                           unit='s',
                            vals=vals.Numbers(1e-9, 50e-6),
                            parameter_class=ManualParameter)
 
@@ -153,46 +153,46 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         self.add_parameter('RO_pulse_marker_channel',
                            vals=vals.Strings(),
                            parameter_class=ManualParameter)
-        self.add_parameter('RO_pulse_power', units='dBm',
+        self.add_parameter('RO_pulse_power', unit='dBm',
                            parameter_class=ManualParameter)
 
         self.add_parameter('f_pulse_mod',
                            initial_value=-100e6,
-                           label='pulse-modulation frequency', units='Hz',
+                           label='pulse-modulation frequency', unit='Hz',
                            parameter_class=ManualParameter)
         self.add_parameter('f_RO_mod',
-                           label='Readout-modulation frequency', units='Hz',
+                           label='Readout-modulation frequency', unit='Hz',
                            initial_value=-2e7,
                            parameter_class=ManualParameter)
 
         self.add_parameter('amp180',
-                           label='Pi-pulse amplitude', units='V',
+                           label='Pi-pulse amplitude', unit='V',
                            initial_value=.25,
                            vals=vals.Numbers(min_value=-2.25, max_value=2.25),
                            parameter_class=ManualParameter)
         self.add_parameter('amp90_scale',
-                           label='pulse amplitude scaling factor', units='',
+                           label='pulse amplitude scaling factor', unit='',
                            initial_value=.5,
                            vals=vals.Numbers(min_value=0, max_value=1.0),
                            parameter_class=ManualParameter)
-        self.add_parameter('gauss_sigma', units='s',
+        self.add_parameter('gauss_sigma', unit='s',
                            initial_value=10e-9,
                            parameter_class=ManualParameter)
-        self.add_parameter('motzoi', label='Motzoi parameter', units='',
+        self.add_parameter('motzoi', label='Motzoi parameter', unit='',
                            initial_value=0,
                            parameter_class=ManualParameter)
 
-        self.add_parameter('phi_skew', label='IQ phase skewness', units='deg',
+        self.add_parameter('phi_skew', label='IQ phase skewness', unit='deg',
                            vals=vals.Numbers(-180, 180),
                            initial_value=0,
                            parameter_class=ManualParameter)
-        self.add_parameter('alpha', label='QI amplitude skewness', units='',
+        self.add_parameter('alpha', label='QI amplitude skewness', unit='',
                            vals=vals.Numbers(.1, 2),
                            initial_value=1,
                            parameter_class=ManualParameter)
 
         # Single shot readout specific parameters
-        self.add_parameter('RO_threshold', units='dac-value',
+        self.add_parameter('RO_threshold', unit='dac-value',
                            initial_value=0,
                            parameter_class=ManualParameter)
         # CBox specific parameter
@@ -204,7 +204,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                            vals=vals.Strings())
 
         self.add_parameter('flux_pulse_buffer',
-                           label='Flux pulse buffer', units='s',
+                           label='Flux pulse buffer', unit='s',
                            initial_value=0.,
                            vals=vals.Numbers(min_value=0., max_value=50e-6),
                            parameter_class=ManualParameter)
@@ -212,27 +212,27 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                            vals=vals.Strings(),
                            parameter_class=ManualParameter)
         self.add_parameter('fluxing_amp',
-                           label='SWAP resolution', units='V',
+                           label='SWAP resolution', unit='V',
                            initial_value=.5,
                            vals=vals.Numbers(min_value=-1., max_value=1.),
                            parameter_class=ManualParameter)
         self.add_parameter('SWAP_amp',
-                           label='SWAP amplitude', units='V',
+                           label='SWAP amplitude', unit='V',
                            initial_value=0.02,
                            vals=vals.Numbers(min_value=0.02, max_value=4.5),
                            parameter_class=ManualParameter)
         self.add_parameter('SWAP_time',
-                           label='SWAP Time', units='s',
+                           label='SWAP Time', unit='s',
                            initial_value=0.,
                            vals=vals.Numbers(min_value=0., max_value=1e-6),
                            parameter_class=ManualParameter)
         self.add_parameter('flux_dead_time',
-                           label='Time between flux pulse and comp.', units='s',
+                           label='Time between flux pulse and comp.', unit='s',
                            initial_value=0.,
                            vals=vals.Numbers(min_value=0., max_value=50e-6),
                            parameter_class=ManualParameter)
         self.add_parameter('mw_to_flux_delay',
-                           label='time between and mw pulse and start of flux pulse', units='s',
+                           label='time between and mw pulse and start of flux pulse', unit='s',
                            initial_value=0.,
                            vals=vals.Numbers(min_value=0., max_value=50e-6),
                            parameter_class=ManualParameter)

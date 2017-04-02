@@ -13,7 +13,7 @@ class QWG_LookuptableManager(Instrument):
         self.QWG=QWG
 
         self.add_parameter('Q_amp180',
-                           units='V',
+                           unit='V',
                            vals=vals.Numbers(-1, 1),
                            parameter_class=ManualParameter,
                            initial_value=0.1)
@@ -25,7 +25,7 @@ class QWG_LookuptableManager(Instrument):
                            parameter_class=ManualParameter,
                            initial_value=0.0)
         self.add_parameter('Q_gauss_width',
-                           vals=vals.Numbers(min_value=1e-9), units='s',
+                           vals=vals.Numbers(min_value=1e-9), unit='s',
                            parameter_class=ManualParameter,
                            initial_value=4e-9)
 

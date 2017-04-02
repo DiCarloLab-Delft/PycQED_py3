@@ -74,7 +74,7 @@ class QuTech_ControlBox(VisaInstrument):
                            vals=vals.Ints(0, 255))
         self.add_parameter('integration_length',
                            label='integration length (# samples)',
-                           units='# samples',
+                           unit='# samples',
                            get_cmd=self._do_get_integration_length,
                            set_cmd=self._do_set_integration_length,
                            vals=vals.Ints(2, 512))
@@ -94,7 +94,7 @@ class QuTech_ControlBox(VisaInstrument):
                 label='Integraion weights input {}'.format(i),
                 get_cmd=self._wrap_ch_get_fun(self._get_int_weights, i),
                 set_cmd=self._wrap_ch_set_fun(self._set_int_weights, i),
-                vals=vals.Anything())
+                vals=vals.Arrays(min_value=-128, max_value=127, shape=(512,)))
 
             self._integration_weights = [[], []]
 
@@ -106,7 +106,7 @@ class QuTech_ControlBox(VisaInstrument):
 
         self.add_parameter('log_length',
                            label='Log length (# shots)',
-                           units='# shots',
+                           unit='# shots',
                            get_cmd=self._do_get_log_length,
                            set_cmd=self._do_set_log_length,
                            vals=vals.Ints(1, 8192))
@@ -140,15 +140,16 @@ class QuTech_ControlBox(VisaInstrument):
             for dac_ch in range(2):
                 self.add_parameter(
                     'AWG{}_dac{}_offset'.format(awg_nr, dac_ch),
-                    label='Dac offset AWG {}', units='mV',
+                    label='Dac offset AWG {}, dac {}'.format(awg_nr, dac_ch),
+                    unit='V',
                     get_cmd=self._gen_sub_ch_get_func(self.get_dac_offset,
                                                       awg_nr, dac_ch),
                     set_cmd=self._gen_sub_ch_set_func(self.set_dac_offset,
                                                       awg_nr, dac_ch),
-                    vals=vals.Numbers(-999, 999))
+                    vals=vals.Numbers(-1, 1))
             # Need to add double wrapping for get/set funcs here
 
-        self.add_parameter('measurement_timeout', units='s',
+        self.add_parameter('measurement_timeout', unit='s',
                            set_cmd=self._do_set_measurement_timeout,
                            get_cmd=self._do_get_measurement_timeout)
 
@@ -600,7 +601,7 @@ class QuTech_ControlBox(VisaInstrument):
         return data
 
     def set_awg_lookuptable(self, awg_nr, table_nr, dac_ch, lut,
-                            length=None, units='V'):
+                            length=None, unit='V'):
         '''
         set the 14 bit values of a lut (V2.0)
 
@@ -610,8 +611,8 @@ class QuTech_ControlBox(VisaInstrument):
             If version <= 2.15:  0 = Q and 1 = I channel.
             If version >= 2.16:  0 = I and 1 = Q channel.
         @param lut : the array of the with amplitude values,
-            if units is 'mV' the range is (-1000mV, 1000mV)
-            if units is 'dac' range is (-8192, 8191)
+            if unit is 'V' the range is (-1V, 1V)
+            if unit is 'dac' range is (-8192, 8191)
         @param length : the length in samples of the lut, (1,128)
                         can be given for test purposes, default is None
 
@@ -620,14 +621,14 @@ class QuTech_ControlBox(VisaInstrument):
 
         '''
 
-        if units == 'V':
+        if unit == 'V':
             lut = lut * 8192.  # dac_peak/V_peak
             # do conversion
             pass
-        elif units == 'dac':
+        elif unit == 'dac':
             pass
         else:
-            raise ValueError('units: "%s" not understood' % units)
+            raise ValueError('unit: "%s" not understood' % unit)
 
         # Check out of bounds
         if awg_nr < 0 or awg_nr > 2:
@@ -812,10 +813,7 @@ class QuTech_ControlBox(VisaInstrument):
         else:
             dac_ch_code = dac_ch
 
-        if offset > 1000 or offset < -1000:
-            raise ValueError('offset out of range [-1, 1] (volts)')
-
-        offset_dac = int(offset/1000.*2**13)
+        offset_dac = int(offset*2**13)
         # For 14 bit signed value, the acceptable range is -8192 to 8191.
         if offset_dac == 2**13:
             offset_dac = int(2**13-1)
@@ -1299,14 +1297,7 @@ class QuTech_ControlBox(VisaInstrument):
               between -128 and 127, (signed byte)
         @return stat : 0 if the upload succeeded and 1 if the upload failed.
         '''
-
         # 2 bytes per array val + cmd_header and EOM
-        if max(weights) > 127:
-            raise ValueError('Weights must be between -128 and 127')
-        if min(weights) < -128:
-            raise ValueError('Weights must be between -128 and 127')
-        if len(weights) != 512:
-            raise ValueError('Length of array must be 512 elements')
 
         if line == 0:
             cmd = defHeaders.UpdWeightsZeroHeader

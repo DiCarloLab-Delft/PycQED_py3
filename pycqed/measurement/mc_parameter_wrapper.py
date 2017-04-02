@@ -16,7 +16,7 @@ def wrap_par_to_swf(parameter):
     sweep_function.sweep_control = 'soft'
     sweep_function.name = parameter.name
     sweep_function.parameter_name = parameter.label
-    sweep_function.unit = parameter.units
+    sweep_function.unit = parameter.unit
 
     sweep_function.prepare = pass_function
     sweep_function.finish = pass_function
@@ -56,7 +56,7 @@ def wrap_pars_to_swf(parameters):
     sweep_function.sweep_control = 'soft'
     sweep_function.name = parameters[0].name
     sweep_function.parameter_name = parameters[0].label
-    sweep_function.unit = parameters[0].units
+    sweep_function.unit = parameters[0].unit
 
     sweep_function.prepare = pass_function
     sweep_function.finish = pass_function
@@ -80,7 +80,7 @@ def wrap_par_to_det(parameter, control='soft'):
     detector_function.detector_control = control
     detector_function.name = parameter.name
     detector_function.value_names = [parameter.label]
-    detector_function.value_units = [parameter.units]
+    detector_function.value_units = [parameter.unit]
 
     detector_function.prepare = pass_function
     detector_function.finish = pass_function
@@ -112,8 +112,7 @@ def wrap_func_to_det(func, name, value_names, units, control='soft',  **kw):
 
 
 def wrap_par_remainder(par, remainder=1):
-    new_par = qc.Parameter(name=par.name, label=par.label, units=par.units)
-
+    new_par = qc.Parameter(name=par.name, label=par.label, unit=par.unit)
     def wrap_set(val):
         val = val % remainder
         par.set(val)
@@ -123,8 +122,7 @@ def wrap_par_remainder(par, remainder=1):
 
 
 def wrap_par_set_get(par):
-    new_par = qc.Parameter(name=par.name, label=par.label, units=par.units)
-
+    new_par = qc.Parameter(name=par.name, label=par.label, unit=par.unit)
     def wrap_set(val):
         par.set(val)
         par.get()

@@ -156,7 +156,7 @@ def show_element(element, delay=True, channels='all'):
                 ax.set_xlim(t0, t1)
 
 
-def show_fourier_of_element_channels(element, channels, units='Hz'):
+def show_fourier_of_element_channels(element, channels, unit='Hz'):
     '''
     Shows a fourier transform of a waveform.
     element : from which a waveform needs to be displayed

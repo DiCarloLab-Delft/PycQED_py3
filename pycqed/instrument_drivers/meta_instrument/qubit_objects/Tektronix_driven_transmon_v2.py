@@ -62,23 +62,23 @@ class Tektronix_driven_transmon_v2(Transmon):
         self.MC = MC
 
         self.add_parameter('mod_amp_cw', label='RO modulation ampl cw',
-                           units='V', initial_value=0.5,
+                           unit='V', initial_value=0.5,
                            parameter_class=ManualParameter)
 
         self.add_parameter('RO_power_cw', label='RO power cw',
-                           units='dBm',
+                           unit='dBm',
                            parameter_class=ManualParameter)
 
         self.add_parameter('spec_pow', label='spectroscopy power',
-                           units='dBm',
+                           unit='dBm',
                            parameter_class=ManualParameter)
         self.add_parameter('spec_pow_pulsed',
                            label='pulsed spectroscopy power',
-                           units='dBm',
+                           unit='dBm',
                            parameter_class=ManualParameter)
         self.add_parameter('td_source_pow',
                            label='Time-domain power',
-                           units='dBm',
+                           unit='dBm',
                            parameter_class=ManualParameter)
 
         self.add_parameter('spec_pulse_type', label='Pulsed spec pulse type',
@@ -88,15 +88,15 @@ class Tektronix_driven_transmon_v2(Transmon):
         # we should also implement SSB_DRAG_pulse for pulsed spec
         self.add_parameter('spec_pulse_length',
                            label='Pulsed spec pulse duration',
-                           units='s',
+                           unit='s',
                            vals=vals.Numbers(1e-9, 20e-6),
                            parameter_class=ManualParameter)
         self.add_parameter('spec_pulse_marker_channel',
-                           units='s',
+                           unit='s',
                            vals=vals.Strings(),
                            parameter_class=ManualParameter)
         self.add_parameter('spec_pulse_depletion_time',
-                           units='s',
+                           unit='s',
                            vals=vals.Numbers(1e-9, 50e-6),
                            parameter_class=ManualParameter)
 
@@ -140,52 +140,52 @@ class Tektronix_driven_transmon_v2(Transmon):
         self.add_parameter('RO_pulse_marker_channel',
                            vals=vals.Strings(),
                            parameter_class=ManualParameter)
-        self.add_parameter('RO_pulse_power', units='dBm',
+        self.add_parameter('RO_pulse_power', unit='dBm',
                            parameter_class=ManualParameter)
 
         self.add_parameter('f_pulse_mod',
                            initial_value=-100e6,
-                           label='pulse-modulation frequency', units='Hz',
+                           label='pulse-modulation frequency', unit='Hz',
                            parameter_class=ManualParameter)
         self.add_parameter('f_RO_mod',
-                           label='Readout-modulation frequency', units='Hz',
+                           label='Readout-modulation frequency', unit='Hz',
                            initial_value=-2e7,
                            parameter_class=ManualParameter)
         # Used in calculating the fixed point frequency, if set to 0 it
         # has no effect
         self.add_parameter('f_JPA_pump_mod',
-                           label='JPA pump modulation frequency', units='Hz',
+                           label='JPA pump modulation frequency', unit='Hz',
                            initial_value=0,
                            parameter_class=ManualParameter,
                            vals=vals.Numbers(0, 1e9))
         self.add_parameter('amp180',
-                           label='Pi-pulse amplitude', units='V',
+                           label='Pi-pulse amplitude', unit='V',
                            initial_value=.25,
                            vals=vals.Numbers(min_value=-0.5, max_value=0.5),
                            parameter_class=ManualParameter)
         self.add_parameter('amp90_scale',
-                           label='pulse amplitude scaling factor', units='',
+                           label='pulse amplitude scaling factor', unit='',
                            initial_value=.5,
                            vals=vals.Numbers(min_value=0, max_value=1.0),
                            parameter_class=ManualParameter)
-        self.add_parameter('gauss_sigma', units='s',
+        self.add_parameter('gauss_sigma', unit='s',
                            initial_value=10e-9,
                            parameter_class=ManualParameter)
-        self.add_parameter('motzoi', label='Motzoi parameter', units='',
+        self.add_parameter('motzoi', label='Motzoi parameter', unit='',
                            initial_value=0,
                            parameter_class=ManualParameter)
 
-        self.add_parameter('phi_skew', label='IQ phase skewness', units='deg',
+        self.add_parameter('phi_skew', label='IQ phase skewness', unit='deg',
                            vals=vals.Numbers(-180, 180),
                            initial_value=0,
                            parameter_class=ManualParameter)
-        self.add_parameter('alpha', label='QI amplitude skewness', units='',
+        self.add_parameter('alpha', label='QI amplitude skewness', unit='',
                            vals=vals.Numbers(.1, 2),
                            initial_value=1,
                            parameter_class=ManualParameter)
 
         # Single shot readout specific parameters
-        self.add_parameter('RO_threshold', units='dac-value',
+        self.add_parameter('RO_threshold', unit='dac-value',
                            initial_value=0,
                            parameter_class=ManualParameter)
         # CBox specific parameter

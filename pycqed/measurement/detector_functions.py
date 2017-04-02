@@ -106,7 +106,7 @@ class Dummy_Detector_Hard(Hard_Detector):
         self.detector_control = 'hard'
         self.name = 'Dummy_Detector'
         self.value_names = ['distance', 'Power']
-        self.value_units = ['m', 'nW']
+        self.value_units = ['m', 'W']
         self.delay = delay
         self.noise = noise
         self.times_called = 0
@@ -895,12 +895,11 @@ class QX_Detector(Soft_Detector):
 
 
 class Function_Detector(Soft_Detector):
-
-    def __init__(self, function, parameters_dictionary, value_names=None,
-                 value_units=None):
-        super().__init__()
-        self.function = function
-        self.parameters_dictionary = parameters_dictionary
+    def __init__(self, sweep_function, result_keys, value_names=None,
+                 value_units=None, msmt_kw={}, **kw):
+        super(Function_Detector, self).__init__()
+        self.sweep_function = sweep_function
+        self.result_keys = result_keys
         self.value_names = value_names
         self.value_units = value_units
         if self.value_units is None:
@@ -956,17 +955,20 @@ class Heterodyne_probe(Soft_Detector):
         self.last_frequency = 0.
         self.threshold = threshold
         self.last = 1.
-        self.trigger_separation = trigger_separation
-        self.demod_mode = demod_mode
+        self.HS.trigger_separation(trigger_separation)
+        if 'double' in demod_mode:
+            HS.single_sideband_demod(False)
+        else:
+            HS.single_sideband_demod(True)
 
     def prepare(self):
-        self.HS.prepare(trigger_separation=self.trigger_separation)
+        self.HS.prepare()
 
     def acquire_data_point(self, **kw):
         passed = False
         c = 0
         while(not passed):
-            S21 = self.HS.probe(demod_mode=self.demod_mode)
+            S21 = self.HS.probe()
             cond_a = ((abs(S21)/self.last) >
                       self.threshold) or ((self.last/abs(S21)) > self.threshold)
             cond_b = self.HS.frequency() >= self.last_frequency
@@ -983,6 +985,9 @@ class Heterodyne_probe(Soft_Detector):
         self.first = False
         self.last = abs(S21)
         return abs(S21), np.angle(S21)/(2*np.pi)*360,  # S21.real, S21.imag
+
+    def finish(self):
+        self.HS.finish()
 
 
 class Heterodyne_probe_soft_avg(Soft_Detector):
