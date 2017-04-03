@@ -32,6 +32,26 @@ def qwg_cw_trigger(codeword,
     return instr
 
 
+def cbox_awg_trigger(codeword, awg_channels=[0]):
+    """
+    returns the appropriate instruction to play a pulse using the
+    CBox AWGs
+    """
+
+    cw = int_to_bin(codeword, w=3, lsb_last=True)
+    cw = ' 1'+cw
+    no_cw = ' 0000'
+
+    instr = 'pulse'
+    for ch in range(3):
+        if ch in awg_channels:
+            instr += cw
+        else:
+            instr += no_cw
+    instr += ' \n'
+    return instr
+
+
 def trigg_ch_to_instr(channel, duration):
     """
     Specify a trigger channel to be triggered and returns the appropriate
