@@ -40,11 +40,21 @@ for i in range(8):
 
 block_I, block_Q = wf.block_pulse(1, 10e-6, sampling_rate=1e9)
 block_I = np.array(block_I)
-block_Q = np.array(block_Q)
+
+
+def flux_pulse(amp=.5, length=10e-6, sampling_rate=1e9, dead_time=5e-6):
+    length_samples = int(length*sampling_rate)
+    dead_time_samples = int(dead_time*sampling_rate)
+    flux_pulse = amp* np.ones(length_samples)
+    dead_time_wf = np.zeros(dead_time_samples)
+    comp_pulse= -1*flux_pulse
+    flux_pulse = np.concatenate([flux_pulse, dead_time_wf, comp_pulse])
+    return flux_pulse
 
 t0 = time.time()
-block_I *= .5
-distorted_I = k0.convolve_kernel([k0.kernel(), block_I], length_samples=60e3)
+Flux_pulse = flux_pulse(amp=.5, length=10e-6, dead_time=5e-6)
+
+distorted_I = k0.convolve_kernel([k0.kernel(), Flux_pulse], length_samples=40e3)
 # distorted_I = block_I
 
 block_cw = 5
@@ -122,3 +132,9 @@ single_pulse_asm = qta.qasm_to_asm(single_pulse_elt.name, operation_dict)
 qumis_file = single_pulse_asm
 CBox.load_instructions(qumis_file.name)
 CBox.start()
+
+
+MC.set_sweep_function(swf.None_Sweep())
+MC.set_sweep_points([0,1])
+MC.set_detector_function(det.None_Detector())
+dat = MC.run('Dummy_kernel_msmt')
