@@ -47,22 +47,18 @@ class Test_single_qubit_seqs(TestCase):
                                            cw_channels=[3, 4, 5])
         self.assertEqual(cw3_instr, exp_cw3)
 
-    def test_cbox_awg_trigger(self):
-        exp_cw = 'pulse 1010 0000 1010 \n'
-        cw_instr = ins_lib.cbox_awg_trigger(codeword=2,
-                                            awg_channels=[0, 2])
+    def test_cbox_awg_pulse(self):
+        exp_cw = 'pulse 1010 0000 1010 \nwait 1\n'
+        cw_instr = ins_lib.cbox_awg_pulse(codeword=2,
+                                          awg_channels=[0, 2])
         self.assertEqual(exp_cw, cw_instr)
 
-        exp_cw = 'pulse 0000 1001 0000 \n'
-        cw_instr = ins_lib.cbox_awg_trigger(codeword=1,
-                                            awg_channels=[1])
+        exp_cw = 'pulse 0000 1001 0000 \nwait 5\n'
+        cw_instr = ins_lib.cbox_awg_pulse(codeword=1,
+                                          awg_channels=[1], duration=5)
         self.assertEqual(exp_cw, cw_instr)
 
     def test_channel_trigger(self):
         instr = ins_lib.trigg_ch_to_instr(channel=3, duration=5)
         exp_instr = 'trigger 0010000, 5 \nwait 5\n'
         self.assertEqual(exp_instr, instr)
-
-
-
-
