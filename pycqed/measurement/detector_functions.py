@@ -97,6 +97,7 @@ class Soft_Detector(Detector_Function):
 ##########################################################################
 
 
+
 class Dummy_Detector_Hard(Hard_Detector):
 
     def __init__(self, delay=0, noise=0, **kw):
@@ -246,89 +247,6 @@ class Sweep_pts_detector(Detector_Function):
         else:
             return self.sweep_points[start_idx:end_idx]
 
-
-class TimeDomainDetector(Hard_Detector):
-
-    def __init__(self, **kw):
-        super(TimeDomainDetector, self).__init__()
-        self.TD_Meas = qt.instruments['TD_Meas']
-        self.name = 'TimeDomainMeasurement'
-        self.value_names = ['I', 'Q']
-        self.value_units = ['V', 'V']
-
-    def prepare(self, sweep_points):
-        self.TD_Meas.set_NoSegments(len(sweep_points))
-        self.TD_Meas.set_cal_mode('None')
-        self.TD_Meas.prepare()
-
-    def get_values(self):
-        return self.TD_Meas.measure()
-
-
-class VNA_Detector(Hard_Detector):
-
-    def __init__(self, bw=100, power=-50, averages=1, **kw):
-        super(VNA_Detector, self).__init__()
-        self.name = 'VNA_Detector'
-        self.value_names = ['S21 (ampl)', 'S21 (comp)',
-                            'S21 (real)', 'S21 (imag)']
-        self.value_units = ['mV', 'mV', 'mV', 'mV']
-        self.VNA = qt.instruments['VNA']
-        self.bw = bw
-        self.power = power
-        self.averages = averages
-
-    def prepare(self, sweep_points):
-        self.VNA.set_format('COMP')
-
-        fstart = sweep_points[0]
-        df = sweep_points[1] - sweep_points[0]
-        npoints = len(sweep_points)
-        fstop = fstart + npoints * df
-
-        self.VNA.prepare_sweep(fstart, fstop, npoints,
-                               self.bw, self.power, self.averages)
-
-    def get_values(self):
-        self.VNA.start_single_sweep()
-        freq, S21 = self.VNA.download_trace()
-        return (np.abs(S21), np.angle(S21, deg=True), S21.real, S21.imag)
-
-    def finish(self, **kw):
-        pass
-
-
-class VNA_ATT_Detector(Hard_Detector):
-
-    def __init__(self, bw=100, power=-50, averages=1, **kw):
-        super(VNA_Detector, self).__init__()
-        self.name = 'VNA_Detector'
-        self.value_names = ['S21 (ampl)', 'S21 (comp)',
-                            'S21 (real)', 'S21 (imag)']
-        self.value_units = ['mV', 'mV', 'mV', 'mV']
-        self.VNA_ATT = qt.instruments['VNA_ATT']
-        self.bw = bw
-        self.power = power
-        self.averages = averages
-
-    def prepare(self, sweep_points):
-        self.VNA_ATT.set_format('COMP')
-
-        fstart = sweep_points[0]
-        df = sweep_points[1] - sweep_points[0]
-        npoints = len(sweep_points)
-        fstop = fstart + npoints * df
-
-        self.VNA_ATT.prepare_sweep(fstart, fstop, npoints,
-                                   self.bw, self.power, self.averages)
-
-    def get_values(self):
-        self.VNA_ATT.start_single_sweep()
-        freq, S21 = self.VNA_ATT.download_trace()
-        return (np.abs(S21), S21, S21.real, S21.imag)
-
-    def finish(self, **kw):
-        pass
 
 
 class ZNB_VNA_detector(Hard_Detector):
@@ -891,39 +809,28 @@ class QX_Detector(Soft_Detector):
         return f
 
 
-class Source_frequency_detector(Soft_Detector):
-
-    def __init__(self, source, **kw):
-        self.set_kw()
-        self.S = source
-        self.detector_control = 'soft'
-        self.name = 'Source frequency detector'
-        self.value_names = ['frequency']
-        self.value_units = ['Hz']
-        self.i = 0
-
-    def acquire_data_point(self, **kw):
-        return self.S.get('frequency')
-
-
 class Function_Detector(Soft_Detector):
-
     def __init__(self, sweep_function, result_keys, value_names=None,
-                 value_unit=None, msmt_kw={}, **kw):
+                 value_units=None, msmt_kw={}, **kw):
         super(Function_Detector, self).__init__()
         self.sweep_function = sweep_function
         self.result_keys = result_keys
         self.value_names = value_names
         self.value_units = value_units
-        self.msmt_kw = msmt_kw
-        if self.value_names is None:
-            self.value_names = result_keys
         if self.value_units is None:
-            self.value_units = [""] * len(result_keys)
+            self.value_units = ['a.u.'] * len(value_names)
 
-    def acquire_data_points(self, **kw):
-        result = self.sweep_function(**self.msmt_kw)
-        return [result[key] for key in result.keys()]
+    def acquire_data_point(self, **kw):
+        measurement_kwargs = {}
+        for key, item in self.parameters_dictionary.items():
+            if hasattr(item, 'get'):
+                value = item.get()
+            else:
+                value = item
+            measurement_kwargs[key] = value
+        result = self.function(**measurement_kwargs)
+
+        return result
 
 
 class Detect_simulated_hanger_Soft(Soft_Detector):
@@ -1059,34 +966,6 @@ class Heterodyne_probe_soft_avg(Soft_Detector):
         self.HS.finish()
 
 
-class PulsedSpectroscopyDetector(Soft_Detector):
-
-    def __init__(self, AWG_filename='Spec_5014', **kw):
-        # AWG_filename='Off_5014'
-        super(PulsedSpectroscopyDetector, self).__init__()
-        self.Pulsed_Spec = qt.instruments['Pulsed_Spec']
-        self.AWG = qt.instruments['AWG']
-        self.ATS = qt.instruments['ATS']
-        self.name = 'Pulsed_Spec'
-        self.value_names = ['I', 'Q']
-        self.value_units = ['V', 'V']
-        self.filename = AWG_filename
-
-    def prepare(self, **kw):
-        self.Pulsed_Spec.set_AWG_seq_filename(self.filename)
-        self.Pulsed_Spec.initialize_instruments()
-        self.AWG.start()
-        self.ATS.abort()
-        self.ATS.configure_board()
-
-    def acquire_data_point(self, **kw):
-        integrated_data = self.Pulsed_Spec.measure()
-        return integrated_data
-
-    def finish(self):
-        self.AWG.stop()
-
-
 class Signal_Hound_fixed_frequency(Soft_Detector):
 
     def __init__(self, signal_hound, frequency=None, Navg=1, delay=0.1,
@@ -1114,39 +993,6 @@ class Signal_Hound_fixed_frequency(Soft_Detector):
 
     def finish(self, **kw):
         self.SH.abort()
-
-
-class RS_FSV_fixed_frequency(Soft_Detector):
-
-    def __init__(self, frequency=None, delay=.1, bw=300,
-                 span=1e-5, npoints=101, **kw):
-        super(RS_FSV_fixed_frequency, self).__init__()
-        self.FSV = qt.instruments['FSV']
-        if frequency is None:
-            frequency = self.FSV.get_marker_frequency()
-        self.frequency = frequency
-        self.name = 'FSV_fixed_frequency'
-        self.value_names = ['Power at %.3f Hz' % self.frequency]
-        self.value_units = ['dBm']
-
-        self.bw = bw
-        self.delay = delay
-        self.span = span
-        self.npoints = npoints
-
-    def prepare(self, **kw):
-        self.FSV.prepare_sweep(self.frequency-self.span/2,
-                               self.frequency+self.span/2,
-                               self.npoints, self.bw, 1, 1, 'ON')
-        self.FSV.set_marker_frequency(self.frequency)
-        self.FSV.set_reference_level(-20)
-
-    def acquire_data_point(self, navg=1, **kw):
-        time.sleep(.1)
-        return np.array([self.FSV.get_marker_power()])
-
-    # def finish(self, **kw):
-    #     self.FSV.stop_streaming()
 
 
 class SH_mixer_skewness_det(Soft_Detector):
