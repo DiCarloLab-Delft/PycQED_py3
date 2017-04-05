@@ -329,12 +329,32 @@ class CBox_v3_driven_transmon(Transmon):
             self.Q_LutMan.get_instr().awg_nr(self.Q_awg_nr())
 
         # Print this should be deleted
-        if 'awg_nr' in self.RO_LutMan.get_instr().parameters:
-            self.RO_LutMan.get_instr().RO_awg_nr(self.Q_awg_nr())
 
         self.Q_LutMan.get_instr().load_pulses_onto_AWG_lookuptable()
         # FIXME: add pulse loading for the RO pulse
         # self.RO_LutMan.get_instr().load_pulses_onto_AWG_lookuptable()
+
+        if 'awg_nr' in self.RO_LutMan.get_instr().parameters:
+            self.RO_LutMan.get_instr().awg_nr(self.RO_awg_nr())
+        if 'CBox' in self.acquisition_instrument():
+            if self.RO_LutMan() != None:
+                self.RO_LutMan.get_instr().M_modulation(self.f_RO_mod())
+                self.RO_LutMan.get_instr().M_amp(self.RO_amp())
+                self.RO_LutMan.get_instr().M_length(self.RO_pulse_length())
+
+                self.RO_LutMan.get_instr().lut_mapping(
+                    ['I', 'X180', 'Y180', 'X90', 'Y90', 'mX90', 'mY90', 'M_square'])
+            self.CBox.get_instr().upload_standard_weights(self.f_RO_mod())
+            self.CBox.get_instr().integration_length(
+                convert_to_clocks(self.RO_acq_integration_length()))
+
+            self.CBox.get_instr().set('sig{}_threshold_line'.format(
+                int(self.signal_line.get())),
+                int(self.RO_threshold.get()))
+            self.CBox.get_instr().lin_trans_coeffs(
+                np.reshape(rotation_matrix(self.RO_rotation_angle(), as_array=True), (4,)))
+
+
 
         self.CBox.get_instr().set('sig{}_threshold_line'.format(
             int(self.signal_line.get())),
@@ -348,10 +368,15 @@ class CBox_v3_driven_transmon(Transmon):
         if 'CBox' in acq_instr_name:
             logging.info("setting CBox acquisition")
             self.int_avg_det = qh.CBox_integrated_average_detector_CC(
-                self.CBox.get_instr(), nr_averages=self.RO_acq_averages()//self.RO_soft_avg())
+                self.CBox.get_instr(),
+                nr_averages=self.RO_acq_averages()//self.RO_soft_averages())
             self.int_avg_det_rot = None  # FIXME: Not implemented
             self.int_log_det = qh.CBox_integration_logging_det_CC(self.CBox)
             self.input_average_detector = None  # FIXME: Not implemented
+            self.int_avg_det_single = qh.CBox_single_integration_average_det_CC(
+                self.CBox.get_instr(),
+                nr_averages=self.RO_acq_averages()//self.RO_soft_averages(),
+                seg_per_point=1)
 
         elif 'UHFQC' in acq_instr_name:
             # Setting weights and pulses in the UHFQC
@@ -661,7 +686,6 @@ class CBox_v3_driven_transmon(Transmon):
         print(qumis_file.name)
         self.CBox.get_instr().load_instructions(qumis_file.name)
         self.CBox.get_instr().run_mode('run')
-        print('running?')
 
         # Create a new sweep function that sweeps two frequencies.
         # use only if the RO pulse type is the CW-RF scan, else only sweep the
@@ -798,7 +822,11 @@ class CBox_v3_driven_transmon(Transmon):
             parameter=self.Q_LutMan.get_instr().Q_amp180,
             pulse_names=['X180'])
         d = self.int_avg_det_single
-        d._set_real_imag(real_imag)
+        try:
+            d._set_real_imag(real_imag)
+        except AttributeError:
+            # FIXME: should be added for CBox detectors as well
+            pass
 
         MC.set_sweep_function(amp_swf)
         MC.set_sweep_points(amps)
@@ -827,7 +855,8 @@ class CBox_v3_driven_transmon(Transmon):
             ).Q_motzoi_parameter,
             pulse_names=['X180', 'X90', 'Y180', 'Y90'])
         d = self.int_avg_det_single
-        d._set_real_imag(False)
+        d.seg_per_point = 2
+        d.detector_control='hard'
 
         # d = qh.CBox_single_integration_average_det_CC(
         #     self.CBox.get_instr(), nr_averages=self.RO_acq_averages()//MC.soft_avg(),
@@ -868,7 +897,7 @@ class CBox_v3_driven_transmon(Transmon):
         prepare_function_kwargs = {
             'counter_param': counter_param,
             'asm_filenames': asm_filenames,
-            'CBox': self.CBox}
+            'CBox': self.CBox.get_instr()}
 
         d = qh.CBox_int_avg_func_prep_det_CC(
             self.CBox.get_instr(), prepare_function=qh.load_range_of_asm_files,
@@ -1200,10 +1229,11 @@ class CBox_v3_driven_transmon(Transmon):
     def get_operation_dict(self, operation_dict={}):
 
         pulse_period_clocks = convert_to_clocks(
-            self.gauss_width()*4, rounding_period=1/abs(self.f_pulse_mod()))
+            self.gauss_width()*4+self.pulse_delay(), rounding_period=1/abs(self.f_pulse_mod()))
         RO_pulse_length_clocks = convert_to_clocks(self.RO_pulse_length())
         RO_pulse_delay_clocks = convert_to_clocks(self.RO_pulse_delay())
         RO_depletion_clocks = convert_to_clocks(self.RO_depletion_time())
+        RO_acq_marker_del_clks = convert_to_clocks(self.RO_acq_marker_delay())
 
         operation_dict['init_all'] = {'instruction':
                                       '\nWaitReg r0 \nWaitReg r0 \n'}
@@ -1238,11 +1268,19 @@ class CBox_v3_driven_transmon(Transmon):
 
         if 'CBox' in self.acquisition_instrument():
             if self.RO_pulse_type() == 'MW_IQmod_pulse_CBox':
+                # operation_dict['RO {}'.format(self.name)] = {
+                #     'duration': RO_pulse_length_clocks,
+                #     'instruction': 'wait {} \npulse 0000 1111 1111 '.format(
+                #         RO_pulse_delay_clocks)
+                #     + '\nwait {} \nmeasure \n'.format(RO_pulse_length_clocks)}
                 operation_dict['RO {}'.format(self.name)] = {
                     'duration': RO_pulse_length_clocks,
                     'instruction': 'wait {} \npulse 0000 1111 1111 '.format(
                         RO_pulse_delay_clocks)
-                    + '\nwait {} \nmeasure \n'.format(RO_pulse_length_clocks)}
+                    + '\nwait {} \nmeasure \nwait {}\n'.format(
+                        RO_acq_marker_del_clks,
+                        max(RO_pulse_length_clocks-RO_acq_marker_del_clks, 0))}
+
 
             if self.RO_pulse_type() == 'MW_IQmod_pulse_UHFQC':
                 raise NotImplementedError
@@ -1336,12 +1374,13 @@ class CBox_v3_driven_transmon(Transmon):
 
 def convert_to_clocks(duration, f_sampling=200e6, rounding_period=None):
     """
+    #FIXME: move this to a qasm helper or ins_lib file
     convert a duration in seconds to an integer number of clocks
 
         f_sampling: 200e6 is the CBox sampling frequency
     """
     if rounding_period is not None:
-        duration = (duration//rounding_period+1)*rounding_period
+        duration = max(duration//rounding_period, 1)*rounding_period
     clock_duration = int(duration*f_sampling)
     return clock_duration
 
@@ -1448,7 +1487,6 @@ class QWG_driven_transmon(CBox_v3_driven_transmon):
                                         self.Q_LutMan.get_instr().Q_motzoi)
 
         d = self.int_avg_det_single
-        d._set_real_imag(False)
 
         # d = qh.CBox_single_integration_average_det_CC(
         #     self.CBox.get_instr(), nr_averages=self.RO_acq_averages()//MC.soft_avg(),
@@ -1498,10 +1536,10 @@ class QWG_driven_transmon(CBox_v3_driven_transmon):
                 self.RO_LutMan.M_modulation(self.f_RO_mod())
                 self.RO_LutMan.M_amp(self.RO_amp())
                 self.RO_LutMan.M_length(self.RO_pulse_length())
-                self.RO_LutMan.load_pulse_onto_AWG_lookuptable(
-                    self.RO_awg_nr())
                 self.RO_LutMan.lut_mapping(
-                    ['I', 'X180', 'Y180', 'X90', 'Y90', 'mX90', 'mY90', 'Block'])
+                    ['I', 'X180', 'Y180', 'X90', 'Y90', 'mX90', 'mY90', 'Mod_M'])
+                self.RO_LutMan.load_pulses_onto_AWG_lookuptable()
+
             self.CBox.get_instr().upload_standard_weights(self.f_RO_mod())
             self.CBox.get_instr().integration_length(
                 convert_to_clocks(self.RO_acq_integration_length()))
