@@ -156,14 +156,14 @@ def SPSA(fun, x0,
             no_improv_thr
         maxiter (int): always break after this number of iterations.
             Set it to 0 to loop indefinitely.
-        alpha, gamma, a, c, A: parameters for the SPSA gains 
+        alpha, gamma, a, c, A: parameters for the SPSA gains
             (see refs for definitions)
         p: probability to get 1 in Bernoulli +/- 1 distribution
             (see refs for context)
     return: tuple (best parameter array, best score)
 
     alpha, gamma, a, c, A and p, are parameters for the algorithm.
-    Their function is described in the references below, 
+    Their function is described in the references below,
     and even optimal values have been discussed in the literature.
 
 
