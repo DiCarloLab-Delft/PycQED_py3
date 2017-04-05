@@ -133,7 +133,7 @@ LutManMan.LutMans(
     [LutMan0.name, LutMan1.name])
 
 
-# SH = sh.SignalHound_USB_SA124B('Signal hound', server_name=None)
+# SH = sh.SignalHound_USB_SA124B('Signal hound')
 
 # Meta-instruments
 HS = hd.HeterodyneInstrument('HS', LO=LO, RF=RF, AWG=AWG,
@@ -175,39 +175,43 @@ station.add_component(QL)
 
 
 import pycqed.instrument_drivers.meta_instrument.qubit_objects.Tektronix_driven_transmon as qbt
-QR = qbt.Tektronix_driven_transmon('QR')
+
+QR = qb.CBox_v3_driven_transmon('QR')
 station.add_component(QR)
 
-QR.add_operation('SWAP')
-QR.add_pulse_parameter('SWAP', 'fluxing_operation_type', 'operation_type',
-                       initial_value='Flux', vals=vals.Strings())
-QR.add_pulse_parameter('SWAP', 'SWAP_pulse_amp', 'amplitude',
-                       initial_value=0.5)
-QR.link_param_to_operation('SWAP', 'fluxing_channel', 'channel')
+# QR = qbt.Tektronix_driven_transmon('QR')
+# station.add_component(QR)
 
-QR.add_pulse_parameter('SWAP', 'SWAP_pulse_type', 'pulse_type',
-                       initial_value='SquareFluxPulse', vals=vals.Strings())
-QR.add_pulse_parameter('SWAP', 'SWAP_refpoint',
-                       'refpoint', 'end', vals=vals.Strings())
-QR.link_param_to_operation('SWAP', 'SWAP_amp', 'SWAP_amp')
-QR.add_pulse_parameter('SWAP', 'SWAP_pulse_buffer',
-                       'pulse_buffer', 0e-9)
+# QR.add_operation('SWAP')
+# QR.add_pulse_parameter('SWAP', 'fluxing_operation_type', 'operation_type',
+#                        initial_value='Flux', vals=vals.Strings())
+# QR.add_pulse_parameter('SWAP', 'SWAP_pulse_amp', 'amplitude',
+#                        initial_value=0.5)
+# QR.link_param_to_operation('SWAP', 'fluxing_channel', 'channel')
 
-QR.link_param_to_operation('SWAP', 'SWAP_time', 'square_pulse_length')
+# QR.add_pulse_parameter('SWAP', 'SWAP_pulse_type', 'pulse_type',
+#                        initial_value='SquareFluxPulse', vals=vals.Strings())
+# QR.add_pulse_parameter('SWAP', 'SWAP_refpoint',
+#                        'refpoint', 'end', vals=vals.Strings())
+# QR.link_param_to_operation('SWAP', 'SWAP_amp', 'SWAP_amp')
+# QR.add_pulse_parameter('SWAP', 'SWAP_pulse_buffer',
+#                        'pulse_buffer', 0e-9)
+
+# QR.link_param_to_operation('SWAP', 'SWAP_time', 'square_pulse_length')
 
 
-QR.add_pulse_parameter('SWAP', 'SWAP_pulse_delay',
-                       'pulse_delay', 0e-9)
+# QR.add_pulse_parameter('SWAP', 'SWAP_pulse_delay',
+#                        'pulse_delay', 0e-9)
 
-gen.load_settings_onto_instrument(QR)
-k0.kernel_list(['RT_Compiled_170308.txt'])
-QR.dist_dict({'ch_list': ['ch2'], 'ch2': k0.kernel()})
+# gen.load_settings_onto_instrument(QR)
+# k0.kernel_list(['RT_Compiled_170308.txt'])
+# QR.dist_dict({'ch_list': ['ch2'], 'ch2': k0.kernel()})
 
-k0.decay_amp_1(-1.)
-k0.decay_tau_1(1.)
-QR.dist_dict({'ch_list': ['ch2'], 'ch2': k0.kernel()})
+# k0.decay_amp_1(-1.)
+# k0.decay_tau_1(1.)
+# QR.dist_dict({'ch_list': ['ch2'], 'ch2': k0.kernel()})
 
-QR.dac_channel(1)
+# QR.dac_channel(1)
 
 
 Starmon.add_qubits([QL, QR])
@@ -342,12 +346,16 @@ CBox = qcb.QuTech_ControlBox_v3(
     'CBox', address='Com6', run_tests=False, server_name=None)
 station.add_component(CBox)
 
-# # import pycqed.instrument_drivers.meta_instrument.CBox_LookuptableManager as cbl
-# # CBox_LutMan = cbl.ControlBox_LookuptableManager('CBox_LutMan')
-# # CBox_LutMan.CBox(CBox.name)
-# # station.add_component(CBox_LutMan)
+import pycqed.instrument_drivers.meta_instrument.CBox_LookuptableManager as cbl
+CBox_LutMan = cbl.ControlBox_LookuptableManager('CBox_LutMan')
+CBox_LutMan.CBox(CBox.name)
+station.add_component(CBox_LutMan)
 
 # UHFQC_1.timeout(2)
 from pycqed.instrument_drivers.physical_instruments import QuTech_AWG_Module as qwg
 QWG = qwg.QuTech_AWG_Module('QWG', address='192.168.0.10', port=5025)
 station.add_component(QWG)
+
+from pycqed.instrument_drivers.physical_instruments import QuTech_Duplexer as qdux
+VSM = qdux.QuTech_Duplexer('VSM', address='TCPIP0::192.168.0.100')
+station.add_component(VSM)

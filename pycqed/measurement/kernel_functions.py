@@ -171,7 +171,10 @@ def step_raw(file_name, process_step=True, step_params=None, norm_type='max'):
         if step_params is None:
             step_max = np.max(step)
             step_min = np.min(step)
-            step_mid = (np.max(step)+np.min(step))/2.
+            # Setting the threshold at 3/2 of the total range so it is robust
+            # against compensation pulses
+            step_mid = 2/3*abs(step_max-step_min) + step_min
+
             step_shift = step-step_mid
             step_upedge = np.where(step_shift > 0)[0]
             if step_upedge.size == 0:
@@ -185,7 +188,9 @@ def step_raw(file_name, process_step=True, step_params=None, norm_type='max'):
                 step_downedge = len(step)
             else:
                 step_downedge = step_downedge[0]
-        #     print(step_max, step_min, step_mid, step_upedge, step_downedge)
+            # print(step_max, step_min, step_mid, step_upedge, step_downedge)
+
+
 
             baseline_end = step_upedge - \
                 np.where(

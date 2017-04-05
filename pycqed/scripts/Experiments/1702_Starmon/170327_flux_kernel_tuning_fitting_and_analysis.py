@@ -9,8 +9,14 @@ trace_folder = r'D:\Experiments\1702_Starmon\RT_kernel_traces'
 # filename = r'\RefCurve_2017-03-30_2_112928.Wfm.csv'
 
 # filename = r'\RefCurve_2017-03-30_5_132742.Wfm.csv'
+# filename = r'\RefCurve_2017-03-30_8_163439.Wfm.csv'
 
-filename = r'\RefCurve_2017-03-30_8_163439.Wfm.csv'
+# filename = r'\RefCurve_2017-03-31_0_172451.Wfm.csv'
+# filename = r'\RefCurve_2017-03-31_1_173411.Wfm.csv'
+
+filename = r'\RefCurve_2017-03-31_2_174708.Wfm.csv'
+# filename = r'\RefCurve_2017-03-31_3_181457.Wfm.csv'
+
 
 def contains_nan(array):
     return np.isnan(array).any()
@@ -38,6 +44,7 @@ amp_k = output_dict['kernel_step']
 
 ##########################
 # Setting up the fitting model
+reload(fit_mods)
 triple_pole_mod = fit_mods.TripleExpDecayModel
 triple_pole_mod.set_param_hint('amp1', value=0.05, vary=True)
 triple_pole_mod.set_param_hint('tau1', value=.1e-6, vary=True)
@@ -68,7 +75,7 @@ if contains_nan(tvals_fit):
 tp_fit_res = triple_pole_mod.fit(data=norm_amps[fit_start:fit_end],
                                  t=tvals_fit, params=my_tp_params)
 
-# print(tp_fit_res.fit_report())
+print(tp_fit_res.fit_report())
 
 #################################
 # Initial plot
@@ -155,16 +162,15 @@ print(save_file_name)
 
 
 
-# Add the distortion to the kernel object
-k0 = station.components['k0']
-# k0.kernel_list([save_file_name+'.txt'])
+# # Add the distortion to the kernel object
+# k0 = station.components['k0']
 # try:
 #     k0.add_kernel_to_kernel_list(save_file_name+'.txt')
 # except ValueError as va:
 #     logging.warning(va)
 
 
-import pycqed.instrument_drivers.meta_instrument.kernel_object as k_obj
-reload(k_obj)
-# k0 = k_obj.Distortion(name='k0')
-# station.add_component(k0)
+
+
+
+

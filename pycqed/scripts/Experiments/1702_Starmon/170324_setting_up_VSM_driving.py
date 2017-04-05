@@ -3,7 +3,8 @@ from pycqed.instruments_drivers.meta_instrument.qubit_objects import duplexer_te
 
 
 from pycqed.instrument_drivers.physical_instruments import QuTech_Duplexer as qdux
-VSM = qdux.QuTech_Duplexer('VSM', address='')
+VSM = qdux.QuTech_Duplexer('VSM', address='TCPIP0::192.168.0.100')
+
 
 def reload_VSM_qubit(qubit):
     reload(qbt)

@@ -164,15 +164,17 @@ class CBox_v3_driven_transmon(Transmon):
                            vals=vals.Ints(min_value=1),
                            parameter_class=ManualParameter)
 
-        self.add_parameter('amp180',
+        self.add_parameter('Q_amp180',
                            label='Pi-pulse amplitude', unit='V',
                            initial_value=0.3,
                            parameter_class=ManualParameter)
-        # Amp 90 is hardcoded to be half amp180
-        self.add_parameter('amp90',
-                           label='Pi/2-pulse amplitude', unit='V',
-                           initial_value=0.3,
+        self.add_parameter('Q_amp90_scale',
+                           label='pulse amplitude scaling factor',
+                           unit='',
+                           initial_value=.5,
+                           vals=vals.Numbers(min_value=0, max_value=1.0),
                            parameter_class=ManualParameter)
+
         self.add_parameter('gauss_width', unit='s',
                            initial_value=10e-9,
                            parameter_class=ManualParameter)
@@ -297,8 +299,8 @@ class CBox_v3_driven_transmon(Transmon):
                                   self.mixer_offs_RO_Q.get())
 
         # pulse pars
-        self.Q_LutMan.get_instr().Q_amp180.set(self.amp180.get())
-        self.Q_LutMan.get_instr().Q_amp90.set(self.amp90.get())
+        self.Q_LutMan.get_instr().Q_amp180(self.Q_amp180())
+        self.Q_LutMan.get_instr().Q_amp90(self.Q_amp90_scale()*self.Q_amp180())
         self.Q_LutMan.get_instr().Q_gauss_width.set(self.gauss_width.get())
         self.Q_LutMan.get_instr().Q_motzoi_parameter.set(self.motzoi.get())
         self.Q_LutMan.get_instr().Q_modulation.set(self.f_pulse_mod.get())
@@ -326,6 +328,7 @@ class CBox_v3_driven_transmon(Transmon):
         if 'awg_nr' in self.Q_LutMan.get_instr().parameters:
             self.Q_LutMan.get_instr().awg_nr(self.Q_awg_nr())
 
+        # Print this should be deleted
         if 'awg_nr' in self.RO_LutMan.get_instr().parameters:
             self.RO_LutMan.get_instr().RO_awg_nr(self.Q_awg_nr())
 
@@ -791,14 +794,11 @@ class CBox_v3_driven_transmon(Transmon):
 
         self.CBox.get_instr().start()
         amp_swf = cbs.Lutman_par_with_reload_single_pulse(
-            LutMan=self.Q_LutMan.get_instr(), parameter=self.Q_LutMan.get_instr().Q_amp180,
+            LutMan=self.Q_LutMan.get_instr(),
+            parameter=self.Q_LutMan.get_instr().Q_amp180,
             pulse_names=['X180'])
         d = self.int_avg_det_single
         d._set_real_imag(real_imag)
-
-        # d = qh.CBox_single_integration_average_det_CC(
-        #     self.CBox.get_instr(), nr_averages=self.RO_acq_averages()//MC.soft_avg(),
-        #     seg_per_point=1)
 
         MC.set_sweep_function(amp_swf)
         MC.set_sweep_points(amps)
@@ -1091,7 +1091,6 @@ class CBox_v3_driven_transmon(Transmon):
         off_on = sqqs.off_on(self.name)
         s = qh.QASM_Sweep(off_on.name, self.CBox.get_instr(), self.get_operation_dict(),
                           parameter_name='Shots')
-        # d = qh.CBox_integration_logging_det_CC(self.CBox)
         d = self.int_log_det
         MC.set_sweep_function(s)
         MC.set_sweep_points(np.arange(nr_shots))
@@ -1206,35 +1205,22 @@ class CBox_v3_driven_transmon(Transmon):
         RO_pulse_delay_clocks = convert_to_clocks(self.RO_pulse_delay())
         RO_depletion_clocks = convert_to_clocks(self.RO_depletion_time())
 
-
         operation_dict['init_all'] = {'instruction':
                                       '\nWaitReg r0 \nWaitReg r0 \n'}
+
+        for cw_idx, pulse_name in enumerate(
+                self.Q_LutMan.get_instr().lut_mapping()[:-1]):
+
+            operation_dict['{} {}'.format(pulse_name, self.name)] = {
+                'duration': pulse_period_clocks,
+                'instruction': ins_lib.cbox_awg_pulse(
+                    codeword=cw_idx, awg_channels=[self.Q_awg_nr()],
+                    duration=pulse_period_clocks)}
+
+        # Identity is a special instruction
         operation_dict['I {}'.format(self.name)] = {
             'duration': pulse_period_clocks, 'instruction': 'wait {} \n'}
-        operation_dict['X180 {}'.format(self.name)] = {
-            'duration': pulse_period_clocks, 'instruction':
-                'pulse 1001 0000 1001  \nwait {}\n'.format(
-                    pulse_period_clocks)}
-        operation_dict['Y180 {}'.format(self.name)] = {
-            'duration': pulse_period_clocks, 'instruction':
-                'pulse 1010 0000 1010  \nwait {}\n'.format(
-                    pulse_period_clocks)}
-        operation_dict['X90 {}'.format(self.name)] = {
-            'duration': pulse_period_clocks, 'instruction':
-                'pulse 1011 0000 1011  \nwait {}\n'.format(
-                    pulse_period_clocks)}
-        operation_dict['Y90 {}'.format(self.name)] = {
-            'duration': pulse_period_clocks, 'instruction':
-                'pulse 1100 0000 1100  \nwait {}\n'.format(
-                    pulse_period_clocks)}
-        operation_dict['mX90 {}'.format(self.name)] = {
-            'duration': pulse_period_clocks, 'instruction':
-                'pulse 1101 0000 1101  \nwait {}\n'.format(
-                    pulse_period_clocks)}
-        operation_dict['mY90 {}'.format(self.name)] = {
-            'duration': pulse_period_clocks, 'instruction':
-                'pulse 1110 0000 1110  \nwait {}\n'.format(
-                    pulse_period_clocks)}
+
         spec_length_clocks = convert_to_clocks(
             self.spec_pulse_length())
         if self.spec_pulse_type() == 'gated':
@@ -1379,6 +1365,7 @@ class QWG_driven_transmon(CBox_v3_driven_transmon):
 
     def add_parameters(self):
         super().add_parameters()
+        # FIXME: chane amp90 scale to Q_amp90 scale
         self.add_parameter('amp90_scale',
                            label='pulse amplitude scaling factor',
                            unit='',
