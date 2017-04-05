@@ -73,3 +73,15 @@ def bin_add_cw_w7(a, b):
     """
     c = (int(a, 2) + int(b, 2))
     return '{0:07b}'.format(c)
+
+
+def convert_to_clocks(duration, f_sampling=200e6, rounding_period=None):
+    """
+    convert a duration in seconds to an integer number of clocks
+
+        f_sampling: 200e6 is the CBox sampling frequency
+    """
+    if rounding_period is not None:
+        duration = max(duration//rounding_period, 1)*rounding_period
+    clock_duration = int(duration*f_sampling)
+    return clock_duration

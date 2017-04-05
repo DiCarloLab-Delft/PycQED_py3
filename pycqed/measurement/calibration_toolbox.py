@@ -1,16 +1,16 @@
 import numpy as np
 import logging
 from qcodes.instrument.parameter import ManualParameter
-from pycqed.measurement import sweep_functions as swf
-from pycqed.measurement import CBox_sweep_functions as CB_swf
+from pycqed.measurement import CBox_sweep_functions as cbs
 from pycqed.measurement import detector_functions as det
-from pycqed.analysis import measurement_analysis as MA
+from pycqed.analysis import measurement_analysis as ma
 from pycqed.measurement import mc_parameter_wrapper as pw
 from pycqed.measurement.pulse_sequences import standard_sequences as st_seqs
 from pycqed.measurement.optimization import nelder_mead
-import imp
-imp.reload(MA)
-imp.reload(CB_swf)
+from pycqed.measurement.waveform_control_CC import single_qubit_qasm_seqs as sqqs
+
+from pycqed.measurement.waveform_control_CC import qasm_to_asm as qta
+from pycqed.measurement.waveform_control_CC import instruction_lib as ins_lib
 
 '''
 Contains general calibration routines, most notably for calculating mixer
@@ -58,7 +58,7 @@ def mixer_carrier_cancellation(SH, source, MC,
             MC.set_sweep_points(swp_pts)
             MC.run(name='Mixer_cal_{}'.format(ch_par.name),
                    sweep_delay=.1)
-            Mixer_Calibration_Analysis = MA.Mixer_Calibration_Analysis(
+            Mixer_Calibration_Analysis = ma.Mixer_Calibration_Analysis(
                 label='Mixer_cal')
             ch_min[i] = Mixer_Calibration_Analysis.fit_results[0]
             ch_par(ch_min[i])
@@ -121,7 +121,7 @@ def mixer_skewness_calibration_QWG(SH, source, QWG,
     MC.set_detector_function(d)
     MC.set_adaptive_function_parameters(ad_func_pars)
     MC.run(name=name, mode='adaptive')
-    a = MA.OptimizationAnalysis()
+    a = ma.OptimizationAnalysis()
     # phi and alpha are the coefficients that go in the predistortion matrix
     alpha = a.optimization_result[0][0]
     phi = a.optimization_result[0][1]
@@ -189,7 +189,7 @@ def mixer_skewness_calibration_5014(SH, source, station,
     MC.set_detector_function(d)
     MC.set_adaptive_function_parameters(ad_func_pars)
     MC.run(name=name, mode='adaptive')
-    a = MA.OptimizationAnalysis()
+    a = ma.OptimizationAnalysis()
     # phi and alpha are the coefficients that go in the predistortion matrix
     alpha = 1/a.optimization_result[0][0]
     phi = -1*a.optimization_result[0][1]
@@ -261,7 +261,7 @@ def mixer_carrier_cancellation_5014(AWG, SH, source, MC,
                                         ch_1_min - voltage_span, 11))
         MC.run(name='Mixer_cal_Offset_%s' % AWG_channel1,
                sweep_delay=.1, debug_mode=True)
-        Mixer_Calibration_Analysis = MA.Mixer_Calibration_Analysis(
+        Mixer_Calibration_Analysis = ma.Mixer_Calibration_Analysis(
             label='Mixer_cal', auto=True)
         ch_1_min = Mixer_Calibration_Analysis.fit_results[0]
         ch1_offset.set(ch_1_min)
@@ -272,7 +272,7 @@ def mixer_carrier_cancellation_5014(AWG, SH, source, MC,
                                         ch_2_min - voltage_span, 11))
         MC.run(name='Mixer_cal_Offset_ch%s' % AWG_channel2,
                sweep_delay=.1, debug_mode=True)
-        Mixer_Calibration_Analysis = MA.Mixer_Calibration_Analysis(
+        Mixer_Calibration_Analysis = ma.Mixer_Calibration_Analysis(
             label='Mixer_cal', auto=True)
         ch_2_min = Mixer_Calibration_Analysis.fit_results[0]
         ch2_offset.set(ch_2_min)
@@ -288,7 +288,7 @@ def mixer_carrier_cancellation_5014(AWG, SH, source, MC,
                                         ch_1_min + dac_resolution*6, 13))
         MC.run(name='Mixer_cal_Offset_%s' % AWG_channel1,
                sweep_delay=.1, debug_mode=True)
-        Mixer_Calibration_Analysis = MA.Mixer_Calibration_Analysis(
+        Mixer_Calibration_Analysis = ma.Mixer_Calibration_Analysis(
             label='Mixer_cal', auto=True)
         last_ch_1_min = ch_1_min
         ch_1_min = Mixer_Calibration_Analysis.fit_results[0]
@@ -299,7 +299,7 @@ def mixer_carrier_cancellation_5014(AWG, SH, source, MC,
                                         ch_2_min + dac_resolution*6, 13))
         MC.run(name='Mixer_cal_Offset_%s' % AWG_channel2,
                sweep_delay=.1, debug_mode=True)
-        Mixer_Calibration_Analysis = MA.Mixer_Calibration_Analysis(
+        Mixer_Calibration_Analysis = ma.Mixer_Calibration_Analysis(
             label='Mixer_cal', auto=True)
         last_ch_2_min = ch_2_min
         min_power = min(Mixer_Calibration_Analysis.measured_powers)
@@ -367,7 +367,7 @@ def mixer_carrier_cancellation_UHFQC(UHFQC, SH, source, MC,
                                         ch_1_min - voltage_span, 11))
         MC.run(name='Mixer_cal_Offset_%s' % AWG_channel1,
                sweep_delay=.1, debug_mode=True)
-        Mixer_Calibration_Analysis = MA.Mixer_Calibration_Analysis(
+        Mixer_Calibration_Analysis = ma.Mixer_Calibration_Analysis(
             label='Mixer_cal', auto=True)
         ch_1_min = Mixer_Calibration_Analysis.fit_results[0]
         ch1_offset(ch_1_min)
@@ -378,7 +378,7 @@ def mixer_carrier_cancellation_UHFQC(UHFQC, SH, source, MC,
                                         ch_2_min - voltage_span, 11))
         MC.run(name='Mixer_cal_Offset_ch%s' % AWG_channel2,
                sweep_delay=.1, debug_mode=True)
-        Mixer_Calibration_Analysis = MA.Mixer_Calibration_Analysis(
+        Mixer_Calibration_Analysis = ma.Mixer_Calibration_Analysis(
             label='Mixer_cal', auto=True)
         ch_2_min = Mixer_Calibration_Analysis.fit_results[0]
         ch2_offset(ch_2_min)
@@ -394,7 +394,7 @@ def mixer_carrier_cancellation_UHFQC(UHFQC, SH, source, MC,
                                         ch_1_min + dac_resolution*6, 13))
         MC.run(name='Mixer_cal_Offset_%s' % AWG_channel1,
                sweep_delay=.1, debug_mode=True)
-        Mixer_Calibration_Analysis = MA.Mixer_Calibration_Analysis(
+        Mixer_Calibration_Analysis = ma.Mixer_Calibration_Analysis(
             label='Mixer_cal', auto=True)
         last_ch_1_min = ch_1_min
         ch_1_min = Mixer_Calibration_Analysis.fit_results[0]
@@ -405,7 +405,7 @@ def mixer_carrier_cancellation_UHFQC(UHFQC, SH, source, MC,
                                         ch_2_min + dac_resolution*6, 13))
         MC.run(name='Mixer_cal_Offset_%s' % AWG_channel2,
                sweep_delay=.1, debug_mode=True)
-        Mixer_Calibration_Analysis = MA.Mixer_Calibration_Analysis(
+        Mixer_Calibration_Analysis = ma.Mixer_Calibration_Analysis(
             label='Mixer_cal', auto=True)
         last_ch_2_min = ch_2_min
         min_power = min(Mixer_Calibration_Analysis.measured_powers)
@@ -438,22 +438,99 @@ def mixer_carrier_cancellation_CBox(CBox, SH, source, MC,
     logging.warning('CBox carrier cancelation is deprecated. \n' +
                     'Replace it with mixer carrier cancelation and pass'
                     ' the channel parameters directly.')
-    ch0_swf = CB_swf.DAC_offset(awg_nr, dac_ch=0, CBox=CBox)
-    ch1_swf = CB_swf.DAC_offset(awg_nr, dac_ch=1, CBox=CBox)
+    ch0_swf = cbs.DAC_offset(awg_nr, dac_ch=0, CBox=CBox)
+    ch1_swf = cbs.DAC_offset(awg_nr, dac_ch=1, CBox=CBox)
 
     return mixer_carrier_cancellation(SH, source, MC,
                                       chI_par=ch0_swf, chQ_par=ch1_swf,
-                                      frequency=frequency, voltage_grid=voltage_grid,
+                                      frequency=frequency,
+                                      voltage_grid=voltage_grid,
                                       xtol=xtol)
 
 
-def mixer_skewness_cal_CBox_adaptive(CBox, SH, source,
-                                     LutMan,
-                                     AWG,
-                                     MC,
-                                     awg_nrs=[0],
-                                     calibrate_both_sidebands=False,
-                                     verbose=True):
+def mixer_skewness_calibration_CBoxV3(SH, source, LutMan, MC, CBox,
+                                      f_mod,
+                                      name='mixer_skewness_calibration_CBox'):
+    '''
+    Inputs:
+        SH              (instrument)     the signal hound
+        source          (instrument)     MW-source used for driving
+        LutMan          (instrument)     LutMan responsible for loading pulses
+        CBox            (instrument)     responsible for loading qumis and
+        f_mod           (float Hz)       Modulation frequency
+
+    returns:
+        alpha, phi     the coefficients that go in the predistortion matrix
+
+    Loads a continuous wave in the lookuptable and changes the predistortion
+    to minimize the power in the spurious sideband.
+
+    For details, see Leo's notes on mixer skewness calibration in the docs
+    '''
+
+    # phi and alpha are the coefficients that go in the predistortion matrix
+
+    # Load the pulses required for a conintuous tone
+    LutMan.lut_mapping()[0] = 'ModBlock'
+    Mod_Block_len = 500e-9
+    Mod_Block_len_clk = ins_lib.convert_to_clocks(Mod_Block_len)
+    LutMan.Q_modulation(f_mod)
+    LutMan.Q_ampCW(.5)  # not 1 as we want some margin for the alpha correction
+    LutMan.load_pulses_onto_AWG_lookuptable()
+
+    # load the QASM/QuMis sequence
+    operation_dict = {}
+    operation_dict['Pulse'] = {
+        'duration': Mod_Block_len_clk,
+        'instruction': ins_lib.cbox_awg_pulse(
+            codeword=0, awg_channels=[LutMan.awg_nr()],
+            duration=Mod_Block_len_clk)}
+
+    # this generates a SSB coninuous wave sequence
+    cw_tone_elt = sqqs.CW_tone()
+    cw_tone_asm = qta.qasm_to_asm(cw_tone_elt.name, operation_dict)
+    CBox.load_instructions(cw_tone_asm.name)
+    CBox.start()
+
+    frequency = source.frequency() - f_mod
+    alpha_swf = cbs.Lutman_par_with_reload_single_pulse(
+        LutMan=LutMan,
+        parameter=LutMan.mixer_alpha,
+        pulse_names=['ModBlock'])
+
+    phi_swf = cbs.Lutman_par_with_reload_single_pulse(
+        LutMan=LutMan,
+        parameter=LutMan.mixer_phi,
+        pulse_names=['ModBlock'])
+    d = det.Signal_Hound_fixed_frequency(SH, frequency)
+
+    ad_func_pars = {'adaptive_function': nelder_mead,
+                    'x0': [1.0, 0.0],
+                    'initial_step': [.15, 10],
+                    'no_improv_break': 10,
+                    'minimize': True,
+                    'maxiter': 500}
+    MC.set_sweep_functions([alpha_swf, phi_swf])
+    MC.set_detector_function(d)
+    MC.set_adaptive_function_parameters(ad_func_pars)
+    MC.set_adaptive_function_parameters(ad_func_pars)
+    MC.run(name=name, mode='adaptive')
+    a = ma.OptimizationAnalysis(label=name)
+    ma.OptimizationAnalysis_v2(label=name)
+
+    alpha = a.optimization_result[0][0]
+    phi = a.optimization_result[0][1]
+
+    return phi, alpha
+
+
+def mixer_skewness_cal_CBox_old(CBox, SH, source,
+                                LutMan,
+                                AWG,
+                                MC,
+                                awg_nrs=[0],
+                                calibrate_both_sidebands=False,
+                                verbose=True):
     '''
     Input args
         CBox
@@ -511,10 +588,10 @@ def mixer_skewness_cal_CBox_adaptive(CBox, SH, source,
     st_seqs.single_marker_seq()
 
     AWG.start()
-    sweepfunctions = [CB_swf.Lutman_par_with_reload(LutMan,
+    sweepfunctions = [cbs.Lutman_par_with_reload(LutMan,
                                                     LutMan.QI_amp_ratio,
                                                     awg_nrs=awg_nrs),
-                      CB_swf.Lutman_par_with_reload(LutMan,
+                      cbs.Lutman_par_with_reload(LutMan,
                                                     LutMan.IQ_phase_skewness,
                                                     awg_nrs=awg_nrs)]
     ampl_min_lst = np.empty(2)
@@ -554,7 +631,7 @@ def mixer_skewness_cal_CBox_adaptive(CBox, SH, source,
         MC.set_detector_function(detector)  # sets test_detector
         MC.set_adaptive_function_parameters(ad_func_pars)
         MC.run(name=name, mode='adaptive')
-        a = MA.OptimizationAnalysis(auto=True, label='Numerical')
+        a = ma.OptimizationAnalysis(auto=True, label='Numerical')
         ampl_min_lst[i] = a.optimization_result[0][0]
         phase_min_lst[i] = a.optimization_result[0][1]
 

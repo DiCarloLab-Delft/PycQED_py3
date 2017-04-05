@@ -17,15 +17,18 @@ from pycqed.measurement.waveform_control_CC import waveform as wf
 from pycqed.analysis import measurement_analysis as ma
 from pycqed.analysis.tools.data_manipulation import rotation_matrix
 # from pycqed.measurement.calibration_toolbox import mixer_carrier_cancellation_CBox
-from pycqed.measurement.calibration_toolbox import mixer_carrier_cancellation
+from pycqed.measurement.calibration_toolbox import (
+    mixer_carrier_cancellation, mixer_skewness_calibration_CBoxV3)
 
-from pycqed.measurement.calibration_toolbox import mixer_skewness_cal_CBox_adaptive
+# from pycqed.measurement.calibration_toolbox import mixer_skewness_calibration_CBoxV3
 from pycqed.measurement import sweep_functions as swf
 from pycqed.measurement.waveform_control_CC import single_qubit_qasm_seqs as sqqs
 import pycqed.measurement.CBox_sweep_functions as cbs
 from pycqed.scripts.Experiments.intel_demo import qasm_helpers as qh
 from pycqed.measurement.waveform_control_CC import qasm_to_asm as qta
 from pycqed.measurement.waveform_control_CC import instruction_lib as ins_lib
+
+from pycqed.measurement.waveform_control_CC.instruction_lib import convert_to_clocks
 
 
 from pycqed.measurement import detector_functions as det
@@ -661,12 +664,13 @@ class CBox_v3_driven_transmon(Transmon):
         see calibration toolbox for details
         '''
         self.prepare_for_timedomain()
-        phi, alpha = mixer_skewness_cal_CBox_adaptive(
+        phi, alpha = mixer_skewness_calibration_CBoxV3(
+            name='mixer_skewness_cal'+self.msmt_suffix,
             CBox=self.CBox.get_instr(), SH=signal_hound,
             source=self.td_source.get_instr(),
-            LutMan=self.Q_LutMan.get_instr(), AWG=self.AWG.get_instr(),
-            MC=self.MC.get_instr(),
-            awg_nrs=[self.Q_awg_nr.get()], calibrate_both_sidebands=True)
+            LutMan=self.Q_LutMan.get_instr(),
+            f_mod=self.f_pulse_mod(),
+            MC=self.MC.get_instr())
         if update:
             self.mixer_drive_phi.set(phi)
             self.mixer_drive_alpha.set(alpha)
@@ -1370,19 +1374,6 @@ class CBox_v3_driven_transmon(Transmon):
         instr += 'wait {} \n'.format(RO_depletion_clocks
                                      + RO_pulse_length_clocks - 2)
         return instr
-
-
-def convert_to_clocks(duration, f_sampling=200e6, rounding_period=None):
-    """
-    #FIXME: move this to a qasm helper or ins_lib file
-    convert a duration in seconds to an integer number of clocks
-
-        f_sampling: 200e6 is the CBox sampling frequency
-    """
-    if rounding_period is not None:
-        duration = max(duration//rounding_period, 1)*rounding_period
-    clock_duration = int(duration*f_sampling)
-    return clock_duration
 
 
 class QWG_driven_transmon(CBox_v3_driven_transmon):
