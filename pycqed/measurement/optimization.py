@@ -168,13 +168,21 @@ def SPSA(fun, x0,
             no_improv_thr
         maxiter (int): always break after this number of iterations.
             Set it to 0 to loop indefinitely.
+        alpha, gamma, a, c, A: parameters for the SPSA gains 
+            (see refs for definitions)
+        p: probability to get 1 in Bernoulli +/- 1 distribution
+            (see refs for context)
     return: tuple (best parameter array, best score)
 
+    alpha, gamma, a, c, A and p, are parameters for the algorithm.
+    Their function is described in the references below, 
+    and even optimal values have been discussed in the literature.
 
-    Pure Python/Numpy implementation of the Nelder-Mead algorithm.
-    Implementation from https://github.com/fchollet/nelder-mead, edited by
-    Adriaan Rol for use in PycQED.
-    Reference: https://en.wikipedia.org/wiki/Nelder%E2%80%93Mead_method
+
+    Pure Python/Numpy implementation of the SPSA algorithm designed by Spall.
+    Implementation from http://www.jhuapl.edu/SPSA/PDF-SPSA/Spall_An_Overview.PDF,
+    edited by Ramiro Sagastizabal for use in PycQED.
+    Reference: http://www.jhuapl.edu/SPSA/Pages/References-Intro.htm
     '''
     # init
     x0 = np.array(x0)  # ensures algorithm also accepts lists
