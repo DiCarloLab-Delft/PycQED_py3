@@ -137,18 +137,6 @@ def nelder_mead(fun, x0,
     return res[0]
 
 
-"""
-spall on how to pick gamma etc
-
-init_stepsize,x_magnitude,max_iter,std_f
-alpha, gamma = 0.602, 0.101 # maybe change to 1.,1./6.
-c = std of func(x0)
-A = 0.9*max_iter
-a = (init_stepsize/x_magnitude)*(1+A)**alpha
-
-"""
-
-
 def SPSA(fun, x0,
          initial_step=0.1,
          no_improve_thr=10e-6, no_improv_break=10,
