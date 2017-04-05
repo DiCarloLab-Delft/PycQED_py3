@@ -135,3 +135,103 @@ def nelder_mead(fun, x0,
     # verification
     fun(res[0][0])
     return res[0]
+
+
+"""
+spall on how to pick gamma etc
+
+init_stepsize,x_magnitude,max_iter,std_f
+alpha, gamma = 0.602, 0.101 # maybe change to 1.,1./6.
+c = std of func(x0)
+A = 0.9*max_iter
+a = (init_stepsize/x_magnitude)*(1+A)**alpha
+
+"""
+
+
+def SPSA(fun, x0,
+         initial_step=0.1,
+         no_improve_thr=10e-6, no_improv_break=10,
+         maxiter=0,
+         gamma=0.101, alpha=0.602, a=0.2, c=0.3, A=300,
+         p=0.5,
+         verbose=False):
+    '''
+    parameters:
+        fun (function): function to optimize, must return a scalar score
+            and operate over a numpy array of the same dimensions as x0
+        x0 (numpy array): initial position
+
+
+        no_improv_thr,  no_improv_break (float, int): break after
+            no_improv_break iterations with an improvement lower than
+            no_improv_thr
+        maxiter (int): always break after this number of iterations.
+            Set it to 0 to loop indefinitely.
+    return: tuple (best parameter array, best score)
+
+
+    Pure Python/Numpy implementation of the Nelder-Mead algorithm.
+    Implementation from https://github.com/fchollet/nelder-mead, edited by
+    Adriaan Rol for use in PycQED.
+    Reference: https://en.wikipedia.org/wiki/Nelder%E2%80%93Mead_method
+    '''
+    # init
+    x0 = np.array(x0)  # ensures algorithm also accepts lists
+    dim = len(x0)
+    prev_best = fun(x0)
+    no_improv = 0
+    res = [[x0, prev_best]]
+
+    x = copy.copy(x0)
+
+    # SPSA iter
+    iters = 0
+    while 1:
+        # order
+        res.sort(key=lambda x: x[1])
+        best = res[0][1]
+
+        # break after maxiter
+        if maxiter and iters >= maxiter:
+            # Conclude failure break the loop
+            if verbose:
+                print('max iterations exceeded, optimization failed')
+            break
+        iters += 1
+
+        if best < prev_best - no_improve_thr:
+            no_improv = 0
+            prev_best = best
+        else:
+            no_improv += 1
+
+        if no_improv >= no_improv_break:
+            # Conclude success, break the loop
+            if verbose:
+                print('No improvement registered for {} rounds,'.format(
+                      no_improv_break) + 'concluding succesful convergence')
+            break
+        # step 1
+        a_k = a/(iters+A)**alpha
+        c_k = c/iters**gamma
+        # step 2
+        delta = np.where(np.random.rand(dim) > p, 1, -1)
+        # step 3
+        x_plus = x+c_k*delta
+        x_minus = x-c_k*delta
+        y_plus = fun(x_plus)
+        y_minus = fun(x_minus)
+        res.append([x_plus, y_plus])
+        res.append([x_minus, y_minus])
+        # step 4
+        gradient = (y_plus-y_minus)/(2.*c_k*delta)
+        # step 5
+        x = x-a_k*gradient
+        score = fun(x)
+        res.append([x, score])
+
+    # once the loop is broken evaluate the final value one more time as
+    # verification
+    fun(res[0][0])
+    return res[0]
