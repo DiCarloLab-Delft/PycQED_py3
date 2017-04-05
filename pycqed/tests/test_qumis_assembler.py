@@ -74,4 +74,4 @@ class Test_single_qubit_seqs(TestCase):
 
         my_asm_obj = asm.Assembler(neg_wait_fname)
         with self.assertRaises(ValueError):
-            my_instructions = my_asm_obj.convert_to_instructions()
+            my_asm_obj.convert_to_instructions()
