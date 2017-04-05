@@ -98,6 +98,7 @@ class Pulse:
 
 # Some simple pulse definitions.
 class SquarePulse(Pulse):
+
     def __init__(self, channel=None, channels=None, name='square pulse', **kw):
         Pulse.__init__(self, name)
         if channel is None and channels is None:
@@ -124,6 +125,7 @@ class SquarePulse(Pulse):
 
 
 class CosPulse(Pulse):
+
     def __init__(self, channel, name='cos pulse', **kw):
         Pulse.__init__(self, name)
 
@@ -144,11 +146,13 @@ class CosPulse(Pulse):
         return self
 
     def chan_wf(self, chan, tvals):
-        return self.amplitude * np.cos(2*np.pi *
+        return self.amplitude * np.cos(2 * np.pi *
                                        (self.frequency * tvals +
-                                        self.phase/360.))
+                                        self.phase / 360.))
+
 
 class LinearPulse(Pulse):
+
     def __init__(self, channel=None, channels=None, name='linear pulse', **kw):
         """ Pulse that performs linear interpolation between two setpoints """
         Pulse.__init__(self, name)
@@ -171,15 +175,17 @@ class LinearPulse(Pulse):
         self.length = kw.pop('length', self.length)
         channel = kw.pop('channel', None)
         if channel is not None:
-            self.channel=channel
+            self.channel = channel
             self.channels = [self.channel]
         self.channels = kw.pop('channels', self.channels)
         return self
 
     def chan_wf(self, chan, tvals):
-        return np.linspace(self.start_value, self.end_value, len(tvals)) 
-    
+        return np.linspace(self.start_value, self.end_value, len(tvals))
+
+
 class clock_train(Pulse):
+
     def __init__(self, channel, name='clock train', **kw):
         Pulse.__init__(self, name)
 
@@ -196,7 +202,7 @@ class clock_train(Pulse):
         self.cycles = kw.pop('cycles', self.cycles)
         self.nr_up_points = kw.pop('nr_up_points', self.nr_up_points)
         self.nr_down_points = kw.pop('nr_down_points', self.nr_down_points)
-        self.length = self.cycles*(self.nr_up_points+self.nr_down_points)*1e-9
+        self.length = self.cycles * (self.nr_up_points + self.nr_down_points) * 1e-9
         return self
 
     def chan_wf(self, chan, tvals):
@@ -205,12 +211,13 @@ class clock_train(Pulse):
             unit_cell.append(self.amplitude)
         for i in np.arange(self.nr_down_points):
             unit_cell.append(0)
-        wf = unit_cell*self.cycles
+        wf = unit_cell * self.cycles
 
         return wf
 
 
 class marker_train(Pulse):
+
     def __init__(self, channel, name='marker train', **kw):
         Pulse.__init__(self, name)
         self.channel = channel
@@ -231,19 +238,19 @@ class marker_train(Pulse):
 
         self.channels = []
         self.channels.append(self.channel)
-        self.length = self.nr_markers*self.marker_separation
+        self.length = self.nr_markers * self.marker_separation
         return self
 
     def chan_wf(self, chan, tvals):
         # Using lists because that is default, I expect arrays also work
         # but have not tested that. MAR 15-2-2016
-        unit_cell = list(np.ones(round(self.marker_length*1e9)))
+        unit_cell = list(np.ones(round(self.marker_length * 1e9)))
         unit_cell.extend(list(np.zeros(
-            round((self.marker_separation-self.marker_length)*1e9))))
-        wf = unit_cell*self.nr_markers
+            round((self.marker_separation - self.marker_length) * 1e9))))
+        wf = unit_cell * self.nr_markers
         # Added this check because I had issues with this before it can occur
         # when e.g. giving separations that are not in sub ns resolution
-        if(len(wf) != round(self.length*1e9)):
+        if(len(wf) != round(self.length * 1e9)):
             raise ValueError('Waveform length is not equal to expected length')
 
         return wf
@@ -279,19 +286,19 @@ def apply_modulation(I_env, Q_env, tvals, mod_frequency,
             [-sin(x)sec(phi-skew)/alpha  cos(x)sec(phi-skew)/alpha]
     '''
 
-    tan_phi_skew = np.tan(2*np.pi*phi_skew/360)
-    sec_phi_alpha = 1/(np.cos(2*np.pi*phi_skew/360) * alpha)
+    tan_phi_skew = np.tan(2 * np.pi * phi_skew / 360)
+    sec_phi_alpha = 1 / (np.cos(2 * np.pi * phi_skew / 360) * alpha)
 
-    I_mod = (I_env*(np.cos(2*np.pi*(mod_frequency*tvals +
-                                    phase/360)) - tan_phi_skew *
-                    np.sin(2*np.pi*(mod_frequency*tvals +
-                                    phase/360))) +
-             Q_env*(np.sin(2*np.pi*(mod_frequency*tvals +
-                                    phase/360)) + tan_phi_skew *
-             np.cos(2*np.pi*(mod_frequency*tvals + phase/360))))
+    I_mod = (I_env * (np.cos(2 * np.pi * (mod_frequency * tvals +
+                                          phase / 360)) - tan_phi_skew *
+                      np.sin(2 * np.pi * (mod_frequency * tvals +
+                                          phase / 360))) +
+             Q_env * (np.sin(2 * np.pi * (mod_frequency * tvals +
+                                          phase / 360)) + tan_phi_skew *
+                      np.cos(2 * np.pi * (mod_frequency * tvals + phase / 360))))
 
-    Q_mod = (-1*I_env*sec_phi_alpha*np.sin(2*np.pi*(mod_frequency *
-             tvals + phase/360.)) +
+    Q_mod = (-1 * I_env * sec_phi_alpha * np.sin(2 * np.pi * (mod_frequency *
+                                                              tvals + phase / 360.)) +
              + Q_env * sec_phi_alpha * np.cos(2 * np.pi * (
-             mod_frequency * tvals + phase/360.)))
+                 mod_frequency * tvals + phase / 360.)))
     return [I_mod, Q_mod]
