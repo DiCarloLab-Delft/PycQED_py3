@@ -142,7 +142,7 @@ def SPSA(fun, x0,
          no_improve_thr=10e-6, no_improv_break=10,
          maxiter=0,
          gamma=0.101, alpha=0.602, a=0.2, c=0.3, A=300,
-         p=0.5,
+         p=0.5, ctrl_min=0.,ctrl_max=np.pi,
          verbose=False):
     '''
     parameters:
@@ -156,9 +156,9 @@ def SPSA(fun, x0,
             no_improv_thr
         maxiter (int): always break after this number of iterations.
             Set it to 0 to loop indefinitely.
-        alpha, gamma, a, c, A: parameters for the SPSA gains
+        alpha, gamma, a, c, A, (float): parameters for the SPSA gains
             (see refs for definitions)
-        p: probability to get 1 in Bernoulli +/- 1 distribution
+        p (float): probability to get 1 in Bernoulli +/- 1 distribution
             (see refs for context)
     return: tuple (best parameter array, best score)
 
@@ -218,12 +218,14 @@ def SPSA(fun, x0,
         x_minus = x-c_k*delta
         y_plus = fun(x_plus)
         y_minus = fun(x_minus)
-        res.append([x_plus, y_plus])
-        res.append([x_minus, y_minus])
+        # res.append([x_plus, y_plus])
+        # res.append([x_minus, y_minus])
         # step 4
         gradient = (y_plus-y_minus)/(2.*c_k*delta)
         # step 5
         x = x-a_k*gradient
+        x = np.where(x < ctrl_min, ctrl_min, x)
+        x = np.where(x > ctrl_max, ctrl_max, x)
         score = fun(x)
         res.append([x, score])
 
