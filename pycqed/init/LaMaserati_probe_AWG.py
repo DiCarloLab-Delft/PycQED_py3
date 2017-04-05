@@ -218,6 +218,7 @@ Starmon.add_qubits([QL, QR])
 gen.load_settings_onto_instrument(Starmon)
 
 gen.load_settings_onto_instrument(QL)
+gen.load_settings_onto_instrument(QR)
 # station.sequencer_config = Starmon.get_operation_dict()['sequencer_config']
 
 
@@ -350,6 +351,12 @@ import pycqed.instrument_drivers.meta_instrument.CBox_LookuptableManager as cbl
 CBox_LutMan = cbl.ControlBox_LookuptableManager('CBox_LutMan')
 CBox_LutMan.CBox(CBox.name)
 station.add_component(CBox_LutMan)
+
+CBox_RO_LutMan = cbl.ControlBox_LookuptableManager('CBox_RO_LutMan')
+CBox_RO_LutMan.CBox(CBox.name)
+station.add_component(CBox_RO_LutMan)
+
+
 
 # UHFQC_1.timeout(2)
 from pycqed.instrument_drivers.physical_instruments import QuTech_AWG_Module as qwg

@@ -13,7 +13,18 @@ def reload_CC_qubit(qubit):
     gen.load_settings_onto_instrument(qubit)
     return qubit
 
+from pycqed.scripts.Experiments.intel_demo import qasm_helpers as qh
+reload(det)
+reload(qh)
 reload(qb)
 QL = reload_CC_qubit(QL)
 QR = reload_CC_qubit(QR)
+
+QR.RO_LutMan('CBox_RO_LutMan')
+QR.RO_awg_nr(2)
+QR.acquisition_instrument('CBox')
+QR.RO_pulse_type('MW_IQmod_pulse_CBox')
+QR.RO_pulse_length(640e-9)
+
+CBox.upload_standard_weights(QR.f_RO_mod())
 
