@@ -12,6 +12,15 @@ from pycqed.measurement.randomized_benchmarking import randomized_benchmarking a
 base_qasm_path = join(dirname(__file__), 'qasm_files')
 
 
+def CW_tone():
+    filename = join(base_qasm_path, 'CW_tone.qasm')
+    qasm_file = mopen(filename, mode='w')
+    qasm_file.writelines('Pulse \n')
+    qasm_file.close()
+    return qasm_file
+
+
+
 def CW_RO_sequence(qubit_name, trigger_separation, clock_cycle=5e-9):
     # N.B.! this delay is not correct because it does not take the
     # trigger length into account
@@ -255,7 +264,7 @@ def single_elt_on(qubit_name):
 def two_elt_MotzoiXY(qubit_name):
     '''
     Sequence used for calibrating the motzoi parameter.
-    Consists of Xy and Yx
+    Consists of yX and xY
 
     needs to reload the points for every data point.
     '''
@@ -263,13 +272,13 @@ def two_elt_MotzoiXY(qubit_name):
     qasm_file = mopen(filename, mode='w')
     qasm_file.writelines('qubit {} \n'.format(qubit_name))
     qasm_file.writelines('\ninit_all\n')
-    qasm_file.writelines('X180 {} \n'.format(qubit_name))
     qasm_file.writelines('Y90 {} \n'.format(qubit_name))
+    qasm_file.writelines('X180 {} \n'.format(qubit_name))
     qasm_file.writelines('RO {}  \n'.format(qubit_name))
 
     qasm_file.writelines('\ninit_all\n')
-    qasm_file.writelines('Y180 {} \n'.format(qubit_name))
     qasm_file.writelines('X90 {} \n'.format(qubit_name))
+    qasm_file.writelines('Y180 {} \n'.format(qubit_name))
     qasm_file.writelines('RO {}  \n'.format(qubit_name))
 
     qasm_file.close()
@@ -387,7 +396,7 @@ def randomized_benchmarking(qubit_name, nr_cliffords, nr_seeds,
 def MotzoiXY(qubit_name, motzois, cal_points=True):
     '''
     Sequence used for calibrating the motzoi parameter.
-    Consists of Xy and Yx
+    Consists of yX and xY
 
     Beware that the elements alternate, if you want to measure both Xy and Yx
     at each motzoi you need repeating motzoi parameters. This was chosen
@@ -414,15 +423,15 @@ def MotzoiXY(qubit_name, motzois, cal_points=True):
             qasm_file.writelines('RO {}  \n'.format(qubit_name))
         if i % 2:
             qasm_file.writelines(
-                'X180_Motz {} {} \n'.format(qubit_name, motzoi))
-            qasm_file.writelines(
                 'Y90_Motz {} {} \n'.format(qubit_name, motzoi))
+            qasm_file.writelines(
+                'X180_Motz {} {} \n'.format(qubit_name, motzoi))
             qasm_file.writelines('RO {}  \n'.format(qubit_name))
         else:
             qasm_file.writelines(
-                'Y180_Motz {} {} \n'.format(qubit_name, motzoi))
-            qasm_file.writelines(
                 'X90_Motz {} {} \n'.format(qubit_name, motzoi))
+            qasm_file.writelines(
+                'Y180_Motz {} {} \n'.format(qubit_name, motzoi))
             qasm_file.writelines('RO {}  \n'.format(qubit_name))
     qasm_file.close()
     return qasm_file
