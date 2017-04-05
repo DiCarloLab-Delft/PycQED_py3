@@ -148,7 +148,37 @@ class CosPulse(Pulse):
                                        (self.frequency * tvals +
                                         self.phase/360.))
 
+class LinearPulse(Pulse):
+    def __init__(self, channel=None, channels=None, name='linear pulse', **kw):
+        """ Pulse that performs linear interpolation between two setpoints """
+        Pulse.__init__(self, name)
+        if channel is None and channels is None:
+            raise ValueError('Must specify either channel or channels')
+        elif channels is None:
+            self.channel = channel  # this is just for convenience, internally
+            # this is the part the sequencer element wants to communicate with
+            self.channels.append(channel)
+        else:
+            self.channels = channels
 
+        self.start_value = kw.pop('start_value', 0)
+        self.end_value = kw.pop('end_value', 0)
+        self.length = kw.pop('length', 0)
+
+    def __call__(self, **kw):
+        self.start_value = kw.pop('start_value', self.start_value)
+        self.end_value = kw.pop('end_value', self.end_value)
+        self.length = kw.pop('length', self.length)
+        channel = kw.pop('channel', None)
+        if channel is not None:
+            self.channel=channel
+            self.channels = [self.channel]
+        self.channels = kw.pop('channels', self.channels)
+        return self
+
+    def chan_wf(self, chan, tvals):
+        return np.linspace(self.start_value, self.end_value, len(tvals)) 
+    
 class clock_train(Pulse):
     def __init__(self, channel, name='clock train', **kw):
         Pulse.__init__(self, name)
