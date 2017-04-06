@@ -13,8 +13,12 @@ def is_number(s):
 
 
 def get_bin(x, n):
+    '''
+    Return the 2's complement of the integer number $x$
+    for a given bitwidth $n$.
+    '''
     if (not is_number(x)):
-        raise ValueError('get_bin: parameter is not a number.')
+        raise ValueError('get_bin: parameter {} is not a number.'.format(x))
 
     return '{0:{fill}{width}b}'.format((int(x) + 2**n) % 2**n,
                                        fill='0', width=n)
@@ -49,6 +53,10 @@ class Assembler():
         # Control if a nop is added after each label.
         self.add_nop_after_label = True
 
+        # Control the nops added after each branch instruction.
+        self.add_nop_after_branch = True
+        self.number_of_nops_appended = 5
+
         self.tfp = None
 
     InstOpCode = {'add':     '000000',
@@ -56,15 +64,12 @@ class Assembler():
                   'beq':     '000100',
                   'bne':     '000101',
                   'addi':    '001000',
-                  'ori':     '001101',
                   'lui':     '001111',
                   'waitreg': '000000',
                   'pulse':   '000000',
                   'measure': '000000',
                   'wait':    '110000',
-                  'trigger': '101000',
-                  'lw':      '100011',
-                  'sw':      '101011'}
+                  'trigger': '101000'}
 
     InstfunctCode = {'add':     '100000',
                      'sub':     '100010',
@@ -112,7 +117,9 @@ class Assembler():
         return position
 
     # lui rt, pos, byte_data
-    def LuiFormat(self, Register, pos, putByte):
+    def LuiFormat(self, args):
+        Register, pos, putByte = args
+
         try:
             opCode = self.InstOpCode['lui']
             FDC = '100'
@@ -125,27 +132,10 @@ class Assembler():
             raise ValueError('Lui instruction format error:{}'.format(
                              detail.args))
 
-    # mov rt, imm32
-    def MovFormat(self, Register, imm32):
-        try:
-            bit32 = get_bin(imm32, 32)
-            putByte0 = int(bit32[24:32], 2)
-            putByte1 = int(bit32[16:24], 2)
-            putByte2 = int(bit32[8:16], 2)
-            putByte3 = int(bit32[0:8], 2)
-            Luis = []
-            Luis.append(self.LuiFormat(Register, 0, putByte0))
-            Luis.append(self.LuiFormat(Register, 1, putByte1))
-            Luis.append(self.LuiFormat(Register, 2, putByte2))
-            Luis.append(self.LuiFormat(Register, 3, putByte3))
-            return Luis
-
-        except ValueError as detail:
-            raise ValueError('Lui instruction format error:{}'.format(
-                             detail.args))
-
     # add rd, rs, rt
-    def AddFormat(self, dst_reg, src_reg1, src_reg2):
+    def AddFormat(self, args):
+        dst_reg, src_reg1, src_reg2 = args
+
         try:
             opCode = self.InstOpCode['add']
             FDC = '100'
@@ -161,7 +151,9 @@ class Assembler():
                              detail.args))
 
     # sub rd, rs, rt
-    def SubFormat(self, dst_reg, src_reg1, src_reg2):
+    def SubFormat(self, args):
+        dst_reg, src_reg1, src_reg2 = args
+
         try:
             opCode = self.InstOpCode['sub']
             FDC = '100'
@@ -177,7 +169,8 @@ class Assembler():
                              detail.args))
 
     # beq rs, rt, off
-    def BeqFormat(self, src_reg1, src_reg2, offset15):
+    def BeqFormat(self, args):
+        src_reg1, src_reg2, offset15 = args
         try:
             opCode = self.InstOpCode['beq']
             FDC = '100'
@@ -191,7 +184,8 @@ class Assembler():
                              detail.args))
 
     # bne rs, rt, off
-    def BneFormat(self, src_reg1, src_reg2, offset15):
+    def BneFormat(self, args):
+        src_reg1, src_reg2, offset15 = args
         try:
             opCode = self.InstOpCode['bne']
             FDC = '100'
@@ -205,7 +199,8 @@ class Assembler():
                              detail.args))
 
     # addi rt, rs, imm
-    def AddiFormat(self, dst_reg, src_reg1, imm15):
+    def AddiFormat(self, args):
+        dst_reg, src_reg1, imm15 = args
         try:
             opCode = self.InstOpCode['addi']
             FDC = '100'
@@ -218,22 +213,9 @@ class Assembler():
             raise ValueError('Addi instruction format error: {}'.format(
                              detail.args))
 
-    # ori rt, rs, imm
-    def OriFormat(self, dst_reg, src_reg1, imm15):
-        try:
-            opCode = self.InstOpCode['ori']
-            FDC = '100'
-            rs = self.get_reg_num(src_reg1)
-            rt = self.get_reg_num(dst_reg)
-            immValue = get_bin(imm15, 15)
-            return opCode + FDC + rs + rt + immValue
-
-        except ValueError as detail:
-            raise ValueError('Ori instruction format error: {}'.format(
-                             detail.args))
-
     # waitreg rs
-    def WaitRegFormat(self, src_reg):
+    def WaitRegFormat(self, args):
+        src_reg, = args
         try:
             opCode = self.InstOpCode['waitreg']
             FDC = '001'
@@ -247,7 +229,8 @@ class Assembler():
                 detail.args))
 
     # pulse AWG0, AWG1, AWG2
-    def PulseFormat(self, awg0, awg1, awg2):
+    def PulseFormat(self, args):
+        awg0, awg1, awg2 = args
         try:
             opCode = self.InstOpCode['pulse']
             FDC = '001'
@@ -259,23 +242,9 @@ class Assembler():
             raise ValueError('Pulse instruction format error: {}'.format(
                 detail.args))
 
-    # measure rt
-    # def MeasureFormat(self, dst_reg):
-    #     try:
-    #         opCode = self.InstOpCode['measure']
-    #         FDC = '011'
-    #         zero4 = '0000'
-    #         rt = self.get_reg_num(dst_reg)
-    #         zero9 = '000000000'
-    #         funct = self.InstfunctCode['measure']
-    #         return opCode + FDC + zero4 + rt + zero9 + funct
-
-    #     except ValueError as detail:
-    #         raise ValueError('Measure instruction format error: {}'.format(
-    #                          detail.args))
-
     # measure
-    def MeasureFormat(self):
+    def MeasureFormat(self, args):
+        assert(len(args) == 0)
         try:
             opCode = self.InstOpCode['measure']
             FDC = '011'
@@ -290,7 +259,8 @@ class Assembler():
                 detail.args))
 
     # wait imm
-    def WaitFormat(self, imm15):
+    def WaitFormat(self, args):
+        imm15, = args
         try:
             opCode = self.InstOpCode['wait']
             FDC = '001'
@@ -299,11 +269,13 @@ class Assembler():
             return opCode + FDC + zero8 + immValue
 
         except ValueError as detail:
-            raise ValueError('Ori instruction format error: {}'.format(
+            raise ValueError('Wait instruction format error: {}'.format(
                              detail.args))
 
     # trigger mask, duration
-    def TriggerFormat(self, mask, imm11):
+    def TriggerFormat(self, args):
+        mask, imm11 = args
+
         if len(mask) != 7:
             raise ValueError('The mask "{}" should be 7 bits. \
                               With the MSb indicating marker 1, \
@@ -329,11 +301,28 @@ class Assembler():
             return opCode + FDC + mask + immValue[1:]
 
         except ValueError as detail:
-            raise ValueError('Ori instruction format error: {}'.format(
+            raise ValueError('Trigger instruction format error: {}'.format(
                              detail.args))
 
-    def NopFormat(self):
+    def NopFormat(self, args):
+        assert(len(args) == 0)
         return "00000000000000000000000000000000"
+
+
+    inst_translation_func = {
+                'add':      AddFormat,
+                'sub':      SubFormat,
+                'beq':      BeqFormat,
+                'bne':      BneFormat,
+                'addi':     AddiFormat,
+                'lui':      LuiFormat,
+                'waitreg':  WaitRegFormat,
+                'pulse':    PulseFormat,
+                'measure':  MeasureFormat,
+                'wait':     WaitFormat,
+                'trigger':  TriggerFormat,
+                'nop':      NopFormat
+    }
 
     @classmethod
     def remove_comment(self, line):
@@ -342,227 +331,231 @@ class Assembler():
         return line
 
     @classmethod
-    def split_label_instr(self, line):
+    def split_line_elements(self, line):
         head, sep, tail = line.partition(':')
         if (sep == ":"):
-            label = head.strip().lower()
-            instr = tail
+            label = head.strip()
+            instr = tail.strip()
         else:
-            label = None
-            instr = head
+            label = ''
+            instr = head.strip()
 
-        return (label, instr)
+        label_instr = self.get_instruction_elements(instr)
+        if len(label_instr) == 0:
+            label_instr.append('')
+        label_instr.insert(0, label)
+
+        return label_instr
 
     @classmethod
     def get_instruction_elements(self, pureInstruction):
         return [rawEle.strip(string.punctuation.translate(
                 {ord('-'): None})) for rawEle in pureInstruction.split()]
 
-    def ParseLabel(self):
+    def get_valid_lines(self):
+        '''
+        Read all lines with valid instructions or labels.
+        Convert every string into lower case.
+        '''
         try:
             Asm_File = open(self.asmfilename, 'r', encoding="utf-8")
+            logging.info("open file", self.asmfilename, "successfully.")
         except:
-            print('\tError: Fail to open file ' + self.asmfilename + ".")
-            exit(0)
+            raise OSError('\tError: Fail to open file ' + self.asmfilename + ".")
 
-        self.tag_addr_dict = {}
-        cur_addr = 0
-        num_of_instr = 0
-
+        self.valid_lines = []
         for line in Asm_File:
             line = self.remove_comment(line)
-
             if (len(line) == 0):  # skip empty line and comment
                 continue
-
-            cur_addr = num_of_instr + 1
-
-            (label, instr) = self.split_label_instr(line)
-            if label is not None:
-                if label in self.tag_addr_dict:
-                    raise ValueError("Redefintion of the label {} in the QuMIS file {}".format(
-                        label, self.asmfilename))
-                self.tag_addr_dict[label] = cur_addr
-
-                if (self.add_nop_after_label):
-                    # the nop inserted after the label
-                    num_of_instr = num_of_instr + 1
-
-            if (len(instr) == 0):
-                continue
-
-            elements = self.get_instruction_elements(instr)
-
-            if (elements[0].lower() == 'mov'):
-                ni = 4
-            else:
-                ni = 1
-            num_of_instr = num_of_instr + ni
+            self.valid_lines.append(line.lower())
 
         Asm_File.close()
 
-        return self.tag_addr_dict
+    def assemble(self):
+        # label, name, param[0], param[1] ...
+        self.label_instrs = []
+
+        self.get_valid_lines()
+        self.convert_line_to_ele_array()
+        # print("instruction befre add_end_file_loop:")
+        # for i, li in enumerate(self.label_instrs):
+        #     print(i, li)
+        self.add_end_file_loop()
+        # print("instruction After add_end_file_loop:")
+        # for i, li in enumerate(self.label_instrs):
+        #     print(i, li)
+        self.remove_wait_zero()
+        self.insert_nops()
+        self.decompose()
+        self.align_labels()
+        self.get_label_addr()
+        self.cal_branch_offset()
+        return self.convert_to_instructions()
+
+    def add_end_file_loop(self):
+        # Append the following instructions at the end of the file
+        # It loops forever and the marker 7 will always be high
+        self.label_instrs.append(['end_of_file_loop', 'wait', '1000'])
+        self.label_instrs.append(['', 'trigger', '0000001','1000'])
+        self.label_instrs.append(['', 'beq', 'r0','r0', 'end_of_file_loop'])
+
+        self.align_labels()
+
+    def cal_branch_offset(self):
+        '''
+        Calculate the offset used in branch instructions.
+        '''
+        for index, label_instr in enumerate(self.label_instrs):
+            # print("instruction:", label_instr)
+            if (label_instr[1] == 'beq' or label_instr[1] == 'bne'):
+                # print("instruction found:", label_instr)
+                if label_instr[4] not in self.label_addr_dict:
+                    raise ValueError("{}: Target label {} not found.".format(label_instr[0], label_instr[4]))
+                offset = self.label_addr_dict[label_instr[4]] - (index + 1)
+                label_instr[4] = offset
+                self.label_instrs[index] = label_instr
+
+    def decompose(self):
+        '''
+        Decompose emulated instruction into atomic instructions.
+        E.g., mov -> 4 lui instructions
+        '''
+        for i, label_instr in enumerate(self.label_instrs):
+            if (label_instr[1] == 'mov'):
+                label = label_instr[0]
+
+                Register = label_instr[2]
+
+                imm32 = label_instr[3]
+                bit32 = get_bin(imm32, 32)
+                putByte0 = int(bit32[24:32], 2)
+                putByte1 = int(bit32[16:24], 2)
+                putByte2 = int(bit32[8:16], 2)
+                putByte3 = int(bit32[0:8], 2)
+
+                lui0 = [label, 'lui', Register, 0, putByte0]
+                lui1 = ['', 'lui', Register, 1, putByte1]
+                lui2 = ['', 'lui', Register, 2, putByte2]
+                lui3 = ['', 'lui', Register, 3, putByte3]
+                self.label_instrs[i] = lui0
+                self.label_instrs.insert(i+1, lui1)
+                self.label_instrs.insert(i+2, lui2)
+                self.label_instrs.insert(i+3, lui3)
+
+    def convert_line_to_ele_array(self):
+        self.label_instrs = []
+        for line in self.valid_lines:
+            self.label_instrs.append(self.split_line_elements(line))
+
+        self.align_labels()
+
+    def align_labels(self):
+        '''
+        Align the label with corresponding instruction, so that
+        every line is occupied by one instruction.
+        '''
+        for i, label_instr in enumerate(self.label_instrs):
+
+            if label_instr[0] == '' and label_instr[1] == '':
+                # remove empty line
+                self.label_instrs.pop(i)
+                continue
+
+            if label_instr[0] != '' and label_instr[1] == '':
+                # A label without an instruction
+                if (i == len(self.label_instrs) - 1):
+                    # last instruction. Add a nop for this label
+                    self.label_instrs[i] = [label_instr[0], 'nop']
+                else:
+                    # not last instruction.
+                    next_label_instr = self.label_instrs[i + 1]
+                    if (next_label_instr[0] != ''):
+                        # next instruction has a lable, throw away the current one
+                        self.label_instrs.pop(i)
+                    else:
+                        # next instruction has no tag, merge the current label
+                        # with next instruction
+                        next_label_instr[0] = label_instr[0]
+                        self.label_instrs[i + 1] = next_label_instr
+                        self.label_instrs.pop(i)
+
+        self.get_label_addr()
+
+    def get_label_addr(self):
+        self.label_addr_dict = {}
+        for i, label_instr in enumerate(self.label_instrs):
+            label = label_instr[0]
+
+            if (len(label) == 0):
+                continue
+
+            if (label in self.label_addr_dict):
+                raise ValueError("Redefintion of the label {} in the QuMIS file {}".format(
+                    label, self.asmfilename))
+
+            self.label_addr_dict[label] = i
+
+    def insert_nops(self):
+        self.align_labels()
+        if (self.add_nop_after_label):
+            self.insert_nop_after_label()
+
+        if (self.add_nop_after_branch):
+            self.insert_nop_after_branch()
+        self.align_labels()
+
+
+    def insert_nop_after_label(self):
+        for (index, label_instr) in enumerate(self.label_instrs):
+            if (label_instr[0] == ''):
+                continue
+            if (label_instr[1] == 'nop'):
+                continue
+
+            label = label_instr[0]
+            self.label_instrs[index] = [label, 'nop']
+            label_instr[0] = ''
+            self.label_instrs.insert(index + 1, label_instr)
+
+        # print("After insert nop after label:")
+        # for (index, label_instr) in enumerate(self.label_instrs):
+        #     print(index, label_instr)
+
+    def insert_nop_after_branch(self):
+        max_addr = len(self.label_instrs)
+        addr = 0
+        while (addr < max_addr):
+            if (self.label_instrs[addr][1] == 'beq' or
+                self.label_instrs[addr][1] == 'bne'):
+
+                nop_instr = ['', 'nop']
+                for i in range(self.number_of_nops_appended):
+                    self.label_instrs.insert(addr + 1, nop_instr)
+                addr = addr + self.number_of_nops_appended
+                max_addr = len(self.label_instrs)
+            addr = addr + 1
+
+    def remove_wait_zero(self):
+        for i, label_instr in enumerate(self.label_instrs):
+            if (label_instr[1] == 'wait' and label_instr[2] == '0'):
+                label_instr = [label_instr[0], '']
+                self.label_instrs[i] = label_instr
+
+        self.align_labels()
 
     def convert_to_instructions(self):
         '''
         The main function that performs the translation from the QuMIS file into binary instructions.
         '''
-
-        self.ParseLabel()
-
         self.NopInstruction = 0
-
-        Asm_File = open(self.asmfilename, 'r', encoding="utf-8")
-        logging.info("open file", self.asmfilename, "successfully.")
-
         cur_addr = 0
         self.instructions = []
 
-        for line in Asm_File:
-            line = self.remove_comment(line)
-
-            if (len(line) == 0):  # skip empty line and comment
-                continue
-
-            cur_addr = len(self.instructions) + 1
-
-            (label, instr) = self.split_label_instr(line)
-            if label is not None:
-                if (self.add_nop_after_label):
-                    self.instructions.append(self.NopInstruction)
-
-            if (len(instr) == 0):
-                continue
-
-            # the following translate function should be tested.
-            elements = [rawEle.strip(string.punctuation.translate(
-                        {ord('-'): None})) for rawEle in instr.split()]
-
-            if (elements[0].lower() == 'lui'):     # lui rt, pos, byte_data
-                self.instructions.append(int(self.LuiFormat(elements[1],
-                                                       elements[2],
-                                                       elements[3]), 2))
-
-            elif (elements[0].lower() == 'mov'):      # mov rt, imm32
-                instr4 = self.MovFormat(elements[1], elements[2])
-                for i in instr4:
-                    self.instructions.append(int(i, 2))
-
-            elif (elements[0].lower() == 'add'):   # add rd, rs, rt
-                if (elements[1][0] != 'r' or elements[2][0] != 'r' or
-                        elements[3][0] != 'r'):
-                    raise ValueError('Add instruction only receive three'
-                                     ' registers as input.')
-                    exit()
-
-                self.instructions.append(int(self.AddFormat(elements[1],
-                                                       elements[2],
-                                                       elements[3]), 2))
-
-            elif (elements[0].lower() == 'sub'):   # sub rd, rs, rt
-                if (elements[1][0] != 'r' or elements[2][0] != 'r' or
-                        elements[3][0] != 'r'):
-                    raise ValueError('Sub instruction only receive three'
-                                     'registers as input.')
-                    exit()
-
-                self.instructions.append(int(self.SubFormat(elements[1],
-                                                       elements[2],
-                                                       elements[3]), 2))
-
-            elif (elements[0].lower() == 'beq'):   # beq rs, rt, off
-                if (elements[1][0] != 'r' or elements[2][0] != 'r'):
-                    raise ValueError('beq instruction only receive registers'
-                                     ' as the first two parameter.')
-                    exit()
-
-                if elements[3].strip().lower() in self.tag_addr_dict:
-                    target_addr = self.tag_addr_dict[elements[3].strip().lower()] -\
-                        (cur_addr + 1)
-                else:
-                    raise ValueError("beq. Cannot find the branch target label:",
-                                     elements[3].strip().lower())
-                    exit()
-
-                self.instructions.append(int(self.BeqFormat(elements[1],
-                                                       elements[2],
-                                                       target_addr), 2))
-                self.add_branch_nop(self.instructions)
-
-            elif (elements[0].lower() == 'bne'):   # bne rs, rt, off
-                if (elements[1][0] != 'r' or elements[2][0] != 'r'):
-                    raise ValueError('bne instruction only receive registers as '
-                                     'the first two parameter.')
-                    exit()
-
-                if elements[3].strip().lower() in self.tag_addr_dict:
-                    target_addr = self.tag_addr_dict[elements[3].strip().lower()] -\
-                        (cur_addr + 1)
-                else:
-                    raise ValueError("bne. Cannot find the branch target label: ",
-                                     elements[3].strip().lower())
-                    exit()
-
-                self.instructions.append(int(self.BneFormat(elements[1],
-                                                       elements[2],
-                                                       target_addr), 2))
-                self.add_branch_nop(self.instructions)
-
-            elif (elements[0].lower() == 'addi'):  # addi rt, rs, imm
-                if (elements[1][0] != 'r' or elements[2][0] != 'r'):
-                    raise ValueError('addi instruction only receive registers as '
-                                     'the first two parameter.')
-                    exit()
-
-                self.instructions.append(int(self.AddiFormat(elements[1],
-                                                        elements[2],
-                                                        elements[3]), 2))
-
-            elif (elements[0].lower() == 'waitreg'):   # WaitReg rs
-                if (elements[1][0] != 'r'):
-                    raise ValueError('WaitReg instruction only a register as the '
-                                     'parameter.')
-                    exit()
-
-                self.instructions.append(int(self.WaitRegFormat(elements[1]), 2))
-
-            elif (elements[0].lower() == 'pulse'):   # Pulse awg0, awg1, awg2
-                self.instructions.append(int(self.PulseFormat(elements[1],
-                                                         elements[2],
-                                                         elements[3]), 2))
-
-            elif (elements[0].lower() == 'measure'):   # Measure
-                if (len(elements) > 1):
-                    print("Parameters in the measure instruction is omitted.")
-
-                self.instructions.append(int(self.MeasureFormat(), 2))
-
-            elif (elements[0].lower() == 'wait'):   # Wait imm
-                self.instructions.append(int(self.WaitFormat(elements[1]), 2))
-
-            elif (elements[0].lower() == 'trigger'):   # Trigger mask, duration
-                self.instructions.append(int(self.TriggerFormat(elements[1],
-                                                           elements[2]), 2))
-
-            elif (elements[0].lower() == 'nop'):
-                self.instructions.append(int(self.NopFormat(), 2))
-
-            else:
-                raise ValueError('Error: unsupported instruction "{}" found on line "{}". '.format(
-                    elements[0], line))
-                Asm_File.close()
-
-        Asm_File.close()
-
-        # Append the following instructions at the end of the file
-        # It loops forever and the marker 7 will always be high
-        # EndOfFileLoop:
-        #   wait 1000
-        #   trigger 0000001 1000
-        #   beq r0, r0, EndOfFileLoop
-        self.instructions.append(int('c08003e8', 16))
-        self.instructions.append(int('a08203e8', 16))
-        self.instructions.append(int('12007ffd', 16))
+        for label_instr in self.label_instrs:
+            elements = label_instr[1:]
+            translate_function = self.inst_translation_func[elements[0].lower()]
+            self.instructions.append(int(translate_function(self, elements[1:]), 2))
 
         return self.instructions
 
@@ -571,69 +564,22 @@ class Assembler():
         Show the final instructions after expanding the mov instruction
         and appending nop instruction after labels and beq/bne.
         '''
-        self.ParseLabel()
-
-        Asm_File = open(self.asmfilename, 'r', encoding="utf-8")
-
+        self.assemble()
         self.text_instructions = []
+        for label_instr in self.label_instrs:
+            # print(label_instr)
+            if (label_instr[0] != ''):
+                label_instr[0] = label_instr[0] + ':'
 
-        for line in Asm_File:
-            line = self.remove_comment(line)
+            text_instruction = ""
+            for i, ele in enumerate(label_instr):
+                if (i == 0):
+                    text_instruction = ele
+                elif (i == 1):
+                    text_instruction = text_instruction + ele
+                else:
+                    text_instruction = text_instruction + ', {}'.format(ele)
 
-            if (len(line) == 0):  # skip empty line and comment
-                continue
-
-            (label, instr) = self.split_label_instr(line)
-            if label is not None:
-                if (self.add_nop_after_label):
-                    self.text_instructions.append(label + ': nop')
-
-            if (len(instr) == 0):
-                continue
-
-            elements = [rawEle.strip(string.punctuation.translate(
-                {ord('-'): None})) for rawEle in instr.split()]
-
-            if (elements[0].lower() == 'mov'):
-                self.text_instructions.append("lui0 " + instr)
-                self.text_instructions.append("lui1 " + instr)
-                self.text_instructions.append("lui2 " + instr)
-                self.text_instructions.append("lui3 " + instr)
-            elif (elements[0].lower() == 'beq'):
-                self.text_instructions.append(instr)
-                self.add_branch_nop(self.text_instructions, TextVersion=True)
-            elif (elements[0].lower() == 'bne'):
-                self.text_instructions.append(instr)
-                self.add_branch_nop(self.text_instructions, TextVersion=True)
-            else:
-                self.text_instructions.append(instr)
-
-        self.text_instructions.append("EndOfFileLoop: wait 1000")
-        self.text_instructions.append("trigger 0000001 10000")
-        self.text_instructions.append("beq r0, r0, EndOfFileLoop")
-
-        if (not self.add_nop_after_label):
-            self.show_label_in_text_instruction()
-
-        Asm_File.close()
-
-
+            self.text_instructions.append(text_instruction)
+            print(text_instruction)
         return self.text_instructions
-
-    def add_branch_nop(self, instructions, TextVersion=False):
-        number_of_nops_appended = 5
-        if (TextVersion):
-            for i in range(number_of_nops_appended):
-                instructions.append('nop')
-        else:
-            instructions.append(1<<8)
-            instructions.append(2<<8)
-            instructions.append(3<<8)
-            instructions.append(4<<8)
-            instructions.append(5<<8)
-            # for i in range(number_of_nops_appended):
-            #     instructions.append(self.NopInstruction)
-
-    def show_label_in_text_instruction(self):
-        for (key, value) in self.tag_addr_dict.items():
-            self.text_instructions[value-1] = key + ":" + self.text_instructions[value-1]
