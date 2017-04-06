@@ -97,6 +97,7 @@ class Soft_Detector(Detector_Function):
 ##########################################################################
 
 
+
 class Dummy_Detector_Hard(Hard_Detector):
 
     def __init__(self, delay=0, noise=0, **kw):
@@ -246,89 +247,6 @@ class Sweep_pts_detector(Detector_Function):
         else:
             return self.sweep_points[start_idx:end_idx]
 
-
-class TimeDomainDetector(Hard_Detector):
-
-    def __init__(self, **kw):
-        super(TimeDomainDetector, self).__init__()
-        self.TD_Meas = qt.instruments['TD_Meas']
-        self.name = 'TimeDomainMeasurement'
-        self.value_names = ['I', 'Q']
-        self.value_units = ['V', 'V']
-
-    def prepare(self, sweep_points):
-        self.TD_Meas.set_NoSegments(len(sweep_points))
-        self.TD_Meas.set_cal_mode('None')
-        self.TD_Meas.prepare()
-
-    def get_values(self):
-        return self.TD_Meas.measure()
-
-
-class VNA_Detector(Hard_Detector):
-
-    def __init__(self, bw=100, power=-50, averages=1, **kw):
-        super(VNA_Detector, self).__init__()
-        self.name = 'VNA_Detector'
-        self.value_names = ['S21 (ampl)', 'S21 (comp)',
-                            'S21 (real)', 'S21 (imag)']
-        self.value_units = ['mV', 'mV', 'mV', 'mV']
-        self.VNA = qt.instruments['VNA']
-        self.bw = bw
-        self.power = power
-        self.averages = averages
-
-    def prepare(self, sweep_points):
-        self.VNA.set_format('COMP')
-
-        fstart = sweep_points[0]
-        df = sweep_points[1] - sweep_points[0]
-        npoints = len(sweep_points)
-        fstop = fstart + npoints * df
-
-        self.VNA.prepare_sweep(fstart, fstop, npoints,
-                               self.bw, self.power, self.averages)
-
-    def get_values(self):
-        self.VNA.start_single_sweep()
-        freq, S21 = self.VNA.download_trace()
-        return (np.abs(S21), np.angle(S21, deg=True), S21.real, S21.imag)
-
-    def finish(self, **kw):
-        pass
-
-
-class VNA_ATT_Detector(Hard_Detector):
-
-    def __init__(self, bw=100, power=-50, averages=1, **kw):
-        super(VNA_Detector, self).__init__()
-        self.name = 'VNA_Detector'
-        self.value_names = ['S21 (ampl)', 'S21 (comp)',
-                            'S21 (real)', 'S21 (imag)']
-        self.value_units = ['mV', 'mV', 'mV', 'mV']
-        self.VNA_ATT = qt.instruments['VNA_ATT']
-        self.bw = bw
-        self.power = power
-        self.averages = averages
-
-    def prepare(self, sweep_points):
-        self.VNA_ATT.set_format('COMP')
-
-        fstart = sweep_points[0]
-        df = sweep_points[1] - sweep_points[0]
-        npoints = len(sweep_points)
-        fstop = fstart + npoints * df
-
-        self.VNA_ATT.prepare_sweep(fstart, fstop, npoints,
-                                   self.bw, self.power, self.averages)
-
-    def get_values(self):
-        self.VNA_ATT.start_single_sweep()
-        freq, S21 = self.VNA_ATT.download_trace()
-        return (np.abs(S21), S21, S21.real, S21.imag)
-
-    def finish(self, **kw):
-        pass
 
 
 class ZNB_VNA_detector(Hard_Detector):
@@ -891,21 +809,6 @@ class QX_Detector(Soft_Detector):
         return f
 
 
-class Source_frequency_detector(Soft_Detector):
-
-    def __init__(self, source, **kw):
-        self.set_kw()
-        self.S = source
-        self.detector_control = 'soft'
-        self.name = 'Source frequency detector'
-        self.value_names = ['frequency']
-        self.value_units = ['Hz']
-        self.i = 0
-
-    def acquire_data_point(self, **kw):
-        return self.S.get('frequency')
-
-
 class Function_Detector(Soft_Detector):
     """
     Defines a detector function that wraps around an user-defined function.
@@ -916,13 +819,13 @@ class Function_Detector(Soft_Detector):
         value_units, units of the elements returned by the function
         msmt_kw, kw arguments for the function
 
-    The input function sweep_function must return a dictionary. 
+    The input function sweep_function must return a dictionary.
     The contents(keys) of this dictionary are going to be the measured
     values to be plotted and stored by PycQED
     """
 
     def __init__(self, sweep_function, result_keys, value_names=None,
-                 value_unit=None, msmt_kw={}, **kw):
+                 value_units=None, msmt_kw={}, **kw):
         super(Function_Detector, self).__init__()
         self.sweep_function = sweep_function
         self.result_keys = result_keys
@@ -932,7 +835,17 @@ class Function_Detector(Soft_Detector):
         if self.value_names is None:
             self.value_names = result_keys
         if self.value_units is None:
-            self.value_units = [""] * len(result_keys)
+            self.value_units = ['a.u.'] * len(value_names)
+
+    def acquire_data_point(self, **kw):
+        measurement_kwargs = {}
+        for key, item in self.parameters_dictionary.items():
+            if hasattr(item, 'get'):
+                value = item.get()
+            else:
+                value = item
+            measurement_kwargs[key] = value
+        result = self.function(**measurement_kwargs)
 
     def acquire_data_point(self, **kw):
         result = self.sweep_function(**self.msmt_kw)
@@ -949,7 +862,7 @@ class Function_Detector_list(Soft_Detector):
         value_units, units of the elements returned by the function
         msmt_kw, kw arguments for the function
 
-    The input function sweep_function must return a dictionary. 
+    The input function sweep_function must return a dictionary.
     The contents(keys) of this dictionary are going to be the measured
     values to be plotted and stored by PycQED
     """
@@ -1131,7 +1044,7 @@ class PulsedSpectroscopyDetector(Soft_Detector):
         return integrated_data
 
     def finish(self):
-        self.AWG.stop()
+        self.HS.finish()
 
 
 class Signal_Hound_fixed_frequency(Soft_Detector):
@@ -1161,39 +1074,6 @@ class Signal_Hound_fixed_frequency(Soft_Detector):
 
     def finish(self, **kw):
         self.SH.abort()
-
-
-class RS_FSV_fixed_frequency(Soft_Detector):
-
-    def __init__(self, frequency=None, delay=.1, bw=300,
-                 span=1e-5, npoints=101, **kw):
-        super(RS_FSV_fixed_frequency, self).__init__()
-        self.FSV = qt.instruments['FSV']
-        if frequency is None:
-            frequency = self.FSV.get_marker_frequency()
-        self.frequency = frequency
-        self.name = 'FSV_fixed_frequency'
-        self.value_names = ['Power at %.3f Hz' % self.frequency]
-        self.value_units = ['dBm']
-
-        self.bw = bw
-        self.delay = delay
-        self.span = span
-        self.npoints = npoints
-
-    def prepare(self, **kw):
-        self.FSV.prepare_sweep(self.frequency-self.span/2,
-                               self.frequency+self.span/2,
-                               self.npoints, self.bw, 1, 1, 'ON')
-        self.FSV.set_marker_frequency(self.frequency)
-        self.FSV.set_reference_level(-20)
-
-    def acquire_data_point(self, navg=1, **kw):
-        time.sleep(.1)
-        return np.array([self.FSV.get_marker_power()])
-
-    # def finish(self, **kw):
-    #     self.FSV.stop_streaming()
 
 
 class SH_mixer_skewness_det(Soft_Detector):
@@ -1445,20 +1325,17 @@ class UHFQC_input_average_detector(Hard_Detector):
 
     def get_values(self):
         self.UHFQC.quex_rl_readout(0)  # resets UHFQC internal readout counters
-        self.UHFQC.awgs_0_enable(1)
-        try:
-            temp = self.UHFQC.awgs_0_enable()
-        except:
-            temp = self.UHFQC.awgs_0_enable()
-        del temp
+
+        self.UHFQC.acquisition_arm()
+        # starting AWG
         if self.AWG is not None:
             self.AWG.start()
-        while self.UHFQC.awgs_0_enable() == 1:
-            time.sleep(0.01)
-        data = ['']*len(self.channels)
-        for i, channel in enumerate(self.channels):
-            dataset = eval("self.UHFQC.quex_iavg_data_{}()".format(channel))
-            data[i] = dataset[0]['vector']
+
+        data_raw = self.UHFQC.acquisition_poll(samples=self.nr_sweep_points,
+                                               arm=False, acquisition_time=0.01,
+                                               timeout=100)
+        data = np.array([data_raw[key]
+                         for key in data_raw.keys()])  # *self.scaling_factor
 
         return data
 
@@ -1471,7 +1348,7 @@ class UHFQC_input_average_detector(Hard_Detector):
         self.UHFQC.awgs_0_userregs_0(
             int(self.nr_averages))  # 0 for rl, 1 for iavg
         self.nr_sweep_points = self.nr_samples
-        self.UHFQC.awgs_0_single(1)
+        self.UHFQC.acquisition_initialize(channels=self.channels, mode='iavg')
 
     def finish(self):
         if self.AWG is not None:
@@ -1498,6 +1375,7 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         self.cal_points = kw.get('cal_points', None)
 
         self._set_real_imag(real_imag)
+
         self.rotate = rotate
 
         self.AWG = AWG
@@ -1523,7 +1401,8 @@ class UHFQC_integrated_average_detector(Hard_Detector):
             self.value_units[1] = 'deg'
 
     def get_values(self):
-
+        self.scaling_factor = 1 / \
+            (1.8e9*self.integration_length*self.nr_averages)
         if self.AWG is not None:
             self.AWG.stop()
         self.UHFQC.quex_rl_readout(1)  # resets UHFQC internal readout counters
@@ -1592,7 +1471,7 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         self.UHFQC.awgs_0_userregs_0(
             int(self.nr_averages*self.nr_sweep_points))
         self.UHFQC.awgs_0_userregs_1(0)  # 0 for rl, 1 for iavg
-        self.UHFQC.awgs_0_single(1)
+
         self.UHFQC.acquisition_initialize(channels=self.channels, mode='rl')
 
     def finish(self):
@@ -1626,29 +1505,26 @@ class UHFQC_integration_logging_det(Hard_Detector):
         self.integration_length = integration_length
         self.nr_shots = nr_shots
         self.cross_talk_suppression = cross_talk_suppression
+        self.scaling_factor = 1/(1.8e9*integration_length)
 
     def get_values(self):
-        self.UHFQC.quex_rl_readout(0)  # resets UHFQC internal readout counters
-        self.UHFQC.awgs_0_enable(1)
-        # probing the values to be sure communication is finished before
-        try:
-            temp = self.UHFQC.awgs_0_enable()
-        except:
-            temp = self.UHFQC.awgs_0_enable()
-        del temp
+        if self.AWG is not None:
+            self.AWG.stop()
+        self.UHFQC.quex_rl_readout(1)  # resets UHFQC internal readout counters
+        self.UHFQC.acquisition_arm()
         # starting AWG
         if self.AWG is not None:
             self.AWG.start()
-        while self.UHFQC.awgs_0_enable() == 1:
-            time.sleep(0.01)
 
-        data = ['']*len(self.channels)
-        for i, channel in enumerate(self.channels):
-            dataset = eval("self.UHFQC.quex_rl_data_{}()".format(channel))
-            data[i] = dataset[0]['vector']
-            if self.cross_talk_suppression:
-                data[i] = data[
-                    i]-eval("self.UHFQC.quex_trans_offset_weightfunction_{}()".format(channel))
+        data_raw = self.UHFQC.acquisition_poll(samples=self.nr_shots,
+                                               arm=False, acquisition_time=0.01,
+                                               timeout=1000)
+        data = np.array([data_raw[key]
+                         for key in data_raw.keys()])*self.scaling_factor
+
+        # offset suppression to be reimplemented
+        # if self.cross_talk_suppression:
+        #     data[i]=data[i]-eval("self.UHFQC.quex_trans_offset_weightfunction_{}()".format(channel))
         return data
 
     def prepare(self, sweep_points):
@@ -1672,6 +1548,7 @@ class UHFQC_integration_logging_det(Hard_Detector):
         else:
             # 0/1/2 crosstalk supressed /digitized/raw
             self.UHFQC.quex_rl_source(2)
+        self.UHFQC.acquisition_initialize(channels=self.channels, mode='rl')
 
     def finish(self):
         if self.AWG is not None:
@@ -1795,3 +1672,198 @@ class ATS_integrated_average_continuous_detector(Hard_Detector):
 
     def finish(self):
         pass
+
+
+### DDM detector functions
+class DDM_input_average_detector(Hard_Detector):
+
+    '''
+    Detector used for acquiring averaged input traces withe the DDM
+
+    '''
+
+    '''
+    Detector used for acquiring single points of the DDM while externally
+    triggered by the AWG.
+    Soft version of the regular integrated avg detector.
+    # not yet pair specific
+    '''
+
+    def __init__(self, DDM, AWG, channels=[1, 2], nr_averages=1024, nr_samples=1024, **kw):
+        super(DDM_input_average_detector, self).__init__()
+
+        self.DDM = DDM
+        self.name = 'DDM_input_averaging_data'
+        self.channels = channels
+        self.value_names = ['']*len(self.channels)
+        self.value_units = ['']*len(self.channels)
+        for i, channel in enumerate(self.channels):
+            self.value_names[i] = 'ch{}'.format(channel)
+            self.value_units[i] = 'V'
+        self.AWG = AWG
+        self.nr_samples = nr_samples
+        self.nr_averages = nr_averages
+
+    def prepare(self, sweep_points):
+        if self.AWG is not None:
+            self.AWG.stop()
+        self.DDM.ch_pair1_inavg_scansize.set(self.nr_samples)
+        self.DDM.ch_pair1_inavg_Navg(self.nr_averages)
+        self.nr_sweep_points = self.nr_samples
+
+    def get_values(self):
+        #arming DDM trigger
+        self.DDM.ch_pair1_inavg_enable.set(1)
+        self.DDM.ch_pair1_run.set(1)
+        # starting AWG
+        if self.AWG is not None:
+            self.AWG.start()
+        # polling the data, function checks that measurement is finished
+        data = ['']*len(self.channels)
+        for i, channel in enumerate(self.channels):
+            data[i] = eval("self.DDM.ch{}_inavg_data()".format(channel))/127
+        return data
+
+    def finish(self):
+        if self.AWG is not None:
+            self.AWG.stop()
+
+
+class DDM_integrated_average_detector(Hard_Detector):
+
+    '''
+    Detector used for integrated average results with the DDM
+
+    '''
+
+    def __init__(self, DDM, AWG, integration_length=1e-6, nr_averages=1024, rotate=False,
+                 channels=[1,2,3,4,5], cross_talk_suppression=False,
+                 **kw):
+        super(DDM_integrated_average_detector, self).__init__()
+        self.DDM = DDM
+        self.name = 'DDM_integrated_average'
+        self.channels = channels
+        self.value_names = ['']*len(self.channels)
+        self.value_units = ['']*len(self.channels)
+        self.cal_points = kw.get('cal_points', None)
+        for i, channel in enumerate(self.channels):
+            self.value_names[i] = 'w{}'.format(channel)
+            self.value_units[i] = 'V'
+        self.rotate = rotate
+        self.AWG = AWG
+        self.nr_averages = nr_averages
+        self.integration_length = integration_length
+        self.rotate = rotate
+        self.cross_talk_suppression = cross_talk_suppression
+        self.scaling_factor=1/(500e6*integration_length)/127
+
+    def prepare(self, sweep_points=None):
+        if self.AWG is not None:
+            self.AWG.stop()
+        if sweep_points is None:
+            self.nr_sweep_points = 1
+        else:
+            self.nr_sweep_points = len(sweep_points)
+        # this sets the result to integration and rotation outcome
+        for i, channel in enumerate(self.channels):
+            eval("self.DDM.ch_pair1_weight{}_wint_intlength({})".format(channel, self.integration_length*500e6))
+        self.DDM.ch_pair1_tvmode_naverages(self.nr_averages)
+        self.DDM.ch_pair1_tvmode_nsegments(self.nr_sweep_points)
+
+    def get_values(self):
+        #arming DDM trigger
+        self.DDM.ch_pair1_tvmode_enable.set(1)
+        self.DDM.ch_pair1_run.set(1)
+        # starting AWG
+        if self.AWG is not None:
+            self.AWG.start()
+        # polling the data, function checks that measurement is finished
+        data = ['']*len(self.channels)
+        for i, channel in enumerate(self.channels):
+            data[i] = eval("self.DDM.ch_pair1_weight{}_tvmode_data()".format(channel))*self.scaling_factor
+        if self.rotate:
+            return self.rotate_and_normalize(data)
+        else:
+            return data
+
+    def acquire_data_point(self):
+        return self.get_values()
+
+    def rotate_and_normalize(self, data):
+        """
+        Rotates and normalizes
+        """
+        if self.cal_points is None:
+            self.corr_data, self.zero_coord, self.one_coord = \
+                a_tools.rotate_and_normalize_data(
+                    data=data,
+                    cal_zero_points=list(range(-4, -2)),
+                    cal_one_points=list(range(-2, 0)))
+        else:
+            self.corr_data, self.zero_coord, self.one_coord = \
+                a_tools.rotate_and_normalize_data(
+                    data=self.measured_values[0:2],
+                    cal_zero_points=self.cal_points[0],
+                    cal_one_points=self.cal_points[1])
+        return self.corr_data, self.corr_data
+
+    def finish(self):
+        if self.AWG is not None:
+            self.AWG.stop()
+
+
+class DDM_integration_logging_det(Hard_Detector):
+
+    '''
+    Detector used for integrated average results with the UHFQC
+
+    '''
+
+    def __init__(self, DDM, AWG, integration_length=1e-6,
+                 channels=[1, 2], nr_shots=4096, **kw):
+        super(DDM_integration_logging_det, self).__init__()
+        self.DDM = DDM
+        self.name = 'DDM_integration_logging_det'
+        self.channels = channels
+        self.value_names = ['']*len(self.channels)
+        self.value_units = ['']*len(self.channels)
+        for i, channel in enumerate(self.channels):
+            self.value_names[i] = 'w{}'.format(channel)
+            self.value_units[i] = 'V'
+        if len(self.channels) == 2:
+            self.value_names = ['I', 'Q']
+            self.value_units = ['V', 'V']
+        self.AWG = AWG
+        self.integration_length = integration_length
+        self.nr_shots = nr_shots
+        self.scaling_factor=1/(500e6*integration_length)/127
+
+    def prepare(self, sweep_points):
+        if self.AWG is not None:
+            self.AWG.stop()
+        if sweep_points is None:
+            self.nr_sweep_points = 1
+        else:
+            self.nr_sweep_points = len(sweep_points)
+        # this sets the result to integration and rotation outcome
+        for i, channel in enumerate(self.channels):
+            eval("self.DDM.ch_pair1_weight{}_wint_intlength({})".format(channel, self.integration_length*500e6))
+        self.DDM.ch_pair1_logging_nshots(self.nr_shots)
+
+
+    def get_values(self):
+        #arming DDM trigger
+        self.DDM.ch_pair1_logging_enable.set(1)
+        self.DDM.ch_pair1_run.set(1)
+        # starting AWG
+        if self.AWG is not None:
+            self.AWG.start()
+        # polling the data, function checks that measurement is finished
+        data = ['']*len(self.channels)
+        for i, channel in enumerate(self.channels):
+            data[i] = eval("self.DDM.ch_pair1_weight{}_logging_int()".format(channel))*self.scaling_factor
+        return data
+
+    def finish(self):
+        if self.AWG is not None:
+            self.AWG.stop()

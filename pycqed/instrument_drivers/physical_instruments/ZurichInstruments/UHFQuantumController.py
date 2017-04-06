@@ -208,6 +208,7 @@ class UHFQC(Instrument):
         self.awgs_0_auxtriggers_0_slope(1)
         # Straight connection, signal input 1 to channel 1, signal input 2 to
         # channel 2
+
         self.quex_deskew_0_col_0(1.0)
         self.quex_deskew_0_col_1(0.0)
         self.quex_deskew_1_col_0(0.0)
@@ -418,7 +419,7 @@ class UHFQC(Instrument):
             arm    (bool): if true arms the acquisition, disable when you
                            need synchronous acquisition with some external dev
             acquisition_time (float): time in sec between polls? # TODO check with Niels H
-            timeout (float): time in unknown units before timeout Error is raised.
+            timeout (float): time in seconds before timeout Error is raised.
 
         """
         data = dict()
@@ -433,7 +434,6 @@ class UHFQC(Instrument):
 
         while accumulated_time < self.timeout() and not all(gotem):
             dataset = self._daq.poll(acquisition_time, 1, 4, True)
-            # print(dataset)
             for n, p in enumerate(self.acquisition_paths):
                 if p in dataset:
                     for v in dataset[p]:
@@ -455,9 +455,9 @@ class UHFQC(Instrument):
 
         return data
 
-    def acquisition(self, samples, acquisition_time=0.010, channels=set([0, 1]), mode='rl'):
+    def acquisition(self, samples, acquisition_time=0.010, timeout=0, channels=set([0, 1]), mode='rl'):
         self.acquisition_initialize(channels, mode)
-        data = self.acquisition_poll(samples, acquisition_time )
+        data = self.acquisition_poll(samples, acquisition_time, timeout)
         self.acquisition_finalize()
 
         return data
@@ -466,15 +466,9 @@ class UHFQC(Instrument):
         # Define the channels to use
         self.acquisition_paths = []
 
-        valid_ch_types = (int, np.integer)
-
-        if not isinstance(channels[0], valid_ch_types):
-            raise ValueError('channels {} must be list of integers'.format(channels))
-
         if mode == 'rl':
             for c in channels:
-                self.acquisition_paths.append(
-                    '/' + self._device + '/quex/rl/data/{}'.format(c))
+                self.acquisition_paths.append('/' + self._device + '/quex/rl/data/{}'.format(c))
             self._daq.subscribe('/' + self._device + '/quex/rl/data/*')
             # Enable automatic readout
             self._daq.setInt('/' + self._device + '/quex/rl/readout', 1)

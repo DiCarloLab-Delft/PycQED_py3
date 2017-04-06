@@ -16,11 +16,6 @@ imp.reload(wf)
 class CBox_Sweep(swf.Hard_Sweep):
     def __init__(self, Duplexer=False, **kw):
         self.sweep_control = 'hard'
-        # self.CBox = qt.instruments['CBox']
-        # self.AWG = qt.instruments['AWG']
-        # self.CBox_lut_man = qt.instruments['CBox_lut_man']
-        # self.TD_Meas = qt.instruments['TD_Meas']
-        print("loading instruments CBox")
         if not hasattr(self, 'cal_points'):
             self.cal_points = kw.pop('cal_points', 10)
 
