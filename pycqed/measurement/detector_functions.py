@@ -1486,7 +1486,7 @@ class UHFQC_integration_logging_det(Hard_Detector):
     '''
 
     def __init__(self, UHFQC, AWG, integration_length=1e-6,
-                 channels=[0, 1], nr_shots=4095,
+                 channels=[0, 1], nr_shots=4094,
                  cross_talk_suppression=False,  **kw):
         super(UHFQC_integration_logging_det, self).__init__()
         self.UHFQC = UHFQC
@@ -1515,8 +1515,8 @@ class UHFQC_integration_logging_det(Hard_Detector):
         if self.AWG is not None:
             self.AWG.start()
 
-        data_raw = self.UHFQC.acquisition_poll(samples=self.nr_shots,
-                                               arm=False, acquisition_time=0.01)
+        data_raw = self.UHFQC.acquisition_poll(
+            samples=self.nr_shots, arm=False, acquisition_time=0.01)
         data = np.array([data_raw[key]
                          for key in data_raw.keys()])*self.scaling_factor
 

@@ -101,7 +101,6 @@ class CBox_v3_driven_transmon(Transmon):
                            parameter_class=ManualParameter,
                            initial_value=0.4)
 
-
     def add_parameters(self):
         self.add_parameter('acquisition_instrument',
                            set_cmd=self._set_acquisition_instr,
@@ -265,7 +264,6 @@ class CBox_v3_driven_transmon(Transmon):
             RF.frequency(f_RO)
             RF.on()
 
-
         self.cw_source.get_instr().off()
         self.cw_source.get_instr().pulsemod_state.set('off')
         self.cw_source.get_instr().power.set(self.spec_pow.get())
@@ -355,8 +353,6 @@ class CBox_v3_driven_transmon(Transmon):
             self.CBox.get_instr().lin_trans_coeffs(
                 np.reshape(rotation_matrix(self.RO_rotation_angle(), as_array=True), (4,)))
 
-
-
         self.CBox.get_instr().set('sig{}_threshold_line'.format(
             int(self.signal_line.get())),
             int(self.RO_threshold.get()))
@@ -401,7 +397,7 @@ class CBox_v3_driven_transmon(Transmon):
             logging.info("setting UHFQC acquisition")
             self.input_average_detector = det.UHFQC_input_average_detector(
                 UHFQC=self._acquisition_instrument,
-                AWG=None, nr_averages=self.RO_acq_averages())
+                AWG=self.CBox.get_instr(), nr_averages=self.RO_acq_averages())
             self.int_avg_det_single = det.UHFQC_integrated_average_detector(
                 UHFQC=self._acquisition_instrument, AWG=self.CBox.get_instr(),
                 channels=[
@@ -864,7 +860,7 @@ class CBox_v3_driven_transmon(Transmon):
             pulse_names=['X180', 'X90', 'Y180', 'Y90'])
         d = self.int_avg_det_single
         d.seg_per_point = 2
-        d.detector_control='hard'
+        d.detector_control = 'hard'
 
         # d = qh.CBox_single_integration_average_det_CC(
         #     self.CBox.get_instr(), nr_averages=self.RO_acq_averages()//MC.soft_avg(),
@@ -945,8 +941,10 @@ class CBox_v3_driven_transmon(Transmon):
         qumis_file = single_pulse_asm
         self.CBox.get_instr().load_instructions(qumis_file.name)
 
-        ch_amp = swf.QWG_lutman_par(self.Q_LutMan, self.Q_LutMan.get_instr().Q_amp180)
-        motzoi = swf.QWG_lutman_par(self.Q_LutMan, self.Q_LutMan.get_instr().Q_motzoi)
+        ch_amp = swf.QWG_lutman_par(
+            self.Q_LutMan, self.Q_LutMan.get_instr().Q_amp180)
+        motzoi = swf.QWG_lutman_par(
+            self.Q_LutMan, self.Q_LutMan.get_instr().Q_motzoi)
 
         self.CBox.get_instr().log_length(log_length)
         self.MC.get_instr().set_sweep_function(ch_amp)
@@ -1071,7 +1069,8 @@ class CBox_v3_driven_transmon(Transmon):
             MC = self.MC.get_instr()
 
         AllXY = sqqs.AllXY(self.name, double_points=True)
-        s = qh.QASM_Sweep(AllXY.name, self.CBox.get_instr(), self.get_operation_dict())
+        s = qh.QASM_Sweep(
+            AllXY.name, self.CBox.get_instr(), self.get_operation_dict())
         d = self.int_avg_det
         MC.set_sweep_function(s)
         MC.set_sweep_points(np.arange(42))
@@ -1126,8 +1125,8 @@ class CBox_v3_driven_transmon(Transmon):
         # FIXME: remove when integrating UHFQC
         self.CBox.get_instr().log_length(1024*6)
         off_on = sqqs.off_on(self.name)
-        s = qh.QASM_Sweep(off_on.name, self.CBox.get_instr(), self.get_operation_dict(),
-                          parameter_name='Shots')
+        s = qh.QASM_Sweep(off_on.name, self.CBox.get_instr(),
+                          self.get_operation_dict(), parameter_name='Shots')
         d = self.int_log_det
         MC.set_sweep_function(s)
         MC.set_sweep_points(np.arange(nr_shots))
@@ -1142,7 +1141,6 @@ class CBox_v3_driven_transmon(Transmon):
                 print('Avg. Assignement fidelity: \t{:.4f}\n'.format(a.F_a) +
                       'Avg. Discrimination fidelity: \t{:.4f}'.format(a.F_d))
             return a.F_a, a.F_d
-
 
     def measure_transients(self, MC=None):
         self.prepare_for_timedomain()
@@ -1161,7 +1159,7 @@ class CBox_v3_driven_transmon(Transmon):
             MC.set_sweep_points(
                 np.arange(self.input_average_detector.nr_samples))
             MC.set_detector_function(self.input_average_detector)
-            MC.run('Measure_transients_{}_{}'.format(self.msmt_suffix, i))
+            MC.run('Measure_transients{}_{}'.format(self.msmt_suffix, i))
             ma.MeasurementAnalysis()
 
     def measure_butterfly(self, return_detector=False, MC=None,
@@ -1310,7 +1308,6 @@ class CBox_v3_driven_transmon(Transmon):
                         RO_acq_marker_del_clks,
                         max(RO_pulse_length_clocks-RO_acq_marker_del_clks, 0))}
 
-
             if self.RO_pulse_type() == 'MW_IQmod_pulse_UHFQC':
                 raise NotImplementedError
 
@@ -1324,10 +1321,10 @@ class CBox_v3_driven_transmon(Transmon):
                 operation_dict['RO {}'.format(self.name)] = {
                     'duration': RO_pulse_length_clocks, 'instruction':
                     (ins_lib.trigg_ch_to_instr(self.RO_acq_marker_channel(),
-                                       RO_pulse_length_clocks) +
+                                               RO_pulse_length_clocks) +
                      'wait {}\n'.format(RO_pulse_delay_clocks) +
                      ins_lib.trigg_ch_to_instr(self.RO_acq_marker_channel(),
-                                       2))}
+                                               2))}
                 # UHF triggers on the rising edge
 
             if RO_depletion_clocks != 0:
@@ -1717,5 +1714,3 @@ class QWG_driven_transmon(CBox_v3_driven_transmon):
             raise NotImplementedError('Unknown acquisition device.')
 
         return operation_dict
-
-
