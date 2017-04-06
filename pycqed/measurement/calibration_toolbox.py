@@ -524,14 +524,16 @@ def mixer_skewness_calibration_CBoxV3(SH, source, LutMan, MC, CBox,
     return phi, alpha
 
 
-def mixer_skewness_cal_CBox_old(CBox, SH, source,
-                                LutMan,
-                                AWG,
-                                MC,
-                                awg_nrs=[0],
-                                calibrate_both_sidebands=False,
-                                verbose=True):
+def mixer_skewness_cal_CBox_adaptive(CBox, SH, source,
+                                     LutMan,
+                                     AWG,
+                                     MC,
+                                     awg_nrs=[0],
+                                     calibrate_both_sidebands=False,
+                                     verbose=True):
     '''
+    Warning! this is for CBox v2
+
     Input args
         CBox
         SH:     Signal Hound

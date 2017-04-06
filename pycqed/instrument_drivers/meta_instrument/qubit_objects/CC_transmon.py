@@ -16,11 +16,9 @@ from qcodes.instrument.parameter import ManualParameter
 from pycqed.measurement.waveform_control_CC import waveform as wf
 from pycqed.analysis import measurement_analysis as ma
 from pycqed.analysis.tools.data_manipulation import rotation_matrix
-# from pycqed.measurement.calibration_toolbox import mixer_carrier_cancellation_CBox
 from pycqed.measurement.calibration_toolbox import (
     mixer_carrier_cancellation, mixer_skewness_calibration_CBoxV3)
 
-# from pycqed.measurement.calibration_toolbox import mixer_skewness_calibration_CBoxV3
 from pycqed.measurement import sweep_functions as swf
 from pycqed.measurement.waveform_control_CC import single_qubit_qasm_seqs as sqqs
 import pycqed.measurement.CBox_sweep_functions as cbs
@@ -407,7 +405,8 @@ class CBox_v3_driven_transmon(Transmon):
             self.int_avg_det_single = det.UHFQC_integrated_average_detector(
                 UHFQC=self._acquisition_instrument, AWG=self.CBox.get_instr(),
                 channels=[
-                    self.RO_acq_weight_function_I(), self.RO_acq_weight_function_Q()],
+                    self.RO_acq_weight_function_I(),
+                    self.RO_acq_weight_function_Q()],
                 nr_averages=self.RO_acq_averages(),
                 real_imag=True,
                 integration_length=self.RO_acq_integration_length())
@@ -416,24 +415,29 @@ class CBox_v3_driven_transmon(Transmon):
             self.int_avg_det = det.UHFQC_integrated_average_detector(
                 UHFQC=self._acquisition_instrument, AWG=self.CBox.get_instr(),
                 channels=[
-                    self.RO_acq_weight_function_I(), self.RO_acq_weight_function_Q()],
+                    self.RO_acq_weight_function_I(),
+                    self.RO_acq_weight_function_Q()],
                 nr_averages=self.RO_acq_averages(),
                 integration_length=self.RO_acq_integration_length())
             self.int_avg_det_rot = det.UHFQC_integrated_average_detector(
                 UHFQC=self._acquisition_instrument, AWG=self.CBox.get_instr(),
-                channels=[self.RO_acq_weight_function_I(), self.RO_acq_weight_function_Q()], nr_averages=self.RO_acq_averages(),
-                integration_length=self.RO_acq_integration_length(), rotate=True)
+                channels=[self.RO_acq_weight_function_I(),
+                          self.RO_acq_weight_function_Q()],
+                nr_averages=self.RO_acq_averages(),
+                integration_length=self.RO_acq_integration_length(),
+                rotate=True)
             self.int_log_det = det.UHFQC_integration_logging_det(
                 UHFQC=self._acquisition_instrument, AWG=self.CBox.get_instr(),
-                channels=[
-                    self.RO_acq_weight_function_I(), self.RO_acq_weight_function_Q()],
+                channels=[self.RO_acq_weight_function_I(),
+                          self.RO_acq_weight_function_Q()],
                 integration_length=self.RO_acq_integration_length())
 
         elif 'ATS' in acq_instr_name:
             logging.info("setting ATS acquisition")
             self.int_avg_det = det.ATS_integrated_average_continuous_detector(
                 ATS=self._acquisition_instrument.card,
-                ATS_acq=self._acquisition_instrument.controller, AWG=self.CBox.get_instr(),
+                ATS_acq=self._acquisition_instrument.controller,
+                AWG=self.CBox.get_instr(),
                 nr_averages=self.RO_acq_averages())
         return
 
@@ -1137,7 +1141,28 @@ class CBox_v3_driven_transmon(Transmon):
             if verbose:
                 print('Avg. Assignement fidelity: \t{:.4f}\n'.format(a.F_a) +
                       'Avg. Discrimination fidelity: \t{:.4f}'.format(a.F_d))
-            return a
+            return a.F_a, a.F_d
+
+
+    def measure_transients(self, MC=None):
+        self.prepare_for_timedomain()
+        if MC is None:
+            MC = self.MC.get_instr()
+
+        # Loading the right qumis instructions
+        for i, pulse_comb in enumerate(['off', 'on']):
+            off_on_sequence = sqqs.off_on(self.name, pulse_comb=pulse_comb)
+            # qumis_file = qta.qasm_to_asm(off_on_sequence.name,
+            #                              self.get_operation_dict())
+            MC.set_sweep_function(swf.QASM_Sweep(
+                filename=off_on_sequence.name, CBox=self.CBox.get_instr(),
+                op_dict=self.get_operation_dict(),
+                parameter_name='Samples', unit='#'))
+            MC.set_sweep_points(
+                np.arange(self.input_average_detector.nr_samples))
+            MC.set_detector_function(self.input_average_detector)
+            MC.run('Measure_transients_{}_{}'.format(self.msmt_suffix, i))
+            ma.MeasurementAnalysis()
 
     def measure_butterfly(self, return_detector=False, MC=None,
                           analyze=True, close_fig=True,

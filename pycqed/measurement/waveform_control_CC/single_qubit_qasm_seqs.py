@@ -20,7 +20,6 @@ def CW_tone():
     return qasm_file
 
 
-
 def CW_RO_sequence(qubit_name, trigger_separation, clock_cycle=5e-9):
     # N.B.! this delay is not correct because it does not take the
     # trigger length into account
@@ -285,19 +284,27 @@ def two_elt_MotzoiXY(qubit_name):
     return qasm_file
 
 
-def off_on(qubit_name):
+def off_on(qubit_name, pulse_comb='off_on'):
+    """
+    Performs an 'Off_On' sequence on the qubit specified.
+    Pulses can be optionally enabled by putting 'off', respectively 'on' in
+    the pulse_comb string.
+    """
     filename = join(base_qasm_path, 'off_on.qasm')
     qasm_file = mopen(filename, mode='w')
     qasm_file.writelines('qubit {} \n'.format(qubit_name))
 
     # Off
-    qasm_file.writelines('\ninit_all\n')
-    qasm_file.writelines('RO {}  \n'.format(qubit_name))
+    if 'off' in pulse_comb.lower():
+        qasm_file.writelines('\ninit_all\n')
+        qasm_file.writelines('RO {}  \n'.format(qubit_name))
     # On
-    qasm_file.writelines('\ninit_all\n')
-    qasm_file.writelines('X180 {}     # On \n'.format(qubit_name))
-    qasm_file.writelines('RO {}  \n'.format(qubit_name))
-
+    if 'on' in pulse_comb.lower():
+        qasm_file.writelines('\ninit_all\n')
+        qasm_file.writelines('X180 {}     # On \n'.format(qubit_name))
+        qasm_file.writelines('RO {}  \n'.format(qubit_name))
+    if 'on' not in pulse_comb.lower() and 'off' not in pulse_comb.lower():
+        raise ValueError
     qasm_file.close()
     return qasm_file
 
@@ -309,7 +316,8 @@ def butterfly(qubit_name, initialize=False):
 
     The duration of the RO + depletion is specified in the definition of RO
     """
-    filename = join(base_qasm_path, 'butterfly_init_{}.qasm'.format(initialize))
+    filename = join(
+        base_qasm_path, 'butterfly_init_{}.qasm'.format(initialize))
     qasm_file = mopen(filename, mode='w')
     qasm_file.writelines('qubit {} \n'.format(qubit_name))
     if initialize:
