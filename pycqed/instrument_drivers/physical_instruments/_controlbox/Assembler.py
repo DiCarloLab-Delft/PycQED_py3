@@ -46,6 +46,9 @@ class Assembler():
 
     def __init__(self, asm_filename):
         self.asmfilename = asm_filename
+        # Control if a nop is added after each label.
+        self.add_nop_after_label = True
+
         self.tfp = None
 
     InstOpCode = {'add':     '000000',
@@ -401,7 +404,9 @@ class Assembler():
         return self.tag_addr_dict
 
     def convert_to_instructions(self):
-        self.add_nop_after_label = True
+        '''
+        The main function that performs the translation from the QuMIS file into binary instructions.
+        '''
 
         self.ParseLabel()
 
