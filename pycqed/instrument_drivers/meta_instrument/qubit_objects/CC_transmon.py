@@ -22,7 +22,7 @@ from pycqed.measurement.calibration_toolbox import (
 from pycqed.measurement import sweep_functions as swf
 from pycqed.measurement.waveform_control_CC import single_qubit_qasm_seqs as sqqs
 import pycqed.measurement.CBox_sweep_functions as cbs
-from pycqed.scripts.Experiments.intel_demo import qasm_helpers as qh
+from pycqed.measurement.waveform_control_CC import qasm_helpers as qh
 from pycqed.measurement.waveform_control_CC import qasm_to_asm as qta
 from pycqed.measurement.waveform_control_CC import instruction_lib as ins_lib
 
