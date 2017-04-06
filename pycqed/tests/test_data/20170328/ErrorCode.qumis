@@ -1,0 +1,12 @@
+mov r0, 0
+mov r1, 200
+
+loop: waitreg r1
+      trigger 1111111, 10
+      pulse 0000 1001 0000
+      waitreg r1
+      # wait 500
+      beq r0, r0, loop
+
+# you should be able to see repeated marker output and pulse output at the same time.
+# the period is 2 us.
