@@ -68,6 +68,10 @@ class Test_single_qubit_seqs(TestCase):
         with self.assertRaises(ValueError):
             self.assembler.get_lui_pos('5')
 
+    def test_wait_negative(self):
+        with self.assertRaises(ValueError):
+            self.assembler.WaitFormat(["-11"])
+
     def test_program_length(self):
 
         self.setUpClass("LabelTest.qumis")

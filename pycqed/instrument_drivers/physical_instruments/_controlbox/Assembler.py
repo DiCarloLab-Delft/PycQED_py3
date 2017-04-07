@@ -261,6 +261,9 @@ class Assembler():
     # wait imm
     def WaitFormat(self, args):
         imm15, = args
+        if (int(imm15) < 0):
+            raise ValueError("The Waiting time {} is smaller than 0.".format(imm15))
+
         try:
             opCode = self.InstOpCode['wait']
             FDC = '001'
