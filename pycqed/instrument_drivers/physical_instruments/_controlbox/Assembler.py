@@ -381,20 +381,13 @@ class Assembler():
 
         self.get_valid_lines()
         self.convert_line_to_ele_array()
-        # print("instruction befre add_end_file_loop:")
-        # for i, li in enumerate(self.label_instrs):
-        #     print(i, li)
         self.add_end_file_loop()
-        # print("instruction After add_end_file_loop:")
-        # for i, li in enumerate(self.label_instrs):
-        #     print(i, li)
         self.remove_wait_zero()
         self.insert_nops()
         self.decompose()
         self.align_labels()
         self.get_label_addr()
         self.cal_branch_offset()
-        return self.convert_to_instructions()
 
     def add_end_file_loop(self):
         # Append the following instructions at the end of the file
@@ -521,10 +514,6 @@ class Assembler():
             label_instr[0] = ''
             self.label_instrs.insert(index + 1, label_instr)
 
-        # print("After insert nop after label:")
-        # for (index, label_instr) in enumerate(self.label_instrs):
-        #     print(index, label_instr)
-
     def insert_nop_after_branch(self):
         max_addr = len(self.label_instrs)
         addr = 0
@@ -551,8 +540,7 @@ class Assembler():
         '''
         The main function that performs the translation from the QuMIS file into binary instructions.
         '''
-        self.NopInstruction = 0
-        cur_addr = 0
+        self.assemble()
         self.instructions = []
 
         for label_instr in self.label_instrs:
@@ -570,7 +558,6 @@ class Assembler():
         self.assemble()
         self.text_instructions = []
         for label_instr in self.label_instrs:
-            # print(label_instr)
             if (label_instr[0] != ''):
                 label_instr[0] = label_instr[0] + ':'
 

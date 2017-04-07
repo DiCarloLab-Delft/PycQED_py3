@@ -75,7 +75,7 @@ class Test_single_qubit_seqs(TestCase):
     def test_program_length(self):
 
         self.setUpClass("LabelTest.qumis")
-        self.assembler.assemble()
+        self.assembler.convert_to_instructions()
         self.assertEqual(len(self.assembler.instructions),
             len(self.assembler.getTextInstructions()))
 
@@ -98,7 +98,7 @@ class Test_single_qubit_seqs(TestCase):
 
     def test_end_of_file_loop(self):
         self.setUpClass()
-        self.assembler.assemble()
+        self.assembler.convert_to_instructions()
         self.assertEqual(self.assembler.instructions[-8], 3229615080)
         self.assertEqual(self.assembler.instructions[-7], 2692875240)
         self.assertEqual(self.assembler.instructions[-6], 302022652)
@@ -202,7 +202,7 @@ class Test_single_qubit_seqs(TestCase):
             if (asm_name[-6:] != '.qumis'):
                 continue
             self.setUpClass(asm_name)
-            instructions = self.assemble()
+            instructions = self.convert_to_instructions()
 
             old_asm_obj = oldasm.Assembler(self.qumis_file_name)
             old_instructions = asm_obj.convert_to_instructions()
