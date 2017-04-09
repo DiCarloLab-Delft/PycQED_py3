@@ -51,7 +51,7 @@ class Assembler():
     def __init__(self, asm_filename):
         self.asmfilename = asm_filename
         # Control if a nop is added after each label.
-        self.add_nop_after_label = True
+        self.add_nop_after_label = False
 
         # Control the nops added after each branch instruction.
         self.add_nop_after_branch = True
@@ -555,7 +555,15 @@ class Assembler():
         Show the final instructions after expanding the mov instruction
         and appending nop instruction after labels and beq/bne.
         '''
-        self.assemble()
+        self.label_instrs = []
+        self.get_valid_lines()
+        self.convert_line_to_ele_array()
+        self.add_end_file_loop()
+        self.remove_wait_zero()
+        self.insert_nops()
+        self.decompose()
+        self.align_labels()
+        self.get_label_addr()
         self.text_instructions = []
         for label_instr in self.label_instrs:
             if (label_instr[0] != ''):
@@ -571,5 +579,4 @@ class Assembler():
                     text_instruction = text_instruction + ', {}'.format(ele)
 
             self.text_instructions.append(text_instruction)
-            print(text_instruction)
         return self.text_instructions
