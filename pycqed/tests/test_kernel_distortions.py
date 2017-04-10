@@ -27,6 +27,7 @@ class Test_KernelObject(unittest.TestCase):
 
     @classmethod
     def setUpClass(self):
+        print('setting up')
         self.station = station.Station()
         # set up a pulsar with some mock settings for the element
         self.k0 = ko.Distortion('k0')
@@ -35,27 +36,30 @@ class Test_KernelObject(unittest.TestCase):
         self.station.add_component(self.k1)
 
     def test_skin_kernel(self):
+        print('skin_kernel')
         self.k0.skineffect_alpha(0.1)
-        self.k0.skineffect_length(40)
+        self.k0.skineffect_length(40e-9)
         kObj_skin = self.k0.get_skin_kernel()
         kf_skin = kf.skin_kernel(alpha=.1, length=40)
         np.testing.assert_array_equal(kObj_skin, kf_skin)
 
     def test_bounce_kernel(self):
-        bl = 40
+        print('bounce_kernel')
+        bl = 40e-9
         ba = .2
-        bt = 12
+        bt = 12e-9
         self.k0.bounce_amp_1(ba)
         self.k0.bounce_tau_1(bt)
         self.k0.bounce_length_1(bl)
         kObj_bounce = self.k0.get_bounce_kernel_1()
-        kf_bounce = kf.bounce_kernel(amp=ba, time=bt, length=bl)
+        kf_bounce = kf.bounce_kernel(amp=ba, time=bt*1e9, length=bl*1e9)
         np.testing.assert_array_equal(kObj_bounce, kf_bounce)
 
     def test_decay_kernel(self):
+        print('decay_kernel')
         dA = 3
-        dtau = 15
-        dl = 100
+        dtau = 15e-9
+        dl = 100e-9
         for i in [1, 2]:
             self.k0.set('decay_amp_{}'.format(i), dA)
             self.k0.set('decay_tau_{}'.format(i), dtau)
@@ -63,12 +67,13 @@ class Test_KernelObject(unittest.TestCase):
 
         kObj_dec1 = self.k0.get_decay_kernel_1()
         kObj_dec2 = self.k0.get_decay_kernel_1()
-        kf_dec = kf.decay_kernel(amp=dA, tau=dtau, length=dl)
+        kf_dec = kf.decay_kernel(amp=dA, tau=dtau*1e9, length=dl*1e9)
 
         np.testing.assert_array_equal(kf_dec, kObj_dec1)
         np.testing.assert_array_equal(kf_dec, kObj_dec2)
 
     def test_config_changed_flag(self):
+        print('config_changed_flag')
         self.k0.decay_amp_1(.9)
         self.assertEqual(self.k0.config_changed(), True)
         self.k0.kernel()
@@ -84,8 +89,8 @@ class Test_KernelObject(unittest.TestCase):
         # restored
         # datadir = os.path.join(pq.__path__[0], 'tests', 'test_data',
         #                        'test_kernels')
-        # self.k0.kernel_dir_path(datadir)
-        # print(self.k0.kernel_dir_path())
+        # self.k0.kernel_dir(datadir)
+        # print(self.k0.kernel_dir())
         # self.k0.kernel_list(['precompiled_RT_20161206.txt'])
         # kernel = self.k0.kernel()
 
@@ -94,26 +99,6 @@ class Test_KernelObject(unittest.TestCase):
     #     kernel_list
     #     self.k0.convolve_kernel(kernel_list, length)
 
-    def test_kernel_to_cache(self):
-        # Turn off all kernels except the skin effect
-        self.k0.decay_length_1(1)
-        self.k0.decay_length_2(1)
-        self.k0.decay_amp_1(0)
-        self.k0.decay_amp_2(0)
-        self.k0.bounce_length_1(1)
-        self.k0.bounce_amp_1(0)
-
-        self.k0.skineffect_alpha(0.1)
-        self.k0.skineffect_length(40)
-        kObj_skin = self.k0.get_skin_kernel()
-
-        # cache is an empty dictionary
-        cache = {}
-        self.k0.kernel_to_cache(cache=cache)
-        self.assertTrue('OPT_chevron.tmp' in cache.keys())
-        skin_cache = cache['OPT_chevron.tmp']
-
-        np.testing.assert_array_equal(kObj_skin, skin_cache)
 
     def test_convolve_kernel(self):
         pass

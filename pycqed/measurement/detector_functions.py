@@ -810,13 +810,30 @@ class QX_Detector(Soft_Detector):
 
 
 class Function_Detector(Soft_Detector):
+    """
+    Defines a detector function that wraps around an user-defined function.
+    Inputs are:
+        sweep_function, function that is going to be wrapped around
+        result_keys, keys of the dictionary returned by the function
+        value_names, names of the elements returned by the function
+        value_units, units of the elements returned by the function
+        msmt_kw, kw arguments for the function
+
+    The input function sweep_function must return a dictionary.
+    The contents(keys) of this dictionary are going to be the measured
+    values to be plotted and stored by PycQED
+    """
+
     def __init__(self, sweep_function, result_keys, value_names=None,
                  value_units=None, msmt_kw={}, **kw):
         super(Function_Detector, self).__init__()
         self.sweep_function = sweep_function
         self.result_keys = result_keys
         self.value_names = value_names
-        self.value_units = value_units
+        self.value_units = value_unit
+        self.msmt_kw = msmt_kw
+        if self.value_names is None:
+            self.value_names = result_keys
         if self.value_units is None:
             self.value_units = ['a.u.'] * len(value_names)
 
@@ -830,7 +847,43 @@ class Function_Detector(Soft_Detector):
             measurement_kwargs[key] = value
         result = self.function(**measurement_kwargs)
 
-        return result
+    def acquire_data_point(self, **kw):
+        result = self.sweep_function(**self.msmt_kw)
+        return [result[key] for key in result.keys()]
+
+
+class Function_Detector_list(Soft_Detector):
+    """
+    Defines a detector function that wraps around an user-defined function.
+    Inputs are:
+        sweep_function, function that is going to be wrapped around
+        result_keys, keys of the dictionary returned by the function
+        value_names, names of the elements returned by the function
+        value_units, units of the elements returned by the function
+        msmt_kw, kw arguments for the function
+
+    The input function sweep_function must return a dictionary.
+    The contents(keys) of this dictionary are going to be the measured
+    values to be plotted and stored by PycQED
+    """
+
+    def __init__(self, sweep_function, result_keys, value_names=None,
+                 value_unit=None, msmt_kw={}, **kw):
+        super(Function_Detector_list, self).__init__()
+        self.sweep_function = sweep_function
+        self.result_keys = result_keys
+        self.value_names = value_names
+        self.value_units = value_unit
+        self.msmt_kw = msmt_kw
+        if self.value_names is None:
+            self.value_names = result_keys
+        if self.value_units is None:
+            self.value_units = [""] * len(result_keys)
+
+    def acquire_data_point(self, **kw):
+        return self.sweep_function(**self.msmt_kw)
+
+
 
 
 class Detect_simulated_hanger_Soft(Soft_Detector):
@@ -961,6 +1014,34 @@ class Heterodyne_probe_soft_avg(Soft_Detector):
         self.first = False
         self.last = abs(S21)
         return S21.real, S21.imag
+
+    def finish(self):
+        self.HS.finish()
+
+
+class PulsedSpectroscopyDetector(Soft_Detector):
+
+    def __init__(self, AWG_filename='Spec_5014', **kw):
+        # AWG_filename='Off_5014'
+        super(PulsedSpectroscopyDetector, self).__init__()
+        self.Pulsed_Spec = qt.instruments['Pulsed_Spec']
+        self.AWG = qt.instruments['AWG']
+        self.ATS = qt.instruments['ATS']
+        self.name = 'Pulsed_Spec'
+        self.value_names = ['I', 'Q']
+        self.value_units = ['V', 'V']
+        self.filename = AWG_filename
+
+    def prepare(self, **kw):
+        self.Pulsed_Spec.set_AWG_seq_filename(self.filename)
+        self.Pulsed_Spec.initialize_instruments()
+        self.AWG.start()
+        self.ATS.abort()
+        self.ATS.configure_board()
+
+    def acquire_data_point(self, **kw):
+        integrated_data = self.Pulsed_Spec.measure()
+        return integrated_data
 
     def finish(self):
         self.HS.finish()
@@ -1244,14 +1325,14 @@ class UHFQC_input_average_detector(Hard_Detector):
 
     def get_values(self):
         self.UHFQC.quex_rl_readout(0)  # resets UHFQC internal readout counters
+
         self.UHFQC.acquisition_arm()
         # starting AWG
         if self.AWG is not None:
             self.AWG.start()
 
         data_raw = self.UHFQC.acquisition_poll(samples=self.nr_sweep_points,
-                                               arm=False, acquisition_time=0.01,
-                                               timeout=100)
+                                               arm=False, acquisition_time=0.01)
         data = np.array([data_raw[key]
                          for key in data_raw.keys()])  # *self.scaling_factor
 
@@ -1280,8 +1361,8 @@ class UHFQC_integrated_average_detector(Hard_Detector):
 
     '''
 
-    def __init__(self, UHFQC, AWG=None, integration_length=1e-6, nr_averages=1024,
-                 rotate=False, real_imag=False,
+    def __init__(self, UHFQC, AWG=None, integration_length=1e-6,
+                 nr_averages=1024, rotate=False, real_imag=False,
                  channels=[0, 1, 2, 3], cross_talk_suppression=False,
                  **kw):
         super(UHFQC_integrated_average_detector, self).__init__()
@@ -1291,13 +1372,8 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         self.value_names = ['']*len(self.channels)
         self.value_units = ['']*len(self.channels)
         self.cal_points = kw.get('cal_points', None)
-        for i, channel in enumerate(self.channels):
-            self.value_names[i] = 'w{}'.format(channel)
-            self.value_units[i] = 'V'
-        self.real_imag = real_imag
-        if self.real_imag:
-            self.value_names[0] = 'Magn'
-            self.value_names[1] = 'Phase'
+
+        self._set_real_imag(real_imag)
 
         self.rotate = rotate
 
@@ -1306,10 +1382,26 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         self.integration_length = integration_length
         self.rotate = rotate
         self.cross_talk_suppression = cross_talk_suppression
-        self.scaling_factor = 1 / \
-            (1.8e9*self.integration_length*self.nr_averages)
+        self.scaling_factor = 1/(1.8e9*integration_length*self.nr_averages)
+
+    def _set_real_imag(self, real_imag=False):
+        """
+        Function so that real imag can be changed after initialization
+        """
+
+        self.real_imag = real_imag
+        for i, channel in enumerate(self.channels):
+            self.value_names[i] = 'w{}'.format(channel)
+            self.value_units[i] = 'V'
+
+        if self.real_imag:
+            self.value_names[0] = 'Magn'
+            self.value_names[1] = 'Phase'
+            self.value_units[1] = 'deg'
 
     def get_values(self):
+        self.scaling_factor = 1 / \
+            (1.8e9*self.integration_length*self.nr_averages)
         if self.AWG is not None:
             self.AWG.stop()
         self.UHFQC.quex_rl_readout(1)  # resets UHFQC internal readout counters
@@ -1319,8 +1411,7 @@ class UHFQC_integrated_average_detector(Hard_Detector):
             self.AWG.start()
 
         data_raw = self.UHFQC.acquisition_poll(samples=self.nr_sweep_points,
-                                               arm=False, acquisition_time=0.01,
-                                               timeout=1000)
+                                               arm=False, acquisition_time=0.01)
         data = np.array([data_raw[key]
                          for key in data_raw.keys()])*self.scaling_factor
         if self.real_imag:
@@ -1328,11 +1419,7 @@ class UHFQC_integrated_average_detector(Hard_Detector):
             Q = data[1]
             S21 = I + 1j*Q
             data[0] = np.abs(S21)
-            data[1] = np.angle(S21)
-
-        # offset suppression to be reimplemented
-        # if self.cross_talk_suppression:
-        #     data[i]=data[i]-eval("self.UHFQC.quex_trans_offset_weightfunction_{}()".format(channel))
+            data[1] = np.angle(S21)/(2*np.pi)*360
 
         if self.rotate:
             return self.rotate_and_normalize(data)
@@ -1383,6 +1470,7 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         self.UHFQC.awgs_0_userregs_0(
             int(self.nr_averages*self.nr_sweep_points))
         self.UHFQC.awgs_0_userregs_1(0)  # 0 for rl, 1 for iavg
+
         self.UHFQC.acquisition_initialize(channels=self.channels, mode='rl')
 
     def finish(self):
@@ -1398,7 +1486,7 @@ class UHFQC_integration_logging_det(Hard_Detector):
     '''
 
     def __init__(self, UHFQC, AWG, integration_length=1e-6,
-                 channels=[0, 1], nr_shots=4095,
+                 channels=[0, 1], nr_shots=4094,
                  cross_talk_suppression=False,  **kw):
         super(UHFQC_integration_logging_det, self).__init__()
         self.UHFQC = UHFQC
@@ -1427,9 +1515,8 @@ class UHFQC_integration_logging_det(Hard_Detector):
         if self.AWG is not None:
             self.AWG.start()
 
-        data_raw = self.UHFQC.acquisition_poll(samples=self.nr_shots,
-                                               arm=False, acquisition_time=0.01,
-                                               timeout=1000)
+        data_raw = self.UHFQC.acquisition_poll(
+            samples=self.nr_shots, arm=False, acquisition_time=0.01)
         data = np.array([data_raw[key]
                          for key in data_raw.keys()])*self.scaling_factor
 

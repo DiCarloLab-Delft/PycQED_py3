@@ -3,6 +3,10 @@ import numpy as np
 from scipy import special
 
 
+kernel_dir = None  #'D:\\GitHubRepos\\iPython-Notebooks\\Experiments\\1607_Qcodes_5qubit\\kernels\\'
+from os.path import join
+
+
 def heaviside(t):
     return t >= 0
 
@@ -45,10 +49,12 @@ def save_kernel(kernel, save_file=None):
     logging.warning('this does not save where you think it does')
     if save_file is None:
         save_file = kernel_name
-    with open(kernel_path+save_file+'.txt', 'w') as f:
+    fn = join(kernel_dir, save_file)+'.txt'
+    with open(fn, 'w') as f:
         for ii in np.arange(len(kernel)-1):
             f.write('%.12e\n' % (kernel[ii]))
         f.write('%.12e' % (kernel[-1]))
+    print('File saved at {}'.format(fn))
 
 
 # function calculating the filter matrix from an impulse response vector
@@ -88,10 +94,12 @@ htilde_lowpass = lambda t, tau: htilde(step_lowpass, t, tau)
 def step_skineffect(t, alpha):
     # Surpresses the numpy divide by zero warning temporarily
     with np.errstate(divide='ignore'):
-        return heaviside(t+1)*(1-special.erf(alpha/21./np.sqrt(t+1)))
+        return heaviside(t+1) * (1-special.erf(alpha/21./np.sqrt(t+1)))
+
 
 htilde_skineffect = lambda t, alpha: step_skineffect(
     t, alpha) - step_skineffect(t-1, alpha)
+
 # response functions for the high-pass filter arising from a bias-tee, modelled as a simple single-pole high-pass filter
 # model parameter: tau (time constant)
 step_biastee = lambda t, tau: heaviside(t)*(np.exp(-t/tau))
@@ -124,7 +132,7 @@ htilde_onchip = lambda t, pairs: htilde(step_onchip, t, pairs)
 
 def step_scope(t=None, params=None):
     # open file
-    f = open('kernels\\'+params['file_name'], 'r')
+    f = open(kernel_dir+params['file_name'], 'r')
     step = np.double(f.readlines())
     f.close()
     max_len_output = len(step)-2*params['points_per_ns']
@@ -155,7 +163,7 @@ htilde_scope = lambda t=None, params=None: htilde(step_scope, t, params)
 
 def step_raw(file_name, process_step=True, step_params=None, norm_type='max'):
 
-    f = open('kernels\\'+file_name, 'r')
+    f = open(kernel_dir+file_name, 'r')
     step = np.double(f.readlines())
     f.close()
 
@@ -163,7 +171,10 @@ def step_raw(file_name, process_step=True, step_params=None, norm_type='max'):
         if step_params is None:
             step_max = np.max(step)
             step_min = np.min(step)
-            step_mid = (np.max(step)+np.min(step))/2.
+            # Setting the threshold at 3/2 of the total range so it is robust
+            # against compensation pulses
+            step_mid = 2/3*abs(step_max-step_min) + step_min
+
             step_shift = step-step_mid
             step_upedge = np.where(step_shift > 0)[0]
             if step_upedge.size == 0:
@@ -177,7 +188,9 @@ def step_raw(file_name, process_step=True, step_params=None, norm_type='max'):
                 step_downedge = len(step)
             else:
                 step_downedge = step_downedge[0]
-        #     print(step_max, step_min, step_mid, step_upedge, step_downedge)
+            # print(step_max, step_min, step_mid, step_upedge, step_downedge)
+
+
 
             baseline_end = step_upedge - \
                 np.where(
@@ -309,8 +322,21 @@ def kernel_sampled(file_name, step_width_ns, points_per_ns, step_params=None,
 
 def get_all_sampled(file_name, step_width_ns, points_per_ns, max_points=600,
                     step_params=None, norm_type='max'):
+    """
+    step_width_ns (ints):  not all points are selected for inversion,
+                    this selects the stepsize for the inversion
+    points_per_ns (int) : sampling rate in GS/s
 
-    f = open('kernels\\'+file_name, 'r')
+
+    Return an output dict containing
+        t_direct     : time values as measured
+        step_direct  : amplitude values as measured
+        t_raw        : time shifted with autodetected start time
+        step_raw     : normalized step
+         FIXME raw should be renamed rescaled (or normalized or shifted)
+    """
+
+    f = open(kernel_dir+file_name, 'r')
     step_direct = np.double(f.readlines())
     f.close()
 
@@ -358,22 +384,8 @@ def get_all_sampled(file_name, step_width_ns, points_per_ns, max_points=600,
     output_dict['t_kernel'] = t_my_kernel
 
     return output_dict
-
-kernel_path = 'D:\\GitHubRepos\\iPython-Notebooks\\Experiments\\1607_Qcodes_5qubit\\kernels\\'
 kernel_name = 'my_current_kernel'
 matrix_kernel_time = 400.
-# step_responses = {'bias_tee':step_biastee,
-#                   'low_pass':step_lowpass,
-#                   'skin_effect':step_skineffect,
-#                   'bounce':step_bounce,
-#                   'scope':step_scope,
-#                   'on_chip':step_onchip}
-# kernel_params = {'bias_tee':get_bias_tee_tau,
-#                  'low_pass':get_low_pass_tau,
-#                  'skin_effect':get_skin_alpha_1GHz,
-#                  'bounce':get_bounce_response,
-#                  'scope':get_scope_trace_params,
-#                  'on_chip':get_on_chip_response}
 
 
 def bounce_kernel(amp=0.02, time=4, length=601):
@@ -387,11 +399,11 @@ def bounce_kernel(amp=0.02, time=4, length=601):
         t) - amp*np.double((t+1) > time)*heaviside(t)
     htilde_bounce = lambda t, time: bounce(
         t, amp, time) - bounce(t-1, amp, time)
-    t_kernel = np.arange(length)
+    t_kernel = np.arange(int(length))
     if abs(amp) > 0.:
         kernel_bounce = kernel_generic2(htilde_bounce, t_kernel, time)
     else:
-        kernel_bounce = np.zeros(length)
+        kernel_bounce = np.zeros(int(length))
         kernel_bounce[0] = 1.
     kernel_bounce = kernel_bounce / np.sum(kernel_bounce)
     return kernel_bounce
@@ -406,14 +418,14 @@ def decay_kernel(amp=1., tau=11000, length=2000):
     """
     tau_k = (1.-amp)*tau
     amp_k = amp/(amp-1)
-    t_kernel = np.arange(length)
+    t_kernel = np.arange(int(length))
     if abs(amp) > 0.:
         kernel_decay_step = 1 + amp_k*np.exp(-t_kernel/tau_k)
         kernel_decay = np.zeros(kernel_decay_step.shape)
         kernel_decay[0] = kernel_decay_step[0]
         kernel_decay[1:] = kernel_decay_step[1:]-kernel_decay_step[:-1]
     else:
-        kernel_decay = np.zeros(length)
+        kernel_decay = np.zeros(int(length))
         kernel_decay[0] = 1.
     return kernel_decay
 
@@ -424,11 +436,11 @@ def skin_kernel(alpha=0., length=601):
     kernel_step_function
         heaviside(t+1)*(1-errf(alpha/21./np.sqrt(t+1)))
     """
-    t_kernel = np.arange(length)
+    t_kernel = np.arange(int(length))
     if abs(alpha) > 0.:
         kernel_skineffect = kernel_generic2(htilde_skineffect,
                                             t_kernel, alpha)
     else:
-        kernel_skineffect = np.zeros(length)
+        kernel_skineffect = np.zeros(int(length))
         kernel_skineffect[0] = 1.
     return kernel_skineffect

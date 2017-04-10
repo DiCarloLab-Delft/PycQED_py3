@@ -10,6 +10,7 @@ preamble = ('mov r0, 20000   # r0 stores the cycle time , 100 us \n' +
             'mov r1, 0       # sets the inter pulse wait to 0\n' +
             'mov r14, 0      # r14 stores number of repetitions\n' +
             '# Experiment: repeat the rounds for infinite times\n' +
+            'wait 1 \n' +
             'Exp_Start: \n')
 
 ending = ('beq r14, r14, Exp_Start       # Infinite loop\n')

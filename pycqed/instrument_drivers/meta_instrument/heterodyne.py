@@ -250,7 +250,7 @@ class HeterodyneInstrument(Instrument):
             self._UHFQC_awg_parameters_changed:
                 self.prepare()
         dataset = self._acquisition_instr.acquisition_poll(
-            samples=1, acquisition_time=0.001, timeout=10)
+            samples=1, acquisition_time=0.001)
         dat = (self.scale_factor_UHFQC*dataset[0][0] +
                self.scale_factor_UHFQC*1j*dataset[1][0])
         return dat
@@ -396,6 +396,10 @@ class HeterodyneInstrument(Instrument):
 
     def _get_acq_marker_channels(self):
         return self._acq_marker_channels
+
+    def finish(self):
+        if 'UHFQC' in self.acquisition_instr():
+            self._acquisition_instr.acquisition_finalize()
 
     def get_demod_array(self):
         return self.cosI, self.sinI

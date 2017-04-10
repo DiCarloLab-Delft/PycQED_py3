@@ -43,11 +43,11 @@ def multi_pulse_elt(i, station, pulse_list, sequencer_config=None):
     flux_compensation_pulse_list = []
 
     if sequencer_config is None:
-        logging.warning('No sequencer config detected, using default config ' +
-                        'from station')
         if hasattr(station, 'sequencer_config'):
             sequencer_config = station.sequencer_config
         else:
+            logging.warning('No sequencer config detected, using default ' +
+                            '\n you can specify one as station.sequencer_config')
             sequencer_config = {'RO_fixed_point': 1e-6,
                                 'Buffer_Flux_Flux': 0,
                                 'Buffer_Flux_MW': 0,

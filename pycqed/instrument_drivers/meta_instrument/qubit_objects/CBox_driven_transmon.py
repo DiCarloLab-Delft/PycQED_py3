@@ -121,6 +121,7 @@ class CBox_driven_transmon(Transmon):
         self.add_parameter('mixer_offs_drive_Q',
                            parameter_class=ManualParameter, initial_value=0)
 
+
     def prepare_for_continuous_wave(self):
 
         self.heterodyne_instr._disable_auto_seq_loading = False
@@ -184,32 +185,6 @@ class CBox_driven_transmon(Transmon):
                       int(self.signal_line.get())),
                       int(self.RO_threshold.get()))
 
-    def find_resonator_frequency(self, use_min=False,
-                                 update=True,
-                                 freqs=None,
-                                 MC=None, close_fig=True):
-        '''
-        Finds the resonator frequency by performing a heterodyne experiment
-        if freqs == None it will determine a default range dependent on the
-        last known frequency of the resonator.
-        '''
-        if freqs is None:
-            f_center = self.f_res.get()
-            f_span = 10e6
-            f_step = 50e3
-            freqs = np.arange(f_center-f_span/2, f_center+f_span/2, f_step)
-        self.measure_heterodyne_spectroscopy(freqs, MC, analyze=False)
-        a = ma.Homodyne_Analysis(label=self.msmt_suffix, close_fig=close_fig)
-        if use_min:
-            f_res = a.min_frequency
-        else:
-            f_res = a.fit_results.params['f0'].value*1e9 # fit converts to Hz
-        if f_res > max(freqs) or f_res < min(freqs):
-            logging.warning('exracted frequency outside of range of scan')
-        elif update:  # don't update if the value is out of the scan range
-            self.f_res.set(f_res)
-        self.f_RO(self.f_res())
-        return f_res
 
     def get_resetless_rb_detector(self, nr_cliff, starting_seed=1,
                                   nr_seeds='max', pulse_p_elt='min',
@@ -476,14 +451,14 @@ class CBox_driven_transmon(Transmon):
                              ' either "conventional" or "self-consistent"')
 
     def measure_heterodyne_spectroscopy(self, freqs, MC=None,
-                                        analyze=True, close_fig=True):
+                                        analyze=True, close_fig=True, RO_length=2000e-9):
         self.prepare_for_continuous_wave()
         if MC is None:
             MC = self.MC
         MC.set_sweep_function(pw.wrap_par_to_swf(
                               self.heterodyne_instr.frequency))
         MC.set_sweep_points(freqs)
-        MC.set_detector_function(det.Heterodyne_probe(self.heterodyne_instr, trigger_separation=2.8e-6))
+        MC.set_detector_function(det.Heterodyne_probe(self.heterodyne_instr, trigger_separation=2.8e-6, RO_length=2274e-9))
         MC.run(name='Resonator_scan'+self.msmt_suffix)
         if analyze:
             ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
@@ -549,7 +524,7 @@ class CBox_driven_transmon(Transmon):
         if analyze:
             ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
 
-    def measure_resonator_power(self, freqs, mod_amps,
+    def measure_resonator_power(self, freqs, powers,
                                 MC=None, analyze=True, close_fig=True):
         '''
         N.B. This one does not use powers but varies the mod-amp.
@@ -560,9 +535,9 @@ class CBox_driven_transmon(Transmon):
             MC = self.MC
         MC.set_sweep_functions(
             [pw.wrap_par_to_swf(self.heterodyne_instr.frequency),
-             pw.wrap_par_to_swf(self.heterodyne_instr.mod_amp)])
+             pw.wrap_par_to_swf(self.heterodyne_instr.RF_power)])
         MC.set_sweep_points(freqs)
-        MC.set_sweep_points_2D(mod_amps)
+        MC.set_sweep_points_2D(powers)
         MC.set_detector_function(det.Heterodyne_probe(self.heterodyne_instr))
         MC.run(name='Resonator_power_scan'+self.msmt_suffix, mode='2D')
         if analyze:
@@ -574,10 +549,8 @@ class CBox_driven_transmon(Transmon):
         if MC is None:
             MC = self.MC
         MC.set_sweep_functions(
-            [pw.wrap_par_to_swf(self.heterodyne_instr.frequency),
-             pw.wrap_par_to_swf(
-                self.IVVI['dac{}'.format(self.dac_channel.get())])
-             ])
+            [self.heterodyne_instr.frequency,
+             self.IVVI.parameters['dac{}'.format(self.dac_channel())]])
         MC.set_sweep_points(freqs)
         MC.set_sweep_points_2D(dac_voltages)
         MC.set_detector_function(det.Heterodyne_probe(self.heterodyne_instr))

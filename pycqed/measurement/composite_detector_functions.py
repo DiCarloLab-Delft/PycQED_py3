@@ -298,8 +298,7 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
                     self.AWG.start()
 
                 data_raw=self.UHFQC.acquisition_poll(samples=self.nr_sweep_points,
-                                                     arm=False, acquisition_time=0.01,
-                                                     timeout=100)
+                                                     arm=False, acquisition_time=0.01)
                 data = np.array([data_raw[key] for key in data_raw.keys()])
 
                 #calculating transients
@@ -326,7 +325,8 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
                                                      timeout=100)
                 data = np.array([data_raw[key] for key in data_raw.keys()])
 
-                #calculating transients
+                # calculating transients
+
                 transient1_I = data[0]
                 transient1_Q = data[1]
 
@@ -771,7 +771,7 @@ class Chevron_optimization_v1(det.Soft_Detector):
     def __init__(self, flux_channel, dist_dict, AWG, MC_nested, qubit,
                  kernel_obj, cost_function_opt=0, **kw):
         super().__init__()
-        kernel_dir_path = 'kernels/'
+        kernel_dir = 'kernels/'
         self.name = 'chevron_optimization_v1'
         self.value_names = ['Cost function', 'SWAP Time']
         self.value_units = ['a.u.', 'ns']
@@ -797,7 +797,7 @@ class Chevron_optimization_v1(det.Soft_Detector):
         kernel_before_loaded = []
         for k in kernel_before_list:
             if k is not '':
-                kernel_before_loaded.append(np.loadtxt(kernel_dir_path+k))
+                kernel_before_loaded.append(np.loadtxt(kernel_dir+k))
         self.kernel_before = kernel_obj.convolve_kernel(kernel_before_loaded,
                                                         30000)
 
