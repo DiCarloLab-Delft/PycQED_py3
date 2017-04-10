@@ -20,8 +20,10 @@ Florian Luthi,
 Adriaan Rol,
 
 ## Contributing
-Please see [Contributing.md](.github/CONTRIBUTING.md)
+Thanks for your interest in the project! We welcome pull requests from developers of all skill levels.
 
+If you find a bug or want to propose a new feature open an issue. If you have written some code that should be merged open a pull request describing your changes and why it should be merged.
+If you have a question or want to discuss something, feel free to send an email to Adriaan Rol (m.a.rol@tudelft.nl).
 
 ## Installation
 
