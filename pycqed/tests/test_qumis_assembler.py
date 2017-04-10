@@ -6,7 +6,6 @@ from os.path import isfile, join
 from pycqed.instrument_drivers.physical_instruments._controlbox \
     import Assembler as asm
 
-from .import oldAssembler as oldasm
 
 class Test_single_qubit_seqs(TestCase):
     @classmethod
