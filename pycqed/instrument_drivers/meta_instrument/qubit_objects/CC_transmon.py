@@ -210,13 +210,23 @@ class CBox_v3_driven_transmon(Transmon):
         self.add_parameter('mixer_offs_RO_Q', unit='V',
                            parameter_class=ManualParameter, initial_value=0)
 
-        self.add_parameter('RO_pulse_type', initial_value='Gated_MW_RO_pulse_UHFQC',
+        self.add_parameter('RO_pulse_type', initial_value='Gated_UHFQC',
                            vals=vals.Enum(
-                               'Gated_MW_RO_pulse_CBox',
-                               'Gated_MW_RO_pulse_UHFQC',
-                               'MW_IQmod_pulse_CBox',
-                               'MW_IQmod_pulse_UHFQC'),
+                               'Gated_CBox', 'Gated_UHFQC',
+                               'IQmod_CBox', 'IQmod_UHFQC',
+                               'IQmod_multiplexed_UHFQC'),
                            parameter_class=ManualParameter)
+        RO_acq_docstr = (
+            'Determines what integration weights to use: '
+            '\n\t SSB: Single sideband demodulation\n\t'
+            'DSB: Double sideband demodulation\n\t'
+            'optimal: do not upload anything relying on preset weights')
+        self.add_parameter('RO_acq_weights',
+                           initial_value='DSB',
+                           vals=vals.Enum('SSB', 'DSB', 'optimal'),
+                           docstring=RO_acq_docstr,
+                           parameter_class=ManualParameter)
+
         self.add_parameter('RO_depletion_time', initial_value=1e-6,
                            unit='s',
                            parameter_class=ManualParameter,
@@ -246,11 +256,43 @@ class CBox_v3_driven_transmon(Transmon):
                            label='Calibration point |1>',
                            parameter_class=ManualParameter)
 
-    def prepare_for_continuous_wave(self):
-        self.acquisition_instrument(self.acquisition_instrument())
-        self.LO.get_instr().on()
-        self.td_source.get_instr().off()
+        self.add_parameter('RO_optimal_weights_I',
+                           vals=vals.Arrays(),
+                           label='Optimized weights for I channel',
+                           parameter_class=ManualParameter)
+        self.add_parameter('RO_optimal_weights_Q',
+                           vals=vals.Arrays(),
+                           label='Optimized weights for Q channel',
+                           parameter_class=ManualParameter)
 
+
+    def prepare_for_continuous_wave(self):
+        self.prepare_readout()
+
+        # LO and RF for readout are turned on in prepare_readout
+        self.td_source.get_instr().off()
+        self.cw_source.get_instr().off()
+        self.cw_source.get_instr().pulsemod_state.set('off')
+        self.cw_source.get_instr().power.set(self.spec_pow.get())
+
+    def prepare_readout(self):
+        """
+        Configures the readout. Consists of the following steps
+        - create the relevant detector functions
+        - set the microwave frequencies and sources
+        - generate the RO pulse
+        - set the integration weights
+        """
+
+        #####################################
+        # Creating the detector functions
+        #####################################
+        # Setting the acquisition instrument also instantiates the RO detectors
+        self.acquisition_instrument(self.acquisition_instrument())
+
+        #####################################
+        # Setting frequencies and MW sources
+        #####################################
         # Use resonator freq unless explicitly specified
         if self.f_RO.get() is None:
             f_RO = self.f_res.get()
@@ -258,18 +300,126 @@ class CBox_v3_driven_transmon(Transmon):
             f_RO = self.f_RO.get()
 
         self.LO.get_instr().frequency.set(f_RO - self.f_RO_mod.get())
+        self.LO.get_instr().on()
+
         if "gated" in self.RO_pulse_type().lower():
             RF = self.RF_RO_source.get_instr()
             RF.power(self.RO_power_cw())
             RF.frequency(f_RO)
             RF.on()
 
-        self.cw_source.get_instr().off()
-        self.cw_source.get_instr().pulsemod_state.set('off')
-        self.cw_source.get_instr().power.set(self.spec_pow.get())
+        self.CBox.get_instr().trigger_source('internal')
+
+        #####################################
+        # Generating the RO pulse
+        #####################################
+        if 'CBox' in self.acquisition_instrument():
+            if 'multiplexed' not in self.RO_pulse_type().lower():
+                self.RO_LutMan.get_instr().M_modulation(self.f_RO_mod())
+                self.RO_LutMan.get_instr().M_amp(self.RO_amp())
+                self.RO_LutMan.get_instr().M_length(self.RO_pulse_length())
+
+                if 'awg_nr' in self.RO_LutMan.get_instr().parameters:
+                    self.RO_LutMan.get_instr().awg_nr(self.RO_awg_nr())
+
+                if 'CBox' in self.acquisition_instrument():
+                    self.CBox.get_instr().set('AWG{:.0g}_dac0_offset'.format(
+                                              self.RO_awg_nr.get()),
+                                              self.mixer_offs_RO_I.get())
+                    self.CBox.get_instr().set('AWG{:.0g}_dac1_offset'.format(
+                                              self.RO_awg_nr.get()),
+                                              self.mixer_offs_RO_Q.get())
+                    if self.RO_LutMan() is not None:
+                        self.RO_LutMan.get_instr().lut_mapping(
+                            ['I', 'X180', 'Y180', 'X90', 'Y90', 'mX90', 'mY90', 'M_square'])
+
+                    self.CBox.get_instr().integration_length(
+                        convert_to_clocks(self.RO_acq_integration_length()))
+
+                    self.CBox.get_instr().set('sig{}_threshold_line'.format(
+                        int(self.signal_line.get())),
+                        int(self.RO_threshold.get()))
+                    self.CBox.get_instr().lin_trans_coeffs(
+                        np.reshape(rotation_matrix(self.RO_rotation_angle(),
+                                                   as_array=True), (4,)))
+
+                    self.CBox.get_instr().set('sig{}_threshold_line'.format(
+                        int(self.signal_line.get())),
+                        int(self.RO_threshold.get()))
+                self.RO_LutMan.get_instr().load_pulses_onto_AWG_lookuptable()
+
+        elif 'UHFQC' in self.acquisition_instrument():
+            if 'gated' in self.RO_pulse_type().lower():
+                UHFQC = self._acquisition_instrument
+                UHFQC.awg_sequence_acquisition()
+            elif 'iqmod' in self.RO_pulse_type().lower():
+                RO_lm = self.RO_LutMan.get_instr()
+                RO_lm.M_length(self.RO_pulse_length())
+                RO_lm.M_amp(self.RO_amp())
+                RO_lm.M_length(self.RO_pulse_length())
+                RO_lm.M_modulation(self.f_RO_mod())
+                RO_lm.acquisition_delay(self.RO_acq_marker_delay())
+
+                if 'multiplexed' not in self.RO_pulse_type().lower():
+                    RO_lm.load_pulse_onto_AWG_lookuptable('M_square')
+
+
+        #####################################
+        # Setting The integration weights
+        #####################################
+        if 'CBox' in self.acquisition_instrument():
+            if self.RO_acq_weights() == 'SSB':
+                raise NotImplementedError('The CBox only supports DSB demodulation')
+                # self.CBox.get_instr().upload_standard_weights(self.f_RO_mod())
+            elif self.RO_acq_weights() == 'DSB':
+                self.CBox.get_instr().upload_standard_weights(self.f_RO_mod())
+            elif self.RO_acq_weights() == 'optimal':
+                # if optimal weights are used the weights will not be set
+                pass
+
+        if 'UHFQC' in self.acquisition_instrument():
+            UHFQC = self._acquisition_instrument
+            if self.RO_acq_weights() == 'SSB':
+                UHFQC.prepare_SSB_weight_and_rotation(
+                    IF=self.f_RO_mod(),
+                    weight_function_I=self.RO_acq_weight_function_I(),
+                    weight_function_Q=self.RO_acq_weight_function_Q())
+            elif self.RO_acq_weights() == 'DSB':
+                UHFQC.prepare_DSB_weight_and_rotation(
+                    IF=self.f_RO_mod(),
+                    weight_function_I=self.RO_acq_weight_function_I(),
+                    weight_function_Q=self.RO_acq_weight_function_Q())
+            elif self.RO_acq_weights() == 'optimal':
+                if (self.RO_optimal_weights_I() is None or 
+                    self.RO_optimal_weights_Q() is None):
+                    logging.warning('Optimal weights are None, not setting integration weights')
+                else:  
+                    UHFQC.set('quex_wint_weights_{}_real'
+                              .format(self.RO_acq_weight_function_I()),
+                              self.RO_optimal_weights_I())
+                    UHFQC.set('quex_wint_weights_{}_imag'
+                              .format(self.RO_acq_weight_function_I()),
+                              self.RO_optimal_weights_Q())
+                    UHFQC.set('quex_wint_weights_{}_real'
+                              .format(self.RO_acq_weight_function_Q()),
+                              self.RO_optimal_weights_Q())
+                    UHFQC.set('quex_wint_weights_{}_imag'
+                              .format(self.RO_acq_weight_function_Q()),
+                              self.RO_optimal_weights_I())
+
+                    UHFQC.set('quex_rot_{}_real'
+                              .format(self.RO_acq_weight_function_I()), 1.0)
+                    UHFQC.set('quex_rot_{}_imag'
+                              .format(self.RO_acq_weight_function_I()), 1.0)
+                    UHFQC.set('quex_rot_{}_real'
+                              .format(self.RO_acq_weight_function_Q()), 1.0)
+                    UHFQC.set('quex_rot_{}_imag'
+                              .format(self.RO_acq_weight_function_Q()), -1.0)
+
 
     def prepare_for_timedomain(self):
-        self.acquisition_instrument(self.acquisition_instrument())
+
+        self.prepare_readout()
         self.MC.get_instr().soft_avg(self.RO_soft_averages())
         self.LO.get_instr().on()
         self.cw_source.get_instr().off()
@@ -277,13 +427,6 @@ class CBox_v3_driven_transmon(Transmon):
         # Set source to fs =f-f_mod such that pulses appear at f = fs+f_mod
         self.td_source.get_instr().frequency.set(self.f_qubit.get()
                                                  - self.f_pulse_mod.get())
-        self.CBox.get_instr().trigger_source('internal')
-        # Use resonator freq unless explicitly specified
-        if self.f_RO.get() is None:
-            f_RO = self.f_res.get()
-        else:
-            f_RO = self.f_RO.get()
-        self.LO.get_instr().frequency.set(f_RO - self.f_RO_mod.get())
 
         self.td_source.get_instr().power.set(self.td_source_pow.get())
 
@@ -292,11 +435,6 @@ class CBox_v3_driven_transmon(Transmon):
                                   self.mixer_offs_drive_I.get())
         self.CBox.get_instr().set('AWG{:.0g}_dac1_offset'.format(self.Q_awg_nr.get()),
                                   self.mixer_offs_drive_Q.get())
-        self.CBox.get_instr().set('AWG{:.0g}_dac0_offset'.format(self.RO_awg_nr.get()),
-                                  self.mixer_offs_RO_I.get())
-        self.CBox.get_instr().set('AWG{:.0g}_dac1_offset'.format(self.RO_awg_nr.get()),
-                                  self.mixer_offs_RO_Q.get())
-
         # pulse pars
         self.Q_LutMan.get_instr().Q_amp180(self.Q_amp180())
         self.Q_LutMan.get_instr().Q_amp90(self.Q_amp90_scale()*self.Q_amp180())
@@ -308,11 +446,6 @@ class CBox_v3_driven_transmon(Transmon):
         if self.spec_pulse_type() == 'square':
             self.Q_LutMan.get_instr().Q_ampCW(self.spec_amp())
             self.Q_LutMan.get_instr().Q_block_length(self.spec_pulse_length())
-
-        # RO pars
-        self.RO_LutMan.get_instr().M_modulation(self.f_RO_mod())
-        self.RO_LutMan.get_instr().M_amp(self.RO_amp())
-        self.RO_LutMan.get_instr().M_length(self.RO_pulse_length())
 
         self.Q_LutMan.get_instr().lut_mapping(
             ['I', 'X180', 'Y180', 'X90', 'Y90', 'mX90', 'mY90', 'M_square'])
@@ -330,32 +463,7 @@ class CBox_v3_driven_transmon(Transmon):
         # Print this should be deleted
 
         self.Q_LutMan.get_instr().load_pulses_onto_AWG_lookuptable()
-        # FIXME: add pulse loading for the RO pulse
-        # self.RO_LutMan.get_instr().load_pulses_onto_AWG_lookuptable()
 
-        if 'awg_nr' in self.RO_LutMan.get_instr().parameters:
-            self.RO_LutMan.get_instr().awg_nr(self.RO_awg_nr())
-        if 'CBox' in self.acquisition_instrument():
-            if self.RO_LutMan() != None:
-                self.RO_LutMan.get_instr().M_modulation(self.f_RO_mod())
-                self.RO_LutMan.get_instr().M_amp(self.RO_amp())
-                self.RO_LutMan.get_instr().M_length(self.RO_pulse_length())
-
-                self.RO_LutMan.get_instr().lut_mapping(
-                    ['I', 'X180', 'Y180', 'X90', 'Y90', 'mX90', 'mY90', 'M_square'])
-            self.CBox.get_instr().upload_standard_weights(self.f_RO_mod())
-            self.CBox.get_instr().integration_length(
-                convert_to_clocks(self.RO_acq_integration_length()))
-
-            self.CBox.get_instr().set('sig{}_threshold_line'.format(
-                int(self.signal_line.get())),
-                int(self.RO_threshold.get()))
-            self.CBox.get_instr().lin_trans_coeffs(
-                np.reshape(rotation_matrix(self.RO_rotation_angle(), as_array=True), (4,)))
-
-        self.CBox.get_instr().set('sig{}_threshold_line'.format(
-            int(self.signal_line.get())),
-            int(self.RO_threshold.get()))
 
     def _get_acquisition_instr(self):
         return self._acquisition_instrument.name
@@ -380,19 +488,6 @@ class CBox_v3_driven_transmon(Transmon):
             # FIXME: option to disable when using optimized weights and
             # mulltiplexed RO to be added later
             UHFQC = self._acquisition_instrument
-            UHFQC.prepare_DSB_weight_and_rotation(
-                IF=self.f_RO_mod(),
-                weight_function_I=self.RO_acq_weight_function_I(),
-                weight_function_Q=self.RO_acq_weight_function_Q())
-
-            # Makes sure the correct sequence/program is loaded in the UHFQC
-            if "gated" in self.RO_pulse_type().lower():
-                UHFQC.awg_sequence_acquisition()
-            elif 'iqmod' in self.RO_pulse_type().lower():
-                UHFQC.awg_sequence_acquisition_and_pulse_SSB(
-                    f_RO_mod=self.f_RO_mod(), RO_amp=self.RO_amp(),
-                    RO_pulse_length=self.RO_pulse_length(),
-                    acquisition_delay=self.RO_acq_marker_delay())
 
             logging.info("setting UHFQC acquisition")
             self.input_average_detector = det.UHFQC_input_average_detector(
@@ -1142,16 +1237,20 @@ class CBox_v3_driven_transmon(Transmon):
                       'Avg. Discrimination fidelity: \t{:.4f}'.format(a.F_d))
             return a.F_a, a.F_d
 
-    def measure_transients(self, MC=None):
+    def measure_transients(self, MC=None, analyze=True):
+        '''
+        Measure transients.
+        Returns two numpy arrays containing the transients for qubit in state
+        |0> and |1>.
+        '''
         self.prepare_for_timedomain()
         if MC is None:
             MC = self.MC.get_instr()
 
         # Loading the right qumis instructions
+        transients = []
         for i, pulse_comb in enumerate(['off', 'on']):
             off_on_sequence = sqqs.off_on(self.name, pulse_comb=pulse_comb)
-            # qumis_file = qta.qasm_to_asm(off_on_sequence.name,
-            #                              self.get_operation_dict())
             MC.set_sweep_function(swf.QASM_Sweep(
                 filename=off_on_sequence.name, CBox=self.CBox.get_instr(),
                 op_dict=self.get_operation_dict(),
@@ -1159,8 +1258,40 @@ class CBox_v3_driven_transmon(Transmon):
             MC.set_sweep_points(
                 np.arange(self.input_average_detector.nr_samples))
             MC.set_detector_function(self.input_average_detector)
-            MC.run('Measure_transients{}_{}'.format(self.msmt_suffix, i))
-            ma.MeasurementAnalysis()
+            data = MC.run('Measure_transients{}_{}'.format(self.msmt_suffix, i))
+            transients.append(data.T[1:])
+
+            if analyze:
+                ma.MeasurementAnalysis()
+
+        return [np.array(t, dtype=np.float64) for t in transients]
+
+
+    def calibrate_optimal_weights(self, MC=None, verify=True, update=True):
+        if MC is None:
+            MC = self.MC.get_instr()
+
+        # return value needs to be added in measure_transients
+        transients = self.measure_transients(MC=MC, analyze=False)
+        # Calculate optimal weights
+        optimized_weights_I = transients[1][0] - transients[0][0]
+        optimized_weights_I = optimized_weights_I - np.mean(optimized_weights_I)
+        weight_scale_factor = 1./np.max(np.abs(optimized_weights_I))
+        optimized_weights_I = np.array(weight_scale_factor*optimized_weights_I)
+
+        optimized_weights_Q = transients[1][1] - transients[0][1]
+        optimized_weights_Q = optimized_weights_Q - np.mean(optimized_weights_Q)
+        weight_scale_factor = 1./np.max(np.abs(optimized_weights_Q))
+        optimized_weights_Q = np.array(weight_scale_factor*optimized_weights_Q)
+
+        if update:
+            self.RO_optimal_weights_I(optimized_weights_I)
+            self.RO_optimal_weights_Q(optimized_weights_Q)
+            self.RO_acq_weights('optimal')
+
+        if verify:
+            self.measure_ssro()
+
 
     def measure_butterfly(self, return_detector=False, MC=None,
                           analyze=True, close_fig=True,
@@ -1294,7 +1425,7 @@ class CBox_v3_driven_transmon(Transmon):
             raise NotImplementedError
 
         if 'CBox' in self.acquisition_instrument():
-            if self.RO_pulse_type() == 'MW_IQmod_pulse_CBox':
+            if self.RO_pulse_type() == 'IQmod_CBox':
                 # operation_dict['RO {}'.format(self.name)] = {
                 #     'duration': RO_pulse_length_clocks,
                 #     'instruction': 'wait {} \npulse 0000 1111 1111 '.format(
@@ -1308,16 +1439,16 @@ class CBox_v3_driven_transmon(Transmon):
                         RO_acq_marker_del_clks,
                         max(RO_pulse_length_clocks-RO_acq_marker_del_clks, 0))}
 
-            if self.RO_pulse_type() == 'MW_IQmod_pulse_UHFQC':
+            if self.RO_pulse_type() == 'IQmod_UHFQC':
                 raise NotImplementedError
 
-            elif self.RO_pulse_type() == 'Gated_MW_RO_pulse_CBox':
+            elif self.RO_pulse_type() == 'Gated_CBox':
                 operation_dict['RO {}'.format(self.name)] = {
                     'duration': RO_pulse_length_clocks, 'instruction':
                     'wait {} \ntrigger 1000000, {} \n measure \n'.format(
                         RO_pulse_delay_clocks, RO_pulse_length_clocks)}
 
-            elif self.RO_pulse_type() == 'Gated_MW_RO_pulse_UHFQC':
+            elif self.RO_pulse_type() == 'Gated_UHFQC':
                 operation_dict['RO {}'.format(self.name)] = {
                     'duration': RO_pulse_length_clocks, 'instruction':
                     (ins_lib.trigg_ch_to_instr(self.RO_acq_marker_channel(),
@@ -1691,7 +1822,7 @@ class QWG_driven_transmon(CBox_v3_driven_transmon):
                         RO_acq_marker_del_clocks, measure_instruction)}
 
             elif (self.RO_pulse_type() == 'Gated_MW_RO_pulse' or
-                    self.RO_pulse_type() == 'MW_IQmod_pulse_UHFQC'):
+                    self.RO_pulse_type() == 'IQmod_UHFQC'):
                 operation_dict['RO {}'.format(self.name)] = {
                     'duration': RO_pulse_length_clocks, 'instruction':
                     'wait {} \n{}'.format(RO_pulse_delay_clocks,
