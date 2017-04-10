@@ -13,7 +13,7 @@ from qcodes.instrument.parameter import ManualParameter
 class SSRO_Fidelity_Detector_CBox(det.Soft_Detector):
 
     '''
-    Currently only for CBox.
+    Currently only for CBox,
     '''
 
     def __init__(self, measurement_name, MC, AWG, CBox,
@@ -76,7 +76,7 @@ class SSRO_Fidelity_Detector_CBox(det.Soft_Detector):
 class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
 
     '''
-    For Qcodes. Readout with CBox, pulse generation with 5014
+    For Qcodes. Readout with CBox, UHFLI, DDM, pulse generation with 5014
     '''
 
     def __init__(self, measurement_name,  MC, AWG, acquisition_instr,
@@ -116,6 +116,9 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
             self.CBox = self.acquisition_instr
         elif 'UHFQC' in str(self.acquisition_instr):
             self.UHFQC = self.acquisition_instr
+        elif 'DDM' in str(self.acquisition_instr):
+            self.DDM = self.acquisition_instr
+
         self.nr_averages = nr_averages
         self.integration_length = integration_length
         self.weight_function_I = weight_function_I
@@ -170,6 +173,28 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
                             IF=self.IF,
                             weight_function_I=self.weight_function_I,
                             weight_function_Q=self.weight_function_Q)
+            elif 'DDM' in str(self.acquisition_instr):
+                self.MC.set_detector_function(
+                    det.DDM_integration_logging_det(
+                        self.acquisition_instr, self.AWG,
+                        channels=[
+                            self.weight_function_I, self.weight_function_Q],
+                        integration_length=self.integration_length,
+                        nr_shots=min(self.nr_shots, 8000)))
+                if self.SSB:
+                    self.DDM.prepare_SSB_weight_and_rotation(
+                        IF=self.IF, weight_function_I=self.weight_function_I,
+                        weight_function_Q=self.weight_function_Q)
+                #not yet implemented
+                # else:
+                #     if self.IF == None:
+                #         raise ValueError(
+                #             'IF has to be provided when not using optimized weights')
+                #     else:
+                #         self.UHFQC.prepare_DSB_weight_and_rotation(
+                #             IF=self.IF,
+                #             weight_function_I=self.weight_function_I,
+                #             weight_function_Q=self.weight_function_Q)
 
     def acquire_data_point(self, *args, **kw):
         self.time_start = time.time()
@@ -185,13 +210,13 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
                     self.CBox.lin_trans_coeffs([1, 0, 0, 1])
                     # self.CBox.demodulation_mode(0)
                     self.CBox.demodulation_mode('double')
-                nr_samples = 512
-                self.CBox.nr_samples.set(nr_samples)
+                self.nr_samples = 512
+                self.CBox.nr_samples.set(self.nr_samples)
                 SWF = awg_swf.OffOn(
                     pulse_pars=self.pulse_pars,
                     RO_pars=self.RO_pars,
                     pulse_comb='OffOff',
-                    nr_samples=nr_samples)
+                    nr_samples=self.nr_samples)
                 SWF.prepare()
                 self.CBox.acquisition_mode('idle')
                 self.AWG.start()
@@ -205,7 +230,7 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
                     pulse_pars=self.pulse_pars,
                     RO_pars=self.RO_pars,
                     pulse_comb='OnOn',
-                    nr_samples=nr_samples)
+                    nr_samples=self.nr_samples)
                 SWF.prepare()
                 self.CBox.acquisition_mode('idle')
                 self.CBox.acquisition_mode('input averaging')
@@ -244,73 +269,64 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
                     det.CBox_integration_logging_det(self.CBox, self.AWG, integration_length=self.integration_length))
 
             elif 'UHFQC' in str(self.acquisition_instr):
-                nr_samples = 4096
+                self.nr_samples = 4096
+                self.channels=[
+                            self.weight_function_I, self.weight_function_Q]
+                #copy pasted from input average prepare
                 self.AWG.stop()
-                # 0 for rl, 1 for iavg
-                self.UHFQC.awgs_0_userregs_0(int(self.nr_averages))
-                self.UHFQC.awgs_0_userregs_1(1)  # 0 for rl, 1 for iavg
-                self.UHFQC.quex_iavg_length(nr_samples)
+                self.UHFQC.quex_iavg_length(self.nr_samples)
                 self.UHFQC.quex_iavg_avgcnt(int(np.log2(self.nr_averages)))
-                self.UHFQC.awgs_0_single(1)
+                self.UHFQC.awgs_0_userregs_1(1)  # 0 for rl, 1 for iavg
+                self.UHFQC.awgs_0_userregs_0(
+                    int(self.nr_averages))  # 0 for rl, 1 for iavg
+                self.nr_sweep_points = self.nr_samples
+                self.UHFQC.acquisition_initialize(channels=self.channels, mode='iavg')
+
+                #prepare sweep
                 SWF = awg_swf.OffOn(
                     pulse_pars=self.pulse_pars,
                     RO_pars=self.RO_pars,
                     pulse_comb='OffOff',
-                    nr_samples=nr_samples)
+                    nr_samples=self.nr_samples)
                 SWF.prepare()
-                self.UHFQC.awgs_0_enable(1)
-                try:
-                    temp = self.UHFQC.awgs_0_enable()
-                except:
-                    temp = self.UHFQC.awgs_0_enable()
-                del temp
-                self.AWG.start()
-                while self.UHFQC.awgs_0_enable() == 1:
-                    time.sleep(0.01)
 
-                self.channels = [0, 1]
-                data = ['']*len(self.channels)
-                for i, channel in enumerate(self.channels):
-                    dataset = eval(
-                        "self.UHFQC.quex_iavg_data_{}()".format(channel))
-                    data[i] = dataset[0]['vector']
-                # data = self.UHFQC.single_acquisition(nr_samples,
-                #                              self.poll_time, timeout=0,
-                #                              channels=set([0,1]),
-                #                              mode='iavg')
-                # data = np.array([data[key] for key in data.keys()])
+                #get values detector
+                self.UHFQC.quex_rl_readout(0) # resets UHFQC internal readout counters
+                self.UHFQC.acquisition_arm()
+                # starting AWG
+                if self.AWG is not None:
+                    self.AWG.start()
+
+                data_raw=self.UHFQC.acquisition_poll(samples=self.nr_sweep_points,
+                                                     arm=False, acquisition_time=0.01)
+                data = np.array([data_raw[key] for key in data_raw.keys()])
+
+                #calculating transients
                 transient0_I = data[0]
                 transient0_Q = data[1]
-                self.AWG.stop()
-                self.UHFQC.quex_iavg_length(nr_samples)
 
+                self.AWG.stop()
                 SWF = awg_swf.OffOn(
                     pulse_pars=self.pulse_pars,
                     RO_pars=self.RO_pars,
                     pulse_comb='OnOn',
-                    nr_samples=nr_samples)
+                    nr_samples=self.nr_samples)
                 SWF.prepare()
-                self.UHFQC.awgs_0_enable(1)
-                try:
-                    temp = self.UHFQC.awgs_0_enable()
-                except:
-                    temp = self.UHFQC.awgs_0_enable()
-                del temp
 
-                self.AWG.start()
+                 #get values detector
+                self.UHFQC.quex_rl_readout(0) # resets UHFQC internal readout counters
+                self.UHFQC.acquisition_arm()
+                # starting AWG
+                if self.AWG is not None:
+                    self.AWG.start()
 
-                while self.UHFQC.awgs_0_enable() == 1:
-                    time.sleep(0.01)
-                data = ['']*len(self.channels)
-                for i, channel in enumerate(self.channels):
-                    dataset = eval(
-                        "self.UHFQC.quex_iavg_data_{}()".format(channel))
-                    data[i] = dataset[0]['vector']
-                # data = self.UHFQC.single_acquisition(nr_samples,
-                #                              self.poll_time, timeout=0,
-                #                              channels=set([0,1]),
-                #                              mode='iavg')
-                # data = np.array([data[key] for key in data.keys()])
+                data_raw=self.UHFQC.acquisition_poll(samples=self.nr_sweep_points,
+                                                     arm=False, acquisition_time=0.01,
+                                                     timeout=100)
+                data = np.array([data_raw[key] for key in data_raw.keys()])
+
+                # calculating transients
+
                 transient1_I = data[0]
                 transient1_Q = data[1]
 
@@ -398,8 +414,8 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
                                    close_fig=True, auto=True)
             if self.optimized_weights:
                 # data_group = self.MC.data_object.create_group('Transients Data')
-                dset = ana.g.create_dataset('Transients', (nr_samples, 4),
-                                            maxshape=(nr_samples, 4))
+                dset = ana.g.create_dataset('Transients', (self.nr_samples, 4),
+                                            maxshape=(self.nr_samples, 4))
                 dset[:, 0] = transient0_I
                 dset[:, 1] = transient0_Q
                 dset[:, 2] = transient1_I
@@ -755,7 +771,7 @@ class Chevron_optimization_v1(det.Soft_Detector):
     def __init__(self, flux_channel, dist_dict, AWG, MC_nested, qubit,
                  kernel_obj, cost_function_opt=0, **kw):
         super().__init__()
-        kernel_dir_path = 'kernels/'
+        kernel_dir = 'kernels/'
         self.name = 'chevron_optimization_v1'
         self.value_names = ['Cost function', 'SWAP Time']
         self.value_units = ['a.u.', 'ns']
@@ -781,7 +797,7 @@ class Chevron_optimization_v1(det.Soft_Detector):
         kernel_before_loaded = []
         for k in kernel_before_list:
             if k is not '':
-                kernel_before_loaded.append(np.loadtxt(kernel_dir_path+k))
+                kernel_before_loaded.append(np.loadtxt(kernel_dir+k))
         self.kernel_before = kernel_obj.convolve_kernel(kernel_before_loaded,
                                                         30000)
 

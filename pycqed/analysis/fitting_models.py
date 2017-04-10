@@ -261,7 +261,10 @@ def gaussian_2D(x, y, amplitude=1,
 
 
 def TripleExpDecayFunc(t, tau1, tau2, tau3, amp1, amp2, amp3, offset, n):
-    return offset+amp1*np.exp(-(t/tau1)**n)+amp2*np.exp(-(t/tau2)**n)+amp3*np.exp(-(t/tau3)**n)
+    return (offset +
+            amp1*np.exp(-(t/tau1)**n) +
+            amp2*np.exp(-(t/tau2)**n) +
+            amp3*np.exp(-(t/tau3)**n))
 
 
 def avoided_crossing_mediated_coupling(flux, f_bus, f_center1, f_center2,
