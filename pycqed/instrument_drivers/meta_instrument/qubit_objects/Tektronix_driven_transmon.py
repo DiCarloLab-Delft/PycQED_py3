@@ -336,12 +336,13 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         self.AWG.set(self.pulse_Q_channel.get()+'_offset',
                      self.pulse_Q_offset.get())
 
-        if self.RO_pulse_type() is 'MW_IQmod_pulse_tek':
+
+        if self.RO_pulse_type() == 'MW_IQmod_pulse_tek':
             self.AWG.set(self.RO_I_channel.get()+'_offset',
                          self.RO_I_offset.get())
             self.AWG.set(self.RO_Q_channel.get()+'_offset',
                          self.RO_Q_offset.get())
-        elif self.RO_pulse_type() is 'MW_IQmod_pulse_UHFQC':
+        elif self.RO_pulse_type() == 'MW_IQmod_pulse_UHFQC':
             eval('self._acquisition_instr.sigouts_{}_offset({})'.format(
                 self.RO_I_channel(), self.RO_I_offset()))
             eval('self._acquisition_instr.sigouts_{}_offset({})'.format(
@@ -351,7 +352,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
             # self._acquisition_instr.awg_sequence_acquisition_and_pulse_SSB(
             #     f_RO_mod=self.f_RO_mod(), RO_amp=self.RO_amp(),
             # RO_pulse_length=self.RO_pulse_length(), acquisition_delay=270e-9)
-        elif self.RO_pulse_type.get() is 'Gated_MW_RO_pulse':
+        elif self.RO_pulse_type.get() == 'Gated_MW_RO_pulse':
             self.rf_RO_source.pulsemod_state('On')
             self.rf_RO_source.frequency(self.f_RO.get())
             self.rf_RO_source.power(self.RO_pulse_power.get())
@@ -460,7 +461,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         if MC is None:
             MC = self.MC
         MC.set_sweep_function(pw.wrap_par_to_swf(
-                              self.heterodyne_instr.frequency))
+                              self.heterodyne_instr.frequency, retrieve_value=True))
         MC.set_sweep_points(freqs)
         MC.set_detector_function(
             det.Heterodyne_probe(self.heterodyne_instr,
@@ -486,7 +487,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                                                     upload=force_load)
 
         MC.set_sweep_function(pw.wrap_par_to_swf(
-                              self.cw_source.frequency))
+                              self.cw_source.frequency, retrieve_value=True))
         MC.set_sweep_points(freqs)
         MC.set_detector_function(
             det.Heterodyne_probe(self.heterodyne_instr, trigger_separation=2.8e-6))
@@ -1057,7 +1058,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
             'amplitude': self.RO_amp.get(),
             'length': self.RO_pulse_length.get(),
             'pulse_delay': self.RO_pulse_delay.get(),
-            'mod_frequency': self.f_RO_mod.get(),
+            'f_RO_mod': self.f_RO_mod.get(),
             'acq_marker_delay': self.RO_acq_marker_delay.get(),
             'acq_marker_channel': self.RO_acq_marker_channel.get(),
             'phase': 0,
