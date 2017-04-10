@@ -290,7 +290,7 @@ class UHFQC_LookuptableManager(Instrument):
 
         return self._wave_dict
 
-    def render_wave(self, wave_name, show=True, time_unit='lut_index',
+    def render_wave(self, wave_name, show=True, time_units='lut_index',
                     reload_pulses=True):
         if reload_pulses:
             self.generate_standard_pulses()
