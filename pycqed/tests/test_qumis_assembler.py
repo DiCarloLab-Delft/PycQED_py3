@@ -191,19 +191,3 @@ class Test_single_qubit_seqs(TestCase):
         self.assembler.convert_line_to_ele_array()
         self.assembler.insert_nops()
         self.assertEqual(addition_target_array, self.assembler.label_instrs)
-
-    def compare_two_assemblers(self):
-        mypath = "./"
-        onlyfiles = [f for f in listdir(mypath) if isfile(join(mypath, f))]
-
-        for asm_name in onlyfiles:
-            print("Current file:", asm_name)
-            if (asm_name[-6:] != '.qumis'):
-                continue
-            self.setAssembler(asm_name)
-            instructions = self.convert_to_instructions()
-
-            old_asm_obj = oldasm.Assembler(self.qumis_file_name)
-            old_instructions = asm_obj.convert_to_instructions()
-
-            self.assertEqual(old_instructions, instructions)
