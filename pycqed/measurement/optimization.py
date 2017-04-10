@@ -160,6 +160,9 @@ def SPSA(fun, x0,
             (see refs for definitions)
         p (float): probability to get 1 in Bernoulli +/- 1 distribution
             (see refs for context)
+        ctrl_min, ctrl_max (float/array): boundaries for the parameters.
+            can be either a global boundary for all dimensions, or a
+            numpy array containing the boundary for each dimension.
     return: tuple (best parameter array, best score)
 
     alpha, gamma, a, c, A and p, are parameters for the algorithm.
