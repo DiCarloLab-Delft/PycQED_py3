@@ -1,5 +1,3 @@
-import logging
-import numpy as np
 from functools import partial
 import time
 from qcodes.instrument.base import Instrument
@@ -87,8 +85,6 @@ class ConversionBoxControl(Instrument):
                            parameter_class=ManualParameter,
                            initial_value=switch_time)
 
-        #self.connect_message()
-
     def set_switch(self, values):
         """
         :param values: a dictionary of key: value pairs, where key is one of
@@ -117,7 +113,8 @@ class ConversionBoxControl(Instrument):
         for key in values:
             self.parameters['{}_mode'.format(key)]._save_val(values[key])
 
-    def _WA_bitpattern(self, mode):
+    @classmethod
+    def _WA_bitpattern(cls, mode):
         if mode == 'reference':
             return 0b01
         elif mode == 'measure':
@@ -125,7 +122,9 @@ class ConversionBoxControl(Instrument):
         else:
             raise ValueError('Trying to set warm amplifier board switch to '
                              'invalid mode: {}'.format(mode))
-    def _UC_bitpattern(self, mode):
+
+    @classmethod
+    def _UC_bitpattern(cls, mode):
         if mode == 'bypass':
             return 0b01
         elif mode == 'modulated':
@@ -134,7 +133,8 @@ class ConversionBoxControl(Instrument):
             raise ValueError('Trying to set up-conversion board switch to '
                              'invalid mode: {}'.format(mode))
 
-    def _switch_bitpattern(self, mode):
+    @classmethod
+    def _switch_bitpattern(cls, mode):
         if mode == 'block':
             return 0b10000000
         elif mode in range(1,7):

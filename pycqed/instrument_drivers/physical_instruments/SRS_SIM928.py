@@ -10,7 +10,6 @@ from qcodes.instrument.parameter import ManualParameter
 class SRS_SIM928(VisaInstrument):
 
     def __init__(self, name, address, **kw):
-        t0 = time.time()
         logging.info(__name__ + ' : Initializing instrument')
         super().__init__(name, address=address, terminator='\n', **kw)
 
@@ -67,7 +66,8 @@ class SRS_SIM928(VisaInstrument):
             if len(idparts) < 4:
                 idparts += [None] * (4 - len(idparts))
         except:
-            logging.warn('Error getting or interpreting *IDN?: ' + repr(idstr))
+            logging.warning('Error getting or interpreting *IDN?: ' +
+                            repr(idstr))
             idparts = [None, None, None, None]
 
         # some strings include the word 'model' at the front of model
@@ -249,8 +249,8 @@ class SRS_SIM928(VisaInstrument):
                 raise Exception(' '.join(errors))
         return errors
 
-
-    def byte_to_bits(self, x):
+    @classmethod
+    def byte_to_bits(cls, x):
         bits = []
         for i in range(8):
             if x & 1 != 0:
