@@ -514,7 +514,15 @@ class Assembler():
                 self.instructions.append(int(self.MeasureFormat(), 2))
 
             elif (elements[0].lower() == 'wait'):   # Wait imm
-                self.instructions.append(int(self.WaitFormat(elements[1]), 2))
+                if int(elements[1]) < 0:
+                    raise ValueError('Error: wait instruction with negative' +
+                                     ' parameter found on line "{}".'.format(line))
+                elif int(elements[1]) == 0:
+                    # 'wait 0' instruction should be ignored
+                    pass
+                elif int(elements[1]) > 0:
+                    self.instructions.append(
+                        int(self.WaitFormat(elements[1]), 2))
 
             elif (elements[0].lower() == 'trigger'):   # Trigger mask, duration
                 self.instructions.append(int(self.TriggerFormat(elements[1],
