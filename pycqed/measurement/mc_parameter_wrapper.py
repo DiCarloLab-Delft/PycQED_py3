@@ -8,7 +8,7 @@ from pycqed.measurement import detector_functions as det
 import time
 
 
-def wrap_par_to_swf(parameter):
+def wrap_par_to_swf(parameter, retrieve_value=False):
     '''
      - only soft sweep_functions
     '''
@@ -20,31 +20,38 @@ def wrap_par_to_swf(parameter):
 
     sweep_function.prepare = pass_function
     sweep_function.finish = pass_function
-    sweep_function.set_parameter = parameter.set
+    if retrieve_value:
+        def set_par(val):
+            parameter.set(val)
+            parameter.get()
+        sweep_function.set_parameter = set_par
+    else:
+        sweep_function.set_parameter = parameter.set
+
+
     return sweep_function
 
-
-def wrap_vector_par_to_swf(parameter, index):
+def wrap_pars_to_swf(parameters, retrieve_value=False):
     '''
      - only soft sweep_functions
-    Wraps a vector parameter so that one can sweep over a component of a
-    vector.
     '''
     sweep_function = swf.Sweep_function()
     sweep_function.sweep_control = 'soft'
-    sweep_function.name = parameter.name
-    sweep_function.parameter_name = parameter.label
-    sweep_function.unit = parameter.units
-
-    def wrapped_set(val):
-        old_val = parameter.get()
-        vector_value = old_val
-        vector_value[index] = val
-        parameter.set(vector_value)
+    sweep_function.name = parameters[0].name
+    sweep_function.parameter_name = parameters[0].label
+    sweep_function.unit = parameters[0].unit
 
     sweep_function.prepare = pass_function
     sweep_function.finish = pass_function
-    sweep_function.set_parameter = wrapped_set
+    def set_par(val):
+        for par in parameters:
+            par.set(val)
+            if retrieve_value:
+                par.get()
+
+    sweep_function.set_parameter = set_par
+
+
     return sweep_function
 
 
