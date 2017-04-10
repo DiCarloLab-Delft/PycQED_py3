@@ -624,16 +624,17 @@ class UHFQC(Instrument):
         sinI = np.array(np.sin(2*np.pi*IF*tbase))
         eval('self.quex_wint_weights_{}_real(np.array(cosI))'.format(
             weight_function_I))
-        eval('self.quex_wint_weights_{}_real(np.array(sinI))'.format(
+        eval('self.quex_wint_weights_{}_imag(np.array(sinI))'.format(
             weight_function_I))
         eval('self.quex_wint_weights_{}_real(np.array(sinI))'.format(
             weight_function_Q))
-        eval('self.quex_wint_weights_{}_real(np.array(cosI))'.format(
+        eval('self.quex_wint_weights_{}_imag(np.array(cosI))'.format(
             weight_function_Q))
         eval('self.quex_rot_{}_real(1.0)'.format(weight_function_I))
         eval('self.quex_rot_{}_imag(0.0)'.format(weight_function_I))
         eval('self.quex_rot_{}_real(1.0)'.format(weight_function_Q))
         eval('self.quex_rot_{}_imag(0.0)'.format(weight_function_Q))
+
 
     def _make_full_path(self, path):
         if path[0] == '/':
