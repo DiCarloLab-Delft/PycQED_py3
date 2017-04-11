@@ -47,7 +47,7 @@ def two_qubit_off_on(q0, q1, RO_target='all'):
 def two_qubit_tomo_cardinal(cardinal,
                             q0,
                             q1,
-                            RO_target):
+                            RO_target='all'):
     '''
     Cardinal tomography for two qubits.
 
