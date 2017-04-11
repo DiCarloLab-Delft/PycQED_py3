@@ -4,7 +4,7 @@ from pycqed.measurement import measurement_control
 from pycqed.measurement.sweep_functions import None_Sweep
 import pycqed.measurement.detector_functions as det
 from pycqed.instrument_drivers.physical_instruments.dummy_instruments import DummyParHolder
-from pycqed.measurement.optimization import nelder_mead
+from pycqed.measurement.optimization import nelder_mead, SPSA
 
 from qcodes import station
 
@@ -238,7 +238,7 @@ class Test_MeasurementControl(unittest.TestCase):
         np.testing.assert_array_almost_equal(x, sweep_pts)
         np.testing.assert_array_almost_equal(y0, y_exp, decimal=5)
 
-    def test_adaptive_measurement(self):
+    def test_adaptive_measurement_nelder_mead(self):
         self.MC.soft_avg(1)
         self.mock_parabola.noise(0)
         self.MC.set_sweep_functions(
@@ -246,6 +246,29 @@ class Test_MeasurementControl(unittest.TestCase):
         self.MC.set_adaptive_function_parameters(
             {'adaptive_function': nelder_mead,
              'x0': [-50, -50], 'initial_step': [2.5, 2.5]})
+        self.mock_parabola.noise(.5)
+        self.MC.set_detector_function(self.mock_parabola.parabola)
+        dat = self.MC.run('1D test', mode='adaptive')
+        xf, yf, pf = dat[-1]
+        self.assertLess(xf, 0.7)
+        self.assertLess(yf, 0.7)
+        self.assertLess(pf, 0.7)
+
+    def test_adaptive_measurement_SPSA(self):
+        self.MC.soft_avg(1)
+        self.mock_parabola.noise(0)
+        self.MC.set_sweep_functions(
+            [self.mock_parabola.x, self.mock_parabola.y])
+        self.MC.set_adaptive_function_parameters(
+            {'adaptive_function': SPSA,
+             'x0': [-50, -50],
+             'a': (0.5)*(1+300)**0.602,
+             'c': 0.2,
+             'alpha': 1.,  # 0.602,
+             'gamma': 1./6.,  # 0.101,
+             'A': 300,
+             'p': 0.5,
+             'maxiter': 330})
         self.mock_parabola.noise(.5)
         self.MC.set_detector_function(self.mock_parabola.parabola)
         dat = self.MC.run('1D test', mode='adaptive')
@@ -288,6 +311,3 @@ class Test_MeasurementControl(unittest.TestCase):
 
         self.MC.clear_persitent_plot()
         self.assertEqual(self.MC._persist_dat, None)
-
-
-
