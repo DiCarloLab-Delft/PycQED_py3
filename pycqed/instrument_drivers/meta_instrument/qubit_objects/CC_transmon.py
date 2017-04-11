@@ -265,7 +265,6 @@ class CBox_v3_driven_transmon(Transmon):
                            label='Optimized weights for Q channel',
                            parameter_class=ManualParameter)
 
-
     def prepare_for_continuous_wave(self):
         self.prepare_readout()
 
@@ -363,13 +362,13 @@ class CBox_v3_driven_transmon(Transmon):
                 if 'multiplexed' not in self.RO_pulse_type().lower():
                     RO_lm.load_pulse_onto_AWG_lookuptable('M_square')
 
-
         #####################################
         # Setting The integration weights
         #####################################
         if 'CBox' in self.acquisition_instrument():
             if self.RO_acq_weights() == 'SSB':
-                raise NotImplementedError('The CBox only supports DSB demodulation')
+                raise NotImplementedError(
+                    'The CBox only supports DSB demodulation')
                 # self.CBox.get_instr().upload_standard_weights(self.f_RO_mod())
             elif self.RO_acq_weights() == 'DSB':
                 self.CBox.get_instr().upload_standard_weights(self.f_RO_mod())
@@ -390,32 +389,23 @@ class CBox_v3_driven_transmon(Transmon):
                     weight_function_I=self.RO_acq_weight_function_I(),
                     weight_function_Q=self.RO_acq_weight_function_Q())
             elif self.RO_acq_weights() == 'optimal':
-                if (self.RO_optimal_weights_I() is None or 
-                    self.RO_optimal_weights_Q() is None):
-                    logging.warning('Optimal weights are None, not setting integration weights')
-                else:  
+                if (self.RO_optimal_weights_I() is None or
+                        self.RO_optimal_weights_Q() is None):
+                    logging.warning(
+                        'Optimal weights are None, not setting integration weights')
+                else:
+                    # When optimal weights are used, only the RO I weight channel is used
                     UHFQC.set('quex_wint_weights_{}_real'
                               .format(self.RO_acq_weight_function_I()),
                               self.RO_optimal_weights_I())
                     UHFQC.set('quex_wint_weights_{}_imag'
                               .format(self.RO_acq_weight_function_I()),
                               self.RO_optimal_weights_Q())
-                    UHFQC.set('quex_wint_weights_{}_real'
-                              .format(self.RO_acq_weight_function_Q()),
-                              self.RO_optimal_weights_Q())
-                    UHFQC.set('quex_wint_weights_{}_imag'
-                              .format(self.RO_acq_weight_function_Q()),
-                              self.RO_optimal_weights_I())
 
                     UHFQC.set('quex_rot_{}_real'
                               .format(self.RO_acq_weight_function_I()), 1.0)
                     UHFQC.set('quex_rot_{}_imag'
                               .format(self.RO_acq_weight_function_I()), 1.0)
-                    UHFQC.set('quex_rot_{}_real'
-                              .format(self.RO_acq_weight_function_Q()), 1.0)
-                    UHFQC.set('quex_rot_{}_imag'
-                              .format(self.RO_acq_weight_function_Q()), -1.0)
-
 
     def prepare_for_timedomain(self):
 
@@ -463,7 +453,6 @@ class CBox_v3_driven_transmon(Transmon):
         # Print this should be deleted
 
         self.Q_LutMan.get_instr().load_pulses_onto_AWG_lookuptable()
-
 
     def _get_acquisition_instr(self):
         return self._acquisition_instrument.name
@@ -1258,14 +1247,14 @@ class CBox_v3_driven_transmon(Transmon):
             MC.set_sweep_points(
                 np.arange(self.input_average_detector.nr_samples))
             MC.set_detector_function(self.input_average_detector)
-            data = MC.run('Measure_transients{}_{}'.format(self.msmt_suffix, i))
+            data = MC.run(
+                'Measure_transients{}_{}'.format(self.msmt_suffix, i))
             transients.append(data.T[1:])
 
             if analyze:
                 ma.MeasurementAnalysis()
 
         return [np.array(t, dtype=np.float64) for t in transients]
-
 
     def calibrate_optimal_weights(self, MC=None, verify=True, update=True):
         if MC is None:
@@ -1275,12 +1264,14 @@ class CBox_v3_driven_transmon(Transmon):
         transients = self.measure_transients(MC=MC, analyze=False)
         # Calculate optimal weights
         optimized_weights_I = transients[1][0] - transients[0][0]
-        optimized_weights_I = optimized_weights_I - np.mean(optimized_weights_I)
+        optimized_weights_I = optimized_weights_I - \
+            np.mean(optimized_weights_I)
         weight_scale_factor = 1./np.max(np.abs(optimized_weights_I))
         optimized_weights_I = np.array(weight_scale_factor*optimized_weights_I)
 
         optimized_weights_Q = transients[1][1] - transients[0][1]
-        optimized_weights_Q = optimized_weights_Q - np.mean(optimized_weights_Q)
+        optimized_weights_Q = optimized_weights_Q - \
+            np.mean(optimized_weights_Q)
         weight_scale_factor = 1./np.max(np.abs(optimized_weights_Q))
         optimized_weights_Q = np.array(weight_scale_factor*optimized_weights_Q)
 
@@ -1291,7 +1282,6 @@ class CBox_v3_driven_transmon(Transmon):
 
         if verify:
             self.measure_ssro()
-
 
     def measure_butterfly(self, return_detector=False, MC=None,
                           analyze=True, close_fig=True,
