@@ -217,6 +217,64 @@ class Test_single_qubit_seqs(TestCase):
         instructions = asm.convert_to_instructions()
 
 
+class Test_multi_qubit_seqs(TestCase):
+
+    @classmethod
+    def setUpClass(self):
+        self.qubits = ['q0', 'q1']
+        self.times = np.linspace(20e-9, 50e-6, 61)
+        # a sample operation dictionary for testing
+        self.operation_dict = {}
+        for q in self.qubits:
+            self.operation_dict['init_all'] = {'instruction': 'WaitReg r0 \n'}
+            self.operation_dict['X180 {}'.format(q)] = {
+                'duration': 2, 'instruction': 'Trigger 1000000, 2 \n'}
+            self.operation_dict['X90 {}'.format(q)] = {
+                'duration': 2, 'instruction': 'Trigger 0100000, 2 \n'}
+            self.operation_dict['Y180 {}'.format(q)] = {
+                'duration': 2, 'instruction': 'Trigger 0100000, 2 \n'}
+            self.operation_dict['Y90 {}'.format(q)] = {
+                'duration': 2, 'instruction': 'Trigger 0100000, 2 \n'}
+
+            self.operation_dict['mX180 {}'.format(q)] = {
+                'duration': 2, 'instruction': 'Trigger 1000000, 2 \n'}
+            self.operation_dict['mX90 {}'.format(q)] = {
+                'duration': 2, 'instruction': 'Trigger 0100000, 2 \n'}
+            self.operation_dict['mY180 {}'.format(q)] = {
+                'duration': 2, 'instruction': 'Trigger 0100000, 2 \n'}
+            self.operation_dict['mY90 {}'.format(q)] = {
+                'duration': 2, 'instruction': 'Trigger 0100000, 2 \n'}
+
+            # FIXME: It should be possible to translate 'I' to 'wait for some
+            # time', which it is not when it is translated to an empty string
+            # like this.
+            self.operation_dict['I {}'.format(q)] = {
+                'duration': None, 'instruction': ''}
+            self.operation_dict['RO {}'.format(q)] = {
+                'duration': 8, 'instruction': 'Trigger 0010000, 2 \n'}
+        self.operation_dict['RO all'] = {
+            'duration': 8, 'instruction': 'Trigger 0010000, 2 \n'}
+
+    def test_two_qubit_off_on(self):
+        qasm_file = mq_qasm.two_qubit_off_on(self.qubits[0], self.qubits[1])
+        asm_file = qta.qasm_to_asm(qasm_file.name, self.operation_dict)
+        asm = Assembler.Assembler(asm_file.name)
+        asm.convert_to_instructions()
+
+    def test_two_qubit_tomo_cardinal(self):
+        qasm_file = mq_qasm.two_qubit_tomo_cardinal(1, self.qubits[0],
+                                                    self.qubits[1])
+        asm_file = qta.qasm_to_asm(qasm_file.name, self.operation_dict)
+        asm = Assembler.Assembler(asm_file.name)
+        asm.convert_to_instructions()
+
+    def test_two_qubit_AllXY(self):
+        qasm_file = mq_qasm.two_qubit_AllXY(self.qubits[0], self.qubits[1])
+        asm_file = qta.qasm_to_asm(qasm_file.name, self.operation_dict)
+        asm = Assembler.Assembler(asm_file.name)
+        asm.convert_to_instructions()
+
+
 class Test_qasm_to_asm(TestCase):
 
     @classmethod
@@ -314,58 +372,6 @@ class Test_qasm_to_asm(TestCase):
             qta.qasm_to_asm(qasm_file.name, self.operation_dict)
 
 
-class Test_multi_qubit_seqs(TestCase):
-
-    @classmethod
-    def setUpClass(self):
-        self.qubits = ['q0', 'q1']
-        self.times = np.linspace(20e-9, 50e-6, 61)
-        # a sample operation dictionary for testing
-        self.operation_dict = {}
-        for q in self.qubits:
-            self.operation_dict['init_all'] = {'instruction': 'WaitReg r0 \n'}
-            self.operation_dict['X180 {}'.format(q)] = {
-                    'duration': 2, 'instruction': 'Trigger 1000000, 2 \n'}
-            self.operation_dict['X90 {}'.format(q)] = {
-                    'duration': 2, 'instruction': 'Trigger 0100000, 2 \n'}
-            self.operation_dict['Y180 {}'.format(q)] = {
-                    'duration': 2, 'instruction': 'Trigger 0100000, 2 \n'}
-            self.operation_dict['Y90 {}'.format(q)] = {
-                    'duration': 2, 'instruction': 'Trigger 0100000, 2 \n'}
-
-            self.operation_dict['mX180 {}'.format(q)] = {
-                    'duration': 2, 'instruction': 'Trigger 1000000, 2 \n'}
-            self.operation_dict['mX90 {}'.format(q)] = {
-                    'duration': 2, 'instruction': 'Trigger 0100000, 2 \n'}
-            self.operation_dict['mY180 {}'.format(q)] = {
-                    'duration': 2, 'instruction': 'Trigger 0100000, 2 \n'}
-            self.operation_dict['mY90 {}'.format(q)] = {
-                    'duration': 2, 'instruction': 'Trigger 0100000, 2 \n'}
-
-            # FIXME: It should be possible to translate 'I' to 'wait for some
-            # time', which it is not when it is translated to an empty string
-            # like this.
-            self.operation_dict['I {}'.format(q)] = {
-                    'duration': None, 'instruction': ''}
-            self.operation_dict['RO {}'.format(q)] = {
-                    'duration': 8, 'instruction': 'Trigger 0010000, 2 \n'}
-        self.operation_dict['RO all'] = {
-                'duration': 8, 'instruction': 'Trigger 0010000, 2 \n'}
-
-    def test_two_qubit_off_on(self):
-        qasm_file = mq_qasm.two_qubit_off_on(self.qubits[0], self.qubits[1])
-        asm_file = qta.qasm_to_asm(qasm_file.name, self.operation_dict)
-        asm = Assembler.Assembler(asm_file.name)
-        instruction = asm.convert_to_instructions()
-
-    def test_two_qubit_tomo_cardinal(self):
-        qasm_file = mq_qasm.two_qubit_tomo_cardinal(1, self.qubits[0],
-                                                    self.qubits[1])
-        asm_file = qta.qasm_to_asm(qasm_file.name, self.operation_dict)
-        asm = Assembler.Assembler(asm_file.name)
-        instruction = asm.convert_to_instructions()
-
-
 class Test_qasm_waveform_management(TestCase):
 
     """
@@ -415,8 +421,8 @@ class Test_qasm_waveform_management(TestCase):
                          'prepare_function_kwargs': None},
             'X180 {}'.format(self.qubit_name): {
                 'duration': 2, 'instruction': 'Trigger 1000000, 2 \n',
-                             'prepare_function': 'mock_control_pulse_prepare',
-                             'prepare_function_kwargs': {'test': 0}},
+                'prepare_function': 'mock_control_pulse_prepare',
+                'prepare_function_kwargs': {'test': 0}},
             'Y180 {}'.format(self.qubit_name): {
                 'duration': 2, 'instruction': 'Trigger 0100000, 2 \n',
                 'prepare_function': 'mock_control_pulse_prepare',
@@ -545,10 +551,12 @@ def valid_operation_dictionary(operation_dict):
 
 
 class Capturing(list):
+
     def __enter__(self):
         self._stdout = sys.stdout
         sys.stdout = self._stringio = StringIO()
         return self
+
     def __exit__(self, *args):
         self.extend(self._stringio.getvalue().splitlines())
         sys.stdout = self._stdout
