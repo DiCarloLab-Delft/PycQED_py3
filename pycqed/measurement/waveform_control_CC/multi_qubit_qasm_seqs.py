@@ -47,26 +47,61 @@ def two_qubit_off_on(q0, q1, RO_target='all'):
 def two_qubit_tomo_cardinal(cardinal,
                             q0,
                             q1,
-                            RO_target,
-                            timings_dict,
-                            verbose=False):
-    # TODO: docstring
+                            RO_target):
+    '''
+    Cardinal tomography for two qubits.
+
+    Args:
+        cardinal        (int) : index of prep gate
+        q0, q1          (str) : target qubits for the sequence
+        RO_target       (str) : target for the RO, can be a qubit name or 'all'
+    '''
     tomo_pulses = ['I ', 'X180 ', 'Y90 ', 'mY90 ', 'X90 ', 'mX90 ']
     for tp in tomo_pulses:
-        tomo_list_q0 = [tp + q0]
-        tomo_list_q1 = [tp + q1]
+        tomo_list_q0 = [tp + q0 + '\n']
+        tomo_list_q1 = [tp + q1 + '\n']
 
-    prep_pulse_q0 = tomo_list_q0[int(cardinal % len(tomo_list_q0))]
-    prep_pulse_q1 = tomo_list_q1[int(cardinal % len(tomo_list_q1))]
+    prep_index_q0 = int(cardinal % len(tomo_list_q0))
+    prep_index_q1 = int(((cardinal - prep_index_q0) / len(tomo_list_q0) %
+                         len(tomo_list_q1)))
+
+    prep_pulse_q0 = tomo_list_q0[prep_index_q0]
+    prep_pulse_q1 = tomo_list_q1[prep_index_q1]
 
     filename = join(base_qasm_path, 'two_qubit_tomo_cardinal.qasm')
     qasm_file = mopen(filename, mode='w')
     qasm_file.writelines('qubit {} \nqubit {} \n'.format(q0, q1))
 
-    for p_q0 in tomo_list_q0:
-        for p_q1 in tomo_list_q1:
+    # Tomography pulses
+    for p_q1 in tomo_list_q1:
+        for p_q0 in tomo_list_q0:
             qasm_file.writelines('\ninit_all\n')
-            qasm_file.writelines(prep_pulse_q0 + '\n')
+            qasm_file.writelines(prep_pulse_q0)
+            qasm_file.writelines(prep_pulse_q1)
+            qasm_file.writelines(p_q0)
+            qasm_file.writelines(p_q1)
+            qasm_file.writelines('RO ' + RO_target + '  \n')
+
+    # Calibration pulses
+    cal_points = [['I ', 'I '],
+                  ['X180 ', 'I '],
+                  ['I ', 'X180 '],
+                  ['X180 ', 'X180 ']]
+    cal_pulses = []
+    # every calibration point is repeated 7 times. This is copied from the
+    # script for Tektronix driven qubits. I do not know if this repetition
+    # is important or even necessary here.
+    for seq in cal_points:
+        cal_pulses += [[seq[0] + q0 + '\n', seq[1] +
+                        q1 + '\n', 'RO ' + RO_target + '\n']] * 7
+
+    for seq in cal_pulses:
+        qasm_file.writelines('\ninit_all\n')
+        for p in seq:
+            qasm_file.writelines(p)
+
+    qasm_file.close()
+    return qasm_file
 
 
 def two_qubit_AllXY(q0, q1, RO_target='all',
