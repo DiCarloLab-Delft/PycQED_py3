@@ -1,8 +1,5 @@
 ﻿import string
-from sys import exit
 import logging
-import tempfile
-
 
 def is_number(s):
     try:
@@ -51,7 +48,7 @@ class Assembler():
     def __init__(self, asm_filename):
         self.asmfilename = asm_filename
         # Control if a nop is added after each label.
-        self.add_nop_after_label = False
+        self.add_nop_after_label = True
 
         # Control the nops added after each branch instruction.
         self.add_nop_after_branch = True

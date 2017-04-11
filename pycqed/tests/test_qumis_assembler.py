@@ -1,8 +1,6 @@
 from unittest import TestCase
 import pycqed as pq
 import os
-from os import listdir
-from os.path import isfile, join
 from pycqed.instrument_drivers.physical_instruments._controlbox \
     import Assembler as asm
 
