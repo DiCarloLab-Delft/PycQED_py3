@@ -394,7 +394,8 @@ class CBox_v3_driven_transmon(Transmon):
                     logging.warning(
                         'Optimal weights are None, not setting integration weights')
                 else:
-                    # When optimal weights are used, only the RO I weight channel is used
+                    # When optimal weights are used, only the RO I weight
+                    # channel is used
                     UHFQC.set('quex_wint_weights_{}_real'
                               .format(self.RO_acq_weight_function_I()),
                               self.RO_optimal_weights_I())
