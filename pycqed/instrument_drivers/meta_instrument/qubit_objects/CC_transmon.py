@@ -489,7 +489,7 @@ class CBox_v3_driven_transmon(Transmon):
                     self.RO_acq_weight_function_I(),
                     self.RO_acq_weight_function_Q()],
                 nr_averages=self.RO_acq_averages(),
-                real_imag=True,
+                real_imag=False, single_int_avg=True,
                 integration_length=self.RO_acq_integration_length())
             self.int_avg_det_single.detector_control = 'soft'
 
@@ -891,7 +891,7 @@ class CBox_v3_driven_transmon(Transmon):
 
     def measure_rabi(self, amps=np.linspace(-.5, .5, 21), n=1,
                      MC=None, analyze=True, close_fig=True,
-                     verbose=False, real_imag=False):
+                     verbose=False, real_imag=True):
         self.prepare_for_timedomain()
         if MC is None:
             MC = self.MC.get_instr()
@@ -946,6 +946,7 @@ class CBox_v3_driven_transmon(Transmon):
         d = self.int_avg_det_single
         d.seg_per_point = 2
         d.detector_control = 'hard'
+        d._set_real_imag(True)
 
         # d = qh.CBox_single_integration_average_det_CC(
         #     self.CBox.get_instr(), nr_averages=self.RO_acq_averages()//MC.soft_avg(),

@@ -1362,8 +1362,9 @@ class UHFQC_integrated_average_detector(Hard_Detector):
     '''
 
     def __init__(self, UHFQC, AWG=None, integration_length=1e-6,
-                 nr_averages=1024, rotate=False, real_imag=False,
+                 nr_averages=1024, rotate=False, real_imag=True,
                  channels=[0, 1, 2, 3], cross_talk_suppression=False,
+                 seg_per_point=1, single_int_avg=False,
                  **kw):
         super(UHFQC_integrated_average_detector, self).__init__()
         self.UHFQC = UHFQC
@@ -1372,9 +1373,10 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         self.value_names = ['']*len(self.channels)
         self.value_units = ['']*len(self.channels)
         self.cal_points = kw.get('cal_points', None)
+        self.single_int_avg = single_int_avg
 
         self._set_real_imag(real_imag)
-
+        self.seg_per_point = seg_per_point
         self.rotate = rotate
 
         self.AWG = AWG
@@ -1394,7 +1396,7 @@ class UHFQC_integrated_average_detector(Hard_Detector):
             self.value_names[i] = 'w{}'.format(channel)
             self.value_units[i] = 'V'
 
-        if self.real_imag:
+        if not self.real_imag:
             self.value_names[0] = 'Magn'
             self.value_names[1] = 'Phase'
             self.value_units[1] = 'deg'
@@ -1414,7 +1416,7 @@ class UHFQC_integrated_average_detector(Hard_Detector):
                                                arm=False, acquisition_time=0.01)
         data = np.array([data_raw[key]
                          for key in data_raw.keys()])*self.scaling_factor
-        if self.real_imag:
+        if not self.real_imag:
             I = data[0]
             Q = data[1]
             S21 = I + 1j*Q
@@ -1450,10 +1452,11 @@ class UHFQC_integrated_average_detector(Hard_Detector):
     def prepare(self, sweep_points=None):
         if self.AWG is not None:
             self.AWG.stop()
-        if sweep_points is None:
-            self.nr_sweep_points = 1
+        if sweep_points is None or self.single_int_avg:
+
+            self.nr_sweep_points = self.seg_per_point
         else:
-            self.nr_sweep_points = len(sweep_points)
+            self.nr_sweep_points = len(sweep_points)*self.seg_per_point
         # this sets the result to integration and rotation outcome
         if self.cross_talk_suppression:
             # 2/0/1 raw/crosstalk supressed /digitized
