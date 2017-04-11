@@ -416,7 +416,7 @@ class Transmon(Qubit):
         doing rabi flipping experiments around that optimum directly.
         '''
         if MC is None:
-            MC = self.MC
+            MC = self.MC.get_instr()
         if np.size(amps) != 1:
             self.measure_rabi(amps, n=1, MC=MC, analyze=False)
             a = ma.Rabi_Analysis(close_fig=close_fig)
