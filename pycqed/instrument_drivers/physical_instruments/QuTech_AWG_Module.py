@@ -376,8 +376,8 @@ class QuTech_AWG_Module(SCPI):
         wv_val = vals.Arrays(min_value=-1, max_value=1)
         wv_val.validate(waveform)
 
-        maxWaveLen = 65532  # FIXME: this is the hardware max
-        # maxWaveLen = 32000  # This is a current max until issue #63 is resolved
+        maxWaveLen = 2**17-4  # FIXME: this is the hardware max
+
         waveLen = len(waveform)
         if waveLen > maxWaveLen:
             raise ValueError('Waveform length ({}) must be < {}'.format(
