@@ -99,7 +99,11 @@ class Test_single_qubit_seqs(TestCase):
         self.assembler.convert_to_instructions()
         self.assertEqual(self.assembler.instructions[-8], 3229615080)
         self.assertEqual(self.assembler.instructions[-7], 2692875240)
-        self.assertEqual(self.assembler.instructions[-6], 302022653)
+
+        if self.assembler.add_nop_after_label == True:
+            self.assertEqual(self.assembler.instructions[-6], 302022652)
+        else:
+            self.assertEqual(self.assembler.instructions[-6], 302022653)
         self.assertEqual(self.assembler.instructions[-5], 0)
         self.assertEqual(self.assembler.instructions[-4], 0)
         self.assertEqual(self.assembler.instructions[-3], 0)
@@ -143,9 +147,22 @@ class Test_single_qubit_seqs(TestCase):
         self.assertEqual(addition_target_array, self.assembler.label_instrs)
 
     def test_insert_nops(self):
-        target_array = [['', 'mov', 'r0', '0'],
+        Error_Code_target_array_no_nop = [['', 'mov', 'r0', '0'],
                          ['', 'mov', 'r1', '200'],
                          ['loop', 'waitreg', 'r1'],
+                         ['', 'trigger', '1111111', '10'],
+                         ['', 'pulse', '0000', '1001', '0000'],
+                         ['', 'waitreg', 'r1'],
+                         ['', 'beq', 'r0', 'r0', 'loop'],
+                         ['', 'nop'],
+                         ['', 'nop'],
+                         ['', 'nop'],
+                         ['', 'nop'],
+                         ['', 'nop']]
+        Error_Code_target_array = [['', 'mov', 'r0', '0'],
+                         ['', 'mov', 'r1', '200'],
+                         ['loop', 'nop'],
+                         ['', 'waitreg', 'r1'],
                          ['', 'trigger', '1111111', '10'],
                          ['', 'pulse', '0000', '1001', '0000'],
                          ['', 'waitreg', 'r1'],
@@ -160,9 +177,14 @@ class Test_single_qubit_seqs(TestCase):
         self.assembler.get_valid_lines()
         self.assembler.convert_line_to_ele_array()
         self.assembler.insert_nops()
-        self.assertEqual(target_array, self.assembler.label_instrs)
+        if self.assembler.add_nop_after_label == True:
+            self.assertEqual(Error_Code_target_array,
+                self.assembler.label_instrs)
+        else:
+            self.assertEqual(Error_Code_target_array_no_nop,
+                self.assembler.label_instrs)
 
-        addition_target_array = [['', 'mov', 'r0', '0'],
+        addition_target_array_no_nop = [['', 'mov', 'r0', '0'],
                                  ['', 'mov', 'r1', '100'],
                                  ['', 'mov', 'r2', '200'],
                                  ['', 'mov', 'r3', '400'],
@@ -182,9 +204,39 @@ class Test_single_qubit_seqs(TestCase):
                                  ['', 'nop'],
                                  ['', 'nop'],
                                  ['', 'trigger', '1111111', '10']]
+
+        addition_target_array = [['', 'mov', 'r0', '0'],
+                                 ['', 'mov', 'r1', '100'],
+                                 ['', 'mov', 'r2', '200'],
+                                 ['', 'mov', 'r3', '400'],
+                                 ['', 'mov', 'r4', '1000'],
+                                 ['', 'mov', 'r5', '3000'],
+                                 ['', 'mov', 'r6', '0'],
+                                 ['', 'mov', 'r7', '0'],
+                                 ['', 'mov', 'r8', '0'],
+                                 ['', 'add', 'r6', 'r1', 'r2'],
+                                 ['', 'add', 'r7', 'r6', 'r2'],
+                                 ['start', 'nop'],
+                                 ['', 'wait', '100'],
+                                 ['', 'addi', 'r8', 'r8', '1'],
+                                 ['', 'beq', 'r0', 'r0', 'start'],
+                                 ['', 'nop'],
+                                 ['', 'nop'],
+                                 ['', 'nop'],
+                                 ['', 'nop'],
+                                 ['', 'nop'],
+                                 ['', 'trigger', '1111111', '10']]
+
+
         qumis_file_name = "Addition.qumis"
         self.setAssembler(qumis_file_name)
         self.assembler.get_valid_lines()
         self.assembler.convert_line_to_ele_array()
         self.assembler.insert_nops()
-        self.assertEqual(addition_target_array, self.assembler.label_instrs)
+
+        if self.assembler.add_nop_after_label == True:
+            self.assertEqual(addition_target_array,
+                self.assembler.label_instrs)
+        else:
+            self.assertEqual(addition_target_array_no_nop,
+                self.assembler.label_instrs)
