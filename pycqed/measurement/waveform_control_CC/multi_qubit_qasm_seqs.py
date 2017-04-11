@@ -4,16 +4,80 @@ from os.path import join, dirname
 base_qasm_path = join(dirname(__file__), 'qasm_files')
 
 
-def AllXY(q0, q1, RO_target='all',
-          sequence_type='sequential',
-          replace_q1_pulses_X180=False,
-          double_points=False):
+def two_qubit_off_on(q0, q1, RO_target='all'):
+    '''
+    off_on sequence on two qubits.
+
+    Args:
+        q0, q1      (str) : target qubits for the sequence
+        RO_target   (str) : target for the RO, can be a qubit name or 'all'
+    '''
+    filename = join(base_qasm_path, 'two_qubit_off_on.qasm')
+    qasm_file = mopen(filename, mode='w')
+    qasm_file.writelines('qubit {} \nqubit {} \n'.format(q0, q1))
+
+    # off - off
+    qasm_file.writelines('\ninit_all\n')
+    qasm_file.writelines('I {}\n'.format(q0))
+    qasm_file.writelines('I {}\n'.format(q1))
+    qasm_file.writelines('RO {}  \n'.format(RO_target))
+
+    # on - off
+    qasm_file.writelines('\ninit_all\n')
+    qasm_file.writelines('X180 {}\n'.format(q0))
+    qasm_file.writelines('I {}\n'.format(q1))
+    qasm_file.writelines('RO {}  \n'.format(RO_target))
+
+    # off - on
+    qasm_file.writelines('\ninit_all\n')
+    qasm_file.writelines('I {}\n'.format(q0))
+    qasm_file.writelines('X180 {}\n'.format(q1))
+    qasm_file.writelines('RO {}  \n'.format(RO_target))
+
+    # on - on
+    qasm_file.writelines('\ninit_all\n')
+    qasm_file.writelines('X180 {}\n'.format(q0))
+    qasm_file.writelines('X180 {}\n'.format(q1))
+    qasm_file.writelines('RO {}  \n'.format(RO_target))
+
+    qasm_file.close()
+    return qasm_file
+
+
+def two_qubit_tomo_cardinal(cardinal,
+                            q0,
+                            q1,
+                            RO_target,
+                            timings_dict,
+                            verbose=False):
+    # TODO: docstring
+    tomo_pulses = ['I ', 'X180 ', 'Y90 ', 'mY90 ', 'X90 ', 'mX90 ']
+    for tp in tomo_pulses:
+        tomo_list_q0 = [tp + q0]
+        tomo_list_q1 = [tp + q1]
+
+    prep_pulse_q0 = tomo_list_q0[int(cardinal % len(tomo_list_q0))]
+    prep_pulse_q1 = tomo_list_q1[int(cardinal % len(tomo_list_q1))]
+
+    filename = join(base_qasm_path, 'two_qubit_tomo_cardinal.qasm')
+    qasm_file = mopen(filename, mode='w')
+    qasm_file.writelines('qubit {} \nqubit {} \n'.format(q0, q1))
+
+    for p_q0 in tomo_list_q0:
+        for p_q1 in tomo_list_q1:
+            qasm_file.writelines('\ninit_all\n')
+            qasm_file.writelines(prep_pulse_q0 + '\n')
+
+
+def two_qubit_AllXY(q0, q1, RO_target='all',
+                    sequence_type='sequential',
+                    replace_q1_pulses_X180=False,
+                    double_points=False):
     """
     AllXY sequence on two qubits.
     Has the option of replacing pulses on q1 with pi pulses
 
     Args:
-        operation_dict (dict) : dictionary containing all pulse parameters
         q0, q1         (str) : target qubits for the sequence
         RO_target      (str) : target for the RO, can be a qubit name or 'all'
         sequence_type  (str) : sequential | interleaved | simultaneous | sandwiched
