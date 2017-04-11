@@ -11,6 +11,7 @@
 import numpy as np
 from pycqed.analysis.fitting_models import Qubit_freq_to_dac
 
+
 class Waveform():
     # complex waveforms
 
@@ -168,10 +169,11 @@ def simple_mod_pulse(pulse_I, pulse_Q, f_modulation,
 
 def martinis_flux_pulse(length, lambda_coeffs, theta_f,
                         f_01_max,
-                        f_bus,
                         g2,
                         E_c,
                         dac_flux_coefficient,
+                        f_interaction=None,
+                        f_bus=None,
                         asymmetry=0,
                         sampling_rate=1e9,
                         return_unit='V'):
@@ -190,41 +192,47 @@ def martinis_flux_pulse(length, lambda_coeffs, theta_f,
                     Voltage for the centerpoint of the waveform.
 
     f_01_max        (float) qubit sweet spot frequency (Hz).
-    f_bus           (float) frequency of the bus (Hz).
     g2              (float) coupling between 11-02 (Hz),
                             approx sqrt(2) g1 (the 10-01 coupling).
     E_c             (float) Charging energy of the transmon (Hz).
+        N.B. specify either f_interaction or f_bus
+    f_interaction   (float) interaction frequency (Hz).
+    f_bus           (float) frequency of the bus (Hz).
     dac_flux_coefficient  (float) conversion factor for AWG voltage to flux (1/V)
     asymmetry       (float) qubit asymmetry
 
     sampling_rate   (float)
-    return_unit     (enum: ['V', 'eps', 'f01', 'theta']) wehter to return the pulse
+    return_unit     (enum: ['V', 'eps', 'f01', 'theta']) whether to return the pulse
                     expressed in units of theta: the reference frame of the
                     interaction, units of epsilon: detuning to the bus
                     eps=f12-f_bus
     """
     lambda_coeffs = np.array(lambda_coeffs)
-    nr_samples = round((length)*sampling_rate) # rounds the nr samples
-    length= nr_samples/sampling_rate # gives back the rounded length
+    nr_samples = int(np.round((length)*sampling_rate))  # rounds the nr samples
+    length = nr_samples/sampling_rate  # gives back the rounded length
     t_step = 1/sampling_rate
     t = np.arange(0, length, t_step)
-    theta_0 = np.arctan(2*g2/(f_01_max-E_c-f_bus))
+    if f_interaction is None:
+        f_interaction = f_bus + E_c
+    theta_0 = np.arctan(2*g2/(f_01_max-f_interaction))
     # you can not have weaker coupling than the initial coupling
     assert(theta_f > theta_0)
     odd_coeff_lambda_sum = np.sum(lambda_coeffs[::2])
     delta_theta = theta_f - theta_0
-    #add a square pulse that reaches theta_f, for this, lambda0 is used
-    lambda0=1-lambda_coeffs[0] # only use lambda_coeffs[0] for scaling, this
-    #enables fixing the square to 0 in optimizations by setting lambda_coeffs[0]=1
+    # add a square pulse that reaches theta_f, for this, lambda0 is used
+    lambda0 = 1-lambda_coeffs[0]  # only use lambda_coeffs[0] for scaling, this
+    # enables fixing the square to 0 in optimizations by setting
+    # lambda_coeffs[0]=1
     th_scale_factor = delta_theta/(lambda0+odd_coeff_lambda_sum)
     mart_pulse_theta = np.ones(nr_samples)*theta_0
     mart_pulse_theta += th_scale_factor*np.ones(nr_samples)*lambda0
 
     for i, lambda_coeff in enumerate(lambda_coeffs):
-       n = i+1
-       mart_pulse_theta += th_scale_factor*lambda_coeff*(1-np.cos(n*2*np.pi*t/length))/2
-    #adding square pulse scaling with lambda0 satisfying the condition
-    #lamb0=1-lambda1
+        n = i+1
+        mart_pulse_theta += th_scale_factor * \
+            lambda_coeff*(1-np.cos(n*2*np.pi*t/length))/2
+    # adding square pulse scaling with lambda0 satisfying the condition
+    # lamb0=1-lambda1
     if return_unit == 'theta':
         return mart_pulse_theta
 
@@ -234,7 +242,7 @@ def martinis_flux_pulse(length, lambda_coeffs, theta_f,
         return mart_pulse_eps
 
     # pulse parameterized in the f01 frequency
-    mart_pulse_f01 = mart_pulse_eps + E_c + f_bus
+    mart_pulse_f01 = mart_pulse_eps + f_interaction
     if return_unit == 'f01':
         return mart_pulse_f01
     mart_pulse_V = Qubit_freq_to_dac(
