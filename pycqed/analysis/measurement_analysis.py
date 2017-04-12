@@ -4052,13 +4052,25 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
             if self.peaks['peak'] is not None:
                 f0 = self.peaks['peak']
                 kappa_guess = self.peaks['peak_width'] / 4
+                peak_flag = True
 
-            else:  # Otherwise take center of range
-                f0 = np.median(self.sweep_points)
-                kappa_guess = 0.005*1e9
+            else:
+                # In case the data shows a dip
+                self.peaks = a_tools.peak_finder(
+                    self.sweep_points, a_tools.smooth(-1.*self.data_dist))
+                if self.peaks['peak'] is not None:
+                    f0 = self.peaks['peak']
+                    kappa_guess = self.peaks['peak_width'] / 4
+                    peak_flag = False
+                else: # If nothing can be found, take center of range
+                    f0 = np.median(self.sweep_points)
+                    kappa_guess = 0.005*1e9
+                    peak_flag = True
 
             amplitude_guess = np.pi * kappa_guess * \
                 abs(max(self.data_dist) - min(self.data_dist))
+            if not peak_flag: # Cahnge the sign of amplitude_guess for dips
+                amplitude_guess*=-1.
 
             LorentzianModel = fit_mods.LorentzianModel
             LorentzianModel.set_param_hint('f0',
@@ -4066,8 +4078,7 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
                                            max=max(self.sweep_points),
                                            value=f0)
             LorentzianModel.set_param_hint('A',
-                                           value=amplitude_guess,
-                                           min=4*np.var(self.data_dist))
+                                           value=amplitude_guess)
             LorentzianModel.set_param_hint('offset',
                                            value=np.mean(self.data_dist),
                                            vary=True)
