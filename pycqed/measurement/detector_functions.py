@@ -1463,7 +1463,7 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
     def __init__(self, UHFQC, AWG=None, integration_length=1e-6,
                  nr_averages=1024, rotate=False, real_imag=True,
                  channels=[0, 1], correlations=[(0, 1)],
-                 seg_per_point=1, single_int_avg=False,
+                 seg_per_point=1, single_int_avg=False, thresholding=False,
                  **kw):
         super(UHFQC_correlation_detector, self).__init__(
             UHFQC, AWG=AWG, integration_length=integration_length,
@@ -1473,6 +1473,7 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
             cross_talk_suppression=False,
             **kw)
         self.correlations = correlations
+        self.thresholding = thresholding
 
         self.value_names = []
         for ch in channels:
@@ -1530,8 +1531,13 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
             self.correlation_channels += [correlation_channel]
 
     def set_up_correlation_weights(self):
-        # FIXME: add option to use thresholding (quex_rl_soure(5))
-        self.UHFQC.quex_rl_source(4)  # -> correlations mode before threshold
+        if self.thresholding:
+            # correlations mode after threshold
+            # NOTE: thresholds need to be set outside the detctor object.
+            self.UHFQC.quex_rl_source(5)
+        else:
+            # correlations mode before threshold
+            self.UHFQC.quex_rl_source(4)
         # Configure correlation mode
         for correlation_channel, corr in zip(self.correlation_channels,
                                              self.correlations):
@@ -1552,12 +1558,17 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
             self.UHFQC.set('quex_corr_{}_mode'.format(correlation_channel), 1)
             self.UHFQC.set('quex_corr_{}_source'.format(correlation_channel),
                            corr[1])
+            # If thresholding is enabled, set the threshold for the correlation
+            # channel.
+            if self.thresholding:
+                thresh_level = \
+                    self.UHFQC.get('quex_thres_{}_level'.format(corr[0]))
+                self.UHFQC.set(
+                    'quex_thres_{}_level'.format(correlation_channel),
+                    thresh_level)
 
     def get_values(self):
         # Slightly different way to deal with scaling factor
-        self.scaling_factor = 1 / \
-            (1.8e9*self.integration_length*self.nr_averages)
-
         self.scaling_factor = 1 / (1.8e9*self.integration_length)
 
         if self.AWG is not None:
@@ -1573,13 +1584,17 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
                                                acquisition_time=0.01)
 
         data = []
-        for key in data_raw.keys():
-            if key in self.correlation_channels:
-                data.append(np.array(data_raw[key]) * (self.scaling_factor**2 /
-                                                       self.nr_averages))
-            else:
-                data.append(np.array(data_raw[key]) * (self.scaling_factor /
-                                                       self.nr_averages))
+        if self.thresholding:
+            for key in data_raw.keys():
+                data.append(np.array(data_raw[key]))
+        else:
+            for key in data_raw.keys():
+                if key in self.correlation_channels:
+                    data.append(np.array(data_raw[key]) *
+                                (self.scaling_factor**2 / self.nr_averages))
+                else:
+                    data.append(np.array(data_raw[key]) *
+                                (self.scaling_factor / self.nr_averages))
 
         if not self.real_imag:
             I = data[0]
