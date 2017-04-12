@@ -508,7 +508,8 @@ class LO_modulated_Heterodyne(HeterodyneInstrument):
     def prepare_UHFQC(self):
         """
         uses the UHFQC to generate the modulating signal and readout
-        """# only uploads a seq to AWG if something changed
+        """
+        # only uploads a seq to AWG if something changed
         if (self._awg_seq_filename not in self.AWG.setup_filename() or
                 self._awg_seq_parameters_changed) and self.auto_seq_loading():
             self._awg_seq_filename = \
