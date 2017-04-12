@@ -1477,7 +1477,8 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
         self.value_names = []
         for ch in channels:
             self.value_names += ['w{}'.format(ch)]
-        self.value_units = ['V']*len(self.value_names)+['V^2']*len(self.correlations)
+        # Note that V^2 is in brackets to prevent confusion with unit prefixes
+        self.value_units = ['V']*len(self.value_names)+['(V^2)']*len(self.correlations)
         for corr in correlations:
             self.value_names += ['corr ({},{})'.format(corr[0], corr[1])]
 
@@ -1520,6 +1521,8 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
                     # selects the lowest available free channel
                     self.channels += [ch]
                     correlation_channel = ch
+                    print('Using channel {} for correlation ({}, {}).'
+                          .format(ch, corr[0], corr[1]))
                     break
             if correlation_channel < 0:
                 raise ValueError('No free channel available for correlation.')
@@ -1549,6 +1552,47 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
             self.UHFQC.set('quex_corr_{}_mode'.format(correlation_channel), 1)
             self.UHFQC.set('quex_corr_{}_source'.format(correlation_channel),
                            corr[1])
+
+    def get_values(self):
+        # Slightly different way to deal with scaling factor
+        self.scaling_factor = 1 / \
+            (1.8e9*self.integration_length*self.nr_averages)
+
+        self.scaling_factor = 1 / (1.8e9*self.integration_length)
+
+        if self.AWG is not None:
+            self.AWG.stop()
+        self.UHFQC.quex_rl_readout(1)  # resets UHFQC internal readout counters
+        self.UHFQC.acquisition_arm()
+        # starting AWG
+        if self.AWG is not None:
+            self.AWG.start()
+
+        data_raw = self.UHFQC.acquisition_poll(samples=self.nr_sweep_points,
+                                               arm=False,
+                                               acquisition_time=0.01)
+
+        data = []
+        for key in data_raw.keys():
+            if key in self.correlation_channels:
+                data.append(np.array(data_raw[key]) * (self.scaling_factor**2 /
+                                                       self.nr_averages))
+            else:
+                data.append(np.array(data_raw[key]) * (self.scaling_factor /
+                                                       self.nr_averages))
+
+        if not self.real_imag:
+            I = data[0]
+            Q = data[1]
+            S21 = I + 1j*Q
+            data[0] = np.abs(S21)
+            data[1] = np.angle(S21)/(2*np.pi)*360
+
+        if self.rotate:
+            return self.rotate_and_normalize(data)
+        else:
+            return data
+
 
 
 class UHFQC_integration_logging_det(Hard_Detector):
