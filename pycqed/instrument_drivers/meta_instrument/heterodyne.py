@@ -469,6 +469,26 @@ class LO_modulated_Heterodyne(HeterodyneInstrument):
         self._I_channel = 'ch3'
         self._Q_channel = 'ch4'
 
+
+    def prepare(self, get_t_base=True):
+        # Preparing the acquisition instruments
+        if 'CBox' in self.acquisition_instr():
+            self.prepare_CBox(get_t_base)
+        elif 'UHFQC' in self.acquisition_instr():
+            self.prepare_UHFQC()
+        elif 'ATS' in self.acquisition_instr():
+            self.prepare_ATS(get_t_base)
+        elif 'DDM' in self.acquisition_instr():
+            self.prepare_DDM()
+
+        else:
+            raise ValueError("Invalid acquisition instrument {} in {}".format(
+                self.acquisition_instr(), self.__class__.__name__))
+
+        # turn on the AWG and the MWGs
+        self.AWG.run()
+        self.on()
+
     def prepare_DDM(self):
         for i, channel in enumerate([1, 2]):
             eval("self._acquisition_instr.ch_pair1_weight{}_wint_intlength({})".format(
