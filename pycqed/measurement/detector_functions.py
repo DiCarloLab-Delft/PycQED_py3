@@ -1019,34 +1019,6 @@ class Heterodyne_probe_soft_avg(Soft_Detector):
         self.HS.finish()
 
 
-class PulsedSpectroscopyDetector(Soft_Detector):
-
-    def __init__(self, AWG_filename='Spec_5014', **kw):
-        # AWG_filename='Off_5014'
-        super(PulsedSpectroscopyDetector, self).__init__()
-        self.Pulsed_Spec = qt.instruments['Pulsed_Spec']
-        self.AWG = qt.instruments['AWG']
-        self.ATS = qt.instruments['ATS']
-        self.name = 'Pulsed_Spec'
-        self.value_names = ['I', 'Q']
-        self.value_units = ['V', 'V']
-        self.filename = AWG_filename
-
-    def prepare(self, **kw):
-        self.Pulsed_Spec.set_AWG_seq_filename(self.filename)
-        self.Pulsed_Spec.initialize_instruments()
-        self.AWG.start()
-        self.ATS.abort()
-        self.ATS.configure_board()
-
-    def acquire_data_point(self, **kw):
-        integrated_data = self.Pulsed_Spec.measure()
-        return integrated_data
-
-    def finish(self):
-        self.HS.finish()
-
-
 class Signal_Hound_fixed_frequency(Soft_Detector):
 
     def __init__(self, signal_hound, frequency=None, Navg=1, delay=0.1,
@@ -1473,7 +1445,6 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         self.UHFQC.awgs_0_userregs_0(
             int(self.nr_averages*self.nr_sweep_points))
         self.UHFQC.awgs_0_userregs_1(0)  # 0 for rl, 1 for iavg
-
         self.UHFQC.acquisition_initialize(channels=self.channels, mode='rl')
 
     def finish(self):

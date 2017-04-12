@@ -434,6 +434,7 @@ class UHFQC(Instrument):
 
         while accumulated_time < self.timeout() and not all(gotem):
             dataset = self._daq.poll(acquisition_time, 1, 4, True)
+
             for n, p in enumerate(self.acquisition_paths):
                 if p in dataset:
                     for v in dataset[p]:

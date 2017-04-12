@@ -47,7 +47,7 @@ def two_qubit_off_on(q0, q1, RO_target='all'):
 def two_qubit_tomo_cardinal(cardinal,
                             q0,
                             q1,
-                            RO_target):
+                            RO_target='all'):
     '''
     Cardinal tomography for two qubits.
 
@@ -57,9 +57,11 @@ def two_qubit_tomo_cardinal(cardinal,
         RO_target       (str) : target for the RO, can be a qubit name or 'all'
     '''
     tomo_pulses = ['I ', 'X180 ', 'Y90 ', 'mY90 ', 'X90 ', 'mX90 ']
+    tomo_list_q0 = []
+    tomo_list_q1 = []
     for tp in tomo_pulses:
-        tomo_list_q0 = [tp + q0 + '\n']
-        tomo_list_q1 = [tp + q1 + '\n']
+        tomo_list_q0 += [tp + q0 + '\n']
+        tomo_list_q1 += [tp + q1 + '\n']
 
     prep_index_q0 = int(cardinal % len(tomo_list_q0))
     prep_index_q1 = int(((cardinal - prep_index_q0) / len(tomo_list_q0) %
