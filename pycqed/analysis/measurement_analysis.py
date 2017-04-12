@@ -370,7 +370,7 @@ class MeasurementAnalysis(object):
             fig.suptitle(plot_title, fontsize=18)
             # Make space for title
 
-        self.save_fig(fig, fig_tight=False, **kw)
+        self.save_fig(fig, fig_tight=True, **kw)
 
         if close_file:
             self.data_file.close()
