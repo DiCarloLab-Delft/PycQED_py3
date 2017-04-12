@@ -450,7 +450,7 @@ class DDMq(SCPI):
                                    'memory after measuremnet and not averaged. ' +
                                    'Every weight pair has only one TV mode memory' +
                                    'It can be used either I or Q '+
-                                   'Foramt is float containg 0s and 1s ', 
+                                   'Foramt is float containg 0s and 1s ',
                                    get_cmd=self._gen_ch_weight_get_func(
                                    self._getQstateCNT, ch_pair, wNr),
 
@@ -464,7 +464,7 @@ class DDMq(SCPI):
                                    'with preset number of averages. ' +
                                    'Every weight pair has only one TV mode memory' +
                                    'It can be used either I or Q '+
-                                   'Format is float containg numbers between 0 and 1 ', 
+                                   'Format is float containg numbers between 0 and 1 ',
                                    get_cmd=self._gen_ch_weight_get_func(
                     self._getQstateAVG, ch_pair, wNr),
 
@@ -873,7 +873,7 @@ class DDMq(SCPI):
                                 'Input signal is less than 25% of ADC resolution. ')
             else:
                 print("\nDI input is Okay.")
-            return None 
+            return None
 
         def _DQ():
             if (reversestatusstr[2] == '1'):
@@ -907,12 +907,12 @@ class DDMq(SCPI):
                                 "\nof a previous scan were still being processed. ")
                 
             if (reversestatuswintstr[20] == '1'):
-                logging.warning("\nFalse Trigger on DI channel." + 
+                logging.warning("\nFalse Trigger on DI channel." +
                                 "\nThe logic will ignore this (false) trigger." +
                                 "\nIndicates that a trigger was received while the ADC samples " +
                                 "\nof a previous scan were still being processed. ")
             if (reversestatuswintstr[21] == '1'):
-                logging.warning("\nFalse Trigger on DQ channel." + 
+                logging.warning("\nFalse Trigger on DQ channel." +
                                 "\nThe logic will ignore this (false) trigger." +
                                 "\nIndicates that a trigger was received while the ADC samples " +
                                 "\nof a previous scan were still being processed. ")
@@ -924,7 +924,7 @@ class DDMq(SCPI):
                      1: _DQ,
                      2: _DCLK_PLL_LOCKED,
                      3: _CalRun,
-                     4: _FalseTrig 
+                     4: _FalseTrig
                      }
   
         for x in range(0, 5):
