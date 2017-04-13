@@ -459,15 +459,15 @@ class Transmon(Qubit):
         if np.size(amps) != 1:
             self.measure_rabi(amps, n=1, MC=MC, analyze=False)
             a = ma.Rabi_Analysis(close_fig=close_fig)
+            # Decide which quadrature to take by comparing the contrast
             if take_fit_I:
-                ampl = abs(a.fit_res[0].params['period'].value)/2
+                ampl = abs(a.fit_res[0].params['period'].value)/2.
                 print("taking I")
+            elif (np.abs(max(a.fit_res[0].data)-min(a.fit_res[0].data)))>/
+                    (np.abs(max(a.fit_res[1].data)-min(a.fit_res[1].data))):
+                ampl = a.fit_res[0].params['period'].value/2.
             else:
-                if (a.fit_res[0].params['period'].stderr <=
-                        a.fit_res[1].params['period'].stderr):
-                    ampl = abs(a.fit_res[0].params['period'].value)/2
-                else:
-                    ampl = abs(a.fit_res[1].params['period'].value)/2
+                ampl = a.fit_res[1].params['period'].value/2.
         else:
             ampl = amps
         if verbose:
