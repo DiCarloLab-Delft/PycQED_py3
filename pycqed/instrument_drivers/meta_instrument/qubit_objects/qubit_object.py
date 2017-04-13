@@ -100,6 +100,12 @@ class Qubit(Instrument):
     def measure_spectroscopy(self):
         raise NotImplementedError()
 
+    def measure_transients(self):
+        raise NotImplementedError()
+
+    def calibrate_optimal_weights(self):
+        raise NotImplementedError()
+
     def measure_heterodyne_spectroscopy(self):
         raise NotImplementedError()
 

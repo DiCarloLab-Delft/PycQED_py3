@@ -325,8 +325,7 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
                                                      timeout=100)
                 data = np.array([data_raw[key] for key in data_raw.keys()])
 
-                # calculating transients
-
+                #calculating transients
                 transient1_I = data[0]
                 transient1_Q = data[1]
 

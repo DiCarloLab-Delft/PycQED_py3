@@ -1019,34 +1019,6 @@ class Heterodyne_probe_soft_avg(Soft_Detector):
         self.HS.finish()
 
 
-class PulsedSpectroscopyDetector(Soft_Detector):
-
-    def __init__(self, AWG_filename='Spec_5014', **kw):
-        # AWG_filename='Off_5014'
-        super(PulsedSpectroscopyDetector, self).__init__()
-        self.Pulsed_Spec = qt.instruments['Pulsed_Spec']
-        self.AWG = qt.instruments['AWG']
-        self.ATS = qt.instruments['ATS']
-        self.name = 'Pulsed_Spec'
-        self.value_names = ['I', 'Q']
-        self.value_units = ['V', 'V']
-        self.filename = AWG_filename
-
-    def prepare(self, **kw):
-        self.Pulsed_Spec.set_AWG_seq_filename(self.filename)
-        self.Pulsed_Spec.initialize_instruments()
-        self.AWG.start()
-        self.ATS.abort()
-        self.ATS.configure_board()
-
-    def acquire_data_point(self, **kw):
-        integrated_data = self.Pulsed_Spec.measure()
-        return integrated_data
-
-    def finish(self):
-        self.HS.finish()
-
-
 class Signal_Hound_fixed_frequency(Soft_Detector):
 
     def __init__(self, signal_hound, frequency=None, Navg=1, delay=0.1,
@@ -1362,8 +1334,9 @@ class UHFQC_integrated_average_detector(Hard_Detector):
     '''
 
     def __init__(self, UHFQC, AWG=None, integration_length=1e-6,
-                 nr_averages=1024, rotate=False, real_imag=False,
+                 nr_averages=1024, rotate=False, real_imag=True,
                  channels=[0, 1, 2, 3], cross_talk_suppression=False,
+                 seg_per_point=1, single_int_avg=False,
                  **kw):
         super(UHFQC_integrated_average_detector, self).__init__()
         self.UHFQC = UHFQC
@@ -1372,9 +1345,10 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         self.value_names = ['']*len(self.channels)
         self.value_units = ['']*len(self.channels)
         self.cal_points = kw.get('cal_points', None)
+        self.single_int_avg = single_int_avg
 
         self._set_real_imag(real_imag)
-
+        self.seg_per_point = seg_per_point
         self.rotate = rotate
 
         self.AWG = AWG
@@ -1394,7 +1368,7 @@ class UHFQC_integrated_average_detector(Hard_Detector):
             self.value_names[i] = 'w{}'.format(channel)
             self.value_units[i] = 'V'
 
-        if self.real_imag:
+        if not self.real_imag:
             self.value_names[0] = 'Magn'
             self.value_names[1] = 'Phase'
             self.value_units[1] = 'deg'
@@ -1414,7 +1388,7 @@ class UHFQC_integrated_average_detector(Hard_Detector):
                                                arm=False, acquisition_time=0.01)
         data = np.array([data_raw[key]
                          for key in data_raw.keys()])*self.scaling_factor
-        if self.real_imag:
+        if not self.real_imag:
             I = data[0]
             Q = data[1]
             S21 = I + 1j*Q
@@ -1450,10 +1424,11 @@ class UHFQC_integrated_average_detector(Hard_Detector):
     def prepare(self, sweep_points=None):
         if self.AWG is not None:
             self.AWG.stop()
-        if sweep_points is None:
-            self.nr_sweep_points = 1
+        if sweep_points is None or self.single_int_avg:
+
+            self.nr_sweep_points = self.seg_per_point
         else:
-            self.nr_sweep_points = len(sweep_points)
+            self.nr_sweep_points = len(sweep_points)*self.seg_per_point
         # this sets the result to integration and rotation outcome
         if self.cross_talk_suppression:
             # 2/0/1 raw/crosstalk supressed /digitized
@@ -1470,12 +1445,110 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         self.UHFQC.awgs_0_userregs_0(
             int(self.nr_averages*self.nr_sweep_points))
         self.UHFQC.awgs_0_userregs_1(0)  # 0 for rl, 1 for iavg
-
         self.UHFQC.acquisition_initialize(channels=self.channels, mode='rl')
 
     def finish(self):
         if self.AWG is not None:
             self.AWG.stop()
+
+
+class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
+    '''
+    Detector used for correlation mode with the UHFCQ.
+    The argument 'correlations' is a list of tuples specifying which channels
+    are correlated, and on which channel the correlated signal is output.
+    For instance, 'correlations=[(0, 1, 3)]' will put the correlation of
+    channels 0 and 1 on channel 3.
+    '''
+    def __init__(self, UHFQC, AWG=None, integration_length=1e-6,
+                 nr_averages=1024, rotate=False, real_imag=True,
+                 channels=[0, 1], correlations=[(0, 1)],
+                 seg_per_point=1, single_int_avg=False,
+                 **kw):
+        super(UHFQC_correlation_detector, self).__init__(
+            UHFQC, AWG=AWG, integration_length=integration_length,
+            nr_averages=nr_averages, rotate=rotate, real_imag=real_imag,
+            channels=channels,
+            seg_per_point=seg_per_point, single_int_avg=single_int_avg,
+            cross_talk_suppression=False,
+            **kw)
+        self.correlations = correlations
+
+        self.value_names = []
+        for ch in channels:
+            self.value_names += ['w{}'.format(ch)]
+        self.value_units = ['V']*len(self.value_names)+['V^2']*len(self.correlations)
+        for corr in correlations:
+            self.value_names += ['corr ({},{})'.format(corr[0], corr[1])]
+
+        self.define_correlation_channels()
+
+    def prepare(self, sweep_points=None):
+        if self.AWG is not None:
+            self.AWG.stop()
+        if sweep_points is None or self.single_int_avg:
+            self.nr_sweep_points = self.seg_per_point
+        else:
+            self.nr_sweep_points = len(sweep_points)*self.seg_per_point
+
+        self.UHFQC.quex_rl_length(self.nr_sweep_points)
+        self.UHFQC.quex_rl_avgcnt(int(np.log2(self.nr_averages)))
+        self.UHFQC.quex_wint_length(int(self.integration_length*(1.8e9)))
+
+        self.set_up_correlation_weights()
+
+        # Configure the result logger to not do any averaging
+        # The AWG program uses userregs/0 to define the number o iterations in
+        # the loop
+        self.UHFQC.awgs_0_userregs_0(
+            int(self.nr_averages*self.nr_sweep_points))
+        self.UHFQC.awgs_0_userregs_1(0)  # 0 for rl, 1 for iavg
+
+        self.UHFQC.acquisition_initialize(channels=self.channels, mode='rl')
+
+    def define_correlation_channels(self):
+        self.correlation_channels = []
+        for corr in self.correlations:
+            # Start by assigning channels
+            if corr[0] not in self.channels or corr[1] not in self.channels:
+                raise ValueError('Correlations should be in channels')
+
+            correlation_channel = -1
+            # 4 is the (current) max number of weights in the UHFQC (v5)
+            for ch in range(4):
+                if ch not in self.channels:
+                    # selects the lowest available free channel
+                    self.channels += [ch]
+                    correlation_channel = ch
+                    break
+            if correlation_channel < 0:
+                raise ValueError('No free channel available for correlation.')
+
+            self.correlation_channels += [correlation_channel]
+
+    def set_up_correlation_weights(self):
+        # FIXME: add option to use thresholding (quex_rl_soure(5))
+        self.UHFQC.quex_rl_source(4)  # -> correlations mode before threshold
+        # Configure correlation mode
+        for correlation_channel, corr in zip(self.correlation_channels,
+                                             self.correlations):
+            # Duplicate source channel to the correlation channel and select
+            # second channel as channel to correlate with.
+            copy_int_weights_real = \
+                self.UHFQC.get('quex_wint_weights_{}_real'.format(corr[0]))[0]['vector']
+            copy_int_weights_imag = \
+                self.UHFQC.get('quex_wint_weights_{}_imag'.format(corr[0]))[0]['vector']
+            self.UHFQC.set(
+                'quex_wint_weights_{}_real'.format(correlation_channel),
+                copy_int_weights_real)
+            self.UHFQC.set(
+                'quex_wint_weights_{}_imag'.format(correlation_channel),
+                copy_int_weights_imag)
+            # Enable correlation mode one the correlation output channel and
+            # set the source to the second source channel
+            self.UHFQC.set('quex_corr_{}_mode'.format(correlation_channel), 1)
+            self.UHFQC.set('quex_corr_{}_source'.format(correlation_channel),
+                           corr[1])
 
 
 class UHFQC_integration_logging_det(Hard_Detector):
