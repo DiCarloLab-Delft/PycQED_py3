@@ -463,7 +463,7 @@ class Transmon(Qubit):
             if take_fit_I:
                 ampl = abs(a.fit_res[0].params['period'].value)/2.
                 print("taking I")
-            elif (np.abs(max(a.fit_res[0].data)-min(a.fit_res[0].data)))>/
+            elif (np.abs(max(a.fit_res[0].data)-min(a.fit_res[0].data)))>\
                     (np.abs(max(a.fit_res[1].data)-min(a.fit_res[1].data))):
                 ampl = a.fit_res[0].params['period'].value/2.
             else:
@@ -477,6 +477,7 @@ class Transmon(Qubit):
             if n > max_n:
                 break
             else:
+                old_amp = ampl
                 ampl_span = 0.3*ampl/n
                 amps = np.linspace(ampl-ampl_span, ampl+ampl_span, 15)
                 self.measure_rabi(amps, n=n, MC=MC, analyze=False)
@@ -484,11 +485,24 @@ class Transmon(Qubit):
                 # Decide which quadrature to take by comparing the contrast
                 if take_fit_I:
                     ampl = a.fit_res[0].params['x0'].value
-                elif (np.abs(max(a.fit_res[0].data)-min(a.fit_res[0].data)))>/
+                elif (np.abs(max(a.fit_res[0].data)-min(a.fit_res[0].data)))>\
                     (np.abs(max(a.fit_res[1].data)-min(a.fit_res[1].data))):
                     ampl = a.fit_res[0].params['x0'].value
                 else:
                     ampl = a.fit_res[1].params['x0'].value
+                if not min(amps)<ampl<max(amps):
+                    ampl_span*=2
+                    amps = np.linspace(old_amp-ampl_span, old_amp+ampl_span, 15)
+                    self.measure_rabi(amps, n=n, MC=MC, analyze=False)
+                    a = ma.Rabi_parabola_analysis(close_fig=close_fig)
+                    # Decide which quadrature to take by comparing the contrast
+                    if take_fit_I:
+                        ampl = a.fit_res[0].params['x0'].value
+                    elif (np.abs(max(a.fit_res[0].data)-min(a.fit_res[0].data)))>\
+                        (np.abs(max(a.fit_res[1].data)-min(a.fit_res[1].data))):
+                        ampl = a.fit_res[0].params['x0'].value
+                    else:
+                        ampl = a.fit_res[1].params['x0'].value
                 if verbose:
                     print('Found amplitude', ampl, '\n')
         if update:
