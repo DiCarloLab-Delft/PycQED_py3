@@ -501,20 +501,26 @@ class Transmon(Qubit):
                 break
             else:
                 old_amp = ampl
-                ampl_span = 0.3*ampl/n
+                ampl_span = 0.35*ampl/n
                 amps = np.linspace(ampl-ampl_span, ampl+ampl_span, 15)
                 self.measure_rabi(amps, n=n, MC=MC, analyze=False)
                 a = ma.Rabi_parabola_analysis(close_fig=close_fig)
                 # Decide which quadrature to take by comparing the contrast
                 if take_fit_I:
                     ampl = a.fit_res[0].params['x0'].value
-                elif (np.abs(max(a.fit_res[0].data)-min(a.fit_res[0].data)))>\
-                    (np.abs(max(a.fit_res[1].data)-min(a.fit_res[1].data))):
+                elif min(amps)<a.fit_res[0].params['x0'].value<max(amps)\
+                        and min(amps)<a.fit_res[1].params['x0'].value<max(amps):
+                    if (np.abs(max(a.fit_res[0].data)-min(a.fit_res[0].data)))>\
+                        (np.abs(max(a.fit_res[1].data)-min(a.fit_res[1].data))):
+                        ampl = a.fit_res[0].params['x0'].value
+                    else:
+                        ampl = a.fit_res[1].params['x0'].value
+                elif min(amps)<a.fit_res[0].params['x0'].value<max(amps):
                     ampl = a.fit_res[0].params['x0'].value
-                else:
+                elif min(amps)<a.fit_res[1].params['x0'].value<max(amps):
                     ampl = a.fit_res[1].params['x0'].value
-                if not min(amps)<ampl<max(amps):
-                    ampl_span*=2
+                else:
+                    ampl_span*=1.5
                     amps = np.linspace(old_amp-ampl_span, old_amp+ampl_span, 15)
                     self.measure_rabi(amps, n=n, MC=MC, analyze=False)
                     a = ma.Rabi_parabola_analysis(close_fig=close_fig)
