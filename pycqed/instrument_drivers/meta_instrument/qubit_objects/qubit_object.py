@@ -391,12 +391,16 @@ class Transmon(Qubit):
                              close_fig=True, verbose=False,
                              MC=None, update=True, take_fit_I=False):
         '''
-        Finds the pulse-amplitude using a rabi experiment.
+        Finds the pulse-amplitude using a Rabi experiment.
+        Fine tunes by doing a Rabi around the optimum with an odd
+        multiple of pulses.
 
-        If amps is an array it starts by fitting a cos to a Rabi experiment
-        to get an initial guess for the amplitude.
-        If amps is a float it uses that as the initial amplitude and starts
-        doing rabi flipping experiments around that optimum directly.
+        Args:
+            amps: (array or float) amplitudes of the first Rabi if an array,
+                if a float is specified it will be treated as an estimate
+                for the amplitude to be found.
+            N_steps: (list of int) number of pulses used in the fine tuning
+            max_n: (int) break of if N> max_n
         '''
         if MC is None:
             MC = self.MC
@@ -406,7 +410,6 @@ class Transmon(Qubit):
             # Decide which quadrature to take by comparing the contrast
             if take_fit_I:
                 ampl = abs(a.fit_res[0].params['period'].value)/2.
-                print("taking I")
             elif (np.abs(max(a.fit_res[0].data) -
                          min(a.fit_res[0].data))) > (
                     np.abs(max(a.fit_res[1].data) -
@@ -458,7 +461,6 @@ class Transmon(Qubit):
                     print('Found amplitude', ampl, '\n')
         if update:
             self.amp180.set(ampl)
-            print(ampl)
 
     def find_amp90_scaling(self, scales=0.5,
                            N_steps=[5, 9], max_n=100,
