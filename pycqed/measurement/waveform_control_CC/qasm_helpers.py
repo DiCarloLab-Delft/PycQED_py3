@@ -319,6 +319,26 @@ class CBox_int_avg_func_prep_det_CC(CBox_integrated_average_detector_CC):
             self.prepare_function()
 
 
+class UHFQC_int_avg_func_prep_det_CC(det.UHFQC_integrated_average_detector):
+
+    def __init__(self, prepare_function, prepare_function_kwargs=None,
+                 **kw):
+        '''
+        int avg detector with additional option to run a specific function
+        everytime the prepare is called.
+        '''
+        super().__init__(**kw)
+        self.prepare_function = prepare_function
+        self.prepare_function_kwargs = prepare_function_kwargs
+
+    def prepare(self, sweep_points=[0]):
+        super().prepare(sweep_points)
+        if self.prepare_function_kwargs is not None:
+            self.prepare_function(**self.prepare_function_kwargs)
+        else:
+            self.prepare_function()
+
+
 def load_range_of_asm_files(asm_filenames, counter_param, CBox):
     asm_filename = asm_filenames[counter_param()]
     counter_param((counter_param()+1) % len(asm_filenames))
