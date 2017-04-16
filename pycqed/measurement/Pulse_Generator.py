@@ -25,7 +25,7 @@ def gauss_pulse(amp, sigma_length, axis='x', nr_sigma=4, sampling_rate=2e8,
     mu = ((nr_pulse_samples-1)/2.)
     pulse_samples = np.linspace(0, nr_pulse_samples, nr_pulse_samples,
                                 endpoint=False)
-    delay_samples = delay*sampling_rate
+    delay_samples = int(delay*sampling_rate)
     # generate pulses
     if axis == 'x':
         pulse_I = amp*np.exp(-0.5*(np.square((pulse_samples-mu) /
@@ -61,8 +61,8 @@ def block_pulse(amp, length, sampling_rate=2e8, delay=0, phase=0):
         phase in degrees
     '''
     nr_samples = (length+delay)*sampling_rate
-    delay_samples = delay*sampling_rate
-    pulse_samples = nr_samples - delay_samples
+    delay_samples = int(delay*sampling_rate)
+    pulse_samples = int(nr_samples - delay_samples)
     amp_I = amp*np.cos(phase*2*np.pi/360)
     amp_Q = amp*np.sin(phase*2*np.pi/360)
     block_I = amp_I * np.ones(pulse_samples)

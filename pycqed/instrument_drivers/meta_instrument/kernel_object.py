@@ -31,11 +31,12 @@ class Distortion(Instrument):
 
         self.add_parameter('kernel_list',
                            initial_value=[],
+                           # update to vals.List after merge of PR #542 in QCodes
                            vals=vals.Anything(),
                            parameter_class=ConfigParameter,
                            docstring='List of external kernels to be loaded')
 
-        self.add_parameter('kernel_dir_path',
+        self.add_parameter('kernel_dir',
                            initial_value='kernels/',
                            vals=vals.Strings(),
                            parameter_class=ManualParameter,
@@ -53,38 +54,37 @@ class Distortion(Instrument):
                        'Kernel is based on parameters in kernel object \n' +
                        'and files specified in the kernel list.'))
 
-
         self.add_parameter('skineffect_alpha', unit='',
                            parameter_class=ConfigParameter,
                            initial_value=0,
                            vals=vals.Numbers())
-        self.add_parameter('skineffect_length', unit='ns',
+        self.add_parameter('skineffect_length', unit='s',
                            parameter_class=ConfigParameter,
-                           initial_value=600,
+                           initial_value=600e-9,
                            vals=vals.Numbers())
 
         self.add_parameter('decay_amp_1', unit='',
                            initial_value=0,
                            parameter_class=ConfigParameter,
                            vals=vals.Numbers())
-        self.add_parameter('decay_tau_1', unit='ns',
-                           initial_value=1,
+        self.add_parameter('decay_tau_1', unit='s',
+                           initial_value=1e-9,
                            parameter_class=ConfigParameter,
                            vals=vals.Numbers())
-        self.add_parameter('decay_length_1', unit='ns',
-                           initial_value=100,
+        self.add_parameter('decay_length_1', unit='s',
+                           initial_value=100e-9,
                            parameter_class=ConfigParameter,
                            vals=vals.Numbers())
         self.add_parameter('decay_amp_2', unit='',
                            initial_value=0,
                            parameter_class=ConfigParameter,
                            vals=vals.Numbers())
-        self.add_parameter('decay_tau_2', unit='ns',
-                           initial_value=1,
+        self.add_parameter('decay_tau_2', unit='s',
+                           initial_value=1e-9,
                            parameter_class=ConfigParameter,
                            vals=vals.Numbers())
-        self.add_parameter('decay_length_2', unit='ns',
-                           initial_value=100,
+        self.add_parameter('decay_length_2', unit='s',
+                           initial_value=100e-9,
                            parameter_class=ConfigParameter,
                            vals=vals.Numbers())
 
@@ -92,12 +92,12 @@ class Distortion(Instrument):
                            initial_value=0,
                            parameter_class=ConfigParameter,
                            vals=vals.Numbers())
-        self.add_parameter('bounce_tau_1', unit='ns',
+        self.add_parameter('bounce_tau_1', unit='s',
                            initial_value=0,
                            parameter_class=ConfigParameter,
                            vals=vals.Numbers())
-        self.add_parameter('bounce_length_1', unit='ns',
-                           initial_value=1,
+        self.add_parameter('bounce_length_1', unit='s',
+                           initial_value=1e-9,
                            parameter_class=ConfigParameter,
                            vals=vals.Numbers())
 
@@ -105,12 +105,12 @@ class Distortion(Instrument):
                            initial_value=0,
                            parameter_class=ConfigParameter,
                            vals=vals.Numbers())
-        self.add_parameter('bounce_tau_2', unit='ns',
+        self.add_parameter('bounce_tau_2', unit='s',
                            initial_value=0,
                            parameter_class=ConfigParameter,
                            vals=vals.Numbers())
-        self.add_parameter('bounce_length_2', unit='ns',
-                           initial_value=1,
+        self.add_parameter('bounce_length_2', unit='s',
+                           initial_value=1e-9,
                            parameter_class=ConfigParameter,
                            vals=vals.Numbers())
 
@@ -126,15 +126,26 @@ class Distortion(Instrument):
                            initial_value=0,
                            parameter_class=ConfigParameter,
                            vals=vals.Numbers())
-        self.add_parameter('poly_length', unit='ns',
+        self.add_parameter('poly_length', unit='s',
                            initial_value=0,
                            parameter_class=ConfigParameter,
                            vals=vals.Numbers())
 
-        self.add_parameter('corrections_length', unit='ns',
+        self.add_parameter('corrections_length', unit='s',
                            parameter_class=ConfigParameter,
-                           initial_value=1000,
+                           initial_value=10e-6,
                            vals=vals.Numbers())
+
+    def add_kernel_to_kernel_list(self, kernel_name):
+        v = vals.Strings()
+        v.validate(kernel_name)
+        kernel_list = self.kernel_list()
+        if kernel_name in kernel_list:
+            raise ValueError('Kernel "{}" already in kernel list'.format(kernel_name))
+        kernel_list.append(kernel_name)
+        self._config_changed =True # has to be done by hand as appending to
+        # the list does not correctlyupdate the changed flag
+        self.kernel_list(kernel_list)
 
     def _get_config_changed(self):
         return self._config_changed
@@ -144,25 +155,25 @@ class Distortion(Instrument):
 
     def get_bounce_kernel_1(self):
         return kf.bounce_kernel(amp=self.bounce_amp_1(),
-                                time=self.bounce_tau_1(),
-                                length=self.bounce_length_1())
+                                time=self.bounce_tau_1()*1e9,
+                                length=self.bounce_length_1()*1e9)
 
     def get_bounce_kernel_2(self):
         return kf.bounce_kernel(amp=self.bounce_amp_2(),
-                                time=self.bounce_tau_2(),
-                                length=self.bounce_length_2())
+                                time=self.bounce_tau_2()*1e9,
+                                length=self.bounce_length_2()*1e9)
 
     def get_skin_kernel(self):
         return kf.skin_kernel(alpha=self.skineffect_alpha(),
-                              length=self.skineffect_length())
+                              length=self.skineffect_length()*1e9)
 
     def get_decay_kernel_1(self):
-        return kf.decay_kernel(amp=self.decay_amp_1(), tau=self.decay_tau_1(),
-                               length=self.decay_length_1())
+        return kf.decay_kernel(amp=self.decay_amp_1(), tau=self.decay_tau_1()*1e9,
+                               length=self.decay_length_1()*1e9)
 
     def get_decay_kernel_2(self):
-        return kf.decay_kernel(amp=self.decay_amp_2(), tau=self.decay_tau_2(),
-                               length=self.decay_length_2())
+        return kf.decay_kernel(amp=self.decay_amp_2(), tau=self.decay_tau_2()*1e9,
+                               length=self.decay_length_2()*1e9)
 
     # def get_poly_kernel(self):
     #     return poly_kernel(a=self.poly_a(),
@@ -170,15 +181,17 @@ class Distortion(Instrument):
     #                        c=self.poly_c(),
     #                        length=self.poly_length())
 
-    def convolve_kernel(self, kernel_list, length=None):
+    def convolve_kernel(self, kernel_list, length_samples=None):
         """
         kernel_list : (list of arrays)
-        length      : (int) maximum length for convolution
+        length_samples      : (int) maximum for convolution
         Performs a convolution of different kernels
         """
         kernels = kernel_list[0]
         for k in kernel_list[1:]:
-            kernels = np.convolve(k, kernels)[:max(len(k), len(kernels))]
+            kernels = np.convolve(k, kernels)[:max(len(k), int(length_samples))]
+        if length_samples is not None:
+            return kernels[:int(length_samples)]
         return kernels
 
     def kernel_to_cache(self, cache):
@@ -202,7 +215,7 @@ class Distortion(Instrument):
 
         external_kernels = []
         for k_name in kernel_list_before:
-            f_name = os.path.join(self.kernel_dir_path(), k_name)
+            f_name = os.path.join(self.kernel_dir(), k_name)
             print('Loading {}'.format(f_name))
 
             kernel_vec = np.loadtxt(f_name)
@@ -216,8 +229,8 @@ class Distortion(Instrument):
             self.get_decay_kernel_2()]
 
         kernel_list = external_kernels + kernel_object_kernels
-        return self.convolve_kernel(kernel_list,
-                                    length=self.corrections_length())
+        return self.convolve_kernel(
+            kernel_list, length_samples=int(self.corrections_length()*1e9))
 
     def save_corrections_kernel(self, filename):
 
@@ -238,51 +251,3 @@ class Distortion(Instrument):
             self._config_changed = False
 
         return self._precalculated_kernel
-
-
-class ConfigParameter(ManualParameter):
-    # TODO: move this to qcodes as a pull request
-
-    """
-    Define one parameter that reflects a manual configuration setting.
-
-    Args:
-        name (string): the local name of this parameter
-
-        instrument (Optional[Instrument]): the instrument this applies to,
-            if any.
-
-        initial_value (Optional[string]): starting value, the
-            only invalid value allowed, and None is only allowed as an initial
-            value, it cannot be set later
-
-        **kwargs: Passed to Parameter parent class
-    """
-
-    def __init__(self, name, instrument=None, initial_value=None, **kwargs):
-        super().__init__(name=name, **kwargs)
-        self._instrument = instrument
-        # if the instrument does not have _config_changed attribute creates it
-        if not hasattr(self._instrument, '_config_changed'):
-            self._instrument._config_changed = True
-        self._meta_attrs.extend(['instrument', 'initial_value'])
-
-        if initial_value is not None:
-            self.validate(initial_value)
-            self._save_val(initial_value)
-
-    def set(self, value):
-        """
-        Validate and saves value.
-        If the value is different from the latest value it sets the
-        Args:
-            value (any): value to validate and save
-        """
-        self.validate(value)
-        if value != self._latest()['value']:
-            self._instrument._config_changed = True
-        self._save_val(value)
-
-    def get(self):
-        """ Return latest value"""
-        return self._latest()['value']
