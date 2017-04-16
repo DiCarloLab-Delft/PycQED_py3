@@ -1,10 +1,7 @@
-import logging
-import numpy as np
-from qcodes.utils.helpers import make_unique, DelegateAttributes
-
 from qcodes.instrument.base import Instrument
 from qcodes.utils import validators as vals
 from qcodes.instrument.parameter import ManualParameter
+from pycqed.instrument_drivers.pq_parameters import InstrumentParameter
 
 
 class DeviceObject(Instrument):
@@ -16,6 +13,16 @@ class DeviceObject(Instrument):
         self.add_parameter('qubits',
                            get_cmd=self._get_qubits,
                            vals=vals.Anything())
+
+        self.add_parameter('acquisition_instrument',
+                           parameter_class=InstrumentParameter)
+        sc_docstr = (
+            'Instrument responsible for controlling the waveform sequences. '
+            'This is currently either a tek5014 AWG or a CBox.')
+        self.add_parameter('seq_contr', label='Sequence controller',
+                           docstring=sc_docstr,
+                           parameter_class=InstrumentParameter)
+
         self.delegate_attr_dicts += ['_qubits']
 
         self._sequencer_config = {}
