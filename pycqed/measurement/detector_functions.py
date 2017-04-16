@@ -1479,7 +1479,12 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
         for ch in channels:
             self.value_names += ['w{}'.format(ch)]
         # Note that V^2 is in brackets to prevent confusion with unit prefixes
-        self.value_units = ['V']*len(self.value_names)+['(V^2)']*len(self.correlations)
+        if not thresholding:
+            self.value_units = ['V']*len(self.value_names) + \
+                               ['(V^2)']*len(self.correlations)
+        else:
+            self.value_units = ['counts']*len(self.value_names) + \
+                               ['normalized']*len(self.correlations)
         for corr in correlations:
             self.value_names += ['corr ({},{})'.format(corr[0], corr[1])]
 
