@@ -3,6 +3,7 @@ Contains helper functions to construct instructions
 """
 
 from pycqed.utilities.general import int_to_bin
+import numpy as np
 
 
 def trigg_cw(channel):
@@ -13,7 +14,7 @@ def trigg_cw(channel):
 
 
 def qwg_cw_trigger(codeword,
-                   trigger_channel=1, cw_channels=[2, 3, 4]):
+                   trigger_channel=1, cw_channels=np.array([2, 3, 4])):
 
     cw = int_to_bin(codeword, w=len(cw_channels), lsb_last=False)
     cw_marker = ['0']*7
@@ -32,7 +33,7 @@ def qwg_cw_trigger(codeword,
     return instr
 
 
-def cbox_awg_pulse(codeword, awg_channels=[0], duration=1):
+def cbox_awg_pulse(codeword, awg_channels=np.array([0]), duration=1):
     """
     returns the appropriate instruction to play a pulse using the
     CBox AWGs
