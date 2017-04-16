@@ -1258,12 +1258,12 @@ class CBox_v3_driven_transmon(Transmon):
 
         return [np.array(t, dtype=np.float64) for t in transients]
 
-    def calibrate_optimal_weights(self, MC=None, verify=True, update=True):
+    def calibrate_optimal_weights(self, MC=None, verify=True, analyze=False, update=True):
         if MC is None:
             MC = self.MC.get_instr()
 
         # return value needs to be added in measure_transients
-        transients = self.measure_transients(MC=MC, analyze=False)
+        transients = self.measure_transients(MC=MC, analyze=analyze)
         # Calculate optimal weights
         optimized_weights_I = transients[1][0] - transients[0][0]
         optimized_weights_I = optimized_weights_I - \
