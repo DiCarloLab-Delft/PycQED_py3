@@ -1175,6 +1175,8 @@ class Rabi_Analysis(TD_Analysis):
             yspan = ymax-ymin
             self.axs[i].set_ylim(ymin-0.23*yspan, 0.05*yspan+ymax)
             self.axs[i].legend(frameon=False, loc='lower left')
+
+
             if show_guess:
                 fine_fit = self.fit_res[i].model.func(
                     x_fine, **self.fit_res[i].init_values)
@@ -2642,10 +2644,10 @@ class Ramsey_Analysis(TD_Analysis):
         freq_est = fft_axis_scaling*index_of_fourier_maximum
         est_number_of_periods = index_of_fourier_maximum
 
-        if (average > 0.7 or
+        if ((average > 0.7*max(self.normalized_data_points)) or
                 (est_number_of_periods < 2) or
                 est_number_of_periods > len(ft_of_data)/2.):
-            print('the trace is to short to find multiple periods')
+            print('the trace is too short to find multiple periods')
 
             if print_fit_results:
                 print('Setting frequency to 0 and ' +
@@ -2666,7 +2668,7 @@ class Ramsey_Analysis(TD_Analysis):
         amplitude_guess = 1
         damped_osc_mod.set_param_hint('amplitude',
                                       value=amplitude_guess,
-                                      min=0.4, max=2.0)
+                                      min=0.4, max=4.0)
 
         if (np.average(self.normalized_data_points[:4]) >
                 np.average(self.normalized_data_points[4:8])):
@@ -2684,7 +2686,7 @@ class Ramsey_Analysis(TD_Analysis):
 
         damped_osc_mod.set_param_hint('exponential_offset',
                                       value=0.5,
-                                      min=0.4, max=1.1)
+                                      min=0.4, max=4.0)
         damped_osc_mod.set_param_hint('oscillation_offset',
                                       value=0, vary=False)
 
@@ -2731,12 +2733,14 @@ class Ramsey_Analysis(TD_Analysis):
                                         xlabel=r'Time ($\mu s$)',
                                         ylabel=ylabel,
                                         save=False)
-        if show_guess:
-            ax.plot(self.sweep_points[:-self.NoCalPoints],
-                    self.fit_res.init_fit, 'k--')
+
         x = np.linspace(self.sweep_points[0],
                         self.sweep_points[-self.NoCalPoints],
                         len(self.sweep_points)*100)
+        if show_guess:
+            y_init = fit_mods.ExpDampOscFunc(x, **self.fit_res.init_values)
+            ax.plot(x*1e6, y_init, 'k--')
+
         best_vals = self.fit_res.best_values
         y = fit_mods.ExpDampOscFunc(
             x, tau=best_vals['tau'],
@@ -2763,6 +2767,7 @@ class Ramsey_Analysis(TD_Analysis):
         self.normalized_data_points = norm[1]
         self.normalized_cal_vals = norm[2]
         self.fit_res = self.fit_Ramsey(print_fit_results)
+
         self.save_fitted_parameters(self.fit_res, var_name=self.value_names[0])
         self.plot_results(fig1, ax, self.fit_res, show_guess=show_guess,
                           ylabel=r'$F$ $|1 \rangle$')

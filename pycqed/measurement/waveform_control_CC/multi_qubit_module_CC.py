@@ -97,3 +97,27 @@ def measure_two_qubit_ssro(device, q0_name, q1_name, nr_shots=4092*4,
     mra.two_qubit_ssro_fidelity('SSRO_{}_{}'.format(q0_name, q1_name))
     MC.soft_avg(old_soft_avg)
     MC.live_plot_enabled(old_live_plot_enabled)
+
+
+def measure_Ram_Z(device, q0_name, q1_name):
+    '''
+    Measure Ram-Z sequence with different wait times after triggering the QWG
+    and between the two pi-half pulses.
+    '''
+    raise NotImplementedError()
+
+
+def measure_chevron(device, q0_name, q1_name):
+    '''
+    Measure chevron pattern, sweeping amplitude and duration of the flux
+    pulse.
+    '''
+    raise NotImplementedError()
+
+
+def measure_CZ_calibration(device, q0_name, q1_name):
+    '''
+    Measure calibration sequence for C-phase gate, sweeping the phase of the
+    recovery pulse.
+    '''
+    raise NotImplementedError()
