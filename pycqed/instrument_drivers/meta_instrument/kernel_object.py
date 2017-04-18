@@ -11,6 +11,7 @@ from pycqed.measurement.kernel_functions import kernel_generic, htilde_bounce, \
     heaviside, kernel_generic2
 
 import pycqed.measurement.kernel_functions as kf
+from pycqed.instrument_drivers.pq_parameters import ConfigParameter
 
 
 class Distortion(Instrument):
