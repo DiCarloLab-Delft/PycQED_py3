@@ -3,6 +3,8 @@ from qcodes.instrument.parameter import ManualParameter
 from qcodes.utils import validators as vals
 import logging
 from pycqed.measurement.waveform_control_CC import waveform as wf
+from pycqed.instrument_drivers.pq_parameters import InstrumentParameter
+import numpy as np
 
 
 class QWG_LookuptableManager(Instrument):
@@ -121,3 +123,38 @@ class QWG_LookuptableManager(Instrument):
 
         self.QWG.start()
         self.QWG.getOperationComplete()
+
+
+class QWG_FluxLookuptableManager(Instrument):
+
+    def __init__(self, name, **kw):
+        logging.info(__name__ + ' : Initializing instrument')
+        super().__init__(name, **kw)
+        self.add_parameter('QWG', parameter_class=InstrumentParameter)
+        self.add_parameter('F_kernel_instr',
+                           parameter_class=InstrumentParameter)
+
+        self.add_parameter('F_amp', unit='V', parameter_class=ManualParameter)
+        self.add_parameter('F_length', unit='s',
+                           parameter_class=ManualParameter)
+        self.add_parameter('F_CW', label='Flux pulse codeword',
+                           vals=vals.Ints(),
+                           parameter_class=ManualParameter)
+        self.add_parameter('F_ch', label='Flux channel',
+                           vals=vals.Ints(),
+                           parameter_class=ManualParameter)
+
+    def load_pulses_onto_AWG_lookuptable(self):
+        block_I, block_Q = wf.block_pulse(self.F_amp(), self.F_length(),
+                                          sampling_rate=1e9)
+        block_I = np.array(block_I)
+        block_Q = np.array(block_Q)
+        k = self.F_kernel_instr.get_instr()
+        distorted_I = k.convolve_kernel(
+            [k.kernel(), block_I], length_samples=60e3)
+        # hardcoded length for the distortions
+
+        self.QWG.get_instr().createWaveformReal(
+            'Square_flux_pulse', distorted_I)
+        self.QWG.get_instr().set('codeword_{}_ch{}_waveform'.format(
+            self.F_CW(), self.F_ch()), 'Square_flux_pulse')

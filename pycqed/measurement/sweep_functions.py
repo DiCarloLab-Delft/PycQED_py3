@@ -387,9 +387,7 @@ class QWG_lutman_par(Soft_Sweep):
         self.LutMan_parameter = LutMan_parameter
 
     def set_parameter(self, val):
-        '''
-        Set the parameter(s) to be sweeped. Differs per sweep function
-        '''
-
+        self.LutMan.QWG.get_instr().stop()
         self.LutMan_parameter.set(val)
         self.LutMan.load_pulses_onto_AWG_lookuptable()
+        self.LutMan.QWG.get_instr().start()
