@@ -99,13 +99,13 @@ def measure_two_qubit_ssro(device, q0_name, q1_name, nr_shots=4092*4,
     MC.live_plot_enabled(old_live_plot_enabled)
 
 
-
 def measure_Ram_Z(device, q0_name, q1_name):
     '''
     Measure Ram-Z sequence with different wait times after triggering the QWG
     and between the two pi-half pulses.
     '''
     raise NotImplementedError()
+
 
 def measure_chevron(device, q0_name, q1_name):
     '''
