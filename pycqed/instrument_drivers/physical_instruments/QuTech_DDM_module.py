@@ -46,7 +46,8 @@ class DDMq(SCPI):
             srun_cmd = 'qutech:run{}'.format(ch_pair)
             self.add_parameter('ch_pair{}_run'.format(ch_pair),
                                label=('Run ch_pair{}'.format(ch_pair)),
-                               docstring='This parameter enables trigger, it is comparable to command "arm".' +
+                               docstring='This parameter enables trigger,' +
+                               ' it is comparable to command "arm".' +
                                ' After run is set, DDM will accept next comming triggers ',
                                #get_cmd=swinten_cmd + '?',
                                set_cmd=srun_cmd
@@ -60,7 +61,8 @@ class DDMq(SCPI):
             self.add_parameter('ch_pair{}_status'.format(ch_pair),
                                label=('Get status '),
                                docstring='It returns status on Over range, under range on DI and DQ ' +
-                               'FPGA clock, Calbration status( in case if is being calibrated it will show the warning,)' +
+                               'FPGA clock, Calbration status( in case if is being ' +
+                               ' calibrated it will show the warning,)' +
                                'False Trigger for input averaging and integration.',
                                get_cmd=self._gen_ch_get_func(
                                    self._getADCstatus, ch_pair)
@@ -126,23 +128,25 @@ class DDMq(SCPI):
                                label=('The number of sample  that' +
                                       'is used for one integration of' +
                                       'ch_pair {} for all weights'.format(ch_pair)),
-                               docstring='This value specifies the number of samples that is used for one integration.  ' +
+                               docstring='This value specifies the number of ' +
+                               'samples that is used for one integration.  ' +
                                'It is only possible to set even numbre of samples.' +
-                               'Each sample has 2 ns period, so the maximum time of integration is 8 us ',
+                               'Each sample has 2 ns period, so the maximum ' +
+                               'time of integration is 8 us ',
                                get_cmd=sintlengthall_cmd + '?',
                                set_cmd=sintlengthall_cmd + ' {}',
                                vals=vals.Numbers(1, 4096)
                                )
-            """
-            TV mode
-            """
-
+            #########
+            ##TV mode
+            #########
             sintavgall_cmd = 'qutech:tvmode{}:naverages:all'.format(ch_pair)
             self.add_parameter('ch_pair{}_tvmode_naverages'.format(ch_pair),
                                unit='#',
                                label=('The number of integration averages' +
                                       'of ch_pair {} all weights'.format(ch_pair)),
-                               docstring='It sets number of integartion avarages for all weights within one ch_pair  ' +
+                               docstring='It sets number of integartion' +
+                               'avarages for all weights within one ch_pair' +
                                'Value can be between 1 and 2^17' +
                                ' Any integer within this range can be set',
                                get_cmd=sintavgall_cmd + '?',
@@ -165,17 +169,17 @@ class DDMq(SCPI):
             self.add_parameter('ch_pair{}_tvmode_enable'.format(ch_pair),
                                label=('Enable tv mode' +
                                       'ch_pair {} all weights '.format(ch_pair)),
-                               docstring='It enables the TV-Mode functionality for all weight pair within one ch_pair.  ' +
+                               docstring='It enables the TV-Mode functionality ' +
+                               'for all weight pair within one ch_pair.  ' +
                                'It is required to enable it prior to run command.' +
                                'Otherwise old data will be read out',
                                get_cmd=stvenall_cmd + '?',
                                set_cmd=stvenall_cmd + ' {}',
                                vals=vals.Numbers(0, 1)
-                               # vals=vals.Numbers(1,4096)
                                )
-            """
-            Threshold
-            """
+            ###########
+            ##Threshold
+            ###########
             sthlall_cmd = 'qutech:qstate{}:threshold:all'.format(ch_pair)
             self.add_parameter('ch_pair{}_qstate_threshold'.format(ch_pair),
                                unit='#',
@@ -190,9 +194,9 @@ class DDMq(SCPI):
                                set_cmd=sthlall_cmd + ' {}',
                                vals=vals.Numbers(-134217728, 134217727)
                                )
-            '''
-            Logging
-            '''
+            #########
+            ##Logging
+            #########
             slogenall_cmd = 'qutech:logging{}:enable:all'.format(ch_pair)
             self.add_parameter('ch_pair{}_logging_enable'.format(ch_pair),
                                label=('Enable logging mode' +
@@ -221,9 +225,9 @@ class DDMq(SCPI):
                                set_cmd=slogshotsall_cmd + ' {}',
                                vals=vals.Numbers(1, 8192)
                                )
-            '''
-            Error fraction
-            '''
+            ################
+            ##Error fraction
+            ################
             serrfarcten_cmd = 'qutech:errorfraction{}:enable:all'.format(
                 ch_pair)
             self.add_parameter('ch_pair{}_err_fract_enable'.format(ch_pair),
@@ -272,9 +276,9 @@ class DDMq(SCPI):
 
             for i in range(self.device_descriptor.numWeights):
                 wNr = i+1
-                '''
+                """
                 Weighted integral + Rotation matrix + TV mode parameters
-                '''
+                """
                 swinten_cmd = 'qutech:wint{}:enable{}'.format(ch_pair, wNr)
                 self.add_parameter('ch_pair{}_weight{}_wint_enable'.format(ch_pair, wNr),
                                    label=('Enable wighted integral' +
@@ -312,11 +316,11 @@ class DDMq(SCPI):
                                    get_cmd=swintstat_cmd + '?'
 
                                    )
-                """
-                Set 4 elements of rotation matrix
-                Rotmat[rotmat00 rotmat01
-                       rotmat10 rotmat11]
-                """
+                ###################################
+                ##Set 4 elements of rotation matrix
+                ##Rotmat[rotmat00 rotmat01
+                ##       rotmat10 rotmat11]
+                ###################################
                 srotmat00_cmd = 'qutech:rotmat{}:rotmat00{}'.format(
                     ch_pair, wNr)
                 self.add_parameter('ch_pair{}_weight{}_rotmat_rotmat00'.format(ch_pair, wNr),
@@ -354,7 +358,6 @@ class DDMq(SCPI):
                                    ' ',
                                    get_cmd=srotmat10_cmd + '?',
                                    set_cmd=srotmat10_cmd + ' {}'
-                                   # vals=vals.Numbers(1,2048)
                                    )
                 srotmat11_cmd = 'qutech:rotmat{}:rotmat11{}'.format(
                     ch_pair, wNr)
@@ -370,9 +373,9 @@ class DDMq(SCPI):
                                    vals=vals.Numbers(-2, 1.99976)
                                    )
 
-                '''
-                TV mode parameters
-                '''
+                ####################
+                ##TV mode parameters
+                ####################
                 sintavg_cmd = 'qutech:tvmode{}:naverages{}'.format(
                     ch_pair, wNr)
                 self.add_parameter('ch_pair{}_weight{}_tvmode_naverages'.format(ch_pair, wNr),
@@ -408,24 +411,23 @@ class DDMq(SCPI):
                                    get_cmd=stven_cmd + '?',
                                    set_cmd=stven_cmd + ' {}',
                                    vals=vals.Numbers(0, 1)
-                                   # vals=vals.Numbers(1,4096)
                                    )
 
                 self.add_parameter('ch_pair{}_weight{}_tvmode_data'.format(ch_pair, wNr),
                                    label=(
                                        'Get TV data channel pair {} weight {}'.format(ch_pair, wNr)),
-                                   docstring='It returns tvmode data written to TVmode memory after measuremnet. ' +
+                                   docstring='It returns tvmode data written ' +
+                                   'to TVmode memory after measuremnet. ' +
                                    'Every weight pair has only one TV mode memory' +
                                    'It can be used either I or Q ',
                                    get_cmd=self._gen_ch_weight_get_func(
                                        self._getTVdata, ch_pair, wNr)
 
-                                   # vals=vals.Numbers(-128,127)
                                    )
 
-                '''
-                TV mode QSTATE parameters
-                '''
+                ###########################
+                ##TV mode QSTATE parameters
+                ###########################
                 sthl_cmd = 'qutech:qstate{}:threshold{}'.format(ch_pair, wNr)
                 self.add_parameter('ch_pair{}_weight{}_qstate_threshold'.format(ch_pair, wNr),
                                    unit='#',
@@ -449,9 +451,8 @@ class DDMq(SCPI):
                                    'It can be used either I or Q ' +
                                    'Foramt is float containg 0s and 1s ',
                                    get_cmd=self._gen_ch_weight_get_func(
-                                   self._getQstateCNT, ch_pair, wNr),
+                                   self._getQstateCNT, ch_pair, wNr)
 
-                                   # vals=vals.Numbers(-128,127)
                                    )
                 self.add_parameter('ch_pair{}_weight{}_qstate_avg_data'.format(ch_pair, wNr),
                                    label=('Get qstate average' +
@@ -463,13 +464,12 @@ class DDMq(SCPI):
                                    'It can be used either I or Q ' +
                                    'Format is float containg numbers between 0 and 1 ',
                                    get_cmd=self._gen_ch_weight_get_func(
-                    self._getQstateAVG, ch_pair, wNr),
+                    self._getQstateAVG, ch_pair, wNr)
 
-                    # vals=vals.Numbers(-128,127)
                 )
-                '''
-                Logging
-                '''
+                #################
+                ##Logging
+                #################
                 slogen_cmd = 'qutech:logging{}:enable{}'.format(ch_pair, wNr)
                 self.add_parameter('ch_pair{}_weight{}_logging_enable'.format(ch_pair, wNr),
                                    label=('Enable logging mode' +
@@ -480,7 +480,6 @@ class DDMq(SCPI):
                                    get_cmd=slogen_cmd + '?',
                                    set_cmd=slogen_cmd + ' {}',
                                    vals=vals.Numbers(0, 1)
-                                   # vals=vals.Numbers(1,4096)
                                    )
 
                 slogshots_cmd = 'qutech:logging{}:nshots{}'.format(
@@ -513,7 +512,8 @@ class DDMq(SCPI):
                 self.add_parameter('ch_pair{}_weight{}_logging_qstate'.format(ch_pair, wNr),
                                    label=('Get qstate logging ' +
                                           'ch_pair {} weight {}'.format(ch_pair, wNr)),
-                                   docstring='It returns Logging data after thresholding written to Logging' +
+                                   docstring='It returns Logging data after ' +
+                                   'thresholding written to Logging' +
                                    'memory after measuremnet. It is up to 8192 shots' +
                                    'with preset number of shots. ' +
                                    'Every weight pair has only one TV mode memory' +
@@ -522,11 +522,10 @@ class DDMq(SCPI):
                                    get_cmd=self._gen_ch_weight_get_func(
                                        self._getLoggingQstate, ch_pair, wNr),
 
-                                   # vals=vals.Numbers(-128,127)
                                    )
-                '''
-                Error fraction
-                '''
+                #################
+                ##Error fraction
+                #################
                 serrfarcten_cmd = 'qutech:errorfraction{}:enable{}'.format(
                     ch_pair, wNr)
                 self.add_parameter('ch_pair{}_weight{}_err_fract_enable'.format(ch_pair, wNr),
@@ -577,9 +576,9 @@ class DDMq(SCPI):
 
                                    vals=vals.Arrays(0, 1)
                                    )
-        '''
-        Sorted by channel
-        '''
+        ###################
+        ##Sorted by channel
+        ###################
         for i in range(self.device_descriptor.numChannels):
             ch = i+1
             self.add_parameter('ch{}_inavg_data'.format(ch),

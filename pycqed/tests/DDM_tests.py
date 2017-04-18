@@ -118,7 +118,7 @@ class DDM_tests(unittest.TestCase):
         par.set(old_val)
 
     def test_parameters(self):
-        for parname, par in sorted(self.ddm.parameters.items()):
+        for par in sorted(self.ddm.parameters.items()):
             # no more failing pars! still here so I can re add if needed
             failing_pars = []
             if par.name not in ['IDN'] and par.name not in failing_pars:
