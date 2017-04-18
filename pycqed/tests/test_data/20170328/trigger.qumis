@@ -1,0 +1,30 @@
+mov r14 0
+
+start:  wait 500
+        trigger 1000000 1
+        wait 2
+        trigger 0000000 1
+        wait 2
+        trigger 0100000 1
+        wait 2
+        trigger 0010000 1
+        wait 2
+        trigger 0110000 1
+        wait 2
+        trigger 0001000 1
+        wait 2
+        trigger 0101000 1
+        wait 2
+        trigger 0011000 1
+        wait 2
+        trigger 0111111 10
+        beq r14, r14, start
+        nop
+        nop
+        nop
+        nop
+        nop
+        nop
+
+# Only one group of triggers will be generated and then the core went to error state since the instrucitons are consumed too fast.
+# The interval between every consecutive triggers is 1 cycle.
