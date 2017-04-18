@@ -7,6 +7,7 @@ from ._controlbox import Assembler
 from . import QuTech_ControlBoxdriver as qcb
 from ._controlbox import defHeaders_CBox_v3 as defHeaders
 
+from qcodes.instrument.parameter import ManualParameter
 # cython drivers for encoding and decoding
 import pyximport
 pyximport.install(setup_args={"script_args": ["--compiler=msvc"],
@@ -38,10 +39,29 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
                            get_cmd=self._do_get_trigger_source,
                            vals=vals.Enum('internal', 'external',
                                           'mixed'))
+        self._pulse_queue_state = defHeaders.pulse_queue_states[0]
+        self.add_parameter(
+            'pulse_queue_state',
+            docstring=('returns 0 if OK. returns 1 if instructions are not'
+                       ' executed fast enough.'),
+            get_cmd=self._do_get_pulse_queue_state)
+        self._max_instruction_address = 0
+        self.add_parameter(
+            'max_instruction_address',
+            docstring=('returns the highest address (index) of instructions '
+                       'that was exectued by the program, should be equal '
+                       'to uploaded_program_length.'),
+            get_cmd=self._do_get_max_instruction_address)
+        self._uploaded_program_length = 0
+        self.add_parameter('uploaded_program_length',
+                           get_cmd=self._do_get_uploaded_program_length)
         self.add_parameter('instr_mem_size',
-                           units='#',
+                           unit='#',
                            label='instruction memory size',
                            get_cmd=self._get_instr_mem_size)
+        self.add_parameter('last_loaded_instructions',
+                           vals=vals.Strings(),
+                           parameter_class=ManualParameter)
         # hardcoded memory limit, depends on firmware of the CBox
         self._instr_mem_size = 2**15
 
@@ -74,9 +94,28 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
               unittest.TestLoader().getTestCaseNames(test_suite.CBox_tests_v3))
         unittest.TextTestRunner(verbosity=2).run(suite)
 
+    def start(self):
+        self.core_state('active')
+        self.run_mode('run')
+
+    def stop(self):
+        self.run_mode('idle')
+        self.core_state('idle')
+
     def _do_get_firmware_version(self):
         v = self.get_master_controller_params()
         return v
+
+    def _do_get_pulse_queue_state(self):
+        self.get_master_controller_params()
+        return self._pulse_queue_state
+
+    def _do_get_max_instruction_address(self):
+        self.get_master_controller_params()
+        return self._max_instruction_address
+
+    def _do_get_uploaded_program_length(self):
+        return self._uploaded_program_length
 
     def get_master_controller_params(self):
         message = self.create_message(defHeaders.ReadVersion)
@@ -116,6 +155,12 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
         self._nr_samples = (v_list[30] << 7) + v_list[31]
         self._avg_size = v_list[32]
         self._nr_averages = 2**self._avg_size
+        # self._offset_calc_delay = (v_list[33] << 4) + v_list[34]
+        queue_state = v_list[35]
+        self._pulse_queue_state = defHeaders.pulse_queue_states[
+            queue_state]
+        self._max_instruction_address = int(((v_list[36] << 14) + \
+            (v_list[37] << 7) + v_list[38])/4)
 
         return version
 
@@ -371,6 +416,7 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
         uploading instructions and ends by setting the core state to active.
         '''
 
+
         asm = Assembler.Assembler(asm_filename)
 
         instructions = asm.convert_to_instructions()
@@ -407,5 +453,9 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
 
         if not stat:
             raise Exception('Failed to load instructions')
+
+        appending_instr_num = 3
+        self._uploaded_program_length = len(instructions) - appending_instr_num
         self.set('core_state', 'active')
+        self.last_loaded_instructions(asm_filename)
         return (stat, mesg)

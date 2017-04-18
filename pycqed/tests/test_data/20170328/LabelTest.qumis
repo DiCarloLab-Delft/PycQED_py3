@@ -1,0 +1,18 @@
+mov r0, 20000   # r0 stores the cycle time , 100 us
+mov r1, 0       # sets the inter pulse wait to 0
+mov r14, 0      # r14 stores number of repetitions
+# Experiment: repeat the rounds for infinite times
+wait 1
+Exp_Start:
+trigger 1000000, 2000
+wait 2000
+wait 4
+trigger 0000001, 2
+wait 1198
+beq r14, r14, Exp_Start       # Infinite loop
+nop # Added to prevent a rare bug... (ask X.FU)
+nop # Added to prevent a rare bug... (ask X.FU)
+nop # Added to prevent a rare bug... (ask X.FU)
+nop # Added to prevent a rare bug... (ask X.FU)
+nop # Added to prevent a rare bug... (ask X.FU)
+nop # Added to prevent a rare bug... (ask X.FU)

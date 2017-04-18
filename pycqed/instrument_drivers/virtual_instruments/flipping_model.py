@@ -14,50 +14,50 @@ class FlippingModel(Instrument):
         super().__init__(name, **kw)
 
         # Instrument parameters
-        self.add_parameter('F_g', units=' ',
+        self.add_parameter('F_g', unit=' ',
                            label='Gate Fidelity',
                            parameter_class=ManualParameter,
                            vals=Numbers(), initial_value=1)
-        self.add_parameter('F_discr', units='',
+        self.add_parameter('F_discr', unit='',
                            label='Discrimination Fidelity',
                            parameter_class=ManualParameter,
                            vals=Numbers(), initial_value=1)
-        self.add_parameter('N_cl', units='',
+        self.add_parameter('N_cl', unit='',
                            label='Number of Cliffords',
                            parameter_class=ManualParameter,
                            vals=Numbers(), initial_value=1)
-        self.add_parameter('tau_d', units='s',
+        self.add_parameter('tau_d', unit='s',
                            label='Dead time (s)',
                            parameter_class=ManualParameter,
                            vals=Numbers(), initial_value=0)
-        self.add_parameter('T1', units='s',
+        self.add_parameter('T1', unit='s',
                            parameter_class=ManualParameter,
                            vals=Numbers(), initial_value=1)
-        self.add_parameter('T1_sigma', units='s',
+        self.add_parameter('T1_sigma', unit='s',
                            parameter_class=ManualParameter,
                            vals=Numbers(), initial_value=0)
 
-        self.add_parameter('P_RB', units='',
+        self.add_parameter('P_RB', unit='',
                            label='Randomized Benchmarking',
                            get_cmd=self._get_P_RB,
                            vals=Numbers())
 
-        self.add_parameter('measured_state', units=' ',
+        self.add_parameter('measured_state', unit=' ',
                            label='Measured state',
                            get_cmd=self._measure,
                            vals=Numbers())
-        self.add_parameter('measure_shots', units=' ',
+        self.add_parameter('measure_shots', unit=' ',
                            label='Measured shots',
                            get_cmd=self._measure_nshots)
-        self.add_parameter('N_shots', units='',
+        self.add_parameter('N_shots', unit='',
                            parameter_class=ManualParameter,
                            vals=Ints(), initial_value=32)
         self.add_parameter('err_frac', label='Error fraction',
-                           units='',
+                           unit='',
                            get_cmd=self._measure_err_frac)
 
         # The state is fully classical in this model
-        self.add_parameter('state', units='',
+        self.add_parameter('state', unit='',
                            label='Physical state',
                            parameter_class=ManualParameter,
                            vals=Enum(1, -1), initial_value=1)

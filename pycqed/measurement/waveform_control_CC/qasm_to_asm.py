@@ -12,7 +12,7 @@ preamble = ('mov r0, 20000   # r0 stores the cycle time , 100 us \n' +
             '# Experiment: repeat the rounds for infinite times\n' +
             'Exp_Start: \n')
 
-ending = 'beq r14, r14, Exp_Start       # Infinite loop'
+ending = ('beq r14, r14, Exp_Start       # Infinite loop\n')
 
 
 def qasm_to_asm(qasm_filepath, operation_dict):

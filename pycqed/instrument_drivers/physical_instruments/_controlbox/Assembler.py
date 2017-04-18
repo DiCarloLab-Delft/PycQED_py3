@@ -1,7 +1,6 @@
 ﻿import string
 from sys import exit
 import logging
-import tempfile
 
 
 def is_number(s):
@@ -256,21 +255,6 @@ class Assembler():
             raise ValueError('Pulse instruction format error: {}'.format(
                 detail.args))
 
-    # measure rt
-    # def MeasureFormat(self, dst_reg):
-    #     try:
-    #         opCode = self.InstOpCode['measure']
-    #         FDC = '011'
-    #         zero4 = '0000'
-    #         rt = self.get_reg_num(dst_reg)
-    #         zero9 = '000000000'
-    #         funct = self.InstfunctCode['measure']
-    #         return opCode + FDC + zero4 + rt + zero9 + funct
-
-    #     except ValueError as detail:
-    #         raise ValueError('Measure instruction format error: {}'.format(
-    #                          detail.args))
-
     # measure
     def MeasureFormat(self):
         try:
@@ -332,27 +316,28 @@ class Assembler():
     def NopFormat(self):
         return "00000000000000000000000000000000"
 
-    # def AppendTail(self):
-    #     try:
-    #         Asm_File = open(self.asmfilename, 'r', encoding="utf-8")
-    #     except:
-    #         print('\tError: Fail to open file ' + self.asmfilename + ".")
-    #         exit(0)
+    @classmethod
+    def remove_comment(self, line):
+        line = line.split('#', 1)[0]  # remove anything after '#' symbole
+        line = line.strip(' \t\n\r')  # remove whitespace
+        return line
 
-    #     self.tfp = tempfile.TemporaryFile('w')
+    @classmethod
+    def split_label_instr(self, line):
+        head, sep, tail = line.partition(':')
+        if (sep == ":"):
+            label = head.strip().lower()
+            instr = tail
+        else:
+            label = None
+            instr = head
 
-    #     for line in Asm_File:
-    #         self.tfp.write("%s" % line)
-    #     self.tfp.write("EndOfFileLoop: wait 1000\n")
-    #     self.tfp.write("trigger 0000001 10000\n")
-    #     self.tfp.write('beq r0, r0, EndOfFileLoop\n')
+        return (label, instr)
 
-    #     self.tfp.seek(0)
-
-    #     for line in self.tfp:
-    #         print(line)
-
-    #     Asm_File.close()
+    @classmethod
+    def get_instruction_elements(self, pureInstruction):
+        return [rawEle.strip(string.punctuation.translate(
+                {ord('-'): None})) for rawEle in pureInstruction.split()]
 
     def ParseLabel(self):
         try:
@@ -361,198 +346,182 @@ class Assembler():
             print('\tError: Fail to open file ' + self.asmfilename + ".")
             exit(0)
 
-        tag_addr_dict = {}
+        self.tag_addr_dict = {}
         cur_addr = 0
-        instructions = []
+        num_of_instr = 0
 
         for line in Asm_File:
-            line = line.split('#', 1)[0]  # remove anything after '#' symbole
-            line = line.strip(' \t\n\r')  # remove whitespace
+            line = self.remove_comment(line)
 
             if (len(line) == 0):  # skip empty line and comment
                 continue
 
-            cur_addr = len(instructions) + 1
+            cur_addr = num_of_instr + 1
 
-            head, sep, tail = line.partition(':')
-            if (sep == ":"):
-                tag_addr_dict[head.strip().lower()] = cur_addr
-                instr = tail
-                if (len(tail) == 0):
-                    continue
-            else:
-                instr = head
+            (label, instr) = self.split_label_instr(line)
+            if label is not None:
+                if label in self.tag_addr_dict:
+                    raise ValueError("Redefintion of the label {} in the QuMIS file {}".format(
+                        label, self.asmfilename))
+                self.tag_addr_dict[label] = cur_addr
 
-            # the following translate function should be tested.
-            elements = [rawEle.strip(string.punctuation.translate(
-                        {ord('-'): None})) for rawEle in instr.split()]
+                # the nop inserted after the label
+                num_of_instr = num_of_instr + 1
+
+            if (len(instr) == 0):
+                continue
+
+            elements = self.get_instruction_elements(instr)
 
             if (elements[0].lower() == 'mov'):
                 ni = 4
             else:
                 ni = 1
-            for i in range(ni):
-                instructions.append(len(instructions))
+            num_of_instr = num_of_instr + ni
 
         Asm_File.close()
 
-        return tag_addr_dict
+        return self.tag_addr_dict
 
     def convert_to_instructions(self):
-        # self.AppendTail()
-        tag_addr_dict = self.ParseLabel()
+        self.ParseLabel()
+
+        self.NopInstruction = 0
 
         Asm_File = open(self.asmfilename, 'r', encoding="utf-8")
         logging.info("open file", self.asmfilename, "successfully.")
 
         cur_addr = 0
-        instructions = []
+        self.instructions = []
 
         for line in Asm_File:
-            line = line.split('#', 1)[0]  # remove anything after '#' symbole
-            line = line.strip(' \t\n\r')  # remove whitespace
+            line = self.remove_comment(line)
 
             if (len(line) == 0):  # skip empty line and comment
                 continue
 
-            cur_addr = len(instructions) + 1
+            cur_addr = len(self.instructions) + 1
 
-            head, sep, tail = line.partition(':')
-            if (sep == ":"):
-                instr = tail
-                if (len(tail) == 0):
-                    continue
-            else:
-                instr = head
+            (label, instr) = self.split_label_instr(line)
+            if label is not None:
+                self.instructions.append(self.NopInstruction)
+
+            if (len(instr) == 0):
+                continue
 
             # the following translate function should be tested.
             elements = [rawEle.strip(string.punctuation.translate(
                         {ord('-'): None})) for rawEle in instr.split()]
 
             if (elements[0].lower() == 'lui'):     # lui rt, pos, byte_data
-                # print('parsing lui instruction.')
-                instructions.append(int(self.LuiFormat(elements[1],
-                                                       elements[2],
-                                                       elements[3]), 2))
+                self.instructions.append(int(self.LuiFormat(elements[1],
+                                                            elements[2],
+                                                            elements[3]), 2))
 
             elif (elements[0].lower() == 'mov'):      # mov rt, imm32
-                # print('parsing mov instruction.')
                 instr4 = self.MovFormat(elements[1], elements[2])
                 for i in instr4:
-                    instructions.append(int(i, 2))
+                    self.instructions.append(int(i, 2))
 
             elif (elements[0].lower() == 'add'):   # add rd, rs, rt
-                # print('parsing add instruction.')
                 if (elements[1][0] != 'r' or elements[2][0] != 'r' or
                         elements[3][0] != 'r'):
-                    raise ValueError('Add instruction only receive three registers'
-                                     ' as input.')
+                    raise ValueError('Add instruction only receive three'
+                                     ' registers as input.')
                     exit()
 
-                instructions.append(int(self.AddFormat(elements[1],
-                                                       elements[2],
-                                                       elements[3]), 2))
+                self.instructions.append(int(self.AddFormat(elements[1],
+                                                            elements[2],
+                                                            elements[3]), 2))
 
             elif (elements[0].lower() == 'sub'):   # sub rd, rs, rt
-                # print('parsing sub instruction.')
                 if (elements[1][0] != 'r' or elements[2][0] != 'r' or
                         elements[3][0] != 'r'):
                     raise ValueError('Sub instruction only receive three'
                                      'registers as input.')
                     exit()
 
-                instructions.append(int(self.SubFormat(elements[1],
-                                                       elements[2],
-                                                       elements[3]), 2))
+                self.instructions.append(int(self.SubFormat(elements[1],
+                                                            elements[2],
+                                                            elements[3]), 2))
 
             elif (elements[0].lower() == 'beq'):   # beq rs, rt, off
-                # print('parsing beq instruction.')
-
                 if (elements[1][0] != 'r' or elements[2][0] != 'r'):
-                    raise ValueError('beq instruction only receive registers as'
-                                     ' the first two parameter.')
+                    raise ValueError('beq instruction only receive registers'
+                                     ' as the first two parameter.')
                     exit()
 
-                if elements[3].strip().lower() in tag_addr_dict:
-                    target_addr = tag_addr_dict[elements[3].strip().lower()] -\
+                if elements[3].strip().lower() in self.tag_addr_dict:
+                    target_addr = self.tag_addr_dict[elements[3].strip().lower()] -\
                         (cur_addr + 1)
                 else:
-                    raise ValueError("beq. Cannot find the branch target label: ",
+                    raise ValueError("beq. Cannot find the branch target label:",
                                      elements[3].strip().lower())
                     exit()
 
-                instructions.append(int(self.BeqFormat(elements[1],
-                                                       elements[2],
-                                                       target_addr), 2))
+                self.instructions.append(int(self.BeqFormat(elements[1],
+                                                            elements[2],
+                                                            target_addr), 2))
+                self.add_branch_nop(self.instructions)
 
             elif (elements[0].lower() == 'bne'):   # bne rs, rt, off
-                # print('parsing bne instruction.')
-
                 if (elements[1][0] != 'r' or elements[2][0] != 'r'):
                     raise ValueError('bne instruction only receive registers as '
                                      'the first two parameter.')
                     exit()
 
-                if elements[3].strip().lower() in tag_addr_dict:
-                    target_addr = tag_addr_dict[elements[3].strip().lower()] -\
+                if elements[3].strip().lower() in self.tag_addr_dict:
+                    target_addr = self.tag_addr_dict[elements[3].strip().lower()] -\
                         (cur_addr + 1)
-                    # print("bne, target_addr: ", target_addr)
                 else:
                     raise ValueError("bne. Cannot find the branch target label: ",
                                      elements[3].strip().lower())
                     exit()
 
-                instructions.append(int(self.BneFormat(elements[1],
-                                                       elements[2],
-                                                       target_addr), 2))
+                self.instructions.append(int(self.BneFormat(elements[1],
+                                                            elements[2],
+                                                            target_addr), 2))
+                self.add_branch_nop(self.instructions)
 
             elif (elements[0].lower() == 'addi'):  # addi rt, rs, imm
-                # print('parsing addi instruction.')
-
                 if (elements[1][0] != 'r' or elements[2][0] != 'r'):
                     raise ValueError('addi instruction only receive registers as '
                                      'the first two parameter.')
                     exit()
 
-                instructions.append(int(self.AddiFormat(elements[1],
-                                                        elements[2],
-                                                        elements[3]), 2))
+                self.instructions.append(int(self.AddiFormat(elements[1],
+                                                             elements[2],
+                                                             elements[3]), 2))
 
             elif (elements[0].lower() == 'waitreg'):   # WaitReg rs
-                # print('parsing WaitReg instruction.')
-
                 if (elements[1][0] != 'r'):
                     raise ValueError('WaitReg instruction only a register as the '
                                      'parameter.')
                     exit()
 
-                instructions.append(int(self.WaitRegFormat(elements[1]), 2))
+                self.instructions.append(
+                    int(self.WaitRegFormat(elements[1]), 2))
 
             elif (elements[0].lower() == 'pulse'):   # Pulse awg0, awg1, awg2
-                # print('parsing Pulse instruction.')
-                instructions.append(int(self.PulseFormat(elements[1],
-                                                         elements[2],
-                                                         elements[3]), 2))
+                self.instructions.append(int(self.PulseFormat(elements[1],
+                                                              elements[2],
+                                                              elements[3]), 2))
 
             elif (elements[0].lower() == 'measure'):   # Measure
-                # print('parsing Measure instruction.')
                 if (len(elements) > 1):
                     print("Parameters in the measure instruction is omitted.")
 
-                instructions.append(int(self.MeasureFormat(), 2))
+                self.instructions.append(int(self.MeasureFormat(), 2))
 
             elif (elements[0].lower() == 'wait'):   # Wait imm
-                # print('parsing Wait instruction.')
-                instructions.append(int(self.WaitFormat(elements[1]), 2))
+                self.instructions.append(int(self.WaitFormat(elements[1]), 2))
 
             elif (elements[0].lower() == 'trigger'):   # Trigger mask, duration
-                # print('parsing Trigger instruction.')
-                instructions.append(int(self.TriggerFormat(elements[1],
-                                                           elements[2]), 2))
+                self.instructions.append(int(self.TriggerFormat(elements[1],
+                                                                elements[2]), 2))
 
             elif (elements[0].lower() == 'nop'):
-                # print('parsing nop instruction.')
-                instructions.append(int(self.NopFormat(), 2))
+                self.instructions.append(int(self.NopFormat(), 2))
 
             else:
                 raise ValueError('Error: unsupported instruction "{}" found on line "{}". '.format(
@@ -567,8 +536,64 @@ class Assembler():
         #   wait 1000
         #   trigger 0000001 1000
         #   beq r0, r0, EndOfFileLoop
-        instructions.append(int('c08003e8', 16))
-        instructions.append(int('a08203e8', 16))
-        instructions.append(int('12007ffd', 16))
+        self.instructions.append(int('c08003e8', 16))
+        self.instructions.append(int('a08203e8', 16))
+        self.instructions.append(int('12007ffd', 16))
 
-        return instructions
+        return self.instructions
+
+    def getTextInstructions(self):
+        '''
+        Show the final instructions after expanding the mov instruction
+        and appending nop instruction after labels and beq/bne.
+        '''
+        Asm_File = open(self.asmfilename, 'r', encoding="utf-8")
+
+        self.text_instructions = []
+
+        for line in Asm_File:
+            line = self.remove_comment(line)
+
+            if (len(line) == 0):  # skip empty line and comment
+                continue
+
+            (label, instr) = self.split_label_instr(line)
+            if label is not None:
+                self.text_instructions.append(label + ': nop')
+
+            if (len(instr) == 0):
+                continue
+
+            elements = [rawEle.strip(string.punctuation.translate(
+                {ord('-'): None})) for rawEle in instr.split()]
+
+            if (elements[0].lower() == 'mov'):
+                self.text_instructions.append("LUI0 " + instr)
+                self.text_instructions.append("LUI1 " + instr)
+                self.text_instructions.append("LUI2 " + instr)
+                self.text_instructions.append("LUI3 " + instr)
+            elif (elements[0].lower() == 'beq'):
+                self.text_instructions.append(instr)
+                self.add_branch_nop(self.text_instructions, TextVersion=True)
+            elif (elements[0].lower() == 'bne'):
+                self.text_instructions.append(instr)
+                self.add_branch_nop(self.text_instructions, TextVersion=True)
+            else:
+                self.text_instructions.append(instr)
+
+        self.text_instructions.append("EndOfFileLoop: wait 1000")
+        self.text_instructions.append("trigger 0000001 10000")
+        self.text_instructions.append("beq r0, r0, EndOfFileLoop")
+
+        Asm_File.close()
+
+        return self.text_instructions
+
+    def add_branch_nop(self, instructions, TextVersion=False):
+        number_of_nops_appended = 5
+        if (TextVersion):
+            for i in range(number_of_nops_appended):
+                instructions.append('nop')
+        else:
+            for i in range(number_of_nops_appended):
+                instructions.append(self.NopInstruction)

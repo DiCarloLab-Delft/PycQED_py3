@@ -135,3 +135,104 @@ def nelder_mead(fun, x0,
     # verification
     fun(res[0][0])
     return res[0]
+
+
+def SPSA(fun, x0,
+         initial_step=0.1,
+         no_improve_thr=10e-6, no_improv_break=10,
+         maxiter=0,
+         gamma=0.101, alpha=0.602, a=0.2, c=0.3, A=300,
+         p=0.5, ctrl_min=0.,ctrl_max=np.pi,
+         verbose=False):
+    '''
+    parameters:
+        fun (function): function to optimize, must return a scalar score
+            and operate over a numpy array of the same dimensions as x0
+        x0 (numpy array): initial position
+
+
+        no_improv_thr,  no_improv_break (float, int): break after
+            no_improv_break iterations with an improvement lower than
+            no_improv_thr
+        maxiter (int): always break after this number of iterations.
+            Set it to 0 to loop indefinitely.
+        alpha, gamma, a, c, A, (float): parameters for the SPSA gains
+            (see refs for definitions)
+        p (float): probability to get 1 in Bernoulli +/- 1 distribution
+            (see refs for context)
+        ctrl_min, ctrl_max (float/array): boundaries for the parameters.
+            can be either a global boundary for all dimensions, or a
+            numpy array containing the boundary for each dimension.
+    return: tuple (best parameter array, best score)
+
+    alpha, gamma, a, c, A and p, are parameters for the algorithm.
+    Their function is described in the references below,
+    and even optimal values have been discussed in the literature.
+
+
+    Pure Python/Numpy implementation of the SPSA algorithm designed by Spall.
+    Implementation from http://www.jhuapl.edu/SPSA/PDF-SPSA/Spall_An_Overview.PDF,
+    edited by Ramiro Sagastizabal for use in PycQED.
+    Reference: http://www.jhuapl.edu/SPSA/Pages/References-Intro.htm
+    '''
+    # init
+    x0 = np.array(x0)  # ensures algorithm also accepts lists
+    dim = len(x0)
+    prev_best = fun(x0)
+    no_improv = 0
+    res = [[x0, prev_best]]
+
+    x = copy.copy(x0)
+
+    # SPSA iter
+    iters = 0
+    while 1:
+        # order
+        res.sort(key=lambda x: x[1])
+        best = res[0][1]
+
+        # break after maxiter
+        if maxiter and iters >= maxiter:
+            # Conclude failure break the loop
+            if verbose:
+                print('max iterations exceeded, optimization failed')
+            break
+        iters += 1
+
+        if best < prev_best - no_improve_thr:
+            no_improv = 0
+            prev_best = best
+        else:
+            no_improv += 1
+
+        if no_improv >= no_improv_break:
+            # Conclude success, break the loop
+            if verbose:
+                print('No improvement registered for {} rounds,'.format(
+                      no_improv_break) + 'concluding succesful convergence')
+            break
+        # step 1
+        a_k = a/(iters+A)**alpha
+        c_k = c/iters**gamma
+        # step 2
+        delta = np.where(np.random.rand(dim) > p, 1, -1)
+        # step 3
+        x_plus = x+c_k*delta
+        x_minus = x-c_k*delta
+        y_plus = fun(x_plus)
+        y_minus = fun(x_minus)
+        # res.append([x_plus, y_plus])
+        # res.append([x_minus, y_minus])
+        # step 4
+        gradient = (y_plus-y_minus)/(2.*c_k*delta)
+        # step 5
+        x = x-a_k*gradient
+        x = np.where(x < ctrl_min, ctrl_min, x)
+        x = np.where(x > ctrl_max, ctrl_max, x)
+        score = fun(x)
+        res.append([x, score])
+
+    # once the loop is broken evaluate the final value one more time as
+    # verification
+    fun(res[0][0])
+    return res[0]
