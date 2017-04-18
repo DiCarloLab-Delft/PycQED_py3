@@ -61,7 +61,7 @@ class Test_single_qubit_seqs(TestCase):
             """
             amp = float(amp)
             codeword = int((amp-min_amp)/(max_amp - min_amp) * 127)
-            return 'Trigger {:07b}, 2 , \n'.format(codeword)
+            return 'Trigger {:07b}, 2 \n'.format(codeword)
         self.operation_dict['Rx {}'.format(self.qubit_name)] = {
             'instruction': Rx_codeword, 'duration': 2}
 
@@ -78,7 +78,7 @@ class Test_single_qubit_seqs(TestCase):
             """
             phase = float(phase)  # input is in degrees
             codeword = int(phase/10+10)  # resolution will be up to 10 deg
-            return 'Trigger {:07b}, 2 , \n'.format(codeword)
+            return 'Trigger {:07b}, 2 \n'.format(codeword)
 
         self.operation_dict['R90_phi {}'.format(self.qubit_name)] = {
             'instruction': Rphi_codeword, 'duration': 2}
@@ -337,7 +337,7 @@ class Test_qasm_to_asm(TestCase):
             """
             amp = float(amp)
             codeword = int((amp-min_amp)/(max_amp - min_amp) * 127)
-            return 'Trigger {:07b}, 2 , \n'.format(codeword)
+            return 'Trigger {:07b}, 2 \n'.format(codeword)
 
         ext_op_dict['Rx'] = {
             self.qubit_name: {'instruction': Rx_codeword,
