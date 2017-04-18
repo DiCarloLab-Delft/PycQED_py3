@@ -433,10 +433,10 @@ class Transmon(Qubit):
             # Decide which quadrature to take by comparing the contrast
             if take_fit_I:
                 ampl = abs(a.fit_res[0].params['period'].value)/2.
-            elif (np.abs(max(a.fit_res[0].data) -
-                         min(a.fit_res[0].data))) > (
-                    np.abs(max(a.fit_res[1].data) -
-                           min(a.fit_res[1].data))):
+            elif (np.abs(max(a.measured_values[0]) -
+                         min(a.measured_values[0]))) > (
+                    np.abs(max(a.measured_values[1]) -
+                           min(a.measured_values[1]))):
                 ampl = a.fit_res[0].params['period'].value/2.
             else:
                 ampl = a.fit_res[1].params['period'].value/2.
@@ -457,10 +457,10 @@ class Transmon(Qubit):
                 # Decide which quadrature to take by comparing the contrast
                 if take_fit_I:
                     ampl = a.fit_res[0].params['x0'].value
-                elif (np.abs(max(a.fit_res[0].data) -
-                             min(a.fit_res[0].data))) > (
-                      np.abs(max(a.fit_res[1].data) -
-                             min(a.fit_res[1].data))):
+                elif (np.abs(max(a.measured_values[0]) -
+                             min(a.measured_values[0]))) > (
+                      np.abs(max(a.measured_values[1]) -
+                             min(a.measured_values[1]))):
                     ampl = a.fit_res[0].params['x0'].value
                 else:
                     ampl = a.fit_res[1].params['x0'].value
@@ -473,10 +473,10 @@ class Transmon(Qubit):
                     # Decide which quadrature to take by comparing the contrast
                     if take_fit_I:
                         ampl = a.fit_res[0].params['x0'].value
-                    elif (np.abs(max(a.fit_res[0].data) -
-                                 min(a.fit_res[0].data))) > (
-                          np.abs(max(a.fit_res[1].data) -
-                                 min(a.fit_res[1].data))):
+                    elif (np.abs(max(a.measured_values[0]) -
+                                 min(a.measured_values[0]))) > (
+                          np.abs(max(a.measured_values[1]) -
+                                 min(a.measured_values[1]))):
                         ampl = a.fit_res[0].params['x0'].value
                     else:
                         ampl = a.fit_res[1].params['x0'].value
