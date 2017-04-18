@@ -1,0 +1,38 @@
+# auto-generated micro code from rb.qasm
+mov r11, 0       # counter
+mov r3,  100     # max iterations
+rb1:
+     wait 100
+     trigger 1111111, 50
+     # wait 20000   # prepz q0
+
+     pulse 1011 1011 1011     # X90
+     wait 4
+     pulse 1100 1100 1100     # Y90
+     wait 5
+     # pulse 1101 1101 1101     # mX90
+     # wait 10
+     # pulse 1001 1001 1001     # X180
+     # wait 10
+     # pulse 1010 1010 1010     # Y180
+     # wait 10
+     # pulse 1001 1001 1001     # X180
+     # wait 10
+     # pulse 1010 1010 1010     # Y180
+     # wait 10
+     # pulse 1011 1011 1011     # X90
+     # wait 10
+     # pulse 1110 1110 1110     # mY90
+     # wait 10
+     # pulse 1101 1101 1101     # mX90
+     # wait 10
+
+     # trigger 1000000, 300
+     # measure
+     # wait 200
+     addi r11, r11, 1   # increment counter
+     bne  r11, r3, rb1  # increment counter
+     bne  r3, r3, rb1  # infinite loop
+
+# In this testbench, in the first around 55us, you could see all the waveforms generated repeatedly.
+# After 55us, the original code run out. Only maker[6] will be high every 5us.
