@@ -415,7 +415,7 @@ def Ram_Z(qubit_name, wait_before, wait_between):
 
     qasm_file.writelines('\ninit_all\n')
 
-    qasm_file.writelines('QWG trigger \n'.format(qubit_name))
+    qasm_file.writelines('QWG trigger \n')
     qasm_file.writelines('I {} {}\n'.format(qubit_name, wait_before))
     qasm_file.writelines('mX90 {}\n'.format(qubit_name))
     qasm_file.writelines('I {} {}\n'.format(qubit_name, wait_between))

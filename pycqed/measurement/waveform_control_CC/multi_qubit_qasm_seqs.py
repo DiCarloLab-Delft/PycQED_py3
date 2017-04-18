@@ -226,7 +226,7 @@ def chevron_seq(q0, q1, excite_q1=False, wait_time=400, RO_target='all'):
     qasm_file.writelines('X180 {}\n'.format(q0))
     if excite_q1:
         qasm_file.writelines('X180 {}\n'.format(q1))
-    qasm_file.writelines('Trigger QWG\n')
+    qasm_file.writelines('QWG trigger\n')
     qasm_file.writelines('I {} {}\n'.format(q1, wait_time))
 
     qasm_file.writelines('RO {} \n'.format(RO_target))
@@ -263,7 +263,7 @@ def CZ_calibration_seq(q0, q1, RO_target='all',
     if excite_q1 is True or excite_q1 is 'both_cases':
         qasm_file.writelines('X180 {}\n'.format(q1))
     qasm_file.writelines('mY90 {}\n'.format(q0))
-    qasm_file.writelines('Trigger QWG\n')
+    qasm_file.writelines('QWG trigger\n')
     qasm_file.writelines('I {} {}\n'.format(q0, wait_time))
     qasm_file.writelines('recX90 {}\n'.format(q0))
 
