@@ -189,10 +189,18 @@ class QuTech_AWG_Module(SCPI):
                           call_cmd='QUTEch:OUTPut:SYNCsideband',
                           docstring=doc_sSG)
         # command is run but using start and stop because
-        self.add_function('start',
-                          call_cmd='awgcontrol:run:immediate')
+        # FIXME: replace custom start function when proper error message has
+        # been implemented.
+        # self.add_function('start',
+        #                   call_cmd='awgcontrol:run:immediate')
         self.add_function('stop',
                           call_cmd='awgcontrol:stop:immediate')
+
+    def start(self):
+        run_mode = self.run_mode()
+        if run_mode == 'NONE':
+            raise RuntimeError('No run mode is specified')
+        self.write('awgcontrol:run:immediate')
 
     def _setMatrix(self, chPair, mat):
         '''
@@ -368,8 +376,8 @@ class QuTech_AWG_Module(SCPI):
         wv_val = vals.Arrays(min_value=-1, max_value=1)
         wv_val.validate(waveform)
 
-        # maxWaveLen = 65532 # FIXME: this is the hardware max
-        maxWaveLen = 32000  # This is a current max until issue #63 is resolved
+        maxWaveLen = 2**17-4  # FIXME: this is the hardware max
+
         waveLen = len(waveform)
         if waveLen > maxWaveLen:
             raise ValueError('Waveform length ({}) must be < {}'.format(

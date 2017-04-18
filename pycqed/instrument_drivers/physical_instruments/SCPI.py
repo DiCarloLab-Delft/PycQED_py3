@@ -50,7 +50,15 @@ class SCPI(IPInstrument):
     ###
 
     def readBinary(self, size):
-        return self._socket.recv(size)  # FIXME: should be in parent class
+        data = self._socket.recv(size)
+        actLen = len(data)
+        expLen = size
+        i = 1
+        while (actLen != expLen):
+            data += self._socket.recv(expLen-actLen)
+            actLen = len(data)
+            i = i+1
+        return data
 
     def writeBinary(self, binMsg):
         self._socket.send(binMsg)       # FIXME: should be in parent class

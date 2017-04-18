@@ -6,6 +6,7 @@ from qcodes.utils import validators as vals
 import logging
 from pycqed.measurement.waveform_control_CC import waveform as wf
 import unittest
+from pycqed.instrument_drivers.pq_parameters import InstrumentParameter
 import matplotlib.pyplot as plt
 import imp
 imp.reload(wf)
@@ -13,7 +14,7 @@ imp.reload(wf)
 global lm  # Global used for passing value to the testsuite
 
 
-class QuTech_ControlBox_LookuptableManager(Instrument):
+class ControlBox_LookuptableManager(Instrument):
 
     '''
     meta-instrument that handles loading pulses into the CBox lookuptables
@@ -27,14 +28,18 @@ class QuTech_ControlBox_LookuptableManager(Instrument):
         Convert all units to SI (s and Hz instead of ns and GHz)
     Note: I did not port over the depletion pulses (MAR 7-1-2016)
     '''
-    shared_kwargs = ['CBox']
-
-    def __init__(self, name, CBox, **kw):
+    def __init__(self, name, **kw):
 
         logging.info(__name__ + ' : Initializing instrument')
         super().__init__(name, **kw)
 
-        self.CBox = CBox
+        self.add_parameter('CBox',
+                           parameter_class=InstrumentParameter)
+
+        self.add_parameter('awg_nr',
+                           vals=vals.Ints(0,2),
+                           initial_value=0,
+                           parameter_class=ManualParameter)
 
         self.add_parameter('Q_amp180',
                            unit='V',
@@ -285,12 +290,12 @@ class QuTech_ControlBox_LookuptableManager(Instrument):
         if reload_pulses:
             self.generate_standard_pulses()
         fig, ax = plt.subplots(1, 1)
-        if time_units == 'lut_index':
+        if time_unit == 'lut_index':
             x = np.arange(len(self._wave_dict[wave_name][0]))
             ax.set_xlabel('Lookuptable index (i)')
             ax.vlines(
                 128, self._voltage_min, self._voltage_max, linestyle='--')
-        elif time_units == 's':
+        elif time_unit == 's':
             x = (np.arange(len(self._wave_dict[wave_name][0]))
                  / self.sampling_rate.get())
             ax.set_xlabel('time (s)')
@@ -332,17 +337,17 @@ class QuTech_ControlBox_LookuptableManager(Instrument):
              (0, 1/self.get('mixer_alpha') * 1/np.cos(self.get('mixer_phi')*2*np.pi/360))))
         return mixer_pre_distortion_matrix
 
-    def load_pulses_onto_AWG_lookuptable(self, awg_nr):
+    def load_pulses_onto_AWG_lookuptable(self):
         '''
         Loads the pulses to the lookuptables, it uses the lut_mapping to
         determine what pulse to load to which lookuptable.
         '''
         self.generate_standard_pulses()
         for i, pulse_name in enumerate(self.get('lut_mapping')):
-            self.load_pulse_onto_AWG_lookuptable(pulse_name, int(awg_nr),
+            self.load_pulse_onto_AWG_lookuptable(pulse_name,
                                                  regenerate_pulses=False)
 
-    def load_pulse_onto_AWG_lookuptable(self, pulse_name, awg_nr,
+    def load_pulse_onto_AWG_lookuptable(self, pulse_name,
                                         regenerate_pulses=True):
         '''
         Load a pulses to the lookuptable, it uses the lut_mapping to
@@ -363,6 +368,8 @@ class QuTech_ControlBox_LookuptableManager(Instrument):
         indices = [i for i, x in enumerate(self.get('lut_mapping')) if
                    x == pulse_name]
         for i in indices:
-            self.CBox.set_awg_lookuptable(int(awg_nr), int(i), I_ch, I_wave)
-            self.CBox.set_awg_lookuptable(int(awg_nr), int(i), Q_ch, Q_wave)
+            self.CBox.get_instr().set_awg_lookuptable(self.awg_nr(),
+                                                      int(i), I_ch, I_wave)
+            self.CBox.get_instr().set_awg_lookuptable(self.awg_nr(),
+                                                      int(i), Q_ch, Q_wave)
 

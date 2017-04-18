@@ -1,0 +1,31 @@
+mov r0, 0
+mov r1, 100
+mov r2, 200
+mov r3, 400
+mov r4, 1000
+mov r5, 3000
+mov r6, 0
+mov r7, 0
+mov r8, 0
+
+add r6, r1, r2
+add r7, r6, r2
+
+start:
+	wait 100
+	addi, r8, r8, 1
+	beq r0, r0, start
+	trigger 1111111, 10
+
+
+## In this simulation, you should see registers are updated one by one:
+# r0: 0
+# r1: 100
+# r2: 200
+# r3: 400
+# r4: 1000
+# r5: 3000
+# r6: 300
+# r7: 500
+# Then you will see r8 increments. After some time, it increments by one every 500ns.
+# NOTE: no trigger output should be watched.
