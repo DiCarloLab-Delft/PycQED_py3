@@ -16,9 +16,6 @@ from qcodes import validators as vals
 import logging
 import time
 
-#logging.warning('my warning ')
-#logging.info('my info ')
-
 
 class DDMq(SCPI):
 
@@ -39,10 +36,11 @@ class DDMq(SCPI):
 
         for i in range(self.device_descriptor.numChannels//2):
             """
-            Channel pair is 2 channel pysically binded in DDM. It can be refered to
-            ADC1=ch_pair1 (ch1 and ch2 ) and ADC2=ch_pair2(ch3 and ch4) board
-            For the user of DDM, ch_pair means a common paramenter (function,method)
-            for two of the channels either for ch1,ch2 or ch3,ch4.
+            Channel pair is 2 channel pysically binded in DDM. It can be
+            referred to ADC1=ch_pair1 (ch1 and ch2 ) and
+            ADC2=ch_pair2(ch3 and ch4) board For the user of DDM, ch_pair
+            means a common paramenter (function,method) for two of the
+            channels either for ch1,ch2 or ch3,ch4.
             """
             ch_pair = i+1
             srun_cmd = 'qutech:run{}'.format(ch_pair)
@@ -61,13 +59,12 @@ class DDMq(SCPI):
                                )
             self.add_parameter('ch_pair{}_status'.format(ch_pair),
                                label=('Get status '),
-                               docstring='It returns status on Over range, under range on DI and DQ '+
+                               docstring='It returns status on Over range, under range on DI and DQ ' +
                                'FPGA clock, Calbration status( in case if is being calibrated it will show the warning,)' +
-                               'False Trigge for input averaging and integration.',
+                               'False Trigger for input averaging and integration.',
                                get_cmd=self._gen_ch_get_func(
                                    self._getADCstatus, ch_pair)
                                )
-             
 
             scaladc_cmd = 'qutech:adc{}:cal'.format(ch_pair)
             self.add_parameter('ch_pair{}_cal_adc'.format(ch_pair),
@@ -200,11 +197,11 @@ class DDMq(SCPI):
             self.add_parameter('ch_pair{}_logging_enable'.format(ch_pair),
                                label=('Enable logging mode' +
                                       'ch_pair {} all weights'.format(ch_pair)),
-                                docstring='It enables the Logging functionality ' +
+                               docstring='It enables the Logging functionality ' +
                                'for all weight pairs within one ch_pair.  ' +
                                'It is required to enable it prior to run command.' +
-                               'Otherwise old data will be read out'+
-                               'To enable mode paramentr should be set to 1'+
+                               'Otherwise old data will be read out' +
+                               'To enable mode paramentr should be set to 1' +
                                'To disable mode paramentr should be set to 0.',
                                get_cmd=slogenall_cmd + '?',
                                set_cmd=slogenall_cmd + ' {}',
@@ -232,11 +229,11 @@ class DDMq(SCPI):
             self.add_parameter('ch_pair{}_err_fract_enable'.format(ch_pair),
                                label=('Enable error fraction mode' +
                                       'ch_pair {} all weights '.format(ch_pair)),
-                                docstring='It enables the   Error Fraction counter functionality ' +
+                               docstring='It enables the   Error Fraction counter functionality ' +
                                'for all weight pairs within one ch_pair.  ' +
                                'It is required to enable it prior to run command.' +
-                               'Otherwise old data will be read out'+
-                               'To enable mode paramentr should be set to 1'+
+                               'Otherwise old data will be read out' +
+                               'To enable mode paramentr should be set to 1' +
                                'To disable mode paramentr should be set to 0.',
                                get_cmd=serrfarcten_cmd + '?',
                                set_cmd=serrfarcten_cmd + ' {}',
@@ -264,7 +261,7 @@ class DDMq(SCPI):
                                'Next0: Next state when in ‘0’' +
                                'Specifies the expected next state when the current state is ‘0’.' +
                                'Next1: Next state when in ‘1’' +
-                               'Specifies the expected next state when the current state is ‘1’.' ,
+                               'Specifies the expected next state when the current state is ‘1’.',
                                set_cmd=self._gen_ch_set_func(
                                    self._sendErrFractSglQbitPatternAll, ch_pair),
                                get_cmd=self._gen_ch_get_func(
@@ -283,8 +280,8 @@ class DDMq(SCPI):
                                    label=('Enable wighted integral' +
                                           'ch_pair {} weight {}'.format(ch_pair, wNr)),
                                    docstring='  ' +
-                                    '' +
-                                    ' ',
+                                   '' +
+                                   ' ',
                                    get_cmd=swinten_cmd + '?',
                                    set_cmd=swinten_cmd + ' {}',
                                    vals=vals.Numbers(0, 1)
@@ -449,7 +446,7 @@ class DDMq(SCPI):
                                    docstring='It returns tvmode data after thresholding written to TVmode' +
                                    'memory after measuremnet and not averaged. ' +
                                    'Every weight pair has only one TV mode memory' +
-                                   'It can be used either I or Q '+
+                                   'It can be used either I or Q ' +
                                    'Foramt is float containg 0s and 1s ',
                                    get_cmd=self._gen_ch_weight_get_func(
                                    self._getQstateCNT, ch_pair, wNr),
@@ -463,7 +460,7 @@ class DDMq(SCPI):
                                    'memory after measuremnet and already averaged  ' +
                                    'with preset number of averages. ' +
                                    'Every weight pair has only one TV mode memory' +
-                                   'It can be used either I or Q '+
+                                   'It can be used either I or Q ' +
                                    'Format is float containg numbers between 0 and 1 ',
                                    get_cmd=self._gen_ch_weight_get_func(
                     self._getQstateAVG, ch_pair, wNr),
@@ -507,7 +504,7 @@ class DDMq(SCPI):
                                    'memory after measuremnet. It is up to 8192 shots' +
                                    'with preset number of shots. ' +
                                    'Every weight pair has only one TV mode memory' +
-                                   'It can be used either I or Q '+
+                                   'It can be used either I or Q ' +
                                    'Foramt is float containg 0s and 1s ',
                                    get_cmd=self._gen_ch_weight_get_func(
                                        self._getLoggingInt, ch_pair, wNr),
@@ -520,8 +517,8 @@ class DDMq(SCPI):
                                    'memory after measuremnet. It is up to 8192 shots' +
                                    'with preset number of shots. ' +
                                    'Every weight pair has only one TV mode memory' +
-                                   'It can be used either I or Q '+
-                                   'Foramt is float containg 0s and 1s ', 
+                                   'It can be used either I or Q ' +
+                                   'Foramt is float containg 0s and 1s ',
                                    get_cmd=self._gen_ch_weight_get_func(
                                        self._getLoggingQstate, ch_pair, wNr),
 
@@ -603,15 +600,14 @@ class DDMq(SCPI):
                                label=('Rotated integration result of' +
                                       'channel {} '.format(ch)),
                                docstring='Not used  ' +
-                                   '' +
-                                   ' ',
+                               '' +
+                               ' ',
                                get_cmd=srotres_cmd + '?'
-                               # vals=vals.Numbers(-134217728,134217727)
                                )
             for i in range(self.device_descriptor.numWeights):
                 wNr = i+1
                 self.add_parameter('ch{}_weight{}_data'.format(ch, wNr),
-                                   label=('Get weight data channel {}'.format(ch ) +
+                                   label=('Get weight data channel {}'.format(ch) +
                                           'weight number {}  '.format(wNr)),
                                    docstring='It set a weight up 4096 samples (8 us) per channel  ' +
                                    'and weight pair. It is int8 integer between -128 to 127' +
@@ -631,18 +627,14 @@ class DDMq(SCPI):
             if (finished == 'ffffffff'):
                 logging.warning('Trigger is not received: DDM timeout')
                 break
-        # print(finished)
         self.write('qutech:inputavg{:d}:data? '.format(ch))
         binBlock = self.binBlockRead()
-        #print('inputavgLen in bytes {:d}'.format(len(binBlock)))
         inputavg = np.frombuffer(binBlock, dtype=np.float32)
         return inputavg
 
     def _getTVdata(self, ch_pair, wNr):
         finished = 0
-        #complete = 0
-        # while (complete != '1'):
-        #    complete = self._getTVpercentage(ch_pair)
+
         while (finished != '1'):
             finished = self._getTVFinished(ch_pair, wNr)
             if (finished == 'ffffffff'):
@@ -650,7 +642,6 @@ class DDMq(SCPI):
                 break
         self.write('qutech:tvmode{:d}:data{:d}? '.format(ch_pair, wNr))
         binBlock = self.binBlockRead()
-        #print('TV data in bytes {:d}'.format(len(binBlock)))
         tvmodedata = np.frombuffer(binBlock, dtype=np.float32)
         return tvmodedata
 
@@ -672,15 +663,11 @@ class DDMq(SCPI):
 
         self.write('qutech:wint{:d}:data{:d}? '.format(ch, wNr))
         binBlock = self.binBlockRead()
-        #print('Weight data in bytes {:d}'.format(len(binBlock)))
         weightdata = np.frombuffer(binBlock, dtype=np.int8)
         return weightdata
 
     def _getQstateCNT(self, ch_pair, wNr):
         finished = 0
-        #complete = 0
-        # while (complete != '1'):
-        #    complete = self._getTVpercentage(ch_pair)
         while (finished != '1'):
             finished = self._getTVFinished(ch_pair, wNr)
             if (finished == 'ffffffff'):
@@ -689,15 +676,11 @@ class DDMq(SCPI):
 
         self.write('qutech:qstate{:d}:data{:d}:counter? '.format(ch_pair, wNr))
         binBlock = self.binBlockRead()
-        #print('Qu state counter {:d}'.format(len(binBlock)))
         qstatecnt = np.frombuffer(binBlock, dtype=np.float32)
         return qstatecnt
 
     def _getQstateAVG(self, ch_pair, wNr):
         finished = 0
-        #complete = 0
-        # while (complete != '1'):
-        #    complete = self._getTVpercentage(ch_pair)
         while (finished != '1'):
             finished = self._getTVFinished(ch_pair, wNr)
             if (finished == 'ffffffff'):
@@ -705,15 +688,11 @@ class DDMq(SCPI):
                 break
         self.write('qutech:qstate{:d}:data{:d}:average? '.format(ch_pair, wNr))
         binBlock = self.binBlockRead()
-        #print('Qu state average {:d}'.format(len(binBlock)))
         qstateavg = np.frombuffer(binBlock, dtype=np.float32)
         return qstateavg
 
     def _getLoggingInt(self, ch_pair, wNr):
         finished = 0
-        #complete = 0
-        # while (complete != '1'):
-        #    complete = self._getTVpercentage(ch_pair)
         while (finished != '1'):
             finished = self._getLoggingFinished(ch_pair, wNr)
             if (finished == 'ffffffff'):
@@ -721,15 +700,11 @@ class DDMq(SCPI):
                 break
         self.write('qutech:logging{:d}:data{:d}:int? '.format(ch_pair, wNr))
         binBlock = self.binBlockRead()
-        #print('Qu state average {:d}'.format(len(binBlock)))
         intlogging = np.frombuffer(binBlock, dtype=np.float32)
         return intlogging
 
     def _getLoggingQstate(self, ch_pair, wNr):
         finished = 0
-        #complete = 0
-        # while (complete != '1'):
-        #    complete = self._getTVpercentage(ch_pair)
         while (finished != '1'):
             finished = self._getLoggingFinished(ch_pair, wNr)
             if (finished == 'ffffffff'):
@@ -737,13 +712,12 @@ class DDMq(SCPI):
                 break
         self.write('qutech:logging{:d}:data{:d}:qstate? '.format(ch_pair, wNr))
         binBlock = self.binBlockRead()
-        #print('Qu state average {:d}'.format(len(binBlock)))
         qstatelogging = np.frombuffer(binBlock, dtype=np.float32)
         return qstatelogging
-    '''
-    Input averaging
-    '''
 
+    #################
+    ##Input averaging
+    #################
     def _getInAvgStatus(self, ch_pair):
         return self.ask('qutech:inputavg{:d}:status? '.format(ch_pair))
 
@@ -754,10 +728,10 @@ class DDMq(SCPI):
 
     def _getInAvgBusy(self, ch_pair):
         return self.ask('qutech:inputavg{:d}:busy? '.format(ch_pair))
-    '''
-    TV MODe
-    '''
 
+    #################
+    ##TV MODe
+    #################
     def _getTVStatus(self, ch_pair, wNr):
         return self.ask('qutech:tvmode{:d}:status{:d}? '.format(ch_pair, wNr))
 
@@ -772,10 +746,10 @@ class DDMq(SCPI):
 
     def _getTVpercentage(self, ch_pair, wNr):
         return self.ask('qutech:tvmode{:d}:percentage{:d}? '.format(ch_pair, wNr))
-    '''
-    Logging
-    '''
 
+    #################
+    ##Logging
+    #################
     def _getLoggingFinished(self, ch_pair, wNr):
         finished = self.ask(
             'qutech:logging{:d}:finished{:d}? '.format(ch_pair, wNr))
@@ -790,10 +764,10 @@ class DDMq(SCPI):
 
     def _getLoggingStatus(self, ch_pair, wNr):
         return self.ask('qutech:errorfraction{:d}:status{:d}? '.format(ch_pair, wNr))
-    '''
-    Error fraction counters
-    '''
 
+    #########################
+    ##Error fraction counters
+    #########################
     def _sendErrFractSglQbitPatternAll(self, ch_pair, pattern):
         self.write('qutech:errorfraction{:d}:pattern:all {:d},{:d}'.format(
                    ch_pair, pattern[0], pattern[1]))
@@ -820,9 +794,6 @@ class DDMq(SCPI):
 
     def _getErrFractCnt(self, ch_pair, wNr):
         finished = 0
-        #complete = 0
-        # while (complete != '1'):
-        #    complete = self._getTVpercentage(ch_pair)
         while (finished != '1'):
             finished = self._getErrFractFinished(ch_pair, wNr)
             if (finished == 'ffffffff'):
@@ -830,7 +801,6 @@ class DDMq(SCPI):
                 break
         self.write('qutech:errorfraction{:d}:data{:d}? '.format(ch_pair, wNr))
         binBlock = self.binBlockRead()
-        #print('Qu state average {:d}'.format(len(binBlock)))
         errfractioncnt = np.frombuffer(binBlock, dtype=np.int32)
         print('NoErrorCounterReg    = {:d}'.format(errfractioncnt[0]))
         print('SingleErrorCounterReg= {:d}'.format(errfractioncnt[1]))
@@ -862,9 +832,11 @@ class DDMq(SCPI):
         inavgstatus = self._getInAvgStatus(ch_pair)
         inavgstatusstr = format(np.int32(inavgstatus), 'b').zfill(32)
         reverseinavgstatus = inavgstatusstr[::-1]
-        statuswint = self.ask('qutech:wint{:d}:status{:d}?'.format(ch_pair, 1))# only first weight pair is checked
+        # only first weight pair is checked
+        statuswint = self.ask('qutech:wint{:d}:status{:d}?'.format(ch_pair, 1))
         statuswintstr = format(int(statuswint), 'b').zfill(32)
         reversestatuswintstr = statuswintstr[::-1]
+
         def _DI():
             if (reversestatusstr[0] == '1'):
                 logging.warning('\nOver range on DI input. ')
@@ -883,14 +855,14 @@ class DDMq(SCPI):
                                 ' Input signal is less than 25% of ADC resolution. ')
             else:
                 print("\nDQ input is Okay.")
-            return None 
+            return None
 
         def _DCLK_PLL_LOCKED():
             if (reversestatusstr[4] == '1'):
                 print("\nDCLK PLL has a phase lock. There is an ADC clock.")
             else:
                 print("\nThere is no ADC clock.")
-            return None 
+            return None
 
         def _CalRun():
             if (reversestatusstr[5] == '1'):
@@ -905,7 +877,7 @@ class DDMq(SCPI):
                                 "\nThe logic will ignore this (false) trigger." +
                                 "\nIndication that a trigger was received while the ADC samples" +
                                 "\nof a previous scan were still being processed. ")
-                
+
             if (reversestatuswintstr[20] == '1'):
                 logging.warning("\nFalse Trigger on DI channel." +
                                 "\nThe logic will ignore this (false) trigger." +
@@ -919,53 +891,59 @@ class DDMq(SCPI):
 
             else:
                 print("\nNo false trigger.Trigger period is okay.")
-            return None    
+            return None
         ADCstatus = {0: _DI,
                      1: _DQ,
                      2: _DCLK_PLL_LOCKED,
                      3: _CalRun,
                      4: _FalseTrig
                      }
-  
+
         for x in range(0, 5):
             print(ADCstatus[x]())
-        return  None
-        #return None
+        return None
+        # return None
 
     # Get threshold value form channel pair, weight number(qubit)
     def _getTHL(self, ch_pair, weight_nr):
         ret = self.ask(
             'qutech:qstate{}:threshold{:d}?'.format(ch_pair, weight_nr))
         return ret
+
     # to be able to set ch/ch_pair in getcmd
     def _gen_ch_get_func(self, fun, ch):
         def get_func():
             return fun(ch)
         return get_func
+
     # to be able to set ch/ch_pair  in setcmd
     def _gen_ch_set_func(self, fun, ch):
         def set_func(val):
             return fun(ch, val)
         return set_func
+
     # to be able to set ch/ch_pair and weight(qbit) number in getcmd
     def _gen_ch_weight_get_func(self, fun, ch, wNr):
         def get_func():
             return fun(ch, wNr)
         return get_func
+
     # to be able to set ch/ch_pair and weight(qbit) number in setcmd
     def _gen_ch_weight_set_func(self, fun, ch, wNr):
         def set_func(val):
             return fun(ch, wNr, val)
         return set_func
+
     # get time on DDM (Linux kernel clock)
     def get_time(self):
         timesec = self.ask('system:time?')
         return int(timesec)
+
     # set time on DDM (Linux kernel clock)
     def set_time(self, timesec):
         self.write('system:time {:d}'.format(timesec))
-    
-    # Overloding get_idn function to format DDM versions  
+
+    # Overloding get_idn function to format DDM versions
     def get_idn(self):
         try:
             idstr = ''  # in case self.ask fails
@@ -982,7 +960,7 @@ class DDMq(SCPI):
                 idparts += [None] * (9 - len(idparts))
             for i in range(0, 9):
                 idparts[i] = idparts[i].split('=')[1]
-        except:
+        except Exception:
             logging.warn('Error getting or interpreting *IDN?: ' + repr(idstr))
             idparts = [None, None, None, None, None, None]
 
@@ -993,7 +971,6 @@ class DDMq(SCPI):
         return dict(zip(('vendor', 'model', 'serial', 'fwVersion', 'fwBuild',
                          'swVersion', 'swBuild', 'kmodVersion',
                          'kmodBuild'), idparts))
-        print(idparts)
 
     def connect_message(self, idn_param='IDN', begin_time=None):
         idn = {'vendor': None, 'model': None,
@@ -1009,7 +986,7 @@ class DDMq(SCPI):
                    'in {t:.2f}s'.format(t=t, **idn))
         print(con_msg)
 
-    #initialization functions
+    # initialization functions
     def prepare_SSB_weight_and_rotation(self, IF,
                                         weight_function_I=1,
                                         weight_function_Q=2):
@@ -1017,18 +994,18 @@ class DDMq(SCPI):
         tbase = np.arange(0, trace_length/5e8, 1/5e8)
         cosI = 127*np.array(np.cos(2*np.pi*IF*tbase))
         sinI = 127*np.array(np.sin(2*np.pi*IF*tbase))
-        #first pair
-        eval('self.ch1_weight{}_data(np.array(cosI))'.format(weight_function_I))
-        eval('self.ch2_weight{}_data(np.array(sinI))'.format(weight_function_I))
-        #second pair
-        eval('self.ch1_weight{}_data(np.array(sinI))'.format(weight_function_Q))
-        eval('self.ch2_weight{}_data(np.array(cosI))'.format(weight_function_Q))
+        # first pair
+        self.set('ch1_weight{}_data'.format(weight_function_I), np.array(cosI))
+        self.set('ch2_weight{}_data'.format(weight_function_I), np.array(sinI))
+        # second pair
+        self.set('ch1_weight{}_data'.format(weight_function_Q), np.array(sinI))
+        self.set('ch2_weight{}_data'.format(weight_function_Q), np.array(cosI))
 
-        #setting the rotation matrices... very danagerous
-        eval('self.ch_pair1_weight{}_rotmat_rotmat00(1)'.format(weight_function_I))
-        eval('self.ch_pair1_weight{}_rotmat_rotmat01(1)'.format(weight_function_I))
-        eval('self.ch_pair1_weight{}_rotmat_rotmat00(-1)'.format(weight_function_Q))
-        eval('self.ch_pair1_weight{}_rotmat_rotmat01(1)'.format(weight_function_Q))
+        # setting the rotation matrices... very danagerous
+        self.set('ch_pair1_weight{}_rotmat_rotmat00'.format(weight_function_I), 1)
+        self.set('ch_pair1_weight{}_rotmat_rotmat01'.format(weight_function_I), 1)
+        self.set('ch_pair1_weight{}_rotmat_rotmat00'.format(weight_function_Q), -1)
+        self.set('ch_pair1_weight{}_rotmat_rotmat01'.format(weight_function_Q), 1)
 
     def prepare_DSB_weight_and_rotation(self, IF,
                                         weight_function_I=1,
@@ -1037,22 +1014,19 @@ class DDMq(SCPI):
         tbase = np.arange(0, trace_length/5e8, 1/5e8)
         cosI = 127*np.array(np.cos(2*np.pi*IF*tbase))
         sinI = 127*np.array(np.sin(2*np.pi*IF*tbase))
-        #first pair
-        eval('self.ch1_weight{}_data(np.array(cosI))'.format(weight_function_I))
-        eval('self.ch2_weight{}_data(np.array(sinI))'.format(weight_function_I))
-        #second pair
-        eval('self.ch1_weight{}_data(np.array(sinI))'.format(weight_function_Q))
-        eval('self.ch2_weight{}_data(np.array(cosI))'.format(weight_function_Q))
 
-        #setting the rotation matrices... very danagerous
-        eval('self.ch_pair1_weight{}_rotmat_rotmat00(1)'.format(weight_function_I))
-        eval('self.ch_pair1_weight{}_rotmat_rotmat01(0)'.format(weight_function_I))
-        eval('self.ch_pair1_weight{}_rotmat_rotmat00(1)'.format(weight_function_Q))
-        eval('self.ch_pair1_weight{}_rotmat_rotmat01(0)'.format(weight_function_Q))
+        # first pair
+        self.set('ch1_weight{}_data'.format(weight_function_I), np.array(cosI))
+        self.set('ch2_weight{}_data'.format(weight_function_I), np.array(sinI))
+        # second pair
+        self.set('ch1_weight{}_data'.format(weight_function_Q), np.array(sinI))
+        self.set('ch2_weight{}_data'.format(weight_function_Q), np.array(cosI))
 
-
-
-
+        # setting the rotation matrices... very danagerous
+        self.set('ch_pair1_weight{}_rotmat_rotmat00'.format(weight_function_I), 1)
+        self.set('ch_pair1_weight{}_rotmat_rotmat01'.format(weight_function_I), 0)
+        self.set('ch_pair1_weight{}_rotmat_rotmat00'.format(weight_function_Q), 1)
+        self.set('ch_pair1_weight{}_rotmat_rotmat01'.format(weight_function_Q), 0)
 
 
 # @ NIKITA LOOK HERE!
@@ -1122,5 +1096,3 @@ class MyCustomValidator(vals.Validator):
         maxv = self._max_value if math.isfinite(self._max_value) else None
         return '<Arrays{}, shape: {}>'.format(range_str(minv, maxv, 'v'),
                                               self._shape)
-
-
