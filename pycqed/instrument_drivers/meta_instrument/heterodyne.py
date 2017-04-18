@@ -399,6 +399,10 @@ class HeterodyneInstrument(Instrument):
     def _get_acq_marker_channels(self):
         return self._acq_marker_channels
 
+    def finish(self):
+        if 'UHFQC' in self.acquisition_instr():
+            self._acquisition_instr.acquisition_finalize()
+
     def get_demod_array(self):
         return self.cosI, self.sinI
 
@@ -468,7 +472,6 @@ class LO_modulated_Heterodyne(HeterodyneInstrument):
         self.acquisition_delay(200e-9)
         self._I_channel = 'ch3'
         self._Q_channel = 'ch4'
-
 
     def prepare(self, get_t_base=True):
         # Preparing the acquisition instruments
