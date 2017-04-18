@@ -1,6 +1,5 @@
 from pycqed.utilities.general import mopen
 from os.path import join, dirname
-
 base_qasm_path = join(dirname(__file__), 'qasm_files')
 
 
@@ -199,5 +198,76 @@ def two_qubit_AllXY(q0, q1, RO_target='all',
             qasm_file.writelines('RO {}  \n'.format(RO_target))
 
     qasm_file.close()
+    return qasm_file
 
+
+def chevron_seq(q0, q1, excite_q1=False, wait_time=400, RO_target='all'):
+    '''
+    Single chevron sequence that does a swap on |01> <-> |10> or |11> <-> |20>.
+
+    Timing of the sequence:
+        X180 q0 -- trigger flux pulse -- RO
+    or  X180 q0 -- X180 q1 -- trigger flux pulse -- RO
+
+    Args:
+        q0, q1      (str): namse of the addressed qubits
+        RO_target   (str): can be q0, q1, or 'all'
+        excite_q1   (bool): choose whether to excite q1, thus choosing
+                            between the |01> <-> |10> and the |11> <-> |20>
+                            swap.
+        wait_time   (int): wait time between triggering QWG and RO
+    '''
+    filename = join(base_qasm_path, 'chevron_seq.qasm')
+    qasm_file = mopen(filename, mode='w')
+    qasm_file.writelines('qubit {} \nqubit {} \n'.format(q0, q1))
+
+    qasm_file.writelines('\ninit_all\n')
+
+    qasm_file.writelines('X180 {}\n'.format(q0))
+    if excite_q1:
+        qasm_file.writelines('X180 {}\n'.format(q1))
+    qasm_file.writelines('Trigger QWG\n')
+    qasm_file.writelines('I {} {}\n'.format(q1, wait_time))
+
+    qasm_file.writelines('RO {} \n'.format(RO_target))
+
+    qasm_file.close()
+    return qasm_file
+
+
+def CZ_calibration_seq(q0, q1, RO_target='all',
+                       CZ_disabled=False,
+                       excite_q1='both_cases',
+                       wait_time=400):
+    '''
+    Sequence used to calibrate fluxe pulses for CZ gates.
+
+    Timing of the sequence:
+    q0:   --   mY90  C-Phase  recX90   --      RO
+    q1: (X180)  --     --       --   (X180)    RO
+
+    Args:
+        q0, q1      (str): names of the addressed qubits
+        RO_target   (str): can be q0, q1, or 'all'
+        CZ_disabled (bool): disable CZ gate
+        excitations (bool/str): can be True, False, or 'both_cases'
+        wait_time   (int): wait time between triggering QWG and RO
+    '''
+
+    filename = join(base_qasm_path, 'chevron_seq.qasm')
+    qasm_file = mopen(filename, mode='w')
+    qasm_file.writelines('qubit {} \nqubit {} \n'.format(q0, q1))
+
+    qasm_file.writelines('\ninit_all\n')
+
+    if excite_q1 is True or excite_q1 is 'both_cases':
+        qasm_file.writelines('X180 {}\n'.format(q1))
+    qasm_file.writelines('mY90 {}\n'.format(q0))
+    qasm_file.writelines('Trigger QWG\n')
+    qasm_file.writelines('I {} {}\n'.format(q0, wait_time))
+    qasm_file.writelines('recX90 {}\n'.format(q0))
+
+    qasm_file.writelines('RO {}  \n'.format(RO_target))
+
+    qasm_file.close()
     return qasm_file

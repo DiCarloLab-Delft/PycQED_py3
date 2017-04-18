@@ -400,3 +400,27 @@ def MotzoiXY(qubit_name, motzois, cal_points=True):
             qasm_file.writelines('RO {}  \n'.format(qubit_name))
     qasm_file.close()
     return qasm_file
+
+
+def Ram_Z(qubit_name, wait_before, wait_between):
+    '''
+    Performs a Ram-Z sequence similar to a conventional echo sequence.
+
+    Timing of sequence:
+        trigger flux pulse -- wait_before -- mX90 -- wait_between -- X90 -- RO
+    '''
+    filename = join(base_qasm_path, 'Ram-Z.qasm')
+    qasm_file = mopen(filename, mode='w')
+    qasm_file.writelines('qubit {} \n'.format(qubit_name))
+
+    qasm_file.writelines('\ninit_all\n')
+
+    qasm_file.writelines('QWG trigger \n'.format(qubit_name))
+    qasm_file.writelines('I {} {}\n'.format(qubit_name, wait_before))
+    qasm_file.writelines('mX90 {}\n'.format(qubit_name))
+    qasm_file.writelines('I {} {}\n'.format(qubit_name, wait_between))
+    qasm_file.writelines('X90 {}\n'.format(qubit_name))
+    qasm_file.writelines('RO {}  \n'.format(qubit_name))
+
+    qasm_file.close()
+    return qasm_file
