@@ -12,6 +12,10 @@ It should contain the following information:
 3. Loop
 4. Register
 5. Memory
+
+
+The QASM file is case insensitive.
+
 '''
 
 
@@ -26,12 +30,12 @@ class time_point():
     def __init__(self):
         self.label = None
         self.absolute_time = None
-        self.waiting_time = None
+        self.pre_waiting_time = None
         self.parallel_events = []
 
 
 class EventType(Enum):
-    IDLE = auto()
+    NONE_EVENT = auto()
     WAIT = auto()
     TRIGGER = auto()
     AWG = auto()
@@ -41,7 +45,7 @@ class EventType(Enum):
 class event():
     def __init__(self):
         self.line_number = -1
-        self.event_type = EventType.IDLE
+        self.event_type = EventType.NONE_EVENT
         self.params = None
         self.duration = 0
         self.start_time_point = time_point()
@@ -60,7 +64,6 @@ class qasm_qumis_compiler():
     def readfile(self):
         '''
         Read all lines in the file.
-        Convert every string into lower case.
         '''
         try:
             prog_file = open(self.filename, 'r', encoding="utf-8")
