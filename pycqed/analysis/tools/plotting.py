@@ -17,11 +17,14 @@ def set_xlabel(axis, label, unit=None, **kw):
         **kw : keyword argument to be passed to matplotlib.set_xlabel
 
     """
-    xticks = axis.get_xticks()
-    scale_factor, unit = SI_prefix_and_scale_factor(
-        val=max(abs(xticks)), unit=unit)
-    axis.set_xticklabels(xticks*scale_factor)
-    axis.set_xlabel(label+' ({})'.format(unit), **kw)
+    if unit is not None:
+        xticks = axis.get_xticks()
+        scale_factor, unit = SI_prefix_and_scale_factor(
+            val=max(abs(xticks)), unit=unit)
+        axis.set_xticklabels(xticks*scale_factor)
+        axis.set_xlabel(label+' ({})'.format(unit), **kw)
+    else:
+        axis.set_xlabel(label, **kw)
     return axis
 
 
@@ -36,11 +39,14 @@ def set_ylabel(axis, label, unit=None, **kw):
         **kw : keyword argument to be passed to matplotlib.set_ylabel
 
     """
-    yticks = axis.get_yticks()
-    scale_factor, unit = SI_prefix_and_scale_factor(
-        val=max(abs(yticks)), unit=unit)
-    axis.set_yticklabels(yticks*scale_factor)
-    axis.set_ylabel(label+' ({})'.format(unit), **kw)
+    if unit is not None:
+        yticks = axis.get_yticks()
+        scale_factor, unit = SI_prefix_and_scale_factor(
+            val=max(abs(yticks)), unit=unit)
+        axis.set_yticklabels(yticks*scale_factor)
+        axis.set_ylabel(label+' ({})'.format(unit), **kw)
+    else:
+        axis.set_ylabel(label, **kw)
     return axis
 
 

@@ -33,6 +33,10 @@ class Test_SI_prefix_scale_factor(unittest.TestCase):
 class test_SI_unit_aware_labels(unittest.TestCase):
 
     def test_label_scaling(self):
+        """
+        This test creates a dummy plot and checks if the tick labels are
+        rescaled correctly
+        """
         f, ax = plt.subplots()
         x = np.linspace(-6, 6, 101)
         y = np.cos(x)
@@ -45,7 +49,7 @@ class test_SI_unit_aware_labels(unittest.TestCase):
         xtick_labels = ax.get_xticklabels()
         xtick_label_vals = [float(xl.get_text()) for xl in xtick_labels]
         for xt, xl in zip(xticks, xtick_label_vals):
-            self.assertEqual(xt/1000, xl)
+            self.assertEqual(xt*1e-3, xl)
 
         yticks = ax.get_yticks()
         ytick_labels = ax.get_yticklabels()
