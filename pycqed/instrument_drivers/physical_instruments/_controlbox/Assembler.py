@@ -447,7 +447,6 @@ class Assembler():
             # OK, current and next instructions are both WAIT.
             # No worry about the labels.
             # If the sum waiting time is within the valid range, merge them.
-            assert(label_instr[1] == 'wait' and next_label_instr[1] == 'wait')
             if (int(label_instr[2]) +
                     int(next_label_instr[2]) < self.MAX_WAIT_TIME):
                 label_instr[2] = str(
