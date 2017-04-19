@@ -1,5 +1,4 @@
 from unittest import TestCase
-import pycqed as pq
 from pycqed.measurement.waveform_control_CC import instruction_lib as ins_lib
 
 
