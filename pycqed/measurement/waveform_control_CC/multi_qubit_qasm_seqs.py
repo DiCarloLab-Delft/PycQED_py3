@@ -304,7 +304,7 @@ def two_qubit_tomo_bell(bell_state, q0, q1,
             qasm_file.writelines(prep_pulse_q0)
             qasm_file.writelines(prep_pulse_q1)
             qasm_file.writelines(
-                'I {} {}\n'.format(int(q0, wait_during_flux//clock_cycle)))
+                'I {} {}\n'.format(q0, int(wait_during_flux//clock_cycle)))
             qasm_file.writelines(after_pulse)
             qasm_file.writelines(p_q1)
             qasm_file.writelines(p_q0)
