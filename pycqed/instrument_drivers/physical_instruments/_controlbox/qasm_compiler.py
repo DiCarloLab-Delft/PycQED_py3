@@ -90,5 +90,19 @@ class qasm_qumis_compiler():
         return line
 
     def line_to_event(self):
+        '''
+        Convert each line in the QASM file into an event.
+        An event could be:
+         - A wait or idling instruction
+         - A single qubit gate
+         - A two qubit gate
+
+        At this moment, the timing information of events is not generated yet.
+        '''
         pass
+
+    def compile(self):
+        self.readfile()
+        self.line_to_event()
+        self.build_dependency_graph()
 
