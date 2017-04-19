@@ -13,14 +13,13 @@ from pycqed.analysis.fitting_models import Qubit_freq_to_dac
 
 
 def gauss_pulse(amp, sigma_length, nr_sigma=4, sampling_rate=2e8,
-                axis='x',
+                axis='x', phase=0,
                 motzoi=0, delay=0):
     '''
     All inputs are in s and Hz.
+    phases are in degree.
     '''
     sigma = sigma_length  # old legacy naming, to be replaced
-    # nr_sigma_samples = int(sigma_length * sampling_rate)
-    # nr_pulse_samples = int(nr_sigma*nr_sigma_samples)
     length = sigma*nr_sigma
     mu = length/2.
 
@@ -36,15 +35,16 @@ def gauss_pulse(amp, sigma_length, nr_sigma=4, sampling_rate=2e8,
     delay_samples = delay*sampling_rate
 
     # generate pulses
-    if axis == 'x':
-        pulse_I = gauss_env
-        pulse_Q = deriv_gauss_env
-    elif axis == 'y':
-        pulse_I = -1*deriv_gauss_env
-        pulse_Q = gauss_env
     Zeros = np.zeros(int(delay_samples))
-    pulse_I = np.array(list(Zeros)+list(pulse_I))
-    pulse_Q = np.array(list(Zeros)+list(pulse_Q))
+    G = np.array(list(Zeros)+list(gauss_env))
+    D = np.array(list(Zeros)+list(deriv_gauss_env))
+
+    if axis == 'y':
+        phase += 90
+
+    pulse_I = np.cos(2*np.pi*phase/360)*G - np.sin(2*np.pi*phase/360)*D
+    pulse_Q = np.sin(2*np.pi*phase/360)*G + np.cos(2*np.pi*phase/360)*D
+
     return pulse_I, pulse_Q
 
 
