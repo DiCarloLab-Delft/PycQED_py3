@@ -201,7 +201,9 @@ def two_qubit_AllXY(q0, q1, RO_target='all',
     return qasm_file
 
 
-def chevron_seq(q0, q1, excite_q1=False, wait_time=400, RO_target='all'):
+def chevron_seq(q0, q1,
+                excite_q1=False, QWG_trigger_delay=150e-9, clock_cycle=5e-9,
+                wait_time=400, RO_target='all'):
     '''
     Single chevron sequence that does a swap on |01> <-> |10> or |11> <-> |20>.
 
@@ -223,11 +225,16 @@ def chevron_seq(q0, q1, excite_q1=False, wait_time=400, RO_target='all'):
 
     qasm_file.writelines('\ninit_all\n')
 
+    qasm_file.writelines('QWG trigger\n')
+    qasm_file.writelines(
+        'I {} {}\n'.format(q0, int(QWG_trigger_delay//clock_cycle)))
+
     qasm_file.writelines('X180 {}\n'.format(q0))
     if excite_q1:
         qasm_file.writelines('X180 {}\n'.format(q1))
-    qasm_file.writelines('QWG trigger\n')
     qasm_file.writelines('I {} {}\n'.format(q1, wait_time))
+    if excite_q1:
+        qasm_file.writelines('X180 {}\n'.format(q0))
 
     qasm_file.writelines('RO {} \n'.format(RO_target))
 

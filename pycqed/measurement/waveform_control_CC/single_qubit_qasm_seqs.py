@@ -445,7 +445,8 @@ def MotzoiXY(qubit_name, motzois, cal_points=True):
     return qasm_file
 
 
-def Ram_Z(qubit_name, wait_before, wait_between):
+def Ram_Z(qubit_name,
+          wait_before=100e-9, wait_between=200e-9, clock_cycle=5e-9):
     '''
     Performs a Ram-Z sequence similar to a conventional echo sequence.
 
@@ -459,9 +460,11 @@ def Ram_Z(qubit_name, wait_before, wait_between):
     qasm_file.writelines('\ninit_all\n')
 
     qasm_file.writelines('QWG trigger \n')
-    qasm_file.writelines('I {} {}\n'.format(qubit_name, wait_before))
+    qasm_file.writelines('I {} {}\n'.format(qubit_name,
+                                            int(wait_before//clock_cycle)))
     qasm_file.writelines('mX90 {}\n'.format(qubit_name))
-    qasm_file.writelines('I {} {}\n'.format(qubit_name, wait_between))
+    qasm_file.writelines('I {} {}\n'.format(qubit_name,
+                                            int(wait_between//clock_cycle)))
     qasm_file.writelines('X90 {}\n'.format(qubit_name))
     qasm_file.writelines('RO {}  \n'.format(qubit_name))
 
