@@ -202,21 +202,24 @@ def two_qubit_AllXY(q0, q1, RO_target='all',
 
 
 def chevron_seq(q0, q1,
-                excite_q1=False, QWG_trigger_delay=150e-9, clock_cycle=5e-9,
-                wait_time=400, RO_target='all'):
+                excite_q1=False, wait_after_trigger=150e-9,
+                wait_during_flux=400e-9, clock_cycle=5e-9, RO_target='all'):
     '''
     Single chevron sequence that does a swap on |01> <-> |10> or |11> <-> |20>.
 
     Timing of the sequence:
-        X180 q0 -- trigger flux pulse -- RO
-    or  X180 q0 -- X180 q1 -- trigger flux pulse -- RO
+        trigger flux pulse -- X180 q0 -- RO
+    or  trigger flux pulse -- X180 q0 -- X180 q1 -- RO
 
     Args:
-        q0, q1      (str): namse of the addressed qubits
+        q0, q1      (str): names of the addressed qubits
         RO_target   (str): can be q0, q1, or 'all'
         excite_q1   (bool): choose whether to excite q1, thus choosing
                             between the |01> <-> |10> and the |11> <-> |20>
                             swap.
+        wait_after_trigger (float): delay time in seconds after sending the
+                            trigger for the flux pulse
+        clock_cycle (float): period of the internal AWG clock
         wait_time   (int): wait time between triggering QWG and RO
     '''
     filename = join(base_qasm_path, 'chevron_seq.qasm')
@@ -227,13 +230,14 @@ def chevron_seq(q0, q1,
 
     qasm_file.writelines('QWG trigger\n')
     qasm_file.writelines(
-        'I {} {}\n'.format(q0, int(QWG_trigger_delay//clock_cycle)))
-
+        'I {} {}\n'.format(q0, int(wait_after_trigger//clock_cycle)))
     qasm_file.writelines('X180 {}\n'.format(q0))
     if excite_q1:
         qasm_file.writelines('X180 {}\n'.format(q1))
-    qasm_file.writelines('I {} {}\n'.format(q1, wait_time))
+    qasm_file.writelines('I {} {}\n'.format(q1, wait_during_flux))
     if excite_q1:
+        # q0 is rotated to ground-state to have better contrast
+        # (|0> and |2> instead of |1> and |2>)
         qasm_file.writelines('X180 {}\n'.format(q0))
 
     qasm_file.writelines('RO {} \n'.format(RO_target))
@@ -242,10 +246,27 @@ def chevron_seq(q0, q1,
     return qasm_file
 
 
+def two_qubit_tomo_bell(bell_state, q0, q1,
+                        RO_target='all'):
+    '''
+    '''
+    tomo_pulses = ['I ', 'X180 ', 'Y90 ', 'mY90 ', 'X90 ', 'mX90 ']
+    tomo_list_q0 = []
+    tomo_list_q1 = []
+    for tp in tomo_pulses:
+        tomo_list_q0 += [tp + q0 + '\n']
+        tomo_list_q1 += [tp + q1 + '\n']
+
+    #
+
+
+
 def CZ_calibration_seq(q0, q1, RO_target='all',
                        CZ_disabled=False,
-                       excite_q1='both_cases',
-                       wait_time=400):
+                       cases=['no_excitation', 'excitation'],
+                       wait_after_trigger=150e-9,
+                       wait_during_flux=200e-9,
+                       clock_cycle=5e-9):
     '''
     Sequence used to calibrate fluxe pulses for CZ gates.
 
@@ -258,7 +279,8 @@ def CZ_calibration_seq(q0, q1, RO_target='all',
         RO_target   (str): can be q0, q1, or 'all'
         CZ_disabled (bool): disable CZ gate
         excitations (bool/str): can be True, False, or 'both_cases'
-        wait_time   (int): wait time between triggering QWG and RO
+        clock_cycle (float): period of the internal AWG clock
+        wait_time   (int): wait time in seconds after triggering the flux
     '''
 
     filename = join(base_qasm_path, 'chevron_seq.qasm')
@@ -267,14 +289,17 @@ def CZ_calibration_seq(q0, q1, RO_target='all',
 
     qasm_file.writelines('\ninit_all\n')
 
-    if excite_q1 is True or excite_q1 is 'both_cases':
-        qasm_file.writelines('X180 {}\n'.format(q1))
-    qasm_file.writelines('mY90 {}\n'.format(q0))
-    qasm_file.writelines('QWG trigger\n')
-    qasm_file.writelines('I {} {}\n'.format(q0, wait_time))
-    qasm_file.writelines('recX90 {}\n'.format(q0))
+    for case in cases:
+        # if excite_q1 is True or excite_q1 is 'both_cases':
+        if case == 'excitation':
+            qasm_file.writelines('X180 {}\n'.format(q1))
+        qasm_file.writelines('QWG trigger\n')
+        qasm_file.writelines('I {} {}\n'.format(q0, wait_after_trigger))
+        qasm_file.writelines('mY90 {}\n'.format(q0))
+        qasm_file.writelines('I {} {}\n'.format(q0, wait_during_flux))
+        qasm_file.writelines('recX90 {}\n'.format(q0))
 
-    qasm_file.writelines('RO {}  \n'.format(RO_target))
+        qasm_file.writelines('RO {}  \n'.format(RO_target))
 
     qasm_file.close()
     return qasm_file
