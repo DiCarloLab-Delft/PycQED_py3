@@ -202,8 +202,8 @@ def two_qubit_AllXY(q0, q1, RO_target='all',
 
 
 def chevron_seq(q0, q1,
-                excite_q1=False, wait_after_trigger=150e-9, wait_time=400e-9,
-                clock_cycle=5e-9, RO_target='all'):
+                excite_q1=False, wait_after_trigger=150e-9,
+                wait_during_flux=400e-9, clock_cycle=5e-9, RO_target='all'):
     '''
     Single chevron sequence that does a swap on |01> <-> |10> or |11> <-> |20>.
 
@@ -230,11 +230,11 @@ def chevron_seq(q0, q1,
 
     qasm_file.writelines('QWG trigger\n')
     qasm_file.writelines(
-        'I {} {}\n'.format(q0, int(QWG_trigger_delay//clock_cycle)))
+        'I {} {}\n'.format(q0, int(wait_after_trigger//clock_cycle)))
     qasm_file.writelines('X180 {}\n'.format(q0))
     if excite_q1:
         qasm_file.writelines('X180 {}\n'.format(q1))
-    qasm_file.writelines('I {} {}\n'.format(q1, wait_time))
+    qasm_file.writelines('I {} {}\n'.format(q1, wait_during_flux))
     if excite_q1:
         # q0 is rotated to ground-state to have better contrast
         # (|0> and |2> instead of |1> and |2>)
@@ -250,13 +250,22 @@ def two_qubit_tomo_bell(bell_state, q0, q1,
                         RO_target='all'):
     '''
     '''
-    pass
+    tomo_pulses = ['I ', 'X180 ', 'Y90 ', 'mY90 ', 'X90 ', 'mX90 ']
+    tomo_list_q0 = []
+    tomo_list_q1 = []
+    for tp in tomo_pulses:
+        tomo_list_q0 += [tp + q0 + '\n']
+        tomo_list_q1 += [tp + q1 + '\n']
+
+    #
 
 
-def c_phase_calibration_seq(q0, q1, RO_target='all',
+
+def CZ_calibration_seq(q0, q1, RO_target='all',
                        CZ_disabled=False,
-                       excite_q1='both_cases',
-                       wait_time=400e-9,
+                       cases=['no_excitation', 'excitation'],
+                       wait_after_trigger=150e-9,
+                       wait_during_flux=200e-9,
                        clock_cycle=5e-9):
     '''
     Sequence used to calibrate fluxe pulses for CZ gates.
@@ -280,14 +289,17 @@ def c_phase_calibration_seq(q0, q1, RO_target='all',
 
     qasm_file.writelines('\ninit_all\n')
 
-    if excite_q1 is True or excite_q1 is 'both_cases':
-        qasm_file.writelines('X180 {}\n'.format(q1))
-    qasm_file.writelines('mY90 {}\n'.format(q0))
-    qasm_file.writelines('QWG trigger\n')
-    qasm_file.writelines('I {} {}\n'.format(q0, wait_time))
-    qasm_file.writelines('recX90 {}\n'.format(q0))
+    for case in cases:
+        # if excite_q1 is True or excite_q1 is 'both_cases':
+        if case == 'excitation':
+            qasm_file.writelines('X180 {}\n'.format(q1))
+        qasm_file.writelines('QWG trigger\n')
+        qasm_file.writelines('I {} {}\n'.format(q0, wait_after_trigger))
+        qasm_file.writelines('mY90 {}\n'.format(q0))
+        qasm_file.writelines('I {} {}\n'.format(q0, wait_during_flux))
+        qasm_file.writelines('recX90 {}\n'.format(q0))
 
-    qasm_file.writelines('RO {}  \n'.format(RO_target))
+        qasm_file.writelines('RO {}  \n'.format(RO_target))
 
     qasm_file.close()
     return qasm_file

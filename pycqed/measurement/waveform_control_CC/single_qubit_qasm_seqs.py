@@ -12,6 +12,40 @@ from pycqed.measurement.randomized_benchmarking import randomized_benchmarking a
 base_qasm_path = join(dirname(__file__), 'qasm_files')
 
 
+def CW_tone():
+    filename = join(base_qasm_path, 'CW_tone.qasm')
+    qasm_file = mopen(filename, mode='w')
+    qasm_file.writelines('Pulse \n')
+    qasm_file.close()
+    return qasm_file
+
+
+def CW_RO_sequence(qubit_name, trigger_separation, clock_cycle=5e-9):
+    # N.B.! this delay is not correct because it does not take the
+    # trigger length into account
+    delay = np.round(trigger_separation/clock_cycle)
+
+    filename = join(base_qasm_path, 'CW_RO_sequence.qasm')
+    qasm_file = mopen(filename, mode='w')
+    qasm_file.writelines('qubit {} \n'.format(qubit_name))
+    qasm_file.writelines('I {} {:d} \n'.format(
+                         qubit_name, int(delay)))
+    qasm_file.writelines('RO {}  \n'.format(qubit_name))
+    qasm_file.close()
+    return qasm_file
+
+
+def pulsed_spec_sequence(qubit_name, clock_cycle=5e-9):
+    filename = join(base_qasm_path, 'pulsed_spec.qasm')
+    qasm_file = mopen(filename, mode='w')
+    qasm_file.writelines('qubit {} \n'.format(qubit_name))
+    qasm_file.writelines('SpecPulse {} \n'.format(
+                         qubit_name))
+    qasm_file.writelines('RO {}  \n'.format(qubit_name))
+    qasm_file.close()
+    return qasm_file
+
+
 def T1(qubit_name, times, clock_cycle=5e-9,
        cal_points=True):
     #
@@ -229,7 +263,7 @@ def single_elt_on(qubit_name):
 def two_elt_MotzoiXY(qubit_name):
     '''
     Sequence used for calibrating the motzoi parameter.
-    Consists of Xy and Yx
+    Consists of yX and xY
 
     needs to reload the points for every data point.
     '''
@@ -237,32 +271,40 @@ def two_elt_MotzoiXY(qubit_name):
     qasm_file = mopen(filename, mode='w')
     qasm_file.writelines('qubit {} \n'.format(qubit_name))
     qasm_file.writelines('\ninit_all\n')
-    qasm_file.writelines('X180 {} \n'.format(qubit_name))
     qasm_file.writelines('Y90 {} \n'.format(qubit_name))
+    qasm_file.writelines('X180 {} \n'.format(qubit_name))
     qasm_file.writelines('RO {}  \n'.format(qubit_name))
 
     qasm_file.writelines('\ninit_all\n')
-    qasm_file.writelines('Y180 {} \n'.format(qubit_name))
     qasm_file.writelines('X90 {} \n'.format(qubit_name))
+    qasm_file.writelines('Y180 {} \n'.format(qubit_name))
     qasm_file.writelines('RO {}  \n'.format(qubit_name))
 
     qasm_file.close()
     return qasm_file
 
 
-def off_on(qubit_name):
+def off_on(qubit_name, pulse_comb='off_on'):
+    """
+    Performs an 'Off_On' sequence on the qubit specified.
+    Pulses can be optionally enabled by putting 'off', respectively 'on' in
+    the pulse_comb string.
+    """
     filename = join(base_qasm_path, 'off_on.qasm')
     qasm_file = mopen(filename, mode='w')
     qasm_file.writelines('qubit {} \n'.format(qubit_name))
 
     # Off
-    qasm_file.writelines('\ninit_all\n')
-    qasm_file.writelines('RO {}  \n'.format(qubit_name))
+    if 'off' in pulse_comb.lower():
+        qasm_file.writelines('\ninit_all\n')
+        qasm_file.writelines('RO {}  \n'.format(qubit_name))
     # On
-    qasm_file.writelines('\ninit_all\n')
-    qasm_file.writelines('X180 {}     # On \n'.format(qubit_name))
-    qasm_file.writelines('RO {}  \n'.format(qubit_name))
-
+    if 'on' in pulse_comb.lower():
+        qasm_file.writelines('\ninit_all\n')
+        qasm_file.writelines('X180 {}     # On \n'.format(qubit_name))
+        qasm_file.writelines('RO {}  \n'.format(qubit_name))
+    if 'on' not in pulse_comb.lower() and 'off' not in pulse_comb.lower():
+        raise ValueError
     qasm_file.close()
     return qasm_file
 
@@ -274,7 +316,8 @@ def butterfly(qubit_name, initialize=False):
 
     The duration of the RO + depletion is specified in the definition of RO
     """
-    filename = join(base_qasm_path, 'butterfly_init_{}.qasm'.format(initialize))
+    filename = join(
+        base_qasm_path, 'butterfly_init_{}.qasm'.format(initialize))
     qasm_file = mopen(filename, mode='w')
     qasm_file.writelines('qubit {} \n'.format(qubit_name))
     if initialize:
@@ -361,7 +404,7 @@ def randomized_benchmarking(qubit_name, nr_cliffords, nr_seeds,
 def MotzoiXY(qubit_name, motzois, cal_points=True):
     '''
     Sequence used for calibrating the motzoi parameter.
-    Consists of Xy and Yx
+    Consists of yX and xY
 
     Beware that the elements alternate, if you want to measure both Xy and Yx
     at each motzoi you need repeating motzoi parameters. This was chosen
@@ -388,15 +431,15 @@ def MotzoiXY(qubit_name, motzois, cal_points=True):
             qasm_file.writelines('RO {}  \n'.format(qubit_name))
         if i % 2:
             qasm_file.writelines(
-                'X180_Motz {} {} \n'.format(qubit_name, motzoi))
-            qasm_file.writelines(
                 'Y90_Motz {} {} \n'.format(qubit_name, motzoi))
+            qasm_file.writelines(
+                'X180_Motz {} {} \n'.format(qubit_name, motzoi))
             qasm_file.writelines('RO {}  \n'.format(qubit_name))
         else:
             qasm_file.writelines(
-                'Y180_Motz {} {} \n'.format(qubit_name, motzoi))
-            qasm_file.writelines(
                 'X90_Motz {} {} \n'.format(qubit_name, motzoi))
+            qasm_file.writelines(
+                'Y180_Motz {} {} \n'.format(qubit_name, motzoi))
             qasm_file.writelines('RO {}  \n'.format(qubit_name))
     qasm_file.close()
     return qasm_file
@@ -425,9 +468,11 @@ def Ram_Z(qubit_name,
     qasm_file.writelines('\ninit_all\n')
 
     qasm_file.writelines('QWG trigger \n')
-    qasm_file.writelines('I {} {}\n'.format(qubit_name, wait_before))
+    qasm_file.writelines('I {} {}\n'.format(qubit_name,
+                                            int(wait_before//clock_cycle)))
     qasm_file.writelines('mX90 {}\n'.format(qubit_name))
-    qasm_file.writelines('I {} {}\n'.format(qubit_name, wait_between))
+    qasm_file.writelines('I {} {}\n'.format(qubit_name,
+                                            int(wait_between//clock_cycle)))
     qasm_file.writelines('X90 {}\n'.format(qubit_name))
     qasm_file.writelines('RO {}  \n'.format(qubit_name))
 
