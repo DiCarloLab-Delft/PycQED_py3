@@ -143,12 +143,19 @@ class QWG_FluxLookuptableManager(Instrument):
         self.add_parameter('F_ch', label='Flux channel',
                            vals=vals.Ints(),
                            parameter_class=ManualParameter)
+        self.add_parameter('F_delay', label='Flux pulse delay',
+                           unit='s',
+                           initial_value=0,
+                           vals=vals.Numbers(),
+                           parameter_class=ManualParameter)
 
     def load_pulses_onto_AWG_lookuptable(self):
         block_I, block_Q = wf.block_pulse(self.F_amp(), self.F_length(),
                                           sampling_rate=1e9)
-        block_I = np.array(block_I)
-        block_Q = np.array(block_Q)
+        wait_samples = np.zeros(int(self.F_delay()*1e9))
+
+        block_I = np.concatenate([wait_samples, np.array(block_I)])
+        block_Q = np.concatenate([wait_samples, np.array(block_Q)])
         k = self.F_kernel_instr.get_instr()
         distorted_I = k.convolve_kernel(
             [k.kernel(), block_I], length_samples=60e3)
