@@ -260,7 +260,6 @@ def two_qubit_tomo_bell(bell_state, q0, q1,
     #
 
 
-
 def CZ_calibration_seq(q0, q1, RO_target='all',
                        CZ_disabled=False,
                        cases=('no_excitation', 'excitation'),
@@ -284,20 +283,19 @@ def CZ_calibration_seq(q0, q1, RO_target='all',
         wait_time   (int): wait time in seconds after triggering the flux
     '''
 
-    filename = join(base_qasm_path, 'chevron_seq.qasm')
+    filename = join(base_qasm_path, 'CZ_calibration_seq.qasm')
     qasm_file = mopen(filename, mode='w')
     qasm_file.writelines('qubit {} \nqubit {} \n'.format(q0, q1))
 
-    qasm_file.writelines('\ninit_all\n')
-
     for case in cases:
+        qasm_file.writelines('\ninit_all\n')
         waitTime = wait_after_trigger
         # if excite_q1 is True or excite_q1 is 'both_cases':
         qasm_file.writelines('QWG trigger\n')
         if case == 'excitation':
             qasm_file.writelines('X180 {}\n'.format(q1))
             # additional pulse between trigger and flux pulse
-            waitTime += mw_pulse_duration
+            waitTime -= mw_pulse_duration
         qasm_file.writelines(
             'I {} {}\n'.format(q0, int(waitTime//clock_cycle)))
         qasm_file.writelines('mY90 {}\n'.format(q0))
