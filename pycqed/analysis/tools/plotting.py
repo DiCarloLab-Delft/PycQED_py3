@@ -54,8 +54,14 @@ def set_ylabel(axis, label, unit=None, **kw):
 
 def SI_prefix_and_scale_factor(val, unit=None):
     """
-    Takes in a value and unit and if applicable returns the proper SI prefix
-    and prefix power
+    Takes in a value and unit and if applicable returns the proper
+    scale factor and SI prefix.
+    Args:
+        val (float) : the value
+        unit (str)  : the unit of the value
+    returns:
+        scale_factor (float) : scale_factor needed to convert value
+        unit (str)           : unit including the prefix
     """
     validtypes = (float, int, np.integer, np.floating)
     if unit in SI_UNITS and isinstance(val, validtypes):
