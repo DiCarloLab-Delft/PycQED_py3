@@ -251,6 +251,16 @@ def two_qubit_tomo_bell(bell_state, q0, q1,
                         clock_cycle=5e-9,
                         RO_target='all'):
     '''
+    Two qubit bell state tomography.
+
+    Args:
+        bell_state      (int): index of prepared bell state
+        q0, q1          (str): names of the target qubits
+        wait_after_trigger (float): delay time in seconds after sending the
+                                    trigger for the flux pulse
+        clock_cycle     (float): period of the internal AWG clock
+        wait_during_flux (int): wait time during the flux pulse
+        RO_target   (str): can be q0, q1, or 'all'
     '''
     tomo_pulses = ['I ', 'X180 ', 'Y90 ', 'mY90 ', 'X90 ', 'mX90 ']
     tomo_list_q0 = []
@@ -340,7 +350,7 @@ def CZ_calibration_seq(q0, q1, RO_target='all',
                        clock_cycle=5e-9,
                        mw_pulse_duration=60e-9):
     '''
-    Sequence used to calibrate fluxe pulses for CZ gates.
+    Sequence used to calibrate flux pulses for CZ gates.
 
     Timing of the sequence:
     q0:   --   mY90  C-Phase  recX90   --      RO
