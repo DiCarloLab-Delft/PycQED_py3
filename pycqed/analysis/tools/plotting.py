@@ -3,7 +3,9 @@ Currently empty should contain the plotting tools portion of the
 analysis toolbox
 '''
 import numpy as np
-from pyqtgraph.units import SI_PREFIXES, UNITS as SI_UNITS
+
+SI_PREFIXES = 'yzafpnum kMGTPEZY'
+SI_UNITS = 'm,s,g,W,J,V,A,F,T,Hz,Ohm,S,N,C,px,b,B'.split(',')
 
 
 def set_xlabel(axis, label, unit=None, **kw):
@@ -76,7 +78,7 @@ def SI_prefix_and_scale_factor(val, unit=None):
 
 
 def annotate_point_pair(ax, text, xy_start, xy_end, xycoords='data',
-                        text_offset=(-10, -5), arrowprops = None, **kw):
+                        text_offset=(-10, -5), arrowprops=None, **kw):
     '''
     Annotates two points by connecting them with an arrow.
     The annotation text is placed near the center of the arrow.
@@ -97,9 +99,9 @@ def annotate_point_pair(ax, text, xy_start, xy_end, xycoords='data',
     text_angle = arrow_angle - 0.5*np.pi
 
     ax.annotate(
-            '', xy=xy_end, xycoords=xycoords,
-            xytext=xy_start, textcoords=xycoords,
-            arrowprops=arrowprops, **kw)
+        '', xy=xy_end, xycoords=xycoords,
+        xytext=xy_start, textcoords=xycoords,
+        arrowprops=arrowprops, **kw)
 
     label = ax.annotate(
         text,
