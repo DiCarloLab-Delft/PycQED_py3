@@ -1319,6 +1319,98 @@ class Rabi_parabola_analysis(Rabi_Analysis):
                                         var_name=self.value_names[i])
 
 
+class CPhase_2Q_amp_cost_analysis(Rabi_Analysis):
+
+    def __init__(self, label='', **kw):
+        super().__init__(label=label, **kw)
+
+    def run_default_analysis(self, close_file=True, **kw):
+        normalize_to_cal_points = kw.pop('normalize_to_cal_points', True)
+        self.get_naming_and_values()
+        print('normalize_to_cal_points', normalize_to_cal_points)
+        if normalize_to_cal_points:
+            cal_0I = np.mean([self.measured_values[0][-4],
+                              self.measured_values[0][-3]])
+            cal_1I = np.mean([self.measured_values[0][-2],
+                              self.measured_values[0][-1]])
+
+            cal_0Q = np.mean([self.measured_values[1][-4],
+                              self.measured_values[1][-2]])
+            cal_1Q = np.mean([self.measured_values[1][-3],
+                              self.measured_values[1][-1]])
+
+            self.measured_values[0][:] = (
+                self.measured_values[0] - cal_0I)/(cal_1I-cal_0I)
+            self.measured_values[1][:] = (
+                self.measured_values[1] - cal_0Q)/(cal_1Q-cal_0Q)
+        # self.measured_values = self.measured_values
+
+        self.sort_data()
+
+        self.sweep_points = self.sweep_points
+        self.calculate_cost_func(**kw)
+        self.make_figures(**kw)
+
+        if close_file:
+            self.data_file.close()
+
+    def sort_data(self):
+        self.x_exc = self.sweep_points[1::2]
+        self.x_idx = self.sweep_points[::2]
+        self.y_exc = ['', '']
+        self.y_idx = ['', '']
+        for i in range(2):
+            self.y_exc[i] = self.measured_values[i][1::2]
+            self.y_idx[i] = self.measured_values[i][::2]
+
+    def calculate_cost_func(self, **kw):
+        num_points = len(self.sweep_points)-4
+
+        id_dat_swp = self.measured_values[1][:num_points//2]
+        ex_dat_swp = self.measured_values[1][num_points//2:-4]
+
+        id_dat_cp = self.measured_values[0][:num_points//2]
+        ex_dat_cp = self.measured_values[0][num_points//2:-4]
+
+        maximum_difference = max((id_dat_cp-ex_dat_cp))
+        # I think the labels are wrong in excited and identity but the value
+        # we get is correct
+        missing_swap_pop = np.mean(ex_dat_swp - id_dat_swp)
+        self.cost_func_val = maximum_difference, missing_swap_pop
+
+    def make_figures(self, **kw):
+        self.fig, self.axs = plt.subplots(2, 1, figsize=(5, 6))
+        for i in [0, 1]:
+            # self.axs[i].ticklabel_format(useOffset=False)
+            self.axs[i].plot(self.x_idx, self.y_idx[i], '-o', label='no excitation')
+            self.axs[i].plot(self.x_exc, self.y_exc[i], '-o', label='excitation')
+
+            self.axs[i].set_xlabel(self.xlabel)
+            self.axs[i].set_ylabel(self.ylabels[i])
+
+            if i == 0:
+                plot_title = kw.pop('plot_title', textwrap.fill(
+                                    self.timestamp_string + '_' +
+                                    self.measurementstring, 40))
+                self.axs[i].legend()
+            else:
+                plot_title = ''
+            # self.plot_results_vs_sweepparam(x=self.sweep_points,
+            #                                 y=self.measured_values[i],
+            #                                 fig=self.fig, ax=self.axs[i],
+            #                                 xlabel=self.xlabel,
+            #                                 ylabel=self.ylabels[i],
+            #                                 save=False,
+            #                                 plot_title=plot_title,
+            #                                 marker='--o')
+
+        self.save_fig(self.fig, fig_tight=True, close_fig=True, **kw)
+
+
+
+
+
+
 class Motzoi_XY_analysis(TD_Analysis):
 
     '''
