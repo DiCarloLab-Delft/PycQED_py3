@@ -263,10 +263,11 @@ def two_qubit_tomo_bell(bell_state, q0, q1,
 
 def CZ_calibration_seq(q0, q1, RO_target='all',
                        CZ_disabled=False,
-                       cases=['no_excitation', 'excitation'],
+                       cases=('no_excitation', 'excitation'),
                        wait_after_trigger=150e-9,
                        wait_during_flux=200e-9,
-                       clock_cycle=5e-9):
+                       clock_cycle=5e-9,
+                       mw_pulse_duration=40e-9):
     '''
     Sequence used to calibrate fluxe pulses for CZ gates.
 
@@ -290,13 +291,18 @@ def CZ_calibration_seq(q0, q1, RO_target='all',
     qasm_file.writelines('\ninit_all\n')
 
     for case in cases:
+        waitTime = wait_after_trigger
         # if excite_q1 is True or excite_q1 is 'both_cases':
+        qasm_file.writelines('QWG trigger\n')
         if case == 'excitation':
             qasm_file.writelines('X180 {}\n'.format(q1))
-        qasm_file.writelines('QWG trigger\n')
-        qasm_file.writelines('I {} {}\n'.format(q0, wait_after_trigger))
+            # additional pulse between trigger and flux pulse
+            waitTime += mw_pulse_duration
+        qasm_file.writelines(
+            'I {} {}\n'.format(q0, int(waitTime//clock_cycle)))
         qasm_file.writelines('mY90 {}\n'.format(q0))
-        qasm_file.writelines('I {} {}\n'.format(q0, wait_during_flux))
+        qasm_file.writelines(
+            'I {} {}\n'.format(q0, int(wait_during_flux//clock_cycle)))
         qasm_file.writelines('recX90 {}\n'.format(q0))
 
         qasm_file.writelines('RO {}  \n'.format(RO_target))
