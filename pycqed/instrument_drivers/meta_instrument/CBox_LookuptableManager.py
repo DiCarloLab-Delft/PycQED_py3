@@ -210,14 +210,14 @@ class ControlBox_LookuptableManager(Instrument):
                                  sampling_rate=self.get('sampling_rate'),
                                  Q_phase_delay=self.get('mixer_IQ_phase_skewness'))
 
-        Wave_Rphi180 = wf.mod_gauss(self.get('Q_amp180'), self.get('Q_gauss_width'),
-                                    self.get('Q_modulation'), axis='x',
+        Wave_Rphi180 = wf.mod_gauss(self.get('Q_amp180'), self.Q_gauss_width(),
+                                    self.get('Q_modulation'), phase=self.Q_Rphi(),
                                     motzoi=self.get('Q_motzoi_parameter'),
                                     sampling_rate=self.get('sampling_rate'),
                                     Q_phase_delay=self.get('mixer_IQ_phase_skewness'))
 
-        Wave_Rphi90 = wf.mod_gauss(self.get('Q_amp90'), self.get('Q_gauss_width'),
-                                   self.get('Q_modulation'), axis='x',
+        Wave_Rphi90 = wf.mod_gauss(self.get('Q_amp90'), self.Q_gauss_width(),
+                                   self.get('Q_modulation'), phase=self.Q_Rphi(),
                                    motzoi=self.get('Q_motzoi_parameter'),
                                    sampling_rate=self.get('sampling_rate'),
                                    Q_phase_delay=self.get('mixer_IQ_phase_skewness'))
