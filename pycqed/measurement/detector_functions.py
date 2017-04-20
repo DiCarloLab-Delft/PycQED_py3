@@ -830,7 +830,7 @@ class Function_Detector(Soft_Detector):
         self.sweep_function = sweep_function
         self.result_keys = result_keys
         self.value_names = value_names
-        self.value_units = value_unit
+        self.value_units = value_units
         self.msmt_kw = msmt_kw
         if self.value_names is None:
             self.value_names = result_keys
@@ -868,12 +868,12 @@ class Function_Detector_list(Soft_Detector):
     """
 
     def __init__(self, sweep_function, result_keys, value_names=None,
-                 value_unit=None, msmt_kw={}, **kw):
+                 value_units=None, msmt_kw={}, **kw):
         super(Function_Detector_list, self).__init__()
         self.sweep_function = sweep_function
         self.result_keys = result_keys
         self.value_names = value_names
-        self.value_units = value_unit
+        self.value_units = value_units
         self.msmt_kw = msmt_kw
         if self.value_names is None:
             self.value_names = result_keys
