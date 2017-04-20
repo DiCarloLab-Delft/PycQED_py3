@@ -148,14 +148,25 @@ class QWG_FluxLookuptableManager(Instrument):
                            initial_value=0,
                            vals=vals.Numbers(),
                            parameter_class=ManualParameter)
+        self.add_parameter('F_compensation_delay',
+                           label='Delay before compensation pulses',
+                           unit='s',
+                           initial_value=4e-6,
+                           vals=vals.Numbers(),
+                           parameter_class=ManualParameter)
 
     def load_pulses_onto_AWG_lookuptable(self):
+        sampling_rate = 1e9
         block_I, block_Q = wf.block_pulse(self.F_amp(), self.F_length(),
                                           sampling_rate=1e9)
-        wait_samples = np.zeros(int(self.F_delay()*1e9))
+        wait_samples = np.zeros(int(self.F_delay()*sampling_rate))
+        wait_samples_2 = np.zeros(int(self.F_compensation_delay()
+                                      * sampling_rate))
 
-        block_I = np.concatenate([wait_samples, np.array(block_I)])
-        block_Q = np.concatenate([wait_samples, np.array(block_Q)])
+        block_I = np.concatenate([wait_samples, np.array(block_I),
+                                 wait_samples_2, -1*np.array(block_I)])
+        block_Q = np.concatenate([wait_samples, np.array(block_Q),
+                                 wait_samples_2, -1*np.array(block_Q)])
         k = self.F_kernel_instr.get_instr()
         distorted_I = k.convolve_kernel(
             [k.kernel(), block_I], length_samples=60e3)
