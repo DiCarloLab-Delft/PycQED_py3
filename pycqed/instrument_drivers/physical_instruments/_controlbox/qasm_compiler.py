@@ -21,12 +21,16 @@ The QASM file is case insensitive.
 
 '''
 IR definition:
-label | absolute time | waiting time | event | duration
+<time point, events>
+time point: label, absolute time, pre_waiting time
+event: type, duration
 '''
 from enum import Enum
 import logging
 
+
 class time_point():
+
     def __init__(self):
         self.label = None
         self.absolute_time = None
@@ -37,25 +41,36 @@ class time_point():
 class EventType(Enum):
     NONE_EVENT = auto()
     WAIT = auto()
-    TRIGGER = auto()
-    AWG = auto()
-    MEASURE = auto()
+    QOP = auto()
+    
+    # I need to think how to separate the technology dependent part and 
+    # technology independent part.
+
+    # TRIGGER = auto()
+    # AWG = auto()
+    # MEASURE = auto()
 
 
-class event():
+class qasm_event():
+
     def __init__(self):
         self.line_number = -1
         self.event_type = EventType.NONE_EVENT
+        self.name = ''
         self.params = None
         self.duration = 0
-        self.start_time_point = time_point()
+        # self.start_time_point = time_point()
+
 
 class prog_line():
+
     def __init__(self):
         self.number = -1
         self.content = ''
 
+
 class qasm_qumis_compiler():
+
     def __init__(self, filename=None):
         self.filename = filename
         self.raw_lines = None
@@ -83,6 +98,10 @@ class qasm_qumis_compiler():
 
         prog_file.close()
 
+    def load_op_dict(self, filename):
+        self.qasm_op_dict = None
+        pass
+
     @classmethod
     def remove_comment(self, line):
         line = line.split('#', 1)[0]  # remove anything after '#' symbole
@@ -98,11 +117,78 @@ class qasm_qumis_compiler():
          - A two qubit gate
 
         At this moment, the timing information of events is not generated yet.
+
+        raw_event_list contains all events before resolving timing information.
         '''
-        pass
+        self.raw_event_list = []
+        for line in self.prog_lines:
+            events = self.get_parallel_qasm_ops(line.content)
+            raw_events = []
+            for e in events:
+                raw_event = qasm_event()
+                raw_event.line_number = line.number
+                                
+                qasm_op_name = self.get_qasm_op_name(e)
+                qasm_op_params = self.get_qasm_op_params(e)
+                
+                raw_event = qasm_op_name
+                raw_event.params = qasm_op_params
+
+                if qasm_op_name not in self.qasm_op_dict:
+                    raise SyntaxError(
+                        "Line {}: Unsuppported operation found:".format(
+                        line.number, qasm_op_name))
+
+                if is_wait_instr(qasm_op_name):
+                    if len(events) != 1:
+                        raise SyntaxError(
+                        "Line {}: the timing instruction is mixed with other "
+                        "instructions:".format(line.number, qasm_op_name))
+                    raw_event.event_type = EventType.WAIT
+                else:
+                    raw_event.event_type = EventType.QOP
+                
+                raw_event.duration = 0
+                raw_events.append(raw_event)
+
+
+
+    @classmethod
+    def get_parallel_qasm_ops(self, op_line):
+        return [rawEle.strip(string.punctuation.translate(
+                {ord('-'): None})) for rawEle in op_line.split("|")]
+
+    @classmethod
+    def get_qasm_op_name(self, qasm_op):
+        if qasm_op = '':
+            raise ValueError("QASM operation cannot be empty")
+        return qasm_op.split()[0]
+
+    @classmethod
+    def get_qasm_op_params(self, qasm_op):
+        if qasm_op = '':
+            raise ValueError("QASM operation cannot be empty")
+        return qasm_op.split()[1:]
 
     def compile(self):
+        self.qumis_instructions = []
         self.readfile()
         self.line_to_event()
-        self.build_dependency_graph()
+        # self.build_dependency_graph()
+        self.assign_timing_to_events()
+        self.compensate_channel_latency()
+        self.gen_full_time_grid()
+        self.convert_to_qumis()
+        return self.qumis_instructions
 
+    def assign_timing_to_events(self):
+        pass
+        
+    def compensate_channel_latency(self):
+        pass
+
+    def gen_time_grid(self):
+        pass
+
+    def convert_to_qumis(self):
+        pass
