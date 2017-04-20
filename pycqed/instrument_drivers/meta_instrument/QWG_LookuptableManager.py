@@ -154,25 +154,100 @@ class QWG_FluxLookuptableManager(Instrument):
                            initial_value=4e-6,
                            vals=vals.Numbers(),
                            parameter_class=ManualParameter)
+        self.add_parameter('F_lambda_coeffs',
+                           label='lambda coefficients for martinis pulse',
+                           unit='',
+                           inital_value=None,
+                           vals=vals.Array(),
+                           parameter_class=ManualParameter)
+        self.add_parameter('F_theta_f',
+                           label='theta_f for martinis pulse',
+                           unit='deg',
+                           inital_value=0.0,
+                           vals=vals.Numbers(),
+                           parameter_class=ManualParameter)
+        self.add_parameter('F_J2',
+                           label='coupling between 11-02',
+                           unit='Hz',
+                           inital_value=0.0,
+                           vals=vals.Numbers(),
+                           parameter_class=ManualParameter)
+        self.add_parameter('F_f_interaction',
+                           label='interaction frequency',
+                           unit='Hz',
+                           inital_value=0.0,
+                           vals=vals.Numbers(),
+                           parameter_class=ManualParameter)
+        self.add_parameter('F_dac_flux_coef',
+                           label='conversion factor for AWG voltage to flux',
+                           unit='(V^-1)',
+                           inital_value=1.0,
+                           vals=vals.Numbers(),
+                           parameter_class=ManualParameter)
+        self.add_parameter('F_E_c',
+                           label='qubit charging energy',
+                           unit='Hz',
+                           inital_value=0.0,
+                           vals=vals.Numbers(),
+                           parameter_class=ManualParameter)
+        self.add_parameter('F_f_01_max',
+                           label='qubit sweet spot frequency',
+                           unit='Hz',
+                           inital_value=0.0,
+                           vals=vals.Numbers(),
+                           parameter_class=ManualParameter)
+        self.add_parameter('F_asymmetry',
+                           label='qubit asymmetry',
+                           unit='Hz',
+                           inital_value=0.0,
+                           vals=vals.Numbers(),
+                           parameter_class=ManualParameter)
+
 
     def load_pulses_onto_AWG_lookuptable(self):
         sampling_rate = 1e9
-        block_I, block_Q = wf.block_pulse(self.F_amp(), self.F_length(),
-                                          sampling_rate=1e9)
+
         wait_samples = np.zeros(int(self.F_delay()*sampling_rate))
         wait_samples_2 = np.zeros(int(self.F_compensation_delay()
                                       * sampling_rate))
+
+        # Block pulses
+        block_I, block_Q = wf.block_pulse(self.F_amp(), self.F_length(),
+                                          sampling_rate=1e9)
 
         block_I = np.concatenate([wait_samples, np.array(block_I),
                                  wait_samples_2, -1*np.array(block_I)])
         block_Q = np.concatenate([wait_samples, np.array(block_Q),
                                  wait_samples_2, -1*np.array(block_Q)])
+
+        martinis_pulse = wf.martinis_flux_pulse(
+            length=self.F_length(),
+            lambda_coeffs=self.F_lambda_coeffs(),
+            theta_f=self.F_theta_f(),
+            g2=self.F_J2(),
+            E_c=self.F_E_c(),
+            dac_flux_coef=self.F_dac_flux_coef(),
+            f_interaction=self.F_f_interaction(),
+            f_bus=None,
+            asymmetry=self.F_asymmetry(),
+            sampling_rate=sampling_rate,
+            return_unit='V')
+
+        martinis_pulse = np.concatenate([wait_samples, np.array(block_Q),
+                                         wait_samples_2,
+                                         -1*np.array(block_Q)])
+
+        # Distortion kernel
         k = self.F_kernel_instr.get_instr()
         distorted_I = k.convolve_kernel(
             [k.kernel(), block_I], length_samples=60e3)
+        distorted_martinis = k.convolve_kernel(
+            [k.kernel(), martinis_pulse], length_samples=60e3)
         # hardcoded length for the distortions
 
         self.QWG.get_instr().createWaveformReal(
             'Square_flux_pulse', distorted_I)
         self.QWG.get_instr().set('codeword_{}_ch{}_waveform'.format(
             self.F_CW(), self.F_ch()), 'Square_flux_pulse')
+
+        self.QWG.get_instr().createWaveformReal('Martinis_flux_pulse', distorted_martinis)
