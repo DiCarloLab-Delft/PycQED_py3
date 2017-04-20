@@ -234,7 +234,8 @@ def chevron_seq(q0, q1,
     qasm_file.writelines('X180 {}\n'.format(q0))
     if excite_q1:
         qasm_file.writelines('X180 {}\n'.format(q1))
-    qasm_file.writelines('I {} {}\n'.format(q1, wait_during_flux))
+    qasm_file.writelines(
+        'I {} {}\n'.format(q1, int(wait_during_flux//clock_cycle)))
     if excite_q1:
         # q0 is rotated to ground-state to have better contrast
         # (|0> and |2> instead of |1> and |2>)
@@ -302,6 +303,8 @@ def CZ_calibration_seq(q0, q1, RO_target='all',
         qasm_file.writelines(
             'I {} {}\n'.format(q0, int(wait_during_flux//clock_cycle)))
         qasm_file.writelines('recX90 {}\n'.format(q0))
+        if case == 'excitation':
+            qasm_file.writelines('X180 {}\n'.format(q1))
 
         qasm_file.writelines('RO {}  \n'.format(RO_target))
 
