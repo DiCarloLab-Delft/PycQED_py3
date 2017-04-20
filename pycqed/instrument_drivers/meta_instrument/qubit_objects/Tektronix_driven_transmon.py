@@ -595,6 +595,23 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         if analyze:
             ma.Rabi_Analysis(auto=True, close_fig=close_fig)
 
+
+    def measure_flipping_seq(self, N=np.arange(31)*2,
+                     MC=None, analyze=True, close_fig=True,
+                     verbose=False, upload=True):
+        # prepare for timedomain takes care of rescaling
+        self.prepare_for_timedomain()
+        if MC is None:
+            MC = self.MC.get_instr()
+
+        MC.set_sweep_function(awg_swf.Flipping(
+            pulse_pars=self.pulse_pars, RO_pars=self.RO_pars, upload=upload))
+        MC.set_sweep_points(N)
+        MC.set_detector_function(self.int_avg_det)
+        MC.run('Flipping'+self.msmt_suffix)
+        if analyze:
+            ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
+
     def measure_rabi_amp90(self,
                            scales=np.linspace(-0.7, 0.7, 31), n=1,
                            MC=None, analyze=True, close_fig=True,

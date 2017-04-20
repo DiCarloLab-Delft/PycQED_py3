@@ -85,6 +85,13 @@ class Qubit(Instrument):
     def measure_rabi(self):
         raise NotImplementedError()
 
+
+    def measure_flipping_seq(self,  N=np.arange(31)*2,
+                     MC=None, analyze=True, close_fig=True,
+                     verbose=False, upload=True):
+        raise NotImplementedError()
+
+
     def measure_ramsey(self):
         raise NotImplementedError()
 

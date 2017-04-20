@@ -94,6 +94,26 @@ class Rabi(swf.Hard_Sweep):
                          n=self.n, return_seq=self.return_seq)
 
 
+class Flipping(swf.Hard_Sweep):
+
+    def __init__(self, pulse_pars, RO_pars, upload=True, return_seq=False):
+        super().__init__()
+        self.pulse_pars = pulse_pars
+        self.RO_pars = RO_pars
+        self.upload = upload
+        self.name = 'Flipping'
+        self.parameter_name = 'Number of Pulses'
+        self.unit = '#'
+        self.return_seq = return_seq
+
+    def prepare(self, **kw):
+        if self.upload:
+            sqs.Flipping_seq(N=self.sweep_points,
+                         pulse_pars=self.pulse_pars,
+                         RO_pars=self.RO_pars,
+                         return_seq=self.return_seq)
+
+
 class two_qubit_tomo_cardinal(swf.Hard_Sweep):
 
     def __init__(self, cardinal, q0_pulse_pars, q1_pulse_pars,
@@ -175,25 +195,6 @@ class two_qubit_tomo_bell(swf.Hard_Sweep):
             self.AWG.set('{}_amp'.format(self.q0_flux_pars['channel']),
                          old_val_qS)
             self.upload = False
-
-class Flipping(swf.Hard_Sweep):
-
-    def __init__(self, pulse_pars, RO_pars, n=1, upload=True, return_seq=False):
-        super().__init__()
-        self.pulse_pars = pulse_pars
-        self.RO_pars = RO_pars
-        self.n = n
-        self.upload = upload
-        self.name = 'Rabi'
-        self.parameter_name = 'amplitude'
-        self.unit = 'V'
-        self.return_seq = return_seq
-
-    def prepare(self, **kw):
-        if self.upload:
-            sqs.Flipping_seq(pulse_pars=self.pulse_pars,
-                             RO_pars=self.RO_pars,
-                             n=self.n, return_seq=self.return_seq)
 
 
 class Rabi_amp90(swf.Hard_Sweep):

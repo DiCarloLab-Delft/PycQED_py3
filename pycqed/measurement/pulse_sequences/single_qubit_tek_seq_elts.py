@@ -144,35 +144,29 @@ def Rabi_seq(amps, pulse_pars, RO_pars, n=1, post_msmt_delay=3e-6,
         return seq
 
 
-def Flipping_seq(pulse_pars, RO_pars, n=1, post_msmt_delay=10e-9,
-                 verbose=False, upload=True, return_seq=False):
+def Flipping_seq(N, pulse_pars, RO_pars,
+                 verbose=False, upload=True, cal_points=True, return_seq=False):
     '''
     Flipping sequence for a single qubit using the tektronix.
     Input pars:
+        N:               array of number of flips (int)
         pulse_pars:      dict containing the pulse parameters
         RO_pars:         dict containing the RO parameters
-        n:               iterations (up to 2n+1 pulses)
-        post_msmt_delay: extra wait time for resetless compatibility
     '''
     seq_name = 'Flipping_sequence'
     seq = sequence.Sequence(seq_name)
     station.pulsar.update_channel_settings()
     el_list = []
     pulses = get_pulse_dict_from_pars(pulse_pars)
-    RO_pulse_delay = RO_pars['pulse_delay']
-    for i in range(n+4):  # seq has to have at least 2 elts
-
-        if (i == (n+1) or i == (n)):
-            el = multi_pulse_elt(i, station, [pulses['I'], RO_pars])
-        elif(i == (n+3) or i == (n+2)):
-            RO_pars['pulse_delay'] = RO_pulse_delay
-            el = multi_pulse_elt(i, station, [pulses['X180'], RO_pars])
+    for tt, n in enumerate(N):  # seq has to have at least 2 elts
+        if cal_points and tt>(len(N)-5):
+            if (tt == (len(N)-4) or tt == (len(N)-3)):
+                el = multi_pulse_elt(n, station, [pulses['I'], RO_pars])
+            elif(tt == (len(N)-2) or tt == (len(N)-1)):
+                el = multi_pulse_elt(n, station, [pulses['X180'], RO_pars])
         else:
-            pulse_list = [pulses['X90']]+(2*i+1)*[pulses['X180']]+[RO_pars]
-            # # copy first element and set extra wait
-            # pulse_list[0] = deepcopy(pulse_list[0])
-            # pulse_list[0]['pulse_delay'] += post_msmt_delay
-            el = multi_pulse_elt(i, station, pulse_list)
+            pulse_list = [pulses['X90']]+(n)*[pulses['X180']]+[RO_pars]
+            el = multi_pulse_elt(n, station, pulse_list)
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
     if upload:
