@@ -1190,9 +1190,19 @@ class Rabi_Analysis(TD_Analysis):
         self.fit_res = ['', '']
         # It would be best to do 1 fit to both datasets but since it is
         # easier to do just one fit we stick to that.
+        # We make an initial guess of the Rabi period using both quadratures
+        data = np.sqrt(self.measured_values[0]**2+self.measured_values[1]**2)
+        params = model.guess(model, data=data,
+                                 t=self.sweep_points)
+        fit_res = fit_mods.CosModel.fit(
+                data=data,
+                t=self.sweep_points,
+                params=params)
+        freq_guess = fit_res.values['frequency']
         for i in [0, 1]:
             params = model.guess(model, data=self.measured_values[i],
                                  t=self.sweep_points)
+            params['frequency'].value[0] = freq_guess
             self.fit_res[i] = fit_mods.CosModel.fit(
                 data=self.measured_values[i],
                 t=self.sweep_points,
