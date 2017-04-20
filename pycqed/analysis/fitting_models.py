@@ -380,8 +380,10 @@ def Cos_guess(model, data, t):
     w = np.fft.fft(data)
     f = np.fft.fftfreq(len(data), t[1]-t[0])
     w[0] = 0  # Removes DC component from fourier transform
-    freq_guess = f[w == max(w)]
 
+    # Use absolute value of complex valued spectrum
+    abs_w = np.abs(w)
+    freq_guess = f[abs_w == max(abs_w)][0]
     ph_guess = (-2*np.pi*t[data == max(data)]*freq_guess)[0]
     # the condition data == max(data) can have several solutions
     #               (for example when discretization is visible)
