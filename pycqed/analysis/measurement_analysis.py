@@ -1167,15 +1167,15 @@ class Rabi_Analysis(TD_Analysis):
 
             fine_fit = self.fit_res[i].model.func(
                 x_fine, **self.fit_res[i].best_values)
-            #adding the fitted amp180
-            label='amp180 = {:.3e}'.format(abs(self.fit_res[i].params['period'].value)/2)
-            self.axs[i].plot(x_fine, fine_fit,label=label )
+            # adding the fitted amp180
+            label = 'amp180 = {:.3e}'.format(
+                abs(self.fit_res[i].params['period'].value)/2)
+            self.axs[i].plot(x_fine, fine_fit, label=label)
             ymin = min(self.measured_values[i])
             ymax = max(self.measured_values[i])
             yspan = ymax-ymin
             self.axs[i].set_ylim(ymin-0.23*yspan, 0.05*yspan+ymax)
             self.axs[i].legend(frameon=False, loc='lower left')
-
 
             if show_guess:
                 fine_fit = self.fit_res[i].model.func(
@@ -1192,11 +1192,11 @@ class Rabi_Analysis(TD_Analysis):
         # We make an initial guess of the Rabi period using both quadratures
         data = np.sqrt(self.measured_values[0]**2+self.measured_values[1]**2)
         params = model.guess(model, data=data,
-                                 t=self.sweep_points)
+                             t=self.sweep_points)
         fit_res = fit_mods.CosModel.fit(
-                data=data,
-                t=self.sweep_points,
-                params=params)
+            data=data,
+            t=self.sweep_points,
+            params=params)
         freq_guess = fit_res.values['frequency']
         for i in [0, 1]:
             params = model.guess(model, data=self.measured_values[i],
@@ -1347,8 +1347,8 @@ class CPhase_2Q_amp_cost_analysis(Rabi_Analysis):
 
         self.sort_data()
 
-        self.sweep_points = self.sweep_points
         self.calculate_cost_func(**kw)
+        self.fit_data(**kw)
         self.make_figures(**kw)
 
         if close_file:
@@ -1379,11 +1379,25 @@ class CPhase_2Q_amp_cost_analysis(Rabi_Analysis):
         self.cost_func_val = maximum_difference, missing_swap_pop
 
     def make_figures(self, **kw):
+        # calculate fitted curves
+        x_points_fit = np.linspace(self.x_idx[0], self.x_idx[-1], 50)
+        fit_idx = self.fit_result['idx_amp'] \
+            * np.cos(2*np.pi * self.fit_result['idx_freq']
+                     * x_points_fit + self.fit_result['idx_phase']) \
+            + self.fit_result['idx_offset']
+
+        fit_exc = self.fit_result['exc_amp'] \
+            * np.cos(2*np.pi * self.fit_result['exc_freq']
+                     * x_points_fit + self.fit_result['exc_phase']) \
+            + self.fit_result['exc_offset']
+
         self.fig, self.axs = plt.subplots(2, 1, figsize=(5, 6))
         for i in [0, 1]:
             # self.axs[i].ticklabel_format(useOffset=False)
-            self.axs[i].plot(self.x_idx, self.y_idx[i], '-o', label='no excitation')
-            self.axs[i].plot(self.x_exc, self.y_exc[i], '-o', label='excitation')
+            self.axs[i].plot(self.x_idx, self.y_idx[i], '-o',
+                             label='no excitation')
+            self.axs[i].plot(self.x_exc, self.y_exc[i], '-o',
+                             label='excitation')
 
             self.axs[i].set_xlabel(self.xlabel)
             self.axs[i].set_ylabel(self.ylabels[i])
@@ -1392,6 +1406,8 @@ class CPhase_2Q_amp_cost_analysis(Rabi_Analysis):
                 plot_title = kw.pop('plot_title', textwrap.fill(
                                     self.timestamp_string + '_' +
                                     self.measurementstring, 40))
+                self.axs[i].plot(x_points_fit, fit_idx, '-')
+                self.axs[i].plot(x_points_fit, fit_exc, '-')
                 self.axs[i].legend()
             else:
                 plot_title = ''
@@ -1406,9 +1422,31 @@ class CPhase_2Q_amp_cost_analysis(Rabi_Analysis):
 
         self.save_fig(self.fig, fig_tight=True, close_fig=True, **kw)
 
+    def fit_data(self, **kw):
+        model = fit_mods.CosModel
+        self.fit_result = {}
 
+        # Fit case with no excitation first
+        guess_params = model.guess(model, data=self.y_idx[0], t=self.x_idx)
+        fit_res = model.fit(data=self.y_idx[0],
+                            t=self.x_idx,
+                            params=guess_params)
+        self.fit_result['idx_amp'] = fit_res.values['amplitude']
+        self.fit_result['idx_freq'] = fit_res.values['frequency']
+        self.fit_result['idx_phase'] = fit_res.values['phase']
+        self.fit_result['idx_offset'] = fit_res.values['offset']
 
+        # Fit case with excitation
+        guess_params = model.guess(model, data=self.y_exc[0], t=self.x_exc)
+        fit_res = model.fit(data=self.y_exc[0],
+                            t=self.x_exc,
+                            params=guess_params)
+        self.fit_result['exc_amp'] = fit_res.values['amplitude']
+        self.fit_result['exc_freq'] = fit_res.values['frequency']
+        self.fit_result['exc_phase'] = fit_res.values['phase']
+        self.fit_result['exc_offset'] = fit_res.values['offset']
 
+        # TODO: save fit params
 
 
 class Motzoi_XY_analysis(TD_Analysis):
@@ -3942,6 +3980,7 @@ class Homodyne_Analysis(MeasurementAnalysis):
 
 
 class Acquisition_Delay_Analysis(MeasurementAnalysis):
+
     def __init__(self, label='AD', **kw):
         kw['label'] = label
         kw['h5mode'] = 'r+'
@@ -3991,6 +4030,7 @@ class Acquisition_Delay_Analysis(MeasurementAnalysis):
             self.data_file.close()
 
         return self.max_delay
+
 
 class Hanger_Analysis_CosBackground(MeasurementAnalysis):
 
@@ -4135,14 +4175,16 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
                              show=False, fit_results_peak=True, **kw):
         def fit_data():
             try:
-                self.data_dist = np.sqrt(self.measured_values[2]**2 + self.measured_values[3])
+                self.data_dist = np.sqrt(
+                    self.measured_values[2]**2 + self.measured_values[3])
                 # self.data_dist = a_tools.calculate_distance_ground_state(
                 #     data_real=self.measured_values[2],
                 #     data_imag=self.measured_values[3])
             except:
                 # Quick fix to make it work with pulsed spec which does not
                 # return both I,Q and, amp and phase
-                self.data_dist = self.measured_values[0] #only using the amplitude!!
+                # only using the amplitude!!
+                self.data_dist = self.measured_values[0]
                 # self.data_dist = a_tools.calculate_distance_ground_state(
                 #     data_real=self.measured_values[0],
                 #     data_imag=self.measured_values[1])
@@ -5317,9 +5359,9 @@ class Chevron_2D(object):
         cmin, cmax = 0, 1
         fig_clim = [cmin, cmax]
         out = pl_tools.flex_colormesh_plot_vs_xy(ax=ax, clim=fig_clim, cmap='viridis',
-                                        xvals=plot_times,
-                                        yvals=plot_x,
-                                        zvals=result)
+                                                 xvals=plot_times,
+                                                 yvals=plot_x,
+                                                 zvals=result)
         ax.set_xlabel(r'AWG Amp (Vpp)')
         ax.set_ylabel(r'Time (ns)')
         ax.set_title('%s: Chevron scan' % self.scan_start)
@@ -5651,9 +5693,9 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
         flux = self.Y[:, 0]
         peaks_low, peaks_high = self.find_peaks()
         self.f, self.ax = self.make_unfiltered_figure(peaks_low, peaks_high,
-                                    transpose=transpose, cmap=cmap,
-                                    add_title=add_title,
-                                    xlabel=xlabel, ylabel=ylabel)
+                                                      transpose=transpose, cmap=cmap,
+                                                      add_title=add_title,
+                                                      xlabel=xlabel, ylabel=ylabel)
 
         filtered_dat = self.filter_data(flux, peaks_low, peaks_high,
                                         a=filt_func_a, x0=filt_func_x0,
@@ -5665,10 +5707,10 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
             filter_func = filtered_dat
 
         self.f, self.ax = self.make_filtered_figure(filt_flux_low, filt_flux_high,
-                                  filt_peaks_low, filt_peaks_high, filter_func,
-                                  add_title=add_title,
-                                  transpose=transpose, cmap=cmap,
-                                  xlabel=xlabel, ylabel=ylabel)
+                                                    filt_peaks_low, filt_peaks_high, filter_func,
+                                                    add_title=add_title,
+                                                    transpose=transpose, cmap=cmap,
+                                                    xlabel=xlabel, ylabel=ylabel)
         if break_before_fitting:
             return
         self.fit_res = self.fit_avoided_crossing(
@@ -5679,13 +5721,12 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
         self.add_analysis_datagroup_to_file()
         self.save_fitted_parameters(self.fit_res, var_name='avoided crossing')
         self.f, self.ax = self.make_fit_figure(filt_flux_low, filt_flux_high,
-                             filt_peaks_low, filt_peaks_high,
-                             add_title=add_title,
-                             fit_res=self.fit_res,
-                             coupling_label=coupling_label,
-                             transpose=transpose, cmap=cmap,
-                             xlabel=xlabel, ylabel=ylabel)
-
+                                               filt_peaks_low, filt_peaks_high,
+                                               add_title=add_title,
+                                               fit_res=self.fit_res,
+                                               coupling_label=coupling_label,
+                                               transpose=transpose, cmap=cmap,
+                                               xlabel=xlabel, ylabel=ylabel)
 
     def run_default_analysis(self, **kw):
         # I'm doing this in the init in this function
