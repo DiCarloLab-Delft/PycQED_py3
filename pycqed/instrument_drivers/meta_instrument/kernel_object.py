@@ -124,11 +124,11 @@ class Distortion(Instrument):
                            parameter_class=ConfigParameter,
                            vals=vals.Numbers())
         self.add_parameter('poly_c', unit='',
-                           initial_value=0,
+                           initial_value=1,
                            parameter_class=ConfigParameter,
                            vals=vals.Numbers())
         self.add_parameter('poly_length', unit='s',
-                           initial_value=0,
+                           initial_value=600e-9,
                            parameter_class=ConfigParameter,
                            vals=vals.Numbers())
 
@@ -144,7 +144,7 @@ class Distortion(Instrument):
         if kernel_name in kernel_list:
             raise ValueError('Kernel "{}" already in kernel list'.format(kernel_name))
         kernel_list.append(kernel_name)
-        self._config_changed =True # has to be done by hand as appending to
+        self._config_changed = True # has to be done by hand as appending to
         # the list does not correctlyupdate the changed flag
         self.kernel_list(kernel_list)
 
@@ -176,11 +176,13 @@ class Distortion(Instrument):
         return kf.decay_kernel(amp=self.decay_amp_2(), tau=self.decay_tau_2()*1e9,
                                length=self.decay_length_2()*1e9)
 
-    # def get_poly_kernel(self):
-    #     return poly_kernel(a=self.poly_a(),
-    #                        b=self.poly_b(),
-    #                        c=self.poly_c(),
-    #                        length=self.poly_length())
+    def get_poly_kernel(self):
+        """
+        Returns polynomial kernel, see kernel_functions.poly_kernel for details
+        """
+        return kf.poly_kernel(
+            coeffs=[self.poly_a(), self.poly_b(), self.poly_c()],
+            length=self.poly_length()*1e9)
 
     def convolve_kernel(self, kernel_list, length_samples=None):
         """
@@ -227,7 +229,8 @@ class Distortion(Instrument):
             self.get_bounce_kernel_2(),
             self.get_skin_kernel(),
             self.get_decay_kernel_1(),
-            self.get_decay_kernel_2()]
+            self.get_decay_kernel_2(),
+            self.get_poly_kernel()]
 
         kernel_list = external_kernels + kernel_object_kernels
         return self.convolve_kernel(
