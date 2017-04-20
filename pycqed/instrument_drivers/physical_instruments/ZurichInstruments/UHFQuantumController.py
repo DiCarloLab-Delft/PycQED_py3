@@ -410,7 +410,7 @@ class UHFQC(Instrument):
         return data
 
     def acquisition_poll(self, samples, arm=True,
-                         acquisition_time=0.010, timeout=10):
+                         acquisition_time=0.010):
         """
         Polls the UHFQC for data.
 

@@ -416,73 +416,21 @@ class Transmon(Qubit):
         self.f_RO(self.f_res())
         return f_res
 
-    # def find_pulse_amplitude(self, amps,
-    #                          N_steps=[3, 7, 13, 17], max_n=18,
-    #                          close_fig=True, verbose=False,
-    #                          MC=None, update=True, take_fit_I=False):
-    #     '''
-    #     Finds the pulse-amplitude using a rabi experiment.
-
-    #     If amps is an array it starts by fitting a cos to a Rabi experiment
-    #     to get an initial guess for the amplitude.
-    #     If amps is a float it uses that as the initial amplitude and starts
-    #     doing rabi flipping experiments around that optimum directly.
-    #     '''
-    #     if MC is None:
-    #         MC = self.MC.get_instr()
-    #     if np.size(amps) != 1:
-    #         self.measure_rabi(amps, n=1, MC=MC, analyze=False)
-    #         a = ma.Rabi_Analysis(close_fig=close_fig)
-    #         if take_fit_I:
-    #             ampl = abs(a.fit_res[0].params['period'].value)/2
-    #             print("taking I")
-    #         else:
-    #             if (a.fit_res[0].params['period'].stderr <=
-    #                     a.fit_res[1].params['period'].stderr):
-    #                 ampl = abs(a.fit_res[0].params['period'].value)/2
-    #             else:
-    #                 ampl = abs(a.fit_res[1].params['period'].value)/2
-    #     else:
-    #         ampl = amps
-    #     if verbose:
-    #         print('Initial Amplitude:', ampl, '\n')
-
-    #     for n in N_steps:
-    #         if n > max_n:
-    #             break
-    #         else:
-    #             ampl_span = 0.3*ampl/n
-    #             amps = np.linspace(ampl-ampl_span, ampl+ampl_span, 15)
-    #             self.measure_rabi(amps, n=n, MC=MC, analyze=False)
-    #             a = ma.Rabi_parabola_analysis(close_fig=close_fig)
-    #             if take_fit_I:
-    #                 ampl = a.fit_res[0].params['x0'].value
-    #             else:
-    #                 if (a.fit_res[0].params['x0'].stderr <=
-    #                         a.fit_res[1].params['x0'].stderr):
-    #                     ampl = a.fit_res[0].params['x0'].value
-    #                 else:
-    #                     ampl = a.fit_res[1].params['x0'].value
-    #             if verbose:
-    #                 print('Found amplitude', ampl, '\n')
-    #     if update:
-    #         self.amp180.set(ampl)
-    #         print(ampl)
-
-        # After this it should enter a loop where it fine tunes the amplitude
-        # based on fine scanes around the optimum with higher sensitivity.
-
-    def find_pulse_amplitude(self, amps,
+    def find_pulse_amplitude(self, amps=np.linspace(-.5, .5, 31),
                              N_steps=[3, 7, 13, 17], max_n=18,
                              close_fig=True, verbose=False,
                              MC=None, update=True, take_fit_I=False):
         '''
-        Finds the pulse-amplitude using a rabi experiment.
+        Finds the pulse-amplitude using a Rabi experiment.
+        Fine tunes by doing a Rabi around the optimum with an odd
+        multiple of pulses.
 
-        If amps is an array it starts by fitting a cos to a Rabi experiment
-        to get an initial guess for the amplitude.
-        If amps is a float it uses that as the initial amplitude and starts
-        doing rabi flipping experiments around that optimum directly.
+        Args:
+            amps: (array or float) amplitudes of the first Rabi if an array,
+                if a float is specified it will be treated as an estimate
+                for the amplitude to be found.
+            N_steps: (list of int) number of pulses used in the fine tuning
+            max_n: (int) break of if N> max_n
         '''
         if MC is None:
             MC = self.MC.get_instr()
@@ -492,9 +440,10 @@ class Transmon(Qubit):
             # Decide which quadrature to take by comparing the contrast
             if take_fit_I:
                 ampl = abs(a.fit_res[0].params['period'].value)/2.
-                print("taking I")
-            elif (np.abs(max(a.fit_res[0].data)-min(a.fit_res[0].data)))>\
-                    (np.abs(max(a.fit_res[1].data)-min(a.fit_res[1].data))):
+            elif (np.abs(max(a.measured_values[0]) -
+                         min(a.measured_values[0]))) > (
+                    np.abs(max(a.measured_values[1]) -
+                           min(a.measured_values[1]))):
                 ampl = a.fit_res[0].params['period'].value/2.
             else:
                 ampl = a.fit_res[1].params['period'].value/2.
@@ -534,8 +483,10 @@ class Transmon(Qubit):
                     # Decide which quadrature to take by comparing the contrast
                     if take_fit_I:
                         ampl = a.fit_res[0].params['x0'].value
-                    elif (np.abs(max(a.fit_res[0].data)-min(a.fit_res[0].data)))>\
-                        (np.abs(max(a.fit_res[1].data)-min(a.fit_res[1].data))):
+                    elif (np.abs(max(a.measured_values[0]) -
+                                 min(a.measured_values[0]))) > (
+                          np.abs(max(a.measured_values[1]) -
+                                 min(a.measured_values[1]))):
                         ampl = a.fit_res[0].params['x0'].value
                     else:
                         ampl = a.fit_res[1].params['x0'].value
@@ -543,7 +494,7 @@ class Transmon(Qubit):
                     print('Found amplitude', ampl, '\n')
         if update:
             self.amp180.set(ampl)
-            print(ampl)
+
 
     def find_amp90_scaling(self, scales=0.5,
                            N_steps=[5, 9], max_n=100,

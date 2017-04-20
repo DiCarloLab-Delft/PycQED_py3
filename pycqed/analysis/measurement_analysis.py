@@ -1178,6 +1178,7 @@ class Rabi_Analysis(TD_Analysis):
             yspan = ymax-ymin
             self.axs[i].set_ylim(ymin-0.23*yspan, 0.05*yspan+ymax)
             self.axs[i].legend(frameon=False, loc='lower left')
+
             if show_guess:
                 fine_fit = self.fit_res[i].model.func(
                     x_fine, **self.fit_res[i].init_values)
