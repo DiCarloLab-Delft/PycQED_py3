@@ -7,6 +7,10 @@
 #  - The PyqCED source code
 #    - Download: https://github.com/DiCarloLab-Delft/PycQED_py3
 
+# Usage:
+# Open Windows PowerShell, enter the root directory of PyqCED, type the following command and press enter:
+#  .\install.ps1
+
 # install packages.
 conda install h5py
 conda install matplotlib
