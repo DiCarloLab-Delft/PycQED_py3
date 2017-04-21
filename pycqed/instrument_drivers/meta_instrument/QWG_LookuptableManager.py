@@ -137,9 +137,6 @@ class QWG_FluxLookuptableManager(Instrument):
         self.add_parameter('F_amp', unit='V', parameter_class=ManualParameter)
         self.add_parameter('F_length', unit='s',
                            parameter_class=ManualParameter)
-        self.add_parameter('F_CW', label='Flux pulse codeword',
-                           vals=vals.Ints(),
-                           parameter_class=ManualParameter)
         self.add_parameter('F_ch', label='Flux channel',
                            vals=vals.Ints(),
                            parameter_class=ManualParameter)
@@ -158,7 +155,7 @@ class QWG_FluxLookuptableManager(Instrument):
                            label='lambda coefficients for martinis pulse',
                            unit='',
                            inital_value=None,
-                           vals=vals.Array(),
+                           vals=vals.Anything(),
                            parameter_class=ManualParameter)
         self.add_parameter('F_theta_f',
                            label='theta_f for martinis pulse',
@@ -202,24 +199,32 @@ class QWG_FluxLookuptableManager(Instrument):
                            inital_value=0.0,
                            vals=vals.Numbers(),
                            parameter_class=ManualParameter)
+        self.add_parameter('codeword_dict',
+                           label='Dictionary assigning codewords to pulses',
+                           unit=''
+                           inital_value={
+                               'Square_flux_pulse': 5,
+                               'Martinis_flux_pulse': 6
+                           },
+                           vals=vals.Anything(),
+                           parameter_class=ManualParameter)
+        self.add_parameter('sampling_rate',
+                           label='Sampling rate of the QWG',
+                           unit='Hz',
+                           initial_value=1.0e9,
+                           vals=vals.Numbers(),
+                           parameter_class=ManualParameter)
 
-
-    def load_pulses_onto_AWG_lookuptable(self):
-        sampling_rate = 1e9
-
-        wait_samples = np.zeros(int(self.F_delay()*sampling_rate))
-        wait_samples_2 = np.zeros(int(self.F_compensation_delay()
-                                      * sampling_rate))
-
+    def standard_waveforms(self):
+        '''
+        Returns standard waveforms, without delays or distortions applied.
+        '''
         # Block pulses
+        # Pulse is not IQ modulated, so block_Q is not used.
         block_I, block_Q = wf.block_pulse(self.F_amp(), self.F_length(),
-                                          sampling_rate=1e9)
+                                          sampling_rate=self.sampling_rate())
 
-        block_I = np.concatenate([wait_samples, np.array(block_I),
-                                 wait_samples_2, -1*np.array(block_I)])
-        block_Q = np.concatenate([wait_samples, np.array(block_Q),
-                                 wait_samples_2, -1*np.array(block_Q)])
-
+        # Fast adiabatic pulse
         martinis_pulse = wf.martinis_flux_pulse(
             length=self.F_length(),
             lambda_coeffs=self.F_lambda_coeffs(),
@@ -230,24 +235,100 @@ class QWG_FluxLookuptableManager(Instrument):
             f_interaction=self.F_f_interaction(),
             f_bus=None,
             asymmetry=self.F_asymmetry(),
-            sampling_rate=sampling_rate,
+            sampling_rate=self.sampling_rate(),
             return_unit='V')
 
-        martinis_pulse = np.concatenate([wait_samples, np.array(block_Q),
-                                         wait_samples_2,
-                                         -1*np.array(block_Q)])
+        return {'Square_flux_pulse': block_I,
+                'Martinis_flux_pulse': martinis_pulse}
 
-        # Distortion kernel
+    def generate_standard_pulses(self):
+        '''
+        Generates all flux pulses that are defined in the method
+        'standard_waveforms'.
+
+        The complete pulses with delays and distortions are stored in
+        self._wave_dict, which is also returned by this method.
+        '''
+        self._wave_dict = {}
+
+        waveforms = self.standard_waveforms()
+
+        # Insert delays and compensation pulses, apply distortions
+        wait_samples = np.zeros(int(self.F_delay()*self.sampling_rate()))
+        wait_samples_2 = np.zeros(int(self.F_compensation_delay()
+                                      * self.sampling_rate()))
         k = self.F_kernel_instr.get_instr()
-        distorted_I = k.convolve_kernel(
-            [k.kernel(), block_I], length_samples=60e3)
-        distorted_martinis = k.convolve_kernel(
-            [k.kernel(), martinis_pulse], length_samples=60e3)
+
+        for key in waveforms.keys():
+            delayed_wave = np.concatenate(
+                [wait_samples, np.array(waveforms[key]), wait_samples_2,
+                 -1 * np.array(waveforms[key])])
+            self._wave_dict[key] = k.convolve_kernel(
+                [k.kernel(), delayed_wave], length_samples=60e3)
         # hardcoded length for the distortions
 
-        self.QWG.get_instr().createWaveformReal(
-            'Square_flux_pulse', distorted_I)
-        self.QWG.get_instr().set('codeword_{}_ch{}_waveform'.format(
-            self.F_CW(), self.F_ch()), 'Square_flux_pulse')
+        return self._wave_dict
 
-        self.QWG.get_instr().createWaveformReal('Martinis_flux_pulse', distorted_martinis)
+    def regenerate_pulse(self, pulse_name):
+        '''
+        Regenerates a single pulse. The pulse is updated in self._wave_dict
+        and also returned by this method.
+
+        Args:
+            pulse_name      (str): name of the pulse to regenerate
+        '''
+        if pulse_name not in self._wave_dict.keys():
+            raise KeyError(
+                'Pulse {} not in wave dictionary.'.format(pulse_name))
+
+        # Get the plain waveform
+        waveform = self.standard_waveforms()[pulse_name]
+
+        # Insert delays and compensation pulses, apply distortions
+        wait_samples = np.zeros(int(self.F_delay()*self.sampling_rate()))
+        wait_samples_2 = np.zeros(int(self.F_compensation_delay()
+                                      * self.sampling_rate()))
+        k = self.F_kernel_instr.get_instr()
+
+        delayed_wave = np.concatenate([wait_samples, np.array(waveform),
+                                       wait_samples_2, -1*np.array(waveform)])
+        distorted_wave = k.convolve_kernel([k.kernel(), delayed_wave],
+                                           length_samples=60e3)
+
+        self._wave_dict[pulse_name] = distorted_wave
+        return distorted_wave
+
+    def load_pulse_onto_AWG_lokuptable(self, pulse_name,
+                                       regenerate_pulse=True):
+        '''
+        Load a specific pulse onto the lookuptable.
+
+        Args:
+            pulse_name          (str): Name of the pulse to be loaded
+            regenerate_pulses   (bool): should the pulses be generated again
+        '''
+        if regenerate_pulse:
+            self.regenerate_pulse(pulse_name)
+
+        if pulse_name not in self.codeword_dict().keys():
+            raise KeyError(
+                'Pulse {} not in codeword mapping.'.format(pulse_name))
+
+        self.QWG.get_instr().createWaveformReal(
+            pulse_name, self._wave_dict[pulse_name])
+        self.QWG.get_instr().set('codeword_{}_ch{}_waveform'.format(
+            self.codeword_dict()[pulse_name], self.F_ch()), pulse_name)
+
+    def load_pulses_onto_AWG_lookuptable(self, regenerate_pulses=False):
+        '''
+        Load all standard pulses to the QWG lookuptable.
+
+        Args:
+            regenerate_pulses   (bool): should the pulses be generated again
+        '''
+        if regenerate_pulses:
+            self.generate_standard_pulses()
+
+        for pulse_name in self._wave_dict:
+            self.load_pulse_onto_AWG_lokuptable(
+                pulse_name, regenerate_pulse=False)
