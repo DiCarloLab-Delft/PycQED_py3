@@ -377,8 +377,10 @@ def Cos_guess(model, data, t):
     offs_guess = np.mean(data)
 
     # Freq guess ! only valid with uniform sampling
-    w = np.fft.fft(data)
-    f = np.fft.fftfreq(len(data), t[1]-t[0])
+    # Only first half of array is used, because the second half contains the
+    # negative frequecy components, and we want a positive frequency.
+    w = np.fft.fft(data)[:len(data)//2]
+    f = np.fft.fftfreq(len(data), t[1]-t[0])[:len(w)]
     w[0] = 0  # Removes DC component from fourier transform
 
     # Use absolute value of complex valued spectrum
