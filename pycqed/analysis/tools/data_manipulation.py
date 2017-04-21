@@ -10,7 +10,7 @@ roughly split into
 
 '''
 import numpy as np
-
+import matplotlib.pyplot as plt
 
 def count_rounds_to_error(series):
     '''
@@ -136,7 +136,7 @@ def binary_derivative(series):
     part of data traces.
     '''
     d_series = np.array([1 if series[i+1] == series[i] else -1
-                        for i in range(len(series)-1)])
+                         for i in range(len(series)-1)])
     return d_series
 
 
@@ -147,10 +147,10 @@ def binary_derivative_2D(data_array, axis=0):
     '''
     if axis == 0:
         dd_array = np.array([binary_derivative(line)
-                            for line in data_array])
+                             for line in data_array])
     elif axis == 1:
         dd_array = np.array([binary_derivative(line)
-                            for line in data_array.T]).T
+                             for line in data_array.T]).T
     return dd_array
 
 
@@ -231,10 +231,10 @@ def digitize(data, threshold, positive_case=True):
     '''
     if positive_case:
         data_digitized = np.asarray([[1 if d_element <= threshold else -1
-                                    for d_element in d_row] for d_row in data])
+                                      for d_element in d_row] for d_row in data])
     else:
         data_digitized = np.asarray([[1 if d_element >= threshold else -1
-                                    for d_element in d_row] for d_row in data])
+                                      for d_element in d_row] for d_row in data])
     return data_digitized
 
 
@@ -275,15 +275,13 @@ def count_error_fractions(trace):
                         # single counter
                         double_err_counter += 1
             else:
-                no_err_counter +=1
+                no_err_counter += 1
         if trace[i] == 1:
-            zero_counter +=1
+            zero_counter += 1
         else:
-            one_counter +=1
+            one_counter += 1
 
     return no_err_counter, single_err_counter, double_err_counter, zero_counter, one_counter
-
-
 
 
 def flatten_2D_histogram(H, xedges, yedges):
@@ -327,6 +325,7 @@ def reject_outliers(data, m=6.):
     s = d/mdev if mdev else 0.
     return data[s < m]
 
+
 def rotation_matrix(angle, as_array=False):
     """
     Returns a 2x2 rotation matrix based on an angle in degrees.
@@ -334,10 +333,11 @@ def rotation_matrix(angle, as_array=False):
     rot_mat * vec shape(2,1) rotates the vector clockwise
     """
     rot_mat = np.matrix([[np.cos(2*np.pi*angle/360), - np.sin(2*np.pi*angle/360)],
-             [np.sin(2*np.pi*angle/360),  np.cos(2*np.pi*angle/360)]])
+                         [np.sin(2*np.pi*angle/360),  np.cos(2*np.pi*angle/360)]])
     if as_array:
         rot_mat = np.array(rot_mat)
     return rot_mat
+
 
 def rotate_complex(complex_number, angle, deg=True):
     """
@@ -347,3 +347,35 @@ def rotate_complex(complex_number, angle, deg=True):
         angle = angle/360*2*np.pi
     rotated_number = complex_number*np.exp(1j*angle)
     return rotated_number
+
+
+def get_outliers_fwd(x, threshold, plot_hist=False, ax=None):
+    dif = np.zeros(x.shape)
+    dif[1:] = x[1:] - x[:-1]
+    if plot_hist:
+        if ax is None:
+            fig = plt.figure(figsize=(8, 6))
+            ax = fig.add_subplot(111)
+        ax.hist(np.abs(dif[~np.isnan(dif)]))
+        ax.axvline(threshold, color='k')
+    return np.where(np.logical_or((np.abs(dif) > threshold), (np.isnan(x))),
+                    True, False)
+
+
+def get_outliers_bwd(x, threshold, plot_hist=False, ax=None):
+    x = x[::-1]
+    dif = np.zeros(x.shape)
+    dif[1:] = x[1:] - x[:-1]
+    if plot_hist:
+        if ax is None:
+            fig = plt.figure(figsize=(8, 6))
+            ax = fig.add_subplot(111)
+        ax.hist(np.abs(dif[~np.isnan(dif)]))
+        ax.axvline(threshold, color='k')
+    return np.where(np.logical_or((np.abs(dif) > threshold), (np.isnan(x))),
+                    True, False)
+
+
+def get_outliers(x, threshold):
+    return np.logical_and(get_outliers_fwd(x, threshold),
+                          get_outliers_bwd(x, threshold)[::-1])
