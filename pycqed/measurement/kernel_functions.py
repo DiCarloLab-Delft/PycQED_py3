@@ -3,7 +3,8 @@ import numpy as np
 from scipy import special
 
 
-kernel_dir = None  #'D:\\GitHubRepos\\iPython-Notebooks\\Experiments\\1607_Qcodes_5qubit\\kernels\\'
+# 'D:\\GitHubRepos\\iPython-Notebooks\\Experiments\\1607_Qcodes_5qubit\\kernels\\'
+kernel_dir = None
 from os.path import join
 
 
@@ -189,8 +190,6 @@ def step_raw(file_name, process_step=True, step_params=None, norm_type='max'):
             else:
                 step_downedge = step_downedge[0]
             # print(step_max, step_min, step_mid, step_upedge, step_downedge)
-
-
 
             baseline_end = step_upedge - \
                 np.where(
@@ -413,9 +412,13 @@ def decay_kernel(amp=1., tau=11000, length=2000):
     """
     Generates a decay kernel, with the specified parameters
 
-    kernel_step_function
-        1 + amp*np.exp(-t_kernel/tau)
+    step_function
+        1 - amp*np.exp(-t_kernel/tau)
+
+    amp and tau are the parameters etimated from the step function
+
     """
+
     tau_k = (1.-amp)*tau
     amp_k = amp/(amp-1)
     t_kernel = np.arange(int(length))
@@ -444,3 +447,18 @@ def skin_kernel(alpha=0., length=601):
         kernel_skineffect = np.zeros(int(length))
         kernel_skineffect[0] = 1.
     return kernel_skineffect
+
+
+def poly_kernel(coeffs, length=601):
+    """
+    Generates the kernel that corresponds to a step response that is described
+    by a polynomial.
+
+    Note that the kernel corresponds to the impulse response and not to the
+    step response.
+    """
+    samples = np.arange(length)
+    polyvec = np.polyval(coeffs, samples)
+    poly_kernel = kernel_from_kernel_stepvec(polyvec)
+
+    return poly_kernel
