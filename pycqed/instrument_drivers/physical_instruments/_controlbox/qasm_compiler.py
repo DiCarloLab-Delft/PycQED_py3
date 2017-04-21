@@ -25,7 +25,7 @@ IR definition:
 time point: label, absolute time, pre_waiting time
 event: type, duration
 '''
-from enum import Enum
+import enum
 import logging
 
 
@@ -38,11 +38,11 @@ class time_point():
         self.parallel_events = []
 
 
-class EventType(Enum):
-    NONE_EVENT = auto()
-    WAIT = auto()
-    QOP = auto()
-    DECLARE = auto()
+class EventType(enum.Enum):
+    NONE_EVENT = enum.auto()
+    WAIT = enum.auto()
+    QOP = enum.auto()
+    DECLARE = enum.auto()
     
     # I need to think how to separate the technology dependent part and 
     # technology independent part.
@@ -65,9 +65,12 @@ class qasm_event():
 
 class prog_line():
 
-    def __init__(self):
-        self.number = -1
-        self.content = ''
+    def __init__(self, number=-1, content=''):
+        self.number = number
+        self.content = content
+
+    def __str__(self):
+        return "{}: {}".format(self.number, self.content)
 
 
 class QASM_QuMIS_Compiler():
@@ -77,7 +80,7 @@ class QASM_QuMIS_Compiler():
         self.raw_lines = None
         self.prog_lines = None
 
-    def readfile(self):
+    def read_file(self):
         '''
         Read all lines in the file.
         '''
@@ -89,19 +92,28 @@ class QASM_QuMIS_Compiler():
 
         self.raw_lines = []
         self.prog_lines = []  # after removing comments.
-        for line_number, line_content in prog_file:
-            self.raw_lines.append(prog_line(line_number, line_content))
+        for line_number, line_content in enumerate(prog_file):
+            self.raw_lines.append(prog_line(line_number, line_content.strip(' \t\n\r')))
 
             line_content = self.remove_comment(line_content)
-            if (len(line) == 0):  # skip empty line and comment
+            if (len(line_content) == 0):  # skip empty line and comment
                 continue
             self.prog_lines.append(prog_line(line_number, line_content))
 
         prog_file.close()
 
-    def load_op_dict(self, filename):
+    def load_qasm_op_dict(self, filename):
         self.qasm_op_dict = None
         pass
+
+    def print_lines(self):
+        print("Raw Lines:")
+        for line in self.raw_lines:
+            print(line)
+
+        print("\nProgram Lines:")
+        for line in self.prog_lines:
+            print(line)
 
     @classmethod
     def remove_comment(self, line):
@@ -121,6 +133,7 @@ class QASM_QuMIS_Compiler():
 
         raw_event_list contains all events before resolving timing information.
         '''
+        self.load_qasm_op_dict()
         self.raw_event_list = []
         for line in self.prog_lines:
             events = self.get_parallel_qasm_ops(line.content)
@@ -152,6 +165,12 @@ class QASM_QuMIS_Compiler():
                 raw_event.duration = 0
                 raw_events.append(raw_event)
 
+    def is_wait_instr(self, qasm_op_name):
+        if (qasm_op_name.lower() == "I"):
+            return True
+        else:
+            return False
+
     @classmethod
     def get_parallel_qasm_ops(self, op_line):
         return [rawEle.strip(string.punctuation.translate(
@@ -159,13 +178,13 @@ class QASM_QuMIS_Compiler():
 
     @classmethod
     def get_qasm_op_name(self, qasm_op):
-        if qasm_op = '':
+        if qasm_op == '':
             raise ValueError("QASM operation cannot be empty")
         return qasm_op.split()[0]
 
     @classmethod
     def get_qasm_op_params(self, qasm_op):
-        if qasm_op = '':
+        if qasm_op == '':
             raise ValueError("QASM operation cannot be empty")
         return qasm_op.split()[1:]
 

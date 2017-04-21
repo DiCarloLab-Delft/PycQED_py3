@@ -1,10 +1,7 @@
 
-import sys
-import numpy as np
-from io import StringIO
 from unittest import TestCase
-from os.path import join, dirname
-from copy import deepcopy
+import pycqed as pq
+import os
 
 # from qcodes import Instrument
 
@@ -41,5 +38,14 @@ class Test_Parallel_QASM_Compiler(TestCase):
 
         self.compiler = qasm_compiler.QASM_QuMIS_Compiler(self.qasm_file_name)
 
+    def test_read_file(self):
+        qasm_file_name = "Nonexisting.qasm"
+        self.setCompiler(qasm_file_name)
+        with self.assertRaises(OSError):
+            self.compiler.read_file()
+
     def test_remove_comment(self):
         self.assertTrue(True)
+
+# tpac = Test_Parallel_QASM_Compiler()
+# tpac.test_remove_comment()
