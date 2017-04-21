@@ -42,6 +42,7 @@ class EventType(Enum):
     NONE_EVENT = auto()
     WAIT = auto()
     QOP = auto()
+    DECLARE = auto()
     
     # I need to think how to separate the technology dependent part and 
     # technology independent part.
@@ -69,7 +70,7 @@ class prog_line():
         self.content = ''
 
 
-class qasm_qumis_compiler():
+class QASM_QuMIS_Compiler():
 
     def __init__(self, filename=None):
         self.filename = filename
@@ -150,8 +151,6 @@ class qasm_qumis_compiler():
                 
                 raw_event.duration = 0
                 raw_events.append(raw_event)
-
-
 
     @classmethod
     def get_parallel_qasm_ops(self, op_line):
