@@ -1202,7 +1202,7 @@ class Rabi_Analysis(TD_Analysis):
         for i in [0, 1]:
             params = model.guess(model, data=self.measured_values[i],
                                  t=self.sweep_points)
-            params['frequency'].value[0] = freq_guess
+            params['frequency'].value = freq_guess
             self.fit_res[i] = fit_mods.CosModel.fit(
                 data=self.measured_values[i],
                 t=self.sweep_points,
