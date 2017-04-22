@@ -5,6 +5,9 @@ import logging
 from pycqed.measurement.waveform_control_CC import waveform as wf
 from pycqed.instrument_drivers.pq_parameters import InstrumentParameter
 import numpy as np
+import matplotlib.pyplot as plt
+from qcodes.plots.pyqtgraph import QtPlot
+from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
 
 
 class QWG_LookuptableManager(Instrument):
@@ -146,70 +149,83 @@ class QWG_FluxLookuptableManager(Instrument):
                            vals=vals.Numbers(),
                            parameter_class=ManualParameter)
         self.add_parameter('F_compensation_delay',
-                           label='Delay before compensation pulses',
+                           label='compens. pulse delay',
                            unit='s',
                            initial_value=4e-6,
                            vals=vals.Numbers(),
                            parameter_class=ManualParameter)
-        self.add_parameter('F_lambda_coeffs',
-                           label='lambda coefficients for martinis pulse',
+        self.add_parameter('F_lambda_1',
+                           docstring='first lambda coef. for martinis pulse',
+                           label='lambda_1',
                            unit='',
-                           inital_value=None,
-                           vals=vals.Anything(),
+                           initial_value=0,
+                           vals=vals.Numbers(),
+                           parameter_class=ManualParameter)
+        self.add_parameter('F_lambda_2',
+                           docstring='second lambda coef. for martinis pulse',
+                           label='lambda_2',
+                           unit='',
+                           initial_value=0,
+                           vals=vals.Numbers(),
                            parameter_class=ManualParameter)
         self.add_parameter('F_theta_f',
-                           label='theta_f for martinis pulse',
+                           docstring='theta_f for martinis pulse',
+                           label='theta_f',
                            unit='deg',
-                           inital_value=0.0,
+                           initial_value=0.0,
                            vals=vals.Numbers(),
                            parameter_class=ManualParameter)
         self.add_parameter('F_J2',
-                           label='coupling between 11-02',
+                           docstring='coupling between 11-02',
+                           label='J2',
                            unit='Hz',
-                           inital_value=0.0,
+                           initial_value=0.0,
                            vals=vals.Numbers(),
                            parameter_class=ManualParameter)
         self.add_parameter('F_f_interaction',
                            label='interaction frequency',
                            unit='Hz',
-                           inital_value=0.0,
+                           initial_value=0.0,
                            vals=vals.Numbers(),
                            parameter_class=ManualParameter)
         self.add_parameter('F_dac_flux_coef',
-                           label='conversion factor for AWG voltage to flux',
+                           docstring='conversion factor AWG voltage to flux',
+                           label='dac flux coef',
                            unit='(V^-1)',
-                           inital_value=1.0,
+                           initial_value=1.0,
                            vals=vals.Numbers(),
                            parameter_class=ManualParameter)
         self.add_parameter('F_E_c',
-                           label='qubit charging energy',
+                           label='qubit E_c',
                            unit='Hz',
-                           inital_value=0.0,
+                           initial_value=0.0,
                            vals=vals.Numbers(),
                            parameter_class=ManualParameter)
         self.add_parameter('F_f_01_max',
-                           label='qubit sweet spot frequency',
+                           label='sweet spot freq',
                            unit='Hz',
-                           inital_value=0.0,
+                           initial_value=0.0,
                            vals=vals.Numbers(),
                            parameter_class=ManualParameter)
         self.add_parameter('F_asymmetry',
                            label='qubit asymmetry',
                            unit='Hz',
-                           inital_value=0.0,
+                           initial_value=0.0,
                            vals=vals.Numbers(),
                            parameter_class=ManualParameter)
         self.add_parameter('codeword_dict',
-                           label='Dictionary assigning codewords to pulses',
-                           unit=''
-                           inital_value={
+                           docstring='Dict assigning codewords to pulses',
+                           label='codeword dict',
+                           unit='',
+                           initial_value={
                                'Square_flux_pulse': 5,
                                'Martinis_flux_pulse': 6
                            },
                            vals=vals.Anything(),
                            parameter_class=ManualParameter)
         self.add_parameter('sampling_rate',
-                           label='Sampling rate of the QWG',
+                           docstring='Sampling rate of the QWG',
+                           label='sampling rate',
                            unit='Hz',
                            initial_value=1.0e9,
                            vals=vals.Numbers(),
@@ -227,11 +243,12 @@ class QWG_FluxLookuptableManager(Instrument):
         # Fast adiabatic pulse
         martinis_pulse = wf.martinis_flux_pulse(
             length=self.F_length(),
-            lambda_coeffs=self.F_lambda_coeffs(),
-            theta_f=self.F_theta_f(),
+            lambda_coeffs=[self.F_lambda_1(), self.F_lambda_2()],
+            theta_f=self.F_theta_f()*2*np.pi/360,
+            f_01_max=self.F_f_01_max(),
             g2=self.F_J2(),
             E_c=self.F_E_c(),
-            dac_flux_coef=self.F_dac_flux_coef(),
+            dac_flux_coefficient=self.F_dac_flux_coef(),
             f_interaction=self.F_f_interaction(),
             f_bus=None,
             asymmetry=self.F_asymmetry(),
@@ -298,8 +315,8 @@ class QWG_FluxLookuptableManager(Instrument):
         self._wave_dict[pulse_name] = distorted_wave
         return distorted_wave
 
-    def load_pulse_onto_AWG_lokuptable(self, pulse_name,
-                                       regenerate_pulse=True):
+    def load_pulse_onto_AWG_lookuptable(self, pulse_name,
+                                        regenerate_pulse=True):
         '''
         Load a specific pulse onto the lookuptable.
 
@@ -330,5 +347,24 @@ class QWG_FluxLookuptableManager(Instrument):
             self.generate_standard_pulses()
 
         for pulse_name in self._wave_dict:
-            self.load_pulse_onto_AWG_lokuptable(
+            self.load_pulse_onto_AWG_lookuptable(
                 pulse_name, regenerate_pulse=False)
+
+    def render_wave(self, wave_name, show=True, time_unit='s', QtPlot_win=None):
+        '''
+        Plots the specified wave.
+
+        Args:
+        '''
+        x = (np.arange(len(self._wave_dict[wave_name])))*1e-9
+        y = self._wave_dict[wave_name]
+
+        if QtPlot_win is None:
+            QtPlot_win = QtPlot(windowTitle=wave_name,
+                                figsize=(600, 400))
+            QtPlot_win.add(
+                x=x, y=y, name=wave_name,
+                symbol='o', symbolSize=5,
+                xlabel='Time', xunit='s', ylabel='Amplitude', yunit='V')
+
+        return QtPlot_win
