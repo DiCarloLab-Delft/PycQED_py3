@@ -376,7 +376,7 @@ class Assembler():
         '''
         try:
             Asm_File = open(self.asmfilename, 'r', encoding="utf-8")
-            logging.info("open file", self.asmfilename, "successfully.")
+            logging.info("open file " + self.asmfilename + " successfully.")
         except:
             raise OSError('\tError: Fail to open file ' +
                           self.asmfilename + ".")
@@ -390,7 +390,7 @@ class Assembler():
 
         Asm_File.close()
 
-    def assemble(self):
+    def assemble(self, verbose=False):
         # label, name, param[0], param[1] ...
         self.label_instrs = []
 
@@ -401,7 +401,8 @@ class Assembler():
         self.insert_nops()
         self.decompose()
         self.merge_consecutive_wait()
-        self.print_label_instrs()
+        if verbose:
+            self.print_label_instrs()
         self.get_label_addr()
         self.cal_branch_offset()
 
@@ -602,11 +603,12 @@ class Assembler():
 
         self.align_labels()
 
-    def convert_to_instructions(self):
+    def convert_to_instructions(self, verbose=False):
         '''
-        The main function that performs the translation from the QuMIS file into binary instructions.
+        The main function that performs the translation from the QuMIS file
+        into binary instructions.
         '''
-        self.assemble()
+        self.assemble(verbose=verbose)
         self.instructions = []
 
         for label_instr in self.label_instrs:
