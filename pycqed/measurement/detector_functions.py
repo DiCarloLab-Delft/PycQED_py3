@@ -1335,7 +1335,7 @@ class UHFQC_integrated_average_detector(Hard_Detector):
 
     def __init__(self, UHFQC, AWG=None, integration_length=1e-6,
                  nr_averages=1024, rotate=False, real_imag=True,
-                 channels=[0, 1, 2, 3], cross_talk_suppression=False,
+                 channels=[0, 1, 2, 3], crosstalk_suppression=False,
                  seg_per_point=1, single_int_avg=False,
                  **kw):
         super(UHFQC_integrated_average_detector, self).__init__()
@@ -1355,7 +1355,7 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         self.nr_averages = nr_averages
         self.integration_length = integration_length
         self.rotate = rotate
-        self.cross_talk_suppression = cross_talk_suppression
+        self.crosstalk_suppression = crosstalk_suppression
         self.scaling_factor = 1/(1.8e9*integration_length*self.nr_averages)
 
     def _set_real_imag(self, real_imag=False):
@@ -1430,7 +1430,7 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         else:
             self.nr_sweep_points = len(sweep_points)*self.seg_per_point
         # this sets the result to integration and rotation outcome
-        if self.cross_talk_suppression:
+        if self.crosstalk_suppression:
             # 2/0/1 raw/crosstalk supressed /digitized
             self.UHFQC.quex_rl_source(0)
         else:
@@ -1470,7 +1470,7 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
             nr_averages=nr_averages, rotate=rotate, real_imag=real_imag,
             channels=channels,
             seg_per_point=seg_per_point, single_int_avg=single_int_avg,
-            cross_talk_suppression=False,
+            crosstalk_suppression=False,
             **kw)
         self.correlations = correlations
 
@@ -1560,7 +1560,7 @@ class UHFQC_integration_logging_det(Hard_Detector):
 
     def __init__(self, UHFQC, AWG, integration_length=1e-6,
                  channels=[0, 1], nr_shots=4094,
-                 cross_talk_suppression=False,  **kw):
+                 crosstalk_suppression=False,  **kw):
         super(UHFQC_integration_logging_det, self).__init__()
         self.UHFQC = UHFQC
         self.name = 'UHFQC_integration_logging_det'
@@ -1576,7 +1576,7 @@ class UHFQC_integration_logging_det(Hard_Detector):
         self.AWG = AWG
         self.integration_length = integration_length
         self.nr_shots = nr_shots
-        self.cross_talk_suppression = cross_talk_suppression
+        self.crosstalk_suppression = crosstalk_suppression
         self.scaling_factor = 1/(1.8e9*integration_length)
 
     def get_values(self):
@@ -1594,8 +1594,9 @@ class UHFQC_integration_logging_det(Hard_Detector):
                          for key in data_raw.keys()])*self.scaling_factor
 
         # offset suppression to be reimplemented
-        # if self.cross_talk_suppression:
-        #     data[i]=data[i]-eval("self.UHFQC.quex_trans_offset_weightfunction_{}()".format(channel))
+        if self.crosstalk_suppression:
+            for i, channel in enumerate(self.channels):
+                data[i]=data[i]-eval("self.UHFQC.quex_trans_offset_weightfunction_{}()".format(channel))
         return data
 
     def prepare(self, sweep_points):
@@ -1613,7 +1614,7 @@ class UHFQC_integration_logging_det(Hard_Detector):
         self.UHFQC.quex_rl_avgcnt(0)  # 1 for single shot readout
         self.UHFQC.quex_wint_length(int(self.integration_length*(1.8e9)))
         # this sets the result to integration and rotation outcome
-        if self.cross_talk_suppression:
+        if self.crosstalk_suppression:
             # 0/1/2 crosstalk supressed /digitized/raw
             self.UHFQC.quex_rl_source(0)
         else:
@@ -1808,7 +1809,7 @@ class DDM_integrated_average_detector(Hard_Detector):
     '''
 
     def __init__(self, DDM, AWG, integration_length=1e-6, nr_averages=1024, rotate=False,
-                 channels=[1,2,3,4,5], cross_talk_suppression=False,
+                 channels=[1,2,3,4,5], crosstalk_suppression=False,
                  **kw):
         super(DDM_integrated_average_detector, self).__init__()
         self.DDM = DDM
@@ -1825,7 +1826,7 @@ class DDM_integrated_average_detector(Hard_Detector):
         self.nr_averages = nr_averages
         self.integration_length = integration_length
         self.rotate = rotate
-        self.cross_talk_suppression = cross_talk_suppression
+        self.crosstalk_suppression = crosstalk_suppression
         self.scaling_factor=1/(500e6*integration_length)/127
 
     def prepare(self, sweep_points=None):
