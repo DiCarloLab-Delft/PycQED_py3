@@ -261,7 +261,10 @@ def gaussian_2D(x, y, amplitude=1,
 
 
 def TripleExpDecayFunc(t, tau1, tau2, tau3, amp1, amp2, amp3, offset, n):
-    return offset+amp1*np.exp(-(t/tau1)**n)+amp2*np.exp(-(t/tau2)**n)+amp3*np.exp(-(t/tau3)**n)
+    return (offset +
+            amp1*np.exp(-(t/tau1)**n) +
+            amp2*np.exp(-(t/tau2)**n) +
+            amp3*np.exp(-(t/tau3)**n))
 
 
 def avoided_crossing_mediated_coupling(flux, f_bus, f_center1, f_center2,
@@ -385,7 +388,7 @@ def Cos_guess(model, data, t):
 
     # Use absolute value of complex valued spectrum
     abs_w = np.abs(w)
-    freq_guess = f[abs_w == max(abs_w)][0]
+    freq_guess = abs(f[abs_w == max(abs_w)][0])
     ph_guess = (-2*np.pi*t[data == max(data)]*freq_guess)[0]
     # the condition data == max(data) can have several solutions
     #               (for example when discretization is visible)
@@ -397,6 +400,7 @@ def Cos_guess(model, data, t):
                                phase=ph_guess,
                                offset=offs_guess)
     params['amplitude'].min = 0  # Ensures positive amp
+    params['frequency'].min = 0
 
     return params
 

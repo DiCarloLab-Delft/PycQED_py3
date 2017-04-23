@@ -12,44 +12,6 @@ import numpy as np
 from pycqed.analysis.fitting_models import Qubit_freq_to_dac
 
 
-class Waveform():
-    # complex waveforms
-
-    @staticmethod
-    def exp(fs, nrSamples, frequency, initialPhase=0, amplitude=1):
-        return amplitude * np.exp(2*np.pi * frequency/fs * np.array(range(nrSamples)) + initialPhase)
-
-    # real (i.e. non-complex) waveforms
-    @staticmethod
-    def cos(fs, nrSamples, frequency, initialPhase=0, amplitude=1):
-        return amplitude * np.cos(2*np.pi * frequency/fs * np.array(range(nrSamples)) + initialPhase)
-
-    @staticmethod
-    def sin(fs, nrSamples, frequency, initialPhase=0, amplitude=1):
-        return amplitude * np.sin(2*np.pi * frequency/fs * np.array(range(nrSamples)) + initialPhase)
-
-    @staticmethod
-    def DC(fs, nrSamples, offset=0):
-        return np.zeros(nrSamples) + offset
-
-    @staticmethod
-    def gauss(fs, nrSamples, mu, sigma, amplitude=1):
-        t = 1/fs * np.array(range(nrSamples))
-        return amplitude*np.exp(-(0.5 * ((t-mu)**2) / sigma**2))
-
-    @staticmethod
-    def derivGauss(fs, nrSamples, mu, sigma, amplitude=1, motzoi=1):
-        t = 1/fs * np.array(range(nrSamples))
-        gauss = amplitude*np.exp(-(0.5 * ((t-mu)**2) / sigma**2))
-        return motzoi * -1 * (t-mu)/(sigma**1) * gauss
-
-    @staticmethod
-    def block(fs, nrSamples, offset=0):
-        negative = np.zeros(nrSamples/2)
-        positive = np.zeros(nrSamples/2) + offset
-        return np.concatenate((negative, positive), axis=0)
-
-
 def gauss_pulse(amp, sigma_length, nr_sigma=4, sampling_rate=2e8,
                 axis='x', phase=0,
                 motzoi=0, delay=0):
@@ -261,7 +223,7 @@ def mod_gauss(amp, sigma_length, f_modulation, axis='x', phase=0,
     '''
     Simple gauss pulse maker for CBOX. All inputs are in s and Hz.
     '''
-    pulse_I, pulse_Q = gauss_pulse(amp, sigma_length, nr_sigma=4,
+    pulse_I, pulse_Q = gauss_pulse(amp, sigma_length, nr_sigma=nr_sigma,
                                    sampling_rate=sampling_rate, axis=axis,
                                    phase=phase,
                                    motzoi=motzoi, delay=delay)
