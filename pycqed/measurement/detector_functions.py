@@ -1277,7 +1277,8 @@ class UHFQC_input_average_detector(Hard_Detector):
     Has two acq_modes, 'IQ' and 'AmpPhase'
     '''
 
-    def __init__(self, UHFQC, AWG=None, channels=[0, 1], nr_averages=1024, nr_samples=4096, **kw):
+    def __init__(self, UHFQC, AWG=None, channels=(0, 1),
+                 nr_averages=1024, nr_samples=4096, **kw):
         super(UHFQC_input_average_detector, self).__init__()
         self.UHFQC = UHFQC
         self.name = 'UHFQC_Streaming_data'
@@ -1331,7 +1332,7 @@ class UHFQC_integrated_average_detector(Hard_Detector):
 
     def __init__(self, UHFQC, AWG=None,
                  integration_length=1e-6, nr_averages=1024,
-                 channels=[0, 1, 2, 3], result_logging_mode='raw',
+                 channels=(0, 1, 2, 3), result_logging_mode='raw',
                  real_imag=True,
                  seg_per_point=1, single_int_avg=False,
                  **kw):
@@ -1478,7 +1479,7 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
 
     def __init__(self, UHFQC, AWG=None, integration_length=1e-6,
                  nr_averages=1024, rotate=False, real_imag=True,
-                 channels=[0, 1], correlations=[(0, 1)],
+                 channels=(0, 1), correlations=[(0, 1)],
                  seg_per_point=1, single_int_avg=False,
                  **kw):
         super(UHFQC_correlation_detector, self).__init__(
@@ -1580,7 +1581,7 @@ class UHFQC_integration_logging_det(Hard_Detector):
     def __init__(self, UHFQC, AWG=None,
                  integration_length=1e-6,
                  nr_shots=4094,
-                 channels=[0, 1],
+                 channels=(0, 1),
                  result_logging_mode='raw', **kw):
         """
         Args:
