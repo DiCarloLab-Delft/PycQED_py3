@@ -66,7 +66,7 @@ int_avg_det = det.UHFQC_integrated_average_detector(
     UHFQC=qubit._acquisition_instr, AWG=qubit.AWG,
     channels=[DataT.RO_acq_weight_function_I(),
               AncT.RO_acq_weight_function_I()], nr_averages=AncT.RO_acq_averages(),
-    integration_length=AncT.RO_acq_integration_length(), result_logging_mode='normalized')
+    integration_length=AncT.RO_acq_integration_length(), result_logging_mode='lin_trans')
 # reload(fsqs)
 # reload(awg_swf)
 # fsqs.station=station
@@ -104,7 +104,7 @@ int_avg_det = det.UHFQC_integrated_average_detector(
                       AncT.RO_acq_weight_function_I()],
             nr_averages=AncT.RO_acq_averages(),
             integration_length=AncT.RO_acq_integration_length(),
-            result_logging_mode='normalized')
+            result_logging_mode='lin_trans')
 
 pulse_dict = AncT.get_operation_dict()
 

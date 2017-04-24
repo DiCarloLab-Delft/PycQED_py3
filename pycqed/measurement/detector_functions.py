@@ -1347,9 +1347,10 @@ class UHFQC_integrated_average_detector(Hard_Detector):
 
         result_logging_mode (str) :  options are
             - raw        -> returns raw data in V
-            - normalized -> returns normalized data using the crosstalk
-                            suppression matrix and offset defined in the
-                            UHFQC instrument. Requires optimal weights.
+            - lin_trans  -> applies the linear transformation matrix and
+                            subtracts the offsets defined in the UFHQC.
+                            This is typically used for crosstalk suppression
+                            and normalization.Requires optimal weights.
             - digitized  -> returns fraction of shots based on the threshold
                             defined in the UFHQC. Requires optimal weights.
 
@@ -1384,6 +1385,11 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         self.AWG = AWG
         self.nr_averages = nr_averages
         self.integration_length = integration_length
+
+        # 0/1/2 crosstalk supressed /digitized/raw
+        res_logging_indices = {'lin_trans': 0, 'digitized': 1, 'raw': 2}
+        self.result_logging_mode_idx = res_logging_indices[result_logging_mode]
+        self.result_logging_mode = result_logging_mode
 
     def _set_real_imag(self, real_imag=False):
         """
@@ -1594,9 +1600,10 @@ class UHFQC_integration_logging_det(Hard_Detector):
 
         result_logging_mode (str):  options are
             - raw        -> returns raw data in V
-            - normalized -> returns normalized data using the crosstalk
-                            suppression matrix and offset defined in the
-                            UHFQC instrument. Requires optimal weights.
+            - lin_trans  -> applies the linear transformation matrix and
+                            subtracts the offsets defined in the UFHQC.
+                            This is typically used for crosstalk suppression
+                            and normalization.Requires optimal weights.
             - digitized  -> returns fraction of shots based on the threshold
                             defined in the UFHQC. Requires optimal weights.
         """
@@ -1621,7 +1628,7 @@ class UHFQC_integration_logging_det(Hard_Detector):
         self.nr_shots = nr_shots
 
         # 0/1/2 crosstalk supressed /digitized/raw
-        res_logging_indices = {'normalized': 0, 'digitized': 1, 'raw': 2}
+        res_logging_indices = {'lin_trans': 0, 'digitized': 1, 'raw': 2}
         self.result_logging_mode_idx = res_logging_indices[result_logging_mode]
         self.result_logging_mode = result_logging_mode
 
@@ -1640,7 +1647,7 @@ class UHFQC_integration_logging_det(Hard_Detector):
                          for key in data_raw.keys()])*self.scaling_factor
 
         # Corrects offsets after crosstalk suppression matrix in UFHQC
-        if self.result_logging_mode == 'normalized':
+        if self.result_logging_mode == 'lin_trans':
             for i, channel in enumerate(self.channels):
                 data[i] = data[i]-self.UHFQC.get(
                     'quex_trans_offset_weightfunction_{}'.format(channel))

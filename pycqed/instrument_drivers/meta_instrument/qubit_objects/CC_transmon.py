@@ -1273,7 +1273,8 @@ class CBox_v3_driven_transmon(Transmon):
 
         return [np.array(t, dtype=np.float64) for t in transients]
 
-    def calibrate_optimal_weights(self, MC=None, verify=True, analyze=False, update=True):
+    def calibrate_optimal_weights(self, MC=None, verify=True, analyze=False,
+                                  update=True):
         if MC is None:
             MC = self.MC.get_instr()
 

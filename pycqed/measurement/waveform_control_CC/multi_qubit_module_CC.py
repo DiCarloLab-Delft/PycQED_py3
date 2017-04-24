@@ -47,7 +47,7 @@ def measure_two_qubit_AllXY(device, q0_name, q1_name,
         AWG=device.seq_contr.get_instr(),
         nr_averages=q0.RO_acq_averages(),
         integration_length=q0.RO_acq_integration_length(),
-        result_logging_mode='normalized',
+        result_logging_mode='lin_trans',
         channels=[q0.RO_acq_weight_function_I(),
                   q1.RO_acq_weight_function_I()])
     MC.set_sweep_function(s)
@@ -85,7 +85,7 @@ def measure_two_qubit_ssro(device, q0_name, q1_name, nr_shots=4092*4,
         AWG=device.seq_contr.get_instr(),
         nr_shots=4092,
         integration_length=q0.RO_acq_integration_length(),
-        result_logging_mode='normalized',
+        result_logging_mode='lin_trans',
         channels=[q0.RO_acq_weight_function_I(),
                   q1.RO_acq_weight_function_I(), 2])
     if no_scaling:
