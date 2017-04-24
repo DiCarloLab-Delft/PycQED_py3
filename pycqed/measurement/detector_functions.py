@@ -1350,7 +1350,7 @@ class UHFQC_integrated_average_detector(Hard_Detector):
             - lin_trans  -> applies the linear transformation matrix and
                             subtracts the offsets defined in the UFHQC.
                             This is typically used for crosstalk suppression
-                            and normalization.Requires optimal weights.
+                            and normalization. Requires optimal weights.
             - digitized  -> returns fraction of shots based on the threshold
                             defined in the UFHQC. Requires optimal weights.
 
@@ -1491,12 +1491,12 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
                  channels=[0, 1], correlations=[(0, 1)],
                  seg_per_point=1, single_int_avg=False, thresholding=False,
                  **kw):
-        super(UHFQC_correlation_detector, self).__init__(
+        super().__init__(
             UHFQC, AWG=AWG, integration_length=integration_length,
-            nr_averages=nr_averages, rotate=rotate, real_imag=real_imag,
+            nr_averages=nr_averages, real_imag=real_imag,
             channels=channels,
             seg_per_point=seg_per_point, single_int_avg=single_int_avg,
-            crosstalk_suppression=False,
+            result_logging_mode='raw',  # FIXME -> do the proper thing (MAR)
             **kw)
         self.correlations = correlations
         self.thresholding = thresholding
@@ -1636,8 +1636,6 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
             data[0] = np.abs(S21)
             data[1] = np.angle(S21)/(2*np.pi)*360
 
-        if self.rotate:
-            return self.rotate_and_normalize(data)
         else:
             return data
 
@@ -1668,7 +1666,7 @@ class UHFQC_integration_logging_det(Hard_Detector):
             - lin_trans  -> applies the linear transformation matrix and
                             subtracts the offsets defined in the UFHQC.
                             This is typically used for crosstalk suppression
-                            and normalization.Requires optimal weights.
+                            and normalization. Requires optimal weights.
             - digitized  -> returns fraction of shots based on the threshold
                             defined in the UFHQC. Requires optimal weights.
         """
