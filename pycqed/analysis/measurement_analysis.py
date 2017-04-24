@@ -22,6 +22,8 @@ from copy import deepcopy
 
 import pycqed.analysis.tools.plotting as pl_tools
 
+from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
+
 try:
     from nathan_plotting_tools import *
 except:
@@ -1347,7 +1349,7 @@ class CPhase_2Q_amp_cost_analysis(Rabi_Analysis):
 
         self.sort_data()
 
-        self.calculate_cost_func(**kw)
+        # self.calculate_cost_func(**kw)
         self.fit_data(**kw)
         self.make_figures(**kw)
 
@@ -1363,20 +1365,20 @@ class CPhase_2Q_amp_cost_analysis(Rabi_Analysis):
             self.y_exc[i] = self.measured_values[i][1::2]
             self.y_idx[i] = self.measured_values[i][::2]
 
-    def calculate_cost_func(self, **kw):
-        num_points = len(self.sweep_points)-4
+    # def calculate_cost_func(self, **kw):
+    #     num_points = len(self.sweep_points)-4
 
-        id_dat_swp = self.measured_values[1][:num_points//2]
-        ex_dat_swp = self.measured_values[1][num_points//2:-4]
+    #     id_dat_swp = self.measured_values[1][:num_points//2]
+    #     ex_dat_swp = self.measured_values[1][num_points//2:-4]
 
-        id_dat_cp = self.measured_values[0][:num_points//2]
-        ex_dat_cp = self.measured_values[0][num_points//2:-4]
+    #     id_dat_cp = self.measured_values[0][:num_points//2]
+    #     ex_dat_cp = self.measured_values[0][num_points//2:-4]
 
-        maximum_difference = max((id_dat_cp-ex_dat_cp))
-        # I think the labels are wrong in excited and identity but the value
-        # we get is correct
-        missing_swap_pop = np.mean(ex_dat_swp - id_dat_swp)
-        self.cost_func_val = maximum_difference, missing_swap_pop
+    #     maximum_difference = max((id_dat_cp-ex_dat_cp))
+    #     # I think the labels are wrong in excited and identity but the value
+    #     # we get is correct
+    #     missing_swap_pop = np.mean(ex_dat_swp - id_dat_swp)
+    #     self.cost_func_val = maximum_difference, missing_swap_pop
 
     def make_figures(self, **kw):
         # calculate fitted curves
@@ -1399,8 +1401,8 @@ class CPhase_2Q_amp_cost_analysis(Rabi_Analysis):
             self.axs[i].plot(self.x_exc, self.y_exc[i], '-o',
                              label='excitation')
 
-            self.axs[i].set_xlabel(self.xlabel)
-            self.axs[i].set_ylabel(self.ylabels[i])
+            # self.axs[i].set_xlabel(self.xlabel)
+            # self.axs[i].set_ylabel(self.ylabels[i])
 
             if i == 0:
                 plot_title = kw.pop('plot_title', textwrap.fill(
@@ -1411,16 +1413,16 @@ class CPhase_2Q_amp_cost_analysis(Rabi_Analysis):
                 self.axs[i].legend()
             else:
                 plot_title = ''
-            # self.plot_results_vs_sweepparam(x=self.sweep_points,
-            #                                 y=self.measured_values[i],
-            #                                 fig=self.fig, ax=self.axs[i],
-            #                                 xlabel=self.xlabel,
-            #                                 ylabel=self.ylabels[i],
-            #                                 save=False,
-            #                                 plot_title=plot_title,
-            #                                 marker='--o')
 
-        self.save_fig(self.fig, fig_tight=True, close_fig=True, **kw)
+            set_xlabel(self.axs[i], self.sweep_name, self.sweep_unit[0])
+            ymi = min(self.axs[i].get_yticks())
+            yma = max(self.axs[i].get_yticks())
+            # somehow not setting this limit changes the tick locations after
+            # they have been set. Unclear what causes this.
+            self.axs[i].set_ylim(ymi, yma)
+            set_ylabel(self.axs[i], self.value_names[i], self.value_units[i])
+
+        self.save_fig(self.fig, fig_tight=True, **kw)
 
     def fit_data(self, **kw):
         model = fit_mods.CosModel
