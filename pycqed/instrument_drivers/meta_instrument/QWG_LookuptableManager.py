@@ -263,8 +263,25 @@ class QWG_FluxLookuptableManager(Instrument):
             sampling_rate=self.sampling_rate(),
             return_unit='V')
 
+        # New version of fast adiabatic pulse
+        martinis_pulse_v2 = wf.martinis_flux_pulse_v2(
+            length=self.F_length(),
+            lambda_coeffs=[self.F_lambda_2(),
+                           self.F_lambda_3()],
+            theta_f=self.F_theta_f()*2*np.pi/360,
+            f_01_max=self.F_f_01_max(),
+            J2=self.F_J2(),
+            E_c=self.F_E_c(),
+            dac_flux_coefficient=self.F_dac_flux_coef(),
+            f_interaction=self.F_f_interaction(),
+            f_bus=None,
+            asymmetry=self.F_asymmetry(),
+            sampling_rate=self.sampling_rate(),
+            return_unit='V')
+
         return {'Square_flux_pulse': block_I,
-                'Martinis_flux_pulse': martinis_pulse}
+                'Martinis_flux_pulse': martinis_pulse,
+                'Martinis_flux_pulse_v2': martinis_pulse_v2}
 
     def generate_standard_pulses(self):
         '''
@@ -344,19 +361,22 @@ class QWG_FluxLookuptableManager(Instrument):
         self.QWG.get_instr().set('codeword_{}_ch{}_waveform'.format(
             self.codeword_dict()[pulse_name], self.F_ch()), pulse_name)
 
-    def load_pulses_onto_AWG_lookuptable(self, regenerate_pulses=False):
+    def load_pulses_onto_AWG_lookuptable(self, regenerate_pulses=True):
         '''
         Load all standard pulses to the QWG lookuptable.
 
         Args:
             regenerate_pulses   (bool): should the pulses be generated again
         '''
+        self.QWG.get_instr().stop()
         if regenerate_pulses:
             self.generate_standard_pulses()
 
         for pulse_name in self._wave_dict:
             self.load_pulse_onto_AWG_lookuptable(
                 pulse_name, regenerate_pulse=False)
+        self.QWG.get_instr().start()
+        self.QWG.get_instr().getOperationComplete()
 
     def render_wave(self, wave_name, show=True, QtPlot_win=None):
         '''
