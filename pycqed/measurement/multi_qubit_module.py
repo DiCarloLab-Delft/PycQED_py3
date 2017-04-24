@@ -24,7 +24,7 @@ def measure_two_qubit_AllXY(device, q0_name, q1_name,
                   q0.RO_acq_weight_function_I()],
         nr_averages=q0.RO_acq_averages(),
         integration_length=q0.RO_acq_integration_length(),
-        cross_talk_suppression=True)
+        result_logging_mode='normalized')
 
     operation_dict = device.get_operation_dict()
 
@@ -65,7 +65,7 @@ def measure_SWAP_CZ_SWAP(device, qS_name, qCZ_name,
                   qS.RO_acq_weight_function_I()],
         nr_averages=qS.RO_acq_averages(),
         integration_length=qS.RO_acq_integration_length(),
-        cross_talk_suppression=True)
+        result_logging_mode='normalized')
     operation_dict = device.get_operation_dict()
     S_CZ_S_swf = awg_swf.awg_seq_swf(
         fsqs.SWAP_CZ_SWAP_phase_corr_swp,
@@ -172,7 +172,7 @@ def tomo2Q_cardinal(cardinal, qubit0, qubit1, timings_dict,
     #               qubit1.RO_acq_weight_function_I()],
     #     nr_averages=qubit0.RO_acq_averages(),
     #     integration_length=qubit0.RO_acq_integration_length(),
-    #     cross_talk_suppression=True)
+    #     result_logging_mode='normalized')
 
     detector = det.UHFQC_integration_logging_det(
         UHFQC=qubit0._acquisition_instr,
@@ -181,7 +181,7 @@ def tomo2Q_cardinal(cardinal, qubit0, qubit1, timings_dict,
                   qubit1.RO_acq_weight_function_I()],
         nr_shots=256,
         integration_length=qubit0.RO_acq_integration_length(),
-        cross_talk_suppression=True)
+        result_logging_mode='normalized')
 
     MC.set_sweep_function(tomo)
     MC.set_sweep_points(sweep_points)
@@ -219,7 +219,7 @@ def tomo2Q_bell(bell_state, device, qS_name, qCZ_name, CPhase=True,
                   qS.RO_acq_weight_function_I()],
         nr_shots=nr_shots,
         integration_length=qS.RO_acq_integration_length(),
-        cross_talk_suppression=True)
+        result_logging_mode='normalized')
 
     tomo_swf = awg_swf.awg_seq_swf(
         mqs.two_qubit_tomo_bell,
@@ -263,7 +263,7 @@ def rSWAP_scan(device, qS_name, qCZ_name,
                   qS.RO_acq_weight_function_I()],
         nr_averages=qS.RO_acq_averages(),
         integration_length=qS.RO_acq_integration_length(),
-        cross_talk_suppression=True)
+        result_logging_mode='normalized')
     operation_dict = device.get_operation_dict()
     rSWAP_swf = awg_swf.awg_seq_swf(
         fsqs.rSWAP_amp_sweep,
@@ -314,7 +314,7 @@ def tomo2Q_cphase_cardinal(cardinal_state, device, qS_name, qCZ_name, CPhase=Tru
                   qS.RO_acq_weight_function_I()],
         nr_shots=nr_shots,
         integration_length=qS.RO_acq_integration_length(),
-        cross_talk_suppression=True)
+        result_logging_mode='normalized')
 
     tomo_swf = awg_swf.awg_seq_swf(
         mqs.two_qubit_tomo_cphase_cardinal,

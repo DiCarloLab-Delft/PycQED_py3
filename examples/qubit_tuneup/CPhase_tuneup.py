@@ -31,7 +31,7 @@ int_avg_det = det.UHFQC_integrated_average_detector(
               DataT.RO_acq_weight_function_I()],
     nr_averages=AncT.RO_acq_averages(),
     integration_length=AncT.RO_acq_integration_length(),
-    cross_talk_suppression=True)
+    result_logging_mode='normalized')
 phases2 = np.tile(np.linspace(0, 720, 16), 2)
 phases2 = np.concatenate([phases2, [730, 740, 750, 760]])
 
@@ -114,7 +114,7 @@ def measure_phase_qcp(points=np.arange(0., 0.15+0.005*4, 0.005)):
         channels=[
             AncT.RO_acq_weight_function_I(), DataT.RO_acq_weight_function_I()],
         nr_averages=AncT.RO_acq_averages(),
-        integration_length=AncT.RO_acq_integration_length(), cross_talk_suppression=True)
+        integration_length=AncT.RO_acq_integration_length(), result_logging_mode='normalized')
     cphasesweep = points
 
     d = cl.CPhase_cost_func_det_Ramiro(qCP=AncT, qS=DataT, dist_dict=dist_dict,
@@ -146,7 +146,7 @@ def measure_phase_qs(points=np.arange(0., 0.15+0.005*4, 0.005)):
         channels=[
             AncT.RO_acq_weight_function_I(), DataT.RO_acq_weight_function_I()],
         nr_averages=AncT.RO_acq_averages(),
-        integration_length=AncT.RO_acq_integration_length(), cross_talk_suppression=True)
+        integration_length=AncT.RO_acq_integration_length(), result_logging_mode='normalized')
     sphasesweep = points
 
     from pycqed.scripts.Experiments.Five_Qubits import cost_functions_Leo_optimization as ca
