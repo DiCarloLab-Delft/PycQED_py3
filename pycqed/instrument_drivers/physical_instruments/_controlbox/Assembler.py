@@ -1,9 +1,18 @@
 ﻿import string
 import logging
 
+
 def is_number(s):
     try:
         float(s)
+        return True
+    except ValueError:
+        return False
+
+
+def RepresentsInt(s):
+    try:
+        int(s)
         return True
     except ValueError:
         return False
@@ -48,7 +57,7 @@ class Assembler():
     def __init__(self, asm_filename):
         self.asmfilename = asm_filename
         # Control if a nop is added after each label.
-        self.add_nop_after_label = True
+        self.add_nop_after_label = False
 
         # Control the nops added after each branch instruction.
         self.add_nop_after_branch = True
@@ -73,6 +82,9 @@ class Assembler():
                      'waitreg': '010000',
                      'pulse':   '000001',
                      'measure': '000010'}
+
+    MAX_WAIT_TIME = 2**15 - 1
+    MIN_WAIT_TIME = 1
 
     def get_reg_num(self, Register):
         '''
@@ -258,8 +270,14 @@ class Assembler():
     # wait imm
     def WaitFormat(self, args):
         imm15, = args
-        if (int(imm15) < 0):
-            raise ValueError("The Waiting time {} is smaller than 0.".format(imm15))
+
+        if not RepresentsInt(imm15):
+            raise ValueError(
+                "Waiting time {} is not an integer.".format(imm15))
+
+        if (int(imm15) < self.MIN_WAIT_TIME or int(imm15) > self.MAX_WAIT_TIME):
+            raise ValueError(
+                "Waiting time {} out of range: 1 ~ 32767.".format(imm15))
 
         try:
             opCode = self.InstOpCode['wait']
@@ -308,20 +326,19 @@ class Assembler():
         assert(len(args) == 0)
         return "00000000000000000000000000000000"
 
-
     inst_translation_func = {
-                'add':      AddFormat,
-                'sub':      SubFormat,
-                'beq':      BeqFormat,
-                'bne':      BneFormat,
-                'addi':     AddiFormat,
-                'lui':      LuiFormat,
-                'waitreg':  WaitRegFormat,
-                'pulse':    PulseFormat,
-                'measure':  MeasureFormat,
-                'wait':     WaitFormat,
-                'trigger':  TriggerFormat,
-                'nop':      NopFormat
+        'add':      AddFormat,
+        'sub':      SubFormat,
+        'beq':      BeqFormat,
+        'bne':      BneFormat,
+        'addi':     AddiFormat,
+        'lui':      LuiFormat,
+        'waitreg':  WaitRegFormat,
+        'pulse':    PulseFormat,
+        'measure':  MeasureFormat,
+        'wait':     WaitFormat,
+        'trigger':  TriggerFormat,
+        'nop':      NopFormat
     }
 
     @classmethod
@@ -359,9 +376,10 @@ class Assembler():
         '''
         try:
             Asm_File = open(self.asmfilename, 'r', encoding="utf-8")
-            logging.info("open file", self.asmfilename, "successfully.")
+            logging.info("open file " + self.asmfilename + " successfully.")
         except:
-            raise OSError('\tError: Fail to open file ' + self.asmfilename + ".")
+            raise OSError('\tError: Fail to open file ' +
+                          self.asmfilename + ".")
 
         self.valid_lines = []
         for line in Asm_File:
@@ -372,7 +390,7 @@ class Assembler():
 
         Asm_File.close()
 
-    def assemble(self):
+    def assemble(self, verbose=False):
         # label, name, param[0], param[1] ...
         self.label_instrs = []
 
@@ -382,7 +400,9 @@ class Assembler():
         self.remove_wait_zero()
         self.insert_nops()
         self.decompose()
-        self.align_labels()
+        self.merge_consecutive_wait()
+        if verbose:
+            self.print_label_instrs()
         self.get_label_addr()
         self.cal_branch_offset()
 
@@ -390,10 +410,52 @@ class Assembler():
         # Append the following instructions at the end of the file
         # It loops forever and the marker 7 will always be high
         self.label_instrs.append(['end_of_file_loop', 'wait', '1000'])
-        self.label_instrs.append(['', 'trigger', '0000001','1000'])
-        self.label_instrs.append(['', 'beq', 'r0','r0', 'end_of_file_loop'])
+        self.label_instrs.append(['', 'trigger', '0000001', '1000'])
+        self.label_instrs.append(['', 'beq', 'r0', 'r0', 'end_of_file_loop'])
 
         self.align_labels()
+
+    def merge_consecutive_wait(self):
+        '''
+        This function merges two consecutive WAIT instructions if the sum
+        of the waiting time of both instructions is not larger than
+        MAX_WAIT_TIME.
+        '''
+        i = 0
+        while i < len(self.label_instrs):
+            label_instr = self.label_instrs[i]
+
+            if (i >= len(self.label_instrs)-1):
+                break
+            next_label_instr = self.label_instrs[i+1]
+
+            # I only care the WAIT instruction here.
+            if (label_instr[1] != 'wait'):
+                i = i + 1
+                continue
+
+            # If the next instruction is a target of a jump instruction,
+            # then, we should not merge the wait instruction.
+            if next_label_instr[0] != '':
+                i = i + 1
+                continue
+
+            # if the next instruction is not wait, then no merge.
+            if (next_label_instr[1] != 'wait'):
+                i = i + 1
+                continue
+
+            # OK, current and next instructions are both WAIT.
+            # No worry about the labels.
+            # If the sum waiting time is within the valid range, merge them.
+            if (int(label_instr[2]) +
+                    int(next_label_instr[2]) < self.MAX_WAIT_TIME):
+                label_instr[2] = str(
+                    int(label_instr[2]) + int(next_label_instr[2]))
+                self.label_instrs[i] = label_instr
+                self.label_instrs.pop(i+1)
+            else:
+                i = i + 1
 
     def cal_branch_offset(self):
         '''
@@ -404,7 +466,8 @@ class Assembler():
             if (label_instr[1] == 'beq' or label_instr[1] == 'bne'):
                 # print("instruction found:", label_instr)
                 if label_instr[4] not in self.label_addr_dict:
-                    raise ValueError("{}: Target label {} not found.".format(label_instr[0], label_instr[4]))
+                    raise ValueError("{}: Target label {} not found.".format(
+                        label_instr[0], label_instr[4]))
                 offset = self.label_addr_dict[label_instr[4]] - (index + 1)
                 label_instr[4] = offset
                 self.label_instrs[index] = label_instr
@@ -436,12 +499,18 @@ class Assembler():
                 self.label_instrs.insert(i+2, lui2)
                 self.label_instrs.insert(i+3, lui3)
 
+        self.align_labels()
+
     def convert_line_to_ele_array(self):
         self.label_instrs = []
         for line in self.valid_lines:
             self.label_instrs.append(self.split_line_elements(line))
 
         self.align_labels()
+
+    def print_label_instrs(self):
+        for label_instr in self.label_instrs:
+            print(label_instr)
 
     def align_labels(self):
         '''
@@ -464,7 +533,8 @@ class Assembler():
                     # not last instruction.
                     next_label_instr = self.label_instrs[i + 1]
                     if (next_label_instr[0] != ''):
-                        # next instruction has a lable, throw away the current one
+                        # next instruction has a lable, throw away the current
+                        # one
                         self.label_instrs.pop(i)
                     else:
                         # next instruction has no tag, merge the current label
@@ -484,8 +554,9 @@ class Assembler():
                 continue
 
             if (label in self.label_addr_dict):
-                raise ValueError("Redefintion of the label {} in the QuMIS file {}".format(
-                    label, self.asmfilename))
+                raise ValueError(
+                    "Redefintion of the label {} in the QuMIS file {}".format(
+                        label, self.asmfilename))
 
             self.label_addr_dict[label] = i
 
@@ -497,7 +568,6 @@ class Assembler():
         if (self.add_nop_after_branch):
             self.insert_nop_after_branch()
         self.align_labels()
-
 
     def insert_nop_after_label(self):
         for (index, label_instr) in enumerate(self.label_instrs):
@@ -516,7 +586,7 @@ class Assembler():
         addr = 0
         while (addr < max_addr):
             if (self.label_instrs[addr][1] == 'beq' or
-                self.label_instrs[addr][1] == 'bne'):
+                    self.label_instrs[addr][1] == 'bne'):
 
                 nop_instr = ['', 'nop']
                 for i in range(self.number_of_nops_appended):
@@ -533,17 +603,20 @@ class Assembler():
 
         self.align_labels()
 
-    def convert_to_instructions(self):
+    def convert_to_instructions(self, verbose=False):
         '''
-        The main function that performs the translation from the QuMIS file into binary instructions.
+        The main function that performs the translation from the QuMIS file
+        into binary instructions.
         '''
-        self.assemble()
+        self.assemble(verbose=verbose)
         self.instructions = []
 
         for label_instr in self.label_instrs:
             elements = label_instr[1:]
-            translate_function = self.inst_translation_func[elements[0].lower()]
-            self.instructions.append(int(translate_function(self, elements[1:]), 2))
+            translate_function = self.inst_translation_func[
+                elements[0].lower()]
+            self.instructions.append(
+                int(translate_function(self, elements[1:]), 2))
 
         return self.instructions
 
@@ -559,7 +632,7 @@ class Assembler():
         self.remove_wait_zero()
         self.insert_nops()
         self.decompose()
-        self.align_labels()
+        self.merge_consecutive_wait()
         self.get_label_addr()
         self.text_instructions = []
         for label_instr in self.label_instrs:

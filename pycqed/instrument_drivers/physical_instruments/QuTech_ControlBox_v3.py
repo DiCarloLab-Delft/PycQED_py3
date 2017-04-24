@@ -159,8 +159,8 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
         queue_state = v_list[35]
         self._pulse_queue_state = defHeaders.pulse_queue_states[
             queue_state]
-        self._max_instruction_address = int(((v_list[36] << 14) + \
-            (v_list[37] << 7) + v_list[38])/4)
+        self._max_instruction_address = int(
+            ((v_list[36] << 14) + (v_list[37] << 7) + v_list[38])/4)
 
         return version
 
@@ -295,12 +295,10 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
             "This is CBox_v3 driver." +
             "Touch 'n Go is only valid for ControlBox version 2.")
 
-    def _set_master_controller_working_state(self,
-                                             core_state='idle',
-                                             acquisition_mode='idle',
-                                             trigger_source='internal',
-                                             demodulation_mode=
-                                             'double side band demodulation'):
+    def _set_master_controller_working_state(
+            self, core_state='idle', acquisition_mode='idle',
+            trigger_source='internal',
+            demodulation_mode='double side band demodulation'):
         '''
         @param core_states: activate the core or disable it:
                         > idle,
@@ -415,7 +413,6 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
         Additionally it starts by setting the core state to idle before
         uploading instructions and ends by setting the core state to active.
         '''
-
 
         asm = Assembler.Assembler(asm_filename)
 
