@@ -381,7 +381,7 @@ class QWG_lutman_par(Soft_Sweep):
         self.set_kw()
         self.name = LutMan_parameter.name
         self.parameter_name = LutMan_parameter.label
-        self.unit = LutMan_parameter.units
+        self.unit = LutMan_parameter.unit
         self.sweep_control = 'soft'
         self.LutMan = LutMan
         self.LutMan_parameter = LutMan_parameter
