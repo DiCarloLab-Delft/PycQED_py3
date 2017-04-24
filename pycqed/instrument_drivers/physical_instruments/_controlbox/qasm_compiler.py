@@ -111,6 +111,7 @@ class qasm_event():
         self.name = ''
         self.params = None
         self.duration = 0
+        self.channel_latency = 0
         # self.start_time_point = time_point()
 
     def __str__(self):
@@ -167,7 +168,13 @@ def lower_dict_key(origin_dict):
 
 class QASM_QuMIS_Compiler():
 
-    def __init__(self, filename=None):
+    def __init__(self, filename=None, verbose_level=1):
+        '''
+        @param: filename, the QASM file to be compiled.
+        @param: verbose_level, message level to be printed. integer, range
+        from 0 to 6. The larger verbose_level is, the more information being
+        printed. 0 prints everything. 6 prints nothing.
+        '''
         self.filename = filename
         self.raw_lines = None
         self.prog_lines = None
@@ -175,6 +182,8 @@ class QASM_QuMIS_Compiler():
         self.qasm_op_dict = None
         self.declared_qubits = []
         self.qubit_map = {}
+        self.verbose_level = verbose_level
+        self.channel_latency_compensated = False
 
         self.config_filename = os.path.join(
             pq.__path__[0], 'instrument_drivers', 'physical_instruments',
@@ -184,16 +193,22 @@ class QASM_QuMIS_Compiler():
         self.qumis_instructions = []
         self.read_file()
         self.line_to_event()
-        self.print_raw_events()
-        # self.build_dependency_graph()
+        # self.print_raw_events()
+        self.build_dependency_graph()
         self.resolve_qubit_name()
-        self.print_timing_events()
+        # self.print_timing_events()
         self.assign_timing_to_events()
         self.print_timing_grid()
         self.compensate_channel_latency()
         self.gen_full_time_grid()
         self.convert_to_qumis()
         return self.qumis_instructions
+
+    def build_dependency_graph(self):
+        pass
+
+    def gen_full_time_grid(self):
+        pass
 
     def load_config(self):
         if (self.config_loaded is True):
@@ -222,7 +237,10 @@ class QASM_QuMIS_Compiler():
         self.qasm_op_dict = lower_dict_key(self.qasm_op_dict)
         self.hardware_spec = data["hardware specification"]
         self.lut = data["lut"]
-        # print(self.qasm_op_dict)
+        print(self.qasm_op_dict)
+
+        self.channels = self.hardware_spec["channels"]
+        self.check_channel_format()
 
         self.physical_qubits = self.hardware_spec["qubit list"]
         if is_integer_array(self.physical_qubits) is False:
@@ -239,6 +257,9 @@ class QASM_QuMIS_Compiler():
 
         self.config_loaded = True
 
+    def check_channel_format(self):
+        pass
+
     def read_file(self):
         '''
         Read all lines in the file.
@@ -253,61 +274,71 @@ class QASM_QuMIS_Compiler():
         self.prog_lines = []  # after removing comments.
         for line_number, line_content in enumerate(prog_file):
             self.raw_lines.append(
-                prog_line(line_number, line_content.strip(' \t\n\r')))
+                prog_line(line_number + 1, line_content.strip(' \t\n\r')))
 
             line_content = self.remove_comment(line_content)
             line_content = line_content.lower()
             if (len(line_content) == 0):  # skip empty line and comment
                 continue
-            self.prog_lines.append(prog_line(line_number, line_content))
+            self.prog_lines.append(prog_line(line_number + 1, line_content))
 
         prog_file.close()
         self.print_lines()
 
     def print_lines(self):
-        # print("Raw Lines:")
-        # for line in self.raw_lines:
-        #     print(line)
-        # print("")
+        if self.verbose_level <= 1:
+            print("Raw Lines:")
+            for line in self.raw_lines:
+                print(line)
+            print("")
 
-        print("Program Lines:")
-        for line in self.prog_lines:
-            print(line)
+        if self.verbose_level <= 2:
+            print("Program Lines:")
+            for line in self.prog_lines:
+                print(line)
 
     def print_op_dict(self):
-        print("QASM operation dictionary:")
-        for key, value in self.qasm_op_dict.items():
-            print(key, value)
+        if self.verbose_level <= 3:
+            print("QASM operation dictionary:")
+            for key, value in self.qasm_op_dict.items():
+                print(key, value)
 
     def print_raw_events(self):
-        print("Raw events:")
-        for i, raw_events in enumerate(self.raw_event_list):
-            raw_print("{0:5d} : ".format(i))
-            for re in raw_events:
-                raw_print("({}, {}, {})".format(re.event_type,
-                                                re.name, re.params))
-            raw_print("\n")
+        if self.verbose_level < 4:
+            print("Raw events:")
+            for i, raw_events in enumerate(self.raw_event_list):
+                raw_print("{0:5d} : ".format(i))
+                for re in raw_events:
+                    raw_print("({}, {}, {})".format(re.event_type,
+                                                    re.name, re.params))
+                raw_print("\n")
 
     def print_timing_events(self):
-        print("Timing events:")
-        for i, timing_events in enumerate(self.timing_event_list):
-            raw_print("{0:5d} : ".format(i))
-            for re in timing_events:
-                raw_print("({}, {}, {})".format(re.event_type,
-                                                re.name, re.params))
-            raw_print("\n")
+        if self.verbose_level < 3:
+            print("Timing events:")
+            for i, timing_events in enumerate(self.timing_event_list):
+                raw_print("{0:5d} : ".format(i))
+                for re in timing_events:
+                    raw_print("({}, {}, {})".format(re.event_type,
+                                                    re.name, re.params))
+                raw_print("\n")
 
     def print_timing_grid(self):
-        print("Timing gird:")
-        i = 0
-        for tp in self.timing_grid:
-            raw_print("{0:5d}: Duration: {1}, Events:".format(i,
-                tp.following_waiting_time))
-            self.print_event_list(tp.parallel_events)
-            raw_print('\n')
+        if self.verbose_level < 5:
+            print("Timing gird:")
+            print("{0: >6s}  {1: <10s}    Events".format("Idx", "Duration"))
+            i = 0
+            for tp in self.timing_grid:
+                raw_print("{0:5d}:".format(i))
+                raw_print("   {0: <8d}    ".format(tp.following_waiting_time))
+                self.print_event_list(tp.parallel_events)
+                raw_print('\n')
+                i = i + 1
 
     def print_event_list(self, event_list):
         raw_print(" ")
+        if event_list == []:
+            raw_print('-')
         for e in event_list:
             raw_print(e.name)
             raw_print(" ")
@@ -315,11 +346,11 @@ class QASM_QuMIS_Compiler():
                 raw_print(str(e.params[0]))
                 raw_print(", ")
                 raw_print(str(e.params[1]))
-                raw_print(";")
             else:
                 raw_print(str(e.params[0]))
-                raw_print(";")
-
+            if e.channel_latency != 0:
+                raw_print("({})".format(e.channel_latency))
+            raw_print('; ')
 
     @classmethod
     def remove_comment(self, line):
@@ -382,15 +413,16 @@ class QASM_QuMIS_Compiler():
                     se.lineno = line.number
                     raise se
 
-                expected_num_of_params =  \
-                    self.qasm_op_dict[qasm_op_name]["parameters"]
+                expected_num_of_params = self.qasm_op_dict[
+                    qasm_op_name]["parameters"]
                 if (qasm_op_name != "qubit") and \
                         (len(qasm_op_params) != expected_num_of_params):
                     se = SyntaxError("unexpected number of parameters for the"
-                                     " QASM instruction {}. {} parameters are"
-                                     " expected.".format(
+                                     " QASM instruction {}. {} parameter(s)"
+                                     " expected. Offered: {}.".format(
                                          qasm_op_name,
-                                         expected_num_of_params))
+                                         expected_num_of_params,
+                                         qasm_op_params))
                     se.filename = self.filename
                     se.lineno = line.number
                     raise se
@@ -473,9 +505,6 @@ class QASM_QuMIS_Compiler():
         '''
         self.timing_grid = []
 
-        pre_waiting_time = 0
-        next_waiting_time = 0
-        pre_line_is_wait = False
         for timing_events in self.timing_event_list:
             # each line starts a new time point
             # two thing to do for this time point:
@@ -532,8 +561,9 @@ class QASM_QuMIS_Compiler():
                 else:
                     i = i + 1
 
-        print("After building qubit map:")
-        self.print_raw_events()
+        if (self.verbose_level <= 4):
+            print("After building qubit map:")
+            self.print_raw_events()
 
     def map_qubits(self):
         self.timing_event_list = []
@@ -568,8 +598,8 @@ class QASM_QuMIS_Compiler():
                                  len(self.physical_qubits)))
             se.filename = self.filename
             raise se
-
-        print(self.declared_qubits)
+        if self.verbose_level <= 2:
+            print("Declared qubits: {}".format(self.declared_qubits))
 
     def add_qubit_map(self, raw_event):
         dec_qubit, phys_qubit = raw_event.params
@@ -607,7 +637,34 @@ class QASM_QuMIS_Compiler():
         self.qubit_map[dec_qubit] = int(phys_qubit)
 
     def compensate_channel_latency(self):
-        pass
+        self.load_channel_latency()
+
+    def load_channel_latency(self):
+        for ti, tp in enumerate(self.timing_grid):
+            for idx, event in enumerate(tp.parallel_events):
+                if event.event_type == EventType.RF:
+                    target_qubit = event.params[0]
+                    channel = self.channels[target_qubit]
+                    event.channel_latency = channel["rf"]["latency"]
+                elif event.event_type == EventType.FLUX:
+                    target_qubit1, target_qubit2 = event.params
+                    channel1 = self.channels[target_qubit1]
+                    channel2 = self.channels[target_qubit2]
+                    latency1 = channel1["flux"]["latency"]
+                    latency2 = channel2["flux"]["latency"]
+                    event.channel_latency = max(latency1, latency2)
+                elif event.event_type == EventType.MSMT:
+                    target_qubit = event.params[0]
+                    channel = self.channels[target_qubit]
+                    event.channel_latency = channel["measure"]["latency"]
+                else:
+                    raise ValueError("non-quantum operation event type"
+                                     " ({}) found while loading channel"
+                                     " latency.".format(event.event_type))
+
+                tp.parallel_events[idx] = event
+            self.timing_grid[ti] = tp
+        self.print_timing_grid()
 
     def gen_time_grid(self):
         pass
