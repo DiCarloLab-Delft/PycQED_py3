@@ -34,6 +34,8 @@ import os
 import sys
 
 
+INIT_WAITING_TIME = 200000 # ns
+
 def is_number(s):
     try:
         float(s)
@@ -50,8 +52,44 @@ def is_int(s):
         return False
 
 
+def is_positive_number(s):
+    if is_number(s) is False:
+        return False
+    if float(s) > 0:
+        return True
+    else:
+        return False
+
+
+def is_positive_integer(s):
+    if is_int(s) is False:
+        return False
+    if int(s) > 0:
+        return True
+    else:
+        return False
+
+
+def is_integer_array(arr):
+    return all(isinstance(item, int) for item in arr)
+
+
 def raw_print(s):
     sys.stdout.write(s)
+
+
+class EventType(enum.Enum):
+    '''
+    Current type definition does not separate the technology-dependent part
+    and technology-independent part.
+    '''
+    NONE_EVENT = enum.auto()
+    DECLARE = enum.auto()
+    MAP = enum.auto()
+    WAIT = enum.auto()
+    RF = enum.auto()
+    FLUX = enum.auto()
+    MSMT = enum.auto()
 
 
 class time_point():
@@ -63,21 +101,25 @@ class time_point():
         self.parallel_events = []
 
 
-class EventType(enum.Enum):
-    NONE_EVENT = enum.auto()
-    WAIT = enum.auto()
-    QOP = enum.auto()
-    MSMT = enum.auto()
-    DECLARE = enum.auto()
-    MAP = enum.auto()
+class qasm_event():
 
-    # I need to think how to separate the technology dependent part and
-    # technology independent part.
+    def __init__(self):
+        self.line_number = -1
+        self.event_type = EventType.NONE_EVENT
+        self.name = ''
+        self.params = None
+        self.duration = 0
+        # self.start_time_point = time_point()
 
-    # TRIGGER = auto()
-    # AWG = auto()
-    # MEASURE = auto()
+    def __str__(self):
+        return "({}, {})".format(self.name, self.event_type)
 
+
+user_op_type = {
+    "rf": EventType.RF,
+    "flux": EventType.FLUX,
+    "measurement": EventType.MSMT
+}
 
 default_op_dict = {
     "I": {
@@ -105,20 +147,6 @@ default_op_dict = {
         "type": EventType.MAP
     }
 }
-
-
-class qasm_event():
-
-    def __init__(self):
-        self.line_number = -1
-        self.event_type = EventType.NONE_EVENT
-        self.name = ''
-        self.params = None
-        self.duration = 0
-        # self.start_time_point = time_point()
-
-    def __str__(self):
-        return "({}, {})".format(self.name, self.event_type)
 
 
 class prog_line():
@@ -150,6 +178,20 @@ class QASM_QuMIS_Compiler():
             pq.__path__[0], 'instrument_drivers', 'physical_instruments',
             "_controlbox", "config.json")
 
+    def compile(self):
+        self.qumis_instructions = []
+        self.read_file()
+        self.line_to_event()
+        self.print_raw_events()
+        # self.build_dependency_graph()
+        self.resolve_qubit_name()
+        self.print_timing_events()
+        self.assign_timing_to_events()
+        self.compensate_channel_latency()
+        self.gen_full_time_grid()
+        self.convert_to_qumis()
+        return self.qumis_instructions
+
     def load_config(self):
         if (self.config_loaded is True):
             return
@@ -160,6 +202,19 @@ class QASM_QuMIS_Compiler():
             data = json.load(data_file)
 
         self.user_qasm_op_dict = data["operation dictionary"]
+        for key in self.user_qasm_op_dict:
+            op_spec = self.user_qasm_op_dict[key]
+            op_type_str = op_spec["type"]
+            if op_type_str not in user_op_type:
+                se = SyntaxError("unsupported operation type ({})"
+                                 " found.".format(op_spec["type"]))
+                se.filename = self.config_filename
+                raise se
+
+            op_type_enum = user_op_type[op_type_str]
+            op_spec["type"] = op_type_enum
+            self.user_qasm_op_dict[key] = op_spec
+
         self.qasm_op_dict = {**default_op_dict, **self.user_qasm_op_dict}
         self.qasm_op_dict = lower_dict_key(self.qasm_op_dict)
         self.hardware_spec = data["hardware specification"]
@@ -167,7 +222,17 @@ class QASM_QuMIS_Compiler():
         # print(self.qasm_op_dict)
 
         self.physical_qubits = self.hardware_spec["qubit list"]
+        if is_integer_array(self.physical_qubits) is False:
+            raise ValueError('"qubit list" in the configuration file is not an'
+                             ' integer array:\n\t{}'.format(
+                                 self.physical_qubits))
+
         self.cycle_time = self.hardware_spec["cycle time"]
+        if is_positive_number(self.cycle_time) is False:
+            raise ValueError('"cycle time" ({}) in the configuration file'
+                             ' is not an positive number.'.format(
+                                 self.cycle_time))
+        self.cycle_time = float(self.cycle_time)
 
         self.config_loaded = True
 
@@ -194,13 +259,15 @@ class QASM_QuMIS_Compiler():
             self.prog_lines.append(prog_line(line_number, line_content))
 
         prog_file.close()
+        self.print_lines()
 
     def print_lines(self):
         # print("Raw Lines:")
         # for line in self.raw_lines:
         #     print(line)
+        # print("")
 
-        print("\nProgram Lines:")
+        print("Program Lines:")
         for line in self.prog_lines:
             print(line)
 
@@ -218,11 +285,29 @@ class QASM_QuMIS_Compiler():
                                                 re.name, re.params))
             raw_print("\n")
 
+    def print_timing_events(self):
+        print("Timing events:")
+        for i, timing_events in enumerate(self.timing_event_list):
+            raw_print("{0:5d} : ".format(i))
+            for re in timing_events:
+                raw_print("({}, {}, {})".format(re.event_type,
+                                                re.name, re.params))
+            raw_print("\n")
+
     @classmethod
     def remove_comment(self, line):
         line = line.split('#', 1)[0]  # remove anything after '#' symbole
         line = line.strip(' \t\n\r')  # remove whitespace
         return line
+
+    @classmethod
+    def is_single_line_op(self, qasm_op_type):
+        if (qasm_op_type == EventType.WAIT) or \
+                (qasm_op_type == EventType.DECLARE) or \
+                (qasm_op_type == EventType.MAP):
+            return True
+        else:
+            return False
 
     def line_to_event(self):
         '''
@@ -235,61 +320,72 @@ class QASM_QuMIS_Compiler():
         self.load_config()
         self.raw_event_list = []
         for line in self.prog_lines:
+            # print("line in prog_lines:", line)
+            # print("line_content:", line.content)
             events = self.get_parallel_qasm_ops(line.content)
+            # print("events:", events)
             raw_events = []
             for e in events:
+                # print("e in events:", e)
                 qasm_op_name = self.get_qasm_op_name(e)
                 if qasm_op_name not in self.qasm_op_dict:
-                    raise SyntaxError(
-                        "{}, line {}: Unsuppported QASM operation {}.".format(
-                            self.filename, line.number, qasm_op_name))
+                    se = SyntaxError("unsuppported QASM operation {}.".format(
+                        qasm_op_name))
+                    se.filename = self.filename
+                    se.lineno = line.number
+                    raise se
 
                 qasm_op_type = self.qasm_op_dict[qasm_op_name]["type"]
 
-                if (qasm_op_type != EventType.QOP) and (len(events) != 1):
-                    raise SyntaxError(
-                        "{}, line {}: QASM instruction {} should exclusively "
-                        "occupy a line.".format(self.filename,
-                                                line.number, qasm_op_name))
+                if self.is_single_line_op(qasm_op_type) and (len(events) != 1):
+                    se = SyntaxError("QASM instruction {} should exclusively "
+                                     "occupy a line.".format(qasm_op_name))
+                    se.filename = self.filename
+                    se.lineno = line.number
+                    raise se
 
                 # check parameter
                 qasm_op_params = self.get_qasm_op_params(e)
                 if (qasm_op_name == "qubit") and (len(qasm_op_params) < 1):
-                    raise SyntaxError(
-                        "{}, line {}: the QASM instruction qubit should"
-                        " contain at least one parameter as the declared"
-                        " qubit.".format(
-                            self.filename,
-                            line.number,
-                            qasm_op_name))
+                    se = SyntaxError("the QASM instruction qubit should "
+                                     "contain at least one parameter as "
+                                     "the declared qubit.".format(
+                                         qasm_op_name))
+                    se.filename = self.filename
+                    se.lineno = line.number
+                    raise se
 
                 expected_num_of_params =  \
                     self.qasm_op_dict[qasm_op_name]["parameters"]
-                if len(qasm_op_params) != expected_num_of_params:
-                    raise SyntaxError(
-                        "{}, line {}: unexpected number of parameters for the"
-                        " QASM instruction {}. {} parameters are"
-                        " expected.".format(
-                            self.filename,
-                            line.number,
-                            qasm_op_name,
-                            expected_num_of_params))
+                if (qasm_op_name != "qubit") and \
+                        (len(qasm_op_params) != expected_num_of_params):
+                    se = SyntaxError("unexpected number of parameters for the"
+                                     " QASM instruction {}. {} parameters are"
+                                     " expected.".format(
+                                         qasm_op_name,
+                                         expected_num_of_params))
+                    se.filename = self.filename
+                    se.lineno = line.number
+                    raise se
 
-                if qasm_op_type == EventType.WAIT:
+                if (qasm_op_type == EventType.WAIT) and \
+                        (expected_num_of_params == 1):
                     pre_waiting_time, = qasm_op_params
                     if is_int(pre_waiting_time) is False:
-                        raise SyntaxError("{}, line {}: parameter {} is not an"
-                                          " integer.".format(
-                                              self.filename,
-                                              line.number,
-                                              pre_waiting_time))
+                        se = SyntaxError("parameter {} is not an "
+                                         "integer.".format(pre_waiting_time))
+                        se.filename = self.filename
+                        se.lineno = line.number
+                        raise se
+
                     pre_waiting_time = int(pre_waiting_time)
                     if pre_waiting_time < 0:
-                        raise ValueError("{}, line {}: parameter {} is not"
-                                          " positive.".format(
-                                              self.filename,
-                                              line.number,
-                                              pre_waiting_time))
+                        ve = ValueError("parameter {} is not "
+                                        "positive.".format(pre_waiting_time))
+                        ve.filename = self.filename
+                        ve.lineno = line.number
+                        raise se
+
                     qasm_op_params = [pre_waiting_time]
 
                 raw_event = qasm_event()
@@ -311,8 +407,8 @@ class QASM_QuMIS_Compiler():
 
     @classmethod
     def get_parallel_qasm_ops(self, op_line):
-        return [rawEle.strip(string.punctuation.translate(
-                {ord('-'): None})) for rawEle in op_line.split("|")]
+        return [rawEle.replace(',', ' ').strip()
+                for rawEle in op_line.split("|")]
 
     @classmethod
     def get_qasm_op_name(self, qasm_op):
@@ -326,18 +422,6 @@ class QASM_QuMIS_Compiler():
             raise ValueError("QASM operation cannot be empty")
         return qasm_op.split()[1:]
 
-    def compile(self):
-        self.qumis_instructions = []
-        self.readfile()
-        self.line_to_event()
-        # self.build_dependency_graph()
-        self.resolve_qubit_name()
-        self.assign_timing_to_events()
-        self.compensate_channel_latency()
-        self.gen_full_time_grid()
-        self.convert_to_qumis()
-        return self.qumis_instructions
-
     def assign_timing_to_events(self):
         '''
         Resolve qubit name and map declared qubits into physical qubits.
@@ -346,17 +430,27 @@ class QASM_QuMIS_Compiler():
         self.timing_grid = []
 
         tp = time_point()
-        for raw_events in self.raw_event_list:
-            for raw_event in raw_events:
-                if (raw_event.event_type == EventType.NONE_EVENT):
-                    continue
-                elif (raw_event.event_type == EventType.DECLARE):
-                    self.extend_dec_qubit_list(raw_event)
-                elif (raw_event.event_type == EventType.MAP):
-                    self.build_qubit_map(raw_event)
-                elif (raw_event.event_type == EventType.WAIT):
+        i = 0
+        for timing_events in self.timing_event_list:
+            for timing_event in timing_events:
+                if timing_event.event_type == EventType.WAIT:
+                    self.timing_grid.append(tp)
                     tp = time_point()
-                    tp.pre_waiting_time = self.get_pre_waiting_time(raw_event)
+                    expected_num_of_params =  \
+                        self.qasm_op_dict[timing_event.
+                            qasm_op_name]["parameters"]
+                    if expected_num_of_params == 1:
+                        tp.pre_waiting_time = timing_event.params[0]
+                    elif timing_event.qasm_op_name == "init_all":
+                        tp.pre_waiting_time = INIT_WAITING_TIME
+                    else:
+                        se = SyntaxError("unsupported instruction ({})"
+                            " found.".format(timing_event.qasm_op_name))
+                        se.filename = self.filename
+                        se.lineno = timing_event.line_number
+                        raise se
+                elif timing_event.event_type == EventType.
+
 
     def get_pre_waiting_time(self, raw_event):
         pre_waiting_time, = raw_event.params
@@ -365,27 +459,97 @@ class QASM_QuMIS_Compiler():
         return int(pre_waiting_time)
 
     def resolve_qubit_name(self):
+        self.build_qubit_map()
         self.map_qubits()
 
-    def map_qubits(self, raw_event):
-        dec_qubit, phys_qubit = raw_event.params
+    def build_qubit_map(self):
+        i = 0
+        while i < len(self.raw_event_list):
+            raw_events = self.raw_event_list[i]
+            for raw_event in raw_events:
+                if (raw_event.event_type == EventType.DECLARE):
+                    self.extend_dec_qubit_list(raw_event)
+                    self.raw_event_list.pop(i)
+                elif (raw_event.event_type == EventType.MAP):
+                    self.add_qubit_map(raw_event)
+                    self.raw_event_list.pop(i)
+                else:
+                    i = i + 1
 
-        if (dec_qubit not in self.declared_qubits):
-            raise SyntaxError("{}, line {}: undefined qubit{} found.".format(
-                self.filename, raw_event.line_number, dec_qubit))
+        print("After building qubit map:")
+        self.print_raw_events()
+
+    def map_qubits(self):
+        self.timing_event_list = []
+        for raw_events in self.raw_event_list:
+            timing_events = []
+            for raw_event in raw_events:
+                if (raw_event.event_type == EventType.WAIT):
+                    timing_events.append(raw_event)
+                if (raw_event.event_type == EventType.RF or
+                        raw_event.event_type == EventType.FLUX or
+                        raw_event.event_type == EventType.MSMT):
+                    params = [self.qubit_map[dec_qubit]\
+                              for dec_qubit in raw_event.params]
+                    raw_event.params = params
+                    timing_events.append(raw_event)
+            self.timing_event_list.append(timing_events)
+
 
     def extend_dec_qubit_list(self, raw_event):
         for q in raw_event.params:
             if self.declared_qubits.count(q):
-                raise SyntaxError("{}, line {}: Redefinition of {}".format(
-                    self.filename, raw_event.line_number, q))
+                se = SyntaxError("Redefinition of {}".format(q))
+                se.filename = self.filename
+                se.lineno = raw_event.line_number
+                raise se
             else:
                 self.declared_qubits.append(q)
 
         if (len(self.declared_qubits) > len(self.physical_qubits)):
-            raise Error("More qubits declared ({}) than available physical"
-                        " qubits ({}).".format(len(self.declared_qubits),
-                                               len(self.physical_qubits)))
+            se = SyntaxError("More qubits declared ({}) than available phys"
+                             "ical qubits ({}).".format(
+                                 len(self.declared_qubits),
+                                 len(self.physical_qubits)))
+            se.filename = self.filename
+            raise se
+
+        print(self.declared_qubits)
+
+    def add_qubit_map(self, raw_event):
+        dec_qubit, phys_qubit = raw_event.params
+
+        if (dec_qubit not in self.declared_qubits):
+            se = SyntaxError("undefined qubit ({}) found.".format(dec_qubit))
+            se.filename = self.filename
+            se.lineno = raw_event.line_number
+            raise se
+
+        if (dec_qubit in self.qubit_map):
+            se = SyntaxError("remapping of the qubit {}.".format(dec_qubit))
+            se.filename = self.filename
+            se.lineno = raw_event.line_number
+            raise se
+
+        if (is_int(phys_qubit) is False):
+            se = SyntaxError("the target qubit ({}) is not"
+                             " an integer.".format(phys_qubit))
+            se.filename = self.filename
+            se.lineno = raw_event.line_number
+            raise se
+
+        phys_qubit = int(phys_qubit)
+
+        if (phys_qubit not in self.physical_qubits):
+            se = SyntaxError("physical qubit ({}) is not available.".format(
+                self.filename,
+                raw_event.line_number,
+                phys_qubit))
+            se.filename = self.filename
+            se.lineno = raw_event.line_number
+            raise se
+
+        self.qubit_map[dec_qubit] = int(phys_qubit)
 
     def compensate_channel_latency(self):
         pass
