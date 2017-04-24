@@ -34,7 +34,8 @@ import os
 import sys
 
 
-INIT_WAITING_TIME = 200000 # ns
+INIT_ALL_WAITING_TIME = 200000  # ns
+
 
 def is_number(s):
     try:
@@ -98,6 +99,7 @@ class time_point():
         self.label = None
         self.absolute_time = None
         self.pre_waiting_time = None
+        self.following_waiting_time = None
         self.parallel_events = []
 
 
@@ -187,6 +189,7 @@ class QASM_QuMIS_Compiler():
         self.resolve_qubit_name()
         self.print_timing_events()
         self.assign_timing_to_events()
+        self.print_timing_grid()
         self.compensate_channel_latency()
         self.gen_full_time_grid()
         self.convert_to_qumis()
@@ -293,6 +296,30 @@ class QASM_QuMIS_Compiler():
                 raw_print("({}, {}, {})".format(re.event_type,
                                                 re.name, re.params))
             raw_print("\n")
+
+    def print_timing_grid(self):
+        print("Timing gird:")
+        i = 0
+        for tp in self.timing_grid:
+            raw_print("{0:5d}: Duration: {1}, Events:".format(i,
+                tp.following_waiting_time))
+            self.print_event_list(tp.parallel_events)
+            raw_print('\n')
+
+    def print_event_list(self, event_list):
+        raw_print(" ")
+        for e in event_list:
+            raw_print(e.name)
+            raw_print(" ")
+            if len(e.params) == 2:
+                raw_print(str(e.params[0]))
+                raw_print(", ")
+                raw_print(str(e.params[1]))
+                raw_print(";")
+            else:
+                raw_print(str(e.params[0]))
+                raw_print(";")
+
 
     @classmethod
     def remove_comment(self, line):
@@ -406,6 +433,23 @@ class QASM_QuMIS_Compiler():
             return False
 
     @classmethod
+    def is_wait_line(self, events):
+        if events[0].event_type == EventType.WAIT:
+            return True
+        else:
+            return False
+
+    @classmethod
+    def is_q_op_event(self, event):
+        op_type = event.event_type
+        if ((op_type == EventType.MSMT) or
+                (op_type == EventType.FLUX) or
+                (op_type == EventType.RF)):
+            return True
+        else:
+            return False
+
+    @classmethod
     def get_parallel_qasm_ops(self, op_line):
         return [rawEle.replace(',', ' ').strip()
                 for rawEle in op_line.split("|")]
@@ -429,28 +473,40 @@ class QASM_QuMIS_Compiler():
         '''
         self.timing_grid = []
 
-        tp = time_point()
-        i = 0
+        pre_waiting_time = 0
+        next_waiting_time = 0
+        pre_line_is_wait = False
         for timing_events in self.timing_event_list:
-            for timing_event in timing_events:
-                if timing_event.event_type == EventType.WAIT:
-                    self.timing_grid.append(tp)
-                    tp = time_point()
-                    expected_num_of_params =  \
-                        self.qasm_op_dict[timing_event.
-                            qasm_op_name]["parameters"]
-                    if expected_num_of_params == 1:
-                        tp.pre_waiting_time = timing_event.params[0]
-                    elif timing_event.qasm_op_name == "init_all":
-                        tp.pre_waiting_time = INIT_WAITING_TIME
-                    else:
-                        se = SyntaxError("unsupported instruction ({})"
-                            " found.".format(timing_event.qasm_op_name))
-                        se.filename = self.filename
-                        se.lineno = timing_event.line_number
-                        raise se
-                elif timing_event.event_type == EventType.
+            # each line starts a new time point
+            # two thing to do for this time point:
+            # 1. determine what happens at this moment
+            # 2. determine the following waiting time
+            tp = time_point()
 
+            # determine the following waiting time
+            if self.is_wait_line(timing_events):
+                timing_event = timing_events[0]
+                op_name = timing_event.name
+                if self.qasm_op_dict[op_name]["parameters"] == 1:
+                    following_waiting_time = timing_event.params[0]
+                elif op_name == "init_all":
+                    following_waiting_time = INIT_ALL_WAITING_TIME
+                else:
+                    se = SyntaxError("unsupported instruction ({})"
+                                     " found.".format(timing_event.name))
+                    se.filename = self.filename
+                    se.lineno = timing_event.line_number
+                    raise se
+            else:
+                following_waiting_time = self.get_max_duration(timing_events)
+
+            tp.following_waiting_time = following_waiting_time
+
+            # determine what happens at this moment
+            if self.is_wait_line(timing_events) is False:
+                tp.parallel_events.extend(timing_events)
+
+            self.timing_grid.append(tp)
 
     def get_pre_waiting_time(self, raw_event):
         pre_waiting_time, = raw_event.params
@@ -489,12 +545,11 @@ class QASM_QuMIS_Compiler():
                 if (raw_event.event_type == EventType.RF or
                         raw_event.event_type == EventType.FLUX or
                         raw_event.event_type == EventType.MSMT):
-                    params = [self.qubit_map[dec_qubit]\
+                    params = [self.qubit_map[dec_qubit]
                               for dec_qubit in raw_event.params]
                     raw_event.params = params
                     timing_events.append(raw_event)
             self.timing_event_list.append(timing_events)
-
 
     def extend_dec_qubit_list(self, raw_event):
         for q in raw_event.params:
@@ -559,3 +614,14 @@ class QASM_QuMIS_Compiler():
 
     def convert_to_qumis(self):
         pass
+
+    def get_max_duration(self, timing_events):
+        max_duration = 0
+        for timing_event in timing_events:
+            if self.is_q_op_event(timing_event) is False:
+                raise ValueError("events should be gates or measurements.")
+
+        max_duration = max(
+            [self.qasm_op_dict[timing_event.name]["duration"]
+             for timing_event in timing_events])
+        return max_duration
