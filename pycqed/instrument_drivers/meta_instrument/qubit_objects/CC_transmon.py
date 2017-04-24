@@ -480,11 +480,12 @@ class CBox_v3_driven_transmon(Transmon):
 
             logging.info("setting UHFQC acquisition")
 
-            if self.RO_acq_weights == 'optimal':
-                RO_channels = [self.RO_I_channel()]
-                result_logging_mode = 'normalized'
+            if self.RO_acq_weights() == 'optimal':
+                RO_channels = [self.RO_acq_weight_function_I()]
+                result_logging_mode = 'lin_trans'
             else:
-                RO_channels = [self.RO_I_channel(), self.RO_Q_channel()]
+                RO_channels = [self.RO_acq_weight_function_I(),
+                               self.RO_acq_weight_function_Q()]
                 result_logging_mode = 'raw'
 
             self.input_average_detector = det.UHFQC_input_average_detector(
@@ -504,7 +505,7 @@ class CBox_v3_driven_transmon(Transmon):
                 channels=RO_channels,
                 result_logging_mode=result_logging_mode,
                 nr_averages=self.RO_acq_averages(),
-                real_imag=False, single_int_avg=True,
+                real_imag=True, single_int_avg=True,
                 integration_length=self.RO_acq_integration_length())
 
             self.int_log_det = det.UHFQC_integration_logging_det(
@@ -1237,6 +1238,7 @@ class CBox_v3_driven_transmon(Transmon):
         MC.live_plot_enabled(old_plot_setting)
         if analyze:
             a = ma.SSRO_Analysis(label='SSRO'+self.msmt_suffix,
+                                 channels=d.value_names,
                                  no_fits=no_fits, close_fig=close_fig)
             if verbose:
                 print('Avg. Assignement fidelity: \t{:.4f}\n'.format(a.F_a) +

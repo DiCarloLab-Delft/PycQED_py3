@@ -19,7 +19,8 @@ import qcodes as qc
 
 
 def measure_two_qubit_AllXY(device, q0_name, q1_name,
-                            sequence_type='sequential', MC=None):
+                            sequence_type='sequential', MC=None,
+                            result_logging_mode='lin_trans'):
     if MC is None:
         MC = qc.station.components['MC']
 
@@ -47,7 +48,7 @@ def measure_two_qubit_AllXY(device, q0_name, q1_name,
         AWG=device.seq_contr.get_instr(),
         nr_averages=q0.RO_acq_averages(),
         integration_length=q0.RO_acq_integration_length(),
-        result_logging_mode='lin_trans',
+        result_logging_mode=result_logging_mode,
         channels=[q0.RO_acq_weight_function_I(),
                   q1.RO_acq_weight_function_I()])
     MC.set_sweep_function(s)
