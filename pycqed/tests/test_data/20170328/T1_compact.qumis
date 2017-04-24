@@ -1,0 +1,37 @@
+lui r15, 0, 144   # r15 stores the Relaxation time, 2 us
+lui r15, 1, 1
+lui r15, 2, 0
+lui r15, 3, 0
+lui r7, 0, 20    # sweep step, 100 ns
+lui r7, 1, 0
+lui r7, 2, 0
+lui r7, 3, 0
+lui r13, 0, 200   # r13 stores the max $T_{inteval}$, 1 us
+lui r13, 1, 0
+lui r13, 2, 0
+lui r13, 3, 0
+lui r14, 0, 255   # r14 stores the round loop times, almost infinite
+lui r14, 1, 255
+lui r14, 2, 255
+lui r14, 3, 15
+ProgramEntry:   WaitReg r15       # Wait for 2 us to relax the qubit
+addi r1, r7, 0    # r1 = $T_{inteval}$ between X180 Pulse and measurement
+T1Exp_Start:    lui r2, 0, 0
+lui r2, 1, 0
+lui r2, 2, 0
+lui r2, 3, 0
+lui r3, 0, 0
+lui r3, 1, 0
+lui r3, 2, 0
+lui r3, 3, 0
+Round_Start:    Sub r5, r15, r1   # r5 = RelaxationTime – $T_{inteval}$
+                WaitReg r5
+Pulse 1000, 0000, 0000         # Assumption: X180 pulse
+WaitReg r1                     # Wait for $T_{inteval}$
+Pulse 0000, 1000, 0000         # Assumption: Readout pulse
+Trigger 1111111, 20       # Assumption: output all markers as high for 100 ns
+Measure                     # Start measurement integration
+add r1, r1, r7                 # Increase $T_{inteval}$ by one step
+BNE r1, r13, Round_Start       # sweep the interval $T_{inteval}$ from 1 us to max $T_{inteval}$ (5 us)
+addi r2, r2, 1
+BNE r2, r14, T1Exp_Start       # repeat the experiment infinitely

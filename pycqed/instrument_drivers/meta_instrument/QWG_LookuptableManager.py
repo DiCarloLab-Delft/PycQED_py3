@@ -10,7 +10,7 @@ class QWG_LookuptableManager(Instrument):
     def __init__(self, name, QWG, **kw):
         logging.info(__name__ + ' : Initializing instrument')
         super().__init__(name, **kw)
-        self.QWG=QWG
+        self.QWG = QWG
 
         self.add_parameter('Q_amp180',
                            unit='V',
@@ -29,10 +29,26 @@ class QWG_LookuptableManager(Instrument):
                            parameter_class=ManualParameter,
                            initial_value=4e-9)
 
+        self.add_parameter('spec_pulse_type',
+                           vals=vals.Enum('block', 'gauss'),
+                           parameter_class=ManualParameter,
+                           initial_value='block')
+        self.add_parameter('spec_amp',
+                           unit='V',
+                           vals=vals.Numbers(0, 1),
+                           parameter_class=ManualParameter,
+                           initial_value=0.4)
+        self.add_parameter(
+            'spec_length', vals=vals.Numbers(min_value=1e-9), unit='s',
+            parameter_class=ManualParameter,
+            docstring=('length of the block pulse if spec_pulse_type' +
+                       'is "block", gauss_width if spec_pulse_type is gauss.'),
+            initial_value=100e-9)
 
     def load_pulses_onto_AWG_lookuptable(self):
         self.QWG.stop()
 
+        # Microwave pulses
         G_amp = self.Q_amp180()/self.QWG.get('ch{}_amp'.format(1))
         # Amplitude is set using the channel amplitude (at least for now)
         G, D = wf.gauss_pulse(G_amp, self.Q_gauss_width(),
@@ -53,6 +69,18 @@ class QWG_LookuptableManager(Instrument):
         self.QWG.createWaveformReal('mX90_q0_Q', -self.Q_amp90_scale()*D)
         self.QWG.createWaveformReal('mY90_q0_I', -self.Q_amp90_scale()*D)
         self.QWG.createWaveformReal('mY90_q0_Q', self.Q_amp90_scale()*G)
+
+        # Spec pulse
+        if self.spec_pulse_type() == 'gauss':
+            spec_G, spec_Q = wf.gauss_pulse(self.spec_amp(),
+                                            self.spec_length(),
+                                            motzoi=0, sampling_rate=1e9)
+        elif self.spec_pulse_type() == 'block':
+            spec_G, spec_Q = wf.block_pulse(self.spec_amp(),
+                                            self.spec_length(),
+                                            sampling_rate=1e9)
+        self.QWG.createWaveformReal('spec_q0_I', spec_G)
+        self.QWG.createWaveformReal('spec_q0_Q', spec_Q)
 
         # Filler waveform
         self.QWG.createWaveformReal('zero', [0]*4)
@@ -85,5 +113,11 @@ class QWG_LookuptableManager(Instrument):
         self.QWG.codeword_5_ch2_waveform('mY90_q0_Q')
         self.QWG.codeword_5_ch3_waveform('mY90_q0_I')
         self.QWG.codeword_5_ch4_waveform('mY90_q0_Q')
+
+        self.QWG.codeword_6_ch1_waveform('spec_q0_I')
+        self.QWG.codeword_6_ch2_waveform('spec_q0_Q')
+        self.QWG.codeword_6_ch3_waveform('spec_q0_I')
+        self.QWG.codeword_6_ch4_waveform('spec_q0_Q')
+
         self.QWG.start()
         self.QWG.getOperationComplete()

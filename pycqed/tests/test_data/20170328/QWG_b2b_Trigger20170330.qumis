@@ -1,0 +1,47 @@
+mov r0, 20000   # r0 stores the cycle time , 100 us
+mov r1, 0       # sets the inter pulse wait to 0
+mov r14, 0      # r14 stores number of repetitions
+# Experiment: repeat the rounds for infinite times
+wait 1
+Exp_Start:
+trigger 0000010, 10
+wait 10
+trigger 0000000, 1
+wait 1
+trigger 1000000, 2
+wait 2
+wait 4
+trigger 0100000, 1
+wait 1
+trigger 1100000, 2
+wait 2
+wait 4
+trigger 0010000, 1
+wait 1
+trigger 1010000, 2
+wait 2
+wait 4
+trigger 0110000, 1
+wait 1
+trigger 1110000, 2
+wait 2
+wait 4
+trigger 0001000, 1
+wait 1
+trigger 1001000, 2
+wait 2
+wait 4
+trigger 0101000, 1
+wait 1
+trigger 1101000, 2
+wait 2
+wait 4
+trigger 0011000, 1
+wait 1
+trigger 1011000, 2
+wait 2
+wait 4
+wait 2000
+beq r14, r14, Exp_Start       # Infinite loop
+
+# As found in the experiment, CBox does not output the triggers repeatedly. It appeared once or so and then disappear.

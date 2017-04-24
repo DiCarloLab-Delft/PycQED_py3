@@ -12,53 +12,14 @@ import numpy as np
 from pycqed.analysis.fitting_models import Qubit_freq_to_dac
 
 
-class Waveform():
-    # complex waveforms
-
-    @staticmethod
-    def exp(fs, nrSamples, frequency, initialPhase=0, amplitude=1):
-        return amplitude * np.exp(2*np.pi * frequency/fs * np.array(range(nrSamples)) + initialPhase)
-
-    # real (i.e. non-complex) waveforms
-    @staticmethod
-    def cos(fs, nrSamples, frequency, initialPhase=0, amplitude=1):
-        return amplitude * np.cos(2*np.pi * frequency/fs * np.array(range(nrSamples)) + initialPhase)
-
-    @staticmethod
-    def sin(fs, nrSamples, frequency, initialPhase=0, amplitude=1):
-        return amplitude * np.sin(2*np.pi * frequency/fs * np.array(range(nrSamples)) + initialPhase)
-
-    @staticmethod
-    def DC(fs, nrSamples, offset=0):
-        return np.zeros(nrSamples) + offset
-
-    @staticmethod
-    def gauss(fs, nrSamples, mu, sigma, amplitude=1):
-        t = 1/fs * np.array(range(nrSamples))
-        return amplitude*np.exp(-(0.5 * ((t-mu)**2) / sigma**2))
-
-    @staticmethod
-    def derivGauss(fs, nrSamples, mu, sigma, amplitude=1, motzoi=1):
-        t = 1/fs * np.array(range(nrSamples))
-        gauss = amplitude*np.exp(-(0.5 * ((t-mu)**2) / sigma**2))
-        return motzoi * -1 * (t-mu)/(sigma**1) * gauss
-
-    @staticmethod
-    def block(fs, nrSamples, offset=0):
-        negative = np.zeros(nrSamples/2)
-        positive = np.zeros(nrSamples/2) + offset
-        return np.concatenate((negative, positive), axis=0)
-
-
 def gauss_pulse(amp, sigma_length, nr_sigma=4, sampling_rate=2e8,
-                axis='x',
+                axis='x', phase=0,
                 motzoi=0, delay=0):
     '''
     All inputs are in s and Hz.
+    phases are in degree.
     '''
     sigma = sigma_length  # old legacy naming, to be replaced
-    # nr_sigma_samples = int(sigma_length * sampling_rate)
-    # nr_pulse_samples = int(nr_sigma*nr_sigma_samples)
     length = sigma*nr_sigma
     mu = length/2.
 
@@ -74,15 +35,16 @@ def gauss_pulse(amp, sigma_length, nr_sigma=4, sampling_rate=2e8,
     delay_samples = delay*sampling_rate
 
     # generate pulses
-    if axis == 'x':
-        pulse_I = gauss_env
-        pulse_Q = deriv_gauss_env
-    elif axis == 'y':
-        pulse_I = -1*deriv_gauss_env
-        pulse_Q = gauss_env
     Zeros = np.zeros(int(delay_samples))
-    pulse_I = np.array(list(Zeros)+list(pulse_I))
-    pulse_Q = np.array(list(Zeros)+list(pulse_Q))
+    G = np.array(list(Zeros)+list(gauss_env))
+    D = np.array(list(Zeros)+list(deriv_gauss_env))
+
+    if axis == 'y':
+        phase += 90
+
+    pulse_I = np.cos(2*np.pi*phase/360)*G - np.sin(2*np.pi*phase/360)*D
+    pulse_Q = np.sin(2*np.pi*phase/360)*G + np.cos(2*np.pi*phase/360)*D
+
     return pulse_I, pulse_Q
 
 
@@ -254,14 +216,16 @@ def martinis_flux_pulse(length, lambda_coeffs, theta_f,
     return mart_pulse_V
 
 
-def mod_gauss(amp, sigma_length, f_modulation, axis='x',
+def mod_gauss(amp, sigma_length, f_modulation, axis='x', phase=0,
+              nr_sigma=4,
               motzoi=0, sampling_rate=2e8,
               Q_phase_delay=0, delay=0):
     '''
     Simple gauss pulse maker for CBOX. All inputs are in s and Hz.
     '''
-    pulse_I, pulse_Q = gauss_pulse(amp, sigma_length, nr_sigma=4,
+    pulse_I, pulse_Q = gauss_pulse(amp, sigma_length, nr_sigma=nr_sigma,
                                    sampling_rate=sampling_rate, axis=axis,
+                                   phase=phase,
                                    motzoi=motzoi, delay=delay)
     pulse_I_mod, pulse_Q_mod = mod_pulse(pulse_I, pulse_Q, f_modulation,
                                          sampling_rate=sampling_rate,

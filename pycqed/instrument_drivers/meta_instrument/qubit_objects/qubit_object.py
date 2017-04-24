@@ -72,7 +72,7 @@ class Qubit(Instrument):
                            get_cmd=self._get_operations)
 
     def get_idn(self):
-        return self.name
+        return {'driver': self.__class__, 'name': self.name}
 
     def _get_operations(self):
         return self._operations
@@ -100,6 +100,12 @@ class Qubit(Instrument):
     def measure_spectroscopy(self):
         raise NotImplementedError()
 
+    def measure_transients(self):
+        raise NotImplementedError()
+
+    def calibrate_optimal_weights(self):
+        raise NotImplementedError()
+
     def measure_heterodyne_spectroscopy(self):
         raise NotImplementedError()
 
@@ -110,6 +116,13 @@ class Qubit(Instrument):
                                 argument_name):
         """
         Links an existing param to an operation for use in the operation dict.
+
+        An example of where to use this would be the flux_channel.
+        Only one parameter is specified but it is relevant for multiple flux
+        pulses. You don't want a different parameter that specifies the channel
+        for the iSWAP and the CZ gate. This can be solved by linking them to
+        your operation.
+
         Args:
             operation_name (str): The operation of which this parameter is an
                 argument. e.g. mw_control or CZ
@@ -148,7 +161,8 @@ class Qubit(Instrument):
                 name.
         """
         if parameter_name in self.parameters:
-            raise KeyError('Duplicate parameter name {}'.format(parameter_name))
+            raise KeyError(
+                'Duplicate parameter name {}'.format(parameter_name))
 
         if operation_name in self.operations().keys():
             self._operations[operation_name][argument_name] = parameter_name
@@ -191,8 +205,6 @@ class Transmon(Qubit):
         self.add_parameter('E_j', unit='Hz',
                            parameter_class=ManualParameter,
                            vals=vals.Numbers())
-        self.add_parameter('assymetry',
-                           parameter_class=ManualParameter)
 
         self.add_parameter('dac_voltage', unit='mV',
                            parameter_class=ManualParameter)
@@ -201,10 +213,9 @@ class Transmon(Qubit):
         self.add_parameter('dac_flux_coefficient', unit='',
                            parameter_class=ManualParameter)
         self.add_parameter('asymmetry', unit='',
+                           initial_value=0,
                            parameter_class=ManualParameter)
         self.add_parameter('dac_channel', vals=vals.Ints(),
-                           parameter_class=ManualParameter)
-        self.add_parameter('flux',
                            parameter_class=ManualParameter)
 
         self.add_parameter('f_qubit', label='qubit frequency', unit='Hz',
@@ -234,41 +245,55 @@ class Transmon(Qubit):
                            vals=vals.Numbers(0, 1e-6),
                            parameter_class=ManualParameter)
 
-        self.add_parameter('f_qubit_calc', vals=vals.Enum(None, 'dac', 'flux'),
+        self.add_parameter('f_qubit_calc_method',
+                           vals=vals.Enum('latest', 'dac', 'flux'),
                            # in the future add 'tracked_dac', 'tracked_flux',
+                           initial_value='latest',
                            parameter_class=ManualParameter)
 
-    def calculate_frequency(self, EC=None, EJ=None, assymetry=None,
-                            dac_voltage=None, flux=None,
-                            no_transitions=1, calc_method='Hamiltonian'):
+    def calculate_frequency(self,
+                            dac_voltage=None,
+                            flux=None):
         '''
-        Calculates transmon energy levels from the full transmon qubit
-        Hamiltonian.
-
+        Calculates the f01 transition frequency from the cosine arc model.
+        (function available in fit_mods. Qubit_dac_to_freq)
 
         Parameters of the qubit object are used unless specified.
         Flux can be specified both in terms of dac voltage or flux but not
         both.
-
-        If specified in terms of a dac voltage it will convert the dac voltage
-        to a flux using convert dac to flux (NOT IMPLEMENTED)
         '''
-        if EC is None:
-            EC = self.EC.get()
-        if EJ is None:
-            EJ = self.EJ.get()
-        if assymetry is None:
-            assymetry = self.assymetry.get()
 
         if dac_voltage is not None and flux is not None:
             raise ValueError('Specify either dac voltage or flux but not both')
-        if flux is None:
-            flux = self.flux.get()
-        # Calculating with dac-voltage not implemented yet
 
-        freq = calculate_transmon_transitions(
-            EC, EJ, asym=assymetry, reduced_flux=flux, no_transitions=1)
-        return freq
+        if self.f_qubit_calc_method() is 'latest':
+            f_qubit_estimate = self.f_qubit()
+
+        elif self.f_qubit_calc_method() == 'dac':
+            if dac_voltage is None:
+                dac_voltage = self.IVVI.get_instr().get(
+                        'dac{}'.format(self.dac_channel()))
+
+            f_qubit_estimate = fit_mods.Qubit_dac_to_freq(
+                dac_voltage=dac_voltage,
+                f_max=self.f_max(),
+                E_c=self.E_c(),
+                dac_sweet_spot=self.dac_sweet_spot(),
+                dac_flux_coefficient=self.dac_flux_coefficient(),
+                asymmetry=self.asymmetry())
+
+        elif self.f_qubit_calc_method() == 'flux':
+            if flux is None:
+                flux = self.FluxCtrl.get_instr().get(
+                    'flux{}'.format(self.dac_channel()))
+            f_qubit_estimate = fit_mods.Qubit_dac_to_freq(
+                dac_voltage=flux,
+                f_max=self.f_max(),
+                E_c=self.E_c(),
+                dac_sweet_spot=0,
+                dac_flux_coefficient=1,
+                asymmetry=self.asymmetry())
+        return f_qubit_estimate
 
     def calculate_flux(self, frequency):
         raise NotImplementedError()
@@ -282,65 +307,40 @@ class Transmon(Qubit):
     def find_frequency(self, method='spectroscopy', pulsed=False,
                        steps=[1, 3, 10, 30, 100, 300, 1000],
                        freqs=None,
-                       f_span=100e6, use_max=False, f_step=1e6,
-                       verbose=True, update=True,
+                       f_span=100e6,
+                       use_max=False,
+                       f_step=1e6,
+                       verbose=True,
+                       update=True,
                        close_fig=True):
+        """
+        Finds the qubit frequency using either the spectroscopy or the Ramsey
+        method.
+        Frequency prediction is done using
+        """
 
         if method.lower() == 'spectroscopy':
             if freqs is None:
-                # If not specified it should specify wether to use the last
-                # known one or wether to calculate and how
-                if self.f_qubit_calc() is None:
-                    freqs = np.arange(self.f_qubit.get()-f_span/2,
-                                      self.f_qubit.get()+f_span/2,
-                                      f_step)
-                elif self.f_qubit_calc() is 'dac':
-                    f_pred = fit_mods.QubitFreqDac(
-                        dac_voltage=self.IVVI.get(
-                            'dac%d' % self.dac_channel()),
-                        f_max=self.f_max()*1e-9,
-                        E_c=self.E_c()*1e-9,
-                        dac_sweet_spot=self.dac_sweet_spot(),
-                        dac_flux_coefficient=self.dac_flux_coefficient(),
-                        asymmetry=self.asymmetry())*1e9
-                    freqs = np.arange(f_pred-f_span/2,
-                                      f_pred+f_span/2,
-                                      f_step)
-                elif self.f_qubit_calc() is 'flux':
-                    fluxes = self.FluxCtrl.flux_vector()
-                    mappings = np.array(self.FluxCtrl.dac_mapping())
-                    # FIXME: this statement is super unclear
-                    my_flux = np.sum(np.where(mappings == self.dac_channel(),
-                                              mappings,
-                                              0))-1
-                    # print(mappings, my_flux, self.dac_channel())
-                    omega = lambda flux, f_max, EC, asym: ((
-                        f_max + EC) * (asym**2 + (1-asym**2) *
-                                       np.cos(np.pi*flux)**2)**0.25 - EC)
-                    f_pred_calc = lambda flux: omega(flux=flux,
-                                                     f_max=self.f_max()*1e-9,
-                                                     EC=self.E_c()*1e-9,
-                                                     asym=self.asymmetry())*1e9
-                    f_pred = f_pred_calc(fluxes[my_flux])
-                    freqs = np.arange(f_pred-f_span/2,
-                                      f_pred+f_span/2,
-                                      f_step)
-                    # print(freqs.min(), freqs.max())
+                f_qubit_estimate = self.calculate_frequency()
+                freqs = np.arange(f_qubit_estimate - f_span/2,
+                                  f_qubit_estimate + f_span/2,
+                                  f_step)
             # args here should be handed down from the top.
             self.measure_spectroscopy(freqs, pulsed=pulsed, MC=None,
-                                      analyze=True, close_fig=close_fig,
-                                      use_max=use_max, update=update)
+                                      analyze=True, close_fig=close_fig)
             if pulsed:
                 label = 'pulsed-spec'
             else:
                 label = 'spectroscopy'
             analysis_spec = ma.Qubit_Spectroscopy_Analysis(
                 label=label, close_fig=True)
-            if use_max:
-                self.f_qubit(analysis_spec.peaks['peak'])
-            else:
-                self.f_qubit(analysis_spec.fitted_freq)
-            # TODO: add updating and fitting
+
+            if update:
+                if use_max:
+                    self.f_qubit(analysis_spec.peaks['peak'])
+                else:
+                    self.f_qubit(analysis_spec.fitted_freq)
+                # TODO: add updating and fitting
         elif method.lower() == 'ramsey':
 
             stepsize = abs(1/self.f_pulse_mod.get())
@@ -380,38 +380,66 @@ class Transmon(Qubit):
                 print('Converged to: {:.9e}'.format(cur_freq))
             if update:
                 self.f_qubit.set(cur_freq)
-                print("update", update)
             return cur_freq
 
-    def find_resonator_frequency(self, **kw):
-        raise NotImplementedError()
+    def find_resonator_frequency(self, use_min=False,
+                                 update=True,
+                                 freqs=None,
+                                 MC=None, close_fig=True):
+        '''
+        Finds the resonator frequency by performing a heterodyne experiment
+        if freqs == None it will determine a default range dependent on the
+        last known frequency of the resonator.
+        '''
+        if freqs is None:
+            f_center = self.f_res.get()
+            f_span = 10e6
+            f_step = 100e3
+            freqs = np.arange(f_center-f_span/2, f_center+f_span/2, f_step)
+        self.measure_heterodyne_spectroscopy(freqs, MC, analyze=False)
+        a = ma.Homodyne_Analysis(label=self.msmt_suffix, close_fig=close_fig)
+        if use_min:
+            f_res = a.min_frequency
+        else:
+            f_res = a.fit_results.params['f0'].value*1e9  # fit converts to Hz
+        if f_res > max(freqs) or f_res < min(freqs):
+            logging.warning('exracted frequency outside of range of scan')
+        elif update:  # don't update if the value is out of the scan range
+            self.f_res.set(f_res)
+        self.f_RO(self.f_res())
+        return f_res
 
-    def find_pulse_amplitude(self, amps,
+    def find_pulse_amplitude(self, amps=np.linspace(-.5, .5, 31),
                              N_steps=[3, 7, 13, 17], max_n=18,
                              close_fig=True, verbose=False,
                              MC=None, update=True, take_fit_I=False):
         '''
-        Finds the pulse-amplitude using a rabi experiment.
+        Finds the pulse-amplitude using a Rabi experiment.
+        Fine tunes by doing a Rabi around the optimum with an odd
+        multiple of pulses.
 
-        If amps is an array it starts by fitting a cos to a Rabi experiment
-        to get an initial guess for the amplitude.
-        If amps is a float it uses that as the initial amplitude and starts
-        doing rabi flipping experiments around that optimum directly.
+        Args:
+            amps: (array or float) amplitudes of the first Rabi if an array,
+                if a float is specified it will be treated as an estimate
+                for the amplitude to be found.
+            N_steps: (list of int) number of pulses used in the fine tuning
+            max_n: (int) break of if N> max_n
         '''
         if MC is None:
             MC = self.MC
         if np.size(amps) != 1:
             self.measure_rabi(amps, n=1, MC=MC, analyze=False)
             a = ma.Rabi_Analysis(close_fig=close_fig)
+            # Decide which quadrature to take by comparing the contrast
             if take_fit_I:
-                ampl = abs(a.fit_res[0].params['period'].value)/2
-                print("taking I")
+                ampl = abs(a.fit_res[0].params['period'].value)/2.
+            elif (np.abs(max(a.measured_values[0]) -
+                         min(a.measured_values[0]))) > (
+                    np.abs(max(a.measured_values[1]) -
+                           min(a.measured_values[1]))):
+                ampl = a.fit_res[0].params['period'].value/2.
             else:
-                if (a.fit_res[0].params['period'].stderr <=
-                        a.fit_res[1].params['period'].stderr):
-                    ampl = abs(a.fit_res[0].params['period'].value)/2
-                else:
-                    ampl = abs(a.fit_res[1].params['period'].value)/2
+                ampl = a.fit_res[1].params['period'].value/2.
         else:
             ampl = amps
         if verbose:
@@ -421,15 +449,34 @@ class Transmon(Qubit):
             if n > max_n:
                 break
             else:
+                old_amp = ampl
                 ampl_span = 0.3*ampl/n
                 amps = np.linspace(ampl-ampl_span, ampl+ampl_span, 15)
                 self.measure_rabi(amps, n=n, MC=MC, analyze=False)
                 a = ma.Rabi_parabola_analysis(close_fig=close_fig)
+                # Decide which quadrature to take by comparing the contrast
                 if take_fit_I:
                     ampl = a.fit_res[0].params['x0'].value
+                elif (np.abs(max(a.measured_values[0]) -
+                             min(a.measured_values[0]))) > (
+                      np.abs(max(a.measured_values[1]) -
+                             min(a.measured_values[1]))):
+                    ampl = a.fit_res[0].params['x0'].value
                 else:
-                    if (a.fit_res[0].params['x0'].stderr <=
-                            a.fit_res[1].params['x0'].stderr):
+                    ampl = a.fit_res[1].params['x0'].value
+                if not min(amps) < ampl < max(amps):
+                    ampl_span *= 2
+                    amps = np.linspace(old_amp-ampl_span,
+                                       old_amp+ampl_span, 15)
+                    self.measure_rabi(amps, n=n, MC=MC, analyze=False)
+                    a = ma.Rabi_parabola_analysis(close_fig=close_fig)
+                    # Decide which quadrature to take by comparing the contrast
+                    if take_fit_I:
+                        ampl = a.fit_res[0].params['x0'].value
+                    elif (np.abs(max(a.measured_values[0]) -
+                                 min(a.measured_values[0]))) > (
+                          np.abs(max(a.measured_values[1]) -
+                                 min(a.measured_values[1]))):
                         ampl = a.fit_res[0].params['x0'].value
                     else:
                         ampl = a.fit_res[1].params['x0'].value
@@ -437,10 +484,6 @@ class Transmon(Qubit):
                     print('Found amplitude', ampl, '\n')
         if update:
             self.amp180.set(ampl)
-            print(ampl)
-
-        # After this it should enter a loop where it fine tunes the amplitude
-        # based on fine scanes around the optimum with higher sensitivity.
 
     def find_amp90_scaling(self, scales=0.5,
                            N_steps=[5, 9], max_n=100,
