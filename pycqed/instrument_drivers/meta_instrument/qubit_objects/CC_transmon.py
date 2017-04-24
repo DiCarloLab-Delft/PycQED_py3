@@ -969,6 +969,8 @@ class CBox_v3_driven_transmon(Transmon):
         nr_cliffords = np.append(
             nr_cliffords, [nr_cliffords[-1]+.5]*2 + [nr_cliffords[-1]+1.5]*2)
 
+        # if 'CBox' not in self.acquisition_instrument():
+        #     raise NotImplementedError
         self.prepare_for_timedomain()
         if MC is None:
             MC = self.MC.get_instr()
@@ -976,11 +978,12 @@ class CBox_v3_driven_transmon(Transmon):
         counter_param = ManualParameter('name_ctr', initial_value=0)
         asm_filenames = []
         for i in range(nr_seeds):
-            RB_qasm = sqqs.randomized_benchmarking(self.name,
-                                                   nr_cliffords=nr_cliffords, nr_seeds=1,
-                                                   label='randomized_benchmarking_' +
-                                                   str(i),
-                                                   double_curves=False)
+            RB_qasm = sqqs.randomized_benchmarking(
+                self.name,
+                nr_cliffords=nr_cliffords, nr_seeds=1,
+                label='randomized_benchmarking_' +
+                str(i),
+                double_curves=False)
             asm_file = qta.qasm_to_asm(RB_qasm.name, self.get_operation_dict())
             asm_filenames.append(asm_file.name)
 
@@ -989,10 +992,21 @@ class CBox_v3_driven_transmon(Transmon):
             'asm_filenames': asm_filenames,
             'CBox': self.CBox.get_instr()}
 
-        d = qh.CBox_int_avg_func_prep_det_CC(
-            self.CBox.get_instr(), prepare_function=qh.load_range_of_asm_files,
-            prepare_function_kwargs=prepare_function_kwargs,
-            nr_averages=256)
+        if 'CBox' in self.acquisition_instrument():
+            d = qh.CBox_int_avg_func_prep_det_CC(
+                self.CBox.get_instr(), prepare_function=qh.load_range_of_asm_files,
+                prepare_function_kwargs=prepare_function_kwargs,
+                nr_averages=256)
+        elif 'UHFQC' in self.acquisition_instrument():
+            d = qh.UHFQC_int_avg_func_prep_det_CC(
+                prepare_function=qh.load_range_of_asm_files,
+                prepare_function_kwargs=prepare_function_kwargs,
+                UHFQC=self._acquisition_instrument, AWG=self.CBox.get_instr(),
+                channels=[
+                    self.RO_acq_weight_function_I(),
+                    self.RO_acq_weight_function_Q()],
+                integration_length=self.RO_acq_integration_length(),
+                nr_averages=256)
 
         s = swf.None_Sweep()
         s.parameter_name = 'Number of Cliffords'
@@ -1258,12 +1272,12 @@ class CBox_v3_driven_transmon(Transmon):
 
         return [np.array(t, dtype=np.float64) for t in transients]
 
-    def calibrate_optimal_weights(self, MC=None, verify=True, update=True):
+    def calibrate_optimal_weights(self, MC=None, verify=True, analyze=False, update=True):
         if MC is None:
             MC = self.MC.get_instr()
 
         # return value needs to be added in measure_transients
-        transients = self.measure_transients(MC=MC, analyze=False)
+        transients = self.measure_transients(MC=MC, analyze=analyze)
         # Calculate optimal weights
         optimized_weights_I = transients[1][0] - transients[0][0]
         optimized_weights_I = optimized_weights_I - \
