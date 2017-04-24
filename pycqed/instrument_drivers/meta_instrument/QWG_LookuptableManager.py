@@ -156,14 +156,21 @@ class QWG_FluxLookuptableManager(Instrument):
                            parameter_class=ManualParameter)
         self.add_parameter('F_lambda_1',
                            docstring='first lambda coef. for martinis pulse',
-                           label='lambda_1',
+                           label='Lambda_1',
                            unit='',
                            initial_value=0,
                            vals=vals.Numbers(),
                            parameter_class=ManualParameter)
         self.add_parameter('F_lambda_2',
                            docstring='second lambda coef. for martinis pulse',
-                           label='lambda_2',
+                           label='Lambda_2',
+                           unit='',
+                           initial_value=0,
+                           vals=vals.Numbers(),
+                           parameter_class=ManualParameter)
+        self.add_parameter('F_lambda_3',
+                           docstring='third lambda coef. for martinis pulse',
+                           label='Lambda_3',
                            unit='',
                            initial_value=0,
                            vals=vals.Numbers(),
@@ -243,7 +250,8 @@ class QWG_FluxLookuptableManager(Instrument):
         # Fast adiabatic pulse
         martinis_pulse = wf.martinis_flux_pulse(
             length=self.F_length(),
-            lambda_coeffs=[self.F_lambda_1(), self.F_lambda_2()],
+            lambda_coeffs=[self.F_lambda_1(), self.F_lambda_2(),
+                           self.F_lambda_3()],
             theta_f=self.F_theta_f()*2*np.pi/360,
             f_01_max=self.F_f_01_max(),
             g2=self.F_J2(),
@@ -350,7 +358,7 @@ class QWG_FluxLookuptableManager(Instrument):
             self.load_pulse_onto_AWG_lookuptable(
                 pulse_name, regenerate_pulse=False)
 
-    def render_wave(self, wave_name, show=True, time_unit='s', QtPlot_win=None):
+    def render_wave(self, wave_name, show=True, QtPlot_win=None):
         '''
         Plots the specified wave.
 
