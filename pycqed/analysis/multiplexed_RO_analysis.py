@@ -23,9 +23,8 @@ def two_qubit_ssro_fidelity(label, fig_format='png'):
     # ma.SSRO_Analysis(auto=False)
     # extract fit parameters for q0
 
-
-    w0_data = data.measured_values[0] #get_values('I')  # 'w0')
-    w1_data = data.measured_values[1] #get_values('Q')  # 'w1')
+    w0_data = data.measured_values[0]  # get_values('I')  # 'w0')
+    w1_data = data.measured_values[1]  # get_values('Q')  # 'w1')
     lengths = []
     i = 0
     for nr_state, state in enumerate(states):

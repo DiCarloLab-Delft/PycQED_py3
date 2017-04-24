@@ -1365,21 +1365,21 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         self.UHFQC = UHFQC
         self.name = '{}_UHFQC_integrated_average'.format(result_logging_mode)
         self.channels = channels
+        self.value_names = ['']*len(self.channels)
         for i, channel in enumerate(self.channels):
             self.value_names[i] = '{} w{}'.format(result_logging_mode,
                                                   channel)
         if result_logging_mode == 'raw':
             self.value_units = ['V']*len(self.channels)
-            self.scaling_factor = 1/(1.8e9*integration_length)
+            self.scaling_factor = 1/(1.8e9*integration_length*nr_averages)
         else:
             self.value_units = ['']*len(self.channels)
-            self.scaling_factor = 1
+            self.scaling_factor = 1/nr_averages
 
         self.single_int_avg = single_int_avg
         if self.single_int_avg:
             self.detector_control = 'soft'
 
-        self._set_real_imag(real_imag)
         self.seg_per_point = seg_per_point
 
         self.AWG = AWG
@@ -1391,15 +1391,18 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         self.result_logging_mode_idx = res_logging_indices[result_logging_mode]
         self.result_logging_mode = result_logging_mode
 
+        self._set_real_imag(real_imag)
+
     def _set_real_imag(self, real_imag=False):
         """
         Function so that real imag can be changed after initialization
         """
 
         self.real_imag = real_imag
-        for i, channel in enumerate(self.channels):
-            self.value_names[i] = 'w{}'.format(channel)
-            self.value_units[i] = 'V'
+        if self.result_logging_mode == 'raw':
+            self.value_units = ['V']*len(self.channels)
+        else:
+            self.value_units = ['']*len(self.channels)
 
         if not self.real_imag:
             if len(self.channels) != 2:
@@ -1423,7 +1426,7 @@ class UHFQC_integrated_average_detector(Hard_Detector):
                          for key in data_raw.keys()])*self.scaling_factor
 
         # Corrects offsets after crosstalk suppression matrix in UFHQC
-        if self.crosstalk_suppression:
+        if self.result_logging_mode == 'lin_trans':
             for i, channel in enumerate(self.channels):
                 data[i] = data[i]-self.UHFQC.get(
                     'quex_trans_offset_weightfunction_{}'.format(channel))
@@ -1576,7 +1579,6 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
             self.UHFQC.set('quex_corr_{}_source'.format(correlation_channel),
                            corr[1])
 
-
 class UHFQC_integration_logging_det(Hard_Detector):
 
     '''
@@ -1613,6 +1615,7 @@ class UHFQC_integration_logging_det(Hard_Detector):
             result_logging_mode)
         self.channels = channels
 
+        self.value_names = ['']*len(self.channels)
         for i, channel in enumerate(self.channels):
             self.value_names[i] = '{} w{}'.format(result_logging_mode,
                                                   channel)
