@@ -1350,7 +1350,7 @@ class UHFQC_integrated_average_detector(Hard_Detector):
             - lin_trans  -> applies the linear transformation matrix and
                             subtracts the offsets defined in the UFHQC.
                             This is typically used for crosstalk suppression
-                            and normalization.Requires optimal weights.
+                            and normalization. Requires optimal weights.
             - digitized  -> returns fraction of shots based on the threshold
                             defined in the UFHQC. Requires optimal weights.
 
@@ -1491,12 +1491,12 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
                  channels=(0, 1), correlations=[(0, 1)],
                  seg_per_point=1, single_int_avg=False,
                  **kw):
-        super(UHFQC_correlation_detector, self).__init__(
+        super().__init__(
             UHFQC, AWG=AWG, integration_length=integration_length,
-            nr_averages=nr_averages, rotate=rotate, real_imag=real_imag,
+            nr_averages=nr_averages, real_imag=real_imag,
             channels=channels,
             seg_per_point=seg_per_point, single_int_avg=single_int_avg,
-            crosstalk_suppression=False,
+            result_logging_mode='raw',  # FIXME -> do the proper thing (MAR)
             **kw)
         self.correlations = correlations
 
@@ -1579,6 +1579,55 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
             self.UHFQC.set('quex_corr_{}_source'.format(correlation_channel),
                            corr[1])
 
+            # If thresholding is enabled, set the threshold for the correlation
+            # channel.
+            if self.thresholding:
+                thresh_level = \
+                    self.UHFQC.get('quex_thres_{}_level'.format(corr[0]))
+                self.UHFQC.set(
+                    'quex_thres_{}_level'.format(correlation_channel),
+                    thresh_level)
+
+    def get_values(self):
+        # Slightly different way to deal with scaling factor
+        self.scaling_factor = 1 / (1.8e9*self.integration_length)
+
+        if self.AWG is not None:
+            self.AWG.stop()
+        self.UHFQC.quex_rl_readout(1)  # resets UHFQC internal readout counters
+        self.UHFQC.acquisition_arm()
+        # starting AWG
+        if self.AWG is not None:
+            self.AWG.start()
+
+        data_raw = self.UHFQC.acquisition_poll(samples=self.nr_sweep_points,
+                                               arm=False,
+                                               acquisition_time=0.01)
+
+        data = []
+        if self.thresholding:
+            for key in data_raw.keys():
+                data.append(np.array(data_raw[key]))
+        else:
+            for key in data_raw.keys():
+                if key in self.correlation_channels:
+                    data.append(np.array(data_raw[key]) *
+                                (self.scaling_factor**2 / self.nr_averages))
+                else:
+                    data.append(np.array(data_raw[key]) *
+                                (self.scaling_factor / self.nr_averages))
+
+        if not self.real_imag:
+            I = data[0]
+            Q = data[1]
+            S21 = I + 1j*Q
+            data[0] = np.abs(S21)
+            data[1] = np.angle(S21)/(2*np.pi)*360
+
+        else:
+            return data
+
+
 class UHFQC_integration_logging_det(Hard_Detector):
 
     '''
@@ -1605,7 +1654,7 @@ class UHFQC_integration_logging_det(Hard_Detector):
             - lin_trans  -> applies the linear transformation matrix and
                             subtracts the offsets defined in the UFHQC.
                             This is typically used for crosstalk suppression
-                            and normalization.Requires optimal weights.
+                            and normalization. Requires optimal weights.
             - digitized  -> returns fraction of shots based on the threshold
                             defined in the UFHQC. Requires optimal weights.
         """
