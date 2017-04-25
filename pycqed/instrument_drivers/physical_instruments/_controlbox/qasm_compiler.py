@@ -193,13 +193,10 @@ class QASM_QuMIS_Compiler():
         self.qumis_instructions = []
         self.read_file()
         self.line_to_event()
-        # self.print_raw_events()
         self.build_dependency_graph()
         self.resolve_qubit_name()
-        # self.print_timing_events()
         self.assign_timing_to_events()
-        self.print_timing_grid()
-        self.compensate_channel_latency()
+        self.resolve_channel_latency()
         self.gen_full_time_grid()
         self.convert_to_qumis()
         return self.qumis_instructions
@@ -237,7 +234,7 @@ class QASM_QuMIS_Compiler():
         self.qasm_op_dict = lower_dict_key(self.qasm_op_dict)
         self.hardware_spec = data["hardware specification"]
         self.lut = data["lut"]
-        print(self.qasm_op_dict)
+        self.print_op_dict()
 
         self.channels = self.hardware_spec["channels"]
         self.check_channel_format()
@@ -297,11 +294,15 @@ class QASM_QuMIS_Compiler():
             for line in self.prog_lines:
                 print(line)
 
+            print("")
+
     def print_op_dict(self):
         if self.verbose_level <= 3:
             print("QASM operation dictionary:")
             for key, value in self.qasm_op_dict.items():
-                print(key, value)
+                raw_print("{0: >10} : ".format(key))
+                print(value)
+            print("\n")
 
     def print_raw_events(self):
         if self.verbose_level < 4:
@@ -312,6 +313,7 @@ class QASM_QuMIS_Compiler():
                     raw_print("({}, {}, {})".format(re.event_type,
                                                     re.name, re.params))
                 raw_print("\n")
+        print("")
 
     def print_timing_events(self):
         if self.verbose_level < 3:
@@ -326,14 +328,32 @@ class QASM_QuMIS_Compiler():
     def print_timing_grid(self):
         if self.verbose_level < 5:
             print("Timing gird:")
-            print("{0: >6s}  {1: <10s}    Events".format("Idx", "Duration"))
+            if len(self.timing_grid) == 0:
+                print("Empty timing grid.")
+                return
+
+            if self.timing_grid[0].absolute_time is not None:
+                absolute_time_generated = True
+            else:
+                absolute_time_generated = False
+
+            if absolute_time_generated is True:
+                print("{0: >6s}  {1: <10s}  {2: <10s}   Events".format("Idx",
+                    "absolute", "next wait"))
+            else:
+                print("{0: >6s}  {1: <10s}   Events".format("Idx",
+                    "next wait"))
             i = 0
             for tp in self.timing_grid:
                 raw_print("{0:5d}:".format(i))
+                if absolute_time_generated is True:
+                    raw_print("   {0: <8d}    ".format(tp.absolute_time))
                 raw_print("   {0: <8d}    ".format(tp.following_waiting_time))
                 self.print_event_list(tp.parallel_events)
                 raw_print('\n')
                 i = i + 1
+
+        print("")
 
     def print_event_list(self, event_list):
         raw_print(" ")
@@ -537,6 +557,10 @@ class QASM_QuMIS_Compiler():
 
             self.timing_grid.append(tp)
 
+        self.get_absolute_timing()
+        print("After assigning timing:")
+        self.print_timing_grid()
+
     def get_pre_waiting_time(self, raw_event):
         pre_waiting_time, = raw_event.params
 
@@ -599,7 +623,9 @@ class QASM_QuMIS_Compiler():
             se.filename = self.filename
             raise se
         if self.verbose_level <= 2:
-            print("Declared qubits: {}".format(self.declared_qubits))
+            print("Extend declared qubit list:")
+            print("\tDeclared qubits: {}".format(self.declared_qubits))
+            print("")
 
     def add_qubit_map(self, raw_event):
         dec_qubit, phys_qubit = raw_event.params
@@ -636,8 +662,9 @@ class QASM_QuMIS_Compiler():
 
         self.qubit_map[dec_qubit] = int(phys_qubit)
 
-    def compensate_channel_latency(self):
+    def resolve_channel_latency(self):
         self.load_channel_latency()
+        self.compensate_channel_latency()
 
     def load_channel_latency(self):
         for ti, tp in enumerate(self.timing_grid):
@@ -664,7 +691,18 @@ class QASM_QuMIS_Compiler():
 
                 tp.parallel_events[idx] = event
             self.timing_grid[ti] = tp
+
+        print("get channel latency:")
         self.print_timing_grid()
+
+    def compensate_channel_latency(self):
+        pass
+
+    def get_absolute_timing(self):
+        current_time = 0
+        for tp in self.timing_grid:
+            tp.absolute_time = current_time
+            current_time = tp.following_waiting_time + current_time
 
     def gen_time_grid(self):
         pass
