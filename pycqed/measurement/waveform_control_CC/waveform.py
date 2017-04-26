@@ -8,6 +8,7 @@
     Bugs:
 '''
 
+import logging
 import numpy as np
 from pycqed.analysis.fitting_models import Qubit_freq_to_dac
 
@@ -194,7 +195,7 @@ def martinis_flux_pulse(length, lambda_coeffs, theta_f,
         mart_pulse_theta += th_scale_factor * \
             lambda_coeff*(1-np.cos(n*2*np.pi*t/length))/2
     # adding square pulse scaling with lambda0 satisfying the condition
-    # lamb0=1-lambda1
+    # lamb0=1-lambda_1
     if return_unit == 'theta':
         return mart_pulse_theta
 
@@ -216,7 +217,7 @@ def martinis_flux_pulse(length, lambda_coeffs, theta_f,
     return mart_pulse_V
 
 
-def martinis_flux_pulse_v2(length, lambda_coeffs, theta_f,
+def martinis_flux_pulse_v2(length, lambda_2, lambda_3, theta_f,
                            f_01_max,
                            J2,
                            dac_flux_coefficient,
@@ -236,7 +237,7 @@ def martinis_flux_pulse_v2(length, lambda_coeffs, theta_f,
     of the pulse has a value corresponding to theta_f.
 
     length          (float)
-    lambda_coeffs   (list of floats) starting from lambda2 since lambda1 is
+    lambda_coeffs   (list of floats) starting from lambda2 since lambda_1 is
                     completely determined by theta_f
     theta_f         (float) final angle of the interaction. This determines the
                     Voltage for the centerpoint of the waveform.
@@ -264,7 +265,6 @@ def martinis_flux_pulse_v2(length, lambda_coeffs, theta_f,
     t = np.arange(0, length, t_step)
 
     # Derived parameters
-    lambdas = np.array(lambda_coeffs)
     if f_interaction is None:
         f_interaction = f_bus + E_c
     theta_i = np.arctan(2*J2 / (f_01_max - f_interaction))
@@ -272,22 +272,27 @@ def martinis_flux_pulse_v2(length, lambda_coeffs, theta_f,
         raise ValueError(
             'theta_f < theta_i: final coupling weaker than initial coupling')
 
-    odd_lambda_sum = np.sum(lambdas[1::2])  # lambdas[0] = lambda2
-    lambda1 = (theta_f - theta_i) / 2 - odd_lambda_sum
+    lambda_1 = (theta_f - theta_i) / 2 - lambda_3
 
     # Calculate the wave
     theta_wave = np.ones(nr_samples) * theta_i
-    theta_wave += lambda1 * (1 - np.cos(2 * np.pi * t / length))
-    for i, lambda_coeff in enumerate(lambdas):
-        n = i + 2  # lambdas[0] = lambda2
-        theta_wave += lambda_coeff * (1 - np.cos(2 * np.pi * n * t / length))
+    theta_wave += lambda_1 * (1 - np.cos(2 * np.pi * t / length))
+    theta_wave += lambda_2 * (1 - np.cos(4 * np.pi * t / length))
+    theta_wave += lambda_3 * (1 - np.cos(6 * np.pi * t / length))
+
+    # Clip wave to [theta_i, pi] to avoid poles in the wave expressed in freq
+    theta_wave_clipped = np.clip(theta_wave, theta_i, np.pi-.01)
+    if not np.array_equal(theta_wave, theta_wave_clipped):
+        logging.warning(
+            'Martinis flux wave form has been clipped to [{}, 180 deg]'
+            .format(theta_i))
 
     # Return in the specified units
     if return_unit == 'theta':
-        return theta_wave
+        return theta_wave_clipped
 
     # Convert to detuning from f_interaction
-    delta_f_wave = 2 * J2 / np.tan(theta_wave)
+    delta_f_wave = 2 * J2 / np.tan(theta_wave_clipped)
     if return_unit == 'eps':
         return delta_f_wave
 

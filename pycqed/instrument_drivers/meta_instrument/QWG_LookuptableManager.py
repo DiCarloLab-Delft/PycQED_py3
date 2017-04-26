@@ -266,8 +266,8 @@ class QWG_FluxLookuptableManager(Instrument):
         # New version of fast adiabatic pulse
         martinis_pulse_v2 = wf.martinis_flux_pulse_v2(
             length=self.F_length(),
-            lambda_coeffs=[self.F_lambda_2(),
-                           self.F_lambda_3()],
+            lambda_2=self.F_lambda_2(),
+            lambda_3=self.F_lambda_3(),
             theta_f=self.F_theta_f()*2*np.pi/360,
             f_01_max=self.F_f_01_max(),
             J2=self.F_J2(),
@@ -390,9 +390,9 @@ class QWG_FluxLookuptableManager(Instrument):
         if QtPlot_win is None:
             QtPlot_win = QtPlot(windowTitle=wave_name,
                                 figsize=(600, 400))
-            QtPlot_win.add(
-                x=x, y=y, name=wave_name,
-                symbol='o', symbolSize=5,
-                xlabel='Time', xunit='s', ylabel='Amplitude', yunit='V')
+        QtPlot_win.add(
+            x=x, y=y, name=wave_name,
+            symbol='o', symbolSize=5,
+            xlabel='Time', xunit='s', ylabel='Amplitude', yunit='V')
 
         return QtPlot_win
