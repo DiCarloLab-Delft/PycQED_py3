@@ -248,7 +248,7 @@ def chevron_seq(q0, q1,
 
 
 def two_qubit_tomo_bell(bell_state, q0, q1,
-                        wait_after_trigger=150e-9, wait_during_flux=200e-9,
+                        wait_after_trigger=10e-9, wait_during_flux=260e-9,
                         clock_cycle=5e-9,
                         RO_target='all'):
     '''
@@ -374,15 +374,15 @@ def CZ_calibration_seq(q0, q1, RO_target='all',
 
     for case in cases:
         qasm_file.writelines('\ninit_all\n')
-        waitTime = wait_after_trigger
-        # if excite_q1 is True or excite_q1 is 'both_cases':
         qasm_file.writelines('QWG trigger\n')
+        waitTime = wait_after_trigger
         if case == 'excitation':
-            qasm_file.writelines('X180 {}\n'.format(q1))
-            # additional pulse between trigger and flux pulse
+            # Decrease wait time because there is an additional pulse
             waitTime -= mw_pulse_duration
         qasm_file.writelines(
             'I {} {}\n'.format(q0, int(waitTime//clock_cycle)))
+        if case == 'excitation':
+            qasm_file.writelines('X180 {}\n'.format(q1))
         qasm_file.writelines('mY90 {}\n'.format(q0))
         qasm_file.writelines(
             'I {} {}\n'.format(q0, int(wait_during_flux//clock_cycle)))
