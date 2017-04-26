@@ -850,10 +850,12 @@ class Function_Detector(Soft_Detector):
             measurement_kwargs[key] = value
         # Call the function
         result = self.get_function(**measurement_kwargs)
+        print(result)
         if self.result_keys is None:
             return result
         else:
-            return [result[key] for key in result.keys()]
+            results = [result[key] for key in self.result_keys]
+            return results
 
 
 class Detect_simulated_hanger_Soft(Soft_Detector):
