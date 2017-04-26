@@ -112,7 +112,7 @@ class DDMq(SCPI):
                                vals=vals.Numbers(0, 1)
                                )
             sholdoff_cmd = 'qutech:input{}:holdoff'.format(ch_pair)
-            self.add_parameter('ch_pair{}_inavg_holdoff'.format(ch_pair),
+            self.add_parameter('ch_pair{}_holdoff'.format(ch_pair),
                                label=('Set holdoff' +
                                       'ch_pair {} '.format(ch_pair)),
                                docstring='specifying the number of clocks the measurement trigger  ' +
@@ -826,16 +826,18 @@ class DDMq(SCPI):
     # Ask for DDM status
     def _getADCstatus(self, ch_pair):
         status = self.ask('qutech:adc{:d}:status? '.format(ch_pair))
-        statusstr = format(int(status), 'b').zfill(32)
+        statusstr = format(np.uint32(status), 'b')
         reversestatusstr = statusstr[::-1]
         inavgstatus = self._getInAvgStatus(ch_pair)
-        inavgstatusstr = format(np.int32(inavgstatus), 'b').zfill(32)
+        inavgstatusstr = format(np.uint32(inavgstatus), 'b').zfill(32)
         reverseinavgstatus = inavgstatusstr[::-1]
         # only first weight pair is checked
         statuswint = self.ask('qutech:wint{:d}:status{:d}?'.format(ch_pair, 1))
         statuswintstr = format(int(statuswint), 'b').zfill(32)
         reversestatuswintstr = statuswintstr[::-1]
-
+        tempstatus=self._get_temp_status(ch_pair)
+        tempstatusstr = format(np.uint32(tempstatus), 'b').zfill(32)
+        reversetempstatusstr = tempstatusstr[::-1]
         def _DI():
             if (reversestatusstr[0] == '1'):
                 logging.warning('\nOver range on DI input. ')
@@ -891,14 +893,30 @@ class DDMq(SCPI):
             else:
                 print("\nNo false trigger.Trigger period is okay.")
             return None
+
+        def _Temperature():
+            print("\nDictionary with temperature information and recommendations." +
+                  "\nCheck WarnMessage for the recommendation:")
+            if (reversetempstatusstr[1] == '1'):
+                logging.warning("\nADC Temperature is Critical!" )
+
+            elif (reversetempstatusstr[0] == '1'):
+                logging.warning("\nADC Temperature change is more than 2°C. Re-calibration is advised!" )
+
+            else:
+                print("\nADC Temperature is okay.")
+
+            return None
+
         ADCstatus = {0: _DI,
                      1: _DQ,
                      2: _DCLK_PLL_LOCKED,
                      3: _CalRun,
-                     4: _FalseTrig
+                     4: _FalseTrig,
+                     5: _Temperature
                      }
 
-        for x in range(0, 5):
+        for x in range(0, 6):
             print(ADCstatus[x]())
         return None
         # return None
@@ -941,6 +959,38 @@ class DDMq(SCPI):
     # set time on DDM (Linux kernel clock)
     def set_time(self, timesec):
         self.write('system:time {:d}'.format(timesec))
+
+    def _get_temp_status(self, ch_pair):
+        temp = self.ask('qutech:adc{:d}:temperature:status? '.format(ch_pair))
+        return int(temp)
+
+    def get_temp(self, ch_pair):
+        try:
+            tempstr = ''  # in case self.ask fails
+            tempstr = self.ask('qutech:adc{:d}:temperature? '.format(ch_pair))
+            # form is supposed to be comma-separated, but we've seen
+            # other separators occasionally
+            for separator in ',;:':
+                # split into no more than 4 parts, so we don't lose info
+                tempparts = [p.strip() for p in tempstr.split(separator, 4)]
+                if len(tempparts) > 1:
+                    break
+            # in case parts at the end are missing, fill in None
+            if len(tempparts) < 5:
+                tempparts += [None] * (5 - len(tempparts))
+            for i in range(0, 5):
+                tempparts[i] = tempparts[i].split('=')[1]
+        except Exception:
+            logging.warn('Error getting or interpreting get_temp ' + repr(tempstr))
+            tempparts = [None, None, None, None, None]
+
+        # some strings include the word 'model' at the front of model
+        if str(tempparts[1]).lower().startswith('ActualTemp'):
+            tempparts[1] = str(tempparts[1])[5:].strip()
+
+        return dict(zip(('ActualTemp', 'LastCalTemp', 'TempDiff', 'BrdTemp',
+                        'WarnMessage'), tempparts))
+
 
     # Overloding get_idn function to format DDM versions
     def get_idn(self):
