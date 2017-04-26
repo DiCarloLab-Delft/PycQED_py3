@@ -33,6 +33,7 @@ import pycqed as pq
 import os
 import sys
 import bisect
+import copy
 
 
 INIT_ALL_WAITING_TIME = 200000  # ns
@@ -99,11 +100,9 @@ class EventType(enum.Enum):
 
 class time_point():
 
-    def __init__(self, label='', absolute_time=-1, pre_waiting_time=-1,
-                 following_waiting_time=-1):
+    def __init__(self, label='', absolute_time=-1, following_waiting_time=-1):
         self.label = label
         self.absolute_time = absolute_time
-        self.pre_waiting_time = pre_waiting_time
         self.following_waiting_time = following_waiting_time
         self.parallel_events = []
 
@@ -124,13 +123,36 @@ class qasm_event():
 
 
 class qumis_event():
+    # class pulse():
+    #     def __init__(self):
+    #         self.qumis_name = 'pulse'
+    #         self.codeword = -1
+
+    # class trigger():
+    #     def __init__(self):
+    #         self.qumis_name = 'trigger'
+    #         self.codeword = -1
+    #         self.format = []    # used for trigger instruction
+    #         self.trigger_bit = -1
+    #         self.codeword_bit = []
+
+    # class measure():
+    #     def __init__(self):
+    #         self.qumis_name = 'measure'
+
+    # class measure_trigger():
+    #     def __init__(self):
+    #         self.qumis_name = 'trigger'
+    #         self.trigger_bit = -1
     def __init__(self):
         self.qumis_name = ''
         self.codeword = -1
         self.awg_nr = -1    # used for pulse instruction
+        self.duration = 0
         self.format = []    # used for trigger instruction
         self.trigger_bit = -1
         self.codeword_bit = []
+
 
 user_op_type = {
     "rf": EventType.RF,
@@ -217,9 +239,6 @@ class QASM_QuMIS_Compiler():
         return self.qumis_instructions
 
     def build_dependency_graph(self):
-        pass
-
-    def gen_full_time_grid(self):
         pass
 
     def load_config(self):
@@ -375,13 +394,13 @@ class QASM_QuMIS_Compiler():
 
     def print_hw_timing_grid(self):
         if self.verbose_level < 5:
-            print("Trigger timing gird:")
+            print("Hardware trigger timing gird:")
             if len(self.hw_timing_grid) == 0:
                 print("Empty trigger timing grid.")
                 return
 
             print("{0: >6s}  {1: <10s}"
-                  "   Events".format("Idx", "absolute"))
+                  "    Events".format("Idx", "absolute"))
             i = 0
             for tp in self.hw_timing_grid:
                 raw_print("{0:5d}:".format(i))
@@ -414,18 +433,28 @@ class QASM_QuMIS_Compiler():
         else:  # qumis event list
             for e in event_list:
                 raw_print(e.qumis_name)
-                raw_print(" ")
                 if e.qumis_name.lower() == "measure":
                     pass
                 elif e.qumis_name.lower() == "pulse":
+                    raw_print(" ")
+                    raw_print("awg")
                     raw_print(str(e.awg_nr))
-                    raw_print(", ")
-                    raw_print(str(e.codeword))
+                    raw_print("(%s)"%str(e.codeword))
                 elif e.qumis_name.lower() == "trigger":
-                    raw_print("[{}]".format(str(e.trigger_bit)))
-                    raw_print(str(e.codeword_bit))
-                    raw_print(str(e.format))
-                    raw_print("(%s)" %str(e.codeword))
+                    raw_print(" ")
+                    raw_print("bits:")
+                    if e.trigger_bit != -1:
+                        raw_print("[{}]".format(str(e.trigger_bit)))
+                    if e.codeword_bit != []:
+                        raw_print(str(e.codeword_bit))
+                    if e.format != []:
+                        raw_print(" f:")
+                        raw_print(str(e.format))
+                    else:
+                        raw_print(" d:")
+                        raw_print(str(e.duration))
+                    if e.codeword != -1:
+                        raw_print(" cw: %s" %str(e.codeword))
                 raw_print('; ')
 
 
@@ -788,7 +817,8 @@ class QASM_QuMIS_Compiler():
                     tp.parallel_events.pop(idx)
 
                     new_absolute_time = tp.absolute_time - compensate_time
-                    tp_index, match = self.search_time_point(new_absolute_time)
+                    tp_index, match = self.search_time_point(self.timing_grid,
+                        new_absolute_time)
                     if match is False:
                         new_tp = time_point(absolute_time=new_absolute_time)
                         self.timing_grid.insert(tp_index, new_tp)
@@ -806,10 +836,12 @@ class QASM_QuMIS_Compiler():
             print("End of compensting channel latency:")
             self.print_timing_grid()
 
-    def search_time_point(self, target_absolute_time):
-        absolute_time_list = [tp.absolute_time for tp in self.timing_grid]
+    def search_time_point(self, timing_grid, target_absolute_time):
+        absolute_time_list = [tp.absolute_time for tp in timing_grid]
         idx = bisect.bisect(absolute_time_list, target_absolute_time)
-        if absolute_time_list[idx-1] == target_absolute_time:
+        if len(absolute_time_list) == 0 or (idx == 0):
+            return (idx, False)
+        elif absolute_time_list[idx-1] == target_absolute_time:
             return (idx, True)
         else:
             return (idx, False)
@@ -841,7 +873,7 @@ class QASM_QuMIS_Compiler():
                     hw_event.awg_nr = channel["awg_nr"]
                     lut_index = channel["lut"]
                     lut = self.luts[lut_index]
-                    hw_event.cdoeword = lut[event.name]
+                    hw_event.codeword = lut[event.name]
                 elif hw_event.qumis_name == "trigger":
                     hw_event.trigger_bit = channel["trigger bit"]
                     hw_event.format = channel["format"]
@@ -849,7 +881,7 @@ class QASM_QuMIS_Compiler():
                         hw_event.codeword_bit = channel["codeword bit"]
                         lut_index = channel["lut"]
                         lut = self.luts[lut_index]
-                        hw_event.cdoeword = lut[event.name]
+                        hw_event.codeword = lut[event.name]
                 else:
                     pass
 
@@ -859,6 +891,65 @@ class QASM_QuMIS_Compiler():
 
         if self.verbose_level < 4:
             self.print_hw_timing_grid()
+
+    def gen_full_time_grid(self):
+        self.split_trigger_instruction()
+
+    def split_trigger_instruction(self):
+        new_tp_list = []
+        for tp in self.hw_timing_grid:
+            absolute_time = tp.absolute_time
+            for hw_event in tp.parallel_events:
+                if (hw_event.qumis_name == "pulse" or
+                        hw_event.qumis_name == "measure"):
+                    new_tp_list = self.add_new_tp_event(
+                        new_tp_list, absolute_time, hw_event)
+                    continue
+
+                if hw_event.qumis_name == "trigger":
+                    if hw_event.format == []:
+                        new_tp_list = self.add_new_tp_event(
+                            new_tp_list, absolute_time, hw_event)
+                        continue
+                    if len(hw_event.format) == 1:
+                        hw_event.duration, = hw_event.format
+                        hw_event.format = []
+                        new_tp_list = self.add_new_tp_event(
+                            new_tp_list, absolute_time, hw_event)
+                        continue
+                    if len(hw_event.format) == 2:
+                        d1, d2 = hw_event.format
+                        hw_event.format = []
+
+                        new_absolute_time = tp.absolute_time - d1
+                        new_hw_event = copy.copy(hw_event)
+                        new_hw_event.duration = d1
+                        new_hw_event.trigger_bit = -1
+                        new_tp_list = self.add_new_tp_event(
+                            new_tp_list, new_absolute_time, new_hw_event)
+
+                        hw_event.duration = d2
+                        new_tp_list = self.add_new_tp_event(
+                            new_tp_list, absolute_time, hw_event)
+
+                        new_tp_list = self.add_new_tp_event(
+                            new_tp_list, absolute_time + d2, None)
+
+        self.hw_timing_grid = new_tp_list
+        self.print_hw_timing_grid()
+
+    def add_new_tp_event(self, timing_grid, absolute_time, event):
+        tp_index, match = self.search_time_point(timing_grid, absolute_time)
+        if match is False:
+            new_tp = time_point(absolute_time=absolute_time)
+            if event is not None:
+                new_tp.parallel_events.append(event)
+            timing_grid.insert(tp_index, new_tp)
+        else:
+            if event is not None:
+                timing_grid[tp_index-1].parallel_events.append(event)
+
+        return timing_grid
 
     def convert_to_qumis(self):
         pass

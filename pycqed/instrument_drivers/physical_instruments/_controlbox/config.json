@@ -120,7 +120,7 @@
                 "measure" : {
                     "qumis" : "trigger",
                     "trigger bit" : 7,
-                    "format" : [1, 2],
+                    "format" : [2],
                     "latency" : 100
                 }
             }
