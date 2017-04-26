@@ -813,11 +813,12 @@ class Function_Detector(Soft_Detector):
     """
     Defines a detector function that wraps around an user-defined function.
     Inputs are:
-        get_function    : function that is going to be wrapped around
-        result_keys     : keys of the dictionary returned by the function
-        value_names     : names of the elements returned by the function
-        value_units     : units of the elements returned by the function
-        msmt_kw         : kwargs for the get_function
+        get_function (fun) : function used for acquiring values
+        value_names (list) : names of the elements returned by the function
+        value_units (list) : units of the elements returned by the function
+        result_keys (list) : keys of the dictionary returned by the function
+                             if not None
+        msmt_kw   (dict)   : kwargs for the get_function
 
     The input function get_function must return a dictionary.
     The contents(keys) of this dictionary are going to be the measured
@@ -839,7 +840,8 @@ class Function_Detector(Soft_Detector):
 
     def acquire_data_point(self, **kw):
         measurement_kwargs = {}
-
+        # If an entry has a get method that will be used to set the value.
+        # This makes parameters work in this context.
         for key, item in self.msmt_kw.items():
             if hasattr(item, 'get'):
                 value = item.get()
@@ -847,7 +849,7 @@ class Function_Detector(Soft_Detector):
                 value = item
             measurement_kwargs[key] = value
         # Call the function
-        result = self.function(**measurement_kwargs)
+        result = self.get_function(**measurement_kwargs)
         if self.result_keys is None:
             return result
         else:
