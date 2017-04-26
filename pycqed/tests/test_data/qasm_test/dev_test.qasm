@@ -12,6 +12,9 @@ X180 q0 | Y90 q1
 I 100
 CZ q0, q1
 mY90 q1
-Measure q0 | Measure q1
+Measure q0
+my180 q1
+
+
 
 
