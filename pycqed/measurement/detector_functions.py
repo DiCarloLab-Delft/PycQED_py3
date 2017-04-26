@@ -818,7 +818,9 @@ class Function_Detector(Soft_Detector):
         value_units (list) : units of the elements returned by the function
         result_keys (list) : keys of the dictionary returned by the function
                              if not None
-        msmt_kw   (dict)   : kwargs for the get_function
+        msmt_kw   (dict)   : kwargs for the get_function, dict items can be
+            values or parameters. If they are parameters the output of the
+            get method will be used for each get_function evaluation.
 
     The input function get_function must return a dictionary.
     The contents(keys) of this dictionary are going to be the measured
