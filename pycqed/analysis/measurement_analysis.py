@@ -3852,6 +3852,7 @@ class Homodyne_Analysis(MeasurementAnalysis):
 
 
 class Acquisition_Delay_Analysis(MeasurementAnalysis):
+
     def __init__(self, label='AD', **kw):
         kw['label'] = label
         kw['h5mode'] = 'r+'
@@ -3901,6 +3902,7 @@ class Acquisition_Delay_Analysis(MeasurementAnalysis):
             self.data_file.close()
 
         return self.max_delay
+
 
 class Hanger_Analysis_CosBackground(MeasurementAnalysis):
 
@@ -5551,9 +5553,9 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
         flux = self.Y[:, 0]
         peaks_low, peaks_high = self.find_peaks()
         self.f, self.ax = self.make_unfiltered_figure(peaks_low, peaks_high,
-                                    transpose=transpose, cmap=cmap,
-                                    add_title=add_title,
-                                    xlabel=xlabel, ylabel=ylabel)
+                                                      transpose=transpose, cmap=cmap,
+                                                      add_title=add_title,
+                                                      xlabel=xlabel, ylabel=ylabel)
 
         filtered_dat = self.filter_data(flux, peaks_low, peaks_high,
                                         a=filt_func_a, x0=filt_func_x0,
@@ -5565,10 +5567,10 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
             filter_func = filtered_dat
 
         self.f, self.ax = self.make_filtered_figure(filt_flux_low, filt_flux_high,
-                                  filt_peaks_low, filt_peaks_high, filter_func,
-                                  add_title=add_title,
-                                  transpose=transpose, cmap=cmap,
-                                  xlabel=xlabel, ylabel=ylabel)
+                                                    filt_peaks_low, filt_peaks_high, filter_func,
+                                                    add_title=add_title,
+                                                    transpose=transpose, cmap=cmap,
+                                                    xlabel=xlabel, ylabel=ylabel)
         if break_before_fitting:
             return
         self.fit_res = self.fit_avoided_crossing(
@@ -5579,13 +5581,12 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
         self.add_analysis_datagroup_to_file()
         self.save_fitted_parameters(self.fit_res, var_name='avoided crossing')
         self.f, self.ax = self.make_fit_figure(filt_flux_low, filt_flux_high,
-                             filt_peaks_low, filt_peaks_high,
-                             add_title=add_title,
-                             fit_res=self.fit_res,
-                             coupling_label=coupling_label,
-                             transpose=transpose, cmap=cmap,
-                             xlabel=xlabel, ylabel=ylabel)
-
+                                               filt_peaks_low, filt_peaks_high,
+                                               add_title=add_title,
+                                               fit_res=self.fit_res,
+                                               coupling_label=coupling_label,
+                                               transpose=transpose, cmap=cmap,
+                                               xlabel=xlabel, ylabel=ylabel)
 
     def run_default_analysis(self, **kw):
         # I'm doing this in the init in this function
@@ -5808,3 +5809,55 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
                                         flux=np.array(total_flux),
                                         params=params)
         return fit_res
+
+
+class IVcurve(MeasurementAnalysis):
+
+    def __init__(self, label='', **kw):
+        kw['label'] = label
+        kw['h5mode'] = 'r+'
+        super().__init__(**kw)
+
+    def run_default_analysis(self, close_file=True, **kw):
+        self.get_naming_and_values()
+        self.fit_data()
+        self.make_figures(**kw)
+        if close_file:
+            self.data_file.close()
+
+    def fit_data(self):
+        # get data
+        self.x = self.sweep_points
+        self.y = self.measured_values[0]
+
+        # finds peak
+        y_diff = self.y[1:] - self.y[:-1]
+        x_diff = self.x[1:]
+        peak_dict = a_tools.peak_finder(x_diff, y_diff)
+        if ((np.mean(self.y)-np.min(self.y))>(np.max(self.y)-np.mean(self.y))):
+            # have a dip
+            key_str = 'dip_idx'
+        else:
+            # have a peak
+            key_str = 'peak_idx'
+        peak_idx = peak_dict[key_str]
+
+        # fits resistance
+        fit_x = self.sweep_points[peak_idx+1:]
+        fit_y = self.measured_values[0][peak_idx+1:]
+        self.fit = np.polyfit(fit_x, fit_y, 1)
+
+    def make_figures(self, **kw):
+        self.fig, self.ax = plt.subplots(1, 1)
+
+        dummy_x = np.linspace(self.x.min(), self.x.max(), 1000)
+
+        self.ax.plot(self.x, self.y, 'o-')
+        self.ax.plot(dummy_x, np.polyval(self.fit, dummy_x), '--',
+                     label='Fit: R = %.3e * v + %.3e' % (self.fit[0], self.fit[1]))
+        self.ax.legend(loc='best')
+        self.ax.set_title('%s: IV curve' % (self.timestamp_string))
+        self.ax.set_xlabel(self.sweep_name)
+        self.ax.set_ylabel('Resistance (Ohm)')
+
+        self.save_fig(self.fig, fig_tight=False, **kw)
