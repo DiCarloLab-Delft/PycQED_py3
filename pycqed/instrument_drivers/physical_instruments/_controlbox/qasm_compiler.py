@@ -28,7 +28,6 @@ event: type, duration
 import enum
 import logging
 import json
-import string
 import pycqed as pq
 import os
 import sys
@@ -37,6 +36,7 @@ import copy
 
 
 INIT_ALL_WAITING_TIME = 200000  # ns
+MAX_TRIG_BITS = 7
 
 
 def is_number(s):
@@ -64,10 +64,10 @@ def is_positive_number(s):
         return False
 
 
-def is_positive_integer(s):
+def is_natural(s):
     if is_int(s) is False:
         return False
-    if int(s) > 0:
+    if int(s) >= 0:
         return True
     else:
         return False
@@ -75,6 +75,38 @@ def is_positive_integer(s):
 
 def is_integer_array(arr):
     return all(isinstance(item, int) for item in arr)
+
+
+def bitfield(n, width, little_endian=True):
+    '''
+    Return the 2's complement of the integer number $x$
+    for a given bitwidth $n$.
+    '''
+    if (not is_natural(n)):
+        raise ValueError('bitfield: n ({}) is not a positive'
+                         ' integer number.'.format(n))
+
+    if (not is_natural(width)):
+        raise ValueError('bitfield: width ({}) is not a positive'
+                         ' integer number.'.format(width))
+
+    bin_str = '{0:{fill}{width}b}'.format(n, fill='0', width=width)
+    if little_endian is True:
+        return [int(digit) for digit in bin_str]
+    else:
+        return [int(digit) for digit in reversed(bin_str)]
+
+
+def min_non_zero(a):
+    '''
+    If there is non zero element in a, return the minimum non-zero element.
+    Otherwise, return 0.
+    '''
+    non_zero_a = [i for i in a if i != 0]
+    if non_zero_a == []:
+        return 0
+    else:
+        return min(non_zero_a)
 
 
 def raw_print(s):
@@ -152,6 +184,25 @@ class qumis_event():
         self.format = []    # used for trigger instruction
         self.trigger_bit = -1
         self.codeword_bit = []
+        self.set_bits = []
+
+    def print_self(self):
+        raw_print(self.qumis_name)
+        raw_print(", codeword:")
+        raw_print(str(self.codeword))
+        # raw_print(", awg_nr:")
+        # raw_print(str(self.awg_nr))
+        raw_print(", duration:")
+        raw_print(str(self.duration))
+        # raw_print(", format:")
+        # raw_print(str(self.format))
+        raw_print(", trigger_bit:")
+        raw_print(str(self.trigger_bit))
+        raw_print(", cw_bit:")
+        raw_print(str(self.codeword_bit))
+        raw_print(", set_bits:")
+        raw_print(str(self.set_bits))
+        raw_print("\n")
 
 
 user_op_type = {
@@ -439,10 +490,12 @@ class QASM_QuMIS_Compiler():
                     raw_print(" ")
                     raw_print("awg")
                     raw_print(str(e.awg_nr))
-                    raw_print("(%s)"%str(e.codeword))
+                    raw_print("(%s)" % str(e.codeword))
                 elif e.qumis_name.lower() == "trigger":
                     raw_print(" ")
                     raw_print("bits:")
+                    if e.set_bits != []:
+                        raw_print(str(e.set_bits))
                     if e.trigger_bit != -1:
                         raw_print("[{}]".format(str(e.trigger_bit)))
                     if e.codeword_bit != []:
@@ -454,9 +507,8 @@ class QASM_QuMIS_Compiler():
                         raw_print(" d:")
                         raw_print(str(e.duration))
                     if e.codeword != -1:
-                        raw_print(" cw: %s" %str(e.codeword))
+                        raw_print(" cw: %s" % str(e.codeword))
                 raw_print('; ')
-
 
     @classmethod
     def remove_comment(self, line):
@@ -669,6 +721,10 @@ class QASM_QuMIS_Compiler():
                     self.raw_event_list.pop(i)
                 else:
                     i = i + 1
+        if len(self.qubit_map) == 0:
+            se = SyntaxError("Qubit map not found in the QASM file.")
+            se.filename = self.filename
+            raise se
 
         if (self.verbose_level < 4):
             print("End of building qubit map:")
@@ -779,11 +835,11 @@ class QASM_QuMIS_Compiler():
             new_event.channel_latency = event.channel_latency
             new_event_list.append(new_event)
 
-            print('new event list:  ')
-            for e in new_event_list:
-                raw_print(str(e))
-                raw_print(str(e.params))
-                raw_print('\n')
+            # print('new event list:  ')
+            # for e in new_event_list:
+            #     raw_print(str(e))
+            #     raw_print(str(e.params))
+            #     raw_print('\n')
 
         return new_event_list
 
@@ -818,7 +874,7 @@ class QASM_QuMIS_Compiler():
 
                     new_absolute_time = tp.absolute_time - compensate_time
                     tp_index, match = self.search_time_point(self.timing_grid,
-                        new_absolute_time)
+                                                             new_absolute_time)
                     if match is False:
                         new_tp = time_point(absolute_time=new_absolute_time)
                         self.timing_grid.insert(tp_index, new_tp)
@@ -893,9 +949,153 @@ class QASM_QuMIS_Compiler():
             self.print_hw_timing_grid()
 
     def gen_full_time_grid(self):
-        self.split_trigger_instruction()
+        self.split_trigger_codeword()
+        self.apply_codeword()
+        self.vertical_divide_trigger()
 
-    def split_trigger_instruction(self):
+    def apply_codeword(self):
+        new_tp_list = []
+        for tp in self.hw_timing_grid:
+            absolute_time = tp.absolute_time
+            for hw_event in tp.parallel_events:
+                if (hw_event.qumis_name == "pulse" or
+                        hw_event.qumis_name == "measure"):
+                    new_tp_list = self.add_new_tp_event(
+                        new_tp_list, absolute_time, hw_event)
+                    continue
+
+                if hw_event.qumis_name == 'trigger':
+                    hw_event.set_bits = []
+
+                    if hw_event.trigger_bit != -1:
+                        hw_event.set_bits.append(hw_event.trigger_bit)
+                        hw_event.trigger_bit = -1
+
+                    if (hw_event.codeword != -1):
+                        bitwidth = len(hw_event.codeword_bit)
+                        codeword_array = bitfield(hw_event.codeword,
+                                                  bitwidth)
+
+                        for i in range(bitwidth):
+                            if codeword_array[i] == 1:
+                                hw_event.set_bits.append(
+                                    hw_event.codeword_bit[i])
+                        hw_event.codeword = -1
+                        hw_event.codeword_bit = []
+
+                    if hw_event.set_bits != []:
+                        new_tp_list = self.add_new_tp_event(
+                            new_tp_list, absolute_time, hw_event)
+
+        self.hw_timing_grid = new_tp_list
+        self.print_hw_timing_grid()
+
+    def vertical_divide_trigger(self):
+        '''
+        Multiple parallel trigger instructions would lead to the following
+        signal shape:
+        Timeslot:    1   2     3    4   5     6
+        1.          ---|---|------|   |-----|----
+        2.             |   |------|---|-----|----
+        3.             |---|------|---|     |
+        4.             |---|------|---|-----|
+        In this case, we would require 6 trigger instructions to describe
+        the digital signal at each time slot.
+        This function resolves original parallel trigger instructions and
+        generates equivalent sequential trigger instructions.
+        '''
+        trigger_bit_duration = [0]*8
+        new_tp_list = []
+        for ti, tp in enumerate(self.hw_timing_grid):
+            absolute_time = tp.absolute_time
+            for hw_event in tp.parallel_events:
+                if (hw_event.qumis_name == "pulse" or
+                        hw_event.qumis_name == "measure"):
+                    new_tp_list = self.add_new_tp_event(
+                        new_tp_list, absolute_time, hw_event)
+                    continue
+
+                if hw_event.qumis_name == 'trigger':
+                    for tb in hw_event.set_bits:
+                        if trigger_bit_duration[tb] > 0:
+                            self.hw_timing_grid = new_tp_list
+                            print("print before trigger overlap error.")
+                            self.print_timing_grid()
+                            raise ValueError("vertical_divide_trigger: "
+                                             "trigger time overlapped. "
+                                             "Something wrong?")
+                        trigger_bit_duration[tb] = hw_event.duration
+
+            if max(trigger_bit_duration) == 0:
+                continue
+
+            min_duration = min_non_zero(trigger_bit_duration)
+            next_trig_ending_time = min_duration + absolute_time
+            next_trig_starting_time = self.get_next_trigger_instr_time(ti)
+
+            # find the next stop time, insert current trigger instruction.
+            # stage 1: next_trig_starting_time < next_trig_ending_time, so the
+            #          next stop time is next_trig_starting_time.
+            # stage 2： the same as stage 1.
+            # stage 3: next_trig_ending_time < next_trig_starting_time, so the
+            #           next stop time is next_trig_ending_time
+            # stage 4, 5 6: next_trig_starting_time = -1, the next stop time is
+            #            the next_trig_ending_time.
+
+            current_time = absolute_time
+            while True:
+                reach_next_starting_time = False
+                if (next_trig_starting_time == -1):
+                    duration = min_duration
+                elif (next_trig_starting_time <= next_trig_ending_time):
+                    duration = next_trig_starting_time - absolute_time
+                    reach_next_starting_time = True
+                else:
+                    duration = min_duration
+
+                new_hw_event = qumis_event()
+                new_hw_event.qumis_name = "trigger"
+                new_hw_event.duration = duration
+                new_hw_event.set_bits = [i for i, d in enumerate(
+                    trigger_bit_duration) if d > 0]
+                for i in new_hw_event.set_bits:
+                    trigger_bit_duration[i] -= duration
+
+                new_tp_list = self.add_new_tp_event(
+                    new_tp_list, current_time, new_hw_event)
+
+                current_time = absolute_time + duration
+
+                min_duration = min_non_zero(trigger_bit_duration)
+
+                if min_duration == 0 or reach_next_starting_time is True:
+                    break
+
+        self.hw_timing_grid = new_tp_list
+        if self.verbose_level < 4:
+            print("after vertical_divide_trigger:")
+        self.print_hw_timing_grid()
+
+    def get_next_trigger_instr_time(self, l):
+        i = l + 1
+        while i < len(self.hw_timing_grid):
+            # print("i:", i)
+            tp = self.hw_timing_grid[i]
+            for hw_event in tp.parallel_events:
+                # hw_event.print_self()
+                if hw_event.qumis_name == "trigger":
+                    return tp.absolute_time
+            i += 1
+        return -1
+
+    def split_trigger_codeword(self):
+        '''
+        Each trigger instruction contains two stages:
+        1. preparing codeword;
+        2. send trigger
+        This function remove the original trigger instruction and for each
+        stage generates a new trigger instruction.
+        '''
         new_tp_list = []
         for tp in self.hw_timing_grid:
             absolute_time = tp.absolute_time
@@ -936,6 +1136,8 @@ class QASM_QuMIS_Compiler():
                             new_tp_list, absolute_time + d2, None)
 
         self.hw_timing_grid = new_tp_list
+        if self.verbose_level < 4:
+            print("after split_trigger_codeword:")
         self.print_hw_timing_grid()
 
     def add_new_tp_event(self, timing_grid, absolute_time, event):
@@ -951,9 +1153,6 @@ class QASM_QuMIS_Compiler():
 
         return timing_grid
 
-    def convert_to_qumis(self):
-        pass
-
     def get_max_duration(self, timing_events):
         max_duration = 0
         for timing_event in timing_events:
@@ -964,3 +1163,56 @@ class QASM_QuMIS_Compiler():
             [self.qasm_op_dict[timing_event.name]["duration"]
              for timing_event in timing_events])
         return max_duration
+
+    def convert_to_qumis(self):
+        '''
+        The final step of compilation. Generate the QuMIS instructions.
+        The instruction format:
+           pulse xxxx, xxxx, xxxx
+           trigger mask, duration
+           measure
+        '''
+        self.qumis_instructions = []
+        self.qumis_instructions.append("wait 1")
+        previous_time = 0
+        for tp in self.hw_timing_grid:
+            pre_waiting_time = tp.absolute_time - previous_time
+            if pre_waiting_time == 0:
+                if tp.absolute_time != 0:
+                    raise ValueError("Strange thing happened. Two time points "
+                                     "have the same absolute time")
+                pass
+            else:
+                self.qumis_instructions.append("wait {:d}".format(
+                    pre_waiting_time))
+
+            previous_time = tp.absolute_time
+
+            pulse_list = [0, 0, 0]
+            for hw_event in tp.parallel_events:
+                if hw_event.qumis_name == "pulse":
+                    pulse_list[hw_event.awg_nr] = 1 << 3 + hw_event.codeword
+
+                if hw_event.qumis_name == "trigger":
+                    mask = 0
+                    for bit in hw_event.set_bits:
+                        mask += (1 << (MAX_TRIG_BITS-bit))
+                    trigger_instruction = "trigger {0:07b}, {1:d}".format(
+                        mask, hw_event.duration)
+                    self.qumis_instructions.append(trigger_instruction)
+
+                if hw_event.qumis_name == "measure":
+                    self.qumis_instructions.append("measure")
+
+            if max(pulse_list) != 0:
+                pulse_instruction = \
+                    "pulse {0:{fill}4b}, {1:{fill}4b}, {2:{fill}4b}".format(
+                        pulse_list[0], pulse_list[1], pulse_list[2], fill='0')
+                self.qumis_instructions.append(pulse_instruction)
+
+        self.print_qumis()
+
+    def print_qumis(self):
+        if self.verbose_level <= 5:
+            for qi in self.qumis_instructions:
+                print(qi)
