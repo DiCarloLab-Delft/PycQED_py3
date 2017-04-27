@@ -811,21 +811,24 @@ class Function_Detector(Soft_Detector):
     """
     Defines a detector function that wraps around an user-defined function.
     Inputs are:
-        sweep_function, function that is going to be wrapped around
-        result_keys, keys of the dictionary returned by the function
-        value_names, names of the elements returned by the function
-        value_units, units of the elements returned by the function
-        msmt_kw, kw arguments for the function
+        get_function (fun) : function used for acquiring values
+        value_names (list) : names of the elements returned by the function
+        value_units (list) : units of the elements returned by the function
+        result_keys (list) : keys of the dictionary returned by the function
+                             if not None
+        msmt_kw   (dict)   : kwargs for the get_function, dict items can be
+            values or parameters. If they are parameters the output of the
+            get method will be used for each get_function evaluation.
 
-    The input function sweep_function must return a dictionary.
+    The input function get_function must return a dictionary.
     The contents(keys) of this dictionary are going to be the measured
     values to be plotted and stored by PycQED
     """
 
-    def __init__(self, sweep_function, result_keys, value_names=None,
-                 value_units=None, msmt_kw={}, **kw):
-        super(Function_Detector, self).__init__()
-        self.sweep_function = sweep_function
+    def __init__(self, get_function, value_names=None,
+                 value_units=None, msmt_kw={}, result_keys=None, **kw):
+        super().__init__()
+        self.get_function = get_function
         self.result_keys = result_keys
         self.value_names = value_names
         self.value_units = value_units
@@ -837,49 +840,23 @@ class Function_Detector(Soft_Detector):
 
     def acquire_data_point(self, **kw):
         measurement_kwargs = {}
-        for key, item in self.parameters_dictionary.items():
+        # If an entry has a get method that will be used to set the value.
+        # This makes parameters work in this context.
+        for key, item in self.msmt_kw.items():
             if hasattr(item, 'get'):
                 value = item.get()
             else:
                 value = item
             measurement_kwargs[key] = value
-        result = self.function(**measurement_kwargs)
 
-    def acquire_data_point(self, **kw):
-        result = self.sweep_function(**self.msmt_kw)
-        return [result[key] for key in result.keys()]
-
-
-class Function_Detector_list(Soft_Detector):
-    """
-    Defines a detector function that wraps around an user-defined function.
-    Inputs are:
-        sweep_function, function that is going to be wrapped around
-        result_keys, keys of the dictionary returned by the function
-        value_names, names of the elements returned by the function
-        value_units, units of the elements returned by the function
-        msmt_kw, kw arguments for the function
-
-    The input function sweep_function must return a dictionary.
-    The contents(keys) of this dictionary are going to be the measured
-    values to be plotted and stored by PycQED
-    """
-
-    def __init__(self, sweep_function, result_keys, value_names=None,
-                 value_units=None, msmt_kw={}, **kw):
-        super(Function_Detector_list, self).__init__()
-        self.sweep_function = sweep_function
-        self.result_keys = result_keys
-        self.value_names = value_names
-        self.value_units = value_units
-        self.msmt_kw = msmt_kw
-        if self.value_names is None:
-            self.value_names = result_keys
-        if self.value_units is None:
-            self.value_units = [""] * len(result_keys)
-
-    def acquire_data_point(self, **kw):
-        return self.sweep_function(**self.msmt_kw)
+        # Call the function
+        result = self.get_function(**measurement_kwargs)
+        print(result)
+        if self.result_keys is None:
+            return result
+        else:
+            results = [result[key] for key in self.result_keys]
+            return results
 
 
 class Detect_simulated_hanger_Soft(Soft_Detector):
@@ -1385,7 +1362,6 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         self.AWG = AWG
         self.nr_averages = nr_averages
         self.integration_length = integration_length
-
         # 0/1/2 crosstalk supressed /digitized/raw
         res_logging_indices = {'lin_trans': 0, 'digitized': 1, 'raw': 2}
         self.result_logging_mode_idx = res_logging_indices[result_logging_mode]
@@ -1646,7 +1622,6 @@ class UHFQC_integration_logging_det(Hard_Detector):
     Detector used for integrated average results with the UHFQC
 
     '''
-
     def __init__(self, UHFQC, AWG=None,
                  integration_length=1e-6,
                  nr_shots=4094,
@@ -1671,6 +1646,7 @@ class UHFQC_integration_logging_det(Hard_Detector):
                             defined in the UFHQC. Requires optimal weights.
         """
         super().__init__()
+
         self.UHFQC = UHFQC
         self.name = '{}_UHFQC_integration_logging_det'.format(
             result_logging_mode)
