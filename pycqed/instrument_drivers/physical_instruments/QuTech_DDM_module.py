@@ -49,7 +49,6 @@ class DDMq(SCPI):
                                docstring='This parameter enables trigger,' +
                                ' it is comparable to command "arm".' +
                                ' After run is set, DDM will accept next comming triggers ',
-                               #get_cmd=swinten_cmd + '?',
                                set_cmd=srun_cmd
                                )
             sreset_int_cmd = 'qutech:reset{}'.format(ch_pair)
@@ -139,7 +138,7 @@ class DDMq(SCPI):
                                vals=vals.Numbers(1, 4096)
                                )
             #########
-            ##TV mode
+            # TV mode
             #########
             sintavgall_cmd = 'qutech:tvmode{}:naverages:all'.format(ch_pair)
             self.add_parameter('ch_pair{}_tvmode_naverages'.format(ch_pair),
@@ -179,7 +178,7 @@ class DDMq(SCPI):
                                vals=vals.Numbers(0, 1)
                                )
             ###########
-            ##Threshold
+            # Threshold
             ###########
             sthlall_cmd = 'qutech:qstate{}:threshold:all'.format(ch_pair)
             self.add_parameter('ch_pair{}_qstate_threshold'.format(ch_pair),
@@ -196,7 +195,7 @@ class DDMq(SCPI):
                                vals=vals.Numbers(-134217728, 134217727)
                                )
             #########
-            ##Logging
+            # Logging
             #########
             slogenall_cmd = 'qutech:logging{}:enable:all'.format(ch_pair)
             self.add_parameter('ch_pair{}_logging_enable'.format(ch_pair),
@@ -227,7 +226,7 @@ class DDMq(SCPI):
                                vals=vals.Numbers(1, 8192)
                                )
             ################
-            ##Error fraction
+            # Error fraction
             ################
             serrfarcten_cmd = 'qutech:errorfraction{}:enable:all'.format(
                 ch_pair)
@@ -318,9 +317,9 @@ class DDMq(SCPI):
 
                                    )
                 ###################################
-                ##Set 4 elements of rotation matrix
-                ##Rotmat[rotmat00 rotmat01
-                ##       rotmat10 rotmat11]
+                # Set 4 elements of rotation matrix
+                # Rotmat[rotmat00 rotmat01
+                # rotmat10 rotmat11]
                 ###################################
                 srotmat00_cmd = 'qutech:rotmat{}:rotmat00{}'.format(
                     ch_pair, wNr)
@@ -375,7 +374,7 @@ class DDMq(SCPI):
                                    )
 
                 ####################
-                ##TV mode parameters
+                # TV mode parameters
                 ####################
                 sintavg_cmd = 'qutech:tvmode{}:naverages{}'.format(
                     ch_pair, wNr)
@@ -427,7 +426,7 @@ class DDMq(SCPI):
                                    )
 
                 ###########################
-                ##TV mode QSTATE parameters
+                # TV mode QSTATE parameters
                 ###########################
                 sthl_cmd = 'qutech:qstate{}:threshold{}'.format(ch_pair, wNr)
                 self.add_parameter('ch_pair{}_weight{}_qstate_threshold'.format(ch_pair, wNr),
@@ -469,7 +468,7 @@ class DDMq(SCPI):
 
                 )
                 #################
-                ##Logging
+                # Logging
                 #################
                 slogen_cmd = 'qutech:logging{}:enable{}'.format(ch_pair, wNr)
                 self.add_parameter('ch_pair{}_weight{}_logging_enable'.format(ch_pair, wNr),
@@ -525,7 +524,7 @@ class DDMq(SCPI):
 
                                    )
                 #################
-                ##Error fraction
+                # Error fraction
                 #################
                 serrfarcten_cmd = 'qutech:errorfraction{}:enable{}'.format(
                     ch_pair, wNr)
@@ -578,7 +577,7 @@ class DDMq(SCPI):
                                    vals=vals.Arrays(0, 1)
                                    )
         ###################
-        ##Sorted by channel
+        # Sorted by channel
         ###################
         for i in range(self.device_descriptor.numChannels):
             ch = i+1
@@ -606,18 +605,19 @@ class DDMq(SCPI):
                                )
             for i in range(self.device_descriptor.numWeights):
                 wNr = i+1
-                self.add_parameter('ch{}_weight{}_data'.format(ch, wNr),
-                                   label=('Get weight data channel {}'.format(ch) +
-                                          'weight number {}  '.format(wNr)),
-                                   docstring='It set a weight up 4096 samples (8 us) per channel  ' +
-                                   'and weight pair. It is int8 integer between -128 to 127' +
-                                   'corresponding +-1V. It should be re-factored before setting or getting ',
-                                   get_cmd=self._gen_ch_weight_get_func(
-                                   self._getWeightData, ch, wNr),
-                                   set_cmd=self._gen_ch_weight_set_func(
-                                   self._sendWeightData, ch, wNr),
-                                   vals=vals.Arrays(-128, 127)
-                                   )
+                self.add_parameter(
+                    'ch{}_weight{}_data'.format(ch, wNr),
+                    label=('Get weight data channel {}'.format(ch) +
+                           'weight number {}  '.format(wNr)),
+                    docstring='It set a weight up 4096 samples (8 us) per channel  ' +
+                    'and weight pair. It is int8 integer between -128 to 127' +
+                    'corresponding +-1V. It should be re-factored before setting or getting ',
+                    get_cmd=self._gen_ch_weight_get_func(
+                        self._getWeightData, ch, wNr),
+                    set_cmd=self._gen_ch_weight_set_func(
+                        self._sendWeightData, ch, wNr),
+                    vals=vals.Arrays(-128, 127)
+                )
 
     def _getInputAverage(self, ch):
         ch_pair = math.ceil(ch/2)
@@ -716,7 +716,7 @@ class DDMq(SCPI):
         return qstatelogging
 
     #################
-    ##Input averaging
+    # Input averaging
     #################
     def _getInAvgStatus(self, ch_pair):
         return self.ask('qutech:inputavg{:d}:status? '.format(ch_pair))
@@ -730,7 +730,7 @@ class DDMq(SCPI):
         return self.ask('qutech:inputavg{:d}:busy? '.format(ch_pair))
 
     #################
-    ##TV MODe
+    # TV MODe
     #################
     def _getTVStatus(self, ch_pair, wNr):
         return self.ask('qutech:tvmode{:d}:status{:d}? '.format(ch_pair, wNr))
@@ -745,10 +745,11 @@ class DDMq(SCPI):
         return self.ask('qutech:tvmode{:d}:busy{:d}? '.format(ch_pair, wNr))
 
     def _getTVpercentage(self, ch_pair, wNr):
-        return self.ask('qutech:tvmode{:d}:percentage{:d}? '.format(ch_pair, wNr))
+        return self.ask('qutech:tvmode{:d}:percentage{:d}? '.format(
+            ch_pair, wNr))
 
     #################
-    ##Logging
+    # Logging
     #################
     def _getLoggingFinished(self, ch_pair, wNr):
         finished = self.ask(
@@ -760,13 +761,15 @@ class DDMq(SCPI):
         return self.ask('qutech:logging{:d}:busy{:d}? '.format(ch_pair, wNr))
 
     def _getLoggingpercentage(self, ch_pair, wNr):
-        return self.ask('qutech:logging{:d}:percentage{:d}? '.format(ch_pair, wNr))
+        return self.ask('qutech:logging{:d}:percentage{:d}? '.format(
+            ch_pair, wNr))
 
     def _getLoggingStatus(self, ch_pair, wNr):
-        return self.ask('qutech:errorfraction{:d}:status{:d}? '.format(ch_pair, wNr))
+        return self.ask('qutech:errorfraction{:d}:status{:d}? '.format(
+            ch_pair, wNr))
 
     #########################
-    ##Error fraction counters
+    # Error fraction counters
     #########################
     def _sendErrFractSglQbitPatternAll(self, ch_pair, pattern):
         self.write('qutech:errorfraction{:d}:pattern:all {:d},{:d}'.format(
@@ -816,13 +819,16 @@ class DDMq(SCPI):
         return fmt_finished
 
     def _getErrFractBusy(self, ch_pair, wNr):
-        return self.ask('qutech:errorfraction{:d}:busy{:d}? '.format(ch_pair, wNr))
+        return self.ask('qutech:errorfraction{:d}:busy{:d}? '.format(
+            ch_pair, wNr))
 
     def _getErrFractpercentage(self, ch_pair, wNr):
-        return self.ask('qutech:errorfraction{:d}:percentage{:d}? '.format(ch_pair, wNr))
+        return self.ask('qutech:errorfraction{:d}:percentage{:d}? '.format(
+            ch_pair, wNr))
 
     def _getErrFractStatus(self, ch_pair, wNr):
-        return self.ask('qutech:errorfraction{:d}:status{:d}? '.format(ch_pair, wNr))
+        return self.ask('qutech:errorfraction{:d}:status{:d}? '.format(
+            ch_pair, wNr))
 
     # Ask for DDM status
     def _getADCstatus(self, ch_pair):
@@ -836,7 +842,7 @@ class DDMq(SCPI):
         statuswint = self.ask('qutech:wint{:d}:status{:d}?'.format(ch_pair, 1))
         statuswintstr = format(int(statuswint), 'b').zfill(32)
         reversestatuswintstr = statuswintstr[::-1]
-        tempstatus=self._get_temp_status(ch_pair)
+        tempstatus = self._get_temp_status(ch_pair)
         tempstatusstr = format(np.uint32(tempstatus), 'b').zfill(32)
         reversetempstatusstr = tempstatusstr[::-1]
 
@@ -897,13 +903,16 @@ class DDMq(SCPI):
             return None
 
         def _Temperature():
-            print("\nDictionary with temperature information and recommendations." +
+            print("\nDictionary with temperature information and" +
+                  " recommendations." +
                   "\nCheck WarnMessage for the recommendation:")
             if (reversetempstatusstr[1] == '1'):
-                logging.warning("\nADC Temperature is Critical!" )
+                logging.warning("\nADC Temperature is Critical!")
 
             elif (reversetempstatusstr[0] == '1'):
-                logging.warning("\nADC Temperature change is more than 2°C. Re-calibration is advised!" )
+                logging.warning(
+                    "\nADC Temperature change is more than 2°C. " +
+                    "Re-calibration is advised!")
 
             else:
                 print("\nADC Temperature is okay.")
@@ -983,7 +992,8 @@ class DDMq(SCPI):
             for i in range(0, 5):
                 tempparts[i] = tempparts[i].split('=')[1]
         except Exception:
-            logging.warn('Error getting or interpreting get_temp ' + repr(tempstr))
+            logging.warn(
+                'Error getting or interpreting get_temp ' + repr(tempstr))
             tempparts = [None, None, None, None, None]
 
         # some strings include the word 'model' at the front of model
@@ -991,8 +1001,7 @@ class DDMq(SCPI):
             tempparts[1] = str(tempparts[1])[5:].strip()
 
         return dict(zip(('ActualTemp', 'LastCalTemp', 'TempDiff', 'BrdTemp',
-                        'WarnMessage'), tempparts))
-
+                         'WarnMessage'), tempparts))
 
     # Overloding get_idn function to format DDM versions
     def get_idn(self):
@@ -1053,10 +1062,14 @@ class DDMq(SCPI):
         self.set('ch2_weight{}_data'.format(weight_function_Q), np.array(cosI))
 
         # setting the rotation matrices... very danagerous
-        self.set('ch_pair1_weight{}_rotmat_rotmat00'.format(weight_function_I), 1)
-        self.set('ch_pair1_weight{}_rotmat_rotmat01'.format(weight_function_I), 1)
-        self.set('ch_pair1_weight{}_rotmat_rotmat00'.format(weight_function_Q), -1)
-        self.set('ch_pair1_weight{}_rotmat_rotmat01'.format(weight_function_Q), 1)
+        self.set(
+            'ch_pair1_weight{}_rotmat_rotmat00'.format(weight_function_I), 1)
+        self.set(
+            'ch_pair1_weight{}_rotmat_rotmat01'.format(weight_function_I), 1)
+        self.set(
+            'ch_pair1_weight{}_rotmat_rotmat00'.format(weight_function_Q), -1)
+        self.set(
+            'ch_pair1_weight{}_rotmat_rotmat01'.format(weight_function_Q), 1)
 
     def prepare_DSB_weight_and_rotation(self, IF,
                                         weight_function_I=1,
@@ -1074,76 +1087,11 @@ class DDMq(SCPI):
         self.set('ch2_weight{}_data'.format(weight_function_Q), np.array(cosI))
 
         # setting the rotation matrices... very danagerous
-        self.set('ch_pair1_weight{}_rotmat_rotmat00'.format(weight_function_I), 1)
-        self.set('ch_pair1_weight{}_rotmat_rotmat01'.format(weight_function_I), 0)
-        self.set('ch_pair1_weight{}_rotmat_rotmat00'.format(weight_function_Q), 1)
-        self.set('ch_pair1_weight{}_rotmat_rotmat01'.format(weight_function_Q), 0)
-
-
-# @ NIKITA LOOK HERE!
-class MyCustomValidator(vals.Validator):
-
-    """
-    Validator for numerical numpy arrays
-    Args:
-        min_value (Optional[Union[float, int]):  Min value allowed, default inf
-        max_value:  (Optional[Union[float, int]): Max  value allowed, default inf
-        shape:     (Optional): None
-    """
-
-    validtypes = (int, float, np.integer, np.floating)
-
-    def __init__(self, min_value=-float("inf"), max_value=float("inf"),
-                 shape=None):
-
-        if isinstance(min_value, self.validtypes):
-            self._min_value = min_value
-        else:
-            raise TypeError('min_value must be a number')
-
-        if isinstance(max_value, self.validtypes) and max_value > min_value:
-            self._max_value = max_value
-        else:
-            raise TypeError('max_value must be a number bigger than min_value')
-        self._shape = shape
-
-    def validate(self, value, context=''):
-
-        if not isinstance(value, np.ndarray):
-            raise TypeError(
-                '{} is not a numpy array; {}'.format(repr(value), context))
-
-        if value.dtype not in self.validtypes:
-            raise TypeError(
-                '{} is not an int or float; {}'.format(repr(value), context))
-        if self._shape is not None:
-            if (np.shape(value) != self._shape):
-                raise ValueError(
-                    '{} does not have expected shape {}; {}'.format(
-                        repr(value), self._shape, context))
-
-        # Only check if max is not inf as it can be expensive for large arrays
-        if self._max_value != (float("inf")):
-            if not (np.max(value) <= self._max_value):
-                raise ValueError(
-                    '{} is invalid: all values must be between '
-                    '{} and {} inclusive; {}'.format(
-                        repr(value), self._min_value,
-                        self._max_value, context))
-
-        # Only check if min is not -inf as it can be expensive for large arrays
-        if self._min_value != (-float("inf")):
-            if not (self._min_value <= np.min(value)):
-                raise ValueError(
-                    '{} is invalid: all values must be between '
-                    '{} and {} inclusive; {}'.format(
-                        repr(value), self._min_value,
-                        self._max_value, context))
-
-    is_numeric = True
-
-    def __repr__(self):
-        minv = self._min_value if math.isfinite(self._min_value) else None
-        maxv = self._max_value if math.isfinite(self._max_value) else None
-        return '<Arrays{}, shape: {}>'.format(range_str(minv, maxv, 'v'),
-                                              self._shape)
+        self.set(
+            'ch_pair1_weight{}_rotmat_rotmat00'.format(weight_function_I), 1)
+        self.set(
+            'ch_pair1_weight{}_rotmat_rotmat01'.format(weight_function_I), 0)
+        self.set(
+            'ch_pair1_weight{}_rotmat_rotmat00'.format(weight_function_Q), 1)
+        self.set(
+            'ch_pair1_weight{}_rotmat_rotmat01'.format(weight_function_Q), 0)
