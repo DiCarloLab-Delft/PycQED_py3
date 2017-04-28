@@ -4,7 +4,7 @@ Library containing pulse shapes.
 '''
 from pycqed.measurement.waveform_control.pulse import Pulse, apply_modulation
 from pycqed.measurement.waveform_control_CC.waveform import martinis_flux_pulse
-
+from pycqed.utilities.general import int_to_bin
 
 class MW_IQmod_pulse(Pulse):
 
@@ -334,9 +334,9 @@ class SquareFluxPulse(Pulse):
 
     def chan_wf(self, chan, tvals):
         sq_pulse = np.ones(
-            round((self.square_pulse_length)*1e9)) * self.amplitude
-        buff_pulse = np.zeros(round((self.length-self.square_pulse_length)*1e9))
-        #using round instead of int to avoid crashing
+            int(round((self.square_pulse_length)*1e9))) * self.amplitude
+        buff_pulse = np.zeros(int(
+            round((self.length-self.square_pulse_length)*1e9)))
         return np.concatenate([sq_pulse, buff_pulse])
 
 
@@ -413,3 +413,50 @@ class MartinisFluxPulse(Pulse):
         # amplitude is not used because of parameterization but
         # we use the sign of the amplitude to set the flux compensation
         return martinis_pulse*np.sign(self.amplitude)
+
+
+class QWG_Codeword(Pulse):
+    def __init__(self,
+                 channel_map=None,
+                 cw_trigger_channel='ch1_marker_1',
+                 cw_channels=['ch1_marker_2', 'ch1_marker_2',
+                              'ch2_marker_1'],
+                 codeword=0, length=20e-9,
+                 name='QWG codeword', **kw):
+        Pulse.__init__(self, name)
+        self.amplitude = kw.pop('amplitude', 0)
+        self.length = length
+        self.cw_channels = cw_channels
+        self.cw_trigger_channel = cw_trigger_channel
+        self.set_codeword(codeword)
+        self.channels = self.cw_channels + [self.cw_trigger_channel]
+
+    # def __call__(self, **kw):
+
+    #     self.amplitude = kw.pop('amplitude', self.amplitude)
+    #     self.length = kw.pop('length', self.length)
+    #     return self
+
+    def set_codeword(self, codeword):
+        self.cw_high_channels = []
+        self.cw_low_channels = []
+        bin_cw = int_to_bin(codeword, w=len(self.cw_channels), lsb_last=False)
+        for i, chan in enumerate(self.cw_channels):
+            if bin_cw[i] == '1':
+                self.cw_high_channels.append(chan)
+            else:
+                self.cw_low_channels.append(chan)
+        self.codeword = codeword
+
+    def chan_wf(self, chan, tvals):
+        if chan in self.cw_high_channels:
+            return np.ones(len(tvals)) * self.amplitude
+        if chan in self.cw_low_channels:
+            return np.zeros(len(tvals))
+        if chan == self.cw_trigger_channel:
+            amps = np.zeros(len(tvals))
+            amps[len(tvals)//2:] = 1
+            return amps
+
+
+

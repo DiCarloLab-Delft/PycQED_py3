@@ -113,6 +113,7 @@ class DDMq(SCPI):
                                )
             sholdoff_cmd = 'qutech:input{}:holdoff'.format(ch_pair)
             self.add_parameter('ch_pair{}_holdoff'.format(ch_pair),
+
                                label=('Set holdoff' +
                                       'ch_pair {} '.format(ch_pair)),
                                docstring='specifying the number of clocks the measurement trigger  ' +
@@ -838,6 +839,7 @@ class DDMq(SCPI):
         tempstatus=self._get_temp_status(ch_pair)
         tempstatusstr = format(np.uint32(tempstatus), 'b').zfill(32)
         reversetempstatusstr = tempstatusstr[::-1]
+
         def _DI():
             if (reversestatusstr[0] == '1'):
                 logging.warning('\nOver range on DI input. ')

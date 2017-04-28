@@ -57,14 +57,13 @@ class DeviceObject(Instrument):
             vals=vals.Numbers(1e-9, 500e-6))
         self.add_sequencer_config_param(self.Flux_comp_dead_time)
 
-
     def get_idn(self):
         return self.name
 
     def _get_qubits(self):
         q_list = []
-        for q in self._qubits:
-            q_list.append(q.name)
+        for q in self._qubits.keys():
+            q_list.append(q)
         return q_list
 
     def _get_sequencer_config(self):
