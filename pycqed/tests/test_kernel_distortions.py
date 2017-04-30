@@ -56,7 +56,6 @@ class Test_KernelObject(unittest.TestCase):
         np.testing.assert_array_equal(kObj_bounce, kf_bounce)
 
     def test_decay_kernel(self):
-        print('decay_kernel')
         dA = 3
         dtau = 15e-9
         dl = 100e-9
@@ -144,3 +143,19 @@ class Test_Kernel_functions(unittest.TestCase):
             -1.08294205e-05])
         np.testing.assert_array_almost_equal(
             skin_kernel_test, known_skin_vals, decimal=7)
+
+    def test_poly_kernel(self):
+        test_kernel = kf.poly_kernel([0, 0, 1], length=40)
+        known_vals = np.zeros(40)
+        known_vals[0] = 1
+
+        np.testing.assert_array_almost_equal(
+            test_kernel, known_vals, decimal=7)
+
+        test_kernel = kf.poly_kernel([1, 0, 1], length=10)
+        known_vals = np.arange(10)*2-1
+        known_vals[0] = 1
+
+        np.testing.assert_array_almost_equal(
+            test_kernel, known_vals, decimal=7)
+
