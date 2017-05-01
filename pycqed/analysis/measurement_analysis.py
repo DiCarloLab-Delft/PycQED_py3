@@ -2779,8 +2779,8 @@ class Ramsey_Analysis(TD_Analysis):
         ft_of_data = np.fft.fft(self.normalized_data_points)
         index_of_fourier_maximum = np.argmax(np.abs(
             ft_of_data[1:len(ft_of_data)//2]))+1
-        max_ramsey_delay = self.sweep_points[-self.NoCalPoints] - \
-            self.sweep_points[0]
+        max_ramsey_delay = self.norm_sweep_points[-1] - \
+            self.norm_sweep_points[0]
 
         fft_axis_scaling = 1/(max_ramsey_delay)
         freq_est = fft_axis_scaling*index_of_fourier_maximum
@@ -2822,9 +2822,9 @@ class Ramsey_Analysis(TD_Analysis):
                                       value=phase_estimate, vary=True)
 
         damped_osc_mod.set_param_hint('tau',
-                                      value=self.sweep_points[1]*10,
-                                      min=self.sweep_points[1],
-                                      max=self.sweep_points[1]*1000)
+                                      value=self.norm_sweep_points[1]*10,
+                                      min=self.norm_sweep_points[1],
+                                      max=self.norm_sweep_points[1]*1000)
 
         damped_osc_mod.set_param_hint('exponential_offset',
                                       value=0.5,
@@ -2837,7 +2837,7 @@ class Ramsey_Analysis(TD_Analysis):
                                       vary=False)
         self.params = damped_osc_mod.make_params()
         fit_res = damped_osc_mod.fit(data=self.normalized_data_points,
-                                     t=self.sweep_points[:-self.NoCalPoints],
+                                     t=self.norm_sweep_points,
                                      params=self.params)
         if fit_res.chisqr > .35:
             logging.warning('Fit did not converge, varying phase')
@@ -2849,7 +2849,7 @@ class Ramsey_Analysis(TD_Analysis):
                 self.params = damped_osc_mod.make_params()
                 fit_res_lst += [damped_osc_mod.fit(
                                 data=self.normalized_data_points,
-                                t=self.sweep_points[:-self.NoCalPoints],
+                                t=self.norm_sweep_points,
                                 params=self.params)]
 
             chisqr_lst = [fit_res.chisqr for fit_res in fit_res_lst]
@@ -2869,16 +2869,16 @@ class Ramsey_Analysis(TD_Analysis):
         ax.text(0.4, 0.95, textstr,
                 transform=ax.transAxes, fontsize=11,
                 verticalalignment='top', bbox=self.box_props)
-        self.plot_results_vs_sweepparam(x=self.sweep_points*1e6,
+        self.plot_results_vs_sweepparam(x=self.norm_sweep_points*1e6,
                                         y=self.normalized_values,
                                         fig=fig, ax=ax,
                                         xlabel=r'Time ($\mu s$)',
                                         ylabel=ylabel,
                                         save=False)
 
-        x = np.linspace(self.sweep_points[0],
-                        self.sweep_points[-self.NoCalPoints],
-                        len(self.sweep_points)*100)
+        x = np.linspace(self.norm_sweep_points[0],
+                        self.norm_sweep_points[-1],
+                        len(self.norm_sweep_points)*100)
         if show_guess:
             y_init = fit_mods.ExpDampOscFunc(x, **self.fit_res.init_values)
             ax.plot(x*1e6, y_init, 'k--')
@@ -2903,12 +2903,19 @@ class Ramsey_Analysis(TD_Analysis):
         self.get_naming_and_values()
         fig1, fig2, ax, axarray = self.setup_figures_and_axes()
 
-        norm = self.normalize_data_to_calibration_points(
-            self.measured_values[0], self.NoCalPoints)
-        self.normalized_values = norm[0]
-        self.normalized_data_points = norm[1]
-        self.normalized_cal_vals = norm[2]
+        if self.rotate_and_normalize:
+            norm = self.normalize_data_to_calibration_points(
+                self.measured_values[0], self.NoCalPoints)
+            self.normalized_values = norm[0]
+            self.normalized_data_points = norm[1]
+            self.normalized_cal_vals = norm[2]
+            self.norm_sweep_points = self.sweep_points[:self.NoCalPoints]
+        else:
+            self.normalized_data_points = self.measured_values[0]
+            self.normalized_values = self.measured_values[0]
+            self.norm_sweep_points = self.sweep_points
         self.fit_res = self.fit_Ramsey(print_fit_results)
+        print(self.fit_res)
 
         self.save_fitted_parameters(self.fit_res, var_name=self.value_names[0])
         self.plot_results(fig1, ax, self.fit_res, show_guess=show_guess,
@@ -2920,6 +2927,8 @@ class Ramsey_Analysis(TD_Analysis):
                     ax2 = axarray[0, i]
                 else:
                     ax2 = axarray[1, i-2]
+            elif len(self.value_names) == 1:
+                ax2 = axarray
             else:
                 ax2 = axarray[i]
 
