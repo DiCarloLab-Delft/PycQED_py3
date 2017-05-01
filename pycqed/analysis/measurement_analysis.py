@@ -939,8 +939,12 @@ class TD_Analysis(MeasurementAnalysis):
                                      int(NoPts-int(calsteps)/2)))
         cal_one_points = list(range(int(NoPts-int(calsteps)/2), NoPts))
 
-        self.corr_data = a_tools.rotate_and_normalize_data(
-            self.measured_values[0:2], cal_zero_points, cal_one_points)[0]
+        if len(self.measured_values) == 1:
+            self.corr_data = a_tools.normalize_data_v3(
+                self.measured_values[0], cal_zero_points, cal_one_points)
+        else:
+            self.corr_data = a_tools.rotate_and_normalize_data(
+                self.measured_values[0:2], cal_zero_points, cal_one_points)[0]
         if save_norm_to_data_file:
             self.add_dataset_to_analysisgroup('Corrected data',
                                               self.corr_data)
@@ -2869,7 +2873,7 @@ class Ramsey_Analysis(TD_Analysis):
         ax.text(0.4, 0.95, textstr,
                 transform=ax.transAxes, fontsize=11,
                 verticalalignment='top', bbox=self.box_props)
-        self.plot_results_vs_sweepparam(x=self.norm_sweep_points*1e6,
+        self.plot_results_vs_sweepparam(x=self.sweep_points*1e6,
                                         y=self.normalized_values,
                                         fig=fig, ax=ax,
                                         xlabel=r'Time ($\mu s$)',
@@ -2903,19 +2907,14 @@ class Ramsey_Analysis(TD_Analysis):
         self.get_naming_and_values()
         fig1, fig2, ax, axarray = self.setup_figures_and_axes()
 
-        if self.rotate_and_normalize:
-            norm = self.normalize_data_to_calibration_points(
-                self.measured_values[0], self.NoCalPoints)
-            self.normalized_values = norm[0]
-            self.normalized_data_points = norm[1]
-            self.normalized_cal_vals = norm[2]
-            self.norm_sweep_points = self.sweep_points[:self.NoCalPoints]
-        else:
-            self.normalized_data_points = self.measured_values[0]
-            self.normalized_values = self.measured_values[0]
-            self.norm_sweep_points = self.sweep_points
+        norm = self.normalize_data_to_calibration_points(
+            self.measured_values[0], self.NoCalPoints)
+        self.normalized_values = norm[0]
+        self.normalized_data_points = norm[1]
+        self.normalized_cal_vals = norm[2]
+        self.norm_sweep_points = self.sweep_points[:len(
+            self.normalized_data_points)]
         self.fit_res = self.fit_Ramsey(print_fit_results)
-        print(self.fit_res)
 
         self.save_fitted_parameters(self.fit_res, var_name=self.value_names[0])
         self.plot_results(fig1, ax, self.fit_res, show_guess=show_guess,
