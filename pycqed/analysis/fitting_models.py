@@ -380,17 +380,15 @@ def Cos_guess(model, data, t):
     offs_guess = np.mean(data)
 
     # Freq guess ! only valid with uniform sampling
-    w = np.fft.fft(data)
-    f = np.fft.fftfreq(len(data), t[1]-t[0])
+    # Only first half of array is used, because the second half contains the
+    # negative frequecy components, and we want a positive frequency.
+    w = np.fft.fft(data)[:len(data)//2]
+    f = np.fft.fftfreq(len(data), t[1]-t[0])[:len(w)]
     w[0] = 0  # Removes DC component from fourier transform
 
-    #using maximum absolute fft component
-    if -min(w)>max(w):
-        freq_guess = f[w == min(w)]
-    else:
-        freq_guess = f[w == max(w)]
-    ph_guess = (-2*np.pi*t[data == max(data)]*freq_guess)[0]
-
+    # Use absolute value of complex valued spectrum
+    abs_w = np.abs(w)
+    freq_guess = abs(f[abs_w == max(abs_w)][0])
     ph_guess = (-2*np.pi*t[data == max(data)]*freq_guess)[0]
     # the condition data == max(data) can have several solutions
     #               (for example when discretization is visible)
@@ -402,6 +400,7 @@ def Cos_guess(model, data, t):
                                phase=ph_guess,
                                offset=offs_guess)
     params['amplitude'].min = 0  # Ensures positive amp
+    params['frequency'].min = 0
 
     return params
 

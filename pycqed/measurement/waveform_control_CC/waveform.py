@@ -13,14 +13,13 @@ from pycqed.analysis.fitting_models import Qubit_freq_to_dac
 
 
 def gauss_pulse(amp, sigma_length, nr_sigma=4, sampling_rate=2e8,
-                axis='x',
+                axis='x', phase=0,
                 motzoi=0, delay=0):
     '''
     All inputs are in s and Hz.
+    phases are in degree.
     '''
     sigma = sigma_length  # old legacy naming, to be replaced
-    # nr_sigma_samples = int(sigma_length * sampling_rate)
-    # nr_pulse_samples = int(nr_sigma*nr_sigma_samples)
     length = sigma*nr_sigma
     mu = length/2.
 
@@ -36,15 +35,16 @@ def gauss_pulse(amp, sigma_length, nr_sigma=4, sampling_rate=2e8,
     delay_samples = delay*sampling_rate
 
     # generate pulses
-    if axis == 'x':
-        pulse_I = gauss_env
-        pulse_Q = deriv_gauss_env
-    elif axis == 'y':
-        pulse_I = -1*deriv_gauss_env
-        pulse_Q = gauss_env
     Zeros = np.zeros(int(delay_samples))
-    pulse_I = np.array(list(Zeros)+list(pulse_I))
-    pulse_Q = np.array(list(Zeros)+list(pulse_Q))
+    G = np.array(list(Zeros)+list(gauss_env))
+    D = np.array(list(Zeros)+list(deriv_gauss_env))
+
+    if axis == 'y':
+        phase += 90
+
+    pulse_I = np.cos(2*np.pi*phase/360)*G - np.sin(2*np.pi*phase/360)*D
+    pulse_Q = np.sin(2*np.pi*phase/360)*G + np.cos(2*np.pi*phase/360)*D
+
     return pulse_I, pulse_Q
 
 
@@ -216,7 +216,7 @@ def martinis_flux_pulse(length, lambda_coeffs, theta_f,
     return mart_pulse_V
 
 
-def mod_gauss(amp, sigma_length, f_modulation, axis='x',
+def mod_gauss(amp, sigma_length, f_modulation, axis='x', phase=0,
               nr_sigma=4,
               motzoi=0, sampling_rate=2e8,
               Q_phase_delay=0, delay=0):
@@ -225,6 +225,7 @@ def mod_gauss(amp, sigma_length, f_modulation, axis='x',
     '''
     pulse_I, pulse_Q = gauss_pulse(amp, sigma_length, nr_sigma=nr_sigma,
                                    sampling_rate=sampling_rate, axis=axis,
+                                   phase=phase,
                                    motzoi=motzoi, delay=delay)
     pulse_I_mod, pulse_Q_mod = mod_pulse(pulse_I, pulse_Q, f_modulation,
                                          sampling_rate=sampling_rate,
