@@ -694,6 +694,34 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                 auto=True, close_fig=close_fig, label='Echo')
             return a
 
+    def measure_CPMG(self, times, CPMG_order=4, label='', MC=None,
+                     artificial_detuning=None, upload=True,
+                     analyze=True, close_fig=True, verbose=True):
+        '''
+        Runs the CPMG sequence, consisting of a starting x90, then CPMG_order
+            times Y180 pulses, and a (artificially detuning) finishing x90 pulse
+        times specify the times between the centers of starting and
+            finishing pulses. Ensure that minimal time does not lead
+            to pulse overlap
+        '''
+        self.prepare_for_timedomain()
+        if MC is None:
+            MC = self.MC.get_instr()
+
+        CPMG_swf = awg_swf.CPMG(
+            pulse_pars=self.pulse_pars, RO_pars=self.RO_pars,
+            CPMG_order=CPMG_order,
+            artificial_detuning=artificial_detuning, upload=upload)
+        MC.set_sweep_function(CPMG_swf)
+        MC.set_sweep_points(times)
+        MC.set_detector_function(self.int_avg_det)
+        MC.run('CPMG_'+str(CPMG_order)+label+self.msmt_suffix)
+
+        if analyze:
+            a = ma.Ramsey_Analysis(
+                auto=True, close_fig=close_fig, label='CPMG')
+            return a
+
     def measure_allxy(self, double_points=True,
                       MC=None,
                       analyze=True, close_fig=True, verbose=True):

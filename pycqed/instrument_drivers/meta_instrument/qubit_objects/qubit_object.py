@@ -98,6 +98,9 @@ class Qubit(Instrument):
     def measure_echo(self):
         raise NotImplementedError()
 
+    def measure_CPMG(self):
+        raise NotImplementedError()
+
     def measure_allxy(self):
         raise NotImplementedError()
 

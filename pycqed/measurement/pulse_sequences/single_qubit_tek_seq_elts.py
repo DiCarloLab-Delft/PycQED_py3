@@ -354,6 +354,67 @@ def Echo_seq(times, pulse_pars, RO_pars,
         return seq_name
 
 
+def CPMG_seq(times, pulse_pars, CPMG_order, RO_pars,
+             artificial_detuning=None,
+             cal_points=True,
+             verbose=False,
+             upload=True, return_seq=False):
+    '''
+    Echo sequence for a single qubit using the tektronix.
+    Input pars:
+        times:          array of times between (start of) pulses (s)
+        CPMG_order:     Number of refocussing Y180 pulses
+        artificial_detuning: artificial_detuning (Hz) implemented using phase
+        pulse_pars:     dict containing the pulse parameters
+        RO_pars:        dict containing the RO parameters
+        cal_points:     whether to use calibration points or not
+    '''
+    seq_name = 'CPMG_sequence'
+    seq = sequence.Sequence(seq_name)
+    station.pulsar.update_channel_settings()
+    el_list = []
+
+    pulses = get_pulse_dict_from_pars(pulse_pars)
+    CPMG_list = []
+    for tt in range(CPMG_order):
+        CPMG_list.append(deepcopy(pulses['Y180']))
+        CPMG_list[tt]['refpoint'] = 'start'
+    final_X90 = deepcopy(pulses['X90'])
+    final_X90['refpoint'] = 'start'
+    starting_X90 = deepcopy(pulses['X90'])
+    starting_X90['refpoint'] = 'start'
+
+    for i, tau in enumerate(times):
+        CPMG_list[0]['pulse_delay'] = tau/(2*CPMG_order)
+        for tt in range(1, CPMG_order):
+            CPMG_list[tt]['pulse_delay'] = tau/CPMG_order
+        final_X90['pulse_delay'] = tau/(2*CPMG_order)
+        if artificial_detuning is not None:
+            final_X90['phase'] = (tau-times[0]) * artificial_detuning * 360
+
+        if cal_points and (i == (len(times)-4) or i == (len(times)-3)):
+            el = multi_pulse_elt(i, station, [pulses['I'], RO_pars])
+        elif cal_points and (i == (len(times)-2) or i == (len(times)-1)):
+            el = multi_pulse_elt(i, station, [pulses['X180'], RO_pars])
+        else:
+            pulse_list = [starting_X90]
+            pulse_list += CPMG_list
+            pulse_list += [final_X90]
+            pulse_list += [RO_pars]
+            el = multi_pulse_elt(i, station, pulse_list)
+
+        el_list.append(el)
+        seq.append_element(el, trigger_wait=True)
+    if upload:
+        station.components['AWG'].stop()
+        station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+    if return_seq:
+        return seq, el_list
+    else:
+        return seq_name
+
+
+
 def AllXY_seq(pulse_pars, RO_pars, double_points=False,
               verbose=False, upload=True, return_seq=False):
     '''

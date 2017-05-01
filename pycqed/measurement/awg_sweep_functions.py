@@ -1030,6 +1030,33 @@ class Echo(swf.Hard_Sweep):
                          cal_points=self.cal_points)
 
 
+class CPMG(swf.Hard_Sweep):
+
+    def __init__(self, pulse_pars, CPMG_order, RO_pars,
+                 artificial_detuning=None,
+                 cal_points=True,
+                 upload=True):
+        super().__init__()
+        self.pulse_pars = pulse_pars
+        self.RO_pars = RO_pars
+        self.CPMG_order = CPMG_order
+        self.upload = upload
+        self.cal_points = cal_points
+        self.artificial_detuning = artificial_detuning
+        self.name = 'CPMG'
+        self.parameter_name = 't'
+        self.unit = 's'
+
+    def prepare(self, **kw):
+        if self.upload:
+            sqs.CPMG_seq(times=self.sweep_points,
+                         CPMG_order = self.CPMG_order,
+                         pulse_pars=self.pulse_pars,
+                         RO_pars=self.RO_pars,
+                         artificial_detuning=self.artificial_detuning,
+                         cal_points=self.cal_points)
+
+
 class Motzoi_XY(swf.Hard_Sweep):
 
     def __init__(self, motzois, pulse_pars, RO_pars, upload=True):
