@@ -268,7 +268,7 @@ class QWG_FluxLookuptableManager(Instrument):
             length=self.F_length(),
             lambda_2=self.F_lambda_2(),
             lambda_3=self.F_lambda_3(),
-            theta_f=self.F_theta_f()*2*np.pi/360,
+            theta_f=self.F_theta_f(),
             f_01_max=self.F_f_01_max(),
             J2=self.F_J2(),
             E_c=self.F_E_c(),
@@ -299,15 +299,20 @@ class QWG_FluxLookuptableManager(Instrument):
         wait_samples = np.zeros(int(self.F_delay()*self.sampling_rate()))
         wait_samples_2 = np.zeros(int(self.F_compensation_delay()
                                       * self.sampling_rate()))
-        k = self.F_kernel_instr.get_instr()
 
         for key in waveforms.keys():
             delayed_wave = np.concatenate(
                 [wait_samples, np.array(waveforms[key]), wait_samples_2,
                  -1 * np.array(waveforms[key])])
-            self._wave_dict[key] = k.convolve_kernel(
-                [k.kernel(), delayed_wave], length_samples=60e3)
-        # hardcoded length for the distortions
+            if self.F_kernel_instr() is not None:
+                k = self.F_kernel_instr.get_instr()
+                self._wave_dict[key] = k.convolve_kernel(
+                    [k.kernel(), delayed_wave], length_samples=60e3)
+                # hard-coded length for the distortions
+            else:
+                logging.warning('No distortion kernel specified,'
+                                ' not distorting flux pulse')
+                self._wave_dict[key] = delayed_wave
 
         return self._wave_dict
 
