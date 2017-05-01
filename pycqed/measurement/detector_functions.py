@@ -1047,6 +1047,43 @@ class Signal_Hound_fixed_frequency(Soft_Detector):
     def finish(self, **kw):
         self.SH.abort()
 
+class Signal_Hound_spectrum(Hard_Detector):
+
+    def __init__(self, signal_hound, MC, frequency=5e9, span=1e8,
+                 Navg=1, rbw=6.5e3, vbw=6.5e3, delay=0.1, **kw):
+        super().__init__()
+        self.frequency = frequency
+        self.name = 'SignalHound_Spectrum'
+        self.value_names = ['PSD']
+        self.value_units = ['sqrt(Hz)']
+        self.delay = delay
+        self.span = span
+        self.rbw = rbw
+        self.vbw = vbw
+        self.SH = signal_hound
+        self.Navg = Navg
+        self.MC = MC
+        self.SH.frequency(self.frequency)
+        self.SH.span(self.span)
+        self.SH.rbw(self.rbw)
+        self.SH.vbw(self.vbw)
+        self.SH.prepare_for_measurement()
+
+    def get_values(self, **kw):
+        print('We get here')
+        self.SH.prepare_for_measurement()
+        print('Navg taken is ', self.Navg)
+        spectrum = self.SH.get_spectrum(Navg=self.Navg)
+        self.MC.set_sweep_points(spectrum[0])
+        return spectrum[1]
+
+    def prepare(self, **kw):
+        self.SH.prepare_for_measurement()
+
+    def finish(self, **kw):
+        self.SH.abort()
+
+
 
 class SH_mixer_skewness_det(Soft_Detector):
 
