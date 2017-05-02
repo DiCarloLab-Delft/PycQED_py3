@@ -20,6 +20,8 @@ from math import erfc
 from scipy.signal import argrelextrema, argrelmax, argrelmin
 from copy import deepcopy
 
+import pycqed.analysis.tools.plotting as pl_tools
+
 try:
     from nathan_plotting_tools import *
 except:
@@ -34,7 +36,6 @@ except ImportError as e:
         logging.warning('Could not import qutip')
     else:
         raise
-
 
 
 imp.reload(dm_tools)
@@ -304,7 +305,7 @@ class MeasurementAnalysis(object):
                 elif len(self.value_names) == 2:
                     ax = axs[i % 2]
                 elif len(self.value_names) == 4:
-                    ax = axs[i/2, i % 2]
+                    ax = axs[i//2, i % 2]
                 else:
                     ax = axs[i]  # If not 2 or 4 just gives a list of plots
                 if i != 0:
@@ -329,7 +330,7 @@ class MeasurementAnalysis(object):
                 'sweep_points_2D', self.sweep_points_2D)
 
             if len(self.value_names) == 4:
-                fig, axs = plt.subplots(len(self.value_names)/2, 2,
+                fig, axs = plt.subplots(int(len(self.value_names)/2), 2,
                                         figsize=(min(6*len(self.value_names),
                                                      11),
                                                  1.5*len(self.value_names)))
@@ -343,7 +344,7 @@ class MeasurementAnalysis(object):
                 elif len(self.value_names) == 2:
                     ax = axs[i % 2]
                 elif len(self.value_names) == 4:
-                    ax = axs[i/2, i % 2]
+                    ax = axs[i//2, i % 2]
                 else:
                     ax = axs[i]  # If not 2 or 4 just gives a list of plots
                 a_tools.color_plot(
@@ -361,7 +362,7 @@ class MeasurementAnalysis(object):
                     **kw)
 
             fig.tight_layout(h_pad=1.5)
-            fig.subplots_adjust(top=0.9)
+            fig.subplots_adjust(top=3.0)
             plot_title = '{timestamp}_{measurement}'.format(
                 timestamp=self.timestamp_string,
                 measurement=self.measurementstring)
@@ -1165,7 +1166,18 @@ class Rabi_Analysis(TD_Analysis):
 
             fine_fit = self.fit_res[i].model.func(
                 x_fine, **self.fit_res[i].best_values)
-            self.axs[i].plot(x_fine, fine_fit, label='fit')
+            #adding the fitted amp180
+            if 'period' in self.fit_res[i].params.keys():
+                label='amp180 = {:.3e}'.format(abs(self.fit_res[i].params['period'].value)/2)
+            else:
+                label='amp180 = {:.3e}'.format(abs(self.fit_res[i].params['x0'].value))
+            self.axs[i].plot(x_fine, fine_fit,label=label )
+            ymin = min(self.measured_values[i])
+            ymax = max(self.measured_values[i])
+            yspan = ymax-ymin
+            self.axs[i].set_ylim(ymin-0.23*yspan, 0.05*yspan+ymax)
+            self.axs[i].legend(frameon=False, loc='lower left')
+
             if show_guess:
                 fine_fit = self.fit_res[i].model.func(
                     x_fine, **self.fit_res[i].init_values)
@@ -1178,9 +1190,19 @@ class Rabi_Analysis(TD_Analysis):
         self.fit_res = ['', '']
         # It would be best to do 1 fit to both datasets but since it is
         # easier to do just one fit we stick to that.
+        # We make an initial guess of the Rabi period using both quadratures
+        data = np.sqrt(self.measured_values[0]**2+self.measured_values[1]**2)
+        params = model.guess(model, data=data,
+                                 t=self.sweep_points)
+        fit_res = fit_mods.CosModel.fit(
+                data=data,
+                t=self.sweep_points,
+                params=params)
+        freq_guess = fit_res.values['frequency']
         for i in [0, 1]:
             params = model.guess(model, data=self.measured_values[i],
                                  t=self.sweep_points)
+            params['frequency'].value = freq_guess
             self.fit_res[i] = fit_mods.CosModel.fit(
                 data=self.measured_values[i],
                 t=self.sweep_points,
@@ -2633,10 +2655,10 @@ class Ramsey_Analysis(TD_Analysis):
         freq_est = fft_axis_scaling*index_of_fourier_maximum
         est_number_of_periods = index_of_fourier_maximum
 
-        if (average > 0.7 or
+        if ((average > 0.7*max(self.normalized_data_points)) or
                 (est_number_of_periods < 2) or
                 est_number_of_periods > len(ft_of_data)/2.):
-            print('the trace is to short to find multiple periods')
+            print('the trace is too short to find multiple periods')
 
             if print_fit_results:
                 print('Setting frequency to 0 and ' +
@@ -2657,7 +2679,7 @@ class Ramsey_Analysis(TD_Analysis):
         amplitude_guess = 1
         damped_osc_mod.set_param_hint('amplitude',
                                       value=amplitude_guess,
-                                      min=0.4, max=2.0)
+                                      min=0.4, max=4.0)
 
         if (np.average(self.normalized_data_points[:4]) >
                 np.average(self.normalized_data_points[4:8])):
@@ -2675,7 +2697,7 @@ class Ramsey_Analysis(TD_Analysis):
 
         damped_osc_mod.set_param_hint('exponential_offset',
                                       value=0.5,
-                                      min=0.4, max=1.1)
+                                      min=0.4, max=4.0)
         damped_osc_mod.set_param_hint('oscillation_offset',
                                       value=0, vary=False)
 
@@ -2723,12 +2745,14 @@ class Ramsey_Analysis(TD_Analysis):
                                         xlabel=self.xlabel,
                                         ylabel=ylabel,
                                         save=False)
-        if show_guess:
-            ax.plot(self.sweep_points[:-self.NoCalPoints],
-                    self.fit_res.init_fit, 'k--')
+
         x = np.linspace(self.sweep_points[0],
                         self.sweep_points[-self.NoCalPoints],
                         len(self.sweep_points)*100)
+        if show_guess:
+            y_init = fit_mods.ExpDampOscFunc(x, **self.fit_res.init_values)
+            ax.plot(x*1e6, y_init, 'k--')
+
         best_vals = self.fit_res.best_values
         y = fit_mods.ExpDampOscFunc(
             x, tau=best_vals['tau'],
@@ -2755,6 +2779,7 @@ class Ramsey_Analysis(TD_Analysis):
         self.normalized_data_points = norm[1]
         self.normalized_cal_vals = norm[2]
         self.fit_res = self.fit_Ramsey(print_fit_results)
+
         self.save_fitted_parameters(self.fit_res, var_name=self.value_names[0])
         self.plot_results(fig1, ax, self.fit_res, show_guess=show_guess,
                           ylabel=r'$F$ $|1 \rangle$')
@@ -5312,9 +5337,9 @@ class DoubleFrequency(MeasurementAnalysis):
 
         textstr = ('$A_1$: {:.3f}       \t$A_2$: {:.3f} \n'.format(A1, A2) +
                    '$f_1$: {:.3f} MHz\t$f_2$: {:.3f} MHz \n'.format(
-                        f1*1e-6, f2*1e-6) +
-                   r'$\tau _1$: {:.2f} $\mu$s'.format(tau1*1e6) +
-                   '  \t'+r'$\tau _2$: {:.2f}$\mu$s'.format(tau2*1e6))
+            f1*1e-6, f2*1e-6) +
+            r'$\tau _1$: {:.2f} $\mu$s'.format(tau1*1e6) +
+            '  \t'+r'$\tau _2$: {:.2f}$\mu$s'.format(tau2*1e6))
 
         ax.text(0.4, 0.95, textstr,
                 transform=ax.transAxes, fontsize=11,
@@ -5499,3 +5524,286 @@ class SWAPN_cost(object):
             plt.close(fig)
         return
 
+
+class AvoidedCrossingAnalysis(MeasurementAnalysis):
+
+    """
+    Performs analysis to fit the avoided crossing
+    """
+
+    def __init__(self, auto=True,
+                 model='direct_coupling',
+                 label=None,
+                 timestamp=None,
+                 transpose=True,
+                 cmap='viridis',
+                 filt_func_a=None, filt_func_x0=None, filt_func_y0=None,
+                 filter_idx_low=[], filter_idx_high=[], filter_threshold=15e6,
+                 f1_guess=None, f2_guess=None, cross_flux_guess=None,
+                 g_guess=30e6, coupling_label='g',
+                 break_before_fitting=False,
+                 add_title=True,
+                 xlabel=None, ylabel='Frequency (GHz)', **kw):
+        super().__init__(timestamp=timestamp, label=label, **kw)
+        self.get_naming_and_values_2D()
+
+        flux = self.Y[:, 0]
+        peaks_low, peaks_high = self.find_peaks()
+        self.f, self.ax = self.make_unfiltered_figure(peaks_low, peaks_high,
+                                    transpose=transpose, cmap=cmap,
+                                    add_title=add_title,
+                                    xlabel=xlabel, ylabel=ylabel)
+
+        filtered_dat = self.filter_data(flux, peaks_low, peaks_high,
+                                        a=filt_func_a, x0=filt_func_x0,
+                                        y0=filt_func_y0,
+                                        filter_idx_low=filter_idx_low,
+                                        filter_idx_high=filter_idx_high,
+                                        filter_threshold=filter_threshold)
+        filt_flux_low, filt_flux_high, filt_peaks_low, filt_peaks_high, \
+            filter_func = filtered_dat
+
+        self.f, self.ax = self.make_filtered_figure(filt_flux_low, filt_flux_high,
+                                  filt_peaks_low, filt_peaks_high, filter_func,
+                                  add_title=add_title,
+                                  transpose=transpose, cmap=cmap,
+                                  xlabel=xlabel, ylabel=ylabel)
+        if break_before_fitting:
+            return
+        self.fit_res = self.fit_avoided_crossing(
+            filt_flux_low, filt_flux_high, filt_peaks_low, filt_peaks_high,
+            f1_guess=f1_guess, f2_guess=f2_guess,
+            cross_flux_guess=cross_flux_guess, g_guess=g_guess,
+            model=model)
+        self.add_analysis_datagroup_to_file()
+        self.save_fitted_parameters(self.fit_res, var_name='avoided crossing')
+        self.f, self.ax = self.make_fit_figure(filt_flux_low, filt_flux_high,
+                             filt_peaks_low, filt_peaks_high,
+                             add_title=add_title,
+                             fit_res=self.fit_res,
+                             coupling_label=coupling_label,
+                             transpose=transpose, cmap=cmap,
+                             xlabel=xlabel, ylabel=ylabel)
+
+
+    def run_default_analysis(self, **kw):
+        # I'm doing this in the init in this function
+        pass
+
+    def find_peaks(self, **kw):
+
+        peaks = np.zeros((len(self.X), 2))
+        for i in range(len(self.X)):
+            p_dict = a_tools.peak_finder_v2(self.X[i], self.Z[0][i])
+            peaks[i, :] = np.sort(p_dict[:2])
+
+        peaks_low = peaks[:, 0]
+        peaks_high = peaks[:, 1]
+        return peaks_low, peaks_high
+
+    def filter_data(self, flux, peaks_low, peaks_high, a, x0=None, y0=None,
+                    filter_idx_low=[], filter_idx_high=[],
+                    filter_threshold=15e5):
+        """
+        Filters the input data in three steps.
+            1. remove outliers using the dm_tools.get_outliers function
+            2. separate data in two branches using a line and filter data on the
+                wrong side of the line.
+            3. remove any data with indices specified by hand
+        """
+        if a is None:
+            a = -1*(max(peaks_high)-min(peaks_low))/(max(flux)-min(flux))
+        if x0 is None:
+            x0 = np.mean(flux)
+        if y0 is None:
+            y0 = np.mean(np.concatenate([peaks_low, peaks_high]))
+
+        filter_func = lambda x: a*(x-x0)+y0
+
+        filter_mask_high = [True] * len(peaks_high)
+        filter_mask_high = ~dm_tools.get_outliers(peaks_high, filter_threshold)
+        filter_mask_high = np.where(
+            peaks_high < filter_func(flux), False, filter_mask_high)
+        filter_mask_high[-2] = False  # hand remove 1 datapoint
+
+        filt_flux_high = flux[filter_mask_high]
+        filt_peaks_high = peaks_high[filter_mask_high]
+
+        filter_mask_low = [True] * len(peaks_low)
+        filter_mask_low = ~dm_tools.get_outliers(peaks_low, filter_threshold)
+        filter_mask_low = np.where(
+            peaks_low > filter_func(flux), False, filter_mask_low)
+        filter_mask_low[[0, -1]] = False  # hand remove 2 datapoints
+
+        filt_flux_low = flux[filter_mask_low]
+        filt_peaks_low = peaks_low[filter_mask_low]
+
+        return (filt_flux_low, filt_flux_high,
+                filt_peaks_low, filt_peaks_high, filter_func)
+
+    def make_unfiltered_figure(self, peaks_low, peaks_high, transpose, cmap,
+                               xlabel=None, ylabel='Frequency (GHz)',
+                               add_title=True):
+        flux = self.Y[:, 0]
+        title = ' unfiltered avoided crossing'
+        f, ax = plt.subplots()
+        if add_title:
+            ax.set_title(self.timestamp_string + title)
+
+        pl_tools.flex_colormesh_plot_vs_xy(self.X[0]*1e-9, flux, self.Z[0],
+                                           ax=ax, transpose=transpose,
+                                           cmap=cmap)
+        ax.plot(flux, peaks_high*1e-9, 'o', markeredgewidth=1.,
+                fillstyle='none', c='r')
+        ax.plot(flux, peaks_low*1e-9, 'o', markeredgewidth=1.,
+                fillstyle='none', c='orange')
+
+        # self.ylabel because the axes are transposed
+        xlabel = self.ylabel if xlabel is None else xlabel
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel(ylabel)
+        ax.set_ylim(min(self.X[0]*1e-9), max(self.X[0]*1e-9))
+        ax.set_xlim(min(flux), max(flux))
+        f.savefig(os.path.join(self.folder, title+'.png'), format='png',
+                  dpi=600)
+        return f, ax
+
+    def make_filtered_figure(self,
+                             filt_flux_low, filt_flux_high,
+                             filt_peaks_low, filt_peaks_high, filter_func,
+                             transpose, cmap,
+                             xlabel=None, ylabel='Frequency (GHz)',
+                             add_title=True):
+        flux = self.Y[:, 0]
+        title = ' filtered avoided crossing'
+        f, ax = plt.subplots()
+        if add_title:
+            ax.set_title(self.timestamp_string + title)
+
+        pl_tools.flex_colormesh_plot_vs_xy(self.X[0]*1e-9, flux, self.Z[0],
+                                           ax=ax, transpose=transpose,
+                                           cmap=cmap)
+        ax.plot(filt_flux_high, filt_peaks_high*1e-9,
+                'o', fillstyle='none', markeredgewidth=1., c='r',
+                label='upper branch peaks')
+        ax.plot(filt_flux_low, filt_peaks_low*1e-9,
+                'o', fillstyle='none', markeredgewidth=1., c='orange',
+                label='lower branch peaks')
+
+        # self.ylabel because the axes are transposed
+        xlabel = self.ylabel if xlabel is None else xlabel
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel(ylabel)
+        ax.set_ylim(min(self.X[0]*1e-9), max(self.X[0]*1e-9))
+        ax.plot(flux, filter_func(flux)*1e-9,  ls='--', c='w',
+                label='filter function')
+        # ax.legend() # looks ugly, better after matplotlib update?
+        f.savefig(os.path.join(self.folder, title+'.png'), format='png',
+                  dpi=600)
+        return f, ax
+
+    def make_fit_figure(self,
+                        filt_flux_low, filt_flux_high,
+                        filt_peaks_low, filt_peaks_high, fit_res,
+                        transpose, cmap, coupling_label='g',
+                        xlabel=None, ylabel='Frequency (GHz)',
+                        add_title=True):
+        flux = self.Y[:, 0]
+        title = ' avoided crossing fit'
+        f, ax = plt.subplots()
+        if add_title:
+            ax.set_title(self.timestamp_string + title)
+
+        pl_tools.flex_colormesh_plot_vs_xy(self.X[0]*1e-9, flux, self.Z[0],
+                                           ax=ax, transpose=transpose,
+                                           cmap=cmap)
+        ax.plot(filt_flux_high, filt_peaks_high*1e-9,
+                'o', fillstyle='none', markeredgewidth=1., c='r',
+                label='upper branch peaks')
+        ax.plot(filt_flux_low, filt_peaks_low*1e-9,
+                'o', fillstyle='none', markeredgewidth=1., c='orange',
+                label='lower branch peaks')
+
+        # self.ylabel because the axes are transposed
+        xlabel = self.ylabel if xlabel is None else xlabel
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel(ylabel)
+        ax.set_ylim(min(self.X[0]*1e-9), max(self.X[0]*1e-9))
+        ax.set_xlim(min(flux), max(flux))
+
+        ax.plot(flux, 1e-9*fit_mods.avoided_crossing_direct_coupling(
+            flux, **fit_res.best_values,
+            flux_state=False), 'r-', label='fit')
+        ax.plot(flux, 1e-9*fit_mods.avoided_crossing_direct_coupling(
+            flux, **fit_res.best_values,
+            flux_state=True), 'y-', label='fit')
+
+        g_legend = r'{} = {:.2f}$\pm${:.2f} MHz'.format(
+            coupling_label,
+            fit_res.params['g']*1e-6, fit_res.params['g'].stderr*1e-6)
+        ax.text(.6, .8, g_legend, transform=ax.transAxes, color='white')
+        # ax.legend() # looks ugly, better after matplotlib update?
+        f.savefig(os.path.join(self.folder, title+'.png'), format='png',
+                  dpi=600)
+        return f, ax
+
+    def fit_avoided_crossing(self,
+                             lower_flux, upper_flux, lower_freqs, upper_freqs,
+                             f1_guess, f2_guess, cross_flux_guess, g_guess,
+                             model='direct'):
+        '''
+        Fits the avoided crossing to a direct or mediated coupling model.
+
+        models are located in
+            fitMods.avoided_crossing_direct_coupling
+            fitMods.avoided_crossing_mediated_coupling
+
+
+        '''
+
+        total_freqs = np.concatenate([lower_freqs, upper_freqs])
+        total_flux = np.concatenate([lower_flux, upper_flux])
+        total_mask = np.concatenate([np.ones(len(lower_flux)),
+                                     np.zeros(len(upper_flux))])
+
+        # Both branches must be combined in a single function for fitting
+        # the model is combined in a single function here
+        def resized_fit_func(flux, f_center1, f_center2, c1, c2, g):
+            return fit_mods.avoided_crossing_direct_coupling(
+                flux=flux, f_center1=f_center1, f_center2=f_center2,
+                c1=c1, c2=c2,
+                g=g, flux_state=total_mask)
+
+        av_crossing_model = lmfit.Model(resized_fit_func)
+
+        if cross_flux_guess is None:
+            cross_flux_guess = np.mean(total_flux)
+        if f1_guess is None:
+            f1_guess = np.mean(total_freqs)-g_guess
+
+        c2_guess = 0.
+        if f2_guess is None:
+            # The factor *1000* is a magic number but seems to give a
+            # reasonable guess that converges well.
+            c1_guess = -1*((max(total_freqs)-min(total_freqs)) /
+                           (max(total_flux)-min(total_flux)))/1000
+
+            f2_guess = cross_flux_guess*(c1_guess-c2_guess)+f1_guess
+        else:
+            c1_guess = c2_guess + (f2_guess-f1_guess)/cross_flux_guess
+
+        av_crossing_model.set_param_hint(
+            'g', min=0., max=0.5e9, value=g_guess, vary=True)
+        av_crossing_model.set_param_hint(
+            'f_center1', min=0, max=20.0e9, value=f1_guess, vary=True)
+        av_crossing_model.set_param_hint(
+            'f_center2', min=0., max=20.0e9, value=f2_guess, vary=True)
+        av_crossing_model.set_param_hint(
+            'c1', min=-1.0e9, max=1.0e9, value=c1_guess, vary=True)
+        av_crossing_model.set_param_hint(
+            'c2', min=-1.0e9, max=1.0e9, value=c2_guess, vary=True)
+        params = av_crossing_model.make_params()
+        fit_res = av_crossing_model.fit(data=np.array(total_freqs),
+                                        flux=np.array(total_flux),
+                                        params=params)
+        return fit_res

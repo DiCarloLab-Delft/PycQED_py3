@@ -90,7 +90,7 @@ def photon_number_splitting_seq(spec_pars, RO_pars, disp_pars, upload=True, retu
     # faster trigger rates.
     nr_of_pulse_reps = int((200e-6-10e-6)//period)
 
-    seq_name = 'Pulsed_spec'
+    seq_name = 'photon_number_spliting'
     seq = sequence.Sequence(seq_name)
     station.pulsar.update_channel_settings()
     el_list = []
