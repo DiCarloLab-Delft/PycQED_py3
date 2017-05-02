@@ -305,7 +305,7 @@ class MeasurementAnalysis(object):
                 elif len(self.value_names) == 2:
                     ax = axs[i % 2]
                 elif len(self.value_names) == 4:
-                    ax = axs[i/2, i % 2]
+                    ax = axs[i//2, i % 2]
                 else:
                     ax = axs[i]  # If not 2 or 4 just gives a list of plots
                 if i != 0:
@@ -330,7 +330,7 @@ class MeasurementAnalysis(object):
                 'sweep_points_2D', self.sweep_points_2D)
 
             if len(self.value_names) == 4:
-                fig, axs = plt.subplots(len(self.value_names)/2, 2,
+                fig, axs = plt.subplots(int(len(self.value_names)/2), 2,
                                         figsize=(min(6*len(self.value_names),
                                                      11),
                                                  1.5*len(self.value_names)))
@@ -344,7 +344,7 @@ class MeasurementAnalysis(object):
                 elif len(self.value_names) == 2:
                     ax = axs[i % 2]
                 elif len(self.value_names) == 4:
-                    ax = axs[i/2, i % 2]
+                    ax = axs[i//2, i % 2]
                 else:
                     ax = axs[i]  # If not 2 or 4 just gives a list of plots
                 a_tools.color_plot(
@@ -362,7 +362,7 @@ class MeasurementAnalysis(object):
                     **kw)
 
             fig.tight_layout(h_pad=1.5)
-            fig.subplots_adjust(top=0.9)
+            fig.subplots_adjust(top=3.0)
             plot_title = '{timestamp}_{measurement}'.format(
                 timestamp=self.timestamp_string,
                 measurement=self.measurementstring)
