@@ -95,6 +95,13 @@ class Test_Waveforms(unittest.TestCase):
         np.testing.assert_almost_equal(I, -d_env)
         np.testing.assert_almost_equal(Q, g_env)
 
+        I, Q = wf.gauss_pulse(amplitude, sigma, axis='x', phase=90,
+                              nr_sigma=4,
+                              sampling_rate=1e9,
+                              motzoi=motzoi, delay=0)
+        np.testing.assert_almost_equal(I, -d_env)
+        np.testing.assert_almost_equal(Q, g_env)
+
     def test_martinis_flux_pulse(self):
         pass
         # This test is disabled and needs to be recreated as per issue #89
