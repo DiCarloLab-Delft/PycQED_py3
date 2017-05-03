@@ -8,7 +8,8 @@ import numpy as np
 from os.path import join, dirname
 
 from pycqed.utilities.general import mopen
-from pycqed.measurement.randomized_benchmarking import randomized_benchmarking as rb
+from pycqed.measurement.randomized_benchmarking import \
+    randomized_benchmarking as rb
 base_qasm_path = join(dirname(__file__), 'qasm_files')
 
 
@@ -445,10 +446,58 @@ def MotzoiXY(qubit_name, motzois, cal_points=True):
     return qasm_file
 
 
-def Ram_Z(qubit_name,
-          wait_before=150e-9, wait_between=200e-9, clock_cycle=5e-9):
+def Ram_Z(qubit_name, no_of_points, cal_points=True,
+          wait_before=50e-9, wait_between=280e-9, clock_cycle=5e-9):
     '''
-    Performs a Ram-Z sequence similar to a conventional echo sequence.
+    Creates QASM sequence for an entire Ram-Z experiment, including
+    calibration points.
+
+    Timing of measurement sequence for one point:
+        trigger flux pulse -- wait_before -- mX90 -- wait_between -- X90 -- RO
+
+    Args:
+        qubit_name      (str): name of the targeted qubit
+        wait_before     (float): delay time in seconds between triggering the
+                                 AWG and the first pi/2 pulse
+        wait_between    (float): delay time in seconds between the two pi/2
+                                 pulses
+        clock_cycle     (float): period of the internal AWG clock
+    '''
+    filename = join(base_qasm_path, 'Ram_Z.qasm')
+    qasm_file = mopen(filename, mode='w')
+    qasm_file.writelines('qubit {} \n'.format(qubit_name))
+
+    # Write  measurement sequence no_of_points times
+    for i in range(no_of_points):
+        qasm_file.writelines('\ninit_all\n')
+
+        if cal_points and (i == no_of_points - 4 or i == no_of_points - 3):
+            # Calibration point for |0>
+            pass
+        elif cal_points and (i == no_of_points - 2 or i == no_of_points - 1):
+            # Calibration point for |1>
+            qasm_file.writelines('X180 {} \n'.format(qubit_name))
+        else:
+            qasm_file.writelines('QWG trigger {}\n'.format(i))
+            qasm_file.writelines(
+                'I {} {}\n'.format(qubit_name,
+                                   int(wait_before//clock_cycle)))
+            qasm_file.writelines('mX90 {}\n'.format(qubit_name))
+            qasm_file.writelines(
+                'I {} {}\n'.format(qubit_name,
+                                   int(wait_between//clock_cycle)))
+            qasm_file.writelines('X90 {}\n'.format(qubit_name))
+
+        qasm_file.writelines('RO {}  \n'.format(qubit_name))
+
+    qasm_file.close()
+    return qasm_file
+
+
+def Ram_Z_single(qubit_name,
+                 wait_before=150e-9, wait_between=200e-9, clock_cycle=5e-9):
+    '''
+    Creates the QASM sequence for a single point in a Ram-Z experiment.
 
     Timing of sequence:
         trigger flux pulse -- wait_before -- mX90 -- wait_between -- X90 -- RO
@@ -461,7 +510,7 @@ def Ram_Z(qubit_name,
                                  pulses
         clock_cycle     (float): period of the internal AWG clock
     '''
-    filename = join(base_qasm_path, 'Ram-Z.qasm')
+    filename = join(base_qasm_path, 'Ram-Z-single.qasm')
     qasm_file = mopen(filename, mode='w')
     qasm_file.writelines('qubit {} \n'.format(qubit_name))
 
