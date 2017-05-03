@@ -21,7 +21,6 @@ def DoubleExpDampOscFunc(t, tau_1, tau_2,
     return cos_1 + cos_2 + osc_offset
 
 
-
 def double_RandomizedBenchmarkingDecay(numCliff, p, offset,
                                        invert=1):
     """
@@ -111,24 +110,6 @@ def QubitFreqDac(dac_voltage, f_max, E_c,
     logging.warning('deprecated, replace QubitFreqDac with Qubit_dac_to_freq')
     return Qubit_dac_to_freq(dac_voltage, f_max, E_c,
                              dac_sweet_spot, dac_flux_coefficient, asymmetry)
-
-
-def Qubit_(dac_voltage, f_max, E_c,
-           dac_sweet_spot, dac_flux_coefficient, asymmetry=0):
-    '''
-    The cosine Arc model for uncalibrated flux for asymmetric qubit.
-
-    dac_voltage (V)
-    f_max (Hz)
-    E_c (Hz)
-    dac_sweet_spot (V)
-    dac_flux_coefficient (1/V)
-    asym (dimensionless asymmetry param) = abs((EJ1-EJ2)/(EJ1+EJ2)),
-    '''
-    calculated_frequency = (f_max + E_c)*(
-        asymmetry**2 + (1-asymmetry**2) *
-        np.cos(dac_flux_coefficient*(dac_voltage-dac_sweet_spot))**2)**0.25-E_c
-    return calculated_frequency
 
 
 def QubitFreqFlux(flux, f_max, E_c,
@@ -279,7 +260,73 @@ def gaussian_2D(x, y, amplitude=1,
 
 
 def TripleExpDecayFunc(t, tau1, tau2, tau3, amp1, amp2, amp3, offset, n):
-    return offset+amp1*np.exp(-(t/tau1)**n)+amp2*np.exp(-(t/tau2)**n)+amp3*np.exp(-(t/tau3)**n)
+    return (offset +
+            amp1*np.exp(-(t/tau1)**n) +
+            amp2*np.exp(-(t/tau2)**n) +
+            amp3*np.exp(-(t/tau3)**n))
+
+
+def avoided_crossing_mediated_coupling(flux, f_bus, f_center1, f_center2,
+                                       c1, c2, g, flux_state=0):
+    """
+    Calculates the frequencies of an avoided crossing for the following model.
+        [f_b,  g,  g ]
+        [g,   f_1, 0 ]
+        [g,   0,  f_2]
+
+    f1 = c1*flux + f_center1
+    f2 = c2*flux + f_center2
+    f_b = constant
+
+    g:  the coupling strength, beware to relabel your variable if using this
+        model to fit J1 or J2.
+    flux_state:  this is a switch used for fitting. It determines which
+        transition to return
+
+    """
+    if type(flux_state) == int:
+        flux_state = [flux_state]*len(flux)
+
+    frequencies = np.zeros([len(flux), 2])
+    for kk, dac in enumerate(flux):
+        f_1 = dac * c1 + f_center1
+        f_2 = dac * c2 + f_center2
+        matrix = [[f_bus, g, g],
+                  [g, f_1, 0.],
+                  [g, 0., f_2]]
+        frequencies[kk, :] = np.linalg.eigvalsh(matrix)[:2]
+    result = np.where(flux_state, frequencies[:, 0], frequencies[:, 1])
+    return result
+
+
+def avoided_crossing_direct_coupling(flux, f_center1, f_center2,
+                                     c1, c2, g, flux_state=0):
+    """
+    Calculates the frequencies of an avoided crossing for the following model.
+        [f_1, g ]
+        [g,  f_2]
+
+    f1 = c1*flux + f_center1
+    f2 = c2*flux + f_center2
+
+    g:  the coupling strength, beware to relabel your variable if using this
+        model to fit J1 or J2.
+    flux_state:  this is a switch used for fitting. It determines which
+        transition to return
+    """
+
+    if type(flux_state) == int:
+        flux_state = [flux_state]*len(flux)
+
+    frequencies = np.zeros([len(flux), 2])
+    for kk, dac in enumerate(flux):
+        f_1 = dac * c1 + f_center1
+        f_2 = dac * c2 + f_center2
+        matrix = [[f_1, g],
+                  [g, f_2]]
+        frequencies[kk, :] = np.linalg.eigvalsh(matrix)[:2]
+    result = np.where(flux_state, frequencies[:, 0], frequencies[:, 1])
+    return result
 
 
 ######################
@@ -332,11 +379,15 @@ def Cos_guess(model, data, t):
     offs_guess = np.mean(data)
 
     # Freq guess ! only valid with uniform sampling
-    w = np.fft.fft(data)
-    f = np.fft.fftfreq(len(data), t[1]-t[0])
+    # Only first half of array is used, because the second half contains the
+    # negative frequecy components, and we want a positive frequency.
+    w = np.fft.fft(data)[:len(data)//2]
+    f = np.fft.fftfreq(len(data), t[1]-t[0])[:len(w)]
     w[0] = 0  # Removes DC component from fourier transform
-    freq_guess = f[w == max(w)]
 
+    # Use absolute value of complex valued spectrum
+    abs_w = np.abs(w)
+    freq_guess = abs(f[abs_w == max(abs_w)][0])
     ph_guess = (-2*np.pi*t[data == max(data)]*freq_guess)[0]
     # the condition data == max(data) can have several solutions
     #               (for example when discretization is visible)
@@ -348,6 +399,7 @@ def Cos_guess(model, data, t):
                                phase=ph_guess,
                                offset=offs_guess)
     params['amplitude'].min = 0  # Ensures positive amp
+    params['frequency'].min = 0
 
     return params
 

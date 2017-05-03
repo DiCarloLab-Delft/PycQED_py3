@@ -4,7 +4,7 @@ from matplotlib import pyplot as plt
 from pycqed.analysis import analysis_toolbox as a_tools
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 # from pycqed.analysis.plotting_tools import *
-from pycqed.analysis.plotting_tools import get_color_order, flex_colormesh_plot_vs_xy, flex_color_plot_vs_x
+from pycqed.analysis.tools.plotting import get_color_order, flex_colormesh_plot_vs_xy, flex_color_plot_vs_x
 
 
 class Standard_MA(object):
@@ -48,7 +48,7 @@ class Standard_MA(object):
 
     def extract_data(self):
         self.TD_timestamps = a_tools.get_timestamps_in_range(
-            self.t_start, self.t_stop, label=self.labels)
+            self.t_start, self.t_stop, label=self.labels, exact_label_match=False)
 
         if len(self.TD_timestamps) < 1:
             raise ValueError(

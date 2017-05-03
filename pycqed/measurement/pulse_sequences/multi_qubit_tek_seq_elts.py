@@ -16,10 +16,34 @@ reload(pulse_library)
 
 station = None
 reload(element)
-kernel_dir_path = 'kernels/'
+kernel_dir = 'kernels/'
 # You need to explicitly set this before running any functions from this module
 # I guess there are cleaner solutions :)
 cached_kernels = {}
+
+
+def avoided_crossing_spec_seq(operation_dict, q0, q1, RO_target,
+                              verbose=False,
+                              upload=True):
+
+    seq_name = 'avoidec_crossing_spec'
+    seq = sequence.Sequence(seq_name)
+    station.pulsar.update_channel_settings()
+    el_list = []
+    sequencer_config = operation_dict['sequencer_config']
+
+    # N.B. Identities not needed in all cases
+    pulse_combinations = ['X180 '+q0, 'SpecPulse '+q1, 'RO '+RO_target]
+    pulses = []
+    for p in pulse_combinations:
+        pulses += [operation_dict[p]]
+    el = multi_pulse_elt(0, station, pulses, sequencer_config)
+    el_list.append(el)
+    seq.append_element(el, trigger_wait=True)
+    if upload:
+        station.components['AWG'].stop()
+        station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+    return seq, el_list
 
 
 def two_qubit_off_on(q0_pulse_pars, q1_pulse_pars, RO_pars,
@@ -814,12 +838,12 @@ def preload_kernels_func(distortion_dict):
         for kernel in distortion_dict[ch]:
             if kernel is not '':
                 if kernel in cached_kernels.keys():
-                    print('Cached {}'.format(kernel_dir_path+kernel))
+                    print('Cached {}'.format(kernel_dir+kernel))
                     output_dict[ch].append(cached_kernels[kernel])
                 else:
-                    print('Loading {}'.format(kernel_dir_path+kernel))
+                    print('Loading {}'.format(kernel_dir+kernel))
                     # print(os.path.isfile('kernels/'+kernel))
-                    kernel_vec = np.loadtxt(kernel_dir_path+kernel)
+                    kernel_vec = np.loadtxt(kernel_dir+kernel)
                     output_dict[ch].append(kernel_vec)
                     cached_kernels.update({kernel: kernel_vec})
     return output_dict

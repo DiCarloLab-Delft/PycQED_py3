@@ -16,6 +16,7 @@ global lm  # Global used for passing value to the testsuite
 
 
 class UHFQC_LookuptableManager(Instrument):
+
     '''
     meta-instrument that handles loading pulses into the UHFQC lookuptables
     and holds their parameters so that they can be sweeped and are logged.
@@ -98,9 +99,9 @@ class UHFQC_LookuptableManager(Instrument):
                            parameter_class=ManualParameter,
                            initial_value=0.0)
         self.add_parameter('M_up_length', unit='s',
-                   vals=vals.Numbers(1e-9, 640e-9),
-                   parameter_class=ManualParameter,
-                   initial_value=100.0e-9)
+                           vals=vals.Numbers(1e-9, 640e-9),
+                           parameter_class=ManualParameter,
+                           initial_value=100.0e-9)
         self.add_parameter('M_up_amp', unit='V',
                            vals=vals.Numbers(0, 1),
                            parameter_class=ManualParameter,
@@ -141,13 +142,14 @@ class UHFQC_LookuptableManager(Instrument):
         self._voltage_max = 1.0-1.0/2**13
 
     def run_test_suite(self):
-            # pass the UHFQC to the module so it can be used in the tests
-            from importlib import reload
-            from .tests import test_suite; reload(test_suite)
-            test_suite.lm = self
-            suite = unittest.TestLoader().loadTestsFromTestCase(
-                test_suite.LutManTests)
-            unittest.TextTestRunner(verbosity=2).run(suite)
+        # pass the UHFQC to the module so it can be used in the tests
+        from importlib import reload
+        from .tests import test_suite
+        reload(test_suite)
+        test_suite.lm = self
+        suite = unittest.TestLoader().loadTestsFromTestCase(
+            test_suite.LutManTests)
+        unittest.TextTestRunner(verbosity=2).run(suite)
 
     def generate_standard_pulses(self):
         '''
@@ -165,42 +167,48 @@ class UHFQC_LookuptableManager(Instrument):
                                   self.get('Q_modulation'), axis='x',
                                   motzoi=self.get('Q_motzoi_parameter'),
                                   sampling_rate=self.get('sampling_rate'),
-                                  Q_phase_delay=self.get('mixer_IQ_phase_skewness'),
+                                  Q_phase_delay=self.get(
+                                      'mixer_IQ_phase_skewness'),
                                   nr_sigma=self.Q_gauss_nr_sigma())
         Wave_X_90 = PG.mod_gauss(self.get('Q_amp90'), self.get('Q_gauss_width'),
                                  self.get('Q_modulation'), axis='x',
                                  motzoi=self.get('Q_motzoi_parameter'),
                                  sampling_rate=self.get('sampling_rate'),
-                                 Q_phase_delay=self.get('mixer_IQ_phase_skewness'),
+                                 Q_phase_delay=self.get(
+                                     'mixer_IQ_phase_skewness'),
                                  nr_sigma=self.Q_gauss_nr_sigma())
 
         Wave_Y_180 = PG.mod_gauss(self.get('Q_amp180'), self.get('Q_gauss_width'),
                                   self.get('Q_modulation'), axis='y',
                                   motzoi=self.get('Q_motzoi_parameter'),
                                   sampling_rate=self.get('sampling_rate'),
-                                  Q_phase_delay=self.get('mixer_IQ_phase_skewness'),
+                                  Q_phase_delay=self.get(
+                                      'mixer_IQ_phase_skewness'),
                                   nr_sigma=self.Q_gauss_nr_sigma())
         Wave_Y_90 = PG.mod_gauss(self.get('Q_amp90'), self.get('Q_gauss_width'),
                                  self.get('Q_modulation'), axis='y',
                                  motzoi=self.get('Q_motzoi_parameter'),
                                  sampling_rate=self.get('sampling_rate'),
-                                 Q_phase_delay=self.get('mixer_IQ_phase_skewness'),
+                                 Q_phase_delay=self.get(
+                                     'mixer_IQ_phase_skewness'),
                                  nr_sigma=self.Q_gauss_nr_sigma())
 
         Wave_mX90 = PG.mod_gauss(-self.get('Q_amp90'), self.get('Q_gauss_width'),
                                  self.get('Q_modulation'), axis='x',
                                  motzoi=self.get('Q_motzoi_parameter'),
                                  sampling_rate=self.get('sampling_rate'),
-                                 Q_phase_delay=self.get('mixer_IQ_phase_skewness'),
+                                 Q_phase_delay=self.get(
+                                     'mixer_IQ_phase_skewness'),
                                  nr_sigma=self.Q_gauss_nr_sigma())
 
         Wave_mY90 = PG.mod_gauss(-self.get('Q_amp90'), self.get('Q_gauss_width'),
                                  self.get('Q_modulation'), axis='y',
                                  motzoi=self.get('Q_motzoi_parameter'),
                                  sampling_rate=self.get('sampling_rate'),
-                                 Q_phase_delay=self.get('mixer_IQ_phase_skewness'),
+                                 Q_phase_delay=self.get(
+                                     'mixer_IQ_phase_skewness'),
                                  nr_sigma=self.Q_gauss_nr_sigma())
-        Block = PG.block_pulse(self.get('Q_ampCW'), self.Q_block_length.get(),  #ns
+        Block = PG.block_pulse(self.get('Q_ampCW'), self.Q_block_length.get(),  # ns
                                sampling_rate=self.get('sampling_rate'),
                                delay=0,
                                phase=0)
@@ -209,61 +217,60 @@ class UHFQC_LookuptableManager(Instrument):
                                 sampling_rate=self.sampling_rate.get(),
                                 Q_phase_delay=self.mixer_IQ_phase_skewness.get())
 
-
-        ###### RO pulses
-        M = PG.block_pulse(self.get('M_amp'), self.M_length.get(),  #ns
-                               sampling_rate=self.get('sampling_rate'),
-                               delay=0,
-                               phase=self.get('M_phi'))
+        # RO pulses
+        M = PG.block_pulse(self.get('M_amp'), self.M_length.get(),  # ns
+                           sampling_rate=self.get('sampling_rate'),
+                           delay=0,
+                           phase=self.get('M_phi'))
         Mod_M = PG.mod_pulse(M[0], M[1],
-                                f_modulation=self.M_modulation.get(),
-                                sampling_rate=self.sampling_rate.get(),
-                                Q_phase_delay=self.mixer_IQ_phase_skewness.get())
+                             f_modulation=self.M_modulation.get(),
+                             sampling_rate=self.sampling_rate.get(),
+                             Q_phase_delay=self.mixer_IQ_phase_skewness.get())
         # advanced RO pulses
         # with ramp-up
-        M_up = PG.block_pulse(self.get('M_up_amp'), self.M_up_length.get(),  #ns
-                               sampling_rate=self.get('sampling_rate'),
-                               delay=0,
-                               phase=self.get('M_up_phi'))
+        M_up = PG.block_pulse(self.get('M_up_amp'), self.M_up_length.get(),  # ns
+                              sampling_rate=self.get('sampling_rate'),
+                              delay=0,
+                              phase=self.get('M_up_phi'))
 
         M_up_mid = (np.concatenate((M_up[0], M[0])),
                     np.concatenate((M_up[1], M[1])))
 
-        Mod_M_up_mid = PG.mod_pulse(M_up_mid[0],M_up_mid[1],
-                                f_modulation=self.get('M_modulation'),
-                                sampling_rate=self.get('sampling_rate'),
-                                Q_phase_delay=self.get('mixer_IQ_phase_skewness'))
+        Mod_M_up_mid = PG.mod_pulse(M_up_mid[0], M_up_mid[1],
+                                    f_modulation=self.get('M_modulation'),
+                                    sampling_rate=self.get('sampling_rate'),
+                                    Q_phase_delay=self.get('mixer_IQ_phase_skewness'))
 
         # with ramp-up and double frequency depletion
-        M_down0 = PG.block_pulse(self.get('M_down_amp0'), self.get('M_down_length'),  #ns
-                       sampling_rate=self.get('sampling_rate'),
-                       delay=0,
-                       phase=self.get('M_down_phi0'))
+        M_down0 = PG.block_pulse(self.get('M_down_amp0'), self.get('M_down_length'),  # ns
+                                 sampling_rate=self.get('sampling_rate'),
+                                 delay=0,
+                                 phase=self.get('M_down_phi0'))
 
-        M_down1 = PG.block_pulse(self.get('M_down_amp1'), self.get('M_down_length'),  #ns
-                       sampling_rate=self.get('sampling_rate'),
-                       delay=0,
-                       phase=self.get('M_down_phi1'))
+        M_down1 = PG.block_pulse(self.get('M_down_amp1'), self.get('M_down_length'),  # ns
+                                 sampling_rate=self.get('sampling_rate'),
+                                 delay=0,
+                                 phase=self.get('M_down_phi1'))
         Mod_M_down0 = PG.mod_pulse(M_down0[0],
-                         M_down1[1],
-                         f_modulation=self.get('M0_modulation'),
-                         sampling_rate=self.get('sampling_rate'),
-                         Q_phase_delay=self.get('mixer_IQ_phase_skewness'))
+                                   M_down1[1],
+                                   f_modulation=self.get('M0_modulation'),
+                                   sampling_rate=self.get('sampling_rate'),
+                                   Q_phase_delay=self.get('mixer_IQ_phase_skewness'))
         Mod_M_down1 = PG.mod_pulse(M_down1[0],
-                     M_down1[1],
-                     f_modulation=self.get('M1_modulation'),
-                     sampling_rate=self.get('sampling_rate'),
-                     Q_phase_delay=self.get('mixer_IQ_phase_skewness'))
+                                   M_down1[1],
+                                   f_modulation=self.get('M1_modulation'),
+                                   sampling_rate=self.get('sampling_rate'),
+                                   Q_phase_delay=self.get('mixer_IQ_phase_skewness'))
 
         # summing the depletion components
         Mod_M_down = (np.add(Mod_M_down0[0],
-                                Mod_M_down1[0]),
+                             Mod_M_down1[0]),
                       np.add(Mod_M_down0[1],
-                                  Mod_M_down1[1]))
+                             Mod_M_down1[1]))
 
-        #concatenating up, mid and depletion
+        # concatenating up, mid and depletion
         Mod_M_up_mid_down = (np.concatenate((Mod_M_up_mid[0], Mod_M_down[0])),
-                    np.concatenate((Mod_M_up_mid[1], Mod_M_down[1])))
+                             np.concatenate((Mod_M_up_mid[1], Mod_M_down[1])))
 
         self._wave_dict = {'I': Wave_I,
                            'X180': Wave_X_180, 'Y180': Wave_Y_180,
@@ -283,7 +290,7 @@ class UHFQC_LookuptableManager(Instrument):
 
         return self._wave_dict
 
-    def render_wave(self, wave_name, show=True, time_unit='lut_index',
+    def render_wave(self, wave_name, show=True, time_units='lut_index',
                     reload_pulses=True):
         if reload_pulses:
             self.generate_standard_pulses()
@@ -291,7 +298,8 @@ class UHFQC_LookuptableManager(Instrument):
         if time_units == 'lut_index':
             x = np.arange(len(self._wave_dict[wave_name][0]))
             ax.set_xlabel('Lookuptable index (i)')
-            ax.vlines(2048, self._voltage_min, self._voltage_max, linestyle='--')
+            ax.vlines(
+                2048, self._voltage_min, self._voltage_max, linestyle='--')
         elif time_units == 's':
             x = (np.arange(len(self._wave_dict[wave_name][0]))
                  / self.sampling_rate.get())
@@ -319,8 +327,10 @@ class UHFQC_LookuptableManager(Instrument):
         if reload_pulses:
             self.generate_standard_pulses()
         fig, ax = plt.subplots(1, 1)
-        f_axis, PSD_I = func.PSD(self._wave_dict[wave_name][0], 1/self.sampling_rate())
-        f_axis, PSD_Q = func.PSD(self._wave_dict[wave_name][1], 1/self.sampling_rate())
+        f_axis, PSD_I = func.PSD(
+            self._wave_dict[wave_name][0], 1/self.sampling_rate())
+        f_axis, PSD_Q = func.PSD(
+            self._wave_dict[wave_name][1], 1/self.sampling_rate())
 
         ax.set_xlabel('frequency (Hz)')
         ax.set_title(wave_name)
@@ -332,10 +342,10 @@ class UHFQC_LookuptableManager(Instrument):
         ax.legend()
 
         ax.set_yscale("log", nonposy='clip')
-        if y_bounds!=None:
-          ax.set_ylim(y_bounds[0],y_bounds[1])
-        if f_bounds!=None:
-          ax.set_xlim(f_bounds[0],f_bounds[1])
+        if y_bounds != None:
+            ax.set_ylim(y_bounds[0], y_bounds[1])
+        if f_bounds != None:
+            ax.set_xlim(f_bounds[0], f_bounds[1])
         if show:
             plt.show()
         return fig, ax
@@ -360,7 +370,13 @@ class UHFQC_LookuptableManager(Instrument):
              (0, 1/self.get('mixer_alpha') * 1/np.cos(self.get('mixer_phi')*2*np.pi/360))))
         return mixer_pre_distortion_matrix
 
-    def load_pulse_onto_AWG_lookuptable(self, pulse_name, regenerate_pulses=True):
+    # TODO: fix this function
+    # def load_pulses_onto_AWG_lookuptable(self, regenerate_pulses=True):
+    #     pulse_name = self.
+    #     self.load_pulse_onto_AWG_lookuptable(pulse_name, regenerate_pulses)
+
+    def load_pulse_onto_AWG_lookuptable(self, pulse_name,
+                                        regenerate_pulses=True):
         '''
         Load a pulses to the lookuptable, it uses the lut_mapping to
         determine which lookuptable to load to.
@@ -369,14 +385,14 @@ class UHFQC_LookuptableManager(Instrument):
             wave_dict = self.generate_standard_pulses()
         else:
             wave_dict = self._wave_dict
-        I_ch = 0
-        Q_ch = 1
+
         I_wave = np.clip(wave_dict[pulse_name][0],
                          self._voltage_min, self._voltage_max)
         Q_wave = np.clip(np.multiply(self.get('mixer_QI_amp_ratio'),
-                         wave_dict[pulse_name][1]), self._voltage_min,
+                                     wave_dict[pulse_name][1]), self._voltage_min,
                          self._voltage_max)
-        self.UHFQC.awg_sequence_acquisition_and_pulse(I_wave, Q_wave, self.acquisition_delay())
+        self.UHFQC.awg_sequence_acquisition_and_pulse(I_wave, Q_wave,
+                                                      self.acquisition_delay())
         print('wave {} should be loaded in UHFQC'.format(pulse_name))
 
     def give_back_wave_forms(self, pulse_name, regenerate_pulses=True):
@@ -393,9 +409,6 @@ class UHFQC_LookuptableManager(Instrument):
         I_wave = np.clip(wave_dict[pulse_name][0],
                          self._voltage_min, self._voltage_max)
         Q_wave = np.clip(np.multiply(self.get('mixer_QI_amp_ratio'),
-                         wave_dict[pulse_name][1]), self._voltage_min,
+                                     wave_dict[pulse_name][1]), self._voltage_min,
                          self._voltage_max)
         return I_wave, Q_wave
-
-
-

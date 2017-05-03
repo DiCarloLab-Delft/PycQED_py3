@@ -20,7 +20,8 @@ class QuDev_transmon(Qubit):
     def __init__(self, name, MC,
                  heterodyne = None, # metainstrument for cw spectroscopy
                  cw_source = None, # MWG for driving the qubit continuously
-                 readout_LO = None, # MWG for down- (and up)converting RO signal
+                 readout_DC_LO = None, # MWG for downconverting RO signal
+                 readout_UC_LO = None, # MWG for upconverting RO signal
                  readout_RF = None, # MWG for driving the readout resonator
                  drive_LO = None,
                  AWG = None,  # for generating IQ modulated drive pulses and
@@ -34,7 +35,8 @@ class QuDev_transmon(Qubit):
         self.cw_source = cw_source
         self.AWG = AWG
         self.UHFQC = UHFQC
-        self.readout_LO = readout_LO
+        self.readout_DC_LO = readout_DC_LO
+        self.readout_UC_LO = readout_UC_LO
         self.readout_RF = readout_RF
         self.drive_LO = drive_LO
 
@@ -88,7 +90,7 @@ class QuDev_transmon(Qubit):
                            parameter_class=ManualParameter,
                            label='DC offset for the readout Q channel')
         self.add_parameter('RO_acq_averages', initial_value=1024,
-                           vals=vals.Numbers(0, 1e6),
+                           vals=vals.Ints(0, 1000000),
                            parameter_class=ManualParameter)
         self.add_parameter('RO_acq_integration_length', initial_value=2.2e-6,
                            vals=vals.Numbers(min_value=10e-9, max_value=2.2e-6),
@@ -97,7 +99,12 @@ class QuDev_transmon(Qubit):
                            vals=vals.Enum(0, 1, 2, 3, 4, 5),
                            parameter_class=ManualParameter)
         self.add_parameter('RO_acq_weight_function_Q', initial_value=1,
-                           vals=vals.Enum(0, 1, 2, 3, 4, 5),
+                           vals=vals.Enum(None, 0, 1, 2, 3, 4, 5),
+                           parameter_class=ManualParameter)
+        self.add_parameter('RO_acq_shots', initial_value=4094,
+                           docstring='Number of single shot measurements to do'
+                                     'in single shot experiments.',
+                           vals=vals.Ints(0, 4095),
                            parameter_class=ManualParameter)
 
         # add pulsed spectroscopy pulse parameters
@@ -223,13 +230,18 @@ class QuDev_transmon(Qubit):
             UHFQC=self.UHFQC, AWG=self.AWG, channels=[
                 self.RO_acq_weight_function_I(),
                 self.RO_acq_weight_function_Q()],
-            integration_length=self.RO_acq_integration_length())
+            integration_length=self.RO_acq_integration_length(),
+            nr_shots=self.RO_acq_shots())
 
         self.int_avg_det = det.UHFQC_integrated_average_detector(
             self.UHFQC, self.AWG, nr_averages=self.RO_acq_averages(),
             channels=[self.RO_acq_weight_function_I(),
                       self.RO_acq_weight_function_Q()],
             integration_length=self.RO_acq_integration_length())
+
+        self.inp_avg_det = det.UHFQC_input_average_detector(
+            UHFQC=self.UHFQC, AWG=self.AWG, nr_averages=self.RO_acq_averages(),
+            nr_samples=4096)
 
     def prepare_for_continuous_wave(self):
         self.heterodyne.auto_seq_loading(True)
@@ -239,7 +251,10 @@ class QuDev_transmon(Qubit):
             self.cw_source.power.set(self.spec_pow())
         if self.readout_RF is not None:
             self.readout_RF.pulsemod_state('Off')
-        self.readout_LO.pulsemod_state('Off')
+        if self.readout_DC_LO is not None:
+            self.readout_DC_LO.pulsemod_state('Off')
+        if self.readout_UC_LO is not None:
+            self.readout_UC_LO.pulsemod_state('Off')
 
     def prepare_for_pulsed_spec(self):
         self.heterodyne.auto_seq_loading(False)
@@ -247,9 +262,35 @@ class QuDev_transmon(Qubit):
             self.cw_source.pulsemod_state('On')
             self.cw_source.on()
             self.cw_source.power.set(self.spec_pow())
-        self.readout_RF.pulsemod_state('On')
 
-        #TODO add settings from prepare_for_timedomain?
+        if self.f_RO() is None:
+            f_RO = self.f_RO_resonator()
+        else:
+            f_RO = self.f_RO()
+        if self.RO_pulse_type() == 'Gated_MW_RO_pulse':
+            self.readout_RF.frequency(f_RO)
+            self.readout_RF.power(self.RO_pulse_power())
+            self.readout_RF.on()
+            self.UHFQC.awg_sequence_acquisition(acquisition_delay=0)
+        elif self.RO_pulse_type() == 'MW_IQmod_pulse_UHFQC':
+            eval('self.UHFQC.sigouts_{}_offset({})'.format(
+                self.RO_I_channel(), self.RO_I_offset()))
+            eval('self.UHFQC.sigouts_{}_offset({})'.format(
+                self.RO_Q_channel(), self.RO_Q_offset()))
+            self.UHFQC.awg_sequence_acquisition_and_pulse_SSB(
+                f_RO_mod=self.f_RO_mod(), RO_amp=self.RO_amp(),
+                RO_pulse_length=self.RO_pulse_length(),
+                acquisition_delay=0)
+            self.readout_UC_LO.pulsemod_state('Off')
+            self.readout_UC_LO.frequency(f_RO - self.f_RO_mod())
+            self.readout_UC_LO.on()
+        elif self.RO_pulse_type() is 'Multiplexed_UHFQC_pulse':
+            # setting up the UHFQC awg sequence must be done externally by a
+            # readout manager
+            self.readout_UC_LO.pulsemod_state('Off')
+            self.readout_UC_LO.frequency(f_RO - self.f_RO_mod())
+            self.readout_UC_LO.on()
+
 
 
     def prepare_for_timedomain(self):
@@ -276,26 +317,35 @@ class QuDev_transmon(Qubit):
             f_RO = self.f_RO_resonator()
         else:
             f_RO = self.f_RO()
-        self.readout_LO.pulsemod_state('Off')
-        self.readout_LO.frequency(f_RO - self.f_RO_mod())
-        self.readout_LO.on()
+        self.readout_DC_LO.pulsemod_state('Off')
+        self.readout_DC_LO.frequency(f_RO - self.f_RO_mod())
+        self.readout_DC_LO.on()
 
         # readout pulse
         if self.RO_pulse_type() is 'MW_IQmod_pulse_UHFQC':
-            eval('self._acquisition_instr.sigouts_{}_offset({})'.format(
+            eval('self.UHFQC.sigouts_{}_offset({})'.format(
                 self.RO_I_channel(), self.RO_I_offset()))
-            eval('self._acquisition_instr.sigouts_{}_offset({})'.format(
+            eval('self.UHFQC.sigouts_{}_offset({})'.format(
                 self.RO_Q_channel(), self.RO_Q_offset()))
             self.UHFQC.awg_sequence_acquisition_and_pulse_SSB(
                 f_RO_mod=self.f_RO_mod(), RO_amp=self.RO_amp(),
                 RO_pulse_length=self.RO_pulse_length(),
                 acquisition_delay=0)
+            self.readout_UC_LO.pulsemod_state('Off')
+            self.readout_UC_LO.frequency(f_RO - self.f_RO_mod())
+            self.readout_UC_LO.on()
         elif self.RO_pulse_type() is 'Gated_MW_RO_pulse':
             self.readout_RF.pulsemod_state('On')
             self.readout_RF.frequency(f_RO)
             self.readout_RF.power(self.RO_pulse_power())
             self.readout_RF.on()
             self.UHFQC.awg_sequence_acquisition(acquisition_delay=0)
+        elif self.RO_pulse_type() is 'Multiplexed_UHFQC_pulse':
+            # setting up the UHFQC awg sequence must be done externally by a
+            # readout manager
+            self.readout_UC_LO.pulsemod_state('Off')
+            self.readout_UC_LO.frequency(f_RO - self.f_RO_mod())
+            self.readout_UC_LO.on()
 
     def measure_heterodyne_spectroscopy(self, freqs=None, MC=None,
                                         analyze=True, close_fig=True):
@@ -546,7 +596,7 @@ class QuDev_transmon(Qubit):
             ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
 
     def measure_echo(self, times=None, MC=None, artificial_detuning=None,
-                     upload=True, analyze=True):
+                     upload=True, analyze=True, close_fig=True):
 
         if times is None:
             raise ValueError("Unspecified times for measure_echo")
@@ -567,7 +617,7 @@ class QuDev_transmon(Qubit):
             ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
 
     def measure_allxy(self, double_points=True, MC=None, upload=True,
-                      analyze=True):
+                      analyze=True, close_fig=True):
         self.prepare_for_timedomain()
         if MC is None:
             MC = self.MC
@@ -605,8 +655,187 @@ class QuDev_transmon(Qubit):
         if analyze:
             ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
 
-    def measure_ssro(self):
-        raise NotImplementedError()
+    def set_default_readout_weights(self, channels = (0, 1)):
+        """
+        Sets the integration weights of the channels `RO_acq_weight_I` and
+        `RO_acq_weight_Q` to the default sinusoidal values. The integration
+        result of I channel is the integral of
+        `cos(w*t)*ch0(t) + sin(w*t)*ch1(t)` and of Q channel is the integral of
+        `cos(w*t)*ch0(t) - sin(w*t)*ch1(t)`.
+
+        Args:
+            channels: An iterable of UHFLI ports that are used for the input
+                      signal. E.g. for using just the first input port one
+                      would use `(0,)`, if using both input ports, one would use
+                      the default value `(0, 1)`.
+        """
+        if self.f_RO() is None:
+            f_RO = self.f_RO_resonator()
+        else:
+            f_RO = self.f_RO()
+        trace_length = 4096
+        tbase = np.arange(0, trace_length / 1.8e9, 1 / 1.8e9)
+        cosI = np.array(np.cos(2 * np.pi * f_RO * tbase))
+        sinI = np.array(np.sin(2 * np.pi * f_RO * tbase))
+
+        c1 = self.RO_acq_weight_function_I()
+        c2 = self.RO_acq_weight_function_Q()
+
+        if 0 in channels:
+            self.UHFQC.set('quex_wint_weights_{}_real'.format(c1), cosI)
+            self.UHFQC.set('quex_rot_{}_real'.format(c1), 1)
+            if c2 is not None:
+                self.UHFQC.set('quex_wint_weights_{}_real'.format(c2), cosI)
+                self.UHFQC.set('quex_rot_{}_real'.format(c2), 1)
+        else:
+            self.UHFQC.set('quex_rot_{}_real'.format(c1), 0)
+            if c2 is not None:
+                self.UHFQC.set('quex_rot_{}_real'.format(c2), 0)
+        if 1 in channels:
+            self.UHFQC.set('quex_wint_weights_{}_imag'.format(c1), sinI)
+            self.UHFQC.set('quex_rot_{}_imag'.format(c1), 1)
+            if c2 is not None:
+                self.UHFQC.set('quex_wint_weights_{}_imag'.format(c2), sinI)
+                self.UHFQC.set('quex_rot_{}_imag'.format(c2), -1)
+        else:
+            self.UHFQC.set('quex_rot_{}_imag'.format(c1), 0)
+            if c2 is not None:
+                self.UHFQC.set('quex_rot_{}_imag'.format(c2), 0)
+
+
+    def calibrate_readout_weights(self, MC=None, update=True, channels=(0, 1),
+                                  analyze=True, close_fig=True):
+        """
+        Sets the weight function of the UHFLI channel
+        `self.RO_acq_weight_function_I` to the difference of the traces of the
+        qubit prepared in the |0> and |1> state, which is optimal assuming that
+        the standard deviation (over different measurements of both traces is
+        a constant. Sets `self.RO_acq_weight_function_Q` to `None`.
+
+        Args:
+            MC: MeasurementControl object to use for the measurement. Defaults
+                to `self.MC`.
+            update: Boolean flag, whether to update the UHFQC integration
+                    weight. Default `True`.
+            channels: An iterable of UHFLI ports that are used for the input
+                      signal. E.g. for using just the first input port one
+                      would use `(0,)`, if using both input ports, one would use
+                      the default value `(0, 1)`.
+            analyze: Boolean flag to run default default analysis generating
+                     plots of the traces.
+            close_fig: Boolean flag to close the matplotlib's figure. If
+                       `False`, then the plots can be viewed with `plt.show()`
+                       Default `True`.
+
+        Returns:
+            Optimal weight(s) for state discrimination.
+        """
+
+        self.prepare_for_timedomain()
+        if MC is None:
+            MC = self.MC
+
+        MC.set_sweep_function(awg_swf.OffOn(
+            pulse_pars=self.get_drive_pars(),
+            RO_pars=self.get_RO_pars(),
+            pulse_comb='OffOff'))
+        MC.set_sweep_points(np.arange(2))
+        MC.set_detector_function(self.inp_avg_det)
+        data0 = MC.run(name='Weight_calib_0'+self.msmt_suffix)
+
+        if analyze:
+            ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
+
+        MC.set_sweep_function(awg_swf.OffOn(
+            pulse_pars=self.get_drive_pars(),
+            RO_pars=self.get_RO_pars(),
+            pulse_comb='OnOn'))
+        MC.set_sweep_points(np.arange(2))
+        MC.set_detector_function(self.inp_avg_det)
+        data1 = MC.run(name='Weight_calib_1' + self.msmt_suffix)
+
+        weights_I = data1[0] - data0[0]
+        weights_I -= np.mean(weights_I)
+        weights_I /= np.max(np.abs(weights_I))
+
+        weights_Q = data1[1] - data0[1]
+        weights_Q -= np.mean(weights_Q)
+        weights_Q /= np.max(np.abs(weights_Q))
+
+        if update:
+            c = self.RO_acq_weight_function_I()
+            self.RO_acq_weight_function_Q(None)
+            if 0 in channels:
+                self.UHFQC.set('quex_wint_weights_{}_real'.format(c),
+                               np.array(weights_I))
+                self.UHFQC.set('quex_rot_{}_real'.format(c), 1)
+            else:
+                self.UHFQC.set('quex_rot_{}_real'.format(c), 0)
+            if 1 in channels:
+                self.UHFQC.set('quex_wint_weights_{}_imag'.format(c),
+                               np.array(weights_Q))
+                self.UHFQC.set('quex_rot_{}_imag'.format(c), 1)
+            else:
+                self.UHFQC.set('quex_rot_{}_imag'.format(c), 0)
+
+        # format the return value to the same shape as channels.
+        ret = []
+        for chan in channels:
+            if chan == 0:
+                ret.append(weights_I)
+            if chan == 1:
+                ret.append(weights_Q)
+        return tuple(ret)
+
+    def find_ssro_fidelity(self, MC=None, analyze=True, close_fig=True,
+                           no_fits=False):
+        """
+        Conduct an off-on measurement on the qubit recording single-shot
+        results and determine the single shot readout fidelity.
+
+        Calculates the assignment fidelity `F_a` which is the average
+        probability of correctly guessing the state that was prepared. If
+        `no_fits` is `False` also finds the discrimination fidelity F_d, that
+        takes into account the probability of an bit flip after state
+        preparation, by fitting double gaussians to both |0> prepared and |1>
+        prepared datasets.
+
+        Args:
+            MC: MeasurementControl object to use for the measurement. Defaults
+                to `self.MC`.
+            analyze: Boolean flag, whether to analyse the measurement results.
+                     Default `True`.
+            close_fig: Boolean flag to close the matplotlib's figure. If
+                       `False`, then the plots can be viewed with `plt.show()`
+                       Default `True`.
+            no_fits: Boolean flag to disable finding the discrimination
+                     fidelity. Default `False`.
+        Returns:
+            If `no_fits` is `False` returns assigment fidelity, discrimination
+            fidelity and SNR = 2 |mu00 - mu11| / (sigma00 + sigma11). Else
+            returns just assignment fidelity.
+        """
+
+        self.prepare_for_timedomain()
+        if MC is None:
+            MC = self.MC
+
+        MC.set_sweep_function(awg_swf.OffOn(
+            pulse_pars=self.get_drive_pars(),
+            RO_pars=self.get_RO_pars()))
+        MC.set_sweep_points(np.arange(self.RO_acq_shots()))
+        MC.set_detector_function(self.int_log_det)
+
+        MC.run(name='SSRO_fidelity'+self.msmt_suffix)
+
+        if analyze:
+            rotate = self.RO_acq_weight_function_Q() is not None
+            ana = ma.SSRO_Analysis(auto=True, close_fig=close_fig,
+                                   rotate=rotate, no_fits=no_fits)
+            if not no_fits:
+                return ana.F_a, ana.F_d, ana.SNR
+            else:
+                return ana.F_a
 
     def measure_flux_detuning(self, flux_params=None, n=1, ramsey_times=None, artificial_detuning=0, MC=None,
                               analyze=True, close_fig=True, upload=True,fluxing_channels=[]):

@@ -10,7 +10,6 @@ from os.path import join, dirname, exists
 from os import makedirs
 
 
-
 def get_git_revision_hash():
     import logging
     import subprocess
@@ -42,6 +41,21 @@ def bool_to_int_str(b):
         return '0'
 
 
+def int_to_bin(x, w, lsb_last=True):
+    """
+    Converts an integer to a binary string of a specified width
+    x (int) : input integer to be converted
+    w (int) : desired width
+    lsb_last (bool): if False, reverts the string e.g., int(1) = 001 -> 100
+    """
+    bin_str = '{0:{fill}{width}b}'.format((int(x) + 2**w) % 2**w,
+                                          fill='0', width=w)
+    if lsb_last:
+        return bin_str
+    else:
+        return bin_str[::-1]
+
+
 def mopen(filename, mode='w'):
     if not exists(dirname(filename)):
         try:
@@ -62,6 +76,7 @@ def dict_to_ordered_tuples(dic):
     ret = [(key, dic[key]) for key in keys]
     return ret
 
+
 def to_hex_string(byteval):
     '''
     Returns a hex representation of bytes for printing purposes
@@ -72,78 +87,75 @@ def to_hex_string(byteval):
 def load_settings_onto_instrument(instrument, load_from_instr=None, folder=None,
                                   label=None,
                                   timestamp=None, **kw):
-        '''
-        Loads settings from an hdf5 file onto the instrument handed to the
-        function.
-        By default uses the last hdf5 file in the datadirectory.
-        By giving a label or timestamp another file can be chosen as the
-        settings file.
-        '''
+    '''
+    Loads settings from an hdf5 file onto the instrument handed to the
+    function.
+    By default uses the last hdf5 file in the datadirectory.
+    By giving a label or timestamp another file can be chosen as the
+    settings file.
+    '''
 
-        older_than = None
-        instrument_name = instrument.name
-        success = False
-        count = 0
-        while success is False and count < 10:
-            try:
-                if folder is None:
-                    folder = a_tools.get_folder(timestamp=timestamp,
-                                                older_than=older_than, **kw)
+    older_than = None
+    instrument_name = instrument.name
+    success = False
+    count = 0
+    while success is False and count < 10:
+        try:
+            if folder is None:
+                folder = a_tools.get_folder(timestamp=timestamp,
+                                            older_than=older_than, **kw)
+            else:
+                folder = folder
+            filepath = a_tools.measurement_filename(folder)
+            f = h5py.File(filepath, 'r')
+            sets_group = f['Instrument settings']
+            if load_from_instr is None:
+                ins_group = sets_group[instrument_name]
+            else:
+                ins_group = sets_group[load_from_instr]
+            print('Loaded Settings Successfully')
+            success = True
+        except:
+            older_than = os.path.split(folder)[0][-8:] \
+                + '_' + os.path.split(folder)[1][:6]
+            folder = None
+            success = False
+        count += 1
+
+    if not success:
+        print('Could not open settings for instrument "%s"' % (
+            instrument_name))
+        return False
+
+    for parameter, value in ins_group.attrs.items():
+        if value != 'None':  # None is saved as string in hdf5
+            if type(value) == str:
+                if value == 'False':
+                    try:
+                        instrument.set(parameter, False)
+                    except:
+                        print('Could not set parameter: "%s" to "%s" for instrument "%s"' % (
+                            parameter, value, instrument_name))
                 else:
-                    folder = folder
-                filepath = a_tools.measurement_filename(folder)
-                f = h5py.File(filepath, 'r')
-                sets_group = f['Instrument settings']
-                if load_from_instr is None:
-                    ins_group = sets_group[instrument_name]
-                else:
-                    ins_group = sets_group[load_from_instr]
-                print('Loaded Settings Successfully')
-                success = True
-            except:
-                older_than = os.path.split(folder)[0][-8:] \
-                             + '_' + os.path.split(folder)[1][:6]
-                folder = None
-                success = False
-            count += 1
-
-        if not success:
-            print('Could not open settings for instrument "%s"' % (
-                instrument_name))
-            return False
-
-        for parameter, value in ins_group.attrs.items():
-            if value != 'None':  # None is saved as string in hdf5
-                if type(value) == str:
-                    if value == 'False':
+                    try:
+                        instrument.set(parameter, float(value))
+                    except Exception:
                         try:
-                            instrument.set(parameter, False)
+                            instrument.set(parameter, value)
                         except:
-                            print('Could not set parameter: "%s" to "%s" for instrument "%s"' % (
-                                parameter, value, instrument_name))
-                    else:
-                        try:
-                            instrument.set(parameter, float(value))
-                        except Exception:
-                            try:
-                                instrument.set(parameter, value)
-                            except:
-                                print('Could not set parameter: "%s" to "%s" for instrument "%s"' % (
-                                    parameter, value, instrument_name))
-                        except Exception:
                             try:
                                 instrument.set(parameter, int(value))
                             except:
                                 print('Could not set parameter: "%s" to "%s" for instrument "%s"' % (
                                     parameter, value, instrument_name))
-                else:
-                    instrument.set(parameter, value)
-        f.close()
-        return True
+            else:
+                instrument.set(parameter, value)
+    f.close()
+    return True
 
 
 def send_email(subject='PycQED needs your attention!',
-               body = '', email=None):
+               body='', email=None):
     # Import smtplib for the actual sending function
     import smtplib
     # Here are the email package modules we'll need
@@ -161,7 +173,6 @@ def send_email(subject='PycQED needs your attention!',
     msg['From'] = 'Lamaserati@tudelft.nl'
     msg['To'] = email
     msg.attach(MIMEText(body, 'plain'))
-
 
     # Send the email via our own SMTP server.
     s = smtplib.SMTP_SSL('smtp.gmail.com')
@@ -209,4 +220,4 @@ def list_available_serial_ports():
 
 
 def add_suffix_to_dict_keys(inputDict, suffix):
-    return {str(key)+suffix : (value ) for key, value in inputDict.items()}
+    return {str(key)+suffix: (value) for key, value in inputDict.items()}
