@@ -8,7 +8,7 @@ station = None
 
 
 def Rabi_2nd_exc_seq(amps, pulse_pars, pulse_pars_2nd, RO_pars, n=1,
-                     cal_points=True,
+                     cal_points=True, upload=True, return_seq=False,
                      post_msmt_delay=3e-6, verbose=False):
     '''
     Rabi sequence for the second excited state
@@ -26,6 +26,7 @@ def Rabi_2nd_exc_seq(amps, pulse_pars, pulse_pars_2nd, RO_pars, n=1,
     el_list = []
     pulses = get_pulse_dict_from_pars(pulse_pars)
     pulses_2nd = get_pulse_dict_from_pars(pulse_pars_2nd)
+
     for i, amp in enumerate(amps):  # seq has to have at least 2 elts
         if cal_points and (i == (len(amps)-6) or
                            i == (len(amps)-5)):
@@ -45,17 +46,21 @@ def Rabi_2nd_exc_seq(amps, pulse_pars, pulse_pars_2nd, RO_pars, n=1,
             # copy first element and set extra wait
             pulse_list[0] = deepcopy(pulse_list[0])
             pulse_list[0]['pulse_delay'] += post_msmt_delay
-            el = multi_pulse_elt(i, station, pulse_list)
+            el = multi_pulse_elt(i, station, pulse_list, [RO_pars])
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
-    station.components['AWG'].stop()
-    station.pulsar.program_awg(seq, *el_list, verbose=verbose)
-    return seq_name
 
+    if upload:
+        station.components['AWG'].stop()
+        station.pulsar.program_awg(seq, *el_list, verbose=verbose)
 
+    if return_seq:
+        return seq_name, el_list
+    else:
+        return seq
 
 def Ramsey_2nd_exc_seq(times, pulse_pars, pulse_pars_2nd, RO_pars, n=1,
-                     cal_points=True,
+                     cal_points=True, artificial_detuning =None,
                      post_msmt_delay=3e-6, verbose=False):
     '''
     Rabi sequence for the second excited state
@@ -87,6 +92,10 @@ def Ramsey_2nd_exc_seq(times, pulse_pars, pulse_pars_2nd, RO_pars, n=1,
         else:
             pulse_pars_x2 = deepcopy(pulses_2nd['X90'])
             pulse_pars_x2['pulse_delay'] = tau
+
+            if artificial_detuning is not None:
+                Dphase = ((tau-times[0]) * artificial_detuning * 360) % 360
+            pulse_pars_x2['phase'] = Dphase
 
             pulse_list = ([pulses['X180']]+n*[pulses_2nd['X90'], pulse_pars_x2] +
                           [pulses['X180'], RO_pars])

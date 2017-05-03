@@ -896,12 +896,12 @@ def peak_finder_v2(x, y, perc=90, window_len=11):
     sort_mask = np.argsort(y[array_peaks])[::-1]
     return peaks_x[sort_mask]
 
+def cut_edges(array, window_len=11):
+    array = array[(window_len//2):-(window_len//2)]
+    return array
 
-def peak_finder(x, y, percentile=70, num_sigma_threshold=5, window_len=11):
+def peak_finder(x, y, percentile=20, num_sigma_threshold=5, window_len=3):
 
-    def cut_edges(array, window_len=11):
-        array = array[(window_len/2):-(window_len/2)]
-        return array
     '''
     Peak finding algorithm designed by Serwan
     1 smooth data
@@ -925,7 +925,10 @@ def peak_finder(x, y, percentile=70, num_sigma_threshold=5, window_len=11):
     thresholdlst = np.arange(y_smoothed.size)[y_smoothed > threshold]
     datthreshold = y_smoothed[thresholdlst]
 
-    kk = 0
+    if thresholdlst.size is 0:
+        kk = 0
+    else:
+        kk = thresholdlst[0]
     inpeak = False
     peakranges = []
     peak_indices = []
@@ -945,7 +948,7 @@ def peak_finder(x, y, percentile=70, num_sigma_threshold=5, window_len=11):
                     inpeak = False
                     peakranges.append([peakfmin, peakfmax])
 
-        peakranges.append([peakfmin, peakfmax])
+            peakranges.append([peakfmin, peakfmax])
         for elem in peakranges:
             try:
                 if elem[0] != elem[1]:
@@ -953,17 +956,30 @@ def peak_finder(x, y, percentile=70, num_sigma_threshold=5, window_len=11):
                                      np.argmax(y_smoothed[elem[0]:elem[1]])]
                 else:
                     peak_indices += [elem[0]]
-                peak_widths += [x[elem[1]] - x[elem[0]]]
+                #peak_widths += [x[elem[1]] - x[elem[0]]]
             except:
                 pass
-        peaks = np.take(x, peak_indices)  # Frequencies of peaks
-        peak_vals = np.take(y_smoothed, peak_indices)  # values of peaks
+
+        peak_indices = np.unique(peak_indices)             #it will find same values more than once
+
+        #Take an approximate peak width for each peak index
+        for i,idx in enumerate(peak_indices):
+            if (idx+i+1)<x.size and (idx-i-1)>=0:          #ensure data points idx+i+1 and idx-i-1 are inside sweep pts
+                peak_widths += [ x[idx+i+1] - x[idx-i-1] ]
+            elif (idx+i+1)>x.size and (idx-i-1)>=0:
+                peak_widths += [ x[idx] - x[idx-i] ]
+            elif (idx+i+1)<x.size and (idx-i-1)<0:
+                peak_widths += [ x[idx+i] - x[idx] ]
+
+        peaks = np.take(x, peak_indices)                 # Frequencies of peaks
+        peak_vals = np.take(y_smoothed, peak_indices)    # values of peaks
         peak_index = peak_indices[np.argmax(peak_vals)]  # idx of highest peak
-        peak = x[peak_index]
-        peak_width = peak_widths[np.argmax(peak_vals)]
+        peak = x[peak_index]                             #Frequency of highest peak
+        peak_width = peak_widths[np.argmax(peak_vals)]   #width of highest peak
 
     else:
         peak = None
+        peak_vals = None
         peak_index = None
         peaks = []
         peak_width = None
@@ -979,7 +995,11 @@ def peak_finder(x, y, percentile=70, num_sigma_threshold=5, window_len=11):
 
     thresholdlst = np.arange(y_smoothed.size)[y_smoothed < threshold]
     datthreshold = y_smoothed[thresholdlst]
-    kk = 0
+
+    if thresholdlst.size is 0:
+        kk = 0
+    else:
+        kk = thresholdlst[0]
     indip = False
     dipranges = []
     dip_indices = []
@@ -999,7 +1019,7 @@ def peak_finder(x, y, percentile=70, num_sigma_threshold=5, window_len=11):
                     indip = False
                     dipranges.append([dipfmin, dipfmax])
 
-        dipranges.append([dipfmin, dipfmax])
+            dipranges.append([dipfmin, dipfmax])
         for elem in dipranges:
             try:
                 if elem[0] != elem[1]:
@@ -1007,9 +1027,21 @@ def peak_finder(x, y, percentile=70, num_sigma_threshold=5, window_len=11):
                                     np.argmin(y_smoothed[elem[0]:elem[1]])]
                 else:
                     dip_indices += [elem[0]]
-                dip_widths += [x[elem[1]] - x[elem[0]]]
+                #dip_widths += [x[elem[1]] - x[elem[0]]]
             except:
                 pass
+
+        dip_indices = np.unique(dip_indices)              #it will find same values more than once
+
+        #Take an approximate dip width for each dip index
+        for i,idx in enumerate(dip_indices):
+            if (idx+i+1)<x.size and (idx-i-1)>=0:         #ensure data points idx+i+1 and idx-i-1 are inside sweep pts
+                dip_widths += [ x[idx+i+1] - x[idx-i-1] ]
+            elif (idx+i+1)>x.size and (idx-i-1)>=0:
+                dip_widths += [ x[idx] - x[idx-i] ]
+            elif (idx+i+1)<x.size and (idx-i-1)<0:
+                dip_widths += [ x[idx+i] - x[idx] ]
+
         dips = np.take(x, dip_indices)
         dip_vals = np.take(y_smoothed, dip_indices)
         dip_index = dip_indices[np.argmin(dip_vals)]
@@ -1017,14 +1049,15 @@ def peak_finder(x, y, percentile=70, num_sigma_threshold=5, window_len=11):
         dip_width = dip_widths[np.argmin(dip_vals)]
     else:
         dip = None
+        dip_vals = None
         dip_index = None
         dips = []
         dip_width = None
 
-    return {'peak': peak, 'peak_idx': peak_index,
+    return {'peak': peak, 'peak_idx': peak_index, 'peak_values':peak_vals,
             'peak_width': peak_width, 'peak_widths': peak_widths,
             'peaks': peaks, 'peaks_idx': peak_indices,
-            'dip': dip, 'dip_idx': dip_index,
+            'dip': dip, 'dip_idx': dip_index, 'dip_values':dip_vals,
             'dip_width': dip_width, 'dip_widths': dip_widths,
             'dips': dips, 'dips_idx': dip_indices}
 
@@ -1075,8 +1108,7 @@ def calculate_rotation_matrix(delta_I, delta_Q):
     '''
 
     angle = np.arctan2(delta_Q, delta_I)
-    rotation_matrix = np.transpose(
-        np.matrix([[np.cos(angle), -1*np.sin(angle)],
+    rotation_matrix = np.transpose(np.matrix([[np.cos(angle), -1*np.sin(angle)],
                    [np.sin(angle), np.cos(angle)]]))
     return rotation_matrix
 
@@ -1471,7 +1503,7 @@ def calculate_transmon_transitions(EC, EJ, asym=0, reduced_flux=0,
     return transitions[:no_transitions]
 
 
-def fit_EC_EJ(f01, f12):
+def fit_EC_EJ(f01, f12, **kw):
     '''
     Calculates EC and EJ from f01 and f12 by numerical optimization.
     '''
@@ -1480,7 +1512,11 @@ def fit_EC_EJ(f01, f12):
     EC0 = f01-f12
     EJ0 = (f01+EC0)**2/(8*EC0)
 
-    penaltyfn = lambda Es: calculate_transmon_transitions(*Es)-[f01, f12]
+    asym = kw.pop('asym',0)
+    reduced_flux = kw.pop('reduced_flux',0)
+    dim = kw.pop('dim',None)
+
+    penaltyfn = lambda Es: calculate_transmon_transitions(*Es,asym=asym,reduced_flux=reduced_flux,dim=dim)-[f01, f12]
     (EC, EJ), success = optimize.leastsq(penaltyfn, (EC0, EJ0))
     return EC, EJ
 

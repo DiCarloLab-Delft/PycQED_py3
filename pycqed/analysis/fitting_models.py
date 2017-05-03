@@ -52,12 +52,11 @@ def Lorentzian(f, A, offset, f0, kappa):
     return val
 
 
-def TwinLorentzFunc(f, amplitude_a, amplitude_b, center_a, center_b,
-                    sigma_a, sigma_b, background=0):
+def TwinLorentzFunc(f, A_gf_over_2, A, f0_gf_over_2, f0,
+                    kappa_gf_over_2, kappa, background=0):
     'twin lorentz with background'
-    val = (amplitude_a/np.pi * (sigma_a / ((f-center_a)**2 + sigma_a**2)) +
-           amplitude_b/np.pi * (sigma_b / ((f-center_b)**2 + sigma_b**2)) +
-           background)
+    val = (A_gf_over_2/np.pi * (kappa_gf_over_2 / ((f-f0_gf_over_2)**2 + kappa_gf_over_2**2)) +
+           A/np.pi * (kappa / ((f-f0)**2 + kappa**2)) + background)
     return val
 
 
@@ -149,7 +148,7 @@ def CosFunc(t, amplitude, frequency, phase, offset):
         phase in rad
         offset a.u.
     '''
-    return amplitude*np.cos(2*np.pi*frequency*t + phase)+offset
+    return amplitude*np.cos(2*np.pi*t*frequency - phase)+offset
 
 
 def ExpDecayFunc(t, tau, amplitude, offset, n):

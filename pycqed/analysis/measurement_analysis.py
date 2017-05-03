@@ -19,6 +19,8 @@ import math
 from math import erfc
 from scipy.signal import argrelextrema, argrelmax, argrelmin
 from copy import deepcopy
+from sympy import pretty
+from sympy.abc import pi
 
 try:
     from nathan_plotting_tools import *
@@ -281,10 +283,45 @@ class MeasurementAnalysis(object):
             weighted_chisqr = np.sum(weight*(fit_res.data-fit_res.best_fit)**2)
             fit_grp.attrs.create(name='weighted_chisqr', data=weighted_chisqr)
 
+    def save_computed_parameters(self, computed_params, var_name):
+
+        """ Allows to save additional parameters computed from fit results,
+        such as the pi pulse and pi/2 pulse amplitudes. Each will be
+        saved as a new attribute in the FittedParams+var_name group created
+        in "save_fitted_parameters."
+
+        Input parameters:
+            computed_params:       DICTIONARY of parameters to be saved; first value of main variable, then
+                                   its statistical data such as stddev. Ex: {'piPulse':piPulse_val,
+                                   'piPulse_std':piPulse_std_val}.
+            var_name:              same var_name used in 'save_fitted_parameters' """
+
+        fit_name = 'Fitted Params ' + var_name
+        if fit_name not in self.analysis_group:
+            fit_grp = self.analysis_group.create_group(fit_name)
+        else:
+            fit_grp = self.analysis_group[fit_name]
+
+        if len(computed_params) == 0:
+            logging.warning('Nothing to save. Parameters dictionary is empty.')
+        else:
+            # for i in computed_params.items():
+            #     fit_grp.attrs.create(name=i[0], data=i[1])
+            for par_name, par_val in computed_params.items():
+                if 'std' not in par_name:
+                    try:
+                        par_group = fit_grp.create_group(par_name)
+                    except:  # if it already exists overwrite existing
+                        par_group = fit_grp[par_name]
+                    par_group.attrs.create(name=par_name, data=par_val)
+                    #par_dict = vars(par_val)
+                else:
+                    par_group.attrs.create(name=par_name,data=par_val)
+
     def run_default_analysis(self, TwoD=False, close_file=True,
                              show=False, log=False, transpose=False, **kw):
         if TwoD is False:
-            self.get_naming_and_values()
+            self.get_naming_and_values() #defined below; this is where self.value_names is assigned.
             self.sweep_points = kw.pop('sweep_points', self.sweep_points)
             # Preallocate the array of axes in the figure
             # Creates either a 2x2 grid or a vertical list
@@ -1126,6 +1163,232 @@ class chevron_optimization_v2(TD_Analysis):
         period, st = self.get_period(data_x[min_idx], data_x[max_idx])
         return np.interp(period*0.5, x_points, y_points)
 
+class Rabi_Analysis_new(TD_Analysis):
+
+    def __init__(self, label='Rabi', **kw):
+        kw['label'] = label
+        kw['h5mode'] = 'r+'
+        super(self.__class__, self).__init__(**kw)
+
+    def fit_Rabi(self, print_fit_results=False):
+        cos_mod = fit_mods.CosModel
+        average = np.mean(self.normalized_data_points)
+
+        #calculate initial guesses from spectrum (from Tim Menke Semester Thesis 2013)
+        fft_of_data = np.fft.fft(self.normalized_data_points,norm='ortho')
+        power_spectrum = np.abs(fft_of_data)**2
+        index_of_fourier_maximum = np.argmax(power_spectrum[1:len(fft_of_data)//2])+1
+        diff = (max(self.normalized_data_points) - min(self.normalized_data_points))
+
+        amp_guess = diff/2
+        freq_guess = index_of_fourier_maximum
+
+        #phase guess
+        phase_guess = np.angle(fft_of_data[index_of_fourier_maximum])
+        if phase_guess<0:
+            phase_guess=-phase_guess
+
+        #offset guess
+        if np.abs( np.abs(min(self.normalized_data_points)) - np.abs(max(self.normalized_data_points)) ) < 3:
+            offset_guess=(min(self.normalized_data_points)+max(self.normalized_data_points))/2
+        elif np.abs(min(self.normalized_data_points))>np.abs(max(self.normalized_data_points)):
+            offset_guess=(min(self.normalized_data_points)-max(self.normalized_data_points))/2
+        else:
+            offset_guess=(max(self.normalized_data_points)-min(self.normalized_data_points))/2
+
+        #Set up fit parameters and perform fit
+        cos_mod.set_param_hint('amplitude',
+                               value=amp_guess,
+                               vary=True,
+                               min=0)
+        cos_mod.set_param_hint('phase',
+                               value=phase_guess,
+                               vary=True,
+                               min=0)
+        cos_mod.set_param_hint('frequency',
+                               value=freq_guess,
+                               vary=True,
+                               min=(1/(100 *self.sweep_points[-1])),
+                               max=(20/self.sweep_points[-1]))
+        cos_mod.set_param_hint('offset',
+                               value=offset_guess,
+                               vary=True)
+        self.params = cos_mod.make_params()
+        fit_res = cos_mod.fit(data=self.normalized_data_points,
+                              t=self.sweep_points[:-self.NoCalPoints],
+                              params=self.params)
+
+        if fit_res.chisqr > .35:
+            logging.warning('Fit did not converge, chi-square > 0.35')
+
+        if print_fit_results:
+            print(fit_res.fit_report())
+
+        return fit_res
+
+    def run_default_analysis(self, print_fit_results=False, **kw):
+
+        close_file = kw.pop('close_file', True)
+        show_guess = kw.pop('show_guess', False)
+        show = kw.pop('show', False)
+        plot_amplitudes = kw.pop('plot_amplitudes',True)
+        show_amplitudes = kw.pop('show_amplitudes',True)
+        self.add_analysis_datagroup_to_file()
+        self.get_naming_and_values()
+        fig1, fig2, ax, axarray = self.setup_figures_and_axes()
+
+        norm = self.normalize_data_to_calibration_points(
+            self.measured_values[0], self.NoCalPoints)
+        self.normalized_values = norm[0]
+        self.normalized_data_points = norm[1]
+        self.normalized_cal_vals = norm[2]
+
+        #get the fit results (lmfit.ModelResult)
+        self.fit_res = self.fit_Rabi(print_fit_results)
+
+        #####################################################
+        ###get the computed pi,pi/2 amplitudes (dictionary)##
+        #####################################################
+
+        #Extract the best fitted frequency and phase.
+        freq_fit = self.fit_res.best_values['frequency']
+        phase_fit = self.fit_res.best_values['phase']
+
+        freq_std = self.fit_res.params['frequency'].stderr
+        phase_std = self.fit_res.params['phase'].stderr
+
+        assert freq_fit != 0 ,"Fitted frequency is zero."
+
+        #If fitted_phase<0, shift fitted_phase by 4. This corresponds to a shift of 2pi in the argument of cos.
+        if phase_fit < 0.1:
+            phase_fit = 0
+
+        #If phase_fit<1, the piHalf amplitude<0.
+        if phase_fit < 1:
+            logging.warning('The data could not be fitted correctly. The fitted '
+                            'phase "%s" <1, which gives negative piHalf '
+                            'amplitude.' %phase_fit)
+
+        stepsize = self.sweep_points[1] - self.sweep_points[0]
+        #Nyquist: wavelength>2*stepsize
+        if (freq_fit) > 2*stepsize:
+            logging.warning('The data could not be fitted correctly. The '
+                            'frequency "%s" is too high.' %freq_fit)
+
+        #Extract pi and pi/2 amplitudes from best fit values
+        if phase_fit == 0:
+             piPulse = 1/(2*freq_fit)
+             piHalfPulse = 1/(4*freq_fit)
+             piPulse_std = freq_std
+             piHalfPulse_std = freq_std
+        else:
+            piPulse = phase_fit/(2*np.pi*freq_fit)
+            piHalfPulse = piPulse - 1/(4*freq_fit)
+
+            #Calculate std. deviation for pi and pi/2 amplitudes based on error propagation theory
+            #(Source: http://ugastro.berkeley.edu/infrared09/PDF-2009/statistics1.pdf)
+            #Errors were assumed to be uncorrelated.
+            piPulse_std = piPulse*math.sqrt( (freq_std/freq_fit)**2 + (phase_std/phase_fit)**2)
+            piHalfPulse_std = math.sqrt( (piPulse_std)**2 + (freq_std/freq_fit)**2 )
+
+        #return as dict for ease of use with "save_computed_parameters"
+        self.rabi_amplitudes = {'piPulse':piPulse,
+                    'piPulse_std':piPulse_std,
+                    'piHalfPulse':piHalfPulse,
+                    'piHalfPulse_std':piHalfPulse_std}
+
+        if show_amplitudes:
+            print(pretty(pi)+'-Pulse Amplitude = {} \t\t'.format(piPulse)+
+                  pretty(pi)+'-Pulse Stddev = {}\n'.format(piPulse_std)+
+                  pretty(pi)+'/2-Pulse Amlitude = {}\t'.format(piHalfPulse)+
+                  pretty(pi)+'/2-Pulse Stddev = {}\n'.format(piHalfPulse_std))
+
+        #################################################
+
+        self.save_fitted_parameters(self.fit_res, var_name=self.value_names[0])
+        self.save_computed_parameters(self.rabi_amplitudes,var_name=self.value_names[0])
+
+        self.plot_results(fig1, ax, show_guess=show_guess,
+                          plot_amplitudes=plot_amplitudes, ylabel=r'$F$ $|1 \rangle$')
+
+        for i, name in enumerate(self.value_names):
+            if len(self.value_names) == 4:
+                if i < 2:
+                    ax2 = axarray[0, i]
+                else:
+                    ax2 = axarray[1, i-2]
+            else:
+                ax2 = axarray[i]
+
+            self.plot_results_vs_sweepparam(x=self.sweep_points,
+                                            y=self.measured_values[i],
+                                            fig=fig2, ax=ax2,
+                                            xlabel=self.xlabel,
+                                            ylabel=self.ylabels[i],
+                                            save=False)
+
+        if show:
+            plt.show()
+        self.save_fig(fig1, figname=self.measurementstring+'_Rabi_fit', **kw)
+        self.save_fig(fig2, figname=self.measurementstring, **kw)
+        if close_file:
+            self.data_file.close()
+        return self.fit_res
+
+    def plot_results(self, fig, ax, ylabel, show_guess=False, plot_amplitudes=True):
+
+        pi_pulse = self.rabi_amplitudes['piPulse']
+        pi_half_pulse = self.rabi_amplitudes['piHalfPulse']
+
+        textstr = ('  $\pi-Amp$  \t= %.3g $ \t \pm$ (%.3g) V'
+                   % (pi_pulse,
+                      self.rabi_amplitudes['piPulse_std']) +
+                   '\n$\pi/2-Amp$ = %.3g $\t \pm$ (%.3g) V '
+                   % (pi_half_pulse,
+                      self.rabi_amplitudes['piHalfPulse_std']))
+        ax.text(0.7, 0.97, textstr,
+                transform=ax.transAxes, fontsize=11,
+                verticalalignment='top', bbox=self.box_props)
+
+        self.plot_results_vs_sweepparam(x=self.sweep_points,        #This also plots the cal_points
+                                        y=self.normalized_values,
+                                        fig=fig, ax=ax,
+                                        xlabel=self.xlabel,
+                                        ylabel=ylabel,
+                                        save=False)
+        # plot with initial guess
+        if show_guess:
+            ax.plot(self.sweep_points[:-self.NoCalPoints],
+                    self.fit_res.init_fit, 'k--')
+
+        #plot with best fit results
+        x = np.linspace(self.sweep_points[0],
+                        self.sweep_points[-self.NoCalPoints],
+                        len(self.sweep_points)*100)
+        best_vals = self.fit_res.best_values
+        cos_fit_func = lambda a: fit_mods.CosFunc(a,
+                                                  amplitude=best_vals['amplitude'],
+                                                  frequency=best_vals['frequency'],
+                                                  phase=best_vals['phase'],
+                                                  offset=best_vals['offset'])
+
+        y = cos_fit_func(x)
+        ax.plot(x, y, 'r-')
+
+        #Plot the calculated pi and pi/2 amplitudes
+        if plot_amplitudes:
+
+            piPulse_fit = cos_fit_func(pi_pulse)
+            piHalfPulse_fit = cos_fit_func(pi_half_pulse)
+            ax.plot(pi_pulse, piPulse_fit, 'ro',markersize=10)
+            ax.plot(pi_half_pulse, piHalfPulse_fit, 'ro',markersize=10)
+
+            #plot 2 horizontal lines for piAmpl and piHaldAmpl
+            ax.plot([min(self.sweep_points), max(self.sweep_points)],[piPulse_fit, piPulse_fit], 'k--')
+            ax.plot([min(self.sweep_points), max(self.sweep_points)],[piHalfPulse_fit, piHalfPulse_fit], 'k--')
+            #Add extra ticks and labels
+            ax.set_yticks(list(ax.get_yticks()) + [piPulse_fit])
+            ax.set_yticks(list(ax.get_yticks()) + [piHalfPulse_fit])
 
 class Rabi_Analysis(TD_Analysis):
 
@@ -1145,8 +1408,7 @@ class Rabi_Analysis(TD_Analysis):
     def make_figures(self, **kw):
         show_guess = kw.pop('show_guess', False)
         self.fig, self.axs = plt.subplots(2, 1, figsize=(5, 6))
-        x_fine = np.linspace(min(self.sweep_points), max(self.sweep_points),
-                             1000)
+        x_fine = np.linspace(min(self.sweep_points), max(self.sweep_points), 1000)
         for i in [0, 1]:
             if i == 0:
                 plot_title = kw.pop('plot_title', textwrap.fill(
@@ -1165,11 +1427,11 @@ class Rabi_Analysis(TD_Analysis):
 
             fine_fit = self.fit_res[i].model.func(
                 x_fine, **self.fit_res[i].best_values)
-            self.axs[i].plot(x_fine, fine_fit, label='fit')
+            self.axs[i].plot(x_fine, fine_fit, label='fit')         #plot fit function with best fit params
             if show_guess:
                 fine_fit = self.fit_res[i].model.func(
                     x_fine, **self.fit_res[i].init_values)
-                self.axs[i].plot(x_fine, fine_fit, label='guess')
+                self.axs[i].plot(x_fine, fine_fit, label='guess')   #plot fit function with guess params
                 self.axs[i].legend(loc='best')
         self.save_fig(self.fig, fig_tight=False, **kw)
 
@@ -2542,19 +2804,19 @@ class T1_Analysis(TD_Analysis):
                                                 ylabel=self.ylabels[i],
                                                 save=False)
 
-        if 'I_cal' in self.value_names[i]:  # Fit the data
-            norm = self.normalize_data_to_calibration_points(
-                self.measured_values[i], self.NoCalPoints)
-            self.normalized_values = norm[0]
-            self.normalized_data_points = norm[1]
-            self.normalized_cal_vals = norm[2]
+                if 'I_cal' in self.value_names[i]:  # Fit the data
+                    norm = self.normalize_data_to_calibration_points(
+                        self.measured_values[i], self.NoCalPoints)
+                    self.normalized_values = norm[0]
+                    self.normalized_data_points = norm[1]
+                    self.normalized_cal_vals = norm[2]
 
-        else:
-            norm = self.normalize_data_to_calibration_points(
-                self.measured_values[0], self.NoCalPoints)
-            self.normalized_values = norm[0]
-            self.normalized_data_points = norm[1]
-            self.normalized_cal_vals = norm[2]
+                else:
+                    norm = self.normalize_data_to_calibration_points(
+                        self.measured_values[0], self.NoCalPoints)
+                    self.normalized_values = norm[0]
+                    self.normalized_data_points = norm[1]
+                    self.normalized_cal_vals = norm[2]
 
         fit_res = self.fit_T1(t_arr=self.sweep_points[:-self.NoCalPoints],
                               data=self.normalized_data_points)
@@ -2636,7 +2898,7 @@ class Ramsey_Analysis(TD_Analysis):
         if (average > 0.7 or
                 (est_number_of_periods < 2) or
                 est_number_of_periods > len(ft_of_data)/2.):
-            print('the trace is to short to find multiple periods')
+            print('the trace is too short to find multiple periods')
 
             if print_fit_results:
                 print('Setting frequency to 0 and ' +
@@ -3775,13 +4037,13 @@ class Homodyne_Analysis(MeasurementAnalysis):
 
         elif 'complex' in fitting_model:
             self.plot_complex_results(
-                data_complex, fig=fig, ax=ax, show=False, save=False)
+                data_complex, fig=fig, ax=ax, show=show, save=False)
             # second figure with amplitude
             fig2, ax2 = self.default_ax()
             ax2.text(0.05, 0.95, textstr, transform=ax.transAxes, fontsize=11,
                      verticalalignment='top', bbox=self.box_props)
             self.plot_results_vs_sweepparam(x=self.sweep_points, y=data_amp,
-                                            fig=fig2, ax=ax2, show=False, save=False)
+                                            fig=fig2, ax=ax2, show=show, save=False)
 
         elif fitting_model == 'lorentzian':
             self.plot_results_vs_sweepparam(x=self.sweep_points,
@@ -3789,6 +4051,7 @@ class Homodyne_Analysis(MeasurementAnalysis):
                                             fig=fig, ax=ax,
                                             xlabel=self.xlabel,
                                             ylabel=str('Power (arb. units)'),
+                                            show=show,
                                             save=False)
 
         if fit_window == None:
@@ -3813,7 +4076,7 @@ class Homodyne_Analysis(MeasurementAnalysis):
         else:
             ax.plot(self.sweep_points, fit_res.best_fit, 'r-')
             f0 = self.fit_results.values['f0']
-            plt.plot(f0, fit_res.eval(f=f0), 'o', ms=8)
+            ax.plot(f0, fit_res.eval(f=f0), 'o', ms=8)
 
             # save figure
             self.save_fig(fig, xlabel=self.xlabel, ylabel='Mag', **kw)
@@ -4018,7 +4281,9 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
 
     def run_default_analysis(self, print_fit_results=False,
                              show=False, fit_results_peak=True, **kw):
-        def fit_data(amp_only=True):
+
+        def fit_data(amp_only=True, analyze_ef=False):
+
             if amp_only:
                 self.data_dist = a_tools.calculate_distance_ground_state(
                      data_amp=self.measured_values[0],
@@ -4028,45 +4293,125 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
                     data_amp=self.measured_values[0],
                     data_phase=self.measured_values[1])
 
-            self.peaks = a_tools.peak_finder(
-                self.sweep_points, a_tools.smooth(self.data_dist))
+            #Cut edges to remove potential calibration points
+            sweep_pts_cut_edges = a_tools.cut_edges(self.sweep_points,window_len=window_len_cut_edges)
+            data_dist_cut_edges = a_tools.cut_edges(self.data_dist,window_len=window_len_cut_edges)
+            data_dist_smooth = a_tools.smooth(data_dist_cut_edges, window_len=window_len_filter)
 
-            if self.peaks['peak'] is not None:
+            self.peaks = a_tools.peak_finder(sweep_pts_cut_edges,
+                                             data_dist_smooth,
+                                             percentile=percentile,
+                                             num_sigma_threshold=num_sigma_threshold)
+
+            #extract highest peak -> ge transition
+            if self.peaks['dip'] is None:
                 f0 = self.peaks['peak']
                 kappa_guess = self.peaks['peak_width'] / 4
-
+                key = 'peak'
+            elif self.peaks['peak'] is None:
+                f0 = self.peaks['dip']
+                kappa_guess = self.peaks['dip_width'] / 4
+                key = 'dip'
+            elif self.peaks['dip'] < self.peaks['peak']:
+                f0 = self.peaks['peak']
+                kappa_guess = self.peaks['peak_width'] / 4
+                key = 'peak'
+            elif self.peaks['peak'] < self.peaks['dip']:
+                f0 = self.peaks['dip']
+                kappa_guess = self.peaks['dip_width'] / 4
+                key = 'dip'
             else:  # Otherwise take center of range
-                f0 = np.median(self.sweep_points)
+                f0 = np.median(sweep_pts_cut_edges)
                 kappa_guess = 0.005*1e9
 
             amplitude_guess = np.pi * kappa_guess * \
-                abs(max(self.data_dist) - min(self.data_dist))
+                              abs(max(data_dist_smooth) - min(data_dist_smooth))
 
-            LorentzianModel = fit_mods.LorentzianModel
-            LorentzianModel.set_param_hint('f0',
-                                           min=min(self.sweep_points),
-                                           max=max(self.sweep_points),
-                                           value=f0)
-            LorentzianModel.set_param_hint('A',
-                                           value=amplitude_guess,
-                                           min=4*np.var(self.data_dist))
-            LorentzianModel.set_param_hint('offset',
-                                           value=np.mean(self.data_dist),
-                                           vary=True)
-            LorentzianModel.set_param_hint('kappa',
-                                           value=kappa_guess,
-                                           min=0,
-                                           vary=True)
-            LorentzianModel.set_param_hint('Q',
-                                           expr='f0/kappa',
-                                           vary=False)
-            self.params = LorentzianModel.make_params()
+            if analyze_ef is False: #fit to a regular Lorentzian
 
-            fit_res = LorentzianModel.fit(data=self.data_dist,
-                                          f=self.sweep_points,
-                                          params=self.params)
-            print('min ampl', 2*np.var(self.data_dist))
-            return fit_res
+                LorentzianModel = fit_mods.LorentzianModel
+
+                LorentzianModel.set_param_hint('f0',
+                                               min=min(sweep_pts_cut_edges),
+                                               max=max(sweep_pts_cut_edges),
+                                               value=f0)
+                LorentzianModel.set_param_hint('A',
+                                               value=amplitude_guess,
+                                               min=4*np.var(self.data_dist))
+                LorentzianModel.set_param_hint('offset',
+                                               value=np.mean(self.data_dist),
+                                               vary=True)
+                LorentzianModel.set_param_hint('kappa',
+                                               value=kappa_guess,
+                                               min=0,
+                                               vary=True)
+                LorentzianModel.set_param_hint('Q',
+                                               expr='f0/kappa',
+                                               vary=False)
+                self.params = LorentzianModel.make_params()
+
+                fit_res = LorentzianModel.fit(data=self.data_dist,
+                                              f=self.sweep_points,
+                                              params=self.params)
+
+            else: #fit a double Lorentzian and extract the 2nd peak as well
+                  #extract second highest peak -> ef transition
+
+                if self.peaks[key+'s'].size > 1: #if there's more than one peak
+                    diff = [self.peaks[key] - self.peaks[key+'s']]
+                    f0_gf_over_2 = self.peaks[key+'s'][np.argmax(diff)]
+                    kappa_guess_ef = self.peaks[key+'_widths'][np.argmax(diff)] / 4
+                    if kappa_guess_ef == 0:
+                        kappa_guess_ef = kappa_guess
+                else:
+                    f0_gf_over_2 = f0-2e6 #CHECK!
+                    kappa_guess_ef = kappa_guess
+                    logging.warning('The find_peaks function was not able to find more than one peak.'
+                                    ' The default values f0_gf_over_2 = "%s" and kappa_guess_ef = "%s" '
+                                    'were used.' %(f0_gf_over_2, kappa_guess) )
+
+                amplitude_guess_ef = 0.5*np.pi * kappa_guess_ef * \
+                                     abs(max(data_dist_smooth) - min(data_dist_smooth)) #not sure this will work
+
+                DoubleLorentzianModel = fit_mods.TwinLorentzModel
+
+                DoubleLorentzianModel.set_param_hint('f0',
+                                                     min=min(sweep_pts_cut_edges),
+                                                     max=max(sweep_pts_cut_edges),
+                                                     value=f0)
+                DoubleLorentzianModel.set_param_hint('f0_gf_over_2',
+                                                     min=min(sweep_pts_cut_edges),
+                                                     max=max(sweep_pts_cut_edges),
+                                                     value=f0_gf_over_2)
+                DoubleLorentzianModel.set_param_hint('A',
+                                                     value=amplitude_guess,
+                                                     min=4*np.var(self.data_dist))
+                DoubleLorentzianModel.set_param_hint('A_gf_over_2',
+                                                     value=amplitude_guess_ef,
+                                                     min=4*np.var(self.data_dist))
+                DoubleLorentzianModel.set_param_hint('kappa',
+                                                     value=kappa_guess,
+                                                     min=0,
+                                                     vary=True)
+                DoubleLorentzianModel.set_param_hint('kappa_gf_over_2',
+                                                     value=kappa_guess_ef,
+                                                     min=0,
+                                                     vary=True)
+                DoubleLorentzianModel.set_param_hint('Q',
+                                                     expr='f0/kappa',
+                                                     vary=False)
+                DoubleLorentzianModel.set_param_hint('Q_ef',
+                                                     expr='f0_gf_over_2/kappa_gf_over_2',
+                                                     vary=False)
+                self.params = DoubleLorentzianModel.make_params()
+
+                fit_res = DoubleLorentzianModel.fit(data=self.data_dist,
+                                                    f=self.sweep_points,
+                                                    params=self.params)
+
+            #In the end, return the fit results regardless of which model was used.
+            print('min ampl =', 2*np.var(self.data_dist))
+            return fit_res #an lmfit ModelResult object
 
         self.add_analysis_datagroup_to_file()
         self.savename = kw.pop('save_name', 'Source Frequency')
@@ -4074,21 +4419,20 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
         close_file = kw.pop('close_file', True)
         self.get_naming_and_values()
 
-        if len(self.value_names) == 1:
-            fig, axarray = plt.subplots(1, 1, figsize=(12, 10))
-            axes = [axarray]
-        elif len(self.value_names) == 2:
-            fig, axarray = plt.subplots(2, 1, figsize=(12, 10))
-            axes = axarray
-        elif len(self.value_names) > 2:
-            fig, axarray = plt.subplots(2, 2, figsize=(12, 10))
-            axes = [axarray[k/2, k % 2] for k in range(len(self.value_names))]
+        percentile = kw.get('percentile',20)
+        num_sigma_threshold = kw.get('num_sigma_threshold',5)
+        window_len_filter = kw.get('window_len',3)
+        window_len_cut_edges = kw.get('analysis_window',10)
 
         use_max = kw.get('use_max', False)
 
-        amp_only = kw.get('amp_only', True)
-        fit_res = fit_data(amp_only=amp_only)
-        self.fitted_freq = fit_res.params['f0'].value
+        #Make the default for amp_only False
+        amp_only = kw.get('amp_only', False)
+        analyze_ef = kw.get('analyze_ef',False)                         #extract analyze_ef from the kwargs;
+                                                                       # if not provided, default to False
+        fit_res = fit_data(amp_only=amp_only, analyze_ef=analyze_ef)    #an lmfit ModelResult object
+        self.fitted_freq = fit_res.params['f0'].value                   #get fitted frequency; gets called
+                                                                        #in QuDev_transmon.find_frequency
 
         self.fit_results.append(fit_res)
         self.save_fitted_parameters(fit_res,
@@ -4096,28 +4440,65 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
         if print_fit_results is True:
             print(fit_res.fit_report())
 
+            if len(self.value_names) == 1:
+                fig, axarray = plt.subplots(1, 1, figsize=(12, 10))
+                axes = [axarray]
+            elif len(self.value_names) == 2:
+                fig, axarray = plt.subplots(2, 1, figsize=(12, 10))
+                axes = axarray
+            elif len(self.value_names) > 2:
+                fig, axarray = plt.subplots(2, 2, figsize=(12, 10))
+                axes = [axarray[k/2, k % 2] for k in range(len(self.value_names))]
+
         for k in range(len(self.measured_values)):
             ax = axes[k]
-            textstr = '$f_{\mathrm{center}}$ = %.5g $\pm$ (%.3g) GHz\n' % (
-                fit_res.params['f0'].value*1e-9,
-                fit_res.params['f0'].stderr*1e-9)
+
+            # Plot a point for each plot at the chosen best fit f0 frequency (f_ge)
+            f0 = fit_res.params['f0'].value
+            f0_idx = a_tools.nearest_idx(self.sweep_points, f0)
+            axes[k].plot(f0, self.measured_values[k][f0_idx], 'o', ms=8)
+
+            if analyze_ef is True:
+                self.fitted_freq_gf_over_2 = fit_res.params['f0_gf_over_2'].value
+                textstr = '$f_{\mathrm{ge}}$ = %.5g $\pm$ (%.3g) GHz\n'\
+                          '$f_{\mathrm{ef}}/2$ = %.5g $\pm$ (%.3g) GHz'% (
+                    fit_res.params['f0'].value*1e-9, fit_res.params['f0'].stderr*1e-9,
+                    fit_res.params['f0_gf_over_2'].value*1e-9, fit_res.params['f0_gf_over_2'].stderr*1e-9)
+
+                # Plot a point for each plot at the chosen best fit f_ef/2 frequency
+                f0_gf_over_2 = fit_res.params['f0_gf_over_2'].value
+                f0_gf_over_2_idx = a_tools.nearest_idx(self.sweep_points, f0_gf_over_2)
+                axes[k].plot(f0_gf_over_2, self.measured_values[k][f0_gf_over_2_idx], 'o', ms=8)
+            else:
+                textstr = '$f_{\mathrm{ge}}$ = %.5g $\pm$ (%.3g) GHz' % (
+                              fit_res.params['f0'].value*1e-9, fit_res.params['f0'].stderr*1e-9)
+
             ax.text(0.05, 0.95, textstr, transform=ax.transAxes,
                     fontsize=11, verticalalignment='top', bbox=self.box_props)
 
+            #This creates 2 subplots, one of I_pts vs sweep_pts, and one of Q_pts vs. sweep_pts
             self.plot_results_vs_sweepparam(x=self.sweep_points,
                                             y=self.measured_values[k],
                                             fig=fig, ax=ax,
                                             xlabel=self.xlabel,
                                             ylabel=self.ylabels[k],
                                             save=False)
-            # Plot a point for each plot at the chosen best fit f0 frequency
-            f0 = fit_res.params['f0'].value
-            f0_idx = a_tools.nearest_idx(self.sweep_points, f0)
-            axes[k].plot(f0, self.measured_values[k][f0_idx], 'o', ms=8)
+        if show:
+            plt.show()
+        self.save_fig(fig, figname=self.savename, **kw)
 
         # Plotting distance from |0>
-        label = r'f0={:.5}$\pm$ {:.2} MHz, linewidth={:.4}$\pm${:.2} MHz'.format(
-            fit_res.params['f0'].value/1e6, fit_res.params['f0'].stderr/1e6, fit_res.params['kappa'].value/1e6, fit_res.params['kappa'].stderr/1e6)
+        if analyze_ef:
+            label = 'f0={:.5}$\pm$ {:.2} MHz, linewidth={:.4}$\pm${:.2} MHz \n'\
+                    'f0_gf/2={:.5}$\pm$ {:.2} MHz, linewidth={:.4}$\pm${:.2} MHz'.format(
+                    fit_res.params['f0'].value/1e6, fit_res.params['f0'].stderr/1e6,
+                    fit_res.params['kappa'].value/1e6, fit_res.params['kappa'].stderr/1e6,
+                    fit_res.params['f0_gf_over_2'].value/1e6, fit_res.params['f0_gf_over_2'].stderr/1e6,
+                    fit_res.params['kappa_gf_over_2'].value/1e6, fit_res.params['kappa_gf_over_2'].stderr/1e6)
+        else:
+            label = r'f0={:.5}$\pm$ {:.2} MHz, linewidth={:.4}$\pm${:.2} MHz'.format(
+                    fit_res.params['f0'].value/1e6, fit_res.params['f0'].stderr/1e6,
+                    fit_res.params['kappa'].value/1e6, fit_res.params['kappa'].stderr/1e6)
         fig_dist, ax_dist = self.default_ax()
         self.plot_results_vs_sweepparam(x=self.sweep_points,
                                         y=self.data_dist,
@@ -4126,13 +4507,14 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
                                         ylabel='S21 distance (V)',
                                         label=False,
                                         save=False)
-        ax_dist.plot(self.sweep_points, fit_res.best_fit, 'r-')
+        ax_dist.plot(self.sweep_points, fit_res.best_fit, 'r-')      #plot Lorentzian with the fit results
         ax_dist.plot(f0, fit_res.best_fit[f0_idx], 'o', ms=8)
+        if analyze_ef:                                               #plot the ef/2 point as well
+            ax_dist.plot(f0_gf_over_2, fit_res.best_fit[f0_gf_over_2_idx], 'o', ms=8)
         if show_guess:
-            ax_dist.plot(self.sweep_points, fit_res.init_fit, 'k--')
-        ax_dist.text(0.05, 0.95, label, transform=ax_dist.transAxes,
+            ax_dist.plot(self.sweep_points, fit_res.init_fit, 'k--') #plot Lorentzian with initial guess
+        ax_dist.text(0.6, 0.95, label, transform=ax_dist.transAxes,
                      fontsize=11, verticalalignment='top', bbox=self.box_props)
-        self.save_fig(fig, figname=self.savename, **kw)
         if show:
             plt.show()
         self.save_fig(fig_dist, figname='Source frequency distance', **kw)
@@ -4152,7 +4534,6 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
         linewidth_estimate = best_fit['kappa'].attrs['value']
 
         return linewidth_estimate
-
 
 class Mixer_Calibration_Analysis(MeasurementAnalysis):
 
