@@ -224,10 +224,7 @@ class QWG_FluxLookuptableManager(Instrument):
                            docstring='Dict assigning codewords to pulses',
                            label='codeword dict',
                            unit='',
-                           initial_value={
-                               'Square_flux_pulse': 5,
-                               'Martinis_flux_pulse': 6
-                           },
+                           initial_value={},
                            vals=vals.Anything(),
                            parameter_class=ManualParameter)
         self.add_parameter('sampling_rate',
@@ -235,6 +232,22 @@ class QWG_FluxLookuptableManager(Instrument):
                            label='sampling rate',
                            unit='Hz',
                            initial_value=1.0e9,
+                           vals=vals.Numbers(),
+                           parameter_class=ManualParameter)
+        self.add_parameter('Z_length',
+                           docstring=
+                               'Duration of single qubit Z pulse in seconds',
+                           label='Z length',
+                           unit='s',
+                           initial_value=10e-9,
+                           vals=vals.Numbers(),
+                           parameter_class=ManualParameter)
+        self.add_parameter('Z_amp',
+                           docstring=
+                               'Amplitude of single qubit Z pulse in volts',
+                           label='Z length',
+                           unit='V',
+                           initial_value=0.0,
                            vals=vals.Numbers(),
                            parameter_class=ManualParameter)
 
@@ -279,9 +292,18 @@ class QWG_FluxLookuptableManager(Instrument):
             sampling_rate=self.sampling_rate(),
             return_unit='V')
 
+        # Flux pulse for single qubit phase correction
+        z_nr_samples = int(np.round(self.Z_length() * self.sampling_rate()))
+        single_qubit_phase_correction = np.ones(z_nr_samples) * self.Z_amp()
+
+        # Construct phase corrected pulses
+        martinis_phase_corrected = np.concatenate(
+            [martinis_pulse_v2, single_qubit_phase_correction])
+
         return {'Square_flux_pulse': block_I,
                 'Martinis_flux_pulse': martinis_pulse,
-                'Martinis_flux_pulse_v2': martinis_pulse_v2}
+                'Martinis_flux_pulse_v2': martinis_pulse_v2,
+                'Martinis_phase_corrected': martinis_phase_corrected}
 
     def generate_standard_pulses(self):
         '''
@@ -307,7 +329,7 @@ class QWG_FluxLookuptableManager(Instrument):
             if self.F_kernel_instr() is not None:
                 k = self.F_kernel_instr.get_instr()
                 self._wave_dict[key] = k.convolve_kernel(
-                    [k.kernel(), delayed_wave], length_samples=60e3)
+                    [k.kernel(), delayed_wave], length_samples=30e3)
                 # hard-coded length for the distortions
             else:
                 logging.warning('No distortion kernel specified,'
