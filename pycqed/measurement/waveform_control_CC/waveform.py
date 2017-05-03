@@ -237,10 +237,11 @@ def martinis_flux_pulse_v2(length, lambda_2, lambda_3, theta_f,
     of the pulse has a value corresponding to theta_f.
 
     length          (float)
-    lambda_coeffs   (list of floats) starting from lambda2 since lambda_1 is
-                    completely determined by theta_f
-    theta_f         (float) final angle of the interaction. This determines the
-                    Voltage for the centerpoint of the waveform.
+    lambda_2
+    lambda_3
+
+    theta_f         (float) final angle of the interaction in degrees.
+                    Determines the Voltage for the center of the waveform.
 
     f_01_max        (float) qubit sweet spot frequency (Hz).
     J2              (float) coupling between 11-02 (Hz),
@@ -268,10 +269,15 @@ def martinis_flux_pulse_v2(length, lambda_2, lambda_3, theta_f,
     if f_interaction is None:
         f_interaction = f_bus + E_c
     theta_i = np.arctan(2*J2 / (f_01_max - f_interaction))
+    # Converting angle to radians as that is used under the hood
+    theta_f = 2*np.pi*theta_f/360
     if theta_f < theta_i:
         raise ValueError(
-            'theta_f < theta_i: final coupling weaker than initial coupling')
+            'theta_f ({:2.f} deg) < theta_i ({:2.f} deg):'.format(
+                theta_f/(2*np.pi)*360, theta_i/(2*np.pi)*360)
+            + 'final coupling weaker than initial coupling')
 
+    # lambda_1 is scaled such that the final ("center") angle is theta_f
     lambda_1 = (theta_f - theta_i) / 2 - lambda_3
 
     # Calculate the wave
@@ -289,6 +295,7 @@ def martinis_flux_pulse_v2(length, lambda_2, lambda_3, theta_f,
 
     # Return in the specified units
     if return_unit == 'theta':
+        # Theta is returned in radians here
         return theta_wave_clipped
 
     # Convert to detuning from f_interaction

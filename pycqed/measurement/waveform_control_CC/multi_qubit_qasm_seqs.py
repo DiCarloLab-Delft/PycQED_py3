@@ -202,8 +202,9 @@ def two_qubit_AllXY(q0, q1, RO_target='all',
 
 
 def chevron_seq(q0, q1,
-                excite_q1=False, wait_after_trigger=150e-9,
-                wait_during_flux=400e-9, clock_cycle=5e-9, RO_target='all'):
+                excite_q1=False, wait_after_trigger=40e-9,
+                wait_during_flux=400e-9, clock_cycle=5e-9, RO_target='all',
+                mw_pulse_duration=40e-9):
     '''
     Single chevron sequence that does a swap on |01> <-> |10> or |11> <-> |20>.
 
@@ -228,7 +229,9 @@ def chevron_seq(q0, q1,
 
     qasm_file.writelines('\ninit_all\n')
 
-    qasm_file.writelines('QWG trigger\n')
+    qasm_file.writelines('QWG trigger square\n')
+    if excite_q1:
+        wait_after_trigger -= mw_pulse_duration
     qasm_file.writelines(
         'I {} {}\n'.format(q0, int(wait_after_trigger//clock_cycle)))
     qasm_file.writelines('X180 {}\n'.format(q0))
@@ -277,21 +280,20 @@ def two_qubit_tomo_bell(bell_state, q0, q1,
     if bell_state % 10 == 0:  # |Phi_m>=|00>-|11>
         prep_pulse_q0 = 'Y90 {}\n'.format(q0)
         prep_pulse_q1 = 'Y90 {}\n'.format(q1)
-        after_pulse = 'mY90 {}\n'.format(q1)
     elif bell_state % 10 == 1:  # |Phi_p>=|00>+|11>
         prep_pulse_q0 = 'mY90 {}\n'.format(q0)
         prep_pulse_q1 = 'Y90 {}\n'.format(q1)
-        after_pulse = 'mY90 {}\n'.format(q1)
     elif bell_state % 10 == 2:  # |Psi_m>=|01>-|10>
         prep_pulse_q0 = 'Y90 {}\n'.format(q0)
         prep_pulse_q1 = 'mY90 {}\n'.format(q1)
-        after_pulse = 'mY90 {}\n'.format(q1)
     elif bell_state % 10 == 3:  # |Psi_p>=|01>+|10>
         prep_pulse_q0 = 'mY90 {}\n'.format(q0)
         prep_pulse_q1 = 'mY90 {}\n'.format(q1)
-        after_pulse = 'mY90 {}\n'.format(q1)
     else:
         raise ValueError('Bell state {} is not defined.'.format(bell_state))
+
+    # Recovery pulse is the same for all Bell states
+    after_pulse = 'recX90 {}\n'.format(q1)
 
     # Disable preparation pulse on one or the other qubit for debugging
     if bell_state//10 == 1:
