@@ -8,10 +8,12 @@
 # TODO in principle that could be generalized for other
 # sequencing hardware i guess
 
-import time
 import numpy as np
 import logging
 from qcodes.instrument.base import Instrument
+from qcodes.instrument_drivers.tektronix.AWG5014 import Tektronix_AWG5014
+from pycqed.instrument_drivers.physical_instruments.ZurichInstruments.\
+    UHFQuantumController import UHFQC
 import time
 
 # some pulses use rounding when determining the correct sample at which to
@@ -25,47 +27,47 @@ SIGNIFICANT_DIGITS = 11
 
 class Pulsar:
     """
-    A meta-instrument responsible for all communication with the AWS-s.
+    A meta-instrument responsible for all communication with the AWGs.
     Contains information about all the available awg-channels in the setup.
     Starting, stopping and programming the AWGs should be done through Pulsar.
-    Currently assumes all AWGs have the same sample rate
+    TODO: Supports Tektronix AWG5014 and ZI UHFLI.
     """
-    def __init__(self, clock=1e9):
-        self.AWG = None  # the default AWG
+    def __init__(self):
+        self.default_AWG = None  # the default AWG object
+        self._AWG_obj = {}  # dictionary from AWG name to AWG object
         self.channels = {}
-        self.AWGs = {}  # dictionary from AWG name to AWG object
-        self.clock = clock
-        self.trigger_AWG = None  # the name of the AWG that triggers all the
-                                 # others
 
     # channel handling
     def define_channel(self, id, name, type, delay, offset,
                        high, low, active, AWG=None):
         """
-        :param id: channel id. For the Tektronix 5014 must be of the form
-                   ch#(_marker#) with # a number and the part in () optional
-        :param name: This name must be specified in pulses for them to play on
-                     this channel
-        :param type: marker/analog
-        :param delay: not implemented
-        :param offset: a (software implemented) offset voltage that is added to
-                       all of the waveforms (analog channel only)
-        :param high: maximal
-        :param low:
-        :param active: whether this channel will be programmed
-        :param AWG: name of the AWG this channel is on
         The AWG object must be created before creating channels for that AWG
+
+        Args:
+            id: channel id. For the Tektronix 5014 must be of the form
+                ch#(_marker#) with # a number and the part in () optional.
+                For UHFQC must be 'ch1' or 'ch2'.
+            name: This name must be specified in pulses for them to play on
+                  this channel.
+            type: marker/analog/readout
+            delay: global delay applied to this channel
+            offset: a (software implemented) offset voltage that is added to
+                    all of the waveforms (analog channel only)
+            high: maximal output value
+            low: minimal output value
+            active: whether this channel will be programmed
+            AWG: name of the AWG this channel is on
         """
         if AWG is None:
-            AWG = self.AWG.name
+            AWG = self.default_AWG.name
 
-        self.AWGs[AWG] = Instrument.find_instrument(AWG)
+        self._AWG_obj[AWG] = Instrument.find_instrument(AWG)
 
         _doubles = []
         for c_name, c_dict in self.channels.items():
             if c_dict['id'] == id and c_dict['AWG'] == AWG:
-                logging.warning("Channel '{}' on {} already in use, will "
-                                "overwrite.".format(id, AWG))
+                logging.warning("Channel '{}' on {} already in use, {} will "
+                                "overwrite {}.".format(id, AWG, name, c_name))
                 _doubles.append(c_name)
         for c in _doubles:
             del self.channels[c]
@@ -81,30 +83,48 @@ class Pulsar:
 
     def get_AWG_object(self, channel):
         """
-        :param channel: name of the relevant channel
-        :return: AWG object
+        Returns the AWG object for the channel
+
+        Args:
+            channel: Name of the channel
+        Returns:
+            the AWG object
         """
-        return self.AWGs[self.channels[channel]['AWG']]
+        return self._AWG_obj[self.channels[channel]['AWG']]
 
     def set_channel_opt(self, name, option, value):
+        """
+        Set a channel option
+
+        Args:
+            name: name of the channel
+            option: name of the option
+            value: new value for the option
+        """
         self.channels[name][option] = value
 
-    def get_subchannels(self, id):
+    def _get_5014_subchannels(self, id):
         """
-        :param id: ch#(_marker#)
-        :return: [ch#, ch#_marker1, ch#_marker2]
+        Returns a list with all subchannels corresponding to AWG5014 channel id
+
+        Args:
+            id: ch#(_marker#)
+        Returns:
+            [ch#, ch#_marker1, ch#_marker2]
         """
         return [id[:3], id[:3]+'_marker1', id[:3]+'_marker2']
 
     def get_used_AWGs(self):
         """
-        :return: an iterable containing the names of the AWGs used
+        Returns:
+            A list of the names of the AWGs in use
         """
         return self.AWGs.keys()
 
     def get_active_AWGs(self):
         """
-        :return: an iterable containing the names of the active AWGs
+        Returns:
+            A set of the names of the AWGs in use with active channels
         """
         active_AWGs = set()
         for c_dict in self.channels.values():
@@ -112,9 +132,17 @@ class Pulsar:
                 active_AWGs.add(c_dict['AWG'])
         return active_AWGs
 
-    def get_channel_names_by_id(self, id, AWG=None):
+    def _get_channel_names_by_5014_id(self, id, AWG=None):
+        """
+        Args:
+            id: ch#
+            AWG: name of the AWG to look the channels for. If `None` uses
+                 the default AWG
+        Returns:
+            dict of channel names with the given id
+        """
         if AWG is None:
-            AWG = self.AWG.name
+            AWG = self.default_AWG.name
         chans = {id: None, id+'_marker1': None, id+'_marker2': None}
         for c_name, c_dict in self.channels.items():
             if c_dict['id'] in chans and c_dict['AWG'] == AWG:
@@ -122,28 +150,51 @@ class Pulsar:
         return chans
 
     def get_channel_name_by_id(self, id, AWG=None):
+        """
+        Args:
+            id: ch#
+            AWG: name of the AWG to look the channels for. If `None` uses
+                 the default AWG.
+        Returns:
+            channel name with the given id
+        """
         if AWG is None:
-            AWG = self.AWG.name
-        for c, c_dict in self.channels.items():
+            AWG = self.default_AWG.name
+        for c_name, c_dict in self.channels.items():
             if c_dict['id'] == id and c_dict['AWG'] == AWG:
-                return c
+                return c_name
 
     def get_used_subchannel_ids(self, all_subchannels=True, AWG=None):
+        """
+        Args:
+            all_subchannels: Boolean flag to return all subchannel id-s if one
+                             is enabled (applicable to AWG5014)
+            AWG: The name of the AWG to look for the channels
+        Returns:
+            id-s of all the used channels (analog and marker) on the given AWG.
+        """
         if AWG is None:
-            AWG = self.AWG.name
+            AWG = self.default_AWG.name
         chans = set()
         for c_dict in self.channels.values():
             if c_dict['active'] and c_dict['AWG'] == AWG:
                 if all_subchannels:
-                    for id in self.get_subchannels(c_dict['id']):
+                    for id in self._get_5014_subchannels(c_dict['id']):
                         chans.add(id)
                 else:
                     chans.add(c_dict['id'])
         return chans
 
     def get_used_channel_ids(self, AWG=None):
+        """
+        Args:
+            AWG: The name of the AWG to look for the channels
+        Returns:
+            id-s of all the used channels on the given AWG. Marker channels on
+             the AWG5014 are considered part of the corresponding analog channel
+        """
         if AWG is None:
-            AWG = self.AWG.name
+            AWG = self.default_AWG.name
         chans = set()
         for c_dict in self.channels.values():
             if c_dict['active'] and c_dict['AWG'] == AWG:
@@ -177,11 +228,13 @@ class Pulsar:
 
     def get_awg_channel_cfg(self, AWG=None):
         """
-        :param AWG: the name of the AWG
-        :return: A dictionary with the configuration parameters for the AWG
+        Args:
+            AWG: the name of the AWG
+        Returns:
+            A dictionary with the configuration parameters for the AWG
         """
         if AWG is None:
-            AWG = self.AWG.name
+            AWG = self.default_AWG.name
         channel_cfg = {}
 
         for c_dict in self.channels.values():
@@ -213,11 +266,17 @@ class Pulsar:
     # waveform/file handling
     def delete_all_waveforms(self, AWG=None):
         if AWG is None:
-            self.AWG.delete_all_waveforms_from_list()
-        else:
-            self.AWGs[AWG].delete_all_waveforms_from_list()
+            AWG = self.default_AWG.name
+        self._AWG_obj[AWG].delete_all_waveforms_from_list()
 
     def program_awgs(self, sequence, *elements, **kw):
+        """
+        Args:
+            sequence: The `Sequence` object telling the order in which to play
+                      the elements
+            *elements: The `Element` objects to program to the AWGs.
+            AWGs: names of the AWGs to program. Defaults to 'all'.
+        """
         # Stores the last uploaded elements for easy access and plotting
         self.last_sequence = sequence
         self.last_elements = elements
@@ -228,11 +287,17 @@ class Pulsar:
             AWGs = self.get_used_AWGs()
 
         for AWGn in AWGs:
-            AWG = self.AWGs[AWGn]
-            AWG.stop()
-            self._program_awg(AWG, sequence, *elements, **kw)
+            AWG = self._AWG_obj[AWGn]
+            if isinstance(AWG, Tektronix_AWG5014):
+                self._program_AWG5014(AWG, sequence, *elements, **kw)
+            elif isinstance(AWG, UHFQC):
+                self._program_UHFQC(AWG, sequence, *elements, **kw)
+            else:
+                raise TypeError('Unsupported AWG intrument: {} of type {}'
+                                .format(AWGn, type(AWG)))
 
-    def _program_awg(self, AWG, sequence, *elements, **kw):
+
+    def _program_AWG5014(self, AWG, sequence, *elements, **kw):
         """
         Upload a single file to the AWG (.awg) which contains all waveforms
         AND sequence information (i.e. nr of repetitions, event jumps etc)
@@ -407,6 +472,128 @@ class Pulsar:
         print(" finished in %.2f seconds." % _t)
         return awg_file
 
+    def _program_UHFQC(self, AWG, sequence, *elements, **kw):
+        channels = kw.pop('channels', 'all')
+        allow_non_zero_first_point_on_trigger_wait = \
+            kw.pop('allow_first_nonzero', False)
+
+        header = """const TRIGGER1  = 0x000001;
+const WINT_TRIG = 0x000010;
+const IAVG_TRIG = 0x000020;
+const WINT_EN   = 0x1f0000;
+setTrigger(WINT_EN);
+var loop_cnt = getUserReg(0);
+var RO_TRIG;
+if(getUserReg(1)){
+  RO_TRIG=IAVG_TRIG;
+}else{
+  RO_TRIG=WINT_TRIG;
+}
+\n"""
+
+        main_loop = 'repeat(loop_cnt) {\n'
+
+
+        footer = """}
+wait(1000);
+setTrigger(0);
+"""
+
+        # parse elements
+        elements_with_non_zero_first_points = []
+        wfnames = {'ch1': [], 'ch2': []}
+        wfdata = []
+        for element in elements:
+            tvals, wfs = element.normalized_waveforms()
+
+            for id in ['ch1', 'ch2']:
+                wfname = element.name + '_%s' % id
+
+                # determine if we actually want to upload this channel
+                if channels != 'all':
+                    upload = False
+                    for c in channels:
+                        if self.channels[c]['id'][:3] == id and \
+                                self.channels[c]['AWG'] == AWG.name and \
+                                self.channels[c]['active']:
+                            upload = True
+                            c_name = c
+                    if not upload:
+                        wfnames[id].append(None)
+                        continue
+                else:
+                    c_name = self.get_channel_name_by_id(id, AWG.name)
+
+                if c_name in wfs:
+                    chan_wf = wfs[c_name]
+                    if chan_wf[0] != 0.:
+                        elements_with_non_zero_first_points.append(
+                            element.name)
+                    wfnames[id].append(wfname)
+                    header += 'wave {} = zeros({})'.format(wfname,
+                                                           element.samples)
+                    wfdata.append(chan_wf)
+                else:
+                    wfnames[id].append(None)
+
+        # create waveform playback code
+        for i, elt in enumerate(sequence.elements):
+            if elt['goto_target'] != 0:
+                raise NotImplementedError('UHFQC sequencer does not yet support'
+                                          ' nontrivial goto-s.')
+            if elt['jump_target'] != 0:
+                raise NotImplementedError('UHFQC sequencer does not support'
+                                          ' jump events.')
+            if elt['trigger_wait']:
+                if elt['wfname'] in elements_with_non_zero_first_points and \
+                        not allow_non_zero_first_point_on_trigger_wait:
+                    raise Exception('pulsar: Trigger wait set for element {} '
+                                    'with a non-zero first point'
+                                    .format(elt['wfname']))
+            name_ch1 = wfnames['ch1'][i]
+            name_ch2 = wfnames['ch2'][i]
+            main_loop += self._UHFQC_element_seqc(elt['repetitions'],
+                                                  elt['trigger_wait'],
+                                                  name_ch1, name_ch2, True)
+
+        awg_str = header + main_loop + footer
+        AWG.awg_string(awg_str)
+
+        # populate the waveforms with data
+        for i, data in enumerate(wfdata):
+            AWG.awg_update_waveform(i, data)
+
+
+    def _UHFQC_element_seqc(self, reps, wait, name1, name2, readout):
+        """
+        Generates a part of the sequence code responsible for playing back a
+        single element
+
+        Args:
+            reps: number of repetitions for this code
+            wait: boolean flag, whether to wait for trigger
+            name1: name of the wave to be played on channel 1
+            name2: name of the wave to be played on channel 2
+            readout: boolean flag, whether to acquire a datapoint after the
+            element
+        Returns:
+            string for playing back an element
+        """
+        repeat_open_str = '\trepeat({}) {\n'.format(reps) if reps != 0 else ''
+        trigger_str = '\t\twaitDigTrigger(1, 1);\n' if wait else ''
+        if name1 is None:
+            play_str = '\t\tplayWave(2, {});\n'.format(name2)
+        elif name2 is None:
+            play_str = '\t\tplayWave(1, {});\n'.format(name1)
+        else:
+            play_str = '\t\tplayWave({}, {});\n'.format(name1, name2)
+        readout_str = '\t\tsetTrigger(WINT_EN +RO_TRIG);\n' if readout else ''
+        readout_str += '\t\tsetTrigger(WINT_EN);\n' if readout else ''
+        wait_wave_str = '\t\twaitWave();\n'
+        repeat_close_str = '\t}\n' if reps != 0 else ''
+        return repeat_open_str + trigger_str + play_str + readout_str + \
+               wait_wave_str + repeat_close_str
+
     def check_sequence_consistency(self, packed_waveforms,
                                    wfname_l,
                                    nrep_l, wait_l, goto_l, logic_jump_l):
@@ -470,15 +657,15 @@ class Pulsar:
         print(" finished in %.2f seconds." % _t)
 
     def start(self):
-        if self.trigger_AWG is None:
+        if self.master_AWG is None:
             for AWG in self.get_active_AWGs():
                 self.AWGs[AWG].start()
         else:
             for AWG in self.get_active_AWGs():
-                if AWG != self.trigger_AWG:
+                if AWG != self.master_AWG:
                     self.AWGs[AWG].start()
             time.sleep(1) # wait 1 second for all other awg-s to start
-            self.AWGs[self.trigger_AWG].start()
+            self.AWGs[self.master_AWG].start()
 
     def stop(self):
         for AWG in self.AWGs.values():
