@@ -10,7 +10,7 @@ from pycqed.analysis.fit_toolbox import functions as fn
 from pycqed.measurement.waveform_control import pulse
 from pycqed.measurement.waveform_control import element
 from pycqed.measurement.waveform_control import sequence
-
+from qcodes.instrument.parameter import _BaseParameter
 from pycqed.instrument_drivers.virtual_instruments.pyqx import qasm_loader as ql
 
 
@@ -843,7 +843,7 @@ class Function_Detector(Soft_Detector):
         # If an entry has a get method that will be used to set the value.
         # This makes parameters work in this context.
         for key, item in self.msmt_kw.items():
-            if hasattr(item, 'get'):
+            if isinstance(item, _BaseParameter):
                 value = item.get()
             else:
                 value = item
