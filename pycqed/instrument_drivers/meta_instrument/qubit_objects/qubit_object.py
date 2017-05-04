@@ -459,9 +459,9 @@ class Transmon(Qubit):
             if n > max_n:
                 break
             else:
-                old_amp = ampl
+                old_amp = np.abs(ampl)
                 ampl_span = 0.35*ampl/n
-                amps = np.linspace(ampl-ampl_span, ampl+ampl_span, 15)
+                amps = np.linspace(np.abs(ampl)-ampl_span, np.abs(ampl)+ampl_span, 15)
                 self.measure_rabi(amps, n=n, MC=MC, analyze=False)
                 a = ma.Rabi_parabola_analysis(close_fig=close_fig)
                 # Decide which quadrature to take by comparing the contrast
@@ -496,7 +496,7 @@ class Transmon(Qubit):
                 if verbose:
                     print('Found amplitude', ampl, '\n')
         if update:
-            self.amp180.set(ampl)
+            self.amp180.set(np.abs(ampl))
 
 
     def find_amp90_scaling(self, scales=0.5,
