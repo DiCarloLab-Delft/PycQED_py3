@@ -253,6 +253,7 @@ def chevron_seq(q0, q1,
 def two_qubit_tomo_bell(bell_state, q0, q1,
                         wait_after_trigger=10e-9, wait_during_flux=260e-9,
                         clock_cycle=5e-9,
+                        single_qubit_compiled_phase=False,
                         RO_target='all'):
     '''
     Two qubit bell state tomography.
@@ -264,6 +265,8 @@ def two_qubit_tomo_bell(bell_state, q0, q1,
                                     trigger for the flux pulse
         clock_cycle     (float): period of the internal AWG clock
         wait_during_flux (int): wait time during the flux pulse
+        single_qubit_compiled_phase (bool): wether to do single qubit phase
+            correction in the recovery pulse
         RO_target   (str): can be q0, q1, or 'all'
     '''
     tomo_pulses = ['I ', 'X180 ', 'Y90 ', 'mY90 ', 'X90 ', 'mX90 ']
@@ -293,7 +296,10 @@ def two_qubit_tomo_bell(bell_state, q0, q1,
         raise ValueError('Bell state {} is not defined.'.format(bell_state))
 
     # Recovery pulse is the same for all Bell states
-    after_pulse = 'recX90 {}\n'.format(q1)
+    if single_qubit_compiled_phase == False:
+        after_pulse = 'mY90 {}\n'.format(q1)
+    else:
+        after_pulse = 'recmY90 {}\n'.format(q1)
 
     # Disable preparation pulse on one or the other qubit for debugging
     if bell_state//10 == 1:
@@ -350,15 +356,15 @@ def two_qubit_tomo_bell(bell_state, q0, q1,
 def CZ_calibration_seq(q0, q1, RO_target='all',
                        CZ_disabled=False,
                        cases=('no_excitation', 'excitation'),
-                       wait_after_trigger=150e-9,
-                       wait_during_flux=200e-9,
+                       wait_after_trigger=40e-9,
+                       wait_during_flux=280e-9,
                        clock_cycle=5e-9,
                        mw_pulse_duration=40e-9):
     '''
     Sequence used to calibrate flux pulses for CZ gates.
 
     Timing of the sequence:
-    q0:   --   mY90  C-Phase  recX90   --      RO
+    q0:   --   mX90  C-Phase  Rphi90   --      RO
     q1: (X180)  --     --       --   (X180)    RO
 
     Args:
@@ -385,14 +391,87 @@ def CZ_calibration_seq(q0, q1, RO_target='all',
             'I {} {}\n'.format(q0, int(waitTime//clock_cycle)))
         if case == 'excitation':
             qasm_file.writelines('X180 {}\n'.format(q1))
-        qasm_file.writelines('mY90 {}\n'.format(q0))
+        qasm_file.writelines('X90 {}\n'.format(q0))
         qasm_file.writelines(
             'I {} {}\n'.format(q0, int(wait_during_flux//clock_cycle)))
-        qasm_file.writelines('recX90 {}\n'.format(q0))
+        qasm_file.writelines('Rphi90 {}\n'.format(q0))
         if case == 'excitation':
             qasm_file.writelines('X180 {}\n'.format(q1))
 
         qasm_file.writelines('RO {}  \n'.format(RO_target))
+
+    qasm_file.close()
+    return qasm_file
+
+
+def CZ_fast_calibration_seq(q0_name, q1_name, no_of_points,
+                            cal_points=True,
+                            RO_target='all',
+                            CZ_disabled=False,
+                            cases=('no_excitation', 'excitation'),
+                            wait_after_trigger=40e-9,
+                            wait_during_flux=280e-9,
+                            clock_cycle=5e-9,
+                            mw_pulse_duration=40e-9):
+    '''
+    Sequence used to (numerically) calibrate CZ gate, including single qubit
+    phase corrections.
+    Repeats the sequence below 'no_of_points' times, giving a new trigger
+    instruction
+        QWG trigger 'i'
+    every time, where 'i' is the number of iteration (starting at 0).
+
+    Timing of the sequence:
+    q0:   --   mX90  C-Phase  X90   --      RO
+    q1: (X180)  --     --       --   (X180)    RO
+
+    Args:
+        q0, q1      (str): names of the addressed qubits
+        RO_target   (str): can be q0, q1, or 'all'
+        CZ_disabled (bool): disable CZ gate
+        excitations (bool/str): can be True, False, or 'both_cases'
+        clock_cycle (float): period of the internal AWG clock
+        wait_time   (int): wait time in seconds after triggering the flux
+    '''
+    filename = join(base_qasm_path, 'CZ_calibration_seq.qasm')
+    qasm_file = mopen(filename, mode='w')
+    qasm_file.writelines('qubit {} \nqubit {} \n'.format(q0_name, q1_name))
+
+    for i in range(no_of_points):
+
+        if cal_points and (i == no_of_points - 4 or i == no_of_points - 3):
+            # Calibration point for |0>
+            qasm_file.writelines('\ninit_all\n')
+            qasm_file.writelines('RO {}  \n'.format(RO_target))
+            pass
+        elif cal_points and (i == no_of_points - 2 or i == no_of_points - 1):
+            # Calibration point for |1>
+            qasm_file.writelines('\ninit_all\n')
+            qasm_file.writelines('X180 {} \n'.format(q0_name))
+            qasm_file.writelines('X180 {} \n'.format(q1_name))
+            qasm_file.writelines('RO {}  \n'.format(RO_target))
+        else:
+            for case in cases:
+                qasm_file.writelines('\ninit_all\n')
+                qasm_file.writelines('QWG trigger {}\n'.format(i))
+                waitTime = wait_after_trigger
+                if case == 'excitation':
+                    # Decrease wait time because there is an additional pulse
+                    waitTime -= mw_pulse_duration
+                qasm_file.writelines(
+                    'I {} {}\n'.format(q0_name,
+                                       int(waitTime//clock_cycle)))
+                if case == 'excitation':
+                    qasm_file.writelines('X180 {}\n'.format(q1_name))
+                qasm_file.writelines('mX90 {}\n'.format(q0_name))
+                qasm_file.writelines(
+                    'I {} {}\n'.format(q0_name,
+                                       int(wait_during_flux//clock_cycle)))
+                qasm_file.writelines('X90 {}\n'.format(q0_name))
+                if case == 'excitation':
+                    qasm_file.writelines('X180 {}\n'.format(q1_name))
+
+                qasm_file.writelines('RO {}  \n'.format(RO_target))
 
     qasm_file.close()
     return qasm_file
