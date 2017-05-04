@@ -20,7 +20,8 @@ mac_dict = {'203178706891063': 'CDickel_Desktop',
             '215977245834050': 'Xiang_PC',
             '23213':'Malay_Laptop',
             '31054844829911': 'Sjoerd_laptop',
-            '26830024075025': 'Qudev_testbench'
+            '26830024075025': 'Qudev_testbench',
+            '79497677591501': 'Aprilia'
             }
 
 data_dir_dict = {'tud276606_FPGA_PC': 'D:\Experiments/CBox_Testing/Data',
@@ -46,5 +47,6 @@ data_dir_dict = {'tud276606_FPGA_PC': 'D:\Experiments/CBox_Testing/Data',
                  # 'Ramiro_Desktop': r'\\131.180.82.190\\Experiments\\1611_Starmon\\Data',
                  r'Nathans_Laptop': 'D:/nlangford\My Documents\Projects\Rabi Model\Experiment_1504\Data',
                  'Bart_Laptop': 'C:\Experiments/NumericalOptimization/Data',
-                 'Qudev_testbench' : r'E:\Control software\data'
+                 'Qudev_testbench' : r'E:\Control software\data',
+                 'Aprilia': r'D:\\Experiements\\Test'
                  }
