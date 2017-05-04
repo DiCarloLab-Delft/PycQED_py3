@@ -41,7 +41,7 @@ class Element:
         self._last_added_pulse = None
 
         if self.pulsar is not None:
-            self.clock = self.pulsar.clock
+            #self.clock = self.pulsar.clock
 
             for c in self.pulsar.channels:
                 chan = self.pulsar.channels[c]

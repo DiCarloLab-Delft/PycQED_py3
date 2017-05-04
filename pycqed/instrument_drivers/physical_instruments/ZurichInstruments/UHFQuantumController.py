@@ -86,7 +86,7 @@ class UHFQC(Instrument):
                            parameter_class=ManualParameter)
         for parameter in s_node_pars:
             parname = parameter[0].replace("/", "_")
-            parfunc = "/"+device+"/"+parameter[0]
+            parfunc = "/"+self._device+"/"+parameter[0]
             if parameter[1] == 'float':
                 self.add_parameter(
                     parname,
@@ -129,7 +129,7 @@ class UHFQC(Instrument):
 
         for parameter in d_node_pars:
             parname = parameter[0].replace("/", "_")
-            parfunc = "/"+device+"/"+parameter[0]
+            parfunc = "/"+self._device+"/"+parameter[0]
             if parameter[1] == 'float':
                 self.add_parameter(
                     parname,

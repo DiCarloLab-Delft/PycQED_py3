@@ -119,7 +119,7 @@ class Pulsar:
         Returns:
             A list of the names of the AWGs in use
         """
-        return self.AWGs.keys()
+        return self._AWG_obj.keys()
 
     def get_active_AWGs(self):
         """
@@ -224,7 +224,7 @@ class Pulsar:
                     if self.channels[names[sid]]['active']:
                         output = True
                 if output:
-                    self.AWGs[AWG].set('{}_state'.format(id), 1)
+                    self._AWG_obj[AWG].set('{}_state'.format(id), 1)
 
     def get_awg_channel_cfg(self, AWG=None):
         """
@@ -502,7 +502,8 @@ setTrigger(0);
         # parse elements
         elements_with_non_zero_first_points = []
         wfnames = {'ch1': [], 'ch2': []}
-        wfdata = []
+        wfdata = {'ch1': [], 'ch2': []}
+        i = 1
         for element in elements:
             tvals, wfs = element.normalized_waveforms()
 
@@ -520,6 +521,7 @@ setTrigger(0);
                             c_name = c
                     if not upload:
                         wfnames[id].append(None)
+                        wfdata[id].append(None)
                         continue
                 else:
                     c_name = self.get_channel_name_by_id(id, AWG.name)
@@ -529,19 +531,24 @@ setTrigger(0);
                     if chan_wf[0] != 0.:
                         elements_with_non_zero_first_points.append(
                             element.name)
+                    header += 'wave {} = ramp({}, 0, {});\n'.format(
+                        wfname,
+                        element.samples(),
+                        1/i
+                    )
+                    i += 1
                     wfnames[id].append(wfname)
-                    header += 'wave {} = zeros({})'.format(wfname,
-                                                           element.samples)
-                    wfdata.append(chan_wf)
+                    wfdata[id].append(chan_wf)
                 else:
                     wfnames[id].append(None)
+                    wfdata[id].append(None)
 
         # create waveform playback code
         for i, elt in enumerate(sequence.elements):
-            if elt['goto_target'] != 0:
+            if elt['goto_target'] != None:
                 raise NotImplementedError('UHFQC sequencer does not yet support'
                                           ' nontrivial goto-s.')
-            if elt['jump_target'] != 0:
+            if elt['jump_target'] != None:
                 raise NotImplementedError('UHFQC sequencer does not support'
                                           ' jump events.')
             if elt['trigger_wait']:
@@ -560,8 +567,20 @@ setTrigger(0);
         AWG.awg_string(awg_str)
 
         # populate the waveforms with data
-        for i, data in enumerate(wfdata):
-            AWG.awg_update_waveform(i, data)
+        i = 0
+        for data1, data2 in zip(wfdata['ch1'], wfdata['ch2']):
+            if data1 is None and data2 is None:
+                continue
+            elif data1 is None:
+                AWG.awg_update_waveform(i, data2)
+                i += 1
+            elif data2 is None:
+                AWG.awg_update_waveform(i, data1)
+                i += 1
+            else:
+                data12 = np.vstack((data1, data2,)).reshape((-1,), order='F')
+                AWG.awg_update_waveform(i, data12)
+                i += 1
 
 
     def _UHFQC_element_seqc(self, reps, wait, name1, name2, readout):
@@ -579,7 +598,8 @@ setTrigger(0);
         Returns:
             string for playing back an element
         """
-        repeat_open_str = '\trepeat({}) {\n'.format(reps) if reps != 0 else ''
+        repeat_open_str = '\trepeat({}) {{\n'.format(reps) if reps != 0 else ''
+        wait_wave_str = '\t\twaitWave();\n' if wait else ''
         trigger_str = '\t\twaitDigTrigger(1, 1);\n' if wait else ''
         if name1 is None:
             play_str = '\t\tplayWave(2, {});\n'.format(name2)
@@ -589,7 +609,6 @@ setTrigger(0);
             play_str = '\t\tplayWave({}, {});\n'.format(name1, name2)
         readout_str = '\t\tsetTrigger(WINT_EN +RO_TRIG);\n' if readout else ''
         readout_str += '\t\tsetTrigger(WINT_EN);\n' if readout else ''
-        wait_wave_str = '\t\twaitWave();\n'
         repeat_close_str = '\t}\n' if reps != 0 else ''
         return repeat_open_str + trigger_str + play_str + readout_str + \
                wait_wave_str + repeat_close_str
@@ -626,7 +645,7 @@ setTrigger(0);
         if AWG is None:
             AWG = self.AWG
         else:
-            AWG = self.AWGs[AWG]
+            AWG = self._AWG_obj[AWG]
         old_timeout = AWG.timeout()
         AWG.timeout(max(180, old_timeout))
         channels = kw.pop('channels', 'all')
@@ -659,16 +678,16 @@ setTrigger(0);
     def start(self):
         if self.master_AWG is None:
             for AWG in self.get_active_AWGs():
-                self.AWGs[AWG].start()
+                self._AWG_obj[AWG].start()
         else:
             for AWG in self.get_active_AWGs():
                 if AWG != self.master_AWG:
-                    self.AWGs[AWG].start()
+                    self._AWG_obj[AWG].start()
             time.sleep(1) # wait 1 second for all other awg-s to start
-            self.AWGs[self.master_AWG].start()
+            self._AWG_obj[self.master_AWG].start()
 
     def stop(self):
-        for AWG in self.AWGs.values():
+        for AWG in self._AWG_obj.values():
             AWG.stop()
 
     def update_channel_settings(self, AWGs='all'):
