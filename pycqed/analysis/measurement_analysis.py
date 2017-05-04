@@ -1216,6 +1216,151 @@ class Rabi_Analysis(TD_Analysis):
                 logging.warning(e)
 
 
+class Flipping_Analysis(TD_Analysis):
+
+    def __init__(self, label='Flipping', **kw):
+        kw['label'] = label
+        kw['h5mode'] = 'r+'
+        super().__init__(**kw)
+
+
+    def run_default_analysis(self, close_file=True, show_guess=False, **kw):
+        # Returns the drive scaling factor.
+        show = kw.pop('show', False)
+        self.add_analysis_datagroup_to_file()
+        self.get_naming_and_values()
+        fig1, fig2, ax, axarray = self.setup_figures_and_axes()
+
+        norm = self.normalize_data_to_calibration_points(
+            self.measured_values[0], self.NoCalPoints)
+        self.normalized_values = norm[0]
+        self.normalized_data_points = norm[1]
+        self.normalized_cal_vals = norm[2]
+        self.fit_Flipping()
+
+        # self.save_fitted_parameters(self.fit_res, var_name=self.value_names[0])
+        self.plot_results(fig1, ax, show_guess=show_guess,
+                          ylabel=r'$F$ $|1 \rangle$')
+
+        for i, name in enumerate(self.value_names):
+            if len(self.value_names) == 4:
+                if i < 2:
+                    ax2 = axarray[0, i]
+                else:
+                    ax2 = axarray[1, i-2]
+            else:
+                ax2 = axarray[i]
+
+            self.plot_results_vs_sweepparam(x=self.sweep_points,
+                                            y=self.measured_values[i],
+                                            fig=fig2, ax=ax2,
+                                            xlabel=self.xlabel,
+                                            ylabel=self.ylabels[i],
+                                            save=False)
+
+        if show:
+            plt.show()
+        self.save_fig(fig1, figname=self.measurementstring+'_Flipping_fit', **kw)
+        self.save_fig(fig2, figname=self.measurementstring, **kw)
+        if close_file:
+            self.data_file.close()
+        return self.drive_scaling_factor
+
+    def plot_results(self, fig, ax, ylabel,show_guess=False):
+        self.plot_results_vs_sweepparam(x=self.sweep_points,
+                                        y=self.normalized_values,
+                                        fig=fig, ax=ax,
+                                        xlabel=r'No. Pulses',
+                                        ylabel=ylabel,
+                                        save=False)
+        if show_guess:
+            y_init = fit_mods.ExpDampOscFunc(self.sweep_points,
+                **self.fit_res.init_values)
+            ax.plot(self.sweep_points, y_init, 'k--')
+
+        ax.plot(self.fit_plot_points_x, self.fit_plot_points_y, 'r-')
+
+    def fit_Flipping(self, **kw):
+        # Split it up in two cases, one where we have oscillations,
+        # one where we are already quite close
+        data = self.normalized_data_points
+        sweep_points = self.sweep_points[:-self.NoCalPoints]
+        w = np.abs(np.fft.fft(data)[1:len(data)//2])
+        if np.argmax(w)==0:
+            # This is the case where we don't have oscilaltions.
+            # We fit a parabola to it.
+            def quadratic_fit_data():
+                M = np.array([sweep_points**2, sweep_points, [1]*len(sweep_points)])
+                Minv = np.linalg.pinv(M)
+                [a, b, c] = np.dot(data, Minv)
+                fit_data = (a*sweep_points**2 + b*sweep_points + c)
+                return fit_data, (a, b, c)
+            self.fit_results_quadratic = quadratic_fit_data()
+            slope = self.fit_results_quadratic[1][1]
+            amplitude = np.average(self.normalized_cal_vals) / 2
+            drive_detuning = slope / (2 * np.pi * abs(amplitude))
+            self.drive_scaling_factor = 1. / (1. + drive_detuning)
+            self.fit_plot_points_x = sweep_points
+            self.fit_plot_points_y = self.fit_results_quadratic[0]
+        else:
+            # This is the case where we have oscilaltions.
+            # We fit a decaying cos to it.
+            def fit_dec_cos_mod(negative_amplitude=False):
+                model = fit_mods.CosModel
+                params = model.guess(model, data=data,
+                                     t=sweep_points)
+                new_mod = fit_mods.ExpDampOscModel
+                if negative_amplitude:
+                    new_mod.set_param_hint('amplitude',
+                                    value=-1*np.abs(params['amplitude'].value),
+                                    min=-1, max=0)
+                else:
+                    new_mod.set_param_hint('amplitude',
+                                    value=np.abs(params['amplitude'].value),
+                                    min=0, max=1)
+                new_mod.set_param_hint('frequency',
+                                    value=params['frequency'].value,
+                                    min=0.2/sweep_points[-1],
+                                    max=10./sweep_points[-1])
+                new_mod.set_param_hint('phase',
+                                    value=-np.pi/2, vary=False)
+                new_mod.set_param_hint('oscillation_offset',
+                                    value=0)
+                new_mod.set_param_hint('exponential_offset',
+                                    value=params['offset'].value)
+                new_mod.set_param_hint('n',
+                                    value=1, vary=False)
+                new_mod.set_param_hint('tau',
+                                    value=sweep_points[-1],
+                                    min=sweep_points[1],
+                                    max=sweep_points[-1]*10)
+                new_params = new_mod.make_params()
+                return new_mod.fit(data=data,
+                                    t=sweep_points, params=new_params)
+            pos_amp_fit = fit_dec_cos_mod(negative_amplitude=False)
+            neg_amp_fit = fit_dec_cos_mod(negative_amplitude=True)
+
+            if pos_amp_fit.chisqr>neg_amp_fit.chisqr:
+                self.fit_res = neg_amp_fit
+            else:
+                self.fit_res = pos_amp_fit
+
+            self.fit_plot_points_x = np.linspace(sweep_points[0],
+                                                 sweep_points[-1],200)
+            self.fit_plot_points_y = fit_mods.ExpDampOscFunc(
+                t=self.fit_plot_points_x,
+                amplitude=self.fit_res.values['amplitude'],
+                frequency=self.fit_res.values['frequency'],
+                phase=self.fit_res.values['phase'],
+                oscillation_offset=self.fit_res.values['oscillation_offset'],
+                exponential_offset=self.fit_res.values['exponential_offset'],
+                n=self.fit_res.values['n'],
+                tau=self.fit_res.values['tau'])
+            self.drive_detuning = self.fit_res.values['frequency']*\
+                np.sign(self.fit_res.values['amplitude'])
+            self.drive_scaling_factor = 1. / (1. + self.drive_detuning)
+
+
 class TD_UHFQC(TD_Analysis):
 
     def __init__(self, NoCalPoints=4, center_point=31, make_fig=True,

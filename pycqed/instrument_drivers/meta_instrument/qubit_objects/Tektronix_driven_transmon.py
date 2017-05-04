@@ -500,7 +500,13 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                                                     close_fig=close_fig,
                                                     update=update,
                                                     upload=force_load)
-
+        probe = det.Heterodyne_probe(self.heterodyne_instr.get_instr(),
+            trigger_separation=5e-6 + self.RO_acq_integration_length(),
+            RO_length=self.RO_acq_integration_length())
+        probe.prepare()
+        phase = probe.acquire_data_point()[1]
+        self.RF_RO_source.get_instr().phase(
+                        (self.RF_RO_source.get_instr().phase()-phase)%360)
         MC.set_sweep_function(pw.wrap_par_to_swf(
                               self.cw_source.get_instr().frequency, retrieve_value=True))
         MC.set_sweep_points(freqs)
@@ -611,7 +617,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         MC.set_detector_function(self.int_avg_det)
         MC.run('Flipping'+self.msmt_suffix)
         if analyze:
-            ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
+            ma.Flipping_Analysis(auto=True, close_fig=close_fig)
 
     def measure_rabi_amp90(self,
                            scales=np.linspace(-0.7, 0.7, 31), n=1,
