@@ -606,7 +606,7 @@ def file_in_folder(folder, timestamp):
 
 def get_all_msmt_filepaths(folder, suffix='hdf5', pattern=''):
     filepaths = []
-    suffixlen = len(suffix) 
+    suffixlen = len(suffix)
 
     for root, dirs, files in os.walk(folder):
         for f in files:
