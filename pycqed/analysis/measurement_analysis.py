@@ -32,7 +32,6 @@ from pycqed.analysis import composite_analysis as ca
 
 try:
     import qutip as qtp
-    from pycqed.analysis.tomography import Tomo_Multiplexed
 except ImportError as e:
     if str(e).find('qutip') >= 0:
         logging.warning('Could not import qutip')
