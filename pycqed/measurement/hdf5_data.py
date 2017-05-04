@@ -99,9 +99,12 @@ class DateTimeGenerator:
 
         return path, tsd
 
-    def new_filename(self, data_obj):
+    def new_filename(self, data_obj, folder=None):
         '''Return a new filename, based on name and timestamp.'''
-        path, tstr = self.create_data_dir(qc_config['datadir'],
+        if folder is None:
+            folder = qc_config['datadir']
+
+        path, tstr = self.create_data_dir(folder,
                                           name=data_obj._name,
                                           ts=data_obj._localtime)
         filename = '%s_%s.hdf5' % (tstr, data_obj._name)
@@ -121,6 +124,8 @@ class Data(h5py.File):
         kwargs:
             name (string) : default is 'data' (%timemark is interpreted as
             its timemark)
+            filepath (string) : path to the file. If this is a folder it will 
+            generate a folder within it with the standard timestamp structure
         """
         # FIXME: the name generation here is a bit nasty
         # name = data.Data._data_list.new_item_name(self, name)
@@ -131,8 +136,11 @@ class Data(h5py.File):
         self._timemark = time.strftime('%H%M%S', self._localtime)
         self._datemark = time.strftime('%Y%m%d', self._localtime)
 
-        if filepath:
-            self.filepath = filepath
+        if filepath is not None:
+            if os.path.isdir(filepath):
+                self.filepath = self._filename_generator.new_filename(self, folder=filepath)
+            else:
+                self.filepath = filepath
         else:
             self.filepath = self._filename_generator.new_filename(self)
 

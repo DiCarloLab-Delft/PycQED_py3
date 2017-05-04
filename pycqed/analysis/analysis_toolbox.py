@@ -606,7 +606,7 @@ def file_in_folder(folder, timestamp):
 
 def get_all_msmt_filepaths(folder, suffix='hdf5', pattern=''):
     filepaths = []
-    suffixlen = len(suffix)
+    suffixlen = len(suffix) 
 
     for root, dirs, files in os.walk(folder):
         for f in files:
@@ -712,7 +712,11 @@ def compare_instrument_settings(analysis_object_a, analysis_object_b):
 
 
 def get_timestamps_in_range(timestamp_start, timestamp_end=None,
-                            label=None, exact_label_match=True):
+                            label=None, exact_label_match=True, folder=None):
+    
+    if folder is None:
+        folder = datadir
+        
     datetime_start = datetime_from_timestamp(timestamp_start)
     if timestamp_end is None:
         datetime_end = datetime.datetime.today()
@@ -723,7 +727,7 @@ def get_timestamps_in_range(timestamp_start, timestamp_end=None,
     for day in reversed(list(range(days_delta+1))):
         date = datetime_start + datetime.timedelta(days=day)
         datemark = timestamp_from_datetime(date)[:8]
-        all_measdirs = [d for d in os.listdir(os.path.join(datadir, datemark))]
+        all_measdirs = [d for d in os.listdir(os.path.join(folder, datemark))]
 
         if exact_label_match:
             all_measdirs = [x for x in all_measdirs if label in x]
