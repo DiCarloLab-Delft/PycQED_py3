@@ -245,7 +245,7 @@ class QWG_FluxLookuptableManager(Instrument):
         self.add_parameter('Z_amp',
                            docstring=
                                'Amplitude of single qubit Z pulse in volts',
-                           label='Z length',
+                           label='Z amplitude',
                            unit='V',
                            initial_value=0.0,
                            vals=vals.Numbers(),
