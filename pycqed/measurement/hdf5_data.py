@@ -124,7 +124,7 @@ class Data(h5py.File):
         kwargs:
             name (string) : default is 'data' (%timemark is interpreted as
             its timemark)
-            filepath (string) : path to the file. If this is a folder it will 
+            filepath (string) : path to the file. If this is a folder it will
             generate a folder within it with the standard timestamp structure
         """
         # FIXME: the name generation here is a bit nasty
