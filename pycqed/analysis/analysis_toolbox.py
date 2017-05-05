@@ -713,7 +713,6 @@ def compare_instrument_settings(analysis_object_a, analysis_object_b):
 
 def get_timestamps_in_range(timestamp_start, timestamp_end=None,
                             label=None, exact_label_match=True, folder=None):
-    
     if folder is None:
         folder = datadir
         
