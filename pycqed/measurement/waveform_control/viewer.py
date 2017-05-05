@@ -30,14 +30,13 @@ def show_element_dclab(element, delay=True, channels='all', ax=None):
                    'ch4_marker1': 'indigo',
                    'ch4_marker2': 'navy'}
     t_vals, outputs_dict = element.waveforms()
-    t_vals = t_vals*1e9
     for key in outputs_dict:
         if 'marker' in key:
             axs2.plot(
-                t_vals, outputs_dict[key], label=key, color=colors_dict[key])
+                t_vals[key]*1e9, outputs_dict[key], label=key, color=colors_dict[key])
         else:
             ax.plot(
-                t_vals, outputs_dict[key], label=key, color=colors_dict[key])
+                t_vals[key]*1e9, outputs_dict[key], label=key, color=colors_dict[key])
     ax.set_xlabel('Time (ns)')
     ax.set_ylabel('Analog output (V)')
     if add_extra_labs:  # only set it once otherwise we end up with 20 labels
@@ -50,7 +49,7 @@ def show_element_dclab(element, delay=True, channels='all', ax=None):
     lo = element._channels['ch1_marker1']['low']
     axs2.set_ylim(lo-0.1*(hi-lo), hi+0.1*(hi-lo))
 
-    ax.set_xlim(t_vals.min(), t_vals.max())
+    ax.set_xlim(t_vals.min()*1e9, t_vals.max()*1e9)
     if add_extra_labs:
         ax.legend(loc='best')
     return ax
@@ -80,14 +79,14 @@ def show_element_pyqt(element, QtPlot_win=None,
         if i+1 > len(QtPlot_win.subplots):
             QtPlot_win.win.nextRow()
             QtPlot_win.add(
-                x=t_vals, y=outputs_dict[ch], name=ch,
+                x=t_vals[ch], y=outputs_dict[ch], name=ch,
                 color=color,
                 subplot=i+1,
                 symbol='o', symbolSize=5,
                 xlabel=xlabel, xunit=xunit, ylabel=ylabel, yunit=yunit)
         else:
             QtPlot_win.add(
-                x=t_vals, y=outputs_dict[ch], name=ch,
+                x=t_vals[ch], y=outputs_dict[ch], name=ch,
                 color=color,
                 subplot=i+1,
                 symbol='o', symbolSize=5,
@@ -143,14 +142,14 @@ def show_element(element, delay=True, channels='all'):
             ax.axhspan(lo, hi, facecolor='w', linewidth=0)
             # the waveform
             if delay:
-                t = tvals
+                t = tvals[wf]
             else:
-                t = element.real_times(tvals, wf)
+                t = element.real_times(tvals[wf], wf)
 
             t0 = min(t0, t[0])
             t1 = max(t1, t[-1])
             # TODO style options
-            show_wf(t, wfs[wf], name=wf, ax=ax, dt=1./element.clock)
+            show_wf(t, wfs[wf], name=wf, ax=ax, dt=1./element._clock(wf))
 
             ax.set_ylim(lo*1.1, hi*1.1)
 
@@ -170,7 +169,11 @@ def show_fourier_of_element_channels(element, channels, unit='Hz'):
     '''
     tvals, wfs = element.waveforms()
     fig, ax = plt.subplots(1, 1)
-    dt = tvals[1]-tvals[0]
+
+    dt = tvals[channels[0]][1] - tvals[channels[0]][0]
+    for i in range(1, len(channels)):
+        if dt != tvals[channels[i]][1] - tvals[channels[i]][0]:
+            raise ValueError('different clock signals not supported')
 
     if len(channels) == 2:
         compl_data = wfs[channels[0]] + 1j * wfs[channels[1]]
@@ -185,14 +188,14 @@ def show_fourier_of_element_channels(element, channels, unit='Hz'):
 
     freqs = np.fft.fftfreq(n, d=dt)
 
-    if units == 'MHz':
+    if unit == 'MHz':
         freqs *= 1e-6
-    elif units == 'GHz':
+    elif unit == 'GHz':
         freqs *= 1e-9
-    elif units == 'Hz':
+    elif unit == 'Hz':
         pass
     else:
-        raise Exception('units "%s" not recognized, valid options' +
-                        ' are GHz, MHz and Hz')
+        raise Exception('units "{}" not recognized, valid options'
+                        ' are GHz, MHz and Hz'.format(unit))
     ax.plot(freqs, trans_dat, ls='-o', marker='.')
-    ax.set_xlabel('Frequency (%s)' % units)
+    ax.set_xlabel('Frequency ({})'.format(unit))

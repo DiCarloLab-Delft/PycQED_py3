@@ -11,10 +11,14 @@
 import numpy as np
 import logging
 from qcodes.instrument.base import Instrument
-from qcodes.instrument_drivers.tektronix.AWG5014 import Tektronix_AWG5014
-from pycqed.instrument_drivers.physical_instruments.ZurichInstruments.\
-    UHFQuantumController import UHFQC
 import time
+try:
+    from qcodes.instrument_drivers.tektronix.AWG5014 import Tektronix_AWG5014
+    from pycqed.instrument_drivers.physical_instruments.ZurichInstruments.\
+        UHFQuantumController import UHFQC
+except:
+    pass
+
 
 # some pulses use rounding when determining the correct sample at which to
 # insert a particular value. this might require correct rounding -- the pulses
@@ -91,6 +95,16 @@ class Pulsar:
             the AWG object
         """
         return self._AWG_obj[self.channels[channel]['AWG']]
+
+    def clock(self, c):
+        """
+        Returns the clock rate of channel `c`
+        Args:
+            c: name of the channel
+        Returns: clock rate in samples per second
+        """
+        AWG = self.get_AWG_object(c)
+        return AWG.clock_freq()
 
     def set_channel_opt(self, name, option, value):
         """

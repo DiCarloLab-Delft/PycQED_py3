@@ -265,6 +265,9 @@ class UHFQC(Instrument):
             return dev_get_type(ch)
         return get_func
 
+    def clock_freq(self):
+        return 1.8e9/(2**self.awgs_0_time())
+
     def reconnect(self):
         zi_utils.autoDetect(self._daq)
 
