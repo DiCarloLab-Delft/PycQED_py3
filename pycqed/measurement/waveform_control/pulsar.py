@@ -215,21 +215,25 @@ class Pulsar:
                 chans.add(c_dict['id'][:3])
         return chans
 
-    def activate_channels(self, channels='all', AWGs='all'):
+    def activate_channels_AWG5014(self, channels='all', AWGs='all'):
         """
-        :param channels: list of channel ids to turn on (if they are defined
-                         and set as active)
-        :param AWGs: a list of names of AWGs on which to turn channels on
-                     or 'all'
         sets the state to 'on' for the active channels
+        Args:
+            channels: list of channel ids to turn on (if they are defined
+                      and set as active)
+            AWGs: a list of names of Tektronix AWG5014 AWGs on which to turn
+                  channels on or 'all'
+
         """
         if AWGs == 'all':
             AWGs = self.get_used_AWGs()
         for AWG in AWGs:
+            if not isinstance(self._AWG_obj[AWG], Tektronix_AWG5014):
+                continue
             ids = self.get_used_channel_ids(AWG)
             for id in ids:
                 output = False
-                names = self.get_channel_names_by_id(id, AWG)
+                names = self._get_channel_names_by_5014_id(id, [AWG])
                 for sid in names:
                     if names[sid] is None:
                         continue
@@ -310,7 +314,6 @@ class Pulsar:
                 raise TypeError('Unsupported AWG intrument: {} of type {}'
                                 .format(AWGn, type(AWG)))
 
-
     def _program_AWG5014(self, AWG, sequence, *elements, **kw):
         """
         Upload a single file to the AWG (.awg) which contains all waveforms
@@ -348,9 +351,8 @@ class Pulsar:
         _t0 = time.time()
         for i, element in enumerate(elements):
             if verbose:
-                print("Generate %s element %d / %d: %s (%d samples)... " %
-                      (AWG.name, i+1, elt_cnt, element.name,
-                       element.samples()), end='')
+                print("Generate %s element %d / %d: %s... " %
+                      (AWG.name, i+1, elt_cnt, element.name), end='')
             _t0 = time.time()
 
             tvals, wfs = element.normalized_waveforms()
@@ -371,16 +373,22 @@ class Pulsar:
                 chan_wfs = {id: None,
                             id+'_marker1': None,
                             id+'_marker2': None}
-                grp = self.get_channel_names_by_id(id, AWG.name)
+                grp = self._get_channel_names_by_5014_id(id, AWG.name)
 
+                samples = 0
                 for sid in grp:
                     if grp[sid] != None and grp[sid] in wfs:
                         chan_wfs[sid] = wfs[grp[sid]]
-                        if chan_wfs[sid][0] != 0.:
+                        if len(chan_wfs[sid]) > 0 and chan_wfs[sid][0] != 0.:
                             elements_with_non_zero_first_points.append(
                                 element.name)
+                        samples = max(samples, len(chan_wfs[sid]))
                     else:
-                        chan_wfs[sid] = np.zeros(element.samples())
+                        chan_wfs[sid] = np.zeros(0)
+                for sid in chan_wfs:
+                    chan_wfs[sid] = np.pad(chan_wfs[sid],
+                                           (0, samples - len(chan_wfs[sid])),
+                                           'constant')
 
                 # Create wform files
                 packed_waveforms[wfname] = AWG.pack_waveform(
@@ -480,7 +488,7 @@ class Pulsar:
         # Waits for AWG to be ready
         AWG.is_awg_ready()
 
-        self.activate_channels(channels, AWGs=[AWG.name])
+        self.activate_channels_AWG5014(channels, AWGs=[AWG.name])
 
         _t = time.time() - _t0
         print(" finished in %.2f seconds." % _t)
@@ -547,7 +555,7 @@ setTrigger(0);
                             element.name)
                     header += 'wave {} = ramp({}, 0, {});\n'.format(
                         wfname,
-                        element.samples(),
+                        element.samples(c_name),
                         1/i
                     )
                     i += 1
@@ -608,7 +616,7 @@ setTrigger(0);
             name1: name of the wave to be played on channel 1
             name2: name of the wave to be played on channel 2
             readout: boolean flag, whether to acquire a datapoint after the
-            element
+                     element
         Returns:
             string for playing back an element
         """
@@ -621,7 +629,7 @@ setTrigger(0);
             play_str = '\t\tplayWave(1, {});\n'.format(name1)
         else:
             play_str = '\t\tplayWave({}, {});\n'.format(name1, name2)
-        readout_str = '\t\tsetTrigger(WINT_EN +RO_TRIG);\n' if readout else ''
+        readout_str = '\t\tsetTrigger(WINT_EN+RO_TRIG);\n' if readout else ''
         readout_str += '\t\tsetTrigger(WINT_EN);\n' if readout else ''
         repeat_close_str = '\t}\n' if reps != 0 else ''
         return repeat_open_str + trigger_str + play_str + readout_str + \
@@ -630,9 +638,9 @@ setTrigger(0);
     def check_sequence_consistency(self, packed_waveforms,
                                    wfname_l,
                                    nrep_l, wait_l, goto_l, logic_jump_l):
-        '''
+        """
         Specific for 4 channel tektronix 5014 where all channels are used.
-        '''
+        """
         if not (len(wfname_l[0]) == len(wfname_l[1]) ==
                 len(wfname_l[2]) == len(wfname_l[3]) ==
                 len(nrep_l) == len(wait_l) == len(goto_l) ==
@@ -650,44 +658,6 @@ setTrigger(0);
                                     ' , in position ' + str(el) +
                                     ' , channel ' + str(ch) +
                                     ' does not exist in waveform dictionary')
-
-    def load_awg_file(self, filename, AWG=None, **kw):
-        """
-        Function to load an AWG sequence from its internal hard drive
-        No possibility for jump statements
-        """
-        if AWG is None:
-            AWG = self.AWG
-        else:
-            AWG = self._AWG_obj[AWG]
-        old_timeout = AWG.timeout()
-        AWG.timeout(max(180, old_timeout))
-        channels = kw.pop('channels', 'all')
-        chan_ids = self.get_used_channel_ids(AWG.name)
-        _t0 = time.time()
-
-        # Store offset settings to restore them after upload the seq
-        # Note that this is the AWG setting offset, as distinct from the
-        # channel parameter offset.
-        offsets = {}
-        for c_dict in self.channels.values():
-            if c_dict['type'] == 'analog' and c_dict['AWG'] == AWG.name:
-                offsets[c_dict['id']] = AWG.get(c_dict['id']+'_offset')
-
-        AWG.load_awg_file(filename)
-        AWG.timeout(old_timeout)
-
-        time.sleep(.1)
-        # Waits for AWG to be ready
-        AWG.is_awg_ready()
-
-        for channel, offset in offsets.items():
-            AWG.set(channel+'_offset', offset)
-
-        self.activate_channels(channels, AWG.name)
-
-        _t = time.time() - _t0
-        print(" finished in %.2f seconds." % _t)
 
     def start(self):
         if self.master_AWG is None:

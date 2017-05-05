@@ -98,7 +98,8 @@ class Element:
         for p in self.pulses:
             if c in self.pulses[p].channels:
                 ends.append(self.pulse_end_sample(p, c))
-
+        if len(ends) == 0:
+            return 0
         samples = max(ends)+1
         while samples % self.granularity != 0:
             samples += 1
