@@ -13,7 +13,8 @@ import re  # used for string parsing
 dcl = 'http://dicarlolab.tudelft.nl//wp-content/uploads/'
 address_dict = {'LaMaserati': dcl + 'LaMaseratiMonitor/',
                 'LaDucati': dcl + 'LaDucatiMonitor/',
-                'LaFerrari': dcl + 'LaFerrariMonitor/'}
+                'LaFerrari': dcl + 'LaFerrariMonitor/',
+                'Aprilia': dcl + 'LaApriliaMonitor/'}
 
 
 class Fridge_Monitor(Instrument):
@@ -27,7 +28,7 @@ class Fridge_Monitor(Instrument):
 
         self.add_parameter(
             'fridge_name', initial_value=fridge_name,
-            vals=vals.Enum('LaMaserati', 'LaDucati', 'LaFerrari'),
+            vals=vals.Enum('LaMaserati', 'LaDucati', 'LaFerrari', 'Aprilia'),
             parameter_class=ManualParameter)
 
         self.url = address_dict[self.fridge_name()]
@@ -47,6 +48,10 @@ class Fridge_Monitor(Instrument):
         elif self.fridge_name() == 'LaFerrari':
             self.monitored_pars = ['T_Sorb', 'T_Still', 'T_MChi', 'T_MCmid',
                                    'T_MClo', 'T_MCStage']
+
+        elif self.fridge_name() == 'Aprilia':
+            self.monitored_pars = ['T_3K', 'T_Still', 'T_CP',
+                                   'T_MChi', 'T_MClo', 'T_MCloCMN ']
 
         for par_name in self.monitored_pars:
             self.add_parameter(par_name, unit='mK',
