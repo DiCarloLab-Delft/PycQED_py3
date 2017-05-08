@@ -2687,7 +2687,9 @@ class T1_Analysis(TD_Analysis):
 
         if make_fig:
             for i, name in enumerate(self.value_names):
-                if len(self.value_names) < 4:
+                if len(self.value_names) == 1:
+                    ax2 = axarray
+                elif len(self.value_names) < 4:
                     ax2 = axarray[i]
                 else:
                     ax2 = axarray[i/2, i % 2]
