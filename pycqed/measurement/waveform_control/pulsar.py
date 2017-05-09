@@ -36,8 +36,9 @@ class Pulsar:
     Starting, stopping and programming the AWGs should be done through Pulsar.
     TODO: Supports Tektronix AWG5014 and ZI UHFLI.
     """
-    def __init__(self):
-        self.default_AWG = None  # the default AWG object
+    def __init__(self, default_AWG=None):
+        self.default_AWG = default_AWG  # the default AWG object
+        self.AWG = self.default_AWG # for backward compatibility.
         self._AWG_obj = {}  # dictionary from AWG name to AWG object
         self.channels = {}
 
@@ -233,7 +234,7 @@ class Pulsar:
             ids = self.get_used_channel_ids(AWG)
             for id in ids:
                 output = False
-                names = self._get_channel_names_by_5014_id(id, [AWG])
+                names = self._get_channel_names_by_5014_id(id, AWG)
                 for sid in names:
                     if names[sid] is None:
                         continue
@@ -357,8 +358,9 @@ class Pulsar:
 
             tvals, wfs = element.normalized_waveforms()
 
+            samples = 1
+            chan_wfs = {}
             for id in chan_ids:
-                wfname = element.name + '_%s' % id
 
                 # determine if we actually want to upload this channel
                 if channels != 'all':
@@ -370,14 +372,13 @@ class Pulsar:
                     if not upload:
                         continue
 
-                chan_wfs = {id: None,
-                            id+'_marker1': None,
-                            id+'_marker2': None}
+                chan_wfs.update({id: None,
+                                 id+'_marker1': None,
+                                 id+'_marker2': None})
                 grp = self._get_channel_names_by_5014_id(id, AWG.name)
 
-                samples = 0
                 for sid in grp:
-                    if grp[sid] != None and grp[sid] in wfs:
+                    if grp[sid] is not None and grp[sid] in wfs:
                         chan_wfs[sid] = wfs[grp[sid]]
                         if len(chan_wfs[sid]) > 0 and chan_wfs[sid][0] != 0.:
                             elements_with_non_zero_first_points.append(
@@ -385,16 +386,19 @@ class Pulsar:
                         samples = max(samples, len(chan_wfs[sid]))
                     else:
                         chan_wfs[sid] = np.zeros(0)
-                for sid in chan_wfs:
-                    chan_wfs[sid] = np.pad(chan_wfs[sid],
-                                           (0, samples - len(chan_wfs[sid])),
-                                           'constant')
+
+            for id in chan_wfs:
+                chan_wfs[id] = np.pad(chan_wfs[id],
+                                      (0, samples - len(chan_wfs[id])),
+                                      'constant')
+            for id in chan_ids:
+                wfname = element.name + '_%s' % id
 
                 # Create wform files
                 packed_waveforms[wfname] = AWG.pack_waveform(
                     chan_wfs[id],
-                    chan_wfs[id+'_marker1'],
-                    chan_wfs[id+'_marker2'])
+                    chan_wfs[id + '_marker1'],
+                    chan_wfs[id + '_marker2'])
 
         _t = time.time() - _t0
 

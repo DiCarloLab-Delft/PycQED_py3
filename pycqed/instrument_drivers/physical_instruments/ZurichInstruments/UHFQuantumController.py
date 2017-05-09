@@ -421,9 +421,8 @@ class UHFQC(Instrument):
             samples (int): the expected number of samples
             arm    (bool): if true arms the acquisition, disable when you
                            need synchronous acquisition with some external dev
-            acquisition_time (float): time in sec between polls? # TODO check with Niels H
-            timeout (float): time in seconds before timeout Error is raised.
-
+            acquisition_time (float): time in sec between polls?
+            # TODO check with Niels H
         """
         data = dict()
 
@@ -736,7 +735,7 @@ class UHFQC(Instrument):
         wave_I_string = self.array_to_combined_vector_string(Iwave, "Iwave")
         wave_Q_string = self.array_to_combined_vector_string(Qwave, "Qwave")
         delay_samples = int(acquisition_delay*1.8e9/8)
-        delay_string = '\twait(getUserReg(2));\n'
+        delay_string = '\twait(wait_delay);\n'
         self.awgs_0_userregs_2(delay_samples)
 
         preamble = """
@@ -746,6 +745,7 @@ const IAVG_TRIG = 0x000020;
 const WINT_EN   = 0x1f0000;
 setTrigger(WINT_EN);
 var loop_cnt = getUserReg(0);
+var wait_delay = getUserReg(2);
 var RO_TRIG;
 if(getUserReg(1)){
   RO_TRIG=IAVG_TRIG;
@@ -756,10 +756,10 @@ if(getUserReg(1)){
         loop_start = """
 repeat(loop_cnt) {
 \twaitDigTrigger(1, 1);
-\tplayWave(Iwave,Qwave);\n"""
+\tplayWave(Iwave, Qwave);\n"""
 
         end_string = """
-\tsetTrigger(WINT_EN +RO_TRIG);
+\tsetTrigger(WINT_EN + RO_TRIG);
 \tsetTrigger(WINT_EN);
 \twaitWave();
 }

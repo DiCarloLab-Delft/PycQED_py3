@@ -279,6 +279,8 @@ class Element:
 
     # computing the numerical waveform
     def ideal_waveforms(self):
+
+
         wfs = {}
         tvals = {}
 
@@ -324,6 +326,8 @@ class Element:
             lo = self.pulsar.channels[wf]['low']
             if self.chan_distorted[wf]:
                 wfs[wf] = self.distorted_wfs[wf]
+            if len(wfs[wf]) == 0:
+                continue
             # truncate all values that are out of bounds
             if self.pulsar.channels[wf]['type'] == 'analog':
                 if max(wfs[wf]) > hi:
