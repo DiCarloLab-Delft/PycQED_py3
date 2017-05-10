@@ -79,8 +79,7 @@ def two_qubit_off_on(q0_pulse_pars, q1_pulse_pars, RO_pars,
         el = multi_pulse_elt(i, station, pulses)
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
-    station.components['AWG'].stop()
-    station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+    station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
     if return_seq:
         return seq, el_list
     else:
@@ -127,8 +126,7 @@ def three_qubit_off_on(q0_pulse_pars, q1_pulse_pars, q2_pulse_pars, RO_pars,
         el = multi_pulse_elt(i, station, pulses)
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
-    station.components['AWG'].stop()
-    station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+    station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
     if return_seq:
         return seq, el_list
     else:
@@ -190,8 +188,7 @@ def four_qubit_off_on(q0_pulse_pars,
         el = multi_pulse_elt(i, station, pulses)
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
-    station.components['AWG'].stop()
-    station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+    station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
     if return_seq:
         return seq, el_list
     else:
@@ -289,8 +286,7 @@ def five_qubit_off_on(q0_pulse_pars,
         el = multi_pulse_elt(i, station, pulses)
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
-    station.components['AWG'].stop()
-    station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+    station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
     if return_seq:
         return seq, el_list
     else:
@@ -396,8 +392,7 @@ def two_qubit_AllXY(operation_dict, q0='q0', q1='q1', RO_target='all',
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
     if upload:
-        station.components['AWG'].stop()
-        station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
     if return_seq:
         return seq, el_list
     else:
@@ -516,8 +511,7 @@ def two_qubit_tomo_cardinal(cardinal,
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
 
-    station.components['AWG'].stop()
-    station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+    station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
     if return_seq:
         return seq, el_list
     else:
@@ -688,8 +682,7 @@ def two_qubit_tomo_bell(bell_state,
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
 
-    station.components['AWG'].stop()
-    station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+    station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
 
     return seq, el_list
 
@@ -824,8 +817,7 @@ def cphase_fringes(phases, q0_pulse_pars, q1_pulse_pars, RO_pars,
 
     # upload
     if upload:
-        station.components['AWG'].stop()
-        station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
     if return_seq:
         return seq, el_list
     else:
@@ -961,8 +953,7 @@ def two_qubit_tomo_cphase_cardinal(cardinal_state,
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
 
-    station.components['AWG'].stop()
-    station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+    station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
 
     return seq, el_list
 
