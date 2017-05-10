@@ -322,6 +322,7 @@ class MeasurementAnalysis(object):
     def run_default_analysis(self, TwoD=False, close_file=True,
                              show=False, log=False, transpose=False, **kw):
         if TwoD is False:
+            self.get_naming_and_values() #defined below; this is where self.value_names is assigned.
             self.sweep_points = kw.pop('sweep_points', self.sweep_points)
             # Preallocate the array of axes in the figure
             # Creates either a 2x2 grid or a vertical list
@@ -1165,6 +1166,31 @@ class chevron_optimization_v2(TD_Analysis):
 
 class Rabi_Analysis_new(TD_Analysis):
 
+    """
+    Analysis script for a Rabi measurement:
+        1. The I and Q data are rotated and normalized based on the calibration points. In most
+          analysis routines, the latter are typically 4: 2 X180 measurements, and 2 identity measurements,
+          which get averaged resulting in one X180 point and one identity point. However, the default for Rabi
+          is 2 (2 identity measurements) because we typically do Rabi in order to find the correct amplitude
+          for an X180 pulse. However, if a previous such value exists, this routine also accepts 4 cal pts.
+        2. The normalized data is fitted to a cosine function.
+        3. The pi-pulse and pi/2-pulse amplitudes are calculated from the fit.
+        4. The normalized data, the best fit results, and the pi and pi/2 pulses are plotted.
+
+    Possible input parameters:
+        auto              (default=True)                automatically perform the entire analysis upon call
+        label='Rabi'      (default=none?)               Label of the analysis routine
+        folder            (default=working folder)      Working folder
+        NoCalPoints       (default=4)                   Number of calibration points
+        print_fit_results (default=False)               print the fit report
+        show              (default=True)                show the plots
+        show_guess        (default=False)               plot with initial guess values
+        show_amplitudes   (default=True)                print the pi&piHalf pulses amplitudes
+        plot_amplitudes   (default=True)                plot the pi&piHalf pulses amplitudes
+        plot_errorbars    (default=True)                plot standard error for each sample point
+        close_file        (default=True)                close the hdf5 file
+    """
+
     def __init__(self, label='Rabi', **kw):
         kw['label'] = label
         kw['h5mode'] = 'r+'
@@ -1233,6 +1259,8 @@ class Rabi_Analysis_new(TD_Analysis):
         show = kw.pop('show', False)
         plot_amplitudes = kw.pop('plot_amplitudes',True)
         show_amplitudes = kw.pop('show_amplitudes',True)
+        plot_errorbars = kw.pop('plot_errorbars',True)
+
         self.add_analysis_datagroup_to_file()
         self.get_naming_and_values()
         fig1, fig2, ax, axarray = self.setup_figures_and_axes()
@@ -1242,6 +1270,14 @@ class Rabi_Analysis_new(TD_Analysis):
         self.normalized_values = norm[0]
         self.normalized_data_points = norm[1]
         self.normalized_cal_vals = norm[2]
+
+        #If we are calibrating only to a pulse with no amplitude (i.e. do nothing), then manually
+        #normalize the y axis.
+        if self.NoCalPoints <= 2:
+            max_min_distance = max(self.normalized_values) - min(self.normalized_values)
+            self.normalized_values = (self.normalized_values - min(self.normalized_values))/max_min_distance
+            self.normalized_data_points = self.normalized_values[:-int(self.NoCalPoints)]
+            self.normalized_cal_vals = self.normalized_values[-int(self.NoCalPoints):]
 
         #get the fit results (lmfit.ModelResult)
         self.fit_res = self.fit_Rabi(print_fit_results)
@@ -1279,8 +1315,8 @@ class Rabi_Analysis_new(TD_Analysis):
         if phase_fit == 0:
              piPulse = 1/(2*freq_fit)
              piHalfPulse = 1/(4*freq_fit)
-             piPulse_std = freq_std
-             piHalfPulse_std = freq_std
+             piPulse_std = freq_std/freq_fit
+             piHalfPulse_std = freq_std/freq_fit
         else:
             piPulse = phase_fit/(2*np.pi*freq_fit)
             piHalfPulse = piPulse - 1/(4*freq_fit)
@@ -1288,7 +1324,13 @@ class Rabi_Analysis_new(TD_Analysis):
             #Calculate std. deviation for pi and pi/2 amplitudes based on error propagation theory
             #(Source: http://ugastro.berkeley.edu/infrared09/PDF-2009/statistics1.pdf)
             #Errors were assumed to be uncorrelated.
-            piPulse_std = piPulse*math.sqrt( (freq_std/freq_fit)**2 + (phase_std/phase_fit)**2)
+
+            #extract cov(phase,freq)
+            freq_idx = self.fit_res.var_names.index('frequency')
+            phase_idx = self.fit_res.var_names.index('phase')
+            cov_freq_phase = self.fit_res.covar[freq_idx,phase_idx]
+            piPulse_std = piPulse*math.sqrt( (2*np.pi*freq_std/freq_fit)**2 + (phase_std/phase_fit)**2
+                                             -2*(cov_freq_phase**2)/phase_fit)
             piHalfPulse_std = math.sqrt( (piPulse_std)**2 + (freq_std/freq_fit)**2 )
 
         #return as dict for ease of use with "save_computed_parameters"
@@ -1298,7 +1340,7 @@ class Rabi_Analysis_new(TD_Analysis):
                     'piHalfPulse_std':piHalfPulse_std}
 
         if show_amplitudes:
-            print(pretty(pi)+'-Pulse Amplitude = {} \t\t'.format(piPulse)+
+            print(pretty(pi)+'-Pulse Amplitude = {} \t'.format(piPulse)+
                   pretty(pi)+'-Pulse Stddev = {}\n'.format(piPulse_std)+
                   pretty(pi)+'/2-Pulse Amlitude = {}\t'.format(piHalfPulse)+
                   pretty(pi)+'/2-Pulse Stddev = {}\n'.format(piHalfPulse_std))
@@ -1308,8 +1350,8 @@ class Rabi_Analysis_new(TD_Analysis):
         self.save_fitted_parameters(self.fit_res, var_name=self.value_names[0])
         self.save_computed_parameters(self.rabi_amplitudes,var_name=self.value_names[0])
 
-        self.plot_results(fig1, ax, show_guess=show_guess,
-                          plot_amplitudes=plot_amplitudes, ylabel=r'$F$ $|1 \rangle$')
+        self.plot_results(fig1, ax, show_guess=show_guess, plot_amplitudes=plot_amplitudes,
+                          plot_errorbars=plot_errorbars, ylabel=r'$F$ $|1 \rangle$')
 
         for i, name in enumerate(self.value_names):
             if len(self.value_names) == 4:
@@ -1335,7 +1377,7 @@ class Rabi_Analysis_new(TD_Analysis):
             self.data_file.close()
         return self.fit_res
 
-    def plot_results(self, fig, ax, ylabel, show_guess=False, plot_amplitudes=True):
+    def plot_results(self, fig, ax, ylabel, show_guess=False, plot_amplitudes=True, plot_errorbars=True):
 
         pi_pulse = self.rabi_amplitudes['piPulse']
         pi_half_pulse = self.rabi_amplitudes['piHalfPulse']
@@ -1356,6 +1398,36 @@ class Rabi_Analysis_new(TD_Analysis):
                                         xlabel=self.xlabel,
                                         ylabel=ylabel,
                                         save=False)
+
+        best_vals = self.fit_res.best_values
+        #Used for plotting the fit (line 1433)
+        cos_fit_func = lambda a: fit_mods.CosFunc(a,
+                                                  amplitude=best_vals['amplitude'],
+                                                  frequency=best_vals['frequency'],
+                                                  phase=best_vals['phase'],
+                                                  offset=best_vals['offset'])
+
+        #Plot the calculated pi and pi/2 amplitudes
+        if plot_amplitudes:
+
+            piPulse_fit = cos_fit_func(pi_pulse)
+            piHalfPulse_fit = cos_fit_func(pi_half_pulse)
+
+            #plot 2 horizontal lines for piAmpl and piHaldAmpl
+            ax.plot([min(self.sweep_points), max(self.sweep_points)],[piPulse_fit, piPulse_fit], 'k--')
+            ax.plot([min(self.sweep_points), max(self.sweep_points)],[piHalfPulse_fit, piHalfPulse_fit], 'k--')
+            #Add extra ticks and labels
+            ax.set_yticks(list(ax.get_yticks()) + [piPulse_fit])
+            ax.set_yticks(list(ax.get_yticks()) + [piHalfPulse_fit])
+
+            ax.plot(pi_pulse, piPulse_fit, 'ro',markersize=10)
+            ax.plot(pi_half_pulse, piHalfPulse_fit, 'ro',markersize=10)
+
+        #Plot error bars
+        if plot_errorbars:
+            a_tools.plot_errorbars(self.sweep_points[:-self.NoCalPoints],self.normalized_data_points,
+                                   ax=ax,only_bars=True)
+
         # plot with initial guess
         if show_guess:
             ax.plot(self.sweep_points[:-self.NoCalPoints],
@@ -1365,30 +1437,8 @@ class Rabi_Analysis_new(TD_Analysis):
         x = np.linspace(self.sweep_points[0],
                         self.sweep_points[-self.NoCalPoints],
                         len(self.sweep_points)*100)
-        best_vals = self.fit_res.best_values
-        cos_fit_func = lambda a: fit_mods.CosFunc(a,
-                                                  amplitude=best_vals['amplitude'],
-                                                  frequency=best_vals['frequency'],
-                                                  phase=best_vals['phase'],
-                                                  offset=best_vals['offset'])
-
         y = cos_fit_func(x)
         ax.plot(x, y, 'r-')
-
-        #Plot the calculated pi and pi/2 amplitudes
-        if plot_amplitudes:
-
-            piPulse_fit = cos_fit_func(pi_pulse)
-            piHalfPulse_fit = cos_fit_func(pi_half_pulse)
-            ax.plot(pi_pulse, piPulse_fit, 'ro',markersize=10)
-            ax.plot(pi_half_pulse, piHalfPulse_fit, 'ro',markersize=10)
-
-            #plot 2 horizontal lines for piAmpl and piHaldAmpl
-            ax.plot([min(self.sweep_points), max(self.sweep_points)],[piPulse_fit, piPulse_fit], 'k--')
-            ax.plot([min(self.sweep_points), max(self.sweep_points)],[piHalfPulse_fit, piHalfPulse_fit], 'k--')
-            #Add extra ticks and labels
-            ax.set_yticks(list(ax.get_yticks()) + [piPulse_fit])
-            ax.set_yticks(list(ax.get_yticks()) + [piHalfPulse_fit])
 
 class Rabi_Analysis(TD_Analysis):
 
@@ -1686,6 +1736,151 @@ class Motzoi_XY_analysis(TD_Analysis):
         self.optimal_motzoi = min(x1, x2, key=lambda x: abs(x))
         return self.optimal_motzoi
 
+class QScale_Analysis(TD_Analysis):
+
+    '''
+    Analysis for the QScale sequence ( (xX)-(xY)-(xmY) ).
+    Extracts the alternating data points and then fits two lines ((xY) and (xmY)) and a constant (xX).
+    The intersect of the fits corresponds to the optimum motzoi parameter.
+
+    1. The I and Q data are rotated and normalized based on the calibration points. In most
+       analysis routines, the latter are typically 4: 2 X180 measurements, and 2 identity measurements,
+       which get averaged resulting in one X180 point and one identity point.
+    2. The data points for the same qscale value are extracted (every other 3rd point because the sequence
+       used for this measurement applies the 3 sets of pulses ( (xX)-(xY)-(xmY) ) consecutively for each qscale value).
+    3. The xX data is fitted to a lmfit.models.ConstantModel(), and the other 2 to an lmfit.models.LinearModel().
+    4. The data and the resulting fits are all plotted on the same graph (self.make_figures).
+    5. The optimal qscale parameter is obtained from the point where the 2 linear fits intersect.
+
+    Possible input parameters:
+        auto              (default=True)                    automatically perform the entire analysis upon call
+        label             (default=none?)                   Label of the analysis routine
+        folder            (default=working folder)          Working folder
+        NoCalPoints       (default=4)                       Number of calibration points
+        cal_points        (default=[[-4, -3], [-2, -1]])    The indices of the calibration points
+        show              (default=True)                    show the plot
+        show_guess        (default=False)                   plot with initial guess values
+        plot_title        (default=measurementstring)       the title for the plot as a string
+        xlabel            (default=self.xlabel)             the label for the x axis as a string
+        ylabel            (default=r'$F|1\rangle$')         the label for the x axis as a string
+        close_file        (default=True)                    close the hdf5 file
+
+    The default analysis (auto=True) returns the optimal qscale parameter.
+    '''
+
+    def __init__(self, label='QScale', **kw):
+        kw['label'] = label
+        kw['h5mode'] = 'r+'
+        super().__init__(**kw)
+
+    def run_default_analysis(self, close_file=True, close_main_fig=True, **kw):
+        self.get_naming_and_values()
+        self.add_analysis_datagroup_to_file()
+        self.cal_points = kw.pop('cal_points', [[-4, -3], [-2, -1]])
+        self.rotate_and_normalize_data()
+        self.add_dataset_to_analysisgroup('Corrected data',
+                                          self.corr_data)
+        self.analysis_group.attrs.create('corrected data based on',
+                                         'calibration points'.encode('utf-8'))
+
+        # Only the unfolding part here is unique to this analysis
+        self.sweep_points_xX = self.sweep_points[:-4:3]
+        self.sweep_points_xY = self.sweep_points[1:-4:3]
+        self.sweep_points_xmY = self.sweep_points[2:-4:3]
+        self.corr_data_xX = self.corr_data[:-4:3]
+        self.corr_data_xY = self.corr_data[1:-4:3]
+        self.corr_data_xmY = self.corr_data[2:-4:3]
+
+        self.fit_data(**kw)
+        self.make_figures(**kw)
+
+        opt_qscale = self.calculate_optimal_qscale()
+
+        if close_file:
+            self.data_file.close()
+        return opt_qscale
+
+    def make_figures(self, **kw):
+
+        # Unique in that it has hardcoded names and points to plot
+        show_guess = kw.pop('show_guess', False)
+        self.fig, self.ax = plt.subplots(1, 1, figsize=(15, 10))
+        plot_title = kw.pop('plot_title', textwrap.fill(
+            self.timestamp_string + '_' +
+            self.measurementstring, 40))
+        self.ax.set_title(plot_title)
+
+        self.ax.ticklabel_format(useOffset=False)
+        self.ax.set_xlabel(kw.pop('xlabel', self.xlabel))
+        self.ax.set_ylabel(kw.pop('ylabel', r'$F|1\rangle$'))
+
+        x_fine = np.linspace(min(self.sweep_points), max(self.sweep_points), 1000)
+        self.ax.plot(self.sweep_points_xX, self.corr_data_xX, 'o', c='b', label=r'$X_{\frac{\pi}{2}}X_{\pi}$')
+        self.ax.plot(self.sweep_points_xY, self.corr_data_xY, 'o', c='g', label=r'$X_{\frac{\pi}{2}}Y_{\pi}$')
+        self.ax.plot(self.sweep_points_xmY, self.corr_data_xmY, 'o', c='r', label=r'$X_{\frac{\pi}{2}}Y_{-\pi}$')
+
+        c = ['b', 'g', 'r']
+        if hasattr(self, 'fit_res'):
+            for i in range(len(self.fit_res)):
+                fine_fit = self.fit_res[i].model.func(
+                    x_fine, **self.fit_res[i].best_values)
+                self.ax.plot(x_fine, fine_fit, c=c[i], label='fit')
+                if show_guess:
+                    fine_fit = self.fit_res[i].model.func(
+                        x_fine, **self.fit_res[i].init_values)
+                    self.ax.plot(x_fine, fine_fit, c=c[i], label='guess')
+
+        self.ax.legend(loc='best')
+        self.ax.set_ylim(-.1, 1.1)
+        self.save_fig(self.fig, fig_tight=True, **kw)
+
+        if kw.pop('show',True):
+            plt.show()
+
+    def fit_data(self, **kw):
+        model_const = lmfit.models.ConstantModel()
+        model_linear = lmfit.models.LinearModel()
+        self.fit_res = ['', '', '']
+
+        #Fit xX measurement - constant
+        params = model_const.guess(data=self.corr_data_xX,
+                             x=self.sweep_points_xX)
+        self.fit_res[0] = model_const.fit(
+            data=self.corr_data_xX,
+            x=self.sweep_points_xX,
+            params=params)
+        self.save_fitted_parameters(fit_res=self.fit_res[0],
+                                    var_name='xX')
+
+        #Fit xY measurement
+        params = model_linear.guess(data=self.corr_data_xY,
+                             x=self.sweep_points_xY)
+        self.fit_res[1] = model_linear.fit(
+            data=self.corr_data_xY,
+            x=self.sweep_points_xY,
+            params=params)
+        self.save_fitted_parameters(fit_res=self.fit_res[1],
+                                    var_name='xY')
+
+        #Fit xmY measurement
+        params = model_linear.guess(data=self.corr_data_xmY,
+                             x=self.sweep_points_xmY)
+        self.fit_res[2] = model_linear.fit(
+            data=self.corr_data_xmY,
+            x=self.sweep_points_xmY,
+            params=params)
+        self.save_fitted_parameters(fit_res=self.fit_res[2],
+                                    var_name='xmY')
+
+    def calculate_optimal_qscale(self):
+
+        #The best qscale parameter is the point where all 3 curves intersect.
+
+        #b_vals0 = self.fit_res[0].best_values
+        b_vals1 = self.fit_res[1].best_values
+        b_vals2 = self.fit_res[2].best_values
+        self.optimal_qscale = (b_vals1['intercept']-b_vals2['intercept'])/(b_vals2['slope']-b_vals1['slope'])
+        return self.optimal_qscale
 
 class Rabi_Analysis_old(TD_Analysis):
 

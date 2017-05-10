@@ -972,8 +972,8 @@ class Ramsey(swf.Hard_Sweep):
 
 class Ramsey_2nd_exc(swf.Hard_Sweep):
 
-    def __init__(self, pulse_pars, pulse_pars_2nd, artificial_detuning=None,
-                 RO_pars, times=None, n=1, cal_points=True, upload=True):
+    def __init__(self, pulse_pars, pulse_pars_2nd, RO_pars, artificial_detuning=None,
+                 times=None, n=1, cal_points=True, upload=True):
         super().__init__()
         self.pulse_pars = pulse_pars
         self.pulse_pars_2nd = pulse_pars_2nd
@@ -1080,6 +1080,29 @@ class Motzoi_XY(swf.Hard_Sweep):
                           pulse_pars=self.pulse_pars,
                           RO_pars=self.RO_pars)
 
+class QScale(swf.Hard_Sweep):
+
+    def __init__(self, qscales, pulse_pars, RO_pars, upload=True):
+        '''
+        Measures 3 number of points per QScale parameter value specified
+        in qscales and adds 4 calibration points to it.
+        '''
+        super().__init__()
+        self.pulse_pars = pulse_pars
+        self.RO_pars = RO_pars
+        self.upload = upload
+        self.name = 'QScale'
+        self.parameter_name = 'QScale_factor'
+        self.unit = ' '
+        sweep_pts = np.repeat(qscales, 3)
+        self.sweep_points = np.append(sweep_pts,
+                                      [qscales[-1]+(qscales[-1]-qscales[-2])]*4)
+
+    def prepare(self, **kw):
+        if self.upload:
+            sqs.QScale(qscales=self.sweep_points,
+                          pulse_pars=self.pulse_pars,
+                          RO_pars=self.RO_pars)
 
 class Freq_XY(swf.Hard_Sweep):
 

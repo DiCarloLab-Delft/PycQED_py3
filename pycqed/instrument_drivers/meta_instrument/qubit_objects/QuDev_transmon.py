@@ -166,7 +166,9 @@ class QuDev_transmon(Qubit):
                                  initial_value=None, vals=vals.Numbers())
         self.add_pulse_parameter('X180', 'nr_sigma', 'nr_sigma',
                                  initial_value=None, vals=vals.Numbers())
-        self.add_pulse_parameter('X180', 'motzoi', 'motzoi',
+        self.add_pulse_parameter('X180', 'drag_qscale', 'drag_qscale',
+                                 initial_value=None, vals=vals.Numbers())
+        self.add_pulse_parameter('X180', 'qscale', 'qscale',
                                  initial_value=None, vals=vals.Numbers())
         self.add_pulse_parameter('X180', 'f_pulse_mod', 'mod_frequency',
                                  initial_value=None, vals=vals.Numbers())
@@ -179,48 +181,48 @@ class QuDev_transmon(Qubit):
 
         # add drive pulse parameters for ef transition
         self.add_operation('X180_ef')
-        self.add_pulse_parameter('X180_ef', 'pulse_type', 'pulse_type',
+        self.add_pulse_parameter('X180_ef', 'pulse_type_ef', 'pulse_type_ef',
                                  initial_value=None, vals=vals.Strings())
-        self.add_pulse_parameter('X180_ef', 'pulse_I_channel', 'I_channel',
+        self.add_pulse_parameter('X180_ef', 'pulse_I_channel_ef', 'I_channel_ef',
                                  initial_value=None, vals=vals.Strings())
-        self.add_pulse_parameter('X180_ef', 'pulse_Q_channel', 'Q_channel',
+        self.add_pulse_parameter('X180_ef', 'pulse_Q_channel_ef', 'Q_channel_ef',
                                  initial_value=None, vals=vals.Strings())
-        self.add_pulse_parameter('X180_ef', 'amp180', 'amplitude',
+        self.add_pulse_parameter('X180_ef', 'amp180_ef', 'amplitude_ef',
                                  initial_value=1, vals=vals.Numbers())
-        self.add_pulse_parameter('X180_ef', 'amp90_scale', 'amp90_scale',
+        self.add_pulse_parameter('X180_ef', 'amp90_scale_ef', 'amp90_scale_ef',
                                  initial_value=0.5, vals=vals.Numbers(0, 1))
-        self.add_pulse_parameter('X180_ef', 'pulse_delay', 'pulse_delay',
+        self.add_pulse_parameter('X180_ef', 'pulse_delay_ef', 'pulse_delay_ef',
                                  initial_value=None, vals=vals.Numbers())
-        self.add_pulse_parameter('X180_ef', 'gauss_sigma', 'sigma',
+        self.add_pulse_parameter('X180_ef', 'gauss_sigma_ef', 'sigma_ef',
                                  initial_value=None, vals=vals.Numbers())
-        self.add_pulse_parameter('X180_ef', 'nr_sigma', 'nr_sigma',
+        self.add_pulse_parameter('X180_ef', 'nr_sigma_ef', 'nr_sigma_ef',
                                  initial_value=None, vals=vals.Numbers())
-        self.add_pulse_parameter('X180_ef', 'motzoi', 'motzoi',
+        self.add_pulse_parameter('X180_ef', 'drag_qscale_ef', 'drag_qscale_ef',
                                  initial_value=None, vals=vals.Numbers())
-        self.add_pulse_parameter('X180_ef', 'f_pulse_mod', 'mod_frequency',
+        self.add_pulse_parameter('X180_ef', 'f_pulse_mod_ef', 'mod_frequency_ef',
                                  initial_value=None, vals=vals.Numbers())
-        self.add_pulse_parameter('X180_ef', 'phi_skew', 'phi_skew',
+        self.add_pulse_parameter('X180_ef', 'phi_skew_ef', 'phi_skew_ef',
                                  initial_value=None, vals=vals.Numbers())
-        self.add_pulse_parameter('X180_ef', 'alpha', 'alpha',
+        self.add_pulse_parameter('X180_ef', 'alpha_ef', 'alpha_ef',
                                  initial_value=None, vals=vals.Numbers())
-        self.add_pulse_parameter('X180_ef', 'X_pulse_phase', 'phase',
+        self.add_pulse_parameter('X180_ef', 'X_pulse_phase_ef', 'phase_ef',
                                  initial_value=None, vals=vals.Numbers())
 
         # add flux pulse parameters
         self.add_operation('flux')
-        self.add_pulse_parameter('flux', 'flux_pulse_type', 'pulse_type',
+        self.add_pulse_parameter('flux', 'flux_pulse_type', 'flux_pulse_type',
                                  initial_value=None, vals=vals.Strings())
-        self.add_pulse_parameter('flux', 'pulse_I_channel', 'I_channel',
+        self.add_pulse_parameter('flux', 'flux_pulse_I_channel', 'flux_I_channel',
                                  initial_value=None, vals=vals.Strings())
-        self.add_pulse_parameter('flux', 'pulse_Q_channel', 'Q_channel',
+        self.add_pulse_parameter('flux', 'flux_pulse_Q_channel', 'flux_Q_channel',
                                  initial_value=None, vals=vals.Strings())
-        self.add_pulse_parameter('flux', 'flux_pulse_amp', 'amplitude',
+        self.add_pulse_parameter('flux', 'flux_pulse_amp', 'flux_amplitude',
                                  initial_value=1, vals=vals.Numbers())
-        self.add_pulse_parameter('flux', 'flux_pulse_length', 'length',
+        self.add_pulse_parameter('flux', 'flux_pulse_length', 'flux_length',
                                  initial_value=None, vals=vals.Numbers())
-        self.add_pulse_parameter('flux', 'flux_pulse_delay', 'pulse_delay',
+        self.add_pulse_parameter('flux', 'flux_pulse_delay', 'flux_pulse_delay',
                                  initial_value=None, vals=vals.Numbers())
-        self.add_pulse_parameter('flux', 'f_pulse_mod', 'mod_frequency',
+        self.add_pulse_parameter('flux', 'flux_f_pulse_mod', 'flux_mod_frequency',
                                  initial_value=None, vals=vals.Numbers())
 
         self.update_detector_functions()
@@ -542,6 +544,27 @@ class QuDev_transmon(Qubit):
         MC.set_sweep_points(times)
         MC.set_detector_function(self.int_avg_det)
         MC.run('T1'+self.msmt_suffix)
+
+        if analyze:
+            ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
+
+    def measure_qscale(self, qscales=None, MC=None, analyze=True, upload=True,
+                       close_fig=True):
+
+        if qscales is None:
+            raise ValueError("Unspecified qscale values for measure_qscale")
+
+        self.prepare_for_timedomain()
+
+        if MC is None:
+            MC = self.MC
+
+        MC.set_sweep_function(awg_swf.QScale(
+                pulse_pars=self.get_drive_pars(), RO_pars=self.get_RO_pars(),
+                upload=upload))
+        MC.set_sweep_points(qscales)
+        MC.set_detector_function(self.int_avg_det)
+        MC.run('QScale'+self.msmt_suffix)
 
         if analyze:
             ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
@@ -1033,28 +1056,59 @@ class QuDev_transmon(Qubit):
             raise ValueError("Unknown method '{}' for "
                              "find_frequency".format(method))
 
-    def find_amplitudes(self, for_ef=False, update=True, MC=None, close_fig=True, **kw):
+    def find_amplitudes(self, rabi_amps, label='Rabi', for_ef=False, update=True,
+                        MC=None, close_fig=True, number_cal_points=2, **kw):
 
         """
         Finds the pi and pi/2 pulse amplitudes from the fit to a Rabi experiment. Uses the Rabi_Analysis(_new)
         class from measurement_analysis.py
 
-        :param update:      update the qubit amp180 and amp90 parameters
-        :param MC:          the measurement control object
-        :param close_fig:   close the resulting figure?
-        :param kw:          other keyword arguments. The Rabi sweep amplitudes array 'amps', or the parameter
-                            'amps_mean' should be passed here
-        :return:            the pi-pulse and pi/2-pulse amplitudes and standard deviations
+        Analysis script for the Rabi measurement:
+        1. The I and Q data are rotated and normalized based on the calibration points. In most
+          analysis routines, the latter are typically 4: 2 X180 measurements, and 2 identity measurements,
+          which get averaged resulting in one X180 point and one identity point. However, the default for Rabi
+          is 2 (2 identity measurements) because we typically do Rabi in order to find the correct amplitude
+          for an X180 pulse. However, if a previous such value exists, this routine also accepts 4 cal pts.
+        2. The normalized data is fitted to a cosine function.
+        3. The pi-pulse and pi/2-pulse amplitudes are calculated from the fit.
+        4. The normalized data, the best fit results, and the pi and pi/2 pulses are plotted.
+
+        :param rabi_amps:          amplitude sweep points for the Rabi experiment
+        :param label:              Label of the analysis routine
+        :param update:             update the qubit amp180 and amp90 parameters
+        :param MC:                 the measurement control object
+        :param close_fig:          close the resulting figure?
+        :param number_cal_points   number of calibration points to use; if it's the first time rabi is run
+                                   then use_cal_points=False
+        :param kw:                 other keyword arguments. The Rabi sweep amplitudes array 'amps', or the
+                                   parameter 'amps_mean' should be passed here
+
+        Other possible input parameters in the kw:
+
+        auto              (default=True)                automatically perform the entire analysis upon call
+        print_fit_results (default=False)               print the fit report
+        show              (default=True)                show the plots
+        show_guess        (default=False)               plot with initial guess values
+        show_amplitudes   (default=True)                print the pi&piHalf pulses amplitudes
+        plot_amplitudes   (default=True)                plot the pi&piHalf pulses amplitudes
+
+        :return:                   the pi-pulse and pi/2-pulse amplitudes and standard deviations
         """
 
         if MC is None:
             MC = self.MC
 
-        n = kw.get('n',1)  #how many times to apply the Rabi pulse for each amplitude
+        n = kw.get('n',1)                                       #how many times to apply the Rabi pulse
+                                                                #for each amplitude
+        show_guess = kw.get('show_guess', False)                #plot with initial guess values
+        show = kw.get('show', True)                             #show the plot or not
+        print_fit_results = kw.get('print_fit_results', True)   #print the fit report
+        show_amplitudes = kw.get('show_amplitudes', True)       #print the pi&piHalf pulses amplitudes
+        plot_amplitudes = kw.get('plot_amplitudes', True)       #plot the pi&piHalf pulses amplitudes
+        auto = kw.get('auto', True)                             #automatically perform the entire analysis
+                                                                #upon call
 
-        #get amplitude sweep from **kw
-        amps = kw.get('amps',None)
-        if amps is None:
+        if rabi_amps is None:
             amps_span = kw.get('amps_span', 1.)
             amps_mean = kw.get('amps_mean', self.amp180())
             nr_points = kw.get('nr_points', 30)
@@ -1064,53 +1118,59 @@ class QuDev_transmon(Qubit):
                                 "amps_mean or the amps function parameter.")
                 return 0
             else:
-                amps = np.linspace(amps_mean - amps_span/2, amps_mean + amps_span/2,
+                rabi_amps = np.linspace(amps_mean - amps_span/2, amps_mean + amps_span/2,
                                     nr_points)
         #Perform Rabi
         if for_ef is False:
-            self.measure_rabi(amps=amps, n=n, MC=MC, close_fig=close_fig)
+            self.measure_rabi(amps=rabi_amps, n=n, MC=MC, close_fig=close_fig)
         else:
-            self.measure_rabi_2nd_exc(amps=amps, n=n, MC=MC, close_fig=close_fig)
+            self.measure_rabi_2nd_exc(amps=rabi_amps, n=n, MC=MC, close_fig=close_fig)
 
         #get pi and pi/2 amplitudes from the analysis results
         # TODO: might have to correct Rabi_Analysis_new to Rabi_Analysis when we decide which version we stick to.
-        RabiA = ma.Rabi_Analysis_new(close_fig=close_fig)
-        rabi_amps = RabiA.rabi_amps    #This is a dict with keywords 'piPulse',  'piPulse_std',
-                                       #'piHalfPulse', 'piHalfPulse_std
+        RabiA = ma.Rabi_Analysis_new(auto=auto, label=label, close_fig=close_fig, show_guess=show_guess,
+                                     show=show, print_fit_results=print_fit_results, NoCalPoints=number_cal_points,
+                                     show_amplitudes=show_amplitudes, plot_amplitudes=plot_amplitudes)
+
+        rabi_amps = RabiA.rabi_amplitudes    #This is a dict with keywords 'piPulse',  'piPulse_std',
+                                             #'piHalfPulse', 'piHalfPulse_std
 
         amp180 = rabi_amps.pop('piPulse')
         amp90 = rabi_amps.pop('piHalfPulse')
 
         if update:
-            self.amp180(amp180)
-            self.amp90_scale(amp90)
+            if for_ef is False:
+                self.amp180(amp180)
+                self.amp90_scale(amp90)
+            else:
+                self.amp180_ef(amp180)
+                self.amp90_scale_ef(amp90)
 
         return rabi_amps
 
-    def find_T1(self, for_ef=False, update=True, MC=None, close_fig=True, **kw):
+    def find_T1(self, amps, for_ef=False, update=True, MC=None, close_fig=True, **kw):
 
         """
-        Finds the relaxation time T1 from the fit to a Ramsey experiment.
-        Uses the Ramsey_Analysis class from measurement_analysis.py
+        Finds the relaxation time T1 from the fit to a Rabi experiment.
+        Uses the Rabi_Analysis class from measurement_analysis.py
 
-        :param artificial_detuning:     difference between drive frequency and qubit frequency estimated from
-                                        qubit spectroscopy
-        :param update:                  update the qubit amp180 and amp90 parameters
+        :param amps:                    array of amplitudes over which to sweep in the Rabi measurement
+        :param update:                  update the qubit T1 parameter
         :param MC:                      the measurement control object
         :param close_fig:               close the resulting figure?
-        :param kw:                      other keyword arguments. The Rabi sweep time delays array 'times',
-                                        or the parameter 'times_mean' should be passed here (in seconds)
-        :return:                        the real qubit frequency (=self.f_qubit()+artificial_detuning-fitted_freq)
-                                        + stddev, the dephasing rate T2* + stddev
+        :param kw:                      other keyword arguments. The the parameters amps_mean, amps_span, nr_points
+                                        should be passed here. These are an alternative to passing the amps array.
+        :return:                        the relaxation time T1 + standard deviation
         """
 
-    def find_frequency_T2_ramsey(self, for_ef=False, artificial_detuning=0, update=True, MC=None,
+    def find_frequency_T2_ramsey(self, times, for_ef=False, artificial_detuning=0, update=True, MC=None,
                                  close_fig=True, **kw):
 
         """
         Finds the real qubit frequency and the dephasing rate T2* from the fit to a Ramsey experiment.
         Uses the Ramsey_Analysis class from measurement_analysis.py
 
+        :param times                    array of times over which to sweep in the Ramsey measurement
         :param artificial_detuning:     difference between drive frequency and qubit frequency estimated from
                                         qubit spectroscopy
         :param update:                  update the qubit amp180 and amp90 parameters
@@ -1129,8 +1189,6 @@ class QuDev_transmon(Qubit):
         if MC is None:
             MC = self.MC
 
-        #get times sweep from **kw
-        times = kw.get('times',None)
         if times is None:
             times_span = kw.get('times_span', 5e-6)
             times_mean = kw.get('times_mean', 2.5e-6)
@@ -1164,17 +1222,94 @@ class QuDev_transmon(Qubit):
 
         return fitted_freq, T2_star
 
+    def find_qscale(self, qscales, label='QScale', for_ef=False, update=True, MC=None, close_fig=True, **kw):
+
+        '''
+        Performs the QScale calibration measurement ( (xX)-(xY)-(xmY) ) and extracts the optimal QScale parameter
+        from the fits (ma.QScale_Analysis).
+
+        ma.QScale_Analysis:
+        1. The I and Q data are rotated and normalized based on the calibration points. In most
+           analysis routines, the latter are typically 4: 2 X180 measurements, and 2 identity measurements,
+           which get averaged resulting in one X180 point and one identity point.
+        2. The data points for the same qscale value are extracted (every other 3rd point because the sequence
+           used for this measurement applies the 3 sets of pulses ( (xX)-(xY)-(xmY) ) consecutively for each qscale value).
+        3. The xX data is fitted to a lmfit.models.ConstantModel(), and the other 2 to an lmfit.models.LinearModel().
+        4. The data and the resulting fits are all plotted on the same graph (self.make_figures).
+        5. The optimal qscale parameter is obtained from the point where the 2 linear fits intersect.
+
+        Required input parameters:
+            qscales                                                 array of qscale values over which to sweep...
+            or qscales_mean and qscales_span                        ...or the mean qscale value and the span around it
+                                                                    (defaults to 3) as kw. Then the script will construct the
+                                                                    sweep points as np.linspace(qscales_mean -
+                                                                    qscales_span/2, qscales_mean + qscales_span/2, nr_points)
+
+        Possible input parameters:
+            label             (default=none?)                       Label of the analysis routine
+            for_ef            (default=False)                       whether to obtain the drag_qscale_ef parameter
+                                                                    NOT IMPLEMENTED YET!
+            update            (default=True)                        whether or not to update the qubit drag_qscale parameter
+                                                                    with the found value
+            MC                (default=self.MC)                     the measurement control object
+            close_fig         (default=True)                        close the resulting figure
+            **kw:
+                qscale_mean       (default=self.drag_qscale()       mean of the desired qscale sweep values
+                qscale_span       (default=3)                       span around the qscale mean
+                nr_points         (default=30)                      number of sweep points between mean-span/2 and
+                                                                    mean+span/2
+                auto              (default=True)                    automatically perform the entire analysis upon call
+                folder            (default=working folder)          Working folder
+                NoCalPoints       (default=4)                       Number of calibration points
+                cal_points        (default=[[-4, -3], [-2, -1]])    The indices of the calibration points
+                show              (default=True)                    show the plot
+                show_guess        (default=False)                   plot with initial guess values
+                plot_title        (default=measurementstring)       the title for the plot as a string
+                xlabel            (default=self.xlabel)             the label for the x axis as a string
+                ylabel            (default=r'$F|1\rangle$')         the label for the x axis as a string
+                close_file        (default=True)                    close the hdf5 file
+
+        Returns:
+             Optimal qscale parameter + standard deviation.
+        '''
+
+        if MC is None:
+            MC = self.MC
+
+        if qscales is None:
+            qscales_span = kw.get('qscales_span', 3)
+            qscales_mean = kw.get('qscales_mean', self.drag_qscale())
+            nr_points = kw.get('nr_points', 30)
+            if qscales_mean == 0:
+                logging.warning("find_qscale does not know over which "
+                                "qscale values to sweep. Please specify the "
+                                "qscales_mean or the qscales function parameter.")
+                return 0
+            else:
+                qscales = np.linspace(qscales_mean - qscales_span/2, qscales_mean + qscales_span/2, nr_points)
+
+        #Perform the qscale calibration measurement
+        self.measure_qscale(qscales=qscales, MC=MC, close_fig=close_fig)
+
+        #Perform analysis and extract the optimal qscale parameter
+        Qscale = ma.QScale_Analysis(auto=True, label=label, **kw) #returns the optimal qscale parameter
+
+        if update:
+            self.drag_qscale(Qscale)
+
+        return Qscale
+
     def find_anharmonicity(self, update=True):
 
         """
-        Computes the qubit anaharmonicity using f_ef and f_ge. It is assumed that
-        the latter have already been found.
+        Computes the qubit anaharmonicity using f_ef (self.f_ef_qubit) and f_ge (self.f_qubit).
+        It is assumed that the latter values exist.
         """
 
         if self.f_qubit() == 0:
-            logging.warning('f_ge = 0. Run qubit spectroscopy or ramsey.')
+            logging.warning('f_ge = 0. Run qubit spectroscopy or Ramsey.')
         if self.f_ef_qubit() == 0:
-            logging.warning('f_ef = 0. Run qubit spectroscopy or ramsey.')
+            logging.warning('f_ef = 0. Run qubit spectroscopy or Ramsey.')
 
         anharmonicity = self.f_ef_qubit() - self.f_qubit()
 
@@ -1187,7 +1322,7 @@ class QuDev_transmon(Qubit):
 
         """
         Extracts EC and EJ from a least squares fit to the transmon Hamiltonian solutions.
-        It uses a_tools.calculate_transom_transitions, f_ge and f_ef.
+        It uses a_tools.calculate_transmon_transitions, f_ge and f_ef.
         **kw should include the following optional keywords:
             asym:               asymmetry d (Koch (2007), eqn 2.18) for asymmetric junctions
             reduced_flux:       reduced magnetic flux through SQUID

@@ -707,6 +707,56 @@ def Motzoi_XY(motzois, pulse_pars, RO_pars,
     else:
         return seq_name
 
+def QScale(qscales, pulse_pars, RO_pars,
+              cal_points=True, verbose=False, upload=True, return_seq=False):
+    '''
+    Sequence used for calibrating the QScale factor used in the DRAG pulses.
+    Applies X(pi/2)X(pi), X(pi/2)Y(pi), X(pi/2)Y(-pi) for each value of QScale factor.
+
+    Beware that the elements alternate, in order to perform these 3 measurements per
+    QScale factor, the qscales sweep values must be repeated 3 times. This was chosen
+    to be more easily compatible with standard detector functions and sweep pts.
+
+    Input pars:
+        qscales:             array of qscale factors
+        pulse_pars:          dict containing the DRAG pulse parameters
+        RO_pars:             dict containing the RO parameters
+        cal_points:          if True, replaces the last 3*4 segments with
+                             calibration points
+    '''
+    seq_name = 'MotzoiXY'
+    seq = sequence.Sequence(seq_name)
+    station.pulsar.update_channel_settings()
+    el_list = []
+    pulse_combinations=[['X90','X180'],['X90','Y180'],['X90','mY180']]
+    pulses = get_pulse_dict_from_pars(pulse_pars)
+    for i, motzoi in enumerate(qscales):
+        pulse_keys = pulse_combinations[i % 3]
+        for p_name in ['X180', 'Y180', 'X90', 'mY180']:
+            pulses[p_name]['motzoi'] = motzoi
+        if cal_points and (i == (len(qscales)-4) or
+                                   i == (len(qscales)-3)):
+            el = multi_pulse_elt(i, station, [pulses['I'], RO_pars])
+        elif cal_points and (i == (len(qscales)-2) or
+                                     i == (len(qscales)-1)):
+            # pick motzoi for calpoint in the middle of the range
+            pulses['X180']['qscale'] = np.mean(qscales)
+            el = multi_pulse_elt(i, station, [pulses['X180'], RO_pars])
+        else:
+            pulse_list = [pulses[x] for x in pulse_keys]
+            pulse_list += [RO_pars]
+            el = multi_pulse_elt(i, station, pulse_list)
+        el_list.append(el)
+        seq.append_element(el, trigger_wait=True)
+
+    if upload:
+        station.components['AWG'].stop()
+        station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+    if return_seq:
+        return seq, el_list
+    else:
+        return seq_name
+
 # Sequences involving the second excited state
 
 

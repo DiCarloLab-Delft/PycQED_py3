@@ -1,5 +1,6 @@
 # some convenience tools
 #
+import inspect
 import logging
 import numpy as np
 import os
@@ -1476,6 +1477,49 @@ def color_plot_interpolated(x, y, z, ax=None,
             cbar.set_label(zlabel)
         return ax, CS, cbar
     return ax, CS
+
+def plot_errorbars(x, y, fit_results=None, fit_function=None, ax=None, only_bars=True):
+
+    if ax is None:
+        new_plot_created = True
+        f, ax = plt.subplots()
+    else:
+        new_plot_created = False
+
+    standard_error = np.std(y)/np.sqrt(y.size)
+
+    if only_bars:
+        ax.errorbar( x, y, yerr=standard_error, ecolor='k', fmt='' )
+    else:
+        ax.errorbar( x, y, yerr=standard_error, ecolor='k', fmt='-o' )
+
+    # best_vals = fit_results.best_values
+    # func_args=inspect.getargspec(fit_function)[0]                   #returns list of function parameters
+    #
+    # plus_list = []
+    # minus_list = []
+    # for i in func_args[1:]:
+    #     plus_list += [best_vals[i] + fit_results.params[i].stderr]
+    #     minus_list += [best_vals[i] - fit_results.params[i].stderr]
+    #
+    # yplus = fit_function(x,*plus_list)
+    # yminus = fit_function(x,*minus_list)
+    #
+    # asymmetric_error=[]
+    # for idx,val in enumerate(y):
+    #     asymmetric_error += [[ val-yminus[idx],yplus[idx]-val ]]
+    # asymmetric_error = np.asarray(asymmetric_error)
+    # asymmetric_error=np.transpose(asymmetric_error)
+    #
+    # if only_bars:
+    #     ax.errorbar( x, y, yerr=asymmetric_error, fmt='' )
+    # else:
+    #     ax.errorbar( x, y, yerr=asymmetric_error, fmt='-o' )
+
+    if new_plot_created:
+        return f,ax
+    else:
+        return
 
 
 ######################################################################
