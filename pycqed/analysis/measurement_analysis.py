@@ -322,6 +322,7 @@ class MeasurementAnalysis(object):
     def run_default_analysis(self, TwoD=False, close_file=True,
                              show=False, log=False, transpose=False, **kw):
         if TwoD is False:
+            self.get_naming_and_values()
             self.sweep_points = kw.pop('sweep_points', self.sweep_points)
             # Preallocate the array of axes in the figure
             # Creates either a 2x2 grid or a vertical list

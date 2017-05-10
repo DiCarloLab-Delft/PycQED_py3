@@ -8,9 +8,17 @@
 # TODO in principle that could be generalized for other
 # sequencing hardware i guess
 
-import time
 import numpy as np
 import logging
+from qcodes.instrument.base import Instrument
+import time
+try:
+    from qcodes.instrument_drivers.tektronix.AWG5014 import Tektronix_AWG5014
+    from pycqed.instrument_drivers.physical_instruments.ZurichInstruments.\
+        UHFQuantumController import UHFQC
+except:
+    pass
+
 
 # some pulses use rounding when determining the correct sample at which to
 # insert a particular value. this might require correct rounding -- the pulses
@@ -23,31 +31,49 @@ SIGNIFICANT_DIGITS = 11
 
 class Pulsar:
     """
-    This is the object that communicates with the AWG.
+    A meta-instrument responsible for all communication with the AWGs.
+    Contains information about all the available awg-channels in the setup.
+    Starting, stopping and programming the AWGs should be done through Pulsar.
+    TODO: Supports Tektronix AWG5014 and ZI UHFLI.
     """
-
-    AWG = None
-    AWG_type = 'regular'  # other option at this point is 'opt09'
-    clock = 1e9
-    channel_ids = ['ch1', 'ch1_marker1', 'ch1_marker2',
-                   'ch2', 'ch2_marker1', 'ch2_marker2',
-                   'ch3', 'ch3_marker1', 'ch3_marker2',
-                   'ch3', 'ch3_marker1', 'ch3_marker2']
-    AWG_sequence_cfg = {}
-
-    def __init__(self):
+    def __init__(self, default_AWG=None):
+        self.default_AWG = default_AWG  # the default AWG object
+        self.AWG = self.default_AWG # for backward compatibility.
+        self._AWG_obj = {}  # dictionary from AWG name to AWG object
         self.channels = {}
 
     # channel handling
     def define_channel(self, id, name, type, delay, offset,
-                       high, low, active):
+                       high, low, active, AWG=None):
+        """
+        The AWG object must be created before creating channels for that AWG
+
+        Args:
+            id: channel id. For the Tektronix 5014 must be of the form
+                ch#(_marker#) with # a number and the part in () optional.
+                For UHFQC must be 'ch1' or 'ch2'.
+            name: This name must be specified in pulses for them to play on
+                  this channel.
+            type: marker/analog/readout
+            delay: global delay applied to this channel
+            offset: a (software implemented) offset voltage that is added to
+                    all of the waveforms (analog channel only)
+            high: maximal output value
+            low: minimal output value
+            active: whether this channel will be programmed
+            AWG: name of the AWG this channel is on
+        """
+        if AWG is None:
+            AWG = self.default_AWG.name
+
+        self._AWG_obj[AWG] = Instrument.find_instrument(AWG)
 
         _doubles = []
-        for c in self.channels:
-            if self.channels[c]['id'] == id:
-                logging.warning(
-                    "Channel '%s' already in use, will overwrite." % id)
-                _doubles.append(c)
+        for c_name, c_dict in self.channels.items():
+            if c_dict['id'] == id and c_dict['AWG'] == AWG:
+                logging.warning("Channel '{}' on {} already in use, {} will "
+                                "overwrite {}.".format(id, AWG, name, c_name))
+                _doubles.append(c_name)
         for c in _doubles:
             del self.channels[c]
 
@@ -57,210 +83,322 @@ class Pulsar:
                                'offset': offset,
                                'high': high,
                                'low': low,
-                               'active': active}
+                               'active': active,
+                               'AWG': AWG}
+
+    def get_AWG_object(self, channel):
+        """
+        Returns the AWG object for the channel
+
+        Args:
+            channel: Name of the channel
+        Returns:
+            the AWG object
+        """
+        return self._AWG_obj[self.channels[channel]['AWG']]
+
+    def clock(self, c):
+        """
+        Returns the clock rate of channel `c`
+        Args:
+            c: name of the channel
+        Returns: clock rate in samples per second
+        """
+        AWG = self.get_AWG_object(c)
+        return AWG.clock_freq()
 
     def set_channel_opt(self, name, option, value):
+        """
+        Set a channel option
+
+        Args:
+            name: name of the channel
+            option: name of the option
+            value: new value for the option
+        """
         self.channels[name][option] = value
 
-    def get_subchannels(self, id):
+    def _get_5014_subchannels(self, id):
+        """
+        Returns a list with all subchannels corresponding to AWG5014 channel id
+
+        Args:
+            id: ch#(_marker#)
+        Returns:
+            [ch#, ch#_marker1, ch#_marker2]
+        """
         return [id[:3], id[:3]+'_marker1', id[:3]+'_marker2']
 
-    def get_channel_names_by_id(self, id):
+    def get_used_AWGs(self):
+        """
+        Returns:
+            A list of the names of the AWGs in use
+        """
+        return self._AWG_obj.keys()
+
+    def get_active_AWGs(self):
+        """
+        Returns:
+            A set of the names of the AWGs in use with active channels
+        """
+        active_AWGs = set()
+        for c_dict in self.channels.values():
+            if c_dict['active']:
+                active_AWGs.add(c_dict['AWG'])
+        return active_AWGs
+
+    def _get_channel_names_by_5014_id(self, id, AWG=None):
+        """
+        Args:
+            id: ch#
+            AWG: name of the AWG to look the channels for. If `None` uses
+                 the default AWG
+        Returns:
+            dict of channel names with the given id
+        """
+        if AWG is None:
+            AWG = self.default_AWG.name
         chans = {id: None, id+'_marker1': None, id+'_marker2': None}
-        for c in self.channels:
-            if self.channels[c]['id'] in chans:
-                chans[self.channels[c]['id']] = c
+        for c_name, c_dict in self.channels.items():
+            if c_dict['id'] in chans and c_dict['AWG'] == AWG:
+                chans[c_dict['id']] = c_name
         return chans
 
-    def get_channel_name_by_id(self, id):
-        for c in self.channels:
-            if self.channels[c]['id'] == id:
-                return c
+    def get_channel_name_by_id(self, id, AWG=None):
+        """
+        Args:
+            id: ch#
+            AWG: name of the AWG to look the channels for. If `None` uses
+                 the default AWG.
+        Returns:
+            channel name with the given id
+        """
+        if AWG is None:
+            AWG = self.default_AWG.name
+        for c_name, c_dict in self.channels.items():
+            if c_dict['id'] == id and c_dict['AWG'] == AWG:
+                return c_name
 
-    def get_used_subchannel_ids(self, all_subchannels=True):
-        chans = []
-
-        for c in self.channels:
-            if self.channels[c]['active'] and \
-                    self.channels[c]['id'] not in chans:
+    def get_used_subchannel_ids(self, all_subchannels=True, AWG=None):
+        """
+        Args:
+            all_subchannels: Boolean flag to return all subchannel id-s if one
+                             is enabled (applicable to AWG5014)
+            AWG: The name of the AWG to look for the channels
+        Returns:
+            id-s of all the used channels (analog and marker) on the given AWG.
+        """
+        if AWG is None:
+            AWG = self.default_AWG.name
+        chans = set()
+        for c_dict in self.channels.values():
+            if c_dict['active'] and c_dict['AWG'] == AWG:
                 if all_subchannels:
-                    [chans.append(id) for id in
-                        self.get_subchannels(self.channels[c]['id'])]
+                    for id in self._get_5014_subchannels(c_dict['id']):
+                        chans.add(id)
                 else:
-                    chans.append(self.channels[c]['id'])
-
+                    chans.add(c_dict['id'])
         return chans
 
-    def get_used_channel_ids(self):
-        chans = []
-        for c in self.channels:
-            if self.channels[c]['active'] and \
-                    self.channels[c]['id'][:3] not in chans:
-                chans.append(self.channels[c]['id'][:3])
+    def get_used_channel_ids(self, AWG=None):
+        """
+        Args:
+            AWG: The name of the AWG to look for the channels
+        Returns:
+            id-s of all the used channels on the given AWG. Marker channels on
+             the AWG5014 are considered part of the corresponding analog channel
+        """
+        if AWG is None:
+            AWG = self.default_AWG.name
+        chans = set()
+        for c_dict in self.channels.values():
+            if c_dict['active'] and c_dict['AWG'] == AWG:
+                chans.add(c_dict['id'][:3])
         return chans
 
-    def setup_channels(self, output=False, reset_unused=True):
-        '''
-        Function seems to be unused (10/09/15) remove?
-        '''
+    def activate_channels_AWG5014(self, channels='all', AWGs='all'):
+        """
+        sets the state to 'on' for the active channels
+        Args:
+            channels: list of channel ids to turn on (if they are defined
+                      and set as active)
+            AWGs: a list of names of Tektronix AWG5014 AWGs on which to turn
+                  channels on or 'all'
 
-        for n in self.channel_ids:
-            getattr(self.AWG, 'set_%s_status' % n[:3])('off')
+        """
+        if AWGs == 'all':
+            AWGs = self.get_used_AWGs()
+        for AWG in AWGs:
+            if not isinstance(self._AWG_obj[AWG], Tektronix_AWG5014):
+                continue
+            ids = self.get_used_channel_ids(AWG)
+            for id in ids:
+                output = False
+                names = self._get_channel_names_by_5014_id(id, AWG)
+                for sid in names:
+                    if names[sid] is None:
+                        continue
+                    if channels != 'all' and names[sid] not in channels:
+                        continue
+                    if self.channels[names[sid]]['active']:
+                        output = True
+                if output:
+                    self._AWG_obj[AWG].set('{}_state'.format(id), 1)
 
-        if reset_unused:
-            for n in self.channel_ids:
-                if 'marker' in n:
-                    getattr(self.AWG, 'set_%s_low' % n)(0)
-                    getattr(self.AWG, 'set_%s_high' % n)(1)
-                else:
-                    getattr(self.AWG, 'set_%s_amplitude' % n)(1.)
-                    getattr(self.AWG, 'set_%s_offset' % n)(0.)
-
-        for c in self.channels:
-            n = self.channels[c]['id']
-
-            # set correct bounds
-            if self.channels[c]['type'] == 'analog':
-                a = self.channels[c]['high'] - self.channels[c]['low']
-                o = (self.channels[c]['high'] + self.channels[c]['low'])/2.
-                getattr(self.AWG, 'set_%s_amplitude' % n)(a)
-                getattr(self.AWG, 'set_%s_offset' % n)(o)
-            elif self.channels[c]['type'] == 'marker':
-                getattr(self.AWG, 'set_%s_low' % n)(self.channels[c]['low'])
-                getattr(self.AWG, 'set_%s_high' % n)(self.channels[c]['high'])
-
-            # turn on the used channels
-            if output and self.channels[c]['active']:
-                getattr(self.AWG, 'set_%s_status' % n[:3])('on')
-
-    def activate_channels(self, channels='all'):
-        ids = self.get_used_channel_ids()
-        for id in ids:
-            output = False
-            names = self.get_channel_names_by_id(id)
-            for sid in names:
-                if names[sid] is None:
-                    continue
-                if channels != 'all' and names[sid] not in channels:
-                    continue
-                if self.channels[names[sid]]['active']:
-                    output = True
-            if output:
-                self.AWG.set('{}_state'.format(id), 1)
-
-    def get_awg_channel_cfg(self):
+    def get_awg_channel_cfg(self, AWG=None):
+        """
+        Args:
+            AWG: the name of the AWG
+        Returns:
+            A dictionary with the configuration parameters for the AWG
+        """
+        if AWG is None:
+            AWG = self.default_AWG.name
         channel_cfg = {}
 
-        for c in self.channels:
-            ch_id = self.channels[c]['id']
-            if self.channels[c]['type'] == 'analog':
+        for c_dict in self.channels.values():
+            if c_dict['AWG'] != AWG:
+                continue
+            ch_id = c_dict['id']
+            if c_dict['type'] == 'analog':
                 channel_cfg['ANALOG_METHOD_%s' % ch_id[-1]] = 1
-                a = self.channels[c]['high'] - self.channels[c]['low']
-                o = (self.channels[c]['high'] + self.channels[c]['low'])/2.
+                a = c_dict['high'] - c_dict['low']
+                o = (c_dict['high'] + c_dict['low'])/2.
                 channel_cfg['ANALOG_AMPLITUDE_%s' % ch_id[-1]] = a
                 channel_cfg['ANALOG_OFFSET_%s' % ch_id[-1]] = o
-            elif self.channels[c]['type'] == 'marker':
+            elif c_dict['type'] == 'marker':
                 channel_cfg['MARKER1_METHOD_%s' % ch_id[2]] = 2
                 channel_cfg['MARKER2_METHOD_%s' % ch_id[2]] = 2
                 channel_cfg['MARKER%s_LOW_%s' % (ch_id[-1], ch_id[2])] = \
-                    self.channels[c]['low']
+                    c_dict['low']
                 channel_cfg['MARKER%s_HIGH_%s' % (ch_id[-1], ch_id[2])] = \
-                    self.channels[c]['high']
+                    c_dict['high']
 
-            # activate the used channels
-            if self.channels[c]['active']:
-                channel_cfg['CHANNEL_STATE_%s' % ch_id[-1]] = 1
-            else:
-                channel_cfg['CHANNEL_STATE_%s' % ch_id[-1]] = 0
+            channel_cfg['CHANNEL_STATE_%s' % ch_id[2]] = 0
+
+        # activate the used channels
+        active_chans = self.get_used_channel_ids(AWG)
+        for chan_id in active_chans:
+            channel_cfg['CHANNEL_STATE_%s' % chan_id[2]] = 1
         return channel_cfg
 
     # waveform/file handling
+    def delete_all_waveforms(self, AWG=None):
+        if AWG is None:
+            AWG = self.default_AWG.name
+        self._AWG_obj[AWG].delete_all_waveforms_from_list()
 
-    def delete_all_waveforms(self):
-        self.AWG.delete_all_waveforms_from_list()
+    def program_awgs(self, sequence, *elements, **kw):
+        """
+        Args:
+            sequence: The `Sequence` object telling the order in which to play
+                      the elements
+            *elements: The `Element` objects to program to the AWGs.
+            AWGs: names of the AWGs to program. Defaults to 'all'.
+        """
+        # Stores the last uploaded elements for easy access and plotting
+        self.last_sequence = sequence
+        self.last_elements = elements
 
-    def program_awg(self, sequence, *elements, **kw):
+        AWGs = kw.pop('AWGs', 'all')
+
+        if AWGs == 'all':
+            AWGs = self.get_used_AWGs()
+
+        for AWGn in AWGs:
+            AWG = self._AWG_obj[AWGn]
+            if isinstance(AWG, Tektronix_AWG5014):
+                self._program_AWG5014(AWG, sequence, *elements, **kw)
+            elif isinstance(AWG, UHFQC):
+                self._program_UHFQC(AWG, sequence, *elements, **kw)
+            else:
+                raise TypeError('Unsupported AWG intrument: {} of type {}'
+                                .format(AWGn, type(AWG)))
+
+    def _program_AWG5014(self, AWG, sequence, *elements, **kw):
         """
         Upload a single file to the AWG (.awg) which contains all waveforms
         AND sequence information (i.e. nr of repetitions, event jumps etc)
         Advantage is that it's much faster, since sequence information is sent
         to the AWG in a single file.
         """
-        # Stores the last uploaded elements for easy access and plotting
-        self.last_sequence = sequence
-        self.last_elements = elements
-
-        old_timeout = self.AWG.timeout()
-        self.AWG.timeout(max(180, old_timeout))
-
         verbose = kw.pop('verbose', False)
         debug = kw.pop('debug', False)
         channels = kw.pop('channels', 'all')
         loop = kw.pop('loop', True)
         allow_non_zero_first_point_on_trigger_wait = \
-            kw.pop('allow_first_zero', False)
+            kw.pop('allow_first_nonzero', False)
         elt_cnt = len(elements)
-        chan_ids = self.get_used_channel_ids()
+
         packed_waveforms = {}
 
-        # Store offset settings to restore them after upload the seq
-        # Note that this is the AWG setting offset, as distinct from the
-        # channel parameter offset.
+        # determine which channels are involved in the sequence
+        if channels == 'all':
+            chan_ids = self.get_used_channel_ids(AWG.name)
+        else:
+            chan_ids = set()
+            for c in channels:
+                if self.channels[c]['AWG'] == AWG.name:
+                    chan_ids.add(self.channels[c]['id'][:3])
+        chan_ids = list(chan_ids) # to make sure we iterate in a certain order
 
-        channels, offsets = self.update_channel_settings()
+        old_timeout = AWG.timeout()
+        AWG.timeout(max(180, old_timeout))
 
         elements_with_non_zero_first_points = []
 
         # order the waveforms according to physical AWG channels and
         # make empty sequences where necessary
+        _t0 = time.time()
         for i, element in enumerate(elements):
             if verbose:
-                print("%d / %d: %s (%d samples)... " % \
-                    (i+1, elt_cnt, element.name, element.samples()))
-                print("Generate/upload '%s' (%d samples)... " \
-                    % (element.name, element.samples()), end=' ')
+                print("Generate %s element %d / %d: %s... " %
+                      (AWG.name, i+1, elt_cnt, element.name), end='')
             _t0 = time.time()
 
             tvals, wfs = element.normalized_waveforms()
-            '''
-            channels_to_print=['MW_Imod']
-            for i in channels_to_print:
-                if len(np.where(wfs[i]>0)[0]) !=0:
-                    print i, np.where(wfs[i]>0)
-            '''
+
+            samples = 1
+            chan_wfs = {}
             for id in chan_ids:
-                wfname = element.name + '_%s' % id
 
                 # determine if we actually want to upload this channel
-                upload = False
-                if channels == 'all':
-                    upload = True
-                else:
+                if channels != 'all':
+                    upload = False
                     for c in channels:
-                        if self.channels[c]['id'][:3] == id:
+                        if self.channels[c]['id'][:3] == id and \
+                                self.channels[c]['AWG'] == AWG.name:
                             upload = True
                     if not upload:
                         continue
 
-                chan_wfs = {id: None,
-                            id+'_marker1': None,
-                            id+'_marker2': None}
-                grp = self.get_channel_names_by_id(id)
+                chan_wfs.update({id: None,
+                                 id+'_marker1': None,
+                                 id+'_marker2': None})
+                grp = self._get_channel_names_by_5014_id(id, AWG.name)
 
                 for sid in grp:
-                    if grp[sid] != None and grp[sid] in wfs:
+                    if grp[sid] is not None and grp[sid] in wfs:
                         chan_wfs[sid] = wfs[grp[sid]]
-                        if chan_wfs[sid][0] != 0.:
+                        if len(chan_wfs[sid]) > 0 and chan_wfs[sid][0] != 0.:
                             elements_with_non_zero_first_points.append(
                                 element.name)
+                        samples = max(samples, len(chan_wfs[sid]))
                     else:
-                        chan_wfs[sid] = np.zeros(element.samples())
+                        chan_wfs[sid] = np.zeros(0)
+
+            for id in chan_wfs:
+                chan_wfs[id] = np.pad(chan_wfs[id],
+                                      (0, samples - len(chan_wfs[id])),
+                                      'constant')
+            for id in chan_ids:
+                wfname = element.name + '_%s' % id
 
                 # Create wform files
-                packed_waveforms[wfname] = self.AWG.pack_waveform(
+                packed_waveforms[wfname] = AWG.pack_waveform(
                     chan_wfs[id],
-                    chan_wfs[id+'_marker1'],
-                    chan_wfs[id+'_marker2'])
+                    chan_wfs[id + '_marker1'],
+                    chan_wfs[id + '_marker2'])
 
         _t = time.time() - _t0
 
@@ -276,17 +414,8 @@ class Pulsar:
                             "8000 elements, Aborting", end=' ')
             return
 
-        print("Programming '%s' (%d element(s)) \t"
-              % (sequence.name, sequence.element_count()), end=' ')
-
-        # determine which channels are involved in the sequence
-        if channels == 'all':
-            chan_ids = self.get_used_channel_ids()
-        else:
-            chan_ids = []
-            for c in channels:
-                if self.channels[c]['id'][:3] not in chan_ids:
-                    chan_ids.append(self.channels[c]['id'][:3])
+        print("Programming %s sequence '%s' (%d element(s)) \t"
+              % (AWG.name, sequence.name, sequence.element_count()), end=' ')
 
         # Create lists with sequence information:
         # wfname_l = list of waveform names [[wf1_ch1,wf2_ch1..],[wf1_ch2,wf2_ch2..],...]
@@ -328,35 +457,16 @@ class Pulsar:
                 logic_jump_l.append(0)
             if elt['trigger_wait']:
                 wait_l.append(1)
-                # if (elt['wfname'] in elements_with_non_zero_first_points) and not(allow_non_zero_first_point_on_trigger_wait):
-                #     print 'warning Trigger wait set for element with a non-zero first point'
-                #     raise Exception('pulsar: Trigger wait set for element {} with a non-zero first point'.format(elt['wfname']))
+                if elt['wfname'] in elements_with_non_zero_first_points and \
+                        not allow_non_zero_first_point_on_trigger_wait:
+                    raise Exception('pulsar: Trigger wait set for element {} '
+                                    'with a non-zero first point'
+                                    .format(elt['wfname']))
             else:
                 wait_l.append(0)
 
-        if loop:
+        if loop and len(goto_l) > 0:
             goto_l[-1] = 1
-
-        # setting jump modes and loading the djump table
-        if sequence.djump_table != None and self.AWG_type not in ['opt09']:
-            raise Exception('pulsar: The AWG configured does not support dynamic jumping')
-
-        if self.AWG_type in ['opt09']:
-            # TODO as self.AWG_sequence_cfg no longer exists but is generated
-            # from the sequence_cfg file, make these set the values on the AWG
-            # itself.
-            if sequence.djump_table != None:
-                # self.AWG.set_event_jump_mode('DJUM')
-                self.AWG_sequence_cfg['EVENT_JUMP_MODE'] = 2  # DYNAMIC JUMP
-                print('AWG set to dynamical jump')
-                awg_djump_table = np.zeros(16, dtype='l')
-                for i in list(sequence.djump_table.keys()):
-                    el_idx = sequence.element_index(sequence.djump_table[i])
-                    awg_djump_table[i] = el_idx
-                self.AWG_sequence_cfg['TABLE_JUMP_DEFINITION'] = awg_djump_table
-
-            else:
-                self.AWG_sequence_cfg['EVENT_JUMP_MODE'] = 1  # EVENT JUMP
 
         if debug:
             self.check_sequence_consistency(packed_waveforms,
@@ -364,41 +474,183 @@ class Pulsar:
                                             nrep_l, wait_l, goto_l,
                                             logic_jump_l)
 
-        filename = sequence.name+'_FILE.AWG'
+        if len(wfname_l) > 0:
+            filename = sequence.name+'_FILE.AWG'
 
-        self.awg_file = self.AWG.generate_awg_file(
-            packed_waveforms,
-            np.array(wfname_l),
-            nrep_l, wait_l, goto_l, logic_jump_l,
-            self.get_awg_channel_cfg())
-        self.AWG.send_awg_file(filename, self.awg_file)
-        self.AWG.load_awg_file(filename)
-        self.AWG.timeout(old_timeout)
+            awg_file = AWG.generate_awg_file(
+                packed_waveforms,
+                np.array(wfname_l),
+                nrep_l, wait_l, goto_l, logic_jump_l,
+                self.get_awg_channel_cfg(AWG.name))
+            AWG.send_awg_file(filename, awg_file)
+            AWG.load_awg_file(filename)
+        else:
+            awg_file = None
+        AWG.timeout(old_timeout)
 
         time.sleep(.1)
         # Waits for AWG to be ready
-        self.AWG.is_awg_ready()
+        AWG.is_awg_ready()
 
-        for channel, offset in offsets.items():
-            self.AWG.set(channel+'_offset', offset)
-
-        self.activate_channels(channels)
+        self.activate_channels_AWG5014(channels, AWGs=[AWG.name])
 
         _t = time.time() - _t0
         print(" finished in %.2f seconds." % _t)
-        return self.awg_file
+        return awg_file
+
+    def _program_UHFQC(self, AWG, sequence, *elements, **kw):
+        channels = kw.pop('channels', 'all')
+        allow_non_zero_first_point_on_trigger_wait = \
+            kw.pop('allow_first_nonzero', False)
+
+        header = """const TRIGGER1  = 0x000001;
+const WINT_TRIG = 0x000010;
+const IAVG_TRIG = 0x000020;
+const WINT_EN   = 0x1f0000;
+setTrigger(WINT_EN);
+var loop_cnt = getUserReg(0);
+var RO_TRIG;
+if(getUserReg(1)){
+  RO_TRIG=IAVG_TRIG;
+}else{
+  RO_TRIG=WINT_TRIG;
+}
+\n"""
+
+        main_loop = 'repeat(loop_cnt) {\n'
+
+
+        footer = """}
+wait(1000);
+setTrigger(0);
+"""
+
+        # parse elements
+        elements_with_non_zero_first_points = []
+        wfnames = {'ch1': [], 'ch2': []}
+        wfdata = {'ch1': [], 'ch2': []}
+        i = 1
+        for element in elements:
+            tvals, wfs = element.normalized_waveforms()
+
+            for id in ['ch1', 'ch2']:
+                wfname = element.name + '_%s' % id
+
+                # determine if we actually want to upload this channel
+                if channels != 'all':
+                    upload = False
+                    for c in channels:
+                        if self.channels[c]['id'][:3] == id and \
+                                self.channels[c]['AWG'] == AWG.name and \
+                                self.channels[c]['active']:
+                            upload = True
+                            c_name = c
+                    if not upload:
+                        wfnames[id].append(None)
+                        wfdata[id].append(None)
+                        continue
+                else:
+                    c_name = self.get_channel_name_by_id(id, AWG.name)
+
+                if c_name in wfs:
+                    chan_wf = wfs[c_name]
+                    if chan_wf[0] != 0.:
+                        elements_with_non_zero_first_points.append(
+                            element.name)
+                    header += 'wave {} = ramp({}, 0, {});\n'.format(
+                        wfname,
+                        element.samples(c_name),
+                        1/i
+                    )
+                    i += 1
+                    wfnames[id].append(wfname)
+                    wfdata[id].append(chan_wf)
+                else:
+                    wfnames[id].append(None)
+                    wfdata[id].append(None)
+
+        # create waveform playback code
+        for i, elt in enumerate(sequence.elements):
+            if elt['goto_target'] != None:
+                raise NotImplementedError('UHFQC sequencer does not yet support'
+                                          ' nontrivial goto-s.')
+            if elt['jump_target'] != None:
+                raise NotImplementedError('UHFQC sequencer does not support'
+                                          ' jump events.')
+            if elt['trigger_wait']:
+                if elt['wfname'] in elements_with_non_zero_first_points and \
+                        not allow_non_zero_first_point_on_trigger_wait:
+                    raise Exception('pulsar: Trigger wait set for element {} '
+                                    'with a non-zero first point'
+                                    .format(elt['wfname']))
+            name_ch1 = wfnames['ch1'][i]
+            name_ch2 = wfnames['ch2'][i]
+            main_loop += self._UHFQC_element_seqc(elt['repetitions'],
+                                                  elt['trigger_wait'],
+                                                  name_ch1, name_ch2, True)
+
+        awg_str = header + main_loop + footer
+        AWG.awg_string(awg_str)
+
+        # populate the waveforms with data
+        i = 0
+        for data1, data2 in zip(wfdata['ch1'], wfdata['ch2']):
+            if data1 is None and data2 is None:
+                continue
+            elif data1 is None:
+                AWG.awg_update_waveform(i, data2)
+                i += 1
+            elif data2 is None:
+                AWG.awg_update_waveform(i, data1)
+                i += 1
+            else:
+                data12 = np.vstack((data1, data2,)).reshape((-1,), order='F')
+                AWG.awg_update_waveform(i, data12)
+                i += 1
+
+
+    def _UHFQC_element_seqc(self, reps, wait, name1, name2, readout):
+        """
+        Generates a part of the sequence code responsible for playing back a
+        single element
+
+        Args:
+            reps: number of repetitions for this code
+            wait: boolean flag, whether to wait for trigger
+            name1: name of the wave to be played on channel 1
+            name2: name of the wave to be played on channel 2
+            readout: boolean flag, whether to acquire a datapoint after the
+                     element
+        Returns:
+            string for playing back an element
+        """
+        repeat_open_str = '\trepeat({}) {{\n'.format(reps) if reps != 0 else ''
+        wait_wave_str = '\t\twaitWave();\n' if wait else ''
+        trigger_str = '\t\twaitDigTrigger(1, 1);\n' if wait else ''
+        if name1 is None:
+            play_str = '\t\tplayWave(2, {});\n'.format(name2)
+        elif name2 is None:
+            play_str = '\t\tplayWave(1, {});\n'.format(name1)
+        else:
+            play_str = '\t\tplayWave({}, {});\n'.format(name1, name2)
+        readout_str = '\t\tsetTrigger(WINT_EN+RO_TRIG);\n' if readout else ''
+        readout_str += '\t\tsetTrigger(WINT_EN);\n' if readout else ''
+        repeat_close_str = '\t}\n' if reps != 0 else ''
+        return repeat_open_str + trigger_str + play_str + readout_str + \
+               wait_wave_str + repeat_close_str
 
     def check_sequence_consistency(self, packed_waveforms,
                                    wfname_l,
                                    nrep_l, wait_l, goto_l, logic_jump_l):
-        '''
+        """
         Specific for 4 channel tektronix 5014 where all channels are used.
-        '''
+        """
         if not (len(wfname_l[0]) == len(wfname_l[1]) ==
                 len(wfname_l[2]) == len(wfname_l[3]) ==
                 len(nrep_l) == len(wait_l) == len(goto_l) ==
                 len(logic_jump_l)):
-            raise Exception('pulsar: sequence list of elements/properties has unequal length')
+            raise Exception('pulsar: sequence list of elements/properties has '
+                            'unequal length')
         ch = 0
         for ch_wf in wfname_l:
             ch += 1
@@ -411,56 +663,46 @@ class Pulsar:
                                     ' , channel ' + str(ch) +
                                     ' does not exist in waveform dictionary')
 
-    def load_awg_file(self, filename, **kw):
-            """
-            Function to load an AWG sequence from its internal hard drive
-            No possibility for jump statements
-            """
-            old_timeout = self.AWG.timeout()
-            self.AWG.timeout(max(180, old_timeout))
-            channels = kw.pop('channels', 'all')
-            chan_ids = self.get_used_channel_ids()
-            _t0 = time.time()
-
-            # Store offset settings to restore them after upload the seq
-            # Note that this is the AWG setting offset, as distinct from the
-            # channel parameter offset.
-            offsets = {}
-            for c in self.channels:
-                if self.channels[c]['type'] == 'analog':
-                    offsets[c] = self.AWG.get(c+'_offset')
-
-            filename = filename
-            self.AWG.load_awg_file(filename)
-            self.AWG.timeout(old_timeout)
-
-            time.sleep(.1)
-            # Waits for AWG to be ready
-            self.AWG.is_awg_ready()
-
-            for channel, offset in offsets.items():
-                self.AWG.set(channel+'_offset', offset)
-
-            self.activate_channels(channels)
-
-            _t = time.time() - _t0
-            print(" finished in %.2f seconds." % _t)
-
-    def update_channel_settings(self):
-        offsets = {}
-        if self.AWG is not None:
-            for ch_name, chan_dict in self.channels.items():
-                if chan_dict['type'] == 'analog':
-                    exec('offsets[ch_name] = self.AWG.{}_offset.get_latest()'.format(ch_name))
-                    if offsets[ch_name] is None:
-                        offsets[ch_name] = self.AWG.get(ch_name+'_offset')
-                    ch_amp = None  # to prevent linting error showing up
-                    exec('ch_amp = self.AWG.{}_amp.get_latest()'.format(ch_name))
-                    if ch_amp is None:
-                        ch_amp = self.AWG.get('{}_amp'.format(ch_name))
-                    chan_dict['low'] = -ch_amp/2
-                    chan_dict['high'] = ch_amp/2
+    def start(self):
+        if self.master_AWG is None:
+            for AWG in self.get_active_AWGs():
+                self._AWG_obj[AWG].start()
         else:
-            offsets = {ch_name+'_offset': 0 for (ch_name, chan_dict) in self.channels.items()}
+            for AWG in self.get_active_AWGs():
+                if AWG != self.master_AWG:
+                    self._AWG_obj[AWG].start()
+            time.sleep(1) # wait 1 second for all other awg-s to start
+            self._AWG_obj[self.master_AWG].start()
+
+    def stop(self):
+        for AWG in self._AWG_obj.values():
+            AWG.stop()
+
+    def update_channel_settings(self, AWGs='all'):
+        """
+        Deprecated with multi-AWG support. AWG settings are set to correct
+        values while programming.
+
+        gets the latest offset and amplitude from the used AWG analog channels,
+        updates the self.channels dictionary accordingly (high = -low = amp/2)
+        and returns the channel dictionary and a separate dictionary of offsets
+        """
+        offsets = {}
+
+        for c_name, c_dict in self.channels.items():
+            if AWGs == 'all' or c_dict['AWG'] in AWGs:
+                if c_dict['type'] == 'analog':
+                    AWG = Instrument.find_instrument(c_dict['AWG'])
+                    exec('offsets[c_name] = AWG.{}_offset.get_latest()'
+                         .format(c_dict['id']))
+                    if offsets[c_name] is None:
+                        offsets[c_name] = AWG.get(c_dict['id']+'_offset')
+                    ch_amp = None  # to prevent linting error showing up
+                    exec('ch_amp = AWG.{}_amp.get_latest()'
+                         .format(c_dict['id']))
+                    if ch_amp is None:
+                        ch_amp = AWG.get('{}_amp'.format(c_dict['id']))
+                    c_dict['low'] = -ch_amp/2
+                    c_dict['high'] = ch_amp/2
 
         return self.channels, offsets
