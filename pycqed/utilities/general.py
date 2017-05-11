@@ -221,3 +221,18 @@ def list_available_serial_ports():
 
 def add_suffix_to_dict_keys(inputDict, suffix):
     return {str(key)+suffix: (value) for key, value in inputDict.items()}
+
+
+def execfile(path, global_vars=None, local_vars=None):
+    """
+    Args:
+        path (str)  : filepath of the file to be executed
+        global_vars : use globals() to use globals from namespace
+        local_vars  : use locals() to use locals from namespace
+
+    execfile function that existed in python 2 but does not exists in python3.
+    """
+    with open(path, 'r') as f:
+        code = compile(f.read(), path, 'exec')
+        exec(code, global_vars, local_vars)
+
