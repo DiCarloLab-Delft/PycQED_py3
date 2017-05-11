@@ -27,23 +27,23 @@ def Pulsed_spec_seq(spec_pars, RO_pars, upload=True, return_seq=False):
         RO_pars:        dict containing RO pars
     '''
     period = spec_pars['pulse_delay'] + RO_pars['pulse_delay']
-    f_RO_mod = RO_pars['mod_frequency']
+    f_RO_mod = RO_pars['f_RO_mod']
     if f_RO_mod == None:
         remainder = 0.0
     else:
-        remainder = period % (1/RO_pars['mod_frequency'])
+        remainder = period % (1/RO_pars['f_RO_mod'])
 
     if (remainder != 0.0):
         msg = ('Period of spec seq ({})'.format(period) +
                'must be multiple of RO modulation period ({})'.format(
-               1/RO_pars['mod_frequency']) +
+               1/RO_pars['f_RO_mod']) +
                "\nAdding {}s to spec_pars['pulse_delay']".format(
-            1/RO_pars['mod_frequency'] - remainder) +
+            1/RO_pars['f_RO_mod'] - remainder) +
             '\nConsider updating parameter')
         logging.warning(msg)
         print(msg)
         spec_pars['pulse_delay'] += 1 / \
-            RO_pars['mod_frequency'] - remainder
+            RO_pars['f_RO_mod'] - remainder
 
     # Nr of pulse reps is set to ensure max nr of pulses and end 10us before
     # next trigger comes in. Assumes 200us trigger period, also works for
