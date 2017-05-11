@@ -205,7 +205,7 @@ def mixer_carrier_cancellation_5014(AWG, SH, source, MC,
                                     frequency=None,
                                     AWG_channel1=1,
                                     AWG_channel2=2,
-                                    voltage_grid=[.1, 0.05, 0.02],
+                                    voltage_grid=[.08, 0.04, 0.02],
                                     xtol=0.001, **kw):
     '''
     Varies the mixer offsets to minimize leakage at the carrier frequency.

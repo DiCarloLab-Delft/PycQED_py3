@@ -117,10 +117,10 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                            vals=vals.Strings(),
                            parameter_class=ManualParameter)
         self.add_parameter('pulse_I_offset', initial_value=0.0,
-                           vals=vals.Numbers(min_value=-0.1, max_value=0.1),
+                           vals=vals.Numbers(min_value=-0.12, max_value=0.12),
                            parameter_class=ManualParameter)
         self.add_parameter('pulse_Q_offset', initial_value=0.0,
-                           vals=vals.Numbers(min_value=-0.1, max_value=0.1),
+                           vals=vals.Numbers(min_value=-0.12, max_value=0.12),
                            parameter_class=ManualParameter)
         # readout parameters for time domain
         self.add_parameter('RO_acq_averages', initial_value=1024,
@@ -551,7 +551,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
 
         spec_pars, RO_pars = self.get_spec_pars()
         # Upload the AWG sequence
-        sq.Pulsed_spec_seq(spec_pars, RO_pars)
+        sq.Pulsed_spec_seq(spec_pars = spec_pars, RO_pars = RO_pars)
 
         self.AWG.get_instr().start()
         if return_detector:
@@ -1140,6 +1140,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
             'nr_sigma': 4,
             'motzoi': self.motzoi.get(),
             'mod_frequency': self.f_pulse_mod.get(),
+            'f_pulse_mod': self.f_pulse_mod.get(),
             'pulse_delay': self.pulse_delay.get(),
             'phi_skew': self.phi_skew.get(),
             'alpha': self.alpha.get(),
@@ -1172,7 +1173,8 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                      'amplitude': 1,
                      'operation_type': 'MW',
                      'target_qubit': self.name,
-                     'channel': self.spec_pulse_marker_channel.get()}
+                     'channel': self.spec_pulse_marker_channel.get(),
+                     'f_pulse_mod': self.f_pulse_mod.get()}
 
         RO_pars['pulse_delay'] += spec_pars['length']
         spec_pars['pulse_delay'] = (RO_pars['length'] +
