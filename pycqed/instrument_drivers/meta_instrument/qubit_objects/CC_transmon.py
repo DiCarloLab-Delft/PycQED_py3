@@ -465,8 +465,10 @@ class CBox_v3_driven_transmon(Transmon):
             self.int_avg_det = qh.CBox_integrated_average_detector_CC(
                 self.CBox.get_instr(),
                 nr_averages=self.RO_acq_averages()//self.RO_soft_averages())
-            self.int_log_det = qh.CBox_integration_logging_det_CC(self.CBox)
-            self.input_average_detector = None  # FIXME: Not implemented
+            self.int_log_det = qh.CBox_integration_logging_det_CC(self.CBox.get_instr())
+            self.input_average_detector = qh.CBox_input_average_detector_CC(
+                CBox=self.CBox.get_instr(),
+                nr_averages=self.RO_acq_averages()//self.RO_soft_averages())
             self.int_avg_det_single = qh.CBox_single_integration_average_det_CC(
                 self.CBox.get_instr(),
                 nr_averages=self.RO_acq_averages()//self.RO_soft_averages(),
@@ -948,7 +950,8 @@ class CBox_v3_driven_transmon(Transmon):
         d = self.int_avg_det_single
         d.seg_per_point = 2
         d.detector_control = 'hard'
-        d._set_real_imag(True)
+        if 'UHFQC' in self.acquisition_instrument.name:
+            d._set_real_imag(True)
 
         # d = qh.CBox_single_integration_average_det_CC(
         #     self.CBox.get_instr(), nr_averages=self.RO_acq_averages()//MC.soft_avg(),
