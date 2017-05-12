@@ -1428,26 +1428,31 @@ class CPhase_2Q_amp_cost_analysis(Rabi_Analysis):
         self.save_fig(self.fig, fig_tight=True, **kw)
 
     def fit_data(self, **kw):
-        model = fit_mods.CosModel
+        # Frequency is known, because we sweep the phase of the second pihalf
+        # pulse in a Ramsey-type experiment.
+        model = lmfit.Model((lambda t, amplitude, phase, offset:
+                            amplitude*np.cos(2*np.pi*t/360.0 + phase)+offset))
         self.fit_result = {}
 
         # Fit case with no excitation first
-        guess_params = model.guess(model, data=self.y_idx[0], t=self.x_idx)
+        guess_params = fit_mods.Cos_amp_phase_guess(model, data=self.y_idx[0],
+                                                    f=1.0/360.0, t=self.x_idx)
         fit_res = model.fit(data=self.y_idx[0],
                             t=self.x_idx,
                             params=guess_params)
         self.fit_result['idx_amp'] = fit_res.values['amplitude']
-        self.fit_result['idx_freq'] = fit_res.values['frequency']
+        self.fit_result['idx_freq'] = 1.0 / 360.0
         self.fit_result['idx_phase'] = fit_res.values['phase']
         self.fit_result['idx_offset'] = fit_res.values['offset']
 
         # Fit case with excitation
-        guess_params = model.guess(model, data=self.y_exc[0], t=self.x_exc)
+        guess_params = fit_mods.Cos_amp_phase_guess(model, data=self.y_exc[0],
+                                                    f=1.0/360.0, t=self.x_exc)
         fit_res = model.fit(data=self.y_exc[0],
                             t=self.x_exc,
                             params=guess_params)
         self.fit_result['exc_amp'] = fit_res.values['amplitude']
-        self.fit_result['exc_freq'] = fit_res.values['frequency']
+        self.fit_result['exc_freq'] = 1.0/360.0
         self.fit_result['exc_phase'] = fit_res.values['phase']
         self.fit_result['exc_offset'] = fit_res.values['offset']
 
