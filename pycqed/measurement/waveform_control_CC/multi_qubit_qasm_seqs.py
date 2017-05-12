@@ -210,7 +210,7 @@ def chevron_seq(q0, q1,
 
     Timing of the sequence:
         trigger flux pulse -- X180 q0 -- RO
-    or  trigger flux pulse -- X180 q0 -- X180 q1 -- RO
+    or  trigger flux pulse -- X180 q0 -- X180 q1 -- X180 q0 -- RO
 
     Args:
         q0, q1      (str): names of the addressed qubits
@@ -364,7 +364,7 @@ def CZ_calibration_seq(q0, q1, RO_target='all',
     Sequence used to calibrate flux pulses for CZ gates.
 
     Timing of the sequence:
-    q0:   --   mX90  C-Phase  Rphi90   --      RO
+    q0:   --   X90  C-Phase  Rphi90   --      RO
     q1: (X180)  --     --       --   (X180)    RO
 
     Args:
@@ -433,7 +433,7 @@ def CZ_fast_calibration_seq(q0_name, q1_name, no_of_points,
         clock_cycle (float): period of the internal AWG clock
         wait_time   (int): wait time in seconds after triggering the flux
     '''
-    filename = join(base_qasm_path, 'CZ_calibration_seq.qasm')
+    filename = join(base_qasm_path, 'CZ_fast_calibration_seq.qasm')
     qasm_file = mopen(filename, mode='w')
     qasm_file.writelines('qubit {} \nqubit {} \n'.format(q0_name, q1_name))
 
@@ -472,6 +472,51 @@ def CZ_fast_calibration_seq(q0_name, q1_name, no_of_points,
                     qasm_file.writelines('X180 {}\n'.format(q1_name))
 
                 qasm_file.writelines('RO {}  \n'.format(RO_target))
+
+    qasm_file.close()
+    return qasm_file
+
+
+def chevron_block_seq(q0_name, q1_name, no_of_points,
+                      excite_q1=False, wait_after_trigger=40e-9,
+                      wait_during_flux=400e-9, clock_cycle=5e-9,
+                      RO_target='all', mw_pulse_duration=40e-9):
+    '''
+    Sequence for measuring a block of a chevron, i.e. using different codewords
+    for different pulse lengths.
+    Args:
+        q0, q1      (str): names of the addressed qubits
+        RO_target   (str): can be q0, q1, or 'all'
+        excite_q1   (bool): choose whether to excite q1, thus choosing
+                            between the |01> <-> |10> and the |11> <-> |20>
+                            swap.
+        wait_after_trigger (float): delay time in seconds after sending the
+                            trigger for the flux pulse
+        clock_cycle (float): period of the internal AWG clock
+        wait_time   (int): wait time between triggering QWG and RO
+    '''
+    filename = join(base_qasm_path, 'chevron_block_seq.qasm')
+    qasm_file = mopen(filename, mode='w')
+    qasm_file.writelines('qubit {} \nqubit {} \n'.format(q0_name, q1_name))
+
+    for i in range(no_of_points):
+        qasm_file.writelines('\ninit_all\n')
+
+        qasm_file.writelines('QWG trigger {}\n'.format(i))
+        if excite_q1:
+            wait_after_trigger -= mw_pulse_duration
+        qasm_file.writelines(
+            'I {} {}\n'.format(q0_name, int(wait_after_trigger//clock_cycle)))
+        qasm_file.writelines('X180 {}\n'.format(q0_name))
+        if excite_q1:
+            qasm_file.writelines('X180 {}\n'.format(q1_name))
+        qasm_file.writelines(
+            'I {} {}\n'.format(q0_name, int(wait_during_flux//clock_cycle)))
+        if excite_q1:
+            # q0 is rotated to ground-state to have better contrast
+            # (|0> and |2> instead of |1> and |2>)
+            qasm_file.writelines('X180 {}\n'.format(q0_name))
+        qasm_file.writelines('RO {} \n'.format(RO_target))
 
     qasm_file.close()
     return qasm_file
