@@ -176,6 +176,61 @@ class CBox_integration_logging_det_CC(det.Hard_Detector):
     def finish(self):
         self.CBox.set('acquisition_mode', 'idle')
 
+
+class CBox_input_average_detector_CC(det.Hard_Detector):
+    '''
+    Detector used for acquiring averaged input traces withe the UHFQC
+
+    '''
+
+    def __init__(self, CBox,
+                 nr_averages=1024, nr_samples=400,
+                 **kw):
+        '''
+        Input average detector.
+        '''
+        super().__init__(**kw)
+        self.CBox = CBox
+        self.name = 'CBox_input_average_detector_CC'
+        self.value_names = ['I', 'Q']
+        self.value_units = ['a.u.', 'a.u.']
+        self.nr_averages = nr_averages
+        self.nr_samples = nr_samples
+
+    def get_values(self):
+        succes = False
+        i = 0
+        while not succes:
+            try:
+                self.CBox.set('run_mode', 'idle')
+                self.CBox.core_state('idle')
+                self.CBox.core_state('active')
+                self.CBox.set('acquisition_mode', 'idle')
+                self.CBox.set('acquisition_mode', 'input averaging')
+                self.CBox.set('run_mode', 'run')
+                # does not restart AWG tape in CBox as we don't use it anymore
+                data = self.CBox.get_input_avg_results()
+                succes = True
+            except Exception as e:
+                logging.warning('Exception caught retrying')
+                logging.warning(e)
+            i += 1
+            if i > 20:
+                break
+
+        return data
+
+    def acquire_data_point(self):
+        return self.get_values()
+
+    def prepare(self, sweep_points=[0]):
+        self.CBox.nr_averages(int(self.nr_averages))
+        self.CBox.nr_samples(int(self.nr_samples))
+
+    def finish(self):
+        self.CBox.set('acquisition_mode', 'idle')
+
+
 class CBox_state_counters_det_CC(det.Hard_Detector):
 
     def __init__(self, CBox, **kw):
