@@ -598,22 +598,26 @@ class UHFQC(Instrument):
 
     def prepare_SSB_weight_and_rotation(self, IF,
                                         weight_function_I=0,
-                                        weight_function_Q=1):
+                                        weight_function_Q=1,
+                                        phase_correction=0):
         """
         Sets defualt integration weights for SSB modulation, beware does not
         load pulses or prepare the UFHQC progarm to do data acquisition
         """
         trace_length = 4096
         tbase = np.arange(0, trace_length/1.8e9, 1/1.8e9)
-        cosI = np.array(np.cos(2*np.pi*IF*tbase))
-        sinI = np.array(np.sin(2*np.pi*IF*tbase))
-        eval('self.quex_wint_weights_{}_real(np.array(cosI))'.format(
+        realI = np.array(np.cos(2*np.pi*IF*tbase))
+        imagI = np.array(np.sin(2*np.pi*IF*tbase + phase_correction))
+        realQ = np.array(np.sin(2*np.pi*IF*tbase))
+        imagQ = np.array(np.cos(2*np.pi*IF*tbase + phase_correction))
+
+        eval('self.quex_wint_weights_{}_real(np.array(realI))'.format(
             weight_function_I))
-        eval('self.quex_wint_weights_{}_imag(np.array(sinI))'.format(
+        eval('self.quex_wint_weights_{}_imag(np.array(imagI))'.format(
             weight_function_I))
-        eval('self.quex_wint_weights_{}_real(np.array(sinI))'.format(
+        eval('self.quex_wint_weights_{}_real(np.array(realQ))'.format(
             weight_function_Q))
-        eval('self.quex_wint_weights_{}_imag(np.array(cosI))'.format(
+        eval('self.quex_wint_weights_{}_imag(np.array(imagQ))'.format(
             weight_function_Q))
         eval('self.quex_rot_{}_real(1.0)'.format(weight_function_I))
         eval('self.quex_rot_{}_imag(1.0)'.format(weight_function_I))
