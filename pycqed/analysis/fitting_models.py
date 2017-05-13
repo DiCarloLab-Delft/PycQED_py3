@@ -6,7 +6,6 @@ import logging
 #   Fitting Functions Library   #
 #################################
 
-
 def RandomizedBenchmarkingDecay(numCliff, Amplitude, p, offset):
     val = Amplitude * (p**numCliff) + offset
     return val

@@ -107,8 +107,8 @@ def photon_number_splitting_seq(spec_pars, RO_pars, disp_pars, upload=True, retu
     return seq
 
 
-def Rabi_seq(amps, pulse_pars, RO_pars, n=1, post_msmt_delay=3e-6,
-             verbose=False, cal_points=True, upload=True, return_seq=False):
+def Rabi_seq(amps, pulse_pars, RO_pars, n=1, post_msmt_delay=3e-6, no_cal_points=2,
+             cal_points=True, verbose=False, upload=True, return_seq=False):
     '''
     Rabi sequence for a single qubit using the tektronix.
     Input pars:
@@ -127,10 +127,16 @@ def Rabi_seq(amps, pulse_pars, RO_pars, n=1, post_msmt_delay=3e-6,
     pulses = get_pulse_dict_from_pars(pulse_pars)
 
     for i, amp in enumerate(amps):  # seq has to have at least 2 elts
-        if cal_points and (i == (len(amps)-4) or i == (len(amps)-3)):
-            el = multi_pulse_elt(i, station,[pulses['I'], RO_pars])
-        elif cal_points and (i == (len(amps)-2) or i == (len(amps)-1)):
-            el = multi_pulse_elt(i, station, [pulses['X180'], RO_pars])
+        if cal_points:
+            if no_cal_points==4:
+                if (i == (len(amps)-4) or i == (len(amps)-3)):
+                    el = multi_pulse_elt(i, station,[pulses['I'], RO_pars])
+                elif (i == (len(amps)-2) or i == (len(amps)-1)):
+                    el = multi_pulse_elt(i, station, [pulses['X180'], RO_pars])
+            elif no_cal_points==2:
+                if (i == (len(amps)-2) or i == (len(amps)-1)):
+                    el = multi_pulse_elt(i, station,[pulses['I'], RO_pars])
+
         else:
             pulses['X180']['amplitude'] = amp
             pulse_list = n*[pulses['X180']]
@@ -139,7 +145,7 @@ def Rabi_seq(amps, pulse_pars, RO_pars, n=1, post_msmt_delay=3e-6,
             pulse_list[0] = deepcopy(pulse_list[0])
             pulse_list[0]['pulse_delay'] += post_msmt_delay
 
-            el = multi_pulse_elt(i, station, pulse_list, [RO_pars])
+            el = multi_pulse_elt(i, station, [pulse_list, RO_pars])
 
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
@@ -232,7 +238,7 @@ def T1_seq(times,
            verbose=False, upload=True, return_seq=False):
     '''
     Rabi sequence for a single qubit using the tektronix.
-    SSB_Drag pulse is used for driving, simple modualtion used for RO
+    SSB_Drag pulse is used for driving, simple modulation used for RO
     Input pars:
         times:       array of times to wait after the initial pi-pulse
         pulse_pars:  dict containing the pulse parameters
@@ -249,18 +255,19 @@ def T1_seq(times,
     for i, tau in enumerate(times):  # seq has to have at least 2 elts
         RO_pars['pulse_delay'] = RO_pulse_delay + tau
         #RO_pars['refpoint'] = 'start'  # time defined between start of ops
-        if cal_points:
-            if (i == (len(times)-4) or i == (len(times)-3)):
-                el = multi_pulse_elt(i, station, [pulses['I'], RO_pars])
-            elif(i == (len(times)-2) or i == (len(times)-1)):
-                RO_pars['pulse_delay'] = RO_pulse_delay
-                el = multi_pulse_elt(i, station, [pulses['X180'], RO_pars])
-            else:
-                el = multi_pulse_elt(i, station, [pulses['X180'], RO_pars])
+        if cal_points and (i == (len(times)-4) or i == (len(times)-3)):
+            el = multi_pulse_elt(i, station, [pulses['I'], RO_pars])
+        elif cal_points and (i == (len(times)-2) or i == (len(times)-1)):
+            RO_pars['pulse_delay'] = RO_pulse_delay
+            el = multi_pulse_elt(i, station, [pulses['X180'], RO_pars])
+        else:
+            el = multi_pulse_elt(i, station, [pulses['X180'], RO_pars])
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
+
     if upload:
         station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
+
     if return_seq:
         return seq, el_list
     else:

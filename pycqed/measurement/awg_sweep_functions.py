@@ -75,12 +75,14 @@ class awg_seq_swf(swf.Hard_Sweep):
 
 class Rabi(swf.Hard_Sweep):
 
-    def __init__(self, pulse_pars, RO_pars, n=1, cal_points=True, upload=True, return_seq=False):
+    def __init__(self, pulse_pars, RO_pars, n=1, cal_points=True, no_cal_points=2,
+                 upload=True, return_seq=False):
         super().__init__()
         self.pulse_pars = pulse_pars
         self.RO_pars = RO_pars
         self.n = n
         self.cal_points = cal_points
+        self.no_cal_points=no_cal_points
         self.upload = upload
         self.name = 'Rabi'
         self.parameter_name = 'amplitude'
@@ -91,18 +93,21 @@ class Rabi(swf.Hard_Sweep):
         if self.upload:
             sqs.Rabi_seq(amps=self.sweep_points,
                          pulse_pars=self.pulse_pars,
-                         RO_pars=self.RO_pars, cal_points=self.cal_points,
+                         RO_pars=self.RO_pars,
+                         cal_points=self.cal_points, no_cal_points=self.no_cal_points,
                          n=self.n, return_seq=self.return_seq)
 
 class Rabi_2nd_exc(swf.Hard_Sweep):
 
     def __init__(self, pulse_pars, pulse_pars_2nd, RO_pars, amps=None,
-                 n=1, cal_points=True, upload=True, return_seq=False):
+                 n=1, cal_points=True, no_cal_points=4, upload=True, return_seq=False):
         super().__init__()
         self.pulse_pars = pulse_pars
         self.pulse_pars_2nd = pulse_pars_2nd
         self.RO_pars = RO_pars
         self.n = n
+        self.cal_points = cal_points
+        self.no_cal_points = no_cal_points
         self.upload = upload
         self.name = 'Rabi 2nd excited state'
         self.parameter_name = 'amplitude'
@@ -123,6 +128,7 @@ class Rabi_2nd_exc(swf.Hard_Sweep):
                                   pulse_pars=self.pulse_pars,
                                   pulse_pars_2nd=self.pulse_pars_2nd,
                                   RO_pars=self.RO_pars, upload=self.upload,
+                                  cal_points=self.cal_points, no_cal_points=self.no_cal_points,
                                   n=self.n, return_seq=self.return_seq)
 
 class two_qubit_tomo_cardinal(swf.Hard_Sweep):
@@ -819,11 +825,12 @@ class cphase_fringes(swf.Hard_Sweep):
 
 class T1(swf.Hard_Sweep):
 
-    def __init__(self, pulse_pars, RO_pars, upload=True):
+    def __init__(self, pulse_pars, RO_pars, cal_points=True, upload=True):
         super().__init__()
         self.pulse_pars = pulse_pars
         self.RO_pars = RO_pars
         self.upload = upload
+        self.cal_points = cal_points
 
         self.name = 'T1'
         self.parameter_name = 't'
@@ -833,7 +840,40 @@ class T1(swf.Hard_Sweep):
         if self.upload:
             sqs.T1_seq(times=self.sweep_points,
                        pulse_pars=self.pulse_pars,
-                       RO_pars=self.RO_pars)
+                       RO_pars=self.RO_pars,
+                       cal_points=self.cal_points,
+                       upload=self.upload)
+
+class T1_2nd_exc(swf.Hard_Sweep):
+
+    def __init__(self, pulse_pars, pulse_pars_2nd, RO_pars,
+                 times=None, cal_points=True, upload=True):
+        super().__init__()
+        self.pulse_pars = pulse_pars
+        self.pulse_pars_2nd = pulse_pars_2nd
+        self.RO_pars = RO_pars
+        self.cal_points = cal_points
+        self.upload = upload
+        self.name = 'T1 2nd excited state'
+        self.parameter_name = 't'
+        self.unit = 's'
+
+        if cal_points and times is not None:
+            self.sweep_points = np.concatenate([times,
+                                                [times[-1]*1.05,
+                                                 times[-1]*1.06,
+                                                 times[-1]*1.07,
+                                                 times[-1]*1.08,
+                                                 times[-1]*1.09,
+                                                 times[-1]*1.1]])
+
+    def prepare(self, **kw):
+        if self.upload:
+            sqs2.T1_2nd_exc_seq(times=self.sweep_points,
+                                pulse_pars=self.pulse_pars,
+                                pulse_pars_2nd=self.pulse_pars_2nd,
+                                RO_pars=self.RO_pars,
+                                cal_points=self.cal_points)
 
 
 class AllXY(swf.Hard_Sweep):
@@ -983,8 +1023,8 @@ class Ramsey_2nd_exc(swf.Hard_Sweep):
         self.cal_points = cal_points
         self.upload = upload
         self.name = 'Rabi 2nd excited state'
-        self.parameter_name = 'amplitude'
-        self.unit = 'V'
+        self.parameter_name = 't'
+        self.unit = 's'
         if cal_points and times is not None:
             self.sweep_points = np.concatenate([times,
                                                 [times[-1]*1.05,
