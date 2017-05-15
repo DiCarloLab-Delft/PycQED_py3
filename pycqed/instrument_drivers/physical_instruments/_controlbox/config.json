@@ -1,0 +1,147 @@
+{
+    "operation dictionary":{
+
+        "x180" : {
+            "parameters" : 1,
+            "duration" : 20,
+            "type" : "rf",
+            "matrix" : [ [0.0, 0.0],
+                        [1.0, 0.0],
+                        [1.0, 0.0],
+                        [0.0, 0.0] ]
+        },
+
+        "x90" : {
+            "parameters" : 1,
+            "duration" : 20,
+            "type" : "rf",
+            "matrix" : []
+        },
+
+        "y180" : {
+            "parameters" : 1,
+            "duration" : 20,
+            "type" : "rf",
+            "matrix" : []
+        },
+
+
+        "y90" : {
+            "parameters" : 1,
+            "duration" : 20,
+            "type" : "rf",
+            "matrix" : []
+        },
+
+
+        "mx180" : {
+            "parameters" : 1,
+            "duration" : 20,
+            "type" : "rf",
+            "matrix" : []
+        },
+
+        "mx90" : {
+            "parameters" : 1,
+            "duration" : 20,
+            "type" : "rf",
+            "matrix" : []
+        },
+
+        "my180" : {
+            "parameters" : 1,
+            "duration" : 20,
+            "type" : "rf",
+            "matrix" : []
+        },
+
+        "my90" : {
+            "parameters" : 1,
+            "duration" : 20,
+            "type" : "rf",
+            "matrix" : []
+        },
+
+        "cz" : {
+            "parameters" : 2,
+            "duration" : 80,
+            "type" : "flux",
+            "matrix" : []
+        },
+
+        "ro" : {
+            "parameters" : 1,
+            "duration" : 300,
+            "type" : "measurement"
+        }
+    },
+
+    "hardware specification" : {
+        "qubit list" : [0, 1],
+        "cycle time" : 5,
+        "channels" :[
+            {
+               "rf" : {
+                    "qumis" : "pulse",
+                    "latency" : 80,
+                    "awg_nr" : 2,
+                    "lut" : 0
+                },
+                "flux" : {
+                    "qumis" : "trigger",
+                    "latency" : 40,
+                    "trigger bit" : 0,
+                    "codeword bit" : [1],
+                    "format" : [1, 2],
+                    "lut" : 1
+                },
+                "measure" : {
+                    "qumis" : "measure",
+                    "latency" : 100
+                }
+            },
+            {
+               "rf" : {
+                    "qumis" : "trigger",
+                    "latency" : 40,
+                    "trigger bit" : 3,
+                    "codeword bit" : [4, 5, 6],
+                    "format" : [1, 2],
+                    "lut" : 0
+                },
+                "flux" : {
+                    "qumis" : "pulse",
+                    "latency" : 80,
+                    "awg_nr" : 0,
+                    "lut" : 1
+                },
+                "measure" : {
+                    "qumis" : "trigger",
+                    "trigger bit" : 7,
+                    "format" : [200],
+                    "latency" : 100
+                }
+            }
+
+        ]
+    },
+
+    "luts" : [
+        {
+            "x180"  : 0,
+            "x90"   : 1,
+            "y180"  : 2,
+            "y90"   : 3,
+            "mx180" : 4,
+            "mx90"  : 5,
+            "my180" : 6,
+            "my90"  : 7
+        },
+        {
+            "cz" : 0,
+            "cz90": 1,
+            "cz45": 2,
+            "dummy_other": 3
+        }
+    ]
+}
