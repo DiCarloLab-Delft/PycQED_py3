@@ -1249,7 +1249,10 @@ class Echo_analysis(TD_Analysis):
 
     def run_default_analysis(self, close_file=True, **kw):
         self.get_naming_and_values()
-        self.rotate_and_normalize_data()
+        norm = self.normalize_data_to_calibration_points(self.measured_values[0], self.NoCalPoints)
+        self.normalized_values = norm[0]
+        self.normalized_data_points = norm[1]
+        self.normalized_cal_vals = norm[2]
         self.fit_data(**kw)
         self.make_figures(**kw)
         if close_file:
