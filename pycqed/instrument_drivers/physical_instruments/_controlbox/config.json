@@ -64,7 +64,7 @@
 
         "cz" : {
             "parameters" : 2,
-            "duration" : 80,
+            "duration" : 40,
             "type" : "flux",
             "matrix" : []
         },
@@ -78,6 +78,7 @@
 
     "hardware specification" : {
         "qubit list" : [0, 1],
+        "init time" : 200000,
         "cycle time" : 5,
         "channels" :[
             {
@@ -92,7 +93,7 @@
                     "latency" : 40,
                     "trigger bit" : 0,
                     "codeword bit" : [1],
-                    "format" : [1, 2],
+                    "format" : [5, 10],
                     "lut" : 1
                 },
                 "measure" : {
@@ -106,7 +107,7 @@
                     "latency" : 40,
                     "trigger bit" : 3,
                     "codeword bit" : [4, 5, 6],
-                    "format" : [1, 2],
+                    "format" : [5, 10],
                     "lut" : 0
                 },
                 "flux" : {
@@ -118,7 +119,7 @@
                 "measure" : {
                     "qumis" : "trigger",
                     "trigger bit" : 7,
-                    "format" : [200],
+                    "format" : [300],
                     "latency" : 100
                 }
             }

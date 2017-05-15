@@ -4,27 +4,21 @@ instruction. More precisely, it defines an Intermediate Representation (IR)
 and the process to translate the IR into QuMIS instructions.
 
 It should contain the following information:
-1. Timing information
+1. Timing information (done)
     - Starting point
     - Duration
     - (optional) Ending point
-2. The event
-3. Loop
-4. Register
-5. Memory
-
+2. Events (done)
+3. Loop (not done yet)
+4. Register (not done yet)
+5. Memory (not done yet)
 
 The QASM file is case insensitive.
 
+Read the class doc string for the usage.
 '''
 
 
-'''
-IR definition:
-<time point, events>
-time point: label, absolute time, pre_waiting time
-event: type, duration
-'''
 import enum
 import logging
 import json
@@ -35,8 +29,8 @@ import bisect
 import copy
 
 
-INIT_ALL_WAITING_TIME = 200000  # ns
 MAX_TRIG_BITS = 7
+DEFAULT_MEASURE_TIME = 300 # ns
 
 
 def is_number(s):
@@ -221,14 +215,13 @@ default_op_dict = {
         "type": EventType.DECLARE
     },
 
-    "Init_all": {
+    "init_all": {
         "parameters": 0,
         "type": EventType.WAIT
     },
 
-    "Measure": {
+    "measure": {
         "parameters": 1,
-        "duration": 300,
         "type": EventType.MEASURE
     },
 
@@ -255,29 +248,46 @@ def lower_dict_key(origin_dict):
 
 class QASM_QuMIS_Compiler():
 
-    def __init__(self, filename=None, verbose_level=1):
+    def __init__(self, config_filename = None, verbose_level=1):
         '''
-        @param: filename, the QASM file to be compiled.
+        @param: config_filename, file specifies the user-defined operation
+        dictionary, hardware specification and the LUTs.
         @param: verbose_level, message level to be printed. integer, range
         from 0 to 6. The larger verbose_level is, the more information being
         printed. 0 prints everything. 6 prints nothing.
+
+        Usage:
+        1. Instantiate the class, e.g., qqc, with a configuration file path.
+        2. qqc.compile(qasm_file, qumis_file_path) will compile the qasm_file
+        and write the resultant qumis program into qumis file.
+        3. qqc.dump_config(config_file_path) can dump current configuration
+        into the file config_file_path in JSON format.
         '''
-        self.filename = filename
         self.raw_lines = None
         self.prog_lines = None
-        self.config_loaded = False
         self.qasm_op_dict = None
         self.declared_qubits = []
         self.qubit_map = {}
         self.verbose_level = verbose_level
         self.channel_latency_compensated = False
 
-        self.config_filename = os.path.join(
-            pq.__path__[0], 'instrument_drivers', 'physical_instruments',
-            "_controlbox", "config.json")
+        if config_filename is None:
+            self.config_filename = os.path.join(
+                pq.__path__[0], 'instrument_drivers', 'physical_instruments',
+                "_controlbox", "config.json")
+            print("Configuration not specified."
+                "Default configuration file instrument_drivers\\"
+                "physical_instruments\\_controlbox\\config.json used.")
+        else:
+            self.config_filename = config_filename
 
-    def compile(self):
+    def compile(self, filename, qumis_fn=None):
+        self.filename = filename
+        self.qumis_fn = qumis_fn
         self.qumis_instructions = []
+        self.hw_timing_grid = []
+        self.timing_grid = []
+        self.load_config()
         self.read_file()
         self.line_to_event()
         self.build_dependency_graph()
@@ -287,21 +297,59 @@ class QASM_QuMIS_Compiler():
         self.convert_to_hw_trigger()
         self.gen_full_time_grid()
         self.convert_to_qumis()
-        return self.qumis_instructions
+        print("QuMIS generated successfully and written into {}".format(
+            self.qumis_fn))
 
     def build_dependency_graph(self):
         pass
 
-    def load_config(self):
-        if (self.config_loaded is True):
-            return
+    def load_config(self, config_filename=None):
+        if config_filename is not None:
+            self.config_filename = config_filename
 
         self.qasm_op_dict = None
 
         with open(self.config_filename) as data_file:
-            data = json.load(data_file)
+            self.data = json.load(data_file)
 
-        self.user_qasm_op_dict = data["operation dictionary"]
+        self.hardware_spec = self.data["hardware specification"]
+        self.luts = self.data["luts"]
+
+
+        self.physical_qubits = self.hardware_spec["qubit list"]
+        if is_integer_array(self.physical_qubits) is False:
+            raise ValueError('"qubit list" in the configuration file is not an'
+                             ' integer array:\n\t{}'.format(
+                                 self.physical_qubits))
+
+        self.cycle_time = self.hardware_spec["cycle time"]
+        self.init_time = self.hardware_spec["init time"]
+        if is_positive_number(self.cycle_time) is False:
+            raise ValueError('"cycle time" ({}) in the configuration file'
+                             ' is not an positive number.'.format(
+                                 self.cycle_time))
+        if is_positive_number(self.init_time) is False:
+            raise ValueError('"init time" ({}) in the configuration file'
+                             ' is not an positive number.'.format(
+                                 self.init_time))
+
+        self.cycle_time = float(self.cycle_time)
+        self.init_time = int(self.init_time / self.cycle_time)
+        self.measure_time = int(DEFAULT_MEASURE_TIME / self.cycle_time)
+
+        self.channels = self.hardware_spec["channels"]
+        self.check_channel_format()
+        for i in range(len(self.channels)):
+            for key in self.channels[i]:
+                self.channels[i][key]["latency"] = int(
+                    self.channels[i][key]["latency"] / self.cycle_time)
+                if "format" in self.channels[i][key]:
+                    trig_format = []
+                    for trig_dur in self.channels[i][key]["format"]:
+                        trig_format.append(int(trig_dur / self.cycle_time))
+                    self.channels[i][key]["format"] = trig_format
+
+        self.user_qasm_op_dict = self.data["operation dictionary"]
         for key in self.user_qasm_op_dict:
             op_spec = self.user_qasm_op_dict[key]
             op_type_str = op_spec["type"]
@@ -313,31 +361,71 @@ class QASM_QuMIS_Compiler():
 
             op_type_enum = user_op_type[op_type_str]
             op_spec["type"] = op_type_enum
+            op_spec["duration"] = int(op_spec["duration"] / self.cycle_time)
+            if op_type_enum == EventType.MEASURE:
+                self.measure_time = int(op_spec["duration"] / self.cycle_time)
             self.user_qasm_op_dict[key] = op_spec
+
+        for key in default_op_dict:
+            if key == "init_all":
+                default_op_dict[key]["duration"] = self.init_time
+            if key == "measure":
+                default_op_dict[key]["duration"] = self.measure_time
 
         self.qasm_op_dict = {**default_op_dict, **self.user_qasm_op_dict}
         self.qasm_op_dict = lower_dict_key(self.qasm_op_dict)
-        self.hardware_spec = data["hardware specification"]
-        self.luts = data["luts"]
         self.print_op_dict()
 
-        self.channels = self.hardware_spec["channels"]
-        self.check_channel_format()
 
-        self.physical_qubits = self.hardware_spec["qubit list"]
-        if is_integer_array(self.physical_qubits) is False:
-            raise ValueError('"qubit list" in the configuration file is not an'
-                             ' integer array:\n\t{}'.format(
-                                 self.physical_qubits))
+    def dump_config(self, config_fn):
+        op_dict = {}
+        for op in self.user_qasm_op_dict:
+            op_dict[op] = self.user_qasm_op_dict[op]
+            if "duration" in self.user_qasm_op_dict[op]:
+                op_dict[op]["duration"] =\
+                    op_dict[op]["duration"] * self.cycle_time
+            if "type" in self.user_qasm_op_dict[op]:
+                if op_dict[op]["type"] == EventType.RF:
+                    op_dict[op]["type"] = "rf"
+                elif op_dict[op]["type"] == EventType.FLUX:
+                    op_dict[op]["type"] = "flux"
+                elif op_dict[op]["type"] == EventType.MEASURE:
+                    op_dict[op]["type"] = "measure"
+                else:
+                    raise ValueError("unexpected event type: {}".format(
+                        op_dict[op]["type"]))
 
-        self.cycle_time = self.hardware_spec["cycle time"]
-        if is_positive_number(self.cycle_time) is False:
-            raise ValueError('"cycle time" ({}) in the configuration file'
-                             ' is not an positive number.'.format(
-                                 self.cycle_time))
-        self.cycle_time = float(self.cycle_time)
+        hardware_spec = {}
+        hardware_spec["qubit list"] = self.physical_qubits
+        hardware_spec["cycle time"] = self.cycle_time
+        hardware_spec["init time"] = self.init_time * self.cycle_time
+        channels = []
 
-        self.config_loaded = True
+        for c in self.channels:
+            channel = {}
+            for key in c:
+                channel[key] = c[key]
+
+                if "latency" in c[key]:
+                    channel[key]["latency"] =\
+                        c[key]["latency"] * self.cycle_time
+
+                if "format" in c[key]:
+                    trig_format = c[key]["format"]
+                    for i in range(len(trig_format)):
+                        trig_format[i] = trig_format[i] * self.cycle_time
+                    channel[key]["format"] = trig_format
+
+            channels.append(channel)
+
+        hardware_spec["channels"] = channels
+
+        data = {}
+        data["operation dictionary"] = op_dict
+        data["hardware specification"] = hardware_spec
+        data["luts"] = self.luts
+        with open(config_fn, 'w') as outfile:
+            json.dump(self.data, outfile, indent=2)
 
     def check_channel_format(self):
         pass
@@ -533,7 +621,6 @@ class QASM_QuMIS_Compiler():
         Timing information of events is not generated.
         raw_event_list contains all events before resolving timing information.
         '''
-        self.load_config()
         self.raw_event_list = []
         for line in self.prog_lines:
             # print("line in prog_lines:", line)
@@ -554,7 +641,7 @@ class QASM_QuMIS_Compiler():
                 qasm_op_type = self.qasm_op_dict[qasm_op_name]["type"]
 
                 if self.is_single_line_op(qasm_op_type) and (len(events) != 1):
-                    se = SyntaxError("QASM instruction {} should exclusively "
+                    se = SyntaxError("QASM instruction {} should e "
                                      "occupy a line.".format(qasm_op_name))
                     se.filename = self.filename
                     se.lineno = line.number
@@ -677,7 +764,7 @@ class QASM_QuMIS_Compiler():
                 if self.qasm_op_dict[op_name]["parameters"] == 1:
                     following_waiting_time = timing_event.params[0]
                 elif op_name == "init_all":
-                    following_waiting_time = INIT_ALL_WAITING_TIME
+                    following_waiting_time = self.init_time
                 else:
                     se = SyntaxError("unsupported instruction ({})"
                                      " found.".format(timing_event.name))
@@ -709,6 +796,8 @@ class QASM_QuMIS_Compiler():
             self.print_timing_events()
 
     def build_qubit_map(self):
+        self.declared_qubits = []
+        self.qubit_map = {}
         i = 0
         while i < len(self.raw_event_list):
             raw_events = self.raw_event_list[i]
@@ -952,6 +1041,7 @@ class QASM_QuMIS_Compiler():
         self.split_trigger_codeword()
         self.apply_codeword()
         self.vertical_divide_trigger()
+        self.compensate_minus_time()
 
     def apply_codeword(self):
         new_tp_list = []
@@ -989,6 +1079,18 @@ class QASM_QuMIS_Compiler():
 
         self.hw_timing_grid = new_tp_list
         self.print_hw_timing_grid()
+
+    def compensate_minus_time(self):
+        if len(self.hw_timing_grid) == 0:
+            return
+        if self.hw_timing_grid[0].absolute_time < 0:
+            added_time = abs(self.hw_timing_grid[0].absolute_time)
+            for i in range(len(self.hw_timing_grid)):
+                self.hw_timing_grid[i].absolute_time += added_time
+
+        if self.verbose_level < 4:
+            self.print_hw_timing_grid()
+
 
     def vertical_divide_trigger(self):
         '''
@@ -1173,7 +1275,6 @@ class QASM_QuMIS_Compiler():
            measure
         '''
         self.qumis_instructions = []
-        self.qumis_instructions.append("wait 1")
         previous_time = 0
         for tp in self.hw_timing_grid:
             pre_waiting_time = tp.absolute_time - previous_time
@@ -1210,6 +1311,14 @@ class QASM_QuMIS_Compiler():
                         pulse_list[0], pulse_list[1], pulse_list[2], fill='0')
                 self.qumis_instructions.append(pulse_instruction)
 
+        if self.qumis_instructions[0][:4] != "wait":
+            print("Instruction 'Wait 1' automatically added at the beginning.")
+            self.qumis_instructions.insert(0, "wait 1")
+
+        qumis_file = open(self.qumis_fn, "w")
+        for qi in self.qumis_instructions:
+            qumis_file.write("{}\n".format(qi))
+        qumis_file.close()
         self.print_qumis()
 
     def print_qumis(self):
