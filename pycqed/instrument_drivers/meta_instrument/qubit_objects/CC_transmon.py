@@ -1248,7 +1248,7 @@ class CBox_v3_driven_transmon(Transmon):
                       'Avg. Discrimination fidelity: \t{:.4f}'.format(a.F_d))
             return a.F_a, a.F_d
 
-    def measure_transients(self, MC=None, analyze=True):
+    def measure_transients(self, MC=None, analyze=True, cases=('off', 'on')):
         '''
         Measure transients.
         Returns two numpy arrays containing the transients for qubit in state
@@ -1260,7 +1260,7 @@ class CBox_v3_driven_transmon(Transmon):
 
         # Loading the right qumis instructions
         transients = []
-        for i, pulse_comb in enumerate(['off', 'on']):
+        for i, pulse_comb in enumerate(cases):
             off_on_sequence = sqqs.off_on(self.name, pulse_comb=pulse_comb)
             MC.set_sweep_function(swf.QASM_Sweep(
                 filename=off_on_sequence.name, CBox=self.CBox.get_instr(),
