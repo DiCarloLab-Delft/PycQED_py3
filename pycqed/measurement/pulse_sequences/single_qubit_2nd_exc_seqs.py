@@ -10,7 +10,7 @@ station = None
 def Rabi_2nd_exc_seq(amps, pulse_pars, pulse_pars_2nd, RO_pars, n=1,
                      cal_points=True,
                      post_msmt_delay=3e-6, verbose=False):
-    '''
+    """
     Rabi sequence for the second excited state
     Input pars:
         amps:            array of pulse amplitudes (V)
@@ -19,7 +19,7 @@ def Rabi_2nd_exc_seq(amps, pulse_pars, pulse_pars_2nd, RO_pars, n=1,
         RO_pars:         dict containing the RO parameters
         n:               number of pulses (1 is conventional Rabi)
         post_msmt_delay: extra wait time for resetless compatibility
-    '''
+    """
     seq_name = 'Rabi_2nd_exc_sequence'
     seq = sequence.Sequence(seq_name)
     station.pulsar.update_channel_settings()
