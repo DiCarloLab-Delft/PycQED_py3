@@ -339,6 +339,24 @@ def get_all_sampled(file_name, step_width_ns, points_per_ns, max_points=600,
     step_direct = np.double(f.readlines())
     f.close()
 
+def get_all_sampled_vector(vector, step_width_ns, points_per_ns, max_points=600,
+                    step_params=None, norm_type='max'):
+    """
+    step_width_ns (ints):  not all points are selected for inversion,
+                    this selects the stepsize for the inversion
+    points_per_ns (int) : sampling rate in GS/s
+
+
+    Return an output dict containing
+        t_direct     : time values as measured
+        step_direct  : amplitude values as measured
+        t_raw        : time shifted with autodetected start time
+        step_raw     : normalized step
+         FIXME raw should be renamed rescaled (or normalized or shifted)
+    """
+
+    step_direct = vector
+
 #     print step_params
 
     my_step_raw, my_step_params = step_raw(
