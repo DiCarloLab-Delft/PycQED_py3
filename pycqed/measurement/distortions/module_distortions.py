@@ -95,7 +95,7 @@ def load_exp_model():
     triple_pole_mod.set_param_hint('tau2', value=.1e-6, vary=True)
     triple_pole_mod.set_param_hint('amp3', max=0., value=0., vary=False)
     triple_pole_mod.set_param_hint('tau3', value=.2e-6, vary=False)
-    triple_pole_mod.set_param_hint('offset', min=0., value=1, vary=True)
+    triple_pole_mod.set_param_hint('offset', min=0., value=1, vary=False)
     triple_pole_mod.set_param_hint('n', value=1, vary=False)
     my_tp_params = triple_pole_mod.make_params()
     return triple_pole_mod, my_tp_params
