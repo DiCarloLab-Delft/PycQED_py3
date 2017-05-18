@@ -982,7 +982,7 @@ class QuDev_transmon(Qubit):
             ma.MeasurementAnalysis(auto=True, close_fig=close_fig)"""
 
     def find_resonator_frequency(self, update=False, freqs=None, MC=None,
-                                 close_fig=True, fitting_model='hanger'):
+                                 close_fig=True, fitting_model='hanger',**kw):
         """
         Finds the resonator frequency by performing a heterodyne experiment
         if freqs == None it will determine a default range dependent on the
@@ -1009,7 +1009,7 @@ class QuDev_transmon(Qubit):
         self.measure_heterodyne_spectroscopy(freqs, MC, analyze=False)
 
         HA = ma.Homodyne_Analysis(label=self.msmt_suffix, close_fig=close_fig,
-                                  fitting_model=fitting_model)
+                                  fitting_model=fitting_model,**kw)
         f0 = HA.fit_results.params['f0'].value
         df0 = HA.fit_results.params['f0'].stderr
         Q = HA.fit_results.params['Q'].value
@@ -1068,6 +1068,27 @@ class QuDev_transmon(Qubit):
         :param close_fig:
         :param analyze_ef:
         :param kw:
+            interactive_plot        (default=False)               whether to plot with plotly or not
+            analyze_ef              (default=False)               whether to look for another f_ge/2 peak/dip
+            percentile              (default=20)                  percentile of the data that is considered background noise
+            num_sigma_threshold     (default=5)                   used to define the threshold above(below) which to look for
+                                                                  peaks(dips); threshold = background_mean +
+                                                                  num_sigma_threshold * background_std
+            window_len              (default=3)                   filtering window length; uses a_tools.smooth
+            analysis_window         (default=10)                  how many data points (calibration points) to remove
+                                                                  before sending data to peak_finder; uses a_tools.cut_edges,
+                                                                  data = data[(analysis_window//2):-(analysis_window//2)]
+            amp_only                (default=False)               whether only I data exists
+            save_name               (default='Source Frequency')  figure name with which it will be saved
+            auto                    (default=True)                automatically perform the entire analysis upon call
+            label                   (default=none?)               label of the analysis routine
+            folder                  (default=working folder)      working folder
+            NoCalPoints             (default=4)                   number of calibration points
+            print_fit_results       (default=True)                print the fit report
+            print_frequency         (default=False)               whether to print the f_ge and f_gf/2
+            show                    (default=True)                show the plots
+            show_guess              (default=False)               plot with initial guess values
+            close_file              (default=True)                close the hdf5 file
         :return:
         """
         if not update:
@@ -1103,7 +1124,7 @@ class QuDev_transmon(Qubit):
 
             amp_only = hasattr(self.heterodyne, 'RF')
             SpecA = ma.Qubit_Spectroscopy_Analysis(
-                analyze_ef=analyze_ef, label=label, amp_only=amp_only, close_fig=close_fig)
+                analyze_ef=analyze_ef, label=label, amp_only=amp_only, close_fig=close_fig,**kw)
             f0 = self.f_qubit(SpecA.fitted_freq)
             if analyze_ef:
                 f0_ef = self.f_ef_qubit(2*SpecA.fitted_freq_gf_over_2 - f0)
@@ -1344,7 +1365,7 @@ class QuDev_transmon(Qubit):
                                         cal_points=cal_points, close_fig=close_fig)
 
         #get new freq and T2* from analysis results
-        RamseyA = ma.Ramsey_Analysis(auto=True)
+        RamseyA = ma.Ramsey_Analysis(auto=True,**kw)
         fitted_freq = RamseyA.Ramsey_freq.pop('freq')
         T2_star = RamseyA.T2_star.pop('T2_star')
 

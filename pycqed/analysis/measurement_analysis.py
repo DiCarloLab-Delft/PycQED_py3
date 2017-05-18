@@ -24,6 +24,12 @@ from sympy.abc import pi
 
 import pycqed.analysis.tools.plotting as pl_tools
 
+#Plotly
+import plotly
+import plotly.graph_objs as go
+from plotly.graph_objs import *
+plotly.offline.init_notebook_mode() #if not offline, it will ask to register with username and password
+
 try:
     from nathan_plotting_tools import *
 except:
@@ -496,6 +502,53 @@ class MeasurementAnalysis(object):
                 self.save_fig(fig, xlabel=xlabel, ylabel=(ylabel+'_log'), **kw)
             else:
                 self.save_fig(fig, xlabel=xlabel, ylabel=ylabel, **kw)
+        return
+
+    def plotly_plot(self, x, ydata, fit_res, **kw):
+
+        title = kw.get('title',textwrap.fill(self.timestamp_string + '_' +
+                                             self.measurementstring, 40))
+
+        xlabel = kw.get('xlabel',None)
+        ylabel = kw.get('ylabel',None)
+
+        if kw.get('show_exponent',True):
+            show_exponent = 'all'
+        else:
+            show_exponent = 'none'
+
+        exponent_format = kw.get('exponent_format','e')
+
+        trace1 = go.Scatter(x=x,y=ydata, line=Line(color='blue',width=2),name='data', mode='lines+markers')
+        trace2 = go.Scatter(x=x,y=fit_res.best_fit, line=Line(color='red',width=3), name='fit')
+        trace3 = go.Scatter(x=x,y=fit_res.init_fit, line=Line(color='black',width=1,dash='dash'),name='init_fit')
+
+        data = Data([trace1,trace2,trace3])
+        layout = dict(title=title,
+                      updatemenus=list([
+                             dict(x=-0.05,
+                                  y=1,
+                                  yanchor='top',
+                                  buttons=list([dict(args=['visible', [True, True, True, True]],
+                                                     label='All',
+                                                     method='restyle'),
+                                                dict(args=['visible', [True, False, False, False]],
+                                                     label='data',
+                                                     method='restyle'),
+                                                dict(args=['visible', [False, True, False, False]],
+                                                     label='fit',
+                                                     method='restyle'),
+                                                dict(args=['visible', [False, False, True, False]],
+                                                     label='init_fit',
+                                                     method='restyle') ] ) ) ] ),
+                      xaxis=dict(title=xlabel,showexponent=show_exponent,exponentformat=exponent_format),
+                      yaxis=dict(title=ylabel))
+
+        fig = Figure(data=data, layout=layout)
+
+        if kw.get('show',True):
+            plotly.offline.iplot(fig)
+
         return
 
     def plot_complex_results(self, cmp_data, fig, ax, show=False, marker='.', **kw):
@@ -4133,7 +4186,7 @@ class Homodyne_Analysis(MeasurementAnalysis):
         Available fitting_models:
             - 'hanger' = amplitude fit with slope
             - 'complex' = complex transmission fit WITHOUT slope
-            - 'fano' = resonance in Purcell filter fit
+            - 'lorentzian' = fit to a Lorentzian lineshape
 
         'fit_window': allows to select the windows of data to fit.
                       Example: fit_window=[100,-100]
@@ -4141,6 +4194,8 @@ class Homodyne_Analysis(MeasurementAnalysis):
         super(self.__class__, self).run_default_analysis(
             close_file=False, **kw)
         self.add_analysis_datagroup_to_file()
+
+        interactive_plot = kw.get('interactive_plot',False)
 
         ########## Fit data ##########
 
@@ -4210,17 +4265,17 @@ class Homodyne_Analysis(MeasurementAnalysis):
 
             if fit_window == None:
                 data_x = self.sweep_points
-                data_y = self.measured_values[0]
+                self.data_y = self.measured_values[0]
             else:
                 data_x = self.sweep_points[fit_window[0]:fit_window[1]]
                 data_y_temp = self.measured_values[0]
-                data_y = data_y_temp[fit_window[0]:fit_window[1]]
+                self.data_y = data_y_temp[fit_window[0]:fit_window[1]]
 
             # # make sure that frequencies are in Hz
             # if np.floor(data_x[0]/1e8) == 0:  # frequency is defined in GHz
             #     data_x = data_x*1e9
 
-            fit_res = Model.fit(data=data_y,
+            fit_res = Model.fit(data=self.data_y,
                                       f=data_x, verbose=False)
 
         elif fitting_model == 'complex':
@@ -4293,6 +4348,7 @@ class Homodyne_Analysis(MeasurementAnalysis):
             fit_res = Model.fit(data=self.measured_powers,
                                           f=self.sweep_points,
                                           params=self.params)
+
         else:
             raise ValueError('fitting model "{}" not recognized'.format(
                              fitting_model))
@@ -4336,6 +4392,11 @@ class Homodyne_Analysis(MeasurementAnalysis):
                                             ylabel=str('S21_mag (arb. units)'),
                                             save=False)
 
+            if interactive_plot:
+                self.plotly_plot(self.sweep_points*1e-9,self.data_y,fit_res,
+                         xlabel=self.xlabel,ylabel=str('Power (arb. units)'),
+                         show_exponent=False)
+
         elif 'complex' in fitting_model:
             self.plot_complex_results(
                 data_complex, fig=fig, ax=ax, show=False, save=False)
@@ -4353,6 +4414,10 @@ class Homodyne_Analysis(MeasurementAnalysis):
                                             xlabel=self.xlabel,
                                             ylabel=str('Power (arb. units)'),
                                             save=False)
+            if interactive_plot:
+                self.plotly_plot(self.sweep_points*1e-9,self.measured_powers,fit_res,
+                                 xlabel=self.xlabel,ylabel=str('Power (arb. units)'),
+                                 show_exponent=False)
 
         if fit_window == None:
             data_x = self.sweep_points
@@ -4588,6 +4653,7 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
         3. The data, the best fit, and peak points are then plotted.
 
     Possible kw parameters:
+        interactive_plot        (default=False)               whether to plot with plotly or not
         analyze_ef              (default=False)               whether to look for another f_ge/2 peak/dip
         percentile              (default=20)                  percentile of the data that is considered background noise
         num_sigma_threshold     (default=5)                   used to define the threshold above(below) which to look for
@@ -4763,9 +4829,10 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
                              show=False, fit_results_peak=True, **kw):
 
         self.add_analysis_datagroup_to_file()
-        self.savename = kw.pop('save_name', 'Source Frequency')
-        show_guess = kw.pop('show_guess', True)
-        close_file = kw.pop('close_file', True)
+        self.savename = kw.get('save_name', 'Source Frequency')
+        show_guess = kw.get('show_guess', True)
+        close_file = kw.get('close_file', True)
+        interactive_plot = kw.get('interactive_plot',False)
         self.get_naming_and_values()
 
         use_max = kw.get('use_max', False)
@@ -4871,6 +4938,11 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
         if show:
             plt.show()
         self.save_fig(fig_dist, figname='Source frequency distance', **kw)
+
+        if interactive_plot:
+            self.plotly_plot(self.sweep_points,self.data_dist,self.fit_res,
+                             xlabel='Frequency (GHz)',ylabel='S21 distance (V)',
+                             show_exponent=False)
 
         if close_file:
             self.data_file.close()
