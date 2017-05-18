@@ -1,8 +1,3 @@
-
-# coding: utf-8
-
-# In[ ]:
-
 import matplotlib.pyplot as plt
 import sys
 sys.path.append("D:/Repository/PyCQED_py3")
@@ -14,126 +9,19 @@ from imp import reload
 reload(kf)
 
 
-# In[ ]:
-
-def get_square_pulse(t,width,t0):
-    square_pulse = kf.square(t,width,t0)
+def get_square_pulse(t, width, t0):
+    square_pulse = kf.square(t, width, t0)
     return square_pulse
-    
-    
-    
 
 
-# In[ ]:
-
-#plot the input square signal
-# get it ready for convolution
-
-get_ipython().magic('matplotlib inline')
-t = np.arange(0,6000)
-width = 100
-t0 = 10
-square_pulse = get_square_pulse(t,width,t0)
-plt.plot(t,square_pulse,label='Input signal')
-axes = plt.gca()
-axes.set_xlim([np.amin(t),np.amax(t)])
-axes.set_ylim([-2,2])
-
-
-# ### Get a distorted signal
-
-# ## define a kernel
-
-# In[ ]:
-
-def get_kernel(t,amp,width, tau):
+def get_sim_kernel(t, amp, width, tau):
     kernel_stepvec = 1. - amp*np.exp(-t/tau)
     return kernel_stepvec
 
 
-#  ## call a kernel
-
-# In[ ]:
-
-width=1
-t0 = 1000
-tau = 100
-amp = 0.1
-kernel_stepvec = get_kernel(t,amp,width,tau)
-# kernel_stepvec /= np.sum(kernel_stepvec)
-
-
-# In[ ]:
-
-"""
-prepare the kernel to calculate step response
-"""
-
-kernel_out = kf.kernel_from_kernel_stepvec(kernel_stepvec, width)
-plt.plot(t,kernel_out,'o-',label='Filter')
-axes = plt.gca()
-axes.set_xlim([0,100])
-# print(np.size(kernel_out),np.size(square_pulse))
-
-
-#plt.plot(t_vec,np.real(convolution)[:len(square_pulse)],label='Filtered Signal')
-# plt.legend(loc=2)
-
-
-# In[ ]:
-
-"""
-convolve the kernel_out with input signal to get distorted signal
-"""
-convolution = np.convolve(square_pulse,kernel_out)
-plt.plot(convolution,label='Filtered')
-plt.plot(square_pulse,label='Input')
-ax = plt.gca()
-ax.set_ylabel('Signal amplitude (normalized)')
-ax.set_xlabel('Time (ns)')
-ax.legend()
-
-
-# ## Execute script to get fitting 
-# ### Remember to pass vector in all functions
-# ### params = 'filename' has been killed
-# ### data is taken as a vector
-
-# In[ ]:
-
-"""
-Plot the kernel on QT graph and prepare for fittling
-passed as a parameter to the output dictionary
-to do: be more clear here
-step_start : start of the signal 
-step_end : end of the signal
-baseline : baseline od the signal
-"""
-
-points_per_ns = 1
-step_width_ns = 1
-step_start = 10
-step_end = 110
-baseline = 0
-output_dict = kf.get_all_sampled_vector(convolution,
-                                        step_width_ns,
-                                        points_per_ns,
-                                        step_params={'baseline':baseline,'step_start':step_start,'step_end':step_end})
-
-try:
-    vw.clear()
-except Exception:
-    from qcodes.plots.pyqtgraph import QtPlot
-    vw = QtPlot(windowTitle='Seq_plot', figsize=(600, 400))
-
-
-# In[ ]:
-
 def contains_nan(array):
     return np.isnan(array).any()
 
-
-# In[ ]:
 
 def load_exp_model():
     """
@@ -145,7 +33,8 @@ def load_exp_model():
     triple_pole_mod = fit_mods.TripleExpDecayModel
     triple_pole_mod.set_param_hint('amp1', value=0.05, vary=True)
     triple_pole_mod.set_param_hint('tau1', value=.1e-6, vary=True)
-    triple_pole_mod.set_param_hint('amp2', value=0, vary=True)#-.001, vary=True)
+    triple_pole_mod.set_param_hint(
+        'amp2', value=0, vary=True)  # -.001, vary=True)
     triple_pole_mod.set_param_hint('tau2', value=.1e-6, vary=True)
     triple_pole_mod.set_param_hint('amp3', max=0., value=0., vary=False)
     triple_pole_mod.set_param_hint('tau3', value=.2e-6, vary=False)
@@ -154,8 +43,6 @@ def load_exp_model():
     my_tp_params = triple_pole_mod.make_params()
     return triple_pole_mod, my_tp_params
 
-
-# In[ ]:
 
 def fit_step(tvals, norm_amps, start_time_fit,
              end_time_fit, model='exp', verbose=0):
@@ -188,17 +75,14 @@ def fit_step(tvals, norm_amps, start_time_fit,
     return tp_fit_res
 
 
-# In[ ]:
-
-def kernel_from_step_fit(tp_fit_res):
+def kernel_from_step_fit(tp_fit_res, kernel_length=60000):
     """
     function to extract result(amplitude, offset, tau) from triple exponential model
     use them to calculate kernel correction
     takes as an input tp_fit_res
     """
-    
 
-    #TODO: give function the right argument, which is fit data
+    # TODO: give function the right argument, which is fit data
     # Extracting the fit results
     tau_1 = tp_fit_res.best_values['tau1']
     amp_1 = tp_fit_res.best_values['amp1']
@@ -212,7 +96,7 @@ def kernel_from_step_fit(tp_fit_res):
 
     # These are the analytical expressions for the kernel corrections
     # to do a better mathematical formula for amp_kernel_1 and tau_kernel_1
-    #to do offset appears in both values
+    # to do offset appears in both values
     amp_kernel_1 = -amp_1/(1.+amp_1)
     tau_kernel_1 = tau_1*(1+amp_1)
     amp_kernel_2 = -amp_2/(1.+amp_2)
@@ -225,8 +109,6 @@ def kernel_from_step_fit(tp_fit_res):
     tau_idx = np.argmax(tpm_taus)
     tau_m = tpm_taus[tau_idx]
     amp_m = tpm_amps[tau_idx]
-    # We pick 8 us
-    kernel_length = 60000  # -> how many samples for the kernel (1GS/s -> ns)
     t_kernel = np.arange(kernel_length)*1e-9
     # fit_kernel_step = (1. + offset*amp_kernel_1*np.exp(-t_kernel/tau_kernel_1)
     #                    + offset*amp_kernel_2*np.exp(-t_kernel/tau_kernel_2))/offset
@@ -236,119 +118,9 @@ def kernel_from_step_fit(tp_fit_res):
     fit_kernel_step = (1. + offset*amp_m*np.exp(-t_kernel/tau_m))/offset
     # FIXME -> we want to use the maximal tau here
 
-    # calculates the response of the delta function based on the kernel for the step
+    # calculates the response of the delta function based on the kernel for
+    # the step
     fit_kernel = kf.kernel_from_kernel_stepvec(fit_kernel_step)
 
     return fit_kernel, fit_kernel_step, t_kernel
-
-
-# In[ ]:
-
-
-tvals = output_dict['t_step_raw']*1e-9  # Shifts the time vals
-amps = output_dict['step_direct']  # uses the non normalized voltages
-
-tvals_k = output_dict['t_kernel']
-amp_k = output_dict['kernel_step']
-
-
-# In[ ]:
-
-# the fit
-#start_time_fit = .1e-6
-#end_time_fit = 9.5e-6
-start_time_fit = .01*1e-6
-end_time_fit = .09*1e-6
-fit_start = np.argmin(np.abs(tvals - start_time_fit))
-fit_end = np.argmin(np.abs(tvals - end_time_fit))
-tvals_fit = tvals[fit_start:fit_end]
-norm_amps = output_dict['step_raw']
-
-
-# In[ ]:
-
-#################################
-# Initial plot
-norm_amps = output_dict['step_raw']  # uses the normalized voltages
-tp_fit_res = fit_step(tvals, norm_amps, start_time_fit, end_time_fit)
-fit_amps = tp_fit_res.best_fit
-# vw.win.nextRow()
-vw.add(x=tvals, xlabel='Time', xunit='s',
-       y=norm_amps, ylabel='Normalized amplitude', yunit='',
-       symbol='o', symbolSize=5, subplot=1)
-
-
-# In[ ]:
-
-
-#calling functions
-fit_kernel, fit_kernel_step, t_kernel = kernel_from_step_fit(tp_fit_res)
-print(fit_kernel_step)
-
-
-# In[ ]:
-
-len(fit_kernel_step)
-
-
-# In[ ]:
-
-# Add fit to plot
-
-vw.add(x=tvals_fit, xlabel='Time', xunit='s',
-       y=fit_amps, ylabel='Normalized amplitude', yunit='',
-       subplot=1)
-
-########## htilde
-# tvals_h = output_dict['t_htilde_raw']*1e-9
-# htilde_raw = output_dict['kernel_step']
-
-# vw.add(x=tvals_h, xlabel='Time', xunit='s',
-#        y=htilde_raw, ylabel='Kernel amplitude', yunit='V/s', symbol='o', symbolSize=5,
-#        subplot=4)
-
-
-
-# tvals_k = output_dict['t_kernel']
-# amp_k = output_dict['kernel_step']
-
-vw.add(x=tvals_k*1e-9, xlabel='Time', xunit='s',
-       y=amp_k, ylabel='Kernel amplitude', yunit='V/s', symbol='o', symbolSize=5,
-       subplot=2)
-
-vw.add(x=t_kernel, xlabel='Time', xunit='s',
-       y=fit_kernel_step, ylabel='Kernel amplitude', yunit='V/s',
-       subplot=2)
-
-# convention is to use the timestamp of the scope file as a base
-#ts = filename[10:-8]
-#save_file_name = 'corr0_'+ts
-
-#kf.save_kernel(fit_kernel, save_file=save_file_name)
-#print(save_file_name)
-
-
-
-# # Add the distortion to the kernel object
-# k0 = station.components['k0']
-# try:
-#     k0.add_kernel_to_kernel_list(save_file_name+'.txt')
-# except ValueError as va:
-#     logging.warning(va)
-
-
-# In[ ]:
-
-
-plt.plot(np.convolve(convolution,fit_kernel))
-
-
-# In[ ]:
-
-
-
-
-# In[ ]:
-
-
 

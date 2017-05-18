@@ -17,35 +17,36 @@ prepare the kernel to calculate step response
 """
 
 kernel_out = kf.kernel_from_kernel_stepvec(kernel_stepvec, width)
-plt.plot(t,kernel_out,'o-',label='Filter')
+plt.plot(t, kernel_out, 'o-', label='Filter')
 axes = plt.gca()
-axes.set_xlim([0,100])
+axes.set_xlim([0, 100])
 # print(np.size(kernel_out),np.size(square_pulse))
 
 
-#plt.plot(t_vec,np.real(convolution)[:len(square_pulse)],label='Filtered Signal')
+# plt.plot(t_vec,np.real(convolution)[:len(square_pulse)],label='Filtered Signal')
 # plt.legend(loc=2)
 
-def convolve_kernel_input(input_signal,kernel):
-	"""
-	takes as an input a signal and a kernel
-	should be used twice in the whole module
-	1. to get the distorted signal, then ideal_signal and kernel_out should be used
-	2.to get the compensated signal, then distorted signal and correction_kernel must be used
-	convolve the kernel_out with input signal to get distorted signal
-	"""
-
-
-	convolution = np.convolve(input_signal,kernel)
+def convolve_kernel_input(input_signal, kernel):
     """
-	plt.plot(convolution,label='Filtered')
-	plt.plot(square_pulse,label='Input')
-	ax = plt.gca()
-	ax.set_ylabel('Signal amplitude (normalized)')
-	ax.set_xlabel('Time (ns)')
-	ax.legend()
-	"""
-	return convolution
+    takes as an input a signal and a kernel
+    should be used twice in the whole module
+    1. to get the distorted signal, then ideal_signal
+    and kernel_out should be used
+    2.to get the compensated signal, then distorted signal
+    and correction_kernel must be used
+    convolve the kernel_out with input signal to get distorted signal
+    """
+
+    convolution = np.convolve(input_signal, kernel)
+    """
+    plt.plot(convolution,label='Filtered')
+    plt.plot(square_pulse,label='Input')
+    ax = plt.gca()
+    ax.set_ylabel('Signal amplitude (normalized)')
+    ax.set_xlabel('Time (ns)')
+    ax.legend()
+    """
+    return convolution
 
 """
 Plot the kernel on QT graph and prepare for fittling
@@ -55,7 +56,7 @@ step_start : start of the signal
 step_end : end of the signal
 baseline : baseline od the signal
 """
-convolution = convolve_kernel_input(input_signal,kernel)
+convolution = convolve_kernel_input(input_signal, kernel)
 points_per_ns = 1
 step_width_ns = 1
 step_start = 10
@@ -64,17 +65,15 @@ baseline = 0
 output_dict = kf.get_all_sampled_vector(convolution,
                                         step_width_ns,
                                         points_per_ns,
-                                        step_params={'baseline':baseline,'step_start':step_start,'step_end':step_end})
+                                        step_params={'baseline': baseline,
+                                                     'step_start': step_start,
+                                                     'step_end': step_end})
 
 try:
     vw.clear()
 except Exception:
     from qcodes.plots.pyqtgraph import QtPlot
     vw = QtPlot(windowTitle='Seq_plot', figsize=(600, 400))
-
-
-
-
 
 
 def contains_nan(array):
@@ -91,7 +90,8 @@ def load_exp_model():
     triple_pole_mod = fit_mods.TripleExpDecayModel
     triple_pole_mod.set_param_hint('amp1', value=0.05, vary=True)
     triple_pole_mod.set_param_hint('tau1', value=.1e-6, vary=True)
-    triple_pole_mod.set_param_hint('amp2', value=0, vary=True)#-.001, vary=True)
+    triple_pole_mod.set_param_hint(
+        'amp2', value=0, vary=True)  # -.001, vary=True)
     triple_pole_mod.set_param_hint('tau2', value=.1e-6, vary=True)
     triple_pole_mod.set_param_hint('amp3', max=0., value=0., vary=False)
     triple_pole_mod.set_param_hint('tau3', value=.2e-6, vary=False)
@@ -99,7 +99,6 @@ def load_exp_model():
     triple_pole_mod.set_param_hint('n', value=1, vary=False)
     my_tp_params = triple_pole_mod.make_params()
     return triple_pole_mod, my_tp_params
-
 
 
 def fit_step(tvals, norm_amps, start_time_fit,
@@ -132,7 +131,7 @@ def fit_step(tvals, norm_amps, start_time_fit,
         print(tp_fit_res.fit_report())
     return tp_fit_res
 
-#plotting the fit
+# plotting the fit
 #################################
 # Initial plot
 norm_amps = output_dict['step_raw']  # uses the normalized voltages
@@ -142,7 +141,7 @@ vw.add(x=tvals, xlabel='Time', xunit='s',
        y=norm_amps, ylabel='Normalized amplitude', yunit='',
        symbol='o', symbolSize=5, subplot=1)
 
-#extract fitting data and calculate analytically "correction kernel"
+# extract fitting data and calculate analytically "correction kernel"
 ###################################################
 
 
@@ -152,9 +151,8 @@ def kernel_from_step_fit(tp_fit_res):
     use them to calculate kernel correction
     takes as an input tp_fit_res
     """
-    
 
-    #TODO: give function the right argument, which is fit data
+    # TODO: give function the right argument, which is fit data
     # Extracting the fit results
     tau_1 = tp_fit_res.best_values['tau1']
     amp_1 = tp_fit_res.best_values['amp1']
@@ -168,7 +166,7 @@ def kernel_from_step_fit(tp_fit_res):
 
     # These are the analytical expressions for the kernel corrections
     # to do a better mathematical formula for amp_kernel_1 and tau_kernel_1
-    #to do offset appears in both values
+    # to do offset appears in both values
     amp_kernel_1 = -amp_1/(1.+amp_1)
     tau_kernel_1 = tau_1*(1+amp_1)
     amp_kernel_2 = -amp_2/(1.+amp_2)
@@ -192,12 +190,11 @@ def kernel_from_step_fit(tp_fit_res):
     fit_kernel_step = (1. + offset*amp_m*np.exp(-t_kernel/tau_m))/offset
     # FIXME -> we want to use the maximal tau here
 
-    # calculates the response of the delta function based on the kernel for the step
+    # calculates the response of the delta function based on the kernel for
+    # the step
     fit_kernel = kf.kernel_from_kernel_stepvec(fit_kernel_step)
 
     return fit_kernel, fit_kernel_step, t_kernel
-
-
 
 
 ##################################################
@@ -209,8 +206,8 @@ tvals_k = output_dict['t_kernel']
 amp_k = output_dict['kernel_step']
 
 # the fit
-#start_time_fit = .1e-6
-#end_time_fit = 9.5e-6
+# start_time_fit = .1e-6
+# end_time_fit = 9.5e-6
 start_time_fit = .01*1e-6
 end_time_fit = .09*1e-6
 fit_start = np.argmin(np.abs(tvals - start_time_fit))
@@ -227,7 +224,7 @@ fit_amps = tp_fit_res.best_fit
 vw.add(x=tvals, xlabel='Time', xunit='s',
        y=norm_amps, ylabel='Normalized amplitude', yunit='',
        symbol='o', symbolSize=5, subplot=1)
-#calling functions
+# calling functions
 fit_kernel, fit_kernel_step, t_kernel = kernel_from_step_fit(tp_fit_res)
 print(t_kernel)
 
@@ -237,7 +234,7 @@ vw.add(x=tvals_fit, xlabel='Time', xunit='s',
        y=fit_amps, ylabel='Normalized amplitude', yunit='',
        subplot=1)
 
-########## htilde
+# htilde
 # tvals_h = output_dict['t_htilde_raw']*1e-9
 # htilde_raw = output_dict['kernel_step']
 
@@ -246,12 +243,12 @@ vw.add(x=tvals_fit, xlabel='Time', xunit='s',
 #        subplot=4)
 
 
-
 # tvals_k = output_dict['t_kernel']
 # amp_k = output_dict['kernel_step']
 
 vw.add(x=tvals_k*1e-9, xlabel='Time', xunit='s',
-       y=amp_k, ylabel='Kernel amplitude', yunit='V/s', symbol='o', symbolSize=5,
+       y=amp_k, ylabel='Kernel amplitude', yunit='V/s',
+       symbol='o', symbolSize=5,
        subplot=2)
 
 vw.add(x=t_kernel, xlabel='Time', xunit='s',
@@ -259,12 +256,11 @@ vw.add(x=t_kernel, xlabel='Time', xunit='s',
        subplot=2)
 
 # convention is to use the timestamp of the scope file as a base
-#ts = filename[10:-8]
-#save_file_name = 'corr0_'+ts
+# ts = filename[10:-8]
+# save_file_name = 'corr0_'+ts
 
-#kf.save_kernel(fit_kernel, save_file=save_file_name)
-#print(save_file_name)
-
+# kf.save_kernel(fit_kernel, save_file=save_file_name)
+# print(save_file_name)
 
 
 # # Add the distortion to the kernel object
