@@ -1,22 +1,6 @@
-import matplotlib.pyplot as plt
-import sys
-sys.path.append("D:/Repository/PyCQED_py3")
 import pycqed.measurement.kernel_functions_vector as kf
 from pycqed.analysis import fitting_models as fit_mods
 import numpy as np
-from imp import reload
-
-reload(kf)
-
-
-def get_square_pulse(t, width, t0):
-    square_pulse = kf.square(t, width, t0)
-    return square_pulse
-
-
-def get_sim_kernel(t, amp, width, tau):
-    kernel_stepvec = 1. - amp*np.exp(-t/tau)
-    return kernel_stepvec
 
 
 def contains_nan(array):
@@ -33,12 +17,11 @@ def load_exp_model():
     triple_pole_mod = fit_mods.TripleExpDecayModel
     triple_pole_mod.set_param_hint('amp1', value=0.05, vary=True)
     triple_pole_mod.set_param_hint('tau1', value=.1e-6, vary=True)
-    triple_pole_mod.set_param_hint(
-        'amp2', value=0, vary=True)  # -.001, vary=True)
-    triple_pole_mod.set_param_hint('tau2', value=.1e-6, vary=True)
+    triple_pole_mod.set_param_hint('amp2', value=0, vary=False)
+    triple_pole_mod.set_param_hint('tau2', value=1e-9, vary=False)
     triple_pole_mod.set_param_hint('amp3', max=0., value=0., vary=False)
-    triple_pole_mod.set_param_hint('tau3', value=.2e-6, vary=False)
-    triple_pole_mod.set_param_hint('offset', min=0., value=1, vary=True)
+    triple_pole_mod.set_param_hint('tau3', value=1e-9, vary=False)
+    triple_pole_mod.set_param_hint('offset', min=0., value=1, vary=False)
     triple_pole_mod.set_param_hint('n', value=1, vary=False)
     my_tp_params = triple_pole_mod.make_params()
     return triple_pole_mod, my_tp_params
@@ -72,7 +55,7 @@ def fit_step(tvals, norm_amps, start_time_fit,
     # if ok with verbosity, print
     if verbose > 0:
         print(tp_fit_res.fit_report())
-    return tp_fit_res
+    return tvals_fit, tp_fit_res
 
 
 def kernel_from_step_fit(tp_fit_res, kernel_length=60000):
@@ -123,4 +106,3 @@ def kernel_from_step_fit(tp_fit_res, kernel_length=60000):
     fit_kernel = kf.kernel_from_kernel_stepvec(fit_kernel_step)
 
     return fit_kernel, fit_kernel_step, t_kernel
-
