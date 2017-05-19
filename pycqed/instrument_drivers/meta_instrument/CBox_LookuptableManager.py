@@ -28,6 +28,7 @@ class ControlBox_LookuptableManager(Instrument):
         Convert all units to SI (s and Hz instead of ns and GHz)
     Note: I did not port over the depletion pulses (MAR 7-1-2016)
     '''
+
     def __init__(self, name, **kw):
 
         logging.info(__name__ + ' : Initializing instrument')
@@ -37,7 +38,7 @@ class ControlBox_LookuptableManager(Instrument):
                            parameter_class=InstrumentParameter)
 
         self.add_parameter('awg_nr',
-                           vals=vals.Ints(0,2),
+                           vals=vals.Ints(0, 2),
                            initial_value=0,
                            parameter_class=ManualParameter)
 
@@ -74,6 +75,11 @@ class ControlBox_LookuptableManager(Instrument):
         self.add_parameter('Q_modulation', vals=vals.Numbers(), unit='Hz',
                            parameter_class=ManualParameter,
                            initial_value=20.0e6)
+        self.add_parameter('Q_Rphi', label='Phase of Rphi pulse',
+                           vals=vals.Numbers(), unit='deg',
+                           parameter_class=ManualParameter,
+                           initial_value=0)
+
         self.add_parameter('sampling_rate', vals=vals.Numbers(), unit='Hz',
                            parameter_class=ManualParameter,
                            initial_value=0.2e9)
@@ -203,6 +209,19 @@ class ControlBox_LookuptableManager(Instrument):
                                  motzoi=self.get('Q_motzoi_parameter'),
                                  sampling_rate=self.get('sampling_rate'),
                                  Q_phase_delay=self.get('mixer_IQ_phase_skewness'))
+
+        Wave_Rphi180 = wf.mod_gauss(self.get('Q_amp180'), self.Q_gauss_width(),
+                                    self.get('Q_modulation'), phase=self.Q_Rphi(),
+                                    motzoi=self.get('Q_motzoi_parameter'),
+                                    sampling_rate=self.get('sampling_rate'),
+                                    Q_phase_delay=self.get('mixer_IQ_phase_skewness'))
+
+        Wave_Rphi90 = wf.mod_gauss(self.get('Q_amp90'), self.Q_gauss_width(),
+                                   self.get('Q_modulation'), phase=self.Q_Rphi(),
+                                   motzoi=self.get('Q_motzoi_parameter'),
+                                   sampling_rate=self.get('sampling_rate'),
+                                   Q_phase_delay=self.get('mixer_IQ_phase_skewness'))
+
         Block = wf.block_pulse(self.get('Q_ampCW'), self.Q_block_length.get(),  # ns
                                sampling_rate=self.get('sampling_rate'),
                                delay=0,
@@ -271,6 +290,7 @@ class ControlBox_LookuptableManager(Instrument):
                            'X180': Wave_X_180, 'Y180': Wave_Y_180,
                            'X90': Wave_X_90, 'Y90': Wave_Y_90,
                            'mX90': Wave_mX90, 'mY90': Wave_mY90,
+                           'Rphi90': Wave_Rphi90, 'Rphi180': Wave_Rphi180,
                            'Block': Block,
                            'ModBlock': ModBlock,
                            'M_square': Mod_M,
@@ -372,4 +392,3 @@ class ControlBox_LookuptableManager(Instrument):
                                                       int(i), I_ch, I_wave)
             self.CBox.get_instr().set_awg_lookuptable(self.awg_nr(),
                                                       int(i), Q_ch, Q_wave)
-

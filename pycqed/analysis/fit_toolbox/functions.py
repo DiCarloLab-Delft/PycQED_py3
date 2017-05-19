@@ -205,4 +205,4 @@ def PSD(array, time_step):
     period = time_step*len(array)
     psd = time_step*time_step/period*(np.abs(np.fft.fft(array)))**2
     psd = psd[idx]
-    return f_axis[len(psd)/2:], psd[len(psd)/2:]
+    return f_axis[len(psd)//2:], psd[len(psd)//2:]
