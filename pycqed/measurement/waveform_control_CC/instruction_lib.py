@@ -16,6 +16,10 @@ def trigg_cw(channel):
 def qwg_cw_trigger(codeword,
                    trigger_channel=1, cw_channels=np.array([2, 3, 4])):
 
+    if codeword > 2**len(cw_channels)-1:
+        raise ValueError('Codeword {} out of range. '
+                         + 'Available codewords are 0 - {} using {} channels.'
+                         .format(2**len(cw_channels) - 1, len(cw_channels)))
     cw = int_to_bin(codeword, w=len(cw_channels), lsb_last=False)
     cw_marker = ['0']*7
     for i, cw_bit in enumerate(cw):
