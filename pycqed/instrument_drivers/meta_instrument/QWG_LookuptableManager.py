@@ -404,6 +404,7 @@ class QWG_FluxLookuptableManager(Instrument):
                 pulse_name, regenerate_pulse=False)
         self.QWG.get_instr().start()
         self.QWG.get_instr().getOperationComplete()
+        print('DEBUG: pulses loaded onto QWG')
 
     def render_wave(self, wave_name, show=True, QtPlot_win=None):
         '''
