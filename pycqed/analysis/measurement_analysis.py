@@ -460,7 +460,6 @@ class MeasurementAnalysis(object):
                 self.save_fig(fig, xlabel=xlabel, ylabel=ylabel, **kw)
         return
 
-
     def plot_complex_results(self, cmp_data, fig, ax, show=False, marker='.', **kw):
         '''
         Plot real and imaginary values measured vs a sweeped parameter
@@ -486,7 +485,6 @@ class MeasurementAnalysis(object):
             self.save_fig(fig, xlabel=xlabel, ylabel=ylabel, **kw)
 
         return
-
 
     def plot_dB_from_linear(self, x, lin_amp, fig, ax, show=False, marker='.', **kw):
         '''
@@ -514,7 +512,6 @@ class MeasurementAnalysis(object):
             self.save_fig(fig, xlabel=xlabel, ylabel=ylabel, **kw)
 
         return
-
 
     def get_naming_and_values_2D(self):
         '''
@@ -1195,12 +1192,14 @@ class Rabi_Analysis(TD_Analysis):
 
             fine_fit = self.fit_res[i].model.func(
                 x_fine, **self.fit_res[i].best_values)
-            #adding the fitted amp180
+            # adding the fitted amp180
             if 'period' in self.fit_res[i].params.keys():
-                label='amp180 = {:.3e}'.format(abs(self.fit_res[i].params['period'].value)/2)
+                label = 'amp180 = {:.3e}'.format(
+                    abs(self.fit_res[i].params['period'].value)/2)
             else:
-                label='amp180 = {:.3e}'.format(abs(self.fit_res[i].params['x0'].value))
-            self.axs[i].plot(x_fine, fine_fit,label=label )
+                label = 'amp180 = {:.3e}'.format(
+                    abs(self.fit_res[i].params['x0'].value))
+            self.axs[i].plot(x_fine, fine_fit, label=label)
             ymin = min(self.measured_values[i])
             ymax = max(self.measured_values[i])
             yspan = ymax-ymin
@@ -1222,11 +1221,11 @@ class Rabi_Analysis(TD_Analysis):
         # We make an initial guess of the Rabi period using both quadratures
         data = np.sqrt(self.measured_values[0]**2+self.measured_values[1]**2)
         params = model.guess(model, data=data,
-                                 t=self.sweep_points)
+                             t=self.sweep_points)
         fit_res = fit_mods.CosModel.fit(
-                data=data,
-                t=self.sweep_points,
-                params=params)
+            data=data,
+            t=self.sweep_points,
+            params=params)
         freq_guess = fit_res.values['frequency']
         for i in [0, 1]:
             params = model.guess(model, data=self.measured_values[i],
@@ -3695,7 +3694,7 @@ class Homodyne_Analysis(MeasurementAnalysis):
             # NB! Expressions are broken in lmfit for python 3.5 this has
             # been fixed in the lmfit repository but is not yet released
             # the newest upgrade to lmfit should fix this (MAR 18-2-2016)
-            HangerModel.set_param_hint('Qi', expr='1./(1./Q-1./Qe*cos(theta))',
+            HangerModel.set_param_hint('Qi', expr='abs(1./(1./Q-1./Qe*cos(theta)))',
                                        vary=False)
             HangerModel.set_param_hint('Qc', expr='Qe/cos(theta)', vary=False)
             HangerModel.set_param_hint('theta', value=0, min=-np.pi/2,
@@ -3801,7 +3800,7 @@ class Homodyne_Analysis(MeasurementAnalysis):
 
         fig, ax = self.default_ax()
 
-        if 'hanger' in fitting_model:
+        if ('hanger' in fitting_model) or ('complex' in fitting_model):
             textstr = '$f_{\mathrm{center}}$ = %.4f $\pm$ (%.3g) GHz' % (
                 fit_res.params['f0'].value, fit_res.params['f0'].stderr) + '\n' \
                 '$Qc$ = %.1f $\pm$ (%.1f)' % (fit_res.params['Qc'].value, fit_res.params['Qc'].stderr) + '\n' \
@@ -3867,7 +3866,7 @@ class Homodyne_Analysis(MeasurementAnalysis):
         else:
             ax.plot(self.sweep_points, fit_res.best_fit, 'r-')
             f0 = self.fit_results.values['f0']
-            plt.plot(f0, fit_res.eval(f=f0), 'o', ms=8)
+            plt.plot(f0*1e9, fit_res.eval(f=f0*1e9), 'o', ms=8)
 
             # save figure
             self.save_fig(fig, xlabel=self.xlabel, ylabel='Mag', **kw)
@@ -3887,6 +3886,7 @@ class VNA_Analysis(MeasurementAnalysis):
     '''
     Nice to use with all measurements performed with the VNA.
     '''
+
     def __init__(self, label='VNA', **kw):
         kw['label'] = label
         kw['h5mode'] = 'r+'
@@ -3896,21 +3896,20 @@ class VNA_Analysis(MeasurementAnalysis):
         super(self.__class__, self).run_default_analysis(
             close_file=False, **kw)
 
-
         # prepare figure in log scale
         data_amp = self.measured_values[0]
 
         fig, ax = self.default_ax()
         self.plot_dB_from_linear(x=self.sweep_points,
-                                lin_amp=data_amp,
-                                fig=fig, ax=ax,
-                                save=False)
+                                 lin_amp=data_amp,
+                                 fig=fig, ax=ax,
+                                 save=False)
 
         self.save_fig(fig, figname='dB_plot', **kw)
 
 
-
 class Acquisition_Delay_Analysis(MeasurementAnalysis):
+
     def __init__(self, label='AD', **kw):
         kw['label'] = label
         kw['h5mode'] = 'r+'
@@ -5611,9 +5610,9 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
         flux = self.Y[:, 0]
         peaks_low, peaks_high = self.find_peaks()
         self.f, self.ax = self.make_unfiltered_figure(peaks_low, peaks_high,
-                                    transpose=transpose, cmap=cmap,
-                                    add_title=add_title,
-                                    xlabel=xlabel, ylabel=ylabel)
+                                                      transpose=transpose, cmap=cmap,
+                                                      add_title=add_title,
+                                                      xlabel=xlabel, ylabel=ylabel)
 
         filtered_dat = self.filter_data(flux, peaks_low, peaks_high,
                                         a=filt_func_a, x0=filt_func_x0,
@@ -5625,10 +5624,10 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
             filter_func = filtered_dat
 
         self.f, self.ax = self.make_filtered_figure(filt_flux_low, filt_flux_high,
-                                  filt_peaks_low, filt_peaks_high, filter_func,
-                                  add_title=add_title,
-                                  transpose=transpose, cmap=cmap,
-                                  xlabel=xlabel, ylabel=ylabel)
+                                                    filt_peaks_low, filt_peaks_high, filter_func,
+                                                    add_title=add_title,
+                                                    transpose=transpose, cmap=cmap,
+                                                    xlabel=xlabel, ylabel=ylabel)
         if break_before_fitting:
             return
         self.fit_res = self.fit_avoided_crossing(
@@ -5639,13 +5638,12 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
         self.add_analysis_datagroup_to_file()
         self.save_fitted_parameters(self.fit_res, var_name='avoided crossing')
         self.f, self.ax = self.make_fit_figure(filt_flux_low, filt_flux_high,
-                             filt_peaks_low, filt_peaks_high,
-                             add_title=add_title,
-                             fit_res=self.fit_res,
-                             coupling_label=coupling_label,
-                             transpose=transpose, cmap=cmap,
-                             xlabel=xlabel, ylabel=ylabel)
-
+                                               filt_peaks_low, filt_peaks_high,
+                                               add_title=add_title,
+                                               fit_res=self.fit_res,
+                                               coupling_label=coupling_label,
+                                               transpose=transpose, cmap=cmap,
+                                               xlabel=xlabel, ylabel=ylabel)
 
     def run_default_analysis(self, **kw):
         # I'm doing this in the init in this function
