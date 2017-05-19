@@ -103,8 +103,9 @@ class MeasurementAnalysis(object):
         if fig is None:
             fig = self.default_fig(*arg, **kw)
         ax = fig.add_subplot(111)
-        ax.set_title(self.timestamp_string+'\n'+self.measurementstring)
+        #ax.set_title(self.timestamp_string+'\n'+self.measurementstring)
         ax.ticklabel_format(useOffset=False)
+
         return fig, ax
 
     def save_fig(self, fig, figname=None, xlabel='x', ylabel='y',
@@ -479,14 +480,16 @@ class MeasurementAnalysis(object):
                              % datasaving_format)
 
     def plot_results_vs_sweepparam(self, x, y, fig, ax, show=False, marker='-o',
-                                   log=False, label=None, **kw):
+                                   log=False, ticks_around=True, label=None, **kw):
         save = kw.pop('save', False)
+        title_font_size = kw.get('title_font_size',13)
         self.plot_title = kw.pop('plot_title',
                                  textwrap.fill(self.timestamp_string + '_' +
                                                self.measurementstring, 40))
         xlabel = kw.pop('xlabel', None)
         ylabel = kw.pop('ylabel', None)
-        ax.set_title(self.plot_title)
+        #ax.set_title(self.plot_title)
+        fig.suptitle(self.plot_title,fontsize=title_font_size,horizontalalignment ='center')
         if xlabel is not None:
             ax.set_xlabel(xlabel)
         if ylabel is not None:
@@ -494,6 +497,12 @@ class MeasurementAnalysis(object):
         ax.plot(x, y, marker, label=label)
         if log:
             ax.set_yscale('log')
+
+        #set axes on top and to the right of plot as well
+        if ticks_around:
+            ax.xaxis.set_tick_params(labeltop='on',top='on',direction='in')
+            ax.yaxis.set_tick_params(labeltop='on',top='on',direction='in')
+
         if show:
             plt.show()
         if save:
@@ -541,8 +550,9 @@ class MeasurementAnalysis(object):
                                                 dict(args=['visible', [False, False, True, False]],
                                                      label='init_fit',
                                                      method='restyle') ] ) ) ] ),
-                      xaxis=dict(title=xlabel,showexponent=show_exponent,exponentformat=exponent_format),
-                      yaxis=dict(title=ylabel))
+                      xaxis=dict(title=xlabel,showexponent=show_exponent,exponentformat=exponent_format,
+                                 ticks='inside',mirror='ticks',showline=True),
+                      yaxis=dict(title=ylabel,ticks='inside',mirror='ticks',showline=True))
 
         fig = Figure(data=data, layout=layout)
 
@@ -1359,7 +1369,8 @@ class Rabi_Analysis_new(TD_Analysis):
                                             fig=fig2, ax=ax2,
                                             xlabel=self.xlabel,
                                             ylabel=self.ylabels[i],
-                                            save=False)
+                                            save=False,
+                                            ticks_around=False)
 
         if show:
             plt.show()
@@ -1389,7 +1400,8 @@ class Rabi_Analysis_new(TD_Analysis):
                                         fig=fig, ax=ax,
                                         xlabel=self.xlabel,
                                         ylabel=ylabel,
-                                        save=False)
+                                        save=False,
+                                        title_font_size=20)
 
         best_vals = self.fit_res.best_values
         #Used for plotting the fit (line 1433)
@@ -3314,7 +3326,8 @@ class Ramsey_Analysis(TD_Analysis):
                                         fig=fig, ax=ax,
                                         xlabel=xlabel,
                                         ylabel=ylabel,
-                                        save=False)
+                                        save=False,
+                                        title_font_size=20)
 
         x = np.linspace(self.sweep_points[0],
                         self.sweep_points[-self.NoCalPoints],
@@ -3375,7 +3388,8 @@ class Ramsey_Analysis(TD_Analysis):
                                             fig=fig2, ax=ax2,
                                             xlabel=self.xlabel,
                                             ylabel=self.ylabels[i],
-                                            save=False)
+                                            save=False,
+                                            ticks_around=False)
 
         stepsize = self.sweep_points[1] - self.sweep_points[0]
         self.total_detuning = self.fit_res.params['frequency'].value
@@ -4390,7 +4404,8 @@ class Homodyne_Analysis(MeasurementAnalysis):
                                             fig=fig, ax=ax,
                                             xlabel=self.xlabel,
                                             ylabel=str('S21_mag (arb. units)'),
-                                            save=False)
+                                            save=False,
+                                            title_font_size=20)
 
             if interactive_plot:
                 self.plotly_plot(self.sweep_points*1e-9,self.data_y,fit_res,
@@ -4405,7 +4420,8 @@ class Homodyne_Analysis(MeasurementAnalysis):
             ax2.text(0.05, 0.95, textstr, transform=ax.transAxes, fontsize=11,
                      verticalalignment='top', bbox=self.box_props)
             self.plot_results_vs_sweepparam(x=self.sweep_points, y=data_amp,
-                                            fig=fig2, ax=ax2, show=False, save=False)
+                                            fig=fig2, ax=ax2, show=False, save=False,
+                                            title_font_size=20)
 
         elif fitting_model == 'lorentzian':
             self.plot_results_vs_sweepparam(x=self.sweep_points*1e-9,
@@ -4413,7 +4429,8 @@ class Homodyne_Analysis(MeasurementAnalysis):
                                             fig=fig, ax=ax,
                                             xlabel=self.xlabel,
                                             ylabel=str('Power (arb. units)'),
-                                            save=False)
+                                            save=False,
+                                            title_font_size=20)
             if interactive_plot:
                 self.plotly_plot(self.sweep_points*1e-9,self.measured_powers,fit_res,
                                  xlabel=self.xlabel,ylabel=str('Power (arb. units)'),
@@ -4888,7 +4905,8 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
                                             fig=fig, ax=ax,
                                             xlabel='Frequency (GHz)',
                                             ylabel=self.ylabels[k],
-                                            save=False)
+                                            save=False,
+                                            ticks_around=False)
         if show:
             plt.show()
         self.save_fig(fig, figname=self.savename, **kw)
@@ -4912,7 +4930,8 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
                                         xlabel='Frequency (GHz)',
                                         ylabel='S21 distance (V)',
                                         label=False,
-                                        save=False)
+                                        save=False,
+                                        title_font_size=20)
         ax_dist.plot(self.sweep_points, self.fit_res.best_fit, 'r-')      #plot Lorentzian with the fit results
         ax_dist.plot(f0, self.fit_res.best_fit[f0_idx], 'o', ms=8)
         if analyze_ef:                                               #plot the ef/2 point as well
