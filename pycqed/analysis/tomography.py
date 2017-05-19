@@ -604,7 +604,7 @@ def rotated_bell_state(dummy_x, angle_MSQ, angle_LSQ,
     return state
 
 
-class Tomo_Multiplexed(object):
+class Tomo_Multiplexed(ma.MeasurementAnalysis):
 
     def __init__(self, auto=True, label='', timestamp=None,
                  MLE=False, target_cardinal=None, target_bell=None,
@@ -613,7 +613,7 @@ class Tomo_Multiplexed(object):
                  single_shots=True,
                  fig_format='png',
                  q0_label='q0',
-                 q1_label='q1', close_fig=True):
+                 q1_label='q1', close_fig=True, **kw):
         self.label = label
         self.timestamp = timestamp
         self.target_cardinal = target_cardinal
@@ -627,27 +627,26 @@ class Tomo_Multiplexed(object):
         self.q1_label = q1_label
         self.close_fig = close_fig
         self.single_shots = single_shots
-        if auto is True:
-            self.run_default_analysis()
+        kw['h5mode'] = 'r+'
+        super(Tomo_Multiplexed, self).__init__(auto=auto, timestamp=timestamp,
+                                               label=label, **kw)
+        # if auto is True:
+        #     self.run_default_analysis()
 
-    def run_default_analysis(self):
-        a = ma.MeasurementAnalysis(auto=False, label=self.label,
-                                   timestamp=self.timestamp)
-        a.get_naming_and_values()
-        self.t_stamp = a.timestamp_string
-        self.savefolder = a.folder
+    def run_default_analysis(self, **kw):
+        self.get_naming_and_values()
         # hard coded number of segments for a 2 qubit state tomography
         # constraint imposed by UHFLI
         self.nr_segments = 64
-        self.exp_name = os.path.split(self.savefolder)[-1][7:]
+        self.exp_name = os.path.split(self.folder)[-1][7:]
         if self.single_shots:
             self.shots_q0 = np.zeros(
-                (self.nr_segments, int(len(a.measured_values[0])/self.nr_segments)))
+                (self.nr_segments, int(len(self.measured_values[0])/self.nr_segments)))
             self.shots_q1 = np.zeros(
-                (self.nr_segments, int(len(a.measured_values[1])/self.nr_segments)))
+                (self.nr_segments, int(len(self.measured_values[1])/self.nr_segments)))
             for i in range(self.nr_segments):
-                self.shots_q0[i, :] = a.measured_values[0][i::self.nr_segments]
-                self.shots_q1[i, :] = a.measured_values[1][i::self.nr_segments]
+                self.shots_q0[i, :] = self.measured_values[0][i::self.nr_segments]
+                self.shots_q1[i, :] = self.measured_values[1][i::self.nr_segments]
 
             # Get correlations between shots
             self.shots_q0q1 = np.multiply(self.shots_q1, self.shots_q0)
@@ -655,7 +654,8 @@ class Tomo_Multiplexed(object):
             if self.start_shot != 0 or self.end_shot != -1:
                 self.shots_q0 = self.shots_q0[:, self.start_shot:self.end_shot]
                 self.shots_q1 = self.shots_q1[:, self.start_shot:self.end_shot]
-                self.shots_q0q1 = self.shots_q0q1[:, self.start_shot:self.end_shot]
+                self.shots_q0q1 = self.shots_q0q1[
+                    :, self.start_shot:self.end_shot]
             ##########################################
             # Making  the first figure, tomo shots
             ##########################################
@@ -664,11 +664,9 @@ class Tomo_Multiplexed(object):
             avg_h2 = np.mean(self.shots_q1, axis=1)
             avg_h12 = np.mean(self.shots_q0q1, axis=1)
         else:
-            avg_h1 = a.measured_values[0]
-            avg_h2 = a.measured_values[1]
-            avg_h12 = a.measured_values[2]
-
-
+            avg_h1 = self.measured_values[0]
+            avg_h2 = self.measured_values[1]
+            avg_h12 = self.measured_values[2]
 
         # Binning all the points required for the tomo
         h1_00 = np.mean(avg_h1[36:36+7])
@@ -686,35 +684,28 @@ class Tomo_Multiplexed(object):
         h12_10 = np.mean(avg_h12[50:50+7])
         h12_11 = np.mean(avg_h12[57:])
 
-
-
         # std_arr = np.array( std_h2_00, std_h2_01, std_h2_10, std_h2_11, std_h12_00, std_h12_01, std_h12_10, std_h12_11])
         # plt.plot(std_arr)
         # plt.show()
-
 
         # Substract avg of all traces
 
         mean_h1 = (h1_00+h1_10+h1_01+h1_11)/4
         mean_h2 = (h2_00+h2_01+h2_10+h2_11)/4
-        mean_h12 =(h12_00+h12_11+h12_01+h12_10)/4
+        mean_h12 = (h12_00+h12_11+h12_01+h12_10)/4
 
-        avg_h1-=mean_h1;
-        avg_h2-=mean_h2;
-        avg_h12-=mean_h12;
+        avg_h1 -= mean_h1
+        avg_h2 -= mean_h2
+        avg_h12 -= mean_h12
 
         scale_h1 = (h1_00+h1_10-h1_01-h1_11)/4
         scale_h2 = (h2_00+h2_01-h2_10-h2_11)/4
-        scale_h12 =(h12_00+h12_11-h12_01-h12_10)/4
-
-
+        scale_h12 = (h12_00+h12_11-h12_01-h12_10)/4
 
         avg_h1 = (avg_h1)/scale_h1
         avg_h2 = (avg_h2)/scale_h2
         avg_h12 = (avg_h12)/scale_h12
         # dived by scalefactor
-
-
 
         # key for next step
         h1_00 = np.mean(avg_h1[36:36+7])
@@ -750,7 +741,8 @@ class Tomo_Multiplexed(object):
         std_h1 = np.mean([std_h1_00, std_h1_01, std_h1_10, std_h1_11])
         std_h2 = np.mean([std_h2_00, std_h2_01, std_h2_10, std_h2_11])
         std_h12 = np.mean([std_h12_00, std_h12_01, std_h12_10, std_h12_11])
-        std_arr = np.array([std_h1_00, std_h1_01, std_h1_10, std_h1_11, std_h2_00, std_h2_01, std_h2_10, std_h2_11, std_h12_00, std_h12_01, std_h12_10, std_h12_11])
+        std_arr = np.array([std_h1_00, std_h1_01, std_h1_10, std_h1_11, std_h2_00, std_h2_01,
+                            std_h2_10, std_h2_11, std_h12_00, std_h12_01, std_h12_10, std_h12_11])
 
         # plt.plot([std_h1, std_h2, std_h12])
         # plt.plot(std_arr)
@@ -862,12 +854,21 @@ class Tomo_Multiplexed(object):
         if self.MLE:
             self.plot_MLE()
 
+        try:
+            self.add_analysis_datagroup_to_file()
+            self.save_fitted_parameters(fit_res=self.fit_res,
+                                        var_name='MLE')
+        except Exception as e:
+            logging.warning(e)
+
+        self.data_file.close()
+
     def plot_TV_mode(self, avg_h0, avg_h1, avg_h01):
 
         figname = 'Tomography_shots_Exp_{}.{}'.format(self.exp_name,
                                                       self.fig_format)
         fig1, axs = plt.subplots(1, 3, figsize=(17, 4))
-        fig1.suptitle(self.exp_name+' ' + self.t_stamp, size=16)
+        fig1.suptitle(self.exp_name+' ' + self.timestamp_string, size=16)
         ax = axs[0]
         ax.plot(np.arange(self.nr_segments), avg_h0,
                 'o-')
@@ -881,7 +882,7 @@ class Tomo_Multiplexed(object):
                 'o-')
         ax.set_title('Correlations {}-{}'.format(self.q0_label, self.q1_label))
         savename = os.path.abspath(os.path.join(
-            self.savefolder, figname))
+            self.folder, figname))
         # value of 450dpi is arbitrary but higher than default
         fig1.savefig(savename, format=self.fig_format, dpi=450)
         if self.close_fig:
@@ -933,9 +934,9 @@ class Tomo_Multiplexed(object):
 
         figname = 'LI-Tomography_Exp_{}.{}'.format(self.exp_name,
                                                    self.fig_format)
-        fig2.suptitle(self.exp_name+' ' + self.t_stamp, size=16)
+        fig2.suptitle(self.exp_name+' ' + self.timestamp_string, size=16)
         savename = os.path.abspath(os.path.join(
-            self.savefolder, figname))
+            self.folder, figname))
         # value of 450dpi is arbitrary but higher than default
         fig2.savefig(savename, format=self.fig_format, dpi=450)
         if self.close_fig:
@@ -986,9 +987,9 @@ class Tomo_Multiplexed(object):
 
         figname = 'MLE-Tomography_Exp_{}.{}'.format(self.exp_name,
                                                     self.fig_format)
-        fig3.suptitle(self.exp_name+' ' + self.t_stamp, size=16)
+        fig3.suptitle(self.exp_name+' ' + self.timestamp_string, size=16)
         savename = os.path.abspath(os.path.join(
-            self.savefolder, figname))
+            self.folder, figname))
         # value of 450dpi is arbitrary but higher than default
         fig3.savefig(savename, format=self.fig_format, dpi=450)
         if self.close_fig:
@@ -1014,9 +1015,9 @@ class Tomo_Multiplexed(object):
         ax.text(0.5, .6, msg)
         figname = 'Fit_report_{}.{}'.format(self.exp_name,
                                             self.fig_format)
-        fig2.suptitle(self.exp_name+' ' + self.t_stamp, size=16)
+        fig2.suptitle(self.exp_name+' ' + self.timestamp_string, size=16)
         savename = os.path.abspath(os.path.join(
-            self.savefolder, figname))
+            self.folder, figname))
         # value of 450dpi is arbitrary but higher than default
         fig2.savefig(savename, format=self.fig_format, dpi=450)
         if self.close_fig:
@@ -1032,9 +1033,9 @@ class Tomo_Multiplexed(object):
         ax.text(0.5, .6, msg)
         figname = 'Fit_report_{}.{}'.format(self.exp_name,
                                             self.fig_format)
-        fig2.suptitle(self.exp_name+' ' + self.t_stamp, size=16)
+        fig2.suptitle(self.exp_name+' ' + self.timestamp_string, size=16)
         savename = os.path.abspath(os.path.join(
-            self.savefolder, figname))
+            self.folder, figname))
         # value of 450dpi is arbitrary but higher than default
         fig2.savefig(savename, format=self.fig_format, dpi=450)
         if self.close_fig:
