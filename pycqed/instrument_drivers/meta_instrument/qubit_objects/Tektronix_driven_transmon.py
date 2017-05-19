@@ -59,7 +59,8 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
 
         self.add_parameter('AWG', parameter_class=InstrumentParameter)
 
-        self.add_parameter('heterodyne_instr', parameter_class=InstrumentParameter)
+        self.add_parameter('heterodyne_instr',
+                           parameter_class=InstrumentParameter)
 
         self.add_parameter('LutMan', parameter_class=InstrumentParameter)
         self.add_parameter('CBox', parameter_class=InstrumentParameter)
@@ -67,7 +68,6 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
 
         self.add_parameter('RF_RO_source',
                            parameter_class=InstrumentParameter)
-
 
         self.add_parameter('mod_amp_cw', label='RO modulation ampl cw',
                            unit='V', initial_value=0.5,
@@ -251,9 +251,19 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
     def get_dist_dict(self):
         return self._dist_dict
 
-
     def set_dist_dict(self, dist_dict):
         self._dist_dict = dist_dict
+
+    def move_to_dac_value(self, dac_value):
+        '''
+        Moves the dac value defined in qubit.dac_channel to the defined value
+        and updates the qubit.dac_voltage
+        '''
+        # move IVVI
+        dac_id = 'dac%s'%(self.dac_channel())
+        self.IVVI.get_instr().set(dac_id, dac_value)
+        # store info
+        self.dac_voltage(dac_value)
 
     def prepare_for_continuous_wave(self):
         # makes sure the settings of the acquisition instrument are reloaded
@@ -279,7 +289,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         self.heterodyne_instr.get_instr().RF_power(self.RO_power_cw())
         self.heterodyne_instr.get_instr().nr_averages(self.RO_acq_averages())
         # Turning of TD source
-        if self.td_source() is not  'None':
+        if self.td_source() is not 'None':
             self.td_source.get_instr().off()
 
         # Updating Spec source
@@ -963,29 +973,29 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
 
         self._acquisition_instr = self.find_instrument(acquisition_instr)
         if 'CBox' in acquisition_instr:
-            if self.AWG()!='None':
-              logging.info("setting CBox acquisition")
-              print('starting int avg')
-              self.int_avg_det = det.CBox_integrated_average_detector(self._acquisition_instr,
-                                                                      self.AWG.get_instr(),
-                                                                      nr_averages=self.RO_acq_averages(),
-                                                                      integration_length=self.RO_acq_integration_length(
-                                                                      ),
-                                                                      normalize=True)
-              print('starting int avg rot')
-              self.int_avg_det_rot = det.CBox_integrated_average_detector(self._acquisition_instr,
-                                                                          self.AWG.get_instr(),
-                                                                          nr_averages=self.RO_acq_averages(),
-                                                                          integration_length=self.RO_acq_integration_length(
-                                                                          ),
-                                                                          normalize=True)
-              print('starting int log det')
-              self.int_log_det = det.CBox_integration_logging_det(self._acquisition_instr,
-                                                                  self.AWG.get_instr(), integration_length=self.RO_acq_integration_length())
+            if self.AWG() != 'None':
+                logging.info("setting CBox acquisition")
+                print('starting int avg')
+                self.int_avg_det = det.CBox_integrated_average_detector(self._acquisition_instr,
+                                                                        self.AWG.get_instr(),
+                                                                        nr_averages=self.RO_acq_averages(),
+                                                                        integration_length=self.RO_acq_integration_length(
+                                                                        ),
+                                                                        normalize=True)
+                print('starting int avg rot')
+                self.int_avg_det_rot = det.CBox_integrated_average_detector(self._acquisition_instr,
+                                                                            self.AWG.get_instr(),
+                                                                            nr_averages=self.RO_acq_averages(),
+                                                                            integration_length=self.RO_acq_integration_length(
+                                                                            ),
+                                                                            normalize=True)
+                print('starting int log det')
+                self.int_log_det = det.CBox_integration_logging_det(self._acquisition_instr,
+                                                                    self.AWG.get_instr(), integration_length=self.RO_acq_integration_length())
 
-              self.input_average_detector = det.CBox_input_average_detector(
-                  self._acquisition_instr,
-                  self.AWG.get_instr(), nr_averages=self.RO_acq_averages())
+                self.input_average_detector = det.CBox_input_average_detector(
+                    self._acquisition_instr,
+                    self.AWG.get_instr(), nr_averages=self.RO_acq_averages())
 
         elif 'UHFQC' in acquisition_instr:
             logging.info("setting UHFQC acquisition")
@@ -1019,11 +1029,11 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                 AWG=self.AWG, nr_averages=self.RO_acq_averages())
 
             self.int_avg_det = det.DDM_integrated_average_detector(
-                    DDM=self._acquisition_instr, AWG=self.AWG,
-                    channels=[self.RO_acq_weight_function_I(),
-                              self.RO_acq_weight_function_Q()],
-                    nr_averages=self.RO_acq_averages(),
-                    integration_length=self.RO_acq_integration_length())
+                DDM=self._acquisition_instr, AWG=self.AWG,
+                channels=[self.RO_acq_weight_function_I(),
+                          self.RO_acq_weight_function_Q()],
+                nr_averages=self.RO_acq_averages(),
+                integration_length=self.RO_acq_integration_length())
 
             self.int_log_det = det.DDM_integration_logging_det(
                 DDM=self._acquisition_instr, AWG=self.AWG,
@@ -1037,11 +1047,11 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                 AWG=self.AWG, nr_averages=self.RO_acq_averages())
 
             self.int_avg_det = det.DDM_integrated_average_detector(
-                    DDM=self._acquisition_instr, AWG=self.AWG,
-                    channels=[self.RO_acq_weight_function_I(),
-                              self.RO_acq_weight_function_Q()],
-                    nr_averages=self.RO_acq_averages(),
-                    integration_length=self.RO_acq_integration_length())
+                DDM=self._acquisition_instr, AWG=self.AWG,
+                channels=[self.RO_acq_weight_function_I(),
+                          self.RO_acq_weight_function_Q()],
+                nr_averages=self.RO_acq_averages(),
+                integration_length=self.RO_acq_integration_length())
 
             self.int_log_det = det.DDM_integration_logging_det(
                 DDM=self._acquisition_instr, AWG=self.AWG,
