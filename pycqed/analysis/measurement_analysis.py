@@ -30,6 +30,7 @@ from pycqed.analysis import composite_analysis as ca
 
 try:
     import qutip as qtp
+
 except ImportError as e:
     if str(e).find('qutip') >= 0:
         logging.warning('Could not import qutip')
