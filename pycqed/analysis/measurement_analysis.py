@@ -461,13 +461,14 @@ class MeasurementAnalysis(object):
                 self.save_fig(fig, xlabel=xlabel, ylabel=ylabel, **kw)
         return
 
+
     def plot_complex_results(self, cmp_data, fig, ax, show=False, marker='.', **kw):
         '''
         Plot real and imaginary values measured vs a sweeped parameter
         Example: complex S21 of a resonator
 
         Author: Stefano Poletto
-        Data: November 15, 2016
+        Date: November 15, 2016
         '''
         save = kw.pop('save', False)
         self.plot_title = kw.pop('plot_title',
@@ -486,6 +487,35 @@ class MeasurementAnalysis(object):
             self.save_fig(fig, xlabel=xlabel, ylabel=ylabel, **kw)
 
         return
+
+
+    def plot_dB_from_linear(self, x, lin_amp, fig, ax, show=False, marker='.', **kw):
+        '''
+        Plot linear data in dB.
+        This is usefull for measurements performed with VNA and Homodyne
+
+        Author: Stefano Poletto
+        Date: May 5, 2017
+        '''
+        save = kw.pop('save', False)
+        self.plot_title = kw.pop('plot_title',
+                                 textwrap.fill(self.timestamp_string + '_' +
+                                               self.measurementstring, 40))
+
+        xlabel = 'Freq'
+        ylabel = 'Transmission (dB)'
+        ax.set_title(self.plot_title)
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel(ylabel)
+        y_dB = 20*np.log10(lin_amp)
+        ax.plot(x, y_dB, marker)
+        if show:
+            plt.show()
+        if save:
+            self.save_fig(fig, xlabel=xlabel, ylabel=ylabel, **kw)
+
+        return
+
 
     def get_naming_and_values_2D(self):
         '''
@@ -3851,6 +3881,36 @@ class Homodyne_Analysis(MeasurementAnalysis):
         return fit_res
 
 
+################
+# VNA analysis #
+################
+class VNA_Analysis(MeasurementAnalysis):
+    '''
+    Nice to use with all measurements performed with the VNA.
+    '''
+    def __init__(self, label='VNA', **kw):
+        kw['label'] = label
+        kw['h5mode'] = 'r+'
+        super().__init__(**kw)
+
+    def run_default_analysis(self, **kw):
+        super(self.__class__, self).run_default_analysis(
+            close_file=False, **kw)
+
+
+        # prepare figure in log scale
+        data_amp = self.measured_values[0]
+
+        fig, ax = self.default_ax()
+        self.plot_dB_from_linear(x=self.sweep_points,
+                                lin_amp=data_amp,
+                                fig=fig, ax=ax,
+                                save=False)
+
+        self.save_fig(fig, figname='dB_plot', **kw)
+
+
+
 class Acquisition_Delay_Analysis(MeasurementAnalysis):
     def __init__(self, label='AD', **kw):
         kw['label'] = label
@@ -3901,6 +3961,7 @@ class Acquisition_Delay_Analysis(MeasurementAnalysis):
             self.data_file.close()
 
         return self.max_delay
+
 
 class Hanger_Analysis_CosBackground(MeasurementAnalysis):
 
