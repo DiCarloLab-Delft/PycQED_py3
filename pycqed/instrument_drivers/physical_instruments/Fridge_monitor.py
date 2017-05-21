@@ -3,9 +3,9 @@ import logging
 from qcodes.instrument.base import Instrument
 from qcodes.utils import validators as vals
 from qcodes.instrument.parameter import ManualParameter
-
+from dateutil.parser import parse
 from time import time
-
+from datetime import datetime
 from urllib.request import urlopen
 import re  # used for string parsing
 
@@ -117,9 +117,14 @@ class Fridge_Monitor(Instrument):
                 source = s.read()
                 s.close()
                 # Extract the last update time of the fridge website
-                upd_time = re.findall(
-                    'Current time: (.*)<br>L', str(source))[0]
-                self.last_mon_update(upd_time)
+                upd_time = parse(re.findall(
+                    'Current time: (.*)<br>Last', str(source))[0])
+                if (datetime.now() - upd_time).seconds > 360:
+                    logging.warning(
+                        "{} is not updating!".format(self.fridge_name()))
+
+                # converts the time object to  a string
+                self.last_mon_update(upd_time.strftime('%Y-%m-%d %H:%M:%S'))
                 # Extract temperature names with temperature from source code
                 temperaturegroups = re.findall(
                     r'<br>(T_[\w_]+(?: \(P\))?) = ([\d\.]+)', str(source))
