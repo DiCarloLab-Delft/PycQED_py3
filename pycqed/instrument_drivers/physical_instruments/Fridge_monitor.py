@@ -127,12 +127,12 @@ class Fridge_Monitor(Instrument):
                 self.last_mon_update(upd_time.strftime('%Y-%m-%d %H:%M:%S'))
                 # Extract temperature names with temperature from source code
                 temperaturegroups = re.findall(
-                    r'<br>(T_[\w_]+(?: \(P\))?) = ([\d\.]+)', str(source))
+                    r'<br>(T_[\w_]+(?: \(P\))?) = ([\S\.]+)', str(source))
 
                 self.temp_dict = {elem[0]: float(
                     elem[1]) for elem in temperaturegroups}
                 pressuregroups = re.findall(
-                    r'<br>(P_[\w_]+(?: \(P\))?) = ([\d\.]+)', str(source))
+                    r'<br>(P_[\w_]+(?: \(P\))?) = ([\S\.]+)', str(source))
                 self.press_dict = {elem[0]: float(
                     elem[1]) for elem in pressuregroups}
 
