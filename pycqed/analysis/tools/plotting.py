@@ -5,7 +5,7 @@ analysis toolbox
 import numpy as np
 
 SI_PREFIXES = 'yzafpnum kMGTPEZY'
-SI_UNITS = 'm,s,g,W,J,V,A,F,T,Hz,Ohm,S,N,C,px,b,B,K'.split(',')
+SI_UNITS = 'm,s,g,W,J,V,A,F,T,Hz,Ohm,S,N,C,px,b,B,K,Bar'.split(',')
 
 
 def set_xlabel(axis, label, unit=None, **kw):

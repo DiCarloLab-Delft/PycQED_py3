@@ -16,6 +16,27 @@ address_dict = {'LaMaserati': dcl + 'LaMaseratiMonitor/',
                 'LaFerrari': dcl + 'LaFerrariMonitor/',
                 'LaAprilia': dcl + 'LaApriliaMonitor/'}
 
+monitored_pars_dict = \
+    {'LaMaserati': {'temp': ['T_CP', 'T_CP (P)', 'T_3K', 'T_3K (P)',
+                             'T_Still', 'T_Still (P)', 'T_MClo',  'T_MClo (P)',
+                             'T_MChi', 'T_MChi (P)', 'T_50K (P)'],
+                    'press': ['P_5', 'P_Still', 'P_IVC', 'P_Probe',
+                              'P_OVC', 'P_4He', 'P_3He']},
+
+     'LaDucati': {'temp': ['T_Sorb', 'T_Still', 'T_MClo', 'T_MChi'],
+                  'press': ['P_5', 'P_Still', 'P_IVC', 'P_OVC',
+                            'P_4He', 'P_3He']},
+
+     'LaAprilia': {'temp': ['T_3K', 'T_Still', 'T_CP',
+                            'T_MChi', 'T_MClo', 'T_MCloCMN '],
+                   'press': ['P_5', 'P_Still', 'P_IVC', 'P_OVC',
+                             'P_4He', 'P_3He']},
+
+     'LaFerrari': {'temp': ['T_Sorb', 'T_Still', 'T_MChi', 'T_MCmid',
+                            'T_MClo', 'T_MCStage'],
+                   'press': ['P_5', 'P_Still', 'P_IVC', 'P_OVC', 'P_4He',
+                             'P_3He']}}
+
 
 class Fridge_Monitor(Instrument):
 
@@ -38,28 +59,16 @@ class Fridge_Monitor(Instrument):
         self.url = address_dict[self.fridge_name()]
         # These parameters could also be extracted by reading the website.
         # might be nicer :)
-        if self.fridge_name() == 'LaMaserati':
-            self.monitored_pars = ['T_CP', 'T_CP (P)',
-                                   'T_3K', 'T_3K (P)',
-                                   'T_Still', 'T_Still (P)',
-                                   'T_MClo',  'T_MClo (P)',
-                                   'T_MChi', 'T_MChi (P)',
-                                   'T_50K (P)']
+        self.monitored_temps = monitored_pars_dict[self.fridge_name()]['temp']
+        self.monitored_press = monitored_pars_dict[self.fridge_name()]['press']
 
-        elif self.fridge_name() == 'LaDucati':
-            self.monitored_pars = ['T_Sorb', 'T_Still', 'T_MClo', 'T_MChi']
-
-        elif self.fridge_name() == 'LaFerrari':
-            self.monitored_pars = ['T_Sorb', 'T_Still', 'T_MChi', 'T_MCmid',
-                                   'T_MClo', 'T_MCStage']
-
-        elif self.fridge_name() == 'LaAprilia':
-            self.monitored_pars = ['T_3K', 'T_Still', 'T_CP',
-                                   'T_MChi', 'T_MClo', 'T_MCloCMN ']
-
-        for par_name in self.monitored_pars:
+        for par_name in self.monitored_temps:
             self.add_parameter(par_name, unit='K',
                                get_cmd=self._gen_temp_get(par_name))
+        for par_name in self.monitored_press:
+            self.add_parameter(par_name, unit='Bar',
+                               get_cmd=self._gen_press_get(par_name))
+
         self._last_temp_update = 0
         self._update_monitor()
 
@@ -73,9 +82,21 @@ class Fridge_Monitor(Instrument):
             self._update_monitor()
             try:
                 return float(self.temp_dict[par_name]) * 1e-3  # mK -> K
-            except:
+            except Exception as e:
                 logging.info('Could not extract {} from {}'.format(
                     par_name, self.url))
+                logging.info(e)
+        return get_cmd
+
+    def _gen_press_get(self, par_name):
+        def get_cmd():
+            self._update_monitor()
+            try:
+                return float(self.press_dict[par_name]) * 1e-3  # mBar -> Bar
+            except Exception as e:
+                logging.info('Could not extract {} from {}'.format(
+                    par_name, self.url))
+                logging.info(e)
         return get_cmd
 
     def snapshot(self, update=False):
@@ -105,8 +126,15 @@ class Fridge_Monitor(Instrument):
 
                 self.temp_dict = {elem[0]: float(
                     elem[1]) for elem in temperaturegroups}
+                pressuregroups = re.findall(
+                    r'<br>(P_[\w_]+(?: \(P\))?) = ([\d\.]+)', str(source))
+                self.press_dict = {elem[0]: float(
+                    elem[1]) for elem in pressuregroups}
+
             except Exception as e:
                 logging.warning(e)
 
-                for temperature_name in self.monitored_pars:
+                for temperature_name in self.monitored_temps:
                     self.temp_dict[temperature_name] = 0
+                for press_name in self.monitored_press:
+                    self.press_dict[press_name] = 0
