@@ -31,6 +31,10 @@ class Fridge_Monitor(Instrument):
             vals=vals.Enum('LaMaserati', 'LaDucati', 'LaFerrari', 'LaAprilia'),
             parameter_class=ManualParameter)
 
+        self.add_parameter('last_mon_update',
+                           label='Last website update',
+                           vals=vals.Strings(),
+                           parameter_class=ManualParameter)
         self.url = address_dict[self.fridge_name()]
         # These parameters could also be extracted by reading the website.
         # might be nicer :)
@@ -54,10 +58,10 @@ class Fridge_Monitor(Instrument):
                                    'T_MChi', 'T_MClo', 'T_MCloCMN ']
 
         for par_name in self.monitored_pars:
-            self.add_parameter(par_name, unit='mK',
+            self.add_parameter(par_name, unit='K',
                                get_cmd=self._gen_temp_get(par_name))
         self._last_temp_update = 0
-        self._update_temperatures()
+        self._update_monitor()
 
     def get_idn(self):
         return {'vendor': 'QuTech',
@@ -66,10 +70,9 @@ class Fridge_Monitor(Instrument):
 
     def _gen_temp_get(self, par_name):
         def get_cmd():
-            self._update_temperatures()
+            self._update_monitor()
             try:
-
-                return float(self.temp_dict[par_name])
+                return float(self.temp_dict[par_name]) * 1e-3  # mK -> K
             except:
                 logging.info('Could not extract {} from {}'.format(
                     par_name, self.url))
@@ -84,7 +87,7 @@ class Fridge_Monitor(Instrument):
         else:
             return super().snapshot(update=update)
 
-    def _update_temperatures(self):
+    def _update_monitor(self):
         time_since_update = time() - self._last_temp_update
         if time_since_update > (self.update_interval()):
             self.temp_dict = {}
@@ -92,14 +95,18 @@ class Fridge_Monitor(Instrument):
                 s = urlopen(self.url, timeout=5)
                 source = s.read()
                 s.close()
+                # Extract the last update time of the fridge website
+                upd_time = re.findall(
+                    'Current time: (.*)<br>L', str(source))[0]
+                self.last_mon_update(upd_time)
                 # Extract temperature names with temperature from source code
                 temperaturegroups = re.findall(
                     r'<br>(T_[\w_]+(?: \(P\))?) = ([\d\.]+)', str(source))
 
                 self.temp_dict = {elem[0]: float(
                     elem[1]) for elem in temperaturegroups}
-            except Exception:
-                logging.info(
-                    '\nTemperatures could not be extracted from website\n')
+            except Exception as e:
+                logging.warning(e)
+
                 for temperature_name in self.monitored_pars:
                     self.temp_dict[temperature_name] = 0
