@@ -9,7 +9,7 @@ map q1 1
 # comment in the mid
 Init_all    # initialize all qubits
 X180 q0 | Y90 q1
-I 100
+I 100  # ns
 CZ q0, q1
 mY90 q1
 Measure q0 | Measure q1
