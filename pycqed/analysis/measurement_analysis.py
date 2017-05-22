@@ -3,6 +3,7 @@ import logging
 import numpy as np
 from scipy import stats
 import h5py
+import matplotlib
 from matplotlib import pyplot as plt
 from pycqed.analysis import analysis_toolbox as a_tools
 from pycqed.analysis import fitting_models as fit_mods
@@ -488,16 +489,26 @@ class MeasurementAnalysis(object):
                                                self.measurementstring, 40))
         xlabel = kw.pop('xlabel', None)
         ylabel = kw.pop('ylabel', None)
+        # axis_font = {'family':'helvetica','size':11}
+
         #ax.set_title(self.plot_title)
-        fig.suptitle(self.plot_title,fontsize=title_font_size,horizontalalignment ='center')
+        if kw.get('show_title',True):
+            fig.suptitle(self.plot_title,fontsize=title_font_size,horizontalalignment ='center',verticalalignment ='top')
         if xlabel is not None:
-            ax.set_xlabel(xlabel)
+            ax.set_xlabel(xlabel,size=11)
         if ylabel is not None:
-            ax.set_ylabel(ylabel)
+            ax.set_ylabel(ylabel,size=11)
         ax.plot(x, y, marker, label=label)
         if log:
             ax.set_yscale('log')
 
+        #set tick size to 10
+        ax.tick_params(axis='both',labelsize=10)
+        # #set the font name for axis tick labels to be Helvetica
+        # for tick in ax.get_xticklabels():
+        #     tick.set_fontname('Helvetica')
+        # for tick in ax.get_yticklabels():
+        #     tick.set_fontname('Helvetica')
         #set axes on top and to the right of plot as well
         if ticks_around:
             ax.xaxis.set_tick_params(labeltop='on',top='on',direction='in')
@@ -551,8 +562,10 @@ class MeasurementAnalysis(object):
                                                      label='init_fit',
                                                      method='restyle') ] ) ) ] ),
                       xaxis=dict(title=xlabel,showexponent=show_exponent,exponentformat=exponent_format,
-                                 ticks='inside',mirror='ticks',showline=True),
-                      yaxis=dict(title=ylabel,ticks='inside',mirror='ticks',showline=True))
+                                 ticks='inside',mirror='ticks',showline=True,tickfont=dict(size=10),
+                                 titlefont=dict(size=11)),
+                      yaxis=dict(title=ylabel,ticks='inside',mirror='ticks',showline=True,
+                                 tickfont=dict(size=10),titlefont=dict(size=11)))
 
         fig = Figure(data=data, layout=layout)
 
@@ -1245,9 +1258,10 @@ class Rabi_Analysis_new(TD_Analysis):
         label='Rabi'      (default=none?)               Label of the analysis routine
         folder            (default=working folder)      Working folder
         NoCalPoints       (default=4)                   Number of calibration points
-        print_fit_results (default=True)               print the fit report
+        print_fit_results (default=True)                print the fit report
         show              (default=True)                show the plots
         show_guess        (default=False)               plot with initial guess values
+        show_title        (default=True)                whether to show the title or not
         show_amplitudes   (default=True)                print the pi&piHalf pulses amplitudes
         plot_amplitudes   (default=True)                plot the pi&piHalf pulses amplitudes
         plot_errorbars    (default=True)                plot standard error for each sample point
@@ -1319,6 +1333,7 @@ class Rabi_Analysis_new(TD_Analysis):
 
         close_file = kw.get('close_file', True)
         show_guess = kw.get('show_guess', False)
+        show_title = kw.get('show_title',True)
         show = kw.get('show', False)
         plot_amplitudes = kw.get('plot_amplitudes',True)
         # show_amplitudes = kw.get('show_amplitudes',True)
@@ -1353,7 +1368,7 @@ class Rabi_Analysis_new(TD_Analysis):
 
         #Plot results
         self.plot_results(fig1, ax, show_guess=show_guess, plot_amplitudes=plot_amplitudes,
-                          plot_errorbars=plot_errorbars, ylabel=r'$F$ $|1 \rangle$')
+                          plot_errorbars=plot_errorbars, show_title=show_title, ylabel=r'$F$ $|1 \rangle$')
 
         for i, name in enumerate(self.value_names):
             if len(self.value_names) == 4:
@@ -1380,7 +1395,8 @@ class Rabi_Analysis_new(TD_Analysis):
             self.data_file.close()
         return self.fit_res
 
-    def plot_results(self, fig, ax, ylabel, show_guess=False, plot_amplitudes=True, plot_errorbars=True):
+    def plot_results(self, fig, ax, ylabel, show_guess=False, plot_amplitudes=True,
+                     plot_errorbars=True,show_title=True):
 
         pi_pulse = self.rabi_amplitudes['piPulse']
         pi_half_pulse = self.rabi_amplitudes['piHalfPulse']
@@ -1401,7 +1417,7 @@ class Rabi_Analysis_new(TD_Analysis):
                                         xlabel=self.xlabel,
                                         ylabel=ylabel,
                                         save=False,
-                                        title_font_size=20)
+                                        show_title=show_title)
 
         best_vals = self.fit_res.best_values
         #Used for plotting the fit (line 1433)
@@ -1873,20 +1889,33 @@ class QScale_Analysis(TD_Analysis):
 
         # Unique in that it has hardcoded names and points to plot
         show_guess = kw.get('show_guess', False)
+        show_title = kw.get('show_title',True)
         self.fig, self.ax = plt.subplots(1, 1, figsize=(15, 10))
         plot_title = kw.get('plot_title', textwrap.fill(
             self.timestamp_string + '_' +
             self.measurementstring, 40))
-        self.ax.set_title(plot_title)
+        if kw.get('show_title',True):
+            self.ax.set_title(plot_title)
 
         self.ax.ticklabel_format(useOffset=False)
         self.ax.set_xlabel(kw.get('xlabel', self.xlabel))
         self.ax.set_ylabel(kw.get('ylabel', r'$F|1\rangle$'))
 
         x_fine = np.linspace(min(self.sweep_points), max(self.sweep_points), 1000)
-        self.ax.plot(self.sweep_points_xX, self.corr_data_xX, 'o', c='b', label=r'$X_{\frac{\pi}{2}}X_{\pi}$')
-        self.ax.plot(self.sweep_points_xY, self.corr_data_xY, 'o', c='g', label=r'$X_{\frac{\pi}{2}}Y_{\pi}$')
-        self.ax.plot(self.sweep_points_xmY, self.corr_data_xmY, 'o', c='r', label=r'$X_{\frac{\pi}{2}}Y_{-\pi}$')
+        # self.ax.plot(self.sweep_points_xX, self.corr_data_xX, 'o', c='b', label=r'$X_{\frac{\pi}{2}}X_{\pi}$')
+        # self.ax.plot(self.sweep_points_xY, self.corr_data_xY, 'o', c='g', label=r'$X_{\frac{\pi}{2}}Y_{\pi}$')
+        # self.ax.plot(self.sweep_points_xmY, self.corr_data_xmY, 'o', c='r', label=r'$X_{\frac{\pi}{2}}Y_{-\pi}$')
+
+        self.plot_results_vs_sweepparam(self.sweep_points_xX, self.corr_data_xX, self.fig, self.ax,
+                                        marker='-ob',label=r'$X_{\frac{\pi}{2}}X_{\pi}$',
+                                        ticks_around=True, show_title=show_title)
+        self.plot_results_vs_sweepparam(self.sweep_points_xY, self.corr_data_xY, self.fig, self.ax,
+                                        marker='-og',label=r'$X_{\frac{\pi}{2}}Y_{\pi}$',
+                                        ticks_around=True, show_title=show_title)
+        self.plot_results_vs_sweepparam(self.sweep_points_xmY, self.corr_data_xmY, self.fig, self.ax,
+                                        marker='-or',label=r'$X_{\frac{\pi}{2}}Y_{-\pi}$',
+                                        ticks_around=True, show_title=show_title)
+
 
         c = ['b', 'g', 'r']
         if hasattr(self, 'fit_res'):
@@ -3137,7 +3166,8 @@ class T1_Analysis(TD_Analysis):
                                                 fig=figarray, ax=ax2,
                                                 xlabel=self.xlabel,
                                                 ylabel=self.ylabels[i],
-                                                save=False)
+                                                save=False,
+                                                ticks_around=False)
 
                 if 'I_cal' in self.value_names[i]:  # Fit the data
                     norm = self.normalize_data_to_calibration_points(
@@ -3309,7 +3339,7 @@ class Ramsey_Analysis(TD_Analysis):
 
         return fit_res
 
-    def plot_results(self, fig, ax, fit_res, ylabel, show_guess=False):
+    def plot_results(self, fig, ax, fit_res, ylabel, show_guess=False,show_title=True):
         textstr = ('  $f$  \t= %.3g $ \t \pm$ (%.3g) Hz'
                    % (fit_res.params['frequency'].value,
                       fit_res.params['frequency'].stderr) +
@@ -3327,7 +3357,7 @@ class Ramsey_Analysis(TD_Analysis):
                                         xlabel=xlabel,
                                         ylabel=ylabel,
                                         save=False,
-                                        title_font_size=20)
+                                        show_title=show_title)
 
         x = np.linspace(self.sweep_points[0],
                         self.sweep_points[-self.NoCalPoints],
@@ -3351,6 +3381,7 @@ class Ramsey_Analysis(TD_Analysis):
 
         close_file = kw.pop('close_file', True)
         show_guess = kw.pop('show_guess', False)
+        show_title = kw.get('show_title',True)
         show = kw.pop('show', False)
         self.add_analysis_datagroup_to_file()
         self.get_naming_and_values()
@@ -3370,7 +3401,7 @@ class Ramsey_Analysis(TD_Analysis):
         self.get_measured_T2_star(**kw)
         self.save_computed_parameters(self.T2_star, var_name=self.value_names[0])
 
-        self.plot_results(fig1, ax, self.fit_res, show_guess=show_guess,
+        self.plot_results(fig1, ax, self.fit_res, show_guess=show_guess,show_title=show_title,
                           ylabel=r'$F$ $|1 \rangle$')
 
         #Plot I and Q data vs sweep_points separately
@@ -4376,6 +4407,7 @@ class Homodyne_Analysis(MeasurementAnalysis):
 
         ########## Plot results ##########
 
+        show_title = kw.get('show_title',True)
         fig, ax = self.default_ax()
 
         if 'hanger' in fitting_model:
@@ -4405,7 +4437,7 @@ class Homodyne_Analysis(MeasurementAnalysis):
                                             xlabel=self.xlabel,
                                             ylabel=str('S21_mag (arb. units)'),
                                             save=False,
-                                            title_font_size=20)
+                                            show_title=show_title)
 
             if interactive_plot:
                 self.plotly_plot(self.sweep_points*1e-9,self.data_y,fit_res,
@@ -4421,7 +4453,7 @@ class Homodyne_Analysis(MeasurementAnalysis):
                      verticalalignment='top', bbox=self.box_props)
             self.plot_results_vs_sweepparam(x=self.sweep_points, y=data_amp,
                                             fig=fig2, ax=ax2, show=False, save=False,
-                                            title_font_size=20)
+                                            title_font_size=20,show_title=show_title)
 
         elif fitting_model == 'lorentzian':
             self.plot_results_vs_sweepparam(x=self.sweep_points*1e-9,
@@ -4430,7 +4462,7 @@ class Homodyne_Analysis(MeasurementAnalysis):
                                             xlabel=self.xlabel,
                                             ylabel=str('Power (arb. units)'),
                                             save=False,
-                                            title_font_size=20)
+                                            show_title=show_title)
             if interactive_plot:
                 self.plotly_plot(self.sweep_points*1e-9,self.measured_powers,fit_res,
                                  xlabel=self.xlabel,ylabel=str('Power (arb. units)'),
@@ -4848,6 +4880,7 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
         self.add_analysis_datagroup_to_file()
         self.savename = kw.get('save_name', 'Source Frequency')
         show_guess = kw.get('show_guess', True)
+        show_title = kw.get('show_title',True)
         close_file = kw.get('close_file', True)
         interactive_plot = kw.get('interactive_plot',False)
         self.get_naming_and_values()
@@ -4931,7 +4964,7 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
                                         ylabel='S21 distance (V)',
                                         label=False,
                                         save=False,
-                                        title_font_size=20)
+                                        show_title=show_title)
         ax_dist.plot(self.sweep_points, self.fit_res.best_fit, 'r-')      #plot Lorentzian with the fit results
         ax_dist.plot(f0, self.fit_res.best_fit[f0_idx], 'o', ms=8)
         if analyze_ef:                                               #plot the ef/2 point as well
