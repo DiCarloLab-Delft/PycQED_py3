@@ -1,12 +1,6 @@
 # Originally by Wolfgang Pfaff
 # Modified by Adriaan Rol 9/2015
-
-# this module contains the sequencer and sequence classes
-
-# TODO this would be nice to have also accessible from clients.
-# should therefore be a SharedObject
-# TODO in principle that could be generalized for other
-# sequencing hardware i guess
+# Modified by Ants Remm 5/2017
 
 import numpy as np
 import logging
@@ -38,6 +32,7 @@ class Pulsar:
     """
     def __init__(self, default_AWG=None):
         self.default_AWG = default_AWG  # the default AWG object
+        self.master_AWG = None
         self.AWG = self.default_AWG # for backward compatibility.
         self._AWG_obj = {}  # dictionary from AWG name to AWG object
         self.channels = {}
@@ -510,15 +505,14 @@ const WINT_EN   = 0x1f0000;
 setTrigger(WINT_EN);
 var loop_cnt = getUserReg(0);
 var RO_TRIG;
-if(getUserReg(1)){
+if (getUserReg(1)) {
   RO_TRIG=IAVG_TRIG;
 }else{
   RO_TRIG=WINT_TRIG;
 }
 \n"""
 
-        main_loop = 'repeat(loop_cnt) {\n'
-
+        main_loop = 'repeat (loop_cnt) {\n'
 
         footer = """}
 wait(1000);
@@ -624,7 +618,7 @@ setTrigger(0);
         Returns:
             string for playing back an element
         """
-        repeat_open_str = '\trepeat({}) {{\n'.format(reps) if reps != 0 else ''
+        repeat_open_str = '\trepeat ({}) {{\n'.format(reps) if reps != 0 else ''
         wait_wave_str = '\t\twaitWave();\n' if wait else ''
         trigger_str = '\t\twaitDigTrigger(1, 1);\n' if wait else ''
         if name1 is None:
@@ -678,7 +672,7 @@ setTrigger(0);
         for AWG in self._AWG_obj.values():
             AWG.stop()
 
-    def update_channel_settings(self, AWGs='all'):
+    def update_channel_settings_old(self, AWGs='all'):
         """
         Deprecated with multi-AWG support. AWG settings are set to correct
         values while programming.
@@ -706,3 +700,28 @@ setTrigger(0);
                     c_dict['high'] = ch_amp/2
 
         return self.channels, offsets
+
+    def update_AWG5014_settings(self, AWGs='all'):
+        """
+        Updates the AWG5014 parameters to the values in
+        `self.channels`
+
+        Args:
+            AWGs: A list of AWG names to update or 'all'. Default 'all'.
+        """
+        for c_name, c_dict in self.channels.items():
+            if AWGs == 'all' or c_dict['AWG'] in AWGs:
+                AWG = Instrument.find_instrument(c_dict['AWG'])
+                if not isinstance(AWG, Tektronix_AWG5014):
+                    continue
+                if c_dict['type'] == 'analog':
+                    amp = c_dict['high'] - c_dict['low']
+                    offset = (c_dict['low'] + c_dict['high'])/2
+                    AWG.set('{}_amp'.format(c_dict['id']), amp)
+                    AWG.set('{}_offset'.format(c_dict['id']), offset)
+                else:  # c_dict['type'] == 'marker'
+                    id = c_dict['id']
+                    low_par = 'ch{}_m{}_low'.format(id[2], id[-1])
+                    high_par = 'ch{}_m{}_high'.format(id[2], id[-1])
+                    AWG.set(low_par, c_dict['low'])
+                    AWG.set(high_par, c_dict['high'])

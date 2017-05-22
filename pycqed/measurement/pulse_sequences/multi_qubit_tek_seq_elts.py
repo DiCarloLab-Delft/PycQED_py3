@@ -41,8 +41,7 @@ def avoided_crossing_spec_seq(operation_dict, q0, q1, RO_target,
     el_list.append(el)
     seq.append_element(el, trigger_wait=True)
     if upload:
-        station.components['AWG'].stop()
-        station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
     return seq, el_list
 
 
