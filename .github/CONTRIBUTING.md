@@ -6,7 +6,7 @@ If you have a question or want to discuss something, feel free to send an email 
 
 ## Git branching model
 
-The  branching model is based on the branching model described in the post [A successful Git branching model](http://nvie.com/posts/a-successful-git-branching-model/). It differs in that the development branch is replaced by several "project" branches. 
+The branching model is based on the branching model described in the post [A successful Git branching model](http://nvie.com/posts/a-successful-git-branching-model/). It differs in that the development branch is replaced by several "project" branches. 
 
 ### The main branches
 
@@ -93,3 +93,16 @@ An issue can have only one priority type label. A priority label can change over
 Optional extra labels exist to further specify what category an issue belong to. These are repository dependent and prefixed with "Cat:
 
 An issue can have multiple category labels assigned.
+
+
+## Weekly code cleanup
+In order to prevent diverging branches and as a general good practice there is a weakly code cleanup moment. 
+
+During the weekly code cleanup you should: 
+
+* Commit your code 
+* Update your project branch with the latest changes from the master 
+* Open pull requests containing progress of last week 
+* review pull requests you have been asked to review 
+
+It is recommended to do this more than once a week.
