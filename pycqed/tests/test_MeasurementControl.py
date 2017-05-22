@@ -3,7 +3,8 @@ import numpy as np
 from pycqed.measurement import measurement_control
 from pycqed.measurement.sweep_functions import None_Sweep
 import pycqed.measurement.detector_functions as det
-from pycqed.instrument_drivers.physical_instruments.dummy_instruments import DummyParHolder
+from pycqed.instrument_drivers.physical_instruments.dummy_instruments \
+    import DummyParHolder
 from pycqed.measurement.optimization import nelder_mead, SPSA
 
 from qcodes import station
