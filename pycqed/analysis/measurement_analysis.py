@@ -30,6 +30,7 @@ from pycqed.analysis import composite_analysis as ca
 
 try:
     import qutip as qtp
+
 except ImportError as e:
     if str(e).find('qutip') >= 0:
         logging.warning('Could not import qutip')
@@ -4108,11 +4109,14 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
                     data_real=self.measured_values[2],
                     data_imag=self.measured_values[3])
             except:
-                # Quick fix to make it work with pulsed spec which does not
-                # return both I,Q and, amp and phase
-                self.data_dist = a_tools.calculate_distance_ground_state(
-                    data_real=self.measured_values[0],
-                    data_imag=self.measured_values[1])
+                # Do not use distance if amplitude and phase are returned
+                self.data_dist = self.measured_values[0]
+
+                # # Quick fix to make it work with pulsed spec which does not
+                # # return both I,Q and, amp and phase
+                # self.data_dist = a_tools.calculate_distance_ground_state(
+                #     data_real=self.measured_values[0],
+                #     data_imag=self.measured_values[1])
 
             self.peaks = a_tools.peak_finder(
                 self.sweep_points, a_tools.smooth(self.data_dist))
