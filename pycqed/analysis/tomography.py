@@ -55,7 +55,7 @@ class TomoAnalysis_JointRO():
         measurements_cal --- Should be an array of length 2 ** n_qubits
         measurements_tomo --- Should be an array of length
             length(rotation_matrixes) ** n_qubits
-        n_qubits --- default(2) the amount of qubits present in the experement
+        n_qubits --- default(2) the amount of qubits present in the experiment
         n_quadratures --- default(1(either I or Q)) The amount of complete
             measurement data sets. For example a combined IQ measurement has
             2 measurement sets.
@@ -67,8 +67,8 @@ class TomoAnalysis_JointRO():
         self.n_states = 2 ** n_qubits
         self.n_quadratures = n_quadratures
 
-        # Generate the vectors of matrixes that correspond to all measurements,
-        # readout bases and rotations
+        # Generate the vectors of matrices that correspond to all
+        # measurements, readout bases and rotations
 
         self.basis_vector = self._calculate_matrix_set(
             self.measurement_basis, n_qubits)
@@ -134,8 +134,9 @@ class TomoAnalysis_JointRO():
                     betas[0] * rotation.dag()
                     * self.readout_vector[0] * rotation)
                 for i in range(1, len(betas)):
-                    measurement_vector[n_rot * quadrature + rotation_index] += betas[
-                        i] * rotation.dag() * self.readout_vector[i] * rotation
+                    measurement_vector[n_rot * quadrature + rotation_index] \
+                        += (betas[i] * rotation.dag() * self.readout_vector[i]
+                            * rotation)
         # save it in the object for use in optimization
         self.measurement_vector = measurement_vector
         self.measurement_vector_numpy = [
@@ -145,7 +146,8 @@ class TomoAnalysis_JointRO():
         discard, rho0 = self.execute_linear_tomo()
         # now fetch the starting t_params from the cholesky decomp of rho
         tcholesky = time.time()
-        T0 = np.linalg.cholesky(scipy.linalg.sqrtm((rho0.dag() * rho0).full()))
+        T0 = np.linalg.cholesky(scipy.linalg.sqrtm((rho0.dag()
+                                                    * rho0).full()))
         t0 = np.zeros(4 ** self.n_qubits, dtype='complex')
         di = np.diag_indices(2 ** self.n_qubits)
         tri = np.tril_indices(2 ** self.n_qubits, -1)
@@ -168,8 +170,10 @@ class TomoAnalysis_JointRO():
 
     def get_basis_labels(self, n_qubits):
         """
-        Returns the basis labels in the same order as the basis vector is parsed.
-        Requires self.measurement_basis_labels to be set with the correct order corresponding to the matrixes in self.measurement_basis
+        Returns the basis labels in the same order as the basis vector is
+        parsed.
+        Requires self.measurement_basis_labels to be set with the correct
+        order corresponding to the matrixes in self.measurement_basis
         """
         if(n_qubits > 1):
             return [y + x for x in self.get_basis_labels(n_qubits - 1)
@@ -206,9 +210,9 @@ class TomoAnalysis_JointRO():
         actual measurement values based on a guessed rho
 
         Keyword arguments:
-        t_params : cholesky decomp parameters used to construct the initial rho
+        t_params: cholesky decomp parameters used to construct the initial rho
         Requires:
-        self.weights :  weights per measurement vector used in calculating the
+        self.weights:  weights per measurement vector used in calculating the
         loss
         """
         rho = self.build_rho_from_triangular_params(t_params)
@@ -250,7 +254,7 @@ class TomoAnalysis_JointRO():
         of (n_quadratures * n_rotation_matrixes ** n_qubits) x n_basis_vectors
         """
         coefficient_matrix = np.zeros(
-            (self.n_quadratures * len(self.rotation_matrixes) ** self.n_qubits,
+            (self.n_quadratures * len(self.rotation_matrixes)**self.n_qubits,
              4 ** self.n_qubits))
         n_rotations = len(self.rotation_matrixes) ** self.n_qubits
         # Now fill in 2 ** self.n_qubits betas into the coefficient matrix on
@@ -264,8 +268,9 @@ class TomoAnalysis_JointRO():
                 for beta_index in range(2 ** self.n_qubits):
                     (place, sign) = self._get_basis_index_from_rotation(
                         beta_index, rotation_index)
-                    coefficient_matrix[
-                        n_rotations * quadrature + rotation_index, place] = sign * self.betas[beta_index]
+                    coefficient_matrix[n_rotations * quadrature
+                        + rotation_index, place] = (sign
+                                                    * self.betas[beta_index])
         return coefficient_matrix
 
     def _get_basis_index_from_rotation(self, beta_index, rotation_index):
@@ -275,16 +280,18 @@ class TomoAnalysis_JointRO():
         after rotation
         This is used in _calculate_coefficient_matrix
         """
-        m = self.rotation_vector[rotation_index].dag(
-        ) * self.readout_vector[beta_index] * self.rotation_vector[rotation_index]
+        m = (self.rotation_vector[rotation_index].dag()
+             * self.readout_vector[beta_index]
+             * self.rotation_vector[rotation_index])
         for basis_index, basis in enumerate(self.basis_vector):
             if(m == basis):
                 return (basis_index, 1)
             elif(m == -basis):
                 return (basis_index, -1)
         # if no basis is found raise an error
-        raise Exception(
-            'No basis vector found corresponding to the measurement rotation. Check that you have used Clifford Gates!')
+        raise Exception('No basis vector found corresponding to the '
+                        + 'measurement rotation. Check that you have used '
+                        + 'Clifford Gates!')
 
     def _calculate_matrix_set(self, starting_set, n_qubits):
         return _calculate_matrix_set(starting_set, n_qubits)
@@ -340,10 +347,11 @@ def order_pauli_output2(pauli_op_dis):
     '''
     pauli_1 = np.array([pauli_op_dis[2], pauli_op_dis[3], pauli_op_dis[1]])
     pauli_2 = np.array([pauli_op_dis[8], pauli_op_dis[12], pauli_op_dis[4]])
-    pauli_corr = np.array([pauli_op_dis[10], pauli_op_dis[11], pauli_op_dis[9],
-                           pauli_op_dis[14], pauli_op_dis[15],
-                           pauli_op_dis[13], pauli_op_dis[6],
-                           pauli_op_dis[7], pauli_op_dis[5]])
+    pauli_corr = np.array([pauli_op_dis[10], pauli_op_dis[11],
+                           pauli_op_dis[9], pauli_op_dis[14],
+                           pauli_op_dis[15], pauli_op_dis[13],
+                           pauli_op_dis[6], pauli_op_dis[7],
+                           pauli_op_dis[5]])
     return pauli_1, pauli_2, pauli_corr
 
 
@@ -409,12 +417,14 @@ def calc_fidelity1(dens_mat1, dens_mat2):
 def calc_fid1_bell(densmat, bell):
     up = qtp.basis(2, 0)
     dn = qtp.basis(2, 1)
-    rhos_bell = [qtp.ket2dm((qtp.tensor([up, up]) + qtp.tensor([dn, dn])).unit()),
+    rhos_bell = [qtp.ket2dm(
+                     (qtp.tensor([up, up]) + qtp.tensor([dn, dn])).unit()),
                  qtp.ket2dm(
                      (qtp.tensor([up, dn]) + qtp.tensor([dn, up])).unit()),
                  qtp.ket2dm(
                      (qtp.tensor([up, up]) - qtp.tensor([dn, dn])).unit()),
-                 qtp.ket2dm((qtp.tensor([up, dn]) - qtp.tensor([dn, up])).unit())]
+                 qtp.ket2dm(
+                     (qtp.tensor([up, dn]) - qtp.tensor([dn, up])).unit())]
     return calc_fidelity1(rhos_bell[bell], densmat)
 
 
@@ -484,7 +494,7 @@ def get_bell_pauli_exp(bell_idx, theta_q0=0, theta_q1=0):
     #           0,
     #           np.sin(theta_q0),
     #           np.cos(theta_q0)*np.cos(theta_q1),  # YY
-    #           -np.sin(theta_q1),         !!!!!!!!!!!!!!!! HERE MINUS SIGN ADDED
+    #           -np.sin(theta_q1),      !!!!!!!!!!!!!!!! HERE MINUS SIGN ADDED
     #           0,
     #           np.sin(theta_q1),
     #           np.cos(theta_q0)*np.cos(theta_q1)]  # ZZ
@@ -495,8 +505,9 @@ def get_bell_pauli_exp(bell_idx, theta_q0=0, theta_q1=0):
              -np.cos(theta_q0), -np.sin(theta_q0),
              0, 0, np.sin(theta_q0), np.cos(theta_q0)])
     elif bell_idx == 1:
-        sets_bell = np.array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, np.cos(
-            theta_q0), np.sin(theta_q0), 0, 0, np.sin(theta_q0), -np.cos(theta_q0)])
+        sets_bell = np.array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0,
+                             np.cos(theta_q0), np.sin(theta_q0), 0, 0,
+                             np.sin(theta_q0), -np.cos(theta_q0)])
     elif bell_idx == 2:
         sets_bell = np.array(
             [1, 0, 0, 0, 0, -1, 0, 0, 0, 0,
@@ -620,25 +631,29 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
         self.nr_segments = 64
         self.exp_name = os.path.split(self.folder)[-1][7:]
         if self.single_shots:
-            self.shots_q0 = np.zeros(
-                (self.nr_segments, int(len(self.measured_values[0])/self.nr_segments)))
-            self.shots_q1 = np.zeros(
-                (self.nr_segments, int(len(self.measured_values[1])/self.nr_segments)))
+            # Average single shots
+            self.shots_q0 = np.zeros((self.nr_segments,
+                                      int(len(self.measured_values[0]) /
+                                          self.nr_segments)))
+            self.shots_q1 = np.zeros((self.nr_segments,
+                                      int(len(self.measured_values[1]) /
+                                          self.nr_segments)))
             for i in range(self.nr_segments):
-                self.shots_q0[i, :] = self.measured_values[0][i::self.nr_segments]
-                self.shots_q1[i, :] = self.measured_values[1][i::self.nr_segments]
+                self.shots_q0[i, :] = \
+                    self.measured_values[0][i::self.nr_segments]
+                self.shots_q1[i, :] = \
+                    self.measured_values[1][i::self.nr_segments]
 
             # Get correlations between shots
             self.shots_q0q1 = np.multiply(self.shots_q1, self.shots_q0)
 
             if self.start_shot != 0 or self.end_shot != -1:
-                self.shots_q0 = self.shots_q0[:, self.start_shot:self.end_shot]
-                self.shots_q1 = self.shots_q1[:, self.start_shot:self.end_shot]
-                self.shots_q0q1 = self.shots_q0q1[
-                    :, self.start_shot:self.end_shot]
-            ##########################################
-            # Making  the first figure, tomo shots
-            ##########################################
+                self.shots_q0 = \
+                    self.shots_q0[:, self.start_shot:self.end_shot]
+                self.shots_q1 = \
+                    self.shots_q1[:, self.start_shot:self.end_shot]
+                self.shots_q0q1 = \
+                    self.shots_q0q1[:, self.start_shot:self.end_shot]
 
             avg_h1 = np.mean(self.shots_q0, axis=1)
             avg_h2 = np.mean(self.shots_q1, axis=1)
@@ -649,62 +664,62 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
             avg_h12 = self.measured_values[2]
 
         # Binning all the points required for the tomo
+        # Calibration points q0
         h1_00 = np.mean(avg_h1[36:36+7])
         h1_01 = np.mean(avg_h1[43:43+7])
         h1_10 = np.mean(avg_h1[50:50+7])
         h1_11 = np.mean(avg_h1[57:])
 
+        # Calibration points q1
         h2_00 = np.mean(avg_h2[36:36+7])
         h2_01 = np.mean(avg_h2[43:43+7])
         h2_10 = np.mean(avg_h2[50:50+7])
         h2_11 = np.mean(avg_h2[57:])
 
+        # Calibration points correlations
         h12_00 = np.mean(avg_h12[36:36+7])
         h12_01 = np.mean(avg_h12[43:43+7])
         h12_10 = np.mean(avg_h12[50:50+7])
         h12_11 = np.mean(avg_h12[57:])
 
-        # std_arr = np.array( std_h2_00, std_h2_01, std_h2_10, std_h2_11, std_h12_00, std_h12_01, std_h12_10, std_h12_11])
-        # plt.plot(std_arr)
-        # plt.show()
-
-        # Substract avg of all traces
-
-        mean_h1 = (h1_00+h1_10+h1_01+h1_11)/4
-        mean_h2 = (h2_00+h2_01+h2_10+h2_11)/4
-        mean_h12 = (h12_00+h12_11+h12_01+h12_10)/4
+        # Subtract average of all calibration points from data
+        mean_h1 = (h1_00 + h1_10 + h1_01 + h1_11) / 4
+        mean_h2 = (h2_00 + h2_01 + h2_10 + h2_11) / 4
+        mean_h12 = (h12_00 + h12_11 + h12_01 + h12_10) / 4
 
         avg_h1 -= mean_h1
         avg_h2 -= mean_h2
         avg_h12 -= mean_h12
 
-        scale_h1 = (h1_00+h1_10-h1_01-h1_11)/4
-        scale_h2 = (h2_00+h2_01-h2_10-h2_11)/4
-        scale_h12 = (h12_00+h12_11-h12_01-h12_10)/4
+        # Rescale by average of difference between high and low voltages
+        # so that all data is on the same range of values
+        scale_h1 = (h1_00 + h1_10 - h1_01 - h1_11) / 4
+        scale_h2 = (h2_00 + h2_01 - h2_10 - h2_11) / 4
+        scale_h12 = (h12_00 + h12_11 - h12_01 - h12_10) / 4
 
         avg_h1 = (avg_h1)/scale_h1
         avg_h2 = (avg_h2)/scale_h2
         avg_h12 = (avg_h12)/scale_h12
-        # dived by scalefactor
 
-        # key for next step
+        # Calculate new average of calibration points.
         h1_00 = np.mean(avg_h1[36:36+7])
         h1_01 = np.mean(avg_h1[43:43+7])
         h1_10 = np.mean(avg_h1[50:50+7])
         h1_11 = np.mean(avg_h1[57:])
 
-        avg_h2 = np.mean(self.shots_q1, axis=1)
+        avg_h2 = np.mean(self.shots_q1, axis=1)  # This line looks wrong
         h2_00 = np.mean(avg_h2[36:36+7])
         h2_01 = np.mean(avg_h2[43:43+7])
         h2_10 = np.mean(avg_h2[50:50+7])
         h2_11 = np.mean(avg_h2[57:])
 
-        avg_h12 = np.mean(self.shots_q0q1, axis=1)
+        avg_h12 = np.mean(self.shots_q0q1, axis=1)  # This line looks wrong
         h12_00 = np.mean(avg_h12[36:36+7])
         h12_01 = np.mean(avg_h12[43:43+7])
         h12_10 = np.mean(avg_h12[50:50+7])
         h12_11 = np.mean(avg_h12[57:])
 
+        # Calculate standard deviation of calibration points
         std_h1_00 = np.std(avg_h1[36:36+7])
         std_h1_01 = np.std(avg_h1[43:43+7])
         std_h1_10 = np.std(avg_h1[50:50+7])
@@ -720,15 +735,18 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
         std_h12_10 = np.std(avg_h12[50:50+7])
         std_h12_11 = np.std(avg_h12[57:])
 
+        # Calculate mean of standard deviations for q0, q1, and correlations
+
         std_h1 = np.mean([std_h1_00, std_h1_01, std_h1_10, std_h1_11])
         std_h2 = np.mean([std_h2_00, std_h2_01, std_h2_10, std_h2_11])
         std_h12 = np.mean([std_h12_00, std_h12_01, std_h12_10, std_h12_11])
+
         std_arr = np.array([std_h1_00, std_h1_01, std_h1_10, std_h1_11, std_h2_00, std_h2_01,
                             std_h2_10, std_h2_11, std_h12_00, std_h12_01, std_h12_10, std_h12_11])
 
-        # plt.plot([std_h1, std_h2, std_h12])
-        # plt.plot(std_arr)
-        # plt.show()
+        # ??
+        # Some more rescaling and then again re-calculating the average.
+        # What is the purpose of this?
 
         fac = np.mean([std_h1, std_h2, std_h12])
         avg_h1 *= fac/std_h1
@@ -807,14 +825,15 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
         bell_idx (int) : integer referring to a specific bell state.
             0: |Psi_m> = |00> - |11>   (<XX>,<YY>,<ZZ>) = (-1,+1,+1)
             1: |Psi_p> = |00> + |11>   (<XX>,<YY>,<ZZ>) = (+1,-1,+1)
-            2: |Psi_m> = |01> - |10>   (<XX>,<YY>,<ZZ>) = (-1,-1,-1)
-            3: |Psi_m> = |01> + |10>   (<XX>,<YY>,<ZZ>) = (+1,+1,-1)
+            2: |Phi_m> = |01> - |10>   (<XX>,<YY>,<ZZ>) = (-1,-1,-1)
+            3: |Phi_p> = |01> + |10>   (<XX>,<YY>,<ZZ>) = (+1,+1,-1)
         """
 
         fit_func_wrapper = lambda dummy_x, angle_MSQ,\
             angle_LSQ, contrast: rotated_bell_state(dummy_x,
                                                     angle_MSQ, angle_LSQ,
-                                                    contrast, self.target_bell)
+                                                    contrast,
+                                                    self.target_bell)
         angles_model = lmfit.Model(fit_func_wrapper)
 
         angles_model.set_param_hint(
@@ -860,7 +879,8 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
         ax = axs[2]
         ax.plot(np.arange(self.nr_segments), np.mean(self.shots_q0q1, axis=1),
                 'o-')
-        ax.set_title('Correlations {}-{}'.format(self.q0_label, self.q1_label))
+        ax.set_title('Correlations {}-{}'.format(self.q0_label,
+                                                 self.q1_label))
         savename = os.path.abspath(os.path.join(
             self.folder, figname))
         # value of 450dpi is arbitrary but higher than default
@@ -892,10 +912,12 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
         ax.set_title('Least squares tomography.')
         if self.verbose > 0:
             print(self.rho)
-        qtp.matrix_histogram_complex(self.rho, xlabels=['00', '01', '10', '11'],
+        qtp.matrix_histogram_complex(self.rho,
+                                     xlabels=['00', '01', '10', '11'],
                                      ylabels=['00', '01', '10', '11'],
-                                     fig=fig2, ax=fig2.add_subplot(
-            122, projection='3d'))
+                                     fig=fig2,
+                                     ax=fig2.add_subplot(122,
+                                                         projection='3d'))
         purity = (self.rho*self.rho).tr()
         msg = 'Purity: {:.3f}'.format(
             purity)
@@ -952,18 +974,21 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
             for i, theta in enumerate(theta_vec):
                 fid_vec[i] = calc_fid2_bell(self.operators_mle,
                                             self.target_bell, theta)
-            msg += '\nMAX Fidelity {:.3f} at \n  LSQ={:.1f} deg and\n  MSQ={:.1f} deg'.format(
-                self.best_fidelity,
-                self.fit_res.best_values['angle_LSQ']*180./np.pi,
-                self.fit_res.best_values['angle_MSQ']*180./np.pi)
+            msg += '\nMAX Fidelity {:.3f} at \n  LSQ={:.1f} deg and\n  ' \
+                   + 'MSQ={:.1f} deg'
+                   .format(self.best_fidelity,
+                           self.fit_res.best_values['angle_LSQ']*180./np.pi,
+                           self.fit_res.best_values['angle_MSQ']*180./np.pi)
         ax.text(txt_x_pos, .6, msg)
 
         plot_operators(self.operators_mle, ax)
         ax.set_title('Max likelihood estimation tomography')
-        qtp.matrix_histogram_complex(self.rho_2, xlabels=['00', '01', '10', '11'],
+        qtp.matrix_histogram_complex(self.rho_2,
+                                     xlabels=['00', '01', '10', '11'],
                                      ylabels=['00', '01', '10', '11'],
                                      fig=fig3,
-                                     ax=fig3.add_subplot(122, projection='3d'))
+                                     ax=fig3.add_subplot(122,
+                                                         projection='3d'))
 
         figname = 'MLE-Tomography_Exp_{}.{}'.format(self.exp_name,
                                                     self.fig_format)
@@ -987,10 +1012,9 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
         angle_LSQ_deg = self.fit_res.best_values['angle_LSQ']*180./np.pi
         angle_MSQ_deg = self.fit_res.best_values['angle_MSQ']*180./np.pi
         ax.set_title('Fit of single qubit phase errors')
-        msg = r'MAX Fidelity at %.3f $\phi_{MSQ}=$%.1f deg and $\phi_{LSQ}=$%.1f deg' % (
-            fidelity,
-            angle_LSQ_deg,
-            angle_MSQ_deg)
+        msg = r'MAX Fidelity at %.3f $\phi_{MSQ}=$%.1f deg and ' \
+              + r'$\phi_{LSQ}=$%.1f deg' % (fidelity, angle_LSQ_deg,
+                                            angle_MSQ_deg)
         msg += "\n Chi sqr. %.3f" % self.fit_res.chisqr
         ax.text(0.5, .6, msg)
         figname = 'Fit_report_{}.{}'.format(self.exp_name,
@@ -1005,10 +1029,9 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
         angle_LSQ_deg = self.fit_res.best_values['angle_LSQ']*180./np.pi
         angle_MSQ_deg = self.fit_res.best_values['angle_MSQ']*180./np.pi
         ax.set_title('Fit of single qubit phase errors')
-        msg = r'MAX Fidelity at %.3f $\phi_{MSQ}=$%.1f deg and $\phi_{LSQ}=$%.1f deg' % (
-            fidelity,
-            angle_LSQ_deg,
-            angle_MSQ_deg)
+        msg = r'MAX Fidelity at %.3f $\phi_{MSQ}=$%.1f deg and ' \
+              + r'$\phi_{LSQ}=$%.1f deg' % (fidelity, angle_LSQ_deg,
+                                            angle_MSQ_deg)
         msg += "\n Chi sqr. %.3f" % self.fit_res.chisqr
         ax.text(0.5, .6, msg)
         figname = 'Fit_report_{}.{}'.format(self.exp_name,
