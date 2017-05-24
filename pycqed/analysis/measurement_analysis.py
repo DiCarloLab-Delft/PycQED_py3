@@ -103,7 +103,7 @@ class MeasurementAnalysis(object):
                 figsize=(min(6*len(self.value_names), 11),
                          1.5*len(self.value_names))
             else:
-               figsize=(6, 1.5*len(self.value_names))
+               figsize=(8, 4*len(self.value_names))
 
         return plt.figure(figsize=figsize, **kw)
 
@@ -117,7 +117,7 @@ class MeasurementAnalysis(object):
         return fig, ax
 
     def save_fig(self, fig, figname=None, xlabel='x', ylabel='y',
-                 fig_tight=True, **kw):
+                 fig_tight=False, **kw):
         plot_formats = kw.pop('plot_formats', ['png'])
         fail_counter = False
         close_fig = kw.pop('close_fig', True)
@@ -174,12 +174,12 @@ class MeasurementAnalysis(object):
         val_len = len(self.value_names)
         if val_len == 4:
             self.figarray, self.axarray = plt.subplots(
-                val_len, 1, figsize=(min(6*len(self.value_names), 11),
-                                     1.5*len(self.value_names)))
+                val_len, 1, figsize=(min(8*len(self.value_names), 11),
+                                     4*len(self.value_names)))
         else:
             self.figarray, self.axarray = plt.subplots(
                 max(len(self.value_names), 1), 1,
-                figsize=(6, 1.5*len(self.value_names)))
+                figsize=(8, 4*len(self.value_names)))
         return tuple(self.f + [self.figarray] + self.ax + [self.axarray])
 
     def get_values(self, key):
@@ -348,7 +348,7 @@ class MeasurementAnalysis(object):
                              1.5*len(self.value_names)))
             else:
                 fig, axs = plt.subplots(max(len(self.value_names), 1), 1,
-                                        figsize=(6, 1.5*len(self.value_names)))
+                                        figsize=(8, 4*len(self.value_names)))
                 # Add all the sweeps to the plot 1 by 1
                 # indices are determined by it's shape/number of sweeps
             for i in range(len(self.value_names)):
@@ -373,6 +373,7 @@ class MeasurementAnalysis(object):
                                                 xlabel=self.xlabel,
                                                 ylabel=self.ylabels[i],
                                                 save=False)
+                fig.suptitle(self.plot_title,fontsize=15)
             if show:
                 plt.show()
 
@@ -499,9 +500,10 @@ class MeasurementAnalysis(object):
         ylabel = kw.get('ylabel', None)
 
         #ax.set_title(self.plot_title)
-        fig.suptitle(self.plot_title,fontsize=title_font_size,
-                     horizontalalignment = 'center', verticalalignment = 'bottom',
-                     y=1)
+        # fig.suptitle(self.plot_title,fontsize=title_font_size,
+        #              horizontalalignment = 'center', verticalalignment = 'bottom',
+        #              y=1)
+        fig.suptitle(self.plot_title,fontsize=title_font_size,y=1)
 
         if xlabel is not None:
             ax.set_xlabel(xlabel,size=11)
@@ -4505,14 +4507,14 @@ class Homodyne_Analysis(MeasurementAnalysis):
         fig, ax = self.default_ax()
 
         if 'hanger' in fitting_model:
-            textstr = '$f_{\mathrm{center}}$ = %.4f $\pm$ (%.3g) GHz' % (
+            textstr = '$f_{\mathrm{center}}$ = %.5f GHz $\pm$ (%.3g) GHz' % (
                 fit_res.params['f0'].value, fit_res.params['f0'].stderr) + '\n' \
                 '$Qc$ = %.1f $\pm$ (%.1f)' % (fit_res.params['Qc'].value, fit_res.params['Qc'].stderr) + '\n' \
                 '$Qi$ = %.1f $\pm$ (%.1f)' % (
                     fit_res.params['Qi'].value, fit_res.params['Qi'].stderr)
 
         elif fitting_model == 'lorentzian':
-            textstr = '$f_{{\mathrm{{center}}}}$ = {:.4f} $\pm$ ({:.3g}) GHz\n' \
+            textstr = '$f_{{\mathrm{{center}}}}$ = {:.5f} GHz $\pm$ ({:.3g}) GHz\n' \
                       '$Q$ = {:.1f} $\pm$ ({:.1f})'.format(
                           fit_res.params['f0'].value*1e-9,
                           fit_res.params['f0'].stderr*1e-9,
@@ -5020,11 +5022,12 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
         self.save_fitted_parameters(self.fit_res,
                                     var_name='distance', save_peaks=True)
 
+        # Plotting measured_values vs sweep points
         if len(self.value_names) == 1:
             fig, axarray = plt.subplots(1, 1, figsize=(6, 1.5*len(self.value_names)))
             axes = [axarray]
         elif len(self.value_names) == 2:
-            fig, axarray = plt.subplots(2, 1, figsize=(6, 1.5*len(self.value_names)))
+            fig, axarray = plt.subplots(2, 1, figsize=(8, 4*len(self.value_names)))
             axes = axarray
         elif len(self.value_names) > 2:
             fig, axarray = plt.subplots(2, 2, figsize=(min(6*len(self.value_names), 11),
@@ -5034,70 +5037,49 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
         for k in range(len(self.measured_values)):
             ax = axes[k]
 
-            # Plot a point for each plot at the chosen best fit f0 frequency (f_ge)
-            f0 = self.fit_res.params['f0'].value
-            f0_idx = a_tools.nearest_idx(self.sweep_points, f0)
-            axes[k].plot(f0, self.measured_values[k][f0_idx], 'o', ms=8)
-
-            if analyze_ef is True:
-                self.fitted_freq_gf_over_2 = self.fit_res.params['f0_gf_over_2'].value
-                # textstr = '$f_{\mathrm{ge}}$=%.5g $\pm$ (%.3g) MHz\nkappa0={%.4g}$\pm${%.2g} MHz\n'\
-                #           '$f_{\mathrm{ef}}/2$=%.5g $\pm$ (%.3g) MHz\nkappa_gf={%.2g}$\pm${%.2g} MHz'% (
-                #     self.fit_res.params['f0'].value*1e-6, self.fit_res.params['f0'].stderr*1e-6,
-                #     self.fit_res.params['kappa'].value/1e6, self.fit_res.params['kappa'].stderr/1e6,
-                #     self.fit_res.params['f0_gf_over_2'].value*1e-6, self.fit_res.params['f0_gf_over_2'].stderr*1e-6,
-                #     self.fit_res.params['kappa_gf_over_2'].value/1e6, self.fit_res.params['kappa_gf_over_2'].stderr/1e6)
-
-                # Plot a point for each plot at the chosen best fit f_ef/2 frequency
-                f0_gf_over_2 = self.fit_res.params['f0_gf_over_2'].value
-                f0_gf_over_2_idx = a_tools.nearest_idx(self.sweep_points, f0_gf_over_2)
-                axes[k].plot(f0_gf_over_2, self.measured_values[k][f0_gf_over_2_idx], 'o', ms=8)
-            # else:
-            #     textstr = '$f_{\mathrm{ge}}$=%.5g $\pm$ (%.3g) MHz\nkappa0={%.4g}$\pm${%.2g} MHz' % (
-            #         self.fit_res.params['f0'].value*1e-6, self.fit_res.params['f0'].stderr*1e-6,
-            #         self.fit_res.params['kappa'].value/1e6, self.fit_res.params['kappa'].stderr/1e6)
-            #
-            # if k==0:
-            #     ax.text(0.49, 0.95, textstr, transform=ax.transAxes,
-            #             fontsize=11, verticalalignment='top', bbox=self.box_props)
-
-            #This creates 2 subplots, one of I_pts vs sweep_pts, and one of Q_pts vs. sweep_pts
-            self.plot_results_vs_sweepparam(x=self.sweep_points,
+            self.plot_results_vs_sweepparam(x=self.sweep_points*1e-9,
                                             y=self.measured_values[k],
                                             fig=fig, ax=ax,
-                                            xlabel='Frequency (Hz)',
+                                            xlabel='Frequency (GHz)',
                                             ylabel=self.ylabels[k],
                                             save=False)
         if show:
             plt.show()
         self.save_fig(fig, figname=self.savename, **kw)
 
+
         # Plotting distance from |0>
         if analyze_ef:
-            label = 'f0={:.5}$\pm$ {:.2} MHz\nkappa0={:.4}$\pm${:.2} MHz\n'\
-                    'f0_gf/2={:.5}$\pm$ {:.2} MHz\nkappa_gf={:.2}$\pm${:.2} MHz'.format(
-                self.fit_res.params['f0'].value/1e6, self.fit_res.params['f0'].stderr/1e6,
+            label = 'f0={:.5f} GHz $\pm$ ({:.2f}) MHz\nkappa0={:.4f} MHz $\pm$ ({:.2f}) MHz\n'\
+                    'f0_gf/2={:.5f} GHz $\pm$ ({:.2f}) MHz\nkappa_gf={:.4f} MHz $\pm$ ({:.2f}) MHz'.format(
+                self.fit_res.params['f0'].value/1e9, self.fit_res.params['f0'].stderr/1e6,
                 self.fit_res.params['kappa'].value/1e6, self.fit_res.params['kappa'].stderr/1e6,
-                self.fit_res.params['f0_gf_over_2'].value/1e6, self.fit_res.params['f0_gf_over_2'].stderr/1e6,
+                self.fit_res.params['f0_gf_over_2'].value/1e9, self.fit_res.params['f0_gf_over_2'].stderr/1e6,
                 self.fit_res.params['kappa_gf_over_2'].value/1e6, self.fit_res.params['kappa_gf_over_2'].stderr/1e6)
         else:
-            label = 'f0={:.5}$\pm$ {:.2} MHz\nkappa0={:.4}$\pm${:.2} MHz'.format(
+            label = 'f0={:.5f} GHz $\pm$ ({:.2f}) MHz\nkappa0={:.4f} MHz $\pm$ ({:.2f}) MHz'.format(
                 self.fit_res.params['f0'].value/1e6, self.fit_res.params['f0'].stderr/1e6,
                 self.fit_res.params['kappa'].value/1e6, self.fit_res.params['kappa'].stderr/1e6)
         fig_dist, ax_dist = self.default_ax()
-        self.plot_results_vs_sweepparam(x=self.sweep_points,
+        self.plot_results_vs_sweepparam(x=self.sweep_points*1e-9,
                                         y=self.data_dist,
                                         fig=fig_dist, ax=ax_dist,
-                                        xlabel='Frequency (Hz)',
+                                        xlabel='Frequency (GHz)',
                                         ylabel='S21 distance (V)',
                                         label=False,
                                         save=False)
-        ax_dist.plot(self.sweep_points, self.fit_res.best_fit, 'r-')      #plot Lorentzian with the fit results
-        ax_dist.plot(f0, self.fit_res.best_fit[f0_idx], 'o', ms=8)
+        ax_dist.plot(self.sweep_points*1e-9, self.fit_res.best_fit, 'r-')      #plot Lorentzian with the fit results
+        # Plot a point for each plot at the chosen best fit f0 frequency (f_ge)
+        f0 = self.fit_res.params['f0'].value
+        f0_idx = a_tools.nearest_idx(self.sweep_points, f0)
+        ax_dist.plot(f0*1e-9, self.fit_res.best_fit[f0_idx], 'o', ms=8)
         if analyze_ef:                                               #plot the ef/2 point as well
-            ax_dist.plot(f0_gf_over_2, self.fit_res.best_fit[f0_gf_over_2_idx], 'o', ms=8)
+            f0_gf_over_2 = self.fit_res.params['f0_gf_over_2'].value
+            self.fitted_freq_gf_over_2 = f0_gf_over_2
+            f0_gf_over_2_idx = a_tools.nearest_idx(self.sweep_points, f0_gf_over_2)
+            ax_dist.plot(f0_gf_over_2*1e-9, self.fit_res.best_fit[f0_gf_over_2_idx], 'o', ms=8)
         if show_guess:
-            ax_dist.plot(self.sweep_points, self.fit_res.init_fit, 'k--') #plot Lorentzian with initial guess
+            ax_dist.plot(self.sweep_points*1e-9, self.fit_res.init_fit, 'k--') #plot Lorentzian with initial guess
         fig_dist.text(0.5, 0, label, transform=ax_dist.transAxes,
                      fontsize=11, verticalalignment='top',
                      horizontalalignment='center',bbox=self.box_props)
