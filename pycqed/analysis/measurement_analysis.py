@@ -3308,8 +3308,8 @@ class T1_Analysis(TD_Analysis):
             textstr = '$T_1$ = %.3g $\pm$ (%.5g) s ' % (
                 self.fit_res.params['tau'].value, self.fit_res.params['tau'].stderr)
 
-            ax.text(0.45, 0.98, textstr, transform=ax.transAxes,
-                    fontsize=11, verticalalignment='top', horizontalalignment='left',
+            fig.text(0.5, 0, textstr, transform=ax.transAxes,
+                    fontsize=11, verticalalignment='top', horizontalalignment='center',
                     bbox=self.box_props)
             self.save_fig(fig, figname=self.measurementstring+'_Fit', **kw)
             # self.save_fig(fig, figname=self.measurementstring+'_' +
