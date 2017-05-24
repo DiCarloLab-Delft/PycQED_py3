@@ -3,7 +3,7 @@ import logging
 import numpy as np
 from scipy import stats
 import h5py
-import matplotlib
+from matplotlib.ticker import FormatStrFormatter
 from matplotlib import pyplot as plt
 from pycqed.analysis import analysis_toolbox as a_tools
 from pycqed.analysis import fitting_models as fit_mods
@@ -97,7 +97,14 @@ class MeasurementAnalysis(object):
         return h5py.File(os.path.join(self.folder, name+'.hdf5'), mode)
 
     def default_fig(self, **kw):
-        figsize = kw.pop('figsize', None)
+        figsize = kw.pop('figsize', (6, 1.5*len(self.value_names)))
+        if figsize is None:
+            if len(self.value_names)==4:
+                figsize=(min(6*len(self.value_names), 11),
+                         1.5*len(self.value_names))
+            else:
+                figsize=(6, 1.5*len(self.value_names))
+
         return plt.figure(figsize=figsize, **kw)
 
     def default_ax(self, fig=None, *arg, **kw):
@@ -110,7 +117,7 @@ class MeasurementAnalysis(object):
         return fig, ax
 
     def save_fig(self, fig, figname=None, xlabel='x', ylabel='y',
-                 fig_tight=True, **kw):
+                 fig_tight=False, **kw):
         plot_formats = kw.pop('plot_formats', ['png'])
         fail_counter = False
         close_fig = kw.pop('close_fig', True)
@@ -365,8 +372,7 @@ class MeasurementAnalysis(object):
                                                 fig=fig, ax=ax, log=log,
                                                 xlabel=self.xlabel,
                                                 ylabel=self.ylabels[i],
-                                                save=False, show=show,
-                                                plot_title=plot_title)
+                                                save=False, show=show)
 
         elif TwoD is True:
             self.get_naming_and_values_2D()
@@ -482,37 +488,44 @@ class MeasurementAnalysis(object):
 
     def plot_results_vs_sweepparam(self, x, y, fig, ax, show=False, marker='-o',
                                    log=False, ticks_around=True, label=None, **kw):
-        save = kw.pop('save', False)
-        title_font_size = kw.get('title_font_size',13)
-        self.plot_title = kw.pop('plot_title',
+        save = kw.get('save', False)
+        title_font_size = kw.get('title_font_size',15)
+        self.plot_title = kw.get('plot_title',
                                  textwrap.fill(self.timestamp_string + '_' +
                                                self.measurementstring, 40))
-        xlabel = kw.pop('xlabel', None)
-        ylabel = kw.pop('ylabel', None)
-        # axis_font = {'family':'helvetica','size':11}
+        xlabel = kw.get('xlabel', None)
+        ylabel = kw.get('ylabel', None)
 
         #ax.set_title(self.plot_title)
-        if kw.get('show_title',True):
-            fig.suptitle(self.plot_title,fontsize=title_font_size,horizontalalignment ='center',verticalalignment ='top')
+        fig.suptitle(self.plot_title,fontsize=title_font_size,
+                     horizontalalignment ='center',
+                     y=0.99)
+
         if xlabel is not None:
             ax.set_xlabel(xlabel,size=11)
         if ylabel is not None:
             ax.set_ylabel(ylabel,size=11)
-        ax.plot(x, y, marker, label=label)
+
+        ax.plot(x, y, marker, markersize=3, label=label)
+
         if log:
             ax.set_yscale('log')
 
         #set tick size to 10
         ax.tick_params(axis='both',labelsize=10)
-        # #set the font name for axis tick labels to be Helvetica
-        # for tick in ax.get_xticklabels():
-        #     tick.set_fontname('Helvetica')
-        # for tick in ax.get_yticklabels():
-        #     tick.set_fontname('Helvetica')
-        #set axes on top and to the right of plot as well
+
         if ticks_around:
-            ax.xaxis.set_tick_params(labeltop='on',top='on',direction='in')
-            ax.yaxis.set_tick_params(labeltop='on',top='on',direction='in')
+            ax.xaxis.set_tick_params(labeltop='off',top='on',direction='in')
+            ax.yaxis.set_tick_params(labeltop='off',top='on',direction='in')
+
+        # Move subplots to the right to fit in PNG
+        # and increase height space between subplots
+        #fig.subplots_adjust(left=0.2,hspace=0.5)
+        fig.subplots_adjust(hspace=0.5,bottom=0.15)
+
+        # set axes labels format to scientific when outside interval [0.01,99]
+        ax.ticklabel_format(axis='x', style='sci', scilimits=(-2,2))
+        ax.ticklabel_format(axis='y', style='sci', scilimits=(-2,2))
 
         if show:
             plt.show()
@@ -524,7 +537,7 @@ class MeasurementAnalysis(object):
                 self.save_fig(fig, xlabel=xlabel, ylabel=ylabel, **kw)
         return
 
-    def plotly_plot(self, x, ydata, fit_res, **kw):
+    def plotly_plot(self, x=None, ydata=None, fit_res=None, **kw):
 
         title = kw.get('title',textwrap.fill(self.timestamp_string + '_' +
                                              self.measurementstring, 40))
@@ -539,38 +552,70 @@ class MeasurementAnalysis(object):
 
         exponent_format = kw.get('exponent_format','e')
 
-        trace1 = go.Scatter(x=x,y=ydata, line=Line(color='blue',width=2),name='data', mode='lines+markers')
-        trace2 = go.Scatter(x=x,y=fit_res.best_fit, line=Line(color='red',width=3), name='fit')
-        trace3 = go.Scatter(x=x,y=fit_res.init_fit, line=Line(color='black',width=1,dash='dash'),name='init_fit')
+        if ydata is not None:
 
-        data = Data([trace1,trace2,trace3])
-        layout = dict(title=title,
-                      updatemenus=list([
-                             dict(x=-0.05,
-                                  y=1,
-                                  yanchor='top',
-                                  buttons=list([dict(args=['visible', [True, True, True, True]],
-                                                     label='All',
-                                                     method='restyle'),
-                                                dict(args=['visible', [True, False, False, False]],
-                                                     label='data',
-                                                     method='restyle'),
-                                                dict(args=['visible', [False, True, False, False]],
-                                                     label='fit',
-                                                     method='restyle'),
-                                                dict(args=['visible', [False, False, True, False]],
-                                                     label='init_fit',
-                                                     method='restyle') ] ) ) ] ),
-                      xaxis=dict(title=xlabel,showexponent=show_exponent,exponentformat=exponent_format,
-                                 ticks='inside',mirror='ticks',showline=True,tickfont=dict(size=10),
-                                 titlefont=dict(size=11)),
-                      yaxis=dict(title=ylabel,ticks='inside',mirror='ticks',showline=True,
-                                 tickfont=dict(size=10),titlefont=dict(size=11)))
+            if fit_res is None:
+                try:
+                    fit_res = self.fit_res
+                except ValueError:
+                    print('WARNING: No fit result object found.')
 
-        fig = Figure(data=data, layout=layout)
+            if x is None:
+                x = self.sweep_points
 
-        if kw.get('show',True):
-            plotly.offline.iplot(fig)
+            trace1 = go.Scatter(x=x,y=ydata, line=Line(color='blue',width=2),name='data', mode='lines+markers')
+            trace2 = go.Scatter(x=x,y=fit_res.best_fit, line=Line(color='red',width=3), name='fit')
+            trace3 = go.Scatter(x=x,y=fit_res.init_fit, line=Line(color='black',width=1,dash='dash'),name='init_fit')
+
+            data = Data([trace1,trace2,trace3])
+            layout = dict(title=title,
+                          updatemenus=list([
+                                 dict(x=-0.05,
+                                      y=1,
+                                      yanchor='top',
+                                      buttons=list([dict(args=['visible', [True, True, True, True]],
+                                                         label='All',
+                                                         method='restyle'),
+                                                    dict(args=['visible', [True, False, False, False]],
+                                                         label='data',
+                                                         method='restyle'),
+                                                    dict(args=['visible', [False, True, False, False]],
+                                                         label='fit',
+                                                         method='restyle'),
+                                                    dict(args=['visible', [False, False, True, False]],
+                                                         label='init_fit',
+                                                         method='restyle') ] ) ) ] ),
+                          xaxis=dict(title=xlabel,showexponent=show_exponent,exponentformat=exponent_format,
+                                     ticks='inside',mirror='ticks',showline=True,tickfont=dict(size=10),
+                                     titlefont=dict(size=11)),
+                          yaxis=dict(title=ylabel,ticks='inside',mirror='ticks',showline=True,
+                                     tickfont=dict(size=10),titlefont=dict(size=11)))
+
+            fig = Figure(data=data, layout=layout)
+
+            if kw.get('show',True):
+                plotly.offline.iplot(fig)
+
+        else:
+            for i, name in enumerate(self.value_names):
+                trace = go.Scatter(x=self.sweep_points,y=self.measured_values[i],
+                                   line=Line(color='blue',width=2),
+                                   name=name, mode='lines+markers')
+                data = Data([trace])
+
+                layout = dict(title=title,
+                              xaxis=dict(title=self.xlabel,showexponent='all',
+                                         exponentformat='e', ticks='inside',
+                                         mirror='ticks',showline=True,tickfont=dict(size=10),
+                                         titlefont=dict(family='Helvetica',size=11)),
+                              yaxis=dict(title=self.ylabels[i],ticks='inside',mirror='ticks',
+                                         showline=True, zeroline=False,tickfont=dict(size=10),
+                                         titlefont=dict(family='Helvetica',size=11)))
+
+                fig = Figure(data=data, layout=layout)
+
+                if kw.get('show',True):
+                    plotly.offline.iplot(fig)
 
         return
 
@@ -1290,7 +1335,6 @@ class Rabi_Analysis_new(TD_Analysis):
         print_fit_results (default=True)                print the fit report
         show              (default=True)                show the plots
         show_guess        (default=False)               plot with initial guess values
-        show_title        (default=True)                whether to show the title or not
         show_amplitudes   (default=True)                print the pi&piHalf pulses amplitudes
         plot_amplitudes   (default=True)                plot the pi&piHalf pulses amplitudes
         plot_errorbars    (default=True)                plot standard error for each sample point
@@ -1361,7 +1405,6 @@ class Rabi_Analysis_new(TD_Analysis):
 
         close_file = kw.get('close_file', True)
         show_guess = kw.get('show_guess', False)
-        show_title = kw.get('show_title',True)
         show = kw.get('show', False)
         plot_amplitudes = kw.get('plot_amplitudes',True)
         # show_amplitudes = kw.get('show_amplitudes',True)
@@ -1396,7 +1439,7 @@ class Rabi_Analysis_new(TD_Analysis):
 
         #Plot results
         self.plot_results(fig1, ax, show_guess=show_guess, plot_amplitudes=plot_amplitudes,
-                          plot_errorbars=plot_errorbars, show_title=show_title, ylabel=r'$F$ $|1 \rangle$')
+                          plot_errorbars=plot_errorbars, ylabel=r'$F$ $|1 \rangle$')
 
         for i, name in enumerate(self.value_names):
             if len(self.value_names) == 4:
@@ -1424,28 +1467,28 @@ class Rabi_Analysis_new(TD_Analysis):
         return self.fit_res
 
     def plot_results(self, fig, ax, ylabel, show_guess=False, plot_amplitudes=True,
-                     plot_errorbars=True,show_title=True):
+                     plot_errorbars=True):
 
         pi_pulse = self.rabi_amplitudes['piPulse']
         pi_half_pulse = self.rabi_amplitudes['piHalfPulse']
 
-        textstr = ('  $\pi-Amp$  \t= %.3g $ \t \pm$ (%.3g) V'
+        textstr = ('   $\pi-Amp$ = %.3g $ \t \pm$ (%.3g) V'
                    % (pi_pulse,
                       self.rabi_amplitudes['piPulse_std']) +
                    '\n$\pi/2-Amp$ = %.3g $\t \pm$ (%.3g) V '
                    % (pi_half_pulse,
                       self.rabi_amplitudes['piHalfPulse_std']))
-        ax.text(0.7, 0.97, textstr,
+        ax.text(0.5,0.98,textstr,
                 transform=ax.transAxes, fontsize=11,
-                verticalalignment='top', bbox=self.box_props)
+                verticalalignment='top',
+                horizontalalignment='center',bbox=self.box_props)
 
         self.plot_results_vs_sweepparam(x=self.sweep_points,        #This also plots the cal_points
                                         y=self.normalized_values,
                                         fig=fig, ax=ax,
                                         xlabel=self.xlabel,
                                         ylabel=ylabel,
-                                        save=False,
-                                        show_title=show_title)
+                                        save=False)
 
         best_vals = self.fit_res.best_values
         #Used for plotting the fit (line 1433)
@@ -1464,6 +1507,7 @@ class Rabi_Analysis_new(TD_Analysis):
             #plot 2 horizontal lines for piAmpl and piHaldAmpl
             ax.plot([min(self.sweep_points), max(self.sweep_points)],[piPulse_fit, piPulse_fit], 'k--')
             ax.plot([min(self.sweep_points), max(self.sweep_points)],[piHalfPulse_fit, piHalfPulse_fit], 'k--')
+            ax.yaxis.set_major_formatter(FormatStrFormatter('%.2f'))
             #Add extra ticks and labels
             ax.set_yticks(list(ax.get_yticks()) + [piPulse_fit])
             ax.set_yticks(list(ax.get_yticks()) + [piHalfPulse_fit])
@@ -1920,7 +1964,6 @@ class QScale_Analysis(TD_Analysis):
 
         # Unique in that it has hardcoded names and points to plot
         show_guess = kw.get('show_guess', False)
-        show_title = kw.get('show_title',True)
         self.fig, self.ax = plt.subplots(1, 1, figsize=(15, 10))
         plot_title = kw.get('plot_title', textwrap.fill(
             self.timestamp_string + '_' +
@@ -1939,13 +1982,13 @@ class QScale_Analysis(TD_Analysis):
 
         self.plot_results_vs_sweepparam(self.sweep_points_xX, self.corr_data_xX, self.fig, self.ax,
                                         marker='-ob',label=r'$X_{\frac{\pi}{2}}X_{\pi}$',
-                                        ticks_around=True, show_title=show_title)
+                                        ticks_around=True)
         self.plot_results_vs_sweepparam(self.sweep_points_xY, self.corr_data_xY, self.fig, self.ax,
                                         marker='-og',label=r'$X_{\frac{\pi}{2}}Y_{\pi}$',
-                                        ticks_around=True, show_title=show_title)
+                                        ticks_around=True)
         self.plot_results_vs_sweepparam(self.sweep_points_xmY, self.corr_data_xmY, self.fig, self.ax,
                                         marker='-or',label=r'$X_{\frac{\pi}{2}}Y_{-\pi}$',
-                                        ticks_around=True, show_title=show_title)
+                                        ticks_around=True)
 
 
         c = ['b', 'g', 'r']
@@ -3197,8 +3240,7 @@ class T1_Analysis(TD_Analysis):
                                                 fig=figarray, ax=ax2,
                                                 xlabel=self.xlabel,
                                                 ylabel=self.ylabels[i],
-                                                save=False,
-                                                ticks_around=False)
+                                                save=False)
 
                 if 'I_cal' in self.value_names[i]:  # Fit the data
                     norm = self.normalize_data_to_calibration_points(
@@ -3245,8 +3287,8 @@ class T1_Analysis(TD_Analysis):
             textstr = '$T_1$ = %.3g $\pm$ (%.5g) s ' % (
                 self.fit_res.params['tau'].value, self.fit_res.params['tau'].stderr)
 
-            ax.text(0.4, 0.95, textstr, transform=ax.transAxes,
-                    fontsize=11, verticalalignment='top',
+            ax.text(0.45, 0.98, textstr, transform=ax.transAxes,
+                    fontsize=11, verticalalignment='top', horizontalalignment='left',
                     bbox=self.box_props)
             self.save_fig(fig, figname=self.measurementstring+'_Fit', **kw)
             # self.save_fig(fig, figname=self.measurementstring+'_' +
@@ -3370,25 +3412,25 @@ class Ramsey_Analysis(TD_Analysis):
 
         return fit_res
 
-    def plot_results(self, fig, ax, fit_res, ylabel, show_guess=False,show_title=True):
-        textstr = ('  $f$  \t= %.3g $ \t \pm$ (%.3g) Hz'
+    def plot_results(self, fig, ax, fit_res, xlabel, ylabel, show_guess=False):
+        textstr = ('$f$    = %.3g $ \t \pm$ (%.3g) Hz'
                    % (fit_res.params['frequency'].value,
                       fit_res.params['frequency'].stderr) +
                    '\n$T_2^\star$ = %.3g $\t \pm$ (%.3g) s '
                    % (fit_res.params['tau'].value,
                       fit_res.params['tau'].stderr))
-        ax.text(0.4, 0.95, textstr,
+        ax.text(0.99, 0.98, textstr,
                 transform=ax.transAxes, fontsize=11,
-                verticalalignment='top', bbox=self.box_props)
+                verticalalignment='top',
+                horizontalalignment='right', bbox=self.box_props)
 
-        xlabel = str(self.sweep_name +r' ($\mu$s)')
         self.plot_results_vs_sweepparam(x=self.sweep_points*1e6,
                                         y=self.normalized_values,
                                         fig=fig, ax=ax,
                                         xlabel=xlabel,
                                         ylabel=ylabel,
                                         save=False,
-                                        show_title=show_title)
+                                        ticks_around=True)
 
         x = np.linspace(self.sweep_points[0],
                         self.sweep_points[-self.NoCalPoints],
@@ -3412,11 +3454,11 @@ class Ramsey_Analysis(TD_Analysis):
 
         close_file = kw.pop('close_file', True)
         show_guess = kw.pop('show_guess', False)
-        show_title = kw.get('show_title',True)
         show = kw.pop('show', False)
         self.add_analysis_datagroup_to_file()
         self.get_naming_and_values()
         fig1, fig2, ax, axarray = self.setup_figures_and_axes()
+        xlabel = str(self.sweep_name +r' ($\mu$s)')
 
         norm = self.normalize_data_to_calibration_points(
             self.measured_values[0], self.NoCalPoints)
@@ -3433,7 +3475,8 @@ class Ramsey_Analysis(TD_Analysis):
         self.get_measured_T2_star(**kw)  #defines self.T2_star as a dict
         self.save_computed_parameters(self.T2_star, var_name=self.value_names[0])
 
-        self.plot_results(fig1, ax, self.fit_res, show_guess=show_guess,show_title=show_title,
+        self.plot_results(fig1, ax, self.fit_res, show_guess=show_guess,
+                          xlabel=xlabel,
                           ylabel=r'$F$ $|1 \rangle$')
 
         #Plot I and Q data vs sweep_points separately
@@ -3446,13 +3489,12 @@ class Ramsey_Analysis(TD_Analysis):
             else:
                 ax2 = axarray[i]
 
-            self.plot_results_vs_sweepparam(x=self.sweep_points,
+            self.plot_results_vs_sweepparam(x=self.sweep_points*1e6,
                                             y=self.measured_values[i],
                                             fig=fig2, ax=ax2,
-                                            xlabel=self.xlabel,
+                                            xlabel=xlabel,
                                             ylabel=self.ylabels[i],
-                                            save=False,
-                                            ticks_around=False)
+                                            save=False)
 
         stepsize = self.sweep_points[1] - self.sweep_points[0]
         self.total_detuning = self.fit_res.params['frequency'].value
@@ -3465,8 +3507,8 @@ class Ramsey_Analysis(TD_Analysis):
 
         if show:
             plt.show()
-        self.save_fig(fig1, figname=self.measurementstring+'_Ramsey_fit', **kw)
-        self.save_fig(fig2, figname=self.measurementstring, **kw)
+        self.save_fig(fig1, figname=self.measurementstring+'_Ramsey_fit', fig_tight=False, **kw)
+        self.save_fig(fig2, figname=self.measurementstring, fig_tight=False, **kw)
 
         if close_file:
             self.data_file.close()
@@ -4439,7 +4481,6 @@ class Homodyne_Analysis(MeasurementAnalysis):
 
         ########## Plot results ##########
 
-        show_title = kw.get('show_title',True)
         fig, ax = self.default_ax()
 
         if 'hanger' in fitting_model:
@@ -4457,8 +4498,9 @@ class Homodyne_Analysis(MeasurementAnalysis):
                           fit_res.params['Q'].value,
                           fit_res.params['Q'].stderr)
 
-        ax.text(0.05, 0.95, textstr, transform=ax.transAxes, fontsize=11,
-                verticalalignment='top', bbox=self.box_props)
+        ax.text(0.99, 0.98, textstr, transform=ax.transAxes, fontsize=11,
+                verticalalignment='top',
+                horizontalalignment='right', bbox=self.box_props)
         idx = list(self.xlabel).index('(')
         self.xlabel = self.xlabel[:idx+1]+'G'+self.xlabel[idx+1:]
 
@@ -4468,8 +4510,7 @@ class Homodyne_Analysis(MeasurementAnalysis):
                                             fig=fig, ax=ax,
                                             xlabel=self.xlabel,
                                             ylabel=str('S21_mag (arb. units)'),
-                                            save=False,
-                                            show_title=show_title)
+                                            save=False)
 
             if interactive_plot:
                 self.plotly_plot(self.sweep_points*1e-9,self.data_y,fit_res,
@@ -4485,7 +4526,7 @@ class Homodyne_Analysis(MeasurementAnalysis):
                      verticalalignment='top', bbox=self.box_props)
             self.plot_results_vs_sweepparam(x=self.sweep_points, y=data_amp,
                                             fig=fig2, ax=ax2, show=False, save=False,
-                                            title_font_size=20,show_title=show_title)
+                                            title_font_size=20)
 
         elif fitting_model == 'lorentzian':
             self.plot_results_vs_sweepparam(x=self.sweep_points*1e-9,
@@ -4493,8 +4534,7 @@ class Homodyne_Analysis(MeasurementAnalysis):
                                             fig=fig, ax=ax,
                                             xlabel=self.xlabel,
                                             ylabel=str('Power (arb. units)'),
-                                            save=False,
-                                            show_title=show_title)
+                                            save=False)
             if interactive_plot:
                 self.plotly_plot(self.sweep_points*1e-9,self.measured_powers,fit_res,
                                  xlabel=self.xlabel,ylabel=str('Power (arb. units)'),
@@ -4943,7 +4983,6 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
         self.add_analysis_datagroup_to_file()
         self.savename = kw.get('save_name', 'Source Frequency')
         show_guess = kw.get('show_guess', True)
-        show_title = kw.get('show_title',True)
         close_file = kw.get('close_file', True)
         interactive_plot = kw.get('interactive_plot',False)
         self.get_naming_and_values()
@@ -4960,13 +4999,14 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
                                     var_name='distance', save_peaks=True)
 
         if len(self.value_names) == 1:
-            fig, axarray = plt.subplots(1, 1, figsize=(12, 10))
+            fig, axarray = plt.subplots(1, 1, figsize=(6, 1.5*len(self.value_names)))
             axes = [axarray]
         elif len(self.value_names) == 2:
-            fig, axarray = plt.subplots(2, 1, figsize=(12, 10))
+            fig, axarray = plt.subplots(2, 1, figsize=(6, 1.5*len(self.value_names)))
             axes = axarray
         elif len(self.value_names) > 2:
-            fig, axarray = plt.subplots(2, 2, figsize=(12, 10))
+            fig, axarray = plt.subplots(2, 2, figsize=(min(6*len(self.value_names), 11),
+                                                       1.5*len(self.value_names)))
             axes = [axarray[k/2, k % 2] for k in range(len(self.value_names))]
 
         for k in range(len(self.measured_values)):
@@ -4979,68 +5019,71 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
 
             if analyze_ef is True:
                 self.fitted_freq_gf_over_2 = self.fit_res.params['f0_gf_over_2'].value
-                textstr = '$f_{\mathrm{ge}}$ = %.5g $\pm$ (%.3g) MHz\n'\
-                          '$f_{\mathrm{ef}}/2$ = %.5g $\pm$ (%.3g) MHz'% (
-                    self.fit_res.params['f0'].value*1e-6, self.fit_res.params['f0'].stderr*1e-6,
-                    self.fit_res.params['f0_gf_over_2'].value*1e-6, self.fit_res.params['f0_gf_over_2'].stderr*1e-6)
+                # textstr = '$f_{\mathrm{ge}}$=%.5g $\pm$ (%.3g) MHz\nkappa0={%.4g}$\pm${%.2g} MHz\n'\
+                #           '$f_{\mathrm{ef}}/2$=%.5g $\pm$ (%.3g) MHz\nkappa_gf={%.2g}$\pm${%.2g} MHz'% (
+                #     self.fit_res.params['f0'].value*1e-6, self.fit_res.params['f0'].stderr*1e-6,
+                #     self.fit_res.params['kappa'].value/1e6, self.fit_res.params['kappa'].stderr/1e6,
+                #     self.fit_res.params['f0_gf_over_2'].value*1e-6, self.fit_res.params['f0_gf_over_2'].stderr*1e-6,
+                #     self.fit_res.params['kappa_gf_over_2'].value/1e6, self.fit_res.params['kappa_gf_over_2'].stderr/1e6)
 
                 # Plot a point for each plot at the chosen best fit f_ef/2 frequency
                 f0_gf_over_2 = self.fit_res.params['f0_gf_over_2'].value
                 f0_gf_over_2_idx = a_tools.nearest_idx(self.sweep_points, f0_gf_over_2)
                 axes[k].plot(f0_gf_over_2, self.measured_values[k][f0_gf_over_2_idx], 'o', ms=8)
-            else:
-                textstr = '$f_{\mathrm{ge}}$ = %.5g $\pm$ (%.3g) MHz' % (
-                    self.fit_res.params['f0'].value*1e-6, self.fit_res.params['f0'].stderr*1e-6)
-
-            ax.text(0.05, 0.95, textstr, transform=ax.transAxes,
-                    fontsize=11, verticalalignment='top', bbox=self.box_props)
+            # else:
+            #     textstr = '$f_{\mathrm{ge}}$=%.5g $\pm$ (%.3g) MHz\nkappa0={%.4g}$\pm${%.2g} MHz' % (
+            #         self.fit_res.params['f0'].value*1e-6, self.fit_res.params['f0'].stderr*1e-6,
+            #         self.fit_res.params['kappa'].value/1e6, self.fit_res.params['kappa'].stderr/1e6)
+            #
+            # if k==0:
+            #     ax.text(0.49, 0.95, textstr, transform=ax.transAxes,
+            #             fontsize=11, verticalalignment='top', bbox=self.box_props)
 
             #This creates 2 subplots, one of I_pts vs sweep_pts, and one of Q_pts vs. sweep_pts
             self.plot_results_vs_sweepparam(x=self.sweep_points,
                                             y=self.measured_values[k],
                                             fig=fig, ax=ax,
-                                            xlabel='Frequency (GHz)',
+                                            xlabel='Frequency (Hz)',
                                             ylabel=self.ylabels[k],
-                                            save=False,
-                                            ticks_around=False)
+                                            save=False)
         if show:
             plt.show()
         self.save_fig(fig, figname=self.savename, **kw)
 
         # Plotting distance from |0>
         if analyze_ef:
-            label = 'f0={:.5}$\pm$ {:.2} MHz, linewidth={:.4}$\pm${:.2} MHz \n'\
-                    'f0_gf/2={:.5}$\pm$ {:.2} MHz, linewidth={:.4}$\pm${:.2} MHz'.format(
+            label = 'f0={:.5}$\pm$ {:.2} MHz\nkappa0={:.4}$\pm${:.2} MHz\n'\
+                    'f0_gf/2={:.5}$\pm$ {:.2} MHz\nkappa_gf={:.2}$\pm${:.2} MHz'.format(
                 self.fit_res.params['f0'].value/1e6, self.fit_res.params['f0'].stderr/1e6,
                 self.fit_res.params['kappa'].value/1e6, self.fit_res.params['kappa'].stderr/1e6,
                 self.fit_res.params['f0_gf_over_2'].value/1e6, self.fit_res.params['f0_gf_over_2'].stderr/1e6,
                 self.fit_res.params['kappa_gf_over_2'].value/1e6, self.fit_res.params['kappa_gf_over_2'].stderr/1e6)
         else:
-            label = r'f0={:.5}$\pm$ {:.2} MHz, linewidth={:.4}$\pm${:.2} MHz'.format(
+            label = 'f0={:.5}$\pm$ {:.2} MHz\nkappa0={:.4}$\pm${:.2} MHz'.format(
                 self.fit_res.params['f0'].value/1e6, self.fit_res.params['f0'].stderr/1e6,
                 self.fit_res.params['kappa'].value/1e6, self.fit_res.params['kappa'].stderr/1e6)
         fig_dist, ax_dist = self.default_ax()
         self.plot_results_vs_sweepparam(x=self.sweep_points,
                                         y=self.data_dist,
                                         fig=fig_dist, ax=ax_dist,
-                                        xlabel='Frequency (GHz)',
+                                        xlabel='Frequency (Hz)',
                                         ylabel='S21 distance (V)',
                                         label=False,
-                                        save=False,
-                                        show_title=show_title)
+                                        save=False)
         ax_dist.plot(self.sweep_points, self.fit_res.best_fit, 'r-')      #plot Lorentzian with the fit results
         ax_dist.plot(f0, self.fit_res.best_fit[f0_idx], 'o', ms=8)
         if analyze_ef:                                               #plot the ef/2 point as well
             ax_dist.plot(f0_gf_over_2, self.fit_res.best_fit[f0_gf_over_2_idx], 'o', ms=8)
         if show_guess:
             ax_dist.plot(self.sweep_points, self.fit_res.init_fit, 'k--') #plot Lorentzian with initial guess
-        ax_dist.text(0.6, 0.95, label, transform=ax_dist.transAxes,
-                     fontsize=11, verticalalignment='top', bbox=self.box_props)
+        ax_dist.text(0.99, 0.98, label, transform=ax_dist.transAxes,
+                     fontsize=11, verticalalignment='top',
+                     horizontalalignment='right',bbox=self.box_props)
 
         if print_fit_results is True:
             print(self.fit_res.fit_report())
 
-        if kw.pop('print_frequency',False):
+        if kw.get('print_frequency',False):
             if analyze_ef:
                 print('f_ge = {:.5} (GHz) \t f_ge Stderr = {:.5} (MHz) \n'
                       'f_gf/2 = {:.5} (GHz) \t f_gf/2 Stderr = {:.5} (MHz)'.format(self.fitted_freq*1e-9,
