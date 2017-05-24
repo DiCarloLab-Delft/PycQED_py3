@@ -103,7 +103,7 @@ class MeasurementAnalysis(object):
                 figsize=(min(6*len(self.value_names), 11),
                          1.5*len(self.value_names))
             else:
-                figsize=(6, 1.5*len(self.value_names))
+               figsize=(6, 1.5*len(self.value_names))
 
         return plt.figure(figsize=figsize, **kw)
 
@@ -117,7 +117,7 @@ class MeasurementAnalysis(object):
         return fig, ax
 
     def save_fig(self, fig, figname=None, xlabel='x', ylabel='y',
-                 fig_tight=False, **kw):
+                 fig_tight=True, **kw):
         plot_formats = kw.pop('plot_formats', ['png'])
         fail_counter = False
         close_fig = kw.pop('close_fig', True)
@@ -140,7 +140,7 @@ class MeasurementAnalysis(object):
                 fig.savefig(
                     self.savename, dpi=300,
                     # value of 300 is arbitrary but higher than default
-                    format=plot_format)
+                    format=plot_format, bbox_inches='tight',pad_inches=0.25)
             except:
                 fail_counter = True
         if fail_counter:
@@ -348,7 +348,7 @@ class MeasurementAnalysis(object):
                              1.5*len(self.value_names)))
             else:
                 fig, axs = plt.subplots(max(len(self.value_names), 1), 1,
-                                        figsize=(5, 3*len(self.value_names)))
+                                        figsize=(6, 1.5*len(self.value_names)))
                 # Add all the sweeps to the plot 1 by 1
                 # indices are determined by it's shape/number of sweeps
             for i in range(len(self.value_names)):
@@ -372,7 +372,9 @@ class MeasurementAnalysis(object):
                                                 fig=fig, ax=ax, log=log,
                                                 xlabel=self.xlabel,
                                                 ylabel=self.ylabels[i],
-                                                save=False, show=show)
+                                                save=False)
+            if show:
+                plt.show()
 
         elif TwoD is True:
             self.get_naming_and_values_2D()
@@ -498,8 +500,8 @@ class MeasurementAnalysis(object):
 
         #ax.set_title(self.plot_title)
         fig.suptitle(self.plot_title,fontsize=title_font_size,
-                     horizontalalignment ='center',
-                     y=0.99)
+                     horizontalalignment = 'center', verticalalignment = 'bottom',
+                     y=1)
 
         if xlabel is not None:
             ax.set_xlabel(xlabel,size=11)
@@ -521,7 +523,8 @@ class MeasurementAnalysis(object):
         # Move subplots to the right to fit in PNG
         # and increase height space between subplots
         #fig.subplots_adjust(left=0.2,hspace=0.5)
-        fig.subplots_adjust(hspace=0.5,bottom=0.15)
+        fig.subplots_adjust(hspace=0.5,bottom=0.18)
+        #fig.tight_layout()
 
         # set axes labels format to scientific when outside interval [0.01,99]
         ax.ticklabel_format(axis='x', style='sci', scilimits=(-2,2))
@@ -539,8 +542,7 @@ class MeasurementAnalysis(object):
 
     def plotly_plot(self, x=None, ydata=None, fit_res=None, **kw):
 
-        title = kw.get('title',textwrap.fill(self.timestamp_string + '_' +
-                                             self.measurementstring, 40))
+        title = kw.get('title',None)
 
         xlabel = kw.get('xlabel',None)
         ylabel = kw.get('ylabel',None)
@@ -552,51 +554,11 @@ class MeasurementAnalysis(object):
 
         exponent_format = kw.get('exponent_format','e')
 
-        if ydata is not None:
-
-            if fit_res is None:
-                try:
-                    fit_res = self.fit_res
-                except ValueError:
-                    print('WARNING: No fit result object found.')
-
-            if x is None:
-                x = self.sweep_points
-
-            trace1 = go.Scatter(x=x,y=ydata, line=Line(color='blue',width=2),name='data', mode='lines+markers')
-            trace2 = go.Scatter(x=x,y=fit_res.best_fit, line=Line(color='red',width=3), name='fit')
-            trace3 = go.Scatter(x=x,y=fit_res.init_fit, line=Line(color='black',width=1,dash='dash'),name='init_fit')
-
-            data = Data([trace1,trace2,trace3])
-            layout = dict(title=title,
-                          updatemenus=list([
-                                 dict(x=-0.05,
-                                      y=1,
-                                      yanchor='top',
-                                      buttons=list([dict(args=['visible', [True, True, True, True]],
-                                                         label='All',
-                                                         method='restyle'),
-                                                    dict(args=['visible', [True, False, False, False]],
-                                                         label='data',
-                                                         method='restyle'),
-                                                    dict(args=['visible', [False, True, False, False]],
-                                                         label='fit',
-                                                         method='restyle'),
-                                                    dict(args=['visible', [False, False, True, False]],
-                                                         label='init_fit',
-                                                         method='restyle') ] ) ) ] ),
-                          xaxis=dict(title=xlabel,showexponent=show_exponent,exponentformat=exponent_format,
-                                     ticks='inside',mirror='ticks',showline=True,tickfont=dict(size=10),
-                                     titlefont=dict(size=11)),
-                          yaxis=dict(title=ylabel,ticks='inside',mirror='ticks',showline=True,
-                                     tickfont=dict(size=10),titlefont=dict(size=11)))
-
-            fig = Figure(data=data, layout=layout)
-
-            if kw.get('show',True):
-                plotly.offline.iplot(fig)
-
-        else:
+        if (x is None) and (ydata is None) and (fit_res is None):
+            #just plot all measured values vs sweep params
+            if title is None:
+                title = textwrap.fill(self.timestamp_string + '_' +
+                                      self.measurementstring, 40)
             for i, name in enumerate(self.value_names):
                 trace = go.Scatter(x=self.sweep_points,y=self.measured_values[i],
                                    line=Line(color='blue',width=2),
@@ -604,8 +566,8 @@ class MeasurementAnalysis(object):
                 data = Data([trace])
 
                 layout = dict(title=title,
-                              xaxis=dict(title=self.xlabel,showexponent='all',
-                                         exponentformat='e', ticks='inside',
+                              xaxis=dict(title=self.xlabel,showexponent=show_exponent,
+                                         exponentformat=exponent_format, ticks='inside',
                                          mirror='ticks',showline=True,tickfont=dict(size=10),
                                          titlefont=dict(family='Helvetica',size=11)),
                               yaxis=dict(title=self.ylabels[i],ticks='inside',mirror='ticks',
@@ -613,9 +575,69 @@ class MeasurementAnalysis(object):
                                          titlefont=dict(family='Helvetica',size=11)))
 
                 fig = Figure(data=data, layout=layout)
-
                 if kw.get('show',True):
                     plotly.offline.iplot(fig)
+
+        else:
+            #plot data points with fit results
+
+            # if fit_res is None:
+            #     try:
+            #         fit_res = self.fit_res
+            #     except ValueError:
+            #         print('WARNING: No fit result object found.')
+
+            if x is None:
+                x = self.sweep_points
+
+            trace1 = go.Scatter(x=x,y=ydata, line=Line(color='blue',width=2),name='data', mode='lines+markers')
+
+            if fit_res is None:
+                data = Data([trace1])
+
+                layout = dict(title=title,
+                              xaxis=dict(title=xlabel,showexponent=show_exponent,
+                                         exponentformat=exponent_format, ticks='inside',
+                                         mirror='ticks',showline=True,tickfont=dict(size=10),
+                                         titlefont=dict(family='Helvetica',size=11)),
+                              yaxis=dict(title=ylabel,ticks='inside',mirror='ticks',
+                                         showline=True, zeroline=False,tickfont=dict(size=10),
+                                         titlefont=dict(family='Helvetica',size=11)))
+            else:
+                trace2 = go.Scatter(x=x,y=fit_res.best_fit, line=Line(color='red',width=3), name='fit')
+                trace3 = go.Scatter(x=x,y=fit_res.init_fit, line=Line(color='black',width=1,dash='dash'),name='init_fit')
+
+                data = Data([trace1,trace2,trace3])
+                if title is None:
+                    title = textwrap.fill(self.timestamp_string + '_' +
+                                          self.measurementstring, 40)
+                layout = dict(title=title,
+                              updatemenus=list([
+                                     dict(x=-0.05,
+                                          y=1,
+                                          yanchor='top',
+                                          buttons=list([dict(args=['visible', [True, True, True, True]],
+                                                             label='All',
+                                                             method='restyle'),
+                                                        dict(args=['visible', [True, False, False, False]],
+                                                             label='data',
+                                                             method='restyle'),
+                                                        dict(args=['visible', [False, True, False, False]],
+                                                             label='fit',
+                                                             method='restyle'),
+                                                        dict(args=['visible', [False, False, True, False]],
+                                                             label='init_fit',
+                                                             method='restyle') ] ) ) ] ),
+                              xaxis=dict(title=xlabel,showexponent=show_exponent,exponentformat=exponent_format,
+                                         ticks='inside',mirror='ticks',showline=True,tickfont=dict(size=10),
+                                         titlefont=dict(size=11)),
+                              yaxis=dict(title=ylabel,ticks='inside',mirror='ticks',showline=True,
+                                         tickfont=dict(size=10),titlefont=dict(size=11)))
+
+            fig = Figure(data=data, layout=layout)
+
+            if kw.get('show',True):
+                plotly.offline.iplot(fig)
 
         return
 
@@ -1455,8 +1477,7 @@ class Rabi_Analysis_new(TD_Analysis):
                                             fig=fig2, ax=ax2,
                                             xlabel=self.xlabel,
                                             ylabel=self.ylabels[i],
-                                            save=False,
-                                            ticks_around=False)
+                                            save=False)
 
         if show:
             plt.show()
@@ -1472,13 +1493,13 @@ class Rabi_Analysis_new(TD_Analysis):
         pi_pulse = self.rabi_amplitudes['piPulse']
         pi_half_pulse = self.rabi_amplitudes['piHalfPulse']
 
-        textstr = ('   $\pi-Amp$ = %.3g $ \t \pm$ (%.3g) V'
+        textstr = ('  $\pi-Amp$ = %.3g $ \t \pm$ (%.3g) V'
                    % (pi_pulse,
                       self.rabi_amplitudes['piPulse_std']) +
                    '\n$\pi/2-Amp$ = %.3g $\t \pm$ (%.3g) V '
                    % (pi_half_pulse,
                       self.rabi_amplitudes['piHalfPulse_std']))
-        ax.text(0.5,0.98,textstr,
+        fig.text(0.5,0,textstr,
                 transform=ax.transAxes, fontsize=11,
                 verticalalignment='top',
                 horizontalalignment='center',bbox=self.box_props)
@@ -3413,16 +3434,16 @@ class Ramsey_Analysis(TD_Analysis):
         return fit_res
 
     def plot_results(self, fig, ax, fit_res, xlabel, ylabel, show_guess=False):
-        textstr = ('$f$    = %.3g $ \t \pm$ (%.3g) Hz'
+        textstr = ('$f$ = %.3g $ \t \pm$ (%.3g) Hz'
                    % (fit_res.params['frequency'].value,
                       fit_res.params['frequency'].stderr) +
                    '\n$T_2^\star$ = %.3g $\t \pm$ (%.3g) s '
                    % (fit_res.params['tau'].value,
                       fit_res.params['tau'].stderr))
-        ax.text(0.99, 0.98, textstr,
+        fig.text(0.5, 0, textstr,
                 transform=ax.transAxes, fontsize=11,
                 verticalalignment='top',
-                horizontalalignment='right', bbox=self.box_props)
+                horizontalalignment='center', bbox=self.box_props)
 
         self.plot_results_vs_sweepparam(x=self.sweep_points*1e6,
                                         y=self.normalized_values,
@@ -4498,9 +4519,9 @@ class Homodyne_Analysis(MeasurementAnalysis):
                           fit_res.params['Q'].value,
                           fit_res.params['Q'].stderr)
 
-        ax.text(0.99, 0.98, textstr, transform=ax.transAxes, fontsize=11,
+        fig.text(0.5, 0, textstr, transform=ax.transAxes, fontsize=11,
                 verticalalignment='top',
-                horizontalalignment='right', bbox=self.box_props)
+                horizontalalignment='center', bbox=self.box_props)
         idx = list(self.xlabel).index('(')
         self.xlabel = self.xlabel[:idx+1]+'G'+self.xlabel[idx+1:]
 
@@ -4522,8 +4543,9 @@ class Homodyne_Analysis(MeasurementAnalysis):
                 data_complex, fig=fig, ax=ax, show=False, save=False)
             # second figure with amplitude
             fig2, ax2 = self.default_ax()
-            ax2.text(0.05, 0.95, textstr, transform=ax.transAxes, fontsize=11,
-                     verticalalignment='top', bbox=self.box_props)
+            fig2.text(0.5, 0, textstr, transform=ax.transAxes, fontsize=11,
+                     verticalalignment='top', horizontalalignment = 'center',
+                      bbox=self.box_props)
             self.plot_results_vs_sweepparam(x=self.sweep_points, y=data_amp,
                                             fig=fig2, ax=ax2, show=False, save=False,
                                             title_font_size=20)
@@ -5076,9 +5098,9 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
             ax_dist.plot(f0_gf_over_2, self.fit_res.best_fit[f0_gf_over_2_idx], 'o', ms=8)
         if show_guess:
             ax_dist.plot(self.sweep_points, self.fit_res.init_fit, 'k--') #plot Lorentzian with initial guess
-        ax_dist.text(0.99, 0.98, label, transform=ax_dist.transAxes,
+        fig_dist.text(0.5, 0, label, transform=ax_dist.transAxes,
                      fontsize=11, verticalalignment='top',
-                     horizontalalignment='right',bbox=self.box_props)
+                     horizontalalignment='center',bbox=self.box_props)
 
         if print_fit_results is True:
             print(self.fit_res.fit_report())
