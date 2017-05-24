@@ -406,8 +406,8 @@ class MeasurementAnalysis(object):
                     cmap_chosen=self.cmap_chosen,
                     **kw)
 
-            fig.tight_layout(h_pad=1.5)
-            fig.subplots_adjust(top=3.0)
+            #fig.tight_layout(h_pad=1.5)
+            #fig.subplots_adjust(top=3.0)
             plot_title = '{timestamp}_{measurement}'.format(
                 timestamp=self.timestamp_string,
                 measurement=self.measurementstring)
@@ -1331,11 +1331,10 @@ class Rabi_Analysis_new(TD_Analysis):
         #Set up fit parameters and perform fit
         cos_mod.set_param_hint('amplitude',
                                value=amp_guess,
-                               vary=True,
-                               min=0)
+                               vary=True)
         cos_mod.set_param_hint('phase',
-                               value=phase_guess,
-                               vary=True,
+                               value=0,
+                               vary=False,
                                min=0)
         cos_mod.set_param_hint('frequency',
                                value=freq_guess,
@@ -3424,6 +3423,7 @@ class Ramsey_Analysis(TD_Analysis):
 
         #Perform fit and save fitted parameters
         self.fit_res = self.fit_Ramsey(**kw)
+        self.get_measured_freq(**kw)
         self.save_fitted_parameters(self.fit_res, var_name=self.value_names[0])
 
         #Extract T2 star and save it
@@ -3454,8 +3454,8 @@ class Ramsey_Analysis(TD_Analysis):
         stepsize = self.sweep_points[1] - self.sweep_points[0]
         self.total_detuning = self.fit_res.params['frequency'].value
         self.detuning_stderr = self.fit_res.params['frequency'].stderr
-        self.T2_star = self.fit_res.params['tau'].value
-        self.T2_star_stderr = self.fit_res.params['tau'].stderr
+        # self.T2_star = self.fit_res.params['tau'].value
+        # self.T2_star_stderr = self.fit_res.params['tau'].stderr
 
         self.artificial_detuning = 4./(60*stepsize)
         self.detuning = self.total_detuning - self.artificial_detuning
@@ -3489,7 +3489,7 @@ class Ramsey_Analysis(TD_Analysis):
         self.T2_star = {'T2_star':T2, 'T2_star_stderr':T2_stderr}
 
         if kw.pop('print_parameters',True):
-            print('T2* = {:.5} (s) \t\t T2* stderr = {:.5} (s)'.format(*self.T2_star.values()))
+            print('T2* = {:.5f} (s) \t\t T2* stderr = {:.5f} (s)'.format(*self.T2_star.values()))
 
         return self.T2_star
 

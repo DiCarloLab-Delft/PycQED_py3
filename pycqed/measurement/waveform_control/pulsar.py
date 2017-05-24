@@ -701,6 +701,10 @@ setTrigger(0);
 
         return self.channels, offsets
 
+    def update_channel_settings(self):
+        logging.error('Pulsar.update_channel_settings() is deprecated with the'
+                      ' multi-AWG support. Please update your code.')
+
     def update_AWG5014_settings(self, AWGs='all'):
         """
         Updates the AWG5014 parameters to the values in
