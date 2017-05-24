@@ -1057,7 +1057,7 @@ class QuDev_transmon(Qubit):
             self.heterodyne.acquisition_delay(d)
         return d
 
-    def find_frequency(self, method='cw_spectroscopy', update=False, MC=None,
+    def find_frequency(self, freqs, method='cw_spectroscopy', update=False, MC=None,
                        close_fig=True, analyze_ef=False, **kw):
         """
         WARNING: Does not automatically update the qubit frequency parameter. Set update=True if you want this!
@@ -1099,7 +1099,6 @@ class QuDev_transmon(Qubit):
             MC = self.MC
 
         if 'spectroscopy' in method.lower():
-            freqs = kw.get('freqs', None)
             if freqs is None:
                 f_span = kw.get('f_span', 100e6)
                 f_mean = kw.get('f_mean', self.f_qubit())

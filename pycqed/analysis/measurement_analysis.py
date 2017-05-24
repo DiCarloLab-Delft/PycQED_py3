@@ -1283,7 +1283,7 @@ class Rabi_Analysis_new(TD_Analysis):
         index_of_fourier_maximum = np.argmax(power_spectrum[1:len(fft_of_data)//2])+1
         diff = (max(self.normalized_data_points) - min(self.normalized_data_points))
 
-        amp_guess = diff/2
+        amp_guess = diff
         freq_guess = index_of_fourier_maximum
 
         #phase guess
@@ -1302,11 +1302,10 @@ class Rabi_Analysis_new(TD_Analysis):
         #Set up fit parameters and perform fit
         cos_mod.set_param_hint('amplitude',
                                value=amp_guess,
-                               vary=True,
-                               min=0)
+                               vary=True)
         cos_mod.set_param_hint('phase',
-                               value=phase_guess,
-                               vary=True,
+                               value=0,
+                               vary=False,
                                min=0)
         cos_mod.set_param_hint('frequency',
                                value=freq_guess,
@@ -1504,7 +1503,10 @@ class Rabi_Analysis_new(TD_Analysis):
             #extract cov(phase,freq)
             freq_idx = self.fit_res.var_names.index('frequency')
             phase_idx = self.fit_res.var_names.index('phase')
-            cov_freq_phase = self.fit_res.covar[freq_idx,phase_idx]
+            if self.fit_res.covar is not None:
+                cov_freq_phase = self.fit_res.covar[freq_idx,phase_idx]
+            else:
+                cov_freq_phase=0
 
             piPulse_std = piPulse*np.sqrt( (2*np.pi*freq_std/freq_fit)**2 + (phase_std/phase_fit)**2
                                            -cov_freq_phase/(np.pi*freq_fit*phase_fit) )
@@ -3395,10 +3397,11 @@ class Ramsey_Analysis(TD_Analysis):
 
         #Perform fit and save fitted parameters
         self.fit_res = self.fit_Ramsey(**kw)
+        self.get_measured_freq(**kw)    #defines self.Ramsey_fres as a dict
         self.save_fitted_parameters(self.fit_res, var_name=self.value_names[0])
 
         #Extract T2 star and save it
-        self.get_measured_T2_star(**kw)
+        self.get_measured_T2_star(**kw)  #defines self.T2_star as a dict
         self.save_computed_parameters(self.T2_star, var_name=self.value_names[0])
 
         self.plot_results(fig1, ax, self.fit_res, show_guess=show_guess,show_title=show_title,
@@ -3425,8 +3428,8 @@ class Ramsey_Analysis(TD_Analysis):
         stepsize = self.sweep_points[1] - self.sweep_points[0]
         self.total_detuning = self.fit_res.params['frequency'].value
         self.detuning_stderr = self.fit_res.params['frequency'].stderr
-        self.T2_star = self.fit_res.params['tau'].value
-        self.T2_star_stderr = self.fit_res.params['tau'].stderr
+        # self.T2_star = self.fit_res.params['tau'].value
+        # self.T2_star_stderr = self.fit_res.params['tau'].stderr
 
         self.artificial_detuning = 4./(60*stepsize)
         self.detuning = self.total_detuning - self.artificial_detuning
@@ -3459,8 +3462,8 @@ class Ramsey_Analysis(TD_Analysis):
 
         self.T2_star = {'T2_star':T2, 'T2_star_stderr':T2_stderr}
 
-        if kw.pop('print_parameters',True):
-            print('T2* = {:.5} (s) \t\t T2* stderr = {:.5} (s)'.format(*self.T2_star.values()))
+        if kw.get('print_parameters',True):
+            print('T2* = {:.5f} (s) \t\t T2* stderr = {:.5f} (s)'.format(*self.T2_star.values()))
 
         return self.T2_star
 
