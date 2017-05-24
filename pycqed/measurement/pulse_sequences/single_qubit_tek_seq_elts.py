@@ -127,12 +127,15 @@ def Rabi_seq(amps, pulse_pars, RO_pars, n=1, post_msmt_delay=3e-6, no_cal_points
     pulses = get_pulse_dict_from_pars(pulse_pars)
 
     for i, amp in enumerate(amps):  # seq has to have at least 2 elts
-        if cal_points and no_cal_points==4 and (i == (len(amps)-4) or i == (len(amps)-3)):
-                    el = multi_pulse_elt(i, station,[pulses['I']+ RO_pars])
-        elif cal_points and no_cal_points==4 and (i == (len(amps)-2) or i == (len(amps)-1)):
-                    el = multi_pulse_elt(i, station, [pulses['X180']+ RO_pars])
-        elif cal_points and no_cal_points==2 and (i == (len(amps)-2) or i == (len(amps)-1)):
-                    el = multi_pulse_elt(i, station,[pulses['I']+ RO_pars])
+        if cal_points and no_cal_points==4 and \
+                (i == (len(amps)-4) or i == (len(amps)-3)):
+            el = multi_pulse_elt(i, station,[pulses['I'], RO_pars])
+        elif cal_points and no_cal_points==4 and \
+                (i == (len(amps)-2) or i == (len(amps)-1)):
+            el = multi_pulse_elt(i, station, [pulses['X180'], RO_pars])
+        elif cal_points and no_cal_points==2 and \
+                (i == (len(amps)-2) or i == (len(amps)-1)):
+            el = multi_pulse_elt(i, station,[pulses['I'], RO_pars])
         else:
             pulses['X180']['amplitude'] = amp
             pulse_list = n*[pulses['X180']]+[RO_pars]
@@ -140,6 +143,8 @@ def Rabi_seq(amps, pulse_pars, RO_pars, n=1, post_msmt_delay=3e-6, no_cal_points
             # copy first element and set extra wait
             pulse_list[0] = deepcopy(pulse_list[0])
             pulse_list[0]['pulse_delay'] += post_msmt_delay
+
+            pulse_list.append(RO_pars)
 
             el = multi_pulse_elt(i, station, pulse_list)
 

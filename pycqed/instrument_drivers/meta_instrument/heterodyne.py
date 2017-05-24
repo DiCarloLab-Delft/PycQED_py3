@@ -13,13 +13,12 @@ import time
 
 
 class HeterodyneInstrument(Instrument):
-
     """
     This is a virtual instrument for a homodyne source
 
     Instrument is CBox, UHFQC, ATS and DDM compatible
-
     """
+
     shared_kwargs = ['RF', 'LO', 'AWG']
 
     def __init__(self, name, RF, LO, AWG=None, acquisition_instr=None,

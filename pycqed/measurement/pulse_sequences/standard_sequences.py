@@ -32,12 +32,12 @@ def generate_marker_element(
     # NOTE: This should be in standard elements
     # make sure tau is a multiple of 1 ns, if it is not the fixed point will
     # not be able to be computed.
+    channels = list(acq_marker_channels.split(','))
     marker_element = element.Element(name=('marker_element %s' % i),
                                      pulsar=station.pulsar)
-    marker_element.add(pulse.SquarePulse(name='refpulse_0', channel='ch1',
+    marker_element.add(pulse.SquarePulse(name='refpulse_0', channel=channels[0],
                        amplitude=0, length=100e-9))
     number_of_pulses = int(200*1e-6/marker_interval)
-    channels = list(acq_marker_channels.split(','))
     for i in range(number_of_pulses):
         for channel in channels:
             marker_element.add(pulse.SquarePulse(channel=channel, amplitude=1,
@@ -55,9 +55,10 @@ def generate_marker_element_with_RF_mod(
     # NOTE: This should be in standard elements
     # make sure tau is a multiple of 1 ns, if it is not the fixed point will
     # not be able to be computed.
+    channels = list(acq_marker_channels.split(','))
     marker_element = element.Element(name=('marker_element %s' % i),
                                      pulsar=station.pulsar)
-    marker_element.add(pulse.SquarePulse(name='refpulse_0', channel='ch1',
+    marker_element.add(pulse.SquarePulse(name='refpulse_0', channel=channels[0],
                        amplitude=0, length=100e-9))
     number_of_pulses = int(200*1e-6/marker_interval)
     marker_element.add(pulse.CosPulse(name='cosI', channel=I_channel,
@@ -65,7 +66,7 @@ def generate_marker_element_with_RF_mod(
     marker_element.add(pulse.CosPulse(name='sinQ', channel=Q_channel,
                        amplitude=mod_amp, frequency=IF,
                        length=200e-6, phase=90))
-    channels = list(acq_marker_channels.split(','))
+
     for i in range(number_of_pulses):
         for channel in channels:
             marker_element.add(pulse.SquarePulse(channel=channel, amplitude=1,

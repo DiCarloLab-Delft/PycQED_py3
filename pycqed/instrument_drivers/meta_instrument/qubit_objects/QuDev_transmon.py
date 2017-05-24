@@ -313,10 +313,10 @@ class QuDev_transmon(Qubit):
         self.drive_LO.on()
 
         # drive modulation
-        self.AWG.set(self.pulse_I_channel() + '_offset',
-                     self.pulse_I_offset())
-        self.AWG.set(self.pulse_Q_channel() + '_offset',
-                     self.pulse_Q_offset())
+        #self.AWG.set(self.pulse_I_channel() + '_offset',
+        #             self.pulse_I_offset())
+        #self.AWG.set(self.pulse_Q_channel() + '_offset',
+        #             self.pulse_Q_offset())
 
         # readout LO
         if self.f_RO() is None:
@@ -431,6 +431,7 @@ class QuDev_transmon(Qubit):
 
         if not pulsed:
 
+            self.heterodyne.frequency(self.f_RO())
             self.prepare_for_continuous_wave()
             self.cw_source.on()
 
@@ -726,14 +727,11 @@ class QuDev_transmon(Qubit):
                       would use `(0,)`, if using both input ports, one would use
                       the default value `(0, 1)`.
         """
-        if self.f_RO() is None:
-            f_RO = self.f_RO_resonator()
-        else:
-            f_RO = self.f_RO()
+
         trace_length = 4096
         tbase = np.arange(0, trace_length / 1.8e9, 1 / 1.8e9)
-        cosI = np.array(np.cos(2 * np.pi * f_RO * tbase))
-        sinI = np.array(np.sin(2 * np.pi * f_RO * tbase))
+        cosI = np.array(np.cos(2 * np.pi * self.f_RO_mod() * tbase))
+        sinI = np.array(np.sin(2 * np.pi * self.f_RO_mod() * tbase))
 
         c1 = self.RO_acq_weight_function_I()
         c2 = self.RO_acq_weight_function_Q()
@@ -1060,18 +1058,21 @@ class QuDev_transmon(Qubit):
     def find_frequency(self, freqs, method='cw_spectroscopy', update=False, MC=None,
                        close_fig=True, analyze_ef=False, **kw):
         """
-        WARNING: Does not automatically update the qubit frequency parameter. Set update=True if you want this!
+        WARNING: Does not automatically update the qubit frequency parameter.
+        Set update=True if you want this!
 
-        :param method:
-        :param update:
-        :param MC:
-        :param close_fig:
-        :param analyze_ef:
-        :param kw:
-            interactive_plot        (default=False)               whether to plot with plotly or not
-            analyze_ef              (default=False)               whether to look for another f_ge/2 peak/dip
-            percentile              (default=20)                  percentile of the data that is considered background noise
-            num_sigma_threshold     (default=5)                   used to define the threshold above(below) which to look for
+        Args:
+            method:
+            update:
+            MC:
+            close_fig:
+            analyze_ef:
+
+        Keyword Args:
+            interactive_plot:        (default=False)               whether to plot with plotly or not
+            analyze_ef:              (default=False)               whether to look for another f_ge/2 peak/dip
+            percentile:              (default=20)                  percentile of the data that is considered background noise
+            num_sigma_threshold:     (default=5)                   used to define the threshold above(below) which to look for
                                                                   peaks(dips); threshold = background_mean +
                                                                   num_sigma_threshold * background_std
             window_len              (default=3)                   filtering window length; uses a_tools.smooth
@@ -1124,15 +1125,18 @@ class QuDev_transmon(Qubit):
             amp_only = hasattr(self.heterodyne, 'RF')
             SpecA = ma.Qubit_Spectroscopy_Analysis(
                 analyze_ef=analyze_ef, label=label, amp_only=amp_only, close_fig=close_fig,**kw)
-            f0 = self.f_qubit(SpecA.fitted_freq)
-            if analyze_ef:
-                f0_ef = self.f_ef_qubit(2*SpecA.fitted_freq_gf_over_2 - f0)
-            else:
-                f0_ef = self.f_ef_qubit()
+            self.f_qubit(SpecA.fitted_freq)
+            f0 = SpecA.fitted_freq
             if update:
                 self.f_qubit(f0)
-                self.f_ef_qubit(f0_ef)
-            return f0, f0_ef
+            if analyze_ef:
+                f0_ef = 2*SpecA.fitted_freq_gf_over_2 - f0
+                if update:
+                    self.f_ef_qubit(f0_ef)
+            if analyze_ef:
+                return f0, f0_ef
+            else:
+                return f0
         else:
             raise ValueError("Unknown method '{}' for "
                              "find_frequency".format(method))
@@ -1220,8 +1224,8 @@ class QuDev_transmon(Qubit):
         rabi_amps = RabiA.rabi_amplitudes    #This is a dict with keywords 'piPulse',  'piPulse_std',
                                              #'piHalfPulse', 'piHalfPulse_std
 
-        amp180 = rabi_amps.pop('piPulse')
-        amp90 = rabi_amps.pop('piHalfPulse')
+        amp180 = rabi_amps['piPulse']
+        amp90 = rabi_amps['piHalfPulse']
 
         if update:
             if for_ef is False:
@@ -1301,7 +1305,7 @@ class QuDev_transmon(Qubit):
             label += '_2nd_excitation'
         T1_Analysis = ma.T1_Analysis(auto=True, label=label, **kw)
         T1_dict = T1_Analysis.T1
-        T1_value = T1_dict.pop('T1')
+        T1_value = T1_dict['T1']
 
         if update:
             if for_ef:
@@ -1365,12 +1369,12 @@ class QuDev_transmon(Qubit):
 
         #get new freq and T2* from analysis results
         RamseyA = ma.Ramsey_Analysis(auto=True,**kw)
-        fitted_freq = RamseyA.Ramsey_freq.pop('freq')
-        T2_star = RamseyA.T2_star.pop('T2_star')
+        fitted_freq = RamseyA.Ramsey_freq['freq']
+        T2_star = RamseyA.T2_star
 
         qubit_freq = self.f_qubit() + artificial_detuning - fitted_freq[0]
 
-        print('New qubit frequency = {:.10} \t stderr = {}:.10'.format(qubit_freq,RamseyA.Ramsey_freq.pop('freq_stderr')))
+        print('New qubit frequency = {:.10} \t stderr = {}:.10'.format(qubit_freq,RamseyA.Ramsey_freq['freq_stderr']))
 
         if update:
             if for_ef:
@@ -1459,7 +1463,7 @@ class QuDev_transmon(Qubit):
         #Perform analysis and extract the optimal qscale parameter
         QscaleA = ma.QScale_Analysis(auto=True, label=label, **kw) #returns the optimal qscale parameter
         Qscale_dict = QscaleA.optimal_qscale #dictionary of value, stderr
-        Qscale_value = Qscale_dict.pop('qscale')
+        Qscale_value = Qscale_dict['qscale']
 
         if update:
             self.drag_qscale(Qscale_value)
