@@ -1170,78 +1170,164 @@ class Rabi_Analysis(TD_Analysis):
             self.data_file.close()
         return self.fit_res
 
-    def make_figures(self, **kw):
+    def make_figures(self, fitting_model='simple', **kw):
         show_guess = kw.pop('show_guess', False)
         self.fig, self.axs = plt.subplots(2, 1, figsize=(5, 6))
-        x_fine = np.linspace(min(self.sweep_points), max(self.sweep_points),
-                             1000)
-        for i in [0, 1]:
-            if i == 0:
-                plot_title = kw.pop('plot_title', textwrap.fill(
-                                    self.timestamp_string + '_' +
-                                    self.measurementstring, 40))
-            else:
-                plot_title = ''
-            self.axs[i].ticklabel_format(useOffset=False)
-            self.plot_results_vs_sweepparam(x=self.sweep_points,
-                                            y=self.measured_values[i],
-                                            fig=self.fig, ax=self.axs[i],
-                                            xlabel=self.xlabel,
-                                            ylabel=self.ylabels[i],
-                                            save=False,
-                                            plot_title=plot_title)
 
-            fine_fit = self.fit_res[i].model.func(
-                x_fine, **self.fit_res[i].best_values)
-            # adding the fitted amp180
-            if 'period' in self.fit_res[i].params.keys():
-                label = 'amp180 = {:.3e}'.format(
-                    abs(self.fit_res[i].params['period'].value)/2)
-            else:
-                label = 'amp180 = {:.3e}'.format(
-                    abs(self.fit_res[i].params['x0'].value))
-            self.axs[i].plot(x_fine, fine_fit, label=label)
-            ymin = min(self.measured_values[i])
-            ymax = max(self.measured_values[i])
-            yspan = ymax-ymin
-            self.axs[i].set_ylim(ymin-0.23*yspan, 0.05*yspan+ymax)
-            self.axs[i].legend(frameon=False, loc='lower left')
+        if fitting_model == 'simple':
+            x_fine = np.linspace(min(self.sweep_points), max(self.sweep_points),
+                                 1000)
+            for i in [0, 1]:
+                if i == 0:
+                    plot_title = kw.pop('plot_title', textwrap.fill(
+                                        self.timestamp_string + '_' +
+                                        self.measurementstring, 40))
+                else:
+                    plot_title = ''
+                self.axs[i].ticklabel_format(useOffset=False)
+                self.plot_results_vs_sweepparam(x=self.sweep_points,
+                                                y=self.measured_values[i],
+                                                fig=self.fig, ax=self.axs[i],
+                                                xlabel=self.xlabel,
+                                                ylabel=self.ylabels[i],
+                                                save=False,
+                                                plot_title=plot_title)
 
-            if show_guess:
                 fine_fit = self.fit_res[i].model.func(
-                    x_fine, **self.fit_res[i].init_values)
-                self.axs[i].plot(x_fine, fine_fit, label='guess')
-                self.axs[i].legend(loc='best')
+                    x_fine, **self.fit_res[i].best_values)
+                # adding the fitted amp180
+                if 'period' in self.fit_res[i].params.keys():
+                    label = 'amp180 = {:.3e}'.format(
+                        abs(self.fit_res[i].params['period'].value)/2)
+                else:
+                    label = 'amp180 = {:.3e}'.format(
+                        abs(self.fit_res[i].params['x0'].value))
+                self.axs[i].plot(x_fine, fine_fit, label=label)
+                ymin = min(self.measured_values[i])
+                ymax = max(self.measured_values[i])
+                yspan = ymax-ymin
+                self.axs[i].set_ylim(ymin-0.23*yspan, 0.05*yspan+ymax)
+                self.axs[i].legend(frameon=False, loc='lower left')
+
+                if show_guess:
+                    fine_fit = self.fit_res[i].model.func(
+                        x_fine, **self.fit_res[i].init_values)
+                    self.axs[i].plot(x_fine, fine_fit, label='guess')
+                    self.axs[i].legend(loc='best')
+
+        elif fitting_model == 'complex':
+            fit_values = fit_mods.CosComplex(self.sweep_points, self.fit_res.params)
+
+            for idx_quadrature in [0,1]:
+                if idx_quadrature == 0:
+                    plot_title = kw.pop('plot_title', textwrap.fill(
+                                        self.timestamp_string + '_' +
+                                        self.measurementstring, 40))
+                else:
+                    plot_title = ''
+
+                self.axs[idx_quadrature].ticklabel_format(useOffset=False)
+                self.plot_results_vs_sweepparam(x=self.sweep_points,
+                                                y=self.measured_values[idx_quadrature],
+                                                fig=self.fig, ax=self.axs[idx_quadrature],
+                                                xlabel=self.xlabel,
+                                                ylabel=self.ylabels[idx_quadrature],
+                                                save=False,
+                                                plot_title=plot_title)
+
+                # adding amplitude for pi-pulse
+                label = 'amp180 = {:.3e}'.format(0.5*abs(self.fit_res.params['frequency'].value))
+
+                if idx_quadrature == 0:
+                    self.axs[idx_quadrature].plot(self.sweep_points, fit_values.real, label=label)
+                elif idx_quadrature == 1:
+                    self.axs[idx_quadrature].plot(self.sweep_points, fit_values.imag, label=label)
+
+                ymin = min(self.measured_values[idx_quadrature])
+                ymax = max(self.measured_values[idx_quadrature])
+                yspan = ymax-ymin
+                self.axs[idx_quadrature].set_ylim(ymin-0.23*yspan, 0.05*yspan+ymax)
+                self.axs[idx_quadrature].legend(frameon=False, loc='lower left')
+
+
+
         self.save_fig(self.fig, fig_tight=False, **kw)
 
-    def fit_data(self, print_fit_results=False, **kw):
-        model = fit_mods.CosModel
-        self.fit_res = ['', '']
-        # It would be best to do 1 fit to both datasets but since it is
-        # easier to do just one fit we stick to that.
-        # We make an initial guess of the Rabi period using both quadratures
-        data = np.sqrt(self.measured_values[0]**2+self.measured_values[1]**2)
-        params = model.guess(model, data=data,
-                             t=self.sweep_points)
-        fit_res = fit_mods.CosModel.fit(
-            data=data,
-            t=self.sweep_points,
-            params=params)
-        freq_guess = fit_res.values['frequency']
-        for i in [0, 1]:
-            params = model.guess(model, data=self.measured_values[i],
+    def fit_data(self, print_fit_results=False, fitting_model='simple', **kw):
+        if fitting_model == 'simple':
+            model = fit_mods.CosModel
+            self.fit_res = ['', '']
+            # It would be best to do 1 fit to both datasets but since it is
+            # easier to do just one fit we stick to that.
+            # We make an initial guess of the Rabi period using both quadratures
+
+            data = np.sqrt(self.measured_values[0]**2+self.measured_values[1]**2)
+            params = model.guess(model, data=data,
                                  t=self.sweep_points)
-            params['frequency'].value = freq_guess
-            self.fit_res[i] = fit_mods.CosModel.fit(
-                data=self.measured_values[i],
+            fit_res = fit_mods.CosModel.fit(
+                data=data,
                 t=self.sweep_points,
                 params=params)
-            try:
-                self.add_analysis_datagroup_to_file()
-                self.save_fitted_parameters(fit_res=self.fit_res[i],
-                                            var_name=self.value_names[i])
-            except Exception as e:
-                logging.warning(e)
+            freq_guess = fit_res.values['frequency']
+            for i in [0, 1]:
+                params = model.guess(model, data=self.measured_values[i],
+                                     t=self.sweep_points)
+                # params['frequency'].value = freq_guess
+                self.fit_res[i] = fit_mods.CosModel.fit(
+                    data=self.measured_values[i],
+                    t=self.sweep_points,
+                    params=params)
+                try:
+                    self.add_analysis_datagroup_to_file()
+                    self.save_fitted_parameters(fit_res=self.fit_res[i],
+                                                var_name=self.value_names[i])
+                except Exception as e:
+                    logging.warning(e)
+
+        elif fitting_model == 'complex':
+            # here we do a join fit of the I and Q quadratures
+            self.fit_res = ['']
+
+            amps = self.sweep_points
+            data_complex = np.add(self.measured_values[0] , 1.j*self.measured_values[1])
+
+            ###################
+            # initial guesses #
+            ###################
+            # offsets
+            off_real_guess = np.mean(data_complex.real)
+            off_imag_guess = np.mean(data_complex.imag)
+
+            # amplitudes
+            A_real_guess = abs(max(data_complex.real)-min(data_complex.real))/2
+            A_imag_guess = abs(max(data_complex.imag)-min(data_complex.imag))/2
+
+            # frequency
+            w = np.fft.fft(data_complex)
+            f = np.fft.fftfreq(len(data_complex), amps[1]-amps[0])
+            w[np.where(f==0)]=0 # remove DC component
+            abs_w = np.abs(w)
+            freq_guess = f[np.where(abs_w==max(abs_w))][0]
+
+            # Phase
+            # search for the phase closest to the amps==0
+            phases = np.arctan2(data_complex.imag, data_complex.real)
+            phase_guess = phases[np.where(abs(amps) == min(abs(amps)))][0]
+
+            # prepare the parameter dictionary
+            P = lmfit.Parameters()
+            #           (Name,              Value,          Vary, Min,      Max,    Expr)
+            P.add_many(('amplitude_real',   A_real_guess,   True,   0,      None,   None),
+                       ('amplitude_imag',   A_imag_guess,   True,   0,      None,   None),
+                       ('phase',            phase_guess,    True,   -np.pi, np.pi,  None),
+                       ('offset_real',      off_real_guess, True,   None,   None,   None),
+                       ('offset_imag',      off_imag_guess,  True,   None,   None,   None),
+                       ('frequency',        freq_guess,     True,   0,      None,   None))
+            
+            # Fit
+            self.fit_res = lmfit.minimize(fit_mods.residual_complex_fcn, P,
+                                     args=(fit_mods.CosComplex, amps, data_complex))
+
 
 
 class TD_UHFQC(TD_Analysis):
