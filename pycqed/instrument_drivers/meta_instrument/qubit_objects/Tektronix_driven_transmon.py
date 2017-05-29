@@ -348,16 +348,21 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
 
         # # makes sure dac range is used optimally, 20% overhead for mixer skew
         # # use 60% of based on linear range in mathematica
+        amp_to_set = abs(self.amp180()*3.0)
+        if amp_to_set < 0.02:
+          amp_to_set = 0.02
+        elif amp_to_set > 4.5:
+          amp_to_set = 4.5
         self.AWG.get_instr().set('{}_amp'.format(self.pulse_I_channel()),
-                                 self.amp180()*3.0)
+                                 amp_to_set)
         self.AWG.get_instr().set('{}_amp'.format(self.pulse_Q_channel()),
-                                 self.amp180()*3.0)
+                                 amp_to_set)
 
         self.AWG.get_instr().set(self.pulse_I_channel.get()+'_offset',
                                  self.pulse_I_offset.get())
         self.AWG.get_instr().set(self.pulse_Q_channel.get()+'_offset',
                                  self.pulse_Q_offset.get())
-
+        print('ro type',self.RO_pulse_type.get())
         if self.RO_pulse_type() is 'MW_IQmod_pulse_tek':
             self.AWG.get_instr().set(self.RO_I_channel.get()+'_offset',
                                      self.RO_I_offset.get())
@@ -373,7 +378,9 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
             # self._acquisition_instr.awg_sequence_acquisition_and_pulse_SSB(
             #     f_RO_mod=self.f_RO_mod(), RO_amp=self.RO_amp(),
             # RO_pulse_length=self.RO_pulse_length(), acquisition_delay=270e-9)
-        elif self.RO_pulse_type.get() is 'Gated_MW_RO_pulse':
+
+        else:# self.RO_pulse_type() is 'Gated_MW_RO_pulse':
+            print('updating the RF')
             self.RF_RO_source.get_instr().pulsemod_state('On')
             self.RF_RO_source.get_instr().frequency(self.f_RO.get())
             self.RF_RO_source.get_instr().power(self.RO_pulse_power.get())
@@ -383,6 +390,8 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                 # self._acquisition_instr.awg_sequence_acquisition()
                 # temperarliy removed for debugging
                 pass
+        # else:
+        #   raise ValueError('RO_pulse_type not recognized')
 
     def calibrate_mixer_offsets(self, signal_hound, offs_type='pulse',
                                 update=True):

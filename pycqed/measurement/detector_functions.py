@@ -307,7 +307,7 @@ class CBox_input_average_detector(Hard_Detector):
         return data
 
     def prepare(self, sweep_points):
-        self.CBox.acquisition_mode(0)
+        self.CBox.acquisition_mode('idle')
         if self.AWG is not None:
             self.AWG.stop()
         self.CBox.nr_averages(int(self.nr_averages))
@@ -317,7 +317,7 @@ class CBox_input_average_detector(Hard_Detector):
     def finish(self):
         if self.AWG is not None:
             self.AWG.stop()
-        self.CBox.acquisition_mode(0)
+        self.CBox.acquisition_mode('idle')
 
 
 class CBox_integrated_average_detector(Hard_Detector):

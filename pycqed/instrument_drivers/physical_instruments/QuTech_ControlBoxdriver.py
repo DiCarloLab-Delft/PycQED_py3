@@ -997,7 +997,8 @@ class QuTech_ControlBox(VisaInstrument):
                                                  demodulation_mode)
 
     def _do_get_demodulation_mode(self):
-        return self._demodulation_mode[3:]
+        # return self._demodulation_mode[3:]
+        return self._demodulation_mode
 
     def _do_set_acquisition_mode(self, acquisition_mode):
         if not isinstance(acquisition_mode, str):
