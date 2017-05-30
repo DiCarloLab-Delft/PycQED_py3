@@ -1,5 +1,6 @@
 import os
 # import qt
+import numpy as np
 import h5py
 from pycqed.analysis import analysis_toolbox as a_tools
 import errno
@@ -236,3 +237,28 @@ def execfile(path, global_vars=None, local_vars=None):
         code = compile(f.read(), path, 'exec')
         exec(code, global_vars, local_vars)
 
+
+def span_lin(center, span, n):
+    """
+    Creates span of points around center
+    Args:
+        center (float) : center of the linspace
+        span   (float) : span the total range of values to span
+        n      (int)   : the number of points in the span
+
+    """
+    return np.linspace(center-span/2, center+span/2, n)
+
+
+def span_step(center, span, stepsize):
+    """
+    Creates a range of points spanned around a center
+    Args:
+        center (float) : center of the linspace
+        span   (float) : span the total range of values to span
+        n      (int)   : the number of points in the span
+
+    N.B. both boundaries are created in the span
+    """
+    # +.1*stepsize in the arange ensures the right boundary is included
+    return np.arange(center-span/2, center+span/2+.1*stepsize, stepsize)
