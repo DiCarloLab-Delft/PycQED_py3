@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from pyqtgraph.Qt import QtGui
-from pyqtgraph.units import SI_PREFIXES, UNITS as SI_UNITS
+from pycqed.analysis.tools.plotting import SI_UNITS, SI_PREFIXES
 import types
 import traceback
 import numpy as np
@@ -15,7 +15,8 @@ except Exception:
 class QcSnaphotWidget(QtGui.QTreeWidget):
 
     """
-    Widget for displaying QcoDes instrument snapshots. Heavily inspired by the DataTreeWidget.
+    Widget for displaying QcoDes instrument snapshots.
+    Heavily inspired by the DataTreeWidget.
     """
 
     def __init__(self, parent=None, data=None):
@@ -71,8 +72,10 @@ class QcSnaphotWidget(QtGui.QTreeWidget):
         # convert traceback to a list of strings
         if isinstance(data, types.TracebackType):
             data = list(
-                map(str.strip, traceback.format_list(traceback.extract_tb(data))))
-        elif HAVE_METAARRAY and (hasattr(data, 'implements') and data.implements('MetaArray')):
+                map(str.strip, traceback.format_list(
+                    traceback.extract_tb(data))))
+        elif HAVE_METAARRAY and (hasattr(data, 'implements')
+                                 and data.implements('MetaArray')):
             data = {
                 'data': data.view(np.ndarray),
                 'meta': data.infoCopy()
