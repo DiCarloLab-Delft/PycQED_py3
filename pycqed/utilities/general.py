@@ -238,27 +238,69 @@ def execfile(path, global_vars=None, local_vars=None):
         exec(code, global_vars, local_vars)
 
 
-def span_lin(center, span, n):
+def span_lin(center, span, num, endpoint=True):
     """
     Creates span of points around center
     Args:
-        center (float) : center of the linspace
+        center (float) : center of the array
         span   (float) : span the total range of values to span
-        n      (int)   : the number of points in the span
+        num      (int) : the number of points in the span
+        endpoint (bool): whether to include the endpoint
 
     """
-    return np.linspace(center-span/2, center+span/2, n)
+    return np.linspace(center-span/2, center+span/2, num, endpoint=endpoint)
 
 
-def span_step(center, span, stepsize):
+def span_step(center, span, step, endpoint=True):
     """
     Creates a range of points spanned around a center
     Args:
-        center (float) : center of the linspace
+        center (float) : center of the array
         span   (float) : span the total range of values to span
-        n      (int)   : the number of points in the span
+        step   (float) : the number of points in the span
+        endpoint (bool): whether to include the endpoint
 
     N.B. both boundaries are created in the span
     """
-    # +.1*stepsize in the arange ensures the right boundary is included
-    return np.arange(center-span/2, center+span/2+.1*stepsize, stepsize)
+    # +.1*step in the arange ensures the right boundary is included
+    return np.arange(center-span/2, center+span/2+endpoint*step/100, step)
+
+
+def gen_sweep_pts(start=None, stop=None,
+                  center=None, span=None,
+                  num=None, step=None, endpoint=True):
+    """
+    Generates an array of sweep points based on different types of input
+    arguments.
+    Boundaries of the array can be specified using either start/stop or
+    using center/span. The points can be specified using either num or step.
+
+    Args:
+        start  (float) : start of the array
+        stop   (float) : end of the array
+        center (float) : center of the array
+        span   (float) : span the total range of values to span
+
+        num      (int) : number of points in the array
+        step   (float) : the number of points in the span
+        endpoint (bool): whether to include the endpoint
+
+    """
+
+    if (start is not None) and (stop is not None):
+        if num is not None:
+            return np.linspace(start, stop, num, endpoint=endpoint)
+        elif step is not None:
+            return np.arange(start, stop + endpoint*step/100)
+        else:
+            raise ValueError('Either "num" or "step" must be specified')
+    elif (center is not None) and (span is not None):
+        if num is not None:
+            return span_lin(center, span, num, endpoint=endpoint)
+        elif step is not None:
+            return span_step(center, span, step, endpoint=endpoint)
+        else:
+            raise ValueError('Either "num" or "step" must be specified')
+    else:
+        raise ValueError('Either ("start" and "stop") or '
+                         '("center" and "span") must be specified')
