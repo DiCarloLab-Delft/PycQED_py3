@@ -975,7 +975,7 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
                 fid_vec[i] = calc_fid2_bell(self.operators_mle,
                                             self.target_bell, theta)
             msg += '\nMAX Fidelity {:.3f} at \n  LSQ={:.1f} deg and\n  ' \
-                   + 'MSQ={:.1f} deg'
+                   + 'MSQ={:.1f} deg'\
                    .format(self.best_fidelity,
                            self.fit_res.best_values['angle_LSQ']*180./np.pi,
                            self.fit_res.best_values['angle_MSQ']*180./np.pi)
