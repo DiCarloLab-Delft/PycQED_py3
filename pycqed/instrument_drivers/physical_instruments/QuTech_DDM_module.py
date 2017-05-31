@@ -16,18 +16,36 @@ from qcodes import validators as vals
 import logging
 import time
 
+log = logging.getLogger(__name__)
+
+
+FINISH_BIT_CHECK_FERQUENTION_HZ = 25
+
 
 class DDMq(SCPI):
+
+    exceptionLevel = logging.CRITICAL
 
     # def __init__(self, logging=True, simMode=False, paranoid=False):
     def __init__(self, name, address, port, **kwargs):
         super().__init__(name, address, port, **kwargs)
         self.device_descriptor = type('', (), {})()
         self.device_descriptor.model = 'DDM'
-        self.device_descriptor.numChannels = 4
-        self.device_descriptor.numWeights = 5
+
+        # Ask the ddm how many adcs and qubits per adc it has.
+        numAdcs = int(self.ask('qutech:nadcs? '))
+        self.device_descriptor.numChannels = numAdcs * 2
+        self.device_descriptor.numWeights = []
+        for i in range(numAdcs):
+            self.device_descriptor.numWeights.append(
+                int(self.ask('qutech:adc{:d}:nqbits? '.format(i+1))))
+
         self.add_parameters()
         self.connect_message()
+
+        # The next line is needed, because the real-time clock is not working
+        # correctly at the moment
+        self.set_time(int(time.time()))
 
     def add_parameters(self):
         #######################################################################
@@ -48,7 +66,8 @@ class DDMq(SCPI):
                                label=('Run ch_pair{}'.format(ch_pair)),
                                docstring='This parameter enables trigger,' +
                                ' it is comparable to command "arm".' +
-                               ' After run is set, DDM will accept next comming triggers ',
+                               ' After run is set, DDM will accept next' +
+                               ' comming triggers ',
                                set_cmd=srun_cmd
                                )
             sreset_int_cmd = 'qutech:reset{}'.format(ch_pair)
@@ -59,10 +78,11 @@ class DDMq(SCPI):
                                )
             self.add_parameter('ch_pair{}_status'.format(ch_pair),
                                label=('Get status '),
-                               docstring='It returns status on Over range, under range on DI and DQ ' +
-                               'FPGA clock, Calbration status( in case if is being ' +
-                               ' calibrated it will show the warning,)' +
-                               'False Trigger for input averaging and integration.',
+                               docstring='It returns status on Over range,' +
+                               ' under range on DI and DQ FPGA clock,' +
+                               ' Calbration status( in case if is being ' +
+                               ' calibrated it will show the warning, False' +
+                               ' Trigger for input averaging and integration.',
                                get_cmd=self._gen_ch_get_func(
                                    self._getADCstatus, ch_pair)
                                )
@@ -70,9 +90,10 @@ class DDMq(SCPI):
             scaladc_cmd = 'qutech:adc{}:cal'.format(ch_pair)
             self.add_parameter('ch_pair{}_cal_adc'.format(ch_pair),
                                label=('Calibrate ADC{}'.format(ch_pair)),
-                               docstring='It calibrates ADC. It is required to do if' +
-                               'the temperature changes or with time. It is done automatically' +
-                               'when power is on',
+                               docstring='It calibrates ADC. It is required' +
+                               ' to do if the temperature changes or with' +
+                               ' time. It is done automatically when power' +
+                               ' is on',
                                set_cmd=scaladc_cmd
                                # vals=vals.Numbers(1,4096)
                                )
@@ -81,8 +102,8 @@ class DDMq(SCPI):
                                unit='#',
                                label=('Number of averages' +
                                       'ch_pair {} '.format(ch_pair)),
-                               docstring='It sets number of averages per channel pair.' +
-                               'Any integer from 1 to 32768',
+                               docstring='It sets number of averages per' +
+                               ' channel pair. Any integer from 1 to 32768',
                                get_cmd=snavg_cmd + '?',
                                set_cmd=snavg_cmd + ' {}',
                                vals=vals.Numbers(1, 32768)
@@ -92,9 +113,10 @@ class DDMq(SCPI):
                                unit='#',
                                label=('Number of samples' +
                                       'ch_pair {} '.format(ch_pair)),
-                               docstring='It sets scan size of the input averaging mode ' +
-                               'up to 8 us. Each sample has 2 ns period' +
-                               'It is only possible to set even number of samples',
+                               docstring='It sets scan size of the input' +
+                               ' averaging mode up to 8 us. Each sample has' +
+                               ' 2 ns period. It is only possible to set' +
+                               ' even number of samples',
                                get_cmd=snsamp_cmd + '?',
                                set_cmd=snsamp_cmd + ' {}',
                                vals=vals.Numbers(1, 4096)
@@ -103,9 +125,10 @@ class DDMq(SCPI):
             self.add_parameter('ch_pair{}_inavg_enable'.format(ch_pair),
                                label=('Enable input averaging' +
                                       'ch_pair {} '.format(ch_pair)),
-                               docstring='It enables input averaging mode prior run command. ' +
-                               'It is required to enable mode every measuremnet' +
-                               'If it is not enabled the last measeared data will be read',
+                               docstring='It enables input averaging mode' +
+                               ' prior run command.  It is required to' +
+                               ' enable mode every measuremnet. If it is not' +
+                               ' enabled the last measeared data will be read',
                                get_cmd=senable_cmd + '?',
                                set_cmd=senable_cmd + ' {}',
                                vals=vals.Numbers(0, 1)
@@ -115,9 +138,11 @@ class DDMq(SCPI):
 
                                label=('Set holdoff' +
                                       'ch_pair {} '.format(ch_pair)),
-                               docstring='specifying the number of clocks the measurement trigger  ' +
-                               'should be delayed before a new scan starts. Each clock is 2 ns period' +
-                               'but it is only posible to set even number of clocks',
+                               docstring='specifying the number of clocks' +
+                               ' the measurement trigger should be delayed' +
+                               ' before a new scan starts. Each clock is 2' +
+                               ' ns period, but it is only posible to set' +
+                               ' even number of clocks',
                                get_cmd=sholdoff_cmd + '?',
                                set_cmd=sholdoff_cmd + ' {}',
                                vals=vals.Numbers(0, 254)
@@ -125,14 +150,14 @@ class DDMq(SCPI):
             sintlengthall_cmd = 'qutech:wint{}:intlength:all'.format(ch_pair)
             self.add_parameter('ch_pair{}_wint_intlength'.format(ch_pair),
                                unit='#',
-                               label=('The number of sample  that' +
-                                      'is used for one integration of' +
-                                      'ch_pair {} for all weights'.format(ch_pair)),
-                               docstring='This value specifies the number of ' +
-                               'samples that is used for one integration.  ' +
-                               'It is only possible to set even numbre of samples.' +
-                               'Each sample has 2 ns period, so the maximum ' +
-                               'time of integration is 8 us ',
+                               label=('The number of sample  that is used' +
+                                      ' for one integration of ch_pair {}' +
+                                      ' for all weights'.format(ch_pair)),
+                               docstring='This value specifies the number of' +
+                               ' samples that is used for one integration.' +
+                               ' It is only possible to set even numbre of' +
+                               ' samples. Each sample has 2 ns period, so' +
+                               ' the maximum time of integration is 8 us',
                                get_cmd=sintlengthall_cmd + '?',
                                set_cmd=sintlengthall_cmd + ' {}',
                                vals=vals.Numbers(1, 4096)
@@ -143,8 +168,9 @@ class DDMq(SCPI):
             sintavgall_cmd = 'qutech:tvmode{}:naverages:all'.format(ch_pair)
             self.add_parameter('ch_pair{}_tvmode_naverages'.format(ch_pair),
                                unit='#',
-                               label=('The number of integration averages' +
-                                      'of ch_pair {} all weights'.format(ch_pair)),
+                               label=('The number of integration averages of' +
+                                      ' ch_pair {} all weights'.format(ch_pair)
+                                      ),
                                docstring='It sets number of integartion' +
                                'avarages for all weights within one ch_pair' +
                                'Value can be between 1 and 2^17' +
@@ -156,11 +182,11 @@ class DDMq(SCPI):
             stvsegall_cmd = 'qutech:tvmode{}:nsegments:all'.format(ch_pair)
             self.add_parameter('ch_pair{}_tvmode_nsegments'.format(ch_pair),
                                unit='#',
-                               label=('The number of TV segments of' +
-                                      'ch_pair {} all weights '.format(ch_pair)),
-                               docstring='It sets the number of samples in one ' +
-                               'scan for all weight within a channel pair.' +
-                               'Value can be between 1and 256. ',
+                               label=('The number of TV segments of ch_pair' +
+                                      ' {} all weights '.format(ch_pair)),
+                               docstring='It sets the number of samples in'
+                               ' one scan for all weight within a channel' +
+                               ' pair. Value can be between 1and 256. ',
                                get_cmd=stvsegall_cmd + '?',
                                set_cmd=stvsegall_cmd + ' {}',
                                vals=vals.Numbers(1, 256)
@@ -168,11 +194,13 @@ class DDMq(SCPI):
             stvenall_cmd = 'qutech:tvmode{}:enable:all'.format(ch_pair)
             self.add_parameter('ch_pair{}_tvmode_enable'.format(ch_pair),
                                label=('Enable tv mode' +
-                                      'ch_pair {} all weights '.format(ch_pair)),
-                               docstring='It enables the TV-Mode functionality ' +
-                               'for all weight pair within one ch_pair.  ' +
-                               'It is required to enable it prior to run command.' +
-                               'Otherwise old data will be read out',
+                                      'ch_pair {} all weights '.format(ch_pair)
+                                      ),
+                               docstring='It enables the TV-Mode' +
+                               ' functionality for all weight pair within' +
+                               ' one ch_pair. It is required to enable it' +
+                               ' prior to run command. Otherwise old data' +
+                               ' will be read out',
                                get_cmd=stvenall_cmd + '?',
                                set_cmd=stvenall_cmd + ' {}',
                                vals=vals.Numbers(0, 1)
@@ -184,12 +212,15 @@ class DDMq(SCPI):
             self.add_parameter('ch_pair{}_qstate_threshold'.format(ch_pair),
                                unit='#',
                                label=('Set threshold of' +
-                                      'ch_pair {} all weights'.format(ch_pair)),
-                               docstring='It sets the value for the Qubit State Threshold ' +
-                               'per all weight pairs within on channel pair ' +
-                               'The value is -2^27 to +2^27-1' +
-                               'It is a relative number based on the ADC 8 bit range (-128..127) ' +
-                               'It will require to have a scale factor as in weighted integral',
+                                      'ch_pair {} all weights'.format(ch_pair)
+                                      ),
+                               docstring='It sets the value for the Qubit' +
+                               ' State Threshold per all weight pairs within' +
+                               ' on channel pair. The value is -2^27 to' +
+                               ' +2^27-1. It is a relative number based on' +
+                               ' the ADC 8 bit range (-128..127). It will' +
+                               ' require to have a scale factor as in' +
+                               ' weighted integral',
                                get_cmd=sthlall_cmd + '?',
                                set_cmd=sthlall_cmd + ' {}',
                                vals=vals.Numbers(-134217728, 134217727)
@@ -200,13 +231,15 @@ class DDMq(SCPI):
             slogenall_cmd = 'qutech:logging{}:enable:all'.format(ch_pair)
             self.add_parameter('ch_pair{}_logging_enable'.format(ch_pair),
                                label=('Enable logging mode' +
-                                      'ch_pair {} all weights'.format(ch_pair)),
-                               docstring='It enables the Logging functionality ' +
-                               'for all weight pairs within one ch_pair.  ' +
-                               'It is required to enable it prior to run command.' +
-                               'Otherwise old data will be read out' +
-                               'To enable mode paramentr should be set to 1' +
-                               'To disable mode paramentr should be set to 0.',
+                                      'ch_pair {} all weights'.format(ch_pair)
+                                      ),
+                               docstring='It enables the Logging ' +
+                               'functionality for all weight pairs within ' +
+                               ' one ch_pair. It is required to enable it' +
+                               ' prior to run command. Otherwise old data' +
+                               ' will be read out. To enable mode paramentr' +
+                               ' should be set to 1. To disable mode' +
+                               ' paramentr should be set to 0.',
                                get_cmd=slogenall_cmd + '?',
                                set_cmd=slogenall_cmd + ' {}',
                                vals=vals.Numbers(0, 1)
@@ -217,7 +250,8 @@ class DDMq(SCPI):
             self.add_parameter('ch_pair{}_logging_nshots'.format(ch_pair),
                                unit='#',
                                label=('The number of logging shots of' +
-                                      'ch_pair {} all weights'.format(ch_pair)),
+                                      'ch_pair {} all weights'.format(ch_pair)
+                                      ),
                                docstring='It sets number Of Shots  ' +
                                'Value can be between 1 and 2^13,' +
                                ' ',
@@ -232,13 +266,15 @@ class DDMq(SCPI):
                 ch_pair)
             self.add_parameter('ch_pair{}_err_fract_enable'.format(ch_pair),
                                label=('Enable error fraction mode' +
-                                      'ch_pair {} all weights '.format(ch_pair)),
-                               docstring='It enables the   Error Fraction counter functionality ' +
-                               'for all weight pairs within one ch_pair.  ' +
-                               'It is required to enable it prior to run command.' +
-                               'Otherwise old data will be read out' +
-                               'To enable mode paramentr should be set to 1' +
-                               'To disable mode paramentr should be set to 0.',
+                                      'ch_pair {} all weights '.format(ch_pair)
+                                      ),
+                               docstring='It enables the   Error Fraction' +
+                               ' counter functionality for all weight pairs' +
+                               ' within one ch_pair. It is required to' +
+                               ' enable it prior to run command. Otherwise' +
+                               ' old data will be read out. To enable mode' +
+                               ' paramentr should be set to 1. To disable ' +
+                               ' mode paramentr should be set to 0.',
                                get_cmd=serrfarcten_cmd + '?',
                                set_cmd=serrfarcten_cmd + ' {}',
                                vals=vals.Numbers(0, 1)
@@ -249,10 +285,11 @@ class DDMq(SCPI):
             self.add_parameter('ch_pair{}_err_fract_nshots'.format(ch_pair),
                                unit='#',
                                label=('The number of error fraction shots of' +
-                                      'ch_pair {} all weights '.format(ch_pair)),
-                               docstring='It sets number Of Shots per channel pair  ' +
-                               'Value can be between 1 and 2^21,' +
-                               ' ',
+                                      'ch_pair {} all weights '.format(ch_pair)
+                                      ),
+                               docstring='It sets number Of Shots per' +
+                               ' channel pair. Value can be between 1 and' +
+                               ' 2^21',
                                get_cmd=serrfractshots_cmd + '?',
                                set_cmd=serrfractshots_cmd + ' {}',
                                vals=vals.Numbers(1, 2097152)
@@ -261,28 +298,32 @@ class DDMq(SCPI):
             self.add_parameter('ch_pair{}_err_fract_pattern'.format(ch_pair),
                                label=('Get error fraction pattern ' +
                                       'ch_pair {}'.format(ch_pair)),
-                               docstring='It sets a binary list of 2 value to set a pattren  ' +
-                               'Next0: Next state when in ‘0’' +
-                               'Specifies the expected next state when the current state is ‘0’.' +
-                               'Next1: Next state when in ‘1’' +
-                               'Specifies the expected next state when the current state is ‘1’.',
+                               docstring='It sets a binary list of 2 value' +
+                               ' to set a pattren Next0: Next state when in' +
+                               ' ‘0’ Specifies the expected next state when' +
+                               ' the current state is ‘0’. Next1: Next ' +
+                               ' state when in ‘1’. Specifies the expected' +
+                               ' next state when the current state is ‘1’.',
                                set_cmd=self._gen_ch_set_func(
-                                   self._sendErrFractSglQbitPatternAll, ch_pair),
-                               get_cmd=self._gen_ch_get_func(
-                                   self._getErrFractSglQbitPatternAll, ch_pair),
+                self._sendErrFractSglQbitPatternAll,
+                ch_pair),
+                get_cmd=self._gen_ch_get_func(
+                self._getErrFractSglQbitPatternAll, ch_pair),
 
-                               vals=vals.Arrays(0, 1)
-                               )
+                vals=vals.Arrays(0, 1)
+            )
 
-            for i in range(self.device_descriptor.numWeights):
+            for i in range(self.device_descriptor.numWeights[ch_pair-1]):
                 wNr = i+1
                 """
                 Weighted integral + Rotation matrix + TV mode parameters
                 """
                 swinten_cmd = 'qutech:wint{}:enable{}'.format(ch_pair, wNr)
-                self.add_parameter('ch_pair{}_weight{}_wint_enable'.format(ch_pair, wNr),
+                self.add_parameter('ch_pair{}_weight{}_wint_enable'.format(
+                                   ch_pair, wNr),
                                    label=('Enable wighted integral' +
-                                          'ch_pair {} weight {}'.format(ch_pair, wNr)),
+                                          'ch_pair {} weight {}'.format(
+                                              ch_pair, wNr)),
                                    docstring='  ' +
                                    '' +
                                    ' ',
@@ -293,23 +334,27 @@ class DDMq(SCPI):
 
                 sintlength_cmd = 'qutech:wint{}:intlength{}'.format(
                     ch_pair, wNr)
-                self.add_parameter('ch_pair{}_weight{}_wint_intlength'.format(ch_pair, wNr),
-                                   unit='#',
-                                   label=('The number of sample  that' +
-                                          'is used for one integration of' +
-                                          'ch_pair {} weight {}'.format(ch_pair, wNr)),
-                                   docstring='  ' +
-                                   '' +
-                                   ' ',
-                                   get_cmd=sintlength_cmd + '?',
-                                   set_cmd=sintlength_cmd + ' {}',
-                                   vals=vals.Numbers(1, 4096)
-                                   )
+                self.add_parameter('ch_pair{}_weight{}_wint_intlength'.format(
+                    ch_pair, wNr),
+                    unit='#',
+                    label=('The number of sample  that' +
+                           'is used for one integration of' +
+                           'ch_pair {} weight {}'.format(
+                               ch_pair, wNr)),
+                    docstring='  ' +
+                    '' +
+                    ' ',
+                    get_cmd=sintlength_cmd + '?',
+                    set_cmd=sintlength_cmd + ' {}',
+                    vals=vals.Numbers(1, 4096)
+                )
                 swintstat_cmd = 'qutech:wint{}:status{}'.format(ch_pair, wNr)
-                self.add_parameter('ch_pair{}_weight{}_wint_status'.format(ch_pair, wNr),
+                self.add_parameter('ch_pair{}_weight{}_wint_status'.format(
+                                   ch_pair, wNr),
                                    unit='#',
                                    label=('Weighted integral status of' +
-                                          'ch_pair {} weight {}'.format(ch_pair, wNr)),
+                                          'ch_pair {} weight {}'.format(
+                                              ch_pair, wNr)),
                                    docstring='  ' +
                                    '' +
                                    ' ',
@@ -323,51 +368,59 @@ class DDMq(SCPI):
                 ###################################
                 srotmat00_cmd = 'qutech:rotmat{}:rotmat00{}'.format(
                     ch_pair, wNr)
-                self.add_parameter('ch_pair{}_weight{}_rotmat_rotmat00'.format(ch_pair, wNr),
+                self.add_parameter('ch_pair{}_weight{}_rotmat_rotmat00'.format(
+                                   ch_pair, wNr),
                                    unit='#',
                                    label=('Rotation matrix value 00 of' +
-                                          'ch_pair {} weight {}'.format(ch_pair, wNr)),
-                                   docstring=' Value for Rotation matrix element 00 ' +
-                                   'This enables values from (+2-2-12) to -2 float number' +
-                                   ' ',
+                                          'ch_pair {} weight {}'.format(
+                                              ch_pair, wNr)),
+                                   docstring=' Value for Rotation matrix' +
+                                   ' element 00 This enables values from' +
+                                   ' (+2-2-12) to -2 float number ',
                                    get_cmd=srotmat00_cmd + '?',
                                    set_cmd=srotmat00_cmd + ' {}',
                                    vals=vals.Numbers(-2, 1.99976)
                                    )
                 srotmat01_cmd = 'qutech:rotmat{}:rotmat01{}'.format(
                     ch_pair, wNr)
-                self.add_parameter('ch_pair{}_weight{}_rotmat_rotmat01'.format(ch_pair, wNr),
+                self.add_parameter('ch_pair{}_weight{}_rotmat_rotmat01'.format(
+                                   ch_pair, wNr),
                                    unit='#',
                                    label=('Rotation matrix value 01 of' +
-                                          'ch_pair {} weight {}'.format(ch_pair, wNr)),
-                                   docstring=' Value for Rotation matrix element 01 ' +
-                                   'This enables values from (+2-2^-12) to -2 float number' +
-                                   ' ',
+                                          'ch_pair {} weight {}'.format(
+                                              ch_pair, wNr)),
+                                   docstring=' Value for Rotation matrix' +
+                                   ' element 01 This enables values from' +
+                                   ' (+2-2^-12) to -2 float number ',
                                    get_cmd=srotmat01_cmd + '?',
                                    set_cmd=srotmat01_cmd + ' {}',
                                    vals=vals.Numbers(-2, 1.99976)
                                    )
                 srotmat10_cmd = 'qutech:rotmat{}:rotmat10{}'.format(
                     ch_pair, wNr)
-                self.add_parameter('ch_pair{}_weight{}_rotmat_rotmat10'.format(ch_pair, wNr),
+                self.add_parameter('ch_pair{}_weight{}_rotmat_rotmat10'.format(
+                                   ch_pair, wNr),
                                    unit='#',
                                    label=('Rotation matrix value 10 of' +
-                                          'ch_pair {} weight {}'.format(ch_pair, wNr)),
-                                   docstring=' Value for Rotation matrix element 10 ' +
-                                   'This enables values from (+2-2^-12) to -2 float number' +
-                                   ' ',
+                                          'ch_pair {} weight {}'.format(
+                                              ch_pair, wNr)),
+                                   docstring=' Value for Rotation matrix ' +
+                                   ' element 10 This enables values from' +
+                                   ' (+2-2^-12) to -2 float number ',
                                    get_cmd=srotmat10_cmd + '?',
                                    set_cmd=srotmat10_cmd + ' {}'
                                    )
                 srotmat11_cmd = 'qutech:rotmat{}:rotmat11{}'.format(
                     ch_pair, wNr)
-                self.add_parameter('ch_pair{}_weight{}_rotmat_rotmat11'.format(ch_pair, wNr),
+                self.add_parameter('ch_pair{}_weight{}_rotmat_rotmat11'.format(
+                                   ch_pair, wNr),
                                    unit='#',
                                    label=('Rotation matrix value 11 of' +
-                                          'ch_pair {} weight {} '.format(ch_pair, wNr)),
-                                   docstring=' Value for Rotation matrix element 11 ' +
-                                   'This enables values from (+2-2^-12) to -2 float number' +
-                                   ' ',
+                                          'ch_pair {} weight {} '.format(
+                                              ch_pair, wNr)),
+                                   docstring=' Value for Rotation matrix' +
+                                   ' element 11 This enables values from' +
+                                   ' (+2-2^-12) to -2 float number ',
                                    get_cmd=srotmat11_cmd + '?',
                                    set_cmd=srotmat11_cmd + ' {}',
                                    vals=vals.Numbers(-2, 1.99976)
@@ -378,48 +431,62 @@ class DDMq(SCPI):
                 ####################
                 sintavg_cmd = 'qutech:tvmode{}:naverages{}'.format(
                     ch_pair, wNr)
-                self.add_parameter('ch_pair{}_weight{}_tvmode_naverages'.format(ch_pair, wNr),
+                self.add_parameter(('ch_pair{}_weight{}_tvmode_naverages'
+                                    ).format(ch_pair, wNr),
                                    unit='#',
-                                   label=('The number of integration averages' +
-                                          'of ch_pair {} weight {}'.format(ch_pair, wNr)),
-                                   docstring='It sets number of integartion avarages   ' +
-                                   'for individual weights within one ch_pair' +
-                                   'Refer to ch_pair{}_tvmode_naverages to set it for all weights ',
+                                   label=('The number of integration' +
+                                          ' averages of ch_pair' +
+                                          ' {} weight {}'.format(ch_pair, wNr)
+                                          ),
+                                   docstring='It sets number of integartion' +
+                                   ' avarages for individual weights within' +
+                                   ' one ch_pair Refer to ch_pair{}_tvmode' +
+                                   '_naverages to set it for all weights ',
                                    get_cmd=sintavg_cmd + '?',
                                    set_cmd=sintavg_cmd + ' {}',
                                    vals=vals.Numbers(1, 131072)
                                    )
                 stvseg_cmd = 'qutech:tvmode{}:nsegments{}'.format(ch_pair, wNr)
-                self.add_parameter('ch_pair{}_weight{}_tvmode_nsegments'.format(ch_pair, wNr),
+                self.add_parameter(('ch_pair{}_weight{}_tvmode_nsegments'
+                                    ).format(ch_pair, wNr),
                                    unit='#',
                                    label=('The number of TV segments of' +
-                                          'ch_pair {} weight {}'.format(ch_pair, wNr)),
-                                   docstring='It sets the number of samples in one scan   ' +
-                                   'for individual weight within a channel pair.' +
-                                   'Refer to ch_pair{}_tvmode_nsegments to set it for all weights ',
+                                          'ch_pair {} weight {}'.format(
+                                              ch_pair, wNr)),
+                                   docstring='It sets the number of samples' +
+                                   ' in one scan for individual weight' +
+                                   ' within a channel pair. Refer to' +
+                                   ' ch_pair{}_tvmode_nsegments to set it' +
+                                   ' for all weights ',
                                    get_cmd=stvseg_cmd + '?',
                                    set_cmd=stvseg_cmd + ' {}',
                                    vals=vals.Numbers(1, 256)
                                    )
                 stven_cmd = 'qutech:tvmode{}:enable{}'.format(ch_pair, wNr)
-                self.add_parameter('ch_pair{}_weight{}_tvmode_enable'.format(ch_pair, wNr),
+                self.add_parameter('ch_pair{}_weight{}_tvmode_enable'.format(
+                                   ch_pair, wNr),
                                    label=('Enable tv mode' +
-                                          'ch_pair {} weight {}'.format(ch_pair, wNr)),
-                                   docstring='It enables the TV-Mode functionality    ' +
-                                   'for each weight pair individualy within one ch_pair.' +
-                                   'Refer to ch_pair{}_tvmode_enable to enable it for all weights',
+                                          'ch_pair {} weight {}'.format(
+                                              ch_pair, wNr)),
+                                   docstring='It enables the TV-Mode' +
+                                   ' functionality for each weight pair' +
+                                   ' individualy within one ch_pair. Refer' +
+                                   ' to ch_pair{}_tvmode_enable to enable' +
+                                   ' it for all weights',
                                    get_cmd=stven_cmd + '?',
                                    set_cmd=stven_cmd + ' {}',
                                    vals=vals.Numbers(0, 1)
                                    )
 
-                self.add_parameter('ch_pair{}_weight{}_tvmode_data'.format(ch_pair, wNr),
-                                   label=(
-                                       'Get TV data channel pair {} weight {}'.format(ch_pair, wNr)),
-                                   docstring='It returns tvmode data written ' +
-                                   'to TVmode memory after measuremnet. ' +
-                                   'Every weight pair has only one TV mode memory' +
-                                   'It can be used either I or Q ',
+                self.add_parameter('ch_pair{}_weight{}_tvmode_data'.format(
+                                   ch_pair, wNr),
+                                   label=('Get TV data channel pair' +
+                                          ' {} weight {}'.format(ch_pair, wNr)
+                                          ),
+                                   docstring='It returns tvmode data written' +
+                                   ' to TVmode memory after measuremnet.' +
+                                   ' Every weight pair has only one TV mode' +
+                                   ' memory. It can be used either I or Q ',
                                    get_cmd=self._gen_ch_weight_get_func(
                                        self._getTVdata, ch_pair, wNr)
 
@@ -429,40 +496,51 @@ class DDMq(SCPI):
                 # TV mode QSTATE parameters
                 ###########################
                 sthl_cmd = 'qutech:qstate{}:threshold{}'.format(ch_pair, wNr)
-                self.add_parameter('ch_pair{}_weight{}_qstate_threshold'.format(ch_pair, wNr),
+                self.add_parameter(('ch_pair{}_weight{}_qstate_threshold'
+                                    ).format(ch_pair, wNr),
                                    unit='#',
                                    label=('Set threshold of' +
-                                          'ch_pair {} weight {}'.format(ch_pair, wNr)),
-                                   docstring='It sets the value for the Qubit State Threshold   ' +
-                                   'individually per weight pair.' +
-                                   'The value is -2^27 to +2^27-1' +
-                                   'It is a relative number based on the ADC 8 bit range (-128..127) ' +
-                                   'It will require to have a scale factor as in weighted integral',
+                                          'ch_pair {} weight {}'.format(
+                                              ch_pair, wNr)),
+                                   docstring='It sets the value for the' +
+                                   ' Qubit State Threshold individually per' +
+                                   ' weight pair. The value is -2^27 to' +
+                                   ' +2^27-1. It is a relative number based' +
+                                   ' on the ADC 8 bit range (-128..127). It' +
+                                   ' will require to have a scale factor as' +
+                                   ' in weighted integral',
                                    get_cmd=sthl_cmd + '?',
                                    set_cmd=sthl_cmd + ' {}',
                                    vals=vals.Numbers(-134217728, 134217727)
                                    )
-                self.add_parameter('ch_pair{}_weight{}_qstate_cnt_data'.format(ch_pair, wNr),
+                self.add_parameter('ch_pair{}_weight{}_qstate_cnt_data'.format(
+                                   ch_pair, wNr),
                                    label=('Get qstate counter' +
-                                          'ch_pair {} weight {} '.format(ch_pair, wNr)),
-                                   docstring='It returns tvmode data after thresholding written to TVmode' +
-                                   'memory after measuremnet and not averaged. ' +
-                                   'Every weight pair has only one TV mode memory' +
-                                   'It can be used either I or Q ' +
+                                          'ch_pair {} weight {} '.format(
+                                              ch_pair, wNr)),
+                                   docstring='It returns tvmode data after' +
+                                   ' thresholding written to TVmode memory' +
+                                   ' after measuremnet and not averaged. ' +
+                                   'Every weight pair has only one TV mode' +
+                                   ' memory. It can be used either I or Q ' +
                                    'Foramt is float containg 0s and 1s ',
                                    get_cmd=self._gen_ch_weight_get_func(
                                    self._getQstateCNT, ch_pair, wNr)
 
                                    )
-                self.add_parameter('ch_pair{}_weight{}_qstate_avg_data'.format(ch_pair, wNr),
+                self.add_parameter('ch_pair{}_weight{}_qstate_avg_data'.format(
+                                   ch_pair, wNr),
                                    label=('Get qstate average' +
-                                          'ch_pair {} weight {}'.format(ch_pair, wNr)),
-                                   docstring='It returns tvmode data after thresholding written to TVmode' +
-                                   'memory after measuremnet and already averaged  ' +
-                                   'with preset number of averages. ' +
-                                   'Every weight pair has only one TV mode memory' +
-                                   'It can be used either I or Q ' +
-                                   'Format is float containg numbers between 0 and 1 ',
+                                          'ch_pair {} weight {}'.format(
+                                              ch_pair, wNr)),
+                                   docstring='It returns tvmode data after' +
+                                   ' thresholding written to TVmode memory' +
+                                   ' after measuremnet and already averaged' +
+                                   ' with preset number of averages. Every' +
+                                   ' weight pair has only one TV mode memory' +
+                                   'It can be used either I or Q Format' +
+                                   ' is float containg numbers between 0 and' +
+                                   ' 1 ',
                                    get_cmd=self._gen_ch_weight_get_func(
                     self._getQstateAVG, ch_pair, wNr)
 
@@ -471,9 +549,11 @@ class DDMq(SCPI):
                 # Logging
                 #################
                 slogen_cmd = 'qutech:logging{}:enable{}'.format(ch_pair, wNr)
-                self.add_parameter('ch_pair{}_weight{}_logging_enable'.format(ch_pair, wNr),
+                self.add_parameter('ch_pair{}_weight{}_logging_enable'.format(
+                                   ch_pair, wNr),
                                    label=('Enable logging mode' +
-                                          'ch_pair {} weight {}'.format(ch_pair, wNr)),
+                                          'ch_pair {} weight {}'.format(
+                                              ch_pair, wNr)),
                                    docstring='  ' +
                                    '' +
                                    ' ',
@@ -484,10 +564,12 @@ class DDMq(SCPI):
 
                 slogshots_cmd = 'qutech:logging{}:nshots{}'.format(
                     ch_pair, wNr)
-                self.add_parameter('ch_pair{}_weight{}_logging_nshots'.format(ch_pair, wNr),
+                self.add_parameter('ch_pair{}_weight{}_logging_nshots'.format(
+                                   ch_pair, wNr),
                                    unit='#',
                                    label=('The number of logging shots of' +
-                                          'ch_pair {} weight {}'.format(ch_pair, wNr)),
+                                          'ch_pair {} weight {}'.format(
+                                              ch_pair, wNr)),
                                    docstring='  ' +
                                    '' +
                                    ' ',
@@ -496,28 +578,33 @@ class DDMq(SCPI):
                                    vals=vals.Numbers(1, 8192)
                                    )
 
-                self.add_parameter('ch_pair{}_weight{}_logging_int'.format(ch_pair, wNr),
+                self.add_parameter('ch_pair{}_weight{}_logging_int'.format(
+                                   ch_pair, wNr),
                                    label=('Get integration logging ' +
-                                          'ch_pair {} weight {}'.format(ch_pair, wNr)),
-                                   docstring='It returns Logging integration data written to Logging' +
-                                   'memory after measuremnet. It is up to 8192 shots' +
-                                   'with preset number of shots. ' +
-                                   'Every weight pair has only one TV mode memory' +
-                                   'It can be used either I or Q ' +
-                                   'Foramt is float containg 0s and 1s ',
+                                          'ch_pair {} weight {}'.format(
+                                              ch_pair, wNr)),
+                                   docstring='It returns Logging integration' +
+                                   ' data written to Logging memory after' +
+                                   ' measuremnet. It is up to 8192 shots' +
+                                   'with preset number of shots. Every' +
+                                   ' weight pair has only one TV mode memory' +
+                                   'It can be used either I or Q  Foramt is' +
+                                   ' float containg 0s and 1s ',
                                    get_cmd=self._gen_ch_weight_get_func(
                                        self._getLoggingInt, ch_pair, wNr),
 
                                    )
-                self.add_parameter('ch_pair{}_weight{}_logging_qstate'.format(ch_pair, wNr),
+                self.add_parameter('ch_pair{}_weight{}_logging_qstate'.format(
+                                   ch_pair, wNr),
                                    label=('Get qstate logging ' +
-                                          'ch_pair {} weight {}'.format(ch_pair, wNr)),
+                                          'ch_pair {} weight {}'.format(
+                                              ch_pair, wNr)),
                                    docstring='It returns Logging data after ' +
-                                   'thresholding written to Logging' +
-                                   'memory after measuremnet. It is up to 8192 shots' +
-                                   'with preset number of shots. ' +
-                                   'Every weight pair has only one TV mode memory' +
-                                   'It can be used either I or Q ' +
+                                   'thresholding written to Logging memory' +
+                                   ' after measuremnet. It is up to 8192' +
+                                   ' shots with preset number of shots.' +
+                                   ' Every weight pair has only one TV mode' +
+                                   ' memory It can be used either I or Q ' +
                                    'Foramt is float containg 0s and 1s ',
                                    get_cmd=self._gen_ch_weight_get_func(
                                        self._getLoggingQstate, ch_pair, wNr),
@@ -528,9 +615,11 @@ class DDMq(SCPI):
                 #################
                 serrfarcten_cmd = 'qutech:errorfraction{}:enable{}'.format(
                     ch_pair, wNr)
-                self.add_parameter('ch_pair{}_weight{}_err_fract_enable'.format(ch_pair, wNr),
+                self.add_parameter(('ch_pair{}_weight{}_err_fract_enable'
+                                    ).format(ch_pair, wNr),
                                    label=('Enable error fraction mode' +
-                                          'ch_pair {} weight {} '.format(ch_pair, wNr)),
+                                          'ch_pair {} weight {} '.format(
+                                              ch_pair, wNr)),
                                    docstring='  ' +
                                    '' +
                                    ' ',
@@ -541,10 +630,12 @@ class DDMq(SCPI):
 
                 serrfractshots_cmd = 'qutech:errorfraction{}:nshots{}'.format(
                     ch_pair, wNr)
-                self.add_parameter('ch_pair{}_weight{}_err_fract_nshots'.format(ch_pair, wNr),
+                self.add_parameter(('ch_pair{}_weight{}_err_fract_nshots'
+                                    ).format(ch_pair, wNr),
                                    unit='#',
-                                   label=('The number of error fraction shots of' +
-                                          'ch_pair {} weight {} '.format(ch_pair, wNr)),
+                                   label=('The number of error fraction' +
+                                          (' shots of ch_pair {} weight' +
+                                           ' {} ').format(ch_pair, wNr)),
                                    docstring='  ' +
                                    '' +
                                    ' ',
@@ -552,27 +643,34 @@ class DDMq(SCPI):
                                    set_cmd=serrfractshots_cmd + ' {}',
                                    vals=vals.Numbers(1, 2097152)
                                    )
-                self.add_parameter('ch_pair{}_weight{}_err_fract_cnt'.format(ch_pair, wNr),
+                self.add_parameter('ch_pair{}_weight{}_err_fract_cnt'.format(
+                                   ch_pair, wNr),
                                    label=('Get all error fraction counters ' +
-                                          'ch_pair {} weight {}'.format(ch_pair, wNr)),
-                                   docstring='It returns 5 counters which are:  ' +
-                                   'No Error Counter, Single Error Counter, Double Error CounterReg' +
-                                   'Zero State CounterReg,One State CounterReg. ',
+                                          'ch_pair {} weight {}'.format(
+                                              ch_pair, wNr)),
+                                   docstring='It returns 5 counters which' +
+                                   ' are:  No Error Counter, Single Error' +
+                                   ' Counter, Double Error CounterReg Zero' +
+                                   ' State CounterReg,One State CounterReg. ',
                                    get_cmd=self._gen_ch_weight_get_func(
                                        self._getErrFractCnt, ch_pair, wNr)
 
                                    # vals=vals.Numbers(-128,127)
                                    )
-                self.add_parameter('ch_pair{}_weight{}_err_fract_pattern'.format(ch_pair, wNr),
+                self.add_parameter(('ch_pair{}_weight{}_err_fract_pattern'
+                                    ).format(ch_pair, wNr),
                                    label=('Get error fraction pattern ' +
-                                          'ch_pair {} weight {}'.format(ch_pair, wNr)),
+                                          'ch_pair {} weight {}'.format(
+                                              ch_pair, wNr)),
                                    docstring='  ' +
                                    '' +
                                    ' ',
                                    set_cmd=self._gen_ch_weight_set_func(
-                                       self._sendErrFractSglQbitPattern, ch_pair, wNr),
+                                       self._sendErrFractSglQbitPattern,
+                                       ch_pair, wNr),
                                    get_cmd=self._gen_ch_weight_get_func(
-                                       self._getErrFractSglQbitPattern, ch_pair, wNr),
+                                       self._getErrFractSglQbitPattern,
+                                       ch_pair, wNr),
 
                                    vals=vals.Arrays(0, 1)
                                    )
@@ -583,11 +681,12 @@ class DDMq(SCPI):
             ch = i+1
             self.add_parameter('ch{}_inavg_data'.format(ch),
                                label=('Get data ch {} '.format(ch)),
-                               docstring='It returns input averaging data  written to input averaging' +
-                               'memory after measuremnet. It is up to 4096 samples (8us)' +
-                               'with preset number of samples. ' +
-                               'Every channel has its input averaging memory' +
-                               'Foramt is integer from -128 to 127 corrsponding to +-1V ',
+                               docstring='It returns input averaging data' +
+                               ' written to input averaging memory after' +
+                               ' measuremnet. It is up to 4096 samples (8us)' +
+                               'with preset number of samples. Every channel' +
+                               ' has its input averaging memory Foramt is ' +
+                               'integer from -128 to 127 corrsponding to +-1V',
                                get_cmd=self._gen_ch_get_func(
                                    self._getInputAverage, ch),
                                vals=vals.Arrays(-128, 127)
@@ -603,15 +702,16 @@ class DDMq(SCPI):
                                ' ',
                                get_cmd=srotres_cmd + '?'
                                )
-            for i in range(self.device_descriptor.numWeights):
+            for i in range(self.device_descriptor.numWeights[ch_pair-1]):
                 wNr = i+1
                 self.add_parameter(
                     'ch{}_weight{}_data'.format(ch, wNr),
                     label=('Get weight data channel {}'.format(ch) +
                            'weight number {}  '.format(wNr)),
-                    docstring='It set a weight up 4096 samples (8 us) per channel  ' +
-                    'and weight pair. It is int8 integer between -128 to 127' +
-                    'corresponding +-1V. It should be re-factored before setting or getting ',
+                    docstring='It set a weight up 4096 samples (8 us) per' +
+                    ' channel and weight pair. It is int8 integer between' +
+                    ' -128 to 127 corresponding +-1V. It should be' +
+                    ' re-factored before setting or getting ',
                     get_cmd=self._gen_ch_weight_get_func(
                         self._getWeightData, ch, wNr),
                     set_cmd=self._gen_ch_weight_set_func(
@@ -619,6 +719,101 @@ class DDMq(SCPI):
                     vals=vals.Arrays(-128, 127)
                 )
 
+    #################
+    # Error handling
+    #################
+
+    class Error(object):
+
+        def __init__(self, errorCode, description, logLevel, acquisitionMode):
+            self.errorCode = errorCode
+            self.description = description
+            self.logLevel = logLevel
+            self.acquisitionMode = acquisitionMode
+
+        def __repr__(self):
+            level = ""
+            if (self.logLevel >= logging.CRITICAL):
+                level = "critical"
+            elif (self.logLevel >= logging.ERROR):
+                level = "error"
+            elif (self.logLevel >= logging.WARNING):
+                level = "warning"
+            return level + ": " + self.description + ", mode: " +\
+                self.acquisitionMode
+
+        def log(self):
+            if (self.logLevel >= logging.CRITICAL):
+                log.critical(self)
+            elif (self.logLevel >= logging.ERROR):
+                log.error(self)
+            elif (self.logLevel >= logging.WARNING):
+                log.warning(self)
+
+    def _parseErrorList(self, acquisitionMode, errorList):
+        errors = []
+
+        start = 0
+        end = -1
+        looping = True
+
+        while (looping):
+            start = end + 1
+            end = errorList.find(',\"', start)
+            errorCode = int(errorList[start:end])
+
+            start = end + 2
+            end = errorList.find("\",", start)
+            description = errorList[start:end]
+
+            start = end + 2
+            end = errorList.find(',', start)
+            if (end < 0):
+                end = len(errorList)
+                looping = False
+            errorLevel = int(errorList[start:end])
+            errors.append(self.Error(errorCode, description,
+                                     errorLevel, acquisitionMode))
+        return errors
+
+    def _parseError(self, acquisitionMode, error):
+        errors = self._parseErrorList(acquisitionMode, error)
+        if (len(errors) > 0):
+            return errors[0]
+        else:
+            return None
+
+    def _displayErrors(self, errors):
+        for i in range(0, len(errors)):
+            if (errors[i].logLevel >= self.exceptionLevel):
+                raise Exception(errors[i])
+            else:
+                errors[i].log()
+
+    def _getInAvgErrors(self, acquisitionMode, ch_pair):
+        return self._parseErrorList(acquisitionMode, self.ask(
+            'qutech:ADC{:d}:errors?'.format(ch_pair))
+        )
+
+    def _getErrors(self, acquisitionMode, ch_pair, wNr):
+        return self._parseErrorList(acquisitionMode, self.ask(
+            'qutech:ADC{:d}:errors{:d}?'.format(ch_pair, wNr))
+        )
+
+    def _displayInAvgErrors(self, acquisitionMode, ch_pair):
+        self._displayErrors(self._getInAvgErrors(acquisitionMode, ch_pair))
+
+    def _displayQBitErrors(self, acquisitionMode, ch_pair, wNr):
+        self._displayErrors(self._getErrors(acquisitionMode, ch_pair, wNr))
+
+    # From this logging level, a message will cause and exceptions instead of
+    # a log message
+    def setExceptionLevel(self, level):
+        self.exceptionLevel = level
+
+    #################
+    # Get Data
+    #################
     def _getInputAverage(self, ch):
         ch_pair = math.ceil(ch/2)
         finished = 0
@@ -627,6 +822,8 @@ class DDMq(SCPI):
             if (finished == 'ffffffff'):
                 logging.warning('Trigger is not received: DDM timeout')
                 break
+            time.sleep(1.0/FINISH_BIT_CHECK_FERQUENTION_HZ)
+        self._displayInAvgErrors("Input Average", ch_pair)
         self.write('qutech:inputavg{:d}:data? '.format(ch))
         binBlock = self.binBlockRead()
         inputavg = np.frombuffer(binBlock, dtype=np.float32)
@@ -634,12 +831,18 @@ class DDMq(SCPI):
 
     def _getTVdata(self, ch_pair, wNr):
         finished = 0
-
         while (finished != '1'):
             finished = self._getTVFinished(ch_pair, wNr)
             if (finished == 'ffffffff'):
                 logging.warning('Trigger is not received: DDM timeout')
                 break
+            elif (finished != '1'):
+                print("\r TV mode(" + str(int(float(self._getTVpercentage(
+                    ch_pair, wNr)))) + "%)", end='\0')
+                time.sleep(1.0/FINISH_BIT_CHECK_FERQUENTION_HZ)
+        if (finished != 'ffffffff'):
+            print("\r", end='\0')
+        self._displayQBitErrors("TV Mode", ch_pair, wNr)
         self.write('qutech:tvmode{:d}:data{:d}? '.format(ch_pair, wNr))
         binBlock = self.binBlockRead()
         tvmodedata = np.frombuffer(binBlock, dtype=np.float32)
@@ -660,7 +863,6 @@ class DDMq(SCPI):
         self.binBlockWrite(binBlock, hdr)
 
     def _getWeightData(self, ch, wNr):
-
         self.write('qutech:wint{:d}:data{:d}? '.format(ch, wNr))
         binBlock = self.binBlockRead()
         weightdata = np.frombuffer(binBlock, dtype=np.int8)
@@ -673,6 +875,13 @@ class DDMq(SCPI):
             if (finished == 'ffffffff'):
                 logging.warning('Trigger is not received: DDM timeout')
                 break
+            elif (finished != '1'):
+                print("\r TV mode(" + str(int(float(self._getTVpercentage(
+                      ch_pair, wNr)))) + "%)", end='\0')
+                time.sleep(1.0/FINISH_BIT_CHECK_FERQUENTION_HZ)
+        if (finished != 'ffffffff'):
+            print("\r", end='\0')
+        self._displayQBitErrors("TV(Qbit state)", ch_pair, wNr)
 
         self.write('qutech:qstate{:d}:data{:d}:counter? '.format(ch_pair, wNr))
         binBlock = self.binBlockRead()
@@ -686,6 +895,14 @@ class DDMq(SCPI):
             if (finished == 'ffffffff'):
                 logging.warning('Trigger is not received: DDM timeout')
                 break
+            elif (finished != '1'):
+                print(
+                    "\r TV mode(" + str(int(float(self._getTVpercentage(
+                        ch_pair, wNr)))) + "%)", end='\0')
+                time.sleep(1.0/FINISH_BIT_CHECK_FERQUENTION_HZ)
+        if (finished != 'ffffffff'):
+            print("\r", end='\0')
+        self._displayQBitErrors("TV(Qbit state)", ch_pair, wNr)
         self.write('qutech:qstate{:d}:data{:d}:average? '.format(ch_pair, wNr))
         binBlock = self.binBlockRead()
         qstateavg = np.frombuffer(binBlock, dtype=np.float32)
@@ -698,6 +915,14 @@ class DDMq(SCPI):
             if (finished == 'ffffffff'):
                 logging.warning('Trigger is not received: DDM timeout')
                 break
+            elif (finished != '1'):
+                print("\r Logging mode(" + str(int(float(
+                    self._getLoggingpercentage(ch_pair, wNr)))) + "%)",
+                    end='\0')
+                time.sleep(1.0/FINISH_BIT_CHECK_FERQUENTION_HZ)
+        if (finished != 'ffffffff'):
+            print("\r", end='\0')
+        self._displayQBitErrors("Logging", ch_pair, wNr)
         self.write('qutech:logging{:d}:data{:d}:int? '.format(ch_pair, wNr))
         binBlock = self.binBlockRead()
         intlogging = np.frombuffer(binBlock, dtype=np.float32)
@@ -710,6 +935,14 @@ class DDMq(SCPI):
             if (finished == 'ffffffff'):
                 logging.warning('Trigger is not received: DDM timeout')
                 break
+            elif (finished != '1'):
+                print("\r Logging mode(" + str(int(float(
+                    self._getLoggingpercentage(ch_pair, wNr)))) + "%)",
+                    end='\0')
+                time.sleep(1.0/FINISH_BIT_CHECK_FERQUENTION_HZ)
+        if (finished != 'ffffffff'):
+            print("\r", end='\0')
+        self._displayQBitErrors("Logging(Qbit state)", ch_pair, wNr)
         self.write('qutech:logging{:d}:data{:d}:qstate? '.format(ch_pair, wNr))
         binBlock = self.binBlockRead()
         qstatelogging = np.frombuffer(binBlock, dtype=np.float32)
@@ -802,6 +1035,15 @@ class DDMq(SCPI):
             if (finished == 'ffffffff'):
                 logging.warning('Trigger is not received: DDM timeout')
                 break
+            elif (finished != '1'):
+                print("\r Error fraction mode(" + str(int(float(
+                    self._getErrFractpercentage(ch_pair, wNr)))) + "%)",
+                    end='\0')
+                time.sleep(1.0/FINISH_BIT_CHECK_FERQUENTION_HZ)
+        if (finished != 'ffffffff'):
+            print("\r", end='\0')
+        self._displayQBitErrors("Error Fract", ch_pair, wNr)
+
         self.write('qutech:errorfraction{:d}:data{:d}? '.format(ch_pair, wNr))
         binBlock = self.binBlockRead()
         errfractioncnt = np.frombuffer(binBlock, dtype=np.int32)
@@ -849,19 +1091,21 @@ class DDMq(SCPI):
         def _DI():
             if (reversestatusstr[0] == '1'):
                 logging.warning('\nOver range on DI input. ')
+                return None
             elif(reversestatusstr[1] == '1'):
-                logging.warning('\nUnder range on DI input.' +
-                                'Input signal is less than 25% of ADC resolution. ')
+                logging.warning('\nUnder range on DI input. Input signal is' +
+                                ' less than 25% of ADC resolution. ')
+                return None
             else:
                 print("\nDI input is Okay.")
-            return None
+                return None
 
         def _DQ():
             if (reversestatusstr[2] == '1'):
                 logging.warning('\nOver range on DQ input. ')
             elif(reversestatusstr[3] == '1'):
-                logging.warning('\nUnder range on DQ input.' +
-                                ' Input signal is less than 25% of ADC resolution. ')
+                logging.warning('\nUnder range on DQ input. Input signal is' +
+                                ' less than 25% of ADC resolution. ')
             else:
                 print("\nDQ input is Okay.")
             return None
@@ -882,30 +1126,33 @@ class DDMq(SCPI):
 
         def _FalseTrig():
             if (reverseinavgstatus[28] == '1'):
-                logging.warning("\nFalse trigger detected in Input Averaging mode." +
-                                "\nThe logic will ignore this (false) trigger." +
-                                "\nIndication that a trigger was received while the ADC samples" +
-                                "\nof a previous scan were still being processed. ")
+                logging.warning("\nFalse trigger detected in Input Averaging" +
+                                " mode. \nThe logic will ignore this (false)" +
+                                " trigger.\nIndication that a trigger was" +
+                                " received while the ADC samples\nof a" +
+                                " previous scan were still being processed. ")
 
             if (reversestatuswintstr[20] == '1'):
-                logging.warning("\nFalse Trigger on DI channel." +
-                                "\nThe logic will ignore this (false) trigger." +
-                                "\nIndicates that a trigger was received while the ADC samples " +
-                                "\nof a previous scan were still being processed. ")
+                logging.warning("\nFalse Trigger on DI channel.\nThe logic" +
+                                " will ignore this (false) trigger." +
+                                "\nIndicates that a trigger was received" +
+                                " while the ADC samples\nof a previous scan" +
+                                " were still being processed. ")
             if (reversestatuswintstr[21] == '1'):
-                logging.warning("\nFalse Trigger on DQ channel." +
-                                "\nThe logic will ignore this (false) trigger." +
-                                "\nIndicates that a trigger was received while the ADC samples " +
-                                "\nof a previous scan were still being processed. ")
+                logging.warning("\nFalse Trigger on DQ channel.\nThe logic" +
+                                " will ignore this (false) trigger." +
+                                "\nIndicates that a trigger was received" +
+                                " while the ADC samples\nof a previous" +
+                                " scan were still being processed. ")
 
             else:
                 print("\nNo false trigger.Trigger period is okay.")
             return None
 
         def _Temperature():
-            print("\nDictionary with temperature information and" +
-                  " recommendations." +
-                  "\nCheck WarnMessage for the recommendation:")
+            # print("\nDictionary with temperature information and" +
+            #      " recommendations." +
+            #      "\nCheck WarnMessage for the recommendation:")
             if (reversetempstatusstr[1] == '1'):
                 logging.warning("\nADC Temperature is Critical!")
 
@@ -924,11 +1171,12 @@ class DDMq(SCPI):
                      2: _DCLK_PLL_LOCKED,
                      3: _CalRun,
                      4: _FalseTrig,
-                     5: _Temperature
+                     5: _Temperature,
                      }
 
         for x in range(0, 6):
             print(ADCstatus[x]())
+
         return None
         # return None
 
@@ -974,6 +1222,10 @@ class DDMq(SCPI):
     def _get_temp_status(self, ch_pair):
         temp = self.ask('qutech:adc{:d}:temperature:status? '.format(ch_pair))
         return int(temp)
+
+    def _get_weigth_data_status(self, ch_pair):
+        status = self.ask('qutech:adc{:d}:weightdata:status? '.format(ch_pair))
+        return int(status)
 
     def get_temp(self, ch_pair):
         try:
