@@ -257,12 +257,11 @@ def span_step(center, span, step, endpoint=True):
     Args:
         center (float) : center of the array
         span   (float) : span the total range of values to span
-        step   (float) : the number of points in the span
-        endpoint (bool): whether to include the endpoint
+        step   (float) : the stepsize between points in the array
+        endpoint (bool): whether to include the endpoint in the span
 
-    N.B. both boundaries are created in the span
     """
-    # +.1*step in the arange ensures the right boundary is included
+    # True*step/100 in the arange ensures the right boundary is included
     return np.arange(center-span/2, center+span/2+endpoint*step/100, step)
 
 
@@ -282,7 +281,7 @@ def gen_sweep_pts(start=None, stop=None,
         span   (float) : span the total range of values to span
 
         num      (int) : number of points in the array
-        step   (float) : the number of points in the span
+        step   (float) : the stepsize between points in the array
         endpoint (bool): whether to include the endpoint
 
     """
