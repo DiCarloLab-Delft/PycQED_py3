@@ -880,21 +880,37 @@ class CBox_v3_driven_transmon(Transmon):
     def measure_resonator_dac(self, freqs, dac_voltages,
                               MC=None, analyze=True, close_fig=True):
 
-        raise NotImplementedError()
-        # self.prepare_for_continuous_wave()
-        # if MC is None:
-        #     MC = self.MC.get_instr()
-        # MC.set_sweep_functions(
-        #     [pw.wrap_par_to_swf(self.heterodyne_instr.frequency),
-        #      pw.wrap_par_to_swf(
-        #         self.IVVI['dac{}'.format(self.dac_channel.get())])
-        #      ])
-        # MC.set_sweep_points(freqs)
-        # MC.set_sweep_points_2D(dac_voltages)
-        # MC.set_detector_function(det.Heterodyne_probe(self.heterodyne_instr))
-        # MC.run(name='Resonator_dac_scan'+self.msmt_suffix, mode='2D')
-        # if analyze:
-        #     ma.MeasurementAnalysis(auto=True, TwoD=True, close_fig=close_fig)
+        self.prepare_for_continuous_wave()
+        if MC is None:
+            MC = self.MC.get_instr()
+
+        # Loading the right qumis instructions
+        CW_RO_sequence = sqqs.CW_RO_sequence(self.name,
+                                             self.RO_acq_period_cw())
+        CW_RO_sequence_asm = qta.qasm_to_asm(CW_RO_sequence.name,
+                                             self.get_operation_dict())
+        qumis_file = CW_RO_sequence_asm
+        print(qumis_file.name)
+        self.CBox.get_instr().load_instructions(qumis_file.name)
+        self.CBox.get_instr().run_mode('run')
+
+        MC.set_sweep_function(swf.Heterodyne_Frequency_Sweep(
+            RO_pulse_type=self.RO_pulse_type(),
+            RF_source=self.RF_RO_source.get_instr(),
+            LO_source=self.LO.get_instr(), IF=self.f_RO_mod()))
+        MC.set_sweep_points(freqs)
+
+        MC.set_sweep_function_2D(
+                self.IVVI.get_instr().parameters[
+                'dac{}'.format(self.dac_channel.get())])
+
+        MC.set_sweep_points(freqs)
+        MC.set_sweep_points_2D(dac_voltages)
+        self.int_avg_det_single._set_real_imag(False)
+        MC.set_detector_function(self.int_avg_det_single)
+        MC.run(name='Resonator_dac_scan'+self.msmt_suffix, mode='2D')
+        if analyze:
+            ma.MeasurementAnalysis(auto=True, TwoD=True, close_fig=close_fig)
 
     def measure_rabi(self, amps=np.linspace(-.5, .5, 21), n=1,
                      MC=None, analyze=True, close_fig=True,
