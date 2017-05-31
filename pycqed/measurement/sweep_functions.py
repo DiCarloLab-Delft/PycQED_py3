@@ -59,13 +59,13 @@ class Heterodyne_Frequency_Sweep(Soft_Sweep):
         self.sweep_points = sweep_points
         self.LO_source = LO_source
         self.IF = IF
-        if 'Gated_MW_RO_pulse' in self.RO_pulse_type:
+        if 'gated' in self.RO_pulse_type.lower():
             self.RF_source = RF_source
 
     def set_parameter(self, val):
         # RF + IF = LO
         self.LO_source.frequency(val-self.IF)
-        if 'Gated_MW_RO_pulse' in self.RO_pulse_type:
+        if 'gated' in self.RO_pulse_type.lower():
             self.RF_source.frequency(val)
 
 

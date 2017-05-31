@@ -791,6 +791,9 @@ class CBox_v3_driven_transmon(Transmon):
         MC.set_sweep_points(freqs)
         # make sure we use the right acquision detector. Mind the new UHFQC
         # spec mode
+
+        # FIXME: setting polar coords should be fixed properly
+        self.int_avg_det_single._set_real_imag(False)
         MC.set_detector_function(self.int_avg_det_single)
         # det.Heterodyne_probe(self.heterodyne_instr)
         MC.run(name='Resonator_scan'+self.msmt_suffix)
