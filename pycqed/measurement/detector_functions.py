@@ -359,7 +359,8 @@ class CBox_integrated_average_detector(Hard_Detector):
                 self.AWG.stop()
                 self.CBox.set('acquisition_mode', 'idle')
                 self.CBox.set('acquisition_mode', 'integration averaging')
-                self.AWG.start()
+                if self.AWG is not None:
+                    self.AWG.start()
                 # does not restart AWG tape in CBox as we don't use it anymore
                 data = self.CBox.get_integrated_avg_results()
                 succes = True
@@ -367,7 +368,8 @@ class CBox_integrated_average_detector(Hard_Detector):
                 logging.warning('Exception caught retrying')
                 logging.warning(e)
                 self.CBox.set('acquisition_mode', 'idle')
-                self.AWG.stop()
+                if self.AWG is not None:
+                    self.AWG.stop()
                 # commented because deprecated
                 # self.CBox.restart_awg_tape(0)
                 # self.CBox.restart_awg_tape(1)
@@ -375,7 +377,8 @@ class CBox_integrated_average_detector(Hard_Detector):
 
                 self.CBox.set('acquisition_mode', 'integration averaging')
                 # Is needed here to ensure data aligns with seq elt
-                self.AWG.start()
+                if self.AWG is not None:
+                    self.AWG.start()
             i += 1
             if i > 20:
                 break
@@ -404,12 +407,14 @@ class CBox_integrated_average_detector(Hard_Detector):
 
     def prepare(self, sweep_points):
         self.CBox.set('nr_samples', self.seg_per_point*len(sweep_points))
-        self.AWG.stop()  # needed to align the samples
+        if self.AWG is not None:
+            self.AWG.stop()  # needed to align the samples
         self.CBox.nr_averages(int(self.nr_averages))
         self.CBox.integration_length(int(self.integration_length/(5e-9)))
         self.CBox.set('acquisition_mode', 'idle')
         self.CBox.set('acquisition_mode', 'integration averaging')
-        self.AWG.start()  # Is needed here to ensure data aligns with seq elt
+        if self.AWG is not None:
+            self.AWG.start()  # Is needed here to ensure data aligns with seq elt
 
     def finish(self):
         self.CBox.set('acquisition_mode', 'idle')
