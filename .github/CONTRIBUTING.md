@@ -75,8 +75,8 @@ Every issue and pull request should be labeled with two required labels, type an
  
 ### Issue type labels
 - **type:task**: indicates that the issue concerns a task. Tasks are used in the GitHub project Kanban board.
-- **type:bug**: indicates that the issue concerns a bug discoverd when testing or using the concerned project.
-- **type:hotfix**: indicates that the issue concerns a bug in a live system (see description above related to the Hotfix branch). Normaly the issue will be reported as a *type:bug* and is later on promoted to a *type:hotfix*.
+- **type:bug**: indicates that the issue concerns a bug discovered when testing or using the concerned project.
+- **type:hotfix**: indicates that the issue concerns a bug in a live system (see description above related to the Hotfix branch). Normally the issue will be reported as a *type:bug* and is later on promoted to a *type:hotfix*.
 - **type:enhancement**: indicates that the issue concerns a request for or a suggestion to an enhancement to an existing feature.
 - **type:feature**: indicates that the issue concerns a request for a new feature.
 - **type:question**: indicates that the issue concerns a question about e.g. the use of the system or a software function.
