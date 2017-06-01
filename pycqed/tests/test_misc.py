@@ -54,11 +54,11 @@ class Test_misc(unittest.TestCase):
         linspan2 = gen.span_lin(3.8, .2, 21)
         np.testing.assert_array_equal(linspan, linspan2)
 
-        ran = gen.gen_sweep_pts(start=3.8, stop=4.2, step=.5)
-        np.testing.assert_array_equal(ran, np.arange(3.8, 4.2001, .5))
+        ran = gen.gen_sweep_pts(start=3.8, stop=4.2, step=.05)
+        np.testing.assert_array_equal(ran, np.arange(3.8, 4.2001, .05))
 
-        ran = gen.gen_sweep_pts(center=3.8, span=.2, step=.5)
-        np.testing.assert_array_equal(ran, gen.span_step(3.8, .200, .5))
+        ran = gen.gen_sweep_pts(center=3.8, span=.2, step=.05)
+        np.testing.assert_array_equal(ran, gen.span_step(3.8, .200, .05))
 
         # missing arguments or invalid combinations of arguments should
         # raise errors

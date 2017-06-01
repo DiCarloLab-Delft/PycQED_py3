@@ -290,7 +290,7 @@ def gen_sweep_pts(start=None, stop=None,
         if num is not None:
             return np.linspace(start, stop, num, endpoint=endpoint)
         elif step is not None:
-            return np.arange(start, stop + endpoint*step/100)
+            return np.arange(start, stop + endpoint*step/100, step)
         else:
             raise ValueError('Either "num" or "step" must be specified')
     elif (center is not None) and (span is not None):
