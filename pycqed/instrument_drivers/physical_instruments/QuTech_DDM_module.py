@@ -813,7 +813,6 @@ class DDMq(SCPI):
         while (finished != '1'):
             finished = self._getInAvgFinished(ch_pair)
             if (finished == 'ffffffff'):
-                logging.warning('Trigger is not received: DDM timeout')
                 break
             time.sleep(1.0/FINISH_BIT_CHECK_FERQUENTION_HZ)
         self._displayInAvgErrors("Input Average", ch)
@@ -827,7 +826,6 @@ class DDMq(SCPI):
         while (finished != '1'):
             finished = self._getTVFinished(ch_pair, wNr)
             if (finished == 'ffffffff'):
-                logging.warning('Trigger is not received: DDM timeout')
                 break
             elif (finished != '1'):
                 print("\r TV mode(" + str(int(float(self._getTVpercentage(
@@ -866,7 +864,6 @@ class DDMq(SCPI):
         while (finished != '1'):
             finished = self._getTVFinished(ch_pair, wNr)
             if (finished == 'ffffffff'):
-                logging.warning('Trigger is not received: DDM timeout')
                 break
             elif (finished != '1'):
                 print("\r TV mode(" + str(int(float(self._getTVpercentage(
@@ -886,7 +883,6 @@ class DDMq(SCPI):
         while (finished != '1'):
             finished = self._getTVFinished(ch_pair, wNr)
             if (finished == 'ffffffff'):
-                logging.warning('Trigger is not received: DDM timeout')
                 break
             elif (finished != '1'):
                 print(
@@ -906,7 +902,6 @@ class DDMq(SCPI):
         while (finished != '1'):
             finished = self._getLoggingFinished(ch_pair, wNr)
             if (finished == 'ffffffff'):
-                logging.warning('Trigger is not received: DDM timeout')
                 break
             elif (finished != '1'):
                 print("\r Logging mode(" + str(int(float(
@@ -926,7 +921,6 @@ class DDMq(SCPI):
         while (finished != '1'):
             finished = self._getLoggingFinished(ch_pair, wNr)
             if (finished == 'ffffffff'):
-                logging.warning('Trigger is not received: DDM timeout')
                 break
             elif (finished != '1'):
                 print("\r Logging mode(" + str(int(float(
@@ -1026,7 +1020,6 @@ class DDMq(SCPI):
         while (finished != '1'):
             finished = self._getErrFractFinished(ch_pair, wNr)
             if (finished == 'ffffffff'):
-                logging.warning('Trigger is not received: DDM timeout')
                 break
             elif (finished != '1'):
                 print("\r Error fraction mode(" + str(int(float(
