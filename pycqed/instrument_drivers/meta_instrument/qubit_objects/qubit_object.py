@@ -85,6 +85,12 @@ class Qubit(Instrument):
     def measure_rabi(self):
         raise NotImplementedError()
 
+    def measure_flipping(self,  number_of_flips=2*np.arange(60),
+                         MC=None, label='',
+                         equator=True,
+                         analyze=True, close_fig=True, verbose=True):
+        raise NotImplementedError
+
     def measure_ramsey(self):
         raise NotImplementedError()
 
@@ -215,8 +221,6 @@ class Transmon(Qubit):
                            parameter_class=ManualParameter,
                            vals=vals.Numbers())
 
-
-
         self.add_parameter('dac_voltage', unit='mV',
                            parameter_class=ManualParameter)
         self.add_parameter('dac_sweet_spot', unit='mV',
@@ -283,7 +287,7 @@ class Transmon(Qubit):
         elif self.f_qubit_calc_method() == 'dac':
             if dac_voltage is None:
                 dac_voltage = self.IVVI.get_instr().get(
-                        'dac{}'.format(self.dac_channel()))
+                    'dac{}'.format(self.dac_channel()))
 
             f_qubit_estimate = fit_mods.Qubit_dac_to_freq(
                 dac_voltage=dac_voltage,
@@ -397,8 +401,8 @@ class Transmon(Qubit):
                 # TODO: add updating and fitting
         elif method.lower() == 'ramsey':
             return self.calibrate_frequency_ramsey(
-                    steps=steps, verbose=verbose, update=update,
-                    close_fig=close_fig)
+                steps=steps, verbose=verbose, update=update,
+                close_fig=close_fig)
         return self.f_qubit()
 
     def find_resonator_frequency(self, use_min=False,
@@ -430,8 +434,8 @@ class Transmon(Qubit):
 
     def calibrate_pulse_amplitude_coarse(self,
                                          amps=np.linspace(-.5, .5, 31),
-                             close_fig=True, verbose=False,
-                             MC=None, update=True, take_fit_I=False):
+                                         close_fig=True, verbose=False,
+                                         MC=None, update=True, take_fit_I=False):
         """
         Calibrates the pulse amplitude using a single rabi oscillation
         """
@@ -452,6 +456,48 @@ class Transmon(Qubit):
         if update:
             self.Q_amp180.set(ampl)
         return ampl
+
+    def calibrate_pulse_amplitude_flipping(self, number_of_flips=np.arange(60),
+                                           MC=None, update=True,
+                                           desired_accuracy=0.001,
+                                           max_iterations=5,
+                                           verbose=True):
+
+        success = False
+        for k in range(max_iterations):
+            old_Q_amp180 = self.Q_amp180()
+            a = self.measure_flipping(MC=MC)
+            Q_amp180_scale_factor = a.drive_scaling_factor
+
+            if verbose:
+                print('Q_amp180_scale_factor', Q_amp180_scale_factor)
+
+            # Check if Q_amp180_scale_factor is within boundaries
+            if Q_amp180_scale_factor > 1.1:
+                Q_amp180_scale_factor = 1.1
+                if verbose:
+                    print('Qubit drive scaling %.3f ' % Q_amp180_scale_factor
+                          + 'is too high, capping at 1.1')
+            elif Q_amp180_scale_factor < 0.9:
+                Q_amp180_scale_factor = 0.9
+                if verbose:
+                    print('Qubit drive scaling %.3f ' % Q_amp180_scale_factor
+                          + 'is too low, capping at 0.9')
+
+            self.Q_amp180(np.round(Q_amp180_scale_factor * self.Q_amp180(), 3))
+
+            if abs((Q_amp180_scale_factor-1)*self.Q_amp180()) < desired_accuracy:
+                if verbose:
+                    print('within threshold')
+                success = True
+                break
+
+        # If converged?
+        if success and verbose:
+            print('Drive calibration set to {}'.format(self.Q_amp180()))
+        if not update or not success:
+            self.Q_amp180(old_Q_amp180)
+        return success
 
     def find_pulse_amplitude(self, amps=np.linspace(-.5, .5, 31),
                              N_steps=[3, 7, 13, 17], max_n=18,
@@ -495,8 +541,8 @@ class Transmon(Qubit):
                     ampl = a.fit_res[0].params['x0'].value
                 elif (np.abs(max(a.measured_values[0]) -
                              min(a.measured_values[0]))) > (
-                      np.abs(max(a.measured_values[1]) -
-                             min(a.measured_values[1]))):
+                    np.abs(max(a.measured_values[1]) -
+                           min(a.measured_values[1]))):
                     ampl = a.fit_res[0].params['x0'].value
                 else:
                     ampl = a.fit_res[1].params['x0'].value
@@ -511,8 +557,8 @@ class Transmon(Qubit):
                         ampl = a.fit_res[0].params['x0'].value
                     elif (np.abs(max(a.measured_values[0]) -
                                  min(a.measured_values[0]))) > (
-                          np.abs(max(a.measured_values[1]) -
-                                 min(a.measured_values[1]))):
+                        np.abs(max(a.measured_values[1]) -
+                               min(a.measured_values[1]))):
                         ampl = a.fit_res[0].params['x0'].value
                     else:
                         ampl = a.fit_res[1].params['x0'].value

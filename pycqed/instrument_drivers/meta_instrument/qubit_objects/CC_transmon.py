@@ -1048,7 +1048,7 @@ class CBox_v3_driven_transmon(Transmon):
 
         MC.set_detector_function(d)
         MC.run('RB_{}seeds'.format(nr_seeds)+self.msmt_suffix)
-        a=ma.RandomizedBenchmarking_Analysis(
+        a = ma.RandomizedBenchmarking_Analysis(
             close_main_fig=close_fig, T1=T1,
             pulse_delay=self.gauss_width.get()*4)
 
@@ -1125,12 +1125,13 @@ class CBox_v3_driven_transmon(Transmon):
                        label='',
                        MC=None, analyze=True, close_fig=True, verbose=True):
         if times == None:
-            # funny default is because CBox has no real time sideband modulation
+            # funny default is because CBox has no real time sideband
+            # modulation
             stepsize = (self.T2_star()*4/61)//(1/abs(self.f_pulse_mod())) \
-                /abs(self.f_pulse_mod())
-            times=np.arange(0, self.T2_star()*4, stepsize)
+                / abs(self.f_pulse_mod())
+            times = np.arange(0, self.T2_star()*4, stepsize)
         if artificial_detuning is None:
-            artificial_detuning=3/times[-1]
+            artificial_detuning = 3/times[-1]
 
         self.prepare_for_timedomain()
         if MC is None:
@@ -1178,10 +1179,11 @@ class CBox_v3_driven_transmon(Transmon):
                      label='',
                      MC=None, analyze=True, close_fig=True, verbose=True):
         if times == None:
-            # funny default is because CBox has no real time sideband modulation
+            # funny default is because CBox has no real time sideband
+            # modulation
             stepsize = (self.T2_echo()*4/61)//(1/abs(self.f_pulse_mod())) \
-                /abs(self.f_pulse_mod())
-            times=np.arange(0, self.T2_echo()*4, stepsize)
+                / abs(self.f_pulse_mod())
+            times = np.arange(0, self.T2_echo()*4, stepsize)
 
         self.prepare_for_timedomain()
         if MC is None:
@@ -1229,9 +1231,9 @@ class CBox_v3_driven_transmon(Transmon):
             a = ma.AllXY_Analysis(close_main_fig=close_fig)
             return a
 
-    def measure_flipping_sequence(self, number_of_flips, MC=None, label='',
-                                  equator=False,
-                                  analyze=True, close_fig=True, verbose=True):
+    def measure_flipping(self, number_of_flips=2*np.arange(60),
+                         MC=None, label='', equator=True,
+                         analyze=True, close_fig=True, verbose=True):
 
         self.prepare_for_timedomain()
         if MC is None:
@@ -1255,7 +1257,7 @@ class CBox_v3_driven_transmon(Transmon):
         MC.set_detector_function(d)
         MC.run('flipping_sequence'+label+self.msmt_suffix)
         if analyze:
-            a = ma.MeasurementAnalysis(close_main_fig=close_fig)
+            a = ma.DriveDetuning_Analysis(label='flipping_sequence')
             return a
 
     def measure_ssro(self, no_fits=False,

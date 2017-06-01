@@ -3143,7 +3143,7 @@ class DriveDetuning_Analysis(TD_Analysis):
     def __init__(self, label='DriveDetuning', **kw):
         kw['label'] = label
         kw['h5mode'] = 'r+'  # Read write mode, file must exist
-        super(self.__class__, self).__init__(**kw)
+        super().__init__(**kw)
 
     def run_default_analysis(self, print_fit_results=False, **kw):
 
@@ -3153,8 +3153,7 @@ class DriveDetuning_Analysis(TD_Analysis):
 
             # Estimate frequency using Fourier transform
             ft_of_data = np.fft.fft(data)
-            freq_est = np.argmax(np.abs(ft_of_data[1:len(ft_of_data)/2]))+1
-            print('using chagned')
+            freq_est = np.argmax(np.abs(ft_of_data[1:len(ft_of_data)//2]))+1
             slope = stats.linregress(list(range(4)), data[:4])[0]
             if slope > 0:
                 amp_sign = 1.
@@ -3189,17 +3188,14 @@ class DriveDetuning_Analysis(TD_Analysis):
         self.add_analysis_datagroup_to_file()
         self.get_naming_and_values()
 
-        if len(self.sweep_points) == 60:
-            self.NoCalPoints = 10
-        else:
-            self.NoCalPoints = 4
+        self.NoCalPoints = 4
 
         self.normalize_data_to_calibration_points(
             self.measured_values[0], self.NoCalPoints)
         self.add_dataset_to_analysisgroup('Corrected data',
                                           self.corr_data)
         self.analysis_group.attrs.create('corrected data based on',
-                                         'calibration points')
+                                         'calibration points'.encode('utf-8'))
 
         data = self.corr_data[:-self.NoCalPoints]
         cal_data = np.split(self.corr_data[-self.NoCalPoints:], 2)
