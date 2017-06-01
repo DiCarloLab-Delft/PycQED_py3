@@ -6,7 +6,7 @@ If you have a question or want to discuss something, feel free to send an email 
 
 ## Git branching model
 
-The branching model is based on the branching model described in the post [A successful Git branching model](http://nvie.com/posts/a-successful-git-branching-model/). It differs in that the development branch is replaced by several "project" branches. 
+The branching model is based on the branching model described in the post [A successful Git branching model](http://nvie.com/posts/a-successful-git-branching-model/), but differs in that the development branch is replaced by several "project" branches. 
 
 ### The main branches
 
@@ -34,7 +34,7 @@ Every project/experiment has it's own project branch, prefixed with _Proj/_. We 
 #### Merging strategy and supporting branches
 Supporting branches are used to develop and integrate new code for project branches and integrate it into the master. 
 
-Supporting branches should be used for a single change and should ideally correspond to a single issue. Supporting branches should be prefixed with the type of issue they address, see **issue type labels** below for details. Once the code on the branch is ready for review a pull request into the master should be opened. 
+Supporting branches should be used for a single change and should ideally correspond to a single issue. Supporting branches should be prefixed with the type of issue they address, see **issue type labels** below for details. Once the code on the branch is ready for review, a pull request into the master should be opened. 
 
 **Supporting branches**
 
