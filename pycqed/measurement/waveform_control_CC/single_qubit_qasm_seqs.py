@@ -248,17 +248,20 @@ def echo(qubit_name, times, clock_cycle=5e-9,
     return qasm_file
 
 
-def single_elt_on(qubit_name):
+def single_elt_on(qubit_name, n=1):
     filename = join(base_qasm_path, 'single_elt_on.qasm')
     qasm_file = mopen(filename, mode='w')
     qasm_file.writelines('qubit {} \n'.format(qubit_name))
     # On
     qasm_file.writelines('\ninit_all\n')
-    qasm_file.writelines('X180 {}     # On \n'.format(qubit_name))
+    for i in range(n):
+        qasm_file.writelines('X180 {}     # On \n'.format(qubit_name))
     qasm_file.writelines('RO {}  \n'.format(qubit_name))
 
     qasm_file.close()
     return qasm_file
+
+
 
 
 def two_elt_MotzoiXY(qubit_name):

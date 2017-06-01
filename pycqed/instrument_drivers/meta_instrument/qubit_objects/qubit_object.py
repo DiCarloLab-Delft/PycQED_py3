@@ -77,7 +77,7 @@ class Qubit(Instrument):
     def _get_operations(self):
         return self._operations
 
-    def measure_T1(self):
+    def measure_T1(self, times=None, MC=None, analyze=True, close_fig=True):
         # Note: I made all functions lowercase but for T1 it just looks too
         # ridiculous
         raise NotImplementedError()
@@ -202,10 +202,20 @@ class Transmon(Qubit):
         self.add_parameter('E_c', unit='Hz',
                            parameter_class=ManualParameter,
                            vals=vals.Numbers())
-
         self.add_parameter('E_j', unit='Hz',
                            parameter_class=ManualParameter,
                            vals=vals.Numbers())
+        self.add_parameter('T1', unit='s',
+                           parameter_class=ManualParameter,
+                           vals=vals.Numbers())
+        self.add_parameter('T2_echo', unit='s',
+                           parameter_class=ManualParameter,
+                           vals=vals.Numbers())
+        self.add_parameter('T2_star', unit='s',
+                           parameter_class=ManualParameter,
+                           vals=vals.Numbers())
+
+
 
         self.add_parameter('dac_voltage', unit='mV',
                            parameter_class=ManualParameter)
@@ -305,6 +315,49 @@ class Transmon(Qubit):
     def prepare_for_continuous_wave(self):
         raise NotImplementedError()
 
+    def calibrate_frequency_ramsey(self, steps=[1, 3, 10, 30, 100, 300, 1000],
+                                   stepsize=None, verbose=True, update=True,
+                                   close_fig=True):
+        if stepsize is None:
+            stepsize = abs(1/self.f_pulse_mod.get())
+        cur_freq = self.f_qubit.get()
+        # Steps don't double to be more robust against aliasing
+        for n in steps:
+            times = np.arange(self.pulse_delay.get(),
+                              50*n*stepsize, n*stepsize)
+            artificial_detuning = 2.5/times[-1]
+            self.measure_ramsey(times,
+                                artificial_detuning=artificial_detuning,
+                                f_qubit=cur_freq,
+                                label='_{}pulse_sep'.format(n),
+                                analyze=False)
+            a = ma.Ramsey_Analysis(auto=True, close_fig=close_fig,
+                                   close_file=False)
+            fitted_freq = a.fit_res.params['frequency'].value
+            measured_detuning = fitted_freq-artificial_detuning
+            cur_freq -= measured_detuning
+
+            qubit_ana_grp = a.analysis_group.create_group(self.msmt_suffix)
+            qubit_ana_grp.attrs['artificial_detuning'] = \
+                str(artificial_detuning)
+            qubit_ana_grp.attrs['measured_detuning'] = \
+                str(measured_detuning)
+            qubit_ana_grp.attrs['estimated_qubit_freq'] = str(cur_freq)
+            a.finish()  # make sure I close the file
+            if verbose:
+                print('Measured detuning:{:.2e}'.format(measured_detuning))
+                print('Setting freq to: {:.9e}, \n'.format(cur_freq))
+            if times[-1] > 1.5*a.T2_star:
+                # If the last step is > T2* then the next will be for sure
+                if verbose:
+                    print('Breaking of measurement because of T2*')
+                break
+        if verbose:
+            print('Converged to: {:.9e}'.format(cur_freq))
+        if update:
+            self.f_qubit.set(cur_freq)
+        return cur_freq
+
     def find_frequency(self, method='spectroscopy', pulsed=False,
                        steps=[1, 3, 10, 30, 100, 300, 1000],
                        freqs=None,
@@ -343,45 +396,10 @@ class Transmon(Qubit):
                     self.f_qubit(analysis_spec.fitted_freq)
                 # TODO: add updating and fitting
         elif method.lower() == 'ramsey':
-
-            stepsize = abs(1/self.f_pulse_mod.get())
-            cur_freq = self.f_qubit.get()
-            # Steps don't double to be more robust against aliasing
-            for n in steps:
-                times = np.arange(self.pulse_delay.get(),
-                                  50*n*stepsize, n*stepsize)
-                artificial_detuning = 4/times[-1]
-                self.measure_ramsey(times,
-                                    artificial_detuning=artificial_detuning,
-                                    f_qubit=cur_freq,
-                                    label='_{}pulse_sep'.format(n),
-                                    analyze=False)
-                a = ma.Ramsey_Analysis(auto=True, close_fig=close_fig,
-                                       close_file=False)
-                fitted_freq = a.fit_res.params['frequency'].value
-                measured_detuning = fitted_freq-artificial_detuning
-                cur_freq -= measured_detuning
-
-                qubit_ana_grp = a.analysis_group.create_group(self.msmt_suffix)
-                qubit_ana_grp.attrs['artificial_detuning'] = \
-                    str(artificial_detuning)
-                qubit_ana_grp.attrs['measured_detuning'] = \
-                    str(measured_detuning)
-                qubit_ana_grp.attrs['estimated_qubit_freq'] = str(cur_freq)
-                a.finish()  # make sure I close the file
-                if verbose:
-                    print('Measured detuning:{:.2e}'.format(measured_detuning))
-                    print('Setting freq to: {:.9e}, \n'.format(cur_freq))
-                if times[-1] > 1.5*a.T2_star:
-                    # If the last step is > T2* then the next will be for sure
-                    if verbose:
-                        print('Breaking of measurement because of T2*')
-                    break
-            if verbose:
-                print('Converged to: {:.9e}'.format(cur_freq))
-            if update:
-                self.f_qubit.set(cur_freq)
-            return cur_freq
+            return self.calibrate_frequency_ramsey(
+                    steps=steps, verbose=verbose, update=update,
+                    close_fig=close_fig)
+        return self.f_qubit()
 
     def find_resonator_frequency(self, use_min=False,
                                  update=True,
@@ -410,6 +428,31 @@ class Transmon(Qubit):
         self.f_RO(self.f_res())
         return f_res
 
+    def calibrate_pulse_amplitude_coarse(self,
+                                         amps=np.linspace(-.5, .5, 31),
+                             close_fig=True, verbose=False,
+                             MC=None, update=True, take_fit_I=False):
+        """
+        Calibrates the pulse amplitude using a single rabi oscillation
+        """
+
+        self.measure_rabi(amps, n=1, MC=MC, analyze=False)
+        a = ma.Rabi_Analysis(close_fig=close_fig)
+        # Decide which quadrature to take by comparing the contrast
+        if take_fit_I:
+            ampl = abs(a.fit_res[0].params['period'].value)/2.
+        elif (np.abs(max(a.measured_values[0]) -
+                     min(a.measured_values[0]))) > (
+                np.abs(max(a.measured_values[1]) -
+                       min(a.measured_values[1]))):
+            ampl = a.fit_res[0].params['period'].value/2.
+        else:
+            ampl = a.fit_res[1].params['period'].value/2.
+
+        if update:
+            self.Q_amp180.set(ampl)
+        return ampl
+
     def find_pulse_amplitude(self, amps=np.linspace(-.5, .5, 31),
                              N_steps=[3, 7, 13, 17], max_n=18,
                              close_fig=True, verbose=False,
@@ -429,18 +472,10 @@ class Transmon(Qubit):
         if MC is None:
             MC = self.MC.get_instr()
         if np.size(amps) != 1:
-            self.measure_rabi(amps, n=1, MC=MC, analyze=False)
-            a = ma.Rabi_Analysis(close_fig=close_fig)
-            # Decide which quadrature to take by comparing the contrast
-            if take_fit_I:
-                ampl = abs(a.fit_res[0].params['period'].value)/2.
-            elif (np.abs(max(a.measured_values[0]) -
-                         min(a.measured_values[0]))) > (
-                    np.abs(max(a.measured_values[1]) -
-                           min(a.measured_values[1]))):
-                ampl = a.fit_res[0].params['period'].value/2.
-            else:
-                ampl = a.fit_res[1].params['period'].value/2.
+            ampl = self.calibrate_pulse_amplitude_coarse(
+                amps=amps, close_fig=close_fig, verbose=verbose,
+                MC=MC, update=update,
+                take_fit_I=take_fit_I)
         else:
             ampl = amps
         if verbose:
@@ -451,7 +486,7 @@ class Transmon(Qubit):
                 break
             else:
                 old_amp = ampl
-                ampl_span = 0.3*ampl/n
+                ampl_span = 0.5*ampl/n
                 amps = np.linspace(ampl-ampl_span, ampl+ampl_span, 15)
                 self.measure_rabi(amps, n=n, MC=MC, analyze=False)
                 a = ma.Rabi_parabola_analysis(close_fig=close_fig)
@@ -484,7 +519,8 @@ class Transmon(Qubit):
                 if verbose:
                     print('Found amplitude', ampl, '\n')
         if update:
-            self.amp180.set(ampl)
+            self.Q_amp180.set(ampl)
+        return ampl
 
     def find_amp90_scaling(self, scales=0.5,
                            N_steps=[5, 9], max_n=100,

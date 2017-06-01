@@ -68,6 +68,8 @@ class CBox_v3_driven_transmon(Transmon):
         self.add_parameter('MC', parameter_class=InstrumentParameter)
         self.add_parameter('RF_RO_source',
                            parameter_class=InstrumentParameter)
+        self.add_parameter('SH', label='SignalHound',
+                           parameter_class=InstrumentParameter)
 
         # Overwriting some pars from the parent class
         self.RO_acq_marker_channel._vals = vals.Ints(1, 7)
@@ -465,7 +467,8 @@ class CBox_v3_driven_transmon(Transmon):
             self.int_avg_det = qh.CBox_integrated_average_detector_CC(
                 self.CBox.get_instr(),
                 nr_averages=self.RO_acq_averages()//self.RO_soft_averages())
-            self.int_log_det = qh.CBox_integration_logging_det_CC(self.CBox.get_instr())
+            self.int_log_det = qh.CBox_integration_logging_det_CC(
+                self.CBox.get_instr())
             self.input_average_detector = qh.CBox_input_average_detector_CC(
                 CBox=self.CBox.get_instr(),
                 nr_averages=self.RO_acq_averages()//self.RO_soft_averages())
@@ -703,7 +706,7 @@ class CBox_v3_driven_transmon(Transmon):
         #             self.f_qubit.set(a.sweep_points[-1]+self.f_pulse_mod.get())
         #     return a.sweep_points[-1]
 
-    def calibrate_mixer_offsets_drive(self, signal_hound, update=True):
+    def calibrate_mixer_offsets_drive(self, update=True):
         '''
         Calibrates the mixer skewness and updates the I and Q offsets in
         the qubit object.
@@ -713,6 +716,7 @@ class CBox_v3_driven_transmon(Transmon):
         # ensures freq is set correctly
         self.prepare_for_timedomain()
 
+        signal_hound = self.SH.get_instr()
         awg_nr = self.Q_awg_nr()
         chI_par = self.CBox.get_instr().parameters[
             'AWG{}_dac{}_offset'.format(awg_nr, 0)]
@@ -724,8 +728,9 @@ class CBox_v3_driven_transmon(Transmon):
         if update:
             self.mixer_offs_drive_I(offset_I)
             self.mixer_offs_drive_Q(offset_Q)
+        return True
 
-    def calibrate_mixer_offsets_RO(self, signal_hound, update=True):
+    def calibrate_mixer_offsets_RO(self, update=True):
         '''
         Calibrates the mixer skewness and updates the I and Q offsets in
         the qubit object.
@@ -733,6 +738,8 @@ class CBox_v3_driven_transmon(Transmon):
         object in order to reduce dependencies.
         '''
         self.prepare_for_timedomain()
+
+        signal_hound = self.SH.get_instr()
         # Only works if CBox is generating RO pulses
         awg_nr = self.RO_awg_nr()
         chI_par = self.CBox.get_instr().parameters[
@@ -745,12 +752,14 @@ class CBox_v3_driven_transmon(Transmon):
         if update:
             self.mixer_offs_drive_I(offset_I)
             self.mixer_offs_drive_Q(offset_Q)
+        return True
 
-    def calibrate_mixer_skewness(self, signal_hound, update=True):
+    def calibrate_mixer_skewness(self, update=True):
         '''
         Calibrates the mixer skewness using mixer_skewness_cal_CBox_adaptive
         see calibration toolbox for details
         '''
+        signal_hound = self.SH.get_instr()
         self.prepare_for_timedomain()
         phi, alpha = mixer_skewness_calibration_CBoxV3(
             name='mixer_skewness_cal'+self.msmt_suffix,
@@ -762,6 +771,7 @@ class CBox_v3_driven_transmon(Transmon):
         if update:
             self.mixer_drive_phi.set(phi)
             self.mixer_drive_alpha.set(alpha)
+        return True
 
     def measure_heterodyne_spectroscopy(self, freqs, MC=None,
                                         analyze=True, close_fig=True):
@@ -901,7 +911,7 @@ class CBox_v3_driven_transmon(Transmon):
         MC.set_sweep_points(freqs)
 
         MC.set_sweep_function_2D(
-                self.IVVI.get_instr().parameters[
+            self.IVVI.get_instr().parameters[
                 'dac{}'.format(self.dac_channel.get())])
 
         MC.set_sweep_points(freqs)
@@ -918,11 +928,8 @@ class CBox_v3_driven_transmon(Transmon):
         self.prepare_for_timedomain()
         if MC is None:
             MC = self.MC.get_instr()
-        if n != 1:
-            raise NotImplementedError('QASM/QuMis sequence for n>1')
-
         # Generating the qumis file
-        single_pulse_elt = sqqs.single_elt_on(self.name)
+        single_pulse_elt = sqqs.single_elt_on(self.name, n=n)
         single_pulse_asm = qta.qasm_to_asm(single_pulse_elt.name,
                                            self.get_operation_dict())
         qumis_file = single_pulse_asm
@@ -949,7 +956,8 @@ class CBox_v3_driven_transmon(Transmon):
             a = ma.Rabi_Analysis(auto=True, close_fig=close_fig)
             return a
 
-    def measure_motzoi(self, motzois, MC=None, analyze=True, close_fig=True,
+    def measure_motzoi(self, motzois=np.linspace(-.3, .3, 31),
+                       MC=None, analyze=True, close_fig=True,
                        verbose=False):
         self.prepare_for_timedomain()
         if MC is None:
@@ -985,7 +993,7 @@ class CBox_v3_driven_transmon(Transmon):
             a = ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
             return a
 
-    def measure_randomized_benchmarking(self, nr_cliffords,
+    def measure_randomized_benchmarking(self, nr_cliffords=2**np.arange(12),
                                         nr_seeds=100, T1=None,
                                         MC=None, analyze=True, close_fig=True,
                                         verbose=False, upload=True):
@@ -1040,9 +1048,11 @@ class CBox_v3_driven_transmon(Transmon):
 
         MC.set_detector_function(d)
         MC.run('RB_{}seeds'.format(nr_seeds)+self.msmt_suffix)
-        ma.RandomizedBenchmarking_Analysis(
+        a=ma.RandomizedBenchmarking_Analysis(
             close_main_fig=close_fig, T1=T1,
             pulse_delay=self.gauss_width.get()*4)
+
+        return a.fit_res.params['fidelity_per_Clifford'].value
 
     def measure_randomized_benchmarking_vs_pars(self, amps=None, motzois=None, freqs=None,
                                                 nr_cliffords=80, nr_seeds=50,
@@ -1081,8 +1091,10 @@ class CBox_v3_driven_transmon(Transmon):
             nr_cliffords, nr_seeds)+self.msmt_suffix, mode='2D')
         ma.TwoD_Analysis()
 
-    def measure_T1(self, times, MC=None,
+    def measure_T1(self, times=None, MC=None,
                    analyze=True, close_fig=True):
+        if times == None:
+            times = np.linspace(0, self.T1()*4, 61)
         self.prepare_for_timedomain()
         if MC is None:
             MC = self.MC.get_instr()
@@ -1106,11 +1118,19 @@ class CBox_v3_driven_transmon(Transmon):
         MC.run('T1'+self.msmt_suffix)
         if analyze:
             a = ma.T1_Analysis(auto=True, close_fig=True)
+            self.T1(a.T1)
             return a.T1
 
-    def measure_ramsey(self, times, artificial_detuning=0, f_qubit=None,
+    def measure_ramsey(self, times=None, artificial_detuning=None, f_qubit=None,
                        label='',
                        MC=None, analyze=True, close_fig=True, verbose=True):
+        if times == None:
+            # funny default is because CBox has no real time sideband modulation
+            stepsize = (self.T2_star()*4/61)//(1/abs(self.f_pulse_mod())) \
+                /abs(self.f_pulse_mod())
+            times=np.arange(0, self.T2_star()*4, stepsize)
+        if artificial_detuning is None:
+            artificial_detuning=3/times[-1]
 
         self.prepare_for_timedomain()
         if MC is None:
@@ -1154,9 +1174,14 @@ class CBox_v3_driven_transmon(Transmon):
                       fitted_freq-artificial_detuning))
             return a
 
-    def measure_echo(self, times, artificial_detuning=0,
+    def measure_echo(self, times=None, artificial_detuning=0,
                      label='',
                      MC=None, analyze=True, close_fig=True, verbose=True):
+        if times == None:
+            # funny default is because CBox has no real time sideband modulation
+            stepsize = (self.T2_echo()*4/61)//(1/abs(self.f_pulse_mod())) \
+                /abs(self.f_pulse_mod())
+            times=np.arange(0, self.T2_echo()*4, stepsize)
 
         self.prepare_for_timedomain()
         if MC is None:
