@@ -107,7 +107,7 @@ class HeterodyneInstrument(Instrument):
 
     def prepare(self, get_t_base=True):
         # Uploading the AWG sequence
-        if self.AWG != None:
+        if self.AWG!=None:
             if (self._awg_seq_filename not in self.AWG.setup_filename() or
                     self._awg_seq_parameters_changed) and self.auto_seq_loading():
                 self._awg_seq_filename = \
@@ -131,8 +131,8 @@ class HeterodyneInstrument(Instrument):
                 self.acquisition_instr(), self.__class__.__name__))
 
         # turn on the AWG and the MWGs
-        if self.AWG != None:
-            self.AWG.start()
+        if self.AWG!=None:
+            self.AWG.run()
         self.on()
 
     def prepare_CBox(self, get_t_base=True):
@@ -179,7 +179,6 @@ class HeterodyneInstrument(Instrument):
         self._acquisition_instr.acquisition_initialize([0, 1], 'rl')
         self.scale_factor_UHFQC = 1/(1.8e9*self.RO_length() *
                                      int(self.nr_averages()))
-        self._UHFQC_awg_parameters_changed = False
 
     def prepare_ATS(self, get_t_base=True):
         if self.AWG != None:
@@ -251,10 +250,11 @@ class HeterodyneInstrument(Instrument):
 
     def probe_UHFQC(self):
         if self._awg_seq_parameters_changed or \
-            self._UHFQC_awg_parameters_changed:
-                self.prepare()
+           self._UHFQC_awg_parameters_changed:
+            self.prepare()
+
         dataset = self._acquisition_instr.acquisition_poll(
-            samples=1, acquisition_time=0.001)
+            samples=1, acquisition_time=0.001, timeout=10)
         dat = (self.scale_factor_UHFQC*dataset[0][0] +
                self.scale_factor_UHFQC*1j*dataset[1][0])
         return dat
