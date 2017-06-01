@@ -739,8 +739,8 @@ class DDMq(SCPI):
                 level = "error"
             elif (self.logLevel >= logging.WARNING):
                 level = "warning"
-            return level + ": " + self.description + ", mode: " +\
-                self.acquisitionMode
+            return level + ": " + self.description + "(" +\
+                self.acquisitionMode + ")"
 
         def log(self):
             if (self.logLevel >= logging.CRITICAL):
@@ -749,6 +749,13 @@ class DDMq(SCPI):
                 log.error(self)
             elif (self.logLevel >= logging.WARNING):
                 log.warning(self)
+
+    def _displayErrors(self, errors):
+        for i in range(0, len(errors)):
+            if (errors[i].logLevel >= self.exceptionLevel):
+                raise Exception(errors[i])
+            else:
+                errors[i].log()
 
     def _parseErrorList(self, acquisitionMode, errorList):
         errors = []
@@ -776,23 +783,9 @@ class DDMq(SCPI):
                                      errorLevel, acquisitionMode))
         return errors
 
-    def _parseError(self, acquisitionMode, error):
-        errors = self._parseErrorList(acquisitionMode, error)
-        if (len(errors) > 0):
-            return errors[0]
-        else:
-            return None
-
-    def _displayErrors(self, errors):
-        for i in range(0, len(errors)):
-            if (errors[i].logLevel >= self.exceptionLevel):
-                raise Exception(errors[i])
-            else:
-                errors[i].log()
-
-    def _getInAvgErrors(self, acquisitionMode, ch_pair):
+    def _getInAvgErrors(self, acquisitionMode, ch):
         return self._parseErrorList(acquisitionMode, self.ask(
-            'qutech:ADC{:d}:errors?'.format(ch_pair))
+            'qutech:channel{:d}:errors?'.format(ch))
         )
 
     def _getErrors(self, acquisitionMode, ch_pair, wNr):
@@ -800,8 +793,8 @@ class DDMq(SCPI):
             'qutech:ADC{:d}:errors{:d}?'.format(ch_pair, wNr))
         )
 
-    def _displayInAvgErrors(self, acquisitionMode, ch_pair):
-        self._displayErrors(self._getInAvgErrors(acquisitionMode, ch_pair))
+    def _displayInAvgErrors(self, acquisitionMode, ch):
+        self._displayErrors(self._getInAvgErrors(acquisitionMode, ch))
 
     def _displayQBitErrors(self, acquisitionMode, ch_pair, wNr):
         self._displayErrors(self._getErrors(acquisitionMode, ch_pair, wNr))
@@ -823,7 +816,7 @@ class DDMq(SCPI):
                 logging.warning('Trigger is not received: DDM timeout')
                 break
             time.sleep(1.0/FINISH_BIT_CHECK_FERQUENTION_HZ)
-        self._displayInAvgErrors("Input Average", ch_pair)
+        self._displayInAvgErrors("Input Average", ch)
         self.write('qutech:inputavg{:d}:data? '.format(ch))
         binBlock = self.binBlockRead()
         inputavg = np.frombuffer(binBlock, dtype=np.float32)
@@ -881,7 +874,7 @@ class DDMq(SCPI):
                 time.sleep(1.0/FINISH_BIT_CHECK_FERQUENTION_HZ)
         if (finished != 'ffffffff'):
             print("\r", end='\0')
-        self._displayQBitErrors("TV(Qbit state)", ch_pair, wNr)
+        self._displayQBitErrors("TV Mode - Qbit state", ch_pair, wNr)
 
         self.write('qutech:qstate{:d}:data{:d}:counter? '.format(ch_pair, wNr))
         binBlock = self.binBlockRead()
@@ -902,7 +895,7 @@ class DDMq(SCPI):
                 time.sleep(1.0/FINISH_BIT_CHECK_FERQUENTION_HZ)
         if (finished != 'ffffffff'):
             print("\r", end='\0')
-        self._displayQBitErrors("TV(Qbit state)", ch_pair, wNr)
+        self._displayQBitErrors("TV Mode - Qbit state", ch_pair, wNr)
         self.write('qutech:qstate{:d}:data{:d}:average? '.format(ch_pair, wNr))
         binBlock = self.binBlockRead()
         qstateavg = np.frombuffer(binBlock, dtype=np.float32)
@@ -942,7 +935,7 @@ class DDMq(SCPI):
                 time.sleep(1.0/FINISH_BIT_CHECK_FERQUENTION_HZ)
         if (finished != 'ffffffff'):
             print("\r", end='\0')
-        self._displayQBitErrors("Logging(Qbit state)", ch_pair, wNr)
+        self._displayQBitErrors("Logging - Qbit state", ch_pair, wNr)
         self.write('qutech:logging{:d}:data{:d}:qstate? '.format(ch_pair, wNr))
         binBlock = self.binBlockRead()
         qstatelogging = np.frombuffer(binBlock, dtype=np.float32)
