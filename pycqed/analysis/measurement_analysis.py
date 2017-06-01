@@ -3149,30 +3149,13 @@ class DriveDetuning_Analysis(TD_Analysis):
 
         def sine_fit_data():
             self.fit_type = 'sine'
-            damped_osc_mod = fit_mods.CosModel
+            model = fit_mods.lmfit.Model(fit_mods.CosFunc)
 
-            # Estimate frequency using Fourier transform
-            ft_of_data = np.fft.fft(data)
-            freq_est = np.argmax(np.abs(ft_of_data[1:len(ft_of_data)//2]))+1
-            slope = stats.linregress(list(range(4)), data[:4])[0]
-            if slope > 0:
-                amp_sign = 1.
-            else:
-                amp_sign = -1.
-            amp_guess = amp_sign * abs((cal_data_mean[1] - cal_data_mean[0])/2)
+            params = fit_mods.Cos_guess(model, data=data,
+                                 t=sweep_points)
 
-            damped_osc_mod.set_param_hint('amplitude', value=amp_guess,
-                                          min=-1.2*amp_guess,
-                                          max=1.2*amp_guess)
-            damped_osc_mod.set_param_hint('frequency', value=freq_est /
-                                          sweep_points[-1])
-            damped_osc_mod.set_param_hint('phase', value=-np.pi/2, vary=False)
-            damped_osc_mod.set_param_hint(
-                'offset', value=np.mean(cal_data_mean))
-            damped_osc_mod.set_param_hint('tau', value=400)
-            self.params = damped_osc_mod.make_params()
-            fit_results = damped_osc_mod.fit(data=data, t=sweep_points,
-                                             params=self.params)
+            fit_results = model.fit(data=data, t=sweep_points,
+                                             params=params)
             return fit_results
 
         def quadratic_fit_data():
@@ -3223,7 +3206,7 @@ class DriveDetuning_Analysis(TD_Analysis):
             frequency = self.fit_results_sine.params['frequency']
             self.slope = 2 * np.pi * amplitude * frequency
 
-        self.drive_detuning = self.slope / (2 * np.pi * abs(amplitude))
+        self.drive_detuning = -1*self.slope / (2 * np.pi * abs(amplitude))
         self.drive_scaling_factor = 1. / (1. + self.drive_detuning)
 
         # Plotting

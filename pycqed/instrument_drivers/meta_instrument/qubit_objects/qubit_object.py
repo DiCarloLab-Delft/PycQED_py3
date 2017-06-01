@@ -319,7 +319,7 @@ class Transmon(Qubit):
     def prepare_for_continuous_wave(self):
         raise NotImplementedError()
 
-    def calibrate_frequency_ramsey(self, steps=[1, 3, 10, 30, 100, 300, 1000],
+    def calibrate_frequency_ramsey(self, steps=[1, 1, 3, 10, 30, 100, 300, 1000],
                                    stepsize=None, verbose=True, update=True,
                                    close_fig=True):
         if stepsize is None:
@@ -351,7 +351,7 @@ class Transmon(Qubit):
             if verbose:
                 print('Measured detuning:{:.2e}'.format(measured_detuning))
                 print('Setting freq to: {:.9e}, \n'.format(cur_freq))
-            if times[-1] > 1.5*a.T2_star:
+            if times[-1] > 2.*a.T2_star:
                 # If the last step is > T2* then the next will be for sure
                 if verbose:
                     print('Breaking of measurement because of T2*')
@@ -469,8 +469,6 @@ class Transmon(Qubit):
             a = self.measure_flipping(MC=MC)
             Q_amp180_scale_factor = a.drive_scaling_factor
 
-            if verbose:
-                print('Q_amp180_scale_factor', Q_amp180_scale_factor)
 
             # Check if Q_amp180_scale_factor is within boundaries
             if Q_amp180_scale_factor > 1.1:
@@ -484,7 +482,11 @@ class Transmon(Qubit):
                     print('Qubit drive scaling %.3f ' % Q_amp180_scale_factor
                           + 'is too low, capping at 0.9')
 
-            self.Q_amp180(np.round(Q_amp180_scale_factor * self.Q_amp180(), 3))
+            self.Q_amp180(np.round(Q_amp180_scale_factor * self.Q_amp180(), 4))
+
+            if verbose:
+                print('Q_amp180_scale_factor {}, new Q_amp180 {}'.format(
+                      Q_amp180_scale_factor, self.Q_amp180()))
 
             if abs((Q_amp180_scale_factor-1)*self.Q_amp180()) < desired_accuracy:
                 if verbose:

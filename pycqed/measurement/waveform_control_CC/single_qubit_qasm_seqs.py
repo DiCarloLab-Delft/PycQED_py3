@@ -91,7 +91,7 @@ def flipping_seq(qubit_name, number_of_flips, clock_cycle=5e-9,
                 qasm_file.writelines('X180 {} \n'.format(
                                      qubit_name))
             if equator:
-                qasm_file.writelines('Y90 {} \n'.format(qubit_name))
+                qasm_file.writelines('X90 {} \n'.format(qubit_name))
             qasm_file.writelines('RO {}  \n'.format(qubit_name))
     qasm_file.close()
     return qasm_file
