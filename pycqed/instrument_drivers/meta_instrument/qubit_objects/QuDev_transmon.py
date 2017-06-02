@@ -476,7 +476,8 @@ class QuDev_transmon(Qubit):
             ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
 
     def measure_rabi(self, amps=None, n=1, MC=None, analyze=True,
-                     close_fig=True, cal_points=True, no_cal_points=2, upload=True):
+                     close_fig=True, cal_points=True, no_cal_points=2,
+                     upload=True, label=None):
 
         if amps is None:
             raise ValueError("Unspecified amplitudes for measure_rabi")
@@ -491,7 +492,9 @@ class QuDev_transmon(Qubit):
             cal_points=cal_points, no_cal_points=no_cal_points, upload=upload))
         MC.set_sweep_points(amps)
         MC.set_detector_function(self.int_avg_det)
-        MC.run('Rabi-n{}'.format(n) + self.msmt_suffix)
+        if label is None:
+            label = 'Rabi-n{}'.format(n) + self.msmt_suffix
+        MC.run(label)
 
         if analyze:
             ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
@@ -1142,7 +1145,8 @@ class QuDev_transmon(Qubit):
                              "find_frequency".format(method))
 
     def find_amplitudes(self, rabi_amps=None, label='Rabi', for_ef=False, update=False,
-                        MC=None, close_fig=True, cal_points=True, NoCalPoints=2, **kw):
+                        MC=None, close_fig=True, cal_points=True, NoCalPoints=2, **kw,
+                        upload=True):
 
         """
         Finds the pi and pi/2 pulse amplitudes from the fit to a Rabi experiment. Uses the Rabi_Analysis(_new)
@@ -1171,8 +1175,10 @@ class QuDev_transmon(Qubit):
         :param no_cal_points       number of calibration points to use; if it's the first time rabi is run
                                    then 2 cal points (two I pulses at the end) should be used for the ge Rabi,
                                    and 4 (two I pulses and 2 ge X180 pulses at the end) for the ef Rabi
+        :param upload:             whether to update the AWG waveforms
         :param kw:                 other keyword arguments. The Rabi sweep amplitudes array 'amps', or the
                                    parameter 'amps_mean' should be passed here
+
 
         Other possible input parameters in the kw:
 
@@ -1218,15 +1224,17 @@ class QuDev_transmon(Qubit):
         #Perform Rabi
         if for_ef is False:
             self.measure_rabi(amps=rabi_amps, n=n, MC=MC, close_fig=close_fig,
-                              cal_points=cal_points, no_cal_points=NoCalPoints)
+                              cal_points=cal_points, no_cal_points=NoCalPoints, upload=upload)
         else:
             self.measure_rabi_2nd_exc(amps=rabi_amps, n=n, MC=MC, close_fig=close_fig,
-                                      cal_points=cal_points, no_cal_points=NoCalPoints)
+                                      cal_points=cal_points, no_cal_points=NoCalPoints, upload=upload)
 
         #get pi and pi/2 amplitudes from the analysis results
         # TODO: might have to correct Rabi_Analysis_new to Rabi_Analysis when we decide which version we stick to.
         if for_ef:
-            label += '_2d_excitation'
+            label = 'Rabi_2d_excitation'
+        elif label is None:
+            label = 'Rabi'
         RabiA = ma.Rabi_Analysis_new(label=label, **kw)
 
         rabi_amps = RabiA.rabi_amplitudes    #This is a dict with keywords 'piPulse',  'piPulse_std',

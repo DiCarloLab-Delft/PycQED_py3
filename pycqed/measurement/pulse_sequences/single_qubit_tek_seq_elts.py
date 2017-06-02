@@ -144,8 +144,6 @@ def Rabi_seq(amps, pulse_pars, RO_pars, n=1, post_msmt_delay=3e-6, no_cal_points
             pulse_list[0] = deepcopy(pulse_list[0])
             pulse_list[0]['pulse_delay'] += post_msmt_delay
 
-            pulse_list.append(RO_pars)
-
             el = multi_pulse_elt(i, station, pulse_list)
 
         el_list.append(el)
