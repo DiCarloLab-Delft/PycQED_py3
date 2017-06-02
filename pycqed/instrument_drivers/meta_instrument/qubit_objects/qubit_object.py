@@ -109,6 +109,12 @@ class Qubit(Instrument):
     def measure_transients(self):
         raise NotImplementedError()
 
+    def calibrate_motzoi(self, MC=None, verbose=True):
+        self.measure_motzoi()# large range
+        # fine range around optimum
+        self.measure_motzoi()
+        # return optimal motzoi
+
     def calibrate_optimal_weights(self, MC=None, verify=True,
                                   analyze=False, update=True):
         raise NotImplementedError()
@@ -457,16 +463,22 @@ class Transmon(Qubit):
             self.Q_amp180.set(ampl)
         return ampl
 
-    def calibrate_pulse_amplitude_flipping(self, number_of_flips=np.arange(60),
+    def calibrate_pulse_amplitude_flipping(self,
                                            MC=None, update=True,
-                                           desired_accuracy=0.001,
-                                           max_iterations=5,
+                                           fine_accuracy=0.01,
+                                           desired_accuracy=0.0005,
+                                           max_iterations=10,
                                            verbose=True):
 
         success = False
+        fine = False
         for k in range(max_iterations):
             old_Q_amp180 = self.Q_amp180()
-            a = self.measure_flipping(MC=MC)
+            if not fine:
+                number_of_flips = 2*np.arange(60)
+            if fine:
+                number_of_flips = 8*np.arange(60)
+            a = self.measure_flipping(MC=MC, number_of_flips=number_of_flips)
             Q_amp180_scale_factor = a.drive_scaling_factor
 
 
@@ -482,13 +494,18 @@ class Transmon(Qubit):
                     print('Qubit drive scaling %.3f ' % Q_amp180_scale_factor
                           + 'is too low, capping at 0.9')
 
-            self.Q_amp180(np.round(Q_amp180_scale_factor * self.Q_amp180(), 4))
+            self.Q_amp180(np.round(Q_amp180_scale_factor * self.Q_amp180(), 5))
 
             if verbose:
-                print('Q_amp180_scale_factor {}, new Q_amp180 {}'.format(
+                print('Q_amp180_scale_factor: {:.4f}, new Q_amp180: {}'.format(
                       Q_amp180_scale_factor, self.Q_amp180()))
 
-            if abs((Q_amp180_scale_factor-1)*self.Q_amp180()) < desired_accuracy:
+            if abs(Q_amp180_scale_factor-1) < fine_accuracy:
+                if verbose:
+                    print('Getting close to optimum, increasing sensitivity')
+                fine = True
+
+            if abs(Q_amp180_scale_factor-1) < desired_accuracy:
                 if verbose:
                     print('within threshold')
                 success = True

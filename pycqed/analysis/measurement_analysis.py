@@ -1225,24 +1225,26 @@ class Rabi_Analysis(TD_Analysis):
         self.save_fig(self.fig, fig_tight=False, **kw)
 
     def fit_data(self, print_fit_results=False, **kw):
-        model = fit_mods.CosModel
+        model = fit_mods.lmfit.Model(fit_mods.CosFunc)
         self.fit_res = ['', '']
         # It would be best to do 1 fit to both datasets but since it is
         # easier to do just one fit we stick to that.
         # We make an initial guess of the Rabi period using both quadratures
         data = np.sqrt(self.measured_values[0]**2+self.measured_values[1]**2)
-        params = model.guess(model, data=data,
+        params = fit_mods.Cos_guess(model, data=data,
                              t=self.sweep_points)
-        fit_res = fit_mods.CosModel.fit(
+        fit_res = model.fit(
             data=data,
             t=self.sweep_points,
             params=params)
         freq_guess = fit_res.values['frequency']
         for i in [0, 1]:
-            params = model.guess(model, data=self.measured_values[i],
+            model = fit_mods.lmfit.Model(fit_mods.CosFunc)
+            params = fit_mods.Cos_guess(model, data=self.measured_values[i],
                                  t=self.sweep_points)
+
             params['frequency'].value = freq_guess
-            self.fit_res[i] = fit_mods.CosModel.fit(
+            self.fit_res[i] = model.fit(
                 data=self.measured_values[i],
                 t=self.sweep_points,
                 params=params)
@@ -1505,20 +1507,24 @@ class Motzoi_XY_analysis(TD_Analysis):
     The intersect of the fits corresponds to the optimum motzoi parameter.
     '''
 
-    def __init__(self, label='Motzoi', **kw):
+    def __init__(self, label='Motzoi', cal_points=[[-4, -3], [-2, -1]], **kw):
         kw['label'] = label
         kw['h5mode'] = 'r+'
+        self.cal_points=cal_points
         super().__init__(**kw)
 
     def run_default_analysis(self, close_file=True, close_main_fig=True, **kw):
         self.get_naming_and_values()
         self.add_analysis_datagroup_to_file()
-        self.cal_points = kw.pop('cal_point', [[-4, -3], [-2, -1]])
-        self.rotate_and_normalize_data()
-        self.add_dataset_to_analysisgroup('Corrected data',
-                                          self.corr_data)
-        self.analysis_group.attrs.create('corrected data based on',
-                                         'calibration points'.encode('utf-8'))
+        if self.cal_points is None:
+            self.corr_data = self.measured_values[0]**2 + self.measured_values[1]**2
+
+        else:
+            self.rotate_and_normalize_data()
+            self.add_dataset_to_analysisgroup('Corrected data',
+                                              self.corr_data)
+            self.analysis_group.attrs.create('corrected data based on',
+                                             'calibration points'.encode('utf-8'))
         # Only the unfolding part here is unique to this analysis
         self.sweep_points_Xy = self.sweep_points[:-4:2]
         self.sweep_points_Yx = self.sweep_points[1:-4:2]
@@ -1564,7 +1570,8 @@ class Motzoi_XY_analysis(TD_Analysis):
                     self.ax.plot(x_fine, fine_fit, c=c[i], label='guess')
 
         self.ax.legend(loc='best')
-        self.ax.set_ylim(-.1, 1.1)
+        if self.cal_points != None:
+            self.ax.set_ylim(-.1, 1.1)
         self.save_fig(self.fig, fig_tight=True, **kw)
 
     def fit_data(self, **kw):
