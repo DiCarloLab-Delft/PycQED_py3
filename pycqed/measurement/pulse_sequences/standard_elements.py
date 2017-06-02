@@ -59,6 +59,7 @@ def multi_pulse_elt(i, station, pulse_list, sequencer_config=None):
                                 'Buffer_RO_MW': 0,
                                 'Buffer_RO_RO': 0,
                                 'Flux_comp_dead_time': 3e-6,
+                                'slave_AWG_trig_channels': [],
                                 }
 
     ##########################
@@ -71,6 +72,13 @@ def multi_pulse_elt(i, station, pulse_list, sequencer_config=None):
     for c_name in station.pulsar.channels:  # Exists to ensure there are no empty channels
         el.add(pulse.SquarePulse(name='refpulse_0', channel=c_name,
                                  amplitude=0, length=1e-9))
+
+    # Trigger the slave AWG-s
+    slave_triggers = sequencer_config.get('slave_AWG_trig_channels', [])
+    for c_name in slave_triggers:
+        el.add(pulse.SquarePulse(name='slave_trigger', channel=c_name,
+                                 amplitude=1, length=20e-9))
+
     # exists to ensure that channel is not high when waiting for trigger
     # and to allow negavtive pulse delay of elements up to 300 ns
     # last_pulse = el.add(

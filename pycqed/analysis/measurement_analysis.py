@@ -5166,8 +5166,8 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
                                            max=max(sweep_pts_cut_edges),
                                            value=f0)
             LorentzianModel.set_param_hint('A',
-                                           value=amplitude_guess)
-                                           # min=4*np.var(self.data_dist)
+                                           value=amplitude_guess)#,
+                                           #min=4*np.var(self.data_dist))
             LorentzianModel.set_param_hint('offset',
                                            value=np.mean(self.data_dist),
                                            vary=True)
