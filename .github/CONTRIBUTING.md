@@ -24,10 +24,11 @@ We consider _origin/master_ to be the main branch where the source code of HEAD 
 * contains only reviewed code
 
 #### The project branch
-Every project/experiment has it's own project branch, prefixed with _Proj/_. We consider the project branch to be the main branch where the source code of HEAD always reflects a state with the latest changes used in the project. The project branches themselves should never get merged into the master. Rather, individual changes should be cherry-picked and merged in the master using discrete pull requests. See also *merging strategy* below.
+Every project/experiment has it's own project branch, prefixed with _proj/_. The project branch serves as a working branch where new features can be developed and tested before they are merged into the master.
+The project branches themselves should never get merged into the master. Rather, individual changes should be cherry-picked unto supporting branches and merged in the master using discrete pull requests. See also *merging strategy* below.
 
-* prefixed with *Proj/*
-* never get merged into master
+* prefixed with *proj/*
+* never gets merged into master
 * changes get cherry-picked into supporting branches to merge into master 
 
 
@@ -56,6 +57,8 @@ Whenever possible the pull request should:
 * be well documented and contain comments
 
 Tests are not mandatory as this is generally hard to make for instruments that interact with hardware. 
+
+Travis and codacy run automatically when a pull request is created. Links to the checks can be found when clicking the "show all checks" button that appears in the "conversation" of a pull request.
 
 If you want to get changes from a project branches onto a supporting branch for a pull request consider using the following snippet. 
 ```
@@ -90,7 +93,7 @@ An issue should have only one type label assigned. A type label is not supposed 
 An issue can have only one priority type label. A priority label can change over time. 
 
 ### Issue category labels 
-Optional extra labels exist to further specify what category an issue belong to. These are repository dependent and prefixed with "Cat:
+Optional extra labels exist to further specify what category an issue belong to. These are repository dependent and prefixed with "cat:
 
 An issue can have multiple category labels assigned.
 
@@ -106,3 +109,9 @@ During the weekly code cleanup you should:
 * review pull requests you have been asked to review 
 
 It is recommended to do this more than once a week.
+
+The following snippet can be used to update your local branch with the master:
+```
+git fetch origin        # updates your local copy of the 'origin'
+git merge origin/master # merges the master into your branch
+```
