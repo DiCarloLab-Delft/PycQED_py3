@@ -238,9 +238,9 @@ def execfile(path, global_vars=None, local_vars=None):
         exec(code, global_vars, local_vars)
 
 
-def span_lin(center, span, num, endpoint=True):
+def span_num(center, span, num, endpoint=True):
     """
-    Creates span of points around center
+    Creates a linear span of points around center
     Args:
         center (float) : center of the array
         span   (float) : span the total range of values to span
@@ -290,12 +290,13 @@ def gen_sweep_pts(start=None, stop=None,
         if num is not None:
             return np.linspace(start, stop, num, endpoint=endpoint)
         elif step is not None:
+            # numpy arange does not natively support endpoint
             return np.arange(start, stop + endpoint*step/100, step)
         else:
             raise ValueError('Either "num" or "step" must be specified')
     elif (center is not None) and (span is not None):
         if num is not None:
-            return span_lin(center, span, num, endpoint=endpoint)
+            return span_num(center, span, num, endpoint=endpoint)
         elif step is not None:
             return span_step(center, span, step, endpoint=endpoint)
         else:
