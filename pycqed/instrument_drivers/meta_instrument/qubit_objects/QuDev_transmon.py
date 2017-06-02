@@ -1141,8 +1141,8 @@ class QuDev_transmon(Qubit):
             raise ValueError("Unknown method '{}' for "
                              "find_frequency".format(method))
 
-    def find_amplitudes(self, rabi_amps, label='Rabi', for_ef=False, update=False,
-                        MC=None, close_fig=True, cal_points=True, no_cal_points=2, **kw):
+    def find_amplitudes(self, rabi_amps=None, label='Rabi', for_ef=False, update=False,
+                        MC=None, close_fig=True, cal_points=True, NoCalPoints=2, **kw):
 
         """
         Finds the pi and pi/2 pulse amplitudes from the fit to a Rabi experiment. Uses the Rabi_Analysis(_new)
@@ -1177,11 +1177,16 @@ class QuDev_transmon(Qubit):
         Other possible input parameters in the kw:
 
         auto              (default=True)                automatically perform the entire analysis upon call
-        print_fit_results (default=True)               print the fit report
+        print_fit_results (default=True)                print the fit report
         show              (default=True)                show the plots
         show_guess        (default=False)               plot with initial guess values
         show_amplitudes   (default=True)                print the pi&piHalf pulses amplitudes
         plot_amplitudes   (default=True)                plot the pi&piHalf pulses amplitudes
+        no_of_columns     (default=1)                   number of columns in your paper; figure
+                                                        sizes will be adjusted accordingly
+                                                        (1 col: figsize = ( 7in , 4in )
+                                                         2 cols: figsize = ( 3.375in , 2.25in ),
+                                                         PRL guidelines)
 
         :returns pi and pi/2 pulses amplitudes + their stderr as a dictionary with keys 'piPulse', 'piHalfPulse',
                  'piPulse_std', 'piHalfPulse_std'.
@@ -1192,6 +1197,9 @@ class QuDev_transmon(Qubit):
 
         if MC is None:
             MC = self.MC
+
+        if not cal_points:
+            NoCalPoints = 0
 
         n = kw.get('n',1)                                       #how many times to apply the Rabi pulse
 
@@ -1210,10 +1218,10 @@ class QuDev_transmon(Qubit):
         #Perform Rabi
         if for_ef is False:
             self.measure_rabi(amps=rabi_amps, n=n, MC=MC, close_fig=close_fig,
-                              cal_points=cal_points, no_cal_points=no_cal_points)
+                              cal_points=cal_points, no_cal_points=NoCalPoints)
         else:
             self.measure_rabi_2nd_exc(amps=rabi_amps, n=n, MC=MC, close_fig=close_fig,
-                                      cal_points=cal_points, no_cal_points=no_cal_points)
+                                      cal_points=cal_points, no_cal_points=NoCalPoints)
 
         #get pi and pi/2 amplitudes from the analysis results
         # TODO: might have to correct Rabi_Analysis_new to Rabi_Analysis when we decide which version we stick to.
@@ -1269,6 +1277,11 @@ class QuDev_transmon(Qubit):
         make_fig          (default=True)                whether to make the figures or not
         show_guess        (default=False)               plot with initial guess values
         show_T1           (default=True)                print the T1 and T1_stderr
+        no_of_columns     (default=1)                   number of columns in your paper; figure
+                                                        sizes will be adjusted accordingly
+                                                        (1 col: figsize = ( 7in , 4in )
+                                                         2 cols: figsize = ( 3.375in , 2.25in ),
+                                                         PRL guidelines)
 
         ! Specify either the times array or the times_mean value (defaults to 5 micro-s) and the span around it
         (defaults to 10 micro-s) as kw. Then the script will construct the sweep points as np.linspace(times_mean -
@@ -1374,15 +1387,18 @@ class QuDev_transmon(Qubit):
 
         qubit_freq = self.f_qubit() + artificial_detuning - fitted_freq[0]
 
-        print('New qubit frequency = {:.10} \t stderr = {}:.10'.format(qubit_freq,RamseyA.Ramsey_freq['freq_stderr']))
+        print('New qubit frequency = {:.f10} \t stderr = {:.f10}'.format(
+            qubit_freq,RamseyA.Ramsey_freq['freq_stderr']))
+        print('T2_Star = {:.5f} \t stderr = {:.5f}'.format(
+            T2_star['T2_star'],T2_star['T2_star_stderr']))
 
         if update:
             if for_ef:
                 self.f_ef_qubit(qubit_freq)
-                self.T2_star_ef(T2_star[0])
+                self.T2_star_ef(T2_star['T2_star'])
             else:
                 self.f_qubit(qubit_freq)
-                self.T2_star(T2_star[0])
+                self.T2_star(T2_star['T2_star'])
 
         return qubit_freq, T2_star
 

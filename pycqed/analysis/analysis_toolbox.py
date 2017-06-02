@@ -1159,7 +1159,7 @@ def rotate_and_normalize_data(data, cal_zero_points=None, cal_one_points=None,
     Inputs:
         data (numpy array) : 2D dataset that has to be rotated and normalized
         zero_coord (tuple) : coordinates of reference zero
-                one_coord (tuple) : coordinates of reference one
+        one_coord (tuple) : coordinates of reference one
         cal_zero_points (range) : range specifying what indices in 'data'
                                   correspond to zero
         cal_one_points (range) : range specifying what indices in 'data'
@@ -1192,6 +1192,47 @@ def rotate_and_normalize_data(data, cal_zero_points=None, cal_one_points=None,
 
     return [normalized_data, zero_coord, one_coord]
 
+def rotate_and_normalize_data_no_cal_points(data, **kw):
+
+    """
+    Rotates and normalizes data by fitting a line through the points
+    plotted in th comlex plane, and projecting onto that line.
+    """
+
+    from lmfit.models import LinearModel
+
+    x = data[0]
+    y = data[1]
+
+    linear_model = LinearModel()
+    params = linear_model.guess(data=y,
+                                x=x)
+    fit_res = linear_model.fit(data=y,
+                               x=x,
+                               params=params)
+
+    line_slope = fit_res.params['slope'].value
+    line_intercept = fit_res.params['intercept'].value
+    #finx the x, y coordinates of the projected points
+    x_proj=(x+line_slope*y-line_slope*line_intercept)/(line_slope**2+1)
+    y_proj= line_slope*(x_proj)+line_intercept
+
+    #find the minimum (on th ey axis) point on the line
+    y_min_line = min(fit_res.best_fit)
+    x_min_line = x[np.argmin(fit_res.best_fit)]
+
+    #find x,y coordinates with respect to end of line
+    x_data = np.abs(x_min_line - x_proj)
+    y_data = y_proj-y_min_line
+
+    #find distance from points on line to end of line
+    rotated_data = np.sqrt(x_data**2+y_data**2)
+
+    #normlaize data
+    max_min_distance = max(rotated_data) - min(rotated_data)
+    normalized_data = (rotated_data - min(rotated_data))/max_min_distance
+
+    return normalized_data
 
 def normalize_data_v3(data, cal_zero_points=np.arange(-4, -2, 1),
                       cal_one_points=np.arange(-2, 0, 1), **kw):
@@ -1481,7 +1522,8 @@ def color_plot_interpolated(x, y, z, ax=None,
         return ax, CS, cbar
     return ax, CS
 
-def plot_errorbars(x, y, fit_results=None, fit_function=None, ax=None, only_bars=True):
+def plot_errorbars(x, y, fit_results=None, fit_function=None, ax=None,
+                   linewidth=2,markersize=2,marker='none',only_bars=True):
 
     if ax is None:
         new_plot_created = True
@@ -1491,10 +1533,12 @@ def plot_errorbars(x, y, fit_results=None, fit_function=None, ax=None, only_bars
 
     standard_error = np.std(y)/np.sqrt(y.size)
 
-    if only_bars:
-        ax.errorbar( x, y, yerr=standard_error, ecolor='k', fmt='' )
-    else:
-        ax.errorbar( x, y, yerr=standard_error, ecolor='k', fmt='-o' )
+    # if only_bars:
+    #     ax.errorbar( x, y, yerr=standard_error, ecolor='k',
+    #                  fmt='',linewidth=linewidth)
+    # else:
+    ax.errorbar( x, y, yerr=standard_error, ecolor='k', fmt=marker,
+                     linewidth=linewidth, markersize=markersize)
 
     # best_vals = fit_results.best_values
     # func_args=inspect.getargspec(fit_function)[0]                   #returns list of function parameters
