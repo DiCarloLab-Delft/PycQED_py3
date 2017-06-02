@@ -957,8 +957,7 @@ class CBox_v3_driven_transmon(Transmon):
             return a
 
     def measure_motzoi(self, motzois=np.linspace(-.3, .3, 31),
-                       MC=None, analyze=True, close_fig=True,
-                       verbose=False):
+                       MC=None, analyze=True, close_fig=True):
         self.prepare_for_timedomain()
         if MC is None:
             MC = self.MC.get_instr()
@@ -980,17 +979,13 @@ class CBox_v3_driven_transmon(Transmon):
         if 'UHFQC' in self.acquisition_instrument.name:
             d._set_real_imag(True)
 
-        # d = qh.CBox_single_integration_average_det_CC(
-        #     self.CBox.get_instr(), nr_averages=self.RO_acq_averages()//MC.soft_avg(),
-        #     seg_per_point=2)
-
         MC.set_sweep_function(motzoi_swf)
         MC.set_sweep_points(np.repeat(motzois, 2))
         MC.set_detector_function(d)
 
         MC.run('Motzoi_XY'+self.msmt_suffix)
         if analyze:
-            a = ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
+            a = ma.Motzoi_XY_analysis(auto=True, cal_points=None, close_fig=close_fig)
             return a
 
     def measure_randomized_benchmarking(self, nr_cliffords=2**np.arange(12),

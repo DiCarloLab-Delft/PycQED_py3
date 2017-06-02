@@ -5,6 +5,7 @@ from qcodes.instrument.base import Instrument
 from qcodes.utils import validators as vals
 from qcodes.instrument.parameter import ManualParameter
 
+from pycqed.utilities.general import gen_sweep_pts
 from pycqed.analysis.analysis_toolbox import calculate_transmon_transitions
 from pycqed.analysis import analysis_toolbox as a_tools
 from pycqed.measurement import detector_functions as det
@@ -109,11 +110,35 @@ class Qubit(Instrument):
     def measure_transients(self):
         raise NotImplementedError()
 
-    def calibrate_motzoi(self, MC=None, verbose=True):
-        self.measure_motzoi()# large range
+    def measure_motzoi(self, motzois=np.linspace(-.3, .3, 31),
+                       MC=None, analyze=True, close_fig=True):
+        raise NotImplementedError()
+
+    def calibrate_motzoi(self, MC=None, verbose=True, update=True):
+        motzois = gen_sweep_pts(center=0, span=1, num=31)
+
+        # large range
+        a = self.measure_motzoi(MC=MC, motzois=motzois, analyze=True)
+        opt_motzoi = a.optimal_motzoi
+        if opt_motzoi > max(motzois) or opt_motzoi < min(motzois):
+            if verbose:
+                print('optimal motzoi {:.3f} '.format(opt_motzoi) +
+                      'outside of measured span, aborting')
+            return False
+
         # fine range around optimum
-        self.measure_motzoi()
-        # return optimal motzoi
+        motzois = gen_sweep_pts(center=a.optimal_motzoi, span=.4, num=31)
+        a=self.measure_motzoi(motzois)
+        opt_motzoi = a.optimal_motzoi
+        if opt_motzoi > max(motzois) or opt_motzoi < min(motzois):
+            if verbose:
+                print('optimal motzoi {:.3f} '.format(opt_motzoi) +
+                      'outside of measured span, aborting')
+        if update:
+            if verbose:
+                print('Setting motzoi to {:.3f}'.format(opt_motzoi))
+            self.motzoi(opt_motzoi)
+        return opt_motzoi
 
     def calibrate_optimal_weights(self, MC=None, verify=True,
                                   analyze=False, update=True):
@@ -465,7 +490,7 @@ class Transmon(Qubit):
 
     def calibrate_pulse_amplitude_flipping(self,
                                            MC=None, update=True,
-                                           fine_accuracy=0.01,
+                                           fine_accuracy=0.005,
                                            desired_accuracy=0.0005,
                                            max_iterations=10,
                                            verbose=True):
