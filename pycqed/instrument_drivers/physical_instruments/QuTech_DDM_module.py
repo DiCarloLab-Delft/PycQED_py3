@@ -15,11 +15,14 @@ import math
 from qcodes import validators as vals
 import logging
 import time
+from qcodes import StandardParameter
 
 log = logging.getLogger(__name__)
 
 
 FINISH_BIT_CHECK_FERQUENTION_HZ = 25
+INT32_MAX = +2147483647
+INT32_MIN = -2147483648
 
 
 class DDMq(SCPI):
@@ -46,6 +49,27 @@ class DDMq(SCPI):
         # The next line is needed, because the real-time clock is not working
         # correctly at the moment
         self.set_time(int(time.time()))
+
+    def add_parameter(self, name, parameter_class=StandardParameter,
+                      **kwargs):
+        # try to get the min and max values of the parameter from the ddm
+        try:
+            if ('vals' in kwargs and 'set_cmd' in kwargs and 'get_cmd' in kwargs):
+                validator = kwargs['vals']
+                if (isinstance(validator, vals.Numbers)):
+                    initialValue = self.ask(kwargs['get_cmd'])
+                    self.write(kwargs['set_cmd'].replace('{}', str(INT32_MAX)))
+                    maxValue = self.ask(kwargs['get_cmd'])
+                    self.write(kwargs['set_cmd'].replace('{}', str(INT32_MIN)))
+                    minValue = self.ask(kwargs['get_cmd'])
+                    self.write(kwargs['set_cmd'].replace('{}', initialValue))
+                    if (str(validator._min_value) != minValue or str(validator._max_value) != maxValue):
+                        kwargs['vals'] = vals.Numbers(minValue, maxValue)
+                        log.warning("The range values of a parameter differ between python driver and the ddm. \n\t(parameter: " + name + ")\n\t(python driver: (" + str(
+                            validator._min_value) + ", " + str(validator._max_value) + "))\n\t(ddm: (" + minValue+", " + maxValue + "))")
+        except:
+            pass
+        super(DDMq, self).add_parameter(name, parameter_class, **kwargs)
 
     def add_parameters(self):
         #######################################################################
@@ -119,7 +143,7 @@ class DDMq(SCPI):
                                ' even number of samples',
                                get_cmd=snsamp_cmd + '?',
                                set_cmd=snsamp_cmd + ' {}',
-                               vals=vals.Numbers(1, 4096)
+                               vals=vals.Numbers(2, 4096)
                                )
             senable_cmd = 'qutech:inputavg{}:enable'.format(ch_pair)
             self.add_parameter('ch_pair{}_inavg_enable'.format(ch_pair),
@@ -160,7 +184,7 @@ class DDMq(SCPI):
                                ' the maximum time of integration is 8 us',
                                get_cmd=sintlengthall_cmd + '?',
                                set_cmd=sintlengthall_cmd + ' {}',
-                               vals=vals.Numbers(1, 4096)
+                               vals=vals.Numbers(2, 4096)
                                )
             #########
             # TV mode
@@ -346,7 +370,7 @@ class DDMq(SCPI):
                     ' ',
                     get_cmd=sintlength_cmd + '?',
                     set_cmd=sintlength_cmd + ' {}',
-                    vals=vals.Numbers(1, 4096)
+                    vals=vals.Numbers(2, 4096)
                 )
                 swintstat_cmd = 'qutech:wint{}:status{}'.format(ch_pair, wNr)
                 self.add_parameter('ch_pair{}_weight{}_wint_status'.format(
