@@ -100,7 +100,9 @@ class Rabi(swf.Hard_Sweep):
 class Rabi_2nd_exc(swf.Hard_Sweep):
 
     def __init__(self, pulse_pars, pulse_pars_2nd, RO_pars, amps=None,
-                 n=1, cal_points=True, no_cal_points=4, upload=True, return_seq=False):
+                 last_ge_pulse=True,
+                 n=1, cal_points=True, no_cal_points=4, upload=True,
+                 return_seq=False):
         super().__init__()
         self.pulse_pars = pulse_pars
         self.pulse_pars_2nd = pulse_pars_2nd
@@ -112,6 +114,7 @@ class Rabi_2nd_exc(swf.Hard_Sweep):
         self.name = 'Rabi 2nd excited state'
         self.parameter_name = 'amplitude'
         self.unit = 'V'
+        self.last_ge_pulse = last_ge_pulse
         self.return_seq = return_seq
         if cal_points and amps is not None:
             self.sweep_points = np.concatenate([amps,
@@ -124,7 +127,7 @@ class Rabi_2nd_exc(swf.Hard_Sweep):
 
     def prepare(self, **kw):
         if self.upload:
-            sqs2.Rabi_2nd_exc_seq(amps=self.sweep_points,
+            sqs2.Rabi_2nd_exc_seq(amps=self.sweep_points, last_ge_pulse=self.last_ge_pulse,
                                   pulse_pars=self.pulse_pars,
                                   pulse_pars_2nd=self.pulse_pars_2nd,
                                   RO_pars=self.RO_pars, upload=self.upload,
@@ -1029,8 +1032,8 @@ class Ramsey_2nd_exc(swf.Hard_Sweep):
             self.sweep_points = np.concatenate([times,
                                                 [times[-1]*1.05,
                                                  times[-1]*1.06,
-                                                 times[-1]*1.07,
-                                                 times[-1]*1.08,
+                                                 #times[-1]*1.07,
+                                                 #times[-1]*1.08,
                                                  times[-1]*1.09,
                                                  times[-1]*1.1]])
 

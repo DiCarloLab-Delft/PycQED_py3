@@ -1798,9 +1798,9 @@ class Rabi_Analysis_new(TD_Analysis):
             self.ax.xaxis.set_major_formatter(FormatStrFormatter('%.2f'))
             self.ax.yaxis.set_major_formatter(FormatStrFormatter('%.2f'))
             #Set ticks and labels
-            self.ax.set_xticks([min(self.scaled_sweep_points),pi_pulse,pi_half_pulse,
-                                max(self.scaled_sweep_points)])
-            self.ax.set_yticks([piPulse_fit,piHalfPulse_fit,1.0])
+            # self.ax.set_xticks([min(self.scaled_sweep_points),pi_pulse,pi_half_pulse,
+            #                     max(self.scaled_sweep_points)])
+            # self.ax.set_yticks([piPulse_fit,piHalfPulse_fit,1.0])
             #plot two points for the pi and piHalf pulses
             self.ax.plot(pi_pulse, piPulse_fit, 'ro',
                     markersize=self.marker_size_special)
@@ -5214,11 +5214,11 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
                                                  max=max(sweep_pts_cut_edges),
                                                  value=f0_gf_over_2)
             DoubleLorentzianModel.set_param_hint('A',
-                                                 value=amplitude_guess,
-                                                 min=4*np.var(self.data_dist))
+                                                 value=amplitude_guess)#,
+                                                 #min=4*np.var(self.data_dist))
             DoubleLorentzianModel.set_param_hint('A_gf_over_2',
-                                                 value=amplitude_guess_ef,
-                                                 min=4*np.var(self.data_dist))
+                                                 value=amplitude_guess_ef)#,
+                                                 #min=4*np.var(self.data_dist))
             DoubleLorentzianModel.set_param_hint('kappa',
                                                  value=kappa_guess,
                                                  min=0,
