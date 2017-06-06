@@ -4130,6 +4130,12 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
             amplitude_guess = np.pi * kappa_guess * \
                 abs(max(self.data_dist) - min(self.data_dist))
 
+            if kappa_guess == 0:
+                    kappa_guess = 1 # When kappa_guess is zero, the fitting procedure fails (claims 'input has nan values')
+
+            if not peak_flag: # Change the sign of amplitude_guess for dips
+                amplitude_guess*=-1.
+
             LorentzianModel = fit_mods.LorentzianModel
             LorentzianModel.set_param_hint('f0',
                                            min=min(self.sweep_points),
