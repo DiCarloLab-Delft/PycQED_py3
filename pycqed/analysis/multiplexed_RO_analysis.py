@@ -9,7 +9,7 @@ from numpy.linalg import inv
 
 
 def two_qubit_ssro_fidelity(label, fig_format='png',
-                            qubit_labels=['q0', 'q1']):
+                            qubit_labels=('q0', 'q1')):
     # extracting data sets
     states = ['00', '01', '10', '11']
     nr_states = len(states)
