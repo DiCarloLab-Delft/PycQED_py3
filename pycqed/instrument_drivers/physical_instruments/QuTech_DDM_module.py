@@ -23,6 +23,8 @@ log = logging.getLogger(__name__)
 FINISH_BIT_CHECK_FERQUENTION_HZ = 25
 INT32_MAX = +2147483647
 INT32_MIN = -2147483648
+CHAR_MAX = +127
+CHAR_MIN = -128
 
 
 class DDMq(SCPI):
@@ -50,25 +52,75 @@ class DDMq(SCPI):
         # correctly at the moment
         self.set_time(int(time.time()))
 
-    def add_parameter(self, name, parameter_class=StandardParameter,
-                      **kwargs):
-        # try to get the min and max values of the parameter from the ddm
+    def _ask(self, data):
+        if (isinstance(data, str)):
+            return self.ask(data)
+        else:
+            return data()
+
+    def _write(self, func, data):
+        if (isinstance(func, str)):
+            return self.write(func.format(data))
+        else:
+            return func(data)
+
+    # Read the min and max values of the parameter from the ddm and update the
+    # min and max values of the validator
+    def _updateValidator(self, name, **kwargs):
         try:
-            if ('vals' in kwargs and 'set_cmd' in kwargs and 'get_cmd' in kwargs):
+            if ('vals' in kwargs and 'set_cmd' in kwargs
+                    and 'get_cmd' in kwargs):
                 validator = kwargs['vals']
                 if (isinstance(validator, vals.Numbers)):
-                    initialValue = self.ask(kwargs['get_cmd'])
-                    self.write(kwargs['set_cmd'].replace('{}', str(INT32_MAX)))
-                    maxValue = self.ask(kwargs['get_cmd'])
-                    self.write(kwargs['set_cmd'].replace('{}', str(INT32_MIN)))
-                    minValue = self.ask(kwargs['get_cmd'])
-                    self.write(kwargs['set_cmd'].replace('{}', initialValue))
-                    if (str(validator._min_value) != minValue or str(validator._max_value) != maxValue):
-                        kwargs['vals'] = vals.Numbers(minValue, maxValue)
-                        log.warning("The range values of a parameter differ between python driver and the ddm. \n\t(parameter: " + name + ")\n\t(python driver: (" + str(
-                            validator._min_value) + ", " + str(validator._max_value) + "))\n\t(ddm: (" + minValue+", " + maxValue + "))")
-        except:
-            pass
+                    initialValue = self._ask(kwargs['get_cmd'])
+                    self._write(kwargs['set_cmd'], str(INT32_MAX))
+                    maxValue = self._ask(kwargs['get_cmd'])
+                    self._write(kwargs['set_cmd'], str(INT32_MIN))
+                    minValue = self._ask(kwargs['get_cmd'])
+                    self._write(kwargs['set_cmd'], initialValue)
+                    if (str(validator._min_value) != minValue
+                            or str(validator._max_value) != maxValue):
+                        kwargs['vals'] = vals.Numbers(float(minValue), float(maxValue))
+                        log.debug("The range values of a parameter differ " +
+                                 "between python driver and the ddm. \n\t(" +
+                                 "parameter: " + name + ")\n\t(python driver" +
+                                 ": (" + str(validator._min_value) + ", " +
+                                 str(validator._max_value) + "))\n\t(ddm: (" +
+                                 minValue+", " + maxValue + "))")
+                elif (isinstance(validator, vals.Arrays)):
+                    initialValue_str = self._ask(kwargs['get_cmd'])
+                    initialValue = list(map(int, initialValue_str))
+                    count = max(1, len(initialValue))
+                    char_max = []
+                    char_min = []
+                    for i in range(count):
+                        char_max.append(CHAR_MAX)
+                        char_min.append(CHAR_MIN)
+                    self._write(kwargs['set_cmd'], char_max)
+                    maxValue = self._ask(kwargs['get_cmd'])[0]
+                    self._write(kwargs['set_cmd'], char_min)
+                    minValue = self._ask(kwargs['get_cmd'])[0]
+                    self._write(kwargs['set_cmd'], initialValue)
+                    if (validator._min_value != minValue
+                            or validator._max_value != maxValue):
+                        kwargs['vals'] = vals.Arrays(minValue, maxValue)
+                        log.debug("The range values of a parameter differ " +
+                                 "between python driver and the ddm. \n\t(" +
+                                 "parameter: " + name + ")\n\t(python driver" +
+                                 str(validator._min_value) + ", " +
+                                 str(validator._max_value) + "))\n\t(ddm: (" +
+                                 str(minValue) + ", " + str(maxValue) + "))")
+                else:
+                    log.debug("Not implemented: Retreiving min and max values" +
+                             " of a parameter from the ddm of type '" +
+                             type(validator) + "'")
+        except Exception as e:
+            log.debug("Exception was thrown while retreiving the min and max" +
+                     " values of a parameter '" + name + "' from the ddm.(%s)", str(e))
+
+    def add_parameter(self, name, parameter_class=StandardParameter,
+                      **kwargs):
+        self._updateValidator(name, **kwargs)
         super(DDMq, self).add_parameter(name, parameter_class, **kwargs)
 
     def add_parameters(self):
@@ -893,8 +945,7 @@ class DDMq(SCPI):
                 print("\r TV mode(" + str(int(float(self._getTVpercentage(
                       ch_pair, wNr)))) + "%)", end='\0')
                 time.sleep(1.0/FINISH_BIT_CHECK_FERQUENTION_HZ)
-        if (finished != 'ffffffff'):
-            print("\r", end='\0')
+        print("\r", end='\0')
         self._displayQBitErrors("TV Mode - Qbit state", ch_pair, wNr)
 
         self.write('qutech:qstate{:d}:data{:d}:counter? '.format(ch_pair, wNr))
@@ -913,8 +964,7 @@ class DDMq(SCPI):
                     "\r TV mode(" + str(int(float(self._getTVpercentage(
                         ch_pair, wNr)))) + "%)", end='\0')
                 time.sleep(1.0/FINISH_BIT_CHECK_FERQUENTION_HZ)
-        if (finished != 'ffffffff'):
-            print("\r", end='\0')
+        print("\r", end='\0')
         self._displayQBitErrors("TV Mode - Qbit state", ch_pair, wNr)
         self.write('qutech:qstate{:d}:data{:d}:average? '.format(ch_pair, wNr))
         binBlock = self.binBlockRead()
@@ -932,8 +982,7 @@ class DDMq(SCPI):
                     self._getLoggingpercentage(ch_pair, wNr)))) + "%)",
                     end='\0')
                 time.sleep(1.0/FINISH_BIT_CHECK_FERQUENTION_HZ)
-        if (finished != 'ffffffff'):
-            print("\r", end='\0')
+        print("\r", end='\0')
         self._displayQBitErrors("Logging", ch_pair, wNr)
         self.write('qutech:logging{:d}:data{:d}:int? '.format(ch_pair, wNr))
         binBlock = self.binBlockRead()
@@ -951,8 +1000,7 @@ class DDMq(SCPI):
                     self._getLoggingpercentage(ch_pair, wNr)))) + "%)",
                     end='\0')
                 time.sleep(1.0/FINISH_BIT_CHECK_FERQUENTION_HZ)
-        if (finished != 'ffffffff'):
-            print("\r", end='\0')
+        print("\r", end='\0')
         self._displayQBitErrors("Logging - Qbit state", ch_pair, wNr)
         self.write('qutech:logging{:d}:data{:d}:qstate? '.format(ch_pair, wNr))
         binBlock = self.binBlockRead()
