@@ -107,14 +107,14 @@ def two_qubit_ssro_fidelity(label, fig_format='png',
 
     y0 = (1-frac1_0)*pylab.normpdf(bins0, mu0_0, sigma0_0) + \
         frac1_0*pylab.normpdf(bins0, mu1_0, sigma1_0)
-    y1_0 = frac1_0*pylab.normpdf(bins0, mu1_0, sigma1_0)
-    y0_0 = (1-frac1_0)*pylab.normpdf(bins0, mu0_0, sigma0_0)
+    # y1_0 = frac1_0*pylab.normpdf(bins0, mu1_0, sigma1_0)
+    # y0_0 = (1-frac1_0)*pylab.normpdf(bins0, mu0_0, sigma0_0)
 
     # building up the histogram fits for on measurements
     y1 = (1-frac1_1)*pylab.normpdf(bins1, mu0_1, sigma0_1) + \
         frac1_1*pylab.normpdf(bins1, mu1_1, sigma1_1)
-    y1_1 = frac1_1*pylab.normpdf(bins1, mu1_1, sigma1_1)
-    y0_1 = (1-frac1_1)*pylab.normpdf(bins1, mu0_1, sigma0_1)
+    # y1_1 = frac1_1*pylab.normpdf(bins1, mu1_1, sigma1_1)
+    # y0_1 = (1-frac1_1)*pylab.normpdf(bins1, mu0_1, sigma0_1)
 
     ax.semilogy(bins0, y0, 'b', linewidth=1.5, label='fit |00>')
     ax.semilogy(bins1, y1, 'r', linewidth=1.5, label='fit |01>')
@@ -227,13 +227,13 @@ def two_qubit_ssro_fidelity(label, fig_format='png',
     mu_0_vec = np.zeros(len(weights))
     for j, weight in enumerate(weights):
         mu_0_vec[j] = np.average(
-            eval('w{}_data_{}'.format(weight, ground_state)))
+            namespace['w{}_data_{}'.format(weight, ground_state)])
 
     mu_matrix = np.zeros((len(cal_states), len(weights)))
     for i, state in enumerate(cal_states):
         for j, weight in enumerate(weights):
             mu_matrix[i, j] = np.average(
-                eval('w{}_data_{}'.format(weight, state)))-mu_0_vec[j]
+                namespace['w{}_data_{}'.format(weight, state)])-mu_0_vec[j]
 
     mu_matrix_inv = inv(mu_matrix)
     V_th_cor = np.dot(mu_matrix_inv, V_th)
