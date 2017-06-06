@@ -176,9 +176,7 @@ class QuDev_transmon(Qubit):
                                  initial_value=None, vals=vals.Numbers())
         self.add_pulse_parameter('X180', 'nr_sigma', 'nr_sigma',
                                  initial_value=None, vals=vals.Numbers())
-        self.add_pulse_parameter('X180', 'drag_qscale', 'drag_qscale',
-                                 initial_value=None, vals=vals.Numbers())
-        self.add_pulse_parameter('X180', 'qscale', 'qscale',
+        self.add_pulse_parameter('X180', 'motzoi', 'motzoi',
                                  initial_value=None, vals=vals.Numbers())
         self.add_pulse_parameter('X180', 'f_pulse_mod', 'mod_frequency',
                                  initial_value=None, vals=vals.Numbers())
@@ -191,33 +189,23 @@ class QuDev_transmon(Qubit):
 
         # add drive pulse parameters for ef transition
         self.add_operation('X180_ef')
-        self.add_pulse_parameter('X180_ef', 'pulse_type_ef', 'pulse_type_ef',
+        self.add_pulse_parameter('X180_ef', 'pulse_type_ef', 'pulse_type',
                                  initial_value=None, vals=vals.Strings())
-        self.add_pulse_parameter('X180_ef', 'pulse_I_channel_ef', 'I_channel_ef',
-                                 initial_value=None, vals=vals.Strings())
-        self.add_pulse_parameter('X180_ef', 'pulse_Q_channel_ef', 'Q_channel_ef',
-                                 initial_value=None, vals=vals.Strings())
-        self.add_pulse_parameter('X180_ef', 'amp180_ef', 'amplitude_ef',
+        self.add_pulse_parameter('X180_ef', 'amp180_ef', 'amplitude',
                                  initial_value=1, vals=vals.Numbers())
         self.add_pulse_parameter('X180_ef', 'amp90_ef', 'amplitude_ef',
                                  initial_value=0.5, vals=vals.Numbers())
         self.add_pulse_parameter('X180_ef', 'amp90_scale_ef', 'amp90_scale_ef',
                                  initial_value=0.5, vals=vals.Numbers(0, 1))
-        self.add_pulse_parameter('X180_ef', 'pulse_delay_ef', 'pulse_delay_ef',
+        self.add_pulse_parameter('X180_ef', 'pulse_delay_ef', 'pulse_delay',
                                  initial_value=None, vals=vals.Numbers())
-        self.add_pulse_parameter('X180_ef', 'gauss_sigma_ef', 'sigma_ef',
+        self.add_pulse_parameter('X180_ef', 'gauss_sigma_ef', 'sigma',
                                  initial_value=None, vals=vals.Numbers())
-        self.add_pulse_parameter('X180_ef', 'nr_sigma_ef', 'nr_sigma_ef',
+        self.add_pulse_parameter('X180_ef', 'nr_sigma_ef', 'nr_sigma',
                                  initial_value=None, vals=vals.Numbers())
-        self.add_pulse_parameter('X180_ef', 'drag_qscale_ef', 'drag_qscale_ef',
+        self.add_pulse_parameter('X180_ef', 'motzoi_ef', 'motzoi',
                                  initial_value=None, vals=vals.Numbers())
-        self.add_pulse_parameter('X180_ef', 'f_pulse_mod_ef', 'mod_frequency_ef',
-                                 initial_value=None, vals=vals.Numbers())
-        self.add_pulse_parameter('X180_ef', 'phi_skew_ef', 'phi_skew_ef',
-                                 initial_value=None, vals=vals.Numbers())
-        self.add_pulse_parameter('X180_ef', 'alpha_ef', 'alpha_ef',
-                                 initial_value=None, vals=vals.Numbers())
-        self.add_pulse_parameter('X180_ef', 'X_pulse_phase_ef', 'phase_ef',
+        self.add_pulse_parameter('X180_ef', 'X_pulse_phase_ef', 'phase',
                                  initial_value=None, vals=vals.Numbers())
 
         # add flux pulse parameters
@@ -271,6 +259,7 @@ class QuDev_transmon(Qubit):
             self.readout_UC_LO.pulsemod_state('Off')
 
     def prepare_for_pulsed_spec(self):
+        # Not working
         self.heterodyne.auto_seq_loading(False)
         if self.cw_source is not None:
             self.cw_source.pulsemod_state('On')
@@ -485,7 +474,7 @@ class QuDev_transmon(Qubit):
 
     def measure_rabi(self, amps=None, n=1, MC=None, analyze=True,
                      close_fig=True, cal_points=True, no_cal_points=2,
-                     upload=True):
+                     upload=True, label=None):
 
         if amps is None:
             raise ValueError("Unspecified amplitudes for measure_rabi")
@@ -500,17 +489,23 @@ class QuDev_transmon(Qubit):
             cal_points=cal_points, no_cal_points=no_cal_points, upload=upload))
         MC.set_sweep_points(amps)
         MC.set_detector_function(self.int_avg_det)
-        MC.run('Rabi-n{}'.format(n) + self.msmt_suffix)
+        if label is None:
+            label = 'Rabi-n{}'.format(n) + self.msmt_suffix
+        MC.run(label)
 
         if analyze:
             ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
 
     def measure_rabi_2nd_exc(self, amps=None, n=1, MC=None, analyze=True,
-                     close_fig=True, cal_points=True, no_cal_points=4,
+                             label=None, last_ge_pulse=True,
+                             close_fig=True, cal_points=True, no_cal_points=4,
                              upload=True):
 
         if amps is None:
             raise ValueError("Unspecified amplitudes for measure_rabi")
+
+        if label is None:
+            label = 'Rabi_2nd_exc-n{}'.format(n) + self.msmt_suffix
 
         self.prepare_for_timedomain()
 
@@ -519,13 +514,14 @@ class QuDev_transmon(Qubit):
 
         MC.set_sweep_function(awg_swf.Rabi_2nd_exc(
                         pulse_pars=self.get_drive_pars(),
-                        pulse_pars_2nd=self.get_drive_pars(ef_transition=True),
+                        pulse_pars_2nd=self.get_ef_drive_pars(),
                         RO_pars=self.get_RO_pars(),
-                        n=n, upload=upload,
+                        last_ge_pulse=last_ge_pulse,
+                        amps=amps, n=n, upload=upload,
                         cal_points=cal_points, no_cal_points=no_cal_points))
         MC.set_sweep_points(amps)
         MC.set_detector_function(self.int_avg_det)
-        MC.run('Rabi_2nd_exc-n{}'.format(n) + self.msmt_suffix)
+        MC.run(label)
 
         if analyze:
             ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
@@ -568,25 +564,29 @@ class QuDev_transmon(Qubit):
             ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
 
     def measure_T1_2nd_exc(self, times=None, MC=None, analyze=True, upload=True,
-                           close_fig=True, cal_points=True):
+                           close_fig=True, cal_points=True, label=None):
 
         if times is None:
             raise ValueError("Unspecified times for measure_T1_2nd_exc")
 
         self.prepare_for_timedomain()
 
+        if label is None:
+            label = 'T1_2nd'+self.msmt_suffix
+
         if MC is None:
             MC = self.MC
 
         MC.set_sweep_function(awg_swf.T1_2nd_exc(
-                        pulse_pars=self.get_drive_pars(),
-                        pulse_pars_2nd=self.get_drive_pars(ef_transition=True),
-                        RO_pars=self.get_RO_pars(),
-                        upload=upload,
-                        cal_points=cal_points))
+                                times=times,
+                                pulse_pars=self.get_drive_pars(),
+                                pulse_pars_2nd=self.get_ef_drive_pars(),
+                                RO_pars=self.get_RO_pars(),
+                                upload=upload,
+                                cal_points=cal_points))
         MC.set_sweep_points(times)
         MC.set_detector_function(self.int_avg_det)
-        MC.run('T1_2nd'+self.msmt_suffix)
+        MC.run(label)
 
         if analyze:
             ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
@@ -639,14 +639,17 @@ class QuDev_transmon(Qubit):
         if analyze:
             ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
 
-    def measure_ramsey_2nd_exc(self, times=None, artificial_detuning=0,
-                               label='', MC=None, analyze=True, close_fig=True,
-                               cal_points=True, n=None, upload=True):
+    def measure_ramsey_2nd_exc(self, times=None, artificial_detuning=0, label=None,
+                       MC=None, analyze=True, close_fig=True, cal_points=True,
+                       n=1, upload=True):
 
         if times is None:
             raise ValueError("Unspecified times for measure_ramsey")
         if artificial_detuning is None:
             logging.warning('Artificial detuning is 0.')
+
+        if label is None:
+            label = 'Ramsey_2nd_exc'+self.msmt_suffix
 
         self.prepare_for_timedomain()
         if MC is None:
@@ -654,14 +657,14 @@ class QuDev_transmon(Qubit):
 
         Rams_2nd_swf = awg_swf.Ramsey_2nd_exc(
             pulse_pars=self.get_drive_pars(),
-            pulse_pars_2nd=self.get_drive_pars(ef_transition=True),
-            RO_pars=self.get_RO_pars(),
+            pulse_pars_2nd=self.get_ef_drive_pars(),
+            RO_pars=self.get_RO_pars(), times=times,
             artificial_detuning=artificial_detuning, cal_points=cal_points,
             n=n, upload=upload)
         MC.set_sweep_function(Rams_2nd_swf)
         MC.set_sweep_points(times)
         MC.set_detector_function(self.int_avg_det)
-        MC.run('Ramsey_2nd_exc'+label+self.msmt_suffix)
+        MC.run(label)
 
         if analyze:
             ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
@@ -1143,52 +1146,47 @@ class QuDev_transmon(Qubit):
         if MC is None:
             MC = self.MC
 
-        if 'spectroscopy' in method.lower():
-            if freqs is None:
-                f_span = kw.get('f_span', 100e6)
-                f_mean = kw.get('f_mean', self.f_qubit())
-                nr_points = kw.get('nr_points', 100)
-                if f_mean == 0:
-                    logging.warning("find_frequency does not know where to "
-                                    "look for the qubit. Please specify the "
-                                    "f_mean or the freqs function parameter.")
-                    return 0
-                else:
-                    freqs = np.linspace(f_mean - f_span/2, f_mean + f_span/2,
-                                        nr_points)
-
-            if 'pulse' not in method.lower():
-                self.measure_spectroscopy(freqs, pulsed=False, MC=MC,
-                                          close_fig=close_fig)
-                label = 'spectroscopy'
+        if freqs is None:
+            f_span = kw.get('f_span', 100e6)
+            f_mean = kw.get('f_mean', self.f_qubit())
+            nr_points = kw.get('nr_points', 100)
+            if f_mean == 0:
+                logging.warning("find_frequency does not know where to "
+                                "look for the qubit. Please specify the "
+                                "f_mean or the freqs function parameter.")
+                return 0
             else:
-                self.measure_spectroscopy(freqs, pulsed=True, MC=MC,
-                                          close_fig=close_fig)
-                label = 'pulsed-spec'
+                freqs = np.linspace(f_mean - f_span/2, f_mean + f_span/2,
+                                    nr_points)
 
-            amp_only = hasattr(self.heterodyne, 'RF')
-            SpecA = ma.Qubit_Spectroscopy_Analysis(
-                analyze_ef=analyze_ef, label=label, amp_only=amp_only,
-                close_fig=close_fig,**kw)
-            self.f_qubit(SpecA.fitted_freq)
-            f0 = SpecA.fitted_freq
-            if update:
-                self.f_qubit(f0)
-            if analyze_ef:
-                f0_ef = 2*SpecA.fitted_freq_gf_over_2 - f0
-                if update:
-                    self.f_ef_qubit(f0_ef)
-            if analyze_ef:
-                return f0, f0_ef
-            else:
-                return f0
+        if 'pulse' not in method.lower():
+            self.measure_spectroscopy(freqs, pulsed=False, MC=MC,
+                                      close_fig=close_fig)
+            label = 'spectroscopy'
         else:
-            raise ValueError("Unknown method '{}' for "
-                             "find_frequency".format(method))
+            self.measure_spectroscopy(freqs, pulsed=True, MC=MC,
+                                      close_fig=close_fig)
+            label = 'pulsed-spec'
 
-    def find_amplitudes(self, rabi_amps=None, label='Rabi', for_ef=False,
-                        update=False, MC=None, close_fig=True, cal_points=True,
-                        no_cal_points=2, last_ge_pulse=True, **kw):
+        amp_only = hasattr(self.heterodyne, 'RF')
+        SpecA = ma.Qubit_Spectroscopy_Analysis(
+            analyze_ef=analyze_ef, label=label, amp_only=amp_only, close_fig=close_fig,**kw)
+        self.f_qubit(SpecA.fitted_freq)
+        f0 = SpecA.fitted_freq
+        if update:
+            self.f_qubit(f0)
+        if analyze_ef:
+            f0_ef = 2*SpecA.fitted_freq_gf_over_2 - f0
+            if update:
+                self.f_ef_qubit(f0_ef)
+        if analyze_ef:
+            return f0, f0_ef
+        else:
+            return f0
+
+    def find_amplitudes(self, rabi_amps=None, label=None, for_ef=False, update=False,
+                        MC=None, close_fig=True, cal_points=True, no_cal_points=2,
+                        upload=True, last_ge_pulse=True, **kw):
 
         """
         Finds the pi and pi/2 pulse amplitudes from the fit to a Rabi
@@ -1266,7 +1264,7 @@ class QuDev_transmon(Qubit):
             MC = self.MC
 
         if not cal_points:
-            NoCalPoints = 0
+            no_cal_points = 0
 
         #how many times to apply the Rabi pulse
         n = kw.get('n',1)
@@ -1284,16 +1282,22 @@ class QuDev_transmon(Qubit):
                 rabi_amps = np.linspace(amps_mean - amps_span/2, amps_mean +
                                         amps_span/2, nr_points)
 
+        if label is None:
+            if for_ef:
+                label = 'Rabi_2nd_excitation' + self.msmt_suffix
+            else:
+                label = 'Rabi' + self.msmt_suffix
+
         #Perform Rabi
         if for_ef is False:
-            self.measure_rabi(amps=rabi_amps, n=n, MC=MC, close_fig=close_fig,
-                              cal_points=cal_points,
-                              no_cal_points=no_cal_points)
+            self.measure_rabi(amps=rabi_amps, n=n, MC=MC, close_fig=close_fig, label=label,
+                              cal_points=cal_points, no_cal_points=no_cal_points, upload=upload)
         else:
             self.measure_rabi_2nd_exc(amps=rabi_amps, n=n, MC=MC,
-                                      close_fig=close_fig,
+                                      close_fig=close_fig, label=label,
                                       cal_points=cal_points,
-                                      no_cal_points=no_cal_points)
+                                      last_ge_pulse=last_ge_pulse,
+                                      no_cal_points=no_cal_points, upload=upload)
 
         #get pi and pi/2 amplitudes from the analysis results
         # TODO: might have to correct Rabi_Analysis_new to Rabi_Analysis
@@ -1422,9 +1426,8 @@ class QuDev_transmon(Qubit):
 
         return T1_dict
 
-    def find_frequency_T2_ramsey(self, times, for_ef=False,
-                                 artificial_detuning=0, update=False, MC=None,
-                                 cal_points=True, close_fig=True, **kw):
+    def find_frequency_T2_ramsey(self, times, for_ef=False, artificial_detuning=0, update=False, MC=None,
+                                     cal_points=True, close_fig=True, upload=True, **kw):
 
         """
         Finds the real qubit frequency and the dephasing rate T2* from the fit
@@ -1486,22 +1489,21 @@ class QuDev_transmon(Qubit):
             self.measure_ramsey(times=times,
                                 artificial_detuning=artificial_detuning,
                                 MC=MC,
-                                cal_points=cal_points, close_fig=close_fig)
+                                cal_points=cal_points, close_fig=close_fig, upload=upload)
+            RamseyA = ma.Ramsey_Analysis(auto=True,**kw)
         else:
-            self.measure_ramsey_2nd_exc(times=times,
-                                        artificial_detuning=artificial_detuning,
-                                        MC=MC,
-                                        cal_points=cal_points,
-                                        close_fig=close_fig)
+            self.measure_ramsey_2nd_exc(times=times, artificial_detuning=artificial_detuning, MC=MC,
+                                        cal_points=cal_points, close_fig=close_fig, upload=upload)
+            RamseyA = ma.Ramsey_Analysis(auto=True, NoCalPoints=6, **kw)
 
         #get new freq and T2* from analysis results
-        RamseyA = ma.Ramsey_Analysis(auto=True,**kw)
+
         fitted_freq = RamseyA.Ramsey_freq['freq']
         T2_star = RamseyA.T2_star
 
-        qubit_freq = self.f_qubit() + artificial_detuning - fitted_freq[0]
+        qubit_freq = self.f_qubit() + artificial_detuning - fitted_freq
 
-        print('New qubit frequency = {:.f10} \t stderr = {:.f10}'.format(
+        print('New qubit frequency = {:.10f} \t stderr = {:.10f}'.format(
             qubit_freq,RamseyA.Ramsey_freq['freq_stderr']))
         print('T2_Star = {:.5f} \t stderr = {:.5f}'.format(
             T2_star['T2_star'],T2_star['T2_star_stderr']))
@@ -1748,11 +1750,11 @@ class QuDev_transmon(Qubit):
     def get_RO_pars(self):
         return self.get_operation_dict()['RO ' + self.name]
 
-    def get_drive_pars(self, ef_transition=False):
-        if ef_transition:
-            return self.get_operation_dict()['X180_ef ' + self.name]
-        else:
-            return self.get_operation_dict()['X180 ' + self.name]
+    def get_drive_pars(self):
+        return self.get_operation_dict()['X180 ' + self.name]
+
+    def get_ef_drive_pars(self):
+        return self.get_operation_dict()['X180_ef ' + self.name]
 
     def get_flux_pars(self):
         return self.get_operation_dict()['flux ' + self.name]
@@ -1764,8 +1766,27 @@ class QuDev_transmon(Qubit):
         operation_dict['Spec ' + self.name]['operation_type'] = 'MW'
         operation_dict['RO ' + self.name]['operation_type'] = 'RO'
         operation_dict['X180 ' + self.name]['operation_type'] = 'MW'
+        operation_dict['X180_ef ' + self.name]['operation_type'] = 'MW'
+        operation_dict['X180_ef ' + self.name]['I_channel'] = \
+            operation_dict['X180 ' + self.name]['I_channel']
+        operation_dict['X180_ef ' + self.name]['Q_channel'] = \
+            operation_dict['X180 ' + self.name]['Q_channel']
+        operation_dict['X180_ef ' + self.name]['phi_skew'] = \
+            operation_dict['X180 ' + self.name]['phi_skew']
+        operation_dict['X180_ef ' + self.name]['alpha'] = \
+            operation_dict['X180 ' + self.name]['alpha']
+
+        if self.f_ef_qubit() == 0:
+            operation_dict['X180_ef ' + self.name]['mod_frequency'] = None
+        else:
+            operation_dict['X180_ef ' + self.name]['mod_frequency'] = \
+                self.f_ef_qubit() - self.f_qubit() + self.f_pulse_mod()
+
         operation_dict.update(add_suffix_to_dict_keys(
             sq.get_pulse_dict_from_pars(operation_dict['X180 ' + self.name]),
             ' ' + self.name))
+        operation_dict.update(add_suffix_to_dict_keys(
+            sq.get_pulse_dict_from_pars(operation_dict['X180_ef ' + self.name]),
+            '_ef ' + self.name))
         return operation_dict
 

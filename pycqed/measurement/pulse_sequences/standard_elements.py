@@ -69,22 +69,17 @@ def multi_pulse_elt(i, station, pulse_list, sequencer_config=None):
         name='{}-pulse-elt_{}'.format(len(pulse_list), i),
         pulsar=station.pulsar,
         readout_fixed_point=sequencer_config['RO_fixed_point'])
+    refpulse0 = None
     for c_name in station.pulsar.channels:  # Exists to ensure there are no empty channels
-        el.add(pulse.SquarePulse(name='refpulse_0', channel=c_name,
-                                 amplitude=0, length=1e-9))
-
-    # Trigger the slave AWG-s
-    slave_triggers = sequencer_config.get('slave_AWG_trig_channels', [])
-    for c_name in slave_triggers:
-        el.add(pulse.SquarePulse(name='slave_trigger', channel=c_name,
-                                 amplitude=1, length=20e-9))
+        refpulse0 = el.add(pulse.SquarePulse(name='refpulse_0', channel=c_name,
+                                             amplitude=0, length=1e-9))
 
     # exists to ensure that channel is not high when waiting for trigger
     # and to allow negavtive pulse delay of elements up to 300 ns
     # last_pulse = el.add(
     #     pulse.SquarePulse(name='refpulse_0', channel='ch1', amplitude=0,
     #                       length=1e-9,), start=300e-9)
-    last_pulse = None
+    last_pulse = refpulse0
 
     ##############################
     # Add all pulses one by one  #
@@ -235,6 +230,12 @@ def multi_pulse_elt(i, station, pulse_list, sequencer_config=None):
     #                                      channel='ch1',
     #                                      amplitude=0, length=final_len),
     #                    refpulse=last_pulse, refpoint='end')
+
+    # Trigger the slave AWG-s
+    slave_triggers = sequencer_config.get('slave_AWG_trig_channels', [])
+    for c_name in slave_triggers:
+        el.add(pulse.SquarePulse(name='slave_trigger', channel=c_name,
+                                 amplitude=1, length=20e-9), start=10e-9)
 
     return el
 
