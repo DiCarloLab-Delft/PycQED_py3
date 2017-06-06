@@ -1969,7 +1969,7 @@ class SSRO_Analysis(MeasurementAnalysis):
             axarray[1].set_xlim(-edge, edge)
             axarray[1].set_ylim(-edge, edge)
 
-            self.save_fig(fig, figname='SSRO_Density_Plots', **kw)
+            self.save_fig(fig, figname='SSRO_Density_Plots', close_fig=True, **kw)
 
         # this part performs 2D gaussian fits and calculates coordinates of the
         # maxima
@@ -2112,8 +2112,7 @@ class SSRO_Analysis(MeasurementAnalysis):
 
         #plt.hist(SS_Q_data, bins=40,label = '0 Q')
         plt.legend(loc=2)
-        self.save_fig(fig, figname='raw-cumulative-histograms', **kw)
-        plt.show()
+        self.save_fig(fig, figname='raw-cumulative-histograms', **kw, close_fig=True)
 
         # saving the results
         if 'SSRO_Fidelity' not in self.analysis_group:
@@ -2249,7 +2248,6 @@ class SSRO_Analysis(MeasurementAnalysis):
         mu0_0 = fit_res_double_0.params['mu0'].value
         mu1_0 = fit_res_double_0.params['mu1'].value
         frac1_0 = fit_res_double_0.params['frac1'].value
-        print('frac1 in 0: {:.4f}'.format(frac1_0))
 
         def NormCdf(x, mu, sigma):
             t = x-mu
@@ -2331,8 +2329,7 @@ class SSRO_Analysis(MeasurementAnalysis):
 
         leg = ax.legend(loc='best')
         leg.get_frame().set_alpha(0.5)
-        self.save_fig(fig, figname='S-curves', **kw)
-        plt.show()
+        self.save_fig(fig, figname='S-curves', close_fig=True, **kw)
 
         # plotting the histograms
         fig, axes = plt.subplots(figsize=(8, 4))
@@ -2393,8 +2390,7 @@ class SSRO_Analysis(MeasurementAnalysis):
         leg2 = ax.legend(loc='best')
         leg2.get_frame().set_alpha(0.5)
         #plt.hist(SS_Q_data, bins=40,label = '0 Q')
-        self.save_fig(fig, figname='Histograms', **kw)
-        plt.show()
+        self.save_fig(fig, figname='Histograms', close_fig=True, **kw)
 
         self.save_fitted_parameters(fit_res_double_0,
                                     var_name='fit_res_double_0')
@@ -3160,6 +3156,12 @@ class DriveDetuning_Analysis(TD_Analysis):
 
             params = fit_mods.Cos_guess(model, data=data,
                                  t=sweep_points)
+            # This ensures that phase is *always* ~90 deg if it is different
+            # this shows up in the amplitude and prevents the correct detuning
+            # is shown.
+            params['phase'].min = np.deg2rad(80)
+            params['phase'].max = np.deg2rad(100)
+
 
             fit_results = model.fit(data=data, t=sweep_points,
                                              params=params)
