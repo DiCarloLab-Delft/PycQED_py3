@@ -45,6 +45,7 @@ class RTO1024_scope(visa.VisaInstrument):
             acq_rate   (int): acquisition rate
         '''
         # NOTE: I think these settings don't work at the moment.
+        # TODO: load settings from file
         opc = self.visa_handle.ask('STOP;*OPC?')
         self.visa_handle.write('TRIGger1:SOURce CHAN{}'
                                .format(self.trigger_ch()))
@@ -65,6 +66,7 @@ class RTO1024_scope(visa.VisaInstrument):
         self.visa_handle.write('ACQuire:COUNt %s'%str(self.num_averages()))
         self.visa_handle.write('RUNSingle')
         # Wait until measurement finishes before extracting data.
+        # TODO: ask device if operation is complete
         sleep(self.num_averages() * self.trigger_interval() + 1)
         self.visa_handle.write('EXPort:WAVeform:SOURce C1W1')
         self.visa_handle.write('CHANnel1:ARIThmetics AVERage')

@@ -229,10 +229,10 @@ class Distortion(Instrument):
             print('Loading {}'.format(f_name))
 
             suffix = f_name.split('.')[-1]
-            if suffix is 'txt':
+            if suffix == 'txt':
                 kernel_vec = np.loadtxt(f_name)
                 external_kernels.append(kernel_vec)
-            elif suffix is 'json':
+            elif suffix == 'json':
                 # Load from json file containing also metadata about fit model
                 with open(f_name) as infile:
                     kernel_dict = json.load(infile)
