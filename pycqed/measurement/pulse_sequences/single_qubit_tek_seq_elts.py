@@ -705,11 +705,13 @@ def QScale(qscales, pulse_pars, RO_pars,
               cal_points=True, verbose=False, upload=True, return_seq=False):
     '''
     Sequence used for calibrating the QScale factor used in the DRAG pulses.
-    Applies X(pi/2)X(pi), X(pi/2)Y(pi), X(pi/2)Y(-pi) for each value of QScale factor.
+    Applies X(pi/2)X(pi), X(pi/2)Y(pi), X(pi/2)Y(-pi) for each value of
+    QScale factor.
 
-    Beware that the elements alternate, in order to perform these 3 measurements per
-    QScale factor, the qscales sweep values must be repeated 3 times. This was chosen
-    to be more easily compatible with standard detector functions and sweep pts.
+    Beware that the elements alternate, in order to perform these 3
+    measurements per QScale factor, the qscales sweep values must be
+    repeated 3 times. This was chosen to be more easily compatible with
+    standard detector functions and sweep pts.
 
     Input pars:
         qscales:             array of qscale factors

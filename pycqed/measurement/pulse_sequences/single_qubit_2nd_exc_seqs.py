@@ -8,8 +8,8 @@ station = None
 
 
 def Rabi_2nd_exc_seq(amps, pulse_pars, pulse_pars_2nd, RO_pars, n=1,
-                     cal_points=True, no_cal_points=4, upload=True, return_seq=False,
-                     post_msmt_delay=3e-6, verbose=False):
+                     cal_points=True, no_cal_points=4, upload=True,
+                     return_seq=False, post_msmt_delay=3e-6, verbose=False):
     """
     Rabi sequence for the second excited state.
     Input pars:
@@ -35,7 +35,9 @@ def Rabi_2nd_exc_seq(amps, pulse_pars, pulse_pars_2nd, RO_pars, n=1,
                 elif (i == (len(amps)-4) or i == (len(amps)-3)):
                     el = multi_pulse_elt(i, station, [pulses['X180'], RO_pars])
                 elif (i == (len(amps)-2) or i == (len(amps)-1)):
-                    el = multi_pulse_elt(i, station, [pulses['X180'], pulses_2nd['X180'], RO_pars])
+                    el = multi_pulse_elt(i, station,
+                                         [pulses['X180'], pulses_2nd['X180'],
+                                          RO_pars])
             elif no_cal_points==4:
                 if (i == (len(amps)-4) or i == (len(amps)-3)):
                     el = multi_pulse_elt(i, station, [pulses['I'], RO_pars])
@@ -92,7 +94,8 @@ def Ramsey_2nd_exc_seq(times, pulse_pars, pulse_pars_2nd, RO_pars, n=1,
             el = multi_pulse_elt(i, station, [pulses['X180'], RO_pars])
         elif cal_points and (i == (len(times)-2) or
                              i == (len(times)-1)):
-            el = multi_pulse_elt(i, station, [pulses['X180'], pulses_2nd['X180'],
+            el = multi_pulse_elt(i, station,
+                                 [pulses['X180'], pulses_2nd['X180'],
                                  RO_pars])
         else:
             pulse_pars_x2 = deepcopy(pulses_2nd['X90'])
@@ -102,8 +105,8 @@ def Ramsey_2nd_exc_seq(times, pulse_pars, pulse_pars_2nd, RO_pars, n=1,
                 Dphase = ((tau-times[0]) * artificial_detuning * 360) % 360
             pulse_pars_x2['phase'] = Dphase
 
-            pulse_list = ([pulses['X180']]+n*[pulses_2nd['X90'], pulse_pars_x2] +
-                          [pulses['X180'], RO_pars])
+            pulse_list = ([pulses['X180']]+n*[pulses_2nd['X90'], pulse_pars_x2]
+                          + [pulses['X180'], RO_pars])
 
             # copy first element and set extra wait
             pulse_list[0] = deepcopy(pulse_list[0])
@@ -121,12 +124,18 @@ def T1_2nd_exc_seq(times,
     '''
     Rabi sequence for a single qubit using the tektronix.
     SSB_Drag pulse is used for driving, simple modulation used for RO
-    Input pars:
-        times:              array of times to wait after the 2nd excitation pi-pulse
-        pulse_pars:         dict containing the pulse parameters
-        pulse_pars_2nd:     dict containing the pulse parameters for ef excitation
-        RO_pars:            dict containing the RO parameters
+
+    Args:
+        times:
+            array of times to wait after the 2nd excitation pi-pulse
+        pulse_pars:
+            dict containing the pulse parameters
+        pulse_pars_2nd:
+            dict containing the pulse parameters for ef excitation
+        RO_pars:
+            dict containing the RO parameters
     '''
+
     seq_name = 'T1_2nd_exc_sequence'
     seq = sequence.Sequence(seq_name)
     station.pulsar.update_channel_settings()
@@ -141,10 +150,13 @@ def T1_2nd_exc_seq(times,
         elif cal_points and (i == (len(times)-4) or i == (len(times)-3)):
             el = multi_pulse_elt(i, station, [pulses['X180'], RO_pars])
         elif cal_points and (i == (len(times)-2) or i == (len(times)-1)):
-            el = multi_pulse_elt(i, station, [pulses['X180'], pulses_2nd['X180'], RO_pars])
+            el = multi_pulse_elt(i, station,
+                                 [pulses['X180'], pulses_2nd['X180'], RO_pars])
         else:
             pulses_x['pulse_delay'] = tau
-            el = multi_pulse_elt(i, station, [pulses['X180'], pulses_2nd['X180'], pulses_x, RO_pars])
+            el = multi_pulse_elt(i, station,
+                                 [pulses['X180'], pulses_2nd['X180'],
+                                  pulses_x, RO_pars])
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
 

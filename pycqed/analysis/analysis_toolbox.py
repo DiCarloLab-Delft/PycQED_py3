@@ -7,6 +7,7 @@ import os
 import time
 import datetime
 import warnings
+from copy import deepcopy
 from collections import OrderedDict as od
 from matplotlib import pyplot as plt
 from matplotlib import colors
@@ -870,7 +871,8 @@ def smooth(x, window_len=11, window='hanning'):
 
     if not window in ['flat', 'hanning', 'hamming', 'bartlett', 'blackman']:
         raise ValueError(
-            "Window is on of 'flat', 'hanning', 'hamming', 'bartlett', 'blackman'")
+            "Window is on of 'flat', 'hanning', 'hamming', 'bartlett', "
+            "'blackman'")
 
     s = np.r_[x[window_len-1:0:-1], x, x[-1:-window_len:-1]]
 
@@ -904,7 +906,9 @@ def cut_edges(array, window_len=11):
     array = array[(window_len//2):-(window_len//2)]
     return array
 
-def peak_finder(x, y, percentile=20, num_sigma_threshold=5, window_len=3):
+
+def peak_finder(x, y, percentile=20, num_sigma_threshold=5,
+                window_len=3, analyze_ef=False):
 
     '''
     Peak finding algorithm designed by Serwan
@@ -960,26 +964,36 @@ def peak_finder(x, y, percentile=20, num_sigma_threshold=5, window_len=3):
                                      np.argmax(y_smoothed[elem[0]:elem[1]])]
                 else:
                     peak_indices += [elem[0]]
-                #peak_widths += [x[elem[1]] - x[elem[0]]]
+                    #peak_widths += [x[elem[1]] - x[elem[0]]]
             except:
                 pass
 
-        peak_indices = np.unique(peak_indices)             #it will find same values more than once
+        #eliminate duplicates
+        peak_indices = np.unique(peak_indices)
 
         #Take an approximate peak width for each peak index
         for i,idx in enumerate(peak_indices):
-            if (idx+i+1)<x.size and (idx-i-1)>=0:          #ensure data points idx+i+1 and idx-i-1 are inside sweep pts
+            if (idx+i+1)<x.size and (idx-i-1)>=0:          #ensure data points
+                #idx+i+1 and idx-i-1
+                #are inside sweep pts
                 peak_widths += [ x[idx+i+1] - x[idx-i-1] ]
             elif (idx+i+1)>x.size and (idx-i-1)>=0:
                 peak_widths += [ x[idx] - x[idx-i] ]
             elif (idx+i+1)<x.size and (idx-i-1)<0:
                 peak_widths += [ x[idx+i] - x[idx] ]
 
-        peaks = np.take(x, peak_indices)                 # Frequencies of peaks
-        peak_vals = np.take(y_smoothed, peak_indices)    # values of peaks
-        peak_index = peak_indices[np.argmax(peak_vals)]  # idx of highest peak
-        peak = x[peak_index]                             #Frequency of highest peak
-        peak_width = peak_widths[np.argmax(peak_vals)]   #width of highest peak
+        peaks = np.take(x, peak_indices)                   #Frequencies of peaks
+        peak_vals = np.take(y_smoothed, peak_indices)           #values of peaks
+        if analyze_ef:
+            #idx of highest peak
+            peak_index = peak_indices[np.argmax(peak_widths)]
+            #width of highest peak
+            peak_width = peak_widths[np.argmax(peak_widths)]
+        else:
+            peak_index = peak_indices[np.argmax(peak_vals)]
+            peak_width = peak_widths[np.argmax(peak_vals)]
+        peak = x[peak_index]                          #Frequency of highest peak
+
 
     else:
         peak = None
@@ -1031,15 +1045,18 @@ def peak_finder(x, y, percentile=20, num_sigma_threshold=5, window_len=3):
                                     np.argmin(y_smoothed[elem[0]:elem[1]])]
                 else:
                     dip_indices += [elem[0]]
-                #dip_widths += [x[elem[1]] - x[elem[0]]]
+                    #dip_widths += [x[elem[1]] - x[elem[0]]]
             except:
                 pass
 
-        dip_indices = np.unique(dip_indices)              #it will find same values more than once
+        #eliminate duplicates
+        dip_indices = np.unique(dip_indices)
 
         #Take an approximate dip width for each dip index
         for i,idx in enumerate(dip_indices):
-            if (idx+i+1)<x.size and (idx-i-1)>=0:         #ensure data points idx+i+1 and idx-i-1 are inside sweep pts
+            if (idx+i+1)<x.size and (idx-i-1)>=0:         #ensure data points
+                #idx+i+1 and idx-i-1
+                #are inside sweep pts
                 dip_widths += [ x[idx+i+1] - x[idx-i-1] ]
             elif (idx+i+1)>x.size and (idx-i-1)>=0:
                 dip_widths += [ x[idx] - x[idx-i] ]
@@ -1048,9 +1065,13 @@ def peak_finder(x, y, percentile=20, num_sigma_threshold=5, window_len=3):
 
         dips = np.take(x, dip_indices)
         dip_vals = np.take(y_smoothed, dip_indices)
-        dip_index = dip_indices[np.argmin(dip_vals)]
+        if analyze_ef:
+            dip_index = dip_indices[np.argmax(dip_widths)]
+            dip_width = dip_widths[np.argmax(dip_widths)]
+        else:
+            dip_index = dip_indices[np.argmin(dip_vals)]
+            dip_width = dip_widths[np.argmax(dip_vals)]
         dip = x[dip_index]
-        dip_width = dip_widths[np.argmin(dip_vals)]
     else:
         dip = None
         dip_vals = None
@@ -1122,8 +1143,8 @@ def normalize_TD_data(data, data_zero, data_one):
 
 
 def normalize_data(data):
-    print(
-        'a_tools.normalize_data is deprecated, recommend using a_tools.normalize_data_v2()')
+    print('a_tools.normalize_data is deprecated, recommend using '
+        'a_tools.normalize_data_v2()')
     return data / np.mean(data)
 
 
@@ -1150,12 +1171,14 @@ def normalize_2D_data_on_elements(data_2D, elements):
 
 
 def rotate_and_normalize_data(data, cal_zero_points=None, cal_one_points=None,
-                              zero_coord=None, one_coord=None, **kw):
+                              zero_coord=None, one_coord=None,
+                              number_of_cal_points=4, **kw):
     '''
     Rotates and normalizes data with respect to some reference coordinates.
     there are two ways to specify the reference coordinates.
         1. Explicitly defining the coordinates
-        2. Specifying which elements of the input data correspond to zero and one
+        2. Specifying which elements of the input data correspond to
+            zero and one
     Inputs:
         data (numpy array) : 2D dataset that has to be rotated and normalized
         zero_coord (tuple) : coordinates of reference zero
@@ -1169,6 +1192,9 @@ def rotate_and_normalize_data(data, cal_zero_points=None, cal_one_points=None,
     if zero_coord is not None:
         I_zero = zero_coord[0]
         Q_zero = zero_coord[1]
+    elif (zero_coord is None) and (number_of_cal_points==2):
+        I_zero = data[0][cal_zero_points]
+        Q_zero = data[1][cal_zero_points]
     else:
         I_zero = np.mean(data[0][cal_zero_points])
         Q_zero = np.mean(data[1][cal_zero_points])
@@ -1176,61 +1202,105 @@ def rotate_and_normalize_data(data, cal_zero_points=None, cal_one_points=None,
     if one_coord is not None:
         I_one = one_coord[0]
         Q_one = one_coord[1]
+    elif (one_coord is None) and (number_of_cal_points==2):
+        I_one = 0
+        Q_one = 0
     else:
         I_one = np.mean(data[0][cal_one_points])
         Q_one = np.mean(data[1][cal_one_points])
         one_coord = (I_one, Q_one)
-    # Translate the date
+
+    # Translate the data
     trans_data = [data[0] - I_zero, data[1] - Q_zero]
-    # Rotate the data
-    M = calculate_rotation_matrix(I_one-I_zero, Q_one-Q_zero)
-    outp = [np.asarray(elem)[0] for elem in M * trans_data]
-    [rotated_data_ch1, rotated_data_ch2] = outp
-    # Normalize the data
-    one_zero_dist = np.sqrt((I_one-I_zero)**2 + (Q_one-Q_zero)**2)
-    normalized_data = rotated_data_ch1/one_zero_dist
+
+    if number_of_cal_points==2:
+
+        from lmfit.models import LinearModel
+
+        x = trans_data[0]
+        y = trans_data[1]
+
+        linear_model = LinearModel()
+        linear_model.set_param_hint('intercept',
+                                     value=0,
+                                     vary=False)
+        linear_model.set_param_hint('slope')
+        params = linear_model.make_params()
+        fit_res = linear_model.fit(data=y,
+                                   x=x,
+                                   params=params)
+
+        line_slope = fit_res.params['slope'].value
+        line_intercept = fit_res.params['intercept'].value
+        #finx the x, y coordinates of the projected points
+        x_proj=(x+line_slope*y-line_slope*line_intercept)/(line_slope**2+1)
+        y_proj= line_slope*(x_proj)+line_intercept
+
+        #find the minimum (on th ey axis) point on the line
+        y_min_line = min(fit_res.best_fit)
+        x_min_line = x[np.argmin(fit_res.best_fit)]
+
+        #find x,y coordinates with respect to end of line
+        x_data = np.abs(x_min_line - x_proj)
+        y_data = y_proj-y_min_line
+
+        #find distance from points on line to end of line
+        rotated_data = np.sqrt(x_data**2+y_data**2)
+
+        #normlaize data
+        max_min_distance = max(rotated_data) - min(rotated_data)
+        normalized_data = (rotated_data - min(rotated_data))/max_min_distance
+
+    else:
+        # Rotate the data
+        M = calculate_rotation_matrix(I_one-I_zero, Q_one-Q_zero)
+        outp = [np.asarray(elem)[0] for elem in M * trans_data]
+        [rotated_data_ch1, rotated_data_ch2] = outp
+
+        # Normalize the data
+        one_zero_dist = np.sqrt((I_one-I_zero)**2 + (Q_one-Q_zero)**2)
+        normalized_data = rotated_data_ch1/one_zero_dist
 
     return [normalized_data, zero_coord, one_coord]
 
 def rotate_and_normalize_data_no_cal_points(data, **kw):
 
     """
-    Rotates and normalizes data by fitting a line through the points
-    plotted in th comlex plane, and projecting onto that line.
+    Rotates and normalizes data based on principal component analysis.
+    (Source: http://www.cs.otago.ac.nz/cosc453/student_tutorials/
+    principal_components.pdf)
     """
 
-    from lmfit.models import LinearModel
+    #translate each column in the data by its mean
+    mean_x = np.mean(data[0])
+    mean_y = np.mean(data[1])
+    trans_x = data[0] - mean_x
+    trans_y = data[1] - mean_y
 
-    x = data[0]
-    y = data[1]
+    #compute the covariance 2x2 matrix
+    cov_matrix = np.cov(np.array([trans_x,trans_y]))
 
-    linear_model = LinearModel()
-    params = linear_model.guess(data=y,
-                                x=x)
-    fit_res = linear_model.fit(data=y,
-                               x=x,
-                               params=params)
+    #find eigenvalues and eigenvectors of the covariance matrix
+    [eigvals, eigvecs] = np.linalg.eig(cov_matrix)
 
-    line_slope = fit_res.params['slope'].value
-    line_intercept = fit_res.params['intercept'].value
-    #finx the x, y coordinates of the projected points
-    x_proj=(x+line_slope*y-line_slope*line_intercept)/(line_slope**2+1)
-    y_proj= line_slope*(x_proj)+line_intercept
-
-    #find the minimum (on th ey axis) point on the line
-    y_min_line = min(fit_res.best_fit)
-    x_min_line = x[np.argmin(fit_res.best_fit)]
-
-    #find x,y coordinates with respect to end of line
-    x_data = np.abs(x_min_line - x_proj)
-    y_data = y_proj-y_min_line
-
-    #find distance from points on line to end of line
-    rotated_data = np.sqrt(x_data**2+y_data**2)
+    #compute the transposed feature vector
+    row_feature_vector = np.array([(eigvecs[0,np.argmin(eigvals)],
+                                    eigvecs[1,np.argmin(eigvals)]),
+                                   (eigvecs[0,np.argmax(eigvals)],
+                                    eigvecs[1,np.argmax(eigvals)])])
+    #compute the row_data_trans matrix with (x,y) pairs in each column. Each
+    #row is a dimension (row1 = x_data, row2 = y_data)
+    row_data_trans = np.array([trans_x,trans_y])
+    #compute final, projected data; only the first row is of interest (it is the
+    #principal axis
+    final_data = np.dot(row_feature_vector, row_data_trans)
 
     #normlaize data
-    max_min_distance = max(rotated_data) - min(rotated_data)
-    normalized_data = (rotated_data - min(rotated_data))/max_min_distance
+    max_min_distance = np.sqrt(max(final_data[1,:])**2 +
+                               min(final_data[1,:])**2)
+    normalized_data = final_data[1,:]/max_min_distance
+    max_min_difference = max(normalized_data -  min(normalized_data))
+    normalized_data = (normalized_data-min(normalized_data))/max_min_difference
 
     return normalized_data
 
@@ -1607,7 +1677,8 @@ def fit_EC_EJ(f01, f12, **kw):
     reduced_flux = kw.pop('reduced_flux',0)
     dim = kw.pop('dim',None)
 
-    penaltyfn = lambda Es: calculate_transmon_transitions(*Es,asym=asym,reduced_flux=reduced_flux,dim=dim)-[f01, f12]
+    penaltyfn = lambda Es: calculate_transmon_transitions(
+        *Es,asym=asym,reduced_flux=reduced_flux,dim=dim)-[f01, f12]
     (EC, EJ), success = optimize.leastsq(penaltyfn, (EC0, EJ0))
     return EC, EJ
 

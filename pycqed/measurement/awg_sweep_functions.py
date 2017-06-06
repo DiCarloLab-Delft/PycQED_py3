@@ -75,8 +75,8 @@ class awg_seq_swf(swf.Hard_Sweep):
 
 class Rabi(swf.Hard_Sweep):
 
-    def __init__(self, pulse_pars, RO_pars, n=1, cal_points=True, no_cal_points=2,
-                 upload=True, return_seq=False):
+    def __init__(self, pulse_pars, RO_pars, n=1, cal_points=True,
+                 no_cal_points=2, upload=True, return_seq=False):
         super().__init__()
         self.pulse_pars = pulse_pars
         self.RO_pars = RO_pars
@@ -94,13 +94,15 @@ class Rabi(swf.Hard_Sweep):
             sqs.Rabi_seq(amps=self.sweep_points,
                          pulse_pars=self.pulse_pars,
                          RO_pars=self.RO_pars,
-                         cal_points=self.cal_points, no_cal_points=self.no_cal_points,
+                         cal_points=self.cal_points,
+                         no_cal_points=self.no_cal_points,
                          n=self.n, return_seq=self.return_seq)
 
 class Rabi_2nd_exc(swf.Hard_Sweep):
 
-    def __init__(self, pulse_pars, pulse_pars_2nd, RO_pars, amps=None,
-                 n=1, cal_points=True, no_cal_points=4, upload=True, return_seq=False):
+    def __init__(self, pulse_pars, pulse_pars_2nd, RO_pars,
+                 n=1, cal_points=True, no_cal_points=4, upload=True,
+                 return_seq=False):
         super().__init__()
         self.pulse_pars = pulse_pars
         self.pulse_pars_2nd = pulse_pars_2nd
@@ -113,14 +115,6 @@ class Rabi_2nd_exc(swf.Hard_Sweep):
         self.parameter_name = 'amplitude'
         self.unit = 'V'
         self.return_seq = return_seq
-        if cal_points and amps is not None:
-            self.sweep_points = np.concatenate([amps,
-                                                [amps[-1]*1.05,
-                                                 amps[-1]*1.06,
-                                                 amps[-1]*1.07,
-                                                 amps[-1]*1.08,
-                                                 amps[-1]*1.09,
-                                                 amps[-1]*1.1]])
 
     def prepare(self, **kw):
         if self.upload:
@@ -128,7 +122,8 @@ class Rabi_2nd_exc(swf.Hard_Sweep):
                                   pulse_pars=self.pulse_pars,
                                   pulse_pars_2nd=self.pulse_pars_2nd,
                                   RO_pars=self.RO_pars, upload=self.upload,
-                                  cal_points=self.cal_points, no_cal_points=self.no_cal_points,
+                                  cal_points=self.cal_points,
+                                  no_cal_points=self.no_cal_points,
                                   n=self.n, return_seq=self.return_seq)
 
 class two_qubit_tomo_cardinal(swf.Hard_Sweep):
@@ -847,7 +842,7 @@ class T1(swf.Hard_Sweep):
 class T1_2nd_exc(swf.Hard_Sweep):
 
     def __init__(self, pulse_pars, pulse_pars_2nd, RO_pars,
-                 times=None, cal_points=True, upload=True):
+                 cal_points=True, upload=True):
         super().__init__()
         self.pulse_pars = pulse_pars
         self.pulse_pars_2nd = pulse_pars_2nd
@@ -857,15 +852,6 @@ class T1_2nd_exc(swf.Hard_Sweep):
         self.name = 'T1 2nd excited state'
         self.parameter_name = 't'
         self.unit = 's'
-
-        if cal_points and times is not None:
-            self.sweep_points = np.concatenate([times,
-                                                [times[-1]*1.05,
-                                                 times[-1]*1.06,
-                                                 times[-1]*1.07,
-                                                 times[-1]*1.08,
-                                                 times[-1]*1.09,
-                                                 times[-1]*1.1]])
 
     def prepare(self, **kw):
         if self.upload:
@@ -1012,8 +998,9 @@ class Ramsey(swf.Hard_Sweep):
 
 class Ramsey_2nd_exc(swf.Hard_Sweep):
 
-    def __init__(self, pulse_pars, pulse_pars_2nd, RO_pars, artificial_detuning=None,
-                 times=None, n=1, cal_points=True, upload=True):
+    def __init__(self, pulse_pars, pulse_pars_2nd, RO_pars,
+                 artificial_detuning=None,
+                 n=1, cal_points=True, upload=True):
         super().__init__()
         self.pulse_pars = pulse_pars
         self.pulse_pars_2nd = pulse_pars_2nd
@@ -1025,14 +1012,6 @@ class Ramsey_2nd_exc(swf.Hard_Sweep):
         self.name = 'Rabi 2nd excited state'
         self.parameter_name = 't'
         self.unit = 's'
-        if cal_points and times is not None:
-            self.sweep_points = np.concatenate([times,
-                                                [times[-1]*1.05,
-                                                 times[-1]*1.06,
-                                                 times[-1]*1.07,
-                                                 times[-1]*1.08,
-                                                 times[-1]*1.09,
-                                                 times[-1]*1.1]])
 
     def prepare(self, **kw):
         if self.upload:
@@ -1040,7 +1019,8 @@ class Ramsey_2nd_exc(swf.Hard_Sweep):
                                     pulse_pars=self.pulse_pars,
                                     pulse_pars_2nd=self.pulse_pars_2nd,
                                     RO_pars=self.RO_pars,
-                                    artificial_detuning = self.artificial_detuning,
+                                    artificial_detuning =
+                                            self.artificial_detuning,
                                     n=self.n, cal_points=self.cal_points)
 
 class FluxDetuning(swf.Hard_Sweep):
