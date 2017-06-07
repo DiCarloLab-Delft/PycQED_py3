@@ -9,7 +9,7 @@ from os.path import join
 
 
 def heaviside(t):
-    return t >= 0
+    return np.double(t >= 0)
 
 
 def square(t, width=1, t0=0):
@@ -42,7 +42,7 @@ def filter_matrix_generic2(fun, t, *params):
                 A[i, j] = heaviside(i-j)*fun(t[i]-t[j], *params)
     return A
 
-
+#don't touch open here
 def save_kernel(kernel, save_file=None):
     '''Save kernel to specified kernels directory.'''
     # TODO: make this into a smarter safe function using the datadir of the
@@ -130,12 +130,12 @@ step_onchip = lambda t, pairs: heaviside(
     t)*(1 + np.sum(np.array(map(lambda pair: pair[0]*np.exp(-t/pair[1]), pairs)), 0))
 htilde_onchip = lambda t, pairs: htilde(step_onchip, t, pairs)
 
-
+#kill the open line, take the data as an array in the function input
 def step_scope(t=None, params=None):
     # open file
-    f = open(kernel_dir+params['file_name'], 'r')
-    step = np.double(f.readlines())
-    f.close()
+    
+    step = params['vector']
+    
     max_len_output = len(step)-2*params['points_per_ns']
     print('max trace time = %.3f ns' %
           (max_len_output/params['points_per_ns']))
@@ -161,12 +161,12 @@ def step_scope(t=None, params=None):
 
 htilde_scope = lambda t=None, params=None: htilde(step_scope, t, params)
 
+# replaced filename in the input as vector
+def step_raw(vector, process_step=True, step_params=None, norm_type='max'):
 
-def step_raw(file_name, process_step=True, step_params=None, norm_type='max'):
-
-    f = open(kernel_dir+file_name, 'r')
-    step = np.double(f.readlines())
-    f.close()
+    #killed file reading here
+    step = vector
+    
 
     if process_step:
         if step_params is None:
@@ -249,10 +249,10 @@ def step_raw(file_name, process_step=True, step_params=None, norm_type='max'):
         return step
 
 
-def step_zeros(file_name, process_step=True, step_params=None, norm_type='max'):
+def step_zeros(vector, process_step=True, step_params=None, norm_type='max'):
 
     my_step_raw, my_step_params = step_raw(
-        file_name, step_params=step_params, norm_type='max')
+        vector, step_params=step_params, norm_type='max')
     my_step_zeros = np.zeros(my_step_raw.shape)
     my_step_zeros[my_step_params['step_start']:] = my_step_raw[
         my_step_params['step_start']:]
@@ -260,11 +260,11 @@ def step_zeros(file_name, process_step=True, step_params=None, norm_type='max'):
     return my_step_zeros, my_step_params
 
 
-def step_sampled(file_name, step_width_ns, points_per_ns, step_params=None, norm_type='max'):
+def step_sampled(vector, step_width_ns, points_per_ns, step_params=None, norm_type='max'):
 
     my_step_width_points = step_width_ns * points_per_ns
     my_step, my_step_params = step_raw(
-        file_name, step_params=step_params, norm_type=norm_type)
+        vector, step_params=step_params, norm_type=norm_type)
 #     idx_sample = np.arange(my_step_params['step_start'],my_step_params['step_end']-my_step_width_points,my_step_width_points)-my_step_width_points
 #     t_sample = (idx_sample-(my_step_params['step_start']-my_step_width_points))/points_per_ns
     idx_sample = np.arange(my_step_params['step_start'], my_step_params[
@@ -283,11 +283,11 @@ def htilde_raw(step_vec, t=None, width=1):
     return step_vec[t+width]-step_vec[t]
 
 
-def htilde_sampled(file_name, step_width_ns, points_per_ns, step_params=None, norm_type='max'):
+def htilde_sampled(vector, step_width_ns, points_per_ns, step_params=None, norm_type='max'):
 
     my_step_width_points = step_width_ns * points_per_ns
     my_step, my_step_params = step_zeros(
-        file_name, step_params=step_params, norm_type=norm_type)
+        vector, step_params=step_params, norm_type=norm_type)
     my_htilde = htilde_raw(my_step, width=my_step_width_points)
     idx_sample = np.arange(my_step_params['step_start'], my_step_params[
                            'step_end']-my_step_width_points, my_step_width_points)-my_step_width_points
@@ -297,11 +297,11 @@ def htilde_sampled(file_name, step_width_ns, points_per_ns, step_params=None, no
     return my_htilde[idx_sample.astype(int)+int(my_step_width_points/2)], t_sample+step_width_ns/2
 
 
-def kernel_sampled(file_name, step_width_ns, points_per_ns, step_params=None,
+def kernel_sampled(vector, step_width_ns, points_per_ns, step_params=None,
                    max_points=600, return_step=True, norm_type='max'):
 
     my_htilde_sampled, my_htilde_t_sampled = htilde_sampled(
-        file_name, step_width_ns, points_per_ns, step_params=step_params,
+        vector, step_width_ns, points_per_ns, step_params=step_params,
         norm_type=norm_type)
     if max_points is None:
         max_points = len(my_htilde_sampled)
@@ -319,7 +319,7 @@ def kernel_sampled(file_name, step_width_ns, points_per_ns, step_params=None,
         return my_kernel
 
 
-def get_all_sampled(file_name, step_width_ns, points_per_ns, max_points=600,
+def get_all_sampled(vector, step_width_ns, points_per_ns, max_points=600,
                     step_params=None, norm_type='max'):
     """
     step_width_ns (ints):  not all points are selected for inversion,
@@ -335,9 +335,7 @@ def get_all_sampled(file_name, step_width_ns, points_per_ns, max_points=600,
          FIXME raw should be renamed rescaled (or normalized or shifted)
     """
 
-    f = open(kernel_dir+file_name, 'r')
-    step_direct = np.double(f.readlines())
-    f.close()
+    f = vector
 
 def get_all_sampled_vector(vector, step_width_ns, points_per_ns, max_points=600,
                     step_params=None, norm_type='max'):
@@ -360,7 +358,7 @@ def get_all_sampled_vector(vector, step_width_ns, points_per_ns, max_points=600,
 #     print step_params
 
     my_step_raw, my_step_params = step_raw(
-        file_name, step_params=step_params, norm_type='max')
+        step_direct, step_params=step_params, norm_type='max')
     t_my_step_raw = (np.arange(len(my_step_raw)) -
                      my_step_params['step_start'])/np.float(points_per_ns)
     my_step_width_points = step_width_ns * points_per_ns
@@ -373,14 +371,14 @@ def get_all_sampled_vector(vector, step_width_ns, points_per_ns, max_points=600,
     t_my_htilde_raw = (np.arange(my_step_width_points, len(
         my_step_zeros))-my_step_params['step_start'])/np.float(points_per_ns)
     my_step_sampled, t_my_step_sampled = step_sampled(
-        file_name, step_width_ns, points_per_ns, step_params=step_params,
+        step_direct, step_width_ns, points_per_ns, step_params=step_params,
         norm_type=norm_type)
     my_htilde_sampled, t_my_htilde_sampled = htilde_sampled(
-        file_name, step_width_ns, points_per_ns, step_params=step_params,
+        step_direct, step_width_ns, points_per_ns, step_params=step_params,
         norm_type=norm_type)
 
     my_kernel_simple, my_kernel_step = kernel_sampled(
-        file_name, step_width_ns, points_per_ns, step_params=step_params,
+        step_direct, step_width_ns, points_per_ns, step_params=step_params,
         max_points=max_points, return_step=True, norm_type=norm_type)
     t_my_kernel = np.arange(len(my_kernel_step))*step_width_ns
 
