@@ -16,6 +16,8 @@ from qcodes import validators as vals
 import logging
 import time
 from qcodes import StandardParameter
+import os
+import json
 
 log = logging.getLogger(__name__)
 
@@ -56,78 +58,64 @@ class DDMq(SCPI):
 
         self.connect_message()
 
-    def _ask(self, data):
-        if (isinstance(data, str)):
-            return self.ask(data)
-        else:
-            return data()
-
-    def _write(self, func, data):
-        if (isinstance(func, str)):
-            return self.write(func.format(data))
-        else:
-            return func(data)
-
-    # Read the min and max values of the parameter from the ddm and update the
-    # min and max values of the validator
-    def _updateValidator(self, name, **kwargs):
-        try:
-            if ('vals' in kwargs and 'set_cmd' in kwargs
-                    and 'get_cmd' in kwargs):
-                validator = kwargs['vals']
-                if (isinstance(validator, vals.Numbers)):
-                    initialValue = self._ask(kwargs['get_cmd'])
-                    self._write(kwargs['set_cmd'], str(INT32_MAX))
-                    maxValue = self._ask(kwargs['get_cmd'])
-                    self._write(kwargs['set_cmd'], str(INT32_MIN))
-                    minValue = self._ask(kwargs['get_cmd'])
-                    self._write(kwargs['set_cmd'], initialValue)
-                    if (str(validator._min_value) != minValue
-                            or str(validator._max_value) != maxValue):
-                        kwargs['vals'] = vals.Numbers(float(minValue), float(maxValue))
-                        log.debug("The range values of a parameter differ " +
-                                 "between python driver and the ddm. \n\t(" +
-                                 "parameter: " + name + ")\n\t(python driver" +
-                                 ": (" + str(validator._min_value) + ", " +
-                                 str(validator._max_value) + "))\n\t(ddm: (" +
-                                 minValue+", " + maxValue + "))")
-                elif (isinstance(validator, vals.Arrays)):
-                    initialValue_str = self._ask(kwargs['get_cmd'])
-                    initialValue = list(map(int, initialValue_str))
-                    count = max(1, len(initialValue))
-                    char_max = []
-                    char_min = []
-                    for i in range(count):
-                        char_max.append(CHAR_MAX)
-                        char_min.append(CHAR_MIN)
-                    self._write(kwargs['set_cmd'], char_max)
-                    maxValue = self._ask(kwargs['get_cmd'])[0]
-                    self._write(kwargs['set_cmd'], char_min)
-                    minValue = self._ask(kwargs['get_cmd'])[0]
-                    self._write(kwargs['set_cmd'], initialValue)
-                    if (validator._min_value != minValue
-                            or validator._max_value != maxValue):
-                        kwargs['vals'] = vals.Arrays(minValue, maxValue)
-                        log.debug("The range values of a parameter differ " +
-                                 "between python driver and the ddm. \n\t(" +
-                                 "parameter: " + name + ")\n\t(python driver" +
-                                 str(validator._min_value) + ", " +
-                                 str(validator._max_value) + "))\n\t(ddm: (" +
-                                 str(minValue) + ", " + str(maxValue) + "))")
-                else:
-                    log.debug("Not implemented: Retreiving min and max values" +
-                             " of a parameter from the ddm of type '" +
-                             type(validator) + "'")
-        except Exception as e:
-            log.debug("Exception was thrown while retreiving the min and max" +
-                     " values of a parameter '" + name + "' from the ddm.(%s)", str(e))
-
-    def add_parameter(self, name, parameter_class=StandardParameter,
-                      **kwargs):
-        self._updateValidator(name, **kwargs)
-        super(DDMq, self).add_parameter(name, parameter_class, **kwargs)
-
     def add_parameters(self):
+        # Check if the firware version match the version of the parameter list
+        firmware_version = ""
+        try:
+            version_info = self.get_idn()
+            firmware_version = version_info['fwVersion']
+        except:
+            log.warning("firmware version was not found".format(
+                self._s_file_name))
+        path = os.path.abspath(__file__)
+        dir_path = os.path.dirname(path)
+        self._s_file_name = os.path.join(
+            dir_path, 'QuTech_DDM_Parameter_Files', 'QuTech_DDM_Parameters.txt')
+        parameter_file_version = ""
+        ddm_parameters = []
+        try:
+            f = open(self._s_file_name).read()
+            f_content = json.loads(f)
+            ddm_parameters = f_content["parameters"]
+            parameter_file_version = f_content["version"]["firmware"]
+        except:
+            log.warning("parameter file for gettable parameters {} not found".format(
+                self._s_file_name))
+        if (firmware_version != parameter_file_version):
+            # Update the parameter list to firmware version of the ddm
+            print("TODO: update QuTech_DDM_Parameters.txt")
+
+        # Add the parameters to 'self'
+       for parameter in ddm_parameters:
+            if (("name" in parameter) == False):
+                log.warning("the parameter list contains a function without a" +
+                            " name")
+                continue
+
+            name = parameter["name"]
+            del parameter["name"]
+
+            if ("vals" in parameter):
+                validator = parameter["vals"]
+                try:
+                    min_val = validator["min_val"]
+                    max_val = validator["max_val"]
+                    val_type = validator["type"]
+                    if (val_type == "int32_t"):
+                        parameter["vals"] = vals.Numbers(min_val, max_val)
+                    else:
+                        log.warning("Failed to set the validator for the parameter " + name + ", because of a unknow validator type: '" + val_type + "'")
+                except:
+                    log.warning("Failed to set the validator for the parameter " + name)
+
+            try:
+                self.add_parameter(name, **parameter)
+            except:
+                log.warning("Failed to create the parameter " + name + ", because of a unknown keyword in this parameter")
+
+        self.add_custom_parameters()
+
+    def add_custom_parameters(self):
         #######################################################################
         # DDM specific
         #######################################################################
