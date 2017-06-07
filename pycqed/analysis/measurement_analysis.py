@@ -464,7 +464,6 @@ class MeasurementAnalysis(object):
                 self.save_fig(fig, xlabel=xlabel, ylabel=ylabel, **kw)
         return
 
-
     def plot_complex_results(self, cmp_data, fig, ax, show=False, marker='.', **kw):
         '''
         Plot real and imaginary values measured vs a sweeped parameter
@@ -490,7 +489,6 @@ class MeasurementAnalysis(object):
             self.save_fig(fig, xlabel=xlabel, ylabel=ylabel, **kw)
 
         return
-
 
     def plot_dB_from_linear(self, x, lin_amp, fig, ax, show=False, marker='.', **kw):
         '''
@@ -518,7 +516,6 @@ class MeasurementAnalysis(object):
             self.save_fig(fig, xlabel=xlabel, ylabel=ylabel, **kw)
 
         return
-
 
     def get_naming_and_values_2D(self):
         '''
@@ -1969,7 +1966,8 @@ class SSRO_Analysis(MeasurementAnalysis):
             axarray[1].set_xlim(-edge, edge)
             axarray[1].set_ylim(-edge, edge)
 
-            self.save_fig(fig, figname='SSRO_Density_Plots', close_fig=True, **kw)
+            self.save_fig(fig, figname='SSRO_Density_Plots',
+                          close_fig=True, **kw)
 
         # this part performs 2D gaussian fits and calculates coordinates of the
         # maxima
@@ -3152,19 +3150,19 @@ class DriveDetuning_Analysis(TD_Analysis):
 
         def sine_fit_data():
             self.fit_type = 'sine'
+
             model = fit_mods.lmfit.Model(fit_mods.CosFunc)
 
             params = fit_mods.Cos_guess(model, data=data,
-                                 t=sweep_points)
+                                        t=sweep_points)
             # This ensures that phase is *always* ~90 deg if it is different
             # this shows up in the amplitude and prevents the correct detuning
             # is shown.
             params['phase'].min = np.deg2rad(80)
             params['phase'].max = np.deg2rad(100)
 
-
             fit_results = model.fit(data=data, t=sweep_points,
-                                             params=params)
+                                    params=params)
             return fit_results
 
         def quadratic_fit_data():
@@ -4028,6 +4026,7 @@ class VNA_Analysis(MeasurementAnalysis):
     '''
     Nice to use with all measurements performed with the VNA.
     '''
+
     def __init__(self, label='VNA', **kw):
         kw['label'] = label
         kw['h5mode'] = 'r+'
@@ -4274,10 +4273,12 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
                 abs(max(self.data_dist) - min(self.data_dist))
 
             if kappa_guess == 0:
-                    kappa_guess = 1 # When kappa_guess is zero, the fitting procedure fails (claims 'input has nan values')
+                # When kappa_guess is zero, the fitting procedure fails (claims
+                # 'input has nan values')
+                kappa_guess = 1
 
-            if not peak_flag: # Change the sign of amplitude_guess for dips
-                amplitude_guess*=-1.
+            if not peak_flag:  # Change the sign of amplitude_guess for dips
+                amplitude_guess *= -1.
 
             LorentzianModel = fit_mods.LorentzianModel
             LorentzianModel.set_param_hint('f0',
