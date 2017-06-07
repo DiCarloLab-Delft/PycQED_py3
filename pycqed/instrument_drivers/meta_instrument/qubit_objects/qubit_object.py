@@ -436,6 +436,12 @@ class Transmon(Qubit):
                 close_fig=close_fig)
         return self.f_qubit()
 
+    def find_frequency_pulsed():
+        pass
+
+    def find_frequency_cw_spec():
+        pass
+
     def find_resonator_frequency(self, use_min=False,
                                  update=True,
                                  freqs=None,
@@ -462,6 +468,7 @@ class Transmon(Qubit):
             self.f_res.set(f_res)
         self.f_RO(self.f_res())
         return f_res
+
 
     def calibrate_pulse_amplitude_coarse(self,
                                          amps=np.linspace(-.5, .5, 31),
@@ -525,7 +532,7 @@ class Transmon(Qubit):
                 print('Q_amp180_scale_factor: {:.4f}, new Q_amp180: {}'.format(
                       Q_amp180_scale_factor, self.Q_amp180()))
 
-            if abs(Q_amp180_scale_factor-1) < fine_accuracy:
+            if (abs(Q_amp180_scale_factor-1) < fine_accuracy) and (not fine):
                 if verbose:
                     print('Getting close to optimum, increasing sensitivity')
                 fine = True
