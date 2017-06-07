@@ -37,6 +37,10 @@ class DDMq(SCPI):
         self.device_descriptor = type('', (), {})()
         self.device_descriptor.model = 'DDM'
 
+        # Wait a small momement, to make sure that the scpi connection is
+        # established before using the connection
+        time.sleep(0.1)
+
         # Ask the ddm how many adcs and qubits per adc it has.
         numAdcs = int(self.ask('qutech:nadcs? '))
         self.device_descriptor.numChannels = numAdcs * 2
@@ -46,11 +50,11 @@ class DDMq(SCPI):
                 int(self.ask('qutech:adc{:d}:nqbits? '.format(i+1))))
 
         self.add_parameters()
-        self.connect_message()
 
-        # The next line is needed, because the real-time clock is not working
-        # correctly at the moment
+        # Because the real-time clock is not working correctly
         self.set_time(int(time.time()))
+
+        self.connect_message()
 
     def _ask(self, data):
         if (isinstance(data, str)):
@@ -137,6 +141,24 @@ class DDMq(SCPI):
             channels either for ch1,ch2 or ch3,ch4.
             """
             ch_pair = i+1
+
+            stemperature_int_cmd = 'qutech:adc{}:temperature'.format(ch_pair)
+            self.add_parameter('ch_pair{}_temperature'.format(ch_pair),
+                               label=('Get the temperature of the adc'),
+                               docstring='It return the current temperature' +
+                               ' of the adc in °C.',
+                               get_cmd=stemperature_int_cmd + '?'
+                               )
+            scalibrated_temperature_int_cmd = ('qutech:adc{}:calibrated:' +
+                                    'temperature').format(ch_pair)
+            self.add_parameter('ch_pair{}_temperature_at_calibration'.format(
+                               ch_pair),
+                               label=('Get the temperature of the adc at the' +
+                               ' last calibration'),
+                               docstring='It return the temperature' +
+                               ' of the adc at the last calibration in °C.',
+                               get_cmd=scalibrated_temperature_int_cmd + '?'
+                               )
             srun_cmd = 'qutech:run{}'.format(ch_pair)
             self.add_parameter('ch_pair{}_run'.format(ch_pair),
                                label=('Run ch_pair{}'.format(ch_pair)),
@@ -855,8 +877,9 @@ class DDMq(SCPI):
                 end = len(errorList)
                 looping = False
             errorLevel = int(errorList[start:end])
-            errors.append(self.Error(errorCode, description,
-                                     errorLevel, acquisitionMode))
+            if (errorCode):
+                errors.append(self.Error(errorCode, description,
+                                         errorLevel, acquisitionMode))
         return errors
 
     def _getInAvgErrors(self, acquisitionMode, ch):
@@ -901,14 +924,13 @@ class DDMq(SCPI):
         finished = 0
         while (finished != '1'):
             finished = self._getTVFinished(ch_pair, wNr)
+            print("\r TV mode(" + str(int(float(self._getTVpercentage(
+                ch_pair, wNr)))) + "%)", end='\0')
             if (finished == 'ffffffff'):
                 break
             elif (finished != '1'):
-                print("\r TV mode(" + str(int(float(self._getTVpercentage(
-                    ch_pair, wNr)))) + "%)", end='\0')
                 time.sleep(1.0/FINISH_BIT_CHECK_FERQUENTION_HZ)
-        if (finished != 'ffffffff'):
-            print("\r", end='\0')
+        print("\r", end='\0')
         self._displayQBitErrors("TV Mode", ch_pair, wNr)
         self.write('qutech:tvmode{:d}:data{:d}? '.format(ch_pair, wNr))
         binBlock = self.binBlockRead()
@@ -939,11 +961,11 @@ class DDMq(SCPI):
         finished = 0
         while (finished != '1'):
             finished = self._getTVFinished(ch_pair, wNr)
+            print("\r TV mode(" + str(int(float(self._getTVpercentage(
+                  ch_pair, wNr)))) + "%)", end='\0')
             if (finished == 'ffffffff'):
                 break
             elif (finished != '1'):
-                print("\r TV mode(" + str(int(float(self._getTVpercentage(
-                      ch_pair, wNr)))) + "%)", end='\0')
                 time.sleep(1.0/FINISH_BIT_CHECK_FERQUENTION_HZ)
         print("\r", end='\0')
         self._displayQBitErrors("TV Mode - Qbit state", ch_pair, wNr)
@@ -957,12 +979,11 @@ class DDMq(SCPI):
         finished = 0
         while (finished != '1'):
             finished = self._getTVFinished(ch_pair, wNr)
+            print("\r TV mode(" + str(int(float(self._getTVpercentage(
+                    ch_pair, wNr)))) + "%)", end='\0')
             if (finished == 'ffffffff'):
                 break
             elif (finished != '1'):
-                print(
-                    "\r TV mode(" + str(int(float(self._getTVpercentage(
-                        ch_pair, wNr)))) + "%)", end='\0')
                 time.sleep(1.0/FINISH_BIT_CHECK_FERQUENTION_HZ)
         print("\r", end='\0')
         self._displayQBitErrors("TV Mode - Qbit state", ch_pair, wNr)
@@ -975,12 +996,11 @@ class DDMq(SCPI):
         finished = 0
         while (finished != '1'):
             finished = self._getLoggingFinished(ch_pair, wNr)
+            print("\r Logging mode(" + str(int(float(
+                self._getLoggingpercentage(ch_pair, wNr)))) + "%)", end='\0')
             if (finished == 'ffffffff'):
                 break
             elif (finished != '1'):
-                print("\r Logging mode(" + str(int(float(
-                    self._getLoggingpercentage(ch_pair, wNr)))) + "%)",
-                    end='\0')
                 time.sleep(1.0/FINISH_BIT_CHECK_FERQUENTION_HZ)
         print("\r", end='\0')
         self._displayQBitErrors("Logging", ch_pair, wNr)
@@ -993,12 +1013,11 @@ class DDMq(SCPI):
         finished = 0
         while (finished != '1'):
             finished = self._getLoggingFinished(ch_pair, wNr)
+            print("\r Logging mode(" + str(int(float(
+                self._getLoggingpercentage(ch_pair, wNr)))) + "%)", end='\0')
             if (finished == 'ffffffff'):
                 break
             elif (finished != '1'):
-                print("\r Logging mode(" + str(int(float(
-                    self._getLoggingpercentage(ch_pair, wNr)))) + "%)",
-                    end='\0')
                 time.sleep(1.0/FINISH_BIT_CHECK_FERQUENTION_HZ)
         print("\r", end='\0')
         self._displayQBitErrors("Logging - Qbit state", ch_pair, wNr)
@@ -1091,15 +1110,13 @@ class DDMq(SCPI):
         finished = 0
         while (finished != '1'):
             finished = self._getErrFractFinished(ch_pair, wNr)
+            print("\r Error fraction mode(" + str(int(float(
+                self._getErrFractpercentage(ch_pair, wNr)))) + "%)", end='\0')
             if (finished == 'ffffffff'):
                 break
             elif (finished != '1'):
-                print("\r Error fraction mode(" + str(int(float(
-                    self._getErrFractpercentage(ch_pair, wNr)))) + "%)",
-                    end='\0')
                 time.sleep(1.0/FINISH_BIT_CHECK_FERQUENTION_HZ)
-        if (finished != 'ffffffff'):
-            print("\r", end='\0')
+        print("\r", end='\0')
         self._displayQBitErrors("Error Fract", ch_pair, wNr)
 
         self.write('qutech:errorfraction{:d}:data{:d}? '.format(ch_pair, wNr))
@@ -1284,34 +1301,6 @@ class DDMq(SCPI):
     def _get_weigth_data_status(self, ch_pair):
         status = self.ask('qutech:adc{:d}:weightdata:status? '.format(ch_pair))
         return int(status)
-
-    def get_temp(self, ch_pair):
-        try:
-            tempstr = ''  # in case self.ask fails
-            tempstr = self.ask('qutech:adc{:d}:temperature? '.format(ch_pair))
-            # form is supposed to be comma-separated, but we've seen
-            # other separators occasionally
-            for separator in ',;:':
-                # split into no more than 4 parts, so we don't lose info
-                tempparts = [p.strip() for p in tempstr.split(separator, 4)]
-                if len(tempparts) > 1:
-                    break
-            # in case parts at the end are missing, fill in None
-            if len(tempparts) < 5:
-                tempparts += [None] * (5 - len(tempparts))
-            for i in range(0, 5):
-                tempparts[i] = tempparts[i].split('=')[1]
-        except Exception:
-            logging.warn(
-                'Error getting or interpreting get_temp ' + repr(tempstr))
-            tempparts = [None, None, None, None, None]
-
-        # some strings include the word 'model' at the front of model
-        if str(tempparts[1]).lower().startswith('ActualTemp'):
-            tempparts[1] = str(tempparts[1])[5:].strip()
-
-        return dict(zip(('ActualTemp', 'LastCalTemp', 'TempDiff', 'BrdTemp',
-                         'WarnMessage'), tempparts))
 
     # Overloding get_idn function to format DDM versions
     def get_idn(self):
