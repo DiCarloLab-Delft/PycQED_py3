@@ -137,7 +137,11 @@ class QWG_FluxLookuptableManager(Instrument):
         self.add_parameter('F_kernel_instr',
                            parameter_class=InstrumentParameter)
 
-        self.add_parameter('F_amp', unit='V', parameter_class=ManualParameter)
+        self.add_parameter('F_amp', unit='frac',
+                           docstring=('Amplitude of flux pulse as fraction of '
+                           'the peak amplitude. Beware of factor 2 with'
+                           ' Vpp in the QWG'),
+                           parameter_class=ManualParameter)
         self.add_parameter('F_length', unit='s',
                            parameter_class=ManualParameter)
         self.add_parameter('F_ch', label='Flux channel',
@@ -243,13 +247,18 @@ class QWG_FluxLookuptableManager(Instrument):
                            vals=vals.Numbers(),
                            parameter_class=ManualParameter)
         self.add_parameter('Z_amp',
-                           docstring=
-                               'Amplitude of single qubit Z pulse in volts',
+                           docstring=('Amplitude of flux pulse as fraction of '
+                           'the peak amplitude. Beware of factor 2 with'
+                           ' Vpp in the QWG'),
                            label='Z amplitude',
-                           unit='V',
+                           unit='frac',
                            initial_value=0.0,
                            vals=vals.Numbers(),
                            parameter_class=ManualParameter)
+
+        self.add_parameter('max_waveform_length', unit='s',
+                           parameter_class=ManualParameter,
+                           initial_value=30e-6)
 
     def standard_waveforms(self):
         '''
@@ -329,8 +338,12 @@ class QWG_FluxLookuptableManager(Instrument):
             if self.F_kernel_instr() is not None:
                 k = self.F_kernel_instr.get_instr()
                 self._wave_dict[key] = k.convolve_kernel(
-                    [k.kernel(), delayed_wave], length_samples=30e3)
-                # hard-coded length for the distortions
+                    [k.kernel(), delayed_wave],
+                    length_samples=int(self.max_waveform_length()*
+                                       self.sampling_rate()))
+                # the waveform is cut off after length_samples.
+                # this is particularly important considering hardware (memory)
+                # limits of the QWG.
             else:
                 logging.warning('No distortion kernel specified,'
                                 ' not distorting flux pulse')
@@ -404,7 +417,6 @@ class QWG_FluxLookuptableManager(Instrument):
                 pulse_name, regenerate_pulse=False)
         self.QWG.get_instr().start()
         self.QWG.get_instr().getOperationComplete()
-        print('DEBUG: pulses loaded onto QWG')
 
     def render_wave(self, wave_name, show=True, QtPlot_win=None):
         '''

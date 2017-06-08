@@ -391,3 +391,26 @@ class QWG_lutman_par(Soft_Sweep):
         self.LutMan_parameter.set(val)
         self.LutMan.load_pulses_onto_AWG_lookuptable(regenerate_pulses=True)
         self.LutMan.QWG.get_instr().start()
+
+
+class QWG_flux_amp(Soft_Sweep):
+    """
+    Sweep function
+    """
+    def __init__(self, QWG, channel, qwg_channel_amp_par, frac_amp, **kw):
+        self.set_kw()
+        self.QWG = QWG
+        self.qwg_channel_amp_par = QWG.parameters['ch{}_amp'.format(channel)]
+        self.name = 'Flux_amp'
+        self.parameter_name = 'Flux_amp'
+        self.unit = 'V'
+        self.sweep_control = 'soft'
+
+        # Amp = frac * Vpp/2
+        self.scale_factor = 2/frac_amp
+
+    def set_parameter(self, val):
+        Vpp = val *self.scale_factor
+        self.qwg_channel_amp_par(Vpp)
+        # Ensure the amplitude was set correctly
+        self.QWG.getOperationComplete()
