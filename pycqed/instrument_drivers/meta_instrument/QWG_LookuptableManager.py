@@ -137,9 +137,11 @@ class QWG_FluxLookuptableManager(Instrument):
         self.add_parameter('F_kernel_instr',
                            parameter_class=InstrumentParameter)
 
-        self.add_parameter('F_amp', unit='V', parameter_class=ManualParameter)
+        self.add_parameter('F_amp', unit='V', parameter_class=ManualParameter,
+                           initial_value=0)
         self.add_parameter('F_length', unit='s',
-                           parameter_class=ManualParameter)
+                           parameter_class=ManualParameter,
+                           initial_value=1e-6)
         self.add_parameter('F_ch', label='Flux channel',
                            vals=vals.Ints(),
                            parameter_class=ManualParameter)
@@ -179,20 +181,20 @@ class QWG_FluxLookuptableManager(Instrument):
                            docstring='theta_f for martinis pulse',
                            label='theta_f',
                            unit='deg',
-                           initial_value=0.0,
+                           initial_value=90,
                            vals=vals.Numbers(),
                            parameter_class=ManualParameter)
         self.add_parameter('F_J2',
                            docstring='coupling between 11-02',
                            label='J2',
                            unit='Hz',
-                           initial_value=0.0,
+                           initial_value=10e6,
                            vals=vals.Numbers(),
                            parameter_class=ManualParameter)
         self.add_parameter('F_f_interaction',
                            label='interaction frequency',
                            unit='Hz',
-                           initial_value=0.0,
+                           initial_value=5e9,
                            vals=vals.Numbers(),
                            parameter_class=ManualParameter)
         self.add_parameter('F_dac_flux_coef',
@@ -205,13 +207,13 @@ class QWG_FluxLookuptableManager(Instrument):
         self.add_parameter('F_E_c',
                            label='qubit E_c',
                            unit='Hz',
-                           initial_value=0.0,
+                           initial_value=250e6,
                            vals=vals.Numbers(),
                            parameter_class=ManualParameter)
         self.add_parameter('F_f_01_max',
                            label='sweet spot freq',
                            unit='Hz',
-                           initial_value=0.0,
+                           initial_value=6e9,
                            vals=vals.Numbers(),
                            parameter_class=ManualParameter)
         self.add_parameter('F_asymmetry',
@@ -362,7 +364,7 @@ class QWG_FluxLookuptableManager(Instrument):
         delayed_wave = np.concatenate([wait_samples, np.array(waveform),
                                        wait_samples_2, -1*np.array(waveform)])
         distorted_wave = k.convolve_kernel([k.kernel(), delayed_wave],
-                                           length_samples=60e3)
+                                           length_samples=30e3)  # was 60e3
 
         self._wave_dict[pulse_name] = distorted_wave
         return distorted_wave
