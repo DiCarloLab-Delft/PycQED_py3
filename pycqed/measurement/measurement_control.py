@@ -351,9 +351,6 @@ class MeasurementControl(Instrument):
                 if swp_pt != prev_swp_pt:
                     # only set if not equal to previous point
                     sweep_function.set_parameter(swp_pt)
-                    print('not equal:', swp_pt, prev_swp_pt)
-                else:
-                    print('not equal:', swp_pt, prev_swp_pt)
             # x[::-1] changes the order in which the parameters are set, so
             # it is first the outer sweep point and then the inner.This
             # is generally not important except for specifics: f.i. the phase
