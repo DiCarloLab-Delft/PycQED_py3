@@ -480,20 +480,24 @@ def CZ_fast_calibration_seq(q0_name, q1_name, no_of_points,
 def chevron_block_seq(q0_name, q1_name, no_of_points,
                       excite_q1=False, wait_after_trigger=40e-9,
                       wait_during_flux=400e-9, clock_cycle=5e-9,
-                      RO_target='all', mw_pulse_duration=40e-9):
+                      RO_target='all', mw_pulse_duration=40e-9,
+                      cal_points=True):
     '''
     Sequence for measuring a block of a chevron, i.e. using different codewords
     for different pulse lengths.
+
     Args:
-        q0, q1      (str): names of the addressed qubits
-        RO_target   (str): can be q0, q1, or 'all'
-        excite_q1   (bool): choose whether to excite q1, thus choosing
-                            between the |01> <-> |10> and the |11> <-> |20>
-                            swap.
+        q0, q1        (str): names of the addressed qubits.
+                             q0 is the pulse that experiences the flux pulse.
+        RO_target     (str): can be q0, q1, or 'all'
+        excite_q1    (bool): choose whether to excite q1, thus choosing
+                             between the |01> <-> |10> and the |11> <-> |20>
+                             swap.
         wait_after_trigger (float): delay time in seconds after sending the
-                            trigger for the flux pulse
+                             trigger for the flux pulse
         clock_cycle (float): period of the internal AWG clock
-        wait_time   (int): wait time between triggering QWG and RO
+        wait_time     (int): wait time between triggering QWG and RO
+        cal_points   (bool): whether to use calibration points or not
     '''
     filename = join(base_qasm_path, 'chevron_block_seq.qasm')
     qasm_file = mopen(filename, mode='w')
@@ -517,6 +521,16 @@ def chevron_block_seq(q0_name, q1_name, no_of_points,
             # (|0> and |2> instead of |1> and |2>)
             qasm_file.writelines('X180 {}\n'.format(q0_name))
         qasm_file.writelines('RO {} \n'.format(RO_target))
+
+    if cal_points:
+        # Add calibration pulses
+        cal_points = [['I {} 8\n'.format(q0), 'I {} 8\n'.format(q1)],
+                      ['X180 {}\n'.format(q0), 'I {} 8\n'.format(q1)],
+                      ['I {} 8\n'.format(q0), 'X180 {}\n'.format(q1)],
+                      ['X180 {}\n'.format(q0), 'X180 {}\n'.format(q1)]]
+        cal_pulses = []
+        for seq in cal_points:
+            cal_pulses += [[seq[0], seq[1], 'RO ' + RO_target + '\n']]
 
     qasm_file.close()
     return qasm_file
