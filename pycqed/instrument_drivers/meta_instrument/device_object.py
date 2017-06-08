@@ -120,6 +120,10 @@ class TwoQubitDevice(DeviceObject):
                            docstring='Used for generating multiplexed RO pulses',
                            parameter_class=InstrumentParameter)
 
+        # N.B. for now the "central_controller" can be a CBox_v3
+        self.add_parameter('central_controller',
+                           parameter_class=InstrumentParameter)
+
         self.add_parameter('RO_LO_freq', unit='Hz',
             docstring=('Frequency of the common LO for all RO pulses.'),
             parameter_class=ManualParameter)
