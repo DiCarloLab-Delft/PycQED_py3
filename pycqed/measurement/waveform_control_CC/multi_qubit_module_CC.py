@@ -7,16 +7,6 @@ from pycqed.analysis import measurement_analysis as ma
 from pycqed.analysis import multiplexed_RO_analysis as mra
 import qcodes as qc
 
-##################
-# This is the prepare for multiplexed RO snippet !!
-##################
-
-# LutManMan.acquisition_delay(q0.RO_acq_marker_delay())
-# # Generate multiplexed pulse
-# multiplexed_wave = [['RO_LutMan_QR', 'M_square'], ['RO_LutMan_QL', 'M_square']]
-# LutManMan.generate_multiplexed_pulse(multiplexed_wave)
-# LutManMan.load_pulse_onto_AWG_lookuptable('Multiplexed_pulse')
-
 
 def measure_two_qubit_AllXY(device, q0_name, q1_name,
                             sequence_type='sequential', MC=None,
@@ -120,6 +110,60 @@ def measure_chevron(device, q0_name, q1_name):
     pulse.
     '''
     raise NotImplementedError()
+
+def measure_chevron(device, q0_name, q1_name,
+                    CC, MC,
+                    QWG_flux_lutman, #operation_dict,
+                    amps=np.arange(0.482, .491, .0010),
+                    lengths=np.arange(50e-9, 500e-9, 5e-9),
+                    wait_during_flux=400e-8,
+                    wait_after_trigger=40e-9,
+                    excite_q1=True):
+    '''
+    Measure chevron for the qubits q0 and q1.
+
+    Args:
+        device:  device object
+        q0_name : name of the first qubit. q0 will be flux pulsed
+        q1_name : name of the second qubit (what is this needed for? )
+
+    '''
+    CC = device.central_controller.get_instr()
+    operation_dict = Starmon.get_operation_dict()
+    single_pulse_elt = mqqs.chevron_seq(q0.name, q1.name, excite_q1=excite_q1,
+                                        RO_target=q0.name,
+                                        wait_during_flux=wait_during_flux,
+                                        wait_after_trigger=wait_after_trigger)
+    # single_pulse_elt = flux_pulse_seq('QR', 'QL')
+    single_pulse_asm = qta.qasm_to_asm(single_pulse_elt.name, operation_dict)
+    qumis_file = single_pulse_asm
+    CC.load_instructions(qumis_file.name)
+    CC.start()
+
+    s1 = swf.QWG_lutman_par(QWG_flux_lutman, QWG_flux_lutman.F_amp)
+    s2 = swf.QWG_lutman_par(QWG_flux_lutman, QWG_flux_lutman.F_length)
+    MC.soft_avg(1)
+    MC.set_sweep_function(s1)
+    MC.set_sweep_function_2D(s2)
+    MC.set_sweep_points(amps)
+    MC.set_sweep_points_2D(lengths)
+    d = det.UHFQC_integrated_average_detector(
+        UHFQC=q0._acquisition_instrument, AWG=CC,
+        channels=[
+            q0.RO_acq_weight_function_I(),
+            q1.RO_acq_weight_function_I()],
+        nr_averages=q0.RO_acq_averages(),
+        real_imag=True, single_int_avg=True,
+        result_logging_mode='lin_trans',
+        integration_length=q0.RO_acq_integration_length(),
+        seg_per_point=1)
+
+    d._set_real_imag(True)
+
+    MC.set_detector_function(d)
+    MC.run('Chevron_{}_{}'.format(q0.name, q1.name), mode='2D')
+
+
 
 
 def measure_CZ_calibration(device, q0_name, q1_name):
