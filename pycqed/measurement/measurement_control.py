@@ -113,6 +113,7 @@ class MeasurementControl(Instrument):
         self.print_measurement_start_msg()
         self.mode = mode
         self.iteration = 0  # used in determining data writing indices
+        self.last_sweep_pts = None  # used to prevent resetting same value
         with h5d.Data(name=self.get_measurement_name()) as self.data_object:
             self.get_measurement_begintime()
             # Commented out because requires git shell interaction from python
@@ -325,6 +326,7 @@ class MeasurementControl(Instrument):
         '''
         Core measurement function used for soft sweeps
         '''
+        start_idx, stop_idx = self.get_datawriting_indices(pts_per_iter=1)
 
         if np.size(x) == 1:
             x = [x]
@@ -332,15 +334,37 @@ class MeasurementControl(Instrument):
             raise ValueError(
                 'size of x "%s" not equal to # sweep functions' % x)
         for i, sweep_function in enumerate(self.sweep_functions[::-1]):
-            sweep_function.set_parameter(x[::-1][i])
+            # If statement below tests if the value is different from the
+            # last value that was set, if it is the same the sweep function
+            # will not be called. This is important when setting a parameter
+            # is either expensive (e.g., loading a waveform) or has adverse
+            # effects (e.g., phase scrambling when setting a MW frequency.
+
+            swp_pt = x[::-1][i]
+
+            if self.iteration == 0:
+                # always set the first point
+                sweep_function.set_parameter(swp_pt)
+            else:
+                # start_idx -1 refers to the last written value
+                prev_swp_pt = self.last_sweep_pts[::-1][i]
+                if swp_pt != prev_swp_pt:
+                    # only set if not equal to previous point
+                    sweep_function.set_parameter(swp_pt)
+                    print('not equal:', swp_pt, prev_swp_pt)
+                else:
+                    print('not equal:', swp_pt, prev_swp_pt)
             # x[::-1] changes the order in which the parameters are set, so
             # it is first the outer sweep point and then the inner.This
             # is generally not important except for specifics: f.i. the phase
             # of an agilent generator is reset to 0 when the frequency is set.
 
+        # used for next iteration
+        self.last_sweep_pts = x
+
         datasetshape = self.dset.shape
         # self.iteration = datasetshape[0] + 1
-        start_idx, stop_idx = self.get_datawriting_indices(pts_per_iter=1)
+
         vals = self.detector_function.acquire_data_point()
         # Resizing dataset and saving
         new_datasetshape = (np.max([datasetshape[0], stop_idx]),
@@ -493,7 +517,7 @@ class MeasurementControl(Instrument):
         if self.main_QtPlot.traces != []:
             self.main_QtPlot.clear()
         self.curves = []
-        xlabels= self.sweep_par_names
+        xlabels = self.sweep_par_names
         xunits = self.sweep_par_units
         ylabels = self.detector_function.value_names
         yunits = self.detector_function.value_units
@@ -521,7 +545,7 @@ class MeasurementControl(Instrument):
                                      ylabel=ylab,
                                      yunit=yunits[yi],
                                      subplot=j+1,
-                                     color=color_cycle[j%len(color_cycle)],
+                                     color=color_cycle[j % len(color_cycle)],
                                      symbol='o', symbolSize=5)
                 self.curves.append(self.main_QtPlot.traces[-1])
                 j += 1
@@ -540,7 +564,7 @@ class MeasurementControl(Instrument):
                 time_since_last_mon_update = 1e9
             try:
                 if (time_since_last_mon_update > self.plotting_interval() or
-                        force_update) :
+                        force_update):
 
                     nr_sweep_funcs = len(self.sweep_function_names)
                     for y_ind in range(len(self.detector_function.value_names)):
@@ -571,20 +595,20 @@ class MeasurementControl(Instrument):
                 [n, m, len(self.detector_function.value_names)])
             self.TwoD_array[:] = np.NAN
             self.secondary_QtPlot.clear()
-            slabels= self.sweep_par_names
+            slabels = self.sweep_par_names
             sunits = self.sweep_par_units
             zlabels = self.detector_function.value_names
             zunits = self.detector_function.value_units
 
             for j in range(len(self.detector_function.value_names)):
                 self.secondary_QtPlot.add(x=self.sweep_pts_x,
-                                   y=self.sweep_pts_y,
-                                   z=self.TwoD_array[:, :, j],
-                                   xlabel=slabels[0], xunit=sunits[0],
-                                   ylabel=sunits[1], yunit=sunits[1],
-                                   zlabel=zlabels[j], zunit=zunits[j],
-                                   subplot=j+1,
-                                   cmap='viridis')
+                                          y=self.sweep_pts_y,
+                                          z=self.TwoD_array[:, :, j],
+                                          xlabel=slabels[0], xunit=sunits[0],
+                                          ylabel=sunits[1], yunit=sunits[1],
+                                          zlabel=zlabels[j], zunit=zunits[j],
+                                          subplot=j+1,
+                                          cmap='viridis')
 
     def update_plotmon_2D(self, force_update=False):
         '''
@@ -599,7 +623,8 @@ class MeasurementControl(Instrument):
                 for j in range(len(self.detector_function.value_names)):
                     z_ind = len(self.sweep_functions) + j
                     self.TwoD_array[y_ind, x_ind, j] = self.dset[i, z_ind]
-                self.secondary_QtPlot.traces[j]['config']['z'] = self.TwoD_array[:, :, j]
+                self.secondary_QtPlot.traces[j]['config'][
+                    'z'] = self.TwoD_array[:, :, j]
                 if (time.time() - self.time_last_2Dplot_update >
                         self.plotting_interval()
                         or self.iteration == len(self.sweep_points)):
@@ -615,19 +640,19 @@ class MeasurementControl(Instrument):
         self.time_last_ad_plot_update = time.time()
         self.secondary_QtPlot.clear()
 
-        slabels= self.sweep_par_names
+        slabels = self.sweep_par_names
         sunits = self.sweep_par_units
         zlabels = self.detector_function.value_names
         zunits = self.detector_function.value_units
 
         for j in range(len(self.detector_function.value_names)):
             self.secondary_QtPlot.add(x=[0],
-                               y=[0],
-                               xlabel='iteration',
-                               ylabel=zlabels[j],
-                               yunit=zunits[j],
-                               subplot=j+1,
-                               symbol='o', symbolSize=5)
+                                      y=[0],
+                                      xlabel='iteration',
+                                      ylabel=zlabels[j],
+                                      yunit=zunits[j],
+                                      subplot=j+1,
+                                      symbol='o', symbolSize=5)
 
     def update_plotmon_adaptive(self, force_update=False):
         if self.live_plot_enabled():
@@ -668,7 +693,7 @@ class MeasurementControl(Instrument):
                     self.time_last_2Dplot_update = time.time()
                     self.secondary_QtPlot.update_plot()
         except Exception as e:
-                logging.warning(e)
+            logging.warning(e)
 
     def _set_plotting_interval(self, plotting_interval):
         self.main_QtPlot.interval = plotting_interval
