@@ -389,7 +389,7 @@ def Cos_guess(model, data, t):
     # Use absolute value of complex valued spectrum
     abs_w = np.abs(w)
     freq_guess = abs(f[abs_w == max(abs_w)][0])
-    ph_guess = (-2*np.pi*t[data == max(data)]*freq_guess)[0]
+    ph_guess = 2*np.pi-(2*np.pi*t[data == max(data)]*freq_guess)[0]
     # the condition data == max(data) can have several solutions
     #               (for example when discretization is visible)
     # to prevent errors we pick the first solution
