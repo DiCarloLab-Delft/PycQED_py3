@@ -35,13 +35,21 @@ class DDMq(SCPI):
 
     # def __init__(self, logging=True, simMode=False, paranoid=False):
     def __init__(self, name, address, port, **kwargs):
-        super().__init__(name, address, port, **kwargs)
+        isConnected = False
+        try :
+            super().__init__(name, address, port, **kwargs)
+            isConnected = True
+        except:
+            self.remove_instance(self)
+            isConnected = False
+        if isConnected == False:
+            super().__init__(name, address, port, **kwargs)
+
         self.device_descriptor = type('', (), {})()
         self.device_descriptor.model = 'DDM'
 
         # Wait a small momement, to make sure that the scpi connection is
         # established before using the connection
-        time.sleep(0.1)
 
         # Ask the ddm how many adcs and qubits per adc it has.
         numAdcs = int(self.ask('qutech:nadcs? '))
@@ -74,19 +82,27 @@ class DDMq(SCPI):
         parameter_file_version = ""
         ddm_parameters = []
         try:
-            f = open(self._s_file_name).read()
-            f_content = json.loads(f)
-            ddm_parameters = f_content["parameters"]
-            parameter_file_version = f_content["version"]["firmware"]
+            file = open(self._s_file_name)
+            file_content = json.loads(open(self._s_file_name).read())
+            ddm_parameters = file_content["parameters"]
+            parameter_file_version = file_content["version"]["firmware"]
         except:
             log.warning("parameter file for gettable parameters {} not found".format(
                 self._s_file_name))
         if (firmware_version != parameter_file_version):
+            print("The parameter file is updated, because the version number of the firware doesn't match the version of the parameter file")
             # Update the parameter list to firmware version of the ddm
-            print("TODO: update QuTech_DDM_Parameters.txt")
+            parameter_str = self.ask('qutech:parameters?')
+            parameter_str = parameter_str.replace('\t', '\n')
+            try:
+                file = open(self._s_file_name, 'w')
+                file.write(parameter_str)
+            except:
+                log.warning("failed to write update the parameters in the parameter file")
+            ddm_parameters = json.loads(parameter_str)["parameters"]
 
         # Add the parameters to 'self'
-       for parameter in ddm_parameters:
+        for parameter in ddm_parameters:
             if (("name" in parameter) == False):
                 log.warning("the parameter list contains a function without a" +
                             " name")
