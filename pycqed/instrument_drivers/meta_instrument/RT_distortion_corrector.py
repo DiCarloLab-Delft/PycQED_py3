@@ -1,6 +1,7 @@
 import pycqed.analysis.fitting_models as fm
 import pycqed.measurement.kernel_functions as kf
 import pycqed.instrument_drivers.physical_instruments.RTO1024 as RTO
+import pyqtgraph.exporters as pg_exp
 import numpy as np
 import lmfit
 from qcodes.plots.pyqtgraph import QtPlot
@@ -83,6 +84,8 @@ class RT_distortion_corrector():
         self.known_fit_models = ['exponential', 'high-pass']
         self.fit_model = None
         self.fit_res = None
+        self._fit_model_loop = 'exponential'  # Default fit model used in the
+                                              # interactive loop
 
         self._loop_helpstring = str(
             'h:      Print this help.\n'
@@ -601,10 +604,10 @@ class RT_distortion_corrector():
                         save_y_range=False)
 
         # LOOP STARTS HERE
-        model = 'exponential'  # Default fit model used
+        self._fit_model_loop = 'exponential'
         while True:
             print('\n-- Correction number {} --'.format(self._iteration))
-            print('Current fit model: {}'.format(model))
+            print('Current fit model: {}'.format(self._fit_model_loop))
             # 2. Fit and plot
             repeat = True
             while repeat:
@@ -622,9 +625,9 @@ class RT_distortion_corrector():
                 # Exit loop
                 break
 
-            if model == 'exponential':
+            if self._fit_model_loop == 'exponential':
                 self.fit_exp_model(fit_start, fit_stop)
-            elif model == 'high-pass':
+            elif self._fit_model_loop == 'high-pass':
                 self.fit_high_pass(fit_stop, fit_stop)
 
             self.plot_fit(self._t_start_loop, self._t_stop_loop)
@@ -642,8 +645,11 @@ class RT_distortion_corrector():
                 continue
 
             # Fit was accepted -> save plot
-            self.vw.save(os.path.join(self.kernel_dir,
-                                      'fit_{}.png'.format(self._iteration)))
+            # exporter = pg_exp.ImageExporter(self.vw.win)
+            # exporter.export(os.path.join(self.kernel_dir,
+            #                           'fit_{}.png'.format(self._iteration)))
+            # # self.vw.save(os.path.join(self.kernel_dir,
+            # #                           'fit_{}.png'.format(self._iteration)))
 
             # 3. Test correction and plot
             # Save last data, in case new distortion is rejected.
@@ -673,8 +679,11 @@ class RT_distortion_corrector():
                 continue
 
             # Correction was accepted -> save plot
-            self.vw.save(os.path.join(self.kernel_dir,
-                                      'trace_{}.png'.format(self._iteration)))
+            # exporter = pg_exp.ImageExporter(self.vw.win)
+            # exporter.export(os.path.join(self.kernel_dir,
+            #                           'trace_{}.png'.format(self._iteration)))
+            # # self.vw.save(os.path.join(self.kernel_dir,
+            # #                           'trace_{}.png'.format(self._iteration)))
 
             # 4. Apply correction
             print('Applying new correction.')
@@ -724,14 +733,18 @@ class RT_distortion_corrector():
             except KeyError:
                 print('No fit has been done yet!')
 
-        elif (inp_elements[0] == 's' and len(inp_elements == 2)):
-            self.vw.save(os.path.join(self.kernel_dir,
-                                      '{}.png'.format(inp_elements[1])))
-            print('Current plot saved.')
+        # elif (inp_elements[0] == 's' and len(inp_elements == 2)):
+        #     exporter = pg_exp.ImageExporter(self.vw.win)
+        #     exporter.export(os.path.join(self.kernel_dir,
+        #                               '{}.png'.format(inp_elements[1])))
+        #     # self.vw.save(os.path.join(self.kernel_dir,
+        #     #                           '{}.png'.format(inp_elements[1])))
+        #     print('Current plot saved.')
 
-        elif (inp_elements[0] == 'model' and len(inp_elements == 2)):
+        elif (inp_elements[0] == 'model' and len(inp_elements) == 2):
             if inp_elements[1] in self.known_fit_models:
-                model = str(inp_elements[1])
+                self._fit_model_loop = str(inp_elements[1])
+                print('Using fit model "{}".'.format(self._fit_model_loop))
             else:
                 print('Model "{}" unknown. Please choose from {}.'
                       .format(inp_elements[1], self.known_fit_models))
