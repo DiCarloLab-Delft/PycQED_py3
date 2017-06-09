@@ -29,9 +29,15 @@ class Test_Rabi_analysis(unittest.TestCase):
         self.assertAlmostEqual(a.fit_res[0].values['period'], 0.3839, places=2)
         self.assertAlmostEqual(a.fit_res[1].values['period'], 0.3839, places=2)
 
+        a = ma.Rabi_Analysis(timestamp='20170607_160504', auto=False)
+        self.assertAlmostEqual(a.get_measured_amp180(), 0.3839/2, places=2)
+
     def test_Rabi_single_weight(self):
         a = ma.Rabi_Analysis(timestamp='20170607_211203')
         self.assertAlmostEqual(a.fit_res[0].values['period'], 0.3839, places=2)
+
+        a = ma.Rabi_Analysis(timestamp='20170607_211203', auto=False)
+        self.assertAlmostEqual(a.get_measured_amp180(), 0.3839/2, places=2)
 
 
 class Test_DoubleFreq_analysis(unittest.TestCase):

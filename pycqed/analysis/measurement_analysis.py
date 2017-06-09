@@ -1264,10 +1264,16 @@ class Rabi_Analysis(TD_Analysis):
                 logging.warning(e)
 
     def get_measured_amp180(self):
-        fitted_pars = self.data_file['Analysis']['Fitted Params {}'.format(
-            self.value_names[0])]
-        amp180 = fitted_pars['period'].attrs['value']/2
-
+        fit_grps = list(self.data_file['Analysis'].keys())
+        fitted_pars_0 = self.data_file['Analysis'][fit_grps[0]]
+        amp180 = fitted_pars_0['period'].attrs['value']/2
+        # If there are two quadratures, return the amplitude with the smallest
+        # errorbar
+        if len(fit_grps) == 2:
+            fitted_pars_1 = self.data_file['Analysis'][fit_grps[1]]
+            if (fitted_pars_1['period'].attrs['stderr'] <
+                    fitted_pars_0['period'].attrs['stderr']):
+                amp180 = fitted_pars_1['period'].attrs['value']/2
         return amp180
 
 
