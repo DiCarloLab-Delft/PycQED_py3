@@ -407,7 +407,7 @@ class QWG_flux_amp(Soft_Sweep):
     """
     Sweep function
     """
-    def __init__(self, QWG, channel, qwg_channel_amp_par, frac_amp, **kw):
+    def __init__(self, QWG, channel, frac_amp, **kw):
         self.set_kw()
         self.QWG = QWG
         self.qwg_channel_amp_par = QWG.parameters['ch{}_amp'.format(channel)]
