@@ -375,8 +375,9 @@ class QWG_FluxLookuptableManager(Instrument):
 
         delayed_wave = np.concatenate([wait_samples, np.array(waveform),
                                        wait_samples_2, -1*np.array(waveform)])
-        distorted_wave = k.convolve_kernel([k.kernel(), delayed_wave],
-                                           length_samples=30e3)  # was 60e3
+        distorted_wave = k.convolve_kernel(
+            [k.kernel(), delayed_wave],
+            length_samples=int(self.max_waveform_length()*self.sampling_rate()))
 
         self._wave_dict[pulse_name] = distorted_wave
         return distorted_wave
