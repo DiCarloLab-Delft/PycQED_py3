@@ -46,7 +46,7 @@ class RTO1024_scope(visa.VisaInstrument):
         '''
         # NOTE: I think these settings don't work at the moment.
         # TODO: load settings from file
-        # opc = self.visa_handle.ask('STOP;*OPC?')
+        opc = self.visa_handle.ask('STOP;*OPC?')
         # self.visa_handle.write('TRIGger1:SOURce CHAN{}'
         #                        .format(self.trigger_ch()))
         # self.visa_handle.write('ACQuire:SRATe {}'.format(acq_rate))
@@ -56,8 +56,12 @@ class RTO1024_scope(visa.VisaInstrument):
         # self.visa_handle.write('EXPort:WAVeform:STARt {}'.format(t_start))
         # self.visa_handle.write('EXPort:WAVeform:STOP {}'.format(t_stop))
         # self.sampling_rate = float(self.visa_handle.ask('ACQuire:POINts:ARATe?'))*1e-9
-        self.visa_handle.write('MMEMory:LOAD:STATe 4',
-            'C:\\Users\\Instrument.RTO-XXXXXX\\Documents\\Data\\1703_Starmon\\Settings_17-06-06.dfl')
+
+        # Load settings from file
+        self.visa_handle.write("MMEM RCL " +
+            "'C:\\Users\\Instrument.RTO-XXXXXX\\Documents\\Data\\1703_Starmon\\Settings_2017-06-06.dfl'")
+        # Include x-values in output
+        self.visa_handle.write('EXPort:WAVeform:INCXvalues ON')
 
     def measure_trace(self):
         '''
