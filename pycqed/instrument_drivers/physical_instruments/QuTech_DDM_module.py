@@ -68,30 +68,35 @@ class DDMq(SCPI):
 
     def add_parameters(self):
         # Check if the firware version match the version of the parameter list
-        firmware_version = ""
+        software_version = ""
         try:
             version_info = self.get_idn()
-            firmware_version = version_info['fwVersion']
+            software_version = version_info['swVersion']
         except:
-            log.warning("firmware version was not found".format(
+            log.warning("software version was not found".format(
                 self._s_file_name))
         path = os.path.abspath(__file__)
         dir_path = os.path.dirname(path)
-        self._s_file_name = os.path.join(
-            dir_path, 'QuTech_DDM_Parameter_Files', 'QuTech_DDM_Parameters.txt')
+        folder_path = os.path.join(dir_path, 'QuTech_DDM_Parameter_Files')
+        self._s_file_name = os.path.join(folder_path, 'QuTech_DDM_Parameters.txt')
         parameter_file_version = ""
         ddm_parameters = []
         try:
             file = open(self._s_file_name)
             file_content = json.loads(open(self._s_file_name).read())
             ddm_parameters = file_content["parameters"]
-            parameter_file_version = file_content["version"]["firmware"]
+            parameter_file_version = file_content["version"]["software"]
         except:
             log.warning("parameter file for gettable parameters {} not found".format(
                 self._s_file_name))
-        if (firmware_version != parameter_file_version):
+            try:
+                if not os.path.exists(folder_path):
+                  os.makedirs(folder_path)
+            except:
+                pass
+        if (software_version != parameter_file_version):
             print("The parameter file is updated, because the version number of the firware doesn't match the version of the parameter file")
-            # Update the parameter list to firmware version of the ddm
+            # Update the parameter list to software version of the ddm
             parameter_str = self.ask('qutech:parameters?')
             parameter_str = parameter_str.replace('\t', '\n')
             try:
@@ -162,15 +167,6 @@ class DDMq(SCPI):
                                docstring='It return the temperature' +
                                ' of the adc at the last calibration in °C.',
                                get_cmd=scalibrated_temperature_int_cmd + '?'
-                               )
-            srun_cmd = 'qutech:run{}'.format(ch_pair)
-            self.add_parameter('ch_pair{}_run'.format(ch_pair),
-                               label=('Run ch_pair{}'.format(ch_pair)),
-                               docstring='This parameter enables trigger,' +
-                               ' it is comparable to command "arm".' +
-                               ' After run is set, DDM will accept next' +
-                               ' comming triggers ',
-                               set_cmd=srun_cmd
                                )
             sreset_int_cmd = 'qutech:reset{}'.format(ch_pair)
             self.add_parameter('ch_pair{}_reset'.format(ch_pair),
