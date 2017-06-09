@@ -10,13 +10,13 @@ class Test_Rabi_analysis(unittest.TestCase):
     def setUpClass(self):
         self.datadir = os.path.join(pq.__path__[0], 'tests', 'test_data')
         ma.a_tools.datadir = self.datadir
-        self.rabis = [ma.Rabi_Analysis(timestamp='20170412_185618'),
-                      ma.Rabi_Analysis(timestamp='20170412_183928'),
-                      ma.Rabi_Analysis(timestamp='20170413_134244')]
 
     def test_Rabi_analysis(self):
-        for ii in range(len(self.rabis)):
-            rabi_an = self.rabis[ii]
+        rabis = [ma.Rabi_Analysis(timestamp='20170412_185618'),
+                 ma.Rabi_Analysis(timestamp='20170412_183928'),
+                 ma.Rabi_Analysis(timestamp='20170413_134244')]
+        for ii in range(len(rabis)):
+            rabi_an = rabis[ii]
             for tt in range(2):
                 rabi_amp = rabi_an.fit_res[tt].values['period']/2.
                 amp_low = 0.63
@@ -24,6 +24,14 @@ class Test_Rabi_analysis(unittest.TestCase):
 
                 self.assertGreaterEqual(rabi_amp, amp_low)
                 self.assertGreaterEqual(amp_high, rabi_amp)
+
+        a = ma.Rabi_Analysis(timestamp='20170607_160504')
+        self.assertAlmostEqual(a.fit_res[0].values['period'], 0.3839, places=2)
+        self.assertAlmostEqual(a.fit_res[1].values['period'], 0.3839, places=2)
+
+    def test_Rabi_single_weight(self):
+        a = ma.Rabi_Analysis(timestamp='20170607_211203')
+        self.assertAlmostEqual(a.fit_res[0].values['period'], 0.3839, places=2)
 
 
 class Test_DoubleFreq_analysis(unittest.TestCase):
@@ -53,6 +61,7 @@ class Test_DoubleFreq_analysis(unittest.TestCase):
 
 
 class test_ramsey_analysis(unittest.TestCase):
+
     @classmethod
     def setUpClass(self):
         self.datadir = os.path.join(pq.__path__[0], 'tests', 'test_data')
@@ -67,6 +76,7 @@ class test_ramsey_analysis(unittest.TestCase):
 
 
 class test_allxy_analysis(unittest.TestCase):
+
     @classmethod
     def setUpClass(self):
         self.datadir = os.path.join(pq.__path__[0], 'tests', 'test_data')
@@ -79,6 +89,7 @@ class test_allxy_analysis(unittest.TestCase):
 
 
 class test_t1_analysis(unittest.TestCase):
+
     @classmethod
     def setUpClass(self):
         self.datadir = os.path.join(pq.__path__[0], 'tests', 'test_data')
@@ -95,6 +106,7 @@ class test_t1_analysis(unittest.TestCase):
 
 
 class test_RB_analysis(unittest.TestCase):
+
     @classmethod
     def setUpClass(self):
         self.datadir = os.path.join(pq.__path__[0], 'tests', 'test_data')

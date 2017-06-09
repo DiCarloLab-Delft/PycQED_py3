@@ -1174,6 +1174,8 @@ class Rabi_Analysis(TD_Analysis):
 
     def run_default_analysis(self, close_file=True, **kw):
         self.get_naming_and_values()
+        # if optimal weight there is only 1 channel otherwise I and Q
+        self.nr_quadratures = len(self.ylabels)
         self.fit_data(**kw)
         self.make_figures(**kw)
         if close_file:
@@ -1182,10 +1184,16 @@ class Rabi_Analysis(TD_Analysis):
 
     def make_figures(self, **kw):
         show_guess = kw.pop('show_guess', False)
-        self.fig, self.axs = plt.subplots(2, 1, figsize=(5, 6))
+        if self.nr_quadratures == 2:
+            self.fig, self.axs = plt.subplots(self.nr_quadratures, 1,
+                                              figsize=(5, 6))
+        else:
+            self.fig, ax = plt.subplots(self.nr_quadratures, 1,
+                                        figsize=(5, 6))
+            self.axs = [ax] # to ensure it always makes a list
         x_fine = np.linspace(min(self.sweep_points), max(self.sweep_points),
                              1000)
-        for i in [0, 1]:
+        for i in range(self.nr_quadratures):
             if i == 0:
                 plot_title = kw.pop('plot_title', textwrap.fill(
                                     self.timestamp_string + '_' +
@@ -1226,24 +1234,24 @@ class Rabi_Analysis(TD_Analysis):
 
     def fit_data(self, print_fit_results=False, **kw):
         model = fit_mods.lmfit.Model(fit_mods.CosFunc)
-        self.fit_res = ['', '']
-        # It would be best to do 1 fit to both datasets but since it is
-        # easier to do just one fit we stick to that.
-        # We make an initial guess of the Rabi period using both quadratures
-        data = np.sqrt(self.measured_values[0]**2+self.measured_values[1]**2)
-        params = fit_mods.Cos_guess(model, data=data,
-                             t=self.sweep_points)
-        fit_res = model.fit(
-            data=data,
-            t=self.sweep_points,
-            params=params)
-        freq_guess = fit_res.values['frequency']
-        for i in [0, 1]:
+        self.fit_res = ['']*self.nr_quadratures
+        if self.nr_quadratures != 1:
+            # It would be best to do 1 fit to both datasets but since it is
+            # easier to do just one fit we stick to that.
+            # We make an initial guess of the Rabi period using both quadratures
+            data = np.sqrt(self.measured_values[0]**2+self.measured_values[1]**2)
+            params = fit_mods.Cos_guess(model, data=data, t=self.sweep_points)
+            fit_res = model.fit(
+                data=data,
+                t=self.sweep_points,
+                params=params)
+            freq_guess = fit_res.values['frequency']
+        for i in range(self.nr_quadratures):
             model = fit_mods.lmfit.Model(fit_mods.CosFunc)
             params = fit_mods.Cos_guess(model, data=self.measured_values[i],
-                                 t=self.sweep_points)
-
-            params['frequency'].value = freq_guess
+                                        t=self.sweep_points)
+            if self.nr_quadratures != 1:
+                params['frequency'].value = freq_guess
             self.fit_res[i] = model.fit(
                 data=self.measured_values[i],
                 t=self.sweep_points,
@@ -1254,6 +1262,13 @@ class Rabi_Analysis(TD_Analysis):
                                             var_name=self.value_names[i])
             except Exception as e:
                 logging.warning(e)
+
+    def get_measured_amp180(self):
+        fitted_pars = self.data_file['Analysis']['Fitted Params {}'.format(
+            self.value_names[0])]
+        amp180 = fitted_pars['period'].attrs['value']/2
+
+        return amp180
 
 
 class TD_UHFQC(TD_Analysis):
