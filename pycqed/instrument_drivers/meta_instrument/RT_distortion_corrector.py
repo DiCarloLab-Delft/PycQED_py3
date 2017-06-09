@@ -48,13 +48,13 @@ class RT_distortion_corrector():
                     an object even when no instruments are connected.
         '''
         self._instr_initialized = False
-        if init_intsr:
+        if init_instr:
             if AWG_lutman is None or oscilloscope is None:
                 raise ValueError('AWG_lutman or oscilloscope not defined. '
                                  'Give AWG_lutman and oscilloscope arguments '
                                  'or set init_instr=False.')
             else:
-                self.init_instruments(AWG_lutman, scope)
+                self.init_instruments(AWG_lutman, oscilloscope)
 
         # Initialize instance variables
         # Plotting
@@ -106,7 +106,7 @@ class RT_distortion_corrector():
         # Make window for plots
         self.vw = QtPlot(window_title='Distortions', figsize=(600, 400))
 
-    def init_instruments(self, AWG_lutman, scope):
+    def init_instruments(self, AWG_lutman, oscilloscope):
         '''
         Attach and initialize instruments.
         self.ker_obj is set to the kernel_object instrument of AWG_lutman.
