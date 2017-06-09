@@ -15,6 +15,11 @@ class RT_distortion_corrector():
     pulses.
     '''
 
+    # TODO:
+    #   - check TODOs in this file
+    #   - waveform length will become parameter in QWG_flux_lutman
+    #       -> adapt this class to handle that
+
     def __init__(self,
                  AWG_lutman=None,
                  oscilloscope=None,
@@ -105,6 +110,12 @@ class RT_distortion_corrector():
         '''
         Attach and initialize instruments.
         self.ker_obj is set to the kernel_object instrument of AWG_lutman.
+
+        Args:
+            AWG_lutman (Instrument):
+                    Lookup table manager for the AWG.
+            oscilloscope (Instrument):
+                    Oscilloscope instrument.
         '''
         self.AWG_lutman = AWG_lutman
         self.ker_obj = AWG_lutman.F_kernel_instr.get_instr()
@@ -409,7 +420,7 @@ class RT_distortion_corrector():
 
         # Labels need to be set in the end, else they don't show sometimes
         self.vw.subplots[0].getAxis('bottom').setLabel('t', 's')
-        self.vw.subplots[0].getAxis('left').setLabel('amp', 'V')
+        self.vw.subplots[0].getAxis('left').setLabel('normalized amp', '')
 
     def plot_fit(self, start_time=0, stop_time=10e-6, save_y_range=True):
         '''
