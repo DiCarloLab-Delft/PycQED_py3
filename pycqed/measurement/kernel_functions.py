@@ -441,7 +441,7 @@ def decay_kernel(amp=1., tau=11000, length=2000):
     amp_k = amp/(amp-1)
     t_kernel = np.arange(int(length))
     if abs(amp) > 0.:
-        kernel_decay_step = 1 + amp_k*np.exp(-t_kernel/tau_k)
+        kernel_decay_step = 1 - amp_k*np.exp(-t_kernel/tau_k)
         kernel_decay = np.zeros(kernel_decay_step.shape)
         kernel_decay[0] = kernel_decay_step[0]
         kernel_decay[1:] = kernel_decay_step[1:]-kernel_decay_step[:-1]
