@@ -45,6 +45,9 @@ class QuDev_transmon(Qubit):
                            parameter_class=ManualParameter)
         self.add_parameter('Q_RO_resonator', label='RO resonator Q factor',
                            initial_value=0, parameter_class=ManualParameter)
+        self.add_parameter('ssro_contrast', unit='arb.', initial_value=0,
+                           label='integrated g-e trace contrast',
+                           parameter_class=ManualParameter)
         self.add_parameter('optimal_acquisition_delay', label='Optimal '
                            'acquisition delay', unit='s', initial_value=0,
                            parameter_class=ManualParameter)
@@ -228,17 +231,20 @@ class QuDev_transmon(Qubit):
         self.update_detector_functions()
 
     def update_detector_functions(self):
+        if self.RO_acq_weight_function_Q() is None:
+            channels = [self.RO_acq_weight_function_I()]
+        else:
+            channels = [self.RO_acq_weight_function_I(),
+                        self.RO_acq_weight_function_Q()]
+
         self.int_log_det = det.UHFQC_integration_logging_det(
-            UHFQC=self.UHFQC, AWG=self.AWG, channels=[
-                self.RO_acq_weight_function_I(),
-                self.RO_acq_weight_function_Q()],
+            UHFQC=self.UHFQC, AWG=self.AWG, channels=channels,
             integration_length=self.RO_acq_integration_length(),
             nr_shots=self.RO_acq_shots())
 
         self.int_avg_det = det.UHFQC_integrated_average_detector(
             self.UHFQC, self.AWG, nr_averages=self.RO_acq_averages(),
-            channels=[self.RO_acq_weight_function_I(),
-                      self.RO_acq_weight_function_Q()],
+            channels=channels,
             integration_length=self.RO_acq_integration_length())
 
         self.inp_avg_det = det.UHFQC_input_average_detector(
@@ -773,14 +779,14 @@ class QuDev_transmon(Qubit):
             if c2 is not None:
                 self.UHFQC.set('quex_rot_{}_imag'.format(c2), 0)
 
-
     def calibrate_readout_weights(self, MC=None, update=True, channels=(0, 1),
-                                  analyze=True, close_fig=True):
+                                  close_fig=True, upload=True, filter_t=None,
+                                  subtract_offset=False, **kw):
         """
         Sets the weight function of the UHFLI channel
         `self.RO_acq_weight_function_I` to the difference of the traces of the
         qubit prepared in the |0> and |1> state, which is optimal assuming that
-        the standard deviation (over different measurements of both traces is
+        the standard deviation over different measurements of both traces is
         a constant. Sets `self.RO_acq_weight_function_Q` to `None`.
 
         Args:
@@ -797,10 +803,17 @@ class QuDev_transmon(Qubit):
             close_fig: Boolean flag to close the matplotlib's figure. If
                        `False`, then the plots can be viewed with `plt.show()`
                        Default `True`.
+            upload: Whether to reupload the AWG waveforms. Currently
+                    unimplemented
+            filter_t: The type of filter to apply to the measured difference
+                      of the average g- and e-trace.
 
         Returns:
             Optimal weight(s) for state discrimination.
         """
+
+        old_averages = self.RO_acq_averages()
+        self.RO_acq_averages(2**15)
 
         self.prepare_for_timedomain()
         if MC is None:
@@ -812,10 +825,12 @@ class QuDev_transmon(Qubit):
             pulse_comb='OffOff'))
         MC.set_sweep_points(np.arange(2))
         MC.set_detector_function(self.inp_avg_det)
-        data0 = MC.run(name='Weight_calib_0'+self.msmt_suffix)
+        MC.run(name='Weight_calib_0'+self.msmt_suffix)
 
-        if analyze:
-            ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
+        MA = ma.MeasurementAnalysis(auto=False)
+        MA.get_naming_and_values()
+        MA.data_file.close()
+        data0 = MA.measured_values
 
         MC.set_sweep_function(awg_swf.OffOn(
             pulse_pars=self.get_drive_pars(),
@@ -823,15 +838,81 @@ class QuDev_transmon(Qubit):
             pulse_comb='OnOn'))
         MC.set_sweep_points(np.arange(2))
         MC.set_detector_function(self.inp_avg_det)
-        data1 = MC.run(name='Weight_calib_1' + self.msmt_suffix)
+        MC.run(name='Weight_calib_1' + self.msmt_suffix)
+
+        MA = ma.MeasurementAnalysis(auto=False)
+        MA.get_naming_and_values()
+        MA.data_file.close()
+        data1 = MA.measured_values
+
+        self.RO_acq_averages(old_averages)
 
         weights_I = data1[0] - data0[0]
-        weights_I -= np.mean(weights_I)
-        weights_I /= np.max(np.abs(weights_I))
-
         weights_Q = data1[1] - data0[1]
-        weights_Q -= np.mean(weights_Q)
-        weights_Q /= np.max(np.abs(weights_Q))
+        if subtract_offset:
+            weights_I -= (np.min(weights_I) + np.max(weights_I))/2
+            weights_Q -= (np.min(weights_Q) + np.max(weights_Q))/2
+
+        contrast = np.sqrt(np.sum((data1[0] - data0[0])**2 + \
+                                  (data1[1] - data0[1])**2))
+        print('\ng-e trace contrast: {}'.format(contrast))
+
+        if filter_t == 'gaussian':
+            data = weights_I + 1j*weights_Q
+            sigma = kw.get('filter_sigma', 10/self.f_RO_mod())
+
+            kernel = np.arange(-5*sigma, 5*sigma, 1/1.8e9)
+            kernel -= np.mean(kernel)
+            kernel = np.exp(-kernel**2 / (2*sigma**2)) * \
+                     np.exp(-2j*np.pi*kernel*self.f_RO_mod())
+
+            pad_len = len(kernel)
+            data = np.pad(data, (pad_len, pad_len), 'constant')
+            data = np.convolve(data, kernel, mode='same')
+            data = data[pad_len+1:-pad_len+1]
+
+            weights_I = np.real(data)
+            weights_Q = np.imag(data)
+        elif filter_t == 'blackman-harris':
+            data = weights_I + 1j*weights_Q
+            sigma = kw.get('filter_sigma', 10/self.f_RO_mod())
+            N = int(1.8e9*sigma/0.1385072985484252)
+            n = np.arange(N)
+            a0, a1, a2, a3 = 0.35875, 0.48829, 0.14128, 0.01168
+            envelope = -a3*np.cos(6*np.pi*n/(N-1))
+            envelope += a2*np.cos(4*np.pi*n/(N-1))
+            envelope -= a1*np.cos(2*np.pi*n/(N-1))
+            envelope += a0
+            times = n/1.8e9
+            times -= np.mean(times)
+            kernel = envelope * np.exp(-2j*np.pi*times*self.f_RO_mod())
+
+            pad_len = len(kernel)
+            data = np.pad(data, (pad_len, pad_len), 'constant')
+            data = np.convolve(data, kernel, mode='same')
+            data = data[pad_len+1:-pad_len+1]
+
+            weights_I = np.real(data)
+            weights_Q = np.imag(data)
+        elif filter_t == 'uniform':
+            data = weights_I + 1j*weights_Q
+            tbase = np.linspace(0, len(data)/1.8, len(data), endpoint=False)
+            p = np.abs(data)
+            p /= np.sum(p)
+            angle = np.sum(p*np.angle(data*np.exp(2j*np.pi*tbase*self.f_RO_mod())))
+            data = np.exp(-2j*np.pi*tbase*self.f_RO_mod() + 1j*angle)
+
+            weights_I = np.real(data)
+            weights_Q = np.imag(data)
+        elif filter_t == 'none':
+            pass
+        else:
+            raise KeyError('Unknown filter type: {}'.format(filter_t))
+
+        max_diff = np.max([np.max(np.abs(weights_I)),
+                           np.max(np.abs(weights_Q))])
+        weights_I /= max_diff
+        weights_Q /= max_diff
 
         if update:
             c = self.RO_acq_weight_function_I()
@@ -848,6 +929,7 @@ class QuDev_transmon(Qubit):
                 self.UHFQC.set('quex_rot_{}_imag'.format(c), 1)
             else:
                 self.UHFQC.set('quex_rot_{}_imag'.format(c), 0)
+            self.ssro_contrast(contrast)
 
         # format the return value to the same shape as channels.
         ret = []
@@ -859,7 +941,7 @@ class QuDev_transmon(Qubit):
         return tuple(ret)
 
     def find_ssro_fidelity(self, MC=None, analyze=True, close_fig=True,
-                           no_fits=False):
+                           no_fits=False, upload=True):
         """
         Conduct an off-on measurement on the qubit recording single-shot
         results and determine the single shot readout fidelity.
@@ -893,7 +975,8 @@ class QuDev_transmon(Qubit):
 
         MC.set_sweep_function(awg_swf.OffOn(
             pulse_pars=self.get_drive_pars(),
-            RO_pars=self.get_RO_pars()))
+            RO_pars=self.get_RO_pars(),
+            upload=upload))
         MC.set_sweep_points(np.arange(self.RO_acq_shots()))
         MC.set_detector_function(self.int_log_det)
 
@@ -901,8 +984,10 @@ class QuDev_transmon(Qubit):
 
         if analyze:
             rotate = self.RO_acq_weight_function_Q() is not None
+            channels = self.int_log_det.value_names
             ana = ma.SSRO_Analysis(auto=True, close_fig=close_fig,
-                                   rotate=rotate, no_fits=no_fits)
+                                   rotate=rotate, no_fits=no_fits,
+                                   channels=channels)
             if not no_fits:
                 return ana.F_a, ana.F_d, ana.SNR
             else:
@@ -1318,9 +1403,11 @@ class QuDev_transmon(Qubit):
         if update:
             if for_ef is False:
                 self.amp180(amp180)
+                self.amp90_scale(amp90/amp180)
                 self.amp90(amp90)
             else:
                 self.amp180_ef(amp180)
+                self.amp90_scale_ef(amp90/amp180)
                 self.amp90_ef(amp90)
 
         return rabi_amps

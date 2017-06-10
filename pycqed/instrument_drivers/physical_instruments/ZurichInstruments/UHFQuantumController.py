@@ -739,7 +739,8 @@ class UHFQC(Instrument):
         wave_I_string = self.array_to_combined_vector_string(Iwave, "Iwave")
         wave_Q_string = self.array_to_combined_vector_string(Qwave, "Qwave")
         delay_samples = int(acquisition_delay*1.8e9/8)
-        delay_string = '\twait(wait_delay);\n'
+        #delay_string = '\twait(wait_delay);\n'
+        delay_string = ''
         self.awgs_0_userregs_2(delay_samples)
 
         preamble = """

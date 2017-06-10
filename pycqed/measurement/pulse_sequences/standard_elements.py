@@ -126,7 +126,8 @@ def multi_pulse_elt(i, station, pulse_list, sequencer_config=None):
         # Adding any non special (composite) pulse
         if (pulse_pars['pulse_type'] not in ['MW_IQmod_pulse_tek',
                                              'MW_IQmod_pulse_UHFQC',
-                                             'Gated_MW_RO_pulse']):
+                                             'Gated_MW_RO_pulse',
+                                             'Multiplexed_UHFQC_pulse']):
             try:
                 # Look for the function in pl = pulse_lib
                 pulse_func = getattr(pl, pulse_pars['pulse_type'])
@@ -170,7 +171,8 @@ def multi_pulse_elt(i, station, pulse_list, sequencer_config=None):
                     start=t0, refpulse=last_pulse,
                     refpoint=pulse_pars['refpoint'])
 
-            elif pulse_pars['pulse_type'] == 'MW_IQmod_pulse_UHFQC':
+            elif (pulse_pars['pulse_type'] == 'MW_IQmod_pulse_UHFQC' or
+                  pulse_pars['pulse_type'] == 'Multiplexed_UHFQC_pulse'):
                 # "adding a 0 amp pulse because the sequencer needs an element for timing
                 last_pulse = el.add(pulse.SquarePulse(
                     name='RO_marker', amplitude=0,
