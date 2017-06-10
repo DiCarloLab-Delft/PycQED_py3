@@ -5285,7 +5285,7 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
 
         amp_only = kw.get('amp_only',False)
         percentile = kw.get('percentile',20)
-        num_sigma_threshold = kw.get('num_sigma_threshold',10)
+        num_sigma_threshold = kw.get('num_sigma_threshold',5)
         window_len_filter = kw.get('window_len',3)
         window_len_cut_edges = kw.get('analysis_window',10)
 
@@ -5312,8 +5312,8 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
         #Find peaks
         self.peaks = a_tools.peak_finder(sweep_pts_cut_edges,
                                          data_dist_smooth,
-                                         percentile=percentile,
                                          analyze_ef=analyze_ef,
+                                         percentile=percentile,
                                          num_sigma_threshold=num_sigma_threshold)
 
         #extract highest peak -> ge transition
@@ -5346,6 +5346,8 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
                             'initial linewidth '
                             'guess was taken as kappa_guess={}'.format(
                              f0,kappa_guess))
+
+        print('Searching for '+key+'s.')
 
         amplitude_guess = np.pi * kappa_guess * \
                           abs(max(data_dist_smooth) - min(data_dist_smooth))
@@ -5382,28 +5384,99 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
         else: #fit a double Lorentzian and extract the 2nd peak as well
             #extract second highest peak -> ef transition
 
-            if self.peaks[key+'s'].size > 1: #if there's more than one peak
-                #difference between largest peak and others
-                diff = [self.peaks[key] - self.peaks[key+'s']]
-                #take peak farthest away from f_ge
-                f0_gf_over_2 = self.peaks[key+'s'][np.argmax(diff)]
-                kappa_guess_ef = self.peaks[key+'_widths'][np.argmax(diff)] / 4
-                if kappa_guess_ef == 0:
-                    kappa_guess_ef = kappa_guess
+            tallest_peak = self.peaks[key] #the gf/2 freq
+            tallest_peak_idx = self.peaks[key+'_idx']
+            tallest_peak_width = self.peaks[key+'_width']
+
+            #serach for 2nd peak (f_ge) to the right of the first
+            n=self.data_dist.size//10
+            m=self.data_dist.size//10
+            while(int(len(sweep_pts_cut_edges)-1) <= int(tallest_peak_idx+n) and
+                          n>0):
+                n -= 1
+
+            self.peaks = a_tools.peak_finder(
+                sweep_pts_cut_edges[int(tallest_peak_idx+n)::],
+                data_dist_smooth[int(tallest_peak_idx+n)::],
+                analyze_ef=False,
+                percentile=percentile,
+                num_sigma_threshold=1,
+                optimize=False,
+                key=key)
+
+            subset_right = data_dist_smooth[int(tallest_peak_idx+n)::]
+            val_right = subset_right[self.peaks[key+'_idx']]
+            f0_right = self.peaks[key]
+            kappa_guess_right = self.peaks[key+'_width']
+            f0_gf_over_2_right = tallest_peak
+            kappa_guess_ef_right = tallest_peak_width
+
+            if np.abs(self.peaks[key] - tallest_peak) > 100e6:
+                print('Both f_ge and f_gf/2 have been found. '
+                      'f_ge was assumed to the RIGHT of f_gf/2.')
+                f0 = f0_right
+                kappa_guess = kappa_guess_right
+                f0_gf_over_2 = f0_gf_over_2_right
+                kappa_guess_ef = kappa_guess_ef_right
+
             else:
-                f0_gf_over_2 = f0-2e6 #CHECK!
-                kappa_guess_ef = kappa_guess
-                logging.warning('The find_peaks function was not able to '
-                                'find more than one peak/dip. '
-                                'The guess values f0_gf_over_2 = "%s" and '
-                                'kappa_guess_ef = "%s" '
-                                'were used.' %(f0_gf_over_2, kappa_guess) )
+                while(int(tallest_peak_idx-m)<0 and m>0):
+                    m -= 1
+
+                #serach for 2nd peak (f_gf/2) to the left of the first
+                self.peaks = a_tools.peak_finder(
+                    sweep_pts_cut_edges[0:int(tallest_peak_idx-m)],
+                    data_dist_smooth[0:int(tallest_peak_idx-m)],
+                    analyze_ef=False,
+                    percentile=percentile,
+                    num_sigma_threshold=1,
+                    optimize=False,
+                    key=key)
+
+                subset_left = data_dist_smooth[0:int(tallest_peak_idx-m)]
+                val_left = subset_left[self.peaks[key+'_idx']]
+                f0_left = tallest_peak
+                kappa_guess_left = tallest_peak_width
+                f0_gf_over_2_left = self.peaks[key]
+                kappa_guess_ef_left = self.peaks[key+'_width']
+
+                if np.abs(self.peaks[key] - tallest_peak) > 100e6:
+                    print('Both f_ge and f_gf/2 have been found. '
+                          'f_ge was assumed to the LEFT of f_gf/2.')
+
+                    f0 = f0_left
+                    kappa_guess = kappa_guess_left
+                    f0_gf_over_2 = f0_gf_over_2_left
+                    kappa_guess_ef = kappa_guess_ef_left
+
+                else:
+                    print('The f_gf/2 '+key+' was not found. Fitting to '
+                          'the next largest '+key+' found.')
+                    if np.abs(val_left) > np.abs(val_right):
+                        f0 = f0_left
+                        kappa_guess = kappa_guess_left
+                        f0_gf_over_2 = f0_gf_over_2_left
+                        kappa_guess_ef = kappa_guess_ef_left
+                    else:
+                        f0 = f0_right
+                        kappa_guess = kappa_guess_right
+                        f0_gf_over_2 = f0_gf_over_2_right
+                        kappa_guess_ef = kappa_guess_ef_right
+
+            if kappa_guess == 0:
+                kappa_guess = 5e6
+            if kappa_guess_ef == 0:
+                kappa_guess_ef == 2.5e6
+
+            amplitude_guess = np.pi * kappa_guess * \
+                              abs(max(data_dist_smooth) - min(data_dist_smooth))
 
             amplitude_guess_ef = 0.5*np.pi * kappa_guess_ef * \
                                  abs(max(data_dist_smooth) -
                                      min(data_dist_smooth))
 
             if key == 'dip':
+                amplitude_guess = -amplitude_guess
                 amplitude_guess_ef = -amplitude_guess_ef
 
             DoubleLorentzianModel = fit_mods.TwinLorentzModel
@@ -5443,7 +5516,6 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
                                                 f=self.sweep_points,
                                                 params=self.params)
 
-        # print('min ampl =', 2*np.var(self.data_dist))
             self.fit_results.append(self.fit_res)
 
     def run_default_analysis(self, print_fit_results=False, analyze_ef=False,

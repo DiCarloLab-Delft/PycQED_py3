@@ -906,9 +906,64 @@ def cut_edges(array, window_len=11):
     array = array[(window_len//2):-(window_len//2)]
     return array
 
-
 def peak_finder(x, y, percentile=20, num_sigma_threshold=5,
-                window_len=3, analyze_ef=False):
+                window_len=3, key=None, analyze_ef=False, optimize=True):
+
+    search_result = look_for_peaks_dips(x=x, y_smoothed=y, percentile=percentile,
+                                        num_sigma_threshold=num_sigma_threshold,
+                                        window_len=window_len,
+                                        key=key,
+                                        analyze_ef=analyze_ef)
+
+    y_for_test = deepcopy(y)
+    if key is not None:
+        key_1 = key
+    else:
+        if search_result['dip'] is None:
+            key_1 = 'peak'
+        elif search_result['peak'] is None:
+            key_1 = 'dip'
+            y_for_test = -y_for_test
+        elif np.abs(y[search_result['dip_idx']]) < \
+                np.abs(y[search_result['peak_idx']]):
+            key_1 = 'peak'
+        elif np.abs(y[search_result['dip_idx']]) > \
+             np.abs(y[search_result['peak_idx']]):
+            key_1 = 'dip'
+            y_for_test = -y_for_test
+
+    if optimize:
+
+        if (y_for_test[search_result[key_1+'_idx']] < max(y_for_test)):
+
+            while ((y_for_test[search_result[key_1+'_idx']] < max(y_for_test)) and
+                    (num_sigma_threshold<100) and
+                        (len(search_result[key_1+'s_idx'])>1)):
+
+                search_result_1 = deepcopy(search_result)
+                num_sigma_threshold += 1
+
+                search_result = look_for_peaks_dips(x=x,y_smoothed=y,
+                                    percentile=percentile,
+                                    num_sigma_threshold=(num_sigma_threshold),
+                                    window_len=window_len,
+                                    key=key_1,
+                                    analyze_ef=analyze_ef)
+
+                if search_result[key_1+'_idx'] is None:
+                    search_result = search_result_1
+                    break
+
+            print('Peak Finder: Optimal num_sigma_threshold after optimization '
+                  'is ', num_sigma_threshold)
+
+    return search_result
+
+def look_for_peaks_dips(x, y_smoothed, percentile=20, num_sigma_threshold=5,
+                        window_len=3, analyze_ef=False, key=None):
+
+# def peak_finder(x, y, percentile=20, num_sigma_threshold=5,
+#                         window_len=3, analyze_ef=False):
 
     '''
     Peak finding algorithm designed by Serwan
@@ -918,7 +973,7 @@ def peak_finder(x, y, percentile=20, num_sigma_threshold=5,
     '''
 
     # Smooth the data
-    y_smoothed = smooth(y, window_len=window_len)
+    #y_smoothed = smooth(y, window_len=window_len)
 
     # Finding peaks
     # Defining the threshold
@@ -964,7 +1019,7 @@ def peak_finder(x, y, percentile=20, num_sigma_threshold=5,
                                      np.argmax(y_smoothed[elem[0]:elem[1]])]
                 else:
                     peak_indices += [elem[0]]
-                    #peak_widths += [x[elem[1]] - x[elem[0]]]
+                #peak_widths += [x[elem[1]] - x[elem[0]]]
             except:
                 pass
 
@@ -974,28 +1029,24 @@ def peak_finder(x, y, percentile=20, num_sigma_threshold=5,
         #Take an approximate peak width for each peak index
         for i,idx in enumerate(peak_indices):
             if (idx+i+1)<x.size and (idx-i-1)>=0:          #ensure data points
-                #idx+i+1 and idx-i-1
-                #are inside sweep pts
+                                                           #idx+i+1 and idx-i-1
+                                                           #are inside sweep pts
                 peak_widths += [ x[idx+i+1] - x[idx-i-1] ]
             elif (idx+i+1)>x.size and (idx-i-1)>=0:
                 peak_widths += [ x[idx] - x[idx-i] ]
             elif (idx+i+1)<x.size and (idx-i-1)<0:
                 peak_widths += [ x[idx+i] - x[idx] ]
+            else:
+                peak_widths += [ 5e6 ]
 
         peaks = np.take(x, peak_indices)                   #Frequencies of peaks
         peak_vals = np.take(y_smoothed, peak_indices)           #values of peaks
-        if analyze_ef:
-            #idx of highest peak
-            peak_index = peak_indices[np.argmax(peak_widths)]
-            #width of highest peak
-            peak_width = peak_widths[np.argmax(peak_widths)]
-        else:
-            peak_index = peak_indices[np.argmax(peak_vals)]
-            peak_width = peak_widths[np.argmax(peak_vals)]
+        peak_index = peak_indices[np.argmax(peak_vals)]
+        peak_width = peak_widths[np.argmax(peak_vals)]
         peak = x[peak_index]                          #Frequency of highest peak
 
-
     else:
+        print('No peaks found in look_for_peaks_dips')
         peak = None
         peak_vals = None
         peak_index = None
@@ -1045,7 +1096,7 @@ def peak_finder(x, y, percentile=20, num_sigma_threshold=5,
                                     np.argmin(y_smoothed[elem[0]:elem[1]])]
                 else:
                     dip_indices += [elem[0]]
-                    #dip_widths += [x[elem[1]] - x[elem[0]]]
+                #dip_widths += [x[elem[1]] - x[elem[0]]]
             except:
                 pass
 
@@ -1055,36 +1106,51 @@ def peak_finder(x, y, percentile=20, num_sigma_threshold=5,
         #Take an approximate dip width for each dip index
         for i,idx in enumerate(dip_indices):
             if (idx+i+1)<x.size and (idx-i-1)>=0:         #ensure data points
-                #idx+i+1 and idx-i-1
-                #are inside sweep pts
+                                                          #idx+i+1 and idx-i-1
+                                                          #are inside sweep pts
                 dip_widths += [ x[idx+i+1] - x[idx-i-1] ]
             elif (idx+i+1)>x.size and (idx-i-1)>=0:
                 dip_widths += [ x[idx] - x[idx-i] ]
             elif (idx+i+1)<x.size and (idx-i-1)<0:
                 dip_widths += [ x[idx+i] - x[idx] ]
+            else:
+                dip_widths += [ 5e6 ]
 
         dips = np.take(x, dip_indices)
         dip_vals = np.take(y_smoothed, dip_indices)
-        if analyze_ef:
-            dip_index = dip_indices[np.argmax(dip_widths)]
-            dip_width = dip_widths[np.argmax(dip_widths)]
-        else:
-            dip_index = dip_indices[np.argmin(dip_vals)]
-            dip_width = dip_widths[np.argmax(dip_vals)]
+        dip_index = dip_indices[np.argmin(dip_vals)]
+        dip_width = dip_widths[np.argmax(dip_vals)]
         dip = x[dip_index]
+
     else:
+        print('No dips found in look_for_peaks_dips')
         dip = None
         dip_vals = None
         dip_index = None
         dips = []
         dip_width = None
 
-    return {'peak': peak, 'peak_idx': peak_index, 'peak_values':peak_vals,
-            'peak_width': peak_width, 'peak_widths': peak_widths,
-            'peaks': peaks, 'peaks_idx': peak_indices,
-            'dip': dip, 'dip_idx': dip_index, 'dip_values':dip_vals,
-            'dip_width': dip_width, 'dip_widths': dip_widths,
-            'dips': dips, 'dips_idx': dip_indices}
+    if key == 'peak':
+        return {'peak': peak, 'peak_idx': peak_index, 'peak_values':peak_vals,
+                'peak_width': peak_width, 'peak_widths': peak_widths,
+                'peaks': peaks, 'peaks_idx': peak_indices,
+                'dip': None, 'dip_idx': None, 'dip_values':[],
+                'dip_width': None, 'dip_widths': [],
+                'dips': [], 'dips_idx': []}
+    elif key == 'dip':
+        return {'peak': None, 'peak_idx': None, 'peak_values':[],
+                'peak_width': None, 'peak_widths': [],
+                'peaks': [], 'peaks_idx': [],
+                'dip': dip, 'dip_idx': dip_index, 'dip_values':dip_vals,
+                'dip_width': dip_width, 'dip_widths': dip_widths,
+                'dips': dips, 'dips_idx': dip_indices}
+    else:
+        return {'peak': peak, 'peak_idx': peak_index, 'peak_values':peak_vals,
+                'peak_width': peak_width, 'peak_widths': peak_widths,
+                'peaks': peaks, 'peaks_idx': peak_indices,
+                'dip': dip, 'dip_idx': dip_index, 'dip_values':dip_vals,
+                'dip_width': dip_width, 'dip_widths': dip_widths,
+                'dips': dips, 'dips_idx': dip_indices}
 
 
 def calculate_distance_ground_state(data_amp, data_phase=None, percentile=70,

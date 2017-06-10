@@ -166,7 +166,7 @@ class QuDev_transmon(Qubit):
                                  initial_value=None, vals=vals.Strings())
         self.add_pulse_parameter('X180', 'amp180', 'amplitude',
                                  initial_value=1, vals=vals.Numbers())
-        self.add_pulse_parameter('X180', 'amp90', 'amplitude',
+        self.add_pulse_parameter('X180', 'amp90', 'amplitude_90',
                                  initial_value=0.5, vals=vals.Numbers())
         self.add_pulse_parameter('X180', 'amp90_scale', 'amp90_scale',
                                  initial_value=0.5, vals=vals.Numbers(0, 1))
@@ -193,9 +193,9 @@ class QuDev_transmon(Qubit):
                                  initial_value=None, vals=vals.Strings())
         self.add_pulse_parameter('X180_ef', 'amp180_ef', 'amplitude',
                                  initial_value=1, vals=vals.Numbers())
-        self.add_pulse_parameter('X180_ef', 'amp90_ef', 'amplitude_ef',
+        self.add_pulse_parameter('X180_ef', 'amp90_ef', 'amplitude_90',
                                  initial_value=0.5, vals=vals.Numbers())
-        self.add_pulse_parameter('X180_ef', 'amp90_scale_ef', 'amp90_scale_ef',
+        self.add_pulse_parameter('X180_ef', 'amp90_scale_ef', 'amp90_scale',
                                  initial_value=0.5, vals=vals.Numbers(0, 1))
         self.add_pulse_parameter('X180_ef', 'pulse_delay_ef', 'pulse_delay',
                                  initial_value=None, vals=vals.Numbers())
@@ -472,27 +472,56 @@ class QuDev_transmon(Qubit):
         if analyze:
             ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
 
-    def measure_rabi(self, amps=None, n=1, MC=None, analyze=True,
+    def measure_rabi(self, amps=None, MC=None, analyze=True,
                      close_fig=True, cal_points=True, no_cal_points=2,
-                     upload=True, label=None):
+                     upload=True, label=None,  n=1):
+
+        """
+        Varies the amplitude of the qubit drive pulse and measures the readout
+        resonator transmission.
+
+        Args:
+            amps            the array of drive pulse amplitudes
+            MC              the MeasurementControl object
+            analyse         whether to create a (base) MeasurementAnalysis
+                            object for this measurement; offers possibility to
+                            manually analyse data using the classes in
+                            measurement_analysis.py
+            close_fig       whether or not to close the default analysis figure
+            cal_points      whether or not to use calibration points
+            no_cal_points   how many calibration points to use
+            upload          whether or not to upload the sequence to the AWG
+            label           the measurement label
+            n               the number of times the drive pulses with the same
+                            amplitude should be repeated in each measurement
+        """
 
         if amps is None:
             raise ValueError("Unspecified amplitudes for measure_rabi")
 
+        # Define the measurement label
+        if label is None:
+            label = 'Rabi-n{}'.format(n) + self.msmt_suffix
+
+        # Prepare the physical instruments for a time domain measurement
         self.prepare_for_timedomain()
 
+        # Define the MeasurementControl object for this measurement
         if MC is None:
             MC = self.MC
 
-        MC.set_sweep_function(awg_swf.Rabi(
-            pulse_pars=self.get_drive_pars(), RO_pars=self.get_RO_pars(), n=n,
-            cal_points=cal_points, no_cal_points=no_cal_points, upload=upload))
+        # Specify the sweep function, the sweep points,
+        # and the detector function, and run the measurement
+        MC.set_sweep_function(awg_swf.Rabi(pulse_pars=self.get_drive_pars(),
+                                           RO_pars=self.get_RO_pars(), n=n,
+                                           cal_points=cal_points,
+                                           no_cal_points=no_cal_points,
+                                           upload=upload))
         MC.set_sweep_points(amps)
         MC.set_detector_function(self.int_avg_det)
-        if label is None:
-            label = 'Rabi-n{}'.format(n) + self.msmt_suffix
         MC.run(label)
 
+        # Create a MeasurementAnalysis object for this measurement
         if analyze:
             ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
 
@@ -1184,77 +1213,78 @@ class QuDev_transmon(Qubit):
         else:
             return f0
 
-    def find_amplitudes(self, rabi_amps=None, label=None, for_ef=False, update=False,
-                        MC=None, close_fig=True, cal_points=True, no_cal_points=2,
-                        upload=True, last_ge_pulse=True, **kw):
+    def find_amplitudes(self, rabi_amps=None, label=None, for_ef=False,
+                        update=False, MC=None, close_fig=True, cal_points=True,
+                        no_cal_points=2, upload=True, last_ge_pulse=True, **kw):
 
         """
-        Finds the pi and pi/2 pulse amplitudes from the fit to a Rabi
-        experiment. Uses the Rabi_Analysis(_new)
-        class from measurement_analysis.py
-        WARNING: Does not automatically update the qubit amplitudes.
-        Set update=True if you want this!
+            Finds the pi and pi/2 pulse amplitudes from the fit to a Rabi
+            experiment. Uses the Rabi_Analysis(_new)
+            class from measurement_analysis.py
+            WARNING: Does not automatically update the qubit amplitudes.
+            Set update=True if you want this!
 
-        Analysis script for the Rabi measurement:
-        1. The I and Q data are rotated and normalized based on the calibration
-            points. In most analysis routines, the latter are typically 4:
-            2 X180 measurements, and 2 identity measurements, which get
-            averaged resulting in one X180 point and one identity point.
-            However, the default for Rabi is 2 (2 identity measurements)
-            because we typically do Rabi in order to find the correct amplitude
-            for an X180 pulse. However, if a previous such value exists, this
-            routine also accepts 4 cal pts.
-        2. The normalized data is fitted to a cosine function.
-        3. The pi-pulse and pi/2-pulse amplitudes are calculated from the fit.
-        4. The normalized data, the best fit results, and the pi and pi/2
-            pulses are plotted.
+            Analysis script for the Rabi measurement:
+            1. The I and Q data are rotated and normalized based on the calibration
+                points. In most analysis routines, the latter are typically 4:
+                2 X180 measurements, and 2 identity measurements, which get
+                averaged resulting in one X180 point and one identity point.
+                However, the default for Rabi is 2 (2 identity measurements)
+                because we typically do Rabi in order to find the correct amplitude
+                for an X180 pulse. However, if a previous such value exists, this
+                routine also accepts 4 cal pts.
+            2. The normalized data is fitted to a cosine function.
+            3. The pi-pulse and pi/2-pulse amplitudes are calculated from the fit.
+            4. The normalized data, the best fit results, and the pi and pi/2
+                pulses are plotted.
 
-        The ef analysis assumes the the e population is zero (because of the
-        ge X180 pulse at the end).
+            The ef analysis assumes the the e population is zero (because of the
+            ge X180 pulse at the end).
 
-        Arguments:
-            rabi_amps:          amplitude sweep points for the
-                                Rabi experiment
-            label:              label of the analysis routine
-            for_ef:             find amplitudes for the ef transition
-            update:             update the qubit amp180 and amp90 parameters
-            MC:                 the measurement control object
-            close_fig:          close the resulting figure?
-            cal_points          whether to used calibration points of not
-            no_cal_points       number of calibration points to use; if it's
-                                the first time rabi is run
-                                then 2 cal points (two I pulses at the end)
-                                should be used for the ge Rabi,
-                                and 4 (two I pulses and 2 ge X180 pulses at
-                                the end) for the ef Rabi
-            last_ge_pulse       whether to map the population to the ground
-                                state after each run of the Rabi experiment
-                                on the ef level
-        Keyword arguments:
-            other keyword arguments. The Rabi sweep amplitudes array 'amps',
-            or the parameter 'amps_mean' should be passed here
+            Arguments:
+                rabi_amps:          amplitude sweep points for the
+                                    Rabi experiment
+                label:              label of the analysis routine
+                for_ef:             find amplitudes for the ef transition
+                update:             update the qubit amp180 and amp90 parameters
+                MC:                 the measurement control object
+                close_fig:          close the resulting figure?
+                cal_points          whether to used calibration points of not
+                no_cal_points       number of calibration points to use; if it's
+                                    the first time rabi is run
+                                    then 2 cal points (two I pulses at the end)
+                                    should be used for the ge Rabi,
+                                    and 4 (two I pulses and 2 ge X180 pulses at
+                                    the end) for the ef Rabi
+                last_ge_pulse       whether to map the population to the ground
+                                    state after each run of the Rabi experiment
+                                    on the ef level
+            Keyword arguments:
+                other keyword arguments. The Rabi sweep amplitudes array 'amps',
+                or the parameter 'amps_mean' should be passed here
 
-            auto              (default=True)
-                automatically perform the entire analysis upon call
-            print_fit_results (default=True)
-                print the fit report
-            show              (default=True)
-                show the plots
-            show_guess        (default=False)
-                plot with initial guess values
-            show_amplitudes   (default=True)
-                print the pi&piHalf pulses amplitudes
-            plot_amplitudes   (default=True)
-                plot the pi&piHalf pulses amplitudes
-            no_of_columns     (default=1)
-                number of columns in your paper; figure sizes will be adjusted
-                accordingly (1 col: figsize = ( 7in , 4in ) 2 cols: figsize =
-                ( 3.375in , 2.25in ), PRL guidelines)
+                auto              (default=True)
+                    automatically perform the entire analysis upon call
+                print_fit_results (default=True)
+                    print the fit report
+                show              (default=True)
+                    show the plots
+                show_guess        (default=False)
+                    plot with initial guess values
+                show_amplitudes   (default=True)
+                    print the pi&piHalf pulses amplitudes
+                plot_amplitudes   (default=True)
+                    plot the pi&piHalf pulses amplitudes
+                no_of_columns     (default=1)
+                    number of columns in your paper; figure sizes will be adjusted
+                    accordingly (1 col: figsize = ( 7in , 4in ) 2 cols: figsize =
+                    ( 3.375in , 2.25in ), PRL guidelines)
 
-        Returns:
-            pi and pi/2 pulses amplitudes + their stderr as a dictionary with
-            keys 'piPulse', 'piHalfPulse', 'piPulse_std', 'piHalfPulse_std'.
-        """
+            Returns:
+                pi and pi/2 pulses amplitudes + their stderr as a dictionary with
+                keys 'piPulse', 'piHalfPulse', 'piPulse_std', 'piHalfPulse_std'.
+            """
+
         if not update:
             logging.warning("Does not automatically update the qubit pi and "
                             "pi/2 amplitudes. "
@@ -1266,7 +1296,7 @@ class QuDev_transmon(Qubit):
         if not cal_points:
             no_cal_points = 0
 
-        #how many times to apply the Rabi pulse
+            #how many times to apply the Rabi pulse
         n = kw.get('n',1)
 
         if rabi_amps is None:
@@ -1290,14 +1320,19 @@ class QuDev_transmon(Qubit):
 
         #Perform Rabi
         if for_ef is False:
-            self.measure_rabi(amps=rabi_amps, n=n, MC=MC, close_fig=close_fig, label=label,
-                              cal_points=cal_points, no_cal_points=no_cal_points, upload=upload)
+            self.measure_rabi(amps=rabi_amps, n=n, MC=MC,
+                              close_fig=close_fig,
+                              label=label,
+                              cal_points=cal_points,
+                              no_cal_points=no_cal_points,
+                              upload=upload)
         else:
             self.measure_rabi_2nd_exc(amps=rabi_amps, n=n, MC=MC,
                                       close_fig=close_fig, label=label,
                                       cal_points=cal_points,
                                       last_ge_pulse=last_ge_pulse,
-                                      no_cal_points=no_cal_points, upload=upload)
+                                      no_cal_points=no_cal_points,
+                                      upload=upload)
 
         #get pi and pi/2 amplitudes from the analysis results
         # TODO: might have to correct Rabi_Analysis_new to Rabi_Analysis
@@ -1309,8 +1344,8 @@ class QuDev_transmon(Qubit):
                                      last_ge_pulse=last_ge_pulse, **kw)
 
         rabi_amps = RabiA.rabi_amplitudes    #This is a dict with keywords
-                                             #'piPulse',  'piPulse_std',
-                                             #'piHalfPulse', 'piHalfPulse_std
+        #'piPulse',  'piPulse_std',
+        #'piHalfPulse', 'piHalfPulse_std
 
         amp180 = rabi_amps['piPulse']
         amp90 = rabi_amps['piHalfPulse']
@@ -1324,6 +1359,7 @@ class QuDev_transmon(Qubit):
                 self.amp90_ef(amp90)
 
         return rabi_amps
+
 
     def find_T1(self, times, label='T1', for_ef=False, update=False, MC=None,
                 cal_points=True, close_fig=True, **kw):
@@ -1641,7 +1677,7 @@ class QuDev_transmon(Qubit):
 
         return Qscale_dict
 
-    def find_anharmonicity(self, update=False):
+    def calculate_anharmonicity(self, update=False):
 
         """
         Computes the qubit anaharmonicity using f_ef (self.f_ef_qubit)
@@ -1667,7 +1703,7 @@ class QuDev_transmon(Qubit):
 
         return  anharmonicity
 
-    def find_EC_EJ(self, update=True, **kw):
+    def calculate_EC_EJ(self, update=True, **kw):
 
         """
         Extracts EC and EJ from a least squares fit to the transmon
