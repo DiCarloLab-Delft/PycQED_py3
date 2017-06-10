@@ -2819,6 +2819,7 @@ class SSRO_Analysis(MeasurementAnalysis):
                           shots_Q_0, min_len, plot_2D_histograms=True,
                           **kw):
         cmap = kw.pop('cmap', 'viridis')
+        plot = kw.get('plot', True)
         # plotting 2D histograms of mmts with pulse
 
         n_bins = 120  # the bins we want to have around our data
@@ -2838,7 +2839,7 @@ class SSRO_Analysis(MeasurementAnalysis):
                                                      [Q_min, Q_max, ]],
                                               normed=True)
 
-        if plot_2D_histograms:
+        if plot and plot_2D_histograms:
             fig, axarray = plt.subplots(nrows=1, ncols=2)
             axarray[0].tick_params(axis='both', which='major',
                                    labelsize=5, direction='out')
@@ -2854,8 +2855,8 @@ class SSRO_Analysis(MeasurementAnalysis):
                                             yedges1[0], yedges1[-1]], cmap=cmap)
             axarray[0].set_xlabel('Int. I (V)')
             axarray[0].set_ylabel('Int. Q (V)')
-            axarray[0].set_xlim(-edge, edge)
-            axarray[0].set_ylim(-edge, edge)
+            #axarray[0].set_xlim(-edge, edge)
+            #axarray[0].set_ylim(-edge, edge)
 
             # plotting 2D histograms of mmts with no pulse
             axarray[1].set_title('2D histogram, no pi pulse')
@@ -2865,8 +2866,8 @@ class SSRO_Analysis(MeasurementAnalysis):
                                             yedges0[-1]], cmap=cmap)
             axarray[1].set_xlabel('Int. I (V)')
             axarray[1].set_ylabel('Int. Q (V)')
-            axarray[1].set_xlim(-edge, edge)
-            axarray[1].set_ylim(-edge, edge)
+            #axarray[1].set_xlim(-edge, edge)
+            #axarray[1].set_ylim(-edge, edge)
 
             self.save_fig(fig, figname='SSRO_Density_Plots', **kw)
 
@@ -2909,14 +2910,14 @@ class SSRO_Analysis(MeasurementAnalysis):
         # interpolating to find the gauss top x and y coordinates
         x_lin = np.linspace(0, n_bins, n_bins+1)
         y_lin = np.linspace(0, n_bins, n_bins+1)
-        f_x_1 = interp1d(x_lin, xedges1)
+        f_x_1 = interp1d(x_lin, xedges1, fill_value='extrapolate')
         x_1_max = f_x_1(params1[1])
-        f_y_1 = interp1d(y_lin, yedges1)
+        f_y_1 = interp1d(y_lin, yedges1, fill_value='extrapolate')
         y_1_max = f_y_1(params1[2])
 
-        f_x_0 = interp1d(x_lin, xedges0)
+        f_x_0 = interp1d(x_lin, xedges0, fill_value='extrapolate')
         x_0_max = f_x_0(params0[1])
-        f_y_0 = interp1d(y_lin, yedges0)
+        f_y_0 = interp1d(y_lin, yedges0, fill_value='extrapolate')
         y_0_max = f_y_0(params0[2])
 
         # following part will calculate the angle to rotate the IQ plane
@@ -2971,6 +2972,9 @@ class SSRO_Analysis(MeasurementAnalysis):
 
     def no_fits_analysis(self, shots_I_1_rot, shots_I_0_rot, min_len,
                          **kw):
+
+        plot = kw.get('plot', True)
+
         min_voltage_1 = np.min(shots_I_1_rot)
         min_voltage_0 = np.min(shots_I_0_rot)
         min_voltage = np.min([min_voltage_1, min_voltage_0])
@@ -2999,21 +3003,22 @@ class SSRO_Analysis(MeasurementAnalysis):
         # adding half a bin size
         F_a = 1-(1-cumsum_diff_list[self.index_V_th_a])/2
 
-        fig, ax = plt.subplots()
-        ax.plot(bins[0:-1], self.cumsum_1, label='cumsum_1', color='red')
-        ax.plot(bins[0:-1], self.cumsum_0, label='cumsum_0', color='blue')
-        ax.axvline(V_th_a, ls='--', label="V_th_a = %.3f" % V_th_a,
-                   linewidth=2, color='grey')
-        ax.text(.7, .6, '$Fa$ = %.4f' % F_a, transform=ax.transAxes,
-                fontsize='large')
-        ax.set_title('raw cumulative histograms')
-        plt.xlabel('DAQ voltage integrated (AU)', fontsize=14)
-        plt.ylabel('Fraction', fontsize=14)
+        if plot:
+            fig, ax = plt.subplots()
+            ax.plot(bins[0:-1], self.cumsum_1, label='cumsum_1', color='red')
+            ax.plot(bins[0:-1], self.cumsum_0, label='cumsum_0', color='blue')
+            ax.axvline(V_th_a, ls='--', label="V_th_a = %.3f" % V_th_a,
+                       linewidth=2, color='grey')
+            ax.text(.7, .6, '$Fa$ = %.4f' % F_a, transform=ax.transAxes,
+                    fontsize='large')
+            ax.set_title('raw cumulative histograms')
+            plt.xlabel('DAQ voltage integrated (AU)', fontsize=14)
+            plt.ylabel('Fraction', fontsize=14)
 
-        #plt.hist(SS_Q_data, bins=40,label = '0 Q')
-        plt.legend(loc=2)
-        self.save_fig(fig, figname='raw-cumulative-histograms', **kw)
-        plt.show()
+            #plt.hist(SS_Q_data, bins=40,label = '0 Q')
+            plt.legend(loc=2)
+            self.save_fig(fig, figname='raw-cumulative-histograms', **kw)
+            plt.show()
 
         # saving the results
         if 'SSRO_Fidelity' not in self.analysis_group:
@@ -3028,6 +3033,9 @@ class SSRO_Analysis(MeasurementAnalysis):
 
     def s_curve_fits(self, shots_I_1_rot, shots_I_0_rot, min_len,
                      **kw):
+
+        plot = kw.get('plot', True)
+
         # Sorting data for analytical fitting
         S_sorted_I_1 = np.sort(shots_I_1_rot)
         S_sorted_I_0 = np.sort(shots_I_0_rot)
@@ -3083,10 +3091,10 @@ class SSRO_Analysis(MeasurementAnalysis):
             return y
 
         NormCdf2Model = lmfit.Model(NormCdf2)
-        NormCdfModel.set_param_hint('mu', value=(np.average(shots_I_0_rot)
-                                                 + np.average(shots_I_0_rot))/2)
-        NormCdfModel.set_param_hint('sigma', value=(np.std(shots_I_0_rot)
-                                                    + np.std(shots_I_0_rot))/2,
+        NormCdfModel.set_param_hint('mu', value=(np.average(shots_I_0_rot) +
+                                                 np.average(shots_I_1_rot))/2)
+        NormCdfModel.set_param_hint('sigma', value=(np.std(shots_I_0_rot) +
+                                                    np.std(shots_I_1_rot))/2,
                                              min=0)
 
         params = NormCdfModel.make_params()
@@ -3199,107 +3207,107 @@ class SSRO_Analysis(MeasurementAnalysis):
         noise = (sigma0_0 + sigma1_1)/2
         SNR = signal/noise
 
-        # plotting s-curves
-        fig, ax = plt.subplots(figsize=(8, 4))
-        ax.set_title(
-            'S-curves (not binned) and fits, determining fidelity and threshold '
-            'optimum, %s shots' % min_len)
-        ax.set_xlabel('DAQ voltage integrated (V)')  # , fontsize=14)
-        ax.set_ylabel('Fraction of counts')  # , fontsize=14)
-        ax.set_ylim((-.01, 1.01))
-        ax.plot(S_sorted_I_0, p_norm_I_0, label='0 I', linewidth=2,
-                color='blue')
-        ax.plot(S_sorted_I_1, p_norm_I_1, label='1 I', linewidth=2,
-                color='red')
+        if plot:
+            # plotting s-curves
+            fig, ax = plt.subplots(figsize=(8, 4))
+            ax.set_title('S-curves (not binned) and fits, determining fidelity '
+                         'and threshold optimum, %s shots' % min_len)
+            ax.set_xlabel('DAQ voltage integrated (V)')  # , fontsize=14)
+            ax.set_ylabel('Fraction of counts')  # , fontsize=14)
+            ax.set_ylim((-.01, 1.01))
+            ax.plot(S_sorted_I_0, p_norm_I_0, label='0 I', linewidth=2,
+                    color='blue')
+            ax.plot(S_sorted_I_1, p_norm_I_1, label='1 I', linewidth=2,
+                    color='red')
 
-        # ax.plot(S_sorted_I_0, fit_res_0.best_fit,
-        #         label='0 I single gaussian fit', ls='--', linewidth=3,
-        #         color='lightblue')
-        # ax.plot(S_sorted_I_1, fit_res_1.best_fit, label='1 I',
-        #         linewidth=2, color='red')
+            # ax.plot(S_sorted_I_0, fit_res_0.best_fit,
+            #         label='0 I single gaussian fit', ls='--', linewidth=3,
+            #         color='lightblue')
+            # ax.plot(S_sorted_I_1, fit_res_1.best_fit, label='1 I',
+            #         linewidth=2, color='red')
 
-        ax.plot(S_sorted_I_0, fit_res_double_0.best_fit,
-                label='0 I double gaussfit', ls='--', linewidth=3,
-                color='lightblue')
-        ax.plot(S_sorted_I_1, fit_res_double_1.best_fit,
-                label='1 I double gaussfit', ls='--', linewidth=3,
-                color='darkred')
-        labelstring = 'V_th_a= %.3f V' % (self.V_th_a)
-        labelstring_corrected = 'V_th_d= %.3f V' % (self.V_th_d)
+            ax.plot(S_sorted_I_0, fit_res_double_0.best_fit,
+                    label='0 I double gaussfit', ls='--', linewidth=3,
+                    color='lightblue')
+            ax.plot(S_sorted_I_1, fit_res_double_1.best_fit,
+                    label='1 I double gaussfit', ls='--', linewidth=3,
+                    color='darkred')
+            labelstring = 'V_th_a= %.3f V' % (self.V_th_a)
+            labelstring_corrected = 'V_th_d= %.3f V' % (self.V_th_d)
 
-        ax.axvline(self.V_th_a, ls='--', label=labelstring,
-                   linewidth=2, color='grey')
-        ax.axvline(self.V_th_d, ls='--', label=labelstring_corrected,
-                   linewidth=2, color='black')
+            ax.axvline(self.V_th_a, ls='--', label=labelstring,
+                       linewidth=2, color='grey')
+            ax.axvline(self.V_th_d, ls='--', label=labelstring_corrected,
+                       linewidth=2, color='black')
 
-        leg = ax.legend(loc='best')
-        leg.get_frame().set_alpha(0.5)
-        self.save_fig(fig, figname='S-curves', **kw)
-        plt.show()
+            leg = ax.legend(loc='best')
+            leg.get_frame().set_alpha(0.5)
+            self.save_fig(fig, figname='S-curves', **kw)
+            plt.show()
 
-        # plotting the histograms
-        fig, axes = plt.subplots(figsize=(8, 4))
-        n1, bins1, patches = pylab.hist(shots_I_1_rot, bins=int(min_len/50),
-                                        label='1 I', histtype='step',
-                                        color='red', normed=True)
-        n0, bins0, patches = pylab.hist(shots_I_0_rot, bins=int(min_len/50),
-                                        label='0 I', histtype='step',
-                                        color='blue', normed=True)
-        pylab.clf()
-        # n0, bins0 = np.histogram(shots_I_0_rot, bins=int(min_len/50), normed=1)
-        # n1, bins1 = np.histogram(shots_I_1_rot, bins=int(min_len/50), normed=1)
+            # plotting the histograms
+            fig, axes = plt.subplots(figsize=(8, 4))
+            n1, bins1, patches = pylab.hist(shots_I_1_rot, bins=int(min_len/50),
+                                            label='1 I', histtype='step',
+                                            color='red', normed=True)
+            n0, bins0, patches = pylab.hist(shots_I_0_rot, bins=int(min_len/50),
+                                            label='0 I', histtype='step',
+                                            color='blue', normed=True)
+            pylab.clf()
+            # n0, bins0 = np.histogram(shots_I_0_rot, bins=int(min_len/50),
+            #                          normed=1)
+            # n1, bins1 = np.histogram(shots_I_1_rot, bins=int(min_len/50),
+            #                          normed=1)
 
-        pylab.plot(bins1[:-1]+0.5*(bins1[1]-bins1[0]), n1, 'ro')
-        pylab.plot(bins0[:-1]+0.5*(bins0[1]-bins0[0]), n0, 'bo')
+            pylab.plot(bins1[:-1]+0.5*(bins1[1]-bins1[0]), n1, 'ro')
+            pylab.plot(bins0[:-1]+0.5*(bins0[1]-bins0[0]), n0, 'bo')
 
-        # n, bins1, patches = np.hist(shots_I_1_rot, bins=int(min_len/50),
-        #                               label = '1 I',histtype='step',
-        #                               color='red',normed=1)
-        # n, bins0, patches = pylab.hist(shots_I_0_rot, bins=int(min_len/50),
-        #                               label = '0 I',histtype='step',
-        #                               color='blue',normed=1)
+            # n, bins1, patches = np.hist(shots_I_1_rot, bins=int(min_len/50),
+            #                               label = '1 I',histtype='step',
+            #                               color='red',normed=1)
+            # n, bins0, patches = pylab.hist(shots_I_0_rot, bins=int(min_len/50),
+            #                               label = '0 I',histtype='step',
+            #                               color='blue',normed=1)
 
-        # add lines showing the fitted distribution
-        # building up the histogram fits for off measurements
-        y0 = (1-frac1_0)*pylab.normpdf(bins0, mu0_0, sigma0_0) + \
-            frac1_0*pylab.normpdf(bins0, mu1_0, sigma1_0)
-        y1_0 = frac1_0*pylab.normpdf(bins0, mu1_0, sigma1_0)
-        y0_0 = (1-frac1_0)*pylab.normpdf(bins0, mu0_0, sigma0_0)
+            # add lines showing the fitted distribution
+            # building up the histogram fits for off measurements
+            y0 = (1-frac1_0)*pylab.normpdf(bins0, mu0_0, sigma0_0) + \
+                frac1_0*pylab.normpdf(bins0, mu1_0, sigma1_0)
+            y1_0 = frac1_0*pylab.normpdf(bins0, mu1_0, sigma1_0)
+            y0_0 = (1-frac1_0)*pylab.normpdf(bins0, mu0_0, sigma0_0)
 
-        # building up the histogram fits for on measurements
-        y1 = (1-frac1_1)*pylab.normpdf(bins1, mu0_1, sigma0_1) + \
-            frac1_1*pylab.normpdf(bins1, mu1_1, sigma1_1)
-        y1_1 = frac1_1*pylab.normpdf(bins1, mu1_1, sigma1_1)
-        y0_1 = (1-frac1_1)*pylab.normpdf(bins1, mu0_1, sigma0_1)
+            # building up the histogram fits for on measurements
+            y1 = (1-frac1_1)*pylab.normpdf(bins1, mu0_1, sigma0_1) + \
+                frac1_1*pylab.normpdf(bins1, mu1_1, sigma1_1)
+            y1_1 = frac1_1*pylab.normpdf(bins1, mu1_1, sigma1_1)
+            y0_1 = (1-frac1_1)*pylab.normpdf(bins1, mu0_1, sigma0_1)
 
-        pylab.semilogy(bins0, y0, 'b', linewidth=1.5)
-        pylab.semilogy(bins0, y1_0, 'b--', linewidth=3.5)
-        pylab.semilogy(bins0, y0_0, 'b--', linewidth=3.5)
+            pylab.semilogy(bins0, y0, 'b', linewidth=1.5)
+            pylab.semilogy(bins0, y1_0, 'b--', linewidth=3.5)
+            pylab.semilogy(bins0, y0_0, 'b--', linewidth=3.5)
 
-        pylab.semilogy(bins1, y1, 'r', linewidth=1.5)
-        pylab.semilogy(bins1, y0_1, 'r--', linewidth=3.5)
-        pylab.semilogy(bins1, y1_1, 'r--', linewidth=3.5)
-        #(pylab.gca()).set_ylim(1e-6,1e-3)
-        pdf_max = (max(max(y0), max(y1)))
-        (pylab.gca()).set_ylim(pdf_max/1000, 2*pdf_max)
+            pylab.semilogy(bins1, y1, 'r', linewidth=1.5)
+            pylab.semilogy(bins1, y0_1, 'r--', linewidth=3.5)
+            pylab.semilogy(bins1, y1_1, 'r--', linewidth=3.5)
+            #(pylab.gca()).set_ylim(1e-6,1e-3)
+            pdf_max = (max(max(y0), max(y1)))
+            (pylab.gca()).set_ylim(pdf_max/1000, 2*pdf_max)
 
-        plt.title('Histograms of {} shots, {}'.format(
-            min_len, self.timestamp_string))
-        plt.xlabel('DAQ voltage integrated (V)')  # , fontsize=14)
-        plt.ylabel('Fraction of counts')  # , fontsize=14)
+            plt.title('Histograms of {} shots, {}'.format(
+                min_len, self.timestamp_string))
+            plt.xlabel('DAQ voltage integrated (V)')  # , fontsize=14)
+            plt.ylabel('Fraction of counts')  # , fontsize=14)
 
-        plt.axvline(self.V_th_a, ls='--',
-                    linewidth=2, color='grey', label='SNR={0:.2f}\n '
-                    '$F_a$={1:.4f}\n $F_d$={2:.4f}\n $p_e$={3:.4f}'.format(
-                    SNR, self.F_a, F_d, frac1_0))
-        plt.axvline(self.V_th_d, ls='--',
-                    linewidth=2, color='black')
-        plt.legend()
-        leg2 = ax.legend(loc='best')
-        leg2.get_frame().set_alpha(0.5)
-        #plt.hist(SS_Q_data, bins=40,label = '0 Q')
-        self.save_fig(fig, figname='Histograms', **kw)
-        plt.show()
+            plt.axvline(self.V_th_a, ls='--', linewidth=2, color='grey',
+                        label='SNR={0:.2f}\n$F_a$={1:.4f}\n$F_d$={2:.4f}\n$p_e$'
+                              '={3:.4f}'.format(SNR, self.F_a, F_d, frac1_0))
+            plt.axvline(self.V_th_d, ls='--', linewidth=2, color='black')
+            plt.legend()
+            leg2 = ax.legend(loc='best')
+            leg2.get_frame().set_alpha(0.5)
+            #plt.hist(SS_Q_data, bins=40,label = '0 Q')
+            self.save_fig(fig, figname='Histograms', **kw)
+            plt.show()
 
         self.save_fitted_parameters(fit_res_double_0,
                                     var_name='fit_res_double_0')

@@ -129,9 +129,9 @@ class UHFQC_LookuptableManagerManager(Instrument):
         print(wave_name)
         ax.set_title(wave_name)
         ax.plot(x, self._wave_dict[wave_name][0],
-                marker='o', label='chI')
+                '-', lw=0.7, label='chI')
         ax.plot(x, self._wave_dict[wave_name][1],
-                marker='o', label='chQ')
+                '-', lw=0.7, label='chQ')
         ax.set_ylabel('Amplitude (V)')
         ax.set_axis_bgcolor('gray')
         ax.axhspan(self._voltage_min, self._voltage_max, facecolor='w',
@@ -154,9 +154,9 @@ class UHFQC_LookuptableManagerManager(Instrument):
         ax.set_xlabel('frequency (Hz)')
         ax.set_title(wave_name)
         ax.plot(f_axis, PSD_I,
-                marker='o', label='chI')
+                '-', lw=0.7, label='chI')
         ax.plot(f_axis, PSD_Q,
-                marker='o', label='chQ')
+                '-', lw=0.7, label='chQ')
         ax.set_ylabel('Spectral density (V^2/Hz)')
         ax.legend()
 

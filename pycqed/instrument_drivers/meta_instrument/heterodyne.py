@@ -41,10 +41,18 @@ class HeterodyneInstrument(Instrument):
         self.acquisition_instr_controller(acquisition_instr_controller)
         self._RF_power = None
 
+
     def common_init(self, name, LO, AWG, acquisition_instr='CBox',
                     single_sideband_demod=False, **kw):
         logging.info(__name__ + ' : Initializing instrument')
         Instrument.__init__(self, name, **kw)
+
+
+        self.add_parameter('set_delay', vals=vals.Numbers(),
+                           label='Delay after setting the frequency',
+                           parameter_class=ManualParameter,
+                           initial_value=0.0)
+
 
         self.LO = LO
         self.AWG = AWG
@@ -273,6 +281,7 @@ class HeterodyneInstrument(Instrument):
         # this is the definition agreed upon in issue 131
         self.RF.frequency(val)
         self.LO.frequency(val-self._f_RO_mod)
+        time.sleep(self.set_delay())
 
     def _get_frequency(self):
         freq = self.RF.frequency()
@@ -286,6 +295,8 @@ class HeterodyneInstrument(Instrument):
         return self._frequency
 
     def _set_f_RO_mod(self, val):
+        if val != self._f_RO_mod and 'UHFQC' in self.acquisition_instr():
+            self._UHFQC_awg_parameters_changed = True
         self._f_RO_mod = val
         self.LO.frequency(self._frequency - val)
 
@@ -607,12 +618,13 @@ class LO_modulated_Heterodyne(HeterodyneInstrument):
 
     def _set_f_RO_mod(self, val):
         if val != self._f_RO_mod:
+            self._f_RO_mod = val
             if 'CBox' in self.acquisition_instr():
                 self._awg_seq_parameters_changed = True
             elif 'UHFQC' in self.acquisition_instr():
                 self._UHFQC_awg_parameters_changed = True
             self.frequency(self._frequency)
-        self._f_RO_mod = val
+
 
     def _get_f_RO_mod(self):
         return self._f_RO_mod
