@@ -578,7 +578,7 @@ class QuDev_transmon(Qubit):
 
 
     def measure_T1(self, times=None, MC=None, analyze=True, upload=True,
-                       close_fig=True, cal_points=True):
+                       close_fig=True, cal_points=True, label=None):
 
         if times is None:
             raise ValueError("Unspecified times for measure_T1")
@@ -588,18 +588,23 @@ class QuDev_transmon(Qubit):
         if MC is None:
             MC = self.MC
 
+        # Define the measurement label
+        if label is None:
+            label = 'T1' + self.msmt_suffix
+
         MC.set_sweep_function(awg_swf.T1(
             pulse_pars=self.get_drive_pars(), RO_pars=self.get_RO_pars(),
             upload=upload, cal_points=cal_points))
         MC.set_sweep_points(times)
         MC.set_detector_function(self.int_avg_det)
-        MC.run('T1'+self.msmt_suffix)
+        MC.run(label)
 
         if analyze:
             ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
 
     def measure_T1_2nd_exc(self, times=None, MC=None, analyze=True, upload=True,
-                           close_fig=True, cal_points=True, label=None):
+                           close_fig=True, cal_points=True, label=None,
+                           last_ge_pulse=True):
 
         if times is None:
             raise ValueError("Unspecified times for measure_T1_2nd_exc")
@@ -618,7 +623,8 @@ class QuDev_transmon(Qubit):
                                 pulse_pars_2nd=self.get_ef_drive_pars(),
                                 RO_pars=self.get_RO_pars(),
                                 upload=upload,
-                                cal_points=cal_points))
+                                cal_points=cal_points,
+                                last_ge_pulse=last_ge_pulse))
         MC.set_sweep_points(times)
         MC.set_detector_function(self.int_avg_det)
         MC.run(label)
@@ -628,7 +634,7 @@ class QuDev_transmon(Qubit):
 
 
     def measure_qscale(self, qscales=None, MC=None, analyze=True, upload=True,
-                       close_fig=True, label=None):
+                       close_fig=True, label=None, cal_points=True):
 
         if qscales is None:
             raise ValueError("Unspecified qscale values for measure_qscale")
@@ -643,7 +649,36 @@ class QuDev_transmon(Qubit):
 
         MC.set_sweep_function(awg_swf.QScale(
                 pulse_pars=self.get_drive_pars(), RO_pars=self.get_RO_pars(),
-                upload=upload))
+                upload=upload, cal_points=cal_points))
+        MC.set_sweep_points(qscales)
+        MC.set_detector_function(self.int_avg_det)
+        MC.run(label)
+
+        if analyze:
+            ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
+
+    def measure_qscale_2nd_exc(self, qscales=None, MC=None, analyze=True,
+                               upload=True, close_fig=True, label=None,
+                               cal_points=True, last_ge_pulse=True):
+
+        if qscales is None:
+            raise ValueError("Unspecified qscale values for"
+                             " measure_qscale_2nd_exc")
+
+        self.prepare_for_timedomain()
+
+        if MC is None:
+            MC = self.MC
+
+        if label is None:
+            label = 'QScale_2nd_exc'+self.msmt_suffix
+
+        MC.set_sweep_function(awg_swf.QScale_2nd_exc(
+            pulse_pars=self.get_drive_pars(),
+            pulse_pars_2nd=self.get_ef_drive_pars(),
+            RO_pars=self.get_RO_pars(),
+            upload=upload, cal_points=cal_points,
+            last_ge_pulse=last_ge_pulse))
         MC.set_sweep_points(qscales)
         MC.set_detector_function(self.int_avg_det)
         MC.run(label)
@@ -676,7 +711,7 @@ class QuDev_transmon(Qubit):
 
     def measure_ramsey_2nd_exc(self, times=None, artificial_detuning=0, label=None,
                        MC=None, analyze=True, close_fig=True, cal_points=True,
-                       n=1, upload=True):
+                       n=1, upload=True, last_ge_pulse=True):
 
         if times is None:
             raise ValueError("Unspecified times for measure_ramsey")
@@ -694,8 +729,9 @@ class QuDev_transmon(Qubit):
             pulse_pars=self.get_drive_pars(),
             pulse_pars_2nd=self.get_ef_drive_pars(),
             RO_pars=self.get_RO_pars(), times=times,
-            artificial_detuning=artificial_detuning, cal_points=cal_points,
-            n=n, upload=upload)
+            artificial_detuning=artificial_detuning,
+            cal_points=cal_points, n=n, upload=upload,
+            last_ge_pulse=last_ge_pulse)
         MC.set_sweep_function(Rams_2nd_swf)
         MC.set_sweep_points(times)
         MC.set_detector_function(self.int_avg_det)
@@ -1422,8 +1458,7 @@ class QuDev_transmon(Qubit):
         #get pi and pi/2 amplitudes from the analysis results
         # TODO: might have to correct Rabi_Analysis_new to Rabi_Analysis
         # when we decide which version we stick to.
-        if for_ef:
-            label += '_2nd_excitation'
+
         RabiA = ma.Rabi_Analysis_new(label=label, NoCalPoints=no_cal_points,
                                      close_fig=close_fig, for_ef=for_ef,
                                      last_ge_pulse=last_ge_pulse, **kw)
@@ -1449,7 +1484,7 @@ class QuDev_transmon(Qubit):
 
 
     def find_T1(self, times, label='T1', for_ef=False, update=False, MC=None,
-                cal_points=True, close_fig=True, **kw):
+                cal_points=True, close_fig=True, last_ge_pulse=True, **kw):
 
         """
         Finds the relaxation time T1 from the fit to an exponential
@@ -1511,6 +1546,12 @@ class QuDev_transmon(Qubit):
         if MC is None:
             MC = self.MC
 
+        if label is None:
+            if for_ef:
+                label = 'T1_2nd_excitation' + self.msmt_suffix
+            else:
+                label = 'T1' + self.msmt_suffix
+
         if times is None:
             times_span = kw.get('times_span', 10e-6)
             times_mean = kw.get('times_mean', 5e-6)
@@ -1528,7 +1569,8 @@ class QuDev_transmon(Qubit):
         if for_ef:
             self.measure_T1_2nd(times, MC=MC,
                                 close_fig=close_fig,
-                                cal_points=cal_points)
+                                cal_points=cal_points,
+                                last_ge_pulse=last_ge_pulse)
         else:
             self.measure_T1(times, MC=MC,
                             close_fig=close_fig,
@@ -1536,8 +1578,10 @@ class QuDev_transmon(Qubit):
 
         #Extract T1 and T1_stddev from ma.T1_Analysis
         if for_ef:
-            label += '_2nd_excitation'
-        T1_Analysis = ma.T1_Analysis(label=label, **kw)
+            NoCalPoints = 6
+        else:
+            NoCalPoints = 4
+        T1_Analysis = ma.T1_Analysis(label=label,NoCalPoints=NoCalPoints, **kw)
         T1_dict = T1_Analysis.T1
         T1_value = T1_dict['T1']
 
@@ -1550,7 +1594,8 @@ class QuDev_transmon(Qubit):
         return T1_dict
 
     def find_frequency_T2_ramsey(self, times, for_ef=False, artificial_detuning=0, update=False, MC=None,
-                                     cal_points=True, close_fig=True, upload=True, **kw):
+                                     cal_points=True, close_fig=True, upload=True,
+                                     last_ge_pulse=True, **kw):
 
         """
         Finds the real qubit frequency and the dephasing rate T2* from the fit
@@ -1616,7 +1661,8 @@ class QuDev_transmon(Qubit):
             RamseyA = ma.Ramsey_Analysis(auto=True,**kw)
         else:
             self.measure_ramsey_2nd_exc(times=times, artificial_detuning=artificial_detuning, MC=MC,
-                                        cal_points=cal_points, close_fig=close_fig, upload=upload)
+                                        cal_points=cal_points, close_fig=close_fig, upload=upload,
+                                        last_ge_pulse=last_ge_pulse)
             RamseyA = ma.Ramsey_Analysis(auto=True, NoCalPoints=6, **kw)
 
         #get new freq and T2* from analysis results
@@ -1642,7 +1688,7 @@ class QuDev_transmon(Qubit):
         return qubit_freq, T2_star
 
     def find_qscale(self, qscales, label=None, for_ef=False, update=False,
-                    MC=None, close_fig=True, **kw):
+                    MC=None, close_fig=True, last_ge_pulse=True, **kw):
 
         '''
         Performs the QScale calibration measurement ( (xX)-(xY)-(xmY) ) and
@@ -1682,7 +1728,6 @@ class QuDev_transmon(Qubit):
                 label of the analysis routine
             for_ef            (default=False)
                 whether to obtain the drag_qscale_ef parameter
-                NOT IMPLEMENTED YET!
             update            (default=True)
                 whether or not to update the qubit drag_qscale parameter with
                 the found value
@@ -1690,6 +1735,8 @@ class QuDev_transmon(Qubit):
                 the measurement control object
             close_fig         (default=True)
                 close the resulting figure
+            last_ge_pulse     (default=True)
+                whether to apply an X180 ge pulse at the end
 
             Keyword parameters:
                 qscale_mean       (default=self.drag_qscale()
@@ -1750,12 +1797,22 @@ class QuDev_transmon(Qubit):
                                       qscales_mean + qscales_span/2, nr_points)
 
         #Perform the qscale calibration measurement
-        self.measure_qscale(qscales=qscales, MC=MC,
-                            close_fig=close_fig, label=label)
+        if for_ef:
+            # Run measuremet
+            self.measure_qscale_2nd_exc(qscales=qscales, MC=MC,
+                                        close_fig=close_fig, label=label,
+                                        last_ge_pulse=last_ge_pulse)
+            NoCalPoints = 6
+        else:
+            self.measure_qscale(qscales=qscales, MC=MC,
+                                close_fig=close_fig, label=label)
+            NoCalPoints = 4
 
-        #Perform analysis and extract the optimal qscale parameter
-        QscaleA = ma.QScale_Analysis(auto=True, label=label, **kw) #returns
-        # the optimal qscale parameter
+        # Perform analysis and extract the optimal qscale parameter
+        # Returns the optimal qscale parameter
+        QscaleA = ma.QScale_Analysis(auto=True, label=label,
+                                     NoCalPoints=NoCalPoints, **kw)
+
         Qscale_dict = QscaleA.optimal_qscale #dictionary of value, stderr
         Qscale_value = Qscale_dict['qscale']
 

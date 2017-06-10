@@ -75,7 +75,9 @@ def Rabi_2nd_exc_seq(amps, pulse_pars, pulse_pars_2nd, RO_pars, n=1,
 
 def Ramsey_2nd_exc_seq(times, pulse_pars, pulse_pars_2nd, RO_pars, n=1,
                      cal_points=True, artificial_detuning =None,
-                     post_msmt_delay=3e-6, verbose=False):
+                     post_msmt_delay=3e-6, verbose=False,
+                     upload=True, return_seq=False,
+                     last_ge_pulse =True):
     '''
     Rabi sequence for the second excited state
     Input pars:
@@ -102,7 +104,7 @@ def Ramsey_2nd_exc_seq(times, pulse_pars, pulse_pars_2nd, RO_pars, n=1,
             el = multi_pulse_elt(i, station, [pulses['I'], RO_pars])
         elif cal_points and (i == (len(times)-2) or
                              i == (len(times)-1)):
-        #    el = multi_pulse_elt(i, station, [pulses['X180'], pulses_2nd['X180'],
+        #    el = multi_pulse_elt(i, station, [pulses_2nd['X180'],
         #                                  RO_pars])
             el = multi_pulse_elt(i, station, [pulses['X180'], RO_pars])
         else:
@@ -113,8 +115,10 @@ def Ramsey_2nd_exc_seq(times, pulse_pars, pulse_pars_2nd, RO_pars, n=1,
                 Dphase = ((tau-times[0]) * artificial_detuning * 360) % 360
             pulse_pars_x2['phase'] = Dphase
 
-            pulse_list = ([pulses['X180']]+n*[pulses_2nd['X90'], pulse_pars_x2]
-                          + [pulses['X180'], RO_pars])
+            pulse_list = ([pulses['X180']]+n*[pulses_2nd['X90'], pulse_pars_x2])
+            if last_ge_pulse:
+                pulse_list += [pulses['X180']]
+            pulse_list += [RO_pars]
 
             # copy first element and set extra wait
             pulse_list[0] = deepcopy(pulse_list[0])
@@ -122,13 +126,82 @@ def Ramsey_2nd_exc_seq(times, pulse_pars, pulse_pars_2nd, RO_pars, n=1,
             el = multi_pulse_elt(i, station, pulse_list)
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
-    station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
-    return seq_name
+
+    if upload:
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
+
+    if return_seq:
+            return seq_name, el_list
+    else:
+        return seq
+
+def QScale_2nd_exc_seq(qscales, pulse_pars,  pulse_pars_2nd, RO_pars,
+           cal_points=True, verbose=False, upload=True, return_seq=False,
+                       last_ge_pulse=True):
+    '''
+    Sequence used for calibrating the QScale factor used in the DRAG pulses.
+    Applies X(pi/2)X(pi), X(pi/2)Y(pi), X(pi/2)Y(-pi) for each value of
+    QScale factor.
+
+    Beware that the elements alternate, in order to perform these 3
+    measurements per QScale factor, the qscales sweep values must be
+    repeated 3 times. This was chosen to be more easily compatible with
+    standard detector functions and sweep pts.
+
+    Input pars:
+        qscales:             array of qscale factors
+        pulse_pars:          dict containing the DRAG pulse parameters
+        RO_pars:             dict containing the RO parameters
+        cal_points:          if True, replaces the last 3*4 segments with
+                             calibration points
+    '''
+    seq_name = 'QScale_2nd_exc_sequence'
+    seq = sequence.Sequence(seq_name)
+    station.pulsar.update_channel_settings()
+    el_list = []
+    pulse_combinations=[['X90','X180'],['X90','Y180'],['X90','mY180']]
+    pulses = get_pulse_dict_from_pars(pulse_pars)
+    pulses_2nd = get_pulse_dict_from_pars(pulse_pars_2nd)
+    for i, motzoi in enumerate(qscales):
+        pulse_keys = pulse_combinations[i % 3]
+        for p_name in ['X180', 'Y180', 'X90', 'mY180']:
+            pulses[p_name]['motzoi'] = motzoi
+            pulses_2nd[p_name]['motzoi'] = motzoi
+        if cal_points and (i == (len(times)-6) or
+                          i == (len(times)-5)):
+           el = multi_pulse_elt(i, station, [pulses['I'], RO_pars])
+        elif cal_points and (i == (len(qscales)-4) or
+                                   i == (len(qscales)-3)):
+            el = multi_pulse_elt(i, station, [pulses['X180'], RO_pars])
+        elif cal_points and (i == (len(qscales)-2) or
+                                     i == (len(qscales)-1)):
+            # pick motzoi for calpoint in the middle of the range
+            pulses['X180']['motzoi'] = np.mean(qscales)
+            el = multi_pulse_elt(i, station, [pulses_2nd['X180_ef'], RO_pars])
+        else:
+            pulse_list = [pulses['X180']]
+            pulse_list += [pulses_2nd[x] for x in pulse_keys]
+            if last_ge_pulse:
+                pulse_list += [pulses['X180']]
+            pulse_list += [RO_pars]
+            el = multi_pulse_elt(i, station, pulse_list)
+        el_list.append(el)
+        seq.append_element(el, trigger_wait=True)
+
+    if upload:
+        station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+
+    if return_seq:
+        return seq, el_list
+    else:
+        return seq_name
 
 def T1_2nd_exc_seq(times,
            pulse_pars, pulse_pars_2nd, RO_pars,
            cal_points=True,
-           verbose=False, upload=True, return_seq=False):
+           verbose=False, upload=True,
+           return_seq=False,
+           last_ge_pulse=True):
     '''
     Rabi sequence for a single qubit using the tektronix.
     SSB_Drag pulse is used for driving, simple modulation used for RO
@@ -159,12 +232,14 @@ def T1_2nd_exc_seq(times,
             el = multi_pulse_elt(i, station, [pulses['X180'], RO_pars])
         elif cal_points and (i == (len(times)-2) or i == (len(times)-1)):
             el = multi_pulse_elt(i, station,
-                                 [pulses['X180'], pulses_2nd['X180'], RO_pars])
+                                 [pulses_2nd['X180'], RO_pars])
         else:
             pulses_x['pulse_delay'] = tau
-            el = multi_pulse_elt(i, station,
-                                 [pulses['X180'], pulses_2nd['X180'],
-                                  pulses_x, RO_pars])
+            pulse_list = [pulses['X180']]+[pulses_2nd['X180']]
+            if last_ge_pulse:
+                pulse_list += [pulses['X180']]
+            pulse_list += [RO_pars]
+            el = multi_pulse_elt(i, station, pulse_list)
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
 
@@ -198,3 +273,5 @@ def SSRO_2nd_exc_state(pulse_pars, pulse_pars_2nd, RO_pars, verbose=False):
     seq.append_element(el, trigger_wait=True)
     station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
     return seq_name
+
+

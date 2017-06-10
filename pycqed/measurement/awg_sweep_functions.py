@@ -844,12 +844,13 @@ class T1(swf.Hard_Sweep):
 class T1_2nd_exc(swf.Hard_Sweep):
 
     def __init__(self, pulse_pars, pulse_pars_2nd, RO_pars,
-                 cal_points=True, upload=True):
+                 cal_points=True, upload=True, last_ge_pulse=True):
         super().__init__()
         self.pulse_pars = pulse_pars
         self.pulse_pars_2nd = pulse_pars_2nd
         self.RO_pars = RO_pars
         self.cal_points = cal_points
+        self.last_ge_pulse = last_ge_pulse
         self.upload = upload
         self.name = 'T1 2nd excited state'
         self.parameter_name = 't'
@@ -861,7 +862,8 @@ class T1_2nd_exc(swf.Hard_Sweep):
                                 pulse_pars=self.pulse_pars,
                                 pulse_pars_2nd=self.pulse_pars_2nd,
                                 RO_pars=self.RO_pars,
-                                cal_points=self.cal_points)
+                                cal_points=self.cal_points,
+                                last_ge_pulse=self.last_ge_pulse)
 
 
 class AllXY(swf.Hard_Sweep):
@@ -1001,8 +1003,9 @@ class Ramsey(swf.Hard_Sweep):
 class Ramsey_2nd_exc(swf.Hard_Sweep):
 
     def __init__(self, pulse_pars, pulse_pars_2nd, RO_pars,
-                 artificial_detuning=None,
-                 n=1, cal_points=True, upload=True):
+                 artificial_detuning=None, return_seq=False,
+                 n=1, cal_points=True, upload=True,
+                 last_ge_pulse=True):
         super().__init__()
         self.pulse_pars = pulse_pars
         self.pulse_pars_2nd = pulse_pars_2nd
@@ -1014,6 +1017,8 @@ class Ramsey_2nd_exc(swf.Hard_Sweep):
         self.name = 'Rabi 2nd excited state'
         self.parameter_name = 't'
         self.unit = 's'
+        self.return_seq = return_seq
+        self.last_ge_pulse=last_ge_pulse
 
     def prepare(self, **kw):
         if self.upload:
@@ -1023,7 +1028,10 @@ class Ramsey_2nd_exc(swf.Hard_Sweep):
                                     RO_pars=self.RO_pars,
                                     artificial_detuning =
                                             self.artificial_detuning,
-                                    n=self.n, cal_points=self.cal_points)
+                                    n=self.n, cal_points=self.cal_points,
+                                    upload=self.upload,
+                                    return_seq=self.return_seq,
+                                    last_ge_pulse=self.last_ge_pulse)
 
 class FluxDetuning(swf.Hard_Sweep):
 
@@ -1104,7 +1112,8 @@ class Motzoi_XY(swf.Hard_Sweep):
 
 class QScale(swf.Hard_Sweep):
 
-    def __init__(self, qscales, pulse_pars, RO_pars, upload=True):
+    def __init__(self, qscales, pulse_pars, RO_pars, upload=True,
+                 cal_points=True):
         '''
         Measures 3 number of points per QScale parameter value specified
         in qscales and adds 4 calibration points to it.
@@ -1116,15 +1125,47 @@ class QScale(swf.Hard_Sweep):
         self.name = 'QScale'
         self.parameter_name = 'QScale_factor'
         self.unit = ' '
+        self.cal_points = cal_points
         sweep_pts = np.repeat(qscales, 3)
-        self.sweep_points = np.append(sweep_pts,
-                                      [qscales[-1]+(qscales[-1]-qscales[-2])]*4)
+        # self.sweep_points = np.append(sweep_pts,
+        #                               [qscales[-1]+(qscales[-1]-qscales[-2])]*4)
 
     def prepare(self, **kw):
         if self.upload:
             sqs.QScale(qscales=self.sweep_points,
-                          pulse_pars=self.pulse_pars,
-                          RO_pars=self.RO_pars)
+                       pulse_pars=self.pulse_pars,
+                       RO_pars=self.RO_pars,
+                       cal_points=self.cal_points)
+
+class QScale_2nd_exc(swf.Hard_Sweep):
+
+    def __init__(self, qscales, pulse_pars, pulse_pars_2nd, RO_pars,
+                 cal_points=True, upload=True, return_seq=False,
+                 last_ge_pulse=True):
+        super().__init__()
+        self.qscales = qscales
+        self.pulse_pars = pulse_pars
+        self.pulse_pars_2nd = pulse_pars_2nd
+        self.RO_pars = RO_pars
+        self.cal_points = cal_points
+        self.upload = upload
+        self.name = 'Qscale 2nd excited state'
+        self.parameter_name = 'motzoi'
+        self.unit = ''
+        self.return_seq = return_seq
+        self.last_ge_pulse = last_ge_pulse
+
+    def prepare(self, **kw):
+        if self.upload:
+            sqs2.QScale_2nd_exc_seq(qscales=self.qscales,
+                                      pulse_pars=self.pulse_pars,
+                                      pulse_pars_2nd=self.pulse_pars_2nd,
+                                      RO_pars=self.RO_pars,
+                                      upload=self.upload,
+                                      cal_points=self.cal_points,
+                                      return_seq=self.return_seq,
+                                      last_ge_pulse=self.last_ge_pulse)
+
 
 class Freq_XY(swf.Hard_Sweep):
 

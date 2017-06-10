@@ -718,7 +718,7 @@ def QScale(qscales, pulse_pars, RO_pars,
         cal_points:          if True, replaces the last 3*4 segments with
                              calibration points
     '''
-    seq_name = 'MotzoiXY'
+    seq_name = 'QScale'
     seq = sequence.Sequence(seq_name)
     station.pulsar.update_channel_settings()
     el_list = []
@@ -734,7 +734,7 @@ def QScale(qscales, pulse_pars, RO_pars,
         elif cal_points and (i == (len(qscales)-2) or
                                      i == (len(qscales)-1)):
             # pick motzoi for calpoint in the middle of the range
-            pulses['X180']['qscale'] = np.mean(qscales)
+            pulses['X180']['motzoi'] = np.mean(qscales)
             el = multi_pulse_elt(i, station, [pulses['X180'], RO_pars])
         else:
             pulse_list = [pulses[x] for x in pulse_keys]
@@ -744,7 +744,6 @@ def QScale(qscales, pulse_pars, RO_pars,
         seq.append_element(el, trigger_wait=True)
 
     if upload:
-        station.components['AWG'].stop()
         station.pulsar.program_awg(seq, *el_list, verbose=verbose)
     if return_seq:
         return seq, el_list
