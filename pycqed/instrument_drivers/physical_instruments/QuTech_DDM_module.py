@@ -88,7 +88,8 @@ class DDMq(SCPI):
         if ('vals' in kwargs and 'set_cmd' in kwargs
                 and 'get_cmd' in kwargs):
             validator = kwargs['vals']
-            if self.ddm_software_version != self.ranges_file_version:
+            if (self.ddm_software_version != self.ranges_file_version or
+                    not (name in self.parameterRangesList)):
                 try:
                         minValue = str(INT32_MIN)
                         maxValue = str(INT32_MAX)
@@ -120,6 +121,7 @@ class DDMq(SCPI):
                         self.parameterRangesList[name] = {}
                         self.parameterRangesList[name]["min_val"] = minValue
                         self.parameterRangesList[name]["max_val"] = maxValue
+                        self.parameterRangesListIsUpToDate = False
                 except Exception as e:
                     log.debug("Exception was thrown while retreiving the min and max" +
                               " values of a parameter '" + name + "' from the ddm.(%s)", str(e))
@@ -161,8 +163,8 @@ class DDMq(SCPI):
             file = open(path)
             file_content = json.loads(file.read())
             self.ranges_file_version = file_content["version"]["ddm_software_version"]
-        except:
-          log.warning("failed to open the " + path)
+        except Exception as e:
+          log.warning("failed to open the " + path + ".(%s)", str(e))
 
         # Check if the firware version match the version of the parameter list
         try:
@@ -179,25 +181,25 @@ class DDMq(SCPI):
             file_content = json.loads(file.read())
             ddm_parameters=file_content["parameters"]
             self.parameter_file_version=file_content["version"]["software"]
-        except:
+        except Exception as e:
             log.warning("parameter file for gettable parameters {} not found".format(
-                self._s_file_name))
+                self._s_file_name) + ".(%s)", str(e))
             try:
                 if not os.path.exists(folder_path):
                   os.makedirs(folder_path)
             except:
                 pass
         if (self.ddm_software_version != self.parameter_file_version):
-            print("The parameter file is updated, because the version number of the firware doesn't match the version of the parameter file")
+            print("The parameter file was updated (Theversion of the parameter file didnt match the ddm software version")
             # Update the parameter list to software version of the ddm
             parameter_str=self.ask('qutech:parameters?')
             parameter_str=parameter_str.replace('\t', '\n')
             try:
                 file=open(self._s_file_name, 'w')
                 file.write(parameter_str)
-            except:
+            except Exception as e:
                 log.warning(
-                    "failed to write update the parameters in the parameter file")
+                    "failed to write update the parameters in the parameter file" + ".(%s)", str(e))
             ddm_parameters=json.loads(parameter_str)["parameters"]
         else:
             self.ranges_file_name=os.path.join(
@@ -205,6 +207,7 @@ class DDMq(SCPI):
             file=open(self.ranges_file_name)
             file_content=json.loads(file.read())
             self.parameterRangesList=file_content["parameters"]
+            self.parameterRangesListIsUpToDate = True
 
         # Add the parameters to 'self'
         for parameter in ddm_parameters:
@@ -225,19 +228,19 @@ class DDMq(SCPI):
                     else:
                         log.warning("Failed to set the validator for the parameter " + \
                                     name + ", because of a unknow validator type: '" + val_type + "'")
-                except:
+                except Exception as e:
                     log.warning(
-                        "Failed to set the validator for the parameter " + name)
+                        "Failed to set the validator for the parameter " + name + ".(%s)", str(e))
 
             try:
                 self.add_parameter(name, **parameter)
-            except:
+            except Exception as e:
                 log.warning("Failed to create the parameter " + name + \
-                            ", because of a unknown keyword in this parameter")
+                            ", because of a unknown keyword in this parameter" + ".(%s)", str(e))
 
         self.add_custom_parameters()
 
-        if (self.ddm_software_version != self.ranges_file_version):
+        if (self.ddm_software_version != self.ranges_file_version or self.parameterRangesListIsUpToDate == False):
             self.ranges_file_name= os.path.join(folder_path, 'QuTech_DDM_Ranges.txt')
             version = {}
             version["ddm_software_version"] = self.ddm_software_version
@@ -262,12 +265,6 @@ class DDMq(SCPI):
             """
             ch_pair= i+1
 
-            sreset_int_cmd= 'qutech:reset{}'.format(ch_pair)
-            self.add_parameter('ch_pair{}_reset'.format(ch_pair),
-                               label =('Reset DDM '),
-                               docstring ='It desables all modes.',
-                               set_cmd =sreset_int_cmd
-                               )
             self.add_parameter('ch_pair{}_status'.format(ch_pair),
                                label =('Get status '),
                                docstring ='It returns status on Over range,' +
@@ -278,204 +275,9 @@ class DDMq(SCPI):
                                get_cmd =self._gen_ch_get_func(
                                    self._getADCstatus, ch_pair)
                                )
-
-            scaladc_cmd= 'qutech:adc{}:cal'.format(ch_pair)
-            self.add_parameter('ch_pair{}_cal_adc'.format(ch_pair),
-                               label =('Calibrate ADC{}'.format(ch_pair)),
-                               docstring ='It calibrates ADC. It is required' +
-                               ' to do if the temperature changes or with' +
-                               ' time. It is done automatically when power' +
-                               ' is on',
-                               set_cmd =scaladc_cmd
-                               # vals=vals.Numbers(1,4096)
-                               )
-            snsamp_cmd= 'qutech:inputavg{}:scansize'.format(ch_pair)
-            self.add_parameter('ch_pair{}_inavg_scansize'.format(ch_pair),
-                               unit ='#',
-                               label =('Number of samples' +
-                                      'ch_pair {} '.format(ch_pair)),
-                               docstring ='It sets scan size of the input' +
-                               ' averaging mode up to 8 us. Each sample has' +
-                               ' 2 ns period. It is only possible to set' +
-                               ' even number of samples',
-                               get_cmd =snsamp_cmd + '?',
-                               set_cmd =snsamp_cmd + ' {}',
-                               vals =vals.Numbers(2, 4096)
-                               )
-            senable_cmd= 'qutech:inputavg{}:enable'.format(ch_pair)
-            self.add_parameter('ch_pair{}_inavg_enable'.format(ch_pair),
-                               label =('Enable input averaging' +
-                                      'ch_pair {} '.format(ch_pair)),
-                               docstring ='It enables input averaging mode' +
-                               ' prior run command.  It is required to' +
-                               ' enable mode every measuremnet. If it is not' +
-                               ' enabled the last measeared data will be read',
-                               get_cmd =senable_cmd + '?',
-                               set_cmd =senable_cmd + ' {}',
-                               vals =vals.Numbers(0, 1)
-                               )
-            sholdoff_cmd= 'qutech:input{}:holdoff'.format(ch_pair)
-            self.add_parameter('ch_pair{}_holdoff'.format(ch_pair),
-
-                               label =('Set holdoff' +
-                                      'ch_pair {} '.format(ch_pair)),
-                               docstring ='specifying the number of clocks' +
-                               ' the measurement trigger should be delayed' +
-                               ' before a new scan starts. Each clock is 2' +
-                               ' ns period, but it is only posible to set' +
-                               ' even number of clocks',
-                               get_cmd =sholdoff_cmd + '?',
-                               set_cmd =sholdoff_cmd + ' {}',
-                               vals =vals.Numbers(0, 254)
-                               )
-            sintlengthall_cmd= 'qutech:wint{}:intlength:all'.format(ch_pair)
-            self.add_parameter('ch_pair{}_wint_intlength'.format(ch_pair),
-                               unit ='#',
-                               label =('The number of sample  that is used' +
-                                      ' for one integration of ch_pair {}' +
-                                      ' for all weights'.format(ch_pair)),
-                               docstring ='This value specifies the number of' +
-                               ' samples that is used for one integration.' +
-                               ' It is only possible to set even numbre of' +
-                               ' samples. Each sample has 2 ns period, so' +
-                               ' the maximum time of integration is 8 us',
-                               get_cmd =sintlengthall_cmd + '?',
-                               set_cmd =sintlengthall_cmd + ' {}',
-                               vals =vals.Numbers(2, 4096)
-                               )
-            #########
-            # TV mode
-            #########
-            sintavgall_cmd= 'qutech:tvmode{}:naverages:all'.format(ch_pair)
-            self.add_parameter('ch_pair{}_tvmode_naverages'.format(ch_pair),
-                               unit ='#',
-                               label =('The number of integration averages of' +
-                                      ' ch_pair {} all weights'.format(ch_pair)
-                                      ),
-                               docstring ='It sets number of integartion' +
-                               'avarages for all weights within one ch_pair' +
-                               'Value can be between 1 and 2^17' +
-                               ' Any integer within this range can be set',
-                               get_cmd =sintavgall_cmd + '?',
-                               set_cmd =sintavgall_cmd + ' {}',
-                               vals =vals.Numbers(1, 131072)
-                               )
-            stvsegall_cmd= 'qutech:tvmode{}:nsegments:all'.format(ch_pair)
-            self.add_parameter('ch_pair{}_tvmode_nsegments'.format(ch_pair),
-                               unit ='#',
-                               label =('The number of TV segments of ch_pair' +
-                                      ' {} all weights '.format(ch_pair)),
-                               docstring ='It sets the number of samples in'
-                               ' one scan for all weight within a channel' +
-                               ' pair. Value can be between 1and 256. ',
-                               get_cmd =stvsegall_cmd + '?',
-                               set_cmd =stvsegall_cmd + ' {}',
-                               vals =vals.Numbers(1, 256)
-                               )
-            stvenall_cmd= 'qutech:tvmode{}:enable:all'.format(ch_pair)
-            self.add_parameter('ch_pair{}_tvmode_enable'.format(ch_pair),
-                               label =('Enable tv mode' +
-                                      'ch_pair {} all weights '.format(ch_pair)
-                                      ),
-                               docstring ='It enables the TV-Mode' +
-                               ' functionality for all weight pair within' +
-                               ' one ch_pair. It is required to enable it' +
-                               ' prior to run command. Otherwise old data' +
-                               ' will be read out',
-                               get_cmd =stvenall_cmd + '?',
-                               set_cmd =stvenall_cmd + ' {}',
-                               vals =vals.Numbers(0, 1)
-                               )
-            ###########
-            # Threshold
-            ###########
-            sthlall_cmd= 'qutech:qstate{}:threshold:all'.format(ch_pair)
-            self.add_parameter('ch_pair{}_qstate_threshold'.format(ch_pair),
-                               unit ='#',
-                               label =('Set threshold of' +
-                                      'ch_pair {} all weights'.format(ch_pair)
-                                      ),
-                               docstring ='It sets the value for the Qubit' +
-                               ' State Threshold per all weight pairs within' +
-                               ' on channel pair. The value is -2^27 to' +
-                               ' +2^27-1. It is a relative number based on' +
-                               ' the ADC 8 bit range (-128..127). It will' +
-                               ' require to have a scale factor as in' +
-                               ' weighted integral',
-                               get_cmd =sthlall_cmd + '?',
-                               set_cmd =sthlall_cmd + ' {}',
-                               vals =vals.Numbers(-134217728, 134217727)
-                               )
-            #########
-            # Logging
-            #########
-            slogenall_cmd= 'qutech:logging{}:enable:all'.format(ch_pair)
-            self.add_parameter('ch_pair{}_logging_enable'.format(ch_pair),
-                               label =('Enable logging mode' +
-                                      'ch_pair {} all weights'.format(ch_pair)
-                                      ),
-                               docstring ='It enables the Logging ' +
-                               'functionality for all weight pairs within ' +
-                               ' one ch_pair. It is required to enable it' +
-                               ' prior to run command. Otherwise old data' +
-                               ' will be read out. To enable mode paramentr' +
-                               ' should be set to 1. To disable mode' +
-                               ' paramentr should be set to 0.',
-                               get_cmd =slogenall_cmd + '?',
-                               set_cmd =slogenall_cmd + ' {}',
-                               vals =vals.Numbers(0, 1)
-                               # vals=vals.Numbers(1,4096)
-                               )
-
-            slogshotsall_cmd= 'qutech:logging{}:nshots:all'.format(ch_pair)
-            self.add_parameter('ch_pair{}_logging_nshots'.format(ch_pair),
-                               unit ='#',
-                               label =('The number of logging shots of' +
-                                      'ch_pair {} all weights'.format(ch_pair)
-                                      ),
-                               docstring ='It sets number Of Shots  ' +
-                               'Value can be between 1 and 2^13,' +
-                               ' ',
-                               get_cmd =slogshotsall_cmd + '?',
-                               set_cmd =slogshotsall_cmd + ' {}',
-                               vals =vals.Numbers(1, 8192)
-                               )
             ################
             # Error fraction
             ################
-            serrfarcten_cmd= 'qutech:errorfraction{}:enable:all'.format(
-                ch_pair)
-            self.add_parameter('ch_pair{}_err_fract_enable'.format(ch_pair),
-                               label=('Enable error fraction mode' +
-                                      'ch_pair {} all weights '.format(ch_pair)
-                                      ),
-                               docstring='It enables the   Error Fraction' +
-                               ' counter functionality for all weight pairs' +
-                               ' within one ch_pair. It is required to' +
-                               ' enable it prior to run command. Otherwise' +
-                               ' old data will be read out. To enable mode' +
-                               ' paramentr should be set to 1. To disable ' +
-                               ' mode paramentr should be set to 0.',
-                               get_cmd=serrfarcten_cmd + '?',
-                               set_cmd=serrfarcten_cmd + ' {}',
-                               vals=vals.Numbers(0, 1)
-                               )
-
-            serrfractshots_cmd = 'qutech:errorfraction{}:nshots:all'.format(
-                ch_pair)
-            self.add_parameter('ch_pair{}_err_fract_nshots'.format(ch_pair),
-                               unit='#',
-                               label=('The number of error fraction shots of' +
-                                      'ch_pair {} all weights '.format(ch_pair)
-                                      ),
-                               docstring='It sets number Of Shots per' +
-                               ' channel pair. Value can be between 1 and' +
-                               ' 2^21',
-                               get_cmd=serrfractshots_cmd + '?',
-                               set_cmd=serrfractshots_cmd + ' {}',
-                               vals=vals.Numbers(1, 2097152)
-                               )
-
             self.add_parameter('ch_pair{}_err_fract_pattern'.format(ch_pair),
                                label=('Get error fraction pattern ' +
                                       'ch_pair {}'.format(ch_pair)),
@@ -486,179 +288,20 @@ class DDMq(SCPI):
                                ' state when in ‘1’. Specifies the expected' +
                                ' next state when the current state is ‘1’.',
                                set_cmd=self._gen_ch_set_func(
-                self._sendErrFractSglQbitPatternAll,
-                ch_pair),
-                get_cmd=self._gen_ch_get_func(
-                self._getErrFractSglQbitPatternAll, ch_pair),
-
-                vals=vals.Arrays(0, 1)
-            )
+                                  self._sendErrFractSglQbitPatternAll,
+                                  ch_pair),
+                               get_cmd=self._gen_ch_get_func(
+                                  self._getErrFractSglQbitPatternAll,
+                                  ch_pair),
+                               vals=vals.Arrays(0, 1)
+                               )
 
             for i in range(self.device_descriptor.numWeights[ch_pair-1]):
                 wNr = i+1
-                """
-                Weighted integral + Rotation matrix + TV mode parameters
-                """
-                swinten_cmd = 'qutech:wint{}:enable{}'.format(ch_pair, wNr)
-                self.add_parameter('ch_pair{}_weight{}_wint_enable'.format(
-                                   ch_pair, wNr),
-                                   label=('Enable wighted integral' +
-                                          'ch_pair {} weight {}'.format(
-                                              ch_pair, wNr)),
-                                   docstring='  ' +
-                                   '' +
-                                   ' ',
-                                   get_cmd=swinten_cmd + '?',
-                                   set_cmd=swinten_cmd + ' {}',
-                                   vals=vals.Numbers(0, 1)
-                                   )
-
-                sintlength_cmd = 'qutech:wint{}:intlength{}'.format(
-                    ch_pair, wNr)
-                self.add_parameter('ch_pair{}_weight{}_wint_intlength'.format(
-                    ch_pair, wNr),
-                    unit='#',
-                    label=('The number of sample  that' +
-                           'is used for one integration of' +
-                           'ch_pair {} weight {}'.format(
-                               ch_pair, wNr)),
-                    docstring='  ' +
-                    '' +
-                    ' ',
-                    get_cmd=sintlength_cmd + '?',
-                    set_cmd=sintlength_cmd + ' {}',
-                    vals=vals.Numbers(2, 4096)
-                )
-                swintstat_cmd = 'qutech:wint{}:status{}'.format(ch_pair, wNr)
-                self.add_parameter('ch_pair{}_weight{}_wint_status'.format(
-                                   ch_pair, wNr),
-                                   unit='#',
-                                   label=('Weighted integral status of' +
-                                          'ch_pair {} weight {}'.format(
-                                              ch_pair, wNr)),
-                                   docstring='  ' +
-                                   '' +
-                                   ' ',
-                                   get_cmd=swintstat_cmd + '?'
-
-                                   )
-                ###################################
-                # Set 4 elements of rotation matrix
-                # Rotmat[rotmat00 rotmat01
-                # rotmat10 rotmat11]
-                ###################################
-                srotmat00_cmd = 'qutech:rotmat{}:rotmat00{}'.format(
-                    ch_pair, wNr)
-                self.add_parameter('ch_pair{}_weight{}_rotmat_rotmat00'.format(
-                                   ch_pair, wNr),
-                                   unit='#',
-                                   label=('Rotation matrix value 00 of' +
-                                          'ch_pair {} weight {}'.format(
-                                              ch_pair, wNr)),
-                                   docstring=' Value for Rotation matrix' +
-                                   ' element 00 This enables values from' +
-                                   ' (+2-2-12) to -2 float number ',
-                                   get_cmd=srotmat00_cmd + '?',
-                                   set_cmd=srotmat00_cmd + ' {}',
-                                   vals=vals.Numbers(-2, 1.99976)
-                                   )
-                srotmat01_cmd = 'qutech:rotmat{}:rotmat01{}'.format(
-                    ch_pair, wNr)
-                self.add_parameter('ch_pair{}_weight{}_rotmat_rotmat01'.format(
-                                   ch_pair, wNr),
-                                   unit='#',
-                                   label=('Rotation matrix value 01 of' +
-                                          'ch_pair {} weight {}'.format(
-                                              ch_pair, wNr)),
-                                   docstring=' Value for Rotation matrix' +
-                                   ' element 01 This enables values from' +
-                                   ' (+2-2^-12) to -2 float number ',
-                                   get_cmd=srotmat01_cmd + '?',
-                                   set_cmd=srotmat01_cmd + ' {}',
-                                   vals=vals.Numbers(-2, 1.99976)
-                                   )
-                srotmat10_cmd = 'qutech:rotmat{}:rotmat10{}'.format(
-                    ch_pair, wNr)
-                self.add_parameter('ch_pair{}_weight{}_rotmat_rotmat10'.format(
-                                   ch_pair, wNr),
-                                   unit='#',
-                                   label=('Rotation matrix value 10 of' +
-                                          'ch_pair {} weight {}'.format(
-                                              ch_pair, wNr)),
-                                   docstring=' Value for Rotation matrix ' +
-                                   ' element 10 This enables values from' +
-                                   ' (+2-2^-12) to -2 float number ',
-                                   get_cmd=srotmat10_cmd + '?',
-                                   set_cmd=srotmat10_cmd + ' {}'
-                                   )
-                srotmat11_cmd = 'qutech:rotmat{}:rotmat11{}'.format(
-                    ch_pair, wNr)
-                self.add_parameter('ch_pair{}_weight{}_rotmat_rotmat11'.format(
-                                   ch_pair, wNr),
-                                   unit='#',
-                                   label=('Rotation matrix value 11 of' +
-                                          'ch_pair {} weight {} '.format(
-                                              ch_pair, wNr)),
-                                   docstring=' Value for Rotation matrix' +
-                                   ' element 11 This enables values from' +
-                                   ' (+2-2^-12) to -2 float number ',
-                                   get_cmd=srotmat11_cmd + '?',
-                                   set_cmd=srotmat11_cmd + ' {}',
-                                   vals=vals.Numbers(-2, 1.99976)
-                                   )
 
                 ####################
                 # TV mode parameters
                 ####################
-                sintavg_cmd = 'qutech:tvmode{}:naverages{}'.format(
-                    ch_pair, wNr)
-                self.add_parameter(('ch_pair{}_weight{}_tvmode_naverages'
-                                    ).format(ch_pair, wNr),
-                                   unit='#',
-                                   label=('The number of integration' +
-                                          ' averages of ch_pair' +
-                                          ' {} weight {}'.format(ch_pair, wNr)
-                                          ),
-                                   docstring='It sets number of integartion' +
-                                   ' avarages for individual weights within' +
-                                   ' one ch_pair Refer to ch_pair{}_tvmode' +
-                                   '_naverages to set it for all weights ',
-                                   get_cmd=sintavg_cmd + '?',
-                                   set_cmd=sintavg_cmd + ' {}',
-                                   vals=vals.Numbers(1, 131072)
-                                   )
-                stvseg_cmd = 'qutech:tvmode{}:nsegments{}'.format(ch_pair, wNr)
-                self.add_parameter(('ch_pair{}_weight{}_tvmode_nsegments'
-                                    ).format(ch_pair, wNr),
-                                   unit='#',
-                                   label=('The number of TV segments of' +
-                                          'ch_pair {} weight {}'.format(
-                                              ch_pair, wNr)),
-                                   docstring='It sets the number of samples' +
-                                   ' in one scan for individual weight' +
-                                   ' within a channel pair. Refer to' +
-                                   ' ch_pair{}_tvmode_nsegments to set it' +
-                                   ' for all weights ',
-                                   get_cmd=stvseg_cmd + '?',
-                                   set_cmd=stvseg_cmd + ' {}',
-                                   vals=vals.Numbers(1, 256)
-                                   )
-                stven_cmd = 'qutech:tvmode{}:enable{}'.format(ch_pair, wNr)
-                self.add_parameter('ch_pair{}_weight{}_tvmode_enable'.format(
-                                   ch_pair, wNr),
-                                   label=('Enable tv mode' +
-                                          'ch_pair {} weight {}'.format(
-                                              ch_pair, wNr)),
-                                   docstring='It enables the TV-Mode' +
-                                   ' functionality for each weight pair' +
-                                   ' individualy within one ch_pair. Refer' +
-                                   ' to ch_pair{}_tvmode_enable to enable' +
-                                   ' it for all weights',
-                                   get_cmd=stven_cmd + '?',
-                                   set_cmd=stven_cmd + ' {}',
-                                   vals=vals.Numbers(0, 1)
-                                   )
-
                 self.add_parameter('ch_pair{}_weight{}_tvmode_data'.format(
                                    ch_pair, wNr),
                                    label=('Get TV data channel pair' +
@@ -676,24 +319,6 @@ class DDMq(SCPI):
                 ###########################
                 # TV mode QSTATE parameters
                 ###########################
-                sthl_cmd = 'qutech:qstate{}:threshold{}'.format(ch_pair, wNr)
-                self.add_parameter(('ch_pair{}_weight{}_qstate_threshold'
-                                    ).format(ch_pair, wNr),
-                                   unit='#',
-                                   label=('Set threshold of' +
-                                          'ch_pair {} weight {}'.format(
-                                              ch_pair, wNr)),
-                                   docstring='It sets the value for the' +
-                                   ' Qubit State Threshold individually per' +
-                                   ' weight pair. The value is -2^27 to' +
-                                   ' +2^27-1. It is a relative number based' +
-                                   ' on the ADC 8 bit range (-128..127). It' +
-                                   ' will require to have a scale factor as' +
-                                   ' in weighted integral',
-                                   get_cmd=sthl_cmd + '?',
-                                   set_cmd=sthl_cmd + ' {}',
-                                   vals=vals.Numbers(-134217728, 134217727)
-                                   )
                 self.add_parameter('ch_pair{}_weight{}_qstate_cnt_data'.format(
                                    ch_pair, wNr),
                                    label=('Get qstate counter' +
@@ -729,36 +354,6 @@ class DDMq(SCPI):
                 #################
                 # Logging
                 #################
-                slogen_cmd = 'qutech:logging{}:enable{}'.format(ch_pair, wNr)
-                self.add_parameter('ch_pair{}_weight{}_logging_enable'.format(
-                                   ch_pair, wNr),
-                                   label=('Enable logging mode' +
-                                          'ch_pair {} weight {}'.format(
-                                              ch_pair, wNr)),
-                                   docstring='  ' +
-                                   '' +
-                                   ' ',
-                                   get_cmd=slogen_cmd + '?',
-                                   set_cmd=slogen_cmd + ' {}',
-                                   vals=vals.Numbers(0, 1)
-                                   )
-
-                slogshots_cmd = 'qutech:logging{}:nshots{}'.format(
-                    ch_pair, wNr)
-                self.add_parameter('ch_pair{}_weight{}_logging_nshots'.format(
-                                   ch_pair, wNr),
-                                   unit='#',
-                                   label=('The number of logging shots of' +
-                                          'ch_pair {} weight {}'.format(
-                                              ch_pair, wNr)),
-                                   docstring='  ' +
-                                   '' +
-                                   ' ',
-                                   get_cmd=slogshots_cmd + '?',
-                                   set_cmd=slogshots_cmd + ' {}',
-                                   vals=vals.Numbers(1, 8192)
-                                   )
-
                 self.add_parameter('ch_pair{}_weight{}_logging_int'.format(
                                    ch_pair, wNr),
                                    label=('Get integration logging ' +
@@ -794,36 +389,6 @@ class DDMq(SCPI):
                 #################
                 # Error fraction
                 #################
-                serrfarcten_cmd = 'qutech:errorfraction{}:enable{}'.format(
-                    ch_pair, wNr)
-                self.add_parameter(('ch_pair{}_weight{}_err_fract_enable'
-                                    ).format(ch_pair, wNr),
-                                   label=('Enable error fraction mode' +
-                                          'ch_pair {} weight {} '.format(
-                                              ch_pair, wNr)),
-                                   docstring='  ' +
-                                   '' +
-                                   ' ',
-                                   get_cmd=serrfarcten_cmd + '?',
-                                   set_cmd=serrfarcten_cmd + ' {}',
-                                   vals=vals.Numbers(0, 1)
-                                   )
-
-                serrfractshots_cmd = 'qutech:errorfraction{}:nshots{}'.format(
-                    ch_pair, wNr)
-                self.add_parameter(('ch_pair{}_weight{}_err_fract_nshots'
-                                    ).format(ch_pair, wNr),
-                                   unit='#',
-                                   label=('The number of error fraction' +
-                                          (' shots of ch_pair {} weight' +
-                                           ' {} ').format(ch_pair, wNr)),
-                                   docstring='  ' +
-                                   '' +
-                                   ' ',
-                                   get_cmd=serrfractshots_cmd + '?',
-                                   set_cmd=serrfractshots_cmd + ' {}',
-                                   vals=vals.Numbers(1, 2097152)
-                                   )
                 self.add_parameter('ch_pair{}_weight{}_err_fract_cnt'.format(
                                    ch_pair, wNr),
                                    label=('Get all error fraction counters ' +
@@ -948,7 +513,7 @@ class DDMq(SCPI):
         while (looping):
             start = end + 1
             end = errorList.find(',\"', start)
-            errorCode = int(errorList[start:end])
+            errorCode = int(float(errorList[start:end]))
 
             start = end + 2
             end = errorList.find("\",", start)
@@ -1117,7 +682,7 @@ class DDMq(SCPI):
 
     def _getInAvgFinished(self, ch_pair):
         finished = self.ask('qutech:inputavg{:d}:finished? '.format(ch_pair))
-        fmt_finished = format(int(finished), 'x')
+        fmt_finished = format(int(float(finished)), 'x')
         return fmt_finished
 
     def _getInAvgBusy(self, ch_pair):
@@ -1132,7 +697,7 @@ class DDMq(SCPI):
     def _getTVFinished(self, ch_pair, wNr):
         finished = self.ask(
             'qutech:tvmode{:d}:finished{:d}? '.format(ch_pair, wNr))
-        fmt_finished = format(int(finished), 'x')
+        fmt_finished = format(int(float(finished)), 'x')
         return fmt_finished
 
     def _getTVBusy(self, ch_pair, wNr):
@@ -1148,7 +713,7 @@ class DDMq(SCPI):
     def _getLoggingFinished(self, ch_pair, wNr):
         finished = self.ask(
             'qutech:logging{:d}:finished{:d}? '.format(ch_pair, wNr))
-        fmt_finished = format(int(finished), 'x')
+        fmt_finished = format(int(float(finished)), 'x')
         return fmt_finished
 
     def _getLoggingBusy(self, ch_pair, wNr):
@@ -1215,7 +780,7 @@ class DDMq(SCPI):
     def _getErrFractFinished(self, ch_pair, wNr):
         finished = self.ask(
             'qutech:errorfraction{:d}:finished{:d}? '.format(ch_pair, wNr))
-        fmt_finished = format(int(finished), 'x')
+        fmt_finished = format(int(float(finished)), 'x')
         return fmt_finished
 
     def _getErrFractBusy(self, ch_pair, wNr):
