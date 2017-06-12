@@ -93,6 +93,11 @@ class test_allxy_analysis(unittest.TestCase):
         a.deviation_total
         self.assertAlmostEqual(a.deviation_total, 0.02855964154)
 
+    def test_allxy_single_weight(self):
+        a = ma.AllXY_Analysis(timestamp='20170607_211630')
+        a.deviation_total
+        self.assertAlmostEqual(a.deviation_total, 0.02855964154)
+
 
 class test_t1_analysis(unittest.TestCase):
 
@@ -101,9 +106,9 @@ class test_t1_analysis(unittest.TestCase):
         self.datadir = os.path.join(pq.__path__[0], 'tests', 'test_data')
         ma.a_tools.datadir = self.datadir
 
-    def test_allxy_IQ_data(self):
-        a = ma.T1_Analysis(timestamp='20170607_210448')
-        self.assertAlmostEqual(a.T1*1e6, 18.0505, places=3)
+    def test_T1_IQ_data(self):
+        a = ma.T1_Analysis(timestamp='20170607_152324')
+        self.assertAlmostEqual(a.T1*1e6, 35.0788, places=3)
 
     def test_loading_T1_fit_res_from_file(self):
         a = ma.T1_Analysis(timestamp='20170607_210448', auto=False)
@@ -118,9 +123,28 @@ class test_RB_analysis(unittest.TestCase):
         self.datadir = os.path.join(pq.__path__[0], 'tests', 'test_data')
         ma.a_tools.datadir = self.datadir
 
-    def test_allxy_IQ_data(self):
+    def test_RB_IQ_data(self):
         a = ma.RandomizedBenchmarking_Analysis(timestamp='20170607_210655')
         fpar = a.fit_res.best_values
         self.assertAlmostEqual(fpar['p'], 0.99289, places=3)
         F = a.fit_res.params['fidelity_per_Clifford'].value*100
         self.assertAlmostEqual(F, 99.64495, places=3)
+
+    @unittest.skip
+    def test_RB_single_weight(self):
+        pass
+
+
+class test_motzoi_analysis(unittest.TestCase):
+    @classmethod
+    def setUpClass(self):
+        self.datadir = os.path.join(pq.__path__[0], 'tests', 'test_data')
+        ma.a_tools.datadir = self.datadir
+
+    def test_motzoi_IQ_no_cal_pts(self):
+        a = ma.Motzoi_XY_analysis(timestamp='20170607_161234')
+        self.assertAlmostEqual(a.optimal_motzoi, -0.3202, places=2)
+
+    def test_motzoi_single_weight(self):
+        a = ma.Motzoi_XY_analysis(timestamp='20170607_210555')
+        self.assertAlmostEqual(a.optimal_motzoi, -0.2856, places=2)

@@ -715,7 +715,7 @@ def get_timestamps_in_range(timestamp_start, timestamp_end=None,
                             label=None, exact_label_match=True, folder=None):
     if folder is None:
         folder = datadir
-        
+
     datetime_start = datetime_from_timestamp(timestamp_start)
     if timestamp_end is None:
         datetime_end = datetime.datetime.today()
@@ -1117,7 +1117,8 @@ def rotate_and_normalize_data(data, cal_zero_points=None, cal_one_points=None,
     Rotates and normalizes data with respect to some reference coordinates.
     there are two ways to specify the reference coordinates.
         1. Explicitly defining the coordinates
-        2. Specifying which elements of the input data correspond to zero and one
+        2. Specifying which elements of the input data correspond to zero
+            and one
     Inputs:
         data (numpy array) : 2D dataset that has to be rotated and normalized
         zero_coord (tuple) : coordinates of reference zero

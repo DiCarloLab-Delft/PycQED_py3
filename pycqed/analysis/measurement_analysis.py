@@ -856,6 +856,11 @@ class TD_Analysis(MeasurementAnalysis):
     #     return self.fit_res
 
     def rotate_and_normalize_data(self):
+        if len(self.measured_values) == 1:
+            # if only one weight function is used rotation is not required
+            self.norm_data_to_cal_points()
+            return
+
         if self.cal_points is None:
             if len(self.measured_values[0]) == 42:
                 self.corr_data, self.zero_coord, self.one_coord = \
@@ -889,6 +894,28 @@ class TD_Analysis(MeasurementAnalysis):
                     one_coord=self.one_coord,
                     cal_zero_points=self.cal_points[0],
                     cal_one_points=self.cal_points[1])
+
+    def norm_data_to_cal_points(self):
+        # Used if data is based on only one weight
+        if self.cal_points is None:
+            # implicit in double point AllXY
+            if len(self.measured_values[0]) == 42:
+                cal_zero_points = list(range(2))
+                cal_one_points = list(range(-8, -4))
+            # implicit in single point AllXY
+            elif len(self.measured_values[0]) == 21:
+                cal_zero_points = list(range(1))
+                cal_one_points = list(range(-4, -2))
+            else:
+                cal_zero_points = list(range(1))
+                cal_one_points = list(range(-2, 0))
+        else:
+            cal_zero_points = self.cal_points[0]
+            cal_one_points = self.cal_points[1]
+        self.corr_data = a_tools.normalize_data_v3(
+            self.measured_values[0],
+            cal_zero_points=cal_zero_points,
+            cal_one_points=cal_one_points)
 
     def run_default_analysis(self,
                              close_main_fig=True,  **kw):
@@ -1190,7 +1217,8 @@ class Rabi_Analysis(TD_Analysis):
         else:
             self.fig, ax = plt.subplots(self.nr_quadratures, 1,
                                         figsize=(5, 6))
-            self.axs = [ax] # to ensure it always makes a list
+            self.axs = [ax]
+            # to ensure it is a list of axes, as figure making relies on this
         x_fine = np.linspace(min(self.sweep_points), max(self.sweep_points),
                              1000)
         for i in range(self.nr_quadratures):
@@ -1531,15 +1559,17 @@ class Motzoi_XY_analysis(TD_Analysis):
     def __init__(self, label='Motzoi', cal_points=[[-4, -3], [-2, -1]], **kw):
         kw['label'] = label
         kw['h5mode'] = 'r+'
-        self.cal_points=cal_points
+        self.cal_points = cal_points
         super().__init__(**kw)
 
     def run_default_analysis(self, close_file=True, close_main_fig=True, **kw):
         self.get_naming_and_values()
         self.add_analysis_datagroup_to_file()
         if self.cal_points is None:
-            self.corr_data = self.measured_values[0]**2 + self.measured_values[1]**2
-
+            if len(self.measured_values) == 2:
+                self.corr_data = self.measured_values[0]**2 + self.measured_values[1]**2
+            else:
+                self.corr_data = self.measured_values[0]
         else:
             self.rotate_and_normalize_data()
             self.add_dataset_to_analysisgroup('Corrected data',
@@ -1591,7 +1621,7 @@ class Motzoi_XY_analysis(TD_Analysis):
                     self.ax.plot(x_fine, fine_fit, c=c[i], label='guess')
 
         self.ax.legend(loc='best')
-        if self.cal_points != None:
+        if self.cal_points is not None:
             self.ax.set_ylim(-.1, 1.1)
         self.save_fig(self.fig, fig_tight=True, **kw)
 
@@ -1623,6 +1653,7 @@ class Motzoi_XY_analysis(TD_Analysis):
         As a parabola can have 2 intersects.
         Will default to picking the one closest to zero
         '''
+        # Fit res 0 is the fit res for Xy, and fit_res 1 for Yx
         b_vals0 = self.fit_res[0].best_values
         b_vals1 = self.fit_res[1].best_values
         x1, x2 = a_tools.solve_quadratic_equation(
@@ -3401,14 +3432,12 @@ class AllXY_Analysis(TD_Analysis):
         self.add_analysis_datagroup_to_file()
         self.get_naming_and_values()
 
-        ideal_data = kw.pop('ideal_data', None)
-        if ideal_data is None:
-            if len(self.measured_values[0]) == 42:
-                ideal_data = np.concatenate((0*np.ones(10), 0.5*np.ones(24),
-                                             np.ones(8)))
-            else:
-                ideal_data = np.concatenate((0*np.ones(5), 0.5*np.ones(12),
-                                             np.ones(4)))
+        if len(self.measured_values[0]) == 42:
+            ideal_data = np.concatenate((0*np.ones(10), 0.5*np.ones(24),
+                                         np.ones(8)))
+        else:
+            ideal_data = np.concatenate((0*np.ones(5), 0.5*np.ones(12),
+                                         np.ones(4)))
         self.rotate_and_normalize_data()
         self.add_dataset_to_analysisgroup('Corrected data',
                                           self.corr_data)
@@ -3418,58 +3447,63 @@ class AllXY_Analysis(TD_Analysis):
         self.deviation_total = np.mean(abs(data_error))
         # Plotting
         if self.make_fig:
-            fig1, fig2, ax1, axarray = self.setup_figures_and_axes()
-            for i in range(2):
-                if len(self.value_names) >= 4:
-                    ax = axarray[i/2, i % 2]
-                else:
-                    ax = axarray[i]
-                self.plot_results_vs_sweepparam(x=self.sweep_points,
-                                                y=self.measured_values[i],
-                                                fig=fig2, ax=ax,
-                                                xlabel=self.xlabel,
-                                                ylabel=str(
-                                                    self.value_names[i]),
-                                                save=False)
-            ax1.set_ylim(min(self.corr_data)-.1, max(self.corr_data)+.1)
-            if self.flip_axis:
-                ylabel = r'$F$ $|0 \rangle$'
-            else:
-                ylabel = r'$F$ $|1 \rangle$'
-            self.plot_results_vs_sweepparam(x=self.sweep_points,
-                                            y=self.corr_data,
-                                            fig=fig1, ax=ax1,
-                                            xlabel='',
-                                            ylabel=ylabel,
-                                            save=False)
-            ax1.plot(self.sweep_points, ideal_data)
-            labels = [item.get_text() for item in ax1.get_xticklabels()]
-            if len(self.measured_values[0]) == 42:
-                locs = np.arange(1, 42, 2)
-            else:
-                locs = np.arange(0, 21, 1)
-            labels = ['II', 'XX', 'YY', 'XY', 'YX',
-                      'xI', 'yI', 'xy', 'yx', 'xY', 'yX',
-                      'Xy', 'Yx', 'xX', 'Xx', 'yY', 'Yy',
-                      'XI', 'YI', 'xx', 'yy']
-
-            ax1.xaxis.set_ticks(locs)
-            ax1.set_xticklabels(labels, rotation=60)
-
-            deviation_text = r'Deviation: %.5f' % self.deviation_total
-            ax1.text(1, 1.05, deviation_text, fontsize=11,
-                     bbox=self.box_props)
-            if not close_main_fig:
-                # Hacked in here, good idea to only show the main fig but can
-                # be optimized somehow
-                self.save_fig(fig1, ylabel='Amplitude (normalized)',
-                              close_fig=False, **kw)
-            else:
-                self.save_fig(fig1, ylabel='Amplitude (normalized)', **kw)
-            self.save_fig(fig2, ylabel='Amplitude', **kw)
+            self.make_figures(ideal_data=ideal_data,
+                              close_main_fig=close_main_fig, **kw)
         if close_file:
             self.data_file.close()
         return self.deviation_total
+
+    def make_figures(self, ideal_data, close_main_fig, **kw):
+        fig1, fig2, ax1, axarray = self.setup_figures_and_axes()
+        for i in range(len(self.value_names)):
+            if len(self.value_names) == 2:
+                ax = axarray[i]
+            else:
+                ax = ax
+            self.plot_results_vs_sweepparam(x=self.sweep_points,
+                                            y=self.measured_values[i],
+                                            fig=fig2, ax=ax,
+                                            xlabel=self.xlabel,
+                                            ylabel=str(
+                                                self.value_names[i]),
+                                            save=False)
+        ax1.set_ylim(min(self.corr_data)-.1, max(self.corr_data)+.1)
+        if self.flip_axis:
+            ylabel = r'$F$ $|0 \rangle$'
+        else:
+            ylabel = r'$F$ $|1 \rangle$'
+        self.plot_results_vs_sweepparam(x=self.sweep_points,
+                                        y=self.corr_data,
+                                        fig=fig1, ax=ax1,
+                                        xlabel='',
+                                        ylabel=ylabel,
+                                        save=False)
+        ax1.plot(self.sweep_points, ideal_data)
+        labels = [item.get_text() for item in ax1.get_xticklabels()]
+        if len(self.measured_values[0]) == 42:
+            locs = np.arange(1, 42, 2)
+        else:
+            locs = np.arange(0, 21, 1)
+        labels = ['II', 'XX', 'YY', 'XY', 'YX',
+                  'xI', 'yI', 'xy', 'yx', 'xY', 'yX',
+                  'Xy', 'Yx', 'xX', 'Xx', 'yY', 'Yy',
+                  'XI', 'YI', 'xx', 'yy']
+
+        ax1.xaxis.set_ticks(locs)
+        ax1.set_xticklabels(labels, rotation=60)
+
+        deviation_text = r'Deviation: %.5f' % self.deviation_total
+        ax1.text(1, 1.05, deviation_text, fontsize=11,
+                 bbox=self.box_props)
+        if not close_main_fig:
+            # Hacked in here, good idea to only show the main fig but can
+            # be optimized somehow
+            self.save_fig(fig1, ylabel='Amplitude (normalized)',
+                          close_fig=False, **kw)
+        else:
+            self.save_fig(fig1, ylabel='Amplitude (normalized)', **kw)
+        self.save_fig(fig2, ylabel='Amplitude', **kw)
+
 
 
 class RandomizedBenchmarking_Analysis(TD_Analysis):
