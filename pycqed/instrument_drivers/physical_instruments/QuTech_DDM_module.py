@@ -35,8 +35,12 @@ class DDMq(SCPI):
 
     # def __init__(self, logging=True, simMode=False, paranoid=False):
     def __init__(self, name, address, port, **kwargs):
+        self.ddm_software_version = ""
+        self.parameter_file_version = ""
+        self.ranges_file_version = ""
+
         isConnected = False
-        try :
+        try:
             super().__init__(name, address, port, **kwargs)
             isConnected = True
         except:
@@ -66,26 +70,115 @@ class DDMq(SCPI):
 
         self.connect_message()
 
+    def _ask(self, data):
+        if (isinstance(data, str)):
+            return self.ask(data)
+        else:
+            return data()
+
+    def _write(self, func, data):
+        if (isinstance(func, str)):
+            return self.write(func.format(data))
+        else:
+            return func(data)
+
+    # Read the min and max values of the parameter from the ddm and update the
+    # min and max values of the validator
+    def _updateValidatorList(self, name, **kwargs):
+        if ('vals' in kwargs and 'set_cmd' in kwargs
+                and 'get_cmd' in kwargs):
+            validator = kwargs['vals']
+            if self.ddm_software_version != self.ranges_file_version:
+                try:
+                        minValue = str(INT32_MIN)
+                        maxValue = str(INT32_MAX)
+                        if (isinstance(validator, vals.Numbers)):
+                            initialValue = self._ask(kwargs['get_cmd'])
+                            self._write(kwargs['set_cmd'], str(INT32_MAX))
+                            maxValue = self._ask(kwargs['get_cmd'])
+                            self._write(kwargs['set_cmd'], str(INT32_MIN))
+                            minValue = self._ask(kwargs['get_cmd'])
+                            self._write(kwargs['set_cmd'], initialValue)
+                        elif (isinstance(validator, vals.Arrays)):
+                            initialValue_str = self._ask(kwargs['get_cmd'])
+                            initialValue = list(map(int, initialValue_str))
+                            count = max(1, len(initialValue))
+                            char_max = []
+                            char_min = []
+                            for i in range(count):
+                                char_max.append(CHAR_MAX)
+                                char_min.append(CHAR_MIN)
+                            self._write(kwargs['set_cmd'], char_max)
+                            maxValue = str(self._ask(kwargs['get_cmd'])[0])
+                            self._write(kwargs['set_cmd'], char_min)
+                            minValue = str(self._ask(kwargs['get_cmd'])[0])
+                            self._write(kwargs['set_cmd'], initialValue)
+                        else:
+                            log.debug("Not implemented: Retreiving min and" +
+                                      " max values of a parameter from the" +
+                                      " ddm of type '" + type(validator) + "'")
+                        self.parameterRangesList[name] = {}
+                        self.parameterRangesList[name]["min_val"] = minValue
+                        self.parameterRangesList[name]["max_val"] = maxValue
+                except Exception as e:
+                    log.debug("Exception was thrown while retreiving the min and max" +
+                              " values of a parameter '" + name + "' from the ddm.(%s)", str(e))
+            else:
+                minValue = self.parameterRangesList[name]["min_val"]
+                maxValue = self.parameterRangesList[name]["max_val"]
+            try:
+                if (isinstance(validator, vals.Numbers)):
+                    if (str(validator._min_value) != minValue
+                            or str(validator._max_value) != maxValue):
+                        kwargs['vals'] = vals.Numbers(
+                            float(minValue), float(maxValue))
+                elif (isinstance(validator, vals.Arrays)):
+                    if (str(validator._min_value) != minValue
+                            or str(validator._max_value) != maxValue):
+                        kwargs['vals'] = vals.Arrays(float(minValue), float(maxValue))
+                else:
+                    log.debug("Not implemented: Setting of min and max values" +
+                               " of a parameter from the ddm of type '" +
+                               type(validator) + "'")
+            except Exception as e:
+                log.debug("Exception was thrown while setting the min and max" +
+                            " values of a parameter '" + name + "' from the ddm.(%s)", str(e))
+                log.debug(str(minValue) + ", " + str(maxValue) + ": " + str(validator._min_value) + ", " + str(validator._max_value))
+
+    def add_parameter(self, name, parameter_class=StandardParameter,
+                      **kwargs):
+        self._updateValidatorList(name, **kwargs)
+        super(DDMq, self).add_parameter(name, parameter_class, **kwargs)
+
     def add_parameters(self):
-        # Check if the firware version match the version of the parameter list
-        software_version = ""
-        try:
-            version_info = self.get_idn()
-            software_version = version_info['swVersion']
-        except:
-            log.warning("software version was not found".format(
-                self._s_file_name))
         path = os.path.abspath(__file__)
         dir_path = os.path.dirname(path)
         folder_path = os.path.join(dir_path, 'QuTech_DDM_Parameter_Files')
-        self._s_file_name = os.path.join(folder_path, 'QuTech_DDM_Parameters.txt')
-        parameter_file_version = ""
+
+        self.parameterRangesList = {}
+        path = os.path.join(folder_path, 'QuTech_DDM_Ranges.txt')
+        try:
+            file = open(path)
+            file_content = json.loads(file.read())
+            self.ranges_file_version = file_content["version"]["ddm_software_version"]
+        except:
+          log.warning("failed to open the " + path)
+
+        # Check if the firware version match the version of the parameter list
+        try:
+            version_info = self.get_idn()
+            self.ddm_software_version = version_info['swVersion']
+        except:
+            log.warning("software version was not found".format(
+                self._s_file_name))
+        self._s_file_name = os.path.join(
+            folder_path, 'QuTech_DDM_Parameters.txt')
         ddm_parameters = []
         try:
             file = open(self._s_file_name)
-            file_content = json.loads(open(self._s_file_name).read())
-            ddm_parameters = file_content["parameters"]
-            parameter_file_version = file_content["version"]["software"]
+            file_content = json.loads(file.read())
+            ddm_parameters=file_content["parameters"]
+            self.parameter_file_version=file_content["version"]["software"]
         except:
             log.warning("parameter file for gettable parameters {} not found".format(
                 self._s_file_name))
@@ -94,17 +187,24 @@ class DDMq(SCPI):
                   os.makedirs(folder_path)
             except:
                 pass
-        if (software_version != parameter_file_version):
+        if (self.ddm_software_version != self.parameter_file_version):
             print("The parameter file is updated, because the version number of the firware doesn't match the version of the parameter file")
             # Update the parameter list to software version of the ddm
-            parameter_str = self.ask('qutech:parameters?')
-            parameter_str = parameter_str.replace('\t', '\n')
+            parameter_str=self.ask('qutech:parameters?')
+            parameter_str=parameter_str.replace('\t', '\n')
             try:
-                file = open(self._s_file_name, 'w')
+                file=open(self._s_file_name, 'w')
                 file.write(parameter_str)
             except:
-                log.warning("failed to write update the parameters in the parameter file")
-            ddm_parameters = json.loads(parameter_str)["parameters"]
+                log.warning(
+                    "failed to write update the parameters in the parameter file")
+            ddm_parameters=json.loads(parameter_str)["parameters"]
+        else:
+            self.ranges_file_name=os.path.join(
+                folder_path, 'QuTech_DDM_Ranges.txt')
+            file=open(self.ranges_file_name)
+            file_content=json.loads(file.read())
+            self.parameterRangesList=file_content["parameters"]
 
         # Add the parameters to 'self'
         for parameter in ddm_parameters:
@@ -113,28 +213,39 @@ class DDMq(SCPI):
                             " name")
                 continue
 
-            name = parameter["name"]
+            name=parameter["name"]
             del parameter["name"]
 
             if ("vals" in parameter):
-                validator = parameter["vals"]
+                validator=parameter["vals"]
                 try:
-                    min_val = validator["min_val"]
-                    max_val = validator["max_val"]
-                    val_type = validator["type"]
-                    if (val_type == "int32_t"):
-                        parameter["vals"] = vals.Numbers(min_val, max_val)
+                    val_type=validator["type"]
+                    if (val_type == "Number"):
+                        parameter["vals"]=vals.Numbers(INT32_MIN, INT32_MAX)
                     else:
-                        log.warning("Failed to set the validator for the parameter " + name + ", because of a unknow validator type: '" + val_type + "'")
+                        log.warning("Failed to set the validator for the parameter " + \
+                                    name + ", because of a unknow validator type: '" + val_type + "'")
                 except:
-                    log.warning("Failed to set the validator for the parameter " + name)
+                    log.warning(
+                        "Failed to set the validator for the parameter " + name)
 
             try:
                 self.add_parameter(name, **parameter)
             except:
-                log.warning("Failed to create the parameter " + name + ", because of a unknown keyword in this parameter")
+                log.warning("Failed to create the parameter " + name + \
+                            ", because of a unknown keyword in this parameter")
 
         self.add_custom_parameters()
+
+        if (self.ddm_software_version != self.ranges_file_version):
+            self.ranges_file_name= os.path.join(folder_path, 'QuTech_DDM_Ranges.txt')
+            version = {}
+            version["ddm_software_version"] = self.ddm_software_version
+            file_content = {}
+            file_content["version"] = version
+            file_content["parameters"] = self.parameterRangesList
+            file = open(self.ranges_file_name, 'w')
+            json.dump(file_content, file,  indent=2)
 
     def add_custom_parameters(self):
         #######################################################################
@@ -149,218 +260,190 @@ class DDMq(SCPI):
             means a common paramenter (function,method) for two of the
             channels either for ch1,ch2 or ch3,ch4.
             """
-            ch_pair = i+1
+            ch_pair= i+1
 
-            stemperature_int_cmd = 'qutech:adc{}:temperature'.format(ch_pair)
-            self.add_parameter('ch_pair{}_temperature'.format(ch_pair),
-                               label=('Get the temperature of the adc'),
-                               docstring='It return the current temperature' +
-                               ' of the adc in °C.',
-                               get_cmd=stemperature_int_cmd + '?'
-                               )
-            scalibrated_temperature_int_cmd = ('qutech:adc{}:calibrated:' +
-                                    'temperature').format(ch_pair)
-            self.add_parameter('ch_pair{}_temperature_at_calibration'.format(
-                               ch_pair),
-                               label=('Get the temperature of the adc at the' +
-                               ' last calibration'),
-                               docstring='It return the temperature' +
-                               ' of the adc at the last calibration in °C.',
-                               get_cmd=scalibrated_temperature_int_cmd + '?'
-                               )
-            sreset_int_cmd = 'qutech:reset{}'.format(ch_pair)
+            sreset_int_cmd= 'qutech:reset{}'.format(ch_pair)
             self.add_parameter('ch_pair{}_reset'.format(ch_pair),
-                               label=('Reset DDM '),
-                               docstring='It desables all modes.',
-                               set_cmd=sreset_int_cmd
+                               label =('Reset DDM '),
+                               docstring ='It desables all modes.',
+                               set_cmd =sreset_int_cmd
                                )
             self.add_parameter('ch_pair{}_status'.format(ch_pair),
-                               label=('Get status '),
-                               docstring='It returns status on Over range,' +
+                               label =('Get status '),
+                               docstring ='It returns status on Over range,' +
                                ' under range on DI and DQ FPGA clock,' +
                                ' Calbration status( in case if is being ' +
                                ' calibrated it will show the warning, False' +
                                ' Trigger for input averaging and integration.',
-                               get_cmd=self._gen_ch_get_func(
+                               get_cmd =self._gen_ch_get_func(
                                    self._getADCstatus, ch_pair)
                                )
 
-            scaladc_cmd = 'qutech:adc{}:cal'.format(ch_pair)
+            scaladc_cmd= 'qutech:adc{}:cal'.format(ch_pair)
             self.add_parameter('ch_pair{}_cal_adc'.format(ch_pair),
-                               label=('Calibrate ADC{}'.format(ch_pair)),
-                               docstring='It calibrates ADC. It is required' +
+                               label =('Calibrate ADC{}'.format(ch_pair)),
+                               docstring ='It calibrates ADC. It is required' +
                                ' to do if the temperature changes or with' +
                                ' time. It is done automatically when power' +
                                ' is on',
-                               set_cmd=scaladc_cmd
+                               set_cmd =scaladc_cmd
                                # vals=vals.Numbers(1,4096)
                                )
-            snavg_cmd = 'qutech:inputavg{}:naverages'.format(ch_pair)
-            self.add_parameter('ch_pair{}_inavg_Navg'.format(ch_pair),
-                               unit='#',
-                               label=('Number of averages' +
-                                      'ch_pair {} '.format(ch_pair)),
-                               docstring='It sets number of averages per' +
-                               ' channel pair. Any integer from 1 to 32768',
-                               get_cmd=snavg_cmd + '?',
-                               set_cmd=snavg_cmd + ' {}',
-                               vals=vals.Numbers(1, 32768)
-                               )
-            snsamp_cmd = 'qutech:inputavg{}:scansize'.format(ch_pair)
+            snsamp_cmd= 'qutech:inputavg{}:scansize'.format(ch_pair)
             self.add_parameter('ch_pair{}_inavg_scansize'.format(ch_pair),
-                               unit='#',
-                               label=('Number of samples' +
+                               unit ='#',
+                               label =('Number of samples' +
                                       'ch_pair {} '.format(ch_pair)),
-                               docstring='It sets scan size of the input' +
+                               docstring ='It sets scan size of the input' +
                                ' averaging mode up to 8 us. Each sample has' +
                                ' 2 ns period. It is only possible to set' +
                                ' even number of samples',
-                               get_cmd=snsamp_cmd + '?',
-                               set_cmd=snsamp_cmd + ' {}',
-                               vals=vals.Numbers(2, 4096)
+                               get_cmd =snsamp_cmd + '?',
+                               set_cmd =snsamp_cmd + ' {}',
+                               vals =vals.Numbers(2, 4096)
                                )
-            senable_cmd = 'qutech:inputavg{}:enable'.format(ch_pair)
+            senable_cmd= 'qutech:inputavg{}:enable'.format(ch_pair)
             self.add_parameter('ch_pair{}_inavg_enable'.format(ch_pair),
-                               label=('Enable input averaging' +
+                               label =('Enable input averaging' +
                                       'ch_pair {} '.format(ch_pair)),
-                               docstring='It enables input averaging mode' +
+                               docstring ='It enables input averaging mode' +
                                ' prior run command.  It is required to' +
                                ' enable mode every measuremnet. If it is not' +
                                ' enabled the last measeared data will be read',
-                               get_cmd=senable_cmd + '?',
-                               set_cmd=senable_cmd + ' {}',
-                               vals=vals.Numbers(0, 1)
+                               get_cmd =senable_cmd + '?',
+                               set_cmd =senable_cmd + ' {}',
+                               vals =vals.Numbers(0, 1)
                                )
-            sholdoff_cmd = 'qutech:input{}:holdoff'.format(ch_pair)
+            sholdoff_cmd= 'qutech:input{}:holdoff'.format(ch_pair)
             self.add_parameter('ch_pair{}_holdoff'.format(ch_pair),
 
-                               label=('Set holdoff' +
+                               label =('Set holdoff' +
                                       'ch_pair {} '.format(ch_pair)),
-                               docstring='specifying the number of clocks' +
+                               docstring ='specifying the number of clocks' +
                                ' the measurement trigger should be delayed' +
                                ' before a new scan starts. Each clock is 2' +
                                ' ns period, but it is only posible to set' +
                                ' even number of clocks',
-                               get_cmd=sholdoff_cmd + '?',
-                               set_cmd=sholdoff_cmd + ' {}',
-                               vals=vals.Numbers(0, 254)
+                               get_cmd =sholdoff_cmd + '?',
+                               set_cmd =sholdoff_cmd + ' {}',
+                               vals =vals.Numbers(0, 254)
                                )
-            sintlengthall_cmd = 'qutech:wint{}:intlength:all'.format(ch_pair)
+            sintlengthall_cmd= 'qutech:wint{}:intlength:all'.format(ch_pair)
             self.add_parameter('ch_pair{}_wint_intlength'.format(ch_pair),
-                               unit='#',
-                               label=('The number of sample  that is used' +
+                               unit ='#',
+                               label =('The number of sample  that is used' +
                                       ' for one integration of ch_pair {}' +
                                       ' for all weights'.format(ch_pair)),
-                               docstring='This value specifies the number of' +
+                               docstring ='This value specifies the number of' +
                                ' samples that is used for one integration.' +
                                ' It is only possible to set even numbre of' +
                                ' samples. Each sample has 2 ns period, so' +
                                ' the maximum time of integration is 8 us',
-                               get_cmd=sintlengthall_cmd + '?',
-                               set_cmd=sintlengthall_cmd + ' {}',
-                               vals=vals.Numbers(2, 4096)
+                               get_cmd =sintlengthall_cmd + '?',
+                               set_cmd =sintlengthall_cmd + ' {}',
+                               vals =vals.Numbers(2, 4096)
                                )
             #########
             # TV mode
             #########
-            sintavgall_cmd = 'qutech:tvmode{}:naverages:all'.format(ch_pair)
+            sintavgall_cmd= 'qutech:tvmode{}:naverages:all'.format(ch_pair)
             self.add_parameter('ch_pair{}_tvmode_naverages'.format(ch_pair),
-                               unit='#',
-                               label=('The number of integration averages of' +
+                               unit ='#',
+                               label =('The number of integration averages of' +
                                       ' ch_pair {} all weights'.format(ch_pair)
                                       ),
-                               docstring='It sets number of integartion' +
+                               docstring ='It sets number of integartion' +
                                'avarages for all weights within one ch_pair' +
                                'Value can be between 1 and 2^17' +
                                ' Any integer within this range can be set',
-                               get_cmd=sintavgall_cmd + '?',
-                               set_cmd=sintavgall_cmd + ' {}',
-                               vals=vals.Numbers(1, 131072)
+                               get_cmd =sintavgall_cmd + '?',
+                               set_cmd =sintavgall_cmd + ' {}',
+                               vals =vals.Numbers(1, 131072)
                                )
-            stvsegall_cmd = 'qutech:tvmode{}:nsegments:all'.format(ch_pair)
+            stvsegall_cmd= 'qutech:tvmode{}:nsegments:all'.format(ch_pair)
             self.add_parameter('ch_pair{}_tvmode_nsegments'.format(ch_pair),
-                               unit='#',
-                               label=('The number of TV segments of ch_pair' +
+                               unit ='#',
+                               label =('The number of TV segments of ch_pair' +
                                       ' {} all weights '.format(ch_pair)),
-                               docstring='It sets the number of samples in'
+                               docstring ='It sets the number of samples in'
                                ' one scan for all weight within a channel' +
                                ' pair. Value can be between 1and 256. ',
-                               get_cmd=stvsegall_cmd + '?',
-                               set_cmd=stvsegall_cmd + ' {}',
-                               vals=vals.Numbers(1, 256)
+                               get_cmd =stvsegall_cmd + '?',
+                               set_cmd =stvsegall_cmd + ' {}',
+                               vals =vals.Numbers(1, 256)
                                )
-            stvenall_cmd = 'qutech:tvmode{}:enable:all'.format(ch_pair)
+            stvenall_cmd= 'qutech:tvmode{}:enable:all'.format(ch_pair)
             self.add_parameter('ch_pair{}_tvmode_enable'.format(ch_pair),
-                               label=('Enable tv mode' +
+                               label =('Enable tv mode' +
                                       'ch_pair {} all weights '.format(ch_pair)
                                       ),
-                               docstring='It enables the TV-Mode' +
+                               docstring ='It enables the TV-Mode' +
                                ' functionality for all weight pair within' +
                                ' one ch_pair. It is required to enable it' +
                                ' prior to run command. Otherwise old data' +
                                ' will be read out',
-                               get_cmd=stvenall_cmd + '?',
-                               set_cmd=stvenall_cmd + ' {}',
-                               vals=vals.Numbers(0, 1)
+                               get_cmd =stvenall_cmd + '?',
+                               set_cmd =stvenall_cmd + ' {}',
+                               vals =vals.Numbers(0, 1)
                                )
             ###########
             # Threshold
             ###########
-            sthlall_cmd = 'qutech:qstate{}:threshold:all'.format(ch_pair)
+            sthlall_cmd= 'qutech:qstate{}:threshold:all'.format(ch_pair)
             self.add_parameter('ch_pair{}_qstate_threshold'.format(ch_pair),
-                               unit='#',
-                               label=('Set threshold of' +
+                               unit ='#',
+                               label =('Set threshold of' +
                                       'ch_pair {} all weights'.format(ch_pair)
                                       ),
-                               docstring='It sets the value for the Qubit' +
+                               docstring ='It sets the value for the Qubit' +
                                ' State Threshold per all weight pairs within' +
                                ' on channel pair. The value is -2^27 to' +
                                ' +2^27-1. It is a relative number based on' +
                                ' the ADC 8 bit range (-128..127). It will' +
                                ' require to have a scale factor as in' +
                                ' weighted integral',
-                               get_cmd=sthlall_cmd + '?',
-                               set_cmd=sthlall_cmd + ' {}',
-                               vals=vals.Numbers(-134217728, 134217727)
+                               get_cmd =sthlall_cmd + '?',
+                               set_cmd =sthlall_cmd + ' {}',
+                               vals =vals.Numbers(-134217728, 134217727)
                                )
             #########
             # Logging
             #########
-            slogenall_cmd = 'qutech:logging{}:enable:all'.format(ch_pair)
+            slogenall_cmd= 'qutech:logging{}:enable:all'.format(ch_pair)
             self.add_parameter('ch_pair{}_logging_enable'.format(ch_pair),
-                               label=('Enable logging mode' +
+                               label =('Enable logging mode' +
                                       'ch_pair {} all weights'.format(ch_pair)
                                       ),
-                               docstring='It enables the Logging ' +
+                               docstring ='It enables the Logging ' +
                                'functionality for all weight pairs within ' +
                                ' one ch_pair. It is required to enable it' +
                                ' prior to run command. Otherwise old data' +
                                ' will be read out. To enable mode paramentr' +
                                ' should be set to 1. To disable mode' +
                                ' paramentr should be set to 0.',
-                               get_cmd=slogenall_cmd + '?',
-                               set_cmd=slogenall_cmd + ' {}',
-                               vals=vals.Numbers(0, 1)
+                               get_cmd =slogenall_cmd + '?',
+                               set_cmd =slogenall_cmd + ' {}',
+                               vals =vals.Numbers(0, 1)
                                # vals=vals.Numbers(1,4096)
                                )
 
-            slogshotsall_cmd = 'qutech:logging{}:nshots:all'.format(ch_pair)
+            slogshotsall_cmd= 'qutech:logging{}:nshots:all'.format(ch_pair)
             self.add_parameter('ch_pair{}_logging_nshots'.format(ch_pair),
-                               unit='#',
-                               label=('The number of logging shots of' +
+                               unit ='#',
+                               label =('The number of logging shots of' +
                                       'ch_pair {} all weights'.format(ch_pair)
                                       ),
-                               docstring='It sets number Of Shots  ' +
+                               docstring ='It sets number Of Shots  ' +
                                'Value can be between 1 and 2^13,' +
                                ' ',
-                               get_cmd=slogshotsall_cmd + '?',
-                               set_cmd=slogshotsall_cmd + ' {}',
-                               vals=vals.Numbers(1, 8192)
+                               get_cmd =slogshotsall_cmd + '?',
+                               set_cmd =slogshotsall_cmd + ' {}',
+                               vals =vals.Numbers(1, 8192)
                                )
             ################
             # Error fraction
             ################
-            serrfarcten_cmd = 'qutech:errorfraction{}:enable:all'.format(
+            serrfarcten_cmd= 'qutech:errorfraction{}:enable:all'.format(
                 ch_pair)
             self.add_parameter('ch_pair{}_err_fract_enable'.format(ch_pair),
                                label=('Enable error fraction mode' +
