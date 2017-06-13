@@ -276,21 +276,21 @@ class QASM_QuMIS_Compiler():
                 pq.__path__[0], 'instrument_drivers', 'physical_instruments',
                 "_controlbox", "config.json")
             print("Configuration not specified."
-                "Default configuration file instrument_drivers\\"
-                "physical_instruments\\_controlbox\\config.json used.")
+                  "Default configuration file instrument_drivers\\"
+                  "physical_instruments\\_controlbox\\config.json used.")
         else:
             self.config_filename = config_filename
 
     def compile(self, filename, qumis_fn=None):
         self.filename = filename
         self.qumis_fn = qumis_fn
-        self.qumis_instructions = []
-        self.hw_timing_grid = []
-        self.timing_grid = []
+        self.qumis_instructions = []  # final result that should be uploaded
+        self.hw_timing_grid = []  # operations on hardware
+        self.timing_grid = []     # quantum operations
         self.load_config()
         self.read_file()
         self.line_to_event()
-        self.build_dependency_graph()
+        self.build_dependency_graph()  # empty function for now
         self.resolve_qubit_name()
         self.assign_timing_to_events()
         self.resolve_channel_latency()
@@ -436,7 +436,7 @@ class QASM_QuMIS_Compiler():
         '''
         try:
             prog_file = open(self.filename, 'r', encoding="utf-8")
-            logging.info("open file", self.filename, "successfully.")
+            logging.info("open file", str(self.filename), "successfully.")
         except:
             raise OSError('\tError: Fail to open file ' + self.filename + ".")
 
@@ -652,8 +652,7 @@ class QASM_QuMIS_Compiler():
                 if (qasm_op_name == "qubit") and (len(qasm_op_params) < 1):
                     se = SyntaxError("the QASM instruction qubit should "
                                      "contain at least one parameter as "
-                                     "the declared qubit.".format(
-                                         qasm_op_name))
+                                     "the declared qubit.")
                     se.filename = self.filename
                     se.lineno = line.number
                     raise se
@@ -881,8 +880,6 @@ class QASM_QuMIS_Compiler():
 
         if (phys_qubit not in self.physical_qubits):
             se = SyntaxError("physical qubit ({}) is not available.".format(
-                self.filename,
-                raw_event.line_number,
                 phys_qubit))
             se.filename = self.filename
             se.lineno = raw_event.line_number
@@ -1282,7 +1279,6 @@ class QASM_QuMIS_Compiler():
                 if tp.absolute_time != 0:
                     raise ValueError("Strange thing happened. Two time points "
                                      "have the same absolute time")
-                pass
             else:
                 self.qumis_instructions.append("wait {:d}".format(
                     pre_waiting_time))
