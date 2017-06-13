@@ -30,7 +30,7 @@ import copy
 
 
 MAX_TRIG_BITS = 7
-DEFAULT_MEASURE_TIME = 300 # ns
+DEFAULT_MEASURE_TIME = 300  # ns
 
 
 def is_number(s):
@@ -248,12 +248,12 @@ def lower_dict_key(origin_dict):
 
 class QASM_QuMIS_Compiler():
 
-    def __init__(self, config_filename = None, verbose_level=1):
+    def __init__(self, config_filename=None, verbosity_level=1):
         '''
         @param: config_filename, file specifies the user-defined operation
         dictionary, hardware specification and the LUTs.
-        @param: verbose_level, message level to be printed. integer, range
-        from 0 to 6. The larger verbose_level is, the more information being
+        @param: verbosity_level, message level to be printed. integer, range
+        from 0 to 6. The larger verbosity_level is, the more information being
         printed. 0 prints everything. 6 prints nothing.
 
         Usage:
@@ -268,7 +268,7 @@ class QASM_QuMIS_Compiler():
         self.qasm_op_dict = None
         self.declared_qubits = []
         self.qubit_map = {}
-        self.verbose_level = verbose_level
+        self.verbosity_level = verbosity_level
         self.channel_latency_compensated = False
 
         if config_filename is None:
@@ -314,7 +314,6 @@ class QASM_QuMIS_Compiler():
 
         self.hardware_spec = self.data["hardware specification"]
         self.luts = self.data["luts"]
-
 
         self.physical_qubits = self.hardware_spec["qubit list"]
         if is_integer_array(self.physical_qubits) is False:
@@ -375,7 +374,6 @@ class QASM_QuMIS_Compiler():
         self.qasm_op_dict = {**default_op_dict, **self.user_qasm_op_dict}
         self.qasm_op_dict = lower_dict_key(self.qasm_op_dict)
         self.print_op_dict()
-
 
     def dump_config(self, config_fn):
         op_dict = {}
@@ -456,13 +454,13 @@ class QASM_QuMIS_Compiler():
         self.print_lines()
 
     def print_lines(self):
-        if self.verbose_level <= 1:
+        if self.verbosity_level >= 1:
             print("Raw Lines:")
             for line in self.raw_lines:
                 print(line)
             print("")
 
-        if self.verbose_level <= 2:
+        if self.verbosity_level >= 2:
             print("Program Lines:")
             for line in self.prog_lines:
                 print(line)
@@ -470,7 +468,7 @@ class QASM_QuMIS_Compiler():
             print("")
 
     def print_op_dict(self):
-        if self.verbose_level < 3:
+        if self.verbosity_level < 3:
             print("QASM operation dictionary:")
             for key, value in self.qasm_op_dict.items():
                 raw_print("{0: >10} : ".format(key))
@@ -478,7 +476,7 @@ class QASM_QuMIS_Compiler():
             print("\n")
 
     def print_raw_events(self):
-        if self.verbose_level < 4:
+        if self.verbosity_level < 4:
             print("Raw events:")
             for i, raw_events in enumerate(self.raw_event_list):
                 raw_print("{0:5d} : ".format(i))
@@ -489,7 +487,7 @@ class QASM_QuMIS_Compiler():
         print("")
 
     def print_timing_events(self):
-        if self.verbose_level < 4:
+        if self.verbosity_level < 4:
             print("Timing events:")
             for i, timing_events in enumerate(self.timing_event_list):
                 raw_print("{0:5d} : ".format(i))
@@ -500,7 +498,7 @@ class QASM_QuMIS_Compiler():
         print("")
 
     def print_timing_grid(self):
-        if self.verbose_level < 5:
+        if self.verbosity_level < 5:
             print("Timing gird:")
             if len(self.timing_grid) == 0:
                 print("Empty timing grid.")
@@ -532,7 +530,7 @@ class QASM_QuMIS_Compiler():
         print("")
 
     def print_hw_timing_grid(self):
-        if self.verbose_level < 5:
+        if self.verbosity_level < 5:
             print("Hardware trigger timing gird:")
             if len(self.hw_timing_grid) == 0:
                 print("Empty trigger timing grid.")
@@ -783,14 +781,14 @@ class QASM_QuMIS_Compiler():
 
         self.get_absolute_timing()
 
-        if self.verbose_level < 4:
+        if self.verbosity_level < 4:
             print("End of assigning timing:")
             self.print_timing_grid()
 
     def resolve_qubit_name(self):
         self.build_qubit_map()
         self.map_qubits()
-        if self.verbose_level < 4:
+        if self.verbosity_level < 4:
             print("End of resolving qubit name:")
             self.print_timing_events()
 
@@ -814,7 +812,7 @@ class QASM_QuMIS_Compiler():
             se.filename = self.filename
             raise se
 
-        if (self.verbose_level < 4):
+        if (self.verbosity_level < 4):
             print("End of building qubit map:")
             self.print_raw_events()
 
@@ -849,7 +847,7 @@ class QASM_QuMIS_Compiler():
                                  len(self.physical_qubits)))
             se.filename = self.filename
             raise se
-        if self.verbose_level <= 2:
+        if self.verbosity_level >= 2:
             print("Extend declared qubit list:")
             print("\tDeclared qubits: {}".format(self.declared_qubits))
             print("")
@@ -902,7 +900,7 @@ class QASM_QuMIS_Compiler():
                     parallel_events.append(event)
             self.timing_grid[ti].parallel_events = parallel_events
 
-        if self.verbose_level <= 3:
+        if self.verbosity_level >= 3:
             print("End of decompose operations:")
             self.print_timing_grid()
 
@@ -940,13 +938,13 @@ class QASM_QuMIS_Compiler():
                 tp.parallel_events[idx] = event
             self.timing_grid[ti] = tp
 
-        if self.verbose_level < 3:
+        if self.verbosity_level < 3:
             print("get channel latency:")
             self.print_timing_grid()
 
     def compensate_channel_latency(self):
         min_latency = self.get_min_channel_latency()
-        if self.verbose_level < 4:
+        if self.verbosity_level < 4:
             print("Min latency is:", min_latency)
         ti = 0
         while ti < len(self.timing_grid):
@@ -974,7 +972,7 @@ class QASM_QuMIS_Compiler():
                     idx = idx + 1
             ti = ti + 1
 
-        if self.verbose_level < 4:
+        if self.verbosity_level < 4:
             print("End of compensting channel latency:")
             self.print_timing_grid()
 
@@ -1031,7 +1029,7 @@ class QASM_QuMIS_Compiler():
             tp.parallel_events = hw_events
             self.hw_timing_grid.append(tp)
 
-        if self.verbose_level < 4:
+        if self.verbosity_level < 4:
             self.print_hw_timing_grid()
 
     def gen_full_time_grid(self):
@@ -1085,9 +1083,8 @@ class QASM_QuMIS_Compiler():
             for i in range(len(self.hw_timing_grid)):
                 self.hw_timing_grid[i].absolute_time += added_time
 
-        if self.verbose_level < 4:
+        if self.verbosity_level < 4:
             self.print_hw_timing_grid()
-
 
     def vertical_divide_trigger(self):
         '''
@@ -1171,7 +1168,7 @@ class QASM_QuMIS_Compiler():
                     break
 
         self.hw_timing_grid = new_tp_list
-        if self.verbose_level < 4:
+        if self.verbosity_level < 4:
             print("after vertical_divide_trigger:")
         self.print_hw_timing_grid()
 
@@ -1235,7 +1232,7 @@ class QASM_QuMIS_Compiler():
                             new_tp_list, absolute_time + d2, None)
 
         self.hw_timing_grid = new_tp_list
-        if self.verbose_level < 4:
+        if self.verbosity_level < 4:
             print("after split_trigger_codeword:")
         self.print_hw_timing_grid()
 
@@ -1318,6 +1315,6 @@ class QASM_QuMIS_Compiler():
         self.print_qumis()
 
     def print_qumis(self):
-        if self.verbose_level <= 5:
+        if self.verbosity_level >= 5:
             for qi in self.qumis_instructions:
                 print(qi)
