@@ -744,7 +744,7 @@ def QScale(qscales, pulse_pars, RO_pars,
         seq.append_element(el, trigger_wait=True)
 
     if upload:
-        station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
     if return_seq:
         return seq, el_list
     else:
@@ -799,7 +799,8 @@ def get_pulse_dict_from_pars(pulse_pars):
         pulses: dictionary of pulse_pars dictionaries
     '''
     pi_amp = pulse_pars['amplitude']
-    pi2_amp = pulse_pars['amplitude']*pulse_pars['amp90_scale']
+    # pi2_amp = pulse_pars['amplitude']*pulse_pars['amp90_scale']
+    pi2_amp = pulse_pars['amplitude_90']
 
     pulses = {'I': deepcopy(pulse_pars),
               'X180': deepcopy(pulse_pars),
@@ -810,6 +811,7 @@ def get_pulse_dict_from_pars(pulse_pars):
               'mY180': deepcopy(pulse_pars),
               'Y90': deepcopy(pulse_pars),
               'mY90': deepcopy(pulse_pars)}
+
 
     pulses['I']['amplitude'] = 0
     pulses['mX180']['amplitude'] = -pi_amp

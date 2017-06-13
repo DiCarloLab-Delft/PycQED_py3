@@ -889,6 +889,141 @@ def smooth(x, window_len=11, window='hanning'):
     return y[edge:-edge]
 
 
+def find_second_peak(sweep_pts_cut_edges=None, data_dist_smooth=None,
+                     key=None, peaks=None, percentile=20, optimize=False):
+
+    """
+    Used for qubit spectroscopy analysis. Find the second gf/2 peak/dip based on
+    the location of the tallest peak found, given in peaks, which is the result
+    of peak_finder. The algorithm takes the index of this tallest peak and looks
+    to the right and to the left of it for the tallest peaks in these new
+    ranges. The resulting two new peaks are compared and the tallest/deepest
+    one is chosen.
+    """
+
+    tallest_peak = peaks[key] #the ge freq
+    tallest_peak_idx = peaks[key+'_idx']
+    tallest_peak_width = peaks[key+'_width']
+    tallest_peak_val = data_dist_smooth[tallest_peak_idx]
+    print('Tallest peak is at ',tallest_peak)
+
+    # Calculate how many data points away from the tallest peak
+    # to look left and right. Should be 50MHz away.
+    freq_range = sweep_pts_cut_edges[-1]-sweep_pts_cut_edges[0]
+    num_points = sweep_pts_cut_edges.size
+    n = int(50e6*num_points/freq_range)
+    m = int(50e6*num_points/freq_range)
+
+    #serach for 2nd peak (f_ge) to the right of the first
+    while(int(len(sweep_pts_cut_edges)-1) <= int(tallest_peak_idx+n) and
+                  n>0):
+        n -= 1
+    if (int(tallest_peak_idx+n)) == sweep_pts_cut_edges.size:
+        n = 0
+    if not ((int(tallest_peak_idx+n)) >= sweep_pts_cut_edges.size):
+        print('Searching for the gf/2 {:} {:} points to the right of the largest'
+              ' in the range {:.5}-{:.5}'.format(
+            key,
+            n,
+            sweep_pts_cut_edges[int(tallest_peak_idx+n)],
+            sweep_pts_cut_edges[-1]))
+
+        peaks_right = peak_finder(
+            sweep_pts_cut_edges[int(tallest_peak_idx+n)::],
+            data_dist_smooth[int(tallest_peak_idx+n)::],
+            analyze_ef=False,
+            percentile=percentile,
+            num_sigma_threshold=1,
+            optimize=optimize,
+            key=key)
+
+        print('Right peak is at ', peaks_right[key])
+        subset_right = data_dist_smooth[int(tallest_peak_idx+n)::]
+        val_right = subset_right[peaks_right[key+'_idx']]
+        f0_right = peaks_right[key]
+        kappa_guess_right = peaks_right[key+'_width']
+        f0_gf_over_2_right = tallest_peak
+        kappa_guess_ef_right = tallest_peak_width
+    else:
+        print('Right peak is None')
+        val_right = 0
+        f0_right = 0
+        kappa_guess_right = 0
+        f0_gf_over_2_right = tallest_peak
+        kappa_guess_ef_right = tallest_peak_width
+
+    while(int(tallest_peak_idx-m)<0 and m>0):
+        m -= 1
+    if int(tallest_peak_idx-m) == 0:
+        m = 0
+    if not (int(tallest_peak_idx-m) <= 0):
+        print('Searching for the gf/2 {:} {:} points to the left of the '
+              'largest, in the range {:.5}-{:.5}'.format(
+            key,
+            m,
+            sweep_pts_cut_edges[0],
+            sweep_pts_cut_edges[int(tallest_peak_idx-m-1)]))
+
+        #serach for 2nd peak (f_gf/2) to the left of the first
+        peaks_left = peak_finder(
+            sweep_pts_cut_edges[0:int(tallest_peak_idx-m)],
+            data_dist_smooth[0:int(tallest_peak_idx-m)],
+            analyze_ef=False,
+            percentile=percentile,
+            num_sigma_threshold=1,
+            optimize=optimize,
+            key=key)
+
+        print('Left peak is at ', peaks_left[key])
+        subset_left = data_dist_smooth[0:int(tallest_peak_idx-m)]
+        val_left = subset_left[peaks_left[key+'_idx']]
+        f0_left = tallest_peak
+        kappa_guess_left = tallest_peak_width
+        f0_gf_over_2_left = peaks_left[key]
+        kappa_guess_ef_left = peaks_left[key+'_width']
+    else:
+        print('Left peak is None')
+        val_left = 0
+        f0_left = tallest_peak
+        kappa_guess_left = tallest_peak_width
+        f0_gf_over_2_left = 0
+        kappa_guess_ef_left = 0
+
+    if np.abs(val_left) > np.abs(val_right):
+        if np.abs(f0_gf_over_2_left - tallest_peak) > 50e6:
+            print('Both f_ge and f_gf/2 have been found. '
+                  'f_ge was assumed to the LEFT of f_gf/2.')
+        else:
+            print('The f_gf/2 '+key+' was not found. Fitting to '
+                                    'the next largest '+key+' found.')
+
+        f0 = f0_left
+        kappa_guess = kappa_guess_left
+        f0_gf_over_2 = f0_gf_over_2_left
+        kappa_guess_ef = kappa_guess_ef_left
+
+    elif np.abs(val_left) < np.abs(val_right):
+        if np.abs(f0_right - tallest_peak) > 50e6:
+            print('Both f_ge and f_gf/2 have been found. '
+                  'f_ge was assumed to the RIGHT of f_gf/2.')
+        else:
+            print('The f_gf/2 '+key+' was not found. Fitting to '
+                                    'the next largest '+key+' found.')
+        f0 = f0_right
+        kappa_guess = kappa_guess_right
+        f0_gf_over_2 = f0_gf_over_2_right
+        kappa_guess_ef = kappa_guess_ef_right
+
+    else:
+        print('Only f_ge has been found.')
+        f0 = tallest_peak
+        kappa_guess = tallest_peak_width
+        f0_gf_over_2 = tallest_peak
+        kappa_guess_ef = tallest_peak_width
+
+
+    return f0, f0_gf_over_2, kappa_guess, kappa_guess_ef
+
 def peak_finder_v2(x, y, perc=90, window_len=11):
     '''
     Peak finder based on argrelextrema function from scipy
@@ -1031,11 +1166,11 @@ def look_for_peaks_dips(x, y_smoothed, percentile=20, num_sigma_threshold=5,
             if (idx+i+1)<x.size and (idx-i-1)>=0:          #ensure data points
                                                            #idx+i+1 and idx-i-1
                                                            #are inside sweep pts
-                peak_widths += [ x[idx+i+1] - x[idx-i-1] ]
+                peak_widths += [ (x[idx+i+1] - x[idx-i-1])/5 ]
             elif (idx+i+1)>x.size and (idx-i-1)>=0:
-                peak_widths += [ x[idx] - x[idx-i] ]
+                peak_widths += [ (x[idx] - x[idx-i])/5 ]
             elif (idx+i+1)<x.size and (idx-i-1)<0:
-                peak_widths += [ x[idx+i] - x[idx] ]
+                peak_widths += [ (x[idx+i] - x[idx])/5 ]
             else:
                 peak_widths += [ 5e6 ]
 
@@ -1046,7 +1181,6 @@ def look_for_peaks_dips(x, y_smoothed, percentile=20, num_sigma_threshold=5,
         peak = x[peak_index]                          #Frequency of highest peak
 
     else:
-        print('No peaks found in look_for_peaks_dips')
         peak = None
         peak_vals = None
         peak_index = None
@@ -1108,11 +1242,11 @@ def look_for_peaks_dips(x, y_smoothed, percentile=20, num_sigma_threshold=5,
             if (idx+i+1)<x.size and (idx-i-1)>=0:         #ensure data points
                                                           #idx+i+1 and idx-i-1
                                                           #are inside sweep pts
-                dip_widths += [ x[idx+i+1] - x[idx-i-1] ]
+                dip_widths += [ (x[idx+i+1] - x[idx-i-1])/5 ]
             elif (idx+i+1)>x.size and (idx-i-1)>=0:
-                dip_widths += [ x[idx] - x[idx-i] ]
+                dip_widths += [ (x[idx] - x[idx-i])/5 ]
             elif (idx+i+1)<x.size and (idx-i-1)<0:
-                dip_widths += [ x[idx+i] - x[idx] ]
+                dip_widths += [ (x[idx+i] - x[idx])/5 ]
             else:
                 dip_widths += [ 5e6 ]
 
@@ -1123,7 +1257,6 @@ def look_for_peaks_dips(x, y_smoothed, percentile=20, num_sigma_threshold=5,
         dip = x[dip_index]
 
     else:
-        print('No dips found in look_for_peaks_dips')
         dip = None
         dip_vals = None
         dip_index = None
@@ -1258,7 +1391,7 @@ def rotate_and_normalize_data(data, cal_zero_points=None, cal_one_points=None,
     if zero_coord is not None:
         I_zero = zero_coord[0]
         Q_zero = zero_coord[1]
-    elif (zero_coord is None) and (number_of_cal_points==2):
+    elif (zero_coord is None) and (number_of_cal_points == 2):
         I_zero = data[0][cal_zero_points]
         Q_zero = data[1][cal_zero_points]
     else:
@@ -1268,7 +1401,7 @@ def rotate_and_normalize_data(data, cal_zero_points=None, cal_one_points=None,
     if one_coord is not None:
         I_one = one_coord[0]
         Q_one = one_coord[1]
-    elif (one_coord is None) and (number_of_cal_points==2):
+    elif (one_coord is None) and (number_of_cal_points == 2):
         I_one = 0
         Q_one = 0
     else:
@@ -1279,7 +1412,7 @@ def rotate_and_normalize_data(data, cal_zero_points=None, cal_one_points=None,
     # Translate the data
     trans_data = [data[0] - I_zero, data[1] - Q_zero]
 
-    if number_of_cal_points==2:
+    if number_of_cal_points == 2:
 
         from lmfit.models import LinearModel
 
@@ -1312,10 +1445,15 @@ def rotate_and_normalize_data(data, cal_zero_points=None, cal_one_points=None,
 
         #find distance from points on line to end of line
         rotated_data = np.sqrt(x_data**2+y_data**2)
+        if rotated_data[0] > np.mean(rotated_data):
+            rotated_data = -rotated_data
+            rotated_data -= min(rotated_data)
 
-        #normlaize data
-        max_min_distance = max(rotated_data) - min(rotated_data)
-        normalized_data = (rotated_data - min(rotated_data))/max_min_distance
+        normalized_data = rotated_data
+
+        # #normlaize data
+        # max_min_distance = max(rotated_data) - min(rotated_data)
+        # normalized_data = (rotated_data - min(rotated_data))/max_min_distance
 
     else:
         # Rotate the data
@@ -1326,6 +1464,10 @@ def rotate_and_normalize_data(data, cal_zero_points=None, cal_one_points=None,
         # Normalize the data
         one_zero_dist = np.sqrt((I_one-I_zero)**2 + (Q_one-Q_zero)**2)
         normalized_data = rotated_data_ch1/one_zero_dist
+
+        if normalized_data[0] > np.mean(normalized_data):
+            normalized_data = -normalized_data
+            normalized_data -= min(normalized_data)
 
     return [normalized_data, zero_coord, one_coord]
 
@@ -1365,8 +1507,12 @@ def rotate_and_normalize_data_no_cal_points(data, **kw):
     max_min_distance = np.sqrt(max(final_data[1,:])**2 +
                                min(final_data[1,:])**2)
     normalized_data = final_data[1,:]/max_min_distance
-    max_min_difference = max(normalized_data -  min(normalized_data))
-    normalized_data = (normalized_data-min(normalized_data))/max_min_difference
+
+    if normalized_data[0] > np.mean(normalized_data):
+        normalized_data = -normalized_data
+        normalized_data -= min(normalized_data)
+    # max_min_difference = max(normalized_data -  min(normalized_data))
+    # normalized_data = (normalized_data-min(normalized_data))/max_min_difference
 
     return normalized_data
 

@@ -48,6 +48,18 @@ def Rabi_2nd_exc_seq(amps, pulse_pars, pulse_pars_2nd, RO_pars, n=1,
         elif cal_points and no_cal_points == 2 and \
                 (i == (len(amps)-2) or i == (len(amps)-1)):
                     el = multi_pulse_elt(i, station, [pulses['I'], pulses_2nd['I'], RO_pars])
+        # if cal_points and (last_ge_pulse==False) and (i == (len(times)-4) or
+        #                                                       i == (len(times)-3)):
+        #     el = multi_pulse_elt(i, station, [pulses['I'], RO_pars])
+        # elif cal_points and (last_ge_pulse==False) and (i == (len(times)-2) or
+        #                                                     i == (len(times)-1)):
+        #     el = multi_pulse_elt(i, station, [pulses_2nd['X180'], RO_pars])
+        # if cal_points and (last_ge_pulse==True) and (i == (len(times)-4) or
+        #                                                      i == (len(times)-3)):
+        #     el = multi_pulse_elt(i, station, [pulses['I'], RO_pars])
+        # elif cal_points and (last_ge_pulse==True) and (i == (len(times)-2) or
+        #                                                        i == (len(times)-1)):
+        #     el = multi_pulse_elt(i, station, [pulses['X180'], RO_pars])
         else:
             pulses_2nd['X180']['amplitude'] = amp
 
@@ -74,7 +86,7 @@ def Rabi_2nd_exc_seq(amps, pulse_pars, pulse_pars_2nd, RO_pars, n=1,
         return seq
 
 def Ramsey_2nd_exc_seq(times, pulse_pars, pulse_pars_2nd, RO_pars, n=1,
-                     cal_points=True, artificial_detuning =None,
+                     cal_points=True, no_cal_points=6, artificial_detuning =None,
                      post_msmt_delay=3e-6, verbose=False,
                      upload=True, return_seq=False,
                      last_ge_pulse =True):
@@ -95,18 +107,38 @@ def Ramsey_2nd_exc_seq(times, pulse_pars, pulse_pars_2nd, RO_pars, n=1,
     pulses = get_pulse_dict_from_pars(pulse_pars)
     pulses_2nd = get_pulse_dict_from_pars(pulse_pars_2nd)
     for i, tau in enumerate(times):
-        #if cal_points and (i == (len(times)-6) or
-        #                   i == (len(times)-5)):
-        #    el = multi_pulse_elt(i, station, [pulses['I'], RO_pars])
-        if cal_points and (i == (len(times)-4) or
-                             i == (len(times)-3)):
-        #    el = multi_pulse_elt(i, station, [pulses['X180'], RO_pars])
-            el = multi_pulse_elt(i, station, [pulses['I'], RO_pars])
-        elif cal_points and (i == (len(times)-2) or
-                             i == (len(times)-1)):
-        #    el = multi_pulse_elt(i, station, [pulses_2nd['X180'],
-        #                                  RO_pars])
-            el = multi_pulse_elt(i, station, [pulses['X180'], RO_pars])
+        if cal_points and no_cal_points == 6 and \
+                (i == (len(times)-6) or i == (len(times)-5)):
+            el = multi_pulse_elt(i, station, [pulses['I'], pulses_2nd['I'], RO_pars])
+        elif cal_points and no_cal_points == 6 and \
+                (i == (len(times)-4) or i == (len(times)-3)):
+            el = multi_pulse_elt(i, station, [pulses['X180'], pulses_2nd['I'], RO_pars])
+        elif cal_points and no_cal_points == 6 and \
+                (i == (len(times)-2) or i == (len(times)-1)):
+            el = multi_pulse_elt(i, station, [pulses['X180'],
+                                              pulses_2nd['X180'],
+                                              RO_pars])
+        elif cal_points and no_cal_points == 4 and \
+                (i == (len(times)-4) or i == (len(times)-3)):
+            el = multi_pulse_elt(i, station, [pulses['I'], pulses_2nd['I'], RO_pars])
+        elif cal_points and no_cal_points == 4 and \
+                (i == (len(times)-2) or i == (len(times)-1)):
+            el = multi_pulse_elt(i, station, [pulses['X180'], pulses_2nd['I'], RO_pars])
+        elif cal_points and no_cal_points == 2 and \
+                (i == (len(times)-2) or i == (len(times)-1)):
+            el = multi_pulse_elt(i, station, [pulses['I'], pulses_2nd['I'], RO_pars])
+        # if cal_points and (last_ge_pulse==False) and (i == (len(times)-4) or
+        #                      i == (len(times)-3)):
+        #     el = multi_pulse_elt(i, station, [pulses['I'], RO_pars])
+        # elif cal_points and (last_ge_pulse==False) and (i == (len(times)-2) or
+        #                      i == (len(times)-1)):
+        #     el = multi_pulse_elt(i, station, [pulses_2nd['X180'], RO_pars])
+        # if cal_points and (last_ge_pulse==True) and (i == (len(times)-4) or
+        #                                                       i == (len(times)-3)):
+        #     el = multi_pulse_elt(i, station, [pulses['I'], RO_pars])
+        # elif cal_points and (last_ge_pulse==True) and (i == (len(times)-2) or
+        #                                                 i == (len(times)-1)):
+        #     el = multi_pulse_elt(i, station, [pulses['X180'], RO_pars])
         else:
             pulse_pars_x2 = deepcopy(pulses_2nd['X90'])
             pulse_pars_x2['pulse_delay'] = tau
@@ -137,7 +169,7 @@ def Ramsey_2nd_exc_seq(times, pulse_pars, pulse_pars_2nd, RO_pars, n=1,
 
 def QScale_2nd_exc_seq(qscales, pulse_pars,  pulse_pars_2nd, RO_pars,
            cal_points=True, verbose=False, upload=True, return_seq=False,
-                       last_ge_pulse=True):
+           last_ge_pulse=True, no_cal_points=6):
     '''
     Sequence used for calibrating the QScale factor used in the DRAG pulses.
     Applies X(pi/2)X(pi), X(pi/2)Y(pi), X(pi/2)Y(-pi) for each value of
@@ -167,17 +199,38 @@ def QScale_2nd_exc_seq(qscales, pulse_pars,  pulse_pars_2nd, RO_pars,
         for p_name in ['X180', 'Y180', 'X90', 'mY180']:
             pulses[p_name]['motzoi'] = motzoi
             pulses_2nd[p_name]['motzoi'] = motzoi
-        if cal_points and (i == (len(times)-6) or
-                          i == (len(times)-5)):
-           el = multi_pulse_elt(i, station, [pulses['I'], RO_pars])
-        elif cal_points and (i == (len(qscales)-4) or
-                                   i == (len(qscales)-3)):
-            el = multi_pulse_elt(i, station, [pulses['X180'], RO_pars])
-        elif cal_points and (i == (len(qscales)-2) or
-                                     i == (len(qscales)-1)):
-            # pick motzoi for calpoint in the middle of the range
-            pulses['X180']['motzoi'] = np.mean(qscales)
-            el = multi_pulse_elt(i, station, [pulses_2nd['X180_ef'], RO_pars])
+        # if cal_points and (i == (len(times)-6) or
+        #                   i == (len(times)-5)):
+        #    el = multi_pulse_elt(i, station, [pulses['I'], RO_pars])
+        # elif cal_points and (i == (len(qscales)-4) or
+        #                            i == (len(qscales)-3)):
+        #     el = multi_pulse_elt(i, station, [pulses['X180'], RO_pars])
+        # elif cal_points and (i == (len(qscales)-2) or
+        #                              i == (len(qscales)-1)):
+        #     # pick motzoi for calpoint in the middle of the range
+        #     pulses['X180']['motzoi'] = np.mean(qscales)
+        #     el = multi_pulse_elt(i, station, [pulses_2nd['X180_ef'], RO_pars])
+        if cal_points and no_cal_points == 6 and \
+                (i == (len(qscales)-6) or i == (len(qscales)-5)):
+            el = multi_pulse_elt(i, station, [pulses['I'], pulses_2nd['I'], RO_pars])
+        elif cal_points and no_cal_points == 6 and \
+                (i == (len(qscales)-4) or i == (len(qscales)-3)):
+            el = multi_pulse_elt(i, station, [pulses['X180'], pulses_2nd['I'], RO_pars])
+        elif cal_points and no_cal_points == 6 and \
+                (i == (len(qscales)-2) or i == (len(qscales)-1)):
+            pulses_2nd['X180']['motzoi'] = np.mean(qscales)
+            el = multi_pulse_elt(i, station, [pulses['X180'],
+                                              pulses_2nd['X180'],
+                                              RO_pars])
+        elif cal_points and no_cal_points == 4 and \
+                (i == (len(qscales)-4) or i == (len(qscales)-3)):
+            el = multi_pulse_elt(i, station, [pulses['I'], pulses_2nd['I'], RO_pars])
+        elif cal_points and no_cal_points == 4 and \
+                (i == (len(qscales)-2) or i == (len(qscales)-1)):
+            el = multi_pulse_elt(i, station, [pulses['X180'], pulses_2nd['I'], RO_pars])
+        elif cal_points and no_cal_points == 2 and \
+                (i == (len(qscales)-2) or i == (len(qscales)-1)):
+            el = multi_pulse_elt(i, station, [pulses['I'], pulses_2nd['I'], RO_pars])
         else:
             pulse_list = [pulses['X180']]
             pulse_list += [pulses_2nd[x] for x in pulse_keys]
@@ -199,6 +252,7 @@ def QScale_2nd_exc_seq(qscales, pulse_pars,  pulse_pars_2nd, RO_pars,
 def T1_2nd_exc_seq(times,
            pulse_pars, pulse_pars_2nd, RO_pars,
            cal_points=True,
+           no_cal_points=6,
            verbose=False, upload=True,
            return_seq=False,
            last_ge_pulse=True):
@@ -224,20 +278,52 @@ def T1_2nd_exc_seq(times,
     pulses = get_pulse_dict_from_pars(pulse_pars)
     pulses_2nd = get_pulse_dict_from_pars(pulse_pars_2nd)
     pulses_x = deepcopy(pulses['X180'])
+    RO_pulse_delay = RO_pars['pulse_delay']
+    RO_pars = deepcopy(RO_pars)  # Prevents overwriting of the dict
 
     for i, tau in enumerate(times):  # seq has to have at least 2 elts
-        if cal_points and (i == (len(times)-6) or i == (len(times)-5)):
-            el = multi_pulse_elt(i, station, [pulses['I'], RO_pars])
-        elif cal_points and (i == (len(times)-4) or i == (len(times)-3)):
-            el = multi_pulse_elt(i, station, [pulses['X180'], RO_pars])
-        elif cal_points and (i == (len(times)-2) or i == (len(times)-1)):
-            el = multi_pulse_elt(i, station,
-                                 [pulses_2nd['X180'], RO_pars])
+        # if cal_points and (i == (len(times)-6) or i == (len(times)-5)):
+        #     el = multi_pulse_elt(i, station, [pulses['I'], RO_pars])
+        # if cal_points and (i == (len(times)-4) or i == (len(times)-3)):
+        #     el = multi_pulse_elt(i, station, [pulses['I'], RO_pars])
+        # elif cal_points and (i == (len(times)-2) or i == (len(times)-1)):
+        #     el = multi_pulse_elt(i, station,
+        #                          [pulses_2nd['X180'], RO_pars])
+        if cal_points and no_cal_points == 6 and \
+                (i == (len(times)-6) or i == (len(times)-5)):
+                    el = multi_pulse_elt(i, station, [pulses['I'],
+                                                      pulses_2nd['I'], RO_pars])
+        elif cal_points and no_cal_points == 6 and \
+                (i == (len(times)-4) or i == (len(times)-3)):
+                    RO_pars['pulse_delay'] = RO_pulse_delay
+                    el = multi_pulse_elt(i, station, [pulses['X180'],
+                                                      pulses_2nd['I'], RO_pars])
+        elif cal_points and no_cal_points == 6 and \
+                (i == (len(times)-2) or i == (len(times)-1)):
+                    RO_pars['pulse_delay'] = RO_pulse_delay
+                    el = multi_pulse_elt(i, station, [pulses['X180'],
+                                                      pulses_2nd['X180'],
+                                                      RO_pars])
+        elif cal_points and no_cal_points == 4 and \
+                (i == (len(times)-4) or i == (len(times)-3)):
+                    el = multi_pulse_elt(i, station, [pulses['I'],
+                                                      pulses_2nd['I'], RO_pars])
+        elif cal_points and no_cal_points == 4 and  \
+                (i == (len(times)-2) or i == (len(times)-1)):
+                    RO_pars['pulse_delay'] = RO_pulse_delay
+                    el = multi_pulse_elt(i, station, [pulses['X180'],
+                                                      pulses_2nd['I'], RO_pars])
+        elif cal_points and no_cal_points == 2 and \
+                (i == (len(times)-2) or i == (len(times)-1)):
+                    el = multi_pulse_elt(i, station, [pulses['I'],
+                                                      pulses_2nd['I'], RO_pars])
         else:
-            pulses_x['pulse_delay'] = tau
             pulse_list = [pulses['X180']]+[pulses_2nd['X180']]
             if last_ge_pulse:
-                pulse_list += [pulses['X180']]
+                pulses_x['pulse_delay'] = tau
+                pulse_list += [pulses_x]
+            else:
+                RO_pars['pulse_delay'] = RO_pulse_delay + tau
             pulse_list += [RO_pars]
             el = multi_pulse_elt(i, station, pulse_list)
         el_list.append(el)

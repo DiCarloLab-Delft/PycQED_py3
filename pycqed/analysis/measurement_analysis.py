@@ -4,6 +4,7 @@ import numpy as np
 from scipy import stats
 import h5py
 from matplotlib.ticker import FormatStrFormatter
+import matplotlib.lines as mlines
 from matplotlib import pyplot as plt
 from pycqed.analysis import analysis_toolbox as a_tools
 from pycqed.analysis import fitting_models as fit_mods
@@ -1279,7 +1280,7 @@ class TD_Analysis(MeasurementAnalysis):
     def __init__(self, NoCalPoints=4, center_point=31, make_fig=True,
                  zero_coord=None, one_coord=None, cal_points=None,
                  rotate_and_normalize=True, last_ge_pulse=True,
-                 plot_cal_points=True, **kw):
+                 plot_cal_points=True, for_ef=False, **kw):
         self.NoCalPoints = NoCalPoints
         self.normalized_values = []
         self.normalized_cal_vals = []
@@ -1292,6 +1293,7 @@ class TD_Analysis(MeasurementAnalysis):
         self.center_point = center_point
         self.plot_cal_points = plot_cal_points
         self.last_ge_pulse = last_ge_pulse
+        self.analyze_ef = for_ef
 
         super(TD_Analysis, self).__init__(**kw)
 
@@ -1347,7 +1349,7 @@ class TD_Analysis(MeasurementAnalysis):
         close_file = kw.pop('close_file',True)
 
         super().run_default_analysis(show=show,
-            close_file=close_file,unit_prefix=unit_prefix,**kw)
+            close_file=close_file, unit_prefix=unit_prefix, **kw)
 
         self.add_analysis_datagroup_to_file()
 
@@ -1366,7 +1368,10 @@ class TD_Analysis(MeasurementAnalysis):
         if self.make_fig:
             self.fig, self.ax = self.default_ax()
 
-            ylabel = r'$F$ $\left(|1 \rangle \right)$'
+            if self.analyze_ef:
+                ylabel = r'$F$ $\left(|f \rangle \right) (arb. units)$'
+            else:
+                ylabel = r'$F$ $\left(|e \rangle \right) (arb. units)$'
             self.plot_results_vs_sweepparam(x=self.scaled_sweep_points,
                                             y=self.normalized_values,
                                             fig=self.fig, ax=self.ax,
@@ -1374,8 +1379,8 @@ class TD_Analysis(MeasurementAnalysis):
                                             ylabel=ylabel,
                                             marker='o-',
                                             save=False)
-            self.ax.set_ylim(min(min(self.normalized_values)-.1, -.1),
-                              max(max(self.normalized_values)+.1, 1.1))
+            # self.ax.set_ylim(min(min(self.normalized_values)-.1, -.1),
+            #                   max(max(self.normalized_values)+.1, 1.1))
 
             if save_fig:
                 if not close_main_fig:
@@ -1409,13 +1414,14 @@ class TD_Analysis(MeasurementAnalysis):
         else:
             NoPts = len(values)
             if (calsteps == 6) and self.last_ge_pulse:
+                # oscillations between |g>-|f>
                 # use the I cal points (data[-6] and data[-5]) and
-                # the X180 cal points (data[-4] and data[-3])
+                # the X180_ef cal points (data[-2] and data[-1])
                 cal_zero_points = list(range(NoPts-int(calsteps),
                                        NoPts-int(2*calsteps/3)))
-                cal_one_points = list(range(NoPts- int(2*calsteps/3),
-                                      NoPts-int(calsteps/3)))
+                cal_one_points = list(range(NoPts-int(calsteps/3), NoPts))
             elif (calsteps == 6) and (not self.last_ge_pulse):
+                # oscillations between |e>-|f>
                 # use the X180 cal points (data[-4] and data[-3])
                 # and the X180_ef cal points (data[-2] and data[-1])
                 cal_zero_points = list(range(NoPts- int(2*calsteps/3),
@@ -1442,13 +1448,13 @@ class TD_Analysis(MeasurementAnalysis):
             # If we are calibrating only to a pulse with no amplitude
             # (i.e. do nothing), then manually
             # normalize the y axis. (Needed for Rabi for example)
-            if calsteps <= 2:
-                max_min_distance = max(normalized_values) - \
-                                   min(normalized_values)
-                normalized_values = (normalized_values -
-                                     min(normalized_values))/max_min_distance
-                normalized_data_points = normalized_values[:-int(calsteps)]
-                normalized_cal_vals = normalized_values[-int(calsteps):]
+            # if calsteps <= 2:
+            #     max_min_distance = max(normalized_values) - \
+            #                        min(normalized_values)
+            #     normalized_values = (normalized_values -
+            #                          min(normalized_values))/max_min_distance
+            #     normalized_data_points = normalized_values[:-int(calsteps)]
+            #     normalized_cal_vals = normalized_values[-int(calsteps):]
 
         return [normalized_values, normalized_data_points, normalized_cal_vals]
 
@@ -1867,14 +1873,15 @@ class Rabi_Analysis_new(TD_Analysis):
                     [piHalfPulse_fit, piHalfPulse_fit], 'k--',
                     linewidth=self.axes_line_width)
             #show only 2 sig figs
-            self.ax.xaxis.set_major_formatter(FormatStrFormatter('%.2f'))
-            self.ax.yaxis.set_major_formatter(FormatStrFormatter('%.2f'))
+            # self.ax.xaxis.set_major_formatter(FormatStrFormatter('%.2f'))
+            # self.ax.yaxis.set_major_formatter(FormatStrFormatter('%.2f'))
             #Set ticks and labels
             # self.ax.set_xticks([min(self.scaled_sweep_points),pi_pulse,
         #                         pi_half_pulse,
             #                     max(self.scaled_sweep_points)])
             # self.ax.set_yticks([piPulse_fit,piHalfPulse_fit,1.0])
-            self.ax.set_yticks(np.arange(0,1.25,0.25))
+            #self.ax.set_yticks(np.arange(0,1.25,0.25))
+
             #plot two points for the pi and piHalf pulses
             self.ax.plot(pi_pulse, piPulse_fit, 'ro',
                     markersize=self.marker_size_special)
@@ -2319,18 +2326,18 @@ class QScale_Analysis(TD_Analysis):
     def __init__(self, label='QScale', **kw):
         kw['label'] = label
         kw['h5mode'] = 'r+'
-        super().__init__(**kw)
+        super().__init__(make_fig=False, **kw)
 
-    def run_default_analysis(self, close_file=True, close_main_fig=True,
+    def run_default_analysis(self, close_file=False,
                              show=False, unit_prefix='', **kw):
 
         super().run_default_analysis(show=show,
                                      close_file=close_file,
                                      unit_prefix=unit_prefix,
-                                     close_main_figure=close_main_fig,
-                                     save_fig=False,**kw)
+                                     close_main_figure=True,
+                                     save_fig=False, **kw)
 
-        self.add_analysis_datagroup_to_file()
+        #self.add_analysis_datagroup_to_file()
         # self.cal_points = kw.pop('cal_points', [[-4, -3], [-2, -1]])
         # self.rotate_and_normalize_data()
         # self.add_dataset_to_analysisgroup('Corrected data',
@@ -2347,13 +2354,15 @@ class QScale_Analysis(TD_Analysis):
         self.corr_data_xmY = self.normalized_values[2:-4:3]
 
         self.fit_data(**kw)
-        self.make_figures(**kw)
+        fig, ax = self.default_ax()
+        self.make_figures(fig=fig, ax=ax, **kw)
 
-        opt_qscale = self.calculate_optimal_qscale(**kw)
-        self.save_computed_parameters(opt_qscale,var_name=self.value_names[0])
+        self.calculate_optimal_qscale(**kw)
+        self.save_computed_parameters(self.optimal_qscale,
+                                      var_name=self.value_names[0])
 
-        if kw.pop('save_fig',True):
-            self.save_fig(self.fig,
+        if kw.pop('save_fig', True):
+            self.save_fig(fig,
                           figname=self.measurementstring+'_Qscale_fit', **kw)
 
         if close_file:
@@ -2361,7 +2370,7 @@ class QScale_Analysis(TD_Analysis):
 
         return self.fit_res
 
-    def make_figures(self, **kw):
+    def make_figures(self, fig=None, ax=None, **kw):
 
         # Unique in that it has hardcoded names and points to plot
         show_guess = kw.pop('show_guess', False)
@@ -2376,37 +2385,52 @@ class QScale_Analysis(TD_Analysis):
         # label=r'$X_{\frac{\pi}{2}}Y_{-\pi}$')
 
         self.plot_results_vs_sweepparam(self.sweep_points_xX, self.corr_data_xX,
-                                        self.fig, self.ax,
-                                        marker='-ob',
+                                        fig, ax,
+                                        marker='ob',
                                         label=r'$X_{\frac{\pi}{2}}X_{\pi}$',
                                         ticks_around=True)
         self.plot_results_vs_sweepparam(self.sweep_points_xY, self.corr_data_xY,
-                                        self.fig, self.ax,
-                                        marker='-og',
+                                        fig, ax,
+                                        marker='og',
                                         label=r'$X_{\frac{\pi}{2}}Y_{\pi}$',
                                         ticks_around=True)
         self.plot_results_vs_sweepparam(self.sweep_points_xmY,
-                                        self.corr_data_xmY, self.fig, self.ax,
-                                        marker='-or',
+                                        self.corr_data_xmY, fig, ax,
+                                        marker='or',
                                         label=r'$X_{\frac{\pi}{2}}Y_{-\pi}$',
                                         ticks_around=True)
-
-
+        ax.legend(loc='best')
         c = ['b', 'g', 'r']
         if hasattr(self, 'fit_res'):
             for i in range(len(self.fit_res)):
                 fine_fit = self.fit_res[i].model.func(
                     x_fine, **self.fit_res[i].best_values)
-                self.ax.plot(x_fine, fine_fit, c=c[i], label='fit')
+                if i == 0:
+                    fine_fit = self.fit_res[i].best_values['c'] * \
+                       np.ones(x_fine.size)
+                ax.plot(x_fine, fine_fit, c=c[i], label='fit')
                 if show_guess:
                     fine_fit = self.fit_res[i].model.func(
                         x_fine, **self.fit_res[i].init_values)
-                    self.ax.plot(x_fine, fine_fit, c=c[i], label='guess')
+                    if i == 0:
+                        fine_fit = self.fit_res[i].best_values['c'] * \
+                                   np.ones(x_fine.size)
+                    ax.plot(x_fine, fine_fit, c=c[i], label='guess')
 
-        self.ax.legend(loc='best')
-        self.ax.set_ylim(-.1, 1.1)
+        # Create custom legend
+        blue_line = mlines.Line2D([], [], color='blue', marker='o',
+                                  markersize=self.marker_size,
+                                  label=r'$X_{\frac{\pi}{2}}X_{\pi}$')
+        green_line = mlines.Line2D([], [], color='green', marker='o',
+                                  markersize=self.marker_size,
+                                  label=r'$X_{\frac{\pi}{2}}Y_{\pi}$')
+        red_line = mlines.Line2D([], [], color='red', marker='o',
+                                  markersize=self.marker_size,
+                                  label=r'$X_{\frac{\pi}{2}}Y_{-\pi}$')
+        ax.legend(handles=[blue_line, green_line, red_line], loc='best')
+        # ax.set_ylim(-.1, 1.1)
 
-        if kw.get('show',True):
+        if kw.get('show', True):
             plt.show()
 
     def fit_data(self, **kw):
@@ -2471,8 +2495,8 @@ class QScale_Analysis(TD_Analysis):
         m1_idx = self.fit_res[1].var_names.index('slope')
         b2_idx = self.fit_res[2].var_names.index('intercept')
         m2_idx = self.fit_res[2].var_names.index('slope')
-        cov_b1_m1 = self.fit_res.covar[b1_idx,m1_idx]
-        cov_b2_m2 = self.fit_res.covar[b2_idx,m2_idx]
+        cov_b1_m1 = self.fit_res[1]. covar[b1_idx,m1_idx]
+        cov_b2_m2 = self.fit_res[2]. covar[b2_idx,m2_idx]
         cov_qscale = - cov_b1_m1 - cov_b2_m2
 
         intercept_diff_mean = self.fit_res[1].params['intercept'].value - \
@@ -2486,7 +2510,7 @@ class QScale_Analysis(TD_Analysis):
             (self.fit_res[2].params['slope'].stderr)**2 - \
             (self.fit_res[1].params['slope'].stderr)**2
 
-        optimal_qscale_stddev = self.optimal_qscale*np.sqrt(
+        optimal_qscale_stddev = optimal_qscale*np.sqrt(
             intercept_diff_std_squared/((intercept_diff_mean)**2) +
             slope_diff_std_squared/((slope_diff_mean)**2) - \
             2*cov_qscale/(intercept_diff_mean*slope_diff_mean) )
@@ -3832,14 +3856,17 @@ class Ramsey_Analysis(TD_Analysis):
 
     def plot_results(self, fit_res, scale=1, show_guess=False):
         units = self.parameter_units[0]
-        textstr = ('$f$ = %.5g $ Hz \pm$ (%.5g) Hz'
-                   % (fit_res.params['frequency'].value,
+        textstr = ('$f_{Ramsey}$ = %.5g $ MHz \pm$ (%.5g) Hz'
+                   % (fit_res.params['frequency'].value*1e-6,
                       fit_res.params['frequency'].stderr) +
                    '\n$T_2^\star$ = %.6g '
                    % (fit_res.params['tau'].value*scale)  +
                    units + ' $\pm$ (%.6g) '
                    % (fit_res.params['tau'].stderr*scale) +
-                   units)
+                   units )#+
+                   # '$f_{qb}$ = %.5g $ MHz \pm$ (%.5g) Hz'
+                   # %(self.Ramsey_freq['freq']*1e-6,
+                   # self.Ramsey_freq['freq_stderr']))
 
         # self.plot_results_vs_sweepparam(x=self.scaled_sweep_points,
         #                                 y=self.normalized_values,
@@ -5392,85 +5419,18 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
         else: #fit a double Lorentzian and extract the 2nd peak as well
             #extract second highest peak -> ef transition
 
-            tallest_peak = self.peaks[key] #the gf/2 freq
-            tallest_peak_idx = self.peaks[key+'_idx']
-            tallest_peak_width = self.peaks[key+'_width']
+            f0, f0_gf_over_2, \
+            kappa_guess, kappa_guess_ef = a_tools.find_second_peak(
+                sweep_pts_cut_edges=sweep_pts_cut_edges,
+                data_dist_smooth=data_dist_smooth,
+                key=key,
+                peaks=self.peaks,
+                percentile=percentile)
 
-            #serach for 2nd peak (f_ge) to the right of the first
-            n=self.data_dist.size//10
-            m=self.data_dist.size//10
-            while(int(len(sweep_pts_cut_edges)-1) <= int(tallest_peak_idx+n) and
-                          n>0):
-                n -= 1
-
-            self.peaks = a_tools.peak_finder(
-                sweep_pts_cut_edges[int(tallest_peak_idx+n)::],
-                data_dist_smooth[int(tallest_peak_idx+n)::],
-                analyze_ef=False,
-                percentile=percentile,
-                num_sigma_threshold=1,
-                optimize=False,
-                key=key)
-
-            subset_right = data_dist_smooth[int(tallest_peak_idx+n)::]
-            val_right = subset_right[self.peaks[key+'_idx']]
-            f0_right = self.peaks[key]
-            kappa_guess_right = self.peaks[key+'_width']
-            f0_gf_over_2_right = tallest_peak
-            kappa_guess_ef_right = tallest_peak_width
-
-            if np.abs(self.peaks[key] - tallest_peak) > 100e6:
-                print('Both f_ge and f_gf/2 have been found. '
-                      'f_ge was assumed to the RIGHT of f_gf/2.')
-                f0 = f0_right
-                kappa_guess = kappa_guess_right
-                f0_gf_over_2 = f0_gf_over_2_right
-                kappa_guess_ef = kappa_guess_ef_right
-
-            else:
-                while(int(tallest_peak_idx-m)<0 and m>0):
-                    m -= 1
-
-                #serach for 2nd peak (f_gf/2) to the left of the first
-                self.peaks = a_tools.peak_finder(
-                    sweep_pts_cut_edges[0:int(tallest_peak_idx-m)],
-                    data_dist_smooth[0:int(tallest_peak_idx-m)],
-                    analyze_ef=False,
-                    percentile=percentile,
-                    num_sigma_threshold=1,
-                    optimize=False,
-                    key=key)
-
-                subset_left = data_dist_smooth[0:int(tallest_peak_idx-m)]
-                val_left = subset_left[self.peaks[key+'_idx']]
-                f0_left = tallest_peak
-                kappa_guess_left = tallest_peak_width
-                f0_gf_over_2_left = self.peaks[key]
-                kappa_guess_ef_left = self.peaks[key+'_width']
-
-                if np.abs(self.peaks[key] - tallest_peak) > 100e6:
-                    print('Both f_ge and f_gf/2 have been found. '
-                          'f_ge was assumed to the LEFT of f_gf/2.')
-
-                    f0 = f0_left
-                    kappa_guess = kappa_guess_left
-                    f0_gf_over_2 = f0_gf_over_2_left
-                    kappa_guess_ef = kappa_guess_ef_left
-
-                else:
-                    print('The f_gf/2 '+key+' was not found. Fitting to '
-                          'the next largest '+key+' found.')
-                    if np.abs(val_left) > np.abs(val_right):
-                        f0 = f0_left
-                        kappa_guess = kappa_guess_left
-                        f0_gf_over_2 = f0_gf_over_2_left
-                        kappa_guess_ef = kappa_guess_ef_left
-                    else:
-                        f0 = f0_right
-                        kappa_guess = kappa_guess_right
-                        f0_gf_over_2 = f0_gf_over_2_right
-                        kappa_guess_ef = kappa_guess_ef_right
-
+            if f0 == 0:
+                f0 = tallest_peak
+            if f0_gf_over_2 == 0:
+                f0_gf_over_2 = tallest_peak
             if kappa_guess == 0:
                 kappa_guess = 5e6
             if kappa_guess_ef == 0:

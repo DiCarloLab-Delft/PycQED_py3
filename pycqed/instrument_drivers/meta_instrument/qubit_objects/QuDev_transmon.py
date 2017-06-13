@@ -356,12 +356,12 @@ class QuDev_transmon(Qubit):
             self.readout_UC_LO.frequency(f_RO - self.f_RO_mod())
             self.readout_UC_LO.on()
 
-    def measure_heterodyne_spectroscopy(self, freqs=None, MC=None,
+    def measure_resonator_spectroscopy(self, freqs=None, MC=None,
                                         analyze=True, close_fig=True):
         """ Varies the frequency of the microwave source to the resonator and
         measures the transmittance """
         if freqs is None:
-            raise ValueError("Unspecified frequencies for measure_heterodyne_"
+            raise ValueError("Unspecified frequencies for measure_resonator_"
                              "spectroscopy")
 
         if MC is None:
@@ -603,8 +603,8 @@ class QuDev_transmon(Qubit):
             ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
 
     def measure_T1_2nd_exc(self, times=None, MC=None, analyze=True, upload=True,
-                           close_fig=True, cal_points=True, label=None,
-                           last_ge_pulse=True):
+                           close_fig=True, cal_points=True, no_cal_points=6,
+                           label=None, last_ge_pulse=True):
 
         if times is None:
             raise ValueError("Unspecified times for measure_T1_2nd_exc")
@@ -618,12 +618,12 @@ class QuDev_transmon(Qubit):
             MC = self.MC
 
         MC.set_sweep_function(awg_swf.T1_2nd_exc(
-                                times=times,
                                 pulse_pars=self.get_drive_pars(),
                                 pulse_pars_2nd=self.get_ef_drive_pars(),
                                 RO_pars=self.get_RO_pars(),
                                 upload=upload,
                                 cal_points=cal_points,
+                                no_cal_points=no_cal_points,
                                 last_ge_pulse=last_ge_pulse))
         MC.set_sweep_points(times)
         MC.set_detector_function(self.int_avg_det)
@@ -647,7 +647,7 @@ class QuDev_transmon(Qubit):
         if label is None:
             label = 'QScale'+self.msmt_suffix
 
-        MC.set_sweep_function(awg_swf.QScale(
+        MC.set_sweep_function(awg_swf.QScale(qscales=qscales,
                 pulse_pars=self.get_drive_pars(), RO_pars=self.get_RO_pars(),
                 upload=upload, cal_points=cal_points))
         MC.set_sweep_points(qscales)
@@ -659,7 +659,8 @@ class QuDev_transmon(Qubit):
 
     def measure_qscale_2nd_exc(self, qscales=None, MC=None, analyze=True,
                                upload=True, close_fig=True, label=None,
-                               cal_points=True, last_ge_pulse=True):
+                               cal_points=True, no_cal_points=6,
+                               last_ge_pulse=True):
 
         if qscales is None:
             raise ValueError("Unspecified qscale values for"
@@ -677,7 +678,7 @@ class QuDev_transmon(Qubit):
             pulse_pars=self.get_drive_pars(),
             pulse_pars_2nd=self.get_ef_drive_pars(),
             RO_pars=self.get_RO_pars(),
-            upload=upload, cal_points=cal_points,
+            upload=upload, cal_points=cal_points, no_cal_points=no_cal_points,
             last_ge_pulse=last_ge_pulse))
         MC.set_sweep_points(qscales)
         MC.set_detector_function(self.int_avg_det)
@@ -686,7 +687,7 @@ class QuDev_transmon(Qubit):
         if analyze:
             ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
 
-    def measure_ramsey(self, times=None, artificial_detuning=0, label='',
+    def measure_ramsey(self, times=None, artificial_detuning=0, label=None,
                        MC=None, analyze=True, close_fig=True, cal_points=True,
                        upload=True):
 
@@ -697,6 +698,10 @@ class QuDev_transmon(Qubit):
         if MC is None:
             MC = self.MC
 
+        # Define the measurement label
+        if label is None:
+            label = 'Ramsey' + self.msmt_suffix
+
         Rams_swf = awg_swf.Ramsey(
             pulse_pars=self.get_drive_pars(), RO_pars=self.get_RO_pars(),
             artificial_detuning=artificial_detuning, cal_points=cal_points,
@@ -704,14 +709,14 @@ class QuDev_transmon(Qubit):
         MC.set_sweep_function(Rams_swf)
         MC.set_sweep_points(times)
         MC.set_detector_function(self.int_avg_det)
-        MC.run('Ramsey'+label+self.msmt_suffix)
+        MC.run(label)
 
         if analyze:
             ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
 
     def measure_ramsey_2nd_exc(self, times=None, artificial_detuning=0, label=None,
                        MC=None, analyze=True, close_fig=True, cal_points=True,
-                       n=1, upload=True, last_ge_pulse=True):
+                       n=1, upload=True, last_ge_pulse=True, no_cal_points=6):
 
         if times is None:
             raise ValueError("Unspecified times for measure_ramsey")
@@ -719,7 +724,7 @@ class QuDev_transmon(Qubit):
             logging.warning('Artificial detuning is 0.')
 
         if label is None:
-            label = 'Ramsey_2nd_exc'+self.msmt_suffix
+            label = 'Ramsey_2nd'+self.msmt_suffix
 
         self.prepare_for_timedomain()
         if MC is None:
@@ -728,9 +733,10 @@ class QuDev_transmon(Qubit):
         Rams_2nd_swf = awg_swf.Ramsey_2nd_exc(
             pulse_pars=self.get_drive_pars(),
             pulse_pars_2nd=self.get_ef_drive_pars(),
-            RO_pars=self.get_RO_pars(), times=times,
+            RO_pars=self.get_RO_pars(),
             artificial_detuning=artificial_detuning,
             cal_points=cal_points, n=n, upload=upload,
+            no_cal_points=no_cal_points,
             last_ge_pulse=last_ge_pulse)
         MC.set_sweep_function(Rams_2nd_swf)
         MC.set_sweep_points(times)
@@ -1150,8 +1156,8 @@ class QuDev_transmon(Qubit):
         if analyze:
             ma.MeasurementAnalysis(auto=True, close_fig=close_fig)"""
 
-    def find_resonator_frequency(self, update=False, freqs=None, MC=None,
-                                 close_fig=True, fitting_model='hanger',**kw):
+    def find_resonator_frequency(self, freqs=None, update=False, MC=None,
+                                 close_fig=True, fitting_model='hanger', **kw):
         """
         Finds the resonator frequency by performing a heterodyne experiment
         if freqs == None it will determine a default range dependent on the
@@ -1177,9 +1183,9 @@ class QuDev_transmon(Qubit):
         if MC is None:
             MC = self.MC
 
-        self.measure_heterodyne_spectroscopy(freqs, MC, analyze=False)
-
-        HA = ma.Homodyne_Analysis(close_fig=close_fig,
+        self.measure_resonator_spectroscopy(freqs, MC, analyze=False)
+        label = 'resonator_scan' + self.msmt_suffix
+        HA = ma.Homodyne_Analysis(label=label, close_fig=close_fig,
                                   fitting_model=fitting_model,**kw)
         f0 = HA.fit_res.params['f0'].value
         df0 = HA.fit_res.params['f0'].stderr
@@ -1278,6 +1284,8 @@ class QuDev_transmon(Qubit):
                 print the fit report
             print_frequency         (default=False)
                 whether to print the f_ge and f_gf/2
+            make_fig          {default=True)
+                    whether or not to make a figure
             show                    (default=True)
                 show the plots
             show_guess              (default=False)
@@ -1318,6 +1326,9 @@ class QuDev_transmon(Qubit):
                                       close_fig=close_fig)
             label = 'pulsed-spec'
 
+        if analyze_ef:
+            label = 'high_power_' + label
+
         amp_only = hasattr(self.heterodyne, 'RF')
         SpecA = ma.Qubit_Spectroscopy_Analysis(
             analyze_ef=analyze_ef, label=label, amp_only=amp_only, close_fig=close_fig,**kw)
@@ -1336,7 +1347,7 @@ class QuDev_transmon(Qubit):
 
     def find_amplitudes(self, rabi_amps=None, label=None, for_ef=False,
                         update=False, MC=None, close_fig=True, cal_points=True,
-                        no_cal_points=2, upload=True, last_ge_pulse=True, **kw):
+                        no_cal_points=4, upload=True, last_ge_pulse=True, **kw):
 
         """
             Finds the pi and pi/2 pulse amplitudes from the fit to a Rabi
@@ -1388,6 +1399,8 @@ class QuDev_transmon(Qubit):
                     automatically perform the entire analysis upon call
                 print_fit_results (default=True)
                     print the fit report
+                make_fig          {default=True)
+                    whether or not to make a figure
                 show              (default=True)
                     show the plots
                 show_guess        (default=False)
@@ -1435,7 +1448,7 @@ class QuDev_transmon(Qubit):
 
         if label is None:
             if for_ef:
-                label = 'Rabi_2nd_excitation' + self.msmt_suffix
+                label = 'Rabi_2nd' + self.msmt_suffix
             else:
                 label = 'Rabi' + self.msmt_suffix
 
@@ -1483,8 +1496,9 @@ class QuDev_transmon(Qubit):
         return rabi_amps
 
 
-    def find_T1(self, times, label='T1', for_ef=False, update=False, MC=None,
-                cal_points=True, close_fig=True, last_ge_pulse=True, **kw):
+    def find_T1(self, times, label=None, for_ef=False, update=False, MC=None,
+                cal_points=True, no_cal_points=6, close_fig=True,
+                last_ge_pulse=True, **kw):
 
         """
         Finds the relaxation time T1 from the fit to an exponential
@@ -1548,7 +1562,7 @@ class QuDev_transmon(Qubit):
 
         if label is None:
             if for_ef:
-                label = 'T1_2nd_excitation' + self.msmt_suffix
+                label = 'T1_2nd' + self.msmt_suffix
             else:
                 label = 'T1' + self.msmt_suffix
 
@@ -1567,12 +1581,13 @@ class QuDev_transmon(Qubit):
 
         #Perform measurement
         if for_ef:
-            self.measure_T1_2nd(times, MC=MC,
+            self.measure_T1_2nd_exc(times=times, MC=MC,
                                 close_fig=close_fig,
                                 cal_points=cal_points,
+                                no_cal_points=no_cal_points,
                                 last_ge_pulse=last_ge_pulse)
         else:
-            self.measure_T1(times, MC=MC,
+            self.measure_T1(times=times, MC=MC,
                             close_fig=close_fig,
                             cal_points=cal_points)
 
@@ -1581,7 +1596,7 @@ class QuDev_transmon(Qubit):
             NoCalPoints = 6
         else:
             NoCalPoints = 4
-        T1_Analysis = ma.T1_Analysis(label=label,NoCalPoints=NoCalPoints, **kw)
+        T1_Analysis = ma.T1_Analysis(label=label, NoCalPoints=NoCalPoints, **kw)
         T1_dict = T1_Analysis.T1
         T1_value = T1_dict['T1']
 
@@ -1595,7 +1610,8 @@ class QuDev_transmon(Qubit):
 
     def find_frequency_T2_ramsey(self, times, for_ef=False, artificial_detuning=0, update=False, MC=None,
                                      cal_points=True, close_fig=True, upload=True,
-                                     last_ge_pulse=True, **kw):
+                                     last_ge_pulse=True, label=None,
+                                     no_cal_points=6,**kw):
 
         """
         Finds the real qubit frequency and the dephasing rate T2* from the fit
@@ -1639,6 +1655,12 @@ class QuDev_transmon(Qubit):
         if MC is None:
             MC = self.MC
 
+        if label is None:
+            if for_ef:
+                label = 'Ramsey_2nd' +self.msmt_suffix
+            else:
+                label = 'Ramsey' + self.msmt_suffix
+
         if times is None:
             times_span = kw.get('times_span', 5e-6)
             times_mean = kw.get('times_mean', 2.5e-6)
@@ -1657,13 +1679,14 @@ class QuDev_transmon(Qubit):
             self.measure_ramsey(times=times,
                                 artificial_detuning=artificial_detuning,
                                 MC=MC,
-                                cal_points=cal_points, close_fig=close_fig, upload=upload)
-            RamseyA = ma.Ramsey_Analysis(auto=True,**kw)
+                                cal_points=cal_points,
+                                close_fig=close_fig, upload=upload)
+            RamseyA = ma.Ramsey_Analysis(auto=True, label=label, **kw)
         else:
             self.measure_ramsey_2nd_exc(times=times, artificial_detuning=artificial_detuning, MC=MC,
                                         cal_points=cal_points, close_fig=close_fig, upload=upload,
-                                        last_ge_pulse=last_ge_pulse)
-            RamseyA = ma.Ramsey_Analysis(auto=True, NoCalPoints=6, **kw)
+                                        last_ge_pulse=last_ge_pulse, no_cal_points=no_cal_points)
+            RamseyA = ma.Ramsey_Analysis(auto=True, NoCalPoints=6, label=label, **kw)
 
         #get new freq and T2* from analysis results
 
@@ -1688,7 +1711,8 @@ class QuDev_transmon(Qubit):
         return qubit_freq, T2_star
 
     def find_qscale(self, qscales, label=None, for_ef=False, update=False,
-                    MC=None, close_fig=True, last_ge_pulse=True, **kw):
+                    MC=None, close_fig=True, last_ge_pulse=True, upload=False,
+                    cal_points=True, no_cal_points=6, **kw):
 
         '''
         Performs the QScale calibration measurement ( (xX)-(xY)-(xmY) ) and
@@ -1799,12 +1823,14 @@ class QuDev_transmon(Qubit):
         #Perform the qscale calibration measurement
         if for_ef:
             # Run measuremet
-            self.measure_qscale_2nd_exc(qscales=qscales, MC=MC,
+            self.measure_qscale_2nd_exc(qscales=qscales, MC=MC, upload=upload,
                                         close_fig=close_fig, label=label,
-                                        last_ge_pulse=last_ge_pulse)
+                                        last_ge_pulse=last_ge_pulse,
+                                        cal_points=cal_points,
+                                        no_cal_points=no_cal_points)
             NoCalPoints = 6
         else:
-            self.measure_qscale(qscales=qscales, MC=MC,
+            self.measure_qscale(qscales=qscales, MC=MC, upload=upload,
                                 close_fig=close_fig, label=label)
             NoCalPoints = 4
 
@@ -1817,7 +1843,7 @@ class QuDev_transmon(Qubit):
         Qscale_value = Qscale_dict['qscale']
 
         if update:
-            self.drag_qscale(Qscale_value)
+            self.motzoi(Qscale_value)
 
         return Qscale_dict
 

@@ -843,13 +843,14 @@ class T1(swf.Hard_Sweep):
 
 class T1_2nd_exc(swf.Hard_Sweep):
 
-    def __init__(self, pulse_pars, pulse_pars_2nd, RO_pars,
+    def __init__(self, pulse_pars, pulse_pars_2nd, RO_pars, no_cal_points=6,
                  cal_points=True, upload=True, last_ge_pulse=True):
         super().__init__()
         self.pulse_pars = pulse_pars
         self.pulse_pars_2nd = pulse_pars_2nd
         self.RO_pars = RO_pars
         self.cal_points = cal_points
+        self.no_cal_points=no_cal_points
         self.last_ge_pulse = last_ge_pulse
         self.upload = upload
         self.name = 'T1 2nd excited state'
@@ -859,6 +860,7 @@ class T1_2nd_exc(swf.Hard_Sweep):
     def prepare(self, **kw):
         if self.upload:
             sqs2.T1_2nd_exc_seq(times=self.sweep_points,
+                                no_cal_points=self.no_cal_points,
                                 pulse_pars=self.pulse_pars,
                                 pulse_pars_2nd=self.pulse_pars_2nd,
                                 RO_pars=self.RO_pars,
@@ -1004,7 +1006,7 @@ class Ramsey_2nd_exc(swf.Hard_Sweep):
 
     def __init__(self, pulse_pars, pulse_pars_2nd, RO_pars,
                  artificial_detuning=None, return_seq=False,
-                 n=1, cal_points=True, upload=True,
+                 n=1, cal_points=True, upload=True, no_cal_points=6,
                  last_ge_pulse=True):
         super().__init__()
         self.pulse_pars = pulse_pars
@@ -1018,7 +1020,8 @@ class Ramsey_2nd_exc(swf.Hard_Sweep):
         self.parameter_name = 't'
         self.unit = 's'
         self.return_seq = return_seq
-        self.last_ge_pulse=last_ge_pulse
+        self.last_ge_pulse = last_ge_pulse
+        self.no_cal_points = no_cal_points
 
     def prepare(self, **kw):
         if self.upload:
@@ -1029,6 +1032,7 @@ class Ramsey_2nd_exc(swf.Hard_Sweep):
                                     artificial_detuning =
                                             self.artificial_detuning,
                                     n=self.n, cal_points=self.cal_points,
+                                    no_cal_points=self.no_cal_points,
                                     upload=self.upload,
                                     return_seq=self.return_seq,
                                     last_ge_pulse=self.last_ge_pulse)
@@ -1141,7 +1145,7 @@ class QScale_2nd_exc(swf.Hard_Sweep):
 
     def __init__(self, qscales, pulse_pars, pulse_pars_2nd, RO_pars,
                  cal_points=True, upload=True, return_seq=False,
-                 last_ge_pulse=True):
+                 last_ge_pulse=True, no_cal_points=6):
         super().__init__()
         self.qscales = qscales
         self.pulse_pars = pulse_pars
@@ -1154,6 +1158,7 @@ class QScale_2nd_exc(swf.Hard_Sweep):
         self.unit = ''
         self.return_seq = return_seq
         self.last_ge_pulse = last_ge_pulse
+        self.no_cal_points=no_cal_points
 
     def prepare(self, **kw):
         if self.upload:
@@ -1163,6 +1168,7 @@ class QScale_2nd_exc(swf.Hard_Sweep):
                                       RO_pars=self.RO_pars,
                                       upload=self.upload,
                                       cal_points=self.cal_points,
+                                      no_cal_points=self.no_cal_points,
                                       return_seq=self.return_seq,
                                       last_ge_pulse=self.last_ge_pulse)
 
