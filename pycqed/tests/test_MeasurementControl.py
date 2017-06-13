@@ -43,6 +43,17 @@ class Test_MeasurementControl(unittest.TestCase):
         np.testing.assert_array_almost_equal(y0, y[0, :])
         np.testing.assert_array_almost_equal(y1, y[1, :])
 
+        # Test that the return dictionary has the right entries
+        dat_keys = set(['dset', 'sweep_parameter_names',
+                        'sweep_parameter_units',
+                        'value_names', 'value_units'])
+        self.assertEqual(dat_keys, set(dat.keys()))
+
+        self.assertEqual(dat['sweep_parameter_names'], ['pts'])
+        self.assertEqual(dat['sweep_parameter_units'], ['arb. unit'])
+        self.assertEqual(dat['value_names'], ['I', 'Q'])
+        self.assertEqual(dat['value_units'], ['mV', 'mV'])
+
     def test_hard_sweep_1D(self):
         sweep_pts = np.linspace(0, 10, 5)
         self.MC.set_sweep_function(None_Sweep(sweep_control='hard'))

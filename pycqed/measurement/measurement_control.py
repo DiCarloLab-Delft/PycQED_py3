@@ -743,17 +743,12 @@ class MeasurementControl(Instrument):
             self.detector_function.value_units)
 
     def create_experiment_result_dict(self):
-        data_object = self.data_object["Experimental Data"]
-        sweep_parameter_names = data_object.attrs["sweep_parameter_names"]
-        sweep_parameter_units = data_object.attrs['sweep_parameter_units']
-        value_names = data_object.attrs["value_names"]
-        value_units = data_object.attrs['value_units']
         result_dict = {
             "dset": self.dset[()],
-            "sweep_parameter_names": sweep_parameter_names,
-            "sweep_parameter_units": sweep_parameter_units,
-            "value_names": value_names,
-            "value_units": value_units
+            "sweep_parameter_names": self.sweep_par_names,
+            "sweep_parameter_units": self.sweep_par_units,
+            "value_names": self.detector_function.value_names,
+            "value_units": self.detector_function.value_units
         }
         return result_dict
 
