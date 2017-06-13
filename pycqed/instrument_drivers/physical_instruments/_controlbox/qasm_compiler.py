@@ -373,7 +373,8 @@ class QASM_QuMIS_Compiler():
 
         self.qasm_op_dict = {**default_op_dict, **self.user_qasm_op_dict}
         self.qasm_op_dict = lower_dict_key(self.qasm_op_dict)
-        self.print_op_dict()
+        if self.verbosity_level > 3:
+            self.print_op_dict()
 
     def dump_config(self, config_fn):
         op_dict = {}
@@ -468,87 +469,86 @@ class QASM_QuMIS_Compiler():
             print("")
 
     def print_op_dict(self):
-        if self.verbosity_level < 3:
-            print("QASM operation dictionary:")
-            for key, value in self.qasm_op_dict.items():
-                raw_print("{0: >10} : ".format(key))
-                print(value)
-            print("\n")
+        print("QASM operation dictionary:")
+        for key, value in self.qasm_op_dict.items():
+            raw_print("{0: >10} : ".format(key))
+            print(value)
+        print("\n")
 
     def print_raw_events(self):
-        if self.verbosity_level < 4:
-            print("Raw events:")
-            for i, raw_events in enumerate(self.raw_event_list):
-                raw_print("{0:5d} : ".format(i))
-                for re in raw_events:
-                    raw_print("({}, {}, {})".format(re.event_type,
-                                                    re.name, re.params))
-                raw_print("\n")
+        print("Raw events:")
+        for i, raw_events in enumerate(self.raw_event_list):
+            raw_print("{0:5d} : ".format(i))
+            for re in raw_events:
+                raw_print("({}, {}, {})".format(re.event_type,
+                                                re.name, re.params))
+            raw_print("\n")
         print("")
 
     def print_timing_events(self):
-        if self.verbosity_level < 4:
-            print("Timing events:")
-            for i, timing_events in enumerate(self.timing_event_list):
-                raw_print("{0:5d} : ".format(i))
-                for re in timing_events:
-                    raw_print("({}, {}, {})".format(re.event_type,
-                                                    re.name, re.params))
-                raw_print("\n")
+        print("Timing events:")
+        for i, timing_events in enumerate(self.timing_event_list):
+            raw_print("{0:5d} : ".format(i))
+            for re in timing_events:
+                raw_print("({}, {}, {})".format(re.event_type,
+                                                re.name, re.params))
+            raw_print("\n")
         print("")
 
     def print_timing_grid(self):
-        if self.verbosity_level < 5:
-            print("Timing gird:")
-            if len(self.timing_grid) == 0:
-                print("Empty timing grid.")
-                return
 
-            if self.timing_grid[0].absolute_time is not None:
-                absolute_time_generated = True
-            else:
-                absolute_time_generated = False
+        print("Timing gird:")
+        if len(self.timing_grid) == 0:
+            print("Empty timing grid.")
+            return
 
+        if self.timing_grid[0].absolute_time is not None:
+            absolute_time_generated = True
+        else:
+            absolute_time_generated = False
+
+        if absolute_time_generated is True:
+            print("{0: >6s}  {1: <10s}"
+                  "   Events".format("Idx", "absolute"))
+        else:
+            print("{0: >6s}  {1: <10s}   Events".format("Idx",
+                                                        "next wait"))
+        i = 0
+        for tp in self.timing_grid:
+            raw_print("{0:5d}:".format(i))
             if absolute_time_generated is True:
-                print("{0: >6s}  {1: <10s}"
-                      "   Events".format("Idx", "absolute"))
+                raw_print("   {0: <8d}    ".format(tp.absolute_time))
             else:
-                print("{0: >6s}  {1: <10s}   Events".format("Idx",
-                                                            "next wait"))
-            i = 0
-            for tp in self.timing_grid:
-                raw_print("{0:5d}:".format(i))
-                if absolute_time_generated is True:
-                    raw_print("   {0: <8d}    ".format(tp.absolute_time))
-                else:
-                    raw_print("   {0: <8d}    ".format(
-                        tp.following_waiting_time))
-                self.print_event_list(tp.parallel_events)
-                raw_print('\n')
-                i = i + 1
-
+                raw_print("   {0: <8d}    ".format(
+                    tp.following_waiting_time))
+            self._print_event_list(tp.parallel_events)
+            raw_print('\n')
+            i = i + 1
         print("")
 
     def print_hw_timing_grid(self):
-        if self.verbosity_level < 5:
-            print("Hardware trigger timing gird:")
-            if len(self.hw_timing_grid) == 0:
-                print("Empty trigger timing grid.")
-                return
+        print("Hardware trigger timing gird:")
+        if len(self.hw_timing_grid) == 0:
+            print("Empty trigger timing grid.")
+            return
 
-            print("{0: >6s}  {1: <10s}"
-                  "    Events".format("Idx", "absolute"))
-            i = 0
-            for tp in self.hw_timing_grid:
-                raw_print("{0:5d}:".format(i))
-                raw_print("   {0: <8d}    ".format(tp.absolute_time))
-                self.print_event_list(tp.parallel_events)
-                raw_print('\n')
-                i = i + 1
+        print("{0: >6s}  {1: <10s}"
+              "    Events".format("Idx", "absolute"))
+        i = 0
+        for tp in self.hw_timing_grid:
+            raw_print("{0:5d}:".format(i))
+            raw_print("   {0: <8d}    ".format(tp.absolute_time))
+            self._print_event_list(tp.parallel_events)
+            raw_print('\n')
+            i = i + 1
 
         print("")
 
-    def print_event_list(self, event_list):
+    def _print_event_list(self, event_list):
+        """
+        private method used for printing of the timing grid and hardware
+        timing grid
+        """
         raw_print(" ")
         if event_list == []:
             raw_print('-')
@@ -781,14 +781,14 @@ class QASM_QuMIS_Compiler():
 
         self.get_absolute_timing()
 
-        if self.verbosity_level < 4:
+        if self.verbosity_level > 4:
             print("End of assigning timing:")
             self.print_timing_grid()
 
     def resolve_qubit_name(self):
         self.build_qubit_map()
         self.map_qubits()
-        if self.verbosity_level < 4:
+        if self.verbosity_level > 4:
             print("End of resolving qubit name:")
             self.print_timing_events()
 
@@ -812,7 +812,7 @@ class QASM_QuMIS_Compiler():
             se.filename = self.filename
             raise se
 
-        if (self.verbosity_level < 4):
+        if (self.verbosity_level > 4):
             print("End of building qubit map:")
             self.print_raw_events()
 
@@ -938,13 +938,13 @@ class QASM_QuMIS_Compiler():
                 tp.parallel_events[idx] = event
             self.timing_grid[ti] = tp
 
-        if self.verbosity_level < 3:
+        if self.verbosity_level > 3:
             print("get channel latency:")
             self.print_timing_grid()
 
     def compensate_channel_latency(self):
         min_latency = self.get_min_channel_latency()
-        if self.verbosity_level < 4:
+        if self.verbosity_level > 4:
             print("Min latency is:", min_latency)
         ti = 0
         while ti < len(self.timing_grid):
@@ -972,7 +972,7 @@ class QASM_QuMIS_Compiler():
                     idx = idx + 1
             ti = ti + 1
 
-        if self.verbosity_level < 4:
+        if self.verbosity_level > 4:
             print("End of compensting channel latency:")
             self.print_timing_grid()
 
@@ -1029,7 +1029,7 @@ class QASM_QuMIS_Compiler():
             tp.parallel_events = hw_events
             self.hw_timing_grid.append(tp)
 
-        if self.verbosity_level < 4:
+        if self.verbosity_level > 4:
             self.print_hw_timing_grid()
 
     def gen_full_time_grid(self):
@@ -1083,7 +1083,7 @@ class QASM_QuMIS_Compiler():
             for i in range(len(self.hw_timing_grid)):
                 self.hw_timing_grid[i].absolute_time += added_time
 
-        if self.verbosity_level < 4:
+        if self.verbosity_level > 4:
             self.print_hw_timing_grid()
 
     def vertical_divide_trigger(self):
@@ -1116,7 +1116,8 @@ class QASM_QuMIS_Compiler():
                         if trigger_bit_duration[tb] > 0:
                             self.hw_timing_grid = new_tp_list
                             print("print before trigger overlap error.")
-                            self.print_timing_grid()
+                            if self.verbosity_level > 5:
+                                self.print_timing_grid()
                             raise ValueError("vertical_divide_trigger: "
                                              "trigger time overlapped. "
                                              "Something wrong?")
@@ -1168,7 +1169,7 @@ class QASM_QuMIS_Compiler():
                     break
 
         self.hw_timing_grid = new_tp_list
-        if self.verbosity_level < 4:
+        if self.verbosity_level > 4:
             print("after vertical_divide_trigger:")
         self.print_hw_timing_grid()
 
@@ -1232,7 +1233,7 @@ class QASM_QuMIS_Compiler():
                             new_tp_list, absolute_time + d2, None)
 
         self.hw_timing_grid = new_tp_list
-        if self.verbosity_level < 4:
+        if self.verbosity_level > 4:
             print("after split_trigger_codeword:")
         self.print_hw_timing_grid()
 
@@ -1312,9 +1313,9 @@ class QASM_QuMIS_Compiler():
         for qi in self.qumis_instructions:
             qumis_file.write("{}\n".format(qi))
         qumis_file.close()
-        self.print_qumis()
+        if self.verbosity_level >= 5:
+            self.print_qumis()
 
     def print_qumis(self):
-        if self.verbosity_level >= 5:
-            for qi in self.qumis_instructions:
-                print(qi)
+        for qi in self.qumis_instructions:
+            print(qi)

@@ -31,8 +31,7 @@ class Test_single_qubit_seqs(TestCase):
         compiler = qc.QASM_QuMIS_Compiler()
 
         c_methods = set(dir(compiler))
-        printing_methods = {'print_event_list',
-                            'print_hw_timing_grid',
+        printing_methods = {'print_hw_timing_grid',
                             'print_lines',
                             'print_op_dict',
                             'print_qumis',
