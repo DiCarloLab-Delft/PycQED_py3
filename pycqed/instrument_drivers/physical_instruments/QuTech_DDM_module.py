@@ -35,9 +35,6 @@ class DDMq(SCPI):
 
     # def __init__(self, logging=True, simMode=False, paranoid=False):
     def __init__(self, name, address, port, **kwargs):
-        self.ddm_software_version = ""
-        self.parameter_file_version = ""
-        self.ranges_file_version = ""
 
         isConnected = False
         try:
@@ -52,8 +49,11 @@ class DDMq(SCPI):
         self.device_descriptor = type('', (), {})()
         self.device_descriptor.model = 'DDM'
 
-        # Wait a small momement, to make sure that the scpi connection is
-        # established before using the connection
+        # Init the version info variable
+        version_info = self.get_idn()
+        self.ddm_software_version = version_info['swVersion']
+        self.parameter_file_version = ""
+        self.ranges_file_version = ""
 
         # Ask the ddm how many adcs and qubits per adc it has.
         numAdcs = int(self.ask('qutech:nadcs? '))
@@ -70,159 +70,23 @@ class DDMq(SCPI):
 
         self.connect_message()
 
-    def _ask(self, data):
-        if (isinstance(data, str)):
-            return self.ask(data)
-        else:
-            return data()
-
-    def _write(self, func, data):
-        if (isinstance(func, str)):
-            return self.write(func.format(data))
-        else:
-            return func(data)
-
-    # Read the min and max values of the parameter from the ddm and update the
-    # min and max values of the validator
-    def _updateValidatorList(self, name, **kwargs):
-        if ('vals' in kwargs and 'set_cmd' in kwargs
-                and 'get_cmd' in kwargs):
-            validator = kwargs['vals']
-            if (self.ddm_software_version != self.ranges_file_version or
-                    not (name in self.parameterRangesList)):
-                try:
-                        minValue = str(INT32_MIN)
-                        maxValue = str(INT32_MAX)
-                        if (isinstance(validator, vals.Numbers)):
-                            initialValue = self._ask(kwargs['get_cmd'])
-                            self._write(kwargs['set_cmd'], str(INT32_MAX))
-                            maxValue = self._ask(kwargs['get_cmd'])
-                            self._write(kwargs['set_cmd'], str(INT32_MIN))
-                            minValue = self._ask(kwargs['get_cmd'])
-                            self._write(kwargs['set_cmd'], initialValue)
-                        elif (isinstance(validator, vals.Arrays)):
-                            initialValue_str = self._ask(kwargs['get_cmd'])
-                            initialValue = list(map(int, initialValue_str))
-                            count = max(1, len(initialValue))
-                            char_max = []
-                            char_min = []
-                            for i in range(count):
-                                char_max.append(CHAR_MAX)
-                                char_min.append(CHAR_MIN)
-                            self._write(kwargs['set_cmd'], char_max)
-                            maxValue = str(self._ask(kwargs['get_cmd'])[0])
-                            self._write(kwargs['set_cmd'], char_min)
-                            minValue = str(self._ask(kwargs['get_cmd'])[0])
-                            self._write(kwargs['set_cmd'], initialValue)
-                        else:
-                            log.debug("Not implemented: Retreiving min and" +
-                                      " max values of a parameter from the" +
-                                      " ddm of type '" + type(validator) + "'")
-                        self.parameterRangesList[name] = {}
-                        self.parameterRangesList[name]["min_val"] = minValue
-                        self.parameterRangesList[name]["max_val"] = maxValue
-                        self.parameterRangesListIsUpToDate = False
-                except Exception as e:
-                    log.debug("Exception was thrown while retreiving the min and max" +
-                              " values of a parameter '" + name + "' from the ddm.(%s)", str(e))
-            else:
-                minValue = self.parameterRangesList[name]["min_val"]
-                maxValue = self.parameterRangesList[name]["max_val"]
-            try:
-                if (isinstance(validator, vals.Numbers)):
-                    if (str(validator._min_value) != minValue
-                            or str(validator._max_value) != maxValue):
-                        kwargs['vals'] = vals.Numbers(
-                            float(minValue), float(maxValue))
-                elif (isinstance(validator, vals.Arrays)):
-                    if (str(validator._min_value) != minValue
-                            or str(validator._max_value) != maxValue):
-                        kwargs['vals'] = vals.Arrays(float(minValue), float(maxValue))
-                else:
-                    log.debug("Not implemented: Setting of min and max values" +
-                               " of a parameter from the ddm of type '" +
-                               type(validator) + "'")
-            except Exception as e:
-                log.debug("Exception was thrown while setting the min and max" +
-                            " values of a parameter '" + name + "' from the ddm.(%s)", str(e))
-                log.debug(str(minValue) + ", " + str(maxValue) + ": " + str(validator._min_value) + ", " + str(validator._max_value))
-
     def add_parameter(self, name, parameter_class=StandardParameter,
                       **kwargs):
-        self._updateValidatorList(name, **kwargs)
+        self._setValidatorLimits(name, kwargs)
         super(DDMq, self).add_parameter(name, parameter_class, **kwargs)
 
     def add_parameters(self):
-        path = os.path.abspath(__file__)
-        dir_path = os.path.dirname(path)
-        folder_path = os.path.join(dir_path, 'QuTech_DDM_Parameter_Files')
-
-        self.parameterRangesList = {}
-        path = os.path.join(folder_path, 'QuTech_DDM_Ranges.txt')
-        try:
-            file = open(path)
-            file_content = json.loads(file.read())
-            self.ranges_file_version = file_content["version"]["ddm_software_version"]
-        except Exception as e:
-          log.warning("failed to open the " + path + ".(%s)", str(e))
-
-        # Check if the firware version match the version of the parameter list
-        try:
-            version_info = self.get_idn()
-            self.ddm_software_version = version_info['swVersion']
-        except:
-            log.warning("software version was not found".format(
-                self._s_file_name))
-        self._s_file_name = os.path.join(
-            folder_path, 'QuTech_DDM_Parameters.txt')
-        ddm_parameters = []
-        try:
-            file = open(self._s_file_name)
-            file_content = json.loads(file.read())
-            ddm_parameters=file_content["parameters"]
-            self.parameter_file_version=file_content["version"]["software"]
-        except Exception as e:
-            log.warning("parameter file for gettable parameters {} not found".format(
-                self._s_file_name) + ".(%s)", str(e))
-            try:
-                if not os.path.exists(folder_path):
-                  os.makedirs(folder_path)
-            except:
-                pass
-        if (self.ddm_software_version != self.parameter_file_version):
-            print("The parameter file was updated (Theversion of the parameter file didnt match the ddm software version")
-            # Update the parameter list to software version of the ddm
-            parameter_str=self.ask('qutech:parameters?')
-            parameter_str=parameter_str.replace('\t', '\n')
-            try:
-                file=open(self._s_file_name, 'w')
-                file.write(parameter_str)
-            except Exception as e:
-                log.warning(
-                    "failed to write update the parameters in the parameter file" + ".(%s)", str(e))
-            ddm_parameters=json.loads(parameter_str)["parameters"]
-        else:
-            self.ranges_file_name=os.path.join(
-                folder_path, 'QuTech_DDM_Ranges.txt')
-            file=open(self.ranges_file_name)
-            file_content=json.loads(file.read())
-            self.parameterRangesList=file_content["parameters"]
-            self.parameterRangesListIsUpToDate = True
+        self.list_of_parameter_limits = self._read_parameter_limits()
+        ddm_parameters = self._read_ddm_parameters()
 
         # Add the parameters to 'self'
         for parameter in ddm_parameters:
-            if (("name" in parameter) == False):
-                log.warning("the parameter list contains a function without a" +
-                            " name")
-                continue
-
-            name=parameter["name"]
+            name = parameter["name"]
             del parameter["name"]
-
             if ("vals" in parameter):
-                validator=parameter["vals"]
+                validator = parameter["vals"]
                 try:
-                    val_type=validator["type"]
+                    val_type = validator["type"]
                     if (val_type == "Number"):
                         parameter["vals"]=vals.Numbers(INT32_MIN, INT32_MAX)
                     else:
@@ -238,19 +102,12 @@ class DDMq(SCPI):
                 log.warning("Failed to create the parameter " + name + \
                             ", because of a unknown keyword in this parameter" + ".(%s)", str(e))
 
-        self.add_custom_parameters()
+        self.add_additional_parameters()
 
-        if (self.ddm_software_version != self.ranges_file_version or self.parameterRangesListIsUpToDate == False):
-            self.ranges_file_name= os.path.join(folder_path, 'QuTech_DDM_Ranges.txt')
-            version = {}
-            version["ddm_software_version"] = self.ddm_software_version
-            file_content = {}
-            file_content["version"] = version
-            file_content["parameters"] = self.parameterRangesList
-            file = open(self.ranges_file_name, 'w')
-            json.dump(file_content, file,  indent=2)
+        if (self.ddm_software_version != self.ranges_file_version or self.parameter_limits_list_is_incomplete == True):
+            self._store_parameter_limits()
 
-    def add_custom_parameters(self):
+    def add_additional_parameters(self):
         #######################################################################
         # DDM specific
         #######################################################################
@@ -466,90 +323,89 @@ class DDMq(SCPI):
                 )
 
     #################
-    # Error handling
+    # Set Validator Limits
     #################
 
-    class Error(object):
+    def _ask(self, data):
+        if (isinstance(data, str)):
+            return self.ask(data)
+        else:
+            return data()
 
-        def __init__(self, errorCode, description, logLevel, acquisitionMode):
-            self.errorCode = errorCode
-            self.description = description
-            self.logLevel = logLevel
-            self.acquisitionMode = acquisitionMode
+    def _write(self, func, data):
+        if (isinstance(func, str)):
+            return self.write(func.format(data))
+        else:
+            return func(data)
 
-        def __repr__(self):
-            level = ""
-            if (self.logLevel >= logging.CRITICAL):
-                level = "critical"
-            elif (self.logLevel >= logging.ERROR):
-                level = "error"
-            elif (self.logLevel >= logging.WARNING):
-                level = "warning"
-            return level + ": " + self.description + "(" +\
-                self.acquisitionMode + ")"
+    # Make use of the validators' limits that are stored in a txt file
+    def _setValidatorLimits(self, name, kwargs):
+        if ('vals' in kwargs and 'set_cmd' in kwargs and 'get_cmd' in kwargs):
+            if (self.ddm_software_version != self.ranges_file_version or
+                    not (name in self.list_of_parameter_limits)):
+                self._updateValidatorLimits(name, kwargs)
+            try:
+                minValue = self.list_of_parameter_limits[name]["min_val"]
+                maxValue = self.list_of_parameter_limits[name]["max_val"]
+                validator = kwargs['vals']
+                if (isinstance(validator, vals.Numbers)):
+                    if (str(validator._min_value) != minValue
+                            or str(validator._max_value) != maxValue):
+                        kwargs['vals'] = vals.Numbers(
+                            float(minValue), float(maxValue))
+                elif (isinstance(validator, vals.Arrays)):
+                    if (str(validator._min_value) != minValue
+                            or str(validator._max_value) != maxValue):
+                        kwargs['vals'] = vals.Arrays(float(minValue), float(
+                          maxValue))
+                else:
+                    log.debug("Not implemented: Setting of min and max" +
+                              " values of a parameter from the ddm of type '" +
+                              type(validator) + "'")
+            except Exception as e:
+                log.debug("Exception was thrown while setting the min and" +
+                          " max values of a parameter '" + name + "' from" +
+                          " the ddm.(%s)", str(e))
 
-        def log(self):
-            if (self.logLevel >= logging.CRITICAL):
-                log.critical(self)
-            elif (self.logLevel >= logging.ERROR):
-                log.error(self)
-            elif (self.logLevel >= logging.WARNING):
-                log.warning(self)
-
-    def _displayErrors(self, errors):
-        for i in range(0, len(errors)):
-            if (errors[i].logLevel >= self.exceptionLevel):
-                raise Exception(errors[i])
+    # Get the min and max values of a parameter from the ddm
+    def _updateValidatorLimits(self, name, kwargs):
+        try:
+            minValue = str(INT32_MIN)
+            maxValue = str(INT32_MAX)
+            validator = kwargs['vals']
+            if (isinstance(validator, vals.Numbers)):
+                initialValue = self._ask(kwargs['get_cmd'])
+                self._write(kwargs['set_cmd'], str(INT32_MAX))
+                maxValue = self._ask(kwargs['get_cmd'])
+                self._write(kwargs['set_cmd'], str(INT32_MIN))
+                minValue = self._ask(kwargs['get_cmd'])
+                self._write(kwargs['set_cmd'], initialValue)
+            elif (isinstance(validator, vals.Arrays)):
+                initialValue_str = self._ask(kwargs['get_cmd'])
+                initialValue = list(map(int, initialValue_str))
+                count = max(1, len(initialValue))
+                char_max = []
+                char_min = []
+                for i in range(count):
+                    char_max.append(CHAR_MAX)
+                    char_min.append(CHAR_MIN)
+                self._write(kwargs['set_cmd'], char_max)
+                maxValue = str(self._ask(kwargs['get_cmd'])[0])
+                self._write(kwargs['set_cmd'], char_min)
+                minValue = str(self._ask(kwargs['get_cmd'])[0])
+                self._write(kwargs['set_cmd'], initialValue)
             else:
-                errors[i].log()
-
-    def _parseErrorList(self, acquisitionMode, errorList):
-        errors = []
-
-        start = 0
-        end = -1
-        looping = True
-
-        while (looping):
-            start = end + 1
-            end = errorList.find(',\"', start)
-            errorCode = int(float(errorList[start:end]))
-
-            start = end + 2
-            end = errorList.find("\",", start)
-            description = errorList[start:end]
-
-            start = end + 2
-            end = errorList.find(',', start)
-            if (end < 0):
-                end = len(errorList)
-                looping = False
-            errorLevel = int(errorList[start:end])
-            if (errorCode):
-                errors.append(self.Error(errorCode, description,
-                                         errorLevel, acquisitionMode))
-        return errors
-
-    def _getInAvgErrors(self, acquisitionMode, ch):
-        return self._parseErrorList(acquisitionMode, self.ask(
-            'qutech:channel{:d}:errors?'.format(ch))
-        )
-
-    def _getErrors(self, acquisitionMode, ch_pair, wNr):
-        return self._parseErrorList(acquisitionMode, self.ask(
-            'qutech:ADC{:d}:errors{:d}?'.format(ch_pair, wNr))
-        )
-
-    def _displayInAvgErrors(self, acquisitionMode, ch):
-        self._displayErrors(self._getInAvgErrors(acquisitionMode, ch))
-
-    def _displayQBitErrors(self, acquisitionMode, ch_pair, wNr):
-        self._displayErrors(self._getErrors(acquisitionMode, ch_pair, wNr))
-
-    # From this logging level, a message will cause and exceptions instead of
-    # a log message
-    def setExceptionLevel(self, level):
-        self.exceptionLevel = level
+                log.debug("Not implemented: Retreiving min and" +
+                          " max values of a parameter from the" +
+                          " ddm of type '" + type(validator) + "'")
+            self.list_of_parameter_limits[name] = {}
+            self.list_of_parameter_limits[name]["min_val"] = minValue
+            self.list_of_parameter_limits[name]["max_val"] = maxValue
+            self.parameter_limits_list_is_incomplete = True
+        except Exception as e:
+            log.debug("Exception was thrown while retreiving the min and max" +
+                      " values of a parameter '" + name + "' from the ddm." +
+                      "(%s)", str(e))
 
     #################
     # Get Data
@@ -1042,3 +898,168 @@ class DDMq(SCPI):
             'ch_pair1_weight{}_rotmat_rotmat00'.format(weight_function_Q), 1)
         self.set(
             'ch_pair1_weight{}_rotmat_rotmat01'.format(weight_function_Q), 0)
+
+    def _read_parameter_limits(self):
+        path = os.path.abspath(__file__)
+        dir_path = os.path.dirname(path)
+        parameters_folder_path = os.path.join(dir_path,
+                                              'QuTech_DDM_Parameter_Files')
+
+        path = os.path.join(parameters_folder_path,
+                            'QuTech_DDM_Parameter_Limits.txt')
+        try:
+            file = open(path)
+            file_content = json.loads(file.read())
+            self.ranges_file_version = file_content["version"][
+                "ddm_software_version"]
+        except Exception as e:
+            log.warning("failed to open the " + path + ".(%s)", str(e))
+
+        if (self.ddm_software_version == self.ranges_file_version):
+            results = file_content["parameters"]
+            self.parameter_limits_list_is_incomplete = False
+        else:
+            results = {}
+
+        return results
+
+    def _read_ddm_parameters(self):
+        path = os.path.abspath(__file__)
+        dir_path = os.path.dirname(path)
+        parameters_folder_path = os.path.join(dir_path,
+                                              'QuTech_DDM_Parameter_Files')
+
+        # Open the file and read the version number
+        self._s_file_name = os.path.join(
+            parameters_folder_path, 'QuTech_DDM_Parameters.txt')
+        try:
+            file = open(self._s_file_name)
+            file_content = json.loads(file.read())
+            self.parameter_file_version = file_content["version"]["software"]
+        except Exception as e:
+            log.warning("parameter file for gettable parameters {} not" +
+                        " found".format(self._s_file_name) + ".(%s)", str(e))
+            try:
+                if not os.path.exists(parameters_folder_path):
+                    os.makedirs(parameters_folder_path)
+            except:
+                pass
+
+        if (self.ddm_software_version == self.parameter_file_version):
+            # Return the parameter list given by the txt file
+            results = file_content["parameters"]
+        else:
+            # Update the parameter list to the data that is given by the ddm
+            parameters_str = self.ask('qutech:parameters?')
+            parameters_str = parameters_str.replace('\t', '\n')
+            try:
+                file = open(self._s_file_name, 'w')
+                file.write(parameters_str)
+            except Exception as e:
+                log.warning("failed to write update the parameters in the" +
+                            " parameter file" + ".(%s)", str(e))
+            results = json.loads(parameters_str)["parameters"]
+        return results
+
+    def _store_parameter_limits(self):
+        path = os.path.abspath(__file__)
+        dir_path = os.path.dirname(path)
+        parameters_folder_path = os.path.join(dir_path,
+                                              'QuTech_DDM_Parameter_Files')
+
+        self.ranges_file_name = os.path.join(parameters_folder_path,
+                                            'QuTech_DDM_Parameter_Limits.txt')
+        version = {}
+        version["ddm_software_version"] = self.ddm_software_version
+        file_content = {}
+        file_content["version"] = version
+        file_content["parameters"] = self.list_of_parameter_limits
+        file = open(self.ranges_file_name, 'w')
+        json.dump(file_content, file,  indent=2)
+
+
+    #################
+    # Error handling
+    #################
+
+    class Error(object):
+
+        def __init__(self, errorCode, description, logLevel, acquisitionMode):
+            self.errorCode = errorCode
+            self.description = description
+            self.logLevel = logLevel
+            self.acquisitionMode = acquisitionMode
+
+        def __repr__(self):
+            level = ""
+            if (self.logLevel >= logging.CRITICAL):
+                level = "critical"
+            elif (self.logLevel >= logging.ERROR):
+                level = "error"
+            elif (self.logLevel >= logging.WARNING):
+                level = "warning"
+            return level + ": " + self.description + "(" +\
+                self.acquisitionMode + ")"
+
+        def log(self):
+            if (self.logLevel >= logging.CRITICAL):
+                log.critical(self)
+            elif (self.logLevel >= logging.ERROR):
+                log.error(self)
+            elif (self.logLevel >= logging.WARNING):
+                log.warning(self)
+
+    def _displayErrors(self, errors):
+        for i in range(0, len(errors)):
+            if (errors[i].logLevel >= self.exceptionLevel):
+                raise Exception(errors[i])
+            else:
+                errors[i].log()
+
+    def _parseErrorList(self, acquisitionMode, errorList):
+        errors = []
+
+        start = 0
+        end = -1
+        looping = True
+
+        while (looping):
+            start = end + 1
+            end = errorList.find(',\"', start)
+            errorCode = int(float(errorList[start:end]))
+
+            start = end + 2
+            end = errorList.find("\",", start)
+            description = errorList[start:end]
+
+            start = end + 2
+            end = errorList.find(',', start)
+            if (end < 0):
+                end = len(errorList)
+                looping = False
+            errorLevel = int(errorList[start:end])
+            if (errorCode):
+                errors.append(self.Error(errorCode, description,
+                                         errorLevel, acquisitionMode))
+        return errors
+
+    def _getInAvgErrors(self, acquisitionMode, ch):
+        return self._parseErrorList(acquisitionMode, self.ask(
+            'qutech:channel{:d}:errors?'.format(ch))
+        )
+
+    def _getErrors(self, acquisitionMode, ch_pair, wNr):
+        return self._parseErrorList(acquisitionMode, self.ask(
+            'qutech:ADC{:d}:errors{:d}?'.format(ch_pair, wNr))
+        )
+
+    def _displayInAvgErrors(self, acquisitionMode, ch):
+        self._displayErrors(self._getInAvgErrors(acquisitionMode, ch))
+
+    def _displayQBitErrors(self, acquisitionMode, ch_pair, wNr):
+        self._displayErrors(self._getErrors(acquisitionMode, ch_pair, wNr))
+
+    # From this logging level, a message will cause and exceptions instead of
+    # a log message
+    def setExceptionLevel(self, level):
+        self.exceptionLevel = level
