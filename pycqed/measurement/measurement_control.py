@@ -113,6 +113,7 @@ class MeasurementControl(Instrument):
         self.print_measurement_start_msg()
         self.mode = mode
         self.iteration = 0  # used in determining data writing indices
+        return_dict = {}
         with h5d.Data(name=self.get_measurement_name()) as self.data_object:
             self.get_measurement_begintime()
             # Commented out because requires git shell interaction from python
@@ -139,8 +140,11 @@ class MeasurementControl(Instrument):
                 raise ValueError('mode %s not recognized' % self.mode)
             result = self.dset[()]
             self.save_MC_metadata(self.data_object)  # timing labels etc
+            return_dict = self.create_experiment_result_dict()
+
         self.finish(result)
-        return result
+        # return self.data_object
+        return return_dict
 
     def measure(self, *kw):
         if self.live_plot_enabled():
@@ -493,7 +497,7 @@ class MeasurementControl(Instrument):
         if self.main_QtPlot.traces != []:
             self.main_QtPlot.clear()
         self.curves = []
-        xlabels= self.sweep_par_names
+        xlabels = self.sweep_par_names
         xunits = self.sweep_par_units
         ylabels = self.detector_function.value_names
         yunits = self.detector_function.value_units
@@ -521,7 +525,7 @@ class MeasurementControl(Instrument):
                                      ylabel=ylab,
                                      yunit=yunits[yi],
                                      subplot=j+1,
-                                     color=color_cycle[j%len(color_cycle)],
+                                     color=color_cycle[j % len(color_cycle)],
                                      symbol='o', symbolSize=5)
                 self.curves.append(self.main_QtPlot.traces[-1])
                 j += 1
@@ -540,7 +544,7 @@ class MeasurementControl(Instrument):
                 time_since_last_mon_update = 1e9
             try:
                 if (time_since_last_mon_update > self.plotting_interval() or
-                        force_update) :
+                        force_update):
 
                     nr_sweep_funcs = len(self.sweep_function_names)
                     for y_ind in range(len(self.detector_function.value_names)):
@@ -571,20 +575,20 @@ class MeasurementControl(Instrument):
                 [n, m, len(self.detector_function.value_names)])
             self.TwoD_array[:] = np.NAN
             self.secondary_QtPlot.clear()
-            slabels= self.sweep_par_names
+            slabels = self.sweep_par_names
             sunits = self.sweep_par_units
             zlabels = self.detector_function.value_names
             zunits = self.detector_function.value_units
 
             for j in range(len(self.detector_function.value_names)):
                 self.secondary_QtPlot.add(x=self.sweep_pts_x,
-                                   y=self.sweep_pts_y,
-                                   z=self.TwoD_array[:, :, j],
-                                   xlabel=slabels[0], xunit=sunits[0],
-                                   ylabel=sunits[1], yunit=sunits[1],
-                                   zlabel=zlabels[j], zunit=zunits[j],
-                                   subplot=j+1,
-                                   cmap='viridis')
+                                          y=self.sweep_pts_y,
+                                          z=self.TwoD_array[:, :, j],
+                                          xlabel=slabels[0], xunit=sunits[0],
+                                          ylabel=sunits[1], yunit=sunits[1],
+                                          zlabel=zlabels[j], zunit=zunits[j],
+                                          subplot=j+1,
+                                          cmap='viridis')
 
     def update_plotmon_2D(self, force_update=False):
         '''
@@ -599,7 +603,8 @@ class MeasurementControl(Instrument):
                 for j in range(len(self.detector_function.value_names)):
                     z_ind = len(self.sweep_functions) + j
                     self.TwoD_array[y_ind, x_ind, j] = self.dset[i, z_ind]
-                self.secondary_QtPlot.traces[j]['config']['z'] = self.TwoD_array[:, :, j]
+                self.secondary_QtPlot.traces[j]['config'][
+                    'z'] = self.TwoD_array[:, :, j]
                 if (time.time() - self.time_last_2Dplot_update >
                         self.plotting_interval()
                         or self.iteration == len(self.sweep_points)):
@@ -615,19 +620,19 @@ class MeasurementControl(Instrument):
         self.time_last_ad_plot_update = time.time()
         self.secondary_QtPlot.clear()
 
-        slabels= self.sweep_par_names
+        slabels = self.sweep_par_names
         sunits = self.sweep_par_units
         zlabels = self.detector_function.value_names
         zunits = self.detector_function.value_units
 
         for j in range(len(self.detector_function.value_names)):
             self.secondary_QtPlot.add(x=[0],
-                               y=[0],
-                               xlabel='iteration',
-                               ylabel=zlabels[j],
-                               yunit=zunits[j],
-                               subplot=j+1,
-                               symbol='o', symbolSize=5)
+                                      y=[0],
+                                      xlabel='iteration',
+                                      ylabel=zlabels[j],
+                                      yunit=zunits[j],
+                                      subplot=j+1,
+                                      symbol='o', symbolSize=5)
 
     def update_plotmon_adaptive(self, force_update=False):
         if self.live_plot_enabled():
@@ -668,7 +673,7 @@ class MeasurementControl(Instrument):
                     self.time_last_2Dplot_update = time.time()
                     self.secondary_QtPlot.update_plot()
         except Exception as e:
-                logging.warning(e)
+            logging.warning(e)
 
     def _set_plotting_interval(self, plotting_interval):
         self.main_QtPlot.interval = plotting_interval
@@ -712,8 +717,8 @@ class MeasurementControl(Instrument):
             self.sweep_par_units.append(sweep_function.unit)
 
         for i, val_name in enumerate(self.detector_function.value_names):
-            self.column_names.append(val_name+' (' +
-                                     self.detector_function.value_units[i] + ')')
+            self.column_names.append(
+                val_name+' (' + self.detector_function.value_units[i] + ')')
         return self.column_names
 
     def create_experimentaldata_dataset(self):
@@ -736,6 +741,21 @@ class MeasurementControl(Instrument):
             self.detector_function.value_names)
         data_group.attrs['value_units'] = h5d.encode_to_utf8(
             self.detector_function.value_units)
+
+    def create_experiment_result_dict(self):
+        data_object = self.data_object["Experimental Data"]
+        sweep_parameter_names = data_object.attrs["sweep_parameter_names"]
+        sweep_parameter_units = data_object.attrs['sweep_parameter_units']
+        value_names = data_object.attrs["value_names"]
+        value_units = data_object.attrs['value_units']
+        result_dict = {
+            "dset": self.dset[()],
+            "sweep_parameter_names": sweep_parameter_names,
+            "sweep_parameter_units": sweep_parameter_units,
+            "value_names": value_names,
+            "value_units": value_units
+        }
+        return result_dict
 
     def save_optimization_settings(self):
         '''
