@@ -8,11 +8,13 @@ import pycqed as pq
 from io import StringIO
 from unittest import TestCase
 from pycqed.instrument_drivers.physical_instruments._controlbox import qasm_compiler as qc
+from pycqed.instrument_drivers.physical_instruments._controlbox.Assembler \
+    import Assembler
 from os.path import join, dirname
 from copy import deepcopy
 
 
-class Test_single_qubit_seqs(TestCase):
+class Test_compiler(TestCase):
 
     @classmethod
     def setUpClass(self):
@@ -21,11 +23,20 @@ class Test_single_qubit_seqs(TestCase):
         self.config_fn = join(self.test_file_dir, 'config.json')
 
     def test_compiler_example(self):
-            qasm_fn = join(self.test_file_dir, 'dev_test.qasm')
-            qumis_fn = join(self.test_file_dir, "output.qumis")
-            compiler = qc.QASM_QuMIS_Compiler(self.config_fn,
-                                              verbosity_level=6)
-            compiler.compile(qasm_fn, qumis_fn)
+        qasm_fn = join(self.test_file_dir, 'dev_test.qasm')
+        qumis_fn = join(self.test_file_dir, "output.qumis")
+        compiler = qc.QASM_QuMIS_Compiler(self.config_fn,
+                                          verbosity_level=0)
+        compiler.compile(qasm_fn, qumis_fn)
+        qumis = compiler.qumis_instructions
+        m = open(compiler.qumis_fn).read()
+        qumis_from_file = m.splitlines()
+        self.assertEqual(qumis, qumis_from_file)
+
+        # finally test that it can be converted into valid instructions
+        asm = Assembler(qumis_fn)
+        instructions = asm.convert_to_instructions()
+
 
     def test_methods_of_compiler(self):
         compiler = qc.QASM_QuMIS_Compiler()
@@ -40,17 +51,17 @@ class Test_single_qubit_seqs(TestCase):
                             'print_timing_grid'}
         self.assertTrue(printing_methods.issubset(c_methods))
 
+    def test_loading_config(self):
+        with Capturing() as output:
+            compiler = qc.QASM_QuMIS_Compiler()
 
-    # def test_set_config(self):
-        # config_fn = r"D:\GitHub\PycQED_py3\pycqed\instrument_drivers\physical_instruments\_controlbox\config.json"
-        # compiler = qc.QASM_QuMIS_Compiler(config_fn, 6)
+        self.assertIn(
+            'Configuration not specified. Default configuration file instrument_drivers\physical_instruments\_controlbox\config.json used.', output)
+        self.assertNotEqual(compiler.config_filename, self.config_fn)
+        compiler.load_config(self.config_fn)
+        self.assertEqual(compiler.config_filename, self.config_fn)
 
-    # def test_example_compilation(self):
-    #     config_fn = r"D:\GitHub\PycQED_py3\pycqed\instrument_drivers\physical_instruments\_controlbox\config.json"
-    #     qasm_fn = r"D:/Github/PycQED_py3/pycqed/tests/test_data/qasm_test/dev_test.qasm"
-    #     qumis_fn = "output.qumis"
-    #     compiler = qc.QASM_QuMIS_Compiler(config_fn, 6)
-    #     compiler.compile(qasm_fn, qumis_fn)
+
 
 
 def valid_operation_dictionary(operation_dict):

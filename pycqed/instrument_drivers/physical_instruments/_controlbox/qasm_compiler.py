@@ -275,7 +275,7 @@ class QASM_QuMIS_Compiler():
             self.config_filename = os.path.join(
                 pq.__path__[0], 'instrument_drivers', 'physical_instruments',
                 "_controlbox", "config.json")
-            print("Configuration not specified."
+            print("Configuration not specified. "
                   "Default configuration file instrument_drivers\\"
                   "physical_instruments\\_controlbox\\config.json used.")
         else:
@@ -1073,7 +1073,8 @@ class QASM_QuMIS_Compiler():
                             new_tp_list, absolute_time, hw_event)
 
         self.hw_timing_grid = new_tp_list
-        self.print_hw_timing_grid()
+        if self.verbosity_level > 4:
+            self.print_hw_timing_grid()
 
     def compensate_minus_time(self):
         if len(self.hw_timing_grid) == 0:
