@@ -744,7 +744,7 @@ class MeasurementControl(Instrument):
             'Data', (0, len(self.sweep_functions) +
                      len(self.detector_function.value_names)),
             maxshape=(None, len(self.sweep_functions) +
-                      len(self.detector_function.value_names)))
+                      len(self.detector_function.value_names)), dtype='float64')
         self.get_column_names()
         self.dset.attrs['column_names'] = h5d.encode_to_utf8(self.column_names)
         # Added to tell analysis how to extract the data
