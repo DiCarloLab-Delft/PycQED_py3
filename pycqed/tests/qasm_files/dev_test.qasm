@@ -13,7 +13,7 @@ I 100  # ns
 CZ q0, q1
 mY90 q1
 Measure q0 | Measure q1
-my180 q1
+y180 q1
 
 
 

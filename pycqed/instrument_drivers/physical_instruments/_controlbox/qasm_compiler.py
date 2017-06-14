@@ -546,7 +546,7 @@ class QASM_QuMIS_Compiler():
 
     def print_timing_grid(self):
 
-        print("Timing gird:")
+        print("Timing grid:")
         if len(self.timing_grid) == 0:
             print("Empty timing grid.")
             return
@@ -792,7 +792,7 @@ class QASM_QuMIS_Compiler():
     def assign_timing_to_events(self):
         '''
         Resolve qubit name and map declared qubits into physical qubits.
-        Arrange all operations into a timing gird.
+        Arrange all operations into a timing grid.
         '''
         self.timing_grid = []
 

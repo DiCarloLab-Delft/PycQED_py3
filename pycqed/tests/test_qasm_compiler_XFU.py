@@ -77,17 +77,67 @@ class Test_compiler(unittest.TestCase):
                                 'x90',
                                 'y180',
                                 'y90',
-                                'mx180',
                                 'mx90',
-                                'my180',
                                 'my90'}
         self.assertEqual(
             set(compiler.luts[0].keys()), allowed_single_q_ops)  # MW and Flux
 
-    def test_converting_to_qumis(self):
-        pass
+    @unittest.expectedFailure
+    def test_converting_CBox_pulses_to_qumis(self):
 
+        qasm_fn = join(self.test_file_dir, 'single_op.qasm')
+        qumis_fn = join(self.test_file_dir, "output.qumis")
+        compiler = qc.QASM_QuMIS_Compiler(self.config_fn,
+                                          verbosity_level=6)
+        compiler.compile(qasm_fn, qumis_fn)
+        qumis = compiler.qumis_instructions
+        x180_q0 = qumis[3]
+        y180_q0 = qumis[5]
+        x90_q0 = qumis[7]
+        y90_q0 = qumis[9]
+        mx90_q0 = qumis[11]
+        my90_q0 = qumis[13]
 
+        self.assertEqual(x180_q0, 'pulse 0000, 0000, 1001')
+        self.assertEqual(y180_q0, 'pulse 0000, 0000, 1010')
+        self.assertEqual(x90_q0, 'pulse 0000, 0000, 1011')
+        self.assertEqual(y90_q0, 'pulse 0000, 0000, 1100')
+        self.assertEqual(mx90_q0, 'pulse 0000, 0000, 1101')
+        self.assertEqual(my90_q0, 'pulse 0000, 0000, 1110')
+
+    @unittest.expectedFailure
+    def test_converting_triggers_to_qumis(self):
+        qasm_fn = join(self.test_file_dir, 'single_op.qasm')
+        qumis_fn = join(self.test_file_dir, "output.qumis")
+        compiler = qc.QASM_QuMIS_Compiler(self.config_fn,
+                                          verbosity_level=6)
+        compiler.compile(qasm_fn, qumis_fn)
+        qumis = compiler.qumis_instructions
+
+        x180_q1 = [qumis[15], qumis[17]]
+        y180_q1 = [qumis[19], qumis[21]]
+        x90_q1 = [qumis[23], qumis[25]]
+        y90_q1 = [qumis[27], qumis[29]]
+        mx90_q1 = [qumis[31], qumis[33]]
+        my90_q1 = [qumis[35], qumis[37]]
+
+        self.assertEqual(x180_q1[0], 'trigger 0100000, 1')
+        self.assertEqual(x180_q1[1], 'trigger 1100000, 2')
+
+        self.assertEqual(y180_q1[0], 'trigger 0010000, 1')
+        self.assertEqual(y180_q1[1], 'trigger 1010000, 2')
+
+        self.assertEqual(x90_q1[0], 'trigger 0110000, 1')
+        self.assertEqual(x90_q1[1], 'trigger 1110000, 2')
+
+        self.assertEqual(y90_q1[0], 'trigger 0001000, 1')
+        self.assertEqual(y90_q1[1], 'trigger 1001000, 2')
+
+        self.assertEqual(mx90_q1[0], 'trigger 0101000, 1')
+        self.assertEqual(mx90_q1[1], 'trigger 1101000, 2')
+
+        self.assertEqual(my90_q1[0], 'trigger 0011000, 1')
+        self.assertEqual(my90_q1[1], 'trigger 1011000, 2')
 
 
 class Test_single_qubit_seqs(unittest.TestCase):
