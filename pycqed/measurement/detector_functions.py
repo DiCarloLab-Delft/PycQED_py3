@@ -1251,13 +1251,6 @@ class UHFQC_input_average_detector(Hard_Detector):
 
     '''
 
-    '''
-    Detector used for acquiring single points of the CBox while externally
-    triggered by the AWG.
-    Soft version of the regular integrated avg detector.
-
-    Has two acq_modes, 'IQ' and 'AmpPhase'
-    '''
 
     def __init__(self, UHFQC, AWG=None, channels=(0, 1),
                  nr_averages=1024, nr_samples=4096, **kw):
@@ -1303,6 +1296,37 @@ class UHFQC_input_average_detector(Hard_Detector):
     def finish(self):
         if self.AWG is not None:
             self.AWG.stop()
+
+
+class UHFQC_demodulated_input_avg_det(UHFQC_input_average_detector):
+    '''
+    Detector used for acquiring averaged input traces withe the UHFQC.
+    Additionally trace are demoulated.
+    '''
+    def __init__(self, f_RO_mod, UHFQC,
+                 real_imag=True, AWG=None, channels=(0, 1),
+                 nr_averages=1024, nr_samples=4096, **kw):
+        super().__init__(UHFQC=UHFQC, AWG=AWG, channels=channels,
+                         nr_averages=nr_averages, nr_samples=nr_samples, **kw)
+        self.f_mod = f_RO_mod
+        self.real_imag = real_imag
+
+    def get_values(self):
+        data = super().get_values()
+        timePts = np.arange(len(data[0])) / 1.8e9
+        data_I_demod = (np.array(data[0]) * np.cos(2*np.pi*timePts*self.f_mod) -
+                        np.array(data[1]) * np.sin(2*np.pi*timePts*self.f_mod))
+        data_Q_demod = (np.array(data[0]) * np.sin(2*np.pi*timePts*self.f_mod) +
+                        np.array(data[1]) * np.cos(2*np.pi*timePts*self.f_mod))
+        ret_data = np.array([data_I_demod, data_Q_demod])
+
+        if not self.real_imag:
+            S21 = data[0] + 1j*data[1]
+            amp = np.abs(S21)
+            phase = np.angle(S21) / (2*np.pi) * 360
+            ret_data = np.array([amp, phase])
+
+        return ret_data
 
 
 class UHFQC_integrated_average_detector(Hard_Detector):
