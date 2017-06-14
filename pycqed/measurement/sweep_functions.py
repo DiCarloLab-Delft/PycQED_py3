@@ -27,6 +27,15 @@ class Sweep_function(object):
     def finish(self, **kw):
         pass
 
+    # note that set_paramter is only actively used in soft sweeps.
+    # it is added here so that performing a "hard 2D" experiment
+    # (see tests for MC) the missing set_parameter in the hard sweep does not
+    # lead to unwanted errors
+    def set_parameter(self, val):
+        '''
+        Set the parameter(s) to be sweeped. Differs per sweep function
+        '''
+        pass
 
 class Soft_Sweep(Sweep_function):
 
@@ -34,11 +43,6 @@ class Soft_Sweep(Sweep_function):
         self.set_kw()
         self.sweep_control = 'soft'
 
-    def set_parameter(self, val):
-        '''
-        Set the parameter(s) to be sweeped. Differs per sweep function
-        '''
-        pass
 ##############################################################################
 
 
@@ -63,7 +67,7 @@ class Heterodyne_Frequency_Sweep(Soft_Sweep):
             self.RF_source = RF_source
 
     def set_parameter(self, val):
-        # RF + IF = LO
+        # RF = LO + IF
         self.LO_source.frequency(val-self.IF)
         if 'gated' in self.RO_pulse_type.lower():
             self.RF_source.frequency(val)
