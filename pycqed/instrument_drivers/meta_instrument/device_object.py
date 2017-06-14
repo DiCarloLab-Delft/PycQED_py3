@@ -128,7 +128,8 @@ class TwoQubitDevice(DeviceObject):
             docstring=('Frequency of the common LO for all RO pulses.'),
             parameter_class=ManualParameter)
 
-    def calibrate_mux_RO(self, calibrate_optimal_weights=True):
+    def calibrate_mux_RO(self, calibrate_optimal_weights=True,
+                         verify_optimal_weights=False):
 
         RO_LMM = self.RO_LutManMan.get_instr()
         UHFQC = self.acquisition_instrument.get_instr()
@@ -137,6 +138,8 @@ class TwoQubitDevice(DeviceObject):
         q1 = self.find_instrument(self.qubits()[1])
 
 
+        if q0.RO_acq_weight_function_I() == q1.RO_acq_weight_function_I():
+            raise ValueError('Cannot use same weight for both qubits')
         # Set the modulation frequencies so that the LO's match
         q0.f_RO_mod(q0.f_RO() - self.RO_LO_freq())
         q1.f_RO_mod(q1.f_RO() - self.RO_LO_freq())
@@ -155,13 +158,16 @@ class TwoQubitDevice(DeviceObject):
         RO_LMM.generate_multiplexed_pulse(multiplexed_wave)
         RO_LMM.load_pulse_onto_AWG_lookuptable('Multiplexed_pulse')
 
-        if calibrate_optimal_weights:
-            q0.calibrate_optimal_weights(analyze=True, verify=False)
-            q1.calibrate_optimal_weights(analyze=True, verify=False)
-
+        # Important that this happens before calibrating the weights
         UHFQC.quex_trans_offset_weightfunction_0(0)
         UHFQC.quex_trans_offset_weightfunction_1(0)
         UHFQC.upload_transformation_matrix([[1, 0], [0, 1]])
+
+        if calibrate_optimal_weights:
+            q0.calibrate_optimal_weights(
+                analyze=True, verify=verify_optimal_weights)
+            q1.calibrate_optimal_weights(
+                analyze=True, verify=verify_optimal_weights)
 
         mqmc.measure_two_qubit_ssro(self, q0.name, q1.name, no_scaling=True,
                                    result_logging_mode='lin_trans')

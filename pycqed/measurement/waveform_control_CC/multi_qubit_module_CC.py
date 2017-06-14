@@ -78,7 +78,7 @@ def measure_two_qubit_ssro(device, q0_name, q1_name, nr_shots=4092*4,
         integration_length=q0.RO_acq_integration_length(),
         result_logging_mode=result_logging_mode,
         channels=[q0.RO_acq_weight_function_I(),
-                  q1.RO_acq_weight_function_I(), 2])
+                  q1.RO_acq_weight_function_I()])
     if no_scaling:
         d.scaling_factor = 1
 
