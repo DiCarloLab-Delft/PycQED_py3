@@ -524,10 +524,11 @@ def chevron_block_seq(q0_name, q1_name, no_of_points,
 
     if cal_points:
         # Add calibration pulses
-        cal_points = [['I {} 8\n'.format(q0), 'I {} 8\n'.format(q1)],
-                      ['X180 {}\n'.format(q0), 'I {} 8\n'.format(q1)],
-                      ['I {} 8\n'.format(q0), 'X180 {}\n'.format(q1)],
-                      ['X180 {}\n'.format(q0), 'X180 {}\n'.format(q1)]]
+        cal_points = [
+            ['I {} 8\n'.format(q0_name), 'I {} 8\n'.format(q1_name)],
+            ['X180 {}\n'.format(q0_name), 'I {} 8\n'.format(q1_name)],
+            ['I {} 8\n'.format(q0_name), 'X180 {}\n'.format(q1_name)],
+            ['X180 {}\n'.format(q0_name), 'X180 {}\n'.format(q1_name)]]
         cal_pulses = []
         for seq in cal_points:
             cal_pulses += [[seq[0], seq[1], 'RO ' + RO_target + '\n']]
