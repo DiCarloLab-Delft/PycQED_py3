@@ -1,4 +1,5 @@
 {
+    "qubit_map": {"q0":0, "q1":1},
     "operation dictionary":{
 
         "x180" : {
