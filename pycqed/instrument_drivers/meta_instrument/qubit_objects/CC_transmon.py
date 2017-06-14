@@ -64,6 +64,11 @@ class CBox_v3_driven_transmon(Transmon):
                            docstring='Lookuptable manager responsible for '
                            'microwave RO pulses',
                            parameter_class=InstrumentParameter)
+        self.add_parameter('flux_LutMan',
+                           docstring='Lookuptable manager responsible for '
+                                     'flux pulses.',
+                           initial_value=None,
+                           parameter_class=InstrumentParameter)
         self.add_parameter('CBox', parameter_class=InstrumentParameter)
         self.add_parameter('MC', parameter_class=InstrumentParameter)
         self.add_parameter('RF_RO_source',
@@ -267,6 +272,7 @@ class CBox_v3_driven_transmon(Transmon):
                            label='Optimized weights for Q channel',
                            parameter_class=ManualParameter)
 
+
     def prepare_for_continuous_wave(self):
         self.prepare_readout()
 
@@ -456,6 +462,19 @@ class CBox_v3_driven_transmon(Transmon):
         # Print this should be deleted
 
         self.Q_LutMan.get_instr().load_pulses_onto_AWG_lookuptable()
+
+    def prepare_for_fluxing(self):
+        '''
+        Genereates flux pulses, loads the to the QWG, and sets the QWG mode.
+        '''
+        f_lutman = self.flux_LutMan.get_instr()
+        QWG = f_lutman.QWG.get_instr()
+
+
+
+        QWG.stop()
+        f_lutman.load_pulses_onto_AWG_lookuptable()
+        QWG.start()
 
     def _get_acquisition_instr(self):
         return self._acquisition_instrument.name
@@ -785,7 +804,6 @@ class CBox_v3_driven_transmon(Transmon):
         CW_RO_sequence_asm = qta.qasm_to_asm(CW_RO_sequence.name,
                                              self.get_operation_dict())
         qumis_file = CW_RO_sequence_asm
-        print(qumis_file.name)
         self.CBox.get_instr().load_instructions(qumis_file.name)
         self.CBox.get_instr().run_mode('run')
 
@@ -1119,6 +1137,10 @@ class CBox_v3_driven_transmon(Transmon):
     def measure_ramsey(self, times=None, artificial_detuning=None, f_qubit=None,
                        label='',
                        MC=None, analyze=True, close_fig=True, verbose=True):
+        """
+        N.B. if the artificial detuning is None it will auto set it such that
+        3 oscillations will show.
+        """
         if times == None:
             # funny default is because CBox has no real time sideband
             # modulation
@@ -1258,7 +1280,7 @@ class CBox_v3_driven_transmon(Transmon):
     def measure_ssro(self, no_fits=False,
                      return_detector=False,
                      MC=None, nr_shots=1024*24,
-                     analyze=True, close_fig=True, verbose=True):
+                     analyze=True, verbose=True):
         # No fancy SSRO detector here @Niels, this may be something for you
 
         self.prepare_for_timedomain()
@@ -1283,7 +1305,7 @@ class CBox_v3_driven_transmon(Transmon):
         if analyze:
             a = ma.SSRO_Analysis(label='SSRO'+self.msmt_suffix,
                                  channels=d.value_names,
-                                 no_fits=no_fits, close_fig=close_fig)
+                                 no_fits=no_fits)
             if verbose:
                 print('Avg. Assignement fidelity: \t{:.4f}\n'.format(a.F_a) +
                       'Avg. Discrimination fidelity: \t{:.4f}'.format(a.F_d))
@@ -1438,6 +1460,54 @@ class CBox_v3_driven_transmon(Transmon):
         # if analyze:
         #     ma.MeasurementAnalysis(close_fig=close_fig)
 
+    def measure_flux_timing(self, taus, MC=None, wait_between=220e-9):
+        '''
+        Measure timing of the flux pulse relative to microwave pulses.
+        The sequence of the experiment is
+            trigger flux pulse -- tau -- X90 -- wait_between -- X90 -- RO
+        where tau is the sweep parameter.
+
+        Note: wait_between should be a integer multiple of the mw pulse
+        modulation frequency!
+
+        Args:
+            taus (array of floats):
+                    The delays between the flux pulse trigger and the first
+                    microwave pulse.
+            MC (instr):
+                    Measurement Control instrument.
+            wait_between (float):
+                    The delay between the two pi-half pulses.
+
+        At large tau we expect to measure the qubit in the |1> state (flux pulse
+        before both mw pulses).
+        When the flux pulse overlaps with one of the mw pulses we expect to
+        measure the qubit in a equal superposition of |0> and |1> (assuming flux
+        pulse amplitude is large enough s.t. mw is not resonant with qubit
+        anymore).
+        When the flux pulse is fully between the mw pulses we expect to measure
+        a constant |1> population which depends on the area of the flux pulse.
+        '''
+        self.prepare_for_timedomain()
+        self.prepare_for_fluxing()
+
+        if MC is None:
+            MC = self.MC.get_instr('MC')
+
+        qasm_file = sqqs.flux_timing_seq(self.name, taus,
+                                         wait_between=wait_between)
+
+        MC.set_sweep_function(swf.QASM_Sweep(
+            filename=qasm_file.name, CBox=self.CBox.get_instr(),
+            op_dict=self.get_operation_dict(),
+            parameter_name='tau', unit='s'))
+        MC.set_sweep_points(taus)
+
+        MC.set_detector_function(self.int_avg_det)
+        MC.run('flux_timing')
+
+        ma.MeasurementAnalysis(label='flux_timing')
+
     def get_operation_dict(self, operation_dict={}):
 
         pulse_period_clocks = convert_to_clocks(
@@ -1450,6 +1520,7 @@ class CBox_v3_driven_transmon(Transmon):
         operation_dict['init_all'] = {'instruction':
                                       '\nWaitReg r0 \nWaitReg r0 \n'}
 
+        # MW control pulses
         for cw_idx, pulse_name in enumerate(
                 self.Q_LutMan.get_instr().lut_mapping()[:-1]):
 
@@ -1463,6 +1534,17 @@ class CBox_v3_driven_transmon(Transmon):
         operation_dict['I {}'.format(self.name)] = {
             'duration': pulse_period_clocks, 'instruction': 'wait {} \n'}
 
+        # Flux pulses
+        if self.flux_LutMan() is not None:
+            f_lutman = self.flux_LutMan.get_instr()
+            for pulse_name, codeword in f_lutman.codeword_dict().items():
+                operation_dict['flux {} {}'.format(pulse_name, self.name)] = {
+                    'duration': 10,
+                    'instruction': ins_lib.qwg_cw_trigger(
+                        codeword, cw_channels=f_lutman.codeword_channels())
+                }
+
+        # Spectroscopy pulses
         spec_length_clocks = convert_to_clocks(
             self.spec_pulse_length())
         if self.spec_pulse_type() == 'gated':
@@ -1478,6 +1560,7 @@ class CBox_v3_driven_transmon(Transmon):
         else:
             raise NotImplementedError
 
+        # Readout pulse
         if 'CBox' in self.acquisition_instrument():
             if self.RO_pulse_type() == 'IQmod_CBox':
                 # operation_dict['RO {}'.format(self.name)] = {
