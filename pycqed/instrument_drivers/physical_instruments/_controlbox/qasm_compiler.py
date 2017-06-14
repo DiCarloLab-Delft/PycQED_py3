@@ -271,6 +271,8 @@ class QASM_QuMIS_Compiler():
         self.channel_latency_compensated = False
         self.qubit_map_from_config = False
 
+        self.infinit_loop_qumis = True
+
         if config_filename is None:
             self.config_filename = os.path.join(
                 pq.__path__[0], 'instrument_drivers', 'physical_instruments',
@@ -1283,6 +1285,11 @@ class QASM_QuMIS_Compiler():
            measure
         '''
         self.qumis_instructions = []
+        if self.infinit_loop_qumis:
+            reps = ('mov r14, 0 \t# r14 stores number ' +
+                    'of repetitions, 0 is infinite')
+            self.qumis_instructions.append(reps)
+            self.qumis_instructions.append('Exp_Start: ')
         previous_time = 0
         for tp in self.hw_timing_grid:
             pre_waiting_time = tp.absolute_time - previous_time
@@ -1321,6 +1328,9 @@ class QASM_QuMIS_Compiler():
         if self.qumis_instructions[0][:4] != "wait":
             print("Instruction 'Wait 1' automatically added at the beginning.")
             self.qumis_instructions.insert(0, "wait 1")
+        if self.infinit_loop_qumis:
+            jump_to_start = "beq r14, r14, Exp_Start \t# Infinite loop"
+            self.qumis_instructions.append(jump_to_start)
 
         qumis_file = open(self.qumis_fn, "w")
         for qi in self.qumis_instructions:

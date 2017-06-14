@@ -24,20 +24,25 @@ class Test_compiler(unittest.TestCase):
             pq.__path__[0], 'tests', 'qasm_files')
         self.config_fn = join(self.test_file_dir, 'config.json')
 
+        self.jump_to_start = "beq r14, r14, Exp_Start \t# Infinite loop"
+
     def test_compiler_example(self):
         qasm_fn = join(self.test_file_dir, 'dev_test.qasm')
         qumis_fn = join(self.test_file_dir, "output.qumis")
         compiler = qc.QASM_QuMIS_Compiler(self.config_fn,
-                                          verbosity_level=6)
+                                          verbosity_level=0)
         compiler.compile(qasm_fn, qumis_fn)
         qumis = compiler.qumis_instructions
         m = open(compiler.qumis_fn).read()
         qumis_from_file = m.splitlines()
         self.assertEqual(qumis, qumis_from_file)
-
         # finally test that it can be converted into valid instructions
         asm = Assembler(qumis_fn)
         instructions = asm.convert_to_instructions()
+        print(compiler.qumis_instructions)
+        self.assertEqual(compiler.qumis_instructions[2], 'Exp_Start: ')
+        self.assertEqual(compiler.qumis_instructions[-1], self.jump_to_start)
+
 
     def test_methods_of_compiler(self):
         compiler = qc.QASM_QuMIS_Compiler()
@@ -90,6 +95,9 @@ class Test_single_qubit_seqs(unittest.TestCase):
             pq.__path__[0], 'tests', 'qasm_files')
         self.config_fn = join(self.test_file_dir, 'config.json')
         self.qubit_name = 'q0'
+        self.jump_to_start = "beq r14, r14, Exp_Start \t# Infinite loop"
+
+
     @unittest.skip('no identity')
     def test_qasm_seq_T1(self):
         times = np.linspace(20e-9, 50e-6, 61)
@@ -103,14 +111,20 @@ class Test_single_qubit_seqs(unittest.TestCase):
         instructions = asm.convert_to_instructions()
 
     def test_qasm_seq_allxy(self):
-        qasm_file = sq_qasm.AllXY(self.qubit_name)
-        qasm_fn = qasm_file.name
-        qumis_fn = join(self.test_file_dir, "allxy_xf.qumis")
-        compiler = qc.QASM_QuMIS_Compiler(self.config_fn,
-                                          verbosity_level=0)
-        compiler.compile(qasm_fn, qumis_fn)
-        asm = Assembler(qumis_fn)
-        instructions = asm.convert_to_instructions()
+        for q_name in ['q0', 'q1']:
+            qasm_file = sq_qasm.AllXY(q_name)
+            qasm_fn = qasm_file.name
+            qumis_fn = join(self.test_file_dir,
+                            "allxy_{}.qumis".format(q_name))
+            compiler = qc.QASM_QuMIS_Compiler(self.config_fn,
+                                              verbosity_level=0)
+            compiler.compile(qasm_fn, qumis_fn)
+            asm = Assembler(qumis_fn)
+            instructions = asm.convert_to_instructions()
+
+            self.assertEqual(compiler.qumis_instructions[2], 'Exp_Start: ')
+            self.assertEqual(compiler.qumis_instructions[-1], self.jump_to_start)
+
 
 
 def valid_operation_dictionary(operation_dict):
