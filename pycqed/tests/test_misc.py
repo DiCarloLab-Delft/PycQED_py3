@@ -63,13 +63,8 @@ class Test_misc(unittest.TestCase):
         # missing arguments or invalid combinations of arguments should
         # raise errors
         with self.assertRaises(ValueError):
-            gen.gen_sweep_pts(start=3.8, span=.3, step=5)
+            gen.gen_sweep_pts(center=3.8, stop=4, step=5)
         with self.assertRaises(ValueError):
             gen.gen_sweep_pts(start=3.8, stop=.3)
         with self.assertRaises(ValueError):
             gen.gen_sweep_pts(center=3.8, span=.3)
-
-
-
-
-
