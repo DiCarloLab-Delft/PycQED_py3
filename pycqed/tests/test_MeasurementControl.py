@@ -1,7 +1,7 @@
 import unittest
 import numpy as np
 from pycqed.measurement import measurement_control
-from pycqed.measurement.sweep_functions import None_Sweep
+from pycqed.measurement.sweep_functions import None_Sweep, None_Sweep_idx
 import pycqed.measurement.detector_functions as det
 from pycqed.instrument_drivers.physical_instruments.dummy_instruments \
     import DummyParHolder
@@ -82,6 +82,26 @@ class Test_MeasurementControl(unittest.TestCase):
         np.testing.assert_array_almost_equal(y, y_rep)
         np.testing.assert_array_almost_equal(z0, z[0, :])
         np.testing.assert_array_almost_equal(z1, z[1, :])
+
+    def test_soft_sweep_2D_function_calls(self):
+        sweep_pts = np.arange(0, 30, 1)
+        sweep_pts_2D = np.arange(0, 5, 1)
+        s1 = None_Sweep_idx(sweep_control='soft')
+        s2 = None_Sweep_idx(sweep_control='soft')
+        self.MC.set_sweep_function(s1)
+        self.MC.set_sweep_function_2D(s2)
+        self.MC.set_sweep_points(sweep_pts)
+        self.MC.set_sweep_points_2D(sweep_pts_2D)
+        self.MC.set_detector_function(det.Dummy_Detector_Soft())
+
+        self.assertEqual(s1.num_calls, 0)
+        self.assertEqual(s2.num_calls, 0)
+        self.MC.run('2D_soft', mode='2D')
+
+        # Test that the 2D scan only gets called 5 times (when it changes)
+        # The 1D value always changes and as such should always be called
+        self.assertEqual(s1.num_calls, 30*5)
+        self.assertEqual(s2.num_calls, 5)
 
     def test_hard_sweep_2D(self):
         """
