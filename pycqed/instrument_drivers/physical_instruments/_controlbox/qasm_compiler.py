@@ -130,13 +130,26 @@ def config_is_valid(config: dict)-> bool:
     if not len(hw_spec['qubit list']) == len(hw_spec['channels']):
         raise ValueError('different number of qubits than channels')
 
+    if not is_integer_array(hw_spec['qubit list']):
+        raise ValueError('"qubit list" in the configuration file is not an'
+                         ' integer array:\n\t{}'.format(
+                             hw_spec['qubit list']))
+
     if not type(hw_spec['init time'] == int):
         raise ValueError('init_time {} must be int'.format(
             hw_spec['init time']))
+    if not is_positive_number(hw_spec['init time']):
+        raise ValueError('"init time" ({}) in the configuration file'
+                         ' is not an positive number.'.format(
+                             hw_spec['init time']))
 
     if not type(hw_spec['cycle time'] == int):
         raise ValueError('init_time {} must be int'.format(
             hw_spec['cycle time']))
+    if not is_positive_number(hw_spec['cycle time']):
+        raise ValueError('"cycle time" ({}) in the configuration file'
+                         ' is not an positive number.'.format(
+                             hw_spec['cycle time']))
 
     for i, ch in enumerate(hw_spec['channels']):
         if not set(ch.keys()).issubset({'rf', 'flux', 'measure'}):
@@ -353,6 +366,7 @@ class QASM_QuMIS_Compiler():
             self.data = json.load(data_file)
 
         if not config_is_valid(self.data):
+            # this error should be unreachable but is here for readability
             raise ValueError('Configuration is not valid')
 
         self.hardware_spec = self.data["hardware specification"]
@@ -363,30 +377,19 @@ class QASM_QuMIS_Compiler():
         self.luts = self.data["luts"]
 
         self.physical_qubits = self.hardware_spec["qubit list"]
-        if is_integer_array(self.physical_qubits) is False:
-            raise ValueError('"qubit list" in the configuration file is not an'
-                             ' integer array:\n\t{}'.format(
-                                 self.physical_qubits))
 
         self.cycle_time = self.hardware_spec["cycle time"]
         self.init_time = self.hardware_spec["init time"]
-        if is_positive_number(self.cycle_time) is False:
-            raise ValueError('"cycle time" ({}) in the configuration file'
-                             ' is not an positive number.'.format(
-                                 self.cycle_time))
-        if is_positive_number(self.init_time) is False:
-            raise ValueError('"init time" ({}) in the configuration file'
-                             ' is not an positive number.'.format(
-                                 self.init_time))
 
         self.cycle_time = float(self.cycle_time)
         self.init_time = int(self.init_time / self.cycle_time)
         self.measure_time = int(DEFAULT_MEASURE_TIME / self.cycle_time)
 
         self.channels = self.hardware_spec["channels"]
-        self.check_channel_format()
+
         for i in range(len(self.channels)):
             for key in self.channels[i]:
+                # Dangerously overwriting latency in ns with latency in clocks
                 self.channels[i][key]["latency"] = int(
                     self.channels[i][key]["latency"] / self.cycle_time)
                 if "format" in self.channels[i][key]:
@@ -473,8 +476,6 @@ class QASM_QuMIS_Compiler():
         with open(config_fn, 'w') as outfile:
             json.dump(self.data, outfile, indent=2)
 
-    def check_channel_format(self):
-        pass
 
     def read_file(self):
         '''
