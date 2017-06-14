@@ -312,3 +312,13 @@ class Test_MeasurementControl(unittest.TestCase):
 
         self.MC.clear_persitent_plot()
         self.assertEqual(self.MC._persist_dat, None)
+
+    def test_data_resolution(self):
+        # This test will fail if the data is saved as 32 bit floats
+        sweep_pts = [3e9+1e-3, 3e9+2e-3]
+        self.MC.set_sweep_function(None_Sweep())
+        self.MC.set_sweep_points(sweep_pts)
+        self.MC.set_detector_function(det.Dummy_Detector_Soft())
+        dat = self.MC.run('1D_soft')
+        x = dat[:, 0]
+        np.testing.assert_array_almost_equal(x, sweep_pts, decimal=5)
