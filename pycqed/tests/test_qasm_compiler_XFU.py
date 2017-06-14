@@ -26,7 +26,7 @@ class Test_compiler(TestCase):
         qasm_fn = join(self.test_file_dir, 'dev_test.qasm')
         qumis_fn = join(self.test_file_dir, "output.qumis")
         compiler = qc.QASM_QuMIS_Compiler(self.config_fn,
-                                          verbosity_level=0)
+                                          verbosity_level=6)
         compiler.compile(qasm_fn, qumis_fn)
         qumis = compiler.qumis_instructions
         m = open(compiler.qumis_fn).read()
@@ -36,7 +36,6 @@ class Test_compiler(TestCase):
         # finally test that it can be converted into valid instructions
         asm = Assembler(qumis_fn)
         instructions = asm.convert_to_instructions()
-
 
     def test_methods_of_compiler(self):
         compiler = qc.QASM_QuMIS_Compiler()
@@ -61,7 +60,22 @@ class Test_compiler(TestCase):
         compiler.load_config(self.config_fn)
         self.assertEqual(compiler.config_filename, self.config_fn)
 
+        hardware_spec_keys = {'qubit list', 'init time',
+                              'cycle time', 'channels'}
+        self.assertEqual(set(compiler.hardware_spec.keys()),
+                         hardware_spec_keys)
 
+        self.assertEqual(len(compiler.luts), 2)  # MW and Flux
+        allowed_single_q_ops = {'x180',
+                                'x90',
+                                'y180',
+                                'y90',
+                                'mx180',
+                                'mx90',
+                                'my180',
+                                'my90'}
+        self.assertEqual(
+            set(compiler.luts[0].keys()), allowed_single_q_ops)  # MW and Flux
 
 
 def valid_operation_dictionary(operation_dict):

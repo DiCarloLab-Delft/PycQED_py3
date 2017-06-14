@@ -91,7 +91,7 @@
                 "flux" : {
                     "qumis" : "trigger",
                     "latency" : 40,
-                    "trigger bit" : 0,
+                    "trigger bit" : 1,
                     "codeword bit" : [1],
                     "format" : [5, 10],
                     "lut" : 1

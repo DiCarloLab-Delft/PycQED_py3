@@ -180,23 +180,22 @@ class qumis_event():
         self.codeword_bit = []
         self.set_bits = []
 
-    def print_self(self):
-        raw_print(self.qumis_name)
-        raw_print(", codeword:")
-        raw_print(str(self.codeword))
-        # raw_print(", awg_nr:")
-        # raw_print(str(self.awg_nr))
-        raw_print(", duration:")
-        raw_print(str(self.duration))
-        # raw_print(", format:")
-        # raw_print(str(self.format))
-        raw_print(", trigger_bit:")
-        raw_print(str(self.trigger_bit))
-        raw_print(", cw_bit:")
-        raw_print(str(self.codeword_bit))
-        raw_print(", set_bits:")
-        raw_print(str(self.set_bits))
-        raw_print("\n")
+    def __repr__(self):
+        base_str = ('qumis_event({}, codeword={}, awg_nr={}, duration={},' +
+                    'trigger_bit={}, codeword_bit={}, set_bits={})')
+        repr = base_str.format(self.qumis_name, self.codeword, self.awg_nr,
+                               self.duration, self.trigger_bit,
+                               self.codeword_bit, self.set_bits)
+        return repr
+
+    def __str__(self):
+        base_str = ('qumis_event: "{}", \n\tcodeword={}, \n\tawg_nr={},' +
+                    ' \n\tduration={}, \n\ttrigger_bit={}, ' +
+                    '\n\tcodeword_bit={}, \n\tset_bits={}\n')
+        repr = base_str.format(self.qumis_name, self.codeword, self.awg_nr,
+                               self.duration, self.trigger_bit,
+                               self.codeword_bit, self.set_bits)
+        return repr
 
 
 user_op_type = {
@@ -527,7 +526,7 @@ class QASM_QuMIS_Compiler():
         print("")
 
     def print_hw_timing_grid(self):
-        print("Hardware trigger timing gird:")
+        print("Hardware trigger timing grid:")
         if len(self.hw_timing_grid) == 0:
             print("Empty trigger timing grid.")
             return
@@ -998,6 +997,10 @@ class QASM_QuMIS_Compiler():
             current_time = tp.following_waiting_time + current_time
 
     def convert_to_hw_trigger(self):
+        """
+        This function takes events from the timing_grid and converts them to
+        hw_triggers using the configuration
+        """
         self.hw_timing_grid = []
 
         for tp in self.timing_grid:
@@ -1051,8 +1054,8 @@ class QASM_QuMIS_Compiler():
 
                 if hw_event.qumis_name == 'trigger':
                     hw_event.set_bits = []
-
                     if hw_event.trigger_bit != -1:
+                        assert(hw_event.trigger_bit != 0)
                         hw_event.set_bits.append(hw_event.trigger_bit)
                         hw_event.trigger_bit = -1
 
@@ -1172,7 +1175,7 @@ class QASM_QuMIS_Compiler():
         self.hw_timing_grid = new_tp_list
         if self.verbosity_level > 4:
             print("after vertical_divide_trigger:")
-        self.print_hw_timing_grid()
+            self.print_hw_timing_grid()
 
     def get_next_trigger_instr_time(self, l):
         i = l + 1
@@ -1236,7 +1239,7 @@ class QASM_QuMIS_Compiler():
         self.hw_timing_grid = new_tp_list
         if self.verbosity_level > 4:
             print("after split_trigger_codeword:")
-        self.print_hw_timing_grid()
+            self.print_hw_timing_grid()
 
     def add_new_tp_event(self, timing_grid, absolute_time, event):
         tp_index, match = self.search_time_point(timing_grid, absolute_time)
@@ -1244,11 +1247,14 @@ class QASM_QuMIS_Compiler():
             new_tp = time_point(absolute_time=absolute_time)
             if event is not None:
                 new_tp.parallel_events.append(event)
+                if 0 in event.set_bits:
+                    raise ValueError
             timing_grid.insert(tp_index, new_tp)
         else:
             if event is not None:
                 timing_grid[tp_index-1].parallel_events.append(event)
-
+            if 0 in event.set_bits:
+                raise ValueError
         return timing_grid
 
     def get_max_duration(self, timing_events):
