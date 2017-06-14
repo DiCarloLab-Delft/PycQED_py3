@@ -269,6 +269,7 @@ class QASM_QuMIS_Compiler():
         self.qubit_map = {}
         self.verbosity_level = verbosity_level
         self.channel_latency_compensated = False
+        self.qubit_map_from_config = False
 
         if config_filename is None:
             self.config_filename = os.path.join(
@@ -312,6 +313,10 @@ class QASM_QuMIS_Compiler():
             self.data = json.load(data_file)
 
         self.hardware_spec = self.data["hardware specification"]
+        if "qubit_map" in self.data.keys():
+            self.qubit_map = self.data["qubit_map"]
+            self.qubit_map_from_config = True
+
         self.luts = self.data["luts"]
 
         self.physical_qubits = self.hardware_spec["qubit list"]
@@ -436,7 +441,7 @@ class QASM_QuMIS_Compiler():
             prog_file = open(self.filename, 'r', encoding="utf-8")
             logging.info("open file", str(self.filename), "successfully.")
         except:
-            raise OSError('\tError: Fail to open file ' + self.filename + ".")
+            raise OSError('\tError: Failed to open file ' + self.filename + ".")
 
         self.raw_lines = []
         self.prog_lines = []  # after removing comments.
@@ -451,21 +456,22 @@ class QASM_QuMIS_Compiler():
             self.prog_lines.append(prog_line(line_number + 1, line_content))
 
         prog_file.close()
-        self.print_lines()
-
-    def print_lines(self):
         if self.verbosity_level >= 1:
-            print("Raw Lines:")
-            for line in self.raw_lines:
-                print(line)
-            print("")
-
+            self.print_raw_lines()
         if self.verbosity_level >= 2:
-            print("Program Lines:")
-            for line in self.prog_lines:
-                print(line)
+            self.print_program_lines()
 
-            print("")
+    def print_raw_lines(self):
+        print("Raw Lines:")
+        for line in self.raw_lines:
+            print(line)
+        print("")
+
+    def print_program_lines(self):
+        print("Program Lines:")
+        for line in self.prog_lines:
+            print(line)
+        print("")
 
     def print_op_dict(self):
         print("QASM operation dictionary:")
@@ -793,7 +799,6 @@ class QASM_QuMIS_Compiler():
 
     def build_qubit_map(self):
         self.declared_qubits = []
-        self.qubit_map = {}
         i = 0
         while i < len(self.raw_event_list):
             raw_events = self.raw_event_list[i]
@@ -802,7 +807,8 @@ class QASM_QuMIS_Compiler():
                     self.extend_dec_qubit_list(raw_event)
                     self.raw_event_list.pop(i)
                 elif (raw_event.event_type == EventType.MAP):
-                    self.add_qubit_map(raw_event)
+                    if not self.qubit_map_from_config:
+                        self.add_qubit_map(raw_event)
                     self.raw_event_list.pop(i)
                 else:
                     i = i + 1

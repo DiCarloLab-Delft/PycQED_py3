@@ -1,7 +1,7 @@
 """
 This module contains tests for the QASM compiler by Xiang Fu
 """
-
+import unittest
 import sys
 import numpy as np
 import pycqed as pq
@@ -12,9 +12,11 @@ from pycqed.instrument_drivers.physical_instruments._controlbox.Assembler \
     import Assembler
 from os.path import join, dirname
 from copy import deepcopy
+from pycqed.measurement.waveform_control_CC import \
+    single_qubit_qasm_seqs as sq_qasm
 
 
-class Test_compiler(TestCase):
+class Test_compiler(unittest.TestCase):
 
     @classmethod
     def setUpClass(self):
@@ -42,7 +44,8 @@ class Test_compiler(TestCase):
 
         c_methods = set(dir(compiler))
         printing_methods = {'print_hw_timing_grid',
-                            'print_lines',
+                            'print_program_lines',
+                            'print_raw_lines',
                             'print_op_dict',
                             'print_qumis',
                             'print_raw_events',
@@ -65,6 +68,8 @@ class Test_compiler(TestCase):
         self.assertEqual(set(compiler.hardware_spec.keys()),
                          hardware_spec_keys)
 
+        self.assertEqual(compiler.qubit_map, {'q0': 0, 'q1': 1})
+
         self.assertEqual(len(compiler.luts), 2)  # MW and Flux
         allowed_single_q_ops = {'x180',
                                 'x90',
@@ -76,6 +81,36 @@ class Test_compiler(TestCase):
                                 'my90'}
         self.assertEqual(
             set(compiler.luts[0].keys()), allowed_single_q_ops)  # MW and Flux
+
+
+class Test_single_qubit_seqs(unittest.TestCase):
+    @classmethod
+    def setUpClass(self):
+        self.test_file_dir = join(
+            pq.__path__[0], 'tests', 'qasm_files')
+        self.config_fn = join(self.test_file_dir, 'config.json')
+        self.qubit_name = 'q0'
+    @unittest.skip('no identity')
+    def test_qasm_seq_T1(self):
+        times = np.linspace(20e-9, 50e-6, 61)
+        qasm_file = sq_qasm.T1(self.qubit_name, times)
+        qasm_fn = qasm_file.name
+        qumis_fn = join(self.test_file_dir, "T1_xf.qumis")
+        compiler = qc.QASM_QuMIS_Compiler(self.config_fn,
+                                          verbosity_level=0)
+        compiler.compile(qasm_fn, qumis_fn)
+        asm = Assembler(qumis_fn)
+        instructions = asm.convert_to_instructions()
+
+    def test_qasm_seq_allxy(self):
+        qasm_file = sq_qasm.AllXY(self.qubit_name)
+        qasm_fn = qasm_file.name
+        qumis_fn = join(self.test_file_dir, "allxy_xf.qumis")
+        compiler = qc.QASM_QuMIS_Compiler(self.config_fn,
+                                          verbosity_level=0)
+        compiler.compile(qasm_fn, qumis_fn)
+        asm = Assembler(qumis_fn)
+        instructions = asm.convert_to_instructions()
 
 
 def valid_operation_dictionary(operation_dict):
