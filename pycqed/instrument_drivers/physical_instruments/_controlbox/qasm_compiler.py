@@ -107,6 +107,44 @@ def raw_print(s):
     sys.stdout.write(s)
 
 
+def config_is_valid(config: dict)-> bool:
+    """
+    Tests if a qasm configuration specification is valid.
+    returns True if it is valid and raises an exception otherwise
+    """
+
+    # the config can optionally contain a qubit map specification
+    expected_keys = {'operation dictionary', 'hardware specification', 'luts'}
+
+    if not expected_keys.issubset(set(config.keys())):
+        raise ValueError('Config misses keys {}'.format(
+            expected_keys - set(config.keys())))
+
+    hw_spec = config['hardware specification']
+    hw_spec_keys = {'qubit list', 'init time',
+                    'cycle time', 'channels'}
+    if not hw_spec_keys.issubset(set(hw_spec.keys())):
+        raise ValueError('hardware specification misses keys {}'.format(
+            hw_spec_keys - set(hw_spec.keys())))
+
+    if not len(hw_spec['qubit list']) == len(hw_spec['channels']):
+        raise ValueError('different number of qubits than channels')
+
+    if not type(hw_spec['init time'] == int):
+        raise ValueError('init_time {} must be int'.format(
+            hw_spec['init time']))
+
+    if not type(hw_spec['cycle time'] == int):
+        raise ValueError('init_time {} must be int'.format(
+            hw_spec['cycle time']))
+
+    for i, ch in enumerate(hw_spec['channels']):
+        if not set(ch.keys()).issubset({'rf', 'flux', 'measure'}):
+            raise ValueError('unexpected key found in channel config')
+
+    return True
+
+
 class EventType(enum.Enum):
     '''
     Current type definition does not separate the technology-dependent part
@@ -313,6 +351,9 @@ class QASM_QuMIS_Compiler():
 
         with open(self.config_filename) as data_file:
             self.data = json.load(data_file)
+
+        if not config_is_valid(self.data):
+            raise ValueError('Configuration is not valid')
 
         self.hardware_spec = self.data["hardware specification"]
         if "qubit_map" in self.data.keys():

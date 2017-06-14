@@ -6,12 +6,10 @@ import sys
 import numpy as np
 import pycqed as pq
 from io import StringIO
-from unittest import TestCase
 from pycqed.instrument_drivers.physical_instruments._controlbox import qasm_compiler as qc
 from pycqed.instrument_drivers.physical_instruments._controlbox.Assembler \
     import Assembler
-from os.path import join, dirname
-from copy import deepcopy
+from os.path import join
 from pycqed.measurement.waveform_control_CC import \
     single_qubit_qasm_seqs as sq_qasm
 
@@ -36,12 +34,12 @@ class Test_compiler(unittest.TestCase):
         m = open(compiler.qumis_fn).read()
         qumis_from_file = m.splitlines()
         self.assertEqual(qumis, qumis_from_file)
-        # finally test that it can be converted into valid instructions
-        asm = Assembler(qumis_fn)
-        instructions = asm.convert_to_instructions()
         self.assertEqual(compiler.qumis_instructions[2], 'Exp_Start: ')
         self.assertEqual(compiler.qumis_instructions[-1], self.jump_to_start)
 
+        # finally test that it can be converted into valid instructions
+        asm = Assembler(qumis_fn)
+        asm.convert_to_instructions()
 
     def test_methods_of_compiler(self):
         compiler = qc.QASM_QuMIS_Compiler()
@@ -86,8 +84,14 @@ class Test_compiler(unittest.TestCase):
         self.assertEqual(
             set(compiler.luts[0].keys()), allowed_single_q_ops)  # MW and Flux
 
+    def test_converting_to_qumis(self):
+        pass
+
+
+
 
 class Test_single_qubit_seqs(unittest.TestCase):
+
     @classmethod
     def setUpClass(self):
         self.test_file_dir = join(
@@ -95,7 +99,6 @@ class Test_single_qubit_seqs(unittest.TestCase):
         self.config_fn = join(self.test_file_dir, 'config.json')
         self.qubit_name = 'q0'
         self.jump_to_start = "beq r14, r14, Exp_Start \t# Infinite loop"
-
 
     @unittest.skip('no identity')
     def test_qasm_seq_T1(self):
@@ -107,7 +110,7 @@ class Test_single_qubit_seqs(unittest.TestCase):
                                           verbosity_level=0)
         compiler.compile(qasm_fn, qumis_fn)
         asm = Assembler(qumis_fn)
-        instructions = asm.convert_to_instructions()
+        asm.convert_to_instructions()
 
     def test_qasm_seq_allxy(self):
         for q_name in ['q0', 'q1']:
@@ -119,11 +122,11 @@ class Test_single_qubit_seqs(unittest.TestCase):
                                               verbosity_level=0)
             compiler.compile(qasm_fn, qumis_fn)
             asm = Assembler(qumis_fn)
-            instructions = asm.convert_to_instructions()
+            asm.convert_to_instructions()
 
             self.assertEqual(compiler.qumis_instructions[2], 'Exp_Start: ')
-            self.assertEqual(compiler.qumis_instructions[-1], self.jump_to_start)
-
+            self.assertEqual(
+                compiler.qumis_instructions[-1], self.jump_to_start)
 
 
 def valid_operation_dictionary(operation_dict):
