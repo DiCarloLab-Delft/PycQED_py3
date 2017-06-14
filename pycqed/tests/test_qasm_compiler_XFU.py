@@ -30,7 +30,7 @@ class Test_compiler(unittest.TestCase):
         qasm_fn = join(self.test_file_dir, 'dev_test.qasm')
         qumis_fn = join(self.test_file_dir, "output.qumis")
         compiler = qc.QASM_QuMIS_Compiler(self.config_fn,
-                                          verbosity_level=0)
+                                          verbosity_level=6)
         compiler.compile(qasm_fn, qumis_fn)
         qumis = compiler.qumis_instructions
         m = open(compiler.qumis_fn).read()
@@ -39,7 +39,6 @@ class Test_compiler(unittest.TestCase):
         # finally test that it can be converted into valid instructions
         asm = Assembler(qumis_fn)
         instructions = asm.convert_to_instructions()
-        print(compiler.qumis_instructions)
         self.assertEqual(compiler.qumis_instructions[2], 'Exp_Start: ')
         self.assertEqual(compiler.qumis_instructions[-1], self.jump_to_start)
 

@@ -1326,7 +1326,8 @@ class QASM_QuMIS_Compiler():
                 self.qumis_instructions.append(pulse_instruction)
 
         if self.qumis_instructions[0][:4] != "wait":
-            print("Instruction 'Wait 1' automatically added at the beginning.")
+            if self.verbosity_level >= 1:
+                print("Instruction 'Wait 1' automatically added at the beginning.")
             self.qumis_instructions.insert(0, "wait 1")
         if self.infinit_loop_qumis:
             jump_to_start = "beq r14, r14, Exp_Start \t# Infinite loop"
