@@ -30,6 +30,7 @@ from pycqed.analysis import composite_analysis as ca
 
 try:
     import qutip as qtp
+
 except ImportError as e:
     if str(e).find('qutip') >= 0:
         logging.warning('Could not import qutip')
@@ -466,7 +467,7 @@ class MeasurementAnalysis(object):
         Example: complex S21 of a resonator
 
         Author: Stefano Poletto
-        Data: November 15, 2016
+        Date: November 15, 2016
         '''
         save = kw.pop('save', False)
         self.plot_title = kw.pop('plot_title',
@@ -479,6 +480,33 @@ class MeasurementAnalysis(object):
         ax.set_xlabel(xlabel)
         ax.set_ylabel(ylabel)
         ax.plot(np.real(cmp_data), np.imag(cmp_data), marker)
+        if show:
+            plt.show()
+        if save:
+            self.save_fig(fig, xlabel=xlabel, ylabel=ylabel, **kw)
+
+        return
+
+    def plot_dB_from_linear(self, x, lin_amp, fig, ax, show=False, marker='.', **kw):
+        '''
+        Plot linear data in dB.
+        This is usefull for measurements performed with VNA and Homodyne
+
+        Author: Stefano Poletto
+        Date: May 5, 2017
+        '''
+        save = kw.pop('save', False)
+        self.plot_title = kw.pop('plot_title',
+                                 textwrap.fill(self.timestamp_string + '_' +
+                                               self.measurementstring, 40))
+
+        xlabel = 'Freq'
+        ylabel = 'Transmission (dB)'
+        ax.set_title(self.plot_title)
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel(ylabel)
+        y_dB = 20*np.log10(lin_amp)
+        ax.plot(x, y_dB, marker)
         if show:
             plt.show()
         if save:
@@ -1165,12 +1193,14 @@ class Rabi_Analysis(TD_Analysis):
 
             fine_fit = self.fit_res[i].model.func(
                 x_fine, **self.fit_res[i].best_values)
-            #adding the fitted amp180
+            # adding the fitted amp180
             if 'period' in self.fit_res[i].params.keys():
-                label='amp180 = {:.3e}'.format(abs(self.fit_res[i].params['period'].value)/2)
+                label = 'amp180 = {:.3e}'.format(
+                    abs(self.fit_res[i].params['period'].value)/2)
             else:
-                label='amp180 = {:.3e}'.format(abs(self.fit_res[i].params['x0'].value))
-            self.axs[i].plot(x_fine, fine_fit,label=label )
+                label = 'amp180 = {:.3e}'.format(
+                    abs(self.fit_res[i].params['x0'].value))
+            self.axs[i].plot(x_fine, fine_fit, label=label)
             ymin = min(self.measured_values[i])
             ymax = max(self.measured_values[i])
             yspan = ymax-ymin
@@ -1192,11 +1222,11 @@ class Rabi_Analysis(TD_Analysis):
         # We make an initial guess of the Rabi period using both quadratures
         data = np.sqrt(self.measured_values[0]**2+self.measured_values[1]**2)
         params = model.guess(model, data=data,
-                                 t=self.sweep_points)
+                             t=self.sweep_points)
         fit_res = fit_mods.CosModel.fit(
-                data=data,
-                t=self.sweep_points,
-                params=params)
+            data=data,
+            t=self.sweep_points,
+            params=params)
         freq_guess = fit_res.values['frequency']
         for i in [0, 1]:
             params = model.guess(model, data=self.measured_values[i],
@@ -1784,7 +1814,8 @@ class SSRO_Analysis(MeasurementAnalysis):
             axarray[1].set_xlim(-edge, edge)
             axarray[1].set_ylim(-edge, edge)
 
-            self.save_fig(fig, figname='SSRO_Density_Plots', **kw)
+            self.save_fig(fig, figname='SSRO_Density_Plots',
+                          close_fig=True, **kw)
 
         # this part performs 2D gaussian fits and calculates coordinates of the
         # maxima
@@ -1927,8 +1958,7 @@ class SSRO_Analysis(MeasurementAnalysis):
 
         #plt.hist(SS_Q_data, bins=40,label = '0 Q')
         plt.legend(loc=2)
-        self.save_fig(fig, figname='raw-cumulative-histograms', **kw)
-        plt.show()
+        self.save_fig(fig, figname='raw-cumulative-histograms', **kw, close_fig=True)
 
         # saving the results
         if 'SSRO_Fidelity' not in self.analysis_group:
@@ -2064,7 +2094,6 @@ class SSRO_Analysis(MeasurementAnalysis):
         mu0_0 = fit_res_double_0.params['mu0'].value
         mu1_0 = fit_res_double_0.params['mu1'].value
         frac1_0 = fit_res_double_0.params['frac1'].value
-        print('frac1 in 0: {:.4f}'.format(frac1_0))
 
         def NormCdf(x, mu, sigma):
             t = x-mu
@@ -2146,8 +2175,7 @@ class SSRO_Analysis(MeasurementAnalysis):
 
         leg = ax.legend(loc='best')
         leg.get_frame().set_alpha(0.5)
-        self.save_fig(fig, figname='S-curves', **kw)
-        plt.show()
+        self.save_fig(fig, figname='S-curves', close_fig=True, **kw)
 
         # plotting the histograms
         fig, axes = plt.subplots(figsize=(8, 4))
@@ -2208,8 +2236,7 @@ class SSRO_Analysis(MeasurementAnalysis):
         leg2 = ax.legend(loc='best')
         leg2.get_frame().set_alpha(0.5)
         #plt.hist(SS_Q_data, bins=40,label = '0 Q')
-        self.save_fig(fig, figname='Histograms', **kw)
-        plt.show()
+        self.save_fig(fig, figname='Histograms', close_fig=True, **kw)
 
         self.save_fitted_parameters(fit_res_double_0,
                                     var_name='fit_res_double_0')
@@ -2966,31 +2993,19 @@ class DriveDetuning_Analysis(TD_Analysis):
 
         def sine_fit_data():
             self.fit_type = 'sine'
-            damped_osc_mod = fit_mods.CosModel
 
-            # Estimate frequency using Fourier transform
-            ft_of_data = np.fft.fft(data)
-            freq_est = np.argmax(np.abs(ft_of_data[1:len(ft_of_data)/2]))+1
-            print('using chagned')
-            slope = stats.linregress(list(range(4)), data[:4])[0]
-            if slope > 0:
-                amp_sign = 1.
-            else:
-                amp_sign = -1.
-            amp_guess = amp_sign * abs((cal_data_mean[1] - cal_data_mean[0])/2)
+            model = fit_mods.lmfit.Model(fit_mods.CosFunc)
 
-            damped_osc_mod.set_param_hint('amplitude', value=amp_guess,
-                                          min=-1.2*amp_guess,
-                                          max=1.2*amp_guess)
-            damped_osc_mod.set_param_hint('frequency', value=freq_est /
-                                          sweep_points[-1])
-            damped_osc_mod.set_param_hint('phase', value=-np.pi/2, vary=False)
-            damped_osc_mod.set_param_hint(
-                'offset', value=np.mean(cal_data_mean))
-            damped_osc_mod.set_param_hint('tau', value=400)
-            self.params = damped_osc_mod.make_params()
-            fit_results = damped_osc_mod.fit(data=data, t=sweep_points,
-                                             params=self.params)
+            params = fit_mods.Cos_guess(model, data=data,
+                                        t=sweep_points)
+            # This ensures that phase is *always* ~90 deg if it is different
+            # this shows up in the amplitude and prevents the correct detuning
+            # is shown.
+            params['phase'].min = np.deg2rad(80)
+            params['phase'].max = np.deg2rad(100)
+
+            fit_results = model.fit(data=data, t=sweep_points,
+                                    params=params)
             return fit_results
 
         def quadratic_fit_data():
@@ -3850,7 +3865,37 @@ class Homodyne_Analysis(MeasurementAnalysis):
         return fit_res
 
 
+################
+# VNA analysis #
+################
+class VNA_Analysis(MeasurementAnalysis):
+    '''
+    Nice to use with all measurements performed with the VNA.
+    '''
+
+    def __init__(self, label='VNA', **kw):
+        kw['label'] = label
+        kw['h5mode'] = 'r+'
+        super().__init__(**kw)
+
+    def run_default_analysis(self, **kw):
+        super(self.__class__, self).run_default_analysis(
+            close_file=False, **kw)
+
+        # prepare figure in log scale
+        data_amp = self.measured_values[0]
+
+        fig, ax = self.default_ax()
+        self.plot_dB_from_linear(x=self.sweep_points,
+                                 lin_amp=data_amp,
+                                 fig=fig, ax=ax,
+                                 save=False)
+
+        self.save_fig(fig, figname='dB_plot', **kw)
+
+
 class Acquisition_Delay_Analysis(MeasurementAnalysis):
+
     def __init__(self, label='AD', **kw):
         kw['label'] = label
         kw['h5mode'] = 'r+'
@@ -3900,6 +3945,7 @@ class Acquisition_Delay_Analysis(MeasurementAnalysis):
             self.data_file.close()
 
         return self.max_delay
+
 
 class Hanger_Analysis_CosBackground(MeasurementAnalysis):
 
@@ -4067,6 +4113,14 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
 
             amplitude_guess = np.pi * kappa_guess * \
                 abs(max(self.data_dist) - min(self.data_dist))
+
+            if kappa_guess == 0:
+                # When kappa_guess is zero, the fitting procedure fails (claims
+                # 'input has nan values')
+                kappa_guess = 1
+
+            if not peak_flag:  # Change the sign of amplitude_guess for dips
+                amplitude_guess *= -1.
 
             LorentzianModel = fit_mods.LorentzianModel
             LorentzianModel.set_param_hint('f0',
@@ -5550,9 +5604,9 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
         flux = self.Y[:, 0]
         peaks_low, peaks_high = self.find_peaks()
         self.f, self.ax = self.make_unfiltered_figure(peaks_low, peaks_high,
-                                    transpose=transpose, cmap=cmap,
-                                    add_title=add_title,
-                                    xlabel=xlabel, ylabel=ylabel)
+                                                      transpose=transpose, cmap=cmap,
+                                                      add_title=add_title,
+                                                      xlabel=xlabel, ylabel=ylabel)
 
         filtered_dat = self.filter_data(flux, peaks_low, peaks_high,
                                         a=filt_func_a, x0=filt_func_x0,
@@ -5564,10 +5618,10 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
             filter_func = filtered_dat
 
         self.f, self.ax = self.make_filtered_figure(filt_flux_low, filt_flux_high,
-                                  filt_peaks_low, filt_peaks_high, filter_func,
-                                  add_title=add_title,
-                                  transpose=transpose, cmap=cmap,
-                                  xlabel=xlabel, ylabel=ylabel)
+                                                    filt_peaks_low, filt_peaks_high, filter_func,
+                                                    add_title=add_title,
+                                                    transpose=transpose, cmap=cmap,
+                                                    xlabel=xlabel, ylabel=ylabel)
         if break_before_fitting:
             return
         self.fit_res = self.fit_avoided_crossing(
@@ -5578,13 +5632,12 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
         self.add_analysis_datagroup_to_file()
         self.save_fitted_parameters(self.fit_res, var_name='avoided crossing')
         self.f, self.ax = self.make_fit_figure(filt_flux_low, filt_flux_high,
-                             filt_peaks_low, filt_peaks_high,
-                             add_title=add_title,
-                             fit_res=self.fit_res,
-                             coupling_label=coupling_label,
-                             transpose=transpose, cmap=cmap,
-                             xlabel=xlabel, ylabel=ylabel)
-
+                                               filt_peaks_low, filt_peaks_high,
+                                               add_title=add_title,
+                                               fit_res=self.fit_res,
+                                               coupling_label=coupling_label,
+                                               transpose=transpose, cmap=cmap,
+                                               xlabel=xlabel, ylabel=ylabel)
 
     def run_default_analysis(self, **kw):
         # I'm doing this in the init in this function
