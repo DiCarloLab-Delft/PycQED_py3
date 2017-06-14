@@ -482,14 +482,14 @@ def Ram_Z(qubit_name, no_of_points, cal_points=True,
             # Calibration point for |1>
             qasm_file.writelines('X180 {} \n'.format(qubit_name))
         else:
-            qasm_file.writelines('QWG trigger {}\n'.format(i))
+            qasm_file.writelines('flux square_{} {}\n'.format(i, qubit_name))
             qasm_file.writelines(
                 'I {} {}\n'.format(qubit_name,
-                                   int(wait_before//clock_cycle)))
+                                   round(int(wait_before/clock_cycle))))
             qasm_file.writelines('mX90 {}\n'.format(qubit_name))
             qasm_file.writelines(
                 'I {} {}\n'.format(qubit_name,
-                                   int(wait_between//clock_cycle)))
+                                   round(int(wait_between/clock_cycle))))
             qasm_file.writelines('X90 {}\n'.format(qubit_name))
 
         qasm_file.writelines('RO {}  \n'.format(qubit_name))
@@ -527,6 +527,76 @@ def Ram_Z_single(qubit_name,
     qasm_file.writelines('I {} {}\n'.format(qubit_name,
                                             int(wait_between//clock_cycle)))
     qasm_file.writelines('X90 {}\n'.format(qubit_name))
+    qasm_file.writelines('RO {}  \n'.format(qubit_name))
+
+    qasm_file.close()
+    return qasm_file
+
+
+def flux_timing_seq(qubit_name, taus,
+                    wait_between=220e-9, clock_cycle=5e-9, cal_points=True):
+    '''
+    Creates the QASM sequence to calibrate the timing of the flux pulse relative
+    to microwave pulses.
+
+    Timing of the sequence:
+        trigger flux pulse -- tau -- X90 -- wait_between -- X90 -- RO
+
+    Args:
+        qubit_name (str):       name of the targeted qubit
+        taus (array of floats): delays between the flux trigger and the first
+                                pi-half pulse (the sweep points).
+        wait_between (float):   delay between the two pi-half pulses
+        clock_cycle (float):    period of the internal AWG clock
+        cal_points (bool):      whether to include calibration points
+    '''
+    filename = join(base_qasm_path, 'flux_timing.qasm')
+    qasm_file = mopen(filename, mode='w')
+    qasm_file.writelines('qubit {} \n'.format(qubit_name))
+
+    for i, tau in enumerate(taus):
+        qasm_file.writelines('\ninit_all\n')
+
+        if cal_points and (i == len(taus) - 4 or i == len(taus) - 3):
+            # Calibration point for |0>
+            pass
+        elif cal_points and (i == len(taus) - 2 or i == len(taus) - 1):
+            # Calibration point for |1>
+            qasm_file.writelines('X180 {} \n'.format(qubit_name))
+        else:
+            qasm_file.writelines('flux square {}\n'.format(qubit_name))
+            qasm_file.writelines(
+                'I {} {}\n'.format(qubit_name, int(round(tau/clock_cycle))))
+            qasm_file.writelines('X90 {}\n'.format(qubit_name))
+            qasm_file.writelines(
+                'I {} {}\n'.format(qubit_name,
+                                   int(round(wait_between/clock_cycle))))
+            qasm_file.writelines('X90 {}\n'.format(qubit_name))
+
+        qasm_file.writelines('RO {}  \n'.format(qubit_name))
+
+    qasm_file.close()
+    return qasm_file
+
+
+
+def flux_resonator_shift_seq(qubit_name):
+    '''
+    Creates the QASM sequence for a flux resonator shift experiment. This
+    experiment is used to measure the response of the qubit to a flux pulse via
+    the resonator shift: sweep RO frequency, measure transient at every
+    frequency -> 2D plot looks similar to what you would measure on the scope
+    (step response).
+    Note: delay in the flux pulse must be set, such that it is played during
+    the readout.
+    '''
+    filename = join(base_qasm_path, 'flux_resonator_shift.qasm')
+    qasm_file = mopen(filename, mode='w')
+    qasm_file.writelines('qubit {} \n'.format(qubit_name))
+
+    qasm_file.writelines('\ninit_all\n')
+
+    qasm_file.writelines('QWG trigger square\n')
     qasm_file.writelines('RO {}  \n'.format(qubit_name))
 
     qasm_file.close()
