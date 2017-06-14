@@ -97,7 +97,6 @@ class Soft_Detector(Detector_Function):
 ##########################################################################
 
 
-
 class Dummy_Detector_Hard(Hard_Detector):
 
     def __init__(self, delay=0, noise=0, **kw):
