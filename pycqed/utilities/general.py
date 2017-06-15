@@ -3,21 +3,21 @@ import os
 import h5py
 from pycqed.analysis import analysis_toolbox as a_tools
 import errno
-
+import pycqed as pq
 import sys
 import glob
-from os.path import join, dirname, exists
+from os.path import dirname, exists
 from os import makedirs
+import logging
+import subprocess
 
 
 def get_git_revision_hash():
-    import logging
-    import subprocess
     try:
         # Refers to the global qc_config
-        PycQEDdir = qc_config['PycQEDdir']
+        PycQEDdir = pq.__path__[0]
         hash = subprocess.check_output(['git', 'rev-parse',
-                                        '--short=7', 'HEAD'], cwd=PycQEDdir)
+                                        '--short=10', 'HEAD'], cwd=PycQEDdir)
     except:
         logging.warning('Failed to get Git revision hash, using 00000 instead')
         hash = '00000'
@@ -235,4 +235,3 @@ def execfile(path, global_vars=None, local_vars=None):
     with open(path, 'r') as f:
         code = compile(f.read(), path, 'exec')
         exec(code, global_vars, local_vars)
-
