@@ -469,12 +469,10 @@ class CBox_v3_driven_transmon(Transmon):
         '''
         f_lutman = self.flux_LutMan.get_instr()
         QWG = f_lutman.QWG.get_instr()
-
-
-
-        QWG.stop()
         f_lutman.load_pulses_onto_AWG_lookuptable()
-        QWG.start()
+        # QWG stop and start happens inside the above function
+        QWG.run_mode('CODeword')
+        QWG.set('ch{}_state'.format(f_lutman.F_ch()), True)
 
     def _get_acquisition_instr(self):
         return self._acquisition_instrument.name
@@ -1507,6 +1505,120 @@ class CBox_v3_driven_transmon(Transmon):
         MC.run('flux_timing')
 
         ma.MeasurementAnalysis(label='flux_timing')
+
+    def measure_ram_z(self, lengths, chunk_size=32, wait_after_trigger=60e-9,
+                      wait_during_flux='auto', MC=None, cal_points=False):
+        '''
+        Perform a Ram-Z experiment: Measure the accumulated phase as a function
+        of flux pulse length.
+        The sequence is
+
+        trigger flux -- wait_after_trigger -- mX90 -- wait_during_flux -- X90
+
+        The timings should be such that the flux pulse is played between the two
+        X90 pulses.
+
+        Args:
+            lengths (array of floats):
+                    Array of the flux pulse lengths (sweep points).
+            chunk_size (int):
+                    Sweep points are divided into chunks of this size. The total
+                    number of sweep points should be an integer multiple of the
+                    chunk size.
+            wait_after_trigger (float):
+                    Delay between the flux pulse trigger and the first mw pulse.
+            wait_during_flux (float or 'auto'):
+                    Delay between the two pi-half pulses. If this is 'auto', the
+                    time is automatically picked based on the sweep points.
+            MC (Intsrument):
+                    Measurmenet control instrument.
+            cal_points (bool):
+                    Whether calibration points should be used. Note that the
+                    calibration points will be inserted in every chunk, because
+                    they are part of the QASM sequence, which is not
+                    regenerated.
+        '''
+        if 'uhfqc' not in self._acquisition_instrument.name.lower():
+            raise RuntimeError('Requires acquisition with UHFQC (detector function '
+                               'only implemented for UHFQC).')
+
+        if len(lengths) % int(chunk_size) != 0:
+            raise ValueError('Total number of points ({}) should be an integer '
+                             'multiple of chunk_size ({})'.format(len(lengths),
+                                                                  chunk_size))
+
+        f_lutman = self.flux_LutMan.get_instr()
+        QWG = f_lutman.QWG.get_instr()
+        operation_dict = self.get_operation_dict()
+        CBox = self.CBox.get_instr()
+
+        if MC is None:
+            MC = self.MC.get_instr()
+
+        # Set the delay between the pihalf pulses to be long enough to fit the
+        # flux pulse
+        if wait_during_flux == 'auto':
+            # Round to the next integer multiple of qubit pulse modulation period
+            T_pulsemod = np.abs(1/self.f_pulse_mod())
+            wait_between = np.ceil(max(lengths) / T_pulsemod) * T_pulsemod
+        else:
+            wait_between = wait_during_flux
+
+        # Set the flux pulses in the operation dictionary
+        # pulse 'square_i' has codeword codewords[i]
+        codewords = np.arange(int(chunk_size))
+        for i, codeword in enumerate(codewords):
+            operation_dict['flux square_{} {}'.format(i, self.name)] = {
+                'duration': 10,
+                'instruction': ins_lib.qwg_cw_trigger(
+                    int(codeword), cw_channels=f_lutman.codeword_channels())
+                }
+
+        # Create the sequence
+        self.prepare_for_timedomain()
+        self.prepare_for_fluxing()
+
+        CBox.trigger_source('internal')
+        qasm_file = sqqs.Ram_Z(
+            qubit_name=self.name,
+            no_of_points=chunk_size,
+            cal_points=cal_points,
+            wait_before=wait_after_trigger,
+            wait_between=wait_between)
+        qumis_file = qta.qasm_to_asm(qasm_file.name, operation_dict)
+        CBox.load_instructions(qumis_file.name)
+
+        # Run the experiment
+        if self.RO_acq_weights() == 'optimal':
+            RO_channels = [self.RO_acq_weight_function_I()]
+            result_logging_mode = 'lin_trans'
+        else:
+            RO_channels = [self.RO_acq_weight_function_I(),
+                           self.RO_acq_weight_function_Q()]
+            result_logging_mode = 'raw'
+
+        d = det.UHFQC_integrated_average_detector(
+            UHFQC=self._acquisition_instrument,
+            AWG=self.CBox.get_instr(),
+            nr_averages=self.RO_acq_averages(),
+            channels=RO_channels,
+            result_logging_mode=result_logging_mode,
+            integration_length=self.RO_acq_integration_length(),
+            chunk_size=chunk_size,
+            real_imag=True)
+
+        MC.set_sweep_function(swf.QWG_lutman_par_chunks(
+            LutMan=f_lutman,
+            LutMan_parameter=f_lutman.F_length,
+            sweep_points=lengths,
+            chunk_size=chunk_size,
+            codewords=codewords,
+            flux_pulse_type='square'))
+        MC.set_sweep_points(lengths)
+        MC.set_detector_function(d)
+        MC.run('Ram_Z_{}'.format(self.name))
+
+        ma.MeasurementAnalysis(label='Ram_Z')
 
     def get_operation_dict(self, operation_dict={}):
 

@@ -461,6 +461,9 @@ def Ram_Z(qubit_name, no_of_points, cal_points=True,
 
     Args:
         qubit_name      (str): name of the targeted qubit
+        no_of_points    (int): number of points in the hard sweep. This is
+                               limited by the QWG waveform memory and number of
+                               codeword channels used.
         wait_before     (float): delay time in seconds between triggering the
                                  AWG and the first pi/2 pulse
         wait_between    (float): delay time in seconds between the two pi/2
