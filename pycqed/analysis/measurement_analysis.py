@@ -464,6 +464,7 @@ class MeasurementAnalysis(object):
                 self.save_fig(fig, xlabel=xlabel, ylabel=ylabel, **kw)
         return
 
+
     def plot_complex_results(self, cmp_data, fig, ax, show=False, marker='.', **kw):
         '''
         Plot real and imaginary values measured vs a sweeped parameter
@@ -489,6 +490,7 @@ class MeasurementAnalysis(object):
             self.save_fig(fig, xlabel=xlabel, ylabel=ylabel, **kw)
 
         return
+
 
     def plot_dB_from_linear(self, x, lin_amp, fig, ax, show=False, marker='.', **kw):
         '''
@@ -516,6 +518,7 @@ class MeasurementAnalysis(object):
             self.save_fig(fig, xlabel=xlabel, ylabel=ylabel, **kw)
 
         return
+
 
     def get_naming_and_values_2D(self):
         '''
@@ -853,6 +856,11 @@ class TD_Analysis(MeasurementAnalysis):
     #     return self.fit_res
 
     def rotate_and_normalize_data(self):
+        if len(self.measured_values) == 1:
+            # if only one weight function is used rotation is not required
+            self.norm_data_to_cal_points()
+            return
+
         if self.cal_points is None:
             # 42 is nr. of points in AllXY
             if len(self.measured_values[0]) == 42:
@@ -887,6 +895,28 @@ class TD_Analysis(MeasurementAnalysis):
                     one_coord=self.one_coord,
                     cal_zero_points=self.cal_points[0],
                     cal_one_points=self.cal_points[1])
+
+    def norm_data_to_cal_points(self):
+        # Used if data is based on only one weight
+        if self.cal_points is None:
+            # implicit in double point AllXY
+            if len(self.measured_values[0]) == 42:
+                cal_zero_points = list(range(2))
+                cal_one_points = list(range(-8, -4))
+            # implicit in single point AllXY
+            elif len(self.measured_values[0]) == 21:
+                cal_zero_points = list(range(1))
+                cal_one_points = list(range(-4, -2))
+            else:
+                cal_zero_points = list(range(1))
+                cal_one_points = list(range(-2, 0))
+        else:
+            cal_zero_points = self.cal_points[0]
+            cal_one_points = self.cal_points[1]
+        self.corr_data = a_tools.normalize_data_v3(
+            self.measured_values[0],
+            cal_zero_points=cal_zero_points,
+            cal_one_points=cal_one_points)
 
     def run_default_analysis(self,
                              close_main_fig=True,  **kw):
@@ -1172,6 +1202,8 @@ class Rabi_Analysis(TD_Analysis):
 
     def run_default_analysis(self, close_file=True, **kw):
         self.get_naming_and_values()
+        # if optimal weight there is only 1 channel otherwise I and Q
+        self.nr_quadratures = len(self.ylabels)
         self.fit_data(**kw)
         self.make_figures(**kw)
         if close_file:
@@ -1180,10 +1212,17 @@ class Rabi_Analysis(TD_Analysis):
 
     def make_figures(self, **kw):
         show_guess = kw.pop('show_guess', False)
-        self.fig, self.axs = plt.subplots(2, 1, figsize=(5, 6))
+        if self.nr_quadratures == 2:
+            self.fig, self.axs = plt.subplots(self.nr_quadratures, 1,
+                                              figsize=(5, 6))
+        else:
+            self.fig, ax = plt.subplots(self.nr_quadratures, 1,
+                                        figsize=(5, 6))
+            self.axs = [ax]
+            # to ensure it is a list of axes, as figure making relies on this
         x_fine = np.linspace(min(self.sweep_points), max(self.sweep_points),
                              1000)
-        for i in [0, 1]:
+        for i in range(self.nr_quadratures):
             if i == 0:
                 plot_title = kw.pop('plot_title', textwrap.fill(
                                     self.timestamp_string + '_' +
@@ -1224,24 +1263,25 @@ class Rabi_Analysis(TD_Analysis):
 
     def fit_data(self, print_fit_results=False, **kw):
         model = fit_mods.lmfit.Model(fit_mods.CosFunc)
-        self.fit_res = ['', '']
-        # It would be best to do 1 fit to both datasets but since it is
-        # easier to do just one fit we stick to that.
-        # We make an initial guess of the Rabi period using both quadratures
-        data = np.sqrt(self.measured_values[0]**2+self.measured_values[1]**2)
-        params = fit_mods.Cos_guess(model, data=data,
-                             t=self.sweep_points)
-        fit_res = model.fit(
-            data=data,
-            t=self.sweep_points,
-            params=params)
-        freq_guess = fit_res.values['frequency']
-        for i in [0, 1]:
+
+        self.fit_res = ['']*self.nr_quadratures
+        if self.nr_quadratures != 1:
+            # It would be best to do 1 fit to both datasets but since it is
+            # easier to do just one fit we stick to that.
+            # We make an initial guess of the Rabi period using both quadratures
+            data = np.sqrt(self.measured_values[0]**2+self.measured_values[1]**2)
+            params = fit_mods.Cos_guess(model, data=data, t=self.sweep_points)
+            fit_res = model.fit(
+                data=data,
+                t=self.sweep_points,
+                params=params)
+            freq_guess = fit_res.values['frequency']
+        for i in range(self.nr_quadratures):
             model = fit_mods.lmfit.Model(fit_mods.CosFunc)
             params = fit_mods.Cos_guess(model, data=self.measured_values[i],
-                                 t=self.sweep_points)
-
-            params['frequency'].value = freq_guess
+                                        t=self.sweep_points)
+            if self.nr_quadratures != 1:
+                params['frequency'].value = freq_guess
             self.fit_res[i] = model.fit(
                 data=self.measured_values[i],
                 t=self.sweep_points,
@@ -1252,6 +1292,19 @@ class Rabi_Analysis(TD_Analysis):
                                             var_name=self.value_names[i])
             except Exception as e:
                 logging.warning(e)
+
+    def get_measured_amp180(self):
+        fit_grps = list(self.data_file['Analysis'].keys())
+        fitted_pars_0 = self.data_file['Analysis'][fit_grps[0]]
+        amp180 = fitted_pars_0['period'].attrs['value']/2
+        # If there are two quadratures, return the amplitude with the smallest
+        # errorbar
+        if len(fit_grps) == 2:
+            fitted_pars_1 = self.data_file['Analysis'][fit_grps[1]]
+            if (fitted_pars_1['period'].attrs['stderr'] <
+                    fitted_pars_0['period'].attrs['stderr']):
+                amp180 = fitted_pars_1['period'].attrs['value']/2
+        return amp180
 
 
 class TD_UHFQC(TD_Analysis):
@@ -1508,15 +1561,17 @@ class Motzoi_XY_analysis(TD_Analysis):
     def __init__(self, label='Motzoi', cal_points=[[-4, -3], [-2, -1]], **kw):
         kw['label'] = label
         kw['h5mode'] = 'r+'
-        self.cal_points=cal_points
+        self.cal_points = cal_points
         super().__init__(**kw)
 
     def run_default_analysis(self, close_file=True, close_main_fig=True, **kw):
         self.get_naming_and_values()
         self.add_analysis_datagroup_to_file()
         if self.cal_points is None:
-            self.corr_data = self.measured_values[0]**2 + self.measured_values[1]**2
-
+            if len(self.measured_values) == 2:
+                self.corr_data = self.measured_values[0]**2 + self.measured_values[1]**2
+            else:
+                self.corr_data = self.measured_values[0]
         else:
             self.rotate_and_normalize_data()
             self.add_dataset_to_analysisgroup('Corrected data',
@@ -1568,7 +1623,7 @@ class Motzoi_XY_analysis(TD_Analysis):
                     self.ax.plot(x_fine, fine_fit, c=c[i], label='guess')
 
         self.ax.legend(loc='best')
-        if self.cal_points != None:
+        if self.cal_points is not None:
             self.ax.set_ylim(-.1, 1.1)
         self.save_fig(self.fig, fig_tight=True, **kw)
 
@@ -1600,6 +1655,7 @@ class Motzoi_XY_analysis(TD_Analysis):
         As a parabola can have 2 intersects.
         Will default to picking the one closest to zero
         '''
+        # Fit res 0 is the fit res for Xy, and fit_res 1 for Yx
         b_vals0 = self.fit_res[0].best_values
         b_vals1 = self.fit_res[1].best_values
         x1, x2 = a_tools.solve_quadratic_equation(
@@ -1967,8 +2023,7 @@ class SSRO_Analysis(MeasurementAnalysis):
             axarray[1].set_xlim(-edge, edge)
             axarray[1].set_ylim(-edge, edge)
 
-            self.save_fig(fig, figname='SSRO_Density_Plots',
-                          close_fig=True, **kw)
+            self.save_fig(fig, figname='SSRO_Density_Plots', close_fig=True, **kw)
 
         # this part performs 2D gaussian fits and calculates coordinates of the
         # maxima
@@ -3151,19 +3206,19 @@ class DriveDetuning_Analysis(TD_Analysis):
 
         def sine_fit_data():
             self.fit_type = 'sine'
-
             model = fit_mods.lmfit.Model(fit_mods.CosFunc)
 
             params = fit_mods.Cos_guess(model, data=data,
-                                        t=sweep_points)
+                                 t=sweep_points)
             # This ensures that phase is *always* ~90 deg if it is different
             # this shows up in the amplitude and prevents the correct detuning
             # is shown.
             params['phase'].min = np.deg2rad(80)
             params['phase'].max = np.deg2rad(100)
 
+
             fit_results = model.fit(data=data, t=sweep_points,
-                                    params=params)
+                                             params=params)
             return fit_results
 
         def quadratic_fit_data():
@@ -3379,14 +3434,12 @@ class AllXY_Analysis(TD_Analysis):
         self.add_analysis_datagroup_to_file()
         self.get_naming_and_values()
 
-        ideal_data = kw.pop('ideal_data', None)
-        if ideal_data is None:
-            if len(self.measured_values[0]) == 42:
-                ideal_data = np.concatenate((0*np.ones(10), 0.5*np.ones(24),
-                                             np.ones(8)))
-            else:
-                ideal_data = np.concatenate((0*np.ones(5), 0.5*np.ones(12),
-                                             np.ones(4)))
+        if len(self.measured_values[0]) == 42:
+            ideal_data = np.concatenate((0*np.ones(10), 0.5*np.ones(24),
+                                         np.ones(8)))
+        else:
+            ideal_data = np.concatenate((0*np.ones(5), 0.5*np.ones(12),
+                                         np.ones(4)))
         self.rotate_and_normalize_data()
         self.add_dataset_to_analysisgroup('Corrected data',
                                           self.corr_data)
@@ -3396,58 +3449,63 @@ class AllXY_Analysis(TD_Analysis):
         self.deviation_total = np.mean(abs(data_error))
         # Plotting
         if self.make_fig:
-            fig1, fig2, ax1, axarray = self.setup_figures_and_axes()
-            for i in range(2):
-                if len(self.value_names) >= 4:
-                    ax = axarray[i/2, i % 2]
-                else:
-                    ax = axarray[i]
-                self.plot_results_vs_sweepparam(x=self.sweep_points,
-                                                y=self.measured_values[i],
-                                                fig=fig2, ax=ax,
-                                                xlabel=self.xlabel,
-                                                ylabel=str(
-                                                    self.value_names[i]),
-                                                save=False)
-            ax1.set_ylim(min(self.corr_data)-.1, max(self.corr_data)+.1)
-            if self.flip_axis:
-                ylabel = r'$F$ $|0 \rangle$'
-            else:
-                ylabel = r'$F$ $|1 \rangle$'
-            self.plot_results_vs_sweepparam(x=self.sweep_points,
-                                            y=self.corr_data,
-                                            fig=fig1, ax=ax1,
-                                            xlabel='',
-                                            ylabel=ylabel,
-                                            save=False)
-            ax1.plot(self.sweep_points, ideal_data)
-            labels = [item.get_text() for item in ax1.get_xticklabels()]
-            if len(self.measured_values[0]) == 42:
-                locs = np.arange(1, 42, 2)
-            else:
-                locs = np.arange(0, 21, 1)
-            labels = ['II', 'XX', 'YY', 'XY', 'YX',
-                      'xI', 'yI', 'xy', 'yx', 'xY', 'yX',
-                      'Xy', 'Yx', 'xX', 'Xx', 'yY', 'Yy',
-                      'XI', 'YI', 'xx', 'yy']
-
-            ax1.xaxis.set_ticks(locs)
-            ax1.set_xticklabels(labels, rotation=60)
-
-            deviation_text = r'Deviation: %.5f' % self.deviation_total
-            ax1.text(1, 1.05, deviation_text, fontsize=11,
-                     bbox=self.box_props)
-            if not close_main_fig:
-                # Hacked in here, good idea to only show the main fig but can
-                # be optimized somehow
-                self.save_fig(fig1, ylabel='Amplitude (normalized)',
-                              close_fig=False, **kw)
-            else:
-                self.save_fig(fig1, ylabel='Amplitude (normalized)', **kw)
-            self.save_fig(fig2, ylabel='Amplitude', **kw)
+            self.make_figures(ideal_data=ideal_data,
+                              close_main_fig=close_main_fig, **kw)
         if close_file:
             self.data_file.close()
         return self.deviation_total
+
+    def make_figures(self, ideal_data, close_main_fig, **kw):
+        fig1, fig2, ax1, axarray = self.setup_figures_and_axes()
+        for i in range(len(self.value_names)):
+            if len(self.value_names) == 2:
+                ax = axarray[i]
+            else:
+                ax = axarray
+            self.plot_results_vs_sweepparam(x=self.sweep_points,
+                                            y=self.measured_values[i],
+                                            fig=fig2, ax=ax,
+                                            xlabel=self.xlabel,
+                                            ylabel=str(
+                                                self.value_names[i]),
+                                            save=False)
+        ax1.set_ylim(min(self.corr_data)-.1, max(self.corr_data)+.1)
+        if self.flip_axis:
+            ylabel = r'$F$ $|0 \rangle$'
+        else:
+            ylabel = r'$F$ $|1 \rangle$'
+        self.plot_results_vs_sweepparam(x=self.sweep_points,
+                                        y=self.corr_data,
+                                        fig=fig1, ax=ax1,
+                                        xlabel='',
+                                        ylabel=ylabel,
+                                        save=False)
+        ax1.plot(self.sweep_points, ideal_data)
+        labels = [item.get_text() for item in ax1.get_xticklabels()]
+        if len(self.measured_values[0]) == 42:
+            locs = np.arange(1, 42, 2)
+        else:
+            locs = np.arange(0, 21, 1)
+        labels = ['II', 'XX', 'YY', 'XY', 'YX',
+                  'xI', 'yI', 'xy', 'yx', 'xY', 'yX',
+                  'Xy', 'Yx', 'xX', 'Xx', 'yY', 'Yy',
+                  'XI', 'YI', 'xx', 'yy']
+
+        ax1.xaxis.set_ticks(locs)
+        ax1.set_xticklabels(labels, rotation=60)
+
+        deviation_text = r'Deviation: %.5f' % self.deviation_total
+        ax1.text(1, 1.05, deviation_text, fontsize=11,
+                 bbox=self.box_props)
+        if not close_main_fig:
+            # Hacked in here, good idea to only show the main fig but can
+            # be optimized somehow
+            self.save_fig(fig1, ylabel='Amplitude (normalized)',
+                          close_fig=False, **kw)
+        else:
+            self.save_fig(fig1, ylabel='Amplitude (normalized)', **kw)
+        self.save_fig(fig2, ylabel='Amplitude', **kw)
+
 
 
 class RandomizedBenchmarking_Analysis(TD_Analysis):
@@ -4027,7 +4085,6 @@ class VNA_Analysis(MeasurementAnalysis):
     '''
     Nice to use with all measurements performed with the VNA.
     '''
-
     def __init__(self, label='VNA', **kw):
         kw['label'] = label
         kw['h5mode'] = 'r+'
@@ -4274,12 +4331,10 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
                 abs(max(self.data_dist) - min(self.data_dist))
 
             if kappa_guess == 0:
-                # When kappa_guess is zero, the fitting procedure fails (claims
-                # 'input has nan values')
-                kappa_guess = 1
+                    kappa_guess = 1 # When kappa_guess is zero, the fitting procedure fails (claims 'input has nan values')
 
-            if not peak_flag:  # Change the sign of amplitude_guess for dips
-                amplitude_guess *= -1.
+            if not peak_flag: # Change the sign of amplitude_guess for dips
+                amplitude_guess*=-1.
 
             LorentzianModel = fit_mods.LorentzianModel
             LorentzianModel.set_param_hint('f0',
