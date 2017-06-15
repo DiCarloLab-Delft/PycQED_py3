@@ -266,6 +266,8 @@ class QWG_FluxLookuptableManager(Instrument):
                                      'codewords.',
                            vals=vals.Lists(vals.Ints()))
 
+        self._wave_dict = {}
+
     def standard_waveforms(self):
         '''
         Returns standard waveforms, without delays or distortions applied.
@@ -367,6 +369,10 @@ class QWG_FluxLookuptableManager(Instrument):
         Args:
             pulse_name      (str): name of the pulse to regenerate
         '''
+        if not self._wave_dict:
+            # Pulses have never been generated since instatiation.
+            self.generate_standard_pulses()
+
         if pulse_name not in self._wave_dict.keys():
             raise KeyError(
                 'Pulse {} not in wave dictionary.'.format(pulse_name))
