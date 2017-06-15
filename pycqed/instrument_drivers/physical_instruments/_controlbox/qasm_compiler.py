@@ -334,7 +334,10 @@ class QASM_QuMIS_Compiler():
         else:
             self.config_filename = config_filename
 
-    def compile(self, filename, qumis_fn=None):
+    def compile(self, filename: str, qumis_fn: str=None)-> bool:
+        """
+        Compiles the
+        """
         self.filename = filename
         self.qumis_fn = qumis_fn
         self.qumis_instructions = []  # final result that should be uploaded
@@ -353,6 +356,7 @@ class QASM_QuMIS_Compiler():
         if self.verbosity_level >= 1:
             print("QuMIS generated successfully and written into {}".format(
                 self.qumis_fn))
+        return True
 
     def build_dependency_graph(self):
         pass
@@ -1094,7 +1098,14 @@ class QASM_QuMIS_Compiler():
         self.compensate_minus_time()
 
     def apply_codeword(self):
+        """
+        This function converts codewords (int) to the correct combination
+        of trigger bits.
+
+        Not really clear what it does for instructions other than trigger.
+
         # N.B. What does this function do exactly?
+        """
         new_tp_list = []
         for tp in self.hw_timing_grid:
             absolute_time = tp.absolute_time
@@ -1115,7 +1126,8 @@ class QASM_QuMIS_Compiler():
                     if (hw_event.codeword != -1):
                         bitwidth = len(hw_event.codeword_bit)
                         codeword_array = bitfield(hw_event.codeword,
-                                                  bitwidth)
+                                                  bitwidth, little_endian=False)
+                        print(codeword_array)
 
                         for i in range(bitwidth):
                             if codeword_array[i] == 1:

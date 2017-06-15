@@ -105,12 +105,11 @@ class Test_compiler(unittest.TestCase):
         self.assertEqual(mx90_q0, 'pulse 0000, 0000, 1101')
         self.assertEqual(my90_q0, 'pulse 0000, 0000, 1110')
 
-    @unittest.expectedFailure
     def test_converting_triggers_to_qumis(self):
         qasm_fn = join(self.test_file_dir, 'single_op.qasm')
         qumis_fn = join(self.test_file_dir, "output.qumis")
         compiler = qc.QASM_QuMIS_Compiler(self.config_fn,
-                                          verbosity_level=6)
+                                          verbosity_level=0)
         compiler.compile(qasm_fn, qumis_fn)
         qumis = compiler.qumis_instructions
 
