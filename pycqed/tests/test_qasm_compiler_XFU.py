@@ -22,7 +22,8 @@ class Test_compiler(unittest.TestCase):
             pq.__path__[0], 'tests', 'qasm_files')
         self.config_fn = join(self.test_file_dir, 'config.json')
 
-        self.jump_to_start = "beq r14, r14, Exp_Start \t# Infinite loop"
+        self.jump_to_start = ("beq r14, r14, Exp_Start " +
+                              "\t# Jump to start ad nauseam")
 
     def test_compiler_example(self):
         qasm_fn = join(self.test_file_dir, 'dev_test.qasm')
@@ -82,7 +83,6 @@ class Test_compiler(unittest.TestCase):
         self.assertEqual(
             set(compiler.luts[0].keys()), allowed_single_q_ops)  # MW and Flux
 
-    @unittest.expectedFailure
     def test_converting_CBox_pulses_to_qumis(self):
 
         qasm_fn = join(self.test_file_dir, 'single_op.qasm')
@@ -148,7 +148,8 @@ class Test_single_qubit_seqs(unittest.TestCase):
             pq.__path__[0], 'tests', 'qasm_files')
         self.config_fn = join(self.test_file_dir, 'config.json')
         self.qubit_name = 'q0'
-        self.jump_to_start = "beq r14, r14, Exp_Start \t# Infinite loop"
+        self.jump_to_start = ("beq r14, r14, Exp_Start " +
+                              "\t# Jump to start ad nauseam")
 
     @unittest.skip('no identity')
     def test_qasm_seq_T1(self):

@@ -27,7 +27,7 @@ import os
 import sys
 import bisect
 import copy
-
+from pycqed.utilities.general import int_to_bin
 
 MAX_TRIG_BITS = 7
 DEFAULT_MEASURE_TIME = 300  # ns
@@ -350,8 +350,9 @@ class QASM_QuMIS_Compiler():
         self.convert_to_hw_trigger()
         self.gen_full_time_grid()
         self.convert_to_qumis()
-        print("QuMIS generated successfully and written into {}".format(
-            self.qumis_fn))
+        if self.verbosity_level >= 1:
+            print("QuMIS generated successfully and written into {}".format(
+                self.qumis_fn))
 
     def build_dependency_graph(self):
         pass
@@ -1083,6 +1084,7 @@ class QASM_QuMIS_Compiler():
             self.hw_timing_grid.append(tp)
 
         if self.verbosity_level > 4:
+            print("After converting event timing grid to hardware timing")
             self.print_hw_timing_grid()
 
     def gen_full_time_grid(self):
@@ -1092,6 +1094,7 @@ class QASM_QuMIS_Compiler():
         self.compensate_minus_time()
 
     def apply_codeword(self):
+        # N.B. What does this function do exactly?
         new_tp_list = []
         for tp in self.hw_timing_grid:
             absolute_time = tp.absolute_time
@@ -1127,6 +1130,7 @@ class QASM_QuMIS_Compiler():
 
         self.hw_timing_grid = new_tp_list
         if self.verbosity_level > 4:
+            print("After applying codewords")
             self.print_hw_timing_grid()
 
     def compensate_minus_time(self):
@@ -1138,6 +1142,7 @@ class QASM_QuMIS_Compiler():
                 self.hw_timing_grid[i].absolute_time += added_time
 
         if self.verbosity_level > 4:
+            print("After compensating for negative time")
             self.print_hw_timing_grid()
 
     def vertical_divide_trigger(self):
@@ -1345,10 +1350,14 @@ class QASM_QuMIS_Compiler():
 
             previous_time = tp.absolute_time
 
-            pulse_list = [0, 0, 0]
+            pulse_list = [None, None, None]
+            # Loop overall hw_events that occur at the same time to turn
+            # them into instructions
             for hw_event in tp.parallel_events:
                 if hw_event.qumis_name == "pulse":
-                    pulse_list[hw_event.awg_nr] = 1 << 3 + hw_event.codeword
+                    # Add the pulse to the pulse list for the
+                    # respective channel
+                    pulse_list[hw_event.awg_nr] = hw_event.codeword
 
                 if hw_event.qumis_name == "trigger":
                     mask = 0
@@ -1361,18 +1370,27 @@ class QASM_QuMIS_Compiler():
                 if hw_event.qumis_name == "measure":
                     self.qumis_instructions.append("measure")
 
-            if max(pulse_list) != 0:
+            # If any pulses where added, create the right instruction
+            if not all(cw is None for cw in pulse_list):
+                pulse_cws = ['']*3
+                for i, cw in enumerate(pulse_list):
+                    if cw is None:  # don't trigger if no codeword specified
+                        pulse_cws[i] = '0000'
+                    else:  # Create the appropriate codeword
+                        pulse_cws[i] = '1'+int_to_bin(cw, w=3, lsb_last=True)
+
                 pulse_instruction = \
-                    "pulse {0:{fill}4b}, {1:{fill}4b}, {2:{fill}4b}".format(
-                        pulse_list[0], pulse_list[1], pulse_list[2], fill='0')
+                    "pulse {}, {}, {}".format(pulse_cws[0],
+                                              pulse_cws[1], pulse_cws[2])
                 self.qumis_instructions.append(pulse_instruction)
 
         if self.qumis_instructions[0][:4] != "wait":
-            if self.verbosity_level >= 1:
-                print("Instruction 'Wait 1' automatically added at the beginning.")
+            if self.verbosity_level >= 2:
+                print("Instruction 'Wait 1' added at the beginning.")
             self.qumis_instructions.insert(0, "wait 1")
         if self.infinit_loop_qumis:
-            jump_to_start = "beq r14, r14, Exp_Start \t# Infinite loop"
+            jump_to_start = ("beq r14, r14, "
+                             "Exp_Start \t# Jump to start ad nauseam")
             self.qumis_instructions.append(jump_to_start)
 
         qumis_file = open(self.qumis_fn, "w")
@@ -1383,5 +1401,7 @@ class QASM_QuMIS_Compiler():
             self.print_qumis()
 
     def print_qumis(self):
+        print("qumis:")
         for qi in self.qumis_instructions:
-            print(qi)
+            print('\t'+qi)
+        print("")
