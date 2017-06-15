@@ -88,6 +88,19 @@ class test_ramsey_analysis(unittest.TestCase):
         self.assertAlmostEqual(fpar['frequency'], 61135.024, places=2)
 
 
+class test_echo_analysis(unittest.TestCase):
+
+    @classmethod
+    def setUpClass(self):
+        self.datadir = os.path.join(pq.__path__[0], 'tests', 'test_data')
+        ma.a_tools.datadir = self.datadir
+
+    def test_echo_single_weight(self):
+        a = ma.Echo_analysis(timestamp='20170607_211611')
+        fpar = a.fit_res.best_values
+        self.assertAlmostEqual(fpar['tau']*1e6, 12.7, places=2)
+
+
 class test_allxy_analysis(unittest.TestCase):
 
     @classmethod
@@ -121,9 +134,7 @@ class test_t1_analysis(unittest.TestCase):
         a = ma.T1_Analysis(timestamp='20170607_152324')
         self.assertAlmostEqual(a.T1*1e6, 35.0788, places=3)
 
-    @unittest.expectedFailure
     def test_loading_T1_fit_res_from_file(self):
-        raise NotImplementedError()
         a = ma.T1_Analysis(timestamp='20170607_210448', auto=False)
         T1 = a.get_measured_T1()[0]
         self.assertAlmostEqual(T1*1e6, 18.0505, places=3)
