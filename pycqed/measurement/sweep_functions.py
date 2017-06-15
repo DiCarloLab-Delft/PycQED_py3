@@ -1,5 +1,6 @@
 import logging
 import time
+import numpy as np
 
 from pycqed.instrument_drivers.virtual_instruments.pyqx import qasm_loader as ql
 from pycqed.measurement.waveform_control_CC import qasm_to_asm as qta
@@ -405,6 +406,7 @@ class QWG_lutman_par(Soft_Sweep):
         self.LutMan_parameter.set(val)
         self.LutMan.load_pulses_onto_AWG_lookuptable(regenerate_pulses=True)
         self.LutMan.QWG.get_instr().start()
+        self.LutMan.QWG.get_instr().getOperationComplete()
 
 
 class QWG_flux_amp(Soft_Sweep):
@@ -428,3 +430,53 @@ class QWG_flux_amp(Soft_Sweep):
         self.qwg_channel_amp_par(Vpp)
         # Ensure the amplitude was set correctly
         self.QWG.getOperationComplete()
+
+
+class QWG_lutman_par_chunks(Soft_Sweep):
+    '''
+    Sweep function that divides sweep points into chunks. Every chunk is
+    measured with a QASM sweep, and the operation dictionary can change between
+    different chunks. Pulses are re-uploaded between chunks.
+    '''
+    def __init__(self, LutMan, LutMan_parameter,
+                 sweep_points, chunk_size, codewords=np.arange(128),
+                 flux_pulse_type='square', **kw):
+       super().__init__(**kw)
+       self.sweep_points = sweep_points
+       self.chunk_size = chunk_size
+       self.LutMan = LutMan
+       self.LutMan_parameter = LutMan_parameter
+       self.name = LutMan_parameter.name
+       self.parameter_name = LutMan_parameter.label
+       self.unit = LutMan_parameter.unit
+       self.flux_pulse_type = flux_pulse_type
+       self.codewords = codewords
+
+    def set_parameter(self, val):
+        # Find index of val in sweep_points
+        ind = np.where(self.sweep_points == val)[0]
+        if len(ind) == 0:
+            # val was not found in the sweep points
+            raise ValueError('Value {} is not in the sweep points'.format(val))
+        ind = ind[0]  # set index to the first occurence of val in sweep points
+
+        QWG = self.LutMan.QWG.get_instr()
+        QWG.stop()
+
+        for i, paramVal in enumerate(self.sweep_points[ind:ind+self.chunk_size]):
+            pulseName = 'pulse_{}'.format(i)
+
+            # Generate new pulse
+            self.LutMan_parameter.set(paramVal)
+            self.LutMan.regenerate_pulse(self.flux_pulse_type)
+
+            # Load onto QWG
+            QWG.createWaveformReal(pulseName,
+                                   self.LutMan._wave_dict[self.flux_pulse_type])
+
+            # Assign codeword
+            QWG.set('codeword_{}_ch{}_waveform'
+                    .format(self.codewords[i], self.LutMan.F_ch()), pulseName)
+
+        QWG.start()
+        QWG.getOperationComplete()

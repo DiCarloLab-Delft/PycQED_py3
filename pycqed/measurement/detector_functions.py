@@ -1341,6 +1341,7 @@ class UHFQC_integrated_average_detector(Hard_Detector):
                  channels=(0, 1, 2, 3), result_logging_mode='raw',
                  real_imag=True,
                  seg_per_point=1, single_int_avg=False,
+                 chunk_size=None,
                  **kw):
         """
         Args:
@@ -1395,6 +1396,7 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         res_logging_indices = {'lin_trans': 0, 'digitized': 1, 'raw': 2}
         self.result_logging_mode_idx = res_logging_indices[result_logging_mode]
         self.result_logging_mode = result_logging_mode
+        self.chunk_size = chunk_size
 
         self._set_real_imag(real_imag)
 
@@ -1459,10 +1461,18 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         # Determine the number of sweep points and set them
         if sweep_points is None or self.single_int_avg:
             # this case will be used when it is a soft detector
+            # Note: single_int_avg overrides chunk_size
+            # single_int_avg = True is equivalent to chunk_size = 1
             self.nr_sweep_points = self.seg_per_point
         else:
             self.nr_sweep_points = len(sweep_points)*self.seg_per_point
         # this sets the result to integration and rotation outcome
+
+            if (self.chunk_size is not None and
+                self.chunk_size < self.nr_sweep_points):
+                # Chunk size is defined and smaller than total number of sweep
+                # points -> only acquire one chunk
+                self.nr_sweep_points = self.chunk_size * self.seg_per_point
 
         self.UHFQC.awgs_0_userregs_0(
             int(self.nr_averages*self.nr_sweep_points))
