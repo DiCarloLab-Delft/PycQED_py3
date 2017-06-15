@@ -1,5 +1,4 @@
 import os
-# import qt
 import numpy as np
 import h5py
 from pycqed.analysis import analysis_toolbox as a_tools
@@ -85,8 +84,8 @@ def to_hex_string(byteval):
     return "b'" + ''.join('\\x{:02x}'.format(x) for x in byteval) + "'"
 
 
-def load_settings_onto_instrument(instrument, load_from_instr=None, folder=None,
-                                  label=None,
+def load_settings_onto_instrument(instrument, load_from_instr=None,
+                                  folder=None, label=None,
                                   timestamp=None, **kw):
     '''
     Loads settings from an hdf5 file onto the instrument handed to the
