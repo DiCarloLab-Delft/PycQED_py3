@@ -1,5 +1,5 @@
 import os
-# import qt
+import numpy as np
 import h5py
 from pycqed.analysis import analysis_toolbox as a_tools
 import errno
@@ -84,8 +84,8 @@ def to_hex_string(byteval):
     return "b'" + ''.join('\\x{:02x}'.format(x) for x in byteval) + "'"
 
 
-def load_settings_onto_instrument(instrument, load_from_instr=None, folder=None,
-                                  label=None,
+def load_settings_onto_instrument(instrument, load_from_instr=None,
+                                  folder=None, label=None,
                                   timestamp=None, **kw):
     '''
     Loads settings from an hdf5 file onto the instrument handed to the
@@ -235,3 +235,73 @@ def execfile(path, global_vars=None, local_vars=None):
     with open(path, 'r') as f:
         code = compile(f.read(), path, 'exec')
         exec(code, global_vars, local_vars)
+
+
+def span_num(center: float, span: float, num: int, endpoint: bool=True):
+    """
+    Creates a linear span of points around center
+    Args:
+        center (float) : center of the array
+        span   (float) : span the total range of values to span
+        num      (int) : the number of points in the span
+        endpoint (bool): whether to include the endpoint
+
+    """
+    return np.linspace(center-span/2, center+span/2, num, endpoint=endpoint)
+
+
+def span_step(center: float, span: float, step: float, endpoint: bool=True):
+    """
+    Creates a range of points spanned around a center
+    Args:
+        center (float) : center of the array
+        span   (float) : span the total range of values to span
+        step   (float) : the stepsize between points in the array
+        endpoint (bool): whether to include the endpoint in the span
+
+    """
+    # True*step/100 in the arange ensures the right boundary is included
+    return np.arange(center-span/2, center+span/2+endpoint*step/100, step)
+
+
+def gen_sweep_pts(start: float=None, stop: float=None,
+                  center: float=0, span: float=None,
+                  num: int=None, step: float=None, endpoint=True):
+    """
+    Generates an array of sweep points based on different types of input
+    arguments.
+    Boundaries of the array can be specified using either start/stop or
+    using center/span. The points can be specified using either num or step.
+
+    Args:
+        start  (float) : start of the array
+        stop   (float) : end of the array
+        center (float) : center of the array
+                         N.B. 0 is chosen as a sensible default for the span.
+                         it is argued that no such sensible default exists
+                         for the other types of input.
+        span   (float) : span the total range of values to span
+
+        num      (int) : number of points in the array
+        step   (float) : the stepsize between points in the array
+        endpoint (bool): whether to include the endpoint
+
+    """
+    if (start is not None) and (stop is not None):
+        if num is not None:
+            return np.linspace(start, stop, num, endpoint=endpoint)
+        elif step is not None:
+            # numpy arange does not natively support endpoint
+            return np.arange(start, stop + endpoint*step/100, step)
+        else:
+            raise ValueError('Either "num" or "step" must be specified')
+    elif (center is not None) and (span is not None):
+        if num is not None:
+            return span_num(center, span, num, endpoint=endpoint)
+        elif step is not None:
+            return span_step(center, span, step, endpoint=endpoint)
+        else:
+            raise ValueError('Either "num" or "step" must be specified')
+    else:
+        raise ValueError('Either ("start" and "stop") or '
+                         '("center" and "span") must be specified')
