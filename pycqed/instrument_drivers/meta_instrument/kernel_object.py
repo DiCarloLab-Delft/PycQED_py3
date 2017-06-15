@@ -30,12 +30,10 @@ class Distortion(Instrument):
                            vals=vals.Ints(),
                            parameter_class=ManualParameter)
 
-        self.add_parameter('kernel_list',
-                           initial_value=[],
-                           # update to vals.List after merge of PR #542 in QCodes
-                           vals=vals.Anything(),
-                           parameter_class=ConfigParameter,
-                           docstring='List of external kernels to be loaded')
+        self.add_parameter(
+            'kernel_list', initial_value=[], vals=vals.Lists(vals.Strings()),
+            parameter_class=ConfigParameter,
+            docstring='List of filenames of external kernels to be loaded')
 
         self.add_parameter('kernel_dir',
                            initial_value='kernels/',
@@ -142,9 +140,10 @@ class Distortion(Instrument):
         v.validate(kernel_name)
         kernel_list = self.kernel_list()
         if kernel_name in kernel_list:
-            raise ValueError('Kernel "{}" already in kernel list'.format(kernel_name))
+            raise ValueError(
+                'Kernel "{}" already in kernel list'.format(kernel_name))
         kernel_list.append(kernel_name)
-        self._config_changed = True # has to be done by hand as appending to
+        self._config_changed = True  # has to be done by hand as appending to
         # the list does not correctlyupdate the changed flag
         self.kernel_list(kernel_list)
 
@@ -192,7 +191,8 @@ class Distortion(Instrument):
         """
         kernels = kernel_list[0]
         for k in kernel_list[1:]:
-            kernels = np.convolve(k, kernels)[:max(len(k), int(length_samples))]
+            kernels = np.convolve(k, kernels)[
+                :max(len(k), int(length_samples))]
         if length_samples is not None:
             return kernels[:int(length_samples)]
         return kernels
