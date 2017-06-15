@@ -257,11 +257,11 @@ user_op_type = {
 
 default_op_dict = {
     "I": {
-        "parameters": 1,
+        "parameters": 1,  # Parameter is wait in ns
         "type": EventType.WAIT
     },
     "qubit": {
-        "parameters": -1,
+        "parameters": -1,  # Accept indefinite number of parameters
         "type": EventType.DECLARE
     },
 
@@ -271,7 +271,7 @@ default_op_dict = {
     },
 
     "measure": {
-        "parameters": 1,
+        "parameters": 1,  # Should be -1? Now only specifies a single target
         "type": EventType.MEASURE
     },
 
