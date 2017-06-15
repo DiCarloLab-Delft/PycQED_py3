@@ -1,24 +1,23 @@
 import os
-# import qt
 import numpy as np
 import h5py
 from pycqed.analysis import analysis_toolbox as a_tools
 import errno
-
+import pycqed as pq
 import sys
 import glob
-from os.path import join, dirname, exists
+from os.path import dirname, exists
 from os import makedirs
+import logging
+import subprocess
 
 
 def get_git_revision_hash():
-    import logging
-    import subprocess
     try:
         # Refers to the global qc_config
-        PycQEDdir = qc_config['PycQEDdir']
+        PycQEDdir = pq.__path__[0]
         hash = subprocess.check_output(['git', 'rev-parse',
-                                        '--short=7', 'HEAD'], cwd=PycQEDdir)
+                                        '--short=10', 'HEAD'], cwd=PycQEDdir)
     except:
         logging.warning('Failed to get Git revision hash, using 00000 instead')
         hash = '00000'
@@ -85,8 +84,8 @@ def to_hex_string(byteval):
     return "b'" + ''.join('\\x{:02x}'.format(x) for x in byteval) + "'"
 
 
-def load_settings_onto_instrument(instrument, load_from_instr=None, folder=None,
-                                  label=None,
+def load_settings_onto_instrument(instrument, load_from_instr=None,
+                                  folder=None, label=None,
                                   timestamp=None, **kw):
     '''
     Loads settings from an hdf5 file onto the instrument handed to the
