@@ -80,9 +80,12 @@ class test_ramsey_analysis(unittest.TestCase):
         self.assertAlmostEqual(fpar['exponential_offset'], 0.5057, places=2)
         self.assertAlmostEqual(fpar['frequency'], 250349.150, places=2)
 
-    @unittest.expectedFailure
     def test_ramsey_single_weight(self):
-        raise NotImplementedError()
+        a = ma.Ramsey_Analysis(timestamp='20170607_211144')
+        fpar = a.fit_res.best_values
+        self.assertAlmostEqual(fpar['tau']*1e6, 8.9793, places=2)
+        self.assertAlmostEqual(fpar['exponential_offset'], 0.5057, places=2)
+        self.assertAlmostEqual(fpar['frequency'], 61135.024, places=2)
 
 
 class test_allxy_analysis(unittest.TestCase):
