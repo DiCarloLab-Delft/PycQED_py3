@@ -1,24 +1,23 @@
 import os
-# import qt
 import numpy as np
 import h5py
 from pycqed.analysis import analysis_toolbox as a_tools
 import errno
-
+import pycqed as pq
 import sys
 import glob
-from os.path import join, dirname, exists
+from os.path import dirname, exists
 from os import makedirs
+import logging
+import subprocess
 
 
 def get_git_revision_hash():
-    import logging
-    import subprocess
     try:
         # Refers to the global qc_config
-        PycQEDdir = qc_config['PycQEDdir']
+        PycQEDdir = pq.__path__[0]
         hash = subprocess.check_output(['git', 'rev-parse',
-                                        '--short=7', 'HEAD'], cwd=PycQEDdir)
+                                        '--short=10', 'HEAD'], cwd=PycQEDdir)
     except:
         logging.warning('Failed to get Git revision hash, using 00000 instead')
         hash = '00000'
@@ -85,8 +84,8 @@ def to_hex_string(byteval):
     return "b'" + ''.join('\\x{:02x}'.format(x) for x in byteval) + "'"
 
 
-def load_settings_onto_instrument(instrument, load_from_instr=None, folder=None,
-                                  label=None,
+def load_settings_onto_instrument(instrument, load_from_instr=None,
+                                  folder=None, label=None,
                                   timestamp=None, **kw):
     '''
     Loads settings from an hdf5 file onto the instrument handed to the
@@ -238,7 +237,7 @@ def execfile(path, global_vars=None, local_vars=None):
         exec(code, global_vars, local_vars)
 
 
-def span_num(center, span, num, endpoint=True):
+def span_num(center: float, span: float, num: int, endpoint: bool=True):
     """
     Creates a linear span of points around center
     Args:
@@ -251,7 +250,7 @@ def span_num(center, span, num, endpoint=True):
     return np.linspace(center-span/2, center+span/2, num, endpoint=endpoint)
 
 
-def span_step(center, span, step, endpoint=True):
+def span_step(center: float, span: float, step: float, endpoint: bool=True):
     """
     Creates a range of points spanned around a center
     Args:
@@ -265,9 +264,9 @@ def span_step(center, span, step, endpoint=True):
     return np.arange(center-span/2, center+span/2+endpoint*step/100, step)
 
 
-def gen_sweep_pts(start=None, stop=None,
-                  center=None, span=None,
-                  num=None, step=None, endpoint=True):
+def gen_sweep_pts(start: float=None, stop: float=None,
+                  center: float=0, span: float=None,
+                  num: int=None, step: float=None, endpoint=True):
     """
     Generates an array of sweep points based on different types of input
     arguments.
@@ -278,6 +277,9 @@ def gen_sweep_pts(start=None, stop=None,
         start  (float) : start of the array
         stop   (float) : end of the array
         center (float) : center of the array
+                         N.B. 0 is chosen as a sensible default for the span.
+                         it is argued that no such sensible default exists
+                         for the other types of input.
         span   (float) : span the total range of values to span
 
         num      (int) : number of points in the array
@@ -285,7 +287,6 @@ def gen_sweep_pts(start=None, stop=None,
         endpoint (bool): whether to include the endpoint
 
     """
-
     if (start is not None) and (stop is not None):
         if num is not None:
             return np.linspace(start, stop, num, endpoint=endpoint)
