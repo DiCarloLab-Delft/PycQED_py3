@@ -14,7 +14,7 @@ class Test_single_qubit_seqs(TestCase):
     def setAssembler(self, qumis_file_name=None):
         test_file_dir = os.path.join(
             pq.__path__[0], 'tests', 'test_data', "20170328")
-        if qumis_file_name != None:
+        if qumis_file_name is not None:
             self.qumis_file_name = os.path.join(test_file_dir,
                                                 qumis_file_name)
         else:
@@ -307,7 +307,7 @@ class Test_single_qubit_seqs(TestCase):
         self.assembler.decompose()
         self.assembler.merge_consecutive_wait()
 
-        if self.assembler.add_nop_after_label == True:
+        if self.assembler.add_nop_after_label:
             self.assertEqual(merge_wait_array,
                              self.assembler.label_instrs)
         else:
