@@ -8,7 +8,7 @@ class qasm_loader:
 
     def __init__(self, file_name):
         # print("[+] pyqx : qasm_loader : loading file '%s' ..." % file_name)
-        self.file_name = file_name
+        print(file_name)
         with open(file_name) as f:
             self.lines = f.readlines()
         # lines pre-processing

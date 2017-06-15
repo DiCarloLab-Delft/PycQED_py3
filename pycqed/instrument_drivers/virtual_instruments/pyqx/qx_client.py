@@ -13,7 +13,6 @@
 
 import socket
 
-
 class qx_client:
 
     """
@@ -31,7 +30,7 @@ class qx_client:
         self.__circuits = []
         # default main circuit is always there
         self.__circuits.append("default")
-        self.__debug = 0
+        self.__debug = 1
 
     def connect(self, host="localhost", port=5555):
         print("[+] connecting to QX server...")
@@ -115,7 +114,7 @@ class qx_client:
         """
         # safety check
         if self.__qubits == 0:   # error : qubits should be created first
-            raise IllegalOperationException
+            raise self.IllegalOperationException
         '''
         if (len(batch_cmd) < self.buffer_size):
             self.send_cmd(".%s" % name)   # create the circuit named 'name'
@@ -134,7 +133,7 @@ class qx_client:
             if seq != 0:
                self.send_cmd(batch)
         '''
-        self.send_cmd(".%s" % name)   # create the circuit named 'name'
+        res = self.send_cmd(".%s" % name)   # create the circuit named 'name'
         # for g in gates:
         #    self.send_cmd(g)
 
@@ -165,7 +164,7 @@ class qx_client:
         if name in self.__circuits:
             self.send_cmd("run %s" % name)
         else:
-            raise IllegalOperationException
+            raise self.IllegalOperationException
 
     def run_noisy_circuit(self, name, error_probability,
                           error_model="depolarizing_channel", iterations=1):
@@ -178,7 +177,7 @@ class qx_client:
         else:
             print("[~] qx_client : trying to execute ", name)
             print(self.__circuits)
-            raise IllegalOperationException   # circuit does not exist
+            raise self.IllegalOperationException   # circuit does not exist
 
     def get_measurement(self, qubit):
         """
