@@ -3459,7 +3459,7 @@ class AllXY_Analysis(TD_Analysis):
             if len(self.value_names) == 2:
                 ax = axarray[i]
             else:
-                ax = ax
+                ax = axarray
             self.plot_results_vs_sweepparam(x=self.sweep_points,
                                             y=self.measured_values[i],
                                             fig=fig2, ax=ax,
