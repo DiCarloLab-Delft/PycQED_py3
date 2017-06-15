@@ -18,6 +18,7 @@ import time
 from qcodes import StandardParameter
 import os
 import json
+import sys
 
 log = logging.getLogger(__name__)
 
@@ -436,6 +437,7 @@ class DDMq(SCPI):
             elif (finished != '1'):
                 time.sleep(1.0/FINISH_BIT_CHECK_FERQUENTION_HZ)
         print("\r", end='\0')
+        sys.stdout.flush()
         self._displayQBitErrors("TV Mode", ch_pair, wNr)
         self.write('qutech:tvmode{:d}:data{:d}? '.format(ch_pair, wNr))
         binBlock = self.binBlockRead()
@@ -473,6 +475,7 @@ class DDMq(SCPI):
             elif (finished != '1'):
                 time.sleep(1.0/FINISH_BIT_CHECK_FERQUENTION_HZ)
         print("\r", end='\0')
+        sys.stdout.flush()
         self._displayQBitErrors("TV Mode - Qbit state", ch_pair, wNr)
 
         self.write('qutech:qstate{:d}:data{:d}:counter? '.format(ch_pair, wNr))
@@ -491,6 +494,7 @@ class DDMq(SCPI):
             elif (finished != '1'):
                 time.sleep(1.0/FINISH_BIT_CHECK_FERQUENTION_HZ)
         print("\r", end='\0')
+        sys.stdout.flush()
         self._displayQBitErrors("TV Mode - Qbit state", ch_pair, wNr)
         self.write('qutech:qstate{:d}:data{:d}:average? '.format(ch_pair, wNr))
         binBlock = self.binBlockRead()
@@ -508,6 +512,7 @@ class DDMq(SCPI):
             elif (finished != '1'):
                 time.sleep(1.0/FINISH_BIT_CHECK_FERQUENTION_HZ)
         print("\r", end='\0')
+        sys.stdout.flush()
         self._displayQBitErrors("Logging", ch_pair, wNr)
         self.write('qutech:logging{:d}:data{:d}:int? '.format(ch_pair, wNr))
         binBlock = self.binBlockRead()
@@ -525,6 +530,7 @@ class DDMq(SCPI):
             elif (finished != '1'):
                 time.sleep(1.0/FINISH_BIT_CHECK_FERQUENTION_HZ)
         print("\r", end='\0')
+        sys.stdout.flush()
         self._displayQBitErrors("Logging - Qbit state", ch_pair, wNr)
         self.write('qutech:logging{:d}:data{:d}:qstate? '.format(ch_pair, wNr))
         binBlock = self.binBlockRead()
@@ -622,6 +628,7 @@ class DDMq(SCPI):
             elif (finished != '1'):
                 time.sleep(1.0/FINISH_BIT_CHECK_FERQUENTION_HZ)
         print("\r", end='\0')
+        sys.stdout.flush()
         self._displayQBitErrors("Error Fract", ch_pair, wNr)
 
         self.write('qutech:errorfraction{:d}:data{:d}? '.format(ch_pair, wNr))
@@ -1017,31 +1024,13 @@ class DDMq(SCPI):
                 errors[i].log()
 
     def _parseErrorList(self, acquisitionMode, errorList):
-        errors = []
-
-        start = 0
-        end = -1
-        looping = True
-
-        while (looping):
-            start = end + 1
-            end = errorList.find(',\"', start)
-            errorCode = int(float(errorList[start:end]))
-
-            start = end + 2
-            end = errorList.find("\",", start)
-            description = errorList[start:end]
-
-            start = end + 2
-            end = errorList.find(',', start)
-            if (end < 0):
-                end = len(errorList)
-                looping = False
-            errorLevel = int(errorList[start:end])
-            if (errorCode):
-                errors.append(self.Error(errorCode, description,
-                                         errorLevel, acquisitionMode))
-        return errors
+        results = []
+        errors = errorList.splitlines()
+        for error_str in errors:
+            error = json.loads(error_str)
+            results.append(self.Error(error['error_code'], error['description']
+                                      , error['error_level'], acquisitionMode))
+        return results
 
     def _getInAvgErrors(self, acquisitionMode, ch):
         return self._parseErrorList(acquisitionMode, self.ask(
