@@ -1863,7 +1863,8 @@ class SSRO_Analysis(MeasurementAnalysis):
                              sample_1=1,
                              channels=['I', 'Q'],
                              no_fits=False,
-                             print_fit_results=False, **kw):
+                             print_fit_results=False,
+                             n_bins: int=120, **kw):
 
         self.add_analysis_datagroup_to_file()
         self.no_fits = no_fits
@@ -1886,10 +1887,10 @@ class SSRO_Analysis(MeasurementAnalysis):
                 shots_I_data = self.measured_values[0]
                 shots_Q_data = self.measured_values[1]
 
-            shots_I_data_0, shots_I_data_1 = a_tools.zigzag(shots_I_data,
-                                                            sample_0, sample_1, nr_samples)
-            shots_Q_data_0, shots_Q_data_1 = a_tools.zigzag(shots_Q_data,
-                                                            sample_0, sample_1, nr_samples)
+            shots_I_data_0, shots_I_data_1 = a_tools.zigzag(
+                shots_I_data, sample_0, sample_1, nr_samples)
+            shots_Q_data_0, shots_Q_data_1 = a_tools.zigzag(
+                shots_Q_data, sample_0, sample_1, nr_samples)
 
         # cutting off half data points (odd number of data points)
         min_len = np.min([np.size(shots_I_data_0), np.size(shots_I_data_1),
@@ -1914,12 +1915,13 @@ class SSRO_Analysis(MeasurementAnalysis):
             cmap = kw.pop('cmap', 'viridis')
             # plotting 2D histograms of mmts with pulse
 
-            n_bins = 120  # the bins we want to have around our data
             I_min = min(min(shots_I_data_0), min(shots_I_data_1))
             I_max = max(max(shots_I_data_0), max(shots_I_data_1))
             Q_min = min(min(shots_Q_data_0), min(shots_Q_data_1))
             Q_max = max(max(shots_Q_data_0), max(shots_Q_data_1))
             edge = max(abs(I_min), abs(I_max), abs(Q_min), abs(Q_max))
+
+
             H0, xedges0, yedges0 = np.histogram2d(shots_I_data_0, shots_Q_data_0,
                                                   bins=n_bins,
                                                   range=[[I_min, I_max],
@@ -2499,7 +2501,8 @@ class SSRO_discrimination_analysis(MeasurementAnalysis):
         super(self.__class__, self).__init__(**kw)
 
     def run_default_analysis(self, plot_2D_histograms=True,
-                             current_threshold=None, theta_in=0, **kw):
+                             current_threshold=None, theta_in=0,
+                             n_bins: int=120, **kw):
         self.add_analysis_datagroup_to_file()
         self.get_naming_and_values()
         I_shots = self.measured_values[0]
@@ -2513,15 +2516,14 @@ class SSRO_discrimination_analysis(MeasurementAnalysis):
             Q_shots = rot_shots.imag
 
         # Reshaping the data
-        n_bins = 120  # the bins we want to have around our data
         # min min and max max constructions exist so that it also works
         # if one dimension only conatins zeros
         H, xedges, yedges = np.histogram2d(I_shots, Q_shots,
                                            bins=n_bins,
-                                           range=[[min(min(I_shots), -1),
-                                                   max(max(I_shots), 1)],
-                                                  [min(min(Q_shots), -1),
-                                                   max(max(Q_shots), 1)]],
+                                           range=[[min(min(I_shots), -1e-6),
+                                                   max(max(I_shots), 1e-6)],
+                                                  [min(min(Q_shots), -1e-6),
+                                                   max(max(Q_shots), 1e-6)]],
                                            normed=True)
         self.H = H
         self.xedges = xedges
@@ -2547,16 +2549,16 @@ class SSRO_discrimination_analysis(MeasurementAnalysis):
             for ax in axs:
                 ax.ticklabel_format(style='sci', fontsize=4,
                                     scilimits=(0, 0))
-                ax.set_xlabel('I')  # TODO: add units
+                set_xlabel(ax, 'I', self.value_units[0])
                 edge = max(max(abs(xedges)), max(abs(yedges)))
                 ax.set_xlim(-edge, edge)
                 ax.set_ylim(-edge, edge)
                 # ax.set_axis_bgcolor(plt.cm.viridis(0))
-            axs[0].set_ylabel('Q')
+            set_ylabel(axs[0], 'Q', self.value_units[1])
             #axs[0].ticklabel_format(style = 'sci',  fontsize=4)
 
             self.save_fig(
-                fig, figname='2D-Histograms_{}'.format(theta_in), **kw)
+                fig, figname='2D-Histograms_rot_{:.1f} deg'.format(theta_in), **kw)
 
         #######################################################
         #         Extract quantities of interest              #
@@ -5331,7 +5333,6 @@ class butterfly_analysis(MeasurementAnalysis):
 
             print("postselection fraction", fraction)
 
-            #raise NotImplementedError()
         else:
             m0_on = self.data[2::4]
             m1_on = self.data[3::4]
