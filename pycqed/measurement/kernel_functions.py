@@ -408,12 +408,13 @@ matrix_kernel_time = 400.
 def bounce_kernel(amp=0.02, time=4, length=601):
     """
     Generates a bounce kernel, with the specified parameters.
+    amp is the fraction of the signal that is reflected.
 
     kernel_step_function:
-        heaviside(t) + amp*heaviside(t-time)
+        (1-amp) heaviside(t) + amp*heaviside(t-time)
     """
-    bounce = lambda t, amp, time: heaviside(
-        t) - amp*np.double((t+1) > time)*heaviside(t)
+    bounce = lambda t, amp, time: (1-amp) * heaviside(
+        t) + amp*np.double((t+1) > time)*heaviside(t)
     htilde_bounce = lambda t, time: bounce(
         t, amp, time) - bounce(t-1, amp, time)
     t_kernel = np.arange(int(length))
