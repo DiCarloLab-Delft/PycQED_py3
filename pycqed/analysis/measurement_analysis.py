@@ -854,6 +854,7 @@ class TD_Analysis(MeasurementAnalysis):
 
     def rotate_and_normalize_data(self):
         if self.cal_points is None:
+            # 42 is nr. of points in AllXY
             if len(self.measured_values[0]) == 42:
                 self.corr_data, self.zero_coord, self.one_coord = \
                     a_tools.rotate_and_normalize_data(
@@ -6026,3 +6027,106 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
                                         flux=np.array(total_flux),
                                         params=params)
         return fit_res
+
+
+class Ram_Z_Analysis(TD_Analysis):
+    '''
+    Analysis for the Ram-Z experiment. Demodulates the signal with the frequency
+    that has the highest amplitude in the spectrum and plots the demodulated
+    signal.
+    '''
+    def __init__(self, f_modulation=None, NoCalPoints=4, make_fig=True,
+                 rotate_and_normalize=False, plot_cal_points=False,
+                 close_file=True, auto=True, **kw):
+        '''
+        Instantiate analysis object.
+        f_modulation can be used to manually specify a modulation frequency. If
+        it is none, the analysis uses the strongest frequency component in the
+        signal.
+        '''
+        self.f_mod = f_modulation
+        super().__init__(NoCalPoints=NoCalPoints,
+                         rotate_and_normalize=rotate_and_normalize,
+                         plot_cal_points=plot_cal_points,
+                         close_file=close_file, auto=auto, **kw)
+        if auto and make_fig:
+            self.make_figures()
+
+    def run_default_analysis(self, close_file=True, **kw):
+        self.get_naming_and_values()
+        self.add_analysis_datagroup_to_file()
+        if self.rotate_and_normalize:
+            self.rotate_and_normalize()
+        else:
+            self.corr_data = self.measured_values[0]
+        self.add_dataset_to_analysisgroup('corrected data', self.corr_data)
+
+        # Demodulate the signal
+        # 1. Calculate spectrum and set modulation frequency
+        self.spectr = np.fft.rfft(self.corr_data)
+        self.dc_offset = np.abs(self.spectr[0] / len(self.sweep_points))
+        self.spectr[0] = 0  # remove DC component
+        self.freqs = np.fft.rfftfreq(n=len(self.corr_data),
+                                d=self.sweep_points[1]-self.sweep_points[0])
+
+        if self.f_mod == None:
+            # Find strongest frequency component
+            self.f_mod_idx = np.argmax(np.abs(self.spectr))
+            self.f_mod = self.freqs[self.f_mod_idx]
+        else:
+            # Find index of specified modulation frequency
+            self.f_mod_idx = np.where(self.freqs >= self.f_mod)[0]
+            if len(self.f_mod_idx) == 0:
+                raise ValueError('Modulation frequency {} MHz not in the '
+                                 'sampled frequency range [0 MHz, {} MHz].'
+                                 .format(self.f_mod, self.freqs[-1]))
+            self.f_mod_idx = self.f_mod_idx[0]
+
+        # Demodulation: shift spectrum by f_mod, shift phase s.t. the phase of
+        # the f_mod component is 0.
+        # TODO: implement super-nyquist sampling
+        self.phi_f_mod = np.angle(self.spectr[self.f_mod_idx])
+        self.amp_f_mod = (np.abs(self.spectr[self.f_mod_idx]) /
+                          len(self.sweep_points))
+        self.demod_spectr = np.roll(self.spectr, -self.f_mod_idx)
+        self.demod_spectr *= np.exp(-1.0j * self.phi_f_mod)
+
+        # Transform back to get demodulated signal
+        self.demod_data = np.fft.irfft(self.demod_spectr,
+                                       n=len(self.sweep_points))
+
+        if close_file:
+            self.data_file.close()
+
+    def make_figures(self, **kw):
+        # Plot raw data
+        fig, ax = plt.subplots(1, 1, figsize=(7, 5))
+        ax.plot(self.sweep_points, self.measured_values[0], '-o')
+        ax.plot(self.sweep_points,
+                np.cos(2*np.pi * self.sweep_points * self.f_mod
+                       + self.phi_f_mod) * self.amp_f_mod - self.dc_offset,
+                '-')
+        ax.set_title('Raw data')
+        pl_tools.set_xlabel(ax, self.sweep_name, self.sweep_unit[0])
+        pl_tools.set_ylabel(ax, self.value_names[0], self.value_units[0])
+        self.save_fig(fig, figname='Raw_data_Ram_Z', fig_tight=False,
+                      **kw)
+
+        # Plot demodulated signal.
+        fig, ax = plt.subplots(1, 1, figsize=(7, 5))
+        ax.plot(self.sweep_points, self.demod_data, '-o')
+        ax.set_title('Demodulated Ram-Z')
+        pl_tools.set_xlabel(ax, self.sweep_name, self.sweep_unit[0])
+        pl_tools.set_ylabel(ax, '', 'a.u.')
+        self.save_fig(fig, figname='Demodulated_Ram_Z', fig_tight=False,
+                      **kw)
+
+        # Plot power spectrum
+
+        fig, ax = plt.subplots(1, 1, figsize=(7, 5))
+        ax.plot(self.freqs, np.abs(self.spectr)**2, '-o')
+        ax.set_title('Ram-Z Spectrum')
+        pl_tools.set_xlabel(ax, 'f', 'Hz')
+        pl_tools.set_ylabel(ax, 'power spectrum', 'a.u.')
+        self.save_fig(fig, figname='Power_spectrum_Ram_Z', fig_tight=False,
+                      **kw)
