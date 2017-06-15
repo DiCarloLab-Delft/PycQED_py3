@@ -1127,7 +1127,6 @@ class QASM_QuMIS_Compiler():
                         bitwidth = len(hw_event.codeword_bit)
                         codeword_array = bitfield(hw_event.codeword,
                                                   bitwidth, little_endian=False)
-                        print(codeword_array)
 
                         for i in range(bitwidth):
                             if codeword_array[i] == 1:
