@@ -10,6 +10,7 @@ from pycqed.analysis import measurement_analysis as ma
 from pycqed.analysis.tools.data_manipulation import rotate_complex
 from pycqed.analysis import multiplexed_RO_analysis as mra
 
+
 class Test_SSRO_discrimination_analysis(unittest.TestCase):
 
     @classmethod
@@ -83,6 +84,6 @@ class Test_multiplexed_SSRO_analysis(unittest.TestCase):
         self.assertAlmostEqual(res_dict['Fd_q0'], 0.6559, places=2)
         self.assertAlmostEqual(res_dict['Fd_q1'], 0.8728, places=2)
 
-        mu_mat_exp =  np.array([[ 1.04126946, -0.00517882],
+        mu_mat_exp = np.array([[1.04126946, -0.00517882],
                                [-0.03172471,  1.00574731]])
         np.testing.assert_almost_equal(res_dict['mu_matrix'], mu_mat_exp)
