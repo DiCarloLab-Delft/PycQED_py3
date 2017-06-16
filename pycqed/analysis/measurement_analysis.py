@@ -2444,10 +2444,11 @@ class SSRO_single_quadrature_discriminiation_analysis(MeasurementAnalysis):
         self.get_naming_and_values()
         hist, bins, centers = self.histogram_shots(self.shots)
         self.fit_data(hist, centers)
-        self.make_figures(hist=hist, centers=centers, **kw)
-
         self.F_discr, self.opt_threshold = \
             self.calculate_discrimination_fidelity(fit_res=self.fit_res)
+
+        self.make_figures(hist=hist, centers=centers, **kw)
+
         if close_file:
             self.data_file.close()
         return
@@ -2492,11 +2493,34 @@ class SSRO_single_quadrature_discriminiation_analysis(MeasurementAnalysis):
                              max(centers), 1000)
         # Plotting the data
         self.ax.bar(centers, hist, align='center', width=width, label='data')
+
+        pars = self.fit_res.best_values
+        Agauss = lmfit.models.gaussian(x=x_fine, sigma=pars['A_sigma'],
+                                       amplitude=pars['A_amplitude'],
+                                       center=pars['A_center'])
+
+        Bgauss = lmfit.models.gaussian(x=x_fine, sigma=pars['B_sigma'],
+                                       amplitude=pars['B_amplitude'],
+                                       center=pars['B_center'])
+
         self.ax.plot(x_fine, self.fit_res.eval(x=x_fine), label='fit', c='r')
+        self.ax.plot(x_fine, Agauss, label='fit_A', c='r', ls='--')
+        self.ax.plot(x_fine, Bgauss, label='fit_B', c='r', ls='--')
+
         if show_guess:
             self.ax.plot(x_fine, self.fit_res.eval(
                 x=x_fine, **self.fit_res.init_values), label='guess', c='g')
             self.ax.legend(loc='best')
+
+        ylim = self.ax.get_ylim()
+        self.ax.vlines(self.opt_threshold, ylim[0] , ylim[1], linestyles='--',
+                  label='opt. threshold')
+        self.ax.text(.95, .95, 'F_discr {:.2f}\nOpt.thresh. {:.2f}'.format(
+                     self.F_discr, self.opt_threshold),
+                     verticalalignment='top', horizontalalignment='right',
+                     transform=self.ax.transAxes)
+        self.ax.legend()
+        # self.F_discr, self.opt_threshold
 
         # Prettifying the plot
         self.ax.ticklabel_format(useOffset=False)
