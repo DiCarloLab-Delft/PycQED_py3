@@ -6029,3 +6029,65 @@ class Power_Analysis(TwoD_Analysis):
 
         self.save_fig(fig, figname=plot_title,
                       fig_tight=False, **kw)
+
+
+class Resonator_Dac_Arch(TwoD_Analysis):
+
+    def run_default_analysis(self, normalize=False, plot_linecuts=True,
+                             linecut_log=False, colorplot_log=False,
+                             plot_all=False, save_fig=True,
+                             transpose=False,
+                             **kw):
+        super(Resonator_Dac_Arch, self).run_default_analysis()
+        peaks = []
+        for i in range(len(self.X[:,0])):
+            pk_d = a_tools.peak_finder(self.X[i,:],self.Z[0][i,:])
+            peaks.append(pk_d['dip'])
+        peaks = np.array(peaks)
+        self.sweet_spot = self.Y[np.argmax(peaks),0]
+        dac_step = self.Y[1,0] - self.Y[0,0]
+        fft = np.fft.fft(peaks)[1:]
+        fft[0] = 0
+        fft_freq = np.fft.fftfreq(n=len(peaks),d=dac_step)[1:]
+        sort_mask = np.argsort(fft_freq)
+        fft_freq = fft_freq[sort_mask]
+        fft = fft[sort_mask]
+        freq_peak = a_tools.peak_finder(x=fft_freq,y=fft)['peak']
+        if freq_peak is not None:
+            self.periodicity = np.abs(1./freq_peak)
+        else:
+            self.periodicity = np.nan
+
+        plot_title = '{timestamp}_{measurement}'.format(
+            timestamp=self.timestamp_string,
+            measurement=self.measurementstring)
+
+        fig, ax = self.default_ax()  # figsize=(8, 5))
+        a_tools.color_plot(
+            x=self.X[0, :],
+            y=self.Y[:, 0],
+            z=self.Z[0],
+            plot_title=plot_title,
+            fig=fig, ax=ax,
+            xlabel=self.xlabel,
+            ylabel=self.ylabel,
+            #                     zlabel=self.zlabels[0],
+            save=False,
+            transpose=transpose,
+            cmap_chosen=self.cmap_chosen,
+            **kw)
+
+        ax.plot(peaks, self.Y[:, 0], 'r')
+
+        if np.isnan(self.periodicity):
+            textstr = 'Sweet_spot = %d mV \n Periodicity = NaN' % (self.sweet_spot)
+        else:
+            textstr = 'Sweet_spot = %d mV \n Periodicity = %d' % (self.sweet_spot,
+                                                                  self.periodicity)
+        ax.text(0.1, 0.6, textstr, transform=ax.transAxes,
+                fontsize=11, verticalalignment='top',
+                bbox=self.box_props)
+        self.save_fig(fig, figname=plot_title,
+                      fig_tight=False, **kw)
+
+
