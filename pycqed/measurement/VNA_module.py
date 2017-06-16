@@ -153,12 +153,12 @@ def acquire_linear_frequency_span_vs_power(file_name, start_freq=None,
 
     MC_instr.run(name=file_name, mode='2D')
 #     ma.Homodyne_Analysis(auto=True, label=file_name, fitting_model='hanger')
-    ma.VNA_Analysis(auto=True, label=file_name)
+    ma.TwoD_Analysis(auto=True, label=file_name)
 
 def acquire_2D_linear_frequency_span_vs_param(file_name, start_freq=None,
                                      stop_freq=None, center_freq=None,
                                      parameter=None, sweep_vector=None,
-                                     span=None, nbr_points=101,
+                                     span=None, nbr_points=101, power=-20,
                                      bandwidth=100, measure='S21'):
     """
     Acquires a single trace from the VNA.
@@ -194,7 +194,7 @@ def acquire_2D_linear_frequency_span_vs_param(file_name, start_freq=None,
                                        force_reset=True)
         MC_instr.set_sweep_function(swf_fct_1D)
 
-    if parameter != None and sweep_vector != None:
+    if parameter is not None and sweep_vector is not None:
         # it prepares the sweep_points, such that it does not complain.
         swf_fct_1D.prepare()
         MC_instr.set_sweep_points(swf_fct_1D.sweep_points)
@@ -207,6 +207,7 @@ def acquire_2D_linear_frequency_span_vs_param(file_name, start_freq=None,
     MC_instr.set_detector_function(det.ZNB_VNA_detector(VNA_instr))
 
     # VNA settings
+    VNA_instr.power(power)
     VNA_instr.average_state('off')
     VNA_instr.bandwidth(bandwidth)
 
@@ -218,4 +219,4 @@ def acquire_2D_linear_frequency_span_vs_param(file_name, start_freq=None,
 
     MC_instr.run(name=file_name, mode='2D')
 #     ma.Homodyne_Analysis(auto=True, label=file_name, fitting_model='hanger')
-    ma.VNA_Analysis(auto=True, label=file_name)
+    ma.TwoD_Analysis(auto=True, label=file_name)
