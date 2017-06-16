@@ -364,5 +364,5 @@ class Test_MeasurementControl(unittest.TestCase):
         self.MC.set_sweep_points(sweep_pts)
         self.MC.set_detector_function(det.Dummy_Detector_Soft())
         dat = self.MC.run('1D_soft')
-        x = dat[:, 0]
+        x = dat['dset'][:, 0]
         np.testing.assert_array_almost_equal(x, sweep_pts, decimal=5)
