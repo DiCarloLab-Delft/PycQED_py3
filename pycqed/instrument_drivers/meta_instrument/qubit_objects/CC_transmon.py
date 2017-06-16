@@ -1332,7 +1332,8 @@ class CBox_v3_driven_transmon(Transmon):
             MC.set_detector_function(self.input_average_detector)
             data = MC.run(
                 'Measure_transients{}_{}'.format(self.msmt_suffix, i))
-            transients.append(data.T[1:])
+            dset = data['dset']
+            transients.append(dset.T[1:])
 
             if analyze:
                 ma.MeasurementAnalysis()
