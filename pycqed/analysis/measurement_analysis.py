@@ -1216,9 +1216,10 @@ class Rabi_Analysis(TD_Analysis):
                     self.axs[i].legend(loc='best')
 
         elif fitting_model == 'complex':
-            fit_values = fit_mods.CosComplex(self.sweep_points, self.fit_res.params)
+            fit_values = fit_mods.CosComplex(
+                self.sweep_points, self.fit_res.params)
 
-            for idx_quadrature in [0,1]:
+            for idx_quadrature in [0, 1]:
                 if idx_quadrature == 0:
                     plot_title = kw.pop('plot_title', textwrap.fill(
                                         self.timestamp_string + '_' +
@@ -1228,28 +1229,34 @@ class Rabi_Analysis(TD_Analysis):
 
                 self.axs[idx_quadrature].ticklabel_format(useOffset=False)
                 self.plot_results_vs_sweepparam(x=self.sweep_points,
-                                                y=self.measured_values[idx_quadrature],
-                                                fig=self.fig, ax=self.axs[idx_quadrature],
+                                                y=self.measured_values[
+                                                    idx_quadrature],
+                                                fig=self.fig, ax=self.axs[
+                                                    idx_quadrature],
                                                 xlabel=self.xlabel,
-                                                ylabel=self.ylabels[idx_quadrature],
+                                                ylabel=self.ylabels[
+                                                    idx_quadrature],
                                                 save=False,
                                                 plot_title=plot_title)
 
                 # adding amplitude for pi-pulse
-                label = 'amp180 = {:.3e}'.format(0.5*abs(self.fit_res.params['frequency'].value))
+                label = 'amp180 = {:.3e}'.format(
+                    0.5*abs(self.fit_res.params['frequency'].value))
 
                 if idx_quadrature == 0:
-                    self.axs[idx_quadrature].plot(self.sweep_points, fit_values.real, label=label)
+                    self.axs[idx_quadrature].plot(
+                        self.sweep_points, fit_values.real, label=label)
                 elif idx_quadrature == 1:
-                    self.axs[idx_quadrature].plot(self.sweep_points, fit_values.imag, label=label)
+                    self.axs[idx_quadrature].plot(
+                        self.sweep_points, fit_values.imag, label=label)
 
                 ymin = min(self.measured_values[idx_quadrature])
                 ymax = max(self.measured_values[idx_quadrature])
                 yspan = ymax-ymin
-                self.axs[idx_quadrature].set_ylim(ymin-0.23*yspan, 0.05*yspan+ymax)
-                self.axs[idx_quadrature].legend(frameon=False, loc='lower left')
-
-
+                self.axs[idx_quadrature].set_ylim(
+                    ymin-0.23*yspan, 0.05*yspan+ymax)
+                self.axs[idx_quadrature].legend(
+                    frameon=False, loc='lower left')
 
         self.save_fig(self.fig, fig_tight=False, **kw)
 
@@ -1259,9 +1266,11 @@ class Rabi_Analysis(TD_Analysis):
             self.fit_res = ['', '']
             # It would be best to do 1 fit to both datasets but since it is
             # easier to do just one fit we stick to that.
-            # We make an initial guess of the Rabi period using both quadratures
+            # We make an initial guess of the Rabi period using both
+            # quadratures
 
-            data = np.sqrt(self.measured_values[0]**2+self.measured_values[1]**2)
+            data = np.sqrt(self.measured_values[
+                           0]**2+self.measured_values[1]**2)
             params = model.guess(model, data=data,
                                  t=self.sweep_points)
             fit_res = fit_mods.CosModel.fit(
@@ -1289,7 +1298,8 @@ class Rabi_Analysis(TD_Analysis):
             self.fit_res = ['']
 
             amps = self.sweep_points
-            data_complex = np.add(self.measured_values[0] , 1.j*self.measured_values[1])
+            data_complex = np.add(self.measured_values[
+                                  0], 1.j*self.measured_values[1])
 
             ###################
             # initial guesses #
@@ -1305,9 +1315,9 @@ class Rabi_Analysis(TD_Analysis):
             # frequency
             w = np.fft.fft(data_complex)
             f = np.fft.fftfreq(len(data_complex), amps[1]-amps[0])
-            w[np.where(f==0)]=0 # remove DC component
+            w[np.where(f == 0)] = 0  # remove DC component
             abs_w = np.abs(w)
-            freq_guess = f[np.where(abs_w==max(abs_w))][0]
+            freq_guess = f[np.where(abs_w == max(abs_w))][0]
 
             # Phase
             # search for the phase closest to the amps==0
@@ -1318,16 +1328,19 @@ class Rabi_Analysis(TD_Analysis):
             P = lmfit.Parameters()
             #           (Name,              Value,          Vary, Min,      Max,    Expr)
             P.add_many(('amplitude_real',   A_real_guess,   True,   0,      None,   None),
-                       ('amplitude_imag',   A_imag_guess,   True,   0,      None,   None),
-                       ('phase',            phase_guess,    True,   -np.pi, np.pi,  None),
-                       ('offset_real',      off_real_guess, True,   None,   None,   None),
-                       ('offset_imag',      off_imag_guess,  True,   None,   None,   None),
+                       ('amplitude_imag',   A_imag_guess,
+                        True,   0,      None,   None),
+                       ('phase',            phase_guess,
+                        True,   -np.pi, np.pi,  None),
+                       ('offset_real',      off_real_guess,
+                        True,   None,   None,   None),
+                       ('offset_imag',      off_imag_guess,
+                        True,   None,   None,   None),
                        ('frequency',        freq_guess,     True,   0,      None,   None))
-            
+
             # Fit
             self.fit_res = lmfit.minimize(fit_mods.residual_complex_fcn, P,
-                                     args=(fit_mods.CosComplex, amps, data_complex))
-
+                                          args=(fit_mods.CosComplex, amps, data_complex))
 
 
 class TD_UHFQC(TD_Analysis):
@@ -5956,3 +5969,63 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
                                         flux=np.array(total_flux),
                                         params=params)
         return fit_res
+
+
+class Power_Analysis(TwoD_Analysis):
+
+    def run_default_analysis(self, normalize=False, plot_linecuts=True,
+                             linecut_log=False, colorplot_log=False,
+                             plot_all=False, save_fig=True,
+                             transpose=False,
+                             **kw):
+        super(Power_Analysis, self).run_default_analysis()
+
+        peaks = []
+        peak_val = []
+        for i in range(len(self.X[:, 0])):
+            pk_d = a_tools.peak_finder(self.X[i, :], self.Z[0][i, :])
+            peaks.append(pk_d['dip'])
+            idx = pk_d['dip_idx']
+            if idx is None:
+                idx = 0
+            peak_val.append(self.Z[0][i, idx])
+        peaks = np.array(peaks)
+        peak_val = np.array(peak_val)
+        smoothed_data = a_tools.smooth(peak_val, window_len=5)
+        deriv = np.divide(smoothed_data[1:] -
+                          smoothed_data[:-1], smoothed_data[1:])
+        if np.abs(deriv[0]) > 0.075:
+            print('The dip at the beginning seems to still be moving.')
+        if np.abs(deriv[-1]) > 0.075:
+            print('The dip at the end seems to still be moving.')
+        self.low_power = peaks[0]
+        self.high_power = peaks[-1]
+        self.delta = high_power-low_power
+
+        plot_title = '{timestamp}_{measurement}'.format(
+            timestamp=self.timestamp_string,
+            measurement=self.measurementstring)
+
+        fig, ax = self.default_ax()  # figsize=(8, 5))
+        a_tools.color_plot(
+            x=self.X[0, :],
+            y=self.Y[:, 0],
+            z=self.Z[0],
+            plot_title=plot_title,
+            fig=fig, ax=ax,
+            xlabel=self.xlabel,
+            ylabel=self.ylabel,
+            #                     zlabel=self.zlabels[0],
+            save=False,
+            transpose=transpose,
+            cmap_chosen=self.cmap_chosen,
+            **kw)
+
+        ax.axvline(self.low_power, color='black', linestyle='dashed',
+                   label='%.5f GHz' % (low_power*1e-9))
+        ax.axvline(self.high_power, color='red', linestyle='dashed',
+                   label='%.5f GHz' % (high_power*1e-9))
+        ax.legend()
+
+        self.save_fig(fig, figname=plot_title,
+                      fig_tight=False, **kw)
