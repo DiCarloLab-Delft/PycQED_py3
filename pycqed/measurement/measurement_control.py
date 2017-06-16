@@ -113,7 +113,10 @@ class MeasurementControl(Instrument):
         self.print_measurement_start_msg()
         self.mode = mode
         self.iteration = 0  # used in determining data writing indices
+        # needs to be defined here because of the with statement below
         return_dict = {}
+        self.last_sweep_pts = None  # used to prevent resetting same value
+
         with h5d.Data(name=self.get_measurement_name()) as self.data_object:
             self.get_measurement_begintime()
             # Commented out because requires git shell interaction from python
@@ -143,7 +146,6 @@ class MeasurementControl(Instrument):
             return_dict = self.create_experiment_result_dict()
 
         self.finish(result)
-        # return self.data_object
         return return_dict
 
     def measure(self, *kw):
@@ -329,6 +331,7 @@ class MeasurementControl(Instrument):
         '''
         Core measurement function used for soft sweeps
         '''
+        start_idx, stop_idx = self.get_datawriting_indices(pts_per_iter=1)
 
         if np.size(x) == 1:
             x = [x]
@@ -336,15 +339,34 @@ class MeasurementControl(Instrument):
             raise ValueError(
                 'size of x "%s" not equal to # sweep functions' % x)
         for i, sweep_function in enumerate(self.sweep_functions[::-1]):
-            sweep_function.set_parameter(x[::-1][i])
+            # If statement below tests if the value is different from the
+            # last value that was set, if it is the same the sweep function
+            # will not be called. This is important when setting a parameter
+            # is either expensive (e.g., loading a waveform) or has adverse
+            # effects (e.g., phase scrambling when setting a MW frequency.
+
+            swp_pt = x[::-1][i]
+
+            if self.iteration == 0:
+                # always set the first point
+                sweep_function.set_parameter(swp_pt)
+            else:
+                # start_idx -1 refers to the last written value
+                prev_swp_pt = self.last_sweep_pts[::-1][i]
+                if swp_pt != prev_swp_pt:
+                    # only set if not equal to previous point
+                    sweep_function.set_parameter(swp_pt)
             # x[::-1] changes the order in which the parameters are set, so
             # it is first the outer sweep point and then the inner.This
             # is generally not important except for specifics: f.i. the phase
             # of an agilent generator is reset to 0 when the frequency is set.
 
+        # used for next iteration
+        self.last_sweep_pts = x
+
         datasetshape = self.dset.shape
         # self.iteration = datasetshape[0] + 1
-        start_idx, stop_idx = self.get_datawriting_indices(pts_per_iter=1)
+
         vals = self.detector_function.acquire_data_point()
         # Resizing dataset and saving
         new_datasetshape = (np.max([datasetshape[0], stop_idx]),
@@ -727,7 +749,7 @@ class MeasurementControl(Instrument):
             'Data', (0, len(self.sweep_functions) +
                      len(self.detector_function.value_names)),
             maxshape=(None, len(self.sweep_functions) +
-                      len(self.detector_function.value_names)))
+                      len(self.detector_function.value_names)), dtype='float64')
         self.get_column_names()
         self.dset.attrs['column_names'] = h5d.encode_to_utf8(self.column_names)
         # Added to tell analysis how to extract the data
