@@ -146,7 +146,6 @@ class QX_Hard_Detector(Hard_Detector):
         self.randomizations = []
         # load files
         logging.info("QX_RB_Hard_Detector : loading qasm files...")
-        # print(qasm_filenames)
         for i, file_name in enumerate(qasm_filenames):
             t1 = time.time()
             qasm = ql.qasm_loader(file_name)
@@ -156,9 +155,9 @@ class QX_Hard_Detector(Hard_Detector):
             circuits = qasm.get_circuits()
             self.randomizations.append(circuits)
             # create the circuits on the server
-            #t1 = time.time()
+            t1 = time.time()
             for c in circuits:
-                circuit_name = c[0] + "_{}".format(i)
+                circuit_name = c[0] + "{}".format(i)
                 self.__qxc.create_circuit(circuit_name, c[1])
             t2 = time.time()
             logging.info("[+] qasm loading time :", t2-t1)
@@ -175,7 +174,7 @@ class QX_Hard_Detector(Hard_Detector):
         data = np.zeros(len(self.sweep_points))
         for c in self.circuits:
             self.__qxc.send_cmd("reset_measurement_averaging")
-            circuit_name = c[0] + "_{}".format(self.current)
+            circuit_name = c[0] + "{}".format(self.current)
             self.__qxc.run_noisy_circuit(circuit_name, self.p_error,
                                          "depolarizing_channel", self.num_avg)
             f = self.__qxc.get_measurement_average(0)
