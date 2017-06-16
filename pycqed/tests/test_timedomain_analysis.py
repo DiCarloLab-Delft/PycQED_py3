@@ -15,8 +15,7 @@ class Test_Rabi_analysis(unittest.TestCase):
         rabis = [ma.Rabi_Analysis(timestamp='20170412_185618'),
                  ma.Rabi_Analysis(timestamp='20170412_183928'),
                  ma.Rabi_Analysis(timestamp='20170413_134244')]
-        for ii in range(len(rabis)):
-            rabi_an = rabis[ii]
+        for rabi_an in rabis:
             for tt in range(2):
                 rabi_amp = rabi_an.fit_res[tt].values['period']/2.
                 amp_low = 0.63
@@ -110,12 +109,10 @@ class test_allxy_analysis(unittest.TestCase):
 
     def test_allxy_IQ_data(self):
         a = ma.AllXY_Analysis(timestamp='20170607_161456')
-        a.deviation_total
         self.assertAlmostEqual(a.deviation_total, 0.02855964154)
 
     def test_allxy_single_weight(self):
         a = ma.AllXY_Analysis(timestamp='20170607_211630')
-        a.deviation_total
         self.assertAlmostEqual(a.deviation_total, 0.0335, places=3)
 
 
@@ -160,6 +157,7 @@ class test_RB_analysis(unittest.TestCase):
 
 
 class test_motzoi_analysis(unittest.TestCase):
+
     @classmethod
     def setUpClass(self):
         self.datadir = os.path.join(pq.__path__[0], 'tests', 'test_data')
