@@ -3852,7 +3852,7 @@ class Homodyne_Analysis(MeasurementAnalysis):
         else:
             ax.plot(self.sweep_points, fit_res.best_fit, 'r-')
             f0 = self.fit_results.values['f0']
-            plt.plot(f0, fit_res.eval(f=f0), 'o', ms=8)
+            plt.plot(f0*1e9, fit_res.eval(f=f0*1e9), 'o', ms=8)
 
             # save figure
             self.save_fig(fig, xlabel=self.xlabel, ylabel='Mag', **kw)
@@ -4094,11 +4094,14 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
                     data_real=self.measured_values[2],
                     data_imag=self.measured_values[3])
             except:
-                # Quick fix to make it work with pulsed spec which does not
-                # return both I,Q and, amp and phase
-                self.data_dist = a_tools.calculate_distance_ground_state(
-                    data_real=self.measured_values[0],
-                    data_imag=self.measured_values[1])
+                # Do not use distance if amplitude and phase are returned
+                self.data_dist = self.measured_values[0]
+
+                # # Quick fix to make it work with pulsed spec which does not
+                # # return both I,Q and, amp and phase
+                # self.data_dist = a_tools.calculate_distance_ground_state(
+                #     data_real=self.measured_values[0],
+                #     data_imag=self.measured_values[1])
 
             self.peaks = a_tools.peak_finder(
                 self.sweep_points, a_tools.smooth(self.data_dist))
