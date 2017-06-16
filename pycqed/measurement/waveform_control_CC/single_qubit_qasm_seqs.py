@@ -451,7 +451,8 @@ def MotzoiXY(qubit_name, motzois, cal_points=True):
 
 
 def Ram_Z(qubit_name, no_of_points, cal_points=True,
-          wait_before=50e-9, wait_between=280e-9, clock_cycle=5e-9):
+          wait_before=50e-9, wait_between=280e-9, clock_cycle=5e-9,
+          rec_Y90=True):
     '''
     Creates QASM sequence for an entire Ram-Z experiment, including
     calibration points.
@@ -469,10 +470,16 @@ def Ram_Z(qubit_name, no_of_points, cal_points=True,
         wait_between    (float): delay time in seconds between the two pi/2
                                  pulses
         clock_cycle     (float): period of the internal AWG clock
+        rec_Y90         (bool): Use Y90 instead of X90 as second mw pulse.
     '''
     filename = join(base_qasm_path, 'Ram_Z.qasm')
     qasm_file = mopen(filename, mode='w')
     qasm_file.writelines('qubit {} \n'.format(qubit_name))
+
+    if rec_Y90:
+        recPulse = 'Y90'
+    else:
+        recPulse = 'X90'
 
     # Write  measurement sequence no_of_points times
     for i in range(no_of_points):
@@ -493,7 +500,7 @@ def Ram_Z(qubit_name, no_of_points, cal_points=True,
             qasm_file.writelines(
                 'I {} {}\n'.format(qubit_name,
                                    round(int(wait_between/clock_cycle))))
-            qasm_file.writelines('X90 {}\n'.format(qubit_name))
+            qasm_file.writelines('{} {}\n'.format(recPulse, qubit_name))
 
         qasm_file.writelines('RO {}  \n'.format(qubit_name))
 
