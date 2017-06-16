@@ -3680,7 +3680,7 @@ class Homodyne_Analysis(MeasurementAnalysis):
             # NB! Expressions are broken in lmfit for python 3.5 this has
             # been fixed in the lmfit repository but is not yet released
             # the newest upgrade to lmfit should fix this (MAR 18-2-2016)
-            HangerModel.set_param_hint('Qi', expr='1./(1./Q-1./Qe*cos(theta))',
+            HangerModel.set_param_hint('Qi', expr='abs(1./(1./Q-1./Qe*cos(theta)))',
                                        vary=False)
             HangerModel.set_param_hint('Qc', expr='Qe/cos(theta)', vary=False)
             HangerModel.set_param_hint('theta', value=0, min=-np.pi/2,
@@ -3786,7 +3786,7 @@ class Homodyne_Analysis(MeasurementAnalysis):
 
         fig, ax = self.default_ax()
 
-        if 'hanger' in fitting_model:
+        if ('hanger' in fitting_model) or ('complex' in fitting_model):
             textstr = '$f_{\mathrm{center}}$ = %.4f $\pm$ (%.3g) GHz' % (
                 fit_res.params['f0'].value, fit_res.params['f0'].stderr) + '\n' \
                 '$Qc$ = %.1f $\pm$ (%.1f)' % (fit_res.params['Qc'].value, fit_res.params['Qc'].stderr) + '\n' \
@@ -3852,7 +3852,7 @@ class Homodyne_Analysis(MeasurementAnalysis):
         else:
             ax.plot(self.sweep_points, fit_res.best_fit, 'r-')
             f0 = self.fit_results.values['f0']
-            plt.plot(f0, fit_res.eval(f=f0), 'o', ms=8)
+            plt.plot(f0*1e9, fit_res.eval(f=f0*1e9), 'o', ms=8)
 
             # save figure
             self.save_fig(fig, xlabel=self.xlabel, ylabel='Mag', **kw)
