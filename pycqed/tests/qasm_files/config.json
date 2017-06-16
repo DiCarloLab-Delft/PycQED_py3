@@ -74,7 +74,13 @@
             "parameters" : 1,
             "duration" : 300,
             "type" : "measurement"
-        }
+        },
+
+        "dummy": {
+        "parameters": 2,
+        "type" : "flux",
+        "duration" : 0
+    }
     },
 
     "hardware specification" : {
@@ -135,13 +141,14 @@
             "x90"   : 3,
             "y90"   : 4,
             "mx90"  : 5,
-            "my90"  : 6
+            "my90"  : 6,
+            "dummy" : -2
         },
         {
             "cz" : 0,
             "cz90": 1,
             "cz45": 2,
-            "dummy_other": 3
+            "dummy": -2
         }
     ]
 }
