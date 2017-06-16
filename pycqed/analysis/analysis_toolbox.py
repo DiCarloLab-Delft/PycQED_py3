@@ -1031,11 +1031,11 @@ def look_for_peaks_dips(x, y_smoothed, percentile=20, num_sigma_threshold=5,
             if (idx+i+1)<x.size and (idx-i-1)>=0:          #ensure data points
                                                            #idx+i+1 and idx-i-1
                                                            #are inside sweep pts
-                peak_widths += [ x[idx+i+1] - x[idx-i-1] ]
+                peak_widths += [ (x[idx+i+1] - x[idx-i-1])/5 ]
             elif (idx+i+1)>x.size and (idx-i-1)>=0:
-                peak_widths += [ x[idx] - x[idx-i] ]
+                peak_widths += [ (x[idx] - x[idx-i])/5 ]
             elif (idx+i+1)<x.size and (idx-i-1)<0:
-                peak_widths += [ x[idx+i] - x[idx] ]
+                peak_widths += [ (x[idx+i] - x[idx])/5 ]
             else:
                 peak_widths += [ 5e6 ]
 
@@ -1108,11 +1108,11 @@ def look_for_peaks_dips(x, y_smoothed, percentile=20, num_sigma_threshold=5,
             if (idx+i+1)<x.size and (idx-i-1)>=0:         #ensure data points
                                                           #idx+i+1 and idx-i-1
                                                           #are inside sweep pts
-                dip_widths += [ x[idx+i+1] - x[idx-i-1] ]
+                dip_widths += [ (x[idx+i+1] - x[idx-i-1])/5 ]
             elif (idx+i+1)>x.size and (idx-i-1)>=0:
-                dip_widths += [ x[idx] - x[idx-i] ]
+                dip_widths += [ (x[idx] - x[idx-i])/5 ]
             elif (idx+i+1)<x.size and (idx-i-1)<0:
-                dip_widths += [ x[idx+i] - x[idx] ]
+                dip_widths += [ (x[idx+i] - x[idx])/5 ]
             else:
                 dip_widths += [ 5e6 ]
 
@@ -1312,10 +1312,15 @@ def rotate_and_normalize_data(data, cal_zero_points=None, cal_one_points=None,
 
         #find distance from points on line to end of line
         rotated_data = np.sqrt(x_data**2+y_data**2)
+        if rotated_data[0] > np.mean(rotated_data):
+            rotated_data = -rotated_data
+            rotated_data -= min(rotated_data)
 
-        #normlaize data
-        max_min_distance = max(rotated_data) - min(rotated_data)
-        normalized_data = (rotated_data - min(rotated_data))/max_min_distance
+        normalized_data = rotated_data
+        #
+        # #normlaize data
+        # max_min_distance = max(rotated_data) - min(rotated_data)
+        # normalized_data = (rotated_data - min(rotated_data))/max_min_distance
 
     else:
         # Rotate the data
@@ -1326,6 +1331,10 @@ def rotate_and_normalize_data(data, cal_zero_points=None, cal_one_points=None,
         # Normalize the data
         one_zero_dist = np.sqrt((I_one-I_zero)**2 + (Q_one-Q_zero)**2)
         normalized_data = rotated_data_ch1/one_zero_dist
+
+        if normalized_data[0] > np.mean(normalized_data):
+            normalized_data = -normalized_data
+            normalized_data -= min(normalized_data)
 
     return [normalized_data, zero_coord, one_coord]
 
@@ -1360,13 +1369,19 @@ def rotate_and_normalize_data_no_cal_points(data, **kw):
     #compute final, projected data; only the first row is of interest (it is the
     #principal axis
     final_data = np.dot(row_feature_vector, row_data_trans)
+    normalized_data = final_data[1,:]
 
-    #normlaize data
-    max_min_distance = np.sqrt(max(final_data[1,:])**2 +
-                               min(final_data[1,:])**2)
-    normalized_data = final_data[1,:]/max_min_distance
-    max_min_difference = max(normalized_data -  min(normalized_data))
-    normalized_data = (normalized_data-min(normalized_data))/max_min_difference
+    #normalize data
+    # max_min_distance = np.sqrt(max(final_data[1,:])**2 +
+    #                            min(final_data[1,:])**2)
+    # normalized_data = final_data[1,:]/max_min_distance
+    # max_min_difference = max(normalized_data -  min(normalized_data))
+    # normalized_data = (normalized_data-min(normalized_data))/max_min_difference
+
+    # Ensure trace starts at closest to zero
+    if normalized_data[0] > np.mean(normalized_data):
+        normalized_data = -normalized_data
+        normalized_data -= min(normalized_data)
 
     return normalized_data
 

@@ -1000,6 +1000,32 @@ class Ramsey(swf.Hard_Sweep):
                            artificial_detuning=self.artificial_detuning,
                            cal_points=self.cal_points)
 
+
+class Ramsey_multiple_detunings(swf.Hard_Sweep):
+
+    def __init__(self, pulse_pars, RO_pars,
+                 artificial_detunings=None,
+                 cal_points=True,
+                 upload=True):
+        super().__init__()
+        self.pulse_pars = pulse_pars
+        self.RO_pars = RO_pars
+        self.upload = upload
+        self.cal_points = cal_points
+        self.artificial_detunings = artificial_detunings
+
+        self.name = 'Ramsey'
+        self.parameter_name = 't'
+        self.unit = 's'
+
+    def prepare(self, **kw):
+        if self.upload:
+            sqs.Ramsey_seq_multiple_detunings(times=self.sweep_points,
+                           pulse_pars=self.pulse_pars,
+                           RO_pars=self.RO_pars,
+                           artificial_detunings=self.artificial_detunings,
+                           cal_points=self.cal_points)
+
 class Ramsey_2nd_exc(swf.Hard_Sweep):
 
     def __init__(self, pulse_pars, pulse_pars_2nd, RO_pars,

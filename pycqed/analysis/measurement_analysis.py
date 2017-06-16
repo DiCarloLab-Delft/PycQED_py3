@@ -670,6 +670,7 @@ class MeasurementAnalysis(object):
         # set axes labels format to scientific when outside interval [0.01,99]
         ax.ticklabel_format(axis='x', style='sci', scilimits=(-2,2))
         ax.ticklabel_format(axis='y', style='sci', scilimits=(-2,2))
+
         #Set the line width of the scientific notation exponent
         ax.xaxis.offsetText.set_fontsize(self.font_size)
         ax.yaxis.offsetText.set_fontsize(self.font_size)
@@ -1279,7 +1280,7 @@ class TD_Analysis(MeasurementAnalysis):
     def __init__(self, NoCalPoints=4, center_point=31, make_fig=True,
                  zero_coord=None, one_coord=None, cal_points=None,
                  rotate_and_normalize=True, last_ge_pulse=True,
-                 plot_cal_points=True, **kw):
+                 plot_cal_points=True, for_ef=True, **kw):
         self.NoCalPoints = NoCalPoints
         self.normalized_values = []
         self.normalized_cal_vals = []
@@ -1292,6 +1293,7 @@ class TD_Analysis(MeasurementAnalysis):
         self.center_point = center_point
         self.plot_cal_points = plot_cal_points
         self.last_ge_pulse = last_ge_pulse
+        self.analyze_ef = for_ef
 
         super(TD_Analysis, self).__init__(**kw)
 
@@ -1366,7 +1368,11 @@ class TD_Analysis(MeasurementAnalysis):
         if self.make_fig:
             self.fig, self.ax = self.default_ax()
 
-            ylabel = r'$F$ $\left(|1 \rangle \right)$'
+            if self.analyze_ef:
+                ylabel = r'$F$ $\left(|f \rangle \right) (arb. units)$'
+            else:
+                ylabel = r'$F$ $\left(|e \rangle \right) (arb. units)$'
+
             self.plot_results_vs_sweepparam(x=self.scaled_sweep_points,
                                             y=self.normalized_values,
                                             fig=self.fig, ax=self.ax,
@@ -1374,8 +1380,8 @@ class TD_Analysis(MeasurementAnalysis):
                                             ylabel=ylabel,
                                             marker='o-',
                                             save=False)
-            self.ax.set_ylim(min(min(self.normalized_values)-.1, -.1),
-                              max(max(self.normalized_values)+.1, 1.1))
+            # self.ax.set_ylim(min(min(self.normalized_values)-.1, -.1),
+            #                   max(max(self.normalized_values)+.1, 1.1))
 
             if save_fig:
                 if not close_main_fig:
@@ -1409,13 +1415,14 @@ class TD_Analysis(MeasurementAnalysis):
         else:
             NoPts = len(values)
             if (calsteps == 6) and self.last_ge_pulse:
+                # oscillations between |g>-|f>
                 # use the I cal points (data[-6] and data[-5]) and
-                # the X180 cal points (data[-4] and data[-3])
+                # the X180_ef cal points (data[-2] and data[-1])
                 cal_zero_points = list(range(NoPts-int(calsteps),
                                        NoPts-int(2*calsteps/3)))
-                cal_one_points = list(range(NoPts- int(2*calsteps/3),
-                                      NoPts-int(calsteps/3)))
+                cal_one_points = list(range(NoPts-int(calsteps/3), NoPts))
             elif (calsteps == 6) and (not self.last_ge_pulse):
+                # oscillations between |e>-|f>
                 # use the X180 cal points (data[-4] and data[-3])
                 # and the X180_ef cal points (data[-2] and data[-1])
                 cal_zero_points = list(range(NoPts- int(2*calsteps/3),
@@ -1442,13 +1449,13 @@ class TD_Analysis(MeasurementAnalysis):
             # If we are calibrating only to a pulse with no amplitude
             # (i.e. do nothing), then manually
             # normalize the y axis. (Needed for Rabi for example)
-            if calsteps <= 2:
-                max_min_distance = max(normalized_values) - \
-                                   min(normalized_values)
-                normalized_values = (normalized_values -
-                                     min(normalized_values))/max_min_distance
-                normalized_data_points = normalized_values[:-int(calsteps)]
-                normalized_cal_vals = normalized_values[-int(calsteps):]
+            # if calsteps <= 2:
+            #     max_min_distance = max(normalized_values) - \
+            #                        min(normalized_values)
+            #     normalized_values = (normalized_values -
+            #                          min(normalized_values))/max_min_distance
+            #     normalized_data_points = normalized_values[:-int(calsteps)]
+            #     normalized_cal_vals = normalized_values[-int(calsteps):]
 
         return [normalized_values, normalized_data_points, normalized_cal_vals]
 
@@ -1867,14 +1874,14 @@ class Rabi_Analysis_new(TD_Analysis):
                     [piHalfPulse_fit, piHalfPulse_fit], 'k--',
                     linewidth=self.axes_line_width)
             #show only 2 sig figs
-            self.ax.xaxis.set_major_formatter(FormatStrFormatter('%.2f'))
-            self.ax.yaxis.set_major_formatter(FormatStrFormatter('%.2f'))
+            # self.ax.xaxis.set_major_formatter(FormatStrFormatter('%.2f'))
+            # self.ax.yaxis.set_major_formatter(FormatStrFormatter('%.2f'))
             #Set ticks and labels
             # self.ax.set_xticks([min(self.scaled_sweep_points),pi_pulse,
         #                         pi_half_pulse,
             #                     max(self.scaled_sweep_points)])
             # self.ax.set_yticks([piPulse_fit,piHalfPulse_fit,1.0])
-            self.ax.set_yticks(np.arange(0,1.25,0.25))
+            #self.ax.set_yticks(np.arange(0,1.25,0.25))
             #plot two points for the pi and piHalf pulses
             self.ax.plot(pi_pulse, piPulse_fit, 'ro',
                     markersize=self.marker_size_special)
@@ -2339,12 +2346,12 @@ class QScale_Analysis(TD_Analysis):
         #                                  'calibration points'.encode('utf-8'))
 
         # Only the unfolding part here is unique to this analysis
-        self.sweep_points_xX = self.sweep_points[:-4:3]
-        self.sweep_points_xY = self.sweep_points[1:-4:3]
-        self.sweep_points_xmY = self.sweep_points[2:-4:3]
-        self.corr_data_xX = self.normalized_values[:-4:3]
-        self.corr_data_xY = self.normalized_values[1:-4:3]
-        self.corr_data_xmY = self.normalized_values[2:-4:3]
+        self.sweep_points_xX = self.sweep_points[:-self.NoCalPoints:3]
+        self.sweep_points_xY = self.sweep_points[1:-self.NoCalPoints:3]
+        self.sweep_points_xmY = self.sweep_points[2:-self.NoCalPoints:3]
+        self.corr_data_xX = self.normalized_values[:-self.NoCalPoints:3]
+        self.corr_data_xY = self.normalized_values[1:-self.NoCalPoints:3]
+        self.corr_data_xmY = self.normalized_values[2:-self.NoCalPoints:3]
 
         self.fit_data(**kw)
         self.make_figures(**kw)
@@ -3739,23 +3746,23 @@ class Ramsey_Analysis(TD_Analysis):
         kw['h5mode'] = 'r+'
         super(self.__class__, self).__init__(**kw)
 
-    def fit_Ramsey(self, **kw):
+    def fit_Ramsey(self, x, y, **kw):
 
         print_fit_results = kw.pop('print_fit_results',True)
         damped_osc_mod = fit_mods.ExpDampOscModel
-        average = np.mean(self.normalized_data_points)
+        average = np.mean(y)
 
-        ft_of_data = np.fft.fft(self.normalized_data_points)
+        ft_of_data = np.fft.fft(y)
         index_of_fourier_maximum = np.argmax(np.abs(
             ft_of_data[1:len(ft_of_data)//2]))+1
-        max_ramsey_delay = self.sweep_points[-self.NoCalPoints] - \
-                           self.sweep_points[0]
+        max_ramsey_delay = x[-self.NoCalPoints] - \
+                           x[0]
 
         fft_axis_scaling = 1/(max_ramsey_delay)
         freq_est = fft_axis_scaling*index_of_fourier_maximum
         est_number_of_periods = index_of_fourier_maximum
 
-        if ((average > 0.7*max(self.normalized_data_points)) or
+        if ((average > 0.7*max(y)) or
                 (est_number_of_periods < 2) or
                 est_number_of_periods > len(ft_of_data)/2.):
             print('the trace is too short to find multiple periods')
@@ -3773,11 +3780,11 @@ class Ramsey_Analysis(TD_Analysis):
             damped_osc_mod.set_param_hint('frequency',
                                           value=freq_est,
                                           vary=True,
-                                          min=(1/(100 *self.sweep_points[-1])),
-                                          max=(20/self.sweep_points[-1]))
+                                          min=(1/(100 *x[-1])),
+                                          max=(20/x[-1]))
 
-        if (np.average(self.normalized_data_points[:4]) >
-                np.average(self.normalized_data_points[4:8])):
+        if (np.average(y[:4]) >
+                np.average(y[4:8])):
             phase_estimate = 0
         else:
             phase_estimate = np.pi
@@ -3790,9 +3797,9 @@ class Ramsey_Analysis(TD_Analysis):
                                       min=0.4,
                                       max=2.0)
         damped_osc_mod.set_param_hint('tau',
-                                      value=self.sweep_points[1]*10,
-                                      min=self.sweep_points[1],
-                                      max=self.sweep_points[1]*1000)
+                                      value=x[1]*10,
+                                      min=x[1],
+                                      max=x[1]*1000)
         damped_osc_mod.set_param_hint('exponential_offset',
                                       value=0.5,
                                       min=0.4,
@@ -3805,8 +3812,8 @@ class Ramsey_Analysis(TD_Analysis):
                                       vary=False)
         self.params = damped_osc_mod.make_params()
 
-        fit_res = damped_osc_mod.fit(data=self.normalized_data_points,
-                                     t=self.sweep_points[:-self.NoCalPoints],
+        fit_res = damped_osc_mod.fit(data=y,
+                                     t=x[:-self.NoCalPoints],
                                      params=self.params)
         if fit_res.chisqr > .35:
             logging.warning('Fit did not converge, varying phase')
@@ -3817,8 +3824,8 @@ class Ramsey_Analysis(TD_Analysis):
                                               value=phase_estimate)
                 self.params = damped_osc_mod.make_params()
                 fit_res_lst += [damped_osc_mod.fit(
-                                data=self.normalized_data_points,
-                                t=self.sweep_points[:-self.NoCalPoints],
+                                data=y,
+                                t=x[:-self.NoCalPoints],
                                 params=self.params)]
 
             chisqr_lst = [fit_res.chisqr for fit_res in fit_res_lst]
@@ -3887,12 +3894,13 @@ class Ramsey_Analysis(TD_Analysis):
         scale = self.scales_dict[unit_prefix]
 
         #Perform fit and save fitted parameters
-        self.fit_res = self.fit_Ramsey(**kw)
-        self.get_measured_freq(**kw)
+        self.fit_res = self.fit_Ramsey(x=self.sweep_points,
+                                       y=self.normalized_data_points, **kw)
+        self.get_measured_freq(fit_res=self.fit_res, **kw)
         self.save_fitted_parameters(self.fit_res, var_name=self.value_names[0])
 
         #Extract T2 star and save it
-        self.get_measured_T2_star(**kw)  #defines self.T2_star as a dic; units
+        self.get_measured_T2_star(fit_res=self.fit_res, **kw)  #defines self.T2_star as a dic; units
                                          #are seconds
         self.save_computed_parameters(self.T2_star,
                                       var_name=self.value_names[0])
@@ -3929,26 +3937,167 @@ class Ramsey_Analysis(TD_Analysis):
 
         return self.fit_res
 
-    def get_measured_freq(self, **kw):
-        freq = self.fit_res.params['frequency'].value
-        freq_stderr = self.fit_res.params['frequency'].stderr
+    def get_measured_freq(self, fit_res, **kw):
+        freq = fit_res.params['frequency'].value
+        freq_stderr = fit_res.params['frequency'].stderr
 
         self.Ramsey_freq = {'freq':freq, 'freq_stderr':freq_stderr}
 
         return self.Ramsey_freq
 
-    def get_measured_T2_star(self, **kw):
+    def get_measured_T2_star(self, fit_res, **kw):
         '''
         Returns measured T2 star from the fit to the Ical data.
          return T2, T2_stderr
         '''
-        T2 = self.fit_res.params['tau'].value
-        T2_stderr = self.fit_res.params['tau'].stderr
+        T2 = fit_res.params['tau'].value
+        T2_stderr = fit_res.params['tau'].stderr
 
         self.T2_star = {'T2_star':T2, 'T2_star_stderr':T2_stderr}
 
         return self.T2_star
 
+
+class Ramsey_Analysis_mult_det(Ramsey_Analysis):
+
+    def __init__(self, label='Ramsey_mult_det', **kw):
+        kw['label'] = label
+        kw['h5mode'] = 'r+'
+        super(self.__class__, self).__init__(**kw)
+
+    def plot_results(self, fit_res, scale=1, show_guess=False):
+        units = self.parameter_units[0]
+        textstr = ('$f_qubit$ = %.5g $ GHz \pm$ (%.5g) Hz'
+                   % (self.qubit_frequency*scale,
+                      fit_res.params['frequency'].stderr) +
+                   '$f$ = %.5g $ Hz \pm$ (%.5g) Hz'
+                   % (fit_res.params['frequency'].value,
+                      fit_res.params['frequency'].stderr) +
+                   '\n$T_2^\star$ = %.6g '
+                   % (fit_res.params['tau'].value*scale)  +
+                   units + ' $\pm$ (%.6g) '
+                   % (fit_res.params['tau'].stderr*scale) +
+                   units)
+
+        self.fig.text(0.5, 0, textstr, fontsize=self.font_size,
+                      transform=self.ax.transAxes,
+                      verticalalignment='top',
+                      horizontalalignment='center', bbox=self.box_props)
+
+        x = np.linspace(self.sweep_points[0],
+                        self.sweep_points[-self.NoCalPoints],
+                        len(self.sweep_points)*100)
+
+        if show_guess:
+            y_init = fit_mods.ExpDampOscFunc(x, **self.fit_res.init_values)
+            self.ax.plot(x*scale, y_init, 'k--', linewidth=self.line_width)
+
+        best_vals = self.fit_res.best_values
+        y = fit_mods.ExpDampOscFunc(
+            x, tau=best_vals['tau'],
+            n=best_vals['n'],
+            frequency=best_vals['frequency'],
+            phase=best_vals['phase'],
+            amplitude=best_vals['amplitude'],
+            oscillation_offset=best_vals['oscillation_offset'],
+            exponential_offset=best_vals['exponential_offset'])
+        self.ax.plot(x*scale, y, 'r-',linewidth=self.line_width)
+
+
+    def run_default_analysis(self, print_fit_results=False,
+                             unit_prefix='u', show=False,
+                             close_file=False, **kw):
+
+        super().run_default_analysis(show=show,
+                                     close_file=close_file,unit_prefix=unit_prefix,
+                                     close_main_figure=True,save_fig=False,**kw)
+
+        show_guess = kw.get('show_guess', False)
+        self.artificial_detunings = kw.pop('artificial_detunings',[-4,4])
+        self.qubit_freq_spec = kw.pop('qubit_frequency_spec',0)
+        self.add_analysis_datagroup_to_file()
+        scale = self.scales_dict[unit_prefix]
+
+        # Extract the data for each ramsey
+        len_art_det = len(self.artificial_detunings)
+        sweep_pts_1 = self.sweep_points[0:-self.NoCalPoints:len_art_det]
+        sweep_pts_2 = self.sweep_points[1:-self.NoCalPoints:len_art_det]
+        ramsey_data_1 = self.normalized_values[0:-self.NoCalPoints:len_art_det]
+        ramsey_data_2 = self.normalized_values[1:-self.NoCalPoints:len_art_det]
+
+        #Perform fit and save fitted parameters
+        fit_res_1 = self.fit_Ramsey(x=sweep_pts_1,
+                                       y=ramsey_data_1, **kw)
+        fit_res_2 = self.fit_Ramsey(x=sweep_pts_2,
+                                         y=ramsey_data_2, **kw)
+
+        ramsey_freq_dict_1 = self.get_measured_freq(fit_res=fit_res_1, **kw)
+        ramsey_freq_1 = ramsey_freq_dict_1['freq']
+        ramsey_freq_dict_2 = self.get_measured_freq(fit_res=fit_res_2, **kw)
+        ramsey_freq_2 = ramsey_freq_dict_2['freq']
+
+        # Calculate possible detunings from real qubit frequency
+        qb_detuning_1 = self.artificial_detunings[0] + ramsey_freq_1
+        qb_detuning_2 = self.artificial_detunings[0] - ramsey_freq_1
+        qb_detuning_3 = self.artificial_detunings[2] + ramsey_freq_2
+        qb_detuning_4 = self.artificial_detunings[2] - ramsey_freq_2
+        # Find which ones match
+        qb_detunings = [qb_detuning_1, qb_detuning_2,
+                        qb_detuning_3, qb_detuning_4]
+        vals, inverse, count = np.unique(qb_detunings, return_inverse=True,
+                                         return_counts=True)
+        idx_vals_repeated = np.where(count > 1)[0]
+        vals_repeated = vals[idx_vals_repeated]
+        self.qb_detuning = vals_repeated
+        self.qubit_frequency = self.qubit_freq_spec + self.qb_detuning
+
+        match_idxs = np.where(qb_detunings==vals_repeated)[0]
+        if match_idxs[0] == 0:
+            self.fit_res = fit_res_1
+            self.ramsey_data = ramsey_data_1
+            self.sweep_pts = sweep_pts_1
+            self.ramsey_freq = ramsey_freq_dict_1
+        else:
+            self.fit_res = fit_res_2
+            self.ramsey_data = ramsey_data_2
+            self.sweep_pts = sweep_pts_2
+            self.ramsey_freq = ramsey_freq_dict_2
+
+        self.save_fitted_parameters(self.fit_res, var_name=self.value_names[0])
+
+        #Extract T2 star and save it
+        self.get_measured_T2_star(fit_res=self.fit_res, **kw)  #defines self.T2_star as a dic; units
+        #are seconds
+        self.save_computed_parameters(self.T2_star,
+                                      var_name=self.value_names[0])
+        self.save_computed_parameters({'new_qubit_frequency':self.qubit_frequency,
+                                       'new_qubit_freq_stderr':self.ramsey_freq['freq_stderr']},
+                                      var_name=self.value_names[0])
+
+        #Plot results
+        self.plot_results(self.fit_res, show_guess=show_guess, scale=scale)
+
+        #Print the T2_star values on screen
+        unit = self.parameter_units[0][-1]
+        if kw.pop('print_parameters',True):
+            print('T2* = {:.5f} '.format(
+                self.T2_star['T2_star']*scale) +'('+pretty(mu)+unit+')'+
+                  '\t\t T2* stderr = {:.5f} '.format(
+                      self.T2_star['T2_star_stderr']*scale) +
+                  '('+pretty(mu)+unit+')')
+
+        #dispaly figure
+        if show:
+            plt.show()
+
+        #save figure
+        self.save_fig(self.fig, figname=self.measurementstring+'_Ramsey_fit',
+                      **kw)
+
+        if close_file:
+            self.data_file.close()
+
+        return self.fit_res
 
 class DragDetuning_Analysis(TD_Analysis):
 
@@ -4727,6 +4876,7 @@ class Homodyne_Analysis(MeasurementAnalysis):
         self.add_analysis_datagroup_to_file()
 
         interactive_plot = kw.get('interactive_plot',False)
+        window_len_filter = kw.get('window_len',10)
 
         ########## Fit data ##########
 
@@ -4739,8 +4889,10 @@ class Homodyne_Analysis(MeasurementAnalysis):
         self.min_frequency = self.sweep_points[min_index]
         self.max_frequency = self.sweep_points[max_index]
 
+        measured_powers_smooth = a_tools.smooth(self.measured_powers,
+                                          window_len=window_len_filter)
         self.peaks = a_tools.peak_finder((self.sweep_points),
-                                         self.measured_powers)
+                                         measured_powers_smooth)
 
         # Search for peak
         if self.peaks['dip'] is not None:    # look for dips first
@@ -5107,6 +5259,8 @@ class Hanger_Analysis_CosBackground(MeasurementAnalysis):
             close_file=False, **kw)
         self.add_analysis_datagroup_to_file()
 
+        window_len_filter = kw.get('window_len',10)
+
         # Fit Power to a Lorentzian
         self.measured_powers = self.measured_values[0]**2
 
@@ -5116,8 +5270,11 @@ class Hanger_Analysis_CosBackground(MeasurementAnalysis):
         self.min_frequency = self.sweep_points[min_index]
         self.max_frequency = self.sweep_points[max_index]
 
+        measured_values_0_smooth = a_tools.smooth(self.measured_values[0],
+                                                window_len=window_len_filter)
+
         self.peaks = a_tools.peak_finder((self.sweep_points),
-                                         self.measured_values[0])
+                                         measured_values_0_smooth)
 
         if self.peaks['dip'] is not None:    # look for dips first
             f0 = self.peaks['dip']
@@ -5395,44 +5552,69 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
             tallest_peak = self.peaks[key] #the gf/2 freq
             tallest_peak_idx = self.peaks[key+'_idx']
             tallest_peak_width = self.peaks[key+'_width']
+            print('tallest peak at ',tallest_peak)
+            print('tallest peak idx = ',tallest_peak_idx)
 
             #serach for 2nd peak (f_ge) to the right of the first
-            n=self.data_dist.size//10
-            m=self.data_dist.size//10
+            # n=self.data_dist.size//10
+            # m=self.data_dist.size//10
+            freq_range = sweep_pts_cut_edges[-1]-sweep_pts_cut_edges[0]
+            num_points = sweep_pts_cut_edges.size
+            n = int(50e6*num_points/freq_range)
+            m = int(50e6*num_points/freq_range)
             while(int(len(sweep_pts_cut_edges)-1) <= int(tallest_peak_idx+n) and
                           n>0):
                 n -= 1
+            if (int(tallest_peak_idx+n)) == sweep_pts_cut_edges.size:
+                n = 0
+            print('n = ',n)
+            if not ((int(tallest_peak_idx+n)) >= sweep_pts_cut_edges.size):
+                print('Searching for the gf/2 {:} in the range {:.5}-{:.5}'.format(
+                    key,
+                    sweep_pts_cut_edges[int(tallest_peak_idx+n)],
+                    sweep_pts_cut_edges[-1]))
 
-            self.peaks = a_tools.peak_finder(
-                sweep_pts_cut_edges[int(tallest_peak_idx+n)::],
-                data_dist_smooth[int(tallest_peak_idx+n)::],
-                analyze_ef=False,
-                percentile=percentile,
-                num_sigma_threshold=1,
-                optimize=False,
-                key=key)
-
-            subset_right = data_dist_smooth[int(tallest_peak_idx+n)::]
-            val_right = subset_right[self.peaks[key+'_idx']]
-            f0_right = self.peaks[key]
-            kappa_guess_right = self.peaks[key+'_width']
-            f0_gf_over_2_right = tallest_peak
-            kappa_guess_ef_right = tallest_peak_width
-
-            if np.abs(self.peaks[key] - tallest_peak) > 100e6:
-                print('Both f_ge and f_gf/2 have been found. '
-                      'f_ge was assumed to the RIGHT of f_gf/2.')
-                f0 = f0_right
-                kappa_guess = kappa_guess_right
-                f0_gf_over_2 = f0_gf_over_2_right
-                kappa_guess_ef = kappa_guess_ef_right
-
+                self.peaks_right = a_tools.peak_finder(
+                    sweep_pts_cut_edges[int(tallest_peak_idx+n)::],
+                    data_dist_smooth[int(tallest_peak_idx+n)::],
+                    analyze_ef=False,
+                    percentile=percentile,
+                    num_sigma_threshold=1,
+                    optimize=False,
+                    key=key)
+                print('Right peak = ',self.peaks_right[key])
+                subset_right = data_dist_smooth[int(tallest_peak_idx+n)::]
+                val_right = subset_right[self.peaks_right[key+'_idx']]
+                f0_right = self.peaks_right[key]
+                kappa_guess_right = self.peaks_right[key+'_width']
+                f0_gf_over_2_right = tallest_peak
+                kappa_guess_ef_right = tallest_peak_width
             else:
-                while(int(tallest_peak_idx-m)<0 and m>0):
-                    m -= 1
+                print('Right peak is None')
+                val_right = 0
+                f0_right = 0
+                kappa_guess_right = 0
+                f0_gf_over_2_right = tallest_peak
+                kappa_guess_ef_right = tallest_peak_width
+
+            # f0 = f0_right
+            # kappa_guess = kappa_guess_right
+            # f0_gf_over_2 = f0_gf_over_2_right
+            # kappa_guess_ef = kappa_guess_ef_right
+
+            while(int(tallest_peak_idx-m)<0 and m>0):
+                m -= 1
+            if int(tallest_peak_idx-m) == 0:
+                m = 0
+            print('m = ',m)
+            if not (int(tallest_peak_idx-m) <= 0):
+                print('Searching for the gf/2 {:} in the range {:.5}-{:.5}'.format(
+                    key,
+                    sweep_pts_cut_edges[0],
+                    sweep_pts_cut_edges[int(tallest_peak_idx-m-1)]))
 
                 #serach for 2nd peak (f_gf/2) to the left of the first
-                self.peaks = a_tools.peak_finder(
+                self.peaks_left = a_tools.peak_finder(
                     sweep_pts_cut_edges[0:int(tallest_peak_idx-m)],
                     data_dist_smooth[0:int(tallest_peak_idx-m)],
                     analyze_ef=False,
@@ -5440,37 +5622,63 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
                     num_sigma_threshold=1,
                     optimize=False,
                     key=key)
-
+                print('Left peak = ',self.peaks_left[key])
                 subset_left = data_dist_smooth[0:int(tallest_peak_idx-m)]
-                val_left = subset_left[self.peaks[key+'_idx']]
+                val_left = subset_left[self.peaks_left[key+'_idx']]
                 f0_left = tallest_peak
                 kappa_guess_left = tallest_peak_width
-                f0_gf_over_2_left = self.peaks[key]
-                kappa_guess_ef_left = self.peaks[key+'_width']
+                f0_gf_over_2_left = self.peaks_left[key]
+                kappa_guess_ef_left = self.peaks_left[key+'_width']
+            else:
+                print('Left peak is None')
+                val_left = 0
+                f0_left = tallest_peak
+                kappa_guess_left = tallest_peak_width
+                f0_gf_over_2_left = 0
+                kappa_guess_ef_left =  0
 
-                if np.abs(self.peaks[key] - tallest_peak) > 100e6:
+            print(f0_gf_over_2_left)
+            # f0 = f0_left
+            # kappa_guess = kappa_guess_left
+            # f0_gf_over_2 = f0_gf_over_2_left
+            # kappa_guess_ef = kappa_guess_ef_left
+
+            if np.abs(val_left) > np.abs(val_right):
+                if np.abs(f0_gf_over_2_left - tallest_peak) > 50e6:
                     print('Both f_ge and f_gf/2 have been found. '
                           'f_ge was assumed to the LEFT of f_gf/2.')
-
-                    f0 = f0_left
-                    kappa_guess = kappa_guess_left
-                    f0_gf_over_2 = f0_gf_over_2_left
-                    kappa_guess_ef = kappa_guess_ef_left
-
                 else:
                     print('The f_gf/2 '+key+' was not found. Fitting to '
-                          'the next largest '+key+' found.')
-                    if np.abs(val_left) > np.abs(val_right):
-                        f0 = f0_left
-                        kappa_guess = kappa_guess_left
-                        f0_gf_over_2 = f0_gf_over_2_left
-                        kappa_guess_ef = kappa_guess_ef_left
-                    else:
-                        f0 = f0_right
-                        kappa_guess = kappa_guess_right
-                        f0_gf_over_2 = f0_gf_over_2_right
-                        kappa_guess_ef = kappa_guess_ef_right
+                                            'the next largest '+key+' found.')
 
+                f0 = f0_left
+                kappa_guess = kappa_guess_left
+                f0_gf_over_2 = f0_gf_over_2_left
+                kappa_guess_ef = kappa_guess_ef_left
+            elif  np.abs(val_left) < np.abs(val_right):
+                if np.abs(f0_right - tallest_peak) > 50e6:
+                    print('Both f_ge and f_gf/2 have been found. '
+                          'f_ge was assumed to the RIGHT of f_gf/2.')
+                else:
+                    print('The f_gf/2 '+key+' was not found. Fitting to '
+                                            'the next largest '+key+' found.')
+                f0 = f0_right
+                kappa_guess = kappa_guess_right
+                f0_gf_over_2 = f0_gf_over_2_right
+                kappa_guess_ef = kappa_guess_ef_right
+            else:
+                print('Only f_ge has been found.')
+                f0 = tallest_peak
+                kappa_guess = tallest_peak_width
+                f0_gf_over_2 = tallest_peak
+                kappa_guess_ef = tallest_peak_width
+
+            print(f0)
+            print(f0_gf_over_2)
+            if f0 == 0:
+                f0 = tallest_peak
+            if f0_gf_over_2 == 0:
+                f0_gf_over_2 = tallest_peak
             if kappa_guess == 0:
                 kappa_guess = 5e6
             if kappa_guess_ef == 0:

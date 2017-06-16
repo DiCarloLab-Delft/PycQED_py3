@@ -323,6 +323,60 @@ def Ramsey_seq(times, pulse_pars, RO_pars,
     else:
         return seq_name
 
+def Ramsey_seq_multiple_detunings(times, pulse_pars, RO_pars,
+               artificial_detunings=None,
+               cal_points=True,
+               verbose=False,
+               upload=True, return_seq=False):
+    '''
+    Ramsey sequence for a single qubit using the tektronix.
+    SSB_Drag pulse is used for driving, simple modualtion used for RO
+    !!! Each value in the times array must be repeated len(artificial_detunings)
+    times!!!
+    Input pars:
+        times:               array of times between (start of) pulses (s)
+        pulse_pars:          dict containing the pulse parameters
+        RO_pars:             dict containing the RO parameters
+        artificial_detunings: list of artificial_detunings (Hz) implemented
+                              using phase
+        cal_points:          whether to use calibration points or not
+    '''
+    seq_name = 'Ramsey_sequence'
+    seq = sequence.Sequence(seq_name)
+    station.pulsar.update_channel_settings()
+    el_list = []
+    # First extract values from input, later overwrite when generating
+    # waveforms
+    pulses = get_pulse_dict_from_pars(pulse_pars)
+
+    pulse_pars_x2 = deepcopy(pulses['X90'])
+    pulse_pars_x2['refpoint'] = 'start'
+    for i, tau in enumerate(times):
+        pulse_pars_x2['pulse_delay'] = tau
+        art_det = artificial_detunings[i % len(artificial_detunings)]
+
+        if art_det is not None:
+            Dphase = ((tau-times[0]) * art_det * 360) % 360
+            pulse_pars_x2['phase'] = Dphase
+
+        if cal_points and (i == (len(times)-4) or i == (len(times)-3)):
+            el = multi_pulse_elt(i, station, [pulses['I'], RO_pars])
+        elif cal_points and (i == (len(times)-2) or i == (len(times)-1)):
+            el = multi_pulse_elt(i, station, [pulses['X180'], RO_pars])
+        else:
+            el = multi_pulse_elt(i, station,
+                                 [pulses['X90'], pulse_pars_x2, RO_pars])
+        el_list.append(el)
+        seq.append_element(el, trigger_wait=True)
+    if upload:
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
+
+
+    if return_seq:
+        return seq, el_list
+    else:
+        return seq_name
+
 
 def Echo_seq(times, pulse_pars, RO_pars,
              artificial_detuning=None,
