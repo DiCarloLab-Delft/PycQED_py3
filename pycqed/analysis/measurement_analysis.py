@@ -464,7 +464,6 @@ class MeasurementAnalysis(object):
                 self.save_fig(fig, xlabel=xlabel, ylabel=ylabel, **kw)
         return
 
-
     def plot_complex_results(self, cmp_data, fig, ax, show=False, marker='.', **kw):
         '''
         Plot real and imaginary values measured vs a sweeped parameter
@@ -490,7 +489,6 @@ class MeasurementAnalysis(object):
             self.save_fig(fig, xlabel=xlabel, ylabel=ylabel, **kw)
 
         return
-
 
     def plot_dB_from_linear(self, x, lin_amp, fig, ax, show=False, marker='.', **kw):
         '''
@@ -518,7 +516,6 @@ class MeasurementAnalysis(object):
             self.save_fig(fig, xlabel=xlabel, ylabel=ylabel, **kw)
 
         return
-
 
     def get_naming_and_values_2D(self):
         '''
@@ -1268,8 +1265,10 @@ class Rabi_Analysis(TD_Analysis):
         if self.nr_quadratures != 1:
             # It would be best to do 1 fit to both datasets but since it is
             # easier to do just one fit we stick to that.
-            # We make an initial guess of the Rabi period using both quadratures
-            data = np.sqrt(self.measured_values[0]**2+self.measured_values[1]**2)
+            # We make an initial guess of the Rabi period using both
+            # quadratures
+            data = np.sqrt(self.measured_values[
+                           0]**2+self.measured_values[1]**2)
             params = fit_mods.Cos_guess(model, data=data, t=self.sweep_points)
             fit_res = model.fit(
                 data=data,
@@ -1337,7 +1336,8 @@ class Echo_analysis(TD_Analysis):
 
     def run_default_analysis(self, close_file=True, **kw):
         self.get_naming_and_values()
-        norm = self.normalize_data_to_calibration_points(self.measured_values[0], self.NoCalPoints)
+        norm = self.normalize_data_to_calibration_points(
+            self.measured_values[0], self.NoCalPoints)
         self.normalized_values = norm[0]
         self.normalized_data_points = norm[1]
         self.normalized_cal_vals = norm[2]
@@ -1522,7 +1522,7 @@ class CPhase_2Q_amp_cost_analysis(Rabi_Analysis):
         # Frequency is known, because we sweep the phase of the second pihalf
         # pulse in a Ramsey-type experiment.
         model = lmfit.Model((lambda t, amplitude, phase, offset:
-                            amplitude*np.cos(2*np.pi*t/360.0 + phase)+offset))
+                             amplitude*np.cos(2*np.pi*t/360.0 + phase)+offset))
         self.fit_result = {}
 
         # Fit case with no excitation first
@@ -1569,7 +1569,8 @@ class Motzoi_XY_analysis(TD_Analysis):
         self.add_analysis_datagroup_to_file()
         if self.cal_points is None:
             if len(self.measured_values) == 2:
-                self.corr_data = self.measured_values[0]**2 + self.measured_values[1]**2
+                self.corr_data = self.measured_values[
+                    0]**2 + self.measured_values[1]**2
             else:
                 self.corr_data = self.measured_values[0]
         else:
@@ -1856,7 +1857,7 @@ class SSRO_Analysis(MeasurementAnalysis):
                  hist_log_scale: bool=True, **kw):
         kw['h5mode'] = 'r+'
         self.rotate = rotate
-        self.channels= channels
+        self.channels = channels
         self.hist_log_scale = hist_log_scale
         self.close_fig = close_fig
         super(self.__class__, self).__init__(**kw)
@@ -1925,7 +1926,6 @@ class SSRO_Analysis(MeasurementAnalysis):
             Q_max = max(max(shots_Q_data_0), max(shots_Q_data_1))
             edge = max(abs(I_min), abs(I_max), abs(Q_min), abs(Q_max))
 
-
             H0, xedges0, yedges0 = np.histogram2d(shots_I_data_0, shots_Q_data_0,
                                                   bins=n_bins,
                                                   range=[[I_min, I_max],
@@ -1951,7 +1951,8 @@ class SSRO_Analysis(MeasurementAnalysis):
                                             yedges1[0], yedges1[-1]], cmap=cmap)
             set_xlabel(axarray[0], self.value_names[0], self.value_units[0])
             if len(self.channels) == 2:
-                set_ylabel(axarray[0], self.value_names[1], self.value_units[1])
+                set_ylabel(axarray[0], self.value_names[
+                           1], self.value_units[1])
             else:
                 set_ylabel(axarray[0], 'Dummy axis')
             axarray[0].set_xlim(-edge, edge)
@@ -1964,13 +1965,15 @@ class SSRO_Analysis(MeasurementAnalysis):
                                             yedges0[-1]], cmap=cmap)
             set_xlabel(axarray[1], self.value_names[0], self.value_units[0])
             if len(self.channels) == 2:
-                set_ylabel(axarray[1], self.value_names[1], self.value_units[1])
+                set_ylabel(axarray[1], self.value_names[
+                           1], self.value_units[1])
             else:
                 set_ylabel(axarray[1], 'Dummy axis')
             axarray[1].set_xlim(-edge, edge)
             axarray[1].set_ylim(-edge, edge)
 
-            self.save_fig(fig, figname='SSRO_Density_Plots', close_fig=self.close_fig, **kw)
+            self.save_fig(fig, figname='SSRO_Density_Plots',
+                          close_fig=self.close_fig, **kw)
 
             self.avg_0_I = np.mean(shots_I_data_0)
             self.avg_1_I = np.mean(shots_I_data_1)
@@ -2024,7 +2027,8 @@ class SSRO_Analysis(MeasurementAnalysis):
 
             set_xlabel(axarray[0], self.value_names[0], self.value_units[0])
             if len(self.channels) == 2:
-                set_ylabel(axarray[0], self.value_names[1], self.value_units[1])
+                set_ylabel(axarray[0], self.value_names[
+                           1], self.value_units[1])
             else:
                 set_ylabel(axarray[0], 'Dummy axis')
             axarray[0].set_xlim(-edge, edge)
@@ -2038,7 +2042,8 @@ class SSRO_Analysis(MeasurementAnalysis):
 
             set_xlabel(axarray[1], self.value_names[0], self.value_units[0])
             if len(self.channels) == 2:
-                set_ylabel(axarray[1], self.value_names[1], self.value_units[1])
+                set_ylabel(axarray[1], self.value_names[
+                           1], self.value_units[1])
             else:
                 set_ylabel(axarray[1], 'Dummy axis')
             axarray[1].set_xlim(-edge, edge)
@@ -2424,7 +2429,8 @@ class SSRO_Analysis(MeasurementAnalysis):
         plt.legend()
         leg2 = ax.legend(loc='best')
         leg2.get_frame().set_alpha(0.5)
-        self.save_fig(fig, figname='Histograms', close_fig=self.close_fig, **kw)
+        self.save_fig(fig, figname='Histograms',
+                      close_fig=self.close_fig, **kw)
 
         self.save_fitted_parameters(fit_res_double_0,
                                     var_name='fit_res_double_0')
@@ -2722,8 +2728,8 @@ class SSRO_single_quadrature_discriminiation_analysis(MeasurementAnalysis):
             self.ax.legend(loc='best')
 
         ylim = self.ax.get_ylim()
-        self.ax.vlines(self.opt_threshold, ylim[0] , ylim[1], linestyles='--',
-                  label='opt. threshold')
+        self.ax.vlines(self.opt_threshold, ylim[0], ylim[1], linestyles='--',
+                       label='opt. threshold')
         self.ax.text(.95, .95, 'F_discr {:.2f}\nOpt.thresh. {:.2f}'.format(
                      self.F_discr, self.opt_threshold),
                      verticalalignment='top', horizontalalignment='right',
@@ -3221,16 +3227,15 @@ class DriveDetuning_Analysis(TD_Analysis):
             model = fit_mods.lmfit.Model(fit_mods.CosFunc)
 
             params = fit_mods.Cos_guess(model, data=data,
-                                 t=sweep_points)
+                                        t=sweep_points)
             # This ensures that phase is *always* ~90 deg if it is different
             # this shows up in the amplitude and prevents the correct detuning
             # is shown.
             params['phase'].min = np.deg2rad(80)
             params['phase'].max = np.deg2rad(100)
 
-
             fit_results = model.fit(data=data, t=sweep_points,
-                                             params=params)
+                                    params=params)
             return fit_results
 
         def quadratic_fit_data():
@@ -3517,7 +3522,6 @@ class AllXY_Analysis(TD_Analysis):
         else:
             self.save_fig(fig1, ylabel='Amplitude (normalized)', **kw)
         self.save_fig(fig2, ylabel='Amplitude', **kw)
-
 
 
 class RandomizedBenchmarking_Analysis(TD_Analysis):
@@ -4097,6 +4101,7 @@ class VNA_Analysis(MeasurementAnalysis):
     '''
     Nice to use with all measurements performed with the VNA.
     '''
+
     def __init__(self, label='VNA', **kw):
         kw['label'] = label
         kw['h5mode'] = 'r+'
@@ -4343,10 +4348,12 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
                 abs(max(self.data_dist) - min(self.data_dist))
 
             if kappa_guess == 0:
-                    kappa_guess = 1 # When kappa_guess is zero, the fitting procedure fails (claims 'input has nan values')
+                # When kappa_guess is zero, the fitting procedure fails (claims
+                # 'input has nan values')
+                kappa_guess = 1
 
-            if not peak_flag: # Change the sign of amplitude_guess for dips
-                amplitude_guess*=-1.
+            if not peak_flag:  # Change the sign of amplitude_guess for dips
+                amplitude_guess *= -1.
 
             LorentzianModel = fit_mods.LorentzianModel
             LorentzianModel.set_param_hint('f0',
@@ -5295,15 +5302,19 @@ class butterfly_analysis(MeasurementAnalysis):
         self.load_hdf5data(folder=self.folder, **kw)
 
         self.get_naming_and_values()
-        I_shots = self.measured_values[0]
-        Q_shots = self.measured_values[1]
 
-        shots = I_shots+1j*Q_shots
-        rot_shots = dm_tools.rotate_complex(shots, angle=theta_in, deg=True)
-        I_shots = rot_shots.real
-        Q_shots = rot_shots.imag
+        if theta_in == 0: 
+            self.data = self.measured_values[0]
+        else:  
+            I_shots = self.measured_values[0]
+            Q_shots = self.measured_values[1]
 
-        self.data = I_shots
+            shots = I_shots+1j*Q_shots
+            rot_shots = dm_tools.rotate_complex(shots, angle=theta_in, deg=True)
+            I_shots = rot_shots.real
+            Q_shots = rot_shots.imag
+
+            self.data = I_shots
 
         if initialize:
             if threshold_init == None:
@@ -5341,7 +5352,6 @@ class butterfly_analysis(MeasurementAnalysis):
             fraction = (
                 np.size(self.data_exc) + np.size(self.data_exc))*3/shots_used/2
 
-            print("postselection fraction", fraction)
 
         else:
             m0_on = self.data[2::4]
@@ -6101,6 +6111,7 @@ class Ram_Z_Analysis(TD_Analysis):
     that has the highest amplitude in the spectrum and plots the demodulated
     signal.
     '''
+
     def __init__(self, f_modulation=None, NoCalPoints=4, make_fig=True,
                  rotate_and_normalize=False, plot_cal_points=False,
                  close_file=True, auto=True, **kw):
@@ -6133,7 +6144,7 @@ class Ram_Z_Analysis(TD_Analysis):
         self.dc_offset = np.abs(self.spectr[0] / len(self.sweep_points))
         self.spectr[0] = 0  # remove DC component
         self.freqs = np.fft.rfftfreq(n=len(self.corr_data),
-                                d=self.sweep_points[1]-self.sweep_points[0])
+                                     d=self.sweep_points[1]-self.sweep_points[0])
 
         if self.f_mod == None:
             # Find strongest frequency component
