@@ -405,6 +405,27 @@ def Cos_guess(model, data, t):
     return params
 
 
+def Cos_amp_phase_guess(model, data, f, t):
+    '''
+    Guess for a cosine fit with fixed frequency f.
+    '''
+    amp_guess = abs(max(data)-min(data))/2  # amp is positive by convention
+    offs_guess = np.mean(data)
+
+    ph_guess = (-2*np.pi*t[data == max(data)]*f)[0]
+    # the condition data == max(data) can have several solutions
+    #               (for example when discretization is visible)
+    # to prevent errors we pick the first solution
+
+    # model.set_param_hint('period', expr='1')
+    params = model.make_params(amplitude=amp_guess,
+                               phase=ph_guess,
+                               offset=offs_guess)
+    params['amplitude'].min = 0  # Ensures positive amp
+
+    return params
+
+
 def gauss_2D_guess(model, data, x, y):
     '''
     takes the mean of every row/column and then uses the regular gauss guess
