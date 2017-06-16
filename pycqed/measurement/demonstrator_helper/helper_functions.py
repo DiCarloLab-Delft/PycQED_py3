@@ -4,6 +4,7 @@ import re
 import urllib.request
 import sys
 import time
+import linecache
 
 from qcodes import station
 
@@ -58,11 +59,12 @@ def simulate_qasm(file_url="uploads/asset/file/65/f27d92be-8505-43dc-af7d-4c395c
     time.sleep(1)
     qxc.create_qubits(5)
     try:
-        sweep_points = _get_qasm_sweep_points(file_path)
+        
         qx_sweep = QX_Hard_Sweep(qxc, file_path)
-        #qx_sweep.prepare()
-
         qx_detector = QX_Hard_Detector(qxc, [file_path], num_avg=10000)
+        sweep_points = range(len(qx_detector.randomizations[0]))
+        print("SWEEP")
+        print(sweep_points)
         # qx_detector.prepare(sweep_points)
         # Start measurment
         MC.set_detector_function(qx_detector)
@@ -71,8 +73,8 @@ def simulate_qasm(file_url="uploads/asset/file/65/f27d92be-8505-43dc-af7d-4c395c
         dat = MC.run("run QASM")
         return [_MC_result_to_chart_dict(dat)]
     except:
-        e = sys.exc_info()
-        print(e)
+        raise
+        
         return []
     finally:
         MC.close()
@@ -84,7 +86,7 @@ def _get_qasm_sweep_points(file_path):
     with open(file_path) as f:
         line = f.readline()
         while(line):
-            if re.match(r'(^|\s+)(RO|measure)(\s+|$)', line):
+            if re.match(r'(^|\s+)(measure)(\s+|$)', line):
                 counter += 1
             line = f.readline()
 
