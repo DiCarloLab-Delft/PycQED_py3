@@ -3951,7 +3951,7 @@ class Homodyne_Analysis(MeasurementAnalysis):
             self.save_fig(fig, figname='complex', **kw)
             self.save_fig(fig2, xlabel='Mag', **kw)
         else:
-            ax.plot(self.sweep_points, fit_res.best_fit, 'r-')
+            ax.plot(data_x, fit_res.best_fit, 'r-')
             f0 = self.fit_results.values['f0']
             plt.plot(f0*1e9, fit_res.eval(f=f0*1e9), 'o', ms=8)
 
