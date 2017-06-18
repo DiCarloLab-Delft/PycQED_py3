@@ -2472,18 +2472,11 @@ class SSRO_discrimination_analysis(MeasurementAnalysis):
             fit_mods.plot_fitres2D_heatmap(self.fit_res, x_tiled, y_rep,
                                            axs=axs, cmap='viridis')
             for ax in axs:
-                ax.ticklabel_format(style='sci', fontsize=4,
-                                    scilimits=(0, 0))
                 set_xlabel(ax, 'I', self.value_units[0])
-                edge = max(max(abs(xedges)), max(abs(yedges)))
-                ax.set_xlim(-edge, edge)
-                ax.set_ylim(-edge, edge)
-                # ax.set_axis_bgcolor(plt.cm.viridis(0))
-            set_ylabel(axs[0], 'Q', self.value_units[1])
-            #axs[0].ticklabel_format(style = 'sci',  fontsize=4)
-
+                set_ylabel(ax, 'Q', self.value_units[1])
             self.save_fig(
-                fig, figname='2D-Histograms_rot_{:.1f} deg'.format(theta_in), **kw)
+                fig, figname='2D-Histograms_rot_{:.1f} deg'.format(theta_in),
+                **kw)
 
         #######################################################
         #         Extract quantities of interest              #
