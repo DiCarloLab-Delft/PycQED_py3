@@ -24,7 +24,7 @@ install:
     - conda update conda --yes
     - conda create -n test_env python=${PYTHON} --yes
     - source activate test_env
-    - conda install numpy scipy pyopengl pytest flake8 six coverage --yes
+    - conda install numpy scipy pyopengl pytest flake8 six coverage matplotlib --yes
     - conda install -c bioconda pygraphviz --yes
     - conda install pyqt --yes;
 
