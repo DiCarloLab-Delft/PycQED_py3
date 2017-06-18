@@ -2,9 +2,9 @@ import unittest
 import pycqed as pq
 import os
 import numpy as np
-from pycqed.analysis import measurement_analysis as ma
-
-ma.a_tools.datadir = os.path.join(pq.__path__[0], 'tests', 'test_data')
+from pycqed.analysis.tomography import Tomo_Multiplexed
+from pycqed.analysis import analysis_toolbox as a_tools
+a_tools.datadir = os.path.join(pq.__path__[0], 'tests', 'test_data')
 
 try:
     import qutip
@@ -18,17 +18,18 @@ try:
 
         def test_tomo_analysis_cardinal_state(self):
 
-            res = ma.Tomo_Multiplexed(label='Tomo_{}'.format(31),
-                                      target_cardinal=None,
-                                      MLE=False)
-            res = ma.Tomo_Multiplexed(label='Tomo_{}'.format(31),
-                                      target_cardinal=31,
-                                      MLE=True)
+            res = Tomo_Multiplexed(label='Tomo_{}'.format(31),
+                                   target_cardinal=None,
+                                   MLE=False)
+            res = Tomo_Multiplexed(label='Tomo_{}'.format(31),
+                                   target_cardinal=31,
+                                   MLE=True)
 
         def test_tomo_analysis_bell_state(self):
-            res = ma.Tomo_Multiplexed(label='Tomo_{}'.format(31), target_cardinal=None,
-                                      target_bell=0,
-                                      MLE=False)
+            res = Tomo_Multiplexed(label='Tomo_{}'.format(31),
+                                   target_cardinal=None,
+                                   target_bell=0,
+                                   MLE=False)
 
     class Test_tomo_helpers(unittest.TestCase):
 
@@ -60,7 +61,6 @@ except ImportError as e:
     else:
         raise
 #
-
 
 
 if __name__ == '__main__':
