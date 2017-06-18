@@ -25,11 +25,7 @@ install:
     - conda create -n test_env python=${PYTHON} --yes
     - source activate test_env
     - conda install numpy scipy pyopengl pytest flake8 six coverage --yes
-    - conda install numpy scipy pyopengl pytest flake8 six coverage --yes
     - conda install -c bioconda pygraphviz --yes
-    - echo ${QT}
-    - echo ${TEST}
-    - echo ${PYTHON}
     - conda install pyqt --yes;
 
     - pip install --upgrade pip
@@ -37,6 +33,9 @@ install:
     - pip install git+git://github.com/DiCarloLab-Delft/Qcodes.git
     - pip install coverage pytest-cov pytest --upgrade
     - pip install codacy-coverage
+    - echo ${QT}
+    - echo ${TEST}
+    - echo ${PYTHON}
     - pip install -e .
 
 before_script: # configure a headless display to test plot generation
