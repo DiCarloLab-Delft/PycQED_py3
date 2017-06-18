@@ -4,6 +4,7 @@ import os
 import numpy as np
 from pycqed.analysis.tomography import Tomo_Multiplexed
 from pycqed.analysis import analysis_toolbox as a_tools
+
 a_tools.datadir = os.path.join(pq.__path__[0], 'tests', 'test_data')
 
 try:
@@ -17,16 +18,17 @@ try:
             pass
 
         def test_tomo_analysis_cardinal_state(self):
-
-            res = Tomo_Multiplexed(label='Tomo_{}'.format(31),
+            # only tests if the analysis runs
+            Tomo_Multiplexed(label='Tomo_{}'.format(31),
                                    target_cardinal=None,
                                    MLE=False)
-            res = Tomo_Multiplexed(label='Tomo_{}'.format(31),
+            Tomo_Multiplexed(label='Tomo_{}'.format(31),
                                    target_cardinal=31,
                                    MLE=True)
 
         def test_tomo_analysis_bell_state(self):
-            res = Tomo_Multiplexed(label='Tomo_{}'.format(31),
+            # only tests if the analysis runs
+            Tomo_Multiplexed(label='Tomo_{}'.format(31),
                                    target_cardinal=None,
                                    target_bell=0,
                                    MLE=False)
