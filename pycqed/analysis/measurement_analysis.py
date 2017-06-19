@@ -576,6 +576,7 @@ class MeasurementAnalysis(object):
                 self.ylabels.append(str(
                     self.value_names[i] + '('+value_units[i]+')'))
             self.xlabel = str(self.sweep_name + '('+self.sweep_unit+')')
+            self.xlabel = self.xlabel[0].upper() + self.xlabel[1::]
         elif datasaving_format == 'Version 2':
 
             self.parameter_names = self.get_key('sweep_parameter_names')
@@ -602,6 +603,7 @@ class MeasurementAnalysis(object):
 
             self.xlabel = self.parameter_names[0] + ' (' +  \
                 self.parameter_units[0] + ')'
+            self.xlabel = self.xlabel[0].upper() + self.xlabel[1::]
             self.parameter_labels = [a+' (' + b + ')' for a, b in zip(
                                      self.parameter_names,
                                      self.parameter_units)]
@@ -640,6 +642,9 @@ class MeasurementAnalysis(object):
                                    **kw):
 
         save = kw.get('save', False)
+        font_size = kw.pop('font_size', None)
+        if font_size is not None:
+            self.font_size = font_size
 
         self.plot_title = kw.get('plot_title',
                                  self.measurementstring + '\n' +
@@ -981,7 +986,9 @@ class MeasurementAnalysis(object):
                 self.zlabels.append(str(
                     self.value_names[i] + '('+value_units[i]+')'))
             self.xlabel = str(self.sweep_name + '('+self.sweep_unit+')')
+            self.xlabel = self.xlabel[0].upper() + self.xlabel[1::]
             self.ylabel = str(self.sweep_name_2D + '('+self.sweep_unit_2D+')')
+            self.ylabel = self.ylabel[0].upper() + self.ylabel[1::]
 
         elif datasaving_format == 'Version 2':
             self.parameter_names = self.get_key('sweep_parameter_names')
@@ -1035,6 +1042,8 @@ class MeasurementAnalysis(object):
                 self.parameter_units[0] + ')'
             self.ylabel = self.parameter_names[1] + ' (' +  \
                 self.parameter_units[1] + ')'
+            self.xlabel = self.xlabel[0].upper() + self.xlabel[1::]
+            self.ylabel = self.ylabel[0].upper() + self.ylabel[1::]
 
             self.parameter_labels = [a+' (' + b + ')' for a, b in zip(
                                      self.parameter_names,
@@ -1638,7 +1647,7 @@ class chevron_optimization_v2(TD_Analysis):
         period, st = self.get_period(data_x[min_idx], data_x[max_idx])
         return np.interp(period*0.5, x_points, y_points)
 
-class Rabi_Analysis_new(TD_Analysis):
+class Rabi_Analysis(TD_Analysis):
 
     """
     Analysis script for a Rabi measurement:
@@ -1706,8 +1715,8 @@ class Rabi_Analysis_new(TD_Analysis):
                              np.argmin(self.normalized_data_points))
 
         if index_of_fourier_maximum == 1:
-            print('Initial guesses obtained by assuming data traces '
-                  'between one half and one period of the cosine.')
+            print('Initial guesses obtained by assuming the data trace '
+                  'is between one half and one period of the cosine.')
             freq_guess = 1.0/(2.0*np.abs(bottom_x_val-top_x_val))
         else:
             print('Initial guesses obtained from fft of data.')
@@ -1973,7 +1982,7 @@ class Rabi_Analysis_new(TD_Analysis):
                                 'piHalfPulse_std':piHalfPulse_std}
 
 
-class Rabi_Analysis(TD_Analysis):
+class Rabi_Analysis_original(TD_Analysis):
 
     def __init__(self, label='Rabi', **kw):
         kw['label'] = label
@@ -3858,7 +3867,10 @@ class Ramsey_Analysis(TD_Analysis):
 
     def plot_results(self, fit_res, scale=1, show_guess=False):
         units = self.parameter_units[0]
-        textstr = ('$f_{Ramsey}$ = %.5g $ MHz \pm$ (%.5g) Hz'
+        textstr = ('$f_{qubit}$ = %.5g $ GHz \pm$ (%.5g) Hz'
+                   % (self.qubit_frequency*scale,
+                      fit_res.params['frequency'].stderr) +
+                   '\n$f_{Ramsey}$ = %.5g $ MHz \pm$ (%.5g) Hz'
                    % (fit_res.params['frequency'].value*1e-6,
                       fit_res.params['frequency'].stderr) +
                    '\n$T_2^\star$ = %.6g '
@@ -3911,6 +3923,8 @@ class Ramsey_Analysis(TD_Analysis):
             close_file=close_file,unit_prefix=unit_prefix,
             close_main_figure=True,save_fig=False,**kw)
 
+        self.artificial_detuning = kw.pop('artificial_detuning',0)
+        self.qubit_freq_spec = kw.pop('qubit_frequency_spec',0)
         show_guess = kw.get('show_guess', False)
         self.add_analysis_datagroup_to_file()
         scale = self.scales_dict[unit_prefix]
@@ -3920,6 +3934,10 @@ class Ramsey_Analysis(TD_Analysis):
                                        y=self.normalized_data_points, **kw)
         self.get_measured_freq(fit_res=self.fit_res, **kw)
         self.save_fitted_parameters(self.fit_res, var_name=self.value_names[0])
+
+        # Calculate new qubit frequency
+        self.qubit_frequency = self.qubit_freq_spec + self.artificial_detuning \
+                               - self.Ramsey_freq['freq']
 
         #Extract T2 star and save it
         self.get_measured_T2_star(fit_res=self.fit_res, **kw)  #defines self.T2_star as a dic; units
@@ -3933,18 +3951,22 @@ class Ramsey_Analysis(TD_Analysis):
         #Print the T2_star values on screen
         unit = self.parameter_units[0][-1]
         if kw.pop('print_parameters',True):
-            print('T2* = {:.5f} '.format(
+            print('New qubit frequency = {:.5f} (GHz)'.format(
+                self.qubit_frequency*1e-9) +
+                  '\t\tqubit frequency stderr = {:.5f} (MHz)'.format(
+                self.Ramsey_freq['freq_stderr']*1e-6)+
+                '\nT2* = {:.5f} '.format(
                 self.T2_star['T2_star']*scale) +'('+pretty(mu)+unit+')'+
-                '\t\t T2* stderr = {:.5f} '.format(
+                '\t\tT2* stderr = {:.5f} '.format(
                 self.T2_star['T2_star_stderr']*scale) +
                 '('+pretty(mu)+unit+')')
 
-        stepsize = self.sweep_points[1] - self.sweep_points[0]
-        self.total_detuning = self.fit_res.params['frequency'].value
-        self.detuning_stderr = self.fit_res.params['frequency'].stderr
-
-        self.artificial_detuning = 4./(60*stepsize)
-        self.detuning = self.total_detuning - self.artificial_detuning
+        # stepsize = self.sweep_points[1] - self.sweep_points[0]
+        # self.total_detuning = self.fit_res.params['frequency'].value
+        # self.detuning_stderr = self.fit_res.params['frequency'].stderr
+        #
+        # self.artificial_detuning = 4./(60*stepsize)
+        # self.detuning = self.total_detuning - self.artificial_detuning
 
         #dispaly figure
         if show:
@@ -3980,7 +4002,7 @@ class Ramsey_Analysis(TD_Analysis):
         return self.T2_star
 
 
-class Ramsey_Analysis_mult_det(Ramsey_Analysis):
+class Ramsey_Analysis_multiple_detunings(Ramsey_Analysis):
 
     def __init__(self, label='Ramsey_mult_det', **kw):
         kw['label'] = label
@@ -4035,7 +4057,7 @@ class Ramsey_Analysis_mult_det(Ramsey_Analysis):
                                      close_main_figure=True,save_fig=False,**kw)
 
         show_guess = kw.get('show_guess', False)
-        self.artificial_detunings = kw.pop('artificial_detunings',[-4,4])
+        self.artificial_detunings = kw.pop('artificial_detunings',[-4e6,4e6])
         self.qubit_freq_spec = kw.pop('qubit_frequency_spec',0)
         self.add_analysis_datagroup_to_file()
         scale = self.scales_dict[unit_prefix]
@@ -4899,6 +4921,7 @@ class Homodyne_Analysis(MeasurementAnalysis):
 
         interactive_plot = kw.get('interactive_plot',False)
         window_len_filter = kw.get('window_len',10)
+        scale = self.scales_dict[unit_prefix]
 
         ########## Fit data ##########
 
@@ -4938,6 +4961,8 @@ class Homodyne_Analysis(MeasurementAnalysis):
             # this in not working at the moment (need to be fixed)
             elif fitting_model == 'simple_hanger':
                 Model = fit_mods.HangerAmplitudeModel
+            else:
+                raise ValueError('The fitting model specified is not available')
             # added reject outliers to be robust agains CBox data acq bug.
             # this should have no effect on regular data acquisition and is
             # only used in the guess.
@@ -5162,8 +5187,6 @@ class Homodyne_Analysis(MeasurementAnalysis):
                     linewidth=self.line_width)
             #f0 = self.fit_results.values['f0']
             f0 = fit_res.params['f0'].value
-            unit_prefix = kw.get('unit_prefix','')
-            scale = self.scales_dict[unit_prefix]
             if 'hanger' in fitting_model:
                 #f is expected in Hz but f0 in GHz!
                 ax.plot(f0, Model.func(f=f0*1e9,**fit_res.best_values), 'o',
@@ -5534,6 +5557,12 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
                             'guess was taken as kappa_guess={}'.format(
                              f0,kappa_guess))
 
+        tallest_peak = f0 #the ge freq
+        print('tallest peak at ',tallest_peak)
+        if f0 == self.peaks[key]:
+            tallest_peak_idx = self.peaks[key+'_idx']
+            print('tallest peak idx = ',tallest_peak_idx)
+
         print('Searching for '+key+'s.')
 
         amplitude_guess = np.pi * kappa_guess * \
@@ -5578,8 +5607,6 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
                 key=key,
                 peaks=self.peaks,
                 percentile=percentile)
-            print('tallest peak at ',tallest_peak)
-            print('tallest peak idx = ',tallest_peak_idx)
 
             if f0 == 0:
                 f0 = tallest_peak

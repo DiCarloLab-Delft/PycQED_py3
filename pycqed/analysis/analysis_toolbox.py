@@ -937,6 +937,8 @@ def find_second_peak(sweep_pts_cut_edges=None, data_dist_smooth=None,
             optimize=optimize,
             key=key)
 
+        # The peak/dip found to the right of the tallest is assumed to be
+        # the ge peak, which means that the tallest was in fact the gf/2 peak
         print('Right peak is at ', peaks_right[key])
         subset_right = data_dist_smooth[int(tallest_peak_idx+n)::]
         val_right = subset_right[peaks_right[key+'_idx']]
@@ -974,6 +976,8 @@ def find_second_peak(sweep_pts_cut_edges=None, data_dist_smooth=None,
             optimize=optimize,
             key=key)
 
+        # The peak/dip found to the left of the tallest is assumed to be
+        # the gf/2 peak, which means that the tallest was indeed the ge peak
         print('Left peak is at ', peaks_left[key])
         subset_left = data_dist_smooth[0:int(tallest_peak_idx-m)]
         val_left = subset_left[peaks_left[key+'_idx']]
@@ -990,10 +994,16 @@ def find_second_peak(sweep_pts_cut_edges=None, data_dist_smooth=None,
         kappa_guess_ef_left = 0
 
     if np.abs(val_left) > np.abs(val_right):
+        # If peak on the left taller than peak on the right, then
+        # the second peak is to the left of the tallest and it is indeed
+        # the gf.2 peak, while the tallest is the ge peak.
         if np.abs(f0_gf_over_2_left - tallest_peak) > 50e6:
+            # If the two peaks found are separated by at least 50MHz,
+            # then both the ge and gf/2 have been found.
             print('Both f_ge and f_gf/2 have been found. '
                   'f_ge was assumed to the LEFT of f_gf/2.')
         else:
+            # If not, then it is just some other signal.
             print('The f_gf/2 '+key+' was not found. Fitting to '
                                     'the next largest '+key+' found.')
 
@@ -1003,10 +1013,16 @@ def find_second_peak(sweep_pts_cut_edges=None, data_dist_smooth=None,
         kappa_guess_ef = kappa_guess_ef_left
 
     elif np.abs(val_left) < np.abs(val_right):
+        # If peak on the right taller than peak on the left, then
+        # the second peak is to the right of the tallest and it is in fact
+        # the ge peak, while the tallest is the gf/2 peak.
         if np.abs(f0_right - tallest_peak) > 50e6:
+            # If the two peaks found are separated by at least 50MHz,
+            # then both the ge and gf/2 have been found.
             print('Both f_ge and f_gf/2 have been found. '
                   'f_ge was assumed to the RIGHT of f_gf/2.')
         else:
+            # If not, then it is just some other signal.
             print('The f_gf/2 '+key+' was not found. Fitting to '
                                     'the next largest '+key+' found.')
         f0 = f0_right
@@ -1015,6 +1031,8 @@ def find_second_peak(sweep_pts_cut_edges=None, data_dist_smooth=None,
         kappa_guess_ef = kappa_guess_ef_right
 
     else:
+        # If the peaks on the right and left are equal, or cannot be compared,
+        # then there was probably no second peak, and only noise was found.
         print('Only f_ge has been found.')
         f0 = tallest_peak
         kappa_guess = tallest_peak_width

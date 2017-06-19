@@ -86,7 +86,7 @@ def Rabi_2nd_exc_seq(amps, pulse_pars, pulse_pars_2nd, RO_pars, n=1,
         return seq
 
 def Ramsey_2nd_exc_seq(times, pulse_pars, pulse_pars_2nd, RO_pars, n=1,
-                     cal_points=True, no_cal_points=6, artificial_detuning =None,
+                     cal_points=True, no_cal_points=6, artificial_detuning=None,
                      post_msmt_delay=3e-6, verbose=False,
                      upload=True, return_seq=False,
                      last_ge_pulse =True):
@@ -168,13 +168,12 @@ def Ramsey_2nd_exc_seq(times, pulse_pars, pulse_pars_2nd, RO_pars, n=1,
         return seq
 
 
-def Ramsey_2nd_exc_seq_mult_det(times, pulse_pars, pulse_pars_2nd, RO_pars, n=1,
-                       cal_points=True, artificial_detuning = None,
+def Ramsey_2nd_exc_seq_multiple_detunings(times, pulse_pars, pulse_pars_2nd, RO_pars, n=1,
+                       cal_points=True, no_cal_points=6, artificial_detunings=None,
                        post_msmt_delay=3e-6, verbose=False,
                        upload=True, return_seq=False,
                        last_ge_pulse =True):
     '''
-    NOT YET IMPLEMENTED
     Rabi sequence for the second excited state
     Input pars:
         amps:            array of pulse amplitudes (V)
@@ -191,24 +190,45 @@ def Ramsey_2nd_exc_seq_mult_det(times, pulse_pars, pulse_pars_2nd, RO_pars, n=1,
     pulses = get_pulse_dict_from_pars(pulse_pars)
     pulses_2nd = get_pulse_dict_from_pars(pulse_pars_2nd)
     for i, tau in enumerate(times):
-        #if cal_points and (i == (len(times)-6) or
-        #                   i == (len(times)-5)):
-        #    el = multi_pulse_elt(i, station, [pulses['I'], RO_pars])
-        if cal_points and (i == (len(times)-4) or
-                                   i == (len(times)-3)):
-            #    el = multi_pulse_elt(i, station, [pulses['X180'], RO_pars])
-            el = multi_pulse_elt(i, station, [pulses['I'], RO_pars])
-        elif cal_points and (i == (len(times)-2) or
-                                     i == (len(times)-1)):
-            #    el = multi_pulse_elt(i, station, [pulses_2nd['X180'],
-            #                                  RO_pars])
-            el = multi_pulse_elt(i, station, [pulses['X180'], RO_pars])
+        art_det = artificial_detunings[i % len(artificial_detunings)]
+        if cal_points and no_cal_points == 6 and \
+                (i == (len(times)-6) or i == (len(times)-5)):
+            el = multi_pulse_elt(i, station, [pulses['I'], pulses_2nd['I'], RO_pars])
+        elif cal_points and no_cal_points == 6 and \
+                (i == (len(times)-4) or i == (len(times)-3)):
+            el = multi_pulse_elt(i, station, [pulses['X180'], pulses_2nd['I'], RO_pars])
+        elif cal_points and no_cal_points == 6 and \
+                (i == (len(times)-2) or i == (len(times)-1)):
+            el = multi_pulse_elt(i, station, [pulses['X180'],
+                                              pulses_2nd['X180'],
+                                              RO_pars])
+        elif cal_points and no_cal_points == 4 and \
+                (i == (len(times)-4) or i == (len(times)-3)):
+            el = multi_pulse_elt(i, station, [pulses['I'], pulses_2nd['I'], RO_pars])
+        elif cal_points and no_cal_points == 4 and \
+                (i == (len(times)-2) or i == (len(times)-1)):
+            el = multi_pulse_elt(i, station, [pulses['X180'], pulses_2nd['I'], RO_pars])
+        elif cal_points and no_cal_points == 2 and \
+                (i == (len(times)-2) or i == (len(times)-1)):
+            el = multi_pulse_elt(i, station, [pulses['I'], pulses_2nd['I'], RO_pars])
+        # if cal_points and (last_ge_pulse==False) and (i == (len(times)-4) or
+        #                      i == (len(times)-3)):
+        #     el = multi_pulse_elt(i, station, [pulses['I'], RO_pars])
+        # elif cal_points and (last_ge_pulse==False) and (i == (len(times)-2) or
+        #                      i == (len(times)-1)):
+        #     el = multi_pulse_elt(i, station, [pulses_2nd['X180'], RO_pars])
+        # if cal_points and (last_ge_pulse==True) and (i == (len(times)-4) or
+        #                                                       i == (len(times)-3)):
+        #     el = multi_pulse_elt(i, station, [pulses['I'], RO_pars])
+        # elif cal_points and (last_ge_pulse==True) and (i == (len(times)-2) or
+        #                                                 i == (len(times)-1)):
+        #     el = multi_pulse_elt(i, station, [pulses['X180'], RO_pars])
         else:
             pulse_pars_x2 = deepcopy(pulses_2nd['X90'])
             pulse_pars_x2['pulse_delay'] = tau
 
-            if artificial_detuning is not None:
-                Dphase = ((tau-times[0]) * artificial_detuning * 360) % 360
+            if art_det is not None:
+                Dphase = ((tau-times[0]) * art_det * 360) % 360
             pulse_pars_x2['phase'] = Dphase
 
             pulse_list = ([pulses['X180']]+n*[pulses_2nd['X90'], pulse_pars_x2])

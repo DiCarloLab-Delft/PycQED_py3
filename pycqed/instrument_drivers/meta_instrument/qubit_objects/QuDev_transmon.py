@@ -783,6 +783,41 @@ class QuDev_transmon(Qubit):
         if analyze:
             ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
 
+    def measure_ramsey_2nd_exc_multiple_detunings(self, times=None,
+                               artificial_detunings=None, label=None,
+                               MC=None, analyze=True, close_fig=True,
+                               cal_points=True, n=1, upload=True,
+                               last_ge_pulse=True, no_cal_points=6):
+
+        if times is None:
+            raise ValueError("Unspecified times for measure_ramsey")
+        if artificial_detunings is None:
+            logging.warning('Artificial detunings were not given.')
+
+        if label is None:
+            label = 'Ramsey_2nd_multiple_detunings'+self.msmt_suffix
+
+        self.prepare_for_timedomain()
+        if MC is None:
+            MC = self.MC
+
+        Rams_2nd_swf = awg_swf.Ramsey_2nd_exc_multiple_detunings(
+            pulse_pars=self.get_drive_pars(),
+            pulse_pars_2nd=self.get_ef_drive_pars(),
+            RO_pars=self.get_RO_pars(),
+            artificial_detunings=artificial_detunings,
+            cal_points=cal_points, n=n, upload=upload,
+            no_cal_points=no_cal_points,
+            last_ge_pulse=last_ge_pulse)
+        MC.set_sweep_function(Rams_2nd_swf)
+        MC.set_sweep_points(times)
+        MC.set_detector_function(self.int_avg_det)
+        MC.run(label)
+
+        if analyze:
+            ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
+
+
     def measure_echo(self, times=None, MC=None, artificial_detuning=None,
                      upload=True, analyze=True, close_fig=True):
 
@@ -1508,10 +1543,7 @@ class QuDev_transmon(Qubit):
                                       upload=upload)
 
         #get pi and pi/2 amplitudes from the analysis results
-        # TODO: might have to correct Rabi_Analysis_new to Rabi_Analysis
-        # when we decide which version we stick to.
-
-        RabiA = ma.Rabi_Analysis_new(label=label, NoCalPoints=no_cal_points,
+        RabiA = ma.Rabi_Analysis(label=label, NoCalPoints=no_cal_points,
                                      close_fig=close_fig, for_ef=for_ef,
                                      last_ge_pulse=last_ge_pulse, **kw)
 
@@ -1720,40 +1752,44 @@ class QuDev_transmon(Qubit):
                                 MC=MC,
                                 cal_points=cal_points,
                                 close_fig=close_fig, upload=upload)
-            RamseyA = ma.Ramsey_Analysis(auto=True, label=label, **kw)
+            RamseyA = ma.Ramsey_Analysis(auto=True, label=label,
+                                         qubit_frequency_spec=self.f_qubit(),
+                                         artificial_detuning=artificial_detuning,
+                                         **kw)
         else:
             self.measure_ramsey_2nd_exc(times=times, artificial_detuning=artificial_detuning, MC=MC,
                                         cal_points=cal_points, close_fig=close_fig, upload=upload,
                                         last_ge_pulse=last_ge_pulse, no_cal_points=no_cal_points)
-            RamseyA = ma.Ramsey_Analysis(auto=True, NoCalPoints=6, label=label, **kw)
+            RamseyA = ma.Ramsey_Analysis(auto=True, NoCalPoints=6, label=label,
+                                         qubit_frequency_spec=self.f_ef_qubit(),
+                                         artificial_detuning=artificial_detuning,
+                                         **kw)
 
         #get new freq and T2* from analysis results
-
-        fitted_freq = RamseyA.Ramsey_freq['freq']
-        T2_star = RamseyA.T2_star
-
-        qubit_freq = self.f_qubit() + artificial_detuning - fitted_freq
+        new_qubit_freq = RamseyA.qubit_frequency    #value
+        fitted_freq = RamseyA.ramsey_freq           #dict
+        T2_star = RamseyA.T2_star                   #dict
 
         print('New qubit frequency = {:.10f} \t stderr = {:.10f}'.format(
-            qubit_freq,RamseyA.Ramsey_freq['freq_stderr']))
+            new_qubit_freq,RamseyA.Ramsey_freq['freq_stderr']))
         print('T2_Star = {:.5f} \t stderr = {:.5f}'.format(
             T2_star['T2_star'],T2_star['T2_star_stderr']))
 
         if update:
             if for_ef:
-                self.f_ef_qubit(qubit_freq)
+                self.f_ef_qubit(new_qubit_freq)
                 self.T2_star_ef(T2_star['T2_star'])
             else:
-                self.f_qubit(qubit_freq)
+                self.f_qubit(new_qubit_freq)
                 self.T2_star(T2_star['T2_star'])
 
-        return qubit_freq, T2_star
+        return new_qubit_freq, fitted_freq, T2_star
 
 
     def calibrate_ramsey(self, times, for_ef=False,
                          artificial_detunings=None, update=False,
-                         MC=None, cal_points=True, close_fig=True,
-                         upload=True, last_ge_pulse=True, **kw):
+                         MC=None, cal_points=True, no_cal_points=6,
+                         close_fig=True, upload=True, last_ge_pulse=True, **kw):
 
         """
         Finds the real qubit frequency and the dephasing rate T2* from the fit
@@ -1812,12 +1848,12 @@ class QuDev_transmon(Qubit):
                                     nr_points)
 
         # Each time value must be repeated len(artificial_detunings) times to
-        # correspoond to the logic in Ramsey_seq_multiple_detunings sequence
+        # correspond to the logic in Ramsey_seq_multiple_detunings sequence
         len_art_det = len(artificial_detunings)
-        temp_array = np.zeros(times.size*len_art_det)
+        temp_array = np.zeros(times.size*(len_art_det-no_cal_points))
         for i in range(len(artificial_detunings)):
             np.put(temp_array,list(range(i,temp_array.size,len_art_det)),times)
-        times = temp_array
+        times =  np.append(temp_array,times[-no_cal_points::])
 
         #Perform Ramsey
         if for_ef is False:
@@ -1826,16 +1862,17 @@ class QuDev_transmon(Qubit):
                                 MC=MC,
                                 cal_points=cal_points,
                                 close_fig=close_fig, upload=upload)
-            RamseyA = ma.Ramsey_Analysis_mult_det(auto=True,
+            RamseyA = ma.Ramsey_Analysis_multiple_detunings(auto=True,
                                 qubit_frequency_spec=self.f_qubit(),
                                 artificial_detunings=artificial_detunings, **kw)
         else:
-            self.measure_ramsey_2nd_mult_det(times=times,
+            self.measure_ramsey_2nd_exc_multiple_detunings(times=times,
                                 artificial_detunings=artificial_detunings,
-                                MC=MC, cal_points=cal_points,
+                                cal_points=cal_points, no_cal_points=no_cal_points,
                                 close_fig=close_fig, upload=upload,
-                                last_ge_pulse=last_ge_pulse)
-            RamseyA = ma.Ramsey_Analysis_mult_det(auto=True, NoCalPoints=6,
+                                last_ge_pulse=last_ge_pulse, MC=MC)
+            RamseyA = ma.Ramsey_Analysis_multiple_detunings(auto=True,
+                                NoCalPoints=6,
                                 qubit_frequency_spec=self.f_ef_qubit(),
                                 artificial_detunings=artificial_detunings, **kw)
 
@@ -1971,11 +2008,11 @@ class QuDev_transmon(Qubit):
 
         # Each qscale value must be repeated 3 times to correspoond to the
         # logic in QScale sequence
-        temp_array = np.zeros(3*qscales.size)
+        temp_array = np.zeros(3*(qscales.size-no_cal_points))
         np.put(temp_array,list(range(0,temp_array.size,3)),qscales)
         np.put(temp_array,list(range(1,temp_array.size,3)),qscales)
         np.put(temp_array,list(range(2,temp_array.size,3)),qscales)
-        qscales = temp_array
+        qscales = np.append(temp_array,qscales[-no_cal_points::])
 
         #Perform the qscale calibration measurement
         if for_ef:

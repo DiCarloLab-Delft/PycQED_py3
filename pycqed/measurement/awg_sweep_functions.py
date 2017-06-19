@@ -1016,7 +1016,7 @@ class Ramsey_multiple_detunings(swf.Hard_Sweep):
         self.cal_points = cal_points
         self.artificial_detunings = artificial_detunings
 
-        self.name = 'Ramsey'
+        self.name = 'Ramsey_mult_det'
         self.parameter_name = 't'
         self.unit = 's'
 
@@ -1027,6 +1027,7 @@ class Ramsey_multiple_detunings(swf.Hard_Sweep):
                            RO_pars=self.RO_pars,
                            artificial_detunings=self.artificial_detunings,
                            cal_points=self.cal_points)
+
 
 class Ramsey_2nd_exc(swf.Hard_Sweep):
 
@@ -1062,6 +1063,42 @@ class Ramsey_2nd_exc(swf.Hard_Sweep):
                                     upload=self.upload,
                                     return_seq=self.return_seq,
                                     last_ge_pulse=self.last_ge_pulse)
+
+class Ramsey_2nd_exc_multiple_detunings(swf.Hard_Sweep):
+
+    def __init__(self, pulse_pars, pulse_pars_2nd, RO_pars,
+                 artificial_detunings=None, return_seq=False,
+                 n=1, cal_points=True, upload=True, no_cal_points=6,
+                 last_ge_pulse=True):
+        super().__init__()
+        self.pulse_pars = pulse_pars
+        self.pulse_pars_2nd = pulse_pars_2nd
+        self.RO_pars = RO_pars
+        self.artificial_detunings = artificial_detunings
+        self.n = n
+        self.cal_points = cal_points
+        self.upload = upload
+        self.name = 'Rabi 2nd excited state'
+        self.parameter_name = 't'
+        self.unit = 's'
+        self.return_seq = return_seq
+        self.last_ge_pulse = last_ge_pulse
+        self.no_cal_points = no_cal_points
+
+    def prepare(self, **kw):
+        if self.upload:
+            sqs2.Ramsey_2nd_exc_seq_multiple_detunings(times=self.sweep_points,
+                                    pulse_pars=self.pulse_pars,
+                                    pulse_pars_2nd=self.pulse_pars_2nd,
+                                    RO_pars=self.RO_pars,
+                                    artificial_detunings =
+                                    self.artificial_detunings,
+                                    n=self.n, cal_points=self.cal_points,
+                                    no_cal_points=self.no_cal_points,
+                                    upload=self.upload,
+                                    return_seq=self.return_seq,
+                                    last_ge_pulse=self.last_ge_pulse)
+
 
 class FluxDetuning(swf.Hard_Sweep):
 
