@@ -17,7 +17,8 @@ class Test_MeasurementControl(unittest.TestCase):
         self.station = station.Station()
         # set up a pulsar with some mock settings for the element
         self.MC = measurement_control.MeasurementControl(
-            'MC', live_plot_enabled=False, verbose=False)
+            'MC', live_plot_enabled=True, verbose=True)
+        self.MC.plotting_interval(5)
         self.MC.station = self.station
         self.station.add_component(self.MC)
 
@@ -206,7 +207,7 @@ class Test_MeasurementControl(unittest.TestCase):
 
         d = self.MC.detector_function
         self.assertEqual(d.times_called, 5)
-
+        self.MC.live_plot_enabled(False)
         self.MC.set_sweep_function(None_Sweep(sweep_control='hard'))
         self.MC.set_sweep_function_2D(None_Sweep(sweep_control='soft'))
         self.MC.set_sweep_points(sweep_pts)
@@ -217,7 +218,7 @@ class Test_MeasurementControl(unittest.TestCase):
         y = avg_dat[:, 1]
         zavg_0 = abs(avg_dat[:, 2] - z[0])
         zavg_1 = abs(avg_dat[:, 3] - z[1])
-
+        self.MC.live_plot_enabled(True)
         np.testing.assert_array_almost_equal(x, x_tiled)
         self.assertGreater(np.mean(z0), np.mean(zavg_0))
         self.assertGreater(np.mean(z1), np.mean(zavg_1))
