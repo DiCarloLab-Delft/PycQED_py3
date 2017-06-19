@@ -5,6 +5,7 @@ import numpy as np
 from pycqed.analysis import measurement_analysis as ma
 from pycqed.analysis import tomography as tomo
 
+
 ma.a_tools.datadir = os.path.join(pq.__path__[0], 'tests', 'test_data')
 
 
@@ -35,7 +36,6 @@ class Test_tomo_helpers(unittest.TestCase):
         pass
 
     def test_bell_paulis(self):
-
         bell_0 = [1] + [0]*3 + [0]*3 + [-1, 0, 0, 0, 1, 0, 0, 0, 1]
         bell_1 = [1] + [0]*3 + [0]*3 + [1, 0, 0, 0, -1, 0, 0, 0, 1]
         bell_2 = [1] + [0]*3 + [0]*3 + [-1, 0, 0, 0, -1, 0, 0, 0, -1]

@@ -108,7 +108,10 @@ class MeasurementControl(Instrument):
         self.print_measurement_start_msg()
         self.mode = mode
         self.iteration = 0  # used in determining data writing indices
+        # needs to be defined here because of the with statement below
+        return_dict = {}
         self.last_sweep_pts = None  # used to prevent resetting same value
+
         with h5d.Data(name=self.get_measurement_name()) as self.data_object:
             self.get_measurement_begintime()
             # Commented out because requires git shell interaction from python
@@ -135,8 +138,10 @@ class MeasurementControl(Instrument):
                 raise ValueError('mode %s not recognized' % self.mode)
             result = self.dset[()]
             self.save_MC_metadata(self.data_object)  # timing labels etc
+            return_dict = self.create_experiment_result_dict()
+
         self.finish(result)
-        return result
+        return return_dict
 
     def measure(self, *kw):
         if self.live_plot_enabled():
@@ -729,8 +734,8 @@ class MeasurementControl(Instrument):
             self.sweep_par_units.append(sweep_function.unit)
 
         for i, val_name in enumerate(self.detector_function.value_names):
-            self.column_names.append(val_name+' (' +
-                                     self.detector_function.value_units[i] + ')')
+            self.column_names.append(
+                val_name+' (' + self.detector_function.value_units[i] + ')')
         return self.column_names
 
     def create_experimentaldata_dataset(self):
@@ -753,6 +758,16 @@ class MeasurementControl(Instrument):
             self.detector_function.value_names)
         data_group.attrs['value_units'] = h5d.encode_to_utf8(
             self.detector_function.value_units)
+
+    def create_experiment_result_dict(self):
+        result_dict = {
+            "dset": self.dset[()],
+            "sweep_parameter_names": self.sweep_par_names,
+            "sweep_parameter_units": self.sweep_par_units,
+            "value_names": self.detector_function.value_names,
+            "value_units": self.detector_function.value_units
+        }
+        return result_dict
 
     def save_optimization_settings(self):
         '''
