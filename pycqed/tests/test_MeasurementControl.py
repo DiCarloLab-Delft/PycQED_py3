@@ -18,7 +18,6 @@ class Test_MeasurementControl(unittest.TestCase):
         # set up a pulsar with some mock settings for the element
         self.MC = measurement_control.MeasurementControl(
             'MC', live_plot_enabled=False, verbose=True)
-        self.MC.plotting_interval(5)
         self.MC.station = self.station
         self.station.add_component(self.MC)
 
