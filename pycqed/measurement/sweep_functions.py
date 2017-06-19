@@ -254,6 +254,24 @@ class QASM_Sweep(Hard_Sweep):
             self.CBox.load_instructions(qumis_file.name)
 
 
+class QuMis_Sweep(Hard_Sweep):
+
+    def __init__(self, filename, CBox, 
+                 parameter_name='Points', unit='a.u.', upload=True):
+        super().__init__()
+        self.name = 'QASM_Sweep'
+        self.filename = filename
+        self.upload = upload
+        self.CBox = CBox
+        self.parameter_name = parameter_name
+        self.unit = unit
+
+    def prepare(self, **kw):
+        self.CBox.trigger_source('internal')
+        if self.upload:
+            self.CBox.load_instructions(self.filename)
+
+
 class QX_Hard_Sweep(Hard_Sweep):
 
     def __init__(self, qxc, filename):  # , num_circuits):
