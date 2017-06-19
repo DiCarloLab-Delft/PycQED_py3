@@ -98,7 +98,9 @@
                     "lut" : 1
                 },
                 "measure" : {
-                    "qumis" : "measure",
+                    "qumis" : "trigger",
+                    "trigger bit" : 7,
+                    "format" : [15],
                     "latency" : 100
                 }
             },
@@ -120,7 +122,7 @@
                 "measure" : {
                     "qumis" : "trigger",
                     "trigger bit" : 7,
-                    "format" : [300],
+                    "format" : [15],
                     "latency" : 100
                 }
             }

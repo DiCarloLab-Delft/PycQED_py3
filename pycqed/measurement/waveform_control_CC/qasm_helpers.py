@@ -5,6 +5,7 @@ from pycqed.analysis.analysis_toolbox import rotate_and_normalize_data
 from pycqed.measurement.waveform_control_CC import qasm_to_asm as qta
 from qcodes.instrument.parameter import ManualParameter
 import pycqed.analysis.measurement_analysis as ma
+from pycqed.instrument_drivers.physical_instruments._controlbox import qasm_compiler as qcx
 import numpy as np
 import os
 import json
@@ -28,6 +29,42 @@ class QASM_Sweep(swf.Hard_Sweep):
         if self.upload:
             qumis_file = qta.qasm_to_asm(self.filename, self.op_dict)
             self.CBox.load_instructions(qumis_file.name)
+
+
+class QASM_Sweep_v2(swf.Hard_Sweep):
+    """
+    Sweep function for a QASM file, using the XFu compiler to generate QuMis
+
+
+    Differs from the previous version in that it uses the QASM compiler by Xiang
+    """
+
+    def __init__(self, qasm_fn: str, config_fn: str, CBox,
+                 parameter_name: str ='Points', unit: str='a.u.',
+                 upload: bool=True, verbosity_level: int=0):
+        super().__init__()
+        self.name = 'QASM_Sweep'
+
+        self.qasm_fn = qasm_fn
+        self.config_fn = config_fn
+        self.CBox = CBox
+        self.upload = upload
+
+        self.parameter_name = parameter_name
+        self.unit = unit
+        self.verbosity_level = verbosity_level
+
+    def prepare(self, **kw):
+        self.CBox.trigger_source('internal')
+        if self.upload:
+            qasm_folder, fn = os.path.split(self.qasm_fn)
+            base_fn = fn.split('.')[0]
+            qumis_fn = os.path.join(qasm_folder, base_fn + ".qumis")
+            compiler = qcx.QASM_QuMIS_Compiler(self.config_fn,
+                                               verbosity_level=self.verbosity_level)
+            compiler.compile(self.qasm_fn, qumis_fn)
+            # qumis_file = qta.qasm_to_asm(self.file_path, self.config_filepath)
+            self.CBox.load_instructions(qumis_fn)
 
 
 class ASM_Sweep(swf.Hard_Sweep):
@@ -298,6 +335,7 @@ class CBox_single_qubit_frac1_counter_CC(CBox_state_counters_det_CC):
         data = d[4]/(d[3]+d[4])
         return data
 
+
 class CBox_err_frac_CC(CBox_state_counters_det_CC):
 
     '''
@@ -348,7 +386,6 @@ class CBox_single_qubit_event_s_fraction_CC(CBox_state_counters_det_CC):
             d[2]/self.nr_shots*100,
             (d[1]-d[2])/self.nr_shots*100]
         return data
-
 
 
 class CBox_int_avg_func_prep_det_CC(CBox_integrated_average_detector_CC):
@@ -454,17 +491,20 @@ def measure_asm_files(asm_filenames, config_filename, qubit, MC):
     MC.run('Demo {}'.format(os.path.split(asm_filenames[0])[-1]))
     if 'rb' in asm_filenames[0]:
         a = ma.RandomizedBenchmarking_Analysis(
-               label='Demo rb', rotate_and_normalize=False, close_fig=True)
+            label='Demo rb', rotate_and_normalize=False, close_fig=True)
         p = a.fit_res.best_values['p']
         Fcl = p+(1-p)/2
         Fg = Fcl**(1/1.875)
-        print('Clifford Fidelity:\t{:.4f}\nGate Fidelity: \t\t{:.4f}'.format(Fcl, Fg))
+        print(
+            'Clifford Fidelity:\t{:.4f}\nGate Fidelity: \t\t{:.4f}'.format(Fcl, Fg))
         Ncl = np.arange(a.sweep_points[0], a.sweep_points[-1])
-        RB_fit = ma.fit_mods.RandomizedBenchmarkingDecay(Ncl, **a.fit_res.best_values)
+        RB_fit = ma.fit_mods.RandomizedBenchmarkingDecay(
+            Ncl, **a.fit_res.best_values)
         MC.main_QtPlot.add(x=Ncl, y=RB_fit, subplot=0)
 
+
 def simulate_qasm_files(qasm_filenames, config_filename, qxc, MC,
-                        error_rate = 0, nr_averages=int(1e4)):
+                        error_rate=0, nr_averages=int(1e4)):
     """
     Takes one or more asm_files as input and runs them on the hardware
     """
@@ -549,7 +589,6 @@ def getHomoFiles(fn):
     return (config_file, homo_files)
 
 
-
 def convert_to_clocks(duration, f_sampling=200e6, rounding_period=None):
     """
     convert a duration in seconds to an integer number of clocks
@@ -575,32 +614,32 @@ def get_operation_dict(qubit, operation_dict={}):
         'duration': pulse_period_clocks, 'instruction': 'wait {} \n'}
     operation_dict['X180 {}'.format(qubit.name)] = {
         'duration': pulse_period_clocks, 'instruction':
-            'trigger 0000000, 1 \nwait 1\n'+
-            'trigger 1000001, 1  \nwait {}\n'.format( #1001001
+            'trigger 0000000, 1 \nwait 1\n' +
+            'trigger 1000001, 1  \nwait {}\n'.format(  # 1001001
                 pulse_period_clocks-1)}
     operation_dict['Y180 {}'.format(qubit.name)] = {
         'duration': pulse_period_clocks, 'instruction':
-            'trigger 0100000, 1 \nwait 1\n'+
+            'trigger 0100000, 1 \nwait 1\n' +
             'trigger 1100001, 1  \nwait {}\n'.format(
                 pulse_period_clocks-1)}
     operation_dict['X90 {}'.format(qubit.name)] = {
         'duration': pulse_period_clocks, 'instruction':
-            'trigger 0010000, 1 \nwait 1\n'+
+            'trigger 0010000, 1 \nwait 1\n' +
             'trigger 1010000, 1  \nwait {}\n'.format(
                 pulse_period_clocks-1)}
     operation_dict['Y90 {}'.format(qubit.name)] = {
         'duration': pulse_period_clocks, 'instruction':
-            'trigger 0110000, 1 \nwait 1\n'+
+            'trigger 0110000, 1 \nwait 1\n' +
             'trigger 1110000, 1  \nwait {}\n'.format(
                 pulse_period_clocks-1)}
     operation_dict['mX90 {}'.format(qubit.name)] = {
         'duration': pulse_period_clocks, 'instruction':
-            'trigger 0001000, 1 \nwait 1\n'+
+            'trigger 0001000, 1 \nwait 1\n' +
             'trigger 1001000, 1  \nwait {}\n'.format(
                 pulse_period_clocks-1)}
     operation_dict['mY90 {}'.format(qubit.name)] = {
         'duration': pulse_period_clocks, 'instruction':
-            'trigger 0101000, 1 \nwait 1\n'+
+            'trigger 0101000, 1 \nwait 1\n' +
             'trigger 1101000, 1  \nwait {}\n'.format(
                 pulse_period_clocks-1)}
 

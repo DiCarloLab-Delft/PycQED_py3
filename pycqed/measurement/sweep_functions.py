@@ -4,6 +4,7 @@ import numpy as np
 
 from pycqed.instrument_drivers.virtual_instruments.pyqx import qasm_loader as ql
 from pycqed.measurement.waveform_control_CC import qasm_to_asm as qta
+from pycqed.instrument_drivers.physical_instruments._controlbox import qasm_compiler as qcx
 
 
 class Sweep_function(object):
@@ -259,9 +260,12 @@ class QASM_Sweep(Hard_Sweep):
             self.CBox.load_instructions(qumis_file.name)
 
 
+
+
+
 class QuMis_Sweep(Hard_Sweep):
 
-    def __init__(self, filename, CBox, 
+    def __init__(self, filename, CBox,
                  parameter_name='Points', unit='a.u.', upload=True):
         super().__init__()
         self.name = 'QASM_Sweep'
