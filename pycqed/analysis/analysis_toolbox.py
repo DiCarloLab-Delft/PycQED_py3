@@ -1289,7 +1289,7 @@ def color_plot(x, y, z, fig, ax, cax=None,
     ylim = kw.pop('ylim', None)
 
     if plot_title is not None:
-        ax.set_title(plot_title, y=1.05)
+        ax.set_title(plot_title, y=1.05, fontsize=18)
     if transpose:
         ax.set_xlabel(ylabel)
         ax.set_ylabel(xlabel)
