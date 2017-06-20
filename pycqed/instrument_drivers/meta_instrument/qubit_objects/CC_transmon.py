@@ -1500,7 +1500,7 @@ class CBox_v3_driven_transmon(Transmon):
         self.prepare_for_fluxing()
 
         if MC is None:
-            MC = self.MC.get_instr('MC')
+            MC = self.MC.get_instr()
 
         qasm_file = sqqs.flux_timing_seq(self.name, taus,
                                          wait_between=wait_between)
@@ -1517,7 +1517,8 @@ class CBox_v3_driven_transmon(Transmon):
         ma.MeasurementAnalysis(label='flux_timing')
 
     def measure_ram_z(self, lengths, chunk_size=32, wait_after_trigger=60e-9,
-                      wait_during_flux='auto', MC=None, cal_points=False):
+                      wait_during_flux='auto', MC=None, cal_points=False,
+                      rec_Y90=False):
         '''
         Perform a Ram-Z experiment: Measure the accumulated phase as a function
         of flux pulse length.
@@ -1562,6 +1563,11 @@ class CBox_v3_driven_transmon(Transmon):
         operation_dict = self.get_operation_dict()
         CBox = self.CBox.get_instr()
 
+        if rec_Y90:
+            suffix = 'sin'
+        else:
+            suffix = 'cos'
+
         if MC is None:
             MC = self.MC.get_instr()
 
@@ -1594,7 +1600,8 @@ class CBox_v3_driven_transmon(Transmon):
             no_of_points=chunk_size,
             cal_points=cal_points,
             wait_before=wait_after_trigger,
-            wait_between=wait_between)
+            wait_between=wait_between,
+            rec_Y90=rec_Y90)
         qumis_file = qta.qasm_to_asm(qasm_file.name, operation_dict)
         CBox.load_instructions(qumis_file.name)
 
@@ -1626,7 +1633,7 @@ class CBox_v3_driven_transmon(Transmon):
             flux_pulse_type='square'))
         MC.set_sweep_points(lengths)
         MC.set_detector_function(d)
-        MC.run('Ram_Z_{}'.format(self.name))
+        MC.run('Ram_Z_{}_{}'.format(suffix, self.name))
 
         ma.MeasurementAnalysis(label='Ram_Z')
 
