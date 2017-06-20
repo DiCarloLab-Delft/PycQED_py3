@@ -208,7 +208,6 @@ class Test_compiler(unittest.TestCase):
             instrs[-1], self.jump_to_start)
 
 
-
 class Test_single_qubit_seqs(unittest.TestCase):
 
     @classmethod
