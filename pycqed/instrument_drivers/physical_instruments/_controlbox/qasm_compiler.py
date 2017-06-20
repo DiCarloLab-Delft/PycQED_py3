@@ -200,13 +200,13 @@ class qasm_event():
 
     def __repr__(self):
         base_str = ('qasm_event({}, params={}, duration={})')
-        repr = base_str.format(self.name, self.params, self.duration)
-        return repr
+        rep = base_str.format(self.name, self.params, self.duration)
+        return rep
 
     def __str__(self):
         base_str = ('qasm_event: "{:10s}", params={}, duration={}')
-        repr = base_str.format(self.name, self.params, self.duration)
-        return repr
+        rep = base_str.format(self.name, self.params, self.duration)
+        return rep
 
 
 class qumis_event():
@@ -224,25 +224,20 @@ class qumis_event():
     def __repr__(self):
         base_str = ('qumis_event({}, codeword={}, awg_nr={}, duration={},' +
                     'trigger_bit={}, codeword_bit={}, set_bits={})')
-        repr = base_str.format(self.qumis_name, self.codeword, self.awg_nr,
-                               self.duration, self.trigger_bit,
-                               self.codeword_bit, self.set_bits)
-        return repr
+        rep = base_str.format(self.qumis_name, self.codeword, self.awg_nr,
+                              self.duration, self.trigger_bit,
+                              self.codeword_bit, self.set_bits)
+        return rep
 
     def __str__(self):
 
         base_str = ('qumis_event: "{}", \n\tcodeword={}, \n\tawg_nr={},' +
                     ' \n\tduration={}, \n\ttrigger_bit={}, ' +
                     '\n\tcodeword_bit={}, \n\tset_bits={}\n')
-        # base_str = ('qumis_event: {:10s} codeword={:<3d}, awg_nr={:d},' +
-        #             ' duration = {:<5d}, trigger_bit={:2d}, ' +
-        #             'codeword_bit={}, set_bits={}\n')
-        # repr = base_str.format("\""+self.qumis_name+"\"", self.codeword,
-        # self.awg_nr,
-        repr = base_str.format(self.qumis_name, self.codeword, self.awg_nr,
-                               self.duration, self.trigger_bit,
-                               self.codeword_bit, self.set_bits)
-        return repr
+        rep = base_str.format(self.qumis_name, self.codeword, self.awg_nr,
+                              self.duration, self.trigger_bit,
+                              self.codeword_bit, self.set_bits)
+        return rep
 
 
 user_op_type = {
