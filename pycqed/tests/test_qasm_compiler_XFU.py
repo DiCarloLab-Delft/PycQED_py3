@@ -151,15 +151,14 @@ class Test_single_qubit_seqs(unittest.TestCase):
         self.jump_to_start = ("beq r14, r14, Exp_Start " +
                               "\t# Jump to start ad nauseam")
 
-        self.times = gen.gen_sweep_pts(start=100, stop=5000, step=200)
+        self.times = gen.gen_sweep_pts(start=100e-9, stop=5e-6, step=200e-9)
 
-    @unittest.expectedFailure
     def test_qasm_seq_T1(self):
         qasm_file = sq_qasm.T1(self.qubit_name, self.times)
         qasm_fn = qasm_file.name
         qumis_fn = join(self.test_file_dir, "T1_xf.qumis")
         compiler = qc.QASM_QuMIS_Compiler(self.config_fn,
-                                          verbosity_level=0)
+                                          verbosity_level=6)
         compiler.compile(qasm_fn, qumis_fn)
         asm = Assembler(qumis_fn)
         asm.convert_to_instructions()
@@ -212,7 +211,6 @@ class Test_single_qubit_seqs(unittest.TestCase):
             self.assertEqual(
                 compiler.qumis_instructions[-1], self.jump_to_start)
 
-    @unittest.expectedFailure
     def test_qasm_seq_ramsey(self):
         for q_name in ['q0', 'q1']:
             qasm_file = sq_qasm.Ramsey(q_name, times=self.times)
@@ -229,7 +227,6 @@ class Test_single_qubit_seqs(unittest.TestCase):
             self.assertEqual(
                 compiler.qumis_instructions[-1], self.jump_to_start)
 
-    @unittest.expectedFailure
     def test_qasm_seq_echo(self):
         for q_name in ['q0', 'q1']:
             qasm_file = sq_qasm.echo(q_name, times=self.times)

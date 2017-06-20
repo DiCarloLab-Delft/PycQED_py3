@@ -12,6 +12,7 @@ dummy q0 q1
 X180 q0 | Y90 q1
 I 100  # ns
 CZ q0, q1
+I 5
 dummy q0 q1
 mY90 q1
 Measure q0 | Measure q1
