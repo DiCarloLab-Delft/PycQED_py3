@@ -331,9 +331,6 @@ class QASM_QuMIS_Compiler():
         self.verbosity_level = verbosity_level
         self.channel_latency_compensated = False
         self.qubit_map_from_config = False
-
-        self.clock_cycle_ns = 5  # Clock cycle for the CBox
-
         self.infinit_loop_qumis = True
         self.compilation_completed = False
         self.qumis_fn = ''
@@ -433,7 +430,8 @@ class QASM_QuMIS_Compiler():
             op_spec["type"] = op_type_enum
             op_spec["duration"] = int(op_spec["duration"] / self.cycle_time)
             if op_type_enum == EventType.MEASUREMENT:
-                self.measureMENT_time = int(op_spec["duration"] / self.cycle_time)
+                self.measureMENT_time = int(op_spec["duration"] /
+                                            self.cycle_time)
             self.user_qasm_op_dict[key] = op_spec
 
         for key in default_op_dict:
@@ -754,7 +752,7 @@ class QASM_QuMIS_Compiler():
                 if (qasm_op_type == EventType.WAIT) and \
                         (expected_num_of_params == 1):
                     waiting_time_ns, = qasm_op_params
-                    waiting_time = int(waiting_time_ns)//self.clock_cycle_ns
+                    waiting_time = int(waiting_time_ns)//self.cycle_time
                     if is_int(waiting_time) is False:
                         se = SyntaxError("parameter {} is not an "
                                          "integer.".format(waiting_time))

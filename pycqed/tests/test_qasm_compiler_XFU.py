@@ -142,7 +142,7 @@ class Test_compiler(unittest.TestCase):
         self.assertEqual(my90_q1[0], 'trigger 0011000, 1')
         self.assertEqual(my90_q1[1], 'trigger 1011000, 2')
 
-    def test_qasm_timing_T1(self):
+    def test_qasm_wait_timing_T1(self):
         # Tests the timing of the qasm sequences using a T1 sequence
         qasm_file = sq_qasm.T1('q0', self.times)
         qasm_fn = qasm_file.name
