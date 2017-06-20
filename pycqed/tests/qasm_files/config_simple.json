@@ -65,22 +65,67 @@
 
         "cz" : {
             "parameters" : 2,
-            "duration" : 40,
+            "duration" : 400,
             "type" : "flux",
             "matrix" : []
         },
-
+        "square" : {
+            "parameters" : 0,
+            "duration" : 400,
+            "type" : "flux",
+            "matrix" : []
+        },
+        "qwg_trigger_0" : {
+            "parameters" : 1,
+            "duration" : 15,
+            "type" : "flux",
+            "matrix" : []
+        },
+        "qwg_trigger_1" : {
+            "parameters" : 1,
+            "duration" : 15,
+            "type" : "flux",
+            "matrix" : []
+        },
+        "qwg_trigger_2" : {
+            "parameters" : 1,
+            "duration" : 15,
+            "type" : "flux",
+            "matrix" : []
+        },
+        "qwg_trigger_3" : {
+            "parameters" : 1,
+            "duration" : 15,
+            "type" : "flux",
+            "matrix" : []
+        },
+        "qwg_trigger_4" : {
+            "parameters" : 1,
+            "duration" : 15,
+            "type" : "flux",
+            "matrix" : []
+        },
+        "qwg_trigger_5" : {
+            "parameters" : 1,
+            "duration" : 15,
+            "type" : "flux",
+            "matrix" : []
+        },
+        "qwg_trigger_6" : {
+            "parameters" : 1,
+            "duration" : 15,
+            "type" : "flux",
+            "matrix" : []
+        },
         "ro" : {
             "parameters" : 1,
             "duration" : 300,
             "type" : "measurement"
         },
-
         "dummy": {
         "parameters": 2,
         "type" : "flux",
-        "duration" : 0
-    }
+        "duration" : 0}
     },
 
     "hardware specification" : {
@@ -99,7 +144,7 @@
                     "qumis" : "trigger",
                     "latency" : 0,
                     "trigger bit" : 1,
-                    "codeword bit" : [1],
+                    "codeword bit" : [2, 3, 4],
                     "format" : [5, 10],
                     "lut" : 1
                 },
@@ -120,10 +165,12 @@
                     "lut" : 0
                 },
                 "flux" : {
-                    "qumis" : "pulse",
-                    "awg_nr" : 0,
-                    "lut" : 1,
-                    "latency" : 0
+                    "qumis" : "trigger",
+                    "latency" : 0,
+                    "trigger bit" : 1,
+                    "codeword bit" : [2, 3, 4],
+                    "format" : [5, 10],
+                    "lut" : 1
                 },
                 "measurement" : {
                     "qumis" : "trigger",
@@ -146,9 +193,16 @@
             "my90"  : 6
         },
         {
-            "cz" : 0,
-            "cz90": 1,
-            "cz45": 2,
+            "flux_trig": 0,
+            "qwg_trigger_0":1,
+            "qwg_trigger_1":1,
+            "qwg_trigger_2":2,
+            "qwg_trigger_3":3,
+            "qwg_trigger_4":4,
+            "qwg_trigger_5":5,
+            "qwg_trigger_6":6,
+            "cz" : -2,
+            "square" : -2,
             "dummy": -2
         }
     ]

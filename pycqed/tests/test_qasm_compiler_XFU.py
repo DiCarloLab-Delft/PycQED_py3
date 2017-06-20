@@ -7,12 +7,16 @@ import numpy as np
 import pycqed as pq
 from io import StringIO
 from pycqed.utilities import general as gen
-from pycqed.instrument_drivers.physical_instruments._controlbox import qasm_compiler as qc
+from pycqed.instrument_drivers.physical_instruments._controlbox \
+    import qasm_compiler as qcx
 from pycqed.instrument_drivers.physical_instruments._controlbox.Assembler \
     import Assembler
 from os.path import join
 from pycqed.measurement.waveform_control_CC import \
-    single_qubit_qasm_seqs as sq_qasm
+    single_qubit_qasm_seqs as sqqs
+
+from pycqed.measurement.waveform_control_CC import \
+    multi_qubit_qasm_seqs as mqqs
 
 
 class Test_compiler(unittest.TestCase):
@@ -32,8 +36,8 @@ class Test_compiler(unittest.TestCase):
     def test_compiler_example(self):
         qasm_fn = join(self.test_file_dir, 'dev_test.qasm')
         qumis_fn = join(self.test_file_dir, "output.qumis")
-        compiler = qc.QASM_QuMIS_Compiler(self.config_fn,
-                                          verbosity_level=6)
+        compiler = qcx.QASM_QuMIS_Compiler(self.config_fn,
+                                           verbosity_level=6)
         compiler.compile(qasm_fn, qumis_fn)
         qumis = compiler.qumis_instructions
         m = open(compiler.qumis_fn).read()
@@ -47,7 +51,7 @@ class Test_compiler(unittest.TestCase):
         asm.convert_to_instructions()
 
     def test_methods_of_compiler(self):
-        compiler = qc.QASM_QuMIS_Compiler()
+        compiler = qcx.QASM_QuMIS_Compiler()
 
         c_methods = set(dir(compiler))
         printing_methods = {'print_hw_timing_grid',
@@ -62,7 +66,7 @@ class Test_compiler(unittest.TestCase):
 
     def test_loading_config(self):
         with Capturing() as output:
-            compiler = qc.QASM_QuMIS_Compiler()
+            compiler = qcx.QASM_QuMIS_Compiler()
 
         self.assertIn(
             'Configuration not specified. Default configuration file instrument_drivers\physical_instruments\_controlbox\config.json used.', output)
@@ -91,8 +95,8 @@ class Test_compiler(unittest.TestCase):
 
         qasm_fn = join(self.test_file_dir, 'single_op.qasm')
         qumis_fn = join(self.test_file_dir, "output.qumis")
-        compiler = qc.QASM_QuMIS_Compiler(self.config_fn,
-                                          verbosity_level=6)
+        compiler = qcx.QASM_QuMIS_Compiler(self.config_fn,
+                                           verbosity_level=6)
         compiler.compile(qasm_fn, qumis_fn)
         qumis = compiler.qumis_instructions
         x180_q0 = qumis[3]
@@ -112,8 +116,8 @@ class Test_compiler(unittest.TestCase):
     def test_converting_triggers_to_qumis(self):
         qasm_fn = join(self.test_file_dir, 'single_op.qasm')
         qumis_fn = join(self.test_file_dir, "output.qumis")
-        compiler = qc.QASM_QuMIS_Compiler(self.config_fn,
-                                          verbosity_level=0)
+        compiler = qcx.QASM_QuMIS_Compiler(self.config_fn,
+                                           verbosity_level=0)
         compiler.compile(qasm_fn, qumis_fn)
         qumis = compiler.qumis_instructions
 
@@ -144,11 +148,11 @@ class Test_compiler(unittest.TestCase):
 
     def test_qasm_wait_timing_pulse_T1(self):
         # Tests the timing of the qasm sequences using a T1 sequence
-        qasm_file = sq_qasm.T1('q0', self.times)
+        qasm_file = sqqs.T1('q0', self.times)
         qasm_fn = qasm_file.name
         qumis_fn = join(self.test_file_dir, "T1_xf.qumis")
-        compiler = qc.QASM_QuMIS_Compiler(self.simple_config_fn,
-                                          verbosity_level=2)
+        compiler = qcx.QASM_QuMIS_Compiler(self.simple_config_fn,
+                                           verbosity_level=2)
         compiler.compile(qasm_fn, qumis_fn)
         asm = Assembler(qumis_fn)
         asm.convert_to_instructions()
@@ -177,11 +181,11 @@ class Test_compiler(unittest.TestCase):
     def test_qasm_wait_timing_trigger_T1(self):
         # Tests the timing of the qasm sequences using a T1 sequence
         # 'q1' contains "trigger" instructions
-        qasm_file = sq_qasm.T1('q1', self.times)
+        qasm_file = sqqs.T1('q1', self.times)
         qasm_fn = qasm_file.name
         qumis_fn = join(self.test_file_dir, "T1_xf.qumis")
-        compiler = qc.QASM_QuMIS_Compiler(self.simple_config_fn,
-                                          verbosity_level=2)
+        compiler = qcx.QASM_QuMIS_Compiler(self.simple_config_fn,
+                                           verbosity_level=2)
         compiler.compile(qasm_fn, qumis_fn)
         asm = Assembler(qumis_fn)
         asm.convert_to_instructions()
@@ -224,12 +228,12 @@ class Test_single_qubit_seqs(unittest.TestCase):
 
     def test_qasm_seq_allxy(self):
         for q_name in ['q0', 'q1']:
-            qasm_file = sq_qasm.AllXY(q_name)
+            qasm_file = sqqs.AllXY(q_name)
             qasm_fn = qasm_file.name
             qumis_fn = join(self.test_file_dir,
                             "allxy_{}.qumis".format(q_name))
-            compiler = qc.QASM_QuMIS_Compiler(self.config_fn,
-                                              verbosity_level=0)
+            compiler = qcx.QASM_QuMIS_Compiler(self.config_fn,
+                                               verbosity_level=0)
             compiler.compile(qasm_fn, qumis_fn)
             asm = Assembler(qumis_fn)
             asm.convert_to_instructions()
@@ -240,12 +244,12 @@ class Test_single_qubit_seqs(unittest.TestCase):
 
     def test_qasm_seq_MotzoiXY(self):
         for q_name in ['q0', 'q1']:
-            qasm_file = sq_qasm.two_elt_MotzoiXY(q_name)
+            qasm_file = sqqs.two_elt_MotzoiXY(q_name)
             qasm_fn = qasm_file.name
             qumis_fn = join(self.test_file_dir,
                             "motzoi_{}.qumis".format(q_name))
-            compiler = qc.QASM_QuMIS_Compiler(self.config_fn,
-                                              verbosity_level=0)
+            compiler = qcx.QASM_QuMIS_Compiler(self.config_fn,
+                                               verbosity_level=0)
             compiler.compile(qasm_fn, qumis_fn)
             asm = Assembler(qumis_fn)
             asm.convert_to_instructions()
@@ -256,12 +260,12 @@ class Test_single_qubit_seqs(unittest.TestCase):
 
     def test_qasm_seq_OffOn(self):
         for q_name in ['q0', 'q1']:
-            qasm_file = sq_qasm.off_on(q_name)
+            qasm_file = sqqs.off_on(q_name)
             qasm_fn = qasm_file.name
             qumis_fn = join(self.test_file_dir,
                             "off_on_{}.qumis".format(q_name))
-            compiler = qc.QASM_QuMIS_Compiler(self.config_fn,
-                                              verbosity_level=0)
+            compiler = qcx.QASM_QuMIS_Compiler(self.config_fn,
+                                               verbosity_level=0)
             compiler.compile(qasm_fn, qumis_fn)
             asm = Assembler(qumis_fn)
             asm.convert_to_instructions()
@@ -272,12 +276,12 @@ class Test_single_qubit_seqs(unittest.TestCase):
 
     def test_qasm_seq_ramsey(self):
         for q_name in ['q0', 'q1']:
-            qasm_file = sq_qasm.Ramsey(q_name, times=self.times)
+            qasm_file = sqqs.Ramsey(q_name, times=self.times)
             qasm_fn = qasm_file.name
             qumis_fn = join(self.test_file_dir,
                             "Ramsey_{}.qumis".format(q_name))
-            compiler = qc.QASM_QuMIS_Compiler(self.simple_config_fn,
-                                              verbosity_level=0)
+            compiler = qcx.QASM_QuMIS_Compiler(self.simple_config_fn,
+                                               verbosity_level=0)
             compiler.compile(qasm_fn, qumis_fn)
             asm = Assembler(qumis_fn)
             asm.convert_to_instructions()
@@ -288,12 +292,12 @@ class Test_single_qubit_seqs(unittest.TestCase):
 
     def test_qasm_seq_echo(self):
         for q_name in ['q0', 'q1']:
-            qasm_file = sq_qasm.echo(q_name, times=self.times)
+            qasm_file = sqqs.echo(q_name, times=self.times)
             qasm_fn = qasm_file.name
             qumis_fn = join(self.test_file_dir,
                             "echo_{}.qumis".format(q_name))
-            compiler = qc.QASM_QuMIS_Compiler(self.config_fn,
-                                              verbosity_level=0)
+            compiler = qcx.QASM_QuMIS_Compiler(self.config_fn,
+                                               verbosity_level=0)
             compiler.compile(qasm_fn, qumis_fn)
             asm = Assembler(qumis_fn)
             asm.convert_to_instructions()
@@ -303,31 +307,33 @@ class Test_single_qubit_seqs(unittest.TestCase):
                 compiler.qumis_instructions[-1], self.jump_to_start)
 
     def test_qasm_seq_butterfly(self):
-        for q_name in ['q0', 'q1']:
-            qasm_file = sq_qasm.butterfly(q_name)
+        for q_name in ['q1', 'q1']:
+            qasm_file = sqqs.butterfly(q_name, initialize=True)
             qasm_fn = qasm_file.name
             qumis_fn = join(self.test_file_dir,
                             "butterfly_{}.qumis".format(q_name))
-            compiler = qc.QASM_QuMIS_Compiler(self.config_fn,
-                                              verbosity_level=0)
+            compiler = qcx.QASM_QuMIS_Compiler(self.simple_config_fn,
+                                               verbosity_level=2)
             compiler.compile(qasm_fn, qumis_fn)
             asm = Assembler(qumis_fn)
             asm.convert_to_instructions()
-
             self.assertEqual(compiler.qumis_instructions[2], 'Exp_Start: ')
             self.assertEqual(
                 compiler.qumis_instructions[-1], self.jump_to_start)
+            # The sequence should contain 6 RO instructions
+            self.assertEqual(
+                compiler.qumis_instructions.count('trigger 0000001, 3'), 6)
 
     def test_qasm_seq_randomized_benchmarking(self):
         ncl = [2, 4, 6, 20]
         nr_seeds = 10
         for q_name in ['q0', 'q1']:
-            qasm_file = sq_qasm.randomized_benchmarking(q_name, ncl, nr_seeds)
+            qasm_file = sqqs.randomized_benchmarking(q_name, ncl, nr_seeds)
             qasm_fn = qasm_file.name
             qumis_fn = join(self.test_file_dir,
                             "randomized_benchmarking_{}.qumis".format(q_name))
-            compiler = qc.QASM_QuMIS_Compiler(self.config_fn,
-                                              verbosity_level=0)
+            compiler = qcx.QASM_QuMIS_Compiler(self.config_fn,
+                                               verbosity_level=0)
             compiler.compile(qasm_fn, qumis_fn)
             asm = Assembler(qumis_fn)
             asm.convert_to_instructions()
@@ -335,6 +341,85 @@ class Test_single_qubit_seqs(unittest.TestCase):
             self.assertEqual(compiler.qumis_instructions[2], 'Exp_Start: ')
             self.assertEqual(
                 compiler.qumis_instructions[-1], self.jump_to_start)
+
+    def test_restless_RB_seq(self):
+        ncl = [10]
+        nr_seeds = 15
+        for q_name in ['q0', 'q1']:
+            qasm_file = sqqs.randomized_benchmarking(
+                q_name, ncl, nr_seeds, restless=True, cal_points=False)
+            qasm_fn = qasm_file.name
+            qumis_fn = join(self.test_file_dir,
+                            "randomized_benchmarking_{}.qumis".format(q_name))
+            compiler = qcx.QASM_QuMIS_Compiler(self.simple_config_fn,
+                                               verbosity_level=0)
+            compiler.compile(qasm_fn, qumis_fn)
+            asm = Assembler(qumis_fn)
+            asm.convert_to_instructions()
+
+            self.assertEqual(compiler.qumis_instructions[2], 'Exp_Start: ')
+            self.assertEqual(
+                compiler.qumis_instructions[-1], self.jump_to_start)
+
+            self.assertEqual(
+                compiler.qumis_instructions.count('trigger 0000001, 3'), 15)
+
+
+class Test_multi_qubit_seqs(unittest.TestCase):
+
+    @classmethod
+    def setUpClass(self):
+        self.test_file_dir = join(
+            pq.__path__[0], 'tests', 'qasm_files')
+        self.config_fn = join(self.test_file_dir, 'config.json')
+        self.simple_config_fn = join(self.test_file_dir, 'config_simple.json')
+        self.qubit_name = 'q0'
+        self.jump_to_start = ("beq r14, r14, Exp_Start " +
+                              "\t# Jump to start ad nauseam")
+        self.times = gen.gen_sweep_pts(start=100e-9, stop=5e-6, step=200e-9)
+        self.clocks = np.round(self.times/5e-9).astype(int)
+
+    def test_two_qubit_off_on(self):
+        for RO_target in ['q0', 'q1', 'all']:
+            qasm_file = mqqs.two_qubit_off_on('q0', 'q1', RO_target='all')
+            qasm_fn = qasm_file.name
+            qumis_fn = join(self.test_file_dir, "TwoQ_off_on.qumis")
+            compiler = qcx.QASM_QuMIS_Compiler(self.simple_config_fn,
+                                               verbosity_level=2)
+            compiler.compile(qasm_fn, qumis_fn)
+            asm = Assembler(qumis_fn)
+            asm.convert_to_instructions()
+
+            self.assertEqual(compiler.qumis_instructions[2], 'Exp_Start: ')
+            self.assertEqual(
+                compiler.qumis_instructions[-1], self.jump_to_start)
+
+            self.assertEqual(
+                compiler.qumis_instructions.count('trigger 0000001, 3'), 4)
+
+    def test_chevron_block_seq(self):
+        qasm_file = mqqs.chevron_block_seq_xf('q0', 'q1', RO_target='q0',
+                                              no_of_points=5)
+        qasm_fn = qasm_file.name
+        qumis_fn = join(self.test_file_dir, "chevron_block.qumis")
+        compiler = qcx.QASM_QuMIS_Compiler(self.simple_config_fn,
+                                           verbosity_level=6)
+        compiler.compile(qasm_fn, qumis_fn)
+        asm = Assembler(qumis_fn)
+        asm.convert_to_instructions()
+
+        self.assertEqual(compiler.qumis_instructions[2], 'Exp_Start: ')
+        self.assertEqual(
+            compiler.qumis_instructions[-1], self.jump_to_start)
+
+        self.assertEqual(
+            compiler.qumis_instructions.count('trigger 0000001, 3'), 5)
+        # compiler.print_timing_events()
+        # compiler.print_timing_grid()
+        # compiler.print_hw_timing_grid()
+        # raise ValueError
+
+        compiler.timing_event_list
 
 
 class Capturing(list):
