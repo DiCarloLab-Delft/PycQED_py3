@@ -152,7 +152,7 @@ def config_is_valid(config: dict)-> bool:
                              hw_spec['cycle time']))
 
     for i, ch in enumerate(hw_spec['qubit_cfgs']):
-        if not set(ch.keys()).issubset({'rf', 'flux', 'measure'}):
+        if not set(ch.keys()).issubset({'rf', 'flux', 'measurement'}):
             raise ValueError('unexpected key found in qubit config')
 
     return True
@@ -169,7 +169,7 @@ class EventType(enum.Enum):
     WAIT = enum.auto()
     RF = enum.auto()
     FLUX = enum.auto()
-    MEASURE = enum.auto()
+    MEASUREMENT = enum.auto()
 
     def __str__(self):
         return self.name.lower()
@@ -246,7 +246,7 @@ class qumis_event():
 user_op_type = {
     "rf": EventType.RF,
     "flux": EventType.FLUX,
-    "measurement": EventType.MEASURE
+    "measurement": EventType.MEASUREMENT
 }
 
 default_op_dict = {
@@ -262,11 +262,6 @@ default_op_dict = {
     "init_all": {
         "parameters": 0,
         "type": EventType.WAIT
-    },
-
-    "measure": {
-        "parameters": 1,  # Should be -1? Now only specifies a single target
-        "type": EventType.MEASURE
     },
 
     "Map": {
@@ -407,7 +402,7 @@ class QASM_QuMIS_Compiler():
 
         self.cycle_time = float(self.cycle_time)
         self.init_time = int(self.init_time / self.cycle_time)
-        self.measure_time = int(DEFAULT_MEASURE_TIME / self.cycle_time)
+        self.measureMENT_time = int(DEFAULT_MEASURE_TIME / self.cycle_time)
 
         self.qubit_cfgs = self.hardware_spec["qubit_cfgs"]
 
@@ -435,15 +430,15 @@ class QASM_QuMIS_Compiler():
             op_type_enum = user_op_type[op_type_str]
             op_spec["type"] = op_type_enum
             op_spec["duration"] = int(op_spec["duration"] / self.cycle_time)
-            if op_type_enum == EventType.MEASURE:
-                self.measure_time = int(op_spec["duration"] / self.cycle_time)
+            if op_type_enum == EventType.MEASUREMENT:
+                self.measureMENT_time = int(op_spec["duration"] / self.cycle_time)
             self.user_qasm_op_dict[key] = op_spec
 
         for key in default_op_dict:
             if key == "init_all":
                 default_op_dict[key]["duration"] = self.init_time
             if key == "measure":
-                default_op_dict[key]["duration"] = self.measure_time
+                default_op_dict[key]["duration"] = self.measureMENT_time
 
         self.qasm_op_dict = {**default_op_dict, **self.user_qasm_op_dict}
         self.qasm_op_dict = lower_dict_key(self.qasm_op_dict)
@@ -462,7 +457,7 @@ class QASM_QuMIS_Compiler():
                     op_dict[op]["type"] = "rf"
                 elif op_dict[op]["type"] == EventType.FLUX:
                     op_dict[op]["type"] = "flux"
-                elif op_dict[op]["type"] == EventType.MEASURE:
+                elif op_dict[op]["type"] == EventType.MEASUREMENT:
                     op_dict[op]["type"] = "measure"
                 else:
                     raise ValueError("unexpected event type: {}".format(
@@ -801,7 +796,7 @@ class QASM_QuMIS_Compiler():
     @classmethod
     def is_q_op_event(self, event):
         op_type = event.event_type
-        if ((op_type == EventType.MEASURE) or
+        if ((op_type == EventType.MEASUREMENT) or
                 (op_type == EventType.FLUX) or
                 (op_type == EventType.RF)):
             return True
@@ -1113,7 +1108,7 @@ class QASM_QuMIS_Compiler():
                 elif tmp_qumis_name == "trigger":
                     hw_event.trigger_bit = channel_cfg["trigger bit"]
                     hw_event.format = channel_cfg["format"]
-                    if event.event_type != EventType.MEASURE:
+                    if event.event_type != EventType.MEASUREMENT:
                         hw_event.codeword_bit = channel_cfg["codeword bit"]
 
                         lut_index = channel_cfg["lut"]

@@ -75,7 +75,11 @@
             "duration" : 300,
             "type" : "measurement"
         },
-
+        "measure" : {
+            "parameters" : 1,
+            "duration" : 300,
+            "type" : "measurement"
+        },
         "dummy": {
         "parameters": 2,
         "type" : "flux",
@@ -103,7 +107,7 @@
                     "format" : [5, 10],
                     "lut" : 1
                 },
-                "measure" : {
+                "measurement" : {
                     "qumis" : "measure",
                     "latency" : 100
                 }
@@ -123,7 +127,7 @@
                     "awg_nr" : 0,
                     "lut" : 1
                 },
-                "measure" : {
+                "measurement" : {
                     "qumis" : "trigger",
                     "trigger bit" : 7,
                     "format" : [300],

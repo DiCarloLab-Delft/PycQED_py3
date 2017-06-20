@@ -103,7 +103,7 @@
                     "format" : [5, 10],
                     "lut" : 1
                 },
-                "measure" : {
+                "measurement" : {
                     "qumis" : "trigger",
                     "trigger bit" : 7,
                     "format" : [15],
@@ -123,7 +123,7 @@
                     "lut" : 1,
                     "latency" : 0
                 },
-                "measure" : {
+                "measurement" : {
                     "qumis" : "trigger",
                     "trigger bit" : 7,
                     "format" : [15],
