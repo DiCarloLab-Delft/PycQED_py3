@@ -461,16 +461,16 @@ class QWG_lutman_par_chunks(Soft_Sweep):
     def __init__(self, LutMan, LutMan_parameter,
                  sweep_points, chunk_size, codewords=np.arange(128),
                  flux_pulse_type='square', **kw):
-       super().__init__(**kw)
-       self.sweep_points = sweep_points
-       self.chunk_size = chunk_size
-       self.LutMan = LutMan
-       self.LutMan_parameter = LutMan_parameter
-       self.name = LutMan_parameter.name
-       self.parameter_name = LutMan_parameter.label
-       self.unit = LutMan_parameter.unit
-       self.flux_pulse_type = flux_pulse_type
-       self.codewords = codewords
+        super().__init__(**kw)
+        self.sweep_points = sweep_points
+        self.chunk_size = chunk_size
+        self.LutMan = LutMan
+        self.LutMan_parameter = LutMan_parameter
+        self.name = LutMan_parameter.name
+        self.parameter_name = LutMan_parameter.label
+        self.unit = LutMan_parameter.unit
+        self.flux_pulse_type = flux_pulse_type
+        self.codewords = codewords
 
     def set_parameter(self, val):
         # Find index of val in sweep_points
@@ -483,7 +483,8 @@ class QWG_lutman_par_chunks(Soft_Sweep):
         QWG = self.LutMan.QWG.get_instr()
         QWG.stop()
 
-        for i, paramVal in enumerate(self.sweep_points[ind:ind+self.chunk_size]):
+        for i, paramVal in enumerate(self.sweep_points[ind:ind +
+                                     self.chunk_size]):
             pulseName = 'pulse_{}'.format(i)
 
             # Generate new pulse
@@ -491,8 +492,8 @@ class QWG_lutman_par_chunks(Soft_Sweep):
             self.LutMan.regenerate_pulse(self.flux_pulse_type)
 
             # Load onto QWG
-            QWG.createWaveformReal(pulseName,
-                                   self.LutMan._wave_dict[self.flux_pulse_type])
+            QWG.createWaveformReal(
+                pulseName, self.LutMan._wave_dict[self.flux_pulse_type])
 
             # Assign codeword
             QWG.set('codeword_{}_ch{}_waveform'
@@ -500,3 +501,44 @@ class QWG_lutman_par_chunks(Soft_Sweep):
 
         QWG.start()
         QWG.getOperationComplete()
+
+
+class QWG_lutman_custom_wave_chunks(Soft_Sweep):
+    '''
+    Sweep function that divides sweep points into chunks. Every chunk is
+    measured with a QASM sweep, and the operation dictionary can change between
+    different chunks. Pulses are re-uploaded between chunks.
+    The custom waveform is defined by a function (wave_func), which takes
+    exactly one parameter, the current sweep point, and returns an array of the
+    pulse samples (without compensation or delay; these are added by the
+    QWG_lutman in the usual way).
+     '''
+    def __init__(self, LutMan, wave_func, sweep_points, chunk_size,
+                 codewords=np.arange(128),
+                 param_name='flux pulse parameter',
+                 param_unit='a.u.',
+                 **kw):
+        super().__init__(**kw)
+        self.wave_func = wave_func
+        self.chunk_size = chunk_size
+        self.LutMan = LutMan
+        self.codewords = codewords
+        self.name = param_name
+        self.parameter_name = param_name
+        self.unit = param_unit
+
+    def set_parameter(self, val):
+        # Find index of val in sweep_points
+        ind = np.where(self.sweep_points == val)[0]
+        if len(ind) == 0:
+            # val was not found in the sweep points
+            raise ValueError('Value {} is not in the sweep points'.format(val))
+        ind = ind[0]  # set index to the first occurence of val in sweep points
+
+        for i, paramVal in enumerate(self.sweep_points[ind:ind +
+                                     self.chunk_size]):
+            pulseName = 'pulse_{}'.format(i)
+
+            self.LutMan.load_custom_pulse_onto_AWG_lookuptable(
+                self.wave_func(paramVal), append_compensation=True,
+                pulse_name=pulseName, codeword=i)
