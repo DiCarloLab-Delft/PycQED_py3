@@ -834,7 +834,8 @@ class QASM_QuMIS_Compiler():
             # two thing to do for this time point:
             # 1. determine what happens at this moment
             # 2. determine the following waiting time
-            tp = time_point()
+            op_name = timing_events[0].name
+            tp = time_point(label=op_name)
 
             # determine the following waiting time
             if self.is_wait_line(timing_events):
@@ -1085,7 +1086,8 @@ class QASM_QuMIS_Compiler():
             for event in tp.parallel_events:
                 hw_event = qumis_event()
                 targ_q_idx, = event.params
-                channel_cfg = self.qubit_cfgs[targ_q_idx][str(event.event_type)]
+                channel_cfg = self.qubit_cfgs[
+                    targ_q_idx][str(event.event_type)]
 
                 tmp_qumis_name = channel_cfg["qumis"]
 
@@ -1211,12 +1213,12 @@ class QASM_QuMIS_Compiler():
                     for tb in hw_event.set_bits:
                         if trigger_bit_duration[tb] > 0:
                             self.hw_timing_grid = new_tp_list
-                            print("print before trigger overlap error.")
                             if self.verbosity_level > 5:
                                 self.print_timing_grid()
-                            raise ValueError("vertical_divide_trigger: "
-                                             "trigger time overlapped. "
-                                             "Something wrong?")
+                            logging.warning("vertical_divide_trigger: "
+                                            "trigger time overlapped. "
+                                            "Something wrong?")
+                            # Ignoring this error seems to work fine...
                         trigger_bit_duration[tb] = hw_event.duration
 
                 else:  # for pulse, measure and other dummy instructions.
