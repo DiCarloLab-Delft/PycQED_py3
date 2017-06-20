@@ -208,28 +208,9 @@ class qasm_event():
         repr = base_str.format(self.name, self.params, self.duration)
         return repr
 
+
 class qumis_event():
-    # class pulse():
-    #     def __init__(self):
-    #         self.qumis_name = 'pulse'
-    #         self.codeword = -1
 
-    # class trigger():
-    #     def __init__(self):
-    #         self.qumis_name = 'trigger'
-    #         self.codeword = -1
-    #         self.format = []    # used for trigger instruction
-    #         self.trigger_bit = -1
-    #         self.codeword_bit = []
-
-    # class measure():
-    #     def __init__(self):
-    #         self.qumis_name = 'measure'
-
-    # class measure_trigger():
-    #     def __init__(self):
-    #         self.qumis_name = 'trigger'
-    #         self.trigger_bit = -1
     def __init__(self):
         self.qumis_name = ''
         self.codeword = -1
@@ -249,10 +230,16 @@ class qumis_event():
         return repr
 
     def __str__(self):
-        base_str = ('qumis_event: {:10s} codeword={:3d}, awg_nr={:3d},' +
-                    ' duration={:5d}, trigger_bit={:2d}, ' +
-                    'codeword_bit={}, set_bits={}\n')
-        repr = base_str.format("\""+self.qumis_name+"\"", self.codeword, self.awg_nr,
+
+        base_str = ('qumis_event: "{}", \n\tcodeword={}, \n\tawg_nr={},' +
+                    ' \n\tduration={}, \n\ttrigger_bit={}, ' +
+                    '\n\tcodeword_bit={}, \n\tset_bits={}\n')
+        # base_str = ('qumis_event: {:10s} codeword={:<3d}, awg_nr={:d},' +
+        #             ' duration = {:<5d}, trigger_bit={:2d}, ' +
+        #             'codeword_bit={}, set_bits={}\n')
+        # repr = base_str.format("\""+self.qumis_name+"\"", self.codeword,
+        # self.awg_nr,
+        repr = base_str.format(self.qumis_name, self.codeword, self.awg_nr,
                                self.duration, self.trigger_bit,
                                self.codeword_bit, self.set_bits)
         return repr
@@ -490,7 +477,6 @@ class QASM_QuMIS_Compiler():
         with open(config_fn, 'w') as outfile:
             json.dump(self.data, outfile, indent=2)
 
-
     def read_file(self):
         '''
         Read all lines in the file.
@@ -499,7 +485,8 @@ class QASM_QuMIS_Compiler():
             prog_file = open(self.filename, 'r', encoding="utf-8")
             logging.info("open file", str(self.filename), "successfully.")
         except:
-            raise OSError('\tError: Failed to open file ' + self.filename + ".")
+            raise OSError('\tError: Failed to open file ' +
+                          self.filename + ".")
 
         self.raw_lines = []
         self.prog_lines = []  # after removing comments.
@@ -617,7 +604,7 @@ class QASM_QuMIS_Compiler():
             raw_print('-')
             return
 
-        if hasattr(event_list[0], 'event_type'): # qasm event list
+        if hasattr(event_list[0], 'event_type'):  # qasm event list
             for e in event_list:
                 raw_print(e.name)
                 raw_print(" ")
@@ -900,7 +887,7 @@ class QASM_QuMIS_Compiler():
                     timing_events.append(raw_event)
                 if self.is_q_op_event(raw_event):
                     params = [self.qubit_map[dec_qubit]
-                        for dec_qubit in raw_event.params]
+                              for dec_qubit in raw_event.params]
                     raw_event.params = params
                     timing_events.append(raw_event)
             self.timing_event_list.append(timing_events)
@@ -1088,7 +1075,7 @@ class QASM_QuMIS_Compiler():
 
                 tmp_qumis_name = channel["qumis"]
 
-                if  tmp_qumis_name == "pulse":
+                if tmp_qumis_name == "pulse":
                     hw_event.awg_nr = channel["awg_nr"]
 
                     lut_index = channel["lut"]
@@ -1103,7 +1090,6 @@ class QASM_QuMIS_Compiler():
                 elif tmp_qumis_name == "trigger":
                     hw_event.trigger_bit = channel["trigger bit"]
                     hw_event.format = channel["format"]
-                    print("\t trigger, event_type:", event.event_type)
                     if event.event_type != EventType.MEASURE:
                         hw_event.codeword_bit = channel["codeword bit"]
 
@@ -1115,11 +1101,8 @@ class QASM_QuMIS_Compiler():
                             hw_event.qumis_name = event.name
                         else:
                             hw_event.qumis_name = tmp_qumis_name
-
-                        print(hw_event)
                 else:
                     pass
-                # print("\t\t", hw_event)
                 hw_events.append(hw_event)
 
             tp.parallel_events = hw_events
@@ -1331,7 +1314,7 @@ class QASM_QuMIS_Compiler():
                         new_tp_list = self.add_new_tp_event(
                             new_tp_list, absolute_time + d2, None)
 
-                else: # for pulse, measure and other dummy instructions.
+                else:  # for pulse, measure and other dummy instructions.
                     new_tp_list = self.add_new_tp_event(
                         new_tp_list, absolute_time, hw_event)
 
