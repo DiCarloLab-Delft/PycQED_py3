@@ -452,7 +452,7 @@ def MotzoiXY(qubit_name, motzois, cal_points=True):
 
 def Ram_Z(qubit_name, no_of_points, cal_points=True,
           wait_before=50e-9, wait_between=280e-9, clock_cycle=5e-9,
-          rec_Y90=True):
+          rec_Y90=False):
     '''
     Creates QASM sequence for an entire Ram-Z experiment, including
     calibration points.
