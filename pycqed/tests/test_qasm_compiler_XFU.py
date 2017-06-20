@@ -68,7 +68,7 @@ class Test_compiler(unittest.TestCase):
         self.assertEqual(compiler.config_filename, self.config_fn)
 
         hardware_spec_keys = {'qubit list', 'init time',
-                              'cycle time', 'channels'}
+                              'cycle time', 'qubit_cfgs'}
         self.assertEqual(set(compiler.hardware_spec.keys()),
                          hardware_spec_keys)
 

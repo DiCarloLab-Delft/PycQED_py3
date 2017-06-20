@@ -87,7 +87,7 @@
         "qubit list" : [0, 1],
         "init time" : 200000,
         "cycle time" : 5,
-        "channels" :[
+        "qubit_cfgs" :[
             {
                "rf" : {
                     "qumis" : "pulse",
