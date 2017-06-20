@@ -160,6 +160,8 @@ class Test_single_qubit_seqs(unittest.TestCase):
         compiler = qc.QASM_QuMIS_Compiler(self.config_fn,
                                           verbosity_level=6)
         compiler.compile(qasm_fn, qumis_fn)
+
+
         asm = Assembler(qumis_fn)
         asm.convert_to_instructions()
 

@@ -289,6 +289,27 @@ def lower_dict_key(origin_dict):
 
 class QASM_QuMIS_Compiler():
 
+    def __repr__(self):
+        base_str = ('QASM_QuMIS_Compiler(config_filename={}, '
+                    'verbosity_level={})')
+        rep = base_str.format(self.config_filename, self.verbosity_level)
+        return rep
+
+    def __str__(self):
+        base_str = ('QASM_QuMIS_Compiler: '
+                    '\n\tbase_fp = {}'
+                    '\n\tconfig_fn = {} '
+                    '\n\tqasm_fn = {}'
+                    '\n\tqumis_fn = {}'
+                    '\n\tcompilation_completed = {}')
+        s = [self.config_filename, self.filename, self.qumis_fn]
+        common_s = os.path.commonprefix(s)
+        path_strings = [sub.replace(common_s, '') for sub in s]
+
+        rep = base_str.format(common_s,
+                              *path_strings, self.compilation_completed)
+        return rep
+
     def __init__(self, config_filename=None, verbosity_level=1):
         '''
         @param: config_filename, file specifies the user-defined operation
@@ -314,6 +335,9 @@ class QASM_QuMIS_Compiler():
         self.qubit_map_from_config = False
 
         self.infinit_loop_qumis = True
+        self.compilation_completed = False
+        self.qumis_fn = ''
+        self.filename = ''
 
         if config_filename is None:
             self.config_filename = os.path.join(
@@ -347,6 +371,7 @@ class QASM_QuMIS_Compiler():
         if self.verbosity_level >= 1:
             print("QuMIS generated successfully and written into {}".format(
                 self.qumis_fn))
+        self.compilation_completed = True
         return True
 
     def build_dependency_graph(self):
