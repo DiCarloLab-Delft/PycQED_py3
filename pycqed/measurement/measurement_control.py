@@ -1,7 +1,6 @@
 import types
 import logging
 import time
-import sys
 import numpy as np
 from scipy.optimize import fmin_powell
 from pycqed.measurement import hdf5_data as h5d
@@ -10,14 +9,12 @@ from pycqed.utilities.general import dict_to_ordered_tuples
 
 # Used for auto qcodes parameter wrapping
 from pycqed.measurement import sweep_functions as swf
-from pycqed.measurement import detector_functions as det
 from pycqed.measurement.mc_parameter_wrapper import wrap_par_to_swf
 from pycqed.measurement.mc_parameter_wrapper import wrap_par_to_det
 
 from qcodes.instrument.base import Instrument
 from qcodes.instrument.parameter import ManualParameter
 from qcodes.utils import validators as vals
-from copy import deepcopy
 from qcodes.plots.colors import color_cycle
 
 
@@ -27,8 +24,6 @@ except:
     print('Could not import msvcrt (used for detecting keystrokes)')
 
 try:
-    # import pyqtgraph as pg
-    # import pyqtgraph.multiprocess as pgmp
     from qcodes.plots.pyqtgraph import QtPlot
 except Exception:
     print('pyqtgraph plotting not supported, '
@@ -46,7 +41,7 @@ class MeasurementControl(Instrument):
     '''
 
     def __init__(self, name,
-                 plotting_interval=0.25,
+                 plotting_interval=1,
                  live_plot_enabled=True, verbose=True):
         super().__init__(name=name, server_name=None)
         # Soft average is currently only available for "hard"

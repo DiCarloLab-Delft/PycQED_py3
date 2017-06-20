@@ -10,8 +10,6 @@ import os
 import lmfit
 
 import matplotlib.pyplot as plt
-from matplotlib.offsetbox import AnchoredText
-from pycqed.analysis import composite_analysis as ca
 from pycqed.analysis import measurement_analysis as ma
 
 
