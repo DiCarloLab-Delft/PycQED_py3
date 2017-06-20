@@ -349,7 +349,7 @@ class QWG_FluxLookuptableManager(Instrument):
                 k = self.F_kernel_instr.get_instr()
                 self._wave_dict[key] = k.convolve_kernel(
                     [k.kernel(), delayed_wave],
-                    length_samples=int(self.max_waveform_length()*
+                    length_samples=int(self.max_waveform_length() *
                                        self.sampling_rate()))
                 # the waveform is cut off after length_samples.
                 # this is particularly important considering hardware (memory)
@@ -430,6 +430,56 @@ class QWG_FluxLookuptableManager(Instrument):
         for pulse_name in self._wave_dict:
             self.load_pulse_onto_AWG_lookuptable(
                 pulse_name, regenerate_pulse=False)
+        self.QWG.get_instr().start()
+        self.QWG.get_instr().getOperationComplete()
+
+    def load_custom_pulse_onto_AWG_lookuptable(self, waveform,
+                                               append_compensation=True,
+                                               pulse_name='custom',
+                                               codeword=0):
+        '''
+        Load a user-defined waveform onto the QWG. The pulse is delayed by
+        self.F_delay() and a compensation pulse is added after
+        self.F_compensation_delay() if append_compensation is True.
+
+        Args:
+            waveform (array):
+                    Samples of the pulse that will be loaded onto QWG.
+            append_compensation (bool):
+                    Should the compensation pulse be added.
+            pulse_name (string):
+                    The name of the pulse. This is also used in the QWG.
+            codeword (int):
+                    QWG codeword used for the pulse.
+        '''
+        self.QWG.get_instr().stop()
+
+        # Insert delays and compensation pulses, apply distortions
+        wait_samples = np.zeros(int(self.F_delay()*self.sampling_rate()))
+        wait_samples_2 = np.zeros(int(self.F_compensation_delay()
+                                      * self.sampling_rate()))
+
+        delayed_wave = np.concatenate([wait_samples, np.array(waveform)])
+        if append_compensation:
+            delayed_wave = np.concatenate(
+                    [delayed_wave, wait_samples_2, -1 * np.array(waveform)])
+
+        if self.F_kernel_instr() is not None:
+            k = self.F_kernel_instr.get_instr()
+            distorted_wave = k.convolve_kernel(
+                [k.kernel(), delayed_wave],
+                length_samples=int(self.max_waveform_length() *
+                                   self.sampling_rate()))
+        else:
+            logging.warning('No distortion kernel specified, not distorting '
+                            'flux pulse.')
+            distorted_wave = delayed_wave
+
+        # Upload pulse
+        self.QWG.get_instr().createWaveformReal(pulse_name, distorted_wave)
+        self.QWG.get_instr().set('codeword_{}_ch{}_waveform'.format(
+            codeword, self.F_ch()), pulse_name)
+
         self.QWG.get_instr().start()
         self.QWG.get_instr().getOperationComplete()
 
