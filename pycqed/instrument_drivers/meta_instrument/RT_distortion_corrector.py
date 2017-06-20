@@ -14,6 +14,7 @@ import json
 import logging
 from qcodes.plots.pyqtgraph import QtPlot
 
+
 class Distortion_corrector():
     def __init__(self, kernel_object, nr_plot_points=1000):
         '''
@@ -48,6 +49,7 @@ class Distortion_corrector():
         self.filename = ''
         self.kernel_dir = self.ker_obj.kernel_dir()
         self.data_dir = self.kernel_dir  # where traces and plots are saved
+        self._iteration = 0
 
         # Data
         self.waveform = []
@@ -58,6 +60,8 @@ class Distortion_corrector():
         self.known_fit_models = ['exponential', 'high-pass', 'spline']
         self.fit_model = None
         self.fit_res = None
+
+        # Default fit model used in the interactive loop
         self._fit_model_loop = 'exponential'
 
         self._loop_helpstring = str(
@@ -99,8 +103,8 @@ class Distortion_corrector():
     def save_plot(self, filename):
         try:
             self.vw.save(os.path.join(self.data_dir, filename))
-        except:
-            logging.warning('Could not save plot'.)
+        except Exception as e:
+            logging.warning('Could not save plot.')
 
     def open_new_correction(self, kernel_length, AWG_sampling_rate,
                             name='{}_corr'.format(
@@ -344,16 +348,16 @@ class Distortion_corrector():
         h[0] = splStep[0]
         h[1:] = splStep[1:] - splStep[:-1]
 
-        filterMatrix = np.zeros( (len(h), len(h)) )
+        filterMatrix = np.zeros((len(h), len(h)))
         for n in range(len(h)):
             for m in range(n+1):
                 filterMatrix[n, m] = h[n - m]
 
-        new_ker = np.linalg.inv(filterMatrix)[:, 0]
+        new_ker = numpy.linalg.inv(filterMatrix)[:, 0]
         self.new_step = np.convolve(new_ker,
                                     np.ones(len(splStep)))[:len(splStep)]
         self.new_kernel_dict = {
-            'name': self.filename + '_' str(self._iteration),
+            'name': self.filename + '_' + str(self._iteration),
             'filter_params': {},
             'fit': {
                 'model': 'spline',
@@ -823,7 +827,7 @@ class Cryo_distortion_corrector(Distortion_corrector):
         '''
         self.AWG_lutman = AWG_lutman
         self.qubit = qubit
-        super().__init__(kernel_object=AWG_lutman.F_kernel_instr.get_intsr(),
+        super().__init__(kernel_object=AWG_lutman.F_kernel_instr.get_instr(),
                          nr_plot_points=nr_plot_points)
         self.time_pts = time_pts
 
@@ -838,7 +842,9 @@ class Cryo_distortion_corrector(Distortion_corrector):
 
         self.qubit.measure_ram_z(self.time_pts, rec_Y90=False)
         self.qubit.measure_ram_z(self.time_pts, rec_Y90=True)
-        a = ma.Ram_Z_Analysis()
+        a = ma.Ram_Z_Analysis()  # TODO: needs params!
         self.data_dir = a.folder
 
-        self.waveform = a.something
+        self.waveform = a.step_response
+        # TODO: Update time_pts to have the same length as waveform.
+        #       Or perhaps do this in measure_trace.

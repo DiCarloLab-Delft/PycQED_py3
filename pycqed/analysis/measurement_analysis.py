@@ -5861,17 +5861,15 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
                                         params=params)
         return fit_res
 
-class Ram_Z_Analysis(TD_Analysis):
+class Ram_Z_Analysis(MeasurementAnalysis):
     def __init__(self, timestamp_cos=None, timestamp_sin=None,
                  filter_raw=False, filter_deriv_phase=False, demodulate=True,
-                 f_demod=0, f01max=None, E_c=None, flux_amp=None, V_0=V_0
-                 auto=True, **kw):
-        super().__init__(timestamp=timestamp_cos, label='Ram_Z_cos',
-                         rotate_and_normalize=True, **kw)
-        self.cosTrace = self.corr_data
-        super().__init__(timestamp=timestamp_sin, label='Ram_Z_sin',
-                         rotate_and_normalize=True, **kw)
-        self.sinTrace = self.corr_data
+                 f_demod=0, f01max=None, E_c=None, flux_amp=None, V_0=0, d_c=1,
+                 auto=True, make_fig=True, **kw):
+        super().__init__(timestamp=timestamp_cos, label='Ram_Z_cos', **kw)
+        self.cosTrace = self.measured_values[0]
+        super().__init__(timestamp=timestamp_sin, label='Ram_Z_sin', **kw)
+        self.sinTrace = self.measured_values[0]
 
         self.filter_raw = filter_raw
         self.filter_deriv_phase = filter_deriv_phase
@@ -5883,16 +5881,19 @@ class Ram_Z_Analysis(TD_Analysis):
         self.flux_amp = flux_amp
         self.V_0 = V_0
 
+        self.d_c = d_c
+
         if auto:
-            self.run_special_analysis()
+            self.run_special_analysis(make_fig=make_fig)
 
-    def rotate_and_normalize(self):
-        # * -1 because cos starts at 0 instead of 1
-        self.corr_data = -(self.measured_values[0] -
-                           np.mean(self.measured_values[0]))
-        self.corr_data /= max(np.abs(self.corr_data))
+    def normalize(self, trace):
+        # * -1 because cos starts at -1 instead of 1
+        trace *= -1
+        trace -= np.mean(trace)
+        trace /= max(np.abs(trace))
+        return trace
 
-    def run_special_analysis(self):
+    def run_special_analysis(self, make_fig=True):
         self.df, self.phases, self.I, self.Q = self.analyse_trace(
             self.cosTrace, self.sinTrace, self.sweep_points,
             filter_raw=self.filter_raw,
@@ -5901,40 +5902,41 @@ class Ram_Z_Analysis(TD_Analysis):
             f_demod=self.f_demod,
             return_all=True)
 
-        self.add_dataset_to_analysisgroup('detuning', self.df)
-        self.add_dataset_to_analysisgroup('phase', selfphases)
+        # self.add_dataset_to_analysisgroup('detuning', self.df)
+        # self.add_dataset_to_analysisgroup('phase', selfphases)
 
         if (self.f01max != None and self.E_c != None and
-            not self.flux_amp != None):
+            self.flux_amp != None):
             self.d_c, self.step_response = self.get_stepresponse(
                 self.df, self.f01max, self.E_c, self.flux_amp, V_0=self.V_0)
-            self.add_dataset_to_analysisgroup('step_response',
-                                              self.step_response)
+            # self.add_dataset_to_analysisgroup('step_response',
+            #                                   self.step_response)
             plotStep = True
         else:
             print('To calculate step response, f01max, E_c, flux_amp, and V_0'
                   ' have to be specified.')
             plotStep = False
 
-        self.make_figures(plot_step=plotStep)
+        if make_fig:
+            self.make_figures(plot_step=plotStep)
 
     def analyse_trace(self, I, Q, x_pts,
                       filter_raw=False, filter_deriv_phase=False,
                       filter_width=1e-9,
-                      demod=False, f_demod=0,
+                      demodulate=False, f_demod=0,
                       return_all=False):
-        # I = normalize(I)
-        # Q = normalize(Q)
+        I = self.normalize(I)
+        Q = self.normalize(Q)
         dt = x_pts[1] - x_pts[0]
 
         # Demodulate
-        if demod:
-            I , Q = self.demodulate(I , Q , f_demod, x_pts)
+        if demodulate:
+            I, Q = self.demodulate(I, Q, f_demod, x_pts)
 
         # Filter raw data
         if filter_raw:
-            I = self.gauss_filter(I , filter_width, dt, pad_val=1)
-            Q = self.gauss_filter(Q , filter_width, dt, pad_val=0)
+            I = self.gauss_filter(I, filter_width, dt, pad_val=1)
+            Q = self.gauss_filter(Q, filter_width, dt, pad_val=0)
 
         # Calcualte phase and undo phase-wrapping
         phases = np.arctan2(Q, I)
@@ -5951,7 +5953,7 @@ class Ram_Z_Analysis(TD_Analysis):
                            for i in range(1, len(phases)-1)]) / (2 * np.pi)
 
         # If the signal was demodulated df is now the detuning from f_demod
-        if demod:
+        if demodulate:
             df += f_demod
         df[0] = 0  # detuning must start at 0
 
@@ -5977,8 +5979,9 @@ class Ram_Z_Analysis(TD_Analysis):
             s (array):      Normalized step response in voltage space.
         '''
         f_end = np.mean(df[-10:])
-        d_c = np.arccos( (1 - f_end / (f01max + E_c))**2 ) / (F_amp - V_0)
-        s = np.arccos( (1 - df / (f01max + E_c))**2 ) / d_c / (F_amp - V_0)
+        # d_c = np.arccos( (1 - f_end / (f01max + E_c))**2 ) / (F_amp - V_0)
+        d_c = self.d_c
+        s = (np.arccos((1 - df / (f01max + E_c))**2) / d_c + V_0) / F_amp
 
         return d_c, s
 
@@ -6133,4 +6136,4 @@ class Ram_Z_Analysis(TD_Analysis):
             elif phases[i+1] - phases[i] > 3:
                 phases[i+1:] -= 2*np.pi
 
-    return phases
+        return phases
