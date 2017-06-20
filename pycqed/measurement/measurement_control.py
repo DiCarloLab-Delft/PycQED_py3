@@ -1,7 +1,6 @@
 import types
 import logging
 import time
-import sys
 import numpy as np
 from scipy.optimize import fmin_powell
 from pycqed.measurement import hdf5_data as h5d
@@ -10,14 +9,12 @@ from pycqed.utilities.general import dict_to_ordered_tuples
 
 # Used for auto qcodes parameter wrapping
 from pycqed.measurement import sweep_functions as swf
-from pycqed.measurement import detector_functions as det
 from pycqed.measurement.mc_parameter_wrapper import wrap_par_to_swf
 from pycqed.measurement.mc_parameter_wrapper import wrap_par_to_det
 
 from qcodes.instrument.base import Instrument
 from qcodes.instrument.parameter import ManualParameter
 from qcodes.utils import validators as vals
-from copy import deepcopy
 from qcodes.plots.colors import color_cycle
 
 
@@ -27,8 +24,6 @@ except:
     print('Could not import msvcrt (used for detecting keystrokes)')
 
 try:
-    # import pyqtgraph as pg
-    # import pyqtgraph.multiprocess as pgmp
     from qcodes.plots.pyqtgraph import QtPlot
 except Exception:
     print('pyqtgraph plotting not supported, '
@@ -46,7 +41,7 @@ class MeasurementControl(Instrument):
     '''
 
     def __init__(self, name,
-                 plotting_interval=0.25,
+                 plotting_interval=1,
                  live_plot_enabled=True, verbose=True):
         super().__init__(name=name, server_name=None)
         # Soft average is currently only available for "hard"
@@ -113,7 +108,10 @@ class MeasurementControl(Instrument):
         self.print_measurement_start_msg()
         self.mode = mode
         self.iteration = 0  # used in determining data writing indices
+        # needs to be defined here because of the with statement below
+        return_dict = {}
         self.last_sweep_pts = None  # used to prevent resetting same value
+
         with h5d.Data(name=self.get_measurement_name()) as self.data_object:
             self.get_measurement_begintime()
             # Commented out because requires git shell interaction from python
@@ -140,8 +138,10 @@ class MeasurementControl(Instrument):
                 raise ValueError('mode %s not recognized' % self.mode)
             result = self.dset[()]
             self.save_MC_metadata(self.data_object)  # timing labels etc
+            return_dict = self.create_experiment_result_dict()
+
         self.finish(result)
-        return result
+        return return_dict
 
     def measure(self, *kw):
         if self.live_plot_enabled():
@@ -734,8 +734,8 @@ class MeasurementControl(Instrument):
             self.sweep_par_units.append(sweep_function.unit)
 
         for i, val_name in enumerate(self.detector_function.value_names):
-            self.column_names.append(val_name+' (' +
-                                     self.detector_function.value_units[i] + ')')
+            self.column_names.append(
+                val_name+' (' + self.detector_function.value_units[i] + ')')
         return self.column_names
 
     def create_experimentaldata_dataset(self):
@@ -758,6 +758,16 @@ class MeasurementControl(Instrument):
             self.detector_function.value_names)
         data_group.attrs['value_units'] = h5d.encode_to_utf8(
             self.detector_function.value_units)
+
+    def create_experiment_result_dict(self):
+        result_dict = {
+            "dset": self.dset[()],
+            "sweep_parameter_names": self.sweep_par_names,
+            "sweep_parameter_units": self.sweep_par_units,
+            "value_names": self.detector_function.value_names,
+            "value_units": self.detector_function.value_units
+        }
+        return result_dict
 
     def save_optimization_settings(self):
         '''

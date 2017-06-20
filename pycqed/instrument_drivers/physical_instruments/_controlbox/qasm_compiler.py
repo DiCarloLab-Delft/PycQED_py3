@@ -163,13 +163,15 @@ class EventType(enum.Enum):
     Current type definition does not separate the technology-dependent part
     and technology-independent part.
     '''
-    NONE_EVENT = enum.auto()
-    DECLARE = enum.auto()
-    MAP = enum.auto()
-    WAIT = enum.auto()
-    RF = enum.auto()
-    FLUX = enum.auto()
-    MEASURE = enum.auto()
+
+    # N.B. integers below can be replaced by enum.auto() in python > 3.6
+    NONE_EVENT = 1
+    DECLARE = 2
+    MAP = 3
+    WAIT = 4
+    RF = 5
+    FLUX = 6
+    MEASURE = 7
 
     def __str__(self):
         return self.name.lower()
@@ -195,32 +197,22 @@ class qasm_event():
         self.channel_latency = 0
         # self.start_time_point = time_point()
 
+    # def __str__(self):
+        # return "({}, {})".format(self.name, self.event_type)
+
+    def __repr__(self):
+        base_str = ('qasm_event({}, params={}, duration={})')
+        repr = base_str.format(self.name, self.params, self.duration)
+        return repr
+
     def __str__(self):
-        return "({}, {})".format(self.name, self.event_type)
+        base_str = ('qasm_event: "{:10s}", params={}, duration={}')
+        repr = base_str.format(self.name, self.params, self.duration)
+        return repr
 
 
 class qumis_event():
-    # class pulse():
-    #     def __init__(self):
-    #         self.qumis_name = 'pulse'
-    #         self.codeword = -1
 
-    # class trigger():
-    #     def __init__(self):
-    #         self.qumis_name = 'trigger'
-    #         self.codeword = -1
-    #         self.format = []    # used for trigger instruction
-    #         self.trigger_bit = -1
-    #         self.codeword_bit = []
-
-    # class measure():
-    #     def __init__(self):
-    #         self.qumis_name = 'measure'
-
-    # class measure_trigger():
-    #     def __init__(self):
-    #         self.qumis_name = 'trigger'
-    #         self.trigger_bit = -1
     def __init__(self):
         self.qumis_name = ''
         self.codeword = -1
@@ -240,9 +232,15 @@ class qumis_event():
         return repr
 
     def __str__(self):
+
         base_str = ('qumis_event: "{}", \n\tcodeword={}, \n\tawg_nr={},' +
                     ' \n\tduration={}, \n\ttrigger_bit={}, ' +
                     '\n\tcodeword_bit={}, \n\tset_bits={}\n')
+        # base_str = ('qumis_event: {:10s} codeword={:<3d}, awg_nr={:d},' +
+        #             ' duration = {:<5d}, trigger_bit={:2d}, ' +
+        #             'codeword_bit={}, set_bits={}\n')
+        # repr = base_str.format("\""+self.qumis_name+"\"", self.codeword,
+        # self.awg_nr,
         repr = base_str.format(self.qumis_name, self.codeword, self.awg_nr,
                                self.duration, self.trigger_bit,
                                self.codeword_bit, self.set_bits)
@@ -481,7 +479,6 @@ class QASM_QuMIS_Compiler():
         with open(config_fn, 'w') as outfile:
             json.dump(self.data, outfile, indent=2)
 
-
     def read_file(self):
         '''
         Read all lines in the file.
@@ -490,7 +487,8 @@ class QASM_QuMIS_Compiler():
             prog_file = open(self.filename, 'r', encoding="utf-8")
             logging.info("open file", str(self.filename), "successfully.")
         except:
-            raise OSError('\tError: Failed to open file ' + self.filename + ".")
+            raise OSError('\tError: Failed to open file ' +
+                          self.filename + ".")
 
         self.raw_lines = []
         self.prog_lines = []  # after removing comments.
@@ -608,7 +606,7 @@ class QASM_QuMIS_Compiler():
             raw_print('-')
             return
 
-        if hasattr(event_list[0], 'event_type'):
+        if hasattr(event_list[0], 'event_type'):  # qasm event list
             for e in event_list:
                 raw_print(e.name)
                 raw_print(" ")
@@ -624,6 +622,18 @@ class QASM_QuMIS_Compiler():
         else:  # qumis event list
             for e in event_list:
                 raw_print(e.qumis_name)
+                if e.codeword == -2:
+                    if e.awg_nr != -1:
+                        raw_print(" ")
+                        raw_print("awg")
+                        raw_print(str(e.awg_nr))
+                        raw_print("(%s)" % str(e.codeword))
+                    else:
+                        raw_print(" ")
+                        raw_print("bits:")
+                        raw_print("[{}]".format(str(e.trigger_bit)))
+                        raw_print(str(e.codeword_bit))
+
                 if e.qumis_name.lower() == "measure":
                     pass
                 elif e.qumis_name.lower() == "pulse":
@@ -1065,30 +1075,43 @@ class QASM_QuMIS_Compiler():
                 target, = event.params
                 channel = self.channels[target][str(event.event_type)]
 
-                hw_event.qumis_name = channel["qumis"]
+                tmp_qumis_name = channel["qumis"]
 
-                if hw_event.qumis_name == "pulse":
+                if tmp_qumis_name == "pulse":
                     hw_event.awg_nr = channel["awg_nr"]
+
                     lut_index = channel["lut"]
                     lut = self.luts[lut_index]
                     hw_event.codeword = lut[event.name]
-                elif hw_event.qumis_name == "trigger":
+
+                    if hw_event.codeword == -2:
+                        hw_event.qumis_name = event.name
+                    else:
+                        hw_event.qumis_name = tmp_qumis_name
+
+                elif tmp_qumis_name == "trigger":
                     hw_event.trigger_bit = channel["trigger bit"]
                     hw_event.format = channel["format"]
                     if event.event_type != EventType.MEASURE:
                         hw_event.codeword_bit = channel["codeword bit"]
+
                         lut_index = channel["lut"]
                         lut = self.luts[lut_index]
                         hw_event.codeword = lut[event.name]
+
+                        if hw_event.codeword == -2:
+                            hw_event.qumis_name = event.name
+                        else:
+                            hw_event.qumis_name = tmp_qumis_name
                 else:
                     pass
-
                 hw_events.append(hw_event)
+
             tp.parallel_events = hw_events
             self.hw_timing_grid.append(tp)
 
         if self.verbosity_level > 4:
-            print("After converting event timing grid to hardware timing")
+            print("After converting event timing grid to hardware timing:")
             self.print_hw_timing_grid()
 
     def gen_full_time_grid(self):
@@ -1100,21 +1123,14 @@ class QASM_QuMIS_Compiler():
     def apply_codeword(self):
         """
         This function converts codewords (int) to the correct combination
-        of trigger bits.
+        of trigger bits for the trigger QuMIS instruction.
 
-        Not really clear what it does for instructions other than trigger.
-
-        # N.B. What does this function do exactly?
+        NOTE: trigger bits starts counting from 1, instead of 0.
         """
         new_tp_list = []
         for tp in self.hw_timing_grid:
             absolute_time = tp.absolute_time
             for hw_event in tp.parallel_events:
-                if (hw_event.qumis_name == "pulse" or
-                        hw_event.qumis_name == "measure"):
-                    new_tp_list = self.add_new_tp_event(
-                        new_tp_list, absolute_time, hw_event)
-                    continue
 
                 if hw_event.qumis_name == 'trigger':
                     hw_event.set_bits = []
@@ -1138,6 +1154,10 @@ class QASM_QuMIS_Compiler():
                     if hw_event.set_bits != []:
                         new_tp_list = self.add_new_tp_event(
                             new_tp_list, absolute_time, hw_event)
+
+                else:  # for pulse, measure, and other dummy instructions.
+                    new_tp_list = self.add_new_tp_event(
+                        new_tp_list, absolute_time, hw_event)
 
         self.hw_timing_grid = new_tp_list
         if self.verbosity_level > 4:
@@ -1175,11 +1195,6 @@ class QASM_QuMIS_Compiler():
         for ti, tp in enumerate(self.hw_timing_grid):
             absolute_time = tp.absolute_time
             for hw_event in tp.parallel_events:
-                if (hw_event.qumis_name == "pulse" or
-                        hw_event.qumis_name == "measure"):
-                    new_tp_list = self.add_new_tp_event(
-                        new_tp_list, absolute_time, hw_event)
-                    continue
 
                 if hw_event.qumis_name == 'trigger':
                     for tb in hw_event.set_bits:
@@ -1192,6 +1207,10 @@ class QASM_QuMIS_Compiler():
                                              "trigger time overlapped. "
                                              "Something wrong?")
                         trigger_bit_duration[tb] = hw_event.duration
+
+                else:  # for pulse, measure and other dummy instructions.
+                    new_tp_list = self.add_new_tp_event(
+                        new_tp_list, absolute_time, hw_event)
 
             if max(trigger_bit_duration) == 0:
                 continue
@@ -1267,11 +1286,6 @@ class QASM_QuMIS_Compiler():
         for tp in self.hw_timing_grid:
             absolute_time = tp.absolute_time
             for hw_event in tp.parallel_events:
-                if (hw_event.qumis_name == "pulse" or
-                        hw_event.qumis_name == "measure"):
-                    new_tp_list = self.add_new_tp_event(
-                        new_tp_list, absolute_time, hw_event)
-                    continue
 
                 if hw_event.qumis_name == "trigger":
                     if hw_event.format == []:
@@ -1301,6 +1315,10 @@ class QASM_QuMIS_Compiler():
 
                         new_tp_list = self.add_new_tp_event(
                             new_tp_list, absolute_time + d2, None)
+
+                else:  # for pulse, measure and other dummy instructions.
+                    new_tp_list = self.add_new_tp_event(
+                        new_tp_list, absolute_time, hw_event)
 
         self.hw_timing_grid = new_tp_list
         if self.verbosity_level > 4:
