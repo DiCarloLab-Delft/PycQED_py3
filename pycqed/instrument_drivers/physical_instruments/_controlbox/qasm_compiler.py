@@ -332,6 +332,8 @@ class QASM_QuMIS_Compiler():
         self.channel_latency_compensated = False
         self.qubit_map_from_config = False
 
+        self.clock_cycle_ns = 5  # Clock cycle for the CBox
+
         self.infinit_loop_qumis = True
         self.compilation_completed = False
         self.qumis_fn = ''
@@ -751,7 +753,8 @@ class QASM_QuMIS_Compiler():
 
                 if (qasm_op_type == EventType.WAIT) and \
                         (expected_num_of_params == 1):
-                    waiting_time, = qasm_op_params
+                    waiting_time_ns, = qasm_op_params
+                    waiting_time = int(waiting_time_ns)//self.clock_cycle_ns
                     if is_int(waiting_time) is False:
                         se = SyntaxError("parameter {} is not an "
                                          "integer.".format(waiting_time))
@@ -998,12 +1001,6 @@ class QASM_QuMIS_Compiler():
             new_event.duration = event.duration
             new_event.channel_latency = event.channel_latency
             new_event_list.append(new_event)
-
-            # print('new event list:  ')
-            # for e in new_event_list:
-            #     raw_print(str(e))
-            #     raw_print(str(e.params))
-            #     raw_print('\n')
 
         return new_event_list
 

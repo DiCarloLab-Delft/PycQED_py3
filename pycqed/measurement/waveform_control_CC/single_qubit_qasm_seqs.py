@@ -138,7 +138,7 @@ def Rabi(qubit_name, amps, n=1):
 
 
 def Ramsey(qubit_name, times, clock_cycle=1e-9,
-           artificial_detuning=4,
+           artificial_detuning=None,
            cal_points=True):
     '''
     Ramsey sequence for a single qubit.

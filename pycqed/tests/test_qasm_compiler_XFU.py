@@ -23,6 +23,9 @@ class Test_compiler(unittest.TestCase):
             pq.__path__[0], 'tests', 'qasm_files')
         self.config_fn = join(self.test_file_dir, 'config.json')
 
+        self.times = gen.gen_sweep_pts(start=100e-9, stop=5e-6, step=200e-9)
+        self.clocks = np.round(self.times/5e-9).astype(int)
+
         self.jump_to_start = ("beq r14, r14, Exp_Start " +
                               "\t# Jump to start ad nauseam")
 
@@ -139,6 +142,29 @@ class Test_compiler(unittest.TestCase):
         self.assertEqual(my90_q1[0], 'trigger 0011000, 1')
         self.assertEqual(my90_q1[1], 'trigger 1011000, 2')
 
+    def test_qasm_timing_T1(self):
+        # Tests the timing of the qasm sequences using a T1 sequence
+        qasm_file = sq_qasm.T1('q0', self.times)
+        qasm_fn = qasm_file.name
+        qumis_fn = join(self.test_file_dir, "T1_xf.qumis")
+        compiler = qc.QASM_QuMIS_Compiler(self.config_fn,
+                                          verbosity_level=0)
+        compiler.compile(qasm_fn, qumis_fn)
+        asm = Assembler(qumis_fn)
+        asm.convert_to_instructions()
+
+        instrs = compiler.qumis_instructions
+        print(self.times)
+        print(self.clocks)
+        print('*'*20)
+        self.assertEqual(instrs[2], 'Exp_Start: ')
+        wait_instrs = instrs[5:-4:3]
+        # -4 in slicing exists to take out the calibration points
+        for clock, wait_instr in zip(self.clocks[:-4], wait_instrs[:-4]):
+            self.assertEqual(clock, int(wait_instr.split()[1]))
+        self.assertEqual(
+            instrs[-1], self.jump_to_start)
+
 
 class Test_single_qubit_seqs(unittest.TestCase):
 
@@ -147,23 +173,13 @@ class Test_single_qubit_seqs(unittest.TestCase):
         self.test_file_dir = join(
             pq.__path__[0], 'tests', 'qasm_files')
         self.config_fn = join(self.test_file_dir, 'config.json')
+        self.simple_config_fn = join(self.test_file_dir, 'config_simple.json')
         self.qubit_name = 'q0'
         self.jump_to_start = ("beq r14, r14, Exp_Start " +
                               "\t# Jump to start ad nauseam")
 
         self.times = gen.gen_sweep_pts(start=100e-9, stop=5e-6, step=200e-9)
-
-    def test_qasm_seq_T1(self):
-        qasm_file = sq_qasm.T1(self.qubit_name, self.times)
-        qasm_fn = qasm_file.name
-        qumis_fn = join(self.test_file_dir, "T1_xf.qumis")
-        compiler = qc.QASM_QuMIS_Compiler(self.config_fn,
-                                          verbosity_level=6)
-        compiler.compile(qasm_fn, qumis_fn)
-
-
-        asm = Assembler(qumis_fn)
-        asm.convert_to_instructions()
+        self.clocks = np.round(self.times/5e-9).astype(int)
 
     def test_qasm_seq_allxy(self):
         for q_name in ['q0', 'q1']:
@@ -213,14 +229,13 @@ class Test_single_qubit_seqs(unittest.TestCase):
             self.assertEqual(
                 compiler.qumis_instructions[-1], self.jump_to_start)
 
-    @unittest.expectedFailure
     def test_qasm_seq_ramsey(self):
         for q_name in ['q0', 'q1']:
             qasm_file = sq_qasm.Ramsey(q_name, times=self.times)
             qasm_fn = qasm_file.name
             qumis_fn = join(self.test_file_dir,
                             "Ramsey_{}.qumis".format(q_name))
-            compiler = qc.QASM_QuMIS_Compiler(self.config_fn,
+            compiler = qc.QASM_QuMIS_Compiler(self.simple_config_fn,
                                               verbosity_level=0)
             compiler.compile(qasm_fn, qumis_fn)
             asm = Assembler(qumis_fn)
