@@ -170,7 +170,7 @@ class EventType(enum.Enum):
     WAIT = 4
     RF = 5
     FLUX = 6
-    MEASURE = 7
+    MEASUREMENT = 7
 
     def __str__(self):
         return self.name.lower()
