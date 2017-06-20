@@ -25,7 +25,7 @@ class Test_compiler(unittest.TestCase):
 
         self.times = gen.gen_sweep_pts(start=100e-9, stop=5e-6, step=200e-9)
         self.clocks = np.round(self.times/5e-9).astype(int)
-
+        self.simple_config_fn = join(self.test_file_dir, 'config_simple.json')
         self.jump_to_start = ("beq r14, r14, Exp_Start " +
                               "\t# Jump to start ad nauseam")
 
@@ -147,21 +147,30 @@ class Test_compiler(unittest.TestCase):
         qasm_file = sq_qasm.T1('q0', self.times)
         qasm_fn = qasm_file.name
         qumis_fn = join(self.test_file_dir, "T1_xf.qumis")
-        compiler = qc.QASM_QuMIS_Compiler(self.config_fn,
-                                          verbosity_level=0)
+        compiler = qc.QASM_QuMIS_Compiler(self.simple_config_fn,
+                                          verbosity_level=2)
         compiler.compile(qasm_fn, qumis_fn)
         asm = Assembler(qumis_fn)
         asm.convert_to_instructions()
-
         instrs = compiler.qumis_instructions
-        print(self.times)
-        print(self.clocks)
-        print('*'*20)
         self.assertEqual(instrs[2], 'Exp_Start: ')
-        wait_instrs = instrs[5:-4:3]
+        wait_instrs = instrs[5:-4:4]
         # -4 in slicing exists to take out the calibration points
         for clock, wait_instr in zip(self.clocks[:-4], wait_instrs[:-4]):
-            self.assertEqual(clock, int(wait_instr.split()[1]))
+            exp_wait = clock + 4  # +4 includes the length of the pulse
+            instr_wait = int(wait_instr.split()[1])
+            self.assertEqual(instr_wait, exp_wait)
+
+        init_instrs = instrs[3:-4:4]
+        init_time = 200e-6/5e-9
+        RO_time = 300e-9/5e-9
+
+        self.assertEqual(init_instrs[0],
+                         'wait {:d}'.format(int(init_time)))
+        for init_instr in init_instrs[1:]:
+            self.assertEqual(init_instr,
+                             'wait {:d}'.format(int(init_time+RO_time)))
+
         self.assertEqual(
             instrs[-1], self.jump_to_start)
 
@@ -177,7 +186,6 @@ class Test_single_qubit_seqs(unittest.TestCase):
         self.qubit_name = 'q0'
         self.jump_to_start = ("beq r14, r14, Exp_Start " +
                               "\t# Jump to start ad nauseam")
-
         self.times = gen.gen_sweep_pts(start=100e-9, stop=5e-6, step=200e-9)
         self.clocks = np.round(self.times/5e-9).astype(int)
 

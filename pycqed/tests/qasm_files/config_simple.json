@@ -91,13 +91,13 @@
             {
                "rf" : {
                     "qumis" : "pulse",
-                    "latency" : 80,
+                    "latency" : 0,
                     "awg_nr" : 0,
                     "lut" : 0
                 },
                 "flux" : {
                     "qumis" : "trigger",
-                    "latency" : 40,
+                    "latency" : 0,
                     "trigger bit" : 1,
                     "codeword bit" : [1],
                     "format" : [5, 10],
@@ -112,9 +112,11 @@
             },
             {
                "rf" : {
-                    "qumis" : "pulse",
-                    "latency" : 80,
-                    "awg_nr" : 2,
+                    "qumis" : "trigger",
+                    "latency" : 40,
+                    "trigger bit" : 1,
+                    "codeword bit" : [2, 3, 4],
+                    "format" : [5, 10],
                     "lut" : 0
                 },
                 "flux" : {

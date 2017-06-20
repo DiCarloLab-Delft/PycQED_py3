@@ -519,9 +519,9 @@ class QASM_QuMIS_Compiler():
             self.prog_lines.append(prog_line(line_number + 1, line_content))
 
         prog_file.close()
-        if self.verbosity_level >= 1:
-            self.print_raw_lines()
         if self.verbosity_level >= 2:
+            self.print_raw_lines()
+        if self.verbosity_level >= 3:
             self.print_program_lines()
 
     def print_raw_lines(self):
@@ -928,7 +928,7 @@ class QASM_QuMIS_Compiler():
                                  len(self.physical_qubits)))
             se.filename = self.filename
             raise se
-        if self.verbosity_level >= 2:
+        if self.verbosity_level >= 3:
             print("Extend declared qubit list:")
             print("\tDeclared qubits: {}".format(self.declared_qubits))
             print("")
@@ -1424,7 +1424,7 @@ class QASM_QuMIS_Compiler():
                 self.qumis_instructions.append(pulse_instruction)
 
         if self.qumis_instructions[0][:4] != "wait":
-            if self.verbosity_level >= 2:
+            if self.verbosity_level >= 4:
                 print("Instruction 'Wait 1' added at the beginning.")
             self.qumis_instructions.insert(0, "wait 1")
         if self.infinit_loop_qumis:
@@ -1436,7 +1436,7 @@ class QASM_QuMIS_Compiler():
         for qi in self.qumis_instructions:
             qumis_file.write("{}\n".format(qi))
         qumis_file.close()
-        if self.verbosity_level >= 5:
+        if self.verbosity_level >= 2:
             self.print_qumis()
 
     def print_qumis(self):
