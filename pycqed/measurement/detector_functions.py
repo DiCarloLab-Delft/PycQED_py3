@@ -2071,3 +2071,18 @@ class DDM_integration_logging_det(Hard_Detector):
     def finish(self):
         if self.AWG is not None:
             self.AWG.stop()
+
+class RTO1024_detector(Hard_Detector):
+    '''
+    Detector for the Rohde-Schwarz RTO1024 oscilloscope.
+    '''
+    def __init__(self, scope):
+        self.scope = scope
+
+    def prepare(self, sweep_points=None):
+        self.sweep_points = sweep_points
+        scope.prepare_measurement(t_start=sweep_points[0],
+                                  t_stop=sweep_points[-1])
+
+    def get_values(self):
+        return scope.measure_trace()

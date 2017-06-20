@@ -1,57 +1,32 @@
 import pycqed.analysis.fitting_models as fm
 import pycqed.measurement.kernel_functions as kf
 import pycqed.instrument_drivers.physical_instruments.RTO1024 as RTO
-import pyqtgraph.exporters as pg_exp
+import pycqed.measurement.detector_functions as det
+import pycqed.analysis.measurement_analysis as ma
+import pycqed.measurement.measurement_control as mc
 import numpy as np
+import numpy.linalg
+import scipy.interpolate as sc_intpl
 import lmfit
-from qcodes.plots.pyqtgraph import QtPlot
 import os.path
 import datetime
 import json
+import logging
+from qcodes.plots.pyqtgraph import QtPlot
 
-
-class RT_distortion_corrector():
-    '''
-    Class for applying corrections for room-temperature distortions to flux
-    pulses.
-    '''
-
-    def __init__(self,
-                 AWG_lutman=None,
-                 oscilloscope=None,
-                 square_amp=1,
-                 no_plot_points=1000,
-                 init_instr=True):
+class Distortion_corrector():
+    def __init__(self, kernel_object, nr_plot_points=1000):
         '''
         Instantiates an object.
-        Note: Sampling rate of the scope is assumed to be 5 GHz. Sampling rate
-        of the AWG is assumed to be 1 GHz.
 
         Args:
-            AWG_lutman (Instrument):
-                    Lookup table manager for the AWG.
-            oscilloscope (Instrument):
-                    Oscilloscope instrument.
-            square_amp (float):
-                    Amplitude of the square pulse that is applied. This is
-                    needed for correct normalization of the step response.
-            no_plot_points (int):
+            kernel_object (Instrument):
+                    kernel object instrument that handles applying kernels to
+                    flux pulses.
+            nr_plot_points (int):
                     Number of points of the waveform that are plotted. Can be
-                    changed in self.no_plot_points.
-            init_instr (bool):
-                    Determines whether instruments (AWG_lutman, oscilloscope,
-                    kernel object) are initialized. Can be used to instantiate
-                    an object even when no instruments are connected.
+                    changed in self.nr_plot_points.
         '''
-        self._instr_initialized = False
-        if init_instr:
-            if AWG_lutman is None or oscilloscope is None:
-                raise ValueError('AWG_lutman or oscilloscope not defined. '
-                                 'Give AWG_lutman and oscilloscope arguments '
-                                 'or set init_instr=False.')
-            else:
-                self.init_instruments(AWG_lutman, oscilloscope)
-
         # Initialize instance variables
         # Plotting
         self._y_min = 0
@@ -60,28 +35,27 @@ class RT_distortion_corrector():
         self._start_idx = 0
         self._t_start_loop = 0  # sets x range for plotting during loop
         self._t_stop_loop = 30e-6
-        self.no_plot_points = no_plot_points
+        self.nr_plot_points = nr_plot_points
 
         # Kernels
         self.kernel_length = 0
         self.kernel_combined_dict = {}
         self.new_kernel_dict = {}
 
+        self.ker_obj = kernel_object
+
         # Files
         self.filename = ''
-        # self.kernel_dir is initialized in self.init_instruemnts, since it
-        # takes its value from the kernel_object.
+        self.kernel_dir = self.ker_obj.kernel_dir()
+        self.data_dir = self.kernel_dir  # where traces and plots are saved
 
         # Data
-        self.raw_waveform = []
-        self.raw_time_pts = []
         self.waveform = []
         self.time_pts = []
         self.new_step = []
-        self.square_amp = square_amp  # Normalization for step
 
         # Fitting
-        self.known_fit_models = ['exponential', 'high-pass']
+        self.known_fit_models = ['exponential', 'high-pass', 'spline']
         self.fit_model = None
         self.fit_res = None
         self._fit_model_loop = 'exponential'  # Default fit model used in the
@@ -99,22 +73,10 @@ class RT_distortion_corrector():
             '        Set the x-range of the plot to (min, max). The points\n'
             '        outside this range are not plotted. The number of\n'
             '        points plotted in the given interval is fixed to\n'
-            '        self.no_plot_points (default=1000).')
+            '        self.nr_plot_points (default=1000).')
 
         # Make window for plots
         self.vw = QtPlot(window_title='Distortions', figsize=(600, 400))
-
-    def init_instruments(self, AWG_lutman, oscilloscope):
-        '''
-        Attach and initialize instruments.
-        self.ker_obj is set to the kernel_object instrument of AWG_lutman.
-        '''
-        self.AWG_lutman = AWG_lutman
-        self.ker_obj = AWG_lutman.F_kernel_instr.get_instr()
-        self.scope = oscilloscope
-        self.scope.prepare_measurement(-10e-6, 40e-6)
-        self.kernel_dir = self.ker_obj.kernel_dir()
-        self._instr_initialized = True
 
     def load_kernel_file(self, filename):
         '''
@@ -135,20 +97,31 @@ class RT_distortion_corrector():
         with open(os.path.join(self.kernel_dir, filename), 'w') as outfile:
             json.dump(kernel_dict, outfile)
 
-    def open_new_correction(self, kernel_length,
-                            filename='{}_RT_corr'.format(
+    def save_plot(self, filename):
+        try:
+            self.vw.save(os.path.join(self.data_dir, filename))
+        except:
+            logging.warning('Could not save plot'.)
+
+    def open_new_correction(self, kernel_length, AWG_sampling_rate,
+                            name='{}_corr'.format(
                                 datetime.date.today().strftime('%y%m%d'))):
         '''
-        Opens a new correction with name 'filename', i.e. initialized the
-        combined kernel to a Dirac delta, empties kernel_list of the
-        kernel object associated with self, and uploads an undistorted
-        square pulse.
-        '''
-        if not self._instr_initialized:
-            raise RuntimeError('Instruments are not initialized.')
+        Opens a new correction with name 'filename', i.e. initializes the
+        combined kernel to a Dirac delta and empties kernel_list of the
+        kernel object associated with self.
 
-        self.kernel_length = int(kernel_length * 1e9)  # AWG SR: 1 GHz
-        self.filename = filename
+        Args:
+            kernel_length (float):
+                    Length of the corrections kernel in s.
+            AWG_sampling_rate (float):
+                    Sampling rate of the AWG generating the flux pulses in Hz.
+            name (string):
+                    Name for the new kernel. The files will be named after
+                    this, but with different suffixes (e.g. '_combined.json').
+        '''
+        self.kernel_length = int(kernel_length * AWG_sampling_rate)
+        self.filename = name
         self._iteration = 0
 
         # Initialize kernel to Dirac delta
@@ -162,65 +135,30 @@ class RT_distortion_corrector():
         self.save_kernel_file(self.kernel_combined_dict,
                               '{}_combined.json'.format(self.filename))
 
-        # Start with new kernel list
+        # Configure kernel object
         self.ker_obj.kernel_list([])
         self.ker_obj.add_kernel_to_kernel_list(
-            '{}_combined.json'.format(filename))
-
-        # Load initial square pulse without distortions
-        self.AWG_lutman.QWG.get_instr().stop()
-        self.AWG_lutman.generate_standard_pulses()
-        self.AWG_lutman.load_pulse_onto_AWG_lookuptable('square')
-        self.AWG_lutman.QWG.get_instr().start()
+            '{}_combined.json'.format(self.filename))
 
     def resume_correction(self, filename):
         '''
         Loads combined kernel from the specified file and prepares for adding
         new corrections to that kernel.
         '''
-        if not self._instr_initialized:
-            raise RuntimeError('Instruments are not initialized.')
-
         # Remove '_combined.json' from filename
         self.filename = '_'.join(filename.split('_')[:-1])
         self.kernel_combined_dict = self.load_kernel_file(filename)
         self._iteration = self.kernel_combined_dict['iteration']
         self.kernel_length = len(self.kernel_combined_dict['kernel'])
 
+        # Configure kernel object
         self.ker_obj.kernel_list([])
         self.ker_obj.add_kernel_to_kernel_list(filename)
 
-        self.AWG_lutman.QWG.get_instr().stop()
-        self.AWG_lutman.generate_standard_pulses()
-        self.AWG_lutman.load_pulse_onto_AWG_lookuptable('square')
-        self.AWG_lutman.QWG.get_instr().start()
-
-    def measure_trace(self, verbose=True):
-        '''
-        Measure a trace with the oscilloscope.
-        Raw data is saved to self.raw_time_pts and self.raw_waveform.
-        Data clipped to start at the rising edge is saved to self.time_pts
-        and self.waveform.
-        '''
-        if not self._instr_initialized:
-            raise RuntimeError('Instruments are not initialized.')
-
-        if verbose:
-            print('Measuring trace...')
-        self.raw_time_pts, self.raw_waveform = \
-            self.scope.measure_trace()
-        waveform = self.raw_waveform / self.square_amp
-        edge_idx = -1
-        for i in range(len(waveform) - 1):
-            if waveform[i+1] - waveform[i] > 0.01:
-                edge_idx = i
-                break
-        if edge_idx < 0:
-            raise ValueError('Failed to find rising edge.')
-
-        self.waveform = waveform[edge_idx:]
-        # Sampling rate hardcoded to 10 GHz
-        self.time_pts = np.arange(len(self.waveform)) / 5e9
+    def measure_trace(self, verbuse=True):
+        raise NotImplementedError(
+            'Base class is not attached to physical instruments and does not '
+            'implement measurements.')
 
     def fit_exp_model(self, start_time_fit, end_time_fit):
         '''
@@ -258,6 +196,8 @@ class RT_distortion_corrector():
             data=self.waveform[self._start_idx:self._stop_idx],
             t=self.time_pts[self._start_idx:self._stop_idx],
             params=params)
+        self.fitted_waveform = fit_res.eval(
+            t=self.time_pts[self._start_idx:self._stop_idx])
 
         # Analytic form of the predistorted square pulse (input that creates a
         # square pulse at the output)
@@ -335,6 +275,8 @@ class RT_distortion_corrector():
             data=self.waveform[self._start_idx:self._stop_idx],
             t=self.time_pts[self._start_idx:self._stop_idx],
             params=params)
+        self.fitted_waveform = fit_res.eval(
+            t=self.time_pts[self._start_idx:self._stop_idx])
 
         # Analytic form of the predistorted square pulse (input that creates a
         # square pulse at the output)
@@ -364,6 +306,59 @@ class RT_distortion_corrector():
             'fit': {
                 'model': 'high-pass',
                 'tau': tau
+            },
+            'kernel': list(new_ker)
+        }
+
+    def fit_spline(self, start_time_fit, end_time_fit, s=0.001):
+        '''
+        Fit the data using a spline interpolation.
+
+        Args:
+            start_time_fit (float):
+                    Start of the fitted interval.
+            end_time_fit (float):
+                    End of the fitted interval.
+            s (float):
+                    Smoothing condition for the spline. See documentation on
+                    scipy.interpolate.splrep for more information.
+        '''
+        self._start_idx = np.argmin(np.abs(self.time_pts - start_time_fit))
+        self._stop_idx = np.argmin(np.abs(self.time_pts - end_time_fit))
+
+        splTuple = sc_intpl.splrep(
+            x=self.time_pts[self._start_idx:self._stop_idx],
+            y=self.waveform[self._start_idx:self._stop_idx],
+            w=np.exp(-self.time_pts[self._start_idx:self._stop_idx] /
+                     self.time_pts[self._stop_idx]),
+            s=s)
+        splStep = sc_intpl.splev(
+            self.time_pts[self._start_idx:self._stop_idx],
+            splTuple, ext=3)
+
+        self.fit_res = None
+        self.fit_model = None
+        self.fitted_waveform = splStep
+
+        # Calculate the kernel and invert it.
+        h = np.empty_like(splStep)
+        h[0] = splStep[0]
+        h[1:] = splStep[1:] - splStep[:-1]
+
+        filterMatrix = np.zeros( (len(h), len(h)) )
+        for n in range(len(h)):
+            for m in range(n+1):
+                filterMatrix[n, m] = h[n - m]
+
+        new_ker = np.linalg.inv(filterMatrix)[:, 0]
+        self.new_step = np.convolve(new_ker,
+                                    np.ones(len(splStep)))[:len(splStep)]
+        self.new_kernel_dict = {
+            'name': self.filename + '_' str(self._iteration),
+            'filter_params': {},
+            'fit': {
+                'model': 'spline',
+                's': s
             },
             'kernel': list(new_ker)
         }
@@ -412,7 +407,7 @@ class RT_distortion_corrector():
 
         # Labels need to be set in the end, else they don't show sometimes
         self.vw.subplots[0].getAxis('bottom').setLabel('t', 's')
-        self.vw.subplots[0].getAxis('left').setLabel('amp', 'V')
+        self.vw.subplots[0].getAxis('left').setLabel('normalized amp', '')
 
     def plot_fit(self, start_time=0, stop_time=10e-6, save_y_range=True):
         '''
@@ -423,13 +418,10 @@ class RT_distortion_corrector():
             save_y_range (bool):
                                 Keep the current y-range of the plot.
         '''
-        yPts = self.fit_model.eval(
-            t=self.time_pts[self._start_idx:self._stop_idx],
-            **self.fit_res.best_values)
         self.plot_trace(start_time=start_time, stop_time=stop_time,
                         save_y_range=save_y_range)
         self.vw.add(x=self.time_pts[self._start_idx:self._stop_idx],
-                    y=yPts,
+                    y=self.fitted_waveform,
                     color='#ff7f0e')
 
         # Labels need to be set in the end, else they don't show sometimes
@@ -437,12 +429,10 @@ class RT_distortion_corrector():
         self.vw.subplots[0].getAxis('left').setLabel('amp', 'V')
 
     def test_new_kernel(self):
-        # Save the new kernel to file and add that to the kernel list in the
-        # kernel object. Upload new waveform.
-        # Kernel list should be [kernel_combined, new_kernel]
-        if not self._instr_initialized:
-            raise RuntimeError('Instruments are not initialized.')
-
+        '''
+        Save the new kernel self.new_kernel_dict to its own file and add it to
+        the kernel list of the kernel object.
+        '''
         # Save new kernel to file
         full_name = '{}_{}.json'.format(self.filename, self._iteration)
         self.save_kernel_file(self.new_kernel_dict, full_name)
@@ -450,20 +440,12 @@ class RT_distortion_corrector():
         # Add new kernel to the kernel list in the kernel object
         self.ker_obj.add_kernel_to_kernel_list(full_name)
 
-        # Upload waveform
-        self.AWG_lutman.QWG.get_instr().stop()
-        self.AWG_lutman.load_pulse_onto_AWG_lookuptable('square')
-        self.AWG_lutman.QWG.get_instr().start()
-
     def apply_new_kernel(self):
         '''
         Includes the latest distortion in the combined kernel by convolving
         it. The correction number (self._iteration) is incremented, such that
         the kernel file for the latest distortion is not overwritten anymore.
         '''
-        if not self._instr_initialized:
-            raise RuntimeError('Instruments are not initialized.')
-
         # Integrate the new kernel into kernel_combined
         ker_combined = np.convolve(
             self.kernel_combined_dict['kernel'],
@@ -495,28 +477,15 @@ class RT_distortion_corrector():
         # necessarily changed.
         self.ker_obj._config_changed = True
 
-        # Upload waveform
-        self.AWG_lutman.QWG.get_instr().stop()
-        self.AWG_lutman.load_pulse_onto_AWG_lookuptable('square')
-        self.AWG_lutman.QWG.get_instr().start()
-
     def discard_new_kernel(self):
         '''
         Removes a the last kernel that was added from the distortions.
         '''
-        if not self._instr_initialized:
-            raise RuntimeError('Instruments are not initialized.')
-
         # Remove kernel from kernel list
         test_kernel_name = '{}_{}.json'.format(self.filename, self._iteration)
         if test_kernel_name in self.ker_obj.kernel_list():
             self.ker_obj.remove_kernel_from_kernel_list(
                 '{}_{}.json'.format(self.filename, self._iteration))
-
-        # Upload waveform
-        self.AWG_lutman.QWG.get_instr().stop()
-        self.AWG_lutman.load_pulse_onto_AWG_lookuptable('square')
-        self.AWG_lutman.QWG.get_instr().start()
 
     def recalculate_combined_kernel(self):
         '''
@@ -525,9 +494,6 @@ class RT_distortion_corrector():
         individual kernels are stored in full length (length of measured
         trace).
         '''
-        if not self._instr_initialized:
-            raise RuntimeError('Instruments are not initialized.')
-
         # Initialize combined kernel to dirac delta
         init_ker = np.zeros(int(self.kernel_length))
         init_ker[0] = 1
@@ -551,10 +517,6 @@ class RT_distortion_corrector():
         # changed.
         self.ker_obj._config_changed = True
 
-        self.AWG_lutman.QWG.get_instr().stop()
-        self.AWG_lutman.load_pulse_onto_AWG_lookuptable('square')
-        self.AWG_lutman.QWG.get_instr().start()
-
     def interactive_loop(self):
         '''
         Starts interactive loop to iteratively add corrections.
@@ -568,9 +530,6 @@ class RT_distortion_corrector():
         # 4. Apply correction
         #   -> quit?
         #   -> back to 2.
-        if not self._instr_initialized:
-            raise RuntimeError('Instruments are not initialized.')
-
         print('********\n'
               'Interactive room-temperature distortion corrections\n'
               '********\n'
@@ -604,7 +563,7 @@ class RT_distortion_corrector():
                         save_y_range=False)
 
         # LOOP STARTS HERE
-        self._fit_model_loop = 'exponential'
+        self._fit_model_loop = 'exponential'  # Default fit model used
         while True:
             print('\n-- Correction number {} --'.format(self._iteration))
             print('Current fit model: {}'.format(self._fit_model_loop))
@@ -628,7 +587,9 @@ class RT_distortion_corrector():
             if self._fit_model_loop == 'exponential':
                 self.fit_exp_model(fit_start, fit_stop)
             elif self._fit_model_loop == 'high-pass':
-                self.fit_high_pass(fit_stop, fit_stop)
+                self.fit_high_pass(fit_start, fit_stop)
+            elif self._fit_model_loop == 'spline':
+                self.fit_spline(fit_start, fit_stop)
 
             self.plot_fit(self._t_start_loop, self._t_stop_loop)
 
@@ -645,11 +606,7 @@ class RT_distortion_corrector():
                 continue
 
             # Fit was accepted -> save plot
-            # exporter = pg_exp.ImageExporter(self.vw.win)
-            # exporter.export(os.path.join(self.kernel_dir,
-            #                           'fit_{}.png'.format(self._iteration)))
-            # # self.vw.save(os.path.join(self.kernel_dir,
-            # #                           'fit_{}.png'.format(self._iteration)))
+            self.save_plot('fit_{}.png'.format(self._iteration))
 
             # 3. Test correction and plot
             # Save last data, in case new distortion is rejected.
@@ -679,11 +636,7 @@ class RT_distortion_corrector():
                 continue
 
             # Correction was accepted -> save plot
-            # exporter = pg_exp.ImageExporter(self.vw.win)
-            # exporter.export(os.path.join(self.kernel_dir,
-            #                           'trace_{}.png'.format(self._iteration)))
-            # # self.vw.save(os.path.join(self.kernel_dir,
-            # #                           'trace_{}.png'.format(self._iteration)))
+            self.save_plot('trace_{}.png'.format(self._iteration))
 
             # 4. Apply correction
             print('Applying new correction.')
@@ -733,13 +686,9 @@ class RT_distortion_corrector():
             except KeyError:
                 print('No fit has been done yet!')
 
-        # elif (inp_elements[0] == 's' and len(inp_elements == 2)):
-        #     exporter = pg_exp.ImageExporter(self.vw.win)
-        #     exporter.export(os.path.join(self.kernel_dir,
-        #                               '{}.png'.format(inp_elements[1])))
-        #     # self.vw.save(os.path.join(self.kernel_dir,
-        #     #                           '{}.png'.format(inp_elements[1])))
-        #     print('Current plot saved.')
+        elif (inp_elements[0] == 's' and len(inp_elements == 2)):
+            self.save_plot('{}.png'.format(inp_elements[1]))
+            print('Current plot saved.')
 
         elif (inp_elements[0] == 'model' and len(inp_elements) == 2):
             if inp_elements[1] in self.known_fit_models:
@@ -779,3 +728,119 @@ class RT_distortion_corrector():
 
         print('End of summary.')
         print('********')
+
+
+class RT_distortion_corrector(Distortion_corrector):
+    '''
+    Class for applying corrections for room-temperature distortions to flux
+    pulses.
+    '''
+
+    # TODO:
+    #   - check TODOs in this file
+    #   - waveform length will become parameter in QWG_flux_lutman
+    #       -> adapt this class to handle that
+    def __init__(self, AWG_lutman, oscilloscope, square_amp,
+                 nr_plot_points=1000):
+        '''
+        Instantiates an object.
+        Note: Sampling rate of the scope is assumed to be 5 GHz. Sampling rate
+        of the AWG is assumed to be 1 GHz.
+
+        Args:
+            AWG_lutman (Instrument):
+                    Lookup table manager for the AWG.
+            oscilloscope (Instrument):
+                    Oscilloscope instrument.
+            square_amp (float):
+                    Amplitude of the square pulse that is applied. This is
+                    needed for correct normalization of the step response.
+            nr_plot_points (int):
+                    Number of points of the waveform that are plotted. Can be
+                    changed in self.nr_plot_points.
+        '''
+        self.AWG_lutman = AWG_lutman
+        self.scope = oscilloscope
+        self.square_amp = square_amp  # Normalization for step
+        super().__init__(kernel_object=AWG_lutman.F_kernel_instr.get_instr(),
+                         nr_plot_points=nr_plot_points)
+
+        self.raw_waveform = []
+        self.raw_time_pts = []
+
+    def measure_trace(self, verbose=True):
+        '''
+        Measure a trace with the oscilloscope.
+        Raw data is saved to self.raw_time_pts and self.raw_waveform.
+        Data clipped to start at the rising edge is saved to self.time_pts
+        and self.waveform.
+        '''
+        # Upload waveform
+        self.AWG_lutman.QWG.get_instr().stop()
+        self.AWG_lutman.load_pulse_onto_AWG_lookuptable('square')
+        self.AWG_lutman.QWG.get_instr().start()
+
+        if verbose:
+            print('Measuring trace...')
+        self.raw_time_pts, self.raw_waveform = \
+            self.scope.measure_trace()
+
+        # Measurement should be implemented using measurement_control
+        # self.data_dir should be set to data dir of last measurement
+        # a = ma.MeasurementAnalysis()
+        # self.data_dir = a.folder
+
+        # Normalize waveform and find rising edge
+        waveform = self.raw_waveform / self.square_amp
+        edge_idx = -1
+        for i in range(len(waveform) - 1):
+            if waveform[i+1] - waveform[i] > 0.01:
+                edge_idx = i
+                break
+        if edge_idx < 0:
+            raise ValueError('Failed to find rising edge.')
+
+        self.waveform = waveform[edge_idx:]
+        # Sampling rate hardcoded to 10 GHz
+        self.time_pts = np.arange(len(self.waveform)) / 5e9
+
+
+class Cryo_distortion_corrector(Distortion_corrector):
+    def __init__(self, time_pts, qubit, AWG_lutman, nr_plot_points=1000):
+        '''
+        Instantiate an object.
+        This class uses qubit.measure_ram_z to measure the step response.
+
+        Args:
+            time_pts (array):
+                    Time points at which the Ram-Z should be measured
+                    (x-axis).
+            quibt (Instrument):
+                    Qubit object on which the experiment is performed.
+            AWG_lutman (Instrument):
+                    Lookup table manager for the AWG.
+            nr_plot_points (int):
+                    Number of points of the waveform that are plotted. Can be
+                    changed in self.nr_plot_points.
+        '''
+        self.AWG_lutman = AWG_lutman
+        self.qubit = qubit
+        super().__init__(kernel_object=AWG_lutman.F_kernel_instr.get_intsr(),
+                         nr_plot_points=nr_plot_points)
+        self.time_pts = time_pts
+
+    def measure_trace(self, verbose=True):
+        '''
+        Measures the step response using two Ram-Z experiments with 90 deg
+        phase difference between them.
+        '''
+        self.AWG_lutman.QWG.get_instr().stop()
+        self.AWG_lutman.load_pulse_onto_AWG_lookuptable('square')
+        self.AWG_lutman.QWG.get_instr().start()
+
+        self.qubit.measure_ram_z(self.time_pts, rec_Y90=False)
+        self.qubit.measure_ram_z(self.time_pts, rec_Y90=True)
+        a = ma.Ram_Z_Analysis()
+        self.data_dir = a.folder
+
+        self.waveform = a.something

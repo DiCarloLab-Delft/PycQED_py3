@@ -5303,9 +5303,9 @@ class butterfly_analysis(MeasurementAnalysis):
 
         self.get_naming_and_values()
 
-        if theta_in == 0: 
+        if theta_in == 0:
             self.data = self.measured_values[0]
-        else:  
+        else:
             I_shots = self.measured_values[0]
             Q_shots = self.measured_values[1]
 
@@ -6106,104 +6106,275 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
 
 
 class Ram_Z_Analysis(TD_Analysis):
-    '''
-    Analysis for the Ram-Z experiment. Demodulates the signal with the frequency
-    that has the highest amplitude in the spectrum and plots the demodulated
-    signal.
-    '''
+    def __init__(self, timestamp_cos=None, timestamp_sin=None,
+                 filter_raw=False, filter_deriv_phase=False, demodulate=True,
+                 f_demod=0, f01max=None, E_c=None, flux_amp=None, V_0=V_0
+                 auto=True, **kw):
+        super().__init__(timestamp=timestamp_cos, label='Ram_Z_cos',
+                         rotate_and_normalize=True, **kw)
+        self.cosTrace = self.corr_data
+        super().__init__(timestamp=timestamp_sin, label='Ram_Z_sin',
+                         rotate_and_normalize=True, **kw)
+        self.sinTrace = self.corr_data
 
-    def __init__(self, f_modulation=None, NoCalPoints=4, make_fig=True,
-                 rotate_and_normalize=False, plot_cal_points=False,
-                 close_file=True, auto=True, **kw):
-        '''
-        Instantiate analysis object.
-        f_modulation can be used to manually specify a modulation frequency. If
-        it is none, the analysis uses the strongest frequency component in the
-        signal.
-        '''
-        self.f_mod = f_modulation
-        super().__init__(NoCalPoints=NoCalPoints,
-                         rotate_and_normalize=rotate_and_normalize,
-                         plot_cal_points=plot_cal_points,
-                         close_file=close_file, auto=auto, **kw)
-        if auto and make_fig:
-            self.make_figures()
+        self.filter_raw = filter_raw
+        self.filter_deriv_phase = filter_deriv_phase
+        self.demod = demodulate
+        self.f_demod = f_demod
 
-    def run_default_analysis(self, close_file=True, **kw):
-        self.get_naming_and_values()
-        self.add_analysis_datagroup_to_file()
-        if self.rotate_and_normalize:
-            self.rotate_and_normalize()
+        self.f01max = f01max
+        self.E_c = E_c
+        self.flux_amp = flux_amp
+        self.V_0 = V_0
+
+        if auto:
+            self.run_special_analysis()
+
+    def rotate_and_normalize(self):
+        # * -1 because cos starts at 0 instead of 1
+        self.corr_data = -(self.measured_values[0] -
+                           np.mean(self.measured_values[0]))
+        self.corr_data /= max(np.abs(self.corr_data))
+
+    def run_special_analysis(self):
+        self.df, self.phases, self.I, self.Q = self.analyse_trace(
+            self.cosTrace, self.sinTrace, self.sweep_points,
+            filter_raw=self.filter_raw,
+            filter_deriv_phase=self.filter_deriv_phase,
+            demodulate=self.demod,
+            f_demod=self.f_demod,
+            return_all=True)
+
+        self.add_dataset_to_analysisgroup('detuning', self.df)
+        self.add_dataset_to_analysisgroup('phase', selfphases)
+
+        if (self.f01max != None and self.E_c != None and
+            not self.flux_amp != None):
+            self.d_c, self.step_response = self.get_stepresponse(
+                self.df, self.f01max, self.E_c, self.flux_amp, V_0=self.V_0)
+            self.add_dataset_to_analysisgroup('step_response',
+                                              self.step_response)
+            plotStep = True
         else:
-            self.corr_data = self.measured_values[0]
-        self.add_dataset_to_analysisgroup('corrected data', self.corr_data)
+            print('To calculate step response, f01max, E_c, flux_amp, and V_0'
+                  ' have to be specified.')
+            plotStep = False
 
-        # Demodulate the signal
-        # 1. Calculate spectrum and set modulation frequency
-        self.spectr = np.fft.rfft(self.corr_data)
-        self.dc_offset = np.abs(self.spectr[0] / len(self.sweep_points))
-        self.spectr[0] = 0  # remove DC component
-        self.freqs = np.fft.rfftfreq(n=len(self.corr_data),
-                                     d=self.sweep_points[1]-self.sweep_points[0])
+        self.make_figures(plot_step=plotStep)
 
-        if self.f_mod == None:
-            # Find strongest frequency component
-            self.f_mod_idx = np.argmax(np.abs(self.spectr))
-            self.f_mod = self.freqs[self.f_mod_idx]
+    def analyse_trace(self, I, Q, x_pts,
+                      filter_raw=False, filter_deriv_phase=False,
+                      filter_width=1e-9,
+                      demod=False, f_demod=0,
+                      return_all=False):
+        # I = normalize(I)
+        # Q = normalize(Q)
+        dt = x_pts[1] - x_pts[0]
+
+        # Demodulate
+        if demod:
+            I , Q = self.demodulate(I , Q , f_demod, x_pts)
+
+        # Filter raw data
+        if filter_raw:
+            I = self.gauss_filter(I , filter_width, dt, pad_val=1)
+            Q = self.gauss_filter(Q , filter_width, dt, pad_val=0)
+
+        # Calcualte phase and undo phase-wrapping
+        phases = np.arctan2(Q, I)
+        phases = self.unwrap_phase(phases)
+
+        # Filter phase and/or calculate the derivative
+        if filter_deriv_phase:
+            df = self.gauss_deriv_filter(phases, filter_width, dt, pad_val=0)\
+                 / (2 * np.pi)
         else:
-            # Find index of specified modulation frequency
-            self.f_mod_idx = np.where(self.freqs >= self.f_mod)[0]
-            if len(self.f_mod_idx) == 0:
-                raise ValueError('Modulation frequency {} MHz not in the '
-                                 'sampled frequency range [0 MHz, {} MHz].'
-                                 .format(self.f_mod, self.freqs[-1]))
-            self.f_mod_idx = self.f_mod_idx[0]
+            # Calculate central derivative
+            phasesPadded = np.concatenate(([0], phases))
+            df = np.array([(phasesPadded[i+1] - phasesPadded[i-1]) / (2*dt)
+                           for i in range(1, len(phases)-1)]) / (2 * np.pi)
 
-        # Demodulation: shift spectrum by f_mod, shift phase s.t. the phase of
-        # the f_mod component is 0.
-        # TODO: implement super-nyquist sampling
-        self.phi_f_mod = np.angle(self.spectr[self.f_mod_idx])
-        self.amp_f_mod = (np.abs(self.spectr[self.f_mod_idx]) /
-                          len(self.sweep_points))
-        self.demod_spectr = np.roll(self.spectr, -self.f_mod_idx)
-        self.demod_spectr *= np.exp(-1.0j * self.phi_f_mod)
+        # If the signal was demodulated df is now the detuning from f_demod
+        if demod:
+            df += f_demod
+        df[0] = 0  # detuning must start at 0
 
-        # Transform back to get demodulated signal
-        self.demod_data = np.fft.irfft(self.demod_spectr,
-                                       n=len(self.sweep_points))
+        if return_all:
+            return df, phases, I, Q
+        else:
+            return df
 
-        if close_file:
-            self.data_file.close()
+    def get_stepresponse(self, df, f01max, E_c, F_amp, V_0=0):
+        '''
+        Calculates the dac flux coefficient and the step response from the
+        detuning.
 
-    def make_figures(self, **kw):
-        # Plot raw data
+        Args:
+            df (array):     Detuning of the qubit.
+            f01max (float): Sweet-spot frequency of the qubit.
+            E_c (float):    Charging energy of the qubig.
+            F_amp (float):  Amplitude of the applied pulse in V.
+            V_0 (float):    Offset from sweet spot in V.
+
+        Returns:
+            d_c (float):    dac flux coefficient.
+            s (array):      Normalized step response in voltage space.
+        '''
+        f_end = np.mean(df[-10:])
+        d_c = np.arccos( (1 - f_end / (f01max + E_c))**2 ) / (F_amp - V_0)
+        s = np.arccos( (1 - df / (f01max + E_c))**2 ) / d_c / (F_amp - V_0)
+
+        return d_c, s
+
+    def make_figures(self, plot_step=True):
+        '''
+        Plot figures. Step response is only plotted if plot_step == True.
+        '''
+        # Plot data, phases, and detuning
         fig, ax = plt.subplots(1, 1, figsize=(7, 5))
-        ax.plot(self.sweep_points, self.measured_values[0], '-o')
-        ax.plot(self.sweep_points,
-                np.cos(2*np.pi * self.sweep_points * self.f_mod
-                       + self.phi_f_mod) * self.amp_f_mod - self.dc_offset,
-                '-')
-        ax.set_title('Raw data')
-        pl_tools.set_xlabel(ax, self.sweep_name, self.sweep_unit[0])
-        pl_tools.set_ylabel(ax, self.value_names[0], self.value_units[0])
-        self.save_fig(fig, figname='Raw_data_Ram_Z', fig_tight=False,
-                      **kw)
-
-        # Plot demodulated signal.
-        fig, ax = plt.subplots(1, 1, figsize=(7, 5))
-        ax.plot(self.sweep_points, self.demod_data, '-o')
-        ax.set_title('Demodulated Ram-Z')
-        pl_tools.set_xlabel(ax, self.sweep_name, self.sweep_unit[0])
-        pl_tools.set_ylabel(ax, '', 'a.u.')
-        self.save_fig(fig, figname='Demodulated_Ram_Z', fig_tight=False,
-                      **kw)
-
-        # Plot power spectrum
+        ax.plot(self.sweep_points[:len(self.I)], self.I, '-o')
+        ax.plot(self.sweep_points[:len(self.Q)], self.Q, '-o')
+        pl_tools.set_xlabel(ax, self.parameter_names[0],
+                            self.parameter_units[0])
+        pl_tools.set_ylabel(ax, 'demodulated normalized trace', 'a.u.')
+        ax.set_title('demodulated normalized data')
+        ax.legend(['cos', 'sin'])
+        self.save_fig(fig, 'Ram-Z_normalized_data.png')
+        # fig.savefig('Ram-Z_normalized_data.png', dpi=300)
 
         fig, ax = plt.subplots(1, 1, figsize=(7, 5))
-        ax.plot(self.freqs, np.abs(self.spectr)**2, '-o')
-        ax.set_title('Ram-Z Spectrum')
-        pl_tools.set_xlabel(ax, 'f', 'Hz')
-        pl_tools.set_ylabel(ax, 'power spectrum', 'a.u.')
-        self.save_fig(fig, figname='Power_spectrum_Ram_Z', fig_tight=False,
-                      **kw)
+        ax.plot(self.sweep_points[:len(self.phases)], self.phases, '-o')
+        pl_tools.set_xlabel(ax, self.parameter_names[0],
+                            self.parameter_units[0])
+        pl_tools.set_ylabel(ax, 'phase', 'rad')
+        ax.set_title('Phase')
+        self.save_fig(fig, 'Ram-Z_phase.png')
+        # fig.savefig('Ram-Z_phase.png', dpi=300)
+
+        fig, ax = plt.subplots(1, 1, figsize=(7, 5))
+        ax.plot(self.sweep_points[:len(self.df)], self.df, '-o')
+        # ax.set_ylim((50e6, 300e6))
+        pl_tools.set_xlabel(ax, self.parameter_names[0],
+                            self.parameter_units[0])
+        pl_tools.set_ylabel(ax, 'detuning', 'Hz')
+        ax.set_title('Detuning')
+        self.save_fig(fig, 'Ram-Z_detuning.png')
+        # fig.savefig('Ram-Z_detuning.png', dpi=300)
+
+        if plot_step:
+            fig, ax = plt.subplots(1, 1, figsize=(7, 5))
+            ax.plot(self.sweep_points[:len(self.step_response)],
+                    self.step_response, '-o')
+            pl_tools.set_xlabel(ax, self.parameter_names[0],
+                                self.parameter_units[0])
+            pl_tools.set_ylabel(ax, 'step response', '')
+            ax.set_title('Step Response')
+            self.save_fig(fig, 'Ram-Z_step_response.png')
+            # fig.savefig('Ram-Z_step_response.png', dpi=300)
+
+    def demodulate(self, I, Q, f_demod, t_pts):
+        '''
+        Demodulate signal in I and Q, sampled at points t_pts, with frequency
+        f_demod.
+        '''
+        cosDemod = np.cos(2 * np.pi * f_demod * t_pts)
+        sinDemod = np.sin(2 * np.pi * f_demod * t_pts)
+        Iout = I * cosDemod + Q * sinDemod
+        Qout = Q * cosDemod - I * sinDemod
+
+        return Iout, Qout
+
+    def gauss_filter(self, data, sigma, d, nr_sigmas=4, pad_val=None):
+        '''
+        Convolves data with a normalized Gaussian with width sigma. When used
+        as a low-pass filter, the width in the frequency domain is 1/sigma.
+        The Gaussian is sampled at the same rate as the data, given by the
+        sample distance d. The convolution is calculated only at points of
+        complete overlap, and the result will thus contain less points than
+        the input array. The data is padded with pad_val (or with data[0] if
+        pad_val is not specified) at the front to ensure that the x-axis is
+        not changed. No padding is done at the end of the data.
+
+        Args:
+            data (array):   Data to be filtered.
+            sigma (float):  Width of the Gaussian filter.
+            d (float):      Sampling distance of the data, i.e. distance
+                            of points on the x-axis of the data.
+            nr_sigmas (int): Up to how many sigmas away from the center the
+                            Gaussian is sampled.  E.g. if d=1 ns, sigma=.5 ns,
+                            nr_sigmas=4 ensure the Gaussian is sampled at
+                            least up to +-2 ns, and the filter will have at
+                            least nine samples.
+            pad_val (float): Value used for padding in front of the data.
+        '''
+        filterHalfWidth = np.ceil(nr_sigmas * sigma / d)
+        tMaxFilter = filterHalfWidth * d
+        # upper limit of range has + dt/10 to include endpoint
+        tFilter = np.arange(-tMaxFilter, tMaxFilter + d/10, step=d)
+
+        gaussFilter = np.exp(-tFilter**2 / (2*sigma**2))
+        gaussFilter /= np.sum(gaussFilter)
+
+        if pad_val == None:
+            pad_val = data[0]
+        paddedData = np.concatenate((np.ones(int(filterHalfWidth)) *
+                                     pad_val, data))
+        return np.convolve(paddedData, gaussFilter, mode='valid')
+
+    def gauss_deriv_filter(self, data, sigma, d, nr_sigmas=4, pad_val=None):
+        '''
+        Convolves data with the derivative of a normalized Gaussian with width
+        sigma. This is useful to apply a low-pass filter (with cutoff 1/sigma)
+        and simultaneously calculate the derivative. The Gaussian is sampled
+        at the same rate as the data, given by the sample distance d. The
+        convolution is calculated only at points of complete overlap, and the
+        result will thus contain less points than the input array. The data is
+        padded with pad_val (or with data[0] if pad_val is not specified) at
+        the front to ensure that the x-axis is not changed. No padding is done
+        at the end of the data.
+
+        Args:
+            data (array):   Data to be filtered.
+            sigma (float):  Width of the Gaussian filter.
+            d (float):      Sampling distance of the data, i.e. distance of
+                            points on the x-axis of the data.
+            nr_sigmas (int): Up to how many sigmas away from the center the
+                            Gaussian is sampled.  E.g. if d=1 ns, sigma=.5 ns,
+                            nr_sigmas=4 ensure the Gaussian is sampled at
+                            least up to +-2 ns, and the filter will have at
+                            least nine samples.
+        '''
+        filterHalfWidth = np.ceil(nr_sigmas * sigma / d)
+        tMaxFilter = filterHalfWidth * d
+        # upper limit of range has + dt/10 to include endpoint
+        tFilter = np.arange(-tMaxFilter, tMaxFilter + d/10, step=d)
+
+        # First calculate normalized Gaussian, then derivative
+        gaussFilter = np.exp(-tFilter**2 / (2*sigma**2))
+        gaussFilter /= np.sum(gaussFilter)
+        gaussDerivFilter = gaussFilter * (-tFilter) / (sigma**2)
+
+        if pad_val == None:
+            pad_val = data[0]
+        paddedData = np.concatenate(
+                (np.ones(int(filterHalfWidth)) * pad_val, data))
+        return np.convolve(paddedData, gaussDerivFilter, mode='valid')
+
+    def unwrap_phase(self, phases):
+        '''
+        Undoes phase-wrapping and returns a continuous version of the phase
+        data.
+        Note: phases are assumed to be given in radians.
+        '''
+        # Phases are now between -pi and pi. But we know that the phase
+        # changes continuously and we want a differentiable function, so we
+        # can undo the phase-wrapping
+        for i, p in enumerate(phases[:-1]):
+            # If a phase wrap is detected, all consecutive points are shifted
+            # by 2*pi
+            if phases[i+1] - phases[i] < -3:  # noise should not be this big.
+                phases[i+1:] += 2*np.pi
+            elif phases[i+1] - phases[i] > 3:
+                phases[i+1:] -= 2*np.pi
+
+    return phases
