@@ -58,6 +58,7 @@ class Distortion_corrector():
         self.known_fit_models = ['exponential', 'high-pass', 'spline']
         self.fit_model = None
         self.fit_res = None
+        self._fit_model_loop = 'exponential'
 
         self._loop_helpstring = str(
             'h:      Print this help.\n'
@@ -561,10 +562,10 @@ class Distortion_corrector():
                         save_y_range=False)
 
         # LOOP STARTS HERE
-        model = 'exponential'  # Default fit model used
+        self._fit_model_loop = 'exponential'  # Default fit model used
         while True:
             print('\n-- Correction number {} --'.format(self._iteration))
-            print('Current fit model: {}'.format(model))
+            print('Current fit model: {}'.format(self._fit_model_loop))
             # 2. Fit and plot
             repeat = True
             while repeat:
@@ -582,11 +583,11 @@ class Distortion_corrector():
                 # Exit loop
                 break
 
-            if model == 'exponential':
+            if self._fit_model_loop == 'exponential':
                 self.fit_exp_model(fit_start, fit_stop)
-            elif model == 'high-pass':
+            elif self._fit_model_loop == 'high-pass':
                 self.fit_high_pass(fit_start, fit_stop)
-            elif model == 'spline':
+            elif self._fit_model_loop == 'spline':
                 self.fit_spline(fit_start, fit_stop)
 
             self.plot_fit(self._t_start_loop, self._t_stop_loop)
@@ -690,7 +691,7 @@ class Distortion_corrector():
 
         elif (inp_elements[0] == 'model' and len(inp_elements == 2)):
             if inp_elements[1] in self.known_fit_models:
-                model = str(inp_elements[1])
+                self._fit_model_loop = str(inp_elements[1])
             else:
                 print('Model "{}" unknown. Please choose from {}.'
                       .format(inp_elements[1], self.known_fit_models))
