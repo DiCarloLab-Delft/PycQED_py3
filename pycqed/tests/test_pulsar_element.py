@@ -5,13 +5,13 @@ from pycqed.measurement.waveform_control.pulsar import Pulsar
 from pycqed.measurement.waveform_control import element
 from pycqed.measurement.waveform_control.pulse import SquarePulse
 from pycqed.measurement.pulse_sequences.standard_elements import multi_pulse_elt
-
+import time
 
 class Test_Element(unittest.TestCase):
 
     def setUp(self):
         # set up a pulsar with some mock settings for the element
-        self.pulsar = Pulsar()
+        self.pulsar = Pulsar('Pulsar'+str(time.time()))
         self.station = qc.Station()
         self.station.pulsar = self.pulsar
         for i in range(4):

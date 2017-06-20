@@ -55,13 +55,13 @@ class Pulsar(Instrument):
         self.last_elements = None
 
     # channel handling
-    def define_channel(self, cid, name, type, delay, offset,
+    def define_channel(self, id, name, type, delay, offset,
                        high, low, active, AWG=None):
         """
         The AWG object must be created before creating channels for that AWG
 
         Args:
-            cid: channel id. For the Tektronix 5014 must be of the form
+            id: channel id. For the Tektronix 5014 must be of the form
                 ch#(_marker#) with # a number and the part in () optional.
                 For UHFQC must be 'ch1' or 'ch2'.
             name: This name must be specified in pulses for them to play on
@@ -79,18 +79,16 @@ class Pulsar(Instrument):
         if AWG is None:
             AWG = self.default_AWG()
 
-        Instrument.find_instrument(AWG)
-
         _doubles = []
         for c_name, c_dict in self.channels.items():
-            if c_dict['id'] == cid and c_dict['AWG'] == AWG:
+            if c_dict['id'] == id and c_dict['AWG'] == AWG:
                 logging.warning("Channel '{}' on '{}' already in use, {} will "
-                                "overwrite {}.".format(cid, AWG, name, c_name))
+                                "overwrite {}.".format(id, AWG, name, c_name))
                 _doubles.append(c_name)
         for c in _doubles:
             del self.channels[c]
 
-        self.channels[name] = {'id': cid,
+        self.channels[name] = {'id': id,
                                'type': type,
                                'delay': delay,
                                'offset': offset,
@@ -309,6 +307,7 @@ class Pulsar(Instrument):
                     if grp_wfs[cid][0] != 0.:
                         elements_with_non_zero_first_points.add(el)
                 wfname = el + '_' + grp
+
                 packed_waveforms[wfname] = obj.pack_waveform(
                     grp_wfs[grp],
                     grp_wfs[grp + '_marker1'],

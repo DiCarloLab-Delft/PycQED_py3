@@ -58,7 +58,7 @@ class VirtualAWG5014(Tektronix_AWG5014):
                                label='Status channel {}'.format(i),
                                parameter_class=ManualParameter,
                                vals=vals.Ints(0, 1))
-            self.add_parameter('ch{}_amp'.format(i), initial_value=1,
+            self.add_parameter('ch{}_amp'.format(i), initial_value=1.,
                                label='Amplitude channel {}'.format(i),
                                unit='Vpp', parameter_class=ManualParameter,
                                vals=vals.Numbers(0.02, 4.5))
@@ -180,15 +180,15 @@ class TestMultipleAWGs(unittest.TestCase):
         self.station.add_component(self.AWG)
         self.station.pulsar = ps.Pulsar('Pulsar1', default_AWG=self.AWG.name)
         for i in range(4):
-            self.station.pulsar.define_channel(cid='ch{}'.format(i+1),
+            self.station.pulsar.define_channel(id='ch{}'.format(i+1),
                                                name='ch{}'.format(i+1),
-                                               type='analog', high=.7, low=-.7,
+                                               type='analog', high=.5, low=-.5,
                                                offset=0.0, delay=0, active=True)
-            self.station.pulsar.define_channel(cid='ch{}_marker1'.format(i+1),
+            self.station.pulsar.define_channel(id='ch{}_marker1'.format(i+1),
                                                name='ch{}_marker1'.format(i+1),
                                                type='marker', high=2, low=0,
                                                offset=0., delay=0, active=True)
-            self.station.pulsar.define_channel(cid='ch{}_marker2'.format(i+1),
+            self.station.pulsar.define_channel(id='ch{}_marker2'.format(i+1),
                                                name='ch{}_marker2'.format(i+1),
                                                type='marker', high=2, low=0,
                                                offset=0., delay=0, active=True)
@@ -234,19 +234,19 @@ class TestMultipleAWGs(unittest.TestCase):
         for i in range(1,3):
             for j in range(1,5):
                 self.station.pulsar.define_channel(
-                    cid='ch{}'.format(j),
+                    id='ch{}'.format(j),
                     name='AWG{} ch{}'.format(i, j),
-                    type='analog', high=.7, low=-.7,
+                    type='analog', high=.5, low=-.5,
                     offset=0.0, delay=0, active=True,
                     AWG='AWG{}'.format(i))
                 self.station.pulsar.define_channel(
-                    cid='ch{}_marker1'.format(j),
+                    id='ch{}_marker1'.format(j),
                     name='AWG{} ch{}_marker1'.format(i, j),
                     type='marker', high=2, low=0,
                     offset=0., delay=0, active=True,
                     AWG='AWG{}'.format(i))
                 self.station.pulsar.define_channel(
-                    cid='ch{}_marker2'.format(j),
+                    id='ch{}_marker2'.format(j),
                     name='AWG{} ch{}_marker2'.format(i, j),
                     type='marker', high=2, low=0,
                     offset=0., delay=0, active=True,
