@@ -163,13 +163,15 @@ class EventType(enum.Enum):
     Current type definition does not separate the technology-dependent part
     and technology-independent part.
     '''
-    NONE_EVENT = enum.auto()
-    DECLARE = enum.auto()
-    MAP = enum.auto()
-    WAIT = enum.auto()
-    RF = enum.auto()
-    FLUX = enum.auto()
-    MEASUREMENT = enum.auto()
+
+    # N.B. integers below can be replaced by enum.auto() in python > 3.6
+    NONE_EVENT = 1
+    DECLARE = 2
+    MAP = 3
+    WAIT = 4
+    RF = 5
+    FLUX = 6
+    MEASURE = 7
 
     def __str__(self):
         return self.name.lower()
