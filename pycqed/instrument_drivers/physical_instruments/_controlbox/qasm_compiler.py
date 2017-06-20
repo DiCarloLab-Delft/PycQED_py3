@@ -1108,17 +1108,16 @@ class QASM_QuMIS_Compiler():
                 elif tmp_qumis_name == "trigger":
                     hw_event.trigger_bit = channel_cfg["trigger bit"]
                     hw_event.format = channel_cfg["format"]
-                    if event.event_type != EventType.MEASUREMENT:
-                        hw_event.codeword_bit = channel_cfg["codeword bit"]
+                    hw_event.qumis_name = tmp_qumis_name
 
+                    if 'codeword bit' in channel_cfg.keys():
+                        hw_event.codeword_bit = channel_cfg["codeword bit"]
                         lut_index = channel_cfg["lut"]
                         lut = self.luts[lut_index]
                         hw_event.codeword = lut[event.name]
 
                         if hw_event.codeword == -2:
                             hw_event.qumis_name = event.name
-                        else:
-                            hw_event.qumis_name = tmp_qumis_name
                 else:
                     pass
                 hw_events.append(hw_event)
