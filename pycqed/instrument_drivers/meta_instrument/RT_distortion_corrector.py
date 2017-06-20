@@ -170,7 +170,7 @@ class RT_distortion_corrector():
         # Load initial square pulse without distortions
         self.AWG_lutman.QWG.get_instr().stop()
         self.AWG_lutman.generate_standard_pulses()
-        self.AWG_lutman.load_pulse_onto_AWG_lookuptable('Square_flux_pulse')
+        self.AWG_lutman.load_pulse_onto_AWG_lookuptable('square')
         self.AWG_lutman.QWG.get_instr().start()
 
     def resume_correction(self, filename):
@@ -192,7 +192,7 @@ class RT_distortion_corrector():
 
         self.AWG_lutman.QWG.get_instr().stop()
         self.AWG_lutman.generate_standard_pulses()
-        self.AWG_lutman.load_pulse_onto_AWG_lookuptable('Square_flux_pulse')
+        self.AWG_lutman.load_pulse_onto_AWG_lookuptable('square')
         self.AWG_lutman.QWG.get_instr().start()
 
     def measure_trace(self, verbose=True):
@@ -452,7 +452,7 @@ class RT_distortion_corrector():
 
         # Upload waveform
         self.AWG_lutman.QWG.get_instr().stop()
-        self.AWG_lutman.load_pulse_onto_AWG_lookuptable('Square_flux_pulse')
+        self.AWG_lutman.load_pulse_onto_AWG_lookuptable('square')
         self.AWG_lutman.QWG.get_instr().start()
 
     def apply_new_kernel(self):
@@ -497,7 +497,7 @@ class RT_distortion_corrector():
 
         # Upload waveform
         self.AWG_lutman.QWG.get_instr().stop()
-        self.AWG_lutman.load_pulse_onto_AWG_lookuptable('Square_flux_pulse')
+        self.AWG_lutman.load_pulse_onto_AWG_lookuptable('square')
         self.AWG_lutman.QWG.get_instr().start()
 
     def discard_new_kernel(self):
@@ -515,7 +515,7 @@ class RT_distortion_corrector():
 
         # Upload waveform
         self.AWG_lutman.QWG.get_instr().stop()
-        self.AWG_lutman.load_pulse_onto_AWG_lookuptable('Square_flux_pulse')
+        self.AWG_lutman.load_pulse_onto_AWG_lookuptable('square')
         self.AWG_lutman.QWG.get_instr().start()
 
     def recalculate_combined_kernel(self):
@@ -552,7 +552,7 @@ class RT_distortion_corrector():
         self.ker_obj._config_changed = True
 
         self.AWG_lutman.QWG.get_instr().stop()
-        self.AWG_lutman.load_pulse_onto_AWG_lookuptable('Square_flux_pulse')
+        self.AWG_lutman.load_pulse_onto_AWG_lookuptable('square')
         self.AWG_lutman.QWG.get_instr().start()
 
     def interactive_loop(self):
