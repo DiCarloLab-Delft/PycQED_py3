@@ -183,6 +183,13 @@ class time_point():
         self.following_waiting_time = following_waiting_time
         self.parallel_events = []
 
+    def __repr__(self):
+        base_str = ('time_point(label={}, absolute_time={}, '
+                    'following_waiting_time={})')
+        rep = base_str.format(self.label, self.absolute_time,
+                              self.following_waiting_time)
+        return rep
+
 
 class qasm_event():
 
@@ -193,10 +200,6 @@ class qasm_event():
         self.params = None
         self.duration = 0
         self.channel_latency = 0
-        # self.start_time_point = time_point()
-
-    # def __str__(self):
-        # return "({}, {})".format(self.name, self.event_type)
 
     def __repr__(self):
         base_str = ('qasm_event({}, params={}, duration={})')
