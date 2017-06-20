@@ -3,9 +3,10 @@ import numpy as np
 
 import qcodes as qc
 from qcodes.instrument.base import Instrument
+from qcodes.instrument.visa import VisaInstrument
 from qcodes.instrument.parameter import ManualParameter
 from qcodes.utils import validators as vals
-from qcodes.instrument_drivers.tektronix import AWG5014 as tek
+from qcodes.instrument_drivers.tektronix.AWG5014 import Tektronix_AWG5014
 import pycqed.measurement.waveform_control.pulsar as ps
 import pycqed.measurement.pulse_sequences.single_qubit_tek_seq_elts as sqs
 
@@ -43,10 +44,10 @@ default_RO_pars = {
     'pulse_type': 'Gated_MW_RO_pulse'}
 
 
-class VirtualAWG5014(Instrument):
+class VirtualAWG5014(Tektronix_AWG5014):
 
     def __init__(self, name):
-        super().__init__(name)
+        Instrument.__init__(self, name)
         self.add_parameter('timeout', unit='s', initial_value=5,
                            parameter_class=ManualParameter,
                            vals=vals.MultiType(vals.Numbers(min_value=0),
@@ -87,7 +88,7 @@ class VirtualAWG5014(Instrument):
                 self.add_parameter(
                     'ch{}_m{}_del'.format(i, j), initial_value=0,
                     label='Channel {} Marker {} delay'.format(i, j),
-                    units='ns', parameter_class=ManualParameter,
+                    unit='ns', parameter_class=ManualParameter,
                     vals=vals.Numbers(0, 1))
                 self.add_parameter(
                     'ch{}_m{}_high'.format(i, j), initial_value=2,
@@ -99,6 +100,10 @@ class VirtualAWG5014(Instrument):
                     label='Channel {} Marker {} low level'.format(i, j),
                     unit='V', parameter_class=ManualParameter,
                     vals=vals.Numbers(-2.7, 2.7))
+
+        self.add_parameter('clock_freq', label='Clock frequency',
+                           unit='Hz', vals=vals.Numbers(1e6, 1.2e9),
+                           parameter_class=ManualParameter, initial_value=1.2e9)
 
         self.awg_files = {}
         self.file = None
@@ -130,7 +135,8 @@ class VirtualAWG5014(Instrument):
         return packed_wf
 
     def generate_awg_file(self, packed_waveforms, wfname_l, nrep_l, wait_l,
-                          goto_l, logic_jump_l, channel_cfg):
+                          goto_l, logic_jump_l, channel_cfg, sequence_cfg=None,
+                          preservechannelsettings=False):
         return {
             'p_wfs': packed_waveforms,
             'names': wfname_l,
@@ -172,18 +178,17 @@ class TestMultipleAWGs(unittest.TestCase):
         #    address='TCPIP0::192.168.1.15::inst0::INSTR', server_name=None)
 
         self.station.add_component(self.AWG)
-        self.station.pulsar = ps.Pulsar()
-        self.station.pulsar.AWG = self.AWG
+        self.station.pulsar = ps.Pulsar('Pulsar1', default_AWG=self.AWG.name)
         for i in range(4):
-            self.station.pulsar.define_channel(id='ch{}'.format(i+1),
+            self.station.pulsar.define_channel(cid='ch{}'.format(i+1),
                                                name='ch{}'.format(i+1),
                                                type='analog', high=.7, low=-.7,
                                                offset=0.0, delay=0, active=True)
-            self.station.pulsar.define_channel(id='ch{}_marker1'.format(i+1),
+            self.station.pulsar.define_channel(cid='ch{}_marker1'.format(i+1),
                                                name='ch{}_marker1'.format(i+1),
                                                type='marker', high=2, low=0,
                                                offset=0., delay=0, active=True)
-            self.station.pulsar.define_channel(id='ch{}_marker2'.format(i+1),
+            self.station.pulsar.define_channel(cid='ch{}_marker2'.format(i+1),
                                                name='ch{}_marker2'.format(i+1),
                                                type='marker', high=2, low=0,
                                                offset=0., delay=0, active=True)
@@ -193,23 +198,30 @@ class TestMultipleAWGs(unittest.TestCase):
 
         sqs.Rabi_seq([0.3, 0.6], self.pulse_pars, self.RO_pars)
 
-        self.assertEqual(max(self.AWG.file['p_wfs']['2-pulse-elt_0_ch1']), 12369)
+        self.assertEqual(max(self.AWG.file['p_wfs']['2-pulse-elt_0_ch1']),
+                         12369)
         self.assertEqual(min(self.AWG.file['p_wfs']['2-pulse-elt_0_ch1']), 4591)
-        self.assertEqual(max(self.AWG.file['p_wfs']['2-pulse-elt_1_ch1']), 16382)
+        self.assertEqual(max(self.AWG.file['p_wfs']['2-pulse-elt_1_ch1']),
+                         16382)
         self.assertEqual(min(self.AWG.file['p_wfs']['2-pulse-elt_1_ch1']), 990)
-        self.assertEqual(max(self.AWG.file['p_wfs']['2-pulse-elt_0_ch2']), 12072)
+        self.assertEqual(max(self.AWG.file['p_wfs']['2-pulse-elt_0_ch2']),
+                         12072)
         self.assertEqual(min(self.AWG.file['p_wfs']['2-pulse-elt_0_ch2']), 4310)
-        self.assertEqual(max(self.AWG.file['p_wfs']['2-pulse-elt_1_ch2']), 15953)
+        self.assertEqual(max(self.AWG.file['p_wfs']['2-pulse-elt_1_ch2']),
+                         15953)
         self.assertEqual(min(self.AWG.file['p_wfs']['2-pulse-elt_1_ch2']), 429)
-        self.assertEqual(max(self.AWG.file['p_wfs']['2-pulse-elt_0_ch3']), 24575)
+        self.assertEqual(max(self.AWG.file['p_wfs']['2-pulse-elt_0_ch3']),
+                         24575)
         self.assertEqual(min(self.AWG.file['p_wfs']['2-pulse-elt_0_ch3']), 8191)
-        self.assertEqual(max(self.AWG.file['p_wfs']['2-pulse-elt_1_ch3']), 24575)
+        self.assertEqual(max(self.AWG.file['p_wfs']['2-pulse-elt_1_ch3']),
+                         24575)
         self.assertEqual(min(self.AWG.file['p_wfs']['2-pulse-elt_1_ch3']), 8191)
-        self.assertEqual(max(self.AWG.file['p_wfs']['2-pulse-elt_0_ch4']), 40959)
+        self.assertEqual(max(self.AWG.file['p_wfs']['2-pulse-elt_0_ch4']),
+                         40959)
         self.assertEqual(min(self.AWG.file['p_wfs']['2-pulse-elt_0_ch4']), 8191)
-        self.assertEqual(max(self.AWG.file['p_wfs']['2-pulse-elt_1_ch4']), 40959)
+        self.assertEqual(max(self.AWG.file['p_wfs']['2-pulse-elt_1_ch4']),
+                         40959)
         self.assertEqual(min(self.AWG.file['p_wfs']['2-pulse-elt_1_ch4']), 8191)
-
 
     def test_with_multiple_AWGs(self):
         self.station = qc.Station()
@@ -218,23 +230,23 @@ class TestMultipleAWGs(unittest.TestCase):
         self.AWG2 = VirtualAWG5014("AWG2")
         self.station.add_component(self.AWG1)
         self.station.add_component(self.AWG2)
-        self.station.pulsar = ps.Pulsar()
+        self.station.pulsar = ps.Pulsar('Pulsar2')
         for i in range(1,3):
             for j in range(1,5):
                 self.station.pulsar.define_channel(
-                    id='ch{}'.format(j),
+                    cid='ch{}'.format(j),
                     name='AWG{} ch{}'.format(i, j),
                     type='analog', high=.7, low=-.7,
                     offset=0.0, delay=0, active=True,
                     AWG='AWG{}'.format(i))
                 self.station.pulsar.define_channel(
-                    id='ch{}_marker1'.format(j),
+                    cid='ch{}_marker1'.format(j),
                     name='AWG{} ch{}_marker1'.format(i, j),
                     type='marker', high=2, low=0,
                     offset=0., delay=0, active=True,
                     AWG='AWG{}'.format(i))
                 self.station.pulsar.define_channel(
-                    id='ch{}_marker2'.format(j),
+                    cid='ch{}_marker2'.format(j),
                     name='AWG{} ch{}_marker2'.format(i, j),
                     type='marker', high=2, low=0,
                     offset=0., delay=0, active=True,
@@ -252,37 +264,67 @@ class TestMultipleAWGs(unittest.TestCase):
         sqs.Rabi_seq([0.3, 0.6], self.pulse_pars, self.RO_pars)
 
         # AWG1
-        self.assertEqual(max(self.AWG1.file['p_wfs']['2-pulse-elt_0_ch1']), 12369)
-        self.assertEqual(min(self.AWG1.file['p_wfs']['2-pulse-elt_0_ch1']), 4591)
-        self.assertEqual(max(self.AWG1.file['p_wfs']['2-pulse-elt_1_ch1']), 16382)
+        self.assertEqual(max(self.AWG1.file['p_wfs']['2-pulse-elt_0_ch1']),
+                         12369)
+        self.assertEqual(min(self.AWG1.file['p_wfs']['2-pulse-elt_0_ch1']),
+                         4591)
+        self.assertEqual(max(self.AWG1.file['p_wfs']['2-pulse-elt_1_ch1']),
+                         16382)
         self.assertEqual(min(self.AWG1.file['p_wfs']['2-pulse-elt_1_ch1']), 990)
-        self.assertEqual(max(self.AWG1.file['p_wfs']['2-pulse-elt_0_ch2']), 8191)
-        self.assertEqual(min(self.AWG1.file['p_wfs']['2-pulse-elt_0_ch2']), 8191)
-        self.assertEqual(max(self.AWG1.file['p_wfs']['2-pulse-elt_1_ch2']), 8191)
-        self.assertEqual(min(self.AWG1.file['p_wfs']['2-pulse-elt_1_ch2']), 8191)
-        self.assertEqual(max(self.AWG1.file['p_wfs']['2-pulse-elt_0_ch3']), 24575)
-        self.assertEqual(min(self.AWG1.file['p_wfs']['2-pulse-elt_0_ch3']), 8191)
-        self.assertEqual(max(self.AWG1.file['p_wfs']['2-pulse-elt_1_ch3']), 24575)
-        self.assertEqual(min(self.AWG1.file['p_wfs']['2-pulse-elt_1_ch3']), 8191)
-        self.assertEqual(max(self.AWG1.file['p_wfs']['2-pulse-elt_0_ch4']), 8191)
-        self.assertEqual(min(self.AWG1.file['p_wfs']['2-pulse-elt_0_ch4']), 8191)
-        self.assertEqual(max(self.AWG1.file['p_wfs']['2-pulse-elt_1_ch4']), 8191)
-        self.assertEqual(min(self.AWG1.file['p_wfs']['2-pulse-elt_1_ch4']), 8191)
+        self.assertEqual(max(self.AWG1.file['p_wfs']['2-pulse-elt_0_ch2']),
+                         8191)
+        self.assertEqual(min(self.AWG1.file['p_wfs']['2-pulse-elt_0_ch2']),
+                         8191)
+        self.assertEqual(max(self.AWG1.file['p_wfs']['2-pulse-elt_1_ch2']),
+                         8191)
+        self.assertEqual(min(self.AWG1.file['p_wfs']['2-pulse-elt_1_ch2']),
+                         8191)
+        self.assertEqual(max(self.AWG1.file['p_wfs']['2-pulse-elt_0_ch3']),
+                         24575)
+        self.assertEqual(min(self.AWG1.file['p_wfs']['2-pulse-elt_0_ch3']),
+                         8191)
+        self.assertEqual(max(self.AWG1.file['p_wfs']['2-pulse-elt_1_ch3']),
+                         24575)
+        self.assertEqual(min(self.AWG1.file['p_wfs']['2-pulse-elt_1_ch3']),
+                         8191)
+        self.assertEqual(max(self.AWG1.file['p_wfs']['2-pulse-elt_0_ch4']),
+                         8191)
+        self.assertEqual(min(self.AWG1.file['p_wfs']['2-pulse-elt_0_ch4']),
+                         8191)
+        self.assertEqual(max(self.AWG1.file['p_wfs']['2-pulse-elt_1_ch4']),
+                         8191)
+        self.assertEqual(min(self.AWG1.file['p_wfs']['2-pulse-elt_1_ch4']),
+                         8191)
 
         # AWG2
-        self.assertEqual(max(self.AWG2.file['p_wfs']['2-pulse-elt_0_ch1']), 8191)
-        self.assertEqual(min(self.AWG2.file['p_wfs']['2-pulse-elt_0_ch1']), 8191)
-        self.assertEqual(max(self.AWG2.file['p_wfs']['2-pulse-elt_1_ch1']), 8191)
-        self.assertEqual(min(self.AWG2.file['p_wfs']['2-pulse-elt_1_ch1']), 8191)
-        self.assertEqual(max(self.AWG2.file['p_wfs']['2-pulse-elt_0_ch2']), 12072)
-        self.assertEqual(min(self.AWG2.file['p_wfs']['2-pulse-elt_0_ch2']), 4310)
-        self.assertEqual(max(self.AWG2.file['p_wfs']['2-pulse-elt_1_ch2']), 15953)
+        self.assertEqual(max(self.AWG2.file['p_wfs']['2-pulse-elt_0_ch1']),
+                         8191)
+        self.assertEqual(min(self.AWG2.file['p_wfs']['2-pulse-elt_0_ch1']),
+                         8191)
+        self.assertEqual(max(self.AWG2.file['p_wfs']['2-pulse-elt_1_ch1']),
+                         8191)
+        self.assertEqual(min(self.AWG2.file['p_wfs']['2-pulse-elt_1_ch1']),
+                         8191)
+        self.assertEqual(max(self.AWG2.file['p_wfs']['2-pulse-elt_0_ch2']),
+                         12072)
+        self.assertEqual(min(self.AWG2.file['p_wfs']['2-pulse-elt_0_ch2']),
+                         4310)
+        self.assertEqual(max(self.AWG2.file['p_wfs']['2-pulse-elt_1_ch2']),
+                         15953)
         self.assertEqual(min(self.AWG2.file['p_wfs']['2-pulse-elt_1_ch2']), 429)
-        self.assertEqual(max(self.AWG2.file['p_wfs']['2-pulse-elt_0_ch3']), 8191)
-        self.assertEqual(min(self.AWG2.file['p_wfs']['2-pulse-elt_0_ch3']), 8191)
-        self.assertEqual(max(self.AWG2.file['p_wfs']['2-pulse-elt_1_ch3']), 8191)
-        self.assertEqual(min(self.AWG2.file['p_wfs']['2-pulse-elt_1_ch3']), 8191)
-        self.assertEqual(max(self.AWG2.file['p_wfs']['2-pulse-elt_0_ch4']), 40959)
-        self.assertEqual(min(self.AWG2.file['p_wfs']['2-pulse-elt_0_ch4']), 8191)
-        self.assertEqual(max(self.AWG2.file['p_wfs']['2-pulse-elt_1_ch4']), 40959)
-        self.assertEqual(min(self.AWG2.file['p_wfs']['2-pulse-elt_1_ch4']), 8191)
+        self.assertEqual(max(self.AWG2.file['p_wfs']['2-pulse-elt_0_ch3']),
+                         8191)
+        self.assertEqual(min(self.AWG2.file['p_wfs']['2-pulse-elt_0_ch3']),
+                         8191)
+        self.assertEqual(max(self.AWG2.file['p_wfs']['2-pulse-elt_1_ch3']),
+                         8191)
+        self.assertEqual(min(self.AWG2.file['p_wfs']['2-pulse-elt_1_ch3']),
+                         8191)
+        self.assertEqual(max(self.AWG2.file['p_wfs']['2-pulse-elt_0_ch4']),
+                         40959)
+        self.assertEqual(min(self.AWG2.file['p_wfs']['2-pulse-elt_0_ch4']),
+                         8191)
+        self.assertEqual(max(self.AWG2.file['p_wfs']['2-pulse-elt_1_ch4']),
+                         40959)
+        self.assertEqual(min(self.AWG2.file['p_wfs']['2-pulse-elt_1_ch4']),
+                         8191)
