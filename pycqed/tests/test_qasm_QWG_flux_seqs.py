@@ -21,7 +21,9 @@ from pycqed.measurement.waveform_control_CC import \
 from pycqed.measurement.waveform_control_CC import \
     QWG_fluxing_seqs as qwfs
 
-from pycqed.measurement.waveform_control_CC.qasm_compiler_helpers import get_timepoints_from_label, get_timetuples_since_event
+from pycqed.measurement.waveform_control_CC.qasm_compiler_helpers import \
+    get_timepoints_from_label, get_timetuples_since_event
+
 
 class Test_QWG_flux_seqs(unittest.TestCase):
 
@@ -74,14 +76,14 @@ class Test_QWG_flux_seqs(unittest.TestCase):
 
         for i in range(3):
             time_pts = get_timepoints_from_label(
-                'square', compiler.timing_grid,
+                target_label='square', timing_grid=compiler.timing_grid,
                 start_label='qwg_trigger_{}'.format(i),
                 end_label='ro')
             print(len(time_pts['target_tps']))
             self.assertEqual(len(time_pts['target_tps']), nr_pulses[i])
 
         time_pts = get_timepoints_from_label(
-            'ro', compiler.timing_grid)
+            target_label='ro', timing_grid=compiler.timing_grid)
         self.assertEqual(len(time_pts['target_tps']), len(nr_pulses)+4)
         # finally test that it can be converted into valid instructions
         asm = Assembler(qumis_fn)
@@ -96,14 +98,14 @@ class Test_QWG_flux_seqs(unittest.TestCase):
         compiler = qcx.QASM_QuMIS_Compiler(self.simple_config_fn,
                                            verbosity_level=2)
         compiler.compile(qasm_fn, qumis_fn)
-        qumis = compiler.qumis_instructions
 
         for i in range(3):
-            time_pts = get_timepoints_from_label(
-                'square', compiler.timing_grid,
+            time_tuples = get_timetuples_since_event(
                 start_label='qwg_trigger_{}'.format(i),
-                end_label='ro')
-            print(len(time_pts['target_tps']))
-            self.assertEqual(len(time_pts['target_tps']), nr_pulses[i])
+                target_labels=['square', 'cz'],
+                timing_grid=compiler.timing_grid, end_label='ro')
 
-
+            self.assertEqual(len(time_tuples), nr_pulses[i])
+            for time_tuple in time_tuples:
+                self.assertEqual(time_tuple[1], 'square')
+                self.assertGreater(time_tuple[0], 0)

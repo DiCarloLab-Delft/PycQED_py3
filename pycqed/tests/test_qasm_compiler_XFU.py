@@ -186,11 +186,11 @@ class Test_compiler(unittest.TestCase):
         qasm_fn = qasm_file.name
         qumis_fn = join(self.test_file_dir, "output.qumis")
         compiler = qcx.QASM_QuMIS_Compiler(self.simple_config_fn,
-                                           verbosity_level=6)
+                                           verbosity_level=2)
         compiler.compile(qasm_fn, qumis_fn)
         print(compiler.timing_grid, sep='\n')
         time_pts = get_timepoints_from_label(
-            'cz', compiler.timing_grid,
+            compiler.timing_grid, 'cz',
             start_label='qwg_trigger_1',
             end_label='ro')
         cz_pts = time_pts['target_tps']
@@ -206,7 +206,7 @@ class Test_compiler(unittest.TestCase):
         self.assertEqual(t_cz-t_trigg, 7)
 
         time_pts = get_timepoints_from_label(
-            'cz', compiler.timing_grid,
+            target_label='cz', timing_grid=compiler.timing_grid,
             start_label=None,
             end_label=None)
         self.assertEqual(len(time_pts['target_tps']), 5)
