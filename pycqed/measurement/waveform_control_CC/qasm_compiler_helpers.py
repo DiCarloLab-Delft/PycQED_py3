@@ -1,5 +1,6 @@
 import enum
 import sys
+import logging
 
 
 def get_timepoints_from_label(
@@ -9,6 +10,8 @@ def get_timepoints_from_label(
     Extract timepoints from a timing grid based on their label.
         target_label : the label to search for in the timing grid
         timing_grid : a list of time_points to search in
+
+    N.B. timing grid is in clocks
 
     returns
         timepoints (dict) with keys
@@ -23,18 +26,22 @@ def get_timepoints_from_label(
             if tp.label == start_label:
                 start_idx = i
                 break
+        if start_idx == 0:
+            logging.warning('Could not find {} in timing grid'.format(
+                start_label))
 
     if end_label is not None:
         for j, tp in enumerate(timing_grid[start_idx:]):
             if tp.label == end_label:
                 end_idx = start_idx + j
                 break
+        if end_idx == -1:
+            logging.warning('Could not find {} in timing grid'.format(
+                end_label))
 
     target_indices = []
 
     for k, tp in enumerate(timing_grid[start_idx:end_idx]):
-        print(k)
-        print(tp.label)
         if tp.label == target_label:
 
             target_indices.append(start_idx + k)
@@ -191,7 +198,6 @@ class EventType(enum.Enum):
 
 
 class time_point():
-
     def __init__(self, label='', absolute_time=-1, following_waiting_time=-1):
         self.label = label
         self.absolute_time = absolute_time

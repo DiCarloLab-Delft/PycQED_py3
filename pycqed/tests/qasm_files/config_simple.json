@@ -62,10 +62,9 @@
             "type" : "rf",
             "matrix" : []
         },
-
         "cz" : {
             "parameters" : 2,
-            "duration" : 400,
+            "duration" : 500,
             "type" : "flux",
             "matrix" : []
         },
