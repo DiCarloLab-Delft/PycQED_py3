@@ -5,7 +5,9 @@ import logging
 
 def get_timetuples_since_event(start_label: str, target_labels: list,
                                timing_grid: list, end_label: str=None) ->list:
-    pass
+
+
+
 
 def get_timepoints_from_label(
         target_label: str, timing_grid: list,
