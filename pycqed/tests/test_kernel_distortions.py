@@ -1,5 +1,3 @@
-import os
-import pycqed as pq
 import unittest
 import numpy as np
 
@@ -93,11 +91,9 @@ class Test_KernelObject(unittest.TestCase):
         # self.k0.kernel_list(['precompiled_RT_20161206.txt'])
         # kernel = self.k0.kernel()
 
-
     # def test_convolve_kernels(self):
     #     kernel_list
     #     self.k0.convolve_kernel(kernel_list, length)
-
 
     def test_convolve_kernel(self):
         pass
@@ -158,4 +154,3 @@ class Test_Kernel_functions(unittest.TestCase):
 
         np.testing.assert_array_almost_equal(
             test_kernel, known_vals, decimal=7)
-

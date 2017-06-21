@@ -5,9 +5,7 @@ import logging
 from pycqed.measurement.waveform_control_CC import waveform as wf
 from pycqed.instrument_drivers.pq_parameters import InstrumentParameter
 import numpy as np
-import matplotlib.pyplot as plt
 from qcodes.plots.pyqtgraph import QtPlot
-from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
 
 
 class QWG_LookuptableManager(Instrument):
@@ -15,7 +13,7 @@ class QWG_LookuptableManager(Instrument):
     def __init__(self, name, QWG, **kw):
         logging.info(__name__ + ' : Initializing instrument')
         super().__init__(name, **kw)
-        self.QWG = QWG
+        self.add_parameter('QWG', parameter_class=InstrumentParameter)
 
         self.add_parameter('Q_amp180',
                            unit='V',
@@ -51,29 +49,37 @@ class QWG_LookuptableManager(Instrument):
             initial_value=100e-9)
 
     def load_pulses_onto_AWG_lookuptable(self):
-        self.QWG.stop()
+        self.QWG.get_instr().stop()
 
         # Microwave pulses
-        G_amp = self.Q_amp180()/self.QWG.get('ch{}_amp'.format(1))
+        G_amp = self.Q_amp180()/self.QWG.get_instr().get('ch{}_amp'.format(1))
         # Amplitude is set using the channel amplitude (at least for now)
         G, D = wf.gauss_pulse(G_amp, self.Q_gauss_width(),
                               motzoi=self.Q_motzoi(),
                               sampling_rate=1e9)  # sampling rate of QWG
-        self.QWG.deleteWaveformAll()
-        self.QWG.createWaveformReal('X180_q0_I', G)
-        self.QWG.createWaveformReal('X180_q0_Q', D)
-        self.QWG.createWaveformReal('X90_q0_I', self.Q_amp90_scale()*G)
-        self.QWG.createWaveformReal('X90_q0_Q', self.Q_amp90_scale()*D)
+        self.QWG.get_instr().deleteWaveformAll()
+        self.QWG.get_instr().createWaveformReal('X180_q0_I', G)
+        self.QWG.get_instr().createWaveformReal('X180_q0_Q', D)
+        self.QWG.get_instr().createWaveformReal('X90_q0_I',
+                                                self.Q_amp90_scale()*G)
+        self.QWG.get_instr().createWaveformReal('X90_q0_Q',
+                                                self.Q_amp90_scale()*D)
 
-        self.QWG.createWaveformReal('Y180_q0_I', D)
-        self.QWG.createWaveformReal('Y180_q0_Q', -G)
-        self.QWG.createWaveformReal('Y90_q0_I', self.Q_amp90_scale()*D)
-        self.QWG.createWaveformReal('Y90_q0_Q', -self.Q_amp90_scale()*G)
+        self.QWG.get_instr().createWaveformReal('Y180_q0_I', D)
+        self.QWG.get_instr().createWaveformReal('Y180_q0_Q', -G)
+        self.QWG.get_instr().createWaveformReal('Y90_q0_I',
+                                                self.Q_amp90_scale()*D)
+        self.QWG.get_instr().createWaveformReal('Y90_q0_Q',
+                                                -self.Q_amp90_scale()*G)
 
-        self.QWG.createWaveformReal('mX90_q0_I', -self.Q_amp90_scale()*G)
-        self.QWG.createWaveformReal('mX90_q0_Q', -self.Q_amp90_scale()*D)
-        self.QWG.createWaveformReal('mY90_q0_I', -self.Q_amp90_scale()*D)
-        self.QWG.createWaveformReal('mY90_q0_Q', self.Q_amp90_scale()*G)
+        self.QWG.get_instr().createWaveformReal('mX90_q0_I',
+                                                -self.Q_amp90_scale()*G)
+        self.QWG.get_instr().createWaveformReal('mX90_q0_Q',
+                                                -self.Q_amp90_scale()*D)
+        self.QWG.get_instr().createWaveformReal('mY90_q0_I',
+                                                -self.Q_amp90_scale()*D)
+        self.QWG.get_instr().createWaveformReal('mY90_q0_Q',
+                                                self.Q_amp90_scale()*G)
 
         # Spec pulse
         if self.spec_pulse_type() == 'gauss':
@@ -84,48 +90,48 @@ class QWG_LookuptableManager(Instrument):
             spec_G, spec_Q = wf.block_pulse(self.spec_amp(),
                                             self.spec_length(),
                                             sampling_rate=1e9)
-        self.QWG.createWaveformReal('spec_q0_I', spec_G)
-        self.QWG.createWaveformReal('spec_q0_Q', spec_Q)
+        self.QWG.get_instr().createWaveformReal('spec_q0_I', spec_G)
+        self.QWG.get_instr().createWaveformReal('spec_q0_Q', spec_Q)
 
         # Filler waveform
-        self.QWG.createWaveformReal('zero', [0]*4)
-        self.QWG.codeword_0_ch1_waveform('X180_q0_I')
-        self.QWG.codeword_0_ch2_waveform('X180_q0_Q')
-        self.QWG.codeword_0_ch3_waveform('X180_q0_I')
-        self.QWG.codeword_0_ch4_waveform('X180_q0_Q')
+        self.QWG.get_instr().createWaveformReal('zero', [0]*4)
+        self.QWG.get_instr().codeword_0_ch1_waveform('X180_q0_I')
+        self.QWG.get_instr().codeword_0_ch2_waveform('X180_q0_Q')
+        self.QWG.get_instr().codeword_0_ch3_waveform('X180_q0_I')
+        self.QWG.get_instr().codeword_0_ch4_waveform('X180_q0_Q')
 
-        self.QWG.codeword_1_ch1_waveform('Y180_q0_I')
-        self.QWG.codeword_1_ch2_waveform('Y180_q0_Q')
-        self.QWG.codeword_1_ch3_waveform('Y180_q0_I')
-        self.QWG.codeword_1_ch4_waveform('Y180_q0_Q')
+        self.QWG.get_instr().codeword_1_ch1_waveform('Y180_q0_I')
+        self.QWG.get_instr().codeword_1_ch2_waveform('Y180_q0_Q')
+        self.QWG.get_instr().codeword_1_ch3_waveform('Y180_q0_I')
+        self.QWG.get_instr().codeword_1_ch4_waveform('Y180_q0_Q')
 
-        self.QWG.codeword_2_ch1_waveform('X90_q0_I')
-        self.QWG.codeword_2_ch2_waveform('X90_q0_Q')
-        self.QWG.codeword_2_ch3_waveform('X90_q0_I')
-        self.QWG.codeword_2_ch4_waveform('X90_q0_Q')
+        self.QWG.get_instr().codeword_2_ch1_waveform('X90_q0_I')
+        self.QWG.get_instr().codeword_2_ch2_waveform('X90_q0_Q')
+        self.QWG.get_instr().codeword_2_ch3_waveform('X90_q0_I')
+        self.QWG.get_instr().codeword_2_ch4_waveform('X90_q0_Q')
 
-        self.QWG.codeword_3_ch1_waveform('Y90_q0_I')
-        self.QWG.codeword_3_ch2_waveform('Y90_q0_Q')
-        self.QWG.codeword_3_ch3_waveform('Y90_q0_I')
-        self.QWG.codeword_3_ch4_waveform('Y90_q0_Q')
+        self.QWG.get_instr().codeword_3_ch1_waveform('Y90_q0_I')
+        self.QWG.get_instr().codeword_3_ch2_waveform('Y90_q0_Q')
+        self.QWG.get_instr().codeword_3_ch3_waveform('Y90_q0_I')
+        self.QWG.get_instr().codeword_3_ch4_waveform('Y90_q0_Q')
 
-        self.QWG.codeword_4_ch1_waveform('mX90_q0_I')
-        self.QWG.codeword_4_ch2_waveform('mX90_q0_Q')
-        self.QWG.codeword_4_ch3_waveform('mX90_q0_I')
-        self.QWG.codeword_4_ch4_waveform('mX90_q0_Q')
+        self.QWG.get_instr().codeword_4_ch1_waveform('mX90_q0_I')
+        self.QWG.get_instr().codeword_4_ch2_waveform('mX90_q0_Q')
+        self.QWG.get_instr().codeword_4_ch3_waveform('mX90_q0_I')
+        self.QWG.get_instr().codeword_4_ch4_waveform('mX90_q0_Q')
 
-        self.QWG.codeword_5_ch1_waveform('mY90_q0_I')
-        self.QWG.codeword_5_ch2_waveform('mY90_q0_Q')
-        self.QWG.codeword_5_ch3_waveform('mY90_q0_I')
-        self.QWG.codeword_5_ch4_waveform('mY90_q0_Q')
+        self.QWG.get_instr().codeword_5_ch1_waveform('mY90_q0_I')
+        self.QWG.get_instr().codeword_5_ch2_waveform('mY90_q0_Q')
+        self.QWG.get_instr().codeword_5_ch3_waveform('mY90_q0_I')
+        self.QWG.get_instr().codeword_5_ch4_waveform('mY90_q0_Q')
 
-        self.QWG.codeword_6_ch1_waveform('spec_q0_I')
-        self.QWG.codeword_6_ch2_waveform('spec_q0_Q')
-        self.QWG.codeword_6_ch3_waveform('spec_q0_I')
-        self.QWG.codeword_6_ch4_waveform('spec_q0_Q')
+        self.QWG.get_instr().codeword_6_ch1_waveform('spec_q0_I')
+        self.QWG.get_instr().codeword_6_ch2_waveform('spec_q0_Q')
+        self.QWG.get_instr().codeword_6_ch3_waveform('spec_q0_I')
+        self.QWG.get_instr().codeword_6_ch4_waveform('spec_q0_Q')
 
-        self.QWG.start()
-        self.QWG.getOperationComplete()
+        self.QWG.get_instr().start()
+        self.QWG.get_instr().getOperationComplete()
 
 
 class QWG_FluxLookuptableManager(Instrument):
@@ -139,8 +145,8 @@ class QWG_FluxLookuptableManager(Instrument):
 
         self.add_parameter('F_amp', unit='frac',
                            docstring=('Amplitude of flux pulse as fraction of '
-                           'the peak amplitude. Beware of factor 2 with'
-                           ' Vpp in the QWG'),
+                                      'the peak amplitude. Beware of factor 2'
+                                      ' with Vpp in the QWG'),
                            parameter_class=ManualParameter)
         self.add_parameter('F_length', unit='s',
                            parameter_class=ManualParameter,
@@ -240,8 +246,8 @@ class QWG_FluxLookuptableManager(Instrument):
                            vals=vals.Numbers(),
                            parameter_class=ManualParameter)
         self.add_parameter('Z_length',
-                           docstring=
-                               'Duration of single qubit Z pulse in seconds',
+                           docstring=('Duration of single qubit Z pulse in'
+                                      ' seconds'),
                            label='Z length',
                            unit='s',
                            initial_value=10e-9,
@@ -249,8 +255,8 @@ class QWG_FluxLookuptableManager(Instrument):
                            parameter_class=ManualParameter)
         self.add_parameter('Z_amp',
                            docstring=('Amplitude of flux pulse as fraction of '
-                           'the peak amplitude. Beware of factor 2 with'
-                           ' Vpp in the QWG'),
+                                      'the peak amplitude. Beware of factor '
+                                      '2 with Vpp in the QWG'),
                            label='Z amplitude',
                            unit='frac',
                            initial_value=0.0,
@@ -462,7 +468,7 @@ class QWG_FluxLookuptableManager(Instrument):
         delayed_wave = np.concatenate([wait_samples, np.array(waveform)])
         if append_compensation:
             delayed_wave = np.concatenate(
-                    [delayed_wave, wait_samples_2, -1 * np.array(waveform)])
+                [delayed_wave, wait_samples_2, -1 * np.array(waveform)])
 
         if self.F_kernel_instr() is not None:
             k = self.F_kernel_instr.get_instr()

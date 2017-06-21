@@ -1,6 +1,7 @@
 import logging
 import time
-
+import os
+from pycqed.measurement.waveform_control_CC import qasm_compiler as qcx
 from pycqed.instrument_drivers.virtual_instruments.pyqx import qasm_loader as ql
 from pycqed.measurement.waveform_control_CC import qasm_to_asm as qta
 
@@ -254,9 +255,76 @@ class QASM_Sweep(Hard_Sweep):
             self.CBox.load_instructions(qumis_file.name)
 
 
+class QASM_Sweep_v2(Hard_Sweep):
+    """
+    Sweep function for a QASM file, using the XFu compiler to generate QuMis
+    """
+
+    def __init__(self, qasm_fn: str, config_fn: str, CBox,
+                 parameter_name: str ='Points', unit: str='a.u.',
+                 upload: bool=True, verbosity_level: int=0):
+        super().__init__()
+        self.name = 'QASM_Sweep'
+
+        self.qasm_fn = qasm_fn
+        self.config_fn = config_fn
+        self.CBox = CBox
+        self.upload = upload
+
+        self.parameter_name = parameter_name
+        self.unit = unit
+        self.verbosity_level = verbosity_level
+
+    def prepare(self, **kw):
+        self.CBox.trigger_source('internal')
+        self.compile_and_upload()
+
+    def _compile_and_upload(self):
+        if self.upload:
+            qasm_folder, fn = os.path.split(self.qasm_fn)
+            base_fn = fn.split('.')[0]
+            qumis_fn = os.path.join(qasm_folder, base_fn + ".qumis")
+            compiler = qcx.QASM_QuMIS_Compiler(
+                self.config_fn, verbosity_level=self.verbosity_level)
+            compiler.compile(self.qasm_fn, qumis_fn)
+            self.CBox.load_instructions(qumis_fn)
+            return compiler
+
+
+class QWG_flux_QASM_Sweep(QASM_Sweep_v2):
+    def __init__(self, qasm_fn: str, config_fn: str,
+                 CBox, QWG_flux_lutman,
+                 parameter_name: str ='Points', unit: str='a.u.',
+                 upload: bool=True, verbosity_level: int=0):
+        super().__init__()
+        self.name = 'QWG_flux_QASM_Sweep'
+
+        self.qasm_fn = qasm_fn
+        self.config_fn = config_fn
+        self.CBox = CBox
+        self.upload = upload
+
+        self.parameter_name = parameter_name
+        self.unit = unit
+        self.verbosity_level = verbosity_level
+
+    def prepare(self, **kw):
+        self.CBox.trigger_source('internal')
+        compiler = self._compile_and_upload()
+
+    def get_timing_tuples(idx: int, compiler
+
+
+
+        # extract timings tuples per trigger
+        # generate waveform based on timing tuple
+        # upload_custom_wf
+
+
+
 class QuMis_Sweep(Hard_Sweep):
 
-    def __init__(self, filename, CBox, 
+    def __init__(self, filename, CBox,
                  parameter_name='Points', unit='a.u.', upload=True):
         super().__init__()
         self.name = 'QASM_Sweep'

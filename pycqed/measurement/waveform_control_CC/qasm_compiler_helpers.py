@@ -3,6 +3,10 @@ import sys
 import logging
 
 
+def get_timetuples_since_event(start_label: str, target_labels: list,
+                               timing_grid: list, end_label: str=None) ->list:
+    pass
+
 def get_timepoints_from_label(
         target_label: str, timing_grid: list,
         start_label: str =None, end_label: str=None)->dict:
@@ -20,7 +24,7 @@ def get_timepoints_from_label(
             'end_tp'      end time_point
     """
     start_idx = 0
-    end_idx = -1
+    end_idx = None
     if start_label is not None:
         for i, tp in enumerate(timing_grid):
             if tp.label == start_label:
@@ -35,21 +39,29 @@ def get_timepoints_from_label(
             if tp.label == end_label:
                 end_idx = start_idx + j
                 break
-        if end_idx == -1:
+        if end_idx == None:
             logging.warning('Could not find {} in timing grid'.format(
                 end_label))
 
     target_indices = []
 
-    for k, tp in enumerate(timing_grid[start_idx:end_idx]):
-        if tp.label == target_label:
+    if end_idx is not None:
 
-            target_indices.append(start_idx + k)
-
-    timepoints = {
-        'start_tp': timing_grid[start_idx],
-        'target_tps': [timing_grid[i] for i in target_indices],
-        'end_tp': timing_grid[end_idx]}
+        for k, tp in enumerate(timing_grid[start_idx:end_idx]):
+            if tp.label == target_label:
+                target_indices.append(start_idx + k)
+        timepoints = {
+            'start_tp': timing_grid[start_idx],
+            'target_tps': [timing_grid[i] for i in target_indices],
+            'end_tp': timing_grid[end_idx]}
+    else:
+        for k, tp in enumerate(timing_grid[start_idx:]):
+            if tp.label == target_label:
+                target_indices.append(start_idx + k)
+        timepoints = {
+            'start_tp': timing_grid[start_idx],
+            'target_tps': [timing_grid[i] for i in target_indices],
+            'end_tp': timing_grid[-1]}
     return timepoints
 
 
@@ -269,6 +281,9 @@ class prog_line():
     def __init__(self, number=-1, content=''):
         self.number = number
         self.content = content
+
+    def __repr__(self):
+        return "prog_line(number={}, content={})".format(self.number, self.content)
 
     def __str__(self):
         return "{}: {}".format(self.number, self.content)
