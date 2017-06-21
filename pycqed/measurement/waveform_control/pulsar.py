@@ -137,12 +137,7 @@ class Pulsar(Instrument):
         Returns: clock rate in samples per second
         """
         obj = self.AWG_obj(channel=channel)
-        if isinstance(obj, Tektronix_AWG5014):
-            return obj.clock_freq()
-        elif isinstance(obj, UHFQC):
-            return 1.8e9
-        else:
-            raise ValueError('Unsupported AWG type: {}'.format(type(obj)))
+        return obj.clock_freq()
 
     def channel_opt(self, name, option, value=None):
         """

@@ -421,8 +421,9 @@ class UHFQC(Instrument):
             samples (int): the expected number of samples
             arm    (bool): if true arms the acquisition, disable when you
                            need synchronous acquisition with some external dev
-            acquisition_time (float): time in sec between polls?
-            # TODO check with Niels H
+            acquisition_time (float): time in sec between polls? # TODO check with Niels H
+            timeout (float): time in seconds before timeout Error is raised.
+
         """
         data = dict()
 
