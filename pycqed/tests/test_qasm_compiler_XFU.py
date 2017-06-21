@@ -7,8 +7,6 @@ import numpy as np
 import pycqed as pq
 from io import StringIO
 from pycqed.utilities import general as gen
-# from pycqed.instrument_drivers.physical_instruments._controlbox \
-#     import qasm_compiler as qcx
 from pycqed.measurement.waveform_control_CC import qasm_compiler as qcx
 from pycqed.instrument_drivers.physical_instruments._controlbox.Assembler \
     import Assembler

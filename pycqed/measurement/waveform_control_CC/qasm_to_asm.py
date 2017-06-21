@@ -1,3 +1,7 @@
+"""
+This is the initial "compiler" that does simple 1 to 1 translation between
+qasm and qumis instructions. This is superceded by the "qasm_compiler" by XFU
+"""
 from pycqed.utilities.general import mopen
 from os.path import join, dirname, basename, splitext
 from copy import deepcopy
