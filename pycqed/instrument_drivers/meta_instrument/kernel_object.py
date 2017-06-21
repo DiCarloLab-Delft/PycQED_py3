@@ -1,6 +1,7 @@
 import os
 import logging
 import numpy as np
+import json
 
 from qcodes.instrument.base import Instrument
 from qcodes.utils import validators as vals
@@ -147,6 +148,12 @@ class Distortion(Instrument):
         # the list does not correctlyupdate the changed flag
         self.kernel_list(kernel_list)
 
+    def remove_kernel_from_kernel_list(self, kernel_name):
+        ker_list = self.kernel_list()
+        ker_list.remove(kernel_name)
+        self._config_changed = True
+        self.kernel_list(ker_list)
+
     def _get_config_changed(self):
         return self._config_changed
 
@@ -221,8 +228,18 @@ class Distortion(Instrument):
             f_name = os.path.join(self.kernel_dir(), k_name)
             print('Loading {}'.format(f_name))
 
-            kernel_vec = np.loadtxt(f_name)
-            external_kernels.append(kernel_vec)
+            suffix = f_name.split('.')[-1]
+            if suffix == 'txt':
+                kernel_vec = np.loadtxt(f_name)
+                external_kernels.append(kernel_vec)
+            elif suffix == 'json':
+                # Load from json file containing also metadata about fit model
+                with open(f_name) as infile:
+                    kernel_dict = json.load(infile)
+                external_kernels.append(kernel_dict['kernel'])
+            else:
+                raise ValueError('File format "{}" not recognized.'
+                                 .format(suffix))
 
         kernel_object_kernels = [
             self.get_bounce_kernel_1(),
