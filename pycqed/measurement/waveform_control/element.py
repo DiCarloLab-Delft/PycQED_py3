@@ -299,6 +299,11 @@ class Element:
                 else:
                     idx0 = self.pulse_start_sample(p, c)
                     idx1 = self.pulse_end_sample(p, c) + 1
+                    if idx0 < 0 or idx1 < 0:
+                        raise Exception(
+                            'Pulse {} on channel {} in element {} starts at a '
+                            'negative time. Please increase the RO_fixpoint.'
+                                .format(p, c, self.name))
                     chan_tvals[c] = np.round(tvals[c].copy()[idx0:idx1] +
                                              self.channel_delay(c) +
                                              self.time_offset,
