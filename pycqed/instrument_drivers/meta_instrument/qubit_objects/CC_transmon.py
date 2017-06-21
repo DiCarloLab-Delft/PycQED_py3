@@ -1323,34 +1323,43 @@ class CBox_v3_driven_transmon(Transmon):
         MC.live_plot_enabled(old_plot_setting)
         # first perform SSRO analysis to extract the optimal rotation angle
         # theta
-        a = ma.SSRO_discrimination_analysis(
-            label='Butterfly',
-            current_threshold=None,
-            close_fig=close_fig,
-            plot_2D_histograms=True)
+        if self.RO_acq_weights() != 'optimal':
+            a = ma.SSRO_discrimination_analysis(
+                label='Butterfly',
+                current_threshold=None,
+                close_fig=close_fig,
+                plot_2D_histograms=True)
 
-        # the, run it a second time to determine the optimal threshold along the
-        # rotated I axis
-        b = ma.SSRO_discrimination_analysis(
-            label='Butterfly',
-            current_threshold=None,
-            close_fig=close_fig,
-            plot_2D_histograms=True, theta_in=-a.theta)
+            # the, run it a second time to determine the optimal threshold along the
+            # rotated I axis
+            b = ma.SSRO_discrimination_analysis(
+                label='Butterfly',
+                current_threshold=None,
+                close_fig=close_fig,
+                plot_2D_histograms=True, theta_in=-a.theta)
+            threshold = b.opt_I_threshold
+            theta = b.theta
+
+        elif self.RO_acq_weights() == 'optimal':
+            a = ma.SSRO_single_quadrature_discriminiation_analysis()
+            threshold = a.opt_threshold
+            theta = 0
 
         c0 = ma.butterfly_analysis(
             close_main_fig=close_fig, initialize=initialize,
-            theta_in=-a.theta,
-            threshold=b.opt_I_threshold, digitize=True, case=False)
+            theta_in=-theta % 360,
+            threshold=threshold, digitize=True, case=False)
         c1 = ma.butterfly_analysis(
             close_main_fig=close_fig, initialize=initialize,
-            theta_in=-a.theta % 360,
-            threshold=b.opt_I_threshold, digitize=True, case=True)
+            theta_in=-theta % 360,
+            threshold=threshold, digitize=True, case=True)
+
         if c0.butterfly_coeffs['F_a_butterfly'] > c1.butterfly_coeffs['F_a_butterfly']:
             bf_coeffs = c0.butterfly_coeffs
         else:
             bf_coeffs = c1.butterfly_coeffs
-        bf_coeffs['theta'] = -a.theta % 360
-        bf_coeffs['threshold'] = b.opt_I_threshold
+        bf_coeffs['theta'] = theta % 360
+        bf_coeffs['threshold'] = threshold
         if update_threshold:
             self.RO_rotation_angle(bf_coeffs['theta'])
             self.RO_threshold(bf_coeffs['threshold'])
