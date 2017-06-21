@@ -3,14 +3,28 @@ import sys
 import logging
 
 
-def get_timetuples_since_event(start_label: str, target_labels: list,
-                               timing_grid: list, end_label: str=None) ->list:
+def get_timetuples_since_event(timing_grid: list, target_labels: list,
+                               start_label: str, end_label: str=None) ->list:
+    """
+    Searches for target labels in a timing grid and returns the time between
+    the the events and the timepoint corresponding to the start_label.
 
-
+    returns
+        time_tuples (list) of tuples (time,
+    """
+    time_tuples = []
+    for target_label in target_labels:
+        time_points = get_timepoints_from_label(
+            timing_grid=timing_grid, target_label=target_label,
+            start_label=start_label, end_label=end_label)
+        t0 = time_points['start_tp'].absolute_time
+        for tp in time_points['target_tps']:
+            time_tuples.append((tp.absolute_time-t0, target_label))
+    return time_tuples
 
 
 def get_timepoints_from_label(
-        target_label: str, timing_grid: list,
+        timing_grid: list, target_label: str,
         start_label: str =None, end_label: str=None)->dict:
     """
     Extract timepoints from a timing grid based on their label.
