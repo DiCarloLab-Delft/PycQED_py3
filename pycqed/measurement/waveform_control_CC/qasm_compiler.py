@@ -25,7 +25,6 @@ import bisect
 import copy
 from pycqed.utilities.general import int_to_bin
 from pycqed.measurement.waveform_control_CC.qasm_compiler_helpers import (
-    get_timepoints_from_label,
     is_number, is_int, is_positive_number, is_natural, is_integer_array,
     bitfield, min_non_zero, raw_print, config_is_valid,
     EventType, time_point, qasm_event, qumis_event, prog_line, lower_dict_key)
