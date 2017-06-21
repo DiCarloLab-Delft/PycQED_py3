@@ -65,11 +65,8 @@ class Test_compiler(unittest.TestCase):
         self.assertTrue(printing_methods.issubset(c_methods))
 
     def test_loading_config(self):
-        with Capturing() as output:
-            compiler = qcx.QASM_QuMIS_Compiler()
-
-        self.assertIn(
-            'Configuration not specified. Default configuration file instrument_drivers\physical_instruments\_controlbox\config.json used.', output)
+        compiler = qcx.QASM_QuMIS_Compiler()
+        self.assertEqual(compiler.config_filename, None)
         self.assertNotEqual(compiler.config_filename, self.config_fn)
         compiler.load_config(self.config_fn)
         self.assertEqual(compiler.config_filename, self.config_fn)
@@ -79,7 +76,8 @@ class Test_compiler(unittest.TestCase):
         self.assertEqual(set(compiler.hardware_spec.keys()),
                          hardware_spec_keys)
 
-        self.assertEqual(compiler.qubit_map, {'q0': 0, 'q1': 1})
+        self.assertEqual(compiler.qubit_map, {'q0': 0, 'q1': 1,
+                                              'ql': 0, 'qr': 1})
 
         self.assertEqual(len(compiler.luts), 2)  # MW and Flux
         allowed_single_q_ops = {'x180',
@@ -210,6 +208,21 @@ class Test_compiler(unittest.TestCase):
 
         self.assertEqual(
             instrs[-1], self.jump_to_start)
+
+    def test_equivalent_maps_custom_qubit_name(self):
+        # generate the same qasm and compile using two qubit names that
+        # refer to the same qubit_cfg in the hardware spec
+        qumis_instrs = [[], []]
+        for i, q_name in enumerate(['q0', 'ql']):
+            qasm_file = sqqs.AllXY(q_name)
+            qasm_fn = qasm_file.name
+            qumis_fn = join(self.test_file_dir,
+                            "allxy_{}.qumis".format(q_name))
+            compiler = qcx.QASM_QuMIS_Compiler(self.config_fn,
+                                               verbosity_level=0)
+            compiler.compile(qasm_fn, qumis_fn)
+            qumis_instrs[i] = compiler.qumis_instructions
+        self.assertEqual(qumis_instrs[0], qumis_instrs[1])
 
 
 class Test_single_qubit_seqs(unittest.TestCase):
