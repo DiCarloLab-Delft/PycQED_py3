@@ -339,14 +339,8 @@ class QASM_QuMIS_Compiler():
         self.filename = ''
 
         if config_filename is None:
-            self.config_filename = os.path.join(
-                pq.__path__[0], 'instrument_drivers', 'physical_instruments',
-                "_controlbox", "config.json")
-            print("Configuration not specified. "
-                  "Default configuration file instrument_drivers\\"
-                  "physical_instruments\\_controlbox\\config.json used.")
-        else:
-            self.config_filename = config_filename
+            logging.warning('No configuration specified')
+        self.config_filename = config_filename
 
     def compile(self, filename: str, qumis_fn: str=None)-> bool:
         """
@@ -361,7 +355,7 @@ class QASM_QuMIS_Compiler():
         self.read_file()               # fills up self.prog_lines
         self.line_to_event()           # fills up self.raw_event_list
         self.build_dependency_graph()  # empty function for now
-        self.resolve_qubit_name()      # extract map from qasm and map to config
+        self.resolve_qubit_name()      # extract map from qasm and map to cfg
         self.assign_timing_to_events()
         self.resolve_channel_latency()
         self.convert_to_hw_trigger()
@@ -379,7 +373,8 @@ class QASM_QuMIS_Compiler():
     def load_config(self, config_filename=None):
         if config_filename is not None:
             self.config_filename = config_filename
-
+        if self.config_filename is None:
+            raise ValueError('No config specified')
         self.qasm_op_dict = None
 
         with open(self.config_filename) as data_file:
