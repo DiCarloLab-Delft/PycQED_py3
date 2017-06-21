@@ -4,9 +4,9 @@
 # modified by: Adriaan Rol
 
 import numpy as np
-from copy import deepcopy
 import pprint
-from . import pulsar as ps
+from copy import deepcopy
+from pycqed.measurement.waveform_control import pulsar as ps
 import logging
 
 
@@ -23,6 +23,7 @@ class Element:
 
         # should granularity be device/channel specific
         self.granularity = kw.pop('granularity', 4)
+        self.min_samples = kw.pop('min_samples', 960)
         self.ignore_offset_correction = kw.pop('ignore_offset_correction',
                                                False)
 
@@ -101,6 +102,8 @@ class Element:
         if len(ends) == 0:
             return 0
         samples = max(ends)+1
+        if samples < self.min_samples:
+            samples = self.min_samples
         while samples % self.granularity != 0:
             samples += 1
         return samples
@@ -279,8 +282,6 @@ class Element:
 
     # computing the numerical waveform
     def ideal_waveforms(self):
-
-
         wfs = {}
         tvals = {}
 

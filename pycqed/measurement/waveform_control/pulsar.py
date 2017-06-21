@@ -41,14 +41,21 @@ class Pulsar(Instrument):
     def __init__(self, name='Pulsar', default_AWG=None, master_AWG=None):
         super().__init__(name)
 
-        self.add_parameter('default_AWG', parameter_class=InstrumentParameter,
-                           initial_value=default_AWG)
+        # for compatibility with old code, the default AWG name is stored in
+        # self.AWG.name
+        if default_AWG is not None:
+            self.AWG = self.AWG_obj(AWG=default_AWG)
+        else:
+            class Object(object):
+                pass
+            self.AWG = Object()
+            self.AWG.name = None
+
+        self.add_parameter('default_AWG',
+                           set_cmd=self._set_default_AWG,
+                           get_cmd=self._get_default_AWG)
         self.add_parameter('master_AWG', parameter_class=InstrumentParameter,
                            initial_value=master_AWG)
-
-        # To maintain compatibility with old code that calls pulsar.AWG
-        if default_AWG is not None:
-            self.AWG = self.AWG_obj(AWG=self.default_AWG())
 
         self.channels = {}
         self.last_sequence = None
@@ -242,6 +249,7 @@ class Pulsar(Instrument):
                     AWG_wfs[cAWG][el.name] = {}
                 AWG_wfs[cAWG][el.name][cid] = waveforms[cname]
 
+        self.update_AWG5014_settings()
         for AWG in AWG_wfs:
             obj = self.AWG_obj(AWG=AWG)
             if isinstance(obj, Tektronix_AWG5014):
@@ -274,8 +282,6 @@ class Pulsar(Instrument):
                                  segment while waiting for the trigger. Default
                                  is `False`.
         """
-        #import pdb
-        #pdb.set_trace()
 
         old_timeout = obj.timeout()
         obj.timeout(max(180, old_timeout))
@@ -286,24 +292,35 @@ class Pulsar(Instrument):
             for cid in cid_wfs:
                 grps.add(cid[:3])
         grps = list(grps)
+        grps.sort()
 
         # create a packed waveform for each element for each channel group
         # in the sequence
         packed_waveforms = {}
         elements_with_non_zero_first_points = set()
         for el, cid_wfs in el_wfs.items():
+            maxlen = 0
+            for wf in cid_wfs.values():
+                if len(wf) > maxlen:
+                    maxlen = len(wf)
             for grp in grps:
                 grp_wfs = {}
                 # arrange waveforms from input data and pad with zeros for
                 # equal length
-                maxlen = 0
                 for cid in self._AWG5014_group_ids(grp):
                     grp_wfs[cid] = cid_wfs.get(cid, np.zeros(1))
-                    maxlen = max(maxlen, len(grp_wfs[cid]))
-                for cid in self._AWG5014_group_ids(grp):
+                    cname = self._AWG5014_id_channel(cid, obj.name)
+                    if cid[4:-1] == 'marker' or cname is None:
+                        cval = 0
+                    else:
+                        cval = self.channels[cname]['offset']
+                        hi = self.channels[cname]['high']
+                        lo = self.channels[cname]['low']
+                        cval = (2*cval - hi - lo)/(hi - lo)
                     grp_wfs[cid] = np.pad(grp_wfs[cid],
                                           (0, maxlen - len(grp_wfs[cid])),
-                                          'constant')
+                                          'constant',
+                                          constant_values=cval)
                     if grp_wfs[cid][0] != 0.:
                         elements_with_non_zero_first_points.add(el)
                 wfname = el + '_' + grp
@@ -507,6 +524,13 @@ setTrigger(0);
             obj._daq.syncSetInt('/' + obj._device + '/awgs/0/enable', 0)
         else:
             raise ValueError('Unsupported AWG type: {}'.format(type(obj)))
+
+    def _set_default_AWG(self, AWG):
+        self.AWG = self.AWG_obj(AWG=AWG)
+
+    def _get_default_AWG(self):
+        return self.AWG.name
+
     ###################################
     # AWG5014 specific helper functions
 
@@ -553,6 +577,23 @@ setTrigger(0);
         Returns: A list of id-s corresponding to the same group as `cid`.
         """
         return [cid[:3], cid[:3] + '_marker1', cid[:3] + '_marker2']
+
+    def _AWG5014_id_channel(self, cid, AWG):
+        """
+        Returns the channel name corresponding to the channel with id `cid` on
+        the AWG `AWG`.
+
+        Args:
+            cid: An id of one of the AWG5014 channels.
+            AWG: The name of the AWG.
+
+        Returns: The corresponding channel name. If the channel is not found,
+                 returns `None`.
+        """
+        for cname, cdict in self.channels.items():
+            if cdict['AWG'] == AWG and cdict['id'] == cid:
+                return cname
+        return None
 
     def _AWG5014_activate_channels(self, grps, AWG):
         """

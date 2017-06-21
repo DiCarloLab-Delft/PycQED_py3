@@ -1,16 +1,22 @@
 import numpy as np
 import unittest
+import time
 
 from pycqed.measurement.waveform_control.pulsar import Pulsar
 from pycqed.measurement.waveform_control import element
 from pycqed.measurement.pulse_sequences import single_qubit_tek_seq_elts as sqs
+from pycqed.instrument_drivers.virtual_instruments.virtual_awg5014 import \
+    VirtualAWG5014
+
 
 
 class Test_SingleQubitTek(unittest.TestCase):
 
     def setUp(self):
         # set up a pulsar with some mock settings for the element
-        self.pulsar = Pulsar()
+        self.AWG = VirtualAWG5014('AWG' + str(time.time()))
+        self.AWG.clock_freq(1e9)
+        self.pulsar = Pulsar('Pulsar' + str(time.time()), self.AWG.name)
         for i in range(4):
             self.pulsar.define_channel(id='ch{}'.format(i+1),
                                           name='ch{}'.format(i+1),
