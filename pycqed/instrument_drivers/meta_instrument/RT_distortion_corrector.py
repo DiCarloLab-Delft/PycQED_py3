@@ -16,7 +16,8 @@ from qcodes.plots.pyqtgraph import QtPlot
 
 
 class Distortion_corrector():
-    def __init__(self, kernel_object, nr_plot_points=1000):
+    def __init__(self, kernel_object, nr_plot_points=1000,
+                 auto_save_plots=True):
         '''
         Instantiates an object.
 
@@ -50,6 +51,7 @@ class Distortion_corrector():
         self.kernel_dir = self.ker_obj.kernel_dir()
         self.data_dir = self.kernel_dir  # where traces and plots are saved
         self._iteration = 0
+        self.auto_save_plots = auto_save_plots
 
         # Data
         self.waveform = []
@@ -608,7 +610,8 @@ class Distortion_corrector():
                 continue
 
             # Fit was accepted -> save plot
-            self.save_plot('fit_{}.png'.format(self._iteration))
+            if self.auto_save_plots:
+                self.save_plot('fit_{}.png'.format(self._iteration))
 
             # 3. Test correction and plot
             # Save last data, in case new distortion is rejected.
@@ -638,7 +641,8 @@ class Distortion_corrector():
                 continue
 
             # Correction was accepted -> save plot
-            self.save_plot('trace_{}.png'.format(self._iteration))
+            if self.auto_save_plots:
+                self.save_plot('trace_{}.png'.format(self._iteration))
 
             # 4. Apply correction
             print('Applying new correction.')
