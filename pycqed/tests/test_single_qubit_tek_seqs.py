@@ -84,7 +84,7 @@ class Test_SingleQubitTek(unittest.TestCase):
             t_ROm = el.effective_pulse_start_time('Acq-trigger-0', 'ch1')
             self.assertAlmostEqual(t_RO, t_ROm, places=10)
             # test if fix point put pulses at the right spot.
-            self.assertAlmostEqual(t_RO % 1e-6, 0)
+            self.assertAlmostEqual(t_RO, np.round(t_RO / 1e-6) * 1e-6)
             # Check pulse delay
             if i < (len(times)-4):
                 t0 = el.effective_pulse_start_time('SSB_DRAG_pulse_0-0', 'ch1')
@@ -127,7 +127,7 @@ class Test_SingleQubitTek(unittest.TestCase):
                     self.assertAlmostEqual(t_RO, t_ROm, places=10)
 
                     # test if fix point put pulses at the right spot.
-                    self.assertAlmostEqual(t_RO % 1e-6, 0)
+                    self.assertAlmostEqual(t_RO, np.round(t_RO/1e-6) * 1e-6)
 
                     # Check Ramsey pulse spacing
                     if i < (len(times)-4):
