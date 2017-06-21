@@ -597,6 +597,8 @@ class QASM_QuMIS_Compiler():
         '''
         Resolve qubit name and map declared qubits into physical qubits.
         Arrange all operations into a timing grid.
+
+        The timing grid is defined in terms of clocks.
         '''
         self.timing_grid = []
 

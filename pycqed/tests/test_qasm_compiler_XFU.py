@@ -175,6 +175,37 @@ class Test_compiler(unittest.TestCase):
         self.assertEqual(
             instrs[-1], self.jump_to_start)
 
+    def test_get_timepoints(self):
+        qasm_file = mqqs.chevron_block_seq_xf('q0', 'q1', RO_target='q0',
+                                              no_of_points=5)
+        qasm_fn = qasm_file.name
+        qumis_fn = join(self.test_file_dir, "output.qumis")
+        compiler = qcx.QASM_QuMIS_Compiler(self.simple_config_fn,
+                                           verbosity_level=6)
+        compiler.compile(qasm_fn, qumis_fn)
+        print(compiler.timing_grid, sep='\n')
+        time_pts = qcx.get_timepoints_from_label(
+            'cz', compiler.timing_grid,
+            start_label='qwg_trigger_1',
+            end_label='ro')
+        cz_pts = time_pts['target_tps']
+        self.assertEqual(len(cz_pts), 1)
+        t_cz = cz_pts[0].absolute_time
+        # Time of time points is in clocks
+        # 500ns specified
+        self.assertEqual(cz_pts[0].following_waiting_time, 100)
+        t_ro = time_pts['end_tp'].absolute_time
+        self.assertEqual(t_ro-t_cz, 100)
+
+        t_trigg = time_pts['start_tp'].absolute_time
+        self.assertEqual(t_cz-t_trigg, 7)
+
+        time_pts = qcx.get_timepoints_from_label(
+            'cz', compiler.timing_grid,
+            start_label=None,
+            end_label=None)
+        self.assertEqual(len(time_pts['target_tps']), 5)
+
     def test_qasm_wait_timing_trigger_T1(self):
         # Tests the timing of the qasm sequences using a T1 sequence
         # 'q1' contains "trigger" instructions
