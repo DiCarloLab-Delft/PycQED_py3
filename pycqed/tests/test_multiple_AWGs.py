@@ -1,5 +1,4 @@
 import unittest
-import numpy as np
 
 import qcodes as qc
 from pycqed.instrument_drivers.virtual_instruments.virtual_awg5014 import \

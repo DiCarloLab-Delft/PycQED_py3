@@ -364,7 +364,7 @@ class Pulsar(Instrument):
             if (el['repetitions'] < 1) or (el['repetitions'] > 65536):
                 raise Exception(
                     'Pulsar: The number of repetitions of AWG "{}" element "{}"'
-                    ' are out of range. Valid range = 1 to 65536 ("%s" received'
+                    ' are out of range. Valid range = 1 to 65536 ("{}" received'
                     ')'.format(obj.name, el['wfname'], el['repetitions'])
                 )
             if el['goto_target'] is not None:
