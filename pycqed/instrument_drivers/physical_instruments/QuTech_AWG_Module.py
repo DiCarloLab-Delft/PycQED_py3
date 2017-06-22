@@ -29,6 +29,7 @@ class HandshakeParameter(StandardParameter):
     instrument.ask instead of instrument.write
     """
     # pass
+
     def _set_set(self, set_cmd, set_parser):
         exec_str = self._instrument.ask if self._instrument else None
         if isinstance(set_cmd, str):
@@ -52,8 +53,8 @@ class QuTech_AWG_Module(SCPI):
         self.device_descriptor.numMarkersPerChannel = 2
         self.device_descriptor.numMarkers = 8
         self.device_descriptor.numTriggers = 8
-        # Commented out until bug fixed
-        self.device_descriptor.numCodewords = 8 # 128
+        # 128 is commented out until bug fixed
+        self.device_descriptor.numCodewords = 8  # 128
 
         # valid values
         self.device_descriptor.mvals_trigger_impedance = vals.Enum(50),
@@ -97,11 +98,11 @@ class QuTech_AWG_Module(SCPI):
                                label=('Transformation matrix channel' +
                                       'pair {}'.format(i)),
                                get_cmd=self._gen_ch_get_func(
-                                    self._getMatrix, ch_pair),
-                               set_cmd=self._gen_ch_set_func(
-                                    self._setMatrix, ch_pair),
-                               # NB range is not a hardware limit
-                               vals=vals.Arrays(-2, 2, shape=(2, 2)))
+                self._getMatrix, ch_pair),
+                set_cmd=self._gen_ch_set_func(
+                self._setMatrix, ch_pair),
+                # NB range is not a hardware limit
+                vals=vals.Arrays(-2, 2, shape=(2, 2)))
 
         for i in range(1, self.device_descriptor.numTriggers+1):
             triglev_cmd = 'qutech:trigger{}:level'.format(i)
