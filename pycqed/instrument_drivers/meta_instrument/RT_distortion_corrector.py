@@ -140,6 +140,7 @@ class Distortion_corrector():
                               '{}_combined.json'.format(self.filename))
 
         # Configure kernel object
+        # TODO: kernel list should not be emptied for cryo corrections
         self.ker_obj.kernel_list([])
         self.ker_obj.add_kernel_to_kernel_list(
             '{}_combined.json'.format(self.filename))
@@ -390,9 +391,11 @@ class Distortion_corrector():
             print(e)
             err = True
 
+        plot_t_pts = self.time_pts[:len(self.waveform)]
+
         # Plot
         self.vw.clear()
-        self.vw.add(x=self.time_pts[start_idx:stop_idx:step],
+        self.vw.add(x=plot_t_pts[start_idx:stop_idx:step],
                     y=self.waveform[start_idx:stop_idx:step],
                     symbol='o')
         self.vw.add(x=[start_time, stop_time],
@@ -812,7 +815,9 @@ class RT_distortion_corrector(Distortion_corrector):
 
 
 class Cryo_distortion_corrector(Distortion_corrector):
-    def __init__(self, time_pts, qubit, AWG_lutman, nr_plot_points=1000):
+    def __init__(self, time_pts, qubit, AWG_lutman, dac_flux_coefficient,
+                 V_0=0, f_demod=0, square_amp=1, nr_plot_points=1000,
+                 chunk_size=32):
         '''
         Instantiate an object.
         This class uses qubit.measure_ram_z to measure the step response.
@@ -829,11 +834,18 @@ class Cryo_distortion_corrector(Distortion_corrector):
                     Number of points of the waveform that are plotted. Can be
                     changed in self.nr_plot_points.
         '''
+        # TODO: add filename initialization
         self.AWG_lutman = AWG_lutman
         self.qubit = qubit
         super().__init__(kernel_object=AWG_lutman.F_kernel_instr.get_instr(),
                          nr_plot_points=nr_plot_points)
         self.time_pts = time_pts
+
+        self.chunk_size=chunk_size
+        self.dac_flux_coefficient = dac_flux_coefficient
+        self.V_0 = V_0
+        self.f_demod = f_demod
+        self.square_amp = square_amp
 
     def measure_trace(self, verbose=True):
         '''
@@ -844,11 +856,15 @@ class Cryo_distortion_corrector(Distortion_corrector):
         self.AWG_lutman.load_pulse_onto_AWG_lookuptable('square')
         self.AWG_lutman.QWG.get_instr().start()
 
-        self.qubit.measure_ram_z(self.time_pts, rec_Y90=False)
-        self.qubit.measure_ram_z(self.time_pts, rec_Y90=True)
-        a = ma.Ram_Z_Analysis()  # TODO: needs params!
+        self.qubit.measure_ram_z(self.time_pts, rec_Y90=False,
+                                 chunk_size=self.chunk_size)
+        self.qubit.measure_ram_z(self.time_pts, rec_Y90=True,
+                                 chunk_size=self.chunk_size)
+        a = ma.Ram_Z_Analysis(f01max=self.qubit.f_max(),
+                              E_c=self.qubit.E_c(),
+                              d_c=self.dac_flux_coefficient,
+                              V_0=self.V_0, flux_amp=self.square_amp,
+                              f_demod=self.f_demod)
         self.data_dir = a.folder
 
         self.waveform = a.step_response
-        # TODO: Update time_pts to have the same length as waveform.
-        #       Or perhaps do this in measure_trace.
