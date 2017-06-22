@@ -109,6 +109,11 @@ class CBox_v3_driven_transmon(Transmon):
                            initial_value=0.4)
 
     def add_parameters(self):
+        self.add_parameter('qasm_config',
+                           docstring='used for generating qumis instructions',
+                           parameter_class=ManualParameter,
+                           vals=vals.Anything())
+
         self.add_parameter('acquisition_instrument',
                            set_cmd=self._set_acquisition_instr,
                            get_cmd=self._get_acquisition_instr,
@@ -1065,7 +1070,8 @@ class CBox_v3_driven_transmon(Transmon):
 
         return a.fit_res.params['fidelity_per_Clifford'].value
 
-    def measure_randomized_benchmarking_vs_pars(self, amps=None, motzois=None, freqs=None,
+    def measure_randomized_benchmarking_vs_pars(self, amps=None,
+                                                motzois=None, freqs=None,
                                                 nr_cliffords=80, nr_seeds=50,
                                                 restless=False,
                                                 log_length=8000):
@@ -1345,8 +1351,16 @@ class CBox_v3_driven_transmon(Transmon):
         if MC is None:
             MC = self.MC.get_instr()
 
-        # return value needs to be added in measure_transients
+        # Ensure that enough averages are used to get accurate weights
+        old_avg = self.RO_acq_averages()
+        self.RO_acq_averages(4096)
+        MC.soft_avg(4)
+
         transients = self.measure_transients(MC=MC, analyze=analyze)
+
+        self.RO_acq_averages(old_avg)
+        MC.soft_avg(self.RO_soft_averages())
+
         # Calculate optimal weights
         optimized_weights_I = transients[1][0] - transients[0][0]
         optimized_weights_I = optimized_weights_I - \
@@ -1389,9 +1403,14 @@ class CBox_v3_driven_transmon(Transmon):
         # FIXME: remove when integrating UHFQC
         self.CBox.get_instr().log_length(1024*6)
         qasm_file = sqqs.butterfly(self.name, initialize=initialize)
-        s = swf.QASM_Sweep(qasm_file.name, self.CBox.get_instr(), self.get_operation_dict(),
-                           parameter_name='Shots')
-
+        # s = swf.QASM_Sweep(qasm_file.name, self.CBox.get_instr(),
+        #                    self.get_operation_dict(),
+        #                    parameter_name='Shots')
+        s = swf.QASM_Sweep_v2(qasm_fn=qasm_file.name,
+                              config=self.qasm_config(),
+                              CBox=self.CBox.get_instr(),
+                              verbosity_level=1,
+                              parameter_name='Shots')
         # d = qh.CBox_integration_logging_det_CC(self.CBox)
         d = self.int_log_det
         MC.set_sweep_function(s)
@@ -1403,6 +1422,8 @@ class CBox_v3_driven_transmon(Transmon):
             self.msmt_suffix, initialize))
         # turn plotting back on
         MC.live_plot_enabled(old_plot_setting)
+
+
         # first perform SSRO analysis to extract the optimal rotation angle
         # theta
         if self.RO_acq_weights() != 'optimal':

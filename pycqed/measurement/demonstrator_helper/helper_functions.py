@@ -47,7 +47,7 @@ def execute_qasm_file(file_url: str, config_json: str=None,
     qasm_fp = _retrieve_file_from_url(file_url)
     sweep_points = _get_qasm_sweep_points(qasm_fp)
 
-    s = qh.QASM_Sweep_v2(qasm_fn=qasm_fp, config_fn=config_fn, CBox=CBox,
+    s = swf.QASM_Sweep_v2(qasm_fn=qasm_fp, config_fn=config_fn, CBox=CBox,
                          verbosity_level=verbosity_level)
     d = det.UHFQC_integrated_average_detector(
         device.acquisition_instrument.get_instr(),
