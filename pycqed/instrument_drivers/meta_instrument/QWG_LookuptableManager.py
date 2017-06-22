@@ -367,6 +367,15 @@ class QWG_FluxLookuptableManager(Instrument):
 
         return self._wave_dict
 
+    def generate_composite_flux_pulse(self, time_tuples: list):
+        """
+        takes a list time_tuples (time, pulse_name) and creates a composite
+        pulse using the parameters stored in the flux lutman.
+        """
+        waveform = None
+        return waveform
+
+
     def regenerate_pulse(self, pulse_name):
         '''
         Regenerates a single pulse. The pulse is updated in self._wave_dict
