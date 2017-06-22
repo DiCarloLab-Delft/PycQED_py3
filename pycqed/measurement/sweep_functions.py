@@ -1,10 +1,11 @@
 import logging
 import time
 import os
+import numpy as np
 from pycqed.measurement.waveform_control_CC import qasm_compiler as qcx
 from pycqed.instrument_drivers.virtual_instruments.pyqx import qasm_loader as ql
 from pycqed.measurement.waveform_control_CC import qasm_to_asm as qta
-from pycqed.instrument_drivers.physical_instruments._controlbox import qasm_compiler as qcx
+from pycqed.measurement.waveform_control_CC import qasm_compiler as qcx
 
 
 class Sweep_function(object):

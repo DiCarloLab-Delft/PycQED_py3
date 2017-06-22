@@ -4,7 +4,6 @@ import pycqed.measurement.detector_functions as det
 from pycqed.analysis.analysis_toolbox import rotate_and_normalize_data
 from qcodes.instrument.parameter import ManualParameter
 import pycqed.analysis.measurement_analysis as ma
-from pycqed.instrument_drivers.physical_instruments._controlbox import qasm_compiler as qcx
 import numpy as np
 import os
 import json
@@ -12,43 +11,6 @@ import json
 
 # this is here for backwards compatibility purposes, there is only one QASM swf
 QASM_Sweep = swf.QASM_Sweep
-
-
-class QASM_Sweep_v2(swf.Hard_Sweep):
-    """
-    Sweep function for a QASM file, using the XFu compiler to generate QuMis
-
-
-    Differs from the previous version in that it uses the QASM compiler by Xiang
-    """
-
-    def __init__(self, qasm_fn: str, config_fn: str, CBox,
-                 parameter_name: str ='Points', unit: str='a.u.',
-                 upload: bool=True, verbosity_level: int=0):
-        super().__init__()
-        self.name = 'QASM_Sweep'
-
-        self.qasm_fn = qasm_fn
-        self.config_fn = config_fn
-        self.CBox = CBox
-        self.upload = upload
-
-        self.parameter_name = parameter_name
-        self.unit = unit
-        self.verbosity_level = verbosity_level
-
-    def prepare(self, **kw):
-        self.CBox.trigger_source('internal')
-        if self.upload:
-            qasm_folder, fn = os.path.split(self.qasm_fn)
-            base_fn = fn.split('.')[0]
-            qumis_fn = os.path.join(qasm_folder, base_fn + ".qumis")
-            compiler = qcx.QASM_QuMIS_Compiler(self.config_fn,
-                                               verbosity_level=self.verbosity_level)
-            compiler.compile(self.qasm_fn, qumis_fn)
-            # qumis_file = qta.qasm_to_asm(self.file_path, self.config_filepath)
-            self.CBox.load_instructions(qumis_fn)
-
 
 class ASM_Sweep(swf.Hard_Sweep):
 

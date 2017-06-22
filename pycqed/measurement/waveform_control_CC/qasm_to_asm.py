@@ -88,6 +88,7 @@ def qasm_to_asm(qasm_filepath, operation_dict):
             elif elts[0] == 'I':
                 clock_waits = int(int(elts[1])//5)
                 instruction = 'wait {} \n'.format(clock_waits)
+                asm_file.writelines(instruction)
             else:
                 raise ValueError(
                     'Command "{}" not recognized, must be in {}'.format(

@@ -2,8 +2,9 @@ from qcodes.instrument.base import Instrument
 from qcodes.utils import validators as vals
 from qcodes.instrument.parameter import ManualParameter
 from pycqed.instrument_drivers.pq_parameters import InstrumentParameter
-from pycqed.analysis import  multiplexed_RO_analysis as mra
+from pycqed.analysis import multiplexed_RO_analysis as mra
 from pycqed.measurement.waveform_control_CC import multi_qubit_module_CC as mqmc
+
 
 class DeviceObject(Instrument):
 
@@ -116,15 +117,17 @@ class TwoQubitDevice(DeviceObject):
 
     def __init__(self, name, **kw):
         super().__init__(name, **kw)
-        self.add_parameter('RO_LutManMan',
-                           docstring='Used for generating multiplexed RO pulses',
-                           parameter_class=InstrumentParameter)
+        self.add_parameter(
+            'RO_LutManMan',
+            docstring='Used for generating multiplexed RO pulses',
+            parameter_class=InstrumentParameter)
 
         # N.B. for now the "central_controller" can be a CBox_v3
         self.add_parameter('central_controller',
                            parameter_class=InstrumentParameter)
 
-        self.add_parameter('RO_LO_freq', unit='Hz',
+        self.add_parameter(
+            'RO_LO_freq', unit='Hz',
             docstring=('Frequency of the common LO for all RO pulses.'),
             parameter_class=ManualParameter)
 
@@ -136,7 +139,6 @@ class TwoQubitDevice(DeviceObject):
 
         q0 = self.find_instrument(self.qubits()[0])
         q1 = self.find_instrument(self.qubits()[1])
-
 
         if q0.RO_acq_weight_function_I() == q1.RO_acq_weight_function_I():
             raise ValueError('Cannot use same weight for both qubits')
@@ -170,7 +172,7 @@ class TwoQubitDevice(DeviceObject):
                 analyze=True, verify=verify_optimal_weights)
 
         mqmc.measure_two_qubit_ssro(self, q0.name, q1.name, no_scaling=True,
-                                   result_logging_mode='lin_trans')
+                                    result_logging_mode='lin_trans')
 
         res_dict = mra.two_qubit_ssro_fidelity(
             label='{}_{}'.format(q0.name, q1.name),
@@ -183,9 +185,9 @@ class TwoQubitDevice(DeviceObject):
         UHFQC.upload_transformation_matrix(res_dict['mu_matrix_inv'])
 
         mqmc.measure_two_qubit_ssro(self, q0.name, q1.name, no_scaling=True,
-                                   result_logging_mode='lin_trans')
+                                    result_logging_mode='lin_trans')
 
-        return  mra.two_qubit_ssro_fidelity(
+        return mra.two_qubit_ssro_fidelity(
             label='{}_{}'.format(q0.name, q1.name),
             qubit_labels=[q0.name, q1.name])
 
@@ -193,7 +195,7 @@ class TwoQubitDevice(DeviceObject):
         q0_name = self.qubits()[0]
         q1_name = self.qubits()[1]
         mqmc.measure_two_qubit_ssro(self, q0_name, q1_name, no_scaling=True,
-                                   result_logging_mode='lin_trans')
+                                    result_logging_mode='lin_trans')
 
         return mra.two_qubit_ssro_fidelity(
             label='{}_{}'.format(q0_name, q1_name),

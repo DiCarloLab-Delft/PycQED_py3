@@ -272,7 +272,6 @@ class CBox_v3_driven_transmon(Transmon):
                            label='Optimized weights for Q channel',
                            parameter_class=ManualParameter)
 
-
     def prepare_for_continuous_wave(self):
         self.prepare_readout()
 
@@ -1001,7 +1000,8 @@ class CBox_v3_driven_transmon(Transmon):
 
         MC.run('Motzoi_XY'+self.msmt_suffix)
         if analyze:
-            a = ma.Motzoi_XY_analysis(auto=True, cal_points=None, close_fig=close_fig)
+            a = ma.Motzoi_XY_analysis(
+                auto=True, cal_points=None, close_fig=close_fig)
             return a
 
     def measure_randomized_benchmarking(self, nr_cliffords=2**np.arange(12),
@@ -1118,8 +1118,8 @@ class CBox_v3_driven_transmon(Transmon):
                                  times[-1]+times[3])])
 
         T1 = sqqs.T1(self.name, times=times)
-        s = qh.QASM_Sweep(T1.name, self.CBox.get_instr(), self.get_operation_dict(),
-                          parameter_name='Time', unit='s')
+        s = swf.QASM_Sweep(T1.name, self.CBox.get_instr(), self.get_operation_dict(),
+                           parameter_name='Time', unit='s')
         d = self.int_avg_det
 
         MC.set_sweep_function(s)
@@ -1172,8 +1172,8 @@ class CBox_v3_driven_transmon(Transmon):
 
         Ramsey = sqqs.Ramsey(
             self.name, times=times, artificial_detuning=None)
-        s = qh.QASM_Sweep(Ramsey.name, self.CBox.get_instr(), self.get_operation_dict(),
-                          parameter_name='Time', unit='s')
+        s = swf.QASM_Sweep(Ramsey.name, self.CBox.get_instr(), self.get_operation_dict(),
+                           parameter_name='Time', unit='s')
         d = self.int_avg_det
         MC.set_sweep_function(s)
         MC.set_sweep_points(times)
@@ -1216,8 +1216,8 @@ class CBox_v3_driven_transmon(Transmon):
             raise ValueError('timesteps must be multiples of modulation freq')
 
         echo = sqqs.echo(self.name, times=times, artificial_detuning=None)
-        s = qh.QASM_Sweep(echo.name, self.CBox.get_instr(), self.get_operation_dict(),
-                          parameter_name='Time', unit='s')
+        s = swf.QASM_Sweep(echo.name, self.CBox.get_instr(), self.get_operation_dict(),
+                           parameter_name='Time', unit='s')
         d = self.int_avg_det
         MC.set_sweep_function(s)
         MC.set_sweep_points(times)
@@ -1235,7 +1235,7 @@ class CBox_v3_driven_transmon(Transmon):
             MC = self.MC.get_instr()
 
         AllXY = sqqs.AllXY(self.name, double_points=True)
-        s = qh.QASM_Sweep(
+        s = swf.QASM_Sweep(
             AllXY.name, self.CBox.get_instr(), self.get_operation_dict())
         d = self.int_avg_det
         MC.set_sweep_function(s)
@@ -1263,8 +1263,8 @@ class CBox_v3_driven_transmon(Transmon):
                                            number_of_flips[-1]+number_of_flips[3])])
         flipping_sequence = sqqs.flipping_seq(self.name, number_of_flips,
                                               equator=equator)
-        s = qh.QASM_Sweep(flipping_sequence.name, self.CBox.get_instr(),
-                          self.get_operation_dict())
+        s = swf.QASM_Sweep(flipping_sequence.name, self.CBox.get_instr(),
+                           self.get_operation_dict())
         d = self.int_avg_det
 
         MC.set_sweep_function(s)
@@ -1291,8 +1291,8 @@ class CBox_v3_driven_transmon(Transmon):
         # FIXME: remove when integrating UHFQC
         self.CBox.get_instr().log_length(1024*6)
         off_on = sqqs.off_on(self.name)
-        s = qh.QASM_Sweep(off_on.name, self.CBox.get_instr(),
-                          self.get_operation_dict(), parameter_name='Shots')
+        s = swf.QASM_Sweep(off_on.name, self.CBox.get_instr(),
+                           self.get_operation_dict(), parameter_name='Shots')
         d = self.int_log_det
         MC.set_sweep_function(s)
         MC.set_sweep_points(np.arange(nr_shots))
@@ -1389,8 +1389,8 @@ class CBox_v3_driven_transmon(Transmon):
         # FIXME: remove when integrating UHFQC
         self.CBox.get_instr().log_length(1024*6)
         qasm_file = sqqs.butterfly(self.name, initialize=initialize)
-        s = qh.QASM_Sweep(qasm_file.name, self.CBox.get_instr(), self.get_operation_dict(),
-                          parameter_name='Shots')
+        s = swf.QASM_Sweep(qasm_file.name, self.CBox.get_instr(), self.get_operation_dict(),
+                           parameter_name='Shots')
 
         # d = qh.CBox_integration_logging_det_CC(self.CBox)
         d = self.int_log_det
@@ -1575,7 +1575,8 @@ class CBox_v3_driven_transmon(Transmon):
         # Set the delay between the pihalf pulses to be long enough to fit the
         # flux pulse
         if wait_during_flux == 'auto':
-            # Round to the next integer multiple of qubit pulse modulation period
+            # Round to the next integer multiple of qubit pulse modulation
+            # period
             T_pulsemod = np.abs(1/self.f_pulse_mod())
             wait_between = np.ceil(max(lengths) / T_pulsemod) * T_pulsemod
         else:
@@ -1589,7 +1590,7 @@ class CBox_v3_driven_transmon(Transmon):
                 'duration': 10,
                 'instruction': ins_lib.qwg_cw_trigger(
                     int(codeword), cw_channels=f_lutman.codeword_channels())
-                }
+            }
 
         # Create the sequence
         self.prepare_for_timedomain()
