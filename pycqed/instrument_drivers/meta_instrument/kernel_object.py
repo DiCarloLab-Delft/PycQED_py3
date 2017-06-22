@@ -8,7 +8,7 @@ from qcodes.utils import validators as vals
 from qcodes.instrument.parameter import ManualParameter
 
 from pycqed.measurement.kernel_functions import (
-    loggingkernel_generic, htilde_bounce,
+    kernel_generic, htilde_bounce,
     htilde_skineffect, save_kernel, step_bounce, step_skineffect,
     heaviside, kernel_generic2)
 
