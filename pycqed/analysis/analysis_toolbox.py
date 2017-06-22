@@ -717,7 +717,7 @@ def get_timestamps_in_range(timestamp_start, timestamp_end=None,
                             label=None, exact_label_match=True, folder=None):
     if folder is None:
         folder = datadir
-        
+
     datetime_start = datetime_from_timestamp(timestamp_start)
     if timestamp_end is None:
         datetime_end = datetime.datetime.today()
@@ -1394,8 +1394,8 @@ def rotate_and_normalize_data(data, cal_zero_points=None, cal_one_points=None,
     Rotates and normalizes data with respect to some reference coordinates.
     there are two ways to specify the reference coordinates.
         1. Explicitly defining the coordinates
-        2. Specifying which elements of the input data correspond to
-            zero and one
+        2. Specifying which elements of the input data correspond to zero
+            and one
     Inputs:
         data (numpy array) : 2D dataset that has to be rotated and normalized
         zero_coord (tuple) : coordinates of reference zero
@@ -1406,86 +1406,92 @@ def rotate_and_normalize_data(data, cal_zero_points=None, cal_one_points=None,
                                  correspond to one
     '''
     # Extract zero and one coordinates
-    if zero_coord is not None:
-        I_zero = zero_coord[0]
-        Q_zero = zero_coord[1]
-    elif (zero_coord is None) and (number_of_cal_points == 2):
-        I_zero = data[0][cal_zero_points]
-        Q_zero = data[1][cal_zero_points]
+    if number_of_cal_points == 0:
+        normalized_data = rotate_and_normalize_data_no_cal_points(data=data)
     else:
-        I_zero = np.mean(data[0][cal_zero_points])
-        Q_zero = np.mean(data[1][cal_zero_points])
-        zero_coord = (I_zero, Q_zero)
-    if one_coord is not None:
-        I_one = one_coord[0]
-        Q_one = one_coord[1]
-    elif (one_coord is None) and (number_of_cal_points == 2):
-        I_one = 0
-        Q_one = 0
-    else:
-        I_one = np.mean(data[0][cal_one_points])
-        Q_one = np.mean(data[1][cal_one_points])
-        one_coord = (I_one, Q_one)
+        if zero_coord is not None:
+            I_zero = zero_coord[0]
+            Q_zero = zero_coord[1]
+        elif (zero_coord is None) and (number_of_cal_points == 2):
+            I_zero = data[0][cal_zero_points]
+            Q_zero = data[1][cal_zero_points]
+        else:
+            I_zero = np.mean(data[0][cal_zero_points])
+            Q_zero = np.mean(data[1][cal_zero_points])
+            zero_coord = (I_zero, Q_zero)
 
-    # Translate the data
-    trans_data = [data[0] - I_zero, data[1] - Q_zero]
+        if one_coord is not None:
+            I_one = one_coord[0]
+            Q_one = one_coord[1]
+        elif (one_coord is None) and (number_of_cal_points == 2):
+            I_one = 0
+            Q_one = 0
+        else:
+            I_one = np.mean(data[0][cal_one_points])
+            Q_one = np.mean(data[1][cal_one_points])
+            one_coord = (I_one, Q_one)
 
-    if number_of_cal_points == 2:
+        # Translate the data
+        trans_data = [data[0] - I_zero, data[1] - Q_zero]
 
-        from lmfit.models import LinearModel
+        if number_of_cal_points == 2:
+            # Least squares fitting to the line through the data, that also
+            # intercepts the calibration point
 
-        x = trans_data[0]
-        y = trans_data[1]
+            from lmfit.models import LinearModel
 
-        linear_model = LinearModel()
-        linear_model.set_param_hint('intercept',
-                                     value=0,
-                                     vary=False)
-        linear_model.set_param_hint('slope')
-        params = linear_model.make_params()
-        fit_res = linear_model.fit(data=y,
-                                   x=x,
-                                   params=params)
+            x = trans_data[0]
+            y = trans_data[1]
 
-        line_slope = fit_res.params['slope'].value
-        line_intercept = fit_res.params['intercept'].value
-        #finx the x, y coordinates of the projected points
-        x_proj=(x+line_slope*y-line_slope*line_intercept)/(line_slope**2+1)
-        y_proj= line_slope*(x_proj)+line_intercept
+            linear_model = LinearModel()
+            linear_model.set_param_hint('intercept',
+                                         value=0,
+                                         vary=False)
+            linear_model.set_param_hint('slope')
+            params = linear_model.make_params()
+            fit_res = linear_model.fit(data=y,
+                                       x=x,
+                                       params=params)
 
-        #find the minimum (on th ey axis) point on the line
-        y_min_line = min(fit_res.best_fit)
-        x_min_line = x[np.argmin(fit_res.best_fit)]
+            line_slope = fit_res.params['slope'].value
+            line_intercept = fit_res.params['intercept'].value
+            #finx the x, y coordinates of the projected points
+            x_proj=(x+line_slope*y-line_slope*line_intercept)/(line_slope**2+1)
+            y_proj= line_slope*(x_proj)+line_intercept
 
-        #find x,y coordinates with respect to end of line
-        x_data = np.abs(x_min_line - x_proj)
-        y_data = y_proj-y_min_line
+            #find the minimum (on th ey axis) point on the line
+            y_min_line = min(fit_res.best_fit)
+            x_min_line = x[np.argmin(fit_res.best_fit)]
 
-        #find distance from points on line to end of line
-        rotated_data = np.sqrt(x_data**2+y_data**2)
-        if rotated_data[0] > np.mean(rotated_data):
-            rotated_data = -rotated_data
-            rotated_data -= min(rotated_data)
+            #find x,y coordinates with respect to end of line
+            x_data = np.abs(x_min_line - x_proj)
+            y_data = y_proj-y_min_line
 
-        normalized_data = rotated_data
+            #find distance from points on line to end of line
+            rotated_data = np.sqrt(x_data**2+y_data**2)
+            if rotated_data[0] > np.mean(rotated_data):
+                rotated_data = -rotated_data
+                rotated_data -= min(rotated_data)
 
-        # #normlaize data
-        # max_min_distance = max(rotated_data) - min(rotated_data)
-        # normalized_data = (rotated_data - min(rotated_data))/max_min_distance
+            normalized_data = rotated_data
 
-    else:
-        # Rotate the data
-        M = calculate_rotation_matrix(I_one-I_zero, Q_one-Q_zero)
-        outp = [np.asarray(elem)[0] for elem in M * trans_data]
-        [rotated_data_ch1, rotated_data_ch2] = outp
+            # #normlaize data
+            # max_min_distance = max(rotated_data) - min(rotated_data)
+            # normalized_data = (rotated_data - min(rotated_data))/max_min_distance
 
-        # Normalize the data
-        one_zero_dist = np.sqrt((I_one-I_zero)**2 + (Q_one-Q_zero)**2)
-        normalized_data = rotated_data_ch1/one_zero_dist
+        else:
+            # Rotate the data
+            M = calculate_rotation_matrix(I_one-I_zero, Q_one-Q_zero)
+            outp = [np.asarray(elem)[0] for elem in M * trans_data]
+            [rotated_data_ch1, rotated_data_ch2] = outp
 
-        if normalized_data[0] > np.mean(normalized_data):
-            normalized_data = -normalized_data
-            normalized_data -= min(normalized_data)
+            # Normalize the data
+            one_zero_dist = np.sqrt((I_one-I_zero)**2 + (Q_one-Q_zero)**2)
+            normalized_data = rotated_data_ch1/one_zero_dist
+
+            if normalized_data[0] > np.mean(normalized_data):
+                normalized_data = -normalized_data
+                normalized_data -= min(normalized_data)
 
     return [normalized_data, zero_coord, one_coord]
 

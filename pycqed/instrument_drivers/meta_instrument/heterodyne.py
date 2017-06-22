@@ -114,13 +114,14 @@ class HeterodyneInstrument(Instrument):
 
     def prepare(self, get_t_base=True):
         # Uploading the AWG sequence
-        if (self._awg_seq_filename not in self.AWG.setup_filename() or
-                self._awg_seq_parameters_changed) and self.auto_seq_loading():
-            self._awg_seq_filename = \
-                st_seqs.generate_and_upload_marker_sequence(
-                    5e-9, self.trigger_separation(), RF_mod=False,
-                    acq_marker_channels=self.acq_marker_channels())
-            self._awg_seq_parameters_changed = False
+        if self.AWG!=None:
+            if (self._awg_seq_filename not in self.AWG.setup_filename() or
+                    self._awg_seq_parameters_changed) and self.auto_seq_loading():
+                self._awg_seq_filename = \
+                    st_seqs.generate_and_upload_marker_sequence(
+                        5e-9, self.trigger_separation(), RF_mod=False,
+                        acq_marker_channels=self.acq_marker_channels())
+                self._awg_seq_parameters_changed = False
 
         # Preparing the acquisition instruments
         if 'CBox' in self.acquisition_instr():
@@ -137,7 +138,8 @@ class HeterodyneInstrument(Instrument):
                 self.acquisition_instr(), self.__class__.__name__))
 
         # turn on the AWG and the MWGs
-        self.AWG.run()
+        if self.AWG!=None:
+            self.AWG.run()
         self.on()
 
     def prepare_CBox(self, get_t_base=True):
