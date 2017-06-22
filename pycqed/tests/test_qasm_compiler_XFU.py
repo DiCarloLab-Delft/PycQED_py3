@@ -188,7 +188,6 @@ class Test_compiler(unittest.TestCase):
         compiler = qcx.QASM_QuMIS_Compiler(self.simple_config_fn,
                                            verbosity_level=2)
         compiler.compile(qasm_fn, qumis_fn)
-        print(compiler.timing_grid, sep='\n')
         time_pts = get_timepoints_from_label(
             compiler.timing_grid, 'cz',
             start_label='qwg_trigger_1',
