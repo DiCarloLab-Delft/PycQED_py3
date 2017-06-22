@@ -53,8 +53,7 @@ class QuTech_AWG_Module(SCPI):
         self.device_descriptor.numMarkersPerChannel = 2
         self.device_descriptor.numMarkers = 8
         self.device_descriptor.numTriggers = 8
-        # 128 is commented out until bug fixed
-        self.device_descriptor.numCodewords = 8  # 128
+        self.device_descriptor.numCodewords = 128
 
         # valid values
         self.device_descriptor.mvals_trigger_impedance = vals.Enum(50),
