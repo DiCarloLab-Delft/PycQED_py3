@@ -145,7 +145,7 @@ class QuTech_AWG_Module(SCPI):
                 docstring='Amplitude channel {} (Vpp into 50 Ohm)'.format(ch),
                 get_cmd=amp_cmd + '?',
                 set_cmd=amp_cmd + ' {:.6f}',
-                vals=vals.Numbers(-2.0, 2.0),
+                vals=vals.Numbers(-1.8, 1.8),
                 get_parser=float)
 
             self.add_parameter('ch{}_offset'.format(ch),
@@ -205,6 +205,10 @@ class QuTech_AWG_Module(SCPI):
         if run_mode == 'NONE':
             raise RuntimeError('No run mode is specified')
         self.write('awgcontrol:run:immediate')
+
+        err_msg = self.getError()
+        if not err_msg.startswith('0'):
+            raise RuntimeError(err_msg)
 
     def _setMatrix(self, chPair, mat):
         '''
