@@ -61,6 +61,8 @@ class Pulsar(Instrument):
         self.last_sequence = None
         self.last_elements = None
 
+        self._clock_prequeried_state = False
+
     # channel handling
     def define_channel(self, id, name, type, delay, offset,
                        high, low, active, AWG=None):
