@@ -84,7 +84,7 @@ class QASM_QuMIS_Compiler():
                               *path_strings, self.compilation_completed)
         return rep
 
-    def __init__(self, config_filename=None, verbosity_level=1):
+    def __init__(self, config_filename: str='', verbosity_level: int=1):
         '''
         @param: config_filename, file specifies the user-defined operation
         dictionary, hardware specification and the LUTs.
@@ -111,12 +111,10 @@ class QASM_QuMIS_Compiler():
         self.compilation_completed = False
         self.qumis_fn = ''
         self.filename = ''
-
-        if config_filename is None:
-            logging.warning('No configuration specified')
         self.config_filename = config_filename
 
-    def compile(self, filename: str, qumis_fn: str=None)-> bool:
+    def compile(self, filename: str, qumis_fn: str=None,
+                config_fn: str ='', config: dict=None)-> bool:
         """
         Compiles the
         """
@@ -125,7 +123,7 @@ class QASM_QuMIS_Compiler():
         self.qumis_instructions = []   # final result that should be uploaded
         self.hw_timing_grid = []       # operations on hardware
         self.timing_grid = []          # quantum operations
-        self.load_config()
+        self.load_config(config_filename=config_fn, config=config)
         self.read_file()               # fills up self.prog_lines
         self.line_to_event()           # fills up self.raw_event_list
         self.build_dependency_graph()  # empty function for now
@@ -144,26 +142,27 @@ class QASM_QuMIS_Compiler():
     def build_dependency_graph(self):
         pass
 
-    def load_config(self, config_filename=None):
-        if config_filename is not None:
+    def load_config(self, config_filename: str='', config: dict =None):
+        if config_filename is not '':
             self.config_filename = config_filename
-        if self.config_filename is None:
+            with open(self.config_filename) as data_file:
+                self.config = json.load(data_file)
+        elif config is not None:
+            self.config = copy.deepcopy(config)
+        else:
             raise ValueError('No config specified')
+
         self.qasm_op_dict = None
-
-        with open(self.config_filename) as data_file:
-            self.data = json.load(data_file)
-
-        if not config_is_valid(self.data):
+        if not config_is_valid(self.config):
             # this error should be unreachable but is here for readability
             raise ValueError('Configuration is not valid')
 
-        self.hardware_spec = self.data["hardware specification"]
-        if "qubit_map" in self.data.keys():
-            self.qubit_map = self.data["qubit_map"]
+        self.hardware_spec = self.config["hardware specification"]
+        if "qubit_map" in self.config.keys():
+            self.qubit_map = self.config["qubit_map"]
             self.qubit_map_from_config = True
 
-        self.luts = self.data["luts"]
+        self.luts = self.config["luts"]
 
         self.physical_qubits = self.hardware_spec["qubit list"]
 
@@ -187,15 +186,17 @@ class QASM_QuMIS_Compiler():
                         trig_format.append(int(trig_dur / self.cycle_time))
                     self.qubit_cfgs[i][key]["format"] = trig_format
 
-        self.user_qasm_op_dict = self.data["operation dictionary"]
+        self.user_qasm_op_dict = self.config["operation dictionary"]
         for key in self.user_qasm_op_dict:
             op_spec = self.user_qasm_op_dict[key]
             op_type_str = op_spec["type"]
-            if op_type_str not in user_op_type:
-                se = SyntaxError("unsupported operation type ({})"
-                                 " found.".format(op_spec["type"]))
-                se.filename = self.config_filename
-                raise se
+            if op_type_str not in user_op_type.keys():
+                raise SyntaxError(
+                    "unsupported operation type ({}) for operation {}."
+                    ", supported types: {}".format(op_spec["type"],
+                                                   key, user_op_type))
+                # se.filename = self.config_filename
+                # raise se
 
             op_type_enum = user_op_type[op_type_str]
             op_spec["type"] = op_type_enum
@@ -264,7 +265,7 @@ class QASM_QuMIS_Compiler():
         data["hardware specification"] = hardware_spec
         data["luts"] = self.luts
         with open(config_fn, 'w') as outfile:
-            json.dump(self.data, outfile, indent=2)
+            json.dump(self.config, outfile, indent=2)
 
     def read_file(self):
         '''

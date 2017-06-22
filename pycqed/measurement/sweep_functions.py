@@ -266,14 +266,14 @@ class QASM_Sweep_v2(Hard_Sweep):
     Sweep function for a QASM file, using the XFu compiler to generate QuMis
     """
 
-    def __init__(self, qasm_fn: str, config_fn: str, CBox,
+    def __init__(self, qasm_fn: str, config: dict, CBox,
                  parameter_name: str ='Points', unit: str='a.u.',
                  upload: bool=True, verbosity_level: int=0):
         super().__init__()
         self.name = 'QASM_Sweep'
 
         self.qasm_fn = qasm_fn
-        self.config_fn = config_fn
+        self.config = config
         self.CBox = CBox
         self.upload = upload
 
@@ -285,16 +285,17 @@ class QASM_Sweep_v2(Hard_Sweep):
         self.CBox.trigger_source('internal')
         self.compile_and_upload()
 
-    def _compile_and_upload(self):
+    def compile_and_upload(self):
         if self.upload:
             qasm_folder, fn = os.path.split(self.qasm_fn)
             base_fn = fn.split('.')[0]
             qumis_fn = os.path.join(qasm_folder, base_fn + ".qumis")
-            compiler = qcx.QASM_QuMIS_Compiler(
-                self.config_fn, verbosity_level=self.verbosity_level)
-            compiler.compile(self.qasm_fn, qumis_fn)
+            self.compiler = qcx.QASM_QuMIS_Compiler(
+                verbosity_level=self.verbosity_level)
+            self.compiler.compile(self.qasm_fn, qumis_fn=qumis_fn,
+                                  config=self.config)
             self.CBox.load_instructions(qumis_fn)
-            return compiler
+            return self.compiler
 
 
 class QWG_flux_QASM_Sweep(QASM_Sweep_v2):
