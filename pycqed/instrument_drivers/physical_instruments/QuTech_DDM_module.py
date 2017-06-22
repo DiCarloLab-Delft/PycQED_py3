@@ -97,7 +97,7 @@ class DDMq(SCPI):
 
         self.add_additional_parameters()
 
-        if (self.version_info['swVersion'] != self.ranges_file_version or
+        if (self.version_info['swBuild'] != self.ranges_file_version or
                 self.parameter_limits_list_is_incomplete):
             self._store_parameter_limits()
 
@@ -113,6 +113,19 @@ class DDMq(SCPI):
         #######################################################################
         # DDM specific
         #######################################################################
+
+        ####################
+        # Correlation parameters
+        ####################
+        self.add_parameter('correlation_data',
+                           label=('Get correlation data'
+                                  ),
+                           docstring='It returns correlatio data written' +
+                           ' to correlation memory after measuremnet.' +
+                           ' Every weight pair has only one TV mode' +
+                           ' memory. It can be used either I or Q ',
+                           get_cmd=self._getCorrelationData
+                           )
 
         for i in range(number_of_channels//2):
             """
@@ -343,7 +356,7 @@ class DDMq(SCPI):
     # Make use of the validators' limits that are stored in a txt file
     def _setValidatorLimits(self, name, kwargs):
         if ('vals' in kwargs and 'set_cmd' in kwargs and 'get_cmd' in kwargs):
-            if (self.version_info['swVersion'] != self.ranges_file_version or
+            if (self.version_info['swBuild'] != self.ranges_file_version or
                     not (name in self.list_of_parameter_limits)):
                 self._updateValidatorLimits(name, kwargs)
             try:
@@ -440,6 +453,24 @@ class DDMq(SCPI):
         sys.stdout.flush()
         self._displayQBitErrors("TV Mode", ch_pair, wNr)
         self.write('qutech:tvmode{:d}:data{:d}? '.format(ch_pair, wNr))
+        binBlock = self.binBlockRead()
+        tvmodedata = np.frombuffer(binBlock, dtype=np.float32)
+        return tvmodedata
+
+    def _getCorrelationData(self):
+        finished = 0
+        while (finished != '1'):
+            finished = self._getCorrelationFinished()
+            print("\r Correlation (" + str(int(float(self._getCorrelationpercentage(
+                )))) + "%)", end='\0')
+            if (finished == 'ffffffff'):
+                break
+            elif (finished != '1'):
+                time.sleep(1.0/FINISH_BIT_CHECK_FERQUENTION_HZ)
+        print("\r", end='\0')
+        sys.stdout.flush()
+        self._displayQBitErrors("Correlation", 1, 1)
+        self.write('qutech:correlation:data? ')
         binBlock = self.binBlockRead()
         tvmodedata = np.frombuffer(binBlock, dtype=np.float32)
         return tvmodedata
@@ -589,6 +620,23 @@ class DDMq(SCPI):
     def _getLoggingStatus(self, ch_pair, wNr):
         return self.ask('qutech:errorfraction{:d}:status{:d}? '.format(
             ch_pair, wNr))
+
+    #################
+    # Correlation Mode
+    #################
+    def _getCorrelationStatus(self):
+        return self.ask('qutech:correlation:status? ')
+
+    def _getCorrelationFinished(self):
+        finished = self.ask('qutech:correlation:finished? ')
+        fmt_finished = format(int(float(finished)), 'x')
+        return fmt_finished
+
+    def _getCorrelationBusy(self):
+        return self.ask('qutech:correlation:busy? ')
+
+    def _getCorrelationpercentage(self):
+        return self.ask('qutech:correlation:percentage? ')
 
     #########################
     # Error fraction counters
@@ -923,7 +971,7 @@ class DDMq(SCPI):
         except Exception as e:
             log.warning("failed to open the " + path + ".(%s)", str(e))
 
-        if (self.version_info['swVersion'] == self.ranges_file_version):
+        if (self.version_info['swBuild'] == self.ranges_file_version):
             results = file_content["parameters"]
             self.parameter_limits_list_is_incomplete = False
         else:
@@ -953,7 +1001,7 @@ class DDMq(SCPI):
             except:
                 pass
 
-        if (self.version_info['swVersion'] == self.parameter_file_version):
+        if (self.version_info['swBuild'] == self.parameter_file_version):
             # Return the parameter list given by the txt file
             results = file_content["parameters"]
         else:
@@ -978,7 +1026,7 @@ class DDMq(SCPI):
         self.ranges_file_name = os.path.join(parameters_folder_path,
                                              'QuTech_DDM_Parameter_Limits.txt')
         version = {}
-        version["ddm_software_version"] = self.version_info['swVersion']
+        version["ddm_software_version"] = self.version_info['swBuild']
         file_content = {}
         file_content["version"] = version
         file_content["parameters"] = self.list_of_parameter_limits
@@ -1028,7 +1076,8 @@ class DDMq(SCPI):
         errors = errorList.splitlines()
         for error_str in errors:
             error = json.loads(error_str)
-            results.append(self.Error(error['error_code'], error['description']
+            if error['error_code']:
+                results.append(self.Error(error['error_code'], error['description']
                                       , error['error_level'], acquisitionMode))
         return results
 
