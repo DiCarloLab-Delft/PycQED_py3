@@ -439,22 +439,24 @@ class MeasurementAnalysis(object):
             raise ValueError('datasaving_format "%s " not recognized'
                              % datasaving_format)
 
-    def plot_results_vs_sweepparam(self, x, y, fig, ax, show=False, marker='-o',
+    def plot_results_vs_sweepparam(self, x, y, fig, ax, show=False,
+                                   marker='-o',
+                                   xlabel=None, x_unit=None,
+                                   ylabel=None, y_unit=None,
                                    log=False, label=None, **kw):
         save = kw.pop('save', False)
         self.plot_title = kw.pop('plot_title',
                                  textwrap.fill(self.timestamp_string + '_' +
                                                self.measurementstring, 40))
-        xlabel = kw.pop('xlabel', None)
-        ylabel = kw.pop('ylabel', None)
+
         ax.set_title(self.plot_title)
-        if xlabel is not None:
-            ax.set_xlabel(xlabel)
-        if ylabel is not None:
-            ax.set_ylabel(ylabel)
         ax.plot(x, y, marker, label=label)
         if log:
             ax.set_yscale('log')
+        if xlabel is not None:
+            set_xlabel(ax, xlabel, x_unit)
+        if ylabel is not None:
+            set_ylabel(ax, ylabel, y_unit)
         if show:
             plt.show()
         if save:
@@ -2810,12 +2812,13 @@ class T1_Analysis(TD_Analysis):
                     ax2 = axarray[i]
                 else:
                     ax2 = axarray[i/2, i % 2]
-
                 self.plot_results_vs_sweepparam(x=self.sweep_points,
                                                 y=self.measured_values[i],
                                                 fig=figarray, ax=ax2,
-                                                xlabel=self.xlabel,
-                                                ylabel=self.ylabels[i],
+                                                xlabel=self.parameter_names[0],
+                                                x_unit=self.parameter_units[0],
+                                                ylabel=self.value_names[i],
+                                                y_unit=self.value_units[i],
                                                 save=False)
 
         if 'I_cal' in self.value_names[i]:  # Fit the data
@@ -4352,8 +4355,9 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
                 # 'input has nan values')
                 kappa_guess = 1
 
-            if not peak_flag:  # Change the sign of amplitude_guess for dips
-                amplitude_guess *= -1.
+            # Commented out as this is an undefined variable
+            # if not peak_flag:  # Change the sign of amplitude_guess for dips
+            #     amplitude_guess *= -1.
 
             LorentzianModel = fit_mods.LorentzianModel
             LorentzianModel.set_param_hint('f0',
