@@ -2,7 +2,6 @@ import logging
 import pycqed.measurement.sweep_functions as swf
 import pycqed.measurement.detector_functions as det
 from pycqed.analysis.analysis_toolbox import rotate_and_normalize_data
-from pycqed.measurement.waveform_control_CC import qasm_to_asm as qta
 from qcodes.instrument.parameter import ManualParameter
 import pycqed.analysis.measurement_analysis as ma
 from pycqed.instrument_drivers.physical_instruments._controlbox import qasm_compiler as qcx
@@ -11,24 +10,8 @@ import os
 import json
 
 
-class QASM_Sweep(swf.Hard_Sweep):
-
-    def __init__(self, filename, CBox, op_dict,
-                 parameter_name='Points', unit='a.u.', upload=True):
-        super().__init__()
-        self.name = 'QASM_Sweep'
-        self.filename = filename
-        self.upload = upload
-        self.CBox = CBox
-        self.op_dict = op_dict
-        self.parameter_name = parameter_name
-        self.unit = unit
-
-    def prepare(self, **kw):
-        self.CBox.trigger_source('internal')
-        if self.upload:
-            qumis_file = qta.qasm_to_asm(self.filename, self.op_dict)
-            self.CBox.load_instructions(qumis_file.name)
+# this is here for backwards compatibility purposes, there is only one QASM swf
+QASM_Sweep = swf.QASM_Sweep
 
 
 class QASM_Sweep_v2(swf.Hard_Sweep):

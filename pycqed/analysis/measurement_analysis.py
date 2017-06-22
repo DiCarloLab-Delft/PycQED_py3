@@ -4,6 +4,7 @@ import numpy as np
 from scipy import stats
 import h5py
 from matplotlib import pyplot as plt
+from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
 from pycqed.analysis import analysis_toolbox as a_tools
 from pycqed.analysis import fitting_models as fit_mods
 from mpl_toolkits.axes_grid1 import make_axes_locatable
@@ -2048,7 +2049,6 @@ class SSRO_Analysis(MeasurementAnalysis):
                 set_ylabel(axarray[1], 'Dummy axis')
             axarray[1].set_xlim(-edge, edge)
             axarray[1].set_ylim(-edge, edge)
-
             self.save_fig(fig, figname='SSRO_Density_Plots',
                           close_fig=self.close_fig, **kw)
 
@@ -2659,8 +2659,8 @@ class SSRO_single_quadrature_discriminiation_analysis(MeasurementAnalysis):
         self.get_naming_and_values()
         hist, bins, centers = self.histogram_shots(self.shots)
         self.fit_data(hist, centers)
-        self.F_discr, self.opt_threshold = self.calculate_discrimination_fidelity(
-            fit_res=self.fit_res)
+        self.F_discr, self.opt_threshold = \
+            self.calculate_discrimination_fidelity(fit_res=self.fit_res)
 
         self.make_figures(hist=hist, centers=centers, **kw)
 
@@ -2735,7 +2735,6 @@ class SSRO_single_quadrature_discriminiation_analysis(MeasurementAnalysis):
                      verticalalignment='top', horizontalalignment='right',
                      transform=self.ax.transAxes)
         self.ax.legend()
-        # self.F_discr, self.opt_threshold
 
         # Prettifying the plot
         self.ax.ticklabel_format(useOffset=False)
@@ -2762,7 +2761,8 @@ class SSRO_single_quadrature_discriminiation_analysis(MeasurementAnalysis):
         for i, x in enumerate(x_fine):
             CDF_a[i] = .5 * erfc((mu_a-x)/(np.sqrt(2)*s_a))
             CDF_b[i] = .5 * erfc((mu_b-x)/(np.sqrt(2)*s_b))
-        F_discr = np.max(abs(CDF_a-CDF_b))
+        F_discr_conservative = np.max(abs(CDF_a-CDF_b))
+        F_discr = 1-(1-F_discr_conservative)/2
         opt_threshold = x_fine[np.argmax(abs(CDF_a-CDF_b))]
         return F_discr, opt_threshold
 

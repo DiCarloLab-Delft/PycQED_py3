@@ -2,6 +2,12 @@ from pycqed.utilities.general import mopen
 from os.path import join, dirname
 base_qasm_path = join(dirname(__file__), 'qasm_files')
 
+#  Calibration pulses for all two qubit sequences globally defined
+cal_points_2Q = [['', ''],
+                 ['X180 {}\n', ''],
+                 ['', 'X180 {}\n'],
+                 ['X180 {}\n', 'X180 {}\n']]
+
 
 def two_qubit_off_on(q0, q1, RO_target='all'):
     '''
@@ -17,27 +23,35 @@ def two_qubit_off_on(q0, q1, RO_target='all'):
 
     # off - off
     qasm_file.writelines('\ninit_all\n')
-    qasm_file.writelines('I {}\n'.format(q0))
-    qasm_file.writelines('I {}\n'.format(q1))
-    qasm_file.writelines('RO {}  \n'.format(RO_target))
+    if RO_target == 'all':
+        qasm_file.writelines('RO {} | RO {} \n'.format(q0, q1))
+    else:
+        qasm_file.writelines('RO {}  \n'.format(RO_target))
 
     # on - off
     qasm_file.writelines('\ninit_all\n')
     qasm_file.writelines('X180 {}\n'.format(q0))
-    qasm_file.writelines('I {}\n'.format(q1))
-    qasm_file.writelines('RO {}  \n'.format(RO_target))
+    if RO_target == 'all':
+        qasm_file.writelines('RO {} | RO {} \n'.format(q0, q1))
+    else:
+        qasm_file.writelines('RO {}  \n'.format(RO_target))
 
     # off - on
     qasm_file.writelines('\ninit_all\n')
-    qasm_file.writelines('I {}\n'.format(q0))
     qasm_file.writelines('X180 {}\n'.format(q1))
-    qasm_file.writelines('RO {}  \n'.format(RO_target))
+    if RO_target == 'all':
+        qasm_file.writelines('RO {} | RO {} \n'.format(q0, q1))
+    else:
+        qasm_file.writelines('RO {}  \n'.format(RO_target))
 
     # on - on
     qasm_file.writelines('\ninit_all\n')
     qasm_file.writelines('X180 {}\n'.format(q0))
     qasm_file.writelines('X180 {}\n'.format(q1))
-    qasm_file.writelines('RO {}  \n'.format(RO_target))
+    if RO_target == 'all':
+        qasm_file.writelines('RO {} | RO {} \n'.format(q0, q1))
+    else:
+        qasm_file.writelines('RO {}  \n'.format(RO_target))
 
     qasm_file.close()
     return qasm_file
@@ -82,19 +96,14 @@ def two_qubit_tomo_cardinal(cardinal,
             qasm_file.writelines(p_q0)
             qasm_file.writelines(p_q1)
             qasm_file.writelines('RO ' + RO_target + '  \n')
-
-    # Calibration pulses
-    cal_points = [['I ', 'I '],
-                  ['X180 ', 'I '],
-                  ['I ', 'X180 '],
-                  ['X180 ', 'X180 ']]
     cal_pulses = []
     # every calibration point is repeated 7 times. This is copied from the
     # script for Tektronix driven qubits. I do not know if this repetition
     # is important or even necessary here.
-    for seq in cal_points:
-        cal_pulses += [[seq[0] + q0 + '\n', seq[1] +
-                        q1 + '\n', 'RO ' + RO_target + '\n']] * 7
+    for seq in cal_points_2Q:
+        cal_pulses += [[seq[0].format(q0) +
+                        seq[1].format(q1) +
+                        'RO {} \n'.format(RO_target)]]
 
     for seq in cal_pulses:
         qasm_file.writelines('\ninit_all\n')
@@ -203,7 +212,7 @@ def two_qubit_AllXY(q0, q1, RO_target='all',
 
 def chevron_seq(q0, q1,
                 excite_q1=False, wait_after_trigger=40e-9,
-                wait_during_flux=400e-9, clock_cycle=5e-9, RO_target='all',
+                wait_during_flux=400e-9, clock_cycle=1e-9, RO_target='all',
                 mw_pulse_duration=40e-9):
     '''
     Single chevron sequence that does a swap on |01> <-> |10> or |11> <-> |20>.
@@ -233,12 +242,12 @@ def chevron_seq(q0, q1,
     if excite_q1:
         wait_after_trigger -= mw_pulse_duration
     qasm_file.writelines(
-        'I {} {}\n'.format(q0, int(wait_after_trigger//clock_cycle)))
+        'I {}\n'.format(int(wait_after_trigger//clock_cycle)))
     qasm_file.writelines('X180 {}\n'.format(q0))
     if excite_q1:
         qasm_file.writelines('X180 {}\n'.format(q1))
     qasm_file.writelines(
-        'I {} {}\n'.format(q1, int(wait_during_flux//clock_cycle)))
+        'I {}\n'.format(int(wait_during_flux//clock_cycle)))
     if excite_q1:
         # q0 is rotated to ground-state to have better contrast
         # (|0> and |2> instead of |1> and |2>)
@@ -252,7 +261,7 @@ def chevron_seq(q0, q1,
 
 def two_qubit_tomo_bell(bell_state, q0, q1,
                         wait_after_trigger=10e-9, wait_during_flux=260e-9,
-                        clock_cycle=5e-9,
+                        clock_cycle=1e-9,
                         single_qubit_compiled_phase=False,
                         RO_target='all'):
     '''
@@ -276,8 +285,8 @@ def two_qubit_tomo_bell(bell_state, q0, q1,
         tomo_list_q0 += [tp + q0 + '\n']
         tomo_list_q1 += [tp + q1 + '\n']
 
-    tomo_list_q0[0] = 'I {} 8\n'.format(q0)
-    tomo_list_q1[0] = 'I {} 8\n'.format(q1)
+    tomo_list_q0[0] = 'I 20\n'.format(q0)
+    tomo_list_q1[0] = 'I 20\n'.format(q1)
 
     # Choose a bell state and set the corresponding preparation pulses
     if bell_state % 10 == 0:  # |Phi_m>=|00>-|11>
@@ -303,9 +312,9 @@ def two_qubit_tomo_bell(bell_state, q0, q1,
 
     # Disable preparation pulse on one or the other qubit for debugging
     if bell_state//10 == 1:
-        prep_pulse_q1 = 'I {} 8'.format(q1)
+        prep_pulse_q1 = 'I 20'
     elif bell_state//10 == 2:
-        prep_pulse_q0 = 'I {} 8'.format(q0)
+        prep_pulse_q0 = 'I 20'
 
     # Define compensation pulses
     # FIXME: needs to be added
@@ -322,26 +331,22 @@ def two_qubit_tomo_bell(bell_state, q0, q1,
             qasm_file.writelines('\ninit_all\n')
             qasm_file.writelines('QWG trigger\n')
             qasm_file.writelines(
-                'I {} {}\n'.format(q0, int(wait_after_trigger//clock_cycle)))
+                'I {}\n'.format(int(wait_after_trigger//clock_cycle)))
             qasm_file.writelines(prep_pulse_q0)
             qasm_file.writelines(prep_pulse_q1)
             qasm_file.writelines(
-                'I {} {}\n'.format(q0, int(wait_during_flux//clock_cycle)))
+                'I {}\n'.format(int(wait_during_flux//clock_cycle)))
             qasm_file.writelines(after_pulse)
             qasm_file.writelines(p_q1)
             qasm_file.writelines(p_q0)
             qasm_file.writelines('RO ' + RO_target + '  \n')
 
     # Add calibration pulses
-    cal_points = [['I {} 8\n'.format(q0), 'I {} 8\n'.format(q1)],
-                  ['X180 {}\n'.format(q0), 'I {} 8\n'.format(q1)],
-                  ['I {} 8\n'.format(q0), 'X180 {}\n'.format(q1)],
-                  ['X180 {}\n'.format(q0), 'X180 {}\n'.format(q1)]]
     cal_pulses = []
     # every calibration point is repeated 7 times. This is copied from the
     # script for Tektronix driven qubits. I do not know if this repetition
     # is important or even necessary here.
-    for seq in cal_points:
+    for seq in cal_points_2Q:
         cal_pulses += [[seq[0], seq[1], 'RO ' + RO_target + '\n']] * 7
 
     for seq in cal_pulses:
@@ -358,7 +363,7 @@ def CZ_calibration_seq(q0, q1, RO_target='all',
                        cases=('no_excitation', 'excitation'),
                        wait_after_trigger=40e-9,
                        wait_during_flux=280e-9,
-                       clock_cycle=5e-9,
+                       clock_cycle=1e-9,
                        mw_pulse_duration=40e-9):
     '''
     Sequence used to calibrate flux pulses for CZ gates.
@@ -388,12 +393,12 @@ def CZ_calibration_seq(q0, q1, RO_target='all',
             # Decrease wait time because there is an additional pulse
             waitTime -= mw_pulse_duration
         qasm_file.writelines(
-            'I {} {}\n'.format(q0, int(waitTime//clock_cycle)))
+            'I {}\n'.format(int(waitTime//clock_cycle)))
         if case == 'excitation':
             qasm_file.writelines('X180 {}\n'.format(q1))
         qasm_file.writelines('X90 {}\n'.format(q0))
         qasm_file.writelines(
-            'I {} {}\n'.format(q0, int(wait_during_flux//clock_cycle)))
+            'I {}\n'.format(int(wait_during_flux//clock_cycle)))
         qasm_file.writelines('Rphi90 {}\n'.format(q0))
         if case == 'excitation':
             qasm_file.writelines('X180 {}\n'.format(q1))
@@ -404,14 +409,14 @@ def CZ_calibration_seq(q0, q1, RO_target='all',
     return qasm_file
 
 
-def CZ_fast_calibration_seq(q0_name, q1_name, no_of_points,
-                            cal_points=True,
-                            RO_target='all',
-                            CZ_disabled=False,
+def CZ_fast_calibration_seq(q0_name: str, q1_name: str, no_of_points: int,
+                            cal_points: bool=True,
+                            RO_target: str='all',
+                            CZ_disabled: bool=False,
                             cases=('no_excitation', 'excitation'),
                             wait_after_trigger=40e-9,
                             wait_during_flux=280e-9,
-                            clock_cycle=5e-9,
+                            clock_cycle=1e-9,
                             mw_pulse_duration=40e-9):
     '''
     Sequence used to (numerically) calibrate CZ gate, including single qubit
@@ -453,20 +458,18 @@ def CZ_fast_calibration_seq(q0_name, q1_name, no_of_points,
         else:
             for case in cases:
                 qasm_file.writelines('\ninit_all\n')
-                qasm_file.writelines('QWG trigger {}\n'.format(i))
+                qasm_file.writelines('QWG_trigger_{}\n'.format(i))
                 waitTime = wait_after_trigger
                 if case == 'excitation':
                     # Decrease wait time because there is an additional pulse
                     waitTime -= mw_pulse_duration
                 qasm_file.writelines(
-                    'I {} {}\n'.format(q0_name,
-                                       int(waitTime//clock_cycle)))
+                    'I {}\n'.format(int(waitTime//clock_cycle)))
                 if case == 'excitation':
                     qasm_file.writelines('X180 {}\n'.format(q1_name))
                 qasm_file.writelines('mX90 {}\n'.format(q0_name))
                 qasm_file.writelines(
-                    'I {} {}\n'.format(q0_name,
-                                       int(wait_during_flux//clock_cycle)))
+                    'I {}\n'.format(int(wait_during_flux//clock_cycle)))
                 qasm_file.writelines('X90 {}\n'.format(q0_name))
                 if case == 'excitation':
                     qasm_file.writelines('X180 {}\n'.format(q1_name))
@@ -479,7 +482,7 @@ def CZ_fast_calibration_seq(q0_name, q1_name, no_of_points,
 
 def chevron_block_seq(q0_name, q1_name, no_of_points,
                       excite_q1=False, wait_after_trigger=40e-9,
-                      wait_during_flux=400e-9, clock_cycle=5e-9,
+                      wait_during_flux=400e-9, clock_cycle=1e-9,
                       RO_target='all', mw_pulse_duration=40e-9,
                       cal_points=True):
     '''
@@ -510,12 +513,12 @@ def chevron_block_seq(q0_name, q1_name, no_of_points,
         if excite_q1:
             wait_after_trigger -= mw_pulse_duration
         qasm_file.writelines(
-            'I {} {}\n'.format(q0_name, int(wait_after_trigger//clock_cycle)))
+            'I {}\n'.format(int(wait_after_trigger//clock_cycle)))
         qasm_file.writelines('X180 {}\n'.format(q0_name))
         if excite_q1:
             qasm_file.writelines('X180 {}\n'.format(q1_name))
         qasm_file.writelines(
-            'I {} {}\n'.format(q0_name, int(wait_during_flux//clock_cycle)))
+            'I {}\n'.format(int(wait_during_flux//clock_cycle)))
         if excite_q1:
             # q0 is rotated to ground-state to have better contrast
             # (|0> and |2> instead of |1> and |2>)
@@ -524,13 +527,8 @@ def chevron_block_seq(q0_name, q1_name, no_of_points,
 
     if cal_points:
         # Add calibration pulses
-        cal_points = [
-            ['I {} 8\n'.format(q0_name), 'I {} 8\n'.format(q1_name)],
-            ['X180 {}\n'.format(q0_name), 'I {} 8\n'.format(q1_name)],
-            ['I {} 8\n'.format(q0_name), 'X180 {}\n'.format(q1_name)],
-            ['X180 {}\n'.format(q0_name), 'X180 {}\n'.format(q1_name)]]
         cal_pulses = []
-        for seq in cal_points:
+        for seq in cal_points_2Q:
             cal_pulses += [[seq[0], seq[1], 'RO ' + RO_target + '\n']]
 
     qasm_file.close()
