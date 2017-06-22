@@ -136,8 +136,11 @@ class Pulsar(Instrument):
             channel: name of the channel
         Returns: clock rate in samples per second
         """
-        obj = self.AWG_obj(channel=channel)
-        return obj.clock_freq()
+        if self._clock_prequeried_state:
+            return self._clocks[self.channels[channel]['AWG']]
+        else:
+            obj = self.AWG_obj(channel=channel)
+            return obj.clock_freq()
 
     def channel_opt(self, name, option, value=None):
         """
@@ -221,6 +224,9 @@ class Pulsar(Instrument):
         if channels == 'all':
             channels = self.channels.keys()
 
+        # prequery all AWG clock values
+        self._clock_prequeried(True)
+
         # dict(name of AWG ->
         #      dict(element name ->
         #           dict(channel id ->
@@ -256,6 +262,8 @@ class Pulsar(Instrument):
             else:
                 raise TypeError('Unsupported AWG instrument: {} of type {}'
                                 .format(AWG, type(obj)))
+
+        self._clock_prequeried(False)
 
     def _program_AWG5014(self, obj, sequence, el_wfs, loop=True,
                          allow_first_nonzero=False):
@@ -525,6 +533,17 @@ setTrigger(0);
 
     def _get_default_AWG(self):
         return self.AWG.name
+
+    def _clock_prequeried(self, status):
+        if status:
+            self._clock_prequeried_state = False
+            self._clocks = {}
+            for c, d in self.channels.items():
+                if d['AWG'] not in self._clocks:
+                    self._clocks[d['AWG']] = self.clock(c)
+            self._clock_prequeried_state = True
+        else:
+            self._clock_prequeried_state = False
 
     ###################################
     # AWG5014 specific helper functions

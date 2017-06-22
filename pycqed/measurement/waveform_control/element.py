@@ -336,10 +336,10 @@ class Element:
                 continue
             # truncate all values that are out of bounds
             if self.pulsar.channels[wf]['type'] == 'analog':
-                if max(wfs[wf]) > hi:
+                if np.max(wfs[wf]) > hi:
                     logging.warning('Clipping waveform {} > {}'.format(
                                     max(wfs[wf]), hi))
-                if min(wfs[wf]) < lo:
+                if np.min(wfs[wf]) < lo:
                     logging.warning('Clipping waveform {} < {}'.format(
                                     min(wfs[wf]), lo))
                 wfs[wf][wfs[wf] > hi] = hi
