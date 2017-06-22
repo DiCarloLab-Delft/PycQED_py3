@@ -1563,6 +1563,7 @@ class CBox_v3_driven_transmon(Transmon):
         operation_dict = self.get_operation_dict()
         CBox = self.CBox.get_instr()
 
+        # Suffix for measurement name
         if rec_Y90:
             suffix = 'sin'
         else:

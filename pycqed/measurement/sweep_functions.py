@@ -446,7 +446,7 @@ class QWG_flux_amp(Soft_Sweep):
         self.scale_factor = 2/frac_amp
 
     def set_parameter(self, val):
-        Vpp = val *self.scale_factor
+        Vpp = val * self.scale_factor
         self.qwg_channel_amp_par(Vpp)
         # Ensure the amplitude was set correctly
         self.QWG.getOperationComplete()
