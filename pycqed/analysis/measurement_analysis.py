@@ -4084,7 +4084,7 @@ class Ramsey_Analysis(TD_Analysis):
     def plot_results(self, fit_res, scale=1, show_guess=False):
         units = self.parameter_units[0]
         textstr = ('$f_{qubit}$ = %.5g $ GHz \pm$ (%.5g) Hz'
-                   % (self.qubit_frequency*scale,
+                   % (self.qubit_frequency*1e-9,
                       fit_res.params['frequency'].stderr) +
                    '\n$f_{Ramsey}$ = %.5g $ MHz \pm$ (%.5g) Hz'
                    % (fit_res.params['frequency'].value*1e-6,
@@ -4093,18 +4093,7 @@ class Ramsey_Analysis(TD_Analysis):
                    % (fit_res.params['tau'].value*scale)  +
                    units + ' $\pm$ (%.6g) '
                    % (fit_res.params['tau'].stderr*scale) +
-                   units )#+
-                   # '$f_{qb}$ = %.5g $ MHz \pm$ (%.5g) Hz'
-                   # %(self.Ramsey_freq['freq']*1e-6,
-                   # self.Ramsey_freq['freq_stderr']))
-
-        # self.plot_results_vs_sweepparam(x=self.scaled_sweep_points,
-        #                                 y=self.normalized_values,
-        #                                 fig=fig, ax=ax,
-        #                                 xlabel=xlabel,
-        #                                 ylabel=ylabel,
-        #                                 marker='o',
-        #                                 save=False)
+                   units )
 
         self.fig.text(0.5, 0, textstr, fontsize=self.font_size,
                  transform=self.ax.transAxes,
@@ -4146,7 +4135,7 @@ class Ramsey_Analysis(TD_Analysis):
         scale = self.scales_dict[unit_prefix]
 
         #Perform fit and save fitted parameters
-        self.fit_res = self.fit_Ramsey(x=self.sweep_points,
+        self.fit_res = self.fit_Ramsey(x=self.sweep_points[:-self.NoCalPoints],
                                        y=self.normalized_data_points, **kw)
         self.get_measured_freq(fit_res=self.fit_res, **kw)
         self.save_fitted_parameters(self.fit_res, var_name=self.value_names[0])
