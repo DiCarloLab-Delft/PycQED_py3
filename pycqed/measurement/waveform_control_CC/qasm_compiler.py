@@ -143,13 +143,19 @@ class QASM_QuMIS_Compiler():
         pass
 
     def load_config(self, config_filename: str='', config: dict =None):
+        self.config = None
+
         if config_filename is not '':
             self.config_filename = config_filename
+
+        if self.config_filename != '':
             with open(self.config_filename) as data_file:
                 self.config = json.load(data_file)
-        elif config is not None:
+
+        if config is not None:
             self.config = copy.deepcopy(config)
-        else:
+
+        if self.config is None:
             raise ValueError('No config specified')
 
         self.qasm_op_dict = None

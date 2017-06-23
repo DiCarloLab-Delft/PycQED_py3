@@ -70,7 +70,7 @@ class Test_compiler(unittest.TestCase):
 
     def test_loading_config(self):
         compiler = qcx.QASM_QuMIS_Compiler()
-        self.assertEqual(compiler.config_filename, None)
+        self.assertEqual(compiler.config_filename, '')
         self.assertNotEqual(compiler.config_filename, self.config_fn)
         compiler.load_config(self.config_fn)
         self.assertEqual(compiler.config_filename, self.config_fn)

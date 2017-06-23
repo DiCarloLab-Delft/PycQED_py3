@@ -109,3 +109,11 @@ class Test_QWG_flux_seqs(unittest.TestCase):
             for time_tuple in time_tuples:
                 self.assertEqual(time_tuple[1], 'square')
                 self.assertGreater(time_tuple[0], 0)
+
+    @unittest.expectedFailure
+    def test_QWG_flux_QASM_sweep(self):
+        qasm_file = qwfs.chevron_block_seq('QL', 'QR', no_of_points=10)
+        qasm_fn = qasm_file.name
+
+        s = swf.QWG_flux_QASM_Sweep(qasm_fn, config_fn,
+                                    CBox=None, QWG_flux_lutman=None)
