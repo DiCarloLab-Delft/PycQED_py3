@@ -17,17 +17,18 @@ from pycqed.measurement.detector_functions import QX_Hard_Detector
 
 from pycqed.instrument_drivers.virtual_instruments.pyqx.qx_client import qx_client
 
-defualt_options = {
+defualt_simulate_options = {
     "shots": 1000,
     "iterations": 1
 }
+defualt_execute_options = {}
 server_host = "http://localhost:3000/"
 
 def execute_AllXY(options={}):
     MC = measurement_control.MeasurementControl(
         'MC', live_plot_enabled=False, verbose=True)
-    defualt_options.update(options)
-    options = defualt_options
+    defualt_simulate_options.update(options)
+    options = defualt_simulate_options
     MC.set_detector_function(AllXYDetector(noise=0.1, delay=5))
     return_value = []
     for i in range(options["iterations"]):
@@ -38,14 +39,14 @@ def execute_AllXY(options={}):
     MC.close()
     return return_value
 
+def execute_qasm_file(file_url, options={}):
+    # file_url="uploads/asset/file/65/f27d92be-8505-43dc-af7d-4c395c70aaf9.qasm"
+    file_path = _get_file_from_url(file_url)
 
-def simulate_qasm(file_url="uploads/asset/file/65/f27d92be-8505-43dc-af7d-4c395c70aaf9.qasm", options={}):
-    file_name = file_url.split("/")[-1]
-    base_path = os.path.dirname(os.path.abspath(__file__))+"\\QASM_files\\"
-    file_path = base_path + file_name
 
-    # download file from server
-    urllib.request.urlretrieve(server_host+file_url, file_path)
+def simulate_qasm_file(file_url, options={}):
+    # file_url="uploads/asset/file/65/f27d92be-8505-43dc-af7d-4c395c70aaf9.qasm"
+    file_path = _get_file_from_url(file_url)
 
     # Connect to the qx simulator
     
@@ -80,6 +81,16 @@ def simulate_qasm(file_url="uploads/asset/file/65/f27d92be-8505-43dc-af7d-4c395c
         MC.close()
         qxc.disconnect()
 
+
+def _get_file_from_url(file_url):
+    # file_url="uploads/asset/file/65/f27d92be-8505-43dc-af7d-4c395c70aaf9.qasm"
+    file_name = file_url.split("/")[-1]
+    base_path = os.path.dirname(os.path.abspath(__file__))+"\\QASM_files\\"
+    file_path = base_path + file_name
+
+    # download file from server
+    urllib.request.urlretrieve(server_host+file_url, file_path)
+    return file_path;
 
 def _get_qasm_sweep_points(file_path):
     counter = 0;

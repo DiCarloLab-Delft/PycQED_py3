@@ -80,6 +80,10 @@ def qasm_to_asm(qasm_filepath, operation_dict):
                     raise NotImplementedError(
                         'Multi qubit ops with args: "{}"'.format(line))
                 asm_file.writelines(instruction)
+            # Identity is a special instruction that is supported as a wait
+            elif elts[0] == 'I':
+                clock_waits = int(int(elts[1])//5)
+                instruction = 'wait {} \n'.format(clock_waits)
             else:
                 raise ValueError(
                     'Command "{}" not recognized, must be in {}'.format(

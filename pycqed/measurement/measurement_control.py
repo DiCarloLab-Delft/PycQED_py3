@@ -1,7 +1,6 @@
 import types
 import logging
 import time
-import sys
 import numpy as np
 from scipy.optimize import fmin_powell
 from pycqed.measurement import hdf5_data as h5d
@@ -10,14 +9,12 @@ from pycqed.utilities.general import dict_to_ordered_tuples
 
 # Used for auto qcodes parameter wrapping
 from pycqed.measurement import sweep_functions as swf
-from pycqed.measurement import detector_functions as det
 from pycqed.measurement.mc_parameter_wrapper import wrap_par_to_swf
 from pycqed.measurement.mc_parameter_wrapper import wrap_par_to_det
 
 from qcodes.instrument.base import Instrument
 from qcodes.instrument.parameter import ManualParameter
 from qcodes.utils import validators as vals
-from copy import deepcopy
 from qcodes.plots.colors import color_cycle
 
 
@@ -27,8 +24,6 @@ except:
     print('Could not import msvcrt (used for detecting keystrokes)')
 
 try:
-    # import pyqtgraph as pg
-    # import pyqtgraph.multiprocess as pgmp
     from qcodes.plots.pyqtgraph import QtPlot
 except Exception:
     print('pyqtgraph plotting not supported, '
@@ -46,7 +41,7 @@ class MeasurementControl(Instrument):
     '''
 
     def __init__(self, name,
-                 plotting_interval=0.25,
+                 plotting_interval=1,
                  live_plot_enabled=True, verbose=True):
         super().__init__(name=name, server_name=None)
         # Soft average is currently only available for "hard"
@@ -113,8 +108,11 @@ class MeasurementControl(Instrument):
         self.print_measurement_start_msg()
         self.mode = mode
         self.iteration = 0  # used in determining data writing indices
+
+        # needs to be defined here because of the with statement below
         return_dict = {}
         self.last_sweep_pts = None  # used to prevent resetting same value
+
         with h5d.Data(name=self.get_measurement_name()) as self.data_object:
             self.get_measurement_begintime()
             # Commented out because requires git shell interaction from python
@@ -144,7 +142,6 @@ class MeasurementControl(Instrument):
             return_dict = self.create_experiment_result_dict()
 
         self.finish(result)
-        # return self.data_object
         return return_dict
 
     def measure(self, *kw):

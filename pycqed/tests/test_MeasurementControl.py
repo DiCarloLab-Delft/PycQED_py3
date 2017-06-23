@@ -17,7 +17,7 @@ class Test_MeasurementControl(unittest.TestCase):
         self.station = station.Station()
         # set up a pulsar with some mock settings for the element
         self.MC = measurement_control.MeasurementControl(
-            'MC', live_plot_enabled=False, verbose=False)
+            'MC', live_plot_enabled=False, verbose=True)
         self.MC.station = self.station
         self.station.add_component(self.MC)
 
@@ -224,7 +224,6 @@ class Test_MeasurementControl(unittest.TestCase):
 
         d = self.MC.detector_function
         self.assertEqual(d.times_called, 5)
-
         self.MC.set_sweep_function(None_Sweep(sweep_control='hard'))
         self.MC.set_sweep_function_2D(None_Sweep(sweep_control='soft'))
         self.MC.set_sweep_points(sweep_pts)
@@ -364,5 +363,5 @@ class Test_MeasurementControl(unittest.TestCase):
         self.MC.set_sweep_points(sweep_pts)
         self.MC.set_detector_function(det.Dummy_Detector_Soft())
         dat = self.MC.run('1D_soft')
-        x = dat[:, 0]
+        x = dat['dset'][:, 0]
         np.testing.assert_array_almost_equal(x, sweep_pts, decimal=5)
