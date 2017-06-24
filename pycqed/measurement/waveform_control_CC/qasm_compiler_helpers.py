@@ -1,13 +1,17 @@
 import enum
 import sys
 import logging
+import copy
 
 
 def get_timetuples_since_event(timing_grid: list, target_labels: list,
-                               start_label: str, end_label: str=None) ->list:
+                               start_label: str, end_label: str=None,
+                               convert_clk_to_ns: bool=False) ->list:
     """
     Searches for target labels in a timing grid and returns the time between
     the the events and the timepoint corresponding to the start_label.
+
+    N.B. timing is in clocks
 
     returns
         time_tuples (list) of tuples (time, label)
@@ -17,7 +21,8 @@ def get_timetuples_since_event(timing_grid: list, target_labels: list,
     for target_label in target_labels:
         time_points = get_timepoints_from_label(
             timing_grid=timing_grid, target_label=target_label,
-            start_label=start_label, end_label=end_label)
+            start_label=start_label, end_label=end_label,
+            convert_clk_to_ns=convert_clk_to_ns)
         t0 = time_points['start_tp'].absolute_time
         for tp in time_points['target_tps']:
             time_tuples.append((tp.absolute_time-t0, target_label))
@@ -27,7 +32,8 @@ def get_timetuples_since_event(timing_grid: list, target_labels: list,
 
 def get_timepoints_from_label(
         timing_grid: list, target_label: str,
-        start_label: str =None, end_label: str=None)->dict:
+        start_label: str =None, end_label: str=None,
+        convert_clk_to_ns: bool =False)->dict:
     """
     Extract timepoints from a timing grid based on their label.
         target_label : the label to search for in the timing grid
@@ -41,6 +47,8 @@ def get_timepoints_from_label(
             'target_tps'  list of time_points found with label target_label
             'end_tp'      end time_point
     """
+    timing_grid = copy.deepcopy(timing_grid)
+
     start_idx = 0
     end_idx = None
     if start_label is not None:
@@ -57,7 +65,7 @@ def get_timepoints_from_label(
             if tp.label == end_label:
                 end_idx = start_idx + j
                 break
-        if end_idx == None:
+        if end_idx is None:
             logging.warning('Could not find {} in timing grid'.format(
                 end_label))
 
@@ -80,6 +88,13 @@ def get_timepoints_from_label(
             'start_tp': timing_grid[start_idx],
             'target_tps': [timing_grid[i] for i in target_indices],
             'end_tp': timing_grid[-1]}
+
+    if convert_clk_to_ns:
+        clock_cycle_time = 5  # 5ns per clock
+        timepoints['start_tp'].absolute_time *= clock_cycle_time
+        for target_tp in timepoints['target_tps']:
+            target_tp.absolute_time *= clock_cycle_time
+        timepoints['end_tp'].absolute_time *= clock_cycle_time
     return timepoints
 
 
