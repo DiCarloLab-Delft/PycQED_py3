@@ -41,7 +41,7 @@ class MeasurementControl(Instrument):
     '''
 
     def __init__(self, name,
-                 plotting_interval=1,
+                 plotting_interval=3,
                  live_plot_enabled=True, verbose=True):
         super().__init__(name=name, server_name=None)
         # Soft average is currently only available for "hard"
@@ -93,6 +93,7 @@ class MeasurementControl(Instrument):
         self._persist_dat = None
         self._persist_xlabs = None
         self._persist_ylabs = None
+        self.plotting_interval(plotting_interval)
 
     ##############################################
     # Functions used to control the measurements #
