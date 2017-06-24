@@ -6137,7 +6137,7 @@ class Ram_Z_Analysis(MeasurementAnalysis):
             if not TwoD:
                 self.run_special_analysis(make_fig=make_fig)
             else:
-
+                pass
 
     def normalize(self, trace):
         # * -1 because cos starts at -1 instead of 1
