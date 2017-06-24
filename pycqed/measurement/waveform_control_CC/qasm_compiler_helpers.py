@@ -10,7 +10,8 @@ def get_timetuples_since_event(timing_grid: list, target_labels: list,
     the the events and the timepoint corresponding to the start_label.
 
     returns
-        time_tuples (list) of tuples (time,
+        time_tuples (list) of tuples (time, label)
+        end_time (int)
     """
     time_tuples = []
     for target_label in target_labels:
@@ -20,7 +21,8 @@ def get_timetuples_since_event(timing_grid: list, target_labels: list,
         t0 = time_points['start_tp'].absolute_time
         for tp in time_points['target_tps']:
             time_tuples.append((tp.absolute_time-t0, target_label))
-    return time_tuples
+    end_time = time_points['end_tp'].absolute_time
+    return time_tuples, end_time
 
 
 def get_timepoints_from_label(

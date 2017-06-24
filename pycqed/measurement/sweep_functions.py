@@ -40,6 +40,7 @@ class Sweep_function(object):
         '''
         pass
 
+
 class Soft_Sweep(Sweep_function):
 
     def __init__(self, **kw):
@@ -95,6 +96,7 @@ class None_Sweep(Soft_Sweep):
 
 
 class None_Sweep_idx(None_Sweep):
+
     def __init__(self, **kw):
         super().__init__(**kw)
         self.num_calls = 0
@@ -134,7 +136,8 @@ class QX_RB_Sweep(Soft_Sweep):
        QX Randomized Benchmarking Test
     """
 
-    def __init__(self, qxc, filename, num_circuits, sweep_control='soft', sweep_points=None, **kw):
+    def __init__(self, qxc, filename, num_circuits, sweep_control='soft',
+                 sweep_points=None, **kw):
         super(QX_RB_Sweep, self).__init__()
         self.sweep_control = sweep_control
         self.name = 'QX_RB_Sweep'
@@ -282,32 +285,34 @@ class QASM_Sweep_v2(Hard_Sweep):
         self.verbosity_level = verbosity_level
 
     def prepare(self, **kw):
-        self.CBox.trigger_source('internal')
         self.compile_and_upload()
 
     def compile_and_upload(self):
         if self.upload:
-            qasm_folder, fn = os.path.split(self.qasm_fn)
-            base_fn = fn.split('.')[0]
-            qumis_fn = os.path.join(qasm_folder, base_fn + ".qumis")
-            self.compiler = qcx.QASM_QuMIS_Compiler(
-                verbosity_level=self.verbosity_level)
-            self.compiler.compile(self.qasm_fn, qumis_fn=qumis_fn,
-                                  config=self.config)
+            self.CBox.trigger_source('internal')
+        qasm_folder, fn = os.path.split(self.qasm_fn)
+        base_fn = fn.split('.')[0]
+        qumis_fn = os.path.join(qasm_folder, base_fn + ".qumis")
+        self.compiler = qcx.QASM_QuMIS_Compiler(
+            verbosity_level=self.verbosity_level)
+        self.compiler.compile(self.qasm_fn, qumis_fn=qumis_fn,
+                              config=self.config)
+        if self.upload:
             self.CBox.load_instructions(qumis_fn)
-            return self.compiler
+        return self.compiler
 
 
 class QWG_flux_QASM_Sweep(QASM_Sweep_v2):
-    def __init__(self, qasm_fn: str, config_fn: str,
+
+    def __init__(self, qasm_fn: str, config: dict,
                  CBox, QWG_flux_lutman,
                  parameter_name: str ='Points', unit: str='a.u.',
                  upload: bool=True, verbosity_level: int=0):
-        super().__init__()
+        super(QASM_Sweep_v2, self).__init__()
         self.name = 'QWG_flux_QASM_Sweep'
 
         self.qasm_fn = qasm_fn
-        self.config_fn = config_fn
+        self.config = config
         self.CBox = CBox
         self.QWG_flux_lutman = QWG_flux_lutman
         self.upload = upload
@@ -319,31 +324,20 @@ class QWG_flux_QASM_Sweep(QASM_Sweep_v2):
     def prepare(self, **kw):
         from pycqed.measurement.waveform_control_CC.qasm_compiler_helpers \
             import get_timetuples_since_event
-        self.CBox.trigger_source('internal')
         # assume this corresponds 1 to 1 with the QWG_trigger
-        compiler = self._compile_and_upload()
-        for i in len(self.sweep_points):
-            time_tuples = get_timetuples_since_event(
+        compiler = self.compile_and_upload()
+        for i in range(len(self.sweep_points)):
+            time_tuples, end_time_ns = get_timetuples_since_event(
                 start_label='qwg_trigger_{}'.format(i),
                 target_labels=['square', 'cz'],
                 timing_grid=compiler.timing_grid, end_label='ro')
             comp_fp = self.QWG_flux_lutman.generate_composite_flux_pulse(
-                time_tuples=time_tuples)
+                time_tuples=time_tuples, end_time_ns=end_time_ns)
+        if self.upload:
             self.QWG_flux_lutman.load_custom_pulse_onto_AWG_lookuptable(
                 waveform=comp_fp, pulse_name='custom_{}'.format(i),
+                distort=True, append_compensation=True,
                 codeword=i)
-
-
-
-
-
-
-
-
-        # extract timings tuples per trigger
-        # generate waveform based on timing tuple
-        # upload_custom_wf
-
 
 
 class QuMis_Sweep(Hard_Sweep):
@@ -388,7 +382,6 @@ class QX_Hard_Sweep(Hard_Sweep):
         # self.__qxc.create_qubits(2)
         # for c in self.circuits:
         #     self.__qxc.create_circuit(c[0], c[1])
-
 
 
 class QX_RB_Hard_Sweep(Hard_Sweep):
@@ -516,6 +509,7 @@ class QWG_flux_amp(Soft_Sweep):
     """
     Sweep function
     """
+
     def __init__(self, QWG, channel, frac_amp, **kw):
         self.set_kw()
         self.QWG = QWG
@@ -541,6 +535,7 @@ class QWG_lutman_par_chunks(Soft_Sweep):
     measured with a QASM sweep, and the operation dictionary can change between
     different chunks. Pulses are re-uploaded between chunks.
     '''
+
     def __init__(self, LutMan, LutMan_parameter,
                  sweep_points, chunk_size, codewords=np.arange(128),
                  flux_pulse_type='square', **kw):
@@ -567,7 +562,7 @@ class QWG_lutman_par_chunks(Soft_Sweep):
         QWG.stop()
 
         for i, paramVal in enumerate(self.sweep_points[ind:ind +
-                                     self.chunk_size]):
+                                                       self.chunk_size]):
             pulseName = 'pulse_{}'.format(i)
 
             # Generate new pulse
@@ -596,6 +591,7 @@ class QWG_lutman_custom_wave_chunks(Soft_Sweep):
     pulse samples (without compensation or delay; these are added by the
     QWG_lutman in the usual way).
      '''
+
     def __init__(self, LutMan, wave_func, sweep_points, chunk_size,
                  codewords=np.arange(128),
                  param_name='flux pulse parameter',
@@ -619,7 +615,7 @@ class QWG_lutman_custom_wave_chunks(Soft_Sweep):
         ind = ind[0]  # set index to the first occurence of val in sweep points
 
         for i, paramVal in enumerate(self.sweep_points[ind:ind +
-                                     self.chunk_size]):
+                                                       self.chunk_size]):
             pulseName = 'pulse_{}'.format(i)
 
             self.LutMan.load_custom_pulse_onto_AWG_lookuptable(

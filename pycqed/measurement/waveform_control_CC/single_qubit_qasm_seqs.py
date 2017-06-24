@@ -485,10 +485,12 @@ def Ram_Z(qubit_name, no_of_points, cal_points=True,
         else:
             qasm_file.writelines('flux square_{} {}\n'.format(i, qubit_name))
             qasm_file.writelines(
-                'I {}\n'.format(int(round(wait_before/clock_cycle))))
+                'I {}\n'.format(qubit_name,
+                                round(int(wait_before/clock_cycle))))
             qasm_file.writelines('mX90 {}\n'.format(qubit_name))
             qasm_file.writelines(
-                'I {}\n'.format(int(round(wait_between/clock_cycle))))
+                'I {}\n'.format(qubit_name,
+                                round(int(wait_between/clock_cycle))))
             qasm_file.writelines('{} {}\n'.format(recPulse, qubit_name))
 
         qasm_file.writelines('RO {}  \n'.format(qubit_name))
