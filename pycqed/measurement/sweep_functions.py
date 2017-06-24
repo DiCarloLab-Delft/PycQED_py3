@@ -327,15 +327,15 @@ class QWG_flux_QASM_Sweep(QASM_Sweep_v2):
         # assume this corresponds 1 to 1 with the QWG_trigger
         compiler = self.compile_and_upload()
         for i in range(len(self.sweep_points)):
-            time_tuples, end_time_ns = get_timetuples_since_event(
+            self.time_tuples, end_time_ns = get_timetuples_since_event(
                 start_label='qwg_trigger_{}'.format(i),
                 target_labels=['square', 'cz'],
                 timing_grid=compiler.timing_grid, end_label='ro')
-            comp_fp = self.QWG_flux_lutman.generate_composite_flux_pulse(
-                time_tuples=time_tuples, end_time_ns=end_time_ns)
+            self.comp_fp = self.QWG_flux_lutman.generate_composite_flux_pulse(
+                time_tuples=self.time_tuples, end_time_ns=end_time_ns)
         if self.upload:
             self.QWG_flux_lutman.load_custom_pulse_onto_AWG_lookuptable(
-                waveform=comp_fp, pulse_name='custom_{}'.format(i),
+                waveform=self.comp_fp, pulse_name='custom_{}'.format(i),
                 distort=True, append_compensation=True,
                 codeword=i)
 
@@ -510,7 +510,7 @@ class QWG_flux_amp(Soft_Sweep):
     Sweep function
     """
 
-    def __init__(self, QWG, channel, frac_amp, **kw):
+    def __init__(self, QWG, channel: int, frac_amp: float, **kw):
         self.set_kw()
         self.QWG = QWG
         self.qwg_channel_amp_par = QWG.parameters['ch{}_amp'.format(channel)]

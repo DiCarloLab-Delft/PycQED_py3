@@ -64,7 +64,7 @@ def chevron_block_seq(q0_name, q1_name, no_of_points,
     return qasm_file
 
 
-def SWAPN(q0_name, q1_name, nr_pulses,
+def SWAPN(q0_name, q1_name, nr_pulses: list,
           excite_q1=False,
           RO_target='all',
           cal_points=True):
@@ -76,10 +76,6 @@ def SWAPN(q0_name, q1_name, nr_pulses,
         excite_q1    (bool): choose whether to excite q1, thus choosing
                              between the |01> <-> |10> and the |11> <-> |20>
                              swap.
-        wait_after_trigger (float): delay time in seconds after sending the
-                             trigger for the flux pulse
-        clock_cycle (float): period of the internal AWG clock
-        wait_time     (int): wait time between triggering QWG and RO
         cal_points   (bool): whether to use calibration points or not
     '''
     filename = join(base_qasm_path, 'chevron_block_seq.qasm')
