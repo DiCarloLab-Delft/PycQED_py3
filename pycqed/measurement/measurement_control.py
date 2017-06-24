@@ -701,7 +701,7 @@ class MeasurementControl(Instrument):
         self._plotting_interval = plotting_interval
 
     def _get_plotting_interval(self):
-        return self._plotting_interval = plotting_interval
+        return self._plotting_interval
 
     def clear_persitent_plot(self):
         self._persist_dat = None
