@@ -1,15 +1,14 @@
 import logging
 import numpy as np
 from scipy import special
-
-
-# 'D:\\GitHubRepos\\iPython-Notebooks\\Experiments\\1607_Qcodes_5qubit\\kernels\\'
-kernel_dir = None
 from os.path import join
+kernel_dir = None
 
 
 def heaviside(t):
-    return t >= 0
+    hs = t >= 0
+    # conversion required for type errors in numpy>=1.13
+    return np.array(hs, dtype=int)
 
 
 def square(t, width=1, t0=0):

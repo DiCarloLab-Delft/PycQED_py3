@@ -122,13 +122,13 @@ def config_is_valid(config: dict)-> bool:
 
     hw_spec = config['hardware specification']
     hw_spec_keys = {'qubit list', 'init time',
-                    'cycle time', 'channels'}
+                    'cycle time', 'qubit_cfgs'}
     if not hw_spec_keys.issubset(set(hw_spec.keys())):
         raise ValueError('hardware specification misses keys {}'.format(
             hw_spec_keys - set(hw_spec.keys())))
 
-    if not len(hw_spec['qubit list']) == len(hw_spec['channels']):
-        raise ValueError('different number of qubits than channels')
+    if not len(hw_spec['qubit list']) == len(hw_spec['qubit_cfgs']):
+        raise ValueError('different number of qubits than qubit_cfgs')
 
     if not is_integer_array(hw_spec['qubit list']):
         raise ValueError('"qubit list" in the configuration file is not an'
@@ -151,9 +151,9 @@ def config_is_valid(config: dict)-> bool:
                          ' is not an positive number.'.format(
                              hw_spec['cycle time']))
 
-    for i, ch in enumerate(hw_spec['channels']):
-        if not set(ch.keys()).issubset({'rf', 'flux', 'measure'}):
-            raise ValueError('unexpected key found in channel config')
+    for i, ch in enumerate(hw_spec['qubit_cfgs']):
+        if not set(ch.keys()).issubset({'rf', 'flux', 'measurement'}):
+            raise ValueError('unexpected key found in qubit config')
 
     return True
 
@@ -163,13 +163,14 @@ class EventType(enum.Enum):
     Current type definition does not separate the technology-dependent part
     and technology-independent part.
     '''
-    NONE_EVENT = enum.auto()
-    DECLARE = enum.auto()
-    MAP = enum.auto()
-    WAIT = enum.auto()
-    RF = enum.auto()
-    FLUX = enum.auto()
-    MEASURE = enum.auto()
+    # N.B. integers below can be replaced by enum.auto() in python > 3.6
+    NONE_EVENT = 1
+    DECLARE = 2
+    MAP = 3
+    WAIT = 4
+    RF = 5
+    FLUX = 6
+    MEASUREMENT = 7
 
     def __str__(self):
         return self.name.lower()
@@ -183,6 +184,13 @@ class time_point():
         self.following_waiting_time = following_waiting_time
         self.parallel_events = []
 
+    def __repr__(self):
+        base_str = ('time_point(label={}, absolute_time={}, '
+                    'following_waiting_time={})')
+        rep = base_str.format(self.label, self.absolute_time,
+                              self.following_waiting_time)
+        return rep
+
 
 class qasm_event():
 
@@ -193,34 +201,20 @@ class qasm_event():
         self.params = None
         self.duration = 0
         self.channel_latency = 0
-        # self.start_time_point = time_point()
+
+    def __repr__(self):
+        base_str = ('qasm_event({}, params={}, duration={})')
+        rep = base_str.format(self.name, self.params, self.duration)
+        return rep
 
     def __str__(self):
-        return "({}, {})".format(self.name, self.event_type)
+        base_str = ('qasm_event: "{:10s}", params={}, duration={}')
+        rep = base_str.format(self.name, self.params, self.duration)
+        return rep
 
 
 class qumis_event():
-    # class pulse():
-    #     def __init__(self):
-    #         self.qumis_name = 'pulse'
-    #         self.codeword = -1
 
-    # class trigger():
-    #     def __init__(self):
-    #         self.qumis_name = 'trigger'
-    #         self.codeword = -1
-    #         self.format = []    # used for trigger instruction
-    #         self.trigger_bit = -1
-    #         self.codeword_bit = []
-
-    # class measure():
-    #     def __init__(self):
-    #         self.qumis_name = 'measure'
-
-    # class measure_trigger():
-    #     def __init__(self):
-    #         self.qumis_name = 'trigger'
-    #         self.trigger_bit = -1
     def __init__(self):
         self.qumis_name = ''
         self.codeword = -1
@@ -234,25 +228,26 @@ class qumis_event():
     def __repr__(self):
         base_str = ('qumis_event({}, codeword={}, awg_nr={}, duration={},' +
                     'trigger_bit={}, codeword_bit={}, set_bits={})')
-        repr = base_str.format(self.qumis_name, self.codeword, self.awg_nr,
-                               self.duration, self.trigger_bit,
-                               self.codeword_bit, self.set_bits)
-        return repr
+        rep = base_str.format(self.qumis_name, self.codeword, self.awg_nr,
+                              self.duration, self.trigger_bit,
+                              self.codeword_bit, self.set_bits)
+        return rep
 
     def __str__(self):
+
         base_str = ('qumis_event: "{}", \n\tcodeword={}, \n\tawg_nr={},' +
                     ' \n\tduration={}, \n\ttrigger_bit={}, ' +
                     '\n\tcodeword_bit={}, \n\tset_bits={}\n')
-        repr = base_str.format(self.qumis_name, self.codeword, self.awg_nr,
-                               self.duration, self.trigger_bit,
-                               self.codeword_bit, self.set_bits)
-        return repr
+        rep = base_str.format(self.qumis_name, self.codeword, self.awg_nr,
+                              self.duration, self.trigger_bit,
+                              self.codeword_bit, self.set_bits)
+        return rep
 
 
 user_op_type = {
     "rf": EventType.RF,
     "flux": EventType.FLUX,
-    "measurement": EventType.MEASURE
+    "measurement": EventType.MEASUREMENT
 }
 
 default_op_dict = {
@@ -268,11 +263,6 @@ default_op_dict = {
     "init_all": {
         "parameters": 0,
         "type": EventType.WAIT
-    },
-
-    "measure": {
-        "parameters": 1,  # Should be -1? Now only specifies a single target
-        "type": EventType.MEASURE
     },
 
     "Map": {
@@ -298,6 +288,27 @@ def lower_dict_key(origin_dict):
 
 class QASM_QuMIS_Compiler():
 
+    def __repr__(self):
+        base_str = ('QASM_QuMIS_Compiler(config_filename={}, '
+                    'verbosity_level={})')
+        rep = base_str.format(self.config_filename, self.verbosity_level)
+        return rep
+
+    def __str__(self):
+        base_str = ('QASM_QuMIS_Compiler: '
+                    '\n\tbase_fp = {}'
+                    '\n\tconfig_fn = {} '
+                    '\n\tqasm_fn = {}'
+                    '\n\tqumis_fn = {}'
+                    '\n\tcompilation_completed = {}')
+        s = [self.config_filename, self.filename, self.qumis_fn]
+        common_s = os.path.commonprefix(s)
+        path_strings = [sub.replace(common_s, '') for sub in s]
+
+        rep = base_str.format(common_s,
+                              *path_strings, self.compilation_completed)
+        return rep
+
     def __init__(self, config_filename=None, verbosity_level=1):
         '''
         @param: config_filename, file specifies the user-defined operation
@@ -321,8 +332,10 @@ class QASM_QuMIS_Compiler():
         self.verbosity_level = verbosity_level
         self.channel_latency_compensated = False
         self.qubit_map_from_config = False
-
         self.infinit_loop_qumis = True
+        self.compilation_completed = False
+        self.qumis_fn = ''
+        self.filename = ''
 
         if config_filename is None:
             self.config_filename = os.path.join(
@@ -342,12 +355,12 @@ class QASM_QuMIS_Compiler():
         self.qumis_fn = qumis_fn
         self.qumis_instructions = []  # final result that should be uploaded
         self.hw_timing_grid = []  # operations on hardware
-        self.timing_grid = []     # quantum operations
+        self.timing_grid = []          # quantum operations
         self.load_config()
-        self.read_file()
-        self.line_to_event()
+        self.read_file()               # fills up self.prog_lines
+        self.line_to_event()           # fills up self.raw_event_list
         self.build_dependency_graph()  # empty function for now
-        self.resolve_qubit_name()
+        self.resolve_qubit_name()      # extract map from qasm and map to config
         self.assign_timing_to_events()
         self.resolve_channel_latency()
         self.convert_to_hw_trigger()
@@ -356,6 +369,7 @@ class QASM_QuMIS_Compiler():
         if self.verbosity_level >= 1:
             print("QuMIS generated successfully and written into {}".format(
                 self.qumis_fn))
+        self.compilation_completed = True
         return True
 
     def build_dependency_graph(self):
@@ -388,20 +402,20 @@ class QASM_QuMIS_Compiler():
 
         self.cycle_time = float(self.cycle_time)
         self.init_time = int(self.init_time / self.cycle_time)
-        self.measure_time = int(DEFAULT_MEASURE_TIME / self.cycle_time)
+        self.measureMENT_time = int(DEFAULT_MEASURE_TIME / self.cycle_time)
 
-        self.channels = self.hardware_spec["channels"]
+        self.qubit_cfgs = self.hardware_spec["qubit_cfgs"]
 
-        for i in range(len(self.channels)):
-            for key in self.channels[i]:
+        for i in range(len(self.qubit_cfgs)):
+            for key in self.qubit_cfgs[i]:
                 # Dangerously overwriting latency in ns with latency in clocks
-                self.channels[i][key]["latency"] = int(
-                    self.channels[i][key]["latency"] / self.cycle_time)
-                if "format" in self.channels[i][key]:
+                self.qubit_cfgs[i][key]["latency"] = int(
+                    self.qubit_cfgs[i][key]["latency"] / self.cycle_time)
+                if "format" in self.qubit_cfgs[i][key]:
                     trig_format = []
-                    for trig_dur in self.channels[i][key]["format"]:
+                    for trig_dur in self.qubit_cfgs[i][key]["format"]:
                         trig_format.append(int(trig_dur / self.cycle_time))
-                    self.channels[i][key]["format"] = trig_format
+                    self.qubit_cfgs[i][key]["format"] = trig_format
 
         self.user_qasm_op_dict = self.data["operation dictionary"]
         for key in self.user_qasm_op_dict:
@@ -416,15 +430,16 @@ class QASM_QuMIS_Compiler():
             op_type_enum = user_op_type[op_type_str]
             op_spec["type"] = op_type_enum
             op_spec["duration"] = int(op_spec["duration"] / self.cycle_time)
-            if op_type_enum == EventType.MEASURE:
-                self.measure_time = int(op_spec["duration"] / self.cycle_time)
+            if op_type_enum == EventType.MEASUREMENT:
+                self.measureMENT_time = int(op_spec["duration"] /
+                                            self.cycle_time)
             self.user_qasm_op_dict[key] = op_spec
 
         for key in default_op_dict:
             if key == "init_all":
                 default_op_dict[key]["duration"] = self.init_time
             if key == "measure":
-                default_op_dict[key]["duration"] = self.measure_time
+                default_op_dict[key]["duration"] = self.measureMENT_time
 
         self.qasm_op_dict = {**default_op_dict, **self.user_qasm_op_dict}
         self.qasm_op_dict = lower_dict_key(self.qasm_op_dict)
@@ -443,7 +458,7 @@ class QASM_QuMIS_Compiler():
                     op_dict[op]["type"] = "rf"
                 elif op_dict[op]["type"] == EventType.FLUX:
                     op_dict[op]["type"] = "flux"
-                elif op_dict[op]["type"] == EventType.MEASURE:
+                elif op_dict[op]["type"] == EventType.MEASUREMENT:
                     op_dict[op]["type"] = "measure"
                 else:
                     raise ValueError("unexpected event type: {}".format(
@@ -455,7 +470,7 @@ class QASM_QuMIS_Compiler():
         hardware_spec["init time"] = self.init_time * self.cycle_time
         channels = []
 
-        for c in self.channels:
+        for c in self.qubit_cfgs:
             channel = {}
             for key in c:
                 channel[key] = c[key]
@@ -472,7 +487,7 @@ class QASM_QuMIS_Compiler():
 
             channels.append(channel)
 
-        hardware_spec["channels"] = channels
+        hardware_spec["qubit_cfgs"] = channels
 
         data = {}
         data["operation dictionary"] = op_dict
@@ -480,7 +495,6 @@ class QASM_QuMIS_Compiler():
         data["luts"] = self.luts
         with open(config_fn, 'w') as outfile:
             json.dump(self.data, outfile, indent=2)
-
 
     def read_file(self):
         '''
@@ -490,7 +504,8 @@ class QASM_QuMIS_Compiler():
             prog_file = open(self.filename, 'r', encoding="utf-8")
             logging.info("open file", str(self.filename), "successfully.")
         except:
-            raise OSError('\tError: Failed to open file ' + self.filename + ".")
+            raise OSError('\tError: Failed to open file ' +
+                          self.filename + ".")
 
         self.raw_lines = []
         self.prog_lines = []  # after removing comments.
@@ -505,9 +520,9 @@ class QASM_QuMIS_Compiler():
             self.prog_lines.append(prog_line(line_number + 1, line_content))
 
         prog_file.close()
-        if self.verbosity_level >= 1:
-            self.print_raw_lines()
         if self.verbosity_level >= 2:
+            self.print_raw_lines()
+        if self.verbosity_level >= 3:
             self.print_program_lines()
 
     def print_raw_lines(self):
@@ -608,7 +623,7 @@ class QASM_QuMIS_Compiler():
             raw_print('-')
             return
 
-        if hasattr(event_list[0], 'event_type'):
+        if hasattr(event_list[0], 'event_type'):  # qasm event list
             for e in event_list:
                 raw_print(e.name)
                 raw_print(" ")
@@ -624,6 +639,18 @@ class QASM_QuMIS_Compiler():
         else:  # qumis event list
             for e in event_list:
                 raw_print(e.qumis_name)
+                if e.codeword == -2:
+                    if e.awg_nr != -1:
+                        raw_print(" ")
+                        raw_print("awg")
+                        raw_print(str(e.awg_nr))
+                        raw_print("(%s)" % str(e.codeword))
+                    else:
+                        raw_print(" ")
+                        raw_print("bits:")
+                        raw_print("[{}]".format(str(e.trigger_bit)))
+                        raw_print(str(e.codeword_bit))
+
                 if e.qumis_name.lower() == "measure":
                     pass
                 elif e.qumis_name.lower() == "pulse":
@@ -725,7 +752,8 @@ class QASM_QuMIS_Compiler():
 
                 if (qasm_op_type == EventType.WAIT) and \
                         (expected_num_of_params == 1):
-                    waiting_time, = qasm_op_params
+                    waiting_time_ns, = qasm_op_params
+                    waiting_time = int(waiting_time_ns)//self.cycle_time
                     if is_int(waiting_time) is False:
                         se = SyntaxError("parameter {} is not an "
                                          "integer.".format(waiting_time))
@@ -770,7 +798,7 @@ class QASM_QuMIS_Compiler():
     @classmethod
     def is_q_op_event(self, event):
         op_type = event.event_type
-        if ((op_type == EventType.MEASURE) or
+        if ((op_type == EventType.MEASUREMENT) or
                 (op_type == EventType.FLUX) or
                 (op_type == EventType.RF)):
             return True
@@ -901,7 +929,7 @@ class QASM_QuMIS_Compiler():
                                  len(self.physical_qubits)))
             se.filename = self.filename
             raise se
-        if self.verbosity_level >= 2:
+        if self.verbosity_level >= 3:
             print("Extend declared qubit list:")
             print("\tDeclared qubits: {}".format(self.declared_qubits))
             print("")
@@ -973,19 +1001,13 @@ class QASM_QuMIS_Compiler():
             new_event.channel_latency = event.channel_latency
             new_event_list.append(new_event)
 
-            # print('new event list:  ')
-            # for e in new_event_list:
-            #     raw_print(str(e))
-            #     raw_print(str(e.params))
-            #     raw_print('\n')
-
         return new_event_list
 
     def load_channel_latency(self):
         for ti, tp in enumerate(self.timing_grid):
             for idx, event in enumerate(tp.parallel_events):
                 target_qubit = event.params[0]
-                channel = self.channels[target_qubit]
+                channel = self.qubit_cfgs[target_qubit]
                 event.channel_latency = \
                     channel[str(event.event_type)]["latency"]
 
@@ -1043,7 +1065,7 @@ class QASM_QuMIS_Compiler():
     def get_min_channel_latency(self):
         return min([min([int(channel[sub_channel]["latency"])
                          for sub_channel in channel])
-                    for channel in self.channels])
+                    for channel in self.qubit_cfgs])
 
     def get_absolute_timing(self):
         current_time = 0
@@ -1062,33 +1084,45 @@ class QASM_QuMIS_Compiler():
             hw_events = []
             for event in tp.parallel_events:
                 hw_event = qumis_event()
-                target, = event.params
-                channel = self.channels[target][str(event.event_type)]
+                targ_q_idx, = event.params
+                channel_cfg = self.qubit_cfgs[targ_q_idx][str(event.event_type)]
 
-                hw_event.qumis_name = channel["qumis"]
+                tmp_qumis_name = channel_cfg["qumis"]
 
-                if hw_event.qumis_name == "pulse":
-                    hw_event.awg_nr = channel["awg_nr"]
-                    lut_index = channel["lut"]
+                if tmp_qumis_name == "pulse":
+                    hw_event.awg_nr = channel_cfg["awg_nr"]
+
+                    lut_index = channel_cfg["lut"]
                     lut = self.luts[lut_index]
                     hw_event.codeword = lut[event.name]
-                elif hw_event.qumis_name == "trigger":
-                    hw_event.trigger_bit = channel["trigger bit"]
-                    hw_event.format = channel["format"]
-                    if event.event_type != EventType.MEASURE:
-                        hw_event.codeword_bit = channel["codeword bit"]
-                        lut_index = channel["lut"]
+
+                    if hw_event.codeword == -2:
+                        hw_event.qumis_name = event.name
+                    else:
+                        hw_event.qumis_name = tmp_qumis_name
+
+                elif tmp_qumis_name == "trigger":
+                    hw_event.trigger_bit = channel_cfg["trigger bit"]
+                    hw_event.format = channel_cfg["format"]
+                    hw_event.qumis_name = tmp_qumis_name
+
+                    if 'codeword bit' in channel_cfg.keys():
+                        hw_event.codeword_bit = channel_cfg["codeword bit"]
+                        lut_index = channel_cfg["lut"]
                         lut = self.luts[lut_index]
                         hw_event.codeword = lut[event.name]
+
+                        if hw_event.codeword == -2:
+                            hw_event.qumis_name = event.name
                 else:
                     pass
-
                 hw_events.append(hw_event)
+
             tp.parallel_events = hw_events
             self.hw_timing_grid.append(tp)
 
         if self.verbosity_level > 4:
-            print("After converting event timing grid to hardware timing")
+            print("After converting event timing grid to hardware timing:")
             self.print_hw_timing_grid()
 
     def gen_full_time_grid(self):
@@ -1100,21 +1134,14 @@ class QASM_QuMIS_Compiler():
     def apply_codeword(self):
         """
         This function converts codewords (int) to the correct combination
-        of trigger bits.
+        of trigger bits for the trigger QuMIS instruction.
 
-        Not really clear what it does for instructions other than trigger.
-
-        # N.B. What does this function do exactly?
+        NOTE: trigger bits starts counting from 1, instead of 0.
         """
         new_tp_list = []
         for tp in self.hw_timing_grid:
             absolute_time = tp.absolute_time
             for hw_event in tp.parallel_events:
-                if (hw_event.qumis_name == "pulse" or
-                        hw_event.qumis_name == "measure"):
-                    new_tp_list = self.add_new_tp_event(
-                        new_tp_list, absolute_time, hw_event)
-                    continue
 
                 if hw_event.qumis_name == 'trigger':
                     hw_event.set_bits = []
@@ -1138,6 +1165,10 @@ class QASM_QuMIS_Compiler():
                     if hw_event.set_bits != []:
                         new_tp_list = self.add_new_tp_event(
                             new_tp_list, absolute_time, hw_event)
+
+                else:  # for pulse, measure, and other dummy instructions.
+                    new_tp_list = self.add_new_tp_event(
+                        new_tp_list, absolute_time, hw_event)
 
         self.hw_timing_grid = new_tp_list
         if self.verbosity_level > 4:
@@ -1175,11 +1206,6 @@ class QASM_QuMIS_Compiler():
         for ti, tp in enumerate(self.hw_timing_grid):
             absolute_time = tp.absolute_time
             for hw_event in tp.parallel_events:
-                if (hw_event.qumis_name == "pulse" or
-                        hw_event.qumis_name == "measure"):
-                    new_tp_list = self.add_new_tp_event(
-                        new_tp_list, absolute_time, hw_event)
-                    continue
 
                 if hw_event.qumis_name == 'trigger':
                     for tb in hw_event.set_bits:
@@ -1192,6 +1218,10 @@ class QASM_QuMIS_Compiler():
                                              "trigger time overlapped. "
                                              "Something wrong?")
                         trigger_bit_duration[tb] = hw_event.duration
+
+                else:  # for pulse, measure and other dummy instructions.
+                    new_tp_list = self.add_new_tp_event(
+                        new_tp_list, absolute_time, hw_event)
 
             if max(trigger_bit_duration) == 0:
                 continue
@@ -1267,11 +1297,6 @@ class QASM_QuMIS_Compiler():
         for tp in self.hw_timing_grid:
             absolute_time = tp.absolute_time
             for hw_event in tp.parallel_events:
-                if (hw_event.qumis_name == "pulse" or
-                        hw_event.qumis_name == "measure"):
-                    new_tp_list = self.add_new_tp_event(
-                        new_tp_list, absolute_time, hw_event)
-                    continue
 
                 if hw_event.qumis_name == "trigger":
                     if hw_event.format == []:
@@ -1301,6 +1326,10 @@ class QASM_QuMIS_Compiler():
 
                         new_tp_list = self.add_new_tp_event(
                             new_tp_list, absolute_time + d2, None)
+
+                else:  # for pulse, measure and other dummy instructions.
+                    new_tp_list = self.add_new_tp_event(
+                        new_tp_list, absolute_time, hw_event)
 
         self.hw_timing_grid = new_tp_list
         if self.verbosity_level > 4:
@@ -1396,7 +1425,7 @@ class QASM_QuMIS_Compiler():
                 self.qumis_instructions.append(pulse_instruction)
 
         if self.qumis_instructions[0][:4] != "wait":
-            if self.verbosity_level >= 2:
+            if self.verbosity_level >= 4:
                 print("Instruction 'Wait 1' added at the beginning.")
             self.qumis_instructions.insert(0, "wait 1")
         if self.infinit_loop_qumis:
@@ -1408,7 +1437,7 @@ class QASM_QuMIS_Compiler():
         for qi in self.qumis_instructions:
             qumis_file.write("{}\n".format(qi))
         qumis_file.close()
-        if self.verbosity_level >= 5:
+        if self.verbosity_level >= 2:
             self.print_qumis()
 
     def print_qumis(self):
