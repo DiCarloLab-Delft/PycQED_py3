@@ -6113,10 +6113,12 @@ class Ram_Z_Analysis(MeasurementAnalysis):
     def __init__(self, timestamp_cos=None, timestamp_sin=None,
                  filter_raw=False, filter_deriv_phase=False, demodulate=True,
                  f_demod=0, f01max=None, E_c=None, flux_amp=None, V_0=0, d_c=1,
-                 auto=True, make_fig=True, **kw):
-        super().__init__(timestamp=timestamp_cos, label='Ram_Z_cos', **kw)
+                 auto=True, make_fig=True, TwoD=False, **kw):
+        super().__init__(timestamp=timestamp_cos, label='Ram_Z_cos', TwoD=TwoD,
+                         **kw)
         self.cosTrace = self.measured_values[0]
-        super().__init__(timestamp=timestamp_sin, label='Ram_Z_sin', **kw)
+        super().__init__(timestamp=timestamp_sin, label='Ram_Z_sin', TwoD=TwoD,
+                         **kw)
         self.sinTrace = self.measured_values[0]
 
         self.filter_raw = filter_raw
@@ -6132,7 +6134,10 @@ class Ram_Z_Analysis(MeasurementAnalysis):
         self.d_c = d_c
 
         if auto:
-            self.run_special_analysis(make_fig=make_fig)
+            if not TwoD:
+                self.run_special_analysis(make_fig=make_fig)
+            else:
+
 
     def normalize(self, trace):
         # * -1 because cos starts at -1 instead of 1
@@ -6151,7 +6156,7 @@ class Ram_Z_Analysis(MeasurementAnalysis):
             return_all=True)
 
         # self.add_dataset_to_analysisgroup('detuning', self.df)
-        # self.add_dataset_to_analysisgroup('phase', selfphases)
+        # self.add_dataset_to_analysisgroup('phase', self.phases)
 
         if (self.f01max != None and self.E_c != None and
             self.flux_amp != None):
@@ -6245,7 +6250,7 @@ class Ram_Z_Analysis(MeasurementAnalysis):
                             self.parameter_units[0])
         pl_tools.set_ylabel(ax, 'demodulated normalized trace', 'a.u.')
         ax.set_title('demodulated normalized data')
-        ax.legend(['cos', 'sin'])
+        ax.legend(['cos', 'sin'], loc=1)
         self.save_fig(fig, 'Ram-Z_normalized_data.png')
         # fig.savefig('Ram-Z_normalized_data.png', dpi=300)
 

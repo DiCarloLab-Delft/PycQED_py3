@@ -1659,6 +1659,12 @@ class CBox_v3_driven_transmon(Transmon):
         MC.run('Ram_Z_{}_{}'.format(suffix, self.name))
 
         ma.MeasurementAnalysis(label='Ram_Z')
+        # Ram_Z_Analysis needs cos and sin measurement, so it needs to be done
+        # outside this function.
+        # ma.Ram_Z_Analysis(label='Ram_Z', demodulate=True, f_demod=f_demod,
+        #                        f01max=self.f_max(), E_c=self.E_c(),
+        #                        flux_amp=fluxAmp, V_0=V_0,
+        #                        d_c=self.dac_flux_coefficient())
 
     def get_operation_dict(self, operation_dict={}):
 

@@ -554,7 +554,7 @@ class Distortion_corrector():
                     datetime.date.today().strftime('%y%m%d'))
             self.open_new_correction(
                 kernel_length=self.ker_obj.corrections_length(),
-                filename=filename)
+                name=filename)
         else:
             # Continue working with current kernel; nothing to do
             pass

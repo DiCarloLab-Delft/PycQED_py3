@@ -557,7 +557,7 @@ class QWG_lutman_par_chunks(Soft_Sweep):
 
     def set_parameter(self, val):
         # Find index of val in sweep_points
-        ind = np.where(self.sweep_points == val)[0]
+        ind = np.where(np.isclose(self.sweep_points, val, atol=1e-10))[0]
         if len(ind) == 0:
             # val was not found in the sweep points
             raise ValueError('Value {} is not in the sweep points'.format(val))

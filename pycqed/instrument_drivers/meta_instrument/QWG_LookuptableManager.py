@@ -344,9 +344,10 @@ class QWG_FluxLookuptableManager(Instrument):
         waveforms = self.standard_waveforms()
 
         # Insert delays and compensation pulses, apply distortions
-        wait_samples = np.zeros(int(self.F_delay()*self.sampling_rate()))
-        wait_samples_2 = np.zeros(int(self.F_compensation_delay()
-                                      * self.sampling_rate()))
+        wait_samples = np.zeros(int(np.round(self.F_delay() *
+                                             self.sampling_rate())))
+        wait_samples_2 = np.zeros(int(np.round(self.F_compensation_delay() *
+                                               self.sampling_rate())))
 
         for key in waveforms.keys():
             delayed_wave = np.concatenate(
@@ -356,8 +357,8 @@ class QWG_FluxLookuptableManager(Instrument):
                 k = self.F_kernel_instr.get_instr()
                 self._wave_dict[key] = k.convolve_kernel(
                     [k.kernel(), delayed_wave],
-                    length_samples=int(self.max_waveform_length() *
-                                       self.sampling_rate()))
+                    length_samples=int(np.round(self.max_waveform_length() *
+                                                self.sampling_rate())))
                 # the waveform is cut off after length_samples.
                 # this is particularly important considering hardware (memory)
                 # limits of the QWG.
