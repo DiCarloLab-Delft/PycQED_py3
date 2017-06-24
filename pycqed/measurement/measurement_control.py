@@ -89,11 +89,12 @@ class MeasurementControl(Instrument):
                 window_title='Secondary plotmon of {}'.format(self.name),
                 figsize=(600, 400))
 
+        self.plotting_interval(plotting_interval)
+
         self.soft_iteration = 0  # used as a counter for soft_avg
         self._persist_dat = None
         self._persist_xlabs = None
         self._persist_ylabs = None
-        self.plotting_interval(plotting_interval)
 
     ##############################################
     # Functions used to control the measurements #
@@ -694,11 +695,13 @@ class MeasurementControl(Instrument):
             logging.warning(e)
 
     def _set_plotting_interval(self, plotting_interval):
-        self.main_QtPlot.interval = plotting_interval
-        self.secondary_QtPlot.interval = plotting_interval
+        if hasattr(self, 'main_QtPlot'):
+            self.main_QtPlot.interval = plotting_interval
+            self.secondary_QtPlot.interval = plotting_interval
+        self._plotting_interval = plotting_interval
 
     def _get_plotting_interval(self):
-        return self.main_QtPlot.interval
+        return self._plotting_interval = plotting_interval
 
     def clear_persitent_plot(self):
         self._persist_dat = None
