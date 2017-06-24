@@ -166,7 +166,7 @@ class Test_QWG_flux_seqs(unittest.TestCase):
         """
         wf_dict = self.QWG_flux_lutman.generate_standard_pulses()
         test_block = np.concatenate([0.5*np.ones(1000), np.zeros(500),
-                                    -0.5*np.ones(1000)])
+                                     -0.5*np.ones(1000)])
         np.testing.assert_array_equal(wf_dict['square'], test_block)
 
         simple_block = self.QWG_flux_lutman.standard_waveforms()['square']
