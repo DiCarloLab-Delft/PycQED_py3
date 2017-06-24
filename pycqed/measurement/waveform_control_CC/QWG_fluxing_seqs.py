@@ -49,7 +49,10 @@ def chevron_block_seq(q0_name, q1_name, no_of_points,
             # q0 is rotated to ground-state to have better contrast
             # (|0> and |2> instead of |1> and |2>)
             qasm_file.writelines('X180 {}\n'.format(q0_name))
-        qasm_file.writelines('RO {} \n'.format(RO_target))
+        if RO_target == 'all':
+            qasm_file.writelines('RO {} | RO {} \n'.format(q0_name, q1_name))
+        else:
+            qasm_file.writelines('RO {} \n'.format(RO_target))
 
     if cal_points:
         # Add calibration pulses

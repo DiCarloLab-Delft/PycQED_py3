@@ -147,6 +147,7 @@ class QWG_FluxLookuptableManager(Instrument):
                            docstring=('Amplitude of flux pulse as fraction of '
                                       'the peak amplitude. Beware of factor 2'
                                       ' with Vpp in the QWG'),
+                           initial_value=0.5,
                            parameter_class=ManualParameter)
         self.add_parameter('F_length', unit='s',
                            parameter_class=ManualParameter,
@@ -272,6 +273,13 @@ class QWG_FluxLookuptableManager(Instrument):
                                      'codewords.',
                            vals=vals.Lists(vals.Ints()))
 
+        self.add_parameter('pulse_map',
+                           initial_value={'cz': 'adiabatic_Z',
+                                          'square': 'square'},
+                           parameter_class=ManualParameter,
+                           # to be replaced with vals.Dict)
+                           vals=vals.Anything())
+
         self._wave_dict = {}
 
     def standard_waveforms(self):
@@ -280,8 +288,8 @@ class QWG_FluxLookuptableManager(Instrument):
         '''
         # Block pulses
         # Pulse is not IQ modulated, so block_Q is not used.
-        block_I, block_Q = wf.block_pulse(self.F_amp(), self.F_length(),
-                                          sampling_rate=self.sampling_rate())
+        block = wf.single_channel_block(self.F_amp(), self.F_length(),
+                                        sampling_rate=self.sampling_rate())
 
         # Fast adiabatic pulse
         # Old version, commented out because we might still need it for
@@ -325,8 +333,7 @@ class QWG_FluxLookuptableManager(Instrument):
         martinis_phase_corrected = np.concatenate(
             [martinis_pulse_v2, single_qubit_phase_correction])
 
-        return {'square': block_I,
-                # 'adiabatic': martinis_pulse,
+        return {'square': block,
                 'adiabatic': martinis_pulse_v2,
                 'adiabatic_Z': martinis_phase_corrected}
 
@@ -344,12 +351,13 @@ class QWG_FluxLookuptableManager(Instrument):
 
         # Insert delays and compensation pulses, apply distortions
         wait_samples = np.zeros(int(self.F_delay()*self.sampling_rate()))
-        wait_samples_2 = np.zeros(int(self.F_compensation_delay()
-                                      * self.sampling_rate()))
+        wait_samples_comp_pulses = np.zeros(int(self.F_compensation_delay()
+                                                * self.sampling_rate()))
 
         for key in waveforms.keys():
             delayed_wave = np.concatenate(
-                [wait_samples, np.array(waveforms[key]), wait_samples_2,
+                [wait_samples, np.array(waveforms[key]),
+                 wait_samples_comp_pulses,
                  -1 * np.array(waveforms[key])])
             if self.F_kernel_instr() is not None:
                 k = self.F_kernel_instr.get_instr()
@@ -367,14 +375,33 @@ class QWG_FluxLookuptableManager(Instrument):
 
         return self._wave_dict
 
-    def generate_composite_flux_pulse(self, time_tuples: list):
+    def generate_composite_flux_pulse(self, time_tuples: list,
+                                      end_time_ns: float):
         """
-        takes a list time_tuples (time, pulse_name) and creates a composite
-        pulse using the parameters stored in the flux lutman.
-        """
-        waveform = None
-        return waveform
+        takes a list time_tuples (time_in_ns, pulse_name) and creates a
+        composite pulse using the parameters stored in the flux lutman.
 
+        This pulse does not include distortions and compensation pulses as
+        these are added when the pulse is uploaded using
+        "load_custom_pulse_onto_AWG_lookuptable".
+        """
+
+        # only intended for QWG which has a sampling rate of 1GSps
+        if self.sampling_rate() != 1e9:
+            raise ValueError('this function only works for 1GSps '
+                             'sampling rate')
+        end_sample = end_time_ns
+
+        pulse_map = self.pulse_map()
+        base_waveforms = self.standard_waveforms()
+
+        composite_waveform = np.zeros(end_sample)
+
+        for time_ns, operation in time_tuples:
+            waveform = base_waveforms[pulse_map[operation]]
+            composite_waveform[time_ns:time_ns+len(waveform)] += waveform
+
+        return composite_waveform
 
     def regenerate_pulse(self, pulse_name):
         '''
@@ -397,15 +424,16 @@ class QWG_FluxLookuptableManager(Instrument):
 
         # Insert delays and compensation pulses, apply distortions
         wait_samples = np.zeros(int(self.F_delay()*self.sampling_rate()))
-        wait_samples_2 = np.zeros(int(self.F_compensation_delay()
-                                      * self.sampling_rate()))
+        wait_samples_comp_pulses = np.zeros(int(self.F_compensation_delay()
+                                                * self.sampling_rate()))
         k = self.F_kernel_instr.get_instr()
 
         delayed_wave = np.concatenate([wait_samples, np.array(waveform),
-                                       wait_samples_2, -1*np.array(waveform)])
+                                       wait_samples_comp_pulses, -1*np.array(waveform)])
         distorted_wave = k.convolve_kernel(
             [k.kernel(), delayed_wave],
-            length_samples=int(self.max_waveform_length()*self.sampling_rate()))
+            length_samples=int(self.max_waveform_length()
+                               * self.sampling_rate()))
 
         self._wave_dict[pulse_name] = distorted_wave
         return distorted_wave
@@ -449,7 +477,8 @@ class QWG_FluxLookuptableManager(Instrument):
         self.QWG.get_instr().getOperationComplete()
 
     def load_custom_pulse_onto_AWG_lookuptable(self, waveform,
-                                               append_compensation=True,
+                                               append_compensation: bool=True,
+                                               distort: bool=True,
                                                pulse_name='custom',
                                                codeword=0):
         '''
@@ -471,13 +500,13 @@ class QWG_FluxLookuptableManager(Instrument):
 
         # Insert delays and compensation pulses, apply distortions
         wait_samples = np.zeros(int(self.F_delay()*self.sampling_rate()))
-        wait_samples_2 = np.zeros(int(self.F_compensation_delay()
-                                      * self.sampling_rate()))
+        wait_samples_comp_pulses = np.zeros(int(self.F_compensation_delay()
+                                                * self.sampling_rate()))
 
         delayed_wave = np.concatenate([wait_samples, np.array(waveform)])
         if append_compensation:
             delayed_wave = np.concatenate(
-                [delayed_wave, wait_samples_2, -1 * np.array(waveform)])
+                [delayed_wave, wait_samples_comp_pulses, -1 * np.array(waveform)])
 
         if self.F_kernel_instr() is not None:
             k = self.F_kernel_instr.get_instr()

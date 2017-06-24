@@ -994,10 +994,12 @@ class QASM_QuMIS_Compiler():
                             self.hw_timing_grid = new_tp_list
                             if self.verbosity_level > 5:
                                 self.print_timing_grid()
-                            logging.warning("vertical_divide_trigger: "
-                                            "trigger time overlapped. "
-                                            "Something wrong?")
-                            # Ignoring this error seems to work fine...
+                                # note: this happens whenever a
+                                # simulataneous RO trigger is used, it can
+                                # be safely ignored in  this case.
+                                logging.warning("vertical_divide_trigger: "
+                                                "trigger time overlapped. "
+                                                "Something wrong?")
                         trigger_bit_duration[tb] = hw_event.duration
 
                 else:  # for pulse, measure and other dummy instructions.
