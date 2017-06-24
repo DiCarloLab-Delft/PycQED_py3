@@ -192,6 +192,20 @@ class Test_compiler(unittest.TestCase):
             compiler.timing_grid, 'cz',
             start_label='qwg_trigger_1',
             end_label='ro')
+
+        time_pts_ns = get_timepoints_from_label(
+            compiler.timing_grid, 'cz',
+            start_label='qwg_trigger_1',
+            end_label='ro', convert_clk_to_ns=True)
+
+        self.assertEqual(time_pts['start_tp'].absolute_time*5,
+                         time_pts_ns['start_tp'].absolute_time)
+        for tp, tp_ns in zip(time_pts['target_tps'],
+                             time_pts_ns['target_tps']):
+            self.assertEqual(tp.absolute_time*5, tp_ns.absolute_time)
+        self.assertEqual(time_pts['end_tp'].absolute_time*5,
+                         time_pts_ns['end_tp'].absolute_time)
+
         cz_pts = time_pts['target_tps']
         self.assertEqual(len(cz_pts), 1)
         t_cz = cz_pts[0].absolute_time
@@ -209,6 +223,9 @@ class Test_compiler(unittest.TestCase):
             start_label=None,
             end_label=None)
         self.assertEqual(len(time_pts['target_tps']), 5)
+
+
+
 
     def test_qasm_wait_timing_trigger_T1(self):
         # Tests the timing of the qasm sequences using a T1 sequence
@@ -461,10 +478,6 @@ class Test_multi_qubit_seqs(unittest.TestCase):
 
         self.assertEqual(
             compiler.qumis_instructions.count('trigger 0000001, 3'), 5)
-        # compiler.print_timing_events()
-        # compiler.print_timing_grid()
-        # compiler.print_hw_timing_grid()
-        # raise ValueError
 
         compiler.timing_event_list
 
