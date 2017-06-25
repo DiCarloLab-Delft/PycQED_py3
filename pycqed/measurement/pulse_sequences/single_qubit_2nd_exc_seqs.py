@@ -1,3 +1,4 @@
+import logging
 from copy import deepcopy
 from pycqed.measurement.pulse_sequences.single_qubit_tek_seq_elts import get_pulse_dict_from_pars
 from pycqed.measurement.pulse_sequences.standard_elements import multi_pulse_elt
@@ -100,6 +101,10 @@ def Ramsey_2nd_exc_seq(times, pulse_pars, pulse_pars_2nd, RO_pars, n=1,
         n:               number of pulses (1 is conventional Rabi)
         post_msmt_delay: extra wait time for resetless compatibility
     '''
+    if np.any(times>1e-3):
+        logging.warning('The values in the times array might be too large.'
+                        'The units should be seconds.')
+
     seq_name = 'Ramsey_2nd_exc_sequence'
     seq = sequence.Sequence(seq_name)
     station.pulsar.update_channel_settings()
@@ -183,6 +188,13 @@ def Ramsey_2nd_exc_seq_multiple_detunings(times, pulse_pars, pulse_pars_2nd, RO_
         n:               number of pulses (1 is conventional Rabi)
         post_msmt_delay: extra wait time for resetless compatibility
     '''
+    if np.any(times>1e-3):
+        logging.warning('The values in the times array might be too large.'
+                        'The units should be seconds.')
+    if np.any(np.asarray(artificial_detunings)<1e3):
+        logging.warning('The artificial detuning is too small. The units '
+                        'should be Hz.')
+
     seq_name = 'Ramsey_2nd_exc_sequence_mult_det'
     seq = sequence.Sequence(seq_name)
     station.pulsar.update_channel_settings()
@@ -325,7 +337,7 @@ def QScale_2nd_exc_seq(qscales, pulse_pars,  pulse_pars_2nd, RO_pars,
         seq.append_element(el, trigger_wait=True)
 
     if upload:
-        station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
 
     if return_seq:
         return seq, el_list
@@ -353,7 +365,9 @@ def T1_2nd_exc_seq(times,
         RO_pars:
             dict containing the RO parameters
     '''
-
+    if np.any(times>1e-3):
+        logging.warning('The values in the times array might be too large.'
+                        'The units should be seconds.')
     seq_name = 'T1_2nd_exc_sequence'
     seq = sequence.Sequence(seq_name)
     station.pulsar.update_channel_settings()

@@ -363,6 +363,9 @@ class QuDev_transmon(Qubit):
         if freqs is None:
             raise ValueError("Unspecified frequencies for measure_resonator_"
                              "spectroscopy")
+        if np.any(freqs<500e6):
+            logging.warning(('Some of the values in the freqs array might be '
+                             'too small. The units should be Hz.'))
 
         if MC is None:
             MC = self.MC
@@ -428,6 +431,9 @@ class QuDev_transmon(Qubit):
         transmittance """
         if freqs is None:
             raise ValueError("Unspecified frequencies for measure_spectroscopy")
+        if np.any(freqs<500e6):
+            logging.warning(('Some of the values in the freqs array might be '
+                             'too small. The units should be Hz.'))
 
         if MC is None:
             MC = self.MC
@@ -582,6 +588,9 @@ class QuDev_transmon(Qubit):
 
         if times is None:
             raise ValueError("Unspecified times for measure_T1")
+        if np.any(times>1e-3):
+            logging.warning('The values in the times array might be too large.'
+                            'The units should be seconds.')
 
         self.prepare_for_timedomain()
 
@@ -608,6 +617,9 @@ class QuDev_transmon(Qubit):
 
         if times is None:
             raise ValueError("Unspecified times for measure_T1_2nd_exc")
+        if np.any(times>1e-3):
+            logging.warning('The values in the times array might be too large.'
+                            'The units should be seconds.')
 
         self.prepare_for_timedomain()
 
@@ -702,10 +714,18 @@ class QuDev_transmon(Qubit):
 
         if times is None:
             raise ValueError("Unspecified times for measure_ramsey")
+        if artificial_detunings is None:
+            logging.warning('Artificial detuning is 0.')
         uniques = np.unique(times[range(len(artificial_detunings))])
         if uniques.size>1:
             raise ValueError("The values in the times array are not repeated "
                              "len(artificial_detunings) times.")
+        if np.any(np.asarray(artificial_detunings)<1e3):
+            logging.warning('The artificial detuning is too small. The units '
+                            'should be Hz.')
+        if np.any(times>1e-3):
+            logging.warning('The values in the times array might be too large.'
+                            'The units should be seconds.')
 
         self.prepare_for_timedomain()
         if MC is None:
@@ -730,6 +750,14 @@ class QuDev_transmon(Qubit):
 
         if times is None:
             raise ValueError("Unspecified times for measure_ramsey")
+        if artificial_detuning is None:
+            logging.warning('Artificial detuning is 0.')
+        if artificial_detuning<1e3:
+            logging.warning('The artificial detuning is too small. The units'
+                            'should be Hz.')
+        if np.any(times>1e-3):
+            logging.warning('The values in the times array might be too large.'
+                            'The units should be seconds.')
 
         self.prepare_for_timedomain()
         if MC is None:
@@ -759,6 +787,12 @@ class QuDev_transmon(Qubit):
             raise ValueError("Unspecified times for measure_ramsey")
         if artificial_detuning is None:
             logging.warning('Artificial detuning is 0.')
+        if artificial_detuning<1e3:
+            logging.warning('The artificial detuning is too small. The units'
+                            'should be Hz.')
+        if np.any(times>1e-3):
+            logging.warning('The values in the times array might be too large.'
+                            'The units should be seconds.')
 
         if label is None:
             label = 'Ramsey_2nd'+self.msmt_suffix
@@ -793,6 +827,12 @@ class QuDev_transmon(Qubit):
             raise ValueError("Unspecified times for measure_ramsey")
         if artificial_detunings is None:
             logging.warning('Artificial detunings were not given.')
+        if np.any(np.asarray(artificial_detunings)<1e3):
+            logging.warning('The artificial detuning is too small. The units '
+                            'should be Hz.')
+        if np.any(times>1e-3):
+            logging.warning('The values in the times array might be too large.'
+                            'The units should be seconds.')
 
         if label is None:
             label = 'Ramsey_2nd_multiple_detunings'+self.msmt_suffix
@@ -1242,6 +1282,9 @@ class QuDev_transmon(Qubit):
             logging.warning("Does not automatically update the RO "
                             "resonator parameters. "
                             "Set update=True if you want this!")
+        if np.any(freqs<500e6):
+            logging.warning(('Some of the values in the freqs array might be '
+                             'too small. The units should be Hz.'))
 
         if freqs is None:
             if self.f_RO_resonator() != 0 and self.Q_RO_resonator() != 0:
@@ -1309,7 +1352,8 @@ class QuDev_transmon(Qubit):
         return d
 
     def find_frequency(self, freqs, method='cw_spectroscopy', update=False,
-                       MC=None, close_fig=True, analyze_ef=False, **kw):
+                       MC=None, close_fig=True, analyze_ef=False, analyze=True,
+                       **kw):
         """
         WARNING: Does not automatically update the qubit frequency parameter.
         Set update=True if you want this!
@@ -1372,6 +1416,9 @@ class QuDev_transmon(Qubit):
             logging.warning("Does not automatically update the qubit "
                             "frequency parameter. "
                             "Set update=True if you want this!")
+        if np.any(freqs<500e6):
+            logging.warning(('Some of the values in the freqs array might be '
+                             'too small. The units should be Hz.'))
 
         if MC is None:
             MC = self.MC
@@ -1401,25 +1448,29 @@ class QuDev_transmon(Qubit):
         if analyze_ef:
             label = 'high_power_' + label
 
-        amp_only = hasattr(self.heterodyne, 'RF')
-        SpecA = ma.Qubit_Spectroscopy_Analysis(
-            analyze_ef=analyze_ef, label=label, amp_only=amp_only, close_fig=close_fig,**kw)
-        self.f_qubit(SpecA.fitted_freq)
-        f0 = SpecA.fitted_freq
-        if update:
-            self.f_qubit(f0)
-        if analyze_ef:
-            f0_ef = 2*SpecA.fitted_freq_gf_over_2 - f0
+        if analyze:
+            amp_only = hasattr(self.heterodyne, 'RF')
+            SpecA = ma.Qubit_Spectroscopy_Analysis(
+                analyze_ef=analyze_ef, label=label, amp_only=amp_only, close_fig=close_fig,**kw)
+            self.f_qubit(SpecA.fitted_freq)
+            f0 = SpecA.fitted_freq
             if update:
-                self.f_ef_qubit(f0_ef)
-        if analyze_ef:
-            return f0, f0_ef
+                self.f_qubit(f0)
+            if analyze_ef:
+                f0_ef = 2*SpecA.fitted_freq_gf_over_2 - f0
+                if update:
+                    self.f_ef_qubit(f0_ef)
+            if analyze_ef:
+                return f0, f0_ef
+            else:
+                return f0
         else:
-            return f0
+            return
 
     def find_amplitudes(self, rabi_amps=None, label=None, for_ef=False,
                         update=False, MC=None, close_fig=True, cal_points=True,
-                        no_cal_points=4, upload=True, last_ge_pulse=True, **kw):
+                        no_cal_points=4, upload=True, last_ge_pulse=True,
+                        analyze=True, **kw):
 
         """
             Finds the pi and pi/2 pulse amplitudes from the fit to a Rabi
@@ -1498,6 +1549,8 @@ class QuDev_transmon(Qubit):
                             "pi/2 amplitudes. "
                             "Set update=True if you want this!")
 
+
+
         if MC is None:
             MC = self.MC
 
@@ -1543,28 +1596,29 @@ class QuDev_transmon(Qubit):
                                       upload=upload)
 
         #get pi and pi/2 amplitudes from the analysis results
-        RabiA = ma.Rabi_Analysis(label=label, NoCalPoints=no_cal_points,
-                                     close_fig=close_fig, for_ef=for_ef,
-                                     last_ge_pulse=last_ge_pulse, **kw)
+        if analyze:
+            RabiA = ma.Rabi_Analysis(label=label, NoCalPoints=no_cal_points,
+                                         close_fig=close_fig, for_ef=for_ef,
+                                         last_ge_pulse=last_ge_pulse, **kw)
 
-        rabi_amps = RabiA.rabi_amplitudes    #This is a dict with keywords
-        #'piPulse',  'piPulse_std',
-        #'piHalfPulse', 'piHalfPulse_std
+            rabi_amps = RabiA.rabi_amplitudes    #This is a dict with keywords
+            #'piPulse',  'piPulse_std',
+            #'piHalfPulse', 'piHalfPulse_std
 
-        amp180 = rabi_amps['piPulse']
-        amp90 = rabi_amps['piHalfPulse']
+            amp180 = rabi_amps['piPulse']
+            amp90 = rabi_amps['piHalfPulse']
 
-        if update:
-            if for_ef is False:
-                self.amp180(amp180)
-                self.amp90_scale(amp90/amp180)
-                self.amp90(amp90)
-            else:
-                self.amp180_ef(amp180)
-                self.amp90_scale_ef(amp90/amp180)
-                self.amp90_ef(amp90)
-
-        return rabi_amps
+            if update:
+                if for_ef is False:
+                    self.amp180(amp180)
+                    self.amp90_scale(amp90/amp180)
+                    self.amp90(amp90)
+                else:
+                    self.amp180_ef(amp180)
+                    self.amp90_scale_ef(amp90/amp180)
+                    self.amp90_ef(amp90)
+        else:
+            return
 
 
     def find_T1(self, times, label=None, for_ef=False, update=False, MC=None,
@@ -1627,6 +1681,9 @@ class QuDev_transmon(Qubit):
         if not update:
             logging.warning("Does not automatically update the qubit "
                             "T1 parameter. Set update=True if you want this!")
+        if np.any(times>1e-3):
+            logging.warning('Some of the values in the times array might be too '
+                            'large.The units should be seconds.')
 
         if MC is None:
             MC = self.MC
@@ -1682,7 +1739,7 @@ class QuDev_transmon(Qubit):
     def find_frequency_T2_ramsey(self, times, for_ef=False, artificial_detuning=0, update=False, MC=None,
                                      cal_points=True, close_fig=True, upload=True,
                                      last_ge_pulse=True, label=None,
-                                     no_cal_points=6,**kw):
+                                     no_cal_points=6, analyze=True, **kw):
 
         """
         Finds the real qubit frequency and the dephasing rate T2* from the fit
@@ -1722,6 +1779,13 @@ class QuDev_transmon(Qubit):
             logging.warning('Artificial_detuning=0; qubit driven at "%s" '
                             'estimated with '
                             'spectroscopy' %self.f_qubit())
+        if artificial_detuning<1e3:
+            logging.warning('The artificial detuning is too small. The units '
+                            'should be Hz.')
+
+        if np.any(times>1e-3):
+            logging.warning('Some of the values in the times array might be too '
+                            'large.The units should be seconds.')
 
         if MC is None:
             MC = self.MC
@@ -1752,38 +1816,45 @@ class QuDev_transmon(Qubit):
                                 MC=MC,
                                 cal_points=cal_points,
                                 close_fig=close_fig, upload=upload)
-            RamseyA = ma.Ramsey_Analysis(auto=True, label=label,
-                                         qubit_frequency_spec=self.f_qubit(),
-                                         artificial_detuning=artificial_detuning,
-                                         **kw)
+
         else:
             self.measure_ramsey_2nd_exc(times=times, artificial_detuning=artificial_detuning, MC=MC,
                                         cal_points=cal_points, close_fig=close_fig, upload=upload,
                                         last_ge_pulse=last_ge_pulse, no_cal_points=no_cal_points)
-            RamseyA = ma.Ramsey_Analysis(auto=True, NoCalPoints=6, label=label,
-                                         qubit_frequency_spec=self.f_ef_qubit(),
+
+        if analyze:
+            if for_ef:
+                no_cal_points = 6
+            else:
+                no_cal_points = 4
+
+            RamseyA = ma.Ramsey_Analysis(auto=True, NoCalPoints=no_cal_points, label=label,
+                                         qubit_frequency_spec=self.f_qubit(),
                                          artificial_detuning=artificial_detuning,
                                          **kw)
 
-        #get new freq and T2* from analysis results
-        new_qubit_freq = RamseyA.qubit_frequency    #value
-        fitted_freq = RamseyA.ramsey_freq           #dict
-        T2_star = RamseyA.T2_star                   #dict
+            #get new freq and T2* from analysis results
+            new_qubit_freq = RamseyA.qubit_frequency    #value
+            fitted_freq = RamseyA.ramsey_freq           #dict
+            T2_star = RamseyA.T2_star                   #dict
 
-        print('New qubit frequency = {:.10f} \t stderr = {:.10f}'.format(
-            new_qubit_freq,RamseyA.Ramsey_freq['freq_stderr']))
-        print('T2_Star = {:.5f} \t stderr = {:.5f}'.format(
-            T2_star['T2_star'],T2_star['T2_star_stderr']))
+            print('New qubit frequency = {:.10f} \t stderr = {:.10f}'.format(
+                new_qubit_freq,RamseyA.Ramsey_freq['freq_stderr']))
+            print('T2_Star = {:.5f} \t stderr = {:.5f}'.format(
+                T2_star['T2_star'],T2_star['T2_star_stderr']))
 
-        if update:
-            if for_ef:
-                self.f_ef_qubit(new_qubit_freq)
-                self.T2_star_ef(T2_star['T2_star'])
-            else:
-                self.f_qubit(new_qubit_freq)
-                self.T2_star(T2_star['T2_star'])
+            if update:
+                if for_ef:
+                    self.f_ef_qubit(new_qubit_freq)
+                    self.T2_star_ef(T2_star['T2_star'])
+                else:
+                    self.f_qubit(new_qubit_freq)
+                    self.T2_star(T2_star['T2_star'])
 
-        return new_qubit_freq, fitted_freq, T2_star
+            return new_qubit_freq, fitted_freq, T2_star
+
+        else:
+            return
 
 
     def calibrate_ramsey(self, times, for_ef=False,
@@ -1829,6 +1900,10 @@ class QuDev_transmon(Qubit):
             logging.warning('Artificial_detuning=0; qubit driven at "%s" '
                             'estimated with '
                             'spectroscopy' %self.f_qubit())
+        if np.any(np.asarray(artificial_detunings)<1e3):
+            logging.warning('The artificial detuning is too small.')
+        if np.any(times>1e-3):
+            logging.warning('The values in the times array might be too large.')
 
         if MC is None:
             MC = self.MC
@@ -1850,7 +1925,7 @@ class QuDev_transmon(Qubit):
         # Each time value must be repeated len(artificial_detunings) times to
         # correspond to the logic in Ramsey_seq_multiple_detunings sequence
         len_art_det = len(artificial_detunings)
-        temp_array = np.zeros(times.size*(len_art_det-no_cal_points))
+        temp_array = np.zeros((times.size-no_cal_points)*len_art_det)
         for i in range(len(artificial_detunings)):
             np.put(temp_array,list(range(i,temp_array.size,len_art_det)),times)
         times =  np.append(temp_array,times[-no_cal_points::])
