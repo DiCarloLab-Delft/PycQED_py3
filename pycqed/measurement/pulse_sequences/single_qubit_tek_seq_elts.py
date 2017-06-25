@@ -243,6 +243,9 @@ def T1_seq(times,
         pulse_pars:  dict containing the pulse parameters
         RO_pars:     dict containing the RO parameters
     '''
+    if np.any(times>1e-3):
+        logging.warning('The values in the times array might be too large.'
+                        'The units should be seconds.')
     seq_name = 'T1_sequence'
     seq = sequence.Sequence(seq_name)
     station.pulsar.update_channel_settings()
@@ -288,6 +291,10 @@ def Ramsey_seq(times, pulse_pars, RO_pars,
         artificial_detuning: artificial_detuning (Hz) implemented using phase
         cal_points:          whether to use calibration points or not
     '''
+    if np.any(times>1e-3):
+        logging.warning('The values in the times array might be too large.'
+                        'The units should be seconds.')
+
     seq_name = 'Ramsey_sequence'
     seq = sequence.Sequence(seq_name)
     station.pulsar.update_channel_settings()
@@ -341,7 +348,7 @@ def Ramsey_seq_multiple_detunings(times, pulse_pars, RO_pars,
                               using phase
         cal_points:          whether to use calibration points or not
     '''
-    seq_name = 'Ramsey_sequence'
+    seq_name = 'Ramsey_sequence_multiple_detunings'
     seq = sequence.Sequence(seq_name)
     station.pulsar.update_channel_settings()
     el_list = []
@@ -368,10 +375,13 @@ def Ramsey_seq_multiple_detunings(times, pulse_pars, RO_pars,
                                  [pulses['X90'], pulse_pars_x2, RO_pars])
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
+
     if upload:
+        print('uploading')
         station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
+        print('upload finished')
 
-
+    print('moved on')
     if return_seq:
         return seq, el_list
     else:
