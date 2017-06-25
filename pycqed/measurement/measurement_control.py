@@ -41,7 +41,7 @@ class MeasurementControl(Instrument):
     '''
 
     def __init__(self, name,
-                 plotting_interval=1,
+                 plotting_interval=3,
                  live_plot_enabled=True, verbose=True):
         super().__init__(name=name, server_name=None)
         # Soft average is currently only available for "hard"
@@ -88,6 +88,8 @@ class MeasurementControl(Instrument):
             self.secondary_QtPlot = QtPlot(
                 window_title='Secondary plotmon of {}'.format(self.name),
                 figsize=(600, 400))
+
+        self.plotting_interval(plotting_interval)
 
         self.soft_iteration = 0  # used as a counter for soft_avg
         self._persist_dat = None
@@ -695,11 +697,13 @@ class MeasurementControl(Instrument):
             logging.warning(e)
 
     def _set_plotting_interval(self, plotting_interval):
-        self.main_QtPlot.interval = plotting_interval
-        self.secondary_QtPlot.interval = plotting_interval
+        if hasattr(self, 'main_QtPlot'):
+            self.main_QtPlot.interval = plotting_interval
+            self.secondary_QtPlot.interval = plotting_interval
+        self._plotting_interval = plotting_interval
 
     def _get_plotting_interval(self):
-        return self.main_QtPlot.interval
+        return self._plotting_interval
 
     def clear_persitent_plot(self):
         self._persist_dat = None
