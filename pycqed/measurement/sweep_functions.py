@@ -330,7 +330,8 @@ class QWG_flux_QASM_Sweep(QASM_Sweep_v2):
             self.time_tuples, end_time_ns = get_timetuples_since_event(
                 start_label='qwg_trigger_{}'.format(i),
                 target_labels=['square', 'cz'],
-                timing_grid=compiler.timing_grid, end_label='ro')
+                timing_grid=compiler.timing_grid, end_label='ro',
+                convert_clk_to_ns=True)
             self.comp_fp = self.QWG_flux_lutman.generate_composite_flux_pulse(
                 time_tuples=self.time_tuples, end_time_ns=end_time_ns)
         if self.upload:
