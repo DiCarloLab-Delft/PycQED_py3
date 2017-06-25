@@ -1388,8 +1388,7 @@ def normalize_2D_data_on_elements(data_2D, elements):
 
 
 def rotate_and_normalize_data(data, cal_zero_points=None, cal_one_points=None,
-                              zero_coord=None, one_coord=None,
-                              number_of_cal_points=4, **kw):
+                              zero_coord=None, one_coord=None, **kw):
     '''
     Rotates and normalizes data with respect to some reference coordinates.
     there are two ways to specify the reference coordinates.
@@ -1406,15 +1405,71 @@ def rotate_and_normalize_data(data, cal_zero_points=None, cal_one_points=None,
                                  correspond to one
     '''
     # Extract zero and one coordinates
-    if number_of_cal_points == 0:
-        normalized_data = rotate_and_normalize_data_no_cal_points(data=data)
+    start_at_zero = kw.get('start_at_zero', False)
+
+    if np.all([cal_zero_points==None, cal_one_points==None,
+               zero_coord==None, one_coord==None]):
+        # no cal points were used
+        normalized_data = rotate_and_normalize_data_no_cal_points(data=data,
+                                                                  **kw)
+    elif np.all([cal_one_points==None, one_coord==None]) and \
+        (not np.all([cal_zero_points==None, zero_coord==None])):
+        # only 2 cal points used; both are I pulses
+        I_zero = np.mean(data[0][cal_zero_points])
+        Q_zero = np.mean(data[1][cal_zero_points])
+
+        # Translate the data
+        trans_data = [data[0] - I_zero, data[1] - Q_zero]
+
+        # Least squares fitting to the line through the data, that also
+        # intercepts the calibration point
+
+        from lmfit.models import LinearModel
+
+        x = trans_data[0]
+        y = trans_data[1]
+
+        linear_model = LinearModel()
+        linear_model.set_param_hint('intercept',
+                                    value=0,
+                                    vary=False)
+        linear_model.set_param_hint('slope')
+        params = linear_model.make_params()
+        fit_res = linear_model.fit(data=y,
+                                   x=x,
+                                   params=params)
+
+        line_slope = fit_res.params['slope'].value
+        line_intercept = fit_res.params['intercept'].value
+        #finx the x, y coordinates of the projected points
+        x_proj=(x+line_slope*y-line_slope*line_intercept)/(line_slope**2+1)
+        y_proj= line_slope*(x_proj)+line_intercept
+
+        #find the minimum (on th ey axis) point on the line
+        y_min_line = min(fit_res.best_fit)
+        x_min_line = x[np.argmin(fit_res.best_fit)]
+
+        #find x,y coordinates with respect to end of line
+        x_data = np.abs(x_min_line - x_proj)
+        y_data = y_proj-y_min_line
+
+        #find distance from points on line to end of line
+        rotated_data = np.sqrt(x_data**2+y_data**2)
+        if start_at_zero and (rotated_data[0] > np.mean(rotated_data)):
+            rotated_data = -rotated_data
+            rotated_data -= min(rotated_data)
+
+        normalized_data = rotated_data
+
+        # #normalize data
+        # max_min_distance = max(rotated_data) - min(rotated_data)
+        # normalized_data = (rotated_data - min(rotated_data))/max_min_distance
+
     else:
+        # for 4 anf 6 cal points
         if zero_coord is not None:
             I_zero = zero_coord[0]
             Q_zero = zero_coord[1]
-        elif (zero_coord is None) and (number_of_cal_points == 2):
-            I_zero = data[0][cal_zero_points]
-            Q_zero = data[1][cal_zero_points]
         else:
             I_zero = np.mean(data[0][cal_zero_points])
             Q_zero = np.mean(data[1][cal_zero_points])
@@ -1423,9 +1478,6 @@ def rotate_and_normalize_data(data, cal_zero_points=None, cal_one_points=None,
         if one_coord is not None:
             I_one = one_coord[0]
             Q_one = one_coord[1]
-        elif (one_coord is None) and (number_of_cal_points == 2):
-            I_one = 0
-            Q_one = 0
         else:
             I_one = np.mean(data[0][cal_one_points])
             Q_one = np.mean(data[1][cal_one_points])
@@ -1434,64 +1486,18 @@ def rotate_and_normalize_data(data, cal_zero_points=None, cal_one_points=None,
         # Translate the data
         trans_data = [data[0] - I_zero, data[1] - Q_zero]
 
-        if number_of_cal_points == 2:
-            # Least squares fitting to the line through the data, that also
-            # intercepts the calibration point
+        # Rotate the data
+        M = calculate_rotation_matrix(I_one-I_zero, Q_one-Q_zero)
+        outp = [np.asarray(elem)[0] for elem in M * trans_data]
+        [rotated_data_ch1, rotated_data_ch2] = outp
 
-            from lmfit.models import LinearModel
+        # Normalize the data
+        one_zero_dist = np.sqrt((I_one-I_zero)**2 + (Q_one-Q_zero)**2)
+        normalized_data = rotated_data_ch1/one_zero_dist
 
-            x = trans_data[0]
-            y = trans_data[1]
-
-            linear_model = LinearModel()
-            linear_model.set_param_hint('intercept',
-                                         value=0,
-                                         vary=False)
-            linear_model.set_param_hint('slope')
-            params = linear_model.make_params()
-            fit_res = linear_model.fit(data=y,
-                                       x=x,
-                                       params=params)
-
-            line_slope = fit_res.params['slope'].value
-            line_intercept = fit_res.params['intercept'].value
-            #finx the x, y coordinates of the projected points
-            x_proj=(x+line_slope*y-line_slope*line_intercept)/(line_slope**2+1)
-            y_proj= line_slope*(x_proj)+line_intercept
-
-            #find the minimum (on th ey axis) point on the line
-            y_min_line = min(fit_res.best_fit)
-            x_min_line = x[np.argmin(fit_res.best_fit)]
-
-            #find x,y coordinates with respect to end of line
-            x_data = np.abs(x_min_line - x_proj)
-            y_data = y_proj-y_min_line
-
-            #find distance from points on line to end of line
-            rotated_data = np.sqrt(x_data**2+y_data**2)
-            if rotated_data[0] > np.mean(rotated_data):
-                rotated_data = -rotated_data
-                rotated_data -= min(rotated_data)
-
-            normalized_data = rotated_data
-
-            # #normlaize data
-            # max_min_distance = max(rotated_data) - min(rotated_data)
-            # normalized_data = (rotated_data - min(rotated_data))/max_min_distance
-
-        else:
-            # Rotate the data
-            M = calculate_rotation_matrix(I_one-I_zero, Q_one-Q_zero)
-            outp = [np.asarray(elem)[0] for elem in M * trans_data]
-            [rotated_data_ch1, rotated_data_ch2] = outp
-
-            # Normalize the data
-            one_zero_dist = np.sqrt((I_one-I_zero)**2 + (Q_one-Q_zero)**2)
-            normalized_data = rotated_data_ch1/one_zero_dist
-
-            if normalized_data[0] > np.mean(normalized_data):
-                normalized_data = -normalized_data
-                normalized_data -= min(normalized_data)
+        if start_at_zero and (normalized_data[0] > np.mean(normalized_data)):
+            normalized_data = -normalized_data
+            normalized_data -= min(normalized_data)
 
     return [normalized_data, zero_coord, one_coord]
 
@@ -1502,6 +1508,7 @@ def rotate_and_normalize_data_no_cal_points(data, **kw):
     (Source: http://www.cs.otago.ac.nz/cosc453/student_tutorials/
     principal_components.pdf)
     """
+    start_at_zero = kw.pop('start_at_zero', False)
 
     #translate each column in the data by its mean
     mean_x = np.mean(data[0])
@@ -1536,7 +1543,7 @@ def rotate_and_normalize_data_no_cal_points(data, **kw):
     # normalized_data = (normalized_data-min(normalized_data))/max_min_difference
 
     # Ensure trace starts at closest to zero
-    if normalized_data[0] > np.mean(normalized_data):
+    if start_at_zero and (normalized_data[0] > np.mean(normalized_data)):
         normalized_data = -normalized_data
         normalized_data -= min(normalized_data)
 

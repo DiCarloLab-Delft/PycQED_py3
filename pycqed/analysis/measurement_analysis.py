@@ -1293,7 +1293,7 @@ class TD_Analysis(MeasurementAnalysis):
     def __init__(self, NoCalPoints=4, center_point=31, make_fig=True,
                  zero_coord=None, one_coord=None, cal_points=None,
                  rotate_and_normalize=True, last_ge_pulse=True,
-                 plot_cal_points=True, for_ef=False, **kw):
+                 plot_cal_points=True, for_ef=False, start_at_zero=False, **kw):
         self.NoCalPoints = NoCalPoints
         self.normalized_values = []
         self.normalized_cal_vals = []
@@ -1307,6 +1307,7 @@ class TD_Analysis(MeasurementAnalysis):
         self.plot_cal_points = plot_cal_points
         self.last_ge_pulse = last_ge_pulse
         self.analyze_ef = for_ef
+        self.start_at_zero = start_at_zero
 
         super(TD_Analysis, self).__init__(**kw)
 
@@ -1447,10 +1448,23 @@ class TD_Analysis(MeasurementAnalysis):
 
         # Extract the indices of the cal points
         NoPts = len(values)
-        if (calsteps == 6) and self.last_ge_pulse:
+        if calsteps == 2:
+            # both are I pulses
+            print('Only I calibration point')
+            cal_zero_points = list(range(NoPts-int(calsteps),NoPts))
+            cal_one_points = None
+        elif calsteps == 4:
+            print('I and X180 calibration points')
+            # first two cal points are I pulses, last two are X180 pulses
+            cal_zero_points = list(range(NoPts-int(calsteps),
+                                         int(NoPts-int(calsteps)/2)))
+            cal_one_points = list(range(int(NoPts-int(calsteps)/2), NoPts))
+        elif (calsteps == 6) and self.last_ge_pulse:
             # oscillations between |g>-|f>
             # use the I cal points (data[-6] and data[-5]) and
             # the X180_ef cal points (data[-2] and data[-1])
+            print('Oscillations between |g> - |f>')
+            print('I and X180_ef calibration points')
             cal_zero_points = list(range(NoPts-int(calsteps),
                                          NoPts-int(2*calsteps/3)))
             cal_one_points = list(range(NoPts-int(calsteps/3), NoPts))
@@ -1458,14 +1472,16 @@ class TD_Analysis(MeasurementAnalysis):
             # oscillations between |e>-|f>
             # use the X180 cal points (data[-4] and data[-3])
             # and the X180_ef cal points (data[-2] and data[-1])
+            print('Oscillations between |e> - |f>')
+            print('X180 and X180_ef calibration points')
             cal_zero_points = list(range(NoPts- int(2*calsteps/3),
                                          NoPts-int(calsteps/3)))
             cal_one_points = list(range(NoPts-int(calsteps/3), NoPts))
         else:
-            # calsteps are either 2 or 4
-            cal_zero_points = list(range(NoPts-int(calsteps),
-                                         int(NoPts-int(calsteps)/2)))
-            cal_one_points = list(range(int(NoPts-int(calsteps)/2), NoPts))
+            # assume no cal points were used
+            print('No calibration points')
+            cal_zero_points = None
+            cal_one_points = None
 
         # Rotate and normalize data
         if len(self.measured_values) == 1:
@@ -1475,7 +1491,7 @@ class TD_Analysis(MeasurementAnalysis):
         else:
             self.corr_data = a_tools.rotate_and_normalize_data(
                 self.measured_values[0:2], cal_zero_points, cal_one_points,
-                number_of_cal_points=calsteps)[0]
+                start_at_zero=self.start_at_zero)[0]
 
         if save_norm_to_data_file:
             self.add_dataset_to_analysisgroup('Corrected data',
@@ -1485,8 +1501,12 @@ class TD_Analysis(MeasurementAnalysis):
                 'calibration points'.encode('utf-8'))
 
         normalized_values = self.corr_data
-        normalized_data_points = normalized_values[:-int(calsteps)]
-        normalized_cal_vals = normalized_values[-int(calsteps):]
+        if calsteps == 0:
+            normalized_data_points = normalized_values
+            normalized_cal_vals = normalized_values
+        else:
+            normalized_data_points = normalized_values[:-int(calsteps)]
+            normalized_cal_vals = normalized_values[-int(calsteps):]
 
         # Optionally, normalize to range [0,1]:
         # If we are calibrating only to a pulse with no amplitude
@@ -1732,7 +1752,7 @@ class Rabi_Analysis(TD_Analysis):
     def __init__(self, label='Rabi', **kw):
         kw['label'] = label
         kw['h5mode'] = 'r+'
-        super(self.__class__, self).__init__(**kw)
+        super(self.__class__, self).__init__(start_at_zero=True, **kw)
 
     def fit_Rabi(self, print_fit_results=True):
         cos_mod = fit_mods.CosModel
@@ -1814,7 +1834,8 @@ class Rabi_Analysis(TD_Analysis):
         super().run_default_analysis(show=show,
                                      close_file=close_file,
                                      unit_prefix=unit_prefix,
-                                     close_main_figure=True,save_fig=False,**kw)
+                                     close_main_figure=True,
+                                     save_fig=False, **kw)
 
         show_guess = kw.get('show_guess', False)
         plot_amplitudes = kw.get('plot_amplitudes',True)
