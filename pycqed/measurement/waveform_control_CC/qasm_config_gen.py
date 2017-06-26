@@ -1,14 +1,26 @@
 q0_name = 'ql'
 q1_name = 'qr'
 
+MW_latency = 0    # Defined as 0
+RO_latency = 0    # to be calibrated
+Flux_latency = 0  # to be calibrated
 
 mw_pulse_duration = 40
 RO_length = 6000
+
 
 q0_RO_delay = 10
 q1_RO_delay = 10
 square_flux_duration_ns = 100
 CZ_duration_ns = 200
+
+flux_dummy = True
+if flux_dummy:
+    sq_cw = -2
+    cz_cw = -2
+else:
+    sq_cw = 0
+    cz_cw = 1
 
 
 def create_config():
@@ -90,7 +102,7 @@ def create_config():
                     },
                     "flux": {
                         "qumis": "trigger",
-                        "latency": mw_pulse_duration,
+                        "latency": 0,
                         "trigger bit": 1,
                         "codeword bit": [1],
                         "format": [5, 10],
@@ -137,11 +149,11 @@ def create_config():
                 "my90": 6
             },
             {
-                "cz": -2,
-                "square": -2,
+                "cz": cz_cw,
+                "square": sq_cw,
                 "cz90": 1,
                 "cz45": 2,
-                "dummy_other": 3
+                "dummy_other": -2
             }
         ]
     }
