@@ -12,7 +12,7 @@ from pycqed.measurement import measurement_control
 
 from pycqed.measurement.demonstrator_helper.AllXY_detector import AllXYDetector
 from pycqed.measurement.detector_functions import QX_Hard_Detector
-from pycqed.instrument_drivers.virtual_instruments.pyqx.qx_client import qx_client
+
 #from pycqed.measurement.waveform_control_CC import qasm_helpers as qh
 from qcodes.instrument.base import Instrument
 from pycqed.measurement import detector_functions as det
