@@ -23,7 +23,8 @@ from copy import deepcopy
 
 import pycqed.analysis.tools.plotting as pl_tools
 
-from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
+from pycqed.analysis.tools.plotting import (set_xlabel, set_ylabel,
+                                            data_to_table_png)
 
 try:
     from nathan_plotting_tools import *
@@ -465,7 +466,6 @@ class MeasurementAnalysis(object):
                 self.save_fig(fig, xlabel=xlabel, ylabel=ylabel, **kw)
         return
 
-
     def plot_complex_results(self, cmp_data, fig, ax, show=False, marker='.', **kw):
         '''
         Plot real and imaginary values measured vs a sweeped parameter
@@ -491,7 +491,6 @@ class MeasurementAnalysis(object):
             self.save_fig(fig, xlabel=xlabel, ylabel=ylabel, **kw)
 
         return
-
 
     def plot_dB_from_linear(self, x, lin_amp, fig, ax, show=False, marker='.', **kw):
         '''
@@ -519,7 +518,6 @@ class MeasurementAnalysis(object):
             self.save_fig(fig, xlabel=xlabel, ylabel=ylabel, **kw)
 
         return
-
 
     def get_naming_and_values_2D(self):
         '''
@@ -1267,8 +1265,10 @@ class Rabi_Analysis(TD_Analysis):
         if self.nr_quadratures != 1:
             # It would be best to do 1 fit to both datasets but since it is
             # easier to do just one fit we stick to that.
-            # We make an initial guess of the Rabi period using both quadratures
-            data = np.sqrt(self.measured_values[0]**2+self.measured_values[1]**2)
+            # We make an initial guess of the Rabi period using both
+            # quadratures
+            data = np.sqrt(self.measured_values[
+                           0]**2+self.measured_values[1]**2)
             params = fit_mods.Cos_guess(model, data=data, t=self.sweep_points)
             fit_res = model.fit(
                 data=data,
@@ -1522,7 +1522,7 @@ class CPhase_2Q_amp_cost_analysis(Rabi_Analysis):
         # Frequency is known, because we sweep the phase of the second pihalf
         # pulse in a Ramsey-type experiment.
         model = lmfit.Model((lambda t, amplitude, phase, offset:
-                            amplitude*np.cos(2*np.pi*t/360.0 + phase)+offset))
+                             amplitude*np.cos(2*np.pi*t/360.0 + phase)+offset))
         self.fit_result = {}
 
         # Fit case with no excitation first
@@ -1569,7 +1569,8 @@ class Motzoi_XY_analysis(TD_Analysis):
         self.add_analysis_datagroup_to_file()
         if self.cal_points is None:
             if len(self.measured_values) == 2:
-                self.corr_data = self.measured_values[0]**2 + self.measured_values[1]**2
+                self.corr_data = self.measured_values[
+                    0]**2 + self.measured_values[1]**2
             else:
                 self.corr_data = self.measured_values[0]
         else:
@@ -3218,16 +3219,15 @@ class DriveDetuning_Analysis(TD_Analysis):
             model = fit_mods.lmfit.Model(fit_mods.CosFunc)
 
             params = fit_mods.Cos_guess(model, data=data,
-                                 t=sweep_points)
+                                        t=sweep_points)
             # This ensures that phase is *always* ~90 deg if it is different
             # this shows up in the amplitude and prevents the correct detuning
             # is shown.
             params['phase'].min = np.deg2rad(80)
             params['phase'].max = np.deg2rad(100)
 
-
             fit_results = model.fit(data=data, t=sweep_points,
-                                             params=params)
+                                    params=params)
             return fit_results
 
         def quadratic_fit_data():
@@ -4093,6 +4093,7 @@ class VNA_Analysis(MeasurementAnalysis):
     '''
     Nice to use with all measurements performed with the VNA.
     '''
+
     def __init__(self, label='VNA', **kw):
         kw['label'] = label
         kw['h5mode'] = 'r+'
@@ -4339,10 +4340,12 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
                 abs(max(self.data_dist) - min(self.data_dist))
 
             if kappa_guess == 0:
-                    kappa_guess = 1 # When kappa_guess is zero, the fitting procedure fails (claims 'input has nan values')
+                # When kappa_guess is zero, the fitting procedure fails (claims
+                # 'input has nan values')
+                kappa_guess = 1
 
-            if not peak_flag: # Change the sign of amplitude_guess for dips
-                amplitude_guess*=-1.
+            if not peak_flag:  # Change the sign of amplitude_guess for dips
+                amplitude_guess *= -1.
 
             LorentzianModel = fit_mods.LorentzianModel
             LorentzianModel.set_param_hint('f0',
@@ -5299,18 +5302,19 @@ class butterfly_analysis(MeasurementAnalysis):
             Q_shots = self.measured_values[1]
 
             shots = I_shots+1j*Q_shots
-            rot_shots = dm_tools.rotate_complex(shots, angle=theta_in, deg=True)
+            rot_shots = dm_tools.rotate_complex(
+                shots, angle=theta_in, deg=True)
             I_shots = rot_shots.real
             Q_shots = rot_shots.imag
 
             self.data = I_shots
 
         if initialize:
-            if threshold_init == None:
+            if threshold_init is None:
                 threshold_init = threshold
 
-            # reshuffeling the data to endup with two arrays for the diffeent
-            # input states
+            # reshuffling the data to end up with two arrays for the
+            # different input states
             shots = np.size(self.data)
             shots_per_mmt = np.floor_divide(shots, 6)
             shots_used = shots_per_mmt*6
@@ -5338,9 +5342,8 @@ class butterfly_analysis(MeasurementAnalysis):
             self.data_rel_post = self.data_rel[:, 1:]
             self.data_exc = self.data_exc_post
             self.data_rel = self.data_rel_post
-            fraction = (
-                np.size(self.data_exc) + np.size(self.data_exc))*3/shots_used/2
-
+            fraction = (np.size(self.data_exc) +
+                        np.size(self.data_exc))*3/shots_used/2
 
         else:
             m0_on = self.data[2::4]
@@ -5367,12 +5370,12 @@ class butterfly_analysis(MeasurementAnalysis):
 
     def run_default_analysis(self,  **kw):
         verbose = kw.pop('verbose', False)
-        exc_coeffs = dm_tools.butterfly_data_binning(Z=self.data_exc,
-                                                     initial_state=0)
-        rel_coeffs = dm_tools.butterfly_data_binning(Z=self.data_rel,
-                                                     initial_state=1)
-        self.butterfly_coeffs = dm_tools.butterfly_matrix_inversion(exc_coeffs,
-                                                                    rel_coeffs)
+        self.exc_coeffs = dm_tools.butterfly_data_binning(Z=self.data_exc,
+                                                          initial_state=0)
+        self.rel_coeffs = dm_tools.butterfly_data_binning(Z=self.data_rel,
+                                                          initial_state=1)
+        self.butterfly_coeffs = dm_tools.butterfly_matrix_inversion(
+            self.exc_coeffs, self.rel_coeffs)
         # eps,declaration,output_input
         F_a_butterfly = (1-(self.butterfly_coeffs.get('eps00_1') +
                             self.butterfly_coeffs.get('eps01_1') +
@@ -5390,7 +5393,70 @@ class butterfly_analysis(MeasurementAnalysis):
         self.butterfly_coeffs['F_a_butterfly'] = F_a_butterfly
         self.butterfly_coeffs['mmt_ind_exc'] = mmt_ind_exc
         self.butterfly_coeffs['mmt_ind_rel'] = mmt_ind_rel
+
+        self.make_data_tables()
+
         return self.butterfly_coeffs
+
+    def make_data_tables(self):
+
+        figname1 = 'raw probabilities'
+
+        data_raw_p = [['P(1st m, 2nd m)_(|in>)', 'val'],
+                      ['P00_0', '{:.4f}'.format(self.exc_coeffs['P00_0'])],
+                      ['P01_0', '{:.4f}'.format(self.exc_coeffs['P01_0'])],
+                      ['P10_0', '{:.4f}'.format(self.exc_coeffs['P10_0'])],
+                      ['P11_0', '{:.4f}'.format(self.exc_coeffs['P11_0'])],
+                      ['P00_1', '{:.4f}'.format(self.rel_coeffs['P00_1'])],
+                      ['P01_1', '{:.4f}'.format(self.rel_coeffs['P01_1'])],
+                      ['P10_1', '{:.4f}'.format(self.rel_coeffs['P10_1'])],
+                      ['P11_1', '{:.4f}'.format(self.rel_coeffs['P11_1'])]]
+
+        savename = os.path.abspath(os.path.join(
+                self.folder, figname1))
+        data_to_table_png(data=data_raw_p, filename=savename+'.png',
+                          title=figname1)
+
+        figname2 = 'inferred states'
+
+        data_inf = [['eps(|out>)_(|in>)', 'val'],
+                    ['eps0_0', '{:.4f}'.format(self.exc_coeffs['eps0_0'])],
+                    ['eps1_0', '{:.4f}'.format(self.exc_coeffs['eps1_0'])],
+                    ['eps0_1', '{:.4f}'.format(self.rel_coeffs['eps0_1'])],
+                    ['eps1_1', '{:.4f}'.format(self.rel_coeffs['eps1_1'])]]
+        savename = os.path.abspath(os.path.join(
+                self.folder, figname2))
+        data_to_table_png(data=data_inf, filename=savename+'.png',
+                          title=figname2)
+
+        bf = self.butterfly_coeffs
+        figname3 = 'Butterfly coefficients'
+        data = [['eps(declared, |out>)_(|in>)', 'val'],
+                ['eps00_0', '{:.4f}'.format(bf['eps00_0'])],
+                ['eps01_0', '{:.4f}'.format(bf['eps01_0'])],
+                ['eps10_0', '{:.4f}'.format(bf['eps10_0'])],
+                ['eps11_0', '{:.4f}'.format(bf['eps11_0'])],
+                ['eps00_1', '{:.4f}'.format(bf['eps00_1'])],
+                ['eps01_1', '{:.4f}'.format(bf['eps01_1'])],
+                ['eps10_1', '{:.4f}'.format(bf['eps10_1'])],
+                ['eps11_1', '{:.4f}'.format(bf['eps11_1'])]]
+        savename = os.path.abspath(os.path.join(
+                self.folder, figname3))
+        data_to_table_png(data=data, filename=savename+'.png',
+                          title=figname3)
+
+
+        figname4 = 'Derived quantities'
+        data = [['Measurement induced excitations',
+                    '{:.4f}'.format(bf['mmt_ind_exc'])],
+                ['Measurement induced relaxation',
+                    '{:.4f}'.format(bf['mmt_ind_rel'])],
+                ['Readout fidelity',
+                    '{:.4f}'.format(bf['F_a_butterfly'])]]
+        savename = os.path.abspath(os.path.join(
+                self.folder, figname4))
+        data_to_table_png(data=data, filename=savename+'.png',
+                          title=figname4)
 
 
 ##########################################
