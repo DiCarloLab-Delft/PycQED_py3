@@ -17,7 +17,7 @@ class Test_MeasurementControl(unittest.TestCase):
         self.station = station.Station()
         # set up a pulsar with some mock settings for the element
         self.MC = measurement_control.MeasurementControl(
-            'MC', live_plot_enabled=False, verbose=True)
+            'MC', live_plot_enabled=True, verbose=True)
         self.MC.station = self.station
         self.station.add_component(self.MC)
 
@@ -122,6 +122,7 @@ class Test_MeasurementControl(unittest.TestCase):
         """
         sweep_pts = np.linspace(10, 20, 3)
         sweep_pts_2D = np.linspace(0, 10, 5)
+        self.MC.live_plot_enabled(False)
         self.MC.set_sweep_function(None_Sweep(sweep_control='hard'))
         self.MC.set_sweep_function_2D(None_Sweep(sweep_control='soft'))
         self.MC.set_sweep_points(sweep_pts)
@@ -143,6 +144,8 @@ class Test_MeasurementControl(unittest.TestCase):
         np.testing.assert_array_almost_equal(z1, z[1])
         d = self.MC.detector_function
         self.assertEqual(d.times_called, 5)
+
+        self.MC.live_plot_enabled(True)
 
     def test_many_shots_hard_sweep(self):
         """
@@ -202,6 +205,7 @@ class Test_MeasurementControl(unittest.TestCase):
 
     def test_soft_averages_hard_sweep_2D(self):
         self.MC.soft_avg(1)
+        self.MC.live_plot_enabled(False)
         sweep_pts = np.arange(5)
         sweep_pts_2D = np.linspace(5, 10, 5)
         self.MC.set_sweep_function(None_Sweep(sweep_control='hard'))
@@ -246,6 +250,7 @@ class Test_MeasurementControl(unittest.TestCase):
                                              decimal=2)
 
         self.assertEqual(d.times_called, 5*1000+5)
+        self.MC.live_plot_enabled(True)
 
     def test_soft_sweep_1D_soft_averages(self):
         self.mock_parabola.noise(0)
