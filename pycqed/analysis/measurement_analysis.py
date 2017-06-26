@@ -23,7 +23,8 @@ from copy import deepcopy
 
 import pycqed.analysis.tools.plotting as pl_tools
 
-from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
+from pycqed.analysis.tools.plotting import (set_xlabel, set_ylabel,
+                                            data_to_table_png)
 
 try:
     from nathan_plotting_tools import *
@@ -4082,7 +4083,7 @@ class Homodyne_Analysis(MeasurementAnalysis):
             self.save_fig(fig, figname='complex', **kw)
             self.save_fig(fig2, xlabel='Mag', **kw)
         else:
-            ax.plot(self.sweep_points, fit_res.best_fit, 'r-')
+            ax.plot(data_x, fit_res.best_fit, 'r-')
             f0 = self.fit_results.values['f0']
             plt.plot(f0*1e9, fit_res.eval(f=f0*1e9), 'o', ms=8)
 
@@ -5314,18 +5315,19 @@ class butterfly_analysis(MeasurementAnalysis):
             Q_shots = self.measured_values[1]
 
             shots = I_shots+1j*Q_shots
-            rot_shots = dm_tools.rotate_complex(shots, angle=theta_in, deg=True)
+            rot_shots = dm_tools.rotate_complex(
+                shots, angle=theta_in, deg=True)
             I_shots = rot_shots.real
             Q_shots = rot_shots.imag
 
             self.data = I_shots
 
         if initialize:
-            if threshold_init == None:
+            if threshold_init is None:
                 threshold_init = threshold
 
-            # reshuffeling the data to endup with two arrays for the diffeent
-            # input states
+            # reshuffling the data to end up with two arrays for the
+            # different input states
             shots = np.size(self.data)
             shots_per_mmt = np.floor_divide(shots, 6)
             shots_used = shots_per_mmt*6
@@ -5353,9 +5355,8 @@ class butterfly_analysis(MeasurementAnalysis):
             self.data_rel_post = self.data_rel[:, 1:]
             self.data_exc = self.data_exc_post
             self.data_rel = self.data_rel_post
-            fraction = (
-                np.size(self.data_exc) + np.size(self.data_exc))*3/shots_used/2
-
+            fraction = (np.size(self.data_exc) +
+                        np.size(self.data_exc))*3/shots_used/2
 
         else:
             m0_on = self.data[2::4]
@@ -5382,12 +5383,12 @@ class butterfly_analysis(MeasurementAnalysis):
 
     def run_default_analysis(self,  **kw):
         verbose = kw.pop('verbose', False)
-        exc_coeffs = dm_tools.butterfly_data_binning(Z=self.data_exc,
-                                                     initial_state=0)
-        rel_coeffs = dm_tools.butterfly_data_binning(Z=self.data_rel,
-                                                     initial_state=1)
-        self.butterfly_coeffs = dm_tools.butterfly_matrix_inversion(exc_coeffs,
-                                                                    rel_coeffs)
+        self.exc_coeffs = dm_tools.butterfly_data_binning(Z=self.data_exc,
+                                                          initial_state=0)
+        self.rel_coeffs = dm_tools.butterfly_data_binning(Z=self.data_rel,
+                                                          initial_state=1)
+        self.butterfly_coeffs = dm_tools.butterfly_matrix_inversion(
+            self.exc_coeffs, self.rel_coeffs)
         # eps,declaration,output_input
         F_a_butterfly = (1-(self.butterfly_coeffs.get('eps00_1') +
                             self.butterfly_coeffs.get('eps01_1') +
@@ -5405,7 +5406,70 @@ class butterfly_analysis(MeasurementAnalysis):
         self.butterfly_coeffs['F_a_butterfly'] = F_a_butterfly
         self.butterfly_coeffs['mmt_ind_exc'] = mmt_ind_exc
         self.butterfly_coeffs['mmt_ind_rel'] = mmt_ind_rel
+
+        self.make_data_tables()
+
         return self.butterfly_coeffs
+
+    def make_data_tables(self):
+
+        figname1 = 'raw probabilities'
+
+        data_raw_p = [['P(1st m, 2nd m)_(|in>)', 'val'],
+                      ['P00_0', '{:.4f}'.format(self.exc_coeffs['P00_0'])],
+                      ['P01_0', '{:.4f}'.format(self.exc_coeffs['P01_0'])],
+                      ['P10_0', '{:.4f}'.format(self.exc_coeffs['P10_0'])],
+                      ['P11_0', '{:.4f}'.format(self.exc_coeffs['P11_0'])],
+                      ['P00_1', '{:.4f}'.format(self.rel_coeffs['P00_1'])],
+                      ['P01_1', '{:.4f}'.format(self.rel_coeffs['P01_1'])],
+                      ['P10_1', '{:.4f}'.format(self.rel_coeffs['P10_1'])],
+                      ['P11_1', '{:.4f}'.format(self.rel_coeffs['P11_1'])]]
+
+        savename = os.path.abspath(os.path.join(
+                self.folder, figname1))
+        data_to_table_png(data=data_raw_p, filename=savename+'.png',
+                          title=figname1)
+
+        figname2 = 'inferred states'
+
+        data_inf = [['eps(|out>)_(|in>)', 'val'],
+                    ['eps0_0', '{:.4f}'.format(self.exc_coeffs['eps0_0'])],
+                    ['eps1_0', '{:.4f}'.format(self.exc_coeffs['eps1_0'])],
+                    ['eps0_1', '{:.4f}'.format(self.rel_coeffs['eps0_1'])],
+                    ['eps1_1', '{:.4f}'.format(self.rel_coeffs['eps1_1'])]]
+        savename = os.path.abspath(os.path.join(
+                self.folder, figname2))
+        data_to_table_png(data=data_inf, filename=savename+'.png',
+                          title=figname2)
+
+        bf = self.butterfly_coeffs
+        figname3 = 'Butterfly coefficients'
+        data = [['eps(declared, |out>)_(|in>)', 'val'],
+                ['eps00_0', '{:.4f}'.format(bf['eps00_0'])],
+                ['eps01_0', '{:.4f}'.format(bf['eps01_0'])],
+                ['eps10_0', '{:.4f}'.format(bf['eps10_0'])],
+                ['eps11_0', '{:.4f}'.format(bf['eps11_0'])],
+                ['eps00_1', '{:.4f}'.format(bf['eps00_1'])],
+                ['eps01_1', '{:.4f}'.format(bf['eps01_1'])],
+                ['eps10_1', '{:.4f}'.format(bf['eps10_1'])],
+                ['eps11_1', '{:.4f}'.format(bf['eps11_1'])]]
+        savename = os.path.abspath(os.path.join(
+                self.folder, figname3))
+        data_to_table_png(data=data, filename=savename+'.png',
+                          title=figname3)
+
+
+        figname4 = 'Derived quantities'
+        data = [['Measurement induced excitations',
+                    '{:.4f}'.format(bf['mmt_ind_exc'])],
+                ['Measurement induced relaxation',
+                    '{:.4f}'.format(bf['mmt_ind_rel'])],
+                ['Readout fidelity',
+                    '{:.4f}'.format(bf['F_a_butterfly'])]]
+        savename = os.path.abspath(os.path.join(
+                self.folder, figname4))
+        data_to_table_png(data=data, filename=savename+'.png',
+                          title=figname4)
 
 
 ##########################################
