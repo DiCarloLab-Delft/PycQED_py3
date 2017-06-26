@@ -439,22 +439,24 @@ class MeasurementAnalysis(object):
             raise ValueError('datasaving_format "%s " not recognized'
                              % datasaving_format)
 
-    def plot_results_vs_sweepparam(self, x, y, fig, ax, show=False, marker='-o',
+    def plot_results_vs_sweepparam(self, x, y, fig, ax, show=False,
+                                   marker='-o',
+                                   xlabel=None, x_unit=None,
+                                   ylabel=None, y_unit=None,
                                    log=False, label=None, **kw):
         save = kw.pop('save', False)
         self.plot_title = kw.pop('plot_title',
                                  textwrap.fill(self.timestamp_string + '_' +
                                                self.measurementstring, 40))
-        xlabel = kw.pop('xlabel', None)
-        ylabel = kw.pop('ylabel', None)
+
         ax.set_title(self.plot_title)
-        if xlabel is not None:
-            ax.set_xlabel(xlabel)
-        if ylabel is not None:
-            ax.set_ylabel(ylabel)
         ax.plot(x, y, marker, label=label)
         if log:
             ax.set_yscale('log')
+        if xlabel is not None:
+            set_xlabel(ax, xlabel, x_unit)
+        if ylabel is not None:
+            set_ylabel(ax, ylabel, y_unit)
         if show:
             plt.show()
         if save:
@@ -464,7 +466,6 @@ class MeasurementAnalysis(object):
             else:
                 self.save_fig(fig, xlabel=xlabel, ylabel=ylabel, **kw)
         return
-
 
     def plot_complex_results(self, cmp_data, fig, ax, show=False, marker='.', **kw):
         '''
@@ -492,7 +493,6 @@ class MeasurementAnalysis(object):
 
         return
 
-
     def plot_dB_from_linear(self, x, lin_amp, fig, ax, show=False, marker='.', **kw):
         '''
         Plot linear data in dB.
@@ -519,7 +519,6 @@ class MeasurementAnalysis(object):
             self.save_fig(fig, xlabel=xlabel, ylabel=ylabel, **kw)
 
         return
-
 
     def get_naming_and_values_2D(self):
         '''
@@ -863,6 +862,7 @@ class TD_Analysis(MeasurementAnalysis):
             return
 
         if self.cal_points is None:
+            # 42 is nr. of points in AllXY
             if len(self.measured_values[0]) == 42:
                 self.corr_data, self.zero_coord, self.one_coord = \
                     a_tools.rotate_and_normalize_data(
@@ -1263,12 +1263,15 @@ class Rabi_Analysis(TD_Analysis):
 
     def fit_data(self, print_fit_results=False, **kw):
         model = fit_mods.lmfit.Model(fit_mods.CosFunc)
+
         self.fit_res = ['']*self.nr_quadratures
         if self.nr_quadratures != 1:
             # It would be best to do 1 fit to both datasets but since it is
             # easier to do just one fit we stick to that.
-            # We make an initial guess of the Rabi period using both quadratures
-            data = np.sqrt(self.measured_values[0]**2+self.measured_values[1]**2)
+            # We make an initial guess of the Rabi period using both
+            # quadratures
+            data = np.sqrt(self.measured_values[
+                           0]**2+self.measured_values[1]**2)
             params = fit_mods.Cos_guess(model, data=data, t=self.sweep_points)
             fit_res = model.fit(
                 data=data,
@@ -1522,7 +1525,7 @@ class CPhase_2Q_amp_cost_analysis(Rabi_Analysis):
         # Frequency is known, because we sweep the phase of the second pihalf
         # pulse in a Ramsey-type experiment.
         model = lmfit.Model((lambda t, amplitude, phase, offset:
-                            amplitude*np.cos(2*np.pi*t/360.0 + phase)+offset))
+                             amplitude*np.cos(2*np.pi*t/360.0 + phase)+offset))
         self.fit_result = {}
 
         # Fit case with no excitation first
@@ -1569,7 +1572,8 @@ class Motzoi_XY_analysis(TD_Analysis):
         self.add_analysis_datagroup_to_file()
         if self.cal_points is None:
             if len(self.measured_values) == 2:
-                self.corr_data = self.measured_values[0]**2 + self.measured_values[1]**2
+                self.corr_data = self.measured_values[
+                    0]**2 + self.measured_values[1]**2
             else:
                 self.corr_data = self.measured_values[0]
         else:
@@ -2529,11 +2533,18 @@ class SSRO_discrimination_analysis(MeasurementAnalysis):
             fit_mods.plot_fitres2D_heatmap(self.fit_res, x_tiled, y_rep,
                                            axs=axs, cmap='viridis')
             for ax in axs:
+                ax.ticklabel_format(style='sci', fontsize=4,
+                                    scilimits=(0, 0))
                 set_xlabel(ax, 'I', self.value_units[0])
-                set_ylabel(ax, 'Q', self.value_units[1])
+                edge = max(max(abs(xedges)), max(abs(yedges)))
+                ax.set_xlim(-edge, edge)
+                ax.set_ylim(-edge, edge)
+                # ax.set_axis_bgcolor(plt.cm.viridis(0))
+            set_ylabel(axs[0], 'Q', self.value_units[1])
+            #axs[0].ticklabel_format(style = 'sci',  fontsize=4)
+
             self.save_fig(
-                fig, figname='2D-Histograms_rot_{:.1f} deg'.format(theta_in),
-                **kw)
+                fig, figname='2D-Histograms_rot_{:.1f} deg'.format(theta_in), **kw)
 
         #######################################################
         #         Extract quantities of interest              #
@@ -2801,12 +2812,13 @@ class T1_Analysis(TD_Analysis):
                     ax2 = axarray[i]
                 else:
                     ax2 = axarray[i/2, i % 2]
-
                 self.plot_results_vs_sweepparam(x=self.sweep_points,
                                                 y=self.measured_values[i],
                                                 fig=figarray, ax=ax2,
-                                                xlabel=self.xlabel,
-                                                ylabel=self.ylabels[i],
+                                                xlabel=self.parameter_names[0],
+                                                x_unit=self.parameter_units[0],
+                                                ylabel=self.value_names[i],
+                                                y_unit=self.value_units[i],
                                                 save=False)
 
         if 'I_cal' in self.value_names[i]:  # Fit the data
@@ -3218,16 +3230,15 @@ class DriveDetuning_Analysis(TD_Analysis):
             model = fit_mods.lmfit.Model(fit_mods.CosFunc)
 
             params = fit_mods.Cos_guess(model, data=data,
-                                 t=sweep_points)
+                                        t=sweep_points)
             # This ensures that phase is *always* ~90 deg if it is different
             # this shows up in the amplitude and prevents the correct detuning
             # is shown.
             params['phase'].min = np.deg2rad(80)
             params['phase'].max = np.deg2rad(100)
 
-
             fit_results = model.fit(data=data, t=sweep_points,
-                                             params=params)
+                                    params=params)
             return fit_results
 
         def quadratic_fit_data():
@@ -4093,6 +4104,7 @@ class VNA_Analysis(MeasurementAnalysis):
     '''
     Nice to use with all measurements performed with the VNA.
     '''
+
     def __init__(self, label='VNA', **kw):
         kw['label'] = label
         kw['h5mode'] = 'r+'
@@ -4339,10 +4351,13 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
                 abs(max(self.data_dist) - min(self.data_dist))
 
             if kappa_guess == 0:
-                    kappa_guess = 1 # When kappa_guess is zero, the fitting procedure fails (claims 'input has nan values')
+                # When kappa_guess is zero, the fitting procedure fails (claims
+                # 'input has nan values')
+                kappa_guess = 1
 
-            if not peak_flag: # Change the sign of amplitude_guess for dips
-                amplitude_guess*=-1.
+            # Commented out as this is an undefined variable
+            # if not peak_flag:  # Change the sign of amplitude_guess for dips
+            #     amplitude_guess *= -1.
 
             LorentzianModel = fit_mods.LorentzianModel
             LorentzianModel.set_param_hint('f0',
@@ -6092,3 +6107,286 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
                                         flux=np.array(total_flux),
                                         params=params)
         return fit_res
+
+
+class Ram_Z_Analysis(MeasurementAnalysis):
+    def __init__(self, timestamp_cos=None, timestamp_sin=None,
+                 filter_raw=False, filter_deriv_phase=False, demodulate=True,
+                 f_demod=0, f01max=None, E_c=None, flux_amp=None, V_0=0, d_c=1,
+                 auto=True, make_fig=True, TwoD=False, **kw):
+        super().__init__(timestamp=timestamp_cos, label='Ram_Z_cos', TwoD=TwoD,
+                         **kw)
+        self.cosTrace = self.measured_values[0]
+        super().__init__(timestamp=timestamp_sin, label='Ram_Z_sin', TwoD=TwoD,
+                         **kw)
+        self.sinTrace = self.measured_values[0]
+
+        self.filter_raw = filter_raw
+        self.filter_deriv_phase = filter_deriv_phase
+        self.demod = demodulate
+        self.f_demod = f_demod
+
+        self.f01max = f01max
+        self.E_c = E_c
+        self.flux_amp = flux_amp
+        self.V_0 = V_0
+
+        self.d_c = d_c
+
+        if auto:
+            if not TwoD:
+                self.run_special_analysis(make_fig=make_fig)
+            else:
+                pass
+
+    def normalize(self, trace):
+        # * -1 because cos starts at -1 instead of 1
+        trace *= -1
+        trace -= np.mean(trace)
+        trace /= max(np.abs(trace))
+        return trace
+
+    def run_special_analysis(self, make_fig=True):
+        self.df, self.phases, self.I, self.Q = self.analyse_trace(
+            self.cosTrace, self.sinTrace, self.sweep_points,
+            filter_raw=self.filter_raw,
+            filter_deriv_phase=self.filter_deriv_phase,
+            demodulate=self.demod,
+            f_demod=self.f_demod,
+            return_all=True)
+
+        # self.add_dataset_to_analysisgroup('detuning', self.df)
+        # self.add_dataset_to_analysisgroup('phase', self.phases)
+
+        if (self.f01max != None and self.E_c != None and
+            self.flux_amp != None):
+            self.d_c, self.step_response = self.get_stepresponse(
+                self.df, self.f01max, self.E_c, self.flux_amp, V_0=self.V_0)
+            # self.add_dataset_to_analysisgroup('step_response',
+            #                                   self.step_response)
+            plotStep = True
+        else:
+            print('To calculate step response, f01max, E_c, flux_amp, and V_0'
+                  ' have to be specified.')
+            plotStep = False
+
+        if make_fig:
+            self.make_figures(plot_step=plotStep)
+
+    def analyse_trace(self, I, Q, x_pts,
+                      filter_raw=False, filter_deriv_phase=False,
+                      filter_width=1e-9,
+                      demodulate=False, f_demod=0,
+                      return_all=False):
+        I = self.normalize(I)
+        Q = self.normalize(Q)
+        dt = x_pts[1] - x_pts[0]
+
+        # Demodulate
+        if demodulate:
+            I, Q = self.demodulate(I, Q, f_demod, x_pts)
+
+        # Filter raw data
+        if filter_raw:
+            I = self.gauss_filter(I, filter_width, dt, pad_val=1)
+            Q = self.gauss_filter(Q, filter_width, dt, pad_val=0)
+
+        # Calcualte phase and undo phase-wrapping
+        phases = np.arctan2(Q, I)
+        phases = self.unwrap_phase(phases)
+
+        # Filter phase and/or calculate the derivative
+        if filter_deriv_phase:
+            df = self.gauss_deriv_filter(phases, filter_width, dt, pad_val=0)\
+                 / (2 * np.pi)
+        else:
+            # Calculate central derivative
+            phasesPadded = np.concatenate(([0], phases))
+            df = np.array([(phasesPadded[i+1] - phasesPadded[i-1]) / (2*dt)
+                           for i in range(1, len(phases)-1)]) / (2 * np.pi)
+
+        # If the signal was demodulated df is now the detuning from f_demod
+        if demodulate:
+            df += f_demod
+        df[0] = 0  # detuning must start at 0
+
+        if return_all:
+            return df, phases, I, Q
+        else:
+            return df
+
+    def get_stepresponse(self, df, f01max, E_c, F_amp, V_0=0):
+        '''
+        Calculates the dac flux coefficient and the step response from the
+        detuning.
+
+        Args:
+            df (array):     Detuning of the qubit.
+            f01max (float): Sweet-spot frequency of the qubit.
+            E_c (float):    Charging energy of the qubig.
+            F_amp (float):  Amplitude of the applied pulse in V.
+            V_0 (float):    Offset from sweet spot in V.
+
+        Returns:
+            d_c (float):    dac flux coefficient.
+            s (array):      Normalized step response in voltage space.
+        '''
+        f_end = np.mean(df[-10:])
+        # d_c = np.arccos( (1 - f_end / (f01max + E_c))**2 ) / (F_amp - V_0)
+        d_c = self.d_c
+        s = (np.arccos((1 - df / (f01max + E_c))**2) / d_c + V_0) / F_amp
+
+        return d_c, s
+
+    def make_figures(self, plot_step=True):
+        '''
+        Plot figures. Step response is only plotted if plot_step == True.
+        '''
+        # Plot data, phases, and detuning
+        fig, ax = plt.subplots(1, 1, figsize=(7, 5))
+        ax.plot(self.sweep_points[:len(self.I)], self.I, '-o')
+        ax.plot(self.sweep_points[:len(self.Q)], self.Q, '-o')
+        pl_tools.set_xlabel(ax, self.parameter_names[0],
+                            self.parameter_units[0])
+        pl_tools.set_ylabel(ax, 'demodulated normalized trace', 'a.u.')
+        ax.set_title('demodulated normalized data')
+        ax.legend(['cos', 'sin'], loc=1)
+        self.save_fig(fig, 'Ram-Z_normalized_data.png')
+        # fig.savefig('Ram-Z_normalized_data.png', dpi=300)
+
+        fig, ax = plt.subplots(1, 1, figsize=(7, 5))
+        ax.plot(self.sweep_points[:len(self.phases)], self.phases, '-o')
+        pl_tools.set_xlabel(ax, self.parameter_names[0],
+                            self.parameter_units[0])
+        pl_tools.set_ylabel(ax, 'phase', 'rad')
+        ax.set_title('Phase')
+        self.save_fig(fig, 'Ram-Z_phase.png')
+        # fig.savefig('Ram-Z_phase.png', dpi=300)
+
+        fig, ax = plt.subplots(1, 1, figsize=(7, 5))
+        ax.plot(self.sweep_points[:len(self.df)], self.df, '-o')
+        # ax.set_ylim((50e6, 300e6))
+        pl_tools.set_xlabel(ax, self.parameter_names[0],
+                            self.parameter_units[0])
+        pl_tools.set_ylabel(ax, 'detuning', 'Hz')
+        ax.set_title('Detuning')
+        self.save_fig(fig, 'Ram-Z_detuning.png')
+        # fig.savefig('Ram-Z_detuning.png', dpi=300)
+
+        if plot_step:
+            fig, ax = plt.subplots(1, 1, figsize=(7, 5))
+            ax.plot(self.sweep_points[:len(self.step_response)],
+                    self.step_response, '-o')
+            pl_tools.set_xlabel(ax, self.parameter_names[0],
+                                self.parameter_units[0])
+            pl_tools.set_ylabel(ax, 'step response', '')
+            ax.set_title('Step Response')
+            self.save_fig(fig, 'Ram-Z_step_response.png')
+            # fig.savefig('Ram-Z_step_response.png', dpi=300)
+
+    def demodulate(self, I, Q, f_demod, t_pts):
+        '''
+        Demodulate signal in I and Q, sampled at points t_pts, with frequency
+        f_demod.
+        '''
+        cosDemod = np.cos(2 * np.pi * f_demod * t_pts)
+        sinDemod = np.sin(2 * np.pi * f_demod * t_pts)
+        Iout = I * cosDemod + Q * sinDemod
+        Qout = Q * cosDemod - I * sinDemod
+
+        return Iout, Qout
+
+    def gauss_filter(self, data, sigma, d, nr_sigmas=4, pad_val=None):
+        '''
+        Convolves data with a normalized Gaussian with width sigma. When used
+        as a low-pass filter, the width in the frequency domain is 1/sigma.
+        The Gaussian is sampled at the same rate as the data, given by the
+        sample distance d. The convolution is calculated only at points of
+        complete overlap, and the result will thus contain less points than
+        the input array. The data is padded with pad_val (or with data[0] if
+        pad_val is not specified) at the front to ensure that the x-axis is
+        not changed. No padding is done at the end of the data.
+
+        Args:
+            data (array):   Data to be filtered.
+            sigma (float):  Width of the Gaussian filter.
+            d (float):      Sampling distance of the data, i.e. distance
+                            of points on the x-axis of the data.
+            nr_sigmas (int): Up to how many sigmas away from the center the
+                            Gaussian is sampled.  E.g. if d=1 ns, sigma=.5 ns,
+                            nr_sigmas=4 ensure the Gaussian is sampled at
+                            least up to +-2 ns, and the filter will have at
+                            least nine samples.
+            pad_val (float): Value used for padding in front of the data.
+        '''
+        filterHalfWidth = np.ceil(nr_sigmas * sigma / d)
+        tMaxFilter = filterHalfWidth * d
+        # upper limit of range has + dt/10 to include endpoint
+        tFilter = np.arange(-tMaxFilter, tMaxFilter + d/10, step=d)
+
+        gaussFilter = np.exp(-tFilter**2 / (2*sigma**2))
+        gaussFilter /= np.sum(gaussFilter)
+
+        if pad_val == None:
+            pad_val = data[0]
+        paddedData = np.concatenate((np.ones(int(filterHalfWidth)) *
+                                     pad_val, data))
+        return np.convolve(paddedData, gaussFilter, mode='valid')
+
+    def gauss_deriv_filter(self, data, sigma, d, nr_sigmas=4, pad_val=None):
+        '''
+        Convolves data with the derivative of a normalized Gaussian with width
+        sigma. This is useful to apply a low-pass filter (with cutoff 1/sigma)
+        and simultaneously calculate the derivative. The Gaussian is sampled
+        at the same rate as the data, given by the sample distance d. The
+        convolution is calculated only at points of complete overlap, and the
+        result will thus contain less points than the input array. The data is
+        padded with pad_val (or with data[0] if pad_val is not specified) at
+        the front to ensure that the x-axis is not changed. No padding is done
+        at the end of the data.
+
+        Args:
+            data (array):   Data to be filtered.
+            sigma (float):  Width of the Gaussian filter.
+            d (float):      Sampling distance of the data, i.e. distance of
+                            points on the x-axis of the data.
+            nr_sigmas (int): Up to how many sigmas away from the center the
+                            Gaussian is sampled.  E.g. if d=1 ns, sigma=.5 ns,
+                            nr_sigmas=4 ensure the Gaussian is sampled at
+                            least up to +-2 ns, and the filter will have at
+                            least nine samples.
+        '''
+        filterHalfWidth = np.ceil(nr_sigmas * sigma / d)
+        tMaxFilter = filterHalfWidth * d
+        # upper limit of range has + dt/10 to include endpoint
+        tFilter = np.arange(-tMaxFilter, tMaxFilter + d/10, step=d)
+
+        # First calculate normalized Gaussian, then derivative
+        gaussFilter = np.exp(-tFilter**2 / (2*sigma**2))
+        gaussFilter /= np.sum(gaussFilter)
+        gaussDerivFilter = gaussFilter * (-tFilter) / (sigma**2)
+
+        if pad_val == None:
+            pad_val = data[0]
+        paddedData = np.concatenate(
+                (np.ones(int(filterHalfWidth)) * pad_val, data))
+        return np.convolve(paddedData, gaussDerivFilter, mode='valid')
+
+    def unwrap_phase(self, phases):
+        '''
+        Undoes phase-wrapping and returns a continuous version of the phase
+        data.
+        Note: phases are assumed to be given in radians.
+        '''
+        # Phases are now between -pi and pi. But we know that the phase
+        # changes continuously and we want a differentiable function, so we
+        # can undo the phase-wrapping
+        for i, p in enumerate(phases[:-1]):
+            # If a phase wrap is detected, all consecutive points are shifted
+            # by 2*pi
+            if phases[i+1] - phases[i] < -3:  # noise should not be this big.
+                phases[i+1:] += 2*np.pi
+            elif phases[i+1] - phases[i] > 3:
+                phases[i+1:] -= 2*np.pi
+
+        return phases
