@@ -4708,8 +4708,8 @@ class TwoD_Analysis(MeasurementAnalysis):
 
     def run_default_analysis(self, normalize=False, plot_linecuts=True,
                              linecut_log=False, colorplot_log=False,
-                             plot_all=False, save_fig=True,
-                             transpose=False,
+                             plot_all=True, save_fig=True,
+                             transpose=False, figsize=None,
                              **kw):
         close_file = kw.pop('close_file', True)
 
@@ -4723,53 +4723,60 @@ class TwoD_Analysis(MeasurementAnalysis):
             # Linecuts are above because somehow normalization applies to both
             # colorplot and linecuts otherwise.
             if plot_linecuts:
-                fig, ax = self.default_ax(figsize=(8, 5))
+                fig, ax = plt.subplots(figsize=figsize)
                 self.fig_array.append(fig)
                 self.ax_array.append(ax)
-                fig_title = '{timestamp}_{measurement}_linecut_{i}'.format(
-                    timestamp=self.timestamp_string,
-                    measurement=self.measurementstring,
-                    i=i)
+                savename = 'linecut_{}'.format(self.value_names[i])
+                fig_title = '{} {} \nlinecut {}'.format(
+                    self.timestamp_string, self.measurementstring,
+                    self.value_names[i])
                 a_tools.linecut_plot(x=self.sweep_points,
                                      y=self.sweep_points_2D,
                                      z=self.measured_values[i],
-                                     plot_title=fig_title,
-                                     xlabel=self.xlabel,
-                                     y_name=self.sweep_name_2D,
-                                     y_unit=self.sweep_unit_2D,
+                                     y_name=self.parameter_names[1],
+                                     y_unit=self.parameter_units[1],
                                      log=linecut_log,
                                      zlabel=self.zlabels[i],
                                      fig=fig, ax=ax, **kw)
+                ax.set_title(fig_title)
+                set_xlabel(ax, self.parameter_names[0],
+                           self.parameter_units[0])
+                # ylabel is value units as we are plotting linecuts
+                set_ylabel(ax, self.value_names[i],
+                           self.value_units[i])
+
                 if save_fig:
-                    self.save_fig(fig, figname=fig_title,
+                    self.save_fig(fig, figname=savename,
                                   fig_tight=False, **kw)
 
-            fig, ax = self.default_ax(figsize=(8, 5))
+            fig, ax = plt.subplots(figsize=figsize)
             self.fig_array.append(fig)
             self.ax_array.append(ax)
             if normalize:
                 print("normalize on")
             # print "unransposed",meas_vals
             # print "transposed", meas_vals.transpose()
-            fig_title = '{timestamp}_{measurement}_{i}'.format(
-                timestamp=self.timestamp_string,
-                measurement=self.measurementstring,
-                i=i)
+            self.ax_array.append(ax)
+            savename = 'Heatmap_{}'.format(self.value_names[i])
+            fig_title = '{} {} \n{}'.format(
+                self.timestamp_string, self.measurementstring,
+                self.value_names[i])
+
             a_tools.color_plot(x=self.sweep_points,
                                y=self.sweep_points_2D,
                                z=meas_vals.transpose(),
-                               plot_title=fig_title,
-                               xlabel=self.xlabel,
-                               ylabel=self.ylabel,
                                zlabel=self.zlabels[i],
                                fig=fig, ax=ax,
                                log=colorplot_log,
                                transpose=transpose,
                                normalize=normalize,
                                **kw)
+            ax.set_title(fig_title)
+            set_xlabel(ax, self.parameter_names[0], self.parameter_units[0])
+            set_ylabel(ax, self.parameter_names[1], self.parameter_units[1])
+
             if save_fig:
-                print("saving fig_title", fig_title)
-                self.save_fig(fig, figname=fig_title, **kw)
+                self.save_fig(fig, figname=savename, **kw)
         if close_file:
             self.finish()
 
