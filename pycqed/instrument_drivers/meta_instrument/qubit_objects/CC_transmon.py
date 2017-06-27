@@ -794,6 +794,20 @@ class CBox_v3_driven_transmon(Transmon):
             self.mixer_drive_alpha.set(alpha)
         return True
 
+    def calibrate_RO_pulse_latency(self, MC=None, update: bool=True)-> bool:
+        # docstring is in parent class
+        self.prepare_for_timedomain()
+        self.td_RO_source.get_instr().frequency(self.f_RO())
+        self.measure_transients(MC=MC, cases=('on'), prepare=False,
+                                analyze=True)
+        raise NotImplementedError
+        # extract the latency from the analysis
+        # update the right parameter
+
+        # N.B. maybe this can be moved to the ABC
+
+        return True
+
     def measure_heterodyne_spectroscopy(self, freqs, MC=None,
                                         analyze=True, close_fig=True):
         self.prepare_for_continuous_wave()
@@ -1109,8 +1123,9 @@ class CBox_v3_driven_transmon(Transmon):
         ma.TwoD_Analysis()
 
     def measure_T1(self, times=None, MC=None,
-                   analyze=True, close_fig=True):
-        if times == None:
+                   close_fig=True, update=True):
+
+        if times is None:
             times = np.linspace(0, self.T1()*4, 61)
         self.prepare_for_timedomain()
         if MC is None:
@@ -1124,7 +1139,8 @@ class CBox_v3_driven_transmon(Transmon):
                                  times[-1]+times[3])])
 
         T1 = sqqs.T1(self.name, times=times)
-        s = swf.QASM_Sweep(T1.name, self.CBox.get_instr(), self.get_operation_dict(),
+        s = swf.QASM_Sweep(T1.name, self.CBox.get_instr(),
+                           self.get_operation_dict(),
                            parameter_name='Time', unit='s')
         d = self.int_avg_det
 
@@ -1133,19 +1149,20 @@ class CBox_v3_driven_transmon(Transmon):
         MC.set_detector_function(d)
 
         MC.run('T1'+self.msmt_suffix)
-        if analyze:
-            a = ma.T1_Analysis(auto=True, close_fig=True)
-            self.T1(a.T1)
-            return a.T1
 
-    def measure_ramsey(self, times=None, artificial_detuning=None, f_qubit=None,
-                       label='',
+        a = ma.T1_Analysis(auto=True, close_fig=True)
+        if update:
+            self.T1(a.T1)
+        return a.T1
+
+    def measure_ramsey(self, times=None, artificial_detuning=None,
+                       f_qubit=None, label='',
                        MC=None, analyze=True, close_fig=True, verbose=True):
         """
         N.B. if the artificial detuning is None it will auto set it such that
         3 oscillations will show.
         """
-        if times == None:
+        if times is None:
             # funny default is because CBox has no real time sideband
             # modulation
             stepsize = (self.T2_star()*4/61)//(1/abs(self.f_pulse_mod())) \
@@ -1315,13 +1332,16 @@ class CBox_v3_driven_transmon(Transmon):
                       'Avg. Discrimination fidelity: \t{:.4f}'.format(a.F_d))
             return a.F_a, a.F_d
 
-    def measure_transients(self, MC=None, analyze=True, cases=('off', 'on')):
+    def measure_transients(self, MC=None, analyze: bool=True,
+                           cases=('off', 'on'),
+                           prepare: bool=True):
         '''
         Measure transients.
         Returns two numpy arrays containing the transients for qubit in state
         |0> and |1>.
         '''
-        self.prepare_for_timedomain()
+        if prepare:
+            self.prepare_for_timedomain()
         if MC is None:
             MC = self.MC.get_instr()
 
@@ -1340,7 +1360,6 @@ class CBox_v3_driven_transmon(Transmon):
                 'Measure_transients{}_{}'.format(self.msmt_suffix, i))
             dset = data['dset']
             transients.append(dset.T[1:])
-
             if analyze:
                 ma.MeasurementAnalysis()
 
@@ -1422,7 +1441,6 @@ class CBox_v3_driven_transmon(Transmon):
             self.msmt_suffix, initialize))
         # turn plotting back on
         MC.live_plot_enabled(old_plot_setting)
-
 
         # first perform SSRO analysis to extract the optimal rotation angle
         # theta
@@ -1926,10 +1944,6 @@ class QWG_driven_transmon(CBox_v3_driven_transmon):
                                         self.Q_LutMan.get_instr().Q_motzoi)
 
         d = self.int_avg_det_single
-
-        # d = qh.CBox_single_integration_average_det_CC(
-        #     self.CBox.get_instr(), nr_averages=self.RO_acq_averages()//MC.soft_avg(),
-        #     seg_per_point=2)
 
         MC.set_sweep_function(motzoi_swf)
         MC.set_sweep_points(np.repeat(motzois, 2))
