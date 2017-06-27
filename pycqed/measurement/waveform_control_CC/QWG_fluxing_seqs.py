@@ -6,6 +6,27 @@ from pycqed.measurement.waveform_control_CC.multi_qubit_qasm_seqs \
     import cal_points_2Q
 
 
+def ramZ_flux_latency(q0_name, wait_after_pulse=40):
+    """
+    Sequence designed to calibrate the delay between the
+    QWG_trigger and the start of the flux pulse
+
+    Consists of a single point. Intended to change the latency parameter
+    in the configuration that is used in compilation.
+    """
+    filename = join(base_qasm_path, 'RamZ_latency_seq.qasm')
+    qasm_file = mopen(filename, mode='w')
+    qasm_file.writelines('qubit {} \n'.format(q0_name))
+
+    # simultaneous MW and flux pulse
+    qasm_file.writelines('\ninit_all\n')
+    qasm_file.writelines('X90 {} | square {}\n'.format(
+        q0_name, q0_name))
+    qasm_file.writelines('I {}\n'.format(wait_after_pulse))
+    qasm_file.writelines('X90 {}\n'.format(q0_name))
+    qasm_file.writelines('RO {} \n')
+
+
 def chevron_block_seq(q0_name, q1_name, no_of_points,
                       excite_q1=False, wait_after_trigger=40e-9,
                       wait_during_flux=400e-9, clock_cycle=1e-9,

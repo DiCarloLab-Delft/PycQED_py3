@@ -212,7 +212,9 @@ class Distortion_corrector():
         aTilde = a / (a + 1)
         tau = fit_res.best_values['tau']
         tauTilde = tau * (a + 1)
-        predist_step = (1 - aTilde * np.exp(-self.time_pts/tauTilde)) / C
+
+        tPts = np.arange(0, self.kernel_length*1e-9, 1e-9)  # TODO AWG sampling rate
+        predist_step = (1 - aTilde * np.exp(-tPts/tauTilde)) / C
 
         # Check if parameters are physical and print warnings if not
         if tau < 0:
@@ -227,7 +229,7 @@ class Distortion_corrector():
         # Take every 5th point because sampling rate of AWG is 1 GHz and
         # sampling rate of scope is 5 GHz.
         # TODO: un-hardcode this
-        new_ker = kf.kernel_from_kernel_stepvec(predist_step[::5])
+        new_ker = kf.kernel_from_kernel_stepvec(predist_step)
 
         self.new_kernel_dict = {
             'name': self.filename + '_' + str(self._iteration),
@@ -286,7 +288,9 @@ class Distortion_corrector():
         # Analytic form of the predistorted square pulse (input that creates a
         # square pulse at the output)
         tau = fit_res.best_values['tau']
-        predist_step = self.time_pts/tau + 1
+
+        tPts = np.arange(0, self.kernel_length*1e-9, 1e-9)  # TODO AWG sampling rate
+        predist_step = tPts/tau + 1
 
         # Check if parameters are physical and print warnings if not
         if tau < 0:
@@ -296,10 +300,8 @@ class Distortion_corrector():
         # Save the results
         self.fit_res = fit_res
         self.new_step = predist_step
-        # Take every 5th point because sampling rate of AWG is 1 GHz and
-        # sampling rate of scope is 5 GHz.
-        # TODO: un-hardcode this
-        new_ker = kf.kernel_from_kernel_stepvec(predist_step[::5])
+
+        new_ker = kf.kernel_from_kernel_stepvec(predist_step)
 
         self.new_kernel_dict = {
             'name': self.filename + '_' + str(self._iteration),
@@ -341,9 +343,15 @@ class Distortion_corrector():
             self.time_pts[self._start_idx:self._stop_idx],
             splTuple, ext=3)
 
+        # Pad step response with avg of last 10 points (assuming the user has
+        # chosen the range such that the response has become flat)
+        splStep = np.concatenate((splStep,
+                                  np.ones(self.kernel_length - len(splStep)) *
+                                  np.mean(splStep[-10:])))
+
         self.fit_res = None
         self.fit_model = None
-        self.fitted_waveform = splStep
+        self.fitted_waveform = splStep[:self._stop_idx-self._start_idx]
 
         # Calculate the kernel and invert it.
         h = np.empty_like(splStep)
@@ -810,7 +818,7 @@ class RT_distortion_corrector(Distortion_corrector):
             raise ValueError('Failed to find rising edge.')
 
         self.waveform = waveform[edge_idx:]
-        # Sampling rate hardcoded to 10 GHz
+        # Sampling rate hardcoded to 5 GHz
         self.time_pts = np.arange(len(self.waveform)) / 5e9
 
 
