@@ -34,11 +34,11 @@ def execute_AllXY(options={}):
     options = defualt_simulate_options
 
     try:
-        MC.set_detector_function(AllXYDetector(noise=0.1, delay=0.2))
         return_value = []
         for i in range(options["iterations"]):
             MC.set_sweep_function(swf.None_Sweep(sweep_control="hard"))
             MC.set_sweep_points(np.arange(21))
+            MC.set_detector_function(AllXYDetector(noise=0.1, delay=0.2))
             dat = MC.run('AllXY')
             return_value.append(_MC_result_to_chart_dict(dat))
         MC.close()

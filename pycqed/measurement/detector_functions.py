@@ -13,7 +13,6 @@ from pycqed.measurement.waveform_control import sequence
 from qcodes.instrument.parameter import _BaseParameter
 from pycqed.instrument_drivers.virtual_instruments.pyqx import qasm_loader as ql
 
-
 class Detector_Function(object):
 
     '''
@@ -134,8 +133,8 @@ class QX_Hard_Detector(Hard_Detector):
         self.set_kw()
         self.detector_control = 'hard'
         self.name = 'QX_Hard_Detector_Fast'
-        self.value_names = ['F']
-        self.value_units = ['|1>']
+        self.value_names = []
+        self.value_units = []
         self.times_called = 0
         self.__qxc = qxc
         self.num_avg = num_avg
@@ -144,6 +143,11 @@ class QX_Hard_Detector(Hard_Detector):
         self.delay = 1
         self.current = 0
         self.randomizations = []
+
+        for i in range(self.__qxc.get_nr_qubits()):
+            self.value_names.append("q"+str(i))
+            self.value_units.append('|1>')
+
         # load files
         logging.info("QX_RB_Hard_Detector : loading qasm files...")
         for i, file_name in enumerate(qasm_filenames):
@@ -156,6 +160,7 @@ class QX_Hard_Detector(Hard_Detector):
             self.randomizations.append(circuits)
             # create the circuits on the server
             t1 = time.time()
+
             for c in circuits:
                 circuit_name = c[0] + "{}".format(i)
                 self.__qxc.create_circuit(circuit_name, c[1])
@@ -169,16 +174,20 @@ class QX_Hard_Detector(Hard_Detector):
     def get_values(self):
         # x = self.sweep_points
         # only serves to initialize the arrays
-        # data = np.array([np.sin(x / np.pi), np.cos(x/np.pi)])
+        # data = np.array([np.sin(x / np.pi), np.cos(x/np.pi)]) 
         i = 0
-        data = np.zeros(len(self.sweep_points))
+        qubits = self.__qxc.get_nr_qubits()
+
+        data = np.zeros((qubits, len(self.sweep_points)))
+
         for c in self.circuits:
             self.__qxc.send_cmd("reset_measurement_averaging")
             circuit_name = c[0] + "{}".format(self.current)
             self.__qxc.run_noisy_circuit(circuit_name, self.p_error,
-                                         "depolarizing_channel", self.num_avg)
-            f = self.__qxc.get_measurement_average(0)
-            data[i] = f
+                                         "depolarizing_channel", self.num_avg)            
+            for n in range(qubits):
+                f = self.__qxc.get_measurement_average(n)
+                data[n][i] = f
             # data[1][i] = f
             i = i + 1
         self.current = int((self.current + 1) % self.num_files)

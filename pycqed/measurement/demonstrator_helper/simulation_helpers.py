@@ -12,6 +12,7 @@ from pycqed.measurement.detector_functions import QX_Hard_Detector
 from pycqed.measurement import sweep_functions as swf
 
 from tess.TessConnect import TessConnection
+from qcodes import station
 
 tc = TessConnection()
 tc.connect("simulate")
@@ -22,12 +23,15 @@ defualt_simulate_options = {
 
 
 def simulate_qasm_file(file_url, options={}):
-    # file_url="uploads/asset/file/65/f27d92be-8505-43dc-af7d-4c395c70aaf9.qasm"
+    file_url="http://localhost:3000/uploads/asset/file/75/ac5bc9e8-3929-4205-babf-2cf9c4490225.qasm"
     file_path = _retrieve_file_from_url(file_url)
 
+    st = station.Station()
     # Connect to the qx simulator
     MC = measurement_control.MeasurementControl(
         'MC', live_plot_enabled=False, verbose=True)
+    MC.station = st
+    st.add_component(MC)
 
     qxc = qx_client()
     qxc.connect()

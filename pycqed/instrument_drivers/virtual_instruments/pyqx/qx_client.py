@@ -205,6 +205,9 @@ class qx_client:
         # print("[+] measurement_average: ",m)
         return float(m.split('\n')[0])
 
+    def get_nr_qubits(self):
+        return self.__qubits
+
     def list_circuits(self):
         circuits = self.send_cmd("circuits")
         # print("[+] created circuits: ", circuits)

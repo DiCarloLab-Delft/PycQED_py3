@@ -13,20 +13,11 @@ class qasm_loader:
             self.lines = f.readlines()
         # lines pre-processing
         for i in range(0, len(self.lines)):
-            l = self.lines[i]
-            j = 0
-            while l[j] == ' ':
-                j = j + 1
-            l = l[j:]
-            j = len(l)-1
-            while l[j] == ' ':
-                j = j - 1
-            l = l[:j]
-            l = l.replace("  ", "")  # remove spaces
-            self.lines[i] = l.replace('\n', '')  # remove empty lines
-            c = self.lines[i].find("#")            # remove comments
+            self.lines[i] = self.lines[i].strip()
+            c = self.lines[i].find("#")                     # remove comments
             if c != -1:
                 self.lines[i] = self.lines[:c]
+
 
     def load_circuits(self):
         n = len(self.lines)
