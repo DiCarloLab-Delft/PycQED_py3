@@ -29,9 +29,14 @@ import pycqed.analysis.tools.plotting as pl_tools
 from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
 
 #Plotly
-import plotly
-import plotly.graph_objs as go
-
+try:
+    import plotly
+    import plotly.graph_objs as go
+except ImportError as e:
+    if str(e).find('plotly') >= 0:
+        logging.warning('Could not import plotly')
+    else:
+        raise e
 try:
     from nathan_plotting_tools import *
 except:
@@ -47,7 +52,7 @@ except ImportError as e:
     else:
         raise
 
-
+add_analysis_datagroup_to_file
 imp.reload(dm_tools)
 
 class MeasurementAnalysis(object):
