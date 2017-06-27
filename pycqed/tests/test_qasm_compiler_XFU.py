@@ -6,12 +6,11 @@ import sys
 import numpy as np
 import pycqed as pq
 from io import StringIO
-from unittest import TestCase
+from pycqed.utilities import general as gen
 from pycqed.instrument_drivers.physical_instruments._controlbox import qasm_compiler as qc
 from pycqed.instrument_drivers.physical_instruments._controlbox.Assembler \
     import Assembler
-from os.path import join, dirname
-from copy import deepcopy
+from os.path import join
 from pycqed.measurement.waveform_control_CC import \
     single_qubit_qasm_seqs as sq_qasm
 
@@ -24,6 +23,12 @@ class Test_compiler(unittest.TestCase):
             pq.__path__[0], 'tests', 'qasm_files')
         self.config_fn = join(self.test_file_dir, 'config.json')
 
+        self.times = gen.gen_sweep_pts(start=100e-9, stop=5e-6, step=200e-9)
+        self.clocks = np.round(self.times/5e-9).astype(int)
+        self.simple_config_fn = join(self.test_file_dir, 'config_simple.json')
+        self.jump_to_start = ("beq r14, r14, Exp_Start " +
+                              "\t# Jump to start ad nauseam")
+
     def test_compiler_example(self):
         qasm_fn = join(self.test_file_dir, 'dev_test.qasm')
         qumis_fn = join(self.test_file_dir, "output.qumis")
@@ -34,10 +39,12 @@ class Test_compiler(unittest.TestCase):
         m = open(compiler.qumis_fn).read()
         qumis_from_file = m.splitlines()
         self.assertEqual(qumis, qumis_from_file)
+        self.assertEqual(compiler.qumis_instructions[2], 'Exp_Start: ')
+        self.assertEqual(compiler.qumis_instructions[-1], self.jump_to_start)
 
         # finally test that it can be converted into valid instructions
         asm = Assembler(qumis_fn)
-        instructions = asm.convert_to_instructions()
+        asm.convert_to_instructions()
 
     def test_methods_of_compiler(self):
         compiler = qc.QASM_QuMIS_Compiler()
@@ -64,7 +71,7 @@ class Test_compiler(unittest.TestCase):
         self.assertEqual(compiler.config_filename, self.config_fn)
 
         hardware_spec_keys = {'qubit list', 'init time',
-                              'cycle time', 'channels'}
+                              'cycle time', 'qubit_cfgs'}
         self.assertEqual(set(compiler.hardware_spec.keys()),
                          hardware_spec_keys)
 
@@ -75,50 +82,260 @@ class Test_compiler(unittest.TestCase):
                                 'x90',
                                 'y180',
                                 'y90',
-                                'mx180',
                                 'mx90',
-                                'my180',
                                 'my90'}
         self.assertEqual(
             set(compiler.luts[0].keys()), allowed_single_q_ops)  # MW and Flux
 
+    def test_converting_CBox_pulses_to_qumis(self):
+
+        qasm_fn = join(self.test_file_dir, 'single_op.qasm')
+        qumis_fn = join(self.test_file_dir, "output.qumis")
+        compiler = qc.QASM_QuMIS_Compiler(self.config_fn,
+                                          verbosity_level=6)
+        compiler.compile(qasm_fn, qumis_fn)
+        qumis = compiler.qumis_instructions
+        x180_q0 = qumis[3]
+        y180_q0 = qumis[5]
+        x90_q0 = qumis[7]
+        y90_q0 = qumis[9]
+        mx90_q0 = qumis[11]
+        my90_q0 = qumis[13]
+
+        self.assertEqual(x180_q0, 'pulse 0000, 0000, 1001')
+        self.assertEqual(y180_q0, 'pulse 0000, 0000, 1010')
+        self.assertEqual(x90_q0, 'pulse 0000, 0000, 1011')
+        self.assertEqual(y90_q0, 'pulse 0000, 0000, 1100')
+        self.assertEqual(mx90_q0, 'pulse 0000, 0000, 1101')
+        self.assertEqual(my90_q0, 'pulse 0000, 0000, 1110')
+
+    def test_converting_triggers_to_qumis(self):
+        qasm_fn = join(self.test_file_dir, 'single_op.qasm')
+        qumis_fn = join(self.test_file_dir, "output.qumis")
+        compiler = qc.QASM_QuMIS_Compiler(self.config_fn,
+                                          verbosity_level=0)
+        compiler.compile(qasm_fn, qumis_fn)
+        qumis = compiler.qumis_instructions
+
+        x180_q1 = [qumis[15], qumis[17]]
+        y180_q1 = [qumis[19], qumis[21]]
+        x90_q1 = [qumis[23], qumis[25]]
+        y90_q1 = [qumis[27], qumis[29]]
+        mx90_q1 = [qumis[31], qumis[33]]
+        my90_q1 = [qumis[35], qumis[37]]
+
+        self.assertEqual(x180_q1[0], 'trigger 0100000, 1')
+        self.assertEqual(x180_q1[1], 'trigger 1100000, 2')
+
+        self.assertEqual(y180_q1[0], 'trigger 0010000, 1')
+        self.assertEqual(y180_q1[1], 'trigger 1010000, 2')
+
+        self.assertEqual(x90_q1[0], 'trigger 0110000, 1')
+        self.assertEqual(x90_q1[1], 'trigger 1110000, 2')
+
+        self.assertEqual(y90_q1[0], 'trigger 0001000, 1')
+        self.assertEqual(y90_q1[1], 'trigger 1001000, 2')
+
+        self.assertEqual(mx90_q1[0], 'trigger 0101000, 1')
+        self.assertEqual(mx90_q1[1], 'trigger 1101000, 2')
+
+        self.assertEqual(my90_q1[0], 'trigger 0011000, 1')
+        self.assertEqual(my90_q1[1], 'trigger 1011000, 2')
+
+    def test_qasm_wait_timing_pulse_T1(self):
+        # Tests the timing of the qasm sequences using a T1 sequence
+        qasm_file = sq_qasm.T1('q0', self.times)
+        qasm_fn = qasm_file.name
+        qumis_fn = join(self.test_file_dir, "T1_xf.qumis")
+        compiler = qc.QASM_QuMIS_Compiler(self.simple_config_fn,
+                                          verbosity_level=2)
+        compiler.compile(qasm_fn, qumis_fn)
+        asm = Assembler(qumis_fn)
+        asm.convert_to_instructions()
+        instrs = compiler.qumis_instructions
+        self.assertEqual(instrs[2], 'Exp_Start: ')
+        wait_instrs = instrs[5:-4:4]
+        # -4 in slicing exists to take out the calibration points
+        for clock, wait_instr in zip(self.clocks[:-4], wait_instrs[:-4]):
+            exp_wait = clock + 4  # +4 includes the length of the pulse
+            instr_wait = int(wait_instr.split()[1])
+            self.assertEqual(instr_wait, exp_wait)
+
+        init_instrs = instrs[3:-4:4]
+        init_time = 200e-6/5e-9
+        RO_time = 300e-9/5e-9
+
+        self.assertEqual(init_instrs[0],
+                         'wait {:d}'.format(int(init_time)))
+        for init_instr in init_instrs[1:]:
+            self.assertEqual(init_instr,
+                             'wait {:d}'.format(int(init_time+RO_time)))
+
+        self.assertEqual(
+            instrs[-1], self.jump_to_start)
+
+    def test_qasm_wait_timing_trigger_T1(self):
+        # Tests the timing of the qasm sequences using a T1 sequence
+        # 'q1' contains "trigger" instructions
+        qasm_file = sq_qasm.T1('q1', self.times)
+        qasm_fn = qasm_file.name
+        qumis_fn = join(self.test_file_dir, "T1_xf.qumis")
+        compiler = qc.QASM_QuMIS_Compiler(self.simple_config_fn,
+                                          verbosity_level=2)
+        compiler.compile(qasm_fn, qumis_fn)
+        asm = Assembler(qumis_fn)
+        asm.convert_to_instructions()
+        instrs = compiler.qumis_instructions
+        self.assertEqual(instrs[2], 'Exp_Start: ')
+        wait_instrs = instrs[7:-4:6]
+        # -4 in slicing exists to take out the calibration points
+        for clock, wait_instr in zip(self.clocks[:-4], wait_instrs[:-4]):
+            exp_wait = clock + 4  # +4 includes the length of the pulse
+            instr_wait = int(wait_instr.split()[1])
+            self.assertEqual(instr_wait, exp_wait)
+
+        init_instrs = instrs[3:-4:6]
+        init_time = 200e-6/5e-9 - 1  # -1 is for the prepare codeword clock
+        RO_time = 300e-9/5e-9
+
+        self.assertEqual(init_instrs[0],
+                         'wait {:d}'.format(int(init_time)))
+        for init_instr in init_instrs[1:-4]:
+            self.assertEqual(init_instr,
+                             'wait {:d}'.format(int(init_time+RO_time)))
+
+        self.assertEqual(
+            instrs[-1], self.jump_to_start)
+
+
 
 class Test_single_qubit_seqs(unittest.TestCase):
+
     @classmethod
     def setUpClass(self):
         self.test_file_dir = join(
             pq.__path__[0], 'tests', 'qasm_files')
         self.config_fn = join(self.test_file_dir, 'config.json')
+        self.simple_config_fn = join(self.test_file_dir, 'config_simple.json')
         self.qubit_name = 'q0'
-    @unittest.skip('no identity')
-    def test_qasm_seq_T1(self):
-        times = np.linspace(20e-9, 50e-6, 61)
-        qasm_file = sq_qasm.T1(self.qubit_name, times)
-        qasm_fn = qasm_file.name
-        qumis_fn = join(self.test_file_dir, "T1_xf.qumis")
-        compiler = qc.QASM_QuMIS_Compiler(self.config_fn,
-                                          verbosity_level=0)
-        compiler.compile(qasm_fn, qumis_fn)
-        asm = Assembler(qumis_fn)
-        instructions = asm.convert_to_instructions()
+        self.jump_to_start = ("beq r14, r14, Exp_Start " +
+                              "\t# Jump to start ad nauseam")
+        self.times = gen.gen_sweep_pts(start=100e-9, stop=5e-6, step=200e-9)
+        self.clocks = np.round(self.times/5e-9).astype(int)
 
     def test_qasm_seq_allxy(self):
-        qasm_file = sq_qasm.AllXY(self.qubit_name)
-        qasm_fn = qasm_file.name
-        qumis_fn = join(self.test_file_dir, "allxy_xf.qumis")
-        compiler = qc.QASM_QuMIS_Compiler(self.config_fn,
-                                          verbosity_level=0)
-        compiler.compile(qasm_fn, qumis_fn)
-        asm = Assembler(qumis_fn)
-        instructions = asm.convert_to_instructions()
+        for q_name in ['q0', 'q1']:
+            qasm_file = sq_qasm.AllXY(q_name)
+            qasm_fn = qasm_file.name
+            qumis_fn = join(self.test_file_dir,
+                            "allxy_{}.qumis".format(q_name))
+            compiler = qc.QASM_QuMIS_Compiler(self.config_fn,
+                                              verbosity_level=0)
+            compiler.compile(qasm_fn, qumis_fn)
+            asm = Assembler(qumis_fn)
+            asm.convert_to_instructions()
 
+            self.assertEqual(compiler.qumis_instructions[2], 'Exp_Start: ')
+            self.assertEqual(
+                compiler.qumis_instructions[-1], self.jump_to_start)
 
-def valid_operation_dictionary(operation_dict):
-    '''
-    checks if the operation dictionary is valid
-    '''
+    def test_qasm_seq_MotzoiXY(self):
+        for q_name in ['q0', 'q1']:
+            qasm_file = sq_qasm.two_elt_MotzoiXY(q_name)
+            qasm_fn = qasm_file.name
+            qumis_fn = join(self.test_file_dir,
+                            "motzoi_{}.qumis".format(q_name))
+            compiler = qc.QASM_QuMIS_Compiler(self.config_fn,
+                                              verbosity_level=0)
+            compiler.compile(qasm_fn, qumis_fn)
+            asm = Assembler(qumis_fn)
+            asm.convert_to_instructions()
 
-    return True
+            self.assertEqual(compiler.qumis_instructions[2], 'Exp_Start: ')
+            self.assertEqual(
+                compiler.qumis_instructions[-1], self.jump_to_start)
+
+    def test_qasm_seq_OffOn(self):
+        for q_name in ['q0', 'q1']:
+            qasm_file = sq_qasm.off_on(q_name)
+            qasm_fn = qasm_file.name
+            qumis_fn = join(self.test_file_dir,
+                            "off_on_{}.qumis".format(q_name))
+            compiler = qc.QASM_QuMIS_Compiler(self.config_fn,
+                                              verbosity_level=0)
+            compiler.compile(qasm_fn, qumis_fn)
+            asm = Assembler(qumis_fn)
+            asm.convert_to_instructions()
+
+            self.assertEqual(compiler.qumis_instructions[2], 'Exp_Start: ')
+            self.assertEqual(
+                compiler.qumis_instructions[-1], self.jump_to_start)
+
+    def test_qasm_seq_ramsey(self):
+        for q_name in ['q0', 'q1']:
+            qasm_file = sq_qasm.Ramsey(q_name, times=self.times)
+            qasm_fn = qasm_file.name
+            qumis_fn = join(self.test_file_dir,
+                            "Ramsey_{}.qumis".format(q_name))
+            compiler = qc.QASM_QuMIS_Compiler(self.simple_config_fn,
+                                              verbosity_level=0)
+            compiler.compile(qasm_fn, qumis_fn)
+            asm = Assembler(qumis_fn)
+            asm.convert_to_instructions()
+
+            self.assertEqual(compiler.qumis_instructions[2], 'Exp_Start: ')
+            self.assertEqual(
+                compiler.qumis_instructions[-1], self.jump_to_start)
+
+    def test_qasm_seq_echo(self):
+        for q_name in ['q0', 'q1']:
+            qasm_file = sq_qasm.echo(q_name, times=self.times)
+            qasm_fn = qasm_file.name
+            qumis_fn = join(self.test_file_dir,
+                            "echo_{}.qumis".format(q_name))
+            compiler = qc.QASM_QuMIS_Compiler(self.config_fn,
+                                              verbosity_level=0)
+            compiler.compile(qasm_fn, qumis_fn)
+            asm = Assembler(qumis_fn)
+            asm.convert_to_instructions()
+
+            self.assertEqual(compiler.qumis_instructions[2], 'Exp_Start: ')
+            self.assertEqual(
+                compiler.qumis_instructions[-1], self.jump_to_start)
+
+    def test_qasm_seq_butterfly(self):
+        for q_name in ['q0', 'q1']:
+            qasm_file = sq_qasm.butterfly(q_name)
+            qasm_fn = qasm_file.name
+            qumis_fn = join(self.test_file_dir,
+                            "butterfly_{}.qumis".format(q_name))
+            compiler = qc.QASM_QuMIS_Compiler(self.config_fn,
+                                              verbosity_level=0)
+            compiler.compile(qasm_fn, qumis_fn)
+            asm = Assembler(qumis_fn)
+            asm.convert_to_instructions()
+
+            self.assertEqual(compiler.qumis_instructions[2], 'Exp_Start: ')
+            self.assertEqual(
+                compiler.qumis_instructions[-1], self.jump_to_start)
+
+    def test_qasm_seq_randomized_benchmarking(self):
+        ncl = [2, 4, 6, 20]
+        nr_seeds = 10
+        for q_name in ['q0', 'q1']:
+            qasm_file = sq_qasm.randomized_benchmarking(q_name, ncl, nr_seeds)
+            qasm_fn = qasm_file.name
+            qumis_fn = join(self.test_file_dir,
+                            "randomized_benchmarking_{}.qumis".format(q_name))
+            compiler = qc.QASM_QuMIS_Compiler(self.config_fn,
+                                              verbosity_level=0)
+            compiler.compile(qasm_fn, qumis_fn)
+            asm = Assembler(qumis_fn)
+            asm.convert_to_instructions()
+
+            self.assertEqual(compiler.qumis_instructions[2], 'Exp_Start: ')
+            self.assertEqual(
+                compiler.qumis_instructions[-1], self.jump_to_start)
 
 
 class Capturing(list):

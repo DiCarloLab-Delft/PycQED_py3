@@ -74,14 +74,24 @@
             "parameters" : 1,
             "duration" : 300,
             "type" : "measurement"
-        }
+        },
+        "measure" : {
+            "parameters" : 1,
+            "duration" : 300,
+            "type" : "measurement"
+        },
+        "dummy": {
+        "parameters": 2,
+        "type" : "flux",
+        "duration" : 0
+    }
     },
 
     "hardware specification" : {
         "qubit list" : [0, 1],
         "init time" : 200000,
         "cycle time" : 5,
-        "channels" :[
+        "qubit_cfgs" :[
             {
                "rf" : {
                     "qumis" : "pulse",
@@ -97,7 +107,7 @@
                     "format" : [5, 10],
                     "lut" : 1
                 },
-                "measure" : {
+                "measurement" : {
                     "qumis" : "measure",
                     "latency" : 100
                 }
@@ -106,8 +116,8 @@
                "rf" : {
                     "qumis" : "trigger",
                     "latency" : 40,
-                    "trigger bit" : 3,
-                    "codeword bit" : [4, 5, 6],
+                    "trigger bit" : 1,
+                    "codeword bit" : [2, 3, 4],
                     "format" : [5, 10],
                     "lut" : 0
                 },
@@ -117,7 +127,7 @@
                     "awg_nr" : 0,
                     "lut" : 1
                 },
-                "measure" : {
+                "measurement" : {
                     "qumis" : "trigger",
                     "trigger bit" : 7,
                     "format" : [300],
@@ -130,20 +140,18 @@
 
     "luts" : [
         {
-            "x180"  : 0,
-            "x90"   : 1,
+            "x180"  : 1,
             "y180"  : 2,
-            "y90"   : 3,
-            "mx180" : 4,
+            "x90"   : 3,
+            "y90"   : 4,
             "mx90"  : 5,
-            "my180" : 6,
-            "my90"  : 7
+            "my90"  : 6
         },
         {
             "cz" : 0,
             "cz90": 1,
             "cz45": 2,
-            "dummy_other": 3
+            "dummy": -2
         }
     ]
 }

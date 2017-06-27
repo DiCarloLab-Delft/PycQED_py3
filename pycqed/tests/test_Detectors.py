@@ -38,7 +38,8 @@ class Test_Detectors(unittest.TestCase):
         self.MC.set_sweep_points(np.linspace(0, 10, 10))
         self.MC.set_detector_function(d)
         dat = self.MC.run()
-        np.testing.assert_array_almost_equal(np.ones(10)*5.5, dat[:, 1])
+        dset = dat["dset"]
+        np.testing.assert_array_almost_equal(np.ones(10)*5.5, dset[:, 1])
 
     def test_function_detector_parameter(self):
 
@@ -58,7 +59,8 @@ class Test_Detectors(unittest.TestCase):
         self.MC.set_sweep_points(xvals)
         self.MC.set_detector_function(d)
         dat = self.MC.run()
-        np.testing.assert_array_almost_equal(xvals+1, dat[:, 1])
+        dset = dat["dset"]
+        np.testing.assert_array_almost_equal(xvals+1, dset[:, 1])
 
     def test_function_detector_dict_all_keys(self):
 
@@ -75,9 +77,10 @@ class Test_Detectors(unittest.TestCase):
         self.MC.set_sweep_points(xvals)
         self.MC.set_detector_function(d)
         dat = self.MC.run()
-        np.testing.assert_array_almost_equal(np.ones(10)*5.5, dat[:, 1])
-        np.testing.assert_array_almost_equal(np.ones(10)*1, dat[:, 2])
-        self.assertEqual(np.shape(dat), (10, 3))
+        dset = dat["dset"]
+        np.testing.assert_array_almost_equal(np.ones(10)*5.5, dset[:, 1])
+        np.testing.assert_array_almost_equal(np.ones(10)*1, dset[:, 2])
+        self.assertEqual(np.shape(dset), (10, 3))
 
     def test_function_detector_dict_single_key(self):
         def dummy_function(val_a, val_b):
@@ -93,8 +96,9 @@ class Test_Detectors(unittest.TestCase):
         self.MC.set_sweep_points(xvals)
         self.MC.set_detector_function(d)
         dat = self.MC.run()
-        np.testing.assert_array_almost_equal(np.ones(10)*5.5, dat[:, 1])
-        self.assertEqual(np.shape(dat), (10, 2))
+        dset = dat["dset"]
+        np.testing.assert_array_almost_equal(np.ones(10)*5.5, dset[:, 1])
+        self.assertEqual(np.shape(dset), (10, 2))
 
     @classmethod
     def tearDownClass(self):
