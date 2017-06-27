@@ -347,7 +347,7 @@ def two_qubit_tomo_bell(bell_state, q0, q1,
     # script for Tektronix driven qubits. I do not know if this repetition
     # is important or even necessary here.
     for seq in cal_points_2Q:
-        cal_pulses += [[seq[0], seq[1], 'RO ' + RO_target + '\n']] * 7
+        cal_pulses += [[seq[0].format(q0), seq[1].format(q1), 'RO ' + RO_target + '\n']] * 7
 
     for seq in cal_pulses:
         qasm_file.writelines('\ninit_all\n')
