@@ -1389,8 +1389,8 @@ def linecut_plot(x, y, z, fig, ax,
     plt.gca().set_color_cycle([colormap(i) for i in np.linspace(
                               0, 0.9, len(y))])
     for i in range(len(y)):
-        label = '{y_name}: {y_val} {y_unit}'.format(
-            y_name=y_name, y_val=y[i], y_unit=y_unit)
+        label = '{}: {:.4g} {}'.format(
+            y_name, y[i], y_unit)
         ax.plot(x, z[:, i], label=label)
     if log:
         ax.set_yscale('log')
