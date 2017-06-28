@@ -2,6 +2,7 @@ import logging
 import time
 import os
 import numpy as np
+from pycqed.utilities.general import setInDict
 from pycqed.measurement.waveform_control_CC import qasm_compiler as qcx
 from pycqed.instrument_drivers.virtual_instruments.pyqx import qasm_loader as ql
 from pycqed.measurement.waveform_control_CC import qasm_to_asm as qta
@@ -300,6 +301,44 @@ class QASM_Sweep_v2(Hard_Sweep):
         if self.upload:
             self.CBox.load_instructions(qumis_fn)
         return self.compiler
+
+
+class QASM_config_sweep(QASM_Sweep_v2):
+    """
+    Sweep function for a QASM file, using the XFu compiler to generate QuMis
+    """
+
+    def __init__(self, qasm_fn: str, config: dict,
+                 config_par_map: list, CBox,
+                 parameter_name: str =None, unit: str='a.u.',
+                 par_scale_factor=1, set_parser=None,
+                 upload: bool=True, verbosity_level: int=0):
+        self.name = 'QASM_config_sweep'
+        self.sweep_control = 'soft'
+        self.qasm_fn = qasm_fn
+        self.config = config
+        self.CBox = CBox
+        self.set_parser = set_parser
+        self.upload = upload
+        self.config_par_map = config_par_map
+        self.par_scale_factor = par_scale_factor
+
+        if parameter_name is None:
+            self.parameter_name = self.config_par_map[-1]
+        else:
+            self.parameter_name = parameter_name
+        self.unit = unit
+        self.verbosity_level = verbosity_level
+
+    def set_parameter(self, val):
+        val *= self.par_scale_factor
+        if self.set_parser is not None:
+            val = self.set_parser(val)
+        setInDict(self.config, self.config_par_map, val)
+        self.compile_and_upload()
+
+    def prepare(self, **kw):
+        pass
 
 
 class QWG_flux_QASM_Sweep(QASM_Sweep_v2):

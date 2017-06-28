@@ -1,5 +1,5 @@
 from pycqed.measurement.waveform_control_CC import multi_qubit_qasm_seqs as mqqs
-from pycqed.measurement.waveform_control_CC import qasm_helpers as qh
+from pycqed.measurement import sweep_functions as swf
 from pycqed.measurement import detector_functions as det
 
 import numpy as np
@@ -32,7 +32,7 @@ def measure_two_qubit_AllXY(device, q0_name, q1_name,
     for q in device.qubits():
         op_dict['I ' + q]['instruction'] = ''
 
-    s = qh.QASM_Sweep(AllXY.name, device.seq_contr.get_instr(), op_dict)
+    s = swf.QASM_Sweep(AllXY.name, device.seq_contr.get_instr(), op_dict)
     d = det.UHFQC_integrated_average_detector(
         device.acquisition_instrument.get_instr(),
         AWG=device.seq_contr.get_instr(),
@@ -70,7 +70,7 @@ def measure_two_qubit_ssro(device, q0_name, q1_name, nr_shots=4092*4,
     for q in device.qubits():
         op_dict['I ' + q]['instruction'] = ''
 
-    s = qh.QASM_Sweep(two_q_ssro.name, device.seq_contr.get_instr(), op_dict)
+    s = swf.QASM_Sweep(two_q_ssro.name, device.seq_contr.get_instr(), op_dict)
     d = det.UHFQC_integration_logging_det(
         device.acquisition_instrument.get_instr(),
         AWG=device.seq_contr.get_instr(),
