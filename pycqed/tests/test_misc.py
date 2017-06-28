@@ -1,11 +1,9 @@
 import unittest
 import numpy as np
 
-# hack for badly installed matplotlib on maserati pc
-# import matplotlib
-# matplotlib.use('QT4Agg')
 from pycqed.utilities import general as gen
-from pycqed.analysis.tools.data_manipulation import rotation_matrix, rotate_complex
+from pycqed.analysis.tools.data_manipulation import (rotation_matrix,
+                                                     rotate_complex)
 
 
 class Test_misc(unittest.TestCase):
@@ -68,3 +66,15 @@ class Test_misc(unittest.TestCase):
             gen.gen_sweep_pts(start=3.8, stop=.3)
         with self.assertRaises(ValueError):
             gen.gen_sweep_pts(center=3.8, span=.3)
+
+    def test_get_set_InDict(self):
+        # Test setting in nested dict
+        test_dict = {'a': {'nest_a': 5}}
+        val = gen.getFromDict(test_dict, ['a', 'nest_a'])
+        self.assertEqual(val, 5)
+
+        # Test setting in nested dict
+        tval = 23
+        gen.setInDict(test_dict, ['a', 'nest_a'], tval)
+        val = gen.getFromDict(test_dict, ['a', 'nest_a'])
+        self.assertEqual(val, 23)
