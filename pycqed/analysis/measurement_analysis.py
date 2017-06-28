@@ -52,7 +52,6 @@ except ImportError as e:
     else:
         raise
 
-add_analysis_datagroup_to_file
 imp.reload(dm_tools)
 
 class MeasurementAnalysis(object):
