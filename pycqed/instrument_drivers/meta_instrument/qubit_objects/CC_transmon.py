@@ -794,19 +794,40 @@ class CBox_v3_driven_transmon(Transmon):
             self.mixer_drive_alpha.set(alpha)
         return True
 
-    def calibrate_RO_pulse_latency(self, MC=None, update: bool=True)-> bool:
+    def calibrate_MW_RO_latency(self, MC=None, update: bool=True,
+                                soft_avg: int=100)-> bool:
         # docstring is in parent class
+
+        if 'UHFQC' not in self.acquisition_instrument():
+            # N.B. made only for UHFQC
+            raise NotImplementedError
+        if MC is None:
+            MC = self.MC.get_instr()
+
         self.prepare_for_timedomain()
-        self.td_RO_source.get_instr().frequency(self.f_RO())
-        self.measure_transients(MC=MC, cases=('on'), prepare=False,
+        # when using direct drive lines a lot of averages are required
+        MC.soft_avg(soft_avg)
+
+        # set the RO LO to the drive frequency, this way the dynamics of the
+        # resonator do not show up in the timing experiment but both pulses
+        # MW and RO do show up in the measured trace.
+        self.LO.get_instr().frequency(self.f_qubit())
+
+        # make the RO pulse short so it is clearly visible in the trace
+        self.RO_LutMan.get_instr().M_length(100e-9)
+        # reupload the modified pulse to the RO lutman
+        self.RO_LutMan.get_instr().load_pulse_onto_AWG_lookuptable('M_square')
+
+        old_max_pt = MC.plotting_max_pts()
+        MC.plotting_max_pts(4100)  # increase as live plot is desired here
+        self.measure_transients(MC=MC, cases=['sim_on'], prepare=False,
                                 analyze=True)
-        raise NotImplementedError
-        # extract the latency from the analysis
-        # update the right parameter
+        MC.plotting_max_pts(old_max_pt)
 
-        # N.B. maybe this can be moved to the ABC
-
-        return True
+        print('Manual analysis and updating of parameters is required.')
+        print('Be sure to update: \n\tMW_latency in config' +
+              '\n\tRO_acq_marker_delay')
+        return False
 
     def measure_heterodyne_spectroscopy(self, freqs, MC=None,
                                         analyze=True, close_fig=True):
@@ -1349,12 +1370,19 @@ class CBox_v3_driven_transmon(Transmon):
         transients = []
         for i, pulse_comb in enumerate(cases):
             off_on_sequence = sqqs.off_on(self.name, pulse_comb=pulse_comb)
-            MC.set_sweep_function(swf.QASM_Sweep(
-                filename=off_on_sequence.name, CBox=self.CBox.get_instr(),
-                op_dict=self.get_operation_dict(),
-                parameter_name='Samples', unit='#'))
+            s = swf.QASM_Sweep_v2(qasm_fn=off_on_sequence.name,
+                                  config=self.qasm_config(),
+                                  CBox=self.CBox.get_instr(),
+                                  verbosity_level=1,
+                                  parameter_name='Transient time', unit='s')
+            MC.set_sweep_function(s)
+
+            if 'UHFQC' in self.acquisition_instrument():
+                sampling_rate = 1.8e9
+            elif 'CBox' in self.acquisition_instrument():
+                sampling_rate = 200e6
             MC.set_sweep_points(
-                np.arange(self.input_average_detector.nr_samples))
+                np.arange(self.input_average_detector.nr_samples)/sampling_rate)
             MC.set_detector_function(self.input_average_detector)
             data = MC.run(
                 'Measure_transients{}_{}'.format(self.msmt_suffix, i))
@@ -1861,7 +1889,7 @@ class QWG_driven_transmon(CBox_v3_driven_transmon):
 
     def add_parameters(self):
         super().add_parameters()
-        # FIXME: chane amp90 scale to Q_amp90 scale
+        # FIXME: chanel amp90 scale to Q_amp90 scale
         self.add_parameter('amp90_scale',
                            label='pulse amplitude scaling factor',
                            unit='',

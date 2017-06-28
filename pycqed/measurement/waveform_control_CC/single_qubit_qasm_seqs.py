@@ -299,11 +299,16 @@ def off_on(qubit_name, pulse_comb='off_on'):
     if 'off' in pulse_comb.lower():
         qasm_file.writelines('\ninit_all\n')
         qasm_file.writelines('RO {}  \n'.format(qubit_name))
+    # simulatneous on
+    if 'sim_on' in pulse_comb.lower():
+        qasm_file.writelines('\ninit_all\n')
+        qasm_file.writelines('X180 {} | RO {}  \n'.format(qubit_name, qubit_name))
     # On
-    if 'on' in pulse_comb.lower():
+    elif 'on' in pulse_comb.lower():
         qasm_file.writelines('\ninit_all\n')
         qasm_file.writelines('X180 {}     # On \n'.format(qubit_name))
         qasm_file.writelines('RO {}  \n'.format(qubit_name))
+
     if 'on' not in pulse_comb.lower() and 'off' not in pulse_comb.lower():
         raise ValueError('pulse_comb must contain "off" or "on" (is {})'
                          .format(pulse_comb))

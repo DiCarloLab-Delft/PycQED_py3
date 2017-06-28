@@ -273,7 +273,7 @@ class QASM_Sweep_v2(Hard_Sweep):
                  parameter_name: str ='Points', unit: str='a.u.',
                  upload: bool=True, verbosity_level: int=0):
         super().__init__()
-        self.name = 'QASM_Sweep'
+        self.name = 'QASM_Sweep_v2'
 
         self.qasm_fn = qasm_fn
         self.config = config

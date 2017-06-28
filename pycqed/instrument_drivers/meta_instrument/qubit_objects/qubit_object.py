@@ -163,24 +163,29 @@ class Qubit(Instrument):
                                   analyze=False, update=True)->bool:
         raise NotImplementedError()
 
-    def calibrate_RO_pulse_latency(self, MC=None, update: bool=True)-> bool:
+    def calibrate_MW_RO_latency(self, MC=None, update: bool=True)-> bool:
         """
-        Calibrates parameter: "latency_RO"
-            (RO_pulse_delay/RO_acq_marker_delay)
+        Calibrates parameters:
+            "latency_MW"
+            "RO_acq_delay"
 
-        Used to calibrate the delay of the RO pulse with respect to the
-        MW pulse.
 
-        Note that in addition to this parameter there is also the point
-        where the acquisition device is triggered
+        Used to calibrate the delay of the MW pulse with respect to the
+        RO pulse and the RO acquisition delay.
 
-        The RO_pulse_latency is calibrated by setting the frequency of
-        the td_source (qubit LO) such that the MW pulse will show up in
-        the RO.
-        Measuring the transients will immediately show what the optimal
-        latency is.
 
-        TODO: need a proper definition of the latency here.
+        The MW_pulse_latency is calibrated by setting the frequency of
+        the LO to the qubit frequency such that both the MW and the RO pulse
+        will show up in the RO.
+        Measuring the transients will  show what the optimal latency is.
+
+        Note that a lot of averages may be required when using dedicated drive
+        lines.
+
+        This function does NOT overwrite the values that were set in the qubit
+        object and as such can be used to verify the succes of the calibration.
+
+        Currently (28/6/2017) the experiment has to be analysed by hand.
 
         """
         raise NotImplementedError()
