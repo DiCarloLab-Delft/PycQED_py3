@@ -323,8 +323,10 @@ class MeasurementAnalysis(object):
                 self.plot_results_vs_sweepparam(x=self.sweep_points,
                                                 y=self.measured_values[i],
                                                 fig=fig, ax=ax, log=log,
-                                                xlabel=self.xlabel,
-                                                ylabel=self.ylabels[i],
+                                                xlabel=self.parameter_names[0],
+                                                x_unit=self.parameter_units[0],
+                                                ylabel=self.value_names[i],
+                                                y_unit=self.value_units[i],
                                                 save=False, show=show,
                                                 plot_title=plot_title)
 
