@@ -78,3 +78,4 @@ class Test_misc(unittest.TestCase):
         gen.setInDict(test_dict, ['a', 'nest_a'], tval)
         val = gen.getFromDict(test_dict, ['a', 'nest_a'])
         self.assertEqual(val, 23)
+        self.assertEqual(test_dict, {'a': {'nest_a': 23}})
