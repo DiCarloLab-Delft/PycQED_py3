@@ -1,3 +1,4 @@
+import re
 
 
 class qasm_loader:
@@ -6,27 +7,45 @@ class qasm_loader:
     QASM File Loder
     """
 
-    def __init__(self, file_name):
+    # Description of lines that should be replace one or multiple lines.
+    _replacements = {
+        "init_all": {
+            "start": ".c{counter}",
+            "qloop": "prepz q{qubit}"
+        },
+        "RO": {
+            "qloop": "measure q{qubit}"
+        },
+        "(x|X)180 q[0-9]+": 'rx180 q{qubit}',
+        "(x|X)90 q[0-9]+": 'rx90 q{qubit}',
+        "(y|Y)180 q[0-9]+": 'ry180 q{qubit}',
+        "(y|Y)90 q[0-9]+": 'ry90 q{qubit}',
+
+    }
+    _circuit_counter = 0
+
+    def __init__(self, file_name, qubits=2):
         # print("[+] pyqx : qasm_loader : loading file '%s' ..." % file_name)
-        print(file_name)
+        self.qubits = qubits
         with open(file_name) as f:
-            self.lines = f.readlines()
+            file_lines = f.readlines()
         # lines pre-processing
-        for i in range(0, len(self.lines)):
-            l = self.lines[i]
-            j = 0
-            while l[j] == ' ':
-                j = j + 1
-            l = l[j:]
-            j = len(l)-1
-            while l[j] == ' ':
-                j = j - 1
-            l = l[:j]
-            l = l.replace("  ", "")  # remove spaces
-            self.lines[i] = l.replace('\n', '')  # remove empty lines
-            c = self.lines[i].find("#")            # remove comments
+        self.lines = []
+
+        for i in range(0, len(file_lines)):
+            file_lines[i] = file_lines[i].strip()
+            # remove empty lines
+            if len(file_lines[i]) == 0:
+                continue
+            self.lines.append(file_lines[i])
+            c = file_lines[i].find("#")                     # remove comments
             if c != -1:
-                self.lines[i] = self.lines[:c]
+                self.lines[-1] = file_lines[:c]
+
+            # replace line if line matches _replacement
+            replacement_lines = self.replaceLine(file_lines[i])
+            if replacement_lines:
+                self.lines[-1:] = replacement_lines
 
     def load_circuits(self):
         n = len(self.lines)
@@ -76,6 +95,41 @@ class qasm_loader:
     def get_circuits(self):
         return self.circuits
 
+    def replaceLine(self, line):
+        if line == "init_all" or line[0] == '.':
+            self._circuit_counter += 1
+        match = False
+        for k in self._replacements:
+            if re.match(k, line):
+                match = k
+                break
+
+        if match:
+            replace = self._replacements[match]
+            # find qubit
+            reg = re.search("q[0-9]+", line)
+            if(reg):
+                qubit = line[reg.start()+1:reg.end()]
+            if isinstance(replace, dict):
+                line = []
+                if "start" in replace:
+                    line += [replace["start"].format(
+                        counter=self._circuit_counter, line=line)]
+                if "qloop" in replace:
+                    for i in range(self.qubits):
+                        line += [replace['qloop'].format(
+                            counter=self._circuit_counter,
+                            qubit=i, line=line)]
+                if "end" in replace:
+                    line += [replace["end"].format(
+                        counter=self._circuit_counter, line=line)]
+
+            elif isinstance(replace, str):
+                line = [replace.format(
+                    counter=self._circuit_counter, qubit=qubit)]
+            return line
+        else:
+            return False
 
 # loading qasm test
 '''

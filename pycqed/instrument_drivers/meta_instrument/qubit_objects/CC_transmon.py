@@ -1058,7 +1058,8 @@ class CBox_v3_driven_transmon(Transmon):
     def measure_randomized_benchmarking(self, nr_cliffords=2**np.arange(12),
                                         nr_seeds=100, T1=None,
                                         MC=None, analyze=True, close_fig=True,
-                                        verbose=False, upload=True):
+                                        verbose=False, upload=True,
+                                        update=True):
         # Adding calibration points
         nr_cliffords = np.append(
             nr_cliffords, [nr_cliffords[-1]+.5]*2 + [nr_cliffords[-1]+1.5]*2)
@@ -1113,6 +1114,8 @@ class CBox_v3_driven_transmon(Transmon):
         a = ma.RandomizedBenchmarking_Analysis(
             close_main_fig=close_fig, T1=T1,
             pulse_delay=self.gauss_width.get()*4)
+        if update:
+            self.F_RB(a.fit_res.params['fidelity_per_Clifford'].value)
 
         return a.fit_res.params['fidelity_per_Clifford'].value
 
@@ -1189,7 +1192,8 @@ class CBox_v3_driven_transmon(Transmon):
 
     def measure_ramsey(self, times=None, artificial_detuning=None,
                        f_qubit=None, label='',
-                       MC=None, analyze=True, close_fig=True, verbose=True):
+                       MC=None, analyze=True, close_fig=True, verbose=True,
+                       update=True):
         """
         N.B. if the artificial detuning is None it will auto set it such that
         3 oscillations will show.
@@ -1236,6 +1240,8 @@ class CBox_v3_driven_transmon(Transmon):
         MC.run('Ramsey'+label+self.msmt_suffix)
         if analyze:
             a = ma.Ramsey_Analysis(auto=True, close_fig=True)
+            if update:
+                self.T2_star(a.T2_star)
             if verbose:
                 fitted_freq = a.fit_res.params['frequency'].value
                 print('Artificial detuning: {:.2e}'.format(
@@ -1246,8 +1252,8 @@ class CBox_v3_driven_transmon(Transmon):
             return a
 
     def measure_echo(self, times=None, artificial_detuning=0,
-                     label='',
-                     MC=None, analyze=True, close_fig=True, verbose=True):
+                     label='', MC=None, analyze=True, close_fig=True,
+                     update=True, verbose=True):
         if times == None:
             # funny default is because CBox has no real time sideband
             # modulation
@@ -1280,6 +1286,8 @@ class CBox_v3_driven_transmon(Transmon):
         MC.run('echo'+label+self.msmt_suffix)
         if analyze:
             a = ma.Echo_analysis(auto=True, close_fig=True)
+            if update:
+                self.T2_echo(a.fit_res.params['tau'].value)
             return a
 
     def measure_allxy(self, MC=None, label='',
@@ -1333,7 +1341,8 @@ class CBox_v3_driven_transmon(Transmon):
     def measure_ssro(self, no_fits=False,
                      return_detector=False,
                      MC=None, nr_shots=1024*24,
-                     analyze=True, verbose=True, update_threshold=True):
+                     analyze=True, verbose=True, update_threshold=True,
+                     update=True):
         # No fancy SSRO detector here @Niels, this may be something for you
 
         # This ensures that the detector is not digitized for the SSRO
@@ -1368,9 +1377,13 @@ class CBox_v3_driven_transmon(Transmon):
             if update_threshold:
                 # use the threshold for the best assignment fidelity
                 self.RO_threshold(a.V_th_a)
+            if update:
+                self.F_ssro(a.F_a)
+                self.F_discr(a.F_d)
             if verbose:
                 print('Avg. Assignement fidelity: \t{:.4f}\n'.format(a.F_a) +
                       'Avg. Discrimination fidelity: \t{:.4f}'.format(a.F_d))
+
             return a.F_a, a.F_d
 
     def measure_transients(self, MC=None, analyze: bool=True,
