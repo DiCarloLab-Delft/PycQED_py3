@@ -10,6 +10,9 @@ import time
 import logging
 import numpy as np
 
+import pygsti
+import pycqed
+
 from .qubit_object import Transmon
 from qcodes.utils import validators as vals
 from qcodes.instrument.parameter import ManualParameter
@@ -1529,6 +1532,66 @@ class CBox_v3_driven_transmon(Transmon):
         instr += 'wait {} \n'.format(RO_depletion_clocks
                                      + RO_pulse_length_clocks - 2)
         return instr
+
+    def measure_single_qubit_GST(self,
+                                 max_lengths=[0]+[2**i for i in range(10)],
+                                 MC=None):
+        '''
+        Measure gate set tomography for this qubit. The gateset that is used
+        is saved in
+        pycqed/measurement/gate_set_tomography/Gateset_5_primitives_GST.txt,
+        and corresponding germs and fiducials can be found in the same folder.
+
+        Args:
+            max_lengths (list):
+                List of maximum sequence length (via germ repeats) for each
+                GST iteration. The largest maximum length should be roughly
+                the number of gates that can be done on a qubit before it
+                completely depolarizes.
+            MC (Instrument):
+                Measurement control instrument that should be used for the
+                experiment. Default (None) uses self.MC.
+        '''
+        if MC is None:
+            MC = self.MC.get_instr()
+
+        # Load gateset, germs and fiducials from file.
+        gstPath = os.path.join(pq.__path__[0], 'measurement',
+                               'gate_set_tomography')
+        gs_target = pygsti.io.load_gateset(
+            os.path.join(gstPath, 'Gateset_5_primitives_GST.txt'))
+        fiducials = pygsti.io.load_gatestring_list(
+            os.path.join(gstPath, 'Fiducials_GST.txt'))
+        germs = pygsti.io.load_gatestring_list(
+            os.path.join(gstPath, 'Germs_5_primitives_GST.txt'))
+
+        # gate_dict maps GST gate labels to QASM operations.
+        gate_dict = {
+            'Gi' : 'I {}'.format(int(np.round(self.gauss_width*1e9 * 4))),
+            'Gx90' : 'X90 {}'.format(self.name),
+            'Gy90' : 'Y90 {}'.format(self.name),
+            'Gx180' : 'X180 {}'.format(self.name),
+            'Gy180' : 'Y180 {}'.format(self.name),
+            'RO' : 'RO {}'.format(self.name)
+        }
+
+        # Create the experiment list, translate it to QASM, and generate the
+        # QASM file(s).
+        raw_exp_list = pygsti.construction.make_lsgst_experiment_list(
+            gs_target.gates.keys(), fiductials, fiducials, germs, max_lengths)
+        exp_list = gstCC.get_experiments_from_list(raw_exp_list, gate_dict)
+        qasm_files = gstCC.generate_QASM(
+            filename='GST_{}'.format(self.name),
+            exp_list=exp_list,
+            qubit_labels=[self.name],
+            max_instructions=self.CBox.get_instr()._get_instr_mem_size())
+
+        # Run the experiment. It might take several runs, if more than one
+        # QASM file was generated.
+        nr_of_exp = len(qasm_files)
+        for qFile in qasm_files:
+            self.prepare_for_timedomain()
+            #s = qh.QASM_
 
 
 class QWG_driven_transmon(CBox_v3_driven_transmon):
