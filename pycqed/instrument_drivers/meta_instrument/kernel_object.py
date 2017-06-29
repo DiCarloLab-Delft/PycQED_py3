@@ -7,9 +7,10 @@ from qcodes.instrument.base import Instrument
 from qcodes.utils import validators as vals
 from qcodes.instrument.parameter import ManualParameter
 
-from pycqed.measurement.kernel_functions import kernel_generic, htilde_bounce, \
-    htilde_skineffect, save_kernel, step_bounce, step_skineffect, \
-    heaviside, kernel_generic2
+from pycqed.measurement.kernel_functions import (
+    kernel_generic, htilde_bounce,
+    htilde_skineffect, save_kernel, step_bounce, step_skineffect,
+    heaviside, kernel_generic2)
 
 import pycqed.measurement.kernel_functions as kf
 from pycqed.instrument_drivers.pq_parameters import ConfigParameter
@@ -17,7 +18,7 @@ from pycqed.instrument_drivers.pq_parameters import ConfigParameter
 
 class Distortion(Instrument):
 
-    '''
+    '''fkeren
     Implements a distortion kernel for a flux channel.
     It contains the parameters and functions needed to produce a kernel file
     according to the models shown in the functions.

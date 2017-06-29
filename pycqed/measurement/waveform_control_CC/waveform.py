@@ -49,17 +49,35 @@ def gauss_pulse(amp, sigma_length, nr_sigma=4, sampling_rate=2e8,
     return pulse_I, pulse_Q
 
 
+def single_channel_block(amp, length, sampling_rate=2e8, delay=0):
+    '''
+    Generates a block pulse.
+        length in s
+        amp in V
+        sampling_rate in Hz
+        empty delay in s
+    '''
+    nr_samples = (length+delay)*sampling_rate
+    delay_samples = delay*sampling_rate
+    pulse_samples = nr_samples - delay_samples
+
+    block = amp * np.ones(int(pulse_samples))
+    Zeros = np.zeros(int(delay_samples))
+    pulse = list(Zeros)+list(block)
+    return pulse
+
+
 def block_pulse(amp, length, sampling_rate=2e8, delay=0, phase=0):
     '''
-    Generates the envelope of a block pulse.
+    Generates the envelope of a block pulse for IQ modulation.
         length in s
         amp in V
         sampling_rate in Hz
         empty delay in s
         phase in degrees
     '''
-    nr_samples = (length+delay)*sampling_rate
-    delay_samples = delay*sampling_rate
+    nr_samples = np.round((length+delay)*sampling_rate)
+    delay_samples = np.round(delay*sampling_rate)
     pulse_samples = nr_samples - delay_samples
     amp_I = amp*np.cos(phase*2*np.pi/360)
     amp_Q = amp*np.sin(phase*2*np.pi/360)

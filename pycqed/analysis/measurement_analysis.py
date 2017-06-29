@@ -23,7 +23,8 @@ from copy import deepcopy
 
 import pycqed.analysis.tools.plotting as pl_tools
 
-from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
+from pycqed.analysis.tools.plotting import (set_xlabel, set_ylabel,
+                                            data_to_table_png)
 
 try:
     from nathan_plotting_tools import *
@@ -322,8 +323,10 @@ class MeasurementAnalysis(object):
                 self.plot_results_vs_sweepparam(x=self.sweep_points,
                                                 y=self.measured_values[i],
                                                 fig=fig, ax=ax, log=log,
-                                                xlabel=self.xlabel,
-                                                ylabel=self.ylabels[i],
+                                                xlabel=self.parameter_names[0],
+                                                x_unit=self.parameter_units[0],
+                                                ylabel=self.value_names[i],
+                                                y_unit=self.value_units[i],
                                                 save=False, show=show,
                                                 plot_title=plot_title)
 
@@ -439,22 +442,24 @@ class MeasurementAnalysis(object):
             raise ValueError('datasaving_format "%s " not recognized'
                              % datasaving_format)
 
-    def plot_results_vs_sweepparam(self, x, y, fig, ax, show=False, marker='-o',
+    def plot_results_vs_sweepparam(self, x, y, fig, ax, show=False,
+                                   marker='-o',
+                                   xlabel=None, x_unit=None,
+                                   ylabel=None, y_unit=None,
                                    log=False, label=None, **kw):
         save = kw.pop('save', False)
         self.plot_title = kw.pop('plot_title',
                                  textwrap.fill(self.timestamp_string + '_' +
                                                self.measurementstring, 40))
-        xlabel = kw.pop('xlabel', None)
-        ylabel = kw.pop('ylabel', None)
+
         ax.set_title(self.plot_title)
-        if xlabel is not None:
-            ax.set_xlabel(xlabel)
-        if ylabel is not None:
-            ax.set_ylabel(ylabel)
         ax.plot(x, y, marker, label=label)
         if log:
             ax.set_yscale('log')
+        if xlabel is not None:
+            set_xlabel(ax, xlabel, x_unit)
+        if ylabel is not None:
+            set_ylabel(ax, ylabel, y_unit)
         if show:
             plt.show()
         if save:
@@ -464,7 +469,6 @@ class MeasurementAnalysis(object):
             else:
                 self.save_fig(fig, xlabel=xlabel, ylabel=ylabel, **kw)
         return
-
 
     def plot_complex_results(self, cmp_data, fig, ax, show=False, marker='.', **kw):
         '''
@@ -492,7 +496,6 @@ class MeasurementAnalysis(object):
 
         return
 
-
     def plot_dB_from_linear(self, x, lin_amp, fig, ax, show=False, marker='.', **kw):
         '''
         Plot linear data in dB.
@@ -519,7 +522,6 @@ class MeasurementAnalysis(object):
             self.save_fig(fig, xlabel=xlabel, ylabel=ylabel, **kw)
 
         return
-
 
     def get_naming_and_values_2D(self):
         '''
@@ -863,6 +865,7 @@ class TD_Analysis(MeasurementAnalysis):
             return
 
         if self.cal_points is None:
+            # 42 is nr. of points in AllXY
             if len(self.measured_values[0]) == 42:
                 self.corr_data, self.zero_coord, self.one_coord = \
                     a_tools.rotate_and_normalize_data(
@@ -1263,12 +1266,15 @@ class Rabi_Analysis(TD_Analysis):
 
     def fit_data(self, print_fit_results=False, **kw):
         model = fit_mods.lmfit.Model(fit_mods.CosFunc)
+
         self.fit_res = ['']*self.nr_quadratures
         if self.nr_quadratures != 1:
             # It would be best to do 1 fit to both datasets but since it is
             # easier to do just one fit we stick to that.
-            # We make an initial guess of the Rabi period using both quadratures
-            data = np.sqrt(self.measured_values[0]**2+self.measured_values[1]**2)
+            # We make an initial guess of the Rabi period using both
+            # quadratures
+            data = np.sqrt(self.measured_values[
+                           0]**2+self.measured_values[1]**2)
             params = fit_mods.Cos_guess(model, data=data, t=self.sweep_points)
             fit_res = model.fit(
                 data=data,
@@ -1522,7 +1528,7 @@ class CPhase_2Q_amp_cost_analysis(Rabi_Analysis):
         # Frequency is known, because we sweep the phase of the second pihalf
         # pulse in a Ramsey-type experiment.
         model = lmfit.Model((lambda t, amplitude, phase, offset:
-                            amplitude*np.cos(2*np.pi*t/360.0 + phase)+offset))
+                             amplitude*np.cos(2*np.pi*t/360.0 + phase)+offset))
         self.fit_result = {}
 
         # Fit case with no excitation first
@@ -1569,7 +1575,8 @@ class Motzoi_XY_analysis(TD_Analysis):
         self.add_analysis_datagroup_to_file()
         if self.cal_points is None:
             if len(self.measured_values) == 2:
-                self.corr_data = self.measured_values[0]**2 + self.measured_values[1]**2
+                self.corr_data = self.measured_values[
+                    0]**2 + self.measured_values[1]**2
             else:
                 self.corr_data = self.measured_values[0]
         else:
@@ -2529,11 +2536,18 @@ class SSRO_discrimination_analysis(MeasurementAnalysis):
             fit_mods.plot_fitres2D_heatmap(self.fit_res, x_tiled, y_rep,
                                            axs=axs, cmap='viridis')
             for ax in axs:
+                ax.ticklabel_format(style='sci', fontsize=4,
+                                    scilimits=(0, 0))
                 set_xlabel(ax, 'I', self.value_units[0])
-                set_ylabel(ax, 'Q', self.value_units[1])
+                edge = max(max(abs(xedges)), max(abs(yedges)))
+                ax.set_xlim(-edge, edge)
+                ax.set_ylim(-edge, edge)
+                # ax.set_axis_bgcolor(plt.cm.viridis(0))
+            set_ylabel(axs[0], 'Q', self.value_units[1])
+            #axs[0].ticklabel_format(style = 'sci',  fontsize=4)
+
             self.save_fig(
-                fig, figname='2D-Histograms_rot_{:.1f} deg'.format(theta_in),
-                **kw)
+                fig, figname='2D-Histograms_rot_{:.1f} deg'.format(theta_in), **kw)
 
         #######################################################
         #         Extract quantities of interest              #
@@ -2801,12 +2815,13 @@ class T1_Analysis(TD_Analysis):
                     ax2 = axarray[i]
                 else:
                     ax2 = axarray[i/2, i % 2]
-
                 self.plot_results_vs_sweepparam(x=self.sweep_points,
                                                 y=self.measured_values[i],
                                                 fig=figarray, ax=ax2,
-                                                xlabel=self.xlabel,
-                                                ylabel=self.ylabels[i],
+                                                xlabel=self.parameter_names[0],
+                                                x_unit=self.parameter_units[0],
+                                                ylabel=self.value_names[i],
+                                                y_unit=self.value_units[i],
                                                 save=False)
 
         if 'I_cal' in self.value_names[i]:  # Fit the data
@@ -3218,16 +3233,15 @@ class DriveDetuning_Analysis(TD_Analysis):
             model = fit_mods.lmfit.Model(fit_mods.CosFunc)
 
             params = fit_mods.Cos_guess(model, data=data,
-                                 t=sweep_points)
+                                        t=sweep_points)
             # This ensures that phase is *always* ~90 deg if it is different
             # this shows up in the amplitude and prevents the correct detuning
             # is shown.
             params['phase'].min = np.deg2rad(80)
             params['phase'].max = np.deg2rad(100)
 
-
             fit_results = model.fit(data=data, t=sweep_points,
-                                             params=params)
+                                    params=params)
             return fit_results
 
         def quadratic_fit_data():
@@ -4093,6 +4107,7 @@ class VNA_Analysis(MeasurementAnalysis):
     '''
     Nice to use with all measurements performed with the VNA.
     '''
+
     def __init__(self, label='VNA', **kw):
         kw['label'] = label
         kw['h5mode'] = 'r+'
@@ -4339,10 +4354,13 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
                 abs(max(self.data_dist) - min(self.data_dist))
 
             if kappa_guess == 0:
-                    kappa_guess = 1 # When kappa_guess is zero, the fitting procedure fails (claims 'input has nan values')
+                # When kappa_guess is zero, the fitting procedure fails (claims
+                # 'input has nan values')
+                kappa_guess = 1
 
-            if not peak_flag: # Change the sign of amplitude_guess for dips
-                amplitude_guess*=-1.
+            # Commented out as this is an undefined variable
+            # if not peak_flag:  # Change the sign of amplitude_guess for dips
+            #     amplitude_guess *= -1.
 
             LorentzianModel = fit_mods.LorentzianModel
             LorentzianModel.set_param_hint('f0',
@@ -4692,8 +4710,8 @@ class TwoD_Analysis(MeasurementAnalysis):
 
     def run_default_analysis(self, normalize=False, plot_linecuts=True,
                              linecut_log=False, colorplot_log=False,
-                             plot_all=False, save_fig=True,
-                             transpose=False,
+                             plot_all=True, save_fig=True,
+                             transpose=False, figsize=None,
                              **kw):
         close_file = kw.pop('close_file', True)
 
@@ -4707,53 +4725,60 @@ class TwoD_Analysis(MeasurementAnalysis):
             # Linecuts are above because somehow normalization applies to both
             # colorplot and linecuts otherwise.
             if plot_linecuts:
-                fig, ax = self.default_ax(figsize=(8, 5))
+                fig, ax = plt.subplots(figsize=figsize)
                 self.fig_array.append(fig)
                 self.ax_array.append(ax)
-                fig_title = '{timestamp}_{measurement}_linecut_{i}'.format(
-                    timestamp=self.timestamp_string,
-                    measurement=self.measurementstring,
-                    i=i)
+                savename = 'linecut_{}'.format(self.value_names[i])
+                fig_title = '{} {} \nlinecut {}'.format(
+                    self.timestamp_string, self.measurementstring,
+                    self.value_names[i])
                 a_tools.linecut_plot(x=self.sweep_points,
                                      y=self.sweep_points_2D,
                                      z=self.measured_values[i],
-                                     plot_title=fig_title,
-                                     xlabel=self.xlabel,
-                                     y_name=self.sweep_name_2D,
-                                     y_unit=self.sweep_unit_2D,
+                                     y_name=self.parameter_names[1],
+                                     y_unit=self.parameter_units[1],
                                      log=linecut_log,
                                      zlabel=self.zlabels[i],
                                      fig=fig, ax=ax, **kw)
+                ax.set_title(fig_title)
+                set_xlabel(ax, self.parameter_names[0],
+                           self.parameter_units[0])
+                # ylabel is value units as we are plotting linecuts
+                set_ylabel(ax, self.value_names[i],
+                           self.value_units[i])
+
                 if save_fig:
-                    self.save_fig(fig, figname=fig_title,
+                    self.save_fig(fig, figname=savename,
                                   fig_tight=False, **kw)
 
-            fig, ax = self.default_ax(figsize=(8, 5))
+            fig, ax = plt.subplots(figsize=figsize)
             self.fig_array.append(fig)
             self.ax_array.append(ax)
             if normalize:
                 print("normalize on")
             # print "unransposed",meas_vals
             # print "transposed", meas_vals.transpose()
-            fig_title = '{timestamp}_{measurement}_{i}'.format(
-                timestamp=self.timestamp_string,
-                measurement=self.measurementstring,
-                i=i)
+            self.ax_array.append(ax)
+            savename = 'Heatmap_{}'.format(self.value_names[i])
+            fig_title = '{} {} \n{}'.format(
+                self.timestamp_string, self.measurementstring,
+                self.value_names[i])
+
             a_tools.color_plot(x=self.sweep_points,
                                y=self.sweep_points_2D,
                                z=meas_vals.transpose(),
-                               plot_title=fig_title,
-                               xlabel=self.xlabel,
-                               ylabel=self.ylabel,
                                zlabel=self.zlabels[i],
                                fig=fig, ax=ax,
                                log=colorplot_log,
                                transpose=transpose,
                                normalize=normalize,
                                **kw)
+            ax.set_title(fig_title)
+            set_xlabel(ax, self.parameter_names[0], self.parameter_units[0])
+            set_ylabel(ax, self.parameter_names[1], self.parameter_units[1])
+
             if save_fig:
-                print("saving fig_title", fig_title)
-                self.save_fig(fig, figname=fig_title, **kw)
+                self.save_fig(fig, figname=savename, **kw)
         if close_file:
             self.finish()
 
@@ -5299,18 +5324,19 @@ class butterfly_analysis(MeasurementAnalysis):
             Q_shots = self.measured_values[1]
 
             shots = I_shots+1j*Q_shots
-            rot_shots = dm_tools.rotate_complex(shots, angle=theta_in, deg=True)
+            rot_shots = dm_tools.rotate_complex(
+                shots, angle=theta_in, deg=True)
             I_shots = rot_shots.real
             Q_shots = rot_shots.imag
 
             self.data = I_shots
 
         if initialize:
-            if threshold_init == None:
+            if threshold_init is None:
                 threshold_init = threshold
 
-            # reshuffeling the data to endup with two arrays for the diffeent
-            # input states
+            # reshuffling the data to end up with two arrays for the
+            # different input states
             shots = np.size(self.data)
             shots_per_mmt = np.floor_divide(shots, 6)
             shots_used = shots_per_mmt*6
@@ -5338,9 +5364,8 @@ class butterfly_analysis(MeasurementAnalysis):
             self.data_rel_post = self.data_rel[:, 1:]
             self.data_exc = self.data_exc_post
             self.data_rel = self.data_rel_post
-            fraction = (
-                np.size(self.data_exc) + np.size(self.data_exc))*3/shots_used/2
-
+            fraction = (np.size(self.data_exc) +
+                        np.size(self.data_exc))*3/shots_used/2
 
         else:
             m0_on = self.data[2::4]
@@ -5367,12 +5392,12 @@ class butterfly_analysis(MeasurementAnalysis):
 
     def run_default_analysis(self,  **kw):
         verbose = kw.pop('verbose', False)
-        exc_coeffs = dm_tools.butterfly_data_binning(Z=self.data_exc,
-                                                     initial_state=0)
-        rel_coeffs = dm_tools.butterfly_data_binning(Z=self.data_rel,
-                                                     initial_state=1)
-        self.butterfly_coeffs = dm_tools.butterfly_matrix_inversion(exc_coeffs,
-                                                                    rel_coeffs)
+        self.exc_coeffs = dm_tools.butterfly_data_binning(Z=self.data_exc,
+                                                          initial_state=0)
+        self.rel_coeffs = dm_tools.butterfly_data_binning(Z=self.data_rel,
+                                                          initial_state=1)
+        self.butterfly_coeffs = dm_tools.butterfly_matrix_inversion(
+            self.exc_coeffs, self.rel_coeffs)
         # eps,declaration,output_input
         F_a_butterfly = (1-(self.butterfly_coeffs.get('eps00_1') +
                             self.butterfly_coeffs.get('eps01_1') +
@@ -5390,7 +5415,70 @@ class butterfly_analysis(MeasurementAnalysis):
         self.butterfly_coeffs['F_a_butterfly'] = F_a_butterfly
         self.butterfly_coeffs['mmt_ind_exc'] = mmt_ind_exc
         self.butterfly_coeffs['mmt_ind_rel'] = mmt_ind_rel
+
+        self.make_data_tables()
+
         return self.butterfly_coeffs
+
+    def make_data_tables(self):
+
+        figname1 = 'raw probabilities'
+
+        data_raw_p = [['P(1st m, 2nd m)_(|in>)', 'val'],
+                      ['P00_0', '{:.4f}'.format(self.exc_coeffs['P00_0'])],
+                      ['P01_0', '{:.4f}'.format(self.exc_coeffs['P01_0'])],
+                      ['P10_0', '{:.4f}'.format(self.exc_coeffs['P10_0'])],
+                      ['P11_0', '{:.4f}'.format(self.exc_coeffs['P11_0'])],
+                      ['P00_1', '{:.4f}'.format(self.rel_coeffs['P00_1'])],
+                      ['P01_1', '{:.4f}'.format(self.rel_coeffs['P01_1'])],
+                      ['P10_1', '{:.4f}'.format(self.rel_coeffs['P10_1'])],
+                      ['P11_1', '{:.4f}'.format(self.rel_coeffs['P11_1'])]]
+
+        savename = os.path.abspath(os.path.join(
+                self.folder, figname1))
+        data_to_table_png(data=data_raw_p, filename=savename+'.png',
+                          title=figname1)
+
+        figname2 = 'inferred states'
+
+        data_inf = [['eps(|out>)_(|in>)', 'val'],
+                    ['eps0_0', '{:.4f}'.format(self.exc_coeffs['eps0_0'])],
+                    ['eps1_0', '{:.4f}'.format(self.exc_coeffs['eps1_0'])],
+                    ['eps0_1', '{:.4f}'.format(self.rel_coeffs['eps0_1'])],
+                    ['eps1_1', '{:.4f}'.format(self.rel_coeffs['eps1_1'])]]
+        savename = os.path.abspath(os.path.join(
+                self.folder, figname2))
+        data_to_table_png(data=data_inf, filename=savename+'.png',
+                          title=figname2)
+
+        bf = self.butterfly_coeffs
+        figname3 = 'Butterfly coefficients'
+        data = [['eps(declared, |out>)_(|in>)', 'val'],
+                ['eps00_0', '{:.4f}'.format(bf['eps00_0'])],
+                ['eps01_0', '{:.4f}'.format(bf['eps01_0'])],
+                ['eps10_0', '{:.4f}'.format(bf['eps10_0'])],
+                ['eps11_0', '{:.4f}'.format(bf['eps11_0'])],
+                ['eps00_1', '{:.4f}'.format(bf['eps00_1'])],
+                ['eps01_1', '{:.4f}'.format(bf['eps01_1'])],
+                ['eps10_1', '{:.4f}'.format(bf['eps10_1'])],
+                ['eps11_1', '{:.4f}'.format(bf['eps11_1'])]]
+        savename = os.path.abspath(os.path.join(
+                self.folder, figname3))
+        data_to_table_png(data=data, filename=savename+'.png',
+                          title=figname3)
+
+
+        figname4 = 'Derived quantities'
+        data = [['Measurement induced excitations',
+                    '{:.4f}'.format(bf['mmt_ind_exc'])],
+                ['Measurement induced relaxation',
+                    '{:.4f}'.format(bf['mmt_ind_rel'])],
+                ['Readout fidelity',
+                    '{:.4f}'.format(bf['F_a_butterfly'])]]
+        savename = os.path.abspath(os.path.join(
+                self.folder, figname4))
+        data_to_table_png(data=data, filename=savename+'.png',
+                          title=figname4)
 
 
 ##########################################
@@ -6097,10 +6185,12 @@ class Ram_Z_Analysis(MeasurementAnalysis):
     def __init__(self, timestamp_cos=None, timestamp_sin=None,
                  filter_raw=False, filter_deriv_phase=False, demodulate=True,
                  f_demod=0, f01max=None, E_c=None, flux_amp=None, V_0=0, d_c=1,
-                 auto=True, make_fig=True, **kw):
-        super().__init__(timestamp=timestamp_cos, label='Ram_Z_cos', **kw)
+                 auto=True, make_fig=True, TwoD=False, **kw):
+        super().__init__(timestamp=timestamp_cos, label='Ram_Z_cos', TwoD=TwoD,
+                         **kw)
         self.cosTrace = self.measured_values[0]
-        super().__init__(timestamp=timestamp_sin, label='Ram_Z_sin', **kw)
+        super().__init__(timestamp=timestamp_sin, label='Ram_Z_sin', TwoD=TwoD,
+                         **kw)
         self.sinTrace = self.measured_values[0]
 
         self.filter_raw = filter_raw
@@ -6116,7 +6206,10 @@ class Ram_Z_Analysis(MeasurementAnalysis):
         self.d_c = d_c
 
         if auto:
-            self.run_special_analysis(make_fig=make_fig)
+            if not TwoD:
+                self.run_special_analysis(make_fig=make_fig)
+            else:
+                pass
 
     def normalize(self, trace):
         # * -1 because cos starts at -1 instead of 1
@@ -6135,7 +6228,7 @@ class Ram_Z_Analysis(MeasurementAnalysis):
             return_all=True)
 
         # self.add_dataset_to_analysisgroup('detuning', self.df)
-        # self.add_dataset_to_analysisgroup('phase', selfphases)
+        # self.add_dataset_to_analysisgroup('phase', self.phases)
 
         if (self.f01max != None and self.E_c != None and
             self.flux_amp != None):
@@ -6229,7 +6322,7 @@ class Ram_Z_Analysis(MeasurementAnalysis):
                             self.parameter_units[0])
         pl_tools.set_ylabel(ax, 'demodulated normalized trace', 'a.u.')
         ax.set_title('demodulated normalized data')
-        ax.legend(['cos', 'sin'])
+        ax.legend(['cos', 'sin'], loc=1)
         self.save_fig(fig, 'Ram-Z_normalized_data.png')
         # fig.savefig('Ram-Z_normalized_data.png', dpi=300)
 

@@ -162,6 +162,8 @@ class MeasurementControl(Instrument):
             sweep_points = self.get_sweep_points()
             if len(self.sweep_functions) == 1:
                 self.get_measurement_preparetime()
+                if self.sweep_functions[0].sweep_control == 'soft':
+                    self.sweep_functions[0].set_parameter(sweep_points[0])
                 self.detector_function.prepare(
                     sweep_points=self.get_sweep_points())
                 self.measure_hard()
