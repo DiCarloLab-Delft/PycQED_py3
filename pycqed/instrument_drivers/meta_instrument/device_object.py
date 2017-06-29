@@ -132,7 +132,8 @@ class TwoQubitDevice(DeviceObject):
             parameter_class=ManualParameter)
 
     def calibrate_mux_RO(self, calibrate_optimal_weights=True,
-                         verify_optimal_weights=False):
+                         verify_optimal_weights=False,
+                         update_threshold=True):
 
         RO_LMM = self.RO_LutManMan.get_instr()
         UHFQC = self.acquisition_instrument.get_instr()
@@ -187,9 +188,18 @@ class TwoQubitDevice(DeviceObject):
         mqmc.measure_two_qubit_ssro(self, q0.name, q1.name, no_scaling=True,
                                     result_logging_mode='lin_trans')
 
-        return mra.two_qubit_ssro_fidelity(
+        a = mra.two_qubit_ssro_fidelity(
             label='{}_{}'.format(q0.name, q1.name),
             qubit_labels=[q0.name, q1.name])
+
+        # do not use V_th_corr as this is measured from data that already
+        # includes a correction matrix
+        thres = a['V_th']
+        if update_threshold:
+            q0.RO_threshold(thres[0])
+            q1.RO_threshold(thres[1])
+
+        return a
 
     def check_mux_RO(self):
         q0_name = self.qubits()[0]

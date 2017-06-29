@@ -1378,9 +1378,13 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         if result_logging_mode == 'raw':
             self.value_units = ['V']*len(self.channels)
             self.scaling_factor = 1/(1.8e9*integration_length*nr_averages)
-        else:
-            self.value_units = ['']*len(self.channels)
+        elif result_logging_mode == 'lin_trans':
+            self.value_units = ['a.u.']*len(self.channels)
             self.scaling_factor = 1/nr_averages
+
+        elif result_logging_mode == 'digitized':
+            self.value_units = ['frac']*len(self.channels)
+            self.scaling_factor = 1
 
         self.single_int_avg = single_int_avg
         if self.single_int_avg:

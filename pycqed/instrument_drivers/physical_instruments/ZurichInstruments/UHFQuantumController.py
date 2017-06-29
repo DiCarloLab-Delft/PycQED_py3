@@ -838,8 +838,6 @@ setTrigger(0);"""
     def upload_transformation_matrix(self, matrix):
         for i in range(np.shape(matrix)[0]):  # looping over the rows
             for j in range(np.shape(matrix)[1]):  # looping over the colums
-                #value =matrix[i,j]
-                # print(value)
                 eval(
                     'self.quex_trans_{}_col_{}_real(matrix[{}][{}])'.format(j, i, i, j))
 
