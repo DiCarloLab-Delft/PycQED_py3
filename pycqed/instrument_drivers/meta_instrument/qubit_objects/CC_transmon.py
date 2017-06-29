@@ -1902,6 +1902,7 @@ class CBox_v3_driven_transmon(Transmon):
 
     def measure_single_qubit_GST(self,
                                  max_lengths=[0]+[2**i for i in range(10)],
+                                 repetitions_per_point=500,
                                  MC=None):
         '''
         Measure gate set tomography for this qubit. The gateset that is used
@@ -1915,10 +1916,15 @@ class CBox_v3_driven_transmon(Transmon):
                 GST iteration. The largest maximum length should be roughly
                 the number of gates that can be done on a qubit before it
                 completely depolarizes.
+            repetitions_per_point (int):
+                Number of times each experiment is repeated in total.
             MC (Instrument):
                 Measurement control instrument that should be used for the
                 experiment. Default (None) uses self.MC.
         '''
+        # TODO: max_acq_points: hard coded?
+        max_acq_points = 4095
+
         if MC is None:
             MC = self.MC.get_instr()
 
@@ -1947,18 +1953,40 @@ class CBox_v3_driven_transmon(Transmon):
         raw_exp_list = pygsti.construction.make_lsgst_experiment_list(
             gs_target.gates.keys(), fiductials, fiducials, germs, max_lengths)
         exp_list = gstCC.get_experiments_from_list(raw_exp_list, gate_dict)
-        qasm_files = gstCC.generate_QASM(
+        qasm_files, exp_nums = gstCC.generate_QASM(
             filename='GST_{}'.format(self.name),
             exp_list=exp_list,
             qubit_labels=[self.name],
-            max_instructions=self.CBox.get_instr()._get_instr_mem_size())
+            max_instructions=self.CBox.get_instr()._get_instr_mem_size(),
+            max_exp_per_file=max_acq_points)
+
+        max_exp_num = max(exp_nums)  # i
+        soft_repetitions = np.ceil(
+            repetitions_per_point / np.floor(max_acq_points / max_exp_num))
+        if soft_repetitions < min_soft_repetitions:
+            soft_repetitions = 5
+            hard_repetitions = np.ceil(repetitions_per_point /
+                                       soft_repetitions)
 
         # Run the experiment. It might take several runs, if more than one
         # QASM file was generated.
         nr_of_exp = len(qasm_files)
-        for qFile in qasm_files:
+        for i, qFile in enumerate(qasm_files):
             self.prepare_for_timedomain()
-            #s = qh.QASM_
+            s = qh.QASM_Sweep_v2(
+                qFile.name, self.CBox.get_instr(), self.get_operation_dict(),
+                parameter_name='GST sequence', unit=None)
+            d = self.int_log_det
+            # nr_shots = largest integer multiple of exp_nums[i] smaller than
+            # max number of shots (4095 for UHFQC).
+            d.nr_shots = (max_acq_points // exp_nums[i]) * exp_nums[i]
+
+            MC.set_sweep_function(s)
+            MC.set_sweep_points(np.arange(exp_nums[i] * repetitions_per_point))
+            MC.set_detector_function(d)
+            MC.run('GST' + self.msmt_suffix + '_{}'.format(i))
+
+
 
 
 class QWG_driven_transmon(CBox_v3_driven_transmon):

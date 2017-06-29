@@ -130,7 +130,8 @@ def get_experiments_from_file(filename, gate_dict, use_pygsti_parser=True):
 
     return experiments
 
-def generate_QASM(filename, exp_list, qubit_labels, max_instructions=2**15):
+def generate_QASM(filename, exp_list, qubit_labels, max_instructions=2**15,
+                  max_exp_per_file=4095):
     '''
     Generates a QASM file from an experiment list. If there are too many
     instructions in the experiment list to fit in the CBox memory, then the
@@ -152,31 +153,42 @@ def generate_QASM(filename, exp_list, qubit_labels, max_instructions=2**15):
             this number is exceeded in the experiment_list, more than one
             QASM file will be generated.
             Default is 2**15 (CBox memory size as of June 29 2017).
+        max_exp_per_file (int):
+            Maximum number of experiments allowed in one file. This is limited
+            by the maximum number of shots the acquisition device can handle.
 
     Returns:
         qasm_files (list):
             List containing the file objects for the generated QASM files.
+        exp_num_list (list):
+            List containing the number of experiments run in each QASM file.
     '''
-    iteration = 0
+    file_num = 0
     file_list = []
+    exp_num_list = []
 
-    file = open('{}_{}.qasm'.format(filename, iteration), 'w')
+    instr_num = 0
+    exp_num = 0
+    file = open('{}_{}.qasm'.format(filename, file_num), 'w')
     file_list.append(file)
     for q in qubit_labels:
         file.writelines('qubit {} \n'.format(q))
 
-    instr_num = 0
-    for exp in exp_list:
+    for i, exp in enumerate(exp_list):
         # Check if we are getting close to the maximum number of instructions
         # the CBox can handle.
         # len(exp) is the number of pulses. Pulses should not take more than
         # 4 instructions at the moment.
-        if instr_num + len(exp)*4 > max_instructions:
+        if (instr_num + len(exp)*4 > max_instructions or
+            exp_num + 1 >= max_exp_per_file):
             # Adding the next experiment might exceed the maximum number of
             # instructions -> save current QASM file and start a new one
             file.close()
-            iteration += 1
-            file = open('{}_{}.qasm'.format(filename, iteration), 'w')
+            exp_num_list.append(exp_num)
+            file_num += 1
+            instr_num = 0  # New file -> reset instruction and experiment num.
+            exp_num = 0
+            file = open('{}_{}.qasm'.format(filename, file_num), 'w')
             file_list.append(file)
             for q in qubit_labels:
                 file.writelines('qubit {} \n'.format(q))
@@ -189,9 +201,11 @@ def generate_QASM(filename, exp_list, qubit_labels, max_instructions=2**15):
         # Write the experiment to the QASM file.
         for gate in exp:
             file.writelines('{}\n'.format(gate))
+        exp_num += 1
 
     file.close()
-    return file_list
+    exp_num_list.append(exp_num)
+    return file_list, exp_num_list
 
 def single_qubit_GST():
     pass
