@@ -364,6 +364,21 @@ class Transmon(Qubit):
                            # in the future add 'tracked_dac', 'tracked_flux',
                            initial_value='latest',
                            parameter_class=ManualParameter)
+        self.add_parameter('F_ssro',
+                           initial_value=0,
+                           label='RO assignment fidelity',
+                           vals=vals.Numbers(0.0, 1.0)
+                           parameter_class=ManualParameter)
+        self.add_parameter('F_discr',
+                           initial_value=0,
+                           label='RO discrimination fidelity',
+                           vals=vals.Numbers(0.0, 1.0)
+                           parameter_class=ManualParameter)
+        self.add_paremeter('F_RB',
+                           initial_value=0,
+                           label='RB gate fidelity',
+                           vals=vals.Numbers(0, 1e-6),
+                           parameter_class=ManualParameter)
 
     def calculate_frequency(self,
                             dac_voltage=None,
