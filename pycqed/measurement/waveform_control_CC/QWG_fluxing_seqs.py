@@ -173,3 +173,85 @@ def CZ_calibration_seq(q0, q1, RO_target='all',
             qasm_file.writelines('RO {}  \n'.format(RO_target))
     qasm_file.close()
     return qasm_file
+
+def two_qubit_tomo_bell(bell_state, q0, q1,
+                        RO_target='all'):
+    '''
+    Two qubit bell state tomography.
+
+    Args:
+        bell_state      (int): index of prepared bell state
+        q0, q1          (str): names of the target qubits
+        RO_target   (str): can be q0, q1, or 'all'
+    '''
+
+    if RO_target == 'all':
+        # This is a bit of a hack as RO all qubits is the same instruction
+        # as any specific qubit
+        RO_target = q0
+
+    tomo_pulses = ['I ', 'X180 ', 'Y90 ', 'mY90 ', 'X90 ', 'mX90 ']
+    tomo_list_q0 = []
+    tomo_list_q1 = []
+    for tp in tomo_pulses:
+        tomo_list_q0 += [tp + q0]
+        tomo_list_q1 += [tp + q1]
+
+    tomo_list_q0[0] = 'I {}'.format(q0)
+    tomo_list_q1[0] = 'I {}'.format(q1)
+
+    # Choose a bell state and set the corresponding preparation pulses
+    if bell_state % 10 == 0:  # |Phi_m>=|00>-|11>
+        prep_pulse_q0 = 'Y90 {}'.format(q0)
+        prep_pulse_q1 = 'Y90 {}'.format(q1)
+    elif bell_state % 10 == 1:  # |Phi_p>=|00>+|11>
+        prep_pulse_q0 = 'mY90 {}'.format(q0)
+        prep_pulse_q1 = 'Y90 {}'.format(q1)
+    elif bell_state % 10 == 2:  # |Psi_m>=|01>-|10>
+        prep_pulse_q0 = 'Y90 {}'.format(q0)
+        prep_pulse_q1 = 'mY90 {}'.format(q1)
+    elif bell_state % 10 == 3:  # |Psi_p>=|01>+|10>
+        prep_pulse_q0 = 'mY90 {}'.format(q0)
+        prep_pulse_q1 = 'mY90 {}'.format(q1)
+    else:
+        raise ValueError('Bell state {} is not defined.'.format(bell_state))
+
+    after_pulse = 'mY90 {}\n'.format(q1)
+
+    # Disable preparation pulse on one or the other qubit for debugging
+    if bell_state//10 == 1:
+        prep_pulse_q1 = 'I {}'.format(q0)
+    elif bell_state//10 == 2:
+        prep_pulse_q0 = 'I {}'.format(q1)
+
+    # Write tomo sequence
+
+    filename = join(base_qasm_path, 'two_qubit_tomo_bell.qasm')
+    qasm_file = mopen(filename, mode='w')
+    qasm_file.writelines('qubit {} \nqubit {} \n'.format(q0, q1))
+
+    for p_q1 in tomo_list_q1:
+        for p_q0 in tomo_list_q0:
+            qasm_file.writelines('\ninit_all\n')
+            qasm_file.writelines('{} | {} \n'.format(prep_pulse_q0,
+                                                     prep_pulse_q1))
+            qasm_file.writelines('CZ {} {} \n'.format(q0, q1))
+            qasm_file.writelines(after_pulse)
+            qasm_file.writelines('{} | {}\n'.format(p_q1, p_q0))
+            qasm_file.writelines('RO ' + RO_target + '  \n')
+
+    # Add calibration pulses
+    cal_pulses = []
+    # every calibration point is repeated 7 times. This is copied from the
+    # script for Tektronix driven qubits. I do not know if this repetition
+    # is important or even necessary here.
+    for seq in cal_points_2Q:
+        cal_pulses += [[seq[0].format(q0), seq[1].format(q1), 'RO ' + RO_target + '\n']] * 7
+
+    for seq in cal_pulses:
+        qasm_file.writelines('\ninit_all\n')
+        for p in seq:
+            qasm_file.writelines(p)
+
+    qasm_file.close()
+    return qasm_file
