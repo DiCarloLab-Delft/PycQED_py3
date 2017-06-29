@@ -1,5 +1,6 @@
 import re
 
+
 class qasm_loader:
 
     """
@@ -123,8 +124,8 @@ class qasm_loader:
                     line += [replace["end"].format(
                         counter=self._circuit_counter, line=line)]
 
-            elif isinstance(replace, str):                
-                line = [replace.format(                    
+            elif isinstance(replace, str):
+                line = [replace.format(
                     counter=self._circuit_counter, qubit=qubit)]
             return line
         else:

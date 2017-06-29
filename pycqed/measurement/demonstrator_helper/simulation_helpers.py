@@ -4,12 +4,15 @@ import re
 import urllib.request
 import time
 import pycqed as pq
+import threading
 
 from pycqed.measurement import measurement_control
 from pycqed.instrument_drivers.virtual_instruments.pyqx.qx_client import qx_client
 from pycqed.measurement.detector_functions import QX_Hard_Detector
 
 from pycqed.measurement import sweep_functions as swf
+
+from pycqed.instrument_drivers.meta_instrument.qubit_objects.dummy_qubit_object import DummyQubit
 
 from tess.TessConnect import TessConnection
 from qcodes import station
@@ -26,10 +29,16 @@ st = station.Station()
 MC = measurement_control.MeasurementControl(
     'MC', live_plot_enabled=False, verbose=True)
 MC.station = st
+
+dq = DummyQubit("q1")
+dq.T1(10)
+
 st.add_component(MC)
+st.add_component(dq)
+
 
 def simulate_qasm_file(file_url, options={}):
-    #file_url="http://localhost:3000/uploads/asset/file/75/ac5bc9e8-3929-4205-babf-2cf9c4490225.qasm"
+    # file_url="http://localhost:3000/uploads/asset/file/75/ac5bc9e8-3929-4205-babf-2cf9c4490225.qasm"
     file_path = _retrieve_file_from_url(file_url)
 
     qxc = qx_client()
@@ -49,8 +58,7 @@ def simulate_qasm_file(file_url, options={}):
         dat = MC.run("run QASM")
         return _MC_result_to_chart_dict(dat)
     except:
-        #raise
-
+        # raise
         return []
     finally:
         qxc.disconnect()
@@ -92,3 +100,6 @@ def _MC_result_to_chart_dict(result):
         "data-type": "chart",
         "data": result
     }]
+
+
+#_send_calibration()
