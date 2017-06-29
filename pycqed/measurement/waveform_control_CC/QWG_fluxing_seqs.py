@@ -134,3 +134,42 @@ def SWAPN(q0_name, q1_name, nr_pulses: list,
             qasm_file.writelines(p)
     qasm_file.close()
     return qasm_file
+
+
+def CZ_calibration_seq(q0, q1, RO_target='all',
+                       cases=('no_excitation', 'excitation')):
+    '''
+    Sequence used to calibrate flux pulses for CZ gates.
+
+    Timing of the sequence:
+    q0:   --   X90  C-Phase  Rphi90   --      RO
+    q1: (X180)  --     --       --   (X180)    RO
+
+    Args:
+        q0, q1      (str): names of the addressed qubits
+        RO_target   (str): can be q0, q1, or 'all'
+        excitations (bool/str): can be True, False, or 'both_cases'
+    '''
+
+    filename = join(base_qasm_path, 'CZ_calibration_seq.qasm')
+    qasm_file = mopen(filename, mode='w')
+    qasm_file.writelines('qubit {} \nqubit {} \n'.format(q0, q1))
+
+    for case in cases:
+        qasm_file.writelines('\ninit_all\n')
+        if case == 'excitation':
+            qasm_file.writelines('X180 {}\n'.format(q1))
+        qasm_file.writelines('X90 {}\n'.format(q0))
+
+        # temporary workaround to deal with limitation in the QASM config
+        # qasm_file.writelines('CZ {} \n'.format(q0))
+        qasm_file.writelines('CZ {} {}\n'.format(q0, q1))
+        qasm_file.writelines('Rphi90 {}\n'.format(q0))
+        if case == 'excitation':
+            qasm_file.writelines('X180 {}\n'.format(q1))
+        if 'RO_target' == 'all':
+            qasm_file.writelines('RO {} | RO {} \n'.format(q0, q1))
+        else:
+            qasm_file.writelines('RO {}  \n'.format(RO_target))
+    qasm_file.close()
+    return qasm_file

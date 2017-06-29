@@ -457,9 +457,10 @@ class QWG_FluxLookuptableManager(Instrument):
                 'Pulse {} not in codeword mapping.'.format(pulse_name))
 
         self.QWG.get_instr().createWaveformReal(
-            pulse_name, self._wave_dict[pulse_name])
+            pulse_name+self.name, self._wave_dict[pulse_name])
         self.QWG.get_instr().set('codeword_{}_ch{}_waveform'.format(
-            self.codeword_dict()[pulse_name], self.F_ch()), pulse_name)
+            self.codeword_dict()[pulse_name], self.F_ch()),
+                                 pulse_name+self.name)
 
     def load_pulses_onto_AWG_lookuptable(self, regenerate_pulses=True):
         '''
