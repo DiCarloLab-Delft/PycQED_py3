@@ -274,6 +274,10 @@ class QWG_FluxLookuptableManager(Instrument):
                                      'codewords.',
                            vals=vals.Lists(vals.Ints()))
 
+        self.add_parameter('disable_CZ',
+                           parameter_class=ManualParameter,
+                           vals=vals.Bool(),
+                           initial_value=False)
         self.add_parameter('pulse_map',
                            initial_value={'cz': 'adiabatic_Z',
                                           'square': 'square'},
@@ -330,6 +334,8 @@ class QWG_FluxLookuptableManager(Instrument):
         z_nr_samples = int(np.round(self.Z_length() * self.sampling_rate()))
         single_qubit_phase_correction = np.ones(z_nr_samples) * self.Z_amp()
 
+        if self.disable_CZ():
+            martinis_pulse_v2 *= 0
         # Construct phase corrected pulses
         martinis_phase_corrected = np.concatenate(
             [martinis_pulse_v2, single_qubit_phase_correction])

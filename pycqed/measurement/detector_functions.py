@@ -1527,7 +1527,7 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
             self.value_units = ['V']*len(self.value_names) + \
                                ['(V^2)']*len(self.correlations)
         else:
-            self.value_units = ['counts']*len(self.value_names) + \
+            self.value_units = ['fraction']*len(self.value_names) + \
                                ['normalized']*len(self.correlations)
         for corr in correlations:
             self.value_names += ['corr ({},{})'.format(corr[0], corr[1])]
@@ -1647,15 +1647,7 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
                     data.append(np.array(data_raw[key]) *
                                 (self.scaling_factor / self.nr_averages))
 
-        if not self.real_imag:
-            I = data[0]
-            Q = data[1]
-            S21 = I + 1j*Q
-            data[0] = np.abs(S21)
-            data[1] = np.angle(S21)/(2*np.pi)*360
-
-        else:
-            return data
+        return data
 
 
 class UHFQC_integration_logging_det(Hard_Detector):

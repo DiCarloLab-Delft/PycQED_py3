@@ -20,7 +20,6 @@ def measure_two_qubit_AllXY(device, q0_name, q1_name,
     q0.prepare_for_timedomain()
     q1.prepare_for_timedomain()
 
-    # device.prepare_multiplexed_RO() # <--- not implemented yet
     double_points = True
     AllXY = mqqs.two_qubit_AllXY(q0_name, q1_name,
                                  RO_target=q0_name,
