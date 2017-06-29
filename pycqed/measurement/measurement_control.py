@@ -42,8 +42,7 @@ class MeasurementControl(Instrument):
 
     def __init__(self, name,
                  plotting_interval=3,
-                 live_plot_enabled=True, verbose=True,
-                 live_plot_enabled_tess=False):
+                 live_plot_enabled=True, verbose=True):
         super().__init__(name=name, server_name=None)
         # Soft average is currently only available for "hard"
         # measurements. It does not work with adaptive measurements.
@@ -66,10 +65,6 @@ class MeasurementControl(Instrument):
                            parameter_class=ManualParameter,
                            vals=vals.Bool(),
                            initial_value=live_plot_enabled)
-        self.add_parameter('live_plot_enabled_tess',
-                           parameter_class=ManualParameter,
-                           vals=vals.Bool(),
-                           initial_value=live_plot_enabled_tess)
         self.add_parameter('plotting_interval',
                            unit='s',
                            vals=vals.Numbers(min_value=0.001),

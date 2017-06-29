@@ -367,7 +367,7 @@ class QX_Hard_Sweep(Hard_Sweep):
         self.filename = filename
         self.__qxc = qxc
         # self.num_circuits = num_circuits
-        qasm = ql.qasm_loader(filename)
+        qasm = ql.qasm_loader(filename, qxc.get_nr_qubits())
         qasm.load_circuits()
         self.circuits = qasm.get_circuits()
 

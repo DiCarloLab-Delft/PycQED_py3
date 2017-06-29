@@ -24,4 +24,4 @@ class AllXYDetector(Detector_Function):
 
         time.sleep(self.delay)
 
-        return dat 
+        return dat

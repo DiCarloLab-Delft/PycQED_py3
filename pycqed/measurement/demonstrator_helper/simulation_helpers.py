@@ -21,17 +21,16 @@ defualt_simulate_options = {
     "iterations": 1
 }
 
+st = station.Station()
+# Connect to the qx simulator
+MC = measurement_control.MeasurementControl(
+    'MC', live_plot_enabled=False, verbose=True)
+MC.station = st
+st.add_component(MC)
 
 def simulate_qasm_file(file_url, options={}):
-    file_url="http://localhost:3000/uploads/asset/file/75/ac5bc9e8-3929-4205-babf-2cf9c4490225.qasm"
+    #file_url="http://localhost:3000/uploads/asset/file/75/ac5bc9e8-3929-4205-babf-2cf9c4490225.qasm"
     file_path = _retrieve_file_from_url(file_url)
-
-    st = station.Station()
-    # Connect to the qx simulator
-    MC = measurement_control.MeasurementControl(
-        'MC', live_plot_enabled=False, verbose=True)
-    MC.station = st
-    st.add_component(MC)
 
     qxc = qx_client()
     qxc.connect()
@@ -50,12 +49,11 @@ def simulate_qasm_file(file_url, options={}):
         dat = MC.run("run QASM")
         return _MC_result_to_chart_dict(dat)
     except:
-        raise
+        #raise
 
         return []
     finally:
         qxc.disconnect()
-        MC.close()
 
 
 # Private

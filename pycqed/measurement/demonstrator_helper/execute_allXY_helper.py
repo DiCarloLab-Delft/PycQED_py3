@@ -25,7 +25,7 @@ def execute_AllXY(options={}):
     st = station.Station()
 
     MC = mc.MeasurementControl(
-        'MC', live_plot_enabled=True, verbose=True)
+        'MC', live_plot_enabled=False, verbose=True)
     MC.soft_avg(40)
     MC.station = st
     st.add_component(MC)

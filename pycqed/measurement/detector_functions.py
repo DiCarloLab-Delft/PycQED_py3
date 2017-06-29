@@ -152,7 +152,7 @@ class QX_Hard_Detector(Hard_Detector):
         logging.info("QX_RB_Hard_Detector : loading qasm files...")
         for i, file_name in enumerate(qasm_filenames):
             t1 = time.time()
-            qasm = ql.qasm_loader(file_name)
+            qasm = ql.qasm_loader(file_name, qxc.get_nr_qubits())
             qasm.load_circuits()
             # t2 = time.time()
             #print("[+] qasm loading time :",t2-t1)
