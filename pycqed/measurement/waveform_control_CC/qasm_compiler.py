@@ -1080,35 +1080,39 @@ class QASM_QuMIS_Compiler():
         for tp in self.hw_timing_grid:
             absolute_time = tp.absolute_time
             for hw_event in tp.parallel_events:
-
                 if hw_event.qumis_name == "trigger":
                     if hw_event.format == []:
                         new_tp_list = self.add_new_tp_event(
                             new_tp_list, absolute_time, hw_event)
                         continue
                     if len(hw_event.format) == 1:
+                        # If len format ==1 then it is a simple trigger
                         hw_event.duration, = hw_event.format
                         hw_event.format = []
                         new_tp_list = self.add_new_tp_event(
                             new_tp_list, absolute_time, hw_event)
                         continue
                     if len(hw_event.format) == 2:
+                        # This splits a trigger that needs to perpare a CW
+                        # before raising a trigger bit.
                         d1, d2 = hw_event.format
                         hw_event.format = []
 
+                        # This is the starting timepoint for preparing the CW
                         new_absolute_time = tp.absolute_time - d1
                         new_hw_event = copy.copy(hw_event)
                         new_hw_event.duration = d1
                         new_hw_event.trigger_bit = -1
                         new_tp_list = self.add_new_tp_event(
-                            new_tp_list, new_absolute_time, new_hw_event)
-
+                            new_tp_list, new_absolute_time, event=new_hw_event)
+                        # This is the starting timepoint for trigger + CW
                         hw_event.duration = d2
                         new_tp_list = self.add_new_tp_event(
-                            new_tp_list, absolute_time, hw_event)
+                            new_tp_list, absolute_time, event=hw_event)
 
+                        # This is an empty timepoint for the end of this instr
                         new_tp_list = self.add_new_tp_event(
-                            new_tp_list, absolute_time + d2, None)
+                            new_tp_list, absolute_time + d2, event=None)
 
                 else:  # for pulse, measure and other dummy instructions.
                     new_tp_list = self.add_new_tp_event(
@@ -1126,13 +1130,15 @@ class QASM_QuMIS_Compiler():
             if event is not None:
                 new_tp.parallel_events.append(event)
                 if 0 in event.set_bits:
-                    raise ValueError
+                    raise ValueError('Bits start counting at 1 instead of 0')
             timing_grid.insert(tp_index, new_tp)
         else:
             if event is not None:
+                # because there is a matched timepoint, no new tp is inserted
+                # the event is added to the existing timepoint
                 timing_grid[tp_index-1].parallel_events.append(event)
-            if 0 in event.set_bits:
-                raise ValueError
+                if 0 in event.set_bits:
+                    raise ValueError('Bits start counting at 1 instead of 0')
         return timing_grid
 
     def get_max_duration(self, timing_events):

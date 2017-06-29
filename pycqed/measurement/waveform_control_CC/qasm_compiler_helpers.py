@@ -292,19 +292,20 @@ class qumis_event():
 
     def __repr__(self):
         base_str = ('qumis_event({}, codeword={}, awg_nr={}, duration={},' +
-                    'trigger_bit={}, codeword_bit={}, set_bits={})')
+                    'format={}', 'trigger_bit={}, codeword_bit={}, ' +
+                    'set_bits={})')
         rep = base_str.format(self.qumis_name, self.codeword, self.awg_nr,
-                              self.duration, self.trigger_bit,
+                              self.duration, self.format, self.trigger_bit,
                               self.codeword_bit, self.set_bits)
         return rep
 
     def __str__(self):
 
         base_str = ('qumis_event: "{}", \n\tcodeword={}, \n\tawg_nr={},' +
-                    ' \n\tduration={}, \n\ttrigger_bit={}, ' +
+                    ' \n\tduration={}, \n\tformat={}, \n\ttrigger_bit={}, ' +
                     '\n\tcodeword_bit={}, \n\tset_bits={}\n')
         rep = base_str.format(self.qumis_name, self.codeword, self.awg_nr,
-                              self.duration, self.trigger_bit,
+                              self.duration, self.format, self.trigger_bit,
                               self.codeword_bit, self.set_bits)
         return rep
 
@@ -316,7 +317,8 @@ class prog_line():
         self.content = content
 
     def __repr__(self):
-        return "prog_line(number={}, content={})".format(self.number, self.content)
+        return "prog_line(number={}, content={})".format(self.number,
+                                                         self.content)
 
     def __str__(self):
         return "{}: {}".format(self.number, self.content)
