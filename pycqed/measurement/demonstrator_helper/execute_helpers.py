@@ -33,33 +33,14 @@ def execute_qasm_file(file_url: str,  # config_json: str=None,
     CBox = Instrument.find_instrument('CBox')
     device = Instrument.find_instrument('Starmon')
     # N.B. hardcoded fixme
-    q0 = device.QL
-    q1 = device.QR
-    cfg = q0.qasm_config()
-    nr_averages = 1024
+    cfg = device.qasm_config()
     qasm_fp = _retrieve_file_from_url(file_url)
     sweep_points = _get_qasm_sweep_points(qasm_fp)
 
     s = swf.QASM_Sweep_v2(qasm_fn=qasm_fp, config=cfg, CBox=CBox,
                           verbosity_level=verbosity_level)
-    # d = det.UHFQC_integrated_average_detector(
-    #     device.acquisition_instrument.get_instr(),
-    #     AWG=device.seq_contr.get_instr(),
-    #     nr_averages=q0.RO_acq_averages(),
-    #     integration_length=q0.RO_acq_integration_length(),
-    #     result_logging_mode='lin_trans',
-    #     channels=[q0.RO_acq_weight_function_I()])
-    d = det.UHFQC_correlation_detector(
-        UHFQC=q0._acquisition_instrument,
-        thresholding=True,
-        AWG=CBox,
-        channels=[q0.RO_acq_weight_function_I(),
-                  q1.RO_acq_weight_function_I()],
-        correlations=[(q0.RO_acq_weight_function_I(),
-                       q1.RO_acq_weight_function_I())],
-        nr_averages=nr_averages,
-        integration_length=q0.RO_acq_integration_length())
 
+    d = device.get_correlation_detector()
     MC.set_sweep_function(s)
     MC.set_sweep_points(sweep_points)
     MC.set_detector_function(d)

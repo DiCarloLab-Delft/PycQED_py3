@@ -1581,12 +1581,19 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
             correlation_channel = -1
             # 4 is the (current) max number of weights in the UHFQC (v5)
             for ch in range(4):
+                if ch in self.channels:
+                    # Disable correlation mode as this is used for normal
+                    # acquisition
+                    self.UHFQC.set('quex_corr_{}_mode'.format(ch), 0)
+
                 if ch not in self.channels:
                     # selects the lowest available free channel
                     self.channels += [ch]
                     correlation_channel = ch
                     print('Using channel {} for correlation ({}, {}).'
                           .format(ch, corr[0], corr[1]))
+                    # correlation mode is turned on in the
+                    # set_up_correlation_weights method
                     break
             if correlation_channel < 0:
                 raise ValueError('No free channel available for correlation.')
