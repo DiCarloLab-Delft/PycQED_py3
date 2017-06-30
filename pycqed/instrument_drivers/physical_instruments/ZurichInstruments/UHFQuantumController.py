@@ -627,6 +627,7 @@ class UHFQC(Instrument):
                  np.array(cosI))
         self.set('quex_wint_weights_{}_real'.format(weight_function_Q),
                  np.array(sinI))
+		# the factor 2 is needed so that scaling matches SSB downconversion
         self.set('quex_rot_{}_real'.format(weight_function_I), 2.0)
         self.set('quex_rot_{}_imag'.format(weight_function_I), 0.0)
         self.set('quex_rot_{}_real'.format(weight_function_Q), 2.0)
