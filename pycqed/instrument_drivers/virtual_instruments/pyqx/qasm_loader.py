@@ -11,15 +11,18 @@ class qasm_loader:
     _replacements = {
         "init_all": {
             "start": ".c{counter}",
-            "qloop": "prepz q{qubit}"
+            "qloop": "prepz {qubit}"
         },
         "RO": {
-            "qloop": "measure q{qubit}"
+            "qloop": "measure {qubit}"
         },
-        "(x|X)180 q[0-9]+": 'rx180 q{qubit}',
-        "(x|X)90 q[0-9]+": 'rx90 q{qubit}',
-        "(y|Y)180 q[0-9]+": 'ry180 q{qubit}',
-        "(y|Y)90 q[0-9]+": 'ry90 q{qubit}',
+        "(x|X)180 q[0-9]+": 'rx180 {qubit[0]}',
+        "(x|X)90 q[0-9]+": 'rx90 {qubit[0]}',
+        "(y|Y)180 q[0-9]+": 'ry180 {qubit[0]}',
+        "(y|Y)90 q[0-9]+": 'ry90 {qubit[0]}',
+        "mY90 q[0-9]+": 'RY {qubit[0]}, -1.57079',
+        "mX90 q[0-9]+": 'RX {qubit[0]}, -1.57079',
+        "(cz|CZ) q[0-9]+ q[0-9]+": "cz {qubit[0]}, {qubit[1]}"
 
     }
     _circuit_counter = 0
@@ -37,15 +40,18 @@ class qasm_loader:
             # remove empty lines
             if len(file_lines[i]) == 0:
                 continue
-            self.lines.append(file_lines[i])
-            c = file_lines[i].find("#")                     # remove comments
-            if c != -1:
-                self.lines[-1] = file_lines[:c]
+            seperated_file_lines = file_lines[i].split("|")
+            for line in seperated_file_lines:
+                line = line.strip()
+                self.lines.append(line)
+                c = line.find("#")              # remove comments
+                if c != -1:
+                    self.lines[-1] = line[:c]
 
-            # replace line if line matches _replacement
-            replacement_lines = self.replaceLine(file_lines[i])
-            if replacement_lines:
-                self.lines[-1:] = replacement_lines
+                # replace line if line matches _replacement
+                replacement_lines = self.replaceLine(line)
+                if replacement_lines:
+                    self.lines[-1:] = replacement_lines
 
     def load_circuits(self):
         n = len(self.lines)
@@ -107,9 +113,9 @@ class qasm_loader:
         if match:
             replace = self._replacements[match]
             # find qubit
-            reg = re.search("q[0-9]+", line)
+            reg = re.findall("q[0-9]", line, re.DOTALL)
             if(reg):
-                qubit = line[reg.start()+1:reg.end()]
+                qubit = reg
             if isinstance(replace, dict):
                 line = []
                 if "start" in replace:
@@ -119,7 +125,7 @@ class qasm_loader:
                     for i in range(self.qubits):
                         line += [replace['qloop'].format(
                             counter=self._circuit_counter,
-                            qubit=i, line=line)]
+                            qubit="q"+str(i), line=line)]
                 if "end" in replace:
                     line += [replace["end"].format(
                         counter=self._circuit_counter, line=line)]

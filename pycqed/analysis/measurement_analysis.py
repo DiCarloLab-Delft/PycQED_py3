@@ -162,11 +162,11 @@ class MeasurementAnalysis(object):
         if val_len == 4:
             self.figarray, self.axarray = plt.subplots(
                 val_len, 1, figsize=(min(6*len(self.value_names), 11),
-                                     1.5*len(self.value_names)+4))
+                                     1.5*len(self.value_names)+3))
         else:
             self.figarray, self.axarray = plt.subplots(
                 max(len(self.value_names), 1), 1,
-                figsize=(6, 1.5*len(self.value_names)))
+                figsize=(6, 1.5*len(self.value_names)+4))
         return tuple(self.f + [self.figarray] + self.ax + [self.axarray])
 
     def get_values(self, key):

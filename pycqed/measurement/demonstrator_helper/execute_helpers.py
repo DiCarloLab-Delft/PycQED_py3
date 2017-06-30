@@ -5,54 +5,42 @@ import urllib.request
 import pycqed_scripts as pqs  # N.B. should not be defined in pycqed
 # import time
 import pycqed as pq
-
+import qcodes as qc
 from qcodes.instrument.base import Instrument
 from pycqed.measurement import detector_functions as det
 from pycqed.measurement import sweep_functions as swf
 from tess.TessConnect import TessConnection
+import logging
 
 import threading
 
 defualt_execute_options = {}
 
 tc = TessConnection()
-tc.connect("simulate")
+tc.connect("execute")
 defualt_simulate_options = {
     "num_avg": 10000,
     "iterations": 1
 }
 
 # Extract some "hardcoded" instruments from the global namespace"
-MC = Instrument.find_instrument('MC')
-CBox = Instrument.find_instrument('CBox')
-device = Instrument.find_instrument('Starmon')
 
 
-def execute_qasm_file(file_url: str, config_json: str=None,
+def execute_qasm_file(file_url: str,  # config_json: str=None,
                       verbosity_level: int=0):
 
+    MC = Instrument.find_instrument('MC')
+    CBox = Instrument.find_instrument('CBox')
+    device = Instrument.find_instrument('Starmon')
     # N.B. hardcoded fixme
-    q0 = device.QR
-
-    if config_json is None:
-        config_dir = os.path.join(
-            pqs.__path__[0], 'experiments', 'Demonstrator_1706')
-        config_fn = os.path.join(config_dir, 'demo_config.json')
-    else:
-        raise NotImplementedError('No support for json input yet')
-
+    cfg = device.qasm_config()
     qasm_fp = _retrieve_file_from_url(file_url)
     sweep_points = _get_qasm_sweep_points(qasm_fp)
 
-    s = swf.QASM_Sweep_v2(qasm_fn=qasm_fp, config_fn=config_fn, CBox=CBox,
+    s = swf.QASM_Sweep_v2(qasm_fn=qasm_fp, config=cfg, CBox=CBox,
                           verbosity_level=verbosity_level)
-    d = det.UHFQC_integrated_average_detector(
-        device.acquisition_instrument.get_instr(),
-        AWG=device.seq_contr.get_instr(),
-        nr_averages=q0.RO_acq_averages(),
-        integration_length=q0.RO_acq_integration_length(),
-        result_logging_mode='lin_trans',
-        channels=[q0.RO_acq_weight_function_I()])
+
+    d = device.get_correlation_detector()
     MC.set_sweep_function(s)
     MC.set_sweep_points(sweep_points)
     MC.set_detector_function(d)
@@ -98,12 +86,22 @@ def _MC_result_to_chart_dict(result):
 
 
 def _send_calibration():
+
+    banned_pars = ['IDN', 'RO_optimal_weights_I', 'RO_optimal_weights_Q',
+                   'qasm_config']
     # threading.Timer(10, _send_calibration).start()
-    snapshot = MC.station.snapshot()
+    # snapshot = MC.station.snapshot()
+    snapshot = qc.station.snapshot()
     calibration = {
-        "q1": snapshot["instruments"]["q1"]
+        "q0": snapshot["instruments"]["QL"],
+        "q1": snapshot["instruments"]["QR"]
     }
-    del calibration['q1']['parameters']['IDN']
+    for par in banned_pars:
+        try:
+            del calibration['q0']['parameters'][par]
+            del calibration['q1']['parameters'][par]
+        except KeyError as e:
+            logging.warning(e)
     tc.client.publish_custom_msg({
         "calibration": calibration
     })

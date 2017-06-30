@@ -2,7 +2,6 @@ import numpy as np
 import os
 import re
 import urllib.request
-import time
 import pycqed as pq
 import threading
 
@@ -12,13 +11,17 @@ from pycqed.measurement.detector_functions import QX_Hard_Detector
 
 from pycqed.measurement import sweep_functions as swf
 
-from pycqed.instrument_drivers.meta_instrument.qubit_objects.dummy_qubit_object import DummyQubit
+# from pycqed.instrument_drivers.meta_instrument.qubit_objects.dummy_qubit_object import DummyQubit
 
 from tess.TessConnect import TessConnection
 from qcodes import station
 
 tc = TessConnection()
 tc.connect("simulate")
+
+# tc.connect("simulate_qsim")
+
+# tc.connect("simulate_QX")
 defualt_simulate_options = {
     "num_avg": 10000,
     "iterations": 1
@@ -27,26 +30,24 @@ defualt_simulate_options = {
 st = station.Station()
 # Connect to the qx simulator
 MC = measurement_control.MeasurementControl(
-    'MC', live_plot_enabled=False, verbose=True)
+    'MC', live_plot_enabled=True, verbose=True)
 MC.station = st
 
-dq = DummyQubit("q1")
-dq.T1(10)
+# dq = DummyQubit("q1")
+# dq.T1(10)
 
 st.add_component(MC)
-st.add_component(dq)
+# st.add_component(dq)
 
 
 def simulate_qasm_file(file_url, options={}):
     # file_url="http://localhost:3000/uploads/asset/file/75/ac5bc9e8-3929-4205-babf-2cf9c4490225.qasm"
     file_path = _retrieve_file_from_url(file_url)
-
     qxc = qx_client()
-    qxc.connect()
-    time.sleep(0.5)
-    qxc.create_qubits(5)
     try:
 
+        qxc.connect()
+        qxc.create_qubits(2)
         qx_sweep = swf.QX_Hard_Sweep(qxc, file_path)
         qx_detector = QX_Hard_Detector(qxc, [file_path], num_avg=10000)
         sweep_points = range(len(qx_detector.randomizations[0]))
@@ -57,9 +58,7 @@ def simulate_qasm_file(file_url, options={}):
         MC.set_sweep_points(sweep_points)
         dat = MC.run("run QASM")
         return _MC_result_to_chart_dict(dat)
-    except:
-        # raise
-        return []
+
     finally:
         qxc.disconnect()
 

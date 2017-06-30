@@ -367,17 +367,17 @@ class Transmon(Qubit):
         self.add_parameter('F_ssro',
                            initial_value=0,
                            label='RO assignment fidelity',
-                           vals=vals.Numbers(0.0, 1.0)
+                           vals=vals.Numbers(0.0, 1.0),
                            parameter_class=ManualParameter)
         self.add_parameter('F_discr',
                            initial_value=0,
                            label='RO discrimination fidelity',
-                           vals=vals.Numbers(0.0, 1.0)
+                           vals=vals.Numbers(0.0, 1.0),
                            parameter_class=ManualParameter)
-        self.add_paremeter('F_RB',
+        self.add_parameter('F_RB',
                            initial_value=0,
-                           label='RB gate fidelity',
-                           vals=vals.Numbers(0, 1e-6),
+                           label='RB single qubit Clifford fidelity',
+                           vals=vals.Numbers(0, 1.0),
                            parameter_class=ManualParameter)
 
     def calculate_frequency(self,
