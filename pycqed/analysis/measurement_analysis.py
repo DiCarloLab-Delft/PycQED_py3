@@ -162,7 +162,7 @@ class MeasurementAnalysis(object):
         if val_len == 4:
             self.figarray, self.axarray = plt.subplots(
                 val_len, 1, figsize=(min(6*len(self.value_names), 11),
-                                     1.5*len(self.value_names)))
+                                     1.5*len(self.value_names)+4))
         else:
             self.figarray, self.axarray = plt.subplots(
                 max(len(self.value_names), 1), 1,
@@ -301,7 +301,7 @@ class MeasurementAnalysis(object):
                              1.5*len(self.value_names)))
             else:
                 fig, axs = plt.subplots(max(len(self.value_names), 1), 1,
-                                        figsize=(5, 3*len(self.value_names)))
+                                        figsize=(5, 3*len(self.value_names)+2))
                 # Add all the sweeps to the plot 1 by 1
                 # indices are determined by it's shape/number of sweeps
             for i in range(len(self.value_names)):

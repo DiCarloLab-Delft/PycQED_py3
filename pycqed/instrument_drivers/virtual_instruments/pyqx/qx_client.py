@@ -30,7 +30,7 @@ class qx_client:
         self.__circuits = []
         # default main circuit is always there
         self.__circuits.append("default")
-        self.__debug = 1
+        self.__debug = 0
 
     def connect(self, host="localhost", port=5555):
         print("[+] connecting to QX server...")
@@ -204,6 +204,9 @@ class qx_client:
                           qubit)   # create the circuit named 'name'
         # print("[+] measurement_average: ",m)
         return float(m.split('\n')[0])
+
+    def get_nr_qubits(self):
+        return self.__qubits
 
     def list_circuits(self):
         circuits = self.send_cmd("circuits")
