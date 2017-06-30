@@ -21,8 +21,8 @@ class qasm_loader:
         "(y|Y)180 q[0-9]+": 'ry180 q{qubit}',
         "(y|Y)90 q[0-9]+": 'ry90 q{qubit}',
         "mY90 q[0-9]+": 'RY q{qubit}, -1.57079',
-        "mX90 q[0-9]+": 'RX q{qubit}, -1.57079'
-
+        "mX90 q[0-9]+": 'RX q{qubit}, -1.57079',
+        'I q[0-9]+': ''
     }
     _circuit_counter = 0
 
