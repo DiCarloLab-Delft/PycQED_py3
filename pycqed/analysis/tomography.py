@@ -39,6 +39,9 @@ class TomoAnalysis_JointRO():
                          qtp.rotation(qtp.sigmay(), np.pi / 2),
                          qtp.rotation(qtp.sigmax(), -np.pi / 2),
                          qtp.rotation(qtp.sigmay(), -np.pi / 2)]
+    measurement_operator_labels = ['I', 'X', 'x', 'y', '-x','-y']
+    #MAKE SURE THE LABELS CORRESPOND TO THE ROTATION MATRIXES DEFINED ABOVE
+
     # The set of single qubit basis operators and labels
     measurement_basis = [
         qtp.identity(2), qtp.sigmaz(), qtp.sigmax(), qtp.sigmay()]
@@ -47,7 +50,7 @@ class TomoAnalysis_JointRO():
     readout_basis = [qtp.identity(2), qtp.sigmaz()]
 
     def __init__(self, measurements_cal, measurements_tomo,
-                 n_qubits=2, n_quadratures=1):
+                 n_qubits=2, n_quadratures=1, check_labels=True):
         """
         keyword arguments:
         measurements_cal --- Should be an array of length 2 ** n_qubits
@@ -75,7 +78,13 @@ class TomoAnalysis_JointRO():
         self.rotation_vector = self._calculate_matrix_set(
             self.rotation_matrixes, n_qubits)
 
-    def execute_linear_tomo(self):
+        if check_labels is True:
+            print('Measurement op. labels: {}'.format(self.get_meas_operator_labels(n_qubits)))
+            print('Basis labels: {}'.format(self.get_basis_labels(n_qubits)))
+
+
+
+    def execute_pseudo_inverse_tomo(self):
         """
         Performs a linear tomography by simple inversion of the system of
         equations due to calibration points
@@ -83,23 +92,6 @@ class TomoAnalysis_JointRO():
 
         # calculate beta positions in coefficient matrix
         coefficient_matrix = self._calculate_coefficient_matrix()
-
-        # The variance scaling matrix takes care of ensuring proper linear
-        # inversion in the case of different noise levels
-
-        var_q0 = 1
-        var_q1 = 1
-        var_q01 = 1
-
-        v_q0 = np.diag(np.ones(36))*var_q0
-        v_q1 = np.diag(np.ones(36))*var_q1
-        v_q01 = np.diag(np.ones(36))*var_q01
-
-        # O = np.zeros((36, 36))
-        # variance_scaling_matrix = np.bmat([[v_q0, O, O],
-        #                                    [O, v_q1, O],
-        #                                    [O, O, v_q01]])
-        variance_scaling_matrix = np.diag(np.ones(36))
         basis_decomposition = np.zeros(4 ** self.n_qubits)
         # first skip beta0
         basis_decomposition[1:] = np.dot(
@@ -112,7 +104,7 @@ class TomoAnalysis_JointRO():
                    for i in range(len(basis_decomposition))])
         return (basis_decomposition, rho)
 
-    def execute_max_likelihood(self, use_weights=True, show_time=False,
+    def execute_least_squares_physical_tomo(self, use_weights=True, show_time=False,
                                ftol=0.01, xtol=0.001, full_output=0,
                                max_iter=1000):
         """
@@ -157,7 +149,7 @@ class TomoAnalysis_JointRO():
             vec.full() for vec in measurement_vector]
         tlinear = time.time()
         # find out the starting rho by the linear tomo
-        discard, rho0 = self.execute_linear_tomo()
+        discard, rho0 = self.execute_pseudo_inverse_tomo()
         # now fetch the starting t_params from the cholesky decomp of rho
         tcholesky = time.time()
         T0 = np.linalg.cholesky(scipy.linalg.sqrtm((rho0.dag() * rho0).full()))
@@ -181,16 +173,122 @@ class TomoAnalysis_JointRO():
                         dims=[[2 for i in range(self.n_qubits)],
                               [2 for i in range(self.n_qubits)]])
 
+    def execute_SDPA_MC_2qubit_tomo(self,
+                                    counts_tomo,
+                                    counts_cal,
+                                    N_total,
+                                    used_bins = [0,2],
+                                    n_runs = 100,
+                                    array_like = False,
+                                    correct_measurement_operators = True):
+        """
+        Executes the SDPDA tomo n_runs times with data distributed via a Multinomial distribution
+        in order to get a list of rhos from which one can calculate errorbars on various derived quantities
+        returns a list of Qobjects (the rhos).
+        If array_like is set to true it will just return a 3D array of rhos
+        """
+
+        rhos= []
+        for i in range(n_runs):
+            #generate a data set based on multinomial distribution with means according to the measured data
+            mc = [np.random.multinomial(sum(counts),(np.array(counts)+0.0) / sum(counts)) for counts in counts_tomo]
+            rhos.append(self.execute_SDPA_2qubit_tomo(mc,
+                                                      counts_cal,
+                                                      N_total,
+                                                      used_bins,
+                                                      correct_measurement_operators))
+
+        if array_like:
+            return np.array([rho.full() for rho in rhos])
+        else:
+            return rhos
+
+
+    def execute_SDPA_2qubit_tomo(self, counts_tomo, counts_cal, N_total, used_bins = [0,2],
+                                 correct_measurement_operators=True):
+        """
+        Estimates a density matrix given single shot counts of 4 thresholded
+        bins using a custom C semidefinite solver from Nathan Langford
+        Each bin should correspond to a projection operator:
+        0: 00, 1: 01, 2: 10, 3: 11
+        The calibration counts are used in calculating corrections to the (ideal) measurement operators
+        The tomo counts are used for the actual reconstruction.
+        """
+        if isinstance(used_bins, int):
+            #allow for a single projection operator
+            used_bins = [used_bins]
+
+        Pm_corrected = self.get_meas_operators_from_cal(counts_cal,
+                                                        correct_measurement_operators)
+
+        #Select the correct data based on the bins used
+        #(and therefore based on the projection operators used)
+        data = np.array([float(count[k]) for count in counts_tomo for k in used_bins] ).transpose()
+
+        #get the total number of counts per tomo
+        N = np.array([np.sum(counts_tomo, axis=1) for k in used_bins]).flatten()
+
+        #add weights based on the total number of data points kept each run
+        #weights = np.sqrt(N)
+        weights = N/float(N_total)
+
+        #calculate the density matrix using the sdpa solver
+        rho_nathan, n_estimate = self._tomoc_fw([Pm_corrected[k] for k in used_bins], data, weights=weights)
+
+        if((np.abs(N_total - n_estimate) / N_total > 0.03)):
+            print('WARNING estimated N(%d) is not close to provided N(%d) '% (n_estimate,N_total))
+
+        return rho_nathan
+
+    def get_meas_operators_from_cal(self, counts_cal, correct_measurement_operators=True):
+        """
+        Used in the thresholded tomography. Returns the set of corrected measurement operators
+        """
+        #setup the projection operators
+        Pm_0 = qtp.projection(2,0,0)
+        Pm_1 = qtp.projection(2,1,1)
+        Pm_00 = qtp.tensor(Pm_0,Pm_0)
+        Pm_11 = qtp.tensor(Pm_1,Pm_1)
+        Pm_01 = qtp.tensor(Pm_0,Pm_1)
+        Pm_10 = qtp.tensor(Pm_1,Pm_0)
+        Pm = [Pm_00, Pm_01, Pm_10, Pm_11]
+        #calculate bin probabilities normalized horizontally
+        probs = counts_cal / np.sum(counts_cal, axis = 1, dtype=float)[:,np.newaxis]
+        #print(probs)
+        #correct the measurement operators based on calibration point counts
+        if correct_measurement_operators is True:
+            #just calc P_m_corrected = probs.T * P_m (matrix product)
+            d = range(len(Pm))
+            l = range(np.shape(counts_cal)[1])
+            Pm_corrected = [sum(probs.T[i][j] * Pm[j] for j in d) for i in l]
+        else:
+            Pm_corrected = Pm
+        # print 'Printing operators'
+        # print Pm_corrected
+        # print 'End of operators'
+        return Pm_corrected
+
+
     def get_basis_labels(self, n_qubits):
         """
         Returns the basis labels in the same order as the basis vector is parsed.
         Requires self.measurement_basis_labels to be set with the correct order corresponding to the matrixes in self.measurement_basis
         """
         if(n_qubits > 1):
-            return [y + x for x in self.get_basis_labels(n_qubits - 1)
+            return [x + y for x in self.get_basis_labels(n_qubits - 1)
                     for y in self.measurement_basis_labels]
         else:
             return self.measurement_basis_labels
+
+    def get_meas_operator_labels(self, n_qubits):
+        """
+        Returns a vector of the rotations in order based on self.measurement_operator_labels
+        """
+        if(n_qubits > 1):
+            return [x + y for x in self.get_meas_operator_labels(n_qubits - 1)
+                    for y in self.measurement_operator_labels]
+        else:
+            return self.measurement_operator_labels
 
     def build_rho_from_triangular_params(self, t_params):
         # build the lower triangular matrix T
@@ -304,6 +402,56 @@ class TomoAnalysis_JointRO():
     def _calculate_matrix_set(self, starting_set, n_qubits):
         return _calculate_matrix_set(starting_set, n_qubits)
 
+    def _tomoc_fw(self, measurement_operators, data, weights=False, filename=False, reload_toolbox = False):
+
+        """
+        Wrapper function to parse the data for the SDPA tomo.
+        TODO cut this code and build a toolbox based on a python version of a c-based semi-definite optimization wrapper, because this code is horrendous.
+        Uses a  python parser to rewrite the MLE tomo into a semi-definite optimization problem which is then solved by a C-Library.
+        requires a list of measurement operators and a set of data of dims: (len(measurement_operators) * len(self.rotation_vector,1)
+        """
+        #get directory of toolbox
+        directory = os.path.dirname(__file__) + '/tools/tomoc_fw'
+        if reload_toolbox is True:
+            reload(pytomoc_fw)
+        if len(data.shape)==1:
+            data = np.expand_dims(data, axis=1)
+        if len(weights.shape)==1:
+            weights = np.expand_dims(weights, axis=1)
+        if type(weights) is bool:
+            if not weights:
+                weights = np.ones(data.shape)
+        #print(measurement_operators[0])
+        observables = [rot.dag() * measurement_operator * rot for rot in self.rotation_vector for measurement_operator in measurement_operators]
+        observablearray = np.array([np.ravel(obs.full(), order='C') for obs in observables])
+        #print data.shape, weights.shape, observablearray.shape
+        # print(data)
+        # print(weights)
+        out = np.concatenate((data,weights,observablearray), axis=1)
+        if not filename:
+            filename = 'temp' + str(uuid.uuid4())
+        with open(directory+'/'+filename+'.tomo','w') as f:
+            np.savetxt(f, out.view(float), fmt='%.11g', delimiter=',')
+    #             np.savetxt(f, out, delimiter=',')
+        #print f.name
+        #os.chdir(directory)
+        #sys.argv = ['pytomoc_fw', '-v', f.name]
+        #execfile('pytomoc_fw')
+
+        pytomoc_fw.execute_pytomoc_fw({}, f.name)
+        filename_rho = directory+'\\'+filename
+
+        rho = np.loadtxt(filename_rho+'.rhor', delimiter=',')+ 1j*np.loadtxt(filename_rho+'.rhoi', delimiter=',')
+        N_est = rho.trace()
+        rho = rho/rho.trace()
+        rho = qtp.Qobj(rho, dims=[[2,2],[2,2]])
+
+        #delete temp files
+        files = glob.glob(filename_rho+'*')
+        for file in files:
+            os.remove(file)
+
+        return rho, N_est
 
 def _calculate_matrix_set(starting_set, n_qubits):
     """
@@ -315,7 +463,7 @@ def _calculate_matrix_set(starting_set, n_qubits):
     you get II IX IY IZ XI XX XY XZ ...
     """
     if(n_qubits > 1):
-        return [qtp.tensor(y, x) for x in
+        return [qtp.tensor(x, y) for x in
                 _calculate_matrix_set(starting_set, n_qubits - 1)
                 for y in starting_set]
     else:
@@ -388,7 +536,7 @@ def plot_target_pauli_set(pauli_set, ax):
     ax.bar(ind, pauli_set[1:], width, color='lightgray', align='center')
 
 
-def plot_operators(results, ax):
+def plot_operators(results, ax, labels=None):
     # NB: reorders the pauli expectation values to correct for convention
     pauli_1, pauli_2, pauli_cor = order_pauli_output2(results)
     width = 0.35
@@ -399,8 +547,11 @@ def plot_operators(results, ax):
     ax.bar(ind2, pauli_2, width, color='b', align='center')
     ax.bar(ind3, pauli_cor, width, color='purple', align='center')
 
+    if labels is None:
+        labels = get_operators_label()
+
     ax.set_xticks(np.arange(0, 2**4))
-    ax.set_xticklabels(get_operators_label())
+    ax.set_xticklabels(labels)
     ax.set_ylim(-1.05, 1.05)
 
 
@@ -528,7 +679,6 @@ def get_bell_pauli_exp(bell_idx, theta_q0=0, theta_q1=0):
 
     return np.concatenate(([1], pauli1, pauli2, paulic))
     # return sets_bell
-
 
 def calc_fid2_cardinal(pauli_op_dis, cardinal_state):
     """
@@ -774,8 +924,8 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
         measurements_tomo = (
             np.array([avg_h1[0:36], avg_h2[0:36],
                       avg_h12[0:36]])).flatten()  # 108 x 1
-        # get the calibration points by averaging over the five measurements taken
-        # knowing the initial state we put in
+        # get the calibration points by averaging over the five measurements
+        # taken knowing the initial state we put in
         measurements_cal = np.array(
             [h1_00, h1_01, h1_10, h1_11,
              h2_00, h2_01, h2_10, h2_11,
@@ -790,17 +940,28 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
             qtp.rotation(qtp.sigmay(), -np.pi / 2),
             qtp.rotation(qtp.sigmax(), np.pi / 2),
             qtp.rotation(qtp.sigmax(), -np.pi / 2)]
+        TomoAnalysis_JointRO.measurement_operator_labels = ['I', 'X', 'y',
+                                                            '-y', 'x', '-x']
+        TomoAnalysis_JointRO.measurement_basis = [qtp.identity(2),
+                                                  qtp.sigmaz(), qtp.sigmax(),
+                                                  qtp.sigmay()]
+        TomoAnalysis_JointRO.measurement_basis_labels = ['I', 'Z', 'X', 'Y']
+        #TomoAnalysis_JointRO.measurement_basis_labels = ['I', 'A', 'B', 'C']
+        TomoAnalysis_JointRO.readout_basis = [qtp.identity(2), qtp.sigmaz()]
 
         # calculate the tomo
         tomo = TomoAnalysis_JointRO(
-            measurements_cal, measurements_tomo, n_qubits=2, n_quadratures=3)
+            measurements_cal, measurements_tomo, n_qubits=2, n_quadratures=3, check_labels=True)
+        self.tomo = tomo
+        self.meas_op_labels = np.concatenate(
+            order_pauli_output2(tomo.get_basis_labels(2)))
         # operators are expectation values of Pauli operators, rho is density
         # mat
-        (self.operators, self.rho) = tomo.execute_linear_tomo()
+        (self.operators, self.rho) = tomo.execute_pseudo_inverse_tomo()
 
         if self.MLE:
             # mle reconstruction of density matrix
-            self.rho_2 = tomo.execute_max_likelihood(
+            self.rho_2 = tomo.execute_least_squares_physical_tomo(
                 ftol=0.000001, xtol=0.0001)
             # reconstructing the pauli vector
             if self.verbose > 1:
@@ -906,7 +1067,7 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
         else:
             txt_x_pos = 10
 
-        plot_operators(self.operators, ax)
+        plot_operators(self.operators, ax, labels=self.meas_op_labels)
         ax.set_title('Least squares tomography.')
         if self.verbose > 0:
             print(self.rho)
@@ -970,13 +1131,14 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
             for i, theta in enumerate(theta_vec):
                 fid_vec[i] = calc_fid2_bell(self.operators_mle,
                                             self.target_bell, theta)
-            msg += '\nMAX Fidelity {:.3f} at \n  LSQ={:.1f} deg and\n  MSQ={:.1f} deg'.format(
-                self.best_fidelity,
-                self.fit_res.best_values['angle_LSQ']*180./np.pi,
-                self.fit_res.best_values['angle_MSQ']*180./np.pi)
+            msg += str('\nMAX Fidelity {:.3f} at \n  ' + self.q0_label
+                    + '={:.1f} deg and\n  ' + self.q1_label
+                    + '={:.1f} deg').format(self.best_fidelity,
+                           self.fit_res.best_values['angle_LSQ']*180./np.pi,
+                           self.fit_res.best_values['angle_MSQ']*180./np.pi)
         ax.text(txt_x_pos, .6, msg)
 
-        plot_operators(self.operators_mle, ax)
+        plot_operators(self.operators_mle, ax, labels=self.meas_op_labels)
         ax.set_title('Max likelihood estimation tomography')
         qtp.matrix_histogram_complex(self.rho_2, xlabels=['00', '01', '10', '11'],
                                      ylabels=['00', '01', '10', '11'],
@@ -999,16 +1161,15 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
         ordered_fit = np.concatenate(
             ([1], np.concatenate(order_pauli_output2(self.fit_res.best_fit))))
         plot_target_pauli_set(ordered_fit, ax)
-        plot_operators(self.operators_fit, ax=ax)
+        plot_operators(self.operators_fit, ax=ax, labels=self.meas_op_labels)
         fidelity = np.dot(self.fit_res.best_fit, self.operators_fit)*0.25
         self.best_fidelity = fidelity
         angle_LSQ_deg = self.fit_res.best_values['angle_LSQ']*180./np.pi
         angle_MSQ_deg = self.fit_res.best_values['angle_MSQ']*180./np.pi
         ax.set_title('Fit of single qubit phase errors')
-        msg = r'MAX Fidelity at %.3f $\phi_{MSQ}=$%.1f deg and $\phi_{LSQ}=$%.1f deg' % (
-            fidelity,
-            angle_LSQ_deg,
-            angle_MSQ_deg)
+        msg = ('MAX Fidelity at %.3f $\phi_{' + self.q1_label
+               + '}=$%.1f deg and $\phi_{' + self.q0_label + '}=$%.1f deg') \
+               % (fidelity, angle_LSQ_deg, angle_MSQ_deg)
         msg += "\n Chi sqr. %.3f" % self.fit_res.chisqr
         ax.text(0.5, .6, msg)
         figname = 'Fit_report_{}.{}'.format(self.exp_name,
@@ -1023,10 +1184,9 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
         angle_LSQ_deg = self.fit_res.best_values['angle_LSQ']*180./np.pi
         angle_MSQ_deg = self.fit_res.best_values['angle_MSQ']*180./np.pi
         ax.set_title('Fit of single qubit phase errors')
-        msg = r'MAX Fidelity at %.3f $\phi_{MSQ}=$%.1f deg and $\phi_{LSQ}=$%.1f deg' % (
-            fidelity,
-            angle_LSQ_deg,
-            angle_MSQ_deg)
+        msg = ('MAX Fidelity at %.3f $\phi_{' + self.q1_label
+               + '}=$%.1f deg and $\phi_{' + self.q0_label + '}=$%.1f deg')\
+               % (fidelity, angle_LSQ_deg, angle_MSQ_deg)
         msg += "\n Chi sqr. %.3f" % self.fit_res.chisqr
         ax.text(0.5, .6, msg)
         figname = 'Fit_report_{}.{}'.format(self.exp_name,
