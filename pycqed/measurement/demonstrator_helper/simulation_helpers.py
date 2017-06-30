@@ -39,29 +39,28 @@ MC.station = st
 st.add_component(MC)
 # st.add_component(dq)
 
-qxc = qx_client()
-qxc.connect()
-qxc.create_qubits(2)
 
 def simulate_qasm_file(file_url, options={}):
     # file_url="http://localhost:3000/uploads/asset/file/75/ac5bc9e8-3929-4205-babf-2cf9c4490225.qasm"
     file_path = _retrieve_file_from_url(file_url)
+    qxc = qx_client()
+    try:
 
+        qxc.connect()
+        qxc.create_qubits(2)
+        qx_sweep = swf.QX_Hard_Sweep(qxc, file_path)
+        qx_detector = QX_Hard_Detector(qxc, [file_path], num_avg=10000)
+        sweep_points = range(len(qx_detector.randomizations[0]))
+        # qx_detector.prepare(sweep_points)
+        # Start measurment
+        MC.set_detector_function(qx_detector)
+        MC.set_sweep_function(qx_sweep)
+        MC.set_sweep_points(sweep_points)
+        dat = MC.run("run QASM")
+        return _MC_result_to_chart_dict(dat)
 
-
-    qx_sweep = swf.QX_Hard_Sweep(qxc, file_path)
-    qx_detector = QX_Hard_Detector(qxc, [file_path], num_avg=10000)
-    sweep_points = range(len(qx_detector.randomizations[0]))
-    # qx_detector.prepare(sweep_points)
-    # Start measurment
-    MC.set_detector_function(qx_detector)
-    MC.set_sweep_function(qx_sweep)
-    MC.set_sweep_points(sweep_points)
-    dat = MC.run("run QASM")
-    return _MC_result_to_chart_dict(dat)
-
-    # finally:
-        # qxc.disconnect()
+    finally:
+        qxc.disconnect()
 
 
 # Private
