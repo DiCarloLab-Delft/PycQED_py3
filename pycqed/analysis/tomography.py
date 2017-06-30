@@ -10,8 +10,6 @@ import os
 import lmfit
 
 import matplotlib.pyplot as plt
-from matplotlib.offsetbox import AnchoredText
-from pycqed.analysis import composite_analysis as ca
 from pycqed.analysis import measurement_analysis as ma
 
 
@@ -85,6 +83,23 @@ class TomoAnalysis_JointRO():
 
         # calculate beta positions in coefficient matrix
         coefficient_matrix = self._calculate_coefficient_matrix()
+
+        # The variance scaling matrix takes care of ensuring proper linear
+        # inversion in the case of different noise levels
+
+        var_q0 = 1
+        var_q1 = 1
+        var_q01 = 1
+
+        v_q0 = np.diag(np.ones(36))*var_q0
+        v_q1 = np.diag(np.ones(36))*var_q1
+        v_q01 = np.diag(np.ones(36))*var_q01
+
+        # O = np.zeros((36, 36))
+        # variance_scaling_matrix = np.bmat([[v_q0, O, O],
+        #                                    [O, v_q1, O],
+        #                                    [O, O, v_q01]])
+        variance_scaling_matrix = np.diag(np.ones(36))
         basis_decomposition = np.zeros(4 ** self.n_qubits)
         # first skip beta0
         basis_decomposition[1:] = np.dot(
@@ -604,6 +619,7 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
                  MLE=False, target_cardinal=None, target_bell=None,
                  start_shot=0, end_shot=-1,
                  verbose=0,
+                 single_shots=True,
                  fig_format='png',
                  q0_label='q0',
                  q1_label='q1', close_fig=True, **kw):
@@ -623,6 +639,8 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
         kw['h5mode'] = 'r+'
         super(Tomo_Multiplexed, self).__init__(auto=auto, timestamp=timestamp,
                                                label=label, **kw)
+        # if auto is True:
+        #     self.run_default_analysis()
 
     def run_default_analysis(self, **kw):
         self.get_naming_and_values()
@@ -654,6 +672,9 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
                     self.shots_q1[:, self.start_shot:self.end_shot]
                 self.shots_q0q1 = \
                     self.shots_q0q1[:, self.start_shot:self.end_shot]
+            ##########################################
+            # Making  the first figure, tomo shots
+            ##########################################
 
             avg_h1 = np.mean(self.shots_q0, axis=1)
             avg_h2 = np.mean(self.shots_q1, axis=1)
@@ -702,18 +723,19 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
         avg_h12 = (avg_h12)/scale_h12
 
         # Calculate new average of calibration points.
+
         h1_00 = np.mean(avg_h1[36:36+7])
         h1_01 = np.mean(avg_h1[43:43+7])
         h1_10 = np.mean(avg_h1[50:50+7])
         h1_11 = np.mean(avg_h1[57:])
 
-        avg_h2 = np.mean(self.shots_q1, axis=1)  # This line looks wrong
+
         h2_00 = np.mean(avg_h2[36:36+7])
         h2_01 = np.mean(avg_h2[43:43+7])
         h2_10 = np.mean(avg_h2[50:50+7])
         h2_11 = np.mean(avg_h2[57:])
 
-        avg_h12 = np.mean(self.shots_q0q1, axis=1)  # This line looks wrong
+
         h12_00 = np.mean(avg_h12[36:36+7])
         h12_01 = np.mean(avg_h12[43:43+7])
         h12_10 = np.mean(avg_h12[50:50+7])
@@ -768,6 +790,47 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
         h12_10 = np.mean(avg_h12[50:50+7])
         h12_11 = np.mean(avg_h12[57:])
 
+        std_h2_00 = np.std(avg_h2[36:36+7])
+        std_h2_01 = np.std(avg_h2[43:43+7])
+        std_h2_10 = np.std(avg_h2[50:50+7])
+        std_h2_11 = np.std(avg_h2[57:])
+
+        std_h12_00 = np.std(avg_h12[36:36+7])
+        std_h12_01 = np.std(avg_h12[43:43+7])
+        std_h12_10 = np.std(avg_h12[50:50+7])
+        std_h12_11 = np.std(avg_h12[57:])
+
+        std_h1 = np.mean([std_h1_00, std_h1_01, std_h1_10, std_h1_11])
+        std_h2 = np.mean([std_h2_00, std_h2_01, std_h2_10, std_h2_11])
+        std_h12 = np.mean([std_h12_00, std_h12_01, std_h12_10, std_h12_11])
+        std_arr = np.array([std_h1_00, std_h1_01, std_h1_10, std_h1_11, std_h2_00, std_h2_01,
+                            std_h2_10, std_h2_11, std_h12_00, std_h12_01, std_h12_10, std_h12_11])
+
+        # plt.plot([std_h1, std_h2, std_h12])
+        # plt.plot(std_arr)
+        # plt.show()
+
+        fac = np.mean([std_h1, std_h2, std_h12])
+        avg_h1 *= fac/std_h1
+        avg_h2 *= fac/std_h2
+        avg_h12 *= fac/std_h12
+
+        h1_00 = np.mean(avg_h1[36:36+7])
+        h1_01 = np.mean(avg_h1[43:43+7])
+        h1_10 = np.mean(avg_h1[50:50+7])
+        h1_11 = np.mean(avg_h1[57:])
+
+        h2_00 = np.mean(avg_h2[36:36+7])
+        h2_01 = np.mean(avg_h2[43:43+7])
+        h2_10 = np.mean(avg_h2[50:50+7])
+        h2_11 = np.mean(avg_h2[57:])
+
+        h12_00 = np.mean(avg_h12[36:36+7])
+        h12_01 = np.mean(avg_h12[43:43+7])
+        h12_10 = np.mean(avg_h12[50:50+7])
+        h12_11 = np.mean(avg_h12[57:])
+
+        self.plot_TV_mode(avg_h1, avg_h2, avg_h12)
         #############################
         # Linear inversion tomo #
         #############################
@@ -869,15 +932,15 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
         fig1, axs = plt.subplots(1, 3, figsize=(17, 4))
         fig1.suptitle(self.exp_name+' ' + self.timestamp_string, size=16)
         ax = axs[0]
-        ax.plot(np.arange(self.nr_segments), np.mean(self.shots_q0, axis=1),
+        ax.plot(np.arange(self.nr_segments), avg_h0,
                 'o-')
         ax.set_title('{}'.format(self.q0_label))
         ax = axs[1]
-        ax.plot(np.arange(self.nr_segments), np.mean(self.shots_q1, axis=1),
+        ax.plot(np.arange(self.nr_segments), avg_h1,
                 'o-')
         ax.set_title('{}'.format(self.q1_label))
         ax = axs[2]
-        ax.plot(np.arange(self.nr_segments), np.mean(self.shots_q0q1, axis=1),
+        ax.plot(np.arange(self.nr_segments), avg_h01,
                 'o-')
         ax.set_title('Correlations {}-{}'.format(self.q0_label,
                                                  self.q1_label))
@@ -894,7 +957,7 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
         ax = fig2.add_subplot(121)
         if self.target_cardinal is not None:
             self.fidelity = calc_fid2_cardinal(self.operators,
-                                          self.target_cardinal)
+                                               self.target_cardinal)
             target_expectations = get_cardianal_pauli_exp(
                 self.target_cardinal)
             plot_target_pauli_set(target_expectations, ax)
@@ -951,13 +1014,13 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
 
         if self.target_cardinal is not None:
             self.fidelity_mle = calc_fid2_cardinal(self.operators_mle,
-                                              self.target_cardinal)
+                                                   self.target_cardinal)
             target_expectations = get_cardianal_pauli_exp(
                 self.target_cardinal)
             plot_target_pauli_set(target_expectations, ax)
         if self.target_bell is not None:
             self.fidelity_mle = calc_fid2_bell(self.operators_mle,
-                                          self.target_bell)
+                                               self.target_bell)
             target_expectations = get_bell_pauli_exp(self.target_bell)
             plot_target_pauli_set(target_expectations, ax)
             txt_x_pos = -1

@@ -10,7 +10,6 @@ from qcodes.instrument.base import Instrument
 from qcodes.utils import validators as vals
 from fnmatch import fnmatch
 from qcodes.instrument.parameter import ManualParameter
-#from instrument_drivers.physical_instruments.ZurichInstruments import UHFQuantumController as ZI_UHFQC
 
 
 class UHFQC(Instrument):
@@ -161,8 +160,8 @@ class UHFQC(Instrument):
         # readout
         for i in range(5):
             self.add_parameter("quex_trans_offset_weightfunction_{}".format(i),
-                               unit='V',
-                               label='RO normalization offset (V)',
+                               unit='',  # unit is adc value
+                               label='RO normalization offset',
                                initial_value=0.0,
                                parameter_class=ManualParameter)
         if init:
@@ -839,8 +838,6 @@ setTrigger(0);"""
     def upload_transformation_matrix(self, matrix):
         for i in range(np.shape(matrix)[0]):  # looping over the rows
             for j in range(np.shape(matrix)[1]):  # looping over the colums
-                #value =matrix[i,j]
-                # print(value)
                 eval(
                     'self.quex_trans_{}_col_{}_real(matrix[{}][{}])'.format(j, i, i, j))
 

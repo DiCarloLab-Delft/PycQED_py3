@@ -715,7 +715,7 @@ def get_timestamps_in_range(timestamp_start, timestamp_end=None,
                             label=None, exact_label_match=True, folder=None):
     if folder is None:
         folder = datadir
-        
+
     datetime_start = datetime_from_timestamp(timestamp_start)
     if timestamp_end is None:
         datetime_end = datetime.datetime.today()
@@ -1117,7 +1117,8 @@ def rotate_and_normalize_data(data, cal_zero_points=None, cal_one_points=None,
     Rotates and normalizes data with respect to some reference coordinates.
     there are two ways to specify the reference coordinates.
         1. Explicitly defining the coordinates
-        2. Specifying which elements of the input data correspond to zero and one
+        2. Specifying which elements of the input data correspond to zero
+            and one
     Inputs:
         data (numpy array) : 2D dataset that has to be rotated and normalized
         zero_coord (tuple) : coordinates of reference zero
@@ -1288,7 +1289,7 @@ def color_plot(x, y, z, fig, ax, cax=None,
     ylim = kw.pop('ylim', None)
 
     if plot_title is not None:
-        ax.set_title(plot_title, y=1.05)
+        ax.set_title(plot_title, y=1.05, fontsize=18)
     if transpose:
         ax.set_xlabel(ylabel)
         ax.set_ylabel(xlabel)
@@ -1388,8 +1389,8 @@ def linecut_plot(x, y, z, fig, ax,
     plt.gca().set_color_cycle([colormap(i) for i in np.linspace(
                               0, 0.9, len(y))])
     for i in range(len(y)):
-        label = '{y_name}: {y_val} {y_unit}'.format(
-            y_name=y_name, y_val=y[i], y_unit=y_unit)
+        label = '{}: {:.4g} {}'.format(
+            y_name, y[i], y_unit)
         ax.plot(x, z[:, i], label=label)
     if log:
         ax.set_yscale('log')

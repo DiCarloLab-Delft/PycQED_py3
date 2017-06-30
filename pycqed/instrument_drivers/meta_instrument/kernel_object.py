@@ -1,14 +1,16 @@
 import os
 import logging
 import numpy as np
+import json
 
 from qcodes.instrument.base import Instrument
 from qcodes.utils import validators as vals
 from qcodes.instrument.parameter import ManualParameter
 
-from pycqed.measurement.kernel_functions import kernel_generic, htilde_bounce, \
-    htilde_skineffect, save_kernel, step_bounce, step_skineffect, \
-    heaviside, kernel_generic2
+from pycqed.measurement.kernel_functions import (
+    kernel_generic, htilde_bounce,
+    htilde_skineffect, save_kernel, step_bounce, step_skineffect,
+    heaviside, kernel_generic2)
 
 import pycqed.measurement.kernel_functions as kf
 from pycqed.instrument_drivers.pq_parameters import ConfigParameter
@@ -16,7 +18,7 @@ from pycqed.instrument_drivers.pq_parameters import ConfigParameter
 
 class Distortion(Instrument):
 
-    '''
+    '''fkeren
     Implements a distortion kernel for a flux channel.
     It contains the parameters and functions needed to produce a kernel file
     according to the models shown in the functions.
@@ -30,12 +32,10 @@ class Distortion(Instrument):
                            vals=vals.Ints(),
                            parameter_class=ManualParameter)
 
-        self.add_parameter('kernel_list',
-                           initial_value=[],
-                           # update to vals.List after merge of PR #542 in QCodes
-                           vals=vals.Anything(),
-                           parameter_class=ConfigParameter,
-                           docstring='List of external kernels to be loaded')
+        self.add_parameter(
+            'kernel_list', initial_value=[], vals=vals.Lists(vals.Strings()),
+            parameter_class=ConfigParameter,
+            docstring='List of filenames of external kernels to be loaded')
 
         self.add_parameter('kernel_dir',
                            initial_value='kernels/',
@@ -142,11 +142,18 @@ class Distortion(Instrument):
         v.validate(kernel_name)
         kernel_list = self.kernel_list()
         if kernel_name in kernel_list:
-            raise ValueError('Kernel "{}" already in kernel list'.format(kernel_name))
+            raise ValueError(
+                'Kernel "{}" already in kernel list'.format(kernel_name))
         kernel_list.append(kernel_name)
-        self._config_changed = True # has to be done by hand as appending to
+        self._config_changed = True  # has to be done by hand as appending to
         # the list does not correctlyupdate the changed flag
         self.kernel_list(kernel_list)
+
+    def remove_kernel_from_kernel_list(self, kernel_name):
+        ker_list = self.kernel_list()
+        ker_list.remove(kernel_name)
+        self._config_changed = True
+        self.kernel_list(ker_list)
 
     def _get_config_changed(self):
         return self._config_changed
@@ -192,7 +199,8 @@ class Distortion(Instrument):
         """
         kernels = kernel_list[0]
         for k in kernel_list[1:]:
-            kernels = np.convolve(k, kernels)[:max(len(k), int(length_samples))]
+            kernels = np.convolve(k, kernels)[
+                :max(len(k), int(length_samples))]
         if length_samples is not None:
             return kernels[:int(length_samples)]
         return kernels
@@ -221,8 +229,18 @@ class Distortion(Instrument):
             f_name = os.path.join(self.kernel_dir(), k_name)
             print('Loading {}'.format(f_name))
 
-            kernel_vec = np.loadtxt(f_name)
-            external_kernels.append(kernel_vec)
+            suffix = f_name.split('.')[-1]
+            if suffix == 'txt':
+                kernel_vec = np.loadtxt(f_name)
+                external_kernels.append(kernel_vec)
+            elif suffix == 'json':
+                # Load from json file containing also metadata about fit model
+                with open(f_name) as infile:
+                    kernel_dict = json.load(infile)
+                external_kernels.append(kernel_dict['kernel'])
+            else:
+                raise ValueError('File format "{}" not recognized.'
+                                 .format(suffix))
 
         kernel_object_kernels = [
             self.get_bounce_kernel_1(),
