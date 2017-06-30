@@ -4,6 +4,7 @@ from qcodes.instrument.parameter import ManualParameter
 from pycqed.instrument_drivers.pq_parameters import InstrumentParameter
 from pycqed.analysis import multiplexed_RO_analysis as mra
 from pycqed.measurement.waveform_control_CC import multi_qubit_module_CC as mqmc
+from pycqed.measurement import detector_functions as det
 
 
 class DeviceObject(Instrument):
@@ -112,6 +113,14 @@ class DeviceObject(Instrument):
     def calibrate_mux_RO(self):
         raise NotImplementedError
 
+    def prepare_for_timedomain(self):
+        """
+        Calls the prepare for timedomain on each of the constituent qubits.
+        """
+        for q in self.qubits():
+            q_obj = self.find_instrument(q)
+            q_obj.prepare_for_timedomain()
+
 
 class TwoQubitDevice(DeviceObject):
 
@@ -133,7 +142,8 @@ class TwoQubitDevice(DeviceObject):
 
     def calibrate_mux_RO(self, calibrate_optimal_weights=True,
                          verify_optimal_weights=False,
-                         update_threshold=True):
+                         update: bool=True,
+                         update_threshold: bool=True):
 
         RO_LMM = self.RO_LutManMan.get_instr()
         UHFQC = self.acquisition_instrument.get_instr()
@@ -141,8 +151,11 @@ class TwoQubitDevice(DeviceObject):
         q0 = self.find_instrument(self.qubits()[0])
         q1 = self.find_instrument(self.qubits()[1])
 
-        if q0.RO_acq_weight_function_I() == q1.RO_acq_weight_function_I():
-            raise ValueError('Cannot use same weight for both qubits')
+        # this is to ensure that the cross talk correction matrix coefficients
+        # can rey on the weight function indices being consistent
+        q0.RO_acq_weight_function_I(0)
+        q1.RO_acq_weight_function_I(1)
+
         # Set the modulation frequencies so that the LO's match
         q0.f_RO_mod(q0.f_RO() - self.RO_LO_freq())
         q1.f_RO_mod(q1.f_RO() - self.RO_LO_freq())
@@ -192,10 +205,16 @@ class TwoQubitDevice(DeviceObject):
             label='{}_{}'.format(q0.name, q1.name),
             qubit_labels=[q0.name, q1.name])
 
-        # do not use V_th_corr as this is measured from data that already
-        # includes a correction matrix
-        thres = a['V_th']
+        if update:
+            q0.F_ssro(a['Fa_q0'])
+            q0.F_discr(a['Fd_q0'])
+            q1.F_ssro(a['Fa_q1'])
+            q1.F_discr(a['Fd_q1'])
+
         if update_threshold:
+            # do not use V_th_corr as this is measured from data that already
+            # includes a correction matrix
+            thres = a['V_th']
             q0.RO_threshold(thres[0])
             q1.RO_threshold(thres[1])
 
@@ -210,3 +229,23 @@ class TwoQubitDevice(DeviceObject):
         return mra.two_qubit_ssro_fidelity(
             label='{}_{}'.format(q0_name, q1_name),
             qubit_labels=[q0_name, q1_name])
+
+    def get_correlation_detector(self):
+        qnames = self.qubits()
+        q0 = self.find_instrument(qnames[0])
+        q1 = self.find_instrument(qnames[1])
+
+        w0 = q0.RO_acq_weight_function_I()
+        w1 = q1.RO_acq_weight_function_I()
+
+
+        d = det.UHFQC_correlation_detector(
+            UHFQC=self.acquisition_instrument.get_instr(),
+            thresholding=True,
+            AWG=self.central_controller.get_instr(),
+            channels=[w0, w1],
+            correlations=[(w0, w1)],
+            nr_averages=nr_averages,
+            integration_length=q0.RO_acq_integration_length())
+        return d
+

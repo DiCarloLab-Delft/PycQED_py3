@@ -174,7 +174,7 @@ class QX_Hard_Detector(Hard_Detector):
     def get_values(self):
         # x = self.sweep_points
         # only serves to initialize the arrays
-        # data = np.array([np.sin(x / np.pi), np.cos(x/np.pi)]) 
+        # data = np.array([np.sin(x / np.pi), np.cos(x/np.pi)])
         i = 0
         qubits = self.__qxc.get_nr_qubits()
 
@@ -184,7 +184,7 @@ class QX_Hard_Detector(Hard_Detector):
             self.__qxc.send_cmd("reset_measurement_averaging")
             circuit_name = c[0] + "{}".format(self.current)
             self.__qxc.run_noisy_circuit(circuit_name, self.p_error,
-                                         "depolarizing_channel", self.num_avg)            
+                                         "depolarizing_channel", self.num_avg)
             for n in range(qubits):
                 f = self.__qxc.get_measurement_average(n)
                 data[n][i] = f
@@ -1515,7 +1515,8 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
 
     def __init__(self, UHFQC, AWG=None, integration_length=1e-6,
                  nr_averages=1024, rotate=False, real_imag=True,
-                 channels=[0, 1], correlations=[(0, 1)],
+                 channels: list = [0, 1], correlations: list=[(0, 1)],
+                 value_names=None,
                  seg_per_point=1, single_int_avg=False, thresholding=False,
                  **kw):
         super().__init__(
@@ -1528,9 +1529,13 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
         self.correlations = correlations
         self.thresholding = thresholding
 
-        self.value_names = []
-        for ch in channels:
-            self.value_names += ['w{}'.format(ch)]
+        if value_names is None:
+            self.value_names = []
+            for ch in channels:
+                self.value_names += ['w{}'.format(ch)]
+        else:
+            self.value_names = value_names
+
         # Note that V^2 is in brackets to prevent confusion with unit prefixes
         if not thresholding:
             self.value_units = ['V']*len(self.value_names) + \
