@@ -488,7 +488,7 @@ def Ram_Z(qubit_name, no_of_points, cal_points=True,
             # Calibration point for |1>
             qasm_file.writelines('X180 {} \n'.format(qubit_name))
         else:
-            qasm_file.writelines('flux square_{} {}\n'.format(i, qubit_name))
+            qasm_file.writelines('square_{} {}\n'.format(i, qubit_name))
             qasm_file.writelines(
                 'I {}\n'.format(int(np.round(wait_before/clock_cycle))))
             qasm_file.writelines('mX90 {}\n'.format(qubit_name))
