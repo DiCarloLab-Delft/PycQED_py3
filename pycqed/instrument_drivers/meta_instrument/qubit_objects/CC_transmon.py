@@ -1960,6 +1960,10 @@ class CBox_v3_driven_transmon(Transmon):
             max_instructions=self.CBox.get_instr()._get_instr_mem_size(),
             max_exp_per_file=max_acq_points)
 
+        # x = repetitions_per_point
+        # i = max_exp_num
+        # l = hard_repetitions
+        # r = soft_repetitions
         max_exp_num = max(exp_nums)  # i
         soft_repetitions = np.ceil(
             repetitions_per_point / np.floor(max_acq_points / max_exp_num))
