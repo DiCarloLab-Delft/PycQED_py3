@@ -1960,35 +1960,50 @@ class CBox_v3_driven_transmon(Transmon):
             max_instructions=self.CBox.get_instr()._get_instr_mem_size(),
             max_exp_per_file=max_acq_points)
 
-        # x = repetitions_per_point
-        # i = max_exp_num
-        # l = hard_repetitions
-        # r = soft_repetitions
+        # We want to measure every experiment (i.e. gate sequence) x times.
+        # Also, we want low frequency noise in our system to affect each
+        # experiment the same, so we don't want to do all repetitions of the
+        # first experiment, then the second, etc., but rather go through all
+        # experiments, then repeat. If we have more than one QASM file, this
+        # would be slower, so we compromise and say we want a minimum of 5
+        # (soft) repetitions of the whole sequence and adjust the hard
+        # repetitions accordingly.
+        # The acquisition device can acquire a maximum of m = max_acq_points
+        # in one go.
+        # A QASM file contains i experiments (i can be different for different
+        # QASM files.
+        # Take the largest i -> can measure floor(m/i) = l repetitions of this
+        # QASM file. => need r = ceil(x/l) soft repetitions of that file.
+        # => set max(r,5) as the number of soft repetitions for all files.
+        # => set ceil(x/r) as the number of hard repetitions for each file
+        # (even if for some files we could do more).
         max_exp_num = max(exp_nums)  # i
-        soft_repetitions = np.ceil(
-            repetitions_per_point / np.floor(max_acq_points / max_exp_num))
+        soft_repetitions = int(np.ceil(
+            repetitions_per_point / np.floor(max_acq_points / max_exp_num)))
         if soft_repetitions < min_soft_repetitions:
             soft_repetitions = 5
-            hard_repetitions = np.ceil(repetitions_per_point /
-                                       soft_repetitions)
+            hard_repetitions = int(np.ceil(repetitions_per_point /
+                                       soft_repetitions))
 
         # Run the experiment. It might take several runs, if more than one
         # QASM file was generated.
-        nr_of_exp = len(qasm_files)
-        for i, qFile in enumerate(qasm_files):
-            self.prepare_for_timedomain()
-            s = qh.QASM_Sweep_v2(
-                qFile.name, self.CBox.get_instr(), self.get_operation_dict(),
-                parameter_name='GST sequence', unit=None)
-            d = self.int_log_det
-            # nr_shots = largest integer multiple of exp_nums[i] smaller than
-            # max number of shots (4095 for UHFQC).
-            d.nr_shots = (max_acq_points // exp_nums[i]) * exp_nums[i]
+        for sr in range(soft_repetitions):
+            for i, qFile in enumerate(qasm_files):
+                self.prepare_for_timedomain()
+                s = qh.QASM_Sweep_v2(
+                    qFile.name, self.CBox.get_instr(), self.get_operation_dict(),
+                    parameter_name='GST sequence', unit=None)
+                d = self.int_log_det
+                # nr_shots = largest integer multiple of exp_nums[i] smaller than
+                # max number of shots (4095 for UHFQC).
+                d.nr_shots = hard_repetitions * exp_nums[i]
 
-            MC.set_sweep_function(s)
-            MC.set_sweep_points(np.arange(exp_nums[i] * repetitions_per_point))
-            MC.set_detector_function(d)
-            MC.run('GST' + self.msmt_suffix + '_{}'.format(i))
+                MC.set_sweep_function(s)
+                MC.set_sweep_points(np.arange(exp_nums[i] * repetitions_per_point))
+                MC.set_detector_function(d)
+                MC.run('GST' + self.msmt_suffix + '_{}'.format(i))
+
+        # Analysis
 
 
 
