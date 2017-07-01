@@ -2,19 +2,18 @@ import numpy as np
 import os
 import re
 import urllib.request
-import time
 import pycqed as pq
 from pycqed.measurement import measurement_control
-from pycqed.measurement import detector_functions as dtf
+from pycqed.measurement import detector_functions as det
 from pycqed.measurement import sweep_functions as swf
-
+from quantumsim import sparsedm as sdm
 from tess.TessConnect import TessConnection
 from qcodes import station
 
 import quantumsim.qasm
 
 tc = TessConnection()
-tc.connect("quantumsim")
+tc.connect("simulate")
 default_simulate_options = {
     "num_avg": 10000,
     "iterations": 1
@@ -29,7 +28,7 @@ MC.station = st
 st.add_component(MC)
 
 
-class Quantumsim_Two_QB_Hard_Detector(dtf.Hard_Detector):
+class Quantumsim_Two_QB_Hard_Detector(det.Hard_Detector):
 
     def __init__(self, qasm_file, **kwargs):
         with open(qasm_file) as f:
@@ -40,9 +39,8 @@ class Quantumsim_Two_QB_Hard_Detector(dtf.Hard_Detector):
         self.parser = quantumsim.qasm.QASMParser(**kwargs)
         self.parser.parse(file_content)
         self.name = 'Quantumsim_Two_QB_Detector'
-        self.value_names = ['Q0', 'Q1', 'corr.']
+        self.value_names = ['Q0 ', 'Q1 ', 'corr. (Q0, Q1) ']
         self.value_units = ['prob.']*3
-
 
     def prepare(self, sweep_points):
         if len(sweep_points) > len(self.parser.circuits):
@@ -58,31 +56,29 @@ class Quantumsim_Two_QB_Hard_Detector(dtf.Hard_Detector):
             parity = diag[[0, 3]].sum()
             p0 = diag[[1, 3]].sum()
             p1 = diag[[2, 3]].sum()
-            # p0 should be QL (?)
-            if d.idx_in_full_dm['QL'] == 0:
-                p0, p1 = p1, p0
             results.append((p0, p1, parity))
 
         return np.array(results).T
 
+
 def simulate_qasm_file(file_url, options={}):
     # file_url="http://localhost:3000/uploads/asset/file/75/ac5bc9e8-3929-4205-babf-2cf9c4490225.qasm"
     file_path = _retrieve_file_from_url(file_url)
+    print('simulation_called')
 
-    try:
-        quantumsim_sweep = swf.None_Sweep()
-        qx_detector = QX_Hard_Detector(qxc, [file_path])
-        sweep_points = range(len(qx_detector.circuits))
-        # qx_detector.prepare(sweep_points)
-        # Start measurment
-        MC.set_detector_function(qx_detector)
-        MC.set_sweep_function(qx_sweep)
-        MC.set_sweep_points(sweep_points)
-        dat = MC.run("run QASM")
-        return _MC_result_to_chart_dict(dat)
-    except:
-        # raise
-        return []
+    quantumsim_sweep = swf.None_Sweep()
+    quantumsim_sweep.parameter_name = 'Circuit number '
+    quantumsim_sweep.unit = '#'
+    quantumsim_det = Quantumsim_Two_QB_Hard_Detector(file_path, dt=(40, 280),
+                                                     t1=30000, t2=20000)
+    sweep_points = range(len(quantumsim_det.parser.circuits))
+
+    MC.set_detector_function(quantumsim_det)
+    MC.set_sweep_function(quantumsim_sweep)
+    MC.set_sweep_points(sweep_points)
+    dat = MC.run("run QASM")
+    print('simulation finished')
+    return _MC_result_to_chart_dict(dat)
 
 
 # Private
@@ -121,5 +117,3 @@ def _MC_result_to_chart_dict(result):
         "data-type": "chart",
         "data": result
     }]
-
-

@@ -37,13 +37,13 @@ def execute_qasm_file(file_url: str,  # config_json: str=None,
     qasm_fp = _retrieve_file_from_url(file_url)
     sweep_points = _get_qasm_sweep_points(qasm_fp)
 
-    s = swf.QASM_Sweep_v2(qasm_fn=qasm_fp, config=cfg, CBox=CBox,
+    s = swf.QASM_Sweep_v2(parameter_name='Circuit number ', unit='#',
+                          qasm_fn=qasm_fp, config=cfg, CBox=CBox,
                           verbosity_level=verbosity_level)
 
     d = device.get_correlation_detector()
-    d.value_names = ['q0', 'q1', 'Corr. (q0, q1)']
+    d.value_names = ['Q0 ', 'Q1 ', 'Corr. (Q0, Q1) ']
     d.value_units = ['frac.', 'frac.', 'frac.']
-
 
     MC.set_sweep_function(s)
     MC.set_sweep_points(sweep_points)
