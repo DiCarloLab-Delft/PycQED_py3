@@ -41,6 +41,10 @@ def execute_qasm_file(file_url: str,  # config_json: str=None,
                           verbosity_level=verbosity_level)
 
     d = device.get_correlation_detector()
+    d.value_names = ['q0', 'q1', 'Corr. (q0, q1)']
+    d.value_units = ['frac.', 'frac.', 'frac.']
+
+
     MC.set_sweep_function(s)
     MC.set_sweep_points(sweep_points)
     MC.set_detector_function(d)

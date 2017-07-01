@@ -17,14 +17,14 @@ class DeviceObject(Instrument):
     def __init__(self, name, **kw):
         super().__init__(name, **kw)
         self.msmt_suffix = '_' + name  # used to append to measuremnet labels
-        self._qubits = {}
         self.add_parameter('qasm_config',
                            docstring='used for generating qumis instructions',
                            parameter_class=ManualParameter,
                            vals=vals.Anything())
         self.add_parameter('qubits',
-                           get_cmd=self._get_qubits,
-                           vals=vals.Anything())
+                           parameter_class=ManualParameter,
+                           initial_value=[],
+                           vals=vals.Lists(elt_validator=vals.Strings()))
 
         self.add_parameter('acquisition_instrument',
                            parameter_class=InstrumentParameter)
@@ -38,8 +38,6 @@ class DeviceObject(Instrument):
         self.add_parameter('seq_contr', label='Sequence controller',
                            docstring=sc_docstr,
                            parameter_class=InstrumentParameter)
-
-        self.delegate_attr_dicts += ['_qubits']
 
         self._sequencer_config = {}
         self.delegate_attr_dicts += ['_sequencer_config']
@@ -83,30 +81,11 @@ class DeviceObject(Instrument):
     def get_idn(self):
         return self.name
 
-    def _get_qubits(self):
-        q_list = []
-        for q in self._qubits.keys():
-            q_list.append(q)
-        return q_list
-
     def _get_sequencer_config(self):
         seq_cfg = {}
         for par_name, config_par in self._sequencer_config.items():
             seq_cfg[par_name] = config_par()
         return seq_cfg
-
-    def add_qubits(self, qubits):
-        """
-        Add one or more qubit objects to the device
-        """
-
-        if type(qubits) == list:
-            for q in qubits:
-                self.add_qubits(q)
-        else:
-            name = qubits.name
-            self._qubits[name] = qubits
-            return name
 
     def add_sequencer_config_param(self, seq_config_par):
         """
@@ -117,7 +96,8 @@ class DeviceObject(Instrument):
 
     def get_operation_dict(self, operation_dict={}):
         # uses the private qubits list
-        for name, q in self._qubits.items():
+        for qname in self.qubits():
+            q = self.find_instrument(qname)
             q.get_operation_dict(operation_dict)
         operation_dict['sequencer_config'] = self.sequencer_config()
         return operation_dict
@@ -213,7 +193,17 @@ class TwoQubitDevice(DeviceObject):
         # Does not work because axes are not normalized
         UHFQC.upload_transformation_matrix(res_dict['mu_matrix_inv'])
 
-        mqmc.measure_two_qubit_ssro(self, q0.name, q1.name, no_scaling=True,
+        a = self.check_mux_RO(update=update, update_threshold=update_threshold)
+        return a
+
+    def check_mux_RO(self, update: bool=True,
+                         update_threshold: bool=True):
+        q0_name, q1_name, = self.qubits()
+
+        q0 = self.find_instrument(q0_name)
+        q1 = self.find_instrument(q1_name)
+
+        mqmc.measure_two_qubit_ssro(self, q0_name, q1_name, no_scaling=True,
                                     result_logging_mode='lin_trans')
 
         a = mra.two_qubit_ssro_fidelity(
@@ -239,16 +229,6 @@ class TwoQubitDevice(DeviceObject):
 
         return a
 
-    def check_mux_RO(self):
-        q0_name = self.qubits()[0]
-        q1_name = self.qubits()[1]
-        mqmc.measure_two_qubit_ssro(self, q0_name, q1_name, no_scaling=True,
-                                    result_logging_mode='lin_trans')
-
-        return mra.two_qubit_ssro_fidelity(
-            label='{}_{}'.format(q0_name, q1_name),
-            qubit_labels=[q0_name, q1_name])
-
     def get_correlation_detector(self):
         qnames = self.qubits()
         q0 = self.find_instrument(qnames[0])
@@ -267,7 +247,7 @@ class TwoQubitDevice(DeviceObject):
             integration_length=q0.RO_acq_integration_length())
         return d
 
-    def measure_two_qubit_AllXY(self, sequence_type='sequential', MC=None):
+    def measure_two_qubit_AllXY(self, sequence_type='simultaneous', MC=None):
         if MC is None:
             MC = qc.station.components['MC']
 

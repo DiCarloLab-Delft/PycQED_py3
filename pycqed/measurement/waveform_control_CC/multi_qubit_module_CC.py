@@ -14,8 +14,8 @@ def measure_two_qubit_AllXY(device, q0_name, q1_name,
     if MC is None:
         MC = qc.station.components['MC']
 
-    q0 = device._qubits[q0_name]
-    q1 = device._qubits[q1_name]
+    q0 = device.find_instrument(q0_name)
+    q1 = device.find_instrument(q1_name)
 
     q0.prepare_for_timedomain()
     q1.prepare_for_timedomain()
@@ -53,9 +53,8 @@ def measure_two_qubit_ssro(device, q0_name, q1_name, nr_shots=4092*4,
     # N.B. this function can be replaced with a more general multi-qubit ssro
     if MC is None:
         MC = qc.station.components['MC']
-
-    q0 = device._qubits[q0_name]
-    q1 = device._qubits[q1_name]
+    q0 = device.find_instrument(q0_name)
+    q1 = device.find_instrument(q1_name)
 
     q0.prepare_for_timedomain()
     q1.prepare_for_timedomain()
