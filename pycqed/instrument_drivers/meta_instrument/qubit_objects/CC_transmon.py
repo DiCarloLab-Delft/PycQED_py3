@@ -515,8 +515,9 @@ class CBox_v3_driven_transmon(Transmon):
                 RO_channels = [self.RO_acq_weight_function_I()]
                 result_logging_mode = 'lin_trans'
 
+                if self.RO_digitized():
+                    result_logging_mode = 'digitized'
                 # Update the RO theshold
-                result_logging_mode = 'digitized'
                 acq_ch = self.RO_acq_weight_function_I()
 
                 # The threshold that is set in the hardware  needs to be
@@ -526,7 +527,6 @@ class CBox_v3_driven_transmon(Transmon):
                 offs = self._acquisition_instrument.get(
                     'quex_trans_offset_weightfunction_{}'.format(acq_ch))
                 hw_threshold = threshold + offs
-
                 self._acquisition_instrument.set(
                     'quex_thres_{}_level'.format(acq_ch), hw_threshold)
 
