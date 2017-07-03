@@ -171,6 +171,7 @@ class HeterodyneInstrument(Instrument):
 
         # this sets the result to integration and rotation outcome
         self._acquisition_instr.quex_rl_source(2)
+        self._acquisition_instr.quex_wint_mode(0)
         # only one sample to average over
         self._acquisition_instr.quex_rl_length(1)
         self._acquisition_instr.quex_rl_avgcnt(

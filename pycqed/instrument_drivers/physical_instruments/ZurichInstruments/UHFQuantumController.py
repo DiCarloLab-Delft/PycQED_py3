@@ -817,12 +817,11 @@ if(getUserReg(1)){
 }
 repeat(loop_cnt) {
 \twaitDigTrigger(1, 1);\n
-\tsetTrigger(WINT_EN +RO_TRIG);
+\tsetTrigger(WINT_EN + RO_TRIG);
 \twait(5);
 \tsetTrigger(WINT_EN);
-\twait(300);
 }
-wait(1000);
+wait(10);
 setTrigger(0);"""
         self.awg_string(string)
 
