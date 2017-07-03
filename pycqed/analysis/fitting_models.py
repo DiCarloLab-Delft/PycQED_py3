@@ -61,7 +61,7 @@ def TwinLorentzFunc(f, amplitude_a, amplitude_b, center_a, center_b,
 
 
 def Qubit_dac_to_freq(dac_voltage, f_max, E_c,
-                      dac_sweet_spot, V_per_phi0, dac_flux_coefficient=None,
+                      dac_sweet_spot, V_per_phi0=None, dac_flux_coefficient=None,
                       asymmetry=0):
     '''
     The cosine Arc model for uncalibrated flux for asymmetric qubit.
