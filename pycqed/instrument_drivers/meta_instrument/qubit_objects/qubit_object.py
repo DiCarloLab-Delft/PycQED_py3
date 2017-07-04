@@ -379,6 +379,21 @@ class Transmon(Qubit):
                            label='RB single qubit Clifford fidelity',
                            vals=vals.Numbers(0, 1.0),
                            parameter_class=ManualParameter)
+        self.add_parameter('V_per_phi0',
+                           initial_value=1,
+                           label='V per phi0',
+                           vals=vals.Numbers(),
+                           docstring='Conversion between flux and voltage. '
+                                     'How many volts need to be applied to '
+                                     'have a flux of 1 phi0 (pulsed).',
+                           parameter_class=ManualParameter)
+        self.add_parameter('V_offset',
+                           initial_value=0,
+                           label='V offset',
+                           vals=vals.Numbers(),
+                           docstring='AWG voltage at which the sweet spot is '
+                                     'found (pulsed).',
+                           parameter_class=ManualParameter)
 
     def calculate_frequency(self,
                             dac_voltage=None,
