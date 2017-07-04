@@ -1701,6 +1701,21 @@ class CBox_v3_driven_transmon(Transmon):
                     Measurement is repeated for all cases given.
             analyze (bool):
                     Do the Ram-Z analysis, extracting the step response.
+            filter_raw (bool):
+                    Apply a Gaussian low-pass filter to the raw (or
+                    demodulated if demod is True) data.
+            filter_deriv_phase (bool):
+                    Apply a Gaussian derivative filter on the phase, thus
+                    simultaneously low-pass filtering and computing the
+                    derivative.
+            demodulate (bool):
+                    Demodulate data befor calculating phase.
+            f_demod (float):
+                    Modulation frequency used if demodulate is True.
+            fulx_amp_analysis (float):
+                    Flux pulse amplitude by which the step response is
+                    normalized in the anlaysis. Set this to 1 to see the
+                    step response in units of ouput voltage.
         '''
         self.prepare_for_timedomain()
         self.prepare_for_fluxing()
@@ -1845,6 +1860,21 @@ class CBox_v3_driven_transmon(Transmon):
                     Measurement is repeated for all cases given.
             analyze (bool):
                     Do the Ram-Z analysis, extracting the step response.
+            filter_raw (bool):
+                    Apply a Gaussian low-pass filter to the raw (or
+                    demodulated if demod is True) data.
+            filter_deriv_phase (bool):
+                    Apply a Gaussian derivative filter on the phase, thus
+                    simultaneously low-pass filtering and computing the
+                    derivative.
+            demodulate (bool):
+                    Demodulate data befor calculating phase.
+            f_demod (float):
+                    Modulation frequency used if demodulate is True.
+            fulx_amp_analysis (float):
+                    Flux pulse amplitude by which the step response is
+                    normalized in the anlaysis. Set this to 1 to see the
+                    step response in units of ouput voltage.
         '''
         self.prepare_for_timedomain()
         self.prepare_for_fluxing()
