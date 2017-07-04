@@ -863,8 +863,7 @@ def get_pulse_dict_from_pars(pulse_pars):
         pulses: dictionary of pulse_pars dictionaries
     '''
     pi_amp = pulse_pars['amplitude']
-    # pi2_amp = pulse_pars['amplitude']*pulse_pars['amp90_scale']
-    pi2_amp = pulse_pars['amplitude_90']
+    pi2_amp = pulse_pars['amplitude']*pulse_pars['amp90_scale']
 
     pulses = {'I': deepcopy(pulse_pars),
               'X180': deepcopy(pulse_pars),

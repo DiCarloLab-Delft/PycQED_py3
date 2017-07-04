@@ -169,8 +169,6 @@ class QuDev_transmon(Qubit):
                                  initial_value=None, vals=vals.Strings())
         self.add_pulse_parameter('X180', 'amp180', 'amplitude',
                                  initial_value=1, vals=vals.Numbers())
-        self.add_pulse_parameter('X180', 'amp90', 'amplitude_90',
-                                 initial_value=0.5, vals=vals.Numbers())
         self.add_pulse_parameter('X180', 'amp90_scale', 'amp90_scale',
                                  initial_value=0.5, vals=vals.Numbers(0, 1))
         self.add_pulse_parameter('X180', 'pulse_delay', 'pulse_delay',
@@ -196,8 +194,6 @@ class QuDev_transmon(Qubit):
                                  initial_value=None, vals=vals.Strings())
         self.add_pulse_parameter('X180_ef', 'amp180_ef', 'amplitude',
                                  initial_value=1, vals=vals.Numbers())
-        self.add_pulse_parameter('X180_ef', 'amp90_ef', 'amplitude_90',
-                                 initial_value=0.5, vals=vals.Numbers())
         self.add_pulse_parameter('X180_ef', 'amp90_scale_ef', 'amp90_scale',
                                  initial_value=0.5, vals=vals.Numbers(0, 1))
         self.add_pulse_parameter('X180_ef', 'pulse_delay_ef', 'pulse_delay',
@@ -752,10 +748,10 @@ class QuDev_transmon(Qubit):
             raise ValueError("Unspecified times for measure_ramsey")
         if artificial_detuning is None:
             logging.warning('Artificial detuning is 0.')
-        if artificial_detuning<1e3:
+        if artificial_detuning < 1e3:
             logging.warning('The artificial detuning is too small. The units'
                             'should be Hz.')
-        if np.any(times>1e-3):
+        if np.any(times > 1e-3):
             logging.warning('The values in the times array might be too large.'
                             'The units should be seconds.')
 
@@ -764,7 +760,7 @@ class QuDev_transmon(Qubit):
             MC = self.MC
 
         # Define the measurement label
-        if label is None:
+        if label == '':
             label = 'Ramsey' + self.msmt_suffix
 
         Rams_swf = awg_swf.Ramsey(
@@ -1612,11 +1608,9 @@ class QuDev_transmon(Qubit):
                 if for_ef is False:
                     self.amp180(amp180)
                     self.amp90_scale(amp90/amp180)
-                    self.amp90(amp90)
                 else:
                     self.amp180_ef(amp180)
                     self.amp90_scale_ef(amp90/amp180)
-                    self.amp90_ef(amp90)
         else:
             return
 
@@ -1815,12 +1809,12 @@ class QuDev_transmon(Qubit):
                                 artificial_detuning=artificial_detuning,
                                 MC=MC,
                                 cal_points=cal_points,
-                                close_fig=close_fig, upload=upload)
+                                close_fig=close_fig, upload=upload, label=label)
 
         else:
             self.measure_ramsey_2nd_exc(times=times, artificial_detuning=artificial_detuning, MC=MC,
                                         cal_points=cal_points, close_fig=close_fig, upload=upload,
-                                        last_ge_pulse=last_ge_pulse, no_cal_points=no_cal_points)
+                                        last_ge_pulse=last_ge_pulse, no_cal_points=no_cal_points, label=label)
 
         if analyze:
             if for_ef:
@@ -1839,7 +1833,7 @@ class QuDev_transmon(Qubit):
             T2_star = RamseyA.T2_star                   #dict
 
             print('New qubit frequency = {:.10f} \t stderr = {:.10f}'.format(
-                new_qubit_freq,RamseyA.Ramsey_freq['freq_stderr']))
+                new_qubit_freq,RamseyA.ramsey_freq['freq_stderr']))
             print('T2_Star = {:.5f} \t stderr = {:.5f}'.format(
                 T2_star['T2_star'],T2_star['T2_star_stderr']))
 
@@ -1957,7 +1951,7 @@ class QuDev_transmon(Qubit):
         T2_star = RamseyA.T2_star                   #dict
 
         print('New qubit frequency = {:.10f} \t stderr = {:.10f}'.format(
-            new_qubit_freq,RamseyA.Ramsey_freq['freq_stderr']))
+            new_qubit_freq, RamseyA.ramsey_freq['freq_stderr']))
         print('T2_Star = {:.5f} \t stderr = {:.5f}'.format(
             T2_star['T2_star'],T2_star['T2_star_stderr']))
 

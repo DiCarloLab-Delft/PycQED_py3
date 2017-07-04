@@ -4167,7 +4167,7 @@ class Ramsey_Analysis(TD_Analysis):
 
         # Calculate new qubit frequency
         self.qubit_frequency = self.qubit_freq_spec + self.artificial_detuning \
-                               - self.Ramsey_freq['freq']
+                               - self.ramsey_freq['freq']
 
         #Extract T2 star and save it
         self.get_measured_T2_star(fit_res=self.fit_res, **kw)  #defines self.T2_star as a dic; units
@@ -4184,7 +4184,7 @@ class Ramsey_Analysis(TD_Analysis):
             print('New qubit frequency = {:.5f} (GHz)'.format(
                 self.qubit_frequency*1e-9) +
                   '\t\tqubit frequency stderr = {:.5f} (MHz)'.format(
-                self.Ramsey_freq['freq_stderr']*1e-6)+
+                self.ramsey_freq['freq_stderr']*1e-6)+
                 '\nT2* = {:.5f} '.format(
                 self.T2_star['T2_star']*scale) +'('+pretty(mu)+unit+')'+
                 '\t\tT2* stderr = {:.5f} '.format(
@@ -4215,9 +4215,9 @@ class Ramsey_Analysis(TD_Analysis):
         freq = fit_res.params['frequency'].value
         freq_stderr = fit_res.params['frequency'].stderr
 
-        self.Ramsey_freq = {'freq':freq, 'freq_stderr':freq_stderr}
+        self.ramsey_freq = {'freq':freq, 'freq_stderr':freq_stderr}
 
-        return self.Ramsey_freq
+        return self.ramsey_freq
 
     def get_measured_T2_star(self, fit_res, **kw):
         '''
