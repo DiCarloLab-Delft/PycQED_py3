@@ -1806,7 +1806,7 @@ class CBox_v3_driven_transmon(Transmon):
                 ma.TwoD_Analysis(label='Ram_Z_')
 
         if analyze:
-            ma.Ram_Z_Analysis(
+            return ma.Ram_Z_Analysis(
                 filter_raw=filter_raw,
                 filter_deriv_phase=filter_deriv_phase,
                 demodulate=demodulate,
