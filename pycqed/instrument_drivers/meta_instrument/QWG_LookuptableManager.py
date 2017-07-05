@@ -293,6 +293,21 @@ class QWG_FluxLookuptableManager(Instrument):
                            'range".\n'
                            '"V" means volts.',
                            vals=vals.Enum('frac', 'V'))
+        self.add_parameter('V_offset',
+                           unit='V',
+                           label='V offset',
+                           docstring='pulsed sweet spot offset',
+                           parameter_class=ManualParameter,
+                           initial_value=0,
+                           vals=vals.Numbers())
+        self.add_parameter('V_per_phi0',
+                           unit='V',
+                           label='V per phi_0',
+                           docstring='pulsed voltage required for one phi0 '
+                                     'of flux',
+                           parameter_class=ManualParameter,
+                           initial_value=1,
+                           vals=vals.Numbers())
 
         self._wave_dict = {}
 
@@ -332,7 +347,8 @@ class QWG_FluxLookuptableManager(Instrument):
             f_01_max=self.F_f_01_max(),
             J2=self.F_J2(),
             E_c=self.F_E_c(),
-            dac_flux_coefficient=self.F_dac_flux_coef(),
+            V_per_phi0=self.V_per_phi0(),
+            V_offset=self.V_offset(),
             f_interaction=self.F_f_interaction(),
             f_bus=None,
             asymmetry=self.F_asymmetry(),
@@ -573,7 +589,7 @@ class QWG_FluxLookuptableManager(Instrument):
         y = self._wave_dict[wave_name]
 
         if QtPlot_win is None:
-            QtPlot_win = QtPlot(windowTitle=wave_name,
+            QtPlot_win = QtPlot(window_title=wave_name,
                                 figsize=(600, 400))
         QtPlot_win.add(
             x=x, y=y, name=wave_name,
