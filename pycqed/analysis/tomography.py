@@ -1167,8 +1167,8 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
         angle_LSQ_deg = self.fit_res.best_values['angle_LSQ']*180./np.pi
         angle_MSQ_deg = self.fit_res.best_values['angle_MSQ']*180./np.pi
         ax.set_title('Fit of single qubit phase errors')
-        msg = ('MAX Fidelity at %.3f $\phi_{' + self.q1_label
-               + '}=$%.1f deg and $\phi_{' + self.q0_label + '}=$%.1f deg') \
+        msg = ('MAX Fidelity at %.3f $\phi_{' + self.q0_label
+               + '}=$%.1f deg and $\phi_{' + self.q1_label + '}=$%.1f deg') \
                % (fidelity, angle_LSQ_deg, angle_MSQ_deg)
         msg += "\n Chi sqr. %.3f" % self.fit_res.chisqr
         ax.text(0.5, .6, msg)
