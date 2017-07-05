@@ -13,6 +13,7 @@ from pycqed.measurement.waveform_control import sequence
 from qcodes.instrument.parameter import _BaseParameter
 from pycqed.instrument_drivers.virtual_instruments.pyqx import qasm_loader as ql
 
+
 class Detector_Function(object):
 
     '''
@@ -1259,7 +1260,6 @@ class UHFQC_input_average_detector(Hard_Detector):
 
     '''
 
-
     def __init__(self, UHFQC, AWG=None, channels=(0, 1),
                  nr_averages=1024, nr_samples=4096, **kw):
         super(UHFQC_input_average_detector, self).__init__()
@@ -1311,6 +1311,7 @@ class UHFQC_demodulated_input_avg_det(UHFQC_input_average_detector):
     Detector used for acquiring averaged input traces withe the UHFQC.
     Additionally trace are demoulated.
     '''
+
     def __init__(self, f_RO_mod, UHFQC,
                  real_imag=True, AWG=None, channels=(0, 1),
                  nr_averages=1024, nr_samples=4096, **kw):
@@ -1481,7 +1482,7 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         # this sets the result to integration and rotation outcome
 
             if (self.chunk_size is not None and
-                self.chunk_size < self.nr_sweep_points):
+                    self.chunk_size < self.nr_sweep_points):
                 # Chunk size is defined and smaller than total number of sweep
                 # points -> only acquire one chunk
                 self.nr_sweep_points = self.chunk_size * self.seg_per_point
@@ -1677,6 +1678,7 @@ class UHFQC_integration_logging_det(Hard_Detector):
     Detector used for integrated average results with the UHFQC
 
     '''
+
     def __init__(self, UHFQC, AWG=None,
                  integration_length=1e-6,
                  nr_shots=4094,
@@ -2089,17 +2091,19 @@ class DDM_integration_logging_det(Hard_Detector):
         if self.AWG is not None:
             self.AWG.stop()
 
+
 class RTO1024_detector(Hard_Detector):
     '''
     Detector for the Rohde-Schwarz RTO1024 oscilloscope.
     '''
+
     def __init__(self, scope):
         self.scope = scope
 
     def prepare(self, sweep_points=None):
         self.sweep_points = sweep_points
-        scope.prepare_measurement(t_start=sweep_points[0],
-                                  t_stop=sweep_points[-1])
+        self.scope.prepare_measurement(t_start=sweep_points[0],
+                                       t_stop=sweep_points[-1])
 
     def get_values(self):
-        return scope.measure_trace()
+        return self.scope.measure_trace()

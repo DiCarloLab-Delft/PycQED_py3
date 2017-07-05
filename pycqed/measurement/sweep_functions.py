@@ -272,7 +272,8 @@ class QASM_Sweep_v2(Hard_Sweep):
 
     def __init__(self, qasm_fn: str, config: dict, CBox,
                  parameter_name: str ='Points', unit: str='a.u.',
-                 upload: bool=True, verbosity_level: int=0):
+                 upload: bool=True, verbosity_level: int=0,
+                 disable_compile_and_upload: bool=False):
         super().__init__()
         self.name = 'QASM_Sweep_v2'
 
@@ -284,9 +285,11 @@ class QASM_Sweep_v2(Hard_Sweep):
         self.parameter_name = parameter_name
         self.unit = unit
         self.verbosity_level = verbosity_level
+        self.disable_compile_and_upload = disable_compile_and_upload
 
     def prepare(self, **kw):
-        self.compile_and_upload()
+        if not self.disable_compile_and_upload:
+            self.compile_and_upload()
 
     def compile_and_upload(self):
         if self.upload:

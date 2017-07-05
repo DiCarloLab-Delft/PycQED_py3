@@ -313,7 +313,8 @@ def grover_seq(q0_name, q1_name, RO_target='all',
                                                               q1_name))
 
             if RO_target == 'all':
-                qasm_file.writelines('RO {} | RO {}\n'.format(q0_name, q1_name))
+                qasm_file.writelines(
+                    'RO {} | RO {}\n'.format(q0_name, q1_name))
             else:
                 qasm_file.writelines('RO {}\n'.format(RO_target))
 
@@ -413,5 +414,32 @@ def grover_tomo_seq(q0_name, q1_name, omega, RO_target='all',
         for p in seq:
             qasm_file.writelines(p)
 
+    qasm_file.close()
+    return qasm_file
+
+
+def purity_CZ_seq(q0, q1, RO_target='all'):
+    """
+    Creates the |00> + |11> Bell state and does a partial tomography in
+    order to determine the purity of both qubits.
+    """
+
+    filename = join(base_qasm_path, 'purity_CZ_seq.qasm')
+    qasm_file = mopen(filename, mode='w')
+    qasm_file.writelines('qubit {} \nqubit {} \n'.format(q0, q1))
+
+    tomo_list = ['mX90', 'mY90', 'I']
+
+    for p_pulse in tomo_list:
+        # Create a Bell state:  |00> + |11>
+        qasm_file.writelines('\ninit_all\n')
+        qasm_file.writelines('mY90 {} | Y90 {} \n'.format(q0, q1))
+        qasm_file.writelines('CZ {} {} \n'.format(q0, q1))
+        qasm_file.writelines('mY90 {}'.format(q1))
+
+        # Perform pulses to measure the purity of both qubits
+        qasm_file.writelines('{} {} | {} {}\n'.format(p_pulse, q0,
+                                                      p_pulse, q1))
+        qasm_file.writelines('RO ' + RO_target + '  \n')
     qasm_file.close()
     return qasm_file
