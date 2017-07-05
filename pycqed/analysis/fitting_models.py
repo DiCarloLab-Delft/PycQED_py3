@@ -83,9 +83,9 @@ def Qubit_dac_to_freq(dac_voltage, f_max, E_c,
         V_per_phi0 = np.pi/dac_flux_coefficient
 
     qubit_freq = (f_max + E_c)*(
-        asymmetry**2 + (1 - asymmetry**2) *
+        asymmetry**2 + (1 - asymmetry**2)) *\
         np.sqrt(abs(np.cos(np.pi / V_per_phi0 *
-                           (dac_voltage - dac_sweet_spot))))) - E_c
+                           (dac_voltage - dac_sweet_spot)))) - E_c
     return qubit_freq
 
 
@@ -102,7 +102,7 @@ def Qubit_dac_to_detun(dac_voltage, f_max, E_c, dac_sweet_spot, V_per_phi0,
     asymmetry (dimensionless asymmetry param) = abs((EJ1-EJ2)/(EJ1+EJ2))
     '''
     return (f_max + E_c)*(
-        1 - asymmetry**2 + (1 - asymmetry**2) *
+        1 - (asymmetry**2 + (1 - asymmetry**2)) *
         np.sqrt(abs(np.cos(np.pi / V_per_phi0 *
                            (dac_voltage - dac_sweet_spot)))))
 
