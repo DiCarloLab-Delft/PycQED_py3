@@ -849,7 +849,7 @@ class Function_Detector(Soft_Detector):
         if self.value_names is None:
             self.value_names = result_keys
         if self.value_units is None:
-            self.value_units = ['a.u.'] * len(value_names)
+            self.value_units = ['a.u.'] * len(self.value_names)
 
     def acquire_data_point(self, **kw):
         measurement_kwargs = {}
