@@ -3,12 +3,12 @@ import os
 import re
 import urllib.request
 import pycqed as pq
-import threading
+import json
 
 from pycqed.measurement import measurement_control
 from pycqed.instrument_drivers.virtual_instruments.pyqx.qx_client import qx_client
 from pycqed.measurement.detector_functions import QX_Hard_Detector
-
+from pycqed.measurement.demonstrator_helper.detectors import Quantumsim_Two_QB_Hard_Detector
 from pycqed.measurement import sweep_functions as swf
 
 # from pycqed.instrument_drivers.meta_instrument.qubit_objects.dummy_qubit_object import DummyQubit
@@ -18,14 +18,6 @@ from qcodes import station
 
 tc = TessConnection()
 tc.connect("simulate")
-
-# tc.connect("simulate_qsim")
-
-# tc.connect("simulate_QX")
-defualt_simulate_options = {
-    "num_avg": 10000,
-    "iterations": 1
-}
 
 st = station.Station()
 # Connect to the qx simulator
@@ -40,9 +32,26 @@ st.add_component(MC)
 # st.add_component(dq)
 
 
-def simulate_qasm_file(file_url, options={}):
+def simulate_qasm_file(file_url: str,  config_json: str):
     # file_url="http://localhost:3000/uploads/asset/file/75/ac5bc9e8-3929-4205-babf-2cf9c4490225.qasm"
     file_path = _retrieve_file_from_url(file_url)
+    options = json.loads(config_json)
+    if("simulator" in options):
+        if options['simulator'] == "qx":
+            return _simulate_QX(file_path, options)
+        elif options['simulator'] == "quantumsim":
+            return _simulate_quantumsim(file_path, options)
+        else:
+            raise Exception("ERROR: simulator "+options['quantumsim'] +
+                            " not recognized")
+    else:
+        raise Exception("ERROR: No simulator selected")
+
+# Private
+# -------
+
+
+def _simulate_QX(file_path, options):
     qxc = qx_client()
     try:
 
@@ -63,8 +72,27 @@ def simulate_qasm_file(file_url, options={}):
         qxc.disconnect()
 
 
-# Private
-# -------
+def _simulate_quantumsim(file_path, options):
+    quantumsim_sweep = swf.None_Sweep()
+    quantumsim_sweep.parameter_name = 'Circuit number '
+    quantumsim_sweep.unit = '#'
+
+    qubit_parameters = {
+        'Q0': {'T1': 30e3, 'T2': 17e3, 'frac1_0': 0.0189, 'frac1_1': 0.918},
+        'Q1': {'T1': 30e3, 'T2': 17e3, 'frac1_0': 0.068, 'frac1_1': 0.949},
+        'q0': {'T1': 30e3, 'T2': 17e3, 'frac1_0': 0.0189, 'frac1_1': 0.918},
+        'q1': {'T1': 30e3, 'T2': 17e3, 'frac1_0': 0.068, 'frac1_1': 0.949}}
+
+    quantumsim_det = Quantumsim_Two_QB_Hard_Detector(
+        file_path, dt=(40, 280), qubit_parameters=qubit_parameters)
+    sweep_points = range(len(quantumsim_det.parser.circuits))
+
+    MC.set_detector_function(quantumsim_det)
+    MC.set_sweep_function(quantumsim_sweep)
+    MC.set_sweep_points(sweep_points)
+    dat = MC.run("run QASM")
+    print('simulation finished')
+    return _MC_result_to_chart_dict(dat)
 
 
 def _get_qasm_sweep_points(file_path):

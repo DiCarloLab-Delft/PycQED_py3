@@ -1,5 +1,6 @@
 import numpy as np
 import os
+import json
 import re
 import urllib.request
 import pycqed_scripts as pqs  # N.B. should not be defined in pycqed
@@ -26,12 +27,19 @@ defualt_simulate_options = {
 # Extract some "hardcoded" instruments from the global namespace"
 
 
-def execute_qasm_file(file_url: str,  # config_json: str=None,
+def execute_qasm_file(file_url: str,  config_json: str,
                       verbosity_level: int=0):
+    options = json.loads(config_json)
 
     MC = Instrument.find_instrument('MC')
     CBox = Instrument.find_instrument('CBox')
     device = Instrument.find_instrument('Starmon')
+
+    if 'num_avr' in options:
+        nr_soft_averages = int(np.round(512/options['num_avr']))
+        MC.soft_avg(nr_soft_averages)
+        device.RO_acq_averages(512)
+
     # N.B. hardcoded fixme
     cfg = device.qasm_config()
     qasm_fp = _retrieve_file_from_url(file_url)
