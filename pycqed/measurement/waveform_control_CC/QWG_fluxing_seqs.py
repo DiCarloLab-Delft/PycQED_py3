@@ -307,17 +307,17 @@ def grover_seq(q0_name, q1_name, RO_target='all',
     else:
         RO_line = 'RO {} \n'.format(RO_target)
 
-    for G1 in ['mY90', 'Y90']:
-        for G0 in ['mY90', 'Y90']:
+    for G1 in ['Y90', 'mY90']:
+        for G0 in ['Y90', 'mY90']:
             qasm_file.writelines('\ninit_all\n')
             qasm_file.writelines('{} {} | {} {}\n'.format(G0, q0_name,
                                                           G1, q1_name))
             qasm_file.writelines('grover_CZ {} {}\n'.format(q0_name, q1_name))
-            qasm_file.writelines('mY90 {} | mY90 {}\n'.format(q0_name,
-                                                              q1_name))
+            qasm_file.writelines('Y90 {} | Y90 {}\n'.format(q0_name,
+                                                            q1_name))
             qasm_file.writelines('cz {} {}\n'.format(q0_name, q1_name))
-            qasm_file.writelines('mY90 {} | mY90 {}\n'.format(q0_name,
-                                                              q1_name))
+            qasm_file.writelines('Y90 {} | Y90 {}\n'.format(q0_name,
+                                                            q1_name))
 
             qasm_file.writelines(RO_line)
 
@@ -376,17 +376,17 @@ def grover_tomo_seq(q0_name, q1_name, omega, RO_target='all',
         tomo_list_q1 += [tp + q1_name]
 
     if omega == 0:
-        G0 = 'mY90'
-        G1 = 'mY90'
+        G0 = 'Y90'
+        G1 = 'Y90'
     elif omega == 1:
-        G0 = 'Y90'
-        G1 = 'mY90'
-    elif omega == 2:
         G0 = 'mY90'
         G1 = 'Y90'
-    elif omega == 3:
+    elif omega == 2:
         G0 = 'Y90'
-        G1 = 'Y90'
+        G1 = 'mY90'
+    elif omega == 3:
+        G0 = 'mY90'
+        G1 = 'mY90'
     else:
         raise ValueError('omega must be in [0, 3]')
 
@@ -406,11 +406,11 @@ def grover_tomo_seq(q0_name, q1_name, omega, RO_target='all',
             qasm_file.writelines('{} {} | {} {}\n'.format(G0, q0_name,
                                                           G1, q1_name))
             qasm_file.writelines('grover_CZ {} {}\n'.format(q0_name, q1_name))
-            qasm_file.writelines('mY90 {} | mY90 {}\n'.format(q0_name,
-                                                              q1_name))
+            qasm_file.writelines('Y90 {} | Y90 {}\n'.format(q0_name,
+                                                            q1_name))
             qasm_file.writelines('cz {} {}\n'.format(q0_name, q1_name))
-            qasm_file.writelines('mY90 {} | mY90 {}\n'.format(q0_name,
-                                                              q1_name))
+            qasm_file.writelines('Y90 {} | Y90 {}\n'.format(q0_name,
+                                                            q1_name))
 
             qasm_file.writelines('{} | {}\n'.format(p_q1, p_q0))
             qasm_file.writelines(RO_line)
@@ -473,16 +473,16 @@ def grover_test_seq(q0_name, q1_name, RO_target='all',
     else:
         RO_line = 'RO {} \n'.format(RO_target)
 
-    for G1 in ['mY90', 'Y90']:
-        for G0 in ['mY90', 'Y90']:
+    for G1 in ['Y90', 'mY90']:
+        for G0 in ['Y90', 'mY90']:
             qasm_file.writelines('\ninit_all\n')
             qasm_file.writelines('{} {} | {} {}\n'.format(G0, q0_name,
                                                           G1, q1_name))
             qasm_file.writelines('grover_CZ {} {}\n'.format(q0_name, q1_name))
-            qasm_file.writelines('mY90 {} | mY90 {}\n'.format(q0_name,
+            qasm_file.writelines('Y90 {} | Y90 {}\n'.format(q0_name,
                                                               q1_name))
             # qasm_file.writelines('cz {} {}\n'.format(q0_name, q1_name))
-            # qasm_file.writelines('mY90 {} | mY90 {}\n'.format(q0_name,
+            # qasm_file.writelines('Y90 {} | Y90 {}\n'.format(q0_name,
             #                                                   q1_name))
 
             qasm_file.writelines(RO_line)
@@ -520,17 +520,17 @@ def grover_test_tomo_seq(q0_name, q1_name, omega, RO_target='all',
         tomo_list_q1 += [tp + q1_name]
 
     if omega == 0:
-        G0 = 'mY90'
-        G1 = 'mY90'
+        G0 = 'Y90'
+        G1 = 'Y90'
     elif omega == 1:
-        G0 = 'Y90'
-        G1 = 'mY90'
-    elif omega == 2:
         G0 = 'mY90'
         G1 = 'Y90'
-    elif omega == 3:
+    elif omega == 2:
         G0 = 'Y90'
-        G1 = 'Y90'
+        G1 = 'mY90'
+    elif omega == 3:
+        G0 = 'mY90'
+        G1 = 'mY90'
     else:
         raise ValueError('omega must be in [0, 3]')
 
@@ -549,13 +549,12 @@ def grover_test_tomo_seq(q0_name, q1_name, omega, RO_target='all',
             qasm_file.writelines('\ninit_all\n')
             qasm_file.writelines('{} {} | {} {}\n'.format(G0, q0_name,
                                                           G1, q1_name))
-            qasm_file.writelines('grover_CZ {} {}\n'.format(q0_name, q1_name))
-            qasm_file.writelines('mY90 {} | mY90 {}\n'.format(q0_name,
-                                                              q1_name))
+            qasm_file.writelines('grover_cz {} {}\n'.format(q0_name, q1_name))
+            qasm_file.writelines('Y90 {} | Y90 {}\n'.format(q0_name,
+                                                            q1_name))
             # qasm_file.writelines('cz {} {}\n'.format(q0_name, q1_name))
-            # qasm_file.writelines('mY90 {} | mY90 {}\n'.format(q0_name,
-            #                                                   q1_name))
-
+            # qasm_file.writelines('Y90 {} | Y90 {}\n'.format(q0_name,
+                                                              # q1_name))
             qasm_file.writelines('{} | {}\n'.format(p_q1, p_q0))
             qasm_file.writelines(RO_line)
 
