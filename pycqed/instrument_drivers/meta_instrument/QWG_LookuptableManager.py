@@ -571,8 +571,24 @@ class QWG_FluxLookuptableManager(Instrument):
                             'flux pulse.')
             distorted_wave = delayed_wave
 
+        # Scale to Vpp if necessary
+        if self.wave_dict_unit() == 'V':
+            # Rescale wave by Vpp/2 of the QWG, such that the output wave
+            # amplitude is actually as specified in the wave dictionary.
+            V_out = self.QWG.get_instr().get('ch{}_amp'
+                                             .format(self.F_ch())) / 2
+            outWave = distorted_wave / V_out
+            if np.any(np.abs(outWave) > 1):
+                raise RuntimeError('Waveform values out of range [-1, 1]. '
+                                   'Try increasing QWG.ch{}_amp.'
+                                   .format(self.F_ch()))
+        elif self.wave_dict_unit() == 'frac':
+            # Do not rescale; wave dictionary is in units of
+            # "fraction of Vpp/2"
+            outWave = distorted_wave
+
         # Upload pulse
-        self.QWG.get_instr().createWaveformReal(pulse_name, distorted_wave)
+        self.QWG.get_instr().createWaveformReal(pulse_name, outWave)
         self.QWG.get_instr().set('codeword_{}_ch{}_waveform'.format(
             codeword, self.F_ch()), pulse_name)
 
