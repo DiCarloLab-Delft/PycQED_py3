@@ -1,5 +1,6 @@
 import numpy as np
 import os
+import json
 import re
 import urllib.request
 import pycqed_scripts as pqs  # N.B. should not be defined in pycqed
@@ -11,6 +12,7 @@ from pycqed.measurement import detector_functions as det
 from pycqed.measurement import sweep_functions as swf
 from tess.TessConnect import TessConnection
 import logging
+import gevent
 
 import threading
 
@@ -26,12 +28,19 @@ defualt_simulate_options = {
 # Extract some "hardcoded" instruments from the global namespace"
 
 
-def execute_qasm_file(file_url: str,  # config_json: str=None,
+def execute_qasm_file(file_url: str,  config_json: str,
                       verbosity_level: int=0):
+    options = json.loads(config_json)
 
     MC = Instrument.find_instrument('MC')
     CBox = Instrument.find_instrument('CBox')
     device = Instrument.find_instrument('Starmon')
+
+    if 'num_avr' in options:
+        nr_soft_averages = int(np.round(512/options['num_avr']))
+        MC.soft_avg(nr_soft_averages)
+        device.RO_acq_averages(512)
+
     # N.B. hardcoded fixme
     cfg = device.qasm_config()
     qasm_fp = _retrieve_file_from_url(file_url)
@@ -86,30 +95,36 @@ def _MC_result_to_chart_dict(result):
         "data": result
     }]
 
+
 # Send the callibration of the machine every 10 minutes
+# This function is blocking!
+def _send_calibration_loop():
+
+    try:
+        while(True):
+            banned_pars = ['IDN', 'RO_optimal_weights_I', 'RO_optimal_weights_Q',
+                           'qasm_config']
+            # threading.Timer(10, _send_calibration).start()
+            # snapshot = MC.station.snapshot()
+            snapshot = qc.station.snapshot()
+            calibration = {
+                "q0": snapshot["instruments"]["QL"],
+                "q1": snapshot["instruments"]["QR"],
+                'fridge': snapshot["instruments"]["Maserati_fridge_mon"]
+            }
+            for par in banned_pars:
+                try:
+                    del calibration['q0']['parameters'][par]
+                    del calibration['q1']['parameters'][par]
+                except KeyError as e:
+                    logging.warning(e)
+            tc.client.publish_custom_msg({
+                "calibration": calibration
+            })
+            gevent.sleep(600)
+
+    except KeyboardInterrupt:
+        print("Keyboard interrupt")
 
 
-def _send_calibration():
-
-    banned_pars = ['IDN', 'RO_optimal_weights_I', 'RO_optimal_weights_Q',
-                   'qasm_config']
-    # threading.Timer(10, _send_calibration).start()
-    # snapshot = MC.station.snapshot()
-    snapshot = qc.station.snapshot()
-    calibration = {
-        "q0": snapshot["instruments"]["QL"],
-        "q1": snapshot["instruments"]["QR"]
-    }
-    for par in banned_pars:
-        try:
-            del calibration['q0']['parameters'][par]
-            del calibration['q1']['parameters'][par]
-        except KeyError as e:
-            logging.warning(e)
-    tc.client.publish_custom_msg({
-        "calibration": calibration
-    })
-    threading.Timer(10*60, _send_calibration).start()
-
-
-_send_calibration()
+gevent.spawn(_send_calibration_loop)
