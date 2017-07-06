@@ -193,7 +193,7 @@ class Test_QWG_flux_seqs(unittest.TestCase):
             f_01_max=self.QWG_flux_lutman.F_f_01_max(),
             J2=self.QWG_flux_lutman.F_J2(),
             E_c=self.QWG_flux_lutman.F_E_c(),
-            dac_flux_coefficient=self.QWG_flux_lutman.F_dac_flux_coef(),
+            V_per_phi0=self.QWG_flux_lutman.V_per_phi0(),
             f_interaction=self.QWG_flux_lutman.F_f_interaction(),
             f_bus=None,
             asymmetry=self.QWG_flux_lutman.F_asymmetry(),
