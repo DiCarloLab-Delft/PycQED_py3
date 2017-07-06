@@ -268,7 +268,7 @@ def two_qubit_tomo_bell(bell_state, q0, q1, RO_target='all'):
 
 
 def grover_seq(q0_name, q1_name, RO_target='all',
-               precompiled_flux=True):
+               precompiled_flux=True, cal_points: bool=True):
     '''
     Writes the QASM sequence for Grover's algorithm on two qubits.
     Sequence:
@@ -287,6 +287,8 @@ def grover_seq(q0_name, q1_name, RO_target='all',
                 Determies if the full waveform for the flux pulses is
                 precompiled, thus only needing one trigger at the start,
                 or if every flux pulse should be triggered individually.
+        cal_points (bool):
+                Whether to add calibration points.
 
     Returns:
         qasm_file: a reference to the new QASM file object.
@@ -300,6 +302,11 @@ def grover_seq(q0_name, q1_name, RO_target='all',
     qasm_file.writelines('qubit {} \n'.format(q0_name))
     qasm_file.writelines('qubit {} \n'.format(q1_name))
 
+    if RO_target == 'all':
+        RO_line = 'RO {} | RO {}\n'.format(q0_name, q1_name)
+    else:
+        RO_line = 'RO {} \n'.format(RO_target)
+
     for G1 in ['mY90', 'Y90']:
         for G0 in ['mY90', 'Y90']:
             qasm_file.writelines('\ninit_all\n')
@@ -312,11 +319,19 @@ def grover_seq(q0_name, q1_name, RO_target='all',
             qasm_file.writelines('mY90 {} | mY90 {}\n'.format(q0_name,
                                                               q1_name))
 
-            if RO_target == 'all':
-                qasm_file.writelines(
-                    'RO {} | RO {}\n'.format(q0_name, q1_name))
-            else:
-                qasm_file.writelines('RO {}\n'.format(RO_target))
+            qasm_file.writelines(RO_line)
+
+    # Add calibration points
+    if cal_points:
+        cal_pulses = []
+        for seq in cal_points_2Q:
+            cal_pulses += [[seq[0].format(q0_name), seq[1].format(q1_name),
+                            RO_line]]
+
+        for seq in cal_pulses:
+            qasm_file.writelines('\ninit_all\n')
+            for p in seq:
+                qasm_file.writelines(p)
 
     qasm_file.close()
     return qasm_file
@@ -435,11 +450,15 @@ def purity_CZ_seq(q0, q1, RO_target='all'):
         qasm_file.writelines('\ninit_all\n')
         qasm_file.writelines('mY90 {} | Y90 {} \n'.format(q0, q1))
         qasm_file.writelines('CZ {} {} \n'.format(q0, q1))
-        qasm_file.writelines('mY90 {}'.format(q1))
+        qasm_file.writelines('mY90 {}\n'.format(q1))
 
         # Perform pulses to measure the purity of both qubits
         qasm_file.writelines('{} {} | {} {}\n'.format(p_pulse, q0,
                                                       p_pulse, q1))
-        qasm_file.writelines('RO ' + RO_target + '  \n')
+        if RO_target == 'all':
+            qasm_file.writelines('RO {} | RO {} \n'.format(q0, q1))
+        else:
+            qasm_file.writelines('RO {} \n'.format(RO_target))
+
     qasm_file.close()
     return qasm_file
