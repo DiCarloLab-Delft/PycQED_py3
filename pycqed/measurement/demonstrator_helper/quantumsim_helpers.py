@@ -1,3 +1,6 @@
+import logging
+logging.warnings.warn('This file is now included in simulation helpers', DeprecationWarning)
+
 import numpy as np
 import os
 import re
@@ -33,7 +36,7 @@ def simulate_qasm_file(file_url, options={}):
     file_path = _retrieve_file_from_url(file_url)
     print('simulation_called')
 
-    
+
 
 # Private
 # -------

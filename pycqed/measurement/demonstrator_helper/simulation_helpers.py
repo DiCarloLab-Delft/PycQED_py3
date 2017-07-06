@@ -1,3 +1,4 @@
+import logging
 import numpy as np
 import os
 import re
@@ -22,11 +23,8 @@ tc.connect("simulate")
 st = station.Station()
 # Connect to the qx simulator
 MC = measurement_control.MeasurementControl(
-    'MC', live_plot_enabled=True, verbose=True)
+    'MC', live_plot_enabled=False, verbose=True)
 MC.station = st
-
-# dq = DummyQubit("q1")
-# dq.T1(10)
 
 st.add_component(MC)
 # st.add_component(dq)
@@ -37,9 +35,9 @@ def simulate_qasm_file(file_url: str,  config_json: str):
     file_path = _retrieve_file_from_url(file_url)
     options = json.loads(config_json)
     if("simulator" in options):
-        if options['simulator'] == "qx":
+        if options['simulator'].lower() == "qx":
             return _simulate_QX(file_path, options)
-        elif options['simulator'] == "quantumsim":
+        elif options['simulator'].lower() == "quantumsim":
             return _simulate_quantumsim(file_path, options)
         else:
             raise Exception("ERROR: simulator "+options['quantumsim'] +
@@ -54,11 +52,12 @@ def simulate_qasm_file(file_url: str,  config_json: str):
 def _simulate_QX(file_path, options):
     qxc = qx_client()
     try:
-
         qxc.connect()
         qxc.create_qubits(2)
         qx_sweep = swf.QX_Hard_Sweep(qxc, file_path)
-        qx_detector = QX_Hard_Detector(qxc, [file_path], num_avg=10000)
+        num_avg = options.get('num_avg', 10000)  # 10000 is the default
+
+        qx_detector = QX_Hard_Detector(qxc, [file_path], num_avg=num_avg)
         sweep_points = range(len(qx_detector.randomizations[0]))
         # qx_detector.prepare(sweep_points)
         # Start measurment
