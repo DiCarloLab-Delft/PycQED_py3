@@ -1019,6 +1019,18 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
                                         var_name='MLE')
         except Exception as e:
             logging.warning(e)
+        try:
+            pars_dict = {'fidelity': self.fidelity,
+                         'best_fidelity': self.best_fidelity,
+                         'angle_LSQ': np.rad2deg(self.fit_res.best_values['angle_LSQ']),
+                         'angle_MSQ': np.rad2deg(self.fit_res.best_values['angle_MSQ']),
+                         'LSQ_name': self.q0_label,
+                         'MSQ_name': self.q1_label}
+
+            self.save_dict_to_analysis_group(pars_dict, 'tomography_results')
+        # only works if MLE and target bell were specified
+        except Exception as e:
+            print(e)
 
         self.data_file.close()
 
