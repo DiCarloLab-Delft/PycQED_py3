@@ -72,7 +72,7 @@ def Qubit_dac_to_freq(dac_voltage, f_max, E_c,
     E_c (Hz): charging energy of the qubit
     V_per_phi0 (V): volt per phi0 (convert voltage to flux)
     dac_sweet_spot (V): voltage at which the sweet-spot is found
-    asymmetry (dimensionless asymmetry param) = abs((EJ1-EJ2)/(EJ1+EJ2))
+    asym (dimensionless asymmetry param) = abs((EJ1-EJ2)/(EJ1+EJ2)),
     '''
     if V_per_phi0 is None and dac_flux_coefficient is None:
         raise ValueError('Please specify "V_per_phi0".')
