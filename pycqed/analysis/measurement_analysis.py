@@ -226,6 +226,20 @@ class MeasurementAnalysis(object):
                 self.analysis_group.create_dataset(
                     name=datasetname, data=data)
 
+    def save_dict_to_analysis_group(self, save_dict, group_name):
+
+        if group_name not in self.analysis_group:
+            dict_grp = self.analysis_group.create_group(group_name)
+        else:
+            dict_grp = self.analysis_group[group_name]
+
+        for key, value in save_dict.items():
+            dict_grp.attrs[key] = str(value)
+
+
+
+
+
     def save_fitted_parameters(self, fit_res, var_name, save_peaks=False,
                                weights=None):
         fit_name = 'Fitted Params ' + var_name
