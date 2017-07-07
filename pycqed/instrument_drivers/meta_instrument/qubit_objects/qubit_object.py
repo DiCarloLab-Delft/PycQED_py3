@@ -570,7 +570,8 @@ class Transmon(Qubit):
     def calibrate_pulse_amplitude_coarse(self,
                                          amps=np.linspace(-.5, .5, 31),
                                          close_fig=True, verbose=False,
-                                         MC=None, update=True, take_fit_I=False):
+                                         MC=None, update=True,
+                                         take_fit_I=False):
         """
         Calibrates the pulse amplitude using a single rabi oscillation
         """
@@ -578,7 +579,7 @@ class Transmon(Qubit):
         self.measure_rabi(amps, n=1, MC=MC, analyze=False)
         a = ma.Rabi_Analysis(close_fig=close_fig)
         # Decide which quadrature to take by comparing the contrast
-        if take_fit_I:
+        if take_fit_I or len(a.measured_values) == 1:
             ampl = abs(a.fit_res[0].params['period'].value)/2.
         elif (np.abs(max(a.measured_values[0]) -
                      min(a.measured_values[0]))) > (
