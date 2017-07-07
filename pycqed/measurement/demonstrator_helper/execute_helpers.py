@@ -36,10 +36,10 @@ def execute_qasm_file(file_url: str,  config_json: str,
     CBox = Instrument.find_instrument('CBox')
     device = Instrument.find_instrument('Starmon')
 
-    if 'num_avr' in options:
-        nr_soft_averages = int(np.round(512/options['num_avr']))
-        MC.soft_avg(nr_soft_averages)
-        device.RO_acq_averages(512)
+    num_avg = int(options.get('num_avg', 512))
+    nr_soft_averages = int(np.round(num_avg/512))
+    MC.soft_avg(nr_soft_averages)
+    device.RO_acq_averages(512)
 
     # N.B. hardcoded fixme
     cfg = device.qasm_config()
