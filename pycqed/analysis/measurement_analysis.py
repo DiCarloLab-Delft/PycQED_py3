@@ -226,8 +226,12 @@ class MeasurementAnalysis(object):
                 self.analysis_group.create_dataset(
                     name=datasetname, data=data)
 
-    def save_dict_to_analysis_group(self, save_dict, group_name):
-
+    def save_dict_to_analysis_group(self, save_dict: dict, group_name: str):
+        """
+        Saves a dictionary to the analysis_group in the hdf5 datafile
+        corresponding to the experiment.
+        Convenient for storing parameters extracted in the analysis.
+        """
         if group_name not in self.analysis_group:
             dict_grp = self.analysis_group.create_group(group_name)
         else:
@@ -235,10 +239,6 @@ class MeasurementAnalysis(object):
 
         for key, value in save_dict.items():
             dict_grp.attrs[key] = str(value)
-
-
-
-
 
     def save_fitted_parameters(self, fit_res, var_name, save_peaks=False,
                                weights=None):
@@ -479,7 +479,6 @@ class MeasurementAnalysis(object):
                 self.save_fig(fig, xlabel=xlabel, ylabel=ylabel, **kw)
         return
 
-
     def plot_complex_results(self, cmp_data, fig, ax, show=False, marker='.', **kw):
         '''
         Plot real and imaginary values measured vs a sweeped parameter
@@ -505,7 +504,6 @@ class MeasurementAnalysis(object):
             self.save_fig(fig, xlabel=xlabel, ylabel=ylabel, **kw)
 
         return
-
 
     def plot_dB_from_linear(self, x, lin_amp, fig, ax, show=False, marker='.', **kw):
         '''
@@ -533,7 +531,6 @@ class MeasurementAnalysis(object):
             self.save_fig(fig, xlabel=xlabel, ylabel=ylabel, **kw)
 
         return
-
 
     def get_naming_and_values_2D(self):
         '''
@@ -1281,8 +1278,10 @@ class Rabi_Analysis(TD_Analysis):
         if self.nr_quadratures != 1:
             # It would be best to do 1 fit to both datasets but since it is
             # easier to do just one fit we stick to that.
-            # We make an initial guess of the Rabi period using both quadratures
-            data = np.sqrt(self.measured_values[0]**2+self.measured_values[1]**2)
+            # We make an initial guess of the Rabi period using both
+            # quadratures
+            data = np.sqrt(self.measured_values[
+                           0]**2+self.measured_values[1]**2)
             params = fit_mods.Cos_guess(model, data=data, t=self.sweep_points)
             fit_res = model.fit(
                 data=data,
@@ -1536,7 +1535,7 @@ class CPhase_2Q_amp_cost_analysis(Rabi_Analysis):
         # Frequency is known, because we sweep the phase of the second pihalf
         # pulse in a Ramsey-type experiment.
         model = lmfit.Model((lambda t, amplitude, phase, offset:
-                            amplitude*np.cos(2*np.pi*t/360.0 + phase)+offset))
+                             amplitude*np.cos(2*np.pi*t/360.0 + phase)+offset))
         self.fit_result = {}
 
         # Fit case with no excitation first
@@ -1583,7 +1582,8 @@ class Motzoi_XY_analysis(TD_Analysis):
         self.add_analysis_datagroup_to_file()
         if self.cal_points is None:
             if len(self.measured_values) == 2:
-                self.corr_data = self.measured_values[0]**2 + self.measured_values[1]**2
+                self.corr_data = self.measured_values[
+                    0]**2 + self.measured_values[1]**2
             else:
                 self.corr_data = self.measured_values[0]
         else:
@@ -3232,16 +3232,15 @@ class DriveDetuning_Analysis(TD_Analysis):
             model = fit_mods.lmfit.Model(fit_mods.CosFunc)
 
             params = fit_mods.Cos_guess(model, data=data,
-                                 t=sweep_points)
+                                        t=sweep_points)
             # This ensures that phase is *always* ~90 deg if it is different
             # this shows up in the amplitude and prevents the correct detuning
             # is shown.
             params['phase'].min = np.deg2rad(80)
             params['phase'].max = np.deg2rad(100)
 
-
             fit_results = model.fit(data=data, t=sweep_points,
-                                             params=params)
+                                    params=params)
             return fit_results
 
         def quadratic_fit_data():
@@ -4107,6 +4106,7 @@ class VNA_Analysis(MeasurementAnalysis):
     '''
     Nice to use with all measurements performed with the VNA.
     '''
+
     def __init__(self, label='VNA', **kw):
         kw['label'] = label
         kw['h5mode'] = 'r+'
@@ -4353,10 +4353,12 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
                 abs(max(self.data_dist) - min(self.data_dist))
 
             if kappa_guess == 0:
-                    kappa_guess = 1 # When kappa_guess is zero, the fitting procedure fails (claims 'input has nan values')
+                # When kappa_guess is zero, the fitting procedure fails (claims
+                # 'input has nan values')
+                kappa_guess = 1
 
-            if not peak_flag: # Change the sign of amplitude_guess for dips
-                amplitude_guess*=-1.
+            if not peak_flag:  # Change the sign of amplitude_guess for dips
+                amplitude_guess *= -1.
 
             LorentzianModel = fit_mods.LorentzianModel
             LorentzianModel.set_param_hint('f0',
@@ -5313,7 +5315,8 @@ class butterfly_analysis(MeasurementAnalysis):
             Q_shots = self.measured_values[1]
 
             shots = I_shots+1j*Q_shots
-            rot_shots = dm_tools.rotate_complex(shots, angle=theta_in, deg=True)
+            rot_shots = dm_tools.rotate_complex(
+                shots, angle=theta_in, deg=True)
             I_shots = rot_shots.real
             Q_shots = rot_shots.imag
 
@@ -5354,7 +5357,6 @@ class butterfly_analysis(MeasurementAnalysis):
             self.data_rel = self.data_rel_post
             fraction = (
                 np.size(self.data_exc) + np.size(self.data_exc))*3/shots_used/2
-
 
         else:
             m0_on = self.data[2::4]
