@@ -64,3 +64,4 @@ class QcSnaphotWidget(QtGui.QTreeWidget):
                         param_node = self.nodes[param_node_name]
                         param_node.setData(1, 0, value_str)
                         param_node.setData(2, 0, unit)
+                        param_node.setData(3, 0, latest_str)
