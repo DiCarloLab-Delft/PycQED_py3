@@ -237,10 +237,6 @@ class MeasurementAnalysis(object):
         for key, value in save_dict.items():
             dict_grp.attrs[key] = str(value)
 
-
-
-
-
     def save_fitted_parameters(self, fit_res, var_name, save_peaks=False,
                                weights=None):
         fit_name = 'Fitted Params ' + var_name
@@ -5333,6 +5329,10 @@ class butterfly_analysis(MeasurementAnalysis):
 
         if theta_in == 0:
             self.data = self.measured_values[0]
+            if not digitize:
+                # analysis uses +1 for |0> and -1 for |1>
+                self.data[self.data == 1] = -1
+                self.data[self.data == 0] = +1
         else:
             I_shots = self.measured_values[0]
             Q_shots = self.measured_values[1]
@@ -5344,8 +5344,8 @@ class butterfly_analysis(MeasurementAnalysis):
             Q_shots = rot_shots.imag
 
             self.data = I_shots
-
-        if initialize:
+        self.initialize = initialize
+        if self.initialize:
             if threshold_init is None:
                 threshold_init = threshold
 
@@ -5357,6 +5357,7 @@ class butterfly_analysis(MeasurementAnalysis):
             m0_on = self.data[3:shots_used:6]
             m1_on = self.data[4:shots_used:6]
             m2_on = self.data[5:shots_used:6]
+
             self.data_rel = np.zeros([np.size(m0_on), 3])
             self.data_rel[:, 0] = m0_on
             self.data_rel[:, 1] = m1_on
@@ -5368,14 +5369,17 @@ class butterfly_analysis(MeasurementAnalysis):
             self.data_exc[:, 0] = m0_off
             self.data_exc[:, 1] = m1_off
             self.data_exc[:, 2] = m2_off
-            self.data_exc = dm_tools.postselect(threshold=threshold_init,
-                                                data=self.data_exc,
-                                                positive_case=case)
-            self.data_rel = dm_tools.postselect(threshold=threshold_init,
-                                                data=self.data_rel,
-                                                positive_case=case)
-            self.data_exc_post = self.data_exc[:, 1:]
-            self.data_rel_post = self.data_rel[:, 1:]
+
+            self.data_exc_post = dm_tools.postselect(threshold=threshold_init,
+                                                     data=self.data_exc,
+                                                     positive_case=case)[:, 1:]
+            self.data_rel_post = dm_tools.postselect(threshold=threshold_init,
+                                                     data=self.data_rel,
+                                                     positive_case=case)[:, 1:]
+
+            self.data_exc_pre_postselect = self.data_exc
+            self.data_rel_pre_postselect = self.data_rel
+            # variable is overwritten here, no good.
             self.data_exc = self.data_exc_post
             self.data_rel = self.data_rel_post
             fraction = (np.size(self.data_exc) +
@@ -5404,8 +5408,50 @@ class butterfly_analysis(MeasurementAnalysis):
         if auto is True:
             self.run_default_analysis(**kw)
 
-    def run_default_analysis(self,  **kw):
-        verbose = kw.pop('verbose', False)
+    def bar_plot_raw_probabilities(self):
+        if self.initialize:
+            nr_msmts = 3
+            data_exc = self.data_exc_pre_postselect
+            data_rel = self.data_rel_pre_postselect
+        else:
+            data_exc = self.data_exc
+            data_rel = self.data_rel
+            nr_msmts = 2
+
+        m_on = np.zeros(nr_msmts)
+        m_off = np.zeros(nr_msmts)
+
+        for i in range(nr_msmts):
+            # Convert pauli eigenvalues to probability of excitation
+            # +1 -> 0 and -1 -> 1
+            m_off[i] = -(np.mean(data_exc[:, i])-1)/2
+            m_on[i] = -(np.mean(data_rel[:, i])-1)/2
+
+        f, ax = plt.subplots()
+        ax.set_ylim(0, 1)
+        w = .4
+        ax.hlines(0.5, -.5, 5, linestyles='--')
+        bar0 = ax.bar(np.arange(nr_msmts)+w/2, m_off, width=w, color='C0',
+                      label='No $\pi$-pulse')
+        bar1 = ax.bar(np.arange(nr_msmts)-w/2, m_on, width=w, color='C3',
+                      label='$\pi$-pulse')
+        pl_tools.autolabel_barplot(ax, bar0)
+        pl_tools.autolabel_barplot(ax, bar1)
+
+        ax.set_xlim(-.5, nr_msmts-.5)
+        ax.set_xticks([0, 1, 2])
+        set_ylabel(ax, 'P (|1>)')
+        ax.legend()
+        set_xlabel(ax, 'Measurement idx')
+        figname = 'Bar plot raw probabilities'
+        ax.set_title(figname)
+
+        savename = os.path.abspath(os.path.join(
+            self.folder, figname+'.png'))
+        print(savename)
+        f.savefig(savename, dpi=300, format='png')
+
+    def run_default_analysis(self,  verbose=False, **kw):
         self.exc_coeffs = dm_tools.butterfly_data_binning(Z=self.data_exc,
                                                           initial_state=0)
         self.rel_coeffs = dm_tools.butterfly_data_binning(Z=self.data_rel,
@@ -5429,7 +5475,7 @@ class butterfly_analysis(MeasurementAnalysis):
         self.butterfly_coeffs['F_a_butterfly'] = F_a_butterfly
         self.butterfly_coeffs['mmt_ind_exc'] = mmt_ind_exc
         self.butterfly_coeffs['mmt_ind_rel'] = mmt_ind_rel
-
+        self.bar_plot_raw_probabilities()
         self.make_data_tables()
 
         return self.butterfly_coeffs
@@ -5449,7 +5495,7 @@ class butterfly_analysis(MeasurementAnalysis):
                       ['P11_1', '{:.4f}'.format(self.rel_coeffs['P11_1'])]]
 
         savename = os.path.abspath(os.path.join(
-                self.folder, figname1))
+            self.folder, figname1))
         data_to_table_png(data=data_raw_p, filename=savename+'.png',
                           title=figname1)
 
@@ -5461,7 +5507,7 @@ class butterfly_analysis(MeasurementAnalysis):
                     ['eps0_1', '{:.4f}'.format(self.rel_coeffs['eps0_1'])],
                     ['eps1_1', '{:.4f}'.format(self.rel_coeffs['eps1_1'])]]
         savename = os.path.abspath(os.path.join(
-                self.folder, figname2))
+            self.folder, figname2))
         data_to_table_png(data=data_inf, filename=savename+'.png',
                           title=figname2)
 
@@ -5477,20 +5523,19 @@ class butterfly_analysis(MeasurementAnalysis):
                 ['eps10_1', '{:.4f}'.format(bf['eps10_1'])],
                 ['eps11_1', '{:.4f}'.format(bf['eps11_1'])]]
         savename = os.path.abspath(os.path.join(
-                self.folder, figname3))
+            self.folder, figname3))
         data_to_table_png(data=data, filename=savename+'.png',
                           title=figname3)
 
-
         figname4 = 'Derived quantities'
         data = [['Measurement induced excitations',
-                    '{:.4f}'.format(bf['mmt_ind_exc'])],
+                 '{:.4f}'.format(bf['mmt_ind_exc'])],
                 ['Measurement induced relaxation',
                     '{:.4f}'.format(bf['mmt_ind_rel'])],
                 ['Readout fidelity',
                     '{:.4f}'.format(bf['F_a_butterfly'])]]
         savename = os.path.abspath(os.path.join(
-                self.folder, figname4))
+            self.folder, figname4))
         data_to_table_png(data=data, filename=savename+'.png',
                           title=figname4)
 
@@ -6197,6 +6242,7 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
 
 
 class Ram_Z_Analysis(MeasurementAnalysis):
+
     def __init__(self, timestamp_cos=None, timestamp_sin=None,
                  filter_raw=False, filter_deriv_phase=False, demodulate=True,
                  f_demod=0, f01max=None, E_c=None, flux_amp=None, V_offset=0,
@@ -6302,7 +6348,7 @@ class Ram_Z_Analysis(MeasurementAnalysis):
         # Filter phase and/or calculate the derivative
         if filter_deriv_phase:
             df = self.gauss_deriv_filter(phases, filter_width, dt, pad_val=0)\
-                 / (2 * np.pi)
+                / (2 * np.pi)
         else:
             # Calculate central derivative
             phasesPadded = np.concatenate(([0], phases))
@@ -6472,7 +6518,7 @@ class Ram_Z_Analysis(MeasurementAnalysis):
         if pad_val is None:
             pad_val = data[0]
         paddedData = np.concatenate(
-                (np.ones(int(filterHalfWidth)) * pad_val, data))
+            (np.ones(int(filterHalfWidth)) * pad_val, data))
         return np.convolve(paddedData, gaussDerivFilter, mode='valid')
 
     def unwrap_phase(self, raw_phases):
@@ -6542,7 +6588,7 @@ class Ram_Z_Analysis(MeasurementAnalysis):
             self.all_df[i] = df
 
         self.mean_freqs = np.array([np.mean(i[-self.mean_count:])
-                                   for i in self.all_df])
+                                    for i in self.all_df])
 
         self.fit_freqs, self.fit_amps = self.remove_outliers(
             [len(self.sweep_points_2D)//2])
@@ -6553,7 +6599,7 @@ class Ram_Z_Analysis(MeasurementAnalysis):
             'V_per_phi0': self.V_per_phi0,
             'dac_sweet_spot': self.V_offset,
             'asymmetry': 0
-            }
+        }
 
         self.fit_res = self.fit_dac_arc(self.fit_freqs,
                                         self.fit_amps,
