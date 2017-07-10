@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import colorsys as colors
 import numpy as np
 
-SI_PREFIXES = 'yzafpnum kMGTPEZY'
+SI_PREFIXES = 'yzafpnμm kMGTPEZY'
 SI_UNITS = 'm,s,g,W,J,V,A,F,T,Hz,Ohm,S,N,C,px,b,B,K,Bar'.split(',')
 
 
