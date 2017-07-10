@@ -287,3 +287,14 @@ def flex_colormesh_plot_vs_xy(xvals, yvals, zvals, ax=None,
                                  vmin=clim[0], vmax=clim[1])
 
     return {'fig': ax.figure, 'ax': ax, 'cmap': colormap}
+
+
+def autolabel_barplot(ax, rects, rotation=90):
+    """
+    Attach a text label above each bar displaying its height
+    """
+    for rect in rects:
+        height = rect.get_height()
+        ax.text(rect.get_x() + rect.get_width()/2., 0.5*height,
+                '%.2f' % (height),
+                ha='center', va='bottom', rotation=rotation)
