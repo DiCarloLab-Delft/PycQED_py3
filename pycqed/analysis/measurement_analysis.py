@@ -1277,8 +1277,8 @@ class Rabi_Analysis(TD_Analysis):
             # easier to do just one fit we stick to that.
             # We make an initial guess of the Rabi period using both
             # quadratures
-            data = np.sqrt(self.measured_values[
-                           0]**2+self.measured_values[1]**2)
+            data = np.sqrt(self.measured_values[0]**2 +
+                           self.measured_values[1]**2)
             params = fit_mods.Cos_guess(model, data=data, t=self.sweep_points)
             fit_res = model.fit(
                 data=data,
@@ -1579,8 +1579,8 @@ class Motzoi_XY_analysis(TD_Analysis):
         self.add_analysis_datagroup_to_file()
         if self.cal_points is None:
             if len(self.measured_values) == 2:
-                self.corr_data = self.measured_values[
-                    0]**2 + self.measured_values[1]**2
+                self.corr_data = self.measured_values[0]**2 +
+                self.measured_values[1]**2
             else:
                 self.corr_data = self.measured_values[0]
         else:
