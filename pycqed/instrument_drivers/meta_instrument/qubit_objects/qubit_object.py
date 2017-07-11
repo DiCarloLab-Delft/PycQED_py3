@@ -266,7 +266,7 @@ class Transmon(Qubit):
         if dac_voltage is not None and flux is not None:
             raise ValueError('Specify either dac voltage or flux but not both')
 
-        if self.f_qubit_calc_method() is 'latest':
+        if self.f_qubit_calc_method() == 'latest':
             f_qubit_estimate = self.f_qubit()
 
         elif self.f_qubit_calc_method() == 'dac':
