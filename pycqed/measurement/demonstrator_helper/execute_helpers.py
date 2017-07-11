@@ -101,27 +101,28 @@ def _MC_result_to_chart_dict(result):
 def _send_calibration_loop():
 
     try:
-        while(True):
-            banned_pars = ['IDN', 'RO_optimal_weights_I', 'RO_optimal_weights_Q',
-                           'qasm_config']
-            # threading.Timer(10, _send_calibration).start()
-            # snapshot = MC.station.snapshot()
-            snapshot = qc.station.snapshot()
-            calibration = {
-                "q0": snapshot["instruments"]["QL"],
-                "q1": snapshot["instruments"]["QR"],
-                'fridge': snapshot["instruments"]["Maserati_fridge_mon"]
-            }
-            for par in banned_pars:
-                try:
-                    del calibration['q0']['parameters'][par]
-                    del calibration['q1']['parameters'][par]
-                except KeyError as e:
-                    logging.warning(e)
-            tc.client.publish_custom_msg({
-                "calibration": calibration
-            })
-            gevent.sleep(600)
+        # while(True):
+        banned_pars = ['IDN', 'RO_optimal_weights_I', 'RO_optimal_weights_Q',
+                       'qasm_config']
+        # threading.Timer(10, _send_calibration).start()
+        # snapshot = MC.station.snapshot()
+        snapshot = qc.station.snapshot()
+        calibration = {
+            "q0": snapshot["instruments"]["QL"],
+            "q1": snapshot["instruments"]["QR"],
+            'fridge': snapshot["instruments"]["Maserati_fridge_mon"]
+        }
+        for par in banned_pars:
+            try:
+                del calibration['q0']['parameters'][par]
+                del calibration['q1']['parameters'][par]
+            except KeyError as e:
+                logging.warning(e)
+        tc.client.publish_custom_msg({
+            "calibration": calibration
+        })
+        gevent.sleep(5)
+        print('Calibration data send')
 
     except KeyboardInterrupt:
         print("Keyboard interrupt")
