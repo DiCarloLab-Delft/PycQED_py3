@@ -1655,3 +1655,9 @@ def get_color_order(i, max_num):
     # take a blue to red scale from 0 to max_num
     # uses HSV system, H_red = 0, H_green = 1/3 H_blue=2/3
     return colors.hsv_to_rgb(2.*float(i)/(float(max_num)*3.), 1., 1.)
+
+
+def get_datetimestamp(time_var=None):
+    if time_var is None:
+        time_var = time.localtime()
+    return time.strftime('%Y%m%d_%H%M%S', time_var)
