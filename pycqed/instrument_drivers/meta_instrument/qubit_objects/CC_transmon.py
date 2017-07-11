@@ -1985,26 +1985,31 @@ class CBox_v3_driven_transmon(Transmon):
             hard_repetitions = int(np.ceil(repetitions_per_point /
                                        soft_repetitions))
 
-        # Run the experiment. It might take several runs, if more than one
-        # QASM file was generated.
-        for sr in range(soft_repetitions):
-            for i, qFile in enumerate(qasm_files):
-                self.prepare_for_timedomain()
-                s = qh.QASM_Sweep_v2(
-                    qFile.name, self.CBox.get_instr(), self.get_operation_dict(),
-                    parameter_name='GST sequence', unit=None)
-                d = self.int_log_det
-                # nr_shots = largest integer multiple of exp_nums[i] smaller than
-                # max number of shots (4095 for UHFQC).
-                d.nr_shots = hard_repetitions * exp_nums[i]
 
-                MC.set_sweep_function(s)
-                MC.set_sweep_points(np.arange(exp_nums[i] * repetitions_per_point))
-                MC.set_detector_function(d)
-                MC.run('GST' + self.msmt_suffix + '_{}'.format(i))
+        self.prepare_for_timedomain()
+        d = self.int_log_det
+        s = swf.Multi_QASM_Sweep(
+            exp_num_list=exp_nums,
+            hard_repetitions=hard_repetitions,
+            soft_repetitions=soft_repetitions,
+            qasm_list=[q.name for q in qasm_files],
+            config=self.qasm_config(),
+            detector=d,
+            CBox=self.CBox.get_instr(),
+            parameter_name='GST sequence',
+            unit=None)
+        total_exp_nr = np.sum(exp_nums) * hard_repetitions * soft_repetitions
+
+        if d.result_logging_mode != 'digitized':
+            logging.warning('GST is intended for use with digitized detector.'
+                            ' Analysis will fail otherwise.')
+
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(np.arange(total_exp_nr))
+        MC.set_detector_function(d)
+        MC.run('GST')
 
         # Analysis
-
 
 
 
