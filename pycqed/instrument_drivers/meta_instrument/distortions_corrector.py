@@ -62,6 +62,7 @@ class Distortion_corrector():
         self.known_fit_models = ['exponential', 'high-pass', 'spline']
         self.fit_model = None
         self.fit_res = None
+
         # Default fit model used in the interactive loop
         self._fit_model_loop = 'exponential'
 
