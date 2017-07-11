@@ -1579,8 +1579,8 @@ class Motzoi_XY_analysis(TD_Analysis):
         self.add_analysis_datagroup_to_file()
         if self.cal_points is None:
             if len(self.measured_values) == 2:
-                self.corr_data = self.measured_values[0]**2 +
-                self.measured_values[1]**2
+                self.corr_data = (self.measured_values[0]**2 +
+                                  self.measured_values[1]**2)
             else:
                 self.corr_data = self.measured_values[0]
         else:
