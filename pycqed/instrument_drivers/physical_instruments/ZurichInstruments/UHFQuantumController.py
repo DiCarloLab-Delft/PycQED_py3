@@ -604,37 +604,33 @@ class UHFQC(Instrument):
         tbase = np.arange(0, trace_length/1.8e9, 1/1.8e9)
         cosI = np.array(np.cos(2*np.pi*IF*tbase))
         sinI = np.array(np.sin(2*np.pi*IF*tbase))
-        eval('self.quex_wint_weights_{}_real(np.array(cosI))'.format(
-            weight_function_I))
-        eval('self.quex_wint_weights_{}_imag(np.array(sinI))'.format(
-            weight_function_I))
-        eval('self.quex_wint_weights_{}_real(np.array(sinI))'.format(
-            weight_function_Q))
-        eval('self.quex_wint_weights_{}_imag(np.array(cosI))'.format(
-            weight_function_Q))
-        eval('self.quex_rot_{}_real(1.0)'.format(weight_function_I))
-        eval('self.quex_rot_{}_imag(1.0)'.format(weight_function_I))
-        eval('self.quex_rot_{}_real(1.0)'.format(weight_function_Q))
-        eval('self.quex_rot_{}_imag(-1.0)'.format(weight_function_Q))
+        self.set('quex_wint_weights_{}_real'.format(weight_function_I),
+                 np.array(cosI))
+        self.set('quex_wint_weights_{}_imag'.format(weight_function_I),
+                 np.array(sinI))
+        self.set('quex_wint_weights_{}_real'.format(weight_function_Q),
+                 np.array(sinI))
+        self.set('quex_wint_weights_{}_imag'.format(weight_function_Q),
+                 np.array(cosI))
+        self.set('quex_rot_{}_real'.format(weight_function_I), 1.0)
+        self.set('quex_rot_{}_imag'.format(weight_function_I), 1.0)
+        self.set('quex_rot_{}_real'.format(weight_function_Q), 1.0)
+        self.set('quex_rot_{}_imag'.format(weight_function_Q), -1.0)
 
     def prepare_DSB_weight_and_rotation(self, IF, weight_function_I=0, weight_function_Q=1):
         trace_length = 4096
         tbase = np.arange(0, trace_length/1.8e9, 1/1.8e9)
         cosI = np.array(np.cos(2*np.pi*IF*tbase))
         sinI = np.array(np.sin(2*np.pi*IF*tbase))
-        eval('self.quex_wint_weights_{}_real(np.array(cosI))'.format(
-            weight_function_I))
-        eval('self.quex_wint_weights_{}_imag(np.array(sinI))'.format(
-            weight_function_I))
-        eval('self.quex_wint_weights_{}_real(np.array(sinI))'.format(
-            weight_function_Q))
-        eval('self.quex_wint_weights_{}_imag(np.array(cosI))'.format(
-            weight_function_Q))
-        eval('self.quex_rot_{}_real(1.0)'.format(weight_function_I))
-        eval('self.quex_rot_{}_imag(0.0)'.format(weight_function_I))
-        eval('self.quex_rot_{}_real(1.0)'.format(weight_function_Q))
-        eval('self.quex_rot_{}_imag(0.0)'.format(weight_function_Q))
-
+        self.set('quex_wint_weights_{}_real'.format(weight_function_I),
+                 np.array(cosI))
+        self.set('quex_wint_weights_{}_real'.format(weight_function_Q),
+                 np.array(sinI))
+		# the factor 2 is needed so that scaling matches SSB downconversion
+        self.set('quex_rot_{}_real'.format(weight_function_I), 2.0)
+        self.set('quex_rot_{}_imag'.format(weight_function_I), 0.0)
+        self.set('quex_rot_{}_real'.format(weight_function_Q), 2.0)
+        self.set('quex_rot_{}_imag'.format(weight_function_Q), 0.0)
 
     def _make_full_path(self, path):
         if path[0] == '/':
@@ -838,8 +834,6 @@ setTrigger(0);"""
     def upload_transformation_matrix(self, matrix):
         for i in range(np.shape(matrix)[0]):  # looping over the rows
             for j in range(np.shape(matrix)[1]):  # looping over the colums
-                #value =matrix[i,j]
-                # print(value)
                 eval(
                     'self.quex_trans_{}_col_{}_real(matrix[{}][{}])'.format(j, i, i, j))
 

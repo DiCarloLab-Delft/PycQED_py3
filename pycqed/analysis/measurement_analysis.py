@@ -163,11 +163,11 @@ class MeasurementAnalysis(object):
         if val_len == 4:
             self.figarray, self.axarray = plt.subplots(
                 val_len, 1, figsize=(min(6*len(self.value_names), 11),
-                                     1.5*len(self.value_names)))
+                                     1.5*len(self.value_names)+3))
         else:
             self.figarray, self.axarray = plt.subplots(
                 max(len(self.value_names), 1), 1,
-                figsize=(6, 1.5*len(self.value_names)))
+                figsize=(6, 1.5*len(self.value_names)+4))
         return tuple(self.f + [self.figarray] + self.ax + [self.axarray])
 
     def get_values(self, key):
@@ -227,6 +227,16 @@ class MeasurementAnalysis(object):
                 del self.analysis_group[datasetname]
                 self.analysis_group.create_dataset(
                     name=datasetname, data=data)
+
+    def save_dict_to_analysis_group(self, save_dict, group_name):
+
+        if group_name not in self.analysis_group:
+            dict_grp = self.analysis_group.create_group(group_name)
+        else:
+            dict_grp = self.analysis_group[group_name]
+
+        for key, value in save_dict.items():
+            dict_grp.attrs[key] = str(value)
 
     def save_fitted_parameters(self, fit_res, var_name, save_peaks=False,
                                weights=None):
@@ -302,7 +312,7 @@ class MeasurementAnalysis(object):
                              1.5*len(self.value_names)))
             else:
                 fig, axs = plt.subplots(max(len(self.value_names), 1), 1,
-                                        figsize=(5, 3*len(self.value_names)))
+                                        figsize=(5, 3*len(self.value_names)+2))
                 # Add all the sweeps to the plot 1 by 1
                 # indices are determined by it's shape/number of sweeps
             for i in range(len(self.value_names)):
@@ -5320,6 +5330,10 @@ class butterfly_analysis(MeasurementAnalysis):
 
         if theta_in == 0:
             self.data = self.measured_values[0]
+            if not digitize:
+                # analysis uses +1 for |0> and -1 for |1>
+                self.data[self.data == 1] = -1
+                self.data[self.data == 0] = +1
         else:
             I_shots = self.measured_values[0]
             Q_shots = self.measured_values[1]
@@ -5331,8 +5345,8 @@ class butterfly_analysis(MeasurementAnalysis):
             Q_shots = rot_shots.imag
 
             self.data = I_shots
-
-        if initialize:
+        self.initialize = initialize
+        if self.initialize:
             if threshold_init is None:
                 threshold_init = threshold
 
@@ -5344,6 +5358,7 @@ class butterfly_analysis(MeasurementAnalysis):
             m0_on = self.data[3:shots_used:6]
             m1_on = self.data[4:shots_used:6]
             m2_on = self.data[5:shots_used:6]
+
             self.data_rel = np.zeros([np.size(m0_on), 3])
             self.data_rel[:, 0] = m0_on
             self.data_rel[:, 1] = m1_on
@@ -5355,14 +5370,17 @@ class butterfly_analysis(MeasurementAnalysis):
             self.data_exc[:, 0] = m0_off
             self.data_exc[:, 1] = m1_off
             self.data_exc[:, 2] = m2_off
-            self.data_exc = dm_tools.postselect(threshold=threshold_init,
-                                                data=self.data_exc,
-                                                positive_case=case)
-            self.data_rel = dm_tools.postselect(threshold=threshold_init,
-                                                data=self.data_rel,
-                                                positive_case=case)
-            self.data_exc_post = self.data_exc[:, 1:]
-            self.data_rel_post = self.data_rel[:, 1:]
+
+            self.data_exc_post = dm_tools.postselect(threshold=threshold_init,
+                                                     data=self.data_exc,
+                                                     positive_case=case)[:, 1:]
+            self.data_rel_post = dm_tools.postselect(threshold=threshold_init,
+                                                     data=self.data_rel,
+                                                     positive_case=case)[:, 1:]
+
+            self.data_exc_pre_postselect = self.data_exc
+            self.data_rel_pre_postselect = self.data_rel
+            # variable is overwritten here, no good.
             self.data_exc = self.data_exc_post
             self.data_rel = self.data_rel_post
             fraction = (np.size(self.data_exc) +
@@ -5391,8 +5409,50 @@ class butterfly_analysis(MeasurementAnalysis):
         if auto is True:
             self.run_default_analysis(**kw)
 
-    def run_default_analysis(self,  **kw):
-        verbose = kw.pop('verbose', False)
+    def bar_plot_raw_probabilities(self):
+        if self.initialize:
+            nr_msmts = 3
+            data_exc = self.data_exc_pre_postselect
+            data_rel = self.data_rel_pre_postselect
+        else:
+            data_exc = self.data_exc
+            data_rel = self.data_rel
+            nr_msmts = 2
+
+        m_on = np.zeros(nr_msmts)
+        m_off = np.zeros(nr_msmts)
+
+        for i in range(nr_msmts):
+            # Convert pauli eigenvalues to probability of excitation
+            # +1 -> 0 and -1 -> 1
+            m_off[i] = -(np.mean(data_exc[:, i])-1)/2
+            m_on[i] = -(np.mean(data_rel[:, i])-1)/2
+
+        f, ax = plt.subplots()
+        ax.set_ylim(0, 1)
+        w = .4
+        ax.hlines(0.5, -.5, 5, linestyles='--')
+        bar0 = ax.bar(np.arange(nr_msmts)+w/2, m_off, width=w, color='C0',
+                      label='No $\pi$-pulse')
+        bar1 = ax.bar(np.arange(nr_msmts)-w/2, m_on, width=w, color='C3',
+                      label='$\pi$-pulse')
+        pl_tools.autolabel_barplot(ax, bar0)
+        pl_tools.autolabel_barplot(ax, bar1)
+
+        ax.set_xlim(-.5, nr_msmts-.5)
+        ax.set_xticks([0, 1, 2])
+        set_ylabel(ax, 'P (|1>)')
+        ax.legend()
+        set_xlabel(ax, 'Measurement idx')
+        figname = 'Bar plot raw probabilities'
+        ax.set_title(figname)
+
+        savename = os.path.abspath(os.path.join(
+            self.folder, figname+'.png'))
+        print(savename)
+        f.savefig(savename, dpi=300, format='png')
+
+    def run_default_analysis(self,  verbose=False, **kw):
         self.exc_coeffs = dm_tools.butterfly_data_binning(Z=self.data_exc,
                                                           initial_state=0)
         self.rel_coeffs = dm_tools.butterfly_data_binning(Z=self.data_rel,
@@ -5416,7 +5476,7 @@ class butterfly_analysis(MeasurementAnalysis):
         self.butterfly_coeffs['F_a_butterfly'] = F_a_butterfly
         self.butterfly_coeffs['mmt_ind_exc'] = mmt_ind_exc
         self.butterfly_coeffs['mmt_ind_rel'] = mmt_ind_rel
-
+        self.bar_plot_raw_probabilities()
         self.make_data_tables()
 
         return self.butterfly_coeffs
@@ -5436,7 +5496,7 @@ class butterfly_analysis(MeasurementAnalysis):
                       ['P11_1', '{:.4f}'.format(self.rel_coeffs['P11_1'])]]
 
         savename = os.path.abspath(os.path.join(
-                self.folder, figname1))
+            self.folder, figname1))
         data_to_table_png(data=data_raw_p, filename=savename+'.png',
                           title=figname1)
 
@@ -5448,7 +5508,7 @@ class butterfly_analysis(MeasurementAnalysis):
                     ['eps0_1', '{:.4f}'.format(self.rel_coeffs['eps0_1'])],
                     ['eps1_1', '{:.4f}'.format(self.rel_coeffs['eps1_1'])]]
         savename = os.path.abspath(os.path.join(
-                self.folder, figname2))
+            self.folder, figname2))
         data_to_table_png(data=data_inf, filename=savename+'.png',
                           title=figname2)
 
@@ -5464,20 +5524,19 @@ class butterfly_analysis(MeasurementAnalysis):
                 ['eps10_1', '{:.4f}'.format(bf['eps10_1'])],
                 ['eps11_1', '{:.4f}'.format(bf['eps11_1'])]]
         savename = os.path.abspath(os.path.join(
-                self.folder, figname3))
+            self.folder, figname3))
         data_to_table_png(data=data, filename=savename+'.png',
                           title=figname3)
 
-
         figname4 = 'Derived quantities'
         data = [['Measurement induced excitations',
-                    '{:.4f}'.format(bf['mmt_ind_exc'])],
+                 '{:.4f}'.format(bf['mmt_ind_exc'])],
                 ['Measurement induced relaxation',
                     '{:.4f}'.format(bf['mmt_ind_rel'])],
                 ['Readout fidelity',
                     '{:.4f}'.format(bf['F_a_butterfly'])]]
         savename = os.path.abspath(os.path.join(
-                self.folder, figname4))
+            self.folder, figname4))
         data_to_table_png(data=data, filename=savename+'.png',
                           title=figname4)
 
@@ -6182,17 +6241,20 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
                                         params=params)
         return fit_res
 
+
 class Ram_Z_Analysis(MeasurementAnalysis):
+
     def __init__(self, timestamp_cos=None, timestamp_sin=None,
                  filter_raw=False, filter_deriv_phase=False, demodulate=True,
-                 f_demod=0, f01max=None, E_c=None, flux_amp=None, V_0=0, d_c=1,
-                 auto=True, make_fig=True, TwoD=False, **kw):
-        super().__init__(timestamp=timestamp_cos, label='Ram_Z_cos', TwoD=TwoD,
-                         **kw)
-        self.cosTrace = self.measured_values[0]
-        super().__init__(timestamp=timestamp_sin, label='Ram_Z_sin', TwoD=TwoD,
-                         **kw)
-        self.sinTrace = self.measured_values[0]
+                 f_demod=0, f01max=None, E_c=None, flux_amp=None, V_offset=0,
+                 V_per_phi0=None, auto=True, make_fig=True, TwoD=False,
+                 mean_count=16, **kw):
+        super().__init__(timestamp=timestamp_cos, label='Ram_Z_cos',
+                         TwoD=TwoD, **kw)
+        self.cosTrace = np.array(self.measured_values[0])
+        super().__init__(timestamp=timestamp_sin, label='Ram_Z_sin',
+                         TwoD=TwoD, **kw)
+        self.sinTrace = np.array(self.measured_values[0])
 
         self.filter_raw = filter_raw
         self.filter_deriv_phase = filter_deriv_phase
@@ -6202,15 +6264,18 @@ class Ram_Z_Analysis(MeasurementAnalysis):
         self.f01max = f01max
         self.E_c = E_c
         self.flux_amp = flux_amp
-        self.V_0 = V_0
+        self.V_offset = V_offset
+        self.V_per_phi0 = V_per_phi0
 
-        self.d_c = d_c
+        self.mean_count = mean_count
 
         if auto:
             if not TwoD:
                 self.run_special_analysis(make_fig=make_fig)
             else:
-                pass
+                self.cosTrace = self.cosTrace.T
+                self.sinTrace = self.sinTrace.T
+                self.run_dac_arc_analysis(make_fig=make_fig)
 
     def normalize(self, trace):
         # * -1 because cos starts at -1 instead of 1
@@ -6220,33 +6285,41 @@ class Ram_Z_Analysis(MeasurementAnalysis):
         return trace
 
     def run_special_analysis(self, make_fig=True):
-        self.df, self.phases, self.I, self.Q = self.analyse_trace(
-            self.cosTrace, self.sinTrace, self.sweep_points,
-            filter_raw=self.filter_raw,
-            filter_deriv_phase=self.filter_deriv_phase,
-            demodulate=self.demod,
-            f_demod=self.f_demod,
-            return_all=True)
+        self.df, self.raw_phases, self.phases, self.I, self.Q = \
+            self.analyze_trace(
+                self.cosTrace, self.sinTrace, self.sweep_points,
+                filter_raw=self.filter_raw,
+                filter_deriv_phase=self.filter_deriv_phase,
+                demodulate=self.demod,
+                f_demod=self.f_demod,
+                return_all=True)
 
         # self.add_dataset_to_analysisgroup('detuning', self.df)
         # self.add_dataset_to_analysisgroup('phase', self.phases)
 
-        if (self.f01max != None and self.E_c != None and
-            self.flux_amp != None):
-            self.d_c, self.step_response = self.get_stepresponse(
-                self.df, self.f01max, self.E_c, self.flux_amp, V_0=self.V_0)
+        if (self.f01max is not None and self.E_c is not None and
+                self.flux_amp is not None and self.V_per_phi0 is not None):
+
+            self.step_response = fit_mods.Qubit_freq_to_dac(
+                frequency=self.f01max-self.df,
+                f_max=self.f01max,
+                E_c=self.E_c,
+                dac_sweet_spot=self.V_offset,
+                V_per_phi0=self.V_per_phi0,
+                asymmetry=0) / self.flux_amp
+
             # self.add_dataset_to_analysisgroup('step_response',
             #                                   self.step_response)
             plotStep = True
         else:
-            print('To calculate step response, f01max, E_c, flux_amp, and V_0'
-                  ' have to be specified.')
+            print('To calculate step response, f01max, E_c, flux_amp, '
+                  'V_per_phi0, and V_offset have to be specified.')
             plotStep = False
 
         if make_fig:
             self.make_figures(plot_step=plotStep)
 
-    def analyse_trace(self, I, Q, x_pts,
+    def analyze_trace(self, I, Q, x_pts,
                       filter_raw=False, filter_deriv_phase=False,
                       filter_width=1e-9,
                       demodulate=False, f_demod=0,
@@ -6265,13 +6338,13 @@ class Ram_Z_Analysis(MeasurementAnalysis):
             Q = self.gauss_filter(Q, filter_width, dt, pad_val=0)
 
         # Calcualte phase and undo phase-wrapping
-        phases = np.arctan2(Q, I)
-        phases = self.unwrap_phase(phases)
+        raw_phases = np.arctan2(Q, I)
+        phases = self.unwrap_phase(raw_phases)
 
         # Filter phase and/or calculate the derivative
         if filter_deriv_phase:
             df = self.gauss_deriv_filter(phases, filter_width, dt, pad_val=0)\
-                 / (2 * np.pi)
+                / (2 * np.pi)
         else:
             # Calculate central derivative
             phasesPadded = np.concatenate(([0], phases))
@@ -6284,32 +6357,9 @@ class Ram_Z_Analysis(MeasurementAnalysis):
         df[0] = 0  # detuning must start at 0
 
         if return_all:
-            return df, phases, I, Q
+            return df, raw_phases, phases, I, Q
         else:
             return df
-
-    def get_stepresponse(self, df, f01max, E_c, F_amp, V_0=0):
-        '''
-        Calculates the dac flux coefficient and the step response from the
-        detuning.
-
-        Args:
-            df (array):     Detuning of the qubit.
-            f01max (float): Sweet-spot frequency of the qubit.
-            E_c (float):    Charging energy of the qubig.
-            F_amp (float):  Amplitude of the applied pulse in V.
-            V_0 (float):    Offset from sweet spot in V.
-
-        Returns:
-            d_c (float):    dac flux coefficient.
-            s (array):      Normalized step response in voltage space.
-        '''
-        f_end = np.mean(df[-10:])
-        # d_c = np.arccos( (1 - f_end / (f01max + E_c))**2 ) / (F_amp - V_0)
-        d_c = self.d_c
-        s = (np.arccos((1 - df / (f01max + E_c))**2) / d_c + V_0) / F_amp
-
-        return d_c, s
 
     def make_figures(self, plot_step=True):
         '''
@@ -6400,7 +6450,7 @@ class Ram_Z_Analysis(MeasurementAnalysis):
         gaussFilter = np.exp(-tFilter**2 / (2*sigma**2))
         gaussFilter /= np.sum(gaussFilter)
 
-        if pad_val == None:
+        if pad_val is None:
             pad_val = data[0]
         paddedData = np.concatenate((np.ones(int(filterHalfWidth)) *
                                      pad_val, data))
@@ -6439,13 +6489,13 @@ class Ram_Z_Analysis(MeasurementAnalysis):
         gaussFilter /= np.sum(gaussFilter)
         gaussDerivFilter = gaussFilter * (-tFilter) / (sigma**2)
 
-        if pad_val == None:
+        if pad_val is None:
             pad_val = data[0]
         paddedData = np.concatenate(
-                (np.ones(int(filterHalfWidth)) * pad_val, data))
+            (np.ones(int(filterHalfWidth)) * pad_val, data))
         return np.convolve(paddedData, gaussDerivFilter, mode='valid')
 
-    def unwrap_phase(self, phases):
+    def unwrap_phase(self, raw_phases):
         '''
         Undoes phase-wrapping and returns a continuous version of the phase
         data.
@@ -6454,6 +6504,7 @@ class Ram_Z_Analysis(MeasurementAnalysis):
         # Phases are now between -pi and pi. But we know that the phase
         # changes continuously and we want a differentiable function, so we
         # can undo the phase-wrapping
+        phases = deepcopy(raw_phases)
         for i, p in enumerate(phases[:-1]):
             # If a phase wrap is detected, all consecutive points are shifted
             # by 2*pi
@@ -6463,6 +6514,128 @@ class Ram_Z_Analysis(MeasurementAnalysis):
                 phases[i+1:] -= 2*np.pi
 
         return phases
+
+    def run_dac_arc_analysis(self, make_fig=True):
+        '''
+        Analyze a 2D Ram-Z scan (pulse length vs. pulse amplitude), and
+        exctract a dac arc.
+        '''
+        df = self.analyze_trace(
+            self.cosTrace[0], self.sinTrace[0], self.sweep_points,
+            filter_raw=self.filter_raw,
+            filter_deriv_phase=self.filter_deriv_phase,
+            demodulate=self.demod,
+            f_demod=self.f_demod,
+            return_all=False)
+
+        if self.demod:
+            # Take an initial guess for V_per_phi0, if it has not been
+            # specified
+            # Note: assumes symmetric qubit.
+            if self.V_per_phi0 is None:
+                self.V_per_phi0 = (
+                    np.pi * (self.sweep_points_2D[0] - self.V_offset) /
+                    np.arccos(((self.f01max - df + self.E_c) /
+                               (self.f01max + self.E_c))**2))
+
+            # Set the demodulation frequencies based on the guess
+            self.demod_freqs = [fit_mods.Qubit_dac_to_detun(
+                v, f_max=self.f01max,
+                E_c=self.E_c,
+                dac_sweet_spot=self.V_offset,
+                V_per_phi0=self.V_per_phi0) for v in self.sweep_points_2D]
+        else:
+            self.demod_freqs = np.zeros(len(self.sweep_points_2D))
+
+        # Run analysis on the remaining traces
+        self.all_df = np.empty((len(self.sweep_points_2D), len(df)))
+        self.all_df[0] = df
+
+        for i in range(1, len(self.sweep_points_2D)):
+            df = self.analyze_trace(
+                self.cosTrace[i], self.sinTrace[i], self.sweep_points,
+                filter_raw=self.filter_raw,
+                filter_deriv_phase=self.filter_deriv_phase,
+                demodulate=self.demod,
+                f_demod=self.demod_freqs[i],
+                return_all=False)
+            self.all_df[i] = df
+
+        self.mean_freqs = np.array([np.mean(i[-self.mean_count:])
+                                    for i in self.all_df])
+
+        self.fit_freqs, self.fit_amps = self.remove_outliers(
+            [len(self.sweep_points_2D)//2])
+
+        self.param_hints = {
+            'f_max': self.f01max,
+            'E_c': self.E_c,
+            'V_per_phi0': self.V_per_phi0,
+            'dac_sweet_spot': self.V_offset,
+            'asymmetry': 0
+        }
+
+        self.fit_res = self.fit_dac_arc(self.fit_freqs,
+                                        self.fit_amps,
+                                        param_hints=self.param_hints)
+
+        if make_fig:
+            self.make_figures_2D()
+
+    def fit_dac_arc(self, df, V, param_hints={}):
+        '''
+        Fit the model for the dac arc to the detunings df (y-axis) and appplied
+        voltages V (x-axis).
+        '''
+        model = lmfit.Model(fit_mods.Qubit_dac_to_detun)
+        model.set_param_hint('f_max', value=param_hints.pop('f_max', 6e9),
+                             min=0, vary=False)
+        model.set_param_hint('E_c', value=param_hints.pop('E_c', 0.25e9),
+                             vary=False)
+        model.set_param_hint('V_per_phi0',
+                             value=param_hints.pop('V_per_phi0', 1))
+        model.set_param_hint('dac_sweet_spot',
+                             value=param_hints.pop('V_offset', 0))
+        model.set_param_hint('asymmetry',
+                             value=param_hints.pop('asymmetry', 0),
+                             vary=False)
+        params = model.make_params()
+
+        fit_res = model.fit(df, dac_voltage=V, params=params)
+        return fit_res
+
+    def remove_outliers(self, indices):
+        '''
+        Removes the elementes at the given indices from the self.all_df and
+        self.sweep_points_2D and returns the resulting arrays.
+
+        Args:
+            indices (tuple of ints):
+                    Indices of elements which should be removed.
+        '''
+        fit_freqs = deepcopy(self.mean_freqs)
+        fit_amps = deepcopy(self.sweep_points_2D)
+
+        return np.delete(fit_freqs, indices), np.delete(fit_amps, indices)
+
+    def make_figures_2D(self, figsize=(7, 5)):
+        xFine = np.linspace(self.sweep_points_2D[0], self.sweep_points_2D[-1],
+                            100)
+        dacArc = self.fit_res.eval(dac_voltage=xFine)  # fit was in GHz
+
+        fig, ax = plt.subplots(1, 1, figsize=figsize)
+        ax.plot(self.sweep_points_2D, self.mean_freqs, '-o')
+        ax.plot(xFine, dacArc)
+        ax.text(.1, .8,
+                '$V_{\mathsf{per }\Phi_0} = $'
+                + str(self.fit_res.best_values['V_per_phi0'])
+                + '\n$V_\mathsf{offset} = $'
+                + str(self.fit_res.best_values['dac_sweet_spot']),
+                transform=ax.transAxes)
+        set_xlabel(ax, self.parameter_names[1], self.parameter_units[1])
+        set_ylabel(ax, 'detuning', 'Hz')
+
+        self.save_fig(fig, 'Ram-Z_dac_arc.png')
 
 
 class GST_Analysis(TD_Analysis):

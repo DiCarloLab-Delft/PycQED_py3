@@ -57,8 +57,8 @@ def single_channel_block(amp, length, sampling_rate=2e8, delay=0):
         sampling_rate in Hz
         empty delay in s
     '''
-    nr_samples = (length+delay)*sampling_rate
-    delay_samples = delay*sampling_rate
+    nr_samples = int(np.round((length+delay)*sampling_rate))
+    delay_samples = int(np.round(delay*sampling_rate))
     pulse_samples = nr_samples - delay_samples
 
     block = amp * np.ones(int(pulse_samples))
@@ -76,8 +76,8 @@ def block_pulse(amp, length, sampling_rate=2e8, delay=0, phase=0):
         empty delay in s
         phase in degrees
     '''
-    nr_samples = np.round((length+delay)*sampling_rate)
-    delay_samples = np.round(delay*sampling_rate)
+    nr_samples = int(np.round((length+delay)*sampling_rate))
+    delay_samples = int(np.round(delay*sampling_rate))
     pulse_samples = nr_samples - delay_samples
     amp_I = amp*np.cos(phase*2*np.pi/360)
     amp_Q = amp*np.sin(phase*2*np.pi/360)
@@ -238,8 +238,9 @@ def martinis_flux_pulse(length, lambda_coeffs, theta_f,
 def martinis_flux_pulse_v2(length, lambda_2, lambda_3, theta_f,
                            f_01_max,
                            J2,
-                           dac_flux_coefficient,
-                           E_c=0,
+                           V_offset=0,
+                           V_per_phi0=1,
+                           E_c=250e6,
                            f_bus=None,
                            f_interaction=None,
                            asymmetry=0,
@@ -278,7 +279,7 @@ def martinis_flux_pulse_v2(length, lambda_2, lambda_3, theta_f,
                     eps=f12-f_bus
     """
     # Define number of samples and time points
-    nr_samples = int(np.round((length)*sampling_rate))  # rounds the nr samples
+    nr_samples = int(np.round((length)*sampling_rate))
     length = nr_samples/sampling_rate  # gives back the rounded length
     t_step = 1/sampling_rate
     t = np.arange(0, length, t_step)
@@ -296,13 +297,13 @@ def martinis_flux_pulse_v2(length, lambda_2, lambda_3, theta_f,
             + 'final coupling weaker than initial coupling')
 
     # lambda_1 is scaled such that the final ("center") angle is theta_f
-    lambda_1 = (theta_f - theta_i) / 2 - lambda_3
+    lambda_1 = (theta_f - theta_i) / (2 + 2 * lambda_3)
 
     # Calculate the wave
     theta_wave = np.ones(nr_samples) * theta_i
     theta_wave += lambda_1 * (1 - np.cos(2 * np.pi * t / length))
-    theta_wave += lambda_2 * (1 - np.cos(4 * np.pi * t / length))
-    theta_wave += lambda_3 * (1 - np.cos(6 * np.pi * t / length))
+    theta_wave += lambda_1 * lambda_2 * (1 - np.cos(4 * np.pi * t / length))
+    theta_wave += lambda_1 * lambda_3 * (1 - np.cos(6 * np.pi * t / length))
 
     # Clip wave to [theta_i, pi] to avoid poles in the wave expressed in freq
     theta_wave_clipped = np.clip(theta_wave, theta_i, np.pi-.01)
@@ -331,8 +332,8 @@ def martinis_flux_pulse_v2(length, lambda_2, lambda_3, theta_f,
         frequency=f_01_wave,
         f_max=f_01_max,
         E_c=E_c,
-        dac_sweet_spot=0,
-        dac_flux_coefficient=dac_flux_coefficient,
+        dac_sweet_spot=V_offset,
+        V_per_phi0=V_per_phi0,
         asymmetry=asymmetry,
         branch='positive')
     return voltage_wave

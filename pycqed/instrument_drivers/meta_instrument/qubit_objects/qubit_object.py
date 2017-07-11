@@ -364,6 +364,36 @@ class Transmon(Qubit):
                            # in the future add 'tracked_dac', 'tracked_flux',
                            initial_value='latest',
                            parameter_class=ManualParameter)
+        self.add_parameter('F_ssro',
+                           initial_value=0,
+                           label='RO assignment fidelity',
+                           vals=vals.Numbers(0.0, 1.0),
+                           parameter_class=ManualParameter)
+        self.add_parameter('F_discr',
+                           initial_value=0,
+                           label='RO discrimination fidelity',
+                           vals=vals.Numbers(0.0, 1.0),
+                           parameter_class=ManualParameter)
+        self.add_parameter('F_RB',
+                           initial_value=0,
+                           label='RB single qubit Clifford fidelity',
+                           vals=vals.Numbers(0, 1.0),
+                           parameter_class=ManualParameter)
+        self.add_parameter('V_per_phi0',
+                           initial_value=1,
+                           label='V per phi0',
+                           vals=vals.Numbers(),
+                           docstring='Conversion between flux and voltage. '
+                                     'How many volts need to be applied to '
+                                     'have a flux of 1 phi0 (pulsed).',
+                           parameter_class=ManualParameter)
+        self.add_parameter('V_offset',
+                           initial_value=0,
+                           label='V offset',
+                           vals=vals.Numbers(),
+                           docstring='AWG voltage at which the sweet spot is '
+                                     'found (pulsed).',
+                           parameter_class=ManualParameter)
 
     def calculate_frequency(self,
                             dac_voltage=None,
@@ -540,7 +570,8 @@ class Transmon(Qubit):
     def calibrate_pulse_amplitude_coarse(self,
                                          amps=np.linspace(-.5, .5, 31),
                                          close_fig=True, verbose=False,
-                                         MC=None, update=True, take_fit_I=False):
+                                         MC=None, update=True,
+                                         take_fit_I=False):
         """
         Calibrates the pulse amplitude using a single rabi oscillation
         """
@@ -548,7 +579,7 @@ class Transmon(Qubit):
         self.measure_rabi(amps, n=1, MC=MC, analyze=False)
         a = ma.Rabi_Analysis(close_fig=close_fig)
         # Decide which quadrature to take by comparing the contrast
-        if take_fit_I:
+        if take_fit_I or len(a.measured_values) == 1:
             ampl = abs(a.fit_res[0].params['period'].value)/2.
         elif (np.abs(max(a.measured_values[0]) -
                      min(a.measured_values[0]))) > (

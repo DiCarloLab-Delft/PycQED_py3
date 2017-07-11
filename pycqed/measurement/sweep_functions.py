@@ -272,7 +272,8 @@ class QASM_Sweep_v2(Hard_Sweep):
 
     def __init__(self, qasm_fn: str, config: dict, CBox,
                  parameter_name: str ='Points', unit: str='a.u.',
-                 upload: bool=True, verbosity_level: int=0):
+                 upload: bool=True, verbosity_level: int=0,
+                 disable_compile_and_upload: bool=False):
         super().__init__()
         self.name = 'QASM_Sweep_v2'
 
@@ -284,9 +285,11 @@ class QASM_Sweep_v2(Hard_Sweep):
         self.parameter_name = parameter_name
         self.unit = unit
         self.verbosity_level = verbosity_level
+        self.disable_compile_and_upload = disable_compile_and_upload
 
     def prepare(self, **kw):
-        self.compile_and_upload(self.qasm_fn, self.config)
+        if not self.disable_compile_and_upload:
+            self.compile_and_upload(self.qasm_fn, self.config)
 
     def compile_and_upload(self, qasm_fn, config):
         if self.upload:
@@ -454,7 +457,7 @@ class QX_Hard_Sweep(Hard_Sweep):
         self.filename = filename
         self.__qxc = qxc
         # self.num_circuits = num_circuits
-        qasm = ql.qasm_loader(filename)
+        qasm = ql.qasm_loader(filename, qxc.get_nr_qubits())
         qasm.load_circuits()
         self.circuits = qasm.get_circuits()
 

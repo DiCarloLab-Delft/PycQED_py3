@@ -85,6 +85,31 @@ def SI_prefix_and_scale_factor(val, unit=None):
     return scale_factor, unit
 
 
+def SI_val_to_msg_str(val: float, unit: str=None):
+    """
+    Takes in a value  with optional unit and returns a string tuple consisting
+    of (value_str, unit) where the value and unit are rescaled according to
+    SI prefixes.
+    """
+    validtypes = (float, int, np.integer, np.floating)
+    if unit in SI_UNITS and isinstance(val, validtypes):
+        if val == 0:
+            prefix_power = 0
+        else:
+            # The defined prefixes go down to -24 but this is below
+            # the numerical precision of python
+            prefix_power = np.clip(-15, (np.log10(abs(val))//3 * 3), 24)
+        # Determine SI prefix, number 8 corresponds to no prefix
+        SI_prefix_idx = int(prefix_power/3 + 8)
+        prefix = SI_PREFIXES[SI_prefix_idx]
+        # Convert the unit
+        val = val*10**-prefix_power
+        unit = prefix+unit
+
+    value_str = str(val)
+    return value_str, unit
+
+
 def data_to_table_png(data: list, filename: str, title: str='',
                       close_fig: bool=True):
     """
@@ -287,3 +312,14 @@ def flex_colormesh_plot_vs_xy(xvals, yvals, zvals, ax=None,
                                  vmin=clim[0], vmax=clim[1])
 
     return {'fig': ax.figure, 'ax': ax, 'cmap': colormap}
+
+
+def autolabel_barplot(ax, rects, rotation=90):
+    """
+    Attach a text label above each bar displaying its height
+    """
+    for rect in rects:
+        height = rect.get_height()
+        ax.text(rect.get_x() + rect.get_width()/2., 0.5*height,
+                '%.2f' % (height),
+                ha='center', va='bottom', rotation=rotation)

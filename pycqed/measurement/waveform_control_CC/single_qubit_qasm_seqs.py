@@ -447,25 +447,19 @@ def MotzoiXY(qubit_name, motzois, cal_points=True):
 
 
 def Ram_Z(qubit_name, no_of_points, cal_points=True,
-          wait_before=50e-9, wait_between=280e-9, clock_cycle=1e-9,
           rec_Y90=False):
     '''
     Creates QASM sequence for an entire Ram-Z experiment, including
     calibration points.
 
-    Timing of measurement sequence for one point:
-        trigger flux pulse -- wait_before -- mX90 -- wait_between -- X90 -- RO
+    sequence:
+        mX90 -- flux_pulse -- X90 -- RO
 
     Args:
         qubit_name      (str): name of the targeted qubit
         no_of_points    (int): number of points in the hard sweep. This is
                                limited by the QWG waveform memory and number of
                                codeword channels used.
-        wait_before     (float): delay time in seconds between triggering the
-                                 AWG and the first pi/2 pulse
-        wait_between    (float): delay time in seconds between the two pi/2
-                                 pulses
-        clock_cycle     (float): period of the internal AWG clock
         rec_Y90         (bool): Use Y90 instead of X90 as second mw pulse.
     '''
     filename = join(base_qasm_path, 'Ram_Z.qasm')
@@ -488,14 +482,9 @@ def Ram_Z(qubit_name, no_of_points, cal_points=True,
             # Calibration point for |1>
             qasm_file.writelines('X180 {} \n'.format(qubit_name))
         else:
-            qasm_file.writelines('flux square_{} {}\n'.format(i, qubit_name))
-            qasm_file.writelines(
-                'I {}\n'.format(int(np.round(wait_before/clock_cycle))))
             qasm_file.writelines('mX90 {}\n'.format(qubit_name))
-            qasm_file.writelines(
-                'I {}\n'.format(int(np.round(wait_between/clock_cycle))))
+            qasm_file.writelines('square_{} {}\n'.format(i, qubit_name))
             qasm_file.writelines('{} {}\n'.format(recPulse, qubit_name))
-
         qasm_file.writelines('RO {}  \n'.format(qubit_name))
 
     qasm_file.close()

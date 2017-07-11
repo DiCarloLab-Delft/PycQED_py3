@@ -274,12 +274,40 @@ class QWG_FluxLookuptableManager(Instrument):
                                      'codewords.',
                            vals=vals.Lists(vals.Ints()))
 
+        self.add_parameter('disable_CZ',
+                           parameter_class=ManualParameter,
+                           vals=vals.Bool(),
+                           initial_value=False)
         self.add_parameter('pulse_map',
                            initial_value={'cz': 'adiabatic_Z',
                                           'square': 'square'},
                            parameter_class=ManualParameter,
                            # to be replaced with vals.Dict)
                            vals=vals.Anything())
+        self.add_parameter('wave_dict_unit',
+                           parameter_class=ManualParameter,
+                           initial_value='frac',
+                           docstring='Unit in which the waveforms are '
+                           'specified.\n'
+                           '"frac" means "fraction of the maximum QWG '
+                           'range".\n'
+                           '"V" means volts.',
+                           vals=vals.Enum('frac', 'V'))
+        self.add_parameter('V_offset',
+                           unit='V',
+                           label='V offset',
+                           docstring='pulsed sweet spot offset',
+                           parameter_class=ManualParameter,
+                           initial_value=0,
+                           vals=vals.Numbers())
+        self.add_parameter('V_per_phi0',
+                           unit='V',
+                           label='V per phi_0',
+                           docstring='pulsed voltage required for one phi0 '
+                                     'of flux',
+                           parameter_class=ManualParameter,
+                           initial_value=1,
+                           vals=vals.Numbers())
 
         self._wave_dict = {}
 
@@ -319,7 +347,8 @@ class QWG_FluxLookuptableManager(Instrument):
             f_01_max=self.F_f_01_max(),
             J2=self.F_J2(),
             E_c=self.F_E_c(),
-            dac_flux_coefficient=self.F_dac_flux_coef(),
+            V_per_phi0=self.V_per_phi0(),
+            V_offset=self.V_offset(),
             f_interaction=self.F_f_interaction(),
             f_bus=None,
             asymmetry=self.F_asymmetry(),
@@ -330,6 +359,8 @@ class QWG_FluxLookuptableManager(Instrument):
         z_nr_samples = int(np.round(self.Z_length() * self.sampling_rate()))
         single_qubit_phase_correction = np.ones(z_nr_samples) * self.Z_amp()
 
+        if self.disable_CZ():
+            martinis_pulse_v2 *= 0
         # Construct phase corrected pulses
         martinis_phase_corrected = np.concatenate(
             [martinis_pulse_v2, single_qubit_phase_correction])
@@ -431,11 +462,12 @@ class QWG_FluxLookuptableManager(Instrument):
         k = self.F_kernel_instr.get_instr()
 
         delayed_wave = np.concatenate([wait_samples, np.array(waveform),
-                                       wait_samples_comp_pulses, -1*np.array(waveform)])
+                                       wait_samples_comp_pulses,
+                                       -1*np.array(waveform)])
         distorted_wave = k.convolve_kernel(
             [k.kernel(), delayed_wave],
-            length_samples=int(self.max_waveform_length()
-                               * self.sampling_rate()))
+            length_samples=int(np.round(self.max_waveform_length()
+                               * self.sampling_rate())))
 
         self._wave_dict[pulse_name] = distorted_wave
         return distorted_wave
@@ -456,8 +488,24 @@ class QWG_FluxLookuptableManager(Instrument):
             raise KeyError(
                 'Pulse {} not in codeword mapping.'.format(pulse_name))
 
+        if self.wave_dict_unit() == 'V':
+            # Rescale wave by Vpp/2 of the QWG, such that the output wave
+            # amplitude is actually as specified in the wave dictionary.
+            V_out = self.QWG.get_instr().get('ch{}_amp'
+                                             .format(self.F_ch())) / 2
+            outWave = self._wave_dict[pulse_name] / V_out
+            if np.any(np.abs(outWave) > 1):
+                raise RuntimeError('Waveform values out of range [-1, 1]. '
+                                   'Try increasing QWG.ch{}_amp.'
+                                   .format(self.F_ch()))
+
+        elif self.wave_dict_unit() == 'frac':
+            # Do not rescale; wave dictionary is in units of
+            # "fraction of Vpp/2"
+            outWave = self._wave_dict[pulse_name]
+
         self.QWG.get_instr().createWaveformReal(
-            pulse_name+self.name, self._wave_dict[pulse_name])
+            pulse_name+self.name, outWave)
         self.QWG.get_instr().set('codeword_{}_ch{}_waveform'.format(
             self.codeword_dict()[pulse_name], self.F_ch()),
                                  pulse_name+self.name)
@@ -509,7 +557,8 @@ class QWG_FluxLookuptableManager(Instrument):
         delayed_wave = np.concatenate([wait_samples, np.array(waveform)])
         if append_compensation:
             delayed_wave = np.concatenate(
-                [delayed_wave, wait_samples_comp_pulses, -1 * np.array(waveform)])
+                [delayed_wave,
+                 wait_samples_comp_pulses, -1 * np.array(waveform)])
 
         if self.F_kernel_instr() is not None:
             k = self.F_kernel_instr.get_instr()
@@ -522,8 +571,24 @@ class QWG_FluxLookuptableManager(Instrument):
                             'flux pulse.')
             distorted_wave = delayed_wave
 
+        # Scale to Vpp if necessary
+        if self.wave_dict_unit() == 'V':
+            # Rescale wave by Vpp/2 of the QWG, such that the output wave
+            # amplitude is actually as specified in the wave dictionary.
+            V_out = self.QWG.get_instr().get('ch{}_amp'
+                                             .format(self.F_ch())) / 2
+            outWave = distorted_wave / V_out
+            if np.any(np.abs(outWave) > 1):
+                raise RuntimeError('Waveform values out of range [-1, 1]. '
+                                   'Try increasing QWG.ch{}_amp.'
+                                   .format(self.F_ch()))
+        elif self.wave_dict_unit() == 'frac':
+            # Do not rescale; wave dictionary is in units of
+            # "fraction of Vpp/2"
+            outWave = distorted_wave
+
         # Upload pulse
-        self.QWG.get_instr().createWaveformReal(pulse_name, distorted_wave)
+        self.QWG.get_instr().createWaveformReal(pulse_name, outWave)
         self.QWG.get_instr().set('codeword_{}_ch{}_waveform'.format(
             codeword, self.F_ch()), pulse_name)
 
@@ -540,7 +605,7 @@ class QWG_FluxLookuptableManager(Instrument):
         y = self._wave_dict[wave_name]
 
         if QtPlot_win is None:
-            QtPlot_win = QtPlot(windowTitle=wave_name,
+            QtPlot_win = QtPlot(window_title=wave_name,
                                 figsize=(600, 400))
         QtPlot_win.add(
             x=x, y=y, name=wave_name,

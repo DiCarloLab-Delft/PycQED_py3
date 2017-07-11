@@ -143,68 +143,51 @@ def two_qubit_AllXY(q0, q1, RO_target='all',
                           ['X180', 'X90'], ['Y90', 'Y180'], ['Y180', 'Y90'],
                           ['X180', 'I'], ['Y180', 'I'], ['X90', 'X90'],
                           ['Y90', 'Y90']]
+
+    pulse_combinations_tiled = pulse_combinations + pulse_combinations
     if double_points:
         pulse_combinations = [val for val in pulse_combinations
                               for _ in (0, 1)]
+
+    if replace_q1_pulses_X180:
+        pulse_combinations_q1 = ['X180' for val in pulse_combinations]
+
+    pulse_combinations_q0 = pulse_combinations
+    pulse_combinations_q1 = pulse_combinations_tiled
+
+
     filename = join(base_qasm_path, 'two_qubit_AllXY.qasm')
     qasm_file = mopen(filename, mode='w')
     qasm_file.writelines('qubit {} \nqubit {} \n'.format(q0, q1))
 
-    if sequence_type == 'simultaneous':
-        raise NotImplementedError('Simultaneous readout not implemented.')
-
-    if replace_q1_pulses_X180:
-        for pulse_comb in pulse_combinations:
-            qasm_file.writelines('\ninit_all\n')
-            if sequence_type == 'interleaved':
-                qasm_file.writelines('{} {}\n'.format(pulse_comb[0], q0) +
-                                     '{} {}\n'.format('X180', q1) +
-                                     '{} {}\n'.format(pulse_comb[1], q0) +
-                                     '{} {}\n'.format('X180', q1))
-            elif sequence_type == 'sandwiched':
-                qasm_file.writelines('{} {}\n'.format('X180', q1) +
-                                     '{} {}\n'.format(pulse_comb[0], q0) +
-                                     '{} {}\n'.format(pulse_comb[1], q0) +
-                                     '{} {}\n'.format('X180', q1))
-            elif sequence_type == 'sequential':
-                qasm_file.writelines('{} {}\n'.format(pulse_comb[0], q0) +
-                                     '{} {}\n'.format(pulse_comb[1], q0) +
-                                     '{} {}\n'.format('X180', q1) +
-                                     '{} {}\n'.format('X180', q1))
-            elif sequence_type == 'simultaneous':
-                # FIXME: Not implemented yet.
-                pass
-            else:
-                raise ValueError("sequence_type {} ".format(sequence_type) +
-                                 "['interleaved', 'simultaneous', " +
-                                 "'sequential', 'sandwiched']")
-            qasm_file.writelines('RO {}  \n'.format(RO_target))
-    else:
-        for pulse_comb in pulse_combinations:
-            qasm_file.writelines('\ninit_all\n')
-            if sequence_type == 'interleaved':
-                qasm_file.writelines('{} {}\n'.format(pulse_comb[0], q0) +
-                                     '{} {}\n'.format(pulse_comb[0], q1) +
-                                     '{} {}\n'.format(pulse_comb[1], q0) +
-                                     '{} {}\n'.format(pulse_comb[1], q1))
-            elif sequence_type == 'sandwiched':
-                qasm_file.writelines('{} {}\n'.format(pulse_comb[0], q1) +
-                                     '{} {}\n'.format(pulse_comb[0], q0) +
-                                     '{} {}\n'.format(pulse_comb[1], q0) +
-                                     '{} {}\n'.format(pulse_comb[1], q1))
-            elif sequence_type == 'sequential':
-                qasm_file.writelines('{} {}\n'.format(pulse_comb[0], q0) +
-                                     '{} {}\n'.format(pulse_comb[1], q0) +
-                                     '{} {}\n'.format(pulse_comb[0], q1) +
-                                     '{} {}\n'.format(pulse_comb[1], q1))
-            elif sequence_type == 'simultaneous':
-                # FIXME: Not implemented yet.
-                pass
-            else:
-                raise ValueError("sequence_type {} ".format(sequence_type) +
-                                 "['interleaved', 'simultaneous', " +
-                                 "'sequential', 'sandwiched']")
-            qasm_file.writelines('RO {}  \n'.format(RO_target))
+    for pulse_comb_q0, pulse_comb_q1 in zip(pulse_combinations_q0,
+                                            pulse_combinations_q1):
+        qasm_file.writelines('\ninit_all\n')
+        if sequence_type == 'interleaved':
+            qasm_file.writelines('{} {}\n'.format(pulse_comb_q0[0], q0) +
+                                 '{} {}\n'.format(pulse_comb_q1[0], q1) +
+                                 '{} {}\n'.format(pulse_comb_q0[1], q0) +
+                                 '{} {}\n'.format(pulse_comb_q1[1], q1))
+        elif sequence_type == 'sandwiched':
+            qasm_file.writelines('{} {}\n'.format(pulse_comb_q1[0], q1) +
+                                 '{} {}\n'.format(pulse_comb_q0[0], q0) +
+                                 '{} {}\n'.format(pulse_comb_q0[1], q0) +
+                                 '{} {}\n'.format(pulse_comb_q1[1], q1))
+        elif sequence_type == 'sequential':
+            qasm_file.writelines('{} {}\n'.format(pulse_comb_q0[0], q0) +
+                                 '{} {}\n'.format(pulse_comb_q0[1], q0) +
+                                 '{} {}\n'.format(pulse_comb_q1[0], q1) +
+                                 '{} {}\n'.format(pulse_comb_q1[1], q1))
+        elif sequence_type == 'simultaneous':
+            qasm_file.writelines('{} {} |'.format(pulse_comb_q0[0], q0) +
+                                 '{} {}\n'.format(pulse_comb_q1[0], q1) +
+                                 '{} {} |'.format(pulse_comb_q0[1], q0) +
+                                 '{} {}\n'.format(pulse_comb_q1[1], q1))
+        else:
+            raise ValueError("sequence_type {} ".format(sequence_type) +
+                             "['interleaved', 'simultaneous', " +
+                             "'sequential', 'sandwiched']")
+        qasm_file.writelines('RO {}  \n'.format(RO_target))
 
     qasm_file.close()
     return qasm_file

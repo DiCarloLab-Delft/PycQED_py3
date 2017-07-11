@@ -40,7 +40,7 @@ user_op_type = {
 }
 
 default_op_dict = {
-    "I": {
+    "Idx": {
         "parameters": 1,  # Parameter is wait in ns
         "type": EventType.WAIT
     },
@@ -479,13 +479,9 @@ class QASM_QuMIS_Compiler():
         '''
         self.raw_event_list = []
         for line in self.prog_lines:
-            # print("line in prog_lines:", line)
-            # print("line_content:", line.content)
             events = self.get_parallel_qasm_ops(line.content)
-            # print("events:", events)
             raw_events = []
             for e in events:
-                # print("e in events:", e)
                 qasm_op_name = self.get_qasm_op_name(e)
                 if qasm_op_name not in self.qasm_op_dict:
                     se = SyntaxError("unsuppported QASM operation {}.".format(
@@ -530,6 +526,7 @@ class QASM_QuMIS_Compiler():
                 if (qasm_op_type == EventType.WAIT) and \
                         (expected_num_of_params == 1):
                     waiting_time_ns, = qasm_op_params
+
                     waiting_time = int(waiting_time_ns)//self.cycle_time
                     if is_int(waiting_time) is False:
                         se = SyntaxError("parameter {} is not an "
@@ -1145,7 +1142,8 @@ class QASM_QuMIS_Compiler():
         max_duration = 0
         for timing_event in timing_events:
             if self.is_q_op_event(timing_event) is False:
-                raise ValueError("events should be gates or measurements.")
+                raise ValueError("Event {} should ".format(timing_event) +
+                                 "be gates or measurements.")
 
         max_duration = max(
             [self.qasm_op_dict[timing_event.name]["duration"]
