@@ -131,7 +131,7 @@ def get_experiments_from_file(filename, gate_dict, use_pygsti_parser=True):
     return experiments
 
 def generate_QASM(filename, exp_list, qubit_labels, max_instructions=2**15,
-                  max_exp_per_file=4095):
+                  max_exp_per_file=4094):
     '''
     Generates a QASM file from an experiment list. If there are too many
     instructions in the experiment list to fit in the CBox memory, then the

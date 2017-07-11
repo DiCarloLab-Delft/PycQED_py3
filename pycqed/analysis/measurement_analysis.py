@@ -6645,8 +6645,8 @@ class GST_Analysis(TD_Analysis):
     pyGSTi. The actual analysis is then run using the tools from pyGSTi.
     '''
     def __init__(self, exp_num_list, hard_repetitioins: int,
-                 soft_repetitions: int, exp_list, gs_target, fiducials, germs,
-                 max_lengths):
+                 soft_repetitions: int, exp_list, gs_target, prep_fiducials,
+                 meas_fiducials, germs, max_lengths):
         '''
         Args:
             exp_num_list (array of ints):
@@ -6663,9 +6663,12 @@ class GST_Analysis(TD_Analysis):
                     used to write the file in pyGSTi format.
             gs_target (obj):
                     pyGSTi GateSet object representing the target gate set.
-            fiducials (list):
+            prep_fiducials (list):
                     List of pyGSTi GateString objects representing the
-                    fiducials for the target gate set.
+                    preparation fiducials for the target gate set.
+            meas_fiducials (list):
+                    List of pyGSTi GateString objects representing the
+                    measurement fiducials for the target gate set.
             germs (list):
                     List of pyGSTi GateString objects representing the germs
                     for the target gate set.
@@ -6679,7 +6682,8 @@ class GST_Analysis(TD_Analysis):
         self.soft_repetitions = soft_repetitions
         self.exp_list = exp_list
         self.gs_target = gs_target
-        self.fiducials = fiducials
+        self.prep_fids = prep_fiducials
+        self.meas_fids = meas_fiducials
         self.germs = germs
         self.max_lengths = max_lengths
 
@@ -6724,7 +6728,7 @@ class GST_Analysis(TD_Analysis):
 
         # Run pyGSTi analysis and create report.
         results = pygsti.do_stdpractice_gst(
-            self.pygsti_fn, self.gs_target, self.fiducials, self.fiducials,
+            self.pygsti_fn, self.gs_target, self.prep_fids, self.meas_fids,
             self.germs, self.max_lengths)
 
         self.report_fn = os.path.join(self.folder, 'pyGSTi_report.html')

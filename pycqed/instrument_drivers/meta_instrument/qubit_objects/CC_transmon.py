@@ -2171,12 +2171,12 @@ class CBox_v3_driven_transmon(Transmon):
                 experiment. Default (None) uses self.MC.
         '''
         # TODO: max_acq_points: hard coded?
-        max_acq_points = 4095
+        max_acq_points = 4094
 
         if MC is None:
             MC = self.MC.get_instr()
 
-        # Load gateset, germs and fiducials from file.
+        # Load gate set, germs, and fiducials from file.
         gstPath = os.path.join(pq.__path__[0], 'measurement',
                                'gate_set_tomography')
         gs_target = pygsti.io.load_gateset(
@@ -2199,7 +2199,7 @@ class CBox_v3_driven_transmon(Transmon):
         # Create the experiment list, translate it to QASM, and generate the
         # QASM file(s).
         raw_exp_list = pygsti.construction.make_lsgst_experiment_list(
-            gs_target.gates.keys(), fiductials, fiducials, germs, max_lengths)
+            gs_target, fiducials, fiducials, germs, max_lengths)
         exp_list = gstCC.get_experiments_from_list(raw_exp_list, gate_dict)
         qasm_files, exp_nums = gstCC.generate_QASM(
             filename='GST_{}'.format(self.name),
@@ -2233,7 +2233,6 @@ class CBox_v3_driven_transmon(Transmon):
             hard_repetitions = int(np.ceil(repetitions_per_point /
                                        soft_repetitions))
 
-
         self.prepare_for_timedomain()
         d = self.int_log_det
         s = swf.Multi_QASM_Sweep(
@@ -2258,7 +2257,15 @@ class CBox_v3_driven_transmon(Transmon):
         MC.run('GST')
 
         # Analysis
-
+        ma.GST_Analysis(exp_num_list=exp_nums,
+                        hard_repetitions=hard_repetitions,
+                        soft_repetitions=soft_repetitions,
+                        exp_list=[g.str for g in raw_exp_list],
+                        gs_target=gs_target,
+                        prep_fiducials=fiducials,
+                        meas_fiducials=fiducials,
+                        germs=germs,
+                        max_lengths=max_lengths)
 
 
 class QWG_driven_transmon(CBox_v3_driven_transmon):

@@ -1,5 +1,6 @@
 import numpy as np
 import qcodes as qc
+from copy import copy
 from qcodes.instrument.base import Instrument
 from qcodes.utils import validators as vals
 from qcodes.instrument.parameter import ManualParameter
@@ -10,6 +11,7 @@ from pycqed.measurement.waveform_control_CC import multi_qubit_qasm_seqs as mqqs
 from pycqed.measurement import detector_functions as det
 from pycqed.measurement import sweep_functions as swf
 from pycqed.analysis import measurement_analysis as ma
+import pycqed.measurement.gate_set_tomography.gate_set_tomography_CC as gstCC
 
 
 class DeviceObject(Instrument):
@@ -247,6 +249,21 @@ class TwoQubitDevice(DeviceObject):
             integration_length=q0.RO_acq_integration_length())
         return d
 
+    def get_integration_logging_detector(self):
+        qnames = self.qubits()
+        q0 = self.find_instrument(qnames[0])
+        q1 = self.find_instrument(qnamse[1])
+
+        w0 = q0.RO_acq_weight_function_I()
+        w1 = q1.RO_acq_weight_function_I()
+
+        d = det.UHFQC_integration_logging_det(
+            UHFQC=self.acquisition_instrument.get_instr(),
+            channels=[w0, w1],
+            result_logging_mode='digitized',
+            integratioin_length=q0.RO_acq_integration_length())
+        return d
+
     def measure_two_qubit_AllXY(self, sequence_type='simultaneous', MC=None):
         if MC is None:
             MC = qc.station.components['MC']
@@ -276,4 +293,125 @@ class TwoQubitDevice(DeviceObject):
         MC.run('AllXY_{}_{}'.format(q0.name, q1.name))
         ma.MeasurementAnalysis()
 
+    def measure_two_qubit_GST(self, q0, q1,
+                              max_lengths=[0]+[2**i for i in range(10)],
+                              repetitions_per_point=500,
+                              MC=None):
+        '''
+        Measure gate set tomography for this qubit. The gateset that is used
+        is saved in
+        pycqed/measurement/gate_set_tomography/Gateset_5_primitives_GST.txt,
+        and corresponding germs and fiducials can be found in the same folder.
 
+        Args:
+            q0, q1 (Instr):
+                Qubits on which the experiment is run.
+            max_lengths (list):
+                List of maximum sequence length (via germ repeats) for each
+                GST iteration. The largest maximum length should be roughly
+                the number of gates that can be done on a qubit before it
+                completely depolarizes.
+            repetitions_per_point (int):
+                Number of times each experiment is repeated in total.
+            MC (Instrument):
+                Measurement control instrument that should be used for the
+                experiment. Default (None) uses self.MC.
+        '''
+        # TODO: max_acq_points: hard coded?
+        max_acq_points = 4094
+
+        if MC is None:
+            MC = self.MC.get_instr()
+
+        # Load the gate set, germs, and fiducials.
+        gs_target = std2Q_XYCPHASE.gs_target.copy()
+        prepFids = std2Q_XYCPHASE.prepStrs
+        measFids = std2Q_XYCPHASE.effectStrs
+        germs = std2Q_XY.germs
+
+        # gate_dict maps GST gate labels to QASM operations
+        gate_dict = {
+            'Gix': 'X180 {}'.format(q0.name),
+            'Giy': 'Y180 {}'.format(q0.name),
+            'Gxi': 'X180 {}'.format(q1.name),
+            'Gyi': 'Y180 {}'.format(q1.name),
+            'Gcphase': 'CZ {} {}'.format(q0.name, q1.name)
+        }
+
+        # Create the experiment list, translate it to QASM, and generate the
+        # QASM file(s).
+        try:
+            max_instr = self.seq_contr.get_instr()._get_instr_mem_size()
+        except AttributeError as e:
+            max_instr = 2**15
+            logging.warning(str(e) + '\nUsing default ({})'.format(max_instr))
+
+        raw_exp_list = pygsti.construction.make_lsgst_experiment_list(
+            gs_target, prepFids, measFids, germs, maxLengths)
+        exp_list = gstCC.get_experiments_from_list(raw_exp_list, gate_dict)
+        qasm_files, exp_nums = gstCC.generateQASM(
+            filename='GST_2Q_{}_{}'.format(q0.name, q1.name),
+            exp_list=exp_list,
+            qubit_labels=[q0.name, q1.name],
+            max_instructions=max_instr,
+            max_exp_per_file=max_acq_points)
+
+        # We want to measure every experiment (i.e. gate sequence) x times.
+        # Also, we want low frequency noise in our system to affect each
+        # experiment the same, so we don't want to do all repetitions of the
+        # first experiment, then the second, etc., but rather go through all
+        # experiments, then repeat. If we have more than one QASM file, this
+        # would be slower, so we compromise and say we want a minimum of 5
+        # (soft) repetitions of the whole sequence and adjust the hard
+        # repetitions accordingly.
+        # The acquisition device can acquire a maximum of m = max_acq_points
+        # in one go.
+        # A QASM file contains i experiments (i can be different for different
+        # QASM files.
+        # Take the largest i -> can measure floor(m/i) = l repetitions of this
+        # QASM file. => need r = ceil(x/l) soft repetitions of that file.
+        # => set max(r,5) as the number of soft repetitions for all files.
+        # => set ceil(x/r) as the number of hard repetitions for each file
+        # (even if for some files we could do more).
+        max_exp_num = max(exp_nums)  # i
+        soft_repetitions = int(np.ceil(
+            repetitions_per_point / np.floor(max_acq_points / max_exp_num)))
+        if soft_repetitions < min_soft_repetitions:
+            soft_repetitions = 5
+            hard_repetitions = int(np.ceil(repetitions_per_point /
+                                       soft_repetitions))
+
+        self.prepare_for_timedomain()
+
+        d = self.get_integration_logging_detector()
+        s = swf.Multi_QASM_Sweep(
+            exp_num_list=exp_nums,
+            hard_repetitions=hard_repetitions,
+            soft_repetitions=soft_repetitions,
+            qasm_list=[q.name for q in qasm_files],
+            config=self.qasm_config(),
+            detector=d,
+            CBox=self.seq_contr.get_instr(),
+            parameter_name='GST sequence',
+            unit=None)
+        total_exp_nr = np.sum(exp_nums) * hard_repetitions * soft_repetitions
+
+        if d.result_logging_mode != 'digitized':
+            logging.warning('GST is intended for use with digitized detector.'
+                            ' Analysis will fail otherwise.')
+
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(np.arange(total_exp_nr))
+        MC.set_detector_function(d)
+        MC.run('GST_2Q')
+
+        # Analysis
+        ma.GST_Analysis(exp_num_list=exp_nums,
+                        hard_repetitions=hard_repetitions,
+                        soft_repetitions=soft_repetitions,
+                        exp_list=[g.str for g in raw_exp_list],
+                        gs_target=gs_target,
+                        prep_fiducials=prepFids,
+                        meas_fiducials=measFids,
+                        germs=germs,
+                        max_lengths=max_lengths)
