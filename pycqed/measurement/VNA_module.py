@@ -102,7 +102,7 @@ def acquire_linear_frequency_span_vs_power(file_name, start_freq=None,
             center_freq (float), central frequency of the trace.
             span (float), span of the trace.
             nbr_points (int), Number of points within the trace.
-            power (float), power in dBm.
+            start_power, stop_power, step_power (float), power range in dBm.
             bandwidth (float), bandwidth in Hz.
             measure (str), scattering parameter to measure (ie. 'S21').
     Output:
