@@ -1053,6 +1053,76 @@ def calculate_distance_ground_state(data_real, data_imag, percentile=70,
         data_dist /= np.max(data_dist)
     return data_dist
 
+
+def calculate_distance_from_ground_IQ(data_real, data_imag,
+                        data_real_ground=None, data_imag_ground=None,
+                        percentile=70):
+    '''
+    Calculates the distance from |ground> in the IQ plane when real and imaginary
+    data are passed.
+    If the position of the |ground> state is not passed it assumes that the system
+    is in the |ground> state for most of the time and it uses a "clever" average of
+    the input data for the |ground>
+
+    INPUT:
+        data_real [array] = projection on the real axes of the IQ plane
+        data_imag [array] = projection on the imaginary axes
+        data_real_ground [single value] = projection on the real axes for the |ground> state
+        data_imag_ground [single value] = projection on the imaginary axes for the |ground> state
+    '''
+    if data_real_ground == None:
+        perc_real = np.percentile(data_real, percentile)
+        perc_imag = np.percentile(data_imag, percentile)
+
+        data_real_ground = np.mean(np.take(data_real,
+                                    np.where(data_real < perc_real)[0]))
+
+        data_imag_ground = np.mean(np.take(data_imag,
+                                np.where(data_imag < perc_imag)[0]))
+
+    data_real_dist = data_real - data_real_ground
+    data_imag_dist = data_imag - data_imag_ground
+
+    distance = np.sqrt(data_real_dist**2 + data_imag_dist**2)
+
+    return distance
+
+
+def calcuate_distance_from_ground_amp_phase(data_amplitude, data_phase,
+                        data_amplitude_ground=None, data_phase_ground=None,
+                        precentile=70):
+    '''
+    Calculates the distance from |ground> in the IQ plane when amplitude and phase
+    data are passed.
+    If the position of the |ground> state is not passed it assumes that the system
+    is in the |ground> state for most of the time and it uses a "clever" average of
+    the input data for the |ground>
+
+    INPUT:
+        data_amplitude [array] = amplitude of the measured points
+        data_phase [array] = phase of the measured points
+        data_amplitude_ground [single value] = amplitude for the |ground> state
+        data_phase_ground [single value] = amplitude for the |ground> state
+    '''
+
+    # convert amplitude and phase in projections on the real and imaginary plane
+    angles_rad = np.pi*data_phase/180
+    data_real = np.multiply(data_amplitude, np.cos(angles_rad))
+    data_imag = np.multiply(data_amplitude, np.sin(angles_rad))
+
+    if data_amplitude_ground == None:
+        distance = calculate_distance_from_ground_IQ(data_real, data_imag, percentile=percentile)
+    else:
+        data_real_ground = data_amplitude_ground*np.cos(np.pi*data_phase_ground/180)
+        data_imag_ground = data_amplitude_ground*np.sin(np.pi*data_phase_ground/180)
+
+        distance = calculate_distance_from_ground_IQ(data_real, data_imag,
+                            data_real_ground=data_real_ground, data_imag_ground=data_imag_ground,
+                            percentile=percentile)
+
+    return distance
+
+
 # def rotate_data_to_zero(data_I, data_Q, NoCalPoints):
 
 

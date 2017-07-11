@@ -409,8 +409,6 @@ class UHFQC(Instrument):
         # print("data type {}".format(type(data)))
         return data
 
-    def acquisition_poll(self, samples, arm=True,
-                         acquisition_time=0.010):
         """
         Polls the UHFQC for data.
 
