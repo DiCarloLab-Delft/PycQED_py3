@@ -36,17 +36,15 @@ class DDMq(SCPI):
 
     # def __init__(self, logging=True, simMode=False, paranoid=False):
     def __init__(self, name, address, port, **kwargs):
-
-        isConnected = False
         try:
             super().__init__(name, address, port, **kwargs)
-            isConnected = True
-        except:
+        except Exception as e:
+            # Setting up the SCPI sometimes fails the first time.  If this
+            # happens a second effort to initialize and settup the connection
+            # is made
+            print("Failed to connect (" + str(e) + "). The system will retry" +
+                  " to connect")
             self.remove_instance(self)
-            isConnected = False
-        # Setting up the SCPI sometimes fails the first time.  If this happens
-        # a second effort to initialize and settup the connection is made
-        if not isConnected:
             super().__init__(name, address, port, **kwargs)
 
         self.device_descriptor = type('', (), {})()
@@ -125,6 +123,27 @@ class DDMq(SCPI):
                            ' Every weight pair has only one TV mode' +
                            ' memory. It can be used either I or Q ',
                            get_cmd=self._getCorrelationData
+                           )
+        #################
+        # Error fraction
+        #################
+        self.add_parameter('two_bit_pattern_cnt',
+                           label='Get all 2 bit fraction counters ',
+                           docstring='It returns 5 counters which' +
+                           ' are:  No Error Counter, Single Error' +
+                           ' Counter, Double Error CounterReg Zero' +
+                           ' State CounterReg,One State CounterReg. ',
+                           get_cmd=self._get2BitPatternCnt
+                           )
+        self.add_parameter('two_bit_pattern_pattern',
+                           label='Get 2 bit pattern ',
+                           docstring='  ' +
+                           '' +
+                           ' ',
+                           set_cmd=self._send2BitPatternPattern,
+                           get_cmd=self._get2BitPatternPattern,
+
+                           vals=vals.Arrays(0b00, 0b11)
                            )
 
         for i in range(number_of_channels//2):
@@ -461,8 +480,8 @@ class DDMq(SCPI):
         finished = 0
         while (finished != '1'):
             finished = self._getCorrelationFinished()
-            print("\r Correlation (" + str(int(float(self._getCorrelationpercentage(
-                )))) + "%)", end='\0')
+            print("\r Correlation (" + str(int(float(
+              self._getCorrelationpercentage()))) + "%)", end='\0')
             if (finished == 'ffffffff'):
                 break
             elif (finished != '1'):
@@ -706,6 +725,62 @@ class DDMq(SCPI):
     def _getErrFractStatus(self, ch_pair, wNr):
         return self.ask('qutech:errorfraction{:d}:status{:d}? '.format(
             ch_pair, wNr))
+
+    #########################
+    # 2 bit pattern
+    #########################
+    def _send2BitPatternPattern(self, pattern):
+        self.write('qutech:twoBitPattern:pattern {:d},{:d},{:d},{:d}'.format(
+                  pattern[0], pattern[1], pattern[2], pattern[3]))
+
+    def _get2BitPatternPattern(self):
+        pstring = self.ask(
+            'qutech:twoBitPattern:pattern? ')
+        P = np.zeros(4)
+        for i, x in enumerate(pstring.split(',')):
+            P[i] = x
+        return (P)
+
+    def _get2BitPatternCnt(self):
+        finished = 0
+        while (finished != '1'):
+            finished = self._getTwoBitPatternFinished()
+            print("\r Two bit pattern counter(" + str(int(float(
+                self._getTwoBitPatternPercentage()))) + "%)", end='\0')
+            if (finished == 'ffffffff'):
+                break
+            elif (finished != '1'):
+                time.sleep(1.0/FINISH_BIT_CHECK_FERQUENTION_HZ)
+        print("\r", end='\0')
+        sys.stdout.flush()
+        self._displayQBitErrors("Two Bit Pattern Counter", 1, 1)
+
+        self.write('qutech:twoBitPattern:data? ')
+        binBlock = self.binBlockRead()
+        errfractioncnt = np.frombuffer(binBlock, dtype=np.int32)
+        print('NoErrorCounterReg    = {:d}'.format(errfractioncnt[0]))
+        print('SingleErrorCounterReg= {:d}'.format(errfractioncnt[1]))
+        print('DoubleErrorCounterReg= {:d}'.format(errfractioncnt[2]))
+        print('00StateCounterReg    = {:d}'.format(errfractioncnt[3]))
+        print('01StateCounterReg    = {:d}'.format(errfractioncnt[4]))
+        print('10StateCounterReg    = {:d}'.format(errfractioncnt[5]))
+        print('11StateCounterReg    = {:d}'.format(errfractioncnt[6]))
+        return errfractioncnt
+
+    def _getTwoBitPatternFinished(self):
+        finished = self.ask(
+            'qutech:twoBitPattern:finished? ')
+        fmt_finished = format(int(float(finished)), 'x')
+        return fmt_finished
+
+    def _getTwoBitPatternBusy(self):
+        return self.ask('qutech:twoBitPattern:busy? ')
+
+    def _getTwoBitPatternPercentage(self):
+        return self.ask('qutech:twoBitPattern:percentage? ')
+
+    def _getTwoBitPatternStatus(self):
+        return self.ask('qutech:twoBitPattern:status? ')
 
     # Ask for DDM status
     def _getADCstatus(self, ch_pair):
@@ -1077,8 +1152,9 @@ class DDMq(SCPI):
         for error_str in errors:
             error = json.loads(error_str)
             if error['error_code']:
-                results.append(self.Error(error['error_code'], error['description']
-                                      , error['error_level'], acquisitionMode))
+                results.append(self.Error(error['error_code'],
+                               error['description'], error['error_level'],
+                               acquisitionMode))
         return results
 
     def _getInAvgErrors(self, acquisitionMode, ch):
