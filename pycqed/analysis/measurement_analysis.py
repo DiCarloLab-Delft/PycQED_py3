@@ -2719,10 +2719,10 @@ class T1_Analysis(TD_Analysis):
         if print_fit_results:
             print(fit_res.fit_report())
         if make_fig:
-            self.plot_results_vs_sweepparam(x=self.sweep_points,
+            self.plot_results_vs_sweepparam(x=self.sweep_points/1e-6,
                                             y=self.normalized_values,
                                             fig=fig, ax=ax,
-                                            xlabel=self.xlabel,
+                                            xlabel='us',
                                             ylabel=r'$F$ $|1 \rangle$',
                                             **kw)
             if show_guess:
@@ -2739,7 +2739,7 @@ class T1_Analysis(TD_Analysis):
                 amplitude=best_vals['amplitude'],
                 offset=best_vals['offset'])
 
-            ax.plot(t, y, 'r-')
+            ax.plot(t/1e-6, y, 'r-')
             textstr = '$T_1$ = %.3g $\pm$ (%.5g) s ' % (
                 fit_res.params['tau'].value, fit_res.params['tau'].stderr)
 
@@ -2867,10 +2867,10 @@ class Ramsey_Analysis(TD_Analysis):
                 transform=ax.transAxes, fontsize=11,
                 verticalalignment='top', bbox=self.box_props)
 
-        self.plot_results_vs_sweepparam(x=self.sweep_points,
+        self.plot_results_vs_sweepparam(x=self.sweep_points/1e-6,
                                         y=self.normalized_values,
                                         fig=fig, ax=ax,
-                                        xlabel=self.xlabel,
+                                        xlabel='t (us)',
                                         ylabel=ylabel,
                                         save=False)
 
@@ -2890,7 +2890,7 @@ class Ramsey_Analysis(TD_Analysis):
             amplitude=best_vals['amplitude'],
             oscillation_offset=best_vals['oscillation_offset'],
             exponential_offset=best_vals['exponential_offset'])
-        ax.plot(x, y, 'r-')
+        ax.plot(x/1e-6, y, 'r-')
 
     def run_default_analysis(self, print_fit_results=False, **kw):
 

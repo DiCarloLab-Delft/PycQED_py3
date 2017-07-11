@@ -715,7 +715,7 @@ def get_timestamps_in_range(timestamp_start, timestamp_end=None,
                             label=None, exact_label_match=True, folder=None):
     if folder is None:
         folder = datadir
-        
+
     datetime_start = datetime_from_timestamp(timestamp_start)
     if timestamp_end is None:
         datetime_end = datetime.datetime.today()
@@ -1523,6 +1523,9 @@ def calculate_transmon_transitions(EC, EJ, asym=0, reduced_flux=0,
                                    no_transitions=2, dim=None):
     '''
     Calculates transmon energy levels from the full transmon qubit Hamiltonian.
+
+    dim (int), number of charge states in the base used
+    no_transitions (int), number of transitions returned
     '''
     if dim is None:
         dim = no_transitions*20
