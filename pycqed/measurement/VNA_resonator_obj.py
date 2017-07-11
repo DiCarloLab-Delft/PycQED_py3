@@ -1,5 +1,6 @@
 from qcodes.instrument.base import Instrument
-
+from pycqed.measurement import VNA_module as VNA_fct
+from pycqed.analysis import measurement_analysis as ma
 
 class VNA_Resonator_Node(Instrument):
 
@@ -14,7 +15,7 @@ class VNA_Resonator_Node(Instrument):
     def frequency_measurement(self):
         if self.nbr_points is None:
             self.nbr_points = int(1 + self.span / 1000)
-        VNA_fct.acquire_single_linear_frequency_span(self.name,
+        VNA_fct.acquire_single_linear_frequency_span(self.name+'_freq',
                                                      center_freq=self.freq,
                                                      span=self.span,
                                                      nbr_points=self.nbr_points,
@@ -28,7 +29,7 @@ class VNA_Resonator_Node(Instrument):
     def power_measurement(self):
         if self.nbr_points is None:
             self.nbr_points = int(1 + self.span / 1000)
-        VNA_fct.acquire_linear_frequency_span_vs_power('Test_2D',
+        VNA_fct.acquire_linear_frequency_span_vs_power(self.name+'_power',
                                                        center_freq=self.freq,
                                                        span=self.span,
                                                        nbr_points=self.nbr_points,
@@ -41,7 +42,7 @@ class VNA_Resonator_Node(Instrument):
     def dac_measurement(self):
         if self.nbr_points is None:
             self.nbr_points = int(1 + self.span / 1000)
-        VNA_fct.acquire_2D_linear_frequency_span_vs_param('Test_2D',
+        VNA_fct.acquire_2D_linear_frequency_span_vs_param(self.name+'_dac',
                                                           center_freq=self.freq,
                                                           span=self.span,
                                                           nbr_points=self.nbr_points,
@@ -49,7 +50,7 @@ class VNA_Resonator_Node(Instrument):
                                                           sweep_vector=self.dac_range,
                                                           power=self.power,
                                                           bandwidth=self.BW)
-        # parameter.set(0)
+        self.self_dac.set(0)
         return True
 
     def multi_dac_measurement(self):
