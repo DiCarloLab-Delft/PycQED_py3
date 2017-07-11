@@ -411,22 +411,22 @@ class CBox_v3_driven_transmon(Transmon):
             elif self.RO_acq_weights() == 'optimal':
                 if (self.RO_optimal_weights_I() is None or
                         self.RO_optimal_weights_Q() is None):
-                    logging.warning(
-                        'Optimal weights are None, not setting integration weights')
+                    logging.warning('Optimal weights are None,'+
+                                    ' not setting integration weights')
                 else:
                     # When optimal weights are used, only the RO I weight
                     # channel is used
-                    UHFQC.set('quex_wint_weights_{}_real'
-                              .format(self.RO_acq_weight_function_I()),
-                              self.RO_optimal_weights_I())
-                    UHFQC.set('quex_wint_weights_{}_imag'
-                              .format(self.RO_acq_weight_function_I()),
-                              self.RO_optimal_weights_Q())
+                    UHFQC.set('quex_wint_weights_{}_real'.format(
+                        self.RO_acq_weight_function_I()),
+                        self.RO_optimal_weights_I())
+                    UHFQC.set('quex_wint_weights_{}_imag'.format(
+                        self.RO_acq_weight_function_I()),
+                        self.RO_optimal_weights_Q())
+                    UHFQC.set('quex_rot_{}_real'.format(
+                        self.RO_acq_weight_function_I()), 1.0)
 
-                    UHFQC.set('quex_rot_{}_real'
-                              .format(self.RO_acq_weight_function_I()), 1.0)
-                    UHFQC.set('quex_rot_{}_imag'
-                              .format(self.RO_acq_weight_function_I()), 1.0)
+                    UHFQC.set('quex_rot_{}_imag'.format(
+                        self.RO_acq_weight_function_I()), -1.0)
 
     def prepare_for_timedomain(self):
 
@@ -578,7 +578,7 @@ class CBox_v3_driven_transmon(Transmon):
                 nr_averages=self.RO_acq_averages())
         return
 
-    def get_resetless_rb_detector(self, nr_cliff, starting_seed=1,
+    def get_restless_rb_detector(self, nr_cliff, starting_seed=1,
                                   nr_seeds='max', pulse_p_elt='min',
                                   MC=None,
                                   upload=True):
@@ -1152,8 +1152,10 @@ class CBox_v3_driven_transmon(Transmon):
         else:
             d = qh.CBox_err_frac_CC(self.CBox)
             net_clifford = 0
-        RB_elt = sqqs.randomized_benchmarking(self.name, nr_cliffords=[nr_cliffords], cal_points=False, nr_seeds=nr_seeds,
-                                              double_curves=False, net_clifford=net_clifford, restless=restless)
+        RB_elt = sqqs.randomized_benchmarking(
+            self.name, nr_cliffords=[nr_cliffords], cal_points=False,
+            nr_seeds=nr_seeds, double_curves=False,
+            net_clifford=net_clifford, restless=restless)
         single_pulse_asm = qta.qasm_to_asm(RB_elt.name,
                                            self.get_operation_dict())
         qumis_file = single_pulse_asm
@@ -1361,7 +1363,6 @@ class CBox_v3_driven_transmon(Transmon):
                      MC=None, nr_shots=1024*24,
                      analyze=True, verbose=True, update_threshold=True,
                      update=True):
-        # No fancy SSRO detector here @Niels, this may be something for you
 
         # This ensures that the detector is not digitized for the SSRO
         # experiment
@@ -1379,8 +1380,12 @@ class CBox_v3_driven_transmon(Transmon):
         # FIXME: remove when integrating UHFQC
         self.CBox.get_instr().log_length(1024*6)
         off_on = sqqs.off_on(self.name)
-        s = swf.QASM_Sweep(off_on.name, self.CBox.get_instr(),
-                           self.get_operation_dict(), parameter_name='Shots')
+        s = swf.QASM_Sweep_v2(qasm_fn=off_on.name,
+                              config=self.qasm_config(),
+                              CBox=self.CBox.get_instr(),
+                              verbosity_level=1,
+                              parameter_name='Shots', unit='#')
+
         d = self.int_log_det
         MC.set_sweep_function(s)
         MC.set_sweep_points(np.arange(nr_shots))
@@ -1451,26 +1456,23 @@ class CBox_v3_driven_transmon(Transmon):
 
         # Ensure that enough averages are used to get accurate weights
         old_avg = self.RO_acq_averages()
-        self.RO_acq_averages(4096)
-        MC.soft_avg(4)
-
+        self.RO_acq_averages(2**15)
         transients = self.measure_transients(MC=MC, analyze=analyze)
 
         self.RO_acq_averages(old_avg)
-        MC.soft_avg(self.RO_soft_averages())
 
         # Calculate optimal weights
         optimized_weights_I = transients[1][0] - transients[0][0]
-        optimized_weights_I = optimized_weights_I - \
-            np.mean(optimized_weights_I)
-        weight_scale_factor = 1./np.max(np.abs(optimized_weights_I))
-        optimized_weights_I = np.array(weight_scale_factor*optimized_weights_I)
-
         optimized_weights_Q = transients[1][1] - transients[0][1]
-        optimized_weights_Q = optimized_weights_Q - \
-            np.mean(optimized_weights_Q)
-        weight_scale_factor = 1./np.max(np.abs(optimized_weights_Q))
-        optimized_weights_Q = np.array(weight_scale_factor*optimized_weights_Q)
+        
+        # joint rescaling to +/-1 Volt
+        maxI=np.max(np.abs(optimized_weights_I))
+        maxQ=np.max(np.abs(optimized_weights_Q))
+        weight_scale_factor = 1./np.max([maxI, maxQ])
+        optimized_weights_I = np.array(
+                        weight_scale_factor*optimized_weights_I)
+        optimized_weights_Q = np.array(
+                        weight_scale_factor*optimized_weights_Q)
 
         if update:
             self.RO_optimal_weights_I(optimized_weights_I)
