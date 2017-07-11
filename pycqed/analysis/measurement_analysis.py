@@ -487,7 +487,7 @@ class MeasurementAnalysis(object):
 
         return
 
-    def plot_dB_from_linear(self, x, lin_amp, fig, ax, show=False, marker='.', **kw):
+    def plot_dB_from_linear(self, x, lin_amp, fig, ax, show=False, marker='-', **kw):
         '''
         Plot linear data in dB.
         This is usefull for measurements performed with VNA and Homodyne
@@ -500,7 +500,7 @@ class MeasurementAnalysis(object):
                                  textwrap.fill(self.timestamp_string + '_' +
                                                self.measurementstring, 40))
 
-        xlabel = 'Freq'
+        xlabel = 'Frequency'
         ylabel = 'Transmission (dB)'
         ax.set_title(self.plot_title)
         ax.set_xlabel(xlabel)
@@ -4277,6 +4277,7 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
 
         fit_res = fit_data()
         self.fitted_freq = fit_res.params['f0'].value
+        self.fitted_freq_std = fit_res.params['f0'].stderr
 
         self.fit_results.append(fit_res)
         self.save_fitted_parameters(fit_res,
