@@ -51,6 +51,8 @@ class Test_single_qubit_seqs(TestCase):
 
             'I {}'.format(self.qubit_name): {
                 'duration': None, 'instruction': 'wait {} \n'},
+            'I': {
+                'duration': None, 'instruction': 'wait {} \n'},
             'RO {}'.format(self.qubit_name): {
                 'duration': 8, 'instruction': 'Trigger 0010000, 2 \n'}}
 
