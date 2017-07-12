@@ -154,6 +154,15 @@ class DDMq(SCPI):
 
                            vals=vals.Arrays(0b00, 0b11)
                            )
+        self.add_parameter('warning_level',
+                           label='Setting from what the level for where ' +
+                           'errors are considered critical',
+                           docstring='On the given level and above, a errors' +
+                           ' will cause exceptions, instead logging of the' +
+                           ' error ',
+                           set_cmd=self._setWarningLevel,
+                           get_cmd=self._getWarningLevel,
+                           )
 
         for i in range(number_of_channels//2):
             """
@@ -1154,8 +1163,10 @@ class DDMq(SCPI):
                 level = "debug"
             else:
                 level = "nonset"
-            return level + ": " + self.description + "(" +\
-                self.acquisitionMode + ")"
+            result = level + ": " + self.description
+            if (len(self.acquisitionMode) > 0):
+                result += "(" + self.acquisitionMode + ")"
+            return result
 
         def log(self):
             if (self.logLevel >= logging.CRITICAL):
@@ -1205,5 +1216,19 @@ class DDMq(SCPI):
 
     # From this logging level, a message will cause and exceptions instead of
     # a log message
-    def setExceptionLevel(self, level):
+    def _setWarningLevel(self, level):
         self.exceptionLevel = level
+
+    def _getWarningLevel(self):
+        result = "Waring Level: " + str(self.exceptionLevel) + "\r\n"
+        result += "\r\n"
+        # Add the list with possible errors to the results
+        result += "Possible Errors: \r\n"
+        errors = json.loads(self.ask("QUTech:ERRor:LIST?"))
+        for error in errors:
+            if (error['error_code']
+                    and error['error_level'] >= self.exceptionLevel):
+                result += str(self.Error(error['error_code'],
+                              error['description'], error['error_level'],
+                              "")) + "\r\n"
+        return result
