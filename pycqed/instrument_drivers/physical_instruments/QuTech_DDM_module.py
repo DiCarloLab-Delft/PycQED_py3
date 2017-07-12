@@ -1038,15 +1038,23 @@ class DDMq(SCPI):
 
         path = os.path.join(parameters_folder_path,
                             'QuTech_DDM_Parameter_Limits.txt')
+
+        if not os.path.exists(parameters_folder_path):
+            os.makedirs(parameters_folder_path)
+
         try:
-            file = open(path)
+            file = open(path, "a+")
+        except Exception as e:
+            log.warning("failed to open " + path + ".(%s)", str(e))
+        try:
             file_content = json.loads(file.read())
             self.ranges_file_version = file_content["version"][
                 "ddm_software_version"]
         except Exception as e:
-            log.warning("failed to open the " + path + ".(%s)", str(e))
+            self.ranges_file_version = 'NaN'
 
-        if (self.version_info['swBuild'] == self.ranges_file_version):
+        if ('swBuild' in self.version_info
+                and self.version_info['swBuild'] == self.ranges_file_version):
             results = file_content["parameters"]
             self.parameter_limits_list_is_incomplete = False
         else:
@@ -1063,20 +1071,23 @@ class DDMq(SCPI):
         # Open the file and read the version number
         self._s_file_name = os.path.join(
             parameters_folder_path, 'QuTech_DDM_Parameters.txt')
+
+        if not os.path.exists(parameters_folder_path):
+            os.makedirs(parameters_folder_path)
+
         try:
-            file = open(self._s_file_name)
-            file_content = json.loads(file.read())
-            self.parameter_file_version = file_content["version"]["software"]
+            file = open(self._s_file_name, "a+")
         except Exception as e:
             log.warning("parameter file for gettable parameters {} not" +
                         " found".format(self._s_file_name) + ".(%s)", str(e))
-            try:
-                if not os.path.exists(parameters_folder_path):
-                    os.makedirs(parameters_folder_path)
-            except:
-                pass
+        try:
+            file_content = json.loads(file.read())
+            self.parameter_file_version = file_content["version"]["software"]
+        except Exception as e:
+            self.parameter_file_version = 'NaN'
 
-        if (self.version_info['swBuild'] == self.parameter_file_version):
+        if ('swBuild' in self.version_info
+                and self.version_info['swBuild'] == self.parameter_file_version):
             # Return the parameter list given by the txt file
             results = file_content["parameters"]
         else:
