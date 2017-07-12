@@ -331,10 +331,10 @@ class TwoQubitDevice(DeviceObject):
 
         # gate_dict maps GST gate labels to QASM operations
         gate_dict = {
-            'Gix': 'X180 {}'.format(q0.name),
-            'Giy': 'Y180 {}'.format(q0.name),
-            'Gxi': 'X180 {}'.format(q1.name),
-            'Gyi': 'Y180 {}'.format(q1.name),
+            'Gix': 'X90 {}'.format(q0.name),
+            'Giy': 'Y90 {}'.format(q0.name),
+            'Gxi': 'X90 {}'.format(q1.name),
+            'Gyi': 'Y90 {}'.format(q1.name),
             'Gcphase': 'CZ {} {}'.format(q0.name, q1.name)
         }
 
