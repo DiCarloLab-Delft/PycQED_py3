@@ -48,6 +48,9 @@ class Test_compiler(unittest.TestCase):
         qumis_from_file = m.splitlines()
         self.assertEqual(qumis, qumis_from_file)
         self.assertEqual(compiler.qumis_instructions[2], 'Exp_Start: ')
+
+        # Test that the final wait after the last instruction is not trimmed
+        self.assertEqual(compiler.qumis_instructions[-2], 'wait 60')
         self.assertEqual(compiler.qumis_instructions[-1], self.jump_to_start)
 
         # finally test that it can be converted into valid instructions
@@ -224,9 +227,6 @@ class Test_compiler(unittest.TestCase):
             start_label=None,
             end_label=None)
         self.assertEqual(len(time_pts['target_tps']), 5)
-
-
-
 
     def test_qasm_wait_timing_trigger_T1(self):
         # Tests the timing of the qasm sequences using a T1 sequence

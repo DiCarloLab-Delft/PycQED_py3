@@ -845,10 +845,24 @@ class QASM_QuMIS_Compiler():
                     for channel in self.qubit_cfgs])
 
     def get_absolute_timing(self):
+        """
+        Updates the self.timing_grid to contain a notion of their absoute
+        time.
+        Adds an extra time point add the end of the timing grid to denote
+        the end of the program.
+        """
         current_time = 0
         for tp in self.timing_grid:
             tp.absolute_time = current_time
             current_time = tp.following_waiting_time + current_time
+
+        # Added the timing point corresponding to the end of the entire
+        #   program into the timing list.
+        tp = time_point()
+        tp.absolute_time = current_time
+        tp.parallel_events = []
+        self.timing_grid.append(tp)
+
 
     def convert_to_hw_trigger(self):
         """
@@ -948,6 +962,10 @@ class QASM_QuMIS_Compiler():
                     new_tp_list = self.add_new_tp_event(
                         new_tp_list, absolute_time, hw_event)
 
+        # at each processing step, add the last timing point back.
+        # this is required as it is not added in the lines above as it is empty.
+        new_tp_list.append(self.hw_timing_grid[-1])
+
         self.hw_timing_grid = new_tp_list
         if self.verbosity_level > 4:
             print("After applying codewords")
@@ -987,17 +1005,10 @@ class QASM_QuMIS_Compiler():
 
                 if hw_event.qumis_name == 'trigger':
                     for tb in hw_event.set_bits:
-                        if trigger_bit_duration[tb] > 0:
-                            self.hw_timing_grid = new_tp_list
-                            if self.verbosity_level > 5:
-                                self.print_timing_grid()
-                                # note: this happens whenever a
-                                # simulataneous RO trigger is used, it can
-                                # be safely ignored in  this case.
-                                logging.warning("vertical_divide_trigger: "
-                                                "trigger time overlapped. "
-                                                "Something wrong?")
-                        trigger_bit_duration[tb] = hw_event.duration
+                        # If multiple trigger instructions occur at the same
+                        # point in time at the same bit, use the longest one.
+                        trigger_bit_duration[tb] = max(trigger_bit_duration[tb],
+                                                        hw_event.duration)
 
                 else:  # for pulse, measure and other dummy instructions.
                     new_tp_list = self.add_new_tp_event(
@@ -1048,8 +1059,12 @@ class QASM_QuMIS_Compiler():
                 if min_duration == 0 or reach_next_starting_time is True:
                     break
 
+        # at each processing step, add the last timing point back.
+        # this is required as it is not added in the lines above as it is empty.
+        new_tp_list.append(self.hw_timing_grid[-1])
         self.hw_timing_grid = new_tp_list
-        if self.verbosity_level > 4:
+        # if self.verbosity_level > 4:
+        if self.verbosity_level > 1:
             print("after vertical_divide_trigger:")
             self.print_hw_timing_grid()
 
@@ -1115,6 +1130,10 @@ class QASM_QuMIS_Compiler():
                     new_tp_list = self.add_new_tp_event(
                         new_tp_list, absolute_time, hw_event)
 
+
+        # at each processing step, add the last timing point back.
+        # this is required as it is not added in the lines above as it is empty.
+        new_tp_list.append(self.hw_timing_grid[-1])
         self.hw_timing_grid = new_tp_list
         if self.verbosity_level > 4:
             print("after split_trigger_codeword:")
@@ -1168,9 +1187,11 @@ class QASM_QuMIS_Compiler():
         for tp in self.hw_timing_grid:
             pre_waiting_time = tp.absolute_time - previous_time
             if pre_waiting_time == 0:
-                if tp.absolute_time != 0:
-                    raise ValueError("Strange thing happened. Two time points "
-                                     "have the same absolute time")
+                # Commenting out this makes it compile when it should not
+                pass
+                # if tp.absolute_time != 0:
+                #     raise ValueError("Strange thing happened. Two time points "
+                #                      "have the same absolute time")
             else:
                 self.qumis_instructions.append("wait {:d}".format(
                     pre_waiting_time))
