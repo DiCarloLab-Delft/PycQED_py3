@@ -3,4 +3,4 @@ numpy
 pandas
 qutip
 pyqtgraph
-pysti
+pygsti
