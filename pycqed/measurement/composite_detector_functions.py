@@ -1490,7 +1490,7 @@ class purity_CZ_detector(det.Soft_Detector):
         self.d = self.device.get_correlation_detector()
 
         # the sequence only get's compiled and uploaded in the prepare
-        self.s.compile_and_upload()
+        self.s.compile_and_upload(self.s.qasm_fn, self.s.config)
 
     def acquire_data_point(self, **kw):
 
