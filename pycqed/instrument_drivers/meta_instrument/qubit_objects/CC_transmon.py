@@ -2151,7 +2151,7 @@ class CBox_v3_driven_transmon(Transmon):
         return instr
 
     def measure_single_qubit_GST(self,
-                                 max_lengths: int=10,
+                                 max_germ_pow: int=10,
                                  repetitions_per_point: int=500,
                                  min_soft_repetitions: int=5,
                                  MC=None, analyze: bool=False):
@@ -2162,11 +2162,8 @@ class CBox_v3_driven_transmon(Transmon):
         and corresponding germs and fiducials can be found in the same folder.
 
         Args:
-            max_lengths (list):
-                List of maximum sequence length (via germ repeats) for each
-                GST iteration. The largest maximum length should be roughly
-                the number of gates that can be done on a qubit before it
-                completely depolarizes.
+            max_germ_pow (int):
+                Largest power of 2 used to set germ lengths.
             repetitions_per_point (int):
                 Number of times each experiment is repeated in total.
             min_soft_repetitions (int):

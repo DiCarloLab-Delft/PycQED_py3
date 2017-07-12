@@ -6750,4 +6750,5 @@ class GST_Analysis(TD_Analysis):
         with open(filepath, 'w') as file:
             file.writelines('## Columns = minus count, plus count\n')
             for seq, tup in count_dict.items():
-                file.writelines('{}  {}  {}\n'.format(seq, tup[0]), tup[1]))
+                file.writelines('{}  {}  {}\n'.format(seq, tup[0]), tup[1])
+
