@@ -1,5 +1,4 @@
 import time
-from qcodes.utils.helpers import make_unique, DelegateAttributes
 import pyqtgraph as pg
 import pyqtgraph.multiprocess as pgmp
 
@@ -14,9 +13,11 @@ class InstrumentMonitor(Instrument):
     """
     proc = None
     rpg = None
+
     def __init__(self, name, station,
                  figsize=(600, 600),
-                 window_title='', theme=((60, 60, 60), 'w'), show_window=True, remote=True, **kwargs):
+                 window_title='', theme=((60, 60, 60), 'w'),
+                 show_window=True, remote=True, **kwargs):
         """
         Initializes the plotting window
         """

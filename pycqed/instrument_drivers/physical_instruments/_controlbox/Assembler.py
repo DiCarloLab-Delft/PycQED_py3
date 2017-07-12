@@ -400,6 +400,7 @@ class Assembler():
         self.remove_wait_zero()
         self.insert_nops()
         self.decompose()
+        self.split_long_wait()
         self.merge_consecutive_wait()
         if verbose:
             self.print_label_instrs()
@@ -414,6 +415,30 @@ class Assembler():
         self.label_instrs.append(['', 'beq', 'r0', 'r0', 'end_of_file_loop'])
 
         self.align_labels()
+
+    def split_long_wait(self):
+        '''
+        This function merges two consecutive WAIT instructions if the sum
+        of the waiting time of both instructions is not larger than
+        MAX_WAIT_TIME.
+        '''
+        i = 0
+        while i < len(self.label_instrs):
+            label_instr = self.label_instrs[i]
+
+            # I only care the WAIT instruction here.
+            if (label_instr[1] != 'wait'):
+                i = i + 1
+                continue
+            remain_wait_time = int(label_instr[2])
+            if remain_wait_time < self.MAX_WAIT_TIME:
+                i += 1
+            while (remain_wait_time > self.MAX_WAIT_TIME):
+                self.label_instrs[i][2] = str(self.MAX_WAIT_TIME)
+                remain_wait_time -= self.MAX_WAIT_TIME
+                new_wait_instr = ['', 'wait', str(remain_wait_time)]
+                self.label_instrs.insert(i+1, new_wait_instr)
+                i += 1
 
     def merge_consecutive_wait(self):
         '''
@@ -632,6 +657,7 @@ class Assembler():
         self.remove_wait_zero()
         self.insert_nops()
         self.decompose()
+        self.split_long_wait()
         self.merge_consecutive_wait()
         self.get_label_addr()
         self.text_instructions = []

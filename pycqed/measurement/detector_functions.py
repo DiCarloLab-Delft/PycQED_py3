@@ -10,7 +10,7 @@ from pycqed.analysis.fit_toolbox import functions as fn
 from pycqed.measurement.waveform_control import pulse
 from pycqed.measurement.waveform_control import element
 from pycqed.measurement.waveform_control import sequence
-
+from qcodes.instrument.parameter import _BaseParameter
 from pycqed.instrument_drivers.virtual_instruments.pyqx import qasm_loader as ql
 
 
@@ -359,7 +359,8 @@ class CBox_integrated_average_detector(Hard_Detector):
                 self.AWG.stop()
                 self.CBox.set('acquisition_mode', 'idle')
                 self.CBox.set('acquisition_mode', 'integration averaging')
-                self.AWG.start()
+                if self.AWG is not None:
+                    self.AWG.start()
                 # does not restart AWG tape in CBox as we don't use it anymore
                 data = self.CBox.get_integrated_avg_results()
                 succes = True
@@ -367,7 +368,8 @@ class CBox_integrated_average_detector(Hard_Detector):
                 logging.warning('Exception caught retrying')
                 logging.warning(e)
                 self.CBox.set('acquisition_mode', 'idle')
-                self.AWG.stop()
+                if self.AWG is not None:
+                    self.AWG.stop()
                 # commented because deprecated
                 # self.CBox.restart_awg_tape(0)
                 # self.CBox.restart_awg_tape(1)
@@ -375,7 +377,8 @@ class CBox_integrated_average_detector(Hard_Detector):
 
                 self.CBox.set('acquisition_mode', 'integration averaging')
                 # Is needed here to ensure data aligns with seq elt
-                self.AWG.start()
+                if self.AWG is not None:
+                    self.AWG.start()
             i += 1
             if i > 20:
                 break
@@ -404,12 +407,14 @@ class CBox_integrated_average_detector(Hard_Detector):
 
     def prepare(self, sweep_points):
         self.CBox.set('nr_samples', self.seg_per_point*len(sweep_points))
-        self.AWG.stop()  # needed to align the samples
+        if self.AWG is not None:
+            self.AWG.stop()  # needed to align the samples
         self.CBox.nr_averages(int(self.nr_averages))
         self.CBox.integration_length(int(self.integration_length/(5e-9)))
         self.CBox.set('acquisition_mode', 'idle')
         self.CBox.set('acquisition_mode', 'integration averaging')
-        self.AWG.start()  # Is needed here to ensure data aligns with seq elt
+        if self.AWG is not None:
+            self.AWG.start()  # Is needed here to ensure data aligns with seq elt
 
     def finish(self):
         self.CBox.set('acquisition_mode', 'idle')
@@ -812,24 +817,27 @@ class Function_Detector(Soft_Detector):
     """
     Defines a detector function that wraps around an user-defined function.
     Inputs are:
-        sweep_function, function that is going to be wrapped around
-        result_keys, keys of the dictionary returned by the function
-        value_names, names of the elements returned by the function
-        value_units, units of the elements returned by the function
-        msmt_kw, kw arguments for the function
+        get_function (fun) : function used for acquiring values
+        value_names (list) : names of the elements returned by the function
+        value_units (list) : units of the elements returned by the function
+        result_keys (list) : keys of the dictionary returned by the function
+                             if not None
+        msmt_kw   (dict)   : kwargs for the get_function, dict items can be
+            values or parameters. If they are parameters the output of the
+            get method will be used for each get_function evaluation.
 
-    The input function sweep_function must return a dictionary.
+    The input function get_function must return a dictionary.
     The contents(keys) of this dictionary are going to be the measured
     values to be plotted and stored by PycQED
     """
 
-    def __init__(self, sweep_function, result_keys, value_names=None,
-                 value_units=None, msmt_kw={}, **kw):
-        super(Function_Detector, self).__init__()
-        self.sweep_function = sweep_function
+    def __init__(self, get_function, value_names=None,
+                 value_units=None, msmt_kw={}, result_keys=None, **kw):
+        super().__init__()
+        self.get_function = get_function
         self.result_keys = result_keys
         self.value_names = value_names
-        self.value_units = value_unit
+        self.value_units = value_units
         self.msmt_kw = msmt_kw
         if self.value_names is None:
             self.value_names = result_keys
@@ -838,50 +846,22 @@ class Function_Detector(Soft_Detector):
 
     def acquire_data_point(self, **kw):
         measurement_kwargs = {}
-        for key, item in self.parameters_dictionary.items():
-            if hasattr(item, 'get'):
+        # If an entry has a get method that will be used to set the value.
+        # This makes parameters work in this context.
+        for key, item in self.msmt_kw.items():
+            if isinstance(item, _BaseParameter):
                 value = item.get()
             else:
                 value = item
             measurement_kwargs[key] = value
-        result = self.function(**measurement_kwargs)
-
-    def acquire_data_point(self, **kw):
-        result = self.sweep_function(**self.msmt_kw)
-        return [result[key] for key in result.keys()]
-
-
-class Function_Detector_list(Soft_Detector):
-
-    """
-    Defines a detector function that wraps around an user-defined function.
-    Inputs are:
-        sweep_function, function that is going to be wrapped around
-        result_keys, keys of the dictionary returned by the function
-        value_names, names of the elements returned by the function
-        value_units, units of the elements returned by the function
-        msmt_kw, kw arguments for the function
-
-    The input function sweep_function must return a dictionary.
-    The contents(keys) of this dictionary are going to be the measured
-    values to be plotted and stored by PycQED
-    """
-
-    def __init__(self, sweep_function, result_keys, value_names=None,
-                 value_unit=None, msmt_kw={}, **kw):
-        super(Function_Detector_list, self).__init__()
-        self.sweep_function = sweep_function
-        self.result_keys = result_keys
-        self.value_names = value_names
-        self.value_units = value_unit
-        self.msmt_kw = msmt_kw
-        if self.value_names is None:
-            self.value_names = result_keys
-        if self.value_units is None:
-            self.value_units = [""] * len(result_keys)
-
-    def acquire_data_point(self, **kw):
-        return self.sweep_function(**self.msmt_kw)
+        # Call the function
+        result = self.get_function(**measurement_kwargs)
+        print(result)
+        if self.result_keys is None:
+            return result
+        else:
+            results = [result[key] for key in self.result_keys]
+            return results
 
 
 class Detect_simulated_hanger_Soft(Soft_Detector):
@@ -1479,6 +1459,8 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
             self.value_names += ['w{}'.format(ch)]
         self.value_units = [
             'V']*len(self.value_names)+['V^2']*len(self.correlations)
+        self.value_units = ['V'] * \
+            len(self.value_names)+['V^2']*len(self.correlations)
         for corr in correlations:
             self.value_names += ['corr ({},{})'.format(corr[0], corr[1])]
 
@@ -1855,9 +1837,8 @@ class DDM_integrated_average_detector(Hard_Detector):
         # polling the data, function checks that measurement is finished
         data = ['']*len(self.channels)
         for i, channel in enumerate(self.channels):
-            data[i] = self.DDM.get("ch_pair1_weight{}_tvmode_data".format(channel))*self.scaling_factor
-            # eval(
-            #     "self.DDM.ch_pair1_weight{}_tvmode_data()".format(channel))*self.scaling_factor
+            data[i] = eval("self.DDM.ch_pair1_weight{}_tvmode_data()".format(
+                channel))*self.scaling_factor
         if self.rotate:
             return self.rotate_and_normalize(data)
         else:
@@ -1938,8 +1919,8 @@ class DDM_integration_logging_det(Hard_Detector):
         # polling the data, function checks that measurement is finished
         data = ['']*len(self.channels)
         for i, channel in enumerate(self.channels):
-            data[i] = eval(
-                "self.DDM.ch_pair1_weight{}_logging_int()".format(channel))*self.scaling_factor
+            data[i] = eval("self.DDM.ch_pair1_weight{}_logging_int()".format(
+                channel))*self.scaling_factor
         return data
 
     def finish(self):

@@ -1,9 +1,10 @@
 import unittest
 import numpy as np
 from pycqed.measurement import measurement_control
-from pycqed.measurement.sweep_functions import None_Sweep
+from pycqed.measurement.sweep_functions import None_Sweep, None_Sweep_idx
 import pycqed.measurement.detector_functions as det
-from pycqed.instrument_drivers.physical_instruments.dummy_instruments import DummyParHolder
+from pycqed.instrument_drivers.physical_instruments.dummy_instruments \
+    import DummyParHolder
 from pycqed.measurement.optimization import nelder_mead, SPSA
 
 from qcodes import station
@@ -16,7 +17,7 @@ class Test_MeasurementControl(unittest.TestCase):
         self.station = station.Station()
         # set up a pulsar with some mock settings for the element
         self.MC = measurement_control.MeasurementControl(
-            'MC', live_plot_enabled=False, verbose=False)
+            'MC', live_plot_enabled=True, verbose=True)
         self.MC.station = self.station
         self.station.add_component(self.MC)
 
@@ -33,14 +34,26 @@ class Test_MeasurementControl(unittest.TestCase):
         self.MC.set_sweep_points(sweep_pts)
         self.MC.set_detector_function(det.Dummy_Detector_Soft())
         dat = self.MC.run('1D_soft')
-        x = dat[:, 0]
+        dset = dat["dset"]
+        x = dset[:, 0]
         xr = np.arange(len(x))/15
         y = np.array([np.sin(xr/np.pi), np.cos(xr/np.pi)])
-        y0 = dat[:, 1]
-        y1 = dat[:, 2]
+        y0 = dset[:, 1]
+        y1 = dset[:, 2]
         np.testing.assert_array_almost_equal(x, sweep_pts)
         np.testing.assert_array_almost_equal(y0, y[0, :])
         np.testing.assert_array_almost_equal(y1, y[1, :])
+
+        # Test that the return dictionary has the right entries
+        dat_keys = set(['dset', 'sweep_parameter_names',
+                        'sweep_parameter_units',
+                        'value_names', 'value_units'])
+        self.assertEqual(dat_keys, set(dat.keys()))
+
+        self.assertEqual(dat['sweep_parameter_names'], ['pts'])
+        self.assertEqual(dat['sweep_parameter_units'], ['arb. unit'])
+        self.assertEqual(dat['value_names'], ['I', 'Q'])
+        self.assertEqual(dat['value_units'], ['mV', 'mV'])
 
     def test_hard_sweep_1D(self):
         sweep_pts = np.linspace(0, 10, 5)
@@ -48,10 +61,11 @@ class Test_MeasurementControl(unittest.TestCase):
         self.MC.set_sweep_points(sweep_pts)
         self.MC.set_detector_function(det.Dummy_Detector_Hard())
         dat = self.MC.run('1D_hard')
-        x = dat[:, 0]
+        dset = dat['dset']
+        x = dset[:, 0]
         y = [np.sin(x / np.pi), np.cos(x/np.pi)]
-        y0 = dat[:, 1]
-        y1 = dat[:, 2]
+        y0 = dset[:, 1]
+        y1 = dset[:, 2]
         np.testing.assert_array_almost_equal(x, sweep_pts)
         np.testing.assert_array_almost_equal(y0, y[0])
         np.testing.assert_array_almost_equal(y1, y[1])
@@ -67,13 +81,13 @@ class Test_MeasurementControl(unittest.TestCase):
         self.MC.set_sweep_points_2D(sweep_pts_2D)
         self.MC.set_detector_function(det.Dummy_Detector_Soft())
         dat = self.MC.run('2D_soft', mode='2D')
-
-        x = dat[:, 0]
-        y = dat[:, 1]
+        dset = dat["dset"]
+        x = dset[:, 0]
+        y = dset[:, 1]
         xr = np.arange(len(sweep_pts)*len(sweep_pts_2D))/15
         z = np.array([np.sin(xr/np.pi), np.cos(xr/np.pi)])
-        z0 = dat[:, 2]
-        z1 = dat[:, 3]
+        z0 = dset[:, 2]
+        z1 = dset[:, 3]
 
         x_tiled = np.tile(sweep_pts, len(sweep_pts_2D))
         y_rep = np.repeat(sweep_pts_2D, len(sweep_pts))
@@ -82,23 +96,45 @@ class Test_MeasurementControl(unittest.TestCase):
         np.testing.assert_array_almost_equal(z0, z[0, :])
         np.testing.assert_array_almost_equal(z1, z[1, :])
 
+    def test_soft_sweep_2D_function_calls(self):
+        sweep_pts = np.arange(0, 30, 1)
+        sweep_pts_2D = np.arange(0, 5, 1)
+        s1 = None_Sweep_idx(sweep_control='soft')
+        s2 = None_Sweep_idx(sweep_control='soft')
+        self.MC.set_sweep_function(s1)
+        self.MC.set_sweep_function_2D(s2)
+        self.MC.set_sweep_points(sweep_pts)
+        self.MC.set_sweep_points_2D(sweep_pts_2D)
+        self.MC.set_detector_function(det.Dummy_Detector_Soft())
+
+        self.assertEqual(s1.num_calls, 0)
+        self.assertEqual(s2.num_calls, 0)
+        self.MC.run('2D_soft', mode='2D')
+
+        # Test that the 2D scan only gets called 5 times (when it changes)
+        # The 1D value always changes and as such should always be called
+        self.assertEqual(s1.num_calls, 30*5)
+        self.assertEqual(s2.num_calls, 5)
+
     def test_hard_sweep_2D(self):
         """
         Hard inner loop, soft outer loop
         """
         sweep_pts = np.linspace(10, 20, 3)
         sweep_pts_2D = np.linspace(0, 10, 5)
+        self.MC.live_plot_enabled(False)
         self.MC.set_sweep_function(None_Sweep(sweep_control='hard'))
         self.MC.set_sweep_function_2D(None_Sweep(sweep_control='soft'))
         self.MC.set_sweep_points(sweep_pts)
         self.MC.set_sweep_points_2D(sweep_pts_2D)
         self.MC.set_detector_function(det.Dummy_Detector_Hard())
         dat = self.MC.run('2D_hard', mode='2D')
-        x = dat[:, 0]
-        y = dat[:, 1]
+        dset = dat["dset"]
+        x = dset[:, 0]
+        y = dset[:, 1]
         z = self.data = [np.sin(x / np.pi), np.cos(x/np.pi)]
-        z0 = dat[:, 2]
-        z1 = dat[:, 3]
+        z0 = dset[:, 2]
+        z1 = dset[:, 3]
 
         x_tiled = np.tile(sweep_pts, len(sweep_pts_2D))
         y_rep = np.repeat(sweep_pts_2D, len(sweep_pts))
@@ -108,6 +144,8 @@ class Test_MeasurementControl(unittest.TestCase):
         np.testing.assert_array_almost_equal(z1, z[1])
         d = self.MC.detector_function
         self.assertEqual(d.times_called, 5)
+
+        self.MC.live_plot_enabled(True)
 
     def test_many_shots_hard_sweep(self):
         """
@@ -119,10 +157,11 @@ class Test_MeasurementControl(unittest.TestCase):
         self.MC.set_sweep_points(sweep_pts)
         self.MC.set_detector_function(det.Dummy_Shots_Detector(max_shots=5))
         dat = self.MC.run('man_shots')
-        x = dat[:, 0]
-        y = dat[:, 1]
+        dset = dat["dset"]
+        x = dset[:, 0]
+        y = dset[:, 1]
 
-        self.assertEqual(np.shape(dat), (len(sweep_pts), 2))
+        self.assertEqual(np.shape(dset), (len(sweep_pts), 2))
         np.testing.assert_array_almost_equal(x, sweep_pts)
         np.testing.assert_array_almost_equal(y, sweep_pts)
 
@@ -136,10 +175,11 @@ class Test_MeasurementControl(unittest.TestCase):
         self.MC.set_sweep_points(sweep_pts)
         self.MC.set_detector_function(det.Dummy_Detector_Hard(noise=.4))
         noisy_dat = self.MC.run('noisy_dat')
-        x = noisy_dat[:, 0]
+        noisy_dset = noisy_dat["dset"]
+        x = noisy_dset[:, 0]
         y = [np.sin(x / np.pi), np.cos(x/np.pi)]
-        yn_0 = abs(noisy_dat[:, 1] - y[0])
-        yn_1 = abs(noisy_dat[:, 2] - y[1])
+        yn_0 = abs(noisy_dset[:, 1] - y[0])
+        yn_1 = abs(noisy_dset[:, 2] - y[1])
 
         d = self.MC.detector_function
         self.assertEqual(d.times_called, 1)
@@ -149,8 +189,9 @@ class Test_MeasurementControl(unittest.TestCase):
         self.MC.set_sweep_points(sweep_pts)
         self.MC.set_detector_function(d)
         avg_dat = self.MC.run('averaged_dat')
-        yavg_0 = abs(avg_dat[:, 1] - y[0])
-        yavg_1 = abs(avg_dat[:, 2] - y[1])
+        avg_dset = avg_dat["dset"]
+        yavg_0 = abs(avg_dset[:, 1] - y[0])
+        yavg_1 = abs(avg_dset[:, 2] - y[1])
 
         np.testing.assert_array_almost_equal(x, sweep_pts)
         self.assertGreater(np.mean(yn_0), np.mean(yavg_0))
@@ -164,6 +205,7 @@ class Test_MeasurementControl(unittest.TestCase):
 
     def test_soft_averages_hard_sweep_2D(self):
         self.MC.soft_avg(1)
+        self.MC.live_plot_enabled(False)
         sweep_pts = np.arange(5)
         sweep_pts_2D = np.linspace(5, 10, 5)
         self.MC.set_sweep_function(None_Sweep(sweep_control='hard'))
@@ -172,11 +214,12 @@ class Test_MeasurementControl(unittest.TestCase):
         self.MC.set_sweep_points_2D(sweep_pts_2D)
         self.MC.set_detector_function(det.Dummy_Detector_Hard(noise=.2))
         noisy_dat = self.MC.run('2D_hard', mode='2D')
-        x = noisy_dat[:, 0]
-        y = noisy_dat[:, 1]
+        noisy_dset = noisy_dat["dset"]
+        x = noisy_dset[:, 0]
+        y = noisy_dset[:, 1]
         z = [np.sin(x / np.pi), np.cos(x/np.pi)]
-        z0 = abs(noisy_dat[:, 2] - z[0])
-        z1 = abs(noisy_dat[:, 3] - z[1])
+        z0 = abs(noisy_dset[:, 2] - z[0])
+        z1 = abs(noisy_dset[:, 3] - z[1])
 
         x_tiled = np.tile(sweep_pts, len(sweep_pts_2D))
         y_rep = np.repeat(sweep_pts_2D, len(sweep_pts))
@@ -185,17 +228,17 @@ class Test_MeasurementControl(unittest.TestCase):
 
         d = self.MC.detector_function
         self.assertEqual(d.times_called, 5)
-
         self.MC.set_sweep_function(None_Sweep(sweep_control='hard'))
         self.MC.set_sweep_function_2D(None_Sweep(sweep_control='soft'))
         self.MC.set_sweep_points(sweep_pts)
         self.MC.set_sweep_points_2D(sweep_pts_2D)
         self.MC.soft_avg(1000)
         avg_dat = self.MC.run('averaged_dat', mode='2D')
-        x = avg_dat[:, 0]
-        y = avg_dat[:, 1]
-        zavg_0 = abs(avg_dat[:, 2] - z[0])
-        zavg_1 = abs(avg_dat[:, 3] - z[1])
+        avg_dset = avg_dat["dset"]
+        x = avg_dset[:, 0]
+        y = avg_dset[:, 1]
+        zavg_0 = abs(avg_dset[:, 2] - z[0])
+        zavg_1 = abs(avg_dset[:, 3] - z[1])
 
         np.testing.assert_array_almost_equal(x, x_tiled)
         self.assertGreater(np.mean(z0), np.mean(zavg_0))
@@ -207,6 +250,7 @@ class Test_MeasurementControl(unittest.TestCase):
                                              decimal=2)
 
         self.assertEqual(d.times_called, 5*1000+5)
+        self.MC.live_plot_enabled(True)
 
     def test_soft_sweep_1D_soft_averages(self):
         self.mock_parabola.noise(0)
@@ -220,9 +264,10 @@ class Test_MeasurementControl(unittest.TestCase):
         self.MC.set_sweep_points(sweep_pts)
         self.MC.set_detector_function(self.mock_parabola.parabola)
         dat = self.MC.run('1D_soft')
-        x = dat[:, 0]
+        dset = dat["dset"]
+        x = dset[:, 0]
         y_exp = x**2
-        y0 = dat[:, 1]
+        y0 = dset[:, 1]
         np.testing.assert_array_almost_equal(x, sweep_pts)
         np.testing.assert_array_almost_equal(y0, y_exp, decimal=5)
 
@@ -232,9 +277,10 @@ class Test_MeasurementControl(unittest.TestCase):
         self.MC.set_sweep_points(sweep_pts)
         self.MC.set_detector_function(self.mock_parabola.parabola)
         dat = self.MC.run('1D_soft')
-        x = dat[:, 0]
+        dset = dat["dset"]
+        x = dset[:, 0]
         y_exp = x**2
-        y0 = dat[:, 1]
+        y0 = dset[:, 1]
         np.testing.assert_array_almost_equal(x, sweep_pts)
         np.testing.assert_array_almost_equal(y0, y_exp, decimal=5)
 
@@ -249,7 +295,8 @@ class Test_MeasurementControl(unittest.TestCase):
         self.mock_parabola.noise(.5)
         self.MC.set_detector_function(self.mock_parabola.parabola)
         dat = self.MC.run('1D test', mode='adaptive')
-        xf, yf, pf = dat[-1]
+        dset = dat["dset"]
+        xf, yf, pf = dset[-1]
         self.assertLess(xf, 0.7)
         self.assertLess(yf, 0.7)
         self.assertLess(pf, 0.7)
@@ -272,7 +319,8 @@ class Test_MeasurementControl(unittest.TestCase):
         self.mock_parabola.noise(.5)
         self.MC.set_detector_function(self.mock_parabola.parabola)
         dat = self.MC.run('1D test', mode='adaptive')
-        xf, yf, pf = dat[-1]
+        dset = dat["dset"]
+        xf, yf, pf = dset[-1]
         self.assertLess(xf, 0.7)
         self.assertLess(yf, 0.7)
         self.assertLess(pf, 0.7)
@@ -291,10 +339,11 @@ class Test_MeasurementControl(unittest.TestCase):
         self.MC.set_sweep_points(sweep_pts)
         self.MC.set_detector_function(det.Dummy_Detector_Hard())
         dat = self.MC.run('1D_hard')
-        x = dat[:, 0]
+        dset = dat["dset"]
+        x = dset[:, 0]
         y = [np.sin(x / np.pi), np.cos(x/np.pi)]
-        y0 = dat[:, 1]
-        y1 = dat[:, 2]
+        y0 = dset[:, 1]
+        y1 = dset[:, 2]
         np.testing.assert_array_almost_equal(x, sweep_pts)
         np.testing.assert_array_almost_equal(y0, y[0])
         np.testing.assert_array_almost_equal(y1, y[1])
@@ -311,3 +360,13 @@ class Test_MeasurementControl(unittest.TestCase):
 
         self.MC.clear_persitent_plot()
         self.assertEqual(self.MC._persist_dat, None)
+
+    def test_data_resolution(self):
+        # This test will fail if the data is saved as 32 bit floats
+        sweep_pts = [3e9+1e-3, 3e9+2e-3]
+        self.MC.set_sweep_function(None_Sweep())
+        self.MC.set_sweep_points(sweep_pts)
+        self.MC.set_detector_function(det.Dummy_Detector_Soft())
+        dat = self.MC.run('1D_soft')
+        x = dat['dset'][:, 0]
+        np.testing.assert_array_almost_equal(x, sweep_pts, decimal=5)
