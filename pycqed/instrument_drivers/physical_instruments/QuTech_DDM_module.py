@@ -1148,6 +1148,12 @@ class DDMq(SCPI):
                 level = "error"
             elif (self.logLevel >= logging.WARNING):
                 level = "warning"
+            elif (self.logLevel >= logging.INFO):
+                level = "info"
+            elif (self.logLevel >= logging.DEBUG):
+                level = "debug"
+            else:
+                level = "nonset"
             return level + ": " + self.description + "(" +\
                 self.acquisitionMode + ")"
 
@@ -1158,6 +1164,10 @@ class DDMq(SCPI):
                 log.error(self)
             elif (self.logLevel >= logging.WARNING):
                 log.warning(self)
+            elif (self.logLevel >= logging.INFO):
+                log.info(self)
+            elif (self.logLevel >= logging.DEBUG):
+                log.debug(self)
 
     def _displayErrors(self, errors):
         for i in range(0, len(errors)):
