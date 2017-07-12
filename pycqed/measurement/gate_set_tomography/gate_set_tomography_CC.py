@@ -76,6 +76,10 @@ def get_experiments_from_file(filename, gate_dict, use_pygsti_parser=True):
     for line in rawLines:
         lines.append(line.split(' ')[0])
 
+    # First line usually contains a comment that we remove here.
+    if lines[0][0] == '#':
+        lines = lines[1:]
+
     if use_pygsti_parser:
         gateStrList = [
             pygsti.objects.GateString(None, stringRepresentation=line)

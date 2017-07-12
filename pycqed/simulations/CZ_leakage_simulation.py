@@ -30,7 +30,8 @@ def simulate_CZ_trajectory(length, lambda_2, lambda_3, theta_f,
                            f_interaction,
                            J2,
                            E_c,
-                           dac_flux_coefficient=1,
+                           V_per_phi0=1,
+                           dac_flux_coefficient=None,
                            asymmetry=0,
                            sampling_rate=2e9, return_all=False,
                            verbose=False):
@@ -44,7 +45,7 @@ def simulate_CZ_trajectory(length, lambda_2, lambda_3, theta_f,
         f_interaction        (float): parameter for waveform (Hz)
         J2                   (float): parameter for waveform (Hz)
         E_c                  (float): parameter for waveform (Hz)
-        dac_flux_coefficient (float): parameter for waveform
+        V_per_phi0           (float): parameter for waveform (V)
         asymmetry            (float): parameter for waveform
         sampling_rate        (float): sampling rate used in simulation (Hz)
         verbose              (bool) : enables optional print statements
@@ -59,6 +60,10 @@ def simulate_CZ_trajectory(length, lambda_2, lambda_3, theta_f,
         eps_vec :       vector of detunings as function of time
         tlist:          vector of times used in the simulation
     """
+    if dac_flux_coefficient is not None:
+        loggin.warning('dac_flux_coefficient deprecated. Please use the '
+                       'physically meaningful V_per_phi0 instead.')
+        V_per_phi0 = np.pi/dac_flux_coefficient
 
     Hx = qtp.sigmax()*2*np.pi  # so that freqs are real and not radial
     Hz = qtp.sigmaz()*2*np.pi  # so that freqs are real and not radial
@@ -75,7 +80,7 @@ def simulate_CZ_trajectory(length, lambda_2, lambda_3, theta_f,
     f_pulse = martinis_flux_pulse(
         length, lambda_2=lambda_2, lambda_3=lambda_3,
         theta_f=theta_f, f_01_max=f_01_max, E_c=E_c,
-        dac_flux_coefficient=dac_flux_coefficient,
+        V_per_phi0=V_per_phi0,
         f_interaction=f_interaction, J2=J2,
         return_unit='eps',
         sampling_rate=sampling_rate)
