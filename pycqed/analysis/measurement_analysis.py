@@ -6644,7 +6644,7 @@ class GST_Analysis(TD_Analysis):
     correctly and writes the counts to a file in the format required by
     pyGSTi. The actual analysis is then run using the tools from pyGSTi.
     '''
-    def __init__(self, exp_num_list, hard_repetitioins: int,
+    def __init__(self, exp_num_list, hard_repetitions: int,
                  soft_repetitions: int, exp_list, gs_target, prep_fiducials,
                  meas_fiducials, germs, max_lengths):
         '''
@@ -6676,7 +6676,6 @@ class GST_Analysis(TD_Analysis):
                     List of maximum sequence length (via germ repeats) used
                     in the experiment.
         '''
-        super().__init__(cal_points=False, make_fig=False)
         self.exp_nums = exp_num_list
         self.hard_repetitions = hard_repetitions
         self.soft_repetitions = soft_repetitions
@@ -6688,6 +6687,7 @@ class GST_Analysis(TD_Analysis):
         self.max_lengths = max_lengths
 
         self.counts = {}
+        super().__init__(cal_points=False, make_fig=False)
 
     def run_default_analysis(self, **kw):
         self.close_file = kw.get('close_file', True)
@@ -6703,24 +6703,25 @@ class GST_Analysis(TD_Analysis):
         # still ordered in blocks according to the hard repetitions.
 
         block_idx = 0
-        for i in range(len(exp_nums)):
+        for i in range(len(self.exp_nums)):
             # The length of exp_nums tells us how many QASM files were used.
             # d: distance between measurements of same sequence
             # l: largest index corresponding to the same qasm file
-            d = exp_nums[i]
-            l = exp_nums[i] * self.hard_repetitions
+            d = self.exp_nums[i]
+            l = self.exp_nums[i] * self.hard_repetitions
 
-            for seq_idx in range(exp_nums[i]):
+            for seq_idx in range(self.exp_nums[i]):
                 # For every sequence in the current QASM file
                 plus_count = 0
                 for soft_idx in range(self.soft_repetitions):
-                    plus_count += np.sum(data[soft_idx, seq_idx:l:d])
+                    plus_count += np.sum(data[soft_idx, seq_idx:l:d],
+                                         dtype=int)
                 minus_count = (self.hard_repetitions * self.soft_repetitions -
                                plus_count)
 
-                self.counts[exp_list[block_idx+seq_idx]] = (minus_count,
-                                                            plus_count)
-            block_idx += exp_nums[i]
+                self.counts[self.exp_list[block_idx+seq_idx]] = (minus_count,
+                                                                 plus_count)
+            block_idx += self.exp_nums[i]
 
         # Write extracted counts to file.
         self.pygsti_fn = os.path.join(self.folder, 'pyGSTi_dataset.txt')
@@ -6734,7 +6735,7 @@ class GST_Analysis(TD_Analysis):
         self.report_fn = os.path.join(self.folder, 'pyGSTi_report.html')
         pygsti.report.create_general_report(results, self.report_fn,
                                             verbosity=3, auto_open=False,
-                                            confidenceLeve=95)
+                                            confidenceLevel=95)
 
     def write_GST_datafile(self, filepath: str, count_dict: dict):
         '''
@@ -6749,4 +6750,4 @@ class GST_Analysis(TD_Analysis):
         with open(filepath, 'w') as file:
             file.writelines('## Columns = minus count, plus count\n')
             for seq, tup in count_dict.items():
-                file.writelines('{}  {}  {}\n'.format(seq, tup[0], tup[1]))
+                file.writelines('{}  {}  {}\n'.format(seq, tup[0]), tup[1]))

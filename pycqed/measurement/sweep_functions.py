@@ -392,24 +392,24 @@ class Multi_QASM_Sweep(QASM_Sweep_v2):
                  soft_repetitions: int, qasm_list, config: dict, detector,
                  CBox, parameter_name: str='Points', unit: str='a.u.',
                  upload: bool=True, verbosity_level: int=0):
-    '''
-    Args:
-        exp_num_list (array of ints):
-                Number of experiments included in each of the given QASM
-                files. This is needed to correctly set the detector points
-                for each QASM Sweep.
-        hard_repetitions (int):
-                Number of hard averages for a single QASM file.
-        soft_repetitions (int):
-                Number of soft averages over the whole sweep, i.e. how many
-                times is the whole list of QASM files repeated.
-        qasm_list (array of strings):
-                List of names of the QASM files to be included in the sweep.
-        config (dict):
-                QASM config used for compilation.
-        detector (obj):
-                An instance of the detector object that is used for the
-                measurement.
+        '''
+        Args:
+            exp_num_list (array of ints):
+                    Number of experiments included in each of the given QASM
+                    files. This is needed to correctly set the detector points
+                    for each QASM Sweep.
+            hard_repetitions (int):
+                    Number of hard averages for a single QASM file.
+            soft_repetitions (int):
+                    Number of soft averages over the whole sweep, i.e. how many
+                    times is the whole list of QASM files repeated.
+            qasm_list (array of strings):
+                    List of names of the QASM files to be included in the sweep.
+            config (dict):
+                    QASM config used for compilation.
+            detector (obj):
+                    An instance of the detector object that is used for the
+                    measurement.
     '''
         super().__init__(qasm_fn=None, config=config, CBox=CBox,
                          parameter_name=parameter_name, unit=unit,
@@ -428,7 +428,7 @@ class Multi_QASM_Sweep(QASM_Sweep_v2):
         self.compile_and_upload(self.qasm_list[self._cur_file_idx],
                                 self.config)
         self.detector.nr_shots = (self.hard_repetitions *
-                                  exp_nums[self._cur_file_idx])
+                                  self.exp_nums[self._cur_file_idx])
         self._cur_file_idx += 1
 
 

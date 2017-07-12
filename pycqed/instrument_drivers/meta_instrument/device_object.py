@@ -294,7 +294,7 @@ class TwoQubitDevice(DeviceObject):
         ma.MeasurementAnalysis()
 
     def measure_two_qubit_GST(self, q0, q1,
-                              max_lengths=[0]+[2**i for i in range(10)],
+                              max_lengths=[2**i for i in range(10)],
                               repetitions_per_point=500,
                               MC=None):
         '''

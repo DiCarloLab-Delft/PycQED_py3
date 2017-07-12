@@ -36,9 +36,9 @@ from pycqed.measurement.waveform_control_CC import instruction_lib as ins_lib
 from pycqed.measurement.waveform_control_CC import QWG_fluxing_seqs as qwfs
 from pycqed.measurement.waveform_control_CC.instruction_lib import convert_to_clocks
 
-
 from pycqed.measurement import detector_functions as det
 from pycqed.instrument_drivers.pq_parameters import InstrumentParameter
+import pycqed.measurement.gate_set_tomography.gate_set_tomography_CC as gstCC
 
 
 class CBox_v3_driven_transmon(Transmon):
@@ -1467,7 +1467,7 @@ class CBox_v3_driven_transmon(Transmon):
         # Calculate optimal weights
         optimized_weights_I = transients[1][0] - transients[0][0]
         optimized_weights_Q = transients[1][1] - transients[0][1]
-        
+
         # joint rescaling to +/-1 Volt
         maxI=np.max(np.abs(optimized_weights_I))
         maxQ=np.max(np.abs(optimized_weights_Q))
@@ -2151,9 +2151,10 @@ class CBox_v3_driven_transmon(Transmon):
         return instr
 
     def measure_single_qubit_GST(self,
-                                 max_lengths=[0]+[2**i for i in range(10)],
-                                 repetitions_per_point=500,
-                                 MC=None):
+                                 max_lengths=[2**i for i in range(10)],
+                                 repetitions_per_point: int=500,
+                                 min_soft_repetitions: int=5,
+                                 MC=None, analyze: bool=False):
         '''
         Measure gate set tomography for this qubit. The gateset that is used
         is saved in
@@ -2168,6 +2169,9 @@ class CBox_v3_driven_transmon(Transmon):
                 completely depolarizes.
             repetitions_per_point (int):
                 Number of times each experiment is repeated in total.
+            min_soft_repetitions (int):
+                Minimum number of soft repetitions that should be done
+                (repetitions of the whole sequene).
             MC (Instrument):
                 Measurement control instrument that should be used for the
                 experiment. Default (None) uses self.MC.
@@ -2179,8 +2183,7 @@ class CBox_v3_driven_transmon(Transmon):
             MC = self.MC.get_instr()
 
         # Load gate set, germs, and fiducials from file.
-        gstPath = os.path.join(pq.__path__[0], 'measurement',
-                               'gate_set_tomography')
+        gstPath = os.path.dirname(gstCC.__file__)
         gs_target = pygsti.io.load_gateset(
             os.path.join(gstPath, 'Gateset_5_primitives_GST.txt'))
         fiducials = pygsti.io.load_gatestring_list(
@@ -2190,7 +2193,7 @@ class CBox_v3_driven_transmon(Transmon):
 
         # gate_dict maps GST gate labels to QASM operations.
         gate_dict = {
-            'Gi' : 'I {}'.format(int(np.round(self.gauss_width*1e9 * 4))),
+            'Gi' : 'I {}'.format(self.name),
             'Gx90' : 'X90 {}'.format(self.name),
             'Gy90' : 'Y90 {}'.format(self.name),
             'Gx180' : 'X180 {}'.format(self.name),
@@ -2232,7 +2235,7 @@ class CBox_v3_driven_transmon(Transmon):
             repetitions_per_point / np.floor(max_acq_points / max_exp_num)))
         if soft_repetitions < min_soft_repetitions:
             soft_repetitions = 5
-            hard_repetitions = int(np.ceil(repetitions_per_point /
+        hard_repetitions = int(np.ceil(repetitions_per_point /
                                        soft_repetitions))
 
         self.prepare_for_timedomain()
@@ -2246,7 +2249,7 @@ class CBox_v3_driven_transmon(Transmon):
             detector=d,
             CBox=self.CBox.get_instr(),
             parameter_name='GST sequence',
-            unit=None)
+            unit='#')
         total_exp_nr = np.sum(exp_nums) * hard_repetitions * soft_repetitions
 
         if d.result_logging_mode != 'digitized':
@@ -2259,15 +2262,16 @@ class CBox_v3_driven_transmon(Transmon):
         MC.run('GST')
 
         # Analysis
-        ma.GST_Analysis(exp_num_list=exp_nums,
-                        hard_repetitions=hard_repetitions,
-                        soft_repetitions=soft_repetitions,
-                        exp_list=[g.str for g in raw_exp_list],
-                        gs_target=gs_target,
-                        prep_fiducials=fiducials,
-                        meas_fiducials=fiducials,
-                        germs=germs,
-                        max_lengths=max_lengths)
+        if analyze:
+            ma.GST_Analysis(exp_num_list=exp_nums,
+                            hard_repetitions=hard_repetitions,
+                            soft_repetitions=soft_repetitions,
+                            exp_list=[g.str for g in raw_exp_list],
+                            gs_target=gs_target,
+                            prep_fiducials=fiducials,
+                            meas_fiducials=fiducials,
+                            germs=germs,
+                            max_lengths=max_lengths)
 
 
 class QWG_driven_transmon(CBox_v3_driven_transmon):

@@ -23,7 +23,7 @@ def get_experiments_from_list(pygsti_list, gate_dict):
     '''
     exp_list = []
     for exp in pygsti_list:
-        operations = ['\ninit all']
+        operations = ['\ninit_all']
         operations += [gate_dict[g] for g in exp.tup]
         operations += [gate_dict['RO']]
         exp_list.append(operations)
