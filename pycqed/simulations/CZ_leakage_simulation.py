@@ -61,7 +61,7 @@ def simulate_CZ_trajectory(length, lambda_2, lambda_3, theta_f,
         tlist:          vector of times used in the simulation
     """
     if dac_flux_coefficient is not None:
-        loggin.warning('dac_flux_coefficient deprecated. Please use the '
+        logging.warning('dac_flux_coefficient deprecated. Please use the '
                        'physically meaningful V_per_phi0 instead.')
         V_per_phi0 = np.pi/dac_flux_coefficient
 
