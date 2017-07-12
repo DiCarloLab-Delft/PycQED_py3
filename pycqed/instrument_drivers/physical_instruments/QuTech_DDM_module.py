@@ -57,6 +57,15 @@ class DDMq(SCPI):
         self.add_parameters()
         self.connect_message()
 
+    def ask(self, data):
+        result = super(DDMq, self).ask(data)
+        if (type(result) is str):
+            try:
+                return float(result)
+            except ValueError:
+                return result
+        return result
+
     def add_parameter(self, name, parameter_class=StandardParameter,
                       **kwargs):
         self._setValidatorLimits(name, kwargs)
