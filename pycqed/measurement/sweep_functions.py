@@ -257,6 +257,7 @@ class QASM_Sweep(Hard_Sweep):
         self.op_dict = op_dict
         self.parameter_name = parameter_name
         self.unit = unit
+        logging.warning('QASM_Sweep is deprecated, use QASM_Sweep_v2')
 
     def prepare(self, **kw):
         self.CBox.trigger_source('internal')
