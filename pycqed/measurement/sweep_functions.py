@@ -87,6 +87,15 @@ class None_Sweep(Soft_Sweep):
         pass
 
 
+class None_Sweep_idx(None_Sweep):
+    def __init__(self, **kw):
+        super().__init__(**kw)
+        self.num_calls = 0
+
+    def set_parameter(self, val):
+        self.num_calls += 1
+
+
 class QX_Sweep(Soft_Sweep):
 
     """
@@ -245,6 +254,24 @@ class QASM_Sweep(Hard_Sweep):
             self.CBox.load_instructions(qumis_file.name)
 
 
+class QuMis_Sweep(Hard_Sweep):
+
+    def __init__(self, filename, CBox, 
+                 parameter_name='Points', unit='a.u.', upload=True):
+        super().__init__()
+        self.name = 'QASM_Sweep'
+        self.filename = filename
+        self.upload = upload
+        self.CBox = CBox
+        self.parameter_name = parameter_name
+        self.unit = unit
+
+    def prepare(self, **kw):
+        self.CBox.trigger_source('internal')
+        if self.upload:
+            self.CBox.load_instructions(self.filename)
+
+
 class QX_Hard_Sweep(Hard_Sweep):
 
     def __init__(self, qxc, filename):  # , num_circuits):
@@ -272,9 +299,6 @@ class QX_Hard_Sweep(Hard_Sweep):
             # print(c)
             self.__qxc.create_circuit(c[0], c[1])
 
-'''
-QX RB Sweep (Multi QASM Files)
-'''
 
 
 class QX_RB_Hard_Sweep(Hard_Sweep):
@@ -312,8 +336,10 @@ class ZNB_VNA_sweep(Hard_Sweep):
         Defines the frequency sweep using one of the following methods:
         1) start a and stop frequency
         2) center frequency and span
-        3) segment sweep (this requires a list of elements. Each element fully defines a sweep)
-           segment_list = [[start_frequency, stop_frequency, nbr_points, power, segment_time, mesurement_delay, bandwidth],
+        3) segment sweep (this requires a list of elements. Each element fully
+           defines a sweep)
+           segment_list = [[start_frequency, stop_frequency, nbr_points,
+                            power, segment_time, mesurement_delay, bandwidth],
                            [elements for segment #2],
                            ...,
                            [elements for segment #n]]

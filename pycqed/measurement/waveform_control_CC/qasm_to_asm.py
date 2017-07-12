@@ -48,6 +48,7 @@ def qasm_to_asm(qasm_filepath, operation_dict):
         for line in qasm_file:
             # Make lines interpretable
             line = line.split('#', 1)[0]  # remove comments
+            line = line.split('map', 1)[0]  # remove mapping info if supplied
             line = line.strip(' \t\n\r')  # remove whitespace
             if (len(line) == 0):  # skip empty line and comment
                 continue
@@ -79,6 +80,10 @@ def qasm_to_asm(qasm_filepath, operation_dict):
                     raise NotImplementedError(
                         'Multi qubit ops with args: "{}"'.format(line))
                 asm_file.writelines(instruction)
+            # Identity is a special instruction that is supported as a wait
+            elif elts[0] == 'I':
+                clock_waits = int(int(elts[1])//5)
+                instruction = 'wait {} \n'.format(clock_waits)
             else:
                 raise ValueError(
                     'Command "{}" not recognized, must be in {}'.format(
