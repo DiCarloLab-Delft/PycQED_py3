@@ -71,13 +71,15 @@ def T1(qubit_name, times, clock_cycle=1e-9,
     return qasm_file
 
 
-def flipping_seq(qubit_name, number_of_flips, clock_cycle=1e-9,
-                 equator=False, cal_points=True):
+def flipping_seq(qubit_name: str, number_of_flips: list,
+                 equator: bool=False, cal_points: bool=True,
+                 restless: bool=False):
     filename = join(base_qasm_path, 'Flipping.qasm')
     qasm_file = mopen(filename, mode='w')
     qasm_file.writelines('qubit {} \n'.format(qubit_name))
     for i, n in enumerate(number_of_flips):
-        qasm_file.writelines('\ninit_all\n')
+        if not restless:
+            qasm_file.writelines('\ninit_all\n')
         if cal_points and (i == (len(number_of_flips)-4) or
                            i == (len(number_of_flips)-3)):
             qasm_file.writelines('RO {}  \n'.format(qubit_name))
