@@ -1,5 +1,6 @@
-matplotlib 
-numpy 
+matplotlib
+numpy
 pandas
 qutip
 pyqtgraph
+pysti
