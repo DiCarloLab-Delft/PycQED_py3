@@ -84,7 +84,8 @@ class Test_compiler(unittest.TestCase):
                                               'ql': 0, 'qr': 1})
 
         self.assertEqual(len(compiler.luts), 2)  # MW and Flux
-        allowed_single_q_ops = {'x180',
+        allowed_single_q_ops = {'i',
+                                'x180',
                                 'x90',
                                 'y180',
                                 'y90',

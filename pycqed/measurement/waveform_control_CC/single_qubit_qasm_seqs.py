@@ -29,7 +29,7 @@ def CW_RO_sequence(qubit_name, trigger_separation, clock_cycle=1e-9):
     filename = join(base_qasm_path, 'CW_RO_sequence.qasm')
     qasm_file = mopen(filename, mode='w')
     qasm_file.writelines('qubit {} \n'.format(qubit_name))
-    qasm_file.writelines('I {:d} \n'.format(int(delay)))
+    qasm_file.writelines('Idx {:d} \n'.format(int(delay)))
     qasm_file.writelines('RO {}  \n'.format(qubit_name))
     qasm_file.close()
     return qasm_file
@@ -65,7 +65,7 @@ def T1(qubit_name, times, clock_cycle=1e-9,
         else:
             qasm_file.writelines('X180 {}     # exciting pi pulse\n'.format(
                                  qubit_name))
-            qasm_file.writelines('I {:d} \n'.format(int(cl)))
+            qasm_file.writelines('Idx {:d} \n'.format(int(cl)))
             qasm_file.writelines('RO {}  \n'.format(qubit_name))
     qasm_file.close()
     return qasm_file
@@ -183,7 +183,7 @@ def Ramsey(qubit_name, times, clock_cycle=1e-9,
         else:
             qasm_file.writelines('X90 {}     \n'.format(
                                  qubit_name))
-            qasm_file.writelines('I {:d} \n'.format(int(cl)))
+            qasm_file.writelines('Idx {:d} \n'.format(int(cl)))
             if artificial_detuning is not None:
                 qasm_file.writelines('R90_phi {} {}\n'.format(
                     qubit_name, phases[i]))
@@ -236,9 +236,9 @@ def echo(qubit_name, times, clock_cycle=1e-9,
             qasm_file.writelines('RO {}  \n'.format(qubit_name))
         else:
             qasm_file.writelines('X90 {}     \n'.format(qubit_name))
-            qasm_file.writelines('I {:d} \n'.format(int(cl//2)))
+            qasm_file.writelines('Idx {:d} \n'.format(int(cl//2)))
             qasm_file.writelines('X180 {}     \n'.format(qubit_name))
-            qasm_file.writelines('I {:d} \n'.format(int(cl//2)))
+            qasm_file.writelines('Idx {:d} \n'.format(int(cl//2)))
             if artificial_detuning is not None:
                 qasm_file.writelines('R90_phi {} {}\n'.format(
                     qubit_name, phases[i]))
