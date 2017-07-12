@@ -17,6 +17,7 @@ import pylab
 from pycqed.analysis.tools import data_manipulation as dm_tools
 import imp
 import math
+import pygsti
 from math import erfc
 from scipy.signal import argrelextrema, argrelmax, argrelmin
 from copy import deepcopy
@@ -844,7 +845,7 @@ class TD_Analysis(MeasurementAnalysis):
     '''
 
     def __init__(self, NoCalPoints=4, center_point=31, make_fig=True,
-                 zero_coord=None, one_coord=None, cal_points=None,
+                 zero_coord=None, one_coord=None, cal_points: bool=None,
                  rotate_and_normalize=True,
                  plot_cal_points=True, **kw):
         self.NoCalPoints = NoCalPoints
@@ -6635,3 +6636,117 @@ class Ram_Z_Analysis(MeasurementAnalysis):
         set_ylabel(ax, 'detuning', 'Hz')
 
         self.save_fig(fig, 'Ram-Z_dac_arc.png')
+
+
+class GST_Analysis(TD_Analysis):
+    '''
+    Analysis for Gate Set Tomography. Extracts data from the files, bins it
+    correctly and writes the counts to a file in the format required by
+    pyGSTi. The actual analysis is then run using the tools from pyGSTi.
+    '''
+    def __init__(self, exp_num_list, hard_repetitioins: int,
+                 soft_repetitions: int, exp_list, gs_target, prep_fiducials,
+                 meas_fiducials, germs, max_lengths):
+        '''
+        Args:
+            exp_num_list (array of ints):
+                    Number of experiments included in each of the given QASM
+                    files. This is needed to correctly set the detector points
+                    for each QASM Sweep.
+            hard_repetitions (int):
+                    Number of hard averages for a single QASM file.
+            soft_repetitions (int):
+                    Number of soft averages over the whole sweep, i.e. how many
+                    times is the whole list of QASM files repeated.
+            exp_list (array of strings):
+                    List of the GST gate sequences in pyGSTi syntax. This is used
+                    used to write the file in pyGSTi format.
+            gs_target (obj):
+                    pyGSTi GateSet object representing the target gate set.
+            prep_fiducials (list):
+                    List of pyGSTi GateString objects representing the
+                    preparation fiducials for the target gate set.
+            meas_fiducials (list):
+                    List of pyGSTi GateString objects representing the
+                    measurement fiducials for the target gate set.
+            germs (list):
+                    List of pyGSTi GateString objects representing the germs
+                    for the target gate set.
+            max_lengths (list):
+                    List of maximum sequence length (via germ repeats) used
+                    in the experiment.
+        '''
+        super().__init__(cal_points=False, make_fig=False)
+        self.exp_nums = exp_num_list
+        self.hard_repetitions = hard_repetitions
+        self.soft_repetitions = soft_repetitions
+        self.exp_list = exp_list
+        self.gs_target = gs_target
+        self.prep_fids = prep_fiducials
+        self.meas_fids = meas_fiducials
+        self.germs = germs
+        self.max_lengths = max_lengths
+
+        self.counts = {}
+
+    def run_default_analysis(self, **kw):
+        self.close_file = kw.get('close_file', True)
+        self.get_naming_and_values()
+
+        # Find the results that belong to the same GST sequence and sum up the
+        # counts.
+        # First, reshape data according to soft repetitions.
+        data = np.reshape(self.measured_values[0],
+                          (self.soft_repetitions, -1))
+        # Each row (i.e. data[i, :]) now contains one of the soft repetitions
+        # containing all of the required GST experiments. They are however
+        # still ordered in blocks according to the hard repetitions.
+
+        block_idx = 0
+        for i in range(len(exp_nums)):
+            # The length of exp_nums tells us how many QASM files were used.
+            # d: distance between measurements of same sequence
+            # l: largest index corresponding to the same qasm file
+            d = exp_nums[i]
+            l = exp_nums[i] * self.hard_repetitions
+
+            for seq_idx in range(exp_nums[i]):
+                # For every sequence in the current QASM file
+                plus_count = 0
+                for soft_idx in range(self.soft_repetitions):
+                    plus_count += np.sum(data[soft_idx, seq_idx:l:d])
+                minus_count = (self.hard_repetitions * self.soft_repetitions -
+                               plus_count)
+
+                self.counts[exp_list[block_idx+seq_idx]] = (minus_count,
+                                                            plus_count)
+            block_idx += exp_nums[i]
+
+        # Write extracted counts to file.
+        self.pygsti_fn = os.path.join(self.folder, 'pyGSTi_dataset.txt')
+        self.write_GST_datafile(self.pygsti_fn, self.counts)
+
+        # Run pyGSTi analysis and create report.
+        results = pygsti.do_stdpractice_gst(
+            self.pygsti_fn, self.gs_target, self.prep_fids, self.meas_fids,
+            self.germs, self.max_lengths)
+
+        self.report_fn = os.path.join(self.folder, 'pyGSTi_report.html')
+        pygsti.report.create_general_report(results, self.report_fn,
+                                            verbosity=3, auto_open=False,
+                                            confidenceLeve=95)
+
+    def write_GST_datafile(self, filepath: str, count_dict: dict):
+        '''
+        Write the measured counts to a file in pyGSTi format.
+        Args:
+            filepath (string):
+                    Full path of the file to be written.
+            count_dict (dict):
+                    Dictionary with gate sequences in pyGSTi syntax as keys,
+                    and tuples of (minus_count, plus_count) as values.
+        '''
+        with open(filepath, 'w') as file:
+            file.writelines('## Columns = minus count, plus count\n')
+            for seq, tup in count_dict.items():
+                file.writelines('{}  {}  {}\n'.format(seq, tup[0], tup[1]))

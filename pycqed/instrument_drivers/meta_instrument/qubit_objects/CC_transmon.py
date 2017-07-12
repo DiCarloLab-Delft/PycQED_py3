@@ -14,6 +14,9 @@ import copy
 import os
 from pycqed.measurement.waveform_control_CC import qasm_compiler as qcx
 
+import pygsti
+import pycqed
+
 from .qubit_object import Transmon
 from qcodes.utils import validators as vals
 from qcodes.instrument.parameter import ManualParameter
@@ -2146,6 +2149,125 @@ class CBox_v3_driven_transmon(Transmon):
         instr += 'wait {} \n'.format(RO_depletion_clocks
                                      + RO_pulse_length_clocks - 2)
         return instr
+
+    def measure_single_qubit_GST(self,
+                                 max_lengths=[0]+[2**i for i in range(10)],
+                                 repetitions_per_point=500,
+                                 MC=None):
+        '''
+        Measure gate set tomography for this qubit. The gateset that is used
+        is saved in
+        pycqed/measurement/gate_set_tomography/Gateset_5_primitives_GST.txt,
+        and corresponding germs and fiducials can be found in the same folder.
+
+        Args:
+            max_lengths (list):
+                List of maximum sequence length (via germ repeats) for each
+                GST iteration. The largest maximum length should be roughly
+                the number of gates that can be done on a qubit before it
+                completely depolarizes.
+            repetitions_per_point (int):
+                Number of times each experiment is repeated in total.
+            MC (Instrument):
+                Measurement control instrument that should be used for the
+                experiment. Default (None) uses self.MC.
+        '''
+        # TODO: max_acq_points: hard coded?
+        max_acq_points = 4094
+
+        if MC is None:
+            MC = self.MC.get_instr()
+
+        # Load gate set, germs, and fiducials from file.
+        gstPath = os.path.join(pq.__path__[0], 'measurement',
+                               'gate_set_tomography')
+        gs_target = pygsti.io.load_gateset(
+            os.path.join(gstPath, 'Gateset_5_primitives_GST.txt'))
+        fiducials = pygsti.io.load_gatestring_list(
+            os.path.join(gstPath, 'Fiducials_GST.txt'))
+        germs = pygsti.io.load_gatestring_list(
+            os.path.join(gstPath, 'Germs_5_primitives_GST.txt'))
+
+        # gate_dict maps GST gate labels to QASM operations.
+        gate_dict = {
+            'Gi' : 'I {}'.format(int(np.round(self.gauss_width*1e9 * 4))),
+            'Gx90' : 'X90 {}'.format(self.name),
+            'Gy90' : 'Y90 {}'.format(self.name),
+            'Gx180' : 'X180 {}'.format(self.name),
+            'Gy180' : 'Y180 {}'.format(self.name),
+            'RO' : 'RO {}'.format(self.name)
+        }
+
+        # Create the experiment list, translate it to QASM, and generate the
+        # QASM file(s).
+        raw_exp_list = pygsti.construction.make_lsgst_experiment_list(
+            gs_target, fiducials, fiducials, germs, max_lengths)
+        exp_list = gstCC.get_experiments_from_list(raw_exp_list, gate_dict)
+        qasm_files, exp_nums = gstCC.generate_QASM(
+            filename='GST_{}'.format(self.name),
+            exp_list=exp_list,
+            qubit_labels=[self.name],
+            max_instructions=self.CBox.get_instr()._get_instr_mem_size(),
+            max_exp_per_file=max_acq_points)
+
+        # We want to measure every experiment (i.e. gate sequence) x times.
+        # Also, we want low frequency noise in our system to affect each
+        # experiment the same, so we don't want to do all repetitions of the
+        # first experiment, then the second, etc., but rather go through all
+        # experiments, then repeat. If we have more than one QASM file, this
+        # would be slower, so we compromise and say we want a minimum of 5
+        # (soft) repetitions of the whole sequence and adjust the hard
+        # repetitions accordingly.
+        # The acquisition device can acquire a maximum of m = max_acq_points
+        # in one go.
+        # A QASM file contains i experiments (i can be different for different
+        # QASM files.
+        # Take the largest i -> can measure floor(m/i) = l repetitions of this
+        # QASM file. => need r = ceil(x/l) soft repetitions of that file.
+        # => set max(r,5) as the number of soft repetitions for all files.
+        # => set ceil(x/r) as the number of hard repetitions for each file
+        # (even if for some files we could do more).
+        max_exp_num = max(exp_nums)  # i
+        soft_repetitions = int(np.ceil(
+            repetitions_per_point / np.floor(max_acq_points / max_exp_num)))
+        if soft_repetitions < min_soft_repetitions:
+            soft_repetitions = 5
+            hard_repetitions = int(np.ceil(repetitions_per_point /
+                                       soft_repetitions))
+
+        self.prepare_for_timedomain()
+        d = self.int_log_det
+        s = swf.Multi_QASM_Sweep(
+            exp_num_list=exp_nums,
+            hard_repetitions=hard_repetitions,
+            soft_repetitions=soft_repetitions,
+            qasm_list=[q.name for q in qasm_files],
+            config=self.qasm_config(),
+            detector=d,
+            CBox=self.CBox.get_instr(),
+            parameter_name='GST sequence',
+            unit=None)
+        total_exp_nr = np.sum(exp_nums) * hard_repetitions * soft_repetitions
+
+        if d.result_logging_mode != 'digitized':
+            logging.warning('GST is intended for use with digitized detector.'
+                            ' Analysis will fail otherwise.')
+
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(np.arange(total_exp_nr))
+        MC.set_detector_function(d)
+        MC.run('GST')
+
+        # Analysis
+        ma.GST_Analysis(exp_num_list=exp_nums,
+                        hard_repetitions=hard_repetitions,
+                        soft_repetitions=soft_repetitions,
+                        exp_list=[g.str for g in raw_exp_list],
+                        gs_target=gs_target,
+                        prep_fiducials=fiducials,
+                        meas_fiducials=fiducials,
+                        germs=germs,
+                        max_lengths=max_lengths)
 
 
 class QWG_driven_transmon(CBox_v3_driven_transmon):
