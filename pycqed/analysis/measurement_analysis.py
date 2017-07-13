@@ -6092,3 +6092,55 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
                                         flux=np.array(total_flux),
                                         params=params)
         return fit_res
+
+
+class IVcurve(MeasurementAnalysis):
+
+    def __init__(self, label='', **kw):
+        kw['label'] = label
+        kw['h5mode'] = 'r+'
+        super().__init__(**kw)
+
+    def run_default_analysis(self, close_file=True, **kw):
+        self.get_naming_and_values()
+        self.fit_data()
+        self.make_figures(**kw)
+        if close_file:
+            self.data_file.close()
+
+    def fit_data(self):
+        # get data
+        self.x = self.sweep_points
+        self.y = self.measured_values[0]
+
+        # finds peak
+        y_diff = self.y[1:] - self.y[:-1]
+        x_diff = self.x[1:]
+        peak_dict = a_tools.peak_finder(x_diff, y_diff)
+        if ((np.mean(self.y)-np.min(self.y))>(np.max(self.y)-np.mean(self.y))):
+            # have a dip
+            key_str = 'dip_idx'
+        else:
+            # have a peak
+            key_str = 'peak_idx'
+        peak_idx = peak_dict[key_str]
+
+        # fits resistance
+        fit_x = self.sweep_points[peak_idx+1:]
+        fit_y = self.measured_values[0][peak_idx+1:]
+        self.fit = np.polyfit(fit_x, fit_y, 1)
+
+    def make_figures(self, **kw):
+        self.fig, self.ax = plt.subplots(1, 1)
+
+        dummy_x = np.linspace(self.x.min(), self.x.max(), 1000)
+
+        self.ax.plot(self.x, self.y, 'o-')
+        self.ax.plot(dummy_x, np.polyval(self.fit, dummy_x), '--',
+                     label='Fit: R = %.3e * v + %.3e' % (self.fit[0], self.fit[1]))
+        self.ax.legend(loc='best')
+        self.ax.set_title('%s: IV curve' % (self.timestamp_string))
+        self.ax.set_xlabel(self.sweep_name)
+        self.ax.set_ylabel('Resistance (Ohm)')
+
+        self.save_fig(self.fig, fig_tight=False, **kw)
