@@ -34,12 +34,6 @@ class DeviceObject(Instrument):
                            initial_value=1024,
                            vals=vals.Ints(),
                            parameter_class=ManualParameter)
-        sc_docstr = (
-            'Instrument responsible for controlling the waveform sequences. '
-            'This is currently either a tek5014 AWG or a CBox.')
-        self.add_parameter('seq_contr', label='Sequence controller',
-                           docstring=sc_docstr,
-                           parameter_class=InstrumentParameter)
 
         self._sequencer_config = {}
         self.delegate_attr_dicts += ['_sequencer_config']
@@ -119,8 +113,8 @@ class DeviceObject(Instrument):
         '''
         Calls the prepare for timedomain on each of the constituent qubits.
         The reset option is passed to the first qubit that is called. For the
-        second, reset is always disabled, in order not to overwrite the
-        settings of the first qubit.
+        rest of the qubit, reset is always disabled, in order not to overwrite
+        the settings of the first qubit.
         '''
         for q in self.qubits():
             q_obj = self.find_instrument(q)
@@ -357,7 +351,8 @@ class TwoQubitDevice(DeviceObject):
         # Create the experiment list, translate it to QASM, and generate the
         # QASM file(s).
         try:
-            max_instr = self.seq_contr.get_instr()._get_instr_mem_size()
+            max_instr = \
+                self.central_controller.get_instr()._get_instr_mem_size()
         except AttributeError as e:
             max_instr = 2**15
             logging.warning(str(e) + '\nUsing default ({})'.format(max_instr))
@@ -405,7 +400,7 @@ class TwoQubitDevice(DeviceObject):
             qasm_list=[q.name for q in qasm_files],
             config=self.qasm_config(),
             detector=d,
-            CBox=self.seq_contr.get_instr(),
+            CBox=self.central_controller.get_instr(),
             parameter_name='GST sequence',
             unit=None)
         total_exp_nr = np.sum(exp_nums) * hard_repetitions * soft_repetitions
