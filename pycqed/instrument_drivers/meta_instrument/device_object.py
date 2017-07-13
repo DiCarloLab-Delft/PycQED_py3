@@ -294,8 +294,8 @@ class TwoQubitDevice(DeviceObject):
         ma.MeasurementAnalysis()
 
     def measure_two_qubit_GST(self, q0, q1,
-                              max_lengths=[2**i for i in range(10)],
-                              repetitions_per_point=500,
+                              max_germ_pow: int=10,
+                              repetitions_per_point: int=500,
                               MC=None):
         '''
         Measure gate set tomography for this qubit. The gateset that is used
@@ -306,11 +306,8 @@ class TwoQubitDevice(DeviceObject):
         Args:
             q0, q1 (Instr):
                 Qubits on which the experiment is run.
-            max_lengths (list):
-                List of maximum sequence length (via germ repeats) for each
-                GST iteration. The largest maximum length should be roughly
-                the number of gates that can be done on a qubit before it
-                completely depolarizes.
+            max_germ_pow (int):
+                Largest power of 2 used to set germ lengths.
             repetitions_per_point (int):
                 Number of times each experiment is repeated in total.
             MC (Instrument):
@@ -328,6 +325,9 @@ class TwoQubitDevice(DeviceObject):
         prepFids = std2Q_XYCPHASE.prepStrs
         measFids = std2Q_XYCPHASE.effectStrs
         germs = std2Q_XY.germs
+
+        max_lengths = [2**i for i in range(max_germ_pow + 1)]
+
 
         # gate_dict maps GST gate labels to QASM operations
         gate_dict = {
@@ -377,8 +377,8 @@ class TwoQubitDevice(DeviceObject):
         soft_repetitions = int(np.ceil(
             repetitions_per_point / np.floor(max_acq_points / max_exp_num)))
         if soft_repetitions < min_soft_repetitions:
-            soft_repetitions = 5
-            hard_repetitions = int(np.ceil(repetitions_per_point /
+            soft_repetitions = min_soft_repetitions
+        hard_repetitions = int(np.ceil(repetitions_per_point /
                                        soft_repetitions))
 
         self.prepare_for_timedomain()

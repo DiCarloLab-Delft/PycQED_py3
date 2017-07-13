@@ -2152,7 +2152,7 @@ class CBox_v3_driven_transmon(Transmon):
 
     def measure_single_qubit_GST(self,
                                  max_germ_pow: int=10,
-                                 repetitions_per_point: int=500,
+                                 repetitions_per_point: int=128,
                                  min_soft_repetitions: int=5,
                                  MC=None, analyze: bool=False):
         '''
@@ -2188,7 +2188,7 @@ class CBox_v3_driven_transmon(Transmon):
         germs = pygsti.io.load_gatestring_list(
             os.path.join(gstPath, 'Germs_5_primitives_GST.txt'))
 
-        max_lengths = [2**i for i in range(max_germ_pow)]
+        max_lengths = [2**i for i in range(max_germ_pow + 1)]
 
         # gate_dict maps GST gate labels to QASM operations.
         gate_dict = {
@@ -2233,7 +2233,7 @@ class CBox_v3_driven_transmon(Transmon):
         soft_repetitions = int(np.ceil(
             repetitions_per_point / np.floor(max_acq_points / max_exp_num)))
         if soft_repetitions < min_soft_repetitions:
-            soft_repetitions = 5
+            soft_repetitions = min_soft_repetitions
         hard_repetitions = int(np.ceil(repetitions_per_point /
                                        soft_repetitions))
 

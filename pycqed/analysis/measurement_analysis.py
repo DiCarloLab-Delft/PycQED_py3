@@ -6646,7 +6646,7 @@ class GST_Analysis(TD_Analysis):
     '''
     def __init__(self, exp_num_list, hard_repetitions: int,
                  soft_repetitions: int, exp_list, gs_target, prep_fiducials,
-                 meas_fiducials, germs, max_lengths):
+                 meas_fiducials, germs, max_lengths, timestamp=None, **kw):
         '''
         Args:
             exp_num_list (array of ints):
@@ -6686,8 +6686,9 @@ class GST_Analysis(TD_Analysis):
         self.germs = germs
         self.max_lengths = max_lengths
 
-        self.counts = {}
-        super().__init__(cal_points=False, make_fig=False)
+        self.counts = []
+        super().__init__(cal_points=False, make_fig=False,
+                         timestamp=timestamp, **kw)
 
     def run_default_analysis(self, **kw):
         self.close_file = kw.get('close_file', True)
@@ -6719,8 +6720,8 @@ class GST_Analysis(TD_Analysis):
                 minus_count = (self.hard_repetitions * self.soft_repetitions -
                                plus_count)
 
-                self.counts[self.exp_list[block_idx+seq_idx]] = (minus_count,
-                                                                 plus_count)
+                self.counts.append((self.exp_list[block_idx+seq_idx],
+                                    minus_count, plus_count))
             block_idx += self.exp_nums[i]
 
         # Write extracted counts to file.
@@ -6737,18 +6738,17 @@ class GST_Analysis(TD_Analysis):
                                             verbosity=3, auto_open=False,
                                             confidenceLevel=95)
 
-    def write_GST_datafile(self, filepath: str, count_dict: dict):
+    def write_GST_datafile(self, filepath: str, counts: list):
         '''
         Write the measured counts to a file in pyGSTi format.
         Args:
             filepath (string):
                     Full path of the file to be written.
-            count_dict (dict):
-                    Dictionary with gate sequences in pyGSTi syntax as keys,
-                    and tuples of (minus_count, plus_count) as values.
+            counts (list):
+                    List pf tuples (gate_seq_str, minus_count, plus_count).
         '''
         with open(filepath, 'w') as file:
             file.writelines('## Columns = minus count, plus count\n')
-            for seq, tup in count_dict.items():
-                file.writelines('{}  {}  {}\n'.format(seq, tup[0]), tup[1])
+            for tup in counts:
+                file.writelines('{}  {}  {}\n'.format(tup[0], tup[1], tup[2]))
 
