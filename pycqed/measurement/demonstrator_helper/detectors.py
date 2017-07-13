@@ -50,7 +50,11 @@ class Quantumsim_Two_QB_Hard_Detector(Hard_Detector):
         results = []
 
         for c in self.parser.circuits:
-            d = sdm.SparseDM(['q1', 'q0'])
+            d = sdm.SparseDM(['q0', 'q1'])
+            # this ensures that the qubits are in the density matrix
+            # in the right order. (fix this, should use d.idx_in_full!)
+            d.ensure_dense("q0")
+            d.ensure_dense("q1")
             c.apply_to(d)
             diag = d.full_dm.get_diag()
             parity = diag[[0, 3]].sum()
