@@ -115,6 +115,18 @@ class DeviceObject(Instrument):
             q_obj = self.find_instrument(q)
             q_obj.prepare_for_timedomain()
 
+    def prepare_for_fluxing(self, reset: bool=True):
+        '''
+        Calls the prepare for timedomain on each of the constituent qubits.
+        The reset option is passed to the first qubit that is called. For the
+        second, reset is always disabled, in order not to overwrite the
+        settings of the first qubit.
+        '''
+        for q in self.qubits():
+            q_obj = self.find_instrument(q)
+            q_obj.prepare_for_fluxing(reset=reset)
+            reset = False
+
 
 class TwoQubitDevice(DeviceObject):
 
@@ -293,7 +305,7 @@ class TwoQubitDevice(DeviceObject):
         MC.run('AllXY_{}_{}'.format(q0.name, q1.name))
         ma.MeasurementAnalysis()
 
-    def measure_two_qubit_GST(self, q0, q1,
+    def measure_two_qubit_GST(self,
                               max_germ_pow: int=10,
                               repetitions_per_point: int=500,
                               MC=None):
@@ -304,8 +316,6 @@ class TwoQubitDevice(DeviceObject):
         and corresponding germs and fiducials can be found in the same folder.
 
         Args:
-            q0, q1 (Instr):
-                Qubits on which the experiment is run.
             max_germ_pow (int):
                 Largest power of 2 used to set germ lengths.
             repetitions_per_point (int):
@@ -319,6 +329,12 @@ class TwoQubitDevice(DeviceObject):
 
         if MC is None:
             MC = self.MC.get_instr()
+
+        qnames = self.qubits()
+        q0 = self.find_instrument(qnames[0])
+        q1 = self.find_instrument(qnames[1])
+        self.prepare_for_timedomain()
+        self.prepare_for_fluxing()
 
         # Load the gate set, germs, and fiducials.
         gs_target = std2Q_XYCPHASE.gs_target.copy()
@@ -380,8 +396,6 @@ class TwoQubitDevice(DeviceObject):
             soft_repetitions = min_soft_repetitions
         hard_repetitions = int(np.ceil(repetitions_per_point /
                                        soft_repetitions))
-
-        self.prepare_for_timedomain()
 
         d = self.get_integration_logging_detector()
         s = swf.Multi_QASM_Sweep(
