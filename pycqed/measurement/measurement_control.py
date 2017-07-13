@@ -110,6 +110,7 @@ class MeasurementControl(Instrument):
         self.print_measurement_start_msg()
         self.mode = mode
         self.iteration = 0  # used in determining data writing indices
+
         # needs to be defined here because of the with statement below
         return_dict = {}
         self.last_sweep_pts = None  # used to prevent resetting same value
@@ -162,6 +163,8 @@ class MeasurementControl(Instrument):
             sweep_points = self.get_sweep_points()
             if len(self.sweep_functions) == 1:
                 self.get_measurement_preparetime()
+                if self.sweep_functions[0].sweep_control == 'soft':
+                    self.sweep_functions[0].set_parameter(sweep_points[0])
                 self.detector_function.prepare(
                     sweep_points=self.get_sweep_points())
                 self.measure_hard()

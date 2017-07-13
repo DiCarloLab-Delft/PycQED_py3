@@ -8,7 +8,8 @@ import numpy as np
 from os.path import join, dirname
 
 from pycqed.utilities.general import mopen
-from pycqed.measurement.randomized_benchmarking import randomized_benchmarking as rb
+from pycqed.measurement.randomized_benchmarking import \
+    randomized_benchmarking as rb
 base_qasm_path = join(dirname(__file__), 'qasm_files')
 
 
@@ -28,8 +29,7 @@ def CW_RO_sequence(qubit_name, trigger_separation, clock_cycle=1e-9):
     filename = join(base_qasm_path, 'CW_RO_sequence.qasm')
     qasm_file = mopen(filename, mode='w')
     qasm_file.writelines('qubit {} \n'.format(qubit_name))
-    qasm_file.writelines('I {:d} \n'.format(
-        int(delay)))
+    qasm_file.writelines('I {:d} \n'.format(int(delay)))
     qasm_file.writelines('RO {}  \n'.format(qubit_name))
     qasm_file.close()
     return qasm_file
@@ -86,11 +86,11 @@ def flipping_seq(qubit_name, number_of_flips, clock_cycle=1e-9,
             qasm_file.writelines('X180 {} \n'.format(qubit_name))
             qasm_file.writelines('RO {}  \n'.format(qubit_name))
         else:
-            if equator:
-                qasm_file.writelines('X90 {} \n'.format(qubit_name))
             for j in range(n):
                 qasm_file.writelines('X180 {} \n'.format(
                                      qubit_name))
+            if equator:
+                qasm_file.writelines('X90 {} \n'.format(qubit_name))
             qasm_file.writelines('RO {}  \n'.format(qubit_name))
     qasm_file.close()
     return qasm_file
@@ -247,13 +247,14 @@ def echo(qubit_name, times, clock_cycle=1e-9,
     return qasm_file
 
 
-def single_elt_on(qubit_name):
+def single_elt_on(qubit_name, n=1):
     filename = join(base_qasm_path, 'single_elt_on.qasm')
     qasm_file = mopen(filename, mode='w')
     qasm_file.writelines('qubit {} \n'.format(qubit_name))
     # On
     qasm_file.writelines('\ninit_all\n')
-    qasm_file.writelines('X180 {}     # On \n'.format(qubit_name))
+    for i in range(n):
+        qasm_file.writelines('X180 {}     # On \n'.format(qubit_name))
     qasm_file.writelines('RO {}  \n'.format(qubit_name))
 
     qasm_file.close()
@@ -298,13 +299,19 @@ def off_on(qubit_name, pulse_comb='off_on'):
     if 'off' in pulse_comb.lower():
         qasm_file.writelines('\ninit_all\n')
         qasm_file.writelines('RO {}  \n'.format(qubit_name))
+    # simulatneous on
+    if 'sim_on' in pulse_comb.lower():
+        qasm_file.writelines('\ninit_all\n')
+        qasm_file.writelines('X180 {} | RO {}  \n'.format(qubit_name, qubit_name))
     # On
-    if 'on' in pulse_comb.lower():
+    elif 'on' in pulse_comb.lower():
         qasm_file.writelines('\ninit_all\n')
         qasm_file.writelines('X180 {}     # On \n'.format(qubit_name))
         qasm_file.writelines('RO {}  \n'.format(qubit_name))
+
     if 'on' not in pulse_comb.lower() and 'off' not in pulse_comb.lower():
-        raise ValueError
+        raise ValueError('pulse_comb must contain "off" or "on" (is {})'
+                         .format(pulse_comb))
     qasm_file.close()
     return qasm_file
 
@@ -320,26 +327,20 @@ def butterfly(qubit_name, initialize=False):
         base_qasm_path, 'butterfly_init_{}.qasm'.format(initialize))
     qasm_file = mopen(filename, mode='w')
     qasm_file.writelines('qubit {} \n'.format(qubit_name))
+
+    qasm_file.writelines('\ninit_all\n')
     if initialize:
-        qasm_file.writelines('\ninit_all\n')
         qasm_file.writelines('RO {}  \n'.format(qubit_name))
-        qasm_file.writelines('RO {}  \n'.format(qubit_name))
-        qasm_file.writelines('RO {}  \n'.format(qubit_name))
+    qasm_file.writelines('RO {}  \n'.format(qubit_name))
+    qasm_file.writelines('RO {}  \n'.format(qubit_name))
 
-        qasm_file.writelines('\ninit_all\n')
+    qasm_file.writelines('\ninit_all\n')
+    if initialize:
         qasm_file.writelines('RO {}  \n'.format(qubit_name))
-        qasm_file.writelines('X180 {}  \n'.format(qubit_name))
-        qasm_file.writelines('RO {}  \n'.format(qubit_name))
-        qasm_file.writelines('RO {}  \n'.format(qubit_name))
-    else:
-        qasm_file.writelines('\ninit_all\n')
-        qasm_file.writelines('RO {}  \n'.format(qubit_name))
-        qasm_file.writelines('RO {}  \n'.format(qubit_name))
+    qasm_file.writelines('X180 {}  \n'.format(qubit_name))
+    qasm_file.writelines('RO {}  \n'.format(qubit_name))
+    qasm_file.writelines('RO {}  \n'.format(qubit_name))
 
-        qasm_file.writelines('\ninit_all\n')
-        qasm_file.writelines('X180 {}  \n'.format(qubit_name))
-        qasm_file.writelines('RO {}  \n'.format(qubit_name))
-        qasm_file.writelines('RO {}  \n'.format(qubit_name))
     qasm_file.close()
     return qasm_file
 
@@ -445,10 +446,66 @@ def MotzoiXY(qubit_name, motzois, cal_points=True):
     return qasm_file
 
 
-def Ram_Z(qubit_name,
-          wait_before=150e-9, wait_between=200e-9, clock_cycle=1e-9):
+def Ram_Z(qubit_name, no_of_points, cal_points=True,
+          wait_before=50e-9, wait_between=280e-9, clock_cycle=1e-9,
+          rec_Y90=False):
     '''
-    Performs a Ram-Z sequence similar to a conventional echo sequence.
+    Creates QASM sequence for an entire Ram-Z experiment, including
+    calibration points.
+
+    Timing of measurement sequence for one point:
+        trigger flux pulse -- wait_before -- mX90 -- wait_between -- X90 -- RO
+
+    Args:
+        qubit_name      (str): name of the targeted qubit
+        no_of_points    (int): number of points in the hard sweep. This is
+                               limited by the QWG waveform memory and number of
+                               codeword channels used.
+        wait_before     (float): delay time in seconds between triggering the
+                                 AWG and the first pi/2 pulse
+        wait_between    (float): delay time in seconds between the two pi/2
+                                 pulses
+        clock_cycle     (float): period of the internal AWG clock
+        rec_Y90         (bool): Use Y90 instead of X90 as second mw pulse.
+    '''
+    filename = join(base_qasm_path, 'Ram_Z.qasm')
+    qasm_file = mopen(filename, mode='w')
+    qasm_file.writelines('qubit {} \n'.format(qubit_name))
+
+    if rec_Y90:
+        recPulse = 'Y90'
+    else:
+        recPulse = 'X90'
+
+    # Write  measurement sequence no_of_points times
+    for i in range(no_of_points):
+        qasm_file.writelines('\ninit_all\n')
+
+        if cal_points and (i == no_of_points - 4 or i == no_of_points - 3):
+            # Calibration point for |0>
+            pass
+        elif cal_points and (i == no_of_points - 2 or i == no_of_points - 1):
+            # Calibration point for |1>
+            qasm_file.writelines('X180 {} \n'.format(qubit_name))
+        else:
+            qasm_file.writelines('square_{} {}\n'.format(i, qubit_name))
+            qasm_file.writelines(
+                'I {}\n'.format(int(np.round(wait_before/clock_cycle))))
+            qasm_file.writelines('mX90 {}\n'.format(qubit_name))
+            qasm_file.writelines(
+                'I {}\n'.format(int(np.round(wait_between/clock_cycle))))
+            qasm_file.writelines('{} {}\n'.format(recPulse, qubit_name))
+
+        qasm_file.writelines('RO {}  \n'.format(qubit_name))
+
+    qasm_file.close()
+    return qasm_file
+
+
+def Ram_Z_single(qubit_name,
+                 wait_before=150e-9, wait_between=200e-9, clock_cycle=1e-9):
+    '''
+    Creates the QASM sequence for a single point in a Ram-Z experiment.
 
     Timing of sequence:
         trigger flux pulse -- wait_before -- mX90 -- wait_between -- X90 -- RO
@@ -461,7 +518,7 @@ def Ram_Z(qubit_name,
                                  pulses
         clock_cycle     (float): period of the internal AWG clock
     '''
-    filename = join(base_qasm_path, 'Ram-Z.qasm')
+    filename = join(base_qasm_path, 'Ram-Z-single.qasm')
     qasm_file = mopen(filename, mode='w')
     qasm_file.writelines('qubit {} \n'.format(qubit_name))
 
@@ -472,6 +529,74 @@ def Ram_Z(qubit_name,
     qasm_file.writelines('mX90 {}\n'.format(qubit_name))
     qasm_file.writelines('I {}\n'.format(int(wait_between//clock_cycle)))
     qasm_file.writelines('X90 {}\n'.format(qubit_name))
+    qasm_file.writelines('RO {}  \n'.format(qubit_name))
+
+    qasm_file.close()
+    return qasm_file
+
+
+def flux_timing_seq(qubit_name, taus,
+                    wait_between=220e-9, clock_cycle=1e-9, cal_points=True):
+    '''
+    Creates the QASM sequence to calibrate the timing of the flux pulse relative
+    to microwave pulses.
+
+    Timing of the sequence:
+        trigger flux pulse -- tau -- X90 -- wait_between -- X90 -- RO
+
+    Args:
+        qubit_name (str):       name of the targeted qubit
+        taus (array of floats): delays between the flux trigger and the first
+                                pi-half pulse (the sweep points).
+        wait_between (float):   delay between the two pi-half pulses
+        clock_cycle (float):    period of the internal AWG clock
+        cal_points (bool):      whether to include calibration points
+    '''
+    filename = join(base_qasm_path, 'flux_timing.qasm')
+    qasm_file = mopen(filename, mode='w')
+    qasm_file.writelines('qubit {} \n'.format(qubit_name))
+
+    for i, tau in enumerate(taus):
+        qasm_file.writelines('\ninit_all\n')
+
+        if cal_points and (i == len(taus) - 4 or i == len(taus) - 3):
+            # Calibration point for |0>
+            pass
+        elif cal_points and (i == len(taus) - 2 or i == len(taus) - 1):
+            # Calibration point for |1>
+            qasm_file.writelines('X180 {} \n'.format(qubit_name))
+        else:
+            qasm_file.writelines('flux square {}\n'.format(qubit_name))
+            qasm_file.writelines(
+                'I {}\n'.format(int(round(tau/clock_cycle))))
+            qasm_file.writelines('X90 {}\n'.format(qubit_name))
+            qasm_file.writelines(
+                'I {}\n'.format(int(round(wait_between/clock_cycle))))
+            qasm_file.writelines('X90 {}\n'.format(qubit_name))
+
+        qasm_file.writelines('RO {}  \n'.format(qubit_name))
+
+    qasm_file.close()
+    return qasm_file
+
+
+def flux_resonator_shift_seq(qubit_name):
+    '''
+    Creates the QASM sequence for a flux resonator shift experiment. This
+    experiment is used to measure the response of the qubit to a flux pulse via
+    the resonator shift: sweep RO frequency, measure transient at every
+    frequency -> 2D plot looks similar to what you would measure on the scope
+    (step response).
+    Note: delay in the flux pulse must be set, such that it is played during
+    the readout.
+    '''
+    filename = join(base_qasm_path, 'flux_resonator_shift.qasm')
+    qasm_file = mopen(filename, mode='w')
+    qasm_file.writelines('qubit {} \n'.format(qubit_name))
+
+    qasm_file.writelines('\ninit_all\n')
+
+    qasm_file.writelines('QWG trigger square\n')
     qasm_file.writelines('RO {}  \n'.format(qubit_name))
 
     qasm_file.close()
