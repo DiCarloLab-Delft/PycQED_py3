@@ -661,9 +661,15 @@ class QWG_lutman_par_chunks(Soft_Sweep):
             self.LutMan_parameter.set(paramVal)
             self.LutMan.regenerate_pulse(self.flux_pulse_type)
 
+            if self.LutMan.wave_dict_unit() == 'V':
+                scaleFac = QWG.get('ch{}_amp'.format(self.LutMan.F_ch())) / 2
+            else:
+                scaleFac = 1
+
             # Load onto QWG
             QWG.createWaveformReal(
-                pulseName, self.LutMan._wave_dict[self.flux_pulse_type])
+                pulseName,
+                self.LutMan._wave_dict[self.flux_pulse_type]/scaleFac)
 
             # Assign codeword
             QWG.set('codeword_{}_ch{}_waveform'
