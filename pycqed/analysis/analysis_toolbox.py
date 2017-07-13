@@ -359,10 +359,6 @@ def get_data_from_ma_v2(ma, param_names, numeric_params=None):
                 if 'Fitted Params' in key:
                     fit_key = key
             temp = temp[fit_key]
-            # print temp.keys()
-            # for key in temp.keys():
-            # print key
-            # print temp[key].attrs['value']
             data[param] = {key: temp[key].attrs['value']
                            for key in list(temp.keys()) if key != 'covar'}
             free_vars = 0
