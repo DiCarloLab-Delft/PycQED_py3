@@ -49,6 +49,7 @@ class DDMq(SCPI):
 
         self.device_descriptor = type('', (), {})()
         self.device_descriptor.model = 'DDM'
+        self.printAcquisitionProgress = True
         # The next line is needed, because real-time clock of the ddm isn't
         # working properly and start at a fixed start date, instead of the
         # actual date
@@ -159,7 +160,14 @@ class DDMq(SCPI):
                            'errors are considered critical',
                            docstring='On the given level and above, a errors' +
                            ' will cause exceptions, instead logging of the' +
-                           ' error ',
+                           ' error.\r\n\r\n' +
+                           'Loggin Levels:\r\n' +
+                           '50 = CRITICAL\r\n' +
+                           '40 = ERROR\r\n' +
+                           '30 = WARNING\r\n' +
+                           '20 = INFO\r\n' +
+                           '10 = DEBUG\r\n' +
+                           '0  = NOTSET ',
                            set_cmd=self._setWarningLevel,
                            get_cmd=self._getWarningLevel,
                            )
@@ -463,10 +471,10 @@ class DDMq(SCPI):
     # Get Data
     #################
     def _getInputAverage(self, ch):
-        ch_pair = math.ceil(ch/2)
-        finished = 0
+        #if self.printAcquisitionProgress:
+        #    print("\n", end='\0')
         while (finished != '1'):
-            finished = self._getInAvgFinished(ch_pair)
+            finished = str(self._getInAvgFinished(ch_pair))
             if (finished == 'ffffffff'):
                 break
             time.sleep(1.0/FINISH_BIT_CHECK_FERQUENTION_HZ)
@@ -477,16 +485,20 @@ class DDMq(SCPI):
         return inputavg
 
     def _getTVdata(self, ch_pair, wNr):
-        finished = 0
+        finished = '0'
+        #if self.printAcquisitionProgress:
+        #    print("\n", end='\0')
         while (finished != '1'):
-            finished = self._getTVFinished(ch_pair, wNr)
-            print("\r TV mode(" + str(int(float(self._getTVpercentage(
-                ch_pair, wNr)))) + "%)", end='\0')
+            finished = str(self._getTVFinished(ch_pair, wNr))
             if (finished == 'ffffffff'):
                 break
             elif (finished != '1'):
+                if self.printAcquisitionProgress:
+                    print("\r TV mode(" + str(int(float(self._getTVpercentage(
+                        ch_pair, wNr)))) + "%)", end='\0')
                 time.sleep(1.0/FINISH_BIT_CHECK_FERQUENTION_HZ)
-        print("\r", end='\0')
+        if self.printAcquisitionProgress:
+            print("\r", end='\0')
         sys.stdout.flush()
         self._displayQBitErrors("TV Mode", ch_pair, wNr)
         self.write('qutech:tvmode{:d}:data{:d}? '.format(ch_pair, wNr))
@@ -495,16 +507,20 @@ class DDMq(SCPI):
         return tvmodedata
 
     def _getCorrelationData(self):
-        finished = 0
+        finished = '0'
+        #if self.printAcquisitionProgress:
+        #    print("\n", end='\0')
         while (finished != '1'):
-            finished = self._getCorrelationFinished()
-            print("\r Correlation (" + str(int(float(
-              self._getCorrelationpercentage()))) + "%)", end='\0')
+            finished = str(self._getCorrelationFinished())
             if (finished == 'ffffffff'):
                 break
             elif (finished != '1'):
+                if self.printAcquisitionProgress:
+                    print("\r Correlation (" + str(int(float(
+                      self._getCorrelationpercentage()))) + "%)", end='\0')
                 time.sleep(1.0/FINISH_BIT_CHECK_FERQUENTION_HZ)
-        print("\r", end='\0')
+        if self.printAcquisitionProgress:
+            print("\r", end='\0')
         sys.stdout.flush()
         self._displayQBitErrors("Correlation", 1, 1)
         self.write('qutech:correlation:data? ')
@@ -533,16 +549,20 @@ class DDMq(SCPI):
         return weightdata
 
     def _getQstateCNT(self, ch_pair, wNr):
-        finished = 0
+        finished = '0'
+        #if self.printAcquisitionProgress:
+        #    print("\n", end='\0')
         while (finished != '1'):
-            finished = self._getTVFinished(ch_pair, wNr)
-            print("\r TV mode(" + str(int(float(self._getTVpercentage(
-                  ch_pair, wNr)))) + "%)", end='\0')
+            finished = str(self._getTVFinished(ch_pair, wNr))
             if (finished == 'ffffffff'):
                 break
             elif (finished != '1'):
+                if self.printAcquisitionProgress:
+                    print("\r TV mode(" + str(int(float(self._getTVpercentage(
+                          ch_pair, wNr)))) + "%)", end='\0')
                 time.sleep(1.0/FINISH_BIT_CHECK_FERQUENTION_HZ)
-        print("\r", end='\0')
+        if self.printAcquisitionProgress:
+            print("\r", end='\0')
         sys.stdout.flush()
         self._displayQBitErrors("TV Mode - Qbit state", ch_pair, wNr)
 
@@ -552,16 +572,20 @@ class DDMq(SCPI):
         return qstatecnt
 
     def _getQstateAVG(self, ch_pair, wNr):
-        finished = 0
+        finished = '0'
+        #if self.printAcquisitionProgress:
+        #    print("\n", end='\0')
         while (finished != '1'):
-            finished = self._getTVFinished(ch_pair, wNr)
-            print("\r TV mode(" + str(int(float(self._getTVpercentage(
-                ch_pair, wNr)))) + "%)", end='\0')
+            finished = str(self._getTVFinished(ch_pair, wNr))
             if (finished == 'ffffffff'):
                 break
             elif (finished != '1'):
+                if self.printAcquisitionProgress:
+                    print("\r TV mode(" + str(int(float(self._getTVpercentage(
+                    ch_pair, wNr)))) + "%)", end='\0')
                 time.sleep(1.0/FINISH_BIT_CHECK_FERQUENTION_HZ)
-        print("\r", end='\0')
+        if self.printAcquisitionProgress:
+            print("\r", end='\0')
         sys.stdout.flush()
         self._displayQBitErrors("TV Mode - Qbit state", ch_pair, wNr)
         self.write('qutech:qstate{:d}:data{:d}:average? '.format(ch_pair, wNr))
@@ -570,16 +594,20 @@ class DDMq(SCPI):
         return qstateavg
 
     def _getLoggingInt(self, ch_pair, wNr):
-        finished = 0
+        finished = '0'
+        #if self.printAcquisitionProgress:
+        #    print("\n", end='\0')
         while (finished != '1'):
-            finished = self._getLoggingFinished(ch_pair, wNr)
-            print("\r Logging mode(" + str(int(float(
-                self._getLoggingpercentage(ch_pair, wNr)))) + "%)", end='\0')
+            finished = str(self._getLoggingFinished(ch_pair, wNr))
             if (finished == 'ffffffff'):
                 break
             elif (finished != '1'):
+                if self.printAcquisitionProgress:
+                      print("\r Logging mode(" + str(int(float(
+                      self._getLoggingpercentage(ch_pair, wNr)))) + "%)", end='\0')
                 time.sleep(1.0/FINISH_BIT_CHECK_FERQUENTION_HZ)
-        print("\r", end='\0')
+        if self.printAcquisitionProgress:
+            print("\r", end='\0')
         sys.stdout.flush()
         self._displayQBitErrors("Logging", ch_pair, wNr)
         self.write('qutech:logging{:d}:data{:d}:int? '.format(ch_pair, wNr))
@@ -588,16 +616,20 @@ class DDMq(SCPI):
         return intlogging
 
     def _getLoggingQstate(self, ch_pair, wNr):
-        finished = 0
+        finished = '0'
+        #if self.printAcquisitionProgress:
+        #    print("\n", end='\0')
         while (finished != '1'):
-            finished = self._getLoggingFinished(ch_pair, wNr)
-            print("\r Logging mode(" + str(int(float(
-                self._getLoggingpercentage(ch_pair, wNr)))) + "%)", end='\0')
+            finished = str(self._getLoggingFinished(ch_pair, wNr))
             if (finished == 'ffffffff'):
                 break
             elif (finished != '1'):
+                if self.printAcquisitionProgress:
+                    print("\r Logging mode(" + str(int(float(
+                      self._getLoggingpercentage(ch_pair, wNr)))) + "%)", end='\0')
                 time.sleep(1.0/FINISH_BIT_CHECK_FERQUENTION_HZ)
-        print("\r", end='\0')
+        if self.printAcquisitionProgress:
+            print("\r", end='\0')
         sys.stdout.flush()
         self._displayQBitErrors("Logging - Qbit state", ch_pair, wNr)
         self.write('qutech:logging{:d}:data{:d}:qstate? '.format(ch_pair, wNr))
@@ -703,16 +735,20 @@ class DDMq(SCPI):
         return (P)
 
     def _getErrFractCnt(self, ch_pair, wNr):
-        finished = 0
+        finished = '0'
+        #if self.printAcquisitionProgress:
+        #    print("\n", end='\0')
         while (finished != '1'):
-            finished = self._getErrFractFinished(ch_pair, wNr)
-            print("\r Error fraction mode(" + str(int(float(
-                self._getErrFractpercentage(ch_pair, wNr)))) + "%)", end='\0')
+            finished = str(self._getErrFractFinished(ch_pair, wNr))
             if (finished == 'ffffffff'):
                 break
             elif (finished != '1'):
+                if self.printAcquisitionProgress:
+                    print("\r Error fraction mode(" + str(int(float(
+                    self._getErrFractpercentage(ch_pair, wNr)))) + "%)", end='\0')
                 time.sleep(1.0/FINISH_BIT_CHECK_FERQUENTION_HZ)
-        print("\r", end='\0')
+        if self.printAcquisitionProgress:
+            print("\r", end='\0')
         sys.stdout.flush()
         self._displayQBitErrors("Error Fract", ch_pair, wNr)
 
@@ -760,16 +796,20 @@ class DDMq(SCPI):
         return (P)
 
     def _get2BitPatternCnt(self):
-        finished = 0
+        finished = '0'
+        #if self.printAcquisitionProgress:
+        #    print("\n", end='\0')
         while (finished != '1'):
-            finished = self._getTwoBitPatternFinished()
-            print("\r Two bit pattern counter(" + str(int(float(
-                self._getTwoBitPatternPercentage()))) + "%)", end='\0')
+            finished = str(self._getTwoBitPatternFinished())
             if (finished == 'ffffffff'):
                 break
             elif (finished != '1'):
+                if self.printAcquisitionProgress:
+                    print("\r Two bit pattern counter(" + str(int(float(
+                    self._getTwoBitPatternPercentage()))) + "%)", end='\0')
                 time.sleep(1.0/FINISH_BIT_CHECK_FERQUENTION_HZ)
-        print("\r", end='\0')
+        if self.printAcquisitionProgress:
+            print("\r", end='\0')
         sys.stdout.flush()
         self._displayQBitErrors("Two Bit Pattern Counter", 1, 1)
 
@@ -786,8 +826,7 @@ class DDMq(SCPI):
         return errfractioncnt
 
     def _getTwoBitPatternFinished(self):
-        finished = self.ask(
-            'qutech:twoBitPattern:finished? ')
+        finished = self.ask('qutech:twoBitPattern:finished? ')
         fmt_finished = format(int(float(finished)), 'x')
         return fmt_finished
 
@@ -1162,8 +1201,8 @@ class DDMq(SCPI):
             elif (self.logLevel >= logging.DEBUG):
                 level = "debug"
             else:
-                level = "nonset"
-            result = level + ": " + self.description
+                level = "notset"
+            result = str(self.logLevel)  + " " + level + ": " + self.description
             if (len(self.acquisitionMode) > 0):
                 result += "(" + self.acquisitionMode + ")"
             return result
@@ -1189,9 +1228,8 @@ class DDMq(SCPI):
 
     def _parseErrorList(self, acquisitionMode, errorList):
         results = []
-        errors = errorList.splitlines()
-        for error_str in errors:
-            error = json.loads(error_str)
+        errors = json.loads(errorList)
+        for error in errors:
             if error['error_code']:
                 results.append(self.Error(error['error_code'],
                                error['description'], error['error_level'],
@@ -1220,15 +1258,26 @@ class DDMq(SCPI):
         self.exceptionLevel = level
 
     def _getWarningLevel(self):
-        result = "Waring Level: " + str(self.exceptionLevel) + "\r\n"
-        result += "\r\n"
+        level = 'notset'
+        if (self.exceptionLevel >= logging.CRITICAL):
+            level = "critical"
+        elif (self.exceptionLevel >= logging.ERROR):
+            level = "error"
+        elif (self.exceptionLevel >= logging.WARNING):
+            level = "warning"
+        elif (self.exceptionLevel >= logging.INFO):
+            level = "info"
+        elif (self.exceptionLevel >= logging.DEBUG):
+            level = "debug"
+        print("Waring Level: " + str(self.exceptionLevel) + " " + level +
+              "\r\n")
         # Add the list with possible errors to the results
-        result += "Possible Errors: \r\n"
+        print("Possible Errors: ")
         errors = json.loads(self.ask("QUTech:ERRor:LIST?"))
         for error in errors:
             if (error['error_code']
                     and error['error_level'] >= self.exceptionLevel):
-                result += str(self.Error(error['error_code'],
+                print(str(self.Error(error['error_code'],
                               error['description'], error['error_level'],
-                              "")) + "\r\n"
-        return result
+                              "")))
+        return self.exceptionLevel
