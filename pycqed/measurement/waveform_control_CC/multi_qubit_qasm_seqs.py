@@ -193,50 +193,41 @@ def two_qubit_AllXY(q0, q1, RO_target='all',
     return qasm_file
 
 
-def chevron_seq(q0, q1,
-                excite_q1=False, wait_after_trigger=40e-9,
-                wait_during_flux=400e-9, clock_cycle=1e-9, RO_target='all',
-                mw_pulse_duration=40e-9):
+def chevron_seq(fluxing_qubit: str, spectator_qubit: str,
+                excite_q1: bool=False, RO_target='all'):
     '''
     Single chevron sequence that does a swap on |01> <-> |10> or |11> <-> |20>.
 
-    Timing of the sequence:
-        trigger flux pulse -- X180 q0 -- RO
-    or  trigger flux pulse -- X180 q0 -- X180 q1 -- X180 q0 -- RO
-
     Args:
-        q0, q1      (str): names of the addressed qubits
+        fluxing_qubit (str): name of the qubit that is fluxed/
+        spectator qubit (str): name of the qubit with which the fluxing
+                            qubit interacts.
         RO_target   (str): can be q0, q1, or 'all'
         excite_q1   (bool): choose whether to excite q1, thus choosing
                             between the |01> <-> |10> and the |11> <-> |20>
                             swap.
-        wait_after_trigger (float): delay time in seconds after sending the
-                            trigger for the flux pulse
-        clock_cycle (float): period of the internal AWG clock
-        wait_time   (int): wait time between triggering QWG and RO
     '''
     filename = join(base_qasm_path, 'chevron_seq.qasm')
     qasm_file = mopen(filename, mode='w')
-    qasm_file.writelines('qubit {} \nqubit {} \n'.format(q0, q1))
+    qasm_file.writelines('qubit {} \nqubit {} \n'.format(fluxing_qubit,
+                                                         spectator_qubit))
 
     qasm_file.writelines('\ninit_all\n')
-
-    qasm_file.writelines('QWG trigger square\n')
     if excite_q1:
-        wait_after_trigger -= mw_pulse_duration
-    qasm_file.writelines(
-        'I {}\n'.format(int(wait_after_trigger//clock_cycle)))
-    qasm_file.writelines('X180 {}\n'.format(q0))
+        qasm_file.writelines('X180 {} | X180 {}\n'.format(fluxing_qubit,
+                                                          spectator_qubit))
+    else:
+        qasm_file.writelines('X180 {}\n'.format(fluxing_qubit))
+    qasm_file.writelines('square {}\n'.format(fluxing_qubit))
     if excite_q1:
-        qasm_file.writelines('X180 {}\n'.format(q1))
-    qasm_file.writelines(
-        'I {}\n'.format(int(wait_during_flux//clock_cycle)))
-    if excite_q1:
-        # q0 is rotated to ground-state to have better contrast
+        # fluxing_qubit is rotated to ground-state to have better contrast
         # (|0> and |2> instead of |1> and |2>)
-        qasm_file.writelines('X180 {}\n'.format(q0))
-
-    qasm_file.writelines('RO {} \n'.format(RO_target))
+        qasm_file.writelines('X180 {}\n'.format(fluxing_qubit))
+    if RO_target == 'all':
+        qasm_file.writelines('RO {} | RO {}\n'.format(fluxing_qubit,
+                                                      spectator_qubit))
+    else:
+        qasm_file.writelines('RO {} \n'.format(RO_target))
 
     qasm_file.close()
     return qasm_file

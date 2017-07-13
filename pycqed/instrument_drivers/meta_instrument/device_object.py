@@ -1,18 +1,23 @@
 import numpy as np
 import qcodes as qc
-from copy import copy
+import os
+import logging
+import pycqed.measurement.waveform_control_CC.qasm_compiler as qcx
+from copy import deepcopy
 from qcodes.instrument.base import Instrument
 from qcodes.utils import validators as vals
 from qcodes.instrument.parameter import ManualParameter
 from pycqed.instrument_drivers.pq_parameters import InstrumentParameter
 from pycqed.analysis import multiplexed_RO_analysis as mra
-from pycqed.measurement.waveform_control_CC import multi_qubit_module_CC as mqmc
-from pycqed.measurement.waveform_control_CC import multi_qubit_qasm_seqs as mqqs
+from pycqed.measurement.waveform_control_CC import multi_qubit_module_CC\
+    as mqmc
+from pycqed.measurement.waveform_control_CC import multi_qubit_qasm_seqs\
+    as mqqs
 from pycqed.measurement import detector_functions as det
 from pycqed.measurement import sweep_functions as swf
 from pycqed.analysis import measurement_analysis as ma
 import pycqed.measurement.gate_set_tomography.gate_set_tomography_CC as gstCC
-
+from pygsti.construction import std2Q_XYCPHASE, std2Q_XY
 
 class DeviceObject(Instrument):
 
@@ -258,7 +263,7 @@ class TwoQubitDevice(DeviceObject):
     def get_integration_logging_detector(self):
         qnames = self.qubits()
         q0 = self.find_instrument(qnames[0])
-        q1 = self.find_instrument(qnamse[1])
+        q1 = self.find_instrument(qnames[1])
 
         w0 = q0.RO_acq_weight_function_I()
         w1 = q1.RO_acq_weight_function_I()
@@ -268,6 +273,25 @@ class TwoQubitDevice(DeviceObject):
             channels=[w0, w1],
             result_logging_mode='digitized',
             integratioin_length=q0.RO_acq_integration_length())
+        return d
+
+    def get_integrated_average_detector(self, seg_per_point: int=1):
+        qnames = self.qubits()
+        q0 = self.find_instrument(qnames[0])
+        q1 = self.find_instrument(qnames[1])
+
+        w0 = q0.RO_acq_weight_function_I()
+        w1 = q1.RO_acq_weight_function_I()
+
+        d = det.UHFQC_integrated_average_detector(
+            UHFQC=self.acquisition_instrument.get_instr(),
+            AWG=self.central_controller.get_instr(),
+            channels=[w0, w1],
+            nr_averages=self.RO_acq_averages(),
+            real_imag=True, single_int_avg=True,
+            result_logging_mode='digitized',
+            integration_length=q0.RO_acq_integration_length(),
+            seg_per_point=seg_per_point)
         return d
 
     def measure_two_qubit_AllXY(self, sequence_type='simultaneous', MC=None):
@@ -302,7 +326,9 @@ class TwoQubitDevice(DeviceObject):
     def measure_two_qubit_GST(self,
                               max_germ_pow: int=10,
                               repetitions_per_point: int=500,
-                              MC=None):
+                              min_soft_repetitions: int=5,
+                              MC=None,
+                              analyze: bool=False):
         '''
         Measure gate set tomography for this qubit. The gateset that is used
         is saved in
@@ -314,6 +340,9 @@ class TwoQubitDevice(DeviceObject):
                 Largest power of 2 used to set germ lengths.
             repetitions_per_point (int):
                 Number of times each experiment is repeated in total.
+            min_soft_repetitions (int):
+                Minimum number of soft repetitions that should be done
+                (repetitions of the whole sequene).
             MC (Instrument):
                 Measurement control instrument that should be used for the
                 experiment. Default (None) uses self.MC.
@@ -415,12 +444,111 @@ class TwoQubitDevice(DeviceObject):
         MC.run('GST_2Q')
 
         # Analysis
-        ma.GST_Analysis(exp_num_list=exp_nums,
-                        hard_repetitions=hard_repetitions,
-                        soft_repetitions=soft_repetitions,
-                        exp_list=[g.str for g in raw_exp_list],
-                        gs_target=gs_target,
-                        prep_fiducials=prepFids,
-                        meas_fiducials=measFids,
-                        germs=germs,
-                        max_lengths=max_lengths)
+        if analyze:
+            ma.GST_Analysis(exp_num_list=exp_nums,
+                            hard_repetitions=hard_repetitions,
+                            soft_repetitions=soft_repetitions,
+                            exp_list=[g.str for g in raw_exp_list],
+                            gs_target=gs_target,
+                            prep_fiducials=prepFids,
+                            meas_fiducials=measFids,
+                            germs=germs,
+                            max_lengths=max_lengths)
+
+    def measure_chevron(self, amps, lengths,
+                        fluxing_qubit=None, spectator_qubit=None,
+                        wait_during_flux='auto', excite_q1: bool=True,
+                        MC=None):
+        '''
+        Measures chevron for the two qubits of the device.
+        The qubit that is fluxed is q0, so the order of the qubit matters!
+
+        Args:
+            fluxing_qubit
+            amps (array of floats):
+                    Flux pulse amplitude sweep points (in V) -> x-axis
+            lengths (array of floats):
+                    Flux pulse length sweep points (in s) -> y-axis
+            fluxing_qubit (str):
+                    name of the qubit that is fluxed/
+            spectator qubit (str):
+                    name of the qubit with which the fluxing qubit interacts.
+            wait_during_flux (float or 'auto'):
+                    Delay during the flux pulse. If this is 'auto',
+                    the time is automatically picked based on the maximum
+                    of the sweep points.
+            excite_q1 (bool):
+                    False: measure |01> - |10> chevron.
+                    True: measure |11> - |02> chevron.
+            MC (Instr):
+                    Measurement control instrument to use for the experiment.
+        '''
+
+        if MC is None:
+                MC = qc.station.components['MC']
+        CBox = self.central_controller.get_instr()
+
+        if fluxing_qubit is None:
+            fluxing_qubit = self.qubits()[0]
+        if spectator_qubit is None:
+            spectator_qubit = self.qubits()[1]
+
+        q0 = self.find_instrument(fluxing_qubit)
+        q1 = self.find_instrument(spectator_qubit)
+        self.prepare_for_timedomain()
+        # only prepare q0 for fluxing, because this is the only qubit that
+        # gets a flux pulse.
+        q0.prepare_for_fluxing()
+
+        # Use flux lutman from q0, since this is the qubit being fluxed.
+        QWG_flux_lutman = q0.flux_LutMan.get_instr()
+        QWG = QWG_flux_lutman.QWG.get_instr()
+
+        # Set the wait time during the flux pulse to be long enough to fit the
+        # longest flux pulse
+        if wait_during_flux == 'auto':
+            # Round to the next integer multiple of qubit pulse modulation
+            # period and add two periods as buffer
+            T_pulsemod = np.abs(1/q0.f_pulse_mod())
+            wait_during_flux = (np.ceil(max(lengths) / T_pulsemod) + 2) \
+                * T_pulsemod
+
+        cfg = deepcopy(self.qasm_config())
+        cfg['operation dictionary']['square']['duration'] = int(
+            np.round(wait_during_flux * 1e9))
+
+        qasm_file = mqqs.chevron_seq(fluxing_qubit=q0.name,
+                                     spectator_qubit=q1.name,
+                                     excite_q1=excite_q1,
+                                     RO_target='all')
+
+        CBox.trigger_source('internal')
+        qasm_folder, fn = os.path.split(qasm_file.name)
+        base_fn = fn.split('.')[0]
+        qumis_fn = os.path.join(qasm_folder, base_fn + '.qumis')
+        compiler = qcx.QASM_QuMIS_Compiler(verbosity_level=1)
+        compiler.compile(qasm_file.name, qumis_fn=qumis_fn, config=cfg)
+
+        CBox.load_instructions(qumis_fn)
+        CBox.start()
+
+        # Set the wave dict unit to frac, because we take care of the proper
+        # scaling in the sweep function
+        oldWaveDictUnit = QWG_flux_lutman.wave_dict_unit()
+        QWG_flux_lutman.wave_dict_unit('frac')
+
+        s1 = swf.QWG_flux_amp(QWG=QWG, channel=QWG_flux_lutman.F_ch(),
+                              frac_amp=QWG_flux_lutman.F_amp())
+
+        s2 = swf.QWG_lutman_par(QWG_flux_lutman, QWG_flux_lutman.F_length)
+        MC.set_sweep_function(s1)
+        MC.set_sweep_function_2D(s2)
+        MC.set_sweep_points(amps)
+        MC.set_sweep_points_2D(lengths)
+        d = self.get_integrated_average_detector()
+
+        MC.set_detector_function(d)
+        MC.run('Chevron_{}_{}'.format(q0.name, q1.name), mode='2D')
+
+        # Restore the old wave dict unit.
+        QWG_flux_lutman.wave_dict_unit(oldWaveDictUnit)
