@@ -61,45 +61,64 @@ def TwinLorentzFunc(f, amplitude_a, amplitude_b, center_a, center_b,
 
 
 def Qubit_dac_to_freq(dac_voltage, f_max, E_c,
-                      dac_sweet_spot, dac_flux_coefficient, asymmetry=0):
+                      dac_sweet_spot, V_per_phi0=None, dac_flux_coefficient=None,
+                      asymmetry=0):
     '''
     The cosine Arc model for uncalibrated flux for asymmetric qubit.
 
     dac_voltage (V)
-    f_max (Hz)
-    E_c (Hz)
-    dac_sweet_spot (V)
-    dac_flux_coefficient (1/V)
+    f_max (Hz): sweet-spot frequency of the qubit
+    E_c (Hz): charging energy of the qubit
+    V_per_phi0 (V): volt per phi0 (convert voltage to flux)
+    dac_sweet_spot (V): voltage at which the sweet-spot is found
     asym (dimensionless asymmetry param) = abs((EJ1-EJ2)/(EJ1+EJ2)),
     '''
+    if V_per_phi0 is None and dac_flux_coefficient is None:
+        raise ValueError('Please specify "V_per_phi0".')
+
+    if dac_flux_coefficient is not None:
+        logging.warning('"dac_flux_coefficient" deprecated. Please use the '
+                        'physically meaningful "V_per_phi0" instead.')
+        V_per_phi0 = np.pi/dac_flux_coefficient
+
     qubit_freq = (f_max + E_c)*(
-        asymmetry**2 + (1-asymmetry**2) *
-        np.sqrt(abs(np.cos(dac_flux_coefficient*(dac_voltage-dac_sweet_spot)))))-E_c
+        asymmetry**2 + (1 - asymmetry**2) *
+        np.sqrt(abs(np.cos(np.pi / V_per_phi0 *
+                           (dac_voltage - dac_sweet_spot))))) - E_c
     return qubit_freq
 
 
 def Qubit_freq_to_dac(frequency, f_max, E_c,
-                      dac_sweet_spot, dac_flux_coefficient, asymmetry=0,
+                      dac_sweet_spot, V_per_phi0=None,
+                      dac_flux_coefficient=None, asymmetry=0,
                       branch='positive'):
     '''
     The cosine Arc model for uncalibrated flux for asymmetric qubit.
     This function implements the inverse of "Qubit_dac_to_freq"
 
     frequency (Hz)
-    f_max (Hz)
-    E_c (Hz)
-    dac_sweet_spot (V)
-    dac_flux_coefficient (1/V)
-    asym (dimensionless asymmetry param) = abs((EJ1-EJ2)/(EJ1+EJ2)),
+    f_max (Hz): sweet-spot frequency of the qubit
+    E_c (Hz): charging energy of the qubit
+    V_per_phi0 (V): volt per phi0 (convert voltage to flux)
+    asym (dimensionless asymmetry param) = abs((EJ1-EJ2)/(EJ1+EJ2))
+    dac_sweet_spot (V): voltage at which the sweet-spot is found
     branch (enum: 'positive' 'negative')
     '''
+    if V_per_phi0 is None and dac_flux_coefficient is None:
+        raise ValueError('Please specify "V_per_phi0".')
 
     asymm_term = (asymmetry**2 + (1-asymmetry**2))
     dac_term = np.arccos(((frequency+E_c)/((f_max+E_c) * asymm_term))**2)
+
+    if dac_flux_coefficient is not None:
+        logging.warning('"dac_flux_coefficient" deprecated. Please use the '
+                        'physically meaningful "V_per_phi0" instead.')
+        V_per_phi0 = np.pi/dac_flux_coefficient
+
     if branch == 'positive':
-        dac_voltage = (dac_term)/dac_flux_coefficient+dac_sweet_spot
+        dac_voltage = (dac_term) * V_per_phi0 / np.pi + dac_sweet_spot
     elif branch == 'negative':
-        dac_voltage = -(dac_term)/dac_flux_coefficient+dac_sweet_spot
+        dac_voltage = -(dac_term) * V_per_phi0 / np.pi + dac_sweet_spot
     else:
         raise ValueError('branch {} not recognized'.format(branch))
 
@@ -389,7 +408,7 @@ def Cos_guess(model, data, t):
     # Use absolute value of complex valued spectrum
     abs_w = np.abs(w)
     freq_guess = abs(f[abs_w == max(abs_w)][0])
-    ph_guess = (-2*np.pi*t[data == max(data)]*freq_guess)[0]
+    ph_guess = 2*np.pi-(2*np.pi*t[data == max(data)]*freq_guess)[0]
     # the condition data == max(data) can have several solutions
     #               (for example when discretization is visible)
     # to prevent errors we pick the first solution
@@ -401,6 +420,27 @@ def Cos_guess(model, data, t):
                                offset=offs_guess)
     params['amplitude'].min = 0  # Ensures positive amp
     params['frequency'].min = 0
+
+    return params
+
+
+def Cos_amp_phase_guess(model, data, f, t):
+    '''
+    Guess for a cosine fit with fixed frequency f.
+    '''
+    amp_guess = abs(max(data)-min(data))/2  # amp is positive by convention
+    offs_guess = np.mean(data)
+
+    ph_guess = (-2*np.pi*t[data == max(data)]*f)[0]
+    # the condition data == max(data) can have several solutions
+    #               (for example when discretization is visible)
+    # to prevent errors we pick the first solution
+
+    # model.set_param_hint('period', expr='1')
+    params = model.make_params(amplitude=amp_guess,
+                               phase=ph_guess,
+                               offset=offs_guess)
+    params['amplitude'].min = 0  # Ensures positive amp
 
     return params
 

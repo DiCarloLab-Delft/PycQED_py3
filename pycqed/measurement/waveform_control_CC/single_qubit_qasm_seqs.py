@@ -20,7 +20,7 @@ def CW_tone():
     return qasm_file
 
 
-def CW_RO_sequence(qubit_name, trigger_separation, clock_cycle=5e-9):
+def CW_RO_sequence(qubit_name, trigger_separation, clock_cycle=1e-9):
     # N.B.! this delay is not correct because it does not take the
     # trigger length into account
     delay = np.round(trigger_separation/clock_cycle)
@@ -28,14 +28,14 @@ def CW_RO_sequence(qubit_name, trigger_separation, clock_cycle=5e-9):
     filename = join(base_qasm_path, 'CW_RO_sequence.qasm')
     qasm_file = mopen(filename, mode='w')
     qasm_file.writelines('qubit {} \n'.format(qubit_name))
-    qasm_file.writelines('I {} {:d} \n'.format(
-                         qubit_name, int(delay)))
+    qasm_file.writelines('I {:d} \n'.format(
+        int(delay)))
     qasm_file.writelines('RO {}  \n'.format(qubit_name))
     qasm_file.close()
     return qasm_file
 
 
-def pulsed_spec_sequence(qubit_name, clock_cycle=5e-9):
+def pulsed_spec_sequence(qubit_name, clock_cycle=1e-9):
     filename = join(base_qasm_path, 'pulsed_spec.qasm')
     qasm_file = mopen(filename, mode='w')
     qasm_file.writelines('qubit {} \n'.format(qubit_name))
@@ -46,7 +46,7 @@ def pulsed_spec_sequence(qubit_name, clock_cycle=5e-9):
     return qasm_file
 
 
-def T1(qubit_name, times, clock_cycle=5e-9,
+def T1(qubit_name, times, clock_cycle=1e-9,
        cal_points=True):
     #
     clocks = np.round(times/clock_cycle)
@@ -65,13 +65,13 @@ def T1(qubit_name, times, clock_cycle=5e-9,
         else:
             qasm_file.writelines('X180 {}     # exciting pi pulse\n'.format(
                                  qubit_name))
-            qasm_file.writelines('I {} {:d} \n'.format(qubit_name, int(cl)))
+            qasm_file.writelines('I {:d} \n'.format(int(cl)))
             qasm_file.writelines('RO {}  \n'.format(qubit_name))
     qasm_file.close()
     return qasm_file
 
 
-def flipping_seq(qubit_name, number_of_flips, clock_cycle=5e-9,
+def flipping_seq(qubit_name, number_of_flips, clock_cycle=1e-9,
                  equator=False, cal_points=True):
     filename = join(base_qasm_path, 'Flipping.qasm')
     qasm_file = mopen(filename, mode='w')
@@ -137,8 +137,8 @@ def Rabi(qubit_name, amps, n=1):
     return qasm_file
 
 
-def Ramsey(qubit_name, times, clock_cycle=5e-9,
-           artificial_detuning=4,
+def Ramsey(qubit_name, times, clock_cycle=1e-9,
+           artificial_detuning=None,
            cal_points=True):
     '''
     Ramsey sequence for a single qubit.
@@ -181,7 +181,7 @@ def Ramsey(qubit_name, times, clock_cycle=5e-9,
         else:
             qasm_file.writelines('X90 {}     \n'.format(
                                  qubit_name))
-            qasm_file.writelines('I {} {:d} \n'.format(qubit_name, int(cl)))
+            qasm_file.writelines('I {:d} \n'.format(int(cl)))
             if artificial_detuning is not None:
                 qasm_file.writelines('R90_phi {} {}\n'.format(
                     qubit_name, phases[i]))
@@ -193,8 +193,8 @@ def Ramsey(qubit_name, times, clock_cycle=5e-9,
     return qasm_file
 
 
-def echo(qubit_name, times, clock_cycle=5e-9,
-         artificial_detuning=4,
+def echo(qubit_name, times, clock_cycle=1e-9,
+         artificial_detuning=None,
          cal_points=True):
     '''
     Echo sequence for a single qubit.
@@ -234,9 +234,9 @@ def echo(qubit_name, times, clock_cycle=5e-9,
             qasm_file.writelines('RO {}  \n'.format(qubit_name))
         else:
             qasm_file.writelines('X90 {}     \n'.format(qubit_name))
-            qasm_file.writelines('I {} {:d} \n'.format(qubit_name, int(cl//2)))
+            qasm_file.writelines('I {:d} \n'.format(int(cl//2)))
             qasm_file.writelines('X180 {}     \n'.format(qubit_name))
-            qasm_file.writelines('I {} {:d} \n'.format(qubit_name, int(cl//2)))
+            qasm_file.writelines('I {:d} \n'.format(int(cl//2)))
             if artificial_detuning is not None:
                 qasm_file.writelines('R90_phi {} {}\n'.format(
                     qubit_name, phases[i]))
@@ -446,7 +446,7 @@ def MotzoiXY(qubit_name, motzois, cal_points=True):
 
 
 def Ram_Z(qubit_name,
-          wait_before=150e-9, wait_between=200e-9, clock_cycle=5e-9):
+          wait_before=150e-9, wait_between=200e-9, clock_cycle=1e-9):
     '''
     Performs a Ram-Z sequence similar to a conventional echo sequence.
 
@@ -468,11 +468,9 @@ def Ram_Z(qubit_name,
     qasm_file.writelines('\ninit_all\n')
 
     qasm_file.writelines('QWG trigger \n')
-    qasm_file.writelines('I {} {}\n'.format(qubit_name,
-                                            int(wait_before//clock_cycle)))
+    qasm_file.writelines('I {}\n'.format(int(wait_before//clock_cycle)))
     qasm_file.writelines('mX90 {}\n'.format(qubit_name))
-    qasm_file.writelines('I {} {}\n'.format(qubit_name,
-                                            int(wait_between//clock_cycle)))
+    qasm_file.writelines('I {}\n'.format(int(wait_between//clock_cycle)))
     qasm_file.writelines('X90 {}\n'.format(qubit_name))
     qasm_file.writelines('RO {}  \n'.format(qubit_name))
 
