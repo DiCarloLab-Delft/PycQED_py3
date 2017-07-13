@@ -305,3 +305,4 @@ def gen_sweep_pts(start: float=None, stop: float=None,
     else:
         raise ValueError('Either ("start" and "stop") or '
                          '("center" and "span") must be specified')
+
