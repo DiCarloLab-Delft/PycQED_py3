@@ -227,8 +227,12 @@ class MeasurementAnalysis(object):
                 self.analysis_group.create_dataset(
                     name=datasetname, data=data)
 
-    def save_dict_to_analysis_group(self, save_dict, group_name):
-
+    def save_dict_to_analysis_group(self, save_dict: dict, group_name: str):
+        """
+        Saves a dictionary to the analysis_group in the hdf5 datafile
+        corresponding to the experiment.
+        Convenient for storing parameters extracted in the analysis.
+        """
         if group_name not in self.analysis_group:
             dict_grp = self.analysis_group.create_group(group_name)
         else:
@@ -1279,6 +1283,7 @@ class Rabi_Analysis(TD_Analysis):
             # quadratures
             data = np.sqrt(self.measured_values[0]**2 +
                            self.measured_values[1]**2)
+
             params = fit_mods.Cos_guess(model, data=data, t=self.sweep_points)
             fit_res = model.fit(
                 data=data,
@@ -1579,8 +1584,10 @@ class Motzoi_XY_analysis(TD_Analysis):
         self.add_analysis_datagroup_to_file()
         if self.cal_points is None:
             if len(self.measured_values) == 2:
+
                 self.corr_data = (self.measured_values[0]**2 +
                                   self.measured_values[1]**2)
+
             else:
                 self.corr_data = self.measured_values[0]
         else:
@@ -5367,8 +5374,10 @@ class butterfly_analysis(MeasurementAnalysis):
             # variable is overwritten here, no good.
             self.data_exc = self.data_exc_post
             self.data_rel = self.data_rel_post
+
             fraction = (np.size(self.data_exc) +
                         np.size(self.data_exc))*3/shots_used/2
+
 
         else:
             m0_on = self.data[2::4]
