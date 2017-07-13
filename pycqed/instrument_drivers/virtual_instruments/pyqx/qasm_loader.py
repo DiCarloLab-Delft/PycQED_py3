@@ -37,21 +37,27 @@ class qasm_loader:
 
         for i in range(0, len(file_lines)):
             file_lines[i] = file_lines[i].strip()
-            # remove empty lines
-            if len(file_lines[i]) == 0:
-                continue
+
+            # remove comments
+            c = file_lines[i].find("#")
+            if c != -1:
+                file_lines[i] = file_lines[i][:c]
+
             seperated_file_lines = file_lines[i].split("|")
             for line in seperated_file_lines:
+
+                # remove trailing whitespace
                 line = line.strip()
                 self.lines.append(line)
-                c = line.find("#")              # remove comments
-                if c != -1:
-                    self.lines[-1] = line[:c]
 
                 # replace line if line matches _replacement
                 replacement_lines = self.replaceLine(line)
                 if replacement_lines:
                     self.lines[-1:] = replacement_lines
+
+            # remove empty lines
+            if len(self.lines[-1]) == 0:
+                del self.lines[-1]
 
     def load_circuits(self):
         n = len(self.lines)
@@ -102,6 +108,8 @@ class qasm_loader:
         return self.circuits
 
     def replaceLine(self, line):
+        if len(line) == 0:
+            return ''
         if line == "init_all" or line[0] == '.':
             self._circuit_counter += 1
         match = False
