@@ -552,7 +552,7 @@ def grover_test_tomo_seq(q0_name, q1_name, omega, RO_target='all',
             qasm_file.writelines('grover_cz {} {}\n'.format(q0_name, q1_name))
             qasm_file.writelines('Y90 {} | Y90 {}\n'.format(q0_name,
                                                             q1_name))
-            # qasm_file.writelines('cz {} {}\n'.format(q0_name, q1_name))
+            qasm_file.writelines('cz {} {}\n'.format(q0_name, q1_name))
             # qasm_file.writelines('Y90 {} | Y90 {}\n'.format(q0_name,
                                                               # q1_name))
             qasm_file.writelines('{} | {}\n'.format(p_q1, p_q0))
