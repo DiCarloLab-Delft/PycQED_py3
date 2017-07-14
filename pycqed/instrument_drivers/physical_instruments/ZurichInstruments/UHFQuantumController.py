@@ -449,13 +449,14 @@ class UHFQC(Instrument):
             self.acquisition_finalize()
             for n, c in enumerate(self.acquisition_paths):
                 if n in data:
-                    print(
-                        "    : Channel {}: Got {} of {} samples", n, len(data[n]), samples)
+                    print("\t: Channel {}: Got {} of {} samples".format(
+                          n, len(data[n]), samples))
             raise TimeoutError("Error: Didn't get all results!")
 
         return data
 
-    def acquisition(self, samples, acquisition_time=0.010, timeout=0, channels=set([0, 1]), mode='rl'):
+    def acquisition(self, samples, acquisition_time=0.010, timeout=0,
+                    channels=set([0, 1]), mode='rl'):
         self.acquisition_initialize(channels, mode)
         data = self.acquisition_poll(samples, acquisition_time, timeout)
         self.acquisition_finalize()
@@ -468,7 +469,8 @@ class UHFQC(Instrument):
 
         if mode == 'rl':
             for c in channels:
-                self.acquisition_paths.append('/' + self._device + '/quex/rl/data/{}'.format(c))
+                self.acquisition_paths.append(
+                    '/' + self._device + '/quex/rl/data/{}'.format(c))
             self._daq.subscribe('/' + self._device + '/quex/rl/data/*')
             # Enable automatic readout
             self._daq.setInt('/' + self._device + '/quex/rl/readout', 1)
@@ -626,7 +628,7 @@ class UHFQC(Instrument):
                  np.array(cosI))
         self.set('quex_wint_weights_{}_real'.format(weight_function_Q),
                  np.array(sinI))
-		# the factor 2 is needed so that scaling matches SSB downconversion
+        # the factor 2 is needed so that scaling matches SSB downconversion
         self.set('quex_rot_{}_real'.format(weight_function_I), 2.0)
         self.set('quex_rot_{}_imag'.format(weight_function_I), 0.0)
         self.set('quex_rot_{}_real'.format(weight_function_Q), 2.0)
@@ -834,8 +836,6 @@ setTrigger(0);"""
     def upload_transformation_matrix(self, matrix):
         for i in range(np.shape(matrix)[0]):  # looping over the rows
             for j in range(np.shape(matrix)[1]):  # looping over the colums
-                #value =matrix[i,j]
-                # print(value)
                 eval(
                     'self.quex_trans_{}_col_{}_real(matrix[{}][{}])'.format(j, i, i, j))
 
