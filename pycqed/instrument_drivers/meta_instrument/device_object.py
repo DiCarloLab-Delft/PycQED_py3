@@ -378,7 +378,8 @@ class TwoQubitDevice(DeviceObject):
             'Giy': 'Y90 {}'.format(q0.name),
             'Gxi': 'X90 {}'.format(q1.name),
             'Gyi': 'Y90 {}'.format(q1.name),
-            'Gcphase': 'CZ {} {}'.format(q0.name, q1.name)
+            'Gcphase': 'CZ {} {}'.format(q0.name, q1.name),
+            'RO': 'RO all'
         }
 
         # Create the experiment list, translate it to QASM, and generate the
