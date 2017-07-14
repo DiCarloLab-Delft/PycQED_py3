@@ -4427,8 +4427,8 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
             if kappa_guess == 0:
                     kappa_guess = 1 # When kappa_guess is zero, the fitting procedure fails (claims 'input has nan values')
 
-            if not peak_flag: # Change the sign of amplitude_guess for dips
-                amplitude_guess*=-1.
+#            if not peak_flag: # Change the sign of amplitude_guess for dips
+#                amplitude_guess*=-1.
 
             LorentzianModel = fit_mods.LorentzianModel
             LorentzianModel.set_param_hint('f0',

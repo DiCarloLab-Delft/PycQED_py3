@@ -49,7 +49,8 @@ class Flux_Control(Instrument):
                            vals=vals.Arrays())
 
         self.add_parameter('dac_mapping',
-                           label='Linear transformation coefficients',
+                           label='Which dac channels are corresponding to the'
+                           'rows of self.transfer_matrix',
                            parameter_class=ManualParameter,
                            vals=vals.Arrays())
 
