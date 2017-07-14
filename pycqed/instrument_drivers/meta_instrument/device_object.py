@@ -17,6 +17,7 @@ from pycqed.measurement import detector_functions as det
 from pycqed.measurement import sweep_functions as swf
 from pycqed.analysis import measurement_analysis as ma
 import pycqed.measurement.gate_set_tomography.gate_set_tomography_CC as gstCC
+import pygsti
 
 class DeviceObject(Instrument):
 
@@ -390,7 +391,7 @@ class TwoQubitDevice(DeviceObject):
             logging.warning(str(e) + '\nUsing default ({})'.format(max_instr))
 
         raw_exp_list = pygsti.construction.make_lsgst_experiment_list(
-            gs_target, prepFids, measFids, germs, maxLengths)
+            gs_target.gates.keys(), prepFids, measFids, germs, max_lengths)
         exp_list = gstCC.get_experiments_from_list(raw_exp_list, gate_dict)
         qasm_files, exp_nums = gstCC.generateQASM(
             filename='GST_2Q_{}_{}'.format(q0.name, q1.name),

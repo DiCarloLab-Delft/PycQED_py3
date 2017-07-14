@@ -1,6 +1,7 @@
 import os
 import logging
 import numpy as np
+import pickle
 from scipy import stats
 import h5py
 from matplotlib import pyplot as plt
@@ -6729,16 +6730,18 @@ class GST_Analysis(TD_Analysis):
         self.write_GST_datafile(self.pygsti_fn, self.counts)
 
         # Run pyGSTi analysis and create report.
-        results = pygsti.do_stdpractice_gst(
+        self.results = pygsti.do_long_sequence_gst(
             self.pygsti_fn, self.gs_target, self.prep_fids, self.meas_fids,
             self.germs, self.max_lengths)
 
-        with open(os.path.join(self.folder, 'pyGSTi_results.p'), 'w') as file:
-            pickle.dump(results, file)
+        with open(os.path.join(self.folder,
+                               'pyGSTi_results.p'), 'wb') as file:
+            pickle.dump(self.results, file)
 
         self.report_fn = os.path.join(self.folder, 'pyGSTi_report.pdf')
-        results.create_full_report_pdf(
-            confidenceLevel=95, filename=self.report_fn, verbosity=2)
+        self.results.create_full_report_pdf(confidenceLevel=95,
+                                            filename=self.report_fn,
+                                            verbosity=2)
 
     def write_GST_datafile(self, filepath: str, counts: list):
         '''

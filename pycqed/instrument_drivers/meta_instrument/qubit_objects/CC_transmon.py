@@ -1907,13 +1907,14 @@ class CBox_v3_driven_transmon(Transmon):
         if lengths == 'full':
             # Fill waveform with zeros such that it is a multiple of
             # chunk_size.
-            lengths = np.arange(len(waveform)) / f_lutman.sampling_rate()
             remainder = len(waveform) % chunk_size
             padding_len = chunk_size - remainder
             while padding_len < 20:
                 # We want to add at least 20 zeros at the end
                 padding_len += chunk_size
-            lengths = np.concatenate(lengths, np.zeros(padding_len))
+
+            waveform = np.concatenate(waveform, np.zeros(padding_len))
+            lengths = np.arange(len(waveform)) / f_lutman.sampling_rate()
 
         if len(lengths) % int(chunk_size) != 0:
             raise ValueError('Total number of points ({}) should be an'
@@ -2207,7 +2208,7 @@ class CBox_v3_driven_transmon(Transmon):
         # Create the experiment list, translate it to QASM, and generate the
         # QASM file(s).
         raw_exp_list = pygsti.construction.make_lsgst_experiment_list(
-            gs_target, fiducials, fiducials, germs, max_lengths)
+            gs_target.gates.keys(), fiducials, fiducials, germs, max_lengths)
         exp_list = gstCC.get_experiments_from_list(raw_exp_list, gate_dict)
         qasm_files, exp_nums = gstCC.generate_QASM(
             filename='GST_{}'.format(self.name),
