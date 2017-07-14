@@ -270,6 +270,7 @@ class TwoQubitDevice(DeviceObject):
 
         d = det.UHFQC_integration_logging_det(
             UHFQC=self.acquisition_instrument.get_instr(),
+            AWG=self.central_controller.get_instr(),
             channels=[w0, w1],
             result_logging_mode='digitized',
             integratioin_length=q0.RO_acq_integration_length())
@@ -379,7 +380,7 @@ class TwoQubitDevice(DeviceObject):
             'Gxi': 'X90 {}'.format(q1.name),
             'Gyi': 'Y90 {}'.format(q1.name),
             'Gcphase': 'CZ {} {}'.format(q0.name, q1.name),
-            'RO': 'RO all'
+            'RO': 'RO {} | RO {}'.format(q0.name, q1.name)
         }
 
         # Create the experiment list, translate it to QASM, and generate the
@@ -394,7 +395,7 @@ class TwoQubitDevice(DeviceObject):
         raw_exp_list = pygsti.construction.make_lsgst_experiment_list(
             gs_target.gates.keys(), prepFids, measFids, germs, max_lengths)
         exp_list = gstCC.get_experiments_from_list(raw_exp_list, gate_dict)
-        qasm_files, exp_nums = gstCC.generateQASM(
+        qasm_files, exp_nums = gstCC.generate_QASM(
             filename='GST_2Q_{}_{}'.format(q0.name, q1.name),
             exp_list=exp_list,
             qubit_labels=[q0.name, q1.name],
@@ -436,7 +437,7 @@ class TwoQubitDevice(DeviceObject):
             detector=d,
             CBox=self.central_controller.get_instr(),
             parameter_name='GST sequence',
-            unit=None)
+            unit='#')
         total_exp_nr = np.sum(exp_nums) * hard_repetitions * soft_repetitions
 
         if d.result_logging_mode != 'digitized':
