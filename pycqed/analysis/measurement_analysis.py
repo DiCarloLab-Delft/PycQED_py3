@@ -6733,10 +6733,12 @@ class GST_Analysis(TD_Analysis):
             self.pygsti_fn, self.gs_target, self.prep_fids, self.meas_fids,
             self.germs, self.max_lengths)
 
-        self.report_fn = os.path.join(self.folder, 'pyGSTi_report.html')
-        pygsti.report.create_general_report(results, self.report_fn,
-                                            verbosity=3, auto_open=False,
-                                            confidenceLevel=95)
+        with open(os.path.join(self.folder, 'pyGSTi_results.p'), 'w') as file:
+            pickle.dump(results, file)
+
+        self.report_fn = os.path.join(self.folder, 'pyGSTi_report.pdf')
+        results.create_full_report_pdf(
+            confidenceLevel=95, filename=self.report_fn, verbosity=2)
 
     def write_GST_datafile(self, filepath: str, counts: list):
         '''
