@@ -171,6 +171,13 @@ class DDMq(SCPI):
                            set_cmd=self._setWarningLevel,
                            get_cmd=self._getWarningLevel,
                            )
+        self.add_parameter('display_progress_enable',
+                           label="Enable or disables printing of the " +
+                           "acquisitions' progress during and measurement",
+                           docstring=' ',
+                           set_cmd=self._setDisplayProgressEnabled,
+                           get_cmd=self._getDisplayProgressEnabled,
+                           )
 
         for i in range(number_of_channels//2):
             """
@@ -471,8 +478,8 @@ class DDMq(SCPI):
     # Get Data
     #################
     def _getInputAverage(self, ch):
-        #if self.printAcquisitionProgress:
-        #    print("\n", end='\0')
+        ch_pair = math.ceil(ch/2)
+        finished = '0'
         while (finished != '1'):
             finished = str(self._getInAvgFinished(ch_pair))
             if (finished == 'ffffffff'):
@@ -486,8 +493,6 @@ class DDMq(SCPI):
 
     def _getTVdata(self, ch_pair, wNr):
         finished = '0'
-        #if self.printAcquisitionProgress:
-        #    print("\n", end='\0')
         while (finished != '1'):
             finished = str(self._getTVFinished(ch_pair, wNr))
             if (finished == 'ffffffff'):
@@ -499,7 +504,7 @@ class DDMq(SCPI):
                 time.sleep(1.0/FINISH_BIT_CHECK_FERQUENTION_HZ)
         if self.printAcquisitionProgress:
             print("\r", end='\0')
-        sys.stdout.flush()
+            sys.stdout.flush()
         self._displayQBitErrors("TV Mode", ch_pair, wNr)
         self.write('qutech:tvmode{:d}:data{:d}? '.format(ch_pair, wNr))
         binBlock = self.binBlockRead()
@@ -508,8 +513,6 @@ class DDMq(SCPI):
 
     def _getCorrelationData(self):
         finished = '0'
-        #if self.printAcquisitionProgress:
-        #    print("\n", end='\0')
         while (finished != '1'):
             finished = str(self._getCorrelationFinished())
             if (finished == 'ffffffff'):
@@ -517,11 +520,11 @@ class DDMq(SCPI):
             elif (finished != '1'):
                 if self.printAcquisitionProgress:
                     print("\r Correlation (" + str(int(float(
-                      self._getCorrelationpercentage()))) + "%)", end='\0')
+                        self._getCorrelationpercentage()))) + "%)", end='\0')
                 time.sleep(1.0/FINISH_BIT_CHECK_FERQUENTION_HZ)
         if self.printAcquisitionProgress:
             print("\r", end='\0')
-        sys.stdout.flush()
+            sys.stdout.flush()
         self._displayQBitErrors("Correlation", 1, 1)
         self.write('qutech:correlation:data? ')
         binBlock = self.binBlockRead()
@@ -550,8 +553,6 @@ class DDMq(SCPI):
 
     def _getQstateCNT(self, ch_pair, wNr):
         finished = '0'
-        #if self.printAcquisitionProgress:
-        #    print("\n", end='\0')
         while (finished != '1'):
             finished = str(self._getTVFinished(ch_pair, wNr))
             if (finished == 'ffffffff'):
@@ -563,7 +564,7 @@ class DDMq(SCPI):
                 time.sleep(1.0/FINISH_BIT_CHECK_FERQUENTION_HZ)
         if self.printAcquisitionProgress:
             print("\r", end='\0')
-        sys.stdout.flush()
+            sys.stdout.flush()
         self._displayQBitErrors("TV Mode - Qbit state", ch_pair, wNr)
 
         self.write('qutech:qstate{:d}:data{:d}:counter? '.format(ch_pair, wNr))
@@ -573,8 +574,6 @@ class DDMq(SCPI):
 
     def _getQstateAVG(self, ch_pair, wNr):
         finished = '0'
-        #if self.printAcquisitionProgress:
-        #    print("\n", end='\0')
         while (finished != '1'):
             finished = str(self._getTVFinished(ch_pair, wNr))
             if (finished == 'ffffffff'):
@@ -582,11 +581,11 @@ class DDMq(SCPI):
             elif (finished != '1'):
                 if self.printAcquisitionProgress:
                     print("\r TV mode(" + str(int(float(self._getTVpercentage(
-                    ch_pair, wNr)))) + "%)", end='\0')
+                        ch_pair, wNr)))) + "%)", end='\0')
                 time.sleep(1.0/FINISH_BIT_CHECK_FERQUENTION_HZ)
         if self.printAcquisitionProgress:
             print("\r", end='\0')
-        sys.stdout.flush()
+            sys.stdout.flush()
         self._displayQBitErrors("TV Mode - Qbit state", ch_pair, wNr)
         self.write('qutech:qstate{:d}:data{:d}:average? '.format(ch_pair, wNr))
         binBlock = self.binBlockRead()
@@ -595,20 +594,19 @@ class DDMq(SCPI):
 
     def _getLoggingInt(self, ch_pair, wNr):
         finished = '0'
-        #if self.printAcquisitionProgress:
-        #    print("\n", end='\0')
         while (finished != '1'):
             finished = str(self._getLoggingFinished(ch_pair, wNr))
             if (finished == 'ffffffff'):
                 break
             elif (finished != '1'):
                 if self.printAcquisitionProgress:
-                      print("\r Logging mode(" + str(int(float(
-                      self._getLoggingpercentage(ch_pair, wNr)))) + "%)", end='\0')
+                    print("\r Logging mode(" + str(int(float(
+                        self._getLoggingpercentage(ch_pair, wNr)))) + "%)",
+                        end='\0')
                 time.sleep(1.0/FINISH_BIT_CHECK_FERQUENTION_HZ)
         if self.printAcquisitionProgress:
             print("\r", end='\0')
-        sys.stdout.flush()
+            sys.stdout.flush()
         self._displayQBitErrors("Logging", ch_pair, wNr)
         self.write('qutech:logging{:d}:data{:d}:int? '.format(ch_pair, wNr))
         binBlock = self.binBlockRead()
@@ -617,8 +615,6 @@ class DDMq(SCPI):
 
     def _getLoggingQstate(self, ch_pair, wNr):
         finished = '0'
-        #if self.printAcquisitionProgress:
-        #    print("\n", end='\0')
         while (finished != '1'):
             finished = str(self._getLoggingFinished(ch_pair, wNr))
             if (finished == 'ffffffff'):
@@ -626,11 +622,12 @@ class DDMq(SCPI):
             elif (finished != '1'):
                 if self.printAcquisitionProgress:
                     print("\r Logging mode(" + str(int(float(
-                      self._getLoggingpercentage(ch_pair, wNr)))) + "%)", end='\0')
+                        self._getLoggingpercentage(ch_pair, wNr)))) + "%)",
+                        end='\0')
                 time.sleep(1.0/FINISH_BIT_CHECK_FERQUENTION_HZ)
         if self.printAcquisitionProgress:
             print("\r", end='\0')
-        sys.stdout.flush()
+            sys.stdout.flush()
         self._displayQBitErrors("Logging - Qbit state", ch_pair, wNr)
         self.write('qutech:logging{:d}:data{:d}:qstate? '.format(ch_pair, wNr))
         binBlock = self.binBlockRead()
@@ -736,8 +733,6 @@ class DDMq(SCPI):
 
     def _getErrFractCnt(self, ch_pair, wNr):
         finished = '0'
-        #if self.printAcquisitionProgress:
-        #    print("\n", end='\0')
         while (finished != '1'):
             finished = str(self._getErrFractFinished(ch_pair, wNr))
             if (finished == 'ffffffff'):
@@ -745,11 +740,12 @@ class DDMq(SCPI):
             elif (finished != '1'):
                 if self.printAcquisitionProgress:
                     print("\r Error fraction mode(" + str(int(float(
-                    self._getErrFractpercentage(ch_pair, wNr)))) + "%)", end='\0')
+                        self._getErrFractpercentage(ch_pair, wNr)))) + "%)",
+                        end='\0')
                 time.sleep(1.0/FINISH_BIT_CHECK_FERQUENTION_HZ)
         if self.printAcquisitionProgress:
             print("\r", end='\0')
-        sys.stdout.flush()
+            sys.stdout.flush()
         self._displayQBitErrors("Error Fract", ch_pair, wNr)
 
         self.write('qutech:errorfraction{:d}:data{:d}? '.format(ch_pair, wNr))
@@ -785,7 +781,7 @@ class DDMq(SCPI):
     #########################
     def _send2BitPatternPattern(self, pattern):
         self.write('qutech:twoBitPattern:pattern {:d},{:d},{:d},{:d}'.format(
-                  pattern[0], pattern[1], pattern[2], pattern[3]))
+            pattern[0], pattern[1], pattern[2], pattern[3]))
 
     def _get2BitPatternPattern(self):
         pstring = self.ask(
@@ -797,8 +793,6 @@ class DDMq(SCPI):
 
     def _get2BitPatternCnt(self):
         finished = '0'
-        #if self.printAcquisitionProgress:
-        #    print("\n", end='\0')
         while (finished != '1'):
             finished = str(self._getTwoBitPatternFinished())
             if (finished == 'ffffffff'):
@@ -806,11 +800,11 @@ class DDMq(SCPI):
             elif (finished != '1'):
                 if self.printAcquisitionProgress:
                     print("\r Two bit pattern counter(" + str(int(float(
-                    self._getTwoBitPatternPercentage()))) + "%)", end='\0')
+                        self._getTwoBitPatternPercentage()))) + "%)", end='\0')
                 time.sleep(1.0/FINISH_BIT_CHECK_FERQUENTION_HZ)
         if self.printAcquisitionProgress:
             print("\r", end='\0')
-        sys.stdout.flush()
+            sys.stdout.flush()
         self._displayQBitErrors("Two Bit Pattern Counter", 1, 1)
 
         self.write('qutech:twoBitPattern:data? ')
@@ -1143,8 +1137,8 @@ class DDMq(SCPI):
         except Exception as e:
             self.parameter_file_version = 'NaN'
 
-        if ('swBuild' in self.version_info
-                and self.version_info['swBuild'] == self.parameter_file_version):
+        if ('swBuild' in self.version_info and
+                self.version_info['swBuild'] == self.parameter_file_version):
             # Return the parameter list given by the txt file
             results = file_content["parameters"]
         else:
@@ -1202,7 +1196,7 @@ class DDMq(SCPI):
                 level = "debug"
             else:
                 level = "notset"
-            result = str(self.logLevel)  + " " + level + ": " + self.description
+            result = str(self.logLevel) + " " + level + ": " + self.description
             if (len(self.acquisitionMode) > 0):
                 result += "(" + self.acquisitionMode + ")"
             return result
@@ -1232,8 +1226,9 @@ class DDMq(SCPI):
         for error in errors:
             if error['error_code']:
                 results.append(self.Error(error['error_code'],
-                               error['description'], error['error_level'],
-                               acquisitionMode))
+                                          error['description'],
+                                          error['error_level'],
+                                          acquisitionMode))
         return results
 
     def _getInAvgErrors(self, acquisitionMode, ch):
@@ -1278,6 +1273,13 @@ class DDMq(SCPI):
             if (error['error_code']
                     and error['error_level'] >= self.exceptionLevel):
                 print(str(self.Error(error['error_code'],
-                              error['description'], error['error_level'],
-                              "")))
+                                     error['description'],
+                                     error['error_level'],
+                                     "")))
         return self.exceptionLevel
+
+    def _setDisplayProgressEnabled(self, val):
+        self.printAcquisitionProgress = val
+
+    def _getDisplayProgressEnabled(self):
+        return self.printAcquisitionProgress
