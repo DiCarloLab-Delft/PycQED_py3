@@ -6362,10 +6362,20 @@ class Ram_Z_Analysis(MeasurementAnalysis):
         else:
             return df
 
-    def make_figures(self, plot_step=True):
+    def make_figures(self, plot_step=True, nan_to_zero=False):
         '''
         Plot figures. Step response is only plotted if plot_step == True.
         '''
+        if nan_to_zero:
+            step = []
+            for x in self.step_response:
+                if np.isnan(x):
+                    step.append(0)
+                else:
+                    step.append(x)
+        else:
+            step = self.step_response
+
         # Plot data, phases, and detuning
         fig, ax = plt.subplots(1, 1, figsize=(7, 5))
         ax.plot(self.sweep_points[:len(self.I)], self.I, '-o')
@@ -6399,8 +6409,8 @@ class Ram_Z_Analysis(MeasurementAnalysis):
 
         if plot_step:
             fig, ax = plt.subplots(1, 1, figsize=(7, 5))
-            ax.plot(self.sweep_points[:len(self.step_response)],
-                    self.step_response, '-o')
+            ax.plot(self.sweep_points[:len(step)],
+                    step, '-o')
             pl_tools.set_xlabel(ax, self.parameter_names[0],
                                 self.parameter_units[0])
             pl_tools.set_ylabel(ax, 'step response', '')
