@@ -19,8 +19,9 @@ def get_default_datadir():
     except Exception:
         # If the mac_address is unknown
         # Stores data in the default data location (pycqed_py3/data/)
-        datadir = os.path.join(os.path.dirname(pq.__file__),
-                               os.pardir, 'data')
+        datadir = os.path.abspath(os.path.join(
+            os.path.dirname(pq.__file__), os.pardir, 'data'))
+        print(datadir)
         logging.info('Setting datadir to default location: {}'.format(
             datadir))
     return datadir

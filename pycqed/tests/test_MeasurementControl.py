@@ -69,8 +69,8 @@ class Test_MeasurementControl(unittest.TestCase):
         ma.MeasurementAnalysis(label='datadir_test_file')
 
         # change the datadir
-        test_dir2 = os.path.join(os.path.dirname(pq.__file__),
-                                 os.pardir, 'data_test_2')
+        test_dir2 = os.path.abspath(os.path.join(
+            os.path.dirname(pq.__file__), os.pardir, 'data_test_2'))
         self.MC.datadir(test_dir2)
 
         sweep_pts = np.linspace(0, 10, 30)
@@ -79,7 +79,7 @@ class Test_MeasurementControl(unittest.TestCase):
         self.MC.set_detector_function(det.Dummy_Detector_Soft())
         self.MC.run('datadir_test_file_2')
         # raises an error if the file is not found
-        with self.assertRaises(NotADirectoryError):
+        with self.assertRaises(Exception):
             ma.MeasurementAnalysis(label='datadir_test_file_2')
         ma.a_tools.datadir = test_dir2
         # changing the dir makes it find the file now
