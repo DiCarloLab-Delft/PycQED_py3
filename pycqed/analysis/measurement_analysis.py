@@ -6249,10 +6249,10 @@ class Ram_Z_Analysis(MeasurementAnalysis):
                  f_demod=0, f01max=None, E_c=None, flux_amp=None, V_offset=0,
                  V_per_phi0=None, auto=True, make_fig=True, TwoD=False,
                  mean_count=16, **kw):
-        super().__init__(timestamp=timestamp_cos, label='Ram_Z_cos',
+        super().__init__(timestamp=timestamp_cos, label='cos',
                          TwoD=TwoD, **kw)
         self.cosTrace = np.array(self.measured_values[0])
-        super().__init__(timestamp=timestamp_sin, label='Ram_Z_sin',
+        super().__init__(timestamp=timestamp_sin, label='sin',
                          TwoD=TwoD, **kw)
         self.sinTrace = np.array(self.measured_values[0])
 

@@ -1838,8 +1838,8 @@ class CBox_v3_driven_transmon(Transmon):
                            filter_deriv_phase: bool=False,
                            demodulate: bool=False, f_demod: float=0):
         '''
-        Perform a Ram-Z experiment: Measure the accumulated phase as a function
-        of flux pulse length.
+        Perform a Ram-Z experiment: Measure the accumulated phase as a
+        function of flux pulse length.
         Version 2 is for new QASM compiler.
 
         sequence:
@@ -1847,8 +1847,12 @@ class CBox_v3_driven_transmon(Transmon):
 
 
         Args:
+            waveform (array of floatS):
+                    Waveform that will be measured in the cryo scope.
             lengths (array of floats):
                     Array of the flux pulse lengths (sweep points).
+                    If this is 'full', the lengths are automatically chosen
+                    such that the full pulse is measured.
             amps (array of floats):
                     If not None it will do a 2D sweep of lengths vs amplitude.
             chunk_size (int):
@@ -1978,7 +1982,7 @@ class CBox_v3_driven_transmon(Transmon):
             MC.set_sweep_points(lengths)
             MC.set_detector_function(d)
 
-            MC.run('Ram_Z_scope_{}_{}'.format(case, self.msmt_suffix))
+            MC.run('Ram_Z_scope_{}'.format(case))
             ma.MeasurementAnalysis(label='Ram_Z_scope')
 
         ma.Ram_Z_Analysis(
@@ -2184,7 +2188,7 @@ class CBox_v3_driven_transmon(Transmon):
         gs_target = pygsti.io.load_gateset(
             os.path.join(gstPath, 'Gateset_5_primitives_GST.txt'))
         fiducials = pygsti.io.load_gatestring_list(
-            os.path.join(gstPath, 'Fiducials_GST.txt'))
+            os.path.join(gstPath, 'Fiducials_5_primitives_GST.txt'))
         germs = pygsti.io.load_gatestring_list(
             os.path.join(gstPath, 'Germs_5_primitives_GST.txt'))
 
