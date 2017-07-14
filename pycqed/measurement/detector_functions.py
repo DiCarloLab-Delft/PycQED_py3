@@ -134,8 +134,8 @@ class QX_Hard_Detector(Hard_Detector):
         self.set_kw()
         self.detector_control = 'hard'
         self.name = 'QX_Hard_Detector_Fast'
-        self.value_names = ['F']
-        self.value_units = ['|1>']
+        self.value_names = []
+        self.value_units = []
         self.times_called = 0
         self.__qxc = qxc
         self.num_avg = num_avg
@@ -144,21 +144,26 @@ class QX_Hard_Detector(Hard_Detector):
         self.delay = 1
         self.current = 0
         self.randomizations = []
+
+        for i in range(self.__qxc.get_nr_qubits()):
+            self.value_names.append("q"+str(i))
+            self.value_units.append('|1>')
+
         # load files
         logging.info("QX_RB_Hard_Detector : loading qasm files...")
-        # print(qasm_filenames)
         for i, file_name in enumerate(qasm_filenames):
             t1 = time.time()
-            qasm = ql.qasm_loader(file_name)
+            qasm = ql.qasm_loader(file_name, qxc.get_nr_qubits())
             qasm.load_circuits()
             # t2 = time.time()
             #print("[+] qasm loading time :",t2-t1)
             circuits = qasm.get_circuits()
             self.randomizations.append(circuits)
             # create the circuits on the server
-            #t1 = time.time()
+            t1 = time.time()
+
             for c in circuits:
-                circuit_name = c[0] + "_{}".format(i)
+                circuit_name = c[0] + "{}".format(i)
                 self.__qxc.create_circuit(circuit_name, c[1])
             t2 = time.time()
             logging.info("[+] qasm loading time :", t2-t1)
@@ -172,14 +177,18 @@ class QX_Hard_Detector(Hard_Detector):
         # only serves to initialize the arrays
         # data = np.array([np.sin(x / np.pi), np.cos(x/np.pi)])
         i = 0
-        data = np.zeros(len(self.sweep_points))
+        qubits = self.__qxc.get_nr_qubits()
+
+        data = np.zeros((qubits, len(self.sweep_points)))
+
         for c in self.circuits:
             self.__qxc.send_cmd("reset_measurement_averaging")
-            circuit_name = c[0] + "_{}".format(self.current)
+            circuit_name = c[0] + "{}".format(self.current)
             self.__qxc.run_noisy_circuit(circuit_name, self.p_error,
                                          "depolarizing_channel", self.num_avg)
-            f = self.__qxc.get_measurement_average(0)
-            data[i] = f
+            for n in range(qubits):
+                f = self.__qxc.get_measurement_average(n)
+                data[n][i] = f
             # data[1][i] = f
             i = i + 1
         self.current = int((self.current + 1) % self.num_files)
@@ -841,7 +850,7 @@ class Function_Detector(Soft_Detector):
         if self.value_names is None:
             self.value_names = result_keys
         if self.value_units is None:
-            self.value_units = ['a.u.'] * len(value_names)
+            self.value_units = ['a.u.'] * len(self.value_names)
 
     def acquire_data_point(self, **kw):
         measurement_kwargs = {}
@@ -853,6 +862,7 @@ class Function_Detector(Soft_Detector):
             else:
                 value = item
             measurement_kwargs[key] = value
+
         # Call the function
         result = self.get_function(**measurement_kwargs)
         print(result)
@@ -1250,14 +1260,6 @@ class UHFQC_input_average_detector(Hard_Detector):
 
     '''
 
-    '''
-    Detector used for acquiring single points of the CBox while externally
-    triggered by the AWG.
-    Soft version of the regular integrated avg detector.
-
-    Has two acq_modes, 'IQ' and 'AmpPhase'
-    '''
-
     def __init__(self, UHFQC, AWG=None, channels=(0, 1),
                  nr_averages=1024, nr_samples=4096, **kw):
         super(UHFQC_input_average_detector, self).__init__()
@@ -1304,6 +1306,38 @@ class UHFQC_input_average_detector(Hard_Detector):
             self.AWG.stop()
 
 
+class UHFQC_demodulated_input_avg_det(UHFQC_input_average_detector):
+    '''
+    Detector used for acquiring averaged input traces withe the UHFQC.
+    Additionally trace are demoulated.
+    '''
+
+    def __init__(self, f_RO_mod, UHFQC,
+                 real_imag=True, AWG=None, channels=(0, 1),
+                 nr_averages=1024, nr_samples=4096, **kw):
+        super().__init__(UHFQC=UHFQC, AWG=AWG, channels=channels,
+                         nr_averages=nr_averages, nr_samples=nr_samples, **kw)
+        self.f_mod = f_RO_mod
+        self.real_imag = real_imag
+
+    def get_values(self):
+        data = super().get_values()
+        timePts = np.arange(len(data[0])) / 1.8e9
+        data_I_demod = (np.array(data[0]) * np.cos(2*np.pi*timePts*self.f_mod) -
+                        np.array(data[1]) * np.sin(2*np.pi*timePts*self.f_mod))
+        data_Q_demod = (np.array(data[0]) * np.sin(2*np.pi*timePts*self.f_mod) +
+                        np.array(data[1]) * np.cos(2*np.pi*timePts*self.f_mod))
+        ret_data = np.array([data_I_demod, data_Q_demod])
+
+        if not self.real_imag:
+            S21 = data[0] + 1j*data[1]
+            amp = np.abs(S21)
+            phase = np.angle(S21) / (2*np.pi) * 360
+            ret_data = np.array([amp, phase])
+
+        return ret_data
+
+
 class UHFQC_integrated_average_detector(Hard_Detector):
 
     '''
@@ -1316,6 +1350,7 @@ class UHFQC_integrated_average_detector(Hard_Detector):
                  channels=(0, 1, 2, 3), result_logging_mode='raw',
                  real_imag=True,
                  seg_per_point=1, single_int_avg=False,
+                 chunk_size=None,
                  **kw):
         """
         Args:
@@ -1353,9 +1388,13 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         if result_logging_mode == 'raw':
             self.value_units = ['V']*len(self.channels)
             self.scaling_factor = 1/(1.8e9*integration_length*nr_averages)
-        else:
-            self.value_units = ['']*len(self.channels)
+        elif result_logging_mode == 'lin_trans':
+            self.value_units = ['a.u.']*len(self.channels)
             self.scaling_factor = 1/nr_averages
+
+        elif result_logging_mode == 'digitized':
+            self.value_units = ['frac']*len(self.channels)
+            self.scaling_factor = 1
 
         self.single_int_avg = single_int_avg
         if self.single_int_avg:
@@ -1366,11 +1405,11 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         self.AWG = AWG
         self.nr_averages = nr_averages
         self.integration_length = integration_length
-
         # 0/1/2 crosstalk supressed /digitized/raw
         res_logging_indices = {'lin_trans': 0, 'digitized': 1, 'raw': 2}
         self.result_logging_mode_idx = res_logging_indices[result_logging_mode]
         self.result_logging_mode = result_logging_mode
+        self.chunk_size = chunk_size
 
         self._set_real_imag(real_imag)
 
@@ -1435,10 +1474,18 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         # Determine the number of sweep points and set them
         if sweep_points is None or self.single_int_avg:
             # this case will be used when it is a soft detector
+            # Note: single_int_avg overrides chunk_size
+            # single_int_avg = True is equivalent to chunk_size = 1
             self.nr_sweep_points = self.seg_per_point
         else:
             self.nr_sweep_points = len(sweep_points)*self.seg_per_point
         # this sets the result to integration and rotation outcome
+
+            if (self.chunk_size is not None and
+                    self.chunk_size < self.nr_sweep_points):
+                # Chunk size is defined and smaller than total number of sweep
+                # points -> only acquire one chunk
+                self.nr_sweep_points = self.chunk_size * self.seg_per_point
 
         self.UHFQC.awgs_0_userregs_0(
             int(self.nr_averages*self.nr_sweep_points))
@@ -1469,8 +1516,9 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
 
     def __init__(self, UHFQC, AWG=None, integration_length=1e-6,
                  nr_averages=1024, rotate=False, real_imag=True,
-                 channels=(0, 1), correlations=[(0, 1)],
-                 seg_per_point=1, single_int_avg=False,
+                 channels: list = [0, 1], correlations: list=[(0, 1)],
+                 value_names=None,
+                 seg_per_point=1, single_int_avg=False, thresholding=False,
                  **kw):
         super().__init__(
             UHFQC, AWG=AWG, integration_length=integration_length,
@@ -1480,12 +1528,22 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
             result_logging_mode='raw',  # FIXME -> do the proper thing (MAR)
             **kw)
         self.correlations = correlations
+        self.thresholding = thresholding
 
-        self.value_names = []
-        for ch in channels:
-            self.value_names += ['w{}'.format(ch)]
-        self.value_units = ['V'] * \
-            len(self.value_names)+['V^2']*len(self.correlations)
+        if value_names is None:
+            self.value_names = []
+            for ch in channels:
+                self.value_names += ['w{}'.format(ch)]
+        else:
+            self.value_names = value_names
+
+        # Note that V^2 is in brackets to prevent confusion with unit prefixes
+        if not thresholding:
+            self.value_units = ['V']*len(self.value_names) + \
+                               ['(V^2)']*len(self.correlations)
+        else:
+            self.value_units = ['fraction']*len(self.value_names) + \
+                               ['normalized']*len(self.correlations)
         for corr in correlations:
             self.value_names += ['corr ({},{})'.format(corr[0], corr[1])]
 
@@ -1524,10 +1582,19 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
             correlation_channel = -1
             # 4 is the (current) max number of weights in the UHFQC (v5)
             for ch in range(4):
+                if ch in self.channels:
+                    # Disable correlation mode as this is used for normal
+                    # acquisition
+                    self.UHFQC.set('quex_corr_{}_mode'.format(ch), 0)
+
                 if ch not in self.channels:
                     # selects the lowest available free channel
                     self.channels += [ch]
                     correlation_channel = ch
+                    print('Using channel {} for correlation ({}, {}).'
+                          .format(ch, corr[0], corr[1]))
+                    # correlation mode is turned on in the
+                    # set_up_correlation_weights method
                     break
             if correlation_channel < 0:
                 raise ValueError('No free channel available for correlation.')
@@ -1535,8 +1602,13 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
             self.correlation_channels += [correlation_channel]
 
     def set_up_correlation_weights(self):
-        # FIXME: add option to use thresholding (quex_rl_soure(5))
-        self.UHFQC.quex_rl_source(4)  # -> correlations mode before threshold
+        if self.thresholding:
+            # correlations mode after threshold
+            # NOTE: thresholds need to be set outside the detctor object.
+            self.UHFQC.quex_rl_source(5)
+        else:
+            # correlations mode before threshold
+            self.UHFQC.quex_rl_source(4)
         # Configure correlation mode
         for correlation_channel, corr in zip(self.correlation_channels,
                                              self.correlations):
@@ -1559,7 +1631,6 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
             self.UHFQC.set('quex_corr_{}_mode'.format(correlation_channel), 1)
             self.UHFQC.set('quex_corr_{}_source'.format(correlation_channel),
                            corr[1])
-
             # If thresholding is enabled, set the threshold for the correlation
             # channel.
             if self.thresholding:
@@ -1598,15 +1669,7 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
                     data.append(np.array(data_raw[key]) *
                                 (self.scaling_factor / self.nr_averages))
 
-        if not self.real_imag:
-            I = data[0]
-            Q = data[1]
-            S21 = I + 1j*Q
-            data[0] = np.abs(S21)
-            data[1] = np.angle(S21)/(2*np.pi)*360
-
-        else:
-            return data
+        return data
 
 
 class UHFQC_integration_logging_det(Hard_Detector):
@@ -1640,6 +1703,7 @@ class UHFQC_integration_logging_det(Hard_Detector):
                             defined in the UFHQC. Requires optimal weights.
         """
         super().__init__()
+
         self.UHFQC = UHFQC
         self.name = '{}_UHFQC_integration_logging_det'.format(
             result_logging_mode)
@@ -2026,3 +2090,20 @@ class DDM_integration_logging_det(Hard_Detector):
     def finish(self):
         if self.AWG is not None:
             self.AWG.stop()
+
+
+class RTO1024_detector(Hard_Detector):
+    '''
+    Detector for the Rohde-Schwarz RTO1024 oscilloscope.
+    '''
+
+    def __init__(self, scope):
+        self.scope = scope
+
+    def prepare(self, sweep_points=None):
+        self.sweep_points = sweep_points
+        self.scope.prepare_measurement(t_start=sweep_points[0],
+                                       t_stop=sweep_points[-1])
+
+    def get_values(self):
+        return self.scope.measure_trace()
