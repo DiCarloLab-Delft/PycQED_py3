@@ -17,7 +17,6 @@ from pycqed.measurement import detector_functions as det
 from pycqed.measurement import sweep_functions as swf
 from pycqed.analysis import measurement_analysis as ma
 import pycqed.measurement.gate_set_tomography.gate_set_tomography_CC as gstCC
-from pygsti.construction import std2Q_XYCPHASE, std2Q_XY
 
 class DeviceObject(Instrument):
 
@@ -360,13 +359,17 @@ class TwoQubitDevice(DeviceObject):
         self.prepare_for_fluxing()
 
         # Load the gate set, germs, and fiducials.
-        gs_target = std2Q_XYCPHASE.gs_target.copy()
-        prepFids = std2Q_XYCPHASE.prepStrs
-        measFids = std2Q_XYCPHASE.effectStrs
-        germs = std2Q_XY.germs
+        gstPath = os.path.dirname(gstCC.__file__)
+        gs_target = pygsti.io.load_gateset(
+            os.path.join(gstPath, 'Gateset_2Q_XYCphase.txt'))
+        prepFids = pygsti.io.load_gatestring_list(
+            os.path.join(gstPath, 'Prep_Fiducials_2Q_XYCphase.txt'))
+        measFids = pygsti.io.load_gatestring_list(
+            os.path.join(gstPath, 'Meas_Fiducials_2Q_XYCphase.txt'))
+        germs = pygsti.io.load_gatestring_list(
+            os.path.join(gstPath, 'Germs_2Q_XYCphase.txt'))
 
         max_lengths = [2**i for i in range(max_germ_pow + 1)]
-
 
         # gate_dict maps GST gate labels to QASM operations
         gate_dict = {
