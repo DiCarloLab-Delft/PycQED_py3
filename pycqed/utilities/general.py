@@ -318,6 +318,11 @@ def getFromDict(dataDict: dict, mapList: list):
         mapList : list of strings specifying the key of the item to get
     Returns:
         value from dictionary
+
+    example:
+        example_dict = {'a': {'nest_a': 5, 'nest_b': 8}
+                        'b': 4}
+        getFromDict(example_dict, ['a', 'nest_a']) -> 5
     """
     return reduce(operator.getitem, mapList, dataDict)
 
@@ -331,5 +336,12 @@ def setInDict(dataDict: dict, mapList: list, value):
         dataDict: nested dictionary to set the value in
         mapList : list of strings specifying the key of the item to set
         value   : the value to set
+
+    example:
+        example_dict = {'a': {'nest_a': 5, 'nest_b': 8}
+                        'b': 4}
+        example_dict_after = getFromDict(example_dict, ['a', 'nest_a'], 6)
+        example_dict = {'a': {'nest_a': 6, 'nest_b': 8}
+                        'b': 4}
     """
     getFromDict(dataDict, mapList[:-1])[mapList[-1]] = value
