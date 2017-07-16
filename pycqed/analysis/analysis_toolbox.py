@@ -10,8 +10,7 @@ from collections import OrderedDict as od
 from matplotlib import pyplot as plt
 from matplotlib import colors
 import pandas as pd
-from uuid import getnode as get_mac
-from pycqed.init.config import setup_dict
+from pycqed.utilities.get_default_datadir import get_default_datadir
 from scipy.interpolate import griddata
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import h5py
@@ -22,18 +21,10 @@ from .tools.data_manipulation import *
 from .tools.plotting import *
 import colorsys as colors
 
-try:
-    # currently not recognized, does not do anything
-    datadir = qc_config['datadir']
-    print('Data directory set to:', datadir)
-except:
-    mac = get_mac()
-    try:
-        setup_name = setup_dict.mac_dict[str(mac)]
-        datadir = setup_dict.data_dir_dict[setup_name]
-    except:
-        datadir = None
-    print('Data directory set to:', datadir)
+
+datadir = get_default_datadir()
+print('Data directory set to:', datadir)
+
 
 ######################################################################
 #     Filehandling tools
@@ -359,10 +350,6 @@ def get_data_from_ma_v2(ma, param_names, numeric_params=None):
                 if 'Fitted Params' in key:
                     fit_key = key
             temp = temp[fit_key]
-            # print temp.keys()
-            # for key in temp.keys():
-            # print key
-            # print temp[key].attrs['value']
             data[param] = {key: temp[key].attrs['value']
                            for key in list(temp.keys()) if key != 'covar'}
             free_vars = 0
@@ -1389,8 +1376,8 @@ def linecut_plot(x, y, z, fig, ax,
     plt.gca().set_color_cycle([colormap(i) for i in np.linspace(
                               0, 0.9, len(y))])
     for i in range(len(y)):
-        label = '{y_name}: {y_val} {y_unit}'.format(
-            y_name=y_name, y_val=y[i], y_unit=y_unit)
+        label = '{}: {:.4g} {}'.format(
+            y_name, y[i], y_unit)
         ax.plot(x, z[:, i], label=label)
     if log:
         ax.set_yscale('log')

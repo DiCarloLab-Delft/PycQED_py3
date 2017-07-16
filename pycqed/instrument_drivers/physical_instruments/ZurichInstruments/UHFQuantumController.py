@@ -10,7 +10,6 @@ from qcodes.instrument.base import Instrument
 from qcodes.utils import validators as vals
 from fnmatch import fnmatch
 from qcodes.instrument.parameter import ManualParameter
-#from instrument_drivers.physical_instruments.ZurichInstruments import UHFQuantumController as ZI_UHFQC
 
 
 class UHFQC(Instrument):
@@ -161,8 +160,8 @@ class UHFQC(Instrument):
         # readout
         for i in range(5):
             self.add_parameter("quex_trans_offset_weightfunction_{}".format(i),
-                               unit='V',
-                               label='RO normalization offset (V)',
+                               unit='',  # unit is adc value
+                               label='RO normalization offset',
                                initial_value=0.0,
                                parameter_class=ManualParameter)
         if init:
