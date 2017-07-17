@@ -691,6 +691,7 @@ class QuDev_transmon(Qubit):
             label = 'QScale_2nd_exc'+self.msmt_suffix
 
         MC.set_sweep_function(awg_swf.QScale_2nd_exc(
+            qscales=qscales,
             pulse_pars=self.get_drive_pars(),
             pulse_pars_2nd=self.get_ef_drive_pars(),
             RO_pars=self.get_RO_pars(),
@@ -716,7 +717,7 @@ class QuDev_transmon(Qubit):
         if uniques.size>1:
             raise ValueError("The values in the times array are not repeated "
                              "len(artificial_detunings) times.")
-        if np.any(np.asarray(artificial_detunings)<1e3):
+        if np.any(np.asarray(np.abs(artificial_detunings))<1e3):
             logging.warning('The artificial detuning is too small. The units '
                             'should be Hz.')
         if np.any(times>1e-3):
@@ -748,7 +749,7 @@ class QuDev_transmon(Qubit):
             raise ValueError("Unspecified times for measure_ramsey")
         if artificial_detuning is None:
             logging.warning('Artificial detuning is 0.')
-        if artificial_detuning < 1e3:
+        if np.abs(artificial_detuning) < 1e3:
             logging.warning('The artificial detuning is too small. The units'
                             'should be Hz.')
         if np.any(times > 1e-3):
@@ -783,7 +784,7 @@ class QuDev_transmon(Qubit):
             raise ValueError("Unspecified times for measure_ramsey")
         if artificial_detuning is None:
             logging.warning('Artificial detuning is 0.')
-        if artificial_detuning<1e3:
+        if np.abs(artificial_detuning)<1e3:
             logging.warning('The artificial detuning is too small. The units'
                             'should be Hz.')
         if np.any(times>1e-3):
@@ -823,7 +824,7 @@ class QuDev_transmon(Qubit):
             raise ValueError("Unspecified times for measure_ramsey")
         if artificial_detunings is None:
             logging.warning('Artificial detunings were not given.')
-        if np.any(np.asarray(artificial_detunings)<1e3):
+        if np.any(np.asarray(np.abs(artificial_detunings))<1e3):
             logging.warning('The artificial detuning is too small. The units '
                             'should be Hz.')
         if np.any(times>1e-3):
@@ -1718,7 +1719,10 @@ class QuDev_transmon(Qubit):
             NoCalPoints = 6
         else:
             NoCalPoints = 4
-        T1_Analysis = ma.T1_Analysis(label=label, NoCalPoints=NoCalPoints, **kw)
+        T1_Analysis = ma.T1_Analysis(label=label,
+                                     NoCalPoints=NoCalPoints,
+                                     for_ef=for_ef,
+                                     last_ge_pulse=last_ge_pulse, **kw)
         T1_dict = T1_Analysis.T1
         T1_value = T1_dict['T1']
 
@@ -1773,7 +1777,7 @@ class QuDev_transmon(Qubit):
             logging.warning('Artificial_detuning=0; qubit driven at "%s" '
                             'estimated with '
                             'spectroscopy' %self.f_qubit())
-        if artificial_detuning<1e3:
+        if np.abs(artificial_detuning)<1e3:
             logging.warning('The artificial detuning is too small. The units '
                             'should be Hz.')
 
@@ -1810,11 +1814,15 @@ class QuDev_transmon(Qubit):
                                 MC=MC,
                                 cal_points=cal_points,
                                 close_fig=close_fig, upload=upload, label=label)
+            #Needed for analysis
+            qubit_frequency_spec = self.f_qubit()
 
         else:
             self.measure_ramsey_2nd_exc(times=times, artificial_detuning=artificial_detuning, MC=MC,
                                         cal_points=cal_points, close_fig=close_fig, upload=upload,
                                         last_ge_pulse=last_ge_pulse, no_cal_points=no_cal_points, label=label)
+            #Needed for analysis
+            qubit_frequency_spec = self.f_ef_qubit()
 
         if analyze:
             if for_ef:
@@ -1823,7 +1831,9 @@ class QuDev_transmon(Qubit):
                 no_cal_points = 4
 
             RamseyA = ma.Ramsey_Analysis(auto=True, NoCalPoints=no_cal_points, label=label,
-                                         qubit_frequency_spec=self.f_qubit(),
+                                         qubit_frequency_spec=qubit_frequency_spec,
+                                         for_ef=for_ef,
+                                         last_ge_pulse=last_ge_pulse,
                                          artificial_detuning=artificial_detuning,
                                          **kw)
 
@@ -1894,7 +1904,7 @@ class QuDev_transmon(Qubit):
             logging.warning('Artificial_detuning=0; qubit driven at "%s" '
                             'estimated with '
                             'spectroscopy' %self.f_qubit())
-        if np.any(np.asarray(artificial_detunings)<1e3):
+        if np.any(np.asarray(np.abs(artificial_detunings))<1e3):
             logging.warning('The artificial detuning is too small.')
         if np.any(times>1e-3):
             logging.warning('The values in the times array might be too large.')
@@ -1942,6 +1952,7 @@ class QuDev_transmon(Qubit):
                                 last_ge_pulse=last_ge_pulse, MC=MC)
             RamseyA = ma.Ramsey_Analysis_multiple_detunings(auto=True,
                                 NoCalPoints=6,
+                                last_ge_pulse=last_ge_pulse,
                                 qubit_frequency_spec=self.f_ef_qubit(),
                                 artificial_detunings=artificial_detunings, **kw)
 
@@ -2100,7 +2111,9 @@ class QuDev_transmon(Qubit):
         # Perform analysis and extract the optimal qscale parameter
         # Returns the optimal qscale parameter
         QscaleA = ma.QScale_Analysis(auto=True, label=label,
-                                     NoCalPoints=NoCalPoints, **kw)
+                                     NoCalPoints=NoCalPoints,
+                                     for_ef=for_ef,
+                                     last_ge_pulse=last_ge_pulse, **kw)
 
         Qscale_dict = QscaleA.optimal_qscale #dictionary of value, stderr
         Qscale_value = Qscale_dict['qscale']

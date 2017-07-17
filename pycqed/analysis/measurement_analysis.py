@@ -2595,12 +2595,13 @@ class QScale_Analysis(TD_Analysis):
         self.corr_data_xmY = self.normalized_values[2:-self.NoCalPoints:3]
 
         self.fit_data(**kw)
-        fig, ax = self.default_ax()
-        self.make_figures(fig=fig, ax=ax, **kw)
 
         self.calculate_optimal_qscale(**kw)
         self.save_computed_parameters(self.optimal_qscale,
                                       var_name=self.value_names[0])
+
+        fig, ax = self.default_ax()
+        self.make_figures(fig=fig, ax=ax, **kw)
 
         if kw.pop('save_fig', True):
             self.save_fig(fig,
@@ -2624,6 +2625,18 @@ class QScale_Analysis(TD_Analysis):
         # label=r'$X_{\frac{\pi}{2}}Y_{\pi}$')
         # self.ax.plot(self.sweep_points_xmY, self.corr_data_xmY, 'o', c='r',
         # label=r'$X_{\frac{\pi}{2}}Y_{-\pi}$')
+        textstr = ('qsacle = %.5g $ \pm$ (%.5g)'
+                   % (self.optimal_qscale['qscale'],self.optimal_qscale['qscale_std']))
+
+        if self.analyze_ef:
+            ylabel = r'$F$ $\left(|f \rangle \right) (arb. units)$'
+        else:
+            ylabel = r'$F$ $\left(|e \rangle \right) (arb. units)$'
+
+        fig.text(0.5, 0, textstr, fontsize=self.font_size,
+                      transform=ax.transAxes,
+                      verticalalignment='top',
+                      horizontalalignment='center', bbox=self.box_props)
 
         self.plot_results_vs_sweepparam(self.sweep_points_xX, self.corr_data_xX,
                                         fig, ax,
@@ -2639,7 +2652,9 @@ class QScale_Analysis(TD_Analysis):
                                         self.corr_data_xmY, fig, ax,
                                         marker='or',
                                         label=r'$X_{\frac{\pi}{2}}Y_{-\pi}$',
-                                        ticks_around=True)
+                                        ticks_around=True,
+                                        xlabel='qscales (arb. units)',
+                                        ylabel=ylabel)
         ax.legend(loc='best')
         c = ['b', 'g', 'r']
         if hasattr(self, 'fit_res'):
@@ -4014,7 +4029,7 @@ class Ramsey_Analysis(TD_Analysis):
     def __init__(self, label='Ramsey', **kw):
         kw['label'] = label
         kw['h5mode'] = 'r+'
-        super(self.__class__, self).__init__(**kw)
+        super(Ramsey_Analysis, self).__init__(**kw)
 
     def fit_Ramsey(self, x, y, **kw):
 
@@ -4232,12 +4247,12 @@ class Ramsey_Analysis(TD_Analysis):
         return self.T2_star
 
 
-class Ramsey_Analysis_multiple_detunings(Ramsey_Analysis):
+class Ramsey_Analysis_multiple_detunings(TD_Analysis):
 
     def __init__(self, label='Ramsey_mult_det', **kw):
         kw['label'] = label
         kw['h5mode'] = 'r+'
-        super(self.__class__, self).__init__(**kw)
+        super(Ramsey_Analysis_multiple_detunings, self).__init__(**kw)
 
     def plot_results(self, fit_res, scale=1, show_guess=False):
         units = self.parameter_units[0]
@@ -4277,6 +4292,95 @@ class Ramsey_Analysis_multiple_detunings(Ramsey_Analysis):
             exponential_offset=best_vals['exponential_offset'])
         self.ax.plot(x*scale, y, 'r-',linewidth=self.line_width)
 
+    def fit_Ramsey(self, x, y, **kw):
+
+        print_fit_results = kw.pop('print_fit_results',True)
+        damped_osc_mod = fit_mods.ExpDampOscModel
+        average = np.mean(y)
+
+        ft_of_data = np.fft.fft(y)
+        index_of_fourier_maximum = np.argmax(np.abs(
+            ft_of_data[1:len(ft_of_data)//2]))+1
+        max_ramsey_delay = x[-1] - x[0]
+
+        fft_axis_scaling = 1/(max_ramsey_delay)
+        freq_est = fft_axis_scaling*index_of_fourier_maximum
+        est_number_of_periods = index_of_fourier_maximum
+
+        if ((average > 0.7*max(y)) or
+                (est_number_of_periods < 2) or
+                    est_number_of_periods > len(ft_of_data)/2.):
+            print('the trace is too short to find multiple periods')
+
+            if print_fit_results:
+                print('Setting frequency to 0 and ' +
+                      'fitting with decaying exponential.')
+            damped_osc_mod.set_param_hint('frequency',
+                                          value=freq_est,
+                                          vary=False)
+            damped_osc_mod.set_param_hint('phase',
+                                          value=0,
+                                          vary=False)
+        else:
+            damped_osc_mod.set_param_hint('frequency',
+                                          value=freq_est,
+                                          vary=True,
+                                          min=(1/(100 *x[-1])),
+                                          max=(20/x[-1]))
+
+        if (np.average(y[:4]) >
+                np.average(y[4:8])):
+            phase_estimate = 0
+        else:
+            phase_estimate = np.pi
+        damped_osc_mod.set_param_hint('phase',
+                                      value=phase_estimate, vary=True)
+
+        amplitude_guess = 1
+        damped_osc_mod.set_param_hint('amplitude',
+                                      value=amplitude_guess,
+                                      min=0.4,
+                                      max=2.0)
+        damped_osc_mod.set_param_hint('tau',
+                                      value=x[1]*10,
+                                      min=x[1],
+                                      max=x[1]*1000)
+        damped_osc_mod.set_param_hint('exponential_offset',
+                                      value=0.5,
+                                      min=0.4,
+                                      max=1.1)
+        damped_osc_mod.set_param_hint('oscillation_offset',
+                                      value=0,
+                                      vary=False)
+        damped_osc_mod.set_param_hint('n',
+                                      value=1,
+                                      vary=False)
+        self.params = damped_osc_mod.make_params()
+
+        fit_res = damped_osc_mod.fit(data=y,
+                                     t=x,
+                                     params=self.params)
+        if fit_res.chisqr > .35:
+            logging.warning('Fit did not converge, varying phase')
+            fit_res_lst = []
+
+            for phase_estimate in np.linspace(0, 2*np.pi, 8):
+                damped_osc_mod.set_param_hint('phase',
+                                              value=phase_estimate)
+                self.params = damped_osc_mod.make_params()
+                fit_res_lst += [damped_osc_mod.fit(
+                    data=y,
+                    t=x,
+                    params=self.params)]
+
+            chisqr_lst = [fit_res.chisqr for fit_res in fit_res_lst]
+            fit_res = fit_res_lst[np.argmin(chisqr_lst)]
+        self.fit_results.append(fit_res)
+
+        if print_fit_results:
+            print(fit_res.fit_report())
+
+        return fit_res
 
     def run_default_analysis(self, print_fit_results=False,
                              unit_prefix='u', show=False,
@@ -4286,8 +4390,9 @@ class Ramsey_Analysis_multiple_detunings(Ramsey_Analysis):
                                      close_file=close_file,unit_prefix=unit_prefix,
                                      close_main_figure=True,save_fig=False,**kw)
 
-        show_guess = kw.get('show_guess', False)
         self.artificial_detunings = kw.pop('artificial_detunings',[-4e6,4e6])
+
+        show_guess = kw.get('show_guess', False)
         self.qubit_freq_spec = kw.pop('qubit_frequency_spec',0)
         self.add_analysis_datagroup_to_file()
         scale = self.scales_dict[unit_prefix]
@@ -4313,15 +4418,19 @@ class Ramsey_Analysis_multiple_detunings(Ramsey_Analysis):
         # Calculate possible detunings from real qubit frequency
         qb_detuning_1 = self.artificial_detunings[0] + ramsey_freq_1
         qb_detuning_2 = self.artificial_detunings[0] - ramsey_freq_1
-        qb_detuning_3 = self.artificial_detunings[2] + ramsey_freq_2
-        qb_detuning_4 = self.artificial_detunings[2] - ramsey_freq_2
+        qb_detuning_3 = self.artificial_detunings[1] + ramsey_freq_2
+        qb_detuning_4 = self.artificial_detunings[1] - ramsey_freq_2
         # Find which ones match
         qb_detunings = [qb_detuning_1, qb_detuning_2,
                         qb_detuning_3, qb_detuning_4]
+        print(qb_detunings)
         vals, inverse, count = np.unique(qb_detunings, return_inverse=True,
                                          return_counts=True)
+        print(vals, inverse, count)
         idx_vals_repeated = np.where(count > 1)[0]
+        print(idx_vals_repeated)
         vals_repeated = vals[idx_vals_repeated]
+        print(vals_repeated)
         self.qb_detuning = vals_repeated
         self.qubit_frequency = self.qubit_freq_spec + self.qb_detuning
 
@@ -4372,6 +4481,26 @@ class Ramsey_Analysis_multiple_detunings(Ramsey_Analysis):
             self.data_file.close()
 
         return self.fit_res
+
+    def get_measured_freq(self, fit_res, **kw):
+        freq = fit_res.params['frequency'].value
+        freq_stderr = fit_res.params['frequency'].stderr
+
+        self.ramsey_freq = {'freq':freq, 'freq_stderr':freq_stderr}
+
+        return self.ramsey_freq
+
+    def get_measured_T2_star(self, fit_res, **kw):
+        '''
+        Returns measured T2 star from the fit to the Ical data.
+         return T2, T2_stderr
+        '''
+        T2 = fit_res.params['tau'].value
+        T2_stderr = fit_res.params['tau'].stderr
+
+        self.T2_star = {'T2_star':T2, 'T2_star_stderr':T2_stderr}
+
+        return self.T2_star
 
 class DragDetuning_Analysis(TD_Analysis):
 
