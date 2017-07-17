@@ -1497,7 +1497,7 @@ class UHFQC_integrated_average_detector(Hard_Detector):
 
 class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
     '''
-    Detector used for correlation mode with the UHFCQ.
+    Detector used for correlation mode with the UHFQC.
     The argument 'correlations' is a list of tuples specifying which channels
     are correlated, and on which channel the correlated signal is output.
     For instance, 'correlations=[(0, 1, 3)]' will put the correlation of
@@ -1772,7 +1772,7 @@ class UHFQC_statistics_logging_det(Soft_Detector):
     Detector used for the statistics logging mode of the UHFQC
     """
 
-    def __init__(self, UHFCQ, AWG, nr_shots: int,
+    def __init__(self, UHFQC, AWG, nr_shots: int,
                  integration_length: float,
                  channels: list,
                  statemap: dict,
@@ -1794,7 +1794,8 @@ class UHFQC_statistics_logging_det(Soft_Detector):
 
 
         """
-        self.UHFCQ = UHFCQ
+        super().__init__()
+        self.UHFQC = UHFQC
         self.AWG = AWG
         self.nr_shots = nr_shots
         self.integration_length = integration_length
@@ -1838,7 +1839,7 @@ class UHFQC_statistics_logging_det(Soft_Detector):
                        dtype=np.uint32)
         return arr
 
-    def prepare(self, sweep_points):
+    def prepare(self):
         if self.AWG is not None:
             self.AWG.stop()
 
@@ -1853,15 +1854,15 @@ class UHFQC_statistics_logging_det(Soft_Detector):
         # Configure the results logger not to do any averaging
         self.UHFQC.quex_rl_length(self.nr_shots)
         self.UHFQC.quex_rl_avgcnt(0)  # log2(1) for single shot readout
-        self.UHFCQ.quex_rl_source(0)
+        self.UHFQC.quex_rl_source(0)
 
         # configure the results logger (rl)
         self.UHFQC.quex_rl_length(4)  # 4 values per channel for stat mode
         self.UHFQC.quex_rl_source(3)  # statistics logging is rl mode "3"
 
         # Configure the statistics logger (sl)
-        self.UHFCQ.quex_sl_length(self.nr_shots)
-        self.UHFCQ.quex_sl_statemap(self.statemap)
+        self.UHFQC.quex_sl_length(self.nr_shots)
+        self.UHFQC.quex_sl_statemap(self.statemap_to_array(self.statemap))
 
         # above should be all
 
@@ -1874,11 +1875,11 @@ class UHFQC_statistics_logging_det(Soft_Detector):
         if self.AWG is not None:
             self.AWG.stop()
 
-    def get_values(self):
+    def acquire_data_point(self, **kw):
         if self.AWG is not None:
             self.AWG.stop()
         self.UHFQC.quex_rl_readout(1)  # resets UHFQC internal readout counters
-        self.UHFCQ.quex_sl_readout(0)  # resets UHFQC internal sl counters ?
+        self.UHFQC.quex_sl_readout(0)  # resets UHFQC internal sl counters ?
 
         self.UHFQC.acquisition_arm()
         # starting AWG
@@ -1889,7 +1890,9 @@ class UHFQC_statistics_logging_det(Soft_Detector):
                                            arm=False,
                                            acquisition_time=0.01)
         # This will fail as the shape will be wrong! todo fix this
-        return data
+        # reshape the data
+        data_concat = np.concatenate((data[0][:-1], data[1]))
+        return data_concat
 
 
 # --------------------------------------------
