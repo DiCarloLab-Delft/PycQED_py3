@@ -100,7 +100,7 @@ class MeasurementControl(Instrument):
     # Functions used to control the measurements #
     ##############################################
 
-    def run(self, name=None, mode='1D', **kw):
+    def run(self, name=None, exp_metadata=None, mode='1D', **kw):
         '''
         Core of the Measurement control.
         '''
@@ -141,6 +141,8 @@ class MeasurementControl(Instrument):
                 raise ValueError('mode %s not recognized' % self.mode)
             result = self.dset[()]
             self.save_MC_metadata(self.data_object)  # timing labels etc
+            if exp_metadata is not None:
+                self.save_exp_metadata(exp_metadata, self.data_object)
             return_dict = self.create_experiment_result_dict()
 
         self.finish(result)
@@ -179,7 +181,7 @@ class MeasurementControl(Instrument):
                     sweep_points=sweep_points[:self.xlen, 0])
                 self.measure_hard()
 
-            # will not be complet if it is a 2D loop, soft avg or many shots
+            # will not be complete if it is a 2D loop, soft avg or many shots
             if not self.is_complete():
                 pts_per_iter = self.dset.shape[0]
                 swp_len = np.shape(sweep_points)[0]
@@ -826,6 +828,30 @@ class MeasurementControl(Instrument):
         set_grp.attrs['mode'] = self.mode
         set_grp.attrs['measurement_name'] = self.measurement_name
         set_grp.attrs['live_plot_enabled'] = self.live_plot_enabled()
+
+    def save_exp_metadata(self, attrs: dict, data_object):
+        '''
+        Saves experiment metadata to the data file.
+
+        Args:
+            attrs (dict):
+                    Simple dictionary without nesting. An attribute will be
+                    created for every key in this dictionary.
+            data_object:
+                    An open hdf5 data object.
+        '''
+        if 'Experimental Data' in data_object:
+            data_group = data_object['Experimental Data']
+        else:
+            data_group = data_object.create_group('Experimental Data')
+
+        if 'Experimental Metadata' in data_group:
+            metadata_group = data_group['Experimental Metadata']
+        else:
+            metadata_group = data_group.create_group('Experimental Metadata')
+
+        for k, v in attrs.items():
+            metadata_group.attrs[k] = v
 
     def print_progress(self, stop_idx=None):
         if self.verbose():
