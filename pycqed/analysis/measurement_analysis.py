@@ -232,8 +232,12 @@ class MeasurementAnalysis(object):
             metadata_dict[k] = v
         return metadata_dict
 
-    def save_dict_to_analysis_group(self, save_dict, group_name):
-
+    def save_dict_to_analysis_group(self, save_dict: dict, group_name: str):
+        """
+        Saves a dictionary to the analysis_group in the hdf5 datafile
+        corresponding to the experiment.
+        Convenient for storing parameters extracted in the analysis.
+        """
         if group_name not in self.analysis_group:
             dict_grp = self.analysis_group.create_group(group_name)
         else:
@@ -1288,8 +1292,9 @@ class Rabi_Analysis(TD_Analysis):
             # easier to do just one fit we stick to that.
             # We make an initial guess of the Rabi period using both
             # quadratures
-            data = np.sqrt(self.measured_values[
-                           0]**2+self.measured_values[1]**2)
+            data = np.sqrt(self.measured_values[0]**2 +
+                           self.measured_values[1]**2)
+
             params = fit_mods.Cos_guess(model, data=data, t=self.sweep_points)
             fit_res = model.fit(
                 data=data,
@@ -1590,8 +1595,10 @@ class Motzoi_XY_analysis(TD_Analysis):
         self.add_analysis_datagroup_to_file()
         if self.cal_points is None:
             if len(self.measured_values) == 2:
-                self.corr_data = self.measured_values[
-                    0]**2 + self.measured_values[1]**2
+
+                self.corr_data = (self.measured_values[0]**2 +
+                                  self.measured_values[1]**2)
+
             else:
                 self.corr_data = self.measured_values[0]
         else:
@@ -5387,8 +5394,10 @@ class butterfly_analysis(MeasurementAnalysis):
             # variable is overwritten here, no good.
             self.data_exc = self.data_exc_post
             self.data_rel = self.data_rel_post
+
             fraction = (np.size(self.data_exc) +
                         np.size(self.data_exc))*3/shots_used/2
+
 
         else:
             m0_on = self.data[2::4]
@@ -6312,6 +6321,11 @@ class Ram_Z_Analysis(MeasurementAnalysis):
                 V_per_phi0=self.V_per_phi0,
                 asymmetry=0) / self.flux_amp
 
+            # TODO: Remove after testing the above line.
+            # self.step_response = self.get_stepresponse(
+            #     self.df, self.f01max, self.E_c, self.flux_amp,
+            #     V_per_phi0=self.V_per_phi0, V_offset=self.V_offset)
+
             # self.add_dataset_to_analysisgroup('step_response',
             #                                   self.step_response)
             plotStep = True
@@ -6379,6 +6393,32 @@ class Ram_Z_Analysis(MeasurementAnalysis):
         else:
             step = self.step_response
 
+    def get_stepresponse(self, df, f01max, E_c, F_amp, V_per_phi0,
+                         V_offset=0):
+        '''
+        Calculates the "volt per phi0" and the step response from the
+        detuning.
+
+        Args:
+            df (array):     Detuning of the qubit.
+            f01max (float): Sweet-spot frequency of the qubit.
+            E_c (float):    Charging energy of the qubig.
+            F_amp (float):  Amplitude of the applied pulse in V.
+            V_per_phi0 (float): Voltage at a flux of phi0.
+            V_offset (float): Offset from sweet spot in V.
+
+        Returns:
+            s (array):      Normalized step response in voltage space.
+        '''
+        s = (np.arccos((1 - df / (f01max + E_c))**2) * np.pi / V_per_phi0 +
+             V_offset) / F_amp
+
+        return s
+
+    def make_figures(self, plot_step=True):
+        '''
+        Plot figures. Step response is only plotted if plot_step == True.
+        '''
         # Plot data, phases, and detuning
         fig, ax = plt.subplots(1, 1, figsize=(7, 5))
         ax.plot(self.sweep_points[:len(self.I)], self.I, '-o')

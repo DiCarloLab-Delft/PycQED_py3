@@ -10,8 +10,7 @@ from collections import OrderedDict as od
 from matplotlib import pyplot as plt
 from matplotlib import colors
 import pandas as pd
-from uuid import getnode as get_mac
-from pycqed.init.config import setup_dict
+from pycqed.utilities.get_default_datadir import get_default_datadir
 from scipy.interpolate import griddata
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import h5py
@@ -22,18 +21,10 @@ from .tools.data_manipulation import *
 from .tools.plotting import *
 import colorsys as colors
 
-try:
-    # currently not recognized, does not do anything
-    datadir = qc_config['datadir']
-    print('Data directory set to:', datadir)
-except:
-    mac = get_mac()
-    try:
-        setup_name = setup_dict.mac_dict[str(mac)]
-        datadir = setup_dict.data_dir_dict[setup_name]
-    except:
-        datadir = None
-    print('Data directory set to:', datadir)
+
+datadir = get_default_datadir()
+print('Data directory set to:', datadir)
+
 
 ######################################################################
 #     Filehandling tools

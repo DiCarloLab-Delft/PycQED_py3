@@ -11,6 +11,7 @@ import qcodes as qc
 def measure_two_qubit_AllXY(device, q0_name, q1_name,
                             sequence_type='sequential', MC=None,
                             result_logging_mode='lin_trans'):
+
     if MC is None:
         MC = qc.station.components['MC']
 
@@ -41,6 +42,7 @@ def measure_two_qubit_AllXY(device, q0_name, q1_name,
         result_logging_mode=result_logging_mode,
         channels=[q0.RO_acq_weight_function_I(),
                   q1.RO_acq_weight_function_I()])
+
     MC.set_sweep_function(s)
     MC.set_sweep_points(np.arange(21*(1+double_points)))
     MC.set_detector_function(d)
@@ -104,16 +106,9 @@ def measure_Ram_Z(device, q0_name, q1_name):
     raise NotImplementedError()
 
 
-def measure_chevron(device, q0_name, q1_name):
-    '''
-    Measure chevron pattern, sweeping amplitude and duration of the flux
-    pulse.
-    '''
-    raise NotImplementedError()
-
 def measure_chevron(device, q0_name, q1_name,
                     CC, MC,
-                    QWG_flux_lutman, #operation_dict,
+                    QWG_flux_lutman,  # operation_dict,
                     amps=np.arange(0.482, .491, .0010),
                     lengths=np.arange(50e-9, 500e-9, 5e-9),
                     wait_during_flux=400e-8,
@@ -162,8 +157,6 @@ def measure_chevron(device, q0_name, q1_name,
 
     MC.set_detector_function(d)
     MC.run('Chevron_{}_{}'.format(q0.name, q1.name), mode='2D')
-
-
 
 
 def measure_CZ_calibration(device, q0_name, q1_name):

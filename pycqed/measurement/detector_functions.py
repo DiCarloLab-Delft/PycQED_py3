@@ -513,7 +513,8 @@ class CBox_single_int_avg_with_LutReload(CBox_single_integration_average_det):
 
 class CBox_integration_logging_det(Hard_Detector):
 
-    def __init__(self, CBox, AWG, integration_length=1e-6, LutMan=None, reload_pulses=False,
+    def __init__(self, CBox, AWG, integration_length=1e-6, LutMan=None,
+                 reload_pulses=False,
                  awg_nrs=None, **kw):
         '''
         If you want AWG reloading you should give a LutMan and specify
@@ -862,7 +863,6 @@ class Function_Detector(Soft_Detector):
             else:
                 value = item
             measurement_kwargs[key] = value
-
         # Call the function
         result = self.get_function(**measurement_kwargs)
         print(result)
@@ -1405,6 +1405,7 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         self.AWG = AWG
         self.nr_averages = nr_averages
         self.integration_length = integration_length
+
         # 0/1/2 crosstalk supressed /digitized/raw
         res_logging_indices = {'lin_trans': 0, 'digitized': 1, 'raw': 2}
         self.result_logging_mode_idx = res_logging_indices[result_logging_mode]
@@ -1480,7 +1481,6 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         else:
             self.nr_sweep_points = len(sweep_points)*self.seg_per_point
         # this sets the result to integration and rotation outcome
-
             if (self.chunk_size is not None and
                     self.chunk_size < self.nr_sweep_points):
                 # Chunk size is defined and smaller than total number of sweep
@@ -1670,6 +1670,54 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
                                 (self.scaling_factor / self.nr_averages))
 
         return data
+
+            # If thresholding is enabled, set the threshold for the correlation
+            # channel.
+            if self.thresholding:
+                thresh_level = \
+                    self.UHFQC.get('quex_thres_{}_level'.format(corr[0]))
+                self.UHFQC.set(
+                    'quex_thres_{}_level'.format(correlation_channel),
+                    thresh_level)
+
+    def get_values(self):
+        # Slightly different way to deal with scaling factor
+        self.scaling_factor = 1 / (1.8e9*self.integration_length)
+
+        if self.AWG is not None:
+            self.AWG.stop()
+        self.UHFQC.quex_rl_readout(1)  # resets UHFQC internal readout counters
+        self.UHFQC.acquisition_arm()
+        # starting AWG
+        if self.AWG is not None:
+            self.AWG.start()
+
+        data_raw = self.UHFQC.acquisition_poll(samples=self.nr_sweep_points,
+                                               arm=False,
+                                               acquisition_time=0.01)
+
+        data = []
+        if self.thresholding:
+            for key in data_raw.keys():
+                data.append(np.array(data_raw[key]))
+        else:
+            for key in data_raw.keys():
+                if key in self.correlation_channels:
+                    data.append(np.array(data_raw[key]) *
+                                (self.scaling_factor**2 / self.nr_averages))
+                else:
+                    data.append(np.array(data_raw[key]) *
+                                (self.scaling_factor / self.nr_averages))
+
+        if not self.real_imag:
+            I = data[0]
+            Q = data[1]
+            S21 = I + 1j*Q
+            data[0] = np.abs(S21)
+            data[1] = np.angle(S21)/(2*np.pi)*360
+
+        else:
+            return data
 
 
 class UHFQC_integration_logging_det(Hard_Detector):
