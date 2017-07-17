@@ -2186,23 +2186,25 @@ class CBox_v3_driven_transmon(Transmon):
 
         # Load gate set, germs, and fiducials from file.
         gstPath = os.path.dirname(gstCC.__file__)
-        gs_target = pygsti.io.load_gateset(
-            os.path.join(gstPath, 'Gateset_5_primitives_GST.txt'))
-        fiducials = pygsti.io.load_gatestring_list(
-            os.path.join(gstPath, 'Fiducials_5_primitives_GST.txt'))
-        germs = pygsti.io.load_gatestring_list(
-            os.path.join(gstPath, 'Germs_5_primitives_GST.txt'))
+        gs_target_path = os.path.join(gstPath, 'Gateset_5_primitives_GST.txt')
+        fiducials_path = os.path.join(gstPath,
+                                      'Fiducials_5_primitives_GST.txt')
+        germs_path = os.path.join(gstPath, 'Germs_5_primitives_GST.txt')
+
+        gs_target = pygsti.io.load_gateset(gs_target_path)
+        fiducials = pygsti.io.load_gatestring_list(fiducials_path)
+        germs = pygsti.io.load_gatestring_list(germs_path)
 
         max_lengths = [2**i for i in range(max_germ_pow + 1)]
 
         # gate_dict maps GST gate labels to QASM operations.
         gate_dict = {
-            'Gi' : 'I {}'.format(self.name),
-            'Gx90' : 'X90 {}'.format(self.name),
-            'Gy90' : 'Y90 {}'.format(self.name),
-            'Gx180' : 'X180 {}'.format(self.name),
-            'Gy180' : 'Y180 {}'.format(self.name),
-            'RO' : 'RO {}'.format(self.name)
+            'Gi': 'I {}'.format(self.name),
+            'Gx90': 'X90 {}'.format(self.name),
+            'Gy90': 'Y90 {}'.format(self.name),
+            'Gx180': 'X180 {}'.format(self.name),
+            'Gy180': 'Y180 {}'.format(self.name),
+            'RO': 'RO {}'.format(self.name)
         }
 
         # Create the experiment list, translate it to QASM, and generate the
@@ -2210,7 +2212,7 @@ class CBox_v3_driven_transmon(Transmon):
         raw_exp_list = pygsti.construction.make_lsgst_experiment_list(
             gs_target.gates.keys(), fiducials, fiducials, germs, max_lengths)
         exp_list = gstCC.get_experiments_from_list(raw_exp_list, gate_dict)
-        qasm_files, exp_nums = gstCC.generate_QASM(
+        qasm_files, exp_per_file, exp_last_file = gstCC.generate_QASM(
             filename='GST_{}'.format(self.name),
             exp_list=exp_list,
             qubit_labels=[self.name],
@@ -2234,9 +2236,8 @@ class CBox_v3_driven_transmon(Transmon):
         # => set max(r,5) as the number of soft repetitions for all files.
         # => set ceil(x/r) as the number of hard repetitions for each file
         # (even if for some files we could do more).
-        max_exp_num = max(exp_nums)  # i
         soft_repetitions = int(np.ceil(
-            repetitions_per_point / np.floor(max_acq_points / max_exp_num)))
+            repetitions_per_point / np.floor(max_acq_points / exp_per_file)))
         if soft_repetitions < min_soft_repetitions:
             soft_repetitions = min_soft_repetitions
         hard_repetitions = int(np.ceil(repetitions_per_point /
@@ -2245,7 +2246,7 @@ class CBox_v3_driven_transmon(Transmon):
         self.prepare_for_timedomain()
         d = self.int_log_det
         s = swf.Multi_QASM_Sweep(
-            exp_num_list=exp_nums,
+            exp_per_file=exp_per_file,
             hard_repetitions=hard_repetitions,
             soft_repetitions=soft_repetitions,
             qasm_list=[q.name for q in qasm_files],
@@ -2254,28 +2255,37 @@ class CBox_v3_driven_transmon(Transmon):
             CBox=self.CBox.get_instr(),
             parameter_name='GST sequence',
             unit='#')
-        total_exp_nr = np.sum(exp_nums) * hard_repetitions * soft_repetitions
-
+        # Note: total_exp_nr can be larger than
+        # len(exp_list) * repetitions_per_point, because the last segment has
+        # to be filled to be the same size as the others, even if the last
+        # QASM file does not contain exp_per_file experiments.
+        total_exp_nr = (len(qasm_files) * exp_per_file * hard_repetitions *
+                        soft_repetitions)
         if d.result_logging_mode != 'digitized':
             logging.warning('GST is intended for use with digitized detector.'
                             ' Analysis will fail otherwise.')
 
+        metadata_dict = {
+            'gs_target': gs_target_path,
+            'prep_fids': fiducials_path,
+            'meas_fids': fiducials_path,
+            'germs': germs_path,
+            'max_lengths': max_lengths,
+            'exp_per_file': exp_per_file,
+            'exp_last_file': exp_last_file,
+            'nr_hard_segs': len(qasm_files),
+            'hard_repetitions': hard_repetitions,
+            'soft_repetitions': soft_repetitions
+        }
+
         MC.set_sweep_function(s)
         MC.set_sweep_points(np.arange(total_exp_nr))
         MC.set_detector_function(d)
-        MC.run('GST')
+        MC.run('GST', exp_metadata=metadata_dict)
 
         # Analysis
         if analyze:
-            ma.GST_Analysis(exp_num_list=exp_nums,
-                            hard_repetitions=hard_repetitions,
-                            soft_repetitions=soft_repetitions,
-                            exp_list=[g.str for g in raw_exp_list],
-                            gs_target=gs_target,
-                            prep_fiducials=fiducials,
-                            meas_fiducials=fiducials,
-                            germs=germs,
-                            max_lengths=max_lengths)
+            ma.GST_Analysis()
 
 
 class QWG_driven_transmon(CBox_v3_driven_transmon):

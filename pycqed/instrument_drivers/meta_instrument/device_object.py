@@ -272,7 +272,7 @@ class TwoQubitDevice(DeviceObject):
             UHFQC=self.acquisition_instrument.get_instr(),
             AWG=self.central_controller.get_instr(),
             channels=[w0, w1],
-            result_logging_mode='digitized',
+            result_logging_mode='lin_trans',
             integratioin_length=q0.RO_acq_integration_length())
         return d
 
@@ -352,7 +352,7 @@ class TwoQubitDevice(DeviceObject):
         max_acq_points = 4094
 
         if MC is None:
-            MC = self.MC.get_instr()
+            MC = qc.station.components['MC']
 
         qnames = self.qubits()
         q0 = self.find_instrument(qnames[0])
@@ -362,14 +362,17 @@ class TwoQubitDevice(DeviceObject):
 
         # Load the gate set, germs, and fiducials.
         gstPath = os.path.dirname(gstCC.__file__)
-        gs_target = pygsti.io.load_gateset(
-            os.path.join(gstPath, 'Gateset_2Q_XYCphase.txt'))
-        prepFids = pygsti.io.load_gatestring_list(
-            os.path.join(gstPath, 'Prep_Fiducials_2Q_XYCphase.txt'))
-        measFids = pygsti.io.load_gatestring_list(
-            os.path.join(gstPath, 'Meas_Fiducials_2Q_XYCphase.txt'))
-        germs = pygsti.io.load_gatestring_list(
-            os.path.join(gstPath, 'Germs_2Q_XYCphase.txt'))
+        gs_target_path = os.path.join(gstPath, 'Gateset_2Q_XYCphase.txt')
+        prep_fids_path = os.path.join(gstPath,
+                                      'Prep_Fiducials_2Q_XYCphase.txt')
+        meas_fids_path = os.path.join(gstPath,
+                                      'Meas_Fiducials_2Q_XYCphase.txt')
+        germs_path = os.path.join(gstPath, 'Germs_2Q_XYCphase.txt')
+
+        gs_target = pygsti.io.load_gateset(gs_target_path)
+        prep_fids = pygsti.io.load_gatestring_list(prep_fids_path)
+        meas_fids = pygsti.io.load_gatestring_list(meas_fids_path)
+        germs = pygsti.io.load_gatestring_list(germs_path)
 
         max_lengths = [2**i for i in range(max_germ_pow + 1)]
 
@@ -387,15 +390,15 @@ class TwoQubitDevice(DeviceObject):
         # QASM file(s).
         try:
             max_instr = \
-                self.central_controller.get_instr()._get_instr_mem_size()
+                self.central_controller.get_instr().instr_mem_size()
         except AttributeError as e:
             max_instr = 2**15
             logging.warning(str(e) + '\nUsing default ({})'.format(max_instr))
 
         raw_exp_list = pygsti.construction.make_lsgst_experiment_list(
-            gs_target.gates.keys(), prepFids, measFids, germs, max_lengths)
+            gs_target.gates.keys(), prep_fids, meas_fids, germs, max_lengths)
         exp_list = gstCC.get_experiments_from_list(raw_exp_list, gate_dict)
-        qasm_files, exp_nums = gstCC.generate_QASM(
+        qasm_files, exp_per_file, exp_last_file = gstCC.generate_QASM(
             filename='GST_2Q_{}_{}'.format(q0.name, q1.name),
             exp_list=exp_list,
             qubit_labels=[q0.name, q1.name],
@@ -412,16 +415,13 @@ class TwoQubitDevice(DeviceObject):
         # repetitions accordingly.
         # The acquisition device can acquire a maximum of m = max_acq_points
         # in one go.
-        # A QASM file contains i experiments (i can be different for different
-        # QASM files.
-        # Take the largest i -> can measure floor(m/i) = l repetitions of this
-        # QASM file. => need r = ceil(x/l) soft repetitions of that file.
-        # => set max(r,5) as the number of soft repetitions for all files.
-        # => set ceil(x/r) as the number of hard repetitions for each file
-        # (even if for some files we could do more).
-        max_exp_num = max(exp_nums)  # i
+        # A QASM file contains i experiments.
+        # -> can measure floor(m/i) = l repetitions of every file
+        # => need r = ceil(x/l) soft repetitions.
+        # => set max(r, 5) as the number of soft repetitions.
+        # => set ceil(x/r) as the number of hard repetitions.
         soft_repetitions = int(np.ceil(
-            repetitions_per_point / np.floor(max_acq_points / max_exp_num)))
+            repetitions_per_point / np.floor(max_acq_points / exp_per_file)))
         if soft_repetitions < min_soft_repetitions:
             soft_repetitions = min_soft_repetitions
         hard_repetitions = int(np.ceil(repetitions_per_point /
@@ -429,7 +429,7 @@ class TwoQubitDevice(DeviceObject):
 
         d = self.get_integration_logging_detector()
         s = swf.Multi_QASM_Sweep(
-            exp_num_list=exp_nums,
+            exp_per_file=exp_per_file,
             hard_repetitions=hard_repetitions,
             soft_repetitions=soft_repetitions,
             qasm_list=[q.name for q in qasm_files],
@@ -438,28 +438,39 @@ class TwoQubitDevice(DeviceObject):
             CBox=self.central_controller.get_instr(),
             parameter_name='GST sequence',
             unit='#')
-        total_exp_nr = np.sum(exp_nums) * hard_repetitions * soft_repetitions
+
+        # Note: total_exp_nr can be larger than
+        # len(exp_list) * repetitions_per_point, because the last segment has
+        # to be filled to be the same size as the others, even if the last
+        # QASM file does not contain exp_per_file experiments.
+        total_exp_nr = (len(qasm_files) * exp_per_file * hard_repetitions *
+                        soft_repetitions)
 
         if d.result_logging_mode != 'digitized':
             logging.warning('GST is intended for use with digitized detector.'
                             ' Analysis will fail otherwise.')
 
+        metadata_dict = {
+            'gs_target': gs_target_path,
+            'prep_fids': prep_fids_path,
+            'meas_fids': meas_fids_path,
+            'germs': germs_path,
+            'max_lengths': max_lengths,
+            'exp_per_file': exp_per_file,
+            'exp_last_file': exp_last_file,
+            'nr_hard_segs': len(qasm_files),
+            'hard_repetitions': hard_repetitions,
+            'soft_repetitions': soft_repetitions
+        }
+
         MC.set_sweep_function(s)
         MC.set_sweep_points(np.arange(total_exp_nr))
         MC.set_detector_function(d)
-        MC.run('GST_2Q')
+        MC.run('GST_2Q', exp_metadata=metadata_dict)
 
         # Analysis
         if analyze:
-            ma.GST_Analysis(exp_num_list=exp_nums,
-                            hard_repetitions=hard_repetitions,
-                            soft_repetitions=soft_repetitions,
-                            exp_list=[g.str for g in raw_exp_list],
-                            gs_target=gs_target,
-                            prep_fiducials=prepFids,
-                            meas_fiducials=measFids,
-                            germs=germs,
-                            max_lengths=max_lengths)
+            ma.GST_Analysis()
 
     def measure_chevron(self, amps, lengths,
                         fluxing_qubit=None, spectator_qubit=None,

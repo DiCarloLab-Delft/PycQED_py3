@@ -1,6 +1,10 @@
 import re
 import pygsti
+import os
+from pycqed.measurement.waveform_control_CC.multi_qubit_qasm_seqs import \
+    base_qasm_path
 import numpy as np
+
 
 def get_experiments_from_list(pygsti_list, gate_dict):
     '''
@@ -29,6 +33,7 @@ def get_experiments_from_list(pygsti_list, gate_dict):
         operations += [gate_dict['RO']]
         exp_list.append(operations)
     return exp_list
+
 
 def get_experiments_from_file(filename, gate_dict, use_pygsti_parser=True):
     '''
@@ -135,6 +140,7 @@ def get_experiments_from_file(filename, gate_dict, use_pygsti_parser=True):
 
     return experiments
 
+
 def generate_QASM(filename, exp_list, qubit_labels, max_instructions=2**15,
                   max_exp_per_file=4094):
     '''
@@ -168,16 +174,8 @@ def generate_QASM(filename, exp_list, qubit_labels, max_instructions=2**15,
         exp_num_list (list):
             List containing the number of experiments run in each QASM file.
     '''
-    file_num = 0
     file_list = []
-    exp_num_list = []
-
-    instr_num = 0
-    exp_num = 0
-    file = open('{}_{}.qasm'.format(filename, file_num), 'w')
-    file_list.append(file)
-    for q in qubit_labels:
-        file.writelines('qubit {} \n'.format(q))
+    filename = os.path.join(base_qasm_path, filename)
 
     # The longest experiment gives us an upper bound for how many experiments
     # we can include in one QASM file before reaching the maximum number of
@@ -187,53 +185,43 @@ def generate_QASM(filename, exp_list, qubit_labels, max_instructions=2**15,
     exp_lens = [len(exp) for exp in exp_list]
     exp_per_file = int(max_instructions // (4 * max(exp_lens)))
 
-    shaped_exp_list = np.reshape(exp_list, (-1, exp_per_file))
+    if exp_per_file >= len(exp_list):
+        # All experiments fit into one file.
+        exp_per_file = len(exp_list)
+        nr_full_files = 1  # needs manual setting because '//' takes floor
+    else:
+        nr_full_files = int(len(exp_list) // exp_per_file)
 
+    # Reshape experiment list according to how it is split into files.
+    shaped_exp_list = np.reshape(exp_list[:nr_full_files*exp_per_file],
+                                 (-1, exp_per_file))
+
+    # Write the files from the nested list.
     for i, sub_list in enumerate(shaped_exp_list):
         file = open('{}_{}.qasm'.format(filename, i), 'w')
         file_list.append(file)
         for q in qubit_labels:
             file.writelines('qubit {} \n'.format(q))
-        file.writelines('\ninit_all')
 
         for exp in sub_list:
             for gate in exp:
-                file.writelines
+                file.writelines('{}\n'.format(gate))
 
         file.close()
 
-    for i, exp in enumerate(exp_list):
-        # Check if we are getting close to the maximum number of instructions
-        # the CBox can handle.
-        # len(exp) is the number of pulses. Pulses should not take more than
-        # 4 instructions at the moment.
-        if (instr_num + len(exp)*4 > max_instructions or
-            exp_num + 1 >= max_exp_per_file):
-            # Adding the next experiment might exceed the maximum number of
-            # instructions -> save current QASM file and start a new one
-            file.close()
-            exp_num_list.append(exp_num)
-            file_num += 1
-            instr_num = 0  # New file -> reset instruction and experiment num.
-            exp_num = 0
-            file = open('{}_{}.qasm'.format(filename, file_num), 'w')
-            file_list.append(file)
-            for q in qubit_labels:
-                file.writelines('qubit {} \n'.format(q))
+    # If there are some experiments remaining, write last file with less than
+    # exp_per_file experiments
+    exp_last_file = len(exp_list) - nr_full_files*exp_per_file
+    if exp_last_file != 0:
+        file = open('{}_{}.qasm'.format(filename, nr_full_files), 'w')
+        file_list.append(file)
+        for q in qubit_labels:
+            file.writelines('qubit {} \n'.format(q))
 
-        # Increment instr_num: init + (4*number lines) + RO
-        # 4 instructions per QASM line is chose as upper bound, because two
-        # simultaneous mw pulses or 1 flux pulse take 4 instructions.
-        instr_num += (1 + 4*len(exp) + 1)
+        for exp in exp_list[nr_full_files*exp_per_file:]:
+            for gate in exp:
+                file.writelines('{}\n'.format(gate))
 
-        # Write the experiment to the QASM file.
-        for gate in exp:
-            file.writelines('{}\n'.format(gate))
-        exp_num += 1
+        file.close()
 
-    file.close()
-    exp_num_list.append(exp_num)
-    return file_list, exp_num_list
-
-def single_qubit_GST():
-    pass
+    return file_list, exp_per_file, exp_last_file

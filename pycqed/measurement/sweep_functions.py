@@ -388,7 +388,7 @@ class Multi_QASM_Sweep(QASM_Sweep_v2):
     '''
     Sweep function that combines multiple QASM sweeps into one sweep.
     '''
-    def __init__(self, exp_num_list, hard_repetitions: int,
+    def __init__(self, exp_per_file: int, hard_repetitions: int,
                  soft_repetitions: int, qasm_list, config: dict, detector,
                  CBox, parameter_name: str='Points', unit: str='a.u.',
                  upload: bool=True, verbosity_level: int=0):
@@ -419,16 +419,23 @@ class Multi_QASM_Sweep(QASM_Sweep_v2):
         self.hard_repetitions = hard_repetitions
         self.soft_repetitions = soft_repetitions
         self._cur_file_idx = 0
+        self.exp_per_file = exp_per_file
+
+        # Set up hard repetitions
+        self.detector.nr_shots = self.hard_repetitions * self.exp_per_file
 
         # Set up soft repetitions
         self.qasm_list = list(qasm_list) * soft_repetitions
-        self.exp_nums = list(exp_num_list) * soft_repetitions
+
+        # This is a hybrid sweep. Sweep control needs to be soft
+        self.sweep_control = 'soft'
 
     def prepare(self):
+        pass
+
+    def set_parameter(self, val):
         self.compile_and_upload(self.qasm_list[self._cur_file_idx],
                                 self.config)
-        self.detector.nr_shots = (self.hard_repetitions *
-                                  self.exp_nums[self._cur_file_idx])
         self._cur_file_idx += 1
 
 
