@@ -20,10 +20,15 @@ class UHFQC(Instrument):
 
     Requirements:
     Installation instructions for Zurich Instrument Libraries.
-    1. install ziPython 3.5 ucs4 16.04 for 64bit Windows from http://www.zhinst.com/downloads, https://people.zhinst.com/~niels/
+    1. install ziPython 3.5/3.6 ucs4 16.04 for 64bit Windows from
+        http://www.zhinst.com/downloads, https://people.zhinst.com/~niels/
     2. pip install dependencies: httplib2, plotly, pyqtgraph
-    3. upload the latest firmware to the UHFQC by opening reboot.bat in 'Transmon\Inventory\ZurichInstruments\firmware_Nielsb\firmware_x'. WIth x the highest available number.
-    4. find out where sequences are stored by saving a sequence from the GUI and then check :"showLog" to see where it is stored. This is the location where AWG sequences can be loaded from.
+    3. upload the latest firmware to the UHFQC by opening reboot.bat in
+    'Transmon\Inventory\ZurichInstruments\firmware_UHFLI\firmware_x\reboot_dev'.
+        With x the highest available number and dev the device number.
+    4. find out where sequences are stored by saving a sequence from the
+        GUI and then check :"showLog" to see where it is stored. This is the
+        location where AWG sequences can be loaded from.
     misc: when device crashes, check the log file in
     EOM
     """
