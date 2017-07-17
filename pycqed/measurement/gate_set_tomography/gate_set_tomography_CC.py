@@ -1,5 +1,6 @@
 import re
 import pygsti
+import numpy as np
 
 def get_experiments_from_list(pygsti_list, gate_dict):
     '''
@@ -177,6 +178,29 @@ def generate_QASM(filename, exp_list, qubit_labels, max_instructions=2**15,
     file_list.append(file)
     for q in qubit_labels:
         file.writelines('qubit {} \n'.format(q))
+
+    # The longest experiment gives us an upper bound for how many experiments
+    # we can include in one QASM file before reaching the maximum number of
+    # instructions the central controller can hold. 4 instructions per line of
+    # QASM code is an  upper bound chosen because two simultaneous mw pulses
+    # or one two-qubit gate use 4 instructions.
+    exp_lens = [len(exp) for exp in exp_list]
+    exp_per_file = int(max_instructions // (4 * max(exp_lens)))
+
+    shaped_exp_list = np.reshape(exp_list, (-1, exp_per_file))
+
+    for i, sub_list in enumerate(shaped_exp_list):
+        file = open('{}_{}.qasm'.format(filename, i), 'w')
+        file_list.append(file)
+        for q in qubit_labels:
+            file.writelines('qubit {} \n'.format(q))
+        file.writelines('\ninit_all')
+
+        for exp in sub_list:
+            for gate in exp:
+                file.writelines
+
+        file.close()
 
     for i, exp in enumerate(exp_list):
         # Check if we are getting close to the maximum number of instructions
