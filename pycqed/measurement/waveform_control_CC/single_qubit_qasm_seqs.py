@@ -526,6 +526,46 @@ def Ram_Z_single(qubit_name,
     return qasm_file
 
 
+def Ram_Z_echo(qubit_name, no_of_points, cal_points=True):
+    '''
+    Creates QASM sequence for an entire Ram-Z experiment, including
+    calibration points.
+
+    sequence:
+        mX90 -- flux(T) -- X180 -- flux(T+dt) -- X90 -- RO
+
+    Args:
+        qubit_name      (str): name of the targeted qubit
+        no_of_points    (int): number of points in the hard sweep. This is
+                               limited by the QWG waveform memory and number of
+                               codeword channels used.
+    '''
+    filename = join(base_qasm_path, 'Ram_Z_echo.qasm')
+    qasm_file = mopen(filename, mode='w')
+    qasm_file.writelines('qubit {} \n'.format(qubit_name))
+
+    # Write  measurement sequence no_of_points times
+    for i in range(no_of_points):
+        qasm_file.writelines('\ninit_all\n')
+
+        if cal_points and (i == no_of_points - 4 or i == no_of_points - 3):
+            # Calibration point for |0>
+            pass
+        elif cal_points and (i == no_of_points - 2 or i == no_of_points - 1):
+            # Calibration point for |1>
+            qasm_file.writelines('X180 {} \n'.format(qubit_name))
+        else:
+            qasm_file.writelines('mX90 {}\n'.format(qubit_name))
+            qasm_file.writelines('square_{} {}\n'.format(i, qubit_name))
+            qasm_file.writelines('X180 {}\n'.format(qubit_name))
+            qasm_file.writelines('square_dummy {}'.format(qubit_name))
+            qasm_file.writelines('X90 {}\n'.format(qubit_name))
+        qasm_file.writelines('RO {}  \n'.format(qubit_name))
+
+    qasm_file.close()
+    return qasm_fil
+
+
 def flux_timing_seq(qubit_name, taus,
                     wait_between=220e-9, clock_cycle=1e-9, cal_points=True):
     '''
