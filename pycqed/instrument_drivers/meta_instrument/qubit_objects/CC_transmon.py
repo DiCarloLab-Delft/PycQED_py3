@@ -1401,8 +1401,8 @@ class CBox_v3_driven_transmon(Transmon):
                                  channels=d.value_names,
                                  no_fits=no_fits)
             if update_threshold:
-                # use the threshold for the best assignment fidelity
-                self.RO_threshold(a.V_th_a)
+                # use the threshold for the best discrimination fidelity
+                self.RO_threshold(a.V_th_d)
             if update:
                 self.F_ssro(a.F_a)
                 self.F_discr(a.F_d)

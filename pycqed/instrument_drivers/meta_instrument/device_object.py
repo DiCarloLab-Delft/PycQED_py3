@@ -209,8 +209,7 @@ class TwoQubitDevice(DeviceObject):
         a = self.check_mux_RO(update=update, update_threshold=update_threshold)
         return a
 
-    def check_mux_RO(self, update: bool=True,
-                         update_threshold: bool=True):
+    def check_mux_RO(self, update: bool=True, update_threshold: bool=True):
         q0_name, q1_name, = self.qubits()
 
         q0 = self.find_instrument(q0_name)
@@ -232,7 +231,7 @@ class TwoQubitDevice(DeviceObject):
         if update_threshold:
             # do not use V_th_corr as this is measured from data that already
             # includes a correction matrix
-            thres = a['V_th']
+            thres = a['V_th_d']
 
             # correction for the offset (that is only applied in software)
             # happens in the qubits objects in the prep for TD where the
