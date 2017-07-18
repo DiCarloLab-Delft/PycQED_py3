@@ -1801,8 +1801,6 @@ class UHFQC_statistics_logging_det(Soft_Detector):
         self.integration_length = integration_length
 
         self.channels = channels
-        self.statemap = statemap
-
         if channel_names is None:
             channel_names = ['ch{}'.format(ch) for ch in channels]
         self.value_names = []
@@ -1812,6 +1810,7 @@ class UHFQC_statistics_logging_det(Soft_Detector):
             self.value_names.extend(ch_value_names)
         self.value_names.append('Total state errors')
         self.value_units = '#'*len(self.value_names)
+
         self.statemap = statemap
 
     @staticmethod
@@ -1889,11 +1888,68 @@ class UHFQC_statistics_logging_det(Soft_Detector):
         data = self.UHFQC.acquisition_poll(samples=4,  # double check this
                                            arm=False,
                                            acquisition_time=0.01)
-        # This will fail as the shape will be wrong! todo fix this
-        # reshape the data
+
         data_concat = np.concatenate((data[0][:-1], data[1]))
         return data_concat
 
+
+class UHFQC_single_qubit_statistics_logging_det(UHFQC_statistics_logging_det):
+
+    def __init__(self, UHFQC, AWG, nr_shots: int,
+                 integration_length: float,
+                 channel: int,
+                 statemap: dict,
+                 channel_name: str=None):
+        """
+        Detector for the statistics logger mode in the UHFQC.
+
+            UHFQC (instrument) : data acquisition device
+            AWG   (instrument) : device responsible for starting and stopping
+                the experiment, can also be a central controller.
+            integration_length (float): integration length in seconds
+            nr_shots (int)     : nr of shots (max is 4095)
+            channel  (int)    : index (channel) of UHFQC weight function
+            statemap (dict) : dictionary specifying the expected output state
+                for each 1 bit input state.
+                e.g.:
+                    statemap ={'0': '0', '1':'1'}
+            channel_name (str) : optional name of the channel
+
+
+        """
+        super(UHFQC_statistics_logging_det, self).__init__()
+        self.UHFQC = UHFQC
+        self.AWG = AWG
+        self.nr_shots = nr_shots
+        self.integration_length = integration_length
+
+        self.channels = [channel, int((channel+1) % 5)]
+
+        if channel_name is None:
+            channel_name = ['ch{}'.format(channel)]
+
+        self.value_names = ['{} counts'.format(channel),
+                            '{} flips'.format(channel),
+                            '{} state errors'.format(channel)]
+        self.value_units = '#'*len(self.value_names)
+
+        self.statemap = self.statemap_one2two_bit(statemap)
+
+    @staticmethod
+    def statemap_one2two_bit(one_bit_sm: dict):
+        """
+        Converts a one bit statemap to an appropriate dummy 2-bit statemap
+        """
+        sm = one_bit_sm
+        two_bit_sm = {'00': '{}{}'.format(sm['0'], sm['0']),
+                      '10': '{}{}'.format(sm['0'], sm['0']),
+                      '01': '{}{}'.format(sm['1'], sm['1']),
+                      '11': '{}{}'.format(sm['1'], sm['1'])}
+        return two_bit_sm
+
+    def acquire_data_point(self, **kw):
+        # Returns only the data for the relevant channel
+        return super().acquire_data_point()[0:3]
 
 # --------------------------------------------
 # Fake detectors
