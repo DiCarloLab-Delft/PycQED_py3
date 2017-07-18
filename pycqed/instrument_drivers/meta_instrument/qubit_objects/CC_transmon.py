@@ -13,7 +13,8 @@ import copy
 
 import os
 from pycqed.measurement.waveform_control_CC import qasm_compiler as qcx
-
+from scipy.optimize import brent
+from pycqed.measurement.optimization import nelder_mead
 import pygsti
 import pycqed
 
@@ -288,6 +289,19 @@ class CBox_v3_driven_transmon(Transmon):
                            label='Optimized weights for Q channel',
                            parameter_class=ManualParameter)
 
+    def upload_qasm_file(self, qasm_file):
+        qasm_fn = qasm_file.name
+        cfg = self.qasm_config()
+        self.CBox.get_instr().trigger_source('internal')
+        qasm_folder, fn = os.path.split(qasm_fn)
+        base_fn = fn.split('.')[0]
+        qumis_fn = os.path.join(qasm_folder, base_fn + ".qumis")
+        compiler = qcx.QASM_QuMIS_Compiler(
+            verbosity_level=1)
+        compiler.compile(qasm_fn, qumis_fn=qumis_fn,
+                         config=cfg)
+        self.CBox.get_instr().load_instructions(qumis_fn)
+
     def prepare_for_continuous_wave(self):
         self.prepare_readout()
 
@@ -414,7 +428,7 @@ class CBox_v3_driven_transmon(Transmon):
             elif self.RO_acq_weights() == 'optimal':
                 if (self.RO_optimal_weights_I() is None or
                         self.RO_optimal_weights_Q() is None):
-                    logging.warning('Optimal weights are None,'+
+                    logging.warning('Optimal weights are None,' +
                                     ' not setting integration weights')
                 else:
                     # When optimal weights are used, only the RO I weight
@@ -581,75 +595,18 @@ class CBox_v3_driven_transmon(Transmon):
                 nr_averages=self.RO_acq_averages())
         return
 
-    def get_restless_rb_detector(self, nr_cliff, starting_seed=1,
-                                  nr_seeds='max', pulse_p_elt='min',
-                                  MC=None,
-                                  upload=True):
-        raise NotImplementedError()
-        # if MC is None:
-        #     MC = self.MC.get_instr()
-
-        # if pulse_p_elt == 'min':
-        #     safety_factor = 5 if nr_cliff < 8 else 3
-        #     pulse_p_elt = int(safety_factor*nr_cliff)
-        # if nr_seeds == 'max':
-        #     nr_seeds = 29184//pulse_p_elt
-
-        # if nr_seeds*pulse_p_elt > 29184:
-        #     raise ValueError(
-        #         'Too many pulses ({}), {} seeds, {} pulse_p_elt'.format(
-        #             nr_seeds*pulse_p_elt, nr_seeds, pulse_p_elt))
-
-        # resetless_interval = (
-        #     np.round(pulse_p_elt*self.pulse_delay.get()*1e6)+2.5)*1e-6
-
-        # combined_tape = []
-        # for i in range(nr_seeds):
-        #     if starting_seed is not None:
-        #         seed = starting_seed*1000*i
-        #     else:
-        #         seed = None
-        #     rb_seq = rb.randomized_benchmarking_sequence(nr_cliff,
-        #                                                  desired_net_cl=3,
-        #                                                  seed=seed)
-        #     tape = rb.convert_clifford_sequence_to_tape(
-        #         rb_seq, self.Q_LutMan.get_instr().lut_mapping.get())
-        #     if len(tape) > pulse_p_elt:
-        #         raise ValueError(
-        #             'Too many pulses ({}), {} pulse_p_elt'.format(
-        #                 len(tape),  pulse_p_elt))
-        #     combined_tape += [0]*(pulse_p_elt-len(tape))+tape
-
-        # # Rename IF in awg_swf_resetless tape
-        # s = awg_swf.Resetless_tape(
-        #     n_pulses=pulse_p_elt, tape=combined_tape,
-        #     IF=self.f_RO_mod.get(),
-        #     pulse_delay=self.pulse_delay.get(),
-        #     resetless_interval=resetless_interval,
-        #     RO_pulse_delay=self.RO_pulse_delay.get(),
-        #     RO_pulse_length=self.RO_pulse_length.get(),
-        #     RO_trigger_delay=self.RO_acq_marker_delay.get(),
-        #     AWG=self.AWG, CBox=self.CBox.get_instr(), upload=upload)
-
-        # d = cdet.CBox_trace_error_fraction_detector(
-        #     'Resetless rb det',
-        #     MC=MC, AWG=self.AWG, CBox=self.CBox.get_instr(),
-        #     sequence_swf=s,
-        #     threshold=self.RO_threshold.get(),
-        #     save_raw_trace=False)
-        # return d
-
-    def calibrate_pulse_parameters(self, method='resetless_rb', nr_cliff=10,
-                                   parameters=['amp', 'motzoi', 'frequency'],
-                                   amp_guess=None, motzoi_guess=None,
-                                   frequency_guess=None,
-                                   a_step=30, m_step=.1, f_step=20e3,
-                                   MC=None, nested_MC=None,
-                                   update=False, close_fig=True,
-                                   verbose=True):
+    def calibrate_pulse_restless(self, nr_cliff=30,
+                                 parameters=['amp', 'motzoi', 'frequency'],
+                                 amp_guess=None, motzoi_guess=None,
+                                 frequency_guess=None,
+                                 nr_seeds='max', nr_shots = 16000,
+                                 a_step=.30, m_step=.1, f_step=20e3,
+                                 MC=None,
+                                 update=False, close_fig=True,
+                                 verbose=True, upload_qasm_file=True):
         '''
         Calibrates single qubit pulse parameters currently only using
-        the resetless rb method (requires reasonable (80%+?) discrimination
+        the resetless rb method (requires reasonable (~80%+) discrimination
         fidelity)
 
         If it there is only one parameter to sweep it will use brent's method
@@ -657,107 +614,133 @@ class CBox_v3_driven_transmon(Transmon):
 
         The function returns the values it found for the optimization.
         '''
-        raise NotImplementedError()
-        # if method is not 'resetless_rb':
-        #     raise NotImplementedError()
+        assert(self.RO_digitized()) # RO must be digitized for this mode
+        self.prepare_for_timedomain()
+        if MC is None:
+            MC = self.MC.get_instr()
 
-        # self.prepare_for_timedomain()
-        # if MC is None:
-        #     MC = self.MC.get_instr()
-        # if nested_MC is None:
-        #     nested_MC = self.nested_MC
+        # Estimate the number of seeds allowed
+        safety_factor = 5 if nr_cliff < 8 else 3
+        pulse_p_elt = int(safety_factor*nr_cliff)
+        if nr_seeds == 'max':
+            nr_seeds = 29184//pulse_p_elt
+        if nr_seeds*pulse_p_elt > 29184:
+            raise ValueError(
+                'Too many pulses ({}), {} seeds, {} pulse_p_elt'.format(
+                    nr_seeds*pulse_p_elt, nr_seeds, pulse_p_elt))
 
-        # d = self.get_resetless_rb_detector(nr_cliff=nr_cliff, MC=nested_MC)
+        name = 'RB_{}cl_numerical'.format(nr_cliff)
 
-        # name = 'RB_{}cl_numerical'.format(nr_cliff)
-        # MC.set_detector_function(d)
+        qasm_file = sqqs.randomized_benchmarking(
+            self.name, nr_cliffords=[nr_cliff],
+            nr_seeds=nr_seeds,
+            net_clifford=3, restless=True,
+            cal_points=False)
+        if upload_qasm_file:
+            self.upload_qasm_file(qasm_file)
 
-        # if amp_guess is None:
-        #     amp_guess = self.amp180.get()
-        # if motzoi_guess is None:
-        #     motzoi_guess = self.motzoi.get()
-        # if frequency_guess is None:
-        #     frequency_guess = self.f_qubit.get()
+        if amp_guess is None:
+            amp_guess = self.Q_amp180.get()
+        if motzoi_guess is None:
+            motzoi_guess = self.motzoi.get()
+        if frequency_guess is None:
+            frequency_guess = self.f_qubit.get()
         # # Because we are sweeping the source and not the qubit frequency
-        # start_freq = frequency_guess - self.f_pulse_mod.get()
+        start_freq = frequency_guess - self.f_pulse_mod.get()
 
-        # sweep_functions = []
-        # x0 = []
-        # init_steps = []
-        # if 'amp' in parameters:
-        #     sweep_functions.append(cb_swf.LutMan_amp180_90(self.LutMan))
-        #     x0.append(amp_guess)
-        #     init_steps.append(a_step)
-        # if 'motzoi' in parameters:
-        #     sweep_functions.append(
-        #         pw.wrap_par_to_swf(self.Q_LutMan.get_instr().motzoi_parameter))
-        #     x0.append(motzoi_guess)
-        #     init_steps.append(m_step)
-        # if 'frequency' in parameters:
-        #     sweep_functions.append(
-        #         pw.wrap_par_to_swf(self.td_source.get_instr().frequency))
-        #     x0.append(start_freq)
-        #     init_steps.append(f_step)
-        # if len(sweep_functions) == 0:
-        #     raise ValueError(
-        #         'parameters "{}" not recognized'.format(parameters))
+        sweep_functions = []
+        x0 = []
+        init_steps = []
+        if 'amp' in parameters:
+            sweep_functions.append(cbs.LutMan_amp180_90(self.Q_LutMan.get_instr()))
+            x0.append(amp_guess)
+            init_steps.append(a_step)
+        if 'motzoi' in parameters:
+            sweep_functions.append(self.Q_LutMan.get_instr().Q_motzoi_parameter)
+            x0.append(motzoi_guess)
+            init_steps.append(m_step)
+        if 'frequency' in parameters:
+            sweep_functions.append(self.td_source.get_instr().frequency)
+            x0.append(start_freq)
+            init_steps.append(f_step)
+        if len(sweep_functions) == 0:
+            raise ValueError(
+                'parameters "{}" not recognized'.format(parameters))
 
-        # MC.set_sweep_functions(sweep_functions)
+        MC.set_sweep_functions(sweep_functions)
 
-        # if len(sweep_functions) != 1:
-        #     # noise ensures no_improv_break sets the termination condition
-        #     ad_func_pars = {'adaptive_function': nelder_mead,
-        #                     'x0': x0,
-        #                     'initial_step': init_steps,
-        #                     'no_improv_break': 10,
-        #                     'minimize': False,
-        #                     'maxiter': 500}
-        # elif len(sweep_functions) == 1:
-        #     # Powell does not work for 1D, use brent instead
-        #     brack = (x0[0]-5*init_steps[0], x0[0])
-        #     # Ensures relative change in parameter is relevant
-        #     if parameters == ['frequency']:
-        #         tol = 1e-9
-        #     else:
-        #         tol = 1e-3
-        #     print('Tolerance:', tol, init_steps[0])
-        #     print(brack)
-        #     ad_func_pars = {'adaptive_function': brent,
-        #                     'brack': brack,
-        #                     'tol': tol,  # Relative tolerance in brent
-        #                     'minimize': False}
-        # MC.set_adaptive_function_parameters(ad_func_pars)
-        # MC.run(name=name, mode='adaptive')
-        # if len(sweep_functions) != 1:
-        #     a = ma.OptimizationAnalysis(auto=True, label=name,
-        #                                 close_fig=close_fig)
-        #     if verbose:
-        #         # Note printing can be made prettier
-        #         print('Optimization converged to:')
-        #         print('parameters: {}'.format(parameters))
-        #         print(a.optimization_result[0])
-        #     if update:
-        #         for i, par in enumerate(parameters):
-        #             if par == 'amp':
-        #                 self.amp180.set(a.optimization_result[0][i])
-        #             elif par == 'motzoi':
-        #                 self.motzoi.set(a.optimization_result[0][i])
-        #             elif par == 'frequency':
-        #                 self.f_qubit.set(a.optimization_result[0][i] +
-        #                                  self.f_pulse_mod.get())
-        #     return a
-        # else:
-        #     a = ma.MeasurementAnalysis(label=name, close_fig=close_fig)
-        #     print('Optimization for {} converged to: {}'.format(
-        #         parameters[0], a.sweep_points[-1]))
-        #     if update:
-        #         if parameters == ['amp']:
-        #             self.amp180.set(a.sweep_points[-1])
-        #         elif parameters == ['motzoi']:
-        #             self.motzoi.set(a.sweep_points[-1])
-        #         elif parameters == ['frequency']:
-        #             self.f_qubit.set(a.sweep_points[-1]+self.f_pulse_mod.get())
-        #     return a.sweep_points[-1]
+        if len(sweep_functions) != 1:
+            # noise ensures no_improv_break sets the termination condition
+            ad_func_pars = {'adaptive_function': nelder_mead,
+                            'par_idx': 1,  # idx of flips in the stat log det
+                            'x0': x0,
+                            'initial_step': init_steps,
+                            'no_improv_break': 10,
+                            'minimize': False,
+                            'maxiter': 500}
+        elif len(sweep_functions) == 1:
+            # Powell does not work for 1D, use brent instead
+            brack = (x0[0]-5*init_steps[0], x0[0])
+            # Ensures relative change in parameter is relevant
+            if parameters == ['frequency']:
+                tol = 1e-9
+            else:
+                tol = 1e-3
+            print('Tolerance:', tol, init_steps[0])
+            print(brack)
+            ad_func_pars = {'adaptive_function': brent,
+                            'par_idx': 1,  # idx of flips in the stat log det
+                            'brack': brack,
+                            'tol': tol,  # Relative tolerance in brent
+                            'minimize': False}
+
+        # a bit hacky
+        UHFQC = self._acquisition_instrument
+        d = det.UHFQC_single_qubit_statistics_logging_det(
+                UHFQC=UHFQC, AWG=self.CBox.get_instr(),
+                nr_shots=nr_shots,
+                integration_length=self.RO_acq_integration_length(),
+                channel=(self.RO_acq_weight_function_I()),
+                statemap={'0': '1',
+                          '1': '0'})
+            #  hardcoded statemap does not make sense but I only use flips
+            #  here anyway so it doesn't really matter...
+
+        MC.set_adaptive_function_parameters(ad_func_pars)
+        MC.set_detector_function(d)
+        MC.run(name=name, mode='adaptive')
+        if len(sweep_functions) != 1:
+            a = ma.OptimizationAnalysis(auto=True, label=name,
+                                        close_fig=close_fig)
+            if len(sweep_functions) == 2:
+                ma.OptimizationAnalysis_v2(label=name)
+            if verbose:
+                # Note printing can be made prettier
+                print('Optimization converged to:')
+                print('parameters: {}'.format(parameters))
+                print(a.optimization_result[0])
+            if update:
+                for i, par in enumerate(parameters):
+                    if par == 'amp':
+                        self.Q_amp180.set(a.optimization_result[0][i])
+                    elif par == 'motzoi':
+                        self.motzoi.set(a.optimization_result[0][i])
+                    elif par == 'frequency':
+                        self.f_qubit.set(a.optimization_result[0][i] +
+                                         self.f_pulse_mod.get())
+            return a
+        else:
+            a = ma.MeasurementAnalysis(label=name, close_fig=close_fig)
+            print('Optimization for {} converged to: {}'.format(
+                parameters[0], a.sweep_points[-1]))
+            if update:
+                if parameters == ['amp']:
+                    self.Q_amp180.set(a.sweep_points[-1])
+                elif parameters == ['motzoi']:
+                    self.motzoi.set(a.sweep_points[-1])
+                elif parameters == ['frequency']:
+                    self.f_qubit.set(a.sweep_points[-1]+self.f_pulse_mod.get())
+            return a.sweep_points[-1]
 
     def calibrate_mixer_offsets_drive(self, update=True):
         '''
@@ -1469,13 +1452,13 @@ class CBox_v3_driven_transmon(Transmon):
         optimized_weights_Q = transients[1][1] - transients[0][1]
 
         # joint rescaling to +/-1 Volt
-        maxI=np.max(np.abs(optimized_weights_I))
-        maxQ=np.max(np.abs(optimized_weights_Q))
+        maxI = np.max(np.abs(optimized_weights_I))
+        maxQ = np.max(np.abs(optimized_weights_Q))
         weight_scale_factor = 1./np.max([maxI, maxQ])
         optimized_weights_I = np.array(
-                        weight_scale_factor*optimized_weights_I)
+            weight_scale_factor*optimized_weights_I)
         optimized_weights_Q = np.array(
-                        weight_scale_factor*optimized_weights_Q)
+            weight_scale_factor*optimized_weights_Q)
 
         if update:
             self.RO_optimal_weights_I(optimized_weights_I)
@@ -2459,10 +2442,10 @@ class QWG_driven_transmon(CBox_v3_driven_transmon):
 
         # Sets the QWG channel amplitudes
         for ch in [1, 2, 3, 4]:
-            self.QWG.set('ch{}_amp'.format(ch), self.amp180()*1.1)
+            self.QWG.set('ch{}_amp'.format(ch), self.Q_amp180()*1.1)
         # FIXME:  Currently hardcoded to use channel 1
-        self.Q_LutMan.get_instr().Q_amp180(self.amp180())
-        self.Q_LutMan.get_instr().Q_amp90_scale(self.amp90_scale())
+        self.Q_LutMan.get_instr().Q_amp180(self.Q_amp180())
+        self.Q_LutMan.get_instr().Q_amp90_scale(self.Q_amp90_scale())
         self.Q_LutMan.get_instr().Q_motzoi(self.motzoi())
         self.Q_LutMan.get_instr().Q_gauss_width(self.gauss_width())
 
