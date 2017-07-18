@@ -1783,7 +1783,8 @@ class UHFQC_statistics_logging_det(Soft_Detector):
                  integration_length: float,
                  channels: list,
                  statemap: dict,
-                 channel_names: list=None):
+                 channel_names: list=None,
+                 normalize_counts: bool=True):
         """
         Detector for the statistics logger mode in the UHFQC.
 
@@ -1791,21 +1792,25 @@ class UHFQC_statistics_logging_det(Soft_Detector):
             AWG   (instrument) : device responsible for starting and stopping
                 the experiment, can also be a central controller.
             integration_length (float): integration length in seconds
-            nr_shots (int)     : nr of shots (max is 4095)
+            nr_shots (int)     : nr of shots, if a number larger than the max
+                of the UFHQC (4095) is chosen it will take chunks of 4095.
+                The total number of chunks is rounded up.
             channels (list)    : index (channel) of UHFQC weight functions
                 to use
             statemap (dict) : dictionary specifying the expected output state
                 for each 2 bit input state.
                 e.g.:
                     statemap ={'00': '00', '01':'10', '10':'10', '11':'00'}
-
-
+            normalize_counts (bool) : if False, returns total counts if True
+                return fraction of counts
         """
         super().__init__()
         self.UHFQC = UHFQC
         self.AWG = AWG
         self.nr_shots = nr_shots
+
         self.integration_length = integration_length
+        self.normalize_counts = normalize_counts
 
         self.channels = channels
         if channel_names is None:
@@ -1816,9 +1821,13 @@ class UHFQC_statistics_logging_det(Soft_Detector):
                               '{} state errors'.format(ch)]
             self.value_names.extend(ch_value_names)
         self.value_names.append('Total state errors')
-        self.value_units = '#'*len(self.value_names)
-
+        if not self.normalize_counts:
+            self.value_units = '#'*len(self.value_names)
+        else:
+            self.value_units = ['frac']*len(self.value_names)
         self.statemap = statemap
+
+        self.max_shots = 4095  # hardware limit of UHFQC
 
     @staticmethod
     def statemap_to_array(statemap: dict):
@@ -1849,25 +1858,30 @@ class UHFQC_statistics_logging_det(Soft_Detector):
         if self.AWG is not None:
             self.AWG.stop()
 
+
+        max_shots = 4095 # hardware limit of UHFQC
+        self.nr_chunks = self.nr_shots//max_shots +1
+        self.shots_per_chunk = np.min([self.nr_shots, max_shots])
+
         # The averaging-count is used to specify how many times the AWG program
         # should run
         self.UHFQC.awgs_0_single(1)
-        self.UHFQC.awgs_0_userregs_0(self.nr_shots)
+        self.UHFQC.awgs_0_userregs_0(self.shots_per_chunk)
         self.UHFQC.awgs_0_userregs_1(0)  # 0 for rl, 1 for iavg (input avg)
         # The AWG program uses userregs/0 to define the number of iterations
         # in the loop
 
         # Configure the results logger not to do any averaging
-        self.UHFQC.quex_rl_length(self.nr_shots)
+        # self.UHFQC.quex_rl_length(self.nr_shots)
         self.UHFQC.quex_rl_avgcnt(0)  # log2(1) for single shot readout
-        self.UHFQC.quex_rl_source(0)
+        # self.UHFQC.quex_rl_source(0)
 
         # configure the results logger (rl)
         self.UHFQC.quex_rl_length(4)  # 4 values per channel for stat mode
         self.UHFQC.quex_rl_source(3)  # statistics logging is rl mode "3"
 
         # Configure the statistics logger (sl)
-        self.UHFQC.quex_sl_length(self.nr_shots)
+        self.UHFQC.quex_sl_length(self.shots_per_chunk)
         self.UHFQC.quex_sl_statemap(self.statemap_to_array(self.statemap))
 
         # above should be all
@@ -1880,23 +1894,30 @@ class UHFQC_statistics_logging_det(Soft_Detector):
     def finish(self):
         if self.AWG is not None:
             self.AWG.stop()
+        self.UHFQC.acquisition_finalize()
 
     def acquire_data_point(self, **kw):
         if self.AWG is not None:
             self.AWG.stop()
-        self.UHFQC.quex_rl_readout(1)  # resets UHFQC internal readout counters
-        self.UHFQC.quex_sl_readout(0)  # resets UHFQC internal sl counters ?
+        data_concat = np.zeros(7)
+        for i in range(self.nr_chunks): 
+            self.UHFQC.quex_rl_readout(1)  # resets UHFQC internal readout counters
+            self.UHFQC.quex_sl_readout(0)  # resets UHFQC internal sl counters ?
 
-        self.UHFQC.acquisition_arm()
-        # starting AWG
-        if self.AWG is not None:
-            self.AWG.start()
+            self.UHFQC.acquisition_arm()
+            # starting AWG
+            if self.AWG is not None and i ==0:
+                self.AWG.start()
 
-        data = self.UHFQC.acquisition_poll(samples=4,  # double check this
-                                           arm=False,
-                                           acquisition_time=0.01)
 
-        data_concat = np.concatenate((data[0][:-1], data[1]))
+            data = self.UHFQC.acquisition_poll(samples=4,  # double check this
+                                               arm=False,
+                                               acquisition_time=0.01)
+
+            data_concat += np.concatenate((data[0][:-1], data[1]))
+
+        if self.normalize_counts:
+            return data_concat/(self.nr_chunks*self.shots_per_chunk)
         return data_concat
 
 
@@ -1906,7 +1927,8 @@ class UHFQC_single_qubit_statistics_logging_det(UHFQC_statistics_logging_det):
                  integration_length: float,
                  channel: int,
                  statemap: dict,
-                 channel_name: str=None):
+                 channel_name: str=None,
+                 normalize_counts: bool=True):
         """
         Detector for the statistics logger mode in the UHFQC.
 
@@ -1929,6 +1951,7 @@ class UHFQC_single_qubit_statistics_logging_det(UHFQC_statistics_logging_det):
         self.AWG = AWG
         self.nr_shots = nr_shots
         self.integration_length = integration_length
+        self.normalize_counts = normalize_counts
 
         self.channels = [channel, int((channel+1) % 5)]
 
@@ -1938,7 +1961,13 @@ class UHFQC_single_qubit_statistics_logging_det(UHFQC_statistics_logging_det):
         self.value_names = ['{} counts'.format(channel),
                             '{} flips'.format(channel),
                             '{} state errors'.format(channel)]
-        self.value_units = '#'*len(self.value_names)
+        if not self.normalize_counts:
+            self.value_units = '#'*len(self.value_names)
+        else:
+            self.value_units = ['frac']*len(self.value_names)
+        self.statemap = statemap
+
+        self.max_shots = 4095  # hardware limit of UHFQC
 
         self.statemap = self.statemap_one2two_bit(statemap)
 

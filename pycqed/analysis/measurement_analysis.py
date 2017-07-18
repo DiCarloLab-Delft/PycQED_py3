@@ -675,24 +675,25 @@ class OptimizationAnalysis_v2(MeasurementAnalysis):
         return
 
     def make_figures(self, **kw):
-        base_figname = 'optimization of ' + self.value_names[0]
-        if np.shape(self.sweep_points)[0] == 2:
-            f, ax = plt.subplots()
-            a_tools.color_plot_interpolated(
-                x=self.sweep_points[0], y=self.sweep_points[1],
-                z=self.measured_values[0], ax=ax,
-                zlabel=self.value_names[0])
-            ax.set_xlabel(self.parameter_labels[0])
-            ax.set_ylabel(self.parameter_labels[1])
-            ax.plot(self.sweep_points[0], self.sweep_points[1], '-o', c='grey')
-            ax.plot(self.sweep_points[0][-1], self.sweep_points[1][-1],
-                    'o', markersize=5, c='w')
-            plot_title = kw.pop('plot_title', textwrap.fill(
-                                self.timestamp_string + '_' +
-                                self.measurementstring, 40))
-            ax.set_title(plot_title)
+        for i in range(len(self.value_names)):
+            base_figname = 'optimization of ' + self.value_names[i]
+            if np.shape(self.sweep_points)[0] == 2:
+                f, ax = plt.subplots()
+                a_tools.color_plot_interpolated(
+                    x=self.sweep_points[0], y=self.sweep_points[1],
+                    z=self.measured_values[i], ax=ax,
+                    zlabel=self.value_names[i])
+                ax.set_xlabel(self.parameter_labels[0])
+                ax.set_ylabel(self.parameter_labels[1])
+                ax.plot(self.sweep_points[0], self.sweep_points[1], '-o', c='grey')
+                ax.plot(self.sweep_points[0][-1], self.sweep_points[1][-1],
+                        'o', markersize=5, c='w')
+                plot_title = kw.pop('plot_title', textwrap.fill(
+                                    self.timestamp_string + '_' +
+                                    self.measurementstring, 40))
+                ax.set_title(plot_title)
 
-            self.save_fig(f, figname=base_figname, **kw)
+                self.save_fig(f, figname=base_figname, **kw)
 
 
 class OptimizationAnalysis(MeasurementAnalysis):
@@ -2187,14 +2188,6 @@ class SSRO_Analysis(MeasurementAnalysis):
         plt.legend(loc=2)
         self.save_fig(fig, figname='raw-cumulative-histograms', **kw, close_fig=self.close_fig)
 
-        # saving the results
-        if 'SSRO_Fidelity' not in self.analysis_group:
-            fid_grp = self.analysis_group.create_group('SSRO_Fidelity')
-        else:
-            fid_grp = self.analysis_group['SSRO_Fidelity']
-        fid_grp.attrs.create(name='V_th_a', data=V_th_a)
-        fid_grp.attrs.create(name='F_a', data=F_a)
-
         self.F_a = F_a
         self.V_th_a = V_th_a
 
@@ -2344,6 +2337,7 @@ class SSRO_Analysis(MeasurementAnalysis):
 
         self.V_th_d = optimize.brent(NormCdfdiff)
         F_d = 1-(1+NormCdfdiff(x=self.V_th_d))/2
+
         # print 'F_corrected',F_corrected
 
         def NormCdfdiffDouble(x, mu0_0=mu0_0,
@@ -2482,6 +2476,9 @@ class SSRO_Analysis(MeasurementAnalysis):
         fid_grp.attrs.create(name='frac1_1', data=frac1_1)
         fid_grp.attrs.create(name='F_d', data=F_d)
         fid_grp.attrs.create(name='SNR', data=SNR)
+        fid_grp.attrs.create(name='V_th_a', data=self.V_th_a)
+        fid_grp.attrs.create(name='V_th_d', data=self.V_th_d)
+        fid_grp.attrs.create(name='F_a', data=self.F_a)
 
         self.sigma0_0 = sigma0_0
         self.sigma1_1 = sigma1_1
