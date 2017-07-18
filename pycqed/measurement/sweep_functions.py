@@ -725,4 +725,4 @@ class QWG_lutman_custom_wave_chunks(Soft_Sweep):
 
             self.LutMan.load_custom_pulse_onto_AWG_lookuptable(
                 self.wave_func(paramVal), append_compensation=True,
-                pulse_name=pulseName, codeword=i)
+                pulse_name=pulseName, codeword=self.codewords[i])
