@@ -469,7 +469,7 @@ class UHFQC(Instrument):
         return data
 
     def acquisition_initialize(self, channels=set([0, 1]), mode='rl'):
-        # Define the channels to use
+        # Define the channels to use and subscribe to them
         self.acquisition_paths = []
 
         if mode == 'rl':
