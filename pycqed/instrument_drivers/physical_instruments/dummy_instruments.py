@@ -39,8 +39,13 @@ class DummyParHolder(Instrument):
         self.add_parameter('skewed_parabola', unit='V',
                            get_cmd=self._measure_skewwed_parabola)
 
+        self.add_parameter('array_like', unit='a.u.',
+                           parameter_class=ManualParameter,
+                           vals=vals.Arrays())
+
     def get_idn(self):
         return 'dummy'
+
     def _measure_parabola(self):
         time.sleep(self.delay())
         return (self.x()**2 + self.y()**2 + self.z()**2 +
@@ -52,7 +57,5 @@ class DummyParHolder(Instrument):
         '''
         time.sleep(self.delay())
         return ((self.x()**2 + self.y()**2 +
-                self.z()**2)*(1 + abs(self.y()-self.x())) +
+                 self.z()**2)*(1 + abs(self.y()-self.x())) +
                 self.noise()*np.random.rand(1))
-
-

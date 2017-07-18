@@ -14,6 +14,7 @@ import os
 import time
 import h5py
 import numpy as np
+import logging
 
 
 class DateTimeGenerator:
@@ -130,3 +131,118 @@ def encode_to_utf8(s):
     elif type(s) == np.ndarray or list:
         s = [s.encode('utf-8') for s in s]
     return s
+
+
+def write_dict_to_hdf5(data_dict: dict, entry_point):
+    """
+    Args:
+        data_dict (dict): dictionary to write to hdf5 file
+        entry_point (hdf5 group.file) : location in the nested hdf5 structure
+            where to write to.
+    """
+    for key, item in data_dict.items():
+        if isinstance(item, (str, bool, tuple, float, int)):
+            entry_point.attrs[key] = item
+        elif isinstance(item, np.ndarray):
+            entry_point.create_dataset(key, data=item)
+        elif item is None:
+            # as h5py does not support saving None as attribute
+            # I create special string, note that this can create
+            # unexpected behaviour if someone saves a string with this name
+            entry_point.attrs[key] = 'NoneType:__None__'
+
+        elif isinstance(item, dict):
+            entry_point.create_group(key)
+            write_dict_to_hdf5(data_dict=item,
+                               entry_point=entry_point[key])
+        elif isinstance(item, list):
+            if len(item) > 0:
+                elt_type = type(item[0])
+                if all(isinstance(x, elt_type) for x in item):
+                    if isinstance(item[0], (int, float,
+                                            np.int32, np.int64)):
+
+                        entry_point.create_dataset(key,
+                                                   data=np.array(item))
+                        entry_point[key].attrs['list_type'] = 'array'
+                    elif isinstance(item[0], str):
+                        dt = h5py.special_dtype(vlen=str)
+                        data = np.array(item)
+                        data = data.reshape((-1, 1))
+                        ds = entry_point.create_dataset(
+                            key, (len(data), 1), dtype=dt)
+                        ds[:] = data
+                    elif isinstance(item[0], dict):
+                        entry_point.create_group(key)
+                        group_attrs = entry_point[key].attrs
+                        group_attrs['list_type'] = 'dict'
+                        base_list_key = 'list_idx_{}'
+                        group_attrs['base_list_key'] = base_list_key
+                        group_attrs['list_length'] = len(item)
+                        for i, list_item in enumerate(item):
+                            list_item_grp = entry_point[key].create_group(
+                                base_list_key.format(i))
+                            write_dict_to_hdf5(
+                                data_dict=list_item,
+                                entry_point=list_item_grp)
+                    else:
+                        logging.warning(
+                            'List of type "{}" for "{}":"{}" not '
+                            'supported, storing as string'.format(
+                                elt_type, key, item))
+                        entry_point.attrs[key] = str(item)
+                else:
+                    logging.warning(
+                        'List of mixed type for "{}":"{}" not supported, '
+                        'storing as string'.format(type(item), key, item))
+                    entry_point.attrs[key] = str(item)
+            else:
+                # as h5py does not support saving None as attribute
+                entry_point.attrs[key] = 'NoneType:__emptylist__'
+
+        else:
+            logging.warning(
+                'Type "{}" for "{}":"{}" not supported, '
+                'storing as string'.format(type(item), key, item))
+            entry_point.attrs[key] = str(item)
+
+
+def read_dict_from_hdf5(data_dict, h5_group):
+    if 'list_type' not in h5_group.attrs:
+        for key, item in h5_group.items():
+            if isinstance(item, h5py.Group):
+                data_dict[key] = {}
+                data_dict[key] = read_dict_from_hdf5(data_dict[key],
+                                                     item)
+            else:  # item either a group or a dataset
+                if 'list_type' not in item.attrs:
+                    data_dict[key] = item.value
+                else:
+                    data_dict[key] = list(item.value)
+        for key, item in h5_group.attrs.items():
+            if type(item) is str:
+                # Extracts "None" as an exception as h5py does not support
+                # storing None, nested if statement to avoid elementwise
+                # comparison warning
+                if item == 'NoneType:__None__':
+                    item = None
+                elif item == 'NoneType:__emptylist__':
+                    item = []
+            data_dict[key] = item
+    elif h5_group.attrs['list_type'] == 'dict':
+        # preallocate empty list
+        list_to_be_filled = [None] * h5_group.attrs['list_length']
+        base_list_key = h5_group.attrs['base_list_key']
+        for i in range(h5_group.attrs['list_length']):
+            list_to_be_filled[i] = {}
+            read_dict_from_hdf5(
+                data_dict=list_to_be_filled[i],
+                h5_group=h5_group[base_list_key.format(i)])
+
+        # THe error is here!, extract correctly but not adding to
+        # data dict correctly
+        data_dict = list_to_be_filled
+    else:
+        raise NotImplementedError('cannot read "list_type":"{}"'.format(
+            h5_group.attrs['list_type']))
+    return data_dict
