@@ -285,14 +285,15 @@ class QWG_FluxLookuptableManager(Instrument):
                            # to be replaced with vals.Dict)
                            vals=vals.Anything())
         self.add_parameter('wave_dict_unit',
-                           parameter_class=ManualParameter,
-                           initial_value='frac',
+                           get_cmd=self._get_wave_dict_unit(),
+                           set_cmd=self._set_wave_dict_unit(),
                            docstring='Unit in which the waveforms are '
                            'specified.\n'
                            '"frac" means "fraction of the maximum QWG '
                            'range".\n'
                            '"V" means volts.',
                            vals=vals.Enum('frac', 'V'))
+        self._wave_dict_unit = 'frac'  # Initial value for wave_dict_unit
         self.add_parameter('V_offset',
                            unit='V',
                            label='V offset',
@@ -310,6 +311,13 @@ class QWG_FluxLookuptableManager(Instrument):
                            vals=vals.Numbers())
 
         self._wave_dict = {}
+
+    def _get_wave_dict_unit(self):
+        return self._wave_dict_unit
+
+    def _set_wave_dict_unit(self, val):
+        self.F_amp.unit = val
+        self._wave_dict_unit = val
 
     def standard_waveforms(self):
         '''
