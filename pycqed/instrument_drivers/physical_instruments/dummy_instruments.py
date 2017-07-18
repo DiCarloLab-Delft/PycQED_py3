@@ -29,6 +29,7 @@ class DummyParHolder(Instrument):
                            label='white noise amplitude',
                            parameter_class=ManualParameter,
                            vals=vals.Numbers(), initial_value=0)
+
         self.add_parameter('delay', unit='s',
                            label='Sampling delay',
                            parameter_class=ManualParameter,
@@ -37,11 +38,18 @@ class DummyParHolder(Instrument):
         self.add_parameter('parabola', unit='V',
                            get_cmd=self._measure_parabola)
         self.add_parameter('skewed_parabola', unit='V',
-                           get_cmd=self._measure_skewwed_parabola)
+                           get_cmd=self._measure_skewed_parabola)
 
         self.add_parameter('array_like', unit='a.u.',
                            parameter_class=ManualParameter,
                            vals=vals.Arrays())
+
+        self.add_parameter('dict_like', unit='a.u.',
+                           parameter_class=ManualParameter,
+                           vals=vals.Dict())
+        self.add_parameter('status', vals=vals.Anything(),
+                           parameter_class=ManualParameter)
+
 
     def get_idn(self):
         return 'dummy'
@@ -51,7 +59,7 @@ class DummyParHolder(Instrument):
         return (self.x()**2 + self.y()**2 + self.z()**2 +
                 self.noise()*np.random.rand(1))
 
-    def _measure_skewwed_parabola(self):
+    def _measure_skewed_parabola(self):
         '''
         Adds a -x term to add a corelation between the parameters.
         '''

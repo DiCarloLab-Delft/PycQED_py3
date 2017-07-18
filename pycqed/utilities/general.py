@@ -1,6 +1,7 @@
 import os
 import numpy as np
 import h5py
+from pycqed.measurement import hdf5_data as h5d
 from pycqed.analysis import analysis_toolbox as a_tools
 import errno
 import pycqed as pq
@@ -152,6 +153,63 @@ def load_settings_onto_instrument(instrument, load_from_instr=None,
                 instrument.set(parameter, value)
     f.close()
     return True
+
+
+def load_settings_onto_instrument_v2(instrument, load_from_instr: str=None,
+                                     label: str=None, filepath: str=None,
+                                     timestamp: str=None):
+    '''
+    Loads settings from an hdf5 file onto the instrument handed to the
+    function.
+    By default uses the last hdf5 file in the datadirectory.
+    By giving a label or timestamp another file can be chosen as the
+    settings file.
+    '''
+
+    older_than = None
+    instrument_name = instrument.name
+    success = False
+    count = 0
+    while success is False and count < 10:
+        try:
+            if filepath is None:
+                folder = a_tools.get_folder(timestamp=timestamp, label=label,
+                                            older_than=older_than)
+                filepath = a_tools.measurement_filename(folder)
+
+            f = h5py.File(filepath, 'r')
+            snapshot = {}
+            h5d.read_dict_from_hdf5(snapshot, h5_group=f['Snapshot'])
+
+            if load_from_instr is None:
+                ins_group = snapshot['instruments'][instrument_name]
+            else:
+                ins_group = snapshot['instruments'][load_from_instr]
+            success = True
+        except Exception as e:
+            logging.warning(e)
+            older_than = os.path.split(folder)[0][-8:] \
+                + '_' + os.path.split(folder)[1][:6]
+            folder = None
+            success = False
+        count += 1
+
+    if not success:
+        logging.warning('Could not open settings for instrument "%s"' % (
+            instrument_name))
+        return False
+
+    for parname, par in ins_group['parameters'].items():
+        try:
+            if instrument.parameters[parname].has_set:
+                instrument.set(parname, par['value'])
+        except Exception as e:
+            print('Could not set parameter: "%s" to "%s" for instrument "%s"' % (
+                parname, par['value'], instrument_name))
+            print(e)
+    f.close()
+    return True
+
 
 
 def send_email(subject='PycQED needs your attention!',
