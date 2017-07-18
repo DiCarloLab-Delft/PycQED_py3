@@ -6261,12 +6261,12 @@ class Ram_Z_Analysis(MeasurementAnalysis):
                  filter_raw=False, filter_deriv_phase=False, demodulate=True,
                  f_demod=0, f01max=None, E_c=None, flux_amp=None, V_offset=0,
                  V_per_phi0=None, auto=True, make_fig=True, TwoD=False,
-                 mean_count=16, **kw):
+                 mean_count=16, close_file=True, **kw):
         super().__init__(timestamp=timestamp_cos, label='cos',
                          TwoD=TwoD, **kw)
         self.cosTrace = np.array(self.measured_values[0])
         super().__init__(timestamp=timestamp_sin, label='sin',
-                         TwoD=TwoD, **kw)
+                         TwoD=TwoD, close_file=False, **kw)
         self.sinTrace = np.array(self.measured_values[0])
 
         self.filter_raw = filter_raw
@@ -6290,6 +6290,9 @@ class Ram_Z_Analysis(MeasurementAnalysis):
                 self.sinTrace = self.sinTrace.T
                 self.run_dac_arc_analysis(make_fig=make_fig)
 
+        if close_file:
+            self.data_file.close()
+
     def normalize(self, trace):
         # * -1 because cos starts at -1 instead of 1
         trace *= -1
@@ -6307,8 +6310,8 @@ class Ram_Z_Analysis(MeasurementAnalysis):
                 f_demod=self.f_demod,
                 return_all=True)
 
-        # self.add_dataset_to_analysisgroup('detuning', self.df)
-        # self.add_dataset_to_analysisgroup('phase', self.phases)
+        self.add_dataset_to_analysisgroup('detuning', self.df)
+        self.add_dataset_to_analysisgroup('phase', self.phases)
 
         if (self.f01max is not None and self.E_c is not None and
                 self.flux_amp is not None and self.V_per_phi0 is not None):
@@ -6321,13 +6324,8 @@ class Ram_Z_Analysis(MeasurementAnalysis):
                 V_per_phi0=self.V_per_phi0,
                 asymmetry=0) / self.flux_amp
 
-            # TODO: Remove after testing the above line.
-            # self.step_response = self.get_stepresponse(
-            #     self.df, self.f01max, self.E_c, self.flux_amp,
-            #     V_per_phi0=self.V_per_phi0, V_offset=self.V_offset)
-
-            # self.add_dataset_to_analysisgroup('step_response',
-            #                                   self.step_response)
+            self.add_dataset_to_analysisgroup('step_response',
+                                              self.step_response)
             plotStep = True
         else:
             print('To calculate step response, f01max, E_c, flux_amp, '
@@ -6375,7 +6373,8 @@ class Ram_Z_Analysis(MeasurementAnalysis):
         df[0] = 0  # detuning must start at 0
 
         if return_all:
-            return df, raw_phases, phases, I, Q
+            return (df, raw_phases * 360 / (2*np.pi),
+                    phases * 360 / (2*np.pi), I, Q)
         else:
             return df
 
@@ -6429,7 +6428,6 @@ class Ram_Z_Analysis(MeasurementAnalysis):
         ax.set_title('demodulated normalized data')
         ax.legend(['cos', 'sin'], loc=1)
         self.save_fig(fig, 'Ram-Z_normalized_data.png')
-        # fig.savefig('Ram-Z_normalized_data.png', dpi=300)
 
         fig, ax = plt.subplots(1, 1, figsize=(7, 5))
         ax.plot(self.sweep_points[:len(self.phases)], self.phases, '-o')
@@ -6438,22 +6436,19 @@ class Ram_Z_Analysis(MeasurementAnalysis):
         pl_tools.set_ylabel(ax, 'phase', 'rad')
         ax.set_title('Phase')
         self.save_fig(fig, 'Ram-Z_phase.png')
-        # fig.savefig('Ram-Z_phase.png', dpi=300)
 
         fig, ax = plt.subplots(1, 1, figsize=(7, 5))
         ax.plot(self.sweep_points[:len(self.df)], self.df, '-o')
-        # ax.set_ylim((50e6, 300e6))
         pl_tools.set_xlabel(ax, self.parameter_names[0],
                             self.parameter_units[0])
         pl_tools.set_ylabel(ax, 'detuning', 'Hz')
         ax.set_title('Detuning')
         self.save_fig(fig, 'Ram-Z_detuning.png')
-        # fig.savefig('Ram-Z_detuning.png', dpi=300)
 
         if plot_step:
             fig, ax = plt.subplots(1, 1, figsize=(7, 5))
-            ax.plot(self.sweep_points[:len(step)],
-                    step, '-o')
+            ax.plot(self.sweep_points[:len(self.step_response)],
+                    self.step_response, '-o')
             pl_tools.set_xlabel(ax, self.parameter_names[0],
                                 self.parameter_units[0])
             pl_tools.set_ylabel(ax, 'step response', '')
