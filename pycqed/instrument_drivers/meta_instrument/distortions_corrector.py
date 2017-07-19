@@ -4,6 +4,7 @@ import pycqed.instrument_drivers.physical_instruments.RTO1024 as RTO
 import pycqed.measurement.detector_functions as det
 import pycqed.analysis.measurement_analysis as ma
 import pycqed.measurement.measurement_control as mc
+import pycqed.analysis.fitting_models as fit_mods
 import numpy as np
 import numpy.linalg
 import scipy.interpolate as sc_intpl
@@ -318,7 +319,17 @@ class Distortion_corrector():
             'kernel': list(new_ker)
         }
 
-    def fit_spline(self, start_time_fit, end_time_fit, s=0.001):
+    def raw_inversion(self, start_time_fit: float, stop_time_fit: float):
+        '''
+        Numerically invert the raw step response to calculate the distortion
+        correction.
+        '''
+        self._start_idx = np.argmin(np.abs(self.time_pts - start_time_fit))
+        self._stop_idx = np.argmin(np.abs(self.time_pts - end_time_fit))
+        # Todo: implement this.
+
+    def fit_spline(self, start_time_fit, end_time_fit, s=0.001,
+                   weight_tau='auto'):
         '''
         Fit the data using a spline interpolation.
 
@@ -330,15 +341,32 @@ class Distortion_corrector():
             s (float):
                     Smoothing condition for the spline. See documentation on
                     scipy.interpolate.splrep for more information.
+            weight_tau (float or 'auto'):
+                    The points are weighted by a decaying exponential with
+                    time constant weight_tau.
+                    If this is 'auto' the time constant is chosen to be
+                    end_time_fit.
+                    If this is 'inf' all weights are set to 1.
+                    Smaller weight means the spline can have a larger
+                    distance from this point. See documentation on
+                    scipy.interpolate.splrep for more information.
         '''
         self._start_idx = np.argmin(np.abs(self.time_pts - start_time_fit))
         self._stop_idx = np.argmin(np.abs(self.time_pts - end_time_fit))
 
+        if weight_tau == 'auto':
+            weight_tau = end_time_fit
+
+        if weight_tau == 'inf':
+            splWeights = np.ones(self._stop_idx - self._start_idx)
+        else:
+            splWeights = np.exp(
+                -self.time_pts[self._start_idx:self._stop_idx] / weight_tau)
+
         splTuple = sc_intpl.splrep(
             x=self.time_pts[self._start_idx:self._stop_idx],
             y=self.waveform[self._start_idx:self._stop_idx],
-            w=np.exp(-self.time_pts[self._start_idx:self._stop_idx] /
-                     self.time_pts[self._stop_idx]),
+            w=splWeights,
             s=s)
         splStep = sc_intpl.splev(
             self.time_pts[self._start_idx:self._stop_idx],
@@ -372,12 +400,13 @@ class Distortion_corrector():
             'filter_params': {},
             'fit': {
                 'model': 'spline',
-                's': s
+                's': s,
+                'weight_tau': weight_tau
             },
             'kernel': list(new_ker)
         }
 
-    def plot_trace(self, start_time=0, stop_time=10e-6, no_plot_pts=1000,
+    def plot_trace(self, start_time=0, stop_time=10e-6, nr_plot_pts=4000,
                    save_y_range=True):
         '''
         Plot last trace that was measured (self.waveform).
@@ -390,7 +419,7 @@ class Distortion_corrector():
         start_idx = np.argmin(np.abs(self.time_pts - start_time))
         stop_idx = np.argmin(np.abs(self.time_pts - stop_time))
         step = max(
-            int(len(self.time_pts[start_idx:stop_idx]) // no_plot_pts), 1)
+            int(len(self.time_pts[start_idx:stop_idx]) // nr_plot_pts), 1)
 
         # Save the y-range of the plot if a window is open.
         err = False
@@ -425,7 +454,8 @@ class Distortion_corrector():
         self.vw.subplots[0].getAxis('bottom').setLabel('t', 's')
         self.vw.subplots[0].getAxis('left').setLabel('normalized amp', '')
 
-    def plot_fit(self, start_time=0, stop_time=10e-6, save_y_range=True):
+    def plot_fit(self, start_time=0, stop_time=10e-6, save_y_range=True,
+                 nr_plot_pts=4000):
         '''
         Plot last trace that was measured (self.waveform) and the latest fit.
         Args:
@@ -435,7 +465,7 @@ class Distortion_corrector():
                                 Keep the current y-range of the plot.
         '''
         self.plot_trace(start_time=start_time, stop_time=stop_time,
-                        save_y_range=save_y_range)
+                        save_y_range=save_y_range, nr_plot_pts=nr_plot_pts)
         self.vw.add(x=self.time_pts[self._start_idx:self._stop_idx],
                     y=self.fitted_waveform,
                     color='#ff7f0e')
@@ -577,7 +607,7 @@ class Distortion_corrector():
         self._t_stop_loop = self.time_pts[-1]
 
         self.plot_trace(self._t_start_loop, self._t_stop_loop,
-                        save_y_range=False)
+                        save_y_range=False, nr_plot_pts=self.nr_plot_points)
 
         # LOOP STARTS HERE
         self._fit_model_loop = 'exponential'  # Default fit model used
@@ -608,7 +638,8 @@ class Distortion_corrector():
             elif self._fit_model_loop == 'spline':
                 self.fit_spline(fit_start, fit_stop)
 
-            self.plot_fit(self._t_start_loop, self._t_stop_loop)
+            self.plot_fit(self._t_start_loop, self._t_stop_loop,
+                          nr_plot_pts=self.nr_plot_points)
 
             repeat = True
             while repeat:
@@ -634,7 +665,8 @@ class Distortion_corrector():
             print('Testing new correction.')
             self.test_new_kernel()
             self.measure_trace()
-            self.plot_trace(self._t_start_loop, self._t_stop_loop)
+            self.plot_trace(self._t_start_loop, self._t_stop_loop,
+                            nr_plot_pts=self.nr_plot_points)
 
             repeat = True
             while repeat:
@@ -649,7 +681,8 @@ class Distortion_corrector():
                 self.discard_new_kernel()
                 self.time_pts = previous_t
                 self.waveform = previous_wave
-                self.plot_trace(self._t_start_loop, self._t_stop_loop)
+                self.plot_trace(self._t_start_loop, self._t_stop_loop,
+                                nr_plot_pts=self.nr_plot_points)
                 # Go back to 2.
                 continue
 
@@ -685,10 +718,12 @@ class Distortion_corrector():
             self._t_stop_loop = float(inp_elements[2])
             if len(self.vw.traces) == 4:  # 3 grey lines + 1 data trace
                 # Only data plotted
-                self.plot_trace(self._t_start_loop, self._t_stop_loop)
+                self.plot_trace(self._t_start_loop, self._t_stop_loop,
+                                nr_plot_pts=self.nr_plot_points)
             else:
                 # Fit also plotted
-                self.plot_fit(self._t_start_loop, self._t_stop_loop)
+                self.plot_fit(self._t_start_loop, self._t_stop_loop,
+                              nr_plot_pts=self.nr_plot_points)
 
         elif inp_elements[0] == 'h':
             print(self._loop_helpstring)
@@ -825,9 +860,8 @@ class RT_distortion_corrector(Distortion_corrector):
 
 
 class Cryo_distortion_corrector(Distortion_corrector):
-    def __init__(self, time_pts, qubit, V_per_phi0,
-                 V_0=0, f_demod=0, square_amp=1, nr_plot_points=4000,
-                 demodulate=False, chunk_size=32):
+    def __init__(self, time_pts, qubit, f_demod=0, square_amp=1,
+                 nr_plot_points=4000, demodulate=False, chunk_size=32):
         '''
         Instantiate an object.
         This class uses qubit.measure_ram_z to measure the step response.
@@ -850,10 +884,11 @@ class Cryo_distortion_corrector(Distortion_corrector):
         super().__init__(kernel_object=self.AWG_lutman.F_kernel_instr.get_instr(),
                          nr_plot_points=nr_plot_points)
         self.time_pts = time_pts
+        self.phases = []
 
         self.chunk_size=chunk_size
-        self.V_per_phi0 = V_per_phi0
-        self.V_0 = V_0
+        self.V_per_phi0 = qubit.V_per_phi0()
+        self.V_0 = qubit.V_offset()
         self.f_demod = f_demod
         self.square_amp = square_amp
         self.demodulate = demodulate
@@ -877,3 +912,127 @@ class Cryo_distortion_corrector(Distortion_corrector):
         self.data_dir = a.folder
 
         self.waveform = a.step_response
+        self.phases = a.phases
+
+    def fit_spline_phase(self, start_time_fit: float, end_time_fit:float,
+                         s: float=0.001, weight_tau='auto',
+                         disable_inversion: bool=False):
+        '''
+        Fit the phase data using a spline interpolation.
+
+        Args:
+            start_time_fit (float):
+                    Start of the fitted interval.
+            end_time_fit (float):
+                    End of the fitted interval.
+            s (float):
+                    Smoothing condition for the spline. See documentation on
+                    scipy.interpolate.splrep for more information.
+            weight_tau (float or 'auto'):
+                    The points are weighted by a decaying exponential with
+                    time constant weight_tau.
+                    If this is 'auto' the time constant is chosen to be
+                    end_time_fit.
+                    If this is 'inf' all weights are set to 1.
+                    Smaller weight means the spline can have a larger
+                    distance from this point. See documentation on
+                    scipy.interpolate.splrep for more information.
+        '''
+        self._start_idx = np.argmin(np.abs(self.time_pts - start_time_fit))
+        self._stop_idx = np.argmin(np.abs(self.time_pts - end_time_fit))
+
+        if weight_tau == 'auto':
+            weight_tau = end_time_fit
+
+        if weight_tau == 'inf':
+            splWeights = np.ones(self._stop_idx - self._start_idx)
+        else:
+            splWeights = np.exp(
+                -self.time_pts[self._start_idx:self._stop_idx] / weight_tau)
+
+        splTuple = sc_intpl.splrep(
+            x=self.time_pts[self._start_idx:self._stop_idx],
+            y=self.phases[self._start_idx:self._stop_idx],
+            w=splWeights,
+            s=s)
+        splObj = sc_intpl.BSpline(*splTuple)
+        splPhase = sc_intpl.splev(
+            self.time_pts[self._start_idx:self._stop_idx], splObj)
+        splDetun = sc_intpl.splev(
+            self.time_pts[self._start_idx:self._stop_idx],
+            splObj.derivative()) / (360.0) \
+            + self.f_demod * self.demodulate
+        splStep = np.array([fit_mods.Qubit_freq_to_dac(
+            frequency=self.qubit.f_max() - df,
+            f_max=self.qubit.f_max(),
+            E_c=self.qubit.E_c(),
+            dac_sweet_spot=self.qubit.V_offset(),
+            V_per_phi0=self.qubit.V_per_phi0(),
+            asymmetry=0) for df in splDetun]) / self.square_amp
+
+        # Pad step response with avg of last 10 points (assuming the user has
+        # chosen the range such that the response has become flat)
+        splStep = np.concatenate(
+            (splStep,
+             np.ones(self.kernel_length - len(splPhase)) *
+             np.mean(splStep[-10:])))
+
+        self.fit_res = None
+        self.fit_model = None
+        self.fitted_phases = splPhase[:self._stop_idx-self._start_idx]
+        self.fitted_waveform = splStep[:self._stop_idx-self._start_idx]
+
+        if not disable_inversion:
+            # Calculate the kernel and invert it.
+            h = np.empty_like(splStep)
+            h[0] = splStep[0]
+            h[1:] = splStep[1:] - splStep[:-1]
+
+            filterMatrix = np.zeros((len(h), len(h)))
+            for n in range(len(h)):
+                for m in range(n+1):
+                    filterMatrix[n, m] = h[n - m]
+
+            new_ker = numpy.linalg.inv(filterMatrix)[:, 0]
+            self.new_step = np.convolve(new_ker,
+                                        np.ones(len(splStep)))[:len(splStep)]
+            self.new_kernel_dict = {
+                'name': self.filename + '_' + str(self._iteration),
+                'filter_params': {},
+                'fit': {
+                    'model': 'spline_phase',
+                    's': s,
+                    'weight_tau': weight_tau
+                },
+                'kernel': list(new_ker)
+            }
+
+    def plot_phase(self, start_time: float=0, stop_time: float=1e-6,
+                   save_y_range: bool=True, nr_plot_pts: int=4000):
+        origWaveform = self.waveform
+        self.waveform = self.phases
+        self.plot_trace(start_time=start_time,
+                        stop_time=stop_time,
+                        save_y_range=save_y_range,
+                        nr_plot_pts=nr_plot_pts)
+        self.vw.subplots[0].getAxis('bottom').setLabel('t', 's')
+        self.vw.subplots[0].getAxis('left').setLabel('phase', 'deg')
+
+        self.waveform = origWaveform
+
+    def plot_fit_phase(self, start_time: float=0, stop_time: float=1e-6,
+                       save_y_range: bool=True, nr_plot_pts: int=4000):
+        origWaveform = self.waveform
+        self.waveform = self.phases
+        self.plot_trace(start_time=start_time,
+                        stop_time=stop_time,
+                        save_y_range=save_y_range,
+                        nr_plot_pts=nr_plot_pts)
+        self.vw.add(x=self.time_pts[self._start_idx:self._stop_idx],
+                    y=self.fitted_phases,
+                    color='#ff7f0e')
+        # Labels need to be set in the end, else they don't show sometimes
+        self.vw.subplots[0].getAxis('bottom').setLabel('t', 's')
+        self.vw.subplots[0].getAxis('left').setLabel('phase', 'deg')
+
+        self.waveform = origWaveform
