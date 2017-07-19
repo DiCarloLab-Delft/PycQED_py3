@@ -11,6 +11,9 @@ from pycqed.measurement.waveform_control_CC import single_qubit_qasm_seqs as sqq
 
 from pycqed.measurement.waveform_control_CC import qasm_to_asm as qta
 from pycqed.measurement.waveform_control_CC import instruction_lib as ins_lib
+from pycqed.measurement import sweep_functions as swf
+from pycqed.analysis import measurement_analysis as ma
+
 
 '''
 Contains general calibration routines, most notably for calculating mixer
@@ -182,7 +185,7 @@ def mixer_skewness_calibration_5014(SH, source, station,
     ad_func_pars = {'adaptive_function': nelder_mead,
                     'x0': [1.0, 0.0],
                     'initial_step': [.15, 10],
-                    'no_improv_break': 10,
+                    'no_improv_break': 12,
                     'minimize': True,
                     'maxiter': 500}
     MC.set_sweep_functions([S1, S2])
@@ -197,6 +200,7 @@ def mixer_skewness_calibration_5014(SH, source, station,
     return phi, alpha
 
 
+
 def mixer_skewness_calibration_adaptive(**kw):
     raise NotImplementedError('see archived calibration toolbox')
 
@@ -204,9 +208,7 @@ def mixer_skewness_calibration_adaptive(**kw):
 def mixer_carrier_cancellation_5014(AWG, SH, source, MC,
                                     frequency=None,
                                     AWG_channel1=1,
-                                    AWG_channel2=2,
-                                    voltage_grid=[.1, 0.05, 0.02],
-                                    xtol=0.001, **kw):
+                                    AWG_channel2=2, **kw):
     '''
     Varies the mixer offsets to minimize leakage at the carrier frequency.
     this is the version for a tektronix AWG.
@@ -224,13 +226,6 @@ def mixer_carrier_cancellation_5014(AWG, SH, source, MC,
 
     Note: Updated for QCodes
     '''
-    ch_1_min = 0  # Initializing variables used later on
-    ch_2_min = 0
-    last_ch_1_min = 1
-    last_ch_2_min = 1
-    ii = 0
-    min_power = 0
-
     source.on()
     if frequency is None:
         frequency = source.get('frequency')
@@ -240,85 +235,31 @@ def mixer_carrier_cancellation_5014(AWG, SH, source, MC,
     '''
     Make coarse sweeps to approximate the minimum
     '''
-    if type(AWG_channel1) is int:
-        ch1_offset = AWG['ch{}_offset'.format(AWG_channel1)]
-    else:
-        ch1_offset = AWG[AWG_channel1+'_offset']
-    if type(AWG_channel2) is int:
-        ch2_offset = AWG['ch{}_offset'.format(AWG_channel2)]
-    else:
-        ch2_offset = AWG[AWG_channel2+'_offset']
+    S1 = AWG.ch1_offset # to be dedicatyed to actual channel
+    S2 =  AWG.ch2_offset
 
-    ch1_swf = pw.wrap_par_to_swf(ch1_offset)
-    ch2_swf = pw.wrap_par_to_swf(ch2_offset)
-    for voltage_span in voltage_grid:
-        # Channel 1
-        MC.set_sweep_function(ch1_swf)
-        MC.set_detector_function(
-            det.Signal_Hound_fixed_frequency(signal_hound=SH,
-                                             frequency=frequency))
-        MC.set_sweep_points(np.linspace(ch_1_min + voltage_span,
-                                        ch_1_min - voltage_span, 11))
-        MC.run(name='Mixer_cal_Offset_%s' % AWG_channel1,
-               sweep_delay=.1, debug_mode=True)
-        Mixer_Calibration_Analysis = ma.Mixer_Calibration_Analysis(
-            label='Mixer_cal', auto=True)
-        ch_1_min = Mixer_Calibration_Analysis.fit_results[0]
-        ch1_offset.set(ch_1_min)
+    detector = det.Signal_Hound_fixed_frequency(
+                SH, frequency=(source.frequency.get()),
+                Navg=5, delay=0.0, prepare_each_point=False)
 
-        # Channel 2
-        MC.set_sweep_function(ch2_swf)
-        MC.set_sweep_points(np.linspace(ch_2_min + voltage_span,
-                                        ch_2_min - voltage_span, 11))
-        MC.run(name='Mixer_cal_Offset_ch%s' % AWG_channel2,
-               sweep_delay=.1, debug_mode=True)
-        Mixer_Calibration_Analysis = ma.Mixer_Calibration_Analysis(
-            label='Mixer_cal', auto=True)
-        ch_2_min = Mixer_Calibration_Analysis.fit_results[0]
-        ch2_offset.set(ch_2_min)
-
-    # Refine and repeat the sweeps to find the minimum
-    while(abs(last_ch_1_min - ch_1_min) > xtol
-          and abs(last_ch_2_min - ch_2_min) > xtol):
-        ii += 1
-        dac_resolution = 0.001
-        # channel 1 finer sweep
-        MC.set_sweep_function(ch1_swf)
-        MC.set_sweep_points(np.linspace(ch_1_min - dac_resolution*6,
-                                        ch_1_min + dac_resolution*6, 13))
-        MC.run(name='Mixer_cal_Offset_%s' % AWG_channel1,
-               sweep_delay=.1, debug_mode=True)
-        Mixer_Calibration_Analysis = ma.Mixer_Calibration_Analysis(
-            label='Mixer_cal', auto=True)
-        last_ch_1_min = ch_1_min
-        ch_1_min = Mixer_Calibration_Analysis.fit_results[0]
-        ch1_offset.set(ch_1_min)
-        # Channel 2 finer sweep
-        MC.set_sweep_function(ch2_swf)
-        MC.set_sweep_points(np.linspace(ch_2_min - dac_resolution*6,
-                                        ch_2_min + dac_resolution*6, 13))
-        MC.run(name='Mixer_cal_Offset_%s' % AWG_channel2,
-               sweep_delay=.1, debug_mode=True)
-        Mixer_Calibration_Analysis = ma.Mixer_Calibration_Analysis(
-            label='Mixer_cal', auto=True)
-        last_ch_2_min = ch_2_min
-        min_power = min(Mixer_Calibration_Analysis.measured_powers)
-        ch_2_min = Mixer_Calibration_Analysis.fit_results[0]
-        ch2_offset.set(ch_2_min)
-
-        if ii > 10:
-            logging.error('Mixer calibration did not converge')
-            break
-    print(ch_1_min, ch_2_min)
+    ad_func_pars = {'adaptive_function': nelder_mead,
+                        'x0': [0.0, 0.0],
+                        'initial_step': [0.01, 0.01],
+                        'no_improv_break': 15,
+                        'minimize': True,
+                        'maxiter': 500}
+    MC.set_sweep_functions([S1, S2])
+    MC.set_detector_function(detector)  # sets test_detector
+    MC.set_adaptive_function_parameters(ad_func_pars)
+    MC.run(name='Offset_calibration', mode='adaptive')
+    a = ma.OptimizationAnalysis(auto=True, label='Offset_calibration')
+    ch_1_min = a.optimization_result[0][0]
+    ch_2_min = a.optimization_result[0][1]
     return ch_1_min, ch_2_min
 
 
 def mixer_carrier_cancellation_UHFQC(UHFQC, SH, source, MC,
-                                     frequency=None,
-                                     AWG_channel1=0,
-                                     AWG_channel2=1,
-                                     voltage_grid=[.1, 0.05, 0.02],
-                                     xtol=0.001, **kw):
+                                     frequency=None,**kw):
     '''
     Varies the mixer offsets to minimize leakage at the carrier frequency.
     this is the version for a UHFQC.
@@ -336,13 +277,6 @@ def mixer_carrier_cancellation_UHFQC(UHFQC, SH, source, MC,
 
     Note: Updated for QCodes
     '''
-    ch_1_min = 0  # Initializing variables used later on
-    ch_2_min = 0
-    last_ch_1_min = 1
-    last_ch_2_min = 1
-    ii = 0
-    min_power = 0
-
     source.on()
     if frequency is None:
         frequency = source.get('frequency')
@@ -352,70 +286,26 @@ def mixer_carrier_cancellation_UHFQC(UHFQC, SH, source, MC,
     '''
     Make coarse sweeps to approximate the minimum
     '''
-    ch1_offset = UHFQC.sigouts_0_offset
-    ch2_offset = UHFQC.sigouts_1_offset
+    S1 = UHFQC.sigouts_0_offset
+    S2 = UHFQC.sigouts_1_offset
 
-    ch1_swf = UHFQC.sigouts_0_offset
-    ch2_swf = UHFQC.sigouts_1_offset
-    for voltage_span in voltage_grid:
-        # Channel 1
-        MC.set_sweep_function(ch1_swf)
-        MC.set_detector_function(
-            det.Signal_Hound_fixed_frequency(signal_hound=SH,
-                                             frequency=frequency))
-        MC.set_sweep_points(np.linspace(ch_1_min + voltage_span,
-                                        ch_1_min - voltage_span, 11))
-        MC.run(name='Mixer_cal_Offset_%s' % AWG_channel1,
-               sweep_delay=.1, debug_mode=True)
-        Mixer_Calibration_Analysis = ma.Mixer_Calibration_Analysis(
-            label='Mixer_cal', auto=True)
-        ch_1_min = Mixer_Calibration_Analysis.fit_results[0]
-        ch1_offset(ch_1_min)
+    detector = det.Signal_Hound_fixed_frequency(
+                SH, frequency=(source.frequency.get()),
+                Navg=5, delay=0.0, prepare_each_point=False)
 
-        # Channel 2
-        MC.set_sweep_function(ch2_swf)
-        MC.set_sweep_points(np.linspace(ch_2_min + voltage_span,
-                                        ch_2_min - voltage_span, 11))
-        MC.run(name='Mixer_cal_Offset_ch%s' % AWG_channel2,
-               sweep_delay=.1, debug_mode=True)
-        Mixer_Calibration_Analysis = ma.Mixer_Calibration_Analysis(
-            label='Mixer_cal', auto=True)
-        ch_2_min = Mixer_Calibration_Analysis.fit_results[0]
-        ch2_offset(ch_2_min)
-
-    # Refine and repeat the sweeps to find the minimum
-    while(abs(last_ch_1_min - ch_1_min) > xtol
-          and abs(last_ch_2_min - ch_2_min) > xtol):
-        ii += 1
-        dac_resolution = 0.001
-        # channel 1 finer sweep
-        MC.set_sweep_function(ch1_swf)
-        MC.set_sweep_points(np.linspace(ch_1_min - dac_resolution*6,
-                                        ch_1_min + dac_resolution*6, 13))
-        MC.run(name='Mixer_cal_Offset_%s' % AWG_channel1,
-               sweep_delay=.1, debug_mode=True)
-        Mixer_Calibration_Analysis = ma.Mixer_Calibration_Analysis(
-            label='Mixer_cal', auto=True)
-        last_ch_1_min = ch_1_min
-        ch_1_min = Mixer_Calibration_Analysis.fit_results[0]
-        ch1_offset.set(ch_1_min)
-        # Channel 2 finer sweep
-        MC.set_sweep_function(ch2_swf)
-        MC.set_sweep_points(np.linspace(ch_2_min - dac_resolution*6,
-                                        ch_2_min + dac_resolution*6, 13))
-        MC.run(name='Mixer_cal_Offset_%s' % AWG_channel2,
-               sweep_delay=.1, debug_mode=True)
-        Mixer_Calibration_Analysis = ma.Mixer_Calibration_Analysis(
-            label='Mixer_cal', auto=True)
-        last_ch_2_min = ch_2_min
-        min_power = min(Mixer_Calibration_Analysis.measured_powers)
-        ch_2_min = Mixer_Calibration_Analysis.fit_results[0]
-        ch2_offset.set(ch_2_min)
-
-        if ii > 10:
-            logging.error('Mixer calibration did not converge')
-            break
-    print(ch_1_min, ch_2_min)
+    ad_func_pars = {'adaptive_function': nelder_mead,
+                        'x0': [0.0, 0.0],
+                        'initial_step': [0.01, 0.01],
+                        'no_improv_break': 15,
+                        'minimize': True,
+                        'maxiter': 500}
+    MC.set_sweep_functions([S1, S2])
+    MC.set_detector_function(detector)  # sets test_detector
+    MC.set_adaptive_function_parameters(ad_func_pars)
+    MC.run(name='Offset_calibration', mode='adaptive')
+    a = ma.OptimizationAnalysis(auto=True, label='Offset_calibration')
+    ch_1_min = a.optimization_result[0][0]
+    ch_2_min = a.optimization_result[0][1]
     return ch_1_min, ch_2_min
 
 
@@ -653,3 +543,79 @@ def mixer_skewness_cal_CBox_adaptive(CBox, SH, source,
         return phi, alpha
     else:
         return phase_min_lst[0], ampl_min_lst[0]
+
+
+def mixer_skewness_cal_UHFQC_adaptive(UHFQC, SH, source, AWG,
+                                      acquisition_marker_channel,
+                                     LutMan,
+                                     MC,
+                                     verbose=True):
+    '''
+    Input args
+        UHFQC
+        SH:     Signal Hound
+        source: MW-source connected to the mixer
+        LutMan: Used for changing the pars and loading the pulses
+        AWG:    Used for supplying triggers to the CBox
+        MC:
+        awg_nrs: The awgs used in the CBox to which the pulses are uploaded.
+                 (list to allow setting a copy on e.g. awg_nr = 1)
+
+
+    Calibrates the mixer skewnness
+    The UHFQC, in this case a fixed sequence is played in the tektronix
+    to ensure the UHFQC is continously triggered and the parameters are
+    reloaded between each measured point.
+
+    If calibrate_both_sidebands is True the optimization runs two calibrations,
+    first it tries to minimize the power in the spurious sideband by varying
+    the phase and amplitude skewness. After that it flips the phase 180 degrees
+    and repeates the same experiment for the desired sideband. Both should
+    give the same result.
+
+    For a description on how to translate these coefficients to a rotation
+    matrix see the notes in docs/notes/MixerSkewnessCalibration_LDC_150629.pdf
+
+    If calibrate_both_sidebands is False it will only minimize the signal in
+    the spurious sideband. and return those values.
+
+    '''
+    # Loads a train of pulses to the AWG to trigger the UHFQC continuously
+    AWG.stop()
+    st_seqs.generate_and_upload_marker_sequence(
+                    5e-9, 1.0e-6, RF_mod=False,
+                    acq_marker_channels=acquisition_marker_channel)
+    AWG.run()
+
+    #  Ensure that the block is 4 periods of the modulation freq
+    #  Ensure that the block is 4 periods of the modulation freq
+    LutMan.M_block_length.set(960e-9)  # in ns
+    LutMan.M_ampCW.set(0.4)
+    LutMan.render_wave('M_ModBlock', time_unit='ns')
+    # divide instead of multiply by 1e-9 because of rounding errs
+    S1 = swf.UHFQC_Lutman_par_with_reload(LutMan,
+                                        LutMan.mixer_alpha,
+                                        ['M_ModBlock'], run=True, single=False)
+    S2 =swf.UHFQC_Lutman_par_with_reload(LutMan,
+                                         LutMan.mixer_phi,
+                                        ['M_ModBlock'], run=True, single=False)
+
+    detector = det.Signal_Hound_fixed_frequency(
+                SH, frequency=(source.frequency.get() -
+                               LutMan.M_modulation()),
+                Navg=5, delay=0.0, prepare_each_point=False)
+
+    ad_func_pars = {'adaptive_function': nelder_mead,
+                        'x0': [1.0, 0.0],
+                        'initial_step': [.15, 10],
+                        'no_improv_break': 10,
+                        'minimize': True,
+                        'maxiter': 500}
+    MC.set_sweep_functions([S1, S2])
+    MC.set_detector_function(detector)  # sets test_detector
+    MC.set_adaptive_function_parameters(ad_func_pars)
+    MC.run(name='Spurious_sideband', mode='adaptive')
+    a = ma.OptimizationAnalysis(auto=True, label='Spurious_sideband')
+    alpha = a.optimization_result[0][0]
+    phi = a.optimization_result[0][1]
+    return phi, alpha
