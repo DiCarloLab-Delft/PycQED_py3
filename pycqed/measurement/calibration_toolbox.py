@@ -34,41 +34,52 @@ def mixer_carrier_cancellation_duplexer(**kw):
 
 def mixer_carrier_cancellation(SH, source, MC,
                                chI_par, chQ_par,
-                               frequency=None,
-                               voltage_grid=[
-                                   0.050, 0.020, 0.010, 0.005, 0.002],
-                               range_min=None,
-                               range_max=None):
+                               frequency: float=None,
+                               init_stepsize: float=0.1):
+    """
+    Varies the mixer offsets to minimize leakage at the carrier frequency.
+    this is a generic version.
 
-    ch_min = [0, 0]  # Initializing variables used later on
+    Args:
+        SH     (instr) : Signal hound used to measure power
+        source (instr) : mw_source that provides the leakage tone
+        MC     (instr) :
+        chI_par (par)  :
+        chQ_par (par)  :
+        frequency (float) : the frequency in Hz at which to minimize leakage
+    """
+
     source.on()
     if frequency is None:
-        frequency = source.get('frequency')
+        frequency = source.frequency()
     else:
-        source.set('frequency', frequency)
+        source.frequency(frequency)
 
-    for voltage_span in voltage_grid:
-        # Channel 0
-        for i, ch_par in enumerate([chI_par, chQ_par]):
-            MC.set_sweep_function(ch_par)
-            MC.set_detector_function(
-                det.Signal_Hound_fixed_frequency(signal_hound=SH, frequency=frequency))
+    '''
+    Make coarse sweeps to approximate the minimum
+    '''
 
-            swp_start = ch_min[i] + voltage_span
-            swp_end = ch_min[i] - voltage_span
-            swp_pts = np.linspace(swp_start, swp_end,  11)
-            print(swp_pts)
-            MC.set_sweep_points(swp_pts)
-            MC.run(name='Mixer_cal_{}'.format(ch_par.name),
-                   sweep_delay=.1)
-            Mixer_Calibration_Analysis = ma.Mixer_Calibration_Analysis(
-                label='Mixer_cal')
-            ch_min[i] = Mixer_Calibration_Analysis.fit_results[0]
-            ch_par(ch_min[i])
+    detector = det.Signal_Hound_fixed_frequency(
+        SH, frequency=(source.frequency()),
+        Navg=5, delay=0.0, prepare_each_point=False)
 
-    chI_par(ch_min[0])
-    chQ_par(ch_min[1])
-    return ch_min
+    ad_func_pars = {'adaptive_function': nelder_mead,
+                    'x0': [0.0, 0.0],
+                    'initial_step': [init_stepsize, init_stepsize],
+                    'no_improv_break': 15,
+                    'minimize': True,
+                    'maxiter': 500}
+    MC.set_sweep_functions([chI_par, chQ_par])
+    MC.set_detector_function(detector)  # sets test_detector
+    MC.set_adaptive_function_parameters(ad_func_pars)
+    MC.run(name='Offset_calibration', mode='adaptive')
+    a = ma.OptimizationAnalysis(label='Offset_calibration')
+    # v2 creates a pretty picture of the optimizations
+    ma.OptimizationAnalysis_v2(label='Offset_calibration')
+
+    ch_1_min = a.optimization_result[0][0]
+    ch_2_min = a.optimization_result[0][1]
+    return ch_1_min, ch_2_min
 
 
 def mixer_skewness_calibration_QWG(SH, source, QWG,
@@ -200,7 +211,6 @@ def mixer_skewness_calibration_5014(SH, source, station,
     return phi, alpha
 
 
-
 def mixer_skewness_calibration_adaptive(**kw):
     raise NotImplementedError('see archived calibration toolbox')
 
@@ -235,19 +245,19 @@ def mixer_carrier_cancellation_5014(AWG, SH, source, MC,
     '''
     Make coarse sweeps to approximate the minimum
     '''
-    S1 = AWG.ch1_offset # to be dedicatyed to actual channel
-    S2 =  AWG.ch2_offset
+    S1 = AWG.ch1_offset  # to be dedicated to actual channel
+    S2 = AWG.ch2_offset
 
     detector = det.Signal_Hound_fixed_frequency(
-                SH, frequency=(source.frequency.get()),
-                Navg=5, delay=0.0, prepare_each_point=False)
+        SH, frequency=(source.frequency.get()),
+        Navg=5, delay=0.0, prepare_each_point=False)
 
     ad_func_pars = {'adaptive_function': nelder_mead,
-                        'x0': [0.0, 0.0],
-                        'initial_step': [0.01, 0.01],
-                        'no_improv_break': 15,
-                        'minimize': True,
-                        'maxiter': 500}
+                    'x0': [0.0, 0.0],
+                    'initial_step': [0.01, 0.01],
+                    'no_improv_break': 15,
+                    'minimize': True,
+                    'maxiter': 500}
     MC.set_sweep_functions([S1, S2])
     MC.set_detector_function(detector)  # sets test_detector
     MC.set_adaptive_function_parameters(ad_func_pars)
@@ -259,7 +269,7 @@ def mixer_carrier_cancellation_5014(AWG, SH, source, MC,
 
 
 def mixer_carrier_cancellation_UHFQC(UHFQC, SH, source, MC,
-                                     frequency=None,**kw):
+                                     frequency=None, **kw):
     '''
     Varies the mixer offsets to minimize leakage at the carrier frequency.
     this is the version for a UHFQC.
@@ -290,15 +300,15 @@ def mixer_carrier_cancellation_UHFQC(UHFQC, SH, source, MC,
     S2 = UHFQC.sigouts_1_offset
 
     detector = det.Signal_Hound_fixed_frequency(
-                SH, frequency=(source.frequency.get()),
-                Navg=5, delay=0.0, prepare_each_point=False)
+        SH, frequency=(source.frequency.get()),
+        Navg=5, delay=0.0, prepare_each_point=False)
 
     ad_func_pars = {'adaptive_function': nelder_mead,
-                        'x0': [0.0, 0.0],
-                        'initial_step': [0.01, 0.01],
-                        'no_improv_break': 15,
-                        'minimize': True,
-                        'maxiter': 500}
+                    'x0': [0.0, 0.0],
+                    'initial_step': [0.01, 0.01],
+                    'no_improv_break': 15,
+                    'minimize': True,
+                    'maxiter': 500}
     MC.set_sweep_functions([S1, S2])
     MC.set_detector_function(detector)  # sets test_detector
     MC.set_adaptive_function_parameters(ad_func_pars)
@@ -422,7 +432,9 @@ def mixer_skewness_cal_CBox_adaptive(CBox, SH, source,
                                      calibrate_both_sidebands=False,
                                      verbose=True):
     '''
-    Warning! this is for CBox v2
+    ################################
+    # Warning! this is for CBox v2 #
+    ################################
 
     Input args
         CBox
@@ -481,11 +493,11 @@ def mixer_skewness_cal_CBox_adaptive(CBox, SH, source,
 
     AWG.start()
     sweepfunctions = [cbs.Lutman_par_with_reload(LutMan,
-                                                    LutMan.QI_amp_ratio,
-                                                    awg_nrs=awg_nrs),
+                                                 LutMan.QI_amp_ratio,
+                                                 awg_nrs=awg_nrs),
                       cbs.Lutman_par_with_reload(LutMan,
-                                                    LutMan.IQ_phase_skewness,
-                                                    awg_nrs=awg_nrs)]
+                                                 LutMan.IQ_phase_skewness,
+                                                 awg_nrs=awg_nrs)]
     ampl_min_lst = np.empty(2)
     phase_min_lst = np.empty(2)
     if calibrate_both_sidebands:
@@ -547,9 +559,9 @@ def mixer_skewness_cal_CBox_adaptive(CBox, SH, source,
 
 def mixer_skewness_cal_UHFQC_adaptive(UHFQC, SH, source, AWG,
                                       acquisition_marker_channel,
-                                     LutMan,
-                                     MC,
-                                     verbose=True):
+                                      LutMan,
+                                      MC,
+                                      verbose=True):
     '''
     Input args
         UHFQC
@@ -583,8 +595,8 @@ def mixer_skewness_cal_UHFQC_adaptive(UHFQC, SH, source, AWG,
     # Loads a train of pulses to the AWG to trigger the UHFQC continuously
     AWG.stop()
     st_seqs.generate_and_upload_marker_sequence(
-                    5e-9, 1.0e-6, RF_mod=False,
-                    acq_marker_channels=acquisition_marker_channel)
+        5e-9, 1.0e-6, RF_mod=False,
+        acq_marker_channels=acquisition_marker_channel)
     AWG.run()
 
     #  Ensure that the block is 4 periods of the modulation freq
@@ -592,25 +604,23 @@ def mixer_skewness_cal_UHFQC_adaptive(UHFQC, SH, source, AWG,
     LutMan.M_block_length.set(960e-9)  # in ns
     LutMan.M_ampCW.set(0.4)
     LutMan.render_wave('M_ModBlock', time_unit='ns')
-    # divide instead of multiply by 1e-9 because of rounding errs
-    S1 = swf.UHFQC_Lutman_par_with_reload(LutMan,
-                                        LutMan.mixer_alpha,
-                                        ['M_ModBlock'], run=True, single=False)
-    S2 =swf.UHFQC_Lutman_par_with_reload(LutMan,
-                                         LutMan.mixer_phi,
-                                        ['M_ModBlock'], run=True, single=False)
+    # divide instead of multiply by 1e-9 because of rounding errors
+    S1 = swf.UHFQC_Lutman_par_with_reload(
+        LutMan, LutMan.mixer_alpha, ['M_ModBlock'], run=True, single=False)
+    S2 = swf.UHFQC_Lutman_par_with_reload(
+        LutMan, LutMan.mixer_phi, ['M_ModBlock'], run=True, single=False)
 
     detector = det.Signal_Hound_fixed_frequency(
-                SH, frequency=(source.frequency.get() -
-                               LutMan.M_modulation()),
-                Navg=5, delay=0.0, prepare_each_point=False)
+        SH, frequency=(source.frequency.get() -
+                       LutMan.M_modulation()),
+        Navg=5, delay=0.0, prepare_each_point=False)
 
     ad_func_pars = {'adaptive_function': nelder_mead,
-                        'x0': [1.0, 0.0],
-                        'initial_step': [.15, 10],
-                        'no_improv_break': 10,
-                        'minimize': True,
-                        'maxiter': 500}
+                    'x0': [1.0, 0.0],
+                    'initial_step': [.15, 10],
+                    'no_improv_break': 10,
+                    'minimize': True,
+                    'maxiter': 500}
     MC.set_sweep_functions([S1, S2])
     MC.set_detector_function(detector)  # sets test_detector
     MC.set_adaptive_function_parameters(ad_func_pars)
