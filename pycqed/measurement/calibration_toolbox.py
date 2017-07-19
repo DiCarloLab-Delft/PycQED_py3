@@ -373,12 +373,15 @@ def mixer_skewness_calibration_CBoxV3(SH, source, LutMan, MC, CBox,
     # Load the pulses required for a conintuous tone
     LutMan.lut_mapping()[0] = 'ModBlock'
     Mod_Block_len = 500e-9
-    Mod_Block_len_clk = ins_lib.convert_to_clocks(Mod_Block_len)
     LutMan.Q_modulation(f_mod)
+    LutMan.Q_block_length(Mod_Block_len)
     LutMan.Q_ampCW(.5)  # not 1 as we want some margin for the alpha correction
     LutMan.load_pulses_onto_AWG_lookuptable()
 
     # load the QASM/QuMis sequence
+    Mod_Block_len_clk = ins_lib.convert_to_clocks(Mod_Block_len) - 1
+    # -1 is a hack to fix some problems with the CBox AWG output
+    # 19-07-2017 XFU & MAR
     operation_dict = {}
     operation_dict['Pulse'] = {
         'duration': Mod_Block_len_clk,
@@ -406,7 +409,7 @@ def mixer_skewness_calibration_CBoxV3(SH, source, LutMan, MC, CBox,
 
     ad_func_pars = {'adaptive_function': nelder_mead,
                     'x0': [1.0, 0.0],
-                    'initial_step': [.15, 10],
+                    'initial_step': [.4, 20],
                     'no_improv_break': 10,
                     'minimize': True,
                     'maxiter': 500}
