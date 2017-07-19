@@ -6,7 +6,7 @@ import pycqed.analysis.measurement_analysis as ma
 import pycqed.measurement.measurement_control as mc
 import pycqed.analysis.fitting_models as fit_mods
 import numpy as np
-import numpy.linalg
+import scipy.linalg
 import scipy.interpolate as sc_intpl
 import lmfit
 import os.path
@@ -392,7 +392,7 @@ class Distortion_corrector():
             for m in range(n+1):
                 filterMatrix[n, m] = h[n - m]
 
-        new_ker = numpy.linalg.inv(filterMatrix)[:, 0]
+        new_ker = scipy.linalg.inv(filterMatrix)[:, 0]
         self.new_step = np.convolve(new_ker,
                                     np.ones(len(splStep)))[:len(splStep)]
         self.new_kernel_dict = {
@@ -993,7 +993,7 @@ class Cryo_distortion_corrector(Distortion_corrector):
                 for m in range(n+1):
                     filterMatrix[n, m] = h[n - m]
 
-            new_ker = numpy.linalg.inv(filterMatrix)[:, 0]
+            new_ker = scipy.linalg.inv(filterMatrix)[:, 0]
             self.new_step = np.convolve(new_ker,
                                         np.ones(len(splStep)))[:len(splStep)]
             self.new_kernel_dict = {
