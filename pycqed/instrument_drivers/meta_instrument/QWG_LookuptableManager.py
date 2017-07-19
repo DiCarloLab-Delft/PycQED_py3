@@ -285,8 +285,8 @@ class QWG_FluxLookuptableManager(Instrument):
                            # to be replaced with vals.Dict)
                            vals=vals.Anything())
         self.add_parameter('wave_dict_unit',
-                           get_cmd=self._get_wave_dict_unit(),
-                           set_cmd=self._set_wave_dict_unit(),
+                           get_cmd=self._get_wave_dict_unit,
+                           set_cmd=self._set_wave_dict_unit,
                            docstring='Unit in which the waveforms are '
                            'specified.\n'
                            '"frac" means "fraction of the maximum QWG '

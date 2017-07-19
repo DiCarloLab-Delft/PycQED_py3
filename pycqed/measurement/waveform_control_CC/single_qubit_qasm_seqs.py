@@ -558,12 +558,12 @@ def Ram_Z_echo(qubit_name, no_of_points, cal_points=True):
             qasm_file.writelines('mX90 {}\n'.format(qubit_name))
             qasm_file.writelines('square_{} {}\n'.format(i, qubit_name))
             qasm_file.writelines('X180 {}\n'.format(qubit_name))
-            qasm_file.writelines('square_dummy {}'.format(qubit_name))
+            qasm_file.writelines('square_dummy {}\n'.format(qubit_name))
             qasm_file.writelines('X90 {}\n'.format(qubit_name))
         qasm_file.writelines('RO {}  \n'.format(qubit_name))
 
     qasm_file.close()
-    return qasm_fil
+    return qasm_file
 
 
 def flux_timing_seq(qubit_name, taus,
