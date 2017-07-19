@@ -1790,7 +1790,7 @@ class CBox_v3_driven_transmon(Transmon):
             MC.set_detector_function(d)
 
             if amps is None:
-                MC.run('Ram_Z_{}_{}'.format(case, self.msmt_suffix))
+                MC.run('Ram_Z_{}{}'.format(case, self.msmt_suffix))
                 ma.MeasurementAnalysis(label='Ram_Z')
             else:
                 s2 = swf.QWG_flux_amp(QWG=f_lutman.QWG.get_instr(),
@@ -1798,7 +1798,7 @@ class CBox_v3_driven_transmon(Transmon):
                                       frac_amp=f_lutman.F_amp())
                 MC.set_sweep_function_2D(s2)
                 MC.set_sweep_points_2D(amps)
-                MC.run('Ram_Z_{}_2D_{}'.format(case, self.msmt_suffix),
+                MC.run('Ram_Z_{}_2D{}'.format(case, self.msmt_suffix),
                        mode='2D')
                 ma.TwoD_Analysis(label='Ram_Z_')
 
@@ -1966,7 +1966,7 @@ class CBox_v3_driven_transmon(Transmon):
             MC.set_sweep_points(lengths)
             MC.set_detector_function(d)
 
-            MC.run('Ram_Z_scope_{}'.format(case))
+            MC.run('Ram_Z_scope_{}{}'.format(case, self.msmt_suffix))
             ma.MeasurementAnalysis(label='Ram_Z_scope')
 
         ma.Ram_Z_Analysis(
@@ -1981,17 +1981,13 @@ class CBox_v3_driven_transmon(Transmon):
             V_per_phi0=self.V_per_phi0(),
             TwoD=False)
 
-    def measure_ram_z_echo(self, lengths, amps=None, chunk_size: int=32, MC=None,
-                      wait_during_flux: str='auto', cal_points: bool=False,
-                      analyze=True,
-                      demodulate=False, f_demod=0, flux_amp_analysis=1):
+    def measure_ram_z_echo(self, lengths, amps=None, chunk_size: int=32,
+                           MC=None, wait_during_flux: str='auto',
+                           cal_points: bool=False, analyze=True):
         '''
-        Perform a Ram-Z experiment: Measure the accumulated phase as a function
-        of flux pulse length.
-        Version 2 is for new QASM compiler.
+        Perform a Ram-Z echo experiment.
 
-        sequence:
-            mX90 -- flux_pulse -- X90 -- RO
+        TODO: more description
 
 
         Args:
@@ -2014,20 +2010,8 @@ class CBox_v3_driven_transmon(Transmon):
                     calibration points will be inserted in every chunk,
                     because they are part of the QASM sequence, which is not
                     regenerated.
-            cases (tuple of strings):
-                    Possible cases are 'cos' and 'sin'. This determines
-                    if an X90 or Y90 pulse is used as second pi-half pulse.
-                    Measurement is repeated for all cases given.
             analyze (bool):
                     Do the Ram-Z analysis, extracting the step response.
-            demodulate (bool):
-                    Demodulate data befor calculating phase.
-            f_demod (float):
-                    Modulation frequency used if demodulate is True.
-            fulx_amp_analysis (float):
-                    Flux pulse amplitude by which the step response is
-                    normalized in the anlaysis. Set this to 1 to see the
-                    step response in units of ouput voltage.
         '''
         self.prepare_for_timedomain()
         self.prepare_for_fluxing()
@@ -2074,7 +2058,7 @@ class CBox_v3_driven_transmon(Transmon):
         # Define a dummy pulse for the second square pulse. The whole flux
         # pulse is compiled into one waveform.
         cfg['luts'][1]['square_dummy'] = -2
-        cfg['operation dictionary']['square+dummy'] = {
+        cfg['operation dictionary']['square_dummy'] = {
             'parameters': 1,
             'duration': int(np.round(wait_between*1e9)),
             'type': 'flux',
@@ -2084,14 +2068,16 @@ class CBox_v3_driven_transmon(Transmon):
         def wave_func(val):
             # Function that calculates the composite wave form from the
             # value of the sweep point.
-            t_second_pulse = (wait_between +
-                              4 * int(np.round(self.gauss_width*1e9)))
+            t_second_pulse = int(
+                np.round((wait_between + 4 * self.gauss_width()) * 1e9))
 
-            composite_pulse = np.zeros(int(np.round(max(lengths)))*2 + 100)
+            composite_pulse = np.zeros(int(np.round(wait_between * 1e9)) * 2
+                                       + 100)
             pulse_len = int(np.round(val * 1e9))
-            composite_pulse[:pulse_len] = np.ones(pulse_len) * QWG.F_amp()
+            composite_pulse[:pulse_len] = (np.ones(pulse_len) *
+                                           f_lutman.F_amp())
             composite_pulse[t_second_pulse:t_second_pulse+pulse_len+1] = \
-                np.ones(pulse_len+1) * QWg.F_amp()
+                np.ones(pulse_len+1) * f_lutman.F_amp()
 
             return composite_pulse
 
@@ -2122,7 +2108,7 @@ class CBox_v3_driven_transmon(Transmon):
         MC.set_detector_function(d)
 
         if amps is None:
-            MC.run('Ram_Z_{}_{}'.format(case, self.msmt_suffix))
+            MC.run('Ram_Z_echo{}'.format(self.msmt_suffix))
             ma.MeasurementAnalysis(label='Ram_Z')
         else:
             s2 = swf.QWG_flux_amp(QWG=f_lutman.QWG.get_instr(),
@@ -2130,7 +2116,7 @@ class CBox_v3_driven_transmon(Transmon):
                                   frac_amp=f_lutman.F_amp())
             MC.set_sweep_function_2D(s2)
             MC.set_sweep_points_2D(amps)
-            MC.run('Ram_Z_{}_2D_{}'.format(case, self.msmt_suffix),
+            MC.run('Ram_Z_2D{}'.format(self.msmt_suffix),
                    mode='2D')
             ma.TwoD_Analysis(label='Ram_Z_')
 
