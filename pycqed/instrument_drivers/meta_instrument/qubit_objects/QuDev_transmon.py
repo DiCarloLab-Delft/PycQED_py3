@@ -1469,7 +1469,7 @@ class QuDev_transmon(Qubit):
 
     def find_amplitudes(self, rabi_amps=None, label=None, for_ef=False,
                         update=False, MC=None, close_fig=True, cal_points=True,
-                        no_cal_points=4, upload=True, last_ge_pulse=True,
+                        no_cal_points=None, upload=True, last_ge_pulse=True,
                         analyze=True, **kw):
 
         """
@@ -1549,10 +1549,16 @@ class QuDev_transmon(Qubit):
                             "pi/2 amplitudes. "
                             "Set update=True if you want this!")
 
-
-
         if MC is None:
             MC = self.MC
+
+        if (cal_points) and (no_cal_points is None):
+            logging.warning('no_cal_points is None. Defaults to 4 is for_ef==False,'
+                            'or to 6 is for_ef==True.')
+            if for_ef:
+                no_cal_points = 6
+            else:
+                no_cal_points = 4
 
         if not cal_points:
             no_cal_points = 0
@@ -1622,7 +1628,7 @@ class QuDev_transmon(Qubit):
 
 
     def find_T1(self, times, label=None, for_ef=False, update=False, MC=None,
-                cal_points=True, no_cal_points=6, close_fig=True,
+                cal_points=True, no_cal_points=None, close_fig=True,
                 last_ge_pulse=True, **kw):
 
         """
@@ -1685,6 +1691,17 @@ class QuDev_transmon(Qubit):
             logging.warning('Some of the values in the times array might be too '
                             'large.The units should be seconds.')
 
+        if (cal_points) and (no_cal_points is None):
+            logging.warning('no_cal_points is None. Defaults to 4 is for_ef==False,'
+                            'or to 6 is for_ef==True.')
+            if for_ef:
+                no_cal_points = 6
+            else:
+                no_cal_points = 4
+
+        if not cal_points:
+            no_cal_points = 0
+
         if MC is None:
             MC = self.MC
 
@@ -1714,32 +1731,34 @@ class QuDev_transmon(Qubit):
                                 cal_points=cal_points,
                                 no_cal_points=no_cal_points,
                                 last_ge_pulse=last_ge_pulse)
+
         else:
             self.measure_T1(times=times, MC=MC,
                             close_fig=close_fig,
                             cal_points=cal_points)
 
         #Extract T1 and T1_stddev from ma.T1_Analysis
-        if for_ef:
-            NoCalPoints = 6
+        if kw.pop('analyze',True):
+            T1_Analysis = ma.T1_Analysis(label=label, NoCalPoints=no_cal_points,
+                                         for_ef=for_ef,
+                                         last_ge_pulse=last_ge_pulse, **kw)
+            T1_dict = T1_Analysis.T1
+            T1_value = T1_dict['T1']
+
+            if update:
+                if for_ef:
+                    self.T1_ef(T1_value)
+                else:
+                    self.T1(T1_value)
+
+            return T1_dict
         else:
-            NoCalPoints = 4
-        T1_Analysis = ma.T1_Analysis(label=label, NoCalPoints=NoCalPoints, **kw)
-        T1_dict = T1_Analysis.T1
-        T1_value = T1_dict['T1']
-
-        if update:
-            if for_ef:
-                self.T1_ef(T1_value)
-            else:
-                self.T1(T1_value)
-
-        return T1_dict
+            return
 
     def find_frequency_T2_ramsey(self, times, for_ef=False, artificial_detuning=0, update=False, MC=None,
                                      cal_points=True, close_fig=True, upload=True,
                                      last_ge_pulse=True, label=None,
-                                     no_cal_points=6, analyze=True, **kw):
+                                     no_cal_points=None, analyze=True, **kw):
 
         """
         Finds the real qubit frequency and the dephasing rate T2* from the fit
@@ -1787,6 +1806,17 @@ class QuDev_transmon(Qubit):
             logging.warning('Some of the values in the times array might be too '
                             'large.The units should be seconds.')
 
+        if (cal_points is True) and (no_cal_points is None):
+            logging.warning('no_cal_points is None. Defaults to 4 is for_ef==False,'
+                            'or to 6 is for_ef==True.')
+            if for_ef:
+                no_cal_points = 6
+            else:
+                no_cal_points = 4
+
+        if cal_points is False:
+            no_cal_points = 0
+
         if MC is None:
             MC = self.MC
 
@@ -1823,13 +1853,9 @@ class QuDev_transmon(Qubit):
                                         last_ge_pulse=last_ge_pulse, no_cal_points=no_cal_points)
 
         if analyze:
-            if for_ef:
-                no_cal_points = 6
-            else:
-                no_cal_points = 4
 
             RamseyA = ma.Ramsey_Analysis(auto=True, NoCalPoints=no_cal_points, label=label,
-                                         qubit_frequency_spec=self.f_qubit(),
+                                         for_ef=for_ef, last_ge_pulse=last_ge_pulse,
                                          artificial_detuning=artificial_detuning,
                                          **kw)
 
@@ -1859,7 +1885,7 @@ class QuDev_transmon(Qubit):
 
     def calibrate_ramsey(self, times, for_ef=False,
                          artificial_detunings=None, update=False,
-                         MC=None, cal_points=True, no_cal_points=6,
+                         MC=None, cal_points=True, no_cal_points=None,
                          close_fig=True, upload=True, last_ge_pulse=True, **kw):
 
         """
@@ -1886,8 +1912,6 @@ class QuDev_transmon(Qubit):
                                         or the parameter 'times_mean' should be
                                         passed here (in seconds)
         :return:                        the real qubit frequency
-                                        (=self.f_qubit()+artificial_detuning-
-                                        fitted_freq)
                                         + stddev, the dephasing rate T2* +
                                         stddev
         """
@@ -1905,22 +1929,24 @@ class QuDev_transmon(Qubit):
         if np.any(times>1e-3):
             logging.warning('The values in the times array might be too large.')
 
+        if (cal_points is True) and (no_cal_points is None):
+            logging.warning('no_cal_points is None. Defaults to 4 is for_ef==False,'
+                            'or to 6 is for_ef==True.')
+            if for_ef:
+                no_cal_points = 6
+            else:
+                no_cal_points = 4
+
+        if cal_points is False:
+            no_cal_points = 0
+
         if MC is None:
             MC = self.MC
 
         if times is None:
-            times_span = kw.get('times_span', 5e-6)
-            times_mean = kw.get('times_mean', 2.5e-6)
-            nr_points = kw.get('nr_points', 50)
-            if times_mean == 0:
-                logging.warning("find_frequency_T2_ramsey does not know over "
-                                "which times to do Ramsey. Please specify the "
-                                "times_mean or the times function parameter.")
-                return 0
-            else:
-                times = np.linspace(times_mean - times_span/2,
-                                    times_mean + times_span/2,
-                                    nr_points)
+            logging.warning("find_frequency_T2_ramsey does not know over "
+                            "which times to do Ramsey. Please specify the "
+                            "times_mean or the times function parameter.")
 
         # Each time value must be repeated len(artificial_detunings) times to
         # correspond to the logic in Ramsey_seq_multiple_detunings sequence
@@ -1937,43 +1963,47 @@ class QuDev_transmon(Qubit):
                                 MC=MC,
                                 cal_points=cal_points,
                                 close_fig=close_fig, upload=upload)
-            RamseyA = ma.Ramsey_Analysis_multiple_detunings(auto=True,
-                                qubit_frequency_spec=self.f_qubit(),
-                                artificial_detunings=artificial_detunings, **kw)
+
         else:
             self.measure_ramsey_2nd_exc_multiple_detunings(times=times,
                                 artificial_detunings=artificial_detunings,
                                 cal_points=cal_points, no_cal_points=no_cal_points,
                                 close_fig=close_fig, upload=upload,
                                 last_ge_pulse=last_ge_pulse, MC=MC)
+
+        # Analyze data if analyze==True
+        if kw.pop('analyze',True):
             RamseyA = ma.Ramsey_Analysis_multiple_detunings(auto=True,
-                                NoCalPoints=6,
-                                qubit_frequency_spec=self.f_ef_qubit(),
+                                NoCalPoints=no_cal_points,
+                                for_ef=for_ef,
+                                last_ge_pulse=last_ge_pulse,
                                 artificial_detunings=artificial_detunings, **kw)
 
-        #get new freq and T2* from analysis results
-        new_qubit_freq = RamseyA.qubit_frequency    #value
-        fitted_freq = RamseyA.ramsey_freq           #dict
-        T2_star = RamseyA.T2_star                   #dict
+            #get new freq and T2* from analysis results
+            new_qubit_freq = RamseyA.qubit_frequency    #value
+            fitted_freq = RamseyA.ramsey_freq           #dict
+            T2_star = RamseyA.T2_star                   #dict
 
-        print('New qubit frequency = {:.10f} \t stderr = {:.10f}'.format(
-            new_qubit_freq,RamseyA.Ramsey_freq['freq_stderr']))
-        print('T2_Star = {:.5f} \t stderr = {:.5f}'.format(
-            T2_star['T2_star'],T2_star['T2_star_stderr']))
+            print('New qubit frequency = {:.10f} \t stderr = {:.10f}'.format(
+                new_qubit_freq,RamseyA.Ramsey_freq['freq_stderr']))
+            print('T2_Star = {:.5f} \t stderr = {:.5f}'.format(
+                T2_star['T2_star'],T2_star['T2_star_stderr']))
 
-        if update:
-            if for_ef:
-                self.f_ef_qubit(new_qubit_freq)
-                self.T2_star_ef(T2_star['T2_star'])
-            else:
-                self.f_qubit(new_qubit_freq)
-                self.T2_star(T2_star['T2_star'])
+            if update:
+                if for_ef:
+                    self.f_ef_qubit(new_qubit_freq)
+                    self.T2_star_ef(T2_star['T2_star'])
+                else:
+                    self.f_qubit(new_qubit_freq)
+                    self.T2_star(T2_star['T2_star'])
 
-        return new_qubit_freq, fitted_freq, T2_star
+            return new_qubit_freq, fitted_freq, T2_star
+        else:
+            return
 
     def find_qscale(self, qscales, label=None, for_ef=False, update=False,
                     MC=None, close_fig=True, last_ge_pulse=True, upload=False,
-                    cal_points=True, no_cal_points=6, **kw):
+                    cal_points=True, no_cal_points=None, **kw):
 
         '''
         Performs the QScale calibration measurement ( (xX)-(xY)-(xmY) ) and
@@ -2061,6 +2091,17 @@ class QuDev_transmon(Qubit):
                             "parameter. "
                             "Set update=True if you want this!")
 
+        if (cal_points) and (no_cal_points is None):
+            logging.warning('no_cal_points is None. Defaults to 4 is for_ef==False,'
+                            'or to 6 is for_ef==True.')
+            if for_ef:
+                no_cal_points = 6
+            else:
+                no_cal_points = 4
+
+        if not cal_points:
+            no_cal_points = 0
+
         if MC is None:
             MC = self.MC
 
@@ -2068,18 +2109,18 @@ class QuDev_transmon(Qubit):
             label = 'QScale' + self.msmt_suffix
 
         if qscales is None:
-            qscales_span = kw.get('qscales_span', 3)
-            qscales_mean = kw.get('qscales_mean', self.drag_qscale())
-            nr_points = kw.get('nr_points', 30)
-            if qscales_mean == 0:
-                logging.warning("find_qscale does not know over which "
-                                "qscale values to sweep. Please specify the "
-                                "qscales_mean or the qscales function"
-                                " parameter.")
-                return 0
-            else:
-                qscales = np.linspace(qscales_mean - qscales_span/2,
-                                      qscales_mean + qscales_span/2, nr_points)
+            # qscales_span = kw.get('qscales_span', 3)
+            # qscales_mean = kw.get('qscales_mean', self.drag_qscale())
+            # nr_points = kw.get('nr_points', 30)
+            # if qscales_mean == 0:
+            logging.warning("find_qscale does not know over which "
+                            "qscale values to sweep. Please specify the "
+                            "qscales_mean or the qscales function"
+                            " parameter.")
+            #     return 0
+            # else:
+            #     qscales = np.linspace(qscales_mean - qscales_span/2,
+            #                           qscales_mean + qscales_span/2, nr_points)
 
         # Each qscale value must be repeated 3 times to correspoond to the
         # logic in QScale sequence
@@ -2097,24 +2138,27 @@ class QuDev_transmon(Qubit):
                                         last_ge_pulse=last_ge_pulse,
                                         cal_points=cal_points,
                                         no_cal_points=no_cal_points)
-            NoCalPoints = 6
         else:
             self.measure_qscale(qscales=qscales, MC=MC, upload=upload,
                                 close_fig=close_fig, label=label)
-            NoCalPoints = 4
 
         # Perform analysis and extract the optimal qscale parameter
         # Returns the optimal qscale parameter
-        QscaleA = ma.QScale_Analysis(auto=True, label=label,
-                                     NoCalPoints=NoCalPoints, **kw)
+        if kw.pop('analyze',True):
+            QscaleA = ma.QScale_Analysis(auto=True, label=label,
+                                         NoCalPoints=no_cal_points,
+                                         for_ef=for_ef,
+                                         last_ge_pulse=last_ge_pulse, **kw)
 
-        Qscale_dict = QscaleA.optimal_qscale #dictionary of value, stderr
-        Qscale_value = Qscale_dict['qscale']
+            Qscale_dict = QscaleA.optimal_qscale #dictionary of value, stderr
+            Qscale_value = Qscale_dict['qscale']
 
-        if update:
-            self.motzoi(Qscale_value)
+            if update:
+                self.motzoi(Qscale_value)
 
-        return Qscale_dict
+            return Qscale_dict
+        else:
+            return
 
     def calculate_anharmonicity(self, update=False):
 

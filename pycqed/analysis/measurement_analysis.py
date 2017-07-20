@@ -24,14 +24,20 @@ from scipy.signal import argrelextrema, argrelmax, argrelmin
 from copy import deepcopy
 from sympy import pretty
 from sympy.abc import pi, mu
+from pprint import pprint
 
 import pycqed.analysis.tools.plotting as pl_tools
 from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
 
 #Plotly
-import plotly
-import plotly.graph_objs as go
-
+try:
+    import plotly
+    import plotly.graph_objs as go
+except ImportError as e:
+    if str(e).find('plotly') >= 0:
+        logging.warning('Could not import plotly')
+    else:
+        raise e
 try:
     from nathan_plotting_tools import *
 except:
@@ -46,7 +52,6 @@ except ImportError as e:
         logging.warning('Could not import qutip')
     else:
         raise
-
 
 imp.reload(dm_tools)
 
@@ -579,7 +584,8 @@ class MeasurementAnalysis(object):
                 self.ylabels.append(str(
                     self.value_names[i] + '('+value_units[i]+')'))
             self.xlabel = str(self.sweep_name + '('+self.sweep_unit+')')
-            self.xlabel = self.xlabel[0].upper() + self.xlabel[1::]
+            if self.xlabel[0] is not 't':
+                self.xlabel = self.xlabel[0].upper() + self.xlabel[1::]
         elif datasaving_format == 'Version 2':
 
             self.parameter_names = self.get_key('sweep_parameter_names')
@@ -606,7 +612,8 @@ class MeasurementAnalysis(object):
 
             self.xlabel = self.parameter_names[0] + ' (' +  \
                 self.parameter_units[0] + ')'
-            self.xlabel = self.xlabel[0].upper() + self.xlabel[1::]
+            if self.xlabel[0] is not 't':
+                self.xlabel = self.xlabel[0].upper() + self.xlabel[1::]
             self.parameter_labels = [a+' (' + b + ')' for a, b in zip(
                                      self.parameter_names,
                                      self.parameter_units)]
@@ -989,9 +996,11 @@ class MeasurementAnalysis(object):
                 self.zlabels.append(str(
                     self.value_names[i] + '('+value_units[i]+')'))
             self.xlabel = str(self.sweep_name + '('+self.sweep_unit+')')
-            self.xlabel = self.xlabel[0].upper() + self.xlabel[1::]
+            if self.xlabel[0] is not 't':
+                self.xlabel = self.xlabel[0].upper() + self.xlabel[1::]
             self.ylabel = str(self.sweep_name_2D + '('+self.sweep_unit_2D+')')
-            self.ylabel = self.ylabel[0].upper() + self.ylabel[1::]
+            if self.ylabel[0] is not 't':
+                self.ylabel = self.ylabel[0].upper() + self.ylabel[1::]
 
         elif datasaving_format == 'Version 2':
             self.parameter_names = self.get_key('sweep_parameter_names')
@@ -1045,8 +1054,10 @@ class MeasurementAnalysis(object):
                 self.parameter_units[0] + ')'
             self.ylabel = self.parameter_names[1] + ' (' +  \
                 self.parameter_units[1] + ')'
-            self.xlabel = self.xlabel[0].upper() + self.xlabel[1::]
-            self.ylabel = self.ylabel[0].upper() + self.ylabel[1::]
+            if self.xlabel[0] is not 't':
+                self.xlabel = self.xlabel[0].upper() + self.xlabel[1::]
+            if self.ylabel[0] is not 't':
+                self.ylabel = self.ylabel[0].upper() + self.ylabel[1::]
 
             self.parameter_labels = [a+' (' + b + ')' for a, b in zip(
                                      self.parameter_names,
@@ -2591,12 +2602,13 @@ class QScale_Analysis(TD_Analysis):
         self.corr_data_xmY = self.normalized_values[2:-self.NoCalPoints:3]
 
         self.fit_data(**kw)
-        fig, ax = self.default_ax()
-        self.make_figures(fig=fig, ax=ax, **kw)
 
         self.calculate_optimal_qscale(**kw)
         self.save_computed_parameters(self.optimal_qscale,
                                       var_name=self.value_names[0])
+
+        fig, ax = self.default_ax()
+        self.make_figures(fig=fig, ax=ax, **kw)
 
         if kw.pop('save_fig', True):
             self.save_fig(fig,
@@ -2620,6 +2632,18 @@ class QScale_Analysis(TD_Analysis):
         # label=r'$X_{\frac{\pi}{2}}Y_{\pi}$')
         # self.ax.plot(self.sweep_points_xmY, self.corr_data_xmY, 'o', c='r',
         # label=r'$X_{\frac{\pi}{2}}Y_{-\pi}$')
+        textstr = ('qsacle = %.5g $ \pm$ (%.5g)'
+                   % (self.optimal_qscale['qscale'],self.optimal_qscale['qscale_std']))
+
+        if self.analyze_ef:
+            ylabel = r'$F$ $\left(|f \rangle \right) (arb. units)$'
+        else:
+            ylabel = r'$F$ $\left(|e \rangle \right) (arb. units)$'
+
+        fig.text(0.5, 0, textstr, fontsize=self.font_size,
+                      transform=ax.transAxes,
+                      verticalalignment='top',
+                      horizontalalignment='center', bbox=self.box_props)
 
         self.plot_results_vs_sweepparam(self.sweep_points_xX, self.corr_data_xX,
                                         fig, ax,
@@ -2635,7 +2659,9 @@ class QScale_Analysis(TD_Analysis):
                                         self.corr_data_xmY, fig, ax,
                                         marker='or',
                                         label=r'$X_{\frac{\pi}{2}}Y_{-\pi}$',
-                                        ticks_around=True)
+                                        ticks_around=True,
+                                        xlabel='qscales (arb. units)',
+                                        ylabel=ylabel)
         ax.legend(loc='best')
         c = ['b', 'g', 'r']
         if hasattr(self, 'fit_res'):
@@ -4010,7 +4036,7 @@ class Ramsey_Analysis(TD_Analysis):
     def __init__(self, label='Ramsey', **kw):
         kw['label'] = label
         kw['h5mode'] = 'r+'
-        super(self.__class__, self).__init__(**kw)
+        super(Ramsey_Analysis, self).__init__(**kw)
 
     def fit_Ramsey(self, x, y, **kw):
 
@@ -4102,34 +4128,39 @@ class Ramsey_Analysis(TD_Analysis):
 
         return fit_res
 
-    def plot_results(self, fit_res, scale=1, show_guess=False):
+    def plot_results(self, fit_res, scale=1, show_guess=False, art_det=0,
+                     fig=None, ax=None, textbox=True):
         units = self.parameter_units[0]
-        textstr = ('$f_{qubit}$ = %.5g $ GHz \pm$ (%.5g) Hz'
-                   % (self.qubit_frequency*1e-9,
-                      fit_res.params['frequency'].stderr) +
-                   '\n$f_{Ramsey}$ = %.5g $ MHz \pm$ (%.5g) Hz'
-                   % (fit_res.params['frequency'].value*1e-6,
-                      fit_res.params['frequency'].stderr) +
-                   '\n$T_2^\star$ = %.6g '
-                   % (fit_res.params['tau'].value*scale)  +
-                   units + ' $\pm$ (%.6g) '
-                   % (fit_res.params['tau'].stderr*scale) +
-                   units )
 
-        self.fig.text(0.5, 0, textstr, fontsize=self.font_size,
-                 transform=self.ax.transAxes,
-                 verticalalignment='top',
-                 horizontalalignment='center', bbox=self.box_props)
+        if textbox:
+            textstr = ('$f_{qubit}$ = %.5g $ GHz \pm$ (%.5g) GHz'
+                       % (self.qubit_frequency*1e-9,
+                          fit_res.params['frequency'].stderr*1e-9) +
+                       '\n$f_{Ramsey}$ = %.5g $ MHz \pm$ (%.5g) MHz'
+                       % (fit_res.params['frequency'].value*1e-6,
+                          fit_res.params['frequency'].stderr*1e-6) +
+                       '\n$T_2^\star$ = %.6g '
+                       % (fit_res.params['tau'].value*scale)  +
+                       units + ' $\pm$ (%.6g) '
+                       % (fit_res.params['tau'].stderr*scale) +
+                       units +
+                       '\nartificial detuning = %.2g MHz'
+                       % (art_det*1e-6))
+
+            fig.text(0.5, 0, textstr, fontsize=self.font_size,
+                     transform=ax.transAxes,
+                     verticalalignment='top',
+                     horizontalalignment='center', bbox=self.box_props)
 
         x = np.linspace(self.sweep_points[0],
                         self.sweep_points[-self.NoCalPoints-1],
                         len(self.sweep_points)*100)
 
         if show_guess:
-            y_init = fit_mods.ExpDampOscFunc(x, **self.fit_res.init_values)
-            self.ax.plot(x*scale, y_init, 'k--', linewidth=self.line_width)
+            y_init = fit_mods.ExpDampOscFunc(x, **fit_res.init_values)
+            ax.plot(x*scale, y_init, 'k--', linewidth=self.line_width)
 
-        best_vals = self.fit_res.best_values
+        best_vals = fit_res.best_values
         y = fit_mods.ExpDampOscFunc(
             x, tau=best_vals['tau'],
             n=best_vals['n'],
@@ -4138,7 +4169,7 @@ class Ramsey_Analysis(TD_Analysis):
             amplitude=best_vals['amplitude'],
             oscillation_offset=best_vals['oscillation_offset'],
             exponential_offset=best_vals['exponential_offset'])
-        self.ax.plot(x*scale, y, 'r-',linewidth=self.line_width)
+        ax.plot(x*scale, y, 'r-',linewidth=self.line_width)
 
 
     def run_default_analysis(self, print_fit_results=False,
@@ -4150,8 +4181,14 @@ class Ramsey_Analysis(TD_Analysis):
             close_main_figure=True,save_fig=False,**kw)
 
         self.artificial_detuning = kw.pop('artificial_detuning',0)
-        self.qubit_freq_spec = kw.pop('qubit_frequency_spec',0)
         show_guess = kw.get('show_guess', False)
+        #self.qubit_freq_spec = kw.pop('qubit_frequency_spec',0)
+        instr_set = self.data_file['Instrument settings']
+        if self.analyze_ef:
+            self.qubit_freq_spec = float(instr_set['qb2'].attrs['f_ef_qubit'])
+        else:
+            self.qubit_freq_spec = float(instr_set['qb2'].attrs['f_qubit'])
+
         self.add_analysis_datagroup_to_file()
         scale = self.scales_dict[unit_prefix]
 
@@ -4163,7 +4200,7 @@ class Ramsey_Analysis(TD_Analysis):
 
         # Calculate new qubit frequency
         self.qubit_frequency = self.qubit_freq_spec + self.artificial_detuning \
-                               - self.Ramsey_freq['freq']
+                               - self.ramsey_freq['freq']
 
         #Extract T2 star and save it
         self.get_measured_T2_star(fit_res=self.fit_res, **kw)  #defines self.T2_star as a dic; units
@@ -4172,7 +4209,9 @@ class Ramsey_Analysis(TD_Analysis):
                                       var_name=self.value_names[0])
 
         #Plot results
-        self.plot_results(self.fit_res, show_guess=show_guess, scale=scale)
+        self.plot_results(self.fit_res, show_guess=show_guess,
+                          scale=scale, art_det=self.artificial_detuning,
+                          fig=self.fig, ax=self.ax)
 
         #Print the T2_star values on screen
         unit = self.parameter_units[0][-1]
@@ -4180,7 +4219,7 @@ class Ramsey_Analysis(TD_Analysis):
             print('New qubit frequency = {:.5f} (GHz)'.format(
                 self.qubit_frequency*1e-9) +
                   '\t\tqubit frequency stderr = {:.5f} (MHz)'.format(
-                self.Ramsey_freq['freq_stderr']*1e-6)+
+                self.ramsey_freq['freq_stderr']*1e-6)+
                 '\nT2* = {:.5f} '.format(
                 self.T2_star['T2_star']*scale) +'('+pretty(mu)+unit+')'+
                 '\t\tT2* stderr = {:.5f} '.format(
@@ -4211,9 +4250,9 @@ class Ramsey_Analysis(TD_Analysis):
         freq = fit_res.params['frequency'].value
         freq_stderr = fit_res.params['frequency'].stderr
 
-        self.Ramsey_freq = {'freq':freq, 'freq_stderr':freq_stderr}
+        self.ramsey_freq = {'freq':freq, 'freq_stderr':freq_stderr}
 
-        return self.Ramsey_freq
+        return self.ramsey_freq
 
     def get_measured_T2_star(self, fit_res, **kw):
         '''
@@ -4233,59 +4272,38 @@ class Ramsey_Analysis_multiple_detunings(Ramsey_Analysis):
     def __init__(self, label='Ramsey_mult_det', **kw):
         kw['label'] = label
         kw['h5mode'] = 'r+'
-        super(self.__class__, self).__init__(**kw)
-
-    def plot_results(self, fit_res, scale=1, show_guess=False):
-        units = self.parameter_units[0]
-        textstr = ('$f_qubit$ = %.5g $ GHz \pm$ (%.5g) Hz'
-                   % (self.qubit_frequency*scale,
-                      fit_res.params['frequency'].stderr) +
-                   '$f$ = %.5g $ Hz \pm$ (%.5g) Hz'
-                   % (fit_res.params['frequency'].value,
-                      fit_res.params['frequency'].stderr) +
-                   '\n$T_2^\star$ = %.6g '
-                   % (fit_res.params['tau'].value*scale)  +
-                   units + ' $\pm$ (%.6g) '
-                   % (fit_res.params['tau'].stderr*scale) +
-                   units)
-
-        self.fig.text(0.5, 0, textstr, fontsize=self.font_size,
-                      transform=self.ax.transAxes,
-                      verticalalignment='top',
-                      horizontalalignment='center', bbox=self.box_props)
-
-        x = np.linspace(self.sweep_points[0],
-                        self.sweep_points[-self.NoCalPoints],
-                        len(self.sweep_points)*100)
-
-        if show_guess:
-            y_init = fit_mods.ExpDampOscFunc(x, **self.fit_res.init_values)
-            self.ax.plot(x*scale, y_init, 'k--', linewidth=self.line_width)
-
-        best_vals = self.fit_res.best_values
-        y = fit_mods.ExpDampOscFunc(
-            x, tau=best_vals['tau'],
-            n=best_vals['n'],
-            frequency=best_vals['frequency'],
-            phase=best_vals['phase'],
-            amplitude=best_vals['amplitude'],
-            oscillation_offset=best_vals['oscillation_offset'],
-            exponential_offset=best_vals['exponential_offset'])
-        self.ax.plot(x*scale, y, 'r-',linewidth=self.line_width)
-
+        super(Ramsey_Analysis_multiple_detunings, self).__init__(**kw)
 
     def run_default_analysis(self, print_fit_results=False,
                              unit_prefix='u', show=False,
                              close_file=False, **kw):
 
-        super().run_default_analysis(show=show,
-                                     close_file=close_file,unit_prefix=unit_prefix,
-                                     close_main_figure=True,save_fig=False,**kw)
+        # super().run_default_analysis(show=show,
+        #                              close_file=close_file,unit_prefix=unit_prefix,
+        #                              close_main_figure=True,save_fig=False,**kw)
 
-        show_guess = kw.get('show_guess', False)
-        self.artificial_detunings = kw.pop('artificial_detunings',[-4e6,4e6])
-        self.qubit_freq_spec = kw.pop('qubit_frequency_spec',0)
+        self.get_naming_and_values()
         self.add_analysis_datagroup_to_file()
+
+        norm = self.normalize_data_to_calibration_points(
+            self.measured_values[0], calsteps=self.NoCalPoints)
+        self.normalized_values = norm[0]
+        self.normalized_data_points = norm[1]
+        self.normalized_cal_vals = norm[2]
+
+        self.add_dataset_to_analysisgroup('Corrected data',
+                                          self.corr_data)
+        self.analysis_group.attrs.create('corrected data based on',
+                                         'calibration points'.encode('utf-8'))
+
+        self.artificial_detunings = kw.pop('artificial_detunings',[-4e6,4e6])
+
+        # Get old qubit frequency from data file
+        instr_set = self.data_file['Instrument settings']
+        if self.analyze_ef:
+            self.qubit_freq_spec = float(instr_set['qb2'].attrs['f_ef_qubit'])
+        else:
+            self.qubit_freq_spec = float(instr_set['qb2'].attrs['f_qubit'])
         scale = self.scales_dict[unit_prefix]
 
         # Extract the data for each ramsey
@@ -4295,7 +4313,7 @@ class Ramsey_Analysis_multiple_detunings(Ramsey_Analysis):
         ramsey_data_1 = self.normalized_values[0:-self.NoCalPoints:len_art_det]
         ramsey_data_2 = self.normalized_values[1:-self.NoCalPoints:len_art_det]
 
-        #Perform fit and save fitted parameters
+        #Perform fit
         fit_res_1 = self.fit_Ramsey(x=sweep_pts_1,
                                        y=ramsey_data_1, **kw)
         fit_res_2 = self.fit_Ramsey(x=sweep_pts_2,
@@ -4307,31 +4325,55 @@ class Ramsey_Analysis_multiple_detunings(Ramsey_Analysis):
         ramsey_freq_2 = ramsey_freq_dict_2['freq']
 
         # Calculate possible detunings from real qubit frequency
-        qb_detuning_1 = self.artificial_detunings[0] + ramsey_freq_1
-        qb_detuning_2 = self.artificial_detunings[0] - ramsey_freq_1
-        qb_detuning_3 = self.artificial_detunings[2] + ramsey_freq_2
-        qb_detuning_4 = self.artificial_detunings[2] - ramsey_freq_2
-        # Find which ones match
-        qb_detunings = [qb_detuning_1, qb_detuning_2,
-                        qb_detuning_3, qb_detuning_4]
-        vals, inverse, count = np.unique(qb_detunings, return_inverse=True,
-                                         return_counts=True)
-        idx_vals_repeated = np.where(count > 1)[0]
-        vals_repeated = vals[idx_vals_repeated]
-        self.qb_detuning = vals_repeated
-        self.qubit_frequency = self.qubit_freq_spec + self.qb_detuning
+        self.new_qb_freqs = {
+            '0':self.qubit_freq_spec + self.artificial_detunings[0] + ramsey_freq_1,
+            '1':self.qubit_freq_spec + self.artificial_detunings[0] - ramsey_freq_1,
+            '2':self.qubit_freq_spec + self.artificial_detunings[1] + ramsey_freq_2,
+            '3':self.qubit_freq_spec + self.artificial_detunings[1] - ramsey_freq_2}
 
-        match_idxs = np.where(qb_detunings==vals_repeated)[0]
-        if match_idxs[0] == 0:
+        print('The 4 possible cases for the new qubit frequency give:')
+        pprint(self.new_qb_freqs)
+
+        # Find which ones match
+        self.diff = {}
+        self.diff.update({'0':self.new_qb_freqs['0']-self.new_qb_freqs['2']})
+        self.diff.update({'1':self.new_qb_freqs['1']-self.new_qb_freqs['3']})
+        self.diff.update({'2':self.new_qb_freqs['1']-self.new_qb_freqs['2']})
+        self.diff.update({'3':self.new_qb_freqs['0']-self.new_qb_freqs['3']})
+        self.correct_key = np.argmin(np.abs(list(self.diff.values())))
+        # Get new qubit frequency
+        self.qubit_frequency = self.new_qb_freqs[str(self.correct_key)]
+
+        # vals, inverse, count = np.unique(qb_detunings, return_inverse=True,
+        #                                  return_counts=True)
+        # print(vals, inverse, count)
+        # idx_vals_repeated = np.where(count > 1)[0]
+        # print(idx_vals_repeated)
+        # vals_repeated = vals[idx_vals_repeated]
+        # print(vals_repeated)
+        # self.qb_detuning = vals_repeated
+        # self.qubit_frequency = self.qubit_freq_spec + self.qb_detuning
+
+        #match_idxs = np.where(qb_detunings==vals_repeated)[0]
+        # if match_idxs[0] == 0:
+        if self.correct_key < 2:
+            # art_det 1 was correct direction
+            # print('Artificial detuning {:.1f} MHz gave the best results.'.format(
+            #     self.artificial_detunings[0]*1e-6))
             self.fit_res = fit_res_1
             self.ramsey_data = ramsey_data_1
             self.sweep_pts = sweep_pts_1
-            self.ramsey_freq = ramsey_freq_dict_1
+            self.ramsey_freq = ramsey_freq_1
+            qb_stderr = ramsey_freq_dict_1['freq_stderr']
         else:
+            # art_det 2 was correct direction
+            # print('Artificial detuning {:.1f} MHz gave the best results.'.format(
+            #     self.artificial_detunings[1]*1e-6))
             self.fit_res = fit_res_2
             self.ramsey_data = ramsey_data_2
             self.sweep_pts = sweep_pts_2
-            self.ramsey_freq = ramsey_freq_dict_2
+            self.ramsey_freq = ramsey_freq_2
+            qb_stderr = ramsey_freq_dict_2['freq_stderr']
 
         self.save_fitted_parameters(self.fit_res, var_name=self.value_names[0])
 
@@ -4341,16 +4383,72 @@ class Ramsey_Analysis_multiple_detunings(Ramsey_Analysis):
         self.save_computed_parameters(self.T2_star,
                                       var_name=self.value_names[0])
         self.save_computed_parameters({'new_qubit_frequency':self.qubit_frequency,
-                                       'new_qubit_freq_stderr':self.ramsey_freq['freq_stderr']},
+                                       'new_qubit_freq_stderr':qb_stderr},
                                       var_name=self.value_names[0])
 
-        #Plot results
-        self.plot_results(self.fit_res, show_guess=show_guess, scale=scale)
+        # Plot results
+        show_guess = kw.pop('show_guess', False)
 
+        if self.analyze_ef:
+            ylabel = r'$F$ $\left(|f \rangle \right) (arb. units)$'
+        else:
+            ylabel = r'$F$ $\left(|e \rangle \right) (arb. units)$'
+        if self.no_of_columns==2:
+            figsize=(3.375, 2.25*len_art_det)
+        else:
+            figsize=(7, 4*len_art_det)
+        self.fig, self.axs = plt.subplots(len_art_det, 1,
+                                          figsize=figsize,
+                                          dpi=self.dpi)
+
+        units = self.parameter_units[0]
+        fit_res_array = [fit_res_1, fit_res_2]
+        for i in range(len_art_det):
+            ax = self.axs[i]
+            self.plot_results_vs_sweepparam(x=self.sweep_pts*scale,
+                                            y=self.ramsey_data,
+                                            fig=self.fig, ax=ax,
+                                            xlabel=self.xlabel,
+                                            ylabel=ylabel,
+                                            marker='o-',
+                                            save=False)
+            self.plot_results(fit_res_array[i], show_guess=show_guess,
+                              scale=scale, art_det=self.artificial_detunings[i],
+                              fig=self.fig, ax=ax, textbox=False)
+
+            textstr = ('artificial detuning = %.2g MHz'
+                       % (self.artificial_detunings[i]*1e-6) +
+                       '\n$f_{Ramsey}$ = %.5g $ MHz \pm$ (%.5g) MHz'
+                       % (fit_res_array[i].params['frequency'].value*1e-6,
+                          fit_res_array[i].params['frequency'].stderr*1e6) +
+                       '\n$T_2^\star$ = %.3g '
+                       % (fit_res_array[i].params['tau'].value*scale)  +
+                       units + ' $\pm$ (%.3g) '
+                       % (fit_res_array[i].params['tau'].stderr*scale) +
+                       units)
+            ax.annotate(textstr, xy=(0.99, 0.98), xycoords='axes fraction',
+                        fontsize=self.font_size, bbox=self.box_props,
+                        horizontalalignment='right', verticalalignment='top')
+
+            if i==(len_art_det-1):
+                textstr_main = ('$f_{qubit \_ new}$ = %.5g $ GHz \pm$ (%.5g) GHz'
+                                % (self.qubit_frequency*1e-9,
+                                   qb_stderr*1e-9) +
+                                '\n$T_2^\star$ = %.3g '
+                                % (self.T2_star['T2_star']*scale)  +
+                                units + ' $\pm$ (%.3g) '
+                                % (self.T2_star['T2_star_stderr']*scale) +
+                                units)
+
+                self.fig.text(0.5, 0, textstr_main, fontsize=self.font_size,
+                              transform=self.axs[i].transAxes,
+                              verticalalignment='top',
+                              horizontalalignment='center', bbox=self.box_props)
+        
         #Print the T2_star values on screen
         unit = self.parameter_units[0][-1]
         if kw.pop('print_parameters',True):
-            print('T2* = {:.5f} '.format(
+            print('\nT2* = {:.5f} '.format(
                 self.T2_star['T2_star']*scale) +'('+pretty(mu)+unit+')'+
                   '\t\t T2* stderr = {:.5f} '.format(
                       self.T2_star['T2_star_stderr']*scale) +
