@@ -4267,7 +4267,7 @@ class Ramsey_Analysis(TD_Analysis):
         return self.T2_star
 
 
-class Ramsey_Analysis_multiple_detunings(Ramsey_Analysis):
+class Ramsey_Analysis_multiple_detunings(TD_Analysis):
 
     def __init__(self, label='Ramsey_mult_det', **kw):
         kw['label'] = label
@@ -4466,6 +4466,26 @@ class Ramsey_Analysis_multiple_detunings(Ramsey_Analysis):
             self.data_file.close()
 
         return self.fit_res
+
+    def get_measured_freq(self, fit_res, **kw):
+        freq = fit_res.params['frequency'].value
+        freq_stderr = fit_res.params['frequency'].stderr
+
+        self.ramsey_freq = {'freq':freq, 'freq_stderr':freq_stderr}
+
+        return self.ramsey_freq
+
+    def get_measured_T2_star(self, fit_res, **kw):
+        '''
+        Returns measured T2 star from the fit to the Ical data.
+         return T2, T2_stderr
+        '''
+        T2 = fit_res.params['tau'].value
+        T2_stderr = fit_res.params['tau'].stderr
+
+        self.T2_star = {'T2_star':T2, 'T2_star_stderr':T2_stderr}
+
+        return self.T2_star
 
 class DragDetuning_Analysis(TD_Analysis):
 
