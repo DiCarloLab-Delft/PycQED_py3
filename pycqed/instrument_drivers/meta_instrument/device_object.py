@@ -19,6 +19,8 @@ from pycqed.analysis import measurement_analysis as ma
 import pycqed.measurement.gate_set_tomography.gate_set_tomography_CC as gstCC
 import pygsti
 from pycqed.utilities.general import gen_sweep_pts
+from pycqed_scripts.experiments.Starmon_1702.clean_scripts.functions import \
+    CZ_cost_Z_amp
 
 class DeviceObject(Instrument):
 
@@ -612,21 +614,8 @@ class TwoQubitDevice(DeviceObject):
             amp_pts = gen_sweep_pts(center=old_z_amp, span=span, num=31)
             CZ_cost_Z_amp(correction_qubit, spectator_qubit, MC,
                           Z_amps_q0=amp_pts)
-            a = ma.MeasurementAnalysis()
-
-            model = lmfit.Model(lambda x, A, C, x0: A * (x - x0)**2 + C)
-            x0_guess = old_z_amp
-            C_guess = -1
-            A_guess = (a.measured_values[0] + 1) / (amp_pts[0] - old_z_amp)**2
-
-            model.set_param_hint('A', value=A_guess, vary=True)
-            model.set_param_hint('C', value=C_guess, vary=True)
-            model.set_param_hint('x0', value=x0_guess, vary=True)
-            params = model.make_params()
-
-            fit_res = model.fit(data=a.measured_values[
-                                0], x=amp_pts, params=params)
-            new_z_amp = fit_res.best_values['x0']
+            a = ma.CZ_single_qubit_phase_analysis()
+            new_z_amp = a.opt_z_amp
 
             if new_z_amp < amp_pts[0] or new_z_amp > amp_pts[-1]:
                 print('Fitted minimum outside scan range. Repeating scan around '

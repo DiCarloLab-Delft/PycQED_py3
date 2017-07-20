@@ -6934,6 +6934,9 @@ class CZ_single_qubit_phase_analysis(TD_Analysis):
         self.fit_res = model.fit(self.fit_data, params=params,
                                  x=self.x_points)
 
+        self.opt_z_amp = (-self.fit_res.best_values['b'] /
+                          (2 * self.fit_res.best_values['a']))
+
         if self.make_fig:
             self.make_figures()
 
@@ -6952,6 +6955,8 @@ class CZ_single_qubit_phase_analysis(TD_Analysis):
         ax.set_title(kw.get('plot_title',
                             textwrap.fill(self.timestamp_string + '_' +
                                           self.measurementstring, 40)))
+        ax.text(.1, .9, 'Optimal amplitude: {:.4f}'.format(self.opt_z_amp),
+                transform=ax.transAxes)
         ax.legend()
         plt.tight_layout()
         self.save_fig(fig, **kw)
