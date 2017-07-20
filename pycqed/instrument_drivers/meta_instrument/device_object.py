@@ -18,6 +18,7 @@ from pycqed.measurement import sweep_functions as swf
 from pycqed.analysis import measurement_analysis as ma
 import pycqed.measurement.gate_set_tomography.gate_set_tomography_CC as gstCC
 import pygsti
+from pycqed.utilities.general import gen_sweep_pts
 
 class DeviceObject(Instrument):
 
@@ -480,7 +481,11 @@ class TwoQubitDevice(DeviceObject):
         The qubit that is fluxed is q0, so the order of the qubit matters!
 
         Args:
-            fluxing_qubit
+            fluxing_qubit (Instr):
+                    Qubit object representing the qubit which is fluxed.
+            spectator_qubit (Instr):
+                    Qubit object representing the qubit with which the
+                    fluxing qubit interacts.
             amps (array of floats):
                     Flux pulse amplitude sweep points (in V) -> x-axis
             lengths (array of floats):
@@ -568,3 +573,68 @@ class TwoQubitDevice(DeviceObject):
 
         # Restore the old wave dict unit.
         QWG_flux_lutman.wave_dict_unit(oldWaveDictUnit)
+
+    def check_CZ_single_qubit_phase(self,
+                                    correction_qubit=None,
+                                    spectator_qubit=None,
+                                    span: float=0.04, num: int=31, MC=None):
+        '''
+        Measures a the Z-amp cost function in a small range around the value
+        from the last calibration, fits a parabola, extracts a new minimum,
+        and sets the new Z-amp in the flux lookup table manager of the
+        correction qubit.
+
+        Args:
+            correction_qubit (Instr):
+                    Qubit object representing the qubit for which the single
+                    qubit phase correction should be calibrated.
+            spectator_qubit (Instr):
+                    Qubit object representing the other qubit involved in the
+                    CZ.
+            span (float):
+                    Full span of the range around the last known value for
+                    Z-amp in which the cost function is measured.
+            num (int):
+                    Number of points measured in the specified range.
+        '''
+        if MC is None:
+            MC = qc.station.components['MC']
+
+        if fluxing_qubit is None:
+            fluxing_qubit = self.qubits()[0]
+        if spectator_qubit is None:
+            spectator_qubit = self.qubits()[1]
+
+        old_z_amp = correction_qubit.flux_LutMan.get_instr().Z_amp()
+        repeat_calibration = True
+
+        while repeat_calibration:
+            amp_pts = gen_sweep_pts(center=old_z_amp, span=span, num=31)
+            CZ_cost_Z_amp(correction_qubit, spectator_qubit, MC,
+                          Z_amps_q0=amp_pts)
+            a = ma.MeasurementAnalysis()
+
+            model = lmfit.Model(lambda x, A, C, x0: A * (x - x0)**2 + C)
+            x0_guess = old_z_amp
+            C_guess = -1
+            A_guess = (a.measured_values[0] + 1) / (amp_pts[0] - old_z_amp)**2
+
+            model.set_param_hint('A', value=A_guess, vary=True)
+            model.set_param_hint('C', value=C_guess, vary=True)
+            model.set_param_hint('x0', value=x0_guess, vary=True)
+            params = model.make_params()
+
+            fit_res = model.fit(data=a.measured_values[
+                                0], x=amp_pts, params=params)
+            new_z_amp = fit_res.best_values['x0']
+
+            if new_z_amp < amp_pts[0] or new_z_amp > amp_pts[-1]:
+                print('Fitted minimum outside scan range. Repeating scan around '
+                      'fitted minimum {}.'.format(new_z_amp))
+                old_z_amp = new_z_amp
+            else:
+                repeat_calibration = False
+
+        correction_qubit.flux_LutMan.get_instr().Z_amp(new_z_amp)
+        return new_z_amp
+

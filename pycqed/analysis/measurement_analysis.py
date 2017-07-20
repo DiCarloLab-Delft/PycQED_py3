@@ -944,6 +944,7 @@ class TD_Analysis(MeasurementAnalysis):
     def run_default_analysis(self,
                              close_main_fig=True,  **kw):
         close_file = kw.pop('close_file', True)
+        make_fig = kw.get('make_fig', self.make_fig)
         self.add_analysis_datagroup_to_file()
         self.get_naming_and_values()
         if self.rotate_and_normalize:
@@ -956,7 +957,7 @@ class TD_Analysis(MeasurementAnalysis):
                                          'calibration points'.encode('utf-8'))
 
         # Plotting
-        if self.make_fig:
+        if make_fig:
             self.fig1, fig2, self.ax1, axarray = self.setup_figures_and_axes()
             # print(len(self.value_names))
             for i in range(len(self.value_names)):
@@ -6913,3 +6914,44 @@ class GST_Analysis(TD_Analysis):
                      *new_count))
 
         return counts
+
+
+class CZ_single_qubit_phase_analysis(TD_Analysis):
+    def __init__(self, **kw):
+        super().__init__(rotate_and_normalize=False, cal_points=False, **kw)
+
+    def run_default_analysis(self, **kw):
+        super().run_default_analysis(make_fig=False, close_file=False)
+
+        model = lmfit.models.QuadraticModel()
+        params = model.guess(self.corr_data)
+
+        dat_exc = self.measured_values[0][1::2]
+        dat_idx = self.measured_values[0][::2]
+        self.fit_data = dat_idx - dat_exc
+        self.x_points = self.sweep_points[::2]
+
+        self.fit_res = model.fit(self.fit_data, params=params,
+                                 x=self.x_points)
+
+        if self.make_fig:
+            self.make_figures()
+
+        if kw.get('close_file', True):
+            self.data_file.close()
+
+    def make_figures(self, **kw):
+
+        xfine = np.linspace(self.x_points[0], self.x_points[-1], 100)
+        fig, figarray, ax, axarray = self.setup_figures_and_axes()
+        ax.plot(self.x_points, self.fit_data, '-o')
+        ax.plot(xfine, self.fit_res.eval(x=xfine), label='best fit')
+        ax.plot(self.x_points, self.fit_res.init_fit, label='initial guess')
+        set_xlabel(ax, self.parameter_names[0], self.parameter_units[0])
+        set_ylabel(ax, 'Z-amp cost', 'a.u.')
+        ax.set_title(kw.get('plot_title',
+                            textwrap.fill(self.timestamp_string + '_' +
+                                          self.measurementstring, 40)))
+        ax.legend()
+        plt.tight_layout()
+        self.save_fig(fig, **kw)
