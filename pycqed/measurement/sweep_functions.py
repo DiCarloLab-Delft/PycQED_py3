@@ -348,40 +348,46 @@ class QASM_config_sweep(QASM_Sweep_v2):
 class QWG_flux_QASM_Sweep(QASM_Sweep_v2):
 
     def __init__(self, qasm_fn: str, config: dict,
-                 CBox, QWG_flux_lutman,
+                 CBox, QWG_flux_lutmans,
                  parameter_name: str ='Points', unit: str='a.u.',
-                 upload: bool=True, verbosity_level: int=0):
+                 upload: bool=True, verbosity_level: int=0,
+                 disable_compile_and_upload: bool = False):
         super(QASM_Sweep_v2, self).__init__()
         self.name = 'QWG_flux_QASM_Sweep'
 
         self.qasm_fn = qasm_fn
         self.config = config
         self.CBox = CBox
-        self.QWG_flux_lutman = QWG_flux_lutman
+        self.QWG_flux_lutmans = QWG_flux_lutmans
         self.upload = upload
 
         self.parameter_name = parameter_name
         self.unit = unit
         self.verbosity_level = verbosity_level
+        self.disable_compile_and_upload = disable_compile_and_upload
 
     def prepare(self, **kw):
-        from pycqed.measurement.waveform_control_CC.qasm_compiler_helpers \
-            import get_timetuples_since_event
-        # assume this corresponds 1 to 1 with the QWG_trigger
-        compiler = self.compile_and_upload(self.qasm_fn, self.config)
-        for i in range(len(self.sweep_points)):
-            self.time_tuples, end_time_ns = get_timetuples_since_event(
-                start_label='qwg_trigger_{}'.format(i),
-                target_labels=['square', 'cz'],
-                timing_grid=compiler.timing_grid, end_label='ro',
-                convert_clk_to_ns=True)
-            self.comp_fp = self.QWG_flux_lutman.generate_composite_flux_pulse(
-                time_tuples=self.time_tuples, end_time_ns=end_time_ns)
-        if self.upload:
-            self.QWG_flux_lutman.load_custom_pulse_onto_AWG_lookuptable(
-                waveform=self.comp_fp, pulse_name='custom_{}'.format(i),
-                distort=True, append_compensation=True,
-                codeword=i)
+        if not self.disable_compile_and_upload:
+            from pycqed.measurement.waveform_control_CC.qasm_compiler_helpers \
+                import get_timetuples_since_event
+            # assume this corresponds 1 to 1 with the QWG_trigger
+            compiler = self.compile_and_upload(self.qasm_fn, self.config)
+            for i in range(len(self.sweep_points)):
+                self.time_tuples, end_time_ns = get_timetuples_since_event(
+                    start_label='qwg_trigger_{}'.format(i),
+                    target_labels=['square', 'cz'],
+                    timing_grid=compiler.timing_grid, end_label='ro',
+                    convert_clk_to_ns=True)
+                for fl_lm in self.QWG_flux_lutmans:
+                    self.comp_fp = fl_lm.generate_composite_flux_pulse(
+                        time_tuples=self.time_tuples,
+                        end_time_ns=end_time_ns)
+                    if self.upload:
+                        fl_lm.load_custom_pulse_onto_AWG_lookuptable(
+                            waveform=self.comp_fp,
+                            pulse_name='custom_{}'.format(i),
+                            distort=True, append_compensation=True,
+                            codeword=i)
 
 
 class Multi_QASM_Sweep(QASM_Sweep_v2):
