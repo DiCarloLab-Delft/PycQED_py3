@@ -539,7 +539,8 @@ class QWG_FluxLookuptableManager(Instrument):
                                                append_compensation: bool=True,
                                                distort: bool=True,
                                                pulse_name='custom',
-                                               codeword=0):
+                                               codeword=0,
+                                               disable_start_stop: bool=False):
         '''
         Load a user-defined waveform onto the QWG. The pulse is delayed by
         self.F_delay() and a compensation pulse is added after
@@ -554,8 +555,13 @@ class QWG_FluxLookuptableManager(Instrument):
                     The name of the pulse. This is also used in the QWG.
             codeword (int):
                     QWG codeword used for the pulse.
+            disable_start_stop (bool):
+                    Disables the starting and stopping of the QWG. This can
+                    be used to speed up loading many custom pulses onto the
+                    QWG.
         '''
-        self.QWG.get_instr().stop()
+        if not disable_start_stop:
+            self.QWG.get_instr().stop()
 
         # Insert delays and compensation pulses, apply distortions
         wait_samples = np.zeros(int(self.F_delay()*self.sampling_rate()))
@@ -600,8 +606,9 @@ class QWG_FluxLookuptableManager(Instrument):
         self.QWG.get_instr().set('codeword_{}_ch{}_waveform'.format(
             codeword, self.F_ch()), pulse_name)
 
-        self.QWG.get_instr().start()
-        self.QWG.get_instr().getOperationComplete()
+        if not disable_start_stop:
+            self.QWG.get_instr().start()
+            self.QWG.get_instr().getOperationComplete()
 
     def render_wave(self, wave_name, show=True, QtPlot_win=None):
         '''

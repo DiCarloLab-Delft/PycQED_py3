@@ -7,6 +7,8 @@ from pycqed.measurement.waveform_control_CC import qasm_compiler as qcx
 from pycqed.instrument_drivers.virtual_instruments.pyqx import qasm_loader as ql
 from pycqed.measurement.waveform_control_CC import qasm_to_asm as qta
 from pycqed.measurement.waveform_control_CC import qasm_compiler as qcx
+import pycqed.measurement.waveform_control_CC.qasm_compiler_helpers as qch
+
 
 
 class Sweep_function(object):
@@ -350,8 +352,9 @@ class QWG_flux_QASM_Sweep(QASM_Sweep_v2):
     def __init__(self, qasm_fn: str, config: dict,
                  CBox, QWG_flux_lutmans,
                  parameter_name: str ='Points', unit: str='a.u.',
-                 upload: bool=True, verbosity_level: int=0,
-                 disable_compile_and_upload: bool = False):
+                 upload: bool=True, verbosity_level: int=1,
+                 disable_compile_and_upload: bool = False,
+                 identical_pulses: bool=True):
         super(QASM_Sweep_v2, self).__init__()
         self.name = 'QWG_flux_QASM_Sweep'
 
@@ -365,19 +368,26 @@ class QWG_flux_QASM_Sweep(QASM_Sweep_v2):
         self.unit = unit
         self.verbosity_level = verbosity_level
         self.disable_compile_and_upload = disable_compile_and_upload
+        self.identical_pulses = identical_pulses
 
     def prepare(self, **kw):
         if not self.disable_compile_and_upload:
-            from pycqed.measurement.waveform_control_CC.qasm_compiler_helpers \
-                import get_timetuples_since_event
             # assume this corresponds 1 to 1 with the QWG_trigger
             compiler = self.compile_and_upload(self.qasm_fn, self.config)
-            for i in range(len(self.sweep_points)):
-                self.time_tuples, end_time_ns = get_timetuples_since_event(
+            if self.identical_pulses:
+                pts = 1
+            else:
+                pts = len(self.sweep_points)
+            for i in range(pts):
+                self.time_tuples, end_time_ns = qch.get_timetuples_since_event(
                     start_label='qwg_trigger_{}'.format(i),
-                    target_labels=['square', 'cz'],
+                    target_labels=['square', 'dummy_CZ', 'CZ'],
                     timing_grid=compiler.timing_grid, end_label='ro',
                     convert_clk_to_ns=True)
+                if len(self.time_tuples) == 0 and self.verbosity_level>0:
+                    logging.warning('No time tuples found')
+
+                t0 = time.time()
                 for fl_lm in self.QWG_flux_lutmans:
                     self.comp_fp = fl_lm.generate_composite_flux_pulse(
                         time_tuples=self.time_tuples,
@@ -385,9 +395,13 @@ class QWG_flux_QASM_Sweep(QASM_Sweep_v2):
                     if self.upload:
                         fl_lm.load_custom_pulse_onto_AWG_lookuptable(
                             waveform=self.comp_fp,
-                            pulse_name='custom_{}'.format(i),
+                            pulse_name='custom_{}_{}'.format(i, fl_lm.name),
                             distort=True, append_compensation=True,
                             codeword=i)
+                t1 = time.time()
+                if self.verbosity_level > 0:
+                    print('Uploading custom flux pulses took {:.2f}s'.format(
+                          t1-t0))
 
 
 class Multi_QASM_Sweep(QASM_Sweep_v2):

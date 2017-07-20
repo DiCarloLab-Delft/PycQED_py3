@@ -607,21 +607,22 @@ def purity_CZ_seq(q0, q1, RO_target='all'):
     return qasm_file
 
 
-def purity_N_CZ_seq(q0, q1, N, RO_target='all'):
+def purity_N_CZ_seq(q0: str, q1: str, N: int, RO_target: str='all'):
     """
     Creates the |00> + |11> Bell state and does a partial tomography in
     order to determine the purity of both qubits.
     """
 
-    filename = join(base_qasm_path, 'purity_CZ_seq.qasm')
+    filename = join(base_qasm_path, 'purity_{}_CZ_seq.qasm'.format(N))
     qasm_file = mopen(filename, mode='w')
     qasm_file.writelines('qubit {} \nqubit {} \n'.format(q0, q1))
 
     tomo_list = ['mX90', 'mY90', 'I']
 
-    for p_pulse in tomo_list:
+    for i, p_pulse in enumerate(tomo_list):
         # Create a Bell state:  |00> + |11>
         qasm_file.writelines('\ninit_all\n')
+        qasm_file.writelines('qwg_trigger_{} {}\n'.format(0, q0))
         qasm_file.writelines('mY90 {} | Y90 {} \n'.format(q0, q1))
         for n in range(N):
             qasm_file.writelines('dummy_CZ {} {} \n'.format(q0, q1))
