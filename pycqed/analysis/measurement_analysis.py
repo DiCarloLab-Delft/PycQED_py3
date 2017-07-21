@@ -6924,12 +6924,13 @@ class CZ_single_qubit_phase_analysis(TD_Analysis):
         super().run_default_analysis(make_fig=False, close_file=False)
 
         model = lmfit.models.QuadraticModel()
-        params = model.guess(self.corr_data)
 
         dat_exc = self.measured_values[0][1::2]
         dat_idx = self.measured_values[0][::2]
         self.fit_data = dat_idx - dat_exc
         self.x_points = self.sweep_points[::2]
+
+        params = model.guess(x=self.x_points, data=self.fit_data)
 
         self.fit_res = model.fit(self.fit_data, params=params,
                                  x=self.x_points)
@@ -6946,10 +6947,11 @@ class CZ_single_qubit_phase_analysis(TD_Analysis):
     def make_figures(self, **kw):
 
         xfine = np.linspace(self.x_points[0], self.x_points[-1], 100)
-        fig, figarray, ax, axarray = self.setup_figures_and_axes()
+        fig, ax = plt.subplots()
         ax.plot(self.x_points, self.fit_data, '-o')
+        ax.plot(self.x_points, self.fit_res.init_fit, '--',
+                label='initial guess', c='k')
         ax.plot(xfine, self.fit_res.eval(x=xfine), label='best fit')
-        ax.plot(self.x_points, self.fit_res.init_fit, label='initial guess')
         set_xlabel(ax, self.parameter_names[0], self.parameter_units[0])
         set_ylabel(ax, 'Z-amp cost', 'a.u.')
         ax.set_title(kw.get('plot_title',

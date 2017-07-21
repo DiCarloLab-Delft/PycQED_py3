@@ -22,6 +22,7 @@ from pycqed.utilities.general import gen_sweep_pts
 from pycqed_scripts.experiments.Starmon_1702.clean_scripts.functions import \
     CZ_cost_Z_amp
 
+
 class DeviceObject(Instrument):
 
     def __init__(self, name, **kw):
@@ -308,7 +309,7 @@ class TwoQubitDevice(DeviceObject):
 
         double_points = True
         AllXY = mqqs.two_qubit_AllXY(q0.name, q1.name,
-                                     RO_target=q0.name, # shold be 'all'
+                                     RO_target=q0.name,  # shold be 'all'
                                      sequence_type=sequence_type,
                                      replace_q1_pulses_X180=False,
                                      double_points=double_points)
@@ -508,7 +509,7 @@ class TwoQubitDevice(DeviceObject):
         '''
 
         if MC is None:
-                MC = qc.station.components['MC']
+            MC = qc.station.components['MC']
         CBox = self.central_controller.get_instr()
 
         if fluxing_qubit is None:
@@ -576,10 +577,10 @@ class TwoQubitDevice(DeviceObject):
         # Restore the old wave dict unit.
         QWG_flux_lutman.wave_dict_unit(oldWaveDictUnit)
 
-    def check_CZ_single_qubit_phase(self,
-                                    correction_qubit=None,
-                                    spectator_qubit=None,
-                                    span: float=0.04, num: int=31, MC=None):
+    def calibrate_CZ_single_qubit_phase_fine(self,
+                                             correction_qubit=None,
+                                             spectator_qubit=None,
+                                             span: float=0.04, num: int=31, MC=None):
         '''
         Measures a the Z-amp cost function in a small range around the value
         from the last calibration, fits a parabola, extracts a new minimum,
@@ -602,8 +603,8 @@ class TwoQubitDevice(DeviceObject):
         if MC is None:
             MC = qc.station.components['MC']
 
-        if fluxing_qubit is None:
-            fluxing_qubit = self.qubits()[0]
+        if correction_qubit is None:
+            correction_qubit = self.qubits()[0]
         if spectator_qubit is None:
             spectator_qubit = self.qubits()[1]
 
@@ -623,7 +624,8 @@ class TwoQubitDevice(DeviceObject):
                 old_z_amp = new_z_amp
             else:
                 repeat_calibration = False
-
+        # This has to be set in the qubit object.
+        # the "prepare_for_fluxing" in turn should ensure the right vals
+        # get updated.
         correction_qubit.flux_LutMan.get_instr().Z_amp(new_z_amp)
         return new_z_amp
-
