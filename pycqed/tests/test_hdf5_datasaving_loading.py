@@ -1,3 +1,5 @@
+import os
+import pycqed as pq
 import unittest
 import h5py
 from pycqed.measurement import hdf5_data as h5d
@@ -6,7 +8,6 @@ import pycqed.utilities.general as gen
 from pycqed.measurement import measurement_control
 from pycqed.instrument_drivers.physical_instruments.dummy_instruments \
     import DummyParHolder
-from pycqed.utilities.get_default_datadir import get_default_datadir
 
 from qcodes import station
 
@@ -26,7 +27,7 @@ class Test_HDF5(unittest.TestCase):
         self.station.add_component(self.mock_parabola)
         self.mock_parabola_2 = DummyParHolder('mock_parabola_2')
         self.station.add_component(self.mock_parabola_2)
-        self.datadir = get_default_datadir()
+        self.datadir = os.path.join(pq.__path__[0], 'tests', 'test_data')
 
     def test_storing_and_loading_station_snapshot(self):
         """
