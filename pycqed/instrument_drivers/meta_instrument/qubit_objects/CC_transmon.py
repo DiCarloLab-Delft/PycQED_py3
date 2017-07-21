@@ -465,7 +465,6 @@ class CBox_v3_driven_transmon(Transmon):
             self.int_avg_det = qh.CBox_integrated_average_detector_CC(
                 self.CBox.get_instr(),
                 nr_averages=self.RO_acq_averages()//self.RO_soft_averages())
-            self.int_avg_det_rot = None  # FIXME: Not implemented
             self.int_log_det = qh.CBox_integration_logging_det_CC(self.CBox)
             self.input_average_detector = None  # FIXME: Not implemented
             self.int_avg_det_single = qh.CBox_single_integration_average_det_CC(
@@ -480,37 +479,39 @@ class CBox_v3_driven_transmon(Transmon):
             UHFQC = self._acquisition_instrument
 
             logging.info("setting UHFQC acquisition")
+
+            if self.RO_acq_weights() == 'optimal':
+                RO_channels = [self.RO_acq_weight_function_I()]
+                result_logging_mode = 'lin_trans'
+            else:
+                RO_channels = [self.RO_acq_weight_function_I(),
+                               self.RO_acq_weight_function_Q()]
+                result_logging_mode = 'raw'
+
             self.input_average_detector = det.UHFQC_input_average_detector(
-                UHFQC=self._acquisition_instrument,
-                AWG=self.CBox.get_instr(), nr_averages=self.RO_acq_averages())
-            self.int_avg_det_single = det.UHFQC_integrated_average_detector(
-                UHFQC=self._acquisition_instrument, AWG=self.CBox.get_instr(),
-                channels=[
-                    self.RO_acq_weight_function_I(),
-                    self.RO_acq_weight_function_Q()],
-                nr_averages=self.RO_acq_averages(),
-                real_imag=False, single_int_avg=True,
-                integration_length=self.RO_acq_integration_length())
-            self.int_avg_det_single.detector_control = 'soft'
+                UHFQC=UHFQC,
+                AWG=self.CBox.get_instr(),
+                nr_averages=self.RO_acq_averages())
 
             self.int_avg_det = det.UHFQC_integrated_average_detector(
-                UHFQC=self._acquisition_instrument, AWG=self.CBox.get_instr(),
-                channels=[
-                    self.RO_acq_weight_function_I(),
-                    self.RO_acq_weight_function_Q()],
+                UHFQC=UHFQC, AWG=self.CBox.get_instr(),
+                channels=RO_channels,
+                result_logging_mode=result_logging_mode,
                 nr_averages=self.RO_acq_averages(),
                 integration_length=self.RO_acq_integration_length())
-            self.int_avg_det_rot = det.UHFQC_integrated_average_detector(
-                UHFQC=self._acquisition_instrument, AWG=self.CBox.get_instr(),
-                channels=[self.RO_acq_weight_function_I(),
-                          self.RO_acq_weight_function_Q()],
+
+            self.int_avg_det_single = det.UHFQC_integrated_average_detector(
+                UHFQC=UHFQC, AWG=self.CBox.get_instr(),
+                channels=RO_channels,
+                result_logging_mode=result_logging_mode,
                 nr_averages=self.RO_acq_averages(),
-                integration_length=self.RO_acq_integration_length(),
-                rotate=True)
+                real_imag=True, single_int_avg=True,
+                integration_length=self.RO_acq_integration_length())
+
             self.int_log_det = det.UHFQC_integration_logging_det(
-                UHFQC=self._acquisition_instrument, AWG=self.CBox.get_instr(),
-                channels=[self.RO_acq_weight_function_I(),
-                          self.RO_acq_weight_function_Q()],
+                UHFQC=UHFQC, AWG=self.CBox.get_instr(),
+                channels=RO_channels,
+                result_logging_mode=result_logging_mode,
                 integration_length=self.RO_acq_integration_length())
 
         elif 'ATS' in acq_instr_name:
@@ -806,6 +807,7 @@ class CBox_v3_driven_transmon(Transmon):
                                                     MC, analyze, close_fig)
         MC.set_sweep_function(self.cw_source.get_instr().frequency)
         MC.set_sweep_points(freqs)
+        self.int_avg_det_single._set_real_imag(False)
         MC.set_detector_function(self.int_avg_det_single)
         MC.run(name='spectroscopy'+self.msmt_suffix)
 
@@ -969,6 +971,8 @@ class CBox_v3_driven_transmon(Transmon):
         nr_cliffords = np.append(
             nr_cliffords, [nr_cliffords[-1]+.5]*2 + [nr_cliffords[-1]+1.5]*2)
 
+        # if 'CBox' not in self.acquisition_instrument():
+        #     raise NotImplementedError
         self.prepare_for_timedomain()
         if MC is None:
             MC = self.MC.get_instr()
@@ -976,11 +980,12 @@ class CBox_v3_driven_transmon(Transmon):
         counter_param = ManualParameter('name_ctr', initial_value=0)
         asm_filenames = []
         for i in range(nr_seeds):
-            RB_qasm = sqqs.randomized_benchmarking(self.name,
-                                                   nr_cliffords=nr_cliffords, nr_seeds=1,
-                                                   label='randomized_benchmarking_' +
-                                                   str(i),
-                                                   double_curves=False)
+            RB_qasm = sqqs.randomized_benchmarking(
+                self.name,
+                nr_cliffords=nr_cliffords, nr_seeds=1,
+                label='randomized_benchmarking_' +
+                str(i),
+                double_curves=False)
             asm_file = qta.qasm_to_asm(RB_qasm.name, self.get_operation_dict())
             asm_filenames.append(asm_file.name)
 
@@ -989,10 +994,21 @@ class CBox_v3_driven_transmon(Transmon):
             'asm_filenames': asm_filenames,
             'CBox': self.CBox.get_instr()}
 
-        d = qh.CBox_int_avg_func_prep_det_CC(
-            self.CBox.get_instr(), prepare_function=qh.load_range_of_asm_files,
-            prepare_function_kwargs=prepare_function_kwargs,
-            nr_averages=256)
+        if 'CBox' in self.acquisition_instrument():
+            d = qh.CBox_int_avg_func_prep_det_CC(
+                self.CBox.get_instr(), prepare_function=qh.load_range_of_asm_files,
+                prepare_function_kwargs=prepare_function_kwargs,
+                nr_averages=256)
+        elif 'UHFQC' in self.acquisition_instrument():
+            d = qh.UHFQC_int_avg_func_prep_det_CC(
+                prepare_function=qh.load_range_of_asm_files,
+                prepare_function_kwargs=prepare_function_kwargs,
+                UHFQC=self._acquisition_instrument, AWG=self.CBox.get_instr(),
+                channels=[
+                    self.RO_acq_weight_function_I(),
+                    self.RO_acq_weight_function_Q()],
+                integration_length=self.RO_acq_integration_length(),
+                nr_averages=256)
 
         s = swf.None_Sweep()
         s.parameter_name = 'Number of Cliffords'
@@ -1222,6 +1238,7 @@ class CBox_v3_driven_transmon(Transmon):
         MC.live_plot_enabled(old_plot_setting)
         if analyze:
             a = ma.SSRO_Analysis(label='SSRO'+self.msmt_suffix,
+                                 channels=d.value_names,
                                  no_fits=no_fits, close_fig=close_fig)
             if verbose:
                 print('Avg. Assignement fidelity: \t{:.4f}\n'.format(a.F_a) +
@@ -1259,12 +1276,13 @@ class CBox_v3_driven_transmon(Transmon):
 
         return [np.array(t, dtype=np.float64) for t in transients]
 
-    def calibrate_optimal_weights(self, MC=None, verify=True, update=True):
+    def calibrate_optimal_weights(self, MC=None, verify=True, analyze=False,
+                                  update=True):
         if MC is None:
             MC = self.MC.get_instr()
 
         # return value needs to be added in measure_transients
-        transients = self.measure_transients(MC=MC, analyze=False)
+        transients = self.measure_transients(MC=MC, analyze=analyze)
         # Calculate optimal weights
         optimized_weights_I = transients[1][0] - transients[0][0]
         optimized_weights_I = optimized_weights_I - \
