@@ -156,7 +156,7 @@ def load_settings_onto_instrument(instrument, load_from_instr=None,
 
 
 def load_settings_onto_instrument_v2(instrument, load_from_instr: str=None,
-                                     label: str=None, filepath: str=None,
+                                     label: str='', filepath: str=None,
                                      timestamp: str=None):
     '''
     Loads settings from an hdf5 file onto the instrument handed to the
@@ -179,6 +179,7 @@ def load_settings_onto_instrument_v2(instrument, load_from_instr: str=None,
     '''
 
     older_than = None
+    folder = None
     instrument_name = instrument.name
     success = False
     count = 0
