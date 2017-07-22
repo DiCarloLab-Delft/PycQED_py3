@@ -20,11 +20,19 @@ from qcodes import station
 tc = TessConnection()
 tc.connect("simulate")
 
+
 st = station.Station()
 # Connect to the qx simulator
 MC = measurement_control.MeasurementControl(
     'MC', live_plot_enabled=False, verbose=True)
+
+datadir = os.path.abspath(os.path.join(
+            os.path.dirname(pq.__file__), os.pardir, 'simulator_data'))
+MC.datadir(datadir)
 MC.station = st
+
+
+
 
 st.add_component(MC)
 # st.add_component(dq)

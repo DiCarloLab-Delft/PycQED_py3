@@ -7,6 +7,8 @@ import pycqed_scripts as pqs  # N.B. should not be defined in pycqed
 # import time
 import pycqed as pq
 import qcodes as qc
+
+from pycqed.measurement import measurement_control
 from qcodes.instrument.base import Instrument
 from pycqed.measurement import detector_functions as det
 from pycqed.measurement import sweep_functions as swf
@@ -26,13 +28,23 @@ defualt_simulate_options = {
 }
 
 # Extract some "hardcoded" instruments from the global namespace"
+station = qc.station
+# Connect to the qx simulator
+MC = measurement_control.MeasurementControl(
+    'Demonstrator_MC', live_plot_enabled=False, verbose=True)
+
+datadir = os.path.abspath(os.path.join(
+            os.path.dirname(pq.__file__), os.pardir, 'demonstrator_execute_data'))
+MC.datadir(datadir)
+station.add_component(MC)
+MC.station = station
 
 
 def execute_qasm_file(file_url: str,  config_json: str,
                       verbosity_level: int=0):
     options = json.loads(config_json)
 
-    MC = Instrument.find_instrument('MC')
+    MC = Instrument.find_instrument('Demonstrator_MC')
     CBox = Instrument.find_instrument('CBox')
     device = Instrument.find_instrument('Starmon')
 
