@@ -160,16 +160,30 @@ def load_settings_onto_instrument_v2(instrument, load_from_instr: str=None,
                                      timestamp: str=None):
     '''
     Loads settings from an hdf5 file onto the instrument handed to the
-    function.
-    By default uses the last hdf5 file in the datadirectory.
+    function. By default uses the last hdf5 file in the datadirectory.
     By giving a label or timestamp another file can be chosen as the
     settings file.
+
+    Args:
+        instrument (instrument) : instrument onto which settings should be
+            loaded
+        load_from_instr (str) : optional name of another instrument from
+            which to load the settings.
+        label (str)           : label used for finding the last datafile
+        filepath (str)        : exact filepath of the hdf5 file to load.
+            if filepath is specified, this takes precedence over the file
+            locating options (label, timestamp etc.).
+        timestamp (str)       : timestamp of file in the datadir
+
+
     '''
 
     older_than = None
     instrument_name = instrument.name
     success = False
     count = 0
+    # Will try multiple times in case the last measurements failed and
+    # created corrupt data files.
     while success is False and count < 10:
         try:
             if filepath is None:
