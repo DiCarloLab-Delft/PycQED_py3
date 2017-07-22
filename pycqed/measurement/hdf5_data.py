@@ -202,8 +202,9 @@ def write_dict_to_hdf5(data_dict: dict, entry_point):
 
         else:
             logging.warning(
-                'Type "{}" for "{}":"{}" not supported, '
-                'storing as string'.format(type(item), key, item))
+                'Type "{}" for "{}" (key): "{}" (item) at location {} '
+                'not supported, '
+                'storing as string'.format(type(item), key, item, entry_point))
             entry_point.attrs[key] = str(item)
 
 
