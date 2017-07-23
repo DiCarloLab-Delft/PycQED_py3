@@ -114,9 +114,33 @@ class DeviceObject(Instrument):
         """
         Calls the prepare for timedomain on each of the constituent qubits.
         """
-        for q in self.qubits():
-            q_obj = self.find_instrument(q)
-            q_obj.prepare_for_timedomain()
+        RO_LMM = self.RO_LutManMan.get_instr()
+
+        q0 = self.find_instrument(self.qubits()[0])
+        q1 = self.find_instrument(self.qubits()[1])
+
+        # this is to ensure that the cross talk correction matrix coefficients
+        # can rey on the weight function indices being consistent
+        q0.RO_acq_weight_function_I(0)
+        q1.RO_acq_weight_function_I(1)
+
+        # Set the modulation frequencies so that the LO's match
+        q0.f_RO_mod(q0.f_RO() - self.RO_LO_freq())
+        q1.f_RO_mod(q1.f_RO() - self.RO_LO_freq())
+
+        # Update parameters
+        q0.RO_pulse_type('IQmod_multiplexed_UHFQC')
+        q1.RO_pulse_type('IQmod_multiplexed_UHFQC')
+
+        q1.prepare_for_timedomain()
+        q0.prepare_for_timedomain()
+        RO_LMM.acquisition_delay(q0.RO_acq_marker_delay())
+
+        # Generate multiplexed pulse
+        multiplexed_wave = [[q0.RO_LutMan(), 'M_square'],
+                            [q1.RO_LutMan(), 'M_square']]
+        RO_LMM.generate_multiplexed_pulse(multiplexed_wave)
+        RO_LMM.load_pulse_onto_AWG_lookuptable('Multiplexed_pulse')
 
     def prepare_for_fluxing(self, reset: bool=True):
         '''
@@ -154,34 +178,10 @@ class TwoQubitDevice(DeviceObject):
                          update: bool=True,
                          update_threshold: bool=True):
 
-        RO_LMM = self.RO_LutManMan.get_instr()
-        UHFQC = self.acquisition_instrument.get_instr()
-
         q0 = self.find_instrument(self.qubits()[0])
         q1 = self.find_instrument(self.qubits()[1])
-
-        # this is to ensure that the cross talk correction matrix coefficients
-        # can rey on the weight function indices being consistent
-        q0.RO_acq_weight_function_I(0)
-        q1.RO_acq_weight_function_I(1)
-
-        # Set the modulation frequencies so that the LO's match
-        q0.f_RO_mod(q0.f_RO() - self.RO_LO_freq())
-        q1.f_RO_mod(q1.f_RO() - self.RO_LO_freq())
-
-        # Update parameters
-        q0.RO_pulse_type('IQmod_multiplexed_UHFQC')
-        q1.RO_pulse_type('IQmod_multiplexed_UHFQC')
-
-        q1.prepare_for_timedomain()
-        q0.prepare_for_timedomain()
-        RO_LMM.acquisition_delay(q0.RO_acq_marker_delay())
-
-        # Generate multiplexed pulse
-        multiplexed_wave = [[q0.RO_LutMan(), 'M_square'],
-                            [q1.RO_LutMan(), 'M_square']]
-        RO_LMM.generate_multiplexed_pulse(multiplexed_wave)
-        RO_LMM.load_pulse_onto_AWG_lookuptable('Multiplexed_pulse')
+        UHFQC = self.acquisition_instrument.get_instr()
+        self.prepare_for_timedomain()
 
         # Important that this happens before calibrating the weights
         UHFQC.quex_trans_offset_weightfunction_0(0)
@@ -577,10 +577,10 @@ class TwoQubitDevice(DeviceObject):
         # Restore the old wave dict unit.
         QWG_flux_lutman.wave_dict_unit(oldWaveDictUnit)
 
-    def calibrate_CZ_single_qubit_phase_fine(self,
-                                             correction_qubit=None,
-                                             spectator_qubit=None,
-                                             span: float=0.04, num: int=31, MC=None):
+    def calibrate_CZ_1Q_phase_fine(self,
+                                   correction_qubit=None,
+                                   spectator_qubit=None,
+                                   span: float=0.04, num: int=31, MC=None):
         '''
         Measures a the Z-amp cost function in a small range around the value
         from the last calibration, fits a parabola, extracts a new minimum,
