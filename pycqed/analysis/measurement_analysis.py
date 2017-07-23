@@ -4188,9 +4188,9 @@ class Ramsey_Analysis(TD_Analysis):
         units = self.parameter_units[0]
 
         if textbox:
-            textstr = ('$f_{qubit \_ old}$ = %.5g GHz'
+            textstr = ('$f_{qubit \_ old}$ = %.7g GHz'
                        % (self.qubit_freq_spec*1e-9) +
-                        '\n$f_{qubit \_ new}$ = %.5g $ GHz \pm$ (%.5g) GHz'
+                        '\n$f_{qubit \_ new}$ = %.7g $ GHz \pm$ (%.5g) GHz'
                        % (self.qubit_frequency*1e-9,
                           fit_res.params['frequency'].stderr*1e-9) +
                        '\n$f_{Ramsey}$ = %.5g $ MHz \pm$ (%.5g) MHz'
@@ -4275,9 +4275,9 @@ class Ramsey_Analysis(TD_Analysis):
         #Print the T2_star values on screen
         unit = self.parameter_units[0][-1]
         if kw.pop('print_parameters',True):
-            print('New qubit frequency = {:.5f} (GHz)'.format(
+            print('New qubit frequency = {:.7f} (GHz)'.format(
                 self.qubit_frequency*1e-9) +
-                  '\t\tqubit frequency stderr = {:.5f} (MHz)'.format(
+                  '\t\tqubit frequency stderr = {:.7f} (MHz)'.format(
                 self.ramsey_freq['freq_stderr']*1e-6)+
                 '\nT2* = {:.5f} '.format(
                 self.T2_star['T2_star']*scale) +'('+pretty(mu)+unit+')'+
