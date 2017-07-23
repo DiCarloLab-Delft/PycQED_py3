@@ -2153,7 +2153,10 @@ class QuDev_transmon(Qubit):
             Qscale_value = Qscale_dict['qscale']
 
             if update:
-                self.motzoi(Qscale_value)
+                if for_ef:
+                    self.motzoi_ef(Qscale_value)
+                else:
+                    self.motzoi(Qscale_value)
 
             return Qscale_dict
         else:
