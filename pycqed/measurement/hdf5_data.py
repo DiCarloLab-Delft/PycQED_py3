@@ -125,10 +125,10 @@ def encode_to_utf8(s):
     Required because h5py does not support python3 strings
     '''
     # converts byte type to string because of h5py datasaving
-    if type(s) == str:
+    if isinstance(s, str):
         s = s.encode('utf-8')
     # If it is an array of value decodes individual entries
-    elif type(s) == np.ndarray or list:
+    elif isinstance(s, (np.ndarray, list)):
         s = [s.encode('utf-8') for s in s]
     return s
 
@@ -236,7 +236,7 @@ def read_dict_from_hdf5(data_dict: dict, h5_group):
             else:
                 data_dict[key] = list(item.value)
     for key, item in h5_group.attrs.items():
-        if type(item) is str:
+        if isinstance(item, str):
             # Extracts "None" as an exception as h5py does not support
             # storing None, nested if statement to avoid elementwise
             # comparison warning
