@@ -141,7 +141,9 @@ def write_dict_to_hdf5(data_dict: dict, entry_point):
             where to write to.
     """
     for key, item in data_dict.items():
-        if isinstance(item, (str, bool, tuple, float, int)):
+        # Basic types
+        if isinstance(item, (str, tuple, float, int, bool,
+                             np.float_, np.int_, np.bool_)):
             entry_point.attrs[key] = item
         elif isinstance(item, np.ndarray):
             entry_point.create_dataset(key, data=item)
@@ -159,19 +161,23 @@ def write_dict_to_hdf5(data_dict: dict, entry_point):
             if len(item) > 0:
                 elt_type = type(item[0])
                 if all(isinstance(x, elt_type) for x in item):
+                    # if all of the same type, store as an hdf5 dset
                     if isinstance(item[0], (int, float,
                                             np.int32, np.int64)):
-
                         entry_point.create_dataset(key,
                                                    data=np.array(item))
                         entry_point[key].attrs['list_type'] = 'array'
+
+                    # strings are saved in a special way
                     elif isinstance(item[0], str):
                         dt = h5py.special_dtype(vlen=str)
                         data = np.array(item)
                         data = data.reshape((-1, 1))
                         ds = entry_point.create_dataset(
                             key, (len(data), 1), dtype=dt)
+                        ds.attrs['list_type'] = 'str'
                         ds[:] = data
+
                     elif isinstance(item[0], dict):
                         entry_point.create_group(key)
                         group_attrs = entry_point[key].attrs
@@ -218,6 +224,12 @@ def read_dict_from_hdf5(data_dict, h5_group):
             else:  # item either a group or a dataset
                 if 'list_type' not in item.attrs:
                     data_dict[key] = item.value
+                elif item.attrs['list_type'] == 'str':
+                    # lists of strings needs some special care, see also
+                    # the writing part in the writing function above.
+                    list_of_str = [x[0] for x in item.value]
+                    data_dict[key] = list_of_str
+
                 else:
                     data_dict[key] = list(item.value)
         for key, item in h5_group.attrs.items():

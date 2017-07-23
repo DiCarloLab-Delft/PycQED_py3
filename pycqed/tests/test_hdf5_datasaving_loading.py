@@ -82,7 +82,14 @@ class Test_HDF5(unittest.TestCase):
             'dataset1': np.linspace(0, 20, 31),
             'dataset2': np.array([[2, 3, 4, 5],
                                   [2, 3, 1, 2]]),
-            'list_of_mixed_type': ['hello', 4, 4.2]}
+            'list_of_mixed_type': ['hello', 4, 4.2],
+            'a list of strings': ['my ', 'name ', 'is ', 'earl.'],
+            'some_np_bool': np.bool(True),
+            'some_int': 3,
+            'some_float': 3.5,
+            'some_np_int': np.int(3),
+            'some_np_float': np.float(3.5)
+            }
 
         data_object = h5d.Data(name='test_object', datadir=self.datadir)
         h5d.write_dict_to_hdf5(test_dict, data_object)
@@ -99,6 +106,19 @@ class Test_HDF5(unittest.TestCase):
                          new_dict['list_of_floats'])
         self.assertEqual(test_dict['weird_dict'], new_dict['weird_dict'])
         self.assertEqual(test_dict['some_bool'], new_dict['some_bool'])
+
+
+        # self.assertEqual(test_dict['list_of_mixed_type'], new_dict['list_of_mixed_type'])
+        self.assertEqual(test_dict['some_np_bool'],
+                         new_dict['some_np_bool'])
+        self.assertEqual(test_dict['some_int'], new_dict['some_int'])
+        self.assertEqual(test_dict['some_np_float'], new_dict['some_np_float'])
+        self.assertEqual(test_dict['a list of strings'],
+                         new_dict['a list of strings'])
+        self.assertEqual(test_dict['a list of strings'][0],
+                         new_dict['a list of strings'][0])
+
+
 
     def test_loading_settings_onto_instrument(self):
         """
@@ -146,5 +166,3 @@ class Test_HDF5(unittest.TestCase):
         self.assertEqual(self.mock_parabola_2.status(), True)
         self.assertEqual(self.mock_parabola_2.dict_like(),
                          {'a': {'b': [2, 3, 5]}})
-
-
