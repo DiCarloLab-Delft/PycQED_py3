@@ -10,6 +10,7 @@ from pycqed.instrument_drivers.physical_instruments.dummy_instruments \
     import DummyParHolder
 
 from qcodes import station
+from pycqed.analysis import analysis_toolbox as a_tools
 
 
 class Test_HDF5(unittest.TestCase):
@@ -18,16 +19,18 @@ class Test_HDF5(unittest.TestCase):
     def setUpClass(self):
         self.station = station.Station()
         # set up a pulsar with some mock settings for the element
+        self.datadir = os.path.join(pq.__path__[0], 'tests', 'test_data')
         self.MC = measurement_control.MeasurementControl(
             'MC', live_plot_enabled=False, verbose=True)
         self.MC.station = self.station
+        self.MC.datadir(self.datadir)
+        a_tools.datadir = self.datadir
         self.station.add_component(self.MC)
 
         self.mock_parabola = DummyParHolder('mock_parabola')
         self.station.add_component(self.mock_parabola)
         self.mock_parabola_2 = DummyParHolder('mock_parabola_2')
         self.station.add_component(self.mock_parabola_2)
-        self.datadir = os.path.join(pq.__path__[0], 'tests', 'test_data')
 
     def test_storing_and_loading_station_snapshot(self):
         """
