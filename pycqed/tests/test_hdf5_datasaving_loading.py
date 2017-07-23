@@ -21,7 +21,7 @@ class Test_HDF5(unittest.TestCase):
         # set up a pulsar with some mock settings for the element
         self.datadir = os.path.join(pq.__path__[0], 'tests', 'test_data')
         self.MC = measurement_control.MeasurementControl(
-            'MC', live_plot_enabled=False, verbose=True)
+            'MC', live_plot_enabled=False, verbose=False)
         self.MC.station = self.station
         self.MC.datadir(self.datadir)
         a_tools.datadir = self.datadir
@@ -74,8 +74,6 @@ class Test_HDF5(unittest.TestCase):
             - 1D array
             - 2D array
 
-        The storing is not magic, it currently does not work for:
-            - list of mixed type (stored as string)
         """
         test_dict = {
             'list_of_ints': list(np.arange(5)),
@@ -85,14 +83,14 @@ class Test_HDF5(unittest.TestCase):
             'dataset1': np.linspace(0, 20, 31),
             'dataset2': np.array([[2, 3, 4, 5],
                                   [2, 3, 1, 2]]),
-            'list_of_mixed_type': ['hello', 4, 4.2],
+            'list_of_mixed_type': ['hello', 4, 4.2, {'a': 5}, [4, 3]],
             'a list of strings': ['my ', 'name ', 'is ', 'earl.'],
             'some_np_bool': np.bool(True),
             'some_int': 3,
             'some_float': 3.5,
             'some_np_int': np.int(3),
             'some_np_float': np.float(3.5)
-            }
+        }
 
         data_object = h5d.Data(name='test_object', datadir=self.datadir)
         h5d.write_dict_to_hdf5(test_dict, data_object)
@@ -110,8 +108,13 @@ class Test_HDF5(unittest.TestCase):
         self.assertEqual(test_dict['weird_dict'], new_dict['weird_dict'])
         self.assertEqual(test_dict['some_bool'], new_dict['some_bool'])
 
+        self.assertEqual(test_dict['list_of_mixed_type'],
+                         new_dict['list_of_mixed_type'])
+        self.assertEqual(test_dict['list_of_mixed_type'][0],
+                         new_dict['list_of_mixed_type'][0])
+        self.assertEqual(test_dict['list_of_mixed_type'][2],
+                         new_dict['list_of_mixed_type'][2])
 
-        # self.assertEqual(test_dict['list_of_mixed_type'], new_dict['list_of_mixed_type'])
         self.assertEqual(test_dict['some_np_bool'],
                          new_dict['some_np_bool'])
         self.assertEqual(test_dict['some_int'], new_dict['some_int'])
@@ -120,8 +123,6 @@ class Test_HDF5(unittest.TestCase):
                          new_dict['a list of strings'])
         self.assertEqual(test_dict['a list of strings'][0],
                          new_dict['a list of strings'][0])
-
-
 
     def test_loading_settings_onto_instrument(self):
         """
