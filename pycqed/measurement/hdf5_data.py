@@ -161,7 +161,8 @@ def write_dict_to_hdf5(data_dict: dict, entry_point):
             if len(item) > 0:
                 elt_type = type(item[0])
                 # Lists of a single type, are stored as an hdf5 dset
-                if all(isinstance(x, elt_type) for x in item):
+                if (all(isinstance(x, elt_type) for x in item) and
+                        not isinstance(item[0], dict)):
                     if isinstance(item[0], (int, float,
                                             np.int32, np.int64)):
                         entry_point.create_dataset(key,
