@@ -141,7 +141,9 @@ def write_dict_to_hdf5(data_dict: dict, entry_point):
             where to write to.
     """
     for key, item in data_dict.items():
-        if isinstance(item, (str, bool, tuple, float, int)):
+        # Basic types
+        if isinstance(item, (str, tuple, float, int, bool,
+                             np.float_, np.int_, np.bool_)):
             entry_point.attrs[key] = item
         elif isinstance(item, np.ndarray):
             entry_point.create_dataset(key, data=item)
@@ -158,44 +160,41 @@ def write_dict_to_hdf5(data_dict: dict, entry_point):
         elif isinstance(item, list):
             if len(item) > 0:
                 elt_type = type(item[0])
+                # Lists of a single type, are stored as an hdf5 dset
                 if all(isinstance(x, elt_type) for x in item):
                     if isinstance(item[0], (int, float,
                                             np.int32, np.int64)):
-
                         entry_point.create_dataset(key,
                                                    data=np.array(item))
                         entry_point[key].attrs['list_type'] = 'array'
+
+                    # strings are saved as a special dtype hdf5 dataset
                     elif isinstance(item[0], str):
                         dt = h5py.special_dtype(vlen=str)
                         data = np.array(item)
                         data = data.reshape((-1, 1))
                         ds = entry_point.create_dataset(
                             key, (len(data), 1), dtype=dt)
+                        ds.attrs['list_type'] = 'str'
                         ds[:] = data
-                    elif isinstance(item[0], dict):
-                        entry_point.create_group(key)
-                        group_attrs = entry_point[key].attrs
-                        group_attrs['list_type'] = 'dict'
-                        base_list_key = 'list_idx_{}'
-                        group_attrs['base_list_key'] = base_list_key
-                        group_attrs['list_length'] = len(item)
-                        for i, list_item in enumerate(item):
-                            list_item_grp = entry_point[key].create_group(
-                                base_list_key.format(i))
-                            write_dict_to_hdf5(
-                                data_dict=list_item,
-                                entry_point=list_item_grp)
                     else:
                         logging.warning(
                             'List of type "{}" for "{}":"{}" not '
                             'supported, storing as string'.format(
                                 elt_type, key, item))
                         entry_point.attrs[key] = str(item)
+                # Storing of generic lists
                 else:
-                    logging.warning(
-                        'List of mixed type for "{}":"{}" not supported, '
-                        'storing as string'.format(type(item), key, item))
-                    entry_point.attrs[key] = str(item)
+                    entry_point.create_group(key)
+                    # N.B. item is of type list
+                    list_dct = {'list_idx_{}'.format(idx): entry for
+                                idx, entry in enumerate(item)}
+                    group_attrs = entry_point[key].attrs
+                    group_attrs['list_type'] = 'generic_list'
+                    group_attrs['list_length'] = len(item)
+                    write_dict_to_hdf5(
+                        data_dict=list_dct,
+                        entry_point=entry_point[key])
             else:
                 # as h5py does not support saving None as attribute
                 entry_point.attrs[key] = 'NoneType:__emptylist__'
@@ -204,46 +203,56 @@ def write_dict_to_hdf5(data_dict: dict, entry_point):
             logging.warning(
                 'Type "{}" for "{}" (key): "{}" (item) at location {} '
                 'not supported, '
-                'storing as string'.format(type(item), key, item, entry_point))
+                'storing as string'.format(type(item), key, item,
+                                           entry_point))
             entry_point.attrs[key] = str(item)
 
 
-def read_dict_from_hdf5(data_dict, h5_group):
-    if 'list_type' not in h5_group.attrs:
-        for key, item in h5_group.items():
-            if isinstance(item, h5py.Group):
-                data_dict[key] = {}
-                data_dict[key] = read_dict_from_hdf5(data_dict[key],
-                                                     item)
-            else:  # item either a group or a dataset
-                if 'list_type' not in item.attrs:
-                    data_dict[key] = item.value
-                else:
-                    data_dict[key] = list(item.value)
-        for key, item in h5_group.attrs.items():
-            if type(item) is str:
-                # Extracts "None" as an exception as h5py does not support
-                # storing None, nested if statement to avoid elementwise
-                # comparison warning
-                if item == 'NoneType:__None__':
-                    item = None
-                elif item == 'NoneType:__emptylist__':
-                    item = []
-            data_dict[key] = item
-    elif h5_group.attrs['list_type'] == 'dict':
-        # preallocate empty list
-        list_to_be_filled = [None] * h5_group.attrs['list_length']
-        base_list_key = h5_group.attrs['base_list_key']
-        for i in range(h5_group.attrs['list_length']):
-            list_to_be_filled[i] = {}
-            read_dict_from_hdf5(
-                data_dict=list_to_be_filled[i],
-                h5_group=h5_group[base_list_key.format(i)])
+def read_dict_from_hdf5(data_dict: dict, h5_group):
+    """
+    Reads a dictionary from an hdf5 file or group that was written using the
+    corresponding "write_dict_to_hdf5" function defined above.
 
-        # THe error is here!, extract correctly but not adding to
-        # data dict correctly
-        data_dict = list_to_be_filled
-    else:
-        raise NotImplementedError('cannot read "list_type":"{}"'.format(
-            h5_group.attrs['list_type']))
+    Args:
+        data_dict (dict): dictionary to which to add entries being read out.
+        h5_group  (hdf5 group): hdf5 file or group from which to read.
+    """
+    # if 'list_type' not in h5_group.attrs:
+    for key, item in h5_group.items():
+        if isinstance(item, h5py.Group):
+            data_dict[key] = {}
+            data_dict[key] = read_dict_from_hdf5(data_dict[key],
+                                                 item)
+        else:  # item either a group or a dataset
+            if 'list_type' not in item.attrs:
+                data_dict[key] = item.value
+            elif item.attrs['list_type'] == 'str':
+                # lists of strings needs some special care, see also
+                # the writing part in the writing function above.
+                list_of_str = [x[0] for x in item.value]
+                data_dict[key] = list_of_str
+
+            else:
+                data_dict[key] = list(item.value)
+    for key, item in h5_group.attrs.items():
+        if type(item) is str:
+            # Extracts "None" as an exception as h5py does not support
+            # storing None, nested if statement to avoid elementwise
+            # comparison warning
+            if item == 'NoneType:__None__':
+                item = None
+            elif item == 'NoneType:__emptylist__':
+                item = []
+        data_dict[key] = item
+
+    if 'list_type' in h5_group.attrs:
+        if h5_group.attrs['list_type'] == 'generic_list':
+            list_dict = data_dict
+            data_list = []
+            for i in range(list_dict['list_length']):
+                data_list.append(list_dict['list_idx_{}'.format(i)])
+            return data_list
+        else:
+            raise NotImplementedError('cannot read "list_type":"{}"'.format(
+                h5_group.attrs['list_type']))
     return data_dict
