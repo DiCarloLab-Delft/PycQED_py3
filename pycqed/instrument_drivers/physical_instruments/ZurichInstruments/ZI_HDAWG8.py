@@ -2,13 +2,26 @@ import time
 import logging
 import os
 from . import zishell_NH as zs
+from qcodes.utils import validators as vals
 from .ZI_base_instrument import ZI_base_instrument
 from qcodes.instrument.parameter import ManualParameter
 
 
 class ZI_HDAWG8(ZI_base_instrument):
-
     """
+    This is PycQED/QCoDeS driver driver for the ZI_HDAWG8.
+
+    Parameter files are generated from the python API of the instrument
+    using the "create_parameter_files" method in the ZI_base_instrument class.
+    These are used to add parameters to the instrument.
+
+    Known issues (last update 25/7/2017)
+        - the parameters "sigouts/*/offset" are detected as int by the
+            create parameter extraction file
+        - the restart device method does not work
+        - the direct/amplified output mode corresponding to node
+            "raw/sigouts/*/mode" is not discoverable through the find method.
+            This parameter is now added by hand as a workaround.
     """
 
     def __init__(self, name, device: str,
@@ -48,6 +61,19 @@ class ZI_HDAWG8(ZI_base_instrument):
             logging.warning("parameter file for data parameters"
                             " {} not found".format(self._d_file_name))
         self.add_ZIshell_device_methods_to_instrument()
+
+        # Manually added parameters
+        # amplified mode is not implemented for all channels
+        for i in [0, 1, 6, 7]:
+            self.add_parameter(
+                'raw_sigouts_{}_mode'.format(i),
+                set_cmd=self._gen_set_func(
+                    self._dev.seti, 'raw/sigouts/1/mode'),
+                get_cmd=self._gen_get_func(
+                    self._dev.geti, 'raw/sigouts/1/mode'),
+                vals=vals.Ints(0, 1),  # Ideally this is an Enum
+                docstring='"0" is direct mode\n"1" is amplified mode')
+
         self.connect_message(begin_time=t0)
 
     def add_ZIshell_device_methods_to_instrument(self):

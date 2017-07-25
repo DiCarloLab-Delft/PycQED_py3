@@ -124,9 +124,7 @@ class ZI_base_instrument(Instrument):
 
         s_node_pars = []
         d_node_pars = []
-        patterns = [
-            #"awgs", "sigouts", "quex", "dios", "system",
-            "*raw*"]
+        patterns = ["awgs", "sigouts", "quex", "dios", "system"]
 
         t0 = time.time()
         for pattern in patterns:
