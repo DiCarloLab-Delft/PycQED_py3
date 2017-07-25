@@ -581,7 +581,7 @@ class TwoQubitDevice(DeviceObject):
                                    correction_qubit=None,
                                    spectator_qubit=None,
                                    span: float=0.04, num: int=31,
-                                   min_fit_pts: int=15, MC=None):
+                                   min_fit_pts: int=15, MC=None) -> bool:
         '''
         Measures a the Z-amp cost function in a small range around the value
         from the last calibration, fits a parabola, extracts a new minimum,
@@ -605,6 +605,10 @@ class TwoQubitDevice(DeviceObject):
                     The measurement is repeated with an adapted range if
                     there are less points than left after discarding points
                     that are too far away from the minimum.
+
+        Returns:
+            success (bool):
+                    True if calibration succeeded, False otherwise.
         '''
         if MC is None:
             MC = qc.station.components['MC']
@@ -621,7 +625,15 @@ class TwoQubitDevice(DeviceObject):
             amp_pts = gen_sweep_pts(center=old_z_amp, span=span, num=31)
             CZ_cost_Z_amp(correction_qubit, spectator_qubit, MC,
                           Z_amps_q0=amp_pts)
-            a = ma.CZ_1Q_phase_analysis()
+            try:
+                a = ma.CZ_1Q_phase_analysis()
+            except RuntimeError as e:
+                # Analysis returns a RuntimeError when the fit fails due to
+                # bad range and it can't fix itself.
+                print(e)
+                return False
+            except Exception as e:
+                raise e
             new_z_amp = a.opt_z_amp
 
             if len(a.fit_data) < min_fit_pts:
@@ -644,4 +656,4 @@ class TwoQubitDevice(DeviceObject):
         # the "prepare_for_fluxing" in turn should ensure the right vals
         # get updated.
         correction_qubit.flux_LutMan.get_instr().Z_amp(new_z_amp)
-        return new_z_amp
+        return True

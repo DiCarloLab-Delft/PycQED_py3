@@ -6936,6 +6936,11 @@ class CZ_1Q_phase_analysis(TD_Analysis):
         self.fit_data = np.delete(self.diff_data, self.del_indices)
         self.x_points_del = np.delete(self.x_points, self.del_indices)
 
+        if not self.fit_data:
+            raise RuntimeError('No points left to fit after removing values '
+                               '> 0! Check coarse calibration and adjust '
+                               'measurement range.')
+
         params = model.guess(x=self.x_points_del, data=self.fit_data)
 
         self.fit_res = model.fit(self.fit_data, params=params,
