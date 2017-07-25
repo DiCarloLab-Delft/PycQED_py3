@@ -580,7 +580,8 @@ class TwoQubitDevice(DeviceObject):
     def calibrate_CZ_1Q_phase_fine(self,
                                    correction_qubit=None,
                                    spectator_qubit=None,
-                                   span: float=0.04, num: int=31, MC=None):
+                                   span: float=0.04, num: int=31,
+                                   min_fit_pts: int=15, MC=None):
         '''
         Measures a the Z-amp cost function in a small range around the value
         from the last calibration, fits a parabola, extracts a new minimum,
@@ -599,6 +600,11 @@ class TwoQubitDevice(DeviceObject):
                     Z-amp in which the cost function is measured.
             num (int):
                     Number of points measured in the specified range.
+            min_fit_pts (int):
+                    Minimum number of points that should be used for the fit.
+                    The measurement is repeated with an adapted range if
+                    there are less points than left after discarding points
+                    that are too far away from the minimum.
         '''
         if MC is None:
             MC = qc.station.components['MC']
@@ -615,12 +621,22 @@ class TwoQubitDevice(DeviceObject):
             amp_pts = gen_sweep_pts(center=old_z_amp, span=span, num=31)
             CZ_cost_Z_amp(correction_qubit, spectator_qubit, MC,
                           Z_amps_q0=amp_pts)
-            a = ma.CZ_single_qubit_phase_analysis()
+            a = ma.CZ_1Q_phase_analysis()
             new_z_amp = a.opt_z_amp
 
+            if len(a.fit_data) < min_fit_pts:
+                print('Bad measurement range: too large or too far from '
+                      'minimum for parabolic model.\nRetrying...')
+                old_z_amp = new_z_amp
+                if a.del_indices[0] == 0 and a.del_indices[-1] == num-1:
+                    # Values larger than one found on both sides
+                    # -> reduce range
+                    span *= 0.5
+                continue
+
             if new_z_amp < amp_pts[0] or new_z_amp > amp_pts[-1]:
-                print('Fitted minimum outside scan range. Repeating scan around '
-                      'fitted minimum {}.'.format(new_z_amp))
+                print('Fitted minimum outside scan range. Repeating scan '
+                      'around fitted minimum {}.'.format(new_z_amp))
                 old_z_amp = new_z_amp
             else:
                 repeat_calibration = False

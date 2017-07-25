@@ -6916,7 +6916,7 @@ class GST_Analysis(TD_Analysis):
         return counts
 
 
-class CZ_single_qubit_phase_analysis(TD_Analysis):
+class CZ_1Q_phase_analysis(TD_Analysis):
     def __init__(self, **kw):
         super().__init__(rotate_and_normalize=False, cal_points=False, **kw)
 
@@ -6927,13 +6927,19 @@ class CZ_single_qubit_phase_analysis(TD_Analysis):
 
         dat_exc = self.measured_values[0][1::2]
         dat_idx = self.measured_values[0][::2]
-        self.fit_data = dat_idx - dat_exc
+        self.diff_data = dat_idx - dat_exc
         self.x_points = self.sweep_points[::2]
 
-        params = model.guess(x=self.x_points, data=self.fit_data)
+        # Remove diff points thate are larger than one (parabola won't fit
+        # there).
+        self.del_indices = np.where(np.array(self.diff_data) > 0)[0]
+        self.fit_data = np.delete(self.diff_data, self.del_indices)
+        self.x_points_del = np.delete(self.x_points, self.del_indices)
+
+        params = model.guess(x=self.x_points_del, data=self.fit_data)
 
         self.fit_res = model.fit(self.fit_data, params=params,
-                                 x=self.x_points)
+                                 x=self.x_points_del)
 
         self.opt_z_amp = (-self.fit_res.best_values['b'] /
                           (2 * self.fit_res.best_values['a']))
@@ -6945,13 +6951,20 @@ class CZ_single_qubit_phase_analysis(TD_Analysis):
             self.data_file.close()
 
     def make_figures(self, **kw):
-
         xfine = np.linspace(self.x_points[0], self.x_points[-1], 100)
         fig, ax = plt.subplots()
-        ax.plot(self.x_points, self.fit_data, '-o')
-        ax.plot(self.x_points, self.fit_res.init_fit, '--',
+        ax.plot(self.x_points, self.diff_data, '-o')
+        ax.plot(self.x_points[self.del_indices],
+                self.diff_data[self.del_indices], 'rx',
+                label='excluded in fit')
+        ax.plot(xfine,
+                self.fit_res.eval(x=xfine, **self.fit_res.init_values),
+                # self.fit_res.init_fit,
+                '--',
                 label='initial guess', c='k')
-        ax.plot(xfine, self.fit_res.eval(x=xfine), label='best fit')
+        ax.plot(xfine,
+                self.fit_res.eval(x=xfine, **self.fit_res.best_values),
+                label='best fit')
         set_xlabel(ax, self.parameter_names[0], self.parameter_units[0])
         set_ylabel(ax, 'Z-amp cost', 'a.u.')
         ax.set_title(kw.get('plot_title',
