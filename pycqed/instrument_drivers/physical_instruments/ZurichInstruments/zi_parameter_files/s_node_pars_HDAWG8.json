@@ -641,12 +641,12 @@
     0,
     1
   ],
-  [
-    "sigouts/0/offset",
-    "int",
-    0,
-    2.2420775429197073e-44
-  ],
+ [
+   "sigouts/0/offset",
+   "int",
+   0,
+   1
+ ],
   [
     "sigouts/0/on",
     "bool",
@@ -683,12 +683,12 @@
     0,
     1
   ],
-  [
-    "sigouts/1/offset",
-    "int",
-    0,
-    2.2420775429197073e-44
-  ],
+ [
+   "sigouts/1/offset",
+   "int",
+   0,
+   1
+ ],
   [
     "sigouts/1/on",
     "bool",
@@ -725,12 +725,12 @@
     0,
     1
   ],
-  [
-    "sigouts/2/offset",
-    "int",
-    0,
-    2.2420775429197073e-44
-  ],
+ [
+   "sigouts/2/offset",
+   "int",
+   0,
+   1
+ ],
   [
     "sigouts/2/on",
     "bool",
@@ -767,12 +767,12 @@
     0,
     1
   ],
-  [
-    "sigouts/3/offset",
-    "int",
-    0,
-    2.2420775429197073e-44
-  ],
+ [
+   "sigouts/3/offset",
+   "int",
+   0,
+   1
+ ],
   [
     "sigouts/3/on",
     "bool",
@@ -809,12 +809,12 @@
     0,
     1
   ],
-  [
-    "sigouts/4/offset",
-    "int",
-    0,
-    2.2420775429197073e-44
-  ],
+ [
+   "sigouts/4/offset",
+   "int",
+   0,
+   1
+ ],
   [
     "sigouts/4/on",
     "bool",
@@ -851,12 +851,12 @@
     0,
     1
   ],
-  [
-    "sigouts/5/offset",
-    "int",
-    0,
-    2.2420775429197073e-44
-  ],
+ [
+   "sigouts/5/offset",
+   "int",
+   0,
+   1
+ ],
   [
     "sigouts/5/on",
     "bool",
@@ -893,12 +893,12 @@
     0,
     1
   ],
-  [
-    "sigouts/6/offset",
-    "int",
-    0,
-    2.2420775429197073e-44
-  ],
+ [
+   "sigouts/6/offset",
+   "int",
+   0,
+   1
+ ],
   [
     "sigouts/6/on",
     "bool",
@@ -935,12 +935,12 @@
     0,
     1
   ],
-  [
-    "sigouts/7/offset",
-    "int",
-    0,
-    2.2420775429197073e-44
-  ],
+ [
+   "sigouts/7/offset",
+   "int",
+   0,
+   1
+ ],
   [
     "sigouts/7/on",
     "bool",

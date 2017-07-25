@@ -1,39 +1,38 @@
 #!/usr/bin/ipython
 
-################################################################################
+##########################################################################
 ##
-## $Id: zishell.py 44323 2017-04-13 07:26:59Z niels $
+# $Id: zishell.py 44323 2017-04-13 07:26:59Z niels $
 ##
-################################################################################
+##########################################################################
 ##
-## Title      : zishell.py
-## Project    :
+# Title      : zishell.py
+# Project    :
 ##
-################################################################################
+##########################################################################
 ##
-## Author     : Niels Haandbaek (niels.haandbaek@zhinst.com)
-## Company    : Zurich Instruments AG
-## Created    : 2014/09/19
-## Platform   : Python
-## Standard   : none
+# Author     : Niels Haandbaek (niels.haandbaek@zhinst.com)
+# Company    : Zurich Instruments AG
+# Created    : 2014/09/19
+# Platform   : Python
+# Standard   : none
 ##
-################################################################################
+##########################################################################
 ##
-## Description: Shell with simplified interface to ziPython
+# Description: Shell with simplified interface to ziPython
 ##
-################################################################################
+##########################################################################
 ##
-## Copyright (c) 2014/2015, Zurich Instruments AG
-## All rights reserved.
+# Copyright (c) 2014/2015, Zurich Instruments AG
+# All rights reserved.
 ##
-################################################################################
+##########################################################################
 
 import xml.etree.ElementTree as ET
 import re
 import subprocess
 import time
 import os
-import inspect
 import textwrap
 import httplib2
 
@@ -43,37 +42,42 @@ import zhinst.ziPython as zi
 import zhinst.utils as utils
 
 from numpy import *
-from subprocess import call
 
-import plotly.plotly as py
 from plotly.graph_objs import *
 
-#with open("zishell.py") as f:
+# with open("zishell.py") as f:
 #    code = compile(f.read(), "zishell.py", 'exec')
 #    exec(code, global_vars, local_vars)
+
 
 class ziShellError(Exception):
     """Base class for exceptions in this module."""
     pass
 
+
 class ziShellServerError(ziShellError):
     """Exception raised when no server is configured or the server cannot be reached."""
     pass
+
 
 class ziShellDAQError(ziShellError):
     """Exception raised when no DAQ has been connected."""
     pass
 
+
 class ziShellConnectError(ziShellError):
     """Exception raised when a device could not be connected."""
     pass
+
 
 class ziShellModuleError(ziShellError):
     """Exception raised when a module has not been started."""
     pass
 
+
 class ziShellEnvironment:
     """Holds all the global variables."""
+
     def __init__(self, host=None, port=8004, api_level=5, device=None):
         # Paths to automatically skip
         self.skip = ['*system*']
@@ -104,7 +108,8 @@ class ziShellEnvironment:
             raise(ziShellServerError())
 
         host, port, api_level = self.server
-        print("Connecting to server on host {0}:{1} using API level {2}".format(host, port, api_level))
+        print("Connecting to server on host {0}:{1} using API level {2}".format(
+            host, port, api_level))
         self.daq = zi.ziDAQServer(host, port, api_level)
         self.daq.setDebugLevel(0)
 
@@ -155,7 +160,7 @@ class ziShellEnvironment:
             for device in self.devices:
                 seti('/' + device + '/raw/system/restart', 1)
                 time.sleep(4)
-                output = check_output(['timeout', '30', 'make', '-C', os.environ['work'] + '/maven', 'uart'], \
+                output = check_output(['timeout', '30', 'make', '-C', os.environ['work'] + '/maven', 'uart'],
                                       stderr=subprocess.STDOUT)
                 if re.search('#DHCP Success', output):
                     return True
@@ -208,7 +213,8 @@ class ziShellEnvironment:
 
         rv = []
         for device in self.devices:
-            rv.append([s for s in str(self.daq.getByte('/' + device + '/features/options')).split('\n') if len(s)])
+            rv.append([s for s in str(self.daq.getByte(
+                '/' + device + '/features/options')).split('\n') if len(s)])
         return rv
 
     def setd(self, path, value):
@@ -249,7 +255,7 @@ class ziShellEnvironment:
             raise(ziShellDAQError())
 
         if type(paths) is not list:
-            paths = [ paths ]
+            paths = [paths]
             single = 1
         else:
             single = 0
@@ -295,7 +301,7 @@ class ziShellEnvironment:
             raise(ziShellDAQError())
 
         if type(paths) is not list:
-            paths = [ paths ]
+            paths = [paths]
             single = 1
         else:
             single = 0
@@ -330,7 +336,7 @@ class ziShellEnvironment:
             raise(ziShellDAQError())
 
         if type(paths) is not list:
-            paths = [ paths ]
+            paths = [paths]
             single = 1
         else:
             single = 0
@@ -359,7 +365,8 @@ class ziShellEnvironment:
         nodes = self.daq.listNodes('/', 7)
         if len(args) and args[0]:
             for m in args:
-                nodes = [k.lower() for k in nodes if fnmatch(k.lower(), m.lower())]
+                nodes = [k.lower()
+                         for k in nodes if fnmatch(k.lower(), m.lower())]
 
         return nodes
 
@@ -381,7 +388,8 @@ class ziShellEnvironment:
         nodes = self.daq.listNodes('/', 15)
         if len(args) and args[0]:
             for m in args:
-                nodes = [k.lower() for k in nodes if fnmatch(k.lower(), m.lower())]
+                nodes = [k.lower()
+                         for k in nodes if fnmatch(k.lower(), m.lower())]
 
         return nodes
 
@@ -390,7 +398,7 @@ class ziShellEnvironment:
             raise(ziShellDAQError())
 
         if type(paths) is not list:
-            paths = [ paths ]
+            paths = [paths]
 
         for p in paths:
             if p[0] == '/':
@@ -404,7 +412,7 @@ class ziShellEnvironment:
             raise(ziShellDAQError())
 
         if type(paths) is not list:
-            paths = [ paths ]
+            paths = [paths]
 
         for p in paths:
             if p[0] == '/':
@@ -440,9 +448,11 @@ class ziShellEnvironment:
 # Global environment
 env = ziShellEnvironment()
 
+
 def printdict(base_path, data):
     for key, value in data.iteritems():
-        path = base_path + ("" if (not base_path or base_path.isspace()) else "/") + key
+        path = base_path + \
+            ("" if (not base_path or base_path.isspace()) else "/") + key
         if isinstance(value, dict):
             printdict(path, value)
         elif isinstance(value, list):
@@ -453,123 +463,155 @@ def printdict(base_path, data):
         else:
             print(path, "=", value)
 
+
 def connect_server(host='localhost', port=8004, api_level=5):
     global env
     env.connect_server(host, port, api_level)
+
 
 def reconnect():
     global env
     env.reconnect()
 
+
 def connected():
     global env
     return env.connected()
+
 
 def connect_device(device, interface='1GbE'):
     global env
     return env.connect_device(device, interface)
 
+
 def disconnect_devices():
     global env
     env.disconnect_devices()
+
 
 def restart_device():
     global env
     env.restart_device()
 
+
 def load_settings(path):
     global env
     return env.load_settings(path)
+
 
 def find(*args):
     global env
     return env.find(*args)
 
+
 def find_devices():
     global env
     return env.find_devices()
+
 
 def finds(*args):
     global env
     return env.finds(*args)
 
+
 def features():
     global env
     return env.features()
 
+
 def has_mf_feature():
     return any([s == 'MF' for s in features()])
 
+
 def has_dig_feature():
     return any([s == 'DIG' for s in features()])
+
 
 def setd(path, value):
     global env
     env.setd(path, value)
 
+
 def seti(path, value):
     global env
     env.seti(path, value)
+
 
 def setv(path, value):
     global env
     env.setv(path, value)
 
+
 def getd(paths, deep=True):
     global env
     return env.getd(paths, deep)
+
 
 def geti(paths, deep=True):
     global env
     return env.geti(paths, deep)
 
+
 def getv(paths):
     global env
     return env.getv(paths)
+
 
 def sync():
     global env
     env.sync()
 
+
 def subs(paths):
     global env
     env.subs(paths)
+
 
 def unsubs(paths):
     global env
     env.unsubs(paths)
 
+
 def poll(length=0.1):
     global env
     return env.poll(length)
+
 
 def awg(filename):
     global env
     env.awg(filename)
 
+
 def powerswitch(sid, channel, onoff):
     conn = httplib2.Http()
-    uri = "http://powerswitches.zhinst.com/index.php?ajax=set&sid={}&chid={}&val={}&su=1".format(sid, channel, onoff)
+    uri = "http://powerswitches.zhinst.com/index.php?ajax=set&sid={}&chid={}&val={}&su=1".format(
+        sid, channel, onoff)
     r, c = conn.request(uri, method="GET")
     if r.status != 200:
-        raise RuntimeError("Error %s(%d) during switching on channel %d." % (r.reason, r.status, channel))
+        raise RuntimeError("Error %s(%d) during switching on channel %d." % (
+            r.reason, r.status, channel))
 
     tmp = c.decode('utf-8')
     if re.match('STAT:\d+\|([\d,]+)', tmp):
         bits = tmp.group(1).split(',')
         if bits[channel] != onoff:
-            raise RuntimeError("Channel %d was not correctly set to %d" % (channel, onoff))
+            raise RuntimeError(
+                "Channel %d was not correctly set to %d" % (channel, onoff))
+
 
 def powerswitch_on(sid, channel):
     powerswitch(sid, channel, 1)
 
+
 def powerswitch_off(sid, channel):
     powerswitch(sid, channel, 0)
+
 
 def powerswitch_reset(sid, channel):
     powerswitch_off(sid, channel)
     time.sleep(5.0)
     powerswitch_on(sid, channel)
+
 
 def check_output(*popenargs, **kwargs):
     if 'stdout' in kwargs:
@@ -585,6 +627,7 @@ def check_output(*popenargs, **kwargs):
         raise subprocess.CalledProcessError(retcode, cmd)
     return output
 
+
 def check_status(string, function):
     for l in textwrap.wrap(string, 40):
         print('{0: <70}'.format(l)),
@@ -595,6 +638,7 @@ def check_status(string, function):
         print('[FAILURE]')
     return result
 
+
 def print_status(string, success):
     for l in textwrap.wrap(string, 40):
         print('{0: <70}'.format(l)),
@@ -602,6 +646,7 @@ def print_status(string, success):
         print('[SUCCESS]')
     else:
         print('[FAILURE]')
+
 
 def getwave(timeout=True):
     global env
@@ -639,11 +684,12 @@ def getwave(timeout=True):
                 elif w['blocknumber'] == complete_wave['blocknumber'] + 1 and w['flags'] == 0:
                     complete_wave['blocknumber'] += 1
                     complete_wave['blockmarker'] = w['blockmarker']
-                    complete_wave['wave'] = vstack((complete_wave['wave'], w['wave']))
+                    complete_wave['wave'] = vstack(
+                        (complete_wave['wave'], w['wave']))
 
             if len(complete_wave['wave']) == complete_wave['totalsamples'] and \
-                   complete_wave['blockmarker'] == 1 and \
-                   complete_wave['flags'] == 0:
+                    complete_wave['blockmarker'] == 1 and \
+                    complete_wave['flags'] == 0:
                 done = True
         else:
             tries += 1
@@ -654,8 +700,10 @@ def getwave(timeout=True):
     else:
         return complete_wave
 
+
 class ziShellDevice:
     """Holds all the global variables."""
+
     def __init__(self, device="", host="", port=8004, interface="1GbE", api_level=5):
         # Paths to automatically skip
         self.skip = ['*system*']
@@ -684,7 +732,8 @@ class ziShellDevice:
 
     def connect_server(self, host, port=8004, api_level=5):
         self.server = (host, port, api_level)
-        print("Connecting to server on host {0}:{1} using API level {2}".format(host, port, api_level))
+        print("Connecting to server on host {0}:{1} using API level {2}".format(
+            host, port, api_level))
         self.daq = zi.ziDAQServer(host, port, api_level)
         if not self.daq:
             raise(ziShellDAQError())
@@ -711,7 +760,8 @@ class ziShellDevice:
         self.device = device
         self.interface = interface
         self.connected = True
-        print("Connected to device {} over {}".format(self.device, self.interface))
+        print("Connected to device {} over {}".format(
+            self.device, self.interface))
 
         # Initialize modules
         self.awgModule = self.daq.awgModule()
@@ -729,7 +779,8 @@ class ziShellDevice:
         try:
             seti('/' + self.device + '/raw/system/restart', 1)
             time.sleep(4)
-            output = check_output(['timeout', '30', 'make', '-C', os.environ['work'] + '/maven', 'uart'], \
+            output = check_output(['timeout', '30', 'make', '-C',
+                                   os.environ['work'] + '/maven', 'uart'],
                                   stderr=subprocess.STDOUT)
             if re.search('#DHCP Success', output):
                 return True
@@ -780,10 +831,11 @@ class ziShellDevice:
             raise(ziShellDAQError())
 
         rv = []
-        rv.append([s for s in str(self.daq.getByte('/' + self.device + '/features/options')).split('\n') if len(s)])
+        rv.append([s for s in str(self.daq.getByte(
+            '/' + self.device + '/features/options')).split('\n') if len(s)])
         return rv
 
-    def setd(self, path, value, sync = False):
+    def setd(self, path, value, sync=False):
         if not self.daq:
             raise(ziShellDAQError())
 
@@ -801,7 +853,7 @@ class ziShellDevice:
             else:
                 self.daq.setDouble('/' + self.device + '/' + path, value)
 
-    def seti(self, path, value, sync = False):
+    def seti(self, path, value, sync=False):
         if not self.daq:
             raise(ziShellDAQError())
 
@@ -815,7 +867,7 @@ class ziShellDevice:
                 self.daq.setInt(path, value)
         else:
             if sync:
-                self.daq.syncSetInt('/' + self.device + '/' + path, value)                
+                self.daq.syncSetInt('/' + self.device + '/' + path, value)
             else:
                 self.daq.setInt('/' + self.device + '/' + path, value)
 
@@ -893,7 +945,8 @@ class ziShellDevice:
         nodes = self.daq.listNodes('/' + self.device + '/', 7)
         if len(args) and args[0]:
             for m in args:
-                nodes = [k.lower() for k in nodes if fnmatch(k.lower(), m.lower())]
+                nodes = [k.lower()
+                         for k in nodes if fnmatch(k.lower(), m.lower())]
 
         return nodes
 
@@ -904,7 +957,8 @@ class ziShellDevice:
         nodes = self.daq.listNodes('/' + self.device + '/', 15)
         if len(args) and args[0]:
             for m in args:
-                nodes = [k.lower() for k in nodes if fnmatch(k.lower(), m.lower())]
+                nodes = [k.lower()
+                         for k in nodes if fnmatch(k.lower(), m.lower())]
 
         return nodes
 
@@ -965,7 +1019,7 @@ class ziShellDevice:
         self.awgModule.set('awgModule/compiler/sourcestring', string)
         self.awgModule.set('awgModule/compiler/start', 1)
         self.awgModule.set('awgModule/elf/file', '')
-        #while self.awgModule.get('awgModule/progress')['progress'][0] < 1.0:
+        # while self.awgModule.get('awgModule/progress')['progress'][0] < 1.0:
         #    time.sleep(0.1)
 
     def read_from_scope(self, timeout=1.0, enable=True):
