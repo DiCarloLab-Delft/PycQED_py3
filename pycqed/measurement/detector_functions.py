@@ -1851,9 +1851,8 @@ class UHFQC_statistics_logging_det(Soft_Detector):
         if self.AWG is not None:
             self.AWG.stop()
 
-
-        max_shots = 4095 # hardware limit of UHFQC
-        self.nr_chunks = self.nr_shots//max_shots +1
+        max_shots = 4095  # hardware limit of UHFQC
+        self.nr_chunks = self.nr_shots//max_shots + 1
         self.shots_per_chunk = np.min([self.nr_shots, max_shots])
 
         # The averaging-count is used to specify how many times the AWG program
@@ -1893,15 +1892,16 @@ class UHFQC_statistics_logging_det(Soft_Detector):
         if self.AWG is not None:
             self.AWG.stop()
         data_concat = np.zeros(7)
-        for i in range(self.nr_chunks): 
-            self.UHFQC.quex_rl_readout(1)  # resets UHFQC internal readout counters
-            self.UHFQC.quex_sl_readout(0)  # resets UHFQC internal sl counters ?
+        for i in range(self.nr_chunks):
+            # resets UHFQC internal readout counters
+            self.UHFQC.quex_rl_readout(1)
+            # resets UHFQC internal sl counters ?
+            self.UHFQC.quex_sl_readout(0)
 
             self.UHFQC.acquisition_arm()
             # starting AWG
-            if self.AWG is not None and i ==0:
+            if self.AWG is not None and i == 0:
                 self.AWG.start()
-
 
             data = self.UHFQC.acquisition_poll(samples=4,  # double check this
                                                arm=False,
@@ -2296,20 +2296,3 @@ class DDM_integration_logging_det(Hard_Detector):
     def finish(self):
         if self.AWG is not None:
             self.AWG.stop()
-
-
-class RTO1024_detector(Hard_Detector):
-    '''
-    Detector for the Rohde-Schwarz RTO1024 oscilloscope.
-    '''
-
-    def __init__(self, scope):
-        self.scope = scope
-
-    def prepare(self, sweep_points=None):
-        self.sweep_points = sweep_points
-        self.scope.prepare_measurement(t_start=sweep_points[0],
-                                       t_stop=sweep_points[-1])
-
-    def get_values(self):
-        return self.scope.measure_trace()
