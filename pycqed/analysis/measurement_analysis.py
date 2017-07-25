@@ -1901,13 +1901,16 @@ class Rabi_Analysis(TD_Analysis):
         q_idx=self.measurementstring.index('q')
         key=self.measurementstring[q_idx::]
         instr_set = self.data_file['Instrument settings']
-        if self.analyze_ef:
-            pi_pulse_old = float(instr_set[key].attrs['amp180_ef'])
-            pi_half_pulse_old = pi_pulse_old*float(instr_set[key].attrs['amp90_scale_ef'])
-        else:
-            pi_pulse_old = float(instr_set[key].attrs['amp180'])
-            pi_half_pulse_old = pi_pulse_old*float(instr_set[key].attrs['amp90_scale'])
-
+        try:
+            if self.analyze_ef:
+                pi_pulse_old = float(instr_set[key].attrs['amp180_ef'])
+                pi_half_pulse_old = pi_pulse_old*float(instr_set[key].attrs['amp90_scale_ef'])
+            else:
+                pi_pulse_old = float(instr_set[key].attrs['amp180'])
+                pi_half_pulse_old = pi_pulse_old*float(instr_set[key].attrs['amp90_scale'])
+        except KeyError:
+            pi_pulse_old = 0
+            pi_half_pulse_old = 0.5
 
         textstr = ('  $\pi-Amp$ = %.3g ' % (pi_pulse)+self.parameter_units[0]+
                    ' $\pm$ (%.3g) '% (self.rabi_amplitudes['piPulse_std'])+
@@ -2653,10 +2656,13 @@ class QScale_Analysis(TD_Analysis):
         q_idx=self.measurementstring.index('q')
         key=self.measurementstring[q_idx::]
         instr_set = self.data_file['Instrument settings']
-        if self.analyze_ef:
-            qscale_old = float(instr_set[key].attrs['motzoi_ef'])
-        else:
-            qscale_old = float(instr_set[key].attrs['motzoi'])
+        try:
+            if self.analyze_ef:
+                qscale_old = float(instr_set[key].attrs['motzoi_ef'])
+            else:
+                qscale_old = float(instr_set[key].attrs['motzoi'])
+        except KeyError:
+            qscale_old = 0
 
         textstr = ('qscale = %.5g $ \pm$ (%.5g)'
                    % (self.optimal_qscale['qscale'],self.optimal_qscale['qscale_std']) +
@@ -4027,10 +4033,13 @@ class T1_Analysis(TD_Analysis):
             q_idx=self.measurementstring.index('q')
             key=self.measurementstring[q_idx::]
             instr_set = self.data_file['Instrument settings']
-            if self.analyze_ef:
-                T1_old = float(instr_set[key].attrs['T1_ef'])*1e6
-            else:
-                T1_old = float(instr_set[key].attrs['T1'])*1e6
+            try:
+                if self.analyze_ef:
+                    T1_old = float(instr_set[key].attrs['T1_ef'])*1e6
+                else:
+                    T1_old = float(instr_set[key].attrs['T1'])*1e6
+            except KeyError:
+                T1_old = 0
 
             textstr = ('$T_1$ = {:.5f} '.format(T1_micro_sec)  +
                        self.parameter_units[0] +
@@ -4243,10 +4252,13 @@ class Ramsey_Analysis(TD_Analysis):
         q_idx=self.measurementstring.index('q')
         key=self.measurementstring[q_idx::]
         instr_set = self.data_file['Instrument settings']
-        if self.analyze_ef:
-            self.qubit_freq_spec = float(instr_set[key].attrs['f_ef_qubit'])
-        else:
-            self.qubit_freq_spec = float(instr_set[key].attrs['f_qubit'])
+        try:
+            if self.analyze_ef:
+                self.qubit_freq_spec = float(instr_set[key].attrs['f_ef_qubit'])
+            else:
+                self.qubit_freq_spec = float(instr_set[key].attrs['f_qubit'])
+        except KeyError:
+            self.qubit_freq_spec = 0
 
         self.add_analysis_datagroup_to_file()
         scale = self.scales_dict[unit_prefix]
@@ -4361,10 +4373,13 @@ class Ramsey_Analysis_multiple_detunings(Ramsey_Analysis):
         q_idx=self.measurementstring.index('q')
         key=self.measurementstring[q_idx::]
         instr_set = self.data_file['Instrument settings']
-        if self.analyze_ef:
-            self.qubit_freq_spec = float(instr_set[key].attrs['f_ef_qubit'])
-        else:
-            self.qubit_freq_spec = float(instr_set[key].attrs['f_qubit'])
+        try:
+            if self.analyze_ef:
+                self.qubit_freq_spec = float(instr_set[key].attrs['f_ef_qubit'])
+            else:
+                self.qubit_freq_spec = float(instr_set[key].attrs['f_qubit'])
+        except KeyError:
+            self.qubit_freq_spec = 0
         scale = self.scales_dict[unit_prefix]
 
         # Extract the data for each ramsey
@@ -5495,7 +5510,10 @@ class Homodyne_Analysis(MeasurementAnalysis):
         q_idx=self.measurementstring.index('q')
         key=self.measurementstring[q_idx::]
         instr_set = self.data_file['Instrument settings']
-        old_RO_freq = float(instr_set[key].attrs['f_RO'])
+        try:
+            old_RO_freq = float(instr_set[key].attrs['f_RO'])
+        except KeyError:
+            old_RO_freq = 0
 
         if ('hanger' in fitting_model) or ('complex' in fitting_model):
             textstr = '$f_{\mathrm{center}}$ = %.5f GHz $\pm$ (%.3g) GHz' % (
@@ -6100,8 +6118,14 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
         instr_set = self.data_file['Instrument settings']
 
         if analyze_ef:
-            old_freq = float(instr_set[key].attrs['f_qubit'])
-            old_freq_ef = float(instr_set[key].attrs['f_ef_qubit'])
+            try:
+                old_freq = float(instr_set[key].attrs['f_qubit'])
+            except KeyError:
+                old_freq = 0
+            try:
+                old_freq_ef = float(instr_set[key].attrs['f_ef_qubit'])
+            except KeyError:
+                old_freq_ef = 0
             label = 'f0={:.5f} GHz $\pm$ ({:.2f}) MHz ' \
                     '\nold f0={:.5f} GHz' \
                     '\nkappa0={:.4f} MHz $\pm$ ({:.2f}) MHz\n'\
@@ -6119,7 +6143,10 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
                 self.fit_res.params['kappa_gf_over_2'].value/1e6,
                 self.fit_res.params['kappa_gf_over_2'].stderr/1e6)
         else:
-            old_freq = float(instr_set[key].attrs['f_qubit'])
+            try:
+                old_freq = float(instr_set[key].attrs['f_qubit'])
+            except KeyError:
+                old_freq = 0
             label = 'f0={:.5f} GHz $\pm$ ({:.2f}) MHz ' \
                     '\nold f0={:.5f} GHz' \
                     '\nkappa0={:.4f} MHz $\pm$ ({:.2f}) MHz'.format(
