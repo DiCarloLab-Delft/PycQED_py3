@@ -646,11 +646,82 @@ class TwoQubitDevice(DeviceObject):
         correction_qubit.flux_LutMan.get_instr().Z_amp(new_z_amp)
         return new_z_amp
 
+    # def measure_CZ_1Q_phase(
+    #         q0, q1,  MC, Z_amps=gen.gen_sweep_pts(start=-.3, stop=.3, num=31),
+    #         cases=('no_excitation', 'excitation')):
+    #     """
+    #     Measure single qubit phase of q0 after a CZ gate as function of the
+    #     amplitude of the Z phase-correction pulse.
+    #     Sequence
+    #         q0:    X90  --      -- Z --  mX90  -- RO
+    #                         CZ
+    #         q1   (X180) --      -- Z -- (X180) -- RO
 
+    #     Args:
+    #         q0 (Instrument):
+    #             Qubit object on which the phase is measured.
+    #         q1 (Instrument):
+    #             Qubit object that acts as the control qubit for the CZ.
+    #         MC (Instrument):
+    #             Measurement Control instrument.
+    #         Z_amps (array of floats):
+    #             Sweep points for the amplitude of the Z flux pulse on q0 (x-axis).
+    #         Z_amps_q1 (array of floats or None):
+    #             If None, the amplitude of the Z pulse on q1 is not changed, and
+    #             a 1D measurement is performed.
+    #             Else: Sweep points for the amplitude of the Z pulse on q1 (y-axis
+    #             in the 2D sweep).
+    #         cases (list or tuple):
+    #             ['excitation']: Do the sequence with the X180 pulses on q1
+    #                             enabled.
+    #             ['no_excitation']: Do the sequence with the X180 pulses on q1
+    #                                disabled.
+    #             ['no_excitation', 'excitation']: Measure bothe cases.
+    #     """
+    #     CBox = q0.CBox.get_instr()
+    #     QWG_lutman = q0.flux_LutMan.get_instr()
+    #     QWG = QWG_lutman.QWG.get_instr()
 
+    #     q1.prepare_for_timedomain()
+    #     q1.prepare_for_fluxing()
+    #     q0.prepare_for_timedomain()
+    #     q0.prepare_for_fluxing(reset=False)
 
+    #     qasm_file = qwfs.CZ_calibration_seq(q0=q0.name, q1=q1.name,
+    #                                         RO_target=q1.name,
+    #                                         vary_single_q_phase=False,
+    #                                         cases=cases)
+    #     qasm_fn = qasm_file.name
+    #     cfg = q0.qasm_config()
+    #     CBox.trigger_source('internal')
+    #     qasm_folder, fn = os.path.split(qasm_fn)
+    #     base_fn = fn.split('.')[0]
+    #     qumis_fn = os.path.join(qasm_folder, base_fn + ".qumis")
+    #     compiler = qcx.QASM_QuMIS_Compiler(
+    #         verbosity_level=1)
+    #     compiler.compile(qasm_fn, qumis_fn=qumis_fn,
+    #                      config=cfg)
 
+    #     CBox.load_instructions(qumis_fn)
+    #     QWG.start()
 
+    #     s = swf.QWG_lutman_par(QWG_lutman, QWG_lutman.Z_amp)
 
+    #     MC.set_sweep_function(s)
+    #     MC.set_sweep_points(Z_amps_pts)
 
+    #     d = det.UHFQC_integrated_average_detector(
+    #         UHFQC=q0._acquisition_instrument, AWG=CBox,
+    #         channels=[
+    #             q0.RO_acq_weight_function_I(),
+    #             q1.RO_acq_weight_function_I()],
+    #         nr_averages=q0.RO_acq_averages(),
+    #         real_imag=True, single_int_avg=True,
+    #         result_logging_mode='lin_trans',
+    #         integration_length=q0.RO_acq_integration_length(),
+    #         seg_per_point=len(cases))
+    #     d.detector_control = 'hard'
 
+    #     MC.set_detector_function(d)
+    #     MC.run('CZ_Z_amp')
+    #     ma.MeasurementAnalysis(label='CZ_Z_amp')
