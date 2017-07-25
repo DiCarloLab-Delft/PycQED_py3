@@ -3,20 +3,16 @@ import os
 import json
 import re
 import urllib.request
-import pycqed_scripts as pqs  # N.B. should not be defined in pycqed
 # import time
 import pycqed as pq
 import qcodes as qc
 
 from pycqed.measurement import measurement_control
 from qcodes.instrument.base import Instrument
-from pycqed.measurement import detector_functions as det
 from pycqed.measurement import sweep_functions as swf
 from tess.TessConnect import TessConnection
 import logging
-import gevent
 
-import threading
 
 defualt_execute_options = {}
 
@@ -29,15 +25,18 @@ defualt_simulate_options = {
 
 # Extract some "hardcoded" instruments from the global namespace"
 station = qc.station
-# Connect to the qx simulator
-MC = measurement_control.MeasurementControl(
-    'Demonstrator_MC', live_plot_enabled=False, verbose=True)
 
-datadir = os.path.abspath(os.path.join(
-            os.path.dirname(pq.__file__), os.pardir, 'demonstrator_execute_data'))
-MC.datadir(datadir)
-station.add_component(MC)
-MC.station = station
+if 'Demonstrator_MC' in station.components.keys():
+    MC = station.components['Demonstrator_MC']
+else:
+    MC = measurement_control.MeasurementControl(
+        'Demonstrator_MC', live_plot_enabled=False, verbose=True)
+    datadir = os.path.abspath(os.path.join(
+                os.path.dirname(pq.__file__), os.pardir,
+                'demonstrator_execute_data'))
+    MC.datadir(datadir)
+    station.add_component(MC)
+    MC.station = station
 
 
 def execute_qasm_file(file_url: str,  config_json: str,
@@ -74,7 +73,52 @@ def execute_qasm_file(file_url: str,  config_json: str,
     return _MC_result_to_chart_dict(data)
 
 
-def _retrieve_file_from_url(file_url):
+def calibrate(config_json: str):
+    """
+    Perform calibrations based on the options specified in the config_json.
+    Calibrations are performed using the dependency graph
+    """
+    if not isinstance(config_json, dict):
+        options = json.loads(config_json)
+    else:
+        options = config_json
+    # relies on this being added explicitly
+    cal_graph = station.calibration_graph
+    if 'readout' in options:
+        cal_graph.multiplexed_RO.state('needs calibration')
+
+    if 'single_qubit_gates' in options:
+        sqg_nodes = ['QL_freq_ramsey', 'QL_motzoi',
+                     'QL_amplitude_fine', 'QL_RB',
+                     'QR_freq_ramsey', 'QR_motzoi',
+                     'QR_amplitude_fine', 'QR_RB', 'TD_char']
+        for node in sqg_nodes:
+            cal_graph.nodes[node].state('needs calibration')
+
+    if 'time_domain_char' in options:
+        tdc_nodes = ['QL_T1', 'QL_T2s', 'QL_echo',
+                     'QR_T1', 'QR_T2s', 'QR_echo', 'TD_char']
+        for node in tdc_nodes:
+            cal_graph.nodes[node].state('needs calibration')
+
+    if 'cz_single_qubit_phase' in options:
+        sqp_nodes = ['CZ_QR_phase', 'CZ_QL_phase', 'CZ']
+        for node in sqp_nodes:
+            cal_graph.nodes[node].state('needs calibration')
+
+    if 'two_qubit_gate' in options:
+        cz_nodes = ['CZ_conditional_phase',
+                    'CZ_QR_phase', 'CZ_QL_phase', 'CZ']
+        for node in cz_nodes:
+            cal_graph.nodes[node].state('needs calibration')
+
+    cal_graph.demonstrator_cal(verbose=True)
+
+    # Send over the results of the calibrations
+    send_calibration_data()
+
+
+def _retrieve_file_from_url(file_url: str):
 
     file_name = file_url.split("/")[-1]
     base_path = os.path.join(
@@ -110,34 +154,25 @@ def _MC_result_to_chart_dict(result):
 
 # Send the callibration of the machine every 10 minutes
 # This function is blocking!
-def _send_calibration_loop():
+def send_calibration_data():
 
-    try:
-        # while(True):
-        banned_pars = ['IDN', 'RO_optimal_weights_I', 'RO_optimal_weights_Q',
-                       'qasm_config']
-        # threading.Timer(10, _send_calibration).start()
-        # snapshot = MC.station.snapshot()
-        snapshot = qc.station.snapshot()
-        calibration = {
-            "q0": snapshot["instruments"]["QL"],
-            "q1": snapshot["instruments"]["QR"],
-            'fridge': snapshot["instruments"]["Maserati_fridge_mon"]
-        }
-        for par in banned_pars:
-            try:
-                del calibration['q0']['parameters'][par]
-                del calibration['q1']['parameters'][par]
-            except KeyError as e:
-                logging.warning(e)
-        tc.client.publish_custom_msg({
-            "calibration": calibration
-        })
-        gevent.sleep(5)
-        print('Calibration data send')
-
-    except KeyboardInterrupt:
-        print("Keyboard interrupt")
-
-
-gevent.spawn(_send_calibration_loop)
+    banned_pars = ['IDN', 'RO_optimal_weights_I', 'RO_optimal_weights_Q',
+                   'qasm_config']
+    # threading.Timer(10, _send_calibration).start()
+    # snapshot = MC.station.snapshot()
+    snapshot = qc.station.snapshot()
+    calibration = {
+        "q0": snapshot["instruments"]["QL"],
+        "q1": snapshot["instruments"]["QR"],
+        'fridge': snapshot["instruments"]["Maserati_fridge_mon"]
+    }
+    for par in banned_pars:
+        try:
+            del calibration['q0']['parameters'][par]
+            del calibration['q1']['parameters'][par]
+        except KeyError as e:
+            logging.warning(e)
+    tc.client.publish_custom_msg({
+        "calibration": calibration
+    })
+    print('Calibration data send')
