@@ -645,3 +645,12 @@ class TwoQubitDevice(DeviceObject):
         # get updated.
         correction_qubit.flux_LutMan.get_instr().Z_amp(new_z_amp)
         return new_z_amp
+
+
+
+
+
+
+
+
+
