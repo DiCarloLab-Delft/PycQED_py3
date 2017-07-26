@@ -282,8 +282,7 @@ class QWG_FluxLookuptableManager(Instrument):
                            initial_value={'cz': 'adiabatic_Z',
                                           'square': 'square'},
                            parameter_class=ManualParameter,
-                           # to be replaced with vals.Dict)
-                           vals=vals.Anything())
+                           vals=vals.Dict())
         self.add_parameter('wave_dict_unit',
                            get_cmd=self._get_wave_dict_unit,
                            set_cmd=self._set_wave_dict_unit,
@@ -439,7 +438,7 @@ class QWG_FluxLookuptableManager(Instrument):
         composite_waveform = np.zeros(end_sample)
 
         for time_ns, operation in time_tuples:
-            waveform = base_waveforms[pulse_map[operation]]
+            waveform = base_waveforms[pulse_map[operation.lower()]]
             composite_waveform[time_ns:time_ns+len(waveform)] += waveform
 
         return composite_waveform

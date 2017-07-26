@@ -3,24 +3,15 @@ This module contains tests for the QASM compiler by Xiang Fu
 """
 import json
 import unittest
-import sys
 import numpy as np
 from pycqed.measurement.waveform_control_CC import waveform as wf
 import pycqed as pq
-from io import StringIO
 from pycqed.utilities import general as gen
-from qcodes.instrument.base import Instrument
 from pycqed.measurement import sweep_functions as swf
 from pycqed.measurement.waveform_control_CC import qasm_compiler as qcx
 from pycqed.instrument_drivers.physical_instruments._controlbox.Assembler \
     import Assembler
 from os.path import join
-from pycqed.measurement.waveform_control_CC import \
-    single_qubit_qasm_seqs as sqqs
-
-from pycqed.measurement.waveform_control_CC import \
-    multi_qubit_qasm_seqs as mqqs
-
 from pycqed.measurement.waveform_control_CC import \
     QWG_fluxing_seqs as qwfs
 
@@ -127,7 +118,7 @@ class Test_QWG_flux_seqs(unittest.TestCase):
 
         s = swf.QWG_flux_QASM_Sweep(
             qasm_fn=qasm_fn, config=self.config_simple,
-            CBox=None, QWG_flux_lutmans=[self.QWG_flux_lutman[0]],
+            CBox=None, QWG_flux_lutmans=[self.QWG_flux_lutman],
             verbosity_level=1, upload=False)
         s.sweep_points = np.arange(6)
         s.prepare()
