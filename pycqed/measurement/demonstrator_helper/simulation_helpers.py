@@ -7,12 +7,12 @@ import pycqed as pq
 import json
 
 from pycqed.measurement import measurement_control
-from pycqed.instrument_drivers.virtual_instruments.pyqx.qx_client import qx_client
+from pycqed.instrument_drivers.virtual_instruments.pyqx.qx_client import \
+    qx_client
 from pycqed.measurement.detector_functions import QX_Hard_Detector
-from pycqed.measurement.demonstrator_helper.detectors import Quantumsim_Two_QB_Hard_Detector
+from pycqed.measurement.demonstrator_helper.detectors import \
+    Quantumsim_Two_QB_Hard_Detector
 from pycqed.measurement import sweep_functions as swf
-
-# from pycqed.instrument_drivers.meta_instrument.qubit_objects.dummy_qubit_object import DummyQubit
 
 from tess.TessConnect import TessConnection
 from qcodes import station
@@ -27,19 +27,14 @@ MC = measurement_control.MeasurementControl(
     'MC', live_plot_enabled=False, verbose=True)
 
 datadir = os.path.abspath(os.path.join(
-            os.path.dirname(pq.__file__), os.pardir, 'simulator_data'))
+    os.path.dirname(pq.__file__), os.pardir, 'simulator_data'))
 MC.datadir(datadir)
 MC.station = st
 
-
-
-
 st.add_component(MC)
-# st.add_component(dq)
 
 
 def simulate_qasm_file(file_url: str,  config_json: str):
-    # file_url="http://localhost:3000/uploads/asset/file/75/ac5bc9e8-3929-4205-babf-2cf9c4490225.qasm"
     file_path = _retrieve_file_from_url(file_url)
     options = json.loads(config_json)
     if("simulator" in options):
@@ -134,6 +129,3 @@ def _MC_result_to_chart_dict(result):
         "data-type": "chart",
         "data": result
     }]
-
-
-#_send_calibration()

@@ -78,40 +78,50 @@ def calibrate(config_json: str):
     Perform calibrations based on the options specified in the config_json.
     Calibrations are performed using the dependency graph
     """
-    if not isinstance(config_json, dict):
-        options = json.loads(config_json)
-    else:
-        options = config_json
+    print('*'*80)
+    print('\t options')
+    print('*'*80)
+
+    print(config_json)
+
+    print('*'*80)
+    options = json.loads(config_json)
+
+
     # relies on this being added explicitly
     cal_graph = station.calibration_graph
     if 'readout' in options:
-        cal_graph.multiplexed_RO.state('needs calibration')
+        if options['readout']:
+            cal_graph.multiplexed_RO.state('needs calibration')
 
     if 'single_qubit_gates' in options:
-        sqg_nodes = ['QL_freq_ramsey', 'QL_motzoi',
-                     'QL_amplitude_fine', 'QL_RB',
-                     'QR_freq_ramsey', 'QR_motzoi',
-                     'QR_amplitude_fine', 'QR_RB', 'TD_char']
-        for node in sqg_nodes:
-            cal_graph.nodes[node].state('needs calibration')
+        if options['single_qubit_gates']:
+            sqg_nodes = ['QL_freq_ramsey', 'QL_motzoi',
+                         'QL_amplitude_fine', 'QL_RB',
+                         'QR_freq_ramsey', 'QR_motzoi',
+                         'QR_amplitude_fine', 'QR_RB', 'TD_char']
+            for node in sqg_nodes:
+                cal_graph.nodes[node].state('needs calibration')
 
     if 'time_domain_char' in options:
-        tdc_nodes = ['QL_T1', 'QL_T2s', 'QL_echo',
-                     'QR_T1', 'QR_T2s', 'QR_echo', 'TD_char']
-        for node in tdc_nodes:
-            cal_graph.nodes[node].state('needs calibration')
+        if options['time_domain_char']:
+            tdc_nodes = ['QL_T1', 'QL_T2s', 'QL_echo',
+                         'QR_T1', 'QR_T2s', 'QR_echo', 'TD_char']
+            for node in tdc_nodes:
+                cal_graph.nodes[node].state('needs calibration')
 
     if 'cz_single_qubit_phase' in options:
-        sqp_nodes = ['CZ_QR_phase', 'CZ_QL_phase', 'CZ']
-        for node in sqp_nodes:
-            cal_graph.nodes[node].state('needs calibration')
+        if options['cz_single_qubit_phase']:
+            sqp_nodes = ['CZ_QR_phase', 'CZ_QL_phase', 'CZ']
+            for node in sqp_nodes:
+                cal_graph.nodes[node].state('needs calibration')
 
     if 'two_qubit_gate' in options:
-        cz_nodes = ['CZ_conditional_phase',
-                    'CZ_QR_phase', 'CZ_QL_phase', 'CZ']
-        for node in cz_nodes:
-            cal_graph.nodes[node].state('needs calibration')
-
+        if options['two_qubit_gate']:
+            cz_nodes = ['CZ_conditional_phase',
+                        'CZ_QR_phase', 'CZ_QL_phase', 'CZ']
+            for node in cz_nodes:
+                cal_graph.nodes[node].state('needs calibration')
     cal_graph.demonstrator_cal(verbose=True)
 
     # Send over the results of the calibrations
