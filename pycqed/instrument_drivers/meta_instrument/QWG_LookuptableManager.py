@@ -152,7 +152,7 @@ class QWG_FluxLookuptableManager(Instrument):
                            parameter_class=ManualParameter)
         self.add_parameter('F_length', unit='s',
                            parameter_class=ManualParameter,
-                           initial_value=1e-6)
+                           initial_value=200e-9)
         self.add_parameter('F_ch', label='Flux channel',
                            vals=vals.Ints(),
                            parameter_class=ManualParameter)

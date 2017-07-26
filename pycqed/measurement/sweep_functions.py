@@ -384,7 +384,7 @@ class QWG_flux_QASM_Sweep(QASM_Sweep_v2):
                     target_labels=['square', 'dummy_CZ', 'CZ'],
                     timing_grid=compiler.timing_grid, end_label='ro',
                     convert_clk_to_ns=True)
-                if len(self.time_tuples) == 0 and self.verbosity_level>0:
+                if len(self.time_tuples) == 0 and self.verbosity_level > 0:
                     logging.warning('No time tuples found')
 
                 t0 = time.time()
