@@ -6921,7 +6921,7 @@ class CZ_1Q_phase_analysis(TD_Analysis):
         super().__init__(rotate_and_normalize=False, cal_points=False, **kw)
 
     def run_default_analysis(self, **kw):
-        super().run_default_analysis(make_fig=False, close_file=False)
+        super().run_default_analysis(make_fig=True, close_file=False)
 
         model = lmfit.models.QuadraticModel()
 
@@ -6936,7 +6936,7 @@ class CZ_1Q_phase_analysis(TD_Analysis):
         self.fit_data = np.delete(self.diff_data, self.del_indices)
         self.x_points_del = np.delete(self.x_points, self.del_indices)
 
-        if not self.fit_data:
+        if self.fit_data.size == 0:
             raise RuntimeError('No points left to fit after removing values '
                                '> 0! Check coarse calibration and adjust '
                                'measurement range.')
