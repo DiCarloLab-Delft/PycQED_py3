@@ -1,10 +1,12 @@
 import matplotlib
+
+
 def apply_default_figure_settings():
-    my_font = {'sans-serif':'Arial'}
+    my_font = {'sans-serif': 'Arial'}
     # my_font = {'family':'sans-serif',
     #            'sans-serif':'DejaVu Sans',
     #            'weight':'normal'}
-    my_font.update({'size':16})
+    my_font.update({'size': 16})
     matplotlib.rc('font', **my_font)
 
 # font = {'family'    :   'sans-serif',
@@ -16,12 +18,12 @@ def apply_default_figure_settings():
     my_mathtext = dict(fontset='dejavusans')
     matplotlib.rc('mathtext', **my_mathtext)
 
-    my_axes = {'formatter.useoffset':False}
-    matplotlib.rc('axes',**my_axes)
+    my_axes = {'formatter.useoffset': False}
+    matplotlib.rc('axes', **my_axes)
 
-    my_xtick = {'major.pad':8,
-                'minor.pad':8}
-    matplotlib.rc('xtick',**my_xtick)
+    my_xtick = {'major.pad': 8,
+                'minor.pad': 8}
+    matplotlib.rc('xtick', **my_xtick)
 
     # matplotlib.rc('text', usetex=True)
 
@@ -47,11 +49,12 @@ def apply_default_figure_settings():
 
     # legend = {'frameon':False,
     #          'fontsize':'small'}
-    legend = {'numpoints':1,
-             'fontsize':14,
-              'loc':'best',
-              'framealpha':0.5}
+    legend = {'numpoints': 1,
+              'fontsize': 14,
+              'loc': 'best',
+              'framealpha': 0.5}
     matplotlib.rc('legend', **legend)
+
 
 def apply_figure_settings(settings_name, settings_dict):
     matplotlib.rc(settings_name, **settings_dict)

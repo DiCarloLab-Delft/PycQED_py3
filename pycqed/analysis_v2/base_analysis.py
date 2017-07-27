@@ -22,14 +22,56 @@ gco = a_tools.get_color_order
 class BaseDataAnalysis(object):
     """
     Abstract Base Class (not intended to be instantiated directly) for
-    different analyses.
+    analysis.
+
+    Children inheriting from this method should specify the following methods
+        - __init__      -> specify params to be extracted, set options
+                           specific to analysis and call run_analysis method.
+        - process_data  -> mundane tasks such as binning and filtering
+        - prepare_plots -> specify default plots and set up plotting dicts
+        - run_fitting   -> perform fits to data
+
+    The core of this class is the flow defined in run_analysis and should
+    be called at the end of the __init__. This executes
+    the following code:
+
+        self.extract_data()    # extract data specified in params dict
+        self.process_data()    # binning, filtering etc
+        if self.do_fitting:
+            self.run_fitting() # fitting to models
+        self.prepare_plots()   # specify default plots
+        if not self.extract_only:
+            self.plot(key_list='auto')  # make the plots
+
     """
 
-    def __init__(self, t_start, t_stop=None, options_dict=None,
+    def __init__(self, t_start, t_stop=None,
+                 options_dict=None,
                  extract_only=False,
                  do_fitting=False):
         '''
+        This is the __init__ of the abstract base class.
+        It is intended to be called at the start of the init of the child
+        classes followed by "run_analysis".
 
+        __init__ of the child classes:
+            The __init__ of child classes  should implement the following
+            functionality:
+                - call the ASB __init__ (this method)
+                - define self.params_dict and self.numeric_params
+                - specify options specific to that analysis
+                - call self.run_analysis
+
+        This method sets several attributes of the analysis class.
+        These include assigning the arguments of this function to attributes.
+        Other arguments that get created are
+            axs (dict)
+            figs (dict)
+            plot_dicts (dict)
+
+        and a bunch of stuff specified in the options dict
+        (TODO: should this not always be extracted from the
+        dict to prevent double refs? )
         '''
         self.t_start = t_start
         if t_stop is None:
@@ -58,6 +100,19 @@ class BaseDataAnalysis(object):
         self.auto_keys = options_dict.get('auto_keys', None)
         if type(self.auto_keys) is str:
             self.auto_keys = [self.auto_keys]
+
+    def run_analysis(self):
+        """
+        This function is at the core of all analysis and defines the flow.
+        This function is typically called after the __init__.
+        """
+        self.extract_data()    # extract data specified in params dict
+        self.process_data()    # binning, filtering etc
+        if self.do_fitting:
+            self.run_fitting()  # fitting to models
+        self.prepare_plots()   # specify default plots
+        if not self.extract_only:
+            self.plot(key_list='auto')  # make the plots
 
     def get_timestamps(self):
         """
@@ -123,7 +178,8 @@ class BaseDataAnalysis(object):
                 if self.verbose:
                     print(len(tstamps), type(tstamps))
                 temp_dict = a_tools.get_data_from_timestamp_list(
-                    tstamps, param_names=self.params_dict, ma_type=self.ma_type,
+                    tstamps, param_names=self.params_dict,
+                    ma_type=self.ma_type,
                     TwoD=TwoD, numeric_params=self.numeric_params,
                     filter_no_analysis=self.filter_no_analysis)
                 for key in self.data_dict:
@@ -138,7 +194,8 @@ class BaseDataAnalysis(object):
             # Convert temperature data to dictionary form and extract Tmc
             if 'temperatures' in self.data_dict:
                 self.data_dict['Tmc'] = []
-                for ii, temperatures in enumerate(self.data_dict['temperatures']):
+                for ii, temperatures in enumerate(
+                        self.data_dict['temperatures']):
                     temp = []
                     self.data_dict['Tmc'].append([])
                     for ii in range(len(temperatures)):
@@ -184,22 +241,24 @@ class BaseDataAnalysis(object):
         # self.data_dict.items()]
         self.data_dict['timestamps'] = [self.t_start]
 
-    def run_analysis(self):
-        self.extract_data()
-        self.process_data()
-        if self.do_fitting:
-            self.run_fitting()
-        self.prepare_plots()
-        if not self.extract_only:
-            self.plot(key_list='auto')
-
     def process_data(self):
+        """
+        process_data: overloaded in child classes,
+        takes care of mundane tasks such as binning filtering etc
+        """
         pass
 
     def prepare_plots(self):
+        """
+        Defines a default plot by setting up the plotting dictionaries to
+        specify what is to be plotted
+        """
         pass
 
     def run_fitting(self):
+        """
+        Perform fits and save results of the fits to file.
+        """
         pass
 
     def save_figures(self, savedir='', savebase=None, tag_tstamp=True,
@@ -616,7 +675,8 @@ class BaseDataAnalysis(object):
         else:
             if pdict is None or axs is None:
                 raise ValueError(
-                    'pdict and axs must be specified when no key is specified.')
+                    'pdict and axs must be specified'
+                    ' when no key is specified.')
         plot_nolabel = pdict.get('no_label', False)
         plot_zlabel = pdict['zlabel']
         plot_cbarwidth = pdict.get('cbarwidth', '10%')
