@@ -10,6 +10,8 @@ from os.path import dirname, exists
 from os import makedirs
 import logging
 import subprocess
+from functools import reduce  # forward compatibility for Python 3
+import operator
 
 
 def get_git_revision_hash():
@@ -306,3 +308,40 @@ def gen_sweep_pts(start: float=None, stop: float=None,
         raise ValueError('Either ("start" and "stop") or '
                          '("center" and "span") must be specified')
 
+
+def getFromDict(dataDict: dict, mapList: list):
+    """
+    get a value from a nested dictionary by specifying a list of keys
+
+    Args:
+        dataDict: nested dictionary to get the value from
+        mapList : list of strings specifying the key of the item to get
+    Returns:
+        value from dictionary
+
+    example:
+        example_dict = {'a': {'nest_a': 5, 'nest_b': 8}
+                        'b': 4}
+        getFromDict(example_dict, ['a', 'nest_a']) -> 5
+    """
+    return reduce(operator.getitem, mapList, dataDict)
+
+
+def setInDict(dataDict: dict, mapList: list, value):
+    """
+    set a value in a nested dictionary by specifying the location using a list
+    of key.
+
+    Args:
+        dataDict: nested dictionary to set the value in
+        mapList : list of strings specifying the key of the item to set
+        value   : the value to set
+
+    example:
+        example_dict = {'a': {'nest_a': 5, 'nest_b': 8}
+                        'b': 4}
+        example_dict_after = getFromDict(example_dict, ['a', 'nest_a'], 6)
+        example_dict = {'a': {'nest_a': 6, 'nest_b': 8}
+                        'b': 4}
+    """
+    getFromDict(dataDict, mapList[:-1])[mapList[-1]] = value
