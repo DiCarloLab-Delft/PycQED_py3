@@ -238,8 +238,10 @@ class BaseDataAnalysis(object):
         if self.single_timestamp:
             new_dict = {}
             for key, value in self.data_dict.items():
-                new_dict[key] = value[0]
+                if key != 'timestamps':
+                    new_dict[key] = value[0]
             self.data_dict = new_dict
+            self.data_dict['timestamp'] = self.timestamps[0]
 
     def extract_data_json(self):
         file_name = self.t_start
@@ -296,6 +298,10 @@ class BaseDataAnalysis(object):
 
     def plot(self, key_list=None, axs_dict=None,
              presentation_mode=None, no_label=False):
+        """
+        Goes over the plots defined in the plot_dicts and creates the
+        desired figures.
+        """
         if presentation_mode is None:
             presentation_mode = self.presentation_mode
         if axs_dict is not None:
@@ -310,9 +316,13 @@ class BaseDataAnalysis(object):
         self.key_list = key_list
 
         for key in key_list:
+            # go over all the plot_dicts
             pdict = self.plot_dicts[key]
             pdict['no_label'] = no_label
-            if key not in self.axs:
+            # Use the key of the plot_dict if no ax_id is specified
+            pdict['ax_id'] = pdict.get('ax_id', key)
+
+            if pdict['ax_id'] not in self.axs:
                 # This fig variable should perhaps be a different
                 # variable for each plot!!
                 # This might fix a bug.
@@ -321,6 +331,7 @@ class BaseDataAnalysis(object):
                     sharex=pdict.get('sharex', False),
                     sharey=pdict.get('sharey', False),
                     figsize=pdict.get('plotsize', (8, 6)))
+
         if presentation_mode:
             self.plot_for_presentation(key_list=key_list, no_label=no_label)
         else:
@@ -330,7 +341,7 @@ class BaseDataAnalysis(object):
                     plotfn = getattr(self, pdict['plotfn'])
                 else:
                     plotfn = pdict['plotfn']
-                plotfn(pdict, axs=self.axs[key])
+                plotfn(pdict, axs=self.axs[pdict['ax_id']])
             self.format_datetime_xaxes(key_list)
             self.add_to_plots(key_list=key_list)
 
@@ -418,9 +429,9 @@ class BaseDataAnalysis(object):
         pfunc = getattr(axs, pdict.get('func', 'plot'))
         plot_xvals = pdict['xvals']
         plot_yvals = pdict['yvals']
-        plot_xlabel = pdict['xlabel']
-        plot_ylabel = pdict['ylabel']
-        plot_title = pdict['title']
+        plot_xlabel = pdict.get('xlabel', None)
+        plot_ylabel = pdict.get('ylabel', None)
+        plot_title = pdict.get('title', None)
         plot_xrange = pdict.get('xrange', None)
         plot_yrange = pdict.get('yrange', None)
         plot_linekws = pdict.get('line_kws', {})
@@ -428,6 +439,8 @@ class BaseDataAnalysis(object):
         plot_linestyle = pdict.get('linestyle', '-')
         plot_marker = pdict.get('marker', 'o')
         dataset_desc = pdict.get('setdesc', '')
+        # Fixme, this default creates a nasty bug when not plotting a set of
+        # lines.
         dataset_label = pdict.get('setlabel', list(range(len(plot_yvals))))
         do_legend = pdict.get('do_legend', False)
 
@@ -449,15 +462,21 @@ class BaseDataAnalysis(object):
                           linestyle=plot_linestyle, marker=plot_marker,
                           label='%s%s' % (dataset_desc, dataset_label),
                           **plot_linekws)
+
         if plot_xrange is None:
-            xmin, xmax = np.min(plot_xvals)-plot_xvals_step / \
-                2., np.max(plot_xvals)+plot_xvals_step/2.
+            # maybe better to do nothing if xrange is None?
+            max_x = np.max(plot_xvals)
+            min_x = np.min(plot_xvals)
+            span = np.abs(max_x - min_x)
+            xmin, xmax = min_x - 0.02*span, max_x+0.02*span
         else:
             xmin, xmax = plot_xrange
-        axs.set_xlabel(plot_xlabel)
         axs.set_xlim(xmin, xmax)
 
-        axs.set_ylabel(plot_ylabel)
+        if plot_xlabel is not None:
+            axs.set_xlabel(plot_xlabel)
+        if plot_ylabel is not None:
+            axs.set_ylabel(plot_ylabel)
         if plot_yrange is not None:
             ymin, ymax = plot_yrange
             axs.set_ylim(ymin, ymax)
@@ -467,13 +486,7 @@ class BaseDataAnalysis(object):
 
         if do_legend:
             legend_pos = pdict.get('legend_pos', 'best')
-            # box_props = dict(boxstyle='Square', facecolor='white', alpha=0.6)
-            legend = axs.legend(loc=legend_pos, frameon=1)
-            frame = legend.get_frame()
-            frame.set_alpha(0.8)
-            frame.set_linewidth(0)
-            frame.set_edgecolor(None)
-            frame.set_facecolor('white')
+            axs.legend(loc=legend_pos)
 
         if self.tight_fig:
             axs.figure.tight_layout()

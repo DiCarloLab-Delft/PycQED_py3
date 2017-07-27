@@ -1,4 +1,6 @@
+import lmfit
 import numpy as np
+from pycqed.analysis import fitting_models as fit_mods
 from pycqed.analysis import analysis_toolbox as a_tools
 import pycqed.analysis_v2.base_analysis as ba
 
@@ -50,6 +52,12 @@ class Single_Qubit_TimeDomainAnalysis(ba.BaseDataAnalysis):
                     cal_zero_points=cal_points[0],
                     cal_one_points=cal_points[1])
 
+        # This should be added to the hdf5 datafile but cannot because of the
+        # way that the "new" analysis works.
+
+        # self.add_dataset_to_analysisgroup('Corrected data',
+        #                                   self.data_dict['corr_data'])
+
 
 class FlippingAnalysis(Single_Qubit_TimeDomainAnalysis):
 
@@ -67,6 +75,9 @@ class FlippingAnalysis(Single_Qubit_TimeDomainAnalysis):
                             'value_names': 'value_names',
                             'value_units': 'value_units',
                             'measured_values': 'measured_values'}
+        # This analysis makes a hardcoded assumption on the calibration points
+        self.options_dict['cal_points'] = [list(range(-4, -2)),
+                                           list(range(-2, 0))]
         self.numeric_params = []
         if auto:
             self.run_analysis()
@@ -80,7 +91,57 @@ class FlippingAnalysis(Single_Qubit_TimeDomainAnalysis):
             'yvals': self.data_dict['corr_data'],
             'ylabel': 'Excited state population',
             'yunit': '',
-            'title': self.data_dict['timestamps'] + ' Flipping'}
+            'setlabel': 'data',
+            'title': self.data_dict['timestamp'] + ' Flipping'}
+
+        fr_poly = self.fit_res['poly_fit']
+        fr_cos = self.fit_res['cos_fit']
+        xv = np.linspace(np.min(self.data_dict['sweep_points']),
+                         np.max(self.data_dict['sweep_points']), 1000)
+
+        self.plot_dicts['poly_fit'] = {
+            'ax_id': 'main',
+            'plotfn': self.plot_line,
+            'xvals': xv,
+            'marker': '',
+            'setlabel': 'poly_fit',
+            'yvals': fr_poly.model.func(x=xv, **fr_poly.best_values)}
+
+        self.plot_dicts['cos_fit'] = {
+            'ax_id': 'main',
+            'plotfn': self.plot_line,
+            'marker': '',
+            'xvals': xv,
+            'setlabel': 'cos_fit',
+            'yvals': fr_cos.model.func(t=xv, **fr_cos.best_values),
+            'do_legend':True}
+
+    def run_fitting(self):
+        self.fit_res = {}
+
+        poly_mod = lmfit.models.PolynomialModel(degree=2)
+        guess_pars = poly_mod.guess(x=self.data_dict['sweep_points'][:-4],
+                                    data=self.data_dict['corr_data'][:-4])
+        self.fit_res['poly_fit'] = poly_mod.fit(
+            x=self.data_dict['sweep_points'][:-4],
+            data=self.data_dict['corr_data'][:-4],
+            params=guess_pars)
+
+        cos_mod = lmfit.Model(fit_mods.CosFunc)
+
+        guess_pars = fit_mods.Cos_guess(model=cos_mod,
+                                        t=self.data_dict['sweep_points'][:-4],
+                                        data=self.data_dict['corr_data'][:-4])
+        # This enforces the oscillation to start at the equator
+        # and ensures that any over/under rotation is absorbed in the
+        # frequency
+        guess_pars['phase'].value = np.deg2rad(90)
+        guess_pars['phase'].vary = False
+
+        self.fit_res['cos_fit'] = cos_mod.fit(
+            t=self.data_dict['sweep_points'][:-4],
+            data=self.data_dict['corr_data'][:-4],
+            params=guess_pars)
 
     def get_scaling_factor(self):
         pass
