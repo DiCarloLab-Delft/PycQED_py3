@@ -816,6 +816,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                                                              nr_samples=nr_samples))
         self.MC.get_instr().set_sweep_points(np.arange(nr_samples))
         self.input_average_detector.nr_samples = nr_samples
+        self.input_average_detector.AWG = self.AWG.get_instr()
         self.MC.get_instr().set_detector_function(self.input_average_detector)
         self.MC.get_instr().run(
             'Measure_transients_{}_0'.format(self.msmt_suffix))
@@ -984,7 +985,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
 
         # in case one does not have an AWG:
         try:
-            AWG_obj = self.AWG()
+            AWG_obj = self.AWG.get_instr()
         except:
             AWG_obj = None
 
