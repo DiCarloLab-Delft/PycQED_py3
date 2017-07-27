@@ -48,7 +48,7 @@ class Standard_MA(object):
 
     def extract_data(self):
         self.TD_timestamps = a_tools.get_timestamps_in_range(
-            self.t_start, self.t_stop, label=self.labels, exact_label_match=False)
+            self.t_start, self.t_stop, label=self.labels, exact_label_match=True)
 
         if len(self.TD_timestamps) < 1:
             raise ValueError(
