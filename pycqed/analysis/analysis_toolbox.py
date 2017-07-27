@@ -456,8 +456,11 @@ def get_data_from_timestamp_list(timestamps,
                                  TwoD=False,
                                  max_files=None,
                                  filter_no_analysis=False,
-                                 numeric_params=None):
+                                 numeric_params=None,
+                                 ma_type='MeasurementAnalysis'):
     from pycqed.analysis import measurement_analysis as ma
+
+    ma_func = getattr(ma, ma_type)
 
     if type(timestamps) is str:
         timestamps = [timestamps]
@@ -479,16 +482,14 @@ def get_data_from_timestamp_list(timestamps,
     remove_timestamps = []
     for timestamp in get_timestamps:
         try:
-            ana = ma.MeasurementAnalysis(timestamp=timestamp, auto=False,
-                                         close_file=False)
-        except:
+            ana = ma_func(timestamp=timestamp, auto=False, close_file=False)
+        except Exception as e:
             try:
                 ana.finish()
                 del ana
             except:
                 pass
-            warnings.warn(
-                'This data file does not exist or has been corrupted.')
+            logging.warning(e)
             remove_timestamps.append(timestamp)
         else:
             try:
@@ -699,7 +700,7 @@ def compare_instrument_settings(analysis_object_a, analysis_object_b):
 
 
 def get_timestamps_in_range(timestamp_start, timestamp_end=None,
-                            label=None, exact_label_match=True, folder=None):
+                            label=None, exact_label_match=False, folder=None):
     if folder is None:
         folder = datadir
 
@@ -723,14 +724,14 @@ def get_timestamps_in_range(timestamp_start, timestamp_end=None,
         if (date.date() - datetime_start.date()).days == 0:
             # Check if newer than starting timestamp
             timemark_start = timemark_from_datetime(datetime_start)
-            all_measdirs = [dirname for dirname in all_measdirs if int(dirname[:6]) >=
-                            int(timemark_start)]
+            all_measdirs = [dirname for dirname in all_measdirs
+                            if int(dirname[:6]) >= int(timemark_start)]
 
         if (date.date() - datetime_end.date()).days == 0:
             # Check if older than ending timestamp
             timemark_end = timemark_from_datetime(datetime_end)
-            all_measdirs = [dirname for dirname in all_measdirs if int(dirname[:6]) <=
-                            int(timemark_end)]
+            all_measdirs = [dirname for dirname in all_measdirs if
+                            int(dirname[:6]) <= int(timemark_end)]
         timestamps = ['{}_{}'.format(datemark, dirname[:6])
                       for dirname in all_measdirs]
         timestamps.reverse()
