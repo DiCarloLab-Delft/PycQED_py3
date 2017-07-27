@@ -218,6 +218,62 @@ def SlopedHangerFuncAmplitude(f, f0, Q, Qe, A, theta, slope):
     return np.abs((1.+slope*(f/1.e9-f0)/f0) *
                   HangerFuncAmplitude(f, f0, Q, Qe, A, theta))
 
+def SlopedHangerFuncAmplitudeGuess(data, f, fit_window=None):
+    xvals = f
+    # print(f)
+    # print(np.squeeze(data))
+    peaks = a_tools.peak_finder(xvals, data)
+      # Search for peak
+    if peaks['dip'] is not None:    # look for dips first
+        f0 = peaks['dip']
+        amplitude_factor = -1.
+    elif peaks['peak'] is not None:  # then look for peaks
+        f0 = peaks['peak']
+        amplitude_factor = 1.
+    else:                                 # Otherwise take center of range
+        f0 = np.median(xvals)
+        amplitude_factor = -1.
+        # logging.error('No peaks or dips in range')
+        # If this error is raised, it should continue the analysis but
+        # not use it to update the qubit object
+    min_index = np.argmin(data)
+    max_index = np.argmax(data)
+    min_frequency = xvals[min_index]
+    max_frequency = xvals[max_index]
+    # Fit data according to the model required
+    # added reject outliers to be robust agains CBox data acq bug.
+    # this should have no effect on regular data acquisition and is
+    # only used in the guess.
+    amplitude_guess = max(dm_tools.reject_outliers(data))
+
+    # Creating parameters and estimations
+    S21min = (min(dm_tools.reject_outliers(data)) /
+              max(dm_tools.reject_outliers(data)))
+
+    Q = f0 / abs(min_frequency - max_frequency)
+
+    Qe = abs(Q / abs(1 - S21min))
+    guess_dict = {'f0': {'value': f0*1e-9,
+                         'min': min(xvals)*1e-9,
+                         'max': max(xvals)*1e-9},
+                  'A': {'value': amplitude_guess},
+                  'Q': {'value': Q,
+                        'min': 1,
+                        'max': 50e6},
+                  'Qe': {'value': Qe,
+                         'min': 1,
+                         'max': 50e6},
+                  'Qi': {'expr': 'abs(1./(1./Q-1./Qe*cos(theta)))',
+                         'vary': False},
+                  'Qc': {'expr': 'Qe/cos(theta)',
+                         'vary': False},
+                  'theta': {'value': 0, 
+                            'min': -np.pi/2,
+                            'max': np.pi/2},
+                  'slope': {'value':0,
+                            'vary':True}}
+    return guess_dict
+
 
 def SlopedHangerFuncComplex(f, f0, Q, Qe, A, theta, phi_v, phi_0, slope):
     # This is the function for a hanger (lambda/4 resonator) which takes into
@@ -246,6 +302,10 @@ def linear_with_background_and_offset(x, a, b, c):
     '''
     return np.sqrt((a*x)**2 + b**2)+c
 
+def double_cos_linear_offset(t, amplitude1,amplitude2, frequency1,frequency2, phase1,phase2, slope, offset):
+    cosfn1 = amplitude1*np.cos(2*np.pi*frequency1*t + phase1)
+    cosfn2 = amplitude2*np.cos(2*np.pi*frequency2*t + phase2)
+    return cosfn1 + cosfn2 + offset + slope*t
 
 def gaussian_2D(x, y, amplitude=1,
                 center_x=0, center_y=0,
