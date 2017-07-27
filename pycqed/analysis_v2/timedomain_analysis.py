@@ -92,7 +92,8 @@ class FlippingAnalysis(Single_Qubit_TimeDomainAnalysis):
             'ylabel': 'Excited state population',
             'yunit': '',
             'setlabel': 'data',
-            'title': self.data_dict['timestamp'] + ' Flipping'}
+            'title': self.data_dict['timestamp'] + ' Flipping',
+            'do_legend': True}
 
         fr_poly = self.fit_res['poly_fit']
         fr_cos = self.fit_res['cos_fit']
@@ -105,7 +106,8 @@ class FlippingAnalysis(Single_Qubit_TimeDomainAnalysis):
             'xvals': xv,
             'marker': '',
             'setlabel': 'poly_fit',
-            'yvals': fr_poly.model.func(x=xv, **fr_poly.best_values)}
+            'yvals': fr_poly.model.func(x=xv, **fr_poly.best_values),
+            'do_legend': True}
 
         self.plot_dicts['cos_fit'] = {
             'ax_id': 'main',
@@ -114,7 +116,7 @@ class FlippingAnalysis(Single_Qubit_TimeDomainAnalysis):
             'xvals': xv,
             'setlabel': 'cos_fit',
             'yvals': fr_cos.model.func(t=xv, **fr_cos.best_values),
-            'do_legend':True}
+            'do_legend': True}
 
     def run_fitting(self):
         self.fit_res = {}
