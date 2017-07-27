@@ -6433,7 +6433,7 @@ class Ram_Z_Analysis(MeasurementAnalysis):
         ax.plot(self.sweep_points[:len(self.phases)], self.phases, '-o')
         pl_tools.set_xlabel(ax, self.parameter_names[0],
                             self.parameter_units[0])
-        pl_tools.set_ylabel(ax, 'phase', 'rad')
+        pl_tools.set_ylabel(ax, 'phase', 'deg')
         ax.set_title(self.timestamp_string + ' Phase')
         self.save_fig(fig, 'Ram-Z_phase.png')
 
