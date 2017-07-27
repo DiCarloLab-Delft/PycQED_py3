@@ -10,12 +10,13 @@ import numpy as np
 
 from matplotlib import pyplot as plt
 from pycqed.analysis import analysis_toolbox as a_tools
+from pycqed.analysis import fitting_models as fit_mods
 import pycqed.analysis_v2.default_figure_settings_analysis as def_fig
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import datetime
 # import SSRO_generic
 import json
-
+import lmfit
 gco = a_tools.get_color_order
 
 
@@ -191,6 +192,7 @@ class BaseDataAnalysis(object):
         self.extract_data()
         self.process_data()
         if self.do_fitting:
+            self.prepare_fitting()
             self.run_fitting()
         self.prepare_plots()
         if not self.extract_only:
@@ -202,8 +204,38 @@ class BaseDataAnalysis(object):
     def prepare_plots(self):
         pass
 
-    def run_fitting(self):
+    def prepare_fitting(self):
         pass
+
+    def run_fitting(self):
+        # This function does the fitting and saving of the parameters
+        # based on the fit_dict options.
+        # Only model fitting is implemented yet. Minimizing fitting should
+        # be implemented here.
+        fit_guess_fn = self.fit_dict['fit_guess_fn']
+        fit_fn = self.fit_dict['fit_fn']
+        fit_yvals = self.fit_dict['fit_yvals']
+        fit_xvals = self.fit_dict['fit_xvals']
+        model = lmfit.Model(fit_fn)
+        if self.do_timestamp_blocks:
+            self.fit_dict['fit_results'] = []
+            for tt in range(len(fit_yvals)):
+                guess_dict = fit_guess_fn(fit_yvals[tt],
+                                          **fit_xvals[tt])
+                for key, val in list(guess_dict.items()):
+                    model.set_param_hint(key, **val)
+                params = model.make_params()
+                self.fit_dict['fit_results'].append(model.fit(fit_yvals[tt],
+                                                              params=params,
+                                                              **fit_xvals[tt]))
+        else:
+            guess_dict = fit_guess_fn(fit_yvals, **fit_xvals)
+            for key, val in list(guess_dict.items()):
+                    model.set_param_hint(key, **val)
+            params = model.make_params()
+            self.fit_dict['fit_results'] = model.fit(fit_yvals,
+                                                     params=params,
+                                                     **fit_xvals)
 
     def save_figures(self, savedir='', savebase=None, tag_tstamp=True,
                      fmt='pdf', key_list='auto'):
@@ -566,7 +598,7 @@ class BaseDataAnalysis(object):
                     xwidth = plot_xwidth[tt]
                 else:
                     xwidth = None
-                out = pfunc(ax=axs, 
+                out = pfunc(ax=axs,
                             xwidth=xwidth,
                             clim=fig_clim, cmap=plot_cmap,
                             xvals=plot_xvals[tt],
