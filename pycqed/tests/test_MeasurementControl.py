@@ -1,3 +1,5 @@
+import os
+import pycqed as pq
 import unittest
 import numpy as np
 from pycqed.measurement import measurement_control
@@ -6,6 +8,8 @@ import pycqed.measurement.detector_functions as det
 from pycqed.instrument_drivers.physical_instruments.dummy_instruments \
     import DummyParHolder
 from pycqed.measurement.optimization import nelder_mead, SPSA
+from pycqed.analysis import measurement_analysis as ma
+from pycqed.utilities.get_default_datadir import get_default_datadir
 
 from qcodes import station
 
@@ -54,6 +58,36 @@ class Test_MeasurementControl(unittest.TestCase):
         self.assertEqual(dat['sweep_parameter_units'], ['arb. unit'])
         self.assertEqual(dat['value_names'], ['I', 'Q'])
         self.assertEqual(dat['value_units'], ['mV', 'mV'])
+
+    @unittest.skipIf(
+        "TRAVIS" in os.environ and os.environ["TRAVIS"] == "true",
+        "Skipping this test on Travis CI.")
+    def test_data_location(self):
+        sweep_pts = np.linspace(0, 10, 30)
+        self.MC.set_sweep_function(None_Sweep())
+        self.MC.set_sweep_points(sweep_pts)
+        self.MC.set_detector_function(det.Dummy_Detector_Soft())
+        self.MC.run('datadir_test_file')
+        # raises an error if the file is not found
+        ma.MeasurementAnalysis(label='datadir_test_file')
+
+        # change the datadir
+        test_dir2 = os.path.abspath(os.path.join(
+            os.path.dirname(pq.__file__), os.pardir, 'data_test_2'))
+        self.MC.datadir(test_dir2)
+
+        sweep_pts = np.linspace(0, 10, 30)
+        self.MC.set_sweep_function(None_Sweep())
+        self.MC.set_sweep_points(sweep_pts)
+        self.MC.set_detector_function(det.Dummy_Detector_Soft())
+        self.MC.run('datadir_test_file_2')
+        # raises an error if the file is not found
+        with self.assertRaises(Exception):
+            ma.MeasurementAnalysis(label='datadir_test_file_2')
+        ma.a_tools.datadir = test_dir2
+        # changing the dir makes it find the file now
+        ma.MeasurementAnalysis(label='datadir_test_file_2')
+        self.MC.datadir(get_default_datadir())
 
     def test_hard_sweep_1D(self):
         sweep_pts = np.linspace(0, 10, 5)
