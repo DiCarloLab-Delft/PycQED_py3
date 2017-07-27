@@ -19,7 +19,9 @@ import qcodes as qc
 
 
 def measure_two_qubit_AllXY(device, q0_name, q1_name,
-                            sequence_type='sequential', MC=None):
+                            sequence_type='sequential', MC=None,
+                            result_logging_mode='lin_trans'):
+
     if MC is None:
         MC = qc.station.components['MC']
 
@@ -47,7 +49,10 @@ def measure_two_qubit_AllXY(device, q0_name, q1_name,
         AWG=device.seq_contr.get_instr(),
         nr_averages=q0.RO_acq_averages(),
         integration_length=q0.RO_acq_integration_length(),
-        channels=[0, 1])
+        result_logging_mode=result_logging_mode,
+        channels=[q0.RO_acq_weight_function_I(),
+                  q1.RO_acq_weight_function_I()])
+
     MC.set_sweep_function(s)
     MC.set_sweep_points(np.arange(21*(1+double_points)))
     MC.set_detector_function(d)
@@ -56,7 +61,8 @@ def measure_two_qubit_AllXY(device, q0_name, q1_name,
 
 
 def measure_two_qubit_ssro(device, q0_name, q1_name, nr_shots=4092*4,
-                           MC=None):
+                           MC=None, no_scaling=False,
+                           crosstalk_suppression=False):
     # N.B. this function can be replaced with a more general multi-qubit ssro
     if MC is None:
         MC = qc.station.components['MC']
@@ -94,9 +100,10 @@ def measure_two_qubit_ssro(device, q0_name, q1_name, nr_shots=4092*4,
     MC.set_sweep_points(np.arange(nr_shots))
     MC.set_detector_function(d)
     MC.run('SSRO_{}_{}'.format(q0_name, q1_name))
-    mra.two_qubit_ssro_fidelity('SSRO_{}_{}'.format(q0_name, q1_name))
     MC.soft_avg(old_soft_avg)
     MC.live_plot_enabled(old_live_plot_enabled)
+    return mra.two_qubit_ssro_fidelity('SSRO_{}_{}'.format(q0_name, q1_name))
+
 
 
 def measure_Ram_Z(device, q0_name, q1_name):
