@@ -350,6 +350,8 @@ class BaseDataAnalysis(object):
         plot_yrange = pdict.get('yrange', None)
         plot_linekws = pdict.get('line_kws', {})
         plot_multiple = pdict.get('multiple', False)
+        plot_linestyle = pdict.get('linestyle', '-')
+        plot_marker = pdict.get('marker', 'o')
         dataset_desc = pdict.get('setdesc', '')
         dataset_label = pdict.get('setlabel', list(range(len(plot_yvals))))
         do_legend = pdict.get('do_legend', False)
@@ -359,14 +361,17 @@ class BaseDataAnalysis(object):
         if plot_multiple:
             p_out = []
             for ii, this_yvals in enumerate(plot_yvals):
-                p_out.append(pfunc(plot_xvals, this_yvals, '-o',
+                p_out.append(pfunc(plot_xvals, this_yvals,
+                                   linestyle=plot_linestyle,
+                                   marker=plot_marker,
                                    color=gco(ii, len(plot_yvals)-1),
                                    label='%s%s' % (
                                        dataset_desc, dataset_label[ii]),
                                    **plot_linekws))
 
         else:
-            p_out = pfunc(plot_xvals, plot_yvals, '-bo',
+            p_out = pfunc(plot_xvals, plot_yvals,
+                          linestyle=plot_linestyle, marker=plot_marker,
                           label='%s%s' % (dataset_desc, dataset_label),
                           **plot_linekws)
         if plot_xrange is None:
