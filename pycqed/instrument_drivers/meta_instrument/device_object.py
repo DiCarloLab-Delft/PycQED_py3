@@ -646,10 +646,14 @@ class TwoQubitDevice(DeviceObject):
                     span *= 0.5
                 continue
 
-            if new_z_amp < amp_pts[0] or new_z_amp > amp_pts[-1]:
-                print('Fitted minimum outside scan range. Repeating scan '
-                      'around fitted minimum {}.'.format(new_z_amp))
-                old_z_amp = new_z_amp
+            if new_z_amp < amp_pts[0]:
+                print('Fitted minimum below scan range. Repeating scan '
+                      'around lowest point {}.'.format(amp_pts[0]))
+                old_z_amp = amp_pts[0]
+            elif new_z_amp > amp_pts[-1]:
+                print('Fitted minimum above scan range. Repeating scan '
+                      'around hightest point {}.'.format(amp_pts[-1]))
+                old_z_amp = amp_pts[-1]
             else:
                 repeat_calibration = False
         # This has to be set in the qubit object.
