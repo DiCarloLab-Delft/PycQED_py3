@@ -6293,9 +6293,11 @@ class Ram_Z_Analysis(MeasurementAnalysis):
 
     def normalize(self, trace):
         # * -1 because cos starts at -1 instead of 1
+        # trace *= -1
+        # trace -= np.mean(trace)
+        # trace /= max(np.abs(trace))
+        trace = np.array(trace) * 2 - 1
         trace *= -1
-        trace -= np.mean(trace)
-        trace /= max(np.abs(trace))
         return trace
 
     def run_special_analysis(self, make_fig=True):
@@ -6376,19 +6378,19 @@ class Ram_Z_Analysis(MeasurementAnalysis):
         else:
             return df
 
-    def make_figures(self, plot_step=True, nan_to_zero=False):
-        '''
-        Plot figures. Step response is only plotted if plot_step == True.
-        '''
-        if nan_to_zero:
-            step = []
-            for x in self.step_response:
-                if np.isnan(x):
-                    step.append(0)
-                else:
-                    step.append(x)
-        else:
-            step = self.step_response
+    # def make_figures(self, plot_step=True, nan_to_zero=False):
+    #     '''
+    #     Plot figures. Step response is only plotted if plot_step == True.
+    #     '''
+    #     if nan_to_zero:
+    #         step = []
+    #         for x in self.step_response:
+    #             if np.isnan(x):
+    #                 step.append(0)
+    #             else:
+    #                 step.append(x)
+    #     else:
+    #         step = self.step_response
 
     def get_stepresponse(self, df, f01max, E_c, F_amp, V_per_phi0,
                          V_offset=0):
@@ -6423,7 +6425,7 @@ class Ram_Z_Analysis(MeasurementAnalysis):
         pl_tools.set_xlabel(ax, self.parameter_names[0],
                             self.parameter_units[0])
         pl_tools.set_ylabel(ax, 'demodulated normalized trace', 'a.u.')
-        ax.set_title('demodulated normalized data')
+        ax.set_title(self.timestamp_string + ' demod. norm. data')
         ax.legend(['cos', 'sin'], loc=1)
         self.save_fig(fig, 'Ram-Z_normalized_data.png')
 
@@ -6432,7 +6434,7 @@ class Ram_Z_Analysis(MeasurementAnalysis):
         pl_tools.set_xlabel(ax, self.parameter_names[0],
                             self.parameter_units[0])
         pl_tools.set_ylabel(ax, 'phase', 'rad')
-        ax.set_title('Phase')
+        ax.set_title(self.timestamp_string + ' Phase')
         self.save_fig(fig, 'Ram-Z_phase.png')
 
         fig, ax = plt.subplots(1, 1, figsize=(7, 5))
@@ -6440,17 +6442,18 @@ class Ram_Z_Analysis(MeasurementAnalysis):
         pl_tools.set_xlabel(ax, self.parameter_names[0],
                             self.parameter_units[0])
         pl_tools.set_ylabel(ax, 'detuning', 'Hz')
-        ax.set_title('Detuning')
+        ax.set_title(self.timestamp_string + ' Detuning')
         self.save_fig(fig, 'Ram-Z_detuning.png')
 
         if plot_step:
             fig, ax = plt.subplots(1, 1, figsize=(7, 5))
             ax.plot(self.sweep_points[:len(self.step_response)],
                     self.step_response, '-o')
+            ax.axhline(y=1, color='0.75')
             pl_tools.set_xlabel(ax, self.parameter_names[0],
                                 self.parameter_units[0])
             pl_tools.set_ylabel(ax, 'step response', '')
-            ax.set_title('Step Response')
+            ax.set_title(self.timestamp_string + ' Step Response')
             self.save_fig(fig, 'Ram-Z_step_response.png')
             # fig.savefig('Ram-Z_step_response.png', dpi=300)
 
