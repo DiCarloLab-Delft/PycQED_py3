@@ -42,13 +42,11 @@ class BaseDataAnalysis(object):
         self.prepare_plots()   # specify default plots
         if not self.extract_only:
             self.plot(key_list='auto')  # make the plots
-
     """
 
-    def __init__(self, t_start, t_stop=None,
-                 options_dict=None,
-                 extract_only=False,
-                 do_fitting=False):
+    def __init__(self, t_start: str, t_stop: str=None,
+                 options_dict: dict={}, extract_only: bool=False,
+                 do_fitting: bool=False):
         '''
         This is the __init__ of the abstract base class.
         It is intended to be called at the start of the init of the child
@@ -73,6 +71,7 @@ class BaseDataAnalysis(object):
         (TODO: should this not always be extracted from the
         dict to prevent double refs? )
         '''
+        self.single_timestamp = False
         self.t_start = t_start
         if t_stop is None:
             self.t_stop = t_start
@@ -80,7 +79,6 @@ class BaseDataAnalysis(object):
             self.t_stop = t_stop
         self.options_dict = options_dict
         self.ma_type = self.options_dict.get('ma_type', 'MeasurementAnalysis')
-        # FIXME: shouldn't scan_label be a keyword fo the init?
         scan_label = options_dict.get('scan_label', '')
         if type(scan_label) is not list:
             self.labels = [scan_label]
@@ -158,9 +156,14 @@ class BaseDataAnalysis(object):
         Extracts the data specified in
             self.params_dict
             self.numeric_params
-        and stores it into
-            self.data_dict
+        and stores it into: self.data_dict
+
+        Data extraction is now supported in three different ways
+            - using json
+            - using timestamp blocks
+            - single timestamp only
         """
+
         if self.t_start[-5:] == '.json':
             self.use_json = True
             self.extract_data_json()
@@ -169,6 +172,10 @@ class BaseDataAnalysis(object):
             self.use_json = False
 
         self.get_timestamps()
+        # this disables the data extraction for other files if there is only
+        # one file being used to load data from
+        if self.single_timestamp:
+            self.timestamps = [self.timestamps[0]]
         TwoD = self.params_dict.pop('TwoD', False)
 
         if self.do_timestamp_blocks:
@@ -192,6 +199,7 @@ class BaseDataAnalysis(object):
                     [a_tools.datetime_from_timestamp(ts) for ts in tstamps])
 
             # Convert temperature data to dictionary form and extract Tmc
+            # N.B. This has the hardcoded temperature names from pycqed_py2
             if 'temperatures' in self.data_dict:
                 self.data_dict['Tmc'] = []
                 for ii, temperatures in enumerate(
@@ -224,6 +232,14 @@ class BaseDataAnalysis(object):
                          (self.data_dict['temperatures'][ii]))
                     self.data_dict['Tmc'].append(temp[ii].get('T_MClo', None))
                 self.data_dict['temperatures'] = temp
+
+        # this is a hacky way to use the same data extraction when there is
+        # many files as when there is few files.
+        if self.single_timestamp:
+            new_dict = {}
+            for key, value in self.data_dict.items():
+                new_dict[key] = value[0]
+            self.data_dict = new_dict
 
     def extract_data_json(self):
         file_name = self.t_start
