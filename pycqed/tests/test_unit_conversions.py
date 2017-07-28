@@ -3,6 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from pycqed.analysis.tools.plotting import SI_prefix_and_scale_factor
 from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
+from pycqed.analysis.tools.plotting import SI_val_to_msg_str
 
 
 class Test_SI_prefix_scale_factor(unittest.TestCase):
@@ -56,3 +57,10 @@ class test_SI_unit_aware_labels(unittest.TestCase):
         ytick_label_vals = [float(yl.get_text()) for yl in ytick_labels]
         for yt, yl in zip(yticks, ytick_label_vals):
             self.assertAlmostEqual(yt*1e6, yl)
+
+    def test_SI_val_to_msg_str(self):
+        val, unit = SI_val_to_msg_str(1030, 'm')
+        self.assertEqual(val, str(1.03))
+        self.assertEqual(unit, 'km')
+
+
